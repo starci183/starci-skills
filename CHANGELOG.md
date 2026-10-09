@@ -68,7 +68,7 @@ Specs ran on invented data and `npm run check` runs no spec, so fixes were repor
 - The verify receipt names the root the specs ran in (one rule, `judgedIn`, shared with the deploy receipt) and is honest about a partial run: `PARTIAL <sha>: check p/p, affected N/T passed, 0 failed, M not started (budget)` (exit 3) when nothing is red and every spec the change touched ran (they run first); `starci git land` accepts it and writes `Affected-Not-Started: M (budget)` into the note, `starci runtime deploy` and the release need N/N. The affected run samples the host again every `resampleMs` (`modules/supervisor/test-concurrency.yaml`) instead of keeping the concurrency of its first second.
 - The last line of `starci runtime check` reads `check: ok — HFS clean; self-checks N of N; specs NOT run (starci runtime verify)`; the debug loop, the Debug role ruling, `CONTRIBUTING.md` and the lane documents tell a lane to report the verify line.
 - `starci test affected --run` keeps a per-spec result cache under the runtime state dir (`spec-cache/`): a spec whose key is unchanged since a green run is not run again and the receipt counts it as `reused`. The key is the spec, its import closure, the data its modules name, the generated outputs of a generator in the closure, the whole runtime (or tree) for a spec that starts the CLI or scans folders, node, platform, the preload closure and the lockfiles; `--no-cache` runs every file; the `spec-cache-key` self-check changes one file of every input class the selector knows and refuses a key that does not move.
-- The replay walk exercises the fourteen workflow legs and selected failure branches with stand-in agents and Orca responses; live Nivo and StarCi workflow proof remains pending.
+- The replay walk exercises the fourteen workflow legs and selected failure branches with stand-in agents and Orca responses; live Nivo and StarCi workflow proof has not been established.
 
 - An affected-spec run returns its scope, per-file results and receipt without repeating the diagnostic graph. The graph remains in the plan, preventing large selections from overflowing the deploy child capture before its proof can be read.
 
@@ -173,7 +173,7 @@ Nothing stood before a merge or before the host: 28 branches were merged on `npm
 - `starci git land` refuses a tip that has no verify receipt for its exact commit and the land base (step `0-verify-receipt`, before the gate, the check and the specs) and writes `Affected: N/N <base>..<tip>` into the land note; `starci runtime deploy` takes the verify receipt of the source clone, or a land note that carries the `Affected:` line for the host head, and no longer takes a land note with the check alone.
 
 ### Deferred
-- Live proof for the two fresh workflows remains pending: the simulated walk does not establish two consecutive passing steps or unattended operation on this runtime.
+- Live proof for the two fresh workflows has not been established: the simulated walk does not establish two consecutive passing steps or unattended operation on this runtime.
 
 - Substantive judging of `content.generate` and `perf.verify` remains open. `scope.finish` also has a judge gap: it has no implemented owner gate. Acceptance-trace is report-only and does not close these gaps.
 - Full storage-writer conversion, the ledger migration with mandatory backup, and the blob collector remain outside this release; the storage convention and readers do not make all ledger content references.
