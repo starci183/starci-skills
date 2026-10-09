@@ -6,8 +6,9 @@
 // refused where it is applied (ctx.openDecision, the one place every controller's item passes), with this code.
 import path from 'node:path';
 
+const NO_REPO = Object.freeze({ code: 'decision-item-without-repo' });
 /** The failure code of an item planned without a repository (modules/kernel/failure-codes.yaml). */
-export const DECISION_WITHOUT_REPO = 'decision-item-without-repo';
+export const DECISION_WITHOUT_REPO = NO_REPO.code;
 const SUPERVISOR = 'supervisor';
 
 /** The ledger an item names: its own ledger, else (a Supervisor item) the product ledger of its refs or its productLedger; null when it names none. */

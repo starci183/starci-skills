@@ -7,8 +7,9 @@
 // This is the one place a refusal is classified for it: every judged phase of the settle preflight passes its judgment through ownedByRuntime.
 import { latestContractOf } from '../machine/contract-version.mjs';
 
+const NEWER = Object.freeze({ code: 'gate-newer-than-admission' });
 /** The failure code of a refusal for a proof the job's admission never taught. */
-export const GATE_NEWER_CODE = 'gate-newer-than-admission';
+export const GATE_NEWER_CODE = NEWER.code;
 /** The settle refusals whose proof is the runtime's to produce: neither a choice of the Kernel nor a failure of the op. */
 export const RUNTIME_OWED_CODES = Object.freeze(new Set([GATE_NEWER_CODE, 'op-critic-verdict-missing']));
 

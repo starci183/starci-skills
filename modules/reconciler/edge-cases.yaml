@@ -1002,14 +1002,14 @@ cases:
     family: authority-safety
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: the settle of a failed op puts the workflow branch back on its last checkpoint) the Nivo settle-fail of op-architecture.decide-e78adc94cc prepared its reset receipt (events 770, 919) with the right target (the checkpoint 30d46eb) and died with workflow-reset-failed at the git reset --soft: the worktree garbage collector had committed the files of the op on the workflow branch (7ea9436, \"preserve ... uncommitted work of its worktree\"), and the reference-transaction hook the runtime installs keeps a workflow branch append-only, so it refused the runtime's own rewind (\"not a fast-forward\"); reproduced on a clone of the tree with the live hook", remedy: {state: in-tree, change: "the hook (version 8) lets a protected branch move to the target named in STARCI_BRANCH_REWIND when the commit it leaves is kept under refs/heads/preserved; preserveAndReset refreshes the hook of the tree and names the target on its reset, so nothing else rewrites the branch"}}
     met: {date: "2026-10-09", where: "alpha.8 live, Nivo workflow tree", evidence: "nivo runtime.sqlite events 770, 771, 842, 850, 919, 920; the reflog of the tree (no reset), HEAD 7ea9436 against the checkpoint 30d46eb, hook .husky/_/reference-transaction v7"}
-    rule: {file: scripts/guards/hook-install.mjs, anchor: "STARCI_BRANCH_REWIND"}
+    rule: {file: scripts/guards/hook-install.mjs, anchor: STARCI_BRANCH_REWIND}
     spec: tests/kernel/workflow-rewind-hook.spec.mjs
     status: covered
   - id: failed-critic-verdict-offers-accept-and-clips-the-critique
     family: correctness
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: the choices of an item do what they say) the item of a done report refused op-critic-verdict-failed offered accept (\"only when the blocker the refusal names has since landed\"), a settle pass the runtime refuses again against the same failed verdict, and its red check kept 200 characters of the failed checks the retry is fed; the choices did not say what they do with the critique", remedy: {state: in-tree, change: "accept is not offered against op-critic-verdict-failed; settle-fail and continue say that the failed checks of the Critic are recorded as the red check of the attempt (up to 1500 characters) and fed to the retry"}}
     met: {date: "2026-10-09", where: "alpha.8 live, Nivo job op-architecture.decide-e78adc94cc", evidence: "nivo runtime.sqlite event 912 (job-settle-needs-kernel code op-critic-verdict-failed), the menu options of job-decision:op-architecture.decide-e78adc94cc"}
-    rule: {file: scripts/machine/decision-resolution.mjs, anchor: "CRITIC_FAILED"}
+    rule: {file: scripts/machine/decision-resolution.mjs, anchor: CRITIC_FAILED}
     spec: tests/kernel/menu-answered-hold.spec.mjs
     status: covered
   - id: kernel-read-attestation-over-the-inline-event-bound
@@ -1030,7 +1030,7 @@ cases:
     family: record-vs-reality
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a counter says what it counts) every decision result of the Nivo Kernel read running:1 while the digest said nothing ran and the workers list was empty: the baseline counted every open job that is not queued, which includes the reported job waiting for its settle (op-architecture.decide-e78adc94cc, worker gone)", remedy: {state: in-tree, change: "running counts the open jobs whose worker is alive (leased, running, answering)"}}
     met: {date: "2026-10-09", where: "alpha.8 live, Nivo workflow", evidence: "nivo runtime.sqlite events 917 to 920 (baseline running 1, job status reported)"}
-    rule: {file: scripts/kernel/decision-log.mjs, anchor: "WORKER_LIVE"}
+    rule: {file: scripts/kernel/decision-log.mjs, anchor: WORKER_LIVE}
     spec: tests/reconciler-controllers/supervisor-mirror.spec.mjs
     status: covered
   - id: critic-verdict-supplied-by-the-maker

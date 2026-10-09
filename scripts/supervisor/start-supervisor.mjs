@@ -438,13 +438,16 @@ const describe = (r) => {
   return `[Supervisor] ${r.action}${terminal}${reason}${error}`;
 };
 
+/** The flags this script takes for the runtime's own callers (the watchdog, the owner's restart) and the CLI refuses with a pointer: modules/cli/commands/supervisor/start.yaml internalFlags. */
+export const INTERNAL_FLAGS = Object.freeze(['replace', 'rotate', 'restart']);
+
 async function main() {
   const argv = process.argv.slice(2);
   const has = (n) => argv.includes(`--${n}`);
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const asJson = has('json');
   const out = (r) => { console.log(asJson ? JSON.stringify(r) : describe(r)); process.exitCode = r.exit ?? (r.ok ? 0 : 1); };
-  if (has('help')) { console.log('use: start-supervisor.mjs [--plan] [--reason <t>] | --replace | --rotate | --status | --stop | --restart  [--json]'); return; }
+  if (has('help')) { console.log(`use: start-supervisor.mjs [--plan] [--reason <t>] | ${INTERNAL_FLAGS.map((name) => '--' + name).join(' | ')} | --status | --stop  [--json]`); return; }
   if (has('status')) return out(await supervisorStatus());
   if (has('stop')) { const r = await stopSupervisor(); supervisorLog('start', describe(r), { data: r }); return out(r); }
   if (has('restart')) {

@@ -9,7 +9,7 @@ import { readTree } from '../api/git/read-tree.mjs';
 import { writeTree } from '../api/git/write-tree.mjs';
 import { lsTree } from '../api/git/ls-tree.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
-import { eventPayloadOf } from '../lib/event-payload.mjs';
+import { eventPayloadOf } from '../machine/event-payload.mjs';
 import { redactData } from '../lib/redact.mjs';
 import { jsonClone } from '../lib/json-clone.mjs';
 import { tempPath } from '../api/fs/temp-path.mjs';

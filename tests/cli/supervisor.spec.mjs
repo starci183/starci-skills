@@ -5,6 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { CATALOG as catalog } from '../../packages/cli/src/catalog.generated.mjs';
 import { main } from '../../scripts/cli/main.mjs';
+import { INTERNAL_FLAGS } from '../../scripts/supervisor/start-supervisor.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const publicVerbs = {
@@ -100,20 +101,14 @@ test('supervisor internal watchdog flags are refused', () => {
   assert.equal(main(['supervisor', 'watchdog', '--once', '--restart'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);
 });
 
-test('a flag the watchdog passes to the seat script is refused by the CLI with a pointer, and every such flag of the script is declared as internal', () => {
+test('a flag the watchdog passes to the seat script is refused by the CLI with a pointer, and the verb declares exactly the flags the script takes for the runtime', () => {
   const start = catalog.groups.supervisor.verbs.start;
-  const messages = [];
-  assert.equal(main(['supervisor', 'start', '--rotate', '--reason', 'handover'], { catalog, stderr: (text) => messages.push(text), runScript: () => 0 }), 2);
-  assert.match(messages.join(''), /unknown option --rotate: it is a call of the runtime itself.*starci supervisor stop, then starci supervisor start/);
-  const script = fs.readFileSync(path.join(root, 'scripts', 'supervisor', 'start-supervisor.mjs'), 'utf8');
-  const taken = [...script.matchAll(/has\('([a-z-]+)'\)/g)].map((match) => match[1]);
-  const declared = new Set(start.flags.map((flag) => flag.name));
-  const internal = new Set(start.internalFlags.map((flag) => flag.name));
-  for (const flag of ['replace', 'rotate', 'restart']) assert.ok(taken.includes(flag), `the script takes --${flag}`);
-  for (const flag of taken.filter((name) => !['help', 'status', 'stop', 'json', 'plan'].includes(name))) {
-    assert.ok(internal.has(flag), `--${flag} of the script is declared as internal in start.yaml`);
-    assert.ok(!declared.has(flag), `--${flag} is not also a public flag`);
+  for (const flag of INTERNAL_FLAGS) {
+    const messages = [];
+    assert.equal(main(['supervisor', 'start', `--${flag}`], { catalog, stderr: (text) => messages.push(text), runScript: () => 0 }), 2, flag);
+    assert.match(messages.join(''), new RegExp(`unknown option --${flag}: it is a call of the runtime itself.*starci supervisor stop, then starci supervisor start`), flag);
   }
-  const watchdog = fs.readFileSync(path.join(root, 'scripts', 'supervisor', 'supervisor-watchdog.mjs'), 'utf8');
-  assert.match(watchdog, /'--rotate'/, 'the watchdog is the caller of the internal flag');
+  assert.deepEqual(start.internalFlags.map((flag) => flag.name).toSorted(), [...INTERNAL_FLAGS].toSorted());
+  const declared = new Set(start.flags.map((flag) => flag.name));
+  for (const flag of INTERNAL_FLAGS) assert.ok(!declared.has(flag), `--${flag} is not also a public flag`);
 });
