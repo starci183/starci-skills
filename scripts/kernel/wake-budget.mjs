@@ -7,11 +7,15 @@
 import { rolesContract } from '../machine/roles-contract.mjs';
 
 const KERNEL_WAKE = 'kernel-woken';
+const KERNEL_BOOTS = ['kernel-booted', 'kernel-restarted'];
 const SUPERVISOR_WAKE = 'supervisor-wake';
 const roleOf = (id) => rolesContract().roles.find((role) => role.id === id);
 
 /** The per-wake budget {turns, tokens} of the Kernel role. */
 export const wakeBudget = () => roleOf('kernel').wakeBudget.perWake;
+
+/** The budget {turns, tokens} of a Kernel boot (its own declared number; the per-wake budget when none is declared). */
+export const bootBudget = () => roleOf('kernel').wakeBudget.perBoot ?? wakeBudget();
 
 /** The per-wake budget {tokens} of the Supervisor role (its tokenBudget, unit wake). */
 export const supervisorWakeBudget = () => ({ tokens: Number(roleOf('supervisor').tokenBudget.perAttempt.default) });
@@ -19,9 +23,12 @@ export const supervisorWakeBudget = () => ({ tokens: Number(roleOf('supervisor')
 /** The tag a wake's rows carry in their turn_ref. */
 export const wakeTag = (seq) => `w${seq}`;
 
-/** The wake events of a workflow's ledger as [{seq, at}] oldest first. */
-export const kernelWakesOf = (db, workflowId) => db.prepare('SELECT seq, created_at AS at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq').all(workflowId, KERNEL_WAKE)
-  .map((row) => ({ seq: Number(row.seq), at: Number(row.at) }));
+/**
+ * The moments a Kernel session is cut at, as [{seq, at, boot?}] oldest first: its wake events, and its boots (`boot: true`). What a new session reads before its first wake
+ * (the contract files, the rev-ack manifest) is its boot's, never the last wake of the session it replaced.
+ */
+export const kernelWakesOf = (db, workflowId) => db.prepare(`SELECT seq, created_at AS at, kind FROM events WHERE workflow_id=? AND kind IN (?,?,?) ORDER BY seq`).all(workflowId, KERNEL_WAKE, ...KERNEL_BOOTS)
+  .map((row) => ({ seq: Number(row.seq), at: Number(row.at), ...(row.kind === KERNEL_WAKE ? {} : { boot: true }) }));
 
 /** The wake events of the Supervisor in machine.sqlite as [{seq, at}] oldest first. */
 export const supervisorWakesOf = (db) => db.prepare('SELECT seq, created_at AS at FROM sup_events WHERE kind=? ORDER BY seq').all(SUPERVISOR_WAKE)
@@ -40,7 +47,7 @@ function spentByTag(db, where, args) {
   return spent;
 }
 
-const ownedBy = (wakes, spent) => wakes.map(({ seq, at }) => ({ seq, at, ...(spent.get(wakeTag(seq)) ?? { turns: 0, tokens: 0 }) }));
+const ownedBy = (wakes, spent) => wakes.map(({ seq, at, boot }) => ({ seq, at, ...(boot ? { boot } : {}), ...(spent.get(wakeTag(seq)) ?? { turns: 0, tokens: 0 }) }));
 
 /** The newest `limit` wakes of a workflow with what each spent: [{seq, at, turns, tokens}] oldest first. */
 export function wakeUsageOf(db, workflowId, { limit = 20 } = {}) {
@@ -54,5 +61,8 @@ export function supervisorWakeUsageOf(db, { limit = 20 } = {}) {
   return wakes.length ? ownedBy(wakes, spentByTag(db, "subject_type='supervisor-turn'", [])) : [];
 }
 
-/** The wakes that spent more turns or tokens than the budget. */
-export const exceededWakes = (wakes, budget) => wakes.filter((wake) => (budget.turns !== undefined && wake.turns > budget.turns) || wake.tokens > budget.tokens);
+/** The wakes that spent more turns or tokens than the budget; a boot is judged by `bootOf` (default: the same budget). */
+export const exceededWakes = (wakes, budget, bootOf = budget) => wakes.filter((wake) => {
+  const limit = wake.boot ? bootOf : budget;
+  return (limit.turns !== undefined && wake.turns > limit.turns) || wake.tokens > limit.tokens;
+});

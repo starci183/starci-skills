@@ -23,12 +23,15 @@ function recordedSession(db, { subjectType, prefix, workflowId = null }) {
  * the earliest buckets first, so a session recorded by an older run is never counted twice.
  */
 function wakeGroups({ got, wakes, recorded, prefix, prices }) {
+  // A tag the session's non-empty cuts do not carry is a legacy one (rows cut before a boot was a cut): taken off the earliest buckets like untagged rows.
+  const tagAt = (index) => (index === 0 ? wakeTag(0) : wakeTag(wakes[index - 1].seq));
+  const live = new Set(got.buckets.flatMap((bucket, index) => (bucket.models?.length ? [tagAt(index)] : [])));
   const tagged = (tag) => recorded.filter((row) => row.tag === tag);
-  let untagged = recorded.filter((row) => row.tag === '');
+  let untagged = recorded.filter((row) => row.tag === '' || !live.has(row.tag));
   let turns = 0;
   const groups = [];
   got.buckets.forEach((bucket, index) => {
-    const tag = index === 0 ? wakeTag(0) : wakeTag(wakes[index - 1].seq);
+    const tag = tagAt(index);
     turns += bucket.turns;
     const own = deltaRows(bucket.models, tagged(tag));
     const fresh = deltaRows(own, untagged);

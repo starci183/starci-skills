@@ -37,6 +37,8 @@ import { telemetrySettings } from '../../machine/op-metrics.mjs';
 import { unresolvedPlaceholders } from '../../goal/goal-text.mjs';
 import { productRepos } from '../../machine/home.mjs';
 import { slaCatalog, clocksOf, setClock, clearClock } from '../sla.mjs'; import { isMain } from '../../lib/is-main.mjs';
+import { gateViewsFromLedger } from '../../kernel/gate-ladder.mjs';
+import { fixCandidatesOf } from '../gate-fix-candidates.mjs';
 import { planWorkflow, stuckPrefix, workflowEntity, SUPERVISOR_LEDGER } from '../workflow-plan.mjs';
 import { eachInOrder, mapInOrder } from '../../lib/in-order.mjs';
 import { recordSwap } from '../revision-swap.mjs';
@@ -227,7 +229,18 @@ async function readFacts(ctx, readers, { key, ledgerId, workflowId, now, setting
   });
   const open = await (ctx.openAsks ?? openAsks)(own.db, new Set([workflowId]));
   const asks = open.map((a) => ({ dispatchId: a.dispatch_id, liveness: a.liveness, lastServedAt: lastServedAt(own.db, workflowId, a.dispatch_id) }));
-  return { base, findings, asks, status, unreadable };
+  const gates = gatesOf(status, own.db, workflowId, { now, timeoutMs: settings.supervisorGateMs });
+  return { base, findings, asks, status, unreadable, gates };
+}
+
+/**
+ * The open supervisor-gates of the pass: the status's own view, else the ledger's (an unreadable status never leaves a gate without its Supervisor item).
+ * A runtime-defect gate carries the live runtime revision and the commits since it was raised that touch what its cause names (gate-fix-candidates.mjs).
+ */
+function gatesOf(status, db, workflowId, { now, timeoutMs }) {
+  const gates = status?.autopilot?.supervisorGates ?? gateViewsFromLedger(db, workflowId, { now, timeoutMs });
+  const rev = runtimeHead({ root: skillRoot });
+  return gates.map((gate) => (gate.cause === 'runtime-defect' || gate.cause === 'unclassified' ? { ...gate, runtimeRev: rev, fixCandidates: fixCandidatesOf(gate, rev) } : gate));
 }
 
 /** Start / keep the plan's clocks and clear the rest of the workflow's; how many were cleared. */
@@ -280,10 +293,10 @@ export async function reconcileWorkflow(key, ctx, { settings = workflowSettings(
   let facts;
   try { facts = await readFacts(ctx, readers, { key, ledgerId, workflowId, now, settings }); } finally { closeAll(readers); }
   if (facts.early) return facts.early;
-  const { base, findings, asks, status, unreadable } = facts;
+  const { base, findings, asks, status, unreadable, gates } = facts;
 
   const existing = clocksOf(ctx, { prefixes: [wfEntity, prefix] }).filter((c) => c.entity === wfEntity || c.entity.startsWith(prefix));
-  const plan = planWorkflow({ ledgerId, workflowId, status, findings, goal: base.goal, asks, clocks: existing, unreadable, now, settings });
+  const plan = planWorkflow({ ledgerId, workflowId, status, findings, goal: base.goal, asks, gates, clocks: existing, unreadable, now, settings });
 
   const cleared = await syncClocks(ctx, plan, existing, { ledgerId, workflowId, wfEntity, status });
 

@@ -30,7 +30,10 @@ function budgetLines(role) {
   const b = role.tokenBudget;
   const wake = role.wakeBudget;
   if (b) return [`- Token budget (${b.status}): ${b.perAttempt.default} per ${b.unit ?? 'attempt'}; over it, ${b.onExceed}.`];
-  if (wake) return [`- Wake budget (${wake.status}): ${wake.perWake.turns} turns and ${wake.perWake.tokens} tokens per wake; over it, ${wake.onExceed}.`];
+  if (wake) {
+    const boot = wake.perBoot ? `, ${wake.perBoot.turns} turns and ${wake.perBoot.tokens} tokens for its boot (the contract files and the rev-ack manifest)` : '';
+    return [`- Wake budget (${wake.status}): ${wake.perWake.turns} turns and ${wake.perWake.tokens} tokens per wake${boot}; over it, ${wake.onExceed}.`];
+  }
   return role.noBudget ? [`- No budget: ${role.noBudget}.`] : [];
 }
 

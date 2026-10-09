@@ -81,3 +81,18 @@ test('the Supervisor session is cut at its supervisor-wake events and a wake ove
     assert.deepEqual(exceededWakes(wakes, supervisorWakeBudget()).map((wake) => wake.seq), [wakes[0].seq]);
   } finally { reader.close(); }
 }));
+
+test('what a new session reads between its boot and its first wake is the boot\'s, never the last wake of the session it replaced (Nivo wake of 22 turns, 2026-10-09)', (t) => world(t, async ({ ledger, t0, sweep, sessions }) => {
+  ledger.transaction(() => ledger.appendEvent({ workflowId: WF, entityType: 'kernel', entityId: WF, kind: 'kernel-restarted', payload: { terminal: 't2' }, createdAt: t0 + 120 * SECOND }));
+  session(sessions, 'kernel-old', `You are [Kernel] ${WF} — ONE long-lived agent.`, t0, [{ at: -10, out: 1 }, { at: 70, out: 300 }]);
+  session(sessions, 'kernel-new', `You are [Kernel] ${WF} — ONE long-lived agent.`, t0, [{ at: 130, out: 50 }, { at: 140, out: 60 }, { at: 150, out: 70 }]);
+  assert.equal((await sweep()).ok, true);
+  const usage = wakeUsageOf(ledger.db, WF);
+  assert.equal(usage.length, 3, 'two wakes and a boot');
+  const [, wakeB, boot] = usage;
+  assert.deepEqual([wakeB.boot ?? false, wakeB.turns], [false, 1], 'the last wake of the old session owns its own turn only');
+  assert.deepEqual([boot.boot, boot.turns, boot.tokens], [true, 3, 210], 'the boot owns what the new session read before its first wake');
+  const budget = { turns: 2, tokens: 1_000_000 };
+  assert.deepEqual(exceededWakes(usage, budget).map((wake) => wake.seq), [boot.seq], 'judged by the wake budget, the boot is over it');
+  assert.deepEqual(exceededWakes(usage, budget, { turns: 40, tokens: 1_000_000 }), [], 'a boot is judged by its own declared budget');
+}));

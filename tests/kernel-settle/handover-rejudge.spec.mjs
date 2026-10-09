@@ -138,3 +138,57 @@ test('the settle that ends the last job a supervisor-gate holds closes the gate'
   gate('inc-retry', ['op-held', OP]);
   assert.deepEqual(ledger.transaction(() => releaseEndedGates(ledger.db, 'wf-g')), [], 'a queued job of the held op keeps the gate');
 }));
+
+/** The Nivo state of 2026-10-09: architecture.decide reported done, handed over by an older runtime, held by an open supervisor-gate. */
+function gatedWorld(ledger, { jobId = 'op-gated', opId = 'architecture.decide' } = {}) {
+  seedWorkflow(ledger, { id: 'wf-n', goal: { revision: 1, markdown: '# n' }, jobs: [{ jobId, opId, status: 'reported', payload: { opId, owned_paths: [] } }] });
+  const { attempt_id: attemptId, dispatch_id: dispatchId } = ledger.db.prepare('SELECT attempt_id, dispatch_id FROM op_attempts WHERE job_id=?').get(jobId);
+  ledger.db.prepare("INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,created_at) VALUES(?,'wf-n',?,'m',?)").run(attemptId, jobId, Date.now());
+  ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES('wf-n',?,?,?,'done',?,?)")
+    .run(attemptId, dispatchId, jobId, JSON.stringify({ head: 'abc', checks: [{ name: 'c', command: 'echo x', exitCode: 0 }] }), Date.now() - 60_000);
+  openIncident(ledger.db, { incidentId: 'inc-gate', workflowId: 'wf-n', kind: 'supervisor-gate', opId, detail: 'settle refused op-gate-tool-failed: owned slice cannot be bound', lastProgress: '[supervisor-gate] settle refused' });
+  ledger.transaction(() => {
+    ledger.appendEvent({ workflowId: 'wf-n', entityType: 'incident', entityId: 'inc-gate', kind: 'incident-raised', payload: { kind: 'supervisor-gate', opId, holds: [jobId] } });
+    ledger.appendEvent({ workflowId: 'wf-n', entityType: 'job', entityId: jobId, attemptId, kind: EVENTS.needsKernel, payload: { dispatchId, reason: 'settle-refused', code: 'op-gate-tool-failed', outcome: 'done', op: opId } });
+  });
+  return { dispatchId };
+}
+
+const incidentRow = (ledger) => ledger.db.prepare("SELECT status, resolved_reason FROM incidents WHERE incident_id='inc-gate'").get();
+const incidentEvents = (ledger, kind) => ledger.db.prepare("SELECT payload_json FROM events WHERE entity_id='inc-gate' AND kind=?").all(kind).map((row) => JSON.parse(row.payload_json));
+
+test('a green judgment under a new revision settles the job and resolves the gate it was held by, as the runtime with the revision as proof', async (t) => withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {
+  gatedWorld(ledger);
+  ledger.close();
+  const settle = (args) => {
+    if (args[0] !== 'settle') return { ok: true };
+    const writer = openLedger({ file: ledgerFile });
+    try { writer.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id='op-gated'").run(); } finally { writer.close(); }
+    return { ok: true, value: { status: 'succeeded' } };
+  };
+  const out = await reconcileJobSettle({ repo: repoRoot, jobId: 'op-gated', verify: async () => ({ green: true, via: 'declared' }), locks: false, api: settle });
+  assert.equal(out.errors.length, 0, JSON.stringify(out.errors));
+  assert.equal(out.settled.length, 1);
+  const reader = openLedger({ file: ledgerFile });
+  const [proof] = incidentEvents(reader, 'gate-holds-settled');
+  const row = incidentRow(reader);
+  reader.close();
+  assert.deepEqual([row.status, row.resolved_reason], ['resolved', 'fixed']);
+  assert.equal(proof.by, 'runtime');
+  assert.equal(proof.resolution, 'fixed');
+  assert.equal(proof.proof.runtimeRev, currentRuntimeRev(), 'the revision that judged is the proof');
+}));
+
+test('a red judgment leaves the gate open and puts the evidence on it, once per revision and reason', async (t) => withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {
+  gatedWorld(ledger);
+  ledger.close();
+  const verify = async () => ({ green: false, reason: 'settle-refused', code: 'op-gate-tool-failed', detail: ['op-gate-tool-failed'] });
+  for (let pass = 0; pass < 2; pass += 1) await reconcileJobSettle({ repo: repoRoot, jobId: 'op-gated', verify, locks: false, api: () => ({ ok: true }) });
+  const reader = openLedger({ file: ledgerFile });
+  const status = incidentRow(reader).status;
+  const noted = incidentEvents(reader, 'gate-rejudged');
+  reader.close();
+  assert.equal(status, 'open');
+  assert.equal(noted.length, 1);
+  assert.deepEqual([noted[0].jobId, noted[0].reason, noted[0].runtimeRev], ['op-gated', 'settle-refused', currentRuntimeRev()]);
+}));

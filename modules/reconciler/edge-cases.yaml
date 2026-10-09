@@ -870,3 +870,31 @@ cases:
     rule: {file: scripts/reconciler/ctx.mjs, anchor: "lastJsonLine"}
     spec: tests/reconciler/status-read-indented-json.spec.mjs
     status: covered
+  - id: open-supervisor-gate-without-a-supervisor-item
+    family: concurrency
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an open supervisor-gate always has one Supervisor item) gate inc-7ef4863b69c7 (runtime-defect, raised 10-08 12:32, ladder step 4 of 4, handler owner) held the settle of op-architecture.decide-e78adc94cc while the Supervisor seat showed 0 Decision Items: the item is planned from starci kernel status autopilot.supervisorGates and the engine could not read that status (engine-status-read-never-parsed-the-indented-answer); with the Kernel in supervisor-wait, the owner under an autopilot ruling never to be asked, and the Supervisor holding no item, nobody could move", remedy: {state: in-tree, change: "the Workflow controller reads the open gates from the ledger when the status is unreadable, so each open gate has its item at any ladder step; a runtime-defect gate is offered again under every new runtime revision (a new item that rings the Supervisor) with the commits made since the gate was raised that touch the codes its cause names, for fixed --text <commit>"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo workflow", evidence: "nivo incidents inc-7ef4863b69c7 open since 10-08 12:32; machine sup_decision_items: no row with refs.gateIncident; 238 status-unreadable items"}
+    rule: {file: scripts/reconciler/gate-plan.mjs, anchor: "planSupervisorGates"}
+    spec: tests/reconciler/gate-always-offered.spec.mjs
+    status: covered
+  - id: gate-held-job-judged-again-never-closes-its-gate
+    family: concurrency
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a repaired runtime defect leaves no open gate) the gate held the settle of the job its own defect had stopped, and nothing joined the two: the settler re-judged the job under the repaired runtime (10:16, checks-recorded, event 634) but its result never reached the gate, and only a Supervisor answer fixed --commit could resolve it", remedy: {state: in-tree, change: "a green re-judgment settles the job and the settle that ends the last job a gate holds resolves the gate as fixed by the runtime, with the revision as proof (event gate-holds-settled: by runtime, proof.runtimeRev); a red re-judgment leaves the gate open and records gate-rejudged on it, which the Supervisor's item reads"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo job op-architecture.decide-e78adc94cc", evidence: "nivo runtime.sqlite events 634 (checks-recorded 10:16:36), 635 (job-settle-needs-kernel settle-refused under 2fc2386a9)"}
+    rule: {file: scripts/kernel/gate-holds-ended.mjs, anchor: "releaseEndedGates"}
+    spec: tests/kernel-settle/handover-rejudge.spec.mjs
+    status: covered
+  - id: settle-judged-observations-of-the-lost-tree
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a rebound attempt is judged where it stands) after the placement was rebound and every declared check re-ran green in the -2 tree (check_runs 61 to 67), the settle was refused op-gate-tool-failed 'the native check has no complete process, target, time or input receipt': the op-proof read the newest native run per subject, and the kernel's runs of 10-07 in the lost tree (check_runs 52 and 57) were a second subject whose receipt no root stands for", remedy: {state: in-tree, change: "the native observations of an attempt are keyed by their subject read through the attempt's placement-rebound events, so a run in the admitted tree and a later run in its rebound tree are one subject and the newest stands"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo job op-architecture.decide-e78adc94cc", evidence: "nivo runtime.sqlite check_runs 68 (op-proof fail, unavailable), 52 and 57 (kernel runner, subject without the -2 suffix)"}
+    rule: {file: scripts/kernel/mechanism-observation.mjs, anchor: "mechanismObservations"}
+    spec: tests/kernel/mechanism-observation-rebound.spec.mjs
+    status: covered
+  - id: boot-reading-counted-as-the-last-wake
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a wake is measured by what it spent) the digest reported the Nivo Kernel for a wake of 22 turns and 2,214,858 tokens over its budget of 20 turns: wake 611 (10:03) is the last wake of the session that was rotated at 10:05; the new session (boot 10:05:53) spent 19 turns and about 1.75 million tokens reading the contract and the rev-ack manifest before its first wake, and the usage sweep cut sessions at wake events only, so those rows carried the tag of wake 611", remedy: {state: in-tree, change: "a Kernel boot (kernel-booted, kernel-restarted) is a cut of the session like a wake and owns what the new session spent before its first wake, judged by its own declared budget (roles.yaml kernel.wakeBudget.perBoot, 40 turns and 6 million tokens, from the measured boot); rows already recorded under a tag the session no longer carries are taken off like untagged rows; the digest judges the wakes since the live runtime revision"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo Kernel", evidence: "nivo runtime.sqlite events 611 (kernel-woken 10:03:14), 612 (kernel-rotated), 619 (kernel-restarted), 623 and 624 (kernel-usage-recorded #w611 for two sessions)"}
+    rule: {file: scripts/kernel/wake-budget.mjs, anchor: "kernelWakesOf"}
+    spec: tests/kernel/usage-wake-cuts.spec.mjs
+    status: covered

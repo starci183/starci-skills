@@ -202,18 +202,19 @@ const SECTIONS = [planGoal, planStall, planOrphaned, planRev, planUnreadable, pl
  *   findings  stallFindings of this workflow
  *   goal      {missing: bool, why}
  *   asks      [{dispatchId, liveness, lastServedAt}] (poll.mjs openAsks)
+ *   gates     the open supervisor-gates read from the ledger (gateViewsFromLedger), given when the status is unreadable
  *   clocks    the workflow's open clocks [{entity, state, enteredAt}] (to read an episode's age)
  *   unreadable  {misses, since, error, heldAt} when this pass could not read starci kernel status (holdStatus), else null
  * Returns {clocks: [{entity, state, slaMs, enteredAt}], decisions: [DI], reparks: [dispatchId], finish, stalled, lines}.
  */
-export function planWorkflow({ ledgerId, workflowId, status = null, findings = [], goal = { missing: false }, asks = [], clocks = [], unreadable = null, now, settings }) {
+export function planWorkflow({ ledgerId, workflowId, status = null, findings = [], goal = { missing: false }, asks = [], gates = [], clocks = [], unreadable = null, now, settings }) {
   const wfEntity = workflowEntity(ledgerId, workflowId);
   const out = { clocks: [], decisions: [], reparks: [], finish: false, stalled: false, lines: [] };
   const rca = status?.rca ?? null;
   const top = firstUntried(rca);
   const frontier = status?.frontier ?? null;
   const p = {
-    ledgerId, workflowId, status, findings, goal, asks, unreadable, now, s: settings, wfEntity, out, rca, top, frontier,
+    ledgerId, workflowId, status, findings, goal, asks, gates, unreadable, now, s: settings, wfEntity, out, rca, top, frontier,
     clock: (entity, state, slaMs, enteredAt) => { if (Number.isFinite(slaMs)) out.clocks.push({ entity, state, slaMs, enteredAt: Number.isFinite(enteredAt) ? enteredAt : now }); },
     openClock: (state) => clocks.find((c) => c.entity === wfEntity && c.state === state) ?? null,
     di: (args) => out.decisions.push(decisionOf({ ledgerId, workflowId, now, dueMs: settings.decisionDueMs, ...args })),

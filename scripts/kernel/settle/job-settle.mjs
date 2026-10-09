@@ -52,7 +52,7 @@ import { eachInOrder } from '../../lib/in-order.mjs';
 import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 import { reconcileAttemptPlacements } from '../attempt-placement.mjs';
 import { currentRuntimeRev } from '../runtime-rev.mjs';
-import { releaseEndedGates } from '../gate-holds-ended.mjs';
+import { releaseEndedGates, recordGateRejudged } from '../gate-holds-ended.mjs';
 import { settlerSettings, runtimeEnv, verifyReported, recordSettlerCheck, parse, slug, jsonOf } from './job-settle-verify.mjs';
 import { tempRoot } from '../../../engine/temp-root.mjs';
 export { classifyCheck, argvOf } from './check-command.mjs';
@@ -166,6 +166,7 @@ function handToKernel(ledger, item, verdict, { now }) {
   if (prior?.reason === verdict.reason && (prior.runtimeRev ?? null) === runtimeRev) return { jobId: item.jobId, state: STATES.kernel, reason: verdict.reason, recorded: false };
   event(ledger, item, EVENTS.needsKernel, { from: STATES.reported, to: STATES.kernel, op: item.op, attempt: item.attempt, outcome: item.outcome,
     reason: verdict.reason, runtimeRev, ...(verdict.detail ? { detail: verdict.detail } : {}), ...(verdict.code ? { code: verdict.code } : {}), ageMs: now - item.filedAt });
+  ledger.transaction(() => recordGateRejudged(ledger.db, item.workflowId, item.jobId, { reason: verdict.reason, detail: verdict.detail ?? [], at: now }));
   return { jobId: item.jobId, state: STATES.kernel, reason: verdict.reason, recorded: true };
 }
 

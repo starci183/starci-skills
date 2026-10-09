@@ -215,6 +215,8 @@ roles:
       status: provisional
       source: "kernel-turn usage rows of the two first real workflows (45 rows): turns p50 11, p75 19, p90 28; tokens (input, output, cache read) p50 3.7 million, p75 5.7 million, p90 9.8 million"
       perWake: {turns: 20, tokens: 6000000}
+      perBoot: {turns: 40, tokens: 6000000}
+      bootSource: "the boot of a Kernel session reads the two Kernel contract files and the rev-ack manifest (about 20 files) before its first wake: measured 2026-10-09 on the Nivo Kernel, 19 turns and 1.75 million tokens"
       onExceed: "the digest reports the wake as a departure of the Kernel (a bug): a wake answers the menu and yields"
     owns: "one workflow: its plan, its jobs and its gates"
     decidesAlone: "settle of a non-green report, retry past the runtime's bound, switch agent, re-plan inside the goal, the write set of an open leg, seam duties, the route of handover feedback, and answers to ops"

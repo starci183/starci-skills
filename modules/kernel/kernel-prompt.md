@@ -90,7 +90,7 @@ HARD RULES:
 - Owns: one workflow: its plan, its jobs and its gates. Decides alone: settle of a non-green report, retry past the runtime's bound, switch agent, re-plan inside the goal, the write set of an open leg, seam duties, the route of handover feedback, and answers to ops.
 - Reports to: Supervisor (one of the five causes above). Overseen by: the runtime, Supervisor, Debug.
 - Measure: legs done inside their bound with zero human untangling.
-- Wake budget (provisional): 20 turns and 6000000 tokens per wake; over it, the digest reports the wake as a departure of the Kernel (a bug): a wake answers the menu and yields.
+- Wake budget (provisional): 20 turns and 6000000 tokens per wake, 40 turns and 6000000 tokens for its boot (the contract files and the rev-ack manifest); over it, the digest reports the wake as a departure of the Kernel (a bug): a wake answers the menu and yields.
 - Guard: its terminals are bound as the "lead" role of modules/kernel/command-policy.yaml.
 - Happy errors it handles (the system working as designed, handled inside the chain through the policy):
   - worker-question (policy row worker-question): an Op asks: the Kernel answers from the goal (menu worker-question) or sends it to the owner

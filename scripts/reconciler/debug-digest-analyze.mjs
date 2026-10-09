@@ -7,7 +7,7 @@ import { loadStandard, judgeStandard } from './debug-standard.mjs';
 import { classifyAll } from './debug-verdicts.mjs';
 import { roleRows } from './debug-roles.mjs';
 import { loadQuestions, answerQuestions, standingOf } from './debug-questions.mjs';
-import { exceededWakes, supervisorWakeBudget, wakeBudget } from '../kernel/wake-budget.mjs';
+import { bootBudget, exceededWakes, supervisorWakeBudget, wakeBudget } from '../kernel/wake-budget.mjs';
 import { seatsOverEmptyBound } from './seat-cost.mjs';
 
 const MIN = 60_000;
@@ -180,7 +180,7 @@ function kernelSection(workflow, ctx) {
     ackedRev: rev?.acked ?? null, currentRev: rev?.current ?? null, revStale: rev?.stale === true, filesBehind: rev?.fileCount ?? 0,
     frontierState: frontier.state ?? null, readyWork: ready,
     idleWithReady: ready > 0 && idle && wakeAgeMs !== null && wakeAgeMs > ctx.n.kernelIdleWakeMs,
-    overBudgetWakes: exceededWakes(workflow.kernelWakes ?? [], wakeBudget()), seatCost: workflow.seatCost ?? null };
+    overBudgetWakes: exceededWakes(workflow.kernelWakes ?? [], wakeBudget(), bootBudget()), seatCost: workflow.seatCost ?? null };
 }
 
 function kernelProblems(view, n) {
@@ -193,7 +193,7 @@ function kernelProblems(view, n) {
   const empty = emptyWakeProblem(kernel.seatCost, `the Kernel of ${name}`, id);
   if (empty) out.push(empty);
   const worst = kernel.overBudgetWakes.at(-1);
-  if (worst) out.push(problem('kernel', 1, `kernel-wake-budget-${id}`, 'kernel-wake-budget', { name, turns: worst.turns, tokens: worst.tokens, wakes: kernel.overBudgetWakes.length, budgetTurns: wakeBudget().turns, budgetTokens: wakeBudget().tokens }, kernel.overBudgetWakes));
+  if (worst) out.push(problem('kernel', 1, `kernel-wake-budget-${id}`, 'kernel-wake-budget', { name, turns: worst.turns, tokens: worst.tokens, wakes: kernel.overBudgetWakes.length, budgetTurns: (worst.boot ? bootBudget() : wakeBudget()).turns, budgetTokens: (worst.boot ? bootBudget() : wakeBudget()).tokens }, kernel.overBudgetWakes));
   return out;
 }
 
