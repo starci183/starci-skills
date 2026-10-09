@@ -77,7 +77,8 @@ export function runRuntimeOnly(name, args = [], {
 }
 
 /**
- * The last line of `starci runtime check`: the whole verdict in one place, so the self-check count alone is never read as green while the runtime HFS stage or the syntax stage failed.
+ * The last line of `starci runtime check`: the whole verdict of the CHECK in one place, so the self-check count alone is never read as green while the runtime HFS stage or the syntax stage failed. A green line also says
+ * what it is not: the check never starts a spec, so it is not the proof that a branch is fit to merge (`starci runtime verify` is: check AND the affected specs on one commit).
  * `parts` = {syntaxFailed, hfsFindings, selfFailed: [ids], selfRun}. Pure.
  */
 export function verdictLine({ syntaxFailed, hfsFindings, selfFailed, selfRun }) {
@@ -85,7 +86,7 @@ export function verdictLine({ syntaxFailed, hfsFindings, selfFailed, selfRun }) 
   if (syntaxFailed) failures.push(`syntax ${syntaxFailed} file(s)`);
   if (hfsFindings) failures.push(`runtime HFS ${hfsFindings} finding(s)`);
   const selfPart = `self-checks ${selfRun - selfFailed.length} of ${selfRun}`;
-  if (!failures.length && !selfFailed.length) return `check: ok — runtime HFS clean; ${selfPart}`;
+  if (!failures.length && !selfFailed.length) return `check: ok — HFS clean; ${selfPart}; specs NOT run (starci runtime verify)`;
   const selfTail = selfFailed.length ? ` (failed: ${selfFailed.join(', ')})` : '';
   return `check: FAILED — ${[...failures, selfPart + selfTail].join('; ')}`;
 }

@@ -4,3 +4,4 @@ logicalThreadsPerFile: 2
 ramPerFileGiB: 2
 minimumReserveGiB: 4
 reserveRamPct: 10
+resampleMs: 20000
