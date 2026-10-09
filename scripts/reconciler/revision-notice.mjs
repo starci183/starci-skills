@@ -4,7 +4,7 @@
 // seat's declared scope, modules/kernel/revision-scope.yaml), an `acked` record the seat writes after reading the files it was sent, a
 // `replaced` record the runtime writes when a fresh seat took its place, or a `baseline` record that adopts the revision a seat first meets.
 // The next change is measured from the newest settled revision, so several commits deployed together are ONE change, and a seat is woken at
-// most once per revision it has not settled (a `woken` record). No record carries a file list: it carries the two revisions, a count and the
+// most once per set of owed files it has not settled (a `woken` record keyed by the digest of the owed files: a revision that leaves them as they were wakes nobody again). No record carries a file list: it carries the two revisions, a count and the
 // diff hash; the list lives in the blob store (`filesSha`), which keeps every record far under the event payload limit however many files.
 import { sha256 } from '../../engine/digest.mjs';
 import { changeScope } from './revision-change.mjs';
@@ -28,8 +28,8 @@ function foldRecords(records) {
   let baseline = null, legacy = null;
   const woken = new Set();
   for (const record of records) {
-    if (record.type === 'settled') baseline = record.rev;
-    else if (record.type === 'woken') woken.add(record.rev);
+    if (record.type === 'settled') { baseline = record.rev; woken.clear(); }
+    else if (record.type === 'woken') woken.add(record.digest);
     else if (record.type === 'legacy-ack') legacy = { rev: record.rev, files: new Set(record.files) };
   }
   return { baseline: baseline ?? legacy?.rev ?? null, woken, legacy };
@@ -37,10 +37,10 @@ function foldRecords(records) {
 
 const owedNotice = ({ role, scope, mine, from, to, woken, legacy }) => {
   const covered = legacy?.rev === to && mine.action === 'reread' && mine.files.every((file) => legacy.files.has(file));
-  const base = { role, from, to, action: mine.action, count: mine.count, digest: scope.digest, files: mine.files, replaceFiles: mine.replaceFiles, wording: scope.wording };
+  const base = { role, from, to, action: mine.action, count: mine.count, digest: mine.digest, files: mine.files, replaceFiles: mine.replaceFiles, wording: scope.wording };
   if (covered) return { ...base, state: 'acked-legacy' };
   if (mine.action === 'replace') return { ...base, state: 'replace-due' };
-  return { ...base, state: woken.has(to) ? 'owed-woken' : 'owed' };
+  return { ...base, state: woken.has(mine.digest) ? 'owed-woken' : 'owed' };
 };
 
 /**

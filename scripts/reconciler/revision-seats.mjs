@@ -12,7 +12,7 @@ const LEGACY_ACK = 'runtime-rev-acked';
 const LIST_TYPE = 'application/json';
 
 const recordOf = (payload) => {
-  if (payload?.verdict === 'woken') return { type: 'woken', rev: payload.to };
+  if (payload?.verdict === 'woken') return { type: 'woken', rev: payload.to, digest: payload.digest };
   return SETTLED_VERDICTS.includes(payload?.verdict) ? { type: 'settled', rev: payload.to } : null;
 };
 const listBytes = (rows) => Buffer.from(JSON.stringify(rows));

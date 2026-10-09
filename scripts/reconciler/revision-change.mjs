@@ -99,9 +99,10 @@ const heaviest = (doc, actions) => actions.reduce((top, a) => (weight(doc, a) > 
 const LISTED = new Set(['reread', REPLACE, 'restart']);
 
 function roleScope(doc, role, perFile, accepted) {
-  const mine = perFile.map(({ entry, actions }) => ({ path: entry.path, action: effective(actions[role] ?? 'none', entry, accepted) })).filter((f) => f.action !== 'none');
+  const mine = perFile.map(({ entry, actions }) => ({ path: entry.path, action: effective(actions[role] ?? 'none', entry, accepted), added: entry.added, deleted: entry.deleted })).filter((f) => f.action !== 'none');
   const named = (pick) => mine.filter(pick).map((f) => f.path).sort(byCodeUnit);
-  return { action: heaviest(doc, mine.map((f) => f.action)), count: mine.length, files: named((f) => LISTED.has(f.action)), replaceFiles: named((f) => f.action === REPLACE) };
+  const digest = sha256(mine.map((f) => [f.path, f.action, f.added, f.deleted].join(String.fromCodePoint(9))).sort(byCodeUnit).join(String.fromCodePoint(10)));
+  return { action: heaviest(doc, mine.map((f) => f.action)), count: mine.length, digest, files: named((f) => LISTED.has(f.action)), replaceFiles: named((f) => f.action === REPLACE) };
 }
 
 /**
