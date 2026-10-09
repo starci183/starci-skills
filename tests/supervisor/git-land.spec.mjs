@@ -44,6 +44,7 @@ const greenDeps = (fx, more = {}) => ({
   runCheck: () => ({ ok: true, pass: 5, total: 5, output: 'green' }),
   changedFiles: () => ['scripts/value.mjs'],
   runSpecs: () => ({ ok: true, selected: 1, pass: 1, rerun: 0, log: path.join(fx.base, 'land.log') }),
+  verifyReceipt: () => ({ ok: true, record: { affected: { passed: 3, total: 3 } } }),
   announceLand: () => true,
   syncCopies: () => 540,
   ...more,
@@ -85,6 +86,7 @@ test('a green land fast-forwards primary local main and records verification tra
   assert.match(note, new RegExp(`Land-Verified: ${fx.tip}`));
   assert.match(note, /Specs: 1\/1/);
   assert.match(note, /Check: 5\/5/);
+  assert.match(note, new RegExp(`Affected: 3/3 ${fx.main}..${fx.tip}`));
   assert.equal(calls.some((argv) => argv.includes('push')), false, JSON.stringify(calls));
 });
 

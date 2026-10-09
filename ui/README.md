@@ -10,8 +10,10 @@ The visual language and component anatomy are documented in [DESIGN.md](DESIGN.m
 
 From the lane's `ui` directory, install its own dependencies under the host lock described in [source management](../docs/source-process.md). Generate the i18n catalog from that lane's runtime source; `prebuild` runs the generator automatically.
 
+Every change to `ui/package.json` or `ui/package-lock.json` requires successful `npm install` and `npm run build` in the changed checkout on this host before committing. Commit the matching manifest and lockfile together, and include the literal text `ui deps changed` in the commit message. After landing, install and build the host's `ui` checkout as well before reporting it ready; each checkout owns its own `node_modules`. Use `npm install` while a development server is running.
+
 ```powershell
-npm ci
+npm install
 npm run build
 $env:STARCI_MACHINE_DB = '<lanes root>/ui/ui/fixtures/seed/machine.sqlite'
 $env:STARCI_ARTIFACT_ROOT = '<tmp>/ui-seed-artifacts'

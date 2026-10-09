@@ -111,7 +111,7 @@ async function affectedProof({ facts, seams, progress }) {
   const proven = seams.provenAffected(source.dir, base, source.sha);
   if (proven) {
     progress(`affected: accepting the receipt already proven for ${base.slice(0, 12)}..${source.sha.slice(0, 12)} (${proven.passed} of ${proven.total} files passed); not run again`);
-    return { affected: { base: proven.base, tip: proven.tip, passed: proven.passed, total: proven.total } };
+    return { affected: { base: proven.base, tip: proven.tip, ...(proven.root ? { root: proven.root } : {}), passed: proven.passed, total: proven.total } };
   }
   const plan = facts.affectedPlan ?? affectedPlanOf(seams, source.dir, base);
   progress(`affected: running ${plan.files ?? 'an unknown number of'} spec file(s) in ${source.dir} against ${base.slice(0, 12)}, budget ${Math.round((plan.budgetMs ?? 0) / 60_000)} min; progress follows`);

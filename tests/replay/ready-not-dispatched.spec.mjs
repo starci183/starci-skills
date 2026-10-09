@@ -60,9 +60,10 @@ test('h: a ready interface op whose brand record lives in the workflow tree pass
   const draw = fixture.jobs.find((job) => job.op === 'interface.draw');
   const world = replayWorld(t, fixture, { tree: true, launch: true });
   assert.equal(world.ack([draw.op]).status, 0);
+  // The engine pass runs the Workflow controller's push in the foreground (the replay world has no detached child): its own push is the one that reads the tree.
   assert.equal(world.engine({ controllers: ['job', 'workflow'], passes: 1 }).ok, true);
-  const [result] = push(world).results;
-  assert.equal(result.jobId, draw.id);
+  const [result] = world.ledger((ledger) => ledger.db.prepare("SELECT payload_json FROM events WHERE kind='kernel-dispatch-push' ORDER BY seq").all().flatMap((row) => JSON.parse(row.payload_json).results).filter((r) => r.jobId === draw.id));
+  assert.ok(result, 'the engine pass pushed the ready job');
   assert.doesNotMatch(String(result.error ?? ''), /grammar-context-missing/, `the push reads the brand record of the tree: ${result.error}`);
   assert.equal(typeof result.dispatched, 'boolean', 'the push went on to route and dispatch the job');
 });

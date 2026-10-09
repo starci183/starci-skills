@@ -22,9 +22,10 @@ async function settleInProcess(args, env) {
   return { ok: value.ok, code: value.ok ? 0 : 1, stdout: JSON.stringify(value), stderr: '', value };
 }
 
-// With spec.foregroundPush the parallelism push is the real verb run in the foreground: without --foreground it hands the push to a detached child that outlives the pass and races
-// whatever the spec does next (the ack of a READ, its own push). The verb is the same; only the process model that lets a pass end before the push does is not reproduced.
-const foregroundPush = (args) => (spec.foregroundPush === true && args.includes('dispatch-ready') && !args.includes('--foreground') && !args.includes('--dry-run') ? [...args, '--foreground'] : args);
+// The parallelism push is the real verb run in the foreground: without --foreground it hands the push to a detached child that outlives the pass and races whatever the spec does next (the
+// ack of a READ, its own push). A replay world is deterministic by construction, so the verb is the same and only the process model that lets a pass end before the push does is not reproduced;
+// spec.detachedPush keeps the live shape for a spec that tests detachment (the world then fails the pass that leaves the child alive unless the spec says it expects one).
+const foregroundPush = (args) => (spec.detachedPush !== true && args.includes('dispatch-ready') && !args.includes('--foreground') && !args.includes('--dry-run') ? [...args, '--foreground'] : args);
 // The GC controller's housekeeping key runs the real `housekeeping.mjs --apply`: on a world that lives in the temp directory it archives the world's own ledger as an orphan (its source roots are
 // under the temp directory) while the other keys of the same pass read it. Housekeeping is not what a replay judges, so it answers ok without running.
 const housekeepingStub = () => ({ ok: true, code: 0, stdout: '{}', stderr: '', value: { ok: true } });
