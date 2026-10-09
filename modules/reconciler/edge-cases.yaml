@@ -1467,7 +1467,7 @@ cases:
     replay: tests/replay/dispatch-owners.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a failure is classified by the typed field the report carries, and the item that asks the Kernel carries the failed attempt's own evidence) StarCi work.author blocked on an sds-gap was read as a too-narrow grant because the words of its detail matched a pattern; shape-refused then offered a widen of the same shape, with free text and none of the blocker or the paths the attempt reported", remedy: {state: in-tree, change: "causesOf classifies by the typed blocker kind first (sds-gap, srs-gap, interface-gap, brand-gap are the new cause record-gap, which is no shape cause and which the route table repairs upstream; shared-change, test-gap, grammar-gap, checker-unavailable keep their causes; a check that exited 124 is a timeout) and falls back to the wording only for a report that names no kind; shape-refused carries the failed attempt's blocker kind and detail and the paths it reported as the ready choice widen-reported"}}
     met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "work.author c10c110700 blocked on an SDS gap, read as grant-too-narrow; shape-guard-retry replay"}
-    rule: {file: scripts/kernel/progress-rca.mjs, anchor: "typedCauses"}
+    rule: {file: scripts/kernel/rca-causes.mjs, anchor: "typedCauses"}
     spec: tests/kernel/dispatch-owners.spec.mjs
     status: covered
   - id: refused-dispatch-is-retried-and-recorded-every-push
