@@ -17571,12 +17571,3 @@ kernel-launch-dispatch-mismatch:
   nextStep_vi: "Supervisor kiểm tra tín hiệu và Dispatch trên Orca; runtime không nhận cửa sổ của bản ghi lạ."
   owner: supervisor
   kind: runtime-fault
-kernel-launch-handle-unbound:
-  title: "The terminal could not be bound to the original reservation"
-  title_vi: "Không gắn được cửa sổ vào chỗ giữ ban đầu"
-  meaning_vi: "Cửa sổ Orca báo cho Dispatch không ghi được vào chỗ giữ của nhà cung cấp, nên chỗ giữ không được giải phóng."
-  causes_vi:
-    - "Chỗ giữ đã bị đổi hoặc bị rào"
-  nextStep_vi: "Supervisor đối chiếu chỗ giữ với Dispatch rồi giải phóng bằng bằng chứng đóng."
-  owner: supervisor
-  kind: runtime-fault

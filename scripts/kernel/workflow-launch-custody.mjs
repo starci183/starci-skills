@@ -61,7 +61,7 @@ const isUnreceipted = (owned, value, receipt) => owned && filled(value.dispatch)
  * Opens ONE Supervisor Decision Item for a held launch whose Dispatch Orca knows (idempotent per signal token and reason), naming the Dispatch, the terminal
  * Orca reports and the evidence of the refusal, so a held launch always has an owner. Never throws; returns the item or null.
  */
-export function escalateHeldLaunch(ledger, { workflowId, signal, reason, evidence }, { machine = withMachine, env = process.env } = {}) {
+function escalateHeldLaunch(ledger, { workflowId, signal, reason, evidence }, { machine = withMachine, env = process.env } = {}) {
   try {
     const generation = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId)?.generation ?? 0;
     const payload = { workflowId, reservation: signal.token, reason, ...evidence };
