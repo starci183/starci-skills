@@ -1,6 +1,6 @@
 // controllers/gc.mjs — the reconciler's GC controller (DESIGN §8.5, §15; lane rc-gc-resource).
 //
-// It wraps scripts/supervisor/gc.mjs, never re-implements it. Three triggers:
+// It wraps scripts/supervisor/gc.mjs, never re-implements it. Five triggers, an event and four keys:
 //   1. an event (op-settled, worker-released[-on-report], kernel-stale-cleared, land-succeeded/land-passed,
 //      workflow-finished, workflow-archived) → verify just that entity: its workers (Orca's worker-list of the entity's
 //      Runs: a reclaimable worker on one of its terminals is released per Orca's nextAction, lib/worker-accounting.mjs
