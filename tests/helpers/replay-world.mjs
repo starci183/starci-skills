@@ -41,7 +41,7 @@ export const DRIVER = path.join(ROOT, 'tests', 'helpers', 'replay-driver.mjs');
 /** The seams this harness stubs, named so a spec (and its reader) can state them. */
 /** The scratch directories the runtime leaves in the temp root of a replayed child (the temp-leak check of the spec preloads names them). */
 const SCRATCH_DIRS = ['starci-kernel-scratch', 'starci-job-scratch', 'starci-settler'];
-export const STUBBED = Object.freeze(['orca binary (terminal and agent launch)', 'critic agent launch (engine driver only)']);
+export const STUBBED = Object.freeze(['orca binary (terminal and agent launch)', 'critic agent launch (engine driver only)', 'housekeeping run of the GC controller (engine driver only)']);
 
 const IDENTITY = { GIT_AUTHOR_NAME: 'replay', GIT_AUTHOR_EMAIL: 'replay@example.test', GIT_COMMITTER_NAME: 'replay', GIT_COMMITTER_EMAIL: 'replay@example.test' };
 const rm = (dir) => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 });
