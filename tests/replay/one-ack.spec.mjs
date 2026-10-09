@@ -27,7 +27,7 @@ test('a revision change that owes the Kernel a file: one plan holds it, one ack 
   const acked = world.cli('revision-ack', ['--workflow', world.wf, '--rev', plan.json.readManifest.rev, '--digest', plan.json.readToken]);
   assert.equal(acked.status, 0, acked.stderr);
   const after = world.status();
-  assert.equal(after.kernelRev.stale, false, 'the gate reads the ack');
+  assert.equal(after.kernelRev, undefined, 'the status has no second revision field: the notice is the one');
   assert.ok(['acked-legacy', 'current'].includes(after.revisionNotice.state), `the notice reads the same ack (${after.revisionNotice.state})`);
   const kinds = world.ledger((ledger) => ledger.db.prepare("SELECT kind FROM events WHERE kind IN ('runtime-rev-acked')").all().map((row) => row.kind));
   assert.equal(kinds.length, 2, 'one event kind for every ack, whichever verb spelling attests');

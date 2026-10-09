@@ -62,9 +62,9 @@ steps:
     scope: workflow
     actor: kernel
     precondition: "kernel-booted"
-    done: "the Kernel acked the runtime revision that is current (status.kernelRev.acked equals current)"
+    done: "the Kernel acked the runtime revision that is current (status.revisionNotice.state is current, not-concerned or acked-legacy)"
     bound: {ref: "modules/reconciler/sla.yaml#codes.REV_ACK_OVERDUE.slaMs"}
-    evidence: "status kernelRev, events runtime-rev-acked"
+    evidence: "status revisionNotice, events runtime-rev-acked"
     probe: kernel-acked-rev
   - id: leg-dispatched
     scope: workflow
@@ -154,6 +154,8 @@ departures:
   secret-survived: {role: runtime, duty: does, registry: debug-questions-lacked-five-signals}
   hold-unlisted: {role: runtime, duty: does, registry: null}
   leg-unowned: {role: runtime, duty: does, registry: critic-hold-filed-as-owner-authority}
+  action-failing: {role: runtime, duty: does, registry: reconciler-action-fails-on-every-pass-unreported}
+  decision-refused: {role: runtime, duty: does, registry: reconciler-action-fails-on-every-pass-unreported}
   status-unreadable: {role: runtime, duty: does, registry: null}
   op-no-cause: {role: runtime, duty: does, registry: null}
   attempt-no-cause: {role: runtime, duty: does, registry: null}

@@ -691,7 +691,25 @@ cases:
     family: smooth-operation
     met: {date: "2026-10-09", where: "wave 4 lane perf/w4-seat-token-cost: the usage sweep cuts a Kernel session at kernel-woken events only", evidence: "scripts/kernel/wake-budget.mjs kernelWakesOf"}
     status: open
-    why: "a transition or doorbell wake has no tokens of its own in the seat-cost view (tokens per wake p50 and p90 read the stall wakes); cutting at the other wake kinds changes the buckets of sessions already recorded and would count the range after an old transition wake twice, so the cut needs a marker event that starts the new cuts from its own instant"
+    why: "RESTATED 2026-10-09 (lane f9) with the cost measured on the newest boots of the ledger copy. Tokens of a boot are not a wake's: the sweep already cuts a session at the boot event, and the wakes the watchdog typed INSIDE a boot turn (13 of the 28 StarCi boot-window wakes, half delivered queued into the busy turn) were what charged the boot's reading to a wake; those wakes are now withheld (kernel-watchdog repeatedWake, reason booting). Where the boot tokens go: StarCi session 3720bbc7 4 usage rows, 20 turns, 142 tool calls, about 2.3M tokens; session 63c88285 18 turns, 59 tool calls, about 1.98M tokens; 14 to 17 model turns re-reading a 100 to 120K context from cache, driven by one read tool call per path of the read plan. The avoidable part is the per-path reads: kernel-ack-rev --plan now writes ONE bundle file of every unread path and the prompt reads it with one call. What remains open: a transition or doorbell wake still has no tokens of its own in the seat-cost view (tokens per wake p50 and p90 read the stall wakes), and cutting at those kinds changes the buckets of sessions already recorded and would count the range after an old transition wake twice, so the cut needs a marker event that starts the new cuts from its own instant. The boot turn count after the bundle is unmeasured until the next boot of a live Kernel: the first number to read there is the turns of the row tagged to the boot event."
+  - id: kernel-wake-counted-toward-rotation-when-the-runtime-caused-it
+    family: smooth-operation
+    found: live
+    replay: tests/replay/wake-accounting.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a seat is replaced when it wasted its life, never for the runtime's own wakes) the Nivo Kernel went through 16 attempts in a day and the status read 119 wakes, 78 empty (66%) OVER-BOUND; the rotation counted every delivered wake, and the watchdog typed a liveness wake every minute for a menu the Kernel was still working on", remedy: {state: in-tree, change: "rotation counts only wakes with a menu; no repeat wake for an unanswered menu, none inside a boot"}}
+    met: {date: "2026-10-09", where: "ledger copy a8live16, events since 10:15 local", evidence: "Nivo: 60 stall wakes with no decision in the window (idleWakes 1 to 8 a minute apart while a settle loop and op-critic-verdict-missing items stood), each series ended in kernel-rotated '8 wakes since its boot' (10 rotations, 10 restarts); StarCi: 15 empty stall wakes, 3 empty doorbells and 1 empty report-filed wake, 7 wakes in each of the 09:47Z and 10:17Z boots one to two minutes apart"}
+    rule: {file: scripts/kernel/seat-wakes.mjs, anchor: "countsTowardRotation"}
+    spec: tests/replay/wake-accounting.spec.mjs
+    status: covered
+  - id: kernel-boot-reads-one-file-per-path
+    family: smooth-operation
+    found: live
+    replay: tests/replay/read-attestation.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a boot costs what its reading costs, once) a Kernel boot took 14 to 17 model turns and 47 to 69 file-read tool calls, about 1.8 to 2.3M tokens, each turn re-reading a 100 to 120K context, one read call per path of the plan", remedy: {state: in-tree, change: "the read plan is one bundle file returned by kernel-ack-rev --plan"}}
+    met: {date: "2026-10-09", where: "ledger copy a8live16, StarCi sessions 3720bbc7 and 63c88285", evidence: "llm_usage rows of the two sessions: 1.65M, 0.29M, 0.36M tokens in 14, 3, 3 turns (69, 2, 23 tool calls) and 1.82M tokens in 17 turns (47 calls)"}
+    rule: {file: scripts/kernel/read-bundle.mjs, anchor: "writeReadBundle"}
+    spec: tests/replay/read-attestation.spec.mjs
+    status: covered
   - id: debug-questions-lacked-five-signals
     family: record-vs-reality
     finding: {role: runtime, duty: does, verdict: departs, evidence: "the five questions Debug could not answer after the first four signals (a provider outage and the resumption of work, whether a source change touched live state, a secret that survived redaction, host-versus-ledger drift, two claimants of one port) each needed a fact the runtime observed and did not record where it occurs", remedy: {state: in-tree, change: "provider_health_events keep the end of the circuit beside the failing job, step and kind; the engine writes signal.runtime-change-applied when it starts on a new revision and when a land re-looks at the running workflows; the redaction module reports which rule still finds a secret in a stored artifact and the digest scans its own inputs with it; the SLA pass writes signal.host-ledger-drift for every clock whose code names a driftKind when it outlives its bound and when it clears; env-health writes signal.port-claim for every claim, refusal and release of a port"}}
@@ -1395,7 +1413,7 @@ cases:
     replay: tests/replay/contract-replace.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a failed start names its step and message in the action journal, the digest and the Supervisor item) the watchdog answered restart-failed with an empty detail, the engine action error read 'action restart-failed', the digest read 'Kernel not alive (probe restart-needed)', and a refusal printed before the claim (workflow-host-not-ready) was recorded nowhere, so the start-hold rule never counted it", remedy: {state: in-tree, change: "the watchdog answer carries reason and error (Kernel start refused at <step>: <message>); a pre-claim refusal and a start that printed no answer are journalled kernel-start-failed under the revision, which the start-hold rule counts and the seat-unrecoverable item reports; the digest line of a dead Kernel adds its last failed start"}}
     met: {date: "2026-10-09", where: "alpha.8 live, runtime 70b853e44", evidence: "engine_actions seat:kernel:* result restart-failed with detail empty; no kernel-start-failed event after kernel-rotated"}
-    rule: {file: scripts/kernel/kernel-watchdog.mjs, anchor: "recordRefusedStart"}
+    rule: {file: scripts/kernel/start-refusal-journal.mjs, anchor: "journalRefusedStart"}
     spec: tests/kernel/start-unanswered.spec.mjs
     status: covered
   - id: ui-dependency-install-deletes-node-modules
@@ -1518,6 +1536,15 @@ cases:
     spec: tests/kernel/dispatch-owners.spec.mjs
     status: covered
 
+  - id: kernel-revision-wake-decided-twice
+    family: record-vs-reality
+    found: live
+    replay: tests/replay/one-wake-decider.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: what a revision change asks of a Kernel is decided once) scripts/kernel/runtime-rev.mjs decided the re-read from its own path list, a 30-minute window after the ack and a 12-file cap, while the revision notice decided from modules/kernel/revision-scope.yaml; the watchdog typed notice || rev, the status carried both kernelRev and revisionNotice, the menu item and the next action read the first and the wake the second, so the same land was 'not stale' to one surface and 'owed' to another (StarCi 2026-10-09 17:15) and a modified rule was a re-read to one and a replacement to the other.", remedy: {state: in-tree, change: "the notice over the table is the one decider: kernel-notice.mjs projects it to the status field revisionNotice, the menu item rev-ack, the reread next action and the one wake sentence (watchdog and transition wakes alike); runtime-rev.mjs keeps only the ack read, the enqueue gate over an op's own contract (opRevHold) and op-rev-drift"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi Kernel, the digest at 17:15 and the contributing audit F1", evidence: "kernelRev.stale false with revisionNotice owed after an op-contract land inside the coalescing window; wakePromptOf typed 'notice || rev'"}
+    rule: {file: scripts/kernel/kernel-notice.mjs, anchor: "revisionWakeLine"}
+    spec: tests/kernel/kernel-runtime-rev.spec.mjs
+    status: covered
   - id: two-revision-acks-disagree-and-one-needs-a-file-the-guard-refuses
     family: record-vs-reality
     found: live
@@ -1614,4 +1641,45 @@ cases:
     met: {date: "2026-10-09", where: "alpha.8 live, Nivo and StarCi workflow trees", evidence: "supervisor gc plan: term_06ac94ed and term_e8442647 [unknown] in the workflow trees' directories; machine worktrees gc: nothing to collect"}
     rule: {file: scripts/machine/workflow-purge-orca.mjs, anchor: "export function classifyTerminals"}
     spec: tests/machine/workflow-purge.spec.mjs
+    status: covered
+
+  - id: kernel-start-refusals-are-not-counted
+    family: failure-while-running
+    found: live
+    replay: tests/replay/start-refusals-counted.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a launch that fails again for one cause is one held seat and one Decision Item, never a silent loop) a Kernel launch of unknown outcome kept the signal launch-unknown and start-workflow answered kernel-launch-unreconciled to the watchdog every two minutes for hours; the refusal was printed before the start claimed anything, so it recorded no kernel-start-failed, the start-hold rule (which counts only that event) never spent its bound, no seat was held, no Decision Item was opened and the digest could not name a loop. Only four refusal steps were journalled by a list in the watchdog; any other (the sender terminal missing, a terminal that cannot be verified) repeated the same way", remedy: {state: in-tree, change: "the watchdog journals every refusal the start printed without recording a failed launch itself (start-refusal-journal.mjs), except the answers that are not failed launches; the start-hold rule then holds the seat after the declared number of failures of one cause and the seat-unrecoverable Decision Item reports it"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "the watchdog answered restart-failed kernel-launch-unreconciled on every Host pass; the ledger held one kernel-start-failed for the original launch and none for the refusals"}
+    rule: {file: scripts/kernel/start-refusal-journal.mjs, anchor: "journalRefusedStart"}
+    spec: tests/replay/start-refusals-counted.spec.mjs
+    status: covered
+  - id: unstamped-orphan-tree-is-reported-in-a-log-row-only
+    family: record-vs-reality
+    met: {date: "2026-10-09", where: "held-state sweep of the failure catalogue (lane fix/a8-held-states-have-owners)", evidence: "scripts/machine/worktrees.mjs reviewUnstamped: an unstamped tree with no registry row is never removed and is reported once as the machine log row worktree.orphan-review"}
+    status: open
+    why: "the catalogue gives unstamped-orphan to the owner, but the tree stays on disk until the owner looks and only a machine log row (once per path) and the GC report item action review name it: no Decision Item, no digest line and no clock follow it. A tree the GC never removes is the owner's to judge, so the item needs the owner's decision options (keep, remove) and a close when the tree is gone; that wants a decision of the owner on what removing an unregistered tree may touch"
+  - id: draft-stuck-refusal-reaches-no-owner-item
+    family: failure-while-running
+    met: {date: "2026-10-09", where: "held-state sweep of the failure catalogue (lane fix/a8-held-states-have-owners)", evidence: "scripts/kernel/clear-draft.mjs and quit-agent.mjs refuse draft-stuck; scripts/kernel/verbs/nudge.mjs refuseDraftDelivery"}
+    status: open
+    why: "a wake or nudge refused because a real person's draft stands in the input box is counted as a missed wake and replaces the seat after the declared number of misses, but the draft belongs to the owner and no item asks the owner to clear it; the replacement would discard that draft. Which of the two is right (ask the owner first, or replace and keep the text) is the owner's decision, so the refusal stays unsurfaced to the owner until it is made"
+  - id: reconciler-action-fails-on-every-pass-unreported
+    family: failure-while-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a stop the runtime makes is a line with an owner, never a row nobody reads) a controller action that ends failed without throwing leaves no queue retry, no Decision Item, no clock and no digest line: the machine store of the first alpha.8 day held 490 failed runs of one Kernel seat watchdog (every two minutes for a day), 59 of the Supervisor seat, 24 of the ask tunnel and 44 of kernel reconcile health:all, each only a failed row of engine_actions; and a Decision Item the runtime refused to open (it named no repository) left one log row per pass and no item, so the role it was for never heard of it", remedy: {state: in-tree, change: "the digest reads the unbroken failing run of every (controller, verb, key) from engine_actions and the refused-item log rows, and prints action-failing and decision-refused problem lines of the runtime once a run is long, spans the declared time and is still happening (modules/reconciler/debug-digest.yaml)"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, machine.sqlite engine_actions", evidence: "ledger-copy-a8a: host run node seat:kernel:starci-monorepo:wf-starci-auth-test-wo failed 490, seat:supervisor failed 59, service:ask-tunnel failed 24, job starci kernel reconcile health:all failed 44, with no matching Decision Item"}
+    rule: {file: scripts/reconciler/debug-digest-silent.mjs, anchor: "silentProblems"}
+    spec: tests/reconciler/debug-digest-silent.spec.mjs
+    status: covered
+  - id: effect-unknown-promised-an-item-opened-none
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a catalogue promise is kept by code) the SLA catalogue says EFFECT_UNKNOWN_STUCK is answered by starci kernel reconcile and then a Decision Item; the Job controller only reconciled on every pass and the clock stayed a warn, so a job fenced as effect_unknown for hours reached the Supervisor through no item", remedy: {state: in-tree, change: "past the SLA bound the Job controller opens one runtime-defect item for the Supervisor per job (effect-unknown-item.mjs)"}}
+    met: {date: "2026-10-09", where: "held-state sweep of the hold table (lane fix/a8-held-states-have-owners)", evidence: "modules/reconciler/sla.yaml EFFECT_UNKNOWN_STUCK autoAction against scripts/reconciler/controllers/job.mjs"}
+    rule: {file: scripts/reconciler/effect-unknown-item.mjs, anchor: "effectUnknownItem"}
+    spec: tests/reconciler/effect-unknown-item.spec.mjs
+    status: covered
+  - id: refused-launch-recovery-and-seat-quarantine-two-items
+    family: concurrency
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: one item per cause) a refused Kernel launch recovery opens its own Supervisor item and the refusal, counted by the start hold, would also quarantine the seat with a seat-unrecoverable item: two items for kernel-launch-unreconciled", remedy: {state: in-tree, change: "the recovery's item owns the refusal; the quarantine counts it and holds the launch but opens no second item while the recovery's item is live (launch-held-item.mjs)"}}
+    met: {date: "2026-10-09", where: "merge of hotfix/a8-kernel-launch-adopt with the start-refusal journal", evidence: "workflow-launch-custody.mjs escalateHeldLaunch and host-seats.mjs seatQuarantine"}
+    rule: {file: scripts/kernel/launch-held-item.mjs, anchor: "recoveryItemOpen"}
+    spec: tests/reconciler/launch-held-item.spec.mjs
     status: covered

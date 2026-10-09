@@ -150,7 +150,7 @@ test('asks: dead / stale / unserved are re-parked through starci kernel serve-as
 test('finish-ready (every job settled, handover approved) is starci kernel finish; an ended workflow clears its clocks', (t) => withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {
   seed(ledger, { progressAgoMin: 5 });
   const { ctx, rec } = fakeCtx({ repoRoot, ledgerFile, statusOf: () => status({ frontier: { state: 'finish-ready', actionable: true, openOperations: 0 },
-    kernelRev: { stale: true, acked: 'a7461cbb4952aaaa', current: 'b709a530dffcbbbb', files: ['modules/kernel/driver-loop.yaml'] } }) });
+    revisionNotice: { role: 'kernel', state: 'owed', from: 'a7461cbb4952aaaa', to: 'b709a530dffcbbbb', count: 1, files: ['modules/kernel/driver-loop.yaml'], line: 'kernel owes 1 file(s) of rev x' } }) });
   const key = keyOf(LEDGER, WF);
   await reconcileWorkflow(key, ctx);
   assert.deepEqual(rec.api.map((a) => [a.verb, ...a.argv]), [['finish', '--workflow', WF]]);
@@ -158,7 +158,7 @@ test('finish-ready (every job settled, handover approved) is starci kernel finis
   assert.ok(rec.logs.some((l) => l.kind === 'reconciler.would' && (l.data?.keys ?? []).includes('rev:b709a530dffc')), 'one doorbell carries the new rev');
   assert.ok(clocksOf(ctx, { prefixes: [`workflow:${LEDGER}:${WF}`] }).some((c) => c.state === 'REV_ACK_OVERDUE'));
   const overdue = planWorkflow({ ledgerId: LEDGER, workflowId: WF, now: NOW, settings: workflowSettings(),
-    status: status({ kernelRev: { stale: true, acked: 'a7461cbb4952aaaa', current: 'b709a530dffcbbbb', files: [] } }),
+    status: status({ revisionNotice: { role: 'kernel', state: 'owed', from: 'a7461cbb4952aaaa', to: 'b709a530dffcbbbb', count: 0, files: [], line: 'kernel owes 0 file(s) of rev x' } }),
     clocks: [{ entity: `workflow:${LEDGER}:${WF}`, state: 'REV_ACK_OVERDUE', enteredAt: NOW - workflowSettings().revAckMs - 1 }] });
   assert.deepEqual(overdue.decisions.filter((d) => d.kind === 'rev-ack').map((d) => d.idempotencyKey), [`rev-ack:${WF}:runtime-rev`], 'overdue: one DI per workflow, whatever the rev');
 
@@ -192,7 +192,7 @@ test('a land-passed event of the Supervisor ledger re-looks at every running wor
   const route = controller.routes['land-passed'];
   assert.equal(route({ ledgerId: 'supervisor', kind: 'land-passed' }), REV_WAKE_KEY);
   assert.equal(route({ ledgerId: LEDGER, workflowId: WF, kind: 'land-passed' }), null);
-  const staleStatus = { ...status(), kernelRev: { stale: true, acked: 'aaaaaaaaaaaa', current: 'bbbbbbbbbbbb', files: ['modules/kernel/driver-loop.yaml'] } };
+  const staleStatus = { ...status(), revisionNotice: { role: 'kernel', state: 'owed', from: 'aaaaaaaaaaaa', to: 'bbbbbbbbbbbb', count: 1, files: ['modules/kernel/driver-loop.yaml'], line: 'kernel owes 1 file(s) of rev x' } };
   const { ctx, rec } = fakeCtx({ repoRoot, ledgerFile, statusOf: () => staleStatus });
   let dropped = 0;
   ctx.dropStatusCache = () => { dropped += 1; };

@@ -7,12 +7,17 @@
 //   2. the chip survives that Enter: the launch is refused TURN_START_UNOBSERVED and the worker and its terminal are closed before the next try;
 //   3. whatever the host does, the Task spec the runtime hands to worker-start is a short pointer to a file, never the prompt itself (content is a file, the reference travels).
 // Real: dispatch-ready and its dispatch child (admission, launch, cleanup), the engine. Stubbed: the Orca binary only (tests/helpers/fake-orca.mjs mode turn-start-unobserved).
-// Not replayed: the Kernel start itself (scripts/kernel/start-workflow.mjs runs the same startAgent/settleLaunch; the copy's inbox and goal are not part of the fixture).
+// Tests 5 and 6 replay the Kernel start itself (`starci workflow start`, the same startAgent/settleLaunch) through the prompt-file delivery: the Kernel's 10.8 KB prompt was pasted whole under the old 16000-character
+// bound and is a pointer to its file under the 2000-character one. Test 3 does NOT tell the two revisions apart: the op packet of this fixture is 28 KB and spilled to a file before the fix too (it pins the pointer shape only);
+// the claim 'content is a file, the reference travels' is carried by tests 5 and 6, which fail on b4c6fcd44.
 // Fixture: tests/fixtures/replay/codex-turn-start.json (extracted from the Nivo ledger copy, neutral).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { loadFixture, replayWorld } from '../helpers/replay-world.mjs';
+import path from 'node:path';
+import { loadFixture, replayWorld, ROOT } from '../helpers/replay-world.mjs';
+import { postInbox } from '../../engine/db/ledger.mjs';
+import { writeInstallMarker } from '../../scripts/machine/npm-install-state.mjs';
 import { ledgerView } from '../../scripts/supervisor/gc-registry.mjs';
 
 const fixture = loadFixture('codex-turn-start');
@@ -60,4 +65,44 @@ test('4: the Run of a Kernel launch that failed is one the agents collector list
   world.ledger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId: world.wf, entityType: 'kernel', entityId: world.wf, kind: 'kernel-start-failed',
     payload: { step: 'worker-start', error: 'TURN_START_UNOBSERVED: x', terminal: 'term_dead', runId: 'run_failed_launch', dispatch: 'ctx_dead', effectState: 'unknown' } })));
   assert.deepEqual(ledgerView(world.repo).launchRuns, ['run_failed_launch'], 'no job names this Run: only the failed launch event does');
+});
+
+/** A world whose Kernel is not yet started: a pending goal in the inbox, a linked workflow worktree with a finished install, the Orca stub answering the chip of a pasted prompt. */
+function kernelStart(t, { chipEnter }) {
+  const world = replayWorld(t, loadFixture('leg-ready'), { tree: true, launch: true, bindKernel: false, linkedTree: true });
+  Object.assign(world.env, { STARCI_FAKE_ORCA_MODE: 'turn-start-unobserved', ...(chipEnter ? { STARCI_FAKE_ORCA_CHIP_ENTER: 'submits' } : {}) });
+  const dir = world.tree.dir;
+  world.tree.write('package.json', '{"name":"app","version":"0.0.0"}\n');
+  world.tree.write('package-lock.json', '{"name":"app","lockfileVersion":3,"packages":{}}\n');
+  world.tree.commit('manifests');
+  fs.mkdirSync(path.join(dir, 'node_modules'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'node_modules', '.package-lock.json'), '{"packages":{}}');
+  assert.equal(writeInstallMarker(dir), true, 'the tree holds a finished install: the start does not run npm');
+  world.ledger((ledger) => postInbox(ledger.db, { workflowId: world.wf, kind: 'goal', payload: { goalRevision: 0 } }));
+  const run = world.starci(['workflow', 'start', '--repo', world.repo, '--goal', world.wf], { timeout: 250_000, extraEnv: { STARCI_RUNTIME: ROOT, ORCA_TERMINAL_HANDLE: 'term-runtime-shell' } });
+  return { world, run, orca: world.orca() };
+}
+
+test('5: the Kernel start hands worker-start a pointer to the file that holds its whole prompt, and the start stands', (t) => {
+  const { world, run, orca } = kernelStart(t, { chipEnter: true });
+  assert.equal(run.status, 0, `the Kernel starts: ${run.stdout.slice(-600)}`);
+  const [start] = orca.workerStarts ?? [];
+  assert.ok(start, 'worker-start was called for the Kernel');
+  assert.ok(start.spec.length < 2000, `the Task spec is a pointer, not the 10 KB prompt (${start.spec.length} chars)`);
+  const file = /PACKET FILE[^\n]*\n\s+(\S.*)\n/.exec(start.spec)?.[1];
+  assert.ok(file && fs.existsSync(file), `it names a file that exists: ${file}`);
+  const prompt = fs.readFileSync(file, 'utf8');
+  assert.ok(prompt.length > 2000 && prompt.includes(world.wf) && !prompt.includes('{workflowId}'), 'and the file holds the whole rendered prompt');
+  assert.equal(world.engine({ controllers: ['job', 'workflow'], passes: 1 }).ok, true, 'the engine restarts over the started Kernel');
+});
+
+test('6: a Kernel start whose turn never begins is refused TURN_START_UNOBSERVED, journalled with its Run, and its worker is closed', (t) => {
+  const { world, run, orca } = kernelStart(t, { chipEnter: false });
+  assert.notEqual(run.status, 0);
+  const [failed] = world.ledger((ledger) => ledger.db.prepare("SELECT payload_json FROM events WHERE kind='kernel-start-failed' ORDER BY seq").all().map((row) => JSON.parse(row.payload_json)));
+  assert.ok(failed, `the refusal is journalled: ${run.stdout.slice(-400)}`);
+  assert.match(String(failed.error ?? failed.reason), /TURN_START_UNOBSERVED/i);
+  assert.ok(failed.runId, 'with the Run the launch created, which the agents collector lists');
+  const states = Object.values(orca.workerStates ?? {});
+  assert.ok(states.length > 0 && states.every((state) => ['stopped', 'released'].includes(state)), `no worker is left alive: ${JSON.stringify(orca.workerStates)}`);
 });

@@ -190,6 +190,31 @@ function codexTurnStart(copy) {
     live: { kernelStartFailures: failed.length, codexKernelStartFailures: codex.length, lastStep: wordOr(failed.at(-1)?.p.step), lastTerminalNamed: Boolean(failed.at(-1)?.p.terminal), promptChars: 16831, pasteChip: 'Pasted Content' } };
 }
 
+/** The leg a Critic hold failed: architecture.decide whose records were finished and whose Critic did not start, and the work.author queued behind it (the facts of case k and l). */
+function criticHoldFacts(copy) {
+  const db = openLedger(copy, 'nivo');
+  const failed = rows(db, "SELECT * FROM jobs WHERE op_id='architecture.decide' AND status='failed' ORDER BY try_no");
+  const dependant = first(db, "SELECT * FROM jobs WHERE op_id='work.author' AND status='queued'");
+  return { tries: failed.length, dependantQueued: Boolean(dependant), routed: countOf(db, "SELECT count(*) n FROM events WHERE kind='failure-routed'") };
+}
+const heldLeg = (status, extra = {}) => ({ id: 'job-1', op: 'architecture.decide', status, admitted: status === 'reported', provider: 'claude', owned: ['d1.sds'],
+  report: { outcome: 'blocked', blocker: { kind: 'authority' }, cause: 'critic-hold', checks: [{ name: 'check-1' }] }, ...extra });
+
+/** Case k: a failed leg whose own Critic could not start, filed with the closest blocker kind it had, and the work.author held behind it. */
+function criticHeld(copy) {
+  const facts = criticHoldFacts(copy);
+  return { workflow: { id: WORKFLOW, phase: 'running', goalRevision: 0 },
+    jobs: [{ ...heldLeg('failed'), admitted: false, result: { verdict: 'blocked', nextStep: null } }, { id: 'job-2', op: 'work.author', status: 'queued', owned: ['own-1'], after: ['job-1'] }],
+    tree: { records: ['d1.sds.rec-1'] }, decisions: [], events: [], live: facts };
+}
+
+/** Case l: the same leg while its report is still unsettled (reported, held by the Critic). */
+function criticHeldReported(copy) {
+  const facts = criticHoldFacts(copy);
+  return { workflow: { id: WORKFLOW, phase: 'running', goalRevision: 0 }, jobs: [heldLeg('reported', { at: { created: -7_200_000, updated: -3_600_000 } })],
+    tree: { records: ['d1.sds.rec-1'] }, decisions: [], events: [], live: facts };
+}
+
 /**
  * Case k: a held Kernel launch (launch-unknown signal) whose start answered outcome_unknown / turn_start_unobserved without naming the terminal it had created: the signal
  * holds a Dispatch and no terminal, the provider receipt is unknown and names no handle, so recovery called the custody incomplete for ever and nothing owned it.
@@ -203,7 +228,7 @@ function launchUnreceipted(copy) {
       provider: wordOr(receipt.provider), receiptState: wordOr(receipt.state), openSupervisorItems: countOf(db, "SELECT count(*) n FROM decision_items WHERE status='open' AND decider='supervisor'") } };
 }
 
-const RECIPES = { 'launch-unreceipted': launchUnreceipted, 'codex-turn-start': codexTurnStart, 'draw-render-tool': drawRenderTool, 'fenced-retry': fencedRetry, 'grammar-in-tree': grammarInTree, 'leg-ready': legReady, 'read-plan': readPlan, 'shape-guard': shapeGuard, 'handed-over': handedOver, 'prepared-fail': preparedFail };
+const RECIPES = { 'critic-held': criticHeld, 'critic-held-reported': criticHeldReported, 'codex-turn-start': codexTurnStart, 'draw-render-tool': drawRenderTool, 'fenced-retry': fencedRetry, 'grammar-in-tree': grammarInTree, 'leg-ready': legReady, 'read-plan': readPlan, 'shape-guard': shapeGuard, 'handed-over': handedOver, 'prepared-fail': preparedFail, 'launch-unreceipted': launchUnreceipted };
 export const CASES = Object.freeze(Object.keys(RECIPES));
 
 /** The fixture document of `name` extracted from `copy`; the source names the copy neutrally. */

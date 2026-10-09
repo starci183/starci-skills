@@ -139,7 +139,7 @@ const diItem = (di, workflow) => {
 
 const waitItem = (wait, workflow) => itemOf('dead-wait', { key: wait.incidentId, subject: { workflow, incident: wait.incidentId, situation: wait.situation }, evidence: [{ ref: `incident:${wait.incidentId}` }] });
 
-const revItem = (rev, workflow) => itemOf('rev-ack', { key: workflow, subject: { workflow, acked: String(rev.acked ?? '').slice(0, 9), rev: rev.current }, evidence: [{ ref: `runtime-rev:${rev.current}` }] });
+const revItem = (notice, workflow) => itemOf('rev-ack', { key: workflow, subject: { workflow, acked: String(notice.from ?? '').slice(0, 9), rev: notice.to }, evidence: [{ ref: `runtime-rev:${notice.to}` }] });
 
 /** The items one next action raises, or [] when the action is a wait, a mechanical move the controllers perform or has no menu kind. */
 function actionItemOf(action, workflow) {
@@ -198,7 +198,7 @@ const sinceOf = (item) => item.deadline ?? Number.MAX_SAFE_INTEGER;
 export function buildMenu(sources) {
   const { workflow } = sources;
   const items = [
-    ...(sources.rev?.stale ? [revItem(sources.rev, workflow)] : []),
+    ...(['owed', 'owed-woken'].includes(sources.rev?.state) ? [revItem(sources.rev, workflow)] : []),
     ...sources.jobDecisions.map((entry) => jobItem(entry, workflow)),
     ...(sources.shapeRefused ?? []).map((refused) => shapeItem(refused, workflow)),
     ...sources.questions.map((q) => questionItem(q, workflow)),

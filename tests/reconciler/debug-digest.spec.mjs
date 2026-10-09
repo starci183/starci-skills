@@ -55,7 +55,7 @@ test('a dead Kernel outranks the held work it leaves behind and an idle Kernel w
 });
 
 test('a Kernel that acked an older runtime than the current one is reported with the files behind', () => {
-  const stale = workflow({ status: status({ kernelRev: { current: REV, acked: 'b'.repeat(40), stale: true, fileCount: 3 } }) });
+  const stale = workflow({ status: status({ revisionNotice: { role: 'kernel', state: 'owed', from: 'b'.repeat(40), to: REV, count: 3, files: [], line: 'kernel owes 3 file(s) of rev x' } }) });
   const d = digest(snapshot({ workflows: [stale] }));
   assert.deepEqual(keys(d), ['kernel-rev-wf-1']);
   assert.equal(d.problems[0].params.files, 3);

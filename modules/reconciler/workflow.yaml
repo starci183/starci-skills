@@ -8,7 +8,7 @@
 # api call, DI and doorbell is a would-row (ctx.api / ctx.openDecision); SLA clocks are recorded in every mode.
 #
 # One pass per key `workflow:<ledgerId>:<workflowId>` computes ONE projection: the cached `starci kernel status --json`
-# (ctx.status: progress, rca, frontier, stuck[], kernelRev) and scripts/supervisor/stall.mjs stallFindings over a
+# (ctx.status: progress, rca, frontier, stuck[], revisionNotice) and scripts/supervisor/stall.mjs stallFindings over a
 # read-only handle, with frontierOf = the cached status (no second starci kernel status). From it:
 #   clocks     STALL_UNOWNED / STALL_ESCALATED (stalled), ORPHANED_FRONTIER, REV_ACK_OVERDUE, GOAL_TEXT_MISSING on
 #              `workflow:<ledger>:<wf>`; one clock per starci kernel status stuck[] item on `stuck:<ledger>:<wf>:<kind>:<id>`
@@ -57,7 +57,7 @@ decisionKinds:
   orphaned-frontier:  {decider: kernel, from: 'frontier orphaned-frontier with an alerting STALLED finding or past supervisorTick.orphanedFrontierMs', subject: 'the episode'}
   retry-decision:     {decider: supervisor, from: 'a retry-cap wait past its stuckSla criticalMs (supervisorOwed)', subject: 'the wait kind and its incident or job'}
   ready-undispatched: {decider: supervisor, from: 'a queued-ready wait past its stuckSla criticalMs (supervisorOwed)', subject: 'the wait kind and its job'}
-  rev-ack:            {decider: kernel, from: 'starci kernel status kernelRev.stale', subject: 'the current runtime rev (short)'}
+  rev-ack:            {decider: kernel, from: 'starci kernel status revisionNotice.state owed', subject: 'the current runtime rev (short)'}
 # The OWED classes of the Supervisor that are no Decision Item of their own (supervise.yaml mission.classes): a starci kernel status stuck[] wait past its
 # stuckSla criticalMs opens ONE Decision Item for the Supervisor of the kind named here (scripts/reconciler/owed-plan.mjs), and a frontier that stays
 # orphaned past progress.supervisorGraceMs opens an orphaned-frontier one. Each kind has typed choices in modules/supervisor/supervisor-menu.yaml.

@@ -1,6 +1,7 @@
 // The text half of `starci kernel status` (verbs/status.mjs): one line per signal, in the same order the
 // Kernel reads them.
 import { OP_REV_DRIFT, shortRev } from '../../runtime-rev.mjs';
+import { noticeOwes } from '../../kernel-notice.mjs';
 import { nameWithId } from '../../../lib/display-names.mjs';
 import { shortWorkflow } from '../../dependency-graph.mjs';
 import { stuckLine } from '../../../machine/op-metrics.mjs';
@@ -22,15 +23,7 @@ const kernelLine = (s) => {
   return `  kernel: attempt ${k.attempt} on ${k.terminal ?? '-'} (${k.launch ?? '-'} by ${k.launchedBy ?? '-'}${at})${you}`;
 };
 
-const kernelRevLine = (s) => {
-  const k = s.kernelRev;
-  let suffix = '';
-  if (k.stale) {
-    const scope = k.full ? 're-read kernel-prompt.md and driver-loop.yaml in full' : `${k.fileCount} file(s)`;
-    suffix = ` STALE (${scope})`;
-  } else if (k.unacked) suffix = ' (never acked)';
-  return `  kernel rev: acked ${shortRev(k.acked) ?? 'none'} current ${shortRev(k.current) ?? '-'}${suffix}`;
-};
+const revisionLine = (s) => `  REVISION ${s.revisionNotice.line}`;
 
 const opRevLine = (w) => `  warn ${OP_REV_DRIFT}: ${w.jobId} (${w.op} a${w.attempt ?? '-'}) dispatched at ${shortRev(w.from)}, its op contract changed by ${shortRev(w.to)}: ${(w.files ?? []).slice(0, 5).join(', ')}`;
 
@@ -181,7 +174,7 @@ export const seatStatusText = (s, out) => {
   const decide = menuLines(shown).map((line) => line.replace(/^Decide \(\d+\)/, `Decide (${total})`));
   const text = [headline(s, out), ...decide,
     ...(total > shown.menu.length ? [`  +${total - shown.menu.length} more item(s): answer these first, then read the next with starci kernel status`] : []),
-    ...(s.kernelRev && (s.kernelRev.stale || s.kernelRev.unacked) ? [kernelRevLine(s)] : []),
+    ...(noticeOwes(s.revisionNotice) ? [revisionLine(s)] : []),
     ...(s.frontier.reason && !total ? [`  reason: ${s.frontier.reason}`] : []),
     '  full view: starci kernel status --full'].join('\n');
   const cut = '\n  ... (cut: starci kernel status --full)';
@@ -194,7 +187,7 @@ export const statusText = (s, out) => [
   ...(s.ramThrottle?.line ? [`  ${s.ramThrottle.line}`] : []),
   ...(s.kernel ? [kernelLine(s)] : []),
   ...menuLines(s),
-  ...(s.kernelRev ? [kernelRevLine(s)] : []),
+  ...(s.revisionNotice ? [revisionLine(s)] : []),
   ...s.opRevDriftWarnings.map(opRevLine),
   ...s.runningRevDrift.map(runningRevLine),
   ...s.outageCircuits.map(outageLine),
