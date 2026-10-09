@@ -572,13 +572,13 @@ else if (verb === 'orchestration run-use') {
   out({ ok: true, result: { run: { id: arg('id'), coordinator_handle: arg('from') } } });
 }
 else if (verb === 'orchestration run-show')
-  out({ ok: true, result: { run: { id: arg('id'), coordinator_handle: process.env.STARCI_FAKE_ORCA_START_FENCED === '1' && !(state.runUses || []).length ? null : state.runs?.[arg('id')]?.coordinator ?? null } } });
+  out({ ok: true, result: { run: { id: arg('id'), coordinator_handle: (process.env.STARCI_FAKE_ORCA_START_FENCED === 'always' || (process.env.STARCI_FAKE_ORCA_START_FENCED === '1' && !(state.runUses || []).length)) ? null : state.runs?.[arg('id')]?.coordinator ?? null } } });
 else if (verb === 'orchestration run-list')
   out({ ok: true, result: { runs: Object.values(state.runs || {}).map(r => ({ id: r.id, objective: r.objective ?? null, coordinator_handle: r.coordinator ?? null })) } });
 // A Task is filed in a Run (worker-start --spec, task-update) only from that Run's coordinator; a lost Run answers run_not_found.
 // STARCI_FAKE_ORCA_START_FENCED=1: the Run is bound to a coordinator Orca does not name (run-show answers none), so worker-start is refused consumer_fenced until a
-// run-use binds the Run to the caller (live, 2026-10-09: the Kernel terminal was not the coordinator Orca had bound; the refusal repeated three times).
-else if (verb === 'orchestration worker-start' && process.env.STARCI_FAKE_ORCA_START_FENCED === '1' && !(state.runUses || []).length)
+// run-use binds the Run to the caller; STARCI_FAKE_ORCA_START_FENCED=always: the refusal stands whatever run-use did (live, 2026-10-09: the Kernel terminal was not the coordinator Orca had bound; the refusal repeated three times).
+else if (verb === 'orchestration worker-start' && (process.env.STARCI_FAKE_ORCA_START_FENCED === 'always' || (process.env.STARCI_FAKE_ORCA_START_FENCED === '1' && !(state.runUses || []).length)))
   fail({ ok: false, error: { code: 'consumer_fenced', message: 'worker-start requires the coordinator terminal currently bound to the Task Run.' } });
 else if ((verb === 'orchestration worker-start' || verb === 'orchestration task-update') && state.runs?.[arg('run')]?.lost)
   fail({ ok: false, error: { code: 'run_not_found', message: 'Run ' + arg('run') + ' was not found.' } });

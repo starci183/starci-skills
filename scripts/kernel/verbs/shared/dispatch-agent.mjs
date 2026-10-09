@@ -16,7 +16,9 @@ export function spawnOperationAgent(input, { rebind = rebindAfterFence, launch =
   const fix = rebind({ runId: input.run, kernelHandle: input.from });
   if (!fix.rebound) return { ...first, runRebind: fix };
   recordRunRebound(input, fix);
-  return { ...launch(input), runRebind: fix };
+  // The refused start released its provider reservation, and a released attempt id is never taken again (attempt-released). The attempt id and the host request id both
+  // derive from the launch request, so the retry is a new admission attempt and a new host start with that one field.
+  return { ...launch({ ...input, request: { ...input.request, fenceRetry: 1 } }), runRebind: fix };
 }
 
 // The re-bind is a ledger fact: the digest and a later reader see why a launch was repeated.

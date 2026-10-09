@@ -410,14 +410,14 @@ cases:
     status: covered
   - id: kernel-left-ready-work
     family: smooth-operation
-    finding: {role: kernel, duty: never, verdict: departs, evidence: "both real Kernels composed dispatch, retry and settle commands from the status text each wake and left ready work or a reported block unhandled for hours; the unit is now the runtime's (the controllers dispatch and retry) and the rest is a menu item", remedy: {state: in-tree}}
+    finding: {role: kernel, duty: never, verdict: departs, evidence: "both real Kernels composed dispatch, retry and settle commands from the status text each wake and left ready work or a reported block unhandled for hours; the unit is now the runtime's (the controllers dispatch and retry) and the rest is a menu item", remedy: {state: in-tree, change: "the launch the re-bind retries carries fenceRetry in its launch request, so its admission attempt id and its host request id are new (a released attempt id is never taken again); the first push dispatches, and a fence the re-bind does not cure is rejected after that one retry with its reservation released and no pool struck"}}
     met: {date: "2026-10-08", where: "the two first real workflows", evidence: "AUDIT-starci-workflow.md issues 6 and 11; Kernel transcripts of wf-starci-auth-test-workflow-muxq4oyr"}
     rule: {file: scripts/kernel/kernel-menu.mjs, anchor: buildMenu}
     spec: tests/kernel/kernel-menu.spec.mjs
     status: covered
   - id: kernel-scripted-node-e-for-reads
     family: smooth-operation
-    finding: {role: kernel, duty: never, verdict: departs, evidence: "the Kernel wrote node -e over status.json, survey.json and ack plans to read a few fields (legs, kernelRev, workGraph, jobs, stuck, opChain); the read verbs now take --field and every program but starci and the pure reads is refused", remedy: {state: in-tree}}
+    finding: {role: kernel, duty: never, verdict: departs, evidence: "the Kernel wrote node -e over status.json, survey.json and ack plans to read a few fields (legs, kernelRev, workGraph, jobs, stuck, opChain); the read verbs now take --field and every program but starci and the pure reads is refused", remedy: {state: in-tree, change: "the launch the re-bind retries carries fenceRetry in its launch request, so its admission attempt id and its host request id are new (a released attempt id is never taken again); the first push dispatches, and a fence the re-bind does not cure is rejected after that one retry with its reservation released and no pool struck"}}
     met: {date: "2026-10-08", where: "the two first real workflows", evidence: "Kernel transcripts: 4 node -e reads of the status and survey JSON"}
     rule: {file: scripts/kernel/verbs/shared/field-view.mjs, anchor: fieldEmit}
     spec: tests/guards/kernel-seat.spec.mjs
@@ -1133,28 +1133,28 @@ cases:
     status: covered
   - id: revision-change-reaches-no-seat-with-an-empty-menu
     family: change-under-running
-    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a seat learns of a change that concerns it) a revision change produced no wake, so a Kernel or the Supervisor with an empty menu never learned of it; a docs-only commit changed the revision for every seat and nothing scoped a change to the roles it concerns; the Supervisor had no revision ack of its own.", remedy: {state: in-tree}}
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a seat learns of a change that concerns it) a revision change produced no wake, so a Kernel or the Supervisor with an empty menu never learned of it; a docs-only commit changed the revision for every seat and nothing scoped a change to the roles it concerns; the Supervisor had no revision ack of its own.", remedy: {state: in-tree, change: "the launch the re-bind retries carries fenceRetry in its launch request, so its admission attempt id and its host request id are new (a released attempt id is never taken again); the first push dispatches, and a fence the re-bind does not cure is rejected after that one retry with its reservation released and no pool struck"}}
     met: {date: "2026-10-09", where: "alpha.8 live, deploys of 2026-10-09", evidence: "six hand deploys (fast-forward, reconciler restart, digest read); runtime-rev.mjs kernelRevState silent patch for files outside the Kernel contract paths; no Supervisor revision record in machine.sqlite sup_events"}
     rule: {file: modules/kernel/revision-scope.yaml, anchor: "schema: starci/revision-scope@1"}
     spec: tests/reconciler/revision-notice.spec.mjs
     status: covered
   - id: rule-removed-from-a-contract-stays-in-the-seat-context
     family: change-under-running
-    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: no seat acts on a rule the tree no longer has) a re-read adds the new text to a long-lived seat context but never removes the old rule, so a deleted or reversed rule kept being followed until the seat was replaced by hand.", remedy: {state: in-tree}}
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: no seat acts on a rule the tree no longer has) a re-read adds the new text to a long-lived seat context but never removes the old rule, so a deleted or reversed rule kept being followed until the seat was replaced by hand.", remedy: {state: in-tree, change: "the launch the re-bind retries carries fenceRetry in its launch request, so its admission attempt id and its host request id are new (a released attempt id is never taken again); the first push dispatches, and a fence the re-bind does not cure is rejected after that one retry with its reservation released and no pool struck"}}
     met: {date: "2026-10-09", where: "alpha.8 live, the Kernel and Supervisor seats", evidence: "a seat context grows by about a thousand tokens per turn and keeps every earlier contract read (seat-cost.yaml rotation); the contract-changed replacement is the only way a removed rule leaves a seat"}
     rule: {file: scripts/machine/revision-replace.mjs, anchor: "contract-changed"}
     spec: tests/supervisor/supervisor-watchdog-revision.spec.mjs
     status: covered
   - id: wake-for-a-revision-change-loops-or-doubles
     family: change-under-running
-    finding: {role: runtime, duty: bound, verdict: departs, evidence: "(duty: a seat is woken at most once for one revision change) a wake per tick for an unacked revision would count against the rotation and idle-replace bounds and replace a healthy seat.", remedy: {state: in-tree}}
+    finding: {role: runtime, duty: bound, verdict: departs, evidence: "(duty: a seat is woken at most once for one revision change) a wake per tick for an unacked revision would count against the rotation and idle-replace bounds and replace a healthy seat.", remedy: {state: in-tree, change: "the launch the re-bind retries carries fenceRetry in its launch request, so its admission attempt id and its host request id are new (a released attempt id is never taken again); the first push dispatches, and a fence the re-bind does not cure is rejected after that one retry with its reservation released and no pool struck"}}
     met: {date: "2026-10-09", where: "design review of the revision notice", evidence: "kernel-watchdog.mjs WAKE_IDLE_REPLACE counts delivered wakes with no move; the notice wake is recorded once per set of owed files and the ack is an activity record"}
     rule: {file: scripts/machine/revision-notice.mjs, anchor: "woken.has(mine.digest)"}
     spec: tests/kernel/kernel-watchdog-revision.spec.mjs
     status: covered
   - id: attempt-in-flight-judged-by-a-rule-newer-than-its-admission
     family: change-under-running
-    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an attempt keeps the rules of its admission) the settle judges against the live tree, so a proof added or tightened after the admission refuses a done the op could not have known; the settle recorded nothing about which revision each proof was owed under.", remedy: {state: in-tree}}
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an attempt keeps the rules of its admission) the settle judges against the live tree, so a proof added or tightened after the admission refuses a done the op could not have known; the settle recorded nothing about which revision each proof was owed under.", remedy: {state: in-tree, change: "the launch the re-bind retries carries fenceRetry in its launch request, so its admission attempt id and its host request id are new (a released attempt id is never taken again); the first push dispatches, and a fence the re-bind does not cure is rejected after that one retry with its reservation released and no pool struck"}}
     met: {date: "2026-10-09", where: "alpha.8 live, a job admitted before a gate existed", evidence: "settle-preflight.mjs phases read knowledge/op-gate.yaml, knowledge/sonar-gate.yaml and modules/kernel/critic.yaml at settle time; only critic-settle.mjs consults the admitted contract"}
     rule: {file: scripts/kernel/settle-revision.mjs, anchor: "proofsOwedUnder"}
     spec: tests/reconciler/revision-notice.spec.mjs
@@ -1169,6 +1169,8 @@ cases:
     why: "reproduced by the replay of tests/replay/supervisor-escape.spec.mjs (the todo test): after the Supervisor's decide rule on the twin, the product-ledger menu-escape item is still open - the failing assertion is notStrictEqual(status, 'open') on that item. Lane f3 owns the fix (it closes the mirrored item when its twin is resolved, in the Workflow controller's mirror pass or in the decide verb); when it lands the todo flag of that test is removed and this entry becomes covered."
   - id: ready-job-never-dispatched-no-owner
     family: smooth-operation
+    found: live
+    replay: tests/replay/ready-not-dispatched.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a ready job is dispatched, or its stop is a problem line with an owner) two live workflows held a ready op job for 15 minutes with nothing running; the Workflow controller ran dispatch-ready every minute and each run answered a refusal that lives only in the detached push result file, so no ledger event, no menu item and no digest line named it", remedy: {state: in-tree, change: "the digest names an op job that stayed ready past the bound, counted from the later of its creation and the workflow's last dispatch or settle, as the departure ready-not-dispatched owned by the runtime (the Workflow controller owns the dispatch of ready work)"}}
     met: {date: "2026-10-09", where: "alpha.8 live, Nivo and StarCi workflows", evidence: "nivo op-architecture.decide-8da14f299d and starci op-interface.draw-b8fb07dca4 ready from 07:53Z to 08:09Z with kernel dispatch-ready done every 30 to 60 seconds and launched 0"}
     rule: {file: scripts/reconciler/debug-standard-probes.mjs, anchor: "readyUndispatched"}
@@ -1205,7 +1207,8 @@ cases:
     family: failure-while-running
     found: live
     replay: tests/replay/ready-not-dispatched.spec.mjs
-    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a launch the host refused for its own binding is repaired and dispatched in the same call) the replay of the live Nivo sequence on the merged tip: worker-start refused consumer_fenced, the Run is re-bound (run-rebound event), but the launch retried inside the same dispatch is refused attempt-released at admission - the first refusal released the provider reservation of the attempt - so it is recorded as a dispatch-rejected, strikes the pool (demoted) and the retry dispatches only on the next push", remedy: {state: open}}
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a launch the host refused for its own binding is repaired and dispatched in the same call) the replay of the live Nivo sequence on the merged tip: worker-start refused consumer_fenced, the Run is re-bound (run-rebound event), but the launch retried inside the same dispatch is refused attempt-released at admission - the first refusal released the provider reservation of the attempt - so it is recorded as a dispatch-rejected, strikes the pool (demoted) and the retry dispatches only on the next push", remedy: {state: in-tree, change: "the launch the re-bind retries carries fenceRetry in its launch request, so its admission attempt id and its host request id are new (a released attempt id is never taken again); the first push dispatches, and a fence the re-bind does not cure is rejected after that one retry with its reservation released and no pool struck"}}
     met: {date: "2026-10-09", where: "replay of the alpha.8 live Nivo sequence (events 1038, 1046, 1052) on the merged tip", evidence: "tests/replay/ready-not-dispatched.spec.mjs, the todo test: first push result dispatch-rejected: attempt-released, second push dispatched; engine/db/provider-reservations.mjs answers attempt-released for a released reservation"}
-    status: open
-    why: "reproduced by the todo test of tests/replay/ready-not-dispatched.spec.mjs: the first push does not dispatch (dispatch-rejected: attempt-released at admission); the failing assertion is results.length === 1. The retry in spawnOperationAgent (scripts/kernel/verbs/shared/dispatch-agent.mjs) must take a fresh reservation or the failed launch must not release it; the lane that owns dispatch-agent fixes it and removes the todo, then this entry becomes covered."
+    rule: {file: scripts/kernel/verbs/shared/dispatch-agent.mjs, anchor: "fenceRetry"}
+    spec: tests/replay/ready-not-dispatched.spec.mjs
+    status: covered
