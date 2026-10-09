@@ -8,8 +8,8 @@
 // history hook of the revision under test, the preserved/ refs. Stubbed: the Orca binary and the Critic agent launch (fake-critic-orca, a failing verdict).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadFixture, replayWorld } from '../_replay/world.mjs';
-import { admitReported } from '../_replay/admit.mjs';
+import { loadFixture, replayWorld } from '../helpers/replay-world.mjs';
+import { admitReported } from '../helpers/replay-admit.mjs';
 
 const fixture = loadFixture('prepared-fail');
 const [job] = fixture.jobs;

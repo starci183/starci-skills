@@ -74,7 +74,7 @@ test('a case found on a live host and covered names a replay spec of tests/repla
   assert.match(checkEdgeCaseRegistry(treeWith(t, live('    replay: tests/replay/y.spec.mjs\n'), [...files, 'tests/replay/y.spec.mjs'])).map((f) => f.message).join('\n'), /does not use the replay harness/);
   const root = treeWith(t, live('    replay: tests/replay/y.spec.mjs\n'), files);
   fs.mkdirSync(path.join(root, 'tests/replay'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'tests/replay/y.spec.mjs'), "import { replayWorld } from '../_replay/world.mjs';\n");
+  fs.writeFileSync(path.join(root, 'tests/replay/y.spec.mjs'), "import { replayWorld } from '../helpers/replay-world.mjs';\n");
   assert.deepEqual(checkEdgeCaseRegistry(root), []);
   assert.match(checkEdgeCaseRegistry(treeWith(t, doc(covered.replace('status: covered', 'found: seen\n    status: covered')), files)).map((f) => f.message).join('\n'), /found must be live/);
   const open = doc(`${covered.replace(/    rule:.*\n    spec:.*\n/, '').replace('status: covered', 'found: live\n    status: open\n    why: not yet')}`);

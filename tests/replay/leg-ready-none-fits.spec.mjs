@@ -6,7 +6,7 @@
 // Stubbed: the Orca binary only. Fixture: tests/fixtures/replay/leg-ready.json (extracted from a ledger copy, neutral: the node keeps only the word the filter reacts to).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadFixture, replayWorld } from '../_replay/world.mjs';
+import { loadFixture, replayWorld } from '../helpers/replay-world.mjs';
 
 const fixture = loadFixture('leg-ready');
 const itemId = (menu) => menu.find((item) => item.kind === 'leg-ready')?.id;

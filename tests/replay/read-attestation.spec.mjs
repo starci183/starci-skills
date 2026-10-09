@@ -5,7 +5,7 @@
 // Stubbed: the Orca binary only (nothing here launches an agent). Fixture: tests/fixtures/replay/read-plan.json (extracted from a ledger copy, neutral).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadFixture, replayWorld } from '../_replay/world.mjs';
+import { loadFixture, replayWorld } from '../helpers/replay-world.mjs';
 
 const INLINE_BOUND = 16384;
 const OP = 'review.verify';

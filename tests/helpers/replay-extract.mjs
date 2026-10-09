@@ -1,16 +1,16 @@
-// extract.mjs - reduces a read-only copy of a real ledger to the minimal fixture that reproduces one case, every free-text and path field replaced by a neutral
-// placeholder (neutral.mjs), and refuses to write a fixture the hygiene scan (hygiene.mjs) finds anything in.
+// replay-extract.mjs - reduces a read-only copy of a real ledger to the minimal fixture that reproduces one case, every free-text and path field replaced by a neutral
+// placeholder (replay-neutral.mjs), and refuses to write a fixture the hygiene scan (replay-hygiene.mjs) finds anything in.
 //
-//   node tests/_replay/extract.mjs <case> <ledger-copy-dir> [--out <dir>]      (default out: tests/fixtures/replay)
+//   node tests/helpers/replay-extract.mjs <case> <ledger-copy-dir> [--out <dir>]      (default out: tests/fixtures/replay)
 //
 // The copy directory holds `<ledger>/runtime.sqlite` per product ledger (and, for the read-plan case, the manifest the Kernel was asked to attest). Nothing is
 // read from the live host; the copy is opened read-only. The extractor is deterministic: the same copy gives the same bytes.
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { FIXTURES } from './world.mjs';
-import { Pseudonyms, wordOr, wordsOf } from './neutral.mjs';
-import { scanFixture } from './hygiene.mjs';
+import { FIXTURES } from './replay-world.mjs';
+import { Pseudonyms, wordOr, wordsOf } from './replay-neutral.mjs';
+import { scanFixture } from './replay-hygiene.mjs';
 
 const WORKFLOW = 'wf-1';
 const parse = (text) => { try { return JSON.parse(text); } catch { return null; } };

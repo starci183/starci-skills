@@ -1,4 +1,4 @@
-// critic-verdict.mjs - the verdict document the stubbed Critic launch returns for the product bytes of a replay tree (used by tests/_replay/driver.mjs only).
+// replay-critic-verdict.mjs - the verdict document the stubbed Critic launch returns for the product bytes of a replay tree (used by tests/helpers/replay-driver.mjs only).
 // The digests are computed from the tree exactly as the runtime computes them (productDigests), so the settle gate judges the document as a real verdict.
 import path from 'node:path';
 import { productDigests, kindEntryOf, criticRubrics } from '../../scripts/work/decision-critic-product.mjs';

@@ -1,12 +1,12 @@
-// world.mjs - the throwaway world a replay spec runs the REAL runtime in (see tests/_replay/README in the spec header of tests/replay/*.spec.mjs).
+// replay-world.mjs - the throwaway world a replay spec (tests/replay/*.spec.mjs) runs the REAL runtime in.
 //
-// A replay fixture (tests/fixtures/replay/<case>.json, produced by tests/_replay/extract.mjs from a read-only copy of a real ledger and reduced to
+// A replay fixture (tests/fixtures/replay/<case>.json, produced by tests/helpers/replay-extract.mjs from a read-only copy of a real ledger and reduced to
 // neutral placeholders) is turned into: a temp runtime root that is a real git repository with revisions (STARCI_KERNEL_REV_ROOT), a product
 // repository with a real ledger and a machine registry, optionally a real workflow tree (a git repository shaped like a workflow worktree, registered in
 // the machine registry), and a bound Kernel seat. The spec then drives the real code:
 //   - `world.cli(verb, args, {as})`   runs `starci kernel <verb>` as a child process, as the bound Kernel or an unbound owner;
 //   - `world.engine({controllers})`   runs the real reconciler Engine (real controllers, real ctx, real child verbs) for one or more passes in a fresh
-//                                     process (tests/_replay/driver.mjs), so every call is an engine restart;
+//                                     process (tests/helpers/replay-driver.mjs), so every call is an engine restart;
 //   - `world.reviseRuntime(...)`      commits a change in the runtime root: the runtime revision changes here.
 // STUBBED seams (the only ones): the Orca binary (terminal and agent launch: tests/helpers/fake-orca.mjs through STARCI_ORCA_COMMAND) and, inside the
 // engine driver only, the Critic agent launch (tests/helpers/fake-critic-orca.mjs through the settler's criticSeams). Nothing else is faked.
@@ -15,11 +15,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
+import { FAKE_ORCA } from './fake-orca.mjs';
 import { ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { TEST_REGISTRY_ENV, openMachine } from '../../engine/db/machine.mjs';
-import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
-import { bindCurrentKernel } from '../helpers/bound-kernel.mjs';
+import { seedWorkflow } from './ledger-fixture.mjs';
+import { bindCurrentKernel } from './bound-kernel.mjs';
 import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 import { openDecisionRow } from '../../scripts/machine/decisions.mjs';
 import { ensureHistoryHook } from '../../scripts/guards/hook-install.mjs';
@@ -28,7 +28,7 @@ export const ROOT = path.resolve(import.meta.dirname, '..', '..');
 export const FIXTURES = path.join(ROOT, 'tests', 'fixtures', 'replay');
 export const CLI = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 export const STARCI = path.join(ROOT, 'packages', 'cli', 'bin', 'starci.mjs');
-export const DRIVER = path.join(ROOT, 'tests', '_replay', 'driver.mjs');
+export const DRIVER = path.join(ROOT, 'tests', 'helpers', 'replay-driver.mjs');
 /** The seams this harness stubs, named so a spec (and its reader) can state them. */
 /** The scratch directories the runtime leaves in the temp root of a replayed child (the temp-leak check of the spec preloads names them). */
 const SCRATCH_DIRS = ['starci-kernel-scratch', 'starci-job-scratch', 'starci-settler'];
@@ -89,8 +89,8 @@ function runtimeRoot(dir, fixture) {
 /** The neutral sentence that makes the runtime's cause matcher (progress-rca causesOf) read a report as `cause`; the extractor verified the live report gave that cause. */
 const CAUSE_PHRASES = { 'grant-too-narrow': 'the fix needs files outside the owned paths' };
 
-/** A declared check of a fixture report: a re-runnable green check is the runtime's own registry self-check (a stand-in for the op's declared check), a red one exits 1. */
-const checkOf = (check) => ({ name: check.name, command: check.rerun === 'red' ? 'node scripts/checks/check-edge-case-registry.mjs --replay-red' : 'node scripts/checks/check-edge-case-registry.mjs', exitCode: check.rerun === 'red' ? 1 : 0 });
+/** A declared check of a fixture report: the runtime's own read-only validation of the work records, which the settler re-runs in the tree (a stand-in for the op's declared check). */
+const checkOf = (check) => ({ name: check.name, command: 'starci runtime validate .starciwork --json', exitCode: 0 });
 
 /** Rows of the fixture that `seedWorkflow` does not take: reports, contracts, decisions. Everything goes through the real writers where one exists. */
 function seedExtras(ledger, wf, fixture, at, admit) {
@@ -208,7 +208,7 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
     // The records are the op's work in its tree: uncommitted for the settle to checkpoint, or (`preserved`) already committed by the worktree's collector.
     const records = (fixture.tree?.records ?? []).map((record) => {
       const parts = String(record).split('.');
-      write(dir, `${ownedPathOf(record)}/index.yaml`, `id: ${parts.at(-1)}\nkind: ${parts.at(-2)}\n`);
+      write(dir, `${ownedPathOf(record)}/index.yaml`, `id: ${parts[1]}.${parts[0]}.${parts.slice(2).join('.')}\nkind: ${parts[1]}\n`);
       return `${ownedPathOf(record)}/index.yaml`;
     });
     if (fixture.tree?.preserved) commit(dir, `preserve ${wf}/gc: uncommitted work of its worktree`);

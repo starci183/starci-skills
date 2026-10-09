@@ -8,8 +8,8 @@ import { Engine } from '../../scripts/reconciler/engine.mjs';
 import { runOnce } from '../../scripts/reconciler/engine-once.mjs';
 import { spawnJson } from '../../scripts/reconciler/ctx.mjs';
 import { reconcileJobSettle } from '../../scripts/kernel/settle/job-settle.mjs';
-import { fakeCriticOrca } from '../helpers/fake-critic-orca.mjs';
-import { criticVerdictFor } from './critic-verdict.mjs';
+import { fakeCriticOrca } from './fake-critic-orca.mjs';
+import { criticVerdictFor } from './replay-critic-verdict.mjs';
 
 const spec = JSON.parse(process.argv[2]);
 const argAfter = (args, flag) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : null; };

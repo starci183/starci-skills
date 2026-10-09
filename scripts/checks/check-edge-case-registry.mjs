@@ -6,7 +6,7 @@
 // of `covered` or `open`. A covered entry names the rule that handles it (a file, optionally with an `anchor` text the file
 // contains) and the spec that reproduces it, and both exist; an open entry says why it is open. Ids are unique.
 // An entry made from a defect found on a live host carries `found: live`; once covered it names the replay spec (`replay:`, a spec of tests/replay/ built on the
-// replay harness tests/_replay/world.mjs from a reduced fixture of the live sequence): a fix is not done until that spec passes (skills/starci/references/debug-loop.md).
+// replay harness tests/helpers/replay-world.mjs from a reduced fixture of the live sequence): a fix is not done until that spec passes (skills/starci/references/debug-loop.md).
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -24,7 +24,7 @@ const REMEDY_STATES = new Set(['in-tree', 'on-host', 'open']);
 const finding = (id, message) => ({ code: CODE, path: REGISTRY_FILE, line: 0, message: `${REGISTRY_FILE} ${id}: ${message}` });
 const has = (root, file) => Boolean(file) && fs.existsSync(path.join(root, file));
 const REPLAY_DIR = 'tests/replay/';
-const REPLAY_HARNESS = '_replay/world.mjs';
+const REPLAY_HARNESS = 'helpers/replay-world.mjs';
 const FOUND = new Set(['live']);
 
 function coveredFindings(root, entry) {

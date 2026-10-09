@@ -7,7 +7,7 @@
 // The sequence is built once per process (shared fixture); both tests read the world it leaves.
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadFixture, replayWorld } from '../_replay/world.mjs';
+import { loadFixture, replayWorld } from '../helpers/replay-world.mjs';
 
 const fixture = loadFixture('leg-ready');
 

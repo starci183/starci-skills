@@ -8,7 +8,7 @@ import { observationContextOf, observeCheck, stageObservation } from '../../scri
 import { classifyCheck, rerunCheck } from '../../scripts/kernel/settle/job-settle.mjs';
 import { recordCheck } from '../../scripts/machine/evidence-store.mjs';
 import { workflowWorktreeOf } from '../../scripts/machine/workflow-tree.mjs';
-import { ROOT, ownedPathOf } from './world.mjs';
+import { ROOT, ownedPathOf } from './replay-world.mjs';
 
 /** Writes the admission and the selected contract of `job` (a fixture job) for its newest attempt. */
 export function admitJob(world, ledger, job) {

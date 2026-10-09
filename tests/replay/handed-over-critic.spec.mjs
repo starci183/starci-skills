@@ -8,8 +8,8 @@
 // (tests/helpers/fake-critic-orca.mjs through the settler's criticSeams, which hands back a verdict document over the real product digests).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadFixture, replayWorld } from '../_replay/world.mjs';
-import { admitReported } from '../_replay/admit.mjs';
+import { loadFixture, replayWorld } from '../helpers/replay-world.mjs';
+import { admitReported } from '../helpers/replay-admit.mjs';
 
 const fixture = loadFixture('handed-over');
 const [job] = fixture.jobs;

@@ -1,16 +1,16 @@
-// on-revision.mjs - runs a replay spec against the runtime tree of an OLDER revision: the proof that a replay fails where the bug lived.
+// replay-on-revision.mjs - runs a replay spec against the runtime tree of an OLDER revision: the proof that a replay fails where the bug lived.
 //
-//   node tests/_replay/on-revision.mjs <sha> <tests/replay/x.spec.mjs> [more specs]
+//   node tests/helpers/replay-on-revision.mjs <sha> <replay spec> [more specs]
 //
 // The revision is exported with `git archive` (no worktree, no checkout of this clone) into a disposable directory inside this clone, so that bare imports
-// resolve to this clone's node_modules; the harness (tests/_replay), the replay specs and the reduced fixtures of the CURRENT tree are copied over it, and the
+// resolve to this clone's node_modules; the harness (tests/helpers/replay-*.mjs), the replay specs and the reduced fixtures of the CURRENT tree are copied over it, and the
 // spec runs there with the four standard preloads. The old tree's own scripts, engine and modules are then the code under test. Exit code: the spec's.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const OVERLAY = ['tests/_replay', 'tests/replay', 'tests/fixtures/replay'];
+const OVERLAY = ['tests/replay', 'tests/fixtures/replay', ...fs.readdirSync(path.join(ROOT, 'tests', 'helpers')).filter((name) => name.startsWith('replay-')).map((name) => `tests/helpers/${name}`)];
 const PRELOADS = ['low-priority', 'isolated-temp', 'isolated-registry', 'runtime-copies'].flatMap((name) => ['--import', `./tests/setup/${name}.mjs`]);
 
 /** Exports `sha` of this repository into `dir` (git archive piped into tar). */

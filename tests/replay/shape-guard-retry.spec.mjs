@@ -6,7 +6,7 @@
 // matcher, the menu builder, the engine. Stubbed: the Orca binary only, so the launch stops at the owner's launch-trust profile (the replay world adopts none).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadFixture, replayWorld } from '../_replay/world.mjs';
+import { loadFixture, replayWorld } from '../helpers/replay-world.mjs';
 
 const fixture = loadFixture('shape-guard');
 const retry = fixture.jobs.find((job) => job.retryOf);

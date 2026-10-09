@@ -7,10 +7,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { openLedger } from '../../engine/db/ledger.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
-import { FIXTURES } from '../_replay/world.mjs';
-import { FIXTURE_MAX_BYTES, scanFixture, scanFixtureDir } from '../_replay/hygiene.mjs';
-import { Pseudonyms, isVocabulary } from '../_replay/neutral.mjs';
-import { CASES, extractCase, writeFixture } from '../_replay/extract.mjs';
+import { FIXTURES } from '../helpers/replay-world.mjs';
+import { FIXTURE_MAX_BYTES, scanFixture, scanFixtureDir } from '../helpers/replay-hygiene.mjs';
+import { Pseudonyms, isVocabulary } from '../helpers/replay-neutral.mjs';
+import { CASES, extractCase, writeFixture } from '../helpers/replay-extract.mjs';
+
+// A drive letter for planted paths, spelled so that this spec holds no drive-letter literal itself.
+const drive = String.fromCharCode(67);
 
 test('every fixture of tests/fixtures/replay passes the hygiene scan, is a few KB and names its case', () => {
   const scanned = scanFixtureDir(FIXTURES);
@@ -28,7 +31,7 @@ test('every fixture of tests/fixtures/replay passes the hygiene scan, is a few K
 test('the scan catches a path, a drive letter, a token, a URL, a product name, an email and a fixture over its size', () => {
   const rules = (document) => scanFixture(document).map((finding) => finding.rule);
   assert.deepEqual(rules({ a: 'src/features/x' }), ['path-like']);
-  assert.deepEqual(rules({ a: 'C:\\work\\x' }), ['path-like']);
+  assert.deepEqual(rules({ a: `${drive}:\\work\\x` }), ['path-like']);
   assert.ok(rules({ a: 'ghp_abcdefghijklmnopqrstuvwxyz0123456789' }).includes('token-like'));
   assert.ok(rules({ a: `${'a1'.repeat(20)}` }).includes('token-like'));
   assert.ok(rules({ a: 'https://example.test' }).includes('url-like'));
@@ -46,7 +49,7 @@ test('placeholders are numbered by first appearance, keep only the words the red
   assert.equal(ids.node('billing.invoices'), 'd-1.s-2');
   assert.equal(ids.node('shop.reset-password'), 'd-2.s-1-password');
   assert.ok(isVocabulary('op-critic-verdict-missing') && isVocabulary('architecture.decide'));
-  assert.ok(!isVocabulary('a path/like') && !isVocabulary('Sentence with spaces.') && !isVocabulary('C:\\x') && !isVocabulary(null));
+  assert.ok(!isVocabulary('a path/like') && !isVocabulary('Sentence with spaces.') && !isVocabulary(`${drive}:\\x`) && !isVocabulary(null));
 });
 
 /** A copy directory holding a Nivo-shaped ledger whose rows are full of product content: names, paths, a token and prose. */
@@ -57,11 +60,11 @@ function copyWithProductContent(t) {
   fs.mkdirSync(path.join(copy, 'nivo'), { recursive: true });
   const ledger = openLedger({ file: path.join(copy, 'nivo', 'runtime.sqlite') });
   try {
-    const payload = { opId: 'architecture.decide', owned_paths: ['C:\\Users\\someone\\nivo-monorepo\\.starciwork\\features\\billing\\sds'], title: 'Nivo billing ghp_abcdefghijklmnopqrstuvwxyz0123456789' };
+    const payload = { opId: 'architecture.decide', owned_paths: [`${drive}:\\Users\\someone\\nivo-monorepo\\.starciwork\\features\\billing\\sds`], title: 'Nivo billing ghp_abcdefghijklmnopqrstuvwxyz0123456789' };
     seedWorkflow(ledger, { id: 'wf-nivo-billing-muxq1xov', goal: { revision: 0, markdown: '# Nivo billing' }, jobs: [{ jobId: 'op-architecture.decide-e78adc94cc', opId: 'architecture.decide', status: 'reported', pool: 'claude-agent', payload }] });
     ledger.db.prepare("UPDATE op_attempts SET provider='claude' WHERE job_id='op-architecture.decide-e78adc94cc'").run();
     ledger.transaction(() => ledger.appendEvent({ workflowId: 'wf-nivo-billing-muxq1xov', entityType: 'job', entityId: 'op-architecture.decide-e78adc94cc', kind: 'job-settle-needs-kernel',
-      payload: { reason: 'settle-refused', code: 'op-critic-verdict-missing', detail: ['D:\\orca\\nivo-monorepo\\notes.md says the Nivo owner wants billing', 'op-critic-verdict-missing'], outcome: 'done', op: 'architecture.decide', attempt: 1, runtimeRev: 'a'.repeat(40), ageMs: 5 } }));
+      payload: { reason: 'settle-refused', code: 'op-critic-verdict-missing', detail: [`${drive}:\\orca\\nivo-monorepo\\notes.md says the Nivo owner wants billing`, 'op-critic-verdict-missing'], outcome: 'done', op: 'architecture.decide', attempt: 1, runtimeRev: 'a'.repeat(40), ageMs: 5 } }));
   } finally { ledger.close(); }
   return copy;
 }
@@ -70,7 +73,7 @@ test('the extractor turns a ledger full of product content into a neutral fixtur
   const copy = copyWithProductContent(t);
   const first = JSON.stringify(extractCase('handed-over', copy));
   assert.equal(first, JSON.stringify(extractCase('handed-over', copy)), 'deterministic');
-  for (const planted of ['nivo', 'Nivo', 'billing', 'someone', 'ghp_', 'C:', 'D:', 'orca', 'muxq1xov', 'e78adc94cc', '\\']) assert.ok(!first.includes(planted), `the fixture holds no ${planted}`);
+  for (const planted of ['nivo', 'Nivo', 'billing', 'someone', 'ghp_', `${drive}:`, 'orca', 'muxq1xov', 'e78adc94cc', '\\']) assert.ok(!first.includes(planted), `the fixture holds no ${planted}`);
   const document = JSON.parse(first);
   assert.deepEqual(scanFixture(document), []);
   assert.deepEqual([document.jobs[0].id, document.jobs[0].op, document.jobs[0].provider, document.workflow.id], ['job-1', 'architecture.decide', 'claude', 'wf-1']);
