@@ -1473,10 +1473,12 @@ cases:
     rule: {file: scripts/reconciler/gc-tree-strays.mjs, anchor: "reconcileTreeStrays"}
     spec: tests/reconciler-controllers/gc-tree-strays.spec.mjs
     status: covered
-  - id: failed-leg-with-runtime-owed-blocker-cannot-be-rejudged
+  - id: failed-leg-with-runtime-owed-blocker-judged-by-the-runtime
     family: correctness
     found: live
-    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: finished work is judged, not redone) job_transitions makes failed terminal, so a finished-but-blocked attempt whose blocker proved runtime-owed (a Critic hold) cannot be re-judged in place; Nivo took a third 13.4M-token attempt of architecture.decide for a verdict the runtime can give over the bytes already written.", remedy: {state: open}}
-    met: {date: "2026-10-09", where: "alpha.8 live, Nivo workflow", evidence: "nivo jobs op-architecture.decide-8da14f299d failed, report 7 blocked on CRITIC_UNAVAILABLE, engine job_transitions has no edge out of failed"}
-    why: "the lawful path is a NEW job that adopts the failed attempt's product digest and settles it; it needs the admission (contract, READ snapshot, bound native proofs) and the attached files of the failed attempt copied onto a worker-less attempt, which touches dispatch, admission and the settle checkpoint; not built in this change. Until then the leg takes the retry route checker-unavailable-is-the-runtimes (limit 2) and the runtime Critic judges the retry"
-    status: open
+    replay: tests/replay/rejudge.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: finished work is judged, not redone) a failed attempt is terminal and a Nivo architecture.decide blocked only on its own Critic that never started could not be re-judged, so the lineage was about to spend a third 13.4M-token attempt for a verdict the runtime can give over the bytes already written.", remedy: {state: in-tree, change: "the failure router prefers a `rejudge` job (settle/rejudge.mjs): precondition = the newest report is blocked on a runtime-owed blocker (checker-unavailable), the preserved ref exists and holds every file the report names, one re-judgment per product digest; it enqueues the lineage's next attempt, admits it without a worker (contract, READ proof), restores the preserved product onto the owned paths, files a runtime report and the settler runs the runtime Critic and settles on its verdict, with zero op tokens; every refusal is a typed code journalled as job-rejudge-refused and the leg then takes the retry route"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo workflow", evidence: "nivo jobs op-architecture.decide-8da14f299d failed (report 7 blocked CRITIC_UNAVAILABLE), event workflow-op-preserved with the preserved ref"}
+    rule: {file: scripts/kernel/settle/rejudge.mjs, anchor: "admitRejudge"}
+    spec: tests/replay/rejudge.spec.mjs
+    status: covered
