@@ -22,6 +22,15 @@ test('a healthy workflow lists no problem and the digest says so in the owner la
   assert.match(renderText(d, { language: 'vi' }), /Kh\u00f4ng th\u1ea5y v\u1ea5n \u0111\u1ec1 n\u00e0o\./);
 });
 
+test('acceptance misses remain report evidence in the digest JSON and both owner languages, with no problem or gate', () => {
+  const trace = { op: 'backend.implement', jobId: 'op-impl', line: 'acceptance-trace: 1 of 2 cited, 1 tests uncited', missing: ['ac.task.title.required.empty'] };
+  const d = digest(snapshot({ workflows: [workflow({ status: status({ acceptanceTraces: [trace] }) })] }));
+  assert.deepEqual(d.workflows[0].acceptanceTraces, [trace]);
+  assert.deepEqual(d.problems, []);
+  assert.equal(d.ok, true);
+  for (const language of ['en', 'vi']) assert.ok(renderText(d, { language }).includes(trace.line));
+});
+
 test('a job held past its deadline names the hold, its handler, the step and the overdue time', () => {
   const hold = policy.holds.find((h) => h.queuedBecause === 'path-lease');
   const deadline = policy.resolve(hold.bound.deadlineMs);

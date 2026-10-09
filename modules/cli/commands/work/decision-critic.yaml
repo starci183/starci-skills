@@ -4,7 +4,7 @@ owner: runtime
 summary: judge a decision leg with the Critic and write a verdict (debug aid; settle ignores it)
 impl: {script: scripts/work/decision-critic.mjs}
 flags:
-  - {name: kind, type: enum, enum: [scope.define, architecture.decide], required: true, summary: the decision leg whose records are judged}
+  - {name: kind, type: enum, enum: [scope.define, business.decide, architecture.decide], required: true, summary: the decision leg whose records are judged}
   - {name: root, type: string, required: true, summary: the work root (.starciwork) or the repository that holds it}
   - {name: out, type: string, required: true, summary: the verdict file to write (for a person to read; the settle never reads it)}
   - {name: records, type: string, summary: "comma-separated decision record files or directories to judge; default every decision record of the kind under the work root"}

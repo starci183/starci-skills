@@ -471,6 +471,15 @@ slots:
     tests: none
     coverage: required
     rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, HFS_SIZE_GROWTH, RT_PINNED_PATH_MOVED]
+  - id: runtime.kernel-acceptance-trace
+    profiles: [runtime]
+    path: scripts/kernel/acceptance-trace.mjs
+    presence: required
+    tracked: tracked
+    tier: inherit
+    tests: none
+    coverage: required
+    why: report-only acceptance citations from the attempt's verified native test receipts
   - id: runtime.kernel-verbs
     profiles: [runtime]
     # One file per modules/cli/commands/kernel/<verb>.yaml (check-cli-parity).
@@ -656,6 +665,16 @@ slots:
     tests: none
     coverage: none
     rules: [RT_SPEC_PLACEMENT]
+
+  - id: runtime.tests-proof-settle
+    profiles: [runtime]
+    path: tests/helpers/mechanism-proof-settle.mjs
+    presence: required
+    tracked: tracked
+    tier: inherit
+    tests: none
+    coverage: none
+    why: the shared private workflow and native READ fixture for mechanism-proof settlement specs
 
   # ----- packages, generated copies -----------------------------------------------------------------------------
   - id: runtime.packages-meta

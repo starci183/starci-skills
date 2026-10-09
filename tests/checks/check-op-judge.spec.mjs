@@ -36,7 +36,7 @@ test('RT_OP_JUDGE_UNDECLARED: a machine judge must be a measure the runtime owns
   assert.match(messages((copy) => { entry(copy, 'backend.implement', 'machine').measures = ['declared-checks', 'work-hygiene', 'sonar-gate']; }), /leaves out op-gate/);
   assert.match(messages((copy) => { entry(copy, 'unit.verify', 'machine').measures.push('sonar-gate'); }), /names sonar-gate, which the runtime does not apply to unit\.verify/);
   assert.match(messages((copy) => { entry(copy, 'unit.verify', 'machine').measures = ['declared-checks', 'op-gate']; }), /leaves out op-proof:unit-kit/);
-  assert.match(messages((copy) => { entry(copy, 'business.decide', 'machine').measures = ['op-proof:read-knowledge']; }), /rests on process measures alone/);
+  assert.match(messages((copy) => { entry(copy, 'business.decide', 'machine').measures = ['op-proof:read-knowledge']; }), /rests on process or report-mode measures alone/);
   assert.match(messages((copy) => { entry(copy, 'business.decide', 'machine').proofs = ['no-such-proof']; }), /cites the proof no-such-proof/);
   assert.match(messages((copy) => { entry(copy, 'review.verify', 'machine').proofs = ['review-gate']; }), /contract-script but cites no proof whose check: is a script of its own/);
 });
@@ -47,7 +47,7 @@ test('RT_OP_JUDGE_UNDECLARED: a machine judge is not an op-written test: a measu
 });
 
 test('RT_OP_JUDGE_UNDECLARED: the Critic declaration and the Critic table cannot drift apart (violating)', () => {
-  assert.match(messages((copy) => { copy.contracts['business.decide'].judge.push({ by: 'critic', rubric: 'x', runs: 'runtime', why: 'x' }); }), /coverage has no row for business\.decide/);
+  assert.match(messages((copy) => { copy.contracts['perf.verify'].judge.push({ by: 'critic', rubric: 'x', runs: 'runtime', why: 'x' }); }), /coverage has no row for perf\.verify/);
   assert.match(messages((copy) => { copy.contracts['scope.define'].judge = copy.contracts['scope.define'].judge.filter((row) => row.by !== 'critic'); }), /marks scope\.define covered but the contract declares no critic judge/);
   assert.match(messages((copy) => { copy.critic.coverage.find((row) => row.kind === 'scope.define').status = 'owed'; }), /coverage row of scope\.define is owed, not covered/);
   assert.match(messages((copy) => { entry(copy, 'scope.define', 'critic').runs = 'in-op'; }), /runs in-op, but the coverage row of scope\.define says .* run by the runtime/);
@@ -65,4 +65,15 @@ test('RT_OP_JUDGE_UNDECLARED: a next-leg is a registered reviewer of the op, and
   assert.match(messages((copy) => { copy.contracts['backend.implement'].judge.push({ by: 'next-leg', leg: 'unit.verify', why: 'x' }); }), /next-leg unit\.verify is not a registered reviewer of backend\.implement/);
   assert.match(messages((copy) => { copy.contracts['backend.implement'].judge = copy.contracts['backend.implement'].judge.filter((row) => row.by !== 'next-leg'); }), /registers review\.verify as a reviewer of backend\.implement but the contract declares no next-leg review\.verify/);
   assert.match(messages((copy) => { copy.registry.reviewers['review.verify'].anchor = 'a-sentence-the-goal-lacks'; }), /reviewers review\.verify: the goal of its contract no longer says/);
+});
+
+test('RT_OP_JUDGE_UNDECLARED: business.decide has the runtime Critic, test.author a next leg, and acceptance-trace is no judge alone (passing, violating)', () => {
+  assert.equal(entry(BASE, 'business.decide', 'critic').runs, 'runtime');
+  assert.ok(BASE.critic.coverage.some((row) => row.kind === 'business.decide' && row.status === 'covered'));
+  assert.equal(entry(BASE, 'test.author', 'next-leg').leg, 'code.refactor');
+  assert.ok(entry(BASE, 'backend.implement', 'machine').measures.includes('acceptance-trace'));
+  assert.equal(BASE.registry.measures['acceptance-trace'].mode, 'report');
+  assert.match(messages((copy) => { entry(copy, 'test.author', 'machine').measures = ['acceptance-trace']; }), /rests on process or report-mode measures alone/);
+  assert.match(messages((copy) => { copy.registry.measures['acceptance-trace'].mode = 'enforce'; }), /acceptance-trace has the mode enforce: only report is built/);
+  assert.match(messages((copy) => { entry(copy, 'unit.verify', 'machine').measures.push('acceptance-trace'); }), /acceptance-trace, which the runtime does not apply to unit.verify/);
 });

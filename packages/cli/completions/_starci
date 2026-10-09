@@ -816,7 +816,7 @@ _starci() {
     'work:compose-direction:--tool') return 0 ;;
     'work:compose-direction:--prompt') return 0 ;;
     'work:compose-direction:--out') return 0 ;;
-    'work:decision-critic:--kind') _values 'values' 'scope.define' 'architecture.decide'; return 0 ;;
+    'work:decision-critic:--kind') _values 'values' 'scope.define' 'business.decide' 'architecture.decide'; return 0 ;;
     'work:decision-critic:--root') return 0 ;;
     'work:decision-critic:--out') return 0 ;;
     'work:decision-critic:--records') return 0 ;;

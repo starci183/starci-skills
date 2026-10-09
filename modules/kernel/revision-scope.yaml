@@ -89,6 +89,18 @@ rows:
     why: "receipt locations and file IO are read by each command; the engine follows its loaded import graph"
     paths: [scripts/gates/commit-proof.mjs]
     roles: {engine: derived}
+  - id: acceptance-trace
+    why: "the report-only measure supplies the next Op's prompt and is loaded by the engine through settle"
+    paths: [scripts/kernel/acceptance-trace.mjs]
+    roles: {op: admission, engine: derived}
+  - id: acceptance-trace-spec
+    why: "the measure's regression spec is run, never read by a role"
+    paths: [tests/kernel/acceptance-trace.spec.mjs]
+    roles: {}
+  - id: mechanism-proof-settle-fixture
+    why: "private settlement fixture code is used only by specs"
+    paths: [tests/helpers/mechanism-proof-settle.mjs]
+    roles: {}
   - id: guards
     why: "guards and the command policy bite on the next command"
     paths: ["scripts/guards/**", modules/kernel/command-policy.yaml]

@@ -21,6 +21,7 @@ import { capabilityPromptLines } from './op-prompt-capabilities.mjs';
 import { opVerbsOfBrief } from './op-prompt-verbs.mjs';
 import { renderRoleLines } from '../machine/roles-contract.mjs';
 import { judgePromptLine } from './op-judge.mjs';
+import { tracePromptLines } from './acceptance-trace.mjs';
 
 // The Op's role (scope, never, clean up, reporting) is modules/kernel/roles.yaml#op; the prompt prints it from there.
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
@@ -166,6 +167,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   `target_repository: ${repoLabel}`,
   `brief: ${brief}  (your contract — never renegotiate it)`,
   ...[judgePromptLine(packet.op, skillRoot)].filter(Boolean),
+  ...tracePromptLines(packet.op, skillRoot),
   ...(packet.context.selected_op ? [`selected_op: mode=${packet.context.selected_op.mode ?? '(single contract)'} — the immutable effective contract is packet context.selected_op.contract. Read it with starci kernel op-contract --json before acting; completionProfile, steps, reads, writes and proofs come only from it. Sibling execution modes grant no authority.`] : []),
   ...specsLines,
   ...verificationScopeLines({ settings: specs }),

@@ -1027,7 +1027,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
         'work compose-direction --tool' = @()
         'work compose-direction --prompt' = @()
         'work compose-direction --out' = @()
-        'work decision-critic --kind' = @('scope.define','architecture.decide')
+        'work decision-critic --kind' = @('scope.define','business.decide','architecture.decide')
         'work decision-critic --root' = @()
         'work decision-critic --out' = @()
         'work decision-critic --records' = @()

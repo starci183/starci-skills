@@ -87,3 +87,34 @@ kinds:
       - {score: "7", anchor: "Traceable, constraints honoured, core choices with alternatives; a thin spot in failure or security coverage."}
       - {score: "8", anchor: "All checks pass; each significant operation resolves owner, contract, boundary, recovery and verification."}
       - {score: "9-10", anchor: "8, and an implementer needs to invent no material case; every choice shows what was weighed against it."}
+
+  - id: business.decide
+    op: modules/ops/ops/business.decide.yaml
+    derivedFrom:
+      - "modules/ops/ops/business.decide.yaml proofs[binding, coverage, impact-security-coverage, revision-decision-log] and writes[node]"
+      - "modules/schemas/work-functional-requirement.schema.yaml, work-business-rule.schema.yaml, work-acceptance-criterion.schema.yaml, work-policy-decision.schema.yaml"
+    minimum: 7
+    gateCap: 5
+    product:
+      records: ["features/*/index.yaml", "features/*/fr/**/index.yaml", "features/*/nfr/**/index.yaml", "features/*/br/**/index.yaml", "features/*/decision/**/index.yaml", "features/*/data/**/index.yaml", "features/*/journey/**/index.yaml"]
+    cites: [refs, dependsOn, rule, extensions.work3.scope.nodes.grounding, extensions.work3.scope.exclusions]
+    tokenBudget:
+      status: provisional
+      perAttempt: 900000
+      source: "an estimate for one single-pass critique of a feature's requirement, rule, criterion and decision records and the scope record they cite; not yet measured from usage rows"
+    checks:
+      - {id: B1, group: traceability, gate: true, check: "Every rule traces to the approved request or is an assumption", test: "Each requirement, rule, journey and criterion follows from a line of the approved request or a handed decided record, or is marked an assumption in the record; a behaviour that names no source and is not marked an assumption fails."}
+      - {id: B2, group: owner-class, gate: true, check: "Owner-class assumptions are asks, not decisions", test: "An assumption about money, authority, customer data, credentials, legal terms or an irreversible effect is filed as a decision record that carries numbered options and a recommendation for the owner; one decided in a rule, requirement or criterion as if settled fails."}
+      - {id: B3, group: scope, gate: true, check: "No contradiction with the scope", test: "No record adds a capability the handed scope record excludes, drops a node it names, or contradicts an exclusion; the feature stays inside the bounded scope."}
+      - {id: B4, group: open-questions, check: "Open questions are listed", test: "Where the request leaves a behaviour open, the record names the question (an assumption, or a decision record with options); nothing the request already decides is listed as open, and nothing unresolved is decided silently."}
+      - {id: B5, group: layer, gate: true, check: "Nothing designed that belongs to architecture", test: "No endpoint, table, queue, library, repository path, class or other mechanism appears; the records state observable behaviour, actors, rules, data meaning and acceptance, not how it is built."}
+      - {id: B6, group: acceptance, check: "Criteria are observable", test: "Every business rule has at least one criterion in given/when/then form with an outcome a person or a check can observe; denial, invalid input and the persistence the rule promises are covered where the rule implies them."}
+      - {id: B7, group: consistency, check: "References resolve and agree", test: "Every refs, dependsOn and rule value names a handed record or an element of the same set; one name per thing across the records; no two rules contradict each other."}
+      - {id: B8, group: actors, check: "Actors, permissions and data meaning are stated", test: "Each behaviour names who may do it and what the data it touches means; an effect on another actor's data or on money has its denial case; no behaviour is left to an unnamed actor."}
+    scoreAnchors:
+      - {score: "1-2", anchor: "Invents behaviour with no source, decides owner-class questions as settled, or contradicts the scope."}
+      - {score: "3-4", anchor: "Plausible rules but several untraceable or unmarked assumptions; some architecture leaks in."}
+      - {score: "5-6", anchor: "Traceable and in scope, but owner-class assumptions decided, open questions missing or criteria not observable."}
+      - {score: "7", anchor: "Every rule traced or marked, owner-class items filed as asks, in scope; a thin criterion or a missing denial case."}
+      - {score: "8", anchor: "All checks pass; open questions are explicit and every rule has observable criteria."}
+      - {score: "9-10", anchor: "8, and an architect and a tester need to ask nothing: every behaviour, assumption and open question is exact."}

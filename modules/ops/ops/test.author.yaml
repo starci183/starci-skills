@@ -222,7 +222,10 @@ judge:
   - by: machine
     measures: [declared-checks, work-hygiene, op-gate]
     proofs: [op-gate]
-    why: "settle re-reads the gate over the authored files and the settler re-runs the validators; whether the cases are meaningful is not measured by anything but the op's own collection run (registry entry op-judge-substance-unjudged)"
+    why: "settle re-reads the gate over the authored files and the settler re-runs the validators; in the canonical-workspace chain code.refactor runs the pinned tests before and after its change"
+  - by: next-leg
+    leg: code.refactor
+    why: "in the canonical-workspace chain (scope.define, test.author, code.refactor, workspace.manage, review.verify) code.refactor runs the regression check these tests pin verbatim before and after its change"
 blockers:
   - code: REQUIREMENT_UNSETTLED
     condition:

@@ -29,6 +29,7 @@ import { frontierOf, frontierStateOf } from './status-frontier.mjs';
 import { cutPhase, decorPhase } from './status-decor.mjs';
 import { seatStatusText, statusText } from './status-lines.mjs';
 import { menuPhase } from './status-menu.mjs';
+import { tracesOf } from '../../acceptance-trace.mjs';
 
 const tryOr = (fn, fallback) => { try { return fn(); } catch { return fallback; } };
 
@@ -288,6 +289,7 @@ const displayPhase = (s) => {
   const newestWhy = attachLegWhys(db, workflowId, s.graph.legs);
   if (newestWhy) s.frontier.why = { headline: newestWhy.headline, op: newestWhy.op, state: newestWhy.state, next: newestWhy.next, owner: newestWhy.owner, attemptId: newestWhy.attemptId };
   s.kernelNotes = kernelNotesOf(db, workflowId);
+  s.acceptanceTraces = tryOr(() => tracesOf(db, workflowId), []);
   // The owner's "test later" list: every leg the config.yaml specs switches deferred (starci kernel run-deferred-tests runs them).
   const specs = ownerSpecs(skillRoot);
   s.testsDeferred = { off: specsOff(specs), jobs: deferredTestsOf(db, workflowId), planned: s.graph.legs.filter((leg) => leg.deferred && !leg.jobId).map((leg) => ({ op: leg.op, reason: leg.deferred })) };
@@ -340,6 +342,7 @@ export function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   if (ledger.readOnly) out.readOnly = true;
   out.opHealth = s.opHealth;
   out.kernelNotes = s.kernelNotes;
+  out.acceptanceTraces = s.acceptanceTraces;
   out.stuck = s.stuck;
   out.ramThrottle = s.ramThrottle;
   out.poolLoad = { running: s.poolLoad.byModel, routeHoldMs: s.poolLoad.routeHoldMs };

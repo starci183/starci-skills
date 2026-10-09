@@ -21,7 +21,8 @@ kinds:
   next-leg: "a reviewer listed under `reviewers` whose `reviews` names this op"
 
 # The measures a machine judge may cite. `kind` product: the measure reads the product; process: it reads how the op worked (a
-# process measure never stands alone: a machine entry cites at least one product measure). `source` is the file that runs it
+# process measure never stands alone: a machine entry cites at least one product measure). `mode` report: the measure records its
+# result as evidence and judges nothing yet; the check allows no other mode until enforcement is built. `source` is the file that runs it
 # and must exist. `independence`: runtime = the runtime runs or re-reads it, repository = the repository's own tools,
 # the maker supplies only inputs. `applies` says for which ops the measure is declared, and the check holds the contracts to it:
 #   dispatched   every op the workflow dispatches (not an external op, not an owner-act op)
@@ -87,6 +88,13 @@ measures:
     independence: runtime
     applies: {ops: [handover.review]}
     what: "the handover ask is refused unless it has the three options in order and no must-have is owed (scripts/kernel/proof-integrity.mjs); the pass is the owner's receipt"
+  acceptance-trace:
+    kind: product
+    source: scripts/kernel/acceptance-trace.mjs
+    independence: runtime
+    mode: report
+    applies: {ops: [backend.implement, interface.implement, e2e.verify, integration.verify]}
+    what: "every acceptance record (ac.*) of the op's scope, which its bound implementation record proves directly or through a business rule, should be cited by id in at least one test the attempt ran, and a test that cites none of them is not counted toward the proof; the acceptance records are written by an earlier leg, never by the maker. Report mode until the first live run: the settle records \"acceptance-trace: N of M cited, K tests uncited\" as evidence on the attempt, shown by starci kernel status --full, and a miss fails and opens nothing (owner ruling acceptance-trace-report-mode)"
   contract-script:
     kind: product
     source: scripts/kernel/settle/check-command.mjs
@@ -112,6 +120,9 @@ reviewers:
   review.verify:
     anchor: "Independently verify"
     reviews: [backend.implement, backend.scaffold, interface.scaffold, interface.implement, package.scaffold, code.refactor, workspace.manage]
+  code.refactor:
+    anchor: "the same regression check run before and after"
+    reviews: [test.author]
   interface.audit:
     anchor: "Audit selected real interface renders"
     reviews: [interface.draw, interface.asset, interface.implement]

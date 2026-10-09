@@ -789,7 +789,7 @@ _starci() {
         work:compose-direction:--tool) return 0;;
         work:compose-direction:--prompt) return 0;;
         work:compose-direction:--out) return 0;;
-        work:decision-critic:--kind) COMPREPLY=( $(compgen -W "scope.define architecture.decide" -- "$cur") ); return 0;;
+        work:decision-critic:--kind) COMPREPLY=( $(compgen -W "scope.define business.decide architecture.decide" -- "$cur") ); return 0;;
         work:decision-critic:--root) return 0;;
         work:decision-critic:--out) return 0;;
         work:decision-critic:--records) return 0;;

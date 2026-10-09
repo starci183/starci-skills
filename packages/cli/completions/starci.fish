@@ -1240,7 +1240,7 @@ complete -c starci -n '__starci_using_command work compose-direction' -l scrim -
 complete -c starci -n '__starci_using_command work compose-direction' -l tool -r -d 'tool name recorded as the composite provenance'
 complete -c starci -n '__starci_using_command work compose-direction' -l prompt -r -d 'prompt text recorded with the composite'
 complete -c starci -n '__starci_using_command work compose-direction' -l out -r -d 'output PNG path (default is beside the content)'
-complete -c starci -n '__starci_using_command work decision-critic' -l kind -r -a 'scope.define architecture.decide' -d 'the decision leg whose records are judged'
+complete -c starci -n '__starci_using_command work decision-critic' -l kind -r -a 'scope.define business.decide architecture.decide' -d 'the decision leg whose records are judged'
 complete -c starci -n '__starci_using_command work decision-critic' -l root -r -d 'the work root (.starciwork) or the repository that holds it'
 complete -c starci -n '__starci_using_command work decision-critic' -l out -r -d 'the verdict file to write (for a person to read; the settle never reads it)'
 complete -c starci -n '__starci_using_command work decision-critic' -l records -r -d 'comma-separated decision record files or directories to judge; default every decision record of the kind under the work root'

@@ -147,7 +147,7 @@ function runUnit(root, { npm = runNpm } = {}) {
   for (const file of [path.join(covDir, 'coverage-summary.json'), outFile]) { try { fs.rmSync(file, { force: true }); } catch { /* temp */ } }
   for (const dir of [covDir, outDir]) { try { fs.rmdirSync(dir); } catch { /* temp; a reporter may leave more */ } }
   return { command: `npm ${args.filter((a) => !/^--(outputFile|coverageDirectory)=/.test(a)).join(' ')}`, exit: run.status ?? null,
-    ...(report ? reduceJest(report) : { total: 0, passed: 0, failed: 0, skipped: 0, files: 0, failedFiles: 0, failures: [] }), coverage,
+    ...(report ? reduceJest(report, root) : { total: 0, passed: 0, failed: 0, skipped: 0, files: 0, failedFiles: 0, failures: [] }), coverage,
     error: jestRunError(report, run) };
 }
 

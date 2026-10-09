@@ -37,7 +37,7 @@ codes:
 
 # Which op kinds owe a Critic. `covered`: the Critic runs and its verdict gates the op. `owed`: declared, not built, with the
 # open edge-case entry that tracks it (modules/reconciler/edge-cases.yaml).
-# A covered decision leg (scope.define, architecture.decide) has its rubric, minimum, product globs, cited fields and token budget in
+# A covered decision leg (scope.define, business.decide, architecture.decide) has its rubric, minimum, product globs, cited fields and token budget in
 # modules/kernel/critic-rubrics.yaml; its settle gate is scripts/kernel/critic-settle.mjs.
 coverage:
   - kind: interface.draw
@@ -63,5 +63,14 @@ coverage:
     rubric: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=architecture.decide].checks"}
     minimum: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=architecture.decide].minimum"}
     tokenBudget: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=architecture.decide].tokenBudget"}
+    passes: "one run per version of the records: the runtime runs the Critic when the op reports done (a verdict the op attaches is ignored), and again for the retry's new records after a failing verdict"
+    gate: "scripts/kernel/critic-settle.mjs judgeCriticVerdict at settle over the runtime Critic run (op-critic-verdict-missing: the runtime owes it, op-critic-verdict-failed, CRITIC_VERDICT_STALE)"
+  - kind: business.decide
+    status: covered
+    entry: critic-coverage-decision-legs
+    product: "the op's requirement, rule, criterion, journey, data and decision records (features/<feature>/{fr,nfr,br,decision,data,journey}/**/index.yaml and the feature record) and the scope record they cite"
+    rubric: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=business.decide]"}
+    minimum: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=business.decide].minimum"}
+    tokenBudget: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=business.decide].tokenBudget"}
     passes: "one run per version of the records: the runtime runs the Critic when the op reports done (a verdict the op attaches is ignored), and again for the retry's new records after a failing verdict"
     gate: "scripts/kernel/critic-settle.mjs judgeCriticVerdict at settle over the runtime Critic run (op-critic-verdict-missing: the runtime owes it, op-critic-verdict-failed, CRITIC_VERDICT_STALE)"

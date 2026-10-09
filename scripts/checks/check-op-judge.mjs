@@ -90,6 +90,9 @@ function expectedMeasures(op, facts) {
 
 const isProcess = (id, registry) => id.startsWith(PROOF_FAMILY) && (registry.measures['op-proof'].processProofs ?? []).includes(id.slice(PROOF_FAMILY.length));
 
+/** Whether a known measure judges the product now: not a process measure and not one still in report mode. */
+const judgesNow = (id, registry) => !isProcess(id, registry) && registry.measures[id.startsWith(PROOF_FAMILY) ? 'op-proof' : id].mode !== 'report';
+
 function measureKnown(id, registry) {
   const family = id.startsWith(PROOF_FAMILY) ? 'op-proof' : id;
   return Boolean(registry.measures[family]) && (family !== 'op-proof' || id.length > PROOF_FAMILY.length);
@@ -121,7 +124,7 @@ function machineFindings(op, entries, facts) {
     else if (!expected.has(id) && !free.has(id)) findings.push(out(`judge machine names ${id}, which the runtime does not apply to ${op}`));
   }
   for (const id of expected) if (!declared.has(id)) findings.push(out(`judge machine leaves out ${id}, which the runtime applies to ${op}`));
-  if (declared.size && ![...declared].some((id) => measureKnown(id, facts.registry) && !isProcess(id, facts.registry))) findings.push(out('judge machine rests on process measures alone: it needs a measure that reads the product'));
+  if (declared.size && ![...declared].some((id) => measureKnown(id, facts.registry) && judgesNow(id, facts.registry))) findings.push(out('judge machine rests on process or report-mode measures alone: it needs a measure that judges the product'));
   return [...findings, ...scriptFindings(op, entries, facts)];
 }
 
@@ -199,6 +202,7 @@ function measureRegistryFindings(facts) {
     const findings = [];
     if (!exists(facts.root, measure.source)) findings.push(out(`measure ${id} names the source ${measure.source}, which does not exist`));
     if (!INDEPENDENCE.includes(measure.independence)) findings.push(out(`measure ${id} has the independence ${measure.independence}: only ${INDEPENDENCE.join(', ')} can judge (a measure the maker authors is not a judge)`));
+    if (measure.mode !== undefined && measure.mode !== 'report') findings.push(out(`measure ${id} has the mode ${measure.mode}: only report is built, enforcement is added with its own refusal`));
     if (!['product', 'process'].includes(measure.kind)) findings.push(out(`measure ${id} has the unknown kind ${measure.kind}`));
     if (measure.applies?.table && !tableOf(facts.root, measure.applies.table).length) findings.push(out(`measure ${id} reads the table ${measure.applies.table}, which is empty or missing`));
     return findings;

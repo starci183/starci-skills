@@ -1,4 +1,4 @@
-// decision-critic-product.mjs - what the Critic of a decision leg (scope.define, architecture.decide) is handed and what the settle
+// decision-critic-product.mjs - what the Critic of a decision leg (scope.define, business.decide, architecture.decide) is handed and what the settle
 // gate recomputes. The rubric of each kind is data (modules/kernel/critic-rubrics.yaml); the product is the op's decision records
 // found by the kind's globs under the work root, and the inputs are the records those records cite (the kind's `cites` fields),
 // resolved by id. Every handed file is copied into the Critic's directory by decision-critic.mjs and hashed by the Critic standard

@@ -235,7 +235,7 @@ function workflowView(workflow, ctx) {
     judgements: legs.map((l) => legJudgement(l, workflow, ctx)), openWork: (workflow.status?.frontier?.openOperations ?? 0) + jobs.queuedCount,
     usage: (workflow.status?.usage?.byOp ?? []).map((o) => ({ op: o.opId, tokens: o.tokens, turns: o.turns, attempts: o.attempts, costUsd: o.costUsd }))
       .sort((a, b) => b.tokens - a.tokens),
-    incidents: workflow.incidents, decisions: workflow.decisions };
+    acceptanceTraces: workflow.status?.acceptanceTraces ?? [], incidents: workflow.incidents, decisions: workflow.decisions };
   const failed = view.statusError === null ? [] : [problem('workflow', view.openWork + 1, `status-${view.id}`, 'status-unreadable', { name: view.name, error: view.statusError })];
   return { ...view, problems: [...kernelProblems(view, ctx.n), ...stopProblems(view), ...unownedLegProblems(workflow, view, ctx), ...failed].map((p) => ({ ...p, workflowId: view.id })) };
 }

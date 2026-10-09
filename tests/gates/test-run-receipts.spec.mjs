@@ -77,6 +77,7 @@ test('gate tests require a complete actual process receipt; no --tests preserves
   const clean = await runGate({ root, base, changed: [], tests: 'fixture' });
   assert.equal(clean.exit, GATE_EXIT.clean, JSON.stringify(clean));
   assert.deepEqual([clean.steps.tests.exit, clean.steps.tests.total, clean.steps.tests.passed, clean.steps.tests.skipped], [0, 1, 1, 0]);
+  assert.deepEqual(clean.steps.tests.testFiles, ['fixture.spec.ts']);
   for (const [label, report, exit, expected] of cases()) {
     writeReceipt(root, report, exit);
     const result = await runGate({ root, base, changed: [], tests: 'fixture' });
@@ -105,6 +106,7 @@ test('unit and test-world producers preserve real nonzero JSON output and refuse
   writeReceipt(root, receipt());
   for (const [i, result] of measure().entries()) {
     assert.equal(result.exit, 0, JSON.stringify(result));
+    assert.deepEqual(result.run.testFiles, ['fixture.spec.ts']);
     assert.equal([judgeUnitRun, judgeTestWorld][i](result).status, 'pass');
   }
   for (const [label, report, exit, expected] of cases()) {
