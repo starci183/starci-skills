@@ -39,7 +39,7 @@ function refusalSummary(r) {
 const SUMMARIES = Object.freeze({ [ADMISSION_SCHEMA]: admissionSummary, [REFUSAL_SCHEMA]: refusalSummary });
 
 /** `{payload, compacted}`: every admission-shaped record in `payload` replaced by its bounded summary; `compacted` says whether one was. */
-export function compactEventPayload(payload, depth = 0) {
+function compactEventPayload(payload, depth = 0) {
   if (depth > EVENT_LIMITS.depth || payload === null || typeof payload !== 'object') return { payload, compacted: false };
   if (isPlainObject(payload) && typeof payload.schema === 'string' && payload.summarized !== true && SUMMARIES[payload.schema])
     return { payload: SUMMARIES[payload.schema](payload), compacted: true };
