@@ -61,15 +61,23 @@ function writeCanonChanges(file, original, changed) {
   fs.writeFileSync(file, output);
 }
 
+function publicationUsageError(ctx) {
+  if ((ctx.positionals ?? []).length) return 'no positional arguments are accepted';
+  if (ctx.args?.plan === true && ctx.args?.publish === true) return '--plan and --publish are mutually exclusive';
+  if (ctx.args?.['runtime-package'] !== true) return null;
+  if (ctx.args?.publish === true && !ctx.args?.['expect-sha']) return '--runtime-package --publish requires --expect-sha';
+  if (ctx.args?.examples !== undefined) return '--runtime-package cannot re-pin examples';
+  return null;
+}
+
 /** `starci release publish`: existing registry publication plus the final binding and example refresh flow. */
 export async function releasePublishFlow(ctx, deps = {}) {
   const ok = (result) => resultOk(result, { acceptOk: false });
   const message = (result) => resultDetail(result, { limit: null, lastLine: true });
-  if ((ctx.positionals ?? []).length) return { code: 2, stderr: 'starci release publish: no positional arguments are accepted' };
+  const usageError = publicationUsageError(ctx);
+  if (usageError) return { code: 2, stderr: `starci release publish: ${usageError}` };
   const root = path.resolve(ctx.cwd ?? process.cwd());
   const runtimePackage = ctx.args?.['runtime-package'] === true;
-  if (runtimePackage && ctx.args?.publish === true && !ctx.args?.['expect-sha']) return { code: 2, stderr: 'starci release publish: --runtime-package --publish requires --expect-sha' };
-  if (runtimePackage && ctx.args?.examples !== undefined) return { code: 2, stderr: 'starci release publish: --runtime-package cannot re-pin examples' };
   const examples = runtimePackage ? [] : exampleNames(ctx.args?.examples, root);
   const lines = [];
   const data = { schema: 'starci/release-publish-flow@1', published: ctx.args?.publish === true, phase: runtimePackage ? 'runtime' : 'packages', rebind: null, examples: [], plan: null };

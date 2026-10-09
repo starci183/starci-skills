@@ -49,6 +49,7 @@ const runtime = (t) => {
   write(root, 'modules/kernel/api.yaml', 'schema: fixture\n');
   write(root, 'modules/kernel/revision-scope.yaml', fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'revision-scope.yaml'), 'utf8'));
   write(root, 'modules/kernel/owner-rulings.yaml', 'rulings: []\n');
+  write(root, 'modules/kernel/revision-scope.yaml', fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'revision-scope.yaml'), 'utf8'));
   write(root, 'modules/cli/commands/kernel/status.yaml', 'verb: status\n');
   write(root, 'modules/ops/_common.yaml', 'c: 1\n');
   write(root, 'modules/ops/ops/interface.draw.yaml', 'id: interface.draw\n');
@@ -89,6 +90,7 @@ test('an acked rev behind HEAD: the notice owes the files the table names, the w
   assert.deepEqual([notice.to, notice.from, notice.state], [rt.B, rt.A, 'owed']);
   assert.ok(notice.files.includes('modules/ops/ops/interface.draw.yaml'), 'the op brief is the Kernel\'s contract (modules/kernel/revision-scope.yaml)');
   assert.ok(!notice.files.includes('README.md'), 'README.md is not');
+  assert.deepEqual([...notice.files].sort(), ['knowledge/ui/rule.yaml', 'modules/ops/ops/interface.draw.yaml'], 'the files of the Kernel\'s contract that changed, and no other');
   const line = revisionWakeLine(notice, wf, { root: rt.root });
   assert.ok(line.startsWith(`Runtime rev ${shortRev(rt.B)} changed ${notice.files.length} file(s) of your contract (`), line);
   assert.match(line, new RegExp(`starci kernel revision-ack --workflow ${wf} --plan`));

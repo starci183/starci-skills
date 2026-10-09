@@ -19,8 +19,8 @@ exit:
 json: flag
 examples:
   - starci release cut
-  - starci release cut --plan --tag v1.0.0-alpha.7
-  - starci release cut --tag v1.0.0-alpha.7 --rows "npm test,linux-parity"
-  - starci release cut --repo <path> --tag v1.0.0-alpha.7 --json
+  - starci release cut --plan --tag v1.0.0-alpha.9
+  - starci release cut --tag v1.0.0-alpha.9 --rows "npm test,linux-parity"
+  - starci release cut --repo <path> --tag v1.0.0-alpha.9 --json
 editions:
   - full

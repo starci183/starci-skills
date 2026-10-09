@@ -2,7 +2,7 @@
 
 ## 4.2.0 - 2026-10-09
 
-- Changed: the lint runner (`lint/run.mjs`) and the bundled runtime copies follow the runtime of 1.0.0-alpha.8. Version 4.1.0 on the registry carries the copies of an earlier runtime.
+- Changed: the lint runner (`lint/run.mjs`) and the bundled runtime copies follow the runtime of 1.0.0-alpha.9. Version 4.1.0 on the registry carries the copies of an earlier runtime.
 
 ## 4.1.0 - 2026-10-08
 

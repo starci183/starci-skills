@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { loadCatalog } from '../../scripts/cli/catalog.mjs';
 import { main } from '../../scripts/cli/main.mjs';
 import { flagsOfUsage } from '../../scripts/checks/check-cli-parity.mjs';
+import { releasePublishFlow } from '../../scripts/supervisor/release-publish-flow.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const loaded = loadCatalog(repoRoot);
@@ -82,4 +83,30 @@ test('release dispatch resolves through the injected script seam', () => {
   }), 0);
   assert.equal(path.relative(repoRoot, calls[0].script).replaceAll(path.sep, '/'), 'scripts/gates/release-proof.mjs');
   assert.deepEqual(calls[0].args, ['--repo', 'repo', '--base', 'main~1', '--out', 'proof.json']);
+});
+
+test('release publish explicitly plans without requesting publication', async () => {
+  const calls = [];
+  const out = [];
+  assert.equal(await main(['release', 'publish', '--plan', '--npm-user', 'starciteacher'], {
+    catalog, env: {}, stdout: (text) => out.push(text), stderr: () => {},
+    importModule: async () => ({ releasePublishFlow: (ctx) => {
+      calls.push(ctx.args);
+      return { code: 0, text: 'plan only' };
+    } }),
+  }), 0);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].plan, true);
+  assert.equal(calls[0].publish, undefined);
+  assert.equal(calls[0]['npm-user'], 'starciteacher');
+  assert.deepEqual(out, ['plan only\n']);
+});
+
+test('release publish refuses --plan with --publish before any host or registry effect', async () => {
+  const result = await releasePublishFlow({ args: { plan: true, publish: true } }, {
+    underHostLock: () => assert.fail('conflicting modes must not acquire the host lock'),
+    releasePublish: () => assert.fail('conflicting modes must not query or publish packages'),
+  });
+  assert.equal(result.code, 2);
+  assert.match(result.stderr, /--plan and --publish are mutually exclusive/);
 });

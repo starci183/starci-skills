@@ -158,53 +158,53 @@ removed:
     kind: config-key
     name: allocation.drawLoop.critic
     use: 'the Critic is picked from its tier (modules/models/tiers.yaml seats.critic, modules/kernel/critic.yaml) with provider independence as a hard filter; its wall bound is allocation.drawLoop.criticTimeoutMs'
-    since: 1.0.0-alpha.8
+    since: 1.0.0-alpha.9
     match: 'allocation\.drawLoop\.critic(?![A-Za-z])'
   - id: config-drawloop-criticwhendrawer
     kind: config-key
     name: allocation.drawLoop.criticWhenDrawer
     use: 'the Critic tier holds a member of every provider and the picker removes the provider of the maker; there is no per-drawer table'
-    since: 1.0.0-alpha.8
+    since: 1.0.0-alpha.9
     match: 'criticWhenDrawer'
   - id: registry-critic-coverage-define-architecture
     kind: vocabulary
     name: critic-coverage-define-architecture
     use: 'the edge-case registry entry is critic-coverage-decision-legs'
-    since: 1.0.0-alpha.8
+    since: 1.0.0-alpha.9
   - id: supervisor-grammar-release
     kind: vocabulary
     name: grammarRelease
     use: 'the owner publishes @starci/grammar through starci release publish; the Supervisor changes no runtime code'
-    since: 1.0.0-alpha.8
+    since: 1.0.0-alpha.9
   - id: supervise-yaml-worker-land-blocks
     kind: vocabulary
     name: supervise.yaml workers
     use: 'the Supervisor spawns no fix workers and lands nothing: it answers its menu (starci supervisor status) and records runtime defects for Debug'
-    since: 1.0.0-alpha.8
+    since: 1.0.0-alpha.9
     match: 'supervise\.yaml\s+(?:workers|landGate)\b|supervise\.yaml\s+kernelSeat/workers'
   - id: supervisor-fixes-through-lanes
     kind: vocabulary
     name: the Supervisor fixes through lanes
     use: 'the Supervisor records a runtime defect (starci supervisor actions record --item runtime-defect:<cause>) and Debug changes .claude'
-    since: 1.0.0-alpha.8
+    since: 1.0.0-alpha.9
     match: 'Supervisor[^\n.]{0,60}\bfix(?:es)?\s+through\s+(?:its\s+own\s+)?(?:staged\s+)?lanes?\b'
   - id: kernel-ranked-actions
     kind: vocabulary
     name: ranked actions
     use: "the Kernel's menu: the Decide section of starci kernel status, answered with starci kernel decide"
-    since: 1.0.0-alpha.8
+    since: 1.0.0-alpha.9
     match: '[Ww]ork the ranked actions|[Ff]irst rca\.actions entry'
   - id: kernel-run-next-actions
     kind: vocabulary
     name: run nextActions
     use: "the Kernel answers the items of its menu; the runtime performs the mechanical next actions"
-    since: 1.0.0-alpha.8
+    since: 1.0.0-alpha.9
     match: 'run nextActions|run each\s+in order and never choose'
   - id: event-op-reported
     kind: vocabulary
     name: op-reported
     use: 'the event a filed report records is report-filed; no event named op-reported was ever emitted'
-    since: 1.0.0-alpha.8
+    since: 1.0.0-alpha.9
     match: '(?<![\w-])op-reported(?![\w-])'
   - id: file-sonar-secrets-keys
     kind: file
@@ -222,25 +222,25 @@ removed:
     kind: vocabulary
     name: the menu kinds of the origins the controllers now move
     use: 'the Job controller enqueues a red node, a stale proof or attempt, the asset leg and the credential ask itself (scripts/kernel/next-moves.mjs); the Kernel menu keeps leg-ready, draw-redraw, seam-duty and move-unbuilt'
-    since: 1.0.0-alpha.8
+    since: 1.0.0-alpha.9
     match: '(?<![\w-])(?:node-rework|stale-redispatch|enqueue-asset-leg|enqueue-credential-ask|rework-node)(?![\w-])'
   - id: vocab-sonar-stack-sealed-members
     kind: vocabulary
     name: ext/sonar secrets custody
     use: 'the stack secrets are the secret.env variables SONARQUBE_DB_PASSWORD, SONARQUBE_ADMIN_PASSWORD, SONARQUBE_ADMIN_TOKEN and CLOUDFLARE_TUNNEL_TOKEN, passed by starci gate sonar up; ext/sonar tracks no sealed member'
-    since: 1.0.0-alpha.8
+    since: 1.0.0-alpha.9
     match: 'ext/sonar/secrets/(?:sonarqube-(?:db|admin|analysis)-(?:password|token)|cloudflare-starci-local-services-tunnel-token)'
   - id: vocab-ecommerce-sealed-demo-secrets
     kind: vocabulary
     name: ecommerce sealed demo secrets
     use: 'the ecommerce example carries demo-only defaults in its compose files and declares no sealed secret (secrets: [])'
-    since: 1.0.0-alpha.8
+    since: 1.0.0-alpha.9
     match: '(?<![\w-])(?:keycloak|minio)-env(?:\.enc)?(?![\w-])'
   - id: vocab-handover-step-mechanical-pending
     kind: vocabulary
     name: the handover-step menu mode mechanical-pending and its choice rerun-handover-review
     use: 'the Job controller enqueues handover.review itself when the handover is due or its ask was answered approve or question (next action handover-review, scripts/kernel/handover-move.mjs); the handover-step item holds only the typed routing of a reported defect'
-    since: 1.0.0-alpha.8
+    since: 1.0.0-alpha.9
     match: '(?<![\w-])(?:mechanical-pending|rerun-handover-review)(?![\w-])'
   - id: vocab-card-delivery-bound
     kind: vocabulary

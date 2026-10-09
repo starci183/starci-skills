@@ -17,6 +17,6 @@ exit:
   "2": bad usage
 json: starci/release-notes@1
 examples:
-  - starci release notes --tag v1.0.0-alpha.7
-  - starci release notes --tag v1.0.0-alpha.7 --out notes.md --json
+  - starci release notes --tag v1.0.0-alpha.9
+  - starci release notes --tag v1.0.0-alpha.9 --out notes.md --json
 editions: [full]

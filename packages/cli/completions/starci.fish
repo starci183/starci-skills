@@ -979,6 +979,7 @@ complete -c starci -n '__starci_using_command release proof' -l repo -r -d 'rele
 complete -c starci -n '__starci_using_command release proof' -l base -r -d 'first commit of the release range'
 complete -c starci -n '__starci_using_command release proof' -l main -r -d 'main reference used by the merge guard'
 complete -c starci -n '__starci_using_command release proof' -l out -r -d 'write the proof to this file'
+complete -c starci -n '__starci_using_command release publish' -l plan -d 'explicitly print the read-only publication plan (the default)'
 complete -c starci -n '__starci_using_command release publish' -l publish -d 'perform the plan instead of reading it'
 complete -c starci -n '__starci_using_command release publish' -l runtime-package -d 'publish the final root runtime after the package phase and committed binding refresh'
 complete -c starci -n '__starci_using_command release publish' -l npm-user -r -d 'required logged-in npm account for publication'
