@@ -103,6 +103,9 @@ allocation:
   # 800 characters or more into a pasted_content block that the model reads as untrusted data: on 2026-10-07 every wake of 1218 characters
   # or more arrived pasted and was refused three times, while all sixteen wakes of 730 characters or fewer arrived as the user's message.
   wake: {maxChars: 790}
+  # promptFile: content above maxChars is written to a file under the state root's dispatch-prompts and the terminal gets a pointer (scripts/agent/prompt-file.mjs); the
+  # writer removes the files older than ttlMs. wake.maxChars above is a different cap: a wake keeps its opener and points at status, it never becomes a file.
+  promptFile: {maxChars: 2000, ttlMs: 86400000}
   # opVerbs: the bound of the "your verbs" block of an [Op] prompt (scripts/kernel/op-prompt-verbs.mjs): the starci calls the op's contract names,
   # each with the flags the contract uses and the required ones, one line per verb. A worker that has the exact call never runs --help
   # (a measured op spent 15 of its 135 turns on it). `standing` verbs are printed in full by the prompt's own reporting and logging blocks;

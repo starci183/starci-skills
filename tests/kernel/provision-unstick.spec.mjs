@@ -11,7 +11,7 @@ import {ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {parseYaml,stringifyYaml} from '../../engine/yaml.mjs';
 import {GATE_WAITS_ON_JOB,legOrderExemption} from '../../scripts/kernel/leg-order.mjs';
-import {TASK_SPEC_MAX_CHARS,packetFileOf,taskSpecOf} from '../../scripts/machine/task-spec.mjs';
+import {promptFileMaxChars,packetFileOf,taskSpecOf} from '../../scripts/agent/prompt-file.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
@@ -39,7 +39,7 @@ test('taskSpecOf: a packet over the argv budget is written verbatim to the job d
 
   const owned=Array.from({length:993},(_,i)=>`.starciwork/features/workspace-provision/impl/shop-be/n${i}/report.json`);
   const big=`[Op] business.decide\nowned_paths: ${owned.join(', ')}\n  cut: ...`;
-  assert.ok(big.length>TASK_SPEC_MAX_CHARS);
+  assert.ok(big.length>promptFileMaxChars());
   const file=packetFileOf(path.join(dir,'jobs','op-business.decide-cc63d20d87'),2);
   assert.match(file,/packet\.a2\.md$/);
   const out=taskSpecOf({prompt:big,file,op:'business.decide',jobId:'op-business.decide-cc63d20d87',attempt:2});

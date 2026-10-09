@@ -65,8 +65,8 @@ boundary:
   durableSurface: >-
     The kernel NEVER writes files as the durable record — the ledger (via
     api calls) plus each job's declared artifacts are the only durable
-    surface; dispatch-time prompt artifacts are api-owned and staged in the
-    os tmpdir (delivered, then deleted). The op IPC is durable the same way:
+    surface; dispatch-time prompt artifacts are api-owned files under the state
+    root's dispatch-prompts (scripts/agent/prompt-file.mjs). The op IPC is durable the same way:
     the contract, the report and the re-run checks are the
     contracts/reports/checks ROWS transacted through `starci kernel dispatch` /
     `starci kernel op-contract` / `starci kernel report` / `starci kernel consume-report` / `starci kernel record-checks`.

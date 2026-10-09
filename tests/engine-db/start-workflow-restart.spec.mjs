@@ -12,7 +12,7 @@ import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 import { ensureWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 import { senderEnv } from '../helpers/sender-env.mjs';
 import { installGuardLauncher } from '../helpers/guard-launcher.mjs';
-// A prompt above the paste bound is delivered as a file that the terminal text points to (scripts/machine/task-spec.mjs): the full prompt is that file.
+// A prompt above the paste bound is delivered as a file that the terminal text points to (scripts/agent/prompt-file.mjs): the full prompt is that file.
 function fullPrompt(prompt) {
   const pointer = /wrote it verbatim to:\r?\n\s+(.+)\r?\n/.exec(String(prompt));
   return pointer ? fs.readFileSync(pointer[1].trim(), 'utf8') : prompt;

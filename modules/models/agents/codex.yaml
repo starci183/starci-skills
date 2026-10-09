@@ -12,12 +12,10 @@ start:
   # 2026-10-02). `pool` resolves to modules/models/registry.yaml pools.<provider pool>.defaultModel.
   defaultModel: pool
 readiness: worker-start-receipt
-# Content is a file; what travels is the reference (scripts/agent/lib.mjs deliverPrompt): a follow-up prompt above maxInlineChars is written to a
+# Content is a file; what travels is the reference (scripts/agent/prompt-file.mjs): a follow-up prompt above allocation.promptFile.maxChars is written to a
 # file and the terminal is given one line that names it, so no TUI paste heuristic (a folded "[Pasted Content N chars]" chip, a swallowed Enter) is involved.
 delivery:
   mode: file-reference-above-inline-limit
-  maxInlineChars: 2000
-  fileName: orca-dispatch-<dispatch>.md
   prompt: 'Read <file> completely. It is your dispatched prompt. Follow it exactly.'
 roles:
   - workflow-kernel

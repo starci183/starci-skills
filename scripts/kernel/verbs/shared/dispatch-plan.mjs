@@ -23,7 +23,7 @@ import { cutManifestOf } from '../../seam-policy.mjs';
 import { kernelOverrideFor } from '../../kernel-authority.mjs';
 import { pinNamesPool, recordedPinOf } from '../../lineage-pin.mjs';
 import { jobDirOf } from '../../job-artifacts.mjs';
-import { packetFileOf } from '../../../machine/task-spec.mjs';
+import { packetFileOf } from '../../../agent/prompt-file.mjs';
 import { ENV_GATED_OPS } from '../../verify-failure.mjs';
 import { readEnv } from '../../../lib/env.mjs';
 import { admitPacket, captureDispatchInputs } from '../../dispatch-admission.mjs';

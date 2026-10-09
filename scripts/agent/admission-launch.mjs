@@ -10,7 +10,7 @@ import { closeWorker, workerClosureProven, workerExitProven } from '../machine/w
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
 import { runShow } from '../api/orca/run-show.mjs';
-import { defaultSpecFile, taskSpecOf } from '../machine/task-spec.mjs';
+import { promptFileOf, taskSpecOf } from './prompt-file.mjs';
 import { PROMPT_DELIVERY_STALLED, TURN_START_UNOBSERVED, resubmitUnobservedTurn, turnStartUnobserved } from './turn-start.mjs';
 import { dispatchDepthOf } from '../lib/worker-depth.mjs';
 import { bestEffortCall } from './best-effort-call.mjs';
@@ -328,7 +328,7 @@ function settleLaunch(session, launch, issued, { effort, onCreated, depth, limit
 // entry terminal (the owner's chat, the Supervisor, whoever ran the launcher; `entry`, Orca's ORCA_TERMINAL_HANDLE)
 // is that Run's coordinator. `priorRunId` is reused while Orca still knows it and accepts the start; a start the prior
 // Run refuses before any effect (a Run another entry coordinates) moves to a fresh Run (a Run's coordinator is the
-// terminal that created it). The Task spec is the prompt, spilled to `specFile` past the host's argv (task-spec.mjs);
+// terminal that created it). The Task spec is the prompt, spilled to `specFile` past the host's argv (prompt-file.mjs);
 // worker-start --spec files it. `request` is the launch's ledger identity (the caller's attempt, token or placement):
 // run-create and worker-start derive their --retry-request ids from it (calls.yaml replay: request).
 // Returns spawnAgent's receipt (runId/taskId on it), or {ok:false, step:'run-create', effectState:'none'}.
@@ -350,7 +350,7 @@ export function startAgent({ provider, model = null, effort = null, worktree, re
   if (!admission.ok) return { ...admission, provider };
   provider = admission.selected.provider; model = admission.selected.model; effort = admission.selected.effort ?? effort;
   // Content is a file, what travels is the reference: a prompt above the inline bound is spilled to the caller's file, else to the state root's dispatch-prompts.
-  const spec = taskSpecOf({ prompt, file: specFile ?? defaultSpecFile(launchScopeId(role, request)), heading: heading ?? title }).spec;
+  const spec = taskSpecOf({ prompt, file: specFile ?? (() => promptFileOf(launchScopeId(role, request))), heading: heading ?? title }).spec;
   const launch = (runId) => spawnAgent({ provider, model, effort, worktree, repo, baseBranch, name, setup, title, spec, taskTitle: title, run: runId, from: entry,
     request, onCreated, parentDispatch, maxDepth, preflight, io: { ...io?.spawn, admission: io?.admission ?? io?.spawn?.admission },
     role, scopeId, allowGroup, admission, bias, ownerGrant, biasTrusted, tier, liveSeat, history, author, qualityFloor, kind, difficulty, config, env });
