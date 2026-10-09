@@ -10,14 +10,14 @@ import { getBlob, putBlob } from './blob.mjs';
 const REF = /^\{"truncated":true,"bytes":(\d+),"sha256":"([0-9a-f]{64})"\}$/;
 
 /** Whether a stored value is a reference. */
-export const isRef = (value) => typeof value === 'string' && value.charCodeAt(0) === 123 && REF.test(value);
+export const isRef = (value) => typeof value === 'string' && value.codePointAt(0) === 123 && REF.test(value);
 
 /** The reference string of a blob. */
 export const refOf = (sha, bytes) => JSON.stringify({ truncated: true, bytes, sha256: sha });
 
 /** The {sha, bytes} a reference names, or null. */
 export function parseRef(value) {
-  const match = typeof value === 'string' && value.charCodeAt(0) === 123 ? REF.exec(value) : null;
+  const match = typeof value === 'string' && value.codePointAt(0) === 123 ? REF.exec(value) : null;
   return match ? { sha: match[2], bytes: Number(match[1]) } : null;
 }
 
