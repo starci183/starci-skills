@@ -5,6 +5,8 @@
 // modules/reconciler/edge-cases.yaml lists every edge case met. Each entry names a listed family, a real occurrence and a status
 // of `covered` or `open`. A covered entry names the rule that handles it (a file, optionally with an `anchor` text the file
 // contains) and the spec that reproduces it, and both exist; an open entry says why it is open. Ids are unique.
+// An entry made from a defect found on a live host carries `found: live`; once covered it names the replay spec (`replay:`, a spec of tests/replay/ built on the
+// replay harness tests/_replay/world.mjs from a reduced fixture of the live sequence): a fix is not done until that spec passes (skills/starci/references/debug-loop.md).
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -21,6 +23,9 @@ const DUTIES = new Set(['does', 'cleanup', 'never', 'reportsUpWhen', 'bound']);
 const REMEDY_STATES = new Set(['in-tree', 'on-host', 'open']);
 const finding = (id, message) => ({ code: CODE, path: REGISTRY_FILE, line: 0, message: `${REGISTRY_FILE} ${id}: ${message}` });
 const has = (root, file) => Boolean(file) && fs.existsSync(path.join(root, file));
+const REPLAY_DIR = 'tests/replay/';
+const REPLAY_HARNESS = '_replay/world.mjs';
+const FOUND = new Set(['live']);
 
 function coveredFindings(root, entry) {
   const out = [];
@@ -29,6 +34,16 @@ function coveredFindings(root, entry) {
   else if (entry.rule.anchor && !fs.readFileSync(path.join(root, ruleFile), 'utf8').includes(entry.rule.anchor)) out.push(finding(entry.id, `rule file ${ruleFile} lacks the anchor ${entry.rule.anchor}`));
   if (!has(root, entry.spec)) out.push(finding(entry.id, `spec file ${entry.spec ?? '(none)'} does not exist`));
   return out;
+}
+
+/** A covered entry found on a live host names a replay spec of tests/replay/ that drives the replay harness; an open one may name it too. */
+function replayFindings(root, entry) {
+  if (entry.found == null) return [];
+  if (!FOUND.has(entry.found)) return [finding(entry.id, `found must be live, got ${entry.found}`)];
+  if (entry.replay == null) return entry.status === 'covered' ? [finding(entry.id, 'was found live and is covered but names no replay spec (replay: tests/replay/<case>.spec.mjs)')] : [];
+  if (!String(entry.replay).startsWith(REPLAY_DIR) || !String(entry.replay).endsWith('.spec.mjs')) return [finding(entry.id, `replay ${entry.replay} is not a spec of ${REPLAY_DIR}`)];
+  if (!has(root, entry.replay)) return [finding(entry.id, `replay spec ${entry.replay} does not exist`)];
+  return fs.readFileSync(path.join(root, entry.replay), 'utf8').includes(REPLAY_HARNESS) ? [] : [finding(entry.id, `replay spec ${entry.replay} does not use the replay harness (${REPLAY_HARNESS})`)];
 }
 
 /** A finding names the role that departed, the contract field it broke, its evidence and the state of its remedy; a correct error is no finding. */
@@ -52,6 +67,7 @@ function entryFindings(root, entry, families) {
   if (!entry.met?.date || !entry.met?.where || !entry.met?.evidence) out.push(finding(entry.id, 'lacks the occurrence (met.date, met.where, met.evidence)'));
   out.push(...findingFindings(entry, new Set([...rolesContract(root).roles.map((r) => r.id), 'runtime'])));
   if (entry.status === 'covered') out.push(...coveredFindings(root, entry));
+  out.push(...replayFindings(root, entry));
   if (entry.status === 'open' && !entry.why) out.push(finding(entry.id, 'is open and says no why'));
   return out;
 }

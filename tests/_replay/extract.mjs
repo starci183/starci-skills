@@ -1,0 +1,155 @@
+// extract.mjs - reduces a read-only copy of a real ledger to the minimal fixture that reproduces one case, every free-text and path field replaced by a neutral
+// placeholder (neutral.mjs), and refuses to write a fixture the hygiene scan (hygiene.mjs) finds anything in.
+//
+//   node tests/_replay/extract.mjs <case> <ledger-copy-dir> [--out <dir>]      (default out: tests/fixtures/replay)
+//
+// The copy directory holds `<ledger>/runtime.sqlite` per product ledger (and, for the read-plan case, the manifest the Kernel was asked to attest). Nothing is
+// read from the live host; the copy is opened read-only. The extractor is deterministic: the same copy gives the same bytes.
+import fs from 'node:fs';
+import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { FIXTURES } from './world.mjs';
+import { Pseudonyms, wordOr, wordsOf } from './neutral.mjs';
+import { scanFixture } from './hygiene.mjs';
+
+const WORKFLOW = 'wf-1';
+const parse = (text) => { try { return JSON.parse(text); } catch { return null; } };
+// Every handle a recipe opens is closed when its extraction ends (a leaked handle holds the copy open on Windows).
+const opened = [];
+const openLedger = (copy, name) => { const db = new DatabaseSync(path.join(copy, name, 'runtime.sqlite'), { readOnly: true }); opened.push(db); return db; };
+const rows = (db, sql, ...args) => db.prepare(sql).all(...args);
+const first = (db, sql, ...args) => db.prepare(sql).get(...args) ?? null;
+const countOf = (db, sql, ...args) => Number(first(db, sql, ...args).n);
+
+/** Every event of `kind` as {seq, at, entity, p} with its payload parsed. */
+const eventsOf = (db, kind) => rows(db, 'SELECT seq, created_at, entity_id, payload_json FROM events WHERE kind=? ORDER BY seq', kind)
+  .map((row) => ({ seq: Number(row.seq), at: Number(row.created_at), entity: row.entity_id, p: parse(row.payload_json) ?? {} }));
+
+/** A fixture job from a real job row: neutral id, runtime-vocabulary op, the status; `extra` carries the case's own fields. */
+const jobOf = (ids, row, extra = {}) => ({ id: ids.id('job', row.job_id), op: wordOr(row.op_id), status: row.status, ...extra });
+
+/** The plan legs and edges of the goal restricted to `ops`. */
+function planOf(db, ops) {
+  const goal = parse(first(db, 'SELECT json FROM goals ORDER BY revision DESC LIMIT 1')?.json) ?? {};
+  const plan = goal.derivedPlan ?? { legs: [], edges: [] };
+  const known = new Set((plan.legs ?? []).map((leg) => leg.op));
+  const kept = ops.filter((op) => known.has(op));
+  return { legs: kept.map((op) => ({ op })), edges: (plan.edges ?? []).filter(([from, to]) => kept.includes(from) && kept.includes(to)) };
+}
+
+/** Case c and f: a Kernel answers none-fits to a leg-ready item whose node name the redaction filter rewrites. */
+function legReady(copy) {
+  const db = openLedger(copy, 'starci');
+  const answers = eventsOf(db, 'kernel-decision').filter((e) => String(e.p.menu?.item).startsWith('leg-ready:') && e.p.menu?.choice === 'none-fits');
+  const [, op, ...rest] = String(answers[0].p.menu.item).split(':');
+  const ids = new Pseudonyms();
+  const node = ids.node(rest.slice(0, -1).join(':'));
+  const succeeded = rows(db, "SELECT DISTINCT op_id FROM jobs WHERE status='succeeded'").map((r) => r.op_id);
+  const plan = planOf(db, [...succeeded, op]);
+  const before = plan.legs.map((leg) => leg.op).filter((leg) => leg !== op).at(-1);
+  const done = first(db, "SELECT * FROM jobs WHERE op_id=? AND status='succeeded' ORDER BY created_at DESC", before);
+  return {
+    workflow: { id: WORKFLOW, phase: first(db, 'SELECT phase FROM workflows').phase, goalRevision: 0 },
+    plan: { legs: [{ op: before }, { op }], edges: [[before, op]] },
+    workGraph: { nodes: [{ id: node, domain: node.split('.')[0], owned: ['own-1'] }] },
+    jobs: [jobOf(ids, done, { owned: ['own-9'] })],
+    live: { noneFitsAnswers: answers.length, menuEscapes: countOf(db, "SELECT count(*) n FROM decision_items WHERE kind='menu-escape'"), op },
+  };
+}
+
+/** Case d: the size of the Kernel's read plan before and after the revision that outgrew the inline event bound. */
+function readPlan(copy) {
+  const db = openLedger(copy, 'starci');
+  const ack = eventsOf(db, 'runtime-rev-acked').filter((e) => e.p.readManifest).at(-1);
+  const grown = parse(fs.readFileSync(path.join(copy, 'manifest.json'), 'utf8'));
+  const files = ack.p.readManifest.files;
+  const inline = first(db, "SELECT length(payload_json) n FROM events WHERE kind='runtime-rev-acked' AND payload_json IS NOT NULL ORDER BY seq DESC LIMIT 1");
+  return {
+    workflow: { id: WORKFLOW, phase: 'running', goalRevision: 0 },
+    runtime: { readPlan: { total: files.length, pathBytes: Math.round(files.reduce((sum, f) => sum + f.path.length, 0) / files.length), grownTotal: grown.files.length } },
+    ops: ['review.verify'],
+    live: { inlineAckBytes: Number(inline.n), limitBytes: 16384, grownManifestBytes: JSON.stringify(grown).length },
+  };
+}
+
+/** Case e: a failed job, the retry the failure route queued behind its curing leg, and the leg that cured it. */
+function shapeGuard(copy) {
+  const db = openLedger(copy, 'starci');
+  const routed = eventsOf(db, 'failure-routed').find((e) => e.p.route === 'upstream-lands-first');
+  const failed = first(db, 'SELECT * FROM jobs WHERE job_id=?', routed.entity);
+  const retry = first(db, 'SELECT * FROM jobs WHERE job_id=?', routed.p.jobs[0]);
+  const cure = first(db, "SELECT * FROM jobs WHERE op_id=? AND status='succeeded' ORDER BY created_at DESC", routed.p.upstream);
+  const report = parse(first(db, 'SELECT report_json r FROM reports WHERE job_id=?', failed.job_id).r);
+  const params = Object.fromEntries(Object.entries(parse(failed.payload_json).params ?? {}).filter(([, value]) => typeof value === 'number'));
+  const ids = new Pseudonyms();
+  for (const row of [cure, failed, retry]) ids.id('job', row.job_id);
+  const cureJob = jobOf(ids, cure, { owned: ['own-9'] });
+  const failedJob = jobOf(ids, failed, { owned: ['own-1'], params, report: { outcome: report.outcome, blocker: { kind: wordOr(report.blocker?.kind) }, cause: 'grant-too-narrow' },
+    result: { verdict: 'blocked', nextStep: { kind: 'retry', route: wordOr(routed.p.route), counted: routed.p.counted === true, upstream: wordOr(routed.p.upstream), mode: wordOr(routed.p.mode), jobs: [ids.id('job', retry.job_id)] } } });
+  const retryJob = jobOf(ids, retry, { owned: ['own-1'], params, unit: failedJob.id, tryNo: retry.try_no, retryOf: failedJob.id, after: [cureJob.id],
+    routed: { route: wordOr(routed.p.route), from: failedJob.id, firing: 1, limit: 1 } });
+  return { workflow: { id: WORKFLOW, phase: 'running', goalRevision: 0 }, jobs: [cureJob, failedJob, retryJob],
+    live: { skippedPushes: countOf(db, "SELECT count(*) n FROM events WHERE kind='kernel-dispatch-push' AND payload_json LIKE '%same-failing-shape%'") } };
+}
+
+/** The handover event of a reported job, reduced to vocabulary words. */
+const handoverEvent = (id, handover) => ({ kind: 'job-settle-needs-kernel', entity: id, at: -60_000,
+  payload: { reason: wordOr(handover.p.reason), code: wordOr(handover.p.code), detail: wordsOf(handover.p.detail).length ? wordsOf(handover.p.detail) : [wordOr(handover.p.code)], outcome: wordOr(handover.p.outcome), op: wordOr(handover.p.op), attempt: Number(handover.p.attempt), runtimeRev: '$rev:1' } });
+
+/** The reported decision job of the Nivo-shaped copy that a handover event with `code` names. */
+function reportedWith(copy, code) {
+  const db = openLedger(copy, 'nivo');
+  const handover = eventsOf(db, 'job-settle-needs-kernel').find((e) => e.p.code === code);
+  const job = first(db, 'SELECT * FROM jobs WHERE job_id=?', handover.entity);
+  const ids = new Pseudonyms();
+  const attempt = first(db, 'SELECT provider, agent FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1', job.job_id);
+  const fixtureJob = jobOf(ids, job, { admitted: true, provider: wordOr(attempt.provider ?? attempt.agent), owned: ['d1.sds'], report: { outcome: 'done', checks: [{ name: 'check-1' }] },
+    at: { created: -7_200_000, updated: -3_600_000 } });
+  return { db, handover, fixtureJob,
+    base: { workflow: { id: WORKFLOW, phase: 'running', goalRevision: 0 }, jobs: [fixtureJob], tree: { records: ['d1.sds.rec-1'] },
+      decisions: [{ kind: 'settle-nongreen', entity: { type: 'job', id: fixtureJob.id } }], events: [handoverEvent(fixtureJob.id, handover)] } };
+}
+
+/** Case a: a done decision report the settler handed to the Kernel for a missing Critic verdict. */
+function handedOver(copy) {
+  const { handover, base } = reportedWith(copy, 'op-critic-verdict-missing');
+  return { ...base, live: { handoverAgeMs: Number(handover.p.ageMs) } };
+}
+
+/** Case b: the same report after a Kernel's settle-fail whose branch rewind failed and left a prepared decision. */
+function preparedFail(copy) {
+  const { db, base } = reportedWith(copy, 'workflow-checkpoint-recovery-conflict');
+  const checkpoints = countOf(db, "SELECT count(*) n FROM events WHERE kind='workflow-checkpoint'");
+  const failedRewinds = eventsOf(db, 'kernel-decision-result').filter((e) => String(e.p.observed).includes('workflow-reset-failed')).length;
+  return { ...base, tree: { records: ['d1.sds.rec-1'], checkpoints, preserved: 1, prepared: { resetTo: 'baseline', verdict: 'fail', halfApplied: true } },
+    live: { failedRewinds, checkpointsBehind: checkpoints } };
+}
+
+const RECIPES = { 'leg-ready': legReady, 'read-plan': readPlan, 'shape-guard': shapeGuard, 'handed-over': handedOver, 'prepared-fail': preparedFail };
+export const CASES = Object.freeze(Object.keys(RECIPES));
+
+/** The fixture document of `name` extracted from `copy`; the source names the copy neutrally. */
+export function extractCase(name, copy) {
+  const recipe = RECIPES[name];
+  if (!recipe) throw new Error(`unknown case ${name} (known: ${CASES.join(', ')})`);
+  try { return { schema: 'replay-fixture@1', case: name, source: { copy: path.basename(copy).replace(/^ledger-copy-/, '') }, ...recipe(copy) }; }
+  finally { for (const db of opened.splice(0)) db.close(); }
+}
+
+/** Writes the fixture; refuses when the hygiene scan finds anything. Answers {file, bytes}. */
+export function writeFixture(name, copy, outDir = FIXTURES) {
+  const document = extractCase(name, copy);
+  const findings = scanFixture(document);
+  if (findings.length) throw new Error(`fixture ${name} is not neutral: ${findings.map((f) => `${f.rule} at ${f.where} (${f.sample})`).join('; ')}`);
+  fs.mkdirSync(outDir, { recursive: true });
+  const file = path.join(outDir, `${name}.json`);
+  const text = `${JSON.stringify(document, null, 1)}\n`;
+  fs.writeFileSync(file, text);
+  return { file, bytes: text.length };
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) {
+  const [name, copy, flag, out] = process.argv.slice(2);
+  if (!name || !copy) { console.error(`use: extract.mjs <${CASES.join('|')}> <ledger-copy-dir> [--out <dir>]`); process.exit(2); }
+  console.log(JSON.stringify(writeFixture(name, path.resolve(copy), flag === '--out' ? path.resolve(out) : FIXTURES)));
+}
