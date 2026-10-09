@@ -89,10 +89,26 @@ function kernelAckedRev(c) {
   return overdue(`acked ${String(k.ackedRev).slice(0, 9)} while ${String(k.currentRev).slice(0, 9)} is current`, 'kernel-rev');
 }
 
+/**
+ * A ready op job that nothing dispatched inside the bound: the oldest ready job of the workflow, counted from the latest of its creation and the last
+ * dispatch or settle of the workflow. The runtime's Workflow controller owns the dispatch of ready work, so it is the owner of this line, whatever the
+ * Kernel does (a refusal that lives only in the detached push result is no ledger event, and a stuck job raised none).
+ */
+function readyUndispatched(c) {
+  const w = c.workflow;
+  const ready = (w.jobs ?? []).filter((job) => job.kind === 'op' && job.status === 'ready');
+  if (!ready.length) return null;
+  const progressed = Math.max(lastAt(eventsOf(w, 'op-dispatched')) ?? 0, lastAt(eventsOf(w, 'op-settled')) ?? 0);
+  const oldest = ready.map((job) => Math.max(Number(job.createdAt) || 0, progressed)).sort((a, b) => a - b)[0];
+  return within(c, oldest) ? null : overdue(`${ready.length} ready job(s) (${ready.map((job) => job.jobId).join(', ')}) not dispatched for ${minutes(c.now - oldest)} min; the Workflow controller owns the dispatch of ready work`, 'ready-not-dispatched');
+}
+
 function legDispatched(c) {
   const k = c.kernel;
   const loop = failuresSince(c.workflow, 'dispatch-rejected', lastAt(eventsOf(c.workflow, 'op-dispatched')));
   if (loop.worst >= c.n.startLoopMin) return overdue(`${loop.worst} launches of ${loop.op} refused at ${loop.step}: ${firstLine(loop.error, 90)}`, 'dispatch-loop');
+  const stuck = readyUndispatched(c);
+  if (stuck) return stuck;
   if (k.idleWithReady) return overdue(`${k.readyWork} ready unit(s), Kernel idle, last woken ${minutes(k.lastWakeAgeMs ?? 0)} min ago`, 'kernel-idle');
   return k.readyWork > 0 ? waiting(`${k.readyWork} ready unit(s) inside the wake bound`) : done('no ready leg waits');
 }

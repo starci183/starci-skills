@@ -3371,7 +3371,7 @@ write or check the generated CLI catalog outputs, docs and shell completions
 | `--check` | boolean |  |
 | `--root` | string |  |
 
-exit: 0 outputs in sync or written; 1 drift listed or a catalog error; 2 neither --write nor --check given or bad usage
+exit: 0 outputs in sync or written; 1 drift listed or a catalog error; 2 neither --write nor --check given, bad usage, or [RUNTIME_TREE_TARGET_FOREIGN]: the located runtime is not the tree that owns this CLI (set STARCI_RUNTIME or --root)
 
 json: none
 

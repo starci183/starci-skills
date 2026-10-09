@@ -3,6 +3,7 @@ verb: derived-fields
 owner: runtime
 summary: regenerate or check the derived fields of the knowledge pattern files
 impl: {script: scripts/hfs/derived-fields.mjs}
+writesRuntimeTree: write
 flags:
   - {name: write, type: boolean, summary: rewrite the stale output in place}
   - {name: check, type: boolean, summary: list the stale output (the default)}

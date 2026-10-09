@@ -182,7 +182,7 @@ const CHECKS = Object.freeze({
   'op-deadline': byCodes(['job-past-deadline'], 'no op runs past its deadline'),
   'done-on-evidence': doneOnEvidence,
   'claim-vs-rerun': claimVsRerun,
-  'ready-dispatched': byCodes(['kernel-idle'], 'no ready leg waits behind an idle Kernel'),
+  'ready-dispatched': byCodes(['kernel-idle', 'ready-not-dispatched'], 'no ready leg waits behind an idle Kernel or an undispatched job'),
   'token-burn': tokenBurn,
   'queue-length': queueLength,
   'reservations-backed': byCodes(['reservation-leak'], 'every live reservation is backed by running work'),

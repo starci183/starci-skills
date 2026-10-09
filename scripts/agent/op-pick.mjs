@@ -88,12 +88,22 @@ function noToolHolder(members, ctx, tools) {
 }
 
 /**
+ * A retry lineage that excluded EVERY pool of the tier leaves the job with no candidate for ever, and nothing owns that dead end: the exclusion then yields
+ * (the pools stay demoted, so the order still prefers the least failed). The retry budget of the job, not the exclusion, bounds the tries that follow.
+ */
+export function yieldTotalExclusion(lineage, members, runtimes) {
+  const targets = members.map((member) => runtimes?.runtimes?.[member.pool]?.target ?? member.pool);
+  if (!lineage?.exclude?.length || !targets.length || !targets.every((target) => lineage.exclude.includes(target))) return lineage;
+  return { ...lineage, exclude: [], demote: [...new Set([...(lineage.demote ?? []), ...lineage.exclude])], exclusionYielded: lineage.exclude };
+}
+
+/**
  * Pick the model of one op. Input: {kind, difficulty, bias {prefer, avoid, only}, biasTrusted, capacity (per pool target; absent = a static plan),
  * runtimes (merged view), modelRegistry, scopeId, attemptId, grants, lineage, history, settings}.
  * Output: {tier, target, modelId, effort, role, work, difficulty, measuredDifficulty, floor, chain, rejected, admission, pick} or {error, ...}.
  */
 export function pickOpModel(input = {}) {
-  const { kind, capacity = null, runtimes, scopeId, attemptId, now = Date.now(), modelsDir, opsDir, grants = null, lineage = null } = input;
+  const { kind, capacity = null, runtimes, scopeId, attemptId, now = Date.now(), modelsDir, opsDir, grants = null } = input;
   const bias = selectorBias(input.bias ?? {});
   const registry = input.modelRegistry ?? loadModelRegistry(modelsDir);
   const settings = input.settings ?? tierSettings({ registry });
@@ -103,6 +113,7 @@ export function pickOpModel(input = {}) {
   if (!route.role) return { error: `no role resolves for kind '${kind}'` };
   const tier = tierOfOp({ kind, difficulty }, settings);
   if (isCallTier(tier, settings)) return { error: callTierRefusal(tier), callTier: tier };
+  const lineage = yieldTotalExclusion(input.lineage ?? null, tierMembers(tier, { settings, registry }), runtimes);
   const ctx = { kind, role: route.role, runtimes, grants, lineage, capacity, modelsDir, opsDir, registry, backoff: input.backoff ?? (capacity ? poolCapsNow() : {}) };
   const members = demotedLast(tierMembers(tier, { settings, registry }).map((member) => ({ ...member, hard: structuralReasons(member, ctx) })), lineage);
   const base = { tier, role: route.role, work: route.work, difficulty, measuredDifficulty: measured, floor: route.floor, chain: members.map((member) => member.id) };

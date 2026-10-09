@@ -22,6 +22,9 @@
 #              an edit wording-only (trailer `Revision-Wording: <path>`); the declaration holds only for a file that keeps its structure.
 #   boot       the file feeds the seat's launch prompt (`seatBoot` below): the prompt is loaded once at birth and cannot be re-read, so
 #              any change replaces the seat.
+# One vocabulary leaves this table: a deploy payload (starci/revision-deploy@1, `starci runtime revision-scope`, the `roleActions` of the runtime-deployed event)
+# and every status line carry only the EFFECTIVE actions none, immediate, admission, restart, reread and replace. `contract` and `boot` are table inputs that
+# resolve per file to reread or replace, so they never appear in a payload.
 # A seat that is already due for rotation by context or budget is replaced by that rotation and the revision change is folded into it
 # (the fresh seat reads the current tree), never updated and then replaced. A replacement happens at the seat's next yield, never in the
 # middle of a decision, and only when nothing of the seat is in flight.
@@ -145,5 +148,5 @@ rows:
     roles: {engine: restart}
   - id: engine-data
     why: "tables the engine loads at start"
-    paths: ["modules/reconciler/**", "modules/host/**", "modules/goal/**", "modules/schemas/**", modules/kernel/allowlist.yaml, modules/kernel/dispatch.yaml, modules/kernel/failure-codes.yaml, modules/kernel/installed-artefacts.yaml, modules/kernel/gate-loosening.yaml, modules/kernel/product-land.yaml, modules/kernel/protected-zone.yaml, modules/kernel/removed-vocabulary.yaml, modules/kernel/revision-scope.yaml, modules/kernel/spec-durations.yaml, modules/kernel/start-workflow.yaml]
+    paths: ["modules/reconciler/**", "modules/host/**", "modules/goal/**", "modules/schemas/**", modules/kernel/allowlist.yaml, modules/kernel/dispatch.yaml, modules/kernel/failure-codes.yaml, modules/kernel/gate-loosening.yaml, modules/kernel/product-land.yaml, modules/kernel/protected-zone.yaml, modules/kernel/installed-artefacts.yaml, modules/kernel/removed-vocabulary.yaml, modules/kernel/revision-scope.yaml, modules/kernel/spec-durations.yaml, modules/kernel/start-workflow.yaml]
     roles: {engine: restart}
