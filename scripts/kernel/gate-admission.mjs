@@ -46,7 +46,7 @@ export function admissionTaught(db, jobId, code) {
  * Whether the rules of the judge `proof` (a settleJudges row of modules/kernel/revision-scope.yaml) moved between the revision the job was admitted under and the
  * live one (scripts/kernel/settle-revision.mjs proofsOwedUnder). False when git cannot compare the two or the admission recorded no revision.
  */
-export function judgeMovedSinceAdmission(db, jobId, op, proof, { root = revRootOf(), owedUnder = proofsOwedUnder } = {}) {
+function judgeMovedSinceAdmission(db, jobId, op, proof, { root = revRootOf(), owedUnder = proofsOwedUnder } = {}) {
   const admitted = parseJson(latestContractOf(db, jobId)?.context_json)?.contract?.runtimeSha ?? null;
   if (!admitted) return false;
   const owed = owedUnder(root, op, admitted, currentRuntimeRev(root));

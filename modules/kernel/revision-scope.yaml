@@ -145,5 +145,5 @@ rows:
     roles: {engine: restart}
   - id: engine-data
     why: "tables the engine loads at start"
-    paths: ["modules/reconciler/**", "modules/host/**", "modules/goal/**", "modules/schemas/**", modules/kernel/allowlist.yaml, modules/kernel/dispatch.yaml, modules/kernel/failure-codes.yaml, modules/kernel/gate-loosening.yaml, modules/kernel/product-land.yaml, modules/kernel/protected-zone.yaml, modules/kernel/removed-vocabulary.yaml, modules/kernel/revision-scope.yaml, modules/kernel/spec-durations.yaml, modules/kernel/start-workflow.yaml]
+    paths: ["modules/reconciler/**", "modules/host/**", "modules/goal/**", "modules/schemas/**", modules/kernel/allowlist.yaml, modules/kernel/dispatch.yaml, modules/kernel/failure-codes.yaml, modules/kernel/installed-artefacts.yaml, modules/kernel/gate-loosening.yaml, modules/kernel/product-land.yaml, modules/kernel/protected-zone.yaml, modules/kernel/removed-vocabulary.yaml, modules/kernel/revision-scope.yaml, modules/kernel/spec-durations.yaml, modules/kernel/start-workflow.yaml]
     roles: {engine: restart}
