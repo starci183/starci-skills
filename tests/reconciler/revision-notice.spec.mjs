@@ -162,7 +162,7 @@ test('the Supervisor verb lists the owed files and attests them by readToken or 
 test('the Kernel ack of the current revision settles the update in place whichever files it covered: there is one ack', (t) => {
   const w = world(t);
   w.repo.commit('rule', { [KERNEL_FILE]: GROWN_STEPS });
-  w.ledger.transaction(() => w.ledger.appendEvent({ workflowId: WF, entityType: 'kernel', entityId: WF, kind: 'runtime-rev-acked', payload: { rev: w.head(), files: ['modules/kernel/api.yaml'], source: 'ack' }, createdAt: Date.now() }));
+  w.ledger.transaction(() => w.ledger.appendEvent({ workflowId: WF, entityType: 'kernel', entityId: WF, kind: 'runtime-rev-acked', payload: { rev: w.head(), files: [KERNEL_FILE], source: 'ack' }, createdAt: Date.now() }));
   const pass = runtimePass(w.kernel(), { repair: true });
   assert.equal(pass.wrote, 'acked');
   assert.equal(pass.notice.state, 'current');

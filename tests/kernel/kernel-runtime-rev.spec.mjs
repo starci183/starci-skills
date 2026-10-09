@@ -43,6 +43,7 @@ const runtime = (t) => {
   write(root, 'modules/kernel/verdict-contract.yaml', 'v: 1\n');
   write(root, 'modules/kernel/api.yaml', 'schema: fixture\n');
   write(root, 'modules/kernel/owner-rulings.yaml', 'rulings: []\n');
+  write(root, 'modules/kernel/revision-scope.yaml', fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'revision-scope.yaml'), 'utf8'));
   write(root, 'modules/cli/commands/kernel/status.yaml', 'verb: status\n');
   write(root, 'modules/ops/_common.yaml', 'c: 1\n');
   write(root, 'modules/ops/ops/interface.draw.yaml', 'id: interface.draw\n');
