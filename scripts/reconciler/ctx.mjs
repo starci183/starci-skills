@@ -40,6 +40,7 @@ import { openClock, slaCatalog } from './sla.mjs';
 import { SKILL_ROOT } from './state.mjs';
 import { clip } from '../lib/clip.mjs';
 import { jsonFromStdout } from '../lib/json.mjs';
+import { decisionRepoRefusal } from './decision-repo.mjs';
 
 export const API_FILE = path.join(SKILL_ROOT, 'scripts', 'kernel', 'cli.mjs');
 export const DECISIONS_FILE = path.join(SKILL_ROOT, 'scripts', 'machine', 'decisions.mjs');
@@ -348,6 +349,12 @@ export function createCtx({
     async openDecision(di) {
       const item = { schema: 'starci/decision-item@1', openedBy: `${controller}-controller`, openedAt: now(), ...di };
       const summary = { kind: item.kind ?? null, decider: item.decider ?? null, idempotencyKey: item.idempotencyKey ?? null, ledgerId: item.ledger ?? null };
+      // An item planned without a repository behind its ledger is refused here, where it is applied, whatever the mode: no reader finds it later.
+      const refusal = decisionRepoRefusal(item, ledgersNow());
+      if (refusal) {
+        log('reconciler.error', `decision ${refusal.error}`, { kind: 'reconciler.decision-refused', code: refusal.code, decision: summary });
+        return { ok: false, refused: true, ...refusal };
+      }
       if (mode !== 'active') return would('decisions --open', [JSON.stringify(summary)], { decision: summary });
       let mod = null;
       try { mod = await loadDecisions(); } catch { mod = null; }

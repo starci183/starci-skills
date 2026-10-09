@@ -1052,3 +1052,17 @@ cases:
     rule: {file: scripts/kernel/verbs/shared/status-critic.mjs, anchor: "runtimeCriticsOf"}
     spec: tests/kernel-settle/gate-newer-than-admission.spec.mjs
     status: covered
+  - id: decision-item-planned-without-its-repository
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an item is refused where it is planned, not discovered by a reader) the gate item of Nivo (sdi-3c462f95) and its Decision Items were opened with a ledger reference that resolved to no repository; ctx.openDecision passed a null repo to the decisions module and the verbs of the item then ran against the runtime root (ledger-root-is-runtime), found only when the Supervisor tried to answer", remedy: {state: in-tree, change: "ctx.openDecision refuses an item whose ledger (its own, or the refs.ledgerId / productLedger of a Supervisor item) resolves, by id or registered name, to no ledger with a repository: result {ok:false, refused:true, code decision-item-without-repo}, a reconciler.decision-refused log row, in every mode, before any verb runs; the Workflow controller prints the refusal as a plan line and does not count the item as opened"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo gate item sdi-3c462f95", evidence: "machine sup_decision_items sdi-3c462f95: payload refs {gateIncident, ledgerId: nivo-monorepo}; the kernel incident steps refused ledger-root-is-runtime"}
+    rule: {file: scripts/reconciler/decision-repo.mjs, anchor: "decisionRepoRefusal"}
+    spec: tests/reconciler/decision-without-repo.spec.mjs
+    status: covered
+  - id: supervisor-rotate-flag-only-in-the-script
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a flag is either a CLI option or refused with a pointer) start-supervisor.mjs takes --replace, --rotate and --restart for the watchdog, the verb supervisor start declares none of them, and the CLI refused them with the bare text unknown option, so a person or an agent who read the script or the registry found a half-flag: it exists in the script, is not in the catalog and the refusal does not say why or what to run instead", remedy: {state: in-tree, change: "rotation stays the watchdog's call (the owner's chat is the Supervisor seat, so a launched rotation has nothing to rotate there, and the watchdog rotates an idle seat by itself); the verb declares the three flags as internalFlags with a pointer, the CLI refuses each with it (unknown option --rotate: it is a call of the runtime itself ... run starci supervisor stop, then starci supervisor start), and a spec fails when the script takes a flag the verb neither declares public nor internal"}}
+    met: {date: "2026-10-09", where: "alpha.8 audit of scripts/supervisor/start-supervisor.mjs against modules/cli/commands/supervisor/start.yaml", evidence: "main() takes has('rotate'); start.yaml declared plan and reason only; tests/cli/supervisor.spec.mjs asserted exit 2 and nothing about the message"}
+    rule: {file: packages/cli/src/validate-args.mjs, anchor: "internal"}
+    spec: tests/cli/supervisor.spec.mjs
+    status: covered

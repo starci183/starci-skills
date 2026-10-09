@@ -153,6 +153,19 @@ const implementationFindings = (errors, file, doc) => {
   return implementationMapFindings(errors, file, doc.impl);
 };
 
+// The flags a verb's script takes for the runtime's own callers and the CLI refuses with a pointer (packages/cli/src/validate-args.mjs).
+const internalFlagFindings = (errors, file, doc) => {
+  if (!Array.isArray(doc.internalFlags)) { err(errors, file, 'internalFlags must be a list'); return; }
+  const declared = new Set((doc.flags ?? []).map((flag) => flag?.name));
+  for (const entry of doc.internalFlags) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) { err(errors, file, 'internalFlags entry is not a map'); continue; }
+    unknownKeys(errors, file, entry, new Set(['name', 'pointer']), 'internalFlags');
+    if (typeof entry.name !== 'string' || !NAME_RE.test(entry.name)) err(errors, file, `internalFlags: bad flag name ${JSON.stringify(entry.name)}`);
+    else if (declared.has(entry.name)) err(errors, file, `internalFlags: --${entry.name} is also a declared flag`);
+    if (typeof entry.pointer !== 'string' || !entry.pointer.trim() || entry.pointer.length > 240) err(errors, file, `internalFlags: --${entry.name} needs a pointer of 1 to 240 chars`);
+  }
+};
+
 const positionalFindings = (errors, file, positional) => {
   if (!Array.isArray(positional)) { err(errors, file, 'positional must be a list'); return; }
   for (const item of positional) {
@@ -192,6 +205,7 @@ const checkVerb = (errors, file, groupName, doc) => {
   checkVerbPolicy(errors, file, doc, moduleImpl);
   if ('flags' in doc) checkFlags(errors, file, doc.flags, `verb ${doc.verb}`);
   if (doc.positional !== undefined) positionalFindings(errors, file, doc.positional);
+  if (doc.internalFlags !== undefined) internalFlagFindings(errors, file, doc);
   exitAndEditionFindings(errors, file, doc);
   return doc;
 };

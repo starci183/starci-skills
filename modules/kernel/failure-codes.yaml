@@ -17286,3 +17286,13 @@ runtime-copies-stale:
   nextStep_vi: "Đóng tiến trình giữ tệp rồi chạy starci release sync-runtime; khởi động lại engine."
   owner: runtime-core
   kind: runtime-fault
+decision-item-without-repo:
+  title: "A Decision Item or gate item was planned without a repository behind its ledger and was refused"
+  title_vi: "Một Decision Item hoặc mục gate được lập kế hoạch mà ledger của nó không có kho (repository) nên bị từ chối"
+  meaning_vi: "Mục nêu một ledger sản phẩm (ledger của mục, hoặc refs.ledgerId / productLedger của mục Supervisor) nhưng ledger đó không phân giải được, theo id hay theo tên đã đăng ký, thành một ledger có repoRoot. Các động từ của mục chạy trong kho đó; không có kho thì chúng chạy trên gốc runtime (ledger-root-is-runtime) và một người đọc chỉ thấy lỗi rất lâu sau. Mục bị từ chối ngay nơi nó được áp dụng (ctx.openDecision), mọi chế độ, và ghi vào log reconciler.decision-refused."
+  causes_vi:
+    - "Ledger của workflow đã bị gỡ khỏi sổ đăng ký hoặc đăng ký thiếu repoRoot"
+    - "Bộ lập kế hoạch ghi một tên ledger mà sổ đăng ký không biết"
+  nextStep_vi: "Đăng ký lại ledger với kho của nó (starci machine-db hoặc đường dẫn .workspaces của dự án) rồi để controller lập lại; không mở mục bằng tay."
+  owner: runtime-core
+  kind: runtime-fault

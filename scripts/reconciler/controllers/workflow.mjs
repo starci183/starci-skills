@@ -45,6 +45,7 @@ import { planWorkflow, stuckPrefix, workflowEntity, SUPERVISOR_LEDGER } from '..
 import { eachInOrder, mapInOrder } from '../../lib/in-order.mjs';
 import { recordSwap } from '../revision-swap.mjs';
 import { runtimeHead } from '../../machine/self-reload.mjs';
+import { DECISION_WITHOUT_REPO } from '../decision-repo.mjs';
 export { planWorkflow, SUPERVISOR_LEDGER };
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
@@ -262,7 +263,11 @@ async function openDecisions(ctx, plan, now, settings) {
   const opened = [];
   await eachInOrder(plan.decisions, async (d) => {
     if (recentlyOpened(ctx, d.idempotencyKey, now, settings.decisionDueMs)) return;
-    try { await ctx.openDecision(d); opened.push(d); } catch (error) { plan.lines.push(`DI ${d.idempotencyKey} failed: ${String(error?.message ?? error).slice(0, 120)}`); }
+    try {
+      const result = await ctx.openDecision(d);
+      if (result?.code === DECISION_WITHOUT_REPO) { plan.lines.push(`DI ${d.idempotencyKey} refused ${result.code}: ${result.error}`); return; }
+      opened.push(d);
+    } catch (error) { plan.lines.push(`DI ${d.idempotencyKey} failed: ${String(error?.message ?? error).slice(0, 120)}`); }
   });
   return opened;
 }
