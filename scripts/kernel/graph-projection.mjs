@@ -15,7 +15,7 @@ import { HANDOVER_OP } from './handover.mjs';
 import { SEAM_PRIORITY_CLASS, SEAM_RECONCILE_CHECK } from './seam-policy.mjs';
 import { ASSET_OP } from '../work/asset-slot.mjs';
 import { retryMoveOf } from './retry-move.mjs';
-import { enqueueMove, legPathsOf, rerunMoveOf, withMove } from './next-moves.mjs';
+import { enqueueMove, legPathsOf, rerunMoveOf, withDeferredStubs, withMove } from './next-moves.mjs';
 import { handoverReviewAction } from './handover-move.mjs';
 import { proposedLegPaths, treesOfWorkflow } from './leg-proposal.mjs';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -104,7 +104,7 @@ const readyQueuedActions = (actions, ctx) => {
 /** The plan ancestors `op` still waits on: an approval, or a leg that has not succeeded and is held neither by a credential only nor by a deferral. */
 const planWaitsOf = (op, ctx, { firstReached, succeeded, credentialOnly }) => {
   const { legOps, planAncestors, jobsByOp, approvalWaitOps, autopilot, deferredPlanOps } = ctx;
-  return (planAncestors.get(op) ?? []).filter((ancestor) => !(autopilot?.on && ancestor === 'provision.ask') && (approvalWaitOps.has(ancestor) || (!succeeded.has(ancestor) && !credentialOnly(ancestor)
+  return (planAncestors.get(op) ?? []).filter((ancestor) => !externalOpsOf(skillRoot).has(ancestor) && !(autopilot?.on && ancestor === 'provision.ask') && (approvalWaitOps.has(ancestor) || (!succeeded.has(ancestor) && !credentialOnly(ancestor)
     && !deferredPlanOps.has(ancestor) && (jobsByOp.has(ancestor) || legOps.indexOf(ancestor) > firstReached))));
 };
 /** The dispatch action of an approved leg nothing holds: deferred, or a dispatch building on placeholder values when only a credential holds it. */
@@ -113,7 +113,7 @@ const approvedLegAction = (op, ctx, credentialOnly) => {
   const placeholder = (planAncestors.get(op) ?? []).some((ancestor) => credentialOnly(ancestor));
   const nodes = workGraph ? workGraph.frontier.map((node) => node.id) : [];
   const deferral = deferredPlanOps.get(op);
-  // The plan leg's own write set is the move; a work graph partitions the leg per node and a leg that declares none leaves the write set to the Kernel.
+  // The plan leg's own write set is the move (a deferred leg that declares none takes its evidence stub: it is never dispatched); a work graph partitions the leg per node and any other leg that declares none leaves the write set to the Kernel.
   const move = nodes.length ? null : enqueueMove(ctx.wf.workflow_id, { op, paths: ctx.legPaths.get(op) });
   const action = withMove({ kind: 'dispatch', origin: 'approved-leg', op, ...(nodes.length ? { nodes } : {}), ...(deferral ? { deferred: deferral.reason } : {}) }, move);
   // The plan declared no write set: the op contract's own families are the proposal the Kernel picks (kernel-menu.yaml leg-ready), not a guess.
@@ -127,14 +127,14 @@ const approvedLegAction = (op, ctx, credentialOnly) => {
   }
   return action;
 };
-/** An approved plan leg with no job and nothing it waits on: a dispatch action (placeholder values when only a credential holds it). */
+/** An approved plan leg with no job and nothing it waits on: a dispatch action (placeholder values when only a credential holds it). While no leg has a job the empty prefix counts as "every leg before it succeeded": the first approved leg is offered like any later one; a leg the chat intake runs is never one. */
 const approvedLegActions = (actions, ctx) => {
   const { legOps, workflowJobs, jobsByOp, credentialWaitOps, autopilot } = ctx;
   const firstReached = legOps.findIndex((op) => jobsByOp.has(op));
   const succeeded = new Set(workflowJobs.filter((row) => row.status === 'succeeded').map((row) => row.op_id));
-  if (firstReached < 0) return;
+  const external = externalOpsOf(skillRoot);
   for (const [index, op] of legOps.entries()) {
-    if (index <= firstReached || jobsByOp.has(op) || op === HANDOVER_OP) continue;
+    if (index <= firstReached || jobsByOp.has(op) || op === HANDOVER_OP || external.has(op)) continue;
     // Autopilot: provision.ask is planned only at the end of the flow (the handover credential checklist below);
     // a live proof waits for it while every other leg proceeds on the sandbox/stub path.
     if (autopilot?.on && (op === 'provision.ask' || (isLiveProofOp(op) && autopilot.credentialsOwed))) continue;
@@ -300,7 +300,7 @@ export function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs,
   const deferredQueued = new Map(queued.map((item) => [item.jobId, testDeferralOf({ skillRoot, op: item.opId, payload: jobPayloadOf(rowOf.get(item.jobId)), settings: specs })]).filter(([, deferral]) => deferral));
   const ctx = { db, wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs, credentialWaitOps,
     approvalWaitOps, workGraph, assetSlotsOwed, autopilot, unresolved, rowOf, deferredJobs, specs, goalText, deferredPlanOps, specDeferredJobs, deferredQueued,
-    legPaths: legPathsOf(latestGoal(db, wf.workflow_id)?.json) };
+    legPaths: withDeferredStubs(legPathsOf(latestGoal(db, wf.workflow_id)?.json), wf.workflow_id, deferredPlanOps.keys()) };
   unresolvedRetryActions(actions, ctx);
   askless(actions, ctx);
   answeredAskActions(actions, ctx);

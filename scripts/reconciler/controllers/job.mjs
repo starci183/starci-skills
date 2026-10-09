@@ -156,7 +156,7 @@ export function listKeysOf(db, ledgerId, { now = Date.now(), settings = jobSetti
   const keys = new Set();
   for (const r of [...live, ...settled, ...owing]) keys.add(jobKey(ledgerId, r.job_id));
   for (const id of openClockJobs) keys.add(jobKey(ledgerId, id));
-  for (const r of live) keys.add(wfKey(ledgerId, r.workflow_id));
+  for (const r of [...live, ...db.prepare("SELECT workflow_id FROM workflows WHERE archived_at IS NULL AND phase='running'").all()]) keys.add(wfKey(ledgerId, r.workflow_id));
   return [...keys];
 }
 
