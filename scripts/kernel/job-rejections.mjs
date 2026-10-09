@@ -6,13 +6,16 @@ import { agentSwitchOf, INCIDENT_CODES } from './op-incident-policy.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { isAdmissionWait } from './admission-refusal.mjs';
 
+// A refusal that names the host's Run binding is the runtime's fault to repair (dispatch re-binds and retries), never the pool's: it spends no strike.
+const isHostBinding = (payload) => /consumer_fenced/i.test(String(payload?.error ?? ''));
+
 /** One lineage-shaped attempt per switch-step refusal of the job: {jobId, attempt, pool, cause, attributable, detail}. */
 export function rejectionAttemptsOf(db, job) {
   const { switchSteps } = agentSwitchOf();
   const code = INCIDENT_CODES.agentSwitch.code;
   const rows = db.prepare("SELECT payload_json FROM events WHERE entity_type='job' AND entity_id=? AND kind='dispatch-rejected' ORDER BY seq").all(job.job_id);
   return rows.map((row) => parseJsonOr(row.payload_json, {}))
-    .filter((payload) => payload.effectState === 'none' && payload.model && switchSteps.includes(payload.step) && !isAdmissionWait(payload))
+    .filter((payload) => payload.effectState === 'none' && payload.model && switchSteps.includes(payload.step) && !isAdmissionWait(payload) && !isHostBinding(payload))
     .map((payload) => {
       const error = payload.error ? ' (' + String(payload.error).slice(0, 80) + ')' : '';
       return { jobId: job.job_id, attempt: job.attempt ?? job.try_no ?? null, pool: payload.model, cause: code, attributable: true, detail: `launch refused at ${payload.step}${error}` };
