@@ -1754,3 +1754,9 @@ cases:
     rule: {file: scripts/supervisor/release-publish-flow.mjs, anchor: "--plan and --publish are mutually exclusive"}
     spec: tests/cli/release.spec.mjs
     status: covered
+  - id: release-affected-range-selector-field
+    family: correctness
+    met: {date: "2026-10-10", where: "release source review", evidence: "the release row reads data.over but testAffected returns data.large; fixtures using the real field fail per-commit selection and commit-ledger assertions on the pre-fix source"}
+    rule: {file: scripts/supervisor/release-affected.mjs, anchor: "range.data.large"}
+    spec: tests/supervisor/release-suite-ci.spec.mjs
+    status: covered

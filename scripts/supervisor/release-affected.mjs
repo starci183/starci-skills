@@ -78,7 +78,7 @@ export async function affectedRelease({ root, deps = {} }) {
   const range = await (deps.testAffected ?? testAffected)({ cwd: root, args: { base, root } }, deps);
   const whole = range.data.scope ?? [];
   const bound = range.data.maxFiles;
-  const summary = range.data.over
+  const summary = range.data.large
     ? await perCommit({ root, base, head, bound, whole, policy: deps.policy ?? policyOf(), deps })
     : withReport(root, summaryOf({ base, head, bound, whole, plans: [], results: await runFiles(root, whole, deps), notCovered: [] }), []);
   return { code: summary.fail ? 1 : 0, summary };

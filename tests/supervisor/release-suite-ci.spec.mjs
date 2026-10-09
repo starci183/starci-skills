@@ -157,7 +157,7 @@ function rangeFixture(t) {
 test('the release range within the verb\'s bound runs its affected set once; the base is the newest release tag not on HEAD', async (t) => {
   const fx = rangeFixture(t);
   assert.equal(rangeBase(fx.repo), 'v1.0.0-alpha.3');
-  const { code, summary } = await affectedRelease({ root: fx.repo, deps: { ...fx.deps, testAffected: async () => ({ code: 0, data: { over: false, scope: ['tests/a.spec.mjs', 'tests/b.spec.mjs'], maxFiles: 10 } }) } });
+  const { code, summary } = await affectedRelease({ root: fx.repo, deps: { ...fx.deps, testAffected: async () => ({ code: 0, data: { large: false, scope: ['tests/a.spec.mjs', 'tests/b.spec.mjs'], maxFiles: 10 } }) } });
   assert.equal(code, 0);
   assert.deepEqual([summary.mode, summary.run, summary.pass, summary.fail, summary.bound], ['range', 2, 2, 0, 10]);
   assert.deepEqual(fx.ran.sort(), ['tests/a.spec.mjs', 'tests/b.spec.mjs']);
@@ -166,7 +166,7 @@ test('the release range within the verb\'s bound runs its affected set once; the
 test('a range over the bound runs the affected set per commit, reuses a commit whose set passed in an earlier cut, and lists what it could not cover', async (t) => {
   const fx = rangeFixture(t);
   const whole = ['tests/a.spec.mjs', 'tests/b.spec.mjs', 'tests/c.spec.mjs', 'tests/extra.spec.mjs'];
-  const deps = { ...fx.deps, testAffected: async () => ({ code: 0, data: { over: true, scope: whole, maxFiles: 1 } }), policy: { maxCommits: 80, maxRunFiles: 400 } };
+  const deps = { ...fx.deps, testAffected: async () => ({ code: 0, data: { large: true, scope: whole, maxFiles: 1 } }), policy: { maxCommits: 80, maxRunFiles: 400 } };
   const first = await affectedRelease({ root: fx.repo, deps });
   assert.equal(first.code, 0);
   assert.deepEqual([first.summary.mode, first.summary.commits.ran, first.summary.commits.reused, first.summary.commits.notCovered], ['per-commit', 3, 0, 0], JSON.stringify(first.summary));
@@ -185,7 +185,7 @@ test('a range over the bound runs the affected set per commit, reuses a commit w
 test('a red affected spec is a red row and its commit leaves no ledger; a range with no earlier release tag has no start and fails', async (t) => {
   const fx = rangeFixture(t);
   fx.state.red = ['tests/b.spec.mjs'];
-  const deps = { ...fx.deps, testAffected: async () => ({ code: 0, data: { over: true, scope: ['tests/a.spec.mjs', 'tests/b.spec.mjs', 'tests/c.spec.mjs'], maxFiles: 1 } }), policy: { maxCommits: 80, maxRunFiles: 400 } };
+  const deps = { ...fx.deps, testAffected: async () => ({ code: 0, data: { large: true, scope: ['tests/a.spec.mjs', 'tests/b.spec.mjs', 'tests/c.spec.mjs'], maxFiles: 1 } }), policy: { maxCommits: 80, maxRunFiles: 400 } };
   const { code, summary } = await affectedRelease({ root: fx.repo, deps });
   assert.equal(code, 1);
   assert.equal(summary.fail, 1);
