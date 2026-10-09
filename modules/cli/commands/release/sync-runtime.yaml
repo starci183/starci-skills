@@ -4,6 +4,7 @@ owner: runtime
 summary: refresh or check package runtime copies and optionally prepare grammar
 impl: {module: scripts/supervisor/release-sync-runtime.mjs, export: releaseSyncRuntime}
 effect: host
+writesRuntimeTree: "!check"
 roles: [worker, lead, coordinator, release, owner]
 conventions:
   - ordinary sync and check retain their existing copy behavior

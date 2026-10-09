@@ -46,7 +46,9 @@ for (const [name, args, code, program = 'starci'] of HABITS) {
     const text = refused.remedy;
     assert.match(text, /starci supervisor decide --item <id> --choice <choice> --reason <why>/, 'the decision verb is spelled');
     assert.match(text, new RegExp(GATE_ITEM), 'the open item of the menu is printed');
-    assert.match(text, /choices: fixed --text <commit> \| workaround --text <route> \| not-runtime-fault/, 'its options are printed');
+    // The fixture gate names no repository (ledgerId none): since 503fad170 a choice whose kernel step cannot bind its repository is not offered.
+    assert.match(text, /choices: record-defect --text <cause> \| none-fits --text <reason>/, 'its options are printed');
+    assert.doesNotMatch(text, /not-runtime-fault|workaround/, 'a choice that cannot bind is not offered');
     assert.match(text, /starci supervisor actions record --item runtime-defect:<cause>/, 'the defect record is spelled');
   });
 }

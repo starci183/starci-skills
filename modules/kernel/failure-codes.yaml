@@ -17484,3 +17484,12 @@ supervisor-rev-unknown:
   nextStep_vi: "Chạy lại starci supervisor revision-ack --plan và dùng revision nó nêu."
   owner: supervisor
   kind: verb-refusal
+RUNTIME_TREE_TARGET_FOREIGN:
+  title: "A verb that writes the runtime tree would write a tree other than the one that owns the running CLI"
+  title_vi: "Một verb ghi cây runtime sẽ ghi vào một cây khác với cây chứa CLI đang chạy"
+  meaning_vi: "CLI tìm runtime theo thứ tự biến môi trường, bản ghi theo người dùng, thư mục .claude phía trên, bản nhúng; bản ghi theo người dùng thắng bản checkout, nên bin của một bản clone có thể chạy runtime của cây live. Verb ghi cây runtime (sinh catalog, trường dẫn xuất, khối README, bản sao runtime) bị từ chối khi cây tìm được không phải cây của bin và không ai chọn rõ ràng."
+  causes_vi:
+    - "STARCI_RUNTIME không được đặt trong một bản clone trong khi bản ghi ~/.starci/runtime.json trỏ tới cây live"
+  nextStep_vi: "Đặt STARCI_RUNTIME tới cây cần ghi (hoặc truyền --root nếu verb có cờ đó) rồi chạy lại."
+  owner: runtime-core
+  kind: verb-refusal
