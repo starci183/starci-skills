@@ -66,6 +66,14 @@ steps:
     bound: {ref: "modules/reconciler/sla.yaml#codes.REV_ACK_OVERDUE.slaMs"}
     evidence: "status revisionNotice, events runtime-rev-acked"
     probe: kernel-acked-rev
+  - id: leg-enqueued
+    scope: workflow
+    actor: runtime
+    precondition: "workflow-started, and an approved plan leg has no job"
+    done: "no approved leg stands without a job: the Job controller enqueued each leg whose write set the plan or its deferral fixes, and the Kernel answered the leg-ready item of each leg the plan leaves open"
+    bound: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
+    evidence: "status nextActions (origin approved-leg or approved-leg-open), jobs, events job-enqueued, op-settled"
+    probe: leg-enqueued
   - id: leg-dispatched
     scope: workflow
     actor: kernel
@@ -127,7 +135,7 @@ steps:
     scope: workflow
     actor: kernel
     precondition: "every leg of the plan is settled"
-    done: "the handover is approved and the workflow finishes (frontier finish-ready leads to phase finished)"
+    done: "the handover is approved and the workflow finishes (frontier finish-ready leads to phase finished); while the handover ask waits on the owner the step waits (owner-wait), and a due handover that is not enqueued inside the bound is a departure"
     bound: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
     evidence: "status frontier finish-ready, events handover-approved and workflow-finished"
     probe: handover
@@ -162,12 +170,15 @@ departures:
   kernel-start-loop: {role: runtime, duty: does, registry: null}
   workflow-not-started: {role: runtime, duty: does, registry: null}
   worker-not-started: {role: runtime, duty: does, registry: null}
+  leg-not-enqueued: {role: runtime, duty: does, registry: approved-leg-stands-without-a-job}
+  leg-open-unanswered: {role: kernel, duty: never, registry: approved-leg-stands-without-a-job}
   dispatch-loop: {role: runtime, duty: does, registry: null}
   ready-not-dispatched: {role: runtime, duty: does, registry: ready-job-never-dispatched-no-owner}
   checks-not-rerun: {role: runtime, duty: does, registry: null}
   settle-overdue: {role: runtime, duty: does, registry: null}
   placement-lost: {role: runtime, duty: does, registry: admitted-op-placement-names-a-lost-tree-path}
   checks-ran-outside-tree: {role: runtime, duty: does, registry: checks-rerun-wrong-tree}
+  handover-not-enqueued: {role: runtime, duty: does, registry: handover-never-due-after-intake-or-deferred-leg}
   handover-stuck: {role: runtime, duty: does, registry: null}
   supervisor-down: {role: supervisor, duty: does, registry: null}
   supervisor-dead: {role: supervisor, duty: does, registry: null}

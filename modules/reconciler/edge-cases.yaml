@@ -1683,3 +1683,20 @@ cases:
     rule: {file: scripts/kernel/launch-held-item.mjs, anchor: "recoveryItemOpen"}
     spec: tests/reconciler/launch-held-item.spec.mjs
     status: covered
+
+  - id: approved-leg-stands-without-a-job
+    family: smooth-operation
+    replay: tests/replay/first-leg-offered.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a stand has an owner and a way to the owner) a freshly approved goal with no job offered an empty Kernel menu, frontier.actionable false and the state orphaned-frontier: approvedLegActions returned while no leg had a job, so only the Kernel prompt started the flow, and with the wake rules of alpha.9 (a seat is woken only while its menu holds an item) a Kernel that yielded before enqueuing, or was replaced right after boot, left the workflow standing with nobody told; the same list never gave the Job controller a key for a running workflow without a live op job, so the enqueue move of an approved leg whose write set the plan declares was never made between two legs", remedy: {state: in-tree, change: "the first approved leg is offered like any later one (the empty prefix counts as every leg before it succeeded; a leg the chat intake runs is never one), as the Job controller's move when the plan declares its write set and as the leg-ready item otherwise; the Job controller lists every running workflow; a deferred plan leg is enqueued by the controller itself on an evidence stub; the digest owns the stand: leg-not-enqueued (runtime) and leg-open-unanswered (Kernel) past the decision bound"}}
+    met: {date: "2026-10-09", where: "alpha.9 pre-mortem walk of the two authentication workflows, finding 1", evidence: "starci kernel status of a new workflow: menu [], frontier orphaned-frontier, actionable false; PREMORTEM.md finding 1"}
+    rule: {file: scripts/kernel/graph-projection.mjs, anchor: "approvedLegActions"}
+    spec: tests/replay/first-leg-offered.spec.mjs
+    status: covered
+  - id: handover-never-due-after-intake-or-deferred-leg
+    family: ending
+    replay: tests/replay/first-leg-offered.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a stand has an owner and a way to the owner) the handover is due only when every approved leg other than the handover holds a succeeded job; the plan of every workflow lists request.analyze, which the chat intake runs and which never has a job, and a test leg the specs switches defer settles cancelled with a deferred verdict, not succeeded: so after the last leg settled the handover was never due, the menu was empty and the frontier read orphaned-frontier, with no handover.review and no word to the owner; the digest read the handover step as done while the ask waited on the owner", remedy: {state: in-tree, change: "a leg the chat intake runs and a test leg the specs switches deferred count as settled for the handover, the Job controller enqueues the handover leg when it is due (it lists every running workflow), and the digest reads the handover step as waiting on the owner while its ask is open and as handover-not-enqueued (runtime) when it is due past the decision bound"}}
+    met: {date: "2026-10-09", where: "alpha.9 pre-mortem walk, end of the flow", evidence: "replay of a plan [request.analyze, scope.define, e2e.verify, handover.review] with the first two settled: handover.due false, frontier orphaned-frontier, menu []"}
+    rule: {file: scripts/kernel/verbs/shared/status-drift.mjs, anchor: "intakeLeg"}
+    spec: tests/replay/first-leg-offered.spec.mjs
+    status: covered
