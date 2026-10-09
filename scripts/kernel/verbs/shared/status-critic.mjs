@@ -4,16 +4,21 @@
 import { parseJson } from '../../../lib/json.mjs';
 import { RUNTIME_CRITIC_EVENT } from '../../settle/critic-run.mjs';
 import { settlerSettings } from '../../settle/job-settle-verify.mjs';
+import { CRITIC_USAGE_EVENT } from '../../critic-run-usage.mjs';
 
 /** The newest runtime Critic run of each open job of the workflow: [{jobId, op, critic, outcome, pass, code, try, at}]. */
 export function runtimeCriticsOf(db, workflowId) {
   const rows = db.prepare(`SELECT e.entity_id, e.created_at, e.payload_json FROM events e JOIN jobs j ON j.job_id=e.entity_id
     WHERE e.workflow_id=? AND e.kind=? AND j.status IN ('running','answering','reported') ORDER BY e.seq`).all(workflowId, RUNTIME_CRITIC_EVENT);
   const maxAttempts = settlerSettings().tail.maxAttempts;
+  const tokensOf = new Map(db.prepare('SELECT payload_json FROM events WHERE workflow_id=? AND kind=?').all(workflowId, CRITIC_USAGE_EVENT)
+    .map((row) => parseJson(row.payload_json, {}) ?? {}).map((usage) => [usage.dispatchId, usage.tokens ?? null]));
+  const keyOf = (critic) => critic?.dispatchId ?? critic?.taskId ?? null;
   const latest = new Map();
   for (const row of rows) {
     const body = parseJson(row.payload_json, {}) ?? {};
-    latest.set(row.entity_id, { jobId: row.entity_id, op: body.op ?? null, critic: body.critic ?? {}, maker: body.maker ?? null, outcome: body.outcome ?? null,
+    const critic = { ...body.critic, tokens: tokensOf.get(keyOf(body.critic)) ?? null };
+    latest.set(row.entity_id, { jobId: row.entity_id, op: body.op ?? null, critic, maker: body.maker ?? null, outcome: body.outcome ?? null,
       pass: body.pass ?? null, code: body.code ?? null, try: body.try ?? 1, maxAttempts, at: Number(row.created_at) });
   }
   return [...latest.values()];

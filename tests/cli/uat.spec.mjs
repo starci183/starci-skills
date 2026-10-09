@@ -9,7 +9,7 @@ import { main } from '../../scripts/cli/main.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const verbs = {
   'assisted-runner': ['actor', 'after', 'receipt', 'request', 'value'],
-  slots: ['record-dir'],
+  slots: ['dry-run', 'record-dir'],
 };
 
 test('uat catalog resolves handlers and declares their parsed flags', () => {

@@ -94,7 +94,7 @@ export async function runtimeCriticFor(ledger, item, { tree, entry: coordinator 
   const maker = makerOf(ledger.db, item);
   const { critique: result, document } = await critique({ kind: item.op, workRoot, records: product.map((file) => file.abs), maker: maker ?? undefined, orca, placement: { repoRoot: tree }, ...(coordinator ? { entry: coordinator } : {}) });
   const body = { jobId: item.jobId, op: item.op, digest, maker: maker?.provider ?? null, try: tries + 1,
-    critic: { provider: result.critic?.provider ?? null, model: result.critic?.model ?? null, dispatchId: result.critic?.dispatchId ?? null, durationMs: result.critic?.ms ?? null, tokens: result.critic?.tokens ?? null },
+    critic: { provider: result.critic?.provider ?? null, model: result.critic?.model ?? null, dispatchId: result.critic?.dispatchId ?? null, taskId: result.critic?.taskId ?? null, durationMs: result.critic?.ms ?? null, tokens: result.critic?.tokens ?? null },
     outcome: document ? 'verdict' : 'hold', code: result.code ?? null, error: clip(result.error ?? null, FIELD_MAX), pass: document?.pass ?? null, ...(document ? { document: compactVerdict(document) } : {}) };
   ledger.transaction(() => ledger.appendEvent({ workflowId: item.workflowId, entityType: 'job', entityId: item.jobId, kind: RUNTIME_CRITIC_EVENT, createdAt: now, payload: body }));
   return document ? { ran: true, outcome: body.outcome, pass: body.pass } : { hold: { code: body.code, error: body.error } };
