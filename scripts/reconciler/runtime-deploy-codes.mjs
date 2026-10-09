@@ -6,6 +6,7 @@ export const DEPLOY = Object.freeze({
   hostNotMain: { code: 'deploy-host-not-main' },
   notFastForward: { code: 'deploy-not-fast-forward' },
   checkRed: { code: 'deploy-check-red' },
+  affectedRed: { code: 'deploy-affected-red' },
   checkUnproven: { code: 'deploy-check-unproven' },
   releaseCutRunning: { code: 'deploy-release-cut-running' },
   hostLockHeld: { code: 'deploy-host-lock-held' },

@@ -1281,3 +1281,10 @@ cases:
     rule: {file: scripts/supervisor/affected-data.mjs, anchor: "dataRules"}
     spec: tests/supervisor/affected-data.spec.mjs
     status: covered
+  - id: deploy-carries-a-revision-whose-affected-specs-never-ran
+    family: change-under-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a revision that reaches the running host passed the specs its change can break) the deploy receipt proved only starci runtime check; a spec the change breaks stayed unseen until the release cut, after the host already ran the revision", remedy: {state: in-tree, change: "after the check, starci runtime deploy runs starci test affected --run --base <host head> in the clean source clone and refuses deploy-affected-red unless the affected receipt is ok, clean and on the source tip; the receipt and the runtime-deployed event carry {base, tip, passed, total}; there is no bypass"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, hand and verb deploys", evidence: "the first deploys carried a check receipt only"}
+    rule: {file: scripts/reconciler/runtime-deploy.mjs, anchor: "affectedProof"}
+    spec: tests/reconciler/runtime-deploy.spec.mjs
+    status: covered

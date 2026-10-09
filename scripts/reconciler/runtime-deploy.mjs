@@ -32,14 +32,21 @@ function hostFacts(host) {
 }
 
 /** Every read the judgement needs: no write. */
-function gather({ from, host, seams, env }) {
+function gather({ from, host, seams, env, plan = false }) {
   const source = resolveSource(from, host);
   const hostState = hostFacts(host);
   if (!source.ok) return { source, host: hostState };
   const range = rangeOf(source, hostState.head);
   const sourceDirty = source.kind === 'clone' && isDirty(source.dir);
-  const receipt = receiptFor({ sha: source.sha, tree: source.tree, host, env });
-  return { source, host: hostState, range, sourceDirty, receipt, lock: seams.lockOwner(), leader: seams.leader(), inFlight: seams.inFlight() };
+  const receipt = receiptFor({ sha: source.sha, tree: source.tree, base: hostState.head, host, env });
+  const affectedPlan = plan && source.kind === 'clone' && !receipt ? affectedPlanOf(seams, source.dir, hostState.head) : null;
+  return { source, host: hostState, range, sourceDirty, receipt, affectedPlan, lock: seams.lockOwner(), leader: seams.leader(), inFlight: seams.inFlight() };
+}
+
+/** What --plan says of the affected run: the size of the set and the budget it runs in; the run itself is not started. */
+function affectedPlanOf(seams, dir, base) {
+  const planned = seams.planAffected(dir, base);
+  return { files: planned.data?.scope?.length ?? null, budgetMs: seams.affectedBudgetMs(dir), error: planned.status === 0 ? null : planned.stderr || `exit ${planned.status}` };
 }
 
 function lockRefusal(lock) {
@@ -66,7 +73,11 @@ export function judge(facts) {
 /** The steps the verb would take, in order, for the facts. */
 function plannedSteps(facts) {
   const { source, range } = facts;
-  const check = facts.receipt ? `check receipt present (${facts.receipt.via})` : `run starci runtime check in ${source.dir} (exit 0 required) and write the receipt`;
+  const ap = facts.affectedPlan;
+  const affectedText = ap ? `run starci test affected --run --base ${facts.host.head.slice(0, 12)} in ${source.dir}: ${ap.files ?? 'an unknown number of'} spec file(s), budget ${Math.round((ap.budgetMs ?? 0) / 60_000)} min (exit 0, a clean receipt on the tip)` : null;
+  const thenAffected = affectedText ? ', then ' + affectedText : '';
+  const runCheck = 'run starci runtime check in ' + source.dir + ' (exit 0 required)' + thenAffected + ', and write the receipt';
+  const check = facts.receipt ? `check receipt present (${facts.receipt.via})` : runCheck;
   const wait = facts.inFlight.length ? `wait for ${facts.inFlight.length} step(s) in flight: ${facts.inFlight.map(stepLine).join('; ')}` : 'no step in flight';
   return [check, `take the host lock (purpose runtime-deploy)`, wait,
     `fast-forward the host tree ${facts.host.head.slice(0, 12)} -> ${source.sha.slice(0, 12)} (${range.commits} commit(s), ${range.files.length} file(s), ONE revision change)`,
@@ -90,18 +101,37 @@ function planResult(facts, refusals) {
 const refused = (facts, found, extra = {}) => result(1, false, `starci runtime deploy: REFUSED ${found.code}: ${found.detail}\nnothing was changed`,
   { mode: 'deploy', ...(facts.source?.ok ? summaryOf(facts) : null), refusals: [found], changed: false, ...extra });
 
-/** The check in the clean source: the receipt exists afterwards, or the verb refuses. */
-function ensureCheck({ facts, seams, env, who }) {
-  if (facts.receipt) return null;
-  const { source } = facts;
-  const run = seams.runCheck(source.dir);
-  const after = resolveSource(source.dir, source.dir);
-  if (!run.ok) return refusal(DEPLOY.checkRed, `starci runtime check exited non-zero on ${source.sha.slice(0, 12)}: ${String(run.output ?? '').trim().split(/\r?\n/).slice(-6).join(' | ')}`);
-  if (after.sha !== source.sha || isDirty(source.dir)) return refusal(DEPLOY.sourceDirty, 'the check changed the source tree or its HEAD moved while it ran; the receipt would not bind the commit');
-  writeReceipt({ sha: source.sha, tree: source.tree, exit: 0, by: who, counts: { pass: run.pass, total: run.total } }, env);
-  return null;
+/** The affected-spec run of the source: {refusal} unless its receipt is ok, clean and on the source tip; else {affected: {base, tip, passed, total}}. */
+function affectedProof(run, source, base) {
+  const receipt = run.data?.receipt;
+  const ran = receipt && receipt.schema === 'starci/affected-receipt@1';
+  if (run.status === 2 || !ran) {
+    const why = run.status === 2 ? 'the time budget ended with spec files not started' : `no receipt came back (${run.stderr || 'exit ' + run.status})`;
+    return { refusal: refusal(DEPLOY.affectedRed, `starci test affected --run --base ${base.slice(0, 12)} did not finish: ${why}`) };
+  }
+  if (!receipt.ok || !receipt.clean || receipt.tip !== source.sha) {
+    const detail = `affected receipt ok=${receipt.ok} clean=${receipt.clean} tip=${String(receipt.tip).slice(0, 12)} (source ${source.sha.slice(0, 12)}), ${receipt.passed} of ${receipt.total} files passed`;
+    return { refusal: refusal(DEPLOY.affectedRed, detail) };
+  }
+  return { affected: { base: receipt.base, tip: receipt.tip, passed: receipt.passed, total: receipt.total } };
 }
 
+const tailOf = (output) => String(output ?? '').trim().split(/\r?\n/).slice(-6).join(' | ');
+
+/** The check, then the specs the change can break, in the clean source: {receipt} exists afterwards, or {refusal}. */
+function ensureCheck({ facts, seams, env, who }) {
+  if (facts.receipt) return { receipt: facts.receipt };
+  const { source } = facts;
+  const base = facts.host.head;
+  const run = seams.runCheck(source.dir);
+  if (!run.ok) return { refusal: refusal(DEPLOY.checkRed, `starci runtime check exited non-zero on ${source.sha.slice(0, 12)}: ${tailOf(run.output)}`) };
+  const proof = affectedProof(seams.runAffected(source.dir, base), source, base);
+  if (proof.refusal) return proof;
+  const after = resolveSource(source.dir, source.dir);
+  if (after.sha !== source.sha || isDirty(source.dir)) return { refusal: refusal(DEPLOY.sourceDirty, 'the check or the specs changed the source tree or its HEAD moved while they ran; the receipt would not bind the commit') };
+  writeReceipt({ sha: source.sha, tree: source.tree, exit: 0, by: who, counts: { pass: run.pass, total: run.total }, affected: proof.affected }, env);
+  return { receipt: { via: 'check-run', affected: proof.affected } };
+}
 
 function returnAdvice({ host, prev, sha }) {
   return [`the previous revision is ${prev}`,
@@ -161,7 +191,7 @@ function succeeded(run, verified) {
   const { facts, seams, deps } = run;
   const { source, range } = facts;
   const payload = { schema: DEPLOY_SCHEMA, from: facts.host.head, to: source.sha, commits: range.commits, fileCount: range.files.length, areas: areasOf(range.files), who: seams.who(),
-    receipt: facts.receipt?.via ?? 'check-run', artefacts: run.counts, engine: { pid: verified.leader.pid, epoch: verified.leader.epoch, rev: verified.leader.rev },
+    receipt: facts.receipt?.via ?? 'check-run', affected: facts.receipt?.affected ?? null, artefacts: run.counts, engine: { pid: verified.leader.pid, epoch: verified.leader.epoch, rev: verified.leader.rev },
     waitedMs: run.waitedMs, roleActions: (deps.roleActions ?? ((input) => seams.roleActions(input.from, input.to)))({ from: facts.host.head, to: source.sha, files: range.files }) ?? null };
   const event = seams.journal(DEPLOY_EVENT, payload, range.files);
   const text = `starci runtime deploy: ${payload.from.slice(0, 12)} -> ${payload.to.slice(0, 12)} (${range.commits} commit(s), one revision change); engine pid ${payload.engine.pid} on the new revision; artefacts ${JSON.stringify(payload.artefacts)}; event seq ${event?.seq ?? '-'}`;
@@ -184,13 +214,13 @@ export async function runtimeDeploy(ctx, deps = {}) {
   const env = ctx.env ?? process.env;
   const host = path.resolve(deps.root ?? skillRoot);
   const seams = { ...hostSeams({ host, env }), ...deps.seams };
-  const facts = gather({ from, host, seams, env });
+  const facts = gather({ from, host, seams, env, plan: Boolean(ctx.args.plan) });
   const refusals = judge(facts);
   if (ctx.args.plan) return planResult(facts, refusals);
   if (refusals.length) return refused(facts, refusals[0], { refusals });
   const checked = ensureCheck({ facts, seams, env, who: seams.who().user });
-  if (checked) return refused(facts, checked);
-  const run = { facts: { ...facts, receipt: facts.receipt ?? { via: 'check-run' } }, host, seams, numbers: deps.numbers ?? deployNumbers(), deps, moved: false, migrated: false, restarted: false,
+  if (checked.refusal) return refused(facts, checked.refusal);
+  const run = { facts: { ...facts, receipt: checked.receipt }, host, seams, numbers: deps.numbers ?? deployNumbers(), deps, moved: false, migrated: false, restarted: false,
     before: null, restartedAt: 0, waitedMs: 0, counts: null };
   const locked = await (deps.underHostLock ?? underHostLock)({ role: ctx.role ?? 'owner', purpose: 'runtime-deploy', env }, () => carryOut(run));
   if (locked?.ok !== false) return locked.value;

@@ -62,7 +62,12 @@ function fakeEngine(host) {
 }
 
 const seamsOf = (w, extra = {}) => ({ lockOwner: () => null, leader: w.engine.leader, inFlight: () => [], snapshot: w.engine.snapshot, runCheck: () => ({ ok: true, pass: 3, total: 3 }),
-  migrate: w.engine.migrate, restart: w.engine.restart, roleActions: () => null, ...extra });
+  migrate: w.engine.migrate, restart: w.engine.restart, roleActions: () => null, runAffected: affectedGreen, planAffected: () => ({ status: 0, data: { scope: ['tests/a.spec.mjs', 'tests/b.spec.mjs', 'tests/c.spec.mjs'] } }),
+  affectedBudgetMs: () => 2_400_000, ...extra });
+
+/** The answer of `starci test affected --run --json` in the source clone: a receipt on its tip, every file passed. */
+const affectedReceipt = (dir, base, over = {}) => ({ schema: 'starci/affected-receipt@1', base, tip: git(dir, 'rev-parse', 'HEAD'), clean: true, files: 3, passed: 3, total: 3, ok: true, ms: 10, budgetMs: 2_400_000, concurrency: 2, ...over });
+const affectedGreen = (dir, base) => ({ status: 0, data: { ok: true, receipt: affectedReceipt(dir, base) } });
 const run = (w, args, { seams = {}, ...deps } = {}) => runtimeDeploy({ args, positionals: [], env: w.env, role: 'owner' }, { root: w.host, numbers: NUMBERS, seams: seamsOf(w, seams), sleep: async () => {}, ...deps });
 const events = (w, kind) => readMachine((m) => m.supEvents({ kind, entityType: 'runtime' }), [], { env: w.env });
 const headOf = (dir) => git(dir, 'rev-parse', 'HEAD');
@@ -91,11 +96,12 @@ const REFUSALS = [
   ['deploy-not-fast-forward', (w) => { commit(w.host, 'docs/host-only.md', 'h\n', 'host moves'); return { from: w.clone }; }],
   ['deploy-check-red', (w) => ({ from: w.clone, seams: { runCheck: () => ({ ok: false, output: 'RT_TIER_DIRECTION scripts/x.mjs' }) } })],
   ['deploy-check-unproven', (w) => { git(w.host, 'fetch', '-q', w.clone, 'HEAD:refs/heads/cand'); return { from: 'cand' }; }],
+  ['deploy-affected-red', (w) => ({ from: w.clone, seams: { runAffected: (dir, base) => ({ status: 1, data: { ok: false, receipt: affectedReceipt(dir, base, { ok: false, passed: 2 }) } }) } })],
   ['deploy-release-cut-running', (w) => ({ from: w.clone, seams: { lockOwner: () => ({ purpose: 'release-cut', pid: 4, since: 'now', stale: false }) } })],
   ['deploy-host-lock-held', (w) => ({ from: w.clone, seams: { lockOwner: () => ({ purpose: 'land', pid: 4, since: 'now', stale: false }) } })],
 ];
 for (const [code, arrange] of REFUSALS) {
-  test(`refuses ${code}: nothing changes, the code is catalogued, --plan names the same refusal (the red check is found only by running it)`, async (t) => {
+  test(`refuses ${code}: nothing changes, the code is catalogued, --plan names the same refusal (the red check and the red specs are found only by running them)`, async (t) => {
     const w = world(t);
     const { from, seams } = arrange(w);
     const before = headOf(w.host);
@@ -106,7 +112,7 @@ for (const [code, arrange] of REFUSALS) {
     assert.equal(headOf(w.host), before, 'the host tree did not move');
     assert.equal(w.engine.restarts, 0);
     assert.equal(events(w, 'runtime-deployed').length, 0);
-    if (code === 'deploy-check-red') return;
+    if (code === 'deploy-check-red' || code === 'deploy-affected-red') return;
     const plan = await run(w, { from, plan: true }, { seams });
     assert.equal(plan.data.refusals[0].code, code, 'the plan lists the same refusal');
   });
@@ -166,7 +172,10 @@ test('the check receipt binds the exact commit and tree: the verb reuses its own
   const forged = JSON.parse(fs.readFileSync(file, 'utf8'));
   fs.writeFileSync(file, JSON.stringify({ ...forged, tree: git(w.clone, 'rev-parse', `${w.tip}^{tree}`) }));
   assert.equal((await run(w, { from: w.clone, plan: true }, { seams })).data.steps[0].startsWith('run starci runtime check'), true, 'a receipt edited by hand fails its digest');
-  writeReceipt({ sha: w.tip, tree: git(w.clone, 'rev-parse', `${w.tip}^{tree}`), exit: 0 }, w.env);
+  const tree = git(w.clone, 'rev-parse', `${w.tip}^{tree}`);
+  writeReceipt({ sha: w.tip, tree, exit: 0, affected: { base: 'f'.repeat(40), tip: w.tip, passed: 1, total: 1 } }, w.env);
+  assert.equal((await run(w, { from: w.clone, plan: true }, { seams })).data.steps[0].startsWith('run starci runtime check'), true, 'a receipt proven against another host head proves nothing for this one');
+  writeReceipt({ sha: w.tip, tree, exit: 0, affected: { base: w.base, tip: w.tip, passed: 1, total: 1 } }, w.env);
   const out = await run(w, { from: w.clone }, { seams });
   assert.equal(out.code, 0, out.text);
   assert.equal(checks, 0, 'a valid receipt is not run again');
@@ -284,4 +293,36 @@ test('a deploy during a settle waits for it, restarts only after it ended, and n
     assert.equal(machine.db.prepare('SELECT state FROM engine_actions WHERE id=?').get(action).state, 'done');
     assert.equal(openPreparedOf(ledger.db, 'job-dead-apply', { read: false }) !== null, true, 'a dead apply stays for the settler to recover; the deploy never withdraws it');
   });
+});
+
+test('the affected specs: green carries {base, tip, passed, total} in the receipt and the event; the plan states the set size and budget and runs nothing', async (t) => {
+  const w = world(t);
+  let ran = 0;
+  const seams = { runAffected: (dir, base) => { ran += 1; return affectedGreen(dir, base); } };
+  const plan = await run(w, { from: w.clone, plan: true }, { seams });
+  assert.equal(ran, 0, 'the plan does not run the specs');
+  assert.ok(plan.data.steps[0].includes("3 spec file(s), budget 40 min"), plan.data.steps[0]);
+  const out = await run(w, { from: w.clone }, { seams });
+  assert.equal(out.code, 0, out.text);
+  assert.equal(ran, 1);
+  const affected = { base: w.base, tip: w.tip, passed: 3, total: 3 };
+  assert.deepEqual(events(w, 'runtime-deployed')[0].payload.affected, affected);
+  assert.deepEqual(JSON.parse(fs.readFileSync(receiptFile(w.tip, w.env), 'utf8')).affected, affected);
+});
+
+test('the affected specs refuse a budget that ended (exit 2), a receipt on another tip, an unclean tree and a run with no receipt; the check ran first and nothing moved', async (t) => {
+  const cases = [
+    ['budget exceeded', (dir, base) => ({ status: 2, data: { ok: false, receipt: affectedReceipt(dir, base, { ok: false, passed: 2 }) } }), /time budget ended/],
+    ['stale tip', (dir, base) => ({ status: 0, data: { ok: true, receipt: affectedReceipt(dir, base, { tip: 'e'.repeat(40) }) } }), /tip=eeeeeeeeeeee/],
+    ['unclean', (dir, base) => ({ status: 0, data: { ok: true, receipt: affectedReceipt(dir, base, { clean: false }) } }), /clean=false/],
+    ['no receipt', () => ({ status: 1, data: null, stderr: 'verb failed' }), /no receipt came back/],
+  ];
+  for (const [name, runAffected, detail] of cases) {
+    const w = world(t);
+    const out = await run(w, { from: w.clone }, { seams: { runAffected } });
+    assert.equal(out.data.refusals[0].code, 'deploy-affected-red', name);
+    assert.match(out.data.refusals[0].detail, detail, name);
+    assert.equal(headOf(w.host), w.base, name);
+    assert.equal(fs.existsSync(receiptFile(w.tip, w.env)), false, `${name}: no receipt is written`);
+  }
 });

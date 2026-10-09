@@ -1,6 +1,8 @@
 // runtime-deploy-host.mjs - the host-side seams of `starci runtime deploy`: reading the host tree and its engine, running the new tree's own verbs as children,
 // and journalling the deploy. Each is replaceable in a spec (runtime-deploy.mjs takes them as `deps`).
+import fs from 'node:fs';
 import os from 'node:os';
+import { parseYaml } from '../../engine/yaml.mjs';
 import path from 'node:path';
 import { allocationMs } from '../../engine/config.mjs';
 import { putMachineBlob, readMachine, withMachine } from '../../engine/db/machine.mjs';
@@ -38,6 +40,10 @@ export function hostSeams({ host, env }) {
     inFlight: () => read((machine) => inFlightSteps({ machine, leader: leaderState({ env }) }), []),
     snapshot: () => { const leader = leaderState({ env }); return read((machine) => ({ leader, after: snapshotOf(machine, leader) })); },
     runCheck: (dir) => runLandFullCheck(dir),
+    // The specs the change can break, run in the source clone against the host head (runs `starci test affected`; exit 2 is a budget that ended with files not started).
+    runAffected: (dir, base) => runHostVerb(dir, ['test', 'affected', '--run', '--base', base], env),
+    planAffected: (dir, base) => runHostVerb(dir, ['test', 'affected', '--plan', '--base', base], env),
+    affectedBudgetMs: (dir) => parseYaml(fs.readFileSync(path.join(dir, 'modules', 'supervisor', 'affected-tests.yaml'), 'utf8')).budgetMs,
     fetchFrom: (dir) => fetch(['--no-tags', dir, 'HEAD'], { cwd: host }),
     fastForward: (sha) => merge(['--ff-only', sha], { cwd: host }),
     migrate: () => runHostVerb(host, ['runtime', 'artefacts', '--migrate'], env),

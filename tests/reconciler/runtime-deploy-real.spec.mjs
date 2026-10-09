@@ -1,7 +1,7 @@
 // `starci runtime deploy` against a REAL throwaway runtime root, no fake engine: a clone of this runtime becomes the host (own config.yaml with every controller off,
 // own .runtime state), a real engine process leads on it, and the verb fast-forwards the host, runs the new tree's `runtime artefacts --migrate` and
-// `reconciler restart` as real child processes, and verifies the new leader from the machine store. Only the check run itself is replaced (it takes minutes
-// and its own spec is the runtime-check one). Nothing here touches the live host: the root, the store and the engine are all inside a temporary directory.
+// `reconciler restart` as real child processes, and verifies the new leader from the machine store. Only the check run and the affected-spec run are replaced (they take minutes
+// and have their own specs). Nothing here touches the live host: the root, the store and the engine are all inside a temporary directory.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -64,7 +64,8 @@ test('a real engine on a throwaway host is carried to a new revision by the verb
   const tip = git(clone, 'rev-parse', 'HEAD');
 
   const out = await runtimeDeploy({ args: { from: clone }, positionals: [], env, role: 'owner' },
-    { root: host, numbers: { waitMs: 30_000, pollMs: 500, verifyMs: 180_000 }, seams: { runCheck: () => ({ ok: true, pass: 1, total: 1 }) } });
+    { root: host, numbers: { waitMs: 30_000, pollMs: 500, verifyMs: 180_000 }, seams: { runCheck: () => ({ ok: true, pass: 1, total: 1 }),
+      runAffected: (dir, base) => ({ status: 0, data: { ok: true, receipt: { schema: 'starci/affected-receipt@1', base, tip, clean: true, files: 1, passed: 1, total: 1, ok: true, ms: 1, budgetMs: 1, concurrency: 1 } } }) } });
   assert.equal(out.code, 0, out.text);
   assert.equal(git(host, 'rev-parse', 'HEAD'), tip);
 
