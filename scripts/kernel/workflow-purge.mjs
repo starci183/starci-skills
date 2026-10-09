@@ -2,6 +2,7 @@
 // The plan is the default (it changes nothing); --apply acts, owner role only, under the host lock and the gc lock. What it judges and removes is
 // scripts/machine/workflow-purge-*.mjs; this file reads the flags, takes the locks, asks for the ledger purge (--ledger: scripts/work/purge-workflow.mjs, which
 // archives the rows to a verified zip before it drops them) and prints.
+import { invocationDir } from '../lib/roots.mjs';
 import path from 'node:path';
 import { purgeFactsOf } from '../machine/workflow-purge-facts.mjs';
 import { buildPurgePlan } from '../machine/workflow-purge-plan.mjs';
@@ -46,7 +47,7 @@ export async function workflowPurge(ctx, deps = {}) {
   if (!args.workflow) return usage('--workflow <id> is required');
   if (args.plan === true && args.apply === true) return usage('--plan and --apply are exclusive; the plan is the default');
   if (args.expect && String(args.expect).length < MIN_EXPECT) return usage(`--expect needs at least ${MIN_EXPECT} characters of the plan sha`);
-  const repo = path.resolve(ctx.cwd ?? process.cwd(), args.repo ?? '.');
+  const repo = path.resolve(invocationDir(ctx), args.repo ?? '.');
   const plan = planOf({ repo, workflowId: args.workflow, env, ledgerMode: args.ledger === true, deps });
   if (args.apply !== true) return { code: plan.ok ? 0 : 1, text: renderPlan(plan), data: plan };
   if (!plan.ok) return { code: 1, text: renderPlan(plan), data: plan };

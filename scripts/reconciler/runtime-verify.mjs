@@ -4,6 +4,7 @@
 // It refuses a tree with uncommitted or untracked changes (a receipt binds a commit) and prints one last line: `verified <sha>: check p/p, affected N/N of <base>..<sha>` or `NOT VERIFIED <sha>: ...` with the red files.
 import path from 'node:path';
 import { tailLines } from '../lib/clip.mjs';
+import { invocationDir } from '../lib/roots.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
@@ -87,7 +88,7 @@ function startProblems({ facts, base }) {
 export async function runtimeVerify(ctx, deps = {}) {
   if ((ctx?.positionals ?? []).length) return { code: 2, text: USAGE, data: { schema: VERIFY_SCHEMA_ANSWER, ok: false, usage: USAGE } };
   const args = ctx?.args ?? {};
-  const root = path.resolve(ctx?.cwd ?? process.cwd(), args.root ?? '.');
+  const root = path.resolve(invocationDir(ctx), args.root ?? '.');
   const seams = { ...defaultSeams({ env: ctx?.env ?? process.env }), ...deps.seams };
   const progress = deps.progress ?? ((line) => (ctx?.io?.stderr ? ctx.io.stderr(`${line}\n`) : process.stderr.write(`${line}\n`)));
   const facts = seams.facts(root);
