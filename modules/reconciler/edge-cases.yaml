@@ -1306,3 +1306,4 @@ cases:
     family: record-vs-reality
     met: {date: "2026-10-09", where: "alpha.8 live, both stores", evidence: "modules/schemas/storage-convention.yaml migrations: 34 text columns of class migrate hold content inline (contracts.markdown and context_json, jobs.payload_json, reports.report_json, goals, work_graph_versions.graph_json, check_runs.summary_json, host_samples.detail_json, engine_actions.result_json, machine_logs.data_json, sup_jobs, sup_reports, ...); the migration of each to a reference column is a proposed runtime step, not run"}
     status: open
+    why: "the migration of each content column to a reference (the writer puts the content in the blob store and the row keeps the sha, readers resolve both shapes) is a runtime migration step that the owner approves before it runs on a live store; it is proposed with the storage convention, not run by hand"
