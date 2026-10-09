@@ -47,6 +47,7 @@ import { createKernelTick } from './kernel-watchdog-tick.mjs';
 import { workflowSender } from './workflow-startup.mjs';
 import { seatWakeOf } from './op-incident-policy.mjs';
 import { createKernelRotation, rotationRule } from './seat-rotation.mjs';
+import { runtimeRevNow, startFailureRun, startHoldBudget, startHoldOf } from './start-hold.mjs';
 import { recordReplaced, recordWoken, runtimePass } from '../machine/revision-ack.mjs';
 import { kernelSeat } from '../machine/revision-seats.mjs';
 import { noticeWakeLine } from '../machine/revision-notice.mjs';
@@ -68,16 +69,18 @@ const CADENCE_MS = allocationMs('watchdogCadenceMs');
 // An `active` screen older than this is a frozen frame, not a running turn
 // (modules/models/runtimes.yaml allocation.liveness.activeStaleMs).
 const ACTIVE_STALE_MS = allocationMs('liveness.activeStaleMs');
+const START_TIMEOUT_MS = allocationMs('liveness.kernelStartTimeoutMs');
 const intervalMs = Math.max(10_000, Number(valueOf('interval-ms')) || CADENCE_MS);
 
-const runNodeJson = (file, args) => {
+const runNodeJson = (file, args, { timeout = 120_000 } = {}) => {
   const result = runNode([file, ...args], {
     cwd: skillRoot,
-    timeout: 120_000,
+    timeout,
   });
   return {
     ok: result.status === 0,
     status: result.status,
+    timedOut: result.error?.code === 'ETIMEDOUT' || result.signal === 'SIGTERM',
     value: jsonFromStdout(result.stdout),
     stdout: String(result.stdout ?? '').trim(),
     stderr: String(result.stderr ?? '').trim(),
@@ -131,6 +134,13 @@ const api = command => runNodeJson(apiFile, [command, '--repo', path.resolve(rep
 // maxReplacementsPerHour (scripts/reconciler/controllers/host.mjs REPLACED), and on 2026-09-29 a timed-out
 // tab close that start-workflow answered "terminal connected" was counted as the 4th and quarantined the seat.
 /** The watchdog answer of a start-workflow run {ok, value, stderr, stdout} past its host-unavailable and live-worker steps. Pure. */
+/** The detail of a start-workflow run that printed no JSON answer: what the process left (its error, stderr, stdout), never an empty string. Pure. */
+export function unansweredStart(started) {
+  const said = String(started.stderr || started.stdout || started.error || '').split(/\r?\n/).filter(Boolean).slice(-3).join(' | ').slice(-400) || null;
+  const how = started.timedOut ? 'start-timeout' : 'start-no-answer';
+  return { ok: false, step: 'start-workflow', reason: how, error: said ?? `start-workflow ended (exit ${started.status ?? 'none'}) without an answer`, timedOut: Boolean(started.timedOut) };
+}
+
 export function startAnswerOf(started, base = {}) {
   const live = started.ok && started.value?.replaced === false;
   let action = 'restart-failed';
@@ -140,11 +150,19 @@ export function startAnswerOf(started, base = {}) {
     ...base, ok: started.ok && started.value?.ok !== false, action,
     ...(live ? { note: started.value?.note ?? null } : {}),
     replacementTerminal: started.value?.terminal ?? null,
-    detail: started.value ?? started.stderr ?? started.stdout,
+    detail: started.value ?? unansweredStart(started),
   };
 }
+// A start that printed no answer (killed at its bound, crashed) is a failed launch like any other: recorded kernel-start-failed so the start-hold rule counts it and
+// the digest names its cause, and the Kernel seat the rotation closed is never left without a recorded reason.
+const recordUnansweredStart = (started) => {
+  const detail = unansweredStart(started);
+  withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, kind: 'kernel-start-failed',
+    payload: { step: detail.step, reason: detail.reason, error: String(detail.error).slice(0, 600), runtimeRev: runtimeRevNow(), timeoutMs: START_TIMEOUT_MS } })));
+};
 const replaceKernel = (base) => {
-  const started = runNodeJson(startFile, ['--repo', path.resolve(repo), '--goal', workflowId, '--launched-by', 'watchdog', '--json']);
+  const started = runNodeJson(startFile, ['--repo', path.resolve(repo), '--goal', workflowId, '--launched-by', 'watchdog', '--json'], { timeout: START_TIMEOUT_MS });
+  if (!started.value) recordUnansweredStart(started);
   const step = started.value?.step ?? null;
   if (step === 'host-unavailable') return { ...base, ok: true, action: 'host-unavailable', reason: started.value?.error ?? null };
   // No sender terminal to launch from is a refusal retrying cannot change: answered once as restart-blocked, which the Host
@@ -357,7 +375,7 @@ async function statusTick() {
   // The runtime revision the Kernel acked and the wake this tick types (or would type): a read-only --once
   // probe shows what the next wake carries (runtime-rev.mjs).
   const kernelRev = status.value?.kernelRev ?? null;
-  return { ...result, ...(titleRepair ? { titleRepair } : {}), ...(kernelRev ? { kernelRev, nextWake: wakePromptOf(workflowId, status.value) } : {}) };
+  return { ...result, ...(titleRepair ? { titleRepair } : {}), ...(kernelRev ? { kernelRev, ...(result.terminalClosed ? {} : { nextWake: wakePromptOf(workflowId, status.value) }) } : {}) };
 }
 
 
@@ -370,7 +388,9 @@ const finalKernelAction = (state) => {
   return state === 'wedged' ? 'kernel-wedged' : 'observed';
 };
 const recordRevisionWoken = (notice) => withKernelLedger((ledger) => recordWoken(kernelSeat({ ledger, workflowId, root: revRootOf() }), notice));
-const kernelRotation = createKernelRotation({ workflowId, openLedger: withKernelLedger, close: closeKernelTerminal, replace: replaceKernel, sender: launchableSender });
+// The replacement is one hand-over: the seat that works is closed only when a start may run now (a launch held or backing off for its cause leaves it as it is).
+const startHold = () => withKernelLedger((ledger) => startHoldOf(startFailureRun(ledger.db, workflowId), { now: Date.now(), budget: startHoldBudget(), rev: runtimeRevNow() })) ?? null;
+const kernelRotation = createKernelRotation({ workflowId, openLedger: withKernelLedger, close: closeKernelTerminal, replace: replaceKernel, sender: launchableSender, hold: startHold });
 const kernelTick = createKernelTick({ api, kernelRotation, workflowId, repair, lostSeatWorker, exitedTwice, stopAndRelease, replaceKernel,
   workerShow, DEAD_WORKER_STATE, settledKernelVerdict, DEAD_VERDICTS, terminalRead, classifyKernelScreen, outputAgeOf,
   staleAwareState, ACTIVE_STALE_MS, exitedAgentPromptRow, DEATH_SETTLE_MS, sleepSync, kernelWakeFailures,

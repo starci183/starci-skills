@@ -93,7 +93,10 @@ allocation:
   # the decision doorbell; still the same turn turnInterruptGraceMs later, the seat is replaced (KERNEL_TURN_OVERDUE,
   # scripts/reconciler/controllers/host.mjs turnStep). A busy turn defers every doorbell and notice (kernel-busy).
   liveness: {activeUnclassifiedMs: 120000, activeStaleMs: 600000, quietMs: 1200000, launchGraceMs: 90000,
-    kernelTurnBudgetMs: 1200000, supervisorTurnBudgetMs: 1800000, turnInterruptGraceMs: 300000}
+    kernelTurnBudgetMs: 1200000, supervisorTurnBudgetMs: 1800000, turnInterruptGraceMs: 300000,
+    # The watchdog's replacement of a Kernel seat runs start-workflow (worktree check, install, Orca launch, attestation): bounded here, under the Host controller's
+    # seats.kernel.timeoutMs that kills the whole watchdog pass. A start that outlives it is killed and recorded kernel-start-failed (start-timeout), never lost silently.
+    kernelStartTimeoutMs: 600000}
   # one local git read over a job's owned paths (scripts/kernel/owned-path-effects.mjs ownedPathEffects, job-artifacts.mjs).
   settleGit: {commandMs: 15000}
   # wake.maxChars: the longest wake typed into a Kernel's input box (scripts/kernel/wake-bound.mjs). Claude Code folds a paste of about

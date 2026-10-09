@@ -40,6 +40,8 @@ import { createKernelRoute, kernelBias, kernelPlanFields } from './kernel-route.
 import { kernelLaunchStatus, launchAuthorityText, launchPlanText } from './start-workflow-display.mjs';
 import { openLedger, ledgerFileFor, transitionWorkflowToRunning, bindKernelJob, releaseKernelJob, recordJobResult, setSignal, clearSignal, updateSignal, openIncident, setInboxStatus } from '../../engine/db/ledger.mjs';
 // The kernel seat's boot count lives in its payload (hierarchy.attempt); jobs.try_no is the op-try ordinal only.
+// A start killed at its bound prints no answer; the last phase line on stderr names where it stood (the watchdog journals it as the cause).
+const phase = (name) => console.error(`start-workflow: phase ${name}`);
 const kernelAttemptOf = (row) => parseJsonOr(row?.payload_json)?.hierarchy?.attempt ?? 0;
 import { inspectOwnerConfig, loadConfig } from '../../engine/config.mjs';
 import { launchKernelGroup } from './launch-kernel-group.mjs';
@@ -242,7 +244,9 @@ try {
   const { workflow: startWorkflow, goal: startGoal } = startInput();
   const startAuthority = workflowStartAuthority({ workflow: startWorkflow, goal: startGoal });
   const barred = startBar({ authority: startAuthority, launchedBy, db: ledger.db, workflowId: target }); if (barred) refuse(barred.step, barred.fields);
+  phase('sender');
   const sender = workflowSender({ env: process.env, launchedBy, ledger, workflowId: target }); if (!sender.ok) refuse(sender.reason, { workflowId: target, error: sender.error });
+  phase('workflow-host');
   const hostStartup = await ensureWorkflowHost({ workflow: startWorkflow, goal: startGoal, env: process.env });
   if (hostStartup.ok !== true || hostStartup.ready !== true)
     refuse(hostStartup.reason ?? 'workflow-host-not-ready', { workflowId: target, startup: hostStartup },
@@ -396,6 +400,7 @@ try {
     process.exit(exitCode);
   };
   try {
+    phase('provider-route');
     prepareProviderBudget();
     route = await resolveKernelRoute(ledger.db);
   } catch (error) {
@@ -427,6 +432,7 @@ try {
     const placed = { path: workflowWorktree.path, branch: workflowWorktree.branch };
     if (ensured.created) appendWorktreeEvent(ledger, workflowId, 'workflow-worktree-created', { orcaWorktreeId: workflowWorktree.orcaWorktreeId, ...placed, appRepo });
     if (ensured.repaired) appendWorktreeEvent(ledger, workflowId, 'workflow-worktree-repaired', { orcaWorktreeId: workflowWorktree.orcaWorktreeId, ...placed, ...ensured.repaired });
+    phase('workflow-worktree-install');
     workflowInstall = await installWorkflowTree({ record: workflowWorktree, env: process.env });
     if (!workflowInstall.ok) failStart('workflow-worktree-install', workflowInstall.error ?? workflowInstall.reason, null,
       { reason: workflowInstall.reason, workflowWorktree, install: workflowInstall });
@@ -461,6 +467,7 @@ try {
   const beforeLaunchAuthority = currentStartAuthority();
   if (!beforeLaunchAuthority.ok) failStart(beforeLaunchAuthority.reason, 'the accepted goal changed before Kernel launch', null,
     { reason: beforeLaunchAuthority.reason, authority: beforeLaunchAuthority, startup: hostStartup, workflowWorktree, install: workflowInstall });
+  phase('kernel-launch');
   const kernelLaunch = launchKernelGroup({ ledger, workflowId, token, expected: startAuthority, route, members, reservationMs: KERNEL_START_RESERVATION_MS,
     hostUnavailableExit: EXIT_HOST_UNAVAILABLE, memberLabel, failStart, launch: { worktree: kernelWorktree, title, prompt, specFile, config: route.ownerConfig,
       role: 'kernel', scopeId: `${ledger.ledgerId ?? ledger.path}:${workflowId}:kernel-attempt:${kernelAttemptOf(priorKernelJob) + 1}`,
