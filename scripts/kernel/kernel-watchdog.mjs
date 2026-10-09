@@ -38,8 +38,8 @@ import { workerShow } from '../api/orca/worker-show.mjs';
 import { stopAndRelease } from '../machine/worker-close.mjs';
 // worker-show states that end a worker (start-workflow.mjs MANAGED_DEAD_STATE).
 const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
-import { jsonFromStdout } from '../lib/json.mjs';
-import {  } from './runtime-rev.mjs';
+import { jsonFromStdout, parseJsonOr } from '../lib/json.mjs';
+import { currentRuntimeRev, revRootOf, revWakeLine } from './runtime-rev.mjs';
 import { openDecisionRow } from '../machine/decisions.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { arg as argvValue } from '../lib/cli-arg.mjs';
