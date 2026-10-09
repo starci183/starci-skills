@@ -56,6 +56,12 @@ proofs:                          # what settle verifies
     requirement: {en: "Scoped unit tests pass; backend E2E runs only in an explicitly selected e2e.verify leg …"}
     check: scripts/work/validate/check-work-deep.mjs    # the executable, when one exists
 
+judge:                           # who judges the product, at least one; "nobody" cannot be declared
+  - by: machine                  # machine | critic | owner | next-leg, each with a one-line `why`
+    measures: [declared-checks, op-gate]   # measures the runtime owns and re-runs at settle (modules/kernel/op-judges.yaml)
+    proofs: [op-gate]            # the proofs of this contract the measures rely on
+    why: "…what the runtime re-runs or re-reads at settle…"
+
 blockers:                        # typed escape hatches, not free text
   - code: SCOPE_WIDENING
     condition: {en: "Required operation lies outside selected code-scope."}
@@ -88,6 +94,7 @@ One rule has one place to be done and at most one place to be checked.
 | `writes[].content` | what the written data holds | a rule about how to produce it |
 | `steps[].action` | the rules, each stated once | a number a param already carries |
 | `proofs[].requirement` | what settle verifies | a second copy of the step's rule |
+| `judge[]` | who judges the product (machine, critic, owner, next-leg) and why | the maker itself, or a test file the same attempt wrote as the only judge |
 | `blockers[].condition` | when the op legitimately stops | a repair procedure |
 | `policy` | op-specific policy data | prose an agent is meant to follow |
 
@@ -162,10 +169,11 @@ non-green decisions through `modules/kernel/driver-loop.yaml`
 5. Write each rule once, in the step that applies it.
 6. Write `proofs` that say what settle verifies, with a `check:` when an
    executable proves it.
-7. Declare every legitimate stop as a `blockers` entry.
-8. Put anything op-specific left over under `policy:`.
-9. Fill `route:` so route-op resolves it.
-10. Run `starci runtime check --only op-manifest`, then
+7. Declare who judges the product in `judge` (principle P2: the maker never judges its own work), against `modules/kernel/op-judges.yaml`; `starci runtime check --only op-judge` holds the entries to the runtime's own tables.
+8. Declare every legitimate stop as a `blockers` entry.
+9. Put anything op-specific left over under `policy:`.
+10. Fill `route:` so route-op resolves it.
+11. Run `starci runtime check --only op-manifest`, then
     `starci runtime gen-ops` to regenerate the registry and
     `--check` to verify (never hand-edit it; see
     [ops-source-ownership](ops-source-ownership.md)).

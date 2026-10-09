@@ -164,7 +164,9 @@ ruleParams:
       - {id: root-adhoc, run: scripts/checks/check-root-adhoc.mjs}
       - {id: storage-convention, run: scripts/checks/check-storage-convention.mjs}
       - {id: held-surfacing, run: scripts/checks/check-held-surfacing.mjs}
+      - {id: op-judge, run: scripts/checks/check-op-judge.mjs}
       - {id: spec-budget, run: scripts/checks/check-spec-budget.mjs}
+      - {id: spec-cache-key, run: scripts/checks/check-spec-cache-key.mjs}
       - {id: default-once, run: scripts/checks/check-default-once.mjs}
       - {id: version-pin-once, run: scripts/checks/check-version-pin-once.mjs}
       - {id: slot-id-shape, run: scripts/checks/check-slot-id-shape.mjs}

@@ -36,6 +36,7 @@ const GIB = 1024 ** 3;
 /** The host sample every replayed process reads: 64 GiB of RAM with 40 free, an idle CPU, 500 GB of disk, no worker running machine-wide. */
 export const ROOMY_HOST = Object.freeze({ totalRamBytes: 64 * GIB, freeRamBytes: 40 * GIB, freeRamPct: 62.5, freeDiskGb: 500, cpuBusy: 0.1, ops: [], kernels: 0 });
 const HOST_TRAP = path.join(ROOT, 'tests', 'helpers', 'replay-host-trap.mjs');
+const CHILD_TRAP = path.join(ROOT, 'tests', 'helpers', 'replay-child-trap.mjs');
 export const STARCI = path.join(ROOT, 'packages', 'cli', 'bin', 'starci.mjs');
 export const DRIVER = path.join(ROOT, 'tests', 'helpers', 'replay-driver.mjs');
 /** The seams this harness stubs, named so a spec (and its reader) can state them. */
@@ -207,8 +208,8 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
     STARCI_AUTOPILOT: 'off', NODE_NO_WARNINGS: '1',
     // The host the runtime reads is injected, never the machine's: a roomy idle host (the dispatch throttle, the disk and RAM floors and the worker census read this sample), and a trap
     // preload in every process that logs a read of the real host (os.freemem, os.cpus, ... ) so a spec can prove none happened.
-    [HOST_RESOURCES_ENV]: JSON.stringify(ROOMY_HOST), STARCI_REPLAY_HOST_READS: path.join(base, 'host-reads.jsonl'),
-    NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${pathToFileURL(HOST_TRAP).href}`.trim() };
+    [HOST_RESOURCES_ENV]: JSON.stringify(ROOMY_HOST), STARCI_REPLAY_HOST_READS: path.join(base, 'host-reads.jsonl'), STARCI_REPLAY_CHILDREN: path.join(base, 'children.jsonl'),
+    NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${pathToFileURL(HOST_TRAP).href} --import=${pathToFileURL(CHILD_TRAP).href}`.trim() };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB', 'STARCI_STATUS_MEMO', 'STARCI_ACTOR']) delete env[key];
   const saved = { ...process.env };
   Object.assign(process.env, { [TEST_REGISTRY_ENV]: env[TEST_REGISTRY_ENV], STARCI_LOCAL_ROOT: env.STARCI_LOCAL_ROOT, STARCI_PROJECTS_ROOT: env.STARCI_PROJECTS_ROOT, STARCI_KERNEL_REV_ROOT: runtime });
@@ -285,6 +286,14 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
     return { status: r.status, json: lastJson(r.stdout) ?? lastJson(r.stderr), stdout: r.stdout, stderr: r.stderr };
   };
   /** The reads of the real host the trap logged in any process of this world: [{read, pid, frame}]. */
+  /** The detached children the processes of this world started and that are still alive: [{pid, by, command, argv}]. A replay pass ends when its work ends; one of these races the spec. */
+  world.leakedChildren = () => {
+    const file = env.STARCI_REPLAY_CHILDREN;
+    if (!fs.existsSync(file)) return [];
+    const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (error) { return error.code === 'EPERM'; } };
+    return fs.readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line)).filter((row) => alive(row.pid));
+  };
+  t.after(() => { for (const row of world.leakedChildren()) { try { spawnSync('taskkill', ['/PID', String(row.pid), '/T', '/F'], { windowsHide: true }); } catch { /* gone */ } try { process.kill(row.pid); } catch { /* gone */ } } });
   world.hostReads = () => { const file = env.STARCI_REPLAY_HOST_READS; return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line)) : []; };
   /** The state the Orca stub kept (runs, run-uses, workers started): its own file, written by every stub call. */
   world.orca = () => { try { return JSON.parse(fs.readFileSync(env.STARCI_FAKE_ORCA_STATE, 'utf8')); } catch { return {}; } };
@@ -306,11 +315,12 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
    * The real reconciler Engine over this world for `passes` passes in a fresh process (an engine restart per call): {ok, passes: [{controllers: [...]}], ...}.
    * `controllers` names the controllers run active (default job, workflow); `critic` configures the stubbed Critic launch ({mode, verdict} for fake-critic-orca); `unbound` runs the engine as the live one runs, with no Kernel identity in its environment (the default keeps the bound Kernel's).
    */
-  world.engine = ({ controllers = ['job', 'workflow'], passes = 1, critic = null, foregroundPush = false, timeout = 300_000, unbound = false } = {}) => {
-    const spec = { repo, ledgerFile, controllers, passes, critic, foregroundPush, ledgerId: path.basename(repo), env: { STARCI_ORCA_COMMAND: env.STARCI_ORCA_COMMAND } };
+  world.engine = ({ controllers = ['job', 'workflow'], passes = 1, critic = null, detachedPush = false, expectLeaked = false, timeout = 300_000, unbound = false } = {}) => {
+    const spec = { repo, ledgerFile, controllers, passes, critic, detachedPush, ledgerId: path.basename(repo), env: { STARCI_ORCA_COMMAND: env.STARCI_ORCA_COMMAND } };
     const r = spawnSync(process.execPath, [DRIVER, JSON.stringify(spec)], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout, env: { ...env, ...(unbound ? {} : kernelEnv) } });
     const out = lastJson(r.stdout);
     assert.ok(out, `engine driver gave no JSON (exit ${r.status}): ${String(r.stderr).slice(-1500)}`);
+    if (!expectLeaked) assert.deepEqual(world.leakedChildren(), [], 'a replay pass left a detached child alive after it returned: it would race whatever the spec does next (engine option detachedPush asks for the live shape)');
     return out;
   };
   return world;

@@ -15566,6 +15566,17 @@ RT_STORAGE_UNDECLARED:
   owner: supervisor
   kind: check-finding
 
+RT_OP_JUDGE_UNDECLARED:
+  title: "An op does not declare who judges its product, or declares a judge the runtime does not provide"
+  title_vi: "Một op chưa khai báo ai chấm sản phẩm của nó, hoặc khai báo người chấm mà runtime không có"
+  meaning_vi: "Nguyên tắc P2: người làm không bao giờ tự chấm việc của mình. Hợp đồng của mỗi op (modules/ops/ops/<op>.yaml) có trường bắt buộc judge, danh sách ít nhất một người chấm: machine (phép đo độc lập mà runtime sở hữu và chạy lại lúc chốt, gọi tên trong modules/kernel/op-judges.yaml; tệp test do chính lượt làm viết thì không bao giờ tự nó là người chấm), critic (Critic độc lập, đúng cho những loại op mà bảng modules/kernel/critic.yaml đánh dấu covered), owner (chỉ nơi có cổng của chủ) hoặc next-leg (chặng sau có hợp đồng là duyệt sản phẩm này). Danh sách rỗng, thiếu trường, phép đo lạ, phép đo runtime không áp dụng cho op đó, Critic khai lệch bảng, owner không có cổng hoặc next-leg chưa đăng ký đều bị từ chối."
+  causes_vi:
+    - "Thêm một op mới mà chưa khai báo trường judge"
+    - "Khai báo một phép đo hoặc Critic mà runtime không chạy cho op đó, hoặc bảng của runtime đổi mà hợp đồng chưa đổi theo"
+  nextStep_vi: "Khai báo judge trong hợp đồng của op theo modules/kernel/op-judges.yaml, hoặc sửa bảng tương ứng của runtime cho khớp với hành vi thật."
+  owner: supervisor
+  kind: check-finding
+
 RT_EVENT_SPILL_BYPASS:
   title: "A ledger event payload is spilled by hand"
   title_vi: "Một payload sự kiện của sổ cái được tự chuyển sang blob"
@@ -17824,6 +17835,16 @@ RT_HELD_UNSURFACED:
     - "Mã trạng thái chưa có đường báo thì phải ghi surfacedBy open kèm mục đang mở trong sổ ca biên"
   nextStep_vi: "Khai báo surfacedBy, surfacedAs và surfacedAt trong mục của mã (decision-item, sla-clock, incident, digest, notifier, caller hoặc open) và làm cho tệp được trỏ tới thật sự báo cho vai trò giữ mã; nếu chưa làm được thì ghi open và thêm mục open vào modules/reconciler/edge-cases.yaml nêu đúng lý do."
   owner: supervisor
+  kind: check-finding
+SPEC_CACHE_KEY_BLIND:
+  title: "The spec cache key does not move with an input class the affected selector knows"
+  title_vi: "Khóa bộ nhớ đệm spec không đổi khi một loại đầu vào mà bộ chọn affected biết bị thay đổi"
+  meaning_vi: "Self-check spec-cache-key dựng một cây nhỏ cho từng loại đầu vào của một spec (import tĩnh, import động theo chuỗi, require, điểm vào được spawn, tệp dữ liệu nêu bằng đường dẫn hoặc cạnh thư mục của nó, thư mục anh em, thư mục và cây được nêu tên, đầu ra sinh ra của một generator, mỗi gốc dữ liệu, tầng runtime và tầng cây, phiên bản node, preload, lockfile), đổi đúng một tệp của loại đó và đòi khóa phải đổi; một khóa đứng yên cho một thay đổi như vậy sẽ cho tái dùng một kết quả xanh cũ, nên bị từ chối."
+  causes_vi:
+    - "Một loại đầu vào mới được thêm vào bộ chọn affected (một mục generated, một gốc dữ liệu) mà khóa chưa tính"
+    - "Bộ đọc dữ liệu của khóa (spec-cache-reads.mjs) bỏ sót một cách một mô-đun nêu tên một tệp"
+  nextStep_vi: "Thêm loại đầu vào đó vào khóa trong scripts/supervisor/spec-cache-key.mjs hoặc spec-cache-reads.mjs rồi chạy lại starci runtime check --only spec-cache-key; không nới check."
+  owner: runtime-core
   kind: check-finding
 rejudge-not-failed:
   title: "The job is not a failed leg"

@@ -15,6 +15,9 @@ export function enqueueMove(workflow, { op, paths, ...rest }) {
   return { verb: 'enqueue', args };
 }
 
+/** The plan write sets with an evidence stub for each deferred leg that declares none: the enqueue of a deferred leg only records the deferral (the leg is never dispatched), so its write set judges nothing. */
+export const withDeferredStubs = (paths, workflow, deferredOps) => new Map([...[...deferredOps].map((op) => [op, `.starciwork/evidence/${workflow}.${op}.deferred`]), ...paths]);
+
 /**
  * The move that runs a settled job's unit again: a failed or awaiting-owner job is retried (`--retry-of`), a succeeded one is reopened with
  * the reason (a passed unit runs again only on an explicit reopen, engine/admission.mjs admitUnitTry). Null when the job has no write set.

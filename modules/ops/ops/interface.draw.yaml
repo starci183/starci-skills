@@ -813,6 +813,21 @@ proofs:
       en: "starci kernel settle re-reads the attached lint.json (runtime check op-proof, proof produced-lint): a done without it (op-lint-proof-missing), with a lint that could not run (op-lint-tool-failed) or with any finding over the produced files (op-lint-findings) is refused."
       vi: "starci kernel settle tự đọc lại lint.json đính kèm (check op-proof, proof produced-lint): done thiếu nó (op-lint-proof-missing), có lint không chạy được (op-lint-tool-failed) hoặc có bất kỳ lỗi nào trên các tệp đã tạo (op-lint-findings) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
+judge:
+  - by: critic
+    rubric: "scripts/work/draw-critic.mjs"
+    runs: in-op
+    proofs: [draw-loop]
+    why: "an independent Critic of another provider judges every round of the draw loop against the brand rubric (the product's brand.direction.rubric, else the built-in default) and the beauty minimum gates the draw"
+  - by: machine
+    measures: [declared-checks, work-hygiene, op-proof:produced-lint, draw-rerun, contract-script]
+    proofs: [draw-gates, draw-quality, draw-loop, shell-conformance, produced-lint]
+    why: "the runtime re-renders every live part and re-runs the machine metrics itself (never the loop's numbers), refuses an asset that is not a token-rendered shape, and re-runs the produced-file lint and the shell-conformance check"
+  - by: owner
+    why: "a drawing is done only on the owner's accept answer to its draw-review ask"
+  - by: next-leg
+    leg: interface.audit
+    why: "interface.audit re-captures the rendered result and compares it with the accepted draws, the installed Grammar and the brand, and routes every drift back"
 blockers:
   - code: APP_SHELL_UNSETTLED
     condition:

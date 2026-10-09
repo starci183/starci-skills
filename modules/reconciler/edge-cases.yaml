@@ -1489,7 +1489,30 @@ cases:
     rule: {file: scripts/kernel/dispatch-refusal-memo.mjs, anchor: "nextMemo"}
     spec: tests/kernel/dispatch-owners.spec.mjs
     status: covered
+  - id: check-green-taken-as-verified
+    family: record-vs-reality
+    found: live
+    replay: tests/replay/verify-green-means-green.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a branch is called verified only on a proof that ran its specs) every lane and the lead reported 'npm run check exit 0, N of N' as the proof a branch was fit to merge and deploy, but the check runs the HFS stage and the self-checks and never a spec; 28 branches were merged and deployed on that word, and the first run of the deploy gate's affected specs then found 14 red spec files and 18 failing tests on the integration tip, several already red on the live host, with a real contract break among them; the land note carried the check alone and the deploy took the note", remedy: {state: in-tree, change: "one verb, starci runtime verify, runs the check and the affected specs on one clean committed tree and writes ONE receipt bound to the exact commit (check p/p, affected N/N for base..tip); its last line is 'verified <sha>: check p/p, affected N/N of <base>..<sha>' or 'NOT VERIFIED <sha>: ...' with the red files; starci git land refuses a tip without it and writes the Affected line into the land note; starci runtime deploy takes the receipt or a note that carries the Affected line, never a check alone; the last line of the check says 'specs NOT run (starci runtime verify)'; the lane documents say a lane reports the verify line"}}
+    met: {date: "2026-10-09", where: "alpha.8 integration tip and the first runtime deploy through the affected gate", evidence: "14 red spec files and 18 failing tests on a tip that 28 branch reports had called green"}
+    rule: {file: scripts/reconciler/runtime-verify.mjs, anchor: "runtimeVerify"}
+    spec: tests/reconciler/runtime-verify.spec.mjs
+    status: covered
+  - id: reused-spec-result-needs-a-key-that-covers-every-input
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a spec result is reused only when nothing it could depend on changed) an affected run of a few hundred spec files was repeated from the first file after every fix, and a result cache keyed by the import closure alone would have reused a green result across a change of a yaml file, a sibling fixture folder, a generated output, the node version or a runner preload", remedy: {state: in-tree, change: "the per-spec cache of starci test affected --run keys a result by the spec, its import closure, the data its modules name (files, sibling and named folders, named trees), the generated outputs of a generator in the closure, the whole runtime or the whole tree for a spec that starts the CLI or scans folders, node, platform, the preload closure and the lockfiles; only a pass is recorded, a reused file is counted as reused in the receipt, and the spec-cache-key self-check changes one file of every input class and refuses a key that does not move"}}
+    met: {date: "2026-10-09", where: "design of the cache in the green-means-green lane", evidence: "reuse measured over five integration merges: a sound key reuses the few specs whose inputs are unchanged and none of the specs a change selected"}
+    rule: {file: scripts/supervisor/spec-cache-key.mjs, anchor: "createKeyer"}
+    spec: tests/supervisor/spec-cache-key.spec.mjs
+    status: covered
 
+  - id: replay-engine-detached-push-races-the-spec
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a replay is deterministic by construction) the engine pass of a replay world handed the parallelism push to a detached dispatch-ready child, as the live engine does, and the child leased the ready job about a second after the pass returned: the spec's own push then found allowed 0 and queuedReady 0, or a job already taken (shape-guard-retry, ready-not-dispatched h and dispatch-owners b failed or flaked by timing and by load).", remedy: {state: in-tree, change: "the replay driver runs the same verb in the foreground by default (engine option detachedPush asks for the live shape); every process of a world carries replay-child-trap.mjs, and the world fails a pass that leaves a detached child alive (world.leakedChildren)"}}
+    met: {date: "2026-10-09", where: "lane f9 replay worlds, lane f4 diagnosis", evidence: "kernel-dispatch-push results empty or taken in the spec's own push after world.engine; dispatch-ready child alive after the pass returned"}
+    rule: {file: tests/helpers/replay-driver.mjs, anchor: "detachedPush"}
+    spec: tests/replay/replay-determinism.spec.mjs
+    status: covered
   - id: kernel-revision-wake-decided-twice
     family: record-vs-reality
     found: live
@@ -1637,3 +1660,45 @@ cases:
     rule: {file: scripts/kernel/launch-held-item.mjs, anchor: "recoveryItemOpen"}
     spec: tests/reconciler/launch-held-item.spec.mjs
     status: covered
+
+  - id: approved-leg-stands-without-a-job
+    family: smooth-operation
+    replay: tests/replay/first-leg-offered.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a stand has an owner and a way to the owner) a freshly approved goal with no job offered an empty Kernel menu, frontier.actionable false and the state orphaned-frontier: approvedLegActions returned while no leg had a job, so only the Kernel prompt started the flow, and with the wake rules of alpha.9 (a seat is woken only while its menu holds an item) a Kernel that yielded before enqueuing, or was replaced right after boot, left the workflow standing with nobody told; the same list never gave the Job controller a key for a running workflow without a live op job, so the enqueue move of an approved leg whose write set the plan declares was never made between two legs", remedy: {state: in-tree, change: "the first approved leg is offered like any later one (the empty prefix counts as every leg before it succeeded; a leg the chat intake runs is never one), as the Job controller's move when the plan declares its write set and as the leg-ready item otherwise; the Job controller lists every running workflow; a deferred plan leg is enqueued by the controller itself on an evidence stub; the digest owns the stand: leg-not-enqueued (runtime) and leg-open-unanswered (Kernel) past the decision bound"}}
+    met: {date: "2026-10-09", where: "alpha.9 pre-mortem walk of the two authentication workflows, finding 1", evidence: "starci kernel status of a new workflow: menu [], frontier orphaned-frontier, actionable false; PREMORTEM.md finding 1"}
+    rule: {file: scripts/kernel/graph-projection.mjs, anchor: "approvedLegActions"}
+    spec: tests/replay/first-leg-offered.spec.mjs
+    status: covered
+  - id: handover-never-due-after-intake-or-deferred-leg
+    family: ending
+    replay: tests/replay/first-leg-offered.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a stand has an owner and a way to the owner) the handover is due only when every approved leg other than the handover holds a succeeded job; the plan of every workflow lists request.analyze, which the chat intake runs and which never has a job, and a test leg the specs switches defer settles cancelled with a deferred verdict, not succeeded: so after the last leg settled the handover was never due, the menu was empty and the frontier read orphaned-frontier, with no handover.review and no word to the owner; the digest read the handover step as done while the ask waited on the owner", remedy: {state: in-tree, change: "a leg the chat intake runs and a test leg the specs switches deferred count as settled for the handover, the Job controller enqueues the handover leg when it is due (it lists every running workflow), and the digest reads the handover step as waiting on the owner while its ask is open and as handover-not-enqueued (runtime) when it is due past the decision bound"}}
+    met: {date: "2026-10-09", where: "alpha.9 pre-mortem walk, end of the flow", evidence: "replay of a plan [request.analyze, scope.define, e2e.verify, handover.review] with the first two settled: handover.due false, frontier orphaned-frontier, menu []"}
+    rule: {file: scripts/kernel/verbs/shared/status-drift.mjs, anchor: "intakeLeg"}
+    spec: tests/replay/first-leg-offered.spec.mjs
+    status: covered
+
+  - id: op-product-has-no-declared-judge
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: unjudged, evidence: "(duty: the maker never judges its own work, principle P2 of modules/kernel/roles.yaml) the judge of each op was implicit: an independent Critic ran for drawing and, by the runtime at settle, for scope.define and architecture.decide; the other ops were judged by re-run checks, native proofs, gates, a later reviewing leg or the owner, and nothing stated this per op, so nothing stopped an op from having no independent judge and nothing tied the Critic table to the contracts", remedy: {state: in-tree, change: "every op contract carries the required field judge (machine, critic, owner, next-leg, each with a why; nobody cannot be declared) read against modules/kernel/op-judges.yaml, and the op-judge self-check refuses an op with no judge, a measure the runtime does not own or apply, a Critic that departs from modules/kernel/critic.yaml coverage, an owner without an owner gate and a next-leg that is not a registered reviewer"}}
+    met: {date: "2026-10-09", where: "owner ruling 2026-10-09: every op declares who judges its product, in alpha.9 with today's behaviour unchanged", evidence: "the 38 contracts of modules/ops/ops were filled from what the settle path runs today (scripts/kernel/verbs/shared/settle-preflight.mjs phases, scripts/kernel/settle/job-settle-verify.mjs, knowledge/op-gate.yaml enforcedOps and opProofs, knowledge/sonar-gate.yaml, modules/kernel/critic.yaml coverage); no Critic, gate or check was added or removed"}
+    rule: {file: scripts/checks/check-op-judge.mjs, anchor: "opJudgeFindings"}
+    spec: tests/checks/check-op-judge.spec.mjs
+    status: covered
+  - id: op-judge-not-shown-to-the-leg-or-the-op
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: unjudged, evidence: "(duty: the Op knows what will judge its product) the op prompt named the independent Critic of two ops in a hand-written list and said nothing of the other judges, so an op could run a Critic of its own or offer its own tests as the proof; the status of a leg did not say who judges it", remedy: {state: in-tree, change: "the op prompt carries one judged_by line built from the judge field of its contract, and starci kernel status --full tags each leg [judge:...] from the same field (scripts/kernel/op-judge.mjs)"}}
+    met: {date: "2026-10-09", where: "owner ruling 2026-10-09: every op declares who judges its product", evidence: "scripts/kernel/op-prompt.mjs independent-critic line named scope.define and architecture.decide by hand"}
+    rule: {file: scripts/kernel/op-judge.mjs, anchor: "judgePromptLine"}
+    spec: tests/kernel/op-judge-surfaces.spec.mjs
+    status: covered
+  - id: op-judge-self-authored-tests
+    family: correctness
+    met: {date: "2026-10-09", where: "the judge declarations of backend.implement, e2e.verify and integration.verify", evidence: "backend.implement writes or updates the unit specs of the subjects it changes (modules/ops/ops/backend.implement.yaml, the unit-specs sentence of the implementation-quality step and the step 'Add or repair scoped unit tests') and the gate's specs and the Sonar coverage of 100 on the measured logic files count those specs; e2e.verify writes 'one scenario per assertion' at the allowlisted spec paths (sideEffects: end-to-end scenario spec authoring) and integration.verify writes the contract specs it then runs, and settle re-runs the world with the specs the same op wrote. The independent measures today are lint, typecheck and canon of the gate, the Sonar new-code issues, the test-world structural rules (no hand-rolled world, none skipped), the provider's own sandbox for integration.verify and the later review.verify; nothing checks that an authored case traces to an acceptance record of work.author"}
+    why: "The declarations say the truth (machine with the independent measures, plus next-leg review.verify where a reviewing leg exists) and the behaviour is unchanged. The owner decides whether a spec the same attempt wrote may stand as proof of behaviour: e.g. a settle measure that refuses an authored case with no assertion id of the work.author records, or a rule that the leg that runs the specs is not the leg that wrote them. Either tightens a gate, so it is the owner's."
+    status: open
+  - id: op-judge-substance-unjudged
+    family: correctness
+    met: {date: "2026-10-09", where: "the judge declarations of business.decide, content.generate, perf.verify, scope.finish and test.author", evidence: "each of these ops is judged by machine measures alone and none of them reads substance: the settler re-runs the record validators (shape, references, coverage of the records) and the READ digest is re-read, but no Critic, no reviewing leg and no owner gate judges whether the specified behaviour (business.decide), the generated content and its examples (content.generate), the measured numbers (perf.verify), the retention of live consumers and sole evidence copies (scope.finish) or the cases of the authored tests (test.author) are right; the op's own run is the evidence"}
+    why: "Adding a Critic row, a reviewing leg or an owner gate for an op changes who can fail a leg, which is the owner's decision per leg and not part of declaring today's behaviour. The declarations name the gap in their why so the op is told its checks are shape only."
+    status: open

@@ -430,7 +430,7 @@ names its successor; files move with the move codemod.
 over every `.mjs` of `engine/`, `scripts/`, `modules/` and `bin/`; the runtime HFS check
 (`scripts/hfs/runtime-check.mjs`) with the runtime-rule modules of `scripts/hfs/runtime-rules/` and
 the cited-path scan over live prose; then every retained self-check of
-`ruleParams.runtime.selfChecks`, in order. Every source file is read with the TypeScript AST
+`ruleParams.runtime.selfChecks`, in order; its last line says it ran no spec (`specs NOT run (starci runtime verify)`). Every source file is read with the TypeScript AST
 (`scripts/hfs/runtime-rules/source-ast.mjs`); no text is grepped. The one allowlist is
 `modules/kernel/allowlist.yaml` (`starci/allowlist@1`): every exception a check keeps is a named,
 shrink-only section of it, and `scripts/checks/check-one-allowlist.mjs` refuses a second one

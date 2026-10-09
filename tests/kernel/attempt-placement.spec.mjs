@@ -183,7 +183,9 @@ test('the op gate binds the owned slice of a rebound attempt in the registered t
   const owned = recorded.targets[0].owned[0];
   const placements = [{ owned, base: tree, path: owned, role: null, via: 'work-owner' }];
   const judge = (binding) => judgeJobLoop({ op: 'architecture.decide', files: [], roots: [tree], gateBases: [], binding });
-  const refused = await judge({ ...recorded, placements });
+  // An op that owes no code loop and owns only Work records has no gate tool to bind (gate-settle.mjs workRecordsOnly): the stale baseline is no failure there. The same stale baseline over a CODE path still refuses.
+  assert.equal(await judge({ ...recorded, placements }), null, 'Work records only: no code gate is owed');
+  const refused = await judge({ ...recorded, placements: [{ ...placements[0], path: 'be/src/code.ts' }] });
   assert.equal(refused.judged.code, 'op-gate-tool-failed');
   assert.match(refused.judged.detail, /could not be bound/);
   const binding = reboundBindingOf(recorded, reboundMapOf(w.ledger.db, contract.attempt_id), placements);

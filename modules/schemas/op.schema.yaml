@@ -21,6 +21,7 @@ required:
   - writes
   - steps
   - proofs
+  - judge
   - blockers
   - route
 properties:
@@ -200,6 +201,26 @@ properties:
           type: string
           minLength: 1
           description: The executable that proves this requirement — a repository-relative path that exists.
+  judge:
+    type: array
+    minItems: 1
+    description: "Who judges the product of this op, at least one (principle P2: the maker never judges its own work; nobody
+      cannot be declared). Each entry is one judge: machine (independent, re-runnable measures named by id), critic (the
+      independent Critic and its rubric), owner (an owner gate) or next-leg (a later leg that reviews this product), with
+      a one-line why. The vocabulary and the tables the entries are held to are modules/kernel/op-judges.yaml; the op-judge
+      self-check (scripts/checks/check-op-judge.mjs) enforces them."
+    items:
+      type: object
+      additionalProperties: false
+      required: [by, why]
+      properties:
+        by: {enum: [machine, critic, owner, next-leg]}
+        measures: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+        proofs: {type: array, minItems: 1, items: {$ref: "#/$defs/slug"}}
+        rubric: {type: string, minLength: 1}
+        runs: {enum: [runtime, in-op]}
+        leg: {type: string, minLength: 1}
+        why: {type: string, minLength: 1, maxLength: 480}
   blockers:
     type: array
     minItems: 1
