@@ -51,6 +51,16 @@ const finishedKernelClose = (ledger, identity, authority) => {
     && ended?.managed?.dispatchId === authority.dispatch && parseJson(end?.payload_json)?.kernelTerminal === authority.terminal;
 };
 
+/**
+ * Whether a file the Kernel was admitted on changed its bytes during the call. A file that is NEW in the current required set is not a change: a menu decision
+ * (`starci kernel decide`) enqueues an op its own arguments do not name, so the ledger write of the nested enqueue adds that op's files to the required set, and the
+ * enqueue's own READ gate (requireAdmittedKernelRead: kernel-read-unverified until this life attested them) judges the new files. Only a changed or vanished file is refused here.
+ */
+function changedReads(before, now) {
+  const current = new Map(now.map((file) => [file.path, JSON.stringify(file)]));
+  return before.some((file) => current.get(file.path) !== JSON.stringify(file));
+}
+
 /** The kernel-role recheck of one mutation: incarnation, workflow scope and READ bytes. */
 const checkKernel = ({ ledger, identity, authority, baseline, args, boundary, authorityOf, manifestOf, root }) => {
   if (boundary?.kind === 'ledger-write' && boundary.db !== ledger.db) throw refuse('Kernel write uses another ledger');
@@ -61,7 +71,7 @@ const checkKernel = ({ ledger, identity, authority, baseline, args, boundary, au
   const targets = targetWorkflow(ledger.db,args);
   if ([...targets].some(id => id !== authority.workflowId)) throw refuse('Kernel mutation targets another workflow');
   const currentReads = manifestOf(ledger.db,identity.workflowId,{ root,authority: current,ops: args.op ? [args.op] : [],clean: false });
-  if (JSON.stringify(currentReads.files) !== JSON.stringify(baseline.files)) throw refuse('required bytes changed during this call', 'kernel-read-unverified');
+  if (changedReads(baseline.files, currentReads.files)) throw refuse('required bytes changed during this call', 'kernel-read-unverified');
 };
 
 /** The op-role recheck of one mutation: the latest attempt row is still this caller's incarnation. */
