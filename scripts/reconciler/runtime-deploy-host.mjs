@@ -3,7 +3,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { allocationMs } from '../../engine/config.mjs';
-import { putMachineBlob, readMachine, withMachine } from '../../engine/db/machine.mjs';
+import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { runNode } from '../api/node/run-node.mjs';
 import { merge } from '../api/git/merge.mjs';
 import { fetch } from '../api/git/fetch.mjs';
@@ -43,8 +43,7 @@ export function hostSeams({ host, env }) {
     migrate: () => runHostVerb(host, ['runtime', 'artefacts', '--migrate'], env),
     restart: () => runHostVerb(host, ['reconciler', 'restart'], env),
     journal: (kind, payload, files) => withMachine((machine) => {
-      const filesSha = files ? putMachineBlob(machine, JSON.stringify({ files }), { mediaType: 'application/json' }) : null;
-      return machine.supEvent({ entityType: 'runtime', entityId: payload.to, kind, payload: { ...payload, filesSha } });
+      return machine.supEvent({ entityType: 'runtime', entityId: payload.to, kind, payload: { ...payload, files: files ?? null } });
     }, { env }),
     // The per-role payload (starci/revision-deploy@1) the role notification reads: asked of the NEW tree's own verb; null where that tree has none.
     roleActions: (from, to) => { const r = runHostVerb(host, ['runtime', 'revision-scope', '--from', from, '--to', to], env); return r.status === 0 ? r.data : null; },

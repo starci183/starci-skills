@@ -7,7 +7,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { openLedger } from '../../engine/db/ledger.mjs';
 import { openMachine } from '../../engine/db/machine.mjs';
-import { getBlob } from '../../engine/db/blob.mjs';
 import { eventPayloadOf } from '../../engine/db/event-payload.mjs';
 import { revisionRepo } from '../helpers/revision-repo.mjs';
 import { attest, noticeFor, planRead, recordReplaced, recordWoken, runtimePass } from '../../scripts/machine/revision-ack.mjs';
@@ -118,12 +117,12 @@ test('an attestation of 500 files stays far under the 16 KB event limit: the rec
   assert.ok(JSON.stringify(manifest).length > EVENT_LIMITS.payloadBytes, 'the manifest alone would not fit an event');
   attest(seat, manifest);
   const row = w.ledger.db.prepare('SELECT payload_json, payload_sha, length(payload_json) AS bytes FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(WF, NOTICE_EVENT);
-  assert.equal(row.payload_sha, null, 'the event is inline');
-  assert.ok(row.bytes < 1024, `the event is ${row.bytes} bytes`);
+  assert.match(row.payload_sha, /^[0-9a-f]{64}$/, 'the list is behind the sha: the one spill path of the event writer');
+  assert.ok(row.bytes <= EVENT_LIMITS.payloadBytes, `the inline view is ${row.bytes} bytes`);
   const payload = eventPayloadOf(row);
   assert.equal(payload.verdict, 'acked');
   assert.equal(payload.count, 500);
-  assert.equal(JSON.parse(getBlob(payload.filesSha).toString('utf8')).length, 500, 'the whole list is behind filesSha');
+  assert.equal(payload.files.length, 500, 'the whole list is in the resolved payload');
   assert.equal(noticeFor(w.kernel()).state, 'current');
 });
 

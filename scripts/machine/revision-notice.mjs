@@ -5,7 +5,7 @@
 // `replaced` record the runtime writes when a fresh seat took its place, or a `baseline` record that adopts the revision a seat first meets.
 // The next change is measured from the newest settled revision, so several commits deployed together are ONE change, and a seat is woken at
 // most once per set of owed files it has not settled (a `woken` record keyed by the digest of the owed files: a revision that leaves them as they were wakes nobody again). No record carries a file list: it carries the two revisions, a count and the
-// diff hash; the list lives in the blob store (`filesSha`), which keeps every record far under the event payload limit however many files.
+// diff hash; the list is the record's own `files`, which the event writer keeps in the blob store behind the sha when it is long, however many files.
 import { sha256 } from '../../engine/digest.mjs';
 import { changeScope } from './revision-change.mjs';
 
@@ -60,10 +60,10 @@ export function noticeOf({ role, root, current, records, scopeFor = scopeOf }) {
   return owedNotice({ role, scope, mine, from: baseline, to: current, woken, legacy });
 }
 
-/** The small payload of a settling or waking record: revisions, verdict, counts and hashes, never a list of files. */
-export function recordPayload(notice, verdict, { filesSha = null } = {}) {
+/** The payload of a settling or waking record: revisions, verdict, counts and hashes, and the list of files an attestation read (the writer spills a long list through the one event path). */
+export function recordPayload(notice, verdict, { files = null } = {}) {
   return { schema: NOTICE_SCHEMA, role: notice.role, from: notice.from ?? null, to: notice.to, verdict, action: notice.action ?? null, count: notice.count ?? 0,
-    digest: notice.digest ?? null, filesSha };
+    digest: notice.digest ?? null, files };
 }
 
 const owedCount = (notice) => (notice.action === 'replace' ? `${notice.replaceFiles.length} changed rule file(s)` : `${notice.files.length} file(s)`);

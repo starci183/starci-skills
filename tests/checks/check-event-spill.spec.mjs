@@ -11,12 +11,13 @@ test('RT_EVENT_SPILL_BYPASS: a writer that passes payloadSha, catches the too-la
     'scripts/kernel/a.mjs': "ledger.appendEvent({ kind: 'x', payload, payloadSha });",
     'scripts/kernel/b.mjs': "if (error.code !== 'STARCI_EVENT_PAYLOAD_TOO_LARGE') throw error;",
     'engine/db/c.mjs': "db.exec(\"INSERT INTO events (kind) VALUES ('x')\");",
+    'scripts/machine/d.mjs': 'const filesSha = seat.storeList(rows);',
     'engine/db/ledger.mjs': 'payloadSha STARCI_EVENT_PAYLOAD_TOO_LARGE INSERT INTO events',
     'tests/kernel/x.spec.mjs': 'payloadSha: sha',
     'scripts/kernel/clean.mjs': "ledger.appendEvent({ kind: 'x', payload });\nconst row = db.prepare('SELECT payload_sha FROM events').get();",
   };
   const findings = eventSpillFindings(bypass);
-  assert.deepEqual(findings.map((f) => f.path).sort(), ['engine/db/c.mjs', 'scripts/kernel/a.mjs', 'scripts/kernel/b.mjs']);
+  assert.deepEqual(findings.map((f) => f.path).sort(), ['engine/db/c.mjs', 'scripts/kernel/a.mjs', 'scripts/kernel/b.mjs', 'scripts/machine/d.mjs']);
   assert.ok(findings.every((f) => f.code === CODE));
 });
 

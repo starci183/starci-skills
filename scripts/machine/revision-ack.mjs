@@ -1,6 +1,6 @@
 // revision-ack.mjs — what the runtime and a seat do with a seat's notice (revision-notice.mjs): evaluate it, settle what concerns the seat
 // nothing, record the one wake, plan the read manifest a seat is sent and attest it. A seat is the adapter of revision-seats.mjs:
-// {role, root, current, records(), append(payload), storeList(rows) -> sha}.
+// {role, root, current, records(), append(payload)}.
 import fs from 'node:fs';
 import path from 'node:path';
 import { sha256 } from '../../engine/digest.mjs';
@@ -52,14 +52,13 @@ export function planRead(seat) {
   return { notice, manifest: readManifestOf(notice, rowOfRoot(seat.root)) };
 }
 
-/** Attest a manifest the seat read: it must equal the one derived now. Writes one `acked` record whose list lives in the blob store. */
+/** Attest a manifest the seat read: it must equal the one derived now. Writes one `acked` record carrying the files it read (the event writer spills a long list). */
 export function attest(seat, submitted) {
   const { notice, manifest } = planRead(seat);
   if (!manifest) throw Object.assign(new Error('no revision change is owed to this seat'), { code: 'revision-nothing-owed' });
   if (!manifestHolds(submitted, manifest)) throw Object.assign(new Error('the manifest is not the complete current read for this revision change'), { code: 'revision-read-unverified' });
-  const filesSha = seat.storeList(manifest.files);
-  seat.append(recordPayload(notice, 'acked', { filesSha }));
-  return { notice, manifest, filesSha };
+  seat.append(recordPayload(notice, 'acked', { files: manifest.files }));
+  return { notice, manifest };
 }
 
 export { NOTICE_SCHEMA };

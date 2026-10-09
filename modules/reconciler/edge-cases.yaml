@@ -1295,3 +1295,14 @@ cases:
     rule: {file: scripts/supervisor/affected-data.mjs, anchor: "dataRules"}
     spec: tests/supervisor/affected-data.spec.mjs
     status: covered
+  - id: store-column-has-no-storage-class
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: content lives in the blob store and a row holds the reference, owner ruling 2026-10-09) nothing declared what a text column may hold: the 16 KiB event bound refused two writers in a day, and the inventory of the read-only copies of the live stores found 34 text columns holding content inline (dispatch contracts of 334 KB, host samples of 78 KB, engine action results, logs, reports), the revision and deploy records each stored their file list by hand and referenced it by filesSha", remedy: {state: in-tree, change: "modules/schemas/storage-convention.yaml declares the class of every text column of both stores (scalar, bounded, reference, spill, migrate) and the storage-convention check refuses an undeclared, stale or inconsistent one; the revision records and the runtime-deployed event carry their file list as an ordinary payload field that the one event writer spills, and the event-spill check refuses filesSha and storeList"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, both stores", evidence: "inventory of the read-only copies 2026-10-09: contracts.markdown 334 KB x 13 rows, contracts.context_json 209 KB, host_samples.detail_json 78 KB x 223 rows, engine_actions.result_json 15 MB in 5228 rows over 1 KB, machine_logs.data_json 31 KB"}
+    rule: {file: scripts/checks/check-storage-convention.mjs, anchor: "storageFindings"}
+    spec: tests/checks/check-storage-convention.spec.mjs
+    status: covered
+  - id: store-columns-hold-content-inline-until-the-migration
+    family: record-vs-reality
+    met: {date: "2026-10-09", where: "alpha.8 live, both stores", evidence: "modules/schemas/storage-convention.yaml migrations: 34 text columns of class migrate hold content inline (contracts.markdown and context_json, jobs.payload_json, reports.report_json, goals, work_graph_versions.graph_json, check_runs.summary_json, host_samples.detail_json, engine_actions.result_json, machine_logs.data_json, sup_jobs, sup_reports, ...); the migration of each to a reference column is a proposed runtime step, not run"}
+    status: open

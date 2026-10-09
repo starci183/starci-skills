@@ -27,6 +27,6 @@ export default {
     const file = String(args['read-manifest']), stat = fs.lstatSync(file);
     if (!stat.isFile() || stat.isSymbolicLink()) throw refuse('the read manifest must be a regular file', 'revision-read-unverified');
     const done = attest(seat, JSON.parse(fs.readFileSync(file, 'utf8')));
-    emit({ ok: true, workflowId, rev: seat.current, count: done.manifest.files.length, filesSha: done.filesSha }, `Kernel read acknowledged ${workflowId} ${seat.current}`, args.json);
+    emit({ ok: true, workflowId, rev: seat.current, count: done.manifest.files.length }, `Kernel read acknowledged ${workflowId} ${seat.current}`, args.json);
   },
 };
