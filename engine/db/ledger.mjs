@@ -1,4 +1,4 @@
-import { installRefResolver } from './ref-value.mjs';
+import {applyPragmas,openDb as openLedgerFile,openReadOnlyLedger} from './ledger-open.mjs';
 import { assertMutationFence } from '../../scripts/lib/mutation-fence.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -107,7 +107,6 @@ export const LEDGER_PRAGMAS=Object.freeze({synchronous:'NORMAL',foreign_keys:'ON
   journal_size_limit:67108864,trusted_schema:'OFF',wal_autocheckpoint:0});
 const CHECKPOINTER_AUTOCHECKPOINT=8000;
 const READ_PRAGMAS=Object.freeze({query_only:'ON',temp_store:'MEMORY',cache_size:-16000,trusted_schema:'OFF'});
-const applyPragmas=(db,pragmas)=>db.exec(Object.entries(pragmas).map(([k,v])=>`PRAGMA ${k}=${v};`).join(' '));
 /** BEGIN IMMEDIATE: spin for `spinMs` without the busy handler's 15 ms sleeps, then wait with the connection's busy_timeout. */
 const LEDGER_SPIN_MS=20;
 export function beginImmediate(db,{spinMs=LEDGER_SPIN_MS}={}){
@@ -127,35 +126,6 @@ export function beginImmediate(db,{spinMs=LEDGER_SPIN_MS}={}){
 let openLedgerTransactions=0;
 /** Ledger write transactions open in THIS process (the typed-log writer never flushes inside one). */
 export const ledgerTransactionDepth=()=>openLedgerTransactions;
-const openSleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms);
-// SQLITE_CANTOPEN is transient on Windows while a concurrent process closes the WAL files: a short bounded retry.
-const OPEN_RETRY_DELAYS_MS=[0,300,900];
-const cantOpen=error=>/unable to open/i.test(String(error?.message??''));
-function openDb({file,busyTimeoutMs,journalMode='WAL',autoVacuum=false,label,pragmas=LEDGER_PRAGMAS}){
-  const {DatabaseSync}=require('node:sqlite');
-  need(typeof file==='string'&&file.trim(),`${label} needs a file`);
-  fs.mkdirSync(path.dirname(path.resolve(file)),{recursive:true});
-  let lastError;
-  for(const delay of OPEN_RETRY_DELAYS_MS){
-    if(delay)openSleep(delay);
-    let db;
-    try{
-      db=installRefResolver(new DatabaseSync(file,{timeout:busyTimeoutMs}));
-      // page_size/auto_vacuum only take on an empty database, before WAL and before the first table.
-      if(autoVacuum&&Number(db.prepare('PRAGMA page_count').get().page_count)===0)db.exec('PRAGMA page_size=4096; PRAGMA auto_vacuum=INCREMENTAL;');
-      const sqliteVersion=db.prepare('select sqlite_version() AS version').get().version;
-      const actual=String(db.prepare(`PRAGMA journal_mode=${journalMode}`).get().journal_mode).toUpperCase();
-      need(actual===String(journalMode).toUpperCase(),`${label}: SQLite selected journal mode ${actual}, expected ${journalMode} (a network or UNC path cannot hold WAL)`,'STARCI_LEDGER_NOT_WAL');
-      applyPragmas(db,pragmas);
-      return {db,sqliteVersion,journalMode:actual};
-    }catch(error){
-      try{db?.close();}catch{}
-      if(!cantOpen(error))throw error;
-      lastError=error;
-    }
-  }
-  throw lastError;
-}
 // handle.transaction(fn): BEGIN IMMEDIATE … COMMIT; a nested call throws. transaction.active() tells whether one is open,
 // so the handle's one-call writes (write.*, ensureWorkflow, appendEvent, enqueueJob) join an open transaction instead.
 const makeTransaction=(db,label,fixture=null)=>{let inside=false;const tx=fn=>{if(fixture){assertOperationalLedger(metaOf(db));}if(inside){throw new Error(`${label}-nested-transaction`);}inside=true;try{beginImmediate(db);}catch(error){inside=false;throw error;}openLedgerTransactions++;try{assertMutationFence({kind:'ledger-write',db});const result=fn(db);db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{/* rollback may fail */}throw error;}finally{inside=false;openLedgerTransactions--;}};tx.active=()=>inside;return tx;};
@@ -227,8 +197,7 @@ export function ledgerIdOf(handle){
 // ---------------------------------------------------------------------------------------------------------
 /** A runtime.sqlite opened read-only with the enforced busy_timeout — what every reader outside the writer uses. */
 export function openLedgerReader(file,{busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS,verify=true,queryOnly=true}={}){
-  const {DatabaseSync}=require('node:sqlite');
-  const db=installRefResolver(new DatabaseSync(file,{readOnly:true,timeout:busyTimeoutMs}));
+  const db=openReadOnlyLedger(file,busyTimeoutMs);
   try{
     // queryOnly:false only for a backup's VACUUM INTO (the file itself stays read-only).
     applyPragmas(db,queryOnly?READ_PRAGMAS:{...READ_PRAGMAS,query_only:'OFF'});
@@ -1030,7 +999,7 @@ export function openLedger({file,now=Date.now,busyTimeoutMs=LEDGER_BUSY_TIMEOUT_
   fixture=ledgerFixtureInit(fixture,{file,repoRoot,product,machine,mapped:typeof file==='string'&&repoRootOfFile.has(path.resolve(file)),checkpointer,now});
   if(fixture){fs.closeSync(fs.openSync(file,'wx'));now=()=>fixture.createdAt;}else if(typeof file==='string'&&fs.existsSync(file)){assertWritableFile(file,busyTimeoutMs);}
   const pragmas=checkpointer?{...LEDGER_PRAGMAS,wal_autocheckpoint:CHECKPOINTER_AUTOCHECKPOINT}:LEDGER_PRAGMAS;
-  const {db,sqliteVersion,journalMode}=openDb({file,busyTimeoutMs,journalMode:'WAL',autoVacuum:true,label:'openLedger',pragmas});
+  const {db,sqliteVersion,journalMode}=openLedgerFile({file,busyTimeoutMs,journalMode:'WAL',autoVacuum:true,label:'openLedger',pragmas});
   const resolved=path.resolve(file);
   let created=false;
   try{created=initAndVerifyLedger(db,{file,now,sqliteVersion,journalMode,repoRoot:repoRoot??repoRootOfFile.get(resolved)??null,product,fixture});}catch(error){try{db.close();}catch{}throw error;}
@@ -1054,7 +1023,7 @@ export function openLedger({file,now=Date.now,busyTimeoutMs=LEDGER_BUSY_TIMEOUT_
 /** A read-write connection to an EXISTING ledger (the typed-log writer's own connection), verified, never initialised. */
 export function openLedgerConnection(file,{busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS}={}){
   need(fs.existsSync(file),`openLedgerConnection needs an existing ledger: ${file}`);assertWritableFile(file,busyTimeoutMs);
-  const {db,sqliteVersion}=openDb({file,busyTimeoutMs,journalMode:'WAL',label:'openLedgerConnection'});
+  const {db,sqliteVersion}=openLedgerFile({file,busyTimeoutMs,journalMode:'WAL',label:'openLedgerConnection',pragmas:LEDGER_PRAGMAS});
   try{verifyLedger(db,{file,sqliteVersion});}catch(error){try{db.close();}catch{}throw error;}
   return db;
 }
