@@ -40,7 +40,7 @@ export function changedFiles(root, from, to) {
 /** The paths the commits in (from, to] declare wording-only through the trailer. */
 export function declaredWording(root, from, to) {
   const out = run(gitLog, root, ['--format=%B', `${from}..${to}`]) ?? '';
-  const pattern = new RegExp(`^${WORDING_TRAILER}:\\s*(.+)$`, 'gm');
+  const pattern = new RegExp(String.raw`^${WORDING_TRAILER}:\s*(.+)$`, 'gm');
   return [...new Set([...out.matchAll(pattern)].flatMap((m) => m[1].split(',').map((p) => p.trim()).filter(Boolean)))].sort(byCodeUnit);
 }
 
@@ -94,13 +94,22 @@ function wordingVerdict(root, from, to, entries, declared) {
   return { declared, accepted, refused };
 }
 
+/** A predicate over the engine-loaded set, which is derived from the import graph the first time a file is asked about. */
+function lazyEngineSet(root, doc) {
+  let loaded = null;
+  return (file) => {
+    loaded ??= engineLoadedSet(root, doc).loaded;
+    return loaded.has(file);
+  };
+}
+
 const weight = (doc, action) => (action === REPLACE ? doc.order.length : doc.order.indexOf(action));
 const heaviest = (doc, actions) => actions.reduce((top, a) => (weight(doc, a) > weight(doc, top) ? a : top), 'none');
 const LISTED = new Set(['reread', REPLACE, 'restart']);
 
 function roleScope(doc, role, perFile, accepted) {
   const mine = perFile.map(({ entry, actions }) => ({ path: entry.path, action: effective(actions[role] ?? 'none', entry, accepted), added: entry.added, deleted: entry.deleted })).filter((f) => f.action !== 'none');
-  const named = (pick) => mine.filter(pick).map((f) => f.path).sort(byCodeUnit);
+  const named = (keep) => mine.filter((f) => keep(f)).map((f) => f.path).sort(byCodeUnit);
   const digest = sha256(mine.map((f) => [f.path, f.action, f.added, f.deleted].join(String.fromCodePoint(9))).sort(byCodeUnit).join(String.fromCodePoint(10)));
   return { action: heaviest(doc, mine.map((f) => f.action)), count: mine.length, digest, files: named((f) => LISTED.has(f.action)), replaceFiles: named((f) => f.action === REPLACE) };
 }
@@ -115,8 +124,7 @@ export function changeScope(root, from, to, { doc = loadScope(root), roles = ALL
   const none = { declared: [], accepted: [], refused: [] };
   if (!entries) return { known: false, from, to, fileCount: 0, digest: null, wording: none, roles: {} };
   const wording = wordingVerdict(root, from, to, entries, declaredWording(root, from, to));
-  let engine = null;
-  const engineLoaded = roles.includes('engine') ? (file) => (engine ??= engineLoadedSet(root, doc).loaded).has(file) : () => false;
+  const engineLoaded = roles.includes('engine') ? lazyEngineSet(root, doc) : () => false;
   const perFile = entries.map((entry) => ({ entry, ...actionsFor(doc, entry.path, { engineLoaded }) }));
   const result = Object.fromEntries(roles.map((role) => [role, roleScope(doc, role, perFile, wording.accepted)]));
   if (result.op) result.op.kinds = [...new Set(entries.flatMap((e) => opKindsOf(doc, e.path)))].sort(byCodeUnit);

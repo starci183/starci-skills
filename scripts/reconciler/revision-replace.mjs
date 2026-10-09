@@ -10,5 +10,7 @@ export function contractReplacement(notice) {
   if (notice?.state !== 'replace-due') return null;
   const names = notice.replaceFiles.slice(0, NAMED).join(', ');
   const more = notice.replaceFiles.length > NAMED ? ` and ${notice.replaceFiles.length - NAMED} more` : '';
-  return { due: true, reason: `${CONTRACT_CHANGED}: ${notice.replaceFiles.length || 'an unmeasurable set of'} rule file(s) changed or lost a rule between ${String(notice.from).slice(0, 12)} and ${String(notice.to).slice(0, 12)}${names ? ` (${names}${more})` : ''}` };
+  const listed = names ? ` (${names}${more})` : '';
+  const count = notice.replaceFiles.length || 'an unmeasurable set of';
+  return { due: true, reason: `${CONTRACT_CHANGED}: ${count} rule file(s) changed or lost a rule between ${String(notice.from).slice(0, 12)} and ${String(notice.to).slice(0, 12)}${listed}` };
 }

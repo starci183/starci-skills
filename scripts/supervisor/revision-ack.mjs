@@ -33,6 +33,7 @@ if (isMain(import.meta.url)) {
     process.exit(2);
   }
   const answer = withMachine((m) => revisionAck(m, { plan, rev: arg(argv, 'rev'), manifestFile: arg(argv, 'read-manifest') }));
-  console.log(argv.includes('--json') ? JSON.stringify(answer) : (answer.ok ? JSON.stringify(answer.readManifest ?? answer) : `refused ${answer.code}: ${answer.error}`));
+  const text = answer.ok ? JSON.stringify(answer.readManifest ?? answer) : `refused ${answer.code}: ${answer.error}`;
+  console.log(argv.includes('--json') ? JSON.stringify(answer) : text);
   process.exitCode = answer.ok ? 0 : 1;
 }

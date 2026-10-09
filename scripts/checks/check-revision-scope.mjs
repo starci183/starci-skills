@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 import { printFindings } from '../lib/check-scan.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { rolesContract } from '../machine/roles-contract.mjs';
@@ -62,7 +63,7 @@ function engineFindings(root, doc, files) {
 
 const bootTokens = (root, generator, dir) => {
   const text = fs.readFileSync(path.join(root, generator), 'utf8').split(/\r?\n/).filter((line) => !/^\s*(?:\/\/|\*|\/\*)/.test(line)).join('\n');
-  return [...new Set([...text.matchAll(PROMPT_TOKEN)].map((m) => `${dir}/${m[1]}`).filter((file) => fs.existsSync(path.join(root, file))))].sort();
+  return [...new Set([...text.matchAll(PROMPT_TOKEN)].map((m) => `${dir}/${m[1]}`).filter((file) => fs.existsSync(path.join(root, file))))].sort(byCodeUnit);
 };
 
 function bootFindings(root, doc) {

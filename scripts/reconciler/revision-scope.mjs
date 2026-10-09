@@ -26,6 +26,11 @@ export const rowsOf = (doc, file) => doc.rows.filter((row) => patternsOf(row).so
 
 const rankOf = (doc, action) => (action === REPLACE ? doc.order.length : doc.order.indexOf(action));
 
+const derivedAction = (engineLoaded, file) => {
+  if (!engineLoaded(file)) return 'none';
+  return 'restart';
+};
+
 /**
  * The action of every role for a changed `file`: the heaviest of the rows it matches (a path no row matches takes `default`). The
  * engine's derived action is `restart` when `engineLoaded(file)` and `none` otherwise.
@@ -35,7 +40,7 @@ export function actionsFor(doc, file, { engineLoaded = () => false } = {}) {
   const out = {};
   for (const roles of rows.length ? rows.map((row) => row.roles) : [doc.default]) {
     for (const [role, declared] of Object.entries(roles)) {
-      const action = declared === DERIVED ? (engineLoaded(file) ? 'restart' : 'none') : declared;
+      const action = declared === DERIVED ? derivedAction(engineLoaded, file) : declared;
       if (rankOf(doc, action) > rankOf(doc, out[role] ?? 'none')) out[role] = action;
     }
   }
