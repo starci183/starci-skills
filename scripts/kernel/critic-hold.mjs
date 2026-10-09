@@ -5,7 +5,7 @@
 // it chose `authority` (seen live on 2026-10-09) and the route table sent the owner a question only the runtime could answer.
 // A Critic that could not start or answer is the runtime's: the proof is owed by the runtime, so the kind of such a report is `checker-unavailable`
 // whatever the op chose (the one mapping every reader of the blocker uses), and its settle is a re-judgment by the runtime's own Critic.
-const CHECKER_UNAVAILABLE = 'checker-unavailable';
+export const CHECKER_UNAVAILABLE = 'checker-unavailable';
 const HOLD = /\bCRITIC_(?:UNAVAILABLE|NO_INDEPENDENT_MEMBER|QUOTA_OUT|AUTHOR_UNKNOWN)\b/;
 
 /** The Critic hold code a blocked report's blocker names, or null. */

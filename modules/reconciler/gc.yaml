@@ -14,3 +14,8 @@ lowResourceGapMs: 3600000
 # An entity event is verified only once its job has been still for eventGraceMs: the owner step (settle, report, land)
 # closes its own terminals right after writing the event, and the GC must not race it.
 eventGraceMs: 60000
+# Stray files in the root of a workflow tree (scripts/machine/tree-strays.mjs): an untracked, unignored regular file no live job owns, older than the min age and
+# no larger than the byte bound is a leftover (a shell redirection's output, like the file named `0`). The key is shadow-logged unless the controller is active.
+treeStraysEveryMs: 600000
+treeStrayMinAgeMs: 1800000
+treeStrayMaxBytes: 1048576

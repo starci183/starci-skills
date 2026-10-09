@@ -124,7 +124,7 @@ function seedExtras(ledger, wf, fixture, at, admit) {
       // An admitted job was admitted and read just now: its report is filed after them (the READ digest must precede the report).
       const filedAt = job.admitted ? Date.now() + 1 : at(job.report.filedAt ?? job.at?.updated ?? -120_000);
       ledger.db.prepare('INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?)')
-        .run(wf, attempt.attempt_id, attempt.dispatch_id, job.id, job.report.outcome, JSON.stringify({ outcome: job.report.outcome, summary: 'replay', files: proofs, ...(job.report.blocker ? { blocker: { ...job.report.blocker, ...(job.report.cause ? { detail: CAUSE_PHRASES[job.report.cause] } : {}) } } : {}), ...(job.report.checks ? { checks: job.report.checks.map(checkOf) } : {}) }),
+        .run(wf, attempt.attempt_id, attempt.dispatch_id, job.id, job.report.outcome, JSON.stringify({ outcome: job.report.outcome, summary: 'replay', files: [...(job.report.files ?? []).map((record) => `${ownedPathOf(record)}/index.yaml`), ...proofs], ...(job.report.blocker ? { blocker: { ...job.report.blocker, ...(job.report.cause ? { detail: CAUSE_PHRASES[job.report.cause] } : {}) } } : {}), ...(job.report.checks ? { checks: job.report.checks.map(checkOf) } : {}) }),
           job.report.consumed === false ? null : filedAt + 1, filedAt);
       for (const check of job.report.checks ?? []) ledger.write.recordCheckRun({ attemptId: attempt.attempt_id, name: check.name, phase: 'verify', runner: 'op', status: checkOf(check).exitCode === 0 ? 'pass' : 'fail', declaredExitCode: checkOf(check).exitCode, exitCode: checkOf(check).exitCode, command: checkOf(check).command });
     }

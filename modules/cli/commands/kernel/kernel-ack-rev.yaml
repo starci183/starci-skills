@@ -3,7 +3,7 @@
 group: kernel
 verb: kernel-ack-rev
 owner: runtime
-summary: project or attest the complete current Kernel READ manifest
+summary: project or attest the Kernel READ manifest (also spelled revision-ack)
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -22,6 +22,9 @@ flags:
   - name: plan
     type: boolean
     summary: return the current server-derived required manifest without acknowledgement
+  - name: digest
+    type: string
+    summary: the readToken --plan returned, after every path it lists was read (no file needed)
   - name: read-manifest
     type: string
     summary: regular JSON file containing the exact complete manifest read by this Kernel
@@ -35,6 +38,7 @@ exit:
 json: flag
 examples:
   - starci kernel kernel-ack-rev --repo <path> --workflow <workflow> --plan
+  - starci kernel kernel-ack-rev --repo <path> --workflow <workflow> --rev <rev> --digest <readToken>
   - starci kernel kernel-ack-rev --repo <path> --workflow <workflow> --rev <rev> --read-manifest <file>
 editions:
   - full

@@ -11,6 +11,9 @@ flags:
   - name: rev
     type: string
     summary: exact current Git SHA of the runtime revision the plan names
+  - name: digest
+    type: string
+    summary: the readToken --plan returned, after every file it lists was read (no file needed)
   - name: read-manifest
     type: string
     summary: regular JSON file holding the exact manifest --plan returned, after every file in it was read

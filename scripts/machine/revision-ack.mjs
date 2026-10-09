@@ -25,8 +25,9 @@ export function runtimePass(seat, { repair = false, adopt = false } = {}) {
     return { notice: { ...notice, state: 'current' }, wrote: verdict };
   }
   if (notice.state === 'no-baseline' && adopt) {
-    seat.append(recordPayload({ role: seat.role, to: seat.current }, 'baseline'));
-    return { notice: { role: seat.role, state: 'current', from: seat.current, to: seat.current }, wrote: 'baseline' };
+    // A seat that never acked read the tree as it stood when it booted, not the tree of today: its baseline is that revision, so the changes since owe it their notice.
+    seat.append(recordPayload({ role: seat.role, to: seat.bootRev?.() ?? seat.current }, 'baseline'));
+    return { notice: noticeFor(seat), wrote: 'baseline' };
   }
   return { notice, wrote: null };
 }

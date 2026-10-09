@@ -85,7 +85,7 @@ test('an acked rev behind HEAD is stale: the wake names the rev, the actual chan
   const line = revWakeLine(state, wf);
   assert.ok(line.startsWith(`Runtime rev ${shortRev(rt.B)}: your acknowledged rev is ${shortRev(rt.A)}; re-read modules/kernel/driver-loop.yaml and modules/ops/ops/interface.draw.yaml`), line);
   assert.match(line, new RegExp(`starci kernel kernel-ack-rev --workflow ${wf} --plan`));
-  assert.match(line,new RegExp(`--rev ${rt.B} --read-manifest <file>`));
+  assert.match(line,new RegExp(`--rev ${rt.B} --digest <readToken>`));
   assert.doesNotMatch(line, /\n/, 'one line: a newline would submit half a wake');
 
   // The gate holds only the legs whose op contract moved.
@@ -107,7 +107,7 @@ test('past the file cap or for an unknown revision, the wake offers the complete
   assert.deepEqual([unacked.unacked, unacked.stale], [true, false]);
   const unackedLine = revWakeLine(unacked, wf);
   assert.ok(unackedLine.startsWith(`Runtime rev ${shortRev(rt.C)}: no complete runtime READ is acknowledged; re-read modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml`), unackedLine);
-  assert.ok(unackedLine.includes(`starci kernel kernel-ack-rev --workflow ${wf} --plan; read every returned path, then attest with --rev ${rt.C} --read-manifest <file>`), unackedLine);
+  assert.ok(unackedLine.includes(`starci kernel kernel-ack-rev --workflow ${wf} --plan; read every returned path, then attest with --rev ${rt.C} --digest <readToken>`), unackedLine);
   assert.equal(opRevStale(unacked, 'interface.draw', { root: rt.root }), null);
 
   ack(rt.A);
@@ -115,7 +115,7 @@ test('past the file cap or for an unknown revision, the wake offers the complete
   assert.deepEqual([full.stale, full.full, full.files.length, full.fileCount], [true, true, REV_DIFF_MAX_FILES, REV_DIFF_MAX_FILES + 2]);
   const fullLine = revWakeLine(full, wf);
   assert.match(fullLine, /re-read modules\/kernel\/kernel-prompt\.md and modules\/kernel\/driver-loop\.yaml, then starci kernel kernel-ack-rev/);
-  assert.ok(fullLine.includes(`--workflow ${wf} --plan; read every returned path, then attest with --rev ${rt.C} --read-manifest <file>`), fullLine);
+  assert.ok(fullLine.includes(`--workflow ${wf} --plan; read every returned path, then attest with --rev ${rt.C} --digest <readToken>`), fullLine);
   assert.ok(opRevStale(full, 'interface.draw', { root: rt.root }), 'the gate reads every changed file, not the capped list');
   assert.equal(opRevStale(full, 'code.refactor', { root: rt.root }), null);
 
@@ -219,7 +219,7 @@ test('api: a stale Kernel is refused kernel-rev-stale for the changed op only, s
   assert.deepEqual(status.kernelRev.files, ['modules/kernel/driver-loop.yaml'], 'no interface.draw leg yet: only the Kernel contract file asks for the re-read');
   assert.equal(status.nextActions[0].kind, 'reread');
   assert.match(status.nextActions[0].reason, new RegExp(`starci kernel kernel-ack-rev --workflow ${fx.wf} --plan`));
-  assert.match(status.nextActions[0].reason, new RegExp(`--rev ${rt.B} --read-manifest <file>`));
+  assert.match(status.nextActions[0].reason, new RegExp(`--rev ${rt.B} --digest <readToken>`));
   assert.equal(status.frontier.actionable, true, 'a stale Kernel has work: the re-read');
 
   const refused = fx.api(['enqueue', '--workflow', fx.wf, '--op', 'interface.draw', '--paths', 'docs/draw']);
