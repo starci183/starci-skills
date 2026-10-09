@@ -8,7 +8,7 @@ import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
-import { kernelTerminalOf, runtimeCriticFor, runtimeCriticRunOf, RUNTIME_CRITIC_EVENT } from '../../scripts/kernel/settle/critic-run.mjs';
+import { kernelTerminalOf, OP_VERDICT_IGNORED_EVENT, runtimeCriticFor, runtimeCriticRunOf, RUNTIME_CRITIC_EVENT } from '../../scripts/kernel/settle/critic-run.mjs';
 import { judgeCriticVerdict } from '../../scripts/kernel/critic-settle.mjs';
 import { criticFor } from '../../scripts/work/critic-pick.mjs';
 import { productDigests, productFiles, kindEntryOf, criticRubrics } from '../../scripts/work/decision-critic-product.mjs';
@@ -61,18 +61,18 @@ test('a done report admitted before the Critic rule settles after a runtime-run 
   const recorded = runtimeCriticRunOf(ledger.db, 'op-arch');
   assert.deepEqual([recorded.outcome, recorded.pass, recorded.maker, recorded.critic.provider], ['verdict', true, 'claude', 'codex']);
   assert.equal(ledger.db.prepare('SELECT count(*) n FROM events WHERE kind=?').get(RUNTIME_CRITIC_EVENT).n, 1);
-  const judged = judgeCriticVerdict({ op: OP, files: [], roots: [tree], owned: ['.starciwork/features/authentication/sds'], runtime: recorded.document, teaches: false });
+  const judged = judgeCriticVerdict({ op: OP, roots: [tree], owned: ['.starciwork/features/authentication/sds'], runtime: recorded.document });
   assert.equal(judged.status, 'pass', JSON.stringify(judged));
-  const without = judgeCriticVerdict({ op: OP, files: [], roots: [tree], owned: ['.starciwork/features/authentication/sds'], teaches: false });
-  assert.equal(without.code, 'gate-newer-than-admission', 'with no verdict at all the refusal names the gate as newer than the admission');
-  assert.equal(judgeCriticVerdict({ op: OP, files: [], roots: [tree], owned: [], teaches: true }).code, 'op-critic-verdict-missing');
+  const without = judgeCriticVerdict({ op: OP, roots: [tree], owned: ['.starciwork/features/authentication/sds'] });
+  assert.equal(without.code, 'op-critic-verdict-missing', 'with no run recorded the refusal says the runtime owes it');
+  assert.equal(judgeCriticVerdict({ op: OP, roots: [tree], owned: [] }).code, 'op-critic-verdict-missing');
 }));
 
 test('a failing critique is the op\'s error-work with the critique attached', (t) => world(t, async ({ ledger, tree, item }) => {
   const critique = async () => ({ critique: { code: null, critic: { provider: 'codex' } }, document: verdictFor(tree, { beauty: 4 }) });
   const ran = await runtimeCriticFor(ledger, item, { tree, retryMs: 60_000, critique });
   assert.deepEqual([ran.ran, ran.pass], [true, false]);
-  const judged = judgeCriticVerdict({ op: OP, files: [], roots: [tree], owned: ['.starciwork/features/authentication/sds'], runtime: runtimeCriticRunOf(ledger.db, 'op-arch').document, teaches: false });
+  const judged = judgeCriticVerdict({ op: OP, roots: [tree], owned: ['.starciwork/features/authentication/sds'], runtime: runtimeCriticRunOf(ledger.db, 'op-arch').document });
   assert.equal(judged.code, 'op-critic-verdict-failed');
   assert.ok(judged.findings.length > 0, 'every failed check travels with its evidence and fix');
 }));
@@ -86,19 +86,40 @@ test('a Critic that cannot judge is a typed hold, retried no sooner than the spa
   assert.equal(runs, 1, 'inside the spacing the hold is read back, the Critic is not launched again');
   await runtimeCriticFor(ledger, item, { tree, retryMs: 60_000, now: 1_100_000, critique });
   assert.equal(runs, 2);
-  const own = judgeCriticVerdict({ op: OP, files: [], roots: [tree], owned: ['.starciwork/features/authentication/sds'], runtime: verdictFor(tree, { critic: 'claude', maker: 'claude' }), teaches: false });
+  const own = judgeCriticVerdict({ op: OP, roots: [tree], owned: ['.starciwork/features/authentication/sds'], runtime: verdictFor(tree, { critic: 'claude', maker: 'claude' }) });
   assert.equal(own.code, 'CRITIC_NO_INDEPENDENT_MEMBER');
 }));
 
-test('the picker never chooses the provider that made the product, and a report that attaches its own verdict or is not a decision leg owes no run', (t) => world(t, async ({ ledger, tree, item }) => {
+test('the picker never chooses the provider that made the product, and a report that is not a decision leg owes no run', (t) => world(t, async ({ ledger, tree, item }) => {
   const pick = criticFor(allocationSettings().drawLoop, 'claude');
   assert.ok(pick.error || pick.critic.provider !== 'claude', 'the Critic of a claude product is not claude');
   assert.equal(await runtimeCriticFor(ledger, { ...item, outcome: 'ask' }, { tree, retryMs: 1, critique: async () => assert.fail('no run for an ask') }), null);
   assert.equal(await runtimeCriticFor(ledger, { ...item, op: 'work.author' }, { tree, retryMs: 1, critique: async () => assert.fail('no run for an op without a Critic') }), null);
+}));
+
+test('a verdict the op attached is ignored and recorded as such: the runtime still runs its own Critic, once per digest, and judges only that run (the maker never supplies its own judge verdict)', (t) => world(t, async ({ ledger, tree, item }) => {
   ledger.db.prepare("INSERT INTO blobs(sha256,bytes,media_type,file_uri,created_at) VALUES(?,?,?,?,?)").run('a'.repeat(64), 1, 'application/json', 'work/blob', Date.now());
   const attempt = ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get('op-arch').attempt_id;
   ledger.db.prepare("INSERT INTO job_artifacts(workflow_id,attempt_id,job_id,op_id,role,kind,name,sha256,bytes,media_type,origin,created_at) VALUES('wf-c',?,'op-arch',?,'report-attachment','file','attachments/critic-verdict.json',?,1,'application/json','op',?)").run(attempt, OP, 'a'.repeat(64), Date.now());
-  assert.equal(await runtimeCriticFor(ledger, item, { tree, retryMs: 1, critique: async () => assert.fail('the op attached its verdict') }), null);
+  let runs = 0;
+  const critique = async () => { runs += 1; return { critique: { code: null, critic: { provider: 'codex', model: 'gpt-x', ms: 4200, dispatchId: 'ctx_c1' } }, document: verdictFor(tree, { beauty: 4 }) }; };
+  const first = await runtimeCriticFor(ledger, item, { tree, retryMs: 60_000, critique });
+  assert.deepEqual([first.ran, first.pass, runs], [true, false, 1], 'the attached verdict does not stand in for the run of the runtime');
+  assert.equal(await runtimeCriticFor(ledger, item, { tree, retryMs: 60_000, critique }), null);
+  const ignored = ledger.db.prepare('SELECT payload_json FROM events WHERE kind=?').all(OP_VERDICT_IGNORED_EVENT);
+  assert.equal(ignored.length, 1, 'recorded once');
+  assert.equal(JSON.parse(ignored[0].payload_json).file, 'attachments/critic-verdict.json');
+  const run = runtimeCriticRunOf(ledger.db, 'op-arch');
+  assert.deepEqual([run.critic.provider, run.critic.model, run.critic.durationMs, run.critic.dispatchId, run.try], ['codex', 'gpt-x', 4200, 'ctx_c1', 1], 'who, model, time and dispatch are on the journal');
+}));
+
+test('a Critic that cannot judge is launched at most maxAttempts times for the same bytes, then only read back', (t) => world(t, async ({ ledger, tree, item }) => {
+  let runs = 0;
+  const critique = async () => { runs += 1; return { critique: { code: 'CRITIC_UNAVAILABLE', error: 'down', critic: { provider: 'codex' } }, document: null }; };
+  for (let i = 0; i < 6; i += 1) await runtimeCriticFor(ledger, item, { tree, retryMs: 10, maxAttempts: 3, now: 1_000_000 + i * 100, critique });
+  assert.equal(runs, 3, 'bounded: the Critic is not launched again for the same digest');
+  assert.deepEqual((await runtimeCriticFor(ledger, item, { tree, retryMs: 10, maxAttempts: 3, now: 9_000_000, critique })).hold.code, 'CRITIC_UNAVAILABLE');
+  assert.equal(runtimeCriticRunOf(ledger.db, 'op-arch').try, 3);
 }));
 
 test('the Kernel terminal of a workflow is read from its kernel signal', (t) => withLedger(t, ({ ledger }) => {

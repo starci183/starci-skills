@@ -30,6 +30,7 @@ import { sessionHomes } from './op-session.mjs';
 import { agentOfJob } from '../lib/job-agent.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 import { planSeatUsage } from './usage-seat-plan.mjs';
+import { sweepCriticUsage } from './critic-run-usage.mjs';
 
 const SESSION_HEAD_BYTES = 256 * 1024;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -399,6 +400,16 @@ function recordSupervisorUsage(supervisors, { out, detail, dryRun, env, openMach
   } catch (error) { out.errors.push(`supervisor: ${message(error).slice(0, 160)}`); }
 }
 
+/** The runtime Critic runs of one ledger get their measured usage (critic-run-usage.mjs); a failure is an error of the pass, never a stop. */
+function recordCriticRuns(ledger, { index, out, dryRun, now, openLedger, openLedgerReader }) {
+  try {
+    const open = { reader: (file) => openLedgerReader(file), writer: (ref) => openLedger(ref) };
+    out.critics.recorded += sweepCriticUsage(ledger, index, { open, dryRun, now });
+  } catch (error) {
+    if (!archivedRefusal(error)) out.errors.push(`${ledger.name} critic runs: ${message(error).slice(0, 160)}`);
+  }
+}
+
 /**
  * One pass: settled attempts without usage (every registered ledger), every Kernel session (its workflow's ledger) and the
  * Supervisor sessions (machine.sqlite). `dryRun` reads and reports, writes nothing. Returns a summary.
@@ -408,7 +419,7 @@ export async function sweepUsage({ env = process.env, home = os.homedir(), now =
     import('../../engine/db/machine.mjs'), import('../../engine/db/ledger.mjs'),
   ]);
   const since = now - lookbackMs;
-  const out = { ok: true, dryRun, lookbackMs, attempts: { pending: 0, recorded: 0, unavailable: 0, skippedEnded: 0 }, kernels: { sessions: 0, recorded: 0, rows: 0, unmatched: 0, skippedEnded: 0 }, supervisor: { sessions: 0, recorded: 0, rows: 0 }, errors: [], unavailable: [], ...(detail ? { detail: { attempts: [], kernels: [], supervisor: [] } } : {}) };
+  const out = { ok: true, dryRun, lookbackMs, attempts: { pending: 0, recorded: 0, unavailable: 0, skippedEnded: 0 }, critics: { recorded: 0 }, kernels: { sessions: 0, recorded: 0, rows: 0, unmatched: 0, skippedEnded: 0 }, supervisor: { sessions: 0, recorded: 0, rows: 0 }, errors: [], unavailable: [], ...(detail ? { detail: { attempts: [], kernels: [], supervisor: [] } } : {}) };
   let ledgers = [];
   const reader = ledgerFiles ? null : openMachineReader({ env });
   if (!reader && !ledgerFiles) return { ...out, ok: false, errors: ['machine.sqlite not found'] };
@@ -420,6 +431,7 @@ export async function sweepUsage({ env = process.env, home = os.homedir(), now =
   const index = indexSessions({ agents: [...wantedAgents], sinceMs: Math.min(since, ...perLedger.flatMap((p) => p.pending.map((a) => (a.dispatched_at ?? since) - SESSION_LEAD_MS)).concat(since)), env, home, archiveRoot });
 
   for (const plan of perLedger) recordLedgerUsage(plan, { index, out, detail, dryRun, now, openLedger, openLedgerReader });
+  for (const plan of perLedger) recordCriticRuns(plan.ledger, { index, out, dryRun, now, openLedger, openLedgerReader });
   const known = new Set(perLedger.flatMap((p) => [...p.workflows]));
   out.kernels.unmatched = index.filter((e) => e.role === 'kernel' && !known.has(e.workflowId)).length;
 

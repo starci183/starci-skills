@@ -5,6 +5,7 @@ import { nameWithId } from '../../../lib/display-names.mjs';
 import { shortWorkflow } from '../../dependency-graph.mjs';
 import { stuckLine } from '../../../machine/op-metrics.mjs';
 import { menuLines } from './status-menu.mjs';
+import { runtimeCriticLine } from './status-critic.mjs';
 import { seatCostConfig } from '../../seat-wakes.mjs';
 
 const headline = (s, out) => {
@@ -226,6 +227,7 @@ export const statusText = (s, out) => [
   ...s.peerMessages.map((message) => `  peer-message: ${message.key} from ${message.from} [${message.kind}] ${message.subject}`),
   ...s.peerWaits.map(peerWaitLine),
   ...s.heldSettle.map(heldSettleLine),
+  ...(s.runtimeCritics ?? []).map((run) => runtimeCriticLine(run)),
   ...s.askReserve.map((dispatchId) => `  ask-reserve: ${dispatchId} never reached the owner; the Workflow controller parks it`),
   ...s.askOnDemand.map((dispatchId) => `  ask-on-demand: ${dispatchId} is on Telegram; the owner generates its link (no form until then)`),
   ...s.typedWaits.resolved.map((item) => `  auto-resolved: ${item.incidentId} [${item.kind ?? '-'}] every typed condition holds — ${item.evidence.join('; ').slice(0, 240)}`),

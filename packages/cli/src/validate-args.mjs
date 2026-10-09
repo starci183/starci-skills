@@ -32,10 +32,10 @@ const typedValue = (flag, raw) => {
 };
 
 /** One `--name[=value]` token: type-check it into values/global, or pass it through to localArgs. */
-const applyOption = (argv, index, token, { known, values, global, localArgs }) => {
+const applyOption = (argv, index, token, { known, internal, values, global, localArgs }) => {
   const name = optionName(token);
   const flag = known.get(name);
-  if (!flag) throw new Error(`unknown option --${name}`);
+  if (!flag) throw new Error(internal.has(name) ? `unknown option --${name}: it is a call of the runtime itself, not a CLI option; ${internal.get(name)}` : `unknown option --${name}`);
   const { value: raw, consumed } = optionValue(argv, index, flag, known);
   const value = typedValue(flag, raw);
   if (flag.type === 'list') {
@@ -121,6 +121,8 @@ export function validateArgs(argv, verb, globalFlags = []) {
   const globals = new Map(globalFlags.map((flag) => [flag.name, { ...flag, global: true }]));
   const locals = new Map((verb.flags ?? []).map((flag) => [flag.name, flag]));
   const known = new Map([...globals, ...locals]);
+  // Flags the runtime's own scripts take and the CLI refuses, each with the pointer a person is given instead.
+  const internal = new Map((verb.internalFlags ?? []).map((entry) => [entry.name, entry.pointer]));
   const values = {};
   const global = {};
   const localArgs = [];
@@ -142,7 +144,7 @@ export function validateArgs(argv, verb, globalFlags = []) {
         continue;
       }
       if (token.startsWith('--')) {
-        index += applyOption(argv, index, token, { known, values, global, localArgs });
+        index += applyOption(argv, index, token, { known, internal, values, global, localArgs });
         continue;
       }
       if (token.startsWith('-')) throw new Error(`unknown option ${token}`);

@@ -106,12 +106,22 @@ function gateLooseningLands(d, snapshot) {
   return verdictOf(unapprovedLanded.length > 0, `${unapprovedLanded.length} land(s) loosened a gate without the owner's approval (${unapprovedLanded.map((l) => l.runId).join(', ')})`, text);
 }
 
+/** One line per runtime Critic run: who judged, the model, the time, the tokens (unmeasured when the run recorded none) and the verdict or the hold. */
+function runtimeRunLine(r, tokensOf) {
+  let verdict = 'hold ' + (r.code ?? '');
+  if (r.runOutcome === 'verdict') verdict = r.runPass ? 'pass' : 'fail';
+  return `${r.entityId} ${r.criticProvider ?? '?'}/${r.criticModel ?? '?'} ${r.durationMs ?? '?'}ms tokens ${tokensOf.get(r.dispatchId) ?? r.tokens ?? 'unmeasured'} ${verdict.trim()} (try ${r.runTry ?? 1})`;
+}
+
 function criticIndependent(d, snapshot) {
-  const runs = eventsOf(snapshot, 'critic-run');
-  if (!runs.length) return unknown('no critic-run event on record yet: the event is written when a draw pass settles');
+  const runs = [...eventsOf(snapshot, 'critic-run'), ...eventsOf(snapshot, 'runtime-critic-run')];
+  if (!runs.length) return unknown('no critic-run or runtime-critic-run event on record yet: the events are written when a draw pass settles and when the settler runs the Critic of a decision leg');
   const shared = runs.filter((r) => r.criticProvider && r.opProvider && !r.independent);
   const unknownMaker = runs.filter((r) => !r.criticProvider || !r.opProvider);
-  const text = `${runs.length} Critic run(s), ${runs.length - shared.length - unknownMaker.length} on another provider than the op, ${unknownMaker.length} with a provider not recorded`;
+  const tokensOf = new Map(eventsOf(snapshot, 'runtime-critic-usage').map((usage) => [usage.dispatchId, usage.tokens]));
+  const own = eventsOf(snapshot, 'runtime-critic-run').map((r) => runtimeRunLine(r, tokensOf));
+  const ownText = own.length ? '; runtime runs: ' + own.join('; ') : '';
+  const text = `${runs.length} Critic run(s), ${runs.length - shared.length - unknownMaker.length} on another provider than the op, ${unknownMaker.length} with a provider not recorded${ownText}`;
   return verdictOf(shared.length > 0, `${shared.length} Critic run(s) on the op's own provider; ${text}`, text);
 }
 

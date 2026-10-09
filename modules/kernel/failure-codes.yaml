@@ -17186,14 +17186,13 @@ move-refused:
   owner: supervisor
   kind: blocker
 op-critic-verdict-missing:
-  title: "The decision leg has no Critic verdict"
-  title_vi: "Chặng quyết định chưa có phán quyết của người chấm độc lập"
-  meaning_vi: "Report không đính kèm phán quyết starci/critic-verdict@1 của loại op (scope.define hoặc architecture.decide): op chưa nhờ người chấm độc lập (nhà cung cấp khác, hạng Critic) chấm các bản ghi quyết định của mình."
+  title: "The runtime has not yet recorded the Critic run of the decision leg"
+  title_vi: "Runtime chưa ghi lần chạy Critic của chặng quyết định"
+  meaning_vi: "Phán quyết của người chấm độc lập (nhà cung cấp khác, hạng Critic) cho loại op scope.define hoặc architecture.decide do chính runtime chạy khi op báo done (sự kiện runtime-critic-run) và là phán quyết duy nhất được tính; tệp op tự đính kèm không bao giờ được đọc. Lần chạy đó chưa được ghi cho các bản ghi hiện tại nên chưa chốt được."
   causes_vi:
-    - "Op không chạy starci work decision-critic sau khi viết bản ghi"
-    - "Tệp critic-verdict.json không được đính kèm vào starci kernel report"
-  nextStep_vi: "Việc chốt bị từ chối; op chạy starci work decision-critic --kind <loại op> --root <app> --out critic-verdict.json rồi nộp lại kèm tệp đó; nếu người chấm báo CRITIC_NO_INDEPENDENT_MEMBER, CRITIC_UNAVAILABLE hoặc CRITIC_QUOTA_OUT thì báo blocked kèm mã, không báo done."
-  owner: op-retry
+    - "Settler chưa chạy tới job này, hoặc người chấm vừa báo một chờ có kiểu (CRITIC_UNAVAILABLE, CRITIC_QUOTA_OUT, CRITIC_NO_INDEPENDENT_MEMBER) và đang được thử lại"
+  nextStep_vi: "Không cần làm gì: settler chạy Critic, cách nhau tail.retryMs và tối đa tail.maxAttempts lần cho cùng các bản ghi, rồi mở một mục cho Supervisor; xem sự kiện runtime-critic-run của job và dòng runtime-critic trong starci kernel status --full."
+  owner: runtime-core
   kind: settle-reason
 
 op-critic-verdict-failed:
@@ -17272,10 +17271,10 @@ gate-rejudge-pending:
 gate-newer-than-admission:
   title: "A settle gate is newer than the job it refused: the op owes nothing, the runtime owes the proof"
   title_vi: "Một cổng settle mới hơn lúc job được nhận: op không nợ gì, runtime nợ bằng chứng"
-  meaning_vi: "Job được nhận và báo cáo trước khi cổng (phán quyết của Critic độc lập) ra đời; hợp đồng đã nhận của nó chưa bao giờ bảo op chạy Critic, worker đã mất, nên op không thể chữa lời từ chối. Settler tự chạy Critic trên sản phẩm đã báo cáo (một lần cho mỗi digest) và settle theo phán quyết đó; Critic không phán xét được là một chờ có kiểu, không phải từ chối."
+  meaning_vi: "Job được nhận và báo cáo trước khi một cổng ra đời (bất kỳ bằng chứng nào cổng đòi: vòng lặp gate, READ, test-world, unit, lint, tài liệu, release, phán quyết Critic); hợp đồng đã nhận của nó chưa bao giờ dạy op bước tạo bằng chứng đó và worker đã mất, nên op không thể chữa lời từ chối. Bằng chứng là của runtime: Critic thì settler tự chạy trên sản phẩm đã báo cáo (một lần cho mỗi digest); bằng chứng khác thì settle được giữ có giới hạn (tail.retryMs, tail.maxAttempts) rồi mở một mục runtime-defect cho Supervisor. Không bao giờ là lựa chọn của Kernel và không bao giờ là lỗi của op."
   causes_vi:
-    - "Báo cáo done của một chặng quyết định được nhận trước khi luật Critic có hiệu lực"
-  nextStep_vi: "Không cần làm gì: settler chạy Critic và settle; xem sự kiện runtime-critic-run của job."
+    - "Báo cáo done của một chặng được nhận trước khi cổng có hiệu lực"
+  nextStep_vi: "Không cần làm gì với op hay Kernel: settler giữ settle và gọi tên mã này; xem sự kiện job-settle-check-unavailable hoặc runtime-critic-run của job."
   owner: runtime-core
   kind: verb-refusal
 runtime-copies-stale:
@@ -17285,6 +17284,16 @@ runtime-copies-stale:
   causes_vi:
     - "Một tệp trong bản sao đang bị tiến trình khác giữ mở hoặc không ghi được"
   nextStep_vi: "Đóng tiến trình giữ tệp rồi chạy starci release sync-runtime; khởi động lại engine."
+  owner: runtime-core
+  kind: runtime-fault
+decision-item-without-repo:
+  title: "A Decision Item or gate item was planned without a repository behind its ledger and was refused"
+  title_vi: "Một Decision Item hoặc mục gate được lập kế hoạch mà ledger của nó không có kho (repository) nên bị từ chối"
+  meaning_vi: "Mục nêu một ledger sản phẩm (ledger của mục, hoặc refs.ledgerId / productLedger của mục Supervisor) nhưng ledger đó không phân giải được, theo id hay theo tên đã đăng ký, thành một ledger có repoRoot. Các động từ của mục chạy trong kho đó; không có kho thì chúng chạy trên gốc runtime (ledger-root-is-runtime) và một người đọc chỉ thấy lỗi rất lâu sau. Mục bị từ chối ngay nơi nó được áp dụng (ctx.openDecision), mọi chế độ, và ghi vào log reconciler.decision-refused."
+  causes_vi:
+    - "Ledger của workflow đã bị gỡ khỏi sổ đăng ký hoặc đăng ký thiếu repoRoot"
+    - "Bộ lập kế hoạch ghi một tên ledger mà sổ đăng ký không biết"
+  nextStep_vi: "Đăng ký lại ledger với kho của nó (starci machine-db hoặc đường dẫn .workspaces của dự án) rồi để controller lập lại; không mở mục bằng tay."
   owner: runtime-core
   kind: runtime-fault
 deploy-source-unresolved:

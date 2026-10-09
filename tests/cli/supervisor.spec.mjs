@@ -5,6 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { CATALOG as catalog } from '../../packages/cli/src/catalog.generated.mjs';
 import { main } from '../../scripts/cli/main.mjs';
+import { INTERNAL_FLAGS } from '../../scripts/supervisor/start-supervisor.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const publicVerbs = {
@@ -21,6 +22,7 @@ const publicVerbs = {
   owed: ['all', 'commits', 'force', 'item', 'reason', 'repo', 'workflow'],
   poll: ['interval-ms', 'once', 'repo', 'stall-minutes', 'workflow'],
   push: ['check', 'repo'],
+  'revision-ack': ['plan', 'read-manifest', 'rev'],
   'push-mains': ['dry-run', 'hooks-only', 'repo'],
   'ram-cap': ['op', 'reserve', 'weight', 'workflow'],
   status: ['menu'],
@@ -98,4 +100,16 @@ test('supervisor internal watchdog flags are refused', () => {
   assert.equal(main(['supervisor', 'start', '--restart'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);
   assert.equal(main(['supervisor', 'watchdog', '--once', '--replace'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);
   assert.equal(main(['supervisor', 'watchdog', '--once', '--restart'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);
+});
+
+test('a flag the watchdog passes to the seat script is refused by the CLI with a pointer, and the verb declares exactly the flags the script takes for the runtime', () => {
+  const start = catalog.groups.supervisor.verbs.start;
+  for (const flag of INTERNAL_FLAGS) {
+    const messages = [];
+    assert.equal(main(['supervisor', 'start', `--${flag}`], { catalog, stderr: (text) => messages.push(text), runScript: () => 0 }), 2, flag);
+    assert.match(messages.join(''), new RegExp(`unknown option --${flag}: it is a call of the runtime itself.*starci supervisor stop, then starci supervisor start`), flag);
+  }
+  assert.deepEqual(start.internalFlags.map((flag) => flag.name).toSorted(), [...INTERNAL_FLAGS].toSorted());
+  const declared = new Set(start.flags.map((flag) => flag.name));
+  for (const flag of INTERNAL_FLAGS) assert.ok(!declared.has(flag), `--${flag} is not also a public flag`);
 });

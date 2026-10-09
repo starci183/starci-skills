@@ -4662,7 +4662,7 @@ starci work compose-direction --ui <record> --content <png> --breakpoint mobile 
 
 ### starci work decision-critic
 
-judge a decision leg's records with the independent Critic and write its typed verdict
+judge a decision leg with the Critic and write a verdict (debug aid; settle ignores it)
 
 | flag | type | |
 | --- | --- | --- |

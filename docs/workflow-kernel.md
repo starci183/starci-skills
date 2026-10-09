@@ -169,16 +169,15 @@ verdict that names other bytes than the attempt's product is `CRITIC_VERDICT_STA
 kinds that owe one; three are covered:
 
 - `interface.draw` — every draw-loop round, gated by the draw loop's finish and `drawGateEvidence`.
-- `scope.define` and `architecture.decide` — the decision legs, because a decision's errors spread to every later leg. The op runs
-  `starci work decision-critic` once its records are written: the Critic is handed the op's decision records and the records they cite
+- `scope.define` and `architecture.decide` — the decision legs, because a decision's errors spread to every later leg. The runtime runs the
+  Critic itself when the op reports done (`scripts/kernel/settle/critic-run.mjs`, once per version of the records, journalled as `runtime-critic-run`); the op runs none and a verdict it attaches is ignored (`runtime-critic-op-verdict-ignored`). The Critic is handed the op's decision records and the records they cite
   (copied into its directory and hashed), the rubric of its kind from `modules/kernel/critic-rubrics.yaml` (derived from the op's
   contract and its work-record schema: sources named, alternatives weighed, constraints and earlier decisions honoured, no requirement
   invented, traceable to the goal) and a manifest. `starci kernel settle` (`scripts/kernel/critic-settle.mjs`) recomputes the digests of the
-  op's records now and refuses a done without a fresh passing verdict for exactly those bytes: `op-critic-verdict-missing`,
+  op's records now and refuses a done without a fresh passing verdict of that run for exactly those bytes: `op-critic-verdict-missing` (the run is not recorded yet: the runtime owes it, never the op or the Kernel),
   `CRITIC_VERDICT_STALE`, or `op-critic-verdict-failed` (a score under the declared minimum is the op's `error-work`: the refusal carries every
   failed check with its evidence and fix, and the retry is fed that critique). The three happy errors of the Critic
-  (`CRITIC_NO_INDEPENDENT_MEMBER`, `CRITIC_UNAVAILABLE`, `CRITIC_QUOTA_OUT`) end `decision-critic` with exit 3 and the leg reports blocked
-  through the existing holds `critic-*` of `op-incident-policy.yaml`. The token budget of one critique is declared per kind in
+  (`CRITIC_NO_INDEPENDENT_MEMBER`, `CRITIC_UNAVAILABLE`, `CRITIC_QUOTA_OUT`) hold the settle (the settler tries again after `tail.retryMs`, up to `tail.maxAttempts`, then a Supervisor item names the checker); `starci work decision-critic` stays a verb for a person who wants to see a critique. The token budget of one critique is declared per kind in
   `critic-rubrics.yaml`; it is provisional, and what a real critique costs is not yet measured.
 
 ## The op loop — `knowledge/op-gate.yaml`

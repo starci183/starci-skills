@@ -1,10 +1,9 @@
 // critic-settle.mjs - the settle-time half of the Critic for the decision legs (modules/kernel/critic.yaml coverage rows of status covered
 // whose kind has a rubric in modules/kernel/critic-rubrics.yaml: scope.define, architecture.decide). `starci kernel settle` refuses a done
-// unless the op attached a fresh passing typed verdict (starci/critic-verdict@1, written by `starci work decision-critic`) for exactly the
-// decision records it wrote now:
-//   op-critic-verdict-missing  no verdict of the op's kind is attached and the runtime has none: the op did not run the Critic
-//   gate-newer-than-admission  the same, for a job whose admitted contract never taught the Critic step: the gate is newer than the job, so the op owes nothing
-//                              (the settler runs the Critic itself first: scripts/kernel/settle/critic-run.mjs, whose verdict is `runtime` below)
+// unless the runtime's Critic run recorded a fresh passing typed verdict (starci/critic-verdict@1) for exactly the
+// decision records it wrote now. The verdict is the one the RUNTIME's own Critic run recorded (scripts/kernel/settle/critic-run.mjs, event
+// runtime-critic-run); a verdict file the op attached is never read, because the maker does not supply its own judge's verdict:
+//   op-critic-verdict-missing  the runtime has not recorded its Critic run for these records yet: the runtime owes it, nothing is asked of the op or the Kernel
 //   CRITIC_VERDICT_STALE       the verdict's digests do not hold every record the op owns now, or every record they cite, or it was
 //                              made against another rubric than the declared one (the stale check of critic-verdict.mjs staleRefusal)
 //   CRITIC_NO_INDEPENDENT_MEMBER  the verdict names the maker's own provider as its Critic
@@ -16,12 +15,10 @@
 import path from 'node:path';
 import { pass, recordProofJudgment, refused } from './mechanism-proofs.mjs';
 import { oneLine } from '../lib/clip.mjs';
-import { readAttached } from './attached-proof.mjs';
 import { criticContract, coverageOf } from '../work/critic-contract.mjs';
 import { failedCheckLines, staleRefusal } from '../work/critic-verdict.mjs';
 import { criticRubrics, kindEntryOf, ownedRelOf, productDigests, productFiles } from '../work/decision-critic-product.mjs';
 
-const CRITIC_VERDICT_SCHEMA = 'starci/critic-verdict@1';
 const CRITIC_PROOF = 'independent-critic';
 const WORK_ROOT_NAME = '.starciwork';
 
@@ -51,17 +48,15 @@ function trustProblem(verdict, entry, codes) {
 }
 
 /**
- * The judgment of a decision leg's verdict: {status, code, detail, findings} - null when the op owes none. `files` are the job's attached
- * files, `roots` its placement roots, `owned` its owned paths. `runtime` is the verdict the runtime's own Critic run recorded (used when the op attached
- * none), `teaches` whether the job's admitted contract told the op to run the Critic. `contract` and `rubrics` default to the tree's.
+ * The judgment of a decision leg's verdict: {status, code, detail, findings} - null when the op owes none. `roots` are the job's placement roots,
+ * `owned` its owned paths. `runtime` is the verdict the runtime's own Critic run recorded, the only verdict judged (an attached file is not read).
+ * `contract` and `rubrics` default to the tree's.
  */
-export function judgeCriticVerdict({ op, files, roots, owned = [], runtime = null, teaches = true, contract = criticContract(), rubrics = criticRubrics() }) {
+export function judgeCriticVerdict({ op, roots, owned = [], runtime = null, contract = criticContract(), rubrics = criticRubrics() }) {
   const entry = criticOwedBy(op, { contract, rubrics });
   if (!entry) return null;
-  const attached = readAttached(files, CRITIC_VERDICT_SCHEMA, (doc) => doc.op === op && doc.kind === op) ?? (runtime ? { doc: runtime, file: 'runtime-critic-run' } : null);
-  if (!attached && !teaches) return refused({ status: 'missing', code: 'gate-newer-than-admission' }, `the Critic gate of ${op} is newer than this job: its admitted contract never told the op to run the Critic, so the runtime owes the verdict (the settler runs the Critic over the reported records; nothing is asked of the op)`);
-  if (!attached) return refused({ status: 'missing', code: 'op-critic-verdict-missing' }, `no Critic verdict (schema ${CRITIC_VERDICT_SCHEMA}, kind ${op}) is attached: run starci work decision-critic --kind ${op} --root <app> --out <STARCI_JOB_SCRATCH>/critic-verdict.json after the records are written, and attach it`);
-  const verdict = attached.doc;
+  if (runtime?.op !== op || runtime?.kind !== op) return refused({ status: 'missing', code: 'op-critic-verdict-missing' }, `the runtime's Critic has not judged the records of ${op} yet (event runtime-critic-run): the runtime owes that run, nothing is asked of the op or the Kernel`);
+  const verdict = runtime;
   const trust = trustProblem(verdict, entry, contract.codes);
   if (trust) return trust;
   const found = workRootOf({ roots, owned, entry });
@@ -84,10 +79,9 @@ export const recordCriticJudgment = (ledger, { attemptId, judgment, now = Date.n
 
 // What the refusal ends with, by code.
 const nextOf = (code, op) => {
-  if (code === 'op-critic-verdict-failed') return `This is error-work: the work is not good yet. Fix every failed check named above in the records (each carries its fix), then run starci work decision-critic --kind ${op} again and attach the new verdict; the same critique is the failure the next attempt is fed.`;
-  if (code === 'gate-newer-than-admission') return 'Nothing is asked of the op or the Kernel: the settler runs the Critic over the reported records itself and judges the settle with its verdict.';
-  if (code === 'op-critic-verdict-missing') return `Run starci work decision-critic --kind ${op} over the records you wrote and attach critic-verdict.json; if it reports a hold (CRITIC_NO_INDEPENDENT_MEMBER, CRITIC_UNAVAILABLE, CRITIC_QUOTA_OUT), settle blocked with that code - never done.`;
-  return `Run starci work decision-critic --kind ${op} again over the current records and attach the new verdict.`;
+  if (code === 'op-critic-verdict-failed') return 'This is error-work: the work is not good yet. The next attempt is fed this critique: every failed check named above carries its evidence and its fix.';
+  if (code === 'op-critic-verdict-missing') return 'Nothing is asked of the op or the Kernel: the settler runs the Critic over the reported records itself and judges the settle with its verdict.';
+  return 'The records changed after the Critic of the runtime judged them: the settler runs the Critic again over the current records.';
 };
 
 /** What `starci kernel settle` prints when it refuses a done the Critic's verdict does not allow. */

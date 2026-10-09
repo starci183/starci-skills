@@ -104,7 +104,7 @@ test('a shadow controller\'s ctx.api spawns nothing and writes one reconciler.wo
   assert.equal(rows.length, 1, 'the same would-call is recorded once per window');
   const ran = await shadow.run('node', ['scripts/supervisor/gc.mjs', '--apply']);
   assert.equal(ran.shadow, true);
-  const di = await shadow.openDecision({ kind: 'settle-nongreen', idempotencyKey: 'k1', decider: 'kernel' });
+  const di = await shadow.openDecision({ kind: 'settle-nongreen', idempotencyKey: 'k1', decider: 'kernel', ledger: 'shop-be' });
   assert.equal(di.shadow, true);
   assert.equal(spawned.length, 0);
   assert.equal(shadow.owns('job.settle'), false);

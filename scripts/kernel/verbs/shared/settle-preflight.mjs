@@ -3,6 +3,7 @@ import { EVIDENCE_HOST_PATH } from '../../job-artifacts.mjs';
 import { recordSonarJudgment, refusalText } from '../../sonar-settle.mjs';
 import { loopRefusalText, proofRefusalText, recordLoopJudgment, recordProofJudgment } from '../../gate-settle.mjs';
 import { criticRefusalText, recordCriticJudgment } from '../../critic-settle.mjs';
+import { ownedByRuntime } from '../../gate-admission.mjs';
 import { refuseVerb } from './verb-exit.mjs';
 
 function mediaPhase(s, settleProofMedia) {
@@ -37,6 +38,7 @@ function sonarPhase(s, settleSonarGate) {
 async function loopPhase(s, settleOpGate) {
   const loop = !s.replay && s.verdict === 'pass' ? await settleOpGate(s.db, s.jobId, s.repo) : null;
   if (!loop) return;
+  loop.judged = ownedByRuntime(s.db, s.jobId, loop.judged, { op: loop.op, proof: 'op-gate' });
   const recorded = recordLoopJudgment(s.ledger, { attemptId: loop.attemptId, judgment: loop });
   if (!recorded.green) {
     refuseVerb(s, { ok: false, jobId: s.jobId, op: loop.op, reason: recorded.code, code: recorded.code, detail: loop.judged.detail, findings: loop.judged.findings, gateStatus: recorded.status },
@@ -49,6 +51,7 @@ async function loopPhase(s, settleOpGate) {
 async function proofPhase(s, settleOpProofs) {
   const proofs = !s.replay && s.verdict === 'pass' ? await settleOpProofs(s.db, s.jobId, s.repo) : null;
   if (!proofs) return null;
+  proofs.judged = ownedByRuntime(s.db, s.jobId, proofs.judged, { op: proofs.op, proof: 'op-proof' });
   const recorded = recordProofJudgment(s.ledger, { attemptId: proofs.attemptId, judgment: proofs });
   if (!recorded.green) {
     refuseVerb(s, { ok: false, jobId: s.jobId, op: proofs.op, reason: recorded.code, code: recorded.code, proof: proofs.proof, detail: proofs.judged.detail, findings: proofs.judged.findings, proofStatus: recorded.status },
