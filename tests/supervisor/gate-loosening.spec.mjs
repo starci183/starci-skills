@@ -7,10 +7,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { approvalIdOf, looseningsOf } from '../../scripts/lib/gate-loosening.mjs';
 import { gateLooseningCheck } from '../../scripts/supervisor/land-gate-loosening.mjs';
 import { checkGateLoosening } from '../../scripts/checks/check-gate-loosening.mjs';
+import { releaseTagOf } from '../../scripts/guards/release-definition.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const RULES_TEXT = fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'gate-loosening.yaml'), 'utf8');
@@ -76,7 +78,10 @@ const repo = (t) => {
   write(dir, 'modules/kernel/owner-rulings.yaml', 'schema: starci/owner-rulings@1\nrulings: []\n');
   write(dir, 'knowledge/hfs/runtime-slots.yaml', 'checks:\n  - {id: one}\n  - {id: two}\n');
   write(dir, 'package.json', '{\n  "version": "1.0.0-alpha.1"\n}\n');
+  write(dir, 'tests/x/released.spec.mjs', 'assert.ok(1);\n');
+  write(dir, 'scripts/x/released.mjs', 'export const released = 1;\n');
   const release = commit(dir, 'release');
+  git(dir, 'tag', '-a', 'v1.0.0-alpha.1', '-m', 'released');
   return { dir, release };
 };
 
@@ -140,6 +145,8 @@ test('the self-check judges a loosening against the released state: what a lane 
   write(dir, 'tests/x/late.spec.mjs', 'assert.ok(1);\nassert.ok(2);\n');
   write(dir, 'scripts/x/late.mjs', 'export const late = 1;\n');
   commit(dir, 'a lane adds a check and its spec');
+  write(dir, 'package.json', '{"version":"1.0.0-alpha.2"}\n');
+  commit(dir, 'prepare the next version without a release tag');
   write(dir, 'knowledge/hfs/runtime-slots.yaml', 'checks:\n  - {id: one}\n  - {id: two}\n');
   fs.rmSync(path.join(dir, 'tests/x/late.spec.mjs'));
   write(dir, 'scripts/x/late.mjs', 'export const late = 2;\n');
@@ -149,4 +156,104 @@ test('the self-check judges a loosening against the released state: what a lane 
   write(dir, 'knowledge/hfs/runtime-slots.yaml', 'checks:\n  - {id: one}\n');
   commit(dir, 'drop a released check');
   assert.equal(checkGateLoosening(dir).length, 1);
+});
+
+
+test('a preparation version commit never hides deletion of a released spec', (t) => {
+  const { dir, release } = repo(t);
+  write(dir, 'package.json', '{"version":"1.0.0-alpha.2"}\n');
+  commit(dir, 'prepare next version');
+  fs.rmSync(path.join(dir, 'tests/x/released.spec.mjs'));
+  write(dir, 'scripts/x/released.mjs', 'export const released = 2;\n');
+  commit(dir, 'delete released protection while changing its product');
+  assert.equal(releaseTagOf({ repo: dir }).head, release);
+  assert.ok(checkGateLoosening(dir).some((entry) => entry.message.includes('spec-deleted')));
+});
+
+test('release selection uses annotated manifest-bound ancestry, excluding HEAD only for the affected range', (t) => {
+  const { dir, release } = repo(t);
+  git(dir, 'tag', '-a', 'v2.0.0', '-m', 'historical tag whose manifest is another version', release);
+  write(dir, 'package.json', '{"version":"1.0.0-alpha.2"}\n');
+  const newer = commit(dir, 'second real release');
+  git(dir, 'tag', '-a', 'v1.0.0-alpha.2', '-m', 'released second');
+  assert.deepEqual(releaseTagOf({ repo: dir }), { ok: true, tag: 'v1.0.0-alpha.2', head: newer });
+  assert.equal(releaseTagOf({ repo: dir, excludeHead: true }).head, release);
+  assert.equal(releaseTagOf({ repo: dir, tag: 'v2.0.0' }).ok, false);
+  git(dir, 'tag', 'v9.0.0');
+  assert.equal(releaseTagOf({ repo: dir, tag: 'v9.0.0' }).ok, false, 'lightweight tags cannot become release evidence');
+});
+
+test('missing or unreadable real release history holds the check while a non-Git source stays unjudged', (t) => {
+  const { dir, release } = repo(t);
+  git(dir, 'tag', '-d', 'v1.0.0-alpha.1');
+  assert.equal(releaseTagOf({ repo: dir }).ok, false);
+  assert.match(checkGateLoosening(dir)[0].message, /cannot judge released gates/);
+  write(dir, 'package.json', 'unreadable manifest\n');
+  commit(dir, 'invalid release manifest');
+  git(dir, 'tag', '-a', 'v1.0.0-alpha.2', '-m', 'invalid release');
+  assert.match(releaseTagOf({ repo: dir }).why, /manifest.*unreadable/);
+  const plain = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-no-git-'));
+  t.after(() => fs.rmSync(plain, { recursive: true, force: true }));
+  write(plain, 'modules/kernel/gate-loosening.yaml', RULES_TEXT);
+  assert.deepEqual(checkGateLoosening(plain), []);
+  assert.ok(release);
+});
+
+test('incomparable released ancestors hold instead of choosing by creation date or version', (t) => {
+  const { dir, release } = repo(t);
+  git(dir, 'checkout', '-q', '-b', 'left', release);
+  write(dir, 'package.json', '{"version":"1.0.0-alpha.2"}\n');
+  const left = commit(dir, 'left release');
+  git(dir, 'tag', '-a', 'v1.0.0-alpha.2', '-m', 'left released');
+  git(dir, 'checkout', '-q', '-b', 'right', release);
+  write(dir, 'package.json', '{"version":"1.0.0-alpha.3"}\n');
+  commit(dir, 'right release');
+  git(dir, 'tag', '-a', 'v1.0.0-alpha.3', '-m', 'right released');
+  git(dir, 'merge', '--no-ff', '-s', 'ours', left, '-m', 'combine incomparable releases');
+  const selected = releaseTagOf({ repo: dir });
+  assert.equal(selected.ok, false);
+  assert.match(selected.why, /ambiguous/);
+  assert.match(checkGateLoosening(dir)[0].message, /ambiguous/);
+});
+
+test('an installed runtime copy inside application Git never judges the enclosing app release', (t) => {
+  const { dir, release } = repo(t);
+  const installed = path.join(dir, '.claude');
+  write(installed, 'modules/kernel/gate-loosening.yaml', RULES_TEXT);
+  write(installed, 'modules/kernel/owner-rulings.yaml', 'schema: starci/owner-rulings@1\nrulings: []\n');
+  write(installed, 'package.json', '{"version":"1.0.0-alpha.9"}\n');
+  const before = releaseTagOf({ repo: installed });
+  assert.equal(before.ok, false);
+  assert.equal(before.status, 'no-runtime-repository');
+  assert.equal(before.head, undefined, 'the enclosing release SHA is never borrowed');
+  assert.deepEqual(checkGateLoosening(installed), [], 'installed source has no runtime Git history to judge');
+  assert.equal(releaseTagOf({ repo: dir }).head, release, 'the real repository still resolves its own release');
+  git(dir, 'tag', '-d', 'v1.0.0-alpha.1');
+  assert.equal(releaseTagOf({ repo: dir }).status, 'unknown');
+  assert.match(checkGateLoosening(dir)[0].message, /cannot judge released gates/);
+  assert.deepEqual(checkGateLoosening(installed), [], 'enclosing app history remains inapplicable without its tag');
+});
+
+
+test('a real shallow runtime clone holds even when HEAD has an eligible annotated release tag', (t) => {
+  const { dir } = repo(t);
+  write(dir, 'package.json', '{"version":"1.0.0-alpha.2"}\n');
+  const head = commit(dir, 'second release with a parent');
+  git(dir, 'tag', '-a', 'v1.0.0-alpha.2', '-m', 'second released');
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-shallow-release-'));
+  t.after(() => fs.rmSync(parent, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  const shallow = path.join(parent, 'clone');
+  git(parent, 'clone', '-q', '--depth=1', pathToFileURL(dir).href, shallow);
+  assert.equal(git(shallow, 'rev-parse', '--is-shallow-repository'), 'true', 'the file URL honors depth, unlike a plain local path');
+  assert.equal(git(shallow, 'cat-file', '-t', 'refs/tags/v1.0.0-alpha.2'), 'tag');
+  assert.equal(git(shallow, 'rev-parse', 'refs/tags/v1.0.0-alpha.2^{commit}'), head);
+  assert.equal(JSON.parse(git(shallow, 'show', `${head}:package.json`)).version, '1.0.0-alpha.2');
+  const boundary = releaseTagOf({ repo: shallow });
+  assert.equal(boundary.ok, false);
+  assert.equal(boundary.status, 'unknown');
+  assert.match(boundary.why, /shallow/);
+  const found = checkGateLoosening(shallow);
+  assert.equal(found.length, 1);
+  assert.equal(found[0].code, 'RT_GATE_LOOSENING');
+  assert.match(found[0].message, /cannot judge released gates.*shallow/);
 });

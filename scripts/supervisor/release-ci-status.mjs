@@ -7,8 +7,7 @@
 import path from 'node:path';
 import { workflowRuns } from '../api/gh/workflow-runs.mjs';
 import { commitChecks } from '../api/gh/commit-checks.mjs';
-import { revParseQuery } from '../api/git/rev-parse-query.mjs';
-import { tag as gitTag } from '../api/git/tag.mjs';
+import { releaseTagOf } from '../guards/release-definition.mjs';
 import { runNode } from '../api/node/run-node.mjs';
 import { gitCommonDir, readL4Record } from '../guards/release-record.mjs';
 import { proofFileOf, proofFilesOf, readProofFile, writeProofFile } from '../gates/commit-proof.mjs';
@@ -113,15 +112,6 @@ function recordRedCi({ repo, tag, head, url, deps = {} }) {
   return { ok: r.status === 0, item, ...(r.status === 0 ? {} : { error: String(r.stderr ?? '').slice(0, 200) }) };
 }
 
-const text = (r) => String(r.stdout ?? '').trim();
-
-/** The release commit of `tag` (default: the newest release tag merged in HEAD): {tag, head} or null. */
-function releaseOf({ repo, tag }) {
-  const named = tag ?? text(gitTag(['--merged', 'HEAD', '--list', 'v*', '--sort=-creatordate'], { cwd: repo })).split(/\r?\n/).find(Boolean);
-  const head = named ? text(revParseQuery([`refs/tags/${named}^{commit}`], { cwd: repo })) : '';
-  return head ? { tag: named, head } : null;
-}
-
 /** Read until the run ends or the deadline `give` passes. */
 async function waitFor({ read, policy, deps, give }) {
   const seen = read();
@@ -136,8 +126,9 @@ async function waitFor({ read, policy, deps, give }) {
  */
 export async function ciStatus({ repo, tag = null, wait = false, deps = {} }) {
   const policy = ciPolicy();
-  const release = releaseOf({ repo, tag });
-  if (!release) return { ok: false, code: 3, verdict: 'unknown', why: 'no release tag to read the CI of (--tag v<version>)' };
+  const boundary = releaseTagOf({ repo, tag });
+  if (!boundary.ok) return { ok: false, code: 3, verdict: 'unknown', why: `cannot read release CI: ${boundary.why}` };
+  const release = { tag: boundary.tag, head: boundary.head };
   const read = () => {
     const seen = (deps.read ?? ciReader)({ cwd: repo, workflow: policy.workflow, sha: release.head, deps: deps.gh ?? {} });
     return { ...seen, verdict: seen.ok ? verdictOf({ runs: seen.runs, checks: seen.checks, patterns: policy.statusPatterns }) : 'unknown' };

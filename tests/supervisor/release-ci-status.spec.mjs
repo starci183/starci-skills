@@ -3,6 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 import { writeL4Record } from '../../scripts/guards/release-record.mjs';
 import { ciLine, ciReader, ciStatus, latestCiRecord, readCiRecord, verdictOf, writeCiRecord } from '../../scripts/supervisor/release-ci-status.mjs';
 import { main, parseArgs } from '../../scripts/supervisor/release-ci-status-cli.mjs';
@@ -26,7 +28,9 @@ function release(t, suite = 'ci') {
   const repo = mkdtemp(t, 'starci-ci-status-');
   git(repo, 'init', '-q', '-b', 'main');
   for (const [k, v] of [['user.email', 'spec@starci.test'], ['user.name', 'spec']]) git(repo, 'config', k, v);
-  git(repo, 'commit', '-q', '--allow-empty', '-m', 'release');
+  fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ version: TAG.slice(1) }));
+  git(repo, 'add', 'package.json');
+  git(repo, 'commit', '-q', '-m', 'release');
   git(repo, 'tag', '-a', TAG, '-m', 'notes');
   const head = git(repo, 'rev-parse', 'HEAD');
   const logs = [{ name: 'npm run check', ok: true, log: 'x', ms: 1 }];

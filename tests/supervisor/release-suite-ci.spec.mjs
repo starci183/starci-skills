@@ -141,6 +141,8 @@ function rangeFixture(t) {
     fs.writeFileSync(path.join(repo, 'tests', `${name}.spec.mjs`), `import { ${name} } from '../src/${name}.mjs';\nexport default ${name};\n`);
   }
   git(repo, 'add', '-A');
+  fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ version: '1.0.0-alpha.3' }));
+  git(repo, 'add', 'package.json');
   git(repo, 'commit', '-q', '-m', 'base');
   git(repo, 'tag', '-a', 'v1.0.0-alpha.3', '-m', 'previous');
   const shas = ['a', 'b', 'c'].map((name) => {

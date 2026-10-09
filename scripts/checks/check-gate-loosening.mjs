@@ -2,7 +2,7 @@
 // check-gate-loosening.mjs - RT_GATE_LOOSENING (R236; part of `npm run check`).
 //   runs in the check stage (self-check gate-loosening)
 //
-// Every commit since the last release commit (the last commit that changed the "version" of package.json) is judged against its parent by
+// At a runtime Git top-level, every commit since the nearest annotated, manifest-bound release is judged against its parent by
 // scripts/lib/gate-loosening.mjs and modules/kernel/gate-loosening.yaml. A commit that loosens a gate or check is owner-class
 // (modules/kernel/roles.yaml rulings.loosening-is-owner-class): it is a finding unless the owner approved it, an owner-rulings entry
 // gate-loosening-<fingerprint> held by its parent or by the checked-out tree (history that reached the branch by a merge was not judged
@@ -25,10 +25,13 @@ const finding = (sha, message) => ({ code: CODE, path: `commit ${sha.slice(0, 10
 /** The RT_GATE_LOOSENING findings over the commits since the release commit of the tree at `root`. */
 export function checkGateLoosening(root = skillRoot) {
   const rules = looseningRules(root);
-  const base = rules ? releaseCommit(root) : null;
-  if (!base) return [];
+  if (!rules) return [];
+  const release = releaseCommit(root);
+  if (release.status === 'no-repository' || release.status === 'no-runtime-repository') return [];
+  if (!release.ok) return [{ code: CODE, path: 'release history', line: 0, message: `cannot judge released gates: ${release.why}` }];
+  const base = release.head;
   const listed = revList(['--no-merges', '--reverse', `--max-count=${COMMIT_LIMIT}`, `${base}..HEAD`], { cwd: root });
-  if (listed.status !== 0) return [];
+  if (listed.status !== 0) return [finding(base, 'cannot read the commits since the release; gate judgment is unknown')];
   const standing = rulingsAt(root, 'HEAD');
   const read = fileReader(root);
   return listed.stdout.split(/\r?\n/).filter(Boolean).flatMap((sha) => {

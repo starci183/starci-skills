@@ -6,7 +6,7 @@
 //   spec-skipped        the spec exists at the release commit
 //   assertion-weakened  the spec exists at the release commit and holds fewer assertion lines now than it held there
 import { show } from '../../api/git/show.mjs';
-import { log } from '../../api/git/log.mjs';
+import { releaseTagOf } from '../../guards/release-definition.mjs';
 
 const BUFFER = 64 * 1024 * 1024;
 
@@ -37,8 +37,5 @@ export function loosensReleased(finding, { base, read, rules }) {
   return assertionsIn(read('HEAD', finding.file), rules.assertionMarkers) < assertionsIn(before, rules.assertionMarkers);
 }
 
-/** The release commit of the tree at `root`: the newest commit that changed the "version" line of package.json, or null. */
-export function releaseCommit(root) {
-  const found = log(['-1', '--format=%H', '-G"version":', '--', 'package.json'], { cwd: root });
-  return found.status === 0 ? found.stdout.trim() || null : null;
-}
+/** The proven release boundary, including unknown history for the owning self-check. */
+export const releaseCommit = (root) => releaseTagOf({ repo: root });

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// release-affected.mjs - the `affected tests` row of a release cut under `suite: ci` (release-ci-rows.mjs): the specs the release range (the newest release tag merged in HEAD, up to HEAD) can break, run locally
+// release-affected.mjs - the `affected tests` row of a release cut under `suite: ci` (release-ci-rows.mjs): the specs since the nearest annotated, manifest-bound release before HEAD can break, run locally
 // while the full suite is CI's. The selection is `starci test affected`'s (affected-test.mjs).
 //   whole range within the verb's bound   the range's affected set is run, once
 //   range over the bound                  never the full suite and never a silent smoke set: the commits of the range are taken one by one (newest `maxCommits`); a commit whose affected set passed
@@ -8,7 +8,7 @@
 // The last stdout line is `RELEASE_AFFECTED {json}`: the range, the bound, files selected / run / reused / passed / failed, the commits per evidence and the specs NOT run locally (CI's). The full report is
 // <git common dir>/starci-release/<head>.affected-report.json. Exit 0 when every spec that ran passed, 1 when one was red or the range has no earlier release tag.
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
-import { tag as gitTag } from '../api/git/tag.mjs';
+import { releaseTagOf } from '../guards/release-definition.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { gitCommonDir } from '../guards/release-record.mjs';
@@ -21,11 +21,10 @@ import { writeAffectedLedger } from './release-affected-ledger.mjs';
 const text = (r) => String(r.stdout ?? '').trim();
 const policyOf = () => readModuleJson('modules', 'supervisor', 'release-cut.yaml').suite.ci.affected;
 
-/** The newest release tag (v*) merged in HEAD that does not point at HEAD itself: the start of the release range, or null. */
+/** The nearest eligible release before HEAD, or null when no boundary can be proven. */
 export function rangeBase(root) {
-  const head = text(revParseQuery(['HEAD'], { cwd: root }));
-  const tags = text(gitTag(['--merged', 'HEAD', '--list', 'v*', '--sort=-creatordate'], { cwd: root })).split(/\r?\n/).filter(Boolean);
-  return tags.find((name) => text(revParseQuery([`refs/tags/${name}^{commit}`], { cwd: root })) !== head) ?? null;
+  const release = releaseTagOf({ repo: root, excludeHead: true });
+  return release.ok ? release.tag : null;
 }
 
 function runFiles(root, files, deps) {
@@ -72,7 +71,7 @@ async function perCommit({ root, base, head, bound, whole, policy, deps }) {
 export async function affectedRelease({ root, deps = {} }) {
   const base = deps.base ?? rangeBase(root);
   const head = text(revParseQuery(['HEAD'], { cwd: root }));
-  if (!base) return { code: 1, summary: { mode: 'no-base', head, why: 'no earlier release tag (v*) is merged in HEAD: the release range has no start' } };
+  if (!base) return { code: 1, summary: { mode: 'no-base', head, why: 'no unambiguous annotated, manifest-bound earlier release is available: the release range has no proven start' } };
   const range = await (deps.testAffected ?? testAffected)({ cwd: root, args: { base, root } }, deps);
   const whole = range.data.scope ?? [];
   const bound = range.data.maxFiles;

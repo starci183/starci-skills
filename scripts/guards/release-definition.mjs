@@ -13,6 +13,9 @@
 import { catFile } from '../api/git/cat-file.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { show } from '../api/git/show.mjs';
+import { tag as gitTag } from '../api/git/tag.mjs';
+import { mergeBaseQuery } from '../api/git/merge-base-query.mjs';
+import { pathKey, realPath } from '../lib/path-key.mjs';
 import { changelogSection, releaseNotesFindings } from '../hfs/runtime-rules/release-notes.mjs';
 import { readL4Record } from './release-record.mjs';
 import { suiteModeOf } from './release-suite-mode.mjs';
@@ -37,6 +40,88 @@ const gitText = (verb, args, cwd) => {
 export function versionAt(cwd, commit) {
   const text = gitText(show, [`${commit}:package.json`], cwd);
   try { return text === null ? null : JSON.parse(text).version ?? null; } catch { return null; }
+}
+
+const releaseUnknown = (why) => ({ ok: false, status: 'unknown', why });
+const ineligibleRelease = (explicit, why) => explicit ? releaseUnknown(why) : { ok: true, candidate: null };
+
+/** A runtime Git root's nearest annotated, manifest-bound release; enclosing application history is inapplicable. */
+export function releaseTagOf({ repo, tag = null, excludeHead = false }) {
+  const history = runtimeGitHistory(repo);
+  if (!history.ok) return history;
+  const listed = tag === null ? gitText(gitTag, ['--merged', 'HEAD', '--list', 'v*'], repo) : tag;
+  if (listed === null) return releaseUnknown('release tags are unreadable');
+  const candidates = [];
+  for (const named of listed.split(/\r?\n/).filter(Boolean)) {
+    const result = releaseCandidate({ repo, named, current: history.head, explicit: tag !== null, excludeHead });
+    if (!result.ok) return result;
+    if (result.candidate) candidates.push(result.candidate);
+  }
+  return nearestRelease(repo, candidates);
+}
+
+/** Runtime history exists only at its own Git top-level with a readable HEAD and full ancestry. */
+function runtimeGitHistory(repo) {
+  const top = revParseQuery(['--show-toplevel'], { cwd: repo });
+  if (top.status !== 0) {
+    if (/not a git repository/i.test(String(top.stderr ?? ''))) return { ok: false, status: 'no-repository', why: 'release history requires a Git repository' };
+    return releaseUnknown('release repository identity is unreadable');
+  }
+  const gitRoot = String(top.stdout ?? '').trim();
+  if (!gitRoot) return releaseUnknown('release repository root is unreadable');
+  if (pathKey(realPath(gitRoot)) !== pathKey(realPath(repo))) return { ok: false, status: 'no-runtime-repository', why: 'the runtime copy is inside an enclosing Git repository; its history belongs to that repository' };
+  const head = gitText(revParseQuery, ['HEAD'], repo)?.trim();
+  if (!head) return releaseUnknown('release history HEAD is unreadable');
+  if (gitText(revParseQuery, ['--is-shallow-repository'], repo)?.trim() !== 'false') return releaseUnknown('release history is shallow or unreadable; fetch complete release history');
+  return { ok: true, head };
+}
+
+/** A candidate binds annotation, peeled commit, manifest spelling and ancestry; default discovery omits ineligible tags. */
+function releaseCandidate({ repo, named, current, explicit, excludeHead }) {
+  const kind = gitText(catFile, ['-t', `refs/tags/${named}`], repo)?.trim();
+  const head = gitText(revParseQuery, [`refs/tags/${named}^{commit}`], repo)?.trim();
+  if (!kind || !head) return releaseUnknown(`release tag ${named} is unreadable`);
+  if (kind !== 'tag') return ineligibleRelease(explicit, `release tag ${named} is not annotated`);
+  const version = versionAt(repo, head);
+  if (!version) return releaseUnknown(`release manifest of ${named} is unreadable`);
+  if (named !== `v${version}`) return ineligibleRelease(explicit, `release tag ${named} differs from its manifest version ${version}`);
+  const reachable = releaseAncestor(repo, head, current);
+  if (reachable === null) return releaseUnknown(`release ancestry of ${named} is unreadable`);
+  if (!reachable) return ineligibleRelease(explicit, `release tag ${named} is not merged in HEAD`);
+  if (excludeHead && head === current) return { ok: true, candidate: null };
+  return { ok: true, candidate: { tag: named, head } };
+}
+
+/** Only one unsuperseded release ancestor proves a boundary; incomparable releases hold. */
+function nearestRelease(repo, candidates) {
+  if (!candidates.length) return releaseUnknown('no eligible annotated, manifest-bound release tag is merged in HEAD');
+  const nearest = [];
+  for (const candidate of candidates) {
+    const superseded = candidateSuperseded(repo, candidate, candidates);
+    if (superseded === null) return releaseUnknown('release ancestry between tags is unreadable');
+    if (!superseded) nearest.push(candidate);
+  }
+  if (nearest.length !== 1) return releaseUnknown(`release history is ambiguous: ${nearest.map((entry) => entry.tag).join(', ')}`);
+  return { ok: true, ...nearest[0] };
+}
+
+/** A release loses its boundary only to a proven descendant release, never to a date or version sort. */
+function candidateSuperseded(repo, candidate, candidates) {
+  for (const other of candidates) {
+    if (candidate.head === other.head) continue;
+    const older = releaseAncestor(repo, candidate.head, other.head);
+    if (older === null) return null;
+    if (older) return true;
+  }
+  return false;
+}
+
+/** Missing Git proof is distinct from a proven non-ancestor. */
+function releaseAncestor(repo, before, after) {
+  const result = mergeBaseQuery(['--is-ancestor', before, after], { cwd: repo });
+  if (result.status === 0) return true;
+  if (result.status === 1) return false;
+  return null;
 }
 
 function versionFindings({ cwd, commit, remoteCommit, version }) {
