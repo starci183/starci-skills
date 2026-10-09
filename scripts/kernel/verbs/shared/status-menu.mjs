@@ -16,7 +16,7 @@ import { RUNTIME_OWED_CODES } from '../../gate-admission.mjs';
 
 const LIVE_KERNEL = new Set(['open', 'claimed']);
 // Kinds with their own menu kind (or a notice): the generic decision-item kind never repeats them.
-const OWN_KIND = new Set(['worker-question', 'rev-ack', 'unread-peer', 'supervisor-ruling', ...JOB_KINDS]);
+const OWN_KIND = new Set(['worker-question', 'rev-ack', 'unread-peer', ...JOB_KINDS]);
 
 /** The resolution with the class its evidence decides (scripts/kernel/failure-class.mjs): the menu reads it to withhold the escape from a work failure. */
 const withFailure = (db, resolution) => (resolution.jobId ? { ...resolution, failure: failureFactsOf(db, resolution.jobId) } : resolution);
