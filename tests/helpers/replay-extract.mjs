@@ -157,7 +157,23 @@ function grammarInTree(copy) {
   return { workflow: { id: WORKFLOW, phase: 'running', goalRevision: 0 }, jobs: [brandJob, drawJob], tree: { brand: true }, live: { refusedPushes: eventsOf(db, 'kernel-dispatch-push').filter((e) => e.p.results?.some((r) => String(r.error).startsWith('grammar-context-missing'))).length, drawStatus: job.status } };
 }
 
-const RECIPES = { 'fenced-retry': fencedRetry, 'grammar-in-tree': grammarInTree, 'leg-ready': legReady, 'read-plan': readPlan, 'shape-guard': shapeGuard, 'handed-over': handedOver, 'prepared-fail': preparedFail };
+/** Case i: an interface.draw dispatched on a host with no render tool resolvable from its tree; it spent 7.4M tokens, reported blocked environment and a supervisor-gate held it. */
+function drawRenderTool(copy) {
+  const db = openLedger(copy, 'starci');
+  const routed = eventsOf(db, 'failure-routed').filter((e) => e.p.shape?.blocker === 'environment' && e.p.opId === 'interface.draw').at(-1);
+  const job = first(db, 'SELECT * FROM jobs WHERE job_id=?', routed.entity);
+  const brand = first(db, "SELECT * FROM jobs WHERE op_id='brand.decide' AND status='succeeded' ORDER BY created_at DESC");
+  const attempt = first(db, 'SELECT tokens_in, tokens_out FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1', job.job_id);
+  const ids = new Pseudonyms();
+  const brandJob = jobOf(ids, brand, { owned: ['own-9'] });
+  const drawJob = jobOf(ids, job, { owned: ['own-1'], params: Object.fromEntries(Object.entries(parse(job.payload_json).params ?? {}).filter(([, value]) => typeof value === 'number')),
+    report: { outcome: 'blocked', blocker: { kind: 'environment' } } });
+  return { workflow: { id: WORKFLOW, phase: 'running', goalRevision: 0 }, jobs: [brandJob, drawJob], tree: { brand: true },
+    live: { drawStatus: job.status, tryNo: Number(job.try_no), attemptTokens: Number(attempt.tokens_in) + Number(attempt.tokens_out), route: wordOr(routed.p.route), routeLimit: Number(routed.p.limit), routeFiring: Number(routed.p.firing),
+      gate: wordOr(routed.p.kind), gateIncidents: countOf(db, "SELECT count(*) n FROM incidents WHERE status='open' AND last_progress LIKE '[supervisor-gate]%'") } };
+}
+
+const RECIPES = { 'draw-render-tool': drawRenderTool, 'fenced-retry': fencedRetry, 'grammar-in-tree': grammarInTree, 'leg-ready': legReady, 'read-plan': readPlan, 'shape-guard': shapeGuard, 'handed-over': handedOver, 'prepared-fail': preparedFail };
 export const CASES = Object.freeze(Object.keys(RECIPES));
 
 /** The fixture document of `name` extracted from `copy`; the source names the copy neutrally. */

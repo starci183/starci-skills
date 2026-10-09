@@ -45,8 +45,8 @@
 // stylesheet: one that imports tailwindcss is compiled by the product's tailwindcss against the bundle's class
 // candidates, any other is bundled by esbuild.
 //
-// Playwright, esbuild and tailwindcss are the project's own installs (scripts/lib/package-at.mjs), resolved from
-// the HTML's or the component's directory, then the working directory; the runtime ships none of them.
+// Tailwindcss is the project's own install (scripts/lib/package-at.mjs). Playwright and esbuild resolve from the HTML's or the
+// component's directory, then the working directory, then the runtime's own install (render-tools.mjs): a product declares neither.
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -54,6 +54,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import {sha256} from '../../engine/digest.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { findPackage, requirePackage } from '../lib/package-at.mjs';
+import { RENDER_TOOL_UNAVAILABLE, esbuildInstall, playwrightInstall } from './render-tools.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { eachInOrder, mapInOrder } from '../lib/in-order.mjs';
@@ -264,9 +265,9 @@ export async function artworkDigests(images, page = null) {
   return out;
 }
 
-export function loadPlaywright(dirs) {
-  const found = findPackage(dirs, ['playwright', '@playwright/test', 'playwright-core']);
-  if (!found) throw new UsageError(`no playwright install resolvable from ${dirs.filter(Boolean).join(', ')} (install it in the project that owns the drawing)`);
+export function loadPlaywright(dirs, { runtime } = {}) {
+  const found = playwrightInstall(dirs, runtime === undefined ? {} : { runtime });
+  if (!found) throw new UsageError(`${RENDER_TOOL_UNAVAILABLE}: no playwright install resolvable from ${dirs.filter(Boolean).join(', ')} or the runtime`);
   const pw = requirePackage(found);
   if (!pw.chromium) throw new UsageError(`${found.name} at ${found.root} exports no chromium`);
   return { chromium: pw.chromium, name: found.name, version: found.version, root: found.root };
@@ -365,7 +366,7 @@ export async function captureHtml({ html, out, viewports, theme, fullPage, name,
   // The rationale beside the source (draw-rationale.mjs rationaleFileOf) labels the redline; an explicit one wins.
   const rationaleFile = rationale === undefined ? rationaleFileOf(html) : rationalePathOf(rationale);
   const why = rationaleFile ? { file: rationaleFile, entries: loadRationale(rationaleFile).entries } : null;
-  const browser = await playwright.chromium.launch().catch((e) => { throw new UsageError(`chromium launch failed (${playwright.name} ${playwright.version}): ${e.message.split('\n')[0]}`); });
+  const browser = await playwright.chromium.launch().catch((e) => { throw new UsageError(`${RENDER_TOOL_UNAVAILABLE}: chromium launch failed (${playwright.name} ${playwright.version}): ${e.message.split('\n')[0]}`); });
   const records = [];
   try {
     await eachInOrder(viewports, async (viewport) => {
@@ -508,8 +509,8 @@ export async function buildFixtureHarness({ component, exportName, props, css, t
   const dirs = [...(productDir ? [productDir] : []), path.dirname(component), cwd];
   const grammarRoot = grammar?.pick?.root ?? null;
   const aliases = grammarRoot && grammar.pick.source !== 'product' ? { [GRAMMAR_PACKAGE]: grammarRoot } : {};
-  const found = findPackage(dirs, ['esbuild']);
-  if (!found) throw new UsageError(`no esbuild resolvable from ${dirs.join(', ')}`);
+  const found = esbuildInstall(dirs);
+  if (!found) throw new UsageError(`${RENDER_TOOL_UNAVAILABLE}: no esbuild resolvable from ${dirs.join(', ')} or the runtime`);
   const esbuild = requirePackage(found);
   const entry = [
     "import * as React from 'react';",

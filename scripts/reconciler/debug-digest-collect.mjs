@@ -22,7 +22,13 @@ const OPEN_PHASES = new Set(['queued', 'running']);
 
 const jobOf = (r) => ({ jobId: r.job_id, kind: r.kind, opId: r.op_id, status: r.status, tryNo: r.try_no, retryOf: r.retry_of ?? null,
   workerId: r.worker_id, deadline: r.deadline ?? null, createdAt: r.created_at, updatedAt: r.updated_at });
-const incidentOf = (r) => ({ id: r.incident_id, kind: r.kind, owner: r.owner, dueAt: r.due_at ?? null, jobId: r.job_id, opId: r.op_id, status: r.status, detail: r.detail });
+const incidentOf = (r, holds = []) => ({ id: r.incident_id, kind: r.kind, owner: r.owner, dueAt: r.due_at ?? null, jobId: r.job_id, opId: r.op_id, status: r.status, detail: r.detail, holds });
+/** The job ids (or op ids) a gate incident holds, from its raising event: a gate names the jobs it holds there and carries no job_id of its own. */
+const heldBy = (db, row) => {
+  const raised = db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq LIMIT 1").get(row.workflow_id, row.incident_id);
+  const holds = parseJsonOr(raised?.payload_json, null)?.holds;
+  return Array.isArray(holds) ? holds.filter((hold) => typeof hold === 'string') : [];
+};
 const decisionOf = (r) => ({ id: r.di_id, kind: r.kind, decider: r.decider, status: r.status, dueAt: r.due_at ?? null, openedAt: r.opened_at, jobId: r.job_id, summary: r.summary });
 
 /** The ledger rows of one repository: its workflows, and per workflow its jobs, open incidents, open Decision Items and Kernel facts. */
@@ -38,7 +44,7 @@ export function ledgerFacts(file, workflowIds = null, { since = 0 } = {}) {
       return { id: w.workflow_id, name: w.display_name ?? w.title ?? w.workflow_id, phase: w.phase, createdAt: w.created_at, updatedAt: w.updated_at,
         attempts: attemptFacts(db, w.workflow_id), events: eventFacts(db, w.workflow_id),
         jobs: db.prepare('SELECT * FROM jobs WHERE workflow_id=?').all(w.workflow_id).map(jobOf),
-        incidents: db.prepare("SELECT * FROM incidents WHERE workflow_id=? AND status='open'").all(w.workflow_id).map(incidentOf),
+        incidents: db.prepare("SELECT * FROM incidents WHERE workflow_id=? AND status='open'").all(w.workflow_id).map((row) => incidentOf(row, heldBy(db, row))),
         decisions: db.prepare("SELECT * FROM decision_items WHERE workflow_id=? AND status='open'").all(w.workflow_id).map(decisionOf),
         kernelJob: kernelJob ? { status: kernelJob.status, updatedAt: kernelJob.updated_at } : null,
         kernelSignal: parseJsonOr(signal?.value_json, null), lastKernelWakeAt: woken, kernelWakes: wakeUsageOf(db, w.workflow_id).filter((wake) => wake.at >= since), seatCost: kernelSeatOf(db, { workflowId: w.workflow_id, name: w.display_name ?? w.title ?? w.workflow_id, since }) };
