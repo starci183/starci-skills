@@ -4279,6 +4279,7 @@ the specs related to the changed functions (--by file: every importer); --run ru
 | `--changed` | list |  |
 | `--by` | string |  |
 | `--run` | boolean |  |
+| `--plan` | boolean |  |
 | `--concurrency` | number |  |
 | `--root` | string |  |
 
@@ -4292,11 +4293,13 @@ Conventions:
 - The set is computed - each changed .mjs symbol is followed by name through its importers, callers and CLI verbs.
 - What cannot be followed by name (yaml, templates, load-time statements, no base, the depth bound) keeps the file-level rule, named in the report.
 - The report names every symbol with its specs and why, and every file that fell back; --json carries them; never larger than --by file.
-- A selection above the bound in modules/supervisor/affected-tests.yaml is printed, not run; the full suite is the lead's.
+- A large set is never refused; it runs in parallel shards inside the printed time budget, and files not started when it ends are listed.
+- The --plan flag prints each selected file with the reason it is in the set; a --run answer carries a receipt (base, tip, passed, total) a gate can require.
+- A generated output maps to its generator's specs; an append-only change to a data file to the specs that name it or its readers.
 - A red file is fixed and run again, then the affected set once; never the whole suite.
 - Each file is its own low-priority node process with the four preloads, at the concurrency of test-concurrency.yaml.
 
-exit: 0 selection printed, or every selected file passed; 1 a selected spec file was red; 2 no base to diff against, or --run on a selection above the declared bound
+exit: 0 selection printed, or every selected file passed; 1 a selected spec file was red; 2 no base to diff against, or the time budget ended before every selected file started
 
 json: starci/test-affected@1
 

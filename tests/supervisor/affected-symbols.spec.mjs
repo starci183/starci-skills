@@ -149,9 +149,11 @@ test('a file that is not parseable source keeps the file-level rule, and says so
   assert.equal(picked.symbols.length, 0);
 });
 
-test('a source file without a base version, and a change in a module-level statement, fall back', (t) => {
+test('a new module is followed by name, and a change in a module-level statement falls back', (t) => {
   const root = tree(t);
-  assert.match(select(root, ['scripts/lib/a.mjs'], { bases: {} }).fallbacks[0].why, /no base version/);
+  const added = select(root, ['scripts/lib/a.mjs'], { bases: {} });
+  assert.deepEqual(added.fallbacks.filter((entry) => entry.file === 'scripts/lib/a.mjs'), [], 'a new module is followed by every export it has, not a file-level fallback');
+  assert.ok(added.symbols.some((entry) => entry.symbol === 'f') && added.files.includes('tests/direct-f.spec.mjs'));
   const moved = select(root, ['scripts/lib/entry.mjs'], { bases: { 'scripts/lib/entry.mjs': "import { f } from './a.mjs';\nexport const unusedHere = 1;\n" } });
   assert.match(moved.fallbacks[0].why, /module-level statement changed/);
 });

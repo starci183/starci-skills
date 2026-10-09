@@ -1171,7 +1171,7 @@ _starci() {
     'task:list') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'task:register') _values 'flags' '--apply' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'task:show') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'test:affected') _values 'flags' '--base' '--changed' '--by' '--run' '--concurrency' '--root' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'test:affected') _values 'flags' '--base' '--changed' '--by' '--run' '--plan' '--concurrency' '--root' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'test:run') _values 'flags' '--level' '--changed' '--against' '--spec' '--concurrency' '--root' '--release-cut' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'typecheck:run') _values 'flags' '--level' '--changed' '--project' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'uat:assisted-runner') _values 'flags' '--request' '--receipt' '--after' '--value' '--actor' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
