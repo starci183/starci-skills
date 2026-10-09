@@ -1452,3 +1452,30 @@ cases:
     rule: {file: scripts/supervisor/gc-registry.mjs, anchor: "failedLaunchRunsOf"}
     spec: tests/replay/codex-turn-start.spec.mjs
     status: covered
+  - id: approved-leg-reaches-the-kernel-without-a-write-set
+    family: smooth-operation
+    found: live
+    replay: tests/replay/dispatch-owners.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a decision point the Kernel is asked comes with its choices) StarCi interface.draw came as the menu item leg-ready ...:approved-leg-open, 'the plan declares no write set for it', with free-text --text paths only; the plan author lists legs by op and declares no paths, nothing owed the write set, and the Kernel guessed ui/** of the feature", remedy: {state: in-tree, change: "the op contract owes the proposal: the feature families of its manifest writes (narrowed to the work-graph node's features) over the features the workflow tree holds; the leg-ready item offers it as the pickable choice enqueue-proposed and keeps the free text only as the escape"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "menu item leg-ready:interface.draw:...:approved-leg-open answered with a guessed ui/** write set; the plan legs carry no paths"}
+    rule: {file: scripts/kernel/leg-proposal.mjs, anchor: "proposedLegPaths"}
+    spec: tests/kernel/dispatch-owners.spec.mjs
+    status: covered
+  - id: shape-refused-classifies-by-text-and-carries-no-evidence
+    family: correctness
+    found: live
+    replay: tests/replay/dispatch-owners.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a failure is classified by the typed field the report carries, and the item that asks the Kernel carries the failed attempt's own evidence) StarCi work.author blocked on an sds-gap was read as a too-narrow grant because the words of its detail matched a pattern; shape-refused then offered a widen of the same shape, with free text and none of the blocker or the paths the attempt reported", remedy: {state: in-tree, change: "causesOf classifies by the typed blocker kind first (sds-gap, srs-gap, interface-gap, brand-gap are the new cause record-gap, which is no shape cause and which the route table repairs upstream; shared-change, test-gap, grammar-gap, checker-unavailable keep their causes; a check that exited 124 is a timeout) and falls back to the wording only for a report that names no kind; shape-refused carries the failed attempt's blocker kind and detail and the paths it reported as the ready choice widen-reported"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "work.author c10c110700 blocked on an SDS gap, read as grant-too-narrow; shape-guard-retry replay"}
+    rule: {file: scripts/kernel/progress-rca.mjs, anchor: "typedCauses"}
+    spec: tests/kernel/dispatch-owners.spec.mjs
+    status: covered
+  - id: refused-dispatch-is-retried-and-recorded-every-push
+    family: smooth-operation
+    found: live
+    replay: tests/replay/dispatch-owners.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: the same refusal of the same job is recorded once and retried on a growing interval) a ready job whose dispatch is refused for the same cause was re-routed and re-refused on every push of the Workflow controller, about every 60 s, writing events each time: about fifty route-decided events for one interface.draw between its enqueue and its dispatch, grammar-context-missing every minute before that", remedy: {state: in-tree, change: "the refusal is remembered on the job (payload.dispatchRefusal); the job is left alone until its next time, which doubles from the declared base to the declared cap (allocation.dispatchRefusal), or tried at once when the fingerprint of its cause changes (runtime revision, a ruling, a resource the refusal names); a push in which every job is held writes no row; the digest names the ready job with the cause it is refused for and the count"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "op-interface.draw-b8fb07dca4: fifty route-decided events between enqueue 14:49 and dispatch 15:32"}
+    rule: {file: scripts/kernel/dispatch-refusal-memo.mjs, anchor: "nextMemo"}
+    spec: tests/kernel/dispatch-owners.spec.mjs
+    status: covered

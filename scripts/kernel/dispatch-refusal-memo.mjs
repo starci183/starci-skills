@@ -9,16 +9,16 @@ import fs from 'node:fs';
 import { allocationSettings } from '../../engine/config.mjs';
 
 const VOLATILE = /\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b|\b(?:push|term|ctx|run|req)[-_][0-9a-f]{6,}\b/gi;
-const RULING_KINDS = ['kernel-decision', 'gate-answered', 'owner-answered', 'supervisor-ruling-applied'];
+const RULING_EVENTS = ['kernel-decision', 'gate-answered', 'owner-answered', 'supervisor-ruling-applied'];
 
 /** The declared growth: {baseMs, factor, capMs}. */
-export const refusalBackoff = () => allocationSettings().dispatchRefusal;
+const refusalBackoff = () => allocationSettings().dispatchRefusal;
 
 /** The state of the files a refusal names: 'absent' or their mtime, in order. */
 const watchedState = (watch) => (watch ?? []).map((file) => { try { return String(fs.statSync(file).mtimeMs); } catch { return 'absent'; } }).join(',');
 
 /** The latest ruling the ledger holds for the workflow (the seq of its newest ruling event), or 0. */
-const rulingSeq = (db, workflowId) => Number(db.prepare(`SELECT max(seq) AS seq FROM events WHERE workflow_id=? AND kind IN (${RULING_KINDS.map(() => '?').join(',')})`).get(workflowId, ...RULING_KINDS)?.seq ?? 0);
+const rulingSeq = (db, workflowId) => Number(db.prepare(`SELECT max(seq) AS seq FROM events WHERE workflow_id=? AND kind IN (${RULING_EVENTS.map(() => '?').join(',')})`).get(workflowId, ...RULING_EVENTS)?.seq ?? 0);
 
 /** What a refusal depends on: its code and step, the detail with ids removed, the runtime revision, the newest ruling and the state of its watched files. */
 export function fingerprintOf({ db, workflowId, refusal, rev }) {
