@@ -1588,3 +1588,9 @@ cases:
     rule: {file: scripts/kernel/verbs/autopilot.mjs, anchor: "opCan"}
     spec: tests/replay/op-verbs.spec.mjs
     status: covered
+  - id: handover-coverage-read-from-the-main-checkout-not-the-workflow-tree
+    family: correctness
+    met: {date: "2026-10-09", where: "premortem walk of the authentication workflows, handover.review (the last leg)", evidence: "the handover ask was refused handover-proof-unjudged (ENOENT on .starciwork/features/identity/fr/account/index.yaml under the ledger repository) while the record exists in the workflow tree; the records of a running workflow reach the main checkout only when the workflow finishes, after the handover is approved"}
+    rule: {file: scripts/kernel/proof-integrity.mjs, anchor: "recordsRootOf"}
+    spec: tests/replay/handover-coverage-in-workflow-tree.spec.mjs
+    status: covered
