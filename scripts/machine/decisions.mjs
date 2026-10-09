@@ -260,7 +260,10 @@ const catalogVerbOf = (value) => {
   const words = String(value ?? '').trim().split(/\s+/).filter(Boolean);
   return words[0] === 'starci' && words.length >= 3 ? words[2] : words[0] ?? '';
 };
+// The Supervisor's menu validated the choice and ran its steps: closing the item with it is allowed whatever verbs the item lists for its controller.
+const SUPERVISOR_DECIDE = /^starci supervisor decide(?:\s|$)/;
 const verbAllowed = (di, verb) => {
+  if (SUPERVISOR_DECIDE.test(String(verb ?? '').trim())) return true;
   const allowed = (di.allowedVerbs ?? []).map(catalogVerbOf).filter(Boolean);
   const head = catalogVerbOf(verb);
   return !allowed.length || allowed.includes(head);

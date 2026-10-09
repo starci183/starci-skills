@@ -933,3 +933,10 @@ cases:
     rule: {file: scripts/kernel/settle/critic-run.mjs, anchor: "runtimeCriticFor"}
     spec: tests/kernel-settle/runtime-critic.spec.mjs
     status: covered
+  - id: gate-item-stays-open-after-its-gate-resolved
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: the Supervisor's menu holds only what can still be answered) both Nivo gate items (sdi-3c462f95 offered at 7d4406419, sdi-3c185189 at 60198c3de) stayed open after the Supervisor answered them fixed and the gate resolved (incident-resolved, events 659 and 660): starci supervisor decide closes its item with the verb 'starci supervisor decide', the item lists 'starci kernel incident' as its allowed verb, and the closure was refused decision-verb-not-allowed, reported only as a resolveNote; the close of an item whose gate is gone ran in the notifier pass of the Workers controller, which is in shadow mode live; and the per-revision re-offer left the previous revision's item open beside the new one", remedy: {state: in-tree, change: "the Supervisor's own closing verb is always allowed for the item it answered; the Workflow controller (active) closes the items of its workflow's resolved gates every pass, and closes the older item of a gate offered again under a newer revision"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo gate items", evidence: "machine sup_decision_items sdi-3c462f95 and sdi-3c185189 open with the incident resolved 'answered' (nivo events 658 to 660); sup_events: supervisor-action decide:fixed with no sup-decision-resolved after it; controller_modes workers shadow"}
+    rule: {file: scripts/reconciler/gate-close.mjs, anchor: "closeGateItems"}
+    spec: tests/supervisor/supervisor-menu.spec.mjs
+    status: covered

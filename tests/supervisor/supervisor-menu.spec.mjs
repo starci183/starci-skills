@@ -7,6 +7,7 @@ import { openMachine } from '../../engine/db/machine.mjs';
 import { openDecision, listSupervisorDecisions } from '../../scripts/machine/decisions.mjs';
 import { readSupervisorMenu } from '../../scripts/supervisor/supervisor-menu-sources.mjs';
 import { menuItemOf, supervisorMenuLines } from '../../scripts/supervisor/supervisor-menu.mjs';
+import { closeResolvedGateDis, closeSupersededGateDis } from '../../scripts/reconciler/gate-close.mjs';
 import { decideItem, stepArgv } from '../../scripts/supervisor/decide.mjs';
 
 let counter = 0;
@@ -118,4 +119,23 @@ test('a step that fails keeps the item open and reports the failing verb', async
   assert.equal(out.ok, false);
   assert.equal(out.code, 'SUPERVISOR_MENU_STEP_FAILED');
   assert.ok(itemFor(id), 'the item stays on the menu');
+});
+
+test('a gate item closes with the menu\'s own verb although it lists the kernel incident verb for its controller (Nivo gate-di-open-after-fixed-resolution)', async () => {
+  const id = await open({ kind: 'runtime-defect', workflowId: 'wf-gate-close', summary: 'supervisor-gate inc-c', allowedVerbs: ['starci kernel incident'], refs: { gateIncident: 'inc-c', ledgerId: 'spec-ledger', cause: 'runtime-defect' } });
+  assert.ok(itemFor(id));
+  const { out } = await decideItem({ item: itemFor(id).id, choice: 'none-fits', reason: 'the menu closes its own item' });
+  assert.equal(out.resolved, true, JSON.stringify(out));
+  assert.equal(itemFor(id), undefined, 'the item left the menu');
+});
+
+test('the older item of a re-offered gate, and the items of a resolved gate, close by themselves', () => {
+  const calls = [];
+  const m = { setSupDecision: (id, change) => calls.push([id, change.verb]) };
+  const di = (id, openedAt, incident = 'inc-r', status = 'open') => ({ id, status, openedAt, refs: { gateIncident: incident, ledgerId: 'spec-ledger' } });
+  const closedOld = closeSupersededGateDis(m, [di('a', 1), di('b', 2), di('c', 3, 'inc-other'), { id: 'd', status: 'open', refs: {} }]);
+  assert.deepEqual(closedOld, ['a']);
+  assert.deepEqual(calls, [['a', 'gate-reoffered']]);
+  const gone = closeResolvedGateDis(m, [di('e', 5, 'inc-done'), di('f', 6, 'inc-open')], { readLedgers: new Set(['spec-ledger']), openGates: new Set(['spec-ledger:inc-open']) });
+  assert.deepEqual(gone, ['e']);
 });
