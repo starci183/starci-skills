@@ -155,13 +155,18 @@ test('a gate that needs a ruling is the Supervisor\'s, and the work the controll
   assert.deepEqual(menu, []);
 });
 
-test('the main kinds build their items: a stale runtime revision, a worker question, a peer message, a wedged worker, work the runtime does not yet do', () => {
-  const menu = buildMenu(sources({ rev: { state: 'owed', from: 'a'.repeat(40), to: 'b'.repeat(40) },
+test('the main kinds build their items: an owed runtime revision, a worker question, a peer message, a wedged worker, work the runtime does not yet do', () => {
+  const menu = buildMenu(sources({ rev: { state: 'owed', from: 'a'.repeat(40), to: 'b'.repeat(40), files: ['modules/kernel/kernel-menu.yaml'] },
     questions: [{ messageId: 'msg-1', jobId: 'op-x-1', opId: 'x', question: 'which table?', askedAt: new Date(T0).toISOString() }], peers: [{ key: 'pm-1', from: 'wf-other', kind: 'request', subject: 'port', at: T0 }],
     wedged: [{ jobId: 'op-x-2', opId: 'x' }], nextActions: [{ kind: 'dispatch', origin: 'approved-leg-open', op: 'architecture.decide', reason: 'approved leg has no job' }] }));
   assert.deepEqual(menu.map((item) => item.id), ['rev-ack:wf-menu', 'worker-question:msg-1', 'peer-message:pm-1', 'worker-wedged:op-x-2', 'leg-ready:architecture.decide:approved-leg-open']);
   assert.equal(menu[0].mode, 'duty');
   assert.equal(menu[0].options[0].direct, true);
+  assert.equal(menu[0].subject.acked, 'a'.repeat(9));
+  assert.equal(menu[0].subject.rev, 'b'.repeat(40));
+  assert.match(menu[0].options[0].effect, /kernel-ack-rev --workflow wf-menu --plan/);
+  assert.ok(menu[0].options[0].effect.includes(`--rev ${'b'.repeat(40)} --digest <readToken>`));
+  assert.doesNotMatch(menu[0].options[0].effect, /--read-manifest/);
   assert.equal(menu.at(-1).mode, 'judgment');
   const question = menu[1];
   assert.deepEqual(question.options.map((o) => o.choice), ['answer', 'ask-owner', 'none-fits']);

@@ -229,11 +229,14 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
       const main = path.join(base, 'tree-main');
       gitInit(main);
       write(main, '.gitignore', 'node_modules/\n');
+      // `tree.scaffold(dir)`: the app files a started workflow's tree holds from its baseline (committed before the branch is registered, so they are no foreign commit).
+      if (typeof tree?.scaffold === 'function') tree.scaffold(main);
       commit(main, 'chore(app): establish canonical hfs app baseline');
       git(main, 'worktree', 'add', '-q', '-b', branch, dir);
     } else {
       gitInit(dir);
       write(dir, '.gitignore', 'node_modules/\n');
+      if (typeof tree?.scaffold === 'function') tree.scaffold(dir);
       commit(dir, 'chore(app): establish canonical hfs app baseline');
       git(dir, 'checkout', '-q', '-b', branch);
     }

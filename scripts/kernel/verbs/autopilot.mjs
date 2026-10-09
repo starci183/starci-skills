@@ -106,4 +106,5 @@ function runAutopilot(ctx) {
   return showAutopilot(ctx);
 }
 
-export default workflowVerb('autopilot', (input) => runAutopilot(contextOf(input)));
+// An op may print the end-of-flow credential checklist (provision.ask files its question verbatim); every other form is the runtime's.
+export default workflowVerb('autopilot', (input) => runAutopilot(contextOf(input)), { opCan: (args) => Boolean(args.checklist) && args.set == null });

@@ -13,6 +13,7 @@ import { ownedPathsOf, getWorkflow } from './rows.mjs';
 import { releaseTypedWaits } from './peer-waits.mjs';
 import { queuedJobOp, refuseOwnerGate, refusePeerWait, opSlotsOrRefuse } from './job-gates.mjs';
 import { hostResourcesFor, HOST_RESOURCES_LOW } from '../../../machine/host-resources.mjs';
+import { workflowWorktreeOf } from '../../../machine/workflow-tree.mjs';
 import { tempRoot, TEMP_ROOT_ENV } from '../../../../engine/temp-root.mjs';
 import { ensureTempRoot } from '../../../api/fs/ensure-temp-root.mjs';
 import { hostThrottle, noteThrottled, releaseThrottled, DISPATCH_THROTTLED } from '../../../machine/ram-throttle.mjs';
@@ -52,8 +53,9 @@ function workflowTreeOf(d) {
 
 /** The grant is re-judged at launch: the tree may have moved since enqueue. */
 function refuseUnsatisfiableGrant(d, dispatchTarget) {
-  const { repo, jobId, op, payload } = d;
-  const grant = checkGrantParents({ op, payload: { ...payload, repository: payload.repository ?? dispatchTarget.repository ?? undefined }, ownedPaths: ownedPathsOf(payload), repo });
+  const { repo, jobId, op, payload, job } = d;
+  const worktree = workflowWorktreeOf({ env: process.env }, job.workflow_id)?.path ?? null;
+  const grant = checkGrantParents({ op, payload: { ...payload, repository: payload.repository ?? dispatchTarget.repository ?? undefined }, ownedPaths: ownedPathsOf(payload), repo, worktree });
   if (grant.ok) return;
   const out = { ok: false, jobId, op, reason: grant.reason, violations: grant.violations.map(({ owned, dir, closest }) => ({ owned, dir, closest })), detail: grant.detail };
   refuseVerb(d, out, `dispatch REFUSED for ${jobId} (${op}): ${out.reason} — ${out.detail}; job stays queued`);

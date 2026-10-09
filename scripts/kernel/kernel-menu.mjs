@@ -30,7 +30,7 @@ export const snoozeMs = () => boundValue(menuCatalog().snooze.ms);
 export function resolveArgs(args, subject) {
   const out = {};
   for (const [key, raw] of Object.entries(args ?? {})) {
-    if (raw === TEXT) { out[key] = TEXT; continue; }
+    if (raw === TEXT || (typeof raw === 'string' && raw.startsWith(`${TEXT}.`))) { out[key] = raw; continue; }
     const value = typeof raw === 'string' && raw.startsWith('$') ? subject[raw.slice(1)] : raw;
     if (value == null || value === '') continue;
     out[key] = value === true ? true : String(value);
@@ -99,7 +99,7 @@ const kindOf = (id) => menuCatalog().kinds.find((kind) => kind.id === id);
 function itemOf(kind, { key, subject, options = null, since = null, evidence = [], di = null, deadlineAt = null, escape = true }) {
   const spec = kindOf(kind);
   const policy = policyOf(spec.hold, since);
-  const own = options ?? (spec.options ?? []).filter((option) => !option.when || subject[option.when]).map((option) => optionOf(option, subject));
+  const own = options ?? (spec.options ?? []).filter((option) => (!option.when || subject[option.when]) && (!option.unless || !subject[option.unless])).map((option) => optionOf(option, subject));
   return {
     id: `${kind}:${key}`, kind, mode: spec.mode, subject: { ...subject }, question: fillTemplate(spec.question, subject).trim(),
     options: escape ? [...own, escapeOption()] : own, evidence, deadline: deadlineAt ?? policy.deadlineAt, step: policy.step, hold: spec.hold ?? null, di,
@@ -146,7 +146,7 @@ function actionItemOf(action, workflow) {
   const origin = originOf(action);
   // A move a supervisor-gate or a peer-wait holds is theirs to release, not the Kernel's to answer.
   if (origin?.class !== 'judgment' || !origin.menu || action.heldBy) return [];
-  const subject = { workflow, op: action.op ?? null, job: action.jobId ?? null, node: action.nodes?.[0] ?? null, paths: action.paths ?? null, params: action.params ?? null, situation: action.reason, attest: action.attest ?? '', proposed: action.proposed ?? '' };
+  const subject = { workflow, op: action.op ?? null, job: action.jobId ?? null, node: action.nodes?.[0] ?? null, paths: action.paths ?? null, params: action.params ?? null, situation: action.reason, attest: action.attest ?? '', proposed: action.proposed ?? '', paramsRequired: action.paramsRequired ?? '', paramsNote: action.paramsRequired ? ` The op requires the parameter(s) ${action.paramsRequired}, which only the Kernel sets.` : '' };
   const key = [action.op, action.jobId ?? action.nodes?.[0] ?? action.cutId, origin.id].filter(Boolean).join(':');
   return [itemOf(origin.menu, { key, subject, evidence: action.jobId ? [{ ref: `job:${action.jobId}` }] : [] })];
 }

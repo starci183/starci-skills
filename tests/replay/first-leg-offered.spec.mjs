@@ -17,6 +17,8 @@ test('a new workflow with no job offers its first approved leg, and the leg the 
   assert.equal(status.frontier.actionable, true, 'so the watchdog has a menu item to wake the Kernel for');
   assert.notEqual(status.frontier.state, 'orphaned-frontier');
   const item = status.menu[0];
+  assert.match(item.subject.attest, /--digest <readToken>/, 'the READ attestation is taught in the form a Kernel can run: it writes no file, so --read-manifest <file> is no instruction for it');
+  assert.doesNotMatch(item.question, /read-manifest/);
   assert.deepEqual(item.options.map((option) => option.choice), ['enqueue-leg', 'none-fits'], 'the escape is free text; scope.define writes no feature family, so there is no proposal');
 });
 
@@ -25,7 +27,7 @@ test('the Kernel enqueues the first leg from the menu, and the leg behind it wai
   assert.equal(world.ack(['scope.define']).status, 0);
   const answered = world.cli('decide', ['--workflow', world.wf, '--item', 'leg-ready:scope.define:approved-leg-open', '--choice', 'enqueue-leg', '--text', '.starciwork/features/own-1', '--reason', 'the scope']);
   assert.equal(answered.status, 0, answered.stderr || answered.stdout);
-  assert.deepEqual(jobsOf(world).map((job) => [job.op, job.paths]), [['scope.define', ['.starciwork/features/own-1']]]);
+  assert.deepEqual(jobsOf(world).map((job) => [job.op, job.status, job.paths]), [['scope.define', 'queued', ['.starciwork/features/own-1']]]);
   assert.deepEqual(world.status().menu.map((item) => item.id), [], 'the first leg has its job and the business leg behind it waits for it');
 });
 

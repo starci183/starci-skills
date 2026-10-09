@@ -34,6 +34,8 @@ import { argvOf } from './settle/check-command.mjs';
 import { workCommonDef } from '../lib/work-schemas.mjs';
 import { validateAgainstSchema } from '../lib/json-schema.mjs';
 import { admittedContractOf } from '../machine/contract-version.mjs';
+import { workflowWorktreeOf } from '../machine/workflow-tree.mjs';
+import { treesInOrder } from '../lib/roots.mjs';
 // The events whose payload chains artifact {id, sha256} (read lazily: job-artifacts.mjs imports this module).
 const chainedArtifactEvents = () => [ARTIFACTS_INDEXED, 'report-filed'];
 
@@ -396,7 +398,16 @@ const collectUiCoverage = ({ repo, uiDirs, briefCases, shapes, cases, errors }) 
  */
 // notCounted: the proof kinds the owner switched off (config.yaml specs.unit/e2e false, scripts/route/spec-deferral.mjs):
 // an FR's requiresProof demand of that kind is not counted, so it makes no must-have on its own (listed as `notCounted`).
-export function coverageOf(db, workflowId, { repo, briefCases = null, artifacts = proofArtifactsOf(db, workflowId, { repo }), notCounted = [], qualified = false } = {}) {
+/** The tree the workflow's records live in: its own worktree while it runs (a checkpoint lands on the main checkout only when the workflow finishes), else the ledger repository. */
+function recordsRootOf(workflowId, repo) {
+  let tree = null;
+  try { tree = workflowWorktreeOf({ env: process.env }, workflowId)?.path ?? null; } catch { tree = null; }
+  return treesInOrder({ tree, repo })[0] ?? repo;
+}
+
+export function coverageOf(db, workflowId, { repo: ledgerRepo, briefCases = null, artifacts = null, notCounted = [], qualified = false } = {}) {
+  const repo = recordsRootOf(workflowId, ledgerRepo);
+  artifacts ??= proofArtifactsOf(db, workflowId, { repo });
   const scope = scopeOf(db, workflowId);
   const index = evidenceIndex(artifacts, { qualified });
   const frRecords = new Map(qualified ? scope.frs.map(id => [id, requiredFrOf(repo, id)]) : frRecordsOf(repo).map(fr => [fr.id, fr]));

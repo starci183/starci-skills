@@ -106,7 +106,7 @@ function attestNoteOf(s, action) {
     const authority = kernelAuthorityOf(s.db, s.workflowId, kernelCustodyOf(s.db, s.workflowId).terminal);
     const required = kernelReadManifest(s.db, s.workflowId, { root: revRootOf(), authority, ops: [action.op] });
     const unread = unreadFiles(s.db, s.workflowId, required);
-    return unread.length ? `This Kernel life has not attested its READ for ${action.op} (${unread.length} file(s)): enqueue is refused kernel-read-unverified until it does; run starci kernel kernel-ack-rev --plan --op ${action.op}, read the files it lists, then attest with --rev and --read-manifest.` : '';
+    return unread.length ? `This Kernel life has not attested its READ for ${action.op} (${unread.length} file(s)): enqueue is refused kernel-read-unverified until it does; run starci kernel kernel-ack-rev --plan --op ${action.op}, read the files it lists, then attest with --rev <rev> --op ${action.op} --digest <readToken> (the token the plan returned).` : '';
   } catch { return ''; }
 }
 

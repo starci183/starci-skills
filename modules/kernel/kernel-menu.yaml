@@ -137,10 +137,11 @@ kinds:
   - id: leg-ready
     mode: judgment
     source: "next action approved-leg-open"
-    question: "Approved leg {op} has no job and every plan leg before it succeeded, but the plan declares no write set for it (or a work graph partitions it). {attest}"
+    question: "Approved leg {op} has no job and every plan leg before it succeeded, but the plan declares no write set for it (or a work graph partitions it). {attest}{paramsNote}"
     options:
-      - {choice: enqueue-proposed, when: proposed, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $proposed}}], effect: "enqueues {op} on the write set its op contract proposes: {proposed}; the Workflow controller then routes and dispatches it"}
-      - {choice: enqueue-leg, text: paths, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $text}}], effect: "escape: enqueues {op} on the paths in --text (its write set) when the proposal does not fit; the Workflow controller then routes and dispatches it"}
+      - {choice: enqueue-proposed, when: proposed, unless: paramsRequired, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $proposed}}], effect: "enqueues {op} on the write set its op contract proposes: {proposed}; the Workflow controller then routes and dispatches it"}
+      - {choice: enqueue-leg, text: paths, unless: paramsRequired, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $text}}], effect: "escape: enqueues {op} on the paths in --text (its write set) when the proposal does not fit; the Workflow controller then routes and dispatches it"}
+      - {choice: enqueue-with-params, when: paramsRequired, text: json, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $text.paths, params: $text.params}}], effect: "enqueues {op}, which requires the parameter(s) {paramsRequired} the Kernel sets: --text is a JSON object {\"paths\": \"<comma list, its write set>\", \"params\": {...}}; the Workflow controller then routes and dispatches it"}
 
   - id: shape-refused
     mode: judgment

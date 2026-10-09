@@ -26,11 +26,26 @@ const refuseWithMenu = (ctx, menu, { code, error }) => refuseVerb(ctx, { ok: fal
   [`decide REFUSED (${code}): ${error}`, ...menuLines({ menu, workflowId: ctx.args.workflow })].join('\n'));
 
 /** The steps of an option with the caller's --text bound to every `$text` argument; a missing optional text drops its flag. */
-const bindArg = ([key, value], text) => {
+const bindArg = ([key, value], text, json) => {
+  if (typeof value === 'string' && value.startsWith(`${TEXT}.`)) {
+    const part = json?.[value.slice(TEXT.length + 1)];
+    return part == null ? [] : [[key, typeof part === 'string' ? part : JSON.stringify(part)]];
+  }
   if (value !== TEXT) return [[key, value]];
   return text ? [[key, text]] : [];
 };
-const boundSteps = (option, text) => option.steps.map((step) => ({ verb: step.verb, args: Object.fromEntries(Object.entries(step.args ?? {}).flatMap((entry) => bindArg(entry, text))) }));
+/** The --text read as one JSON object, for the arguments that take a part of it (`$text.paths`); a text that is no object is refused. */
+function jsonTextOf(text) {
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+  } catch { /* refused below */ }
+  throw Object.assign(new Error('this choice takes --text as one JSON object (see its effect)'), { code: 'menu-text-invalid' });
+}
+const boundSteps = (option, text) => {
+  const json = JSON.stringify(option.steps).includes(`"${TEXT}.`) ? jsonTextOf(text) : null;
+  return option.steps.map((step) => ({ verb: step.verb, args: Object.fromEntries(Object.entries(step.args ?? {}).flatMap((entry) => bindArg(entry, text, json))) }));
+};
 
 const flagText = ([key, value]) => (value === true ? `--${key}` : `--${key} ${String(value).slice(0, 60)}`);
 const stepText = (step) => [step.verb, ...Object.entries(step.args).map(flagText)].join(' ');

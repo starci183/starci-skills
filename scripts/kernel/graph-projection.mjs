@@ -17,7 +17,7 @@ import { ASSET_OP } from '../work/asset-slot.mjs';
 import { retryMoveOf } from './retry-move.mjs';
 import { enqueueMove, legPathsOf, rerunMoveOf, withDeferredStubs, withMove } from './next-moves.mjs';
 import { handoverReviewAction } from './handover-move.mjs';
-import { proposedLegPaths, treesOfWorkflow } from './leg-proposal.mjs';
+import { proposedLegPaths, requiredKernelParamsOf, treesOfWorkflow } from './leg-proposal.mjs';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ownerLanguage = () => ownerLanguageOf();
 
@@ -107,6 +107,17 @@ const planWaitsOf = (op, ctx, { firstReached, succeeded, credentialOnly }) => {
   return (planAncestors.get(op) ?? []).filter((ancestor) => !externalOpsOf(skillRoot).has(ancestor) && !(autopilot?.on && ancestor === 'provision.ask') && (approvalWaitOps.has(ancestor) || (!succeeded.has(ancestor) && !credentialOnly(ancestor)
     && !deferredPlanOps.has(ancestor) && (jobsByOp.has(ancestor) || legOps.indexOf(ancestor) > firstReached))));
 };
+/**
+ * What the Kernel is offered to enqueue a leg the plan leaves open: the op contract's own families as the proposal (kernel-menu.yaml leg-ready), not a guess, and the parameters only
+ * the Kernel can set. Nothing for a leg whose plan declares its write set (the runtime enqueues it) or a deferred one.
+ */
+function legProposalOf({ op, ctx, move, deferral }) {
+  const nodePaths = ctx.workGraph?.frontier?.[0]?.ownedPaths ?? [];
+  const proposed = move || deferral ? '' : proposedLegPaths({ skillRoot, op, trees: treesOfWorkflow(ctx.db, ctx.wf.workflow_id), nodePaths });
+  const required = move ? [] : requiredKernelParamsOf({ skillRoot, op });
+  return { ...(proposed ? { proposed } : {}), ...(required.length ? { paramsRequired: required.join(', ') } : {}) };
+}
+
 /** The dispatch action of an approved leg nothing holds: deferred, or a dispatch building on placeholder values when only a credential holds it. */
 const approvedLegAction = (op, ctx, credentialOnly) => {
   const { planAncestors, workGraph, deferredPlanOps } = ctx;
@@ -116,10 +127,7 @@ const approvedLegAction = (op, ctx, credentialOnly) => {
   // The plan leg's own write set is the move (a deferred leg that declares none takes its evidence stub: it is never dispatched); a work graph partitions the leg per node and any other leg that declares none leaves the write set to the Kernel.
   const move = nodes.length ? null : enqueueMove(ctx.wf.workflow_id, { op, paths: ctx.legPaths.get(op) });
   const action = withMove({ kind: 'dispatch', origin: 'approved-leg', op, ...(nodes.length ? { nodes } : {}), ...(deferral ? { deferred: deferral.reason } : {}) }, move);
-  // The plan declared no write set: the op contract's own families are the proposal the Kernel picks (kernel-menu.yaml leg-ready), not a guess.
-  const nodePaths = workGraph?.frontier?.[0]?.ownedPaths ?? [];
-  const proposed = move || deferral ? '' : proposedLegPaths({ skillRoot, op, trees: treesOfWorkflow(ctx.db, ctx.wf.workflow_id), nodePaths });
-  if (proposed) action.proposed = proposed;
+  Object.assign(action, legProposalOf({ op, ctx, move, deferral }));
   if (deferral) {
     action.reason = `approved leg ${op} is deferred (${deferral.reason}): starci kernel enqueue --op ${op} with its paths records it - it settles deferred at once, never dispatched, no attempt spent - and the legs behind it do not wait on it`;
   } else {

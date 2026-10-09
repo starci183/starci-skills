@@ -3692,7 +3692,7 @@ const runExtensionVerb = async (spec, args, repo) => {
     process.exitCode = 1; return;
   }
   const caller = callerOf(ledger.db, process.env, { file: ledger.path });
-  if (caller.role === OP_ROLE && spec.kernelOnly) {
+  if (caller.role === OP_ROLE && spec.kernelOnly && !spec.opCan?.(args)) {
     refuseOpCaller(receiptLedger(ledger, openLedger), { cmd: spec.verb, caller, code: 'op-context-refused',
       detail: `'${spec.verb}' is a kernel verb and this caller is operation ${caller.jobId ?? '(unbound)'} (${caller.via}); an op files its own starci kernel report and nothing else` });
   }

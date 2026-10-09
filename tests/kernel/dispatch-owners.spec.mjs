@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { proposedLegPaths, featureFamiliesOf } from '../../scripts/kernel/leg-proposal.mjs';
+import { proposedLegPaths, featureFamiliesOf, requiredKernelParamsOf } from '../../scripts/kernel/leg-proposal.mjs';
 import { buildMenu } from '../../scripts/kernel/kernel-menu.mjs';
 import { causesOf, isShapeCause, CAUSES } from '../../scripts/kernel/progress-rca.mjs';
 import { fingerprintOf, isHeld, memoOf, nextMemo } from '../../scripts/kernel/dispatch-refusal-memo.mjs';
@@ -22,11 +22,29 @@ const tree = (t, features) => {
   return dir;
 };
 
+test('the rev-ack item teaches the attestation a Kernel seat can run (a digest, no file)', async () => {
+  const { menuCatalog } = await import('../../scripts/kernel/kernel-menu.mjs');
+  const effect = menuCatalog().kinds.find((kind) => kind.id === 'rev-ack').options[0].effect;
+  assert.match(effect, /--digest <readToken>/);
+  assert.doesNotMatch(effect, /read-manifest/);
+});
+
+test('the parameters only the Kernel can set are named for the op that needs them', () => {
+  assert.deepEqual(requiredKernelParamsOf({ skillRoot, op: 'provision.ask' }), ['subject']);
+  assert.deepEqual(requiredKernelParamsOf({ skillRoot, op: 'interface.audit' }), ['audit']);
+  assert.deepEqual(requiredKernelParamsOf({ skillRoot, op: 'review.verify' }), ['mode'], 'the default mode `select` is planning only: dispatch refuses it');
+  assert.deepEqual(requiredKernelParamsOf({ skillRoot, op: 'scope.define' }), []);
+  assert.deepEqual(requiredKernelParamsOf({ skillRoot, op: 'no.such.op' }), []);
+});
+
 test('the proposed write set of a leg is the op contract\'s feature families of every feature the trees hold, never a guess', (t) => {
   const one = tree(t, ['authentication', 'system-health']);
   const two = tree(t, ['authentication']);
   assert.equal(proposedLegPaths({ skillRoot, op: 'interface.draw', trees: [one, two] }), '.starciwork/features/authentication/ui,.starciwork/features/system-health/ui');
-  assert.match(proposedLegPaths({ skillRoot, op: 'work.author', trees: [two] }), /^\.starciwork\/features\/authentication\/impl,.*uat$/);
+  // work.author declares planned identity, environment and fixture slots (contract: "the kernel's owned_paths for such a dispatch include exactly those slot directories"): the proposal grants them
+  // with the leg, otherwise a uat flow's accounts have no identity slot to be declared in and the report is refused outside owned_paths (premortem walk, work.author).
+  assert.match(proposedLegPaths({ skillRoot, op: 'work.author', trees: [two] }), /^\.starciwork\/features\/authentication\/impl,.*uat,\.starciwork\/_resources\/environments,\.starciwork\/_resources\/fixtures,\.starciwork\/_resources\/identities$/);
+  assert.equal(proposedLegPaths({ skillRoot, op: 'work.author', trees: [] }), '.starciwork/_resources/environments,.starciwork/_resources/fixtures,.starciwork/_resources/identities', 'no feature yet: the slots the op declares are still granted');
   assert.equal(proposedLegPaths({ skillRoot, op: 'interface.draw', trees: [] }), '', 'no tree holds a feature: nothing to propose');
   assert.equal(proposedLegPaths({ skillRoot, op: 'no.such.op', trees: [one] }), '');
   assert.deepEqual(featureFamiliesOf({ writes: [{ path: '.starciwork/features/<feature>/ui/<name>/index.yaml' }, { path: '.starciwork/shell/index.yaml' }, { path: '.starciwork/features/<feature>/{a,b}/x' }] }), ['ui']);

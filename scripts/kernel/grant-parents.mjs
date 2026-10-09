@@ -8,6 +8,7 @@
 import path from 'node:path';
 import { ownedPathPlacements, projectBinding } from './target-repo.mjs';
 import { isDir } from '../lib/fs-kind.mjs';
+import { treesInOrder } from '../lib/roots.mjs';
 
 const slash = (p) => String(p).replaceAll('\\', '/');
 const GLOB_OR_DIR = /(^|\/)\*{1,2}$/;
@@ -65,10 +66,16 @@ function grantParentDetail(violations) {
   return `${violations.length} owned path(s) could never be satisfied: ${shown.join('; ')}. Fix the path to the real directory, or declare a new module with --new-module <repository-relative dir>`;
 }
 
-/** Check the owned paths of a job; {ok:true} or {ok:false, reason, violations, detail}. */
-export function checkGrantParents({ op, payload, ownedPaths, repo, timeoutMs }) {
+/**
+ * Check the owned paths of a job; {ok:true} or {ok:false, reason, violations, detail}. `worktree`: the workflow's own tree, where the legs before this one left their
+ * directories (a checkpoint lands on main only when the workflow finishes). A directory that exists in the tree or in the main checkout satisfies the grant: only a path
+ * neither holds could never be written into.
+ */
+export function checkGrantParents({ op, payload, ownedPaths, repo, worktree = null, timeoutMs }) {
   const workDir = projectBinding(repo)?.workDir ?? '.starciwork';
-  const placements = ownedPathPlacements({ op, payload, ownedPaths, repo, worktree: null, timeoutMs });
-  const violations = grantParentViolations({ placements, newModules: newModulesOf(payload), workDir });
+  const newModules = newModulesOf(payload);
+  const violationsAt = (tree) => grantParentViolations({ placements: ownedPathPlacements({ op, payload, ownedPaths, repo, worktree: tree, timeoutMs }), newModules, workDir });
+  const byTree = treesInOrder({ tree: worktree, repo }).map((tree) => violationsAt(tree));
+  const violations = (byTree[0] ?? []).filter((v) => byTree.every((rows) => rows.some((w) => w.owned === v.owned && w.dir === v.dir)));
   return violations.length ? { ok: false, reason: 'grant-parent-missing', violations, detail: grantParentDetail(violations) } : { ok: true };
 }

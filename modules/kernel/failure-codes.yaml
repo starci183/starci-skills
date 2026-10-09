@@ -17327,6 +17327,16 @@ menu-text-missing:
   nextStep_vi: "Gọi lại starci kernel decide kèm --text."
   owner: op-retry
   kind: blocker
+menu-text-invalid:
+  title: "The option needs --text as one JSON object"
+  title_vi: "Lựa chọn cần --text là một đối tượng JSON"
+  meaning_vi: "Lựa chọn nhận --text là một đối tượng JSON (đường dẫn ghi và tham số của op) nhưng văn bản không phải JSON hoặc không phải đối tượng."
+  causes_vi:
+    - "--text không phải JSON"
+    - "--text là mảng hoặc giá trị đơn thay vì đối tượng"
+  nextStep_vi: "Gọi lại starci kernel decide với --text là đối tượng JSON như hiệu ứng của lựa chọn mô tả."
+  owner: op-retry
+  kind: blocker
 menu-step-failed:
   title: "A step of the chosen option failed"
   title_vi: "Một bước của lựa chọn thất bại"
