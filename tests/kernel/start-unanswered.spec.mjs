@@ -28,3 +28,12 @@ test('the rotation closes the seat only when a start may run: a held start leave
   assert.equal(make(() => null).rotate(input).action, 'rotated');
   assert.deepEqual(calls, ['close', 'event', 'replace']);
 });
+
+test('the digest line of a dead Kernel says why it is not being restarted: the step and message of its last failed start', async () => {
+  const { digest, snapshot, workflow } = await import('../helpers/debug-digest-fixture.mjs');
+  const dead = workflow({ kernelJob: { status: 'running', updatedAt: 1 }, kernelSignal: { terminal: 't' }, seatProbe: { action: 'restart-needed' },
+    lastStartFailure: { at: 1, step: 'workflow-host-not-ready', reason: 'workflow-host-not-ready', error: 'services/ui-build red' } });
+  const problem = digest(snapshot({ workflows: [dead] })).problems.find((p) => p.params?.probe === 'restart-needed');
+  assert.ok(problem, 'the dead Kernel is a problem line');
+  assert.match(problem.params.why, /not restarted, its last start failed at workflow-host-not-ready: services\/ui-build red/);
+});

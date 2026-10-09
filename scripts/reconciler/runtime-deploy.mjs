@@ -144,6 +144,15 @@ function moveStage(run) {
   return merged.status === 0 && run.moved ? null : failedAfterMove(run, DEPLOY.notFastForward, `git merge --ff-only failed: ${String(merged.stderr ?? '').trim().slice(0, 200)}`);
 }
 
+/** The UI dependencies a deploy changed: the new tree installs (non-destructively) and builds the harness UI before the engine restarts; a host that cannot is named, not discovered later. */
+function uiStage(run) {
+  const { facts, seams } = run;
+  if (!facts.range.files.some((file) => /^ui\/package(-lock)?\.json$/.test(file))) return null;
+  const built = seams.uiBuild();
+  const red = (built.data?.items ?? []).filter((item) => item.status === 'red' && item.required).map((item) => `${item.id}: ${item.detail}`);
+  return built.status === 0 && red.length === 0 ? null : failedAfterMove(run, DEPLOY.uiInstallFailed, `starci reconciler up --services after ui/package.json changed: ${red.join('; ') || built.stderr || 'exit ' + built.status}`);
+}
+
 /** The new tree's own migration of the installed artefacts, then its engine restart. */
 function reviveStage(run) {
   const { seams } = run;
@@ -170,7 +179,7 @@ function succeeded(run, verified) {
 
 /** The stages under the host lock, in order; the first one that returns a result ends the deploy. */
 async function carryOut(run) {
-  const stopped = (await waitStage(run)) ?? moveStage(run) ?? reviveStage(run);
+  const stopped = (await waitStage(run)) ?? moveStage(run) ?? uiStage(run) ?? reviveStage(run);
   if (stopped) return stopped;
   const { facts, seams, numbers, deps } = run;
   const verified = await verifyRestart({ read: seams.snapshot, before: run.before, sha: facts.source.sha, restartedAt: run.restartedAt, verifyMs: numbers.verifyMs, pollMs: numbers.pollMs, now: deps.now, sleep: deps.sleep });

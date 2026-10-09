@@ -42,6 +42,8 @@ export function hostSeams({ host, env }) {
     fastForward: (sha) => merge(['--ff-only', sha], { cwd: host }),
     migrate: () => runHostVerb(host, ['runtime', 'artefacts', '--migrate'], env),
     restart: () => runHostVerb(host, ['reconciler', 'restart'], env),
+    // The NEW tree heals the harness UI (non-destructive dependency install, then the build) when the deploy changed ui/package.json or its lockfile.
+    uiBuild: () => runHostVerb(host, ['reconciler', 'up', '--services'], env),
     journal: (kind, payload, files) => withMachine((machine) => {
       const filesSha = files ? putMachineBlob(machine, JSON.stringify({ files }), { mediaType: 'application/json' }) : null;
       return machine.supEvent({ entityType: 'runtime', entityId: payload.to, kind, payload: { ...payload, filesSha } });

@@ -134,6 +134,14 @@ const api = command => runNodeJson(apiFile, [command, '--repo', path.resolve(rep
 // maxReplacementsPerHour (scripts/reconciler/controllers/host.mjs REPLACED), and on 2026-09-29 a timed-out
 // tab close that start-workflow answered "terminal connected" was counted as the 4th and quarantined the seat.
 /** The watchdog answer of a start-workflow run {ok, value, stderr, stdout} past its host-unavailable and live-worker steps. Pure. */
+/** The `reason` and `error` of a failed start answer, top-level so the Host's action journal, the digest and the Supervisor item name the cause. Pure. */
+function failureFieldsOf(started) {
+  const said = started.value ?? unansweredStart(started);
+  const step = said.step ?? said.reason ?? 'start-workflow';
+  const message = String(said.error ?? said.host?.summary?.red ?? said.reason ?? 'no message').slice(0, 300);
+  return { reason: step, error: `Kernel start refused at ${step}: ${message}` };
+}
+
 /** The detail of a start-workflow run that printed no JSON answer: what the process left (its error, stderr, stdout), never an empty string. Pure. */
 export function unansweredStart(started) {
   const said = String(started.stderr || started.stdout || started.error || '').split(/\r?\n/).filter(Boolean).slice(-3).join(' | ').slice(-400) || null;
@@ -151,10 +159,15 @@ export function startAnswerOf(started, base = {}) {
     ...(live ? { note: started.value?.note ?? null } : {}),
     replacementTerminal: started.value?.terminal ?? null,
     detail: started.value ?? unansweredStart(started),
+    ...(live || started.ok ? {} : failureFieldsOf(started)),
   };
 }
 // A start that printed no answer (killed at its bound, crashed) is a failed launch like any other: recorded kernel-start-failed so the start-hold rule counts it and
 // the digest names its cause, and the Kernel seat the rotation closed is never left without a recorded reason.
+// A refusal the start prints before it claims anything (the host is not ready, the goal is not startable) leaves no kernel-start-failed event of its own: the watchdog journals it.
+const PRE_CLAIM_REFUSALS = new Set(['workflow-host-not-ready', 'workflow-approval-required', 'workflow-not-startable', 'workflow-goal-unverified']);
+const recordRefusedStart = (value) => withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, kind: 'kernel-start-failed',
+  payload: { step: value.step, reason: value.step, error: String(value.error ?? value.host?.error ?? value.host?.items?.find?.((item) => item.status === 'red' && item.required)?.detail ?? value.step).slice(0, 600), runtimeRev: runtimeRevNow() } })));
 const recordUnansweredStart = (started) => {
   const detail = unansweredStart(started);
   withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, kind: 'kernel-start-failed',
@@ -163,6 +176,7 @@ const recordUnansweredStart = (started) => {
 const replaceKernel = (base) => {
   const started = runNodeJson(startFile, ['--repo', path.resolve(repo), '--goal', workflowId, '--launched-by', 'watchdog', '--json'], { timeout: START_TIMEOUT_MS });
   if (!started.value) recordUnansweredStart(started);
+  else if (started.value.ok === false && PRE_CLAIM_REFUSALS.has(started.value.step)) recordRefusedStart(started.value);
   const step = started.value?.step ?? null;
   if (step === 'host-unavailable') return { ...base, ok: true, action: 'host-unavailable', reason: started.value?.error ?? null };
   // No sender terminal to launch from is a refusal retrying cannot change: answered once as restart-blocked, which the Host
@@ -389,7 +403,14 @@ const finalKernelAction = (state) => {
 };
 const recordRevisionWoken = (notice) => withKernelLedger((ledger) => recordWoken(kernelSeat({ ledger, workflowId, root: revRootOf() }), notice));
 // The replacement is one hand-over: the seat that works is closed only when a start may run now (a launch held or backing off for its cause leaves it as it is).
-const startHold = () => withKernelLedger((ledger) => startHoldOf(startFailureRun(ledger.db, workflowId), { now: Date.now(), budget: startHoldBudget(), rev: runtimeRevNow() })) ?? null;
+// The same readiness the start itself runs (workflow-up --check, the rows a Kernel start needs): a host that cannot start a Kernel keeps the one that works.
+const startPreflight = () => {
+  const checked = runNodeJson(path.join(skillRoot, 'scripts', 'reconciler', 'workflow-up.mjs'), ['--check', '--json'], { timeout: START_TIMEOUT_MS });
+  if (checked.value?.ok !== false) return null;
+  const red = (checked.value.items ?? []).filter((item) => item.status === 'red' && item.required).map((item) => `${item.id}: ${item.detail}`);
+  return { state: 'not-ready', count: red.length, step: 'workflow-host-not-ready', reason: red.join('; ').slice(0, 300) };
+};
+const startHold = () => withKernelLedger((ledger) => startHoldOf(startFailureRun(ledger.db, workflowId), { now: Date.now(), budget: startHoldBudget(), rev: runtimeRevNow() })) ?? startPreflight();
 const kernelRotation = createKernelRotation({ workflowId, openLedger: withKernelLedger, close: closeKernelTerminal, replace: replaceKernel, sender: launchableSender, hold: startHold });
 const kernelTick = createKernelTick({ api, kernelRotation, workflowId, repair, lostSeatWorker, exitedTwice, stopAndRelease, replaceKernel,
   workerShow, DEAD_WORKER_STATE, settledKernelVerdict, DEAD_VERDICTS, terminalRead, classifyKernelScreen, outputAgeOf,

@@ -48,7 +48,7 @@ export function createKernelRotation({ workflowId, openLedger, close, replace, s
     if (!launchable.ok) return { ok: true, ...base, action: 'replacement-unlaunchable', reason: launchable.reason, error: launchable.error };
     // The seat that works is not closed while no start may run: a launch backing off or held for its cause would leave the workflow without a Kernel.
     const held = hold();
-    if (held) return { ok: true, ...base, action: 'replacement-held', reason: `${rotation.reason}; the start is ${held.state} (${held.count} launch(es) failed at ${held.step} for ${held.reason ?? 'one cause'}), the seat stays`, hold: held };
+    if (held) return { ok: true, ...base, action: 'replacement-held', reason: `${rotation.reason}; the start is ${held.state} (${held.count} at ${held.step}: ${held.reason ?? 'one cause'}), the seat stays`, hold: held };
     const terminalClosed = close(terminal, dispatch);
     if (!terminalClosed.ok) return { ...base, terminalClosed, ok: false, action: 'kernel-terminal-close-failed', error: terminalClosed.error ?? 'the rotated kernel terminal could not be closed' };
     openLedger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, kind: rule.event, payload: { terminal, reason: rotation.reason } })));

@@ -132,7 +132,7 @@ test('a cold non-Git UI installs through the native npm API with its private env
   const manifests = ['package.json', 'package-lock.json'].map((name) => fs.readFileSync(path.join(fixture.ui, name)));
   t.mock.method(childProcess, 'spawnSync', (binary, args, options) => {
     calls.push('ci');
-    assert.ok(args.includes('ci'), 'the actual ci call file reaches the npm runner');
+    assert.ok(args.includes('install') && !args.includes('ci'), 'the non-destructive install reaches the npm runner, never npm ci over a node_modules a process may hold');
     assert.ok(args.includes('--prefer-offline') && args.includes('--no-audit') && args.includes('--no-fund'));
     assert.equal(options.cwd, fixture.ui);
     assert.equal(options.env.STARCI_UI_BOOTSTRAP_PROBE, 'private-fixture', 'the owning API forwards the host private environment to npmSpawn');
@@ -172,7 +172,7 @@ test('a warm real local UI toolchain skips installation, while an incomplete nod
     else fs.mkdirSync(path.join(fixture.ui, 'node_modules'));
     const result = await buildUi({ uiDir: fixture.ui }, {
       underHostLock: async (options, run) => ({ ok: true, value: await run() }),
-      ci: async () => { calls.push('ci'); fixture.tools(); return { ok: true, status: 0 }; },
+      install: async () => { calls.push('ci'); fixture.tools(); return { ok: true, status: 0 }; },
       npm: () => { calls.push('build'); return { status: 0 }; },
     });
     assert.equal(result.ok, true);
@@ -186,7 +186,7 @@ test('failed, unknown or incomplete UI installation cannot reach build or report
     let builds = 0;
     const result = await buildUi({ uiDir: fixture.ui }, {
       underHostLock: async (options, run) => ({ ok: true, value: await run() }),
-      ci: async () => { if (outcome instanceof Error) throw outcome; return outcome; },
+      install: async () => { if (outcome instanceof Error) throw outcome; return outcome; },
       npm: () => { builds++; return { status: 0 }; },
     });
     assert.equal(result.ok, false);
@@ -200,7 +200,7 @@ test('UI installation that changes a manifest is red even with a zero npm receip
   let builds = 0;
   const result = await buildUi({ uiDir: fixture.ui }, {
     underHostLock: async (options, run) => ({ ok: true, value: await run() }),
-    ci: async () => { fixture.tools(); fs.appendFileSync(path.join(fixture.ui, 'package-lock.json'), 'changed'); return { ok: true, status: 0 }; },
+    install: async () => { fixture.tools(); fs.appendFileSync(path.join(fixture.ui, 'package-lock.json'), 'changed'); return { ok: true, status: 0 }; },
     npm: () => { builds++; return { status: 0 }; },
   });
   assert.equal(result.ok, false);
@@ -226,7 +226,7 @@ test('linked UI ancestors, node_modules and tool directories cannot borrow a too
     const calls = [];
     const result = await buildUi({ uiDir }, {
       underHostLock: async (options, run) => ({ ok: true, value: await run() }),
-      ci: () => { calls.push('ci'); return { ok: true, status: 0 }; },
+      install: () => { calls.push('ci'); return { ok: true, status: 0 }; },
       npm: () => { calls.push('build'); return { status: 0 }; },
     });
     assert.equal(result.ok, false);
@@ -238,7 +238,7 @@ test('a held host lock refuses UI work and a failed awaited build blocks subsequ
   const calls = [], env = { STARCI_UI_BOOTSTRAP_PROBE: 'private-fixture' };
   const held = await buildUi({ env }, {
     underHostLock: async () => ({ ok: false, reason: 'held' }),
-    ci: () => { calls.push('ci'); }, npm: () => { calls.push('build'); },
+    install: () => { calls.push('ci'); }, npm: () => { calls.push('build'); },
   });
   assert.equal(held.ok, false);
   assert.match(held.output, /host lock refused.*held/);

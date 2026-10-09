@@ -17502,3 +17502,13 @@ RUNTIME_TREE_TARGET_FOREIGN:
   nextStep_vi: "Đặt STARCI_RUNTIME tới cây cần ghi (hoặc truyền --root nếu verb có cờ đó) rồi chạy lại."
   owner: runtime-core
   kind: verb-refusal
+deploy-ui-install-failed:
+  title: "A deploy changed the harness UI dependencies and the host could not install and build them"
+  title_vi: "Deploy đổi phụ thuộc của giao diện harness nhưng host không cài và build được"
+  meaning_vi: "ui/package.json hoặc ui/package-lock.json đổi trong dải deploy; sau khi fast-forward, cây mới chạy starci reconciler up --services (cài không phá hủy rồi build) và việc đó đỏ. Cây đã được di chuyển, engine chưa restart."
+  causes_vi:
+    - "Một phụ thuộc mới của ui không cài được trên host (mạng, tệp bị tiến trình giữ)"
+    - "Build của ui lỗi với phụ thuộc mới"
+  nextStep_vi: "Đọc dòng lỗi (thiếu module hoặc tệp bị giữ), sửa nguyên nhân rồi chạy lại starci reconciler up --services; Kernel không phụ thuộc vào UI nên workflow không bị chặn."
+  owner: runtime-core
+  kind: runtime-fault

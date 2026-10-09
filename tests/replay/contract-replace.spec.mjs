@@ -32,9 +32,9 @@ function deployed(t) {
   world.reviseRuntime(changed, 'a revision that reverses a rule of the Kernel contract');
   return world;
 }
-const watchdog = (world) => {
+const watchdog = (world, extraEnv = {}) => {
   const run = spawnSync(process.execPath, ['--import', HANGS, WATCHDOG, '--repo', world.repo, '--workflow', world.wf, '--once', '--repair', '--json'],
-    { cwd: ROOT, encoding: 'utf8', env: { ...world.env, ORCA_TERMINAL_HANDLE: 'term-kernel-current' }, timeout: 300_000 });
+    { cwd: ROOT, encoding: 'utf8', env: { ...world.env, ORCA_TERMINAL_HANDLE: 'term-kernel-current', ...extraEnv }, timeout: 300_000 });
   assert.ok(run.stdout.trim(), `watchdog said nothing (exit ${run.status}): ${run.stderr.slice(0, 800)}`);
   return { status: run.status, answer: JSON.parse(run.stdout.trim().split(/\r?\n/).at(-1)) };
 };
@@ -65,5 +65,27 @@ test('while the launches of this revision are held for their cause, the working 
   assert.equal(answer.action, 'replacement-held', 'the replacement waits for a start that may run');
   assert.equal(answer.terminalClosed, undefined, 'the seat that works was not closed');
   assert.equal(events(world, 'kernel-rotated').length, 0, 'no replacement was recorded');
+  assert.equal(world.orca().terminals['term-kernel-current'].closed, undefined, 'the Kernel terminal is still open');
+});
+
+test('a start refused because the host is not ready (the harness UI build was red on the live host) is named by its step and message, journalled, and the digest says why the Kernel is not restarted', (t) => {
+  const world = deployed(t);
+  const refusal = { ok: false, step: 'workflow-host-not-ready', workflowId: world.wf, error: 'host readiness: services/ui-build red: ui build FAILED: Cannot find module @heroui/react' };
+  const { answer } = watchdog(world, { STARCI_REPLAY_START_ANSWER: JSON.stringify(refusal) });
+  assert.equal(answer.action, 'restart-failed');
+  assert.equal(answer.reason, 'workflow-host-not-ready');
+  assert.match(answer.error, /^Kernel start refused at workflow-host-not-ready: host readiness: services\/ui-build red/);
+  assert.equal(answer.detail.step, 'workflow-host-not-ready', 'the whole refusal rides in the detail');
+  const [failed] = events(world, 'kernel-start-failed');
+  assert.deepEqual([failed.step, failed.runtimeRev], ['workflow-host-not-ready', runtimeRevNow()], 'journalled although the start itself recorded nothing');
+  assert.match(failed.error, /Cannot find module/);
+});
+
+test('a host that cannot start a Kernel (a required readiness row red) keeps the working Kernel: the replacement is held, nothing closed', (t) => {
+  const world = deployed(t);
+  const { answer } = watchdog(world, { STARCI_REPLAY_HOST_RED: 'orca' });
+  assert.equal(answer.action, 'replacement-held');
+  assert.ok(answer.reason.includes('the start is not-ready (1 at workflow-host-not-ready: orca: orca is red), the seat stays'), answer.reason);
+  assert.equal(events(world, 'kernel-rotated').length, 0);
   assert.equal(world.orca().terminals['term-kernel-current'].closed, undefined, 'the Kernel terminal is still open');
 });

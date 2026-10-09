@@ -1,0 +1,10 @@
+schema: starci/module-reconciler-readiness@1
+id: reconciler.readiness
+# Which consumers a readiness row of `starci reconciler up` gates. A required red row blocks the consumer it gates and no other: the start of a workflow's Kernel
+# (consumer kernel-start, scripts/kernel/workflow-startup.mjs ensureWorkflowHost through workflow-up.mjs) needs the host its Kernel runs on - Orca, the ledgers, the
+# guard, the engine, the provider pins - and never the harness UI, which only the owner's screen reads. A row not listed here gates every consumer.
+consumers: [kernel-start, harness]
+rows:
+  - {id: ui-build, gates: [harness], why: "the built harness UI (ui/dist) is read by the owner's screen only"}
+  - {id: harness-ui, gates: [harness], why: "the harness UI server serves the owner's screen only"}
+  - {id: harness-tunnel, gates: [harness], why: "the public tunnel of the harness UI"}
