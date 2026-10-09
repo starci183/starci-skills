@@ -5,7 +5,6 @@ import fs from 'node:fs';
 import { ledgerFileFor, openLedgerReader } from '../../engine/db/ledger.mjs';
 import { artifactRoot } from '../../engine/db/blob.mjs';
 import { eventPayloadOf } from '../../engine/db/event-payload.mjs';
-import { prepareStored } from '../../engine/db/ref-value.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { jobPayload, jobRunIds, jobTerminalHandles, KERNEL_LAUNCH_EVENTS } from './terminal-ledger.mjs';
 import { SETTLED_JOBS } from './worktree-registry.mjs';
@@ -27,7 +26,7 @@ function jobsOf(db, workflowId) {
 }
 
 // The payloads of the workflow's evidence events, newest first.
-const evidencePayloadsOf = (db, workflowId, root) => prepareStored(db, `SELECT kind, payload_json, payload_sha FROM events WHERE workflow_id=? AND kind IN (${EVIDENCE_EVENTS.map(() => '?').join(',')}) ORDER BY seq DESC`)
+const evidencePayloadsOf = (db, workflowId, root) => db.prepare(`SELECT kind, CASE WHEN payload_sha IS NULL THEN payload_json END AS payload_json, payload_sha FROM events WHERE workflow_id=? AND kind IN (${EVIDENCE_EVENTS.map(() => '?').join(',')}) ORDER BY seq DESC`)
   .all(workflowId, ...EVIDENCE_EVENTS).map((row) => ({ kind: row.kind, payload: eventPayloadOf(row, { root }) ?? {} }));
 
 const kernelSignalOf = (db, workflowId) => {

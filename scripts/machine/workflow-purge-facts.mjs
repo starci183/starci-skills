@@ -7,7 +7,6 @@ import path from 'node:path';
 import { starciLocalRoot } from '../../engine/runtime-root.mjs';
 import { artifactRoot } from '../../engine/db/blob.mjs';
 import { eventPayloadOf } from '../../engine/db/event-payload.mjs';
-import { prepareStored } from '../../engine/db/ref-value.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { parseRuntimeStamp, psCoverage } from '../lib/orca-orphans.mjs';
 import { worktreePs } from '../api/orca/worktree-ps.mjs';
@@ -37,7 +36,7 @@ function machineFactsOf(workflowId, env) {
       .map((di) => ({ diId: di.di_id, kind: di.kind, status: di.status })),
     purgedAt: m.db.prepare("SELECT created_at FROM sup_events WHERE kind='workflow-purged' AND entity_type='workflow' AND entity_id=? ORDER BY seq DESC LIMIT 1").get(workflowId)?.created_at ?? null,
     // A launch that failed after the stop is journalled here, not in the archived ledger (an archived ledger takes no event).
-    launchFailures: prepareStored(m.db, "SELECT payload_json, payload_sha FROM sup_events WHERE kind='kernel-start-failed' AND entity_id=? ORDER BY seq").all(workflowId).map((row) => eventPayloadOf(row, { root: artifactRoot(env) }) ?? {}),
+    launchFailures: m.db.prepare("SELECT CASE WHEN payload_sha IS NULL THEN payload_json END AS payload_json, payload_sha FROM sup_events WHERE kind='kernel-start-failed' AND entity_id=? ORDER BY seq").all(workflowId).map((row) => eventPayloadOf(row, { root: artifactRoot(env) }) ?? {}),
     inProgress: parseJson(m.db.prepare('SELECT value FROM machine_meta WHERE key=?').get(purgeMetaKey(workflowId))?.value, null),
   }), env);
 }
