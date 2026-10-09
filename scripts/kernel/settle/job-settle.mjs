@@ -54,6 +54,7 @@ import { reconcileAttemptPlacements } from '../attempt-placement.mjs';
 import { currentRuntimeRev } from '../runtime-rev.mjs';
 import { releaseEndedGates, recordGateRejudged } from '../gate-holds-ended.mjs';
 import { kernelTerminalOf, runtimeCriticFor } from './critic-run.mjs';
+import { recoverPreparedSettlement } from './prepared-recovery.mjs';
 import { settlerSettings, runtimeEnv, verifyReported, recordSettlerCheck, parse, slug, jsonOf } from './job-settle-verify.mjs';
 import { tempRoot } from '../../../engine/temp-root.mjs';
 export { classifyCheck, argvOf } from './check-command.mjs';
@@ -164,7 +165,7 @@ async function checkerUnavailable(ledger, item, verdict, { now, settings }) {
 function handToKernel(ledger, item, verdict, { now }) {
   const prior = kernelHandoverOf(ledger.db, item);
   const runtimeRev = currentRuntimeRev();
-  if (prior?.reason === verdict.reason && (prior.runtimeRev ?? null) === runtimeRev) return { jobId: item.jobId, state: STATES.kernel, reason: verdict.reason, recorded: false };
+  if (prior?.reason === verdict.reason && (prior.code ?? null) === (verdict.code ?? null) && (prior.runtimeRev ?? null) === runtimeRev) return { jobId: item.jobId, state: STATES.kernel, reason: verdict.reason, recorded: false };
   event(ledger, item, EVENTS.needsKernel, { from: STATES.reported, to: STATES.kernel, op: item.op, attempt: item.attempt, outcome: item.outcome,
     reason: verdict.reason, runtimeRev, ...(verdict.detail ? { detail: verdict.detail } : {}), ...(verdict.code ? { code: verdict.code } : {}), ageMs: now - item.filedAt });
   ledger.transaction(() => recordGateRejudged(ledger.db, item.workflowId, item.jobId, { reason: verdict.reason, detail: verdict.detail ?? [], at: now }));
@@ -293,6 +294,8 @@ async function settleItem(ledger, item, out, { repo, abs, settings, env, now, dr
     const fresh = reportedJobs(ledger.db, { jobId: item.jobId })[0];
     if (!fresh) { out.skipped.push({ jobId: item.jobId, reason: 'no-longer-reported' }); return; }
     if (settlePlacement(ledger, fresh, { env, dryRun })?.ended.length) { out.skipped.push({ jobId: item.jobId, reason: 'placement-lost' }); return; }
+    // A prepared fail decision whose apply never completed blocks every later settle of the attempt: the runtime withdraws one that aims at a base the tree no longer has.
+    if (!dryRun) recoverPreparedSettlement(ledger, fresh, { env, now: now() });
     const done = await settleReported(ledger, fresh, { repo: abs, settings, env, now, dryRun, verify, api, critic: { tree: dryRun ? null : workflowWorktreeOf({ env }, fresh.workflowId)?.path ?? null, seams: criticSeams } });
     out[done.target].push(done.row);
   } catch (error) {

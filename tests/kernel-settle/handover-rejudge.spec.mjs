@@ -239,3 +239,30 @@ test('the read-only work checks an op\'s own contract names are re-run by the se
   assert.equal(classifyCheck({ command: 'starci work layout-render --root x' }, { skillRoot: root }).kind, 'foreign', 'a work verb that is not a declared read-only check stays foreign');
   assert.equal(classifyCheck({ command: 'starci work brand .starciwork --write' }, { skillRoot: root }).kind, 'foreign', 'a mutating flag is never re-run');
 });
+
+const appendTo = (fx, kind, payload) => { const writer = openLedger({ file: fx.file }); try { writer.transaction(() => writer.appendEvent({ workflowId: 'wf-x', entityType: 'job', entityId: 'op-a', attemptId: fx.attemptId, kind, payload })); } finally { writer.close(); } };
+
+test('a report refused only because a prepared decision of its attempt was never applied is the settler\'s to look at once; a new refusal code of the same reason is recorded', async (t) => {
+  const fx = reportedFixture({ reason: 'settle-refused', code: 'workflow-checkpoint-recovery-conflict', runtimeRev: LIVE_REV });
+  t.after(fx.close);
+  assert.equal(stepOf(fx).kind, 'settle-nongreen', 'nothing prepared: the Kernel\'s item');
+  appendTo(fx, 'workflow-op-preserved-prepared', { resetTo: 'a'.repeat(40) });
+  const step = stepOf(fx);
+  assert.deepEqual([step.kind, step.rejudge], ['settle', true], 'a prepared receipt that nobody looked at yet');
+  appendTo(fx, 'workflow-op-preserved-withdrawn', { code: 'prepared-settlement-withdrawn' });
+  assert.equal(stepOf(fx).kind, 'settle-nongreen', 'looked at: the loop ends');
+
+  await withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {
+    gatedWorld(ledger, { jobId: 'op-code', gated: false });
+    ledger.transaction(() => ledger.appendEvent({ workflowId: 'wf-n', entityType: 'job', entityId: 'op-code', kind: EVENTS.needsKernel,
+      payload: { dispatchId: ledger.db.prepare('SELECT dispatch_id FROM op_attempts WHERE job_id=?').get('op-code').dispatch_id, reason: 'settle-refused', code: 'workflow-checkpoint-recovery-conflict', runtimeRev: currentRuntimeRev() } }));
+    ledger.close();
+    const verify = async () => ({ green: false, reason: 'settle-refused', code: 'op-critic-verdict-failed', detail: ['op-critic-verdict-failed'] });
+    const out = await reconcileJobSettle({ repo: repoRoot, jobId: 'op-code', verify, locks: false, api: () => ({ ok: true }) });
+    assert.equal(out.kernel[0].recorded, true, 'the Critic\'s failing verdict replaces the recovery refusal as the handover');
+    const reader = openLedger({ file: ledgerFile });
+    const codes = reader.db.prepare("SELECT payload_json FROM events WHERE kind=? AND entity_id='op-code' ORDER BY seq").all(EVENTS.needsKernel).map((row) => JSON.parse(row.payload_json).code);
+    reader.close();
+    assert.deepEqual(codes, ['workflow-checkpoint-recovery-conflict', 'op-critic-verdict-failed']);
+  });
+});

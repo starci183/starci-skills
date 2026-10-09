@@ -51,6 +51,8 @@ import { ownerOnlyQuestion } from '../../kernel/op-incident-policy.mjs';
 import { TERMINAL_HOLDS, holdView, terminalFactsOf } from '../../kernel/terminal-step.mjs';
 import { runMechanicalMoves } from '../mechanical-moves.mjs';
 import { planReport } from '../job-plan-report.mjs';
+import { openPreparedOf } from '../../kernel/settle/prepared-recovery.mjs';
+import { RECOVERY_CONFLICT } from '../job-plan-report.mjs';
 import { currentRuntimeRev } from '../../kernel/runtime-rev.mjs';
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
@@ -135,7 +137,8 @@ export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings()
     jobId: row.job_id, workflowId: row.workflow_id, op: row.op_id, attempt: row.attempt, status: row.status, workerId: row.worker_id,
     payload, createdAt: Number(row.created_at), updatedAt: Number(row.updated_at),
     report: reported ? { dispatchId: reported.dispatchId, outcome: reported.outcome, filedAt: reported.filedAt, consumedAt: reported.consumedAt } : null,
-    handover: handover ? { reason: handover.reason ?? null, detail: handover.detail ?? null, at: handover.at, runtimeRev: handover.runtimeRev ?? null } : null,
+    handover: handover ? { reason: handover.reason ?? null, code: handover.code ?? null, detail: handover.detail ?? null, at: handover.at, runtimeRev: handover.runtimeRev ?? null } : null,
+    preparedOpen: handover?.code === RECOVERY_CONFLICT && openPreparedOf(db, jobId, { read: false }) != null,
     runtimeRev,
     released, releaseProof: releaseProofOf(payload), settledAt: SETTLED.includes(row.status) ? Number(payload.settledAt ?? row.updated_at) : null,
     dispatchedAt: lastEventAt('op-dispatched'), questionAt: lastEventAt('worker-question-bridged'), now, windowMs: settings.settledWindowMs,

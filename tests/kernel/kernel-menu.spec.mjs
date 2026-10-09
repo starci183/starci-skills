@@ -123,6 +123,15 @@ test('a settle refused only because a gate is newer than the admission of its jo
   handover(again, 'op-critic-verdict-missing');
   again.close();
   assert.deepEqual(status(world).menu, [], 'the runtime owes the Critic verdict (op-critic-verdict-missing): not a choice of the Kernel');
+  const recovery = openLedger({ file: world.ledgerFile });
+  recovery.transaction(() => recovery.appendEvent({ workflowId: WF, entityType: 'job', entityId: REPORTED, attemptId, kind: 'job-settle-needs-kernel',
+    payload: { dispatchId, reason: 'settle-refused', code: 'workflow-checkpoint-recovery-conflict', detail: ['settle must recover its prepared fail decision'], outcome: 'done', op: 'architecture.decide' } }));
+  recovery.close();
+  assert.deepEqual(status(world).menu, [], 'a prepared decision never applied is withdrawn by the settler: not a choice of the Kernel');
+  const kept = openLedger({ file: world.ledgerFile });
+  kept.transaction(() => kept.appendEvent({ workflowId: WF, entityType: 'job', entityId: REPORTED, attemptId, kind: 'workflow-op-preserved-kept', payload: { reason: 'the receipt aims at the live gate base' } }));
+  kept.close();
+  assert.deepEqual(status(world).menu.map((item) => item.id), [`job-decision:${REPORTED}`], 'a receipt the runtime kept is an apply for the Kernel to finish');
   const last = openLedger({ file: world.ledgerFile });
   handover(last, 'gate-newer-than-admission');
   last.close();

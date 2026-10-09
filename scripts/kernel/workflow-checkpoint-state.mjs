@@ -19,7 +19,7 @@ const SHA = /^[0-9a-f]{40,64}$/;
 const fail = ({ code }, message) => Object.assign(new Error(message), { code });
 export const literalPaths = (files) => files.map((file) => `:(literal)${file}`);
 
-function receiptPayload(row) {
+export function receiptPayload(row) {
   return row?.payload_sha ? JSON.parse(getBlob(row.payload_sha).toString('utf8')) : parseJson(row?.payload_json) ?? null;
 }
 export function appendEffectEvent(ctx, args) {
@@ -34,7 +34,11 @@ export function appendEffectEvent(ctx, args) {
     });
   }
 }
-export const preparedSettlementOf = (ctx, { workflowId, opId, attemptId }) => receiptPayload(ctx.db.prepare("SELECT payload_json,payload_sha FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=? AND attempt_id IS ? AND kind IN ('workflow-checkpoint-prepared','workflow-op-preserved-prepared') ORDER BY seq DESC LIMIT 1").get(workflowId, opId, attemptId))?.settlement ?? null;
+/** The event kind that withdraws a prepared preserve receipt the runtime found void (scripts/kernel/settle/prepared-recovery.mjs). */
+export const PREPARED_WITHDRAWN = 'workflow-op-preserved-withdrawn';
+// A prepared receipt counts only while no withdrawal of its attempt is newer than it.
+const NOT_WITHDRAWN = `AND seq>COALESCE((SELECT MAX(w.seq) FROM events w WHERE w.workflow_id=events.workflow_id AND w.entity_id=events.entity_id AND w.attempt_id IS events.attempt_id AND w.kind='${PREPARED_WITHDRAWN}'),0)`;
+export const preparedSettlementOf = (ctx, { workflowId, opId, attemptId }) => receiptPayload(ctx.db.prepare(`SELECT payload_json,payload_sha FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=? AND attempt_id IS ? AND kind IN ('workflow-checkpoint-prepared','workflow-op-preserved-prepared') ${NOT_WITHDRAWN} ORDER BY seq DESC LIMIT 1`).get(workflowId, opId, attemptId))?.settlement ?? null;
 
 /** Read the prepared/applied receipt for the same job dispatch attempt. */
 export function receiptState(ctx, { workflowId, opId }, kind) {
@@ -44,9 +48,9 @@ export function receiptState(ctx, { workflowId, opId }, kind) {
     ? ctx.db.prepare('SELECT attempt_id, dispatch_id FROM op_attempts WHERE workflow_id=? AND job_id=? ORDER BY attempt_id DESC LIMIT 1').get(workflowId, opId)
     : ctx.db.prepare('SELECT attempt_id, dispatch_id FROM op_attempts WHERE workflow_id=? AND job_id=? AND attempt_id=?').get(workflowId, opId, acceptedAttempt);
   const identity = { workflowId, opId, attemptId: attempt?.attempt_id ?? null, dispatchId: attempt?.dispatch_id ?? null };
-  const other = ctx.db.prepare("SELECT kind FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=? AND attempt_id IS ? AND kind IN ('workflow-checkpoint-prepared','workflow-op-preserved-prepared') AND kind<>? LIMIT 1").get(workflowId, opId, identity.attemptId, `${kind}-prepared`);
+  const other = ctx.db.prepare(`SELECT kind FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=? AND attempt_id IS ? AND kind IN ('workflow-checkpoint-prepared','workflow-op-preserved-prepared') AND kind<>? ${NOT_WITHDRAWN} LIMIT 1`).get(workflowId, opId, identity.attemptId, `${kind}-prepared`);
   if (other) throw fail({ code: 'workflow-checkpoint-recovery-conflict' }, `dispatch ${identity.dispatchId ?? opId} must recover its ${other.kind} effect before changing its verdict`);
-  const read = (phase) => receiptPayload(ctx.db.prepare("SELECT payload_json,payload_sha FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=? AND attempt_id IS ? AND kind=? ORDER BY seq DESC LIMIT 1").get(workflowId, opId, identity.attemptId, `${kind}-${phase}`));
+  const read = (phase) => receiptPayload(ctx.db.prepare(`SELECT payload_json,payload_sha FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=? AND attempt_id IS ? AND kind=? ${phase === 'prepared' ? NOT_WITHDRAWN : ''} ORDER BY seq DESC LIMIT 1`).get(workflowId, opId, identity.attemptId, `${kind}-${phase}`));
   return { identity, prepared: read('prepared'), applied: read('applied') };
 }
 export function saveReceipt(ctx, kind, phase, receipt) {

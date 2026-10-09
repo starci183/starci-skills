@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { mergeBase } from '../api/git/merge-base.mjs';
 import { diffNames } from '../api/git/diff-names.mjs';
+import { log as gitLog } from '../api/git/log.mjs';
 import { revParse as gitRevParse } from '../api/git/rev-parse.mjs';
 import { withMachine } from '../../engine/db/machine.mjs';
 import { isInside } from '../lib/walk.mjs';
@@ -63,8 +64,26 @@ export function gateBaseAt(ctx, dir) {
 }
 
 /** The base an op's gate measures against: the previous checkpoint, else the merge-base of the workflow branch with main. */
+/**
+ * The newest checkpoint commit of the workflow's own chain on the branch (subject `checkpoint <workflowId>: ...`, first-parent line from HEAD), or null. A registry
+ * record that lost its checkpoint pointer (a tree put back by the custody repair) must not fall back to the merge-base with main: that would put the base of
+ * every settled op's gate, and the target of a reset, behind the work those ops committed.
+ */
+export function chainCheckpointOf(rec) {
+  const r = gitLog(['--first-parent', '--format=%H%x09%s', '-n', '256', 'HEAD'], { cwd: rec.path, timeout: 30_000 });
+  if (r.status !== 0) return null;
+  const prefix = `checkpoint ${rec.workflowId}:`;
+  for (const line of String(r.stdout ?? '').split(/\r?\n/)) {
+    const [sha, subject] = line.split('\t');
+    if (SHA.test(sha ?? '') && subject?.startsWith(prefix)) return sha;
+  }
+  return null;
+}
+
 export function gateBaseOf(ctx, workflowId) {
   const rec = presentRecordOf(ctx, workflowId);
+  const chained = rec.checkpoint ? null : chainCheckpointOf(rec);
+  if (chained) return chained;
   if (rec.checkpoint) {
     const sha = revParse(rec.path, rec.checkpoint);
     if (!sha) throw fail({ code: 'workflow-gate-base-unknown' }, `the checkpoint ${rec.checkpoint} of workflow ${workflowId} is not a commit of ${rec.path}`);

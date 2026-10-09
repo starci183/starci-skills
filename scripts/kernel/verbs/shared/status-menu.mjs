@@ -16,8 +16,12 @@ const OWN_KIND = new Set(['worker-question', 'rev-ack', 'unread-peer', 'supervis
 const withFailure = (db, resolution) => (resolution.jobId ? { ...resolution, failure: failureFactsOf(db, resolution.jobId) } : resolution);
 
 const RUNTIME_OWED_CODES = new Set(['gate-newer-than-admission', 'op-critic-verdict-missing']);
+// A prepared fail decision never applied (workflow-checkpoint-recovery-conflict) is the settler's to withdraw when void; once it kept the receipt, finishing the apply is the Kernel's.
+const RECOVERY_CONFLICT = 'workflow-checkpoint-recovery-conflict';
 /** Whether the settle of a handed-over job is the runtime's to finish. */
-const runtimeOwned = (db, item) => (item.detail ?? []).some((code) => RUNTIME_OWED_CODES.has(code))
+const codesOf = (item) => [item.code, ...(item.detail ?? [])].filter(Boolean);
+const runtimeOwned = (db, item) => codesOf(item).some((code) => RUNTIME_OWED_CODES.has(code))
+  || (codesOf(item).includes(RECOVERY_CONFLICT) && db.prepare("SELECT 1 FROM events WHERE entity_id=? AND kind='workflow-op-preserved-kept' AND seq>(SELECT COALESCE(MAX(seq),0) FROM events WHERE entity_id=? AND kind='job-settle-needs-kernel') LIMIT 1").get(item.jobId, item.jobId) == null)
   || db.prepare("SELECT 1 FROM events WHERE entity_id=? AND kind='job-settle-check-unavailable' AND seq>(SELECT COALESCE(MAX(seq),0) FROM events WHERE entity_id=? AND kind='job-settle-needs-kernel') LIMIT 1").get(item.jobId, item.jobId) != null;
 
 /**
