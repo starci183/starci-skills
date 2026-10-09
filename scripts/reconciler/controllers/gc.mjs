@@ -486,8 +486,7 @@ export function createGcController(overrides = {}) {
     async reconcile(key, ctx) {
       const k = parseKey(key);
       // The engine runs this controller only when it is not off; ctx.mode decides act (active) or record (shadow).
-      const keyed = { sweep: reconcileSweep, housekeeping: reconcileHousekeeping, 'blob-sweep': reconcileBlobSweep, worktrees: reconcileWorktrees,
-        'tree-strays': (c) => reconcileTreeStrays(c, { settings, deps, name: NAME, would }) }[k.type];
+      const keyed = { sweep: reconcileSweep, housekeeping: reconcileHousekeeping, 'blob-sweep': reconcileBlobSweep, worktrees: reconcileWorktrees, 'tree-strays': (c) => reconcileTreeStrays(c, { settings, deps, name: NAME, would }) }[k.type];
       if (keyed) return keyed(ctx);
       if (k.type === 'job') return reconcileJob(ctx, k);
       if (k.type === 'workflow') return reconcileWorkflow(ctx, k);
