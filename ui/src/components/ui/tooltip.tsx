@@ -1,55 +1,43 @@
-
 import * as React from "react"
+import { Tooltip as HeroTooltip } from "@heroui/react"
 import { cn } from "@/lib/utils"
-import { Tooltip as TooltipPrimitive } from "radix-ui"
 
-function TooltipProvider({
-  delayDuration = 0,
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
-  return (
-    <TooltipPrimitive.Provider
-      data-slot="tooltip-provider"
-      delayDuration={delayDuration}
-      {...props}
-    />
-  )
+const DelayContext = React.createContext(0)
+
+function TooltipProvider({ delayDuration = 0, children }: { delayDuration?: number; children?: React.ReactNode }) {
+  return <DelayContext value={delayDuration}>{children}</DelayContext>
 }
 
-function Tooltip({
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Root>) {
-  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+function Tooltip({ open, delayDuration, ...props }:
+  Omit<React.ComponentProps<typeof HeroTooltip.Root>, "isOpen" | "delay"> & { open?: boolean; delayDuration?: number }) {
+  const delay = React.useContext(DelayContext)
+  return <HeroTooltip.Root isOpen={open} delay={delayDuration ?? delay} {...props} />
 }
 
-function TooltipTrigger({
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
-  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
+function TooltipTrigger({ asChild = false, children, ...props }:
+  React.ComponentProps<"button"> & { asChild?: boolean }) {
+  // A HeroUI Button or Link reads the vendor's focus/hover context without cloning.
+  if (asChild) return <>{children}</>
+  return <HeroTooltip.Trigger<"button"> data-ui="tooltip-trigger" {...props}
+    render={triggerProps => <button {...triggerProps} type={props.type ?? "button"} />}>
+    {children}
+  </HeroTooltip.Trigger>
 }
 
-function TooltipContent({
-  className,
-  sideOffset = 0,
-  children,
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Content>) {
-  return (
-    <TooltipPrimitive.Portal>
-      <TooltipPrimitive.Content
-        data-slot="tooltip-content"
-        sideOffset={sideOffset}
-        className={cn(
-          "z-50 inline-flex w-fit max-w-xs origin-(--radix-tooltip-content-transform-origin) items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs text-background has-data-[slot=kbd]:pr-1.5 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 **:data-[slot=kbd]:relative **:data-[slot=kbd]:isolate **:data-[slot=kbd]:z-50 **:data-[slot=kbd]:rounded-sm data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-          className
-        )}
-        {...props}
-      >
-        {children}
-        <TooltipPrimitive.Arrow className="z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px] bg-foreground fill-foreground" />
-      </TooltipPrimitive.Content>
-    </TooltipPrimitive.Portal>
-  )
+function TooltipContent({ className, side = "top", align = "center", sideOffset, children, hidden, placement, offset, showArrow = true, ...props }:
+  React.ComponentProps<typeof HeroTooltip.Content> & {
+    side?: "top" | "right" | "bottom" | "left"
+    align?: "start" | "center" | "end"
+    sideOffset?: number
+    hidden?: boolean
+  }) {
+  const alignment = side === 'left' || side === 'right' ? align === 'start' ? 'top' : 'bottom' : align
+  const resolvedPlacement = align === 'center' ? side : `${side} ${alignment}` as NonNullable<React.ComponentProps<typeof HeroTooltip.Content>['placement']>
+  if (hidden) return null
+  return <HeroTooltip.Content data-ui="tooltip-content" placement={placement ?? resolvedPlacement}
+    offset={offset ?? sideOffset} showArrow={showArrow} className={cn("max-w-xs text-xs", className)} {...props}>
+    {children}{showArrow && <HeroTooltip.Arrow />}
+  </HeroTooltip.Content>
 }
 
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger }

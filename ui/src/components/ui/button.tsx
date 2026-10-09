@@ -1,66 +1,95 @@
 import * as React from "react"
+import { Button as HeroButton, Link as HeroLink, buttonVariants as heroButtonVariants, type ButtonProps as HeroButtonProps, type LinkProps as HeroLinkProps } from "@heroui/react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
-import { Slot } from "radix-ui"
 
-const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-sm border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/80",
-        outline:
-          "border-border bg-background shadow-none hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
-        ghost:
-          "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
-        destructive:
-          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
-        default:
-          "h-8 gap-1.5 px-2.5 in-data-[slot=button-group]:rounded-sm has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        xs: "h-6 gap-1 rounded-[min(var(--radius-md),8px)] px-2 text-xs in-data-[slot=button-group]:rounded-sm has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1 rounded-[min(var(--radius-md),10px)] px-2.5 in-data-[slot=button-group]:rounded-sm has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5",
-        lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        icon: "size-8",
-        "icon-xs":
-          "size-6 rounded-[min(var(--radius-md),8px)] in-data-[slot=button-group]:rounded-sm [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm":
-          "size-7 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-sm",
-        "icon-lg": "size-9",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
+const compatibilityVariants = cva("group/button", {
+  variants: {
+    variant: { default: "", outline: "", secondary: "", ghost: "", destructive: "", link: "underline-offset-4 hover:underline" },
+    size: { default: "", xs: "text-xs", sm: "", lg: "", icon: "", "icon-xs": "", "icon-sm": "", "icon-lg": "" },
+  },
+  defaultVariants: { variant: "default", size: "default" },
+})
+
+type CompatibilityVariants = VariantProps<typeof compatibilityVariants>
+type CompatibilityProps = CompatibilityVariants & {
+  disabled?: boolean
+  className?: string
+  style?: React.CSSProperties
+  title?: string
+}
+type ButtonControlProps = Omit<HeroButtonProps, "variant" | "size" | "className" | "style"> & CompatibilityProps & { asChild?: false }
+type ButtonLinkProps = Omit<HeroLinkProps, "children" | "className" | "style"> & CompatibilityProps & {
+  asChild: true
+  children: React.ReactElement<React.ComponentProps<"a">>
+  isIconOnly?: boolean
+  fullWidth?: boolean
+  type?: HeroButtonProps["type"]
+}
+type ButtonProps = ButtonControlProps | ButtonLinkProps
+
+// Native anchor callbacks retain their actual element while HeroUI owns link interactions.
+function nativeLinkProps({ onFocus, onBlur, onKeyDown, onKeyUp, onClick, ...props }: React.ComponentProps<"a">): HeroLinkProps {
+  return {
+    ...props,
+    onFocus: onFocus ? event => onFocus(event as React.FocusEvent<HTMLAnchorElement>) : undefined,
+    onBlur: onBlur ? event => onBlur(event as React.FocusEvent<HTMLAnchorElement>) : undefined,
+    onKeyDown: onKeyDown ? event => onKeyDown(event as React.KeyboardEvent<HTMLAnchorElement>) : undefined,
+    onKeyUp: onKeyUp ? event => onKeyUp(event as React.KeyboardEvent<HTMLAnchorElement>) : undefined,
+    onClick: onClick ? event => onClick(event as React.MouseEvent<HTMLAnchorElement>) : undefined,
   }
-)
+}
 
-function Button({
-  className,
-  variant = "default",
-  size = "default",
-  asChild = false,
-  ...props
-}: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean
-  }) {
-  const Comp = asChild ? Slot.Root : "button"
+function vendorVariant(variant: CompatibilityVariants["variant"]): HeroButtonProps["variant"] {
+  if (variant === "default" || !variant) return "primary"
+  if (variant === "destructive") return "danger-soft"
+  if (variant === "link") return "ghost"
+  return variant
+}
 
-  return (
-    <Comp
+function vendorSize(size: CompatibilityVariants["size"]): HeroButtonProps["size"] {
+  if (size === "lg" || size === "icon-lg") return "lg"
+  if (size === "xs" || size === "sm" || size === "icon-xs" || size === "icon-sm") return "sm"
+  return "md"
+}
+
+function buttonVariants({ variant = "default", size = "default", className, fullWidth, isIconOnly }: CompatibilityVariants & { className?: string; fullWidth?: boolean; isIconOnly?: boolean } = {}) {
+  return cn(heroButtonVariants({ variant: vendorVariant(variant), size: vendorSize(size), fullWidth, isIconOnly: isIconOnly ?? size?.startsWith("icon") }), compatibilityVariants({ variant, size }), className)
+}
+
+function Button(buttonProps: ButtonProps) {
+  if (buttonProps.asChild) {
+    const { className, variant = "default", size = "default", asChild, disabled, isDisabled, isIconOnly, fullWidth, onClick, children, type, ...props } = buttonProps
+    const { children: linkChildren, className: linkClassName, onClick: linkClick, ...linkProps } = children.props
+    return <HeroLink
+      {...nativeLinkProps(linkProps)}
+      {...props}
+      isDisabled={isDisabled ?? disabled}
       data-slot="button"
       data-variant={variant}
       data-size={size}
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    />
-  )
+      className={cn(buttonVariants({ variant, size, fullWidth, isIconOnly }), "no-underline", className, linkClassName)}
+      onClick={event => {
+        linkClick?.(event as React.MouseEvent<HTMLAnchorElement>)
+        onClick?.(event)
+      }}
+    >{linkChildren}</HeroLink>
+  }
+  const { className, variant = "default", size = "default", asChild, disabled, isDisabled, isIconOnly, onClick, children, type = "button", ...props } = buttonProps
+  return <HeroButton
+    {...props}
+    type={type}
+    isDisabled={isDisabled ?? disabled}
+    variant={vendorVariant(variant)}
+    size={vendorSize(size)}
+    isIconOnly={isIconOnly ?? size?.startsWith("icon")}
+    data-slot="button"
+    data-variant={variant}
+    data-size={size}
+    className={cn(compatibilityVariants({ variant, size }), className)}
+    onClick={onClick}
+  >{children}</HeroButton>
 }
 
-export { Button, buttonVariants }
+export { Button, buttonVariants, nativeLinkProps }
+export type { ButtonProps, ButtonControlProps, ButtonLinkProps }

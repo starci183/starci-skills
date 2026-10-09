@@ -1,41 +1,30 @@
-
-import * as React from "react"
+import { ProgressBar, type ProgressBarProps } from "@heroui/react"
 import { cn } from "@/lib/utils"
-import { Progress as ProgressPrimitive } from "radix-ui"
 import type { Tone } from "../status"
 
-function Progress({
-  className,
-  value = null,
-  tone,
-  max = 100,
-  ...props
-}: React.ComponentProps<typeof ProgressPrimitive.Root> & { tone?: Tone }) {
+type ProgressProps = Omit<ProgressBarProps, "value" | "maxValue" | "children" | "className"> & {
+  value?: number | null
+  max?: number
+  tone?: Tone
+  className?: string
+}
+
+function Progress({ className, value = null, tone, max = 100, ...props }: ProgressProps) {
   const hasMaximum = Number.isFinite(max) && max > 0
   const maximum = hasMaximum ? max : 100
   const bounded = hasMaximum && typeof value === "number" && Number.isFinite(value)
     ? Math.min(Math.max(value, 0), maximum) : null
-  return (
-    <ProgressPrimitive.Root
-      data-slot="progress"
-      data-tone={tone}
-      value={bounded}
-      max={maximum}
-      className={cn(
-        "relative flex h-1.5 w-full items-center overflow-x-hidden rounded-full bg-muted",
-        tone && "progress-tone",
-        className
-      )}
-      {...props}
-      aria-valuenow={bounded ?? undefined}
-    >
-      {bounded != null && <ProgressPrimitive.Indicator
-        data-slot="progress-indicator"
-        className="size-full flex-1 bg-primary transition-all"
-        style={{ transform: `translateX(-${100 - bounded / maximum * 100}%)` }}
-      />}
-    </ProgressPrimitive.Root>
-  )
+  const color = tone === "success" ? "success" : tone === "failed" ? "danger" : tone === "warning" ? "warning" : tone === "skipped" ? "default" : "accent"
+  return <ProgressBar
+    {...props}
+    value={bounded ?? undefined}
+    maxValue={maximum}
+    isIndeterminate={bounded == null}
+    color={color}
+    size="sm"
+    data-tone={tone}
+    className={cn("min-w-0 gap-0", tone && "[--progress-bar-fill:var(--tone)]", className)}
+  ><ProgressBar.Track className="h-full min-h-1.5">{bounded != null ? <ProgressBar.Fill /> : null}</ProgressBar.Track></ProgressBar>
 }
 
 export { Progress }

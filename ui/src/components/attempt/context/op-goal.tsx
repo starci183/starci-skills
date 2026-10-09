@@ -5,6 +5,7 @@ import type { Concept } from '../../concept';
 import { Card } from '../frame/card';
 import { t } from '../../../i18n/t';
 import { FeedbackState } from '../../feedback-state';
+import { formatAbsolute } from '../../../i18n/vi';
 
 export const concept: Concept = 'C8';
 
@@ -21,9 +22,10 @@ export function OpGoalCard({ attempt, info, loading }: Readonly<{ attempt: Attem
   return <Card id="attempt-op-goal" concept="C8" title={t('What this op does')} hint={info?.nameVi?.trim() || info?.nameEn?.trim() || attempt.op}>
     <div className="flex min-w-0 flex-col gap-4">
       {info?.readError ? <FeedbackState error>{info.readError}</FeedbackState> : null}
-      {main ? <p className="m-0 max-w-[72ch] text-base leading-relaxed">{main}</p> : <p className="m-0 text-sm text-muted-foreground">{loading ? t('Loading the description…') : t('No description for this op yet.')}</p>}
-      <p className="m-0 text-xs text-muted-foreground">{t('Current operation YAML reference')}{attempt.dispatchContext?.runtimeSha ? <> · {t('Dispatched runtime revision')}: <code>{attempt.dispatchContext.runtimeSha.slice(0, 12)}</code></> : null}</p>
-      {goalVi && goalEn ? <details className="text-sm"><summary className="cursor-pointer text-xs text-muted-foreground">{t('English version')}</summary><p className="mb-0 mt-2 whitespace-pre-wrap break-words text-muted-foreground">{goalEn}</p></details> : null}
+      <section className="min-w-0"><h3 className="m-0 mb-2 text-sm font-medium">{t('Assignment')}</h3><p className="m-0 max-w-[80ch] whitespace-pre-line break-words text-sm leading-relaxed">{attempt.input?.what ?? t('Historical dispatch input was not recorded.')}</p><p className="mb-0 mt-2 text-xs text-muted-foreground">{attempt.dispatchContext ? t('Dispatch contract captured at {at}', { at: formatAbsolute(attempt.dispatchContext.createdAt) }) : t('Dispatch contract capture unavailable')}</p></section>
+      <section className="min-w-0 border-t pt-4"><h3 className="m-0 mb-2 text-xs text-muted-foreground">{t('Current operation YAML reference')}</h3>{main ? <p className="m-0 max-w-[80ch] whitespace-pre-line break-words text-sm leading-relaxed">{main}</p> : <p className="m-0 text-sm text-muted-foreground">{loading ? t('Loading the description…') : t('No description for this op yet.')}</p>}
+      {attempt.dispatchContext?.runtimeSha ? <p className="mb-0 mt-2 text-xs text-muted-foreground">{t('Dispatched runtime revision')}: <code>{attempt.dispatchContext.runtimeSha.slice(0, 12)}</code></p> : null}</section>
+      {goalVi && goalEn ? <Advanced title={t('English version')} keepMounted><p className="m-0 whitespace-pre-wrap break-words text-sm text-muted-foreground">{goalEn}</p></Advanced> : null}
       <Advanced summary={scopeKnown ? t('{n} writable paths', { n: owned.length }) : t('Write scope not recorded')}>
         <div className="grid gap-4 md:grid-cols-2">
           <div>

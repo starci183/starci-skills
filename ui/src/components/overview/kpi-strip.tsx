@@ -1,4 +1,5 @@
 import type { WorkersSummary } from '../../contract';
+import { Card, Skeleton } from '@heroui/react';
 import type { Tone } from '../status';
 import type { Concept } from '../concept';
 import { compactVi, costVi } from '../usage-view';
@@ -18,16 +19,16 @@ export function KpiStrip({ summary, needsAttention, loading = false }: Readonly<
     { tone: 'success', value: observed(summary?.passed24h), label: t('settled passes in 24 h'), note: t('Pass verdicts settled in the recorded 24-hour window.') },
     { tone: 'failed', value: observed(summary?.failed24h), label: t('settled failures in 24 h'), note: t('Fail or partial verdicts settled in the recorded 24-hour window.') },
   ];
-  if (!summary && loading) return <section aria-label={t('Worker metrics')} className="kpi-strip grid grid-cols-2 lg:grid-cols-4">
-    {Array.from({ length: 4 }, (_, index) => <div key={index} className="kpi-cell"><div className="h-8 w-12 rounded bg-muted" /><div className="mt-3 h-4 w-24 rounded bg-muted" /><div className="mt-2 h-3 w-full rounded bg-muted" /></div>)}
-  </section>;
-  return <Stagger className="kpi-strip grid grid-cols-2 lg:grid-cols-4">
+  if (!summary && loading) return <Card aria-label={t('Worker metrics')} className="kpi-strip grid grid-cols-2 gap-0 p-0 lg:grid-cols-4">
+    {Array.from({ length: 4 }, (_, index) => <div key={index} className="kpi-cell"><Skeleton className="h-8 w-12 rounded" /><Skeleton className="mt-3 h-4 w-24 rounded" /><Skeleton className="mt-2 h-3 w-full rounded" /></div>)}
+  </Card>;
+  return <Stagger><Card aria-label={t('Worker metrics')} className="kpi-strip grid grid-cols-2 gap-0 p-0 lg:grid-cols-4">
     {items.map(item => <StaggerItem key={item.label} className="kpi-cell min-w-0"><div data-tone={item.value == null ? 'queued' : item.tone} className="flex h-full min-w-0 flex-col gap-1" aria-label={item.label}>
       <div className="text-3xl font-semibold tabular-nums leading-none">{item.value == null ? <span aria-label={t('Not observed.')}>—</span> : <Ticker value={item.value} />}</div>
       <div className="mt-2 flex items-center gap-2 text-sm font-medium"><span className="status-dot" aria-hidden="true" />{item.label}</div>
       <p className="text-xs leading-snug text-muted-foreground">{item.note}</p>
     </div></StaggerItem>)}
-  </Stagger>;
+  </Card></Stagger>;
 }
 
 /** Secondary numbers (settling ops, queued units, 24 h tokens) shown inside "Advanced". */

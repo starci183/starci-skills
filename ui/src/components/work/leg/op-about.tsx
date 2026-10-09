@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Advanced } from '../../motion';
 import type { LegRow } from '../../../contract';
 import { PathLink } from '../../path-link';
 import { legInfo } from '../pipeline/node/op-identity';
@@ -14,16 +14,12 @@ function Block({ title, children }: Readonly<{ title: string; children: React.Re
 /** "What this op does" + inputs, outputs, side effects, manifest — from the op's own yaml (read-only). */
 export function OpAbout({ leg }: Readonly<{ leg: LegRow }>) {
   const info = legInfo(leg);
-  const [more, setMore] = useState(false);
   if (!info) return null;
   const goalVi = info.goal.vi ?? info.goal.en;
   return <div className="mb-2">
     <Block title={t('What this op does')}>
       <p className="text-sm">{goalVi ?? t('No description for this op yet.')}</p>
-      {info.goal.en && info.goal.vi ? <div className="mt-2">
-        <button type="button" className="text-xs font-medium text-primary hover:underline" aria-expanded={more} onClick={() => setMore(v => !v)}>{more ? t('Hide the English original') : t('View the English original')}</button>
-        {more ? <p className="mt-2 rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">{info.goal.en}</p> : null}
-      </div> : null}
+      {info.goal.en && info.goal.vi ? <Advanced keepMounted className="mt-2" title={t('View the English original')}><p className="text-sm text-muted-foreground">{info.goal.en}</p></Advanced> : null}
     </Block>
     <Block title={t('Needs inputs')}>{info.reads.length ? <ul className="space-y-2">{info.reads.map(read => <li key={read.id} className="text-xs">
       <span className="font-mono font-semibold">{read.id}</span>{read.purpose ? <span className="block text-muted-foreground">{read.purpose}</span> : null}</li>)}</ul> : <p className="text-xs text-muted-foreground">{t('Not declared.')}</p>}</Block>

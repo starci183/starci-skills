@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { File, Folder } from 'lucide-react';
+import { Link } from '@heroui/react';
+import { Button } from './ui/button';
 import type { Concept } from './concept';
 import { t } from '../i18n/t';
 
@@ -20,9 +22,9 @@ export function PathLink({ path, kind = 'dir', label }: { readonly path: string 
     void navigator.clipboard?.writeText(path).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); }, () => undefined);
   };
   return <span className="path-link">
-    <a className="path-main" href={`vscode://file/${toUrlPath(path)}`} title={t('Open in VS Code on the host')}><Icon className="size-3.5 shrink-0" aria-hidden="true" />{label ?? path}</a>
-    <a className="path-action" href={`cursor://file/${toUrlPath(path)}`} title={t('Open in Cursor')}>Cursor</a>
-    {kind === 'file' ? <a className="path-action" href={`vscode://file/${toUrlPath(parentOf(path))}`} title={t('Open the containing folder')}>{t('folder')}</a> : null}
-    <button type="button" className="path-action" onClick={copy} title={t('Copy path')}>{copied ? t('Copied') : t('Copy')}</button>
+    <Link className="path-main" href={`vscode://file/${toUrlPath(path)}`} aria-label={`${t('Open in VS Code on the host')}: ${label ?? path}`}><Link.Icon><Icon className="size-3.5 shrink-0" aria-hidden="true" /></Link.Icon><span title={t('Open in VS Code on the host')}>{label ?? path}</span></Link>
+    <Link className="path-action" href={`cursor://file/${toUrlPath(path)}`} aria-label={`${t('Open in Cursor')}: ${path}`}><span title={t('Open in Cursor')}>Cursor</span></Link>
+    {kind === 'file' ? <Link className="path-action" href={`vscode://file/${toUrlPath(parentOf(path))}`} aria-label={`${t('Open the containing folder')}: ${parentOf(path)}`}><span title={t('Open the containing folder')}>{t('folder')}</span></Link> : null}
+    <Button variant="ghost" size="xs" type="button" className="path-action" onClick={copy} title={t('Copy path')}>{copied ? t('Copied') : t('Copy')}</Button>
   </span>;
 }

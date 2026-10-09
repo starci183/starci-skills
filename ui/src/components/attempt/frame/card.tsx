@@ -21,7 +21,7 @@ export function Card({ id, title, hint, right, concept: c, children, className =
       <div className="min-w-0">{children}</div>
     </ConceptBlock>;
   }
-  return <ConceptBlock concept={c} as="section" id={id} className={`min-w-0 scroll-mt-4 ${className}`}>
+  return <ConceptBlock concept={c} as="section" id={id} className={`min-w-0 scroll-mt-24 ${className}`}>
     <Surface className="min-w-0 shadow-none [--card-spacing:--spacing(4)] min-[760px]:[--card-spacing:--spacing(6)]">
       <CardHeader className="flex flex-row flex-wrap items-center gap-x-3 gap-y-1 border-b">
         <h2 className="m-0 font-semibold">{title}</h2>

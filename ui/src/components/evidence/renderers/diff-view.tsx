@@ -25,7 +25,7 @@ function parseDiff(lines: string[]): Row[] {
 }
 
 const style: Record<Kind, string> = {
-  file: 'bg-muted font-semibold text-foreground',
+  file: 'bg-default font-semibold text-foreground',
   meta: 'text-muted-foreground',
   hunk: 'bg-[var(--status-running-bg)] text-[var(--status-running)]',
   add: 'bg-[var(--status-success-bg)] text-[var(--status-success)]',

@@ -1,9 +1,9 @@
 import type { LegRow, LegStatus, PipelineView } from '../../../contract';
 import { t } from '../../../i18n/t';
 
-export const NODE_H = 116, COL_GAP = 20, ROW_GAP = 16, PAD_X = 8, HEAD_H = 34, PAD_B = 14;
+export const NODE_H = 216, COL_GAP = 24, ROW_GAP = 16, PAD_X = 8, HEAD_H = 48, PAD_B = 8;
 
-export type PlacedLeg = { leg: LegRow; x: number; y: number; col: number };
+export type PlacedLeg = { leg: LegRow; x: number; y: number; height: number; col: number };
 export type Column = { level: number; index: number; label: string; legs: LegRow[] };
 export type PlacedEdge = { from: string; to: string; path: string; tone: 'current' | 'done' | 'plain' };
 
@@ -28,39 +28,31 @@ export function buildColumns(legs: LegRow[]): Column[] {
   });
 }
 
-/** Drop an edge when a longer path already connects its ends (keeps the picture readable; reachability is unchanged). */
-export function reduceEdges(edges: PipelineView['edges']) {
-  const next = new Map<string, Set<string>>();
-  for (const edge of edges) (next.get(edge.from) ?? next.set(edge.from, new Set()).get(edge.from)!).add(edge.to);
-  const reaches = (from: string, target: string, skip: string): boolean => {
-    const seen = new Set<string>(); const stack = [...(next.get(from) ?? [])].filter(item => item !== skip);
-    while (stack.length) { const item = stack.pop()!; if (item === target) return true; if (seen.has(item)) continue; seen.add(item); stack.push(...(next.get(item) ?? [])); }
-    return false;
-  };
-  return edges.filter(edge => !reaches(edge.from, edge.to, edge.to));
-}
-
 const doneLike = (status: LegStatus) => status === 'success';
 
-export function layoutPipeline(pipeline: PipelineView, availWidth = 1050) {
+export function layoutPipeline(pipeline: PipelineView, availWidth = 1050, measuredHeights: ReadonlyMap<string, number> = new Map()) {
   const columns = buildColumns(pipeline.legs);
-  const tallest = Math.max(1, ...columns.map(col => col.legs.length));
-  const bodyH = tallest * NODE_H + (tallest - 1) * ROW_GAP;
+  const legHeight = (leg: LegRow) => Math.max(NODE_H, measuredHeights.get(leg.op) ?? NODE_H);
+  const bodyH = Math.max(NODE_H, ...columns.map(col => col.legs.reduce((height, leg) => height + legHeight(leg), 0) + Math.max(0, col.legs.length - 1) * ROW_GAP));
   const gaps = Math.max(0, columns.length - 1) * COL_GAP;
-  const NODE_W = Math.max(152, Math.min(190, Math.floor((availWidth - PAD_X * 2 - gaps) / Math.max(1, columns.length))));
+  const NODE_W = Math.max(240, Math.min(272, Math.floor((availWidth - PAD_X * 2 - gaps) / Math.max(1, columns.length))));
   const width = PAD_X * 2 + columns.length * NODE_W + gaps;
   const height = HEAD_H + bodyH + PAD_B;
   const placed = new Map<string, PlacedLeg>();
   for (const col of columns) {
-    const colH = col.legs.length * NODE_H + (col.legs.length - 1) * ROW_GAP;
-    const top = HEAD_H + (bodyH - colH) / 2;
-    col.legs.forEach((leg, row) => placed.set(leg.op, { leg, col: col.index, x: PAD_X + col.index * (NODE_W + COL_GAP), y: top + row * (NODE_H + ROW_GAP) }));
+    // A distant tall branch must not reserve blank space above the visible columns.
+    let top = HEAD_H;
+    for (const leg of col.legs) {
+      const height = legHeight(leg);
+      placed.set(leg.op, { leg, col: col.index, x: PAD_X + col.index * (NODE_W + COL_GAP), y: top, height });
+      top += height + ROW_GAP;
+    }
   }
   const edges: PlacedEdge[] = [];
-  for (const edge of reduceEdges(pipeline.edges)) {
+  for (const edge of pipeline.edges) {
     const a = placed.get(edge.from), b = placed.get(edge.to);
     if (!a || !b) continue;
-    const x1 = a.x + NODE_W, y1 = a.y + NODE_H / 2, x2 = b.x, y2 = b.y + NODE_H / 2;
+    const x1 = a.x + NODE_W, y1 = a.y + a.height / 2, x2 = b.x, y2 = b.y + b.height / 2;
     const dx = Math.max(24, (x2 - x1) / 2);
     edges.push({ from: edge.from, to: edge.to, path: `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`,
       tone: b.leg.current ? 'current' : doneLike(a.leg.status) && doneLike(b.leg.status) ? 'done' : 'plain' });

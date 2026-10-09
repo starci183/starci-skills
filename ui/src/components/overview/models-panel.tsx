@@ -1,11 +1,11 @@
 import type { WorkersSummary } from '../../contract';
+import { Meter, ProgressBar } from '@heroui/react';
 import type { Concept } from '../concept';
 import { AgentAvatar, AgentStack, agentOf } from '../agent/agent-avatar';
 import { attemptAgent, useAttemptAgents } from '../agent/use-running-agents';
 import { familyTint } from '../agent/agent-marks';
-import { Grow } from '../motion';
 import { t } from '../../i18n/t';
-import { FeedbackState } from '../feedback-state';
+import { FeedbackState, SourceWarning } from '../feedback-state';
 import { hasUnavailableSources } from './read-state';
 import { costVi } from '../usage-view';
 
@@ -26,8 +26,8 @@ export function ModelsPanel({ summary, bare = false, readError, sourcePartial = 
   return <div className={`flex flex-col gap-4 ${bare ? '' : 'p-4 sm:p-6'}`}>
     <div>
       <p className="text-xs font-medium text-muted-foreground">{t('Loaded executing attempts · host scope')}</p>
-      {error && <output className="block shell-error mt-2">{t('The source is failing; showing the last read. {error}', { error })}</output>}
-      {partial ? <output className="block shell-error mt-2">{t('Some sources are unavailable; showing the recorded part.')}</output> : null}
+      {error && <SourceWarning className="mt-2">{t('The source is failing; showing the last read. {error}', { error })}</SourceWarning>}
+      {partial ? <SourceWarning className="mt-2">{t('Some sources are unavailable; showing the recorded part.')}</SourceWarning> : null}
       {families.size ? <div className="mt-2 flex flex-col gap-2">{[...families.entries()].map(([family, list]) => <div key={family} className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="w-14 shrink-0 text-xs font-medium">{familyTint[list[0].family].name}</span>
         <span className="flex flex-wrap items-center gap-2">{list.map(agent => <AgentAvatar key={agent.href} agent={agent} size={26} live />)}</span>
@@ -37,14 +37,18 @@ export function ModelsPanel({ summary, bare = false, readError, sourcePartial = 
       {meta?.next ? <p className="mt-2 text-xs text-muted-foreground">{t('More active attempts are available in the attempt list.')}</p> : null}
     </div>
     <div><p className="mb-2 text-xs font-medium text-muted-foreground">{t('Executing operations by recorded model · host scope')}</p>
-    {readError && <output className="block shell-error mb-2">{t('The source is failing; showing the last read. {error}', { error: readError })}</output>}
-    {sourcePartial && <output className="block shell-error mb-2">{t('Some sources are unavailable; showing the recorded part.')}</output>}
+    {readError && <SourceWarning className="mb-2">{t('The source is failing; showing the last read. {error}', { error: readError })}</SourceWarning>}
+    {sourcePartial && <SourceWarning className="mb-2">{t('Some sources are unavailable; showing the recorded part.')}</SourceWarning>}
     {models.length ? <ul className="flex flex-col gap-3">
-      {models.map((item, index) => <li key={`${item.model ?? item.pool ?? 'unknown'}-${index}`} data-tone={item.running == null ? 'queued' : 'running'}>
+      {models.map((item, index) => {
+        const known = typeof item.running === 'number' && Number.isFinite(item.running) && item.running >= 0;
+        const label = `${t('Executing operations by recorded model · host scope')} · ${item.model ?? item.pool ?? t('Unknown model')}`;
+        return <li key={`${item.model ?? item.pool ?? 'unknown'}-${index}`} data-tone={known ? 'running' : 'queued'}>
         <div className="flex items-baseline justify-between gap-2 text-sm"><span className="flex min-w-0 items-center gap-2"><AgentAvatar agent={agentOf(item)} size={22} /><span className="min-w-0 truncate font-medium">{item.model ?? item.pool ?? t('Unknown model')}</span></span><span className="shrink-0 text-right tabular-nums">{t('{n} executing', { n: number(item.running) })}<span className="block text-xs text-muted-foreground">{t('{n} reported', { n: number(item.settling) })}</span></span></div>
-        <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">{item.running != null && Number.isFinite(item.running) ? <Grow className="block h-full rounded-full" style={{ width: `${(item.running / max) * 100}%`, background: 'var(--tone)' }} /> : null}</div>
+        {known ? <Meter value={item.running} maxValue={max} size="sm" color="accent" aria-label={label} valueLabel={t('{n} executing', { n: number(item.running) })} className="mt-1 gap-0"><Meter.Track><Meter.Fill style={{ background: 'var(--tone)' }} /></Meter.Track></Meter>
+          : <ProgressBar isIndeterminate size="sm" aria-label={label} className="mt-1 gap-0"><ProgressBar.Track /></ProgressBar>}
         <p className="mt-1 truncate text-xs text-muted-foreground">{[item.agent, item.pool].filter(Boolean).join(' · ') || t('unknown agent')}</p>
-      </li>)}
+      </li>; })}
     </ul> : <p className="text-sm text-muted-foreground">{!summary ? readError ? t('The source is unavailable.') : sourceLoaded ? t('Not observed.') : t('Loading…') : sourcePartial || readError ? t('No executing operations were observed in the last read.') : t('No ops running.')}</p>}</div>
     <div className="border-t pt-3">
       <p className="text-xs font-medium text-muted-foreground">{t('Project-ledger usage in the last 24 hours.')}</p>

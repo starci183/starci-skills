@@ -1,7 +1,7 @@
 import type { Concept } from '../../concept';
 export const concept: Concept = 'C8';
 import type { ReactNode } from 'react';
-import { CopyButton, Frame, Line, Toolbar, wordTone } from './common';
+import { CopyButton, Frame, Line, Toolbar } from './common';
 import { TextView } from './text-view';
 import { t } from '../../../i18n/t';
 
@@ -29,17 +29,14 @@ function scalar(raw: string, k: string): { node: ReactNode; block: boolean } {
   const meta = /^([&*!][^\s]*)(\s+)?(.*)$/.exec(v);
   if (meta) {
     const rest = scalar(meta[3], `${k}r`);
-    return { node: <span key={k}><span className="text-[var(--status-warning)]">{meta[1]}</span>{meta[2] ?? ''}{rest.node}</span>, block: rest.block };
+    return { node: <span key={k}><span className="text-foreground">{meta[1]}</span>{meta[2] ?? ''}{rest.node}</span>, block: rest.block };
   }
   if (v.startsWith('"') || v.startsWith("'")) return { node: <span key={k} className="text-foreground">{v}</span>, block: false };
   if (v.startsWith('[') || v.startsWith('{')) return { node: <span key={k} className="text-foreground">{v}</span>, block: false };
-  if (NUM_RE.test(v)) return { node: <span key={k} data-tone="running" className="text-[var(--tone)]">{v}</span>, block: false };
+  if (NUM_RE.test(v)) return { node: <span key={k} className="text-foreground">{v}</span>, block: false };
   if (/^(true|false|null|~|yes|no)$/i.test(v)) {
-    const tone = /^true$/i.test(v) ? 'success' : /^false$/i.test(v) ? 'failed' : null;
-    return { node: <span key={k} data-tone={tone ?? undefined} className={tone ? 'font-medium text-[var(--tone)]' : 'italic text-muted-foreground'}>{v}</span>, block: false };
+    return { node: <span key={k} className={/^(null|~)$/i.test(v) ? 'italic text-muted-foreground' : 'text-foreground'}>{v}</span>, block: false };
   }
-  const tone = wordTone(v);
-  if (tone) return { node: <span key={k} data-tone={tone} className="font-medium text-[var(--tone)]">{v}</span>, block: false };
   return { node: <span key={k} className="text-foreground">{v}</span>, block: false };
 }
 
@@ -82,7 +79,7 @@ function tokenize(line: string): { nodes: ReactNode[]; block: boolean } {
   return { nodes, block };
 }
 
-/** YAML with line numbers and light highlighting. Outcome values (pass/fail/blocked/done…) take status tones. */
+/** YAML with line numbers and neutral syntax; source literals do not establish runtime status. */
 export function YamlView({ text }: Readonly<{ text: string }>) {
   const src = text.replaceAll(/^﻿/g, '').replaceAll(/\r\n/g, '\n');
   const lines = src.split('\n');

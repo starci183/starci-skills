@@ -1,4 +1,5 @@
 import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { Link } from '@heroui/react';
 import { useApiQuery } from '../../../api/query';
 import type { AttemptDetailV3, ContractInfo, Ref } from '../../../contract';
 import { formatOpLabel } from '../../../i18n/vi';
@@ -19,13 +20,13 @@ const verdictWords: Record<string, string> = { pass: t('passed'), fail: t('faile
 const outcomeWords: Record<string, string> = { done: t('done'), partial: t('partial'), failed: t('failed'), ask: t('needs a question'), blocked: t('blocked') };
 
 function Crumb({ href, children }: Readonly<{ href: string; children: React.ReactNode }>) {
-  return <a className="hover:text-foreground hover:underline" href={href}>{children}</a>;
+  return <Link className="text-xs text-muted-foreground" href={href}>{children}</Link>;
 }
 
 function SiblingLink({ target, label, dir }: Readonly<{ target: Ref; label: string; dir: 'prev' | 'next' }>) {
-  return <a href={target.href} className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs text-muted-foreground hover:border-primary hover:text-foreground">
+  return <Link href={target.href} className="gap-1 text-xs">
     {dir === 'prev' ? <ArrowLeft className="size-3.5" aria-hidden="true" /> : null}{label} #{target.id}{dir === 'next' ? <ArrowRight className="size-3.5" aria-hidden="true" /> : null}
-  </a>;
+  </Link>;
 }
 
 /** Displays the native Attempt identity; job try, dispatch sequence and model provenance remain separate facts. */
@@ -41,7 +42,7 @@ export function AttemptHeader({ attempt, project }: Readonly<{ attempt: AttemptD
   const agent = agentOf({ ...attempt, model: attempt.modelAuthority === 'attested' ? attempt.model : null });
   const contract = useApiQuery<ContractInfo>('/api/contract', { topics: ['system'], intervalMs: 60_000 });
   const name = formatOpLabel(attempt.op, contract.data?.opLabels);
-  const end = attempt.settledAt ?? attempt.reportedAt ?? (open ? Date.now() : null);
+  const end = attempt.settledAt ?? attempt.terminalEndedAt ?? attempt.reportedAt ?? (open ? Date.now() : null);
   const duration = attempt.dispatchedAt && end ? end - attempt.dispatchedAt : null;
   const total = attempt.usage?.total;
   // The Attempt summary includes cache tokens; llm_usage input/output measurements have a different scope.
@@ -58,12 +59,13 @@ export function AttemptHeader({ attempt, project }: Readonly<{ attempt: AttemptD
     </nav>
     <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
       <div className="flex min-w-0 items-start gap-3">
-        <AgentAvatar agent={agent} size={52} live={open && !attempt.reportedAt} />
+        <AgentAvatar agent={agent} size={52} live={open && attempt.terminalEndedAt == null && !attempt.reportedAt} />
         <div className="flex min-w-0 flex-col gap-2">
           <h1 className="m-0 text-2xl font-semibold tracking-tight sm:text-[28px] sm:leading-[34px]">{t('Attempt #{id}', { id: attempt.id })}</h1>
           <p className="m-0 break-words text-base font-medium leading-6">{name}</p>
           <p className="m-0 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span>Agent: <strong className="font-medium text-foreground">{attempt.agent ?? attempt.provider ?? t('unknown')}</strong></span>
+            <span>{t('Requested model: {model}', { model: attempt.requestedModel ?? t('Not recorded') })}</span>
             <span>{modelText}</span>
           </p>
           <p className="m-0 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">

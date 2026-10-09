@@ -1,4 +1,5 @@
 import { ArrowRight } from 'lucide-react';
+import { Link } from '@heroui/react';
 import type { LegRow, PipelineView } from '../../contract';
 import { statusLabels, statusFromUnit } from '../status';
 import { unitStateLabels } from '../../i18n/vi';
@@ -19,7 +20,6 @@ function Section({ title, children }: Readonly<{ title: string; children: React.
   return <section><h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>{children}</section>;
 }
 const none = <p className="text-xs text-muted-foreground">{t('None')}</p>;
-const oneLine = (text: string, n = 220) => { const s = text.replace(/\s+/g, ' ').trim(); return s.length > n ? `${s.slice(0, n - 1)}…` : s; };
 
 /** Side drawer for one leg. Essentials: what it does, why it is (not) moving, the one next step. Everything else sits under "Advanced". */
 export function LegDrawer({ project, wf, leg, pipeline, onClose }: Readonly<{ project: string; wf: string; leg: LegRow | null; pipeline: PipelineView; onClose: () => void }>) {
@@ -31,13 +31,11 @@ export function LegDrawer({ project, wf, leg, pipeline, onClose }: Readonly<{ pr
   const now = Date.now();
   const waiting = upstream.filter(op => byOp.get(op)?.status !== 'success');
   const legHref = (op: string) => `#/w/${encodeURIComponent(project)}/${encodeURIComponent(wf)}?leg=${encodeURIComponent(op)}`;
-  // "Why it stopped" / status line: the reason the leg is not simply running, else where it stands.
+  // Recorded lifecycle and disposition remain separate from an Op's latest report summary.
   const why = leg.binding === 'unbound' ? t('No runtime unit is bound to this exact leg and goal revision.') : leg.deferred ? t('Deferred: {reason}', { reason: leg.deferred })
     : leg.status === 'external' ? t('Handled externally')
     : waiting.length && !leg.attempts.length ? t('Waiting for {list} to finish first.', { list: waiting.join(', ') })
-    : latest?.summary && leg.status !== 'success' ? oneLine(latest.summary)
-    : leg.current ? (latest?.status === 'settling' ? t('Awaiting settlement') : latest ? t('Running attempt #{id}.', { id: latest.id }) : statusLabels[leg.status])
-    : latest?.summary ? oneLine(latest.summary)
+    : leg.current ? (latest?.status === 'settling' ? t('Awaiting settlement') : latest?.open ? t('Running attempt #{id}.', { id: latest.id }) : statusLabels[leg.status])
     : `${statusLabels[leg.status]}.`;
   const next = leg.status === 'success' ? (leg.units[0] ? { href: leg.units[0].href, label: t('View the unit result') } : latest ? { href: latest.href, label: t('Open the latest attempt') } : null)
     : latest && (latest.open || leg.status === 'failed' || leg.status === 'blocked' || leg.status === 'retry') ? { href: latest.href, label: t('Open attempt #{id}', { id: latest.id }) }
@@ -49,8 +47,9 @@ export function LegDrawer({ project, wf, leg, pipeline, onClose }: Readonly<{ pr
         <div className="flex flex-col gap-5">
           <p className="text-xs text-muted-foreground">{leg.inPlan ? t('Goal revision {n}', { n: leg.goalRevision ?? '—' }) : t('Recorded operation history')} · {leg.binding === 'recorded-unit' ? t('Bound by recorded unit and revision') : leg.binding === 'unbound' ? t('Runtime association unproven') : t('Operation scope; excluded from plan progress')}</p>
           <Section title={t('What it does')}><LegAbout leg={leg} /></Section>
-          <Section title={leg.status === 'success' ? t('State') : t('Why it stopped')}>{leg.why ? <WhyBlock why={leg.why} /> : <p className="text-sm">{why}</p>}</Section>
-          <Section title={t('Next work')}>{next ? <a href={next.href} className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">{next.label} <ArrowRight className="size-3.5" aria-hidden="true" /></a> : <p className="text-sm text-muted-foreground">{t('Nothing to do next yet.')}</p>}</Section>
+          <Section title={leg.why ? t('Why') : t('State')}>{leg.why ? <WhyBlock why={leg.why} /> : <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{why}</p>}</Section>
+          {latest?.summary && <Section title={t('Recorded summary')}><p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{latest.summary}</p></Section>}
+          <Section title={t('Next work')}>{next ? <Link href={next.href} className="gap-2 text-sm font-medium">{next.label} <ArrowRight className="size-3.5 shrink-0" aria-hidden="true" /></Link> : <p className="text-sm text-muted-foreground">{t('Nothing to do next yet.')}</p>}</Section>
           <Advanced summary={t('inputs · outputs · {units} units · {attempts} attempts · tokens', { units: leg.units.length, attempts: attempts.length })}>
             <div className="flex flex-col gap-6">
               {(leg.injected || leg.deferred) && <div className="flex flex-col gap-1 border-l-2 pl-3 text-xs">
@@ -62,7 +61,7 @@ export function LegDrawer({ project, wf, leg, pipeline, onClose }: Readonly<{ pr
                 <span className="min-w-0 flex-1 break-words text-sm">{u.title}</span>
                 <StatusChip status={statusFromUnit(u.state)} label={unitStateLabels[u.state] ?? u.state} />
                 <span className="text-xs text-muted-foreground">{t('try {tries}/{budget}', { tries: u.tries, budget: u.tryBudget })}</span>
-                <a href={u.href} className="inline-flex items-center text-primary" aria-label={t('Open {title}', { title: u.title })}><ArrowRight className="size-3.5" /></a>
+                <Link href={u.href} aria-label={t('Open {title}', { title: u.title })}><ArrowRight className="size-3.5" aria-hidden="true" /></Link>
                 <span className="w-full break-all font-mono text-xs text-muted-foreground">{u.unit} · {t('Goal revision {n}', { n: u.goalRevision })} · {u.subjectKey} · {t('{n} dispatches', { n: u.dispatches })}</span>
               </li>)}</ul> : none}</Section>
               <Section title={t('Attempts · {n}', { n: attempts.length })}>{attempts.length

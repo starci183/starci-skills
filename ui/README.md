@@ -2,7 +2,7 @@
 
 This is the public, read-only StarCi control-plane UI. It shows how an approved Goal becomes a Workflow, how a long-lived Kernel seat dispatches short-lived Op agents, what those agents reported, which checks ran, what the settler decided, and whether code landed. It also shows decisions owed to the owner or Supervisor and the reconciler's health.
 
-The interface uses React, Vite, local shadcn/ui components backed by Radix, cmdk search, Geist typography, Lucide icons and Vietnamese labels. Neutral chrome and the original operations layout share one light/dark token system. It is one web app with its API on the same origin. The server reads the host machine database and registered project ledgers through the read-only engine readers. It has no write API, login, answer form, CLI-backed request or live worktree diff.
+The interface uses React, Vite, HeroUI compounds, Geist typography, Lucide icons and Vietnamese labels. Modal, Autocomplete and ListBox own keyboard search. Neutral chrome and the operations layout share one light/dark token system. It is one web app with its API on the same origin. The server reads the host machine database and registered project ledgers through the read-only engine readers. It has no write API, login, answer form, CLI-backed request or live worktree diff.
 
 The visual language and component anatomy are documented in [DESIGN.md](DESIGN.md).
 

@@ -1,61 +1,38 @@
-import { ChevronDownIcon } from "lucide-react"
-import * as React from "react"
-import { cn } from "@/lib/utils"
+import type { ReactNode } from 'react';
+import { Label, ListBox, Select, type SelectProps } from '@heroui/react';
+import { cn } from '@/lib/utils';
 
+type NativeSelectProps = Omit<SelectProps<object>, 'children' | 'id' | 'ref' | 'value' | 'defaultValue' | 'onChange' | 'selectionMode'> & {
+  children: ReactNode;
+  id?: string;
+  label?: ReactNode;
+  size?: 'sm' | 'default';
+  value?: string;
+  defaultValue?: string;
+  onValueChange?: (value: string) => void;
+};
 
-type NativeSelectProps = Omit<React.ComponentProps<"select">, "size"> & {
-  size?: "sm" | "default"
+/** Single-value filter composition; callbacks receive the selected collection ID. */
+function NativeSelect({ children, className, id, label, size = 'default', value, defaultValue, onValueChange, ...props }: NativeSelectProps) {
+  return <Select
+    {...props}
+    className={cn('min-w-0', className)}
+    selectionMode="single"
+    value={value}
+    defaultValue={defaultValue}
+    onChange={selected => { if (selected !== null) onValueChange?.(String(selected)); }}
+  >
+    {label ? <Label>{label}</Label> : null}
+    <Select.Trigger id={id} className={cn('w-full min-w-0', size === 'sm' ? 'h-8 text-xs' : 'h-9')}>
+      <Select.Value className="min-w-0 truncate" />
+      <Select.Indicator />
+    </Select.Trigger>
+    <Select.Popover className="max-w-[calc(100vw-2rem)]"><ListBox>{children}</ListBox></Select.Popover>
+  </Select>;
 }
 
-function NativeSelect({
-  className,
-  size = "default",
-  ...props
-}: NativeSelectProps) {
-  return (
-    <div
-      className={cn(
-        "group/native-select relative w-fit has-[select:disabled]:opacity-50",
-        className
-      )}
-      data-slot="native-select-wrapper"
-      data-size={size}
-    >
-      <select
-        data-slot="native-select"
-        data-size={size}
-        className="h-9 w-full min-w-0 appearance-none rounded-sm border border-input bg-transparent py-1 pr-8 pl-2.5 text-sm shadow-none transition-[color,box-shadow] outline-none select-none selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-[size=sm]:h-8 dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
-        {...props}
-      />
-      <ChevronDownIcon aria-hidden="true" className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-muted-foreground select-none" />
-    </div>
-  )
-}
+// Direct collection members retain React Aria's item/section identity.
+const NativeSelectOption = ListBox.Item;
+const NativeSelectOptGroup = ListBox.Section;
 
-function NativeSelectOption({
-  className,
-  ...props
-}: React.ComponentProps<"option">) {
-  return (
-    <option
-      data-slot="native-select-option"
-      className={cn("bg-[Canvas] text-[CanvasText]", className)}
-      {...props}
-    />
-  )
-}
-
-function NativeSelectOptGroup({
-  className,
-  ...props
-}: React.ComponentProps<"optgroup">) {
-  return (
-    <optgroup
-      data-slot="native-select-optgroup"
-      className={cn("bg-[Canvas] text-[CanvasText]", className)}
-      {...props}
-    />
-  )
-}
-
-export { NativeSelect, NativeSelectOptGroup, NativeSelectOption }
+export { NativeSelect, NativeSelectOptGroup, NativeSelectOption };
