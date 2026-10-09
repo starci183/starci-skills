@@ -2,7 +2,7 @@
 // {role, root, current, records(), append(payload), storeList(rows) -> sha}. A Kernel's records are events of its workflow ledger (the legacy
 // `runtime-rev-acked` ack counts as the Kernel's own ack of the files it attested); the Supervisor's are events of machine.sqlite.
 import { putBlob } from '../../engine/db/blob.mjs';
-import { eventPayloadOf } from '../lib/event-payload.mjs';
+import { eventPayloadOf } from '../../engine/db/event-payload.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { supervisorEvent } from './home.mjs';
 import { runtimeShaOf } from './contract-version.mjs';

@@ -8,7 +8,7 @@ import path from 'node:path';
 import { openLedger } from '../../engine/db/ledger.mjs';
 import { openMachine } from '../../engine/db/machine.mjs';
 import { getBlob } from '../../engine/db/blob.mjs';
-import { eventPayloadOf } from '../../scripts/lib/event-payload.mjs';
+import { eventPayloadOf } from '../../engine/db/event-payload.mjs';
 import { revisionRepo } from '../helpers/revision-repo.mjs';
 import { attest, noticeFor, planRead, recordReplaced, recordWoken, runtimePass } from '../../scripts/machine/revision-ack.mjs';
 import { kernelSeat, supervisorSeat } from '../../scripts/machine/revision-seats.mjs';

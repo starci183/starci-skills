@@ -14,6 +14,8 @@ test('a deploy event carries one action and one count per role, never a file lis
   assert.equal(payload.roles.supervisor.action, 'replace');
   assert.equal(payload.roles.op.action, 'admission');
   assert.deepEqual(payload.roles.op.kinds, ['interface.draw']);
+  const vocabulary = new Set(['none', 'immediate', 'admission', 'restart', 'reread', 'replace']);
+  assert.ok(Object.values(payload.roles).every((entry) => vocabulary.has(entry.action)), 'a payload speaks only the effective vocabulary');
   assert.equal(JSON.stringify(payload).includes('driver-loop'), false, 'no file names in the event');
   assert.ok(JSON.stringify(payload).length < 700);
   assert.equal(deployLine(payload), `revision ${to.slice(0, 12)}: Kernel re-read 2 files / Supervisor replaced / Op next attempt reads the new rules / Critic not concerned / engine not concerned`);

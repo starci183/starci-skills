@@ -77,4 +77,9 @@ test('a real engine on a throwaway host is carried to a new revision by the verb
   assert.equal(deployed.length, 1);
   assert.equal(deployed[0].payload.to, tip);
   assert.equal(deployed[0].payload.engine.pid, after.pid);
+  // The role notification's contract, end to end: the event carries the payload of the REAL `starci runtime revision-scope` verb of the new tree.
+  const roles = deployed[0].payload.roleActions;
+  assert.equal(roles.schema, 'starci/revision-deploy@1');
+  assert.equal(roles.to, tip);
+  assert.deepEqual(Object.fromEntries(Object.entries(roles.roles).map(([role, entry]) => [role, entry.action])), { kernel: 'none', supervisor: 'none', op: 'none', critic: 'none', engine: 'none' }, 'a docs-only deploy concerns no role');
 });
