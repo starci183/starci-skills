@@ -940,3 +940,10 @@ cases:
     rule: {file: scripts/reconciler/gate-close.mjs, anchor: "closeGateItems"}
     spec: tests/supervisor/supervisor-menu.spec.mjs
     status: covered
+  - id: live-runtime-generated-copies-stale-after-land
+    family: power-lifecycle
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a deployed revision serves its own generated copies) packages/hfs/runtime and packages/eslint/{be,fe}/runtime are git-ignored output of the runtime sources; a git merge --ff-only on the live checkout moved the sources and left the copies stale until someone ran starci release sync-runtime by hand (540 files, 2026-10-09); the engine start and starci git land checked and regenerated nothing (recorded by the Supervisor as live-runtime-generated-copies-not-synced-after-land, worker report 17 of fix-package-runtime-copies-stale-f7032b)", remedy: {state: in-tree, change: "a new engine process compares the generated copies with their sources at start (the check that sync-runtime --check runs), regenerates what drifted and records runtime-copies-synced in the swap it writes, and does not lead with the typed cause runtime-copies-stale (RT_GENERATED_DRIFT) when the regeneration fails; starci git land regenerates them after main moved and reports it when it cannot"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, the lead's deploys", evidence: "supervisor-action recorded runtime-defect:live-runtime-generated-copies-not-synced-after-land (sup_events 1152); release sync-runtime: 540 files synced by hand"}
+    rule: {file: scripts/reconciler/engine-process.mjs, anchor: "ensureRuntimeCopies"}
+    spec: tests/reconciler/engine-start-recovery.spec.mjs
+    status: covered

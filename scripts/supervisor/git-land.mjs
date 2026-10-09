@@ -5,6 +5,7 @@ import path from 'node:path';
 import { diff as diffCall } from '../api/git/diff.mjs';
 import { isAncestor as isAncestorCall } from '../api/git/is-ancestor.mjs';
 import { mergeBase as mergeBaseCall } from '../api/git/merge-base.mjs';
+import { syncRuntime } from '../hfs/sync-runtime.mjs';
 import { revParse as revParseCall } from '../api/git/rev-parse.mjs';
 import { gitCallResult, linkedNodeModules, landLocalMain as landLocalMainCall } from './git-land-repo.mjs';
 import { underHostLock as underHostLockCall } from '../machine/verb-lock.mjs';
@@ -58,6 +59,11 @@ function specsForLand({ worktree, ref, verified, verifiedLog, tip, base, concurr
   return { specRun, specs };
 }
 
+/** The regeneration of the runtime copies after a land: {ok, files} or {ok:false, error}; never throws, the land has happened. */
+function copiesAfterLand(deps) {
+  try { return { ok: true, files: (deps.syncCopies ?? syncRuntime)() }; } catch (error) { return { ok: false, error: String(error?.message ?? error).slice(0, 200) }; }
+}
+
 async function lockedLand({ worktree, ref, verified, verifiedLog, dryRun, lane, concurrency, kernelNote }, deps) {
   const tip = tipOf(worktree, ref, deps);
   if (!tip) return refused({ step: STEP.gate, cause: 'ref-unresolved', detail: ref });
@@ -86,9 +92,12 @@ async function lockedLand({ worktree, ref, verified, verifiedLog, dryRun, lane, 
   const landed = (deps.landLocalMain ?? landLocalMainCall)({ worktree, ref, tip, trailers }, deps);
   if (!landed?.ok) return refused({ step: STEP.merge, cause: landed?.cause ?? 'fast-forward', detail: landed?.detail ?? 'local main did not move', result: { landed: Boolean(landed?.landed), tip, base, specs, check, log: specRun.log ?? null } });
   const announced = (deps.announceLand ?? announceLandCall)({ landed: tip, lane, kernelNote });
-  const data = { ...cleanResult({ ok: true, landed: true, tip, base, specs, check, log: specRun.log ?? null }), trailers, announced };
+  // Main moved under the live checkout: its generated, git-ignored package runtime copies are regenerated now, so a running system never serves stale ones.
+  const copies = copiesAfterLand(deps);
+  const data = { ...cleanResult({ ok: true, landed: true, tip, base, specs, check, log: specRun.log ?? null }), trailers, announced, copies };
   const laneText = lane ? ` (${lane})` : '';
-  return { code: 0, text: `starci git land: landed ${tip.slice(0, 12)}${laneText} on local main\n${trailers.join('\n')}`, data };
+  const copiesText = copies.ok ? '' : `\nstarci git land: the runtime copies were NOT regenerated (${copies.error}); run starci release sync-runtime`;
+  return { code: 0, text: `starci git land: landed ${tip.slice(0, 12)}${laneText} on local main\n${trailers.join('\n')}${copiesText}`, data };
 }
 
 /** Function-backed `git land <worktree> <ref>` verb. */

@@ -3,6 +3,7 @@
 import { reapProviderReservations } from '../machine/provider-reservation-reap.mjs';
 import { bootIdentity } from './boot-id.mjs';
 import { previousBootRev, recordSwap } from './revision-swap.mjs';
+import { driftOfRuntime, syncRuntime } from '../hfs/sync-runtime.mjs';
 
 /** The text line of a `--once` result. */
 export const onceLine = (result) => '[reconciler --once] ' + ((result.ok && 'ok') || 'NOT OK') + ' ' + (result.controllers.map((c) => `${c.name}(${c.mode}) keys=${c.keys} ok=${c.ok} failed=${c.failed.length}`).join('; ') || 'no controller on') + ((result.error && ` ${result.error}`) || '');
@@ -29,10 +30,30 @@ function recoveryStep(engine, step, run) {
  * receipts the host restart ended (a reboot leaves the whole batch stale) and re-arms the queue keys whose retry budget an earlier process spent.
  * When the previous engine booted on another revision it records the swap with the actions this start performed (revision-swap.mjs).
  */
-export function startRecovery(engine, safeStart, { reap = reapProviderReservations, boot = bootIdentity } = {}) {
+/**
+ * The generated package runtime copies (packages/hfs/runtime, packages/eslint/{be,fe}/runtime) are git-ignored output of the runtime sources; a `git merge` on the
+ * live checkout moves the sources and leaves them stale. A new engine process checks them against their sources and regenerates what drifted; when it cannot,
+ * it does not lead (typed cause runtime-copies-stale, RT_GENERATED_DRIFT): a runtime serving stale generated copies is not the revision it reports.
+ */
+export function ensureRuntimeCopies(engine, { driftOf = driftOfRuntime, sync = syncRuntime } = {}) {
+  const drift = driftOf();
+  if (!drift.length) return null;
+  try {
+    const files = sync();
+    engine.log('reconciler.event', `engine start regenerated the runtime copies (${drift.length} difference(s), ${files} file(s) written)`, { kind: 'reconciler.runtime-copies-synced', drift: drift.slice(0, 10) });
+    return { action: 'runtime-copies-synced', count: drift.length };
+  } catch (error) {
+    engine.log('reconciler.error', `engine start could not regenerate the runtime copies: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.runtime-copies-stale', drift: drift.slice(0, 10) });
+    throw Object.assign(new Error(`runtime-copies-stale: RT_GENERATED_DRIFT ${drift.length} generated copy difference(s) and starci release sync-runtime failed: ${String(error?.message ?? error).slice(0, 200)}`), { code: 'runtime-copies-stale' });
+  }
+}
+
+export function startRecovery(engine, safeStart, { reap = reapProviderReservations, boot = bootIdentity, copies = ensureRuntimeCopies } = {}) {
   if (safeStart.reevaluated) logSafeReevaluated(engine, safeStart);
   const priorRev = previousBootRev(engine.state);
   const applied = [{ action: 'engine-restarted', count: 1 }];
+  const synced = copies(engine);
+  if (synced) applied.push(synced);
   recoveryStep(engine, 'boot-id', () => {
     const identity = boot({ now: engine.now?.() });
     engine.log('reconciler.event', `engine start on host boot ${identity.bootId}`, { kind: 'reconciler.boot', ...identity, pid: process.pid, rev: engine.rev ?? null });

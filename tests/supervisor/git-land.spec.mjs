@@ -45,6 +45,7 @@ const greenDeps = (fx, more = {}) => ({
   changedFiles: () => ['scripts/value.mjs'],
   runSpecs: () => ({ ok: true, selected: 1, pass: 1, rerun: 0, log: path.join(fx.base, 'land.log') }),
   announceLand: () => true,
+  syncCopies: () => 540,
   ...more,
 });
 
@@ -158,4 +159,18 @@ test('ff-only refuses when local main moved to a divergent commit while verifica
   assert.equal(out.data.refusal.step, '6-local-main');
   assert.equal(out.data.refusal.cause, 'fast-forward');
   assert.notEqual(git(fx.repo, 'rev-parse', 'HEAD'), fx.tip);
+});
+
+test('a land regenerates the generated runtime copies of the live checkout after main moved, and says so when it cannot', async (t) => {
+  const fx = fixture(t);
+  let synced = 0;
+  const out = await gitLand(context(fx), greenDeps(fx, { syncCopies: () => { synced += 1; return 540; } }));
+  assert.equal(out.code, 0, out.text);
+  assert.equal(synced, 1);
+  assert.deepEqual(out.data.copies, { ok: true, files: 540 });
+  const fx2 = fixture(t);
+  const failing = await gitLand(context(fx2), greenDeps(fx2, { syncCopies: () => { throw new Error('EBUSY'); } }));
+  assert.equal(failing.code, 0, 'the land happened; the copies are reported, not the land refused');
+  assert.equal(failing.data.copies.ok, false);
+  assert.match(failing.text, /runtime copies were NOT regenerated.*starci release sync-runtime/);
 });
