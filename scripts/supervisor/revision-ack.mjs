@@ -21,7 +21,7 @@ export function revisionAck(m, { plan = false, rev = null, manifestFile = null }
   try {
     if (resolveRev(seat.root, String(rev)) !== seat.current) return { ok: false, code: 'supervisor-rev-unknown', error: 'the revision is not the current deployed commit' };
     const done = attest(seat, JSON.parse(fs.readFileSync(String(manifestFile), 'utf8')));
-    return { ok: true, rev: seat.current, count: done.manifest.files.length, filesSha: done.filesSha };
+    return { ok: true, rev: seat.current, count: done.manifest.files.length };
   } catch (error) { return { ok: false, code: error.code ?? 'revision-read-unverified', error: String(error?.message ?? error) }; }
 }
 

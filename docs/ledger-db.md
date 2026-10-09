@@ -208,6 +208,24 @@ each ledger read-only (`forEachLedger`) and merge in JavaScript. Attaching a bat
   transcript keeps 90 days after the session ends. A blob a Work record cites (`pinned = 1`) is kept
   forever.
 
+### The storage convention (owner ruling 2026-10-09)
+
+Content lives as a file in the blob store under the runtime state dir (`<runtime root>/.runtime/artifacts`, content-addressed, `engine/db/blob.mjs`); a database row
+holds only the reference (the sha) plus the small scalars it is queried by. The convention is declared once, in `modules/schemas/storage-convention.yaml`, and enforced by
+the `storage-convention` check (`RT_STORAGE_UNDECLARED`) and the `event-spill` check (`RT_EVENT_SPILL_BYPASS`).
+
+- **Always a blob, whatever its size:** a report, a critique or verdict, a prompt or dispatch contract, a read manifest, a list of files, a log or command output, a menu or digest
+  snapshot, an image or render, a diff.
+- **May stay inline:** ids, states, timestamps, counts, short codes and one-line reasons up to 256 bytes (`scalar`); other free text that is queried or shown whole up to
+  1024 bytes (`bounded`); the sha or uri of a blob (`reference`).
+- **A payload of any size** (`events.payload_json`, `sup_events.payload_json`) goes through the one spill path: the writer keeps a bounded inline view (at most 16 KiB, the top-level
+  scalars) and the whole payload behind `payload_sha`; readers resolve it with `eventPayloadOf` (`engine/db/event-payload.mjs`).
+- **Declared, not assumed:** every text column of the product ledger and of `machine.sqlite` has a class in the registry. A column that holds content inline today is class
+  `migrate`, listed with the largest value measured in the read-only copies of the live stores; the migration of such a column to a reference is a proposed runtime step
+  (idempotent, journalled), never a hand rewrite of a live store. Existing rows stay readable: a legacy inline value resolves as before.
+- **Retention.** Blobs are immutable. `blob-gc.mjs` marks and plans only; it does not delete (apply is refused until every reference writer fences deletion), so nothing collects an
+  unreferenced blob today (the live store is about 164 MB).
+
 ## 6. `.starciwork`
 
 `.starciwork` keeps what matters to the product and nothing about agents: Work records, SRS/SDS,

@@ -37,7 +37,7 @@ editions:
   - full
 reads: the workflow ledger's revision records and the bytes of the files the change sends
 writes: one runtime-rev-noticed event (verdict acked) with the two revisions, a count and the diff hash; the file list is a blob
-returns: '{ok:true, workflowId, state, readManifest (null when nothing is owed)} for --plan; {ok:true, workflowId, rev, count, filesSha} for an attestation'
+returns: '{ok:true, workflowId, state, readManifest (null when nothing is owed)} for --plan; {ok:true, workflowId, rev, count} for an attestation'
 refuses:
   - workflow-unknown
   - kernel-rev-unknown

@@ -11,7 +11,6 @@ import { writeReceipt, receiptFile } from '../../scripts/reconciler/runtime-depl
 import { areaOf, areasOf } from '../../scripts/reconciler/runtime-deploy-source.mjs';
 import { acquireHostLock, releaseHostLock } from '../../scripts/machine/host-lock.mjs';
 import { openPreparedOf } from '../../scripts/kernel/settle/prepared-recovery.mjs';
-import { getBlob } from '../../engine/db/blob.mjs';
 import { readMachine } from '../../engine/db/machine.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -158,7 +157,7 @@ test('the happy path: a tip three commits ahead is ONE revision change, checked,
   assert.equal((await run(bare, { from: bare.clone })).code, 0);
   assert.equal(events(bare, 'runtime-deployed')[0].payload.roleActions, null, 'a new tree without the verb leaves the field null');
   assert.ok(Buffer.byteLength(JSON.stringify(p)) < 4096, 'the payload is small');
-  assert.deepEqual(JSON.parse(getBlob(p.filesSha).toString('utf8')).files.sort(), ['docs/c.md', 'modules/kernel/b.yaml', 'scripts/kernel/a.mjs']);
+  assert.deepEqual([...p.files].sort(), ['docs/c.md', 'modules/kernel/b.yaml', 'scripts/kernel/a.mjs']);
   assert.equal(fs.existsSync(receiptFile(w.tip, w.env)), true, 'the verb wrote the receipt after running the check itself');
 });
 

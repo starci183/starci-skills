@@ -15361,6 +15361,17 @@ RT_PROSE_RESTATES_SLOTS:
   owner: supervisor
   kind: check-finding
 
+RT_STORAGE_UNDECLARED:
+  title: "A text column of a store has no storage class"
+  title_vi: "Một cột văn bản của kho dữ liệu chưa có lớp lưu trữ"
+  meaning_vi: "Nội dung nằm thành tệp trong kho blob dưới thư mục trạng thái runtime còn hàng trong cơ sở dữ liệu chỉ giữ tham chiếu (sha) và các giá trị nhỏ dùng để truy vấn. Mọi cột văn bản của sổ cái sản phẩm và machine.sqlite phải được khai báo trong modules/schemas/storage-convention.yaml với một lớp: scalar, bounded, reference, spill hoặc migrate. Một cột chưa khai báo, một khai báo trỏ vào cột không còn, một lớp lạ, hoặc lớp migrate không khớp danh sách migrations là đi vòng quy ước."
+  causes_vi:
+    - "Thêm bảng hoặc cột văn bản mới mà không khai báo lớp"
+    - "Cột bị đổi tên hoặc xóa nhưng khai báo vẫn còn"
+  nextStep_vi: "Khai báo cột trong modules/schemas/storage-convention.yaml: nội dung dùng reference (lưu blob, giữ sha), giá trị nhỏ dùng scalar hoặc bounded."
+  owner: supervisor
+  kind: check-finding
+
 RT_EVENT_SPILL_BYPASS:
   title: "A ledger event payload is spilled by hand"
   title_vi: "Một payload sự kiện của sổ cái được tự chuyển sang blob"

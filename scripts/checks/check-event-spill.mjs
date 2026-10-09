@@ -18,6 +18,7 @@ export const SELF_FILES = Object.freeze(['scripts/checks/check-event-spill.mjs',
 const inScope = scopeFilter({ scope: /^(?:scripts|engine|ui|ext)\//, ext: /\.(?:mjs|cjs|js)$/, out: /node_modules\/|\/dist\/|^packages\/|\.spec\./, exclude: [...OWNER_FILES, ...SELF_FILES] });
 const BYPASS = [
   { re: /\bpayloadSha\s*[:,)}]/, what: 'passes payloadSha to a write' },
+  { re: /\b(?:filesSha|storeList)\b/, what: 'stores a list by hand and references its sha from an event' },
   { re: /STARCI_EVENT_PAYLOAD_TOO_LARGE/, what: 'catches the payload-too-large refusal to spill by hand' },
   { re: /INSERT\s+INTO\s+events\b|insertRow\(\s*db\s*,\s*['"]events['"]/i, what: 'inserts into the events table directly' },
 ];
