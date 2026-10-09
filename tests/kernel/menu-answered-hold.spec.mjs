@@ -141,3 +141,12 @@ test('a prepared fail decision the runtime kept stays the Kernel\'s after the se
   assert.ok(!item.options.some((option) => option.choice === 'accept'), 'a pass is refused against a prepared fail decision');
   assert.ok(item.options.some((option) => option.choice === 'settle-fail'));
 }));
+
+test('an approved leg that this Kernel life has not attested its READ for says so in its question (StarCi: enqueue refused kernel-read-unverified three lives in a row)', () => {
+  const action = { kind: 'dispatch', origin: 'approved-leg-open', op: 'interface.draw', reason: 'approved leg interface.draw has no job' };
+  const [bare] = buildMenu(sources({ nextActions: [action] }));
+  assert.doesNotMatch(bare.question, /attest/);
+  assert.doesNotMatch(bare.question, /\{attest\}/);
+  const [noted] = buildMenu(sources({ nextActions: [{ ...action, attest: 'This Kernel life has not attested its READ for interface.draw (19 file(s)): run starci kernel kernel-ack-rev --plan --op interface.draw.' }] }));
+  assert.match(noted.question, /not attested its READ for interface\.draw \(19 file\(s\)\)/);
+});

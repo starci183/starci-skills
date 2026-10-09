@@ -1045,3 +1045,24 @@ cases:
     rule: {file: scripts/kernel/settle/prepared-recovery.mjs, anchor: "keptOpenOf"}
     spec: tests/kernel/menu-answered-hold.spec.mjs
     status: covered
+  - id: stray-file-in-the-workflow-tree-blocks-the-fail-decision-recovery
+    family: failure-while-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a failed op settles and the tree goes back on its checkpoint) every settle-fail of Nivo op-architecture.decide-e78adc94cc after 13:12 died workflow-checkpoint-recovery-conflict: the Kernel shell had left a file named 0 in the root of the workflow tree (a redirect, 91 bytes, 13:12:46), a file under no lease that appeared after the receipt was prepared, and the recovery refuses any newer file (\"newer files conflict with the prepared effect\"); the Kernel cannot delete a file, the settler looks at the receipt once", remedy: {state: in-tree, change: "when the only files newer than a prepared preserve receipt are strays (under no lease) and the branch has not moved, the receipt is prepared again so that the preserved commit and the reset cover them; a newer file of the op's own scope stays a conflict"}}
+    met: {date: "2026-10-09", where: "alpha.8 live 13:54, Nivo workflow tree", evidence: "the tree: untracked file 0 (13:12:46) at its root, HEAD 7ea9436, no reset in the reflog since 07:40; nivo runtime.sqlite events 979, 986, 990 (settle failed: workflow-checkpoint-recovery-conflict)"}
+    rule: {file: scripts/kernel/workflow-checkpoint.mjs, anchor: "onlyStrayIsNewer"}
+    spec: tests/kernel/workflow-checkpoint.spec.mjs
+    status: covered
+  - id: idle-wakes-of-an-earlier-revision-replace-the-kernel-after-the-deploy
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a Kernel is replaced only when it is really dead or idle at the situation it was woken for) the StarCi Kernel received three idle wakes at 13:34 to 13:35 under revision 328a4d3; the deploy of 6513ee8 changed the situation and re-offered items, and at 13:48:41 the watchdog replaced the Kernel for the three old wakes (kernel-replaced-idle, attempt 12 to 13), twelve minutes after the deploy", remedy: {state: in-tree, change: "a kernel-woken event records the runtime revision it was given under, and the idle-wake streak counts only wakes of the live revision"}}
+    met: {date: "2026-10-09", where: "alpha.8 live 13:48, StarCi workflow", evidence: "starci runtime.sqlite events 3011 to 3014 (kernel-woken idleWakes 1 to 3), 3033 (kernel-replaced-idle wakes 3), 3041 (kernel-restarted attempt 13)"}
+    rule: {file: scripts/kernel/kernel-watchdog.mjs, anchor: "idleWakesOf"}
+    spec: tests/kernel/auth-seat-churn.spec.mjs
+    status: covered
+  - id: approved-leg-asks-no-attestation-the-enqueue-needs
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: the menu says what the choice needs) the StarCi Kernel of attempt 13 chose enqueue-leg for interface.draw at 13:53 and was refused kernel-read-unverified: a Kernel life must attest the files of the leg it opens (84 to 103 files), the status shows only the attestation of an earlier life (\"acked 328a4d\"), and nothing on the leg-ready item said so, so three lives in a row answered the item without attesting", remedy: {state: in-tree, change: "the leg-ready item carries the unattested file count and the kernel-ack-rev steps while this life has not attested the READ of that leg"}}
+    met: {date: "2026-10-09", where: "alpha.8 live 13:54, StarCi workflow", evidence: "starci runtime.sqlite events 3052, 3053 (enqueue-leg reverted kernel-read-unverified at attempt 13); the plan on the copy lists 103 files, 103 unread; the attestation lands on the copy"}
+    rule: {file: scripts/kernel/verbs/shared/status-menu.mjs, anchor: "attestNoteOf"}
+    spec: tests/kernel/menu-answered-hold.spec.mjs
+    status: covered

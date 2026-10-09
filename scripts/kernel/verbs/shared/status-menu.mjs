@@ -7,7 +7,9 @@ import { buildMenu, menuCatalog, snoozeMs } from '../../kernel-menu.mjs';
 import { feedbackOfHandover } from '../../handover-slices.mjs';
 import { decisionsOf } from '../../progress-rca.mjs';
 import { keptOpenOf } from '../../settle/prepared-recovery.mjs';
-import { currentRuntimeRev } from '../../runtime-rev.mjs';
+import { currentRuntimeRev, revRootOf } from '../../runtime-rev.mjs';
+import { kernelReadManifest, unreadFiles } from '../../required-read.mjs';
+import { kernelAuthorityOf, kernelCustodyOf } from './kernel-seat.mjs';
 import { failureFactsOf } from '../../failure-class.mjs';
 import { failedShapesOf, jobRow, shapeOf } from '../../kernel-authority.mjs';
 
@@ -87,6 +89,20 @@ const feedbackOf = (s) => (s.handover?.ask?.decision === 'feedback' && s.handove
   ? feedbackOfHandover(s.workflowJobs, s.handover.ask, { max: menuCatalog().kinds.find((kind) => kind.id === 'handover-step').feedback.maxSlices })
   : null);
 
+/**
+ * The sentence an approved leg carries when this Kernel life has not attested the files that leg needs read: enqueue is refused kernel-read-unverified until it has, and
+ * nothing else on the menu says so (the status line shows the last attestation of an earlier life). Empty when the READ is complete or cannot be planned.
+ */
+function attestNoteOf(s, action) {
+  if (action.origin !== 'approved-leg-open' || !action.op) return '';
+  try {
+    const authority = kernelAuthorityOf(s.db, s.workflowId, kernelCustodyOf(s.db, s.workflowId).terminal);
+    const required = kernelReadManifest(s.db, s.workflowId, { root: revRootOf(), authority, ops: [action.op] });
+    const unread = unreadFiles(s.db, s.workflowId, required);
+    return unread.length ? `This Kernel life has not attested its READ for ${action.op} (${unread.length} file(s)): enqueue is refused kernel-read-unverified until it does; run starci kernel kernel-ack-rev --plan --op ${action.op}, read the files it lists, then attest with --rev and --read-manifest.` : '';
+  } catch { return ''; }
+}
+
 /** s.menu: the ordered open decision points, and the frontier's `actionable` follows it. */
 export const menuPhase = (s) => {
   const { db, workflowId, wf, now } = s;
@@ -97,7 +113,7 @@ export const menuPhase = (s) => {
   s.menu = buildMenu({
     workflow: workflowId, rev: s.kernelRev, jobDecisions: jobDecisionsOf(s, live), shapeRefused: shapeRefusedOf(s),
     questions: s.workerQuestions, peers: s.peerMessages, wedged: s.wedgedWorkers.map((w) => ({ jobId: w.jobId, opId: s.workflowJobs.find((row) => row.job_id === w.jobId)?.op_id ?? null })),
-    deadWaits: deadWaitsOf(s), decisions: live.filter((di) => !OWN_KIND.has(di.kind)), nextActions: s.graph.nextActions, handover: s.handover, feedback: feedbackOf(s), snoozed: snoozedOf(s), answered: answeredOf(s),
+    deadWaits: deadWaitsOf(s), decisions: live.filter((di) => !OWN_KIND.has(di.kind)), nextActions: s.graph.nextActions.map((action) => ({ ...action, attest: attestNoteOf(s, action) })), handover: s.handover, feedback: feedbackOf(s), snoozed: snoozedOf(s), answered: answeredOf(s),
   });
   s.actionable = s.menu.length > 0;
   s.frontier.actionable = s.actionable;

@@ -106,3 +106,14 @@ test('B: an idle or wake-dead replace whose terminal close failed answers kernel
   assert.equal(seatStateOf('kernel-terminal-close-failed'), 'replacing');
   assert.equal(REPLACED.has('kernel-terminal-close-failed'), false);
 });
+
+test('A1c: wakes given under an earlier runtime revision do not count against the Kernel after a deploy (StarCi 13:48: 3 wakes before the deploy replaced the Kernel 12 minutes after it)', () => {
+  const withRev = (kind, t, rev) => ({ kind, created_at: at(t), payload_json: JSON.stringify({ rev }) });
+  const wakes = [withRev('kernel-woken', '10:00:00', 'old'), withRev('kernel-woken', '10:01:00', 'old'), withRev('kernel-woken', '10:02:00', 'old')];
+  assert.equal(idleWakesOf(wakes, { now: at('10:40:00'), rev: 'old' }).due, true, 'the same revision: three idle wakes replace the Kernel');
+  const after = idleWakesOf(wakes, { now: at('10:40:00'), rev: 'new' });
+  assert.equal(after.wakes, 0, 'a new revision starts the streak over');
+  assert.equal(after.due, false);
+  const mixed = idleWakesOf([...wakes, withRev('kernel-woken', '10:30:00', 'new')], { now: at('10:40:00'), rev: 'new' });
+  assert.equal(mixed.wakes, 1, 'only the wake given under the live revision counts');
+});
