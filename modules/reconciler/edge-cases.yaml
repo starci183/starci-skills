@@ -919,3 +919,10 @@ cases:
     rule: {file: scripts/kernel/gate-holds-ended.mjs, anchor: "pendingRejudgeOf"}
     spec: tests/kernel-settle/handover-rejudge.spec.mjs
     status: covered
+  - id: ask-report-owned-by-nobody
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: every report is consumed within the settler's bound) StarCi op-brand.decide-2a722a1aa2 (try 5) reported outcome ask at 10:52:11 (a new question: which demo persona; brand and render had passed this time); the autopilot answered it provisionally at 10:52:15 (ask-answered, event 2572), yet the report stayed reported for 16 minutes: the Job controller's report plan sent every non-done outcome to a settle-nongreen item for the Kernel ('the settler never settles these'), although the settler settles ask, blocked, failed and partial itself (mechanicalSettleOf, H1) and the Kernel menu has no item for a job the settler never handed over (the item lives only while the settler hands the job to the Kernel): the Kernel yielded on an empty menu, correctly", remedy: {state: in-tree, change: "the Job controller plans the settler for every report but the owner's own act (handover.review): ask and blocked settle blocked, failed and partial settle fail, then the retry moves and the autopilot's provisional answer carry on"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "starci runtime.sqlite events 2568 (reported, report-filed:ask), 2572 (ask-answered); decision_items di-771feb90 settle-nongreen open, menu [] and frontier transition-ready"}
+    rule: {file: scripts/reconciler/job-plan-report.mjs, anchor: "planReport"}
+    spec: tests/kernel-settle/handover-rejudge.spec.mjs
+    status: covered

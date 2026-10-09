@@ -140,12 +140,13 @@ test('the settle that ends the last job a supervisor-gate holds closes the gate'
 }));
 
 /** The Nivo state of 2026-10-09: architecture.decide reported done, handed over by an older runtime, held by an open supervisor-gate. */
-function gatedWorld(ledger, { jobId = 'op-gated', opId = 'architecture.decide' } = {}) {
+function gatedWorld(ledger, { jobId = 'op-gated', opId = 'architecture.decide', outcome = 'done', gated = true } = {}) {
   seedWorkflow(ledger, { id: 'wf-n', goal: { revision: 1, markdown: '# n' }, jobs: [{ jobId, opId, status: 'reported', payload: { opId, owned_paths: [] } }] });
   const { attempt_id: attemptId, dispatch_id: dispatchId } = ledger.db.prepare('SELECT attempt_id, dispatch_id FROM op_attempts WHERE job_id=?').get(jobId);
   ledger.db.prepare("INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,created_at) VALUES(?,'wf-n',?,'m',?)").run(attemptId, jobId, Date.now());
-  ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES('wf-n',?,?,?,'done',?,?)")
-    .run(attemptId, dispatchId, jobId, JSON.stringify({ head: 'abc', checks: [{ name: 'c', command: 'echo x', exitCode: 0 }] }), Date.now() - 60_000);
+  ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES('wf-n',?,?,?,?,?,?)")
+    .run(attemptId, dispatchId, jobId, outcome, JSON.stringify({ head: 'abc', checks: [{ name: 'c', command: 'echo x', exitCode: 0 }] }), Date.now() - 60_000);
+  if (!gated) return { dispatchId };
   openIncident(ledger.db, { incidentId: 'inc-gate', workflowId: 'wf-n', kind: 'supervisor-gate', opId, detail: 'settle refused op-gate-tool-failed: owned slice cannot be bound', lastProgress: '[supervisor-gate] settle refused' });
   ledger.transaction(() => {
     ledger.appendEvent({ workflowId: 'wf-n', entityType: 'incident', entityId: 'inc-gate', kind: 'incident-raised', payload: { kind: 'supervisor-gate', opId, holds: [jobId] } });
@@ -202,3 +203,23 @@ test('a workaround that would dispatch a finished leg again waits for the runtim
     payload: { dispatchId: ledger.db.prepare('SELECT dispatch_id FROM op_attempts WHERE job_id=?').get('op-gated').dispatch_id, reason: 'settle-refused', runtimeRev: 'f'.repeat(40) } }));
   assert.deepEqual(pendingRejudgeOf(ledger.db, 'wf-n', gate, { runtimeRev: 'f'.repeat(40) }), [], 'judged under the live revision and handed back red: the workaround may be answered');
 }));
+
+test('a report whose outcome is ask or blocked is settled blocked by the settler within its bound, never left to a Kernel menu that has no item for it (StarCi op-brand.decide-2a722a1aa2, 10:52)', async (t) => {
+  for (const outcome of ['ask', 'blocked', 'failed']) {
+    const fx = reportedFixture(null, outcome);
+    t.after(fx.close);
+    const step = stepOf(fx);
+    assert.equal(step.kind, 'settle', `${outcome}: ${JSON.stringify(step)}`);
+  }
+  await withLedger(t, async ({ repoRoot, ledger }) => {
+    gatedWorld(ledger, { jobId: 'op-asked', outcome: 'ask', gated: false });
+    ledger.close();
+    const calls = [];
+    const api = (args) => { calls.push(args); return { ok: true, value: { status: 'failed' } }; };
+    const out = await reconcileJobSettle({ repo: repoRoot, jobId: 'op-asked', verify: async () => ({ green: false, reason: 'outcome-ask' }), locks: false, api });
+    assert.equal(out.errors.length, 0, JSON.stringify(out.errors));
+    const settle = calls.find((args) => args[0] === 'settle');
+    assert.ok(settle, 'the settle API was called');
+    assert.equal(settle[settle.indexOf('--verdict') + 1], 'blocked');
+  });
+});

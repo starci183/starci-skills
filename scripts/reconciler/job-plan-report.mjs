@@ -13,10 +13,10 @@ export function planReport(f, clock, set) {
   } else if (f.handover) {
     clock('DECISION_OVERDUE', f.handover.at);
     set({ kind: 'settle-nongreen', concern: 'job.consume-check', reason: f.handover.reason });
-  } else if (f.report.outcome !== 'done' || KERNEL_ONLY_OPS.includes(f.op)) {
-    // The settler never settles these; its handover is the Kernel's item (starci kernel status settleDecisions).
+  } else if (KERNEL_ONLY_OPS.includes(f.op)) {
+    // The owner's act is the Kernel's item; every other outcome (done, blocked, ask, failed, partial) the settler settles itself (job-settle.mjs mechanicalSettleOf).
     clock('DECISION_OVERDUE', f.report.filedAt);
-    set({ kind: 'settle-nongreen', concern: 'job.consume-check', reason: KERNEL_ONLY_OPS.includes(f.op) ? 'owner-act' : `outcome-${f.report.outcome}` });
+    set({ kind: 'settle-nongreen', concern: 'job.consume-check', reason: 'owner-act' });
   } else {
     clock('SETTLE_OVERDUE', f.report.filedAt);
     set({ kind: 'settle', concern: 'job.settle' });
