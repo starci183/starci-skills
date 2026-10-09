@@ -1,0 +1,134 @@
+# Which part of the runtime tree concerns which role, and what each role does when a path of it changes between two revisions.
+# Read by scripts/reconciler/revision-scope.mjs; the self-check `revision-scope` (scripts/checks/check-revision-scope.mjs) proves that
+# every tracked path of the tree matches at least one row, that the engine-loaded set is derived from the import graph and never
+# hand-listed, and that the vocabulary below is the only one used.
+#
+# One role per key of `roles`; an absent role takes no action. A path that matches several rows takes, per role, the HEAVIEST action
+# of those rows (`order` below): an ambiguous path is read, never skipped. A path that matches no row takes `default` (the self-check
+# keeps that from happening for a tracked path; it covers a path that appears later).
+#
+# Actions, lightest to heaviest:
+#   none       nothing for this role: a docs, test or changelog change costs the seat nothing and blocks nothing.
+#   immediate  the file is a guard or a command policy: it bites on the next command, nothing is read or restarted.
+#   admission  an Op or a Critic keeps the rules of its admission for the attempt in flight and is never updated or restarted inside an
+#              attempt; the next try and the next Critic run are admitted under the new rules.
+#   restart    the long-lived engine process loaded the file at start: one engine restart (a process matter, never a seat's). For code the
+#              set is DERIVED (`engine: derived`): a file reachable from `engineEntries` through relative imports restarts the engine, any
+#              other script is a new process on every command and needs nothing.
+#   reread     the default for a live seat: it is updated in place - woken once with exactly the changed files, it reads and acks them.
+#   contract   the seat's contract, menu or policy: UPDATED in place when the change only adds lines; REPLACED by a fresh seat that boots
+#              from the stores (principle P8) when a line of an existing file is deleted or modified (a removed or reversed rule would
+#              stay in the seat's context after a re-read), for a binary file, or when git cannot measure the diff. A commit may declare
+#              an edit wording-only (trailer `Revision-Wording: <path>`); the declaration holds only for a file that keeps its structure.
+#   boot       the file feeds the seat's launch prompt (`seatBoot` below): the prompt is loaded once at birth and cannot be re-read, so
+#              any change replaces the seat.
+# A seat that is already due for rotation by context or budget is replaced by that rotation and the revision change is folded into it
+# (the fresh seat reads the current tree), never updated and then replaced. A replacement happens at the seat's next yield, never in the
+# middle of a decision, and only when nothing of the seat is in flight.
+schema: starci/revision-scope@1
+order: [none, immediate, admission, restart, reread, contract, boot]
+roleIds: [kernel, supervisor, op, critic, engine]
+default:
+  kernel: contract
+  supervisor: contract
+  op: admission
+  critic: admission
+  engine: restart
+# The processes that stay loaded across commands. The controllers directory is discovered at start, so every controller is an entry.
+engineEntries:
+  - scripts/reconciler/engine.mjs
+  - scripts/reconciler/controllers/*.mjs
+  - scripts/machine/decisions.mjs
+# The files each seat's launch prompt is built from, and the generator that reads them. The self-check reads the generator and fails
+# when it names a file of its modules directory that is not listed here (or a listed file it does not name).
+seatBoot:
+  kernel:
+    generator: scripts/kernel/start-workflow.mjs
+    dir: modules/kernel
+    files: [modules/kernel/kernel-prompt.md]
+  supervisor:
+    generator: scripts/supervisor/start-supervisor.mjs
+    dir: modules/supervisor
+    files: [modules/supervisor/supervisor-prompt.md, modules/supervisor/supervise.yaml]
+rows:
+  - id: docs-and-notes
+    why: "text a person reads; no role loads it"
+    paths: ["docs/**", "**/*.md", CHANGELOG.md, LICENSE, THIRD_PARTY_NOTICES.md, "benchmark/**", codecov.yml, sonar-project.properties, .gitattributes, .gitignore, ".github/**", ".claude/**", "ext/**", "init/**", hfs.json]
+    roles: {}
+  - id: tests
+    why: "specs, fixtures and example applications are run, never read by a role"
+    paths: ["tests/**", "**/*.spec.mjs", "examples/**", "packages/test-world/**"]
+    roles: {}
+  - id: tooling
+    why: "UI, packages, skills and tool configuration: a new process on every use"
+    paths: ["ui/**", "packages/**", "skills/**", package.json, package-lock.json, config.example.yaml, secret.env.example, "knowledge/hfs/**", "knowledge/grammars/**"]
+    roles: {}
+  - id: code
+    why: "runtime code: the engine restarts only for the files its process loaded (derived from the import graph); every verb is a new process"
+    paths: ["scripts/**/*.mjs", "engine/**/*.mjs", "packages/**/*.mjs", "ui/**/*.mjs"]
+    roles: {engine: derived}
+  - id: guards
+    why: "guards and the command policy bite on the next command"
+    paths: ["scripts/guards/**", modules/kernel/command-policy.yaml]
+    roles: {kernel: immediate, supervisor: immediate, op: immediate, critic: immediate}
+  - id: kernel-seat
+    why: "the Kernel's contract: prompt, loop, API, rulings"
+    paths: [modules/kernel/driver-loop.yaml, modules/kernel/api.yaml, modules/kernel/owner-rulings.yaml]
+    roles: {kernel: contract}
+  - id: kernel-boot
+    why: "the file a Kernel's launch prompt is built from; it is loaded once at birth and cannot be re-read mid-session"
+    paths: [modules/kernel/kernel-prompt.md]
+    roles: {kernel: boot}
+  - id: kernel-menu-and-policy
+    why: "the menu a Kernel answers and the policy rows behind it; the Supervisor rules on the gates they raise"
+    paths: [modules/kernel/kernel-menu.yaml, modules/kernel/op-incident-policy.yaml]
+    roles: {kernel: contract, supervisor: reread, engine: restart}
+  - id: kernel-cli
+    why: "the verbs a Kernel is taught"
+    paths: ["modules/cli/commands/kernel/**"]
+    roles: {kernel: reread}
+  - id: supervisor-cli
+    why: "the verbs the Supervisor is taught"
+    paths: ["modules/cli/commands/supervisor/**"]
+    roles: {supervisor: reread}
+  - id: cli-other
+    why: "the other verb definitions: read when a command starts"
+    paths: ["modules/cli/**", "modules/i18n/**"]
+    roles: {}
+  - id: roles-contract
+    why: "the source of every role block; the generated surfaces have their own rows"
+    paths: [modules/kernel/roles.yaml]
+    roles: {kernel: reread, supervisor: reread}
+  - id: supervisor-seat
+    why: "the Supervisor's contract: prompt, rules and menu"
+    paths: [modules/supervisor/supervisor-menu.yaml, modules/supervisor/bridging.yaml, modules/supervisor/lessons.yaml]
+    roles: {supervisor: contract}
+  - id: supervisor-boot
+    why: "the files the Supervisor's launch prompt is built from (the prompt and the doctrine block taken from supervise.yaml)"
+    paths: [modules/supervisor/supervisor-prompt.md, modules/supervisor/supervise.yaml]
+    roles: {supervisor: boot}
+  - id: supervisor-worker
+    why: "the prompt of the Supervisor's workers"
+    paths: [modules/supervisor/worker-prompt.md]
+    roles: {supervisor: reread}
+  - id: supervisor-tooling
+    why: "data of commands the Supervisor runs: read when a command starts"
+    paths: [modules/supervisor/affected-tests.yaml, modules/supervisor/release-cut.yaml, modules/supervisor/test-concurrency.yaml]
+    roles: {}
+  - id: op-contracts
+    why: "the op briefs and the knowledge an Op reads; a Kernel re-reads them before it enqueues the op"
+    paths: ["modules/ops/**", "modules/models/**", "knowledge/*.yaml", "knowledge/patterns/**", "knowledge/ui/**"]
+    roles: {op: admission, kernel: reread}
+    opKinds: {from: "modules/ops/ops/(?<kind>[^/]+)[.]yaml", otherwise: all}
+  - id: critic-contracts
+    why: "the Critic's rubric and verdict contract"
+    paths: [modules/kernel/critic.yaml, modules/kernel/critic-rubrics.yaml, modules/kernel/verdict-contract.yaml]
+    roles: {critic: admission, op: admission, kernel: reread}
+  - id: engine-assets
+    why: "files of the engine package and script data files: loaded by the long-lived process or by a command; the heavier action holds"
+    paths: ["engine/**/*.sql", "engine/**/*.json", "scripts/**/*.txt", "scripts/**/*.json", "scripts/**/*.yaml"]
+    roles: {engine: restart}
+  - id: engine-data
+    why: "tables the engine loads at start"
+    paths: ["modules/reconciler/**", "modules/host/**", "modules/goal/**", "modules/schemas/**", modules/kernel/allowlist.yaml, modules/kernel/dispatch.yaml, modules/kernel/failure-codes.yaml, modules/kernel/gate-loosening.yaml, modules/kernel/product-land.yaml, modules/kernel/protected-zone.yaml, modules/kernel/removed-vocabulary.yaml, modules/kernel/spec-durations.yaml, modules/kernel/start-workflow.yaml]
+    roles: {engine: restart}

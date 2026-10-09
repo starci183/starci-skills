@@ -1,0 +1,72 @@
+// revision-scope.mjs — the declared table of modules/kernel/revision-scope.yaml: which path of the runtime tree concerns which role, and the
+// action each role takes when that path changes. Pure over the table and a file name; the git side (what changed between two revisions) is
+// revision-change.mjs, the per-seat notice is revision-notice.mjs.
+import fs from 'node:fs';
+import path from 'node:path';
+import { parseYaml } from '../../engine/yaml.mjs';
+import { braceVariants, globExpression } from '../lib/glob.mjs';
+import { readModules, buildGraph } from '../supervisor/affected-graph.mjs';
+
+export const SCOPE_FILE = 'modules/kernel/revision-scope.yaml';
+/** The action of a seat whose contract lost or reversed a rule, or whose boot prompt changed: heavier than every table action. */
+export const REPLACE = 'replace';
+const DERIVED = 'derived';
+const regexes = new WeakMap();
+
+/** The table of the tree at `root`. */
+export const loadScope = (root) => parseYaml(fs.readFileSync(path.join(root, SCOPE_FILE), 'utf8'));
+
+const patternsOf = (row) => {
+  if (!regexes.has(row)) regexes.set(row, row.paths.flatMap(braceVariants).map(globExpression));
+  return regexes.get(row);
+};
+
+/** The rows whose paths match `file`. */
+export const rowsOf = (doc, file) => doc.rows.filter((row) => patternsOf(row).some((rx) => rx.test(file)));
+
+const rankOf = (doc, action) => (action === REPLACE ? doc.order.length : doc.order.indexOf(action));
+
+/**
+ * The action of every role for a changed `file`: the heaviest of the rows it matches (a path no row matches takes `default`). The
+ * engine's derived action is `restart` when `engineLoaded(file)` and `none` otherwise.
+ */
+export function actionsFor(doc, file, { engineLoaded = () => false } = {}) {
+  const rows = rowsOf(doc, file);
+  const out = {};
+  for (const roles of rows.length ? rows.map((row) => row.roles) : [doc.default]) {
+    for (const [role, declared] of Object.entries(roles)) {
+      const action = declared === DERIVED ? (engineLoaded(file) ? 'restart' : 'none') : declared;
+      if (rankOf(doc, action) > rankOf(doc, out[role] ?? 'none')) out[role] = action;
+    }
+  }
+  return { actions: out, rows: rows.map((row) => row.id) };
+}
+
+/** The op kinds a changed file concerns: ['*'] for a shared file, the kind a brief names, [] when the file is no op contract. */
+export function opKindsOf(doc, file) {
+  const rows = rowsOf(doc, file).filter((row) => row.opKinds);
+  if (!rows.length) return [];
+  const match = rows.map((row) => new RegExp(`^${row.opKinds.from}$`).exec(file)).find(Boolean);
+  return match?.groups?.kind ? [match.groups.kind] : ['*'];
+}
+
+/** The tracked files the engine process loads: everything reachable from `engineEntries` through static and literal dynamic imports (a spawned process is not). */
+export function engineLoadedSet(root, doc) {
+  const modules = readModules(root);
+  const files = modules.map((m) => m.file);
+  const entries = doc.engineEntries.flatMap((entry) => { const rx = globExpression(entry); return files.filter((file) => rx.test(file)); });
+  const { importers } = buildGraph({ root, modules });
+  const forward = new Map();
+  for (const links of importers.values()) {
+    for (const link of links.filter((l) => l.kind !== 'spawn')) forward.set(link.from, [...(forward.get(link.from) ?? []), link.target]);
+  }
+  const seen = new Set();
+  const stack = [...entries];
+  while (stack.length) {
+    const file = stack.pop();
+    if (seen.has(file)) continue;
+    seen.add(file);
+    stack.push(...(forward.get(file) ?? []));
+  }
+  return { loaded: seen, entries };
+}
