@@ -196,6 +196,7 @@ playbooks and mechanism owners rather than duplicating their defaults.
 - Reports to: Owner (an owner-class matter). Overseen by: the runtime, Debug.
 - Measure: gates answered inside their bound, and no defect left unrecorded.
 - Token budget (provisional): 10000000 per wake; over it, the usage sweep cuts the Supervisor session at its supervisor-wake events and tags every supervisor-turn row with the wake that owns it; the digest reports a wake over the budget as a departure of the Supervisor (supervisor-wake-budget).
+- Runtime changes (modules/kernel/revision-scope.yaml): woken once with exactly the changed files that concern it, it reads them and attests with starci supervisor revision-ack; a change that concerns it nothing costs it nothing; it is replaced by a fresh seat, at its next yield, only when a rule of its contract was removed or reversed or its boot prompt changed.
 - Guard: its terminals are bound as the "supervisor" role of modules/kernel/command-policy.yaml.
 - Happy errors it handles (the system working as designed, handled inside the chain through the policy):
   - gate-ruling (policy row supervisor-gate): a gate a Kernel raised: the Supervisor rules with fixed, workaround or not-runtime-fault (menu gate-ruling)

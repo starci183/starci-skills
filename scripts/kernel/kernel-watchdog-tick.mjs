@@ -1,4 +1,5 @@
 // One decision pass over the Kernel seat; the host owns the cadence.
+import { contractReplacement } from '../machine/revision-replace.mjs';
 const noTerminalResult = ({ workflowId, phase, terminal, repair, lostSeatWorker, exitedTwice, stopAndRelease, replaceKernel }) => {
   if (terminal) return null;
   if (!repair) return { ok: true, workflowId, phase, action: 'restart-needed', reason: 'kernel signal/terminal absent' };
@@ -84,6 +85,7 @@ const sendIdleWake = (ctx, idle) => {
   const proof = sendWakeWithProof({ terminal, text: wakePromptOf(workflowId, status.value), before: String(read.screen ?? '') });
   if (!proof.ok && proof.delivery !== 'agent-exited') recordKernelWakeFailed(terminal, { state: classified.state, sendErrorCode: proof.sendErrorCode ?? null, delivery: proof.delivery ?? null });
   if (proof.ok) recordKernelWoken(terminal, { delivery: proof.delivery ?? null, idleWakes: idle.wakes + 1 });
+  if (proof.ok && status.value?.revisionNotice?.state === 'owed') ctx.recordRevisionWoken(status.value.revisionNotice);
   if (!proof.ok && liveness.staleActive && wakeSendRefused(proof))
     return replaceUnwritableKernel({ phase, terminal, dispatch, stale, outputAgeMs, proof });
   return wakeResultOf({ proof, workflowId, phase, terminal, stale, outputAgeMs, wakeActionOf, deliveryFieldsOf });
@@ -94,7 +96,8 @@ const idleTurnResult = (ctx) => {
     dispatch, kernelWakeRefusedAt, replaceUnwritableKernel, kernelWakeFailures, wakeFailuresProveDead, replaceWakeDeadKernel,
     kernelIdleWakes, escalateIdleStall, replaceIdleKernel, kernelRotation } = ctx;
   if (classified.state !== 'turn-idle') return null;
-  if (status.value?.frontier?.actionable === false) return { ok: true, workflowId, phase, terminal, action: 'idle-waiting', ...stale, reason: status.value?.frontier?.reason ?? 'frontier not actionable', outputAgeMs };
+  const owes = ['owed', 'replace-due'].includes(status.value?.revisionNotice?.state);
+  if (status.value?.frontier?.actionable === false && !owes) return { ok: true, workflowId, phase, terminal, action: 'idle-waiting', ...stale, reason: status.value?.frontier?.reason ?? 'frontier not actionable', outputAgeMs };
   if (!repair) return { ok: true, workflowId, phase, terminal, action: 'wake-needed', ...stale, outputAgeMs };
   const refusedAt = liveness.staleActive ? kernelWakeRefusedAt(terminal) : null;
   if (refusedAt != null && refusedAt > (lastOutputAt ?? 0))
@@ -105,6 +108,8 @@ const idleTurnResult = (ctx) => {
   if (idle.due) return idle.replaced ? escalateIdleStall({ phase, terminal, idle, outputAgeMs }) : replaceIdleKernel({ phase, terminal, dispatch, stale, outputAgeMs, idle });
   const rotation = kernelRotation.due();
   if (rotation.due) return kernelRotation.rotate({ phase, terminal, dispatch, stale, outputAgeMs, rotation });
+  const contract = contractReplacement(status.value?.revisionNotice);
+  if (contract) return kernelRotation.rotate({ phase, terminal, dispatch, stale, outputAgeMs, rotation: contract });
   return sendIdleWake(ctx, idle);
 };
 

@@ -74,7 +74,7 @@ function supervisorSection({ snapshot }) {
   return { enabled: supervisor.enabled, seat: view, health: supervisor.health,
     lastWakeAgeMs: supervisor.lastWakeAt ? now - Number(supervisor.lastWakeAt) : null,
     openDecisions: supervisor.decisions.length, dueDecisions, staleGates: dueDecisions.filter((d) => d.gate),
-    overBudgetWakes: exceededWakes(supervisor.wakes ?? [], supervisorWakeBudget()), seatCost: supervisor.seatCost ?? null };
+    overBudgetWakes: exceededWakes(supervisor.wakes ?? [], supervisorWakeBudget()), seatCost: supervisor.seatCost ?? null, revision: supervisor.revision ?? null };
 }
 
 function seatProblem(section, n) {
@@ -177,7 +177,7 @@ function kernelSection(workflow, ctx) {
   const idle = frontier.state === 'idle' || /idle/.test(String(probe ?? ''));
   return { alive: kernelJob?.status === 'running' && Boolean(kernelSignal?.terminal) && !DEAD_PROBES.has(probe),
     job: kernelJob?.status ?? null, terminal: kernelSignal?.terminal ?? null, probe, lastWakeAgeMs: wakeAgeMs,
-    ackedRev: rev?.acked ?? null, currentRev: rev?.current ?? null, revStale: rev?.stale === true, filesBehind: rev?.fileCount ?? 0,
+    revision: status?.revisionNotice?.line ?? null, ackedRev: rev?.acked ?? null, currentRev: rev?.current ?? null, revStale: rev?.stale === true, filesBehind: rev?.fileCount ?? 0,
     frontierState: frontier.state ?? null, readyWork: ready,
     idleWithReady: ready > 0 && idle && wakeAgeMs !== null && wakeAgeMs > ctx.n.kernelIdleWakeMs,
     overBudgetWakes: exceededWakes(workflow.kernelWakes ?? [], wakeBudget(), bootBudget()), seatCost: workflow.seatCost ?? null };

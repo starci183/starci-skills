@@ -47,7 +47,8 @@ function workflowLines(tr, w, now) {
   const k = w.kernel;
   const lines = [tr(TEXT.workflow, { name: w.name, ledger: w.ledger, phase: w.phase ?? '-' }),
     tr(TEXT.kernel, { alive: k.alive ? tr(TEXT.alive) : tr(TEXT.notAlive), woken: agoOf(tr, k.lastWakeAgeMs), acked: String(k.ackedRev ?? '-').slice(0, 9),
-      current: String(k.currentRev ?? '-').slice(0, 9), state: k.frontierState ?? '-', ready: k.readyWork })];
+      current: String(k.currentRev ?? '-').slice(0, 9), state: k.frontierState ?? '-', ready: k.readyWork }),
+    ...(k.revision ? [tr(TEXT.revisionSeat, { line: k.revision })] : [])];
   const running = w.running.map((r) => `${r.op}(${r.status}, try ${r.tryNo}, ${minutes(r.ageMs)}m)`).join(', ');
   lines.push(tr(TEXT.running, { items: running || tr(TEXT.none) }));
   for (const h of w.held) lines.push(tr(TEXT.held, { op: h.op, hold: h.hold, handler: h.handler ?? '-', step: stepText(tr, h.step), deadline: deadlineOf(tr, h, now) }));
@@ -66,6 +67,7 @@ export function renderText(digest, { language, questions = false }) {
   const alarm = digest.problems.find((p) => p.key === 'controllers-off');
   if (alarm) lines.push(tr(TEXT.alarm, { text: problemText(tr, alarm) }));
   lines.push(reconcilerLine(tr, digest.reconciler), supervisorLine(tr, digest.supervisor));
+  if (digest.supervisor.revision) lines.push(tr(TEXT.revisionSeat, { line: digest.supervisor.revision }));
   if (!digest.workflows.length) lines.push(tr(TEXT.noWorkflow));
   for (const w of digest.workflows) lines.push(...workflowLines(tr, w, digest.at));
   if (digest.releaseCi) lines.push(tr(TEXT.releaseCi, { line: digest.releaseCi }));

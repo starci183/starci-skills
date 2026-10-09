@@ -17436,3 +17436,42 @@ INSTALLED_ARTEFACT_UNDECLARED:
   nextStep_vi: "Thêm dòng artefact vào modules/kernel/installed-artefacts.yaml cùng handler trong scripts/reconciler/installed-artefacts.mjs, hoặc sửa dòng đã lệch."
   owner: runtime-core
   kind: check-finding
+RT_REVISION_SCOPE:
+  title: "The revision-scope table does not match the runtime tree"
+  title_vi: "Bảng phạm vi bản sửa không khớp với cây runtime"
+  meaning_vi: "Một đường dẫn có trong cây không thuộc dòng nào của bảng phạm vi, bảng gọi tên vai trò hay hành động lạ, một tệp động cơ nạp bị liệt kê tay, tệp dựng lời nhắc khởi động của một ghế không khớp với bộ sinh, hoặc phép so sánh chỉ-sửa-lời-văn cho qua một thay đổi bỏ mục."
+  causes_vi:
+    - "Thêm một tệp hay thư mục mới mà chưa có dòng trong bảng"
+    - "Bộ sinh lời nhắc đọc thêm một tệp mà bảng seatBoot chưa ghi"
+  nextStep_vi: "Thêm dòng cho đường dẫn vào modules/kernel/revision-scope.yaml hoặc sửa seatBoot cho khớp bộ sinh."
+  owner: supervisor
+  kind: check-finding
+revision-nothing-owed:
+  title: "No runtime revision change is owed to this seat"
+  title_vi: "Không có thay đổi nào của runtime cần ghế này đọc"
+  meaning_vi: "Ghế gọi revision-ack khi không có thay đổi nào của cây runtime liên quan đến nó: bản sửa gần nhất không chạm tệp nào thuộc phạm vi của nó, hoặc nó đã xác nhận rồi."
+  causes_vi:
+    - "Ghế đã xác nhận bản sửa này"
+    - "Bản sửa chỉ chạm tệp không thuộc phạm vi của vai trò"
+  nextStep_vi: "Không cần làm gì; xem dòng REVISION trong starci kernel status hoặc starci supervisor status."
+  owner: runtime-core
+  kind: verb-refusal
+revision-read-unverified:
+  title: "The submitted read manifest is not the complete current one"
+  title_vi: "Bản kê các tệp đã đọc không phải bản đầy đủ hiện hành"
+  meaning_vi: "Bản kê ghế nộp khác bản kê runtime tính lại từ các byte đang nằm trên đĩa: thiếu tệp, sai băm hoặc đã có bản sửa mới hơn."
+  causes_vi:
+    - "Ghế bỏ sót một tệp trong danh sách --plan"
+    - "Cây runtime đổi giữa lúc lấy --plan và lúc xác nhận"
+  nextStep_vi: "Chạy lại revision-ack --plan, đọc đủ các tệp rồi nộp đúng bản kê nó trả về."
+  owner: runtime-core
+  kind: verb-refusal
+supervisor-rev-unknown:
+  title: "The revision is not the current deployed commit"
+  title_vi: "Bản sửa không phải commit đang triển khai"
+  meaning_vi: "Giá trị --rev của Supervisor không khớp commit hiện hành của cây runtime."
+  causes_vi:
+    - "Cây runtime đã chuyển sang commit mới sau khi lấy --plan"
+  nextStep_vi: "Chạy lại starci supervisor revision-ack --plan và dùng revision nó nêu."
+  owner: supervisor
+  kind: verb-refusal

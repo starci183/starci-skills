@@ -901,6 +901,9 @@ moduleLocalDocumentKinds:
   - id: starci/module-kernel-menu@1
     governs: "The Kernel's menu: its kinds of decision point with their typed options, the classification of every next-action origin and of every frontier state, and the escape and snooze bounds."
     files: [modules/kernel/kernel-menu.yaml]
+  - id: starci/revision-scope@1
+    governs: "What a change of the runtime tree asks of each role: the rows that say which path concerns which role and the action each takes (none, immediate, admission, restart, reread, contract, boot), the engine entries its loaded set is derived from, the files each seat's launch prompt is built from, and what each settle judge reads."
+    files: [modules/kernel/revision-scope.yaml]
   - id: starci/module-reconciler-edge-cases@1
     governs: "The registry of every edge case met: family, real occurrence, the rule that handles it, the spec that reproduces it, and its status."
     files: [modules/reconciler/edge-cases.yaml]

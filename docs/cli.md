@@ -2234,6 +2234,27 @@ json: flag
 starci kernel retire-ask --repo <path> --workflow <workflow> --dispatch <dispatch> --reason <reason>
 ```
 
+### starci kernel revision-ack
+
+project or attest the files a runtime revision change sends to this Kernel
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+| `--workflow` | string | required |
+| `--rev` | string |  |
+| `--plan` | boolean |  |
+| `--read-manifest` | string |  |
+
+exit: 0 planned or acknowledged; 1 refused or unavailable current identity/READ inputs; 2 bad usage: a required flag is missing or a flag has no value
+
+json: flag
+
+```sh
+starci kernel revision-ack --repo <path> --workflow <workflow> --plan
+starci kernel revision-ack --repo <path> --workflow <workflow> --rev <rev> --read-manifest <file>
+```
+
 ### starci kernel route
 
 resolve and persist the model decision of a job
@@ -3530,6 +3551,25 @@ starci runtime readme-blocks --check
 starci runtime readme-blocks --write
 ```
 
+### starci runtime revision-scope
+
+show what a deploy of the runtime tree asks of each role between two revisions
+
+| flag | type | |
+| --- | --- | --- |
+| `--from` | string | required |
+| `--to` | string |  |
+| `--root` | string |  |
+
+exit: 0 scope printed; 2 bad usage
+
+json: flag
+
+```sh
+starci runtime revision-scope --from <sha>
+starci runtime revision-scope --from <sha> --to <sha> --json
+```
+
 ### starci runtime status
 
 the runtime's version, tree root and manifest drift — a read-only summary
@@ -4099,6 +4139,25 @@ json: flag
 starci supervisor report
 starci supervisor report --repo <path> --send
 starci supervisor report --json
+```
+
+### starci supervisor revision-ack
+
+read the files a runtime revision change sends to the Supervisor and attest them
+
+| flag | type | |
+| --- | --- | --- |
+| `--plan` | boolean |  |
+| `--rev` | string |  |
+| `--read-manifest` | string |  |
+
+exit: 0 planned or acknowledged; 1 refused; 2 bad usage: --plan, or --rev with --read-manifest
+
+json: flag
+
+```sh
+starci supervisor revision-ack --plan
+starci supervisor revision-ack --rev <rev> --read-manifest <file>
 ```
 
 ### starci supervisor start

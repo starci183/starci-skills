@@ -10,6 +10,7 @@ import { jobOpOf, jobPayloadOf, jobRowOf } from './shared/rows.mjs';
 import { releaseTypedWaits } from './shared/peer-waits.mjs';
 import { queueTail as queueSettleTail, startTail as startSettleTail } from '../settle/job-settle.mjs';
 import { OP_REV_DRIFT, shortRev } from '../runtime-rev.mjs';
+import { recordSettleRevision } from '../../kernel/settle-revision.mjs';
 import { unbindGuardTerminal } from '../../guards/hook-install.mjs';
 import { settlePreflight } from './shared/settle-preflight.mjs';
 import { newSettleState, settleUnderLock } from './shared/settle-accept.mjs';
@@ -243,6 +244,7 @@ export default {
     recordSettledCriticRuns(ledger, job, repo);
     const assetSlots = recordSettledAssetSlots(ledger, job, repo);
     const revDrift = recordOpRevDrift(ledger, job);
+    recordSettleRevision(ledger, job, { op: jobOpOf(job) });
     let status = 'failed';
     if (verdict === 'pass') status = 'succeeded';
     else if (st.awaitingOwner) status = AWAITING_OWNER_STATUS;

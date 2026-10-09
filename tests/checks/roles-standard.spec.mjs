@@ -26,9 +26,9 @@ test('the shipped contract: every one of the five roles meets every requirement 
   const doc = rolesContract(skillRoot);
   assert.deepEqual(doc.standard.roles, ['op', 'critic', 'kernel', 'supervisor', 'debug']);
   const standings = roleStandings(doc, skillRoot);
-  assert.deepEqual(Object.values(standing(doc, 'critic').cells), Array(7).fill('present'));
+  assert.deepEqual(Object.values(standing(doc, 'critic').cells), Array(8).fill('present'));
   assert.deepEqual(standingMessages(standings), [], 'no requirement is missing and no pending entry is unsound');
-  for (const one of standings) assert.deepEqual(Object.values(one.cells), Array(7).fill('present'), one.id);
+  for (const one of standings) assert.deepEqual(Object.values(one.cells), Array(8).fill('present'), one.id);
   assert.deepEqual(doc.roles.filter((one) => one.pending).map((one) => one.id), [], 'a pending marker is removed the day its requirement is built');
   assert.deepEqual(checkRolesContract().map((finding) => finding.message), []);
 });
@@ -36,10 +36,10 @@ test('the shipped contract: every one of the five roles meets every requirement 
 test('the check prints the role x requirement table, every cell present', () => {
   const table = standardTable();
   const lines = table.split('\n');
-  assert.match(lines[0], /^Role\s+fields\s+happy-errors\s+bug-surface\s+prompt-block\s+guard-binding\s+budget\s+chain$/);
+  assert.match(lines[0], /^Role\s+fields\s+happy-errors\s+bug-surface\s+prompt-block\s+guard-binding\s+budget\s+chain\s+revision-ack$/);
   assert.equal(lines.length, 2 + 5, 'a header, a rule and one row per role');
-  assert.match(lines.find((line) => line.startsWith('Critic')), /^Critic\s+present(\s+present){6}$/);
-  for (const role of ['Op', 'Critic', 'Kernel', 'Supervisor', 'Debug']) assert.match(lines.find((line) => line.startsWith(role)), /^\w+\s+present(\s+present){6}$/);
+  assert.match(lines.find((line) => line.startsWith('Critic')), /^Critic\s+present(\s+present){7}$/);
+  for (const role of ['Op', 'Critic', 'Kernel', 'Supervisor', 'Debug']) assert.match(lines.find((line) => line.startsWith(role)), /^\w+\s+present(\s+present){7}$/);
   const out = spawnSync(process.execPath, [path.join(skillRoot, 'scripts', 'checks', 'check-roles-contract.mjs')], { encoding: 'utf8', env: { ...process.env, STARCI_RUNTIME: skillRoot } });
   assert.equal(out.status, 0, out.stderr);
   assert.ok(out.stdout.includes(table), 'the check prints the table and then its verdict');
@@ -103,7 +103,7 @@ test('green: a role that builds its requirement and drops the pending entry is c
     role.bugSurface = [{ bug: 'the Kernel hangs', signal: 'SLA SEAT_VACANT', detectedBy: 'scripts/checks/check-roles-contract.mjs' }];
     delete role.pending;
   });
-  assert.deepEqual(Object.values(standing(doc, 'kernel').cells), Array(7).fill('present'));
+  assert.deepEqual(Object.values(standing(doc, 'kernel').cells), Array(8).fill('present'));
   assert.deepEqual(messagesOf(doc), []);
 });
 
@@ -164,8 +164,8 @@ test('the table in docs/workflow-kernel.md is the generated one; --write refresh
 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-roles-table-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const files = ['modules/kernel/roles.yaml', 'modules/kernel/op-incident-policy.yaml', 'modules/kernel/command-policy.yaml', 'modules/reconciler/edge-cases.yaml', 'docs/workflow-kernel.md', ...doc.roles.flatMap((role) => role.surfaces.map((surface) => surface.file)),
-    ...doc.roles.flatMap((role) => (role.bugSurface ?? []).map((entry) => entry.detectedBy))];
+  const files = ['modules/kernel/roles.yaml', 'modules/kernel/op-incident-policy.yaml', 'modules/kernel/command-policy.yaml', 'modules/kernel/revision-scope.yaml', 'modules/reconciler/edge-cases.yaml', 'docs/workflow-kernel.md', ...doc.roles.flatMap((role) => role.surfaces.map((surface) => surface.file)),
+    ...doc.roles.flatMap((role) => (role.bugSurface ?? []).map((entry) => entry.detectedBy)), ...doc.roles.map((role) => role.revisionAck?.file).filter(Boolean)];
   for (const file of new Set(files)) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     fs.copyFileSync(path.join(skillRoot, file), path.join(root, file));
@@ -180,4 +180,15 @@ test('the table in docs/workflow-kernel.md is the generated one; --write refresh
   assert.deepEqual(checkRolesContract(root), []);
   fs.writeFileSync(doc2, fs.readFileSync(doc2, 'utf8').replace('<!-- roles:table:begin -->', ''));
   assert.match(checkRolesContract(root)[0].message, /lacks the generated roles table markers/);
+});
+
+test('revision-ack: a seated role names an existing verb and the event, an Op or Critic its admission, Debug why it has none; anything else is missing', () => {
+  const state = (id, change) => standing(withRole(id, change), id).cells['revision-ack'];
+  assert.equal(state('kernel', (role) => { delete role.revisionAck; }), 'missing', 'no declaration');
+  assert.equal(state('kernel', (role) => { role.revisionAck.file = 'scripts/no/such-verb.mjs'; }), 'missing', 'the verb file exists');
+  assert.equal(state('supervisor', (role) => { role.revisionAck.event = 'something-else'; }), 'missing', 'the attesting event is runtime-rev-noticed');
+  assert.equal(state('kernel', (role) => { role.revisionAck.scope = 'nobody'; }), 'missing', 'the scope is a role of the revision-scope table');
+  assert.equal(state('op', (role) => { role.revisionAck.reason = 'short'; }), 'missing', 'an admission says why');
+  assert.equal(state('debug', (role) => { role.revisionAck = { noAck: 'no' }; }), 'missing', 'a role with no ack says why');
+  assert.equal(state('critic', () => {}), 'present');
 });

@@ -2099,3 +2099,12 @@ rules:
     failureCodes: ["RT_GATE_LOOSENING"]
     enforcers:
       - {kind: runtime, id: gate-loosening, at: scripts/checks/check-gate-loosening.mjs}
+  - id: R237
+    code: "RT_REVISION_SCOPE"
+    law: "What a change of the runtime tree asks of each role is declared once, in modules/kernel/revision-scope.yaml: every tracked path matches a row, the engine-loaded files are derived from the import graph of the engine's entries and never hand-listed, the files each seat's launch prompt is built from are the files its generator reads, and a wording-only declaration holds only for an edit that keeps the file's structure."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_REVISION_SCOPE"]
+    enforcers:
+      - {kind: runtime, id: revision-scope, at: scripts/checks/check-revision-scope.mjs}
