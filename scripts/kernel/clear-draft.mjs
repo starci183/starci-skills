@@ -82,41 +82,9 @@ export function clearDraft({ terminal, attempts = CLEAR_DRAFT_ATTEMPTS, interval
   return { ok, cleared: ok, sends, initial: first.draft, draft: now.draft, ...(ok ? {} : { reason: 'draft-stuck' }) };
 }
 
-/**
- * Is the draft in `terminal`'s input box real? For a draft the runtime will NOT clear (foreign text):
- * one Ctrl+U, and the box's answer decides. Never throws. Returns {verdict, draft, sends, ...}:
- *  - 'none'        no draft (anymore);
- *  - 'stale'       the Ctrl+U left it unchanged: note 'draft-stale', type as if the box were empty;
- *  - 'real'        it changed: typed text. `removed` is the text the Ctrl+U deleted (null when the
- *                  change is not a plain cut). With `restore`, what it deleted from a one-row draft is
- *                  typed back (enter:false) and `restored` says whether the box reads the original
- *                  again; a row cut from a multi-row draft is not retyped (a newline typed into an agent
- *                  box can submit it): restored:false, and the caller reports `removed`;
- *  - 'unreadable'  a read failed: treat as real.
- */
-export function probeDraft({ terminal, restore = true, intervalMs = CLEAR_DRAFT_INTERVAL_MS, deps = {} } = {}) {
-  const { read: readRaw, send, sleep } = depsOf(deps);
-  const read = draftReader(readRaw, terminal);
-  const first = read();
+/** Read an unknown draft without sending keys; reported text holds even when Orca may show stale input. */
+export function probeDraft({ terminal, deps = {} } = {}) {
+  const first = draftReader(deps.read ?? terminalRead, terminal)();
   if (!first) return { verdict: 'unreadable', draft: null, sends: 0 };
-  if (!first.draft) return { verdict: 'none', draft: null, sends: 0 };
-  const probe = ctrlUProbe({ terminal, draft: first.draft, intervalMs, read, send, sleep });
-  if (!probe.now) return { verdict: 'unreadable', draft: first.draft, sends: probe.sends };
-  if (probe.unchanged) return { verdict: 'stale', note: DRAFT_STALE, draft: first.draft, sends: probe.sends };
-  const initial = String(first.draft).trim(), after = String(probe.now.draft ?? '').trim();
-  // Ctrl+U deleted from the cursor back to the row start: on one row, what is left is the draft's tail;
-  // on the last of several rows, its head.
-  let removed = null;
-  if (!after) removed = initial;
-  else if (initial.endsWith(after)) removed = initial.slice(0, initial.length - after.length);
-  else if (initial.startsWith(after)) removed = initial.slice(after.length).replace(/^\n/, '');
-  const retype = restore && removed && !/\n/.test(initial) && initial.endsWith(after);
-  let restored = false, sends = probe.sends;
-  if (retype) {
-    try { send({ terminal, text: removed, enter: false }); } catch { /* the re-read decides */ }
-    sends += 1;
-    sleep(intervalMs);
-    restored = sameDraft(read()?.draft, initial);
-  }
-  return { verdict: 'real', draft: first.draft, after: probe.now.draft ?? null, removed, restored, sends };
+  return { verdict: first.draft ? 'real' : 'none', draft: first.draft ?? null, sends: 0 };
 }

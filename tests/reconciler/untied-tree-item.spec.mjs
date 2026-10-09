@@ -8,6 +8,9 @@ import { spawnSync } from 'node:child_process';
 import { untiedGroups, untiedDecision, untiedTreesDecision, staleItems } from '../../scripts/reconciler/untied-tree-item.mjs';
 import { UNTIED, untiedTreeFacts, untiedTreeLine } from '../../scripts/machine/untied-tree.mjs';
 import { listStrangerWorkers } from '../../scripts/machine/workflow-purge-orca.mjs';
+import { reviewUnstamped } from '../../scripts/machine/untied-tree.mjs';
+import { withMachine } from '../../engine/db/machine.mjs';
+import { openDecision, supervisorDecisions } from '../../scripts/machine/decisions.mjs';
 
 const IDENT = { GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@example.test', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@example.test' };
 const git = (cwd, ...args) => spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8', env: { ...process.env, ...IDENT } });
@@ -43,7 +46,7 @@ test('one item per repository, keyed by the set of paths; other reasons are not 
 test('the item names K trees with their facts, goes to the Supervisor, and says the runtime removes nothing', (t) => {
   const a = tree(t, { dirty: true });
   const [group] = untiedGroups([review('/r/one', a)]);
-  const di = untiedDecision(group, group.trees.map(untiedTreeFacts));
+  const di = untiedDecision(group, group.trees.map((entry) => untiedTreeFacts(entry)));
   assert.deepEqual([di.kind, di.decider, di.ledger], ['unregistered-trees', 'supervisor', 'supervisor']);
   assert.match(di.summary, /^1 unregistered tree\(s\) under .*one: .*\(branch feature, last commit .*, dirty\)/);
   assert.match(di.summary, /removes nothing it did not create/);
@@ -65,6 +68,30 @@ test('an item whose set changed or whose trees are gone is stale; the current on
 
 test('the purge plan lists a thing it cannot tie to a workflow with the same phrase (passing)', () => {
   assert.equal(UNTIED, 'the runtime cannot tie it to a workflow');
-  const [listed] = listStrangerWorkers({ rows: [{ dispatchId: 'd1', runId: 'run-9', terminalState: 'ready', worktreePath: '/t/wf', terminalHandle: 'h' }], treePaths: ['/t/wf'] });
-  if (listed) assert.ok(listed.why.startsWith(UNTIED), listed.why);
+  const [listed] = listStrangerWorkers({ rows: [{ dispatchId: 'd1', runId: 'run-9', terminalState: 'retained', resource: { worktreeId: 'repo::/t/wf', terminalHandle: 'h' } }], treePaths: ['/t/wf'] });
+  assert.ok(listed.why.startsWith(UNTIED), listed.why);
+});
+
+test('the collector plan lists an unknown tree with the shared phrase; repeated passes keep exactly one item per repository', async (t) => {
+  const repo = tree(t, { dirty: false });
+  const a = tree(t, { dirty: true });
+  const b = tree(t, { dirty: false });
+  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(repo, 'machine.sqlite') };
+  const ctx = { mode: 'active', env, now: () => Date.now(), openDecision: (spec) => openDecision(repo, spec, { env }) };
+  const rows = (dir) => reviewUnstamped({ dir, repoRoot: repo, home: 'git', detail: { branch: 'feature' }, apply: false, env });
+  const listed = rows(a);
+  assert.equal(listed.action, 'review');
+  assert.ok(listed.why.startsWith(UNTIED));
+  await untiedTreesDecision(ctx, [listed, rows(a)]);
+  await untiedTreesDecision(ctx, [listed]);
+  const live = () => withMachine((m) => supervisorDecisions(m).filter((di) => di.kind === 'unregistered-trees'), { env });
+  assert.equal(live().length, 1);
+  assert.match(live()[0].summary, /^1 unregistered/);
+  assert.ok(live()[0].summary.includes(UNTIED));
+  await untiedTreesDecision(ctx, [listed, rows(b)]);
+  assert.equal(live().length, 1, 'a changed set replaces its item');
+  assert.match(live()[0].summary, /^2 unregistered/);
+  await untiedTreesDecision(ctx, []);
+  assert.deepEqual(live(), [], 'a complete empty pass closes the item');
+  assert.ok(fs.existsSync(a) && fs.existsSync(b), 'the collector removes neither tree');
 });

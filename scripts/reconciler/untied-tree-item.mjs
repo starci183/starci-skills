@@ -6,7 +6,8 @@ import path from 'node:path';
 import { mapInOrder } from '../lib/in-order.mjs';
 import { supervisorDecisions } from '../machine/decisions.mjs';
 import { withSupervisor } from '../machine/home.mjs';
-import { untiedTreeFacts, untiedTreeLine } from '../machine/untied-tree.mjs';
+import { untiedTreeFacts, untiedTreeLine, untiedWhy } from '../machine/untied-tree.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 const UNTIED_ITEM_KIND = 'unregistered-trees';
 const LIVE = new Set(['open', 'claimed', 'escalated']);
@@ -16,7 +17,8 @@ const hashOf = (text) => crypto.createHash('sha256').update(text).digest('hex').
 export function untiedGroups(items) {
   const byRepo = Map.groupBy((items ?? []).filter((item) => item.reason === 'unstamped-orphan' && item.repoRoot), (item) => path.resolve(item.repoRoot));
   return [...byRepo].map(([repo, rows]) => {
-    const trees = rows.map((row) => ({ path: row.path, branch: row.branch ?? null })).sort((a, b) => a.path.localeCompare(b.path));
+    const unique = new Map(rows.map((row) => [path.resolve(row.path), { path: row.path, branch: row.branch ?? null }]));
+    const trees = [...unique.values()].sort((a, b) => byCodeUnit(a.path, b.path));
     const digest = hashOf([repo, ...trees.map((t) => t.path)].join('\n'));
     return { repo, key: [UNTIED_ITEM_KIND, path.basename(repo), digest].join(':'), trees };
   });
@@ -24,11 +26,11 @@ export function untiedGroups(items) {
 
 /** The Decision Item of one group. Pure over the tree facts. */
 export function untiedDecision(group, facts) {
-  const lines = facts.map(untiedTreeLine);
+  const lines = facts.map((tree) => untiedTreeLine(tree));
   return {
     schema: 'starci/decision-item@1', kind: UNTIED_ITEM_KIND, decider: 'supervisor', ledger: 'supervisor', idempotencyKey: group.key,
     entity: { type: 'repository', id: group.repo }, openedBy: 'gc-controller', escalateTo: 'owner', allowedVerbs: [],
-    summary: `${facts.length} unregistered tree(s) under ${group.repo}: ${lines.join('; ')}. The runtime cannot tie them to a workflow and removes nothing it did not create; removing one is a human act`,
+    summary: `${facts.length} unregistered tree(s) under ${group.repo}: ${lines.join('; ')}. ${untiedWhy('the runtime removes nothing it did not create; removing one is a human act')}`,
     evidence: lines.map((line) => ({ ref: line })), refs: { repo: group.repo, paths: group.trees.map((t) => t.path) },
   };
 }
@@ -37,8 +39,8 @@ export function untiedDecision(group, facts) {
 export const staleItems = (dis, wanted) => dis.filter((di) => di.kind === UNTIED_ITEM_KIND && LIVE.has(di.status) && !wanted.has(di.idempotencyKey));
 
 /** Close those items on the machine writer `m`; the ids closed. */
-function closeStale(m, wanted, now) {
-  const stale = staleItems(supervisorDecisions(m, { now }), wanted);
+function closeStale(m, wanted, now, repos) {
+  const stale = staleItems(supervisorDecisions(m, { now }), wanted).filter((di) => repos === null || repos.has(di.entity?.id));
   for (const di of stale) m.setSupDecision(di.id, { status: 'resolved', by: 'reconciler/gc', verb: 'trees-gone', rationale: 'the unregistered trees it listed are gone or the set changed' });
   return stale.map((di) => di.id);
 }
@@ -46,7 +48,7 @@ function closeStale(m, wanted, now) {
 /** One GC pass: open the item of each repository with untied trees, close the ones that no longer stand. `complete` = the pass saw every tree (it did not halt). */
 export async function untiedTreesDecision(ctx, items, { complete = true } = {}) {
   const groups = untiedGroups(items);
-  await mapInOrder(groups, (group) => ctx.openDecision(untiedDecision(group, group.trees.map(untiedTreeFacts))));
-  if (complete && ctx.mode === 'active') withSupervisor((m) => closeStale(m, new Set(groups.map((g) => g.key)), ctx.now()), { env: ctx.env ?? process.env });
+  if (ctx.mode === 'active') withSupervisor((m) => closeStale(m, new Set(groups.map((g) => g.key)), ctx.now(), complete ? null : new Set(groups.map((g) => g.repo))), { env: ctx.env ?? process.env });
+  await mapInOrder(groups, (group) => ctx.openDecision(untiedDecision(group, group.trees.map((tree) => untiedTreeFacts(tree)))));
   return groups.length;
 }

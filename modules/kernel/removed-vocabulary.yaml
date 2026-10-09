@@ -242,3 +242,9 @@ removed:
     use: 'the Job controller enqueues handover.review itself when the handover is due or its ask was answered approve or question (next action handover-review, scripts/kernel/handover-move.mjs); the handover-step item holds only the typed routing of a reported defect'
     since: 1.0.0-alpha.8
     match: '(?<![\w-])(?:mechanical-pending|rerun-handover-review)(?![\w-])'
+  - id: vocab-draft-probe-mutations
+    kind: vocabulary
+    name: draft probe mutation fields
+    use: 'probeDraft reads only and returns verdict, draft and sends; a foreign draft receives no keys'
+    since: 1.0.0-alpha.9
+    match: '\b(?:draftProbe|probeDraft)\.(?:restore|restored|removed|after)\b'

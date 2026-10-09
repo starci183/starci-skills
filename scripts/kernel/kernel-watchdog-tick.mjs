@@ -1,5 +1,6 @@
 // One decision pass over the Kernel seat; the host owns the cadence.
 import { contractReplacement } from '../machine/revision-replace.mjs';
+import { draftSeatResult } from './draft-hold.mjs';
 const noTerminalResult = ({ workflowId, phase, terminal, repair, lostSeatWorker, exitedTwice, stopAndRelease, replaceKernel }) => {
   if (terminal) return null;
   if (!repair) return { ok: true, workflowId, phase, action: 'restart-needed', reason: 'kernel signal/terminal absent' };
@@ -99,7 +100,6 @@ const idleTurnResult = (ctx) => {
     dispatch, kernelWakeRefusedAt, replaceUnwritableKernel, kernelWakeFailures, wakeFailuresProveDead, replaceWakeDeadKernel,
     kernelIdleWakes, escalateIdleStall, replaceIdleKernel, kernelRotation } = ctx;
   if (classified.state !== 'turn-idle') return null;
-  if (!ctx.read.draft) ctx.recordDraftCleared(terminal);
   const owes = ['owed', 'replace-due'].includes(status.value?.revisionNotice?.state);
   if (status.value?.frontier?.actionable === false && !owes) return { ok: true, workflowId, phase, terminal, action: 'idle-waiting', ...stale, reason: status.value?.frontier?.reason ?? 'frontier not actionable', outputAgeMs };
   if (!repair) return { ok: true, workflowId, phase, terminal, action: 'wake-needed', ...stale, outputAgeMs };
@@ -132,6 +132,8 @@ export function createKernelTick(deps) {
     const seatContext = { ...deps, workflowId: deps.workflowId, phase, terminal, signalValue, status, repair: deps.repair };
     const noSeat = noTerminalResult(seatContext);
     if (noSeat) return noSeat;
+    const heldDraft = draftSeatResult(seatContext);
+    if (heldDraft) return heldDraft;
     const noDispatch = noDispatchResult(seatContext);
     if (noDispatch) return noDispatch;
     const deadWorker = deadWorkerResult(seatContext);

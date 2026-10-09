@@ -43,10 +43,11 @@ import { revParse } from '../api/git/rev-parse.mjs';
 import { isAncestor } from '../api/git/is-ancestor.mjs';
 import { branchDescription } from '../api/git/branch-description.mjs';
 import { removeOrcaWorktree, bindOrcaWorktree, orcaWorktreeClient } from './worktree-orca.mjs';
-import { pidAlive, machineLog, withMachine } from '../../engine/db/machine.mjs';
+import { pidAlive, machineLog } from '../../engine/db/machine.mjs';
 import { ledgerLookup } from './worktree-ledger-lookup.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { shortHash } from '../lib/hash.mjs';
+import { reviewUnstamped } from './untied-tree.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -276,22 +277,6 @@ const ENDED = new Set(ENDED_WORKFLOW_PHASES);
 function orphanIncident({ level = 'warn', kind = 'worktree.orphan', msg, owner = {}, data, env }) {
   machineLog({ actor: 'gc', kind, level, msg: msg.slice(0, 500), ledgerId: owner.ledgerId ?? null, workflowId: owner.workflowId ?? null,
     jobId: owner.jobId ?? null, data }, { env });
-}
-
-/**
- * An unstamped orphan tree (3.8): no runtime stamp (Orca) or no job (git), no registry row, idle past the owner grace. It is
- * never removed - it may be the owner's own work: it is listed for the owner's review, one incident per tree for good
- * (machine_logs kind worktree.orphan-review, deduplicated by path), and every pass reports it as a `review` item.
- */
-function reviewUnstamped({ dir, repoRoot, home, detail, apply, env }) {
-  if (apply) {
-    try {
-      const seen = withMachine((m) => m.db.prepare("SELECT data_json FROM machine_logs WHERE kind='worktree.orphan-review'").all(), { env })
-        .some((r) => { try { return sameTree(JSON.parse(r.data_json)?.path, dir); } catch { return false; } });
-      if (!seen) orphanIncident({ kind: 'worktree.orphan-review', msg: `unstamped ${home} tree ${dir} has no registry row and no owner: awaiting the owner's review, never removed by the GC`, data: { path: dir, home, ...detail }, env });
-    } catch { /* the review item below still reports it */ }
-  }
-  return { path: dir, repoRoot: repoRoot ? path.resolve(repoRoot) : null, reason: 'unstamped-orphan', action: 'review', home, branch: detail?.branch ?? null, ok: true };
 }
 
 /** A registered Orca tree Orca no longer lists (orca-tree-unlisted): reported and marked, never removed by other means. */

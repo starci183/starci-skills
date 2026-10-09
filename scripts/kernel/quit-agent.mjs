@@ -12,7 +12,7 @@
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { exitedAgentPromptRow, clipDraft, terminalIdentityOf } from '../lib/terminal-liveness.mjs';
+import { exitedAgentPromptRow, clipDraft, terminalIdentityOf, draftOwnership } from '../lib/terminal-liveness.mjs';
 import { clearDraft } from './clear-draft.mjs';
 import { draftText } from '../lib/orca-terminal.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
@@ -50,8 +50,8 @@ export function agentOfTerminal(entry) {
  * Type the agent's quit command into `handle` and wait up to `waitMs` for the
  * terminal to disconnect. Never throws. Returns {sent, exited, command} or null
  * when the agent has no known quit command or the terminal is not live; a
- * draft that Ctrl+U shrank but could not clear returns {sent:false, reason:'draft-stuck', draft}; a
- * stale draft (the first Ctrl+U left it unchanged) adds {draftNote:'draft-stale', staleDraft}.
+ * human draft returns {sent:false, reason:'foreign-input', draft} without keys. Runtime text that
+ * cannot be cleared refuses 'draft-stuck'; stale runtime text carries draftNote 'draft-stale'.
  * The quit reads no output: a caller that keeps the attempt's transcript captures it by Dispatch before the quit
  * (transcripts.mjs captureWorker, worker-read; deep map T1).
  */
@@ -67,17 +67,13 @@ export function quitAgent({ handle, agent, waitMs = QUIT_WAIT_MS, intervalMs = 5
 function quitLive({ handle, agent, command, waitMs, intervalMs, connected, send, read, sleep }) {
   // An agent that already exited left a bare shell: typing the quit input there would run it as a
   // shell command (a /quit or a Ctrl+C sent to PowerShell). Nothing is typed; the close follows.
-  let draft = null;
-  try {
-    const r = read({ terminal: handle, screen: true });
-    if (r?.ok && exitedAgentPromptRow(r.screen)) return { sent: false, exited: true, command, agentExited: true };
-    draft = r?.ok ? draftText(r) : null;
-  } catch { /* unreadable: fall through */ }
-  // Text left unsubmitted in the input box (Orca's `draft`, invisible in the frame) would take the
-  // quit command as its tail: '<draft>/quit' + Enter submits the draft and restarts a settled op.
-  // The box is emptied with Ctrl+U first; one that shrank but will not empty gets no quit input at all.
-  // A draft the first Ctrl+U leaves unchanged is stale on Orca's side (clear-draft.mjs): the quit
-  // command is typed as into an empty box, and the result carries draftNote 'draft-stale'.
+  let frame = null;
+  try { frame = read({ terminal: handle, screen: true }); } catch { /* unreadable input holds the quit */ }
+  if (!frame?.ok) return { sent: false, exited: false, command, reason: 'terminal-unreadable' };
+  const draft = draftText(frame);
+  if (draft && draftOwnership(draft).kind === 'foreign') return { sent: false, exited: false, command, reason: 'foreign-input', draft: clipDraft(draft) };
+  if (exitedAgentPromptRow(frame.screen)) return { sent: false, exited: true, command, agentExited: true };
+  // Unknown draft text holds the quit without keys; only runtime-owned text may be cleared.
   let note = {};
   if (draft) {
     const cleared = clearDraft({ terminal: handle, deps: { read, send, sleep } });

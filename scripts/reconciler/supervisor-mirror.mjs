@@ -84,7 +84,7 @@ export function mirrorPlan(db, { ledgerId, ledgerName, workflowId, now, answers 
       out.closures.push({ id: di.id, by: 'supervisor', verb: `supervisor-${answer.choice}`, note: `${answer.choice}: ${answer.reason}`.slice(0, 400) });
       const notice = noticeOf({ di, answer, ledgerId, workflowId });
       if (notice) out.notices.push(notice);
-    } else if (stale) out.closures.push({ id: di.id, by: 'runtime', verb: 'supervisor-item-stale', note: stale });
+    } else if (stale) out.closures.push({ id: di.id, by: 'runtime', verb: 'supervisor-item-stale', note: stale, twinKey: twinKey(ledgerName, di.id) });
     else out.twins.push(twinOf(di, { ledgerId, ledgerName, workflowId }));
   }
   return out;

@@ -4,18 +4,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createKernelTick } from '../../scripts/kernel/kernel-watchdog-tick.mjs';
 import { wakePromptOf } from '../../scripts/kernel/kernel-watchdog.mjs';
+import { draftOwnership } from '../../scripts/lib/terminal-liveness.mjs';
 
 const WF = 'wf-tick';
 const notice = (state, extra = {}) => ({ role: 'kernel', state, from: 'a'.repeat(40), to: 'b'.repeat(40), action: 'reread', count: 1, files: ['modules/kernel/driver-loop.yaml'], replaceFiles: [], ...extra });
 
-function tickWith({ frontier = { actionable: false, reason: 'nothing waits' }, revisionNotice = null, rotationDue = false } = {}) {
-  const log = { sent: [], revisionWoken: [], rotated: [] };
+function tickWith({ frontier = { actionable: false, reason: 'nothing waits' }, revisionNotice = null, rotationDue = false, draft = null, dispatch = 'D1', workerState = 'running' } = {}) {
+  const log = { sent: [], revisionWoken: [], rotated: [], replaced: 0, held: [] };
   const deps = {
     workflowId: WF, repair: true,
-    api: () => ({ ok: true, value: { ok: true, signals: [{ scope: 'kernel', key: WF, value: { terminal: 'T1', dispatch: 'D1' } }] } }),
-    lostSeatWorker: () => null, exitedTwice: () => false, stopAndRelease: () => ({ ok: true }), replaceKernel: () => ({ action: 'restarted' }),
-    workerShow: () => ({ ok: true, state: 'running' }), DEAD_WORKER_STATE: /dead/, settledKernelVerdict: () => ({ verdict: 'live', shown: { terminal: {} } }), DEAD_VERDICTS: new Set(),
-    terminalRead: () => ({ ok: true, screen: 'idle' }), classifyKernelScreen: () => ({ state: 'turn-idle' }), outputAgeOf: () => ({ lastOutputAt: null, outputAgeMs: 0 }),
+    recordDraftCleared: () => {}, draftHeld: () => false, foreignDraft: (text) => draftOwnership(text).kind === 'foreign', draftRefused: () => false,
+    recordDraftHeld: (terminal, proof) => log.held.push({ terminal, proof }),
+    api: () => ({ ok: true, value: { ok: true, signals: [{ scope: 'kernel', key: WF, value: { terminal: 'T1', dispatch } }] } }),
+    lostSeatWorker: () => null, exitedTwice: () => false, stopAndRelease: () => ({ ok: true }), replaceKernel: () => { log.replaced += 1; return { action: 'restarted' }; },
+    workerShow: () => ({ ok: true, state: workerState }), DEAD_WORKER_STATE: /dead/, settledKernelVerdict: () => ({ verdict: 'live', shown: { terminal: {} } }), DEAD_VERDICTS: new Set(),
+    terminalRead: () => ({ ok: true, screen: 'idle', draft }), classifyKernelScreen: () => ({ state: 'turn-idle' }), outputAgeOf: () => ({ lastOutputAt: null, outputAgeMs: 0 }),
     staleAwareState: (state) => ({ state, staleActive: false }), ACTIVE_STALE_MS: 1, exitedAgentPromptRow: () => null, DEATH_SETTLE_MS: 0, sleepSync: () => {},
     kernelWakeFailures: () => [], wakeFailuresProveDead: () => ({ dead: false }), kernelIdleWakes: () => ({ wakes: 0, replaced: 0, due: false }),
     kernelRotation: { due: () => ({ due: rotationDue, reason: rotationDue ? '8 wakes since its boot' : null }), rotate: (args) => { log.rotated.push(args.rotation.reason); return { ok: true, action: 'rotated' }; } },
@@ -26,6 +29,15 @@ function tickWith({ frontier = { actionable: false, reason: 'nothing waits' }, r
   const status = { value: { frontier, revisionNotice, kernel: { attempt: 1 } } };
   return { result: createKernelTick(deps)(status, 'running'), log };
 }
+
+test('a human draft holds both a missing worker and a dead worker before fencing or replacing the seat', () => {
+  for (const fields of [{ dispatch: null }, { workerState: 'dead' }]) {
+    const { result, log } = tickWith({ ...fields, draft: 'I am still typing\nplease wait' });
+    assert.deepEqual([result.ok, result.delivery, result.action], [false, 'foreign-input', 'wake-failed']);
+    assert.deepEqual([log.replaced, log.sent, log.rotated], [0, [], []]);
+    assert.equal(log.held.length, 1);
+  }
+});
 
 test('a concerned Kernel with an empty menu is woken once, with the notice in the wake', () => {
   const { result, log } = tickWith({ revisionNotice: notice('owed') });

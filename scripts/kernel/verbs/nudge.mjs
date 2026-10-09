@@ -170,34 +170,17 @@ export default {
   // 2026-09-25: a hidden draft took every later send as its tail). The runtime's own - this wake or
   // the contract left staged, or runtime wakes piled up - goes on to the proven wake, which submits
   // or clears it (scripts/kernel/wake-delivery.mjs).
-  // Orca's draft can be stale on its side (sn-foundation term_da5f72b3, 2026-09-25: 'check status' no
-  // key cleared while the box was empty): foreign text gets one Ctrl+U probe (clear-draft.mjs
-  // probeDraft). Text that changed is real - the deleted part is typed back and the nudge refuses;
-  // text the Ctrl+U left unchanged is stale - noted draft-stale, never refused, and the wake is typed.
-  const draftProbeOf = (probe) => {
-    const draftProbe = { verdict: probe.verdict, sends: probe.sends };
-    if (probe.verdict !== 'real') return draftProbe;
-    draftProbe.restored = probe.restored;
-    if (!probe.restored) draftProbe.removed = probe.removed;
-    return draftProbe;
-  };
+  // Unknown draft text holds without keys, including a reportedly stale input row.
   const refuseForeignDraft = (probe, draftOwner) => {
-    const draftProbe = draftProbeOf(probe);
-      const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: draftOwner.draft.slice(0, 200), inputSource: 'draft', draftProbe, worker };
-    const shown = draftOwner.draft.length > 80 ? `${draftOwner.draft.slice(0, 80)}…` : draftOwner.draft;
-    const restoredNote = probe.restored ? ', its cut typed back' : ', NOT restored';
-    const probeNote = probe.verdict === 'real' ? `changed it - real text${restoredNote}` : 'left it unreadable';
-      emit(out, `nudge REFUSED for ${jobId}: foreign-input — the input box draft Orca reports holds '${shown}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed (a Ctrl+U probe ${probeNote}), no event is appended`, args.json);
+    const draftProbe = { verdict: probe.verdict, sends: probe.sends };
+    const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: draftOwner.draft.slice(0, 200), inputSource: 'draft', draftProbe, worker };
+    emit(out, `nudge REFUSED for ${jobId}: foreign-input ? the input box holds a human draft; no keys are sent, no event is appended`, args.json);
     throw new VerbExit(1);
   };
   const foreignDraftGate = (prompt, stagedEvidence) => {
     const draftOwner = worker.draft ? draftOwnership(worker.draft, { texts: [prompt, stagedEvidence.sentText], stagedPattern: stagedEvidence.stagedPattern }) : null;
-    const staleDrafts = [];
-    if (draftOwner?.kind !== 'foreign') return staleDrafts;
-    const probe = probeDraft({ terminal: worker.terminalHandle });
-    if (probe.verdict === 'stale') staleDrafts.push(probe.draft);
-    else if (probe.verdict !== 'none') refuseForeignDraft(probe, draftOwner);
-    return staleDrafts;
+    if (draftOwner?.kind === 'foreign') refuseForeignDraft(probeDraft({ terminal: worker.terminalHandle }), draftOwner);
+    return [];
   };
   const inputRowGate = (prompt, stagedEvidence) => {
     const nudgeFrame = typeof worker.screen === 'string' ? worker.screen : null;
@@ -214,7 +197,7 @@ export default {
   const refuseDraftDelivery = (proof) => {
     const out = { ok: false, jobId, nudged: false, reason: proof.delivery, input: proof.draft ?? null, inputSource: 'draft', ...deliveryFieldsOf(proof), worker };
     const why = proof.delivery === 'foreign-input'
-      ? `the input box draft Orca reports holds '${String(proof.draft ?? '').slice(0, 80)}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed (only a Ctrl+U probe and its restore)`
+      ? `the input box draft Orca reports holds '${String(proof.draft ?? '').slice(0, 80)}' that is neither a staged paste nor the runtime's own delivered text; no keys are sent`
       : `the input box holds piled-up runtime text that bounded Ctrl+U shrank but could not empty ('${String(proof.draft ?? '').slice(0, 80)}'); the wake was not typed onto it`;
     emit(out, `nudge REFUSED for ${jobId}: ${proof.delivery} — ${why}, no event is appended`, args.json);
     throw new VerbExit(1);

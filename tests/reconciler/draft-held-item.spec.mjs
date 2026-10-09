@@ -9,6 +9,7 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { NOW, MIN, numbers, digest, snapshot, workflow } from '../helpers/debug-digest-fixture.mjs';
+import { renderText } from '../../scripts/reconciler/debug-digest-render.mjs';
 
 const draft = { since: NOW - 7 * MIN, lastAt: NOW - MIN, refusals: 3, terminal: 'term_k', delivery: 'foreign-input', draft: 'x' };
 
@@ -21,6 +22,7 @@ test('a draft past the bound with no open Supervisor item is a problem line of t
   const d = digest(snapshot({ workflows: [workflow({ draft })] }));
   assert.ok(d.problems.some((x) => x.key.startsWith('draft-unowned')), 'the digest carries it');
   assert.equal(d.problems.find((x) => x.key.startsWith('draft-unowned')).role, 'runtime');
+  assert.match(renderText(d, { language: 'en' }), /draft has stood.*runtime owes the Supervisor/);
 });
 
 test('the mirror closes the Supervisor item once the draft is gone, and keeps it while the draft stands', (t) => withLedger(t, ({ ledger }) => {

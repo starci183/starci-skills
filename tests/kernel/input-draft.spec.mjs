@@ -147,13 +147,13 @@ test('piled runtime wakes are cleared with Ctrl+U before the wake is typed; the 
   assert.deepEqual(w.term('term-k').submitted,[WAKE]);
 });
 
-test('real foreign text in the draft refuses the wake: one Ctrl+U probe, its cut typed back; a draft that will not empty refuses too',t=>{
+test('real foreign text in the draft refuses the wake: no keys sent; a draft that will not empty refuses too',t=>{
   const w=orcaWorld(t);
   w.seed('term-k',{draft:'[watchdog] wake: starci kernel status'});
   const r=w.call('scripts/kernel/wake-delivery.mjs','sendWakeWithProof',{terminal:'term-k',text:WAKE,intervalMs:0});
   assert.deepEqual([r.ok,r.delivery,r.evidence,r.draft,r.sent],[false,'foreign-input','draft','[watchdog] wake: starci kernel status',null]);
-  assert.deepEqual(r.draftProbe,{verdict:'real',sends:2,restored:true});
-  assert.deepEqual(w.term('term-k').keys.map(k=>[k.text,k.enter]),[['\u0015',false],['[watchdog] wake: starci kernel status',false]],'the probe, then its cut typed back; the wake never');
+  assert.deepEqual(r.draftProbe,{verdict:'real',sends:0});
+  assert.deepEqual(w.term('term-k').keys??[],[],'no keys touch a human draft');
   assert.equal(w.term('term-k').draft,'[watchdog] wake: starci kernel status','the owner\'s text is back in the box');
   assert.equal(w.term('term-k').submitted,undefined);
   w.seed('term-s',{draft:`${WAKE}\n${WAKE}`,draftKeep:1});
@@ -175,18 +175,25 @@ test('sendEnterWithProof trusts the draft, not the receipt: an Enter that left t
 
 /* ------------------------------------------------------------------ quit-agent */
 
-test('quit-agent empties a draft before its quit command, and types nothing over a draft it cannot clear',t=>{
+test('quit-agent clears runtime text and refuses a human draft without keys',t=>{
   const w=orcaWorld(t);
-  w.seed('term-q',{command:'codex --model gpt-6.1-sol',draft:'half a contract'});
+  w.seed('term-q',{command:'codex --model gpt-6.1-sol',draft:OTHER});
   const r=w.call('scripts/kernel/quit-agent.mjs','quitAgent',{handle:'term-q',agent:'codex',waitMs:0,intervalMs:0});
   assert.equal(r.sent,true);
   assert.deepEqual(w.term('term-q').keys.map(k=>[k.text==='\u0015'?'^U':k.text,k.enter]),[['^U',false],['/quit',true]]);
-  assert.equal(w.term('term-q').submitted,undefined,'the draft was never submitted with /quit as its tail');
+  assert.equal(w.term('term-q').submitted,undefined);
   assert.equal(w.term('term-q').quit,'/quit');
-  w.seed('term-s',{command:'codex --model gpt-6.1-sol',draft:'half a contract\nsecond row',draftKeep:1});
-  const s=w.call('scripts/kernel/quit-agent.mjs','quitAgent',{handle:'term-s',agent:'codex',waitMs:0,intervalMs:0});
-  assert.deepEqual([s.sent,s.exited,s.reason,s.draft],[false,false,'draft-stuck','half a contract']);
-  assert.ok(w.term('term-s').keys.every(k=>k.text==='\u0015'));
+  for (const draft of ['half a contract','first row\nsecond row']) {
+    w.seed('term-s',{command:'codex --model gpt-6.1-sol',draft});
+    const out=w.call('scripts/kernel/quit-agent.mjs','quitAgent',{handle:'term-s',agent:'codex',waitMs:0,intervalMs:0});
+    assert.deepEqual([out.sent,out.exited,out.reason,out.draft],[false,false,'foreign-input',draft.replaceAll('\n',' ')]);
+    assert.deepEqual(w.term('term-s').keys??[],[]);
+    assert.equal(w.term('term-s').draft,draft);
+  }
+  w.seed('term-stuck',{command:'codex --model gpt-6.1-sol',draft:`${WAKE}\n${WAKE}`,draftKeep:1});
+  const stuck=w.call('scripts/kernel/quit-agent.mjs','quitAgent',{handle:'term-stuck',agent:'codex',waitMs:0,intervalMs:0});
+  assert.deepEqual([stuck.sent,stuck.reason],[false,'draft-stuck']);
+  assert.ok(w.term('term-stuck').keys.every(k=>k.text==='\u0015'));
 });
 
 /* ------------------------------------------------------------------ starci kernel nudge */
@@ -217,16 +224,16 @@ const nudgeFixture=t=>{
   return {...w,repo,workflowId,jobId,run,events};
 };
 
-test('nudge refuses a worker whose input box holds real foreign text in its draft; only the Ctrl+U probe and its restore are typed',t=>{
+test('nudge refuses a worker whose input box holds real foreign text in its draft; no keys are typed',t=>{
   const fx=nudgeFixture(t);
   fx.writeState(s=>{Object.assign(s.terminals['fake-terminal-1'],{screen:IDLE,draft:'continue to cut 6',keys:[]});s.sends=0;});
   const r=fx.run(['nudge','--repo',fx.repo,'--job',fx.jobId,'--json']);
   assert.equal(r.status,1,r.stdout);
   const out=json(r.stdout);
   assert.deepEqual([out.ok,out.nudged,out.reason,out.input,out.inputSource],[false,false,'foreign-input','continue to cut 6','draft']);
-  assert.deepEqual(out.draftProbe,{verdict:'real',sends:2,restored:true});
+  assert.deepEqual(out.draftProbe,{verdict:'real',sends:0});
   const term=fx.orcaState().terminals['fake-terminal-1'];
-  assert.deepEqual(term.keys.map(k=>[k.text,k.enter]),[['\u0015',false],['continue to cut 6',false]],'only the Ctrl+U probe and its restore');
+  assert.deepEqual(term.keys,[],'no keys are sent');
   assert.equal(term.draft,'continue to cut 6');
   assert.equal(fx.events('op-worker-nudged').length,0);
 });
@@ -246,38 +253,34 @@ test('nudge clears piled runtime wakes from the draft and delivers one clean wak
   assert.equal(fx.events('op-worker-nudged').length,1);
 });
 
-/* ------------------------------------------ a draft stale on Orca's side (sn-foundation, 2026-09-25) */
-// Orca blanks the input row of every screen read that carries a draft, so the screen cannot tell a real
-// draft from a stale one. On the sn-foundation Kernel (term_da5f72b3) Orca reported 'check status' that
-// no Ctrl+U changed while the box was empty; every wake was refused and the Kernel looked unreachable.
-// A draft the first Ctrl+U leaves unchanged is draft-stale: a note, never a refusal.
-
-test('clearDraft and probeDraft: a draft Ctrl+U leaves unchanged is stale; one that shrinks is real',t=>{
+test('runtime clear identifies stale text; a foreign draft probe sends no keys',t=>{
   const w=orcaWorld(t);
-  w.seed('term-a',{draft:'check status',draftStale:true});
+  w.seed('term-a',{draft:OTHER,draftStale:true});
   const c=w.call('scripts/kernel/clear-draft.mjs','clearDraft',{terminal:'term-a',intervalMs:0});
-  assert.deepEqual([c.ok,c.stale,c.note,c.cleared,c.sends,c.draft],[true,true,'draft-stale',false,1,'check status']);
-  assert.deepEqual(w.term('term-a').keys.map(k=>k.text),['\u0015'],'one Ctrl+U decides; no more are sent');
-  const p=w.call('scripts/kernel/clear-draft.mjs','probeDraft',{terminal:'term-a',intervalMs:0});
-  assert.deepEqual([p.verdict,p.note,p.draft,p.sends],['stale','draft-stale','check status',1]);
-  w.seed('term-b',{draft:'please look at the lint first'});
-  const real=w.call('scripts/kernel/clear-draft.mjs','probeDraft',{terminal:'term-b',intervalMs:0});
-  assert.deepEqual([real.verdict,real.removed,real.restored,real.sends],['real','please look at the lint first',true,2]);
-  assert.equal(w.term('term-b').draft,'please look at the lint first','a one-row cut is typed back');
-  w.seed('term-c',{draft:'first row\nsecond row'});
-  const rows=w.call('scripts/kernel/clear-draft.mjs','probeDraft',{terminal:'term-c',intervalMs:0});
-  assert.deepEqual([rows.verdict,rows.removed,rows.restored,rows.sends],['real','second row',false,1],'a row cut from several is reported, never retyped');
+  assert.deepEqual([c.ok,c.stale,c.note,c.cleared,c.sends],[true,true,'draft-stale',false,1]);
+  assert.deepEqual(w.term('term-a').keys.map(k=>k.text),['\u0015']);
+  for (const draft of ['please look at the lint first','first row\nsecond row','check status']) {
+    w.seed('term-b',{draft,draftStale:true});
+    const probe=w.call('scripts/kernel/clear-draft.mjs','probeDraft',{terminal:'term-b',intervalMs:0});
+    assert.deepEqual([probe.verdict,probe.draft,probe.sends],['real',draft,0]);
+    assert.equal(w.term('term-b').draft,draft);
+    assert.deepEqual(w.term('term-b').keys??[],[]);
+  }
   w.seed('term-d',{});
   assert.equal(w.call('scripts/kernel/clear-draft.mjs','probeDraft',{terminal:'term-d',intervalMs:0}).verdict,'none');
 });
 
-test('a stale foreign draft does not refuse the wake: draft-stale is noted and the wake lands once',t=>{
+test('a reportedly stale foreign draft refuses the wake without keys',t=>{
   const w=orcaWorld(t);
   w.seed('term-k',{draft:'check status',draftStale:true});
   const r=w.call('scripts/kernel/wake-delivery.mjs','sendWakeWithProof',{terminal:'term-k',text:WAKE,intervalMs:0});
-  assert.deepEqual([r.ok,r.delivery,r.draftNote,r.staleDraft],[true,'delivered','draft-stale','check status']);
-  assert.deepEqual(w.term('term-k').keys.map(k=>k.text==='\u0015'?'^U':k.text===WAKE?'wake':k.text),['^U','wake']);
-  assert.deepEqual(w.term('term-k').submitted,[WAKE],'the agent got the wake, not the stale text');
+  assert.deepEqual([r.ok,r.delivery,r.sent],[false,'foreign-input',null]);
+  assert.deepEqual(w.term('term-k').keys??[],[]);
+  assert.equal(w.term('term-k').draft,'check status');
+  assert.deepEqual(w.term('term-k').submitted??[],[]);
+  const again=w.call('scripts/kernel/wake-delivery.mjs','sendWakeWithProof',{terminal:'term-k',text:WAKE,intervalMs:0,staleDrafts:['check status']});
+  assert.equal(again.delivery,'foreign-input','a caller stale hint never overrides foreign ownership');
+  assert.deepEqual(w.term('term-k').keys??[],[]);
 });
 
 test('stale runtime text in the draft is not draft-stuck: noted, and the wake is typed',t=>{
@@ -294,29 +297,24 @@ test('deliveryFieldsOf carries the draft-stale note into receipts and events',as
     {delivery:'delivered',evidence:'wake-text',draftNote:'draft-stale',staleDraft:'check status'});
 });
 
-test('quit-agent types its quit command over a stale draft and notes it',t=>{
+test('quit-agent refuses a reportedly stale human draft without keys',t=>{
   const w=orcaWorld(t);
   w.seed('term-q',{command:'codex --model gpt-6.1-sol',draft:'check status',draftStale:true});
   const r=w.call('scripts/kernel/quit-agent.mjs','quitAgent',{handle:'term-q',agent:'codex',waitMs:0,intervalMs:0});
-  assert.deepEqual([r.sent,r.draftNote,r.staleDraft],[true,'draft-stale','check status']);
-  assert.deepEqual(w.term('term-q').keys.map(k=>[k.text==='\u0015'?'^U':k.text,k.enter]),[['^U',false],['/quit',true]]);
-  assert.equal(w.term('term-q').quit,'/quit');
+  assert.deepEqual([r.sent,r.reason,r.draft],[false,'foreign-input','check status']);
+  assert.deepEqual(w.term('term-q').keys??[],[]);
+  assert.equal(w.term('term-q').quit,undefined);
 });
 
-test('nudge wakes a worker whose Orca draft is stale: one Ctrl+U probe, the wake, draft-stale on the event',t=>{
+test('nudge refuses a reportedly stale human draft without keys or a nudge event',t=>{
   const fx=nudgeFixture(t);
   fx.writeState(s=>{Object.assign(s.terminals['fake-terminal-1'],{screen:IDLE,draft:'check status',draftStale:true,keys:[]});});
   const r=fx.run(['nudge','--repo',fx.repo,'--job',fx.jobId,'--json']);
-  assert.equal(r.status,0,r.stderr||r.stdout);
-  const out=json(r.stdout);
-  assert.deepEqual([out.nudged,out.delivery,out.draftNote,out.staleDraft],[true,'delivered','draft-stale','check status']);
+  assert.equal(r.status,1,r.stderr||r.stdout);
+  assert.equal(json(r.stdout).reason,'foreign-input');
   const term=fx.orcaState().terminals['fake-terminal-1'];
-  assert.deepEqual(term.keys.map(k=>k.text==='\u0015'?'^U':k.text.startsWith('Operation liveness wake')?'wake':k.text),['^U','wake'],'probed once, never refused');
-  assert.equal(term.submitted.length,1);
-  assert.ok(term.submitted[0].startsWith(`Operation liveness wake for durable job ${fx.jobId}`));
-  const events=fx.events('op-worker-nudged');
-  // M10: the ledger event labels the foreign draft instead of quoting it; the operator's
-  // result above keeps the bounded slice.
-  assert.deepEqual([events.length,events[0].draftNote],[1,'draft-stale']);
-  assert.equal(events[0].staleDraft,'draft, 12 chars, sha256:4c7810db029c','the event carries the labelled digest, never the verbatim foreign text');
+  assert.deepEqual(term.keys,[]);
+  assert.equal(term.draft,'check status');
+  assert.deepEqual(term.submitted??[],[]);
+  assert.deepEqual(fx.events('op-worker-nudged'),[]);
 });

@@ -11,6 +11,8 @@ import { loadFixture, replayWorld, ROOT } from '../helpers/replay-world.mjs';
 import { draftEpisode, draftFactsOf } from '../../scripts/kernel/draft-hold.mjs';
 import { planWorkflow } from '../../scripts/reconciler/workflow-plan.mjs';
 import { workflowSettings } from '../../scripts/reconciler/controllers/workflow.mjs';
+import { withMachine } from '../../engine/db/machine.mjs';
+import { seatCostConfig } from '../../scripts/kernel/seat-wakes.mjs';
 
 const WATCHDOG = path.join(ROOT, 'scripts', 'kernel', 'kernel-watchdog.mjs');
 const CHROME = ['─────', '❯', '─────', '  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'];
@@ -45,7 +47,8 @@ test('a wake refused for a person\'s draft is recorded once, is not a missed wak
   assert.equal(count(w, 'kernel-wake-failed'), 0, 'a draft is not a missed wake');
   assert.equal(count(w, 'kernel-rotated') + count(w, 'kernel-restarted') + count(w, 'kernel-replaced-idle'), 0, 'the seat is never replaced');
   assert.equal(w.orca().terminals['term-kernel-current'].closed, undefined, 'and never closed');
-  assert.match(w.orca().terminals['term-kernel-current'].draft, /lint first/, 'the person\'s words are still in the box');
+  assert.equal(w.orca().terminals['term-kernel-current'].draft, DRAFT, 'the person\'s words are still in the box');
+  assert.deepEqual(w.orca().terminals['term-kernel-current'].keys ?? [], [], 'no probe, restore, Enter or wake keys are sent');
 });
 
 test('a person\'s draft also holds a rotation that was due: the contract change waits until the draft is gone', (t) => {
@@ -55,6 +58,36 @@ test('a person\'s draft also holds a rotation that was due: the contract change 
   assert.equal(answer.delivery, 'foreign-input', 'the wake is tried and refused; no replacement is started');
   assert.equal(count(w, 'kernel-rotated'), 0);
   assert.equal(w.orca().terminals['term-kernel-current'].closed, undefined);
+  assert.deepEqual(w.orca().terminals['term-kernel-current'].keys ?? [], []);
+});
+
+test('a multiline draft holds a queued-input Enter without altering either row', (t) => {
+  const draft = `${DRAFT}\nI have not finished the second row`;
+  const { w, state } = world(t, { draft });
+  assert.equal(watchdog(w).delivery, 'foreign-input');
+  state({ draft, screen: ['Press Enter to send queued messages', ...CHROME].join('\n') });
+  assert.equal(watchdog(w).delivery, 'foreign-input');
+  assert.deepEqual(w.orca().terminals['term-kernel-current'].keys ?? [], []);
+  assert.equal(w.orca().terminals['term-kernel-current'].draft, draft);
+  assert.equal(w.orca().terminals['term-kernel-current'].closed, undefined);
+  assert.equal(count(w, 'kernel-wake-draft-held'), 1);
+});
+
+test('the real Workflow controller opens one Supervisor item and closes both copies when the draft is gone', (t) => {
+  const { w, state } = world(t, { draft: DRAFT });
+  const boundMs = seatCostConfig().kernel.wakeRepeatMs;
+  w.ledger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId: w.wf, entityType: 'kernel', entityId: w.wf,
+    kind: 'kernel-wake-draft-held', createdAt: Date.now() - boundMs - 1000, payload: { terminal: 'term-kernel-current', delivery: 'foreign-input', draft: DRAFT } })));
+  watchdog(w);
+  const items = () => withMachine((m) => m.db.prepare("SELECT status FROM sup_decision_items WHERE kind='seat-draft-held'").all(), { env: w.env });
+  w.engine({ controllers: ['workflow'], unbound: true });
+  w.engine({ controllers: ['workflow'], unbound: true });
+  assert.deepEqual(items().map((di) => di.status), ['open'], 'one Supervisor item through repeated real passes');
+  state({});
+  watchdog(w);
+  w.engine({ controllers: ['workflow'], unbound: true });
+  assert.deepEqual(items().map((di) => di.status), ['resolved'], 'its Supervisor twin closes automatically');
+  assert.equal(w.ledger((ledger) => ledger.db.prepare("SELECT COUNT(*) AS n FROM decision_items WHERE kind='seat-draft-held' AND status IN ('open','claimed')").get().n), 0);
 });
 
 test('ONE Supervisor item opens after the seat\'s wake-repeat bound, not before; it does not repeat while open', (t) => {
