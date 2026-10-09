@@ -1356,9 +1356,10 @@ cases:
   - id: op-launched-critic-turn-start-unobserved
     family: failure-while-running
     found: live
-    finding: {role: runtime, duty: does, verdict: unjudged, evidence: "(duty: a Critic worker the runtime or an op launches starts) the Critic an op launched itself (decision-critic from inside architecture.decide try 2) ended exit 3 `worker-start, turn start unobserved`: the codex Critic worker's prompt was not seen submitted (the PROMPT_DELIVERY_STALLED family of scripts/agent/lib.mjs, not the missing sender terminal that held the RUNTIME's Critic runs of try 1 at 04:54 to 05:16 with no_active_sender_terminal, fixed by passing the Kernel terminal). The op's own transcript is not in the ledger, so the Orca-side cause of the stalled delivery is not proven.", remedy: {state: open}}
+    replay: tests/replay/codex-turn-start.spec.mjs
+    finding: {role: runtime, duty: does, verdict: unjudged, evidence: "(duty: a Critic worker the runtime or an op launches starts) the Critic an op launched itself (decision-critic from inside architecture.decide try 2) ended exit 3 `worker-start, turn start unobserved`: the codex Critic worker's prompt was not seen submitted (the PROMPT_DELIVERY_STALLED family of scripts/agent/lib.mjs, not the missing sender terminal that held the RUNTIME's Critic runs of try 1 at 04:54 to 05:16 with no_active_sender_terminal, fixed by passing the Kernel terminal). The op's own transcript is not in the ledger, so the Orca-side cause of the stalled delivery is not proven.", remedy: {state: in-tree, change: "the same launch path now spills every Task spec above 2000 characters to a file (the Critic placement holds TASK.md) and presses Enter once for an unsubmitted paste chip (scripts/agent/turn-start.mjs); the cause of THIS Critic stall is not proven"}}
     met: {date: "2026-10-09", where: "alpha.8 live, Nivo op-architecture.decide-8da14f299d", evidence: "reports 7 blocker detail (placement retained as ctx_2760d12aa15d); runtime-critic-run events 773 to 839 hold CRITIC_UNAVAILABLE no_active_sender_terminal, event 842 verdict"}
-    why: "decision legs no longer launch a Critic from the op on this revision, so the Nivo path is gone; interface.draw still launches its Critic from inside the op (the draw lane, scripts/work/draw-*), where the same prompt-delivery stall can recur and the sender is the op's own terminal"
+    why: "the Nivo ledger copy proves the signature (report 7: worker-start, turn start unobserved, a codex Critic) but holds neither the Task spec length nor the terminal frame of that Critic, so the paste chip is not proven for it; the fix covers the path (interface.draw Critic launches through the same startAgent) and the entry closes when a frame of an unobserved Critic start is on record"
     status: open
 
   - id: deploy-carries-a-revision-whose-affected-specs-never-ran
@@ -1423,3 +1424,31 @@ cases:
     met: {date: "2026-10-09", where: "alpha.8 live, both stores", evidence: "modules/schemas/storage-convention.yaml migrations: 34 text columns of class migrate hold content inline (contracts.markdown and context_json, jobs.payload_json, reports.report_json, goals, work_graph_versions.graph_json, check_runs.summary_json, host_samples.detail_json, engine_actions.result_json, machine_logs.data_json, sup_jobs, sup_reports, ...); the migration of each to a reference column is a proposed runtime step, not run"}
     status: open
     why: "the migration of each content column to a reference (the writer puts the content in the blob store and the row keeps the sha, readers resolve both shapes) is a runtime migration step that the owner approves before it runs on a live store; it is proposed with the storage convention, not run by hand"
+
+  - id: codex-prompt-chip-never-submitted-and-launch-left-alive
+    family: failure-while-running
+    found: live
+    replay: tests/replay/codex-turn-start.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a launch is proven started or closed) Nivo: every worker-start of a codex agent ended outcome_unknown / turn_start_unobserved: Codex 0.160 folded the pasted Task spec into a [Pasted Content N chars] chip and the Enter that followed did not submit it (the terminal stood idle with the prompt in its input box). The runtime treated outcome_unknown as unproven and cleaned up only when worker-show read the worker ended, so the terminal stayed alive and unowned, the answer said terminal null, and the engine retried the same launch: one dead codex terminal per try and no Kernel for hours", remedy: {state: in-tree, change: "a worker-start answered turn_start_unobserved is read by the runtime (scripts/agent/turn-start.mjs): an unsubmitted paste chip in the input box gets one Enter-only send from the runtime, which launched the terminal; a start still not proven is refused TURN_START_UNOBSERVED and its worker and terminal are closed (effect partial, stop and release) before the next try, the answer names the terminal, and the start-hold counts the cause; a launch with no terminal named is refused with its custody unknown"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo Kernel start", evidence: "coordinator report of a hand-run start-workflow: worker-start outcome_unknown stage turn_start_unobserved, terminal null, Codex TUI idle with the prompt chip in its input box"}
+    rule: {file: scripts/agent/admission-launch.mjs, anchor: "healUnobservedTurn"}
+    spec: tests/agent/turn-start.spec.mjs
+    status: covered
+  - id: worker-start-prompt-pasted-not-filed
+    family: correctness
+    found: live
+    replay: tests/replay/codex-turn-start.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: content is a file, what travels is the reference) the Task spec of a launch was pasted into the agent terminal up to 16000 characters (plus the Orca preamble: a 16831-character paste) and a follow-up prompt up to the card limit (none for codex, claude and cursor, 16384 for devin); a seat launched without a spec file (the Critic, the Supervisor, a worker) pasted its whole prompt whatever its size", remedy: {state: in-tree, change: "every Task spec above 2000 characters is a file and a pointer (task-spec.mjs): the job packet file for an op, the Kernel state file, TASK.md in a Critic placement (removed with it), else <state>/dispatch-prompts/<launch hash>.md swept by the next launch after a day; the agent cards of codex, claude, cursor and devin declare file delivery above 2000 characters for follow-up prompts"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo Kernel start", evidence: "the pasted chip read [Pasted Content 16831 chars]"}
+    rule: {file: scripts/machine/task-spec.mjs, anchor: "Content is a file; what travels is the reference"}
+    spec: tests/agent/prompt-file-delivery.spec.mjs
+    status: covered
+  - id: dead-agent-terminals-of-failed-launches-uncollected
+    family: failure-while-running
+    found: live
+    replay: tests/replay/codex-turn-start.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a mechanism leaves no leftover) each failed Kernel launch left a dead codex terminal that the terminal GC never took: the agents collector lists workers per Orca Run of the Runs a ledger job or a Supervisor job names, a Kernel launch that fails before it has a job names none, and a terminal no ledger row binds is not the terminal collector to close", remedy: {state: in-tree, change: "the launch closes its own worker and terminal when it is not proven started, and the Runs named by kernel-start-failed events (runId) are listed by the agents collector like a job Run (gc-registry.mjs launchRuns), so a leftover of an earlier revision is released from the worker accounting of Orca"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo", evidence: "coordinator report: one dead codex terminal per retry in orca terminal list"}
+    rule: {file: scripts/supervisor/gc-registry.mjs, anchor: "failedLaunchRunsOf"}
+    spec: tests/replay/codex-turn-start.spec.mjs
+    status: covered

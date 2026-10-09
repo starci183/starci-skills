@@ -10,7 +10,8 @@ import { closeWorker, workerClosureProven, workerExitProven } from '../machine/w
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
 import { runShow } from '../api/orca/run-show.mjs';
-import { taskSpecOf } from '../machine/task-spec.mjs';
+import { defaultSpecFile, taskSpecOf } from '../machine/task-spec.mjs';
+import { PROMPT_DELIVERY_STALLED, TURN_START_UNOBSERVED, resubmitUnobservedTurn, turnStartUnobserved } from './turn-start.mjs';
 import { dispatchDepthOf } from '../lib/worker-depth.mjs';
 import { bestEffortCall } from './best-effort-call.mjs';
 import { depthPreflight, entryDispatchOf } from './depth-preflight.mjs';
@@ -277,7 +278,23 @@ function attestedTerminal(session, started, onCreated) {
 }
 
 // The worker a settled start produced, attested against what was routed, or the failure that reconciled it.
-function settleLaunch(session, launch, started, { effort, onCreated, depth, limit, card }) {
+// A worker-start whose turn start Orca could not observe: the runtime reads the frame; an unsubmitted paste chip gets one Enter from the runtime
+// (it launched the terminal), a start that is still not proven is refused TURN_START_UNOBSERVED and closed (turn-start.mjs).
+function healUnobservedTurn(session, started) {
+  if (!turnStartUnobserved(started) || !session.dispatchId) return null;
+  const terminal = started.agentTerminalHandle ?? shownHandle(bestEffortCall(() => session.orca.show({ dispatch: session.dispatchId })));
+  const refuse = (why, extra) => failLaunch(session, 'worker-start', `${TURN_START_UNOBSERVED}: ${why}`, { errorCode: 'turn-start-unobserved', failureKind: PROMPT_DELIVERY_STALLED, transient: true, ...extra });
+  if (!terminal) return { failure: refuse('Orca named no terminal for the worker whose turn start it could not observe', { effectState: 'unknown', details: started }) };
+  bindHandle(session, terminal);
+  const proof = resubmitUnobservedTurn({ terminal, io: session.io?.turnStart });
+  if (proof.state === 'submitted' || proof.state === 'resubmitted') return { started: { ...started, ok: true, outcome: 'ok', effectState: 'none', agentTerminalHandle: terminal, resubmitted: proof.state === 'resubmitted' } };
+  return { failure: refuse(`the prompt was not seen submitted (${proof.state}) even after the runtime's one re-submit; the worker and its terminal are closed`, { effectState: 'partial', terminal, screen: proof.screen.slice(-400), details: started }) };
+}
+
+function settleLaunch(session, launch, issued, { effort, onCreated, depth, limit, card }) {
+  const healed = startRefused(issued, session.dispatchId) ? healUnobservedTurn(session, issued) : null;
+  if (healed?.failure) return healed.failure;
+  const started = healed?.started ?? issued;
   if (startRefused(started, session.dispatchId)) return failStart(session, started);
   // --spec made the Task: a ready start that names none is a receipt the runtime cannot settle.
   if (!session.taskId) return failLaunch(session, 'worker-start', 'worker-start --spec answered ready without result.taskId', { code: 'worker-start-no-task', details: started });
@@ -332,7 +349,8 @@ export function startAgent({ provider, model = null, effort = null, worktree, re
       runId: null, seat: request?.seat ?? null } }, { io: io?.admission ?? io?.spawn?.admission, env });
   if (!admission.ok) return { ...admission, provider };
   provider = admission.selected.provider; model = admission.selected.model; effort = admission.selected.effort ?? effort;
-  const spec = taskSpecOf({ prompt, file: specFile, heading: heading ?? title }).spec;
+  // Content is a file, what travels is the reference: a prompt above the inline bound is spilled to the caller's file, else to the state root's dispatch-prompts.
+  const spec = taskSpecOf({ prompt, file: specFile ?? defaultSpecFile(launchScopeId(role, request)), heading: heading ?? title }).spec;
   const launch = (runId) => spawnAgent({ provider, model, effort, worktree, repo, baseBranch, name, setup, title, spec, taskTitle: title, run: runId, from: entry,
     request, onCreated, parentDispatch, maxDepth, preflight, io: { ...io?.spawn, admission: io?.admission ?? io?.spawn?.admission },
     role, scopeId, allowGroup, admission, bias, ownerGrant, biasTrusted, tier, liveSeat, history, author, qualityFloor, kind, difficulty, config, env });

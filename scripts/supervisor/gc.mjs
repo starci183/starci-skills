@@ -355,8 +355,8 @@ export function classifyTerminals({ terminals, titles, sup, ledgers, workers = n
 /** The typed failure of a Run whose worker-list did not answer (modules/kernel/failure-codes.yaml). */
 export const WORKER_LIST_UNAVAILABLE = 'WORKER_LIST_UNAVAILABLE';
 
-/** The Orca Runs the runtime owns: every Run a product ledger's job or a Supervisor job names, first-seen order. */
-const runtimeRuns = ({ sup, ledgers }) => distinctRuns([...ledgers.flatMap((l) => l.jobs.map((j) => j.task?.runId)), ...sup.jobs.map((j) => j.runId)]);
+/** The Orca Runs the runtime owns: every Run a product ledger's job, a failed Kernel launch of it, or a Supervisor job names, first-seen order. */
+const runtimeRuns = ({ sup, ledgers }) => distinctRuns([...ledgers.flatMap((l) => [...l.jobs.map((j) => j.task?.runId), ...(l.launchRuns ?? [])]), ...sup.jobs.map((j) => j.runId)]);
 
 /**
  * Orca's worker accounting for the runtime's Runs: every Orca Run a product ledger's job or a Supervisor job names,

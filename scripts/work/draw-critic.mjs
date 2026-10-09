@@ -39,7 +39,7 @@ import { repeatInOrder } from '../lib/in-order.mjs';
 import { ownerRubricChecks } from './draw-feedback.mjs';
 import { startAgent } from '../agent/lib.mjs';
 import { criticFor } from './critic-pick.mjs';
-import { codeOfOutcome, handedDigests, touchedByCritic, typedVerdict } from './critic-verdict.mjs';
+import { TASK_SPEC_FILE, codeOfOutcome, handedDigests, touchedByCritic, typedVerdict } from './critic-verdict.mjs';
 import { bindCriticTerminal, criticBound, unbindCriticTerminal, writeCriticGuard } from './critic-guard.mjs';
 import { decisionKind } from '../agent/call-admission.mjs';
 import { renderRoleLines } from '../machine/roles-contract.mjs';
@@ -250,6 +250,8 @@ export function launchCriticWorker({ critic, dir, prompt, entry = null, parentDi
   return clientOf(orca).launch({ provider: critic.provider, model: critic.model, effort: critic.effort ?? null, worktree: dir, onCreated: bindCriticTerminal(guardFile),
     role: 'critic', tier: critic.tier ?? null, author: critic.author, allowGroup: critic.allowGroup ?? [{ provider: critic.provider, model: critic.model, effort: critic.effort }],
     title: `[Critic] ${subject.title} ${critic.model}`, prompt, objective: subject.objective, entry, parentDispatch,
+    // The Task spec is a file in the placement (removed with it) once it is longer than a terminal should be pasted; the guard's own file is the critic's only other one.
+    specFile: path.join(dir, TASK_SPEC_FILE),
     // Its clean directory is made once per round (criticWorkspace): the launch's ledger identity.
     request: { critic: dir } });
 }

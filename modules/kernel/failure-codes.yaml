@@ -17565,3 +17565,13 @@ deploy-ui-install-failed:
   nextStep_vi: "Đọc dòng lỗi (thiếu module hoặc tệp bị giữ), sửa nguyên nhân rồi chạy lại starci reconciler up --services; Kernel không phụ thuộc vào UI nên workflow không bị chặn."
   owner: runtime-core
   kind: runtime-fault
+TURN_START_UNOBSERVED:
+  title: "A worker's first turn was not seen to start"
+  title_vi: "Không thấy lượt đầu của worker bắt đầu"
+  meaning_vi: "Orca đã tạo worker và gõ Task vào terminal của agent nhưng không xác minh được lượt đầu đã bắt đầu; runtime đã đọc khung hình và nhấn Enter một lần cho đoạn dán chưa gửi, vẫn không thấy lượt chạy."
+  causes_vi:
+    - "TUI của agent gộp đoạn dán lớn thành chip và Enter không gửi được nó"
+    - "Agent chưa sẵn sàng nhận đầu vào khi Task được gõ"
+  nextStep_vi: "Runtime đóng worker và terminal của lần khởi chạy đó trước khi thử lại, và bộ đếm giữ khởi chạy tính nó; không ai phải gõ vào terminal."
+  owner: runtime-core
+  kind: runtime-fault

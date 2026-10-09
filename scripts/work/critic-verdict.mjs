@@ -24,6 +24,9 @@ export function typedVerdict({ normalised, handed, rubric, minimum, critic }) {
     rubric: { source: rubric?.source ?? null, checks: (rubric?.checks ?? []).length }, critic: { provider: critic.provider, model: critic.model, tier: critic.tier ?? null } };
 }
 
+/** The Task spec file the runtime writes into a Critic's placement once its prompt is too long to paste: the runtime's file, not the Critic's work. */
+export const TASK_SPEC_FILE = 'TASK.md';
+
 /**
  * The bytes the Critic changed in its directory after it was handed `handed`, or []: a handed file with another digest or
  * missing, and a file beside them that is neither handed nor the verdict file.
@@ -33,7 +36,7 @@ export function touchedByCritic({ dir, handed, verdictFile }) {
     const at = path.join(dir, entry.file);
     return !fs.existsSync(at) || sha256File(at) !== entry.sha256;
   }).map((entry) => `${entry.file} changed or removed`);
-  const known = new Set([...handed.map((entry) => entry.file), verdictFile, '.git', '.claude', '.devin']);
+  const known = new Set([...handed.map((entry) => entry.file), verdictFile, TASK_SPEC_FILE, '.git', '.claude', '.devin']);
   const extra = fs.readdirSync(dir).filter((name) => !known.has(name)).map((name) => `${name} created`);
   return [...changed, ...extra];
 }

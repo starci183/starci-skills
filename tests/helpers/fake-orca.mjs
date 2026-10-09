@@ -22,6 +22,10 @@
 //                          'prompt-stalled': worker-start created an exact
 //                          worker whose prompt injection stalled; its process
 //                          exited and release retains only terminal bookkeeping.
+//                          'turn-start-unobserved': worker-start creates the worker and its terminal, whose input box holds the prompt as an
+//                          unsubmitted "[Pasted Content N chars]" chip, and answers outcome_unknown / turn_start_unobserved with no
+//                          terminal handle in the receipt (Codex 0.160, Nivo Kernel 2026-10-09). An Enter-only send submits the chip
+//                          when STARCI_FAKE_ORCA_CHIP_ENTER=submits, else the chip stays.
 //                          'run-create-no-sender': run-create is refused locally with
 //                          no_active_sender_terminal (id local), before any mutation.
 //                          'dead-terminal': terminal show reports the exact
@@ -390,6 +394,14 @@ else if (verb === 'terminal send' && record(arg('terminal'))?.sendRefused) {
   state.refusedSends = (state.refusedSends || 0) + 1; save();
   fail({ ok: false, error: { code: record(arg('terminal')).sendRefused, message: record(arg('terminal')).sendRefused } });
 }
+// terminals[h].chipUnsubmitted: the input box holds a pasted-content chip; an Enter-only send submits it when chipEnter, else nothing changes.
+else if (verb === 'terminal send' && record(arg('terminal'))?.chipUnsubmitted && !(arg('text') ?? '')) {
+  const r = record(arg('terminal'));
+  state.chipEnters = [...(state.chipEnters || []), { terminal: arg('terminal'), submits: r.chipEnter === true }];
+  if (r.chipEnter) { r.staged = false; r.sent = true; r.chipUnsubmitted = false; }
+  state.sends += 1; save();
+  out({ ok: true, result: { sent: true } });
+}
 // terminals[h].transportFailOnce = '<request id>': the first text+Enter prompt fails ambiguously with that
 // request id in error.data; a reissue carrying --retry-request <id> is applied once and answers the prompt receipt.
 else if (verb === 'terminal send' && record(arg('terminal'))?.transportFailOnce && arg('text') && argv.includes('--enter')) {
@@ -653,6 +665,12 @@ else if (verb === 'orchestration worker-start') {
   const dispatchId = 'dispatch-fake-' + state.workerStarts.length;
   state.agent = arg('agent'); state.model = arg('model'); state.dispatchId = dispatchId; state.assignee = handle;
   state.assignees = { ...(state.assignees || {}), [dispatchId]: handle };
+  if (mode === 'turn-start-unobserved') {
+    state.workerStates = { ...(state.workerStates || {}), [dispatchId]: 'outcome_unknown' };
+    state.terminals[handle] = { ...state.terminals[handle], staged: true, sent: false, chipUnsubmitted: true, chipEnter: process.env.STARCI_FAKE_ORCA_CHIP_ENTER === 'submits' }; save();
+    fail({ ok: false, error: { code: 'turn_start_unobserved', message: "Dispatch input was written and submitted, but codex's turn start could not be verified during observation (up to 30s)." },
+      result: { runId: arg('run'), taskId, dispatchId, state: 'outcome_unknown', stage: 'turn_start_unobserved', turnStart: 'unobserved' } });
+  }
   state.workerStates = { ...(state.workerStates || {}), [dispatchId]: 'ready' }; save();
   out({ ok: true, result: { runId: arg('run'), taskId, dispatchId,
     state: 'ready', stage: 'ready',
