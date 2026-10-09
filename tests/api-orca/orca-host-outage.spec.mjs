@@ -94,7 +94,10 @@ const buildFixture=root=>{
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
     STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot,STARCI_AGENT_TRUST_HOME:trustHome,ORCA_TERMINAL_HANDLE:SENDER,
     STARCI_HOST_WAIT_MS:'0',STARCI_KERNEL_DEATH_SETTLE_MS:'0',STARCI_LOCAL_ROOT:path.join(root,'localappdata'),
-    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),STARCI_PROJECTS_ROOT:path.join(root,'projects')};
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),STARCI_PROJECTS_ROOT:path.join(root,'projects'),
+    // The revision the runtime reads is injected: a directory that is no git repository has no revision, so no revision notice is recorded and the ledger is compared on the outage alone.
+    STARCI_KERNEL_REV_ROOT:path.join(root,'rev-root')};
+  fs.mkdirSync(env.STARCI_KERNEL_REV_ROOT,{recursive:true});
   // Both external boundaries belong to every descendant, including watchdog -> start-workflow.
   const closureImport=`data:text/javascript,${encodeURIComponent(`import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/worker-close-loader.mjs',import.meta.url).href)});register(${JSON.stringify(new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href)});`)}`;
   env.NODE_OPTIONS=[env.NODE_OPTIONS,`--import=${closureImport}`].filter(Boolean).join(' ');
