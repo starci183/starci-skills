@@ -141,6 +141,13 @@ kinds:
     options:
       - {choice: enqueue-leg, text: paths, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $text}}], effect: "enqueues {op} on the paths in --text (its write set); the Workflow controller then routes and dispatches it"}
 
+  - id: shape-refused
+    mode: judgment
+    source: "a ready job the dispatch push skips because its shape (op, owned paths, params) is the shape of a failed job of its unit"
+    question: "{situation}"
+    options:
+      - {choice: widen, text: paths, steps: [{verb: graph-edit, args: {workflow: $workflow, edit: widen, job: $job, add-paths: $text}}], effect: "adds the paths in --text to the job's grant, so it is a new shape the push dispatches; --text is a comma list of repository paths the failed attempt could not reach"}
+
   - id: draw-redraw
     mode: judgment
     source: "next action draw-redraw-unbound"

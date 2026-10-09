@@ -114,6 +114,9 @@ const jobItem = ({ di, resolution }, workflow) => {
     evidence: [{ ref: `job:${resolution.jobId}` }, ...(di.evidence ?? []).slice(0, 6)], di: di.id ?? null });
 };
 
+const shapeItem = (refused, workflow) => itemOf('shape-refused', { key: refused.jobId, subject: { workflow, job: refused.jobId, op: refused.op, situation: refused.situation },
+  evidence: [{ ref: `job:${refused.jobId}` }, { ref: `job:${refused.failedJobId}` }] });
+
 const questionItem = (q, workflow) => itemOf('worker-question', { key: q.messageId, subject: { workflow, message: q.messageId, job: q.jobId, op: q.opId, ask: q.question },
   since: q.askedAt ?? null, evidence: [{ ref: `worker-question:${q.messageId}` }] });
 
@@ -168,13 +171,14 @@ const sinceOf = (item) => item.deadline ?? Number.MAX_SAFE_INTEGER;
 
 /**
  * The menu: [{id, kind, mode, subject, question, options: [{choice, verb, args, steps, effect}], evidence, deadline, step, hold, di}].
- * `sources`: {workflow, rev, jobDecisions: [{di, resolution}], questions, peers, wedged, deadWaits, decisions, nextActions, handover, feedback ({title, slices}, scripts/kernel/handover-slices.mjs), snoozed: Set of item ids}.
+ * `sources`: {workflow, rev, jobDecisions: [{di, resolution}], shapeRefused: [{jobId, op, failedJobId, situation}], questions, peers, wedged, deadWaits, decisions, nextActions, handover, feedback ({title, slices}, scripts/kernel/handover-slices.mjs), snoozed: Set of item ids}.
  */
 export function buildMenu(sources) {
   const { workflow } = sources;
   const items = [
     ...(sources.rev?.stale ? [revItem(sources.rev, workflow)] : []),
     ...sources.jobDecisions.map((entry) => jobItem(entry, workflow)),
+    ...(sources.shapeRefused ?? []).map((refused) => shapeItem(refused, workflow)),
     ...sources.questions.map((q) => questionItem(q, workflow)),
     ...sources.peers.map((m) => peerItem(m, workflow)),
     ...sources.wedged.map((w) => wedgedItem(w, workflow)),

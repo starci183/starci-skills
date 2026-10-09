@@ -7,6 +7,7 @@ import { buildMenu, menuCatalog, snoozeMs } from '../../kernel-menu.mjs';
 import { feedbackOfHandover } from '../../handover-slices.mjs';
 import { decisionsOf } from '../../progress-rca.mjs';
 import { failureFactsOf } from '../../failure-class.mjs';
+import { failedShapesOf, jobRow, shapeOf } from '../../kernel-authority.mjs';
 
 const LIVE_KERNEL = new Set(['open', 'claimed']);
 // Kinds with their own menu kind (or a notice): the generic decision-item kind never repeats them.
@@ -40,6 +41,19 @@ function jobDecisionsOf(s, kernelDis) {
   return [...byJob.values(), ...virtual].filter((di) => !held.has(di.entity.id)).map((di) => ({ di, resolution: withFailure(db, resolutionOf(db, di, { repo, now })) }));
 }
 
+/**
+ * The ready jobs the dispatch push refuses for their shape (dispatch-ready: the same op, owned paths and params as a failed job of the unit, for a cause of the shape):
+ * [{jobId, op, failedJobId, situation}]. Dispatching them again repeats the failure, so the Kernel changes the shape or says none-fits; until then nothing runs.
+ */
+function shapeRefusedOf(s) {
+  const { db, workflowId } = s;
+  return (s.queued ?? []).filter((item) => item.queuedBecause === 'ready').map((item) => item.jobId).flatMap((jobId) => {
+    const job = jobRow(db, jobId);
+    const failed = job ? failedShapesOf(db, workflowId, job).get(shapeOf(job.op_id, job.payload)) : null;
+    return failed ? [{ jobId, op: job.op_id, failedJobId: failed.jobId, situation: `${job.op_id} ${jobId} is ready but has the shape of ${failed.jobId}, which failed (${failed.causes.join(', ')}): the push does not dispatch it again; widen its grant or change its shape` }] : [];
+  });
+}
+
 /** The waits that can no longer end on their own: a peer-wait whose peer is not running and a typed wait with an unmeetable condition. */
 const deadWaitsOf = (s) => [
   ...s.deadPeerWaits.map((wait) => ({ incidentId: wait.incidentId, situation: `peer-wait ${wait.incidentId} on ${wait.peer} can no longer be met: the peer is ${wait.peerPhase ?? 'not running'}` })),
@@ -65,7 +79,7 @@ export const menuPhase = (s) => {
   const pending = pendingJobsOf(db, workflowId, now);
   const live = kernelDis.filter((di) => liveFor(di, pending, db));
   s.menu = buildMenu({
-    workflow: workflowId, rev: s.kernelRev, jobDecisions: jobDecisionsOf(s, live),
+    workflow: workflowId, rev: s.kernelRev, jobDecisions: jobDecisionsOf(s, live), shapeRefused: shapeRefusedOf(s),
     questions: s.workerQuestions, peers: s.peerMessages, wedged: s.wedgedWorkers.map((w) => ({ jobId: w.jobId, opId: s.workflowJobs.find((row) => row.job_id === w.jobId)?.op_id ?? null })),
     deadWaits: deadWaitsOf(s), decisions: live.filter((di) => !OWN_KIND.has(di.kind)), nextActions: s.graph.nextActions, handover: s.handover, feedback: feedbackOf(s), snoozed: snoozedOf(s),
   });

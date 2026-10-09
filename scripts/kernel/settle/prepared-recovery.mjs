@@ -2,7 +2,7 @@
 //
 // `starci kernel settle --verdict fail|blocked` prepares a durable receipt (workflow-op-preserved-prepared: the branch it resets, the commit it resets
 // to, the files it puts back) and then applies it. When the apply dies, the receipt stays and every later settle of that attempt must recover it
-// (workflow-checkpoint-recovery-conflict) - it can no longer pass, however green the report has since become. Live (Nivo, 2026-10-09): a Kernel chose
+// (workflow-checkpoint-recovery-conflict) - it can no longer pass, however green the report has since become. Live (2026-10-09, an architecture leg): a Kernel chose
 // settle-fail on a done report of a 26 million token leg, only because a menu offered a choice the runtime had no business offering; its receipt aimed the
 // reset at the merge-base with main (the registry record had lost its checkpoint pointer), behind two settled ops, and the apply left the index half reset.
 //
@@ -13,7 +13,7 @@
 import { gateBaseOf, workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 import { receiptPayload, PREPARED_WITHDRAWN, literalPaths } from '../workflow-checkpoint-state.mjs';
 import { revParse } from '../../api/git/rev-parse.mjs';
-import { runGit } from '../../api/git/lib.mjs';
+import { reset as gitReset } from '../../api/git/reset.mjs';
 
 /** The typed code of a withdrawal. */
 export const PREPARED_WITHDRAWN_CODE = 'prepared-settlement-withdrawn';
@@ -37,7 +37,7 @@ export function openPreparedOf(db, jobId, { read = true } = {}) {
 /** The index of `files` put back on HEAD (a path reset: the working files stay as they are). */
 function restoreIndex(dir, files) {
   if (!files.length) return { ok: true };
-  const r = runGit(['reset', '-q', 'HEAD', '--', ...literalPaths(files)], { cwd: dir, timeout: 120_000 });
+  const r = gitReset(['-q', 'HEAD', '--', ...literalPaths(files)], { cwd: dir, timeout: 120_000 });
   return { ok: !r.error && r.status === 0, error: String(r.stderr ?? r.error?.message ?? '').slice(0, 200) };
 }
 
