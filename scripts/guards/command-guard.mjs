@@ -66,6 +66,7 @@ import { installLinkVerdict, installVerdict, kernelMailboxVerdict } from './inst
 import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { readInput } from './hook-io.mjs';
+import { kernelRedirectVerdict } from './kernel-seat.mjs';
 import { boundGuard, boundSeat, fileWriteVerdict, gitSubOf, redirectTargetsOf, rightsRoleOf, runtimeRootOf, writeTargetsOf } from './rights.mjs';
 import { intrinsicPolicyRead, loadCommandPolicy, policyVerdict } from './command-policy.mjs';
 import { commandsOf, programOf } from './shell-commands.mjs';
@@ -287,6 +288,10 @@ async function rightsOfCall({ commands, command, cwd, ctx, guard }) {
       return Boolean(v);
     });
     if (refusal) return refusal;
+  }
+  if (ctx.role === 'lead') {
+    const redirect = kernelRedirectVerdict({ command, cwd });
+    if (redirect) return { tool: 'shell', ...redirect };
   }
   for (const c of commands) {
     const v = policyVerdict({ role: ctx.role, command: c, guard, handle: ctx.handle, lockOwner: ctx.lockOwner, policy: ctx.policy });
