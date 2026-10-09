@@ -22,6 +22,13 @@ const tree = (t, features) => {
   return dir;
 };
 
+test('the rev-ack item teaches the attestation a Kernel seat can run (a digest, no file)', async () => {
+  const { menuCatalog } = await import('../../scripts/kernel/kernel-menu.mjs');
+  const effect = menuCatalog().kinds.find((kind) => kind.id === 'rev-ack').options[0].effect;
+  assert.match(effect, /--digest <readToken>/);
+  assert.doesNotMatch(effect, /read-manifest/);
+});
+
 test('the parameters only the Kernel can set are named for the op that needs them', () => {
   assert.deepEqual(requiredKernelParamsOf({ skillRoot, op: 'provision.ask' }), ['subject']);
   assert.deepEqual(requiredKernelParamsOf({ skillRoot, op: 'interface.audit' }), ['audit']);

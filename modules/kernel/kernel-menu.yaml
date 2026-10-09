@@ -85,7 +85,7 @@ kinds:
     source: "kernelRev.stale"
     question: "The runtime moved from revision {acked} to {rev}: read the files it lists, then attest the complete READ manifest."
     options:
-      - {choice: ack-rev, direct: true, effect: "run directly: starci kernel kernel-ack-rev --workflow {workflow} --plan, read every path it lists under unread, then starci kernel kernel-ack-rev --workflow {workflow} --rev {rev} --read-manifest <file>"}
+      - {choice: ack-rev, direct: true, effect: "run directly: starci kernel kernel-ack-rev --workflow {workflow} --plan, read every path it lists under unread, then starci kernel kernel-ack-rev --workflow {workflow} --rev {rev} --digest <readToken> (the token the plan returned; the Kernel writes no file)"}
 
   - id: job-decision
     mode: judgment

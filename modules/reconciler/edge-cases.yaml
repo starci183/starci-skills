@@ -1594,3 +1594,9 @@ cases:
     rule: {file: scripts/kernel/proof-integrity.mjs, anchor: "recordsRootOf"}
     spec: tests/replay/handover-coverage-in-workflow-tree.spec.mjs
     status: covered
+  - id: menu-teaches-a-file-attestation-a-kernel-seat-cannot-write
+    family: correctness
+    met: {date: "2026-10-09", where: "premortem walk of the authentication workflows, the leg-ready item of every new leg", evidence: "the item said to attest the READ with --rev and --read-manifest <file>, and the rev-ack item to run kernel-ack-rev ... --read-manifest <file>; the Kernel seat writes no file (KERNEL_NO_FILE_WRITE) and the attestation it can run is --digest <readToken>, which the kernel prompt teaches"}
+    rule: {file: scripts/kernel/verbs/shared/status-menu.mjs, anchor: "--digest <readToken>"}
+    spec: tests/replay/first-leg-offered.spec.mjs
+    status: covered

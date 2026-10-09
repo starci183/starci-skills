@@ -104,6 +104,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - A write grant is judged against the workflow's own tree at enqueue and at dispatch (`grant-parent-missing` for a directory only the tree holds, with `--new-module` as the only way out, is gone; `tests/replay/grant-in-workflow-tree.spec.mjs`).
 - The proof coverage a handover ask is judged on (`starci kernel coverage`, the handover guard of `starci kernel report`) reads the records of the workflow's own tree while it runs, not the main checkout they reach only at finish: the last leg was refused `handover-proof-unjudged` for a record the tree holds (`tests/replay/handover-coverage-in-workflow-tree.spec.mjs`).
 - An op may print the end-of-flow credential checklist its contract orders it to file (`starci kernel autopilot --checklist`); every other kernel-only verb stays refused to an op terminal (`tests/replay/op-verbs.spec.mjs`).
+- The leg-ready item and the rev-ack item teach the READ attestation a Kernel seat can run (`--rev <rev> --digest <readToken>`); both said `--read-manifest <file>`, and the seat writes no file (`tests/replay/first-leg-offered.spec.mjs`, `tests/kernel/dispatch-owners.spec.mjs`).
 - A list flag takes the values the way the op contracts write them (`starci gate read --knowledge a b c`): every following token that is no option; the handler still receives the repeated form (`tests/cli/list-flag-values.spec.mjs`).
 
 ## [1.0.0-alpha.7] — 2026-10-08

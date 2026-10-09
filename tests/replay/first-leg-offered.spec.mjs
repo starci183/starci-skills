@@ -12,6 +12,8 @@ test('a fresh goal offers its first leg on the Kernel menu, and the Kernel start
   const item = status.menu.find((entry) => entry.kind === 'leg-ready');
   assert.ok(item, `the first leg is offered: ${JSON.stringify(status.menu.map((entry) => entry.id))} (frontier ${status.frontier.state})`);
   assert.equal(item.subject.op, 'scope.define', 'the first leg after the external intake leg');
+  assert.match(item.subject.attest, /--digest <readToken>/, 'the READ attestation is taught in the form a Kernel can run: it writes no file, so --read-manifest <file> is no instruction for it');
+  assert.doesNotMatch(item.question, /read-manifest/);
   assert.equal(status.frontier.actionable, true, 'the Kernel is woken for it');
   assert.equal(status.menu.some((entry) => entry.subject?.op === 'business.decide'), false, 'only the first leg: the legs behind it wait');
   walk.ack('scope.define');
