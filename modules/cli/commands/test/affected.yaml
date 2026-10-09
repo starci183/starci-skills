@@ -9,7 +9,8 @@ conventions:
   - Everyday verification after npm run check; the whole suite is the merged-tree run and the release cut.
   - The set is computed - each changed .mjs symbol is followed by name through its importers, callers and CLI verbs.
   - What cannot be followed by name (yaml, templates, load-time statements, no base, the depth bound) keeps the file-level rule, named in the report.
-  - The report names every symbol with its specs and why, and every file that fell back; --json carries them; never larger than --by file.
+  - Selection and --plan JSON carry every symbol, its specs and reasons, and file-level fallbacks; the set is never larger than --by file.
+  - A --run machine answer carries the complete selected set, every result and the receipt; the diagnostic graph remains available through --plan.
   - A large set is never refused; it runs in parallel shards inside the printed time budget, and files not started when it ends are listed.
   - The --plan flag prints each selected file with the reason it is in the set; a --run answer carries a receipt (base, tip, passed, total) a gate can require.
   - A generated output maps to its generator's specs; an append-only change to a data file to the specs that name it or its readers.

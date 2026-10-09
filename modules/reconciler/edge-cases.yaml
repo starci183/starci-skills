@@ -1812,3 +1812,10 @@ cases:
     spec: tests/replay/fixtures.spec.mjs
     replay: tests/replay/fixtures.spec.mjs
     status: covered
+  - id: deploy-affected-child-capture-overflow
+    family: correctness
+    met: {date: "2026-10-10", where: "native deploy protocol review", evidence: "The affected diagnostic graph exceeds the old deploy child's default capture; the regression reproduces ENOBUFS on 4ae183a72 before the complete run receipt can be read."}
+    rule: {file: scripts/supervisor/affected-test.mjs, anchor: "const runData"}
+    spec: tests/replay/affected-child-capture.spec.mjs
+    replay: tests/replay/affected-child-capture.spec.mjs
+    status: covered

@@ -212,8 +212,10 @@ async function affectedAnswer(ctx, deps) {
   const header = picked.over ? [largeText(picked)] : [];
   if (args.plan) return reply(0, [...selectionHead({ base, changed, picked }), ...header, ...planLines(picked)].join('\n'), data);
   if (!args.run) return reply(0, [...selectionText({ base, changed, picked }), ...header].join('\n'), data);
+  // The diagnostic graph belongs to the plan; a run transports every selected file, result and receipt without repeating that graph.
+  const runData = { base, changed, large: data.large, maxFiles: data.maxFiles, narrowed: data.narrowed, mode: data.mode };
   const empty = { concurrency: 0 };
-  if (!picked.files.length) return reply(0, 'affected: 0 files, 0 pass, 0 fail', { ...data, results: [], receipt: receiptOf({ root, base: diffBase, picked, results: [], concurrency: empty, startedAt: Date.now(), budgetMs: policy.budgetMs, deps }) });
+  if (!picked.files.length) return reply(0, 'affected: 0 files, 0 pass, 0 fail', { ...runData, ok: true, scope: [], results: [], receipt: receiptOf({ root, base: diffBase, picked, results: [], concurrency: empty, startedAt: Date.now(), budgetMs: policy.budgetMs, deps }) });
   const run = await runSelection({ root, picked, changed, args, deps, base: diffBase, policy });
-  return { ...run, data: { ...data, ...run.data } };
+  return { ...run, data: { ...runData, ...run.data } };
 }
