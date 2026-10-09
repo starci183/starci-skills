@@ -43,16 +43,16 @@ export function seatRow({ seat, name, wakes, skipped = [], tokens = null }) {
     byCause: byCause(wakes, skipped) };
 }
 
-/** The Kernel row of one workflow from its ledger. */
-export function kernelSeatOf(db, { workflowId, name = workflowId, now = Date.now() }) {
-  const wakes = wakesWithUsage(withWorked(kernelWakeLog(db, workflowId), kernelWorkAts(db, workflowId), { now }), wakeUsageOf(db, workflowId, { limit: 100000 }));
+/** The Kernel row of one workflow from its ledger; `since` keeps the wakes from that instant on (the runtime revision now in force). */
+export function kernelSeatOf(db, { workflowId, name = workflowId, now = Date.now(), since = 0 }) {
+  const wakes = wakesWithUsage(withWorked(kernelWakeLog(db, workflowId), kernelWorkAts(db, workflowId), { now }), wakeUsageOf(db, workflowId, { limit: 100000 })).filter((wake) => wake.at >= since);
   const kernelTokens = db.prepare("SELECT COALESCE(SUM(COALESCE(input_tokens,0)+COALESCE(output_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0)),0) AS tokens FROM llm_usage WHERE workflow_id=? AND subject_type='kernel-turn'").get(workflowId).tokens;
-  return seatRow({ seat: 'kernel', name, wakes, skipped: kernelSkippedLog(db, workflowId), tokens: Number(kernelTokens) });
+  return seatRow({ seat: 'kernel', name, wakes, skipped: kernelSkippedLog(db, workflowId).filter((item) => item.at >= since), tokens: Number(kernelTokens) });
 }
 
-/** The Supervisor row from machine.sqlite. */
-export function supervisorSeatOf(db, { now = Date.now() } = {}) {
-  const wakes = wakesWithUsage(withWorked(supervisorWakeLog(db), supervisorWorkAts(db), { now }), supervisorWakeUsageOf(db, { limit: 100000 }));
+/** The Supervisor row from machine.sqlite; `since` keeps the wakes from that instant on. */
+export function supervisorSeatOf(db, { now = Date.now(), since = 0 } = {}) {
+  const wakes = wakesWithUsage(withWorked(supervisorWakeLog(db), supervisorWorkAts(db), { now }), supervisorWakeUsageOf(db, { limit: 100000 })).filter((wake) => wake.at >= since);
   const tokens = db.prepare("SELECT COALESCE(SUM(COALESCE(input_tokens,0)+COALESCE(output_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0)),0) AS tokens FROM llm_usage WHERE subject_type='supervisor-turn'").get().tokens;
   return seatRow({ seat: 'supervisor', name: 'Supervisor', wakes, tokens: Number(tokens) });
 }

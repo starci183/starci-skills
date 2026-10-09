@@ -26,7 +26,7 @@ const incidentOf = (r) => ({ id: r.incident_id, kind: r.kind, owner: r.owner, du
 const decisionOf = (r) => ({ id: r.di_id, kind: r.kind, decider: r.decider, status: r.status, dueAt: r.due_at ?? null, openedAt: r.opened_at, jobId: r.job_id, summary: r.summary });
 
 /** The ledger rows of one repository: its workflows, and per workflow its jobs, open incidents, open Decision Items and Kernel facts. */
-export function ledgerFacts(file, workflowIds = null) {
+export function ledgerFacts(file, workflowIds = null, { since = 0 } = {}) {
   const db = openLedgerReader(file);
   try {
     const workflows = db.prepare("SELECT workflow_id, display_name, title, phase, created_at, updated_at FROM workflows WHERE archived_at IS NULL AND phase NOT IN ('finished','archived')").all()
@@ -41,7 +41,7 @@ export function ledgerFacts(file, workflowIds = null) {
         incidents: db.prepare("SELECT * FROM incidents WHERE workflow_id=? AND status='open'").all(w.workflow_id).map(incidentOf),
         decisions: db.prepare("SELECT * FROM decision_items WHERE workflow_id=? AND status='open'").all(w.workflow_id).map(decisionOf),
         kernelJob: kernelJob ? { status: kernelJob.status, updatedAt: kernelJob.updated_at } : null,
-        kernelSignal: parseJsonOr(signal?.value_json, null), lastKernelWakeAt: woken, kernelWakes: wakeUsageOf(db, w.workflow_id), seatCost: kernelSeatOf(db, { workflowId: w.workflow_id, name: w.display_name ?? w.title ?? w.workflow_id }) };
+        kernelSignal: parseJsonOr(signal?.value_json, null), lastKernelWakeAt: woken, kernelWakes: wakeUsageOf(db, w.workflow_id), seatCost: kernelSeatOf(db, { workflowId: w.workflow_id, name: w.display_name ?? w.title ?? w.workflow_id, since }) };
     });
   } finally { db.close(); }
 }
@@ -98,7 +98,7 @@ export async function collectSnapshot({ env = process.env, repos = [], workflowI
   const historyErrors = [];
   await eachInOrder(wanted, async (l) => {
     let found;
-    try { found = ledger(l.file, workflowIds); } catch (e) { workflows.push({ id: null, name: l.name, ledger: l.name, repo: l.repo_root, phase: null, jobs: [], incidents: [], decisions: [], statusError: `ledger unreadable: ${String(e.message).slice(0, 100)}` }); return; }
+    try { found = ledger(l.file, workflowIds, { since: facts.engine?.revSince ?? 0 }); } catch (e) { workflows.push({ id: null, name: l.name, ledger: l.name, repo: l.repo_root, phase: null, jobs: [], incidents: [], decisions: [], statusError: `ledger unreadable: ${String(e.message).slice(0, 100)}` }); return; }
     await eachInOrder(found, async (w) => { workflows.push({ ...w, ledger: l.name, repo: l.repo_root, ...(await workflowReads(w, l.repo_root, { timeoutMs, run })) }); });
     try { finished.push(...history(l.file).map((h) => ({ ...h, ledger: l.name }))); } catch (e) { historyErrors.push(`${l.name}: ${String(e.message).slice(0, 100)}`); }
   });

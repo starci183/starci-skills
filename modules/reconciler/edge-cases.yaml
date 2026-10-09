@@ -807,3 +807,31 @@ cases:
     rule: {file: scripts/kernel/verbs/shared/status-menu.mjs, anchor: "jobDecisionsOf"}
     spec: tests/kernel/kernel-menu.spec.mjs
     status: covered
+  - id: replaced-seat-keeps-the-dead-seats-input-failures
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: the record names the seat that stands) the Supervisor seat replaced at 09:12 read live, yet seats.input_failures_consecutive stayed 4 from the dead seat's refused wakes (last at 08:38), so v_deaf_seats named it and the digest printed supervisor-deaf with blocks 1000 for the rest of the morning; the counter reset only when a wake was recorded with another terminal, and the seat start wrote the new terminal first", remedy: {state: in-tree, change: "writing the Supervisor seat (the start of a new one) clears its run of refused inputs; the digest reads a seat as deaf only for failures at or after the seat booted"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Supervisor seat term_e1dad6a9", evidence: "machine.sqlite seats supervisor: terminal term_e1dad6a9, input_failures_consecutive 4, last_input_failure_at 08:38 local, booted 09:12"}
+    rule: {file: scripts/machine/home.mjs, anchor: "writeSeat"}
+    spec: tests/machine/seat-replacement-clears-deaf.spec.mjs
+    status: covered
+  - id: digest-start-loop-counts-failures-a-launch-outlived
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a departure ends when its cause ends) the digest reported kernel-start-loop (1670 launches failed at workflow-worktree-install) for the StarCi workflow whose Kernel had been restarted at 09:37 (kernel-restarted, event 2546): the step judge looked for kernel-booted only, found the one of 2026-10-07, and counted every failure since, of every runtime revision; the start hold already counts only failures since the last launch that stood and of the revision now running; the same blindness made kernel-rev measure the ack bound from the predecessor's ack hours earlier", remedy: {state: in-tree, change: "the digest's start-loop and ack-bound steps use every launch event (booted, restarted, adopted) and the start hold's window: failures after the last launch that stood, of the live runtime revision; the ack bound counts from the later of the last ack and the last launch"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow wf-starci-auth-test-workflow-muxq4oyr", evidence: "starci runtime.sqlite events 2538 to 2542 (kernel-start-failed under the old runtime), 2546 (kernel-restarted 09:37:05); digest 09:49"}
+    rule: {file: scripts/reconciler/debug-standard-probes.mjs, anchor: "lastLaunchAt"}
+    spec: tests/reconciler/debug-standard.spec.mjs
+    status: covered
+  - id: seat-reservation-read-as-a-job-reservation
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: the digest names what a reservation serves) reservations of the Supervisor seat (scope main:attempt:2) and of a Kernel seat in launch (scope <ledger>:<workflow>:kernel-attempt:4) read as 'live for no job' because the check knew only job ids, a seat id and a Kernel job in a live status: a Kernel job between two incarnations is ready, a Supervisor reservation carries no seat id", remedy: {state: in-tree, change: "a seat's reservation is held while the seat it serves stands (the Supervisor seat live or booting, the workflow's Kernel job ready, leased or running); the digest names the seat in the line and flags a reservation only when its seat or job is gone"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, digest 09:49", evidence: "provider_reservations 171fcf62 (role supervisor, scope main:attempt:2), f515f003 (role kernel, kernel-attempt:4, created 09:47:51 with the Kernel job restarting)"}
+    rule: {file: scripts/reconciler/debug-digest-analyze.mjs, anchor: "reservationOwner"}
+    spec: tests/reconciler/debug-digest.spec.mjs
+    status: covered
+  - id: empty-wake-departure-counts-wakes-of-older-runtimes
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a remedy takes effect when it is deployed) the digest named the runtime for waking the Nivo Kernel 30 times with 12 (40 percent) finding nothing to decide, while 4 of the 12 were sent by earlier runtimes (events 500, 503, 507, 521) and the 8 of the current one came from the menu item a gate held (kernel-woken-for-a-menu-item-a-gate-holds): the seat-cost view counted a seat's whole history", remedy: {state: in-tree, change: "the digest judges the empty-wake share over the wakes since the runtime revision now leading took over (leader_history: the first epoch of the unbroken run at that revision), as the start hold judges failures by revision; reconciler status keeps the whole history"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo Kernel", evidence: "nivo runtime.sqlite kernel-woken events 500 to 579 with the worked flag of withWorked; machine leader_history epoch 39 at 88b80ac79 acquired 09:31"}
+    rule: {file: scripts/reconciler/debug-digest-machine.mjs, anchor: "revSinceOf"}
+    spec: tests/reconciler/debug-digest.spec.mjs
+    status: covered
