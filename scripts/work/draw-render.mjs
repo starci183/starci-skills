@@ -45,8 +45,7 @@
 // stylesheet: one that imports tailwindcss is compiled by the product's tailwindcss against the bundle's class
 // candidates, any other is bundled by esbuild.
 //
-// Tailwindcss is the project's own install (scripts/lib/package-at.mjs). Playwright and esbuild resolve from the HTML's or the
-// component's directory, then the working directory, then the runtime's own install (render-tools.mjs): a product declares neither.
+// Tailwindcss is the project's own install (package-at.mjs); Playwright and esbuild resolve from the HTML's or component's directory, the working directory, then the runtime's own install (render-tools.mjs).
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';

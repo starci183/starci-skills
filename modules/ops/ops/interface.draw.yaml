@@ -880,8 +880,8 @@ route:
   nodeKinds: [ui]
   phase: [direct, pre-implementation]
   intent: [direction, draw, render, ui-design]
-  # draw-render and layout-render drive Playwright themselves (runtime verbs, no browser tool of the agent): the op declares no agent host
-  # tool, so every agent that can run the verbs and read a PNG is eligible. The capture needs Playwright with its browser and esbuild on the
+  # draw-render and layout-render drive Playwright themselves (runtime verbs, no browser tool of the agent): the op declares no host tool of an
+  # agent, so every agent that can run the verbs and read a PNG is eligible. The capture needs Playwright with its browser and esbuild on the
   # host (the product's install, else the runtime's own): host-capability-required:render makes the dispatch refuse RENDER_TOOL_UNAVAILABLE
   # before an attempt is spent when the host has none (scripts/work/render-tools.mjs).
   riskHints: [host-capability-required:render]

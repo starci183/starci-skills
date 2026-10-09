@@ -21,7 +21,8 @@ import { ledgerFacts } from '../../scripts/reconciler/debug-digest-collect.mjs';
 const fixture = loadFixture('draw-render-tool');
 const queuedDraw = { ...fixture, jobs: fixture.jobs.map((job) => (job.op === 'interface.draw' ? { id: job.id, op: job.op, status: 'queued', owned: job.owned, params: job.params } : job)) };
 const draw = fixture.jobs.find((job) => job.op === 'interface.draw');
-const NO_BROWSER = chromiumGap(loadPlaywright([ROOT]).chromium);
+const browserGap = chromiumGap(loadPlaywright([ROOT]).chromium);
+const NO_BROWSER = browserGap ? `the capture needs a Chromium download: ${browserGap}` : false;
 const PAGE = '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>html,body{margin:0}body{font-family:ui-sans-serif,sans-serif}main{padding:16px}</style></head><body><main><h1>Drawing</h1></main></body></html>';
 
 const push = (world, extraEnv = {}) => world.cli('dispatch-ready', ['--workflow', world.wf, '--foreground'], { timeout: 300_000, extraEnv }).json.results[0] ?? { dispatched: false, error: 'the push listed no job' };
