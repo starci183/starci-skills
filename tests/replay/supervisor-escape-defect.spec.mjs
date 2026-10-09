@@ -1,4 +1,4 @@
-// Replay of the other two answers to the Kernel's escape (registry: kernel-escape-ruling-leaves-the-product-item-open): the StarCi Supervisor answered di-16537df8 and di-866fd7b8
+// Replay of the other two answers to the Kernel's escape (registry: kernel-escape-opened-in-the-product-ledger-is-owned-by-nobody): the StarCi Supervisor answered di-16537df8 and di-866fd7b8
 // with record-defect, which reaches Debug and never the Kernel, and both items stayed open. The Workflow controller of the real engine (fresh processes, unbound as the live one is)
 // closes the product item and tells the Kernel, as a supervisor-ruling Decision Item with a doorbell, that no answer will follow.
 // Real: Kernel verbs, the Supervisor's verbs, the engine. Stubbed: the Orca binary only. Fixture: tests/fixtures/replay/leg-ready.json.

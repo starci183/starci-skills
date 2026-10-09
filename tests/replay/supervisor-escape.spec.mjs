@@ -1,4 +1,4 @@
-// Replay of the StarCi stall of 2026-10-09 (registry: kernel-escape-opened-in-the-product-ledger-is-owned-by-nobody, kernel-escape-ruling-leaves-the-product-item-open):
+// Replay of the StarCi stall of 2026-10-09 (registry: kernel-escape-opened-in-the-product-ledger-is-owned-by-nobody):
 // the Kernel's none-fits opens the Decision Item menu-escape in the product ledger for the Supervisor, who reads machine.sqlite only. The Workflow controller mirrors it
 // as the Supervisor's twin; the Supervisor answers it with a ruling; the ruling must reach the Kernel and the product-ledger item must close. The sequence: the Kernel
 // escapes the item, the engine runs (a fresh process), the Supervisor reads its menu and rules, the engine runs again.
@@ -43,7 +43,7 @@ test('a Kernel escape reaches the Supervisor menu, and the Supervisor\'s ruling 
   assert.equal(doorbell, 1, 'the Kernel is rung once for it');
 });
 
-// The mirror's loop closes (registry: kernel-escape-ruling-leaves-the-product-item-open): the Workflow controller resolves the product-ledger item once the Supervisor answered its twin.
+// The mirror's loop closes (registry: kernel-escape-opened-in-the-product-ledger-is-owned-by-nobody, second half): the Workflow controller resolves the product-ledger item once the Supervisor answered its twin.
 test('the product-ledger menu-escape item closes once the Supervisor ruled on it', () => {
   const { escape, items } = shared;
   const after = items().find((di) => di.di_id === escape.di_id);
