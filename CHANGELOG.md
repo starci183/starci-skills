@@ -4,11 +4,12 @@ All notable changes to StarCi are documented here. The runtime is on the `1.0.0-
 until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
-## [1.0.0-alpha.9] — in preparation
+## [1.0.0-alpha.9] — 2026-10-10
 
 `1.0.0-alpha.8` was never cut: its notes are part of this release, and `1.0.0-alpha.9` is the one release after `1.0.0-alpha.7`. The registry of runtime defects grew from 28 entries on 2026-10-07 to 60 on 2026-10-08 and 120 on 2026-10-09, 33 of them caught on the live host; fixing them one at a time did not converge, so this release is organised by the nine classes of problem they came from. Each class below describes the problem and the changes present in this tree; unfinished work is listed under Deferred. This release is cut with `release.suite: ci` (class 9): the whole suite is read from the `ci` workflow, and the machine runs `npm run check`, the package suites, the affected specs of the range, the live Orca smokes and the example rows.
 
 ### Removed
+- The narrowed spec prune removes 71 tests across 55 files, including one whole spec file; retained test bodies and role-prompt pins are preserved (class 2).
 - The op's own Critic at `scope.define` and `architecture.decide`: an op no longer runs, writes, attaches or blocks on a Critic, and a verdict file it attaches is ignored. The Critic is the runtime's, run at settle by another provider than the maker (class 5).
 - The Kernel's ranked actions and its `nextActions` procedure, the menu kinds of the next actions the Job controller now performs (`node-rework`, `stale-redispatch`, `asset-slots`, `credential-step`), the handover-step mode that re-ran the handover review by hand and its `rerun-handover-review` choice, the `op-reported` route key, and every menu choice the runtime cannot carry out (`accept` on a failed Critic verdict) (class 8).
 - The Supervisor's fix workers and its landing of runtime code, and the `grammarRelease` duty: the Supervisor answers its menu and records runtime defects; Debug changes `.claude` (class 8).
@@ -177,7 +178,8 @@ Nothing stood before a merge or before the host: 28 branches were merged on `npm
 - Substantive judging of `content.generate` and `perf.verify` remains open. `scope.finish` also has a judge gap: it has no implemented owner gate. Acceptance-trace is report-only and does not close these gaps.
 - Full storage-writer conversion, the ledger migration with mandatory backup, and the blob collector remain outside this release; the storage convention and readers do not make all ledger content references.
 - Converting the remaining legacy runtime sites that derive a root with `process.cwd()` remains work for later releases; the root-adhoc check prevents new sites but does not complete those conversions.
-- The remaining spec files have not all been reviewed test by test; a final remaining count has not been measured on the integrated release tip.
+- The narrowed prune leaves 958 spec files and 6,821 test declarations; the remaining tests have not all been reviewed body by body.
+- Three export-consequence test removals remain outside the narrowed prune scope; those tests and the production exports are retained.
 - The gate-loosening check still judges per file; judging every removed line is deferred.
 - Splitting the edge-case registry into one file per entry is deferred.
 - `define-goal` does not yet declare every leg's write set.
