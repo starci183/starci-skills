@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { gitLand } from '../../scripts/supervisor/git-land.mjs';
-import { affectedTrailer, landVerifyReceipt } from '../../scripts/supervisor/git-land-receipt.mjs';
+import { affectedTrailers, landVerifyReceipt } from '../../scripts/supervisor/git-land-receipt.mjs';
 import { verifyRecord, writeVerifyReceipt } from '../../scripts/supervisor/verify-receipt.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
@@ -45,7 +45,7 @@ const greenDeps = (fx) => ({
   syncCopies: () => 1,
 });
 const land = (fx, args = {}, deps = {}) => gitLand({ positionals: [fx.lane, 'lane'], args, cwd: fx.base, env: {}, role: 'coordinator' }, { ...greenDeps(fx), ...deps });
-const receipt = (fx, over = {}) => verifyRecord({ sha: fx.tip, tree: fx.tree, base: fx.main, check: { pass: 5, total: 5 }, affected: { passed: 7, total: 7, reused: 0 }, ...over });
+const receipt = (fx, over = {}) => verifyRecord({ root: fx.lane, sha: fx.tip, tree: fx.tree, base: fx.main, check: { pass: 5, total: 5 }, affected: { passed: 7, total: 7, reused: 0 }, ...over });
 
 test('a land without a verify receipt is refused at step 0 before the gate, the check or the specs run, and names the verb that produces it', async (t) => {
   const fx = fixture(t);
@@ -94,5 +94,30 @@ test('the receipt lookup is pure over the worktree and names the verb in its ref
   writeVerifyReceipt(fx.lane, receipt(fx));
   const found = landVerifyReceipt({ worktree: fx.lane, tip: fx.tip, base: fx.main });
   assert.equal(found.ok, true);
-  assert.equal(affectedTrailer({ record: found.record, base: fx.main, tip: fx.tip }), `Affected: 7/7 ${fx.main}..${fx.tip}`);
+  assert.deepEqual(affectedTrailers({ record: found.record, base: fx.main, tip: fx.tip }), [`Affected: 7/7 ${fx.main}..${fx.tip}`]);
+});
+
+test('a partial verify receipt lands (0 failed, the changed specs ran) and the note records what was not started; a deploy then needs the rest', async (t) => {
+  const fx = fixture(t);
+  const partial = (affected) => receipt(fx, { affected: { passed: 150, total: 469, reused: 0, ...affected } });
+  writeVerifyReceipt(fx.lane, partial({ notStarted: 319, changedSpecsRan: true }));
+  const out = await land(fx);
+  assert.equal(out.code, 0, out.text);
+  const note = git(fx.repo, 'notes', '--ref=land', 'show', fx.tip);
+  assert.match(note, new RegExp(`^Affected: 150/469 ${fx.main}\.\.${fx.tip}$`, 'm'));
+  assert.match(note, /^Affected-Not-Started: 319 \(budget\)$/m);
+});
+
+test('a partial receipt with a failure, with a changed spec not run, or one that ran in another tree does not open the land', async (t) => {
+  const fx = fixture(t);
+  for (const [name, record, pattern] of [
+    ['a failure', receipt(fx, { affected: { passed: 149, total: 469, failed: 1, notStarted: 319 } }), /1 failed/],
+    ['a changed spec not run', receipt(fx, { affected: { passed: 150, total: 469, notStarted: 319, changedSpecsRan: false } }), /spec the lane changed that was not run/],
+    ['another tree', verifyRecord({ root: fx.repo, sha: fx.tip, tree: fx.tree, base: fx.main, check: { pass: 5, total: 5 }, affected: { passed: 7, total: 7 } }), /ran in .*not in /],
+  ]) {
+    writeVerifyReceipt(fx.lane, record);
+    const out = await land(fx, { 'dry-run': true });
+    assert.equal(out.code, 1, name);
+    assert.match(out.data.refusal.detail, pattern, name);
+  }
 });

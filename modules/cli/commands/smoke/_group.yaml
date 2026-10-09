@@ -1,3 +1,4 @@
 group: smoke
 summary: prove published StarCi behavior in isolated scratch applications
 owner: runtime
+runtimeSide: tree

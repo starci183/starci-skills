@@ -161,6 +161,7 @@ ruleParams:
       - {id: guidance-commands, run: scripts/checks/check-guidance-commands.mjs}
       - {id: port-once, run: scripts/checks/check-port-once.mjs}
       - {id: event-spill, run: scripts/checks/check-event-spill.mjs}
+      - {id: root-adhoc, run: scripts/checks/check-root-adhoc.mjs}
       - {id: storage-convention, run: scripts/checks/check-storage-convention.mjs}
       - {id: spec-budget, run: scripts/checks/check-spec-budget.mjs}
       - {id: spec-cache-key, run: scripts/checks/check-spec-cache-key.mjs}
@@ -177,6 +178,7 @@ ruleParams:
       - {id: revision-scope, run: scripts/checks/check-revision-scope.mjs}
       - {id: sonar-rules, run: scripts/checks/check-sonar-rules.mjs}
       - {id: installed-artefacts, run: scripts/checks/check-installed-artefacts.mjs}
+      - {id: test-spawn-seam, run: scripts/checks/check-test-spawn-seam.mjs}
 
 slots:
 
@@ -383,7 +385,7 @@ slots:
   - id: runtime.db
     profiles: [runtime]
     # Store connection owners and their schema and receipt modules. No api import: a value a store needs from git is passed in.
-    path: "engine/db/{ledger,ledger-paths,machine,machine-connection,machine-schema,provider-reservations,blob,authorizer,attempt-overrun,event-compact,event-payload,ref-value}.mjs"
+    path: "engine/db/{ledger,ledger-paths,machine,machine-connection,machine-schema,provider-reservations,blob,authorizer,attempt-overrun,event-compact,event-payload,ref-value,ledger-open,machine-open}.mjs"
     presence: required
     tracked: tracked
     tier: db

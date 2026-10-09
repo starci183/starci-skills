@@ -39,7 +39,7 @@ const verify = (repo) => runtimeVerify({ args: { root: repo.dir, base: repo.base
     runAffected: (dir, base, progress) => runAffectedChild({ dir, base, env: repo.env, budgetMs: 240_000, marginMs: 60_000, pollMs: 100, progress, cli: path.join(skillRoot, 'packages', 'cli', 'bin', 'starci.mjs'), runtime: skillRoot }),
   },
 });
-const deployAsks = (repo) => receiptFor({ sha: repo.tip, tree: repo.tree, base: repo.base, host: repo.dir, env: repo.env, dir: repo.dir });
+const deployAsks = (repo) => receiptFor({ sha: repo.tip, tree: repo.tree, base: repo.base, host: repo.dir, env: repo.env, root: repo.dir });
 
 test('a green check with a red spec is NOT VERIFIED: the line names the file, no receipt is left, and neither the land nor the deploy accepts the commit', async (t) => {
   const repo = repository(t, { redSpec: true });
@@ -58,7 +58,7 @@ test('the same commit with the spec fixed is verified once, and the land and the
   const landed = landVerifyReceipt({ worktree: repo.dir, tip: repo.tip, base: repo.base });
   assert.equal(landed.ok, true);
   assert.deepEqual([landed.record.check, landed.record.affected.passed, landed.record.affected.total], [{ pass: 2301, total: 2301 }, 1, 1]);
-  assert.deepEqual(deployAsks(repo).affected, { base: repo.base, tip: repo.tip, passed: 1, total: 1 });
+  assert.deepEqual(deployAsks(repo).affected, { base: repo.base, tip: repo.tip, root: path.resolve(repo.dir), passed: 1, total: 1 });
   const again = await verify(repo);
   assert.match(again.text.split('\n').at(-1), /^verified /, 'a second verification of the same pair accepts the proven affected receipt and the unchanged green file is reused');
 });

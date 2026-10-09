@@ -40,12 +40,18 @@ export function menuHintOf(guard, { env = process.env, root = skillRoot } = {}) 
  * tree it works in, which a later fail decision of that tree then has to recover from (live: a file named 0, left by a redirect, made every settle-fail of a job unrecoverable).
  * The null devices are not files; the status text is read with --field, never redirected.
  */
-export function kernelRedirectVerdict({ command, cwd }) {
+function kernelRedirectVerdict({ command, cwd }) {
   const targets = redirectTargetsOf(command, cwd);
   if (!targets.length) return null;
   const use = 'read with starci kernel status --field <name> or starci kernel logs; the call needs no file';
   return refusal('KERNEL_NO_FILE_WRITE', command, `the Kernel seat writes no file: the redirection into ${path.basename(targets[0])} would leave a stray file in its workflow tree`, use, use);
 }
+
+/** The Kernel-seat verdicts of one shell call as a tool verdict, or null for any other role: today the no-file-write rule. */
+export const kernelSeatCallVerdict = ({ role, command, cwd }) => {
+  const v = role === 'lead' ? kernelRedirectVerdict({ command, cwd }) : null;
+  return v ? { tool: 'shell', ...v } : null;
+};
 
 const useOf = (table, hint) => [table.use ?? 'starci kernel decide', hint].filter(Boolean).join('\n');
 

@@ -9,13 +9,15 @@ import { revParse } from '../api/git/rev-parse.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { runLandFullCheck } from '../supervisor/git-land-verify.mjs';
 import { baseOf } from '../supervisor/affected-test.mjs';
-import { verdictOf, verifyRecord, writeVerifyReceipt } from '../supervisor/verify-receipt.mjs';
+import { judgedIn, verdictOf, verifyRecord, writeVerifyReceipt } from '../supervisor/verify-receipt.mjs';
+import { diffNames } from '../api/git/diff-names.mjs';
 import { affectedJudgement, provenFor, runAffectedChild } from './runtime-deploy-affected.mjs';
 import { isDirty } from './runtime-deploy-source.mjs';
 
 const VERIFY_SCHEMA_ANSWER = 'starci/runtime-verify@1';
 const USAGE = 'usage: starci runtime verify [--base <ref>] [--root <tree>] [--json]';
 const TAIL_LINES = 6;
+const PARTIAL_EXIT = 3;
 
 const tailOf = (output) => tailLines(output, TAIL_LINES, { join: ' | ' });
 
@@ -32,27 +34,44 @@ function defaultSeams({ env }) {
     facts: factsOf,
     base: (root, ref) => baseOf(root, ref),
     runCheck: (root) => runLandFullCheck(root),
+    changedSpecs: (root, base) => (diffNames(root, base, 'HEAD') ?? []).filter((file) => /^tests\/.*\.spec\.mjs$/.test(file)),
     provenAffected: (root, base, tip) => provenFor({ dir: root, base, tip }),
     runAffected: (root, base, progress) => runAffectedChild({ dir: root, base, env, budgetMs: readModuleJson('modules', 'supervisor', 'affected-tests.yaml').budgetMs, progress }),
   };
 }
 
-const answer = (code, data, lines) => ({ code, text: [...lines, data.verdict].join('\n'), data: { schema: VERIFY_SCHEMA_ANSWER, ok: code === 0, ...data } });
+const answer = (code, data, lines) => ({ code, text: [...lines, data.verdict].join('\n'), data: { schema: VERIFY_SCHEMA_ANSWER, ok: code === 0, partial: code === PARTIAL_EXIT, ...data } });
+
+/** The affected numbers of a receipt that judged `root`, with the lane's own changed specs checked against the files not started: {passed, total, failed, notStarted, changedSpecsRan, reused, files, ms}. */
+function affectedOf({ receipt, unfinished = [], changedSpecs = [] }) {
+  return { passed: receipt.passed, total: receipt.total, failed: 0, notStarted: unfinished.length, changedSpecsRan: changedSpecs.every((file) => !unfinished.includes(file)), reused: receipt.reused ?? 0, files: receipt.files, ms: receipt.ms };
+}
+
+/** Whether a run that did not finish is a partial the land accepts: nothing red, the receipt is the clean one of this tip and base, the budget (not a crash or a timeout) ended it. */
+const isPartial = (run, { sha, base }) => Boolean(run.receipt) && run.red.length === 0 && run.unfinished.length > 0 && run.exit.code === 2 && !run.exit.timedOut && run.receipt.clean === true && run.receipt.tip === sha && run.receipt.base === base;
+
+/** A partial run is a proof for the land only when every spec the lane changed ran: {affected}, else the refusal naming the specs that did not. */
+function partialProof({ run, changedSpecs }) {
+  const affected = affectedOf({ receipt: run.receipt, unfinished: run.unfinished, changedSpecs });
+  const missed = changedSpecs.filter((file) => run.unfinished.includes(file));
+  return affected.changedSpecsRan ? { affected } : { detail: `the budget ended before ${missed.length} spec file(s) the change itself touched ran: ${missed.join(', ')}. Run starci runtime verify again: the files that passed are reused and the run continues.`, red: [] };
+}
 
 /** The affected proof for `base..sha`: a receipt already proven for the pair, else a real run judged by the deploy's own judgement. {affected} or {detail, red}. */
 async function affectedProof({ root, seams, base, sha, progress }) {
+  const changedSpecs = seams.changedSpecs(root, base);
   const proven = seams.provenAffected(root, base, sha);
   if (proven) {
     progress(`affected: accepting the receipt already proven for ${base.slice(0, 12)}..${sha.slice(0, 12)} (${proven.passed} of ${proven.total} files passed); not run again`);
-    return { affected: { passed: proven.passed, total: proven.total, reused: proven.reused ?? 0, files: proven.files, ms: proven.ms } };
+    return judgedIn(proven.root, root) ? { affected: affectedOf({ receipt: proven }) } : { detail: `the proven affected receipt ran in ${proven.root ?? 'no named tree'}, not in ${root}`, red: [] };
   }
   progress(`affected: running the specs for ${base.slice(0, 12)}..${sha.slice(0, 12)} in ${root}; progress follows`);
   const run = await seams.runAffected(root, base, progress);
+  if (run.receipt && !judgedIn(run.receipt.root, root)) return { detail: `the affected specs ran in ${run.receipt.root ?? 'no named tree'}, not in ${root}`, red: [] };
+  if (isPartial(run, { sha, base })) return partialProof({ run, changedSpecs });
   const judged = affectedJudgement(run, { sha, base });
-  const resume = (run.unfinished ?? []).length ? ' Run starci runtime verify again: the files that passed are reused and the run continues with the rest.' : '';
-  if (!judged.affected) return { detail: judged.detail + resume, red: run.red ?? [] };
-  const { receipt } = run;
-  return { affected: { passed: judged.affected.passed, total: judged.affected.total, reused: receipt.reused ?? 0, files: receipt.files, ms: receipt.ms } };
+  const resume = run.unfinished.length ? ' Run starci runtime verify again: the files that passed are reused and the run continues with the rest.' : '';
+  return judged.affected ? { affected: affectedOf({ receipt: run.receipt, changedSpecs }) } : { detail: judged.detail + resume, red: run.red ?? [] };
 }
 
 /** What stops the verification before anything runs: the problems alone decide, or []. */
@@ -84,7 +103,7 @@ export async function runtimeVerify(ctx, deps = {}) {
   if (!proof.affected) return fail([proof.detail], { check, red: proof.red });
   const after = seams.facts(root);
   if (after.sha !== facts.sha || after.dirty) return fail(['the check or the specs changed the tree or HEAD moved while they ran; the receipt would not bind the commit'], { check });
-  const record = verifyRecord({ sha: facts.sha, tree: facts.tree, base, check, affected: proof.affected });
+  const record = verifyRecord({ sha: facts.sha, tree: facts.tree, root, base, check, affected: proof.affected });
   const receiptFile = writeVerifyReceipt(root, record);
-  return answer(0, { sha: facts.sha, base, check, affected: proof.affected, problems: [], red: [], receiptFile, verdict: verdictOf({ sha: facts.sha, base, check, affected: proof.affected, problems: [] }) }, [`receipt: ${receiptFile}`]);
+  return answer(proof.affected.notStarted > 0 ? PARTIAL_EXIT : 0, { sha: facts.sha, base, check, affected: proof.affected, problems: [], red: [], receiptFile, verdict: verdictOf({ sha: facts.sha, base, check, affected: proof.affected, problems: [] }) }, [`receipt: ${receiptFile}`]);
 }

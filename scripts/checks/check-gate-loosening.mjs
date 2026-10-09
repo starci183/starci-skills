@@ -12,22 +12,15 @@
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { printFindings } from '../lib/check-scan.mjs';
-import { log } from '../api/git/log.mjs';
 import { revList } from '../api/git/rev-list.mjs';
 import { judgeChange, looseningRules, rulingsAt } from '../supervisor/land-gate-loosening.mjs';
 import { approvalIdOf, approved } from '../lib/gate-loosening.mjs';
-import { fileReader, loosensReleased } from './lib/released-state.mjs';
+import { fileReader, loosensReleased, releaseCommit } from './lib/released-state.mjs';
 
 export const CODE = 'RT_GATE_LOOSENING';
 const COMMIT_LIMIT = 400;
 
 const finding = (sha, message) => ({ code: CODE, path: `commit ${sha.slice(0, 10)}`, line: 0, message: `commit ${sha.slice(0, 10)} ${message}` });
-
-/** The release commit of the tree: the newest commit that changed the "version" line of package.json, or null. */
-function releaseCommit(root) {
-  const found = log(['-1', '--format=%H', '-G"version":', '--', 'package.json'], { cwd: root });
-  return found.status === 0 ? found.stdout.trim() || null : null;
-}
 
 /** The RT_GATE_LOOSENING findings over the commits since the release commit of the tree at `root`. */
 export function checkGateLoosening(root = skillRoot) {

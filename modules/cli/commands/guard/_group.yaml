@@ -1,3 +1,4 @@
 group: guard
 summary: enforce StarCi tool, history and host-footprint safety guards
 owner: runtime
+runtimeSide: host

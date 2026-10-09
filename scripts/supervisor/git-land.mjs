@@ -11,7 +11,7 @@ import { gitCallResult, linkedNodeModules, landLocalMain as landLocalMainCall } 
 import { underHostLock as underHostLockCall } from '../machine/verb-lock.mjs';
 import { runLandGate as runLandGateCall } from './git-land-gate.mjs';
 import { runLandFullCheck, verifyLandSpecs } from './git-land-verify.mjs';
-import { affectedTrailer, landVerifyReceipt } from './git-land-receipt.mjs';
+import { affectedTrailers, landVerifyReceipt } from './git-land-receipt.mjs';
 import { announceLand as announceLandCall } from './land-announce.mjs';
 import { KERNEL_NOTE_TRAILER, kernelNoteRefusal } from '../machine/land-kernel-note.mjs';
 
@@ -96,7 +96,7 @@ async function lockedLand({ worktree, ref, verified, verifiedLog, dryRun, lane, 
   if (specResult.refusal) return specResult.refusal;
   const { specRun, specs } = specResult;
 
-  const trailers = [`Land-Verified: ${tip}`, `Specs: ${specs.pass}/${specs.selected}`, `Check: ${check.pass}/${check.total}`, affectedTrailer({ record: receipt.record, base: verifyBase, tip }), ...(kernelNote ? [`${KERNEL_NOTE_TRAILER}: ${kernelNote}`] : [])];
+  const trailers = [`Land-Verified: ${tip}`, `Specs: ${specs.pass}/${specs.selected}`, `Check: ${check.pass}/${check.total}`, ...affectedTrailers({ record: receipt.record, base: verifyBase, tip }), ...(kernelNote ? [`${KERNEL_NOTE_TRAILER}: ${kernelNote}`] : [])];
   if (dryRun) {
     const data = { ...cleanResult({ ok: true, landed: false, tip, base, specs, check, log: specRun.log ?? null }), trailers };
     return { code: 0, text: `starci git land: dry run passed for ${tip.slice(0, 12)}; local main was not changed\n${trailers.join('\n')}`, data };

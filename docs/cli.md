@@ -3643,10 +3643,10 @@ Conventions:
 - A branch is verified only by this receipt: check N of N and affected specs N of N for base..tip, on the exact commit.
 - A fix lane reports the last line of this verb, not the line of starci runtime check (which never runs a spec).
 - Refuses a tree with uncommitted or untracked changes; the receipt binds a commit.
-- starci git land and starci runtime deploy refuse a revision without this receipt or the proof they run themselves.
+- starci git land accepts a partial receipt (0 failed, the lane's changed specs ran, not-started counted); deploy and release need all of them.
 - A spec whose inputs are unchanged since a proven green run is reused; the receipt counts the reused files.
 
-exit: 0 verified: check and every affected spec passed on the exact commit, receipt written; 1 NOT VERIFIED: dirty tree, no base, red check, or a red or unfinished spec file; 2 bad usage
+exit: 0 verified: check and every affected spec passed on the exact commit, receipt written; 1 NOT VERIFIED: dirty tree, no base, red check, or a red spec file; 2 bad usage; 3 PARTIAL: nothing red, the lane's own specs ran, some were not started inside the budget (fit to land, not to deploy)
 
 json: starci/runtime-verify@1
 
@@ -5614,6 +5614,41 @@ json: flag
 ```sh
 starci workflow define --text "Add password reset"
 starci workflow define --plan --text "Add password reset"
+```
+
+### starci workflow purge
+
+remove what an archived workflow left on the host (plan by default)
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+| `--workflow` | string | required |
+| `--plan` | boolean |  |
+| `--apply` | boolean |  |
+| `--ledger` | boolean |  |
+| `--expect` | string |  |
+
+Effect: host
+
+Roles: owner
+
+Conventions:
+
+- the plan is the default and changes nothing; --apply acts, under the host lock and the gc lock
+- only an archived workflow with no live job, lease, seat or worker is purged; Orca must answer
+- trees, refs, workers and terminals go through the worktree home, the git api and worker-close; never a raw recursive delete
+- a branch is deleted only with its proof (registry row, or name grammar with a tip in main or on the workflow's checkpoint chain); the plan prints every tip
+- what the ledger or Orca cannot tie to the workflow by evidence is listed and never touched
+- the ledger rows are kept unless --ledger archives them to a verified zip and drops them
+
+exit: 0 plan printed, or the purge finished (or was already done); 1 a precondition refused it, or a step failed and the purge can be resumed; 2 bad usage
+
+json: flag
+
+```sh
+starci workflow purge --repo <repo> --workflow <id>
+starci workflow purge --repo <repo> --workflow <id> --apply --expect <sha>
 ```
 
 ### starci workflow start

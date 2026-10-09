@@ -23,3 +23,19 @@ export function treeTargetRefusal({ command, args, located, own }) {
   if (located.source === 'STARCI_RUNTIME' || args.includes('--root') || sameRoot(located.root, own)) return null;
   return { code: RUNTIME_TREE_FOREIGN, message: `${RUNTIME_TREE_FOREIGN}: this verb writes the runtime tree, and the located runtime ${located.root} (${located.source}) is not the tree ${own} that owns this CLI; set STARCI_RUNTIME=${own} (or pass --root) to say which tree to write` };
 }
+
+/** The explicit runtime choices that outrank a verb's side: STARCI_RUNTIME, or the verb's own --root. */
+const chosenExplicitly = (located, args) => located.source === 'STARCI_RUNTIME' || args.includes('--root');
+
+/**
+ * The runtime a verb runs: a tree-side verb (one whose result is about the runtime tree that owns the running bin: a check, a test selection, a receipt, a catalog
+ * regeneration) runs THIS checkout unless a tree was chosen explicitly, so its verdict is about the tree it ran in; a host-side verb runs the located runtime (the
+ * per-user record included). {located, retargeted}: `retargeted` carries the runtime the record pointed at when this checkout replaced it. Pure.
+ */
+export function targetOf({ command, args, located, own }) {
+  if (!located || !own || command?.runtimeSide !== 'tree' || chosenExplicitly(located, args) || sameRoot(located.root, own)) return { located, retargeted: null };
+  return { located: { root: own, source: 'own-checkout' }, retargeted: located };
+}
+
+/** The one stderr line saying a tree-side verb ran this checkout although the located runtime is another tree. */
+export const retargetNotice = (retargeted, own) => `starci: this verb is about the runtime tree that owns this CLI, so it ran ${own}, not ${retargeted.root} (${retargeted.source}); set STARCI_RUNTIME to judge another tree\n`;

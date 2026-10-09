@@ -1,3 +1,4 @@
 group: docker
 summary: build and run application-owned Docker resources without crossing project boundaries
 owner: runtime
+runtimeSide: host

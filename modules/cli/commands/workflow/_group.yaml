@@ -3,3 +3,4 @@
 group: workflow
 summary: workflow lifecycle — define a goal, start its kernel, status, stop
 owner: runtime
+runtimeSide: host

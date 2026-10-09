@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { starciLocalRoot } from '../../engine/runtime-root.mjs';
 import { notes } from '../api/git/notes.mjs';
-import { readVerifyReceipt } from '../supervisor/verify-receipt.mjs';
+import { judgedIn, readVerifyReceipt } from '../supervisor/verify-receipt.mjs';
 
 const RECEIPT_SCHEMA = 'starci/deploy-receipt@1';
 
@@ -27,13 +27,15 @@ export function writeReceipt({ sha, tree, exit, at = Date.now(), by = null, coun
   return file;
 }
 
-function readReceipt(sha, tree, base, env) {
+function readReceipt(sha, tree, base, env, root) {
   let record;
   try { record = JSON.parse(fs.readFileSync(receiptFile(sha, env), 'utf8')); } catch { return null; }
   const bound = record?.schema === RECEIPT_SCHEMA && record.sha === sha && record.tree === tree && record.exit === 0 && record.digest === digestOf(record);
   // The affected specs ran against a base: the receipt stands for the host it was proven against, never for another host revision.
   const affectedOk = record?.affected?.tip === sha && record.affected.base === base && record.affected.passed === record.affected.total;
-  return bound && affectedOk ? { via: 'deploy-receipt', at: record.at, affected: record.affected } : null;
+  // The specs ran in one tree: a receipt whose affected run judged another tree's root is that tree's proof, never this source's.
+  const judgedHere = judgedIn(record?.affected?.root, root);
+  return bound && affectedOk && judgedHere ? { via: 'deploy-receipt', at: record.at, affected: record.affected } : null;
 }
 
 function landNoteReceipt(host, sha, base) {
@@ -48,11 +50,11 @@ function landNoteReceipt(host, sha, base) {
   return verified && check && check[1] === check[2] && affectedOk ? { via: 'land-note', counts: `${check[1]}/${check[2]}`, affected: { base, tip: sha, passed: Number(affected[1]), total: Number(affected[2]) } } : null;
 }
 
-/** The verify receipt in the source checkout `dir` (`starci runtime verify`), as a deploy receipt, or null. */
-function verifyReceipt({ dir, sha, tree, base }) {
-  const found = readVerifyReceipt({ root: dir, sha, tree, base });
-  return found.record ? { via: 'verify-receipt', at: found.record.at, affected: { base, tip: sha, passed: found.record.affected.passed, total: found.record.affected.total } } : null;
+/** The verify receipt of the source checkout `root` (`starci runtime verify`), as a deploy receipt, or null. */
+function verifyReceipt({ root, sha, tree, base }) {
+  const found = readVerifyReceipt({ root, sha, tree, base });
+  return found.record ? { via: 'verify-receipt', at: found.record.at, affected: { base, tip: sha, root: found.record.root, passed: found.record.affected.passed, total: found.record.affected.total } } : null;
 }
 
-/** The receipt that stands for `sha`: {via, ...} or null. `host` is the host repository, where the land note lives; `dir` the source checkout, where the verify receipt lives. */
-export const receiptFor = ({ sha, tree, base, host, env, dir = host }) => readReceipt(sha, tree, base, env) ?? verifyReceipt({ dir, sha, tree, base }) ?? landNoteReceipt(host, sha, base);
+/** The receipt that stands for `sha`: {via, ...} or null. `host` is the host repository, where the land note lives; `root` the source checkout the specs must have run in. */
+export const receiptFor = ({ sha, tree, base, host, env, root }) => readReceipt(sha, tree, base, env, root) ?? verifyReceipt({ root, sha, tree, base }) ?? landNoteReceipt(host, sha, base);

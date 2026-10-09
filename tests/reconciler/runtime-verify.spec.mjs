@@ -18,6 +18,10 @@ const git = (cwd, ...args) => {
 const BASE = 'b'.repeat(40);
 const SHA = 'a'.repeat(40);
 
+const done = { exited: true, code: 0, signal: null, timedOut: false };
+const receiptIn = (root, over = {}) => ({ schema: 'starci/affected-receipt@1', root, base: BASE, tip: SHA, clean: true, files: 3, passed: 3, total: 3, ok: true, ...over });
+const ran = (root, over = {}, run = {}) => ({ exit: done, receipt: receiptIn(root, over), answer: {}, tail: [], red: [], unfinished: [], ...run });
+
 /** The seams of a verification that finds a clean commit, a green check and a green affected run; `over` replaces any. */
 function seams(over = {}) {
   return {
@@ -25,7 +29,8 @@ function seams(over = {}) {
     base: () => BASE,
     runCheck: () => ({ ok: true, pass: 2301, total: 2301, output: 'ok' }),
     provenAffected: () => null,
-    runAffected: () => ({ exit: { exited: true, code: 0, signal: null, timedOut: false }, receipt: { schema: 'starci/affected-receipt@1', base: BASE, tip: SHA, clean: true, files: 3, passed: 3, total: 3, ok: true, reused: 1, ms: 40 }, answer: {}, tail: [], red: [], unfinished: [] }),
+    changedSpecs: () => [],
+    runAffected: (root) => ran(root, { reused: 1, ms: 40 }),
     ...over,
   };
 }
@@ -55,11 +60,12 @@ test('NOT VERIFIED, each with its reason: a dirty tree, no base, a red check (th
   const redCheck = await verify(t, { runCheck: () => ({ ok: false, pass: 2300, total: 2301, output: 'x\nRT_TIER_DIRECTION scripts/a.mjs' }), runAffected: () => { affectedRuns += 1; } });
   assert.match(last(redCheck.out), /^NOT VERIFIED aaaaaaaaaaaa: the runtime check is red \(2300\/2301\); the affected specs were not run: .*RT_TIER_DIRECTION/);
   assert.equal(affectedRuns, 0);
-  const redSpecs = await verify(t, { runAffected: () => ({ exit: { exited: true, code: 1, signal: null, timedOut: false }, receipt: { ok: false, passed: 1, total: 3, files: 3, clean: true, tip: SHA, base: BASE }, answer: {}, tail: [], red: ['tests/a.spec.mjs', 'tests/b.spec.mjs'], unfinished: [] }) });
+  const redSpecs = await verify(t, { runAffected: (root) => ran(root, { ok: false, passed: 1 }, { exit: { ...done, code: 1 }, red: ['tests/a.spec.mjs', 'tests/b.spec.mjs'] }) });
   assert.equal(redSpecs.out.code, 1);
   assert.match(last(redSpecs.out), /^NOT VERIFIED aaaaaaaaaaaa: 2 spec file\(s\) are red: tests\/a\.spec\.mjs, tests\/b\.spec\.mjs \[red: tests\/a\.spec\.mjs, tests\/b\.spec\.mjs\]$/);
-  const unfinished = await verify(t, { runAffected: () => ({ exit: { exited: true, code: 2, signal: null, timedOut: false }, receipt: { ok: false, passed: 2, total: 3, files: 4, clean: true, tip: SHA, base: BASE }, answer: {}, tail: [], red: [], unfinished: ['tests/z.spec.mjs'] }) });
-  assert.match(last(unfinished.out), /^NOT VERIFIED .*the time budget ended with 1 spec file\(s\) not started.* Run starci runtime verify again: the files that passed are reused/);
+  const unfinished = await verify(t, { runAffected: (root) => ran(root, { ok: false, passed: 2, total: 3 }, { exit: { ...done, code: 2 }, unfinished: ['tests/z.spec.mjs'] }), changedSpecs: () => ['tests/z.spec.mjs'] });
+  assert.match(last(unfinished.out), /^NOT VERIFIED .*the budget ended before 1 spec file\(s\) the change itself touched ran.*Run starci runtime verify again: the files that passed are reused/);
+  assert.equal(unfinished.out.code, 1, 'the lane changed the spec that did not run: not a partial');
   let calls = 0;
   const moved = await verify(t, { facts: () => ({ sha: calls++ ? 'c'.repeat(40) : SHA, tree: 't', dirty: false }) });
   assert.match(last(moved.out), /^NOT VERIFIED .*HEAD moved while they ran/);
@@ -68,7 +74,7 @@ test('NOT VERIFIED, each with its reason: a dirty tree, no base, a red check (th
 
 test('an affected receipt already proven for the same base..tip is accepted, not run again; a usage error is exit 2', async (t) => {
   let ran = 0;
-  const proven = await verify(t, { provenAffected: () => ({ passed: 5, total: 5, reused: 0, files: 5, ms: 9 }), runAffected: () => { ran += 1; } });
+  const proven = await verify(t, { provenAffected: (root) => ({ root, passed: 5, total: 5, reused: 0, files: 5, ms: 9 }), runAffected: () => { ran += 1; } });
   assert.equal(proven.out.code, 0);
   assert.equal(ran, 0);
   assert.match(last(proven.out), /affected 5\/5 of /);
@@ -79,7 +85,7 @@ test('an affected receipt already proven for the same base..tip is accepted, not
 
 test('the receipt verifies only the commit, tree and base it names, and only with BOTH proofs full; a hand edit fails its digest', (t) => {
   const root = mkdtemp(t, 'starci-verify-');
-  const record = verifyRecord({ sha: SHA, tree: 't1', base: BASE, check: { pass: 4, total: 4 }, affected: { passed: 2, total: 2, reused: 0 } });
+  const record = verifyRecord({ root, sha: SHA, tree: 't1', base: BASE, check: { pass: 4, total: 4 }, affected: { passed: 2, total: 2, reused: 0 } });
   writeVerifyReceipt(root, record);
   const read = (over) => readVerifyReceipt({ root, sha: SHA, tree: 't1', base: BASE, ...over });
   assert.ok(read({}).record);
@@ -91,12 +97,46 @@ test('the receipt verifies only the commit, tree and base it names, and only wit
     fs.writeFileSync(file, JSON.stringify(edit(record)));
     assert.match(read({}).problem, pattern, name);
   }
-  const short = verifyRecord({ sha: SHA, tree: 't1', base: BASE, check: { pass: 3, total: 4 }, affected: { passed: 2, total: 2 } });
+  const short = verifyRecord({ root, sha: SHA, tree: 't1', base: BASE, check: { pass: 3, total: 4 }, affected: { passed: 2, total: 2 } });
   writeVerifyReceipt(root, short);
   assert.match(read({}).problem, /records the check at 3\/4/, 'a digest-correct receipt that records a short check is still not a verification');
-  const partial = verifyRecord({ sha: SHA, tree: 't1', base: BASE, check: { pass: 4, total: 4 }, affected: { passed: 1, total: 2 } });
+  const partial = verifyRecord({ root, sha: SHA, tree: 't1', base: BASE, check: { pass: 4, total: 4 }, affected: { passed: 1, total: 2 } });
   writeVerifyReceipt(root, partial);
   assert.match(read({}).problem, /records the affected specs at 1\/2/);
+});
+
+test('a partial run is honest: land reads it (0 failed, the specs the lane changed ran, not-started counted), deploy and release never do', (t) => {
+  const root = mkdtemp(t, 'starci-verify-');
+  const at = (affected) => verifyRecord({ root, sha: SHA, tree: 't1', base: BASE, check: { pass: 4, total: 4 }, affected });
+  const asks = (record) => { writeVerifyReceipt(root, record); return [readVerifyReceipt({ root, sha: SHA, tree: 't1', base: BASE, need: 'land' }), readVerifyReceipt({ root, sha: SHA, tree: 't1', base: BASE })]; };
+  const [landOk, deployNo] = asks(at({ passed: 150, total: 469, notStarted: 319, changedSpecsRan: true }));
+  assert.ok(landOk.record, 'a partial with its own specs run opens the land');
+  assert.match(deployNo.problem, /150\/469 \(319 not started\): a deploy needs all of them/);
+  assert.match(asks(at({ passed: 150, total: 469, notStarted: 319, changedSpecsRan: false }))[0].problem, /a spec the lane changed that was not run/);
+  assert.match(asks(at({ passed: 150, total: 469, notStarted: 318, changedSpecsRan: true }))[0].problem, /150\/469 with 318 not started/);
+  assert.match(asks(at({ passed: 149, total: 469, failed: 1, notStarted: 319 }))[0].problem, /1 failed/);
+  assert.equal(verdictOf({ sha: SHA, base: BASE, check: { pass: 4, total: 4 }, affected: at({ passed: 150, total: 469, notStarted: 319 }).affected, problems: [] }).replace(/[0-9a-f]{12}/g, 'X'),
+    'PARTIAL X: check 4/4, affected 150/469 passed, 0 failed, 319 not started (budget) of X..X; fit to land, not to deploy or release');
+});
+
+test('a verb run whose budget ended with nothing red and the lane specs run is PARTIAL, exit 3; a changed spec that never ran is NOT VERIFIED', async (t) => {
+  const partial = (changed) => ({ runAffected: (root) => ran(root, { ok: false, passed: 2, total: 5 }, { exit: { ...done, code: 2 }, unfinished: ['tests/x.spec.mjs', 'tests/y.spec.mjs', 'tests/z.spec.mjs'] }), changedSpecs: () => changed });
+  const ok = await verify(t, partial(['tests/a.spec.mjs']));
+  assert.equal(ok.out.code, 3, ok.out.text);
+  assert.equal(ok.out.data.partial, true);
+  assert.match(last(ok.out), /^PARTIAL aaaaaaaaaaaa: check 2301\/2301, affected 2\/5 passed, 0 failed, 3 not started \(budget\) of /);
+  const found = readVerifyReceipt({ root: ok.root, sha: SHA, tree: 't'.repeat(40), base: BASE, need: 'land' });
+  assert.equal(found.record.affected.notStarted, 3);
+  const bad = await verify(t, partial(['tests/y.spec.mjs']));
+  assert.equal(bad.out.code, 1);
+  assert.match(last(bad.out), /^NOT VERIFIED /);
+});
+
+test('specs that ran in another tree are no proof here: the verb refuses a receipt that names no root or another one', async (t) => {
+  const other = await verify(t, { runAffected: () => ran('/somewhere/else') });
+  assert.match(last(other.out), /^NOT VERIFIED .*the affected specs ran in \/somewhere\/else, not in /);
+  const none = await verify(t, { runAffected: () => ran(undefined) });
+  assert.match(last(none.out), /ran in no named tree/);
 });
 
 test('the last line names the red files, caps the list, and a verified line never carries a problem', () => {
@@ -124,10 +164,11 @@ function hostAndClone(t) {
 test('a deploy takes the verify receipt of the source clone for the host head, and nothing weaker', (t) => {
   const w = hostAndClone(t);
   const env = { STARCI_LOCAL_ROOT: path.join(w.root, 'state') };
-  const ask = (over = {}) => receiptFor({ sha: w.tip, tree: w.tree, base: w.base, host: w.host, env, dir: w.clone, ...over });
+  const ask = (over = {}) => receiptFor({ sha: w.tip, tree: w.tree, base: w.base, host: w.host, env, root: w.clone, ...over });
   assert.equal(ask(), null, 'no receipt, no proof');
-  writeVerifyReceipt(w.clone, verifyRecord({ sha: w.tip, tree: w.tree, base: w.base, check: { pass: 9, total: 9 }, affected: { passed: 4, total: 4, reused: 0 } }));
-  assert.deepEqual([ask().via, ask().affected], ['verify-receipt', { base: w.base, tip: w.tip, passed: 4, total: 4 }]);
+  writeVerifyReceipt(w.clone, verifyRecord({ root: w.clone, sha: w.tip, tree: w.tree, base: w.base, check: { pass: 9, total: 9 }, affected: { passed: 4, total: 4, reused: 0 } }));
+  assert.deepEqual([ask().via, ask().affected], ['verify-receipt', { base: w.base, tip: w.tip, root: w.clone, passed: 4, total: 4 }]);
+  assert.equal(ask({ root: w.host }), null, 'the same receipt copied beside another tree names the root it ran in: not the proof of that tree');
   assert.equal(ask({ base: 'e'.repeat(40) }), null, 'a receipt proven against another host head is no proof for this one');
 });
 
@@ -135,7 +176,7 @@ test('a land note is a deploy receipt only when it carries the affected proof fo
   const w = hostAndClone(t);
   git(w.host, 'fetch', '-q', w.clone, 'HEAD');
   const env = { STARCI_LOCAL_ROOT: path.join(w.root, 'state') };
-  const ask = () => receiptFor({ sha: w.tip, tree: w.tree, base: w.base, host: w.host, env, dir: w.host });
+  const ask = () => receiptFor({ sha: w.tip, tree: w.tree, base: w.base, host: w.host, env, root: w.host });
   const note = (...lines) => git(w.host, 'notes', '--ref=land', 'add', '-f', '-m', lines.join('\n'), w.tip);
   note(`Land-Verified: ${w.tip}`, 'Specs: 3/3', 'Check: 9/9');
   assert.equal(ask(), null, 'check alone is not a receipt');
