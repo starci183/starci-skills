@@ -6,7 +6,9 @@
 // Real: the Kernel verbs, the engine, the throttle. Stubbed: the Orca binary; the host sample is the injected seam of the runtime (scripts/machine/host-resources.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadFixture, replayWorld, ROOMY_HOST } from '../helpers/replay-world.mjs';
+import path from 'node:path';
+import { locateRuntime } from '../../packages/cli/src/runtime-locate.mjs';
+import { loadFixture, replayWorld, ROOMY_HOST, ROOT } from '../helpers/replay-world.mjs';
 
 const fixture = loadFixture('shape-guard');
 const GIB = 1024 ** 3;
@@ -15,6 +17,25 @@ const allowedUnder = (world, host) => {
   const status = world.cli('status', ['--workflow', world.wf], { extraEnv: { STARCI_HOST_RESOURCES_JSON: JSON.stringify(host) } }).json;
   return [status.progress.allowedParallel, status.progress.readyJobs];
 };
+
+test('a replay CLI uses the checkout under test even when the host links another runtime', (t) => {
+  const saved = process.env.STARCI_RUNTIME;
+  delete process.env.STARCI_RUNTIME;
+  let world;
+  try {
+    world = replayWorld(t, fixture);
+  } finally {
+    if (saved === undefined) delete process.env.STARCI_RUNTIME;
+    else process.env.STARCI_RUNTIME = saved;
+  }
+  const home = path.join(world.base, 'home');
+  const foreign = path.join(world.base, 'foreign-runtime');
+  const record = path.join(home, '.starci', 'runtime.json');
+  const entries = [record, path.join(foreign, 'scripts', 'cli', 'main.mjs'), path.join(ROOT, 'scripts', 'cli', 'main.mjs')];
+  const located = locateRuntime({ cwd: ROOT, env: world.env, home, exists: (file) => entries.includes(file), read: () => JSON.stringify({ root: foreign }), embeddedRoot: ROOT });
+  assert.equal(located.root, ROOT, 'the public CLI and the direct Kernel verbs run the same revision');
+  assert.equal(located.source, 'STARCI_RUNTIME', 'the replay chooses its runtime before the host link is read');
+});
 
 test('the injected host decides dispatch capacity, and no process of a replayed pass reads the real host', (t) => {
   const world = replayWorld(t, fixture, { tree: true });

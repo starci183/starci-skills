@@ -1748,3 +1748,16 @@ cases:
     met: {date: "2026-10-09", where: "the judge declarations of business.decide, content.generate, perf.verify, scope.finish and test.author", evidence: "each of these ops is judged by machine measures alone and none of them reads substance: the settler re-runs the record validators (shape, references, coverage of the records) and the READ digest is re-read, but no Critic, no reviewing leg and no owner gate judges whether the specified behaviour (business.decide), the generated content and its examples (content.generate), the measured numbers (perf.verify), the retention of live consumers and sole evidence copies (scope.finish) or the cases of the authored tests (test.author) are right; the op's own run is the evidence"}
     why: "Adding a Critic row, a reviewing leg or an owner gate for an op changes who can fail a leg, which is the owner's decision per leg and not part of declaring today's behaviour. The declarations name the gap in their why so the op is told its checks are shape only."
     status: open
+  - id: replay-cli-follows-the-host-runtime-link
+    family: record-vs-reality
+    finding:
+      role: runtime
+      duty: does
+      verdict: departs
+      evidence: "A replay without an inherited STARCI_RUNTIME runs direct Kernel verbs from the checkout but lets the public CLI follow the host runtime link. The digest can therefore read another revision while the push writes the refusal memo with the checkout's code."
+      remedy: {state: in-tree, change: "The replay environment pins STARCI_RUNTIME to the checkout that owns the harness."}
+    met: {date: "2026-10-10", where: "replay lane runtime-selection regression", evidence: "The fake-link regression fails on revision 98b38a97a: the public CLI selects the foreign runtime while the direct Kernel verbs select the checkout."}
+    rule: {file: tests/helpers/replay-world.mjs, anchor: "STARCI_RUNTIME: ROOT"}
+    spec: tests/replay/host-independence.spec.mjs
+    replay: tests/replay/host-independence.spec.mjs
+    status: covered

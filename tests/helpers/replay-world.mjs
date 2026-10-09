@@ -203,6 +203,7 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
   fs.mkdirSync(path.join(base, 'memo'), { recursive: true });
   const machineFile = path.join(base, 'machine.sqlite');
   const env = { ...process.env, [TEST_REGISTRY_ENV]: machineFile, STARCI_LOCAL_ROOT: path.join(base, 'local'), STARCI_PROJECTS_ROOT: path.join(base, 'projects'),
+    STARCI_RUNTIME: ROOT,
     STARCI_ARTIFACT_ROOT: path.join(base, 'artifacts'), STARCI_KERNEL_REV_ROOT: runtime, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG: path.join(base, 'orca.jsonl'), STARCI_FAKE_ORCA_STATE: path.join(base, 'orca-state.json'), STARCI_GIT_MEMO_DIR: path.join(base, 'memo'),
     STARCI_AUTOPILOT: 'off', NODE_NO_WARNINGS: '1',
