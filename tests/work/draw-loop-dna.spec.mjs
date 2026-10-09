@@ -207,11 +207,15 @@ test('the critic: the product rubric or the default, a verdict parsed and gate-c
   fs.writeFileSync(png, encodePng(blankImage(4, 4, WHITE)));
   fs.writeFileSync(path.join(dir, 'a.html'), GOOD);
   let seen = null;
-  const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9), onStart: (a) => { seen = { dir: a.worktree, files: fs.readdirSync(a.worktree).sort() }; } });
+  const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9), onStart: (a) => {
+    const packet = /to:\r?\n\s+(\S+\.md)/.exec(a.spec)?.[1];
+    seen = { dir: a.worktree, files: fs.readdirSync(a.worktree).sort(), packet: packet ? fs.readFileSync(packet, 'utf8') : null };
+  } });
   const critique = await runCritic({ images: [{ path: png, label: 'desktop' }], html: path.join(dir, 'a.html'), rubric: DEFAULT_RUBRIC,
     critic: criticFor(allocationSettings().drawLoop, { provider: 'devin', model: 'swe-2-max' }).critic, placement: { tmpRoot: dir }, orca });
   assert.deepEqual(seen.files, ['render-1.png', 'rubric.yaml', 'screen.html'], 'the critic sees only the PNGs, the HTML and the rubric');
-  const spec = orca.calls.find((c) => c[0] === 'worker-start')[1].spec;
+  // a prompt over the paste bound is a file the runtime wrote: the Task spec is that file
+  const spec = seen.packet ?? orca.calls.find((c) => c[0] === 'worker-start')[1].spec;
   assert.match(spec, /did NOT draw this screen/);
   assert.equal(critique.outcome, 'judged');
   assert.equal(critique.verdict.beauty, 9);
