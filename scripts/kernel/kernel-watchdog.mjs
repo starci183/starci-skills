@@ -48,6 +48,7 @@ import { workflowSender } from './workflow-startup.mjs';
 import { seatWakeOf } from './op-incident-policy.mjs';
 import { createKernelRotation, rotationRule } from './seat-rotation.mjs';
 import { runtimeRevNow, startFailureRun, startHoldBudget, startHoldOf } from './start-hold.mjs';
+import { journalRefusedStart, lastStartFailedSeq } from './start-refusal-journal.mjs';
 import { recordReplaced, recordWoken, runtimePass } from '../machine/revision-ack.mjs';
 import { kernelSeat } from '../machine/revision-seats.mjs';
 import { noticeWakeLine } from '../machine/revision-notice.mjs';
@@ -165,19 +166,17 @@ export function startAnswerOf(started, base = {}) {
 }
 // A start that printed no answer (killed at its bound, crashed) is a failed launch like any other: recorded kernel-start-failed so the start-hold rule counts it and
 // the digest names its cause, and the Kernel seat the rotation closed is never left without a recorded reason.
-// A refusal the start prints before it claims anything (the host is not ready, the goal is not startable) leaves no kernel-start-failed event of its own: the watchdog journals it.
-const PRE_CLAIM_REFUSALS = new Set(['workflow-host-not-ready', 'workflow-approval-required', 'workflow-not-startable', 'workflow-goal-unverified']);
-const recordRefusedStart = (value) => withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, kind: 'kernel-start-failed',
-  payload: { step: value.step, reason: value.step, error: String(value.error ?? value.host?.error ?? value.host?.items?.find?.((item) => item.status === 'red' && item.required)?.detail ?? value.step).slice(0, 600), runtimeRev: runtimeRevNow() } })));
+// A refusal the start prints without having recorded a failed launch itself is journaled by start-refusal-journal.mjs, so the start-hold rule counts it.
 const recordUnansweredStart = (started) => {
   const detail = unansweredStart(started);
   withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, kind: 'kernel-start-failed',
     payload: { step: detail.step, reason: detail.reason, error: String(detail.error).slice(0, 600), runtimeRev: runtimeRevNow(), timeoutMs: START_TIMEOUT_MS } })));
 };
 const replaceKernel = (base) => {
+  const before = withKernelLedger((ledger) => lastStartFailedSeq(ledger, workflowId)) ?? 0;
   const started = runNodeJson(startFile, ['--repo', path.resolve(repo), '--goal', workflowId, '--launched-by', 'watchdog', '--json'], { timeout: START_TIMEOUT_MS });
   if (!started.value) recordUnansweredStart(started);
-  else if (started.value.ok === false && PRE_CLAIM_REFUSALS.has(started.value.step)) recordRefusedStart(started.value);
+  else withKernelLedger((ledger) => journalRefusedStart(ledger, { workflowId, value: started.value, before }));
   const step = started.value?.step ?? null;
   if (step === 'host-unavailable') return { ...base, ok: true, action: 'host-unavailable', reason: started.value?.error ?? null };
   // No sender terminal to launch from is a refusal retrying cannot change: answered once as restart-blocked, which the Host

@@ -9,6 +9,7 @@ import { roleRows } from './debug-roles.mjs';
 import { loadQuestions, answerQuestions, standingOf } from './debug-questions.mjs';
 import { bootBudget, exceededWakes, supervisorWakeBudget, wakeBudget } from '../kernel/wake-budget.mjs';
 import { seatsOverEmptyBound } from './seat-cost.mjs';
+import { silentProblems } from './debug-digest-silent.mjs';
 
 const MIN = 60_000;
 const LIVE_JOB = new Set(['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown']);
@@ -295,7 +296,7 @@ export function analyze(snapshot, policy, n, docs = declared()) {
   const supervisor = supervisorSection(ctx);
   const workflows = snapshot.workflows.map((w) => workflowView(w, ctx));
   const admission = admissionSection(ctx);
-  const legacy = [...reconcilerProblems(reconciler, n), ...supervisorProblems(supervisor, n), ...workflows.flatMap((w) => w.problems), ...admissionProblems(admission), ...secretProblems(ctx)];
+  const legacy = [...reconcilerProblems(reconciler, n), ...supervisorProblems(supervisor, n), ...workflows.flatMap((w) => w.problems), ...admissionProblems(admission), ...secretProblems(ctx), ...silentProblems(snapshot.silent, n, snapshot.now)];
   const views = workflows.map((view, i) => ({ ...view, source: withRows(snapshot.workflows[i]) }));
   const standard = judgeStandard(docs.standard, { now: snapshot.now, n, reconciler, supervisor, admission }, views);
   const verdicts = classifyAll({ n, defs: docs.standard, standard, views, registry: snapshot.registry ?? [], problems: legacy });

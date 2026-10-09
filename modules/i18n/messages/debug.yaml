@@ -171,3 +171,7 @@ messages:
     vi: "(đã thêm tín hiệu: {signal})"
   - en: "Last release CI: {line}"
     vi: "CI của bản phát hành gần nhất: {line}"
+  - en: "The {controller} controller ran {verb} for {key} and it failed {count} times in a row over {min} min ({error}); nothing else reports it: the runtime owes the role it serves a line, a retry or an item."
+    vi: "Controller {controller} chạy {verb} cho {key} và thất bại {count} lần liên tiếp trong {min} phút ({error}); không nơi nào khác báo việc này: runtime nợ vai trò mà nó phục vụ một dòng, một lần thử lại hoặc một mục."
+  - en: "The Decision Item {key} ({kind}) was refused {count} times over {min} min ({code}); the role it was for is not being told."
+    vi: "Decision Item {key} ({kind}) bị từ chối {count} lần trong {min} phút ({code}); vai trò mà nó dành cho không được báo."
