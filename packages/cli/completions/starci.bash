@@ -30,7 +30,7 @@ _starci() {
         reconciler) COMPREPLY=( $(compgen -W "once reopen restart start status stop up" -- "$cur") );;
         release) COMPREPLY=( $(compgen -W "app-installs check ci-status clean-test cut env-test images launch-smoke notes proof publish sync-runtime" -- "$cur") );;
         route) COMPREPLY=( $(compgen -W "op" -- "$cur") );;
-        runtime) COMPREPLY=( $(compgen -W "architecture artefacts benchmark-snapshot check deploy derived-fields doctor gen-catalog gen-ops housekeeping import-held-secret install ledger-hygiene link machine-db owner-claims-audit readme-blocks revision-scope status update validate version" -- "$cur") );;
+        runtime) COMPREPLY=( $(compgen -W "architecture artefacts benchmark-snapshot check deploy derived-fields doctor gen-catalog gen-ops housekeeping import-held-secret install ledger-hygiene link machine-db owner-claims-audit readme-blocks revision-scope status update validate verify version" -- "$cur") );;
         smoke) COMPREPLY=( $(compgen -W "scaffold" -- "$cur") );;
         supabase) COMPREPLY=( $(compgen -W "start status stop" -- "$cur") );;
         supervisor) COMPREPLY=( $(compgen -W "actions bridge channel decide direct-commits gate-stability gc land lesson-actions notify owed poll push push-mains ram-cap report revision-ack start status stop telegram-bridge tell watchdog workers" -- "$cur") );;
@@ -631,6 +631,8 @@ _starci() {
         runtime:revision-scope:--root) return 0;;
         runtime:update:--hosts) return 0;;
         runtime:validate:--owned) return 0;;
+        runtime:verify:--base) return 0;;
+        runtime:verify:--root) return 0;;
         smoke:scaffold:--into) return 0;;
         supervisor:actions:--item) return 0;;
         supervisor:actions:--action) return 0;;
@@ -1135,6 +1137,7 @@ _starci() {
         runtime:status) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:update) COMPREPLY=( $(compgen -W "--force --hosts --no-bootstrap --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:validate) COMPREPLY=( $(compgen -W "--strict --owned --json --cwd --quiet --help --edition" -- "$cur") );;
+        runtime:verify) COMPREPLY=( $(compgen -W "--base --root --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:version) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         smoke:scaffold) COMPREPLY=( $(compgen -W "--into --keep --json --cwd --quiet --help --edition" -- "$cur") );;
         supabase:start) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
@@ -1167,7 +1170,7 @@ _starci() {
         task:list) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         task:register) COMPREPLY=( $(compgen -W "--apply --json --cwd --quiet --help --edition" -- "$cur") );;
         task:show) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
-        test:affected) COMPREPLY=( $(compgen -W "--base --changed --by --run --plan --receipt-file --concurrency --root --json --cwd --quiet --help --edition" -- "$cur") );;
+        test:affected) COMPREPLY=( $(compgen -W "--base --changed --by --run --plan --receipt-file --no-cache --concurrency --root --json --cwd --quiet --help --edition" -- "$cur") );;
         test:run) COMPREPLY=( $(compgen -W "--level --changed --against --spec --concurrency --root --release-cut --json --cwd --quiet --help --edition" -- "$cur") );;
         typecheck:run) COMPREPLY=( $(compgen -W "--level --changed --project --json --cwd --quiet --help --edition" -- "$cur") );;
         uat:assisted-runner) COMPREPLY=( $(compgen -W "--request --receipt --after --value --actor --json --cwd --quiet --help --edition" -- "$cur") );;

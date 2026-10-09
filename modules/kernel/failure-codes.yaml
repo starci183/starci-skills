@@ -17836,6 +17836,16 @@ RT_HELD_UNSURFACED:
   nextStep_vi: "Khai báo surfacedBy, surfacedAs và surfacedAt trong mục của mã (decision-item, sla-clock, incident, digest, notifier, caller hoặc open) và làm cho tệp được trỏ tới thật sự báo cho vai trò giữ mã; nếu chưa làm được thì ghi open và thêm mục open vào modules/reconciler/edge-cases.yaml nêu đúng lý do."
   owner: supervisor
   kind: check-finding
+SPEC_CACHE_KEY_BLIND:
+  title: "The spec cache key does not move with an input class the affected selector knows"
+  title_vi: "Khóa bộ nhớ đệm spec không đổi khi một loại đầu vào mà bộ chọn affected biết bị thay đổi"
+  meaning_vi: "Self-check spec-cache-key dựng một cây nhỏ cho từng loại đầu vào của một spec (import tĩnh, import động theo chuỗi, require, điểm vào được spawn, tệp dữ liệu nêu bằng đường dẫn hoặc cạnh thư mục của nó, thư mục anh em, thư mục và cây được nêu tên, đầu ra sinh ra của một generator, mỗi gốc dữ liệu, tầng runtime và tầng cây, phiên bản node, preload, lockfile), đổi đúng một tệp của loại đó và đòi khóa phải đổi; một khóa đứng yên cho một thay đổi như vậy sẽ cho tái dùng một kết quả xanh cũ, nên bị từ chối."
+  causes_vi:
+    - "Một loại đầu vào mới được thêm vào bộ chọn affected (một mục generated, một gốc dữ liệu) mà khóa chưa tính"
+    - "Bộ đọc dữ liệu của khóa (spec-cache-reads.mjs) bỏ sót một cách một mô-đun nêu tên một tệp"
+  nextStep_vi: "Thêm loại đầu vào đó vào khóa trong scripts/supervisor/spec-cache-key.mjs hoặc spec-cache-reads.mjs rồi chạy lại starci runtime check --only spec-cache-key; không nới check."
+  owner: runtime-core
+  kind: check-finding
 rejudge-not-failed:
   title: "The job is not a failed leg"
   title_vi: "Việc không phải là lượt đã lỗi"

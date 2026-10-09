@@ -1,15 +1,16 @@
 // runtime-deploy-receipt.mjs - the proof that `npm run check` (starci runtime check) exited 0 on one exact commit.
-// Two records count, both bound to the commit sha and its tree:
+// Three records count, each bound to the commit sha and its tree and each carrying BOTH the check and the affected specs for a base (a check alone is never a receipt):
 //   - a deploy receipt, <state>/deploy/receipts/<sha>.json, written ONLY by `starci runtime deploy` after it ran the check itself in the clean source clone AND the specs the
 //     change can break (`starci test affected --run --base <host head>`, a clean receipt on this tip); it stands for the host head it was proven against;
-//   - the land note of the host repository (refs/notes/land), whose `Land-Verified: <sha>` and `Check: <pass>/<total>` lines `starci git land` wrote after its own full check.
+//   - the verify receipt of the source clone (`starci runtime verify`: check p/p AND affected N/N for the host head..sha, scripts/supervisor/verify-receipt.mjs);
+//   - the land note of the host repository (refs/notes/land), whose `Land-Verified: <sha>`, `Check: <pass>/<total>` and `Affected: <passed>/<total> <base>..<sha>` lines `starci git land` wrote from the verify receipt and its own full check.
 // A lane cannot claim green: the verb runs the check itself when neither record exists, and a hand-written receipt fails its tree binding or its digest.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { starciLocalRoot } from '../../engine/runtime-root.mjs';
 import { notes } from '../api/git/notes.mjs';
-import { sameResolvedPath } from '../lib/path-key.mjs';
+import { judgedIn, readVerifyReceipt } from '../supervisor/verify-receipt.mjs';
 
 const RECEIPT_SCHEMA = 'starci/deploy-receipt@1';
 
@@ -33,18 +34,27 @@ function readReceipt(sha, tree, base, env, root) {
   // The affected specs ran against a base: the receipt stands for the host it was proven against, never for another host revision.
   const affectedOk = record?.affected?.tip === sha && record.affected.base === base && record.affected.passed === record.affected.total;
   // The specs ran in one tree: a receipt whose affected run judged another tree's root is that tree's proof, never this source's.
-  const judgedHere = typeof record?.affected?.root === 'string' && sameResolvedPath(record.affected.root, root);
+  const judgedHere = judgedIn(record?.affected?.root, root);
   return bound && affectedOk && judgedHere ? { via: 'deploy-receipt', at: record.at, affected: record.affected } : null;
 }
 
-function landNoteReceipt(host, sha) {
+function landNoteReceipt(host, sha, base) {
   const r = notes(['--ref=land', 'show', sha], { cwd: host });
   if (r.status !== 0) return null;
   const body = String(r.stdout ?? '');
   const check = /^Check: (\d+)\/(\d+)$/m.exec(body);
+  const affected = /^Affected: (\d+)\/(\d+) ([0-9a-f]+)\.\.([0-9a-f]+)$/m.exec(body);
   const verified = new RegExp(`^Land-Verified: ${sha}$`, 'm').test(body);
-  return verified && check && check[1] === check[2] ? { via: 'land-note', counts: `${check[1]}/${check[2]}` } : null;
+  // The affected specs ran against a base: the note stands for the host head it was proven against, like a deploy receipt; a note without the Affected line proves the check alone and is no receipt.
+  const affectedOk = affected && affected[1] === affected[2] && affected[3] === base && affected[4] === sha;
+  return verified && check && check[1] === check[2] && affectedOk ? { via: 'land-note', counts: `${check[1]}/${check[2]}`, affected: { base, tip: sha, passed: Number(affected[1]), total: Number(affected[2]) } } : null;
 }
 
-/** The receipt that stands for `sha`: {via, ...} or null. `host` is the host repository, where the land note lives. */
-export const receiptFor = ({ sha, tree, base, host, env, root }) => readReceipt(sha, tree, base, env, root) ?? landNoteReceipt(host, sha);
+/** The verify receipt of the source checkout `root` (`starci runtime verify`), as a deploy receipt, or null. */
+function verifyReceipt({ root, sha, tree, base }) {
+  const found = readVerifyReceipt({ root, sha, tree, base });
+  return found.record ? { via: 'verify-receipt', at: found.record.at, affected: { base, tip: sha, root: found.record.root, passed: found.record.affected.passed, total: found.record.affected.total } } : null;
+}
+
+/** The receipt that stands for `sha`: {via, ...} or null. `host` is the host repository, where the land note lives; `root` the source checkout the specs must have run in. */
+export const receiptFor = ({ sha, tree, base, host, env, root }) => readReceipt(sha, tree, base, env, root) ?? verifyReceipt({ root, sha, tree, base }) ?? landNoteReceipt(host, sha, base);
