@@ -3,9 +3,9 @@
 // requirement is a finding; a pending entry is a finding once its requirement is present or when it names no lane and date.
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseYaml } from '../../engine/yaml.mjs';
+import { parseYaml } from '../../../engine/yaml.mjs';
 import { pendingFor } from './roles-table.mjs';
-import { NOTICE_EVENT } from '../machine/revision-notice.mjs';
+import { NOTICE_EVENT } from '../../machine/revision-notice.mjs';
 
 const POLICY_FILE = 'modules/kernel/op-incident-policy.yaml';
 const COMMAND_POLICY_FILE = 'modules/kernel/command-policy.yaml';

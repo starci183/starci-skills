@@ -6,8 +6,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { checkRolesContract, standardTable, writeRoleBlocks } from '../../scripts/checks/check-roles-contract.mjs';
-import { renderStandingTable, roleStandings, standingMessages } from '../../scripts/machine/roles-standard.mjs';
-import { renderRolesTable, tableOf, withRolesTable } from '../../scripts/machine/roles-table.mjs';
+import { renderStandingTable, roleStandings, standingMessages } from '../../scripts/checks/lib/roles-standard.mjs';
+import { renderRolesTable, tableOf, withRolesTable } from '../../scripts/checks/lib/roles-table.mjs';
 import { rolesContract } from '../../scripts/machine/roles-contract.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 

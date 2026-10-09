@@ -6,17 +6,17 @@
 // Markdown block generated from it between `<!-- roles:begin <id> -->` and `<!-- roles:end <id> -->`; a surface in `cite` mode
 // names `modules/kernel/roles.yaml#<id>`. No surface of a role teaches a spelling the role's `contradicts` list names, and the
 // contract is consistent: every reportsTo and overseenBy names a role, and the chain `reports` list follows reportsTo. The role
-// standard (`standard:` in the contract, scripts/machine/roles-standard.mjs) is checked per role and printed as a role x requirement
+// standard (`standard:` in the contract, scripts/checks/lib/roles-standard.mjs) is checked per role and printed as a role x requirement
 // table; a missing requirement is red unless the role's `pending:` entry names the lane building it. `--table` prints the
-// owner-facing table (scripts/machine/roles-table.mjs) that docs/workflow-kernel.md carries between its markers.
+// owner-facing table (scripts/checks/lib/roles-table.mjs) that docs/workflow-kernel.md carries between its markers.
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { printFindings } from '../lib/check-scan.mjs';
 import { ROLES_FILE, markerOf, renderRoleBlock, rolesContract, withRoleBlock } from '../machine/roles-contract.mjs';
-import { renderRolesTable, tableOf, withRolesTable } from '../machine/roles-table.mjs';
-import { renderStandingTable, roleStandings, standingMessages } from '../machine/roles-standard.mjs';
+import { renderRolesTable, tableOf, withRolesTable } from './lib/roles-table.mjs';
+import { renderStandingTable, roleStandings, standingMessages } from './lib/roles-standard.mjs';
 
 const TABLE_DOC = 'docs/workflow-kernel.md';
 
