@@ -1,0 +1,54 @@
+{
+ "schema": "replay-fixture@1",
+ "case": "leg-ready",
+ "source": {
+  "copy": "a8live9"
+ },
+ "workflow": {
+  "id": "wf-1",
+  "phase": "running",
+  "goalRevision": 0
+ },
+ "plan": {
+  "legs": [
+   {
+    "op": "brand.decide"
+   },
+   {
+    "op": "interface.draw"
+   }
+  ],
+  "edges": [
+   [
+    "brand.decide",
+    "interface.draw"
+   ]
+  ]
+ },
+ "workGraph": {
+  "nodes": [
+   {
+    "id": "d-1.s-1-password",
+    "domain": "d-1",
+    "owned": [
+     "own-1"
+    ]
+   }
+  ]
+ },
+ "jobs": [
+  {
+   "id": "job-1",
+   "op": "brand.decide",
+   "status": "succeeded",
+   "owned": [
+    "own-9"
+   ]
+  }
+ ],
+ "live": {
+  "noneFitsAnswers": 19,
+  "menuEscapes": 3,
+  "op": "interface.draw"
+ }
+}
