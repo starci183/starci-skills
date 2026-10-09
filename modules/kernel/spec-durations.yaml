@@ -10,7 +10,7 @@ rows:
   - {spec: tests/engine-db/orchestration-question-bridge.spec.mjs, seconds: 29}
   - {spec: tests/engine-db/peer-messages.spec.mjs, seconds: 41}
   - {spec: tests/gates/op-gate-loop.spec.mjs, seconds: 33}
-  - {spec: tests/gates/sonar-local.spec.mjs, seconds: 74}
+  - {spec: tests/gates/sonar-local.spec.mjs, seconds: 55}
   - {spec: tests/hfs-architecture/architecture-hfs-layout.spec.mjs, seconds: 39}
   - {spec: tests/hfs/architecture.spec.mjs, seconds: 36}
   - {spec: tests/hfs/hfs-docker-rules.spec.mjs, seconds: 21}
@@ -31,7 +31,7 @@ rows:
   - {spec: tests/kernel/stale-input.spec.mjs, seconds: 56}
   - {spec: tests/kernel/waiter-priority.spec.mjs, seconds: 25}
   - {spec: tests/kernel/workflow-checkpoint.spec.mjs, seconds: 172}
-  - {spec: tests/packages-hfs/hfs-cli.spec.mjs, seconds: 99}
+  - {spec: tests/packages-hfs/hfs-cli.spec.mjs, seconds: 69}
   - {spec: tests/packages-hfs/hfs-scaffold-app.spec.mjs, seconds: 333}
   - {spec: tests/repo/architecture-default-deny.spec.mjs, seconds: 9}
   - {spec: tests/repo/architecture-entrypoint.spec.mjs, seconds: 6}
