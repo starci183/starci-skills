@@ -39,7 +39,7 @@ const cleanDirsLeft = (dir) => fs.readdirSync(dir).filter((n) => n.startsWith('s
 test('the critic is started through worker-start with the configured provider, model and effort; its verdict is read; the worker is released', async (t) => {
   const r = round(t);
   let seen = null;
-  const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 8), onStart: (a) => { seen = { dir: a.worktree, files: fs.readdirSync(a.worktree).sort() }; } });
+  const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 8), onStart: (a) => { seen = { dir: a.worktree, files: fs.readdirSync(a.worktree).sort(), task: fs.readFileSync(path.join(a.worktree, 'TASK.md'), 'utf8') }; } });
   const critique = await runCritic({ ...r, rubric: DEFAULT_RUBRIC, critic: picked, orca, placement: { tmpRoot: r.dir }, entry: 'term_op', ...clock() });
   assert.equal(critique.outcome, 'judged', critique.error);
   assert.equal(critique.verdict.beauty, 8);
@@ -50,7 +50,9 @@ test('the critic is started through worker-start with the configured provider, m
   assert.equal(start.worktree, seen.dir, 'the worker is placed in the clean dir');
   assert.equal(start.from, 'term_op', 'the worker belongs to the Run of the terminal running the loop');
   assert.deepEqual(seen.files, ['TASK.md', 'render-1.png', 'rubric.yaml', 'screen.html'], 'the clean dir holds the Task spec file (828098f6d: content is a file) and no drawing context');
-  const spec = orca.calls.find((c) => c[0] === 'worker-start')[1].spec;
+  const pointer = orca.calls.find((c) => c[0] === 'worker-start')[1].spec;
+  assert.ok(pointer.includes(path.join(seen.dir, 'TASK.md')), 'what travels is the reference to the Task spec file (828098f6d)');
+  const spec = seen.task;
   const at = (f) => path.join(seen.dir, f).replaceAll('\\', '/');
   for (const f of ['render-1.png', 'screen.html', 'rubric.yaml', VERDICT_FILE]) assert.ok(spec.includes(at(f)), `the Task spec names ${f}`);
   assert.match(spec, /the one file you may write is/, 'every other write is forbidden');

@@ -207,11 +207,13 @@ test('the critic: the product rubric or the default, a verdict parsed and gate-c
   fs.writeFileSync(png, encodePng(blankImage(4, 4, WHITE)));
   fs.writeFileSync(path.join(dir, 'a.html'), GOOD);
   let seen = null;
-  const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9), onStart: (a) => { seen = { dir: a.worktree, files: fs.readdirSync(a.worktree).sort() }; } });
+  const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9), onStart: (a) => { seen = { dir: a.worktree, files: fs.readdirSync(a.worktree).sort(), task: fs.readFileSync(path.join(a.worktree, 'TASK.md'), 'utf8') }; } });
   const critique = await runCritic({ images: [{ path: png, label: 'desktop' }], html: path.join(dir, 'a.html'), rubric: DEFAULT_RUBRIC,
     critic: criticFor(allocationSettings().drawLoop, { provider: 'devin', model: 'swe-2-max' }).critic, placement: { tmpRoot: dir }, orca });
   assert.deepEqual(seen.files, ['TASK.md', 'render-1.png', 'rubric.yaml', 'screen.html'], 'the critic sees only the PNGs, the HTML, the rubric and its Task spec file (828098f6d)');
-  const spec = orca.calls.find((c) => c[0] === 'worker-start')[1].spec;
+  const pointer = orca.calls.find((c) => c[0] === 'worker-start')[1].spec;
+  assert.ok(pointer.includes(path.join(seen.dir, 'TASK.md')), 'what travels is the reference to the Task spec file (828098f6d)');
+  const spec = seen.task;
   assert.match(spec, /did NOT draw this screen/);
   assert.equal(critique.outcome, 'judged');
   assert.equal(critique.verdict.beauty, 9);
