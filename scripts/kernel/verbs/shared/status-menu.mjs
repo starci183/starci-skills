@@ -6,6 +6,7 @@ import { JOB_KINDS, liveFor, pendingJobsOf, resolutionOf } from '../../../machin
 import { buildMenu, menuCatalog, snoozeMs } from '../../kernel-menu.mjs';
 import { feedbackOfHandover } from '../../handover-slices.mjs';
 import { decisionsOf } from '../../progress-rca.mjs';
+import { currentRuntimeRev } from '../../runtime-rev.mjs';
 import { failureFactsOf } from '../../failure-class.mjs';
 import { failedShapesOf, jobRow, shapeOf } from '../../kernel-authority.mjs';
 
@@ -60,17 +61,23 @@ const deadWaitsOf = (s) => [
   ...s.typedUnmeetable.map((wait) => ({ incidentId: wait.incidentId, situation: `typed wait ${wait.incidentId} can no longer be met: ${wait.unmeetable.join('; ')}` })),
 ];
 
-/** The item ids a chosen wait still holds back. */
-function snoozedOf(s) {
+/**
+ * The answers that still hold their item back: inside the snooze and given at the runtime revision that is live now. A new revision may cure
+ * what the answer waited on or what its step failed on (a failed step is the runtime's, not the item's), so the item is offered again once.
+ */
+function standingAnswersOf(s) {
   const since = s.now - snoozeMs();
-  return new Set(decisionsOf(s.db, s.workflowId).filter((d) => ['keep-waiting', 'none-fits'].includes(d.menu?.choice) && d.at > since).map((d) => d.menu.item));
+  const rev = currentRuntimeRev() ?? null;
+  return decisionsOf(s.db, s.workflowId).filter((d) => d.menu?.item && d.at > since && (d.menu.rev ?? null) === rev);
 }
+
+/** The item ids a chosen wait still holds back. */
+const snoozedOf = (s) => new Set(standingAnswersOf(s).filter((d) => ['keep-waiting', 'none-fits'].includes(d.menu.choice)).map((d) => d.menu.item));
 
 /** The items whose latest answer failed a step, by id, with the facts the item had then: asked again only when the item's facts change. */
 function answeredOf(s) {
-  const since = s.now - snoozeMs();
   const latest = new Map();
-  for (const d of decisionsOf(s.db, s.workflowId)) if (d.menu?.item && d.at > since) latest.set(d.menu.item, d);
+  for (const d of standingAnswersOf(s)) latest.set(d.menu.item, d);
   return new Map([...latest].filter(([, d]) => d.status === 'revert' && d.menu.facts).map(([id, d]) => [id, d.menu.facts]));
 }
 

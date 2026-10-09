@@ -1031,3 +1031,10 @@ cases:
     rule: {file: scripts/kernel/decision-log.mjs, anchor: "WORKER_LIVE"}
     spec: tests/reconciler-controllers/supervisor-mirror.spec.mjs
     status: covered
+  - id: failed-step-answer-hides-its-item-past-the-revision-that-cures-it
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an item the Kernel answered is hidden only while nothing that could change the outcome changed) 6513ee8ba holds an item off the Kernel menu while its latest answer failed a step and its facts are unchanged; the Nivo settle-fail failed on the history hook, which the same revision fixed, so after the restart the Critic-failed item was hidden, the frontier read settle-ready with zero ready work, and no Kernel would ever decide it (op-architecture.decide-e78adc94cc stayed reported)", remedy: {state: in-tree, change: "a menu answer records the runtime revision it was given at; a hold (a chosen wait or a failed step) stands only at that revision, so a new revision offers the item again once and the Kernel is woken for it; failing again at the new revision holds it again"}}
+    met: {date: "2026-10-09", where: "alpha.8 live 13:42, Nivo workflow", evidence: "nivo runtime.sqlite events 984 to 995 (settle-fail reverted workflow-checkpoint-recovery-conflict, rev 6513ee8 acked 13:36:48, no kernel-decision after); the item hidden by its recorded facts"}
+    rule: {file: scripts/kernel/verbs/shared/status-menu.mjs, anchor: "standingAnswersOf"}
+    spec: tests/kernel/menu-answered-hold.spec.mjs
+    status: covered
