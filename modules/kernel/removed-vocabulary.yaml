@@ -242,3 +242,9 @@ removed:
     use: 'the Job controller enqueues handover.review itself when the handover is due or its ask was answered approve or question (next action handover-review, scripts/kernel/handover-move.mjs); the handover-step item holds only the typed routing of a reported defect'
     since: 1.0.0-alpha.8
     match: '(?<![\w-])(?:mechanical-pending|rerun-handover-review)(?![\w-])'
+  - id: vocab-card-delivery-bound
+    kind: vocabulary
+    name: the agent card delivery keys maxInlineChars, fileName and fileDirectory
+    use: 'one bound, one directory and one cleanup serve every card: allocation.promptFile in modules/models/runtimes.yaml (scripts/agent/prompt-file.mjs); a card keeps delivery.mode and delivery.prompt'
+    since: 1.0.0-alpha.9
+    match: '(?<![\w-])(?:maxInlineChars|fileDirectory)(?![\w-])'
