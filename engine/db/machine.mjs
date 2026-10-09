@@ -1,4 +1,5 @@
 import { installRefResolver } from './ref-value.mjs';
+import { isUnderTempDir, tempDirsOf } from './machine-temp.mjs';
 // engine/db/machine.mjs — the ONE writer of machine.sqlite (DBTREE.sql Part B, schema 'starci/machine@1', user_version MACHINE_VERSION).
 //
 // machine.sqlite is the host's single operational store: the ledger registry, the Supervisor (sup_*), the engine
@@ -39,7 +40,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { putBlob as storeBlob, blobPath, getBlob } from './blob.mjs'; import { EVENT_LIMITS } from './event-compact.mjs';
 import { redactBytes, redactData, redactText } from '../../scripts/lib/redact.mjs'; import { isMain } from '../../scripts/lib/is-main.mjs';
 import { isSpecRun, readEnv } from '../../scripts/lib/env.mjs';
-import { pathKey } from '../../scripts/lib/path-key.mjs'; import { pidAlive } from '../../scripts/lib/pid-alive.mjs';
+import { pidAlive } from '../../scripts/lib/pid-alive.mjs';
 import { insertRowWith } from '../../scripts/lib/sqlite.mjs';
 import { need as refuseUnless } from '../refuse.mjs';
 import { sha256 } from '../digest.mjs';
@@ -81,16 +82,7 @@ export const projectLedgerFile = (ledgerId, env = process.env) => {
 };
 /** The explicit test registry: a machine.sqlite that replaces the host's for this process tree (tests/setup/isolated-registry.mjs). */
 export const TEST_REGISTRY_ENV = 'STARCI_TEST_MACHINE_FILE';
-const normDir = (file) => pathKey(file, { fold: true });
-const tempDirsOf = (env = process.env) => [...new Set([os.tmpdir(), tempRoot({ env }), env.TEMP, env.TMP].filter(Boolean)
-  .flatMap((dir) => { const out = [normDir(dir)]; try { out.push(normDir(fs.realpathSync.native(dir))); } catch { /* missing */ } return out; }))].filter((dir) => !/^(?:[a-z]:)?$/.test(dir));
-/** True when `file` sits under the OS temp directory or the configured temp root, as written or as its realpath. */
-export function isUnderTempDir(file, { env = process.env, tempDirs = tempDirsOf(env) } = {}) {
-  if (typeof file !== 'string' || !file) return false;
-  const forms = [normDir(file)];
-  try { forms.push(normDir(fs.realpathSync.native(file))); } catch { /* missing */ }
-  return forms.some((form) => tempDirs.map(normDir).some((dir) => form.startsWith(`${dir}/`)));
-}
+export { isUnderTempDir };
 /**
  * machine.sqlite for `env`: TEST_REGISTRY_ENV when set; else <starciLocalRoot>/machine.sqlite (beside projects/) — except inside a node --test
  * process tree whose runtime root is not under the temp directory, which gets a shared temp registry instead.

@@ -1,4 +1,5 @@
 import { installRefResolver } from './ref-value.mjs';
+import { olderThan } from './version-order.mjs';
 import { assertMutationFence } from '../../scripts/lib/mutation-fence.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -166,8 +167,6 @@ const assertWritableFile=(file,busyTimeoutMs)=>{if(fs.statSync(file).size===0){r
 export {hasTable as hasLedgerTable} from '../../scripts/lib/sqlite.mjs';
 /** True when `table` of the ledger `db` has `column`. */
 export const hasLedgerColumn=(db,table,column)=>db.prepare(`PRAGMA table_info(${table})`).all().some(c=>c.name===column);
-const versionTuple=v=>String(v).split('.').map(Number);
-const olderThan=(a,b)=>{const x=versionTuple(a),y=versionTuple(b);for(let i=0;i<Math.max(x.length,y.length);i++){if((x[i]??0)!==(y[i]??0))return (x[i]??0)<(y[i]??0);}return false;};
 
 /**
  * Refuse any file that is not a starci/runtime@1 ledger at user_version LEDGER_VERSION. Also refuses a
