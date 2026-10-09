@@ -8,6 +8,7 @@
 import path from 'node:path';
 import { ownedPathPlacements, projectBinding } from './target-repo.mjs';
 import { isDir } from '../lib/fs-kind.mjs';
+import { treesInOrder } from '../lib/roots.mjs';
 
 const slash = (p) => String(p).replaceAll('\\', '/');
 const GLOB_OR_DIR = /(^|\/)\*{1,2}$/;
@@ -74,7 +75,7 @@ export function checkGrantParents({ op, payload, ownedPaths, repo, worktree = nu
   const workDir = projectBinding(repo)?.workDir ?? '.starciwork';
   const newModules = newModulesOf(payload);
   const violationsAt = (tree) => grantParentViolations({ placements: ownedPathPlacements({ op, payload, ownedPaths, repo, worktree: tree, timeoutMs }), newModules, workDir });
-  const inTree = violationsAt(worktree);
-  const violations = worktree && inTree.length ? inTree.filter((v) => violationsAt(null).some((w) => w.owned === v.owned && w.dir === v.dir)) : inTree;
+  const byTree = treesInOrder({ tree: worktree, repo }).map((tree) => violationsAt(tree));
+  const violations = (byTree[0] ?? []).filter((v) => byTree.every((rows) => rows.some((w) => w.owned === v.owned && w.dir === v.dir)));
   return violations.length ? { ok: false, reason: 'grant-parent-missing', violations, detail: grantParentDetail(violations) } : { ok: true };
 }

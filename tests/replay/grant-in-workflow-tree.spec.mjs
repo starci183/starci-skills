@@ -4,6 +4,8 @@
 // Real: `starci kernel enqueue` and the dispatch push as child processes over a world whose main checkout holds no be/ and whose workflow tree is an hfs app. Stubbed: the Orca binary.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { openWalk } from '../helpers/walk-world.mjs';
 
 const PATHS = '.starciwork/features/identity/impl/be/account,be/src/modules/domain/account';
@@ -25,4 +27,15 @@ test('a grant under a directory no tree holds is still refused, naming the close
   assert.equal(queued.ok, false);
   assert.equal(queued.result.json.reason ?? queued.result.json.code, 'grant-parent-missing');
   assert.match(queued.result.json.detail ?? queued.result.json.error, /be\/src\/modules\/nowhere/);
+  assert.match(queued.result.json.detail ?? queued.result.json.error, /closest existing directory is be\/src\/modules/);
+});
+
+test('one grant may use parents from both the workflow tree and the main checkout', (t) => {
+  const walk = openWalk(t);
+  fs.mkdirSync(path.join(walk.world.repo, 'be', 'src', 'shared'), { recursive: true });
+  assert.equal(fs.existsSync(path.join(walk.tree, 'be', 'src', 'shared')), false);
+  assert.equal(fs.existsSync(path.join(walk.world.repo, 'be', 'src', 'modules', 'domain')), false);
+  walk.ack('backend.implement');
+  const queued = walk.enqueue('backend.implement', `${PATHS},be/src/shared/helper.ts`);
+  assert.equal(queued.ok, true, queued.result?.stderr || queued.result?.stdout);
 });

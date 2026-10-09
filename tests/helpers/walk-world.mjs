@@ -59,7 +59,7 @@ export function openWalk(t, { fixture = walkFixture(), launch = true, seed = nul
   /** The Kernel's attestation of its READ of the op (the admission of a new leg reads it back). */
   walk.ack = (op) => { const r = world.ack([op]); assert.equal(r.status, 0, `ack ${op}: ${r.stderr || r.stdout}`); return r; };
 
-  /** Enqueue by the Kernel's hand (the first leg has no menu item) and answers the job id. */
+  /** Enqueue a fixture job directly and answer its job id. */
   walk.enqueue = (op, paths, extra = []) => {
     const r = cli('enqueue', ['--workflow', world.wf, '--op', op, '--paths', paths, ...extra]);
     if (r.status !== 0) return { ok: false, result: r };
