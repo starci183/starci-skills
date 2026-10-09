@@ -6,7 +6,7 @@ import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { eventPayloadOf } from '../../engine/db/event-payload.mjs';
 import { EVENT_LIMITS } from '../../engine/db/event-compact.mjs';
 
-test('a writer that passes payloadSha, catches the too-large refusal or inserts into events is refused; the owners and specs are not', () => {
+test('RT_EVENT_SPILL_BYPASS: a writer that passes payloadSha, catches the too-large refusal or inserts into events is refused (violating); the owners and specs are not', () => {
   const bypass = {
     'scripts/kernel/a.mjs': "ledger.appendEvent({ kind: 'x', payload, payloadSha });",
     'scripts/kernel/b.mjs': "if (error.code !== 'STARCI_EVENT_PAYLOAD_TOO_LARGE') throw error;",
@@ -20,7 +20,7 @@ test('a writer that passes payloadSha, catches the too-large refusal or inserts 
   assert.ok(findings.every((f) => f.code === CODE));
 });
 
-test('the runtime tree has no writer that bypasses the one spill path', () => {
+test('RT_EVENT_SPILL_BYPASS: the runtime tree has no writer that bypasses the one spill path (passing)', () => {
   assert.deepEqual(checkEventSpill(), []);
 });
 

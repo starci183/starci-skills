@@ -7,13 +7,9 @@
 // events.payload_sha. The 16 KiB inline bound refused two writers before this check (a Kernel launch admission, a read-plan attestation); each had its own spill.
 // This check refuses a runtime source file other than those two that spills by hand: a `payloadSha` passed to a write, the TOO_LARGE catch that pairs with one,
 // or a direct INSERT into the events table. Readers go through engine/db/event-payload.mjs.
-import fs from 'node:fs';
-import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
-import { printFindings, scopeFilter } from '../lib/check-scan.mjs';
-import { lsFiles } from '../api/git/ls-files.mjs';
-import { gitOutputOf } from '../lib/git.mjs';
+import { printFindings, scopeFilter, trackedSources } from '../lib/check-scan.mjs';
 
 export const CODE = 'RT_EVENT_SPILL_BYPASS';
 export const OWNER_FILES = Object.freeze(['engine/db/ledger.mjs', 'engine/db/event-compact.mjs']);
@@ -32,14 +28,6 @@ export function eventSpillFindings(files) {
 }
 
 /** Run the check on the runtime at `root`. */
-export function checkEventSpill(root = skillRoot) {
-  const tracked = gitOutputOf(lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z').split('\0').filter(Boolean);
-  const files = {};
-  for (const rel of tracked) {
-    if (!inScope(rel)) continue;
-    try { files[rel] = fs.readFileSync(path.join(root, rel), 'utf8'); } catch { /* a lane may hold an uncommitted deletion */ }
-  }
-  return eventSpillFindings(files);
-}
+export const checkEventSpill = (root = skillRoot) => eventSpillFindings(trackedSources(root, inScope));
 
 if (isMain(import.meta.url)) process.exit(printFindings(checkEventSpill(), 'OK: every ledger event payload spills through appendEvent only.'));

@@ -60,7 +60,7 @@ function spilledView(redacted, bytes, sha) {
  * stores it and returns its sha, kept when the caller already holds one) when it carries an admission record (the bounded summary is the inline
  * JSON) or when it is over the inline bound (the inline JSON is its top-level scalars and the sha). This is the one path of every event writer:
  * a payload that grows with its input (a file list, a manifest, a critique, a menu) never fails the write, and a reader that needs the whole
- * payload goes through scripts/lib/event-payload.mjs.
+ * payload goes through engine/db/event-payload.mjs.
  */
 export function eventPayloadRecord(payload, payloadSha, spill) {
   if (payload === null || payload === undefined) return { payloadJson: null, payloadSha };
