@@ -328,7 +328,7 @@ function settleLaunch(session, launch, issued, { effort, onCreated, depth, limit
 // entry terminal (the owner's chat, the Supervisor, whoever ran the launcher; `entry`, Orca's ORCA_TERMINAL_HANDLE)
 // is that Run's coordinator. `priorRunId` is reused while Orca still knows it and accepts the start; a start the prior
 // Run refuses before any effect (a Run another entry coordinates) moves to a fresh Run (a Run's coordinator is the
-// terminal that created it). The Task spec is the prompt, spilled to `specFile` past the host's argv (prompt-file.mjs);
+// terminal that created it). The Task spec is the prompt, spilled to `specFile` past allocation.promptFile.maxChars (prompt-file.mjs);
 // worker-start --spec files it. `request` is the launch's ledger identity (the caller's attempt, token or placement):
 // run-create and worker-start derive their --retry-request ids from it (calls.yaml replay: request).
 // Returns spawnAgent's receipt (runId/taskId on it), or {ok:false, step:'run-create', effectState:'none'}.

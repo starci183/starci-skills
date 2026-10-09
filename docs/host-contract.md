@@ -123,7 +123,7 @@ spawnAgent({provider, model, effort, worktree, title, spec, run, from, request})
 startAgent({…, prompt, objective, entry, priorRunId, request})
   run-create(objective, from = entry, --retry-request)
                                        → the agent's own Run (Kernel, Supervisor, [Worker])
-  spawnAgent(spec = prompt, ...)       → spilled to a file past the host argv (prompt-file.mjs)
+  spawnAgent(spec = prompt, ...)       → spilled to a file past allocation.promptFile.maxChars (prompt-file.mjs)
 ```
 
 Every mutation declares `replay` in `calls.yaml` (`idempotency`): `request`

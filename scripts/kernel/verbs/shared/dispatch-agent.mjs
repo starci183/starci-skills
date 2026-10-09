@@ -40,7 +40,7 @@ function launchOperationAgent({ ledger, job, op, model, launchModel, payload, jo
   // (the start receipt, else worker-show), its [Op] title, and the attestation that the worker's EFFECTIVE agent/model
   // equal the route - a mismatch is a provider-side defect, rejected with the typed infra-provider incident. No
   // `--parent`: the Run's coordinator places the op under the Kernel (smoke 2026-10-01, launch.report.md). A packet
-  // longer than the host's argv takes is written to the job's evidence directory and the spec points at it
+  // longer than allocation.promptFile.maxChars is written to the job's evidence directory and the spec points at it
   // (prompt-file.mjs; inc-826e077777de). The start's ledger identity is the job and its lease token (calls.yaml
   // worker-start replay: request): a lost receipt replays this start, and a new lease is a new start.
   const spec = taskSpecOf({ prompt, file: packetFile, op, jobId, attempt: job.try_no }).spec;
