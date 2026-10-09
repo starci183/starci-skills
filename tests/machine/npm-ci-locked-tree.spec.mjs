@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { installFailureOf, insideTree, treeHolders } from '../../scripts/machine/npm-install-failure.mjs';
+import { treeHolds } from '../../scripts/api/process/tree-holds.mjs';
 import { npmCi } from '../../scripts/machine/npm-ci.mjs';
 import { installStateOf } from '../../scripts/machine/npm-install-state.mjs';
 import { installWorkflowTree } from '../../scripts/kernel/workflow-startup.mjs';
@@ -143,9 +144,9 @@ test('the holders of a tree are the processes whose command line is inside it, o
     { pid: 13, name: 'node.exe', cmd: 'node unrelated.js' },
     { pid: 99, name: 'node.exe', cmd: `node ${forward}/self.js` },
   ];
-  const holders = treeHolders(tree, { list: () => rows, env: {}, self: 99 });
+  const holders = treeHolders(tree, { list: () => rows, env: {}, self: 99, holds: () => [] });
   assert.deepEqual(holders.map((p) => p.pid), [10, 11]);
-  assert.equal(treeHolders(tree, { list: () => null, env: {} }), null, 'an unreadable table is null, not no holders');
+  assert.equal(treeHolders(tree, { list: () => null, env: {}, holds: () => [] }), null, 'an unreadable table is null, not no holders');
   assert.equal(insideTree(`node ${forward}/a.js`, tree), true);
 });
 
@@ -180,4 +181,37 @@ test('a tree whose install differs from the lockfile is a real npm ci, and an ex
   const explicit = standIn(whole);
   await npmCi(ctx(whole), deps(explicit));
   assert.equal(explicit.runs.count, 1);
+});
+
+test('a server started with a relative command line from inside the tree is a holder, with the way it holds', (t) => {
+  const tree = path.join(mkdtemp(t, 'starci-holders-'), 'wf');
+  const rows = [
+    { pid: 31, ppid: 30, name: 'node.exe', cmd: 'node ../../../node_modules/next/dist/bin/next start -p 3919' },
+    { pid: 32, ppid: 1, name: 'node.exe', cmd: 'node unrelated.js' },
+    { pid: 33, ppid: 1, name: 'node.exe', cmd: `node ${tree}/node_modules/.bin/vite` },
+  ];
+  const seen = [];
+  const holders = treeHolders(tree, { list: () => rows, env: {}, self: 99, holds: (root, input) => { seen.push([root, input.pids]); return [{ pid: 31, via: 'working directory' }, { pid: 33, via: 'mapped file' }]; } });
+  assert.deepEqual(holders.map((h) => [h.pid, h.via]), [[31, 'working directory'], [33, 'command line']]);
+  assert.equal(holders[0].commandLine, rows[0].cmd, 'the relative command line is shown as it is');
+  assert.deepEqual(seen, [[tree, [31, 32, 33]]]);
+});
+
+test('on Linux a process is a holder by its working directory or a mapped file, read through /proc', () => {
+  const tree = '/work/wf';
+  const links = { '/proc/5/cwd': '/work/wf/apps/web', '/proc/6/cwd': '/work/wf-other', '/proc/7/cwd': '/' };
+  const maps = { '/proc/6/maps': '7f00-7f01 r-xp 00000000 08:01 1234   /work/wf/node_modules/@swc/core/swc.node\n', '/proc/7/maps': '7f00-7f01 r-xp 00000000 08:01 99  /usr/lib/libc.so\n' };
+  const found = treeHolds(tree, { pids: [5, 6, 7, 8], platform: 'linux',
+    readlink: (file) => { if (file in links) return links[file]; throw new Error('gone'); },
+    readFile: (file) => { if (file in maps) return maps[file]; throw new Error('denied'); } });
+  assert.deepEqual(found, [{ pid: 5, via: 'working directory' }, { pid: 6, via: 'mapped file' }]);
+});
+
+test('on Windows the holders are the processes whose loaded modules lie in the tree, and a failed read is null', () => {
+  const root = path.win32.join('D:', 'orca', 'wf');
+  const module = path.win32.join(root, 'node_modules', 'a.node');
+  const run = (script) => { assert.match(script, /Modules/); assert.ok(script.includes("'" + root + "'")); return { status: 0, stdout: JSON.stringify([{ pid: 12, file: module }]) }; };
+  assert.deepEqual(treeHolds(root, { platform: 'win32', run }), [{ pid: 12, via: 'loaded module ' + module }]);
+  assert.deepEqual(treeHolds(root, { platform: 'win32', run: () => ({ status: 0, stdout: '' }) }), []);
+  assert.equal(treeHolds(root, { platform: 'win32', run: () => ({ status: 1, stdout: '' }) }), null);
 });
