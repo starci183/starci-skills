@@ -71,7 +71,7 @@ test('failed launches that a launch which stood followed, or that another runtim
     const stood = digest(snapshot({ workflows: [withRows({ events: [...settledEvents(), ...failures, event(launch, { at: NOW - 10 * MIN })] })] }));
     assert.deepEqual(bugCodes(stood), [], launch);
   }
-  const live = status({ kernelRev: { current: 'b'.repeat(40), acked: 'b'.repeat(40), stale: false, fileCount: 0 } });
+  const live = status({ revisionNotice: { role: 'kernel', state: 'current', from: 'b'.repeat(40), to: 'b'.repeat(40), count: 0, files: [], line: 'kernel acked rev x' } });
   const oldRuntime = digest(snapshot({ workflows: [withRows({ status: live, events: [...settledEvents(), ...failures] })] }));
   assert.ok(!bugCodes(oldRuntime).includes('kernel-start-loop'), 'the failures of another revision do not count, as the start hold does not count them');
   const same = failures.map((e) => ({ ...e, runtimeRev: 'b'.repeat(40) }));
@@ -80,7 +80,7 @@ test('failed launches that a launch which stood followed, or that another runtim
 });
 
 test('a Kernel restarted after the last ack is inside the ack bound from its restart, not from the ack of its predecessor', () => {
-  const behind = status({ kernelRev: { current: 'b'.repeat(40), acked: 'a'.repeat(40), stale: true, fileCount: 2 } });
+  const behind = status({ revisionNotice: { role: 'kernel', state: 'owed', from: 'a'.repeat(40), to: 'b'.repeat(40), count: 2, files: [], line: 'kernel owes 2 file(s) of rev x' } });
   const restarted = digest(snapshot({ workflows: [withRows({ status: behind, events: [...settledEvents(), event('runtime-rev-acked', { at: NOW - 600 * MIN }), event('kernel-restarted', { at: NOW - 5 * MIN })] })] }));
   assert.deepEqual(restarted.problems, []);
   assert.deepEqual(row(restarted, 'kernel').happy, [{ kind: 'rev-pending', count: 1 }]);
@@ -90,7 +90,7 @@ test('a Kernel seat that is being replaced and a Kernel that has not yet acked t
   const starting = digest(snapshot({ workflows: [withRows({ kernelJob: { status: 'failed', updatedAt: NOW - MIN } })] }));
   assert.deepEqual(starting.problems, []);
   assert.deepEqual(row(starting, 'runtime').happy, [{ kind: 'kernel-starting', count: 1 }]);
-  const behind = status({ kernelRev: { current: 'b'.repeat(40), acked: 'a'.repeat(40), stale: true, fileCount: 2 } });
+  const behind = status({ revisionNotice: { role: 'kernel', state: 'owed', from: 'a'.repeat(40), to: 'b'.repeat(40), count: 2, files: [], line: 'kernel owes 2 file(s) of rev x' } });
   const pending = digest(snapshot({ workflows: [withRows({ status: behind, events: [...settledEvents(), event('runtime-rev-acked', { at: NOW - 5 * MIN })] })] }));
   assert.deepEqual(pending.problems, []);
   assert.deepEqual(row(pending, 'kernel').happy, [{ kind: 'rev-pending', count: 1 }]);
@@ -267,4 +267,36 @@ test('interventions by a person, the lost tree of an unsettled attempt and a cla
   assert.equal(answer('rr-placement-exists').state, 'attention');
   assert.equal(answer('co-claim-vs-rerun').state, 'attention');
   assert.equal(answer('fr-stale-gates').state, 'ok');
+});
+
+test('an approved leg that stands without a job is waiting inside its bound and, past it, the runtime\'s departure when the plan fixes its write set and the Kernel\'s when it does not', () => {
+  const standing = (origin, settledAgo) => {
+    const events = [event('checks-recorded', { attemptId: 1 }), event('op-settled', { attemptId: 1, verdict: 'pass', at: NOW - settledAgo, checkedIn: [{ cwd: TREE }] })];
+    return digest(snapshot({ workflows: [withRows({ events, status: status({ nextActions: [{ kind: 'dispatch', origin, op: 'business.decide' }] }) })] }));
+  };
+  const fresh = standing('approved-leg', MIN);
+  assert.deepEqual(fresh.problems, []);
+  assert.equal(step(fresh, 'leg-enqueued').state, 'waiting');
+  const mechanical = standing('approved-leg', 40 * MIN);
+  assert.deepEqual(bugCodes(mechanical), ['leg-not-enqueued']);
+  assert.equal(mechanical.problems[0].role, 'runtime');
+  assert.equal(flow(mechanical).firstDeparture.id, 'leg-enqueued');
+  const open = standing('approved-leg-open', 40 * MIN);
+  assert.deepEqual(bugCodes(open), ['leg-open-unanswered']);
+  assert.equal(open.problems[0].role, 'kernel');
+  const held = digest(snapshot({ workflows: [withRows({ status: status({ nextActions: [{ kind: 'dispatch', origin: 'approved-leg', op: 'business.decide', heldBy: { incident: 'inc-1' } }] }) })] }));
+  assert.deepEqual(held.problems, [], 'a leg a supervisor-gate or a peer-wait holds is theirs to release');
+  assert.equal(step(held, 'leg-enqueued').state, 'done');
+});
+
+test('the end of the flow: a handover ask that waits on the owner is a wait, a due handover that is not enqueued is a runtime departure', () => {
+  const ending = (handover, ago) => digest(snapshot({ workflows: [withRows({ status: status({ frontier: { state: 'handover-due', openOperations: 0, readyOperations: 0, queued: [] }, handover }),
+    events: [event('checks-recorded', { attemptId: 1 }), event('op-settled', { attemptId: 1, verdict: 'pass', at: NOW - ago, checkedIn: [{ cwd: TREE }] })] })] }));
+  const asked = ending({ state: 'awaiting-owner', due: false }, 120 * MIN);
+  assert.deepEqual(asked.problems, []);
+  assert.deepEqual([step(asked, 'handover').state, step(asked, 'handover').happy], ['waiting', 'owner-wait']);
+  assert.equal(step(ending({ state: 'due', due: true }, MIN), 'handover').state, 'waiting');
+  const stuck = ending({ state: 'due', due: true }, 40 * MIN);
+  assert.deepEqual(bugCodes(stuck), ['handover-not-enqueued']);
+  assert.equal(stuck.problems[0].role, 'runtime');
 });

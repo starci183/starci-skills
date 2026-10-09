@@ -66,13 +66,13 @@ import { installLinkVerdict, installVerdict, kernelMailboxVerdict } from './inst
 import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { readInput } from './hook-io.mjs';
-import { kernelRedirectVerdict } from './kernel-seat.mjs';
-import { boundGuard, boundSeat, fileWriteVerdict, gitSubOf, redirectTargetsOf, rightsRoleOf, runtimeRootOf, writeTargetsOf } from './rights.mjs';
+import { fileRightsVerdict, policyToolVerdict, rightsOfCall } from './call-rights.mjs';
+import { boundGuard, boundSeat, gitSubOf, redirectTargetsOf, rightsRoleOf } from './rights.mjs';
 import { intrinsicPolicyRead, loadCommandPolicy, policyVerdict } from './command-policy.mjs';
 import { commandsOf, programOf } from './shell-commands.mjs';
 import { tempPath } from '../api/fs/temp-path.mjs';
 import { findInOrder } from '../lib/in-order.mjs';
-import { criticReadVerdict, criticWriteVerdict } from './critic-reach.mjs';
+import { criticReadVerdict } from './critic-reach.mjs';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export { boundGuard } from './rights.mjs';
 
@@ -257,46 +257,6 @@ async function rightsContext({ guard = null, seat = null, env = process.env, tex
   return { role, handle: env?.ORCA_TERMINAL_HANDLE ?? null, lockOwner, policy: role && role !== 'release' ? loadCommandPolicy({ root: skillRoot }) : null };
 }
 
-/** The refusal of one file write for the rights role, or null: the zone declaration loads only for a role that can be refused. */
-async function fileRightsVerdict({ role, filePath, tool = 'Edit', edit = null, guard = null, shell = false }) {
-  if (role === 'critic') return criticWriteVerdict({ filePath, guard, tool });
-  if ((role !== 'supervisor' && role !== 'op') || !runtimeRootOf(filePath)) return null;
-  let zone = { runtimeRoot: runtimeRootOf(filePath) };
-  if (role === 'supervisor') {
-    const pz = await import('./protected-zone.mjs');
-    zone = { ...pz.zoneOfPath(filePath), catalogNames: pz.catalogNames };
-  }
-  return fileWriteVerdict({ role, filePath, tool, edit, guard, zone, shell });
-}
-
-/** The rights refusal of one parsed shell call: its commands (policyVerdict) and the files they write (fileRightsVerdict). */
-const policyToolVerdict = (command, verdict) => {
-  const whole = [command.word ?? command.program, ...command.args].join(' ');
-  return { tool: command.program, ...verdict, command: verdict.command === whole ? command.args.join(' ').slice(0, 200) : verdict.command };
-};
-
-async function rightsOfCall({ commands, command, cwd, ctx, guard }) {
-  if (!ctx.role) return null;
-  // The file rights are the more specific refusal (a write into the protected zone, an op writing the runtime checkout): they come before the generic command policy.
-  if (ctx.role === 'supervisor' || ctx.role === 'op' || ctx.role === 'critic') {
-    // The Critic's writer programs are judged whole by the command policy (their content words are not paths): only its redirections are targets here.
-    const targets = [...(ctx.role === 'critic' ? [] : commands.flatMap((c) => writeTargetsOf(c))), ...redirectTargetsOf(command, cwd)];
-    let refusal = null;
-    await findInOrder(targets, async (filePath) => {
-      const v = await fileRightsVerdict({ role: ctx.role, filePath, tool: 'shell', guard, shell: true });
-      if (v) refusal = { tool: 'shell', ...v };
-      return Boolean(v);
-    });
-    if (refusal) return refusal;
-  }
-  const redirect = ctx.role === 'lead' ? kernelRedirectVerdict({ command, cwd }) : null;
-  if (redirect) return { tool: 'shell', ...redirect };
-  for (const c of commands) {
-    const v = policyVerdict({ role: ctx.role, command: c, guard, handle: ctx.handle, lockOwner: ctx.lockOwner, policy: ctx.policy });
-    if (v) return policyToolVerdict(c, v);
-  }
-  return null;
-}
 
 /**
  * The first refusal for one shell call, or null: {tool, code, command, reason, remedy}. `dialect` is the text's shell

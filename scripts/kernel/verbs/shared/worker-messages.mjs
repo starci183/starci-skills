@@ -22,6 +22,7 @@ import { canonicalJSON } from '../../../../engine/canonical-json.mjs';
 import { shortHash } from '../../../lib/hash.mjs';
 import { check as orcaCheck } from '../../../api/orca/check.mjs';
 import { JOB_ROW, latestKernelJobOf } from '../../../machine/job-row.mjs';
+import { jobRunIds } from '../../../machine/terminal-ledger.mjs';
 import { contractDispatchIdOf, jobPayloadOf, operationTerminalHandleOf, verbWorkflow } from './rows.mjs';
 
 export const WORKER_QUESTION = 'worker-question';
@@ -42,7 +43,7 @@ const workflowRunIdsOf = (db, workflowId) => {
   const ids = new Set();
   for (const row of db.prepare('SELECT payload_json FROM jobs WHERE workflow_id=?').all(workflowId)) {
     const payload = jobPayloadOf(row);
-    for (const id of [payload.orca?.runId, payload.managed?.runId, payload.hierarchy?.runtime?.runId]) if (id) ids.add(String(id));
+    for (const id of jobRunIds(payload)) ids.add(id);
   }
   return ids;
 };

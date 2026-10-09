@@ -118,7 +118,7 @@ export const menuPhase = (s) => {
   const pending = pendingJobsOf(db, workflowId, now);
   const live = kernelDis.filter((di) => liveFor(di, pending, db));
   s.menu = buildMenu({
-    workflow: workflowId, rev: s.kernelRev, jobDecisions: jobDecisionsOf(s, live), shapeRefused: shapeRefusedOf(s),
+    workflow: workflowId, rev: s.revisionNotice, jobDecisions: jobDecisionsOf(s, live), shapeRefused: shapeRefusedOf(s),
     questions: s.workerQuestions, peers: s.peerMessages, wedged: s.wedgedWorkers.map((w) => ({ jobId: w.jobId, opId: s.workflowJobs.find((row) => row.job_id === w.jobId)?.op_id ?? null })),
     deadWaits: deadWaitsOf(s), decisions: live.filter((di) => !OWN_KIND.has(di.kind)), nextActions: s.graph.nextActions.map((action) => ({ ...action, attest: attestNoteOf(s, action) })), handover: s.handover, feedback: feedbackOf(s), snoozed: snoozedOf(s), answered: answeredOf(s),
   });

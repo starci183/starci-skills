@@ -142,6 +142,11 @@ proofs:
       en: "starci kernel settle re-reads the attached unit-run.json (runtime check op-proof, proof unit-kit): a done without it (op-unit-proof-missing), with a red or empty run (op-unit-run-red), with a measured file below 100 on any metric or a spec-required subject without its spec (op-unit-coverage-below) or with a required spec off the kit (op-unit-kit-violation) is refused."
       vi: "starci kernel settle tự đọc lại unit-run.json đính kèm (check op-proof, proof unit-kit): done thiếu nó (op-unit-proof-missing), có lần chạy đỏ hoặc rỗng (op-unit-run-red), có tệp được đo dưới 100 ở bất kỳ chỉ số nào hay đối tượng bắt buộc spec thiếu spec (op-unit-coverage-below) hoặc có spec bắt buộc sai bộ công cụ (op-unit-kit-violation) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
+judge:
+  - by: machine
+    measures: [declared-checks, op-gate, op-proof:unit-kit]
+    proofs: [unit-kit, op-gate]
+    why: "settle re-runs the whole unit project natively, requires 100 on every metric of the measured files and the kit shape of every service spec"
 blockers:
   - code: UNIT_RUNNER_MISSING
     condition:

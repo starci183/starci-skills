@@ -53,6 +53,8 @@ export const statusWorld = (t) => {
   write(rt, 'modules/kernel/driver-loop.yaml', 'loop: 1\n');
   write(rt, 'modules/ops/ops/interface.draw.yaml', 'id: interface.draw\n');
   write(rt, 'scripts/kernel/op-prompt.mjs', 'export {};\n');
+  // The table that decides what a revision change owes a Kernel is part of the runtime tree the notice reads.
+  write(rt, 'modules/kernel/revision-scope.yaml', fs.readFileSync(path.join(import.meta.dirname, '..', '..', 'modules', 'kernel', 'revision-scope.yaml'), 'utf8'));
   git(rt, 'add', '-A'); git(rt, 'commit', '-qm', 'A');
   const A = git(rt, 'rev-parse', 'HEAD');
   write(rt, 'modules/ops/ops/interface.draw.yaml', 'id: interface.draw\nnew: rule\n');

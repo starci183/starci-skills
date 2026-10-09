@@ -1,3 +1,4 @@
 group: supabase
 summary: operate one app's isolated local Supabase stack
 owner: runtime
+runtimeSide: host

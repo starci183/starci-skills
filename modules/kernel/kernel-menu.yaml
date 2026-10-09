@@ -39,7 +39,7 @@ origins:
   - {id: reopened-provisional, kind: retry, class: mechanical, doneBy: "Job controller: the retry move (scripts/reconciler/mechanical-moves.mjs)"}
   - {id: deferred-queued, kind: dispatch, class: mechanical, doneBy: "Workflow controller: starci kernel dispatch-ready routes the job, which settles it deferred"}
   - {id: ready-queued, kind: dispatch, class: mechanical, doneBy: "Workflow controller: starci kernel dispatch-ready (a root-verify job and a seam job included)"}
-  - {id: approved-leg, kind: dispatch, class: mechanical, fallback: approved-leg-open, doneBy: "Job controller: the enqueue move on the write set the plan leg declares (scripts/reconciler/mechanical-moves.mjs)"}
+  - {id: approved-leg, kind: dispatch, class: mechanical, fallback: approved-leg-open, doneBy: "Job controller: the enqueue move on the write set the plan leg declares, or on its evidence stub when the leg is deferred (scripts/reconciler/mechanical-moves.mjs)"}
   - {id: approved-leg-open, kind: dispatch, class: judgment, menu: leg-ready, why: "the plan leg declares no write set, or a work graph partitions it per node: the paths the leg owns are the Kernel's to choose"}
   - {id: red-node, kind: dispatch, class: mechanical, fallback: move-unbuilt, doneBy: "Job controller: the enqueue move of the op that last wrote the node, on the node's owned paths (a failed last job is retried, a passed one is reopened)"}
   - {id: stale-proof, kind: impact-check, class: mechanical, fallback: move-unbuilt, doneBy: "Job controller: the rerun move of the job that made the proof (a passed unit is reopened)"}
@@ -82,10 +82,10 @@ frontier:
 kinds:
   - id: rev-ack
     mode: duty
-    source: "kernelRev.stale"
+    source: "revisionNotice.state owed"
     question: "The runtime moved from revision {acked} to {rev}: read the files it lists, then attest the complete READ manifest."
     options:
-      - {choice: ack-rev, direct: true, effect: "run directly: starci kernel kernel-ack-rev --workflow {workflow} --plan, read every path it lists under unread, then starci kernel kernel-ack-rev --workflow {workflow} --rev {rev} --digest <readToken> (the token the plan returned; the Kernel writes no file)"}
+      - {choice: ack-rev, direct: true, effect: "run directly: starci kernel kernel-ack-rev --workflow {workflow} --plan, read every path it lists under unread, then starci kernel kernel-ack-rev --workflow {workflow} --rev {rev} --digest <readToken>"}
 
   - id: job-decision
     mode: judgment

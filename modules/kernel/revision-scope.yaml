@@ -143,8 +143,8 @@ rows:
     roles: {op: admission, kernel: reread}
     opKinds: {from: "modules/ops/ops/(?<kind>[^/]+)[.]yaml", otherwise: all}
   - id: critic-contracts
-    why: "the Critic's rubric and verdict contract"
-    paths: [modules/kernel/critic.yaml, modules/kernel/critic-rubrics.yaml, modules/kernel/verdict-contract.yaml]
+    why: "the Critic's rubric and verdict contract, and the registry of who judges each op's product"
+    paths: [modules/kernel/critic.yaml, modules/kernel/critic-rubrics.yaml, modules/kernel/verdict-contract.yaml, modules/kernel/op-judges.yaml]
     roles: {critic: admission, op: admission, kernel: reread}
   - id: engine-assets
     why: "files of the engine package and script data files: loaded by the long-lived process or by a command; the heavier action holds"

@@ -24,7 +24,7 @@ flags:
   - {name: help, type: boolean}
   - {name: edition, type: enum, enum: [full, lite]}
 `;
-const GROUP_YAML = `group: kernel\nsummary: kernel verbs\nowner: runtime\n`;
+const GROUP_YAML = `group: kernel\nsummary: kernel verbs\nowner: runtime\nruntimeSide: host\n`;
 const VERB = `group: kernel
 verb: settle
 owner: runtime
@@ -101,7 +101,7 @@ test('a duplicate verb name across files is rejected', () => {
 });
 
 test('an empty group directory is an error', () => {
-  const root = fixture((put) => put(`${CATALOG_DIR}/debug/_group.yaml`, 'group: debug\nsummary: debug\nowner: runtime\n'));
+  const root = fixture((put) => put(`${CATALOG_DIR}/debug/_group.yaml`, 'group: debug\nsummary: debug\nowner: runtime\nruntimeSide: host\n'));
   try {
     assert.ok(catalogErrors(root).some((e) => /an empty group is an error/.test(e)));
   } finally { fs.rmSync(root, { recursive: true, force: true }); }

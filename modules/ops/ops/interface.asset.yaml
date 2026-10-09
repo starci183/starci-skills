@@ -219,6 +219,14 @@ proofs:
       en: "starci kernel settle re-reads the attached lint.json (runtime check op-proof, proof produced-lint): a done without it (op-lint-proof-missing), with a lint that could not run (op-lint-tool-failed) or with any finding over the produced files (op-lint-findings) is refused."
       vi: "starci kernel settle tự đọc lại lint.json đính kèm (check op-proof, proof produced-lint): done thiếu nó (op-lint-proof-missing), có lint không chạy được (op-lint-tool-failed) hoặc có bất kỳ lỗi nào trên các tệp đã tạo (op-lint-findings) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
+judge:
+  - by: machine
+    measures: [declared-checks, op-proof:produced-lint]
+    proofs: [produced-lint]
+    why: "the lint over every file the op produced is re-run natively at settle"
+  - by: next-leg
+    leg: interface.audit
+    why: "interface.audit re-captures the rendered result and compares it with the accepted draws, the installed Grammar and the brand, and routes every drift back"
 blockers:
   - code: BRAND_RULE_UNSATISFIABLE
     condition:

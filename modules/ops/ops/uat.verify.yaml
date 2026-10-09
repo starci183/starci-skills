@@ -343,6 +343,11 @@ proofs:
         its real owner, reused mutations are restored where authorized, and retained objects have
         explicit ownership reasons. Partial setup, failed flows and uncertain asynchronous effects
         remain in the cleanup ledger until resolved; unfinished cleanup cannot earn done.
+judge:
+  - by: machine
+    measures: [declared-checks, work-hygiene, proof-media, contract-script]
+    proofs: [recording]
+    why: "the settler re-runs the record validators and a pass without a screenshot and a genuine video of every executed flow is refused"
 blockers:
   - code: ENVIRONMENT_NOT_READY
     condition:

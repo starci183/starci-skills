@@ -33,7 +33,13 @@ const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const START_WORKFLOW=path.join(ROOT,'scripts','kernel','start-workflow.mjs');
 const DEFINE_GOAL=path.join(ROOT,'scripts','goal','define-goal.mjs');
-const json=text=>{try{return JSON.parse(text);}catch{return null;}};
+// start-workflow writes one `start-workflow: phase <name>` line per phase to stderr before its JSON answer (the phase lines of the Kernel start), so a failure answer is the last line of stderr.
+const json=text=>{
+  try{return JSON.parse(text);}catch{
+    const last=String(text??'').trim().split(/\r?\n/).at(-1);
+    try{return JSON.parse(last);}catch{return null;}
+  }
+};
 
 // Managed dispatch rides the scripts/api/orca orchestration wrappers
 // (runCreate/workerStart/workerShow/workerStop/

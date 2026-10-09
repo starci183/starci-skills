@@ -58,6 +58,7 @@ import { readJsonFile } from '../lib/json.mjs';
 import { eachInOrder } from '../lib/in-order.mjs';
 import { groupLiveParts } from './draw-loop-groups.mjs';
 import { insidePath } from '../lib/path-key.mjs';
+import { invocationDir } from '../lib/roots.mjs';
 import { writeJsonFile } from '../api/fs/write-json-file.mjs';
 import { buildFixtureHarness, captureHtml, loadPlaywright, parseViewports } from './draw-render.mjs';
 import { DRAW_SOURCE_SUFFIX, checkDrawSource, rationaleFileFor } from './draw/draw-source.mjs';
@@ -129,8 +130,8 @@ export function stopOf(rounds, settings) {
 }
 
 async function defaultRender({ html, out, viewports, name, fullPage, repo = null }) {
-  // Playwright resolves as draw-render.mjs does: the source's directory, the product repo, the cwd, then the runtime's own install.
-  const playwright = loadPlaywright([path.dirname(html), ...(repo ? [repo] : []), process.cwd()]);
+  // Playwright resolves as draw-render.mjs does: the source's directory, the product repo, the invocation directory, then the runtime's own install.
+  const playwright = loadPlaywright([path.dirname(html), ...(repo ? [repo] : []), invocationDir()]);
   const source = { mode: 'html', html: { path: html, sha256: sha256File(html) } };
   return captureHtml({ html, out, viewports, theme: 'light', fullPage, name, source, playwright });
 }
@@ -151,7 +152,7 @@ export function fixturesByWidth(values) {
  * bundle per distinct fixture. Keeps the first bundle in `harnessDir` (the browser metrics load its index.html).
  */
 async function defaultComponentRender({ source, fixtures, css = [], productDir, grammar, out, viewports, name, fullPage, harnessDir, rationale = null }) {
-  const playwright = loadPlaywright([productDir, path.dirname(source), process.cwd()]);
+  const playwright = loadPlaywright([productDir, path.dirname(source), invocationDir()]);
   const groups = new Map();
   for (const v of viewports) {
     const f = fixtures.byWidth[String(v.width)] ?? fixtures.default;

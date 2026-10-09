@@ -1,6 +1,7 @@
 group: runtime
 verb: owner-claims-audit
 owner: runtime
+runtimeSide: host
 summary: audit owner-decision claims and owner-gates in runtime ledgers
 impl:
   script: scripts/housekeeping/owner-claims-audit.mjs

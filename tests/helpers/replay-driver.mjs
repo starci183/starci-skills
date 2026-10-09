@@ -22,7 +22,11 @@ async function settleInProcess(args, env) {
   return { ok: value.ok, code: value.ok ? 0 : 1, stdout: JSON.stringify(value), stderr: '', value };
 }
 
-const spawnChild = (cmd, args, options) => (String(args[0]).endsWith('job-settle-main.mjs') ? settleInProcess(args, options.env) : spawnJson(cmd, args, options));
+// The parallelism push is the real verb run in the foreground: without --foreground it hands the push to a detached child that outlives the pass and races whatever the spec does next (the
+// ack of a READ, its own push). A replay world is deterministic by construction, so the verb is the same and only the process model that lets a pass end before the push does is not reproduced;
+// spec.detachedPush keeps the live shape for a spec that tests detachment (the world then fails the pass that leaves the child alive unless the spec says it expects one).
+const foregroundPush = (args) => (spec.detachedPush !== true && args.includes('dispatch-ready') && !args.includes('--foreground') && !args.includes('--dry-run') ? [...args, '--foreground'] : args);
+const spawnChild = (cmd, args, options) => (String(args[0]).endsWith('job-settle-main.mjs') ? settleInProcess(args, options.env) : spawnJson(cmd, foregroundPush(args), options));
 const NUMBERS = { pollMs: 2000, leaseMs: 30000, renewMs: 10000, heartbeatStaleMs: 60000, statusCacheMs: 1, backoff: { minMs: 1000, maxMs: 300000 }, crashLoop: { max: 3, windowMs: 1800000 } };
 const controllers = Object.fromEntries(spec.controllers.map((name) => [name, { mode: 'active' }]));
 const ledgers = [{ ledgerId: spec.ledgerId, name: path.basename(spec.repo), repo: spec.repo, file: spec.ledgerFile }];

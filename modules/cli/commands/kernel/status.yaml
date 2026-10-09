@@ -12,7 +12,7 @@ flags:
     summary: comma list of dotted paths of the answer; prints only those fields as JSON
   - name: full
     type: boolean
-    summary: the whole text view (every section); the Kernel seat's own call prints its one-line state and its Decide section by default
+    summary: the whole text view (every section; the legs line tags each leg [judge:...] with who judges its product, the judge field of its op contract); the Kernel seat's own call prints its one-line state and its Decide section by default
   - name: repo
     type: string
     summary: managed repository whose .starciwork ledger the command uses
@@ -105,8 +105,8 @@ returns:
   nextActions: "[{kind:reread|retry|root-verify|dispatch|impact-check|supervisor-gate|owner-gate|wait,
     op, jobId?, incidentId?, nodes?, final?, reason, label, displayName?}] (label: the op label,
     modules/ops/_labels.yaml; displayName: the named job's `<op label> · <what> · <workflow name>`)
-    — the Kernel's next steps. reread (first, only while kernelRev.stale): re-read kernelRev.files
-    (or kernel-prompt.md and driver-loop.yaml in full), then starci kernel kernel-ack-rev; it makes the
+    — the Kernel's next steps. reread (first, only while revisionNotice.state is owed): re-read revisionNotice.files,
+    then starci kernel kernel-ack-rev; it makes the
     frontier actionable. The rest in the order it runs them, from ledger rows only
     (scripts/kernel/cli.mjs graphProjectionOf); empty once finished. retry: a failed job whose
     settle recorded a nextStep and that nothing follows (no retry names it, its step queued nothing,
@@ -138,7 +138,7 @@ returns:
     config.yaml specs switches deferred (status succeeded, result verdict deferred, no attempt
     spent) and the plan legs not yet enqueued that will be; starci kernel run-deferred-tests runs them. legs[]
     of a deferred op carry `deferred` too"
-  kernelRev: "{current, acked, ackedAt, ackSource, stale, unacked?, full?, files[], fileCount, revision?, readUnavailable?}: actual Git revision or explicitly installed required-byte revision. The complete required current READ manifest and current Kernel incarnation gate affected enqueue/dispatch. Wakes summarize it; they are never READ acknowledgements."
+  revisionNotice: "{role, state, from, to, action, count, digest, files[], replaceFiles[], line}: the ONE statement of what the last runtime revision change asks of this Kernel, decided by the notice (modules/kernel/revision-scope.yaml): state owed / owed-woken (re-read the files, attest them with starci kernel kernel-ack-rev), replace-due (the runtime replaces the seat at its next yield), current, not-concerned, acked-legacy, no-baseline. Wakes and the menu item rev-ack summarize it; they are never READ acknowledgements. The complete required current READ manifest and the current Kernel incarnation gate affected enqueue/dispatch."
   autopilot: "{on, source, ruling?, provisional[{dispatchId, opId, jobId, class, record, receiptPath,
     label: 'self-accepted provisionally', at}], deferred[{jobId, opId, reason, incidentId?, since}],
     deferredToHandover[{key, dispatchId?, jobId?, opId, deferClass:

@@ -1,3 +1,4 @@
 group: worker
 summary: start, inspect and completely close supervised Orca workers
 owner: runtime
+runtimeSide: host

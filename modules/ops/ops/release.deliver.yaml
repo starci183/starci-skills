@@ -89,6 +89,11 @@ proofs:
       en: "For a publish or a deploy starci kernel settle re-reads the attached release-proof.json (runtime check op-proof, proof release): a done without it (op-release-proof-missing), with a required step missing or skipped (op-release-step-skipped) or with a step red or unrunnable (op-release-step-red) is refused."
       vi: "Với publish hoặc deploy starci kernel settle tự đọc lại release-proof.json đính kèm (check op-proof, proof release): done thiếu nó (op-release-proof-missing), thiếu hoặc bỏ qua một bước bắt buộc (op-release-step-skipped) hoặc có bước đỏ hay không chạy được (op-release-step-red) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
+judge:
+  - by: machine
+    measures: [declared-checks, op-proof:release]
+    proofs: [release]
+    why: "for a publish or a deploy settle re-runs the release proof natively (fresh installs, lint, typecheck, boot, canon pins, merge guard, a green repository check) and refuses a skipped step"
 blockers:
   - code: OPERATION_REQUIRED
     condition:

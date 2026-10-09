@@ -29,3 +29,10 @@ providerResumeMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
 secretScanArtifacts: 200
 secretScanBytes: 4000000
 signalRows: 500
+# actionFailMin / actionFailMinMs: a reconciler action (a controller's verb for one key) or a refused Decision Item that fails on this many passes in a row over at least this
+# long is a stop the runtime owes a line for, since nothing else tells a role about it. silentFreshMs: such a stop is still happening when its newest failure is this young.
+# silentRows: how many of the newest finished actions and refusal log rows one digest reads.
+actionFailMin: 5
+actionFailMinMs: 1800000
+silentFreshMs: 900000
+silentRows: 20000
