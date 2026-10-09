@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { setSignal, changeWorkflowPhase } from '../../engine/db/ledger.mjs';
-import { recoverWorkflowLaunch, releaseWorkflowWorker } from '../../scripts/kernel/workflow-launch-custody.mjs';
+import { recoverWorkflowLaunch, releaseWorkflowWorker, rollbackUnpublishedKernel } from '../../scripts/kernel/workflow-launch-custody.mjs';
 
 const fixture = (t, run) => withLedger(t, ({ ledger, machine }) => {
   const workflowId = 'wf-launch-recovery', token = 'original-launch', terminal = 'owned-kernel-terminal', dispatch = 'owned-dispatch';
@@ -114,4 +114,19 @@ test('the shared worker closer refuses an accepted release without exact termina
   for (const made of [{ ok: true }, { ok: true, handle: 'owned', closed: { ok: true, proof: 'requested' }, processes: { verdict: 'none' } }]) {
     assert.equal(releaseWorkflowWorker('dispatch', 'owned', { close: () => made }).ok, false);
   }
+});
+
+test('a started Kernel whose publication failed for any cause is stopped and released with proof, and only a proven closure unbinds its guard', () => {
+  const seen = [];
+  const closure = (ok) => (dispatchId, handle) => { seen.push(['release', dispatchId, handle]); return { ok, handle }; };
+  const unbinder = (handle) => seen.push(['unbind', handle]);
+  const proven = rollbackUnpublishedKernel({ dispatchId: 'dispatch-1', handle: 'term-1', unbind: unbinder }, { release: closure(true) });
+  assert.equal(proven.ok, true);
+  assert.deepEqual(seen, [['release', 'dispatch-1', 'term-1'], ['unbind', 'term-1']]);
+  seen.length = 0;
+  const unproven = rollbackUnpublishedKernel({ dispatchId: 'dispatch-1', handle: 'term-1', unbind: unbinder }, { release: closure(false) });
+  assert.equal(unproven.ok, false);
+  assert.deepEqual(seen, [['release', 'dispatch-1', 'term-1']], 'an unproven closure keeps the guard bound');
+  const thrown = rollbackUnpublishedKernel({ dispatchId: 'd', handle: 'h', unbind: () => { throw new Error('guard store busy'); } }, { release: closure(true) });
+  assert.equal(thrown.ok, true, 'an unbind failure never turns a proven release into a failure');
 });

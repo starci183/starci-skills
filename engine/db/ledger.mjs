@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
 import {resourceAdmission,workflowOpSlots,SETTLED_JOB_LIST} from '../admission.mjs';
 import {sha256} from '../digest.mjs';
-import {putBlob,blobPath,artifactRoot} from './blob.mjs';
+import {putBlob,blobPath,artifactRoot} from './blob.mjs';import {EVENT_LIMITS,eventPayloadRecord} from './event-compact.mjs';
 import {redactData,redactText} from '../../scripts/lib/redact.mjs';
 import {isBusyError,newSpanId,newTraceId,withMachine} from './machine.mjs';
 import {projectsRootFor,repoRootKey,resolveLedgerFile,ledgerFixtureInit,assertOperationalLedger} from './ledger-paths.mjs';
@@ -311,7 +311,7 @@ function updateRow(db,table,where,fields){
   return db.prepare(sql).run(...pairs.map(p=>p[1]),...keys.map(p=>p[1]));
 }
 const nowMs=()=>Date.now();
-const EVENT_PAYLOAD_MAX=16384;
+const EVENT_PAYLOAD_MAX=EVENT_LIMITS.payloadBytes;
 
 // --- blobs ------------------------------------------------------------------------------------------------
 /** Index a blob already in the store (engine/db/blob.mjs putBlob). Idempotent on sha256. */
@@ -335,13 +335,13 @@ export function storeBlob(db,{content,mediaType='application/octet-stream',redac
 /** digest = sha256(prev_digest || event_id || kind || coalesce(payload_json,'') || created_at), per workflow chain. */
 export const eventDigest=({prevDigest,eventId,kind,payloadJson,createdAt})=>sha256(`${prevDigest??''}${eventId}${kind}${payloadJson??''}${createdAt}`);
 /**
- * One events row. The chain link is computed here inside the caller's BEGIN IMMEDIATE. A payload over 16 KiB goes to
- * the blob store (payloadSha) and the row keeps no payload_json.
+ * One events row. The chain link is computed here inside the caller's BEGIN IMMEDIATE. A payload over 16 KiB, or one that carries a
+ * launch admission decision or refusal (event-compact.mjs), goes whole to the blob store (payloadSha); the row keeps a bounded inline view.
  */
 export function appendEvent(db,{eventId=newToken(),workflowId,entityType,entityId,generation=null,kind,payload=null,payloadSha=null,
   attemptId=null,spanId=null,occurredAt=null,createdAt=nowMs()}){
   need(workflowId&&entityType&&entityId!=null&&kind,'Event workflowId, entityType, entityId and kind are required');
-  let payloadJson=payload===null||payload===undefined?null:JSON.stringify(redactData(payload));
+  let payloadJson;({payloadJson,payloadSha}=eventPayloadRecord(payload,payloadSha,content=>storeBlob(db,{content,mediaType:'application/json',redaction:'v1',createdAt}).sha256));
   need(payloadJson===null||payloadJson.length<=EVENT_PAYLOAD_MAX||payloadSha,`event payload is ${payloadJson?.length} bytes (> ${EVENT_PAYLOAD_MAX}); store it as a blob and pass payloadSha`,'STARCI_EVENT_PAYLOAD_TOO_LARGE');
   if(payloadSha&&payloadJson?.length>EVENT_PAYLOAD_MAX)payloadJson=null;
   const gen=generation??db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId)?.generation??0;

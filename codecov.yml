@@ -56,6 +56,7 @@ flag_management:
         - "engine/db/attempt-overrun.mjs"
         - "engine/db/authorizer.mjs"
         - "engine/db/blob.mjs"
+        - "engine/db/event-compact.mjs"
         - "engine/db/ledger-paths.mjs"
         - "engine/db/ledger.mjs"
         - "engine/db/machine-connection.mjs"

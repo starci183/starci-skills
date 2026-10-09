@@ -765,3 +765,10 @@ cases:
     rule: {file: scripts/kernel/verbs/report.mjs, anchor: "Orca 1.4.221 sends none"}
     spec: tests/kernel-verbs-shared/managed-dispatch.spec.mjs
     status: covered
+  - id: kernel-seat-publication-refused-for-the-size-of-the-admission-decision
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a Kernel seat that was launched is published) the kernel-booted event embedded the whole admission decision (the selected member with its quota snapshot, every candidate with its codes); 16962 bytes passed the ledger's 16384 byte event bound, the publication failed with kernel-seat-publication-failed after the Orca worker had started, and a few such failures hold the seat through the start-hold", remedy: {state: in-tree, change: "appendEvent keeps a bounded summary of any admission decision or admission refusal inline and stores the whole payload as a blob behind payload_sha, so no admission-shaped event can pass the bound; the bound is declared once (EVENT_LIMITS); a publication failure of any cause rolls the started worker back (stop and release with proof)"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, workflow wf-nivo-auth-test-workflow-muxq1xov, kernel-watchdog repair", evidence: "restart-failed, step kernel-seat-publication-failed, event payload is 16962 bytes (> 16384)"}
+    rule: {file: engine/db/event-compact.mjs, anchor: "compactEventPayload"}
+    spec: tests/engine-db/event-compact.spec.mjs
+    status: covered

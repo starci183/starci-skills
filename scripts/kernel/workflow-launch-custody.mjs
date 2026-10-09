@@ -18,6 +18,16 @@ export function releaseWorkflowWorker(dispatchId, handle = null, { env = process
     ...(proven ? {} : { error: released?.release?.error ?? released?.stop?.error ?? released?.error ?? 'worker terminal or process exit is unproven' }) };
 }
 
+/**
+ * Undo a started Kernel launch whose publication failed, for any cause: the exact Dispatch is stopped and released with terminal and process proof,
+ * and only a proven closure unbinds the terminal's guard. The returned receipt (ok false = closure unproven) rides on the start failure.
+ */
+export function rollbackUnpublishedKernel({ dispatchId, handle, unbind }, { release = releaseWorkflowWorker } = {}) {
+  const cleanup = release(dispatchId, handle);
+  if (cleanup.ok) { try { unbind(handle); } catch { /* pruned by age later */ } }
+  return cleanup;
+}
+
 const filled = (value) => typeof value === 'string' && value !== '';
 
 /** The admission released under the event `eventOf` builds; a throwing build or release is a refused one carrying its message. */

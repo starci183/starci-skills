@@ -35,7 +35,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { putBlob as storeBlob, blobPath, getBlob } from './blob.mjs';
+import { putBlob as storeBlob, blobPath, getBlob } from './blob.mjs'; import { EVENT_LIMITS } from './event-compact.mjs';
 import { redactBytes, redactData, redactText } from '../../scripts/lib/redact.mjs'; import { isMain } from '../../scripts/lib/is-main.mjs';
 import { isSpecRun, readEnv } from '../../scripts/lib/env.mjs';
 import { pathKey } from '../../scripts/lib/path-key.mjs'; import { pidAlive } from '../../scripts/lib/pid-alive.mjs';
@@ -477,7 +477,7 @@ function attachLedgers(m, ledgers = listLedgers(m)) {
 function supEvent(m, { entityType = 'supervisor', entityId = 'main', kind, payload = null, spanId = null, at = m.now(), eventId = null }) {
   need(kind, 'supEvent needs kind');
   return m.transaction((db) => {
-    const { json, sha } = jsonOrBlob(m, payload == null ? null : redactData(payload), 16384);
+    const { json, sha } = jsonOrBlob(m, payload == null ? null : redactData(payload), EVENT_LIMITS.payloadBytes);
     const prev = db.prepare('SELECT digest FROM sup_events ORDER BY seq DESC LIMIT 1').get()?.digest ?? null;
     const id = eventId ?? crypto.randomUUID();
     const digest = sha256([prev ?? '', id, entityType, entityId, kind, json ?? '', sha ?? '', at].join('\n'));

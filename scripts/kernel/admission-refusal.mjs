@@ -5,6 +5,7 @@
 // members of the job's route chain, and it never counts as the agent's fault (job-rejections.mjs). Any other code stays a candidate
 // refusal and names the alternatives the route chain still holds.
 import { list } from '../lib/list.mjs';
+import { REFUSAL_SCHEMA } from '../../engine/db/event-compact.mjs';
 
 // Admission codes that say the candidate is busy or parked for a while, not that it cannot serve this job; the value is the
 // queuedBecause hold of the policy table the wait reads as.
@@ -24,7 +25,7 @@ const alternativesLine = (alternatives) => (alternatives.length
 
 /**
  * The record of one refused admission, or null when the launch result carries no admission plan:
- * {class: 'wait'|'candidate', queuedBecause, rejected: [{id, provider, model, codes}], alternatives, line}.
+ * {schema, class: 'wait'|'candidate', queuedBecause, rejected: [{id, provider, model, codes}], alternatives, line}.
  */
 export function admissionRefusalOf(launched, payload, model) {
   const rejected = list(launched?.decision?.rejected).map(rowOf);
@@ -36,7 +37,7 @@ export function admissionRefusalOf(launched, payload, model) {
   const head = wait
     ? `a wait (${queuedBecause}), not the agent's fault; it clears when the holder settles or the circuit expires`
     : 'every candidate is refused by its own conditions';
-  return { class: wait ? 'wait' : 'candidate', queuedBecause, rejected, alternatives, line: `${why} - ${head}; ${alternativesLine(alternatives)}` };
+  return { schema: REFUSAL_SCHEMA, class: wait ? 'wait' : 'candidate', queuedBecause, rejected, alternatives, line: `${why} - ${head}; ${alternativesLine(alternatives)}` };
 }
 
 /** True for a stored dispatch-rejected payload whose admission refusal is a wait: it spends no pool strike. */
