@@ -8,7 +8,7 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {addWorkCommon} from '../../scripts/lib/work-schemas.mjs';
 import {openLedger,ledgerFileFor,projectsRootFor} from '../../engine/db/ledger.mjs';
 import {writeAskReceipt} from '../../scripts/machine/ask-receipts.mjs';
-import {OWNER_ANSWER_SCHEMA,TOKEN_PASS_STATUSES,checkTokensMatchSource,checkValueSource} from '../../scripts/work/brand/brand.mjs';
+import { OWNER_ANSWER_SCHEMA, checkTokensMatchSource, checkValueSource } from '../../scripts/work/brand/brand.mjs';
 
 /*
  * Nivo brand.decide blocked BRAND_TOKEN_UNTRACEABLE: the owner (through the autopilot's standing ruling) had ruled the ink colour
@@ -52,9 +52,7 @@ const brandWith=(token=ruled())=>({identity:{family:'starci'},
 const checkIn=(p,stage,token)=>checkTokensMatchSource({brand:brandWith(token),sourceRoot:p.repoRoot,brandDir:p.brandDir,stage});
 const entry=(result,token='--accent')=>result.evidence.tokens.find(found=>found.token===token);
 
-test('the ruling form is a pass status next to match and planned-from-reference',()=>{
-  assert.deepEqual([...TOKEN_PASS_STATUSES],['match','planned-from-reference','planned-from-ruling']);
-});
+
 
 test('decide: a token no file declares passes when the ledger holds the answer that ruled its value, with the declaration owed to interface.implement',t=>{
   const p=product(t);

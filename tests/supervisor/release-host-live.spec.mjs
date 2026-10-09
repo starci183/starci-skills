@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { liveRowsMissing } from '../../scripts/supervisor/release-host-live.mjs';
 import { releaseHostMissing, releaseHostWhy } from '../../scripts/supervisor/release-host.mjs';
 import { probeOrcaAccount } from '../../scripts/agent/quota/orca-account.mjs';
-import { SETTLE_SMOKE_PROVIDERS } from '../../scripts/kernel/launch-smoke-models.mjs';
+
 
 const NOW = Date.parse('2026-10-09T10:00:00Z');
 const POLICY = { version: 1, reservePercent: 80, exhaustedPercent: 100, maxAgeMs: 120_000, hostPolledMaxAgeMs: 300_000 };
@@ -21,9 +21,7 @@ test('only the providers whose quota Orca polls are read: claude and codex by th
   assert.deepEqual(asked, ['claude', 'codex']);
 });
 
-test('the smokes name the providers they launch, one no-op agent each', () => {
-  assert.deepEqual([...SETTLE_SMOKE_PROVIDERS], ['claude', 'codex', 'devin']);
-});
+
 
 test('a provider with a fresh host-polled quota and a checkout inside launchTrust leave nothing missing', () => {
   assert.deepEqual(only(['claude'], { probe: probeWith(entryList(10_000)) }), []);

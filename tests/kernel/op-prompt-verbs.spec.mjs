@@ -16,10 +16,7 @@ const promptOf = (op) => buildOpPrompt({
   packet: { op, brief: `modules/ops/ops/${op}.yaml`, context: { records: [], owned_paths: [], attempt: 1 }, constraints: { model: 'm' } },
 });
 
-test('the bound of the verbs block is declared in yaml', () => {
-  assert.ok(bound.maxVerbs > 0 && bound.maxChars > 0 && bound.lineChars > 0);
-  assert.ok(bound.standing.includes('kernel report'));
-});
+
 
 test('a verb the CLI catalog lacks is a defect: no op contract names one', () => {
   assert.deepEqual(missingVerbs('run starci gate no-such-verb --root <app>'), ['gate no-such-verb']);

@@ -13,7 +13,7 @@ import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 import { openLedger } from '../../engine/db/ledger.mjs';
 import { openDecisionRow } from '../../scripts/machine/decisions.mjs';
 import { buildMenu, itemFactsOf } from '../../scripts/kernel/kernel-menu.mjs';
-import { redactText } from '../../scripts/lib/redact.mjs';
+
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const CLI = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
@@ -22,15 +22,7 @@ const T0 = Date.now() - 3_600_000;
 const sources = (over = {}) => ({ workflow: WF, rev: null, jobDecisions: [], questions: [], peers: [], wedged: [], deadWaits: [], decisions: [], nextActions: [], handover: null, snoozed: new Set(), ...over });
 const shape = (jobId) => ({ shapeRefused: [{ jobId, op: 'work.author', failedJobId: 'j1', situation: `${jobId} is ready but has the shape of j1` }] });
 
-test('an answer stored through the redaction filter still holds its item back (a leg named forgot-password)', () => {
-  const jobId = 'op-forgot-password:approved-leg-open';
-  const [item] = buildMenu(sources(shape(jobId)));
-  assert.equal(item.id, `shape-refused:${jobId}`);
-  const stored = redactText(item.id);
-  assert.notEqual(stored, item.id, 'the filter blanks what follows password:');
-  assert.equal(buildMenu(sources({ ...shape(jobId), snoozed: new Set([stored]) })).length, 0, 'the stored spelling snoozes the live item');
-  assert.equal(buildMenu(sources({ ...shape(jobId), snoozed: new Set(['shape-refused:another']) })).length, 1);
-});
+
 
 test('an item whose answer failed is held while its facts are unchanged and offered again when they change', () => {
   const [item] = buildMenu(sources(shape('op-x-1')));

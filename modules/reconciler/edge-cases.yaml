@@ -1015,7 +1015,7 @@ cases:
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: the Kernel can attest the runtime revision it reads) the StarCi Kernel could not acknowledge revision a6b651ed128f nor 328a4d367424: kernel-ack-rev appended the whole read manifest (103 files, 19267 bytes) as the event payload and the ledger refused it STARCI_EVENT_PAYLOAD_TOO_LARGE (16384), so every enqueue of a new leg was refused kernel-read-unverified (dec-47a88c5428, dec-97f398806a) and the interface.draw leg of authentication.forgot-password never opened", remedy: {state: in-tree, change: "the attestation event keeps its whole payload in the blob store when it is over the inline bound, and its two readers (the admission and the revision gate) resolve the blob"}}
     met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "starci runtime.sqlite events 2748, 2753 (kernel-decision-result revert enqueue failed: kernel-read-unverified; none-fits naming STARCI_EVENT_PAYLOAD_TOO_LARGE 19267 > 16384)"}
     rule: {file: scripts/kernel/verbs/kernel-ack-rev.mjs, anchor: "appendEvent"}
-    spec: tests/kernel/ack-rev-large-manifest.spec.mjs
+    spec: tests/replay/read-attestation.spec.mjs
     status: covered
   - id: kernel-escape-opened-in-the-product-ledger-is-owned-by-nobody
     family: record-vs-reality

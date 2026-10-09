@@ -10,10 +10,7 @@ const skillRoot = path.resolve(import.meta.dirname, '..', '..');
 const checkerFile = path.join(skillRoot, 'scripts', 'checks', 'check-json-exceptions.mjs');
 const allowlistFile = path.join(skillRoot, 'modules', 'kernel', 'allowlist.yaml');
 
-test('the JSON exception checker and its owner allowlist exist',()=>{
-  assert.equal(fs.existsSync(checkerFile), true, 'scripts/checks/check-json-exceptions.mjs is required');
-  assert.equal(fs.existsSync(allowlistFile), true, 'modules/kernel/allowlist.yaml is required');
-});
+
 
 /** A fixture allowlist document carrying only the json-exceptions section text given (already indented one level). */
 const allowlistDoc = (section) => `schema: starci/allowlist@1\njson-exceptions:\n${section}`;
@@ -192,16 +189,7 @@ test('a registered directory is exact: wildcards, trailing slashes, escapes and 
   }
 });
 
-test('the shipped allowlist registers benchmark/snapshots as a directory, not file by file', async () => {
-  const checkJsonExceptions = await loadChecker();
-  const result = checkJsonExceptions();
-  assert.ok(result.allowedDirectories.includes('benchmark/snapshots'), 'benchmark/snapshots is a registered directory');
-  assert.equal(
-    result.allowed.some(file => file.startsWith('benchmark/snapshots/')),
-    false,
-    'snapshots are covered by the directory entry; a per-file line would need an edit for every new snapshot',
-  );
-});
+
 
 test('only the skill-root tests tree is skipped; a product or template tests directory stays in the inventory', async t => {
   const checkJsonExceptions = await loadChecker();

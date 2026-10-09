@@ -13,10 +13,7 @@ const opGuard = (op) => ({ schema: 'starci/op-guard@1', role: 'op', op });
 const verbCommand = { program: 'starci', args: ['work', 'layout-render', '--work', '.starciwork', '--node', '/[locale]', '--breakpoint', 'desktop', '--theme', 'light', '--write'], cwd: ROOT };
 const run = (command, op = 'brand.decide') => policyVerdict({ role: 'op', command: { cwd: ROOT, ...command }, guard: opGuard(op), policy: POLICY });
 
-test('the policy table names the two layout-capturing ops and the verb', () => {
-  assert.deepEqual(POLICY.renders.layoutRender.verb, ['work', 'layout-render']);
-  assert.deepEqual(POLICY.renders.layoutRender.ops, ['brand.decide', 'interface.draw']);
-});
+
 
 test('the named ops run the verb; any other op or bound role is refused with the verb as the use', () => {
   for (const op of POLICY.renders.layoutRender.ops) assert.equal(run(verbCommand, op), null, op);

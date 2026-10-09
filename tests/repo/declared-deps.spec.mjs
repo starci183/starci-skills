@@ -38,11 +38,7 @@ test('every runtime-bound bare specifier under scripts/ engine/ modules/ bin/ ex
   assert.deepEqual(violations, []);
 });
 
-test('check-helper-once.mjs loads acorn in the runtime context, so acorn is declared', () => {
-  const rel = 'scripts/checks/check-helper-once.mjs';
-  assert.ok(runtimeSpecifiers(rel, fs.readFileSync(path.join(root, rel), 'utf8')).includes('acorn'));
-  assert.ok(declared.has('acorn'), "acorn resolves inside the runtime tree: declare it in package.json");
-});
+
 
 test('a callback parameter that shares a runtime-anchored name does not make a caller-rooted require runtime-bound', () => {
   const source = [

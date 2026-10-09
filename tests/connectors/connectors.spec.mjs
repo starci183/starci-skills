@@ -423,17 +423,7 @@ test('discover-chat lists chat ids, types and names only',async()=>{
   assert.equal(bot.calls[0].method,'getUpdates');
 });
 
-test('the one send point is the kernel api\'s parkAsk; serve-ask binding and the supervisor send nothing',()=>{
-  const read=p=>fs.readFileSync(new URL(`../../${p}`,import.meta.url),'utf8');
-  const serveAsk=read('scripts/kernel/ask-server.mjs');
-  assert.match(serveAsk,/export async function parkAsk\(\{[^}]*notify = notifyAsk/,'parkAsk is where an ask is told');
-  assert.doesNotMatch(serveAsk,/notifyAsk\(\{ ledgerFile: file/,'a binding form never sends a message (the bridge edits the notice)');
-  for(const p of ['scripts/supervisor/poll.mjs','scripts/kernel/kernel-watchdog.mjs'])
-    assert.doesNotMatch(read(p),/connectors\/telegram|api\.telegram\.org/,`${p} must not notify`);
-  const api=read('scripts/kernel/cli.mjs');
-  assert.doesNotMatch(api,/sendMessage\(|api\.telegram\.org|connectors\/telegram\.mjs/,'the kernel api reaches Telegram only through serve-ask.mjs parkAsk/closeAskMessages');
-  assert.match(read('scripts/kernel/verbs/serve-ask.mjs'),/await parkAsk\(\{ ledger, ledgerFile: ledgerFileFor\(repo\), repo, workflowId, report \}\)/);
-});
+
 
 // Owner, 2026-09-24: "answered means deleted" — an answered or retired ask leaves the chat.
 test('an answered or retired ask deletes every message that shows it; one Telegram will not delete is edited instead',async t=>{

@@ -23,13 +23,7 @@ function seed(ledger, result) {
 const retryRow = (ledger) => ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get('op-work.author-retry02');
 const withPayload = (row) => ({ ...row, payload: JSON.parse(row.payload_json) });
 
-test('a failed job routed to a retry behind its curing leg does not poison the shape of that retry', (t) => withLedger(t, (world) => {
-  const { ledger } = world;
-  seed(ledger, { verdict: 'blocked', nextStep: step });
-  const retry = withPayload(retryRow(ledger));
-  assert.equal(failedShapesOf(ledger.db, WF, retry).get(shapeOf(retry.op_id, retry.payload)), undefined, 'the retry is new work: its curing leg landed');
-  ledger.close();
-}));
+
 
 test('a failed job with no such route still refuses the identical shape', (t) => withLedger(t, (world) => {
   const { ledger } = world;

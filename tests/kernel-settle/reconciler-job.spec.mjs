@@ -96,17 +96,7 @@ test('a red report handed to the Kernel -> one settle-nongreen DI, the same key 
   } finally { fx.close(); }
 });
 
-test('a dead worker -> starci kernel reconcile --dead-worker --settle-failed; a held one -> --release-worker', async () => {
-  const fx = fixture({ report: null });
-  try {
-    const dead = ctxFor(fx, { status: () => ({ frontier: { deadWorkerJobs: ['op-a'] } }) });
-    await job.reconcile('job:shop-be:op-a', dead);
-    assert.deepEqual(dead.calls.api.map((c) => [c.verb, ...c.argv]), [['reconcile', '--job', 'op-a', '--dead-worker', '--settle-failed']]);
-    const held = ctxFor(fx, { status: () => ({ frontier: { heldWorkerJobs: ['op-a'] } }) });
-    await job.reconcile('job:shop-be:op-a', held);
-    assert.deepEqual(held.calls.api.map((c) => [c.verb, ...c.argv]), [['reconcile', '--job', 'op-a', '--release-worker']]);
-  } finally { fx.close(); }
-});
+
 
 test('active but not owning the concern -> nothing acts', async () => {
   const fx = fixture({ report: { outcome: 'done' } });

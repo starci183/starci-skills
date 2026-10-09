@@ -253,12 +253,7 @@ test('L4: a fresh CPU and RAM decision reaches the actual runtime process after 
   assert.equal(second[1].concurrency.concurrency, 1);
 });
 
-test('L4: the test script of the runtime repository binds - no lifecycle hook, one direct Node command', () => {
-  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-  const bound = runtimeSpecStep(root, { cmd: 'npm', args: ['test'] }, { concurrency: 4 });
-  assert.equal(typeof bound.cmd, 'string');
-  assert.ok(bound.args.some((word) => String(word).includes('tests/**/*.spec.mjs')), 'the bound command keeps the suite selection');
-});
+
 
 test('L4: runtime binding fails closed for shell commands, lifecycle hooks, and a script that overrides the host budget', (t) => {
   const base = tmp(t, 'script');

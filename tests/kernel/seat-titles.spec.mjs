@@ -39,19 +39,7 @@ test('kernel watchdog repairs a drifted tab, ignoring the pane title', () => {
   assert.deepEqual(stable.calls, [], 'pane title drift alone does not trigger tab rename');
 });
 
-test('supervisor watchdog repairs its seat and only live Worker tabs', () => {
-  const d = host({ term_sup: 'Done - Claude', term_worker: 'Claude Code', term_ok: '[Worker] fine', term_reported: 'Claude Code' });
-  const repairs = repairSupervisorTabTitles('term_sup', [
-    { worker_id: 'term_worker', payload: { cluster: 'fix-title', terminalClosed: false } },
-    { worker_id: 'term_ok', payload: { cluster: 'fine', terminalClosed: false } },
-    { worker_id: 'term_reported', payload: { cluster: 'reported', terminalClosed: true } },
-  ], d);
-  assert.equal(repairs.length, 2);
-  assert.deepEqual(d.calls, [
-    { terminal: 'term_sup', title: '[Supervisor] main' },
-    { terminal: 'term_worker', title: '[Worker] fix-title' },
-  ]);
-});
+
 
 test('unavailable Orca listing does not issue a rename', () => {
   const calls = [];

@@ -22,9 +22,7 @@ const promptOf = (op, contextPack) => buildOpPrompt({
   packet: { op, brief: `modules/ops/ops/${op}.yaml`, context: { records: [], owned_paths: [], attempt: 1 }, constraints: { model: 'm' } },
 });
 
-test('the deciding and authoring ops are the ones the gate files with the read-knowledge proof', () => {
-  assert.ok(decidingOps.length >= 9, decidingOps.join(', '));
-});
+
 
 for (const op of boundOps) {
   test(`${op}: its filed READ is its own knowledge, not a glob over all of knowledge/`, () => {

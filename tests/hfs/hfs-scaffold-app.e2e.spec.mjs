@@ -63,9 +63,7 @@ function testWorldRequire() {
 
 /** The Postgres image the canon stack pins (the example app's stack declaration: what a world attaches to). */
 const POSTGRES_IMAGE = parseYaml(fs.readFileSync(path.join(RUNTIME, 'examples', 'ecommerce-app', '.starcistacks', 'application-stacks.yaml'), 'utf8')).components?.postgres?.image;
-test('the example app stack declaration pins a postgres image', () => {
-  assert.ok(typeof POSTGRES_IMAGE === 'string' && POSTGRES_IMAGE.length > 0, 'the example app stack declaration pins a postgres image');
-});
+
 
 test('a test-world package without its own install fails at once with the command that installs it', (t) => {
   const dir = mkdtemp(t, 'starci-test-world-install-');

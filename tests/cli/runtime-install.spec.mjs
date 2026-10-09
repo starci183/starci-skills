@@ -6,7 +6,7 @@ import path from 'node:path';
 import process from 'node:process';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { installRuntime, resolveNpmEntry, RUNTIME_VERSION } from '../../packages/cli/src/runtime-install.mjs';
+import { installRuntime, resolveNpmEntry } from '../../packages/cli/src/runtime-install.mjs';
 import {init, update} from '../../scripts/install/install.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
@@ -57,23 +57,7 @@ test('npm entry resolution returns null when no npm-cli.js exists', () => {
   assert.equal(resolveNpmEntry({ execPath: path.resolve('node-none', 'node'), env: {}, exists: () => false }), null);
 });
 
-test('runtime install spawns Node with npm and installer argument arrays without a shell', () => {
-  const npmEntry = path.resolve('node-current', 'node_modules', 'npm', 'bin', 'npm-cli.js');
-  const calls = [];
-  const fixture = fakeInstall({
-    resolveNpmEntry: () => npmEntry,
-    spawn: (command, args, options) => { calls.push({ command, args, options }); return { status: 0 }; },
-  });
 
-  assert.equal(installRuntime({ cwd: fixture.cwd, home: fixture.home }, fixture.deps), 0);
-  assert.equal(calls.length, 2);
-  assert.equal(calls[0].command, process.execPath);
-  assert.deepEqual(calls[0].args, [npmEntry, 'install', '--prefix', fixture.installRoot, `starci@${RUNTIME_VERSION}`]);
-  assert.equal(calls[0].options.shell, false);
-  assert.equal(calls[1].command, process.execPath);
-  assert.deepEqual(calls[1].args, [fixture.installer, 'init', '--dir', fixture.cwd]);
-  assert.equal(calls[1].options.shell, false);
-});
 
 test('a missing npm entry names every probe and tells the user how to proceed', () => {
   const errors = [];

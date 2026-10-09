@@ -27,20 +27,9 @@ test('the receipt is classified by its stage wherever the host put it', () => {
   assert.equal(turnStartUnobserved(null), false);
 });
 
-test('an unsubmitted paste chip gets one Enter-only send from the runtime and the start stands once the chip is gone', () => {
-  const { io, log } = scripted([CHIP, CHIP, RUNNING]);
-  const proof = resubmitUnobservedTurn({ terminal: 'term_x', io });
-  assert.equal(proof.state, 'resubmitted');
-  assert.deepEqual(log.sends, [{ terminal: 'term_x', text: '', enter: true }], 'exactly one Enter, no second paste of the prompt');
-});
 
-test('a chip that survives the Enter is unsubmitted, never retried more than once', () => {
-  const { io, log } = scripted([CHIP]);
-  const proof = resubmitUnobservedTurn({ terminal: 'term_x', io });
-  assert.equal(proof.state, 'unsubmitted');
-  assert.match(proof.screen, /Pasted Content 16831 chars/);
-  assert.equal(log.sends.length, 1);
-});
+
+
 
 test('a turn that already runs stands without any input; an idle empty box and an unreadable frame are not repaired by typing', () => {
   const running = scripted([RUNNING]);

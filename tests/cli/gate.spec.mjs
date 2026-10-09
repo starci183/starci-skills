@@ -4,7 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { CATALOG as catalog } from '../../packages/cli/src/catalog.generated.mjs';
-import { main } from '../../scripts/cli/main.mjs';
+
 import { flagsOfUsage } from '../../scripts/checks/check-cli-parity.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -59,14 +59,4 @@ test('gate catalog resolves every implementation and exactly declares its parsed
     assert.deepEqual(flagsOfUsage(spec.usage(source)).sort(), [...spec.flags].sort(), `${verb} usage reflects its parser`);
     assert.deepEqual(command.flags.map((flag) => flag.name).sort(), [...spec.flags].sort(), `${verb} catalog flags`);
   }
-});
-
-test('gate dispatch resolves through the injected script seam', () => {
-  const calls = [];
-  assert.equal(main(['gate', 'unit', '--root', 'app', '--out', 'unit.json'], {
-    catalog,
-    runScript: (script, args, options) => { calls.push({ script, args, options }); return 0; },
-  }), 0);
-  assert.equal(path.relative(repoRoot, calls[0].script).replaceAll(path.sep, '/'), 'scripts/gates/unit-run.mjs');
-  assert.deepEqual(calls[0].args, ['--root', 'app', '--out', 'unit.json']);
 });

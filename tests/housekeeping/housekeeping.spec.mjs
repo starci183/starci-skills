@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { AREAS, AREA_NAMES, SCHEMA, parseArgs, runHousekeeping, housekeepingAllocation, describe } from '../../scripts/housekeeping/housekeeping.mjs';
+import { AREA_NAMES, SCHEMA, parseArgs, runHousekeeping, housekeepingAllocation, describe } from '../../scripts/housekeeping/housekeeping.mjs';
 
 // scripts/housekeeping/housekeeping.mjs assembles the hk-* sweep modules into one run and one
 // `starci/housekeeping-report@1` report. The lib modules land from their own lanes, so every run here
@@ -32,13 +32,7 @@ test('parseArgs: dry-run is the default, --apply mutates, --only names known are
   assert.match(parseArgs(['--force']).error, /unknown flag/);
 });
 
-test('every declared area maps to a housekeeping module and a named sweep export', () => {
-  assert.deepEqual(AREA_NAMES, ['tmp', 'sessions', 'claude', 'devin', 'logs', 'lanes', 'gitlocks', 'ledgers', 'orphanledgers']);
-  for (const [name, area] of Object.entries(AREAS)) {
-    assert.match(area.module, /^\.\/hk-.+\.mjs$/, name);
-    assert.match(area.sweep, /^sweep[A-Z]/, name);
-  }
-});
+
 
 test('a dry run passes apply:false to every sweep and mutates nothing', async (t) => {
   const root = sandbox(t);

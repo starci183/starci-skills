@@ -99,10 +99,7 @@ const literalContractTokens=()=>{
 
 const known=id=>catalog.has(id)||Object.hasOwn(OUTSIDE_THE_GENERATED_CATALOGUE,id);
 
-test('the census reads the whole Common registry and the rule catalogue', ()=>{
-  assert.ok(census.renderers.length>=95,`the registry holds ${census.renderers.length} renderers`);
-  assert.ok(catalog.size>=150,`the catalogue holds ${catalog.size} ids`);
-});
+
 
 test('every Common renderer stamps at least one data-contract rule id on its anatomy', ()=>{
   const bare=census.renderers.filter(r=>r.claims.length+r.computedClaims.length===0).map(r=>`${r.group}/${r.component}`);

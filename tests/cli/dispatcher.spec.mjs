@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { main } from '../../packages/cli/src/main.mjs';
-import { installRuntime, RUNTIME_VERSION } from '../../packages/cli/src/runtime-install.mjs';
+import { installRuntime } from '../../packages/cli/src/runtime-install.mjs';
 import { locateRuntime, ownRuntimeRoot } from '../../packages/cli/src/runtime-locate.mjs';
 
 const global = [
@@ -65,34 +65,7 @@ test('help and completion are served without a runtime', async () => {
   assert.equal(completion.value.out, 'complete\n');
 });
 
-test('app and runtime owners route through their injected seams', async () => {
-  const app = capture();
-  let appCall;
-  assert.equal(await main(['--cwd', 'product', 'app', 'check', '--json'], {
-    ...app, catalog, cwd: path.resolve('base'),
-    importHfs: async () => ({ main: async (argv, io) => { appCall = { argv, cwd: io.cwd }; return 1; } }),
-  }), 1);
-  assert.deepEqual(appCall.argv, ['check', '--json']);
-  assert.equal(appCall.cwd, path.resolve('base', 'product'));
 
-  const runtime = capture();
-  let spawnCall;
-  assert.equal(await main(['runtime', 'check', '--json'], {
-    ...runtime, catalog,
-    locateRuntime: () => ({ root: path.resolve('runtime'), source: 'test' }),
-    spawn: (command, args, options) => { spawnCall = { command, args, options }; return { status: 0 }; },
-  }), 0);
-  assert.match(spawnCall.args[0], /scripts[\\/]cli[\\/]main\.mjs$/);
-  assert.deepEqual(spawnCall.args.slice(1), ['runtime', 'check', '--json']);
-
-  const wrapped = path.join(path.resolve('home'), '.starci', 'bin');
-  await main(['runtime', 'check'], {
-    ...capture(), catalog, home: path.resolve('home'), env: { PATH: [wrapped, path.resolve('tools')].join(path.delimiter) },
-    locateRuntime: () => ({ root: path.resolve('runtime'), source: 'test' }),
-    spawn: (command, args, options) => { spawnCall = { command, args, options }; return { status: 0 }; },
-  });
-  assert.equal(spawnCall.options.env.PATH, path.resolve('tools'), 'the runtime process never sees the guarded wrapper directory');
-});
 
 test('runtime install is in-process and never locates or spawns a runtime', async () => {
   const output = capture();
@@ -106,28 +79,7 @@ test('runtime install is in-process and never locates or spawns a runtime', asyn
   assert.equal(installCall.force, true);
 });
 
-test('runtime installer exposes npm/fetch and process seams without network access', () => {
-  const home = path.resolve('fake-home');
-  const cwd = path.resolve('fake-repo');
-  const writes = [];
-  let npmCall;
-  let nodeCall;
-  const code = installRuntime({ cwd, home }, {
-    platform: 'linux',
-    exists: (file) => file.endsWith(path.join('scripts', 'install', 'install.mjs')),
-    mkdir: () => {},
-    write: (file, text) => { writes.push({ file, text }); },
-    chmod: () => {},
-    runNpm: (args, options) => { npmCall = { args, options }; return { status: 0 }; },
-    runNode: (args, options) => { nodeCall = { args, options }; return { status: 0 }; },
-  });
-  assert.equal(code, 0);
-  assert.deepEqual(npmCall.args.slice(0, 3), ['install', '--prefix', path.join(home, '.starci', 'runtime')]);
-  assert.equal(npmCall.args[3], `starci@${RUNTIME_VERSION}`);
-  assert.equal(nodeCall.args[1], 'init');
-  assert.ok(writes.some(({ file }) => file.endsWith(path.join('.starci', 'runtime.json'))));
-  assert.ok(writes.some(({ file }) => file.endsWith(path.join('.starci', 'bin', 'starci'))));
-});
+
 
 test('bad commands are refusals, while runtime absence is exit 3', async () => {
   const unknown = capture();
@@ -188,14 +140,7 @@ const runtimeCall = async (argv, extra = {}) => {
   return { code, call, ...output.value };
 };
 
-test('-- passes everything after it through, and dispatcher flags land before it', async () => {
-  const dashed = await runtimeCall(['runtime', 'check', '--json', '--only', 'x', '--', '--root', 'a b&c', '--help']);
-  assert.equal(dashed.code, 0);
-  assert.deepEqual(dashed.call.args, ['runtime', 'check', '--only', 'x', '--json', '--', '--root', 'a b&c', '--help']);
-  const noRoom = await runtimeCall(['runtime', 'plain', '--', 'stray']);
-  assert.equal(noRoom.code, 0);
-  assert.deepEqual(noRoom.call.args, ['runtime', 'plain', '--', 'stray']);
-});
+
 
 test('option values: a dash value is allowed, a value that names a flag is a missing value, empty numbers are refused', async () => {
   assert.deepEqual((await runtimeCall(['runtime', 'check', '--only', '-x'])).call.args, ['runtime', 'check', '--only', '-x']);

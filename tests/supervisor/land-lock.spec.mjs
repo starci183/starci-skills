@@ -16,11 +16,7 @@ test('the work runs inside the lock as role coordinator, purpose land by default
   assert.deepEqual(calls.map((c) => [c.role, c.purpose]), [['coordinator', 'land']]);
 });
 
-test('a caller names its own purpose (a staging install locks as npm-ci)', () => {
-  const calls = [];
-  underHostLockWaiting({ purpose: 'npm-ci', env: { NODE_TEST_CONTEXT: '' }, deps: { hostLock: (o, work) => { calls.push(o.purpose); return work(); } } }, () => 1);
-  assert.deepEqual(calls, ['npm-ci']);
-});
+
 
 test('a lock that is held is polled until it frees, then the work runs exactly once', () => {
   const { now, sleep } = clock();

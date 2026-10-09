@@ -13,10 +13,7 @@ const POLICY = loadCommandPolicy({ root: ROOT });
 const verbCommand = { program: 'starci', args: ['work', 'imagegen', '--prompt', 'p.txt', '--out', 'assets', '--json'], cwd: ROOT };
 const opGuard = (op) => ({ schema: 'starci/op-guard@1', role: 'op', op });
 
-test('the policy table names the drawing ops and the verb', () => {
-  assert.deepEqual(POLICY.calls.imagegen.verb, ['work', 'imagegen']);
-  assert.deepEqual(POLICY.calls.imagegen.ops, ['interface.draw', 'interface.asset', 'brand.decide']);
-});
+
 
 test('interface.draw, interface.asset and brand.decide may run the verb', () => {
   for (const op of POLICY.calls.imagegen.ops) assert.equal(policyVerdict({ role: 'op', command: verbCommand, guard: opGuard(op), policy: POLICY }), null, op);

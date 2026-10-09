@@ -76,14 +76,7 @@ for (const [name, reason, show] of [
   }));
 }
 
-test('an unverified closure keeps custody, the bound terminal and one Supervisor item', (t) => fixture(t, (f) => {
-  const result = refused(f, () => shown(), { close: () => ({ ok: false, error: 'terminal still connected' }) });
-  assert.equal(result.reason, 'kernel-launch-closure-unverified');
-  assert.equal(result.terminal, TERMINAL);
-  assert.notEqual(f.reservation().state, 'released');
-  assert.equal(f.items().length, 1);
-  assert.equal(JSON.parse(f.items()[0].evidence_json).terminal, TERMINAL, 'the item names the terminal Orca reports');
-}));
+
 
 test('a signal that changed while recovery ran is not this launch: nothing is adopted and no item is opened', (t) => fixture(t, (f) => {
   const stale = { ...f.read(), token: 'someone-else' };

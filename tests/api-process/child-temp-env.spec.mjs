@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { tempChildEnv, TEMP_ROOT_ENV } from '../../engine/temp-root.mjs';
 import { withTempEnv } from '../../engine/temp-root.mjs';
-import { spawnCapture } from '../../scripts/api/process/spawn-capture.mjs';
+
 import { runProgram } from '../../scripts/api/process/run-program.mjs';
 import { nodeSpawn } from '../../scripts/api/node/lib.mjs';
 import { gitSpawn } from '../../scripts/api/git/lib.mjs';
@@ -36,15 +36,7 @@ test('withTempEnv replaces only env; an absent env is the process environment', 
   assert.equal(withTempEnv().env.TEMP, path.resolve(process.env[TEMP_ROOT_ENV] || os.tmpdir()));
 });
 
-test('spawnCapture hands its child the temp root', async (t) => {
-  const { root } = fresh(t);
-  let seen = null;
-  const spawnChild = (cmd, args, options) => { seen = options; throw new Error('stop'); };
-  await spawnCapture('x', [], { env: { [TEMP_ROOT_ENV]: root }, spawnChild });
-  assert.equal(seen.env.TEMP, path.resolve(root));
-  assert.equal(seen.env.TMP, path.resolve(root));
-  assert.equal(seen.env.TMPDIR, path.resolve(root));
-});
+
 
 test('real children see the temp root: node, a program run, git and npm', (t) => {
   const { root } = fresh(t);

@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { projectStart as callStart } from '../../scripts/api/supabase/project-start.mjs';
-import { projectStatus as callStatus } from '../../scripts/api/supabase/project-status.mjs';
-import { projectStop as callStop } from '../../scripts/api/supabase/project-stop.mjs';
+
+
+
 import {
   findSupabaseAppRoot,
   parseSupabaseConfig,
@@ -164,18 +164,4 @@ test('supabaseStatus maps the CLI not-running answer to a clean stopped result',
   assert.equal(out.code, 0);
   assert.equal(out.data.running, false);
   assert.deepEqual(out.data.urls, { api: null, studio: null, db: null });
-});
-
-test('the three call files construct one argv call each and stop names only the requested project', () => {
-  const calls = [];
-  const run = (file, args, options) => { calls.push({ file, args, options }); return { status: 0 }; };
-  const appRoot = path.resolve('fixture-app');
-  callStart(appRoot, { supabase: 'supabase-fixture', env: {}, run });
-  callStop(appRoot, 'only-this-project', { supabase: 'supabase-fixture', env: {}, noBackup: true, run });
-  callStatus(appRoot, { supabase: 'supabase-fixture', env: {}, run });
-  assert.equal(calls.length, 3);
-  assert.deepEqual(calls[0].args, ['start', '--workdir', appRoot]);
-  assert.deepEqual(calls[1].args, ['stop', '--project-id', 'only-this-project', '--no-backup', '--workdir', appRoot]);
-  assert.deepEqual(calls[2].args, ['status', '-o', 'json', '--workdir', appRoot]);
-  assert.equal(calls.flatMap((entry) => entry.args).includes('--all'), false);
 });

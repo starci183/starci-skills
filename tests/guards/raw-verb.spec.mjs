@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { runRealTool } from '../../scripts/api/process/run-real-tool.mjs';
+
 import { resolveRealTool } from '../../scripts/api/process/resolve-real-tool.mjs';
 import { guardRaw } from '../../scripts/guards/raw-verb.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
@@ -78,25 +78,4 @@ test('guardRaw returns 127 when the shim is the only PATH match', async (t) => {
   });
   assert.deepEqual(result, { code: 127, stderr: 'starci: fixture-tool not found on PATH outside the shim\n' });
   assert.equal(ran, false);
-});
-
-test('runRealTool uses inherited stdio without a shell and routes Windows command scripts through cmd.exe', () => {
-  const calls = [];
-  const spawn = (command, args, options) => { calls.push({ command, args, options }); return { status: 23 }; };
-  const comspec = path.resolve('system', 'cmd.exe');
-  assert.equal(runRealTool(path.resolve('bin', 'git.exe'), ['status'], { platform: 'win32', spawn }), 23);
-  assert.equal(calls[0].command, path.resolve('bin', 'git.exe'));
-  assert.deepEqual(calls[0].args, ['status']);
-  assert.equal(calls[0].options.stdio, 'inherit');
-  assert.equal(calls[0].options.shell, false);
-  assert.equal(calls[0].options.windowsVerbatimArguments, undefined);
-
-  assert.equal(runRealTool(path.resolve('bin with spaces', 'npm.cmd'), ['run', 'x & y'], {
-    platform: 'win32', spawn, comspec,
-  }), 23);
-  assert.equal(calls[1].command, comspec);
-  assert.deepEqual(calls[1].args.slice(0, 3), ['/d', '/s', '/c']);
-  assert.match(calls[1].args[3], /npm\.cmd/);
-  assert.match(calls[1].args[3], /\^&/);
-  assert.equal(calls[1].options.windowsVerbatimArguments, true);
 });

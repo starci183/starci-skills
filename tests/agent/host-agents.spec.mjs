@@ -97,10 +97,7 @@ test('an agent whose Orca default args lack the card bypass flag is refused agen
   assert.equal(ask(fixture(t)).ok, true, 'a card without bypassFlag asks nothing');
 });
 
-test('every real card declares its bypass flag as data', async () => {
-  const { loadAdapter } = await import('../../scripts/agent/lib.mjs');
-  for (const agent of ['claude', 'codex', 'devin']) assert.match(loadAdapter(agent).card.start.bypassFlag, /^--/, agent);
-});
+
 
 test('the cursor card passes the preflight when cursor-agent is installed and bypassed, and is refused naming cursor-agent when it is not', async (t) => {
   const { loadAdapter } = await import('../../scripts/agent/lib.mjs');

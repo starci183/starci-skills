@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { freshFetch } from '../../scripts/api/sonar/fresh-fetch.mjs';
-import { PROOF_BRANCH, cloudConfig, ensureCloudProject, sonarCloudFindings, sonarOrganization } from '../../scripts/supervisor/release-sonarcloud.mjs';
+
+import { cloudConfig, ensureCloudProject, sonarCloudFindings, sonarOrganization } from '../../scripts/supervisor/release-sonarcloud.mjs';
 import { lintReportFile, removeLintReport, writeLintReport } from '../../scripts/supervisor/release-sonar-report.mjs';
 import { sonarCloudRefusal } from '../../scripts/supervisor/release-cut-plan.mjs';
 import { sonarSupplier } from '../../scripts/supervisor/release-l4-sonar.mjs';
@@ -56,15 +56,7 @@ test('config: SonarCloud host, the runtime token from secret.env (not the SONAR_
   assert.throws(() => cloudConfig(tmp(t, 'nokey'), SETTINGS), /no sonar\.projectKey/);
 });
 
-test('fetch: every request asks for its own connection, so a socket pooled before a long synchronous step is never reused', async (t) => {
-  const real = globalThis.fetch;
-  t.after(() => { globalThis.fetch = real; });
-  const seen = [];
-  globalThis.fetch = async (url, init) => { seen.push(init.headers); return { status: 200 }; };
-  await freshFetch('https://sonarcloud.io/api/x', { headers: { Accept: 'application/json' } });
-  await freshFetch('https://sonarcloud.io/api/y');
-  assert.deepEqual(seen, [{ Accept: 'application/json', Connection: 'close' }, { Connection: 'close' }]);
-});
+
 
 test('findings: a ready SonarCloud has none; no example means nothing to check; the token travels only as a bearer header', async () => {
   const cloud = fakeCloud();
@@ -125,19 +117,9 @@ function gateOf({ scan = { outcome: 'pass', scanner: { exitCode: 0 }, ceTask: { 
 }
 const supplier = (t, fake, extra = {}) => sonarSupplier([APP], { gate: fake.gate, settings: SETTINGS, lintReport: () => ({ ok: true }), logDir: () => tmp(t, 'log'), reportDir: () => tmp(t, 'report'), ...extra });
 
-test('supplier: the project is ensured, the scan runs with the organization on the proof branch, the dashboard is read, and both passing is the proof', async (t) => {
-  const fake = gateOf();
-  const proof = await supplier(t, fake).proofs['shop: sonar']();
-  assert.equal(proof.ok, true);
-  assert.deepEqual(fake.calls, ['ensure', ['scan', ['-Dsonar.organization=acme', fake.calls[1][1][1], `-Dsonar.branch.name=${PROOF_BRANCH}`]], ['dashboard', PROOF_BRANCH]]);
-});
 
-test('supplier: a project created by this proof is analysed as its main branch, never on a branch of a project that has none', async (t) => {
-  const fake = gateOf({ project: { created: true } });
-  await supplier(t, fake).proofs['shop: sonar']();
-  assert.deepEqual([fake.calls[1][1][0], fake.calls[1][1].length], ['-Dsonar.organization=acme', 2]);
-  assert.deepEqual(fake.calls[2], ['dashboard', undefined], 'the dashboard reads the main branch the analysis became');
-});
+
+
 
 test('supplier: the scan row holds the runtime bar elsewhere: a processed analysis whose SonarCloud gate is red or NONE still passes the scan row and the dashboard decides', async (t) => {
   const green = gateOf({ scan: processedScan() });

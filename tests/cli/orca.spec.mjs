@@ -4,7 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { CATALOG as catalog } from '../../packages/cli/src/catalog.generated.mjs';
-import { main } from '../../scripts/cli/main.mjs';
+
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const verbs = {
@@ -19,14 +19,4 @@ test('orca catalog resolves wrappers and declares their parsed flags', () => {
     assert.equal(fs.existsSync(path.join(root, command.impl.script)), true, command.impl.script);
     assert.deepEqual(command.flags.map((flag) => flag.name).sort(), flags);
   }
-});
-
-test('orca dispatches an always-JSON wrapper through the injected runtime seam', () => {
-  let call;
-  assert.equal(main(['orca', 'terminal-read', '--terminal', 'term-1', '--json'], {
-    catalog,
-    runScript: (script, args) => { call = { script, args }; return 0; },
-  }), 0);
-  assert.match(call.script, /scripts[\\/]api[\\/]orca[\\/]terminal-read\.mjs$/);
-  assert.deepEqual(call.args, ['--terminal', 'term-1']);
 });

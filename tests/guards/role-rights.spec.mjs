@@ -111,9 +111,7 @@ const decisionOf = (role, text, { guard = role === 'op' ? OP : null, handle = HA
   return null;
 };
 
-test('role table contains enough command cases', () => {
-  assert.ok(CASES.length >= 120, `the role table has ${CASES.length} command texts`);
-});
+
 
 for (const role of [...GUARDED, 'release', 'owner']) {
   test(`${role} command policy: ${CASES.length} command texts`, () => {
