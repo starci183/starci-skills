@@ -1,6 +1,7 @@
 // release-cut-verb.spec.mjs - `starci release cut` is the catalog door of cutRelease, the only path that pushes main with a release tag.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -51,4 +52,20 @@ test('an asynchronous cutRelease (the L4 Sonar proof runs in-process) is awaited
   const code = await main(['--tag', 'v1.0.0'], { ...slow, cutRelease: async () => { await new Promise((resolve) => setImmediate(resolve)); return { ok: false, verdict: 'sonar', why: 'gate red' }; } });
   assert.equal(code, 1);
   assert.match(slow.value.out, /refused \(sonar\): gate red/);
+});
+
+// The lead started `starci release cut` in the backend repository whose ignored .claude folder is the runtime: the cut judged that repository (565 tracked changes) instead of the runtime.
+test('without --repo the cut and the release notes take the runtime this command runs from, whatever directory they are started in', async (t) => {
+  const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-cut-cwd-'));
+  const before = process.cwd();
+  t.after(() => { process.chdir(before); fs.rmSync(elsewhere, { recursive: true, force: true }); });
+  process.chdir(elsewhere);
+  let seen;
+  const io = capture();
+  await main(['--tag', 'v1.0.0', '--plan'], { ...io, cutRelease: (options) => { seen = options; return { ok: true, verdict: 'plan' }; } });
+  assert.equal(seen.repo, repoRoot, 'the cut resolves the runtime root, not the git top of the working directory');
+  const { releaseNotes } = await import('../../scripts/supervisor/release-notes.mjs');
+  let read;
+  releaseNotes({ args: { tag: 'v1.0.0' }, positionals: [], cwd: elsewhere }, { readChangelog: (dir) => { read = dir; return ''; } });
+  assert.equal(read, repoRoot);
 });

@@ -32,7 +32,7 @@ flags:
     summary: the outcome the report must carry; refused when the envelope says otherwise
   - name: dispatch-capability
     type: string
-    summary: the dispatch capability from the Orca preamble, authenticating the worker_done message
+    summary: the dispatch capability of the Orca preamble when it carries one, forwarded with the worker_done message
 exit:
   "0": success
   "1": refusal or error

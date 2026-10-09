@@ -108,7 +108,7 @@ function releaseTagState({ tag, branch, remote, cwd, run, out, refuse }) {
 async function beforeSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, refuse, sonar }) {
   const unmet = await preSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, sonar });
   if (unmet) return refuse(unmet.verdict, unmet.why, { findings: unmet.findings });
-  const hostMissing = (deps.host ?? releaseHostMissing)({ repo });
+  const hostMissing = (deps.host ?? releaseHostMissing)({ repo, root: cwd });
   return hostMissing.length ? refuse('release-host', releaseHostWhy(hostMissing), { hostMissing }) : null;
 }
 

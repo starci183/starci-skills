@@ -74,7 +74,8 @@ const fakeGraphqlWs = async (pushes: ReadonlyArray<Record<string, unknown>>, opt
                     pushes.forEach((data, index) => setTimeout(() => socket.write(textFrame(JSON.stringify({ type: "next", id: message.id, payload: { data } }))), 30 * (index + 1)))
                 }
             }
-            if (close) socket.end(closeFrame(1000, "normal closure"))
+            // The client answers a refusal with its own close frame, which can arrive after the server ended the socket (Linux delivers it): end once.
+            if (close && !socket.writableEnded) socket.end(closeFrame(1000, "normal closure"))
         })
     })
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))

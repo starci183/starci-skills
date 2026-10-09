@@ -42,6 +42,7 @@ const WORKFLOWS = [
       { name: 'Build', run: 'npm run build:be' },
     ] },
     browser: { if: "${{ github.event_name == 'workflow_dispatch' }}", steps: [{ run: 'npm run test:browser' }] },
+    release: { if: "${{ startsWith(github.ref, 'refs/tags/v') }}", steps: [{ name: 'Create the GitHub Release', run: 'gh release create "$TAG"' }] },
     images: { steps: [{ uses: 'docker/build-push-action@v6' }, { name: 'Image', run: 'docker build .' }] },
   } } },
 ];
@@ -63,7 +64,9 @@ test('the parity plan is derived from the workflows: one run per example app, th
   assert.match(reasons.Integration, /manual or tag-upload/);
   assert.match(reasons.Unit, /spec suite/);
   assert.match(reasons.Image, /docker/);
-  assert.match(plan.skipped.find((s) => s.name.endsWith('browser')).reason, /manual job/);
+  assert.match(plan.skipped.find((s) => s.name.endsWith('browser')).reason, /manual or tag-only job/);
+  assert.match(plan.skipped.find((s) => s.name.endsWith(':release')).reason, /tag-only job/, 'the GitHub Release job runs only on a pushed tag, never in the parity container');
+  assert.equal(plan.steps.some((s) => s.name.includes('GitHub Release')), false);
   assert.match(plan.skipped.find((s) => s.name.includes('GITHUB_OUTPUT') || s.name.includes('apps=')).reason, /plumbing/);
 });
 
@@ -443,6 +446,22 @@ test('L4: a test-world package in the checkout is built after the installs and b
   const old = new Date(Date.now() - 60_000);
   fs.utimesSync(built, old, old);
   assert.match(testWorldDistProblem(producer), /older than its source/);
-  fs.utimesSync(built, new Date(), new Date());
+  const later = new Date(Date.now() + 5_000);
+  fs.utimesSync(built, later, later);
   assert.equal(testWorldDistProblem(producer), null);
+});
+
+test('a step that does work and then names an output runs, and the runner scratch variables exist in the container; a step that only echoes an output is plumbing', () => {
+  const doc = { jobs: { pack: { steps: [
+    { name: 'Pack', run: 'mkdir -p "$RUNNER_TEMP/pack"\nnpm pack --json > "$RUNNER_TEMP/npm-pack.json"\necho "tarball=x" >> "$GITHUB_OUTPUT"' },
+    { name: 'Verify', run: 'node check "$RUNNER_TEMP/npm-pack.json"' },
+    { name: 'Output', run: 'echo "apps=1" >> "$GITHUB_OUTPUT"' },
+    { name: 'Provide age', run: 'go install example.org/tool@v1\necho "$(go env GOPATH)/bin" >> "$GITHUB_PATH"' },
+  ] } } };
+  const plan = parityPlan({ workflows: [{ file: 'p.yml', doc }], apps: [] });
+  assert.deepEqual(plan.steps.map((s) => s.name.replace(/^.*?: /, '')), ['Pack', 'Verify']);
+  assert.match(plan.skipped[0].reason, /plumbing/);
+  assert.match(plan.skipped[1].reason, /toolchain/, 'a step that needs the runner image Go is left out, not failed for a missing binary');
+  const script = parityScript(plan);
+  assert.match(script, /export RUNNER_TEMP=\/tmp\/runner-temp GITHUB_OUTPUT=\S+ GITHUB_STEP_SUMMARY=/);
 });

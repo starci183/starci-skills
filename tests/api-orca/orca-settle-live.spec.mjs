@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { status as orcaStatus } from '../../scripts/api/orca/status.mjs';
 import { startAgent } from '../../scripts/agent/lib.mjs';
+import { liveLaunchTrust } from '../helpers/live-launch-trust.mjs';
 import { noopAgent, SETTLE_SMOKE_PROVIDERS } from '../../scripts/kernel/launch-smoke-models.mjs';
 import { workerOutput } from '../../scripts/machine/worker-output.mjs';
 import { workerShow } from '../../scripts/api/orca/worker-show.mjs';
@@ -28,7 +29,7 @@ const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 if (process.env.STARCI_ORCA_LIVE === '1' || process.env.STARCI_REQUIRE_ORCA_LIVE === '1') process.env.STARCI_OWNER_CONFIG_WITHIN = ROOT;
 const AGENTS = SETTLE_SMOKE_PROVIDERS;
 const AGENT_PROCESS_WHERE = "Name='claude.exe' OR Name='codex.exe' OR Name='devin.exe'";
-const NOOP_SPEC = `This is a smoke test. Do not read, edit, create or delete anything. Run exactly one shell command, with your own ids from your Orca worker preamble (your task id, your dispatch id, and your terminal handle as --from): node ${ROOT}scripts/api/orca/send.mjs --task-id <your task id> --dispatch-id <your dispatch id> --from <your terminal handle> --dispatch-capability <the dcap_ value of the --dispatch-capability flag in your Orca preamble> --outcome succeeded --report-path smoke . Do not send worker_done any other way. Then stay idle and never exit.`;
+const NOOP_SPEC = `This is a smoke test. Do not read, edit, create or delete anything. Run exactly one shell command, with your own ids from your Orca worker preamble (your task id, your dispatch id, and your terminal handle as --from): node ${ROOT}scripts/api/orca/send.mjs --task-id <your task id> --dispatch-id <your dispatch id> --from <your terminal handle> --outcome succeeded --report-path smoke . Add --dispatch-capability <its dcap_ value> only if your Orca preamble carries that flag; if it does not, run the command without it. Do not send worker_done any other way. Then stay idle and never exit.`;
 const SETTLED = ['succeeded', 'failed'];
 
 const unavailable = () => {
@@ -45,7 +46,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const agentPids = () => new Map((listHostProcesses({ where: AGENT_PROCESS_WHERE, timeoutMs: 30000 }) ?? []).map((p) => [p.pid, p]));
 
 // The runtime's one launch path (startAgent -> spawnAgent): pre-trusts the directory, so the first-run trust prompt
-// cannot hold the agent, creates the Run from this terminal, starts with --spec and attests the agent. The launch names
+// cannot hold the agent (the trust step runs on an environment without the test-runner marker: tests/helpers/live-launch-trust.mjs), creates the Run from this terminal, starts with --spec and attests the agent. The launch names
 // the cheapest priced tier member of the provider that meets the worker floors (noopAgent: the member modules/models/tiers.yaml
 // declares, its tier and effort), so the admission allow group is that one concrete member.
 async function startNoop(agent, label) {
@@ -54,9 +55,9 @@ async function startNoop(agent, label) {
   const started = startAgent({ provider: agent, model: member.model, effort: member.effort, role: 'worker', tier: member.tier,
     allowGroup: [{ provider: agent, model: member.model, pool: member.pool, effort: member.effort }],
     worktree: ROOT, title: `smoke settled ${label}`, prompt: NOOP_SPEC, objective: `smoke settled ${label}`,
-    entry: process.env.ORCA_TERMINAL_HANDLE, request: { smoke: 'settled', label, at: Date.now() } });
-  console.log(`SMOKE-START ${JSON.stringify({ label, member: `${member.model}/${member.effort ?? '-'}/${member.tier}`, ok: started.ok, dispatchId: started.dispatchId ?? null, runId: started.runId ?? null, step: started.step ?? null, error: started.error ?? null, refused: started.ok ? null : { detail: started.detail ?? null, rejected: started.decision?.rejected ?? null } })}`);
-  assert.ok(started.ok, `start ${agent}: ${started.error ?? started.step}${started.detail ? ` (${started.detail})` : ''}`);
+    io: { spawn: { trust: liveLaunchTrust } }, entry: process.env.ORCA_TERMINAL_HANDLE, request: { smoke: 'settled', label, at: Date.now() } });
+  console.log(`SMOKE-START ${JSON.stringify({ label, member: `${member.model}/${member.effort ?? '-'}/${member.tier}`, ok: started.ok, dispatchId: started.dispatchId ?? null, runId: started.runId ?? null, step: started.step ?? null, error: started.error ?? null, trust: started.trust ?? null, refused: started.ok ? null : { detail: started.detail ?? null, rejected: started.decision?.rejected ?? null } })}`);
+  assert.ok(started.ok, `start ${agent}: ${started.error ?? started.step}${started.detail ? ` (${started.detail})` : ''}${started.trust ? ` trust=${JSON.stringify({ status: started.trust.status, reason: started.trust.reason ?? null, errors: started.trust.errors ?? null })}` : ''}`);
   return started;
 }
 // Before any teardown: the dispatch id and the pane tail, so a stall (a trust prompt, a login) is diagnosable.
