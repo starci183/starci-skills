@@ -111,7 +111,7 @@ Every key and its allowed values are in [docs/config-format.md](docs/config-form
 
 ## Project status
 
-StarCi is on the alpha line `1.0.0-alpha.N`; the current source is `1.0.0-alpha.7`. Contracts are provisional.
+StarCi is on the alpha line `1.0.0-alpha.N`; the current source is `1.0.0-alpha.9`. Contracts are provisional.
 `1.0.0` means the two real workflows run smoothly from the goal to the handover, and then the contracts freeze.
 Today both stop at a design gate (`brand.decide`), and the cost of a decision leg is not yet measured against
 its budget. [CHANGELOG.md](CHANGELOG.md) lists what changed in each release and its "Known limitations".

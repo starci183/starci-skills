@@ -655,7 +655,7 @@ exit: 0 every assertion passed; 1 an assertion failed; 2 bad usage or the sandbo
 json: none
 
 ```sh
-starci gate install-sandbox --tarball starci-1.0.0-alpha.7.tgz
+starci gate install-sandbox --tarball starci-1.0.0-alpha.9.tgz
 ```
 
 ### starci gate read
@@ -2947,7 +2947,7 @@ exit: 0 the ci workflow of the release commit is green; 1 it is red (for a relea
 json: flag
 
 ```sh
-starci release ci-status --tag v1.0.0-alpha.8 --wait
+starci release ci-status --tag v1.0.0-alpha.9 --wait
 starci release ci-status --json
 ```
 
@@ -2990,9 +2990,9 @@ json: flag
 
 ```sh
 starci release cut
-starci release cut --plan --tag v1.0.0-alpha.7
-starci release cut --tag v1.0.0-alpha.7 --rows "npm test,linux-parity"
-starci release cut --repo <path> --tag v1.0.0-alpha.7 --json
+starci release cut --plan --tag v1.0.0-alpha.9
+starci release cut --tag v1.0.0-alpha.9 --rows "npm test,linux-parity"
+starci release cut --repo <path> --tag v1.0.0-alpha.9 --json
 ```
 
 ### starci release env-test
@@ -3097,8 +3097,8 @@ exit: 0 the notes were printed or written; 1 the CHANGELOG has no finished secti
 json: starci/release-notes@1
 
 ```sh
-starci release notes --tag v1.0.0-alpha.7
-starci release notes --tag v1.0.0-alpha.7 --out notes.md --json
+starci release notes --tag v1.0.0-alpha.9
+starci release notes --tag v1.0.0-alpha.9 --out notes.md --json
 ```
 
 ### starci release proof

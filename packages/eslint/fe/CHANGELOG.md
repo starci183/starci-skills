@@ -2,7 +2,7 @@
 
 ## 8.2.0 - 2026-10-09
 
-- Changed: the bundled runtime copies (engine config, architecture machine, slot manifest, canon pins, failure codes) follow the runtime of 1.0.0-alpha.8; no rule is added or removed. Version 8.1.0 on the registry carries the copies of an earlier runtime.
+- Changed: the bundled runtime copies (engine config, architecture machine, slot manifest, canon pins, failure codes) follow the runtime of 1.0.0-alpha.9; no rule is added or removed. Version 8.1.0 on the registry carries the copies of an earlier runtime.
 
 ## 8.1.0 - 2026-10-08
 
