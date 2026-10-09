@@ -947,3 +947,24 @@ cases:
     rule: {file: scripts/reconciler/engine-process.mjs, anchor: "ensureRuntimeCopies"}
     spec: tests/reconciler/engine-start-recovery.spec.mjs
     status: covered
+  - id: runtime-critic-launched-without-a-sender-terminal
+    family: power-lifecycle
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a runtime-owed proof can be produced) after the deploy of 4b8dbfde3 the settler ran the Critic for Nivo op-architecture.decide-e78adc94cc eight times in 15 minutes (runtime-critic-run events 737, 742, 753, 761, 773, 783, 787, 791, all hold CRITIC_UNAVAILABLE) because Orca refused the Critic's run-create: no_active_sender_terminal, the settler child having no terminal of its own to send from; each hold left the old handover op-critic-verdict-missing standing, so the Kernel menu kept offering settle-fail, continue and accept, which cannot work (the settle-fail of 11:53 reverted with workflow-reset-failed), the Kernel was woken every minute for an item it could only yield on, and two Kernels were rotated after 8 empty wakes each (events 725, 756; attempts 8 and 9); the StarCi Kernel rotated the same way after it chose none-fits on its own unusable item (events 2647, 2654)", remedy: {state: in-tree, change: "the settler launches the runtime Critic from the workflow's Kernel terminal (kernelTerminalOf); a handed-over job whose refusal is the Critic verdict, or that the settler has held for a checker that could not run since the handover, is the runtime's and not on the Kernel menu; an item the Kernel hands up with none-fits is not asked again inside the snooze"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo and StarCi Kernels", evidence: "nivo runtime.sqlite events 737 to 791 (runtime-critic-run hold, job-settle-check-unavailable try 1 to 8), 725 and 756 (kernel-rotated 8 wakes), 768 to 771 (settle-fail revert workflow-reset-failed); starci events 2643 to 2654"}
+    rule: {file: scripts/kernel/settle/critic-run.mjs, anchor: "kernelTerminalOf"}
+    spec: tests/kernel-settle/runtime-critic.spec.mjs
+    status: covered
+  - id: op-contract-checks-not-rerunnable
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: the settler re-runs the checks an op's contract demands) StarCi op-brand.decide-8bd6f3374d (try 6), the first done report of brand.decide (tries 1 to 5 were ask or blocked), declared the two checks its contract names, work brand --stage decide and work shell-conformance; the classifier knew only runtime validate, scripts/checks/*.mjs and work graph, so both read foreign (not-a-check-script: packages/cli/bin/starci.mjs) and the report was handed over as check-not-reverifiable (events 2626, 2665): a runtime bug, not the op's, since the op did exactly what its contract says", remedy: {state: in-tree, change: "starci work brand and starci work shell-conformance, in the starci and node spellings, are re-runnable read-only checks (WORK_CHECK_SCRIPTS: verb to impl script); a mutating flag still makes a check foreign"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi job op-brand.decide-8bd6f3374d", evidence: "starci runtime.sqlite events 2626 and 2665 (job-settle-needs-kernel check-not-reverifiable, detail brand-final and shell-final not-a-check-script)"}
+    rule: {file: scripts/kernel/settle/check-command.mjs, anchor: "WORK_CHECK_SCRIPTS"}
+    spec: tests/kernel-settle/handover-rejudge.spec.mjs
+    status: covered
+  - id: budget-overrun-item-of-a-reported-job-stays-open
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an item lives while it can be answered) di-758483cb, the budget-overrun item of a running attempt ('the job is running and still running'), stayed open on the Kernel's list after the job reported at 11:34:30 (the Kernel's let-finish decision, events 2627 and 2628, only snoozed it)", remedy: {state: in-tree, change: "the item of a running attempt (subject attempt-N-running) lives while its job runs, so the sweep closes it when the job reports; the item of a settled attempt lives until a later try exists"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi", evidence: "starci decision_items di-758483cb open with job op-brand.decide-8bd6f3374d reported"}
+    rule: {file: scripts/machine/decision-resolution.mjs, anchor: "budgetOverrunLive"}
+    spec: tests/machine/budget-overrun-liveness.spec.mjs
+    status: covered

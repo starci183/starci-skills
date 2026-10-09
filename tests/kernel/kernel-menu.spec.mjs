@@ -226,6 +226,9 @@ test('none-fits records the reason and escalates the item\'s Decision Item to th
   assert.equal(JSON.parse(r.stdout).escalated, di.id);
   const row = withReader(world, (db) => listDecisions(db, { workflowId: WF, all: true }).find((d) => d.id === di.id));
   assert.deepEqual([row.status, row.escalateTo], ['escalated', 'supervisor']);
+  const after = status(world);
+  assert.deepEqual(after.menu, [], 'an item the Kernel handed up is not asked again inside the snooze: the wake of an unanswerable item rotated two Kernels in 30 minutes');
+  assert.equal(after.frontier.actionable, false);
 }));
 
 test('none-fits on an item without a Decision Item opens the Supervisor\'s menu-escape item', (t) => withLedger(t, (world) => {

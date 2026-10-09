@@ -45,7 +45,7 @@ const deadWaitsOf = (s) => [
 /** The item ids a chosen wait still holds back. */
 function snoozedOf(s) {
   const since = s.now - snoozeMs();
-  return new Set(decisionsOf(s.db, s.workflowId).filter((d) => d.menu?.choice === 'keep-waiting' && d.at > since).map((d) => d.menu.item));
+  return new Set(decisionsOf(s.db, s.workflowId).filter((d) => ['keep-waiting', 'none-fits'].includes(d.menu?.choice) && d.at > since).map((d) => d.menu.item));
 }
 
 /** The defect the owner reported on the handover ({title, slices}); null unless the answer is feedback. */
