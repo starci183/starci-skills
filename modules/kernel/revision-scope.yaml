@@ -101,10 +101,14 @@ rows:
     why: "the menu a Kernel answers and the policy rows behind it; the Supervisor rules on the gates they raise"
     paths: [modules/kernel/kernel-menu.yaml, modules/kernel/op-incident-policy.yaml]
     roles: {kernel: contract, supervisor: reread, engine: restart}
-  - id: kernel-cli
-    why: "the verbs a Kernel is taught"
-    paths: ["modules/cli/commands/kernel/**"]
+  - id: kernel-cli-seat
+    why: "the verbs a Kernel seat can run (command-policy.yaml kernel.verbs.kernel) and the group file: the contracts it reads at boot (scripts/kernel/required-read.mjs)"
+    paths: [modules/cli/commands/kernel/_group.yaml, modules/cli/commands/kernel/status.yaml, modules/cli/commands/kernel/logs.yaml, modules/cli/commands/kernel/questions.yaml, modules/cli/commands/kernel/messages.yaml, modules/cli/commands/kernel/survey.yaml, modules/cli/commands/kernel/hierarchy.yaml, modules/cli/commands/kernel/artifacts.yaml, modules/cli/commands/kernel/coverage.yaml, modules/cli/commands/kernel/usage.yaml, modules/cli/commands/kernel/observe.yaml, modules/cli/commands/kernel/peers.yaml, modules/cli/commands/kernel/foundations.yaml, modules/cli/commands/kernel/extensions.yaml, modules/cli/commands/kernel/decisions.yaml, modules/cli/commands/kernel/inbox.yaml, modules/cli/commands/kernel/log.yaml, modules/cli/commands/kernel/decide.yaml, modules/cli/commands/kernel/kernel-ack-rev.yaml, modules/cli/commands/kernel/revision-ack.yaml]
     roles: {kernel: reread}
+  - id: kernel-cli
+    why: "the verbs the controllers run for the Kernel: read when a command starts, not by the seat"
+    paths: ["modules/cli/commands/kernel/**"]
+    roles: {}
   - id: supervisor-cli
     why: "the verbs the Supervisor is taught"
     paths: ["modules/cli/commands/supervisor/**"]

@@ -18,7 +18,9 @@ test('a read manifest over the inline event bound is attested, kept whole in the
   const saved = process.env.STARCI_KERNEL_REV_ROOT;
   process.env.STARCI_KERNEL_REV_ROOT = w.runtime;
   try {
-    for (let i = 0; i < 160; i += 1) w.write(`modules/cli/commands/kernel/extra-${i}.yaml`, `verb: fixture-${i}`);
+    // a leg whose brief cites 160 schema files: the read plan of that leg names every one
+    for (let i = 0; i < 160; i += 1) w.write(`modules/schemas/big-${i}.yaml`, `id: big-${i}`);
+    w.write('modules/ops/ops/review.verify.yaml', Array.from({ length: 160 }, (_, i) => `modules/schemas/big-${i}.yaml`).join(String.fromCodePoint(10)));
     w.git('add', '-A');
     w.git('commit', '-qm', 'a large read plan');
     const required = kernelReadManifest(w.ledger.db, w.workflowId, options(w));
@@ -29,7 +31,8 @@ test('a read manifest over the inline event bound is attested, kept whole in the
     const admitted = callerAdmission(w.ledger, args, { env: { ...process.env, ORCA_TERMINAL_HANDLE: w.handle }, root: w.runtime });
     admitted.run(() => ackRev.run({ ledger: w.ledger, args, caller: admitted.caller, emit() {} }));
     const row = w.ledger.db.prepare("SELECT payload_json, payload_sha FROM events WHERE kind='runtime-rev-acked' ORDER BY seq DESC LIMIT 1").get();
-    assert.equal(row.payload_json, null, 'the row keeps no inline JSON');
+    assert.equal(JSON.parse(row.payload_json).spilled, true, 'the row keeps a bounded inline view of the scalars');
+    assert.equal(JSON.parse(row.payload_json).rev, required.rev);
     assert.match(row.payload_sha, /^[0-9a-f]{64}$/);
     assert.equal(eventPayloadOf(row).readManifest.digest, required.digest, 'the whole manifest is behind the sha');
     assert.deepEqual(unreadFiles(w.ledger.db, w.workflowId, required), [], 'the admission reads the attestation back');

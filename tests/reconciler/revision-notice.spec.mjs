@@ -109,7 +109,7 @@ test('a revision that moves again before the seat acked is a new change from the
 test('an attestation of 500 files stays far under the 16 KB event limit: the record carries a hash and a count, the list lives in the blob store', (t) => {
   const w = world(t);
   const many = {};
-  for (let i = 0; i < 500; i += 1) many[`modules/cli/commands/kernel/extra-${i}.yaml`] = `verb: fixture-${i}\n`;
+  for (let i = 0; i < 500; i += 1) many[`modules/models/extra-${i}.yaml`] = `model: fixture-${i}\n`;
   w.repo.commit('five hundred verbs', many);
   const seat = w.kernel();
   const { notice, manifest } = planRead(seat);

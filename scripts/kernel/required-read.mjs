@@ -1,6 +1,8 @@
 // required-read.mjs — the server-derived Kernel READ set and actual deployed bytes.
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256 } from '../../engine/digest.mjs';
 import { contractFilesOf, runtimeShaOf } from '../machine/contract-version.mjs';
 import { statusQuery } from '../api/git/status-query.mjs';
@@ -9,7 +11,14 @@ import { ENGINE_SCHEMA } from '../../engine/constants.mjs';
 import { eventPayloadOf } from '../../engine/db/event-payload.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 export const KERNEL_BOOT_FILES = Object.freeze(['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml']);
-export const KERNEL_CONTRACT_FILES = Object.freeze([...KERNEL_BOOT_FILES, 'modules/kernel/api.yaml', 'modules/cli/commands/kernel', 'modules/kernel/owner-rulings.yaml']);
+const POLICY_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'kernel', 'command-policy.yaml');
+const VERB_CONTRACTS = 'modules/cli/commands/kernel/';
+/**
+ * The verb contracts a Kernel seat reads: the group file and the verbs its seat table lets it run (command-policy.yaml kernel.verbs.kernel). The other verbs of the group are the
+ * runtime's, run by the controllers; their contracts are not the seat's to read, and requiring the whole directory made a fresh life read 55 contract files and spend about two million tokens before its first wake.
+ */
+const seatVerbContracts = () => ['_group', ...(parseYaml(fs.readFileSync(POLICY_FILE, 'utf8'))?.kernel?.verbs?.kernel ?? [])].map((verb) => `${VERB_CONTRACTS}${verb}.yaml`);
+export const KERNEL_CONTRACT_FILES = Object.freeze([...KERNEL_BOOT_FILES, 'modules/kernel/api.yaml', ...seatVerbContracts(), 'modules/kernel/owner-rulings.yaml']);
 const OP_PROMPT_FILE = 'scripts/kernel/op-prompt.mjs';
 const KERNEL_READ_SCHEMA = 'starci/kernel-required-read@1';
 const refuse = detail => Object.assign(new Error(detail), { code: 'kernel-read-unverified' });
@@ -53,7 +62,9 @@ const gitRevision = (root) => {
 export function kernelReadManifest(db, workflowId, { root, authority, ops = [], clean = true, status = statusQuery } = {}) {
   try {
     const requiredOps = [...new Set([...db.prepare('SELECT DISTINCT op_id FROM jobs WHERE workflow_id=? AND op_id IS NOT NULL').all(workflowId).map(row => row.op_id), ...ops])].sort(byCodeUnit);
-    const paths = [...KERNEL_CONTRACT_FILES, ...requiredOps.flatMap(op => contractFilesOf(root, op)), ...(requiredOps.length ? [OP_PROMPT_FILE] : [])];
+    // A verb contract the tree does not carry is not required (an installed tree ships the verbs it has); every other contract file absent refuses.
+    const present = (relative) => !relative.startsWith(VERB_CONTRACTS) || fs.existsSync(path.join(root, relative));
+    const paths = [...KERNEL_CONTRACT_FILES.filter(present), ...requiredOps.flatMap(op => contractFilesOf(root, op)), ...(requiredOps.length ? [OP_PROMPT_FILE] : [])];
     const installed = !fs.existsSync(path.join(root,'.git'));
     const files = new Set([...paths, ...(installed ? ['package.json','engine/constants.mjs'] : [])].flatMap(relative => expand(root, relative)));
     const rows = [...files].sort(byCodeUnit).map(relative => {
