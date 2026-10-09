@@ -5,7 +5,7 @@
 // The Edit and Write tools reach the verdict file only; on Claude and Devin the Read, Grep and Glob tools reach the directory only.
 // Every other command, path or tool is refused with RIGHTS_CRITIC_REACH.
 import path from 'node:path';
-import { pathKey, sameOrUnder } from '../lib/path-key.mjs';
+import { pathKey, sameOrUnder, slash } from '../lib/path-key.mjs';
 import { refusal } from './rights.mjs';
 
 export const CRITIC_REACH_CODE = 'RIGHTS_CRITIC_REACH';
@@ -38,7 +38,7 @@ function readReach({ program, args, cwd, guard }) {
   const dir = guard.reach.dir;
   if (!inside(cwd, dir)) return cwd;
   const words = TEXT_PROGRAMS.has(program) ? args.map(String).filter((word) => expands(word, program)) : pathWords(args);
-  return words.find((word) => expands(word, program) || (!TEXT_PROGRAMS.has(program) && !readable(path.resolve(cwd, word), guard))) ?? null;
+  return words.find((word) => expands(word, program) || (!TEXT_PROGRAMS.has(program) && !readable(path.resolve(cwd, slash(word)), guard))) ?? null;
 }
 
 /** The target path a writer program names: the -Path/-FilePath value, else its first non-option word. */
