@@ -1259,4 +1259,10 @@ cases:
     met: {date: "2026-10-09", where: "alpha.8 live 13:54, Nivo workflow tree", evidence: "the file 0 at the root of the Nivo workflow tree (the -2 placement), created 13:12:46"}
     rule: {file: scripts/guards/kernel-seat.mjs, anchor: "kernelRedirectVerdict"}
     spec: tests/guards/kernel-seat.spec.mjs
+  - id: kernel-life-reads-the-contracts-of-verbs-it-cannot-run
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a fresh Kernel life reads what it needs and no more) the required READ of a Kernel life named the whole modules/cli/commands/kernel directory (55 verb contracts, 84 to 103 files with the leg contracts), although the seat table lets it run 18 verbs: the other contracts describe verbs the controllers run; the boot read of the Nivo life 13 was 19 turns and about 1.75 million tokens before its first wake (the cache re-reads the growing context every turn), and any change to a runtime-owned verb contract marked every Kernel rev stale", remedy: {state: in-tree, change: "the required READ and the revision drift name the group file and the contracts of the verbs of the seat table (command-policy.yaml kernel.verbs.kernel) instead of the directory, 22 files instead of 55"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo and StarCi workflows", evidence: "nivo runtime.sqlite events 900 to 909 (kernel-usage-recorded under the boot tag w900: 1.3 million tokens at turn 19); the plan on the copy lists 103 files for interface.draw"}
+    rule: {file: scripts/kernel/required-read.mjs, anchor: "seatVerbContracts"}
+    spec: tests/kernel/required-read.spec.mjs
     status: covered
