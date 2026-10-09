@@ -45,7 +45,7 @@ const fixture = (t) => {
     fs.writeFileSync(file, text);
   };
   put('modules/cli/commands/_global.yaml', GLOBAL_YAML);
-  put('modules/cli/commands/demo/_group.yaml', 'group: demo\nsummary: fixture verbs\nowner: runtime\n');
+  put('modules/cli/commands/demo/_group.yaml', 'group: demo\nsummary: fixture verbs\nowner: runtime\nruntimeSide: host\n');
   put('modules/cli/commands/demo/ok.yaml', verbYaml({
     verb: 'ok', module: 'ok.mjs', exported: 'runOk', effect: 'host', roles: '[lead, owner]',
     conventions: 'run this fixture in its isolated temp directory',

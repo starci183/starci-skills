@@ -18,7 +18,6 @@
 // An Orca outage (runtime_unavailable, orca.exe ENOENT) is host-unavailable: waited out and re-verified, never a
 // restart (scripts/kernel/host-outage.mjs). The cadence is the Host controller's (modules/reconciler/host.yaml).
 
-import { byCodeUnit } from '../lib/list.mjs';
 import '../api/process/hide-child-windows.mjs';
 import path from 'node:path';
 import { runNode } from '../api/node/run-node.mjs';
@@ -40,6 +39,7 @@ import { stopAndRelease } from '../machine/worker-close.mjs';
 // worker-show states that end a worker (start-workflow.mjs MANAGED_DEAD_STATE).
 const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
 import { jsonFromStdout, parseJsonOr } from '../lib/json.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 import { currentRuntimeRev, revRootOf } from './runtime-rev.mjs';
 import { revisionWakeLine } from './kernel-notice.mjs';
 import { openDecisionRow } from '../machine/decisions.mjs';
