@@ -98,7 +98,7 @@ measures:
 # present in `at`, so a gate that is renamed away is found.
 ownerGates:
   handover.review: {at: scripts/kernel/handover.mjs, anchor: "handover-approved", what: "a pass settles only on the owner's approve receipt for the latest handover ask"}
-  interface.draw: {at: scripts/work/draw-review.mjs, anchor: "DRAW_REVIEW_DECISIONS", what: "a drawing is done only on the owner's accept answer to its draw-review ask"}
+  interface.draw: {at: scripts/work/draw-review.mjs, anchor: "starci/draw-review@1", what: "a drawing is done only on the owner's accept answer to its draw-review ask"}
   brand.decide: {at: scripts/work/brand-direction.mjs, anchor: "brand-direction-review", what: "the brand direction is ready only on the owner's own receipt for the current revision"}
   decision.prepare: {at: modules/kernel/op-incident-policy.yaml, anchor: "ask-owner", what: "the runtime carries the recommendation and the owner overturns it with workflow-answer"}
   provision.ask: {at: modules/kernel/op-incident-policy.yaml, anchor: "ask-owner", what: "the owner supplies the credential, account, dataset or go-ahead the op names"}
