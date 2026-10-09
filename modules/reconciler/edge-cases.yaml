@@ -1083,7 +1083,7 @@ cases:
   - id: kernel-shell-redirect-leaves-a-stray-file-in-the-workflow-tree
     family: authority-safety
     finding: {role: kernel, duty: does, verdict: departs, evidence: "(duty: the Kernel writes no file; its shell is starci and pure reads) a Kernel redirected the output of a log read into a file named 0 in the root of its workflow tree (91 bytes, 13:12:46; the content is a starci logs JSON row); the seat guard judged each command but never the redirection, so the stray stood and made every later settle-fail of the tree unrecoverable", remedy: {state: in-tree, change: "the seat guard refuses a call that redirects output into a file (KERNEL_NO_FILE_WRITE), naming the reads that need none; the null devices and stream merges (2>&1) stay allowed. A stray that already stands is covered by the fail-decision recovery (onlyStrayIsNewer)"}}
-    met: {date: "2026-10-09", where: "alpha.8 live 13:54, Nivo workflow tree", evidence: "the file 0 at the root of D:/orca/nivo-monorepo/wf-wf-nivo-auth-test-workflow-muxq1xov-2, created 13:12:46"}
+    met: {date: "2026-10-09", where: "alpha.8 live 13:54, Nivo workflow tree", evidence: "the file 0 at the root of the Nivo workflow tree (the -2 placement), created 13:12:46"}
     rule: {file: scripts/guards/kernel-seat.mjs, anchor: "kernelRedirectVerdict"}
     spec: tests/guards/kernel-seat.spec.mjs
     status: covered
