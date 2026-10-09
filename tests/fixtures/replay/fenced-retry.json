@@ -1,0 +1,41 @@
+{
+ "schema": "replay-fixture@1",
+ "case": "fenced-retry",
+ "source": {
+  "copy": "a8live10"
+ },
+ "workflow": {
+  "id": "wf-1",
+  "phase": "running",
+  "goalRevision": 0
+ },
+ "jobs": [
+  {
+   "id": "job-1",
+   "op": "architecture.decide",
+   "status": "failed",
+   "owned": [
+    "own-1"
+   ],
+   "provider": "claude",
+   "result": {
+    "verdict": "fail"
+   }
+  },
+  {
+   "id": "job-2",
+   "op": "architecture.decide",
+   "status": "queued",
+   "owned": [
+    "own-1"
+   ],
+   "unit": "job-1",
+   "tryNo": 2,
+   "retryOf": "job-1"
+  }
+ ],
+ "live": {
+  "fencedRefusals": 3,
+  "retryStatus": "ready"
+ }
+}

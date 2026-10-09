@@ -16,7 +16,13 @@ const WORKFLOW = 'wf-1';
 const parse = (text) => { try { return JSON.parse(text); } catch { return null; } };
 // Every handle a recipe opens is closed when its extraction ends (a leaked handle holds the copy open on Windows).
 const opened = [];
-const openLedger = (copy, name) => { const db = new DatabaseSync(path.join(copy, name, 'runtime.sqlite'), { readOnly: true }); opened.push(db); return db; };
+/** The ledger file of `name` in a copy: `<name>/runtime.sqlite`, else the newest `<name>-monorepo-*.sqlite` beside it (a later copy of the same ledger). */
+function ledgerFileOf(copy, name) {
+  const nested = path.join(copy, name, 'runtime.sqlite');
+  const flat = fs.readdirSync(copy).filter((entry) => entry.startsWith(`${name}-monorepo-`) && entry.endsWith('.sqlite')).sort().at(-1);
+  return flat ? path.join(copy, flat) : nested;
+}
+const openLedger = (copy, name) => { const db = new DatabaseSync(ledgerFileOf(copy, name), { readOnly: true }); opened.push(db); return db; };
 const rows = (db, sql, ...args) => db.prepare(sql).all(...args);
 const first = (db, sql, ...args) => db.prepare(sql).get(...args) ?? null;
 const countOf = (db, sql, ...args) => Number(first(db, sql, ...args).n);
@@ -125,7 +131,33 @@ function preparedFail(copy) {
     live: { failedRewinds, checkpointsBehind: checkpoints } };
 }
 
-const RECIPES = { 'leg-ready': legReady, 'read-plan': readPlan, 'shape-guard': shapeGuard, 'handed-over': handedOver, 'prepared-fail': preparedFail };
+/** Case g: a ready retry whose worker-start the host refused consumer_fenced three times, which excluded every pool. */
+function fencedRetry(copy) {
+  const db = openLedger(copy, 'nivo');
+  const fences = rows(db, "SELECT entity_id FROM events WHERE kind='dispatch-rejected' AND payload_json LIKE '%consumer_fenced%' ORDER BY seq");
+  const retry = first(db, 'SELECT * FROM jobs WHERE job_id=?', fences[0].entity_id);
+  const failed = first(db, 'SELECT * FROM jobs WHERE job_id=?', retry.retry_of);
+  const ids = new Pseudonyms();
+  for (const row of [failed, retry]) ids.id('job', row.job_id);
+  const failedJob = jobOf(ids, failed, { owned: ['own-1'], provider: 'claude', result: { verdict: 'fail' } });
+  // The live job stood ready after its first refused launches; the replay starts at the queued job and lets the runtime refuse it.
+  const retryJob = jobOf(ids, retry, { status: 'queued', owned: ['own-1'], unit: failedJob.id, tryNo: retry.try_no, retryOf: failedJob.id });
+  return { workflow: { id: WORKFLOW, phase: 'running', goalRevision: 0 }, jobs: [failedJob, retryJob], live: { fencedRefusals: fences.length, retryStatus: retry.status } };
+}
+
+/** Case h: a ready interface op refused grammar-context-missing while the brand record sat in the workflow tree. */
+function grammarInTree(copy) {
+  const db = openLedger(copy, 'starci');
+  const refused = eventsOf(db, 'kernel-dispatch-push').find((e) => e.p.results?.some((r) => String(r.error).startsWith('grammar-context-missing')));
+  const job = first(db, 'SELECT * FROM jobs WHERE job_id=?', refused.p.results[0].jobId);
+  const brand = first(db, "SELECT * FROM jobs WHERE op_id='brand.decide' AND status='succeeded' ORDER BY created_at DESC");
+  const ids = new Pseudonyms();
+  const brandJob = jobOf(ids, brand, { owned: ['own-9'] });
+  const drawJob = jobOf(ids, job, { owned: ['own-1'], params: Object.fromEntries(Object.entries(parse(job.payload_json).params ?? {}).filter(([, value]) => typeof value === 'number')) });
+  return { workflow: { id: WORKFLOW, phase: 'running', goalRevision: 0 }, jobs: [brandJob, drawJob], tree: { brand: true }, live: { refusedPushes: eventsOf(db, 'kernel-dispatch-push').filter((e) => e.p.results?.some((r) => String(r.error).startsWith('grammar-context-missing'))).length, drawStatus: job.status } };
+}
+
+const RECIPES = { 'fenced-retry': fencedRetry, 'grammar-in-tree': grammarInTree, 'leg-ready': legReady, 'read-plan': readPlan, 'shape-guard': shapeGuard, 'handed-over': handedOver, 'prepared-fail': preparedFail };
 export const CASES = Object.freeze(Object.keys(RECIPES));
 
 /** The fixture document of `name` extracted from `copy`; the source names the copy neutrally. */
