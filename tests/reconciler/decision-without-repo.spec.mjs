@@ -3,11 +3,13 @@
 // where it is applied (ctx.openDecision, the one place every controller's item passes), with decision-item-without-repo.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import os from 'node:os';
+import path from 'node:path';
 import { createCtx } from '../../scripts/reconciler/ctx.mjs';
 import { DECISION_WITHOUT_REPO, decisionRepoRefusal } from '../../scripts/reconciler/decision-repo.mjs';
 import { planSupervisorGates } from '../../scripts/reconciler/gate-plan.mjs';
 
-const LEDGERS = [{ ledgerId: 'led-1111', name: 'nivo-monorepo', repo: '/work/nivo-monorepo', file: '/x/runtime.sqlite' }, { ledgerId: 'led-2222', name: 'no-repo', repo: null, file: '/y/runtime.sqlite' }];
+const LEDGERS = [{ ledgerId: 'led-1111', name: 'nivo-monorepo', repo: '/work/nivo-monorepo', file: path.join(os.tmpdir(), 'starci-decision-without-repo', 'runtime.sqlite') }, { ledgerId: 'led-2222', name: 'no-repo', repo: null, file: path.join(os.tmpdir(), 'starci-decision-without-repo', 'second.sqlite') }];
 const GATE = { incidentId: 'inc-1', subject: 'gate-op', cause: 'op-gate-tool-failed', holds: ['op-1'], handler: 'supervisor', step: 1, steps: 3 };
 
 /** The items planSupervisorGates plans for a ledger id, through the planner's own `di` seam shaped like the workflow planner's. */

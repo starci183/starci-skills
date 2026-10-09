@@ -72,13 +72,17 @@ export const loadFixture = (name) => JSON.parse(fs.readFileSync(path.join(FIXTUR
 /** The neutral path an opaque fixture token (`d1.sds`) stands for in the work tree: dots are path separators under `.starciwork/features`. */
 export const ownedPathOf = (token) => `.starciwork/features/${String(token).split('.').join('/')}`;
 
-/** Files of the runtime root that make the Kernel's read plan: `count` neutral files of about `pathBytes` characters of path under the real read-plan directory. */
+/**
+ * Files of the runtime root that make the Kernel's read plan: `count` neutral files of about `pathBytes` characters of path, in a directory the brief of an op cites (contractFilesOf): the read
+ * plan of a Kernel no longer holds the verb contracts it cannot run, so the plan grows with the legs it names.
+ */
 function planFiles({ count, pathBytes = 40, from = 0 }) {
-  const dir = 'modules/cli/commands/kernel';
+  const dir = 'modules/schemas';
   const pad = Math.max(0, Number(pathBytes) - dir.length - 12);
   return Array.from({ length: Number(count) }, (_, i) => [`${dir}/v${String(from + i).padStart(3, '0')}${'x'.repeat(pad)}.yaml`, `verb: replay-${from + i}\n`]);
 }
 
+const SEAT_CONTRACT = 'modules/cli/commands/kernel/status.yaml';
 const KERNEL_FILES = { 'modules/kernel/kernel-prompt.md': 'Kernel prompt\n', 'modules/kernel/driver-loop.yaml': 'tick: survey\n', 'modules/kernel/api.yaml': 'schema: replay\n',
   'modules/kernel/owner-rulings.yaml': 'rulings: []\n', 'modules/kernel/verdict-contract.yaml': 'verdict: pass\n', 'modules/ops/_common.yaml': 'common: replay\n', 'scripts/kernel/op-prompt.mjs': 'export {};\n' };
 
@@ -90,12 +94,16 @@ function runtimeRoot(dir, fixture) {
   const scope = path.join(ROOT, 'modules', 'kernel', 'revision-scope.yaml');
   if (fs.existsSync(scope)) write(dir, 'modules/kernel/revision-scope.yaml', fs.readFileSync(scope, 'utf8'));
   const ops = new Set([...(fixture.ops ?? ['review.verify']), ...(fixture.jobs ?? []).map((job) => job.op), ...(fixture.plan?.legs ?? []).map((leg) => leg.op)]);
-  for (const op of ops) write(dir, `modules/ops/ops/${op}.yaml`, `id: ${op}\n`);
+  const neutral = [];
   // The read plan's size is the fixture's: `readPlan.total` files in all (the fixed Kernel files and the op files count), the rest neutral verb files.
   const fixed = Object.keys(KERNEL_FILES).length + ops.size;
   const plan = fixture.runtime?.readPlan ?? { total: fixed + 3 };
-  for (const [rel, text] of planFiles({ count: Math.max(0, plan.total - fixed), pathBytes: plan.pathBytes })) write(dir, rel, text);
-  return { runtime: dir, revs: [commit(dir, 'revision 1')], plan, fixed };
+  for (const [rel, text] of planFiles({ count: Math.max(0, plan.total - fixed - 1), pathBytes: plan.pathBytes })) { write(dir, rel, text); neutral.push(rel); }
+  // the one verb contract a Kernel seat reads that the revision under test touches (a revision of the Kernel's contracts is what makes its attestation stale)
+  write(dir, SEAT_CONTRACT, 'verb: status\n');
+  // the first op's brief cites the neutral files, so the Kernel's read plan for that op names every one
+  [...ops].forEach((op, index) => write(dir, `modules/ops/ops/${op}.yaml`, `id: ${op}\n${index === 0 ? neutral.map((rel) => `${rel}\n`).join('') : ''}`));
+  return { runtime: dir, revs: [commit(dir, 'revision 1')], plan, fixed, neutral, firstOp: [...ops][0] };
 }
 
 /** The neutral sentence that makes the runtime's cause matcher (progress-rca causesOf) read a report as `cause`; the extractor verified the live report gave that cause. */
@@ -188,7 +196,7 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
   gitInit(repo);
   write(repo, '.gitignore', '.starciwork/\n');
   commit(repo, 'init');
-  const { runtime, revs, plan: readPlan, fixed } = runtimeRoot(path.join(base, 'runtime'), fixture);
+  const { runtime, revs, plan: readPlan, fixed, neutral, firstOp } = runtimeRoot(path.join(base, 'runtime'), fixture);
   const stub = path.join(base, 'fake-orca.mjs');
   fs.writeFileSync(stub, FAKE_ORCA);
   fs.mkdirSync(path.join(base, 'memo'), { recursive: true });
@@ -273,8 +281,11 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
   world.orca = () => { try { return JSON.parse(fs.readFileSync(env.STARCI_FAKE_ORCA_STATE, 'utf8')); } catch { return {}; } };
   world.status = () => { const r = world.cli('status', ['--workflow', wf]); assert.equal(r.status, 0, `status: ${r.stderr || r.stdout}`); return r.json; };
   /** The runtime revision whose read plan has grown to the fixture's `grownTotal` files (the revision that outgrew the inline event bound). */
-  world.growReadPlan = () => world.reviseRuntime(Object.fromEntries(planFiles({ count: readPlan.grownTotal - readPlan.total, pathBytes: readPlan.pathBytes, from: readPlan.total - fixed })),
-    'revision with a larger read plan');
+  world.growReadPlan = () => {
+    const grown = planFiles({ count: readPlan.grownTotal - readPlan.total, pathBytes: readPlan.pathBytes, from: readPlan.total - fixed });
+    neutral.push(...grown.map(([rel]) => rel));
+    return world.reviseRuntime({ ...Object.fromEntries(grown), [SEAT_CONTRACT]: 'verb: status\nrevision: 2\n', [`modules/ops/ops/${firstOp}.yaml`]: `id: ${firstOp}\n${neutral.map((rel) => `${rel}\n`).join('')}` }, 'revision with a larger read plan');
+  };
   /** The runtime revision changes here: `files` ({rel: text}) are written and committed in the runtime root. Answers the new revision. */
   world.reviseRuntime = (files = {}, message = `revision ${revs.length + 1}`) => {
     for (const [rel, text] of Object.entries(files)) write(runtime, rel, text);
