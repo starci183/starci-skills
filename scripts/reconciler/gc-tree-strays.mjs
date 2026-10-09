@@ -6,7 +6,6 @@ import { claimDue, finishDuty } from './schedules.mjs';
 import { mapInOrder } from '../lib/in-order.mjs';
 import { strayFilesOf, removeStrays } from '../machine/tree-strays.mjs';
 import { readMachine } from '../../engine/db/machine.mjs';
-import { ledgerFileFor, openLedgerReader } from '../../engine/db/ledger.mjs';
 
 const COLLECTOR = 'gc-tree-strays';
 const LIVE = ['queued', 'ready', 'leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown'];
@@ -14,13 +13,20 @@ const LIVE = ['queued', 'ready', 'leased', 'running', 'answering', 'reported', '
 /** The live host reads of the key: the registered workflow trees, and the paths the live jobs of one workflow own. */
 export const treeStrayDeps = {
   workflowTrees: async (ctx) => readMachine((m) => m.db.prepare("SELECT workflow_id, path, repo_root FROM worktrees WHERE kind='workflow' AND removed_at IS NULL AND orca_id IS NOT NULL").all()
-    .map((row) => ({ workflowId: row.workflow_id, path: path.resolve(row.path), repo: row.repo_root })), [], { env: ctx.env ?? process.env }),
-  ownedPaths: async (repo, workflowId) => {
-    const ledger = openLedgerReader(ledgerFileFor(path.resolve(repo)));
-    try {
-      return ledger.prepare(`SELECT payload_json FROM jobs WHERE workflow_id=? AND status IN (${LIVE.map(() => '?').join(',')})`).all(workflowId, ...LIVE)
-        .flatMap((row) => (JSON.parse(row.payload_json ?? '{}').owned_paths ?? []).map((owned) => (typeof owned === 'string' ? owned : owned?.path)).filter(Boolean));
-    } finally { ledger.close?.(); }
+    .map((row) => ({ workflowId: row.workflow_id, path: path.resolve(row.path), repo: row.repo_root })), [], { env: process.env }),
+  // null when no ledger of the controller knows the workflow: ownership is unknown and the tree is left alone. The registry's repo_root names the ledger's repository when it can.
+  ownedPaths: async (repo, workflowId, ctx) => {
+    const same = (l) => l.repo && path.resolve(l.repo) === path.resolve(repo);
+    const candidates = [...(ctx.ledgers ?? []).filter(same), ...(ctx.ledgers ?? []).filter((l) => !same(l))];
+    for (const candidate of candidates) {
+      const owned = ctx.read(candidate.ledgerId, (db) => {
+        if (!db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(workflowId)) return null;
+        return db.prepare(`SELECT payload_json FROM jobs WHERE workflow_id=? AND kind='op' AND status IN (${LIVE.map(() => '?').join(',')})`).all(workflowId, ...LIVE)
+          .flatMap((row) => (JSON.parse(row.payload_json ?? '{}').owned_paths ?? []).map((entry) => (typeof entry === 'string' ? entry : entry?.path)).filter(Boolean));
+      });
+      if (owned) return owned;
+    }
+    return null;
   },
 };
 
@@ -30,7 +36,9 @@ export async function reconcileTreeStrays(ctx, { settings, deps, name, would }) 
   const claim = claimDue(ctx, { controller: name, duty: 'tree-strays', intervalMs: settings.treeStraysEveryMs, now });
   if (!claim.due) return { skipped: 'not due', nextAt: claim.nextAt ?? null };
   const judged = await mapInOrder(await deps.workflowTrees(ctx), async (tree) => {
-    const plan = strayFilesOf({ tree: tree.path, owned: await deps.ownedPaths(tree.repo, tree.workflowId), now, minAgeMs: settings.treeStrayMinAgeMs, maxBytes: settings.treeStrayMaxBytes });
+    const owned = await deps.ownedPaths(tree.repo, tree.workflowId, ctx);
+    if (owned === null) return null;
+    const plan = strayFilesOf({ tree: tree.path, owned, now, minAgeMs: settings.treeStrayMinAgeMs, maxBytes: settings.treeStrayMaxBytes });
     return plan.length ? { tree, plan, removed: ctx.mode === 'active' ? removeStrays(tree.path, plan) : null } : null;
   });
   const found = judged.filter(Boolean);
