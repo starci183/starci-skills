@@ -80,11 +80,13 @@ const wakeResultOf = ({ proof, workflowId, phase, terminal, stale, outputAgeMs, 
 
 /** The proven liveness wake of an idle Kernel and its tick answer (a refused send on a stale frame replaces the seat). */
 const sendIdleWake = (ctx, idle) => {
+  const withheld = ctx.repeatedWake?.(ctx.status.value);
+  if (withheld) return { ok: true, workflowId: ctx.workflowId, phase: ctx.phase, terminal: ctx.terminal, action: 'wake-withheld', reason: withheld.reason, since: withheld.since, outputAgeMs: ctx.outputAgeMs };
   const { status, workflowId, phase, terminal, stale, outputAgeMs, liveness, dispatch, replaceUnwritableKernel, sendWakeWithProof, wakePromptOf, read,
     recordKernelWakeFailed, recordKernelWoken, wakeSendRefused, wakeActionOf, deliveryFieldsOf, classified } = ctx;
   const proof = sendWakeWithProof({ terminal, text: wakePromptOf(workflowId, status.value), before: String(read.screen ?? '') });
   if (!proof.ok && proof.delivery !== 'agent-exited') recordKernelWakeFailed(terminal, { state: classified.state, sendErrorCode: proof.sendErrorCode ?? null, delivery: proof.delivery ?? null });
-  if (proof.ok) recordKernelWoken(terminal, { delivery: proof.delivery ?? null, idleWakes: idle.wakes + 1 });
+  if (proof.ok) recordKernelWoken(terminal, { delivery: proof.delivery ?? null, idleWakes: idle.wakes + 1, ...ctx.menuOf(status.value) });
   if (proof.ok && status.value?.revisionNotice?.state === 'owed') ctx.recordRevisionWoken(status.value.revisionNotice);
   if (!proof.ok && liveness.staleActive && wakeSendRefused(proof))
     return replaceUnwritableKernel({ phase, terminal, dispatch, stale, outputAgeMs, proof });

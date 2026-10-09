@@ -46,6 +46,8 @@ import { arg as argvValue } from '../lib/cli-arg.mjs';
 import { createKernelTick } from './kernel-watchdog-tick.mjs';
 import { workflowSender } from './workflow-startup.mjs';
 import { seatWakeOf } from './op-incident-policy.mjs';
+import { createHash } from 'node:crypto';
+import { seatCostConfig } from './seat-wakes.mjs';
 import { createKernelRotation, rotationRule } from './seat-rotation.mjs';
 import { runtimeRevNow, startFailureRun, startHoldBudget, startHoldOf } from './start-hold.mjs';
 import { recordReplaced, recordWoken, runtimePass } from '../machine/revision-ack.mjs';
@@ -315,6 +317,23 @@ export function idleWakesOf(rows, { now = Date.now(), rev } = {}) {
   return { wakes, firstWakeAt, replaced, due };
 }
 const IDLE_KINDS = [...KERNEL_MOVES, ...KERNEL_BOOTS, ...KERNEL_ACTIVITY, KERNEL_WOKEN_EVENT, KERNEL_IDLE_REPLACED_EVENT];
+/** The menu a wake is typed for: its item count and a fingerprint of the item ids (what a repeated wake is compared by). */
+const menuOf = (statusValue) => {
+  const ids = (Array.isArray(statusValue?.menu) ? statusValue.menu : []).map((item) => item.id).toSorted();
+  return { menuItems: ids.length, menuFp: createHash('sha1').update(ids.join('|')).digest('hex').slice(0, 12) };
+};
+/** {reason, since} when the newest wake was for this same menu, the Kernel has authored nothing since, and it is younger than seat-cost kernel.wakeRepeatMs; else null. */
+const repeatedWake = (statusValue) => {
+  const now = menuOf(statusValue);
+  return withKernelLedger((ledger) => {
+    const boot = ledger.db.prepare(`SELECT created_at FROM events WHERE workflow_id=? AND kind IN (${[...KERNEL_BOOTS].map(() => '?').join(',')}) ORDER BY seq DESC LIMIT 1`).get(workflowId, ...KERNEL_BOOTS);
+    if (boot && Date.now() - Number(boot.created_at) < seatCostConfig().kernel.bootGraceMs) return { reason: 'booting', since: Number(boot.created_at) };
+    const last = ledger.db.prepare('SELECT seq, created_at, payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(workflowId, KERNEL_WOKEN_EVENT);
+    if (!last || parseJsonOr(last.payload_json).menuFp !== now.menuFp || Date.now() - Number(last.created_at) >= seatCostConfig().kernel.wakeRepeatMs) return null;
+    const acted = ledger.db.prepare(`SELECT 1 FROM events WHERE workflow_id=? AND seq>? AND kind IN (${[...KERNEL_ACTIVITY, ...KERNEL_MOVES].map(() => '?').join(',')}) LIMIT 1`).get(workflowId, last.seq, ...KERNEL_ACTIVITY, ...KERNEL_MOVES);
+    return acted ? null : { reason: 'same-menu-unanswered', since: Number(last.created_at) };
+  }) ?? null;
+};
 const kernelIdleWakes = () => withKernelLedger((ledger) => idleWakesOf(ledger.db.prepare(
   `SELECT kind, created_at, payload_json FROM events WHERE workflow_id=? AND kind IN (${IDLE_KINDS.map(() => '?').join(',')}) ORDER BY seq`)
   .all(workflowId, ...IDLE_KINDS), { rev: currentRuntimeRev() ?? null })) ?? { wakes: 0, firstWakeAt: null, replaced: 0, due: false };
@@ -413,7 +432,7 @@ const startPreflight = () => {
 const startHold = () => withKernelLedger((ledger) => startHoldOf(startFailureRun(ledger.db, workflowId), { now: Date.now(), budget: startHoldBudget(), rev: runtimeRevNow() })) ?? startPreflight();
 const kernelRotation = createKernelRotation({ workflowId, openLedger: withKernelLedger, close: closeKernelTerminal, replace: replaceKernel, sender: launchableSender, hold: startHold });
 const kernelTick = createKernelTick({ api, kernelRotation, workflowId, repair, lostSeatWorker, exitedTwice, stopAndRelease, replaceKernel,
-  workerShow, DEAD_WORKER_STATE, settledKernelVerdict, DEAD_VERDICTS, terminalRead, classifyKernelScreen, outputAgeOf,
+  repeatedWake, menuOf, workerShow, DEAD_WORKER_STATE, settledKernelVerdict, DEAD_VERDICTS, terminalRead, classifyKernelScreen, outputAgeOf,
   staleAwareState, ACTIVE_STALE_MS, exitedAgentPromptRow, DEATH_SETTLE_MS, sleepSync, kernelWakeFailures,
   wakeFailuresProveDead, replaceWakeDeadKernel, sendEnterWithProof, recordKernelWakeFailed, deliveryFieldsOf,
   kernelWakeRefusedAt, replaceUnwritableKernel, kernelIdleWakes, escalateIdleStall, replaceIdleKernel,

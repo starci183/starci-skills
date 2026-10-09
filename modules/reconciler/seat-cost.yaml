@@ -20,7 +20,15 @@
 emptyWakeSharePercent: 35
 minWakes: 6
 wakeActMs: 120000
+# kernel.wakeRepeatMs: a Kernel that was woken for a menu and has authored nothing since is not woken again for the SAME menu inside this time (it is working on it, or
+#   booting: a boot reads for ~19 turns); the repeat is withheld and recorded once per menu as kernel-wake-skipped (cause same-menu-unanswered).
+# A delivered wake records `menuItems` (the items of the menu it was typed for): a wake typed for an empty menu is the RUNTIME's departure and never counts toward
+#   the rotation by wakes; a wake typed for a menu the seat then left unanswered is the seat's waste and does.
+# kernel.bootGraceMs: a Kernel that just booted reads its required files (one bundle, a few turns) and its first status inside its boot turn; no liveness wake is typed in this
+#   time (the wakes that fell inside the two newest StarCi boots, 1 to 7 a minute apart and half delivered `queued` into the busy turn, cut the boot's usage into wakes).
 kernel:
+  wakeRepeatMs: 300000
+  bootGraceMs: 300000
   wakes:
     kernel-woken: stall
     kernel-transition-woken: transition
