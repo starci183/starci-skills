@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.2.0 - 2026-10-09
+
+- Changed: the lint runner (`lint/run.mjs`) and the bundled runtime copies follow the runtime of 1.0.0-alpha.8. Version 4.1.0 on the registry carries the copies of an earlier runtime.
+
 ## 4.1.0 - 2026-10-08
 
 - Breaking (runtime alpha.4 CLI unification): remove the `hfs` bin and expose `main(argv, io)` for the sole `starci app ...` grammar; the app flags `--repo` and `--root` are replaced by the global `--cwd` flag.

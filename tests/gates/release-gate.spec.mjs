@@ -442,3 +442,15 @@ test('release-check consumes canon child exit status despite positive JSON and k
     }
   }
 });
+
+test('the release cut refuses before its suite when an already-published package differs from the registry (drift), not only when one is unpublished', async (t) => {
+  const { publishPlanRefusal } = await import('../../scripts/supervisor/release-cut-plan.mjs');
+  const root = tree(t);
+  const registry = allPublished({ local: 'other', content: (name) => (name === '@starci/leaf-a' ? 'drift 1: differs a.js' : 'same') });
+  const refusal = publishPlanRefusal({ repo: root, deps: { publishPlan: () => planSummary(buildPlan({ root, registry, scope: 'packages' })) } });
+  assert.equal(refusal.verdict, 'publish-plan');
+  assert.ok(refusal.findings.some((finding) => /leaf-a@1\.0\.0 is on the registry but the source differs/.test(finding)));
+  assert.ok(refusal.findings.some((finding) => /canon@2\.0\.0 is already published, but a publish or version bump/.test(finding)));
+  const clean = allPublished({ local: 'other', content: 'same' });
+  assert.equal(publishPlanRefusal({ repo: root, deps: { publishPlan: () => planSummary(buildPlan({ root, registry: clean, scope: 'packages' })) } }), null);
+});

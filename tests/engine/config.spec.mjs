@@ -271,7 +271,7 @@ test('sonar.organization is configuration: a SonarCloud organization key, valida
 test('the spec preload confines the owner config.yaml to the spec temp root: a file outside it is never read, one inside it is',()=>{
   const within=process.env[OWNER_CONFIG_WITHIN_ENV];
   assert.ok(within&&path.resolve(os.tmpdir()).toLowerCase()===path.resolve(within).toLowerCase(),'tests/setup/isolated-temp.mjs sets the confinement to the spec temp root');
-  const outside=fs.mkdtempSync(path.join(path.parse(within).root,'starci-config-outside-'));
+  const outside=fs.mkdtempSync(path.join(path.dirname(within),'starci-config-outside-'));
   const inside=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-inside-'));
   try{
     for(const dir of [outside,inside]){fs.copyFileSync(new URL('../../config.example.yaml',import.meta.url),path.join(dir,'config.example.yaml'));fs.writeFileSync(path.join(dir,'config.yaml'),stringifyYaml({...expected(),language:'xx-owner'}));}
