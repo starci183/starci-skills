@@ -21,14 +21,12 @@ test('a: the approved leg whose plan declares no write set offers the op contrac
   assert.equal(item.options[0].args.paths, '.starciwork/features/own-1/ui', 'the proposal is the contract family of the node\'s feature, not a guess');
   assert.equal(item.options[0].text, undefined);
 
-  // The pick's step is the enqueue verb with the proposal as its --paths: run exactly that, as the Kernel does after attesting its READ.
+  // The pick goes through the real decide verb, as the Kernel answers it (the READ of the op attested first).
   assert.equal(world.ack(['interface.draw']).status, 0, 'the Kernel attests its READ of the op');
-  const step = item.options[0].steps[0];
-  const flags = Object.entries(step.args).flatMap(([key, value]) => [`--${key}`, value]);
-  const picked = world.cli(step.verb, flags);
+  const picked = world.cli('decide', ['--workflow', world.wf, '--item', item.id, '--choice', 'enqueue-proposed', '--reason', 'the contract write set']);
   assert.equal(picked.status, 0, picked.stderr || picked.stdout);
   const jobs = world.ledger((ledger) => ledger.db.prepare("SELECT payload_json FROM jobs WHERE op_id='interface.draw'").all().map((row) => JSON.parse(row.payload_json).owned_paths));
-  assert.deepEqual(jobs, [['.starciwork/features/own-1/ui']], 'the proposal passes the enqueue guards (write families, custody) and the leg is enqueued on it');
+  assert.deepEqual(jobs, [['.starciwork/features/own-1/ui']], 'the proposal passes the enqueue guards and the leg is enqueued on it');
 });
 
 /** The shape-guard world with a retry that is a plain repeat of the failed job (the failure route queued nothing behind a curing leg). */
