@@ -248,3 +248,9 @@ removed:
     use: 'one bound, one directory and one cleanup serve every card: allocation.promptFile in modules/models/runtimes.yaml (scripts/agent/prompt-file.mjs); a card keeps delivery.mode and delivery.prompt'
     since: 1.0.0-alpha.9
     match: '(?<![\w-])(?:maxInlineChars|fileDirectory)(?![\w-])'
+  - id: vocab-backoff-factor-keys
+    kind: vocabulary
+    name: the growth factor of allocation.dispatchRefusal and of the backoff of modules/reconciler/host.yaml
+    use: 'every backoff is the one retry budget (scripts/lib/retry-budget.mjs), which doubles its interval up to a cap: declare baseMs/capMs or minMs/maxMs only'
+    since: 1.0.0-alpha.9
+    match: '(?<![\w-])(?:dispatchRefusal|backoff):\s*\{[^}\n]*\bfactor\b'
