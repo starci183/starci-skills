@@ -10,6 +10,7 @@ import { renderApply, renderPlan } from '../machine/workflow-purge-render.mjs';
 import { underHostLock } from '../machine/verb-lock.mjs';
 import { acquireGcLock } from '../machine/gc-lock.mjs';
 import { purgeWorkflow } from '../work/purge-workflow.mjs';
+import { invocationDir } from '../lib/roots.mjs';
 import { guardsRoot } from '../guards/guards-root.mjs';
 
 const MIN_EXPECT = 12;
@@ -46,7 +47,7 @@ export async function workflowPurge(ctx, deps = {}) {
   if (!args.workflow) return usage('--workflow <id> is required');
   if (args.plan === true && args.apply === true) return usage('--plan and --apply are exclusive; the plan is the default');
   if (args.expect && String(args.expect).length < MIN_EXPECT) return usage(`--expect needs at least ${MIN_EXPECT} characters of the plan sha`);
-  const repo = path.resolve(ctx.cwd ?? process.cwd(), args.repo ?? '.');
+  const repo = path.resolve(invocationDir(ctx), args.repo ?? '.');
   const plan = planOf({ repo, workflowId: args.workflow, env, ledgerMode: args.ledger === true, deps });
   if (args.apply !== true) return { code: plan.ok ? 0 : 1, text: renderPlan(plan), data: plan };
   if (!plan.ok) return { code: 1, text: renderPlan(plan), data: plan };
