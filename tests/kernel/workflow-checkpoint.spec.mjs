@@ -410,6 +410,25 @@ for (const phase of ['prepared', 'branch-applied', 'index-applied', 'applied']) 
   });
 }
 
+test('a stray file a Kernel shell left after the receipt was prepared does not make the fail decision unrecoverable (Nivo: a file named 0 in the tree root)', (t) => {
+  const fx = settleFixture(t), jobId = 'op-stray-after-prepare';
+  fx.prepare({ jobId, outcome: 'blocked' });
+  const base = git(fx.tree, 'rev-parse', 'HEAD');
+  const ledger = openLedger({ file: ledgerFileFor(fx.repo, { env: fx.env }) });
+  try {
+    const ctx = { db: ledger.db, ledger, repo: fx.repo, env: fx.env, ensureHistoryHook: () => ({ installed: false }) };
+    assert.throws(() => preserveAndReset({ ...ctx, checkpointPhase: (at) => {
+      if (at === 'prepared') throw Object.assign(new Error('interrupted'), { code: 'injected-preserve-interruption' });
+    } }, { workflowId: fx.workflowId, opId: jobId }), (error) => error.code === 'injected-preserve-interruption');
+    fs.writeFileSync(path.join(fx.tree, '0'), '{"ok":true}');
+    const recovered = preserveAndReset(ctx, { workflowId: fx.workflowId, opId: jobId });
+    assert.equal(recovered.resetTo, base);
+    assert.equal(git(fx.tree, 'status', '--porcelain'), '', 'the tree is back on its checkpoint, the stray file kept with the preserved work');
+    assert.equal(git(fx.tree, 'show', `${recovered.preservedRef}:0`), '{"ok":true}');
+    assert.equal(git(fx.tree, 'show', `${recovered.preservedRef}:docs/change.md`), `owned change of ${jobId}`);
+  } finally { ledger.close(); }
+});
+
 test('a zero-row registry update fails visibly and retry keeps the existing checkpoint identity', (t) => {
   const fx = settleFixture(t), jobId = 'op-registry-failed';
   const attemptId = fx.prepare({ jobId }), before = git(fx.tree, 'rev-parse', 'HEAD');

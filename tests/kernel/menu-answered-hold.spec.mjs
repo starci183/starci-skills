@@ -5,6 +5,7 @@
 // A failed Critic verdict is also never offered accept.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
@@ -41,8 +42,8 @@ test('an item whose answer failed is held while its facts are unchanged and offe
   assert.equal(buildMenu(sources({ ...shape('op-x-1'), answered: options })).length, 1, 'a changed option asks again');
 });
 
-const envOf = (world) => ({ ...process.env, [TEST_REGISTRY_ENV]: world.machineFile, STARCI_LOCAL_ROOT: world.machineHome, STARCI_AUTOPILOT: 'off', ORCA_TERMINAL_HANDLE: '' });
-const status = (world) => JSON.parse(spawnSync(process.execPath, [CLI, 'status', '--repo', world.repoRoot, '--workflow', WF, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180_000, env: envOf(world) }).stdout);
+const envOf = (world, extra = {}) => ({ ...process.env, ...extra, [TEST_REGISTRY_ENV]: world.machineFile, STARCI_LOCAL_ROOT: world.machineHome, STARCI_AUTOPILOT: 'off', ORCA_TERMINAL_HANDLE: '' });
+const status = (world, extra = {}) => JSON.parse(spawnSync(process.execPath, [CLI, 'status', '--repo', world.repoRoot, '--workflow', WF, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180_000, env: envOf(world, extra) }).stdout);
 
 /** A reported architecture.decide job the runtime handed over with `code`, and its Decision Item. */
 function reportedWith(ledger, code) {
@@ -77,22 +78,75 @@ test('another refusal of a done report still offers accept', (t) => withLedger(t
   assert.ok(status(world).menu[0].options.some((option) => option.choice === 'accept'));
 }));
 
-test('an answer whose step failed holds the job item while the facts stand; a changed item is offered again', (t) => withLedger(t, (world) => {
+/** A runtime checkout the status reads its revision from: {env, advance()} moves its HEAD, as a land does. */
+function revisionRoot(root) {
+  const dir = fs.mkdtempSync(path.join(root, 'rev-'));
+  const git = (...args) => { const r = spawnSync('git', args, { cwd: dir, encoding: 'utf8', windowsHide: true }); assert.equal(r.status, 0, r.stderr); return r.stdout.trim(); };
+  git('init', '-q', '-b', 'main');
+  git('config', 'user.email', 'spec@starci.test');
+  git('config', 'user.name', 'spec');
+  let n = 0;
+  const advance = () => { fs.writeFileSync(path.join(dir, 'f.txt'), String(n += 1)); git('add', '-A'); git('commit', '-q', '-m', `rev ${n}`); return git('rev-parse', 'HEAD'); };
+  advance();
+  return { env: { STARCI_KERNEL_REV_ROOT: dir }, head: () => git('rev-parse', 'HEAD'), advance };
+}
+
+test('an answer whose step failed holds the item while the facts and the runtime revision stand; a new revision or a changed item offers it again once', (t) => withLedger(t, (world) => {
   const REPORTED = reportedWith(world.ledger, 'op-critic-verdict-failed');
   world.ledger.close();
-  const [item] = status(world).menu;
-  const answer = (facts) => {
+  const revision = revisionRoot(world.root ?? world.repoRoot);
+  const [item] = status(world, revision.env).menu;
+  let n = 0;
+  const answer = (facts, rev) => {
     const writer = openLedger({ file: world.ledgerFile });
+    const id = `dec-spec-${n += 1}`;
     writer.transaction(() => {
-      writer.appendEvent({ workflowId: WF, entityType: 'kernel', entityId: 'dec-spec', kind: 'kernel-decision', payload: { hypothesis: 'spec', actionKey: `settle-fail:${item.id}:spec`, metric: 'm', command: 'c', baseline: {}, menu: { item: item.id, choice: 'settle-fail', facts } } });
-      writer.appendEvent({ workflowId: WF, entityType: 'kernel', entityId: 'dec-spec', kind: 'kernel-decision-result', payload: { result: 'revert', observed: 'settle failed: workflow-reset-failed' } });
+      writer.appendEvent({ workflowId: WF, entityType: 'kernel', entityId: id, kind: 'kernel-decision', payload: { hypothesis: 'spec', actionKey: `settle-fail:${item.id}:spec`, metric: 'm', command: 'c', baseline: {}, menu: { item: item.id, choice: 'settle-fail', facts, rev } } });
+      writer.appendEvent({ workflowId: WF, entityType: 'kernel', entityId: id, kind: 'kernel-decision-result', payload: { result: 'revert', observed: 'settle failed: workflow-reset-failed' } });
     });
     writer.close();
   };
-  answer('not-the-facts-of-the-item');
-  assert.equal(status(world).menu.length, 1, 'an answer to other facts holds nothing back');
-  answer(itemFactsOf(item));
-  const held = status(world);
-  assert.deepEqual(held.menu, [], `${REPORTED}: the failed answer is not asked again`);
+  const rev1 = revision.head();
+  answer('not-the-facts-of-the-item', rev1);
+  assert.equal(status(world, revision.env).menu.length, 1, 'an answer to other facts holds nothing back');
+  answer(itemFactsOf(item), rev1);
+  const held = status(world, revision.env);
+  assert.deepEqual(held.menu, [], `${REPORTED}: the failed answer is not asked again at the revision it failed on`);
   assert.equal(held.frontier.actionable, false, 'so the watchdog does not wake the Kernel for it');
+  const rev2 = revision.advance();
+  assert.notEqual(rev2, rev1);
+  const back = status(world, revision.env);
+  assert.deepEqual(back.menu.map((entry) => entry.id), [item.id], 'a new runtime revision may cure the failed step: the item is offered again');
+  assert.equal(back.frontier.actionable, true, 'and the Kernel is woken for it');
+  answer(itemFactsOf(item), rev2);
+  assert.deepEqual(status(world, revision.env).menu, [], 'failing again at the new revision holds it again until the next one');
 }));
+
+test('a prepared fail decision the runtime kept stays the Kernel\'s after the settler hands the job over again (Nivo 2026-10-09 13:42: kept, then re-handed at a new revision, hidden from both)', (t) => withLedger(t, (world) => {
+  const REPORTED = reportedWith(world.ledger, 'workflow-checkpoint-recovery-conflict');
+  const { attempt_id: attemptId, dispatch_id: dispatchId } = world.ledger.db.prepare('SELECT attempt_id, dispatch_id FROM op_attempts WHERE job_id=?').get(REPORTED);
+  const append = (kind, payload) => world.ledger.transaction(() => world.ledger.appendEvent({ workflowId: WF, entityType: 'job', entityId: REPORTED, attemptId, kind, payload }));
+  const handover = () => append('job-settle-needs-kernel', { dispatchId, reason: 'settle-refused', code: 'workflow-checkpoint-recovery-conflict', detail: ['settle must recover its prepared fail decision'], outcome: 'done', op: 'architecture.decide' });
+  append('workflow-op-preserved-prepared', { opId: REPORTED, attemptId, resetTo: 'a'.repeat(40) });
+  handover();
+  world.ledger.close();
+  assert.deepEqual(status(world).menu, [], 'a receipt nobody looked at yet is the settler\'s to withdraw or keep');
+  const writer = openLedger({ file: world.ledgerFile });
+  writer.transaction(() => writer.appendEvent({ workflowId: WF, entityType: 'job', entityId: REPORTED, attemptId, kind: 'workflow-op-preserved-kept', payload: { reason: 'the receipt aims at the live gate base' } }));
+  writer.transaction(() => writer.appendEvent({ workflowId: WF, entityType: 'job', entityId: REPORTED, attemptId, kind: 'job-settle-needs-kernel',
+    payload: { dispatchId, reason: 'settle-refused', code: 'workflow-checkpoint-recovery-conflict', detail: ['settle must recover its prepared fail decision'], outcome: 'done', op: 'architecture.decide', runtimeRev: 'b'.repeat(40) } }));
+  writer.close();
+  const [item] = status(world).menu;
+  assert.equal(item?.id, `job-decision:${REPORTED}`, 'a kept receipt is an apply to finish, whichever hand-over is the newest');
+  assert.ok(!item.options.some((option) => option.choice === 'accept'), 'a pass is refused against a prepared fail decision');
+  assert.ok(item.options.some((option) => option.choice === 'settle-fail'));
+}));
+
+test('an approved leg that this Kernel life has not attested its READ for says so in its question (StarCi: enqueue refused kernel-read-unverified three lives in a row)', () => {
+  const action = { kind: 'dispatch', origin: 'approved-leg-open', op: 'interface.draw', reason: 'approved leg interface.draw has no job' };
+  const [bare] = buildMenu(sources({ nextActions: [action] }));
+  assert.doesNotMatch(bare.question, /attest/);
+  assert.doesNotMatch(bare.question, /\{attest\}/);
+  const [noted] = buildMenu(sources({ nextActions: [{ ...action, attest: 'This Kernel life has not attested its READ for interface.draw (19 file(s)): run starci kernel kernel-ack-rev --plan --op interface.draw.' }] }));
+  assert.match(noted.question, /not attested its READ for interface\.draw \(19 file\(s\)\)/);
+});

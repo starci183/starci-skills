@@ -137,7 +137,7 @@ kinds:
   - id: leg-ready
     mode: judgment
     source: "next action approved-leg-open"
-    question: "Approved leg {op} has no job and every plan leg before it succeeded, but the plan declares no write set for it (or a work graph partitions it)."
+    question: "Approved leg {op} has no job and every plan leg before it succeeded, but the plan declares no write set for it (or a work graph partitions it). {attest}"
     options:
       - {choice: enqueue-leg, text: paths, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $text}}], effect: "enqueues {op} on the paths in --text (its write set); the Workflow controller then routes and dispatches it"}
 

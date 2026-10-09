@@ -101,7 +101,7 @@ function itemOf(kind, { key, subject, options = null, since = null, evidence = [
   const policy = policyOf(spec.hold, since);
   const own = options ?? (spec.options ?? []).map((option) => optionOf(option, subject));
   return {
-    id: `${kind}:${key}`, kind, mode: spec.mode, subject: { ...subject }, question: fillTemplate(spec.question, subject),
+    id: `${kind}:${key}`, kind, mode: spec.mode, subject: { ...subject }, question: fillTemplate(spec.question, subject).trim(),
     options: escape ? [...own, escapeOption()] : own, evidence, deadline: deadlineAt ?? policy.deadlineAt, step: policy.step, hold: spec.hold ?? null, di,
   };
 }
@@ -144,7 +144,7 @@ function actionItemOf(action, workflow) {
   const origin = originOf(action);
   // A move a supervisor-gate or a peer-wait holds is theirs to release, not the Kernel's to answer.
   if (origin?.class !== 'judgment' || !origin.menu || action.heldBy) return [];
-  const subject = { workflow, op: action.op ?? null, job: action.jobId ?? null, node: action.nodes?.[0] ?? null, paths: action.paths ?? null, params: action.params ?? null, situation: action.reason };
+  const subject = { workflow, op: action.op ?? null, job: action.jobId ?? null, node: action.nodes?.[0] ?? null, paths: action.paths ?? null, params: action.params ?? null, situation: action.reason, attest: action.attest ?? '' };
   const key = [action.op, action.jobId ?? action.nodes?.[0] ?? action.cutId, origin.id].filter(Boolean).join(':');
   return [itemOf(origin.menu, { key, subject, evidence: action.jobId ? [{ ref: `job:${action.jobId}` }] : [] })];
 }

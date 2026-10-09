@@ -6,6 +6,10 @@ import { JOB_KINDS, liveFor, pendingJobsOf, resolutionOf } from '../../../machin
 import { buildMenu, menuCatalog, snoozeMs } from '../../kernel-menu.mjs';
 import { feedbackOfHandover } from '../../handover-slices.mjs';
 import { decisionsOf } from '../../progress-rca.mjs';
+import { keptOpenOf } from '../../settle/prepared-recovery.mjs';
+import { currentRuntimeRev, revRootOf } from '../../runtime-rev.mjs';
+import { kernelReadManifest, unreadFiles } from '../../required-read.mjs';
+import { kernelAuthorityOf, kernelCustodyOf } from './kernel-seat.mjs';
 import { failureFactsOf } from '../../failure-class.mjs';
 import { failedShapesOf, jobRow, shapeOf } from '../../kernel-authority.mjs';
 import { RUNTIME_OWED_CODES } from '../../gate-admission.mjs';
@@ -22,7 +26,7 @@ const RECOVERY_CONFLICT = 'workflow-checkpoint-recovery-conflict';
 /** Whether the settle of a handed-over job is the runtime's to finish. */
 const codesOf = (item) => [item.code, ...(item.detail ?? [])].filter(Boolean);
 const runtimeOwned = (db, item) => codesOf(item).some((code) => RUNTIME_OWED_CODES.has(code))
-  || (codesOf(item).includes(RECOVERY_CONFLICT) && db.prepare("SELECT 1 FROM events WHERE entity_id=? AND kind='workflow-op-preserved-kept' AND seq>(SELECT COALESCE(MAX(seq),0) FROM events WHERE entity_id=? AND kind='job-settle-needs-kernel') LIMIT 1").get(item.jobId, item.jobId) == null)
+  || (codesOf(item).includes(RECOVERY_CONFLICT) && !keptOpenOf(db, item.jobId))
   || db.prepare("SELECT 1 FROM events WHERE entity_id=? AND kind='job-settle-check-unavailable' AND seq>(SELECT COALESCE(MAX(seq),0) FROM events WHERE entity_id=? AND kind='job-settle-needs-kernel') LIMIT 1").get(item.jobId, item.jobId) != null;
 
 /**
@@ -60,17 +64,23 @@ const deadWaitsOf = (s) => [
   ...s.typedUnmeetable.map((wait) => ({ incidentId: wait.incidentId, situation: `typed wait ${wait.incidentId} can no longer be met: ${wait.unmeetable.join('; ')}` })),
 ];
 
-/** The item ids a chosen wait still holds back. */
-function snoozedOf(s) {
+/**
+ * The answers that still hold their item back: inside the snooze and given at the runtime revision that is live now. A new revision may cure
+ * what the answer waited on or what its step failed on (a failed step is the runtime's, not the item's), so the item is offered again once.
+ */
+function standingAnswersOf(s) {
   const since = s.now - snoozeMs();
-  return new Set(decisionsOf(s.db, s.workflowId).filter((d) => ['keep-waiting', 'none-fits'].includes(d.menu?.choice) && d.at > since).map((d) => d.menu.item));
+  const rev = currentRuntimeRev() ?? null;
+  return decisionsOf(s.db, s.workflowId).filter((d) => d.menu?.item && d.at > since && (d.menu.rev ?? null) === rev);
 }
+
+/** The item ids a chosen wait still holds back. */
+const snoozedOf = (s) => new Set(standingAnswersOf(s).filter((d) => ['keep-waiting', 'none-fits'].includes(d.menu.choice)).map((d) => d.menu.item));
 
 /** The items whose latest answer failed a step, by id, with the facts the item had then: asked again only when the item's facts change. */
 function answeredOf(s) {
-  const since = s.now - snoozeMs();
   const latest = new Map();
-  for (const d of decisionsOf(s.db, s.workflowId)) if (d.menu?.item && d.at > since) latest.set(d.menu.item, d);
+  for (const d of standingAnswersOf(s)) latest.set(d.menu.item, d);
   return new Map([...latest].filter(([, d]) => d.status === 'revert' && d.menu.facts).map(([id, d]) => [id, d.menu.facts]));
 }
 
@@ -78,6 +88,20 @@ function answeredOf(s) {
 const feedbackOf = (s) => (s.handover?.ask?.decision === 'feedback' && s.handover.state === 'answered'
   ? feedbackOfHandover(s.workflowJobs, s.handover.ask, { max: menuCatalog().kinds.find((kind) => kind.id === 'handover-step').feedback.maxSlices })
   : null);
+
+/**
+ * The sentence an approved leg carries when this Kernel life has not attested the files that leg needs read: enqueue is refused kernel-read-unverified until it has, and
+ * nothing else on the menu says so (the status line shows the last attestation of an earlier life). Empty when the READ is complete or cannot be planned.
+ */
+function attestNoteOf(s, action) {
+  if (action.origin !== 'approved-leg-open' || !action.op) return '';
+  try {
+    const authority = kernelAuthorityOf(s.db, s.workflowId, kernelCustodyOf(s.db, s.workflowId).terminal);
+    const required = kernelReadManifest(s.db, s.workflowId, { root: revRootOf(), authority, ops: [action.op] });
+    const unread = unreadFiles(s.db, s.workflowId, required);
+    return unread.length ? `This Kernel life has not attested its READ for ${action.op} (${unread.length} file(s)): enqueue is refused kernel-read-unverified until it does; run starci kernel kernel-ack-rev --plan --op ${action.op}, read the files it lists, then attest with --rev and --read-manifest.` : '';
+  } catch { return ''; }
+}
 
 /** s.menu: the ordered open decision points, and the frontier's `actionable` follows it. */
 export const menuPhase = (s) => {
@@ -89,7 +113,7 @@ export const menuPhase = (s) => {
   s.menu = buildMenu({
     workflow: workflowId, rev: s.kernelRev, jobDecisions: jobDecisionsOf(s, live), shapeRefused: shapeRefusedOf(s),
     questions: s.workerQuestions, peers: s.peerMessages, wedged: s.wedgedWorkers.map((w) => ({ jobId: w.jobId, opId: s.workflowJobs.find((row) => row.job_id === w.jobId)?.op_id ?? null })),
-    deadWaits: deadWaitsOf(s), decisions: live.filter((di) => !OWN_KIND.has(di.kind)), nextActions: s.graph.nextActions, handover: s.handover, feedback: feedbackOf(s), snoozed: snoozedOf(s), answered: answeredOf(s),
+    deadWaits: deadWaitsOf(s), decisions: live.filter((di) => !OWN_KIND.has(di.kind)), nextActions: s.graph.nextActions.map((action) => ({ ...action, attest: attestNoteOf(s, action) })), handover: s.handover, feedback: feedbackOf(s), snoozed: snoozedOf(s), answered: answeredOf(s),
   });
   s.actionable = s.menu.length > 0;
   s.frontier.actionable = s.actionable;

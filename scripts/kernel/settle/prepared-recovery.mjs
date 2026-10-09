@@ -34,6 +34,17 @@ export function openPreparedOf(db, jobId, { read = true } = {}) {
   return receipt ? { seq: Number(row.seq), attemptId: attempt, receipt } : null;
 }
 
+/**
+ * Whether the prepared preserve receipt of a job's latest attempt was looked at and kept - its apply is the Kernel's to finish - and has not been applied, withdrawn or
+ * replaced by a newer receipt since. The state stands until the apply lands: a later hand-over of the same refusal (the settler judges again at each runtime revision) does not end it.
+ */
+export function keptOpenOf(db, jobId) {
+  const attempt = db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId)?.attempt_id ?? null;
+  const kept = db.prepare('SELECT seq FROM events WHERE entity_id=? AND attempt_id IS ? AND kind=? ORDER BY seq DESC LIMIT 1').get(jobId, attempt, PREPARED_KEPT);
+  if (!kept) return false;
+  return db.prepare("SELECT 1 FROM events WHERE entity_id=? AND attempt_id IS ? AND seq>? AND kind IN ('workflow-op-preserved-applied', ?, ?) LIMIT 1").get(jobId, attempt, kept.seq, PREPARED_WITHDRAWN, PREPARED) == null;
+}
+
 /** The index of `files` put back on HEAD (a path reset: the working files stay as they are). */
 function restoreIndex(dir, files) {
   if (!files.length) return { ok: true };

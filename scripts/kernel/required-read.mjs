@@ -6,7 +6,7 @@ import { contractFilesOf, runtimeShaOf } from '../machine/contract-version.mjs';
 import { statusQuery } from '../api/git/status-query.mjs';
 import { INSTALL_MANIFEST_FILE, INSTALL_PROTOCOL_SCHEMA, installedPayloadDigest } from '../lib/install-custody.mjs';
 import { ENGINE_SCHEMA } from '../../engine/constants.mjs';
-import { eventPayloadOf } from '../machine/event-payload.mjs';
+import { eventPayloadOf } from '../../engine/db/event-payload.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 export const KERNEL_BOOT_FILES = Object.freeze(['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml']);
 export const KERNEL_CONTRACT_FILES = Object.freeze([...KERNEL_BOOT_FILES, 'modules/kernel/api.yaml', 'modules/cli/commands/kernel', 'modules/kernel/owner-rulings.yaml']);
