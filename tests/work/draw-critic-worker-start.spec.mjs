@@ -12,7 +12,7 @@ import { agentCliSpawns } from '../../scripts/checks/check-host-boundary.mjs';
 import { fakeCriticOrca, passingVerdict } from '../helpers/fake-critic-orca.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 
-// The prompt of a Critic whose Task spec is a pointer: the text of the file the pointer names (the second line after PACKET FILE), read while the worker starts, before the runtime removes it.
+// The prompt of a Critic whose Task spec is a pointer: the text of the file the pointer names (the second line after PACKET FILE).
 const taskOf = (spec) => { const lines = String(spec).split(String.fromCodePoint(10)).map((line) => line.trim()); const at = lines.findIndex((line) => line.startsWith('PACKET FILE:')); return at < 0 ? String(spec) : fs.readFileSync(lines[at + 1], 'utf8'); };
 
 // The draw loop's independent critic is an Orca worker started through orchestration worker-start with the provider,

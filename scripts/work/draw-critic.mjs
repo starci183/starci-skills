@@ -248,7 +248,7 @@ export function removeCriticWorkspace({ dir, repoRoot, orcaId, branch = null, en
  */
 export function launchCriticWorker({ critic, dir, prompt, entry = null, parentDispatch = null, orca = null, context = null, subject = DRAW_SUBJECT }) {
   // The Critic directory holds only the product it judges. The Task file the runtime writes for a prompt too long to paste lives in the state root's dispatch-prompts and is the one
-  // file outside the directory the guard lets the Critic read (reach.taskFile); cleanupCriticWorkspace removes it.
+  // file outside the directory the guard lets the Critic read (reach.taskFile); prompt-file.mjs owns its cleanup.
   const specFile = promptFileOf(`critic:${path.basename(dir)}`);
   const guardFile = writeCriticGuard({ dir, verdictFile: VERDICT_FILE, taskFile: specFile, context, id: path.basename(dir) });
   return { ...clientOf(orca).launch({ provider: critic.provider, model: critic.model, effort: critic.effort ?? null, worktree: dir, onCreated: bindCriticTerminal(guardFile),
@@ -398,7 +398,6 @@ async function criticVerdict({ client, launched, entry, critic, pollMs, sleep, n
 }
 
 function cleanupCriticWorkspace({ launched, client, entry, orca, base, unplace, workspace, dir }) {
-  if (launched?.specFile) fs.rmSync(launched.specFile, { force: true });
   let placementSafe = launched?.effectState === 'none' || !launched;
   if (launched?.ok) {
     // Stop is a no-op for a worker that already settled; release frees its seat; the Task closes.

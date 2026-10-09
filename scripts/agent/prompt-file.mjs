@@ -8,8 +8,7 @@
 //
 // One directory: <state root>/dispatch-prompts, except the files that already are files and are cited, never re-written (an op's
 // packet in its job directory, a Kernel's state file). One cleanup rule: the writer that names a file in that directory removes the
-// files older than allocation.promptFile.ttlMs first. Three call sites use it: the Task spec of a launch (taskSpecOf), a follow-up
-// prompt to a live agent (deliverPrompt, scripts/agent/lib.mjs) and a Critic's Task file (reach.taskFile of its guard).
+// files older than allocation.promptFile.ttlMs first. Launch specs, follow-up delivery, wake bounds and Critic Task files use this owner.
 
 import fs from 'node:fs';
 import path from 'node:path';

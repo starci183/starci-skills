@@ -254,3 +254,9 @@ removed:
     use: 'every backoff is the one retry budget (scripts/lib/retry-budget.mjs), which doubles its interval up to a cap: declare baseMs/capMs or minMs/maxMs only'
     since: 1.0.0-alpha.9
     match: '(?<![\w-])(?:dispatchRefusal|backoff):\s*\{[^}\n]*\bfactor\b'
+  - id: vocab-wake-terminal-bound
+    kind: vocabulary
+    name: the independent wake character bound
+    use: 'allocation.promptFile.maxChars is the terminal bound owned by scripts/agent/prompt-file.mjs'
+    since: 1.0.0-alpha.9
+    match: '(?<![\w-])(?:allocation\.)?wake\.maxChars|\bwake:\s*\{\s*maxChars\b'

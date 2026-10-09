@@ -1,21 +1,12 @@
-// wake-bound.mjs — a wake typed into a Kernel's input box stays under the size Claude Code folds into a pasted_content block.
-//
-// Claude Code folds a paste of about 800 characters or more into a block the model reads as untrusted pasted data. On 2026-10-07
-// the Kernel of a real workflow received twelve wakes of 1218 to 1242 characters as pasted blocks and refused three of them,
-// while all sixteen wakes of 730 characters or fewer arrived as the user's message. The cap is allocation.wake.maxChars
-// (modules/models/runtimes.yaml). A wake over it keeps its opener and the seat identity and points at `starci kernel status` for
-// the rest, the runtime-rev sentence first kept when it still fits.
-import { allocationSettings } from '../../engine/config.mjs';
+// wake-bound.mjs — wakes use the terminal bound owned by prompt-file.mjs. A longer wake keeps its opener and seat identity,
+// points at starci kernel status for the rest, and keeps the revision sentence when it fits.
+import { promptFileMaxChars } from '../agent/prompt-file.mjs';
 
 const POINTER = 'The rest is in starci kernel status.';
 const OPENER_FALLBACK_CHARS = 200;
 
-/** The declared cap on one typed wake; refuses when the contract omits it. */
-export function wakeMaxChars() {
-  const max = Number(allocationSettings()?.wake?.maxChars);
-  if (!Number.isInteger(max) || max <= 0) throw new Error('modules/models/runtimes.yaml allocation.wake.maxChars must declare a positive number of characters');
-  return max;
-}
+/** The shared terminal bound for one wake. */
+export const wakeMaxChars = promptFileMaxChars;
 
 const openerOf = (text) => {
   const end = text.indexOf('. ');
