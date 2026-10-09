@@ -1,7 +1,7 @@
 // leg-proposal.mjs - the write set the runtime proposes for an approved plan leg whose plan declares none.
 // The plan author (goal define / `starci kernel plan`) lists the legs by op and, today, no paths; the Kernel was then asked for free text and guessed (live, 2026-10-09:
 // interface.draw, "the plan declares no write set for it", answered with ui/** of the feature). The op contract already says what the op may write: each
-// `.starciwork/features/<feature>/<family>/...` entry of its manifest `writes`. The proposal is that family directory of every feature the work tree holds,
+// `.starciwork/features/<feature>/<family>/...` entry of its manifest `writes`, and every `.starciwork/_resources/<category>/...` entry (the planned identity, environment and fixture slots). The proposal is that family directory of every feature the work tree holds,
 // the Work paths of the leg. It is a proposal the Kernel picks as a typed choice (kernel-menu.yaml leg-ready `enqueue-proposed`), never a silent enqueue:
 // a leg the plan did not size is still the Kernel's judgment, but a pick, not a guess. Reads only.
 import fs from 'node:fs';
@@ -12,6 +12,7 @@ import { workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 
 const FEATURE_WRITE = /^\.starciwork\/features\/<feature>\/([^<{/]+)\//;
 const WORK = '.starciwork';
+const RESOURCE_WRITE = /^\.starciwork\/(_resources\/[^<{/]+)\//;
 const NODE_FEATURE = /\.starciwork\/features\/([^/]+)/;
 
 /** The literal families (`ui`, `sds`, ...) the manifest writes under a feature, in code-unit order. */
@@ -22,6 +23,16 @@ export function featureFamiliesOf(brief) {
     if (found) families.add(found[1]);
   }
   return [...families].sort(byCodeUnit);
+}
+
+/** The literal resource directories (`.starciwork/_resources/identities`, ...) the manifest writes: the planned slots an op declares are granted with the leg. */
+export function resourceDirsOf(brief) {
+  const dirs = new Set();
+  for (const write of Array.isArray(brief?.writes) ? brief.writes : []) {
+    const found = RESOURCE_WRITE.exec(typeof write?.path === 'string' ? write.path.trim() : '');
+    if (found) dirs.add(`${WORK}/${found[1]}`);
+  }
+  return [...dirs].sort(byCodeUnit);
 }
 
 /** The features a tree holds: the directories of `.starciwork/features` that carry an index.yaml. */
@@ -42,7 +53,7 @@ export function proposedLegPaths({ skillRoot, op, trees, nodePaths = [] }) {
   const named = new Set((nodePaths ?? []).map((p) => NODE_FEATURE.exec(String(p).replaceAll('\\', '/'))?.[1]).filter(Boolean));
   const held = [...new Set((trees ?? []).filter(Boolean).flatMap(featuresIn))];
   const features = (named.size ? [...named] : held).sort(byCodeUnit);
-  return features.flatMap((feature) => families.map((family) => `${WORK}/features/${feature}/${family}`)).join(',');
+  return [...features.flatMap((feature) => families.map((family) => `${WORK}/features/${feature}/${family}`)), ...resourceDirsOf(brief)].join(',');
 }
 
 /** The trees a workflow's features are read from: its own worktree first (a finished leg wrote its records there), then the ledger repository's checkout. */

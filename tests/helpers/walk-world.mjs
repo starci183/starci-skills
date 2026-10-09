@@ -40,8 +40,8 @@ function scaffoldApp(dir) {
 }
 
 /** The walk over `world`: verbs the Kernel, the engine and the op stand-in call. */
-export function openWalk(t, { fixture = walkFixture(), launch = true } = {}) {
-  const world = replayWorld(t, fixture, { tree: { scaffold: scaffoldApp }, launch });
+export function openWalk(t, { fixture = walkFixture(), launch = true, seed = null } = {}) {
+  const world = replayWorld(t, fixture, { tree: { scaffold: scaffoldApp }, launch, seed });
   const tree = world.tree.dir;
   // Orca hands every worker its own terminal handle; the ledger and the guard bind that handle to one job.
   world.env.STARCI_FAKE_ORCA_UNIQUE_TERMINALS = '1';

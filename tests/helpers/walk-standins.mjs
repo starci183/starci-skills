@@ -4,8 +4,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { FEATURE, scratchOf } from './walk-world.mjs';
-import { parseYaml } from '../../engine/yaml.mjs';
-import { recordsOf } from './walk-records.mjs';
+import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
+import { RESOURCE_RECORDS, recordsOf } from './walk-records.mjs';
 
 export const WORK = '.starciwork';
 const readOp = (root, op) => parseYaml(fs.readFileSync(path.join(root, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'));
@@ -65,6 +65,7 @@ export const LEG_PATHS = {
   'scope.define': [`${WORK}/features/${FEATURE}`, `${WORK}/index.yaml`],
   'business.decide': ['fr', 'nfr', 'br', 'decision', 'data', 'journey'].map((f) => `${WORK}/features/${FEATURE}/${f}`).concat(`${WORK}/features/${FEATURE}/index.yaml`),
   'architecture.decide': ['sds', 'contract', 'integration'].map((f) => `${WORK}/features/${FEATURE}/${f}`),
+  'work.author': [`${WORK}/features/${FEATURE}/impl`, `${WORK}/features/${FEATURE}/uat`, `${WORK}/_resources/identities`],
 };
 
 /** An authoring op whose product is families of the example feature: its READ, its records, its validator. */
@@ -79,34 +80,60 @@ function familyStandIn(op, families, summary) {
 
 const envelope = (op, summary, files, checks, extra = {}) => ({ schema: 'starci/op-report@1', outcome: 'done', summary, files, checks, ...extra });
 
+/** work.author: the planned implementation record and the uat flow with its resources, the READ, the document gate. */
+function workAuthor({ walk, jobId }) {
+  const files = [...writeFamilies(walk, ['impl', 'uat']), ...Object.entries(RESOURCE_RECORDS).map(([rel, text]) => put(walk.tree, `${WORK}/${rel}`, text))];
+  const read = readCheck({ walk, jobId, op: 'work.author', touches: files });
+  const docOut = path.join(scratchOf(walk.world, jobId), 'doc-gate.json');
+  const docArgs = ['gate', 'run', '--scope', 'docs', '--tree', WORK, '--out', docOut];
+  const doc = walk.sh(docArgs, { jobId });
+  const validate = validateCheck(walk, null, jobId);
+  const checks = [read.check, { name: 'starci-doc-gate', command: `starci ${docArgs.join(' ')}`, exitCode: doc.status ?? 1, phase: 'verify', evidence: 'document gate' }, validate.check];
+  return { report: envelope('work.author', 'The sign-in implementation and its uat flow authored in planned mode.', files, checks), attach: [read.attach, docOut], steps: { read: read.result, doc, validate: validate.result } };
+}
+
 export const STANDINS = {
+  'work.author': workAuthor,
   'business.decide': familyStandIn('business.decide', ['fr', 'br'], 'Business rules and requirements decided.'),
   'architecture.decide': familyStandIn('architecture.decide', ['sds', 'contract', 'integration'], 'Contracts and integrations decided.'),
   'scope.define'({ walk, jobId }) {
-    const { tree, world } = walk;
-    const feature = `${WORK}/features/${FEATURE}/index.yaml`;
-    const files = [put(tree, feature, yamlOf(['schema: work/feature@1', `id: ${FEATURE}`, 'title: A person signs up, signs in and keeps a session.', 'description: Account, sign-in and the session every other service verifies against.',
-      'extensions:', '  work3:', '    scope:', ...JSON.stringify(SCOPE, null, 2).split('\n').map((line) => `      ${line}`)])),
-    put(tree, `${WORK}/index.yaml`, yamlOf(['schema: work/catalog@1', 'id: auth', 'description: The authentication product.', 'features:', `  - id: ${FEATURE}`, `    directory: features/${FEATURE}`, '    description: Sign-up, sign-in and the session.']))];
-    const graph = proposeGraph({ walk, jobId, graph: GRAPH(world.wf), reason: 'work graph v0' });
+    const files = produceScope(walk);
+    const graph = proposeGraph({ walk, jobId, graph: GRAPH(walk.world.wf), reason: 'work graph v0' });
     const read = readCheck({ walk, jobId, op: 'scope.define', touches: files });
     const validate = validateCheck(walk, null, jobId);
     return { report: envelope('scope.define', 'Scope bounded: two nodes, one dependency, one exclusion.', files, [read.check, validate.check]), attach: [read.attach], steps: { graph, read: read.result, validate: validate.result } };
   },
 };
 
+/** The catalog entry of the feature the request introduces, added to the scaffold's catalog (its other entries stay). */
+function addCatalogEntry(tree) {
+  const rel = `${WORK}/index.yaml`;
+  const catalog = parseYaml(fs.readFileSync(path.join(tree, rel), 'utf8'));
+  if (!catalog.features.some((f) => f.id === FEATURE)) catalog.features.push({ id: FEATURE, directory: `features/${FEATURE}`, description: 'Sign-up, sign-in and the session.' });
+  return put(tree, rel, stringifyYaml(catalog));
+}
+
+/** The records scope.define writes: the feature with its bounded scope and the catalog entry. */
+export function produceScope(walk) {
+  const feature = `${WORK}/features/${FEATURE}/index.yaml`;
+  return [put(walk.tree, feature, yamlOf(['schema: work/feature@1', `id: ${FEATURE}`, 'title: A person signs up, signs in and keeps a session.', 'description: Account, sign-in and the session every other service verifies against.',
+    'extensions:', '  work3:', '    scope:', ...JSON.stringify(SCOPE, null, 2).split(NL).map((line) => `      ${line}`)])),
+  addCatalogEntry(walk.tree)];
+}
+
+export const GRAPH_V0 = GRAPH;
+
 const BRAND = ['schema: work/brand@1', 'id: brand', 'kind: brand', 'state: done', 'rev: 1', 'brand:', '  identity:', '    name: Acme', '    family: heroui',
-  '  color:', '    primary: "#0D9488"', '    surface: "#FFFFFF"', '  typography:', '    sans: Inter', '  mascot:', '    name: none', '  imagery:', '    auth: split-screen',
+  '  sources:', '    - path: fe/apps/web/src/app/globals.css', '  color:', '    primary: "#0D9488"', '    surface: "#FFFFFF"', '  typography:', '    sans: Inter', '  mascot:', '    name: none', '  imagery:', '    auth: split-screen',
   '  forbidden:', '    - Never ship text on the primary colour below a 4.5 to 1 contrast ratio.', 'review:', '  reviewer: brand owner', '  authority: Owner settled rev 1.', '  reviewedAt: 2026-10-09T10:00:00.000Z', ''].join('\n');
 
 const NL = String.fromCharCode(10);
 const SHELL_EVIDENCE = ['schema: work/evidence@1', 'record: shell', 'outcome: pass', 'assertions:', '  - id: shell#conformance', '    command: starci work shell-conformance .starciwork/shell/index.yaml', '    exit: 0', '    outcome: pass',
   '    observation: The layout tree is done, every visible layout has a slot-measured capture at desktop and mobile, and the lockup is a cropped render.', 'provenance:', '  actor: brand.decide', ''].join(NL);
 
-const png = async (walk) => {
+const PNG = async (walk, dir) => {
   const { blankImage, drawOver, encodePng } = await import('../../scripts/work/png.mjs');
   const capture = (w, h, slot) => { const image = blankImage(w, h, [30, 60, 90, 255]); drawOver(image, blankImage(slot.width, slot.height, [255, 0, 255, 255]), slot.x, slot.y); return encodePng(image); };
-  const dir = path.join(scratchOf(walk.world, walk.currentJob), 'captures', 'layouts');
   fs.mkdirSync(dir, { recursive: true });
   const files = { desktop: path.join(dir, 'web--locale--desktop--light.png'), mobile: path.join(dir, 'web--locale--mobile--light.png') };
   fs.writeFileSync(files.desktop, capture(1440, 900, { x: 240, y: 64, width: 1200, height: 836 }));
@@ -114,29 +141,36 @@ const png = async (walk) => {
   return files;
 };
 
-/** brand.decide: the brand record and the settled layout tree of the shell (scan, capture each visible layout at each breakpoint, crop the lockup, persona, settle), through the real verbs. */
-STANDINS['brand.decide'] = async ({ walk, jobId }) => {
-  walk.currentJob = jobId;
+/** The brand record and the settled layout tree of the shell (scan, capture each visible layout at each breakpoint, crop the lockup, persona, settle), through the real verbs. */
+export async function produceBrand(walk, { scratch, jobId = null }) {
   const sh = (args) => walk.sh(args, { jobId });
   const steps = { scan: sh(['work', 'layout-tree', 'scan', '--work', WORK, '--write']) };
-  const files = await png(walk);
+  const files = await PNG(walk, path.join(scratch, 'captures', 'layouts'));
   for (const bp of ['desktop', 'mobile']) steps[`capture-${bp}`] = sh(['work', 'layout-tree', 'capture', '--work', WORK, '--node', '/[locale]', '--breakpoint', bp, '--theme', 'light', '--file', files[bp], '--write']);
   steps.lockup = sh(['work', 'layout-tree', 'lockup', '--work', WORK, '--from', 'shell/assets/layouts/web--locale--desktop--light.png', '--rect', '10,10,100,30', '--write']);
   const shellFile = path.join(walk.tree, WORK, 'shell', 'index.yaml');
   let shell = fs.readFileSync(shellFile, 'utf8').replace(/^state: todo/m, 'state: done').replace(/(layout:\n\s+component: AppLayout\n\s+chrome: visible\n\s+state: )todo/, '$1done');
-  if (!/^personas:/m.test(shell)) shell = shell.replace(/^themes:/m, 'personas:\n  - role: owner\n    default: true\n    workspace: Acme\n    user: An Nguyen\n    currency: VND\n    dateFormat: dd/MM/yyyy\nthemes:');
+  const persona = ['personas:', '  - role: owner', '    default: true', '    workspace: Acme', '    user: An Nguyen', '    currency: VND', '    dateFormat: dd/MM/yyyy', 'themes:'].join(NL);
+  if (!/^personas:/m.test(shell)) shell = shell.replace(/^themes:/m, persona);
   fs.writeFileSync(shellFile, shell);
   const brand = put(walk.tree, `${WORK}/brand/index.yaml`, BRAND);
   const shellEvidence = put(walk.tree, `${WORK}/shell/evidence.yaml`, SHELL_EVIDENCE);
-  const conformance = sh(['work', 'shell-conformance', `${WORK}/shell/index.yaml`]);
-  const conformanceFile = path.join(scratchOf(walk.world, jobId), 'shell-conformance.txt');
-  fs.writeFileSync(conformanceFile, `${conformance.stdout}\n`);
-  const brandCheck = sh(['work', 'brand', WORK]);
-  steps.conformance = conformance; steps.brandCheck = brandCheck;
-  const read = readCheck({ walk, jobId, op: 'brand.decide', touches: [brand, `${WORK}/shell/index.yaml`] });
+  return { steps, files, written: [brand, `${WORK}/shell/index.yaml`, shellEvidence], brand };
+}
+
+STANDINS['brand.decide'] = async ({ walk, jobId }) => {
+  const scratch = scratchOf(walk.world, jobId);
+  const made = await produceBrand(walk, { scratch, jobId });
+  const conformance = walk.sh(['work', 'shell-conformance', `${WORK}/shell/index.yaml`], { jobId });
+  const conformanceFile = path.join(scratch, 'shell-conformance.txt');
+  fs.writeFileSync(conformanceFile, `${conformance.stdout}
+`);
+  const brandCheck = walk.sh(['work', 'brand', WORK], { jobId });
+  const read = readCheck({ walk, jobId, op: 'brand.decide', touches: [made.brand, `${WORK}/shell/index.yaml`] });
   const validate = validateCheck(walk, null, jobId);
   const checks = [read.check, validate.check, { name: 'shell-conformance', command: `starci work shell-conformance ${WORK}/shell/index.yaml`, exitCode: conformance.status ?? 1, phase: 'verify', evidence: 'layout tree settled' },
     { name: 'brand-checks', command: `starci work brand ${WORK}`, exitCode: brandCheck.status ?? 1, phase: 'verify', evidence: 'brand checks' }];
-  return { report: envelope('brand.decide', 'Brand rev 1 settled; shell layout tree captured and conformant.', [brand, `${WORK}/shell/index.yaml`], checks), attach: [read.attach, conformanceFile, ...Object.values(files)], steps: { ...steps, read: read.result, validate: validate.result } };
+  return { report: envelope('brand.decide', 'Brand rev 1 settled; shell layout tree captured and conformant.', made.written, checks), attach: [read.attach, conformanceFile, ...Object.values(made.files)],
+    steps: { ...made.steps, conformance, brandCheck, read: read.result, validate: validate.result } };
 };
 LEG_PATHS['brand.decide'] = [`${WORK}/brand`, `${WORK}/shell`];
