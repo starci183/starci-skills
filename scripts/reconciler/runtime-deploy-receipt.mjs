@@ -9,7 +9,7 @@ import path from 'node:path';
 import { starciLocalRoot } from '../../engine/runtime-root.mjs';
 import { notes } from '../api/git/notes.mjs';
 
-export const RECEIPT_SCHEMA = 'starci/deploy-receipt@1';
+const RECEIPT_SCHEMA = 'starci/deploy-receipt@1';
 
 export const receiptFile = (sha, env) => path.join(starciLocalRoot(env), 'deploy', 'receipts', `${sha}.json`);
 

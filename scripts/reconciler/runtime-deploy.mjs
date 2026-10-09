@@ -63,7 +63,7 @@ export function judge(facts) {
 }
 
 /** The steps the verb would take, in order, for the facts. */
-export function plannedSteps(facts) {
+function plannedSteps(facts) {
   const { source, range } = facts;
   const check = facts.receipt ? `check receipt present (${facts.receipt.via})` : `run starci runtime check in ${source.dir} (exit 0 required) and write the receipt`;
   const wait = facts.inFlight.length ? `wait for ${facts.inFlight.length} step(s) in flight: ${facts.inFlight.map(stepLine).join('; ')}` : 'no step in flight';

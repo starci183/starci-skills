@@ -90,7 +90,7 @@ State which of the three you used. Do not claim a loop exists until the host con
 
 ## Carrying a fix onto the host
 
-One verb replaces the hand sequence (fetch, `git merge --ff-only` in the live checkout, `starci reconciler restart`, read the digest):
+One verb replaces the hand sequence (a hand fast-forward of the live checkout, `starci reconciler restart`, read the digest):
 
 ```
 starci runtime deploy --from <clone-or-ref> --plan     # every step and every refusal, nothing changed
@@ -100,7 +100,7 @@ starci runtime deploy --from <clone-or-ref>            # the deploy
 - It refuses unless the source is committed and clean, a fast-forward of the host tree, and proven by a check receipt bound to that exact commit (the verb runs `starci runtime check` in the clean source itself; a lane cannot claim green). It refuses while a release cut holds the host lock.
 - It waits for the settles, Critic runs and prepared decisions in flight and stops none of them; when they do not finish in time it refuses and names them.
 - A tip several commits ahead is one revision change: one fast-forward, `starci runtime artefacts --migrate` from the new tree (generated copies and the hooks of every live workflow tree), one engine restart, then the verification (new revision with a fresh heartbeat, every controller in its mode, no seat dead) and one `runtime-deployed` event.
-- A failure after the fast-forward names the host state and the way back without destructive git: `git revert --no-edit <previous>..<new>` on the host tree, then `starci reconciler restart`.
+- A failure after the fast-forward names the host state, the previous revision and the way back without destructive git (a revert of the range, never a reset), which the output of the verb prints.
 
 ## The role contract
 
