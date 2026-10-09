@@ -53,14 +53,17 @@ test('a launch the host refused consumer_fenced spends no pool strike; a refusal
 test('a fence at worker-start re-binds the Run to the Kernel terminal once and retries the launch once; a second fence is rejected as before', () => {
   const calls = [];
   const rows = [];
-  const input = { ledger: { transaction: (fn) => fn(), appendEvent: (e) => rows.push(e) }, job: { workflow_id: 'wf-1' }, jobId: 'op-a-1', run: 'run_1', from: 'term_kernel' };
+  const input = { request: { job: 'op-a-1', lease: 'l1' }, ledger: { transaction: (fn) => fn(), appendEvent: (e) => rows.push(e) }, job: { workflow_id: 'wf-1' }, jobId: 'op-a-1', run: 'run_1', from: 'term_kernel' };
   const fence = { ok: false, step: 'worker-start', error: 'consumer_fenced: worker-start requires the coordinator terminal currently bound to the Task Run.', effectState: 'none' };
   const results = [fence, { ok: true, terminal: 'term_op' }];
-  const launch = () => { calls.push('launch'); return results.shift(); };
+  const requests = [];
+  const launch = (launched) => { calls.push('launch'); requests.push(launched.request); return results.shift(); };
   const rebind = () => { calls.push('rebind'); return { rebound: true, action: 'rebound', previousCoordinator: null }; };
   const out = spawnOperationAgent(input, { launch, rebind });
   assert.deepEqual(calls, ['launch', 'rebind', 'launch']);
   assert.equal(out.ok, true);
+  assert.equal(requests[0]?.fenceRetry, undefined);
+  assert.equal(requests[1].fenceRetry, 1, 'the retry is a new admission attempt: its request differs, so its attempt id and host request id do');
   assert.equal(rows[0].kind, 'run-rebound');
   assert.equal(rows[0].payload.runId, 'run_1');
 

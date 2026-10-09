@@ -96,7 +96,9 @@ function kernelAckedRev(c) {
  */
 function readyUndispatched(c) {
   const w = c.workflow;
-  const ready = (w.jobs ?? []).filter((job) => job.kind === 'op' && job.status === 'ready');
+  // Ready is the job's own status, or the Kernel status naming it ready in the queue (a queued row the frontier calls ready).
+  const listed = new Set((w.status?.frontier?.queued ?? []).filter((q) => q.queuedBecause === 'ready').map((q) => q.jobId));
+  const ready = (w.jobs ?? []).filter((job) => job.kind === 'op' && (job.status === 'ready' || listed.has(job.jobId)));
   if (!ready.length) return null;
   const progressed = Math.max(lastAt(eventsOf(w, 'op-dispatched')) ?? 0, lastAt(eventsOf(w, 'op-settled')) ?? 0);
   const oldest = ready.map((job) => Math.max(Number(job.createdAt) || 0, progressed)).sort((a, b) => a - b)[0];

@@ -10,6 +10,7 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadFixture, replayWorld } from '../helpers/replay-world.mjs';
+import { readMachine } from '../../engine/db/machine.mjs';
 
 const push = (world) => world.cli('dispatch-ready', ['--workflow', world.wf, '--foreground'], { timeout: 300_000 }).json;
 
@@ -42,12 +43,16 @@ test('g: a worker-start refused consumer_fenced re-binds the Run, no pool is exc
   assert.equal(world.engine({ controllers: ['job', 'workflow'], passes: 1 }).ok, true, 'the engine restarts over the dispatched job');
 });
 
-// OPEN (registry: run-fence-repair-retries-a-released-attempt): the launch the re-bind retries inside the same dispatch meets its own released reservation
-// (attempt-released at admission), is recorded as a refusal and strikes the pool (demoted, not excluded); the next push dispatches. The test carries todo until the
-// retry takes a fresh reservation; the assertion is the exact one that fix must satisfy.
-test('g: the first push dispatches the retry in the same call as the re-bind, and records no refusal', { todo: 'open: the retried launch meets its released reservation' }, () => {
+// registry: run-fence-repair-retries-a-released-attempt. The refused start released its provider reservation and a released attempt id is never taken again
+// (attempt-released), so the launch the re-bind retries is a new admission attempt (spawnOperationAgent): the first push dispatches and records no refusal.
+test('g: the first push dispatches the retry in the same call as the re-bind, and records no refusal', () => {
   const [{ results }] = shared;
   assert.equal(results.length, 1, `dispatched on the first push, not after ${results.length}: ${JSON.stringify(results.map((r) => r.error ?? r.dispatched))}`);
+  const [{ world }] = shared;
+  const rejected = world.ledger((ledger) => ledger.db.prepare("SELECT count(*) AS n FROM events WHERE kind='dispatch-rejected'").get().n);
+  assert.equal(rejected, 0, 'no refusal is recorded, so no pool is struck at any step');
+  const reservations = readMachine((m) => m.providerReservations({ activeOnly: true }), [], { env: world.env });
+  assert.equal(reservations.length, 1, 'one reservation is held for the dispatched worker: none leaked, none doubled');
 });
 
 test('h: a ready interface op whose brand record lives in the workflow tree passes the grammar context and goes on to launch', (t) => {
@@ -60,4 +65,35 @@ test('h: a ready interface op whose brand record lives in the workflow tree pass
   assert.equal(result.jobId, draw.id);
   assert.doesNotMatch(String(result.error ?? ''), /grammar-context-missing/, `the push reads the brand record of the tree: ${result.error}`);
   assert.equal(typeof result.dispatched, 'boolean', 'the push went on to route and dispatch the job');
+});
+
+// registry: ready-job-never-dispatched-no-owner. The ready retry of the fenced world, with no fix of the launch in the way (the fence stays), sits past the bound: the real
+// digest names it ready-not-dispatched with the runtime as its owner.
+test('i: a ready job nothing dispatched inside its bound is a problem line of the real digest, owned by the runtime', (t) => {
+  const fixture = loadFixture('fenced-retry');
+  const world = replayWorld(t, fixture, { tree: true, launch: true });
+  const retry = fixture.jobs.find((job) => job.retryOf);
+  assert.equal(world.ack([retry.op]).status, 0, 'the Kernel attests its READ, so the dispatch step is judged');
+  const hour = Date.now() - 3_600_000;
+  world.ledger((ledger) => ledger.db.prepare("UPDATE jobs SET created_at=? WHERE job_id=?").run(hour, retry.id));
+  const digest = world.starci(['debug', 'digest', '--workflow', world.wf]);
+  const text = JSON.stringify(digest.json);
+  assert.match(text, /ready-not-dispatched/, `the digest names the stalled ready job: ${String(digest.stdout).slice(0, 600)}`);
+  assert.match(text, /Workflow controller/, 'and says who owns the dispatch');
+});
+
+// A fence a re-bind does not cure: the one retry is refused too, the job stays ready, and the runtime leaks no reservation and strikes no pool at any step.
+test('j: a fence the re-bind does not cure is rejected after one retry, leaks no reservation and strikes no pool', (t) => {
+  const fixture = loadFixture('fenced-retry');
+  const retry = fixture.jobs.find((job) => job.retryOf);
+  const world = replayWorld(t, fixture, { tree: true, launch: true });
+  world.env.STARCI_FAKE_ORCA_START_FENCED = 'always';
+  assert.equal(world.ack([retry.op]).status, 0);
+  const results = [push(world).results[0], push(world).results[0]];
+  assert.ok(results.every((r) => r.dispatched === false), `the fence stands: ${JSON.stringify(results.map((r) => r.error))}`);
+  const rebinds = world.orca().runUses.length;
+  assert.ok(rebinds >= 1 && rebinds <= results.length, `at most one re-bind per push, never a loop inside one (${rebinds})`);
+  assert.deepEqual(readMachine((m) => m.providerReservations({ activeOnly: true }), [], { env: world.env }), [], 'no reservation is left held by a refused start');
+  const routes = world.ledger((ledger) => ledger.db.prepare("SELECT payload_json FROM events WHERE kind='route-decided' ORDER BY seq").all().map((row) => JSON.parse(row.payload_json).lineageAdjust));
+  assert.deepEqual(routes.flatMap((adjust) => [...(adjust?.demoted ?? []), ...(adjust?.excluded ?? [])]).filter((pool) => pool === 'codex-agent'), [], 'the pool the host failed to start is neither demoted nor excluded');
 });
