@@ -26,11 +26,13 @@ function ledgerBlockers(facts, workflowId) {
 }
 
 // The refusals of the host side: Orca must be readable (nothing is proven from a silent Orca), no worker may be live, the host lock must be free.
-function hostBlockers(facts, live) {
+function hostBlockers(facts, live, listed) {
   const out = [];
-  if (!facts.orca.readable) out.push({ code: 'workflow-purge-orca-unreadable', detail: `Orca did not answer: ${facts.orca.error ?? 'no detail'}; no leftover can be proven or closed` });
+  if (!facts.orca.readable || !facts.orca.complete) out.push({ code: 'workflow-purge-orca-unreadable', detail: `Orca did not answer completely: ${facts.orca.error ?? 'incomplete worktree listing'}; no leftover can be proven or closed` });
   for (const run of facts.workers.unreadable) out.push({ code: 'workflow-purge-orca-unreadable', detail: `worker-list for Run ${run.run} failed: ${run.error}` });
   if (live.length) out.push({ code: 'workflow-purge-worker-live', detail: `${live.length} worker(s) of the workflow's Runs are active: ${live.map((w) => w.dispatchId).join(', ')}` });
+  const unknown = listed.filter((item) => item.holdsTree);
+  if (unknown.length) out.push({ code: 'workflow-purge-custody-unknown', detail: `${unknown.length} unproved holder(s) in the workflow's trees: ${unknown.map((item) => item.id).join(', ')}; every tree and ledger row stays` });
   const held = facts.hostLock;
   if (held) out.push({ code: 'workflow-purge-host-busy', detail: 'the host lock is held (' + [held.role, held.purpose].filter(Boolean).join(', ') + ', pid ' + held.pid + '); a purge waits for it' });
   return out;
@@ -56,18 +58,19 @@ function counts(plan) {
  * The plan of a purge: {schema, workflowId, repo, blockers, trees, refs, workers, terminals, listed, guards, prompts, decisions, ledger, counts, already, sha}.
  * `ok` is true when blockers is empty. `already`: the journal holds the purge and nothing of it remains. facts: purgeFactsOf; ledgerMode: --ledger.
  */
-export function buildPurgePlan({ facts, workflowId, repo, ledgerMode = false }) {
+export function buildPurgePlan({ facts, workflowId, repo, ledgerMode = false, archiveBlockers = [] }) {
   const workers = classifyWorkers(facts.workers.rows);
   const treePaths = facts.trees.map((tree) => tree.path);
   const terminals = classifyTerminals({ terminals: facts.terminals, evidence: facts.evidence, treePaths, workerClose: workers.close });
+  const listed = [...terminals.listed, ...listStrangerWorkers({ rows: facts.workers.others ?? [], treePaths, terminals: facts.terminals })];
   // A workflow whose ledger rows are gone after a journalled purge is purged, not unknown.
   const gone = !facts.ledger.found && facts.machine.purgedAt != null;
-  const blockers = gone ? [] : [...ledgerBlockers(facts, workflowId), ...(facts.ledger.found ? hostBlockers(facts, workers.live) : [])];
+  const blockers = [...(gone ? [] : ledgerBlockers(facts, workflowId)), ...(facts.ledger.found || facts.trees.length ? hostBlockers(facts, workers.live, listed) : []), ...archiveBlockers];
   const plan = { schema: PURGE_PLAN_SCHEMA, workflowId, repo: path.resolve(repo), blockers, trees: facts.trees.map((tree) => treeItem(tree)),
     refs: facts.refs.map((ref) => ({ repoRoot: ref.repoRoot, name: ref.name, kind: ref.kind, tip: ref.tip, proof: ref.proof, action: ref.action, why: ref.why })),
     workers: workers.close.map((worker) => ({ dispatchId: worker.dispatchId, runId: worker.runId, terminal: worker.terminal, state: worker.state, liveness: worker.liveness })),
     terminals: terminals.close.map((terminal) => ({ handle: terminal.handle, cwd: terminal.cwd, title: terminal.title })),
-    listed: [...terminals.listed, ...listStrangerWorkers({ rows: facts.workers.others ?? [], treePaths })],
+    listed,
     guards: facts.guards.map((file) => path.resolve(file)), prompts: facts.prompts.map((file) => path.resolve(file)),
     decisions: facts.machine.decisions.map((di) => di.diId), ledger: ledgerPart(facts, ledgerMode) };
   const nothingLeft = !plan.trees.length && !plan.workers.length && !plan.terminals.length && !plan.refs.some((ref) => ref.action === 'delete');

@@ -223,8 +223,8 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
   fs.mkdirSync(env[TEMP_ROOT_ENV], { recursive: true });
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB', 'STARCI_STATUS_MEMO', 'STARCI_ACTOR', 'CODEX_HOME']) delete env[key];
   const saved = { ...process.env };
-  Object.assign(process.env, { [TEST_REGISTRY_ENV]: env[TEST_REGISTRY_ENV], STARCI_LOCAL_ROOT: env.STARCI_LOCAL_ROOT, STARCI_PROJECTS_ROOT: env.STARCI_PROJECTS_ROOT, STARCI_KERNEL_REV_ROOT: runtime });
-  t.after(() => { for (const key of ['STARCI_LOCAL_ROOT', 'STARCI_PROJECTS_ROOT', 'STARCI_KERNEL_REV_ROOT', TEST_REGISTRY_ENV]) { if (saved[key] === undefined) delete process.env[key]; else process.env[key] = saved[key]; } });
+  Object.assign(process.env, { [TEST_REGISTRY_ENV]: env[TEST_REGISTRY_ENV], STARCI_LOCAL_ROOT: env.STARCI_LOCAL_ROOT, STARCI_PROJECTS_ROOT: env.STARCI_PROJECTS_ROOT, STARCI_ARTIFACT_ROOT: env.STARCI_ARTIFACT_ROOT, STARCI_KERNEL_REV_ROOT: runtime });
+  t.after(() => { for (const key of ['STARCI_LOCAL_ROOT', 'STARCI_PROJECTS_ROOT', 'STARCI_ARTIFACT_ROOT', 'STARCI_KERNEL_REV_ROOT', TEST_REGISTRY_ENV]) { if (saved[key] === undefined) delete process.env[key]; else process.env[key] = saved[key]; } });
   openMachine({ file: machineFile }).close();
   const now = Date.now();
   const at = (offset) => now + Number(offset);

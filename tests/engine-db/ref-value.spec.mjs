@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { isRef, refOf, parseRef, resolveValue, putContent, installRefResolver } from '../../engine/db/ref-value.mjs';
+import { isRef, refOf, parseRef, resolveValue, putContent, installRefResolver, prepareStored } from '../../engine/db/ref-value.mjs';
 import { putBlob } from '../../engine/db/blob.mjs';
 import { openLedger, openLedgerReader } from '../../engine/db/ledger.mjs';
 import { openMachine, openMachineReader } from '../../engine/db/machine.mjs';
@@ -42,6 +42,7 @@ test('a handle with the resolver returns the content for get, all and iterate, a
   insert.run(stored(big), 1);
   insert.run('inline', 2);
   assert.equal(db.prepare('SELECT body FROM t WHERE n=1').get().body, big);
+  assert.equal(prepareStored(db, 'SELECT body FROM t WHERE n=1').get().body, stored(big), 'an archive reads the exact reference cell through the storage owner');
   assert.deepEqual(db.prepare('SELECT body FROM t ORDER BY n').all().map((r) => r.body), [big, 'inline']);
   assert.deepEqual([...db.prepare('SELECT body FROM t ORDER BY n').iterate()].map((r) => r.body), [big, 'inline']);
   assert.equal(db.prepare('SELECT count(*) AS n FROM t').get().n, 2);

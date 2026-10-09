@@ -18045,6 +18045,27 @@ workflow-purge-worker-live:
   owner: owner
   kind: verb-refusal
 
+workflow-purge-custody-unknown:
+  title: "Unproved custody holds a workflow tree"
+  title_vi: "Cây workflow còn người giữ chưa chứng minh được quyền sở hữu"
+  meaning_vi: "Worker hoặc terminal trong cây chưa được bằng chứng ràng buộc với workflow; mọi bước dọn đều bị giữ lại."
+  causes_vi:
+    - "Run hoặc handle không được sổ hay journal chứng minh"
+  nextStep_vi: "Chủ sở hữu xác minh người giữ cây và để nó rời cây qua đường quản lý của nó trước khi dọn lại."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-archive-incomplete:
+  title: "The complete workflow archive evidence cannot be verified"
+  title_vi: "Không xác minh được đầy đủ bằng chứng của archive workflow"
+  meaning_vi: "Một tham chiếu blob thiếu, hỏng, không đọc được hoặc không xác định được phạm vi workflow; --ledger từ chối trước mọi tác động dọn."
+  causes_vi:
+    - "Blob hoặc metadata không còn đọc lại đúng digest"
+    - "Catalog tham chiếu không có quan hệ sở hữu workflow trong schema"
+  nextStep_vi: "Khôi phục bằng chứng bị thiếu hoặc sửa quan hệ sở hữu trước khi chạy lại --ledger."
+  owner: owner
+  kind: verb-refusal
+
 workflow-purge-orca-unreadable:
   title: "Orca did not answer, so no leftover can be proven"
   title_vi: "Orca không trả lời nên không chứng minh được phần còn sót"

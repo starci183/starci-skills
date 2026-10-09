@@ -306,6 +306,12 @@ function bundleManifest(ref, { db = null, root = null } = {}) {
   return doc?.schema === BUNDLE_SCHEMA ? doc : null;
 }
 
+/** Direct blob references of a bundle, validated by the storage format owner; ordinary blobs have none. Reads never materialize a view. */
+export function blobReferences(ref, { root = null } = {}) {
+  const manifest = bundleManifest(ref, { root });
+  return manifest ? bundleEntries(manifest).map(([, sha]) => sha) : [];
+}
+
 /**
  * Remove a staging directory this call made: the files it wrote, then the directories above them, deepest first. It never walks a tree: the link-safe
  * recursive delete is scripts/api/fs/safe-remove.mjs, which the db tier cannot import, and a staging tree holds only what this call created.

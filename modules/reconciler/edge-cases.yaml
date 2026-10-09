@@ -1762,3 +1762,19 @@ cases:
     rule: {file: tests/helpers/replay-world.mjs, anchor: "tempChildEnv"}
     spec: tests/replay/tree-stray.spec.mjs
     status: covered
+  - id: workflow-purge-spilled-custody-and-unknown-holders
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "purge reads payload_json alone and loses pointer-only or clipped Run, terminal and ref custody; unproved holders are listed but their tree remains removable", remedy: {state: in-tree, change: "hydrate ledger and machine events through eventPayloadOf; incomplete host reads and unknown tree custody refuse before any purge effect"}}
+    met: {date: "2026-10-10", where: "isolated real-writer and CLI replay", evidence: "pre-fix 6a034fdd5 loses proved custody and removes trees holding unknown workers or terminals; the fixed replay retains the tree and rows on refusal"}
+    rule: {file: scripts/machine/workflow-purge-plan.mjs, anchor: "export function buildPurgePlan"}
+    spec: tests/machine/workflow-purge.spec.mjs
+    replay: tests/replay/workflow-purge.spec.mjs
+    status: covered
+  - id: workflow-purge-incomplete-blob-archive
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "native purge archives job_artifacts only, omitting events, goal inputs, attempt and check streams and other declared reference owners", remedy: {state: in-tree, change: "one archive evidence helper reads blob_ref_columns, schema foreign keys, stored content references and storage-owned bundle membership; every referenced original is verified before effects and compared again under the ledger writer lock"}}
+    met: {date: "2026-10-10", where: "isolated archive replay and native purge spec", evidence: "pre-fix replay archives no bytes without job_artifacts and purges with missing or corrupt check evidence; the fixed ZIP alone restores the workflow blob closure, excluding foreign evidence"}
+    rule: {file: scripts/work/workflow-archive-evidence.mjs, anchor: "export function workflowArchiveEvidence"}
+    spec: tests/housekeeping/workflow-purge-archive.spec.mjs
+    replay: tests/replay/workflow-purge.spec.mjs
+    status: covered

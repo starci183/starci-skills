@@ -4,6 +4,6 @@ import { parseJson } from '../../scripts/lib/json.mjs';
 import { getBlob } from './blob.mjs';
 
 /** The payload of an events row ({payload_json, payload_sha}); null when the row has none. */
-export function eventPayloadOf(row) {
-  return row?.payload_sha ? JSON.parse(getBlob(row.payload_sha).toString('utf8')) : parseJson(row?.payload_json) ?? null;
+export function eventPayloadOf(row, { root = null } = {}) {
+  return row?.payload_sha ? JSON.parse(getBlob(row.payload_sha, { root }).toString('utf8')) : parseJson(row?.payload_json) ?? null;
 }

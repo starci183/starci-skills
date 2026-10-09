@@ -11,6 +11,9 @@ import { renderApply, renderPlan } from '../machine/workflow-purge-render.mjs';
 import { underHostLock } from '../machine/verb-lock.mjs';
 import { acquireGcLock } from '../machine/gc-lock.mjs';
 import { purgeWorkflow } from '../work/purge-workflow.mjs';
+import { workflowArchiveEvidence } from '../work/workflow-archive-evidence.mjs';
+import { openLedgerReader } from '../../engine/db/ledger.mjs';
+import { artifactRoot } from '../../engine/db/blob.mjs';
 import { guardsRoot } from '../guards/guards-root.mjs';
 
 const MIN_EXPECT = 12;
@@ -25,7 +28,23 @@ function purgeLedgerRows({ plan }) {
   } catch (error) { return { ok: false, error: `${error?.code ?? 'purge-failed'}: ${String(error?.message ?? error).slice(0, 300)}` }; }
 }
 
-const planOf = ({ repo, workflowId, env, ledgerMode, deps }) => buildPurgePlan({ facts: purgeFactsOf({ repo, workflowId, env, guardsDir: guardsRoot(undefined, env), deps }), workflowId, repo, ledgerMode });
+// --ledger cannot start host effects when the native archive cannot retain all referenced bytes.
+function archiveBlockersOf(facts, workflowId, env, ledgerMode) {
+  if (!ledgerMode || !facts.ledger.found) return [];
+  let db;
+  try {
+    db = openLedgerReader(facts.ledger.file);
+    workflowArchiveEvidence(db, workflowId, { root: artifactRoot(env) });
+    return [];
+  } catch (error) {
+    return [{ code: 'workflow-purge-archive-incomplete', detail: `archive evidence cannot be verified: ${String(error?.message ?? error).slice(0, 300)}; no purge effect is authorized` }];
+  } finally { db?.close(); }
+}
+
+function planOf({ repo, workflowId, env, ledgerMode, deps }) {
+  const facts = purgeFactsOf({ repo, workflowId, env, guardsDir: guardsRoot(undefined, env), deps });
+  return buildPurgePlan({ facts, workflowId, repo, ledgerMode, archiveBlockers: archiveBlockersOf(facts, workflowId, env, ledgerMode) });
+}
 
 // The apply under the host lock and the gc lock, with the plan read again once the locks are ours (the plan shown may be old).
 async function applyLocked({ shown, args, env, deps }) {

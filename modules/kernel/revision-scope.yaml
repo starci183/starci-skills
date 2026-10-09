@@ -69,6 +69,10 @@ settleJudges:
   - {proof: draw-metrics, files: ["scripts/work/draw-loop-settle.mjs", "scripts/work/draw/**", "knowledge/ui/**"], admissionAware: false}
   - {proof: work-hygiene, files: ["scripts/work/validate/**", "modules/schemas/**"], admissionAware: false}
 rows:
+  - id: workflow-archive-evidence
+    why: "native purge reads the schema-owned workflow projection and complete blob closure in each new verb process"
+    paths: [scripts/work/workflow-archive-evidence.mjs]
+    roles: {}
   - id: docs-and-notes
     why: "text a person reads; no role loads it"
     paths: ["docs/**", "**/*.md", CHANGELOG.md, LICENSE, THIRD_PARTY_NOTICES.md, "benchmark/**", codecov.yml, sonar-project.properties, .gitattributes, .gitignore, ".github/**", ".claude/**", "ext/**", "init/**", hfs.json]
