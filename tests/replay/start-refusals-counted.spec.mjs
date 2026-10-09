@@ -76,3 +76,34 @@ test('an answer that is not a failed launch (Orca not answering, a Kernel whose 
   watchdog(world, { ok: false, step: 'kernel-worker-alive', workflowId: world.wf, error: 'the Dispatch is alive' });
   assert.deepEqual(failures(world), []);
 });
+
+// The codes on the Kernel-launch chain (catalogued surfacedBy decision-item / seat-unrecoverable): each reaches the start-hold through the watchdog journal.
+// The recovery's reasons ride in the refusal kernel-launch-unreconciled; the others are the refusal's own step.
+const RECOVERY_REASONS = ['kernel-launch-custody-incomplete', 'kernel-launch-host-unavailable', 'kernel-launch-dispatch-unsettled', 'kernel-launch-terminal-unproven',
+  'kernel-launch-runs-unreadable', 'kernel-launch-run-exists'];
+const OWN_STEPS = ['kernel-start-reservation-lost', 'kernel-guard-unbound', 'kernel-seat-publication-failed', 'worktree-registry-unavailable'];
+
+for (const reason of RECOVERY_REASONS) {
+  test(`${reason}: the refusal that carries it is journalled with that reason`, (t) => {
+    const world = deployed(t);
+    watchdog(world, { ok: false, step: 'kernel-launch-unreconciled', workflowId: world.wf, recovery: { ok: false, reason, effectState: 'unknown' } });
+    const [failed, ...rest] = failures(world);
+    assert.equal(rest.length, 0);
+    assert.deepEqual([failed.step, failed.runtimeRev], ['kernel-launch-unreconciled', runtimeRevNow()]);
+    assert.match(failed.error, new RegExp(reason));
+  });
+}
+
+for (const step of OWN_STEPS) {
+  test(`${step}: the refusal is journalled under its own step and, repeated, holds the launch`, (t) => {
+    const world = deployed(t);
+    const rev = runtimeRevNow();
+    world.ledger((ledger) => ledger.transaction(() => {
+      for (let i = 0; i < 2; i += 1) ledger.appendEvent({ workflowId: world.wf, entityType: 'kernel', entityId: world.wf, kind: 'kernel-start-failed', createdAt: Date.now() - (3 - i) * 3_600_000,
+        payload: { step, reason: step, error: step, runtimeRev: rev } });
+    }));
+    watchdog(world, { ok: false, step, workflowId: world.wf, error: `${step} refused` });
+    assert.equal(failures(world).at(-1).step, step);
+    assert.deepEqual([holdOf(world)?.state, holdOf(world)?.step], ['held', step]);
+  });
+}

@@ -1621,3 +1621,17 @@ cases:
     rule: {file: packages/cli/src/runtime-target.mjs, anchor: "targetOf"}
     spec: tests/cli/runtime-side.spec.mjs
     status: covered
+  - id: effect-unknown-promised-an-item-opened-none
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a catalogue promise is kept by code) the SLA catalogue says EFFECT_UNKNOWN_STUCK is answered by starci kernel reconcile and then a Decision Item; the Job controller only reconciled on every pass and the clock stayed a warn, so a job fenced as effect_unknown for hours reached the Supervisor through no item", remedy: {state: in-tree, change: "past the SLA bound the Job controller opens one runtime-defect item for the Supervisor per job (effect-unknown-item.mjs)"}}
+    met: {date: "2026-10-09", where: "held-state sweep of the hold table (lane fix/a8-held-states-have-owners)", evidence: "modules/reconciler/sla.yaml EFFECT_UNKNOWN_STUCK autoAction against scripts/reconciler/controllers/job.mjs"}
+    rule: {file: scripts/reconciler/effect-unknown-item.mjs, anchor: "effectUnknownItem"}
+    spec: tests/reconciler/effect-unknown-item.spec.mjs
+    status: covered
+  - id: refused-launch-recovery-and-seat-quarantine-two-items
+    family: concurrency
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: one item per cause) a refused Kernel launch recovery opens its own Supervisor item and the refusal, counted by the start hold, would also quarantine the seat with a seat-unrecoverable item: two items for kernel-launch-unreconciled", remedy: {state: in-tree, change: "the recovery's item owns the refusal; the quarantine counts it and holds the launch but opens no second item while the recovery's item is live (launch-held-item.mjs)"}}
+    met: {date: "2026-10-09", where: "merge of hotfix/a8-kernel-launch-adopt with the start-refusal journal", evidence: "workflow-launch-custody.mjs escalateHeldLaunch and host-seats.mjs seatQuarantine"}
+    rule: {file: scripts/kernel/launch-held-item.mjs, anchor: "recoveryItemOpen"}
+    spec: tests/reconciler/launch-held-item.spec.mjs
+    status: covered
