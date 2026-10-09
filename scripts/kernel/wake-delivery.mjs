@@ -57,8 +57,7 @@ import { classifyAgentScreen, staleAwareState, outputAgeOf, wakeDeliveryOf, exit
 import { squash } from '../lib/clip.mjs';
 import { clearDraft, probeDraft, sameDraft, DRAFT_STALE, CLEAR_DRAFT_INTERVAL_MS } from './clear-draft.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { kernelNoticeOf, revisionWakeLine } from './kernel-notice.mjs';
-import { revRootOf } from './runtime-rev.mjs';
+import { kernelWakeRevLine } from './kernel-notice.mjs';
 import { boundedWake } from './wake-bound.mjs';
 import { gatedWake } from './wake-menu-gate.mjs';
 
@@ -408,7 +407,7 @@ export function wakeKernel({ db, workflowId, text, pending = 'hold', activeStale
 const revLineOf = (db, workflowId, attempt, deps) => {
   if (attempt == null) return null;
   if (deps.revLine !== undefined) return deps.revLine;
-  try { return revisionWakeLine(kernelNoticeOf(db, workflowId, { root: revRootOf() }), workflowId, { root: revRootOf() }); } catch { return null; }
+  return kernelWakeRevLine(db, workflowId);
 };
 
 // pending 'enter' on a staged/queued input: one proven Enter, never a second wake on top.

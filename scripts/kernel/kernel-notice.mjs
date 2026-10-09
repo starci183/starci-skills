@@ -4,7 +4,7 @@
 import { noticeFor } from '../machine/revision-ack.mjs';
 import { kernelSeat } from '../machine/revision-seats.mjs';
 import { noticeLine, noticeWakeLine } from '../machine/revision-notice.mjs';
-import { landKernelNotes, shortRev } from './runtime-rev.mjs';
+import { landKernelNotes, revRootOf, shortRev } from './runtime-rev.mjs';
 
 const SHOWN = 12;
 
@@ -31,4 +31,9 @@ export function revisionWakeLine(notice, workflowId, { root, landNotes = landKer
   const notes = notice.from && notice.from !== notice.to && notice.state !== 'current' ? landNotes(root, notice.from, notice.to) : [];
   const head = owed || `Runtime rev ${shortRev(notice.to)}.`;
   return `${head}${noteSentence(notes)}`;
+}
+
+/** revisionWakeLine read from the ledger; null when it cannot be read (a db with no events table, no git). */
+export function kernelWakeRevLine(db, workflowId, root = revRootOf()) {
+  try { return revisionWakeLine(kernelNoticeOf(db, workflowId, { root }), workflowId, { root }); } catch { return null; }
 }
