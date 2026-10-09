@@ -5,7 +5,7 @@ import { sha256, sha256File } from '../../engine/digest.mjs';
 import { getBlob } from '../../engine/db/blob.mjs';
 import { latestCheckRuns, stageBlob } from '../machine/evidence-store.mjs';
 import { admittedContractOf, latestContractOf } from '../machine/contract-version.mjs';
-import { reboundMapOf, supersedeDir, supersedeDirs } from '../machine/placement-rebound.mjs';
+import { reboundMapOf, supersedeDir, supersedeDirs, supersedePath } from '../machine/placement-rebound.mjs';
 import { inputStamp } from '../gates/type-impact.mjs';
 import { DIGEST_SCHEMA } from '../gates/read-digest.mjs';
 import { isLinkLike } from '../api/fs/is-link-like.mjs';
@@ -51,7 +51,7 @@ export function observationContextOf(db, job, { repo, skillRoot }) {
   const attempt = db.prepare('SELECT * FROM op_attempts WHERE attempt_id=? AND job_id=?').get(contract.attempt_id, job.job_id);
   if (!attempt || attempt.try_no !== job.try_no) throw new Error('current mechanism proof has no exact active attempt');
   return { attemptId: attempt.attempt_id, admittedAt: admitted.at, admittedRuntimeSha: admitted.version?.runtimeSha ?? null,
-    skillRoot, selected, readRefs: context.readRefs, ownedPaths: context.owned_paths ?? [],
+    skillRoot, selected, readRefs: context.readRefs, ownedPaths: context.owned_paths ?? [], rebound: reboundMapOf(db, attempt.attempt_id),
     roots: [...new Set(roots)], primary: roots[0], reportAt: db.prepare('SELECT created_at FROM reports WHERE attempt_id=?').get(attempt.attempt_id)?.created_at ?? null };
 }
 
@@ -198,6 +198,9 @@ const digestFileShape = (file, rel, named) => {
   return null;
 };
 
+/** `file` through the attempt's placement-rebound events (a context without them leaves it as it is). */
+const placedPath = (context, file) => (context.rebound && typeof file === 'string' ? supersedePath(context.rebound, file) : file);
+
 /** The unusable detail of a READ entry the admission captured; an admitted Source law can drift advisably (recorded in `sourceDrift`), the target's bytes cannot. */
 const capturedVerdict = (file, rel, captured, context, sourceDrift) => {
   const canonical = CANONICAL_ROLES.has(file.role);
@@ -206,7 +209,8 @@ const capturedVerdict = (file, rel, captured, context, sourceDrift) => {
     if (!revision) return `READ differs from its filed input: ${rel}`;
     sourceDrift.push({ path: rel, admissionDigest: captured.sha256, readDigest: file.sha256, revision });
   }
-  if (captured.rootKind !== 'source' && (!fs.lstatSync(plain(captured.absolute)).isFile() || sha256File(captured.absolute) !== file.sha256))
+  const absolute = placedPath(context, captured.absolute);
+  if (captured.rootKind !== 'source' && (!fs.lstatSync(plain(absolute)).isFile() || sha256File(absolute) !== file.sha256))
     return `READ target input changed or is missing: ${rel}`;
   return null;
 };
@@ -240,10 +244,12 @@ export function judgeFiledRead(digest, context, doc, observations) {
   if (digest?.schema !== DIGEST_SCHEMA || !Array.isArray(digest.files)) return { status: 'missing', code: 'op-read-digest-missing', detail: 'the required READ digest is absent', findings: [] };
   const at = Date.parse(digest.at), firstCheck = observations.filter((row) => row.native.schema !== DIGEST_SCHEMA && !row.judged).reduce((earliest, row) => Math.min(earliest, row.startedAt), context.reportAt ?? Infinity);
   if (!Number.isFinite(at) || at < context.admittedAt || at > firstCheck) return bad('READ was not recorded after admission and before CHECK/REPORT');
-  if (!context.roots.some((root) => sameResolvedPath(root, digest.root))) return bad('READ names a foreign target');
+  // The digest the op filed names the tree it worked in; a tree put back at another path stands for it.
+  const placed = { ...digest, root: placedPath(context, digest.root) };
+  if (!context.roots.some((root) => sameResolvedPath(root, placed.root))) return bad('READ names a foreign target');
   const named = new Map(), sourceDrift = [];
   for (const file of digest.files) {
-    const verdict = digestFileVerdict(file, named, context, digest, sourceDrift);
+    const verdict = digestFileVerdict(file, named, context, placed, sourceDrift);
     if (verdict) return bad(verdict);
   }
   // Admission's concrete READ expansion owns these law identities. A later

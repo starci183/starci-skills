@@ -17260,3 +17260,12 @@ workflow-worktree-install-slot-held:
   nextStep_vi: "Chạy starci uat slots collect (thêm --dry-run để chỉ xem), đọc pid trong phiếu, dừng tiến trình đó rồi mở lại ghế bằng starci reconciler reopen <ghế>."
   owner: runtime-core
   kind: verb-refusal
+gate-rejudge-pending:
+  title: "A workaround for a gate was refused: the done report it holds has not been judged under the live runtime"
+  title_vi: "Từ chối workaround cho gate: báo cáo done mà nó giữ chưa được runtime hiện hành phán xét"
+  meaning_vi: "Workaround của một gate là dispatch lại op, nhưng job gate đang giữ đã có báo cáo done. Kết cục đúng của báo cáo done là settle nó, và settler phán xét lại nó một lần cho mỗi bản runtime; dispatch lại một chặng đã xong khi chưa có phán xét đó chỉ làm lại công việc cũ."
+  causes_vi:
+    - "Runtime vừa đổi bản và settler chưa phán xét lại job đang bị giữ"
+  nextStep_vi: "Đợi settler phán xét lại (starci kernel status hiện gate-rejudged trên gate nếu vẫn đỏ), rồi trả lời lại; một phán xét xanh tự settle job và đóng gate."
+  owner: runtime-core
+  kind: verb-refusal

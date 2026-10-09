@@ -12,6 +12,7 @@ import { appendEvent, resolveIncident } from '../../engine/db/ledger.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 import { supervisorGatesOf } from './autopilot-budget.mjs';
 import { currentRuntimeRev } from './runtime-rev.mjs';
+import { kernelHandoverOf, reportedJobs } from '../machine/reported-jobs.mjs';
 
 /** The resolved reason an incident row takes, and the event that says the holds settled. */
 export const HOLDS_SETTLED_REASON = 'fixed';
@@ -53,4 +54,15 @@ export function recordGateRejudged(db, workflowId, jobId, { reason, detail = [],
     noted.push(gate.incidentId);
   }
   return noted;
+}
+
+/**
+ * The jobs a gate holds whose done report the runtime has not judged under the live revision yet: [jobId]. A workaround (a new dispatch of the same op) is
+ * refused while any exists - the right outcome of a done report is its settle, and the settler judges it once per revision (the Job controller), so the
+ * re-dispatch of a finished leg waits for that judgment and is allowed only when it came back red.
+ */
+export function pendingRejudgeOf(db, workflowId, gate, { runtimeRev = currentRuntimeRev() } = {}) {
+  if (!runtimeRev) return [];
+  return reportedJobs(db, { workflowId }).filter((item) => gate.holds.includes(item.jobId) && item.outcome === 'done')
+    .filter((item) => kernelHandoverOf(db, item)?.runtimeRev !== runtimeRev).map((item) => item.jobId);
 }

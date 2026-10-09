@@ -905,3 +905,17 @@ cases:
     rule: {file: scripts/supervisor/supervisor-menu-sources.mjs, anchor: "ledgerOf"}
     spec: tests/supervisor/supervisor-menu.spec.mjs
     status: covered
+  - id: rebound-job-read-digest-names-the-lost-tree
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a rebound attempt is judged where it stands) the runtime re-judged Nivo op-architecture.decide-e78adc94cc under 7d4406419 at 10:48 (checks 69 to 75 green, the settle API not reached): the op-proof was red op-read-digest-no-knowledge 'READ names a foreign target' (check_runs 76, events 642 and 643), because the READ digest the op filed on 10-07 names the tree it worked in (the lost path) and its captured target files lie there, while the roots stand at the -2 path", remedy: {state: in-tree, change: "the READ judgment reads the digest's root and the captured target files through the attempt's placement-rebound events (supersedePath: a path inside a replaced directory is swapped for its replacement)"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo job op-architecture.decide-e78adc94cc", evidence: "nivo runtime.sqlite check_runs 76 (op-proof red, 10:48:27), events 642 (job-settle-needs-kernel settle-refused under 7d4406419) and 643 (gate-rejudged)"}
+    rule: {file: scripts/kernel/mechanism-observation.mjs, anchor: "placedPath"}
+    spec: tests/kernel/mechanism-observation-rebound.spec.mjs
+    status: covered
+  - id: workaround-redispatches-a-report-the-runtime-has-not-judged
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a done report's outcome is its settle) the Supervisor ruled workaround on pool claude-agent for the Nivo gate (a new architecture.decide job, about 26 million tokens) while the done report of the held job had passed all seven checks again at 10:16 and was awaiting the runtime's re-judgment; the step failed (ledger-root-is-runtime) and left nothing applied (no gate-answered, no enqueue, one architecture.decide job in the ledger), but the ruling stood in its recorded defect note and would dispatch a duplicate leg once the item could be answered", remedy: {state: in-tree, change: "a workaround resolution is refused (gate-rejudge-pending) while a done report the gate holds has not been judged by the runtime under the live revision; a red judgment under it allows the workaround"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo gate sdi-3c462f95", evidence: "machine sup_events 1120, 1127, 1128 (supervisor-action: ruling stands as workaround on claude-agent); nivo runtime.sqlite: no gate-answered event, one jobs row with op architecture.decide"}
+    rule: {file: scripts/kernel/gate-holds-ended.mjs, anchor: "pendingRejudgeOf"}
+    spec: tests/kernel-settle/handover-rejudge.spec.mjs
+    status: covered

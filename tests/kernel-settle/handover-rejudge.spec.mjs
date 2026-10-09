@@ -9,7 +9,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { openLedger, ledgerFileFor, openIncident } from '../../engine/db/ledger.mjs';
-import { releaseEndedGates, HOLDS_SETTLED_REASON, HOLDS_SETTLED_EVENT } from '../../scripts/kernel/gate-holds-ended.mjs';
+import { releaseEndedGates, pendingRejudgeOf, HOLDS_SETTLED_REASON, HOLDS_SETTLED_EVENT } from '../../scripts/kernel/gate-holds-ended.mjs';
 import { planJob, jobFacts, jobSettings } from '../../scripts/reconciler/controllers/job.mjs';
 import { attemptFacts } from '../../scripts/reconciler/debug-digest-ledger.mjs';
 import { classifyCheck, reconcileJobSettle, EVENTS } from '../../scripts/kernel/settle/job-settle.mjs';
@@ -191,4 +191,14 @@ test('a red judgment leaves the gate open and puts the evidence on it, once per 
   assert.equal(status, 'open');
   assert.equal(noted.length, 1);
   assert.deepEqual([noted[0].jobId, noted[0].reason, noted[0].runtimeRev], ['op-gated', 'settle-refused', currentRuntimeRev()]);
+}));
+
+test('a workaround that would dispatch a finished leg again waits for the runtime judgment of its done report under the live revision (Nivo sdi-3c462f95)', async (t) => withLedger(t, async ({ ledger }) => {
+  gatedWorld(ledger);
+  const gate = { incidentId: 'inc-gate', holds: ['op-gated'], opId: 'architecture.decide' };
+  assert.deepEqual(pendingRejudgeOf(ledger.db, 'wf-n', gate, { runtimeRev: 'f'.repeat(40) }), ['op-gated'], 'judged under an older revision: pending');
+  assert.deepEqual(pendingRejudgeOf(ledger.db, 'wf-n', gate, { runtimeRev: null }), [], 'no live revision known: nothing to wait for');
+  ledger.transaction(() => ledger.appendEvent({ workflowId: 'wf-n', entityType: 'job', entityId: 'op-gated', kind: EVENTS.needsKernel,
+    payload: { dispatchId: ledger.db.prepare('SELECT dispatch_id FROM op_attempts WHERE job_id=?').get('op-gated').dispatch_id, reason: 'settle-refused', runtimeRev: 'f'.repeat(40) } }));
+  assert.deepEqual(pendingRejudgeOf(ledger.db, 'wf-n', gate, { runtimeRev: 'f'.repeat(40) }), [], 'judged under the live revision and handed back red: the workaround may be answered');
 }));

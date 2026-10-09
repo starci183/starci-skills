@@ -3,7 +3,8 @@
 // roots). When its workflow tree is put back at another path, the runtime appends a `placement-rebound` ledger event
 // (scripts/kernel/attempt-placement.mjs); settle and the checks read the recorded directory through the attempt's rebounds here.
 import { parseJson } from '../lib/json.mjs';
-import { pathKey } from '../lib/path-key.mjs';
+import path from 'node:path';
+import { pathKey, slash } from '../lib/path-key.mjs';
 
 /** The ledger event that supersedes an admitted placement. */
 export const PLACEMENT_REBOUND = 'placement-rebound';
@@ -29,6 +30,16 @@ export function supersedeDir(map, dir) {
   let current = dir;
   for (let hop = 0; hop < CHAIN_MAX && typeof current === 'string' && map.has(pathKey(current)); hop += 1) current = map.get(pathKey(current));
   return current;
+}
+
+/** A file or directory path through the rebounds: the replaced directory it lies in is swapped for its replacement; the path itself when none applies. */
+export function supersedePath(map, file) {
+  const text = slash(path.resolve(file)), key = pathKey(file);
+  for (const [from, to] of map) {
+    if (key === from) return supersedeDir(map, to);
+    if (key.startsWith(`${from}/`)) return path.join(supersedeDir(map, to), text.slice(from.length + 1));
+  }
+  return file;
 }
 
 /** `dirs` of `attemptId` through its rebounds. */
