@@ -228,15 +228,33 @@ function secretProblems({ snapshot }) {
   return [...hits.values()].slice(0, SECRET_PROBLEMS).map((h) => problem('runtime', 1, `secret-${h.artifact}-${h.rule}`, 'secret-survived', { artifact: h.artifact, rule: h.rule, kind: h.kind, count: h.count }, h));
 }
 
-/** Reservations live for a job that is not running, a Supervisor job that ended, or a seat that is gone. */
+/** The seat a reservation serves, named for a person: the Supervisor seat, the Kernel seat of a workflow, else the job or the seat id. */
+function reservationOwner(r) {
+  if (r.jobId) return r.jobId;
+  if (r.kernelWorkflow) return `the Kernel seat of ${r.kernelWorkflow}`;
+  if (r.role === 'supervisor') return 'the Supervisor seat';
+  return r.seat ?? 'no job';
+}
+
+// A Kernel job between two incarnations is `ready`: its new seat's reservation is taken before the job is leased.
+const KERNEL_SEAT_JOB = new Set([...LIVE_JOB, 'ready']);
+const SUPERVISOR_SEAT_STATES = new Set(['live', 'booting']);
+
+/**
+ * Reservations live for a job that is not running, a Supervisor job that ended, or a seat that is gone. A seat's reservation (the Supervisor's, a
+ * Kernel's) is not a job's: it is held while the seat it serves stands (the Supervisor seat live or booting, the workflow's Kernel job alive).
+ */
 function admissionSection({ snapshot }) {
   const running = new Map(snapshot.workflows.flatMap((w) => w.jobs.map((j) => [j.jobId, LIVE_JOB.has(j.status)])));
+  const kernelSeats = new Map(snapshot.workflows.flatMap((w) => w.jobs.filter((j) => j.kind === 'kernel').map((j) => [j.jobId, KERNEL_SEAT_JOB.has(j.status)])));
   for (const j of snapshot.supJobs) running.set(j.jobId, LIVE_SUP_JOB.has(j.status));
   const seats = new Set(snapshot.seats);
+  const supervisorStands = SUPERVISOR_SEAT_STATES.has(snapshot.supervisor?.seat?.state);
   const live = snapshot.reservations.filter((r) => r.releasedAt === null);
   const held = (r) => {
     if (r.jobId) return running.get(r.jobId) === true;
-    if (r.kernelWorkflow) return running.get(`kernel-${r.kernelWorkflow}`) === true;
+    if (r.kernelWorkflow) return kernelSeats.get(`kernel-${r.kernelWorkflow}`) === true || running.get(`kernel-${r.kernelWorkflow}`) === true;
+    if (r.role === 'supervisor' && !r.seat) return supervisorStands;
     return Boolean(r.seat) && seats.has(r.seat);
   };
   return { live: live.length, leaked: live.filter((r) => !held(r)).map((r) => ({ ...r, ageMs: snapshot.now - Number(r.updatedAt) })) };
@@ -244,7 +262,7 @@ function admissionSection({ snapshot }) {
 
 function admissionProblems(section) {
   return section.leaked.map((r) => problem('admission', 1, `reservation-${r.id}`, 'reservation-leak',
-    { provider: r.provider, id: r.id.slice(0, 8), state: r.state, owner: r.jobId ?? r.seat ?? 'no job', min: minutes(r.ageMs) }, r));
+    { provider: r.provider, id: r.id.slice(0, 8), state: r.state, owner: reservationOwner(r), min: minutes(r.ageMs) }, r));
 }
 
 /** A snapshot workflow with the ledger rows the standard reads; a workflow collected without them has none. */

@@ -2,6 +2,8 @@
 // collected snapshot and answering `done`, `waiting` (inside its bound, or on a party whose wait is the design), `overdue` (the bound
 // is spent and the done-state is not observable) or `na` (the precondition does not hold). An overdue answer names the departure
 // code of the operating standard; an attempt-scope probe answers one entry per attempt.
+import { KERNEL_LAUNCH_EVENTS } from '../machine/terminal-ledger.mjs';
+
 const MIN = 60_000;
 const minutes = (ms) => Math.max(0, Math.round(ms / MIN));
 
@@ -15,10 +17,15 @@ const eventsOf = (w, kind) => (w.events ?? []).filter((e) => e.kind === kind);
 const lastAt = (events) => events.reduce((at, e) => Math.max(at, Number(e.at)), 0) || null;
 const groupKey = (e) => `${e.op ?? ''}|${e.step ?? ''}|${e.error ?? ''}`;
 
-/** Failures of one kind since the last success of another, and the largest group of them that failed at the same step with the same error. */
-function failuresSince(w, failKind, successKind) {
-  const since = lastAt(eventsOf(w, successKind)) ?? 0;
-  const failures = eventsOf(w, failKind).filter((e) => Number(e.at) > since);
+/** The last time a Kernel launch stood (booted, restarted or adopted), or null. */
+const lastLaunchAt = (w) => lastAt(KERNEL_LAUNCH_EVENTS.flatMap((kind) => eventsOf(w, kind)));
+
+/**
+ * Failures of one kind since the last success of another, and the largest group of them that failed at the same step with the same error.
+ * `rev` (when given) keeps the failures of that runtime revision, the window the start hold counts (scripts/kernel/start-hold.mjs failuresUnder).
+ */
+function failuresSince(w, failKind, since, rev = null) {
+  const failures = eventsOf(w, failKind).filter((e) => Number(e.at) > (since ?? 0) && (!rev || e.runtimeRev === rev));
   const groups = new Map();
   for (const e of failures) groups.set(groupKey(e), [...(groups.get(groupKey(e)) ?? []), e]);
   const worst = [...groups.values()].sort((a, b) => b.length - a.length)[0] ?? [];
@@ -65,7 +72,7 @@ function workflowStarted(c) {
 function kernelBooted(c) {
   const w = c.workflow;
   if (w.phase !== 'running') return na(`phase ${w.phase}`);
-  const loop = failuresSince(w, 'kernel-start-failed', 'kernel-booted');
+  const loop = failuresSince(w, 'kernel-start-failed', lastLaunchAt(w), c.kernel.currentRev);
   if (loop.worst >= c.n.startLoopMin) return overdue(`${loop.worst} launches failed at ${loop.step}: ${firstLine(loop.error, 90)}`, 'kernel-start-loop');
   if (c.kernel.alive) return done(`Kernel job ${c.kernel.job}, terminal ${c.kernel.terminal}`);
   const since = Math.max(Number(w.kernelJob?.updatedAt ?? 0), Number(w.updatedAt ?? 0)) || null;
@@ -76,14 +83,15 @@ function kernelAckedRev(c) {
   const k = c.kernel;
   if (!k.alive) return na('no live Kernel');
   if (!k.revStale) return done(`acked ${String(k.ackedRev ?? '').slice(0, 9)}`);
-  const since = lastAt(eventsOf(c.workflow, 'runtime-rev-acked')) ?? lastAt(eventsOf(c.workflow, 'kernel-booted'));
+  // The incarnation reads the current prompt at its boot and answers the rev-ack item within its bound: the bound counts from whichever came last.
+  const since = Math.max(lastAt(eventsOf(c.workflow, 'runtime-rev-acked')) ?? 0, lastLaunchAt(c.workflow) ?? 0) || null;
   if (within(c, since)) return waiting(`${k.filesBehind} file(s) behind, inside the ack bound`, 'rev-pending');
   return overdue(`acked ${String(k.ackedRev).slice(0, 9)} while ${String(k.currentRev).slice(0, 9)} is current`, 'kernel-rev');
 }
 
 function legDispatched(c) {
   const k = c.kernel;
-  const loop = failuresSince(c.workflow, 'dispatch-rejected', 'op-dispatched');
+  const loop = failuresSince(c.workflow, 'dispatch-rejected', lastAt(eventsOf(c.workflow, 'op-dispatched')));
   if (loop.worst >= c.n.startLoopMin) return overdue(`${loop.worst} launches of ${loop.op} refused at ${loop.step}: ${firstLine(loop.error, 90)}`, 'dispatch-loop');
   if (k.idleWithReady) return overdue(`${k.readyWork} ready unit(s), Kernel idle, last woken ${minutes(k.lastWakeAgeMs ?? 0)} min ago`, 'kernel-idle');
   return k.readyWork > 0 ? waiting(`${k.readyWork} ready unit(s) inside the wake bound`) : done('no ready leg waits');

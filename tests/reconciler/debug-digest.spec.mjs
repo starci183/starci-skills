@@ -88,6 +88,17 @@ test('a reservation live for a job that is not running, a finished Supervisor jo
   assert.equal(d.problems[0].params.min, 20);
 });
 
+test('the reservation of a seat names the seat it serves and is leaked only when that seat is gone', () => {
+  const reservation = (id, over) => ({ id: id.padEnd(32, '0'), provider: 'claude', model: 'm', role: 'supervisor', state: 'live', jobId: null, seat: null, kernelWorkflow: null,
+    createdAt: NOW - 90 * MIN, updatedAt: NOW - 38 * MIN, releasedAt: null, ...over });
+  const reservations = [reservation('sup-bare'), reservation('kernel-restarting', { role: 'kernel', state: 'launching', kernelWorkflow: 'wf-1' })];
+  const standing = digest(snapshot({ reservations, workflows: [workflow({ jobs: [job(), job({ jobId: 'kernel-wf-1', kind: 'kernel', opId: null, status: 'ready' })] })] }));
+  assert.deepEqual(standing.admission.leaked, [], 'the Supervisor seat stands and the Kernel job is between two incarnations');
+  const gone = digest(snapshot({ reservations, supervisor: { ...snapshot().supervisor, seat: { state: 'empty', terminalHandle: null, deaf: false } },
+    workflows: [workflow({ jobs: [job()] })] }));
+  assert.deepEqual(gone.problems.filter((p) => p.code === 'reservation-leak').map((p) => p.params.owner).sort(), ['the Kernel seat of wf-1', 'the Supervisor seat']);
+});
+
 test('controllers that are off while the config asks for them are the first line, also when the leader is gone', () => {
   const off = snapshot({ engine: { leader: { pid: 7, epoch: 3, heartbeatAt: NOW - 5_000, rev: REV }, modes: { job: 'off', host: 'off' }, configured: { job: 'active', host: 'active' }, safe: [], failingQueue: [] } });
   const d = digest(off);

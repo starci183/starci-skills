@@ -7,7 +7,7 @@ import { loadQuestions, cleanRun } from '../../scripts/reconciler/debug-question
 import { attemptFacts, eventFacts, historyFacts } from '../../scripts/reconciler/debug-digest-ledger.mjs';
 import { renderText } from '../../scripts/reconciler/debug-digest-render.mjs';
 import { rolesContract } from '../../scripts/machine/roles-contract.mjs';
-import { NOW, MIN, digest, job, status, workflow, snapshot, keys } from '../helpers/debug-digest-fixture.mjs';
+import { NOW, MIN, REV, digest, job, status, workflow, snapshot, keys } from '../helpers/debug-digest-fixture.mjs';
 
 const TREE = '/orca/starci-monorepo/wf-one';
 const attempt = (over = {}) => ({ attemptId: 1, jobId: 'op-x-1', op: 'x', tryNo: 1, agent: 'claude', provider: 'claude', dispatchedAt: NOW - 90 * MIN, startedAt: NOW - 89 * MIN,
@@ -53,7 +53,7 @@ test('a queued workflow is a happy wait inside the start bound and a runtime dep
 });
 
 test('a Kernel that cannot be started again and again is the runtime\'s departure, not the Kernel\'s', () => {
-  const failures = Array.from({ length: 6 }, (_, i) => event('kernel-start-failed', { at: NOW - (30 - i) * MIN, step: 'workflow-worktree-install', error: 'npm error code EPERM' }));
+  const failures = Array.from({ length: 6 }, (_, i) => event('kernel-start-failed', { at: NOW - (30 - i) * MIN, step: 'workflow-worktree-install', error: 'npm error code EPERM', runtimeRev: REV }));
   const wf = withRows({ kernelJob: { status: 'failed', updatedAt: NOW - 60 * MIN }, seatProbe: { action: 'restart-needed' }, events: [...settledEvents(), ...failures] });
   const d = digest(snapshot({ workflows: [wf] }));
   assert.deepEqual(bugCodes(d), ['kernel-start-loop']);
@@ -63,6 +63,27 @@ test('a Kernel that cannot be started again and again is the runtime\'s departur
   assert.equal(row(d, 'runtime').verdict, 'bug');
   const quiet = digest(snapshot({ workflows: [{ ...wf, events: [...settledEvents(), ...failures.slice(0, 2)] }] }));
   assert.deepEqual(bugCodes(quiet), ['kernel-dead']);
+});
+
+test('failed launches that a launch which stood followed, or that another runtime revision made, are history and no departure (StarCi 2026-10-09: 1670 failures, then kernel-restarted)', () => {
+  const failures = Array.from({ length: 6 }, (_, i) => event('kernel-start-failed', { at: NOW - (30 - i) * MIN, step: 'workflow-worktree-install', error: 'npm error code EPERM', runtimeRev: 'a'.repeat(40) }));
+  for (const launch of ['kernel-booted', 'kernel-restarted', 'kernel-adopted']) {
+    const stood = digest(snapshot({ workflows: [withRows({ events: [...settledEvents(), ...failures, event(launch, { at: NOW - 10 * MIN })] })] }));
+    assert.deepEqual(bugCodes(stood), [], launch);
+  }
+  const live = status({ kernelRev: { current: 'b'.repeat(40), acked: 'b'.repeat(40), stale: false, fileCount: 0 } });
+  const oldRuntime = digest(snapshot({ workflows: [withRows({ status: live, events: [...settledEvents(), ...failures] })] }));
+  assert.ok(!bugCodes(oldRuntime).includes('kernel-start-loop'), 'the failures of another revision do not count, as the start hold does not count them');
+  const same = failures.map((e) => ({ ...e, runtimeRev: 'b'.repeat(40) }));
+  const current = digest(snapshot({ workflows: [withRows({ status: live, kernelJob: { status: 'failed', updatedAt: NOW - 60 * MIN }, seatProbe: { action: 'restart-needed' }, events: [...settledEvents(), ...same] })] }));
+  assert.ok(bugCodes(current).includes('kernel-start-loop'), 'the failures of the revision now running still do');
+});
+
+test('a Kernel restarted after the last ack is inside the ack bound from its restart, not from the ack of its predecessor', () => {
+  const behind = status({ kernelRev: { current: 'b'.repeat(40), acked: 'a'.repeat(40), stale: true, fileCount: 2 } });
+  const restarted = digest(snapshot({ workflows: [withRows({ status: behind, events: [...settledEvents(), event('runtime-rev-acked', { at: NOW - 600 * MIN }), event('kernel-restarted', { at: NOW - 5 * MIN })] })] }));
+  assert.deepEqual(restarted.problems, []);
+  assert.deepEqual(row(restarted, 'kernel').happy, [{ kind: 'rev-pending', count: 1 }]);
 });
 
 test('a Kernel seat that is being replaced and a Kernel that has not yet acked the new revision are happy errors inside their bounds', () => {
