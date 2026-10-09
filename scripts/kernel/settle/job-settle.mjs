@@ -53,7 +53,7 @@ import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 import { reconcileAttemptPlacements } from '../attempt-placement.mjs';
 import { currentRuntimeRev } from '../runtime-rev.mjs';
 import { releaseEndedGates, recordGateRejudged } from '../gate-holds-ended.mjs';
-import { runtimeCriticFor } from './critic-run.mjs';
+import { kernelTerminalOf, runtimeCriticFor } from './critic-run.mjs';
 import { settlerSettings, runtimeEnv, verifyReported, recordSettlerCheck, parse, slug, jsonOf } from './job-settle-verify.mjs';
 import { tempRoot } from '../../../engine/temp-root.mjs';
 export { classifyCheck, argvOf } from './check-command.mjs';
@@ -254,7 +254,7 @@ function settleRefused(ledger, fresh, settled, now) {
  */
 async function settleReported(ledger, fresh, { repo, settings, env, now, dryRun, verify, api, critic = {} }) {
   // A done decision leg without a Critic verdict of its own is judged with the one the runtime's Critic gives it; a Critic that could not judge holds the settle (the checker-unavailable path).
-  const owed = dryRun ? null : await runtimeCriticFor(ledger, fresh, { tree: critic.tree, retryMs: settings.tail.retryMs, now: now(), ...critic.seams });
+  const owed = dryRun ? null : await runtimeCriticFor(ledger, fresh, { tree: critic.tree, retryMs: settings.tail.retryMs, now: now(), entry: critic.tree ? kernelTerminalOf(ledger.db, fresh.workflowId) : null, ...critic.seams });
   if (owed?.hold) return { target: 'skipped', row: await checkerUnavailable(ledger, fresh, { reason: 'checker-unavailable', detail: [`critic: ${owed.hold.code ?? 'CRITIC_UNAVAILABLE'}: ${owed.hold.error ?? ''}`] }, { now: now(), settings }) };
   const verdict = await verdictOf(ledger, fresh, { repo, settings, env, dryRun, verify });
   let settleAs = 'pass';

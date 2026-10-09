@@ -44,15 +44,25 @@ function makerOf(db, item) {
   return provider ? { provider: String(provider).toLowerCase(), model: attempt?.model ?? null } : null;
 }
 
+/**
+ * The terminal the workflow's Kernel sits in: the sender an orchestration command of the runtime's Critic is addressed from (Orca refuses a run-create with no sender
+ * terminal: no_active_sender_terminal), or null when none is recorded.
+ */
+export function kernelTerminalOf(db, workflowId) {
+  const row = db.prepare("SELECT value_json FROM signals WHERE scope='kernel' AND key=?").get(workflowId);
+  const terminal = parseJson(row?.value_json, null)?.terminal;
+  return typeof terminal === 'string' && terminal ? terminal : null;
+}
+
 /** Whether the job's report already attaches a Critic verdict of its own (the op ran the Critic): the runtime owes none then. */
 const attachesVerdict = (db, jobId) => db.prepare("SELECT 1 FROM job_artifacts WHERE job_id=? AND name LIKE '%critic-verdict%' LIMIT 1").get(jobId) != null;
 
 /**
  * The Critic run `item` (a reported job: {jobId, workflowId, op, outcome}) is owed, if any. Returns null when none is owed or one already stands for
  * this product digest, `{ran: true, outcome, pass}` after a run that produced a verdict, `{hold: {code, error}}` when the Critic could not judge.
- * `tree` is the workflow's registered tree, `retryMs` the spacing of runs that could not judge, `critique` the seam (the real Critic, or a fake).
+ * `tree` is the workflow's registered tree, `entry` the Kernel's terminal (kernelTerminalOf), `retryMs` the spacing of runs that could not judge, `critique` the seam (the real Critic, or a fake).
  */
-export async function runtimeCriticFor(ledger, item, { tree, retryMs, now = Date.now(), critique = critiqueDecision, orca = null, rubrics = criticRubrics() }) {
+export async function runtimeCriticFor(ledger, item, { tree, entry: coordinator = null, retryMs, now = Date.now(), critique = critiqueDecision, orca = null, rubrics = criticRubrics() }) {
   const entry = item.outcome === 'done' ? criticOwedBy(item.op) : null;
   if (!entry || !tree || attachesVerdict(ledger.db, item.jobId)) return null;
   const workRoot = path.join(tree, WORK_ROOT_NAME);
@@ -66,7 +76,7 @@ export async function runtimeCriticFor(ledger, item, { tree, retryMs, now = Date
   if (prior?.document) return null;
   if (prior && now - prior.at < retryMs) return { hold: { code: prior.code, error: prior.error } };
   const maker = makerOf(ledger.db, item);
-  const { critique: result, document } = await critique({ kind: item.op, workRoot, records: product.map((file) => file.abs), maker: maker ?? undefined, orca, placement: { repoRoot: tree } });
+  const { critique: result, document } = await critique({ kind: item.op, workRoot, records: product.map((file) => file.abs), maker: maker ?? undefined, orca, placement: { repoRoot: tree }, ...(coordinator ? { entry: coordinator } : {}) });
   const body = { jobId: item.jobId, op: item.op, digest, maker: maker?.provider ?? null, critic: { provider: result.critic?.provider ?? null, model: result.critic?.model ?? null },
     outcome: document ? 'verdict' : 'hold', code: result.code ?? null, error: clip(result.error ?? null, FIELD_MAX), pass: document?.pass ?? null, ...(document ? { document: compactVerdict(document) } : {}) };
   ledger.transaction(() => ledger.appendEvent({ workflowId: item.workflowId, entityType: 'job', entityId: item.jobId, kind: RUNTIME_CRITIC_EVENT, createdAt: now, payload: body }));

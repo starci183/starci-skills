@@ -15,6 +15,11 @@ const OWN_KIND = new Set(['worker-question', 'rev-ack', 'unread-peer', 'supervis
 /** The resolution with the class its evidence decides (scripts/kernel/failure-class.mjs): the menu reads it to withhold the escape from a work failure. */
 const withFailure = (db, resolution) => (resolution.jobId ? { ...resolution, failure: failureFactsOf(db, resolution.jobId) } : resolution);
 
+const RUNTIME_OWED_CODES = new Set(['gate-newer-than-admission', 'op-critic-verdict-missing']);
+/** Whether the settle of a handed-over job is the runtime's to finish. */
+const runtimeOwned = (db, item) => (item.detail ?? []).some((code) => RUNTIME_OWED_CODES.has(code))
+  || db.prepare("SELECT 1 FROM events WHERE entity_id=? AND kind='job-settle-check-unavailable' AND seq>(SELECT COALESCE(MAX(seq),0) FROM events WHERE entity_id=? AND kind='job-settle-needs-kernel') LIMIT 1").get(item.jobId, item.jobId) != null;
+
 /**
  * The job items waiting on the Kernel: [{di, resolution}] for each reported job the settler handed over and each live retry-decision. A job whose settle an
  * open gate or wait holds (frontier.heldSettleJobs) is that wait's to release, as a held move is (kernel-menu.mjs actionItemOf): the Kernel is offered no choice there.
@@ -22,8 +27,9 @@ const withFailure = (db, resolution) => (resolution.jobId ? { ...resolution, fai
 function jobDecisionsOf(s, kernelDis) {
   const { db, workflowId, now, repo } = s;
   const handed = [...(pendingJobsOf(db, workflowId, now)?.values() ?? [])];
-  // A settle refused only because a gate is newer than the job's admission is the runtime's (its settler supplies what the gate wants): no choice of the Kernel's can cure it.
-  const held = new Set([...(s.heldSettle ?? []).map((item) => item.jobId), ...handed.filter((item) => (item.detail ?? []).includes('gate-newer-than-admission')).map((item) => item.jobId)]);
+  // A settle the runtime owes is not the Kernel's: a refusal for the Critic verdict (the settler runs the Critic itself; gate-newer-than-admission names the same state), and a job whose
+  // settler is holding it for a checker that could not run since the handover (job-settle-check-unavailable): no choice of the Kernel's can cure either.
+  const held = new Set([...(s.heldSettle ?? []).map((item) => item.jobId), ...handed.filter((item) => runtimeOwned(db, item)).map((item) => item.jobId)]);
   const byJob = new Map(kernelDis.filter((di) => JOB_KINDS.has(di.kind) && di.entity?.type === 'job').map((di) => [di.entity.id, di]));
   const virtual = handed.filter((item) => !byJob.has(item.jobId))
     .map((item) => ({ kind: 'settle-nongreen', workflowId, entity: { type: 'job', id: item.jobId }, summary: `${item.op} ${item.jobId} reported ${item.outcome}: the runtime did not settle it (${item.reason})`, evidence: [] }));

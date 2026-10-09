@@ -19,11 +19,24 @@ const retryDecisionLive = (db, jobId) => {
   return !db.prepare('SELECT 1 FROM jobs WHERE retry_of=? OR (unit_id IS NOT NULL AND unit_id=? AND try_no>?) LIMIT 1').get(jobId, row.unit_id, row.try_no);
 };
 
+const RUNNING = new Set(['leased', 'running', 'answering', 'effect_unknown']);
+/**
+ * Whether a budget-overrun item still waits: the item of a running attempt (subject `attempt-<n>-running`) lives while its job runs - once the job reported, the
+ * settler measures the attempt from its usage rows and a second item takes its place; the item of a settled attempt lives while the unit has no later try.
+ */
+const budgetOverrunLive = (db, d) => {
+  const row = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(d.entity.id);
+  if (!row) return false;
+  if (/-running(?::|$)/.test(String(d.idempotencyKey ?? ''))) return RUNNING.has(row.status);
+  return retryDecisionLive(db, d.entity.id) || !SETTLED_JOB_LIST.includes(row.status);
+};
+
 /**
  * Whether a DI still waits on the Kernel. A settle-nongreen or checks-needed item lives while the settler hands its job to the
  * Kernel; a retry-decision item concerns a settled job, so it lives while that job has no later try.
  */
 export const liveFor = (d, pending, db) => {
+  if (d.kind === 'budget-overrun' && d.entity?.type === 'job') return budgetOverrunLive(db, d);
   if (!(JOB_KINDS.has(d.kind) && d.entity?.type === 'job')) return true;
   if (d.kind === 'retry-decision') return retryDecisionLive(db, d.entity.id);
   return !(pending && !pending.has(d.entity.id));

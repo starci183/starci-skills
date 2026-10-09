@@ -108,7 +108,7 @@ test('a settle refused only because a gate is newer than the admission of its jo
     .run(WF, attemptId, dispatchId, REPORTED, 'done', '{}', T0 + 60_000, T0 + 30_000);
   const handover = (target, code) => target.transaction(() => target.appendEvent({ workflowId: WF, entityType: 'job', entityId: REPORTED, attemptId, kind: 'job-settle-needs-kernel',
     payload: { dispatchId, reason: 'settle-refused', code, detail: [code], outcome: 'done', op: 'architecture.decide' } }));
-  handover(ledger, 'op-critic-verdict-missing');
+  handover(ledger, 'op-gate-new-findings');
   openDecisionRow(ledger, { workflowId: WF, kind: 'settle-nongreen', entity: { type: 'job', id: REPORTED }, summary: `${REPORTED} reported done: the runtime did not settle it`, by: 'reconciler/job' }, { now: T0 });
   ledger.close();
   const before = status(world).menu;
@@ -116,10 +116,18 @@ test('a settle refused only because a gate is newer than the admission of its jo
   const recordStep = before[0].options.find((option) => option.choice === 'settle-fail').steps.find((step) => step.verb === 'record-checks');
   assert.ok(Array.isArray(JSON.parse(recordStep.args.checks).checks), 'the recorded refusal is the {checks:[...]} envelope record-checks takes (a bare array was refused checks-invalid, so settle-fail never ran)');
   const writable = openLedger({ file: world.ledgerFile });
-  handover(writable, 'gate-newer-than-admission');
+  writable.transaction(() => writable.appendEvent({ workflowId: WF, entityType: 'job', entityId: REPORTED, attemptId, kind: 'job-settle-check-unavailable', payload: { dispatchId, op: 'architecture.decide', try: 1, detail: ['critic: CRITIC_UNAVAILABLE'] } }));
   writable.close();
+  assert.deepEqual(status(world).menu, [], 'the settler holds the job for a checker that could not run since the handover: the Kernel has nothing to choose');
+  const again = openLedger({ file: world.ledgerFile });
+  handover(again, 'op-critic-verdict-missing');
+  again.close();
+  assert.deepEqual(status(world).menu, [], 'the runtime owes the Critic verdict (op-critic-verdict-missing): not a choice of the Kernel');
+  const last = openLedger({ file: world.ledgerFile });
+  handover(last, 'gate-newer-than-admission');
+  last.close();
   const out = status(world);
-  assert.deepEqual(out.menu, [], 'the runtime owes the verdict; the Kernel has nothing to choose');
+  assert.deepEqual(out.menu, []);
   assert.equal(out.frontier.actionable, false);
 }));
 

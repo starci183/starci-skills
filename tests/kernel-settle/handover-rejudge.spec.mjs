@@ -223,3 +223,19 @@ test('a report whose outcome is ask or blocked is settled blocked by the settler
     assert.equal(settle[settle.indexOf('--verdict') + 1], 'blocked');
   });
 });
+
+test('the read-only work checks an op\'s own contract names are re-run by the settler, in both spellings (StarCi op-brand.decide-8bd6f3374d: brand-final, shell-final)', () => {
+  const root = path.resolve('.');
+  const node = 'node work/runtime/.claude/packages/cli/bin/starci.mjs';
+  for (const [command, rel] of [[`${node} work brand .starciwork --source . --stage decide --json`, 'scripts/work/brand/brand.mjs'],
+    ['starci work brand .starciwork --source . --stage decide --json', 'scripts/work/brand/brand.mjs'],
+    [`${node} work shell-conformance .starciwork/shell/index.yaml --json`, 'scripts/work/ui/shell-conformance.mjs'],
+    ['starci work shell-conformance .starciwork/shell/index.yaml', 'scripts/work/ui/shell-conformance.mjs']]) {
+    const check = classifyCheck({ name: 'c', command, exitCode: 0 }, { skillRoot: root });
+    assert.equal(check.kind, 'runtime', `${command}: ${check.why}`);
+    assert.equal(check.rel, rel);
+    assert.ok(!check.argv.includes('work'), 'the script gets its own arguments');
+  }
+  assert.equal(classifyCheck({ command: 'starci work layout-render --root x' }, { skillRoot: root }).kind, 'foreign', 'a work verb that is not a declared read-only check stays foreign');
+  assert.equal(classifyCheck({ command: 'starci work brand .starciwork --write' }, { skillRoot: root }).kind, 'foreign', 'a mutating flag is never re-run');
+});

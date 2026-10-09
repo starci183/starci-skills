@@ -8,7 +8,7 @@ import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
-import { runtimeCriticFor, runtimeCriticRunOf, RUNTIME_CRITIC_EVENT } from '../../scripts/kernel/settle/critic-run.mjs';
+import { kernelTerminalOf, runtimeCriticFor, runtimeCriticRunOf, RUNTIME_CRITIC_EVENT } from '../../scripts/kernel/settle/critic-run.mjs';
 import { judgeCriticVerdict } from '../../scripts/kernel/critic-settle.mjs';
 import { criticFor } from '../../scripts/work/critic-pick.mjs';
 import { productDigests, productFiles, kindEntryOf, criticRubrics } from '../../scripts/work/decision-critic-product.mjs';
@@ -49,9 +49,10 @@ const world = async (t, fn) => withLedger(t, async ({ ledger }) => {
 test('a done report admitted before the Critic rule settles after a runtime-run Critic pass, and the run is recorded once per digest', (t) => world(t, async ({ ledger, tree, item }) => {
   const calls = [];
   const critique = async (args) => { calls.push(args); return { critique: { code: null, critic: { provider: 'codex', model: 'gpt-x' } }, document: verdictFor(tree) }; };
-  const first = await runtimeCriticFor(ledger, item, { tree, retryMs: 60_000, critique });
+  const first = await runtimeCriticFor(ledger, item, { tree, retryMs: 60_000, critique, entry: 'term_kernel' });
   assert.deepEqual([first.ran, first.pass], [true, true]);
   assert.equal(calls.length, 1);
+  assert.equal(calls[0].entry, 'term_kernel', 'the Critic is launched from the Kernel terminal: Orca refuses a run-create with no sender (no_active_sender_terminal)');
   assert.equal(calls[0].kind, OP);
   assert.deepEqual(calls[0].maker, { provider: 'claude', model: null }, 'the Critic is asked to judge a product made by the op provider');
   assert.equal(calls[0].records.length, productFiles({ workRoot: path.join(tree, '.starciwork'), entry, within: ['features/authentication/sds'] }).length);
@@ -98,4 +99,10 @@ test('the picker never chooses the provider that made the product, and a report 
   const attempt = ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get('op-arch').attempt_id;
   ledger.db.prepare("INSERT INTO job_artifacts(workflow_id,attempt_id,job_id,op_id,role,kind,name,sha256,bytes,media_type,origin,created_at) VALUES('wf-c',?,'op-arch',?,'report-attachment','file','attachments/critic-verdict.json',?,1,'application/json','op',?)").run(attempt, OP, 'a'.repeat(64), Date.now());
   assert.equal(await runtimeCriticFor(ledger, item, { tree, retryMs: 1, critique: async () => assert.fail('the op attached its verdict') }), null);
+}));
+
+test('the Kernel terminal of a workflow is read from its kernel signal', (t) => withLedger(t, ({ ledger }) => {
+  seedWorkflow(ledger, { id: 'wf-s', goal: { revision: 1, markdown: '# s' }, jobs: [], signals: [{ scope: 'kernel', key: 'wf-s', value: { terminal: 'term_kernel_s' } }] });
+  assert.equal(kernelTerminalOf(ledger.db, 'wf-s'), 'term_kernel_s');
+  assert.equal(kernelTerminalOf(ledger.db, 'wf-none'), null);
 }));
