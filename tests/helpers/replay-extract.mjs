@@ -16,11 +16,12 @@ const WORKFLOW = 'wf-1';
 const parse = (text) => { try { return JSON.parse(text); } catch { return null; } };
 // Every handle a recipe opens is closed when its extraction ends (a leaked handle holds the copy open on Windows).
 const opened = [];
-/** The ledger file of `name` in a copy: `<name>/runtime.sqlite`, else the newest `<name>-monorepo-*.sqlite` beside it (a later copy of the same ledger). */
+/** The ledger file of `name` in a copy: `<name>/runtime.sqlite`, else the newest `<name>-monorepo-*.sqlite` beside it (a later copy of the same ledger), else `<name>.sqlite`. */
 function ledgerFileOf(copy, name) {
   const nested = path.join(copy, name, 'runtime.sqlite');
   const flat = fs.readdirSync(copy).filter((entry) => entry.startsWith(`${name}-monorepo-`) && entry.endsWith('.sqlite')).sort().at(-1);
-  return flat ? path.join(copy, flat) : nested;
+  const plain = path.join(copy, `${name}.sqlite`);
+  return flat ? path.join(copy, flat) : (fs.existsSync(nested) ? nested : plain);
 }
 const openLedger = (copy, name) => { const db = new DatabaseSync(ledgerFileOf(copy, name), { readOnly: true }); opened.push(db); return db; };
 const rows = (db, sql, ...args) => db.prepare(sql).all(...args);
@@ -173,7 +174,23 @@ function drawRenderTool(copy) {
       gate: wordOr(routed.p.kind), gateIncidents: countOf(db, "SELECT count(*) n FROM incidents WHERE status='open' AND last_progress LIKE '[supervisor-gate]%'") } };
 }
 
-const RECIPES = { 'draw-render-tool': drawRenderTool, 'fenced-retry': fencedRetry, 'grammar-in-tree': grammarInTree, 'leg-ready': legReady, 'read-plan': readPlan, 'shape-guard': shapeGuard, 'handed-over': handedOver, 'prepared-fail': preparedFail };
+/**
+ * Case j: every launch of a codex worker through worker-start ended outcome_unknown / turn_start_unobserved (Codex 0.160 folded the 16.8 KB Task spec into a pasted-content
+ * chip and the Enter did not submit it); the Nivo Kernel stood unstarted. The ledger gives the facts of the failed Kernel launches; the world needs an op to launch, so the jobs
+ * are the neutral ready interface op behind a finished brand leg.
+ */
+function codexTurnStart(copy) {
+  const db = openLedger(copy, 'nivo');
+  const failed = eventsOf(db, 'kernel-start-failed');
+  const codex = failed.filter((e) => e.p.agent === 'codex' || e.p.admission?.decision?.selected?.agent === 'codex');
+  const ids = new Pseudonyms();
+  const brandJob = { id: ids.id('job', 'brand'), op: 'brand.decide', status: 'succeeded', owned: ['own-9'] };
+  const drawJob = { id: ids.id('job', 'draw'), op: 'interface.draw', status: 'queued', owned: ['own-1'], params: { candidatesPerScreen: 1, gateRounds: 5 } };
+  return { workflow: { id: WORKFLOW, phase: 'running', goalRevision: 0 }, jobs: [brandJob, drawJob], tree: { brand: true },
+    live: { kernelStartFailures: failed.length, codexKernelStartFailures: codex.length, lastStep: wordOr(failed.at(-1)?.p.step), lastTerminalNamed: Boolean(failed.at(-1)?.p.terminal), promptChars: 16831, pasteChip: 'Pasted Content' } };
+}
+
+const RECIPES = { 'codex-turn-start': codexTurnStart, 'draw-render-tool': drawRenderTool, 'fenced-retry': fencedRetry, 'grammar-in-tree': grammarInTree, 'leg-ready': legReady, 'read-plan': readPlan, 'shape-guard': shapeGuard, 'handed-over': handedOver, 'prepared-fail': preparedFail };
 export const CASES = Object.freeze(Object.keys(RECIPES));
 
 /** The fixture document of `name` extracted from `copy`; the source names the copy neutrally. */

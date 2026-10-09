@@ -16,6 +16,7 @@ import { classifyAgentScreen, stagedInputRegion, DEFAULT_STAGED_PATTERN, frameWi
 import { squash } from '../lib/clip.mjs';
 import { INPUT_GLYPH_CHARS, INPUT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
 import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
+import { PROMPT_DELIVERY_STALLED } from './turn-start.mjs';
 export { loadAdapter } from './model-registry.mjs';
 
 const regexp = (source, fallback) => {
@@ -315,7 +316,7 @@ export function deliverPrompt({ handle, adapter, prompt, worktree, dispatchId = 
 // at an empty prompt is a lost send, sent once more; lost again, the send is refused
 // PROMPT_DELIVERY_STALLED, a transient launch fault (never quota, never the model). A terminal whose
 // process incarnation the host no longer accepts is refused TERMINAL_INCARNATION_STALE, never transient.
-export const PROMPT_DELIVERY_STALLED = 'prompt-delivery-stalled';
+export { PROMPT_DELIVERY_STALLED };
 export const TERMINAL_INCARNATION_STALE = 'terminal-incarnation-stale';
 function sendPrompt(handle, text, adapter, io) {
   const send = io?.send ?? terminalSend, read = io?.read ?? terminalRead, sleep = io?.sleep ?? sleepSync;

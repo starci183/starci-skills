@@ -5,7 +5,7 @@ import { commitWorkflowStart } from './workflow-startup.mjs';
 
 /** The failure record of one refused start: the selected member, the effect and every receipt field it left. */
 const failureOf = (spawned, selected) => ({ agent: selected.provider, requestedModel: selected.model, effectState: spawned.effectState ?? 'unknown', admission: spawned.admission ?? null,
-  ...(spawned.errorCode ? { errorCode: spawned.errorCode } : undefined), ...(spawned.hostRequestId ? { hostRequestId: spawned.hostRequestId } : undefined), ...(spawned.dispatchId ? { dispatch: spawned.dispatchId } : undefined),
+  ...(spawned.errorCode ? { errorCode: spawned.errorCode } : undefined), ...(spawned.hostRequestId ? { hostRequestId: spawned.hostRequestId } : undefined), ...(spawned.dispatchId ? { dispatch: spawned.dispatchId } : undefined), ...(spawned.runId ? { runId: spawned.runId } : undefined),
   ...(spawned.cleanup ? { cleanup: spawned.cleanup } : undefined), ...(spawned.observation ? { observation: spawned.observation } : undefined),
   ...(spawned.trust ? { trust: spawned.trust } : undefined) });
 

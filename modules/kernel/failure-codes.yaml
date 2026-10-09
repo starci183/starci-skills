@@ -17544,3 +17544,13 @@ deploy-affected-red:
   nextStep_vi: "Sửa spec đỏ đầu tiên trong thông báo, commit, rồi chạy lại starci runtime deploy; với bộ spec quá lớn, chạy starci test affected --run trong clone để thấy tệp nào chưa kịp chạy rồi chạy lại."
   owner: runtime-core
   kind: verb-refusal
+TURN_START_UNOBSERVED:
+  title: "A worker's first turn was not seen to start"
+  title_vi: "Không thấy lượt đầu của worker bắt đầu"
+  meaning_vi: "Orca đã tạo worker và gõ Task vào terminal của agent nhưng không xác minh được lượt đầu đã bắt đầu; runtime đã đọc khung hình và nhấn Enter một lần cho đoạn dán chưa gửi, vẫn không thấy lượt chạy."
+  causes_vi:
+    - "TUI của agent gộp đoạn dán lớn thành chip và Enter không gửi được nó"
+    - "Agent chưa sẵn sàng nhận đầu vào khi Task được gõ"
+  nextStep_vi: "Runtime đóng worker và terminal của lần khởi chạy đó trước khi thử lại, và bộ đếm giữ khởi chạy tính nó; không ai phải gõ vào terminal."
+  owner: runtime-core
+  kind: runtime-fault

@@ -93,8 +93,19 @@ export function ledgerView(repo) {
     const updatedAt = new Map((() => { try { return db.prepare('SELECT job_id, updated_at FROM jobs').all().map((r) => [r.job_id, r.updated_at]); } catch { return []; } })());
     const jobs = ledgerJobs(db).map((j) => ({ jobId: j.job_id, workflowId: j.workflow_id, kind: j.kind, status: j.status, updatedAt: updatedAt.get(j.job_id) ?? null,
       handles: [...new Set([...jobTerminalHandles(j, j.payload), j.payload?.launchTerminal?.handle].filter(Boolean))] }));
-    return { repo: path.resolve(repo), workflows, jobs, leases: leaseRowsOf(db) };
+    return { repo: path.resolve(repo), workflows, jobs, leases: leaseRowsOf(db), launchRuns: failedLaunchRunsOf(db) };
   } finally { h.close(); }
+}
+
+/**
+ * The Orca Runs of Kernel launches that failed: no job names them (the launch died before a job existed), so the agents collector never listed their
+ * workers and a dead agent TUI such a launch left stayed open and unowned (Nivo 2026-10-09: one dead codex terminal per retry).
+ */
+function failedLaunchRunsOf(db) {
+  try {
+    return [...new Set(db.prepare("SELECT payload_json FROM events WHERE kind='kernel-start-failed' ORDER BY seq DESC LIMIT 200").all()
+      .map((row) => { try { return JSON.parse(row.payload_json)?.runId; } catch { return null; } }).filter((run) => typeof run === 'string' && run))];
+  } catch { return []; }
 }
 
 /** Every lease row of a ledger with its job's and workflow's state (the leases collector's input). */
