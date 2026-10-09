@@ -267,7 +267,7 @@ export function createHostController(deps = {}) {
         idempotencyKey: `service-quarantined:${name}:${next.since}`, severity: entry.ownerPath ? 'critical' : 'warn', ownerPath: entry.ownerPath === true,
         summary: `${name}: more than ${s.quarantine.maxRestarts} restarts in ${Math.round(s.quarantine.windowMs / 60000)} min, quarantined`,
         evidence: [{ ref: `probe:${JSON.stringify(next.lastProbe).slice(0, 200)}` }, { ref: `restarts:${next.restarts.length}` }],
-        options: [{ key: 'reopen', verb: `node ${SERVICES_FILE} --reopen ${name}`, recommended: true }], allowedVerbs: ['reopen'],
+        options: [{ key: 'reopen', verb: `starci reconciler reopen ${name}`, recommended: true }], allowedVerbs: ['reopen'],
       }));
     }
     if (entry.kind === 'checker' && step.to === 'failed' && next.downSince != null && now - next.downSince >= entry.slaMs) {
@@ -328,7 +328,7 @@ export function createHostController(deps = {}) {
   }
 
   // More than maxReplacementsPerHour replacements, or a launch held for a cause it repeats: the seat is quarantined; the first time, one DI seat-unrecoverable.
-  const quarantineSeat = (ctx, args) => seatQuarantine(ctx, args, { di, servicesFile: SERVICES_FILE });
+  const quarantineSeat = (ctx, args) => seatQuarantine(ctx, args, { di });
 
   // The seat's SLA clocks: each one runs while the seat is in one of its states and closes otherwise.
   async function seatClocks(ctx, { key, seat, s, ledgerId, workflowId, action }) {

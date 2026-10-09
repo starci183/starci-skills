@@ -163,6 +163,7 @@ complete -c starci -n '__starci_needs_verb npm' -a 'install' -d 'add exact depen
 complete -c starci -n '__starci_needs_verb orca' -a 'terminal-read' -d 'read an Orca terminal screen and staged draft'
 complete -c starci -n '__starci_needs_verb orca' -a 'terminal-send' -d 'send text or Enter to an Orca terminal'
 complete -c starci -n '__starci_needs_verb reconciler' -a 'once' -d 'run one reconcile pass of the controllers in memory, shadow unless --apply'
+complete -c starci -n '__starci_needs_verb reconciler' -a 'reopen' -d 'put a quarantined service or seat back to declared with a clean restart history'
 complete -c starci -n '__starci_needs_verb reconciler' -a 'restart' -d 'stop the reconciler engine and ensure a new leader'
 complete -c starci -n '__starci_needs_verb reconciler' -a 'start' -d 'ensure the reconciler engine has a healthy leader'
 complete -c starci -n '__starci_needs_verb reconciler' -a 'status' -d 'print reconciler leader, queue, mode and violation status'

@@ -12154,7 +12154,7 @@ workflow-worktree-install-locked:
   causes_vi:
     - "Một tiến trình của workflow trước hoặc của một op vẫn chạy trong cây (dev server, watcher)"
     - "Một cài đặt khác hoặc trình chống virus giữ file"
-  nextStep_vi: "Đọc đường dẫn bị khóa và danh sách tiến trình trong phiếu, dừng tiến trình giữ file rồi mở lại ghế bằng services.mjs --reopen; runtime tự bỏ qua npm ci khi cây đã cài đúng lockfile."
+  nextStep_vi: "Đọc đường dẫn bị khóa và danh sách tiến trình trong phiếu, dừng tiến trình giữ file rồi mở lại ghế bằng starci reconciler reopen <ghế>; runtime tự bỏ qua npm ci khi cây đã cài đúng lockfile."
   owner: runtime-core
   kind: verb-refusal
 kernel-start-held:
@@ -12163,7 +12163,7 @@ kernel-start-held:
   meaning_vi: "Lần khởi động Kernel đã thất bại đủ số lần đã khai báo vì cùng một nguyên nhân ở cùng một bước. Runtime không thử lại nữa cho đến hết thời gian giữ; ghế bị cách ly và một mục quyết định seat-unrecoverable nêu nguyên nhân, số lần và bằng chứng."
   causes_vi:
     - "Một bước khởi động lỗi lặp lại (cài đặt cây, tin cậy khởi chạy, cấp phép) mà thử lại không đổi được"
-  nextStep_vi: "Đọc nguyên nhân trong mục quyết định, sửa gốc rồi mở lại ghế bằng services.mjs --reopen; hết thời gian giữ runtime thử đúng một lần."
+  nextStep_vi: "Đọc nguyên nhân trong mục quyết định, sửa gốc rồi mở lại ghế bằng starci reconciler reopen <ghế>; hết thời gian giữ runtime thử đúng một lần."
   owner: supervisor
   kind: blocker
 workflow-worktree-missing:

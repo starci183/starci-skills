@@ -30,12 +30,12 @@ export function seatHold(rec, now, s, rev = null) {
  * The Decision Item of a quarantined Kernel seat, opened once per quarantine: more replacements than the hour allows, or a launch
  * held for a cause it repeats (`hold`: the cause, its count and the evidence kernel/start-hold.mjs read from the ledger).
  */
-export async function seatQuarantine(ctx, { key, rec, next, ledgerId, workflowId, action, now, hold = null }, { di, servicesFile }) {
+export async function seatQuarantine(ctx, { key, rec, next, ledgerId, workflowId, action, now, hold = null }, { di }) {
   if (rec.state === 'quarantined') return;
   await ctx.openDecision(di({
     kind: 'seat-unrecoverable', ledger: ledgerId, workflowId, entity: { type: 'seat', id: key }, idempotencyKey: `seat-unrecoverable:${key}:${now}`,
     summary: hold ? `${workflowId}: ${holdSummary(hold)}; the Kernel seat is quarantined` : `${workflowId}: the Kernel seat was replaced ${next.restarts.length} times in an hour; quarantined`,
     evidence: [{ ref: `action:${action}` }, ...(hold ? [{ ref: `hold:${JSON.stringify(hold).slice(0, 1500)}` }] : [])],
-    options: [{ key: 'reopen', verb: `node ${servicesFile} --reopen ${key}`, recommended: true }], allowedVerbs: ['reopen'],
+    options: [{ key: 'reopen', verb: `starci reconciler reopen ${key}`, recommended: true }], allowedVerbs: ['reopen'],
   }));
 }

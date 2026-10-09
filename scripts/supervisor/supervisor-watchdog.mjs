@@ -435,7 +435,7 @@ function wakePlanFor({ m, env, now, terminal }) {
 function replaceDeadSeat({ m, deps, env, now, terminal, plan }) {
   m.transaction(() => supervisorEvent(m, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, delivered: false, action: 'seat-agent-exited', withheld: true } }));
   m.close();
-  return replaceSeat(deps, env, 'agent-exited', { reason: 'seat-agent-exited', terminal, tags: plan.tags, withheld: true });
+  return replaceSeat(deps, env, 'agent-exited', { reason: 'the seat agent exited: its terminal shows a shell prompt', terminal, tags: plan.tags, withheld: true });
 }
 
 /** One pass over a live seat: repair tab titles, plan the wake, and deliver it (or report why not). */

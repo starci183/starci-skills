@@ -45,7 +45,7 @@ allowTaskRepair: false
 checkers: []
 
 # Kernel seats (DESIGN 9.4): more than maxReplacementsPerHour replacements -> quarantined + DI seat-unrecoverable;
-# a quarantined seat is left alone for holdMs (or until `services.mjs --reopen <seat>`). A restart the watchdog answers
+# a quarantined seat is left alone for holdMs (or until `starci reconciler reopen <seat>`). A restart the watchdog answers
 # restart-blocked (no sender terminal to launch from: a refusal only a human opening a terminal changes) is tried again
 # once per blockedRetryMs, not every pass. A Kernel launch that fails again for the same cause (scripts/kernel/start-hold.mjs) waits
 # startRetryMs, doubling to startRetryMaxMs, between attempts; after startSameCauseMax failures of one cause it is held for

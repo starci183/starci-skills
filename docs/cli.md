@@ -2769,6 +2769,23 @@ json: flag
 starci reconciler once --controller job --json
 ```
 
+### starci reconciler reopen
+
+put a quarantined service or seat back to declared with a clean restart history
+
+Positionals: name
+
+Roles: lead, owner
+
+exit: 0 the row is declared again; 1 no such row; 2 bad usage
+
+json: flag
+
+```sh
+starci reconciler reopen seat:kernel:<ledger-id>:<workflow-id>
+starci reconciler reopen <service-name>
+```
+
 ### starci reconciler restart
 
 stop the reconciler engine and ensure a new leader

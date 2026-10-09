@@ -100,7 +100,6 @@ internal:
   - {path: scripts/reconciler/controllers/workflow.mjs, why: "Engine-discovered workflow controller", usedBy: [scripts/reconciler/engine.mjs]}
   - {path: scripts/reconciler/ledger-health.mjs, why: "Host ledger-health controller", usedBy: [scripts/reconciler/controllers/host.mjs]}
   - {path: scripts/reconciler/notifier.mjs, why: "Fleet notification controller", usedBy: [scripts/reconciler/controllers/workers.mjs]}
-  - {path: scripts/reconciler/services.mjs, why: "Host service-registry controller", usedBy: [scripts/reconciler/controllers/host.mjs]}
   - {path: scripts/reconciler/sla.mjs, why: "Workflow SLA controller", usedBy: [scripts/reconciler/engine.mjs]}
   - {path: scripts/guards/release-push-gate.mjs, why: "Body of the generated pre-push hook of the runtime repository", usedBy: [scripts/guards/git-hooks.mjs]}
   - {path: scripts/route/route-model.mjs, why: "Model-route selector and --plan preview", usedBy: [scripts/goal/define-goal.mjs]}

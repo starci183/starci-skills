@@ -1,0 +1,20 @@
+group: reconciler
+verb: reopen
+owner: runtime
+summary: put a quarantined service or seat back to declared with a clean restart history
+impl:
+  script: scripts/reconciler/services.mjs
+  args: [--reopen]
+positional:
+  - {name: name, required: true, variadic: false}
+flags: []
+exit:
+  "0": the row is declared again
+  "1": no such row
+  "2": bad usage
+json: flag
+examples:
+  - starci reconciler reopen seat:kernel:<ledger-id>:<workflow-id>
+  - starci reconciler reopen <service-name>
+roles: [lead, owner]
+editions: [full]

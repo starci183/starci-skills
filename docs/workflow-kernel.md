@@ -85,6 +85,10 @@ agent, settle green reports, run the retry of a job whose gate resolved or whose
 judgment is the Kernel's menu (`modules/kernel/kernel-menu.yaml`), one function of the ledger state: `starci kernel status` prints its
 open items as the Decide section, and `menu[]` in its JSON.
 
+A Kernel seat whose launch failed for one cause is held (`kernel-start-held`) and quarantined with one Decision Item; the hold counts only
+the failures of the runtime revision now running, so a deployed remedy gets one launch at once. `starci reconciler reopen <seat>` puts a
+quarantined seat or service back to `declared` earlier; the Decision Item names that verb.
+
 | Step | Call | Why |
 | --- | --- | --- |
 | read | `starci kernel status --workflow <id>` (`--field <path>` selects fields) | The menu: each item names its situation, the policy step and deadline, and the options that answer it. |

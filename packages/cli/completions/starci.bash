@@ -27,7 +27,7 @@ _starci() {
         machine) COMPREPLY=( $(compgen -W "decisions kernel-watchdog lessons op-metrics seam-policy worktrees worktrees-clean" -- "$cur") );;
         npm) COMPREPLY=( $(compgen -W "ci install" -- "$cur") );;
         orca) COMPREPLY=( $(compgen -W "terminal-read terminal-send" -- "$cur") );;
-        reconciler) COMPREPLY=( $(compgen -W "once restart start status stop up" -- "$cur") );;
+        reconciler) COMPREPLY=( $(compgen -W "once reopen restart start status stop up" -- "$cur") );;
         release) COMPREPLY=( $(compgen -W "app-installs check ci-status clean-test cut env-test images launch-smoke notes proof publish sync-runtime" -- "$cur") );;
         route) COMPREPLY=( $(compgen -W "op" -- "$cur") );;
         runtime) COMPREPLY=( $(compgen -W "architecture benchmark-snapshot check derived-fields doctor gen-catalog gen-ops housekeeping import-held-secret install ledger-hygiene link machine-db owner-claims-audit readme-blocks status update validate version" -- "$cur") );;
@@ -1076,6 +1076,7 @@ _starci() {
         orca:terminal-read) COMPREPLY=( $(compgen -W "--terminal --tail --limit --json --cwd --quiet --help --edition" -- "$cur") );;
         orca:terminal-send) COMPREPLY=( $(compgen -W "--terminal --text --text-file --no-enter --wait-submit --json --cwd --quiet --help --edition" -- "$cur") );;
         reconciler:once) COMPREPLY=( $(compgen -W "--controller --key --apply --json --cwd --quiet --help --edition" -- "$cur") );;
+        reconciler:reopen) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         reconciler:restart) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         reconciler:start) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         reconciler:status) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
