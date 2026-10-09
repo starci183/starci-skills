@@ -1761,3 +1761,16 @@ cases:
     spec: tests/replay/host-independence.spec.mjs
     replay: tests/replay/host-independence.spec.mjs
     status: covered
+  - id: replay-fixture-has-no-extraction-recipe
+    family: record-vs-reality
+    finding:
+      role: runtime
+      duty: does
+      verdict: departs
+      evidence: "The first-leg fixture has no registered extraction recipe and its source carries a path-like value. The replay fixture spec fails its case inventory before reaching the hygiene assertion."
+      remedy: {state: in-tree, change: "A first-leg recipe reads the approved plan of a running workflow with no op jobs and emits the checked-in fixture through the hygiene-checked writer."}
+    met: {date: "2026-10-10", where: "five-run replay sweep", evidence: "fixtures.spec.mjs fails all five runs: first-leg.json is absent from CASES."}
+    rule: {file: tests/helpers/replay-extract.mjs, anchor: "function firstLeg"}
+    spec: tests/replay/fixtures.spec.mjs
+    replay: tests/replay/fixtures.spec.mjs
+    status: covered

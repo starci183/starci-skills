@@ -2,7 +2,7 @@
  "schema": "replay-fixture@1",
  "case": "first-leg",
  "source": {
-  "pre-mortem": "premortem/a9-all-legs finding 1"
+  "copy": "first-leg"
  },
  "workflow": {
   "id": "wf-1",

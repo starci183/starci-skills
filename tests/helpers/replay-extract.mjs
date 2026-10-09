@@ -36,12 +36,22 @@ const eventsOf = (db, kind) => rows(db, 'SELECT seq, created_at, entity_id, payl
 const jobOf = (ids, row, extra = {}) => ({ id: ids.id('job', row.job_id), op: wordOr(row.op_id), status: row.status, ...extra });
 
 /** The plan legs and edges of the goal restricted to `ops`. */
-function planOf(db, ops) {
+function planOf(db, ops = null) {
   const goal = parse(first(db, 'SELECT json FROM goals ORDER BY revision DESC LIMIT 1')?.json) ?? {};
   const plan = goal.derivedPlan ?? { legs: [], edges: [] };
   const known = new Set((plan.legs ?? []).map((leg) => leg.op));
-  const kept = ops.filter((op) => known.has(op));
+  const kept = (ops ?? [...known]).filter((op) => known.has(op));
   return { legs: kept.map((op) => ({ op })), edges: (plan.edges ?? []).filter(([from, to]) => kept.includes(from) && kept.includes(to)) };
+}
+
+/** A newly started workflow whose approved plan has no operation job yet. */
+function firstLeg(copy) {
+  const db = openLedger(copy, 'starci');
+  const workflow = first(db, "SELECT workflow_id, phase FROM workflows WHERE phase='running' ORDER BY created_at, workflow_id LIMIT 1");
+  if (!workflow || countOf(db, "SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind='op'", workflow.workflow_id)) {
+    throw new Error('first-leg needs a running workflow with no op jobs');
+  }
+  return { workflow: { id: WORKFLOW, phase: workflow.phase, goalRevision: 0 }, plan: planOf(db), jobs: [] };
 }
 
 /** Case c and f: a Kernel answers none-fits to a leg-ready item whose node name the redaction filter rewrites. */
@@ -228,7 +238,7 @@ function launchUnreceipted(copy) {
       provider: wordOr(receipt.provider), receiptState: wordOr(receipt.state), openSupervisorItems: countOf(db, "SELECT count(*) n FROM decision_items WHERE status='open' AND decider='supervisor'") } };
 }
 
-const RECIPES = { 'critic-held': criticHeld, 'critic-held-reported': criticHeldReported, 'codex-turn-start': codexTurnStart, 'draw-render-tool': drawRenderTool, 'fenced-retry': fencedRetry, 'grammar-in-tree': grammarInTree, 'leg-ready': legReady, 'read-plan': readPlan, 'shape-guard': shapeGuard, 'handed-over': handedOver, 'prepared-fail': preparedFail, 'launch-unreceipted': launchUnreceipted };
+const RECIPES = { 'critic-held': criticHeld, 'critic-held-reported': criticHeldReported, 'codex-turn-start': codexTurnStart, 'draw-render-tool': drawRenderTool, 'fenced-retry': fencedRetry, 'first-leg': firstLeg, 'grammar-in-tree': grammarInTree, 'leg-ready': legReady, 'read-plan': readPlan, 'shape-guard': shapeGuard, 'handed-over': handedOver, 'prepared-fail': preparedFail, 'launch-unreceipted': launchUnreceipted };
 export const CASES = Object.freeze(Object.keys(RECIPES));
 
 /** The fixture document of `name` extracted from `copy`; the source names the copy neutrally. */
