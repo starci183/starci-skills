@@ -12,6 +12,7 @@ import { sweepWorkers } from '../../scripts/supervisor/supervisor-watchdog.mjs';
 import { createJob, jobOf } from '../../scripts/supervisor/workers.mjs';
 import { openLedger } from '../../engine/db/ledger.mjs';
 import { EVENTS } from '../../scripts/kernel/settle/job-settle.mjs';
+import { currentRuntimeRev } from '../../scripts/kernel/runtime-rev.mjs';
 
 const settings = jobSettings({ allocation: {} });
 const NOW = Date.now() + 5_000;
@@ -47,7 +48,7 @@ function fixture({ status = 'running', payload = {}, report = null, handover = n
     for (const next of walk) ledger.db.prepare("UPDATE jobs SET status=? WHERE job_id='op-a'").run(next);
   }
   const ev = (kind, p, ago = 0) => ledger.transaction(() => ledger.appendEvent({ workflowId: 'wf-x', entityType: 'job', entityId: 'op-a', kind, payload: p }));
-  if (handover) ev(EVENTS.needsKernel, { dispatchId: 'ctx_1', reason: handover.reason, ...(handover.code ? { code: handover.code } : {}) });
+  if (handover) ev(EVENTS.needsKernel, { dispatchId: 'ctx_1', reason: handover.reason, runtimeRev: currentRuntimeRev(), ...(handover.code ? { code: handover.code } : {}) });
   for (const e of events) ev(e.kind, e.payload);
   ledger.close();
   const db = new DatabaseSync(file, { readOnly: true });

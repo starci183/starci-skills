@@ -51,6 +51,8 @@ import { NEEDS_KERNEL_EVENT, KERNEL_ONLY_OPS, reportedJobs, kernelHandoverOf } f
 import { eachInOrder } from '../../lib/in-order.mjs';
 import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 import { reconcileAttemptPlacements } from '../attempt-placement.mjs';
+import { currentRuntimeRev } from '../runtime-rev.mjs';
+import { releaseEndedGates } from '../gate-holds-ended.mjs';
 import { settlerSettings, runtimeEnv, verifyReported, recordSettlerCheck, parse, slug, jsonOf } from './job-settle-verify.mjs';
 import { tempRoot } from '../../../engine/temp-root.mjs';
 export { classifyCheck, argvOf } from './check-command.mjs';
@@ -160,9 +162,10 @@ async function checkerUnavailable(ledger, item, verdict, { now, settings }) {
 /** reported -> needs-kernel, once per dispatch and reason. */
 function handToKernel(ledger, item, verdict, { now }) {
   const prior = kernelHandoverOf(ledger.db, item);
-  if (prior?.reason === verdict.reason) return { jobId: item.jobId, state: STATES.kernel, reason: verdict.reason, recorded: false };
+  const runtimeRev = currentRuntimeRev();
+  if (prior?.reason === verdict.reason && (prior.runtimeRev ?? null) === runtimeRev) return { jobId: item.jobId, state: STATES.kernel, reason: verdict.reason, recorded: false };
   event(ledger, item, EVENTS.needsKernel, { from: STATES.reported, to: STATES.kernel, op: item.op, attempt: item.attempt, outcome: item.outcome,
-    reason: verdict.reason, ...(verdict.detail ? { detail: verdict.detail } : {}), ...(verdict.code ? { code: verdict.code } : {}), ageMs: now - item.filedAt });
+    reason: verdict.reason, runtimeRev, ...(verdict.detail ? { detail: verdict.detail } : {}), ...(verdict.code ? { code: verdict.code } : {}), ageMs: now - item.filedAt });
   return { jobId: item.jobId, state: STATES.kernel, reason: verdict.reason, recorded: true };
 }
 
@@ -266,6 +269,7 @@ async function settleReported(ledger, fresh, { repo, settings, env, now, dryRun,
     latencyMs: at - fresh.filedAt, consumedBefore: fresh.consumedAt != null, nextStep: settled.value?.nextStep ?? null, cutSet: settled.value?.cutSet ?? null,
     tail: settled.value?.tail ?? null, ...(judged.parity ? { parity: judged.parity } : {}) });
   markAttempt(ledger, fresh, { settledAt: at, settledBy: 'settler' });
+  ledger.transaction(() => releaseEndedGates(ledger.db, fresh.workflowId, { at }));
   return { target: 'settled', row: { jobId: fresh.jobId, op: fresh.op, verdict: settleAs, via: judged.via, latencyMs: at - fresh.filedAt, status: settled.value?.status ?? (settleAs === 'pass' ? 'succeeded' : 'failed') } };
 }
 

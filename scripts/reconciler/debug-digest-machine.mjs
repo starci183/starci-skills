@@ -29,6 +29,20 @@ function startsOf(m) {
   return { boots, runs };
 }
 
+/**
+ * When the runtime revision now leading took over: the `acquired_at` of the oldest leader epoch in the unbroken run of epochs at that revision, or null.
+ * A departure of the wake path is judged from here, as the start hold judges failures by revision: the wakes of an older runtime are history.
+ */
+function revSinceOf(m, rev) {
+  if (!rev) return null;
+  let since = null;
+  for (const row of ask(m, 'SELECT rev, acquired_at FROM leader_history ORDER BY epoch DESC LIMIT 200')) {
+    if (row.rev !== rev) break;
+    since = Number(row.acquired_at);
+  }
+  return since;
+}
+
 function engineOf(m) {
   const leader = ask(m, 'SELECT * FROM engine_leader WHERE name=?', [LEADER_NAME])[0] ?? null;
   const modes = Object.fromEntries(ask(m, 'SELECT controller, mode FROM controller_modes').map((r) => [r.controller, r.mode]));
@@ -37,18 +51,19 @@ function engineOf(m) {
     .map((r) => ({ controller: r.controller, n: Number(r.n) }));
   const config = reconcilerConfig();
   const configured = Object.fromEntries(CONTROLLER_NAMES.map((name) => [name, configuredMode(name, config)]));
-  return { leader: leader ? { pid: leader.pid, epoch: leader.epoch, heartbeatAt: leader.heartbeat_at, rev: leader.rev } : null, modes, configured, safe, failingQueue, ...startsOf(m) };
+  return { leader: leader ? { pid: leader.pid, epoch: leader.epoch, heartbeatAt: leader.heartbeat_at, rev: leader.rev } : null, revSince: revSinceOf(m, leader?.rev ?? null), modes, configured, safe, failingQueue, ...startsOf(m) };
 }
 
-function supervisorOf(m) {
+function supervisorOf(m, since = null) {
   const seat = ask(m, 'SELECT * FROM seats WHERE seat_id=?', [SUPERVISOR_SEAT.seatId])[0] ?? null;
-  const deaf = ask(m, 'SELECT seat_id FROM v_deaf_seats').some((r) => r.seat_id === SUPERVISOR_SEAT.seatId);
+  // Deaf is the live seat's: refused inputs from before it booted belong to the seat it replaced.
+  const deaf = ask(m, 'SELECT seat_id, last_input_failure_at FROM v_deaf_seats').some((r) => r.seat_id === SUPERVISOR_SEAT.seatId && Number(r.last_input_failure_at ?? 0) >= Number(seat?.booted_at ?? 0));
   const enabled = parseJsonOr(ask(m, 'SELECT value_json FROM sup_signals WHERE scope=?', [SUPERVISOR_SEAT.enabledScope])[0]?.value_json)?.enabled ?? null;
   const wake = ask(m, "SELECT MAX(created_at) AS at FROM sup_events WHERE kind='supervisor-wake'")[0]?.at ?? null;
   const decisions = ask(m, "SELECT di_id, kind, decider, due_at, summary, workflow_id FROM sup_decision_items WHERE status='open'")
     .map((d) => ({ id: d.di_id, kind: d.kind, decider: d.decider, dueAt: d.due_at ?? null, summary: d.summary, workflowId: d.workflow_id }));
   return { seat: seat ? { state: seat.state, terminalHandle: seat.terminal_handle, lastSeenAt: seat.last_seen_at, lastInputOkAt: seat.last_input_ok_at, deaf } : null,
-    enabled, lastWakeAt: wake, wakes: supervisorWakeUsageOf(m.db), seatCost: supervisorSeatOf(m.db), decisions, health: null };
+    enabled, lastWakeAt: wake, wakes: supervisorWakeUsageOf(m.db), seatCost: supervisorSeatOf(m.db, { since: since ?? 0 }), decisions, health: null };
 }
 
 function reservationsOf(m) {
@@ -100,7 +115,7 @@ export function machineFacts({ env = process.env, read = readMachine, numbers = 
   return read((m) => ({
     providerEvents: providerEventsOf(m, numbers.signalRows), ...signalsOf(m, numbers, readBlob),
     ledgers: ask(m, "SELECT ledger_id, name, repo_root, file FROM ledgers WHERE state='active' ORDER BY name"),
-    engine: engineOf(m), supervisor: supervisorOf(m), reservations: reservationsOf(m),
+    engine: engineOf(m), supervisor: supervisorOf(m, revSinceOf(m, ask(m, 'SELECT rev FROM engine_leader')[0]?.rev ?? null)), reservations: reservationsOf(m),
     seats: ask(m, 'SELECT seat_id FROM seats').map((r) => r.seat_id),
     supJobs: ask(m, 'SELECT job_id, status FROM sup_jobs').map((r) => ({ jobId: r.job_id, status: r.status })),
     lands: ask(m, "SELECT run_id, lane, result, started_at, json_extract(specs_json,'$.loosening.id') AS id, json_extract(specs_json,'$.loosening.approved') AS approved FROM land_runs WHERE json_extract(specs_json,'$.loosening') IS NOT NULL ORDER BY run_id DESC LIMIT 50")

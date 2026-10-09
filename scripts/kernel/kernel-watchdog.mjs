@@ -46,7 +46,7 @@ import { arg as argvValue } from '../lib/cli-arg.mjs';
 import { createKernelTick } from './kernel-watchdog-tick.mjs';
 import { workflowSender } from './workflow-startup.mjs';
 import { seatWakeOf } from './op-incident-policy.mjs';
-import { createKernelRotation } from './seat-rotation.mjs';
+import { createKernelRotation, rotationRule } from './seat-rotation.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
@@ -237,6 +237,8 @@ export function wakeFailuresProveDead(failedAts, { lastOutputAt = null, now = Da
 // the settle tail, and the Kernel's own records (it is responding, e.g. holding behind an ask it cannot serve) reset the
 // wakes only. On 2026-09-29 a product's auth Kernel was replaced 5 times while it wrote kernel-decision/kernel-proposal
 // records between wakes that piled up within 90 s, and an op-settled between streaks kept the escalation from firing.
+// A boot starts a new Kernel incarnation: the wakes an earlier one received do not count against it (the seat-cost rotation's boot events).
+const KERNEL_BOOTS = new Set(rotationRule('kernel').bootEvents);
 const KERNEL_WOKEN_EVENT = 'kernel-woken';
 const KERNEL_IDLE_REPLACED_EVENT = 'kernel-replaced-idle';
 const WAKE_IDLE_REPLACE = SEAT_WAKE.idleReplace;
@@ -258,6 +260,7 @@ export function idleWakesOf(rows, { now = Date.now() } = {}) {
   let wakes = 0, firstWakeAt = null, replacedAts = [];
   for (const row of rows) {
     if (KERNEL_MOVES.has(row.kind)) { wakes = 0; firstWakeAt = null; replacedAts = []; }
+    else if (KERNEL_BOOTS.has(row.kind)) { wakes = 0; firstWakeAt = null; }
     else if (KERNEL_ACTIVITY.has(row.kind)) { wakes = 0; firstWakeAt = null; }
     else if (row.kind === KERNEL_WOKEN_EVENT) { if (wakes === 0) { firstWakeAt = Number(row.created_at) || null; } wakes += 1; }
     else if (row.kind === KERNEL_IDLE_REPLACED_EVENT) { replacedAts.push(Number(row.created_at) || 0); wakes = 0; firstWakeAt = null; }
@@ -266,7 +269,7 @@ export function idleWakesOf(rows, { now = Date.now() } = {}) {
   const due = wakes >= WAKE_IDLE_REPLACE && firstWakeAt != null && now - firstWakeAt >= WAKE_IDLE_WINDOW_MS;
   return { wakes, firstWakeAt, replaced, due };
 }
-const IDLE_KINDS = [...KERNEL_MOVES, ...KERNEL_ACTIVITY, KERNEL_WOKEN_EVENT, KERNEL_IDLE_REPLACED_EVENT];
+const IDLE_KINDS = [...KERNEL_MOVES, ...KERNEL_BOOTS, ...KERNEL_ACTIVITY, KERNEL_WOKEN_EVENT, KERNEL_IDLE_REPLACED_EVENT];
 const kernelIdleWakes = () => withKernelLedger((ledger) => idleWakesOf(ledger.db.prepare(
   `SELECT kind, created_at FROM events WHERE workflow_id=? AND kind IN (${IDLE_KINDS.map(() => '?').join(',')}) ORDER BY seq`)
   .all(workflowId, ...IDLE_KINDS))) ?? { wakes: 0, firstWakeAt: null, replaced: 0, due: false };

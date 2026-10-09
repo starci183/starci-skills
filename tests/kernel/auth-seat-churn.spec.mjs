@@ -21,6 +21,16 @@ test('A1: a Kernel that writes its own records between wakes is not idle (the 10
   }
 });
 
+test('A1b: the wakes an earlier Kernel incarnation received do not count against the one that booted after them', () => {
+  for (const boot of ['kernel-booted', 'kernel-restarted']) {
+    const idle = idleWakesOf(rows(['kernel-woken', '10:00:00'], ['kernel-woken', '10:01:00'], ['kernel-woken', '10:02:00'], [boot, '10:05:00'], ['kernel-woken', '10:06:00']), { now: at('10:30:00') });
+    assert.equal(idle.wakes, 1, boot);
+    assert.equal(idle.firstWakeAt, at('10:06:00'), boot);
+  }
+  const kept = idleWakesOf(rows(['kernel-replaced-idle', '10:03:00'], ['kernel-restarted', '10:05:00'], ['kernel-woken', '10:06:00']), { now: at('10:30:00') });
+  assert.equal(kept.replaced, 1, 'a boot does not clear the idle-replacement streak the escalation reads');
+});
+
 test('A2: three wakes piled up within 90 s are not a replace; the same wakes spanning the window are', () => {
   const wakes = rows(['kernel-woken', '10:05:27'], ['kernel-woken', '10:06:23'], ['kernel-woken', '10:06:53']);
   const early = idleWakesOf(wakes, { now: at('10:07:52') });
