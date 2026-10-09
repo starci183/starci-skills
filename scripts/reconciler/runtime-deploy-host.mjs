@@ -14,6 +14,7 @@ import { leaderState } from './boot.mjs';
 import { inFlightSteps } from './runtime-deploy-inflight.mjs';
 import { snapshotOf } from './runtime-deploy-verify.mjs';
 import { runLandFullCheck } from '../supervisor/git-land-verify.mjs';
+import { provenFor, runAffectedChild } from './runtime-deploy-affected.mjs';
 
 export const DEPLOY_EVENT = 'runtime-deployed';
 export const DEPLOY_FAILED_EVENT = 'runtime-deploy-failed';
@@ -31,6 +32,9 @@ export function runHostVerb(host, args, env) {
   return { status: r.error ? 1 : r.status, data, stderr: String(r.stderr ?? r.error?.message ?? '').slice(0, 400) };
 }
 
+/** The budget the source clone's affected run runs in (modules/supervisor/affected-tests.yaml of that tree). */
+const affectedBudget = (dir) => parseYaml(fs.readFileSync(path.join(dir, 'modules', 'supervisor', 'affected-tests.yaml'), 'utf8')).budgetMs;
+
 /** The default seams over the real host. `env` is the verb's environment, `host` the host tree. */
 export function hostSeams({ host, env }) {
   const read = (fn, fallback = null) => readMachine(fn, fallback, { env });
@@ -40,10 +44,11 @@ export function hostSeams({ host, env }) {
     inFlight: () => read((machine) => inFlightSteps({ machine, leader: leaderState({ env }) }), []),
     snapshot: () => { const leader = leaderState({ env }); return read((machine) => ({ leader, after: snapshotOf(machine, leader) })); },
     runCheck: (dir) => runLandFullCheck(dir),
-    // The specs the change can break, run in the source clone against the host head (runs `starci test affected`; exit 2 is a budget that ended with files not started).
-    runAffected: (dir, base) => runHostVerb(dir, ['test', 'affected', '--run', '--base', base], env),
+    // The specs the change can break, run in the source clone against the host head as a real child writing a receipt file (runtime-deploy-affected.mjs).
+    runAffected: (dir, base, progress) => runAffectedChild({ dir, base, env, budgetMs: affectedBudget(dir), progress }),
+    provenAffected: (dir, base, tip) => provenFor({ dir, base, tip }),
     planAffected: (dir, base) => runHostVerb(dir, ['test', 'affected', '--plan', '--base', base], env),
-    affectedBudgetMs: (dir) => parseYaml(fs.readFileSync(path.join(dir, 'modules', 'supervisor', 'affected-tests.yaml'), 'utf8')).budgetMs,
+    affectedBudgetMs: affectedBudget,
     fetchFrom: (dir) => fetch(['--no-tags', dir, 'HEAD'], { cwd: host }),
     fastForward: (sha) => merge(['--ff-only', sha], { cwd: host }),
     migrate: () => runHostVerb(host, ['runtime', 'artefacts', '--migrate'], env),

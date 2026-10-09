@@ -21,6 +21,7 @@ flags:
   - {name: by, type: string, summary: 'symbol (default: the specs related to the changed functions) or file (every spec importing a changed file)'}
   - {name: run, type: boolean, summary: 'run the selected spec files, one per process, inside the time budget'}
   - {name: plan, type: boolean, summary: 'print the selected files with the reason each is in the set; run nothing'}
+  - {name: receipt-file, type: string, summary: 'with --run, write the receipt to this file; the answer carries its path (a gate reads the file, not the output)'}
   - {name: concurrency, type: number, summary: override automatic file concurrency with a positive integer}
   - {name: root, type: string, summary: 'repository root (default: the command cwd)'}
 positional: []

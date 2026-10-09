@@ -61,12 +61,13 @@ function fakeEngine(host) {
 }
 
 const seamsOf = (w, extra = {}) => ({ lockOwner: () => null, leader: w.engine.leader, inFlight: () => [], snapshot: w.engine.snapshot, runCheck: () => ({ ok: true, pass: 3, total: 3 }),
-  migrate: w.engine.migrate, restart: w.engine.restart, roleActions: () => null, runAffected: affectedGreen, planAffected: () => ({ status: 0, data: { scope: ['tests/a.spec.mjs', 'tests/b.spec.mjs', 'tests/c.spec.mjs'] } }),
+  migrate: w.engine.migrate, restart: w.engine.restart, roleActions: () => null, runAffected: affectedGreen, provenAffected: () => null, planAffected: () => ({ status: 0, data: { scope: ['tests/a.spec.mjs', 'tests/b.spec.mjs', 'tests/c.spec.mjs'] } }),
   affectedBudgetMs: () => 2_400_000, ...extra });
 
 /** The answer of `starci test affected --run --json` in the source clone: a receipt on its tip, every file passed. */
 const affectedReceipt = (dir, base, over = {}) => ({ schema: 'starci/affected-receipt@1', base, tip: git(dir, 'rev-parse', 'HEAD'), clean: true, files: 3, passed: 3, total: 3, ok: true, ms: 10, budgetMs: 2_400_000, concurrency: 2, ...over });
-const affectedGreen = (dir, base) => ({ status: 0, data: { ok: true, receipt: affectedReceipt(dir, base) } });
+const affectedRun = (receipt, over = {}) => ({ exit: { exited: true, code: 0, signal: null, timedOut: false }, receipt, answer: {}, tail: [], red: [], unfinished: [], ...over });
+const affectedGreen = (dir, base) => affectedRun(affectedReceipt(dir, base));
 const run = (w, args, { seams = {}, ...deps } = {}) => runtimeDeploy({ args, positionals: [], env: w.env, role: 'owner' }, { root: w.host, numbers: NUMBERS, seams: seamsOf(w, seams), sleep: async () => {}, ...deps });
 const events = (w, kind) => readMachine((m) => m.supEvents({ kind, entityType: 'runtime' }), [], { env: w.env });
 const headOf = (dir) => git(dir, 'rev-parse', 'HEAD');
@@ -95,7 +96,7 @@ const REFUSALS = [
   ['deploy-not-fast-forward', (w) => { commit(w.host, 'docs/host-only.md', 'h\n', 'host moves'); return { from: w.clone }; }],
   ['deploy-check-red', (w) => ({ from: w.clone, seams: { runCheck: () => ({ ok: false, output: 'RT_TIER_DIRECTION scripts/x.mjs' }) } })],
   ['deploy-check-unproven', (w) => { git(w.host, 'fetch', '-q', w.clone, 'HEAD:refs/heads/cand'); return { from: 'cand' }; }],
-  ['deploy-affected-red', (w) => ({ from: w.clone, seams: { runAffected: (dir, base) => ({ status: 1, data: { ok: false, receipt: affectedReceipt(dir, base, { ok: false, passed: 2 }) } }) } })],
+  ['deploy-affected-red', (w) => ({ from: w.clone, seams: { runAffected: (dir, base) => affectedRun(affectedReceipt(dir, base, { ok: false, passed: 2 }), { exit: { exited: true, code: 1, signal: null, timedOut: false }, red: ['tests/b.spec.mjs'] }) } })],
   ['deploy-release-cut-running', (w) => ({ from: w.clone, seams: { lockOwner: () => ({ purpose: 'release-cut', pid: 4, since: 'now', stale: false }) } })],
   ['deploy-host-lock-held', (w) => ({ from: w.clone, seams: { lockOwner: () => ({ purpose: 'land', pid: 4, since: 'now', stale: false }) } })],
 ];
@@ -310,17 +311,19 @@ test('the affected specs: green carries {base, tip, passed, total} in the receip
 });
 
 test('the affected specs refuse a budget that ended (exit 2), a receipt on another tip, an unclean tree and a run with no receipt; the check ran first and nothing moved', async (t) => {
+  const exit = (code) => ({ exited: true, code, signal: null, timedOut: false });
   const cases = [
-    ['budget exceeded', (dir, base) => ({ status: 2, data: { ok: false, receipt: affectedReceipt(dir, base, { ok: false, passed: 2 }) } }), /time budget ended/],
-    ['stale tip', (dir, base) => ({ status: 0, data: { ok: true, receipt: affectedReceipt(dir, base, { tip: 'e'.repeat(40) }) } }), /tip=eeeeeeeeeeee/],
-    ['unclean', (dir, base) => ({ status: 0, data: { ok: true, receipt: affectedReceipt(dir, base, { clean: false }) } }), /clean=false/],
-    ['no receipt', () => ({ status: 1, data: null, stderr: 'verb failed' }), /no receipt came back/],
+    ['budget exceeded', (dir, base) => affectedRun(affectedReceipt(dir, base, { ok: false, passed: 2 }), { exit: exit(2), unfinished: ['tests/late.spec.mjs'] }), /time budget ended with 1 spec file\(s\) not started: tests\/late\.spec\.mjs/],
+    ['stale tip', (dir, base) => affectedRun(affectedReceipt(dir, base, { tip: 'e'.repeat(40) })), /receipt is for tip eeeeeeeeeeee/],
+    ['unclean', (dir, base) => affectedRun(affectedReceipt(dir, base, { clean: false })), /not clean/],
+    ['child died', () => affectedRun(null, { exit: exit(7), tail: ['PASS tests/a.spec.mjs (0.1s)'] }), /wrote no receipt: the child exited 7.*Last lines: PASS tests\/a/],
   ];
   for (const [name, runAffected, detail] of cases) {
     const w = world(t);
     const out = await run(w, { from: w.clone }, { seams: { runAffected } });
     assert.equal(out.data.refusals[0].code, 'deploy-affected-red', name);
     assert.match(out.data.refusals[0].detail, detail, name);
+    assert.match(out.data.refusals[0].detail, /starci test affected --run --base [0-9a-f]{12} in /, 'the refusal names the command and the clone');
     assert.equal(headOf(w.host), w.base, name);
     assert.equal(fs.existsSync(receiptFile(w.tip, w.env)), false, `${name}: no receipt is written`);
   }
@@ -345,4 +348,25 @@ test('a deploy that changes ui/package.json installs and builds the harness UI b
   const none = world(t);
   const untouched = await run(none, { from: none.clone }, { seams: { uiBuild: () => { throw new Error('no ui change, no ui build'); } } });
   assert.equal(untouched.code, 0, untouched.text);
+});
+
+test('a long affected run is announced before it starts, a receipt already proven for the base..tip pair is accepted instead of a second run', async (t) => {
+  const w = world(t);
+  const said = [];
+  let ran = 0;
+  const first = await run(w, { from: w.clone }, { progress: (line) => said.push(line), seams: { runAffected: (dir, base) => { ran += 1; return affectedGreen(dir, base); } } });
+  assert.equal(first.code, 0, first.text);
+  assert.equal(ran, 1);
+  const announced = said.findIndex((line) => /^affected: running 3 spec file\(s\) in .* budget 40 min; progress follows$/.test(line));
+  assert.ok(announced >= 0, `announced before it runs: ${JSON.stringify(said)}`);
+  assert.ok(said.findIndex((line) => line.startsWith('check: running starci runtime check')) < announced, 'the check is announced first');
+
+  const second = world(t);
+  const proven = [];
+  const out = await run(second, { from: second.clone }, { progress: (line) => proven.push(line), seams: {
+    runAffected: () => { throw new Error('the pair is proven: no second run'); },
+    provenAffected: (dir, base, tip) => ({ base, tip, passed: 9, total: 9, ok: true, clean: true }) } });
+  assert.equal(out.code, 0, out.text);
+  assert.ok(proven.some((line) => /accepting the receipt already proven .* \(9 of 9 files passed\); not run again/.test(line)));
+  assert.deepEqual(events(second, 'runtime-deployed')[0].payload.affected, { base: second.base, tip: second.tip, passed: 9, total: 9 });
 });

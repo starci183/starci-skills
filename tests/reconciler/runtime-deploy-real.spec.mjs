@@ -65,7 +65,7 @@ test('a real engine on a throwaway host is carried to a new revision by the verb
 
   const out = await runtimeDeploy({ args: { from: clone }, positionals: [], env, role: 'owner' },
     { root: host, numbers: { waitMs: 30_000, pollMs: 500, verifyMs: 180_000 }, seams: { runCheck: () => ({ ok: true, pass: 1, total: 1 }),
-      runAffected: (dir, base) => ({ status: 0, data: { ok: true, receipt: { schema: 'starci/affected-receipt@1', base, tip, clean: true, files: 1, passed: 1, total: 1, ok: true, ms: 1, budgetMs: 1, concurrency: 1 } } }) } });
+      runAffected: (dir, base) => ({ exit: { exited: true, code: 0, signal: null, timedOut: false }, tail: [], red: [], unfinished: [], answer: {}, receipt: { schema: 'starci/affected-receipt@1', base, tip, clean: true, files: 1, passed: 1, total: 1, ok: true, ms: 1, budgetMs: 1, concurrency: 1 } }), provenAffected: () => null } });
   assert.equal(out.code, 0, out.text);
   assert.equal(git(host, 'rev-parse', 'HEAD'), tip);
 
