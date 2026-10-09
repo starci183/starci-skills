@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { starciLocalRoot } from '../../engine/runtime-root.mjs';
 import { notes } from '../api/git/notes.mjs';
+import { sameResolvedPath } from '../lib/path-key.mjs';
 
 const RECEIPT_SCHEMA = 'starci/deploy-receipt@1';
 
@@ -25,13 +26,15 @@ export function writeReceipt({ sha, tree, exit, at = Date.now(), by = null, coun
   return file;
 }
 
-function readReceipt(sha, tree, base, env) {
+function readReceipt(sha, tree, base, env, root) {
   let record;
   try { record = JSON.parse(fs.readFileSync(receiptFile(sha, env), 'utf8')); } catch { return null; }
   const bound = record?.schema === RECEIPT_SCHEMA && record.sha === sha && record.tree === tree && record.exit === 0 && record.digest === digestOf(record);
   // The affected specs ran against a base: the receipt stands for the host it was proven against, never for another host revision.
   const affectedOk = record?.affected?.tip === sha && record.affected.base === base && record.affected.passed === record.affected.total;
-  return bound && affectedOk ? { via: 'deploy-receipt', at: record.at, affected: record.affected } : null;
+  // The specs ran in one tree: a receipt whose affected run judged another tree's root is that tree's proof, never this source's.
+  const judgedHere = typeof record?.affected?.root === 'string' && sameResolvedPath(record.affected.root, root);
+  return bound && affectedOk && judgedHere ? { via: 'deploy-receipt', at: record.at, affected: record.affected } : null;
 }
 
 function landNoteReceipt(host, sha) {
@@ -44,4 +47,4 @@ function landNoteReceipt(host, sha) {
 }
 
 /** The receipt that stands for `sha`: {via, ...} or null. `host` is the host repository, where the land note lives. */
-export const receiptFor = ({ sha, tree, base, host, env }) => readReceipt(sha, tree, base, env) ?? landNoteReceipt(host, sha);
+export const receiptFor = ({ sha, tree, base, host, env, root }) => readReceipt(sha, tree, base, env, root) ?? landNoteReceipt(host, sha);

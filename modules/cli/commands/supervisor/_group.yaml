@@ -1,3 +1,4 @@
 group: supervisor
 summary: inspect, start or stop the one StarCi Supervisor seat
 owner: runtime
+runtimeSide: host

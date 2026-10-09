@@ -1561,3 +1561,10 @@ cases:
     rule: {file: scripts/lib/roots.mjs, anchor: "workDirHolding"}
     spec: tests/lib/roots.spec.mjs
     status: covered
+  - id: tree-verb-ran-the-other-tree-through-the-home-record
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "a lane ran starci test affected --run inside its clone with STARCI_RUNTIME unset: the per-user home record outranks the checkout, so the CLI printed a notice and ran the live tree's code and specs for ten minutes, and the verdict was about the wrong tree. The refusal of 2026-10-09 covered only verbs that write the runtime tree", remedy: {state: in-tree, change: "every verb declares its side (runtimeSide, per group and per verb; the catalog refuses a group without one): a tree-side verb (about the runtime tree that owns the running bin: runtime check, test affected, release, gate, regeneration) runs this checkout unless STARCI_RUNTIME or its own --root chose a tree, a host-side verb runs the located runtime as before; the affected receipt names the root it judged and the deploy gate refuses a receipt that judged another tree's root"}}
+    met: {date: "2026-10-09", where: "a lane clone, test affected --run without STARCI_RUNTIME", evidence: "coordinator report of 2026-10-09: the CLI printed 'running the runtime at the live checkout (STARCI_RUNTIME/home record), not this checkout' and ran the other tree's specs"}
+    rule: {file: packages/cli/src/runtime-target.mjs, anchor: "targetOf"}
+    spec: tests/cli/runtime-side.spec.mjs
+    status: covered

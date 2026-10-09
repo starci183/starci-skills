@@ -173,9 +173,11 @@ test('the check receipt binds the exact commit and tree: the verb reuses its own
   fs.writeFileSync(file, JSON.stringify({ ...forged, tree: git(w.clone, 'rev-parse', `${w.tip}^{tree}`) }));
   assert.equal((await run(w, { from: w.clone, plan: true }, { seams })).data.steps[0].startsWith('run starci runtime check'), true, 'a receipt edited by hand fails its digest');
   const tree = git(w.clone, 'rev-parse', `${w.tip}^{tree}`);
-  writeReceipt({ sha: w.tip, tree, exit: 0, affected: { base: 'f'.repeat(40), tip: w.tip, passed: 1, total: 1 } }, w.env);
+  writeReceipt({ sha: w.tip, tree, exit: 0, affected: { root: w.clone, base: 'f'.repeat(40), tip: w.tip, passed: 1, total: 1 } }, w.env);
   assert.equal((await run(w, { from: w.clone, plan: true }, { seams })).data.steps[0].startsWith('run starci runtime check'), true, 'a receipt proven against another host head proves nothing for this one');
-  writeReceipt({ sha: w.tip, tree, exit: 0, affected: { base: w.base, tip: w.tip, passed: 1, total: 1 } }, w.env);
+  writeReceipt({ sha: w.tip, tree, exit: 0, affected: { root: path.join(w.clone, '..', 'another-tree'), base: w.base, tip: w.tip, passed: 1, total: 1 } }, w.env);
+  assert.equal((await run(w, { from: w.clone, plan: true }, { seams })).data.steps[0].startsWith('run starci runtime check'), true, 'a receipt whose specs ran in another tree proves nothing for this source');
+  writeReceipt({ sha: w.tip, tree, exit: 0, affected: { root: w.clone, base: w.base, tip: w.tip, passed: 1, total: 1 } }, w.env);
   const out = await run(w, { from: w.clone }, { seams });
   assert.equal(out.code, 0, out.text);
   assert.equal(checks, 0, 'a valid receipt is not run again');

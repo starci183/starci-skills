@@ -1,3 +1,4 @@
 group: app
 summary: product application scaffolding, checks, managed output and local test infrastructure
 owner: "@starci/hfs"
+runtimeSide: host

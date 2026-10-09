@@ -1,6 +1,7 @@
 group: runtime
 verb: housekeeping
 owner: runtime
+runtimeSide: host
 summary: inspect or apply the host housekeeping sweeps
 impl:
   script: scripts/housekeeping/housekeeping.mjs
