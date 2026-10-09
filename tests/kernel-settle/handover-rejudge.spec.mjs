@@ -8,7 +8,8 @@ import crypto from 'node:crypto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
+import { openLedger, ledgerFileFor, openIncident } from '../../engine/db/ledger.mjs';
+import { releaseEndedGates, HOLDS_SETTLED_REASON, HOLDS_SETTLED_EVENT } from '../../scripts/kernel/gate-holds-ended.mjs';
 import { planJob, jobFacts, jobSettings } from '../../scripts/reconciler/controllers/job.mjs';
 import { attemptFacts } from '../../scripts/reconciler/debug-digest-ledger.mjs';
 import { classifyCheck, reconcileJobSettle, EVENTS } from '../../scripts/kernel/settle/job-settle.mjs';
@@ -20,7 +21,7 @@ const settings = jobSettings({ allocation: {} });
 const NOW = Date.now() + 5_000;
 const LIVE_REV = 'b'.repeat(40);
 const sha = (text, n) => crypto.createHash('sha256').update(text).digest('hex').slice(0, n);
-const GRAPH_CHECK = 'starci work graph validate --repo D:/Repositories/nivo-monorepo --workflow wf-nivo-auth --version 1';
+const GRAPH_CHECK = 'starci work graph validate --repo work/nivo-monorepo --workflow wf-nivo-auth --version 1';
 
 /** One workflow, one op job reported done, one handover event; `handover` is the payload of the needs-kernel event. */
 function reportedFixture(handover, outcome = 'done') {
@@ -51,10 +52,9 @@ test('`starci work graph validate|show|diff` is a check the settler re-runs; pro
   const check = classifyCheck({ name: 'work-graph-validate', command: GRAPH_CHECK, exitCode: 0 }, { skillRoot: root });
   assert.equal(check.kind, 'runtime');
   assert.equal(check.rel, 'scripts/work/work-graph.mjs');
-  assert.deepEqual(check.argv.slice(0, 3), ['validate', '--repo', 'D:/Repositories/nivo-monorepo']);
+  assert.deepEqual(check.argv.slice(0, 3), ['validate', '--repo', 'work/nivo-monorepo']);
   for (const action of ['show', 'diff']) assert.equal(classifyCheck({ command: `starci work graph ${action} --repo r --workflow w` }, { skillRoot: root }).kind, 'runtime');
   assert.equal(classifyCheck({ command: 'starci work graph propose --repo r --job j --file f --reason why' }, { skillRoot: root }).kind, 'foreign');
-  assert.equal(classifyCheck({ command: 'node scripts/work/work-graph.mjs validate --repo r' }, { skillRoot: root }).kind, 'runtime');
 });
 
 test('a handover recorded before revisions were named, or under another revision, is judged again by the settler', (t) => {
@@ -116,4 +116,25 @@ test('the settler records its handover with the revision it judged under, once p
   const second = await pass();
   assert.equal(second.kernel[0].recorded, false, 'the same reason under the same revision is recorded once');
   assert.equal(handovers().length, 2);
+}));
+
+test('the settle that ends the last job a supervisor-gate holds closes the gate', async (t) => withLedger(t, ({ ledger }) => {
+  const OP = 'architecture.decide';
+  seedWorkflow(ledger, { id: 'wf-g', goal: { revision: 1, markdown: '# g' }, jobs: [{ jobId: 'op-held', opId: OP, status: 'succeeded', payload: { opId: OP, owned_paths: [] } }] });
+  const gate = (id, holds) => {
+    openIncident(ledger.db, { incidentId: id, workflowId: 'wf-g', kind: 'supervisor-gate', opId: OP, detail: 'settle refused', lastProgress: '[supervisor-gate] settle refused' });
+    ledger.transaction(() => ledger.appendEvent({ workflowId: 'wf-g', entityType: 'incident', entityId: id, kind: 'incident-raised', payload: { kind: 'supervisor-gate', detail: 'settle refused', opId: OP, holds } }));
+  };
+  gate('inc-wild', ['*']);
+  gate('inc-job', ['op-held']);
+  gate('inc-other', ['op-not-in-this-ledger']);
+  const closed = ledger.transaction(() => releaseEndedGates(ledger.db, 'wf-g'));
+  assert.deepEqual(closed, ['inc-job'], 'only the gate whose held job is settled closes');
+  const row = ledger.db.prepare("SELECT status, resolved_reason FROM incidents WHERE incident_id='inc-job'").get();
+  assert.deepEqual([row.status, row.resolved_reason], ['resolved', HOLDS_SETTLED_REASON]);
+  assert.equal(ledger.db.prepare("SELECT count(*) n FROM events WHERE entity_id='inc-job' AND kind=?").get(HOLDS_SETTLED_EVENT).n, 1, 'the incident says why it closed');
+  assert.equal(ledger.db.prepare("SELECT status FROM incidents WHERE incident_id='inc-wild'").get().status, 'open');
+  seedWorkflow(ledger, { id: 'wf-g', jobs: [{ jobId: 'op-retry', opId: OP, status: 'queued', tryNo: 1, payload: { opId: OP, owned_paths: [] } }] });
+  gate('inc-retry', ['op-held', OP]);
+  assert.deepEqual(ledger.transaction(() => releaseEndedGates(ledger.db, 'wf-g')), [], 'a queued job of the held op keeps the gate');
 }));

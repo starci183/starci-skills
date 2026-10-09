@@ -52,6 +52,7 @@ import { eachInOrder } from '../../lib/in-order.mjs';
 import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 import { reconcileAttemptPlacements } from '../attempt-placement.mjs';
 import { currentRuntimeRev } from '../runtime-rev.mjs';
+import { releaseEndedGates } from '../gate-holds-ended.mjs';
 import { settlerSettings, runtimeEnv, verifyReported, recordSettlerCheck, parse, slug, jsonOf } from './job-settle-verify.mjs';
 import { tempRoot } from '../../../engine/temp-root.mjs';
 export { classifyCheck, argvOf } from './check-command.mjs';
@@ -268,6 +269,7 @@ async function settleReported(ledger, fresh, { repo, settings, env, now, dryRun,
     latencyMs: at - fresh.filedAt, consumedBefore: fresh.consumedAt != null, nextStep: settled.value?.nextStep ?? null, cutSet: settled.value?.cutSet ?? null,
     tail: settled.value?.tail ?? null, ...(judged.parity ? { parity: judged.parity } : {}) });
   markAttempt(ledger, fresh, { settledAt: at, settledBy: 'settler' });
+  ledger.transaction(() => releaseEndedGates(ledger.db, fresh.workflowId, { at }));
   return { target: 'settled', row: { jobId: fresh.jobId, op: fresh.op, verdict: settleAs, via: judged.via, latencyMs: at - fresh.filedAt, status: settled.value?.status ?? (settleAs === 'pass' ? 'succeeded' : 'failed') } };
 }
 

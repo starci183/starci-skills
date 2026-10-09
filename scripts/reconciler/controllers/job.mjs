@@ -12,7 +12,8 @@
 //                                                  (reconcileJobSettle({ repo: R, jobId: J }) -
 //                                                  consume, re-verify or canon parity, starci kernel record-checks + starci kernel settle; wrapped, never
 //                                                  re-implemented)
-//   reported, handed to the Kernel              -> Decision Item settle-nongreen (one per report)             job.consume-check
+//   reported, handed to the Kernel              -> Decision Item settle-nongreen (one per report); a handover of an    job.consume-check
+//                                                  older runtime revision is judged by the settler again (job-plan-report.mjs)
 //   answering                                   -> starci kernel questions --workflow (bridge) + DI worker-question    job.consume-check
 //   effect_unknown older than effectUnknownMs   -> starci kernel reconcile --job <id>                                  job.worker
 //   settled, worker release unproven            -> the settler for this job (its releaseSettled closes and    job.close-verify
@@ -43,12 +44,13 @@ import { OPENED_BY, SUPERVISOR_LEDGER, jobKey } from '../job-keys.mjs';
 import { mapInOrder } from '../../lib/in-order.mjs';
 import { clocksOf } from '../sla.mjs';
 import { settlerSettings, releaseProofOf, EVENTS as SETTLE_EVENTS } from '../../kernel/settle/job-settle.mjs';
-import { reportedJobs, kernelHandoverOf, KERNEL_ONLY_OPS } from '../../machine/reported-jobs.mjs';
+import { reportedJobs, kernelHandoverOf } from '../../machine/reported-jobs.mjs';
 import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs'; import { isMain } from '../../lib/is-main.mjs';
 import { positiveNumber } from '../../lib/number.mjs';
 import { ownerOnlyQuestion } from '../../kernel/op-incident-policy.mjs';
 import { TERMINAL_HOLDS, holdView, terminalFactsOf } from '../../kernel/terminal-step.mjs';
 import { runMechanicalMoves } from '../mechanical-moves.mjs';
+import { planReport } from '../job-plan-report.mjs';
 import { currentRuntimeRev } from '../../kernel/runtime-rev.mjs';
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
@@ -187,28 +189,6 @@ export function planJob(f, { frontier = {}, questions = [], settings = jobSettin
   if (SETTLED.includes(f.status) && !f.released && f.now - f.updatedAt <= f.windowMs) planCloseVerify(f, clock, set);
   if (f.terminal && !f.terminal.taken) planTerminal(f, clock, set);
   return { step, clocks };
-}
-
-/** A done report the settler handed to the Kernel under another runtime revision than the live one (a handover recorded before revisions were named counts as older). */
-const judgedByOlderRuntime = (f) => f.report.outcome === 'done' && !KERNEL_ONLY_OPS.includes(f.op) && Boolean(f.runtimeRev) && f.handover.runtimeRev !== f.runtimeRev;
-
-/** The clock and step of a live job with a report. Consume is part of settle (settle-runtime-service): SETTLE_OVERDUE / DECISION_OVERDUE time the report, no separate CONSUME_OVERDUE clock. */
-function planReport(f, clock, set) {
-  if (f.handover && judgedByOlderRuntime(f)) {
-    // The runtime that handed the report over was an older one: the verdict is a function of the code, so the settler judges it again once per revision.
-    clock('SETTLE_OVERDUE', f.handover.at);
-    set({ kind: 'settle', concern: 'job.settle', rejudge: true });
-  } else if (f.handover) {
-    clock('DECISION_OVERDUE', f.handover.at);
-    set({ kind: 'settle-nongreen', concern: 'job.consume-check', reason: f.handover.reason });
-  } else if (f.report.outcome !== 'done' || KERNEL_ONLY_OPS.includes(f.op)) {
-    // The settler never settles these; its handover is the Kernel's item (starci kernel status settleDecisions).
-    clock('DECISION_OVERDUE', f.report.filedAt);
-    set({ kind: 'settle-nongreen', concern: 'job.consume-check', reason: KERNEL_ONLY_OPS.includes(f.op) ? 'owner-act' : `outcome-${f.report.outcome}` });
-  } else {
-    clock('SETTLE_OVERDUE', f.report.filedAt);
-    set({ kind: 'settle', concern: 'job.settle' });
-  }
 }
 
 /** The clock and step of a job left terminal with nothing after it (policy holds failed-no-step, owner-wait-no-ask). */
