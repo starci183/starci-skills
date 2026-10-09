@@ -12,30 +12,17 @@
 // from the ledger rows the settle judged: check_runs, the filed report, settle_json. The language is the owner's
 // config.yaml `language`; the catalog carries Vietnamese only, so the text is Vietnamese.
 import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../engine/yaml.mjs';
 import { blobPath } from '../../engine/db/blob.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { failureCodeCatalog } from '../lib/failure-code-catalog.mjs';
 import { translator } from '../lib/i18n.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { latestCheckRuns } from '../machine/evidence-store.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const WHY_SCHEMA = 'starci/why@1';
-const CATALOG_PATH = path.join(root, 'modules', 'kernel', 'failure-codes.yaml');
-
-let catalogCache = null;
-/** The catalog: a flat map code -> {title, title_vi, meaning_vi, causes_vi[], nextStep_vi, owner, kind}. */
-export function loadCatalog(file = CATALOG_PATH) {
-  if (file === CATALOG_PATH && catalogCache) return catalogCache;
-  const catalog = parseYaml(fs.readFileSync(file, 'utf8')) ?? {};
-  if (file === CATALOG_PATH) catalogCache = catalog;
-  return catalog;
-}
 
 /** One code explained: the catalog entry, or {code, known:false} for a code the catalog does not carry. */
-export function explainCode(code, catalog = loadCatalog()) {
+export function explainCode(code, catalog = failureCodeCatalog()) {
   const e = catalog[code];
   return e ? { code, known: true, ...e } : { code, known: false, title_vi: code, meaning_vi: null, nextStep_vi: null, owner: 'runtime-core', kind: null };
 }
@@ -335,7 +322,7 @@ const failWhy = (w) => {
  * (passed, or still running).
  */
 export function buildWhy(ctx) {
-  const { attempt, unit = null, catalog = loadCatalog() } = ctx;
+  const { attempt, unit = null, catalog = failureCodeCatalog() } = ctx;
   const checks = ctx.checks ?? [];
   const settle = ctx.settle ?? {};
   const rep = ctx.report ? parseJson(ctx.report.report_json, {}) : {};
@@ -377,7 +364,7 @@ export function buildWhy(ctx) {
 const handleDb = (h) => (h?.db ?? h);
 
 /** Gather the facts of one attempt row and build its why (never stored). */
-export function computeWhy(ledger, attemptRow, { catalog = loadCatalog(), readBlob = readBlobText } = {}) {
+export function computeWhy(ledger, attemptRow, { catalog = failureCodeCatalog(), readBlob = readBlobText } = {}) {
   const db = handleDb(ledger);
   const attempt = typeof attemptRow === 'object' ? attemptRow : one(db, 'SELECT * FROM op_attempts WHERE attempt_id=?', attemptRow);
   if (!attempt) return null;

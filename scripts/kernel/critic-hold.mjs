@@ -5,13 +5,16 @@
 // it chose `authority` (seen live on 2026-10-09) and the route table sent the owner a question only the runtime could answer.
 // A Critic that could not start or answer is the runtime's: the proof is owed by the runtime, so the kind of such a report is `checker-unavailable`
 // whatever the op chose (the one mapping every reader of the blocker uses), and its settle is a re-judgment by the runtime's own Critic.
+import { criticHoldCodes } from '../work/critic-contract.mjs';
+
 export const CHECKER_UNAVAILABLE = 'checker-unavailable';
-const HOLD = /\bCRITIC_(?:UNAVAILABLE|NO_INDEPENDENT_MEMBER|QUOTA_OUT|AUTHOR_UNKNOWN)\b/;
+let holdPattern = null;
+const holdPatternOf = () => (holdPattern ??= new RegExp(String.raw`\b(?:${criticHoldCodes().join('|')})\b`));
 
 /** The Critic hold code a blocked report's blocker names, or null. */
 export function criticHoldOf(envelope) {
   if (envelope?.outcome !== 'blocked') return null;
-  return HOLD.exec(String(envelope.blocker?.detail ?? ''))?.[0] ?? null;
+  return holdPatternOf().exec(String(envelope.blocker?.detail ?? ''))?.[0] ?? null;
 }
 
 /** The blocker kind the runtime reads from a report: `checker-unavailable` for a Critic hold, else the kind the op filed (null when none). */

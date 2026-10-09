@@ -3,21 +3,15 @@
 // (policy row error-work: the Kernel retries, switches agent, re-plans); a typed refusal code the catalog classes runtime-fault is a
 // runtime fault (policy row error-runtime-defect). The Kernel's menu withholds the escape for a work failure that still has retries,
 // and a supervisor-gate of cause runtime-defect over work evidence is refused (verbs/shared/gate-raise.mjs).
-import fs from 'node:fs';
-import path from 'node:path';
-import { parseYaml } from '../../engine/yaml.mjs';
-import { skillRoot } from '../../engine/runtime-root.mjs';
+import { failureCodeCatalog } from '../lib/failure-code-catalog.mjs';
 import { boundValue } from './op-incident-policy.mjs';
 
 const CLASS_OF_KIND = Object.freeze({ 'check-finding': 'work', 'runtime-fault': 'runtime' });
 const CODE = /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b/g;
 const RETRY_BOUND = { ref: 'modules/models/kinds.yaml#routes[id=rejected-report-retries].limit' };
-let catalog = null;
-
-const catalogOf = () => (catalog ??= parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'kernel', 'failure-codes.yaml'), 'utf8')));
 
 /** 'work' | 'runtime' for a catalogued code whose kind decides the class, else null. */
-export const classOfCode = (code) => CLASS_OF_KIND[catalogOf()[code]?.kind] ?? null;
+export const classOfCode = (code) => CLASS_OF_KIND[failureCodeCatalog()[code]?.kind] ?? null;
 
 /** The catalogued codes a text names, each with its class. */
 const codesIn = (text) => [...new Set(String(text ?? '').match(CODE) ?? [])].map((code) => ({ code, class: classOfCode(code) })).filter((entry) => entry.class);

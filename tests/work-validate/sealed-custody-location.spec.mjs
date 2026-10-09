@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { validateWork } from '../../scripts/work/validate/work-validate.mjs';
 import { SEALED_LOCATION_RE } from '../../scripts/work/validate/check-work-artifacts.mjs';
-import { loadCatalog } from '../../scripts/kernel/why.mjs';
+import { failureCodeCatalog } from '../../scripts/lib/failure-code-catalog.mjs';
 
 // Owner ruling 2026-09-29, corrected 2026-10-01: a sealed secret lives only at .starcistacks/<env>/secrets/<slug>.enc
 // (app-relative: .starcistacks sits at the app root beside the Work tree, never under be/); the Work tree holds the identity record whose custody.sealed points there and never a sealed file. Fixtures hold no values.
@@ -91,7 +91,7 @@ test('a sealed file kept under .starciwork is refused with SEALED_FILE_IN_WORK',
 });
 
 test('both codes are catalogued with Vietnamese text', () => {
-  const catalog = loadCatalog();
+  const catalog = failureCodeCatalog();
   for (const code of ['SEALED_CUSTODY_LOCATION', 'SEALED_FILE_IN_WORK']) {
     assert.match(catalog[code].title_vi, /\S/);
     assert.match(catalog[code].nextStep_vi, /git mv|custody\.sealed/);

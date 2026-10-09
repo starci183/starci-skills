@@ -12,7 +12,8 @@ import {readProperties} from '../../scripts/lib/properties.mjs';
 import {coverageScopeOf,judgeCoverage,judgeDashboard,judgeSummary,loadSonarGate,serverConditions,thresholdsOf} from '../../scripts/gates/sonar-gate.mjs';
 import {enforcesOp,judgeJob,readSonarSummary,recordSonarJudgment,SONAR_CHECK,SONAR_INCIDENT_TAG} from '../../scripts/kernel/sonar-settle.mjs';
 import {independentChecksOf} from '../../scripts/kernel/verbs/shared/check-evidence.mjs';
-import {buildWhy,checkFacts,loadCatalog} from '../../scripts/kernel/why.mjs';
+import {buildWhy,checkFacts} from '../../scripts/kernel/why.mjs';
+import {failureCodeCatalog} from '../../scripts/lib/failure-code-catalog.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {proofRepo} from '../helpers/sonar-scan.mjs';
@@ -156,7 +157,7 @@ test('a red judgment is a failed runtime check whose why speaks Vietnamese; a la
   const row=ledger.db.prepare('SELECT * FROM check_runs WHERE attempt_id=? AND name=?').get(attemptId,SONAR_CHECK);
   const facts=checkFacts(row,()=>null);
   assert.deepEqual(facts.codes,['sonar-gate-red']);
-  const catalog=loadCatalog();
+  const catalog=failureCodeCatalog();
   const why=buildWhy({attempt:{attempt_id:attemptId,workflow_id:'wf-sonar',op_id:'backend.implement',try_no:1,verdict:'fail',report_outcome:'done',end_state:'settled',settled_at:1,reported_at:1},
     checks:[facts],report:{report_id:1,report_json:json({outcome:'done',summary:'xong'})},settle:{claimOverruled:true},unit:null,catalog});
   assert.ok(why.codes.includes('sonar-gate-red'));
@@ -184,7 +185,7 @@ test('an unavailable Sonar records the explicit why, tells the Supervisor once a
   const row=ledger.db.prepare('SELECT * FROM check_runs WHERE attempt_id=? AND name=? ORDER BY run_seq DESC').get(attemptId,SONAR_CHECK);
   assert.equal(row.status,'fail','a red check, not an "unavailable" that summarizeCheckEvidence would count as neither');
   assert.deepEqual(checkFacts(row,()=>null).codes,['sonar-unavailable']);
-  assert.match(loadCatalog()['sonar-unavailable'].meaning_vi,/Supervisor/);
+  assert.match(failureCodeCatalog()['sonar-unavailable'].meaning_vi,/Supervisor/);
   record(ledger,attemptId,scan(),3000);
   assert.equal(ledger.db.prepare("SELECT count(*) n FROM incidents WHERE status='open'").get().n,0,'a judged slice resolves the notice');
 });

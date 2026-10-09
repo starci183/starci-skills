@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { checkGrantParents } from '../../scripts/kernel/grant-parents.mjs';
-import { loadCatalog } from '../../scripts/kernel/why.mjs';
+import { failureCodeCatalog } from '../../scripts/lib/failure-code-catalog.mjs';
 
 // The fe/ side keeps its app router at fe/apps/app/src/app; there is no fe/src/app. Owned paths are app-relative.
 function fixture(t) {
@@ -62,7 +62,7 @@ test('a declared create-new-module grant passes when the module root parent exis
 });
 
 test('the refusal code is in the Vietnamese catalog', () => {
-  const entry = loadCatalog()['grant-parent-missing'];
+  const entry = failureCodeCatalog()['grant-parent-missing'];
   assert.ok(entry?.title_vi && entry.meaning_vi && entry.nextStep_vi);
   assert.equal(entry.kind, 'input-invalid');
 });

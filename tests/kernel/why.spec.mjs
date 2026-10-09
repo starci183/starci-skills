@@ -6,7 +6,8 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {changeWorkflowPhase,ledgerFileFor,openLedger,recordCheckRun,recordJobResult,setJobStatus,startAttempt,updateAttempt} from '../../engine/db/ledger.mjs';
 import {catalogProblems,emittedCodes,readCatalog} from '../../scripts/checks/check-failure-codes.mjs';
-import {buildWhy,checkFacts,explainCode,kernelNotesOf,loadCatalog,whyOf,WHY_SCHEMA} from '../../scripts/kernel/why.mjs';
+import {buildWhy,checkFacts,explainCode,kernelNotesOf,whyOf,WHY_SCHEMA} from '../../scripts/kernel/why.mjs';
+import {failureCodeCatalog} from '../../scripts/lib/failure-code-catalog.mjs';
 import {recordWhy} from '../../scripts/kernel/why-record.mjs';
 import {loadAdapter,adapterModelAuthority,loadModelRegistry,loadRuntimes} from '../../scripts/agent/model-registry.mjs';
 import {selectAdmission} from '../../scripts/lib/agent-admission.mjs';
@@ -27,7 +28,7 @@ test('the catalog carries every emitted code, in the owner-facing shape, and no 
   assert.deepEqual(p.stale,[],'a catalog entry no code emits');
   assert.deepEqual(p.malformed,[]);
   assert.ok(p.catalog>=1000,`the catalog has ${p.catalog} entries`);
-  const c=loadCatalog();
+  const c=failureCodeCatalog();
   assert.match(c.TARGET_MISSING.title_vi,/kh\u00f4ng t\u1ed3n t\u1ea1i/);
   assert.equal(c['rerun-red'].kind,'settle-reason');
   assert.ok(c['prompt-stuck'].nextStep_vi);

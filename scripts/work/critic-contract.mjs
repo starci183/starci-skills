@@ -11,5 +11,10 @@ const CRITIC_FILE = 'modules/kernel/critic.yaml';
 /** The Critic contract of the tree at `root`. */
 export const criticContract = (root = ROOT) => parseYaml(fs.readFileSync(path.join(root, CRITIC_FILE), 'utf8'));
 
+const HOLD_CODE_KEYS = Object.freeze(['unavailable', 'noIndependentMember', 'quotaOut', 'authorUnknown']);
+
+/** The codes of the holds in which the Critic could not judge, as `codes` of the contract spells them. */
+export const criticHoldCodes = (contract = criticContract()) => HOLD_CODE_KEYS.map((key) => contract.codes[key]);
+
 /** The coverage row of op kind `kind` ({kind, status: covered|owed, ...}), or null when the kind owes no Critic. */
 export const coverageOf = (kind, contract = criticContract()) => contract.coverage.find((row) => row.kind === kind) ?? null;
