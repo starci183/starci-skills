@@ -91,6 +91,7 @@ flag_management:
         - "scripts/context/**/*.mjs"
         - "scripts/example/**/*.mjs"
         - "scripts/gates/*.mjs"
+        - "scripts/gates/commit-proof.mjs"
         - "scripts/goal/**/*.mjs"
         - "scripts/guards/**/*.mjs"
         - "scripts/hfs/**/*.mjs"
