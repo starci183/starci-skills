@@ -67,7 +67,7 @@ export function eventPayloadRecord(payload, payloadSha, spill) {
   const redacted = redactData(payload);
   const { payload: inline, compacted } = compactEventPayload(redacted);
   const json = JSON.stringify(inline);
-  if (compacted || json.length <= EVENT_LIMITS.payloadBytes) return { payloadJson: json, payloadSha: compacted && !payloadSha ? spill(Buffer.from(JSON.stringify(redacted))) : payloadSha };
-  const sha = payloadSha ?? spill(Buffer.from(JSON.stringify(redacted)));
+  if (compacted || payloadSha || json.length <= EVENT_LIMITS.payloadBytes) return { payloadJson: json, payloadSha: compacted && !payloadSha ? spill(Buffer.from(JSON.stringify(redacted))) : payloadSha };
+  const sha = spill(Buffer.from(JSON.stringify(redacted)));
   return { payloadJson: JSON.stringify(spilledView(redacted, json.length, sha)), payloadSha: sha };
 }

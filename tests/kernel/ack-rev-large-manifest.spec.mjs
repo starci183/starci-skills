@@ -29,7 +29,8 @@ test('a read manifest over the inline event bound is attested, kept whole in the
     const admitted = callerAdmission(w.ledger, args, { env: { ...process.env, ORCA_TERMINAL_HANDLE: w.handle }, root: w.runtime });
     admitted.run(() => ackRev.run({ ledger: w.ledger, args, caller: admitted.caller, emit() {} }));
     const row = w.ledger.db.prepare("SELECT payload_json, payload_sha FROM events WHERE kind='runtime-rev-acked' ORDER BY seq DESC LIMIT 1").get();
-    assert.equal(row.payload_json, null, 'the row keeps no inline JSON');
+    assert.equal(JSON.parse(row.payload_json).spilled, true, 'the row keeps a bounded inline view of the scalars');
+    assert.equal(JSON.parse(row.payload_json).rev, required.rev);
     assert.match(row.payload_sha, /^[0-9a-f]{64}$/);
     assert.equal(eventPayloadOf(row).readManifest.digest, required.digest, 'the whole manifest is behind the sha');
     assert.deepEqual(unreadFiles(w.ledger.db, w.workflowId, required), [], 'the admission reads the attestation back');
