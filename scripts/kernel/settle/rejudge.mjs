@@ -30,12 +30,12 @@ import { preservedRefOf } from '../preserved-ref.mjs';
 import { classifyCheck, rerunCheck } from './job-settle.mjs';
 
 export const REJUDGE_ROUTE = 'rejudge-of-a-preserved-product';
-export const REJUDGE_EVENT = 'job-rejudge-admitted';
+const REJUDGE_EVENT = 'job-rejudge-admitted';
 /** Journalled by the router when the precondition does not hold (the code says which part): the leg then takes the retry route. */
 export const REJUDGE_REFUSED_EVENT = 'job-rejudge-refused';
 /** The blocker kinds the runtime owes the proof of; a failed attempt blocked on one of them is judged, not redone. */
 const RUNTIME_OWED = new Set([CHECKER_UNAVAILABLE]);
-const refuse = (code, detail) => ({ ok: false, code, detail });
+const refuse = ({ code }, detail) => ({ ok: false, code, detail });
 
 /** The newest report of a job as {outcome, envelope} or null. */
 function reportOf(db, jobId) {
@@ -57,18 +57,18 @@ function productDigestAt(tree, ref, files) {
  * Whether the failed job `job` is owed a re-judgment: {ok: true, ref, digest, report} or {ok: false, code, detail}. Pure over the ledger and the tree's git.
  * Codes: rejudge-not-failed, rejudge-blocker-not-runtime-owed, rejudge-nothing-to-judge, rejudge-no-preserved-ref, rejudge-product-mismatch, rejudge-already-done.
  */
-export function rejudgeOwed(db, job, { tree }) {
-  if (job.status !== 'failed') return refuse('rejudge-not-failed', `the job is ${job.status}`);
+function rejudgeOwed(db, job, { tree }) {
+  if (job.status !== 'failed') return refuse({ code: 'rejudge-not-failed' }, `the job is ${job.status}`);
   const report = reportOf(db, job.job_id);
-  if (report?.outcome !== 'blocked' || !RUNTIME_OWED.has(effectiveBlockerKind(report.envelope))) return refuse('rejudge-blocker-not-runtime-owed', 'the newest report is not blocked on a runtime-owed blocker');
-  if (!criticOwedBy(job.op_id)) return refuse('rejudge-nothing-to-judge', `${job.op_id} owes no runtime Critic`);
+  if (report?.outcome !== 'blocked' || !RUNTIME_OWED.has(effectiveBlockerKind(report.envelope))) return refuse({ code: 'rejudge-blocker-not-runtime-owed' }, 'the newest report is not blocked on a runtime-owed blocker');
+  if (!criticOwedBy(job.op_id)) return refuse({ code: 'rejudge-nothing-to-judge' }, `${job.op_id} owes no runtime Critic`);
   const ref = preservedRefOf(db, job.job_id);
-  if (!ref || !tree || revParseQuery(['--verify', '--quiet', ref], { dir: tree, timeout: 30_000 }).status !== 0) return refuse('rejudge-no-preserved-ref', 'the attempt left no preserved ref');
+  if (!ref || !tree || revParseQuery(['--verify', '--quiet', ref], { dir: tree, timeout: 30_000 }).status !== 0) return refuse({ code: 'rejudge-no-preserved-ref' }, 'the attempt left no preserved ref');
   const files = (report.envelope.files ?? []).filter((file) => typeof file === 'string' && !path.isAbsolute(file));
   const digest = productDigestAt(tree, ref, files);
-  if (!digest) return refuse('rejudge-product-mismatch', 'the preserved ref does not hold every file the report names');
+  if (!digest) return refuse({ code: 'rejudge-product-mismatch' }, 'the preserved ref does not hold every file the report names');
   const done = db.prepare("SELECT 1 FROM events WHERE kind=? AND json_extract(payload_json,'$.digest')=? LIMIT 1").get(REJUDGE_EVENT, digest);
-  if (done) return refuse('rejudge-already-done', 'this product digest was re-judged once');
+  if (done) return refuse({ code: 'rejudge-already-done' }, 'this product digest was re-judged once');
   return { ok: true, ref, digest, report, files };
 }
 
@@ -135,7 +135,7 @@ export function admitRejudge(ledger, failed, { internals, workflowTree, repo, en
   if (!owed.ok) return owed;
   const routed = { route: REJUDGE_ROUTE, from: failed.job_id, firing: 1, limit: 1 };
   const next = internals.enqueueFollowOn(ledger, failed, { retryOf: failed.job_id, reason: REJUDGE_ROUTE, of: failed.job_id, routed });
-  if (!next.enqueued) return refuse('rejudge-not-enqueued', next.reason ?? 'the lineage refused the next attempt');
+  if (!next.enqueued) return refuse({ code: 'rejudge-not-enqueued' }, next.reason ?? 'the lineage refused the next attempt');
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(next.jobId);
   const payload = parseJson(job.payload_json, {}) ?? {};
   try {
@@ -157,7 +157,7 @@ export function admitRejudge(ledger, failed, { internals, workflowTree, repo, en
     ledger.transaction(() => {
       // The READ proof was observed after the admission and before this report: its time is the clock's now, not the start of the admission.
       fileReport(db, { attemptId, outcome: 'done', report, fromTerminal: 'runtime:rejudge', createdAt: Date.now() + 1 });
-      setJobStatus(db, { jobId: job.job_id, to: 'reported', reason: 'rejudge-report-filed', attemptId, at: now });
+      setJobStatus(db, { jobId: job.job_id, to: 'reported', reason: 'rejudge', attemptId, at: now });
       updateJob(db, { jobId: job.job_id, payload: { ...payload, rejudge: { of: failed.job_id, digest: owed.digest, ref: owed.ref } } });
       ledger.appendEvent({ workflowId: failed.workflow_id, entityType: 'job', entityId: job.job_id, kind: REJUDGE_EVENT, createdAt: now,
         payload: { jobId: job.job_id, of: failed.job_id, op: failed.op_id, digest: owed.digest, ref: owed.ref, files: owed.files.length, attemptId } });
@@ -165,7 +165,8 @@ export function admitRejudge(ledger, failed, { internals, workflowTree, repo, en
     return { ok: true, jobId: job.job_id, digest: owed.digest, ref: owed.ref };
   } catch (error) {
     // The enqueued job is a real lineage row: it ends failed, journalled, and the router takes the retry route over the failed lineage.
-    ledger.transaction(() => { try { setJobStatus(db, { jobId: job.job_id, to: 'failed', reason: 'rejudge-failed', at: now }); } catch { /* already terminal */ } recordJobResult(db, { jobId: job.job_id, result: { verdict: 'fail', rejudge: { code: error.code ?? 'rejudge-failed', detail: String(error.message ?? error).slice(0, 200) } } }); });
-    return refuse(error.code ?? 'rejudge-failed', String(error.message ?? error).slice(0, 200));
+    ledger.transaction(() => { try { setJobStatus(db, { jobId: job.job_id, to: 'failed', reason: 'rejudge', at: now }); } catch { /* already terminal */ } recordJobResult(db, { jobId: job.job_id, result: { verdict: 'fail', rejudge: { code: error.code ?? 'rejudge-failed', detail: String(error.message ?? error).slice(0, 200) } } }); });
+    const detail = String(error.message ?? error).slice(0, 200);
+    return error.code ? refuse({ code: error.code }, detail) : refuse({ code: 'rejudge-failed' }, detail);
   }
 }

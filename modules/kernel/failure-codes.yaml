@@ -17575,3 +17575,103 @@ TURN_START_UNOBSERVED:
   nextStep_vi: "Runtime đóng worker và terminal của lần khởi chạy đó trước khi thử lại, và bộ đếm giữ khởi chạy tính nó; không ai phải gõ vào terminal."
   owner: runtime-core
   kind: runtime-fault
+rejudge-not-failed:
+  title: "The job is not a failed leg"
+  title_vi: "Việc không phải là lượt đã lỗi"
+  meaning_vi: "Chỉ lượt đã lỗi (trạng thái cuối) mới được chấm lại."
+  causes_vi:
+    - "Chỉ lượt đã lỗi (trạng thái cuối) mới được chấm lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-blocker-not-runtime-owed:
+  title: "The blocker is not one the runtime owes"
+  title_vi: "Điều chặn không phải việc của runtime"
+  meaning_vi: "Báo cáo bị chặn vì lý do khác: lượt đi theo đường chạy lại."
+  causes_vi:
+    - "Báo cáo bị chặn vì lý do khác: lượt đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-nothing-to-judge:
+  title: "The op owes no runtime Critic"
+  title_vi: "Op không nợ Critic của runtime"
+  meaning_vi: "Loại op này không có phán quyết của Critic để chấm lại."
+  causes_vi:
+    - "Loại op này không có phán quyết của Critic để chấm lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-no-preserved-ref:
+  title: "No preserved product"
+  title_vi: "Không có sản phẩm được giữ lại"
+  meaning_vi: "Lượt lỗi không để lại ref preserved: đi theo đường chạy lại."
+  causes_vi:
+    - "Lượt lỗi không để lại ref preserved: đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-product-mismatch:
+  title: "The preserved ref does not hold the reported files"
+  title_vi: "Ref được giữ không có đủ tệp báo cáo"
+  meaning_vi: "Ref preserved thiếu tệp mà báo cáo nêu: đi theo đường chạy lại."
+  causes_vi:
+    - "Ref preserved thiếu tệp mà báo cáo nêu: đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-already-done:
+  title: "This product was already re-judged"
+  title_vi: "Sản phẩm này đã được chấm lại một lần"
+  meaning_vi: "Mỗi bản băm sản phẩm chỉ được chấm lại một lần."
+  causes_vi:
+    - "Mỗi bản băm sản phẩm chỉ được chấm lại một lần."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-not-enqueued:
+  title: "The lineage refused the next attempt"
+  title_vi: "Dòng dõi từ chối lượt kế tiếp"
+  meaning_vi: "Cổng của đơn vị không cho lượt kế tiếp: đi theo đường chạy lại."
+  causes_vi:
+    - "Cổng của đơn vị không cho lượt kế tiếp: đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-failed:
+  title: "The re-judgment could not be admitted"
+  title_vi: "Không nhận được việc chấm lại"
+  meaning_vi: "Một bước nhận (hợp đồng, bằng chứng READ, khôi phục) lỗi; việc chấm lại kết thúc lỗi và đường chạy lại tiếp quản."
+  causes_vi:
+    - "Một bước nhận (hợp đồng, bằng chứng READ, khôi phục) lỗi; việc chấm lại kết thúc lỗi và đường chạy lại tiếp quản."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-no-mechanical-check:
+  title: "The failed report declared no check the runtime can re-run"
+  title_vi: "Báo cáo lỗi không khai kiểm tra nào runtime chạy lại được"
+  meaning_vi: "Không có bằng chứng cơ học để chấm lại: đi theo đường chạy lại."
+  causes_vi:
+    - "Không có bằng chứng cơ học để chấm lại: đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-read-proof-failed:
+  title: "The READ proof of the restored product failed"
+  title_vi: "Bằng chứng READ của sản phẩm khôi phục lỗi"
+  meaning_vi: "Chạy bằng chứng đọc trên cây đã khôi phục thất bại."
+  causes_vi:
+    - "Chạy bằng chứng đọc trên cây đã khôi phục thất bại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
