@@ -1,4 +1,4 @@
-import {applyPragmas,openDb as openLedgerFile} from './ledger-open.mjs';
+import {applyPragmas,need,openDb as openLedgerFile} from './ledger-open.mjs';
 import {openReadOnlyDb} from './ref-value.mjs';
 import { assertMutationFence } from '../../scripts/lib/mutation-fence.mjs';
 import fs from 'node:fs';
@@ -53,7 +53,6 @@ export const JOB_ARTIFACT_ROLES=Object.freeze(['check-output','check-stdout','ch
 export const LEDGER_SCHEMA='starci/runtime@1';
 export const LEDGER_VERSION=1;
 
-const need=(ok,message,code)=>{if(!ok)throw Object.assign(new Error(message),code?{code}:{});};
 const json=value=>value===undefined||value===null?null:JSON.stringify(value);
 const parseJson=text=>text===null||text===undefined?null:JSON.parse(text);
 

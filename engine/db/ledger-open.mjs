@@ -5,7 +5,7 @@ import { installRefResolver } from './ref-value.mjs';
 
 // engine/db/ledger-open.mjs — how a ledger file is opened: bounded retry on a transient CANTOPEN, a reference-resolving handle.
 const require=createRequire(import.meta.url);
-const need=(ok,message,code)=>{if(!ok)throw Object.assign(new Error(message),code?{code}:{});};
+export const need=(ok,message,code)=>{if(!ok)throw Object.assign(new Error(message),code?{code}:{});};
 export const applyPragmas=(db,pragmas)=>db.exec(Object.entries(pragmas).map(([k,v])=>`PRAGMA ${k}=${v};`).join(' '));
 const openSleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms);
 // SQLITE_CANTOPEN is transient on Windows while a concurrent process closes the WAL files: a short bounded retry.
