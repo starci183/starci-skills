@@ -3710,8 +3710,9 @@ const runExtensionVerb = async (spec, args, repo) => {
   } finally { ledger.close(); }
 };
 /* ------------------------------------------------------------------ main */
-export const main = (argv = process.argv.slice(2)) => runMain(argv).catch((error) => { if (!(error instanceof VerbExit)) { throw error; } process.exitCode = error.exitCode; });
-async function runMain(argv) {
+export const main = () => runMain().catch((error) => { if (!(error instanceof VerbExit)) { throw error; } process.exitCode = error.exitCode; });
+async function runMain() {
+  const argv = process.argv.slice(2);
   const cmd = argv[0];
   if (!cmd || cmd === '--help' || cmd === '-h') { const lines = extensionUsage(API_EXT); if (lines.length) console.log(`extension verbs (scripts/kernel/verbs):\n${lines.join('\n')}\n`); }
   if (!cmd || cmd === '--help' || cmd === '-h') { usage(cmd ? 0 : 2); }
