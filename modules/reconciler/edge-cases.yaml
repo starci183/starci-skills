@@ -1368,3 +1368,12 @@ cases:
     rule: {file: scripts/reconciler/runtime-deploy.mjs, anchor: "affectedProof"}
     spec: tests/reconciler/runtime-deploy.spec.mjs
     status: covered
+  - id: held-kernel-launch-without-a-terminal-has-no-owner
+    family: failure-while-running
+    found: live
+    replay: tests/replay/launch-unreceipted.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a held launch is reconciled or owned) both workflows had no Kernel and could not get one: the codex Kernel launches ended outcome_unknown / turn_start_unobserved, Orca created the worker and its terminal but its answer named none, so the launch-unknown signal stored a Dispatch with no terminal and the provider receipt (state unknown) no handle; recoverWorkflowLaunch matched none of its three shapes (isUnboundLaunch needs no Dispatch, isUnadopted a receipt handle, isBoundLaunch both) and answered kernel-launch-custody-incomplete for ever; the provider capacity stayed held (49 minutes and counting) and no Supervisor item existed", remedy: {state: in-tree, change: "a held launch whose signal names a Dispatch and no terminal and whose receipt names no handle is reconciled from worker-show of THAT Dispatch (workflow-launch-settled.mjs unobservedLaunchTerminal): when Orca names its terminal and reports the start unknown/unobserved (or settled) with no heartbeat, the terminal is bound to the original reservation, the worker is stopped and released with the closure proof, the reservation released and the signal cleared in one guarded transaction (kernel-launch-reconciled with the evidence); a worker that may be running is never closed; every refusal keeps custody and opens ONE Supervisor Decision Item naming the Dispatch, the terminal and the evidence"}}
+    met: {date: "2026-10-09", where: "alpha.8 live 18:30, StarCi and Nivo Kernel starts", evidence: "start-workflow answer kernel-launch-unreconciled / kernel-launch-custody-incomplete for dispatches ctx_c43eb397ec5c and ctx_768a32aeb100; the held signal read from a copy of the StarCi ledger: launch-unknown, terminal null, receipt state unknown and no handle"}
+    rule: {file: scripts/kernel/workflow-launch-custody.mjs, anchor: "recoverUnreceipted"}
+    spec: tests/kernel/workflow-launch-unreceipted.spec.mjs
+    status: covered

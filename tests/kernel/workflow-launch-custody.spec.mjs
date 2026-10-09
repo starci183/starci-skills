@@ -46,7 +46,8 @@ test('held launch recovery closes the exact worker and actual original provider 
 test('missing identity or provider custody causes no closure call and retains the original machine reservations', (t) => fixture(t, (f) => {
   const before = f.read(), budgets = f.machine.providerReservations();
   const original = JSON.parse(before.value_json);
-  for (const changed of [{ dispatch: null }, { terminal: null, admission: { ...original.admission, receipt: { ...original.admission.receipt, handle: null } } }, { admission: null },
+  // A Dispatch with no terminal and no receipt handle is no longer incomplete: Orca's record of that Dispatch settles it (tests/kernel/workflow-launch-unreceipted.spec.mjs).
+  for (const changed of [{ dispatch: null }, { admission: null },
     { admission: { ...original.admission, receipt: { ...original.admission.receipt, handle: 'foreign-terminal' } } }]) {
     setSignal(f.ledger.db, { scope: 'kernel', key: f.workflowId, workflowId: f.workflowId, token: f.token,
       holderPid: before.holder_pid, value: { ...original, ...changed }, expiresAt: null });

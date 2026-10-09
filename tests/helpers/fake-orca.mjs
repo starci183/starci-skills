@@ -704,7 +704,11 @@ else if (verb === 'orchestration worker-release') {
         lastError: 'The agent terminal was closed but its process could not be confirmed stopped' } });
   }
   if (!(unknownReleases > 0 && state.releases <= unknownReleases)) {
-    state.workerStates = { ...(state.workerStates || {}), [arg('dispatch')]: 'released' }; save();
+    state.workerStates = { ...(state.workerStates || {}), [arg('dispatch')]: 'released' };
+    // state.releaseClosesTerminal: Orca closes the agent terminal of a Dispatch it releases (the live behaviour); unset, the terminal stays as seeded.
+    const closing = state.releaseClosesTerminal ? state.assignees?.[arg('dispatch')] : null;
+    if (closing && state.terminals?.[closing]) state.terminals[closing] = { ...state.terminals[closing], connected: false, writable: false, closed: true };
+    save();
     out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'released' } });
   }
 }

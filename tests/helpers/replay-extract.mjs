@@ -173,7 +173,20 @@ function drawRenderTool(copy) {
       gate: wordOr(routed.p.kind), gateIncidents: countOf(db, "SELECT count(*) n FROM incidents WHERE status='open' AND last_progress LIKE '[supervisor-gate]%'") } };
 }
 
-const RECIPES = { 'draw-render-tool': drawRenderTool, 'fenced-retry': fencedRetry, 'grammar-in-tree': grammarInTree, 'leg-ready': legReady, 'read-plan': readPlan, 'shape-guard': shapeGuard, 'handed-over': handedOver, 'prepared-fail': preparedFail };
+/**
+ * Case k: a held Kernel launch (launch-unknown signal) whose start answered outcome_unknown / turn_start_unobserved without naming the terminal it had created: the signal
+ * holds a Dispatch and no terminal, the provider receipt is unknown and names no handle, so recovery called the custody incomplete for ever and nothing owned it.
+ */
+function launchUnreceipted(copy) {
+  const db = openLedger(copy, 'starci');
+  const signal = rows(db, "SELECT value_json FROM signals WHERE scope='kernel'").map((row) => parse(row.value_json)).find((value) => value?.state === 'launch-unknown');
+  const receipt = signal.admission?.receipt ?? {};
+  return { workflow: { id: WORKFLOW, phase: 'running', goalRevision: 0 }, jobs: [],
+    launch: { state: signal.state, terminalNamed: Boolean(signal.terminal), dispatchNamed: Boolean(signal.dispatch), receiptHandleNamed: Boolean(receipt.handle), role: wordOr(receipt.role),
+      provider: wordOr(receipt.provider), receiptState: wordOr(receipt.state), openSupervisorItems: countOf(db, "SELECT count(*) n FROM decision_items WHERE status='open' AND decider='supervisor'") } };
+}
+
+const RECIPES = { 'launch-unreceipted': launchUnreceipted, 'draw-render-tool': drawRenderTool, 'fenced-retry': fencedRetry, 'grammar-in-tree': grammarInTree, 'leg-ready': legReady, 'read-plan': readPlan, 'shape-guard': shapeGuard, 'handed-over': handedOver, 'prepared-fail': preparedFail };
 export const CASES = Object.freeze(Object.keys(RECIPES));
 
 /** The fixture document of `name` extracted from `copy`; the source names the copy neutrally. */
