@@ -30,6 +30,8 @@ export const PROBLEM_TEXT = Object.freeze({
   'job-past-deadline': '{op} ({jobId}) runs {min} min past its job deadline.',
   'status-unreadable': 'The status of {name} could not be read: {error}',
   'reservation-leak': 'The {provider} reservation {id} ({state}) is live for {owner}, which is not running; held {min} min.',
+  'action-failing': 'The {controller} controller ran {verb} for {key} and it failed {count} times in a row over {min} min ({error}); nothing else reports it: the runtime owes the role it serves a line, a retry or an item.',
+  'decision-refused': 'The Decision Item {key} ({kind}) was refused {count} times over {min} min ({code}); the role it was for is not being told.',
   'secret-survived': 'A secret survived redaction in {artifact} ({kind}): the {rule} rule still matches {count} time(s) in the stored text.',
 });
 
