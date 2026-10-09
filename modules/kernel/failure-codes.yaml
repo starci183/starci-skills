@@ -17575,3 +17575,13 @@ TURN_START_UNOBSERVED:
   nextStep_vi: "Runtime đóng worker và terminal của lần khởi chạy đó trước khi thử lại, và bộ đếm giữ khởi chạy tính nó; không ai phải gõ vào terminal."
   owner: runtime-core
   kind: runtime-fault
+SPEC_CACHE_KEY_BLIND:
+  title: "The spec cache key does not move with an input class the affected selector knows"
+  title_vi: "Khóa bộ nhớ đệm spec không đổi khi một loại đầu vào mà bộ chọn affected biết bị thay đổi"
+  meaning_vi: "Self-check spec-cache-key dựng một cây nhỏ cho từng loại đầu vào của một spec (import tĩnh, import động theo chuỗi, require, điểm vào được spawn, tệp dữ liệu nêu bằng đường dẫn hoặc cạnh thư mục của nó, thư mục anh em, thư mục và cây được nêu tên, đầu ra sinh ra của một generator, mỗi gốc dữ liệu, tầng runtime và tầng cây, phiên bản node, preload, lockfile), đổi đúng một tệp của loại đó và đòi khóa phải đổi; một khóa đứng yên cho một thay đổi như vậy sẽ cho tái dùng một kết quả xanh cũ, nên bị từ chối."
+  causes_vi:
+    - "Một loại đầu vào mới được thêm vào bộ chọn affected (một mục generated, một gốc dữ liệu) mà khóa chưa tính"
+    - "Bộ đọc dữ liệu của khóa (spec-cache-reads.mjs) bỏ sót một cách một mô-đun nêu tên một tệp"
+  nextStep_vi: "Thêm loại đầu vào đó vào khóa trong scripts/supervisor/spec-cache-key.mjs hoặc spec-cache-reads.mjs rồi chạy lại starci runtime check --only spec-cache-key; không nới check."
+  owner: runtime-core
+  kind: check-finding

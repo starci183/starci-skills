@@ -11,11 +11,12 @@ import { gitCallResult, linkedNodeModules, landLocalMain as landLocalMainCall } 
 import { underHostLock as underHostLockCall } from '../machine/verb-lock.mjs';
 import { runLandGate as runLandGateCall } from './git-land-gate.mjs';
 import { runLandFullCheck, verifyLandSpecs } from './git-land-verify.mjs';
+import { affectedTrailer, landVerifyReceipt } from './git-land-receipt.mjs';
 import { announceLand as announceLandCall } from './land-announce.mjs';
 import { KERNEL_NOTE_TRAILER, kernelNoteRefusal } from '../machine/land-kernel-note.mjs';
 
 const SCHEMA = 'starci/git-land@1';
-const STEP = Object.freeze({ links: '1-linked-node-modules', gate: '2-land-gate', check: '3-runtime-check', specs: '4-specs', lock: '5-serial-lock', merge: '6-local-main' });
+const STEP = Object.freeze({ verify: '0-verify-receipt', links: '1-linked-node-modules', gate: '2-land-gate', check: '3-runtime-check', specs: '4-specs', lock: '5-serial-lock', merge: '6-local-main' });
 const cleanResult = ({ ok, landed = false, tip = null, base = null, specs = null, check = null, log = null }) => ({
   schema: SCHEMA, ok, landed, tip, base,
   specs: specs ?? { selected: 0, pass: 0, rerun: 0 },
@@ -64,11 +65,22 @@ function copiesAfterLand(deps) {
   try { return { ok: true, files: (deps.syncCopies ?? syncRuntime)() }; } catch (error) { return { ok: false, error: String(error?.message ?? error).slice(0, 200) }; }
 }
 
+/** The verify receipt of the tip against the land base (main..tip): {receipt, base}, or the typed refusal when `starci runtime verify` has not proved this exact commit. */
+function verifyForLand({ worktree, ref, tip }, deps) {
+  const base = baseOf(worktree, ref, deps);
+  const receipt = (deps.verifyReceipt ?? landVerifyReceipt)({ worktree, tip, base });
+  return receipt.ok ? { receipt, base } : { refusal: refused({ step: STEP.verify, cause: 'verify-receipt-missing', detail: receipt.detail, result: { tip, base } }) };
+}
+
 async function lockedLand({ worktree, ref, verified, verifiedLog, dryRun, lane, concurrency, kernelNote }, deps) {
   const tip = tipOf(worktree, ref, deps);
   if (!tip) return refused({ step: STEP.gate, cause: 'ref-unresolved', detail: ref });
   const head = tipOf(worktree, 'HEAD', deps);
   if (head !== tip) return refused({ step: STEP.gate, cause: 'worktree-ref-mismatch', detail: `HEAD ${head ?? 'unreadable'} does not equal ${ref} ${tip}`, result: { tip } });
+
+  const proof = verifyForLand({ worktree, ref, tip }, deps);
+  if (proof.refusal) return proof.refusal;
+  const { receipt, base: verifyBase } = proof;
 
   const gate = (deps.runGate ?? runLandGateCall)({ worktree, ref }, deps);
   if (!gate?.ok) return refused({ step: STEP.gate, cause: 'gate-red', detail: (gate?.problems ?? [gate?.detail ?? 'land gate failed']).slice(0, 8).join('; '), result: { tip, base: gate?.base ?? null } });
@@ -84,7 +96,7 @@ async function lockedLand({ worktree, ref, verified, verifiedLog, dryRun, lane, 
   if (specResult.refusal) return specResult.refusal;
   const { specRun, specs } = specResult;
 
-  const trailers = [`Land-Verified: ${tip}`, `Specs: ${specs.pass}/${specs.selected}`, `Check: ${check.pass}/${check.total}`, ...(kernelNote ? [`${KERNEL_NOTE_TRAILER}: ${kernelNote}`] : [])];
+  const trailers = [`Land-Verified: ${tip}`, `Specs: ${specs.pass}/${specs.selected}`, `Check: ${check.pass}/${check.total}`, affectedTrailer({ record: receipt.record, base: verifyBase, tip }), ...(kernelNote ? [`${KERNEL_NOTE_TRAILER}: ${kernelNote}`] : [])];
   if (dryRun) {
     const data = { ...cleanResult({ ok: true, landed: false, tip, base, specs, check, log: specRun.log ?? null }), trailers };
     return { code: 0, text: `starci git land: dry run passed for ${tip.slice(0, 12)}; local main was not changed\n${trailers.join('\n')}`, data };

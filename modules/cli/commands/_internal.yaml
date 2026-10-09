@@ -62,6 +62,7 @@ internal:
   - {path: scripts/checks/check-storage-convention.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-event-spill.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-spec-budget.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-spec-cache-key.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-schema-shared.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-slot-id-shape.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-documented-defaults.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}

@@ -3620,6 +3620,36 @@ starci runtime validate .starciwork
 starci runtime validate <work-root> --strict --owned <path>
 ```
 
+### starci runtime verify
+
+verify a committed revision - the check AND the affected specs on one commit, one receipt
+
+| flag | type | |
+| --- | --- | --- |
+| `--base` | string |  |
+| `--root` | string |  |
+
+Effect: host
+
+Roles: worker, lead, coordinator, release, owner
+
+Conventions:
+
+- A branch is verified only by this receipt: check N of N and affected specs N of N for base..tip, on the exact commit.
+- A fix lane reports the last line of this verb, not the line of starci runtime check (which never runs a spec).
+- Refuses a tree with uncommitted or untracked changes; the receipt binds a commit.
+- starci git land and starci runtime deploy refuse a revision without this receipt or the proof they run themselves.
+- A spec whose inputs are unchanged since a proven green run is reused; the receipt counts the reused files.
+
+exit: 0 verified: check and every affected spec passed on the exact commit, receipt written; 1 NOT VERIFIED: dirty tree, no base, red check, or a red or unfinished spec file; 2 bad usage
+
+json: starci/runtime-verify@1
+
+```sh
+starci runtime verify --base <tip the branch was cut from>
+starci runtime verify --json
+```
+
 ### starci runtime version
 
 print the runtime package version
@@ -4398,6 +4428,7 @@ the specs related to the changed functions (--by file: every importer); --run ru
 | `--run` | boolean |  |
 | `--plan` | boolean |  |
 | `--receipt-file` | string |  |
+| `--no-cache` | boolean |  |
 | `--concurrency` | number |  |
 | `--root` | string |  |
 
@@ -4415,6 +4446,7 @@ Conventions:
 - The --plan flag prints each selected file with the reason it is in the set; a --run answer carries a receipt (base, tip, passed, total) a gate can require.
 - A generated output maps to its generator's specs; an append-only change to a data file to the specs that name it or its readers.
 - A red file is fixed and run again, then the affected set once; never the whole suite.
+- A spec whose key (import closure, data it names, runner) is unchanged since a green run is reused; the receipt counts reused files; --no-cache runs all.
 - Each file is its own low-priority node process with the four preloads, at the concurrency of test-concurrency.yaml.
 
 exit: 0 selection printed, or every selected file passed; 1 a selected spec file was red; 2 no base to diff against, or the time budget ended before every selected file started

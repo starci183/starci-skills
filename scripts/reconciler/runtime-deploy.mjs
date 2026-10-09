@@ -39,7 +39,7 @@ function gather({ from, host, seams, env, plan = false }) {
   if (!source.ok) return { source, host: hostState };
   const range = rangeOf(source, hostState.head);
   const sourceDirty = source.kind === 'clone' && isDirty(source.dir);
-  const receipt = receiptFor({ sha: source.sha, tree: source.tree, base: hostState.head, host, env });
+  const receipt = receiptFor({ sha: source.sha, tree: source.tree, base: hostState.head, host, env, dir: source.dir });
   const affectedPlan = plan && source.kind === 'clone' && !receipt ? affectedPlanOf(seams, source.dir, hostState.head) : null;
   return { source, host: hostState, range, sourceDirty, receipt, affectedPlan, lock: seams.lockOwner(), leader: seams.leader(), inFlight: seams.inFlight() };
 }

@@ -1,0 +1,26 @@
+group: runtime
+verb: verify
+owner: runtime
+summary: verify a committed revision - the check AND the affected specs on one commit, one receipt
+impl: {module: scripts/reconciler/runtime-verify.mjs, export: runtimeVerify}
+effect: host
+roles: [worker, lead, coordinator, release, owner]
+conventions:
+  - "A branch is verified only by this receipt: check N of N and affected specs N of N for base..tip, on the exact commit."
+  - "A fix lane reports the last line of this verb, not the line of starci runtime check (which never runs a spec)."
+  - "Refuses a tree with uncommitted or untracked changes; the receipt binds a commit."
+  - "starci git land and starci runtime deploy refuse a revision without this receipt or the proof they run themselves."
+  - "A spec whose inputs are unchanged since a proven green run is reused; the receipt counts the reused files."
+flags:
+  - {name: base, type: string, summary: 'ref to diff against (default: the merge-base with main, else origin/main)'}
+  - {name: root, type: string, summary: 'repository root (default: the command cwd)'}
+positional: []
+exit:
+  "0": "verified: check and every affected spec passed on the exact commit, receipt written"
+  "1": "NOT VERIFIED: dirty tree, no base, red check, or a red or unfinished spec file"
+  "2": "bad usage"
+json: starci/runtime-verify@1
+examples:
+  - starci runtime verify --base <tip the branch was cut from>
+  - starci runtime verify --json
+editions: [full]
