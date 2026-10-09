@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -22,6 +22,8 @@ import { INSTALL_MANIFEST_FILE, INSTALL_PROTOCOL_SCHEMA, installedPayloadDigest 
 // rev is behind, what to re-read; enqueue/dispatch of a leg whose op contract changed waits for the ack.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
+// The plan of kernel-ack-rev writes its read bundle under the Kernel's scratch in the temp root; the spec removes what its CLI runs wrote.
+after(() => fs.rmSync(path.join(os.tmpdir(), 'starci-kernel-scratch'), { recursive: true, force: true }));
 const json = (text) => { try { return JSON.parse(text); } catch { return null; } };
 const lastJson = (text) => json(String(text ?? '').trim()) ?? String(text ?? '').trim().split(/\r?\n/).reverse().map(json).find(Boolean) ?? null;
 

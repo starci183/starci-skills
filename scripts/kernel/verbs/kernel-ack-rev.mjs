@@ -26,7 +26,7 @@ export default {
     if (args.plan) {
       const unread = unreadFiles(db, workflowId, required);
       // The unread files as ONE file to read with one call, not one tool call and one model turn per path.
-      const bundle = unread.length ? writeReadBundle({ repo, workflowId, root, rows: required.files.filter((row) => unread.includes(row.path)), digest: required.digest }) : null;
+      const bundle = unread.length && repo ? writeReadBundle({ repo, workflowId, root, rows: required.files.filter((row) => unread.includes(row.path)), digest: required.digest }) : null;
       return emit({ ok: true, workflowId, readManifest: required, unread, ...(bundle ? { bundle } : {}) }, JSON.stringify(required), args.json);
     }
     const rev = required.revision.kind === 'git' ? resolveRev(root,String(args.rev)) : String(args.rev);
