@@ -1031,3 +1031,24 @@ cases:
     rule: {file: scripts/kernel/decision-log.mjs, anchor: "WORKER_LIVE"}
     spec: tests/reconciler-controllers/supervisor-mirror.spec.mjs
     status: covered
+  - id: critic-verdict-supplied-by-the-maker
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: the maker never supplies its own judge's verdict) the settle accepted a starci/critic-verdict@1 file the op itself attached and ran the runtime Critic only when the op attached none, so the op decided whether it was judged and by whom; the op also ran its own Critic, a second run for the same bytes", remedy: {state: in-tree, change: "judgeCriticVerdict reads only the verdict of the runtime's own Critic run (event runtime-critic-run: another provider than the maker, journalled); runtimeCriticFor runs it for every done decision leg once per product digest and records an attached verdict file once as runtime-critic-op-verdict-ignored; scope.define and architecture.decide no longer teach, write or block on a Critic step"}}
+    met: {date: "2026-10-09", where: "alpha.8 audit of scripts/kernel/critic-settle.mjs and scripts/kernel/settle/critic-run.mjs", evidence: "critic-run.mjs attachesVerdict skipped the run when job_artifacts named critic-verdict; critic-settle.mjs readAttached took the attached document before the runtime one"}
+    rule: {file: scripts/kernel/settle/critic-run.mjs, anchor: "noteIgnoredVerdict"}
+    spec: tests/kernel-settle/runtime-critic.spec.mjs
+    status: covered
+  - id: gate-newer-than-admission-for-every-gate
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a gate introduced after a job's admission is a proof the runtime owes, whatever the gate) gate-newer-than-admission was recognised only for the Critic gate; a done report admitted before the op loop, READ, test-world, unit, lint, document, review or release proof existed was refused with the missing-proof code of the op, which the Kernel menu offered as a choice and the retry treated as the failure of the op", remedy: {state: in-tree, change: "ownedByRuntime (scripts/kernel/gate-admission.mjs) classifies the missing proof of every judged phase of the settle preflight against what the admitted contract taught; the settler holds a gate-newer-than-admission or op-critic-verdict-missing refusal through its checker-unavailable path (counted tries, then a runtime-defect item for the Supervisor) and the menu offers nothing for them (RUNTIME_OWED_CODES)"}}
+    met: {date: "2026-10-09", where: "alpha.8 audit after the Nivo op-architecture.decide case", evidence: "settle-preflight.mjs judged each phase on its own code; only judgeCriticVerdict knew teaches"}
+    rule: {file: scripts/kernel/gate-admission.mjs, anchor: "ownedByRuntime"}
+    spec: tests/kernel-settle/gate-newer-than-admission.spec.mjs
+    status: covered
+  - id: runtime-critic-run-not-visible-or-bounded
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: work the runtime does is visible and bounded like the work of an op) the Critic the settler runs for a decision leg left one event with no model, duration or dispatch, appeared in no kernel status and no debug digest, and was launched again every tail.retryMs for the same bytes with no bound and no Supervisor item", remedy: {state: in-tree, change: "the runtime-critic-run event carries the Critic provider, model, dispatch, duration, tokens (unmeasured when none was read), try and verdict; starci kernel status --full prints a runtime-critic line per open decision leg; the debug digest answers co-critic-independent from these events and prints each run; the Critic is launched at most tail.maxAttempts times for one digest and the checker-unavailable path of the settler then opens a Supervisor item"}}
+    met: {date: "2026-10-09", where: "alpha.8 audit of scripts/kernel/settle/critic-run.mjs", evidence: "runtimeCriticFor re-ran on every pass after retryMs; debug-digest-ledger.mjs STEP_EVENTS held only critic-run"}
+    rule: {file: scripts/kernel/verbs/shared/status-critic.mjs, anchor: "runtimeCriticsOf"}
+    spec: tests/kernel-settle/gate-newer-than-admission.spec.mjs
+    status: covered

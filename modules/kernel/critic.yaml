@@ -52,8 +52,8 @@ coverage:
     rubric: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=scope.define].checks"}
     minimum: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=scope.define].minimum"}
     tokenBudget: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=scope.define].tokenBudget"}
-    passes: "one single pass: the op runs starci work decision-critic once its records are written, and again after a failing verdict"
-    gate: "scripts/kernel/critic-settle.mjs judgeCriticVerdict at settle (op-critic-verdict-missing, op-critic-verdict-failed, CRITIC_VERDICT_STALE)"
+    passes: "one run per version of the records: the runtime runs the Critic when the op reports done (a verdict the op attaches is ignored), and again for the retry's new records after a failing verdict"
+    gate: "scripts/kernel/critic-settle.mjs judgeCriticVerdict at settle over the runtime Critic run (op-critic-verdict-missing: the runtime owes it, op-critic-verdict-failed, CRITIC_VERDICT_STALE)"
   - kind: architecture.decide
     status: covered
     entry: critic-coverage-decision-legs
@@ -61,5 +61,5 @@ coverage:
     rubric: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=architecture.decide].checks"}
     minimum: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=architecture.decide].minimum"}
     tokenBudget: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=architecture.decide].tokenBudget"}
-    passes: "one single pass: the op runs starci work decision-critic once its records are written, and again after a failing verdict"
-    gate: "scripts/kernel/critic-settle.mjs judgeCriticVerdict at settle (op-critic-verdict-missing, op-critic-verdict-failed, CRITIC_VERDICT_STALE)"
+    passes: "one run per version of the records: the runtime runs the Critic when the op reports done (a verdict the op attaches is ignored), and again for the retry's new records after a failing verdict"
+    gate: "scripts/kernel/critic-settle.mjs judgeCriticVerdict at settle over the runtime Critic run (op-critic-verdict-missing: the runtime owes it, op-critic-verdict-failed, CRITIC_VERDICT_STALE)"

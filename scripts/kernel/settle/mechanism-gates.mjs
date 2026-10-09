@@ -43,15 +43,14 @@ function settleOpProofs(db, jobId, repo) {
   return judgment ? { ...judgment, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
 }
 // The independent Critic's verdict a decision leg owes at settle (scripts/kernel/critic-settle.mjs over modules/kernel/critic.yaml coverage):
-// null when the op owes none, else the judgment of the attached verdict against the op's records now.
+// null when the op owes none, else the judgment of the runtime's Critic verdict against the op's records now.
 function settleCriticVerdict(db, jobId, repo) {
   const s = settleJobContext(db, jobId, { requiresReport: true });
   if (!s) return null;
-  const { roots, files } = settleJobFiles(db, s.job, repo, s.filed, { jobId: s.job.job_id });
+  const { roots } = settleJobFiles(db, s.job, repo, s.filed, { jobId: s.job.job_id });
   const owned = (jobPayloadOf(s.job).owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string' && !p.includes(':'));
   const runtime = runtimeCriticRunOf(db, s.job.job_id)?.document ?? null;
-  const teaches = String(latestContractOf(db, s.job.job_id)?.markdown ?? '').includes('decision-critic');
-  const judged = judgeCriticVerdict({ op: s.op, files, roots: [...new Set([...roots, repo].filter(Boolean))], owned, runtime, teaches });
+  const judged = judgeCriticVerdict({ op: s.op, roots: [...new Set([...roots, repo].filter(Boolean))], owned, runtime });
   return judged ? { op: s.op, judged, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
 }
   return { settleOpGate, settleOpProofs, settleCriticVerdict };

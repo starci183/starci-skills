@@ -1,12 +1,12 @@
 group: work
 verb: decision-critic
 owner: runtime
-summary: judge a decision leg's records with the independent Critic and write its typed verdict
+summary: judge a decision leg with the Critic and write a verdict (debug aid; settle ignores it)
 impl: {script: scripts/work/decision-critic.mjs}
 flags:
   - {name: kind, type: enum, enum: [scope.define, architecture.decide], required: true, summary: the decision leg whose records are judged}
   - {name: root, type: string, required: true, summary: the work root (.starciwork) or the repository that holds it}
-  - {name: out, type: string, required: true, summary: the verdict file to write (the op attaches it; starci kernel settle requires it for exactly these bytes)}
+  - {name: out, type: string, required: true, summary: the verdict file to write (for a person to read; the settle never reads it)}
   - {name: records, type: string, summary: "comma-separated decision record files or directories to judge; default every decision record of the kind under the work root"}
   - {name: input, type: string, summary: "comma-separated extra input files the decision rests on, such as the goal or request text"}
   - {name: maker, type: string, summary: "provider that made the records; default the provider of the op running this verb"}

@@ -58,9 +58,10 @@ const verdictFor = (kind, score, { failing = [] } = {}) => ({ schema: 'starci/de
   checks: kindEntryOf(kind, rubrics).checks.map((c) => ({ id: c.id, pass: !failing.includes(c.id), evidence: `read ${c.id}`, fix: failing.includes(c.id) ? `repair ${c.id}` : null })) });
 
 const critique = (r, kind, orca, extra = {}) => critiqueDecision({ kind, workRoot: r.workRoot, maker: 'devin', orca, placement: { tmpRoot: r.root }, entry: 'term_op', ...clock(), ...extra });
-const attach = (r, document) => [{ abs: put(r.root, 'job/critic-verdict.json', JSON.stringify(document)), name: 'critic-verdict.json' }];
+// the settle reads only the verdict the runtime's own Critic run recorded: `runtime` is that event's document
+const attach = (r, document) => document;
 const OWNED = { 'scope.define': ['.starciwork/features/shop/index.yaml'], 'architecture.decide': ['.starciwork/features/shop/sds', '.starciwork/features/shop/contract'] };
-const judge = (r, kind, files) => judgeCriticVerdict({ op: kind, files, roots: [r.root], owned: OWNED[kind] });
+const judge = (r, kind, runtime) => judgeCriticVerdict({ op: kind, roots: [r.root], owned: OWNED[kind], runtime });
 
 test('the rubric file validates: a rubric per kind, derived from its op contract, with checks, gates, anchors, a minimum and a token budget', () => {
   assert.equal(rubrics.schema, 'starci/module-kernel-critic-rubrics@1');
@@ -105,9 +106,9 @@ test('critic.yaml covers both kinds, the refs resolve to the rubric file, and no
   for (const kind of KINDS) {
     const op = parseYaml(fs.readFileSync(path.join(ROOT, 'modules', 'ops', 'ops', `${kind}.yaml`), 'utf8'));
     assert.ok(op.proofs.some((p) => p.id === 'independent-critic'), `${kind} states the proof`);
-    assert.ok(op.writes.some((w) => w.id === 'critic-verdict'));
-    assert.ok(op.blockers.some((b) => b.code === 'CRITIC_HOLD'));
-    assert.match(JSON.stringify(op.steps), /starci work decision-critic/);
+    assert.ok(!op.writes.some((w) => w.id === 'critic-verdict'), 'the op writes no verdict: the runtime runs the Critic');
+    assert.ok(!op.blockers.some((b) => b.code === 'CRITIC_HOLD'), 'the op holds nothing for the Critic: the settler does');
+    assert.doesNotMatch(JSON.stringify(op.steps), /decision-critic/);
     assert.ok(proofsOf(kind).includes('read-knowledge'), 'the read proof is still owed');
   }
 });
@@ -209,9 +210,9 @@ test('a verdict under the minimum exits 1 and prints every failed check with its
 test('the settle gate refuses without a verdict, with a stale one, with a failing one, and passes a fresh passing one', async (t) => {
   for (const kind of KINDS) {
     const r = repo(t);
-    const missing = judge(r, kind, []);
+    const missing = judge(r, kind, null);
     assert.deepEqual([missing.status, missing.code], ['missing', 'op-critic-verdict-missing'], kind);
-    assert.match(missing.detail, /starci work decision-critic/);
+    assert.match(missing.detail, /runtime-critic-run/);
 
     const { document } = await critique(r, kind, fakeCriticOrca({ verdict: verdictFor(kind, 9) }), { records: null });
     assert.equal(judge(r, kind, attach(r, document)).status, 'pass', `${kind}: a fresh passing verdict for exactly the product bytes`);

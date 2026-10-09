@@ -8,6 +8,7 @@ import { feedbackOfHandover } from '../../handover-slices.mjs';
 import { decisionsOf } from '../../progress-rca.mjs';
 import { failureFactsOf } from '../../failure-class.mjs';
 import { failedShapesOf, jobRow, shapeOf } from '../../kernel-authority.mjs';
+import { RUNTIME_OWED_CODES } from '../../gate-admission.mjs';
 
 const LIVE_KERNEL = new Set(['open', 'claimed']);
 // Kinds with their own menu kind (or a notice): the generic decision-item kind never repeats them.
@@ -16,7 +17,6 @@ const OWN_KIND = new Set(['worker-question', 'rev-ack', 'unread-peer', 'supervis
 /** The resolution with the class its evidence decides (scripts/kernel/failure-class.mjs): the menu reads it to withhold the escape from a work failure. */
 const withFailure = (db, resolution) => (resolution.jobId ? { ...resolution, failure: failureFactsOf(db, resolution.jobId) } : resolution);
 
-const RUNTIME_OWED_CODES = new Set(['gate-newer-than-admission', 'op-critic-verdict-missing']);
 // A prepared fail decision never applied (workflow-checkpoint-recovery-conflict) is the settler's to withdraw when void; once it kept the receipt, finishing the apply is the Kernel's.
 const RECOVERY_CONFLICT = 'workflow-checkpoint-recovery-conflict';
 /** Whether the settle of a handed-over job is the runtime's to finish. */

@@ -54,6 +54,7 @@ import { reconcileAttemptPlacements } from '../attempt-placement.mjs';
 import { currentRuntimeRev } from '../runtime-rev.mjs';
 import { releaseEndedGates, recordGateRejudged } from '../gate-holds-ended.mjs';
 import { kernelTerminalOf, runtimeCriticFor } from './critic-run.mjs';
+import { RUNTIME_OWED_CODES } from '../gate-admission.mjs';
 import { recoverPreparedSettlement } from './prepared-recovery.mjs';
 import { settlerSettings, runtimeEnv, verifyReported, recordSettlerCheck, parse, slug, jsonOf } from './job-settle-verify.mjs';
 import { tempRoot } from '../../../engine/temp-root.mjs';
@@ -243,8 +244,10 @@ function recordMechanicalChecks(ledger, fresh, verdict, { repo, env, now, api })
 }
 
 /** The result of a refused settle API call: an already-settled job is skipped, anything else goes to the Kernel. */
-function settleRefused(ledger, fresh, settled, now) {
+async function settleRefused(ledger, fresh, settled, { now, settings }) {
   if (settled.code === 'job-settled') return { target: 'skipped', row: { jobId: fresh.jobId, reason: 'already-settled' } };
+  // A proof the job's admission never taught is the runtime's: the settle stays held, bounded, and the Supervisor is told (never the Kernel's, never the op's).
+  if (RUNTIME_OWED_CODES.has(settled.code)) return { target: 'skipped', row: await checkerUnavailable(ledger, fresh, { reason: settled.code, detail: [`${settled.code}: ${settled.error ?? ''}`] }, { now: now(), settings }) };
   return { target: 'kernel', row: handToKernel(ledger, fresh, { reason: 'settle-refused', code: settled.code, detail: [settled.error] }, { now: now() }) };
 }
 
@@ -255,7 +258,7 @@ function settleRefused(ledger, fresh, settled, now) {
  */
 async function settleReported(ledger, fresh, { repo, settings, env, now, dryRun, verify, api, critic = {} }) {
   // A done decision leg without a Critic verdict of its own is judged with the one the runtime's Critic gives it; a Critic that could not judge holds the settle (the checker-unavailable path).
-  const owed = dryRun ? null : await runtimeCriticFor(ledger, fresh, { tree: critic.tree, retryMs: settings.tail.retryMs, now: now(), entry: critic.tree ? kernelTerminalOf(ledger.db, fresh.workflowId) : null, ...critic.seams });
+  const owed = dryRun ? null : await runtimeCriticFor(ledger, fresh, { tree: critic.tree, retryMs: settings.tail.retryMs, maxAttempts: settings.tail.maxAttempts, now: now(), entry: critic.tree ? kernelTerminalOf(ledger.db, fresh.workflowId) : null, ...critic.seams });
   if (owed?.hold) return { target: 'skipped', row: await checkerUnavailable(ledger, fresh, { reason: 'checker-unavailable', detail: [`critic: ${owed.hold.code ?? 'CRITIC_UNAVAILABLE'}: ${owed.hold.error ?? ''}`] }, { now: now(), settings }) };
   const verdict = await verdictOf(ledger, fresh, { repo, settings, env, dryRun, verify });
   let settleAs = 'pass';
@@ -269,7 +272,7 @@ async function settleReported(ledger, fresh, { repo, settings, env, now, dryRun,
   const checksRefused = recordMechanicalChecks(ledger, fresh, judged, { repo, env, now, api });
   if (checksRefused) return checksRefused;
   const settled = api(['settle', '--repo', repo, '--job', fresh.jobId, '--verdict', settleAs], { env });
-  if (!settled.ok) return settleRefused(ledger, fresh, settled, now);
+  if (!settled.ok) return settleRefused(ledger, fresh, settled, { now, settings });
   const at = now();
   event(ledger, fresh, EVENTS.settled, { from: STATES.reported, to: STATES.settled, op: fresh.op, attempt: fresh.attempt, verdict: settleAs, via: judged.via,
     latencyMs: at - fresh.filedAt, consumedBefore: fresh.consumedAt != null, nextStep: settled.value?.nextStep ?? null, cutSet: settled.value?.cutSet ?? null,

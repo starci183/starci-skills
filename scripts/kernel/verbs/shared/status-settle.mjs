@@ -1,6 +1,7 @@
 // The settle frontier of `starci kernel status` (verbs/status.mjs): consumed reports whose jobs are still
 // open, split into the settles the Kernel owes now and the ones a recorded wait holds.
 import { PEER_WAIT } from './peer-waits.mjs';
+import { runtimeCriticsOf } from './status-critic.mjs';
 import { parkedBehindWaits, waitHeldOperations, noteParkedBehind } from '../../frontier-parked.mjs';
 
 // A filed report moves its job to reported (starci kernel report); a job still running/answering has a
@@ -54,6 +55,7 @@ export const settlePhase = (s) => {
   // while status read settle-ready ACTIONABLE and the watchdog re-woke the Kernel every tick for
   // nothing). Resolving the wait (starci kernel incident --resolve, or the peer's message for --until-message)
   // makes it settle-ready again, which is actionable and wakes the Kernel.
+  s.runtimeCritics = runtimeCriticsOf(db, s.workflowId);
   s.settleReady = [];
   s.heldSettle = [];
   for (const jobId of s.settleOwed) {
