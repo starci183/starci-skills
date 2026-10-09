@@ -1298,7 +1298,7 @@ cases:
     replay: tests/replay/contract-replace.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a failed start names its step and message in the action journal, the digest and the Supervisor item) the watchdog answered restart-failed with an empty detail, the engine action error read 'action restart-failed', the digest read 'Kernel not alive (probe restart-needed)', and a refusal printed before the claim (workflow-host-not-ready) was recorded nowhere, so the start-hold rule never counted it", remedy: {state: in-tree, change: "the watchdog answer carries reason and error (Kernel start refused at <step>: <message>); a pre-claim refusal and a start that printed no answer are journalled kernel-start-failed under the revision, which the start-hold rule counts and the seat-unrecoverable item reports; the digest line of a dead Kernel adds its last failed start"}}
     met: {date: "2026-10-09", where: "alpha.8 live, runtime 70b853e44", evidence: "engine_actions seat:kernel:* result restart-failed with detail empty; no kernel-start-failed event after kernel-rotated"}
-    rule: {file: scripts/kernel/kernel-watchdog.mjs, anchor: "PRE_CLAIM_REFUSALS"}
+    rule: {file: scripts/kernel/kernel-watchdog.mjs, anchor: "recordRefusedStart"}
     spec: tests/kernel/start-unanswered.spec.mjs
     status: covered
   - id: ui-dependency-install-deletes-node-modules
