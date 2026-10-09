@@ -34,7 +34,7 @@ test('the ack of a read plan that outgrew the inline event bound lands after an 
   assert.notEqual(second.json?.code, 'STARCI_EVENT_PAYLOAD_TOO_LARGE');
   const rows = ackRows(world);
   assert.equal(rows.length, 2);
-  assert.equal(rows[1].inline, null, 'the row keeps no inline JSON');
+  assert.ok(rows[1].inline < 1024, `the row keeps a bounded inline view of the scalars (${rows[1].inline} bytes), not the manifest`);
   assert.match(rows[1].payload_sha, /^[0-9a-f]{64}$/, 'the whole attestation is behind the sha');
 
   assert.equal(newLeg(world).json?.code, 'params-invalid', 'the READ gate passes: the verb now refuses only the params');
