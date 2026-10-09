@@ -8,8 +8,9 @@ change that contradicts them is a bug in the code.
 
 ```sh
 npm ci
-npm run check   # starci runtime check
+npm run check   # starci runtime check: structure only, it never runs a spec
 starci test affected --run   # the specs your change can break (see Verification)
+starci runtime verify --base <tip you cut from>   # check AND the affected specs on one commit: the line a lane reports
 npm run test:packages   # starci release clean-test: the spec suite of every package under packages/
 ```
 
@@ -25,10 +26,13 @@ every run and the land gate runs it for the packages a land touches.
 
 ## Verification
 
+**Verified means one receipt.** `npm run check` proves structure (syntax, HFS, self-checks) and its last line says so: `check: ok — HFS clean; self-checks N of N; specs NOT run (starci runtime verify)`. It is never the proof that a branch is fit to merge or deploy. `starci runtime verify --base <tip you cut from>` runs the check and then the affected specs on one committed, clean tree, writes ONE receipt bound to that exact commit (`check p/p` and `affected N/N for <base>..<tip>`) and prints a last line that cannot be misread: `verified <sha>: check p/p, affected N/N of <base>..<sha>`, or `NOT VERIFIED <sha>: ...` with the red files. A lane reports that line, not the check line. The receipt names the root the specs ran in. On a busy shared host a hub-reaching set (420 to 470 files) cannot finish inside the 40-minute budget: the verb then prints `PARTIAL <sha>: ... N passed, 0 failed, M not started (budget) ...` (exit 3) when nothing is red and every spec the change itself touched ran (those run first). `starci git land` takes a complete receipt or such a partial one (it records `Affected-Not-Started: M` in the land note) and refuses a tip without one; `starci runtime deploy` and the release need every selected spec (N/N) and take the receipt only then, or run both proofs themselves. The concurrency is sampled again while a run goes.
+
 Everyday verification is `npm run check` plus `starci test affected --run`. The verb computes the spec files your diff can break with the
 land gate's own selection (the specs named after, importing or spawning the CLI behind a changed file, the invariant specs, and the specs behind
 a runtime module that reads a changed `modules/**` or `knowledge/**` file), runs each once, and ends with `affected: N files, P pass, F fail`.
 A red file is fixed and that file is run again, then the affected set once; the root `npm test` is never the answer to a red file or a small fix.
+A spec that passed at an unchanged key (its import closure, the data it names, the runner; for a spec that starts the CLI the whole runtime) is reused, not run again, and the receipt counts it as `reused`; a run that ends on its time budget therefore leaves its passes, and the next `starci runtime verify` continues with the files it never started. `--no-cache` runs every file. The cache saves a rerun of an unchanged tree and the specs a change did not reach; it cannot shrink the set a hub change selects (that is the selector's: `affected-tests.yaml`).
 `starci test affected --changed <file...>` names the files itself; a selection above the bound in `modules/supervisor/affected-tests.yaml` is printed and left to the lead.
 
 Under `config.yaml` `release.suite: ci` (the owner's recorded choice, shipped default `local`) the cut's own full run does not exist: the GitHub `ci` workflow runs the suite after the push, the cut runs `npm run check`, `npm run test:packages`, the specs affected by the release range, the live Orca smokes and the example rows, and a red CI is fixed forward with the next pre-release (`starci release ci-status`; [releasing](docs/releasing.md#where-the-suite-runs)).
@@ -199,7 +203,7 @@ comment line (`<!-- [removed-list] -->` in Markdown, `# [removed-list]` in yaml)
 
 ## Pushing and releasing
 
-The remote `main` of this repository is not pushed between releases. A land fast-forwards LOCAL main, and the work is verified locally (`npm run check` with the Sonar-rules gate, `starci test affected --run` for the change; the full suite runs once on the merged tree and once inside the cut, with the cut's own spec conditions from `starci release env-test`, and the packages suites with `npm run test:packages` for the packages a change touches); nobody pushes to obtain a CI or SonarCloud reading.
+The remote `main` of this repository is not pushed between releases. A land fast-forwards LOCAL main, and the work is verified locally (`starci runtime verify`: `npm run check` with the Sonar-rules gate and `starci test affected --run` for the change, on one commit; the full suite runs once on the merged tree and once inside the cut, with the cut's own spec conditions from `starci release env-test`, and the packages suites with `npm run test:packages` for the packages a change touches); nobody pushes to obtain a CI or SonarCloud reading.
 Main goes to the remote exactly when a release milestone is cut, in one atomic push of main and one annotated `v*` tag, through `starci release cut --tag v<version>` (`--plan` reports what it would run and require; it runs nothing).
 The installed pre-push hook (`scripts/guards/release-push-gate.mjs`, written by `starci runtime link`) makes that mechanical: it refuses a push of `main` or of a `v*` tag unless the pushed commit is a release commit — the version moved past the remote main's, an annotated tag `v<version>` on it, a dated CHANGELOG heading for exactly that version, and the release record of that exact commit with a green full suite, packages suites and checks. The refusal names what is missing and the command that produces it; there is no bypass switch.
 R221 `CI_TRIGGERS_RELEASE_ONLY` refuses any other workflow trigger and R222 `RELEASE_NOTES` refuses a tag over unfinished CHANGELOG notes. The model, the release definition, the refusals and the risks are in [git governance](docs/git-governance.md).

@@ -14,6 +14,7 @@ conventions:
   - The --plan flag prints each selected file with the reason it is in the set; a --run answer carries a receipt (base, tip, passed, total) a gate can require.
   - A generated output maps to its generator's specs; an append-only change to a data file to the specs that name it or its readers.
   - A red file is fixed and run again, then the affected set once; never the whole suite.
+  - "A spec whose key (import closure, data it names, runner) is unchanged since a green run is reused; the receipt counts reused files; --no-cache runs all."
   - Each file is its own low-priority node process with the four preloads, at the concurrency of test-concurrency.yaml.
 flags:
   - {name: base, type: string, summary: 'ref to diff against (default: the merge-base with main, else origin/main)'}
@@ -22,6 +23,7 @@ flags:
   - {name: run, type: boolean, summary: 'run the selected spec files, one per process, inside the time budget'}
   - {name: plan, type: boolean, summary: 'print the selected files with the reason each is in the set; run nothing'}
   - {name: receipt-file, type: string, summary: 'with --run, write the receipt to this file; the answer carries its path (a gate reads the file, not the output)'}
+  - {name: no-cache, type: boolean, summary: 'run every selected file; ignore the per-spec result cache'}
   - {name: concurrency, type: number, summary: override automatic file concurrency with a positive integer}
   - {name: root, type: string, summary: 'repository root (default: the command cwd)'}
 positional: []

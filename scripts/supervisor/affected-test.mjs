@@ -17,8 +17,10 @@ import { affectedBySymbol, symbolData, symbolLines } from './affected-symbols.mj
 import { show } from '../api/git/show.mjs';
 import { pathList } from '../machine/test-ladder.mjs';
 import { resolveTestConcurrency } from '../machine/test-concurrency.mjs';
+import { liveLimit } from './affected-concurrency.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { leaveReceipts } from './affected-receipt-file.mjs';
+import { withSpecCache } from './spec-cache-run.mjs';
 
 const SCHEMA = 'starci/test-affected@1';
 const RECEIPT_SCHEMA = 'starci/affected-receipt@1';
@@ -70,6 +72,7 @@ function policyOf(deps) {
   if (!Array.isArray(policy.dataRoots) || !policy.dataRoots.every((root) => typeof root === 'string' && root)) throw new Error('modules/supervisor/affected-tests.yaml dataRoots must list directory names');
   if (!Number.isSafeInteger(policy.symbolDepth) || policy.symbolDepth < 1) throw new Error('modules/supervisor/affected-tests.yaml symbolDepth must be a positive integer');
   if (!Number.isSafeInteger(policy.budgetMs) || policy.budgetMs < 1) throw new Error('modules/supervisor/affected-tests.yaml budgetMs must be a positive integer');
+  if (!Number.isSafeInteger(policy.specCache?.keepDays) || policy.specCache.keepDays < 1) throw new Error('modules/supervisor/affected-tests.yaml specCache.keepDays must be a positive integer');
   if (!Array.isArray(policy.generated) || !policy.generated.every((entry) => entry?.output && entry?.generator)) throw new Error('modules/supervisor/affected-tests.yaml generated must list {output, generator}');
   return policy;
 }
@@ -90,19 +93,28 @@ export async function runSpecFile(root, file, deps = {}) {
   return { file, pass, ms: Date.now() - started, tail: pass ? [] : lines(output).slice(-TAIL_LINES), failedTests: pass ? 0 : failingTestsIn(output) };
 }
 
-/** Run `files` with at most `limit` processes at once: the results in the order of `files`. */
+/** Run `files` with at most `limit` processes at once (a number, or a function asked again each time a file ends): the results in the order of `files`. */
 export function runBounded(files, limit, runOne) {
+  const limitOf = typeof limit === 'function' ? limit : () => limit;
   const results = new Array(files.length);
-  let next = 0;
-  const lane = () => {
-    if (next >= files.length) return Promise.resolve();
-    const index = next++;
-    return runOne(files[index]).then((result) => { results[index] = result; return lane(); });
-  };
-  return Promise.all(Array.from({ length: Math.min(limit, files.length) }, lane)).then(() => results);
+  let next = 0, flying = 0, done = 0;
+  return new Promise((resolve, reject) => {
+    if (!files.length) { resolve(results); return; }
+    const pump = () => {
+      while (next < files.length && flying < Math.max(1, limitOf())) {
+        const index = next++;
+        flying += 1;
+        runOne(files[index]).then((result) => { results[index] = result; flying -= 1; done += 1; if (done === files.length) resolve(results); else pump(); }, reject);
+      }
+    };
+    pump();
+  });
 }
 
-const verdictLine = (r) => `${r.pass ? 'PASS' : 'FAIL'} ${r.file} (${(r.ms / 1000).toFixed(1)}s)`;
+const verdictLine = (r) => {
+  if (r.reused) return `REUSED ${r.file} (green at an unchanged key since ${new Date(r.provenAt).toISOString()}, ${r.tier})`;
+  return `${r.pass ? 'PASS' : 'FAIL'} ${r.file} (${(r.ms / 1000).toFixed(1)}s)`;
+};
 const reply = (code, text, data) => ({ code, text, data: { schema: SCHEMA, ...data } });
 
 function selectionHead({ base, changed, picked }) {
@@ -113,6 +125,7 @@ function selectionHead({ base, changed, picked }) {
 }
 const selectionText = (parts) => [...selectionHead(parts), ...parts.picked.files.map((file) => `  ${file}`)];
 
+const reusedText = (results) => { const count = results.filter((r) => r.reused).length; return count ? ` (${count} reused from a proven green run at an unchanged key)` : ''; };
 const largeText = (picked) => `affected: ${picked.files.length} spec files, above the ${picked.maxFiles} of an ordinary change: run in parallel shards inside the time budget`;
 const minutes = (ms) => `${Math.round(ms / 60_000)} min`;
 
@@ -129,19 +142,26 @@ function receiptOf({ root, base, picked, results, concurrency, startedAt, budget
   const passed = results.filter((r) => r.pass).length;
   const changedNow = String((deps.diff ?? diff)(['--name-only', 'HEAD'], { cwd: root }).stdout ?? '').trim();
   const untracked = String((deps.lsFiles ?? lsFiles)(['--others', '--exclude-standard'], { cwd: root }).stdout ?? '').trim();
-  return { schema: RECEIPT_SCHEMA, root: path.resolve(root), base: base ? String(base) : null, tip: tip ?? null, clean: !changedNow && !untracked, files: picked.files.length, passed, total: results.length,
+  return { schema: RECEIPT_SCHEMA, root: path.resolve(root), base: base ? String(base) : null, tip: tip ?? null, clean: !changedNow && !untracked, files: picked.files.length, passed, total: results.length, reused: results.filter((r) => r.reused).length,
     ok: results.length === picked.files.length && passed === results.length, ms: Date.now() - startedAt, budgetMs, concurrency: concurrency.concurrency };
 }
 
-async function runSelection({ root, picked, args, deps, base, budgetMs }) {
+async function runSelection({ root, picked, changed, args, deps, base, policy }) {
+  const budgetMs = policy.budgetMs;
   const decision = resolveTestConcurrency(args.concurrency, deps);
   const progress = deps.progress ?? ((line) => process.stderr.write(line + '\n'));
-  const startedAt = Date.now();
   progress(`affected: ${picked.files.length} file(s), concurrency ${decision.concurrency}, budget ${minutes(budgetMs)}`);
+  // The keys are computed before the budget clock starts: the budget is for running specs.
+  const cached = withSpecCache({ root, files: picked.files, policy, preloads: PRELOADS, disabled: Boolean(args['no-cache']), deps, runOne: (file) => runSpecFile(root, file, deps) });
+  if (cached.off) progress(`affected: spec cache off: ${cached.off}`);
+  // The specs the change itself touched run first, so a run that ends on its budget has run the lane's own specs.
+  const order = [...picked.files.filter((file) => changed.includes(file)), ...picked.files.filter((file) => !changed.includes(file))];
+  const startedAt = Date.now();
   const timedOut = () => Date.now() - startedAt >= budgetMs;
-  const results = await runBounded(picked.files, decision.concurrency, (file) => (timedOut()
+  const limit = liveLimit({ decision, deps, onChange: (next, was) => progress(`affected: concurrency ${was} -> ${next} (the host was sampled again)`) });
+  const results = await runBounded(order, limit, (file) => (timedOut()
     ? Promise.resolve({ file, pass: false, ms: 0, tail: ['not started: the time budget ended'], failedTests: null, skipped: true })
-    : runSpecFile(root, file, deps).then((result) => { progress(verdictLine(result)); return result; })));
+    : cached.runOne(file).then((result) => { progress(verdictLine(result)); return result; })));
   const skipped = results.filter((r) => r.skipped);
   const failed = results.filter((r) => !r.pass && !r.skipped);
   const out = results.map((r) => (r.skipped ? `SKIP ${r.file} (budget)` : verdictLine(r)));
@@ -151,12 +171,12 @@ async function runSelection({ root, picked, args, deps, base, budgetMs }) {
   const tests = failed.length && failedTests !== null ? `; failing tests: ${failedTests}` : '';
   const budget = skipped.length ? `; ${skipped.length} not started inside the ${minutes(budgetMs)} budget` : '';
   out.push(`affected: elapsed ${((Date.now() - startedAt) / 1000).toFixed(0)}s`,
-    `affected: ${results.length} files, ${results.length - failed.length - skipped.length} pass, ${failed.length} fail${tests}${budget}`);
+    `affected: ${results.length} files, ${results.length - failed.length - skipped.length} pass${reusedText(results)}, ${failed.length} fail${tests}${budget}`);
   const receipt = receiptOf({ root, base, picked, results, concurrency: decision, startedAt, budgetMs, deps });
   let code = 0;
   if (failed.length) code = 1;
   else if (skipped.length) code = 2;
-  const rows = results.map(({ file, pass, ms, failedTests: count, skipped: notRun }) => ({ file, pass, ms, failedTests: count, ...(notRun ? { skipped: true } : {}) }));
+  const rows = results.map(({ file, pass, ms, failedTests: count, skipped: notRun, reused, tier }) => ({ file, pass, ms, failedTests: count, ...(notRun ? { skipped: true } : {}), ...(reused ? { reused: true } : {}), ...(tier ? { tier } : {}) }));
   return reply(code, out.join('\n'), { ok: code === 0, scope: picked.files, results: rows, failedTests, concurrency: decision, receipt });
 }
 
@@ -194,6 +214,6 @@ async function affectedAnswer(ctx, deps) {
   if (!args.run) return reply(0, [...selectionText({ base, changed, picked }), ...header].join('\n'), data);
   const empty = { concurrency: 0 };
   if (!picked.files.length) return reply(0, 'affected: 0 files, 0 pass, 0 fail', { ...data, results: [], receipt: receiptOf({ root, base: diffBase, picked, results: [], concurrency: empty, startedAt: Date.now(), budgetMs: policy.budgetMs, deps }) });
-  const run = await runSelection({ root, picked, args, deps, base: diffBase, budgetMs: policy.budgetMs });
+  const run = await runSelection({ root, picked, changed, args, deps, base: diffBase, policy });
   return { ...run, data: { ...data, ...run.data } };
 }

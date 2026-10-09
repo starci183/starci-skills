@@ -87,7 +87,7 @@ test('an unknown or missing --only name exits 2 and lists dynamic valid names', 
 
 // A lane and the lead both read "self-checks: 44 of 44 passed" as green while the runtime HFS stage failed and the check exited 1: the last line carries the whole verdict.
 test('the last line of the check states the whole verdict: a failed HFS or syntax stage is never hidden behind the self-check count', () => {
-  assert.equal(verdictLine({ syntaxFailed: 0, hfsFindings: 0, selfFailed: [], selfRun: 45 }), 'check: ok — runtime HFS clean; self-checks 45 of 45');
+  assert.equal(verdictLine({ syntaxFailed: 0, hfsFindings: 0, selfFailed: [], selfRun: 45 }), 'check: ok — HFS clean; self-checks 45 of 45; specs NOT run (starci runtime verify)');
   assert.equal(verdictLine({ syntaxFailed: 0, hfsFindings: 2, selfFailed: ['env'], selfRun: 45 }), 'check: FAILED — runtime HFS 2 finding(s); self-checks 44 of 45 (failed: env)');
   assert.equal(verdictLine({ syntaxFailed: 0, hfsFindings: 1, selfFailed: [], selfRun: 44 }), 'check: FAILED — runtime HFS 1 finding(s); self-checks 44 of 44');
   assert.equal(verdictLine({ syntaxFailed: 3, hfsFindings: 0, selfFailed: [], selfRun: 44 }), 'check: FAILED — syntax 3 file(s); self-checks 44 of 44');

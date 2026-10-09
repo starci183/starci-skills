@@ -9,7 +9,7 @@ import { baseOf, runBounded, runSpecFile, testAffected } from '../../scripts/sup
 import { readSpecs } from '../../scripts/lib/spec-pool.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
-const POLICY = { maxFiles: 10, dataRoots: ['modules', 'knowledge'], symbolDepth: 4, budgetMs: 600_000, generated: [] };
+const POLICY = { maxFiles: 10, dataRoots: ['modules', 'knowledge'], symbolDepth: 4, budgetMs: 600_000, generated: [], specCache: { keepDays: 30 } };
 
 function tree(t) {
   const root = mkdtemp(t, 'starci-affected-');

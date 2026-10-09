@@ -15,3 +15,7 @@ generated:
 # Entry modules a symbol reaches only through a module-level statement and whose specs are the verb-level rule's (land-cli-specs.mjs): the CLI bin runs whichever verb it is
 # given, so a change reaching it selects the specs that run the verbs whose handlers the change reaches, not every spec that starts the bin.
 verbCovered: [packages/cli/bin/starci.mjs, packages/cli/src/package-entry.spec.mjs]
+# The per-spec result cache (spec-cache*.mjs): a spec whose key - its import closure, the data it names, the runner - is unchanged since a green run is reused, and the receipt counts it as `reused`.
+# A record unused for keepDays is removed. `--no-cache` runs every file.
+specCache:
+  keepDays: 30

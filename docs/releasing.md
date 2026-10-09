@@ -23,7 +23,7 @@ starci check run --level L2
 starci test run --level L2 --against <ref>
 ```
 
-During development the same selection is `starci test affected --run`; the whole suite runs once on the merged tree and once inside the release cut.
+During development the same selection is `starci test affected --run` (joined with the check on one commit by `starci runtime verify`); the whole suite runs once on the merged tree and once inside the release cut.
 
 Review source changes and test failures. Do not weaken validators to produce a green release. Knowledge is authored as YAML under `knowledge/` and read directly; see [knowledge YAML](knowledge-yaml.md). The runtime bundles its YAML dependency in `engine/yaml.mjs`; retain its license notice (`engine/yaml-license.json`, THIRD_PARTY_NOTICES.md) when deliberately changing that dependency.
 
