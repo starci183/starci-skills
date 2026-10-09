@@ -120,8 +120,8 @@ reads:
     path: modules/models/registry.yaml with modules/models/runtimes.yaml, the selected runtime and the
       actual host tools
     purpose:
-      en: "Whether this host runs the Playwright capture of `scripts/work/draw-render.mjs` (node and the product's own
-        Playwright install in the product checkout) and which tool was actually invoked. Owner ruling 2026-09-27
+      en: "Whether this host runs the Playwright capture of `scripts/work/draw-render.mjs` (node, and Playwright with its browser
+        and esbuild: the product's install when it has one, else the runtime's own) and which tool was actually invoked. Owner ruling 2026-09-27
         (draw-devin-brand-claude): interface.draw walks the draw order - Devin first, Codex the fallback - and a
         raster region is an artworkSlot interface.asset generates through `starci work imagegen` (the steps keep the drawer
         off raster art)."
@@ -836,8 +836,9 @@ blockers:
         never at the start. Report `blocked` with blocker `brand-gap` naming the layout node and what step 1 could not do.
   - code: RENDER_TOOL_UNAVAILABLE
     condition:
-      en: The draw-render Playwright capture cannot run on this host. Report host-unsupported; do not
-        substitute ImageGen, hand-painted boxes or a prose description.
+      en: The draw-render Playwright capture cannot run on this host although the dispatch admitted it (the dispatch refuses a host without
+        Playwright, its browser and esbuild before it starts the op, so this is a browser that fails to launch). Report host-unsupported with
+        the launch error; do not substitute ImageGen, hand-painted boxes or a prose description.
   - code: IMAGEGEN_TOOL_UNAVAILABLE
     condition:
       en: A raster region is required and it is not declared as an artworkSlots entry with its brief for
@@ -879,8 +880,11 @@ route:
   nodeKinds: [ui]
   phase: [direct, pre-implementation]
   intent: [direction, draw, render, ui-design]
-  # draw-render and layout-render drive Playwright themselves in the product checkout (runtime verbs, no browser tool of the agent): the op
-  # declares no host tool, so every agent that can run the verbs and read a PNG is eligible.
+  # draw-render and layout-render drive Playwright themselves (runtime verbs, no browser tool of the agent): the op declares no host tool of an
+  # agent, so every agent that can run the verbs and read a PNG is eligible. The capture needs Playwright with its browser and esbuild on the
+  # host (the product's install, else the runtime's own): host-capability-required:render makes the dispatch refuse RENDER_TOOL_UNAVAILABLE
+  # before an attempt is spent when the host has none (scripts/work/render-tools.mjs).
+  riskHints: [host-capability-required:render]
   prerequisites:
     - business.decide settled pass (reviewed SRS seed; Work leaves remain todo)
     - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)

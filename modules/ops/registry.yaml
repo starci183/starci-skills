@@ -811,6 +811,8 @@ ops:
           draws)
         - a todo or absent layout tree is admitted - this op scans it and draws or captures the
           missing shell and ancestor layouts first
+      riskHints:
+        - host-capability-required:render
     lifecyclePosition: direct | pre-implementation
     kindInferred: draw
   - id: interface.implement

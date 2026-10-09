@@ -21,6 +21,7 @@ import { boundRecordPaths, segments } from './bound-records.mjs';
 import { normRel } from '../lib/path-key.mjs';
 import { readParamName } from '../context/read-refs.mjs';
 import { planPrerequisiteLine } from './plan-prerequisites.mjs';
+import { hostCapabilityGaps } from './host-capabilities.mjs';
 
 /** The refusal code of the design gate (unmet kind design-not-settled). */
 export const DESIGN_NOT_SETTLED = 'DESIGN_NOT_SETTLED';
@@ -90,6 +91,9 @@ export function checkPrerequisites({ brief, payload, repo, params = payload?.par
   const directionRead = reads.find((read) => read?.directionArchetype === true);
   addDirectionPrerequisites({ directionRead, bindings, payload, repo, unmet, unknown });
 
+  // A host fact the op cannot run without (route.riskHints host-capability-required:<id>): refused here, before an attempt is spent on finding it out.
+  unmet.push(...hostCapabilityGaps({ brief, dirs: [repo] }));
+
   return { unmet, unknown };
 }
 
@@ -122,9 +126,12 @@ export function prerequisiteDetail({ op, jobId, unmet }) {
     if (item.kind === 'direction-unaccepted')
       return `bound ui record ${item.record} is a ${item.archetype} surface${item.derived ? ' (derived; set ui.archetype to override)' : ''} and its brand.direction archetype is not accepted by the owner - ${item.why ?? 'status ' + (item.status ?? 'absent')} (reads.${item.read}, directionArchetype); enqueue brand.decide --param directionArchetype=${item.archetype} (direction mode; it asks the owner, BRAND_DIRECTION_UNACCEPTED until answered) and dispatch this job --after it`;
     if (item.kind === 'plan-prerequisite-unsettled') return planPrerequisiteLine(item);
+    if (item.kind === 'host-capability-missing') return `${item.code}: ${op} needs the host capability ${item.capability} and ${item.why}; ${item.fix} (route.riskHints host-capability-required, scripts/work/render-tools.mjs)`;
     return `${op} has an unmet prerequisite (${item.kind})`;
   });
-  return `${lines.join('; ')}. Produce the missing record or finish the dependency through the op that owns it, then run starci kernel dispatch --job ${jobId} again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked. The job stays queued and nothing was reserved or launched.`;
+  const hostOnly = unmet.every((item) => item.kind === 'host-capability-missing');
+  const next = hostOnly ? 'The host is not ready: raise starci kernel incident --kind tool-unavailable for the Supervisor, which owns the host; dispatch again once it holds the tool.' : 'Produce the missing record or finish the dependency through the op that owns it, then run starci kernel dispatch --job ${jobId} again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked.';
+  return `${lines.join('; ')}. ${next} The job stays queued and nothing was reserved or launched.`;
 }
 
 /**

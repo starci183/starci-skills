@@ -129,7 +129,7 @@ export function stopOf(rounds, settings) {
 }
 
 async function defaultRender({ html, out, viewports, name, fullPage, repo = null }) {
-  // Playwright is the product's own install (draw-render.mjs): from the source's directory, the product repo, the cwd.
+  // Playwright resolves as draw-render.mjs does: the source's directory, the product repo, the cwd, then the runtime's own install.
   const playwright = loadPlaywright([path.dirname(html), ...(repo ? [repo] : []), process.cwd()]);
   const source = { mode: 'html', html: { path: html, sha256: sha256File(html) } };
   return captureHtml({ html, out, viewports, theme: 'light', fullPage, name, source, playwright });

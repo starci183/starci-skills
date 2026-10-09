@@ -139,7 +139,7 @@ supervisorGate: "Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish;
   the retry. supervisorExtraBudget gates per node group, then the leg is deferred (settle.nextStep
   kind deferred); a gate unresolved past supervisorGateTimeoutMs defers what it holds once the owner was told.
   A supervisor-gate is raised after the workaround of its cause class (op-incident-policy gateCauses): --cause
-  no-eligible-agent|plan-divergence|runtime-defect|peer-dependency|retry-cap|budget with --workaround <what you tried> or
+  no-eligible-agent|plan-divergence|runtime-defect|peer-dependency|retry-cap|host-not-ready|budget with --workaround <what you tried> or
   --no-workaround <typed reason> [--because]; a plan-divergence raise with neither records the provisional answer as a
   revisitable decision for the handover and opens no gate; a raise the job's route chain contradicts is refused
   (gate-workaround-available); a runtime-defect raise over jobs whose evidence the failure-code catalog classes as work (a failing check on the op's own product) is refused (gate-cause-class-work). A gate carries a typed release condition where its cause allows (--until-runtime-has,

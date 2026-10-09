@@ -1,0 +1,53 @@
+{
+ "schema": "replay-fixture@1",
+ "case": "draw-render-tool",
+ "source": {
+  "copy": "a8live12"
+ },
+ "workflow": {
+  "id": "wf-1",
+  "phase": "running",
+  "goalRevision": 0
+ },
+ "jobs": [
+  {
+   "id": "job-1",
+   "op": "brand.decide",
+   "status": "succeeded",
+   "owned": [
+    "own-9"
+   ]
+  },
+  {
+   "id": "job-2",
+   "op": "interface.draw",
+   "status": "failed",
+   "owned": [
+    "own-1"
+   ],
+   "params": {
+    "candidatesPerScreen": 1,
+    "gateRounds": 5
+   },
+   "report": {
+    "outcome": "blocked",
+    "blocker": {
+     "kind": "environment"
+    }
+   }
+  }
+ ],
+ "tree": {
+  "brand": true
+ },
+ "live": {
+  "drawStatus": "failed",
+  "tryNo": 1,
+  "attemptTokens": 8053078,
+  "route": "environment-needs-the-user",
+  "routeLimit": 1,
+  "routeFiring": 0,
+  "gate": "supervisor-gate",
+  "gateIncidents": 1
+ }
+}

@@ -137,7 +137,8 @@ function stepTaken(leg, workflow) {
   if (successor) return { taken: true, by: { kind: 'retry', id: successor.jobId, detail: successor.status } };
   const decision = workflow.decisions.find((d) => d.jobId === leg.jobId && d.status === 'open');
   if (decision) return { taken: true, by: { kind: 'decision', id: decision.kind, detail: decision.decider } };
-  const incident = workflow.incidents.find((i) => i.jobId === leg.jobId && i.status === 'open');
+  // A gate (supervisor-gate, owner-gate) carries no job_id: it names the jobs it holds in its raising event.
+  const incident = workflow.incidents.find((i) => (i.jobId === leg.jobId || i.holds?.includes(leg.jobId)) && i.status === 'open');
   if (incident) return { taken: true, by: { kind: 'incident', id: incident.kind, detail: incident.owner } };
   const peerOp = /^other-op:(.+)$/.exec(leg.why?.owner ?? '')?.[1];
   const peer = peerOp ? workflow.jobs.find((j) => j.opId === peerOp && (LIVE_JOB.has(j.status) || j.status === 'queued')) : null;

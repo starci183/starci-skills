@@ -1295,3 +1295,39 @@ cases:
     rule: {file: scripts/supervisor/affected-data.mjs, anchor: "dataRules"}
     spec: tests/supervisor/affected-data.spec.mjs
     status: covered
+  - id: draw-render-tool-resolved-from-the-product-only
+    family: correctness
+    found: live
+    replay: tests/replay/draw-render-tool.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a capture the runtime runs finds the tools the runtime pins) StarCi op-interface.draw-b8fb07dca4 (try 1, 08:32Z) spent 8.0M tokens and 66 turns and reported blocked environment RENDER_TOOL_UNAVAILABLE: draw-render resolved Playwright and esbuild from the drawing's directory, the product directories and the working directory only, and the product declares neither (a drawing is captured by the runtime); the runtime's own install, which layout-render.mjs already tried first, was never a candidate of draw-render, draw-loop or the layer re-measure, and a Chromium of the exact revision sat in the host's browser cache", remedy: {state: in-tree, change: "scripts/work/render-tools.mjs: Playwright (the first install whose browser exists) and esbuild resolve from the project's directories and then the runtime's own install; draw-render, draw-loop and draw-layer take it through loadPlaywright and the esbuild lookup; a launch failure carries the catalogued code RENDER_TOOL_UNAVAILABLE"}}
+    met: {date: "2026-10-09", where: "alpha.8 live 15:32 local, StarCi workflow", evidence: "starci runtime.sqlite report 12 of op-interface.draw-b8fb07dca4 (blocker environment, checks draw-render capture unavailable), events 3190-3216 (attempt-budget-overrun at 7.45M tokens)"}
+    rule: {file: scripts/work/render-tools.mjs, anchor: "playwrightInstall"}
+    spec: tests/work/render-tools.spec.mjs
+    status: covered
+  - id: op-needing-a-host-tool-spends-an-attempt-to-find-it-missing
+    family: correctness
+    found: live
+    replay: tests/replay/draw-render-tool.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an attempt is not spent on a fact the runtime can read from the host) the same op was dispatched with no check that the capture it exists to run could run: the op found out after 66 turns and 8M tokens; no manifest field declared the host fact, so dispatch and status could not refuse or hold it", remedy: {state: in-tree, change: "an op declares route.riskHints host-capability-required:<id> (interface.draw: render); scripts/kernel/host-capabilities.mjs probes it and prerequisites.mjs refuses prerequisite-unmet RENDER_TOOL_UNAVAILABLE with what provisions the tool before anything is reserved; status holds the job as queuedBecause host-tool-missing (host-hold.mjs capabilityHold; policy hold host-tool-missing, handler supervisor, chain supervisor then owner) so the Kernel is not woken for a wait only the host's owner ends; the job reads ready again by itself once the tool resolves"}}
+    met: {date: "2026-10-09", where: "alpha.8 live 15:32 local, StarCi workflow", evidence: "starci runtime.sqlite events 3190 (attempt-started) to 3203 (settled blocked): no admission check of the capture; attempt 13 tokens 8053078"}
+    rule: {file: scripts/kernel/host-hold.mjs, anchor: "capabilityHold"}
+    spec: tests/kernel/host-capability-hold.spec.mjs
+    status: covered
+  - id: environment-blocker-gate-names-retry-cap-and-the-digest-misses-it
+    family: correctness
+    found: live
+    replay: tests/replay/draw-render-tool.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a recorded cause is the true one, and the digest's two lines agree) the blocked environment report of op-interface.draw-b8fb07dca4 was routed environment-needs-the-user (fired 0 of limit 1) to one supervisor-gate inc-26ed2ed3fa73 whose recorded workaround cause was retry-cap / retry-cap-spent, a claim that the route's retry limit was spent that its own firing count contradicts; the digest matched an incident to a failed leg by job_id, a supervisor-gate has none (it names its jobs in its raising event holds), so one line said no retry, Decision Item or incident followed the leg (NOT reasonable) while another said the gate item was overdue", remedy: {state: in-tree, change: "an environment blocker raises its supervisor-gate with the gate cause host-not-ready (op-incident-policy.yaml gateCauses) and the no-workaround reason not-provisioned-by-runtime; the digest reads the holds of every open gate from its raising event and counts a gate that holds the leg as the step taken"}}
+    met: {date: "2026-10-09", where: "alpha.8 live 16:08 digest, StarCi workflow", evidence: "starci runtime.sqlite events 3219 and 3220 (incident-opened, incident-raised holds op-interface.draw-b8fb07dca4, workaround cause retry-cap), incidents inc-26ed2ed3fa73 job_id null"}
+    rule: {file: scripts/reconciler/debug-digest-analyze.mjs, anchor: "stepTaken"}
+    spec: tests/reconciler/debug-digest-gate-holds.spec.mjs
+    status: covered
+  - id: draw-source-entry-never-settles
+    family: correctness
+    found: live
+    replay: tests/replay/draw-render-tool.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a verb the runtime ships answers) starci work draw-source, the standalone source gate interface.draw's contract runs, exited 13 (Node's unsettled top-level await) on every call: the entry module awaited main() at its top level, main() imports draw-grammar.mjs, and draw-grammar.mjs imports the entry, a dependency that never finishes evaluating while it waits; the op reported it as a second runtime defect", remedy: {state: in-tree, change: "the entry of scripts/work/draw/draw-source.mjs no longer awaits at the top level (main().then): the gate answers 0 or 1 with its verdict"}}
+    met: {date: "2026-10-09", where: "alpha.8 live 15:32 local, StarCi workflow", evidence: "starci runtime.sqlite report 12 of op-interface.draw-b8fb07dca4: check draw-source gate (standalone) exit 13, unsettled top-level await at draw-source.mjs:463"}
+    rule: {file: scripts/work/draw/draw-source.mjs, anchor: "No top-level await"}
+    spec: tests/replay/draw-render-tool.spec.mjs
+    status: covered

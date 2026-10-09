@@ -17512,3 +17512,14 @@ RUNTIME_TREE_TARGET_FOREIGN:
   nextStep_vi: "Đặt STARCI_RUNTIME tới cây cần ghi (hoặc truyền --root nếu verb có cờ đó) rồi chạy lại."
   owner: runtime-core
   kind: verb-refusal
+RENDER_TOOL_UNAVAILABLE:
+  title: "The host cannot take a capture"
+  title_vi: "Máy chủ không chụp được bản vẽ"
+  meaning_vi: "Op cần chụp một bản render (Playwright cùng trình duyệt của nó và esbuild) nhưng máy chủ không có công cụ nào trong số đó, ở cả cây của dự án lẫn bản cài của runtime, hoặc trình duyệt không khởi động được."
+  causes_vi:
+    - "Runtime chưa cài các phụ thuộc của chính nó (npm install trong thư mục runtime)"
+    - "Playwright có nhưng bản tải trình duyệt chưa có trong bộ nhớ đệm của máy chủ (npx playwright install chromium)"
+    - "Trình duyệt có nhưng không khởi động được trên máy chủ này"
+  nextStep_vi: "Lệnh giao bị từ chối trước khi tốn một lượt thử, job đứng chờ với lý do host-tool-missing; Supervisor là người giữ máy chủ, cài công cụ nêu trong thông báo rồi job tự sẵn sàng lại ở lần đọc trạng thái sau; không cần op hay chủ dự án."
+  owner: supervisor
+  kind: dispatch-refusal

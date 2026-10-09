@@ -918,7 +918,7 @@ autopilot:
     Supervisor item reached the owner level); neither blocks independent work. Never route a retry cap or a runtime defect to the owner.
     WORKAROUND FIRST (modules/kernel/op-incident-policy.yaml gateCauses): before you raise a supervisor-gate for a job, try the
     workaround of its cause class and record it. starci kernel incident --kind owner-gate|supervisor-gate takes --cause
-    no-eligible-agent|plan-divergence|runtime-defect|peer-dependency|retry-cap|budget and either --workaround <what you tried and what came of it>
+    no-eligible-agent|plan-divergence|runtime-defect|peer-dependency|retry-cap|host-not-ready|budget and either --workaround <what you tried and what came of it>
     or --no-workaround <typed reason of that class> [--because <evidence>]; without them the raise is refused (gate-cause-required,
     gate-workaround-required). A job refused for no-eligible-candidate goes to another agent of its route chain first (starci kernel dispatch
     --model <pool>); the runtime refuses a no-workaround claim while the chain still has an untried member (gate-workaround-available). A plan
