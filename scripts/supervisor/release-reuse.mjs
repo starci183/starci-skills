@@ -10,11 +10,10 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { lsTree } from '../api/git/ls-tree.mjs';
-import { gitCommonDir } from '../guards/release-record.mjs';
+import { gitCommonDir, proofFileOf, proofFilesOf } from '../guards/release-record.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 
 const LEDGER_SCHEMA = 'starci/l4-rows@1';
-const LEDGER_SUFFIX = '.l4-rows.json';
 const SHA = /^[0-9a-f]{40,64}$/;
 
 /** The declared reuse policy of release-cut.yaml. */
@@ -60,7 +59,7 @@ export function rowDigest({ entries, cls, signature, policy = reusePolicy() }) {
 }
 
 /** The ledger directory file of `head`. */
-export const ledgerPath = ({ commonDir, head }) => path.join(commonDir, 'starci-release', `${head}${LEDGER_SUFFIX}`);
+export const ledgerPath = ({ commonDir, head }) => proofFileOf({ commonDir, sha: head, kind: 'rows' });
 
 /** Write the ledger of a cut: its green rows with their digests. {ok, file} or {ok: false, reason}; never throws. Keeps the newest `keep` ledgers. */
 export function writeLedger({ repo, head, tag, rows, digests, commonDir = null, now = () => new Date(), keep = reusePolicy().keep }) {
@@ -72,25 +71,23 @@ export function writeLedger({ repo, head, tag, rows, digests, commonDir = null, 
     fs.mkdirSync(path.dirname(file), { recursive: true });
     const green = rows.filter((row) => row.ok === true && !row.absent).map((row) => ({ name: row.name, digest: digests[row.name] ?? null, row }));
     fs.writeFileSync(file, `${JSON.stringify({ schema: LEDGER_SCHEMA, head, tag, at: now().toISOString(), rows: green })}\n`);
-    prune(path.dirname(file), keep);
+    prune(dir, keep);
     return { ok: true, file };
   } catch (error) { return { ok: false, reason: error.message }; }
 }
 
-function prune(dir, keep) {
-  const files = fs.readdirSync(dir).filter((name) => name.endsWith(LEDGER_SUFFIX)).map((name) => ({ name, at: fs.statSync(path.join(dir, name)).mtimeMs }));
-  files.sort((a, b) => b.at - a.at).slice(keep).forEach((file) => fs.rmSync(path.join(dir, file.name), { force: true }));
+function prune(commonDir, keep) {
+  const files = proofFilesOf({ commonDir, kind: 'rows' }).map((file) => ({ file, at: fs.statSync(file).mtimeMs }));
+  files.sort((a, b) => b.at - a.at).slice(keep).forEach((entry) => fs.rmSync(entry.file, { force: true }));
 }
 
 /** Every ledger of the repository, newest first: [{head, tag, at, rows: [{name, digest, row}]}]; unreadable files are left out. */
 export function readLedgers({ repo, commonDir = null }) {
   const dir = commonDir ?? gitCommonDir(repo);
   if (!dir) return [];
-  const folder = path.join(dir, 'starci-release');
-  if (!fs.existsSync(folder)) return [];
-  const ledgers = fs.readdirSync(folder).filter((name) => name.endsWith(LEDGER_SUFFIX)).flatMap((name) => {
+  const ledgers = proofFilesOf({ commonDir: dir, kind: 'rows' }).flatMap((file) => {
     try {
-      const ledger = JSON.parse(fs.readFileSync(path.join(folder, name), 'utf8'));
+      const ledger = JSON.parse(fs.readFileSync(file, 'utf8'));
       return ledger?.schema === LEDGER_SCHEMA && SHA.test(String(ledger.head)) && Array.isArray(ledger.rows) ? [ledger] : [];
     } catch { return []; }
   });

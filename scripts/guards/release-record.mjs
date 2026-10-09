@@ -25,8 +25,23 @@ export function gitCommonDir(repo, { run = revParseQuery } = {}) {
   return r.status === 0 && out ? path.resolve(out) : null;
 }
 
+/**
+ * Where the proof a release leaves for one commit lives: <git common dir>/starci-release/<sha>.<kind>.json, one file per kind - the L4 record (l4), the affected specs
+ * that passed (affected), the rows a cut can reuse (rows), the CI verdict (ci) and the range report (report). The one place that spells the directory and the kinds.
+ */
+const PROOF_KINDS = Object.freeze({ l4: 'l4', affected: 'affected', rows: 'l4-rows', ci: 'ci', report: 'affected-report' });
+export const proofDirOf = (commonDir) => path.join(commonDir, 'starci-release');
+export const proofFileOf = ({ commonDir, sha, kind }) => path.join(proofDirOf(commonDir), `${sha}.${PROOF_KINDS[kind]}.json`);
+
+/** Every proof file of one kind under `commonDir` (the commits that have one), unordered; [] when the directory does not exist. */
+export function proofFilesOf({ commonDir, kind }) {
+  const folder = proofDirOf(commonDir);
+  const suffix = `.${PROOF_KINDS[kind]}.json`;
+  return fs.existsSync(folder) ? fs.readdirSync(folder).filter((name) => name.endsWith(suffix)).map((name) => path.join(folder, name)) : [];
+}
+
 /** The record file of `head` under `commonDir`. */
-export const l4RecordPath = ({ commonDir, head }) => path.join(commonDir, 'starci-release', `${head}.l4.json`);
+export const l4RecordPath = ({ commonDir, head }) => proofFileOf({ commonDir, sha: head, kind: 'l4' });
 
 /**
  * Write the L4 record of `head` for release tag `tag`. {ok, file} or {ok:false, reason}: a head that is not a full sha, a tag

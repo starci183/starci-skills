@@ -11,7 +11,7 @@ import { commitChecks } from '../api/gh/commit-checks.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { tag as gitTag } from '../api/git/tag.mjs';
 import { runNode } from '../api/node/run-node.mjs';
-import { gitCommonDir, readL4Record } from '../guards/release-record.mjs';
+import { gitCommonDir, proofFileOf, proofFilesOf, readL4Record } from '../guards/release-record.mjs';
 import { sleep } from '../lib/sleep.mjs';
 import { RELEASE_DEFAULTS } from '../../engine/release-config.mjs';
 import { ciPolicy } from './release-ci-rows.mjs';
@@ -64,14 +64,12 @@ export function verdictOf({ runs, checks, patterns }) {
   return 'green';
 }
 
-const recordFile = (dir, head) => path.join(dir, 'starci-release', `${head}.ci.json`);
-
 /** Leave the CI state of a release commit: {ok, file} or {ok: false, reason}. Never throws. */
 export function writeCiRecord({ repo, head, tag, suite, state, runs = [], checks = [], defect = null, commonDir = null, now = () => new Date() }) {
   const dir = commonDir ?? gitCommonDir(repo);
   if (!dir) return { ok: false, reason: 'the repository has no git common dir' };
   try {
-    const file = recordFile(dir, head);
+    const file = proofFileOf({ commonDir: dir, sha: head, kind: 'ci' });
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, `${JSON.stringify({ schema: CI_SCHEMA, head, tag, suite, state, runs, checks, defect, at: now().toISOString() })}\n`);
     return { ok: true, file };
@@ -81,7 +79,7 @@ export function writeCiRecord({ repo, head, tag, suite, state, runs = [], checks
 /** The CI record of `head`, or null. */
 export function readCiRecord({ repo, head, commonDir = null }) {
   const dir = commonDir ?? gitCommonDir(repo);
-  try { const record = JSON.parse(fs.readFileSync(recordFile(dir, head), 'utf8')); return record?.schema === CI_SCHEMA && record.head === head ? record : null; } catch { return null; }
+  try { const record = JSON.parse(fs.readFileSync(proofFileOf({ commonDir: dir, sha: head, kind: 'ci' }), 'utf8')); return record?.schema === CI_SCHEMA && record.head === head ? record : null; } catch { return null; }
 }
 
 /** One CI record file, or null when it is unreadable or another schema. */
@@ -93,9 +91,7 @@ function readCiFile(file) {
 export function latestCiRecord({ repo, commonDir = null }) {
   const dir = commonDir ?? gitCommonDir(repo);
   if (!dir) return null;
-  const folder = path.join(dir, 'starci-release');
-  const names = fs.existsSync(folder) ? fs.readdirSync(folder).filter((name) => name.endsWith('.ci.json')) : [];
-  const newest = names.map((name) => readCiFile(path.join(folder, name))).filter(Boolean).sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  const newest = proofFilesOf({ commonDir: dir, kind: 'ci' }).map((file) => readCiFile(file)).filter(Boolean).sort((a, b) => String(b.at).localeCompare(String(a.at)));
   return newest[0] ?? null;
 }
 

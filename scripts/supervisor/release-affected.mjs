@@ -13,7 +13,7 @@ import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { tag as gitTag } from '../api/git/tag.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
-import { gitCommonDir } from '../guards/release-record.mjs';
+import { gitCommonDir, proofFileOf } from '../guards/release-record.mjs';
 import { resolveTestConcurrency } from '../machine/test-concurrency.mjs';
 import { runBounded, runSpecFile, testAffected } from './affected-test.mjs';
 import { commitPlans } from './release-affected-commits.mjs';
@@ -52,7 +52,7 @@ function withReport(root, summary, plans) {
   const dir = gitCommonDir(root);
   const short = { ...summary, notCovered: summary.notCovered.slice(0, 20), notRun: summary.notRun.slice(0, 20), notRunCount: summary.notRun.length };
   if (!dir) return short;
-  const file = path.join(dir, 'starci-release', `${summary.head}.affected-report.json`);
+  const file = proofFileOf({ commonDir: dir, sha: summary.head, kind: 'report' });
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `${JSON.stringify({ ...summary, plans })}\n`);
   return { ...short, report: file };

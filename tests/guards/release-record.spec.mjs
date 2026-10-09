@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { gitCommonDir, l4RecordPath, readL4Record, writeL4Record } from '../../scripts/guards/release-record.mjs';
+import { gitCommonDir, l4RecordPath, proofDirOf, proofFileOf, proofFilesOf, readL4Record, writeL4Record } from '../../scripts/guards/release-record.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 const HEAD = 'a'.repeat(40);
@@ -64,4 +64,17 @@ test('the common dir of a real repository and of its linked worktree is the same
   assert.equal(fs.realpathSync(a), fs.realpathSync(b));
   assert.equal(gitCommonDir(base), null, 'a directory that is no repository has no common dir');
   git(['worktree', 'remove', '--force', linked], repo);
+});
+
+test('the proof of a commit has one home: <common dir>/starci-release/<sha>.<kind>.json, and the files of one kind are found by their suffix', (t) => {
+  const commonDir = mkdtemp(t, 'starci-proof-kinds-');
+  const dirOf = proofDirOf(commonDir);
+  fs.mkdirSync(dirOf, { recursive: true });
+  const kinds = { l4: 'l4', affected: 'affected', rows: 'l4-rows', ci: 'ci', report: 'affected-report' };
+  for (const [kind, suffix] of Object.entries(kinds)) {
+    assert.equal(proofFileOf({ commonDir, sha: HEAD, kind }), path.join(dirOf, `${HEAD}.${suffix}.json`));
+    fs.writeFileSync(proofFileOf({ commonDir, sha: HEAD, kind }), '{}');
+  }
+  assert.deepEqual(proofFilesOf({ commonDir, kind: 'affected' }), [path.join(dirOf, `${HEAD}.affected.json`)], 'an affected report is not an affected ledger');
+  assert.deepEqual(proofFilesOf({ commonDir: path.join(commonDir, 'absent'), kind: 'ci' }), []);
 });

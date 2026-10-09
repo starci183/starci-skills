@@ -2,12 +2,11 @@
 // <git common dir>/starci-release/<sha>.affected.json {schema, commit, files, ranAt, at} beside the release record. A later cut finds it and does not run that commit's set again.
 // The land gate keeps no such list (machine.sqlite holds a land's spec MODE and failures, not the spec files that passed), so this ledger is the only per-commit evidence the cut reads.
 import fs from 'node:fs';
-import path from 'node:path';
-import { gitCommonDir } from '../guards/release-record.mjs';
+import { gitCommonDir, proofDirOf, proofFileOf } from '../guards/release-record.mjs';
 
 const SCHEMA = 'starci/affected-ledger@1';
 const SHA = /^[0-9a-f]{40,64}$/;
-const fileOf = (dir, commit) => path.join(dir, 'starci-release', `${commit}.affected.json`);
+const fileOf = (commonDir, commit) => proofFileOf({ commonDir, sha: commit, kind: 'affected' });
 
 /** The spec files that passed for `commit` in an earlier cut, or null when no ledger exists. */
 export function readAffectedLedger({ repo, commit, commonDir = null }) {
@@ -25,7 +24,7 @@ export function writeAffectedLedger({ repo, commit, files, ranAt, commonDir = nu
   const dir = commonDir ?? gitCommonDir(repo);
   if (!dir) return { ok: false, reason: 'the repository has no git common dir' };
   try {
-    fs.mkdirSync(path.join(dir, 'starci-release'), { recursive: true });
+    fs.mkdirSync(proofDirOf(dir), { recursive: true });
     fs.writeFileSync(fileOf(dir, commit), `${JSON.stringify({ schema: SCHEMA, commit, files, ranAt, at: now().toISOString() })}\n`);
     return { ok: true };
   } catch (error) { return { ok: false, reason: error.message }; }
