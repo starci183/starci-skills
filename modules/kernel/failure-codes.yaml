@@ -17247,6 +17247,6 @@ EXAMPLES_CI_LISTER_UNSAFE:
   causes_vi:
     - "Thiếu bước `release sync-runtime` trước các bước liệt kê"
     - "Bước liệt kê dùng `echo \"x=$(lệnh)\"` thay vì gán biến trước"
-  nextStep_vi: "Thêm bước `npm run starci --silent -- release sync-runtime` sau `npm ci` và viết bước liệt kê dạng `x=$(lệnh)` rồi `echo \"x=$x\" >> \"$GITHUB_OUTPUT\"`."
+  nextStep_vi: "Thêm bước `starci release sync-runtime` ngay sau bước cài phụ thuộc và viết bước liệt kê dạng `x=$(lệnh)` rồi `echo \"x=$x\" >> \"$GITHUB_OUTPUT\"`."
   owner: runtime-core
   kind: check-finding
