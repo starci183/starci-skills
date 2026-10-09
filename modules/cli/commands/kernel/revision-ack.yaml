@@ -3,7 +3,7 @@
 group: kernel
 verb: revision-ack
 owner: runtime
-summary: the same verb as kernel-ack-rev: project or attest the complete current Kernel READ manifest
+summary: "the same verb as kernel-ack-rev: project or attest the Kernel READ manifest"
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -38,6 +38,7 @@ exit:
 json: flag
 examples:
   - starci kernel revision-ack --repo <path> --workflow <workflow> --plan
+  - starci kernel revision-ack --repo <path> --workflow <workflow> --rev <rev> --digest <readToken>
   - starci kernel revision-ack --repo <path> --workflow <workflow> --rev <rev> --read-manifest <file>
 editions:
   - full

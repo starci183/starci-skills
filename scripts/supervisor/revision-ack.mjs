@@ -22,7 +22,8 @@ export function revisionAck(m, { plan = false, rev = null, manifestFile = null, 
     if (resolveRev(seat.root, String(rev)) !== seat.current) return { ok: false, code: 'supervisor-rev-unknown', error: 'the revision is not the current deployed commit' };
     // The attestation names the file it read, or the readToken the plan returned (a seat cannot redirect output into a file).
     const owed = planRead(seat).manifest;
-    const done = attest(seat, manifestFile ? JSON.parse(fs.readFileSync(String(manifestFile), 'utf8')) : owed?.digest === digest ? owed : null);
+    const byToken = owed?.digest === digest ? owed : null;
+    const done = attest(seat, manifestFile ? JSON.parse(fs.readFileSync(String(manifestFile), 'utf8')) : byToken);
     return { ok: true, rev: seat.current, count: done.manifest.files.length };
   } catch (error) { return { ok: false, code: error.code ?? 'revision-read-unverified', error: String(error?.message ?? error) }; }
 }

@@ -3,7 +3,7 @@
 group: kernel
 verb: kernel-ack-rev
 owner: runtime
-summary: project or attest the complete current Kernel READ manifest (the one attestation of this Kernel; also spelled revision-ack)
+summary: project or attest the Kernel READ manifest (also spelled revision-ack)
 impl:
   script: scripts/kernel/cli.mjs
   args:

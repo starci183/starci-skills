@@ -1452,3 +1452,31 @@ cases:
     rule: {file: scripts/supervisor/gc-registry.mjs, anchor: "failedLaunchRunsOf"}
     spec: tests/replay/codex-turn-start.spec.mjs
     status: covered
+  - id: two-revision-acks-disagree-and-one-needs-a-file-the-guard-refuses
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a seat's acknowledged revision is one fact) kernel-ack-rev (runtime-rev-acked, the enqueue gate) and revision-ack (runtime-rev-noticed) ran side by side and the digest printed both: StarCi at 17:15 had acked 70b853e44 by the first and was 'due for replacement' by the second. The attestation also demanded a manifest FILE, which a Kernel seat can only write by redirecting output (`--plan > file`), and the seat guard refuses a redirection (KERNEL_NO_FILE_WRITE): the 'guard refused ack-rev' note of 12:56.", remedy: {state: in-tree, change: "revision-ack is the same verb as kernel-ack-rev (one handler, one event runtime-rev-acked, one gate); the plan returns a readToken and the attestation takes --digest <readToken>, so no file is written; the notice reads the Kernel's ack of the current revision as its settle; the digest prints one revision line; a seat that never acked has its baseline at the revision it booted on"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi and Nivo Kernels", evidence: "starci events 3394 to 3450 (kernel-rev-stale refusals while the Kernel could not attest), the digest lines 'acked runtime X of Y' and 'Revision: kernel acked rev Y' side by side"}
+    rule: {file: scripts/kernel/verbs/revision-ack.mjs, anchor: "the same verb as kernel-ack-rev"}
+    spec: tests/kernel/one-ack.spec.mjs
+    status: covered
+  - id: records-op-refused-op-gate-tool-failed-for-a-moved-placement
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an op owes only the gates its kind owes) a Nivo architecture.decide, which owns only Work records (.starciwork) and is no member of enforcedOps, was refused op-gate-tool-failed 'owned slice cannot be bound' because its placement no longer matched the admitted baseline: the code loop's binding was checked before the loop was found not owed.", remedy: {state: in-tree, change: "judgeJobLoop treats a binding mismatch of an op that is not loop-enforced and owns only Work records as no judgment (gate-settle.mjs workRecordsOnly); a code op with the same drift is still refused"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo op-architecture.decide-e78adc94cc", evidence: "nivo events 490, 496, 497, 635 (settle pass refused op-gate-tool-failed), gate answered fixed at 8c5987174 only for the rebound placement"}
+    rule: {file: scripts/kernel/gate-settle.mjs, anchor: "workRecordsOnly"}
+    spec: tests/gates/op-gate-loop.spec.mjs
+    status: covered
+  - id: stray-file-in-a-workflow-tree-root-is-never-collected
+    family: smooth-operation
+    finding: {role: runtime, duty: cleanup, verdict: departs, evidence: "(duty: the runtime collects what no lease owns) the file named `0` that a redirection left in a StarCi workflow tree root blocked a settle; the settle was made tolerant and the guard refuses redirects, but nothing collected the leftover.", remedy: {state: in-tree, change: "the GC controller's key gc:tree-strays plans (shadow) or removes (active) an untracked, unignored, non-hidden regular file in a live workflow tree root that no live job owns, older than treeStrayMinAgeMs and smaller than treeStrayMaxBytes, and journals each one"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow tree", evidence: "the settle blocked by the file named 0 in the tree root (f3's settle tolerance commit)"}
+    rule: {file: scripts/reconciler/gc-tree-strays.mjs, anchor: "reconcileTreeStrays"}
+    spec: tests/reconciler-controllers/gc-tree-strays.spec.mjs
+    status: covered
+  - id: failed-leg-with-runtime-owed-blocker-cannot-be-rejudged
+    family: correctness
+    found: live
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: finished work is judged, not redone) job_transitions makes failed terminal, so a finished-but-blocked attempt whose blocker proved runtime-owed (a Critic hold) cannot be re-judged in place; Nivo took a third 13.4M-token attempt of architecture.decide for a verdict the runtime can give over the bytes already written.", remedy: {state: open}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo workflow", evidence: "nivo jobs op-architecture.decide-8da14f299d failed, report 7 blocked on CRITIC_UNAVAILABLE, engine job_transitions has no edge out of failed"}
+    why: "the lawful path is a NEW job that adopts the failed attempt's product digest and settles it; it needs the admission (contract, READ snapshot, bound native proofs) and the attached files of the failed attempt copied onto a worker-less attempt, which touches dispatch, admission and the settle checkpoint; not built in this change. Until then the leg takes the retry route checker-unavailable-is-the-runtimes (limit 2) and the runtime Critic judges the retry"
+    status: open
