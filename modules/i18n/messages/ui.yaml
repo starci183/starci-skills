@@ -3970,7 +3970,7 @@ messages:
   - en: "Failed services"
     vi: "Dịch vụ bị lỗi"
   - en: "Failed agent seats"
-    vi: "Phiên agent bị lỗi"
+    vi: "Ghế agent bị lỗi"
   - en: "Latest cleanup run #"
     vi: "Mã lượt dọn dẹp gần nhất"
   - en: "Queued/running integration tickets"

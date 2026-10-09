@@ -212,21 +212,32 @@ function UnitsTab({ project, wf, graph, graphTab }: { readonly project: string; 
   </Panel>;
 }
 
+/** Refine the broad running projection only when recorded report and unsettled attempt custody agree. */
+function attemptListStatus(attempt: AttemptRow) {
+  const status = statusFromUi(attempt.ui);
+  const open = attempt.dispatchedAt != null && attempt.settledAt == null && attempt.endState == null && attempt.verdict == null;
+  const reported = attempt.reportedAt != null || attempt.reportOutcome != null;
+  return status === 'running' && open && reported ? 'settling' : status;
+}
+
 function AttemptsTab({ project, wf }: { readonly project: string; readonly wf: string }) {
   const url = `/api/attempts?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`;
   const attempts = usePagedApiQuery<AttemptRow>(url, { topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 30_000, getKey: attempt => String(attempt.id) });
   const contract = useApiQuery<ContractInfo>('/api/contract', { topics: ['system'], intervalMs: 60_000 });
   return <Panel title={t('Attempts')} concept="C7">
     <ReadState snapshot={attempts} url={url} />
-    <div className="divide-y">{attempts.data?.map(item => <Link key={item.id} href={item.href} className="flex w-full min-w-0 items-start gap-3 py-4 text-sm text-foreground">
+    <div className="divide-y">{attempts.data?.map(item => {
+      const status = attemptListStatus(item);
+      return <Link key={item.id} href={item.href} className="flex w-full min-w-0 items-start gap-3 py-4 text-sm text-foreground">
       <span className="flex min-w-0 flex-1 flex-col gap-2">
-        <span className="flex flex-wrap items-start justify-between gap-3"><span className="min-w-0 break-words font-medium">{formatOpLabel(item.op, contract.data?.opLabels)}</span><StatusChip status={statusFromUi(item.ui)} /></span>
+        <span className="flex flex-wrap items-start justify-between gap-3"><span className="min-w-0 break-words font-medium">{formatOpLabel(item.op, contract.data?.opLabels)}</span><StatusChip status={status} label={status === 'settling' ? t('Awaiting settlement') : undefined} /></span>
         {item.summary && <span className="whitespace-pre-wrap break-words text-muted-foreground">{item.summary}</span>}
         <span className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground"><span>{t('Attempt #{id}', { id: item.id })}</span><span>{t('job try {n} · dispatch {dispatch}', { n: item.attempt, dispatch: item.dispatchSeq })}</span><span>{item.agent ?? t('unknown agent')}</span><span>{formatAbsolute(item.dispatchedAt)}</span></span>
         <span className="break-all font-mono text-xs text-muted-foreground">{t('Unit {unit} · job {job}', { unit: item.unit ?? t('not recorded'), job: item.job })}</span>
         <span className="break-all font-mono text-xs text-muted-foreground">{item.op}</span>
       </span><ArrowRight className="size-4 shrink-0" aria-hidden="true" />
-    </Link>)}</div>
+    </Link>;
+    })}</div>
     {attempts.meta && !attempts.error && !partialSources(attempts).length && !attempts.data?.length && <p className="text-sm text-muted-foreground">{t('No attempts yet.')}</p>}<MoreRows read={attempts} />
   </Panel>;
 }
