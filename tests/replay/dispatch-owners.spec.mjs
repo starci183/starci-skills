@@ -81,7 +81,11 @@ test('c: the same refusal of the same ready job is recorded once, held on a grow
   assert.equal(count(world, 'kernel-api') + count(world, 'dispatch-push'), afterFirst.pushes, 'a push in which every job is held writes no row');
 
   world.ledger((ledger) => ledger.db.prepare("UPDATE jobs SET created_at=? WHERE job_id=?").run(Date.now() - 3_600_000, draw.id));
-  const digest = JSON.stringify(world.starci(['debug', 'digest', '--workflow', world.wf]).json);
+  const persisted = world.ledger((ledger) => JSON.parse(ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(draw.id).payload_json).dispatchRefusal);
+  assert.deepEqual(persisted, first.memo, 'the foreground push commits the memo before the digest reads it');
+  const read = world.starci(['debug', 'digest', '--workflow', world.wf]);
+  assert.equal(read.status, 0, read.stderr || read.stdout);
+  const digest = JSON.stringify(read.json);
   assert.match(digest, /ready-not-dispatched/);
   assert.match(digest, /refused 1x for grammar-context-missing/, 'the digest names the cause the job is refused for');
 

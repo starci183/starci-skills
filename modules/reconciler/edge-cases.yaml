@@ -1785,3 +1785,30 @@ cases:
     rule: {file: scripts/supervisor/release-affected.mjs, anchor: "range.data.large"}
     spec: tests/supervisor/release-suite-ci.spec.mjs
     status: covered
+
+  - id: replay-cli-follows-the-host-runtime-link
+    family: record-vs-reality
+    finding:
+      role: runtime
+      duty: does
+      verdict: departs
+      evidence: "A replay without an inherited STARCI_RUNTIME runs direct Kernel verbs from the checkout but lets the public CLI follow the host runtime link. The digest can therefore read another revision while the push writes the refusal memo with the checkout's code."
+      remedy: {state: in-tree, change: "The replay environment pins STARCI_RUNTIME to the checkout that owns the harness."}
+    met: {date: "2026-10-10", where: "replay lane runtime-selection regression", evidence: "The fake-link regression fails on revision 98b38a97a: the public CLI selects the foreign runtime while the direct Kernel verbs select the checkout."}
+    rule: {file: tests/helpers/replay-world.mjs, anchor: "STARCI_RUNTIME: ROOT"}
+    spec: tests/replay/host-independence.spec.mjs
+    replay: tests/replay/host-independence.spec.mjs
+    status: covered
+  - id: replay-fixture-has-no-extraction-recipe
+    family: record-vs-reality
+    finding:
+      role: runtime
+      duty: does
+      verdict: departs
+      evidence: "The first-leg fixture has no registered extraction recipe and its source carries a path-like value. The replay fixture spec fails its case inventory before reaching the hygiene assertion."
+      remedy: {state: in-tree, change: "A first-leg recipe reads the approved plan of a running workflow with no op jobs and emits the checked-in fixture through the hygiene-checked writer."}
+    met: {date: "2026-10-10", where: "five-run replay sweep", evidence: "fixtures.spec.mjs fails all five runs: first-leg.json is absent from CASES."}
+    rule: {file: tests/helpers/replay-extract.mjs, anchor: "function firstLeg"}
+    spec: tests/replay/fixtures.spec.mjs
+    replay: tests/replay/fixtures.spec.mjs
+    status: covered

@@ -86,3 +86,29 @@ test('the extractor turns a ledger full of product content into a neutral fixtur
   assert.equal(fs.readFileSync(path.join(out, 'handed-over.json'), 'utf8'), `${JSON.stringify(document, null, 1)}\n`);
   assert.throws(() => extractCase('no-such-case', copy), /unknown case/);
 });
+
+test('the first-leg recipe extracts the approved plan before any op job and refuses an already enqueued workflow', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-first-leg-extract-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  const copy = path.join(dir, 'ledger-copy-first-leg');
+  const file = path.join(copy, 'starci', 'runtime.sqlite');
+  const plan = { legs: [{ op: 'request.analyze' }, { op: 'scope.define' }, { op: 'business.decide' }], edges: [['request.analyze', 'scope.define'], ['scope.define', 'business.decide']] };
+  const ledger = openLedger({ file });
+  try {
+    seedWorkflow(ledger, { id: 'source-workflow', goal: { revision: 0, derivedPlan: plan }, jobs: [] });
+    const document = extractCase('first-leg', copy);
+    assert.deepEqual(document.plan, plan);
+    assert.deepEqual(document.workflow, { id: 'wf-1', phase: 'running', goalRevision: 0 });
+    assert.deepEqual(document.jobs, []);
+    assert.deepEqual(document.source, { copy: 'first-leg' });
+    assert.deepEqual(scanFixture(document), []);
+    const out = path.join(dir, 'generated');
+    writeFixture('first-leg', copy, out);
+    assert.equal(fs.readFileSync(path.join(out, 'first-leg.json'), 'utf8'), fs.readFileSync(path.join(FIXTURES, 'first-leg.json'), 'utf8'), 'the checked-in fixture is emitted by its recipe');
+    ledger.write.createUnit({ workflowId: 'source-workflow', unitId: 'u1', opId: 'scope.define', subjectKey: 'u1', goalRevision: 0 });
+    ledger.enqueueJob({ jobId: 'j1', workflowId: 'source-workflow', unitId: 'u1', opId: 'scope.define', tryNo: 1, kind: 'op', payload: {} });
+    assert.throws(() => extractCase('first-leg', copy), /no op jobs/);
+  } finally {
+    ledger.close();
+  }
+});
