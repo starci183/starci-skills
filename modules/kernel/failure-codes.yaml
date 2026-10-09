@@ -17239,3 +17239,14 @@ RELEASE_SUITE_MODE:
   nextStep_vi: "Owner đặt release.suite: ci trong config.yaml (quyết định của owner), hoặc chạy lại starci release cut --tag v<version> với release.suite: local để suite gốc chạy tại chỗ; không sửa tay bản ghi."
   owner: owner
   kind: verb-refusal
+
+EXAMPLES_CI_LISTER_UNSAFE:
+  title: "The examples workflow lists its apps unsafely"
+  title_vi: "Job liệt kê ứng dụng của workflow ví dụ khởi động không an toàn"
+  meaning_vi: "Job `apps` phải sinh bản sao runtime của các gói (`starci release sync-runtime`) trước khi chạy CLI, và gán đầu ra lệnh vào biến trước khi ghi vào `$GITHUB_OUTPUT`; `echo \"$(lệnh)\"` nuốt lỗi của lệnh nên ma trận rỗng, các job `app` và `images` biến mất mà run vẫn đỏ không rõ lý do."
+  causes_vi:
+    - "Thiếu bước `release sync-runtime` trước các bước liệt kê"
+    - "Bước liệt kê dùng `echo \"x=$(lệnh)\"` thay vì gán biến trước"
+  nextStep_vi: "Thêm bước `npm run starci --silent -- release sync-runtime` sau `npm ci` và viết bước liệt kê dạng `x=$(lệnh)` rồi `echo \"x=$x\" >> \"$GITHUB_OUTPUT\"`."
+  owner: runtime-core
+  kind: check-finding

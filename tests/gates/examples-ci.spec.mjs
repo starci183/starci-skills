@@ -297,3 +297,18 @@ test('a tracked runtime slot declares coverage required or none, and an ignored 
   ignored.slots.find((slot) => slot.tracked === 'ignored').coverage = 'none';
   assert.match(runtimeShapeProblems(ignored).join('\n'), /coverage belongs to a tracked slot/);
 });
+
+test('the lister job refuses a missing sync-runtime step and a listing swallowed inside echo', (t) => {
+  const root = fixture(t, ['alpha']);
+  const file = path.join(root, WORKFLOW);
+  const original = fs.readFileSync(file, 'utf8');
+  assert.deepEqual(codes(root), []);
+  const withoutSync = original.replace(/ {6}- name: Generate the packages' runtime copies\n {8}run: npm run starci --silent -- release sync-runtime\n/, '');
+  assert.notEqual(withoutSync, original);
+  fs.writeFileSync(file, withoutSync);
+  assert.deepEqual(codes(root), ['EXAMPLES_CI_LISTER_UNSAFE']);
+  const swallowed = original.replace(/apps=\$\((npm run starci[^\n]*)\)\n\s+echo "apps=\$apps"/, 'echo "apps=$($1)"');
+  assert.notEqual(swallowed, original);
+  fs.writeFileSync(file, swallowed);
+  assert.deepEqual(codes(root), ['EXAMPLES_CI_LISTER_UNSAFE']);
+});

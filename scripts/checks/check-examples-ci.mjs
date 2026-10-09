@@ -189,9 +189,23 @@ const hardcodedAppFindings = (apps, text, add) => {
   for (const app of apps) if (new RegExp(String.raw`examples/${app}\b`).test(text)) add('EXAMPLES_CI_HARDCODED', WORKFLOW, `the workflow names examples/${app}: every app is reached through the matrix only`);
 };
 
+/** The lister job's start-up: the generated runtime copies exist before the CLI runs, and no listing command sits inside an echo (its failure would be swallowed into an empty matrix). */
+const SYNC_COMMAND = 'release sync-runtime';
+const SWALLOWING_ECHO = /echo\s+"[^"\n]*\$\(/;
+const listerFindings = (lister, add) => {
+  const steps = lister?.steps ?? [];
+  const firstListing = steps.findIndex((step) => runsCommand(step, MATRIX_COMMAND) || runsCommand(step, IMAGES_COMMAND));
+  const syncAt = steps.findIndex((step) => String(step?.run ?? '').includes(SYNC_COMMAND));
+  if (firstListing >= 0 && (syncAt < 0 || syncAt > firstListing))
+    add('EXAMPLES_CI_LISTER_UNSAFE', `${WORKFLOW}#jobs.${MATRIX_JOB}`, `job ${MATRIX_JOB} must run \`starci ${SYNC_COMMAND}\` before the listing steps: packages/hfs/runtime is generated and untracked, so a fresh checkout cannot start the CLI without it`);
+  if (steps.some((step) => SWALLOWING_ECHO.test(String(step?.run ?? ''))))
+    add('EXAMPLES_CI_LISTER_UNSAFE', `${WORKFLOW}#jobs.${MATRIX_JOB}`, 'a listing step must assign the command output to a variable first (x=$(...)), not echo "$(...)": a failing command inside echo is swallowed and the matrix comes out empty');
+};
+
 const workflowFindings = (doc, text, apps, add) => {
   const jobs = doc.jobs ?? {};
   const lister = jobs[MATRIX_JOB];
+  listerFindings(lister, add);
   if (!lister || !(lister.steps ?? []).some((step) => runsCommand(step, MATRIX_COMMAND)) || !String(lister.outputs?.apps ?? '').includes('steps.'))
     add('EXAMPLES_CI_MATRIX_NOT_DERIVED', WORKFLOW, `job ${MATRIX_JOB} must run \`${MATRIX_COMMAND}\` and expose its output as outputs.apps`);
   const matrixJobs = Object.entries(jobs).filter(([id, job]) => id !== IMAGES_JOB && job?.strategy?.matrix);
