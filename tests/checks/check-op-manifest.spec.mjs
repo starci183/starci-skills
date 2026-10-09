@@ -20,6 +20,7 @@ const validOp = () => ({
   writes: [{ id: 'evidence', path: 'evidence/**', content: { en: 'Retain the observed bytes and their provenance.' } }],
   steps: [{ reads: ['target'], writes: ['evidence'], action: { en: 'Read the selected record and retain what was observed.' } }],
   proofs: [{ id: 'binding', requirement: { en: '`starci runtime validate` passes and every cited path exists.' } }],
+  judge: [{ by: 'machine', measures: ['declared-checks'], why: 'the settler re-runs the checks it can run itself' }],
   blockers: [{ code: 'DECLARED_DEPENDENCY_UNMET', condition: { en: 'A declared prerequisite is absent.' } }],
   route: { nodeKinds: ['business'], phase: ['verify'], intent: ['sample'] },
 });
@@ -190,7 +191,7 @@ test('every declared placeholder names a <token> its manifest uses', async () =>
 
 test('every concrete execution mode is schema-checked and checks/defaults are real', () => {
   const op = validOp();
-  const { schema, route, ...mode } = validOp();
+  const { schema, route, judge, ...mode } = validOp();
   op.params = { mode: { type: 'enum', enum: ['select', 'run'], default: 'select', setBy: 'kernel', doc: { en: 'Selected mode.' } } };
   op.policy = { executionModes: { run: mode } };
   assert.deepEqual(checkFixture(op).findings, []);
