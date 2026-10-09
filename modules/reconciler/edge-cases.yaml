@@ -1536,6 +1536,13 @@ cases:
     spec: tests/kernel/dispatch-owners.spec.mjs
     status: covered
 
+  - id: replay-engine-detached-push-races-the-spec
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a replay is deterministic by construction) the engine pass of a replay world handed the parallelism push to a detached dispatch-ready child, as the live engine does, and the child leased the ready job about a second after the pass returned: the spec's own push then found allowed 0 and queuedReady 0, or a job already taken (shape-guard-retry, ready-not-dispatched h and dispatch-owners b failed or flaked by timing and by load).", remedy: {state: in-tree, change: "the replay driver runs the same verb in the foreground by default (engine option detachedPush asks for the live shape); every process of a world carries replay-child-trap.mjs, and the world fails a pass that leaves a detached child alive (world.leakedChildren)"}}
+    met: {date: "2026-10-09", where: "lane f9 replay worlds, lane f4 diagnosis", evidence: "kernel-dispatch-push results empty or taken in the spec's own push after world.engine; dispatch-ready child alive after the pass returned"}
+    rule: {file: tests/helpers/replay-driver.mjs, anchor: "detachedPush"}
+    spec: tests/replay/replay-determinism.spec.mjs
+    status: covered
   - id: kernel-revision-wake-decided-twice
     family: record-vs-reality
     found: live
