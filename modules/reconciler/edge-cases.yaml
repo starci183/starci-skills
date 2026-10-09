@@ -1536,6 +1536,15 @@ cases:
     spec: tests/kernel/dispatch-owners.spec.mjs
     status: covered
 
+  - id: kernel-revision-wake-decided-twice
+    family: record-vs-reality
+    found: live
+    replay: tests/replay/one-wake-decider.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: what a revision change asks of a Kernel is decided once) scripts/kernel/runtime-rev.mjs decided the re-read from its own path list, a 30-minute window after the ack and a 12-file cap, while the revision notice decided from modules/kernel/revision-scope.yaml; the watchdog typed notice || rev, the status carried both kernelRev and revisionNotice, the menu item and the next action read the first and the wake the second, so the same land was 'not stale' to one surface and 'owed' to another (StarCi 2026-10-09 17:15) and a modified rule was a re-read to one and a replacement to the other.", remedy: {state: in-tree, change: "the notice over the table is the one decider: kernel-notice.mjs projects it to the status field revisionNotice, the menu item rev-ack, the reread next action and the one wake sentence (watchdog and transition wakes alike); runtime-rev.mjs keeps only the ack read, the enqueue gate over an op's own contract (opRevHold) and op-rev-drift"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi Kernel, the digest at 17:15 and the contributing audit F1", evidence: "kernelRev.stale false with revisionNotice owed after an op-contract land inside the coalescing window; wakePromptOf typed 'notice || rev'"}
+    rule: {file: scripts/kernel/kernel-notice.mjs, anchor: "revisionWakeLine"}
+    spec: tests/kernel/kernel-runtime-rev.spec.mjs
+    status: covered
   - id: two-revision-acks-disagree-and-one-needs-a-file-the-guard-refuses
     family: record-vs-reality
     found: live

@@ -13,7 +13,8 @@ import { hostHoldOf } from '../../host-hold.mjs';
 import { hostThrottle, throttleSummary } from '../../../machine/ram-throttle.mjs';
 import { AUTOPILOT_RULING, autopilotSettings, autopilotSweep } from '../../autopilot-run.mjs';
 import { wakeKernelForTransition } from '../../wake-delivery.mjs';
-import { kernelRevState, revRootOf } from '../../runtime-rev.mjs';
+import { revRootOf } from '../../runtime-rev.mjs';
+import { kernelNoticeOf, noticeOwes } from '../../kernel-notice.mjs';
 import { ownerSpecs, deferredTestsOf, specsOff } from '../../../route/spec-deferral.mjs';
 import { dependenciesOf, dependencyGraph } from '../../dependency-graph.mjs';
 import { jobDisplayNameOf, opLabel, workflowDisplayName } from '../../../lib/display-names.mjs';
@@ -186,7 +187,7 @@ const messagesPhase = (s) => {
     : pendingPeerMessagesOf(db, workflowId).map(({ key, from, kind, subject, at }) => ({ key, from, kind, subject, at }));
 };
 
-const kernelRevOf = (db, workflowId) => tryOr(() => kernelRevState(db, workflowId, { root: revRootOf() }), null);
+const revisionNoticeOf = (db, workflowId) => tryOr(() => kernelNoticeOf(db, workflowId, { root: revRootOf() }), null);
 
 const peerMovable = (s, op) => !s.jobsByOp.has(op) && !s.peerHeldOps.has(op)
   && !(s.planAncestors.get(op) ?? []).some((up) => s.peerHeldOps.has(up) && !s.jobsByOp.get(up)?.some((row) => row.status === 'succeeded'));
@@ -195,11 +196,10 @@ const graphPhase = (s) => {
   const { db, workflowId, wf, internals } = s;
   const { ACTIONABLE_FRONTIER_STATES, NEXT_ACTION_MOVES, graphProjectionOf, opRevDriftOf, rereadActionOf, runningOpRevDriftOf } = internals;
   s.graph = graphProjectionOf(db, { wf, legOps: s.legOps, planAncestors: s.planAncestors, workflowJobs: s.workflowJobs, jobsByOp: s.jobsByOp, failedRows: s.failedRows, queued: s.queued, ownerGates: s.ownerGates, peerWaits: s.peerWaits, awaitingOwner: s.awaitingOwner, staleReady: s.staleReady, staleProofs: s.staleProofs, credentialWaitOps: s.credentialWaitOps, approvalWaitOps: s.approvalWaitOps, workGraph: s.workGraph, assetSlotsOwed: s.assetSlotsOwed, autopilot: s.autopilotView.graph, handover: s.handover });
-  // The runtime rev the Kernel acked against the runtime's HEAD (runtime-rev.mjs): a stale Kernel re-reads the
-  // changed kernel files and acks before anything else, and enqueue/dispatch of a leg whose op contract changed
-  // is refused kernel-rev-stale until it does. op-rev-drift: settled legs whose op contract moved after dispatch.
-  s.kernelRev = wf.phase === 'finished' ? null : kernelRevOf(db, workflowId);
-  if (s.kernelRev?.stale) s.graph.nextActions.unshift(rereadActionOf(s.kernelRev, workflowId));
+  // What the runtime revision asks of this Kernel (kernel-notice.mjs, the one decider): an owing Kernel re-reads the files the notice
+  // names and attests them before anything else, and enqueue/dispatch of a leg whose op contract changed is refused kernel-rev-stale until it does. op-rev-drift: settled legs whose op contract moved after dispatch.
+  s.revisionNotice = wf.phase === 'finished' || wf.archived_at ? null : revisionNoticeOf(db, workflowId);
+  if (noticeOwes(s.revisionNotice)) s.graph.nextActions.unshift(rereadActionOf(s.revisionNotice, workflowId));
   s.opRevDriftWarnings = tryOr(() => opRevDriftOf(db, workflowId), []);
   s.runningRevDrift = tryOr(() => runningOpRevDriftOf(db, workflowId), []);
   // With nothing open, a step nextActions names is the Kernel's next move; orphaned-frontier is left for a
@@ -211,7 +211,7 @@ const graphPhase = (s) => {
   if (s.peerWaitMovable.length) s.frontierState = 'orphaned-frontier';
   // A peer-wait holds only the ops it names: an unheld next step is still the Kernel's move (fe-hold-until-landed).
   if (['orphaned-frontier', 'supervisor-wait', 'peer-wait'].includes(s.frontierState) && s.graph.nextActions.some((action) => NEXT_ACTION_MOVES.includes(action.kind) && !action.heldBy)) s.frontierState = 'next-ready';
-  s.actionable = ACTIONABLE_FRONTIER_STATES.includes(s.frontierState) || s.kernelRev?.stale === true || s.readyOperations > 0 || s.staleReady.length > 0 || s.askReserve.length > 0 || s.peerMessages.length > 0 || s.deadPeerWaits.length > 0;
+  s.actionable = ACTIONABLE_FRONTIER_STATES.includes(s.frontierState) || noticeOwes(s.revisionNotice) || s.readyOperations > 0 || s.staleReady.length > 0 || s.askReserve.length > 0 || s.peerMessages.length > 0 || s.deadPeerWaits.length > 0;
 };
 
 const ramThrottleOf = (s) => {
@@ -308,7 +308,7 @@ const statusOut = (s) => ({
   ...(s.knowledgeChangeRequests.length ? { knowledgeChangeRequests: s.knowledgeChangeRequests } : {}),
   ...(s.logTypedMissing.length ? { logTypedMissing: s.logTypedMissing } : {}),
   ...(s.assetSlotsOwed.length ? { assetSlotsOwed: s.assetSlotsOwed } : {}),
-  ...(s.kernelRev ? { kernelRev: s.kernelRev } : {}),
+  ...(s.revisionNotice ? { revisionNotice: s.revisionNotice } : {}),
   ...(s.opRevDriftWarnings.length ? { opRevDrift: s.opRevDriftWarnings } : {}),
   ...(s.runningRevDrift.length ? { runningOpRevDrift: s.runningRevDrift } : {}),
 });

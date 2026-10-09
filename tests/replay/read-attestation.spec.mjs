@@ -31,7 +31,7 @@ test('the ack of a read plan that outgrew the inline event bound lands after an 
   assert.equal(restarted.ok, true, 'the engine restarts over the world');
 
   world.growReadPlan();
-  assert.equal(world.status().kernelRev.stale, true, 'the revision change makes the Kernel stale');
+  assert.ok(['owed', 'owed-woken'].includes(world.status().revisionNotice.state), 'the revision change makes the Kernel owe a re-read');
   const refused = newLeg(world);
   assert.equal(refused.json?.code, 'kernel-read-unverified', 'a new leg waits for the ack of the new revision');
 
@@ -47,5 +47,5 @@ test('the ack of a read plan that outgrew the inline event bound lands after an 
   assert.match(rows[1].payload_sha, /^[0-9a-f]{64}$/, 'the whole attestation is behind the sha');
 
   assert.equal(newLeg(world).json?.code, 'params-invalid', 'the READ gate passes: the verb now refuses only the params');
-  assert.equal(world.status().kernelRev.stale, false);
+  assert.ok(['current', 'acked-legacy'].includes(world.status().revisionNotice.state));
 });

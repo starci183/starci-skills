@@ -8,6 +8,7 @@ import { classifyAll } from './debug-verdicts.mjs';
 import { roleRows } from './debug-roles.mjs';
 import { loadQuestions, answerQuestions, standingOf } from './debug-questions.mjs';
 import { bootBudget, exceededWakes, supervisorWakeBudget, wakeBudget } from '../kernel/wake-budget.mjs';
+import { noticeOwes } from '../kernel/kernel-notice.mjs';
 import { seatsOverEmptyBound } from './seat-cost.mjs';
 
 const MIN = 60_000;
@@ -169,7 +170,7 @@ function legJudgement(leg, workflow, ctx) {
 
 function kernelSection(workflow, ctx) {
   const { kernelJob, kernelSignal, status, lastKernelWakeAt, seatProbe, lastStartFailure = null } = workflow;
-  const rev = status?.kernelRev ?? null;
+  const rev = status?.revisionNotice ?? null;
   const frontier = status?.frontier ?? {};
   // What waits on the Kernel is its menu; a status without one reads the frontier counts.
   const ready = Array.isArray(status?.menu) ? status.menu.length : (frontier.readyOperations ?? 0) + (frontier.nudgeReadyJobs?.length ?? 0) + (frontier.settleReadyJobs?.length ?? 0);
@@ -178,7 +179,7 @@ function kernelSection(workflow, ctx) {
   const idle = frontier.state === 'idle' || /idle/.test(String(probe ?? ''));
   return { alive: kernelJob?.status === 'running' && Boolean(kernelSignal?.terminal) && !DEAD_PROBES.has(probe),
     job: kernelJob?.status ?? null, terminal: kernelSignal?.terminal ?? null, probe, startFailure: lastStartFailure, lastWakeAgeMs: wakeAgeMs,
-    revision: status?.revisionNotice?.line ?? null, ackedRev: rev?.acked ?? null, currentRev: rev?.current ?? null, revStale: rev?.stale === true, filesBehind: rev?.fileCount ?? 0,
+    revision: status?.revisionNotice?.line ?? null, ackedRev: rev?.from ?? null, currentRev: rev?.to ?? null, revStale: noticeOwes(rev), filesBehind: noticeOwes(rev) ? (rev.count ?? 0) : 0,
     frontierState: frontier.state ?? null, readyWork: ready,
     idleWithReady: ready > 0 && idle && wakeAgeMs !== null && wakeAgeMs > ctx.n.kernelIdleWakeMs,
     overBudgetWakes: exceededWakes(workflow.kernelWakes ?? [], wakeBudget(), bootBudget()), seatCost: workflow.seatCost ?? null };

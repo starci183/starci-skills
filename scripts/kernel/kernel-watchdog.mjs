@@ -40,7 +40,8 @@ import { stopAndRelease } from '../machine/worker-close.mjs';
 // worker-show states that end a worker (start-workflow.mjs MANAGED_DEAD_STATE).
 const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
 import { jsonFromStdout, parseJsonOr } from '../lib/json.mjs';
-import { currentRuntimeRev, revRootOf, revWakeLine } from './runtime-rev.mjs';
+import { currentRuntimeRev, revRootOf } from './runtime-rev.mjs';
+import { revisionWakeLine } from './kernel-notice.mjs';
 import { openDecisionRow } from '../machine/decisions.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { arg as argvValue } from '../lib/cli-arg.mjs';
@@ -53,7 +54,6 @@ import { createKernelRotation, rotationRule } from './seat-rotation.mjs';
 import { runtimeRevNow, startFailureRun, startHoldBudget, startHoldOf } from './start-hold.mjs';
 import { recordReplaced, recordWoken, runtimePass } from '../machine/revision-ack.mjs';
 import { kernelSeat } from '../machine/revision-seats.mjs';
-import { noticeWakeLine } from '../machine/revision-notice.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
@@ -103,13 +103,9 @@ export const buildWakePrompt = (workflow, attempt = null, revLine = null) => bou
   'Never run Start-Sleep, shell sleep or a polling loop.',
   WAKE_BOUNDS,
 ].join(' ') });
-/** The liveness wake this tick would type, from one starci kernel status read: its seat attempt and its kernelRev (runtime-rev.mjs). */
-export const wakePromptOf = (workflow, statusValue) => {
-  const rev = statusValue?.kernel ? revWakeLine(statusValue?.kernelRev, workflow) : null;
-  const notice = noticeWakeLine(statusValue?.revisionNotice, `starci kernel revision-ack --workflow ${workflow}`);
-  // ONE sentence about the runtime revision: what a change sends this Kernel when it owes one, else where its attestation stands.
-  return buildWakePrompt(workflow, statusValue?.kernel?.attempt ?? null, notice || rev || null);
-};
+/** The liveness wake this tick would type, from one starci kernel status read: its seat attempt and its revisionNotice (kernel-notice.mjs, the one sentence about the runtime revision). */
+export const wakePromptOf = (workflow, statusValue) =>
+  buildWakePrompt(workflow, statusValue?.kernel?.attempt ?? null, revisionWakeLine(statusValue?.revisionNotice, workflow, { root: revRootOf() }));
 
 /** Repair only the Orca tab title: the agent owns the pane title and may change it on every turn. */
 export function repairKernelTabTitle(terminal, name, { list = () => terminalList({ includeVisualLayouts: true }), tabTitles = tabTitlesOf,
@@ -409,8 +405,8 @@ async function statusTick() {
     ? repairKernelTabTitle(titleTerminal, status.value.title ?? workflowId) : null;
   // The runtime revision the Kernel acked and the wake this tick types (or would type): a read-only --once
   // probe shows what the next wake carries (runtime-rev.mjs).
-  const kernelRev = status.value?.kernelRev ?? null;
-  return { ...result, ...(titleRepair ? { titleRepair } : {}), ...(kernelRev ? { kernelRev, ...(result.terminalClosed ? {} : { nextWake: wakePromptOf(workflowId, status.value) }) } : {}) };
+  const revisionNotice = status.value?.revisionNotice ?? null;
+  return { ...result, ...(titleRepair ? { titleRepair } : {}), ...(revisionNotice ? { revisionNotice, ...(result.terminalClosed ? {} : { nextWake: wakePromptOf(workflowId, status.value) }) } : {}) };
 }
 
 

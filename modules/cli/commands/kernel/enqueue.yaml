@@ -167,7 +167,7 @@ refuses:
   - unknown-op: no brief at modules/ops/ops/<opId>.yaml
   - "kernel-rev-stale: the Kernel's acked runtime rev is behind and this op's contract (its brief,
     _common, the verdict contract, the schemas and checks it cites, scripts/kernel/op-prompt.mjs) changed in between (runtime-rev.mjs opRevStale). Re-read what api
-    status kernelRev lists, starci kernel kernel-ack-rev, enqueue again; legs of other ops are unaffected"
+    status revisionNotice lists, starci kernel kernel-ack-rev, enqueue again; legs of other ops are unaffected"
   - "grant-parent-missing: an owned path whose directory does not exist in its target repository
     (the path itself for a directory or glob grant, its parent for a file grant - e.g. src/app when
     the repository keeps its router at apps/app/src/app), so the worker could never satisfy the
