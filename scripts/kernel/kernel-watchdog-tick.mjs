@@ -136,6 +136,7 @@ export function createKernelTick(deps) {
     if (verdict.result) return verdict.result;
     const read = deps.terminalRead({ terminal, screen: true });
     if (!read.ok) return { ok: false, workflowId: deps.workflowId, phase, terminal, action: 'terminal-unreadable', error: read.error };
+    deps.observeRevision?.(status);
     const shared = { ...deps, workflowId: deps.workflowId, phase, terminal, dispatch: signalValue.dispatch, read, status };
     const shellPrompt = shellPromptResult(shared);
     if (shellPrompt) return shellPrompt;

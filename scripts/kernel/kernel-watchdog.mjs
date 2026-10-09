@@ -380,14 +380,15 @@ async function watchdogTick() {
   return statusTick();
 }
 
-// The notice the tick reads (a change the runtime settles by itself needs no wake: current), and the records written after it, only once the host answered.
+// The notice the tick reads: a change the runtime settles by itself needs no wake.
 const revisionNoticeOf = (status) => {
   const probe = withKernelLedger((ledger) => runtimePass(kernelSeat({ ledger, workflowId, root: revRootOf() }), { repair: false }));
   if (!probe) return status.value.revisionNotice;
   return ['not-concerned', 'acked'].includes(probe.notice.state) ? { ...probe.notice, state: 'current' } : probe.notice;
 };
-const settleRevisionAfter = (result, status) => {
-  if (!repair || result.action === 'host-unavailable') return;
+// A revision record describes a seat observed through a responding host.
+const observeRevision = (status) => {
+  if (!repair) return;
   const settled = withKernelLedger((ledger) => runtimePass(kernelSeat({ ledger, workflowId, root: revRootOf() }), { repair, adopt: true }));
   if (settled) status.value.revisionNotice = settled.notice;
 };
@@ -405,11 +406,9 @@ async function statusTick() {
   // Q14 / MB-08: only a running workflow's Kernel is repaired, woken or relaunched. A paused, stopped (or not yet
   // started) workflow is left alone - nothing but the owner's starci kernel lifecycle --resume brings it back.
   if (phase !== 'running') return { ok: true, workflowId, phase, action: 'not-running' };
-  // The seat's revision notice is read first and written only after the host answered: an Orca that is not answering is waited out, and a ledger record about a seat the tick could not observe
-  // (a settled change, a baseline) waits for the tick that can. A change the runtime settles by itself needs no wake, so the tick sees it as current.
+  // The tick reads the notice before probing the host; observing the seat settles it before any wake.
   status.value.revisionNotice = revisionNoticeOf(status);
   const result = kernelTick(status, phase);
-  settleRevisionAfter(result, status);
   // Creation supplies the title, but a moved/restored tab can lose it. The sidebar reads
   // visualLayouts' tab title, not terminal-list's agent-controlled pane title.
   const titleTerminal = result.replacementTerminal ?? result.terminal;
@@ -441,7 +440,7 @@ const startPreflight = () => {
 };
 const startHold = () => withKernelLedger((ledger) => startHoldOf(startFailureRun(ledger.db, workflowId), { now: Date.now(), budget: startHoldBudget(), rev: runtimeRevNow() })) ?? startPreflight();
 const kernelRotation = createKernelRotation({ workflowId, openLedger: withKernelLedger, close: closeKernelTerminal, replace: replaceKernel, sender: launchableSender, hold: startHold });
-const kernelTick = createKernelTick({ api, kernelRotation, workflowId, repair, lostSeatWorker, exitedTwice, stopAndRelease, replaceKernel,
+const kernelTick = createKernelTick({ api, kernelRotation, observeRevision, workflowId, repair, lostSeatWorker, exitedTwice, stopAndRelease, replaceKernel,
   repeatedWake, menuOf, workerShow, DEAD_WORKER_STATE, settledKernelVerdict, DEAD_VERDICTS, terminalRead, classifyKernelScreen, outputAgeOf,
   staleAwareState, ACTIVE_STALE_MS, exitedAgentPromptRow, DEATH_SETTLE_MS, sleepSync, kernelWakeFailures,
   wakeFailuresProveDead, replaceWakeDeadKernel, sendEnterWithProof, recordKernelWakeFailed, deliveryFieldsOf,

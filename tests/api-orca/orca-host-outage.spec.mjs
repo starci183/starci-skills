@@ -368,15 +368,25 @@ test('watchdog: a lost seat whose kernel worker exited to a bare shell is fenced
   assert.deepEqual([rows.signal.terminal,rows.job.status],[result.terminal,'running']);
 });
 
-// The revision baseline is a ledger record about a seat the tick observed: an outage tick writes none, the first tick the host answers does.
-test('watchdog: the revision baseline is adopted only once the host answered and the seat was observed',t=>{
-  const f=fixture(t);
-  const noticed=()=>f.ledgerRows().kinds.filter(kind=>kind==='runtime-rev-noticed').length;
-  const before=noticed();
-  const down=tick(f,{STARCI_FAKE_ORCA_HOST:'runtime_unavailable'});
-  assert.equal(down.result.action,'host-unavailable',JSON.stringify(down.result));
-  assert.equal(noticed(),before,'an outage tick writes no revision record');
-  const up=tick(f);
-  assert.notEqual(up.result.action,'host-unavailable',JSON.stringify(up.result));
-  assert.ok(noticed()>=before,'the answered tick may write it');
-});
+// The baseline belongs to an observed seat, whichever order host availability takes.
+for(const order of [['down','up','down','up'],['up','down','up']]){
+  test(`watchdog: revision baseline adoption for host order ${order.join(', ')}`,t=>{
+    const f=fixture(t);
+    const noticed=()=>f.ledgerRows().kinds.filter(kind=>kind==='runtime-rev-noticed').length;
+    const initial=noticed();
+    let adopted=false;
+    for(const availability of order){
+      const before=f.ledgerRows();
+      const answer=tick(f,availability==='down'?{STARCI_FAKE_ORCA_HOST:'runtime_unavailable'}:{});
+      assert.equal(answer.status,0,answer.stderr||JSON.stringify(answer.result));
+      if(availability==='down'){
+        assert.equal(answer.result.action,'host-unavailable',JSON.stringify(answer.result));
+        assert.deepEqual(f.ledgerRows(),before,'an outage pass only waits, before and after adoption');
+      }else{
+        assert.notEqual(answer.result.action,'host-unavailable',JSON.stringify(answer.result));
+        adopted=true;
+      }
+      assert.equal(noticed(),initial+Number(adopted),'exactly one baseline after the first observation');
+    }
+  });
+}

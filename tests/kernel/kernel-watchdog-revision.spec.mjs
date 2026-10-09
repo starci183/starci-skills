@@ -8,8 +8,8 @@ import { wakePromptOf } from '../../scripts/kernel/kernel-watchdog.mjs';
 const WF = 'wf-tick';
 const notice = (state, extra = {}) => ({ role: 'kernel', state, from: 'a'.repeat(40), to: 'b'.repeat(40), action: 'reread', count: 1, files: ['modules/kernel/driver-loop.yaml'], replaceFiles: [], ...extra });
 
-function tickWith({ frontier = { actionable: false, reason: 'nothing waits' }, revisionNotice = null, rotationDue = false } = {}) {
-  const log = { sent: [], revisionWoken: [], rotated: [] };
+function tickWith({ frontier = { actionable: false, reason: 'nothing waits' }, revisionNotice = null, rotationDue = false, overrides = {} } = {}) {
+  const log = { sent: [], revisionWoken: [], rotated: [], observed: [] };
   const deps = {
     workflowId: WF, repair: true,
     api: () => ({ ok: true, value: { ok: true, signals: [{ scope: 'kernel', key: WF, value: { terminal: 'T1', dispatch: 'D1' } }] } }),
@@ -22,10 +22,26 @@ function tickWith({ frontier = { actionable: false, reason: 'nothing waits' }, r
     sendWakeWithProof: (args) => { log.sent.push(args.text); return { ok: true, delivery: 'typed' }; }, wakePromptOf: (wf, value) => `wake ${value.revisionNotice?.state ?? 'none'}`,
     recordKernelWoken: () => {}, recordKernelWakeFailed: () => {}, wakeSendRefused: () => false, wakeActionOf: (proof) => (proof.ok ? 'woken' : 'wake-failed'),
     deliveryFieldsOf: () => ({}), finalKernelAction: () => 'observed', jsonFromStdout: (v) => v, recordRevisionWoken: (n) => log.revisionWoken.push(n.to),
+    observeRevision: (status) => log.observed.push(status.value), ...overrides,
   };
   const status = { value: { frontier, revisionNotice, kernel: { attempt: 1 } } };
   return { result: createKernelTick(deps)(status, 'running'), log };
 }
+
+test('revision records wait for a responding host and a readable seat', () => {
+  const missingObservation = [
+    { api: () => ({ ok: false }) },
+    { workerShow: () => ({ hostUnavailable: true }) },
+    { settledKernelVerdict: () => ({ verdict: 'host-unavailable' }) },
+    { settledKernelVerdict: () => ({ verdict: 'unverified' }) },
+    { terminalRead: () => ({ ok: false, error: 'unreadable' }) },
+  ];
+  for (const overrides of missingObservation) {
+    assert.deepEqual(tickWith({ overrides }).log.observed, [], 'an unobserved seat writes no revision record');
+  }
+  const { log } = tickWith();
+  assert.equal(log.observed.length, 1, 'the readable seat is observed even when the menu is empty');
+});
 
 test('a concerned Kernel with an empty menu is woken once, with the notice in the wake', () => {
   const { result, log } = tickWith({ revisionNotice: notice('owed') });

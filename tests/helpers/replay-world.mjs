@@ -16,7 +16,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { createRequire } from 'node:module';
 import { HOST_RESOURCES_ENV } from '../../scripts/machine/host-resources.mjs';
+import { TEMP_ROOT_ENV, tempChildEnv } from '../../engine/temp-root.mjs';
 import { FAKE_ORCA } from './fake-orca.mjs';
 import { ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { TEST_REGISTRY_ENV, openMachine } from '../../engine/db/machine.mjs';
@@ -39,10 +41,12 @@ const HOST_TRAP = path.join(ROOT, 'tests', 'helpers', 'replay-host-trap.mjs');
 const CHILD_TRAP = path.join(ROOT, 'tests', 'helpers', 'replay-child-trap.mjs');
 export const STARCI = path.join(ROOT, 'packages', 'cli', 'bin', 'starci.mjs');
 export const DRIVER = path.join(ROOT, 'tests', 'helpers', 'replay-driver.mjs');
+// Installed browser binaries remain available when the replay host's home is isolated.
+const BROWSER_CACHE = createRequire(import.meta.url)('playwright-core/lib/coreBundle').registry.registryDirectory;
 /** The seams this harness stubs, named so a spec (and its reader) can state them. */
 /** The scratch directories the runtime leaves in the temp root of a replayed child (the temp-leak check of the spec preloads names them). */
 const SCRATCH_DIRS = ['starci-kernel-scratch', 'starci-job-scratch', 'starci-settler'];
-export const STUBBED = Object.freeze(['orca binary (terminal and agent launch)', 'critic agent launch (engine driver only)', 'housekeeping run of the GC controller (engine driver only)']);
+export const STUBBED = Object.freeze(['orca binary (terminal and agent launch)', 'critic agent launch (engine driver only)']);
 
 const IDENTITY = { GIT_AUTHOR_NAME: 'replay', GIT_AUTHOR_EMAIL: 'replay@example.test', GIT_COMMITTER_NAME: 'replay', GIT_COMMITTER_EMAIL: 'replay@example.test' };
 const rm = (dir) => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 });
@@ -202,15 +206,22 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
   fs.writeFileSync(stub, FAKE_ORCA);
   fs.mkdirSync(path.join(base, 'memo'), { recursive: true });
   const machineFile = path.join(base, 'machine.sqlite');
-  const env = { ...process.env, [TEST_REGISTRY_ENV]: machineFile, STARCI_LOCAL_ROOT: path.join(base, 'local'), STARCI_PROJECTS_ROOT: path.join(base, 'projects'),
+  const profile = path.join(base, 'profile'), appData = path.join(profile, 'data');
+  // The host's disposable files live beside its repositories, so housekeeping never classifies a live source as temp.
+  const env = tempChildEnv({ ...process.env, [TEMP_ROOT_ENV]: path.join(base, 'tmp'), [TEST_REGISTRY_ENV]: machineFile, STARCI_LOCAL_ROOT: path.join(base, 'local'), STARCI_PROJECTS_ROOT: path.join(base, 'projects'),
+    HOME: profile, USERPROFILE: profile, APPDATA: appData, LOCALAPPDATA: appData, XDG_CONFIG_HOME: appData,
+    PLAYWRIGHT_BROWSERS_PATH: BROWSER_CACHE,
+    STARCI_OWNER_ROOT: path.join(base, 'owner'), STARCI_ARCHIVE_ROOT: path.join(base, 'archive'), STARCI_LANES_ROOT: path.join(base, 'lanes'),
+    STARCI_CLAUDE_PROJECTS_ROOT: path.join(profile, '.claude', 'projects'), STARCI_ORCA_CODEX_HOME: path.join(profile, 'orca-codex'),
     STARCI_ARTIFACT_ROOT: path.join(base, 'artifacts'), STARCI_KERNEL_REV_ROOT: runtime, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG: path.join(base, 'orca.jsonl'), STARCI_FAKE_ORCA_STATE: path.join(base, 'orca-state.json'), STARCI_GIT_MEMO_DIR: path.join(base, 'memo'),
     STARCI_AUTOPILOT: 'off', NODE_NO_WARNINGS: '1',
     // The host the runtime reads is injected, never the machine's: a roomy idle host (the dispatch throttle, the disk and RAM floors and the worker census read this sample), and a trap
     // preload in every process that logs a read of the real host (os.freemem, os.cpus, ... ) so a spec can prove none happened.
     [HOST_RESOURCES_ENV]: JSON.stringify(ROOMY_HOST), STARCI_REPLAY_HOST_READS: path.join(base, 'host-reads.jsonl'), STARCI_REPLAY_CHILDREN: path.join(base, 'children.jsonl'),
-    NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${pathToFileURL(HOST_TRAP).href} --import=${pathToFileURL(CHILD_TRAP).href}`.trim() };
-  for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB', 'STARCI_STATUS_MEMO', 'STARCI_ACTOR']) delete env[key];
+    NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${pathToFileURL(HOST_TRAP).href} --import=${pathToFileURL(CHILD_TRAP).href}`.trim() });
+  fs.mkdirSync(env[TEMP_ROOT_ENV], { recursive: true });
+  for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB', 'STARCI_STATUS_MEMO', 'STARCI_ACTOR', 'CODEX_HOME']) delete env[key];
   const saved = { ...process.env };
   Object.assign(process.env, { [TEST_REGISTRY_ENV]: env[TEST_REGISTRY_ENV], STARCI_LOCAL_ROOT: env.STARCI_LOCAL_ROOT, STARCI_PROJECTS_ROOT: env.STARCI_PROJECTS_ROOT, STARCI_KERNEL_REV_ROOT: runtime });
   t.after(() => { for (const key of ['STARCI_LOCAL_ROOT', 'STARCI_PROJECTS_ROOT', 'STARCI_KERNEL_REV_ROOT', TEST_REGISTRY_ENV]) { if (saved[key] === undefined) delete process.env[key]; else process.env[key] = saved[key]; } });

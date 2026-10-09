@@ -1748,3 +1748,17 @@ cases:
     met: {date: "2026-10-09", where: "the judge declarations of business.decide, content.generate, perf.verify, scope.finish and test.author", evidence: "each of these ops is judged by machine measures alone and none of them reads substance: the settler re-runs the record validators (shape, references, coverage of the records) and the READ digest is re-read, but no Critic, no reviewing leg and no owner gate judges whether the specified behaviour (business.decide), the generated content and its examples (content.generate), the measured numbers (perf.verify), the retention of live consumers and sole evidence copies (scope.finish) or the cases of the authored tests (test.author) are right; the op's own run is the evidence"}
     why: "Adding a Critic row, a reviewing leg or an owner gate for an op changes who can fail a leg, which is the owner's decision per leg and not part of declaring today's behaviour. The declarations name the gap in their why so the op is told its checks are shape only."
     status: open
+  - id: watchdog-revision-baseline-without-host-observation
+    family: failure-while-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "runtimePass introduced by 6d6e1f910 records runtime-rev-noticed before the watchdog observes the seat; an unavailable host must only wait", remedy: {state: in-tree, change: "the watchdog adopts and settles revisions after a successful terminal read, before any wake; an outage before or after baseline adoption writes no ledger rows"}}
+    met: {date: "2026-10-10", where: "Orca outage spec on a Git runtime root", evidence: "both availability orders assert one baseline after observation and unchanged ledger rows during outage"}
+    rule: {file: scripts/kernel/kernel-watchdog-tick.mjs, anchor: "observeRevision"}
+    spec: tests/api-orca/orca-host-outage.spec.mjs
+    status: covered
+  - id: replay-housekeeping-archives-its-own-live-ledger
+    family: concurrency
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the tree-stray replay introduced in 04475d4cd places live sources under the replay host's temp root; real housekeeping archives its ledger before the tree-strays key reads ownership", remedy: {state: in-tree, change: "the replay host owns an isolated temp root beside its repositories and isolated home paths; the driver runs real housekeeping and the spec proves the workflow ledger survives"}}
+    met: {date: "2026-10-10", where: "tree-stray replay with the housekeeping stub removed", evidence: "0 pass / 1 fail with inherited temp roots; 1 pass / 0 fail with separate host roots"}
+    rule: {file: tests/helpers/replay-world.mjs, anchor: "tempChildEnv"}
+    spec: tests/replay/tree-stray.spec.mjs
+    status: covered

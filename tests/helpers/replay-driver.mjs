@@ -26,13 +26,7 @@ async function settleInProcess(args, env) {
 // ack of a READ, its own push). A replay world is deterministic by construction, so the verb is the same and only the process model that lets a pass end before the push does is not reproduced;
 // spec.detachedPush keeps the live shape for a spec that tests detachment (the world then fails the pass that leaves the child alive unless the spec says it expects one).
 const foregroundPush = (args) => (spec.detachedPush !== true && args.includes('dispatch-ready') && !args.includes('--foreground') && !args.includes('--dry-run') ? [...args, '--foreground'] : args);
-// The GC controller's housekeeping key runs the real `housekeeping.mjs --apply`: on a world that lives in the temp directory it archives the world's own ledger as an orphan (its source roots are
-// under the temp directory) while the other keys of the same pass read it. Housekeeping is not what a replay judges, so it answers ok without running.
-const housekeepingStub = () => ({ ok: true, code: 0, stdout: '{}', stderr: '', value: { ok: true } });
-const spawnChild = (cmd, args, options) => {
-  if (String(args[0]).endsWith('housekeeping.mjs')) return housekeepingStub();
-  return String(args[0]).endsWith('job-settle-main.mjs') ? settleInProcess(args, options.env) : spawnJson(cmd, foregroundPush(args), options);
-};
+const spawnChild = (cmd, args, options) => (String(args[0]).endsWith('job-settle-main.mjs') ? settleInProcess(args, options.env) : spawnJson(cmd, foregroundPush(args), options));
 const NUMBERS = { pollMs: 2000, leaseMs: 30000, renewMs: 10000, heartbeatStaleMs: 60000, statusCacheMs: 1, backoff: { minMs: 1000, maxMs: 300000 }, crashLoop: { max: 3, windowMs: 1800000 } };
 const controllers = Object.fromEntries(spec.controllers.map((name) => [name, { mode: 'active' }]));
 const ledgers = [{ ledgerId: spec.ledgerId, name: path.basename(spec.repo), repo: spec.repo, file: spec.ledgerFile }];
