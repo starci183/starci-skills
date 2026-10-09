@@ -30,7 +30,7 @@ function world(ledger, markdown, { jobId = 'op-u', outcome = 'done' } = {}) {
 const missing = { status: 'missing', code: 'op-unit-proof-missing', detail: 'no unit run summary is attached', findings: [] };
 
 test('a missing proof the admitted contract never taught is classified once, for every gate; a taught one and a red one are not', (t) => withLedger(t, ({ ledger }) => {
-  world(ledger, 'machines:\n  starci-gate → starci gate run\n');
+  world(ledger, '# dispatch contract — [Op] unit.verify (job op-u)\n\nmachines:\n  starci-gate → starci gate run\n');
   const owned = ownedByRuntime(ledger.db, 'op-u', missing);
   assert.equal(owned.code, GATE_NEWER_CODE);
   assert.equal(owned.gate, 'op-unit-proof-missing', 'the proof that refused is kept');
@@ -46,12 +46,12 @@ test('a missing proof the admitted contract never taught is classified once, for
 }));
 
 test('a contract that taught the step keeps the refusal of the op', (t) => withLedger(t, ({ ledger }) => {
-  world(ledger, 'machines:\n  starci-unit-run → starci gate unit --root <app>\n');
+  world(ledger, '# dispatch contract — [Op] unit.verify (job op-u)\n\nmachines:\n  starci-unit-run → starci gate unit --root <app>\n');
   assert.equal(ownedByRuntime(ledger.db, 'op-u', missing), missing);
 }));
 
 test('the settle preflight reports the classified code for the proof phase', (t) => withLedger(t, async ({ ledger }) => {
-  const { attemptId } = world(ledger, 'machines: nothing about proofs');
+  const { attemptId } = world(ledger, '# dispatch contract — [Op] unit.verify (job op-u)\n\nmachines: nothing about proofs');
   const none = () => null;
   const settleOpProofs = () => ({ op: OP, jobId: 'op-u', attemptId, status: 'reported', proof: 'unit-kit', proofs: ['unit-kit'], judged: { ...missing } });
   const emitted = [];
@@ -65,7 +65,7 @@ test('the settle preflight reports the classified code for the proof phase', (t)
 }));
 
 test('the settler holds such a refusal bounded and opens a Supervisor item, never a Kernel handover', async (t) => withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {
-  world(ledger, 'machines: nothing about proofs');
+  world(ledger, '# dispatch contract — [Op] unit.verify (job op-u)\n\nmachines: nothing about proofs');
   ledger.close();
   const settings = { ...settlerSettings(), tail: { retryMs: 0, maxAttempts: 2 } };
   const api = () => ({ ok: false, code: GATE_NEWER_CODE, error: 'the gate is newer' });
@@ -100,4 +100,10 @@ test('a runtime Critic run is on the status with who, model, time, tokens and ve
   const answer = answerQuestions(groups, {}, { now: Date.now(), workflows: [{ events }] }, digestNumbers()).flatMap((g) => g.questions)[0];
   assert.equal(answer.state, 'ok');
   assert.match(answer.evidence, /runtime runs: op-u codex\/gpt-x 91000ms tokens unmeasured pass \(try 1\)/);
+}));
+
+test('a contract that is no dispatch prompt cannot say what the op was taught: a missing proof keeps its own code', (t) => withLedger(t, ({ ledger }) => {
+  world(ledger, 'm');
+  assert.equal(admissionTaught(ledger.db, 'op-u', 'op-unit-proof-missing'), true);
+  assert.equal(ownedByRuntime(ledger.db, 'op-u', missing), missing);
 }));

@@ -27,12 +27,16 @@ const TAUGHT_BY = Object.freeze({
   'op-review-defects-missing': 'review-defects',
 });
 
-/** Whether the contract the job was admitted under taught the step that produces the proof `code` names; true when the code names a proof no step teaches. */
+// The contract an admission files starts with this line (buildContractMarkdown in scripts/kernel/cli.mjs) and carries the op prompt; a contract of another shape
+// (a fixture, a record that is not a dispatch) cannot say what the op was taught, so it never makes a proof "newer than the admission".
+const DISPATCH_CONTRACT = '# dispatch contract';
+
+/** Whether the contract the job was admitted under taught the step that produces the proof `code` names; true when the code names a proof no step teaches or the contract is no dispatch prompt. */
 export function admissionTaught(db, jobId, code) {
   const token = TAUGHT_BY[code];
   if (!token) return true;
   const markdown = String(latestContractOf(db, jobId)?.markdown ?? '');
-  return markdown.includes(token);
+  return !markdown.startsWith(DISPATCH_CONTRACT) || markdown.includes(token);
 }
 
 /**
