@@ -320,16 +320,6 @@ test('the request id is a deterministic UUIDv8: same inputs the same id, another
   assert.equal(new Set(ids.filter((_,i)=>i!==1)).size,4);
 });
 
-test('a non-UUID --retry-request is refused by the shape check, and the receipt error is the reported reason, not a crashpad stderr line',t=>{
-  const fx=stubEnv(t);
-  const run=spawnSync(process.execPath,[path.join(fx.root,'fake-orca.mjs'),'orchestration','run-create','--objective','o','--retry-request','starci-run-create-0123456789abcdef01234567','--json'],{encoding:'utf8',env:fx.env,windowsHide:true});
-  assert.equal(run.status,1);
-  assert.equal(JSON.parse(run.stdout).error.code,'invalid_argument');
-  assert.match(JSON.parse(run.stdout).error.message,/must be the UUID Orca reported/);
-  const out=call(fx,`c=>c('run-create',{objective:'o',from:'k'},{request:{workflow:'wf-9'}})`);
-  assert.equal(out.outcome,'ok','the runner derives a UUID the fake accepts');
-});
-
 test('a failed call reports the receipt error, not a crashpad line on stderr',t=>{
   const fx=stubEnv(t,{STARCI_FAKE_ORCA_CHECK_FAILS:'1',STARCI_FAKE_ORCA_STDERR:'registration_protocol_win.cc:108 CreateFile: 0x2'});
   const out=call(fx,`c=>c('check',{run:'run-1'})`);

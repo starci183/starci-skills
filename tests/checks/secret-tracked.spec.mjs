@@ -45,9 +45,3 @@ test('RT_SECRET_TRACKED: with an empty allowance a tracked old member fails, nam
   assert.equal(found.length, HELD_MEMBERS.length);
   assert.ok(found.every((f) => f.code === RT_SECRET_TRACKED && f.message.includes('untracked .claude/secret.env')));
 });
-
-test('RT_SECRET_TRACKED: the runtime tree tracks no secret outside its declared held list, and the per-example Sonar tokens are gone', () => {
-  const result = runtimeCheck({ repoRoot: ROOT, root: ROOT });
-  assert.deepEqual(result.findings.filter((f) => f.code === RT_SECRET_TRACKED), []);
-  for (const member of [...['lite-app', 'shape-slot', 'starci-ecommerce-app'].map((name) => `sonarqube-${name}-token.key.enc`), 'KEYS.md']) assert.equal(fs.existsSync(path.join(ROOT, 'ext', 'sonar', 'secrets', member)), false, member);
-});

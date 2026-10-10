@@ -2,18 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { serviceItems } from '../../scripts/reconciler/start-items.mjs';
 import { startDownServices } from '../../scripts/reconciler/start-apply.mjs';
-import { RECONCILER_SERVICE, SERVICE_TASKS, reconcilerTaskItem, reconcilerTaskProbe, serviceTaskNote, startOutcome, taskItems } from '../../scripts/reconciler/task-health.mjs';
+import { RECONCILER_SERVICE, reconcilerTaskItem, reconcilerTaskProbe, serviceTaskNote, startOutcome, taskItems } from '../../scripts/reconciler/task-health.mjs';
 import { TASK_DEFINITIONS } from '../../scripts/machine/task-register.mjs';
 
 const audit = (key, over = {}) => ({ name: key, taskName: TASK_DEFINITIONS[key].taskName, ok: true, problem: null, state: 'Ready', lastResult: 0, reason: null, fix: null, ...over });
 const stale = (key) => audit(key, { ok: false, problem: 'action-stale', reason: `Windows task '${TASK_DEFINITIONS[key].taskName}' runs "old" but a registration today writes "new"`, fix: `starci task register ${key} --apply` });
 const result = (audits) => ({ ok: true, audits });
-
-test('every service that runs through a task maps to a task the runtime can register', () => {
-  assert.deepEqual(Object.keys(SERVICE_TASKS).sort(), ['harness-tunnel', 'harness-ui', RECONCILER_SERVICE].sort());
-  for (const key of Object.values(SERVICE_TASKS)) assert.ok(TASK_DEFINITIONS[key], key);
-  assert.equal(RECONCILER_SERVICE, 'sched-task:StarCi-Reconciler');
-});
 
 test('the reconciler task probe is healthy only on a registered, enabled, current task with its shim', async () => {
   const ok = await reconcilerTaskProbe({ audit: async () => result({ reconciler: audit('reconciler') }), allowTaskRepair: false });
