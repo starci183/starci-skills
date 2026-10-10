@@ -11,6 +11,7 @@ import { parseJson } from '../lib/json.mjs';
 import { parseRuntimeStamp, psCoverage } from '../lib/orca-orphans.mjs';
 import { worktreePs } from '../api/orca/worktree-ps.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
+import { terminalInventoryOf } from '../lib/orca-terminal.mjs';
 import { workerListAll } from './worker-list-all.mjs';
 import { hostLockOwner } from './host-lock.mjs';
 import { mainRootOf } from './worktree-git.mjs';
@@ -133,13 +134,14 @@ export function purgeFactsOf({ repo, workflowId, guardsDir, env = process.env, d
   try { ps = orca.ps(); } catch (error) { ps = { ok: false, worktrees: [], error: String(error?.message ?? error) }; }
   let terminals;
   try { terminals = orca.terminals(); } catch (error) { terminals = { ok: false, terminals: [], error: String(error?.message ?? error) }; }
+  const terminalInventory = terminalInventoryOf(terminals);
   const trees = treesOf({ rows: machine.rows, orcaPs: ps, workflowId });
   const evidence = withLaunchFailures(ledger.evidence ?? { handles: [], runIds: [], dispatchIds: [], preservedRefs: [] }, machine.launchFailures);
   const jobIds = (ledger.jobs ?? []).map((job) => job.jobId);
   const rowBranches = machine.rows.filter((row) => row.kind === 'workflow' && row.branch).map((row) => row.branch);
   const refs = reposOf(trees, machine.rows).flatMap((repoRoot) => workflowRefsOf({ repoRoot, workflowId, rowBranches, jobIds, preservedRefs: evidence.preservedRefs, trees: trees.map((tree) => tree.path) }));
   const owner = (deps.lockOwner ?? hostLockOwner)({ env });
-  return { ledger, machine, trees, refs, evidence, workers: workersOf(evidence.runIds, orca), terminals: terminals.ok ? terminals.terminals : [],
-    orca: { readable: ps.ok === true && terminals.ok === true, complete: psCoverage(ps).complete, error: ps.ok ? terminals.error ?? null : ps.error ?? null },
+  return { ledger, machine, trees, refs, evidence, workers: workersOf(evidence.runIds, orca), terminals: terminalInventory ?? [],
+    orca: { readable: ps.ok === true && terminalInventory !== null, terminalInventory, complete: psCoverage(ps).complete, error: ps.ok ? terminals.error ?? null : ps.error ?? null },
     guards: guardFilesOf(workflowId, guardsDir), prompts: promptFilesOf(workflowId, env), hostLock: owner && !owner.stale ? { role: owner.role, purpose: owner.purpose, pid: owner.pid } : null };
 }

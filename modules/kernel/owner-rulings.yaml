@@ -157,3 +157,14 @@ rulings:
       Consequences are only unused imports and pure declarations inside the same edited specs and one registry reproducer field pointing to the retained read-attestation replay; production exports, classifier, runtime coverage policy and example coverage are unchanged.
       There is no approval of unrelated or historical findings and no waiver of a red check. The former shutdown deadline is cancelled.
     enforcedBy: [scripts/lib/gate-loosening.mjs, scripts/checks/check-gate-loosening.mjs, scripts/supervisor/land-gate-loosening.mjs]
+  - id: purge-deleted-terminal-idempotent
+    date: '2026-10-11'
+    ruling: >-
+      The owner reports that he deleted all Orca terminals and directs, translated from Vietnamese:
+      pruning checks whether the Orca terminal still exists and closes the existing terminals; a terminal that is absent is already deleted, not a cleanup error.
+      Workflow purge acknowledges exact handle absence only from a successful available unscoped terminal inventory, including persisted retry targets.
+      The acknowledgement remains in the public plan and its digest and issues no close or release for the absent target.
+      It proves terminal absence, not physical process exit, and releases no provider capacity by that acknowledgement.
+      Unknown process observations are advisory for deleted terminals; a positively observed process carrying the exact handle still holds destructive cleanup.
+      Existing owned terminals are closed and then verified; failed terminal reads stay unknown, and foreign Dispatch records remain untouched.
+    enforcedBy: [scripts/api/orca/terminal-list.mjs, scripts/machine/workflow-purge-orca.mjs, scripts/machine/workflow-purge-plan.mjs, scripts/machine/workflow-purge-apply.mjs]

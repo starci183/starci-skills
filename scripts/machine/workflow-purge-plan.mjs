@@ -4,7 +4,8 @@
 import path from 'node:path';
 import { canonicalJSON } from '../../engine/canonical-json.mjs';
 import { sha256 } from '../../engine/digest.mjs';
-import { classifyTerminals, classifyWorkers, listStrangerWorkers } from './workflow-purge-orca.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
+import { classifyTerminals, classifyWorkers, listStrangerWorkers, purgeTerminalAbsent } from './workflow-purge-orca.mjs';
 
 const PURGE_PLAN_SCHEMA = 'starci/workflow-purge-plan@1';
 const LIVE_SEATS = new Set(['booting', 'live', 'busy', 'replacing']);
@@ -54,7 +55,9 @@ function counts(plan) {
     workers: plan.workers.length, terminals: plan.terminals.length, listed: plan.listed.length, guards: plan.guards.length, prompts: plan.prompts.length, decisions: plan.decisions.length };
 }
 
-// A successful release can disappear from fresh facts before its process proof succeeds. The stored exact targets remain obligations on retry.
+const terminalAction = (handle, plan) => plan.absentTerminals?.includes(handle) ? { action: 'already-deleted', proof: 'terminal-absent' } : {};
+
+/** Preserve the stored exact targets on retry, including fresh terminal-absence acknowledgements. */
 export function purgeClosureTargets(stored, plan) {
   const held = stored.closures;
   if (!held && (![stored.counts?.workers, stored.counts?.terminals].every(count => Number.isSafeInteger(count) && count === 0))) return { error: 'the unfinished purge has no stored closure identities' };
@@ -63,11 +66,13 @@ export function purgeClosureTargets(stored, plan) {
   for (const worker of [...(held?.workers ?? []), ...plan.workers]) {
     if (typeof worker?.dispatchId !== 'string' || !worker.dispatchId || (worker.terminal != null && typeof worker.terminal !== 'string')) return { error: 'a stored worker closure identity is unreadable' };
     if (workers.has(worker.dispatchId) && workers.get(worker.dispatchId).terminal !== worker.terminal) return { error: 'a worker terminal changed since the unfinished purge' };
-    workers.set(worker.dispatchId, { dispatchId: worker.dispatchId, terminal: worker.terminal });
+    workers.set(worker.dispatchId, { dispatchId: worker.dispatchId, terminal: worker.terminal,
+      ...terminalAction(worker.terminal, plan) });
   }
   for (const terminal of [...(held?.terminals ?? []), ...plan.terminals]) {
     if (typeof terminal?.handle !== 'string' || !terminal.handle) return { error: 'a stored terminal closure identity is unreadable' };
-    terminals.set(terminal.handle, { handle: terminal.handle });
+    terminals.set(terminal.handle, { handle: terminal.handle,
+      ...terminalAction(terminal.handle, plan) });
   }
   return { workers: [...workers.values()], terminals: [...terminals.values()] };
 }
@@ -83,20 +88,25 @@ export function purgeResumeScope(stored, plan) {
  * `ok` is true when blockers is empty. `already`: the journal holds the purge and nothing of it remains. facts: purgeFactsOf; ledgerMode: --ledger.
  */
 export function buildPurgePlan({ facts, workflowId, repo, ledgerMode = false, archiveBlockers = [] }) {
-  const workers = classifyWorkers(facts.workers.rows);
+  const inventory = facts.orca.terminalInventory ?? null;
+  const workers = classifyWorkers(facts.workers.rows, inventory);
   const treePaths = facts.trees.map((tree) => tree.path);
   const terminals = classifyTerminals({ terminals: facts.terminals, evidence: facts.evidence, treePaths, workerClose: workers.close });
-  const listed = [...terminals.listed, ...listStrangerWorkers({ rows: facts.workers.others ?? [], treePaths, terminals: facts.terminals })];
+  const listed = [...terminals.listed, ...listStrangerWorkers({ rows: facts.workers.others ?? [], treePaths, terminals: facts.terminals, terminalInventory: inventory })];
   // A workflow whose ledger rows are gone after a journalled purge is purged, not unknown.
   const gone = !facts.ledger.found && facts.machine.purgedAt != null;
   const blockers = [...(gone ? [] : ledgerBlockers(facts, workflowId)), ...(facts.ledger.found || facts.trees.length ? hostBlockers(facts, workers.live, listed) : []), ...archiveBlockers];
   const plan = { schema: PURGE_PLAN_SCHEMA, workflowId, repo: path.resolve(repo), blockers, trees: facts.trees.map((tree) => treeItem(tree)),
     refs: facts.refs.map((ref) => ({ repoRoot: ref.repoRoot, name: ref.name, kind: ref.kind, tip: ref.tip, proof: ref.proof, action: ref.action, why: ref.why })),
-    workers: workers.close.map((worker) => ({ dispatchId: worker.dispatchId, runId: worker.runId, terminal: worker.terminal, state: worker.state, liveness: worker.liveness })),
+    workers: workers.close.map((worker) => ({ dispatchId: worker.dispatchId, runId: worker.runId, terminal: worker.terminal, state: worker.state, liveness: worker.liveness,
+      ...(worker.action ? { action: worker.action, proof: worker.proof } : {}) })),
     terminals: terminals.close.map((terminal) => ({ handle: terminal.handle, cwd: terminal.cwd, title: terminal.title })),
     listed,
     guards: facts.guards.map((file) => path.resolve(file)), prompts: facts.prompts.map((file) => path.resolve(file)),
     decisions: facts.machine.decisions.map((di) => di.diId), ledger: ledgerPart(facts, ledgerMode) };
+  const handles = [...facts.evidence.handles, ...workers.close.map(worker => worker.terminal), ...listed.map(item => item.terminal),
+    ...(facts.machine.inProgress?.closures?.workers ?? []).map(worker => worker.terminal), ...(facts.machine.inProgress?.closures?.terminals ?? []).map(terminal => terminal.handle)];
+  plan.absentTerminals = [...new Set(handles.filter(handle => purgeTerminalAbsent(handle, inventory)))].sort(byCodeUnit);
   plan.resume = purgeResumeScope(facts.machine.inProgress, plan);
   if (plan.resume?.closures.error) blockers.push({ code: 'workflow-purge-custody-unknown', detail: plan.resume.closures.error });
   const nothingLeft = !plan.trees.length && !plan.workers.length && !plan.terminals.length && !plan.refs.some((ref) => ref.action === 'delete');

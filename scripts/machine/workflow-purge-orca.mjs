@@ -11,6 +11,10 @@ const HELD_STATES = new Set(['active', 'reclaimable', 'retained', 'release_pendi
 
 const workerRow = (plan) => ({ dispatchId: plan.dispatchId, runId: plan.runId, terminal: plan.terminalHandle, state: plan.terminalState, liveness: plan.liveness, reason: plan.reason });
 
+/** Exact handle absence in an admitted unscoped inventory; this acknowledges terminal deletion, not physical process exit. */
+export const purgeTerminalAbsent = (handle, inventory) => typeof handle === 'string' && Boolean(handle)
+  && Array.isArray(inventory) && !inventory.some(row => row.handle === handle);
+
 // Context-only Dispatches have a retained projection but no supervised resource. Only Orca's explicit absence
 // qualifies: an omitted resource, a workspace or conflicting lifecycle fields keeps custody unknown.
 const resourceAbsent = (row) => row?.workerState === 'unsupervised' && row?.terminalState === 'retained'
@@ -25,13 +29,17 @@ const resourceAbsent = (row) => row?.workerState === 'unsupervised' && row?.term
  * The workers of the workflow's Runs: {close: [worker], live: [worker]}. A worker Orca holds (any held state) is closed, except one that is
  * still active and not exited: that one is live, and a purge refuses while it exists.
  */
-export function classifyWorkers(rows) {
+export function classifyWorkers(rows, terminalInventory = null) {
   const plans = releasePlan(rows);
   const close = [], live = [];
   rows.forEach((row, index) => {
     const plan = plans[index];
     if (plan.terminalState === 'released' || resourceAbsent(row)) return;
     const worker = workerRow(plan);
+    if (purgeTerminalAbsent(worker.terminal, terminalInventory)) {
+      close.push({ ...worker, action: 'already-deleted', proof: 'terminal-absent' });
+      return;
+    }
     if (!HELD_STATES.has(plan.terminalState) || !plan.liveness || (plan.terminalState === 'active' && plan.liveness !== 'exited')) live.push(worker);
     else close.push(worker);
   });
@@ -68,12 +76,14 @@ export function classifyTerminals({ terminals, evidence, treePaths, workerClose 
 
 
 /** The workers of other Runs that Orca holds inside a tree of the workflow: listed, never touched (no ledger row ties their Run to it). [{kind, id, why}] */
-export function listStrangerWorkers({ rows, treePaths, terminals = [] }) {
+export function listStrangerWorkers({ rows, treePaths, terminals = [], terminalInventory = null }) {
   const held = rows.filter((row) => row?.terminalState !== 'released' && !resourceAbsent(row));
   return held.filter((row) => {
     const terminal = terminals.find((item) => item.handle === terminalHandleOf(row));
     const where = worktreePathOf(row) ?? cwdOf(terminal ?? {});
     if (!where) return treePaths.length > 0 && row?.projection?.liveness?.verdict !== 'exited';
     return Boolean(where) && treePaths.some((tree) => sameTree(where, tree) || insideTree(where, tree));
-  }).map((row) => ({ kind: 'worker', id: row.dispatchId, holdsTree: true, why: untiedWhy('Orca has not proved it outside the workflow trees, and its Run ' + row.runId + ' is not one the ledger names (terminal ' + (terminalHandleOf(row) ?? 'none') + ')') }));
+  }).map((row) => purgeTerminalAbsent(terminalHandleOf(row), terminalInventory)
+    ? { kind: 'worker', id: row.dispatchId, terminal: terminalHandleOf(row), holdsTree: false, proof: 'terminal-absent', why: 'the exact terminal was already deleted; this foreign Dispatch record is left untouched' }
+    : { kind: 'worker', id: row.dispatchId, holdsTree: true, why: untiedWhy('Orca has not proved it outside the workflow trees, and its Run ' + row.runId + ' is not one the ledger names (terminal ' + (terminalHandleOf(row) ?? 'none') + ')') });
 }

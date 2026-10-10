@@ -42,7 +42,8 @@ const call=(fx,body)=>{
   const script=path.join(fx.root,`case-${Math.random().toString(36).slice(2)}.mjs`);
   fs.writeFileSync(script,`import {orcaCall} from ${JSON.stringify(pathToFileURL(path.join(ROOT,'scripts','api','orca','lib.mjs')).href)};\n`+
     `import {requestShow} from ${JSON.stringify(pathToFileURL(path.join(ROOT,'scripts','api','orca','request-show.mjs')).href)};\n`+
-    `console.log(JSON.stringify((${body})(orcaCall,requestShow)));\n`);
+    `import {terminalList} from ${JSON.stringify(pathToFileURL(path.join(ROOT,'scripts','api','orca','terminal-list.mjs')).href)};\n`+
+    `console.log(JSON.stringify((${body})(orcaCall,requestShow,terminalList)));\n`);
   const r=spawnSync(process.execPath,[script],{encoding:'utf8',env:fx.env,timeout:60000,maxBuffer:CASE_MAX_BUFFER,windowsHide:true});
   const diagnostic=caseDiagnostic(r);
   assert.equal(r.error,undefined,diagnostic);
@@ -53,6 +54,20 @@ const call=(fx,body)=>{
 const logged=fx=>fs.existsSync(fx.log)
   ?fs.readFileSync(fx.log,'utf8').trim().split(/\r?\n/).filter(Boolean).map(l=>JSON.parse(l).argv)
   :[];
+
+test('terminal-list adapter admits only a successful native inventory with complete unique handles',t=>{
+  const answers=[{ok:true,result:{terminals:[]}},{ok:true,result:{terminals:[{handle:'present',connected:true}]}},{ok:false,result:{terminals:[]}},
+    {ok:true,result:{}},{ok:true,result:{terminals:[{}]}},
+    {ok:true,result:{terminals:[{handle:'duplicate'},{handle:'duplicate'}]}}];
+  for(const [index,answer] of answers.entries()) {
+    const fx=stubEnv(t);
+    fs.writeFileSync(path.join(fx.root,'fake-orca.mjs'),`console.log(${JSON.stringify(JSON.stringify(answer))});\n`);
+    const out=call(fx,`(c,show,list)=>list()`);
+    assert.equal(out.ok,index<2,JSON.stringify(answer));
+    assert.deepEqual(out.terminals,index<2?answer.result.terminals:[]);
+    if(index>=2)assert.ok(out.error,'a failed inventory must remain visibly unreadable');
+  }
+});
 
 test('argv is assembled from calls.yaml — declared flags only, in contract order',t=>{
   const fx=stubEnv(t);

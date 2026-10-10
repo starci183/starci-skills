@@ -35,7 +35,7 @@
 import { fileURLToPath } from 'node:url';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalWait } from '../api/orca/terminal-wait.mjs';
-import { TERMINAL_GONE_CODES } from '../lib/orca-terminal.mjs';
+import { TERMINAL_GONE_CODES, terminalInventoryOf } from '../lib/orca-terminal.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
@@ -54,12 +54,16 @@ const AGENT_NODE_CLI = /(?:@openai[\\/]codex|@anthropic-ai[\\/]claude-code|[\\/]
 export const isAgentProcess = (p) => !RUNTIME_SCRIPT.test(String(p?.cmd ?? ''))
   && (AGENT_IMAGE.test(String(p?.name ?? '')) || (/^node(?:\.exe)?$/i.test(String(p?.name ?? '')) && AGENT_NODE_CLI.test(String(p?.cmd ?? ''))));
 
-/** What terminal show proves about `handle`: 'gone' | 'disconnected' | 'connected' | 'unknown' (Orca silent). */
-export function terminalState(handle, { show = terminalShow } = {}) {
+/** Exact health or successful unscoped inventory absence: 'gone' | 'disconnected' | 'connected' | 'unknown'. */
+export function terminalState(handle, { show = terminalShow, list = terminalList } = {}) {
   let shown;
-  try { shown = show({ terminal: handle }); } catch { return 'unknown'; }
+  try { shown = show({ terminal: handle }); } catch { shown = null; }
   if (shown?.ok && shown.terminal) return shown.connected === true ? 'connected' : 'disconnected';
   if (TERMINAL_GONE_CODES.has(shown?.errorCode) && !shown.hostUnavailable) return 'gone';
+  try {
+    const inventory = terminalInventoryOf(list());
+    if (inventory && !inventory.some(row => row.handle === handle)) return 'gone';
+  } catch { /* a failed inventory proves nothing */ }
   return 'unknown';
 }
 
@@ -85,12 +89,12 @@ function closeOnce(handle, { list = terminalList, close = terminalClose, byPane 
 
 // Orca proves the exit (terminal wait --for exit: an exited or closed handle answers at once); only an answer it cannot give
 // (host down, the verb refused) falls back to polling terminal show. The closing result, or null while the handle stays connected.
-function verifyExit(handle, out, { show, sleep, verifyMs, intervalMs, wait }) {
+function verifyExit(handle, out, { show, list, sleep, verifyMs, intervalMs, wait }) {
   let proven = null;
   try { proven = wait({ terminal: handle, for: 'exit', timeoutMs: verifyMs }); } catch { proven = null; }
   const viaWait = proven?.ok === true && !proven.hostUnavailable;
   const stateNow = () => {
-    if (!viaWait) return terminalState(handle, { show });
+    if (!viaWait) return terminalState(handle, { show, list });
     return proven.satisfied ? 'disconnected' : 'connected';
   };
   for (let waited = 0; waited <= (viaWait ? 0 : verifyMs); waited += intervalMs) {
@@ -111,7 +115,7 @@ function verifyExit(handle, out, { show, sleep, verifyMs, intervalMs, wait }) {
 export function closeAndVerify(handle, { show = terminalShow, close = terminalClose, list = terminalList, sleep = sleepSync,
   verifyMs = VERIFY_MS, intervalMs = VERIFY_INTERVAL_MS, wait = terminalWait } = {}) {
   if (!handle) return null;
-  const before = terminalState(handle, { show });
+  const before = terminalState(handle, { show, list });
   if (before === 'gone') return { handle, ok: true, proof: 'gone', attempts: 0, before };
   if (before === 'unknown') return { handle, ok: false, proof: null, attempts: 0, reason: 'host-unavailable' };
   const out = { handle, ok: false, proof: null, attempts: 0, before };
@@ -120,7 +124,7 @@ export function closeAndVerify(handle, { show = terminalShow, close = terminalCl
     out.attempts += 1;
     if (r.tab) out.tab = r.tab;
     if (r.error) out.error = r.error;
-    const verdict = verifyExit(handle, out, { show, sleep, verifyMs, intervalMs, wait });
+    const verdict = verifyExit(handle, out, { show, list, sleep, verifyMs, intervalMs, wait });
     if (verdict) return verdict;
   }
   return { ...out, reason: 'still-connected' };

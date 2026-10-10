@@ -24,3 +24,14 @@ export const draftText = (terminal) => (typeof terminal?.draft === 'string' && t
 // host: the terminal is gone, not merely unreadable. Only codes observed from
 // a live Orca belong here (terminal_handle_stale, 2026-09-23).
 export const TERMINAL_GONE_CODES = new Set(['terminal_handle_stale']);
+
+/** A successful available host inventory, or null; missing, malformed and duplicate handles never prove absence. */
+export function terminalInventoryOf(answer) {
+  if (answer?.ok !== true || answer.hostUnavailable === true || !Array.isArray(answer.terminals)) return null;
+  const seen = new Set();
+  for (const row of answer.terminals) {
+    if (typeof row?.handle !== 'string' || !row.handle.trim() || seen.has(row.handle)) return null;
+    seen.add(row.handle);
+  }
+  return answer.terminals;
+}

@@ -23,7 +23,7 @@ const eventsOf = (machine) => machine.db.prepare("SELECT payload_json FROM sup_e
 function run(world, args, extra = {}) {
   const { closed } = world;
   const deps = {
-    orca: world.reads, orcaTree: world.orca, lockOwner: () => null,
+    orca: world.reads, orcaTree: world.orca, lockOwner: () => null, terminalProcesses: () => [],
     closeTerminal: (handle) => { closed.terminals.push(handle); world.terminals = world.terminals.filter((t) => t.handle !== handle); return { ok: true, proof: 'gone' }; },
     closeWorker: ({ dispatch, handle }) => { closed.workers.push(dispatch); world.workers = world.workers.filter((w) => w.dispatchId !== dispatch); world.terminals = world.terminals.filter((t) => t.handle !== handle); return { ok: true, handle, closed: { ok: true, proof: 'gone' }, processes: { verdict: 'none' } }; },
     ...extra,
@@ -35,9 +35,9 @@ function run(world, args, extra = {}) {
 function leftovers(world, { unknownInTree = false } = {}) {
   const tree = world.trees.second.path;
   const strangerHome = unknownInTree ? tree : path.join(world.base, 'elsewhere');
-  world.terminals = [terminalRow('term-dead-1', tree), terminalRow('term-dead-2', tree), terminalRow('term-owner-shell', strangerHome, { agentIdentity: null }),
+  world.terminals = [terminalRow('term-op-old', tree), terminalRow('term-dead-1', tree), terminalRow('term-dead-2', tree), terminalRow('term-owner-shell', strangerHome, { agentIdentity: null }),
     terminalRow('term-elsewhere', path.join(world.base, 'elsewhere')), terminalRow('term-other-wf', world.trees.other.path)];
-  world.workers = [workerRow('dsp-op', 'run-old', 'term-op-old', 'release_unknown'), workerRow('dsp-launch-1', 'run-launch', 'term-dead-1', 'reclaimable'), workerRow('dsp-stranger', 'run-stranger', 'term-x', 'release_unknown'), workerRow('dsp-in-tree', 'run-x', 'term-y', 'retained', 'live', strangerHome)];
+  world.workers = [workerRow('dsp-op', 'run-old', 'term-op-old', 'release_unknown'), workerRow('dsp-launch-1', 'run-launch', 'term-dead-1', 'reclaimable'), workerRow('dsp-stranger', 'run-stranger', 'term-x', 'release_unknown'), workerRow('dsp-in-tree', 'run-x', unknownInTree ? 'term-owner-shell' : 'term-y', 'retained', 'live', strangerHome)];
 }
 
 const snapshot = (world) => ({ refs: refsOf(world.app), effects: world.orca.names().filter((name) => name === 'create' || name === 'remove'), disk: fs.readdirSync(world.orca.root).sort(), registry: world.machine.db.prepare('SELECT path, removed_at FROM worktrees ORDER BY path').all(),
@@ -81,6 +81,7 @@ test('missing or contradictory resource absence keeps unplaced custody held', t 
     if (damage === 'next-action') historical.projection.nextAction = { kind: 'release', argv: [] };
     if (damage === 'worker-state') historical.workerState = 'abandoned';
     world.workers = [historical];
+    world.terminals = [terminalRow('term-context', world.trees.second.path)];
     const before = snapshot(world);
     const refused = await run(world, { apply: true, ledger: true });
     assert.equal(refused.code, 1, damage);
@@ -149,8 +150,10 @@ test('a job, a seat, a worker, an unreadable Orca and a held host lock each refu
     assert.deepEqual(await codeOf({}), ['workflow-purge-live-seat']);
     world.machine.db.prepare('DELETE FROM seats').run();
     world.workers = [workerRow('dsp-op', 'run-old', 'term-op-old', 'active', 'live')];
+    world.terminals = [terminalRow('term-op-old', world.trees.second.path)];
     assert.deepEqual(await codeOf({}), ['workflow-purge-worker-live']);
     world.workers = [];
+    world.terminals = [];
     assert.deepEqual(await codeOf({ orca: { ...world.reads, ps: () => ({ ok: false, worktrees: [], error: 'orca runtime not reachable' }) } }), ['workflow-purge-orca-unreadable']);
     assert.deepEqual(await codeOf({ lockOwner: () => ({ role: 'release', purpose: 'release-cut', pid: 1, stale: false }) }), ['workflow-purge-host-busy']);
     assert.ok(fs.existsSync(world.trees.second.path), 'nothing was removed by any refusal');
@@ -371,6 +374,7 @@ for (const read of ['global-workers', 'truncated-trees', 'omitted-host']) test(`
 
 for (const state of [null, 'unknown', 'active']) test(`unknown live worker custody (${state}) without a location holds workflow removal`, (t) => purgeWorld(t, async (world) => {
   world.workers = [workerRow('dsp-unplaced', 'run-unproved', 'term-unplaced', state, 'unknown')];
+  world.terminals = [terminalRow('term-unplaced', null)];
   const before = snapshot(world);
   const out = await run(world, { apply: true });
   assert.equal(out.code, 1);
@@ -499,85 +503,83 @@ for (const damage of ['release-refused', 'terminal-unclosed', 'process-unverifia
   }));
 }
 
-test('a released worker missing from the next plan still owes its exact stored process closure before purge resumes', t => purgeWorld(t, async world => {
+test('stored exact worker targets are acknowledged absent without claiming process exit, while reappearance invalidates the reviewed plan', t => purgeWorld(t, async world => {
   dependencyLeftovers(t, world);
-  const before = dependencyEffects(world);
   const unknownClose = ({ dispatch, handle }) => {
     world.closed.workers.push(dispatch);
-    world.workers = world.workers.map(worker => worker.dispatchId === dispatch ? { ...worker, terminalState: 'released' } : worker);
-    world.terminals = world.terminals.filter(terminal => terminal.handle !== handle);
     return { ok: true, handle, closed: { ok: true, proof: 'gone' }, processes: { verdict: 'unverifiable' } };
   };
-  for (const attempt of [1, 2]) {
-    const out = await run(world, { apply: true, ledger: true }, { closeWorker: unknownClose });
-    assert.equal(out.code, 1, `attempt ${attempt}: ${out.text}`);
-    assert.equal(out.data.event, null);
-    assert.equal(out.data.results.workers.length, 2, 'both original exact worker targets remain obligations');
-    assert.deepEqual(out.data.results.workers.map(worker => worker.terminal).sort(), ['term-dead-1', 'term-op-old']);
-    if (attempt === 2) {
-      assert.deepEqual(out.data.plan.workers, [], 'fresh native accounting no longer plans released workers');
-      assert.deepEqual(out.data.plan.terminals, [], 'the actual terminal inventory no longer holds closed terminals');
-      assert.equal(out.data.resumed, true);
-    }
-    const after = dependencyEffects(world);
-    assert.deepEqual({ ...after.host, closed: before.host.closed }, before.host);
-    for (const key of ['files', 'decisions', 'purges', 'archive']) assert.deepEqual(after[key], before[key], key);
-    assert.equal(after.progress.length, 1);
-  }
+  const unfinished = await run(world, { apply: true, ledger: true }, { closeWorker: unknownClose });
+  assert.equal(unfinished.code, 1, unfinished.text);
+  assert.equal(unfinished.data.event, null);
+  assert.equal(eventsOf(world.machine).length, 0);
+  world.terminals = world.terminals.filter(row => !['term-dead-1', 'term-op-old'].includes(row.handle));
+  world.workers = world.workers.map(row => ['dsp-launch-1', 'dsp-op'].includes(row.dispatchId) ? { ...row, terminalState: 'released' } : row);
   const reviewed = await run(world, { plan: true, ledger: true });
-  assert.deepEqual(reviewed.data.workers, []);
-  assert.deepEqual(reviewed.data.terminals, []);
-  assert.deepEqual(reviewed.data.resume.closures.workers.map(worker => worker.dispatchId).sort(), ['dsp-launch-1', 'dsp-op']);
-  assert.match(reviewed.text, /retry workers requiring closure proof/);
-  assert.match(reviewed.text, /dsp-op terminal term-op-old/);
-  // A native apply persists a newly discovered exact obligation; no fixture writes the progress store itself.
+  assert.equal(reviewed.code, 0, reviewed.text);
+  assert.deepEqual(reviewed.data.resume.closures.workers.map(row => [row.dispatchId, row.terminal]).sort(), [['dsp-launch-1', 'term-dead-1'], ['dsp-op', 'term-op-old']]);
+  assert.ok(['term-dead-1', 'term-op-old'].every(handle => reviewed.data.absentTerminals.includes(handle)));
+  world.terminals.push(terminalRow('term-op-old', world.trees.second.path));
+  const before = dependencyEffects(world);
+  const stale = await run(world, { apply: true, ledger: true, expect: reviewed.data.sha });
+  assert.equal(stale.code, 1, stale.text);
+  assert.equal(stale.data.refusal.code, 'workflow-purge-plan-changed');
+  assert.deepEqual(dependencyEffects(world), before, 'reappeared exact handle refuses before effects');
+  world.terminals = world.terminals.filter(row => row.handle !== 'term-op-old');
   world.workers.push(workerRow('dsp-late', 'run-old', 'term-late', 'reclaimable'));
   world.terminals.push(terminalRow('term-late', world.trees.second.path));
   const expanded = await run(world, { apply: true, ledger: true }, { closeWorker: unknownClose });
   assert.equal(expanded.code, 1, expanded.text);
+  world.workers = world.workers.map(row => row.dispatchId === 'dsp-late' ? { ...row, terminalState: 'released' } : row);
+  world.terminals = world.terminals.filter(row => row.handle !== 'term-late');
   const changed = await run(world, { plan: true, ledger: true });
   assert.deepEqual(changed.data.workers, reviewed.data.workers);
   assert.deepEqual(changed.data.terminals, reviewed.data.terminals);
-  assert.notEqual(changed.data.sha, reviewed.data.sha, 'only the persisted retry scope grew while fresh closure arrays stayed empty');
-  const closesBefore = [...world.closed.workers];
-  const stale = await run(world, { apply: true, ledger: true, expect: reviewed.data.sha });
-  assert.equal(stale.code, 1, stale.text);
-  assert.equal(stale.data.refusal.code, 'workflow-purge-plan-changed');
-  assert.deepEqual(world.closed.workers, closesBefore, 'old --expect refuses before every close');
-  const completed = await run(world, { apply: true, ledger: true });
+  assert.notEqual(changed.data.sha, reviewed.data.sha, 'persisted exact retry scope is bound even after new targets disappear from current closure arrays');
+  assert.equal(changed.data.resume.closures.workers.length, 3);
+  const staleScope = dependencyEffects(world);
+  assert.equal((await run(world, { apply: true, ledger: true, expect: reviewed.data.sha })).code, 1);
+  assert.deepEqual(dependencyEffects(world), staleScope, 'the old scope hash refuses before every close');
+  const calls = structuredClone(world.closed);
+  const completed = await run(world, { apply: true, ledger: true, expect: changed.data.sha });
   assert.equal(completed.code, 0, completed.text);
-  assert.equal(completed.data.results.workers.length, 3, 'positive exact closure proves every original and newly persisted target');
   assert.equal(completed.data.resumed, true);
+  assert.deepEqual(world.closed, calls, 'absent persisted targets require no lifecycle calls');
+  assert.equal(completed.data.results.workers.length, 3);
+  for (const row of completed.data.results.workers) {
+    assert.equal(row.action, 'already-deleted');
+    assert.equal(row.proof, 'terminal-absent');
+    assert.equal(row.processes.verdict, 'unverifiable');
+    assert.equal(row.processes.advisory, true);
+  }
   assert.equal(fs.existsSync(world.trees.second.path), false);
   assert.equal(eventsOf(world.machine).length, 1);
 }));
 
-test('an unfinished exact closure after a prior purge journal remains visible and requires reproof instead of already purged', t => purgeWorld(t, async world => {
+test('an absent exact target after an unfinished post-journal close is acknowledged without a second release', t => purgeWorld(t, async world => {
   dependencyLeftovers(t, world);
-  const first = await run(world, { apply: true });
-  assert.equal(first.code, 0, first.text);
+  assert.equal((await run(world, { apply: true })).code, 0);
   assert.equal(eventsOf(world.machine).length, 1);
   world.workers.push(workerRow('dsp-after-journal', 'run-old', 'term-after-journal', 'reclaimable'));
   world.terminals.push(terminalRow('term-after-journal', world.trees.second.path));
-  const unknownClose = ({ dispatch, handle }) => {
+  const unfinished = await run(world, { apply: true }, { closeWorker: ({ dispatch, handle }) => {
     world.closed.workers.push(dispatch);
-    world.workers = world.workers.map(worker => worker.dispatchId === dispatch ? { ...worker, terminalState: 'released' } : worker);
-    world.terminals = world.terminals.filter(terminal => terminal.handle !== handle);
     return { ok: true, handle, closed: { ok: true, proof: 'gone' }, processes: { verdict: 'unverifiable' } };
-  };
-  const unfinished = await run(world, { apply: true }, { closeWorker: unknownClose });
+  } });
   assert.equal(unfinished.code, 1, unfinished.text);
+  world.terminals = world.terminals.filter(row => row.handle !== 'term-after-journal');
   const shown = await run(world, { plan: true });
-  assert.deepEqual(shown.data.workers, []);
-  assert.deepEqual(shown.data.terminals, []);
-  assert.equal(shown.data.already, false);
-  assert.match(shown.text, /dsp-after-journal terminal term-after-journal/);
-  assert.doesNotMatch(shown.text, /already purged/);
-  const retried = await run(world, { apply: true, expect: shown.data.sha }, { closeWorker: unknownClose });
-  assert.equal(retried.code, 1, retried.text);
-  assert.equal(retried.data.results.workers.length, 1);
-  assert.equal(retried.data.event, null);
-  assert.equal(eventsOf(world.machine).length, 1);
+  assert.equal(shown.data.already, false, 'stored exact obligation must still be acknowledged');
+  assert.ok(shown.data.absentTerminals.includes('term-after-journal'));
+  const calls = structuredClone(world.closed);
+  const retried = await run(world, { apply: true, expect: shown.data.sha });
+  assert.equal(retried.code, 0, retried.text);
+  assert.deepEqual(world.closed, calls);
+  const [row] = retried.data.results.workers;
+  assert.equal(row.terminal, 'term-after-journal');
+  assert.equal(row.action, 'already-deleted');
+  assert.equal(row.proof, 'terminal-absent');
+  assert.equal(row.processes.verdict, 'unverifiable');
 }));
 
 test('a Work citation holds public ledger plan and apply before every host effect', t => purgeWorld(t, async world => {
@@ -628,4 +630,94 @@ test('a dependency arriving at the GC lock is held by the fresh plan before host
   assert.equal(out.code, 1, out.text);
   assert.deepEqual(dependencyEffects(world), afterMutation);
   assert.ok(out.data.blockers.some(item => item.code === 'workflow-purge-ledger-dependency'), out.text);
+}));
+
+for (const failure of ['failed', 'malformed', 'missing-handle']) test(`${failure} native terminal inventory cannot authorize absence`, t => purgeWorld(t, async world => {
+  const terminals = () => failure === 'failed' ? { ok: false, error: 'inventory unreadable' } : { ok: true, terminals: failure === 'malformed' ? null : [{}] };
+  const before = snapshot(world);
+  const out = await run(world, { apply: true }, { orca: { ...world.reads, terminals } });
+  assert.equal(out.code, 1, out.text);
+  assert.deepEqual(snapshot(world), before);
+}));
+
+test('owned absent terminal with unknown process census is acknowledged and foreign absent custody is never released', t => purgeWorld(t, async world => {
+  world.workers = [workerRow('dsp-op', 'run-old', 'term-op-old', 'active', 'live'), workerRow('dsp-nivo-gone', 'run-foreign', 'term-nivo-gone', 'retained', 'unknown', world.trees.second.path)];
+  const shown = await run(world, { plan: true }, { terminalProcesses: () => null });
+  assert.equal(shown.code, 0, shown.text);
+  assert.ok(shown.data.absentTerminals.includes('term-op-old'));
+  assert.equal(shown.data.workers.find(row => row.dispatchId === 'dsp-op').action, 'already-deleted');
+  const foreign = shown.data.listed.find(row => row.id === 'dsp-nivo-gone');
+  assert.equal(foreign.holdsTree, false);
+  assert.equal(foreign.proof, 'terminal-absent');
+  const out = await run(world, { apply: true, expect: shown.data.sha }, { terminalProcesses: () => null });
+  assert.equal(out.code, 0, out.text);
+  assert.deepEqual(world.closed, { terminals: [], workers: [] });
+  assert.ok(world.workers.some(row => row.dispatchId === 'dsp-nivo-gone'));
+  const [row] = out.data.results.workers;
+  assert.equal(row.action, 'already-deleted');
+  assert.equal(row.proof, 'terminal-absent');
+  assert.equal(row.processes.verdict, 'unverifiable');
+  assert.equal(row.processes.advisory, true);
+}));
+
+test('readable process tagged with an absent exact handle holds destructive cleanup without killing it', t => purgeWorld(t, async world => {
+  world.workers = [workerRow('dsp-op', 'run-old', 'term-op-old', 'retained', 'unknown')];
+  const before = snapshot(world);
+  const out = await run(world, { apply: true, ledger: true }, { terminalProcesses: () => [{ pid: 17, readable: true, values: { ORCA_TERMINAL_HANDLE: 'term-op-old' } }] });
+  assert.equal(out.code, 1, out.text);
+  assert.equal(fs.existsSync(world.trees.second.path), true);
+  assert.deepEqual(snapshot(world), before);
+}));
+
+test('a present owned worker still closes through positive full closure rather than absence', t => purgeWorld(t, async world => {
+  world.workers = [workerRow('dsp-op', 'run-old', 'term-op-old', 'reclaimable', 'exited')];
+  world.terminals = [terminalRow('term-op-old', world.trees.second.path)];
+  const shown = await run(world, { plan: true });
+  assert.equal(shown.code, 0, shown.text);
+  assert.equal(shown.data.absentTerminals.includes('term-op-old'), false);
+  const out = await run(world, { apply: true, expect: shown.data.sha });
+  assert.equal(out.code, 0, out.text);
+  assert.deepEqual(world.closed.workers, ['dsp-op']);
+}));
+
+for (const afterClose of ['absent', 'present', 'unreadable']) test(`an unknown worker census still closes its owned terminal and verifies ${afterClose} inventory in one apply`, t => purgeWorld(t, async world => {
+  world.workers = [workerRow('dsp-op', 'run-old', 'term-op-old', 'reclaimable', 'unknown')];
+  world.terminals = [terminalRow('term-op-old', world.trees.second.path)];
+  let closed = false;
+  const terminals = () => closed && afterClose === 'unreadable' ? { ok: false, error: 'native listing failed' } : world.reads.terminals();
+  const out = await run(world, { apply: true }, {
+    orca: { ...world.reads, terminals }, terminalProcesses: () => null,
+    closeWorker: ({ handle }) => ({ ok: true, handle, closed: null, processes: { verdict: 'unverifiable', reason: 'incomplete process census' } }),
+    closeTerminal: handle => {
+      closed = true;
+      world.closed.terminals.push(handle);
+      if (afterClose !== 'present') world.terminals = world.terminals.filter(row => row.handle !== handle);
+      return { ok: true, proof: 'gone' };
+    },
+  });
+  assert.deepEqual(world.closed.terminals, ['term-op-old']);
+  assert.equal(out.code, afterClose === 'absent' ? 0 : 1, out.text);
+  assert.equal(fs.existsSync(world.trees.second.path), afterClose !== 'absent');
+  const [row] = out.data.results.workers;
+  if (afterClose === 'absent') {
+    assert.equal(row.action, 'already-deleted');
+    assert.equal(row.proof, 'terminal-absent');
+    assert.equal(row.processes.verdict, 'unverifiable');
+  } else assert.equal(row.ok, false);
+}));
+
+for (const field of ['survivors', 'census']) test(`a positively observed worker ${field} still holds purge when the next process read is unavailable`, t => purgeWorld(t, async world => {
+  world.workers = [workerRow('dsp-op', 'run-old', 'term-op-old', 'reclaimable', 'unknown')];
+  world.terminals = [terminalRow('term-op-old', world.trees.second.path)];
+  const out = await run(world, { apply: true }, { terminalProcesses: () => null,
+    closeWorker: ({ handle }) => {
+      world.terminals = [];
+      return { ok: true, handle, closed: { ok: true, proof: 'gone' }, processes: { verdict: 'unverifiable', [field]: [{ pid: 17, created: 1 }] } };
+    },
+  });
+  assert.equal(out.code, 1, out.text);
+  assert.equal(fs.existsSync(world.trees.second.path), true);
+  assert.equal(out.data.results.workers[0].ok, false);
+  assert.deepEqual(world.closed, { terminals: [], workers: [] });
+  assert.equal(eventsOf(world.machine).length, 0);
 }));

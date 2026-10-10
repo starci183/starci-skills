@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { classifyTerminals, onlyPrompts, isShellTitle, tabTitles, gcLine } from '../../scripts/supervisor/gc.mjs';
-import { closeAndVerify, closeSelfSafe } from '../../scripts/machine/close-verify.mjs';
+import { closeAndVerify, closeSelfSafe, terminalState } from '../../scripts/machine/close-verify.mjs';
 import { translator } from '../../scripts/lib/i18n.mjs';
 import { winPath } from '../fixtures/win-path.mjs';
 
@@ -138,4 +138,48 @@ test('leaked processes: orphan agent CLIs and PowerShell no tab owns; never the 
   assert.equal(isAgentProcess(table[7]), false);
   const plan = orphanProcesses({ table, now: 1_000_000, minAgeMs: 10, listedCount: 2 });
   assert.deepEqual(plan.map((p) => [p.pid, p.kind]), [[6, 'orphan-agent'], [2, 'orphan-shell']]);
+});
+
+
+test('a failed exact show may use only a successful complete native inventory to prove terminal absence', () => {
+  for (const show of [() => ({ ok: false, errorCode: 'unknown_error' }), () => { throw new Error('show unavailable'); }]) {
+    let closes = 0, waits = 0;
+    const list = () => ({ ok: true, terminals: [{ handle: 'foreign-terminal' }] });
+    assert.equal(terminalState('term-absent', { show, list }), 'gone');
+    const out = closeAndVerify('term-absent', { show, list, close: () => { closes += 1; return { ok: true }; },
+      wait: () => { waits += 1; return { ok: true, satisfied: true }; }, sleep: () => {}, verifyMs: 0 });
+    assert.deepEqual([out.ok, out.before, out.proof, out.attempts], [true, 'gone', 'gone', 0]);
+    assert.deepEqual([closes, waits], [0, 0], 'positive absence invokes no close or exit wait');
+  }
+});
+
+test('failed, unavailable or malformed terminal inventories remain unknown and cannot authorize a close', () => {
+  const answers = [null, {}, { terminals: [] }, { ok: false, terminals: [] },
+    { ok: true, hostUnavailable: true, terminals: [] }, { ok: true, terminals: null },
+    { ok: true, terminals: [{}] }, { ok: true, terminals: [{ handle: '' }] },
+    { ok: true, terminals: [{ handle: 'foreign' }, { handle: 'foreign' }] },
+    { ok: true, terminals: [{ handle: 'term-present' }] }];
+  for (const answer of answers) {
+    const show = () => ({ ok: false, errorCode: 'unknown_error' });
+    const list = () => answer;
+    let closes = 0;
+    assert.equal(terminalState('term-present', { show, list }), 'unknown');
+    const out = closeAndVerify('term-present', { show, list, close: () => { closes += 1; return { ok: true }; },
+      wait: () => ({ ok: false, hostUnavailable: true }), sleep: () => {}, verifyMs: 0 });
+    assert.deepEqual([out.ok, out.proof, out.attempts, closes], [false, null, 0, 0], JSON.stringify(answer));
+  }
+  assert.equal(terminalState('term-present', { show: () => ({ ok: false }), list: () => { throw new Error('listing failed'); } }), 'unknown');
+});
+
+test('positive connected exact health outranks an empty inventory, and post-close absence is re-proven', () => {
+  let lists = 0;
+  const list = () => { lists += 1; return { ok: true, terminals: [] }; };
+  assert.equal(terminalState('term-present', { show: () => ({ ok: true, terminal: { handle: 'term-present' }, connected: true }), list }), 'connected');
+  assert.equal(lists, 0, 'a positive exact show is authoritative before any inventory fallback');
+  let closed = false, closes = 0;
+  const show = () => closed ? { ok: false, errorCode: 'unknown_error' } : { ok: true, terminal: { handle: 'term-present' }, connected: true };
+  const out = closeAndVerify('term-present', { show, list, close: () => { closed = true; closes += 1; return { ok: true }; },
+    wait: () => ({ ok: false, hostUnavailable: true }), sleep: () => {}, verifyMs: 0 });
+  assert.deepEqual([out.ok, out.before, out.proof, closes], [true, 'connected', 'gone', 1]);
+  assert.ok(lists >= 1, 'post-close fallback reads actual inventory again');
 });

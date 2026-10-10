@@ -8,6 +8,7 @@
 // the tab keeps the title `terminal create --title` gave it.
 import { orcaCall } from './lib.mjs';
 import { arg, flag } from '../../lib/cli-arg.mjs';
+import { terminalInventoryOf } from '../../lib/orca-terminal.mjs';
 
 /**
  * Read the host's terminal inventory, optionally scoped to one worktree, without claiming ownership.
@@ -18,8 +19,9 @@ import { arg, flag } from '../../lib/cli-arg.mjs';
  */
 export function terminalList({ worktree, includeVisualLayouts = false } = {}) {
   const r = orcaCall('terminal-list', { worktree, 'include-visual-layouts': includeVisualLayouts === true });
-  return { ok: r.exitCode === 0, terminals: r.result?.terminals ?? [],
-    visualLayouts: r.result?.visualLayouts ?? [], error: r.error, hostUnavailable: r.hostUnavailable === true };
+  const inventory = terminalInventoryOf({ ok: r.exitCode === 0 && r.receipt?.ok === true, terminals: r.result?.terminals, hostUnavailable: r.hostUnavailable });
+  return { ok: inventory !== null, terminals: inventory ?? [],
+    visualLayouts: r.result?.visualLayouts ?? [], error: r.error || (inventory === null ? 'terminal inventory is unreadable' : null), hostUnavailable: r.hostUnavailable === true };
 }
 
 if (process.argv[1]?.endsWith('terminal-list.mjs')) {

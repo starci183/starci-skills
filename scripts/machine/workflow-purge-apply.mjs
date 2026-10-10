@@ -11,6 +11,9 @@ import { branchDelete } from '../api/git/branch-delete.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
 import { closeAndVerify } from './close-verify.mjs';
 import { closeWorker, workerClosureProven } from './worker-close.mjs';
+import { terminalList } from '../api/orca/terminal-list.mjs';
+import { terminalInventoryOf } from '../lib/orca-terminal.mjs';
+import { processEnv } from '../api/process/process-env.mjs';
 import { releaseOrcaSlot, markRemoved, withRegistry } from './worktree-registry.mjs';
 import { removeOrcaWorktree, orcaWorktreeClient } from './worktree-orca.mjs';
 import { removeScratchWorktree } from './worktree-git.mjs';
@@ -20,14 +23,46 @@ const MAIN = 'main';
 
 const failure = (error) => String(error?.message ?? error).slice(0, 300);
 
-function closeOneWorker(worker, { env, deps }) {
-  let r;
-  try { r = (deps.closeWorker ?? closeWorker)({ dispatch: worker.dispatchId, handle: worker.terminal, retryRelease: true, env }); } catch (error) { r = { ok: false, error: failure(error) }; }
-  const ok = workerClosureProven(r, worker.terminal) && !r.hygiene;
-  return { dispatchId: worker.dispatchId, terminal: worker.terminal, ok, ...(ok ? { closure: r.processes?.verdict ?? null } : { error: r?.hygiene ? 'a process of the worker survived release and close' : r?.error ?? r?.outcome ?? 'worker closure proof is missing' }) };
+// Purge acknowledges a terminal already deleted by Orca. This is a lifecycle no-op, not a physical process-exit or provider-capacity receipt.
+const absentResult = (processObservation) => ({ ok: true, action: 'already-deleted', proof: 'terminal-absent',
+  processes: { verdict: 'unverifiable', advisory: true, observation: processObservation } });
+
+// Confirm exact absence through a fresh unscoped inventory. Unknown process observations are advisory; observed tagged survivors remain held.
+function verifyAbsence(handles, deps) {
+  let inventory;
+  try { inventory = terminalInventoryOf((deps.orca?.terminals ?? terminalList)()); } catch { inventory = null; }
+  const errors = inventory === null ? ['the fresh terminal inventory is unreadable']
+    : handles.filter(handle => inventory.some(row => row.handle === handle)).map(handle => `terminal ${handle} is still present`);
+  if (errors.length) return { errors, processObservation: 'not-read' };
+  let rows = null;
+  try { rows = (deps.terminalProcesses ?? (() => processEnv({ names: ['ORCA_TERMINAL_HANDLE'] })))(); } catch { /* unknown process observations are advisory for deleted terminals */ }
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (row?.readable === true && handles.includes(row.values?.ORCA_TERMINAL_HANDLE)) errors.push(`process ${row.pid} still carries deleted terminal ${row.values.ORCA_TERMINAL_HANDLE}`);
+  }
+  return { errors, processObservation: Array.isArray(rows) ? 'read' : 'unavailable' };
 }
 
-function closeOneTerminal(terminal, { deps }) {
+function closeOneWorker(worker, { env, deps, plan, processObservation }) {
+  if (plan.absentTerminals?.includes(worker.terminal)) return { dispatchId: worker.dispatchId, terminal: worker.terminal, ...absentResult(processObservation) };
+  let r;
+  try { r = (deps.closeWorker ?? closeWorker)({ dispatch: worker.dispatchId, handle: worker.terminal, retryRelease: true, env }); } catch (error) { r = { ok: false, error: failure(error) }; }
+  const survivor = Boolean(r.hygiene) || [r.processes?.survivors, r.processes?.census].some(rows => Array.isArray(rows) && rows.length > 0);
+  const ok = workerClosureProven(r, worker.terminal) && !survivor;
+  // An incomplete host census must not prevent closing an owned terminal. Its physical process proof remains separate.
+  if (!ok && !survivor && r.handle === worker.terminal && r.processes?.verdict === 'unverifiable') {
+    const closed = r.closed == null ? closeOneTerminal({ handle: worker.terminal }, { deps, plan, processObservation }) : r.closed;
+    if (closed.ok) {
+      const verified = verifyAbsence([worker.terminal], deps);
+      if (!verified.errors.length) return { dispatchId: worker.dispatchId, terminal: worker.terminal, ...absentResult(verified.processObservation), closed };
+      return { dispatchId: worker.dispatchId, terminal: worker.terminal, ok: false, closed, error: verified.errors.join('; ') };
+    }
+    return { dispatchId: worker.dispatchId, terminal: worker.terminal, ok: false, closed, error: closed.error ?? closed.reason ?? 'terminal close failed' };
+  }
+  return { dispatchId: worker.dispatchId, terminal: worker.terminal, ok, ...(ok ? { closure: r.processes?.verdict ?? null } : { error: survivor ? 'a process of the worker survived release and close' : r.processes?.reason ?? r?.error ?? 'worker closure proof is missing' }) };
+}
+
+function closeOneTerminal(terminal, { deps, plan, processObservation }) {
+  if (plan.absentTerminals?.includes(terminal.handle)) return { handle: terminal.handle, ...absentResult(processObservation) };
   let r;
   try { r = (deps.closeTerminal ?? closeAndVerify)(terminal.handle); } catch (error) { r = { ok: false, reason: failure(error) }; }
   return { handle: terminal.handle, ok: r?.ok === true, proof: r?.proof ?? null, ...(r?.ok ? {} : { error: r?.reason ?? r?.error ?? 'close failed' }) };
@@ -106,11 +141,18 @@ function journalPurge({ plan, stored, resumed, results, env }) {
  */
 export function applyPurgePlan({ plan, env = process.env, deps = {} }) {
   const now = (deps.now ?? Date.now)();
-  const { resumed, stored, error } = beginPurge(plan, { env, now });
   const results = { workers: [], terminals: [], trees: [], refs: [], guards: [], prompts: [], decisions: [], ledger: null };
+  let processObservation = 'not-read';
+  if (plan.absentTerminals?.length) {
+    const verified = verifyAbsence(plan.absentTerminals, deps);
+    const { errors } = verified;
+    processObservation = verified.processObservation;
+    if (errors.length) return { ok: false, resumed: Boolean(plan.resume), results, errors, event: null };
+  }
+  const { resumed, stored, error } = beginPurge(plan, { env, now });
   if (error) return { ok: false, resumed, results, errors: [error], event: null };
-  results.workers = stored.closures.workers.map(worker => closeOneWorker(worker, { env, deps }));
-  results.terminals = stored.closures.terminals.map(terminal => closeOneTerminal(terminal, { deps }));
+  results.workers = stored.closures.workers.map(worker => closeOneWorker(worker, { env, deps, plan, processObservation }));
+  results.terminals = stored.closures.terminals.map(terminal => closeOneTerminal(terminal, { deps, plan, processObservation }));
   const closureErrors = [...results.workers, ...results.terminals].filter(item => !item.ok)
     .map(item => `${item.dispatchId ?? item.handle}: ${item.error ?? 'closure failed'}`);
   if (closureErrors.length) return { ok: false, resumed, results, errors: closureErrors, event: null };

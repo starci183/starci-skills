@@ -58,6 +58,8 @@ const orcaCalls = (world) => fs.readFileSync(world.env.STARCI_FAKE_ORCA_LOG, 'ut
 test('stop names the next step; the plan lists the tree, the refs with their tips and the dead launch terminals; apply removes them and leaves the rest', (t) => {
   const { world, dir } = stoppedWorld(t);
   const stop = world.cli('archive', ['--workflow', wf, '--reason', 'owner stop', '--by', 'owner'], { as: 'owner' });
+  const afterArchiveCalls = orcaCalls(world).length;
+  assert.equal(world.orca().terminals['term-op-1'].closed, true, 'archive already closed the owned worker terminal');
   assert.equal(stop.status, 0, stop.stderr || stop.stdout);
   assert.match(stop.json.next.purge, /^starci workflow purge --repo .+ --workflow wf-1 --plan$/);
 
@@ -69,16 +71,20 @@ test('stop names the next step; the plan lists the tree, the refs with their tip
   assert.deepEqual(plan.refs.filter((ref) => ref.action === 'delete').map((ref) => ref.name).sort(), [`preserved/${wf}/gc`, `wf-${wf}`]);
   assert.deepEqual(plan.terminals.map((c) => c.handle).sort(), ['term-dead-1', 'term-dead-2']);
   assert.deepEqual(plan.workers.map((w) => w.dispatchId), ['dsp-1']);
+  assert.ok(plan.absentTerminals?.includes('term-op-1'), 'native inventory proves the archived worker terminal absent');
   assert.ok(plan.listed.length === 0, 'the owner shell is outside the tree and is not even listed');
   assert.equal(fs.existsSync(dir), true, 'the plan removed nothing');
 
   const applied = world.starci(['workflow', 'purge', '--repo', world.repo, '--workflow', wf, '--apply', '--expect', plan.sha.slice(0, 12)]);
   assert.equal(applied.status, 0, applied.stderr || applied.stdout);
+  const absentWorker = applied.json.results.workers.find(worker => worker.dispatchId === 'dsp-1');
+  assert.deepEqual({ ok: absentWorker?.ok, action: absentWorker?.action, proof: absentWorker?.proof }, { ok: true, action: 'already-deleted', proof: 'terminal-absent' });
   assert.equal(fs.existsSync(dir), false);
   const branches = git(world.repo, 'for-each-ref', '--format=%(refname:short)', 'refs/heads').split(/\r?\n/).sort();
   assert.deepEqual(branches, ['feature/unrelated', 'main'], 'the workflow branch and its preserved ref are gone; main and the foreign branch stay');
   const calls = orcaCalls(world);
-  assert.ok(calls.some((call) => /orchestration worker-release .*dsp-1/.test(call)), 'the worker is released through worker-close');
+  assert.ok(calls.some((call) => /orchestration worker-release .*dsp-1/.test(call)), 'archive released the worker through worker-close');
+  assert.equal(calls.slice(afterArchiveCalls).some(call => call.startsWith('orchestration worker-release ')), false, 'purge never re-releases an inventory-absent worker');
   for (const handle of ['term-dead-1', 'term-dead-2']) assert.ok(calls.some((call) => call.startsWith('terminal close') && call.includes(handle)), `${handle} is closed`);
   assert.equal(calls.some((call) => call.startsWith('terminal close') && call.includes('term-owner')), false, 'a terminal the ledger does not name is never closed');
   const machine = machineOf(world);
@@ -121,6 +127,7 @@ test('a released worker with unproven native process closure retains its workflo
   const { world, dir } = stoppedWorld(t);
   stopWorld(world);
   world.env.STARCI_FAKE_CLOSURE_UNPROVEN = '1';
+  writeBooks(world, books => ({ ...books, terminals: { ...books.terminals, 'term-op-1': { ...books.terminals['term-op-1'], handle: 'term-op-1', worktree: dir, closed: false, connected: true } } }));
   const planned = world.starci(purgeArgs(world, '--plan'));
   assert.equal(planned.status, 0, planned.stderr || planned.stdout);
   const applied = world.starci(purgeArgs(world, '--apply', '--expect', planned.json.sha));
@@ -178,11 +185,11 @@ test('genuine all-scope accounting keeps one retained abandoned resource held be
     projection: { resource: { state: 'absent', reason: 'unsupervised' }, workspace: null, liveness: { verdict: 'unverifiable', reason: 'unsupervised_settled' }, nextAction: { kind: 'none', argv: [] } } };
   const holder = { dispatchId: 'dsp-held', runId: 'run-foreign', workerState: 'abandoned', terminalState: 'retained', resource: { terminalHandle: 'term-held', worktreeId: 'repo-product::' + dir },
     projection: { resource: { state: 'owned' }, liveness: { verdict: 'unverifiable', reason: 'missing_status' }, nextAction: { kind: 'release', argv: ['orchestration', 'worker-release', '--dispatch', 'dsp-held'] } } };
-  writeBooks(world, books => ({ ...books, workerRows: [...books.workerRows, history, holder] }));
+  writeBooks(world, books => ({ ...books, terminals: { ...books.terminals, 'term-held': { handle: 'term-held', title: 'codex', worktree: dir, connected: true } }, workerRows: [...books.workerRows, history, holder] }));
   const refused = world.starci(purgeArgs(world, '--apply', '--ledger'));
   assert.equal(refused.status, 1, refused.stderr || refused.stdout);
   assert.ok(refused.json.blockers.some(item => item.code === 'workflow-purge-custody-unknown'));
-  assert.deepEqual(refused.json.listed.map(item => item.id), ['dsp-held']);
+  assert.deepEqual(refused.json.listed.map(item => item.id), ['term-held', 'dsp-held']);
   noPurgeEffects(world, dir);
   assert.deepEqual(world.orca().workerRows.slice(-2), [history, holder]);
 });
@@ -214,7 +221,7 @@ test('pointer-only ledger events and spilled machine events preserve Run, termin
   const machine = machineOf(world);
   try { machine.supEvent({ entityType: 'kernel', entityId: wf, kind: 'kernel-start-failed', payload: { runId: 'run-machine-spill', terminal: 'term-machine-spill', dispatch: 'dsp-machine-spill', detail: 'fixture'.repeat(4000) } }); } finally { machine.close(); }
   writeBooks(world, (books) => ({ ...books,
-    terminals: { ...books.terminals, 'term-machine-spill': { handle: 'term-machine-spill', title: 'codex', worktree: dir, connected: true } },
+    terminals: { ...books.terminals, 'term-spilled': { handle: 'term-spilled', title: 'codex', worktree: dir, connected: true }, 'term-machine-spill': { handle: 'term-machine-spill', title: 'codex', worktree: dir, connected: true } },
     workerRows: [...books.workerRows, { dispatchId: 'dsp-spilled', runId: 'run-spilled', terminalState: 'release_unknown', resource: { terminalHandle: 'term-spilled', worktreeId: `repo-product::${dir}` }, projection: { liveness: { verdict: 'exited' } } }],
   }));
   const plan = world.starci(purgeArgs(world));
@@ -232,7 +239,7 @@ test('pointer-only ledger events and spilled machine events preserve Run, termin
 for (const kind of ['worker', 'terminal']) test(`unknown ${kind} custody in a workflow tree refuses --apply --ledger before any effect`, (t) => {
   const { world, dir } = stoppedWorld(t);
   stopWorld(world);
-  writeBooks(world, (books) => kind === 'worker' ? { ...books, workerRows: [...books.workerRows, { dispatchId: 'dsp-foreign', runId: 'run-foreign', terminalState: 'active', resource: { terminalHandle: 'term-foreign', worktreeId: `repo-product::${dir}` }, projection: { liveness: { verdict: 'unknown' } } }] }
+  writeBooks(world, (books) => kind === 'worker' ? { ...books, terminals: { ...books.terminals, 'term-foreign': { handle: 'term-foreign', title: 'codex', worktree: dir, connected: true } }, workerRows: [...books.workerRows, { dispatchId: 'dsp-foreign', runId: 'run-foreign', terminalState: 'active', resource: { terminalHandle: 'term-foreign', worktreeId: `repo-product::${dir}` }, projection: { liveness: { verdict: 'unknown' } } }] }
     : { ...books, terminals: { ...books.terminals, 'term-foreign': { handle: 'term-foreign', title: 'owner shell', worktree: dir, connected: true } } });
   const refused = world.starci(purgeArgs(world, '--apply', '--ledger'));
   assert.equal(refused.status, 1, 'unproved custody never authorizes tree removal');

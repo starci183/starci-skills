@@ -24,6 +24,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 ### Changed
 - Kernel decisions use executable menu choices; mechanical moves belong to the Job controller (class 8).
 - Runtime changes follow the role revision scope and commit-bound deploy proof (class 4).
+- Workflow purge closes remaining owned Orca terminals and treats exact handles missing from a successful unscoped inventory as already deleted. This acknowledgement also resolves interrupted retries without a second close or release; failed inventory reads remain unknown (class 1).
 - Runtime judgment adds the approved `business.decide` Critic; acceptance-trace remains report-only (class 5).
 
 ### Added
@@ -59,7 +60,7 @@ The runtime stands still rather than guess, but nothing obliged a standing state
 - Ledger purge checks foreign-key dependents in the plan and again under the apply lock, then rechecks in the ledger writer before deletion. Dependents outside the workflow cascade and unsupported dependency shapes hold removal; product citations are retained.
 - Worker closure requires readable process and environment censuses with identical unique PID sets before capture, stop or close. Missing, duplicate and mismatched rows retain the worker instead of proving closure from a later empty sample.
 - Workflow purge distinguishes context-only historical records from supervised resources using positive resource absence. Worker inventory validates Run scope and cursor pagination; bound, malformed and incomplete inventories hold cleanup, and actual resource holders remain protected.
-- Workflow purge requires complete worker closure before removing trees, refs, files, decisions or ledger rows. Interrupted purges retain exact Dispatch and terminal obligations, disclose them in the retry plan and bind them to its SHA. A prior purge event cannot hide an unfinished retry; independent closes and later independent tree/ref failures keep their existing behavior.
+- Workflow purge requires complete closure for present workers and acknowledges already deleted exact terminals from a successful unscoped inventory before removing trees, refs, files, decisions or ledger rows. Interrupted purges retain exact Dispatch and terminal targets, disclose them in the retry plan and bind them to its SHA. Absence is a terminal lifecycle acknowledgement, not process-exit or provider-capacity proof; positively observed process survivors hold destructive cleanup. A prior purge event cannot hide an unfinished retry; independent closes and later independent tree/ref failures keep their existing behavior.
 
 ### Class 2: done without proof
 Specs ran on invented data and `npm run check` runs no spec, so fixes were reported done that did not hold on the host (four times in one day) and 14 red spec files passed unseen. Now a defect found on a live host is done only when a replay spec built from the sequence that showed it passes (`edge-case-registry`, R233: a live case needs a `replay:` spec), the replay world cannot read the host, and the specs a change can break are computed (`starci test affected`) and run by the land gate and the deploy.
@@ -187,7 +188,7 @@ Nothing stood before a merge or before the host: 28 branches were merged on `npm
 - Substantive judging of `content.generate` and `perf.verify` remains open. `scope.finish` also has a judge gap: it has no implemented owner gate. Acceptance-trace is report-only and does not close these gaps.
 - Full storage-writer conversion, the ledger migration with mandatory backup, and the blob collector remain outside this release; the storage convention and readers do not make all ledger content references.
 - Converting the remaining legacy runtime sites that derive a root with `process.cwd()` remains work for later releases; the root-adhoc check prevents new sites but does not complete those conversions.
-- After the narrowed prune and the release-plan replays, the tree holds 962 spec files and 6,841 test declarations; the remaining tests have not all been reviewed body by body.
+- After the narrowed prune and the release-plan replays, the tree holds 962 spec files and 6,851 test declarations; the remaining tests have not all been reviewed body by body.
 - A refused purge can display the worker-release outcome `ok` as its error text when process proof is missing; this diagnostic remains misleading and does not make closure pass.
 - Three export-consequence test removals remain outside the narrowed prune scope; those tests and the production exports are retained.
 - The gate-loosening check still judges per file; judging every removed line is deferred.
