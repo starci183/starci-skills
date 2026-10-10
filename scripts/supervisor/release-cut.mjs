@@ -28,6 +28,7 @@ import { statusQuery } from '../api/git/status-query.mjs';
 import { symbolicRefQuery } from '../api/git/symbolic-ref-query.mjs';
 import { tag as gitTag } from '../api/git/tag.mjs';
 import { updateRef } from '../api/git/update-ref.mjs';
+import { gitResultOf } from '../lib/git.mjs';
 import { changelogSection, releaseNotesFindings } from '../hfs/runtime-rules/release-notes.mjs';
 import { runL4, skipReport } from './release-l4.mjs';
 import { combine, decisionLines, needsSonar, refusalFor, remember, selectionFor } from './release-cut-rows.mjs';
@@ -44,11 +45,11 @@ const RELEASE_TAG = /^v\d[\w.+-]*$/;
 const GIT_CALLS = { 'symbolic-ref': symbolicRefQuery, status: statusQuery, 'rev-parse': revParseQuery, tag: gitTag, 'cat-file': catFile, 'ls-remote': lsRemote };
 
 /** Run one git verb of the release flow in `cwd`: {ok, stdout, stderr}. */
-function git([verb, ...args], { cwd }) {
+function git([verb, ...args], { cwd, input }) {
   const call = GIT_CALLS[verb];
   if (!call) throw new Error(`git ${verb}: not a call of the release flow`);
-  const r = call(args, { cwd, timeout: 120_000 });
-  return { ok: r.status === 0, stdout: String(r.stdout ?? '').trim(), stderr: String(r.stderr ?? '').trim() };
+  const r = gitResultOf(call(args, { cwd, timeout: 120_000, ...(input === undefined ? {} : { input }) }));
+  return { ok: r.ok, stdout: String(r.stdout).trim(), stderr: r.ok ? '' : r.error };
 }
 
 /**
@@ -194,7 +195,7 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   if (!scan.ok) return refuse('secret-scan', scan.error ?? `${scan.findings.length} finding(s) in the pushed range`, { findings: scan.findings });
 
   if (!local) {
-    const made = run(['tag', '-a', tag, '--cleanup=verbatim', '-m', changelogSection(changelog, tag.slice(1)).body], { cwd });
+    const made = run(['tag', '-a', tag, '--cleanup=verbatim', '-F', '-'], { cwd, input: changelogSection(changelog, tag.slice(1)).body });
     if (!made.ok) return refuse('tag-failed', `could not create the annotated tag ${tag}: ${made.stderr.slice(0, 200)}`);
     out.tagCreated = true;
   }

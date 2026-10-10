@@ -8,11 +8,13 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { cutRelease, pushRefusal } from '../../scripts/supervisor/release-cut.mjs';
 import { push } from '../../scripts/api/git/push.mjs';
+import { catFile } from '../../scripts/api/git/cat-file.mjs';
 import { renderRuntimeHooks } from '../../scripts/guards/git-hooks.mjs';
 import { gitCommonDir, l4RecordPath, readL4Record, writeL4Record } from '../../scripts/guards/release-record.mjs';
 import { classifySkip, planL4, runL4, skipReport, skipsOf } from '../../scripts/supervisor/release-l4.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { releaseHostMissing } from '../../scripts/supervisor/release-host.mjs';
+import { changelogSection } from '../../scripts/hfs/runtime-rules/release-notes.mjs';
 import { rootInstallProblem } from '../../scripts/machine/npm-install-state.mjs';
 import { leftoversRefusal } from '../../scripts/gates/release-leftovers.mjs';
 
@@ -75,6 +77,26 @@ test('a green release creates the annotated tag with the CHANGELOG section as it
   assert.match(message, /^## \[1\.0\.0-alpha\.4\]/m, 'the tag message is the CHANGELOG section');
   assert.match(message, /shipped: the release notes/);
   assert.doesNotMatch(message, /older/, 'and only that section');
+});
+
+test('release notes larger than a Windows command line retain their exact Unicode contents in the atomic release tag', async (t) => {
+  const notes = '- shipped: ' + 'Nội dung release hoàn chỉnh. '.repeat(2400) + '\n';
+  const changelog = CHANGELOG.replace('- shipped: the release notes\n', notes);
+  const expected = changelogSection(changelog, TAG.slice(1)).body;
+  assert.ok(expected.length > 32767, 'the notes exceed the Windows process command-line limit');
+  const fx = fixture(t, { changelog });
+  const out = await cut(fx);
+  assert.deepEqual([out.ok, out.verdict, out.tagCreated], [true, 'pushed', true], JSON.stringify(out));
+  const head = git(fx.repo, 'rev-parse', 'HEAD');
+  assert.equal(fx.remoteMain(), head);
+  assert.deepEqual(fx.remoteTags(), [TAG]);
+  assert.equal(git(fx.origin, 'cat-file', '-t', `refs/tags/${TAG}`), 'tag');
+  assert.equal(git(fx.origin, 'rev-parse', `refs/tags/${TAG}^{commit}`), head);
+  const object = catFile(['tag', `refs/tags/${TAG}`], { cwd: fx.origin, encoding: 'buffer' });
+  assert.equal(object.status, 0, String(object.stderr));
+  const messageAt = object.stdout.indexOf(Buffer.from('\n\n'));
+  assert.ok(messageAt > 0, 'the annotated tag has its header and message separator');
+  assert.deepEqual(object.stdout.subarray(messageAt + 2), Buffer.from(expected, 'utf8'));
 });
 
 test('an annotated tag already on HEAD is reused; a lightweight one, one on another commit, a missing or non-release tag name are refused', async (t) => {

@@ -6,6 +6,8 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [1.0.0-alpha.9] — 2026-10-10
 
+- Release on Windows: native Git reads the full Unicode tag notes from stdin with verbatim cleanup; long sections no longer exceed the process command-line limit. Spawn failures keep their native error through the existing Git result owner. A real temporary atomic release checks the annotated tag message byte for byte.
+
 `1.0.0-alpha.8` was never cut: its notes are part of this release, and `1.0.0-alpha.9` is the one release after `1.0.0-alpha.7`. The registry of runtime defects grew from 28 entries on 2026-10-07 to 60 on 2026-10-08 and 120 on 2026-10-09, 33 of them caught on the live host; fixing them one at a time did not converge, so this release is organised by the nine classes of problem they came from. Each class below describes the problem and the changes present in this tree; unfinished work is listed under Deferred. This release is cut with `release.suite: ci` (class 9): the whole suite is read from the `ci` workflow, and the machine runs `npm run check`, the package suites, the affected specs of the range, the live Orca smokes and the example rows.
 
 ### Removed
