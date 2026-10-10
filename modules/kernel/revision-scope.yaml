@@ -86,6 +86,10 @@ rows:
     why: "specs, fixtures and example applications are run, never read by a role"
     paths: ["tests/**", "**/*.spec.mjs", "examples/**", "packages/test-world/**"]
     roles: {}
+  - id: release-cut-plan-replay
+    why: "the cut adapter replay runs private commands and verifies that the selected suite policy reaches the default runner"
+    paths: [tests/helpers/replay-release-cut-plan.mjs, tests/replay/release-cut-plan.spec.mjs]
+    roles: {}
   - id: tooling
     why: "UI, packages, skills and tool configuration: a new process on every use"
     paths: ["ui/**", "packages/**", "skills/**", package.json, package-lock.json, config.example.yaml, secret.env.example, "knowledge/hfs/**", "knowledge/grammars/**"]

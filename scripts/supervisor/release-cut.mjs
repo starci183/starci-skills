@@ -79,7 +79,10 @@ const heldWhy = (o) => {
 };
 
 /** The default L4 runner (scripts/supervisor/release-l4.mjs): every step of the L4 row once, each to a log: [{name, ok, log, ms, skips, absent?}]. The Sonar proofs come from the existing gate (release-l4-sonar.mjs), the Linux step from release-linux-parity.mjs. */
-const defaultSuite = (repo, deps = {}) => runL4(repo, { proofs: deps.proofs, supplier: deps.supplier, ...(deps.parity !== undefined ? { parity: deps.parity } : {}), parityDeps: deps.parityDeps ?? {}, carry: deps.carry ?? {} });
+const defaultSuite = (repo, deps = {}) => runL4(repo, {
+  plan: deps.selection?.plan, proofs: deps.proofs, supplier: deps.supplier,
+  ...(deps.parity !== undefined ? { parity: deps.parity } : {}), parityDeps: deps.parityDeps ?? {}, carry: deps.carry ?? {},
+});
 
 function releaseTagState({ tag, branch, remote, cwd, run, out, refuse }) {
   if (!tag) return { refusal: refuse('no-release-tag', 'name the release tag: v<version>') };
