@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { openLedger } from '../../engine/db/ledger.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { FIXTURES } from '../helpers/replay-world.mjs';
@@ -14,6 +15,8 @@ import { CASES, extractCase, writeFixture } from '../helpers/replay-extract.mjs'
 
 // A drive letter for planted paths, spelled so that this spec holds no drive-letter literal itself.
 const drive = String.fromCharCode(67);
+// Generate a provider-shaped stand-in per run; letters keep the prefix branch distinct from the long digit-bearing token rule.
+const generatedGithubToken = () => ['ghp', Array.from(randomBytes(36), (byte) => String.fromCharCode(97 + byte % 26)).join('')].join('_');
 
 test('every fixture of tests/fixtures/replay passes the hygiene scan, is a few KB and names its case', () => {
   const scanned = scanFixtureDir(FIXTURES);
@@ -32,7 +35,7 @@ test('the scan catches a path, a drive letter, a token, a URL, a product name, a
   const rules = (document) => scanFixture(document).map((finding) => finding.rule);
   assert.deepEqual(rules({ a: 'src/features/x' }), ['path-like']);
   assert.deepEqual(rules({ a: `${drive}:\\work\\x` }), ['path-like']);
-  assert.ok(rules({ a: 'ghp_abcdefghijklmnopqrstuvwxyz0123456789' }).includes('token-like'));
+  assert.ok(rules({ a: generatedGithubToken() }).includes('token-like'));
   assert.ok(rules({ a: `${'a1'.repeat(20)}` }).includes('token-like'));
   assert.ok(rules({ a: 'https://example.test' }).includes('url-like'));
   assert.ok(rules({ a: 'someone@example.test' }).includes('url-like'));
@@ -60,7 +63,7 @@ function copyWithProductContent(t) {
   fs.mkdirSync(path.join(copy, 'nivo'), { recursive: true });
   const ledger = openLedger({ file: path.join(copy, 'nivo', 'runtime.sqlite') });
   try {
-    const payload = { opId: 'architecture.decide', owned_paths: [`${drive}:\\Users\\someone\\nivo-monorepo\\.starciwork\\features\\billing\\sds`], title: 'Nivo billing ghp_abcdefghijklmnopqrstuvwxyz0123456789' };
+    const payload = { opId: 'architecture.decide', owned_paths: [`${drive}:\\Users\\someone\\nivo-monorepo\\.starciwork\\features\\billing\\sds`], title: `Nivo billing ${generatedGithubToken()}` };
     seedWorkflow(ledger, { id: 'wf-nivo-billing-muxq1xov', goal: { revision: 0, markdown: '# Nivo billing' }, jobs: [{ jobId: 'op-architecture.decide-e78adc94cc', opId: 'architecture.decide', status: 'reported', pool: 'claude-agent', payload }] });
     ledger.db.prepare("UPDATE op_attempts SET provider='claude' WHERE job_id='op-architecture.decide-e78adc94cc'").run();
     ledger.transaction(() => ledger.appendEvent({ workflowId: 'wf-nivo-billing-muxq1xov', entityType: 'job', entityId: 'op-architecture.decide-e78adc94cc', kind: 'job-settle-needs-kernel',

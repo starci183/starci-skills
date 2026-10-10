@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { TEST_REGISTRY_ENV, openMachine } from '../../engine/db/machine.mjs';
 import { loadQuestions, answerQuestions } from '../../scripts/reconciler/debug-questions.mjs';
 import { machineFacts } from '../../scripts/reconciler/debug-digest-machine.mjs';
@@ -122,7 +123,7 @@ const PLANTED = Object.freeze({
   'env-secret': 'MY_SERVICE_API_KEY=planted-env-value-42',
   'keyed-secret': 'password = planted-keyed-value-42',
   otp: 'verification code: 482913',
-  'private-key-block': '-----BEGIN RSA PRIVATE KEY-----\nMIIplanted\n-----END RSA PRIVATE KEY-----',
+  'private-key-block': `${['-----BEGIN', 'RSA', 'PRIVATE', 'KEY-----'].join(' ')}\n${randomBytes(24).toString('base64')}\n${['-----END', 'RSA', 'PRIVATE', 'KEY-----'].join(' ')}`,
 });
 
 test('the scan names the artifact and the rule of every kind of secret that survived, counts it, and never returns the text', () => {
