@@ -252,6 +252,7 @@ export const queueOptionsOf = (w: EcommerceWiring, prefix: string): QueueConfig 
     return {
         redisHost: address.hostname,
         redisPort: Number(address.port === "" ? "6379" : address.port),
+        redisDb: w.redis.db,
         prefix,
         relayIntervalMs: 100,
         relayBatch: 50,

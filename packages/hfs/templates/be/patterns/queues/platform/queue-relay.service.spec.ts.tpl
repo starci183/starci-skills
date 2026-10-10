@@ -16,6 +16,7 @@ const AT = "2026-02-03T04:05:06.000Z"
 const options: QueueOptions = {
     redisHost: "localhost",
     redisPort: 6379,
+    redisDb: 0,
     prefix: "test",
     relayIntervalMs: 100,
     relayBatch: 2,

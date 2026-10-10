@@ -630,7 +630,7 @@ function fileQualifier(props={},pkg=null){
  */
 function runSliceCoverage({jestCwd,files,timeoutMs=900_000}){
   let bin;
-  try{bin=createRequire(path.join(jestCwd,'package.json')).resolve('jest/bin/jest.js');}
+  try{bin=createRequire(path.join(jestCwd,'package.json')).resolve('jest/bin/jest');}
   catch{return {exitCode:null,error:`jest is not installed under ${posixPath(jestCwd)}`};}
   const collect=files.flatMap(file=>['--collectCoverageFrom',file]);
   const run=runNode([bin,'--selectProjects','unit','--coverage','--ci','--coverageReporters','lcov',...collect,'--findRelatedTests',...files],{cwd:jestCwd,timeout:timeoutMs,maxBuffer:64*1024*1024});

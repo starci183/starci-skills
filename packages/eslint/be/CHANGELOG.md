@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.1 - 2026-10-10
+
+- Changed: refresh the bundled canon pins for the queue-template package patch; lint rules are unchanged.
+
 ## 3.2.0 - 2026-10-09
 
 - Changed: the bundled runtime copies (engine config, architecture machine, slot manifest, canon pins, failure codes) follow the runtime of 1.0.0-alpha.9; no rule is added or removed. Version 3.1.0 on the registry carries the copies of an earlier runtime.

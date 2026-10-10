@@ -12,6 +12,7 @@ import { QueueWorkerService } from "./queue-worker.service"
 const options: QueueOptions = {
     redisHost: "localhost",
     redisPort: 6379,
+    redisDb: 0,
     prefix: "test",
     relayIntervalMs: 100,
     relayBatch: 2,

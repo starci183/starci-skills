@@ -90,6 +90,14 @@ rows:
     why: "the cut adapter replay runs private commands and verifies that the selected suite policy reaches the default runner"
     paths: [tests/helpers/replay-release-cut-plan.mjs, tests/replay/release-cut-plan.spec.mjs]
     roles: {}
+  - id: app-jest-export-replay
+    why: "the app gate replay proves project-local exported Jest execution and retains failed or missing-tool refusals"
+    paths: [tests/helpers/replay-gate-jest-exports.mjs, tests/replay/gate-jest-exports.spec.mjs]
+    roles: {}
+  - id: queue-redis-db-replay
+    why: "the authored queue adapter replay executes the nonzero database regression against the selected runtime revision"
+    paths: [tests/helpers/replay-queue-redis-db.mjs, tests/replay/queue-redis-db.spec.mjs]
+    roles: {}
   - id: tooling
     why: "UI, packages, skills and tool configuration: a new process on every use"
     paths: ["ui/**", "packages/**", "skills/**", package.json, package-lock.json, config.example.yaml, secret.env.example, "knowledge/hfs/**", "knowledge/grammars/**"]

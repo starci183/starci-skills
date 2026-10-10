@@ -143,6 +143,9 @@ The routing table and the dispatcher contradicted each other, so work had no one
 
 ### Class 9: integration discipline
 
+- App gates and slice coverage resolve Jest through its declared executable export, including a root-hoisted one-app install; missing tools and failing assertions retain their existing refusal semantics.
+- Queue adapters and scaffolded queue templates preserve the declared Redis database for both Queue and Worker. The example test world passes its leased database through the same typed options, preventing queues from silently sharing DB 0 across isolated test worlds; adapter regressions cover a nonzero database without changing scheduler assertions or timeouts.
+
 Nothing stood before a merge or before the host: 28 branches were merged on `npm run check`, which runs no spec, and `npm ci` deleted a package folder in use. Now a release is cut under `release.suite` with a host check that refuses in seconds, a schedule of rows that resumes from its own ledger, the affected specs of the range and the live smokes; a workflow tree that holds its install is marked, not wiped; the examples and the packages are proven against the registry before a tag.
 
 - The release affected row reads the selector's `large` field and uses per-commit selection for a range above its bound, preserving commit reuse and the explicit `notRun` list.

@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.2.1 - 2026-10-10
+
+- Fixed: queue templates preserve the declared Redis database for both Queue and Worker connections, with a nonzero-database adapter regression.
+
 ## 4.2.0 - 2026-10-09
 
 - Changed: the lint runner (`lint/run.mjs`) and the bundled runtime copies follow the runtime of 1.0.0-alpha.9. Version 4.1.0 on the registry carries the copies of an earlier runtime.
