@@ -42,7 +42,7 @@ export function scratchOf(world, jobId) {
 /** The workflow tree is an hfs app, as a started workflow's is: the lite example app (hfs.json, be/, fe/, the stack declaration) and the Work root's own files, committed as the tree's scaffold. */
 function scaffoldApp(dir) {
   const lite = path.join(ROOT, 'examples', 'lite-app');
-  fs.cpSync(lite, dir, { recursive: true, filter: (src) => !/[\/](node_modules|.git|.husky)([\/]|$)/.test(src) });
+  fs.cpSync(lite, dir, { recursive: true, filter: (src) => !/[\\/](node_modules|\.git|\.husky)([\\/]|$)/.test(src) });
   fs.copyFileSync(path.join(ROOT, 'examples', 'ecommerce-app', '.starciwork', 'workspace.yaml'), path.join(dir, '.starciwork', 'workspace.yaml'));
 }
 
