@@ -29,6 +29,22 @@ function pageProblem(page, run, first) {
   return null;
 }
 
+// A page is appended only after all Dispatch identities are unique, keeping partial failure rows unchanged.
+function appendPage(page, workers, dispatches) {
+  for (const row of page.workers) {
+    if (dispatches.has(row.dispatchId)) return 'worker-list repeated a Dispatch across pages';
+    dispatches.add(row.dispatchId);
+  }
+  workers.push(...page.workers);
+  return null;
+}
+
+function cursorProblem(next, cursors, pages, maxPages) {
+  if (cursors.has(next)) return 'worker-list repeated a cursor';
+  cursors.add(next);
+  return pages >= maxPages ? `worker-list still had more rows after ${pages} pages` : null;
+}
+
 /** Every page of one listing, the cursor passed back unchanged. {ok, workers, counts, scope, pages, error, hostUnavailable}. */
 export function workerListAll({ run, terminalState, maxPages = MAX_PAGES, list = workerList } = {}) {
   const workers = [];
@@ -41,21 +57,15 @@ export function workerListAll({ run, terminalState, maxPages = MAX_PAGES, list =
     const problem = pageProblem(page, run, first);
     if (problem) return { ok: false, workers, counts: first?.counts ?? null, scope: first?.scope ?? page.scope ?? null, pages, error: problem, hostUnavailable: false };
     first ??= page;
-    for (const row of page.workers) {
-      if (dispatches.has(row.dispatchId)) return { ok: false, workers, counts: first.counts, scope: first.scope, pages, error: 'worker-list repeated a Dispatch across pages', hostUnavailable: false };
-      dispatches.add(row.dispatchId);
-    }
-    workers.push(...page.workers);
+    const appendProblem = appendPage(page, workers, dispatches);
+    if (appendProblem) return { ok: false, workers, counts: first.counts, scope: first.scope, pages, error: appendProblem, hostUnavailable: false };
     const next = page.page?.hasMore ? page.page.nextCursor : null;
-    if (!next) {
-      if (workers.length !== first.page.total) return { ok: false, workers, counts: first.counts, scope: first.scope, pages, error: 'worker-list ended before its total was covered', hostUnavailable: false };
-      break;
-    }
-    if (cursors.has(next)) return { ok: false, workers, counts: first.counts, scope: first.scope, pages, error: 'worker-list repeated a cursor', hostUnavailable: false };
-    cursors.add(next);
-    if (pages >= maxPages) return { ok: false, workers, counts: first.counts, scope: first.scope, pages, error: `worker-list still had more rows after ${pages} pages`, hostUnavailable: false };
+    if (!next) break;
+    const cursorIssue = cursorProblem(next, cursors, pages, maxPages);
+    if (cursorIssue) return { ok: false, workers, counts: first.counts, scope: first.scope, pages, error: cursorIssue, hostUnavailable: false };
     cursor = next;
   }
+  if (workers.length !== first.page.total) return { ok: false, workers, counts: first.counts, scope: first.scope, pages, error: 'worker-list ended before its total was covered', hostUnavailable: false };
   return { ok: true, workers, counts: first.counts, scope: first.scope, pages, error: null, hostUnavailable: false };
 }
 
