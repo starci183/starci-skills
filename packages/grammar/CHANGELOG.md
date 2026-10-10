@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased
+## 0.8.4 - 2026-10-10
+
+Patch, additive (nivo-lite connections; owner approved publishing @starci packages).
+
+- **Copyable and read-only `Input`.** `isCopyable` with `copyLabel` (and `copiedLabel`, `onCopy`) adds a Grammar `Button` after the
+  control that copies the current value, controlled or not, masked secrets included without revealing them; when the clipboard is
+  refused the value is selected instead. `isReadOnly` keeps the value focusable and selectable at full contrast but not editable
+  (`data-grammar-readonly`). The control and the action sit in `.starci-core-input-row`.
+- **Fixed: `defaultValue` and edits on an uncontrolled `Input`.** The vendor TextField owned the value and overrode the inner input,
+  so a `defaultValue` rendered empty. `value`, `defaultValue` and the change callback now belong to the TextField.
+
+## 0.8.2 / 0.8.3 - 2026-10-05
+
 
 Minor, additive (lane C0-CANON).
 

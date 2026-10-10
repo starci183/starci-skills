@@ -2799,6 +2799,21 @@
         gap: 0.5rem !important;
     }
 
+    .starci-core-input-row {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .starci-core-input-row > .starci-core-input-control {
+        flex: 1 1 auto;
+    }
+
+    .starci-core-input[data-grammar-readonly="true"] .starci-core-input-field {
+        cursor: text;
+    }
+
     .starci-core-input-control {
         position: relative;
         display: flex;

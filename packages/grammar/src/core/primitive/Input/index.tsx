@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type ComponentType, type ReactNode } from "react"
+import { useEffect, useState, type ComponentType, type ReactNode } from "react"
 import {
     Description as HeroDescription,
     ErrorMessage as HeroErrorMessage,
@@ -9,6 +9,7 @@ import {
     Skeleton as HeroSkeleton,
     TextField as HeroTextField,
 } from "@heroui/react"
+import { Button } from "../Button/index.js"
 
 export type InputKind = "email" | "tel" | "password" | "newPassword" | "code" | "text"
 export type InputVariant = "primary" | "secondary"
@@ -30,6 +31,15 @@ export type InputProps = {
     readonly isDisabled?: boolean
     readonly isRequired?: boolean
     readonly isSkeleton?: boolean
+    /** The value can be focused, selected and copied but not changed (unlike `isDisabled`, it stays at full contrast). */
+    readonly isReadOnly?: boolean
+    /** Adds a copy action after the control that copies the current value; needs `copyLabel` (and `copiedLabel` for the confirmation). */
+    readonly isCopyable?: boolean
+    readonly copyLabel?: string
+    /** Shown on the copy action for a moment after a successful copy. */
+    readonly copiedLabel?: string
+    /** Called with the copied value after it reached the clipboard. */
+    readonly onCopy?: (value: string) => void
     readonly revealLabel?: string
     readonly hideLabel?: string
     readonly revealIcon?: InputIcon
@@ -62,6 +72,11 @@ export const Input = ({
     isDisabled = false,
     isRequired = false,
     isSkeleton = false,
+    isReadOnly = false,
+    isCopyable = false,
+    copyLabel,
+    copiedLabel,
+    onCopy,
     revealLabel,
     hideLabel,
     revealIcon: RevealIcon,
@@ -74,6 +89,31 @@ export const Input = ({
     const invalid = isError || errorMessage != null
     const toggleLabel = isRevealed ? hideLabel : revealLabel
     const ToggleIcon = isRevealed ? HideIcon : RevealIcon
+    const [isCopied, setIsCopied] = useState(false)
+    const canCopy = isCopyable && copyLabel !== undefined
+
+    useEffect(() => {
+        if (!isCopied) return
+        const timer = setTimeout(() => setIsCopied(false), 2000)
+        return () => clearTimeout(timer)
+    }, [isCopied])
+
+    /**
+     * Copies what the control holds now (controlled or not); when the clipboard is refused, the value is selected instead.
+     * The control is found by its id because the vendor input does not forward a ref.
+     */
+    const copy = async () => {
+        const field = document.getElementById(id)
+        const control = field instanceof HTMLInputElement ? field : null
+        const current = control?.value ?? value ?? ""
+        try {
+            await navigator.clipboard.writeText(current)
+            setIsCopied(true)
+            onCopy?.(current)
+        } catch {
+            control?.select()
+        }
+    }
 
     if (isSkeleton) {
         return (
@@ -94,38 +134,47 @@ export const Input = ({
             isInvalid={invalid}
             isDisabled={isDisabled}
             isRequired={isRequired}
+            isReadOnly={isReadOnly}
+            {...(value === undefined
+                ? defaultValue === undefined ? {} : { defaultValue }
+                : { value })}
+            onChange={(next: string) => onValueChange?.(next)}
+            data-grammar-readonly={isReadOnly ? "true" : "false"}
             data-contract="GAP-2"
             className="starci-core-input"
         >
             <HeroLabel>{label}</HeroLabel>
             {hint == null ? null : <HeroDescription>{hint}</HeroDescription>}
-            <div className="starci-core-input-control" data-reveal={isSecret && toggleLabel !== undefined ? "true" : "false"}>
-                <HeroInput
-                    id={id}
-                    name={name}
-                    type={isSecret && isRevealed ? "text" : kind.type}
-                    autoComplete={kind.autoComplete}
-                    inputMode={kind.inputMode}
-                    {...(placeholder === undefined ? {} : { placeholder })}
-                    {...(value === undefined
-                        ? defaultValue === undefined ? {} : { defaultValue }
-                        : { value })}
-                    fullWidth
-                    className="starci-core-input-field"
-                    onChange={(event) => onValueChange?.(event.target.value)}
-                />
-                {!isSecret || toggleLabel === undefined ? null : (
-                    <button
-                        type="button"
-                        aria-label={toggleLabel}
-                        disabled={isDisabled}
-                        data-contract="TONE-2"
-                        className="starci-core-input-reveal"
-                        onClick={() => setIsRevealed((current) => !current)}
-                    >
-                        {ToggleIcon === undefined ? <span data-contract="FONT-1" className="starci-core-input-reveal-label">{toggleLabel}</span> : <ToggleIcon className="starci-core-input-reveal-icon" />}
-                    </button>
-                )}
+            <div className="starci-core-input-row" data-copyable={canCopy ? "true" : "false"}>
+                <div className="starci-core-input-control" data-reveal={isSecret && toggleLabel !== undefined ? "true" : "false"}>
+                    <HeroInput
+                        id={id}
+                        name={name}
+                        type={isSecret && isRevealed ? "text" : kind.type}
+                        autoComplete={kind.autoComplete}
+                        inputMode={kind.inputMode}
+                        {...(placeholder === undefined ? {} : { placeholder })}
+                        fullWidth
+                        className="starci-core-input-field"
+                    />
+                    {!isSecret || toggleLabel === undefined ? null : (
+                        <button
+                            type="button"
+                            aria-label={toggleLabel}
+                            disabled={isDisabled}
+                            data-contract="TONE-2"
+                            className="starci-core-input-reveal"
+                            onClick={() => setIsRevealed((current) => !current)}
+                        >
+                            {ToggleIcon === undefined ? <span data-contract="FONT-1" className="starci-core-input-reveal-label">{toggleLabel}</span> : <ToggleIcon className="starci-core-input-reveal-icon" />}
+                        </button>
+                    )}
+                </div>
+                {canCopy ? (
+                    <Button variant="outline" isDisabled={isDisabled} onPress={() => void copy()}>
+                        <span aria-live="polite">{isCopied && copiedLabel !== undefined ? copiedLabel : copyLabel}</span>
+                    </Button>
+                ) : null}
             </div>
             {errorMessage == null ? null : <HeroErrorMessage>{errorMessage}</HeroErrorMessage>}
         </HeroTextField>
