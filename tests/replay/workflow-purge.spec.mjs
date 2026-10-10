@@ -114,6 +114,66 @@ const noPurgeEffects = (world, dir) => {
   assert.equal(git(world.repo, 'rev-parse', `refs/heads/wf-${wf}`), git(dir, 'rev-parse', 'HEAD'));
 };
 
+test('native-shaped context-only Dispatches with positive resource absence do not retain a workflow tree or get released', t => {
+  const { world, dir } = stoppedWorld(t);
+  stopWorld(world);
+  const historical = (dispatchId, runId) => ({ dispatchId, runId, workerState: 'unsupervised', terminalState: 'retained', agentTerminalHandle: 'term-' + dispatchId, resource: null,
+    projection: { resource: { state: 'absent', reason: 'unsupervised' }, workspace: null, liveness: { verdict: 'unverifiable', reason: 'unsupervised_settled' }, nextAction: { kind: 'none', argv: [] } } });
+  const contexts = [historical('dsp-context-own', 'run-1'), historical('dsp-context-foreign', 'run-history')];
+  writeBooks(world, books => ({ ...books, workerRows: [...books.workerRows, ...contexts] }));
+  const planned = world.starci(purgeArgs(world, '--plan'));
+  assert.equal(planned.status, 0, planned.stderr || planned.stdout);
+  assert.deepEqual(planned.json.blockers, []);
+  assert.deepEqual(planned.json.workers.map(worker => worker.dispatchId), ['dsp-1']);
+  assert.equal(fs.existsSync(dir), true);
+  const applied = world.starci(purgeArgs(world, '--apply', '--expect', planned.json.sha));
+  assert.equal(applied.status, 0, applied.stderr || applied.stdout);
+  assert.equal(fs.existsSync(dir), false);
+  assert.deepEqual(world.orca().workerRows.filter(worker => worker.workerState === 'unsupervised'), contexts, 'historical Dispatch records and their liveness are untouched');
+  const effects = orcaCalls(world).slice(world.purgeCallStart).filter(call => /^(terminal close|orchestration worker-release) /.test(call));
+  for (const context of contexts) assert.equal(effects.some(call => call.includes(context.dispatchId) || call.includes(context.agentTerminalHandle)), false, 'resource absence never authorizes a close');
+});
+
+test('a caller-bound native worker listing cannot hide foreign resource custody or authorize an apply', t => {
+  const { world, dir } = stoppedWorld(t);
+  stopWorld(world);
+  writeBooks(world, books => ({ ...books, workerListBoundRun: 'run-1', workerRows: [...books.workerRows,
+    { dispatchId: 'dsp-hidden', runId: 'run-foreign', workerState: 'abandoned', terminalState: 'retained', resource: { terminalHandle: 'term-hidden', worktreeId: 'repo-product::' + dir }, projection: { resource: { state: 'owned' }, liveness: { verdict: 'unverifiable', reason: 'missing_status' }, nextAction: { kind: 'release', argv: ['orchestration', 'worker-release', '--dispatch', 'dsp-hidden'] } } },
+  ] }));
+  for (const flags of [['--plan'], ['--apply', '--ledger']]) {
+    const refused = world.starci(purgeArgs(world, ...flags));
+    assert.equal(refused.status, 1, refused.stderr || refused.stdout);
+    assert.ok(refused.json.blockers.some(item => item.code === 'workflow-purge-orca-unreadable'));
+    noPurgeEffects(world, dir);
+  }
+});
+
+test('genuine all-scope accounting keeps one retained abandoned resource held beside historical resource absence', t => {
+  const { world, dir } = stoppedWorld(t);
+  stopWorld(world);
+  const history = { dispatchId: 'dsp-history', runId: 'run-history', workerState: 'unsupervised', terminalState: 'retained', agentTerminalHandle: 'term-history', resource: null,
+    projection: { resource: { state: 'absent', reason: 'unsupervised' }, workspace: null, liveness: { verdict: 'unverifiable', reason: 'unsupervised_settled' }, nextAction: { kind: 'none', argv: [] } } };
+  const holder = { dispatchId: 'dsp-held', runId: 'run-foreign', workerState: 'abandoned', terminalState: 'retained', resource: { terminalHandle: 'term-held', worktreeId: 'repo-product::' + dir },
+    projection: { resource: { state: 'owned' }, liveness: { verdict: 'unverifiable', reason: 'missing_status' }, nextAction: { kind: 'release', argv: ['orchestration', 'worker-release', '--dispatch', 'dsp-held'] } } };
+  writeBooks(world, books => ({ ...books, workerRows: [...books.workerRows, history, holder] }));
+  const refused = world.starci(purgeArgs(world, '--apply', '--ledger'));
+  assert.equal(refused.status, 1, refused.stderr || refused.stdout);
+  assert.ok(refused.json.blockers.some(item => item.code === 'workflow-purge-custody-unknown'));
+  assert.deepEqual(refused.json.listed.map(item => item.id), ['dsp-held']);
+  noPurgeEffects(world, dir);
+  assert.deepEqual(world.orca().workerRows.slice(-2), [history, holder]);
+});
+
+test('a worker page scoped to another Run refuses through the real CLI before effects', t => {
+  const { world, dir } = stoppedWorld(t);
+  stopWorld(world);
+  writeBooks(world, books => ({ ...books, workerListScopes: { 'run-1': { source: 'flag', run: 'run-wrong' } } }));
+  const refused = world.starci(purgeArgs(world, '--apply', '--ledger'));
+  assert.equal(refused.status, 1, refused.stderr || refused.stdout);
+  assert.ok(refused.json.blockers.some(item => item.code === 'workflow-purge-orca-unreadable'));
+  noPurgeEffects(world, dir);
+});
+
 test('pointer-only ledger events and spilled machine events preserve Run, terminal and ref custody; a live proved worker refuses before any effect', (t) => {
   const { world, dir } = stoppedWorld(t);
   const preservedRef = 'preserved/private-spilled-evidence';

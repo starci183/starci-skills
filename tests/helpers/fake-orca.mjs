@@ -736,11 +736,12 @@ else if (verb === 'orchestration worker-abandon')
 // state.workerRows seeds Orca's worker accounting (worker-list row shape): filtered by --run and
 // --terminal-state, paged by --limit with an opaque numeric cursor. A run filter reports scope flag.
 else if (verb === 'orchestration worker-list') {
-  const rows = (state.workerRows || []).filter((w) => (!arg('run') || w.runId === arg('run')) && (!arg('terminal-state') || w.terminalState === arg('terminal-state')));
+  const selectedRun = arg('run') ?? state.workerListBoundRun ?? null;
+  const rows = (state.workerRows || []).filter((w) => (!selectedRun || w.runId === selectedRun) && (!arg('terminal-state') || w.terminalState === arg('terminal-state')));
   const limit = Number(arg('limit')) || 100;
   const start = Number(arg('cursor')) || 0;
   const more = start + limit < rows.length;
-  out({ ok: true, result: { workers: rows.slice(start, start + limit), counts: {}, scope: { source: arg('run') ? 'flag' : 'all' },
+  out({ ok: true, result: { workers: rows.slice(start, start + limit), counts: {}, scope: state.workerListScopes?.[arg('run') ?? '*'] ?? { source: arg('run') ? 'flag' : selectedRun ? 'bound' : 'all', run: selectedRun },
     page: { limit, total: rows.length, hasMore: more, nextCursor: more ? String(start + limit) : null } } });
 }
 // state.workerOutput[dispatch] seeds Orca's worker-read answer: {source: 'transcript'|'terminal', pages: [{rows,

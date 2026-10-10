@@ -97,7 +97,7 @@ export function purgeWorld(t, fn, { archiveIt = true } = {}) {
     world.reads = {
       ps: () => orca.ps(),
       terminals: () => ({ ok: true, terminals: world.terminals }),
-      workers: (run) => ({ ok: true, workers: run == null ? world.workers : world.workers.filter((w) => w.runId === run) }),
+      workers: (run) => ({ ok: true, scope: { source: run == null ? 'all' : 'flag', run: run ?? null }, workers: run == null ? world.workers : world.workers.filter((w) => w.runId === run) }),
     };
     if (archiveIt) archive(ledger, ARCHIVED);
     return fn(world);

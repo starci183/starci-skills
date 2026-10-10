@@ -98,15 +98,16 @@ function workersOf(runIds, orca) {
   for (const run of runIds) {
     let listed;
     try { listed = orca.workers(run); } catch (error) { listed = { ok: false, error: String(error?.message ?? error) }; }
-    if (listed?.ok) rows.push(...listed.workers);
-    else unreadable.push({ run, error: String(listed?.error ?? 'no answer').slice(0, 200) });
+    if (listed?.ok && Array.isArray(listed.workers) && listed.scope?.source === 'flag' && listed.scope.run === run
+      && listed.workers.every(worker => worker.runId === run)) rows.push(...listed.workers);
+    else unreadable.push({ run, error: String(listed?.error ?? 'worker-list did not answer the requested Run').slice(0, 200) });
   }
   // Every Run's workers: an unreadable global listing cannot prove the workflow's trees have no unknown custody.
   let others = [];
   try {
     const all = orca.workers(undefined);
-    if (all?.ok) others = all.workers.filter((w) => !runIds.includes(w.runId));
-    else unreadable.push({ run: null, error: String(all?.error ?? 'no answer').slice(0, 200) });
+    if (all?.ok && Array.isArray(all.workers) && all.scope?.source === 'all' && all.scope.run == null) others = all.workers.filter((w) => !runIds.includes(w.runId));
+    else unreadable.push({ run: null, error: String(all?.error ?? 'worker-list did not cover every Run').slice(0, 200) });
   } catch (error) { unreadable.push({ run: null, error: String(error?.message ?? error).slice(0, 200) }); }
   return { rows, unreadable, others };
 }

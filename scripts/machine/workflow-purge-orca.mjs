@@ -11,6 +11,16 @@ const HELD_STATES = new Set(['active', 'reclaimable', 'retained', 'release_pendi
 
 const workerRow = (plan) => ({ dispatchId: plan.dispatchId, runId: plan.runId, terminal: plan.terminalHandle, state: plan.terminalState, liveness: plan.liveness, reason: plan.reason });
 
+// Context-only Dispatches have a retained projection but no supervised resource. Only Orca's explicit absence
+// qualifies: an omitted resource, a workspace or conflicting lifecycle fields keeps custody unknown.
+const resourceAbsent = (row) => row?.workerState === 'unsupervised' && row?.terminalState === 'retained'
+  && Object.hasOwn(row, 'resource') && row.resource === null
+  && row.projection?.resource?.state === 'absent' && row.projection.resource.reason === 'unsupervised'
+  && row.projection.workspace === null && row.projection.liveness?.verdict === 'unverifiable'
+  && row.projection.liveness.reason === 'unsupervised_settled'
+  && row.projection.nextAction?.kind === 'none' && Array.isArray(row.projection.nextAction.argv)
+  && row.projection.nextAction.argv.length === 0;
+
 /**
  * The workers of the workflow's Runs: {close: [worker], live: [worker]}. A worker Orca holds (any held state) is closed, except one that is
  * still active and not exited: that one is live, and a purge refuses while it exists.
@@ -20,7 +30,7 @@ export function classifyWorkers(rows) {
   const close = [], live = [];
   rows.forEach((row, index) => {
     const plan = plans[index];
-    if (plan.terminalState === 'released') return;
+    if (plan.terminalState === 'released' || resourceAbsent(row)) return;
     const worker = workerRow(plan);
     if (!HELD_STATES.has(plan.terminalState) || !plan.liveness || (plan.terminalState === 'active' && plan.liveness !== 'exited')) live.push(worker);
     else close.push(worker);
@@ -59,7 +69,7 @@ export function classifyTerminals({ terminals, evidence, treePaths, workerClose 
 
 /** The workers of other Runs that Orca holds inside a tree of the workflow: listed, never touched (no ledger row ties their Run to it). [{kind, id, why}] */
 export function listStrangerWorkers({ rows, treePaths, terminals = [] }) {
-  const held = rows.filter((row) => row?.terminalState !== 'released');
+  const held = rows.filter((row) => row?.terminalState !== 'released' && !resourceAbsent(row));
   return held.filter((row) => {
     const terminal = terminals.find((item) => item.handle === terminalHandleOf(row));
     const where = worktreePathOf(row) ?? cwdOf(terminal ?? {});

@@ -37,7 +37,7 @@ test('worker-list wrapper: --run and --terminal-state reach Orca, and every page
   assert.equal(out.ok, true);
   assert.equal(out.workers.length, 230, 'paged past 100 rows');
   assert.equal(out.pages, 3);
-  assert.deepEqual(out.scope, { source: 'flag' });
+  assert.deepEqual(out.scope, { source: 'flag', run: 'run_a' });
   const argvs = fs.readFileSync(log, 'utf8').trim().split(/\r?\n/).map((l) => JSON.parse(l).argv).filter((a) => a.includes('worker-list'));
   assert.equal(argvs.length, 3);
   for (const a of argvs) assert.ok(a.includes('--run') && a[a.indexOf('--run') + 1] === 'run_a' && a.includes('--terminal-state') && a.includes('--json'), a.join(' '));
@@ -46,11 +46,30 @@ test('worker-list wrapper: --run and --terminal-state reach Orca, and every page
 
 test('workerListAll: a failed page fails the listing, and a cursor that never ends is cut off', () => {
   let n = 0;
-  const failing = workerListAll({ run: 'r', list: () => (++n === 1 ? { ok: true, workers: [row('a')], page: { hasMore: true, nextCursor: 'c1' } } : { ok: false, error: 'runtime_unavailable' }) });
+  const failing = workerListAll({ run: 'r', list: () => (++n === 1 ? { ok: true, workers: [row('a', { run: 'r' })], scope: { source: 'flag', run: 'r' }, page: { total: 2, hasMore: true, nextCursor: 'c1' } } : { ok: false, error: 'runtime_unavailable' }) });
   assert.deepEqual([failing.ok, failing.error, failing.workers.length], [false, 'runtime_unavailable', 1]);
-  const endless = workerListAll({ run: 'r', maxPages: 3, list: () => ({ ok: true, workers: [], page: { hasMore: true, nextCursor: 'again' } }) });
+  n = 0;
+  const endless = workerListAll({ run: 'r', maxPages: 3, list: () => ({ ok: true, workers: [row(`a${++n}`, { run: 'r' })], scope: { source: 'flag', run: 'r' }, page: { total: 4, hasMore: true, nextCursor: `cursor-${n}` } }) });
   assert.equal(endless.ok, false);
   assert.match(endless.error, /after 3 pages/);
+});
+
+test('worker paging refuses lost scope, contradictory totals, repeated identities and missing continuation', () => {
+  const first = { ok: true, workers: [row('a', { run: 'r' })], scope: { source: 'flag', run: 'r' }, page: { total: 2, hasMore: true, nextCursor: 'older' } };
+  const last = { ok: true, workers: [row('b', { run: 'r' })], scope: { source: 'flag', run: 'r' }, page: { total: 2, hasMore: false, nextCursor: null } };
+  for (const pages of [
+    [{ ...first, scope: null }], [{ ...first, scope: { source: 'bound', run: 'r' } }],
+    [{ ...first, workers: [row('foreign')] }], [{ ...first, page: { total: 2, hasMore: true, nextCursor: null } }],
+    [first, { ...last, scope: { source: 'flag', run: 'another' } }],
+    [first, { ...last, page: { total: 3, hasMore: false, nextCursor: null } }],
+    [first, { ...last, workers: [] }], [first, { ...last, workers: first.workers }],
+    [first, { ...last, page: first.page }], [{ ...last, page: { total: 1, hasMore: false, nextCursor: 'unexpected' } }],
+  ]) {
+    let at = 0;
+    const out = workerListAll({ run: 'r', list: () => pages[at++] });
+    assert.equal(out.ok, false, JSON.stringify(pages));
+    assert.ok(out.error);
+  }
 });
 
 test('activeWorkersAllRuns: only a listing over every Run counts; a bound or failed one is null', () => {

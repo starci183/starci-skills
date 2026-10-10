@@ -43,6 +43,67 @@ function leftovers(world, { unknownInTree = false } = {}) {
 const snapshot = (world) => ({ refs: refsOf(world.app), effects: world.orca.names().filter((name) => name === 'create' || name === 'remove'), disk: fs.readdirSync(world.orca.root).sort(), registry: world.machine.db.prepare('SELECT path, removed_at FROM worktrees ORDER BY path').all(),
   events: world.machine.db.prepare('SELECT count(*) n FROM sup_events').get().n, closed: structuredClone(world.closed) });
 
+const contextWorker = (runId = 'run-history') => ({ dispatchId: 'dsp-context', runId, workerState: 'unsupervised', terminalState: 'retained', agentTerminalHandle: 'term-context', resource: null,
+  projection: { resource: { state: 'absent', reason: 'unsupervised' }, workspace: null, liveness: { verdict: 'unverifiable', reason: 'unsupervised_settled' }, nextAction: { kind: 'none', argv: [] } } });
+
+test('positive context-only resource absence is not a worker holder or a close target, while liveness stays unverifiable', t => purgeWorld(t, async world => {
+  for (const runId of ['run-history', 'run-old']) {
+    const historical = contextWorker(runId);
+    world.workers = [historical];
+    const before = snapshot(world);
+    const planned = await run(world, { plan: true });
+    assert.equal(planned.code, 0, planned.text);
+    assert.deepEqual(planned.data.workers, []);
+    assert.deepEqual(planned.data.blockers, []);
+    assert.equal(historical.projection.liveness.verdict, 'unverifiable');
+    assert.deepEqual(snapshot(world), before);
+  }
+}));
+
+test('resource absence never hides a foreign terminal in the workflow tree', t => purgeWorld(t, async world => {
+  world.workers = [contextWorker()];
+  world.terminals = [terminalRow('term-context', world.trees.second.path)];
+  const before = snapshot(world);
+  const refused = await run(world, { apply: true, ledger: true });
+  assert.equal(refused.code, 1);
+  assert.ok(refused.data.blockers.some(item => item.code === 'workflow-purge-custody-unknown'));
+  assert.deepEqual(refused.data.listed.map(item => item.id), ['term-context']);
+  assert.deepEqual(snapshot(world), before);
+}));
+
+test('missing or contradictory resource absence keeps unplaced custody held', t => purgeWorld(t, async world => {
+  for (const damage of ['missing-resource', 'resource-present', 'unknown-projection', 'workspace', 'next-action', 'worker-state']) {
+    const historical = contextWorker();
+    if (damage === 'missing-resource') delete historical.resource;
+    if (damage === 'resource-present') historical.resource = { terminalHandle: 'term-context' };
+    if (damage === 'unknown-projection') historical.projection.resource.state = 'unknown';
+    if (damage === 'workspace') historical.projection.workspace = { id: 'repo::' + world.trees.second.path };
+    if (damage === 'next-action') historical.projection.nextAction = { kind: 'release', argv: [] };
+    if (damage === 'worker-state') historical.workerState = 'abandoned';
+    world.workers = [historical];
+    const before = snapshot(world);
+    const refused = await run(world, { apply: true, ledger: true });
+    assert.equal(refused.code, 1, damage);
+    assert.ok(refused.data.blockers.some(item => item.code === 'workflow-purge-custody-unknown'), damage);
+    assert.deepEqual(snapshot(world), before, damage);
+  }
+}));
+
+test('bound, missing and contradictory worker scopes cannot authorize purge', t => purgeWorld(t, async world => {
+  for (const scope of [null, { source: 'bound', run: 'run-old' }, { source: 'flag', run: 'run-old' }, { source: 'all', run: 'run-old' }]) {
+    const before = snapshot(world);
+    const orca = { ...world.reads, workers: runId => runId == null ? { ok: true, workers: [], scope } : world.reads.workers(runId) };
+    const refused = await run(world, { apply: true, ledger: true }, { orca });
+    assert.equal(refused.code, 1, JSON.stringify(scope));
+    assert.ok(refused.data.blockers.some(item => item.code === 'workflow-purge-orca-unreadable'));
+    assert.deepEqual(snapshot(world), before);
+  }
+  const orca = { ...world.reads, workers: runId => runId == null ? world.reads.workers(runId) : { ok: true, workers: [], scope: { source: 'flag', run: 'wrong-run' } } };
+  const refused = await run(world, { apply: true }, { orca });
+  assert.equal(refused.code, 1);
+  assert.ok(refused.data.blockers.some(item => item.code === 'workflow-purge-orca-unreadable'));
+}));
+
 test('the plan is the default and changes nothing: it prints custody blockers, trees, refs, proved leftovers and unknown holders', (t) => {
   return purgeWorld(t, async (world) => {
     leftovers(world, { unknownInTree: true });
