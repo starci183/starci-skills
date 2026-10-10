@@ -255,7 +255,7 @@ test('generic closure releases capacity only after both terminal and process-tre
       release: () => ({ ok: true, state: 'released' }),
       close: (handle) => { assert.equal(handle, 'terminal-a'); closed = true; return { handle, ok: true, proof: 'gone' }; },
       tableOf: () => verifiable ? closed ? [] : [object] : null,
-      envOf: () => verifiable ? closed ? [] : [{ pid: object.pid, values: { ORCA_TERMINAL_HANDLE: 'terminal-a' } }] : null,
+      envOf: () => verifiable ? closed ? [] : [{ pid: object.pid, readable: true, values: { ORCA_TERMINAL_HANDLE: 'terminal-a' } }] : null,
       capture: (pid, { ownership }) => {
         assert.equal(closed, false, 'identity must be captured while the terminal process is live');
         assert.equal(pid, object.pid);
