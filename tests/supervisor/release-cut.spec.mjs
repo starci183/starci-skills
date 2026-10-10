@@ -80,7 +80,7 @@ test('a green release creates the annotated tag with the CHANGELOG section as it
 });
 
 test('release notes larger than a Windows command line retain their exact Unicode contents in the atomic release tag', async (t) => {
-  const notes = '- shipped: ' + 'Nội dung release hoàn chỉnh. '.repeat(2400) + '\n';
+  const notes = '- shipped: ' + 'Complete Unicode release notes: \u03bb \u{1f680}. '.repeat(2400) + '\n';
   const changelog = CHANGELOG.replace('- shipped: the release notes\n', notes);
   const expected = changelogSection(changelog, TAG.slice(1)).body;
   assert.ok(expected.length > 32767, 'the notes exceed the Windows process command-line limit');
