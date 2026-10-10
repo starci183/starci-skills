@@ -70,6 +70,10 @@ settleJudges:
   - {proof: work-hygiene, files: ["scripts/work/validate/**", "modules/schemas/**"], admissionAware: false}
   - {proof: brand-consumable, files: [scripts/kernel/brand-product.mjs, scripts/kernel/grammar-context.mjs, scripts/lib/roots.mjs], admissionAware: false}
 rows:
+  - id: worker-terminal-census-replay
+    why: "the close replay rejects partial process environment coverage without terminal or process effects"
+    paths: [tests/replay/worker-close-census.spec.mjs]
+    roles: {}
   - id: held-state-mechanisms
     why: "draft holds, untied tree facts and their decision plans preserve human custody; loaded engine code follows the import graph"
     paths: [scripts/kernel/draft-hold.mjs, scripts/reconciler/draft-plan.mjs, scripts/reconciler/untied-tree-item.mjs, scripts/machine/untied-tree.mjs]
