@@ -184,7 +184,7 @@ Nothing stood before a merge or before the host: 28 branches were merged on `npm
 - Substantive judging of `content.generate` and `perf.verify` remains open. `scope.finish` also has a judge gap: it has no implemented owner gate. Acceptance-trace is report-only and does not close these gaps.
 - Full storage-writer conversion, the ledger migration with mandatory backup, and the blob collector remain outside this release; the storage convention and readers do not make all ledger content references.
 - Converting the remaining legacy runtime sites that derive a root with `process.cwd()` remains work for later releases; the root-adhoc check prevents new sites but does not complete those conversions.
-- After the narrowed prune and the release-plan replay, the tree holds 959 spec files and 6,823 test declarations; the remaining tests have not all been reviewed body by body.
+- After the narrowed prune and the release-plan replays, the tree holds 961 spec files and 6,826 test declarations; the remaining tests have not all been reviewed body by body.
 - Three export-consequence test removals remain outside the narrowed prune scope; those tests and the production exports are retained.
 - The gate-loosening check still judges per file; judging every removed line is deferred.
 - Splitting the edge-case registry into one file per entry is deferred.
