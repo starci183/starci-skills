@@ -62,6 +62,23 @@ test('a complete empty initial census cannot become empty proof when post-close 
   }
 });
 
+test('an environment-only PID cannot authorize initial closure or certify an inconsistent later snapshot', () => {
+  for (const value of [HANDLE, null]) {
+    const initial = censusWorld({ initialEnv: [observation(row.pid, value)], afterTable: [], afterEnv: [] });
+    const before = closeWorker({ dispatch: DISPATCH, stopFirst: true, deps: initial.deps, env: {} });
+    assert.equal(before.processes.verdict, 'unverifiable');
+    assert.equal(before.ok, false, 'a later empty snapshot cannot make the unconfirmed release moot');
+    assert.equal(workerClosureProven(before, HANDLE), false);
+    assert.deepEqual(initial.effects, ['release'], 'initial snapshot disagreement authorizes no stop or close');
+    const later = censusWorld({ afterEnv: [observation(row.pid, value)] });
+    const after = closeWorker({ dispatch: DISPATCH, deps: later.deps, env: {} });
+    assert.equal(after.processes.verdict, 'unverifiable');
+    assert.equal(after.ok, false);
+    assert.equal(workerClosureProven(after, HANDLE), false);
+    assert.deepEqual(later.effects, ['release', 'close']);
+  }
+});
+
 test('captured objects disappearing cannot prove terminal absence through a partial later census', () => {
   for (const afterEnv of [[], [{ pid: foreign.pid, readable: false, values: { ORCA_TERMINAL_HANDLE: null } }]]) {
     const world = censusWorld({ initialTable: [row], initialEnv: [observation(row.pid, HANDLE)],

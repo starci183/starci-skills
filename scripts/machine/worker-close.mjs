@@ -94,7 +94,7 @@ export const workerExitProven = (receipt, handle) => Boolean(handle)
 /** Release succeeded and the exact terminal plus measured captured objects have ended. Pure. */
 export const workerClosureProven = (receipt, handle) => receipt?.ok === true && workerExitProven(receipt, handle);
 
-/** Every observed process has one readable handle observation; incomplete coverage cannot prove terminal absence. Pure. */
+/** Process and readable handle observations cover the same PID set; incomplete coverage cannot prove terminal absence. Pure. */
 function terminalCensusProblem(table, envRows) {
   if (!Array.isArray(table) || !Array.isArray(envRows)) return 'the process table or the process environments could not be read';
   const observed = new Set();
@@ -111,6 +111,7 @@ function terminalCensusProblem(table, envRows) {
       return 'the terminal environment census does not cover the process table';
     listed.add(row.pid);
   }
+  if (observed.size !== listed.size) return 'the process table does not cover the terminal environment census';
   return null;
 }
 
