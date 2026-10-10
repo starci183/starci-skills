@@ -5,7 +5,7 @@ import { loadTypescript } from '../../lib/package-at.mjs';
 const VERB = 'terminal' + '-' + 'create';
 const ADAPTER = 'scripts/api/orca/terminal-create.mjs';
 const CONSUMER = 'scripts/supervisor/release-terminal.mjs';
-const FACTORY = 'create' + 'ReleaseTerminal';
+const FACTORY = 'terminal' + 'Create';
 const identifier = (ts, node, text) => ts.isIdentifier(node) && node.text === text;
 const literal = (ts, node, text) => ts.isStringLiteralLike(node) && node.text === text;
 

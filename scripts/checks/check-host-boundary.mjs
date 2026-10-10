@@ -66,7 +66,6 @@ const LOADS_HOST=/\b(load|loads|loading|read|reads|reading)\b[^.\n]{0,100}module
 const LAUNCH_ROOTS=['engine','scripts','bin','init','modules','packages'];
 const TERMINAL_LAUNCH=[
   [/\bterminalCreate\b/,'the terminalCreate wrapper'],
-  [new RegExp(String.raw`\bcreate`+String.raw`ReleaseTerminal\b`),'the bounded release-shell factory outside its owned call shape'],
   [/['"`]terminal-create['"`]/,"the calls.yaml 'terminal-create' call"],
   [/['"`]terminal['"`]\s*,\s*['"`]create['"`]/,"a ['terminal','create'] argv"],
   [/['"`][^'"`\n]*\borca(?:\.exe)?\s+terminal\s+create\b/,'an `orca terminal create` command'],

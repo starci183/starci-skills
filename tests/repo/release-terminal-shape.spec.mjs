@@ -9,13 +9,13 @@ import { findHostBoundaryViolations } from '../../scripts/checks/check-host-boun
 const FILE = 'scripts/api/orca/terminal-create.mjs';
 // Parser inputs are fixtures; native adapter behavior is exercised separately by its owning spec.
 const ADAPTER = `import { orcaCall } from './lib.mjs';
-export function createReleaseTerminal() {
+export function terminalCreate() {
   const selected = { id: 'fixture-source' };
   return orcaCall('terminal-create', { worktree: selected.id, shell: 'powershell.exe', title: '[Release] StarCi runtime' });
 }`;
-const CONSUMER = `import { createReleaseTerminal } from '../api/orca/terminal-create.mjs';
+const CONSUMER = `import { terminalCreate } from '../api/orca/terminal-create.mjs';
 export function prepareReleaseTerminal() {
-  let native; native = createReleaseTerminal(); return native;
+  let native; native = terminalCreate(); return native;
 }`;
 
 test('the boundary admits only the fixture adapter fixed plain PowerShell call literal', () => {
@@ -35,7 +35,7 @@ test('a second create, alias, destructuring, spread, arbitrary shell/command/env
     ADAPTER.replace("shell: 'powershell.exe'", "shell: 'cmd.exe'"),
     ADAPTER.replace("title: '[Release] StarCi runtime'", "title: '[Release] StarCi runtime', command: 'claude -p x'"),
     ADAPTER.replace("title: '[Release] StarCi runtime'", "title: '[Release] StarCi runtime', environment: 'other'"),
-    ADAPTER.replace("function createReleaseTerminal()", "function createReleaseTerminal(input)"),
+    ADAPTER.replace("function terminalCreate()", "function terminalCreate(input)"),
   ];
   for (const changed of changes) assert.equal(releaseTerminalCallRange(changed, FILE), null);
 });
@@ -43,11 +43,11 @@ test('a second create, alias, destructuring, spread, arbitrary shell/command/env
 test('the factory consumer admits only its one unaliased zero-argument import/call, and another caller stays red', () => {
   const file = 'scripts/supervisor/release-terminal.mjs';
   assert.equal(releaseTerminalConsumerRanges(CONSUMER, file).length, 2);
-  for (const changed of [CONSUMER + '\ncreateReleaseTerminal();\n',
-    CONSUMER.replace('createReleaseTerminal();', 'createReleaseTerminal({command: "claude -p x"});'),
-    CONSUMER.replace('{ createReleaseTerminal }', '{ createReleaseTerminal as invoke }').replace('createReleaseTerminal();', 'invoke();'),
-    CONSUMER.replace('native = createReleaseTerminal();', 'const invoke = createReleaseTerminal; native = invoke();'),
-    CONSUMER.replace('native = createReleaseTerminal();', 'const {invoke} = {invoke: createReleaseTerminal}; native = invoke();')])
+  for (const changed of [CONSUMER + '\nterminalCreate();\n',
+    CONSUMER.replace('terminalCreate();', 'terminalCreate({command: "claude -p x"});'),
+    CONSUMER.replace('{ terminalCreate }', '{ terminalCreate as invoke }').replace('terminalCreate();', 'invoke();'),
+    CONSUMER.replace('native = terminalCreate();', 'const invoke = terminalCreate; native = invoke();'),
+    CONSUMER.replace('native = terminalCreate();', 'const {invoke} = {invoke: terminalCreate}; native = invoke();')])
     assert.deepEqual(releaseTerminalConsumerRanges(changed, file), []);
   assert.deepEqual(releaseTerminalConsumerRanges(CONSUMER, 'scripts/kernel/release-terminal.mjs'), []);
 });

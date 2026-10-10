@@ -16,7 +16,7 @@ const real = (value) => { try { return fs.realpathSync(value); } catch { return 
  * Native custody is preserved verbatim, including unknown outcomes. This call never retries.
  * @returns {object} The native typed envelope, or an explicit local refusal before any mutation.
  */
-export function createReleaseTerminal() {
+export function terminalCreate() {
   if (arguments.length !== 0) throw new Error('release terminal creation accepts no input');
   const source = real(starciSourceRoot());
   const runtime = source ? real(path.join(source, '.claude')) : null;

@@ -35,8 +35,8 @@ function fixture(t, { inventory='registered', mode='committed' }={}) {
     RELEASE_TEST_INVENTORY:inventory,RELEASE_TEST_CREATE:mode}};
 }
 function run(fx, payload='') {
-  const program=`import {createReleaseTerminal} from ${JSON.stringify(factory)};
-  try { console.log(JSON.stringify({value:createReleaseTerminal(${payload})})); }
+  const program=`import {terminalCreate} from ${JSON.stringify(factory)};
+  try { console.log(JSON.stringify({value:terminalCreate(${payload})})); }
   catch(error) { console.log(JSON.stringify({error:error.message})); }`;
   const result=spawnSync(process.execPath,['--input-type=module','-e',program],{env:fx.env,encoding:'utf8',windowsHide:true,timeout:60000});
   assert.equal(result.error,undefined); assert.equal(result.status,0,result.stderr);

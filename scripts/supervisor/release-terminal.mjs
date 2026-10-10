@@ -1,7 +1,7 @@
 // release-terminal.mjs — prepare only the missing shell; a prepared shell never satisfies the cut's live-context gate.
 import fs from 'node:fs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
-import { createReleaseTerminal } from '../api/orca/terminal-create.mjs';
+import { terminalCreate } from '../api/orca/terminal-create.mjs';
 
 /**
  * Prepare this runtime's plain release shell, without commands or an invented terminal environment.
@@ -14,7 +14,7 @@ export function prepareReleaseTerminal({ repo }) {
   try { canonical = fs.realpathSync(repo) === fs.realpathSync(skillRoot); } catch { /* local refusal below */ }
   if (!canonical) return { outcome: 'failed', effectState: 'none', native: null, why: 'terminal preparation is limited to the canonical runtime release' };
   let native;
-  try { native = createReleaseTerminal(); }
+  try { native = terminalCreate(); }
   catch (error) { return { outcome: 'unknown', effectState: 'unknown', native: null, why: 'terminal custody is unknown: ' + error.message + '; do not retry automatically' }; }
   const terminal = native.result?.terminal ?? null;
   const received = native.outcome === 'ok' && native.effectState === 'committed';
