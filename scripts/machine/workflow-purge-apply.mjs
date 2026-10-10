@@ -5,10 +5,12 @@
 // the first effect, so a crashed apply is resumed by the next one and the event counts the whole run. Nothing here deletes recursively on its own:
 // no main checkout and no history is touched, and no branch is deleted that the plan did not list as the workflow's.
 import fs from 'node:fs';
+import { canonicalJSON } from '../../engine/canonical-json.mjs';
+import { purgeClosureTargets, purgeResumeScope } from './workflow-purge-plan.mjs';
 import { branchDelete } from '../api/git/branch-delete.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
 import { closeAndVerify } from './close-verify.mjs';
-import { closeWorker } from './worker-close.mjs';
+import { closeWorker, workerClosureProven } from './worker-close.mjs';
 import { releaseOrcaSlot, markRemoved, withRegistry } from './worktree-registry.mjs';
 import { removeOrcaWorktree, orcaWorktreeClient } from './worktree-orca.mjs';
 import { removeScratchWorktree } from './worktree-git.mjs';
@@ -21,8 +23,8 @@ const failure = (error) => String(error?.message ?? error).slice(0, 300);
 function closeOneWorker(worker, { env, deps }) {
   let r;
   try { r = (deps.closeWorker ?? closeWorker)({ dispatch: worker.dispatchId, handle: worker.terminal, retryRelease: true, env }); } catch (error) { r = { ok: false, error: failure(error) }; }
-  const ok = r?.ok === true && !r.hygiene;
-  return { dispatchId: worker.dispatchId, terminal: worker.terminal, ok, ...(ok ? { closure: r.processes?.verdict ?? null } : { error: r?.hygiene ? 'a process of the worker survived release and close' : r?.error ?? r?.outcome ?? 'release failed' }) };
+  const ok = workerClosureProven(r, worker.terminal) && !r.hygiene;
+  return { dispatchId: worker.dispatchId, terminal: worker.terminal, ok, ...(ok ? { closure: r.processes?.verdict ?? null } : { error: r?.hygiene ? 'a process of the worker survived release and close' : r?.error ?? r?.outcome ?? 'worker closure proof is missing' }) };
 }
 
 function closeOneTerminal(terminal, { deps }) {
@@ -63,14 +65,22 @@ function resolveDecisions(diIds, env) {
 
 /** The plan as it is stored while a purge runs: enough to resume it and to journal the whole run. */
 const storedPlanOf = (plan, now) => ({ planSha: plan.sha, startedAt: now, counts: plan.counts, refs: plan.refs.filter((ref) => ref.action === 'delete').map((ref) => ({ repoRoot: ref.repoRoot, name: ref.name, tip: ref.tip })),
-  trees: plan.trees.map((tree) => ({ path: tree.path, branch: tree.branch })), ledger: plan.ledger.mode });
+  trees: plan.trees.map((tree) => ({ path: tree.path, branch: tree.branch })), ledger: plan.ledger.mode,
+  closures: { workers: plan.workers.map(({ dispatchId, terminal }) => ({ dispatchId, terminal })), terminals: plan.terminals.map(({ handle }) => ({ handle })) } });
 
 // machine_meta holds the first plan of an unfinished purge; an existing one is kept (the resumed run's smaller plan must not replace the whole run's counts).
 function beginPurge(plan, { env, now }) {
   return withRegistry((m) => m.transaction((db) => {
     const key = purgeMetaKey(plan.workflowId);
     const held = db.prepare('SELECT value FROM machine_meta WHERE key=?').get(key)?.value;
-    if (held) return { resumed: true, stored: JSON.parse(held) };
+    if (held) {
+      const stored = JSON.parse(held), closures = purgeClosureTargets(stored, plan);
+      if (closures.error) return { resumed: true, stored, error: closures.error };
+      if (canonicalJSON(purgeResumeScope(stored, plan)) !== canonicalJSON(plan.resume)) return { resumed: true, stored, error: 'the unfinished purge closure scope changed since the plan' };
+      stored.closures = closures;
+      db.prepare('UPDATE machine_meta SET value=? WHERE key=?').run(JSON.stringify(stored), key);
+      return { resumed: true, stored };
+    }
     const stored = storedPlanOf(plan, now);
     db.prepare('INSERT INTO machine_meta(key, value) VALUES(?, ?)').run(key, JSON.stringify(stored));
     return { resumed: false, stored };
@@ -90,14 +100,20 @@ function journalPurge({ plan, stored, resumed, results, env }) {
 
 /**
  * Apply `plan`. {ok, resumed, results: {workers, terminals, trees, refs, guards, prompts, decisions, ledger}, errors, event}. A step that fails does not stop the
- * next ones (each is independent and safe to repeat), except a removal that touched a main checkout (fatal): everything stops. With errors the journal
+ * other independent closes; tree and workflow cleanup require every planned closure to be proven. Later independent steps continue on failure,
+ * except a removal that touched a main checkout (fatal): everything stops. With errors the journal
  * event is not written and the stored plan stays, so the next apply resumes. Seams (deps): closeWorker, closeTerminal, orcaTree, purgeLedger, now.
  */
 export function applyPurgePlan({ plan, env = process.env, deps = {} }) {
   const now = (deps.now ?? Date.now)();
-  const { resumed, stored } = beginPurge(plan, { env, now });
-  const results = { workers: plan.workers.map((worker) => closeOneWorker(worker, { env, deps })), terminals: plan.terminals.map((terminal) => closeOneTerminal(terminal, { deps })),
-    trees: [], refs: [], guards: [], prompts: [], decisions: [], ledger: null };
+  const { resumed, stored, error } = beginPurge(plan, { env, now });
+  const results = { workers: [], terminals: [], trees: [], refs: [], guards: [], prompts: [], decisions: [], ledger: null };
+  if (error) return { ok: false, resumed, results, errors: [error], event: null };
+  results.workers = stored.closures.workers.map(worker => closeOneWorker(worker, { env, deps }));
+  results.terminals = stored.closures.terminals.map(terminal => closeOneTerminal(terminal, { deps }));
+  const closureErrors = [...results.workers, ...results.terminals].filter(item => !item.ok)
+    .map(item => `${item.dispatchId ?? item.handle}: ${item.error ?? 'closure failed'}`);
+  if (closureErrors.length) return { ok: false, resumed, results, errors: closureErrors, event: null };
   for (const tree of plan.trees) {
     const done = removeOneTree(tree, { env, deps });
     results.trees.push(done);

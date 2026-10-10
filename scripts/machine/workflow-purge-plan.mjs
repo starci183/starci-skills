@@ -54,6 +54,30 @@ function counts(plan) {
     workers: plan.workers.length, terminals: plan.terminals.length, listed: plan.listed.length, guards: plan.guards.length, prompts: plan.prompts.length, decisions: plan.decisions.length };
 }
 
+// A successful release can disappear from fresh facts before its process proof succeeds. The stored exact targets remain obligations on retry.
+export function purgeClosureTargets(stored, plan) {
+  const held = stored.closures;
+  if (!held && (![stored.counts?.workers, stored.counts?.terminals].every(count => Number.isSafeInteger(count) && count === 0))) return { error: 'the unfinished purge has no stored closure identities' };
+  if (Object.hasOwn(stored, 'closures') && (!held || !Array.isArray(held.workers) || !Array.isArray(held.terminals))) return { error: 'the stored closure identities are unreadable' };
+  const workers = new Map(), terminals = new Map();
+  for (const worker of [...(held?.workers ?? []), ...plan.workers]) {
+    if (typeof worker?.dispatchId !== 'string' || !worker.dispatchId || (worker.terminal != null && typeof worker.terminal !== 'string')) return { error: 'a stored worker closure identity is unreadable' };
+    if (workers.has(worker.dispatchId) && workers.get(worker.dispatchId).terminal !== worker.terminal) return { error: 'a worker terminal changed since the unfinished purge' };
+    workers.set(worker.dispatchId, { dispatchId: worker.dispatchId, terminal: worker.terminal });
+  }
+  for (const terminal of [...(held?.terminals ?? []), ...plan.terminals]) {
+    if (typeof terminal?.handle !== 'string' || !terminal.handle) return { error: 'a stored terminal closure identity is unreadable' };
+    terminals.set(terminal.handle, { handle: terminal.handle });
+  }
+  return { workers: [...workers.values()], terminals: [...terminals.values()] };
+}
+
+/** The stable exact retry scope disclosed by the public plan and bound by its SHA. */
+export function purgeResumeScope(stored, plan) {
+  if (!stored) return null;
+  return { planSha: stored.planSha ?? null, counts: stored.counts ?? null, closures: purgeClosureTargets(stored, plan) };
+}
+
 /**
  * The plan of a purge: {schema, workflowId, repo, blockers, trees, refs, workers, terminals, listed, guards, prompts, decisions, ledger, counts, already, sha}.
  * `ok` is true when blockers is empty. `already`: the journal holds the purge and nothing of it remains. facts: purgeFactsOf; ledgerMode: --ledger.
@@ -73,7 +97,9 @@ export function buildPurgePlan({ facts, workflowId, repo, ledgerMode = false, ar
     listed,
     guards: facts.guards.map((file) => path.resolve(file)), prompts: facts.prompts.map((file) => path.resolve(file)),
     decisions: facts.machine.decisions.map((di) => di.diId), ledger: ledgerPart(facts, ledgerMode) };
+  plan.resume = purgeResumeScope(facts.machine.inProgress, plan);
+  if (plan.resume?.closures.error) blockers.push({ code: 'workflow-purge-custody-unknown', detail: plan.resume.closures.error });
   const nothingLeft = !plan.trees.length && !plan.workers.length && !plan.terminals.length && !plan.refs.some((ref) => ref.action === 'delete');
-  const already = facts.machine.purgedAt != null && nothingLeft && (gone || !ledgerMode || facts.ledger.purgeState === 'purged');
+  const already = !plan.resume && facts.machine.purgedAt != null && nothingLeft && (gone || !ledgerMode || facts.ledger.purgeState === 'purged');
   return { ...plan, ok: blockers.length === 0, already, counts: counts(plan), sha: sha256(canonicalJSON(plan)) };
 }

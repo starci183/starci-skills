@@ -26,6 +26,9 @@ const fixture = {
 /** The world after the owner stopped the workflow: tree, preserved ref and a foreign branch in the product repository; Orca's books seeded. */
 function stoppedWorld(t) {
   const world = replayWorld(t, fixture);
+  // The fake Orca terminals have no OS process tree. Model that boundary while the real close lifecycle proves custody.
+  const closureImport = `data:text/javascript,${encodeURIComponent(`import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/worker-close-loader.mjs', import.meta.url).href)});`)}`;
+  world.env.NODE_OPTIONS = [world.env.NODE_OPTIONS, `--import=${closureImport}`].filter(Boolean).join(' ');
   const dir = path.join(world.base, 'orca', 'product', `wf-${wf}`);
   fs.mkdirSync(path.dirname(dir), { recursive: true });
   git(world.repo, 'worktree', 'add', '-q', '-b', `wf-${wf}`, dir);
@@ -38,11 +41,11 @@ function stoppedWorld(t) {
   const terminal = (handle, cwd) => ({ handle, title: 'codex', worktree: cwd, closed: false, connected: true, agentIdentity: 'codex' });
   fs.writeFileSync(world.env.STARCI_FAKE_ORCA_STATE, JSON.stringify({
     sends: 0,
-    terminals: { 'term-dead-1': terminal('term-dead-1', dir), 'term-dead-2': terminal('term-dead-2', dir), 'term-owner': terminal('term-owner', world.base), 'fake-terminal-1': { handle: 'fake-terminal-1', connected: false, writable: false } },
+    terminals: { 'term-op-1': terminal('term-op-1', dir), 'term-dead-1': terminal('term-dead-1', dir), 'term-dead-2': terminal('term-dead-2', dir), 'term-owner': terminal('term-owner', world.base), 'fake-terminal-1': { handle: 'fake-terminal-1', connected: false, writable: false } },
     worktreeRepos: { 'repo-product': world.repo },
     worktrees: [
       { id: `repo-product::${world.repo}`, repoId: 'repo-product', hostId: 'local', path: world.repo, branch: 'main', comment: '', isMainWorktree: true, liveTerminalCount: 0 },
-      { id: `repo-product::${dir}`, repoId: 'repo-product', hostId: 'local', path: dir, branch: `wf-${wf}`, comment: runtimeStampOf({ kind: 'workflow', slot: `wf-${wf}`, owner: { workflowId: wf } }), isMainWorktree: false, liveTerminalCount: 2 },
+      { id: `repo-product::${dir}`, repoId: 'repo-product', hostId: 'local', path: dir, branch: `wf-${wf}`, comment: runtimeStampOf({ kind: 'workflow', slot: `wf-${wf}`, owner: { workflowId: wf } }), isMainWorktree: false, liveTerminalCount: 3 },
     ],
     workerRows: [{ dispatchId: 'dsp-1', runId: 'run-1', terminalState: 'release_unknown', workerState: 'settled', resource: { terminalHandle: 'term-op-1' }, projection: { liveness: { verdict: 'exited' }, nextAction: null } }],
   }));
@@ -113,6 +116,26 @@ const noPurgeEffects = (world, dir) => {
   assert.equal(orcaCalls(world).slice(world.purgeCallStart).some((call) => /^(terminal close|worktree rm|orchestration worker-release) /.test(call)), false);
   assert.equal(git(world.repo, 'rev-parse', `refs/heads/wf-${wf}`), git(dir, 'rev-parse', 'HEAD'));
 };
+
+test('a released worker with unproven native process closure retains its workflow tree, refs and ledger through the real CLI', t => {
+  const { world, dir } = stoppedWorld(t);
+  stopWorld(world);
+  world.env.STARCI_FAKE_CLOSURE_UNPROVEN = '1';
+  const planned = world.starci(purgeArgs(world, '--plan'));
+  assert.equal(planned.status, 0, planned.stderr || planned.stdout);
+  const applied = world.starci(purgeArgs(world, '--apply', '--expect', planned.json.sha));
+  assert.equal(applied.status, 1, applied.stderr || applied.stdout);
+  assert.equal(applied.json.event, null);
+  assert.equal(applied.json.results.workers[0].ok, false);
+  for (const key of ['trees', 'refs', 'guards', 'prompts', 'decisions']) assert.deepEqual(applied.json.results[key], [], key);
+  assert.equal(applied.json.results.ledger, null);
+  assert.equal(fs.existsSync(dir), true);
+  assert.equal(world.ledger(ledger => ledger.db.prepare('SELECT count(*) n FROM workflows WHERE workflow_id=?').get(wf).n), 1);
+  assert.equal(git(world.repo, 'rev-parse', `refs/heads/wf-${wf}`), git(dir, 'rev-parse', 'HEAD'));
+  assert.equal(git(world.repo, 'rev-parse', `refs/heads/preserved/${wf}/gc`), git(dir, 'rev-parse', 'HEAD'));
+  assert.ok(orcaCalls(world).slice(world.purgeCallStart).some(call => /orchestration worker-release .*dsp-1/.test(call)), 'release alone succeeded before process proof was refused');
+  assert.equal(orcaCalls(world).slice(world.purgeCallStart).some(call => call.startsWith('worktree rm ')), false);
+});
 
 test('native-shaped context-only Dispatches with positive resource absence do not retain a workflow tree or get released', t => {
   const { world, dir } = stoppedWorld(t);
