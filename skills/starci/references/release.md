@@ -46,3 +46,12 @@ Product releases follow the same maintained governance for their own accepted sc
 `unit.verify` or `e2e.verify` runs are on-demand goal/owner actions, not an automatic extra release.
 `scripts/supervisor/push-git.mjs` and `push-mains` push product repositories only; they refuse the runtime
 repository, whose main moves only through the release owner.
+
+## Missing release shell
+
+A real runtime cut whose only host prerequisite missing is its actual Orca terminal may prepare
+one plain PowerShell shell in the canonical Source. It still returns a release-host refusal, with
+the complete native receipt; no suite, tag or push starts. Inspect that receipt and run the cut
+inside the newly owned terminal. Never copy a handle into an environment to impersonate its context.
+The plan stays read-only. Unknown creation custody is retained: inspect native terminal inventory
+before any deliberate retry; the adapter has no automatic retry or arbitrary command input.

@@ -288,7 +288,8 @@ starciOrchestrationAllowlist:
     - orchestration check
 forbiddenForStarciOrchestration:
   # Every agent launch is orchestration worker-start (modules/kernel/start-workflow.yaml): the runtime
-  # never creates a terminal and never dispatches a Task into a terminal it made.
+  # never creates an agent terminal and never dispatches a Task into a terminal it made.
+  # The owner-authorized release maintenance adapter may prepare one plain Source PowerShell shell; it launches no agent.
   - terminal create
   - orchestration dispatch
   - orchestration coordinator-start

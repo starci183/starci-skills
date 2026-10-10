@@ -28,6 +28,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - Runtime judgment adds the approved `business.decide` Critic; acceptance-trace remains report-only (class 5).
 
 ### Added
+- A bounded native release-shell preparation: a real cut with only its Orca terminal missing may request a plain PowerShell shell in the registered Source worktree, preserving the native receipt. Planning creates nothing; preparation still refuses the cut until it runs in an actual live terminal, and cannot supply commands, environment or agent launches (class 9).
 - `starci runtime deploy`, `starci runtime artefacts`, `starci runtime revision-scope`, `starci kernel revision-ack`, `starci supervisor revision-ack`, `modules/kernel/revision-scope.yaml` and `modules/kernel/installed-artefacts.yaml` (class 4).
 - `starci runtime verify` (a commit-bound check and affected-spec receipt), `starci test affected` (the specs a change can break, computed from the changed functions), the replay harness under `tests/helpers/replay-*.mjs` and the host-independence trap (class 2).
 - `starci release ci-status`, `starci release cut --rows`, the cut's host check and its row reuse ledger (class 9).

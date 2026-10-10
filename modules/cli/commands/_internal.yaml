@@ -1,4 +1,5 @@
 internal:
+  - {path: scripts/api/orca/terminal-create.mjs, why: "Bounded plain release shell preparation, never an agent launcher", usedBy: [scripts/supervisor/release-terminal.mjs]}
   - {path: scripts/reconciler/workflow-up.mjs, why: "Accepted workflow host startup child", usedBy: [scripts/kernel/workflow-startup.mjs]}
   - {path: scripts/agent/quota/index.mjs, why: "Provider quota probe child", usedBy: [scripts/agent/credential-probe.mjs]}
   - {path: scripts/agent/send.mjs, why: "Agent prompt-delivery helper", usedBy: [scripts/agent/lib.mjs]}

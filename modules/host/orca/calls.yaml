@@ -439,6 +439,18 @@ calls:
     required: [url, page, worktree]
     receipt: [result]
     note: Rebind only the workflow's persisted input page after helper restart. Never navigate an unrelated owner tab.
+  terminal-create:
+    command: terminal create
+    kind: mutation
+    replay: none
+    flags: [worktree, shell, title]
+    required: [worktree, shell, title]
+    receipt: [result]
+    creates: terminal
+    note: >-
+      Maintenance only: scripts/api/orca/terminal-create.mjs selects this Source's unique registered
+      worktree, shell powershell.exe and the fixed release title. Never command/environment/focus/agent
+      parameters or retry-request. The runner never retries receipt loss; the caller retains unknown custody.
   terminal-list:
     command: terminal list
     kind: read

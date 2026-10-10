@@ -35,6 +35,7 @@ import { combine, decisionLines, needsSonar, refusalFor, remember, selectionFor 
 import { scanRange } from './push-mains.mjs';
 import { planOf, preSuiteRefusal } from './release-cut-plan.mjs';
 import { releaseHostMissing, releaseHostWhy } from './release-host.mjs';
+import { prepareReleaseTerminal } from './release-terminal.mjs';
 import { withHostLock as holdHostLock } from '../machine/host-lock.mjs';
 import { writeL4Record } from '../guards/release-record.mjs';
 import { suiteModeOf } from '../guards/release-suite-mode.mjs';
@@ -109,11 +110,16 @@ function releaseTagState({ tag, branch, remote, cwd, run, out, refuse }) {
  * What is already known to stop the cut before the suite runs, as a refusal or null: the release definition (scripts/guards/release-definition.mjs) is what the pre-push hook enforces, and what the
  * L4 row needs from this host (an Orca terminal, a reachable Orca, a Docker daemon) decides whether the row can pass at all: a cut that would fail an hour in refuses in seconds.
  */
-async function beforeSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, refuse, sonar }) {
+async function beforeSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, refuse, sonar, plan }) {
   const unmet = await preSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, sonar });
   if (unmet) return refuse(unmet.verdict, unmet.why, { findings: unmet.findings });
   const hostMissing = (deps.host ?? releaseHostMissing)({ repo, root: cwd });
-  return hostMissing.length ? refuse('release-host', releaseHostWhy(hostMissing), { hostMissing }) : null;
+  if (!hostMissing.length) return null;
+  if (plan || hostMissing.length !== 1 || hostMissing[0].need !== 'an Orca terminal')
+    return refuse('release-host', releaseHostWhy(hostMissing), { hostMissing });
+  // A real cut may prepare only the missing shell. It still refuses: no suite, tag, push or invented environment.
+  const terminalPreparation = (deps.prepareTerminal ?? prepareReleaseTerminal)({ repo });
+  return refuse('release-host', releaseHostWhy(hostMissing) + '; ' + terminalPreparation.why, { hostMissing, terminalPreparation });
 }
 
 /** The refusal of a `--rows` the plan or the ledger of this commit cannot serve, or null. */
@@ -179,7 +185,7 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   const mode = (deps.suiteMode ?? suiteModeOf)(repo);
   out.suiteMode = mode;
   const selection = selectionFor({ repo, head, rows, reuse, mode, deps });
-  const stop = rowsRefusal(selection, rows, refuse) ?? await beforeSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, refuse, sonar: needsSonar(selection) });
+  const stop = rowsRefusal(selection, rows, refuse) ?? await beforeSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, refuse, sonar: needsSonar(selection), plan });
   if (stop) return stop;
   if (plan) return planOf({ head, tag, remote, branch, out, selection });
 

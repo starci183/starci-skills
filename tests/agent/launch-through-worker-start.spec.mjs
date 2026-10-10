@@ -62,9 +62,14 @@ test('the agent-launch rule flags every terminal-creating form and nothing else'
   assert.deepEqual(found,['scripts/api/orca/wrapper.mjs:1','scripts/bad.mjs:1','scripts/bad.mjs:2','scripts/bad.mjs:3','scripts/bad.mjs:4','scripts/shell.mjs:1']);
 });
 
-test('the Orca contract carries no terminal-creating call and forbids it for the runtime',()=>{
+test('the Orca contract bounds plain shell creation and forbids terminal creation for agent orchestration',()=>{
   const calls=readYaml('modules/host/orca/calls.yaml').calls;
-  assert.equal(calls['terminal-create'],undefined,'no terminal-create call');
+  const plainShell=calls['terminal-create'];
+  assert.equal(plainShell.command,'terminal create');
+  assert.equal(plainShell.kind,'mutation');
+  assert.equal(plainShell.replay,'none','receipt loss cannot replay a shell creation');
+  assert.deepEqual(plainShell.flags,['worktree','shell','title'],'no command, environment, agent or terminal adoption');
+  assert.deepEqual(plainShell.required,plainShell.flags,'each fixed shell field is required');
   assert.equal(calls.dispatch,undefined,'no orchestration dispatch into a pre-made terminal');
   assert.equal(calls['worker-start'].flags.includes('terminal'),false,'worker-start never adopts a terminal');
   assert.equal(calls['task-create'],undefined,'worker-start --spec files the Task: there is no task-create call');
@@ -75,7 +80,7 @@ test('the Orca contract carries no terminal-creating call and forbids it for the
   const api=readYaml('modules/host/orca/api.yaml');
   for(const command of BYPASS)assert.ok(api.forbiddenForStarciOrchestration.includes(command),`${command} is forbidden`);
   assert.equal(api.roleCommands?.workflowKernel?.includes('terminal create')??false,false);
-  // The wrapper lib builds every argv from calls.yaml: neither a terminal-create call nor a --terminal adoption can be built.
+  // The wrapper rejects commands in shell creation and terminal adoption in worker-start before invoking the host.
   const refusals=spawnSync(process.execPath,['--input-type=module','-e',
     `import {orcaCall} from ${JSON.stringify(pathToFileURL(path.join(ROOT,'scripts','api','orca','lib.mjs')).href)};`+
     "const t=f=>{try{f();return null;}catch(e){return e.message;}};"+

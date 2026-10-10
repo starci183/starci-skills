@@ -426,3 +426,40 @@ test('the host check refuses a root install that is not the lockfile\'s, naming 
   const missing = releaseHostMissing({ env: { ORCA_TERMINAL_HANDLE: 't' }, orca: () => ({ ok: true, reachable: true }), docker: () => ({ status: 0 }), root, install: () => 'drift' });
   assert.deepEqual(missing.map((m) => [m.need, m.fix]), [['the lockfile install', 'run npm ci in the runtime root']]);
 });
+
+// Outer-host stand-ins exercise preparation refusal; these are not native/live release receipts.
+test('a read-only cut plan never creates a release shell when the actual terminal is missing', async (t) => {
+  const fx = fixture(t), calls = [];
+  const out = await cut(fx, { plan: true }, {
+    host: () => [{ need: 'an Orca terminal', why: 'actual handle absent', fix: 'use a native shell' }],
+    prepareTerminal: () => { calls.push('create'); throw new Error('plan must never create'); },
+    suite: () => { calls.push('suite'); throw new Error('plan must never run suite'); },
+  });
+  assert.equal(out.verdict, 'release-host'); assert.deepEqual(calls, []); untouched(fx);
+});
+
+test('a real cut may prepare only the missing plain shell and still refuses without suite/tag/push', async (t) => {
+  const fx = fixture(t), calls = [];
+  const evidence = { outcome: 'ok', effectState: 'committed', why: 'stand-in preparation receipt', native: { result: { terminal: { handle: 'fixture-only' } } } };
+  const before = process.env.ORCA_TERMINAL_HANDLE;
+  const out = await cut(fx, {}, {
+    host: () => [{ need: 'an Orca terminal', why: 'actual handle absent', fix: 'use a native shell' }],
+    prepareTerminal: ({ repo }) => { assert.equal(repo, fx.repo); calls.push('create'); return evidence; },
+    suite: () => { calls.push('suite'); throw new Error('preparation is not a ready release host'); },
+  });
+  assert.equal(out.verdict, 'release-host'); assert.equal(out.ok, false);
+  assert.equal(out.terminalPreparation, evidence); assert.deepEqual(calls, ['create']);
+  assert.equal(out.tagCreated, false); assert.equal(process.env.ORCA_TERMINAL_HANDLE, before); untouched(fx);
+});
+
+test('another unmet host prerequisite prevents shell creation and unknown creation custody is retained without retry', async (t) => {
+  const fx = fixture(t), calls = [];
+  const terminal = { need: 'an Orca terminal', why: 'absent', fix: 'use native shell' };
+  const deps = { host: () => [terminal, { need: 'a Docker daemon', why: 'absent', fix: 'start Docker' }],
+    prepareTerminal: () => { calls.push('create'); return { outcome: 'unknown', effectState: 'unknown', why: 'do not retry automatically', native: { receipt: null } }; } };
+  const stopped = await cut(fx, {}, deps);
+  assert.equal(stopped.verdict, 'release-host'); assert.deepEqual(calls, []);
+  const unknown = await cut(fx, {}, { ...deps, host: () => [terminal] });
+  assert.equal(unknown.verdict, 'release-host'); assert.equal(unknown.terminalPreparation.effectState, 'unknown');
+  assert.match(unknown.why, /do not retry automatically/); assert.deepEqual(calls, ['create']); untouched(fx);
+});

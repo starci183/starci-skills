@@ -69,9 +69,14 @@ default args (Orca settings `agentDefaultArgs`: claude
 `--dangerously-skip-permissions`, codex `--dangerously-bypass-approvals-and-sandbox`,
 devin `--permission-mode bypass --respect-workspace-trust false`); the runtime
 passes only `--agent`, and `--model`/`--effort` where the card takes them.
-`terminal create` and `orchestration dispatch` are forbidden for the runtime
-(`api.yaml` `forbiddenForStarciOrchestration`), and `scripts/checks/check-host-boundary.mjs`
-rule `agent-launch` fails on any terminal-creating code.
+`terminal create` and `orchestration dispatch` remain forbidden for agent orchestration
+(`api.yaml` `forbiddenForStarciOrchestration`). Owner-authorized release maintenance may prepare
+one plain PowerShell shell in the canonical Source through `scripts/api/orca/terminal-create.mjs`.
+The adapter accepts no input and issues only the fixed worktree/shell/title parameters; it starts no agent
+and types no command. The host-boundary check recognizes only that single native call by its AST shape,
+not a pathname-wide exemption. Receipt loss is unknown custody, never an automatic retry.
+A cut started outside an actual Orca terminal still refuses after preparation; the native terminal
+must run the next cut and inherit its own actual context. A read-only cut plan never creates a shell.
 
 ## Card anatomy
 
