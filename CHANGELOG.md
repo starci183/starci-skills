@@ -4,6 +4,14 @@ All notable changes to StarCi are documented here. The runtime is on the `1.0.0-
 until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
+## [1.0.0-alpha.10.1] — 2026-10-11
+
+### Fixed
+- The main CI runtime scan consumes the successful test job's exact coverage artifact in a dependent Sonar job. The full suite and scanner retain their existing limits and scope; their work no longer shares the test job's wall-clock budget. Coverage is bound to the run, source commit and producer attempt, and its content hash is checked before scanning.
+
+### Changed
+- CLI 1.2.5 carries runtime 1.0.0-alpha.10.1; HFS 4.2.5 and the BE/FE lint canons 3.2.6/8.2.6 carry the refreshed command and canon pins.
+
 ## [1.0.0-alpha.10] — 2026-10-11
 
 `1.0.0-alpha.9.1` was never cut: its notes (the Fixed section below) are part of this release, and `1.0.0-alpha.10` is the one release after `1.0.0-alpha.9`.

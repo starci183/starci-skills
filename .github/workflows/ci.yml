@@ -12,7 +12,7 @@ name: ci
 # the runs of the branch main (a main push, or a dispatch of main): SonarCloud names an analysis after the checked-out ref, so a tag run would open a
 # branch named after the tag, and the commit of a release tag was already scanned by the main push that carried it. The runtime is analysed on SonarCloud
 # (https://sonarcloud.io, fixed in this job; the apps and examples use the host's local SonarQube in ext/sonar through examples.yml and never this job):
-# one scan step waits for the quality gate and fails the job on a red gate, and it runs only where secrets.SONAR_TOKEN, vars.SONAR_ORGANIZATION and
+# the dependent main-only Sonar job waits for the quality gate and fails on a red gate, and it runs only where secrets.SONAR_TOKEN, vars.SONAR_ORGANIZATION and
 # vars.SONAR_PROJECT_KEY all exist; otherwise a notice names each missing setting (never a silent pass). The root sonar-project.properties carries sources,
 # tests, exclusions and the lcov path; the organization and the project key come from the variables.
 
@@ -37,11 +37,10 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    env:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_HOST_URL: https://sonarcloud.io
-      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
-      SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+    outputs:
+      runtime-coverage-artifact-id: ${{ steps.runtime-coverage.outputs.artifact-id }}
+      runtime-coverage-lcov-sha256: ${{ steps.coverage-proof.outputs.lcov-sha256 }}
+      runtime-coverage-producer-attempt: ${{ steps.coverage-proof.outputs.producer-attempt }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -90,10 +89,145 @@ jobs:
           disable_search: true
           fail_ci_if_error: true
 
+      # The main-only scanner consumes this job's immutable artifact, never a name search or a coverage rerun.
+      - name: Bind runtime coverage artifact
+        id: coverage-proof
+        if: ${{ success() && github.ref == 'refs/heads/main' }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          import { createHash } from 'node:crypto';
+          const { GITHUB_REPOSITORY, GITHUB_REF, GITHUB_RUN_ID, GITHUB_SHA, GITHUB_JOB, GITHUB_RUN_ATTEMPT, GITHUB_OUTPUT } = process.env;
+          assert.equal(GITHUB_REF, 'refs/heads/main');
+          assert.equal(GITHUB_JOB, 'check-and-test');
+          assert.match(GITHUB_RUN_ID, /^[1-9]\d*$/);
+          assert.match(GITHUB_RUN_ATTEMPT, /^[1-9]\d*$/);
+          assert.match(GITHUB_SHA, /^[a-f0-9]{40}$/);
+          assert.ok(GITHUB_REPOSITORY);
+          assert.ok(fs.lstatSync('coverage/lcov.info').isFile());
+          const bytes = fs.readFileSync('coverage/lcov.info');
+          assert.ok(bytes.length > 0, 'the coverage report must exist and be nonempty');
+          const lcovSha256 = createHash('sha256').update(bytes).digest('hex');
+          const proof = { repository: GITHUB_REPOSITORY, ref: GITHUB_REF, runId: GITHUB_RUN_ID, headSha: GITHUB_SHA, producerJobId: GITHUB_JOB, producerAttempt: GITHUB_RUN_ATTEMPT, lcovSha256 };
+          fs.writeFileSync('coverage/provenance.json', JSON.stringify(proof) + '\n', { flag: 'wx' });
+          fs.appendFileSync(GITHUB_OUTPUT, `lcov-sha256=${lcovSha256}\nproducer-attempt=${GITHUB_RUN_ATTEMPT}\n`);
+          NODE
+
+      - name: Upload runtime coverage artifact
+        id: runtime-coverage
+        if: ${{ success() && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: runtime-coverage-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            coverage/lcov.info
+            coverage/provenance.json
+          if-no-files-found: error
+
+      # Every published @starci package (the starci pins of knowledge/hfs/canon-pins.yaml) passes its own tests from a
+      # clean install of its own manifest and lock in a temp dir: nothing hoisted in this checkout can hide an undeclared
+      # dependency (test-world 1.0.0 shipped one). Exit 1 a red package, 2 a proof that could not run - never a pass.
+      # This is the CI run of every package suite under packages/ (heroicons, grammar, both eslint canons, stylelint, tsconfig,
+      # prettier-config, jest-preset, test-world, cli, hfs); `npm run test:packages` is the same proof on a developer machine.
+      # It runs after a red static check or coverage step too, so a red package suite is never hidden behind another red step.
+      - name: Published packages from a clean install
+        if: ${{ !cancelled() }}
+        run: npm run starci --silent -- release clean-test
+
+      # The scaffolded app is proven against fresh registry installs: lint, typecheck and the api boot must RUN.
+      # STARCI_REQUIRE_APP_INSTALLS=1 inside the script turns a missing install into a failure, never a skip.
+      - name: Scaffold app against registry installs
+        run: npm run starci --silent -- release app-installs
+
+  # This separate job keeps the scanner and quality gate out of the full suite's existing job budget.
+  sonar:
+    name: runtime sonar
+    needs: check-and-test
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    permissions:
+      contents: read
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: https://sonarcloud.io
+      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+      SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+      COVERAGE_ARTIFACT_ID: ${{ needs.check-and-test.outputs.runtime-coverage-artifact-id }}
+      COVERAGE_LCOV_SHA256: ${{ needs.check-and-test.outputs.runtime-coverage-lcov-sha256 }}
+      COVERAGE_PRODUCER_ATTEMPT: ${{ needs.check-and-test.outputs.runtime-coverage-producer-attempt }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      # Keep the scanner's dependency and generated Grammar inputs equal to the checked suite's inputs.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install the eslint canon workspace
+        working-directory: packages
+        run: npm ci --ignore-scripts
+
+      - name: Install @starci/test-world
+        working-directory: packages/test-world
+        run: npm ci --ignore-scripts
+
+      - name: Build @starci/grammar
+        working-directory: packages/grammar
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+
+      - name: Validate runtime coverage producer
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          assert.match(process.env.COVERAGE_ARTIFACT_ID, /^[1-9]\d*$/, 'one immutable producer artifact ID is required');
+          assert.match(process.env.COVERAGE_LCOV_SHA256, /^[a-f0-9]{64}$/);
+          assert.match(process.env.COVERAGE_PRODUCER_ATTEMPT, /^[1-9]\d*$/);
+          assert.ok(Number(process.env.COVERAGE_PRODUCER_ATTEMPT) <= Number(process.env.GITHUB_RUN_ATTEMPT));
+          NODE
+
+      - name: Download runtime coverage artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ needs.check-and-test.outputs.runtime-coverage-artifact-id }}
+          path: coverage
+          merge-multiple: true
+
+      - name: Verify runtime coverage artifact
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          import { createHash } from 'node:crypto';
+          assert.deepEqual(fs.readdirSync('coverage').sort(), ['lcov.info', 'provenance.json']);
+          for (const file of ['coverage/lcov.info', 'coverage/provenance.json']) assert.ok(fs.lstatSync(file).isFile());
+          const proof = JSON.parse(fs.readFileSync('coverage/provenance.json', 'utf8'));
+          assert.equal(proof.repository, process.env.GITHUB_REPOSITORY);
+          assert.equal(proof.ref, process.env.GITHUB_REF);
+          assert.equal(proof.ref, 'refs/heads/main');
+          assert.equal(proof.runId, process.env.GITHUB_RUN_ID);
+          assert.equal(proof.headSha, process.env.GITHUB_SHA);
+          assert.equal(proof.producerJobId, 'check-and-test');
+          assert.equal(proof.producerAttempt, process.env.COVERAGE_PRODUCER_ATTEMPT);
+          assert.equal(proof.lcovSha256, process.env.COVERAGE_LCOV_SHA256);
+          const bytes = fs.readFileSync('coverage/lcov.info');
+          assert.ok(bytes.length > 0);
+          assert.equal(createHash('sha256').update(bytes).digest('hex'), process.env.COVERAGE_LCOV_SHA256);
+          NODE
+
       # SonarCloud analysis of the runtime (full history from the checkout above, for blame and the new-code period). The scan waits for the quality gate
       # (sonar.qualitygate.wait, up to an hour: SonarCloud queues) and the step fails on a red gate.
       - name: Sonar scan (SonarCloud) and quality gate
-        if: ${{ !cancelled() && github.ref == 'refs/heads/main' && env.SONAR_TOKEN != '' && env.SONAR_ORGANIZATION != '' && env.SONAR_PROJECT_KEY != '' }}
+        if: ${{ success() && !cancelled() && github.ref == 'refs/heads/main' && env.SONAR_TOKEN != '' && env.SONAR_ORGANIZATION != '' && env.SONAR_PROJECT_KEY != '' }}
         uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2 # v7.2.1
         timeout-minutes: 75
         with:
@@ -111,21 +245,6 @@ jobs:
           [ -z "$SONAR_ORGANIZATION" ] && missing="$missing vars.SONAR_ORGANIZATION"
           [ -z "$SONAR_PROJECT_KEY" ] && missing="$missing vars.SONAR_PROJECT_KEY"
           echo "::notice title=Sonar skipped::the runtime was not scanned on SonarCloud; missing repository settings:$missing"
-
-      # Every published @starci package (the starci pins of knowledge/hfs/canon-pins.yaml) passes its own tests from a
-      # clean install of its own manifest and lock in a temp dir: nothing hoisted in this checkout can hide an undeclared
-      # dependency (test-world 1.0.0 shipped one). Exit 1 a red package, 2 a proof that could not run - never a pass.
-      # This is the CI run of every package suite under packages/ (heroicons, grammar, both eslint canons, stylelint, tsconfig,
-      # prettier-config, jest-preset, test-world, cli, hfs); `npm run test:packages` is the same proof on a developer machine.
-      # It runs after a red static check or coverage step too, so a red package suite is never hidden behind another red step.
-      - name: Published packages from a clean install
-        if: ${{ !cancelled() }}
-        run: npm run starci --silent -- release clean-test
-
-      # The scaffolded app is proven against fresh registry installs: lint, typecheck and the api boot must RUN.
-      # STARCI_REQUIRE_APP_INSTALLS=1 inside the script turns a missing install into a failure, never a skip.
-      - name: Scaffold app against registry installs
-        run: npm run starci --silent -- release app-installs
 
   # A pushed release tag becomes a GitHub Release: named after the tag, its body exactly the CHANGELOG section of that version (the same
   # section `starci release cut` made the annotated tag message from: `starci release notes`), marked a pre-release when the version has a

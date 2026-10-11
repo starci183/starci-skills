@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.5 - 2026-10-11
+
+- Changed: carry runtime version 1.0.0-alpha.10.1 and pin HFS 4.2.5; command behavior is unchanged.
+
 ## 1.2.4 - 2026-10-11
 
 - Changed: carry runtime version 1.0.0-alpha.10; behaviour is unchanged.
