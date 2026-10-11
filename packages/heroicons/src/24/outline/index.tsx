@@ -152,3 +152,11 @@ export const PlaygroundIcon = outlineIcon("PlaygroundIcon", (
         <path strokeLinecap="round" strokeLinejoin="round" d="m7.5 9 2.25 2.25L7.5 13.5m4.5 0h4.5" />
     </>
 ))
+
+/** Second-brain cut: two hemispheres on one midline with a fold on each lobe (shared business memory). */
+export const BrainIcon = outlineIcon("BrainIcon", (
+    <>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 5.25a2.625 2.625 0 0 0-5.1-.875A2.75 2.75 0 0 0 4.5 7.5c0 .35.065.69.185 1A3 3 0 0 0 4.5 13.4 2.75 2.75 0 0 0 6.75 18a2.625 2.625 0 0 0 5.25.75V5.25Zm0 0a2.625 2.625 0 0 1 5.1-.875A2.75 2.75 0 0 1 19.5 7.5c0 .35-.065.69-.185 1A3 3 0 0 1 19.5 13.4 2.75 2.75 0 0 1 17.25 18a2.625 2.625 0 0 1-5.25.75" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4.685 8.5A2.625 2.625 0 0 0 8.25 10.5m11.065-2A2.625 2.625 0 0 1 15.75 10.5M4.5 13.4c.6.55 1.4.85 2.25.85m12.75-.85c-.6.55-1.4.85-2.25.85M9 15.75a2.25 2.25 0 0 0-2.25 2.25m8.25-2.25A2.25 2.25 0 0 1 17.25 18" />
+    </>
+))
