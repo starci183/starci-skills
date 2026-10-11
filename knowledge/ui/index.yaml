@@ -22,6 +22,14 @@ topics:
     question: What the running surface actually shows and does
     applicableWorkOp: Selected interface audit or UAT op
 guidance:
+  - id: maturing-rules
+    requirement: |-
+      This knowledge and the reference grammar are maturing, not final (owner, 2026-10-11). A render the owner rejects is
+      evidence that a rule is missing, too loose or wrong: fix the surface, then record the correction as a dated
+      "Owner ruling" case on the nearest rule (or amend the case that misled), and push a defect that belongs to a
+      component into the grammar itself. A ruling found wrong is corrected in place the same day, never left standing
+      beside its correction. Passing every case here is necessary, not sufficient: the owner's review and UX judgement
+      (one focal point, one primary, a mostly neutral page) still decide.
   - id: image-first-direction
     requirement: |-
       For every large frontend task, choose the smallest representative set of critical screens that covers

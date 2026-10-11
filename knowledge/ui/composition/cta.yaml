@@ -35,6 +35,10 @@ rules:
           The action sits in a dense toolbar, a card, or a page-level decision
         assert: |-
           `size` is bound through the published prop from that interaction context, and no vendor button is restyled to reach it
+      - id: case-5
+        when: The same command is offered in two places of one view (the page header and an empty state, a toolbar and a card)
+        assert: |-
+          Owner ruling 2026-10-11: one view shows one `primary` per command. While the region is empty its `EmptyNotice` owns the command as the primary and the header omits it (STATE-3); once content exists the header owns it and no empty state repeats it. Two filled buttons with the same verb on one screen is a defect, even when they sit in different regions
     notThisRule: |-
       counting how much dominant emphasis a whole page spends is ACCENT-1.
   - id: CTA-2
@@ -127,7 +131,7 @@ rules:
       - id: case-4
         when: Two actions live in separate regions
         assert: |-
-          They belong to separate decision owners in the `.starciwork` specification, and neither ranks against the other
+          They belong to separate decision owners in the `.starciwork` specification, and neither ranks against the other - unless they fire the same command, which CTA-1 case-5 settles (one primary per command per view)
 doesNotDecide: |-
   Which region holds the decision is [Layout](layout.yaml), and which anchor names it is
   [Hierarchy](hierarchy.yaml). How many effects an activation may produce and who owns pending is
