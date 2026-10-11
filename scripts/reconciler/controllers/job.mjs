@@ -12,7 +12,8 @@
 //                                                  (reconcileJobSettle({ repo: R, jobId: J }) -
 //                                                  consume, re-verify or canon parity, starci kernel record-checks + starci kernel settle; wrapped, never
 //                                                  re-implemented)
-//   reported, handed to the Kernel              -> Decision Item settle-nongreen (one per report)             job.consume-check
+//   reported, handed to the Kernel              -> Decision Item settle-nongreen (one per report); a handover of an    job.consume-check
+//                                                  older runtime revision is judged by the settler again (job-plan-report.mjs)
 //   answering                                   -> starci kernel questions --workflow (bridge) + DI worker-question    job.consume-check
 //   effect_unknown older than effectUnknownMs   -> starci kernel reconcile --job <id>                                  job.worker
 //   settled, worker release unproven            -> the settler for this job (its releaseSettled closes and    job.close-verify
@@ -32,7 +33,7 @@
 //
 // Internal args (spawned by the reconciler engine): --dry [--repo <path>] [--workflow <id>] [--json].
 //     one read-only pass over the live ledgers: prints each job's plan (step + clocks); writes nothing.
-import fs from 'node:fs';
+import fs from 'node:fs'; import { effectUnknownItem } from '../effect-unknown-item.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
@@ -43,18 +44,25 @@ import { OPENED_BY, SUPERVISOR_LEDGER, jobKey } from '../job-keys.mjs';
 import { mapInOrder } from '../../lib/in-order.mjs';
 import { clocksOf } from '../sla.mjs';
 import { settlerSettings, releaseProofOf, EVENTS as SETTLE_EVENTS } from '../../kernel/settle/job-settle.mjs';
-import { reportedJobs, kernelHandoverOf, KERNEL_ONLY_OPS } from '../../machine/reported-jobs.mjs';
+import { reportedJobs, kernelHandoverOf } from '../../machine/reported-jobs.mjs';
 import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs'; import { isMain } from '../../lib/is-main.mjs';
 import { positiveNumber } from '../../lib/number.mjs';
 import { ownerOnlyQuestion } from '../../kernel/op-incident-policy.mjs';
 import { TERMINAL_HOLDS, holdView, terminalFactsOf } from '../../kernel/terminal-step.mjs';
+import { runMechanicalMoves } from '../mechanical-moves.mjs';
+import { planReport, RECOVERY_CONFLICT } from '../job-plan-report.mjs';
+import { openPreparedOf } from '../../kernel/settle/prepared-recovery.mjs';
+import { currentRuntimeRev } from '../../kernel/runtime-rev.mjs';
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
 const JOB_FILE = path.join(skillRoot, 'modules', 'reconciler', 'job.yaml');
 export const SETTLER_SCRIPT = 'scripts/kernel/settle/job-settle-main.mjs';
 const WORKERS_KEY = 'workers:supervisor';
 const HEALTH_KEY = 'health:all';
-const OPEN = ['queued', 'leased', 'running', 'answering', 'effect_unknown'];
+const OPEN = new Set(['queued', 'leased', 'running', 'answering', 'effect_unknown']);
+// The statuses a report puts a job in until a verdict settles it: `starci kernel report` moves running -> reported.
+const REPORT_WAIT = new Set(['running', 'answering', 'effect_unknown', 'reported']);
+const LISTED = [...OPEN, 'reported'];
 const SETTLED = SETTLED_JOB_LIST;
 
 /* ------------------------------------------------------------------------------------------------ settings */
@@ -117,7 +125,7 @@ const wfRoute = (ev) => ev?.ledgerId !== SUPERVISOR_LEDGER && ev?.workflowId ? w
 
 const parse = (text) => { try { return JSON.parse(text); } catch { return null; } };
 /** Everything the planner needs about one job, from a read-only handle. Null when the job is not an op job. */
-export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings() } = {}) {
+export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings(), runtimeRev = currentRuntimeRev() } = {}) {
   const row = db.prepare("SELECT job_id, workflow_id, op_id, try_no AS attempt, status, worker_id, payload_json, created_at, updated_at FROM jobs WHERE job_id=? AND kind='op'").get(jobId);
   if (!row) return null;
   const payload = parse(row.payload_json) ?? {};
@@ -128,7 +136,9 @@ export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings()
     jobId: row.job_id, workflowId: row.workflow_id, op: row.op_id, attempt: row.attempt, status: row.status, workerId: row.worker_id,
     payload, createdAt: Number(row.created_at), updatedAt: Number(row.updated_at),
     report: reported ? { dispatchId: reported.dispatchId, outcome: reported.outcome, filedAt: reported.filedAt, consumedAt: reported.consumedAt } : null,
-    handover: handover ? { reason: handover.reason ?? null, detail: handover.detail ?? null, at: handover.at } : null,
+    handover: handover ? { reason: handover.reason ?? null, code: handover.code ?? null, detail: handover.detail ?? null, at: handover.at, runtimeRev: handover.runtimeRev ?? null } : null,
+    preparedOpen: handover?.code === RECOVERY_CONFLICT && openPreparedOf(db, jobId, { read: false }) != null,
+    runtimeRev,
     released, releaseProof: releaseProofOf(payload), settledAt: SETTLED.includes(row.status) ? Number(payload.settledAt ?? row.updated_at) : null,
     dispatchedAt: lastEventAt('op-dispatched'), questionAt: lastEventAt('worker-question-bridged'), now, windowMs: settings.settledWindowMs,
     terminal: terminalFactsOf(db, jobId),
@@ -138,7 +148,7 @@ export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings()
 /** Keys of the resync: open op jobs of running workflows, settled ones of the last settledWindowMs, and each running workflow. */
 export function listKeysOf(db, ledgerId, { now = Date.now(), settings = jobSettings(), openClockJobs = [] } = {}) {
   const live = db.prepare(`SELECT j.job_id, j.workflow_id FROM jobs j JOIN workflows w ON w.workflow_id=j.workflow_id
-    WHERE j.kind='op' AND w.archived_at IS NULL AND COALESCE(w.phase,'') <> 'finished' AND j.status IN (${OPEN.map(() => '?').join(',')})`).all(...OPEN);
+    WHERE j.kind='op' AND w.archived_at IS NULL AND COALESCE(w.phase,'') <> 'finished' AND j.status IN (${LISTED.map(() => '?').join(',')})`).all(...LISTED);
   const settled = db.prepare(`SELECT job_id, workflow_id FROM jobs WHERE kind='op' AND status IN (${SETTLED.map(() => '?').join(',')}) AND updated_at>?`)
     .all(...SETTLED, now - settings.settledWindowMs);
   const owing = db.prepare("SELECT j.job_id FROM jobs j JOIN workflows w ON w.workflow_id=j.workflow_id WHERE j.kind='op' AND w.archived_at IS NULL AND w.phase='running' AND j.status IN ('failed','awaiting_owner')").all()
@@ -146,7 +156,7 @@ export function listKeysOf(db, ledgerId, { now = Date.now(), settings = jobSetti
   const keys = new Set();
   for (const r of [...live, ...settled, ...owing]) keys.add(jobKey(ledgerId, r.job_id));
   for (const id of openClockJobs) keys.add(jobKey(ledgerId, id));
-  for (const r of live) keys.add(wfKey(ledgerId, r.workflow_id));
+  for (const r of [...live, ...db.prepare("SELECT workflow_id FROM workflows WHERE archived_at IS NULL AND phase='running'").all()]) keys.add(wfKey(ledgerId, r.workflow_id));
   return [...keys];
 }
 
@@ -169,7 +179,7 @@ export function planJob(f, { frontier = {}, questions = [], settings = jobSettin
     set({ kind: 'dead-worker', concern: 'job.worker', verb: 'reconcile', argv: ['--job', f.jobId, '--dead-worker', '--settle-failed'] });
   }
   if (live && (frontier.heldWorkerJobs ?? []).includes(f.jobId)) set({ kind: 'release-worker', concern: 'job.worker', verb: 'reconcile', argv: ['--job', f.jobId, '--release-worker'] });
-  if (live && f.report) planReport(f, clock, set);
+  if (REPORT_WAIT.has(f.status) && f.report) planReport(f, clock, set);
   if (f.status === 'answering') {
     clock('QUESTION_OVERDUE', f.questionAt ?? f.updatedAt);
     set({ kind: 'questions', concern: 'job.consume-check', questions: questions.filter((q) => q?.jobId === f.jobId) });
@@ -183,26 +193,11 @@ export function planJob(f, { frontier = {}, questions = [], settings = jobSettin
   return { step, clocks };
 }
 
-/** The clock and step of a live job with a report. Consume is part of settle (settle-runtime-service): SETTLE_OVERDUE / DECISION_OVERDUE time the report, no separate CONSUME_OVERDUE clock. */
-function planReport(f, clock, set) {
-  if (f.handover) {
-    clock('DECISION_OVERDUE', f.handover.at);
-    set({ kind: 'settle-nongreen', concern: 'job.consume-check', reason: f.handover.reason });
-  } else if (f.report.outcome !== 'done' || KERNEL_ONLY_OPS.includes(f.op)) {
-    // The settler never settles these; its handover is the Kernel's item (starci kernel status settleDecisions).
-    clock('DECISION_OVERDUE', f.report.filedAt);
-    set({ kind: 'settle-nongreen', concern: 'job.consume-check', reason: KERNEL_ONLY_OPS.includes(f.op) ? 'owner-act' : `outcome-${f.report.outcome}` });
-  } else {
-    clock('SETTLE_OVERDUE', f.report.filedAt);
-    set({ kind: 'settle', concern: 'job.settle' });
-  }
-}
-
 /** The clock and step of a job left terminal with nothing after it (policy holds failed-no-step, owner-wait-no-ask). */
 function planTerminal(f, clock, set) {
   clock('DECISION_OVERDUE', f.terminal.since);
+  // An owner wait with no ask is the retry move of mechanical-moves.mjs (its refusal opens the retry-decision item).
   if (f.terminal.hold === TERMINAL_HOLDS.failedNoStep) set({ kind: 'route-failure', concern: 'job.settle', verb: 'reconcile', argv: ['--job', f.jobId, '--route-failure'] });
-  else set({ kind: 'terminal-decision', concern: 'job.consume-check', reason: 'owner-wait-no-ask' });
 }
 
 /** The clock and step of a settled job whose worker release is not proven. */
@@ -303,10 +298,10 @@ ${JSON.stringify(r?.value ?? null)}`);
 async function reconcileJob(ctx, ledgerId, jobId, settings) {
   const f = ctx.read(ledgerId, (db) => jobFacts(db, jobId, { now: ctx.now(), settings }));
   if (!f) { for (const state of CLOCK_CODES) { ctx.clear(jobKey(ledgerId, jobId), state); } return { ok: true, action: 'gone' }; }
-  const status = OPEN.includes(f.status) ? await ctx.status(ledgerId, f.workflowId) : null;
+  const status = OPEN.has(f.status) || f.status === 'reported' ? await ctx.status(ledgerId, f.workflowId) : null;
   const plan = planJob(f, { frontier: status?.frontier ?? {}, questions: status?.workerQuestions ?? [], settings });
   await keepClocks(ctx, ledgerId, jobId, plan.clocks);
-  if (!OPEN.includes(f.status)) ctx.clear(jobKey(ledgerId, jobId), 'WORKER_STALLED');
+  if (!OPEN.has(f.status)) ctx.clear(jobKey(ledgerId, jobId), 'WORKER_STALLED');
   const s = plan.step;
   if (!s) return { ok: true, action: 'idle', clocks: plan.clocks.map((c) => c.state) };
   if (!may(ctx, s.concern)) return { ok: true, action: 'not-owned', step: s.kind };
@@ -325,14 +320,12 @@ async function actJob(ctx, ledgerId, jobId, f, s, settings) {
   const repo = ledgerOf(ctx, ledgerId)?.repo;
   switch (s.kind) {
     case 'dead-worker': case 'release-worker': case 'effect-unknown':
-      return { action: s.kind, ...(await ctx.api(ledgerId, s.verb, s.argv)) };
+      return { action: s.kind, ...(await ctx.api(ledgerId, s.verb, s.argv)), ...(await effectUnknownItem(ctx, ledgerId, f, s, settings)) };
     case 'settle':
       // The runtime settler for this one job: reconcileJobSettle (consume, re-verify / canon parity, starci kernel record-checks + settle, release).
       return { action: 'settle', ...(await ctx.run('node', [SETTLER_SCRIPT, '--repo', repo, '--job', jobId, '--json'], { timeoutMs: settings.settleRunTimeoutMs })) };
     case 'route-failure':
       return routeFailure(ctx, ledgerId, f, s, settings);
-    case 'terminal-decision':
-      return { action: 'terminal-decision', ...(await ctx.openDecision(retryDecision(f, ledgerId, s.reason, { now: ctx.now(), settings }))) };
     case 'settle-nongreen':
       return { action: 'settle-nongreen', ...(await ctx.openDecision(settleDecision(f, ledgerId, { now: ctx.now(), settings }))) };
     case 'questions': {
@@ -381,10 +374,21 @@ async function routeFailure(ctx, ledgerId, f, s, settings) {
   return { action: 'route-failure', ...r, decision: (await ctx.openDecision(retryDecision(f, ledgerId, reason, { now: ctx.now(), settings }))) };
 }
 
+/** The status a workflow pass judges by: {status}, or {early} when the pass ends here (unreadable: named, never reported as ended; finished or archived: ended). */
+async function workflowStatusRead(ctx, ledgerId, workflowId) {
+  const read = typeof ctx.statusRead === 'function' ? await ctx.statusRead(ledgerId, workflowId) : { value: await ctx.status(ledgerId, workflowId), failure: null };
+  if (!read.value) return { early: { ok: true, action: 'status-unreadable', why: read.failure?.error ?? 'no status' } };
+  if (read.value.phase === 'finished' || read.value.archivedAt) return { early: { ok: true, action: 'ended' } };
+  return { status: read.value };
+}
+
 async function reconcileWorkflow(ctx, ledgerId, workflowId, settings) {
-  const status = await ctx.status(ledgerId, workflowId);
-  if (!status || status.phase === 'finished' || status.archivedAt) return { ok: true, action: 'ended' };
+  const read = await workflowStatusRead(ctx, ledgerId, workflowId);
+  if (read.early) return read.early;
+  const { status } = read;
   const id = `${ledgerId}:${workflowId}`;
+  const moved = may(ctx, 'job.settle') ? await runMechanicalMoves(ctx, ledgerId, status, { facts: (jobId) => ctx.read(ledgerId, (db) => jobFacts(db, jobId, { now: ctx.now(), settings })), refused: (f, reason) => retryDecision(f, ledgerId, reason, { now: ctx.now(), settings }), workflowId, settings }) : [];
+  if (moved.length) ctx.log('reconciler.act', `workflow ${id} ran ${moved.length} mechanical move(s)`, { moved });
   const plan = planWorkflow(status, { lastDispatchAt: lastDispatch.get(id) ?? 0, now: ctx.now(), settings });
   const entity = wfKey(ledgerId, workflowId);
   if (plan.readyJobs.length && (Number(status.progress?.running) || 0) < (Number(status.progress?.allowedParallel) || 0)) ctx.clock(entity, 'READY_UNDISPATCHED', settings.sla.READY_UNDISPATCHED, { ledgerId });
@@ -434,7 +438,7 @@ export default {
   concurrency: 2,
   timeoutMs: 960_000,
   routes: {
-    'op-dispatched': jobRoute, 'op-reported': jobRoute, 'report-consumed': jobRoute, 'checks-recorded': jobRoute, 'op-settled': jobRoute,
+    'op-dispatched': jobRoute, 'report-filed': jobRoute, 'report-consumed': jobRoute, 'checks-recorded': jobRoute, 'op-settled': jobRoute,
     'op-auto-settled': jobRoute, 'job-settle-*': jobRoute, 'worker-*': jobRoute, 'incident-raised': wfRoute, 'incident-resolved': wfRoute,
   },
   async list(ctx) {

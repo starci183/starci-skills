@@ -34,7 +34,7 @@ reads:
         variable name - and which identity:<identity-slug> alias in the selected backend Stack environment
         (.starcistacks/<env>/secrets/<identity-slug>.enc, app-relative) holds it. The resource metadata names the custody and variable.
   - id: standard
-    path: shared
+    path: docs/architecture.md + docs/code-pattern-enforcement.md + knowledge/op-gate.yaml + knowledge/design-patterns.yaml + knowledge/architecture-rules.yaml + knowledge/hfs/rules.yaml
     purpose:
       en: shared
       vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (starci app explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
@@ -140,6 +140,13 @@ proofs:
       en: "starci kernel settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
       vi: "starci kernel settle tự đọc lại read-digest.json đính kèm (check op-proof, proof read-knowledge): done thiếu bản tóm tắt (op-read-digest-missing), không nêu tệp knowledge nào hoặc có bản ghi đã viết thiếu slot hfs (op-read-digest-no-knowledge) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
+judge:
+  - by: machine
+    measures: [declared-checks, work-hygiene, op-proof:read-knowledge]
+    proofs: [one-record, read-knowledge]
+    why: "the settler re-runs the record validator over the records written, the Work files are checked for hygiene and the READ of the standard is re-read from the digest"
+  - by: owner
+    why: "the runtime never decides for the owner: it carries the recommendation into the work and the owner overturns it later"
 blockers:
   - code: QUESTION_UNCLEAR
     condition:

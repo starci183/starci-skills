@@ -3,7 +3,7 @@
 // modules/reconciler/workflow.yaml. Engine contract: LANES.md "Shared contract" (lane rc-engine discovers this file).
 //
 // One key per running workflow, `workflow:<ledgerId>:<workflowId>`. Each pass reads ONE projection - the cached
-// `starci kernel status --json` (ctx.status: progress, rca, frontier, stuck[], kernelRev) and scripts/supervisor/stall.mjs
+// `starci kernel status --json` (ctx.status: progress, rca, frontier, stuck[], revisionNotice) and scripts/supervisor/stall.mjs
 // stallFindings over a read-only handle, its frontierOf answered from that same cached status - and from it:
 //   - keeps the SLA clocks of the workflow (stalled, orphaned, rev-ack, goal text, one per stuck[] wait);
 //   - opens one Decision Item per finding for the Kernel (progress-stall, stale-gate, stale-wait, stale-peer-wait,
@@ -37,8 +37,18 @@ import { telemetrySettings } from '../../machine/op-metrics.mjs';
 import { unresolvedPlaceholders } from '../../goal/goal-text.mjs';
 import { productRepos } from '../../machine/home.mjs';
 import { slaCatalog, clocksOf, setClock, clearClock } from '../sla.mjs'; import { isMain } from '../../lib/is-main.mjs';
+import { gateViewsFromLedger } from '../../kernel/gate-ladder.mjs';
+import { fixCandidatesOf } from '../gate-fix-candidates.mjs';
+import { closeGateItems, gateSightOf } from '../gate-close.mjs';
+import { mirrorPlan, twinAnswersOf } from '../supervisor-mirror.mjs';
+import { contradictedRulings } from '../supervisor-ruling-withdraw.mjs';
+import { applyMirror } from '../supervisor-mirror-apply.mjs';
 import { planWorkflow, stuckPrefix, workflowEntity, SUPERVISOR_LEDGER } from '../workflow-plan.mjs';
 import { eachInOrder, mapInOrder } from '../../lib/in-order.mjs';
+import { recordSwap } from '../revision-swap.mjs';
+import { runtimeHead } from '../../machine/self-reload.mjs';
+import { DECISION_WITHOUT_REPO } from '../decision-repo.mjs';
+import { draftFactsOf } from '../../kernel/draft-hold.mjs';
 export { planWorkflow, SUPERVISOR_LEDGER };
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
@@ -71,7 +81,7 @@ export function workflowSettings({ file = WORKFLOW_FILE, allocation = null, cata
     revAckMs: cat.codes.REV_ACK_OVERDUE?.slaMs ?? 1_800_000,
     goalMs: cat.codes.GOAL_TEXT_MISSING?.slaMs ?? 0,
     supervisorGateMs: cat.codes.SUPERVISOR_GATE_OVERDUE?.slaMs ?? num(alloc?.autopilot?.supervisorGateTimeoutMs, 21_600_000),
-    stuckSla,
+    stuckSla, supervisorOwed: Object.fromEntries(Object.entries(doc.supervisorOwed ?? {}).map(([kind, diKind]) => [kind, String(diKind)])),
   };
 }
 
@@ -225,7 +235,20 @@ async function readFacts(ctx, readers, { key, ledgerId, workflowId, now, setting
   });
   const open = await (ctx.openAsks ?? openAsks)(own.db, new Set([workflowId]));
   const asks = open.map((a) => ({ dispatchId: a.dispatch_id, liveness: a.liveness, lastServedAt: lastServedAt(own.db, workflowId, a.dispatch_id) }));
-  return { base, findings, asks, status, unreadable };
+  const gates = gatesOf(status, own.db, workflowId, { now, timeoutMs: settings.supervisorGateMs });
+  return { base, findings, asks, status, unreadable, gates, draft: draftFactsOf(own.db, workflowId), sight: gateSightOf([own]),
+    mirror: mirrorPlan(own.db, { ledgerId, ledgerName: path.basename(own.repo), workflowId, now, answers: twinAnswersOf(ctx.stateDb) }),
+    rulings: contradictedRulings(own.db, ctx.stateDb, { workflowId, now }) };
+}
+
+/**
+ * The open supervisor-gates of the pass: the status's own view, else the ledger's (an unreadable status never leaves a gate without its Supervisor item).
+ * A runtime-defect gate carries the live runtime revision and the commits since it was raised that touch what its cause names (gate-fix-candidates.mjs).
+ */
+function gatesOf(status, db, workflowId, { now, timeoutMs }) {
+  const gates = status?.autopilot?.supervisorGates ?? gateViewsFromLedger(db, workflowId, { now, timeoutMs });
+  const rev = runtimeHead({ root: skillRoot });
+  return gates.map((gate) => (gate.cause === 'runtime-defect' || gate.cause === 'unclassified' ? { ...gate, runtimeRev: rev, fixCandidates: fixCandidatesOf(gate, rev) } : gate));
 }
 
 /** Start / keep the plan's clocks and clear the rest of the workflow's; how many were cleared. */
@@ -244,12 +267,35 @@ async function openDecisions(ctx, plan, now, settings) {
   const opened = [];
   await eachInOrder(plan.decisions, async (d) => {
     if (recentlyOpened(ctx, d.idempotencyKey, now, settings.decisionDueMs)) return;
-    try { await ctx.openDecision(d); opened.push(d); } catch (error) { plan.lines.push(`DI ${d.idempotencyKey} failed: ${String(error?.message ?? error).slice(0, 120)}`); }
+    try {
+      const result = await ctx.openDecision(d);
+      if (result?.code === DECISION_WITHOUT_REPO) { plan.lines.push(`DI ${d.idempotencyKey} refused ${result.code}: ${result.error}`); return; }
+      opened.push(d);
+    } catch (error) { plan.lines.push(`DI ${d.idempotencyKey} failed: ${String(error?.message ?? error).slice(0, 120)}`); }
   });
   return opened;
 }
 
+/**
+ * The key a runtime land (the Supervisor ledger's land-passed event) routes to: every running workflow is looked at at once, so a Kernel
+ * whose acknowledged revision the land made stale is woken now instead of at the next resync. The wake itself is the one reconcileWorkflow
+ * rings (planRev: one doorbell per workflow and revision), so a land wakes a seat at most once.
+ */
+export const REV_WAKE_KEY = 'rev-wake';
+
+/** The re-look of every running workflow after a land: {ok, key, looked: [workflow keys]}. The status cache is dropped first so the pass reads the new revision; the re-look is recorded as a runtime-change-applied signal. */
+async function reconcileAfterLand(ctx, settings) {
+  ctx.dropStatusCache?.();
+  const keys = await listWorkflows(ctx);
+  const results = await mapInOrder(keys, (workflowKey) => reconcileWorkflow(workflowKey, ctx, { settings }));
+  const doorbells = results.filter((r) => r?.doorbell).length;
+  const applied = [{ action: 'workflows-looked-at', count: keys.length }, { action: 'kernel-doorbells-rung', count: doorbells }];
+  recordSwap(ctx.machine, { cause: 'land', toRev: runtimeHead({ root: skillRoot }), applied, at: ctx.now() });
+  return { ok: results.every((r) => r?.ok !== false), key: REV_WAKE_KEY, looked: keys, doorbells };
+}
+
 export async function reconcileWorkflow(key, ctx, { settings = workflowSettings() } = {}) {
+  if (key === REV_WAKE_KEY) return reconcileAfterLand(ctx, settings);
   const k = parseKey(key);
   if (!k) return { ok: false, key, skipped: 'bad-key' };
   const { ledgerId, workflowId } = k;
@@ -259,16 +305,20 @@ export async function reconcileWorkflow(key, ctx, { settings = workflowSettings(
   let facts;
   try { facts = await readFacts(ctx, readers, { key, ledgerId, workflowId, now, settings }); } finally { closeAll(readers); }
   if (facts.early) return facts.early;
-  const { base, findings, asks, status, unreadable } = facts;
+  const { base, findings, asks, status, unreadable, gates, sight, mirror, rulings, draft } = facts;
 
   const existing = clocksOf(ctx, { prefixes: [wfEntity, prefix] }).filter((c) => c.entity === wfEntity || c.entity.startsWith(prefix));
-  const plan = planWorkflow({ ledgerId, workflowId, status, findings, goal: base.goal, asks, clocks: existing, unreadable, now, settings });
+  const plan = planWorkflow({ draft, ledgerId, workflowId, status, findings, goal: base.goal, asks, gates, clocks: existing, unreadable, now, settings });
 
   const cleared = await syncClocks(ctx, plan, existing, { ledgerId, workflowId, wfEntity, status });
 
   // decisions, then one doorbell for the Kernel's
   const opened = await openDecisions(ctx, plan, now, settings);
-  const kernelKeys = opened.filter((d) => d.decider === 'kernel').map((d) => d.idempotencyKey);
+  // The items a Kernel verb opened for the Supervisor in this product ledger reach the Supervisor's own store.
+  const mirrored = await applyMirror(ctx, { ledgerId, workflowId, mirror, rulings, lines: plan.lines, now, openDecisions: (decisions) => openDecisions(ctx, { decisions, lines: plan.lines }, now, settings) });
+  // The Supervisor's items of this workflow's gates close with the gate, and an older revision's item closes when the newer one stands.
+  if (ctx.mode === 'active') closeGateItems(sight, { env: ctx.env ?? process.env, now });
+  const kernelKeys = [...opened, ...mirrored].filter((d) => d.decider === 'kernel').map((d) => d.idempotencyKey);
   // A stale runtime rev not yet overdue is a re-wake, not a decision: one doorbell per (workflow, rev).
   if (plan.rewake && !recentlyOpened(ctx, `rev-wake:${workflowId}:${plan.rewake}`, now, settings.revAckMs)) kernelKeys.push(`rev:${plan.rewake}`);
   const doorbell = kernelKeys.length ? await ringKernelDoorbell(ctx, { ledgerId, workflowId, keys: kernelKeys }) : null;
@@ -309,7 +359,7 @@ export default {
   concerns: ['workflow.stall-wake', 'workflow.progress', 'workflow.ask-repark'],
   resyncMs: defaults.resyncMs,
   concurrency: defaults.concurrency,
-  routes: Object.fromEntries(defaults.routes.map((kind) => [kind, route])),
+  routes: { ...Object.fromEntries(defaults.routes.map((kind) => [kind, route])), 'land-passed': (ev) => (evLedger(ev) === SUPERVISOR_LEDGER ? REV_WAKE_KEY : null) },
   list: (ctx) => listWorkflows(ctx),
   reconcile: (key, ctx) => reconcileWorkflow(key, ctx, { settings: settingsNow() }),
 };

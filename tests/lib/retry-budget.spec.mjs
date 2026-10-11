@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nextRetry, retryAfterFailure } from '../../scripts/lib/retry-budget.mjs';
+import { doublingDelay, nextRetry, retryAfterFailure } from '../../scripts/lib/retry-budget.mjs';
 
 test('the interval doubles up to its ceiling and every step names its reason', () => {
   const budget = { intervalMs: 1000, maxIntervalMs: 4000 };
@@ -29,4 +29,8 @@ test('a failure folds onto the record the caller kept', () => {
   assert.deepEqual([first.attempts, first.firstAt, first.retry], [1, 50, true]);
   const second = retryAfterFailure({ intervalMs: 1000, maxAttempts: 2 }, { attempts: first.attempts, firstAt: first.firstAt }, { now: 1050, reason: 'lock-held' });
   assert.deepEqual([second.attempts, second.firstAt, second.exhausted], [2, 50, 'attempts']);
+});
+
+test('doublingDelay: a plain doubling backoff from minMs to maxMs, by attempt number', () => {
+  assert.deepEqual([1, 2, 3, 4, 9, 10, 25].map((attempts) => doublingDelay(attempts, { minMs: 1000, maxMs: 300000 })), [1000, 2000, 4000, 8000, 256000, 300000, 300000]);
 });

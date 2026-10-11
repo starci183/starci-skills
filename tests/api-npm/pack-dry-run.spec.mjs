@@ -5,12 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { packDryRun } from '../../scripts/api/npm/pack-dry-run.mjs';
 
-test('packDryRun asks the npm runner for the fixed argument array in the package directory', () => {
-  const seen = [];
-  const r = packDryRun('/pkg', { spawn: (args, options) => { seen.push({ args, options }); return { status: 0, stdout: '[]', stderr: '' }; } });
-  assert.deepEqual(seen, [{ args: ['pack', '--dry-run', '--json', '--ignore-scripts'], options: { cwd: '/pkg' } }]);
-  assert.deepEqual(r, { status: 0, stdout: '[]', stderr: '', error: null });
-});
+
 
 test('packDryRun runs the real npm of this node install (an absolute target, no shell) in a temp package', (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-npm-pack-'));

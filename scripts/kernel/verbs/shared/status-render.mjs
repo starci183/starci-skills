@@ -13,7 +13,8 @@ import { hostHoldOf } from '../../host-hold.mjs';
 import { hostThrottle, throttleSummary } from '../../../machine/ram-throttle.mjs';
 import { AUTOPILOT_RULING, autopilotSettings, autopilotSweep } from '../../autopilot-run.mjs';
 import { wakeKernelForTransition } from '../../wake-delivery.mjs';
-import { kernelRevState, revRootOf } from '../../runtime-rev.mjs';
+import { revRootOf } from '../../runtime-rev.mjs';
+import { kernelNoticeOf, noticeOwes } from '../../kernel-notice.mjs';
 import { ownerSpecs, deferredTestsOf, specsOff } from '../../../route/spec-deferral.mjs';
 import { dependenciesOf, dependencyGraph } from '../../dependency-graph.mjs';
 import { jobDisplayNameOf, opLabel, workflowDisplayName } from '../../../lib/display-names.mjs';
@@ -26,7 +27,9 @@ import { settlePhase } from './status-settle.mjs';
 import { driftPhase, handoverPhase } from './status-drift.mjs';
 import { frontierOf, frontierStateOf } from './status-frontier.mjs';
 import { cutPhase, decorPhase } from './status-decor.mjs';
-import { statusText } from './status-lines.mjs';
+import { seatStatusText, statusText } from './status-lines.mjs';
+import { menuPhase } from './status-menu.mjs';
+import { tracesOf } from '../../acceptance-trace.mjs';
 
 const tryOr = (fn, fallback) => { try { return fn(); } catch { return fallback; } };
 
@@ -36,19 +39,19 @@ const preludePhase = (s) => {
   // Typed release conditions first (scripts/kernel/gate-conditions.mjs): a wait whose --until-*
   // conditions all hold is resolved here - on every status, so on every watchdog tick - before the
   // gates below are read, so what it held reads ready (actionable) in this same projection.
-  s.typedWaits = wf.phase === 'finished' ? { resolved: [], open: [] } : releaseTypedWaits(ledger, { repo: path.resolve(args.repo ?? process.cwd()), workflowId });
+  s.typedWaits = wf.phase === 'finished' ? { resolved: [], open: [] } : releaseTypedWaits(ledger, { repo: path.resolve(args.repo ?? process.cwd()), workflowId, resolve: !ledger.readOnly });
   s.typedUnmeetable = s.typedWaits.open.filter((incident) => incident.unmeetable.length > 0);
   // Autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28): on every status - so every watchdog tick -
   // pending asks are answered provisionally or deferred to handover, owner gates re-routed to the Supervisor, timed-out
   // supervisor gates deferred and budgets checked, before anything below is projected. Never fails the read.
   s.autopilotSettingsNow = autopilotSettings();
   s.autopilotSweepOut = null;
-  if (wf.phase !== 'running' || wf.archived_at != null) return;
+  if (wf.phase !== 'running' || wf.archived_at != null || ledger.readOnly) return;
   try {
     s.autopilotSweepOut = autopilotSweep({ ledger, repo: path.resolve(args.repo ?? process.cwd()), workflowId, settings: s.autopilotSettingsNow,
       wake: (l, o) => wakeKernelForTransition(l, { workflowId: o.workflowId, transition: 'ask-answered', ids: { dispatchId: o.dispatchId }, lines: [
         `autopilot answered ask ${o.dispatchId} (answeredBy autopilot, owner ruling ${AUTOPILOT_RULING}); receipt ${o.receiptPath}.`,
-        'Re-read canonical starci kernel status now and run nextActions: re-enqueue the asking op --retry-of its job so it applies the receipt.'] }) });
+        'The runtime re-runs the asking op with the receipt; read starci kernel status for what waits on you.'] }) });
   } catch (error) { s.autopilotSweepOut = { on: true, errors: [{ error: String(error?.message ?? error).slice(0, 300) }], answered: [], deferred: [], rerouted: [], timedOut: [], supplied: [] }; }
 };
 
@@ -72,10 +75,10 @@ const jobsPhase = (s) => {
   // A worker that is still running keeps its path leases: status renews them while its liveness is
   // not proven dead, so a long op no longer loses its fence at dispatchLeaseTtlMs and reads
   // leases=0 while a peer could be granted its paths (inc-2262f5eab354).
-  renewLiveWorkerLeases(s.ledger, s.workers, s.now);
+  if (!s.ledger.readOnly) renewLiveWorkerLeases(s.ledger, s.workers, s.now);
   // A worker whose screen shows its provider's outage row (quota spent, no capacity) opens that provider's
   // circuit, so route/dispatch skip the pool at once instead of after the worker goes quiet.
-  s.outageCircuits = recordWorkerOutageEvidence(s.ledger, s.workers, s.now);
+  s.outageCircuits = s.ledger.readOnly ? [] : recordWorkerOutageEvidence(s.ledger, s.workers, s.now);
   s.leases = db.prepare('SELECT resource_key,job_id,expires_at FROM leases WHERE workflow_id=? AND expires_at>? ORDER BY resource_key').all(workflowId, s.now);
   // Operations the Kernel can move right now with no wait at all: a queued job
   // to route/dispatch, a fenced launch to reconcile. An 'engaged' frontier that
@@ -133,7 +136,7 @@ const queuePhase = (s) => {
   try { blocking = blockingJobs(db, { now: s.now }); } catch { blocking = new Map(); }
   orderQueuedByBlocking(s.queued, blocking);
   s.blockingOthers = blockingOthersOf(blocking, workflowId, { now: s.now });
-  if (wf.phase === 'running') blockingHeadsUp(s.ledger, { self: wf, blocking, now: s.now });
+  if (wf.phase === 'running' && !s.ledger.readOnly) blockingHeadsUp(s.ledger, { self: wf, blocking, now: s.now });
   // Queued jobs a peer-wait holds are the peer's to unblock: when they are all that is open, the
   // frontier is peer-wait rather than engaged. A wait whose peer is no longer running can never be
   // met by it, so it is the Kernel's move again.
@@ -175,7 +178,7 @@ const messagesPhase = (s) => {
   // drains the workflow's Runs into the ledger first (orchestration check, then
   // the ledger write, then --ack: api-lib/messages.mjs), so the questions it
   // projects are the ledger's. A finished workflow has no worker left to ask.
-  const drained = wf.phase === 'finished' ? { error: null } : drainWorkflowMessages(ledger, workflowId, { rebind: (runId) => internals.bindRunToKernel({ db, ledger, workflowId, runId, by: 'status' }) });
+  const drained = wf.phase === 'finished' || ledger.readOnly ? { error: null } : drainWorkflowMessages(ledger, workflowId, { rebind: (runId) => internals.bindRunToKernel({ db, ledger, workflowId, runId, by: 'status' }) });
   s.workerAsks = { pending: workerQuestionsOf(db, workflowId).pending, error: drained.error };
   s.workerQuestions = s.workerAsks.pending.map(({ messageId, type, jobId, opId, attempt, question, options, askedAt }) => ({ messageId, type, jobId, opId, attempt, question, options, askedAt }));
   // A peer workflow's pending message (starci kernel notify, or the enqueue overlap
@@ -185,7 +188,7 @@ const messagesPhase = (s) => {
     : pendingPeerMessagesOf(db, workflowId).map(({ key, from, kind, subject, at }) => ({ key, from, kind, subject, at }));
 };
 
-const kernelRevOf = (db, workflowId) => tryOr(() => kernelRevState(db, workflowId, { root: revRootOf() }), null);
+const revisionNoticeOf = (db, workflowId) => tryOr(() => kernelNoticeOf(db, workflowId, { root: revRootOf() }), null);
 
 const peerMovable = (s, op) => !s.jobsByOp.has(op) && !s.peerHeldOps.has(op)
   && !(s.planAncestors.get(op) ?? []).some((up) => s.peerHeldOps.has(up) && !s.jobsByOp.get(up)?.some((row) => row.status === 'succeeded'));
@@ -193,12 +196,11 @@ const peerMovable = (s, op) => !s.jobsByOp.has(op) && !s.peerHeldOps.has(op)
 const graphPhase = (s) => {
   const { db, workflowId, wf, internals } = s;
   const { ACTIONABLE_FRONTIER_STATES, NEXT_ACTION_MOVES, graphProjectionOf, opRevDriftOf, rereadActionOf, runningOpRevDriftOf } = internals;
-  s.graph = graphProjectionOf(db, { wf, legOps: s.legOps, planAncestors: s.planAncestors, workflowJobs: s.workflowJobs, jobsByOp: s.jobsByOp, failedRows: s.failedRows, queued: s.queued, ownerGates: s.ownerGates, peerWaits: s.peerWaits, awaitingOwner: s.awaitingOwner, staleReady: s.staleReady, staleProofs: s.staleProofs, credentialWaitOps: s.credentialWaitOps, approvalWaitOps: s.approvalWaitOps, workGraph: s.workGraph, assetSlotsOwed: s.assetSlotsOwed, autopilot: s.autopilotView.graph });
-  // The runtime rev the Kernel acked against the runtime's HEAD (runtime-rev.mjs): a stale Kernel re-reads the
-  // changed kernel files and acks before anything else, and enqueue/dispatch of a leg whose op contract changed
-  // is refused kernel-rev-stale until it does. op-rev-drift: settled legs whose op contract moved after dispatch.
-  s.kernelRev = wf.phase === 'finished' ? null : kernelRevOf(db, workflowId);
-  if (s.kernelRev?.stale) s.graph.nextActions.unshift(rereadActionOf(s.kernelRev, workflowId));
+  s.graph = graphProjectionOf(db, { wf, legOps: s.legOps, planAncestors: s.planAncestors, workflowJobs: s.workflowJobs, jobsByOp: s.jobsByOp, failedRows: s.failedRows, queued: s.queued, ownerGates: s.ownerGates, peerWaits: s.peerWaits, awaitingOwner: s.awaitingOwner, staleReady: s.staleReady, staleProofs: s.staleProofs, credentialWaitOps: s.credentialWaitOps, approvalWaitOps: s.approvalWaitOps, workGraph: s.workGraph, assetSlotsOwed: s.assetSlotsOwed, autopilot: s.autopilotView.graph, handover: s.handover });
+  // What the runtime revision asks of this Kernel (kernel-notice.mjs, the one decider): an owing Kernel re-reads the files the notice
+  // names and attests them before anything else, and enqueue/dispatch of a leg whose op contract changed is refused kernel-rev-stale until it does. op-rev-drift: settled legs whose op contract moved after dispatch.
+  s.revisionNotice = wf.phase === 'finished' || wf.archived_at ? null : revisionNoticeOf(db, workflowId);
+  if (noticeOwes(s.revisionNotice)) s.graph.nextActions.unshift(rereadActionOf(s.revisionNotice, workflowId));
   s.opRevDriftWarnings = tryOr(() => opRevDriftOf(db, workflowId), []);
   s.runningRevDrift = tryOr(() => runningOpRevDriftOf(db, workflowId), []);
   // With nothing open, a step nextActions names is the Kernel's next move; orphaned-frontier is left for a
@@ -210,7 +212,7 @@ const graphPhase = (s) => {
   if (s.peerWaitMovable.length) s.frontierState = 'orphaned-frontier';
   // A peer-wait holds only the ops it names: an unheld next step is still the Kernel's move (fe-hold-until-landed).
   if (['orphaned-frontier', 'supervisor-wait', 'peer-wait'].includes(s.frontierState) && s.graph.nextActions.some((action) => NEXT_ACTION_MOVES.includes(action.kind) && !action.heldBy)) s.frontierState = 'next-ready';
-  s.actionable = ACTIONABLE_FRONTIER_STATES.includes(s.frontierState) || s.kernelRev?.stale === true || s.readyOperations > 0 || s.staleReady.length > 0 || s.askReserve.length > 0 || s.peerMessages.length > 0 || s.deadPeerWaits.length > 0;
+  s.actionable = ACTIONABLE_FRONTIER_STATES.includes(s.frontierState) || noticeOwes(s.revisionNotice) || s.readyOperations > 0 || s.staleReady.length > 0 || s.askReserve.length > 0 || s.peerMessages.length > 0 || s.deadPeerWaits.length > 0;
 };
 
 const ramThrottleOf = (s) => {
@@ -287,6 +289,7 @@ const displayPhase = (s) => {
   const newestWhy = attachLegWhys(db, workflowId, s.graph.legs);
   if (newestWhy) s.frontier.why = { headline: newestWhy.headline, op: newestWhy.op, state: newestWhy.state, next: newestWhy.next, owner: newestWhy.owner, attemptId: newestWhy.attemptId };
   s.kernelNotes = kernelNotesOf(db, workflowId);
+  s.acceptanceTraces = tryOr(() => tracesOf(db, workflowId), []);
   // The owner's "test later" list: every leg the config.yaml specs switches deferred (starci kernel run-deferred-tests runs them).
   const specs = ownerSpecs(skillRoot);
   s.testsDeferred = { off: specsOff(specs), jobs: deferredTestsOf(db, workflowId), planned: s.graph.legs.filter((leg) => leg.deferred && !leg.jobId).map((leg) => ({ op: leg.op, reason: leg.deferred })) };
@@ -307,7 +310,7 @@ const statusOut = (s) => ({
   ...(s.knowledgeChangeRequests.length ? { knowledgeChangeRequests: s.knowledgeChangeRequests } : {}),
   ...(s.logTypedMissing.length ? { logTypedMissing: s.logTypedMissing } : {}),
   ...(s.assetSlotsOwed.length ? { assetSlotsOwed: s.assetSlotsOwed } : {}),
-  ...(s.kernelRev ? { kernelRev: s.kernelRev } : {}),
+  ...(s.revisionNotice ? { revisionNotice: s.revisionNotice } : {}),
   ...(s.opRevDriftWarnings.length ? { opRevDrift: s.opRevDriftWarnings } : {}),
   ...(s.runningRevDrift.length ? { runningOpRevDrift: s.runningRevDrift } : {}),
 });
@@ -333,12 +336,16 @@ export function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   cutPhase(s);
   hostPhase(s);
   displayPhase(s);
+  menuPhase(s);
   const out = statusOut(s);
+  out.menu = s.menu;
+  if (ledger.readOnly) out.readOnly = true;
   out.opHealth = s.opHealth;
   out.kernelNotes = s.kernelNotes;
+  out.acceptanceTraces = s.acceptanceTraces;
   out.stuck = s.stuck;
   out.ramThrottle = s.ramThrottle;
   out.poolLoad = { running: s.poolLoad.byModel, routeHoldMs: s.poolLoad.routeHoldMs };
   if (s.dependencies) out.dependencies = s.dependencies;
-  emit(out, statusText(s, out), args.json);
+  emit(out, s.kernel?.you && !args.full ? seatStatusText(s, out) : statusText(s, out), args.json);
 }

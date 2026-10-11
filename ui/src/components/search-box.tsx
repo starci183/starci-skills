@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { ArrowRight, CircleAlert, ExternalLink, LoaderCircle, Search } from 'lucide-react';
-import { Button } from './ui/button';
-import { Command, CommandEmpty, CommandInput, CommandItem, CommandList, CommandLoading } from './ui/command';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Autocomplete, Button, Description, ListBox, Modal, SearchField } from '@heroui/react';
 import { StateChip } from './state-chip';
 import { FeedbackState } from './feedback-state';
 import { readEnvelope, readErrorEnvelope } from '../api/query';
@@ -65,6 +63,14 @@ function initialResult(query: string): SearchResult {
   return { query, data: null, meta: null, loading: false, error: null, errorCode: null, errorMeta: null, observedAt: null };
 }
 
+function RestoreSearchFocus({ restore }: Readonly<{ restore: () => void }>) {
+  useEffect(() => () => {
+    // Run after the modal has unmounted and HeroUI has restored its focus scope.
+    requestAnimationFrame(() => requestAnimationFrame(restore));
+  }, [restore]);
+  return null;
+}
+
 export function SearchBox() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -72,6 +78,8 @@ export function SearchBox() {
   const [result, setResult] = useState<SearchResult>(() => initialResult(''));
   const trigger = useRef<HTMLButtonElement | null>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
+  const isOpen = useRef(false);
+  const descriptionId = useId();
   const needle = query.trim();
   const current = result.query === needle ? result : null;
   const hits = current?.data?.hits ?? [];
@@ -90,7 +98,13 @@ export function SearchBox() {
       const target = document.activeElement;
       returnFocus.current = target instanceof HTMLElement && target !== document.body && target !== document.documentElement ? target : null;
     }
+    isOpen.current = next;
     setOpen(next);
+  }, []);
+  const restoreFocus = useCallback(() => {
+    if (isOpen.current) return;
+    const target = returnFocus.current?.isConnected ? returnFocus.current : trigger.current;
+    target?.focus();
   }, []);
 
   useEffect(() => {
@@ -142,43 +156,54 @@ export function SearchBox() {
     else navigate(hit.ref.href);
     changeOpen(false);
   };
-  return <Dialog open={open} onOpenChange={changeOpen}>
-    <DialogTrigger asChild>
-      <Button ref={trigger} variant="outline" className="shell-search-trigger" aria-label={t('Search an id or evidence')} aria-keyshortcuts="Meta+K Control+K">
-        <Search className="size-4" aria-hidden="true" /><span>{t('Search an id or evidence')}</span><kbd>{shortcut}</kbd>
-      </Button>
-    </DialogTrigger>
-    <DialogContent className="search-dialog command-dialog gap-0 overflow-hidden" onCloseAutoFocus={event => {
-      const target = returnFocus.current?.isConnected ? returnFocus.current : trigger.current;
-      if (target) { event.preventDefault(); target.focus(); }
-    }}>
-      <DialogHeader className="px-6 pt-6 pb-2 pr-14"><DialogTitle>{t('Search in StarCi')}</DialogTitle><DialogDescription>{t('Paste a workflow, unit, attempt, decision or blob id.')}</DialogDescription></DialogHeader>
-      <Command className="rounded-none! px-5 pb-5 pt-0" shouldFilter={false} label={t('Search results')}>
-        <CommandInput autoFocus value={query} onValueChange={setQuery} placeholder={t('Enter an id or keyword…')} aria-label={t('Search keywords')} />
-        <CommandList className="search-results" aria-busy={loading}>
-          {!needle && <output>{t('Enter an id to open its evidence.')}</output>}
-          {partial && !error && <output className="flex items-center gap-2 py-2 text-xs text-[var(--status-warning)]" title={provenance}>
-            <CircleAlert className="size-4 shrink-0" aria-hidden="true" /><span className="min-w-0 flex-1">{t('Some search sources could not be read.')}</span>
-            <Button variant="ghost" size="sm" disabled={loading} onClick={() => setRetry(value => value + 1)}>{t('Retry')}</Button>
-          </output>}
-          {loading && <CommandLoading><span className="flex items-center gap-2 px-3 py-4"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />{t('Searching…')}</span></CommandLoading>}
-          {error && <div title={provenance}><FeedbackState error onRetry={() => setRetry(value => value + 1)}>{current?.data ? t('Could not refresh the search. Showing the last successful results.') : error}</FeedbackState></div>}
-          {!loading && !error && needle && hits.length === 0 && <CommandEmpty>{partial ? t('No matching results from the available sources.') : t('No matching results.')}</CommandEmpty>}
-          {hits.map(hit => {
-            const target = targetOf(hit);
-            const identity = hit.ref ?? hit.matched;
-            const alias = hit.ref && (hit.matched.kind !== hit.ref.kind || hit.matched.id !== hit.ref.id);
-            return <CommandItem key={hitKey(hit)} value={hitKey(hit)} className="search-hit" disabled={target === null} onSelect={() => choose(hit)} title={target === 'blob' ? t('Open evidence') : undefined}>
-              <span><strong>{hit.title}</strong><small className="break-all">{identity.kind} · {identity.id}{hit.project ? ` · ${hit.project}` : ''}{identity.workflow ? ` · ${identity.workflow}` : ''}</small>
-                {alias && <small className="break-all">{t('Matched {kind}: {id}', { kind: hit.matched.kind, id: hit.matched.id })}</small>}
-                {!target && <small>{t('No supported page for this result.')}</small>}
-              </span>
-              <StateChip state={hit.ui} compact />{target === 'blob' ? <ExternalLink className="size-4" aria-hidden="true" /> : target === 'route' ? <ArrowRight className="size-4" aria-hidden="true" /> : null}
-            </CommandItem>;
-          })}
-          {current?.data?.truncated && <output title={provenance}>{t('Showing the first {n} search results.', { n: hits.length })}</output>}
-        </CommandList>
-      </Command>
-    </DialogContent>
-  </Dialog>;
+  return <Modal isOpen={open} onOpenChange={changeOpen}>
+    <Button ref={trigger} variant="outline" className="shell-search-trigger" aria-label={t('Search an id or evidence')} aria-keyshortcuts="Meta+K Control+K">
+      <Search className="size-4" aria-hidden="true" /><span>{t('Search an id or evidence')}</span><kbd>{shortcut}</kbd>
+    </Button>
+    <Modal.Backdrop>
+      <Modal.Container placement="center" size="md" className="search-dialog">
+        <Modal.Dialog className="command-dialog gap-0 overflow-hidden" aria-describedby={descriptionId}>
+          <RestoreSearchFocus restore={restoreFocus} />
+          <Modal.CloseTrigger aria-label={t('Close')} />
+          <Modal.Header><Modal.Heading>{t('Search in StarCi')}</Modal.Heading><Description id={descriptionId}>{t('Paste a workflow, unit, attempt, decision or blob id.')}</Description></Modal.Header>
+          <Modal.Body>
+            <Autocomplete.Filter inputValue={query} onInputChange={setQuery}>
+              <SearchField autoFocus fullWidth aria-label={t('Search keywords')}>
+                <SearchField.Group>
+                  <SearchField.SearchIcon />
+                  <SearchField.Input placeholder={t('Enter an id or keyword…')} />
+                  <SearchField.ClearButton aria-label={t('Clear search')} />
+                </SearchField.Group>
+              </SearchField>
+              <div className="search-results" aria-busy={loading}>
+                {!needle && <output>{t('Enter an id to open its evidence.')}</output>}
+                {partial && !error && <output className="flex items-center gap-2 py-2 text-xs text-[var(--status-warning)]" title={provenance}>
+                  <CircleAlert className="size-4 shrink-0" aria-hidden="true" /><span className="min-w-0 flex-1">{t('Some search sources could not be read.')}</span>
+                  <Button variant="ghost" size="sm" isDisabled={loading} onPress={() => setRetry(value => value + 1)}>{t('Retry')}</Button>
+                </output>}
+                {loading && <output className="flex items-center gap-2 px-3 py-4" aria-live="polite"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />{t('Searching…')}</output>}
+                {error && <div title={provenance}><FeedbackState error onRetry={() => setRetry(value => value + 1)}>{current?.data ? t('Could not refresh the search. Showing the last successful results.') : error}</FeedbackState></div>}
+                <ListBox items={hits} aria-label={t('Search results')} selectionMode="none" renderEmptyState={() => !loading && !error && needle ? <output className="block py-6 text-center text-sm">{partial ? t('No matching results from the available sources.') : t('No matching results.')}</output> : null}>
+                  {hit => {
+                    const target = targetOf(hit);
+                    const identity = hit.ref ?? hit.matched;
+                    const alias = hit.ref && (hit.matched.kind !== hit.ref.kind || hit.matched.id !== hit.ref.id);
+                    return <ListBox.Item id={hitKey(hit)} textValue={hit.title} className="search-hit" isDisabled={target === null} onAction={() => choose(hit)}>
+                      <span title={[hit.title, identity.store, identity.ledgerId, hit.project, identity.workflow, identity.kind, identity.id].filter(Boolean).join(' · ')}><strong>{hit.title}</strong><small className="break-all">{identity.kind} · {identity.id}</small>
+                        <small className="break-all">{[identity.store === 'machine' ? t('Machine') : identity.ledgerId ?? t('Not observed.'), hit.project, identity.workflow].filter(Boolean).join(' · ')}</small>
+                        {alias && <small className="break-all">{t('Matched {kind}: {id}', { kind: hit.matched.kind, id: hit.matched.id })}</small>}
+                        {!target && <small>{t('No supported page for this result.')}</small>}
+                      </span>
+                      <StateChip state={hit.ui} />{target === 'blob' ? <ExternalLink className="size-4 shrink-0" aria-hidden="true" /> : target === 'route' ? <ArrowRight className="size-4 shrink-0" aria-hidden="true" /> : null}
+                    </ListBox.Item>;
+                  }}
+                </ListBox>
+                {current?.data?.truncated && <output title={provenance}>{t('Showing the first {n} search results.', { n: hits.length })}</output>}
+              </div>
+            </Autocomplete.Filter>
+          </Modal.Body>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
+  </Modal>;
 }

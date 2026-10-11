@@ -164,6 +164,9 @@ properties:
           $ref: "#/$defs/openBlock"
         description: The real files the tokens were traced from, each with its digest. It is what turns a
           palette from an assertion into something a machine check can compare against the product.
+          A non-reference CSS entry carries path and optional repository; every such path resolves in that
+          repository. The family CSS comes from those entries or the installed grammar family export.
+          The runtime brand-consumable measure in modules/kernel/op-judges.yaml checks this at settle.
       direction:
         $ref: "#/$defs/direction"
         description: "The product's composition taste - how its pages are arranged, which DNA recipes they use,
@@ -274,18 +277,27 @@ $defs:
   valueSource:
     type: object
     additionalProperties: false
-    required:
-      - path
-      - value
-    description: "The external reference render a colour token's value was read from, for a token the app's
+    oneOf:
+      - properties: {path: true, value: true, ruling: false}
+        required: [path, value]
+      - properties: {ruling: true, token: true, value: true, path: false, line: false, sha256: false}
+        required: [ruling, token, value]
+    description: "Two forms. {path, value, ...}: the external reference render a colour token's value was read from. {ruling, token, value}: the answered ask that ruled the value, when no file declares it. Either is for a token the app's
       own theme has not written yet (interface.implement writes it later). scripts/work/brand/brand.mjs
       tokens-match-source reads the reference - never writes it - and, at the decide stage, passes the token
       as planned-from-reference when the reference declares `token` in its default scope with exactly
       `value`, the value is the brand value and a declared sha256 still names the file. Once a declared
       sources[] file (other than this reference) carries the token, the normal source match applies; at the
       verify stage (review.verify) a planned token still absent from the app source is refused
-      (planned-source-missing)."
+      (planned-source-missing). A ruling form is traced to the ledger's recorded answer instead of a file: scripts/work/brand/brand-value-source.mjs
+      finds the answer of dispatch `ruling` (given by the owner, the owner's autopilot ruling or the config's auto-accept), requires its
+      words to carry `value`, requires `token` to be this brand token and `value` to be the brand value, and passes it as planned-from-ruling
+      with the declaration owed to interface.implement."
     properties:
+      ruling:
+        type: string
+        minLength: 1
+        description: The dispatch id of the answered ask that ruled the value (the `[dispatchId, ...]` of the op's owner_answers line).
       path:
         type: string
         pattern: ^(?![A-Za-z]:)(?!/)(?!.*(?:^|/)\.\.(?:/|$)).+$

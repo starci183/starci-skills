@@ -10,12 +10,14 @@ import { jobOpOf, jobPayloadOf, jobRowOf } from './shared/rows.mjs';
 import { releaseTypedWaits } from './shared/peer-waits.mjs';
 import { queueTail as queueSettleTail, startTail as startSettleTail } from '../settle/job-settle.mjs';
 import { OP_REV_DRIFT, shortRev } from '../runtime-rev.mjs';
+import { recordSettleRevision } from '../../kernel/settle-revision.mjs';
 import { unbindGuardTerminal } from '../../guards/hook-install.mjs';
 import { settlePreflight } from './shared/settle-preflight.mjs';
 import { newSettleState, settleUnderLock } from './shared/settle-accept.mjs';
 import { finalizeAttemptTranscript } from '../transcripts.mjs';
 import { landShellFoundationIfSettled } from '../shell-foundation.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
+import { recordSettledCriticRuns } from '../../work/critic-run-record.mjs';
 import { isSpecRun } from '../../lib/env.mjs';
 
 const peerNoteOf = (peerBlocked, verdict) => {
@@ -239,8 +241,10 @@ export default {
     const { tail, sessionReleased, artifacts } = await settleTailOf({ ledger, db, jobId, job, repo, verdict, args, internals });
     const shellLanded = landInterfaceShell({ ledger, db, jobId, job, repo, verdict, internals });
     const grammarProposals = recordSettledGrammarProposals(ledger, job, repo);
+    recordSettledCriticRuns(ledger, job, repo);
     const assetSlots = recordSettledAssetSlots(ledger, job, repo);
     const revDrift = recordOpRevDrift(ledger, job);
+    recordSettleRevision(ledger, job, { op: jobOpOf(job) });
     let status = 'failed';
     if (verdict === 'pass') status = 'succeeded';
     else if (st.awaitingOwner) status = AWAITING_OWNER_STATUS;

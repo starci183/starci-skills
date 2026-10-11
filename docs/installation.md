@@ -13,7 +13,7 @@ npm are required. The runtime ships sources only — it bundles its own YAML par
 downloaded archive before executing it; `npx` executes package code. Pin a
 reviewed version instead of assuming `latest` is safe.
 
-The init identity setup needs `age-keygen` 1.2.1 or 1.3.1 on `PATH` (the versions `scripts/api/sops/lib.mjs` accepts); the installer never skips key
+The init identity setup needs `age-keygen` on `PATH` at a version accepted by `scripts/api/sops/lib.mjs`; the installer never skips key
 generation, so without a supported `age-keygen` it projects the files, names the missing or unsupported tool and exits 1 as "held".
 
 Have the owner install the exact reviewed `@starci/cli` package globally, then run:
@@ -177,7 +177,7 @@ The script asserts the `age-keygen` prerequisite by name. Run either sandbox as 
 | --- | --- |
 | `npx @starci/cli` cannot find the release | Use a reviewed package version; it may not be published. |
 | Bootstrap entry missing or stale | Re-run `starci runtime install --cwd <host>`; the managed block is regenerated from `init/AGENTS.md`. `starci runtime check --only entry -- <host> [claimed-entry] [--hosts claude,devin|all]` judges `AGENTS.md` plus the `CLAUDE.md`/`DEVIN.md` copies that exist or are named by `--hosts`. |
-| Install exits 1 with "initial age setup" held | `age-keygen` 1.2.1 or 1.3.1 is missing from `PATH`; the message names the tool, see the prerequisites above. |
+| Install exits 1 with "initial age setup" held | A supported `age-keygen` is missing from `PATH`; the message names the tool, see the prerequisites above. |
 | Install exits 1 with `initial age setup failed (setup-unknown): <cause>` | The cause is the error's code and message from the setup step (secrets redacted); the install is held, not half-applied. A path through a Windows 8.3 short name or a symlinked prefix is not a cause. |
 | `.claude` already exists | Inspect ownership/custom files; do not reflexively pass `--force`. |
 | `config.yaml` missing | Copy `config.example.yaml`; it is seeded only when absent. |

@@ -62,7 +62,8 @@ const seedAsk = (repo, { jobId, op, dispatchId, question, params = null }) => se
   l.db.prepare('INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?)')
     .run(WF, attemptId, dispatchId, jobId, 'ask', JSON.stringify({ schema: 'starci/op-report@1', outcome: 'ask', from: jobId, summary: 'ask', question }), Date.now(), Date.now());
 });
-const status = (repo, env = {}) => { const r = run(env, 'status', '--repo', repo, '--workflow', WF, '--json'); assert.equal(r.status, 0, r.stderr); return json(r); };
+// The status call is the reconciler's: the autopilot sweep is a reaction that runs for the roles that own it, never for a person reading.
+const status = (repo, env = {}) => { const r = run({ STARCI_ACTOR: 'reconciler/job', ...env }, 'status', '--repo', repo, '--workflow', WF, '--json'); assert.equal(r.status, 0, r.stderr); return json(r); };
 
 const CREDENTIAL = { kind: 'credential', text: 'VNPAY sandbox: nh\u1eadp vnpay-hash-secret.key v\u00e0 VNPAY_TMN_CODE', options: [], refs: [] };
 const PAYOS = { kind: 'irreversible-confirmation', text: '\u0110\u0103ng k\u00fd webhook dev l\u00ean k\u00eanh PayOS d\u00f9ng chung c\u1ee7a Academy v\u00e0 m\u1ed9t giao d\u1ecbch th\u1eadt 229.000 VND',
@@ -200,7 +201,7 @@ test('retry caps: supervisor-gate within supervisorExtraBudget, then the leg is 
 });
 
 /** A ui record with one live part drawn through a passing draw loop, beauty `beauty`, with its rationale. */
-const loopRecord = (t, { beauty = 9, outcome = 'passed', rationale = true } = {}) => {
+const loopRecord = (t, { beauty = 9, outcome = 'passed', rationale = true, judged = null } = {}) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-autopilot-ui-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   fs.mkdirSync(path.join(dir, 'assets', 'loop'), { recursive: true });
@@ -210,7 +211,7 @@ const loopRecord = (t, { beauty = 9, outcome = 'passed', rationale = true } = {}
   if (rationale) fs.writeFileSync(path.join(dir, 'assets', 'p.rationale.json'), '{"decisions":[]}');
   const sha = createHash('sha256').update(fs.readFileSync(png)).digest('hex');
   fs.writeFileSync(path.join(dir, 'assets', 'loop', 'loop.json'), JSON.stringify({ schema: 'starci/draw-loop@1', outcome, installed: [{ sha256: sha }],
-    rounds: [{ n: 1, allPass: outcome === 'passed', failures: outcome === 'passed' ? 0 : 2, beauty }], remaining: outcome === 'passed' ? [] : [{ code: 'DNA_OFF_GRAMMAR' }] }));
+    rounds: [{ n: 1, allPass: outcome === 'passed', failures: outcome === 'passed' ? 0 : 2, beauty, critic: { judged: judged ?? [sha] } }], remaining: outcome === 'passed' ? [] : [{ code: 'DNA_OFF_GRAMMAR' }] }));
   fs.writeFileSync(path.join(dir, 'index.yaml'), stringifyYaml({ schema: 'work/ui-screen@1', id: 'ui.x.y', state: 'todo',
     assets: [{ path: 'assets/p.png', role: 'direction-content', breakpoint: 'desktop', theme: 'light', sha256: sha, generation: { tool: 'draw-render', mode: 'draw-loop', loop: { sha256: putBundle(path.join(dir, 'assets', 'loop')), round: 1 } } }] }));
   return { dir, sha };
@@ -227,6 +228,28 @@ test('draw gates: provisional only when the loop passed, the critic scored at le
   assert.deepEqual(new Set(drawGateEvidence({ repo: red.dir, recordPath: 'index.yaml', beautyMin: 8 }).findings.map((f) => f.code)), new Set(['DRAW_METRICS_FAILED', 'DRAW_RATIONALE_MISSING']));
   const stale = drawGateEvidence({ repo: good.dir, recordPath: 'index.yaml', reviewed: [{ path: 'assets/p.png', sha256: 'f'.repeat(64) }], beautyMin: 8 });
   assert.deepEqual(stale.findings.map((f) => f.code), ['REVIEW_PART_REDRAWN']);
+});
+
+test('draw gates: the record is read from the workflow tree first, then the main checkout (two trees holding different records)', (t) => {
+  const inTree = loopRecord(t);
+  const inMain = loopRecord(t, { beauty: 6 });
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-autopilot-empty-'));
+  t.after(() => fs.rmSync(empty, { recursive: true, force: true }));
+  const args = { recordPath: 'index.yaml', beautyMin: 8 };
+  assert.equal(drawGateEvidence({ repo: inMain.dir, tree: inTree.dir, ...args }).ok, true, 'the workflow tree\x27s record wins over the main checkout\x27s');
+  assert.deepEqual(drawGateEvidence({ repo: inMain.dir, tree: empty, ...args }).findings.map((f) => f.code), ['DRAW_BEAUTY_BELOW'], 'a tree without the record falls back to the main checkout');
+  assert.deepEqual(drawGateEvidence({ repo: inMain.dir, ...args }).findings.map((f) => f.code), ['DRAW_BEAUTY_BELOW'], 'no tree reads the main checkout');
+});
+
+test('draw gates: a verdict is accepted only for the bytes it judged; another digest or none is CRITIC_VERDICT_STALE', (t) => {
+  const other = loopRecord(t, { judged: ['e'.repeat(64)] });
+  assert.deepEqual(drawGateEvidence({ repo: other.dir, recordPath: 'index.yaml', beautyMin: 8 }).findings.map((f) => f.code), ['CRITIC_VERDICT_STALE']);
+  const none = loopRecord(t, { judged: [] });
+  const findings = drawGateEvidence({ repo: none.dir, recordPath: 'index.yaml', beautyMin: 8 }).findings;
+  assert.deepEqual(findings.map((f) => f.code), ['CRITIC_VERDICT_STALE']);
+  assert.match(findings[0].detail, /names no product digest/);
+  const unscored = loopRecord(t, { beauty: null });
+  assert.deepEqual(drawGateEvidence({ repo: unscored.dir, recordPath: 'index.yaml', beautyMin: 8 }).findings.map((f) => f.code), ['DRAW_BEAUTY_BELOW'], 'no score is the beauty finding alone');
 });
 
 // The greenfield layout draw of tests/work/draw-review.spec.mjs, reused: apply settles a provisional acceptance.

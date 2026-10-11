@@ -21,7 +21,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
-import { parseYaml } from '../../engine/yaml.mjs';
+import { parseYamlCached } from '../lib/yaml-cached.mjs';
 import { braceVariants } from '../lib/glob.mjs';
 import { APP_KIND, RUNTIME_KIND, manifestKind } from './manifest-shape.mjs';
 import { APP_SCOPE, manifestShapeProblems, PROFILES } from './slot-manifest-shape.mjs';
@@ -73,7 +73,7 @@ export function appRelativeMessages(side, sideRoot) {
  */
 export function loadSlotManifest({ root = skillRoot, file = path.join(root, HFS_MANIFEST_FILE), text } = {}) {
   let doc;
-  try { doc = parseYaml(text ?? fs.readFileSync(file, 'utf8')); } catch (error) { fail('HFS_MANIFEST_INVALID', `the slot manifest cannot be read (${String(error?.message ?? error).split('\n')[0]})`, { file }); }
+  try { doc = parseYamlCached(text ?? fs.readFileSync(file, 'utf8')); } catch (error) { fail('HFS_MANIFEST_INVALID', `the slot manifest cannot be read (${String(error?.message ?? error).split('\n')[0]})`, { file }); }
   const problems = manifestShapeProblems(doc);
   if (!problems.length) problems.push(...manifestSemanticProblems(doc, { varsOf, braceVariants, compileVariant }));
   if (problems.length) fail('HFS_MANIFEST_INVALID', `the slot manifest breaks its schema: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? '; and ' + (problems.length - 5) + ' more' : ''}`, { file, problems });

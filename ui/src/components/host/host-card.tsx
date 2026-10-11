@@ -1,7 +1,8 @@
 import type { HostView } from '../../contract';
 import { useApiQuery } from '../../api/query';
 import { toneVar, type Tone } from '../status';
-import { Advanced, Grow } from '../motion';
+import { Advanced } from '../motion';
+import { Card, Chip, ProgressBar } from '@heroui/react';
 import { DataTable } from '../data-table';
 import type { Concept } from '../concept';
 import { PageSkeleton } from '../feedback-state';
@@ -19,19 +20,18 @@ function uptime(sec: number): string {
   return d ? t('{d} days {h} h', { d, h }) : h ? t('{h} h {m} min', { h, m }) : t('{m} min', { m });
 }
 
-function Bar({ pct, tone, label }: Readonly<{ pct: number | null; tone: Tone; label: string }>) {
+function Bar({ pct, tone, label, valueText }: Readonly<{ pct: number | null; tone: Tone; label: string; valueText?: string }>) {
   const value = pct == null || !Number.isFinite(pct) ? null : Math.max(0, Math.min(100, pct));
-  return <div className="h-2 overflow-hidden rounded-full bg-muted">
-    <progress className="sr-only" aria-label={label} value={value == null ? undefined : Math.round(value)} max={100}
-      aria-valuetext={value == null ? t('No reading yet') : undefined} />
-    {value != null && <Grow className="block h-full rounded-full" style={{ width: `${value}%`, background: toneVar(tone) }} />}
-  </div>;
+  return <ProgressBar size="sm" aria-label={label} value={value ?? undefined} isIndeterminate={value == null}
+    aria-valuetext={value == null ? t('No reading yet') : valueText}>
+    <ProgressBar.Track>{value != null ? <ProgressBar.Fill style={{ background: toneVar(tone) }} /> : null}</ProgressBar.Track>
+  </ProgressBar>;
 }
 
-function Row({ label, value, pct, tone }: Readonly<{ label: string; value: string; pct: number | null; tone: Tone }>) {
+function Row({ label, value, pct, tone, barLabel, barValueText }: Readonly<{ label: string; value: string; pct: number | null; tone: Tone; barLabel?: string; barValueText?: string }>) {
   return <div className="flex flex-col gap-1">
     <div className="flex flex-wrap items-baseline justify-between gap-x-2 text-sm"><span className="min-w-0 text-muted-foreground">{label}</span><span className="font-medium tabular-nums">{value}</span></div>
-    <Bar pct={pct} tone={tone} label={label} />
+    <Bar pct={pct} tone={tone} label={barLabel ?? label} valueText={barValueText} />
   </div>;
 }
 
@@ -55,7 +55,7 @@ function Spark({ history }: Readonly<{ history: HostView['history'] }>) {
     return points.join(' ');
   };
   return <div>
-    <svg viewBox="0 0 300 60" preserveAspectRatio="none" role="img" aria-label={t('Free CPU and RAM over time')} className="h-20 w-full">
+    <svg viewBox="0 0 300 60" preserveAspectRatio="none" role="img" aria-label={t('CPU and free RAM trend')} className="h-20 w-full">
       {[25, 50, 75].map(g => <line key={g} x1="0" x2="300" y1={58 - g * 0.56} y2={58 - g * 0.56} stroke="var(--border)" strokeWidth="1" vectorEffect="non-scaling-stroke" />)}
       <path fill="none" stroke="var(--chart-ink)" strokeWidth="2" vectorEffect="non-scaling-stroke" d={line(r => r.cpuPct)} />
       <path fill="none" stroke="var(--chart-muted)" strokeWidth="2" vectorEffect="non-scaling-stroke" d={line(r => r.freeRamPct)} />
@@ -72,9 +72,9 @@ function Spark({ history }: Readonly<{ history: HostView['history'] }>) {
 export function HostCard({ compact = false, bare = false }: Readonly<{ compact?: boolean; bare?: boolean }>) {
   const query = useApiQuery<HostView>('/api/host', { topics: ['system'], intervalMs: 10_000 });
   const host = query.data;
-  if (!host) return <section className="rounded-lg border bg-card p-4 sm:p-6" data-concept="C14">
+  if (!host) return <Card<"section"> render={(props) => <section {...props} />} className="p-4 sm:p-6" data-concept="C14">
     {query.error ? <QueryReadNotice query={query} url="/api/host" /> : <PageSkeleton label={t('Reading the host…')} />}
-  </section>;
+  </Card>;
   const gpu = host.gpus[0];
   const load = host.cpu.loadPct;
   const usedMb = host.ram.totalMb - host.ram.freeMb;
@@ -84,12 +84,12 @@ export function HostCard({ compact = false, bare = false }: Readonly<{ compact?:
     ? <span className="text-muted-foreground">{t('No CPU temperature observation.')}</span> : <Temp value={host.cpu.tempC} />;
   const modeTone: Tone = host.throttleMode === 'critical' ? 'failed' : host.throttleMode === 'heavy' ? 'warning' : host.throttleMode === 'normal' ? 'success' : 'queued';
 
-  return <section data-concept="C14" className={`min-w-0 ${bare ? '' : 'rounded-lg border bg-card'}`}>
-    <div className={`flex items-start justify-between gap-3 border-b py-3 ${bare ? "" : "px-4 sm:px-6"}`}>
-      <div className="min-w-0"><h2 className="truncate font-semibold">{host.name ?? t('Host')}</h2><p className="truncate text-xs text-muted-foreground">{host.os} · {t('up {uptime}', { uptime: uptime(host.uptimeSec) })}</p></div>
-      {host.throttleMode ? <span data-tone={modeTone} className="shrink-0 rounded-full border px-2 py-0.5 text-xs" style={{ color: 'var(--tone)', background: 'var(--tone-bg)', borderColor: 'var(--tone-line)' }}>{t('throttled: {mode}', { mode: host.throttleMode })}</span> : null}
-    </div>
-    <div className={`flex flex-col gap-4 ${bare ? 'pt-4' : 'p-4 sm:p-6'}`}>
+  return <Card<"section"> render={(props) => <section {...props} />} variant={bare ? 'transparent' : 'default'} data-concept="C14" className="min-w-0 gap-0 p-0">
+    <Card.Header className={`flex-row items-start justify-between gap-3 border-b py-3 ${bare ? "" : "px-4 sm:px-6"}`}>
+      <div className="min-w-0"><Card.Title<"h2"> render={props => <h2 {...props} />} className="truncate">{host.name ?? t('Host')}</Card.Title><Card.Description className="truncate text-xs">{host.os} · {t('up {uptime}', { uptime: uptime(host.uptimeSec) })}</Card.Description></div>
+      {host.throttleMode ? <Chip size="sm" variant="soft" data-tone={modeTone} className="shrink-0" style={{ color: 'var(--tone)', background: 'var(--tone-bg)' }}><Chip.Label>{t('throttled: {mode}', { mode: host.throttleMode })}</Chip.Label></Chip> : null}
+    </Card.Header>
+    <Card.Content className={`flex flex-col gap-4 ${bare ? 'pt-4' : 'p-4 sm:p-6'}`}>
       <QueryReadNotice query={query} url="/api/host" />
       <div>
         <p className="mb-2 truncate text-sm font-medium" title={host.cpu.model}>{host.cpu.model}</p>
@@ -111,7 +111,12 @@ export function HostCard({ compact = false, bare = false }: Readonly<{ compact?:
         </div> : null}
         {host.disks.length ? <div className="flex flex-col gap-3 border-t pt-3">
           <p className="text-xs font-medium text-muted-foreground">{t('Disks (free space)')}</p>
-          {host.disks.map(d => { const usedPct = (1 - d.freeGb / d.totalGb) * 100; return <Row key={d.mount} label={d.mount} value={t('{free} GB free / {total} GB', { free: nf(d.freeGb, 1), total: nf(d.totalGb, 1) })} pct={usedPct} tone="running" />; })}
+          {host.disks.map(d => {
+            const freePct = Number.isFinite(d.freeGb) && Number.isFinite(d.totalGb) && d.totalGb > 0 && d.freeGb >= 0 && d.freeGb <= d.totalGb
+              ? d.freeGb / d.totalGb * 100 : null;
+            const value = t('{free} GB free / {total} GB', { free: nf(d.freeGb, 1), total: nf(d.totalGb, 1) });
+            return <Row key={d.mount} label={d.mount} value={value} pct={freePct} tone={readingTone(freePct)} barLabel={`${t('Disks (free space)')} · ${d.mount}`} barValueText={freePct == null ? undefined : `${nf(freePct, 1)}% · ${value}`} />;
+          })}
         </div> : null}
         <div className="flex flex-col gap-3 border-t pt-3">
           <p className="text-xs font-medium text-muted-foreground">{t('RAM per agent')}{host.running != null ? t(' · {n} ops running', { n: host.running }) : ''}</p>
@@ -129,6 +134,6 @@ export function HostCard({ compact = false, bare = false }: Readonly<{ compact?:
           { key: 'error', header: t('Read failure'), mobileStack: true, render: row => row.error ?? '—' },
         ]} />
       </Advanced>
-    </div>
-  </section>;
+    </Card.Content>
+  </Card>;
 }

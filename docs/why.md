@@ -79,9 +79,9 @@ goes to the `not-codes` section of `modules/kernel/allowlist.yaml` with the reas
    `whyOf(ledgerDbOrHandle, attemptRowOrId)`: the stored value, else computed now when the attempt has no stored why.
    The reader does not write the ledger. Also `whyOfOp(db, workflowId, opId)`, `whysOfWorkflow(db, workflowId)`,
    `computeWhy`, `explainCode(code)`,
-   `loadCatalog()`. `v_op_history` carries `why_json` (the UI's `/api/attempts` rows).
+   `failureCodeCatalog()`. `v_op_history` carries `why_json` (the UI's `/api/attempts` rows).
 2. **Catalog path and shape.** `modules/kernel/failure-codes.yaml`, flat map `code -> {title, title_vi, meaning_vi, causes_vi[],
-   nextStep_vi, owner, kind}`, parsed with `engine/yaml.mjs` (`loadCatalog()` in scripts/kernel/why.mjs does exactly that).
+   nextStep_vi, owner, kind}`, parsed with `engine/yaml.mjs` (`failureCodeCatalog()` in scripts/lib/failure-code-catalog.mjs does exactly that).
 3. **The two sibling states and their UI mapping.**
    - `awaiting-owner` (lane/ask-state): the job is `jobs.status='awaiting_owner'`; the attempt keeps `verdict='blocked'` and
      `report_outcome='ask'`. `v_op_history.job_status` is the job's status (a column of the view), so the UI reads

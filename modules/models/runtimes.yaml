@@ -93,9 +93,20 @@ allocation:
   # the decision doorbell; still the same turn turnInterruptGraceMs later, the seat is replaced (KERNEL_TURN_OVERDUE,
   # scripts/reconciler/controllers/host.mjs turnStep). A busy turn defers every doorbell and notice (kernel-busy).
   liveness: {activeUnclassifiedMs: 120000, activeStaleMs: 600000, quietMs: 1200000, launchGraceMs: 90000,
-    kernelTurnBudgetMs: 1200000, supervisorTurnBudgetMs: 1800000, turnInterruptGraceMs: 300000}
+    kernelTurnBudgetMs: 1200000, supervisorTurnBudgetMs: 1800000, turnInterruptGraceMs: 300000,
+    # The watchdog's replacement of a Kernel seat runs start-workflow (worktree check, install, Orca launch, attestation): bounded here, under the Host controller's
+    # seats.kernel.timeoutMs that kills the whole watchdog pass. A start that outlives it is killed and recorded kernel-start-failed (start-timeout), never lost silently.
+    kernelStartTimeoutMs: 600000}
   # one local git read over a job's owned paths (scripts/kernel/owned-path-effects.mjs ownedPathEffects, job-artifacts.mjs).
   settleGit: {commandMs: 15000}
+  # prompt-file.mjs owns terminal delivery, wake bounds, file placement and cleanup.
+  promptFile: {maxChars: 2000, ttlMs: 86400000}
+  # opVerbs: the bound of the "your verbs" block of an [Op] prompt (scripts/kernel/op-prompt-verbs.mjs): the starci calls the op's contract names,
+  # each with the flags the contract uses and the required ones, one line per verb. A worker that has the exact call never runs --help
+  # (a measured op spent 15 of its 135 turns on it). `standing` verbs are printed in full by the prompt's own reporting and logging blocks;
+  # `omitGroups` are the verbs of the Kernel and above, which an op's contract names only to say who runs them.
+  opVerbs: {maxVerbs: 20, maxChars: 3000, lineChars: 190, standing: ["kernel report", "kernel log", "kernel op-contract"],
+    omitGroups: [kernel, supervisor, workflow, reconciler]}
   # Typed logs (scripts/kernel/typed-logs.mjs, the ledger's logs table): perJobCap rows a job's own writes
   # may store before one log.truncated row closes them (derived event rows are never capped); dataMaxBytes bounds
   # one row's data after redaction. diff: the caps of a job patch's pre-structured <patch>.json
@@ -187,6 +198,13 @@ allocation:
   # replacement takes over the loop's lock within handoverMs or is stopped. The reconciler engine checks every checkMs; an engine whose
   # revision still differs from the live one that long past minIntervalMs + checkMs + handoverMs is a drift row (scripts/reconciler/drift.mjs).
   selfReload: {minIntervalMs: 300000, handoverMs: 30000, checkMs: 60000, driftGraceMs: 120000}
+  # deploy (scripts/reconciler/runtime-deploy.mjs): a deploy waits up to waitMs, polling every pollMs, for the settles, Critic runs and prepared
+  # decisions in flight to finish; after the engine restart it waits up to verifyMs for the new leader's fresh heartbeat on the new revision. The affected-spec child
+  # may run its declared budget (modules/supervisor/affected-tests.yaml) plus affectedMarginMs before the deploy stops it.
+  deploy: {waitMs: 1800000, pollMs: 5000, verifyMs: 120000, affectedMarginMs: 300000}
+  # dispatchRefusal (scripts/kernel/dispatch-refusal-memo.mjs): a ready job whose dispatch is refused for the same cause is tried again after baseMs, then twice as long each time (the one retry budget), up to capMs; a change of
+  # the cause's fingerprint (runtime revision, a ruling, a resource the refusal names) tries it at once.
+  dispatchRefusal: {baseMs: 60000, capMs: 900000}
   # footprint (scripts/guards/footprint-scan.mjs): one host-wide scan at most every everyMs; a crashed
   # tick's claim lock is cleared after lockStaleMs.
   footprint: {everyMs: 600000, lockStaleMs: 60000}
@@ -194,12 +212,15 @@ allocation:
   jobGuard: {ttlMs: 604800000}
   # landGate (scripts/supervisor/land.mjs): a land waits waitMs for its turn at the gate; its spec run may take
   # specsBaseMs plus perSpecMs for every spec it runs, specConcurrency spec files at a time.
-  landGate: {waitMs: 1800000, specsBaseMs: 600000, perSpecMs: 60000, specConcurrency: 6}
+  landGate: {waitMs: 1800000, specsBaseMs: 600000, perSpecMs: 60000, specConcurrency: 6, cliVerbs: 12}
   # workerClose (scripts/machine/worker-close.mjs; owner rule: a finished worker is closed COMPLETELY): after worker-release and the terminal
   # close the runtime waits verifyMs for every process of that terminal's shell tree to end (polled every pollMs); a survivor proven to belong
   # to the tree is stopped and given stopVerifyMs to end before the finding is raised.
   # A finished [Worker] job whose terminal has no recorded closure is closed again by the Job controller's worker sweep (scripts/supervisor/supervisor-watchdog.mjs):
   # every leftoverRetryMs (doubling to leftoverRetryMaxMs) for at most leftoverRetryAttempts attempts, each failure recorded with its reason on the job.
+  # uatSlot (scripts/uat/slot-collect.mjs, slot-lessee.mjs): a held UAT run checks its lessee (its attempt, the process that launched it) every watchMs and ends with it;
+  # the Host pass ends a slot whose lessee is gone, and a slot that recorded no lessee at all once it has been held unknownHoldMs (3 hours: a UAT run is minutes).
+  uatSlot: {watchMs: 5000, unknownHoldMs: 10800000}
   workerClose: {verifyMs: 10000, pollMs: 1000, stopVerifyMs: 5000, leftoverRetryMs: 60000, leftoverRetryMaxMs: 900000, leftoverRetryAttempts: 12}
   # providerReservation (scripts/machine/provider-reservation-reap.mjs): an admission whose receipt stayed `reserved` this long never reached
   # worker-start (the consume moves it to `launching` first), so its launcher died and the slot is released. A receipt with no terminal handle and no
@@ -238,20 +259,26 @@ allocation:
   quitAgent: {waitMs: 6000}
   # drawRender (scripts/work/draw-render.mjs): a capture waits settleMs after document.fonts.ready.
   drawRender: {settleMs: 500}
+  # layoutRender (scripts/work/layout-render.mjs): the runtime serves the product app for one capture; readyMs is how long the dev server may take to answer
+  # its first request (a cold Next compile), navigateMs the page load, settleMs the wait after fonts are ready, stopMs the grace before a still-running server is killed.
+  # publicOriginKeys are the scaffold's public-origin variables (its README: the product app's own address and the product app the landing hands over to); each gets the render's origin.
+  layoutRender: {readyMs: 180000, navigateMs: 90000, settleMs: 500, stopMs: 5000, publicOriginKeys: [NEXT_PUBLIC_SITE_URL, NEXT_PUBLIC_APP_URL]}
   # drawLoop (scripts/work/draw-loop.mjs, scripts/work/draw/draw-taste.mjs; owner rulings 2026-09-27): interface.draw
   # draws -> shoots -> evaluates -> fixes in rounds. A loop stops when every machine metric passes and the
   # independent critic's beauty is at least beautyMin, after maxRounds, or after stallRounds rounds in a row that
   # neither cut the failures nor raised the beauty; the best round is kept. Taste thresholds: accentBudget is the
   # largest share of the render the accent colour may fill (the brand art band excluded), bandsPerCardMax the most
   # hairline bands one card splits into, badgesPerEntityMax the most badges one entity carries. critic is the fresh,
-  # context-free Orca worker that scores beauty and hierarchy against the product's brand.direction rubric: started
+  # context-free Orca worker that scores beauty and hierarchy against the product's brand.direction rubric: picked through
+  # the tier picker from the Critic tier (modules/models/tiers.yaml seats.critic, modules/kernel/critic.yaml) with the
+  # independence rule as a hard filter, then started
   # through orchestration worker-start --agent <provider> --model --effort (scripts/agent/lib.mjs startAgent) on a
   # runtime worktree detached at the empty tree (draw-critic.mjs criticWorkspace; Orca refuses a bare temp dir) holding only the PNGs, the HTML and the rubric; it writes verdict.json and reports worker_done; a
-  # critic with no worker_done within timeoutMs is stopped and released (outcome timeout, no beauty). The critic is a DIFFERENT model from the drawer: a Codex drawer (the high tier's second member)
-  # is judged by criticWhenDrawer.codex; for any other drawer the critic is Codex. The images a drawer asks of the imagegen call
-  # (starci work imagegen) do not make the call's model the drawer. When the drawer (the op's provider, bound to its
-  # terminal - scripts/guards/op-context.mjs - or draw-loop.mjs round --drawer) is the critic's provider the round is
-  # judged by criticWhenDrawer.<drawer> instead, and a round with no independent critic has no beauty. directionPrerequisite: interface.draw needs an ACCEPTED brand.direction
+  # critic with no worker_done within criticTimeoutMs is stopped and released (outcome timeout, no beauty). The critic is a member of ANOTHER PROVIDER than
+  # the drawer: the members of its tier of that provider are removed before the pick, and a tier with no other provider's member refuses the critique with
+  # CRITIC_NO_INDEPENDENT_MEMBER (the drawer never judges itself). The images a drawer asks of the imagegen call
+  # (starci work imagegen) do not make the call's model the drawer. The drawer is the op's provider, bound to its
+  # terminal (scripts/guards/op-context.mjs) or named by draw-loop.mjs round --drawer; a round with no independent critic has no beauty. directionPrerequisite: interface.draw needs an ACCEPTED brand.direction
   # archetype for its ui record's ui.archetype - brand.mjs checkDirection evidence.ready, the owner's receipt
   # (scripts/kernel/prerequisites.mjs direction-unaccepted; the Kernel enqueues brand.decide --param
   # directionArchetype=<archetype> first). false switches the gate off.
@@ -262,9 +289,7 @@ allocation:
     accentBudget: 0.10
     bandsPerCardMax: 3
     badgesPerEntityMax: 2
-    critic: {provider: codex, model: gpt-6.1-sol, effort: high, timeoutMs: 900000}
-    criticWhenDrawer:
-      codex: {provider: claude, model: claude-opus-5-5, effort: high, timeoutMs: 900000}
+    criticTimeoutMs: 900000
     directionPrerequisite: true
     # How long the workflow that claimed foundation `shell` (the layout chain an interface.draw draws) may hold it before a
     # waiting draw opens a Supervisor Decision Item (scripts/kernel/shell-foundation.mjs; owner ruling 2026-09-29 draw-from-todo).
@@ -303,8 +328,8 @@ allocation:
   # reportWindowMs.
   workerJobs: {leaseTtlMs: 604800000, reportWindowMs: 604800000}
   # draft (scripts/kernel/clear-draft.mjs): the beat between one Ctrl+U and the re-read that judges
-  # the input box's answer - a TUI repaints a beat later. clearDraft and probeDraft default to it and
-  # the wake-delivery draft probe caps its own interval at it.
+  # the input box's answer - a TUI repaints a beat later. clearDraft defaults to it and
+  # wake-delivery caps its runtime-owned draft clear interval at it.
   draft: {intervalMs: 300}
   # housekeeping (scripts/housekeeping/housekeeping.mjs): every retention window and root the host
   # cleanup reads - no literal may live in the script. tmp: top-level %TEMP% entries whose name starts

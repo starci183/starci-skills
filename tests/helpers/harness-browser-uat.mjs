@@ -117,9 +117,12 @@ async function checkpointDom(page, sample, attempt, t) {
   if (attempt.report?.json?.head) assert.equal(await tested.getAttribute('title'), attempt.report.json.head);
   else assert.equal(await tested.count(), 0);
   if (attempt.checkpoint) {
-    const disclosure = section.locator('details');
-    if (!(await disclosure.evaluate(e => e.open))) { await disclosure.locator('summary').focus(); await page.keyboard.press('Enter'); }
-    assert.equal(await disclosure.evaluate(e => e.open), true);
+    const disclosure = section.locator('[data-slot="accordion"]');
+    assert.equal(await disclosure.count(), 1);
+    const trigger = disclosure.getByRole('button', { name: t('Checkpoint scope & files'), exact: true });
+    assert.equal(await trigger.count(), 1);
+    if (await trigger.getAttribute('aria-expanded') !== 'true') { await trigger.focus(); await page.keyboard.press('Enter'); }
+    assert.equal(await trigger.getAttribute('aria-expanded'), 'true');
     for (const [label, values] of [['Recorded owned paths', attempt.checkpoint.scope], ['Files recorded by the checkpoint', attempt.checkpoint.files]]) {
       const value = disclosure.getByText(t(label), { exact: true }).locator('..').locator('dd');
       if (values == null) assert.equal((await value.innerText()).trim(), t('Not recorded'));
@@ -136,7 +139,7 @@ async function checkpointDom(page, sample, attempt, t) {
 async function productsDom(page, attempt, t) {
   const card = page.locator('#attempt-products');
   await card.getByText(t('Content source: recorded runtime checkpoint'), { exact: false }).waitFor();
-  const trigger = card.locator('button[data-slot="collapsible-trigger"]');
+  const trigger = card.locator('button[data-slot="accordion-trigger"]').filter({ has: page.getByText(t('Advanced'), { exact: true }) });
   assert.equal(await trigger.count(), 1);
   if (await trigger.getAttribute('aria-expanded') !== 'true') {
     await trigger.focus(); await page.keyboard.press('Enter');
@@ -201,10 +204,15 @@ export async function capturePhase({ source, sourceSha, browser, origin, private
         await telemetry.goto(`${origin}/${sample.route}`);
         await page.locator('#main-content').waitFor();
         if (!privateData) {
-          await page.getByRole('heading', { name: t(sample.key === 'overview' ? 'Overview' : 'System'), level: 1, exact: true }).waitFor();
-          if (sample.key !== 'overview') {
-            const selected = page.getByRole('navigation', { name: t('System sections'), exact: true }).locator('a[aria-current="page"]');
+          if (sample.key === 'overview') {
+            await page.getByRole('heading', { name: t('Overview'), level: 1, exact: true }).waitFor();
+          } else {
+            const tablist = page.getByRole('tablist', { name: t('System sections'), exact: true });
+            await tablist.waitFor(); assert.equal(await tablist.count(), 1);
+            const selected = tablist.getByRole('tab', { selected: true });
+            await selected.waitFor(); assert.equal(await selected.count(), 1);
             assert.equal(await selected.getAttribute('href'), sample.route);
+            await page.getByRole('heading', { name: `${t('System')} / ${(await selected.innerText()).trim()}`, level: 1, exact: true }).waitFor();
           }
         }
         await page.waitForFunction(metricsLabel => !document.querySelector('#main-content .page-skeleton')

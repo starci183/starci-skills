@@ -27,8 +27,9 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { tabTitlesOf } from './terminal-dedupe.mjs';
-import { classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow } from '../lib/terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow, draftOwnership, DEFAULT_STAGED_PATTERN } from '../lib/terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeSendRefused, WAKE_BOUNDS, withWakeIdentity } from './wake-delivery.mjs';
+import { boundedWake } from './wake-bound.mjs';
 import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { settledKernelVerdict, DEAD_VERDICTS, DEATH_SETTLE_MS } from './host-outage.mjs';
@@ -37,14 +38,24 @@ import { workerShow } from '../api/orca/worker-show.mjs';
 import { stopAndRelease } from '../machine/worker-close.mjs';
 // worker-show states that end a worker (start-workflow.mjs MANAGED_DEAD_STATE).
 const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
-import { jsonFromStdout } from '../lib/json.mjs';
-import { revWakeLine } from './runtime-rev.mjs';
+import { jsonFromStdout, parseJsonOr } from '../lib/json.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
+import { currentRuntimeRev, revRootOf } from './runtime-rev.mjs';
+import { revisionWakeLine } from './kernel-notice.mjs';
 import { openDecisionRow } from '../machine/decisions.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { arg as argvValue } from '../lib/cli-arg.mjs';
 import { createKernelTick } from './kernel-watchdog-tick.mjs';
 import { workflowSender } from './workflow-startup.mjs';
 import { seatWakeOf } from './op-incident-policy.mjs';
+import { createHash } from 'node:crypto';
+import { seatCostConfig } from './seat-wakes.mjs';
+import { createKernelRotation, rotationRule } from './seat-rotation.mjs';
+import { runtimeRevNow, startFailureRun, startHoldBudget, startHoldOf } from './start-hold.mjs';
+import { journalRefusedStart, lastStartFailedSeq } from './start-refusal-journal.mjs';
+import { draftEpisode, draftRefused, recordDraftCleared, recordDraftHeld } from './draft-hold.mjs';
+import { recordReplaced, recordWoken, runtimePass } from '../machine/revision-ack.mjs';
+import { kernelSeat } from '../machine/revision-seats.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
@@ -63,16 +74,18 @@ const CADENCE_MS = allocationMs('watchdogCadenceMs');
 // An `active` screen older than this is a frozen frame, not a running turn
 // (modules/models/runtimes.yaml allocation.liveness.activeStaleMs).
 const ACTIVE_STALE_MS = allocationMs('liveness.activeStaleMs');
+const START_TIMEOUT_MS = allocationMs('liveness.kernelStartTimeoutMs');
 const intervalMs = Math.max(10_000, Number(valueOf('interval-ms')) || CADENCE_MS);
 
-const runNodeJson = (file, args) => {
+const runNodeJson = (file, args, { timeout = 120_000 } = {}) => {
   const result = runNode([file, ...args], {
     cwd: skillRoot,
-    timeout: 120_000,
+    timeout,
   });
   return {
     ok: result.status === 0,
     status: result.status,
+    timedOut: result.error?.code === 'ETIMEDOUT' || result.signal === 'SIGTERM',
     value: jsonFromStdout(result.stdout),
     stdout: String(result.stdout ?? '').trim(),
     stderr: String(result.stderr ?? '').trim(),
@@ -84,17 +97,17 @@ const classifyKernelScreen = classifyAgentScreen;
 
 // A wake is typed into the Kernel's input box as one paste. Claude Code folds a paste of about 800 characters or more into a
 // pasted_content block, which the Kernel model reads as untrusted pasted data and refused three times on 2026-10-07; the
-// whole typed wake (this text, the rev line, the seat identity) stays well under that, so it arrives as the user's message.
-export const buildWakePrompt = (workflow, attempt = null, revLine = null) => withWakeIdentity([
-  `Watchdog liveness wake for ${workflow}: phase=running, your last turn ended at the prompt; act on it now.`,
-  'Read starci kernel status; settle each needs-kernel-decision item, then work the ranked actions.',
-  'If only a recorded wait remains, yield the model turn immediately: the runtime wakes this Kernel again.',
-  'Never run Start-Sleep, shell sleep or a polling loop.',
+// whole typed wake (this text, the rev line, the seat identity) is bounded by wake-bound.mjs, so it arrives as the user's message.
+export const buildWakePrompt = (workflow, attempt = null, revLine = null) => boundedWake({ workflowId: workflow, attempt, revLine, compose: withWakeIdentity, text: [
+  `Watchdog liveness wake for ${workflow}: act on it now.`,
+  'Read starci kernel status; answer each menu item with starci kernel decide.',
+  'Empty menu: yield the model turn immediately; the runtime wakes this Kernel again.',
+  'Never run Start-Sleep, sleep or poll.',
   WAKE_BOUNDS,
-].join(' '), workflow, attempt, revLine);
-/** The liveness wake this tick would type, from one starci kernel status read: its seat attempt and its kernelRev (runtime-rev.mjs). */
+].join(' ') });
+/** The liveness wake this tick would type, from one starci kernel status read: its seat attempt and its revisionNotice (kernel-notice.mjs, the one sentence about the runtime revision). */
 export const wakePromptOf = (workflow, statusValue) =>
-  buildWakePrompt(workflow, statusValue?.kernel?.attempt ?? null, statusValue?.kernel ? revWakeLine(statusValue?.kernelRev, workflow) : null);
+  buildWakePrompt(workflow, statusValue?.kernel?.attempt ?? null, revisionWakeLine(statusValue?.revisionNotice, workflow, { root: revRootOf() }));
 
 /** Repair only the Orca tab title: the agent owns the pane title and may change it on every turn. */
 export function repairKernelTabTitle(terminal, name, { list = () => terminalList({ includeVisualLayouts: true }), tabTitles = tabTitlesOf,
@@ -123,6 +136,21 @@ const api = command => runNodeJson(apiFile, [command, '--repo', path.resolve(rep
 // maxReplacementsPerHour (scripts/reconciler/controllers/host.mjs REPLACED), and on 2026-09-29 a timed-out
 // tab close that start-workflow answered "terminal connected" was counted as the 4th and quarantined the seat.
 /** The watchdog answer of a start-workflow run {ok, value, stderr, stdout} past its host-unavailable and live-worker steps. Pure. */
+/** The `reason` and `error` of a failed start answer, top-level so the Host's action journal, the digest and the Supervisor item name the cause. Pure. */
+function failureFieldsOf(started) {
+  const said = started.value ?? unansweredStart(started);
+  const step = said.step ?? said.reason ?? 'start-workflow';
+  const message = String(said.error ?? said.host?.summary?.red ?? said.reason ?? 'no message').slice(0, 300);
+  return { reason: step, error: `Kernel start refused at ${step}: ${message}` };
+}
+
+/** The detail of a start-workflow run that printed no JSON answer: what the process left (its error, stderr, stdout), never an empty string. Pure. */
+export function unansweredStart(started) {
+  const said = String(started.stderr || started.stdout || started.error || '').split(/\r?\n/).filter(Boolean).slice(-3).join(' | ').slice(-400) || null;
+  const how = started.timedOut ? 'start-timeout' : 'start-no-answer';
+  return { ok: false, step: 'start-workflow', reason: how, error: said ?? `start-workflow ended (exit ${started.status ?? 'none'}) without an answer`, timedOut: Boolean(started.timedOut) };
+}
+
 export function startAnswerOf(started, base = {}) {
   const live = started.ok && started.value?.replaced === false;
   let action = 'restart-failed';
@@ -132,19 +160,38 @@ export function startAnswerOf(started, base = {}) {
     ...base, ok: started.ok && started.value?.ok !== false, action,
     ...(live ? { note: started.value?.note ?? null } : {}),
     replacementTerminal: started.value?.terminal ?? null,
-    detail: started.value ?? started.stderr ?? started.stdout,
+    detail: started.value ?? unansweredStart(started),
+    ...(live || started.ok ? {} : failureFieldsOf(started)),
   };
 }
+// A start that printed no answer (killed at its bound, crashed) is a failed launch like any other: recorded kernel-start-failed so the start-hold rule counts it and
+// the digest names its cause, and the Kernel seat the rotation closed is never left without a recorded reason.
+// A refusal the start prints without having recorded a failed launch itself is journaled by start-refusal-journal.mjs, so the start-hold rule counts it.
+const recordUnansweredStart = (started) => {
+  const detail = unansweredStart(started);
+  withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, kind: 'kernel-start-failed',
+    payload: { step: detail.step, reason: detail.reason, error: String(detail.error).slice(0, 600), runtimeRev: runtimeRevNow(), timeoutMs: START_TIMEOUT_MS } })));
+};
 const replaceKernel = (base) => {
-  const started = runNodeJson(startFile, ['--repo', path.resolve(repo), '--goal', workflowId, '--launched-by', 'watchdog', '--json']);
+  const before = withKernelLedger((ledger) => lastStartFailedSeq(ledger, workflowId)) ?? 0;
+  const started = runNodeJson(startFile, ['--repo', path.resolve(repo), '--goal', workflowId, '--launched-by', 'watchdog', '--json'], { timeout: START_TIMEOUT_MS });
+  if (!started.value) recordUnansweredStart(started);
+  else withKernelLedger((ledger) => journalRefusedStart(ledger, { workflowId, value: started.value, before }));
   const step = started.value?.step ?? null;
   if (step === 'host-unavailable') return { ...base, ok: true, action: 'host-unavailable', reason: started.value?.error ?? null };
   // No sender terminal to launch from is a refusal retrying cannot change: answered once as restart-blocked, which the Host
   // controller holds for blockedRetryMs (modules/reconciler/host.yaml) instead of repeating it every pass.
   if (step === 'workflow-sender-terminal-missing') return { ...base, ok: false, action: 'restart-blocked', reason: step, error: started.value?.error ?? null, detail: started.value };
+  // The same cause failed the launch as often as the bound allows: held until its declared time, answered once (a quarantine of the seat).
+  if (step === 'kernel-start-held') return { ...base, ok: false, action: 'start-held', reason: step, hold: started.value?.hold ?? null, detail: started.value };
   if (step === 'kernel-worker-alive') return { ...base, ok: true, action: 'already-live', note: started.value?.error ?? null,
     replacementTerminal: null, detail: started.value };
-  return startAnswerOf(started, base);
+  return noteReplaced(startAnswerOf(started, base));
+};
+// A fresh Kernel read the tree at birth: the revision change it replaced is settled (revision-ack.mjs recordReplaced).
+const noteReplaced = (answer) => {
+  if (answer.action === 'restarted') withKernelLedger((ledger) => recordReplaced(kernelSeat({ ledger, workflowId, root: revRootOf() }), answer.deathReason ?? 'replaced'));
+  return answer;
 };
 
 // Orca 1.4.209 binds a send to the terminal's process incarnation: a kernel terminal created before
@@ -214,6 +261,10 @@ export const WAKE_FAIL_REPLACE = SEAT_WAKE.failReplace;
 export const WAKE_FAIL_WINDOW_MS = SEAT_WAKE.failWindowMs;
 const recordKernelWakeFailed = (terminal, detail) => withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({
   workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_WAKE_FAILED_EVENT, payload: { terminal, ...detail } })));
+const foreignDraft = (draft) => Boolean(draft) && draftOwnership(draft, { texts: [], stagedPattern: DEFAULT_STAGED_PATTERN }).kind === 'foreign';
+const draftHeld = () => Boolean(withKernelLedger((ledger) => draftEpisode(ledger.db, workflowId)));
+const holdDraft = (terminal, proof) => withKernelLedger((ledger) => recordDraftHeld(ledger, { workflowId, terminal, proof }));
+const clearDraftHold = (terminal) => withKernelLedger((ledger) => recordDraftCleared(ledger, { workflowId, terminal }));
 const kernelWakeFailures = (terminal) => withKernelLedger((ledger) => ledger.db.prepare(
   "SELECT created_at FROM events WHERE workflow_id=? AND kind=? AND json_extract(payload_json,'$.terminal')=? ORDER BY seq").all(workflowId, KERNEL_WAKE_FAILED_EVENT, terminal)
   .map((row) => row.created_at)) ?? [];
@@ -233,6 +284,8 @@ export function wakeFailuresProveDead(failedAts, { lastOutputAt = null, now = Da
 // the settle tail, and the Kernel's own records (it is responding, e.g. holding behind an ask it cannot serve) reset the
 // wakes only. On 2026-09-29 a product's auth Kernel was replaced 5 times while it wrote kernel-decision/kernel-proposal
 // records between wakes that piled up within 90 s, and an op-settled between streaks kept the escalation from firing.
+// A boot starts a new Kernel incarnation: the wakes an earlier one received do not count against it (the seat-cost rotation's boot events).
+const KERNEL_BOOTS = new Set(rotationRule('kernel').bootEvents);
 const KERNEL_WOKEN_EVENT = 'kernel-woken';
 const KERNEL_IDLE_REPLACED_EVENT = 'kernel-replaced-idle';
 const WAKE_IDLE_REPLACE = SEAT_WAKE.idleReplace;
@@ -244,17 +297,20 @@ const KERNEL_MOVES = new Set(['job-enqueued', 'follow-on-enqueued', 'job-dropped
 const KERNEL_ACTIVITY = new Set(['op-dispatched', 'op-settled', 'kernel-decision', 'kernel-decision-result', 'kernel-proposal',
   'autopilot-deferred-to-handover', 'ask-superseded', 'ask-answered', 'peer-message-acked', 'runtime-rev-acked']);
 const recordKernelWoken = (terminal, detail) => withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({
-  workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_WOKEN_EVENT, payload: { terminal, ...detail } })));
+  workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_WOKEN_EVENT, payload: { terminal, ...detail, rev: currentRuntimeRev() ?? null } })));
 /**
  * {wakes, firstWakeAt, replaced, due}: delivered wakes since the Kernel's last move or record (firstWakeAt the
  * created_at of the first), idle replacements within IDLE_REPLACED_WINDOW_MS since its last job move, and whether H11
  * acts (WAKE_IDLE_REPLACE wakes, the first at least WAKE_IDLE_WINDOW_MS old). Pure over the ledger rows {kind, created_at}.
  */
-export function idleWakesOf(rows, { now = Date.now() } = {}) {
+export function idleWakesOf(rows, { now = Date.now(), rev } = {}) {
   let wakes = 0, firstWakeAt = null, replacedAts = [];
   for (const row of rows) {
     if (KERNEL_MOVES.has(row.kind)) { wakes = 0; firstWakeAt = null; replacedAts = []; }
+    else if (KERNEL_BOOTS.has(row.kind)) { wakes = 0; firstWakeAt = null; }
     else if (KERNEL_ACTIVITY.has(row.kind)) { wakes = 0; firstWakeAt = null; }
+    // A wake given under another runtime revision is another situation: what the Kernel could not do then may be done now, so the streak starts over.
+    else if (row.kind === KERNEL_WOKEN_EVENT && rev !== undefined && (parseJsonOr(row.payload_json).rev ?? null) !== rev) { wakes = 0; firstWakeAt = null; }
     else if (row.kind === KERNEL_WOKEN_EVENT) { if (wakes === 0) { firstWakeAt = Number(row.created_at) || null; } wakes += 1; }
     else if (row.kind === KERNEL_IDLE_REPLACED_EVENT) { replacedAts.push(Number(row.created_at) || 0); wakes = 0; firstWakeAt = null; }
   }
@@ -262,10 +318,27 @@ export function idleWakesOf(rows, { now = Date.now() } = {}) {
   const due = wakes >= WAKE_IDLE_REPLACE && firstWakeAt != null && now - firstWakeAt >= WAKE_IDLE_WINDOW_MS;
   return { wakes, firstWakeAt, replaced, due };
 }
-const IDLE_KINDS = [...KERNEL_MOVES, ...KERNEL_ACTIVITY, KERNEL_WOKEN_EVENT, KERNEL_IDLE_REPLACED_EVENT];
+const IDLE_KINDS = [...KERNEL_MOVES, ...KERNEL_BOOTS, ...KERNEL_ACTIVITY, KERNEL_WOKEN_EVENT, KERNEL_IDLE_REPLACED_EVENT];
+/** The menu a wake is typed for: its item count and a fingerprint of the item ids (what a repeated wake is compared by). */
+const menuOf = (statusValue) => {
+  const ids = (Array.isArray(statusValue?.menu) ? statusValue.menu : []).map((item) => item.id).toSorted(byCodeUnit);
+  return { menuItems: ids.length, menuFp: createHash('sha1').update(ids.join('|')).digest('hex').slice(0, 12) };
+};
+/** {reason, since} when the newest wake was for this same menu, the Kernel has authored nothing since, and it is younger than seat-cost kernel.wakeRepeatMs; else null. */
+const repeatedWake = (statusValue) => {
+  const now = menuOf(statusValue);
+  return withKernelLedger((ledger) => {
+    const boot = ledger.db.prepare(`SELECT created_at FROM events WHERE workflow_id=? AND kind IN (${[...KERNEL_BOOTS].map(() => '?').join(',')}) ORDER BY seq DESC LIMIT 1`).get(workflowId, ...KERNEL_BOOTS);
+    if (boot && Date.now() - Number(boot.created_at) < seatCostConfig().kernel.bootGraceMs) return { reason: 'booting', since: Number(boot.created_at) };
+    const last = ledger.db.prepare('SELECT seq, created_at, payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(workflowId, KERNEL_WOKEN_EVENT);
+    if (!last || parseJsonOr(last.payload_json).menuFp !== now.menuFp || Date.now() - Number(last.created_at) >= seatCostConfig().kernel.wakeRepeatMs) return null;
+    const acted = ledger.db.prepare(`SELECT 1 FROM events WHERE workflow_id=? AND seq>? AND kind IN (${[...KERNEL_ACTIVITY, ...KERNEL_MOVES].map(() => '?').join(',')}) LIMIT 1`).get(workflowId, last.seq, ...KERNEL_ACTIVITY, ...KERNEL_MOVES);
+    return acted ? null : { reason: 'unanswered', since: Number(last.created_at) };
+  }) ?? null;
+};
 const kernelIdleWakes = () => withKernelLedger((ledger) => idleWakesOf(ledger.db.prepare(
-  `SELECT kind, created_at FROM events WHERE workflow_id=? AND kind IN (${IDLE_KINDS.map(() => '?').join(',')}) ORDER BY seq`)
-  .all(workflowId, ...IDLE_KINDS))) ?? { wakes: 0, firstWakeAt: null, replaced: 0, due: false };
+  `SELECT kind, created_at, payload_json FROM events WHERE workflow_id=? AND kind IN (${IDLE_KINDS.map(() => '?').join(',')}) ORDER BY seq`)
+  .all(workflowId, ...IDLE_KINDS), { rev: currentRuntimeRev() ?? null })) ?? { wakes: 0, firstWakeAt: null, replaced: 0, due: false };
 const escalateIdleStall = ({ phase, terminal, idle, outputAgeMs }) => {
   let decision = null;
   try {
@@ -312,6 +385,19 @@ async function watchdogTick() {
   return statusTick();
 }
 
+// The notice the tick reads: a change the runtime settles by itself needs no wake.
+const revisionNoticeOf = (status) => {
+  const probe = withKernelLedger((ledger) => runtimePass(kernelSeat({ ledger, workflowId, root: revRootOf() }), { repair: false }));
+  if (!probe) return status.value.revisionNotice;
+  return ['not-concerned', 'acked'].includes(probe.notice.state) ? { ...probe.notice, state: 'current' } : probe.notice;
+};
+// A revision record describes a seat observed through a responding host.
+const observeRevision = (status) => {
+  if (!repair) return;
+  const settled = withKernelLedger((ledger) => runtimePass(kernelSeat({ ledger, workflowId, root: revRootOf() }), { repair, adopt: true }));
+  if (settled) status.value.revisionNotice = settled.notice;
+};
+
 async function statusTick() {
   const status = api('status');
   if (!status.ok || !status.value?.ok) return {
@@ -325,6 +411,8 @@ async function statusTick() {
   // Q14 / MB-08: only a running workflow's Kernel is repaired, woken or relaunched. A paused, stopped (or not yet
   // started) workflow is left alone - nothing but the owner's starci kernel lifecycle --resume brings it back.
   if (phase !== 'running') return { ok: true, workflowId, phase, action: 'not-running' };
+  // The tick reads the notice before probing the host; observing the seat settles it before any wake.
+  status.value.revisionNotice = revisionNoticeOf(status);
   const result = kernelTick(status, phase);
   // Creation supplies the title, but a moved/restored tab can lose it. The sidebar reads
   // visualLayouts' tab title, not terminal-list's agent-controlled pane title.
@@ -333,8 +421,8 @@ async function statusTick() {
     ? repairKernelTabTitle(titleTerminal, status.value.title ?? workflowId) : null;
   // The runtime revision the Kernel acked and the wake this tick types (or would type): a read-only --once
   // probe shows what the next wake carries (runtime-rev.mjs).
-  const kernelRev = status.value?.kernelRev ?? null;
-  return { ...result, ...(titleRepair ? { titleRepair } : {}), ...(kernelRev ? { kernelRev, nextWake: wakePromptOf(workflowId, status.value) } : {}) };
+  const revisionNotice = status.value?.revisionNotice ?? null;
+  return { ...result, ...(titleRepair ? { titleRepair } : {}), ...(revisionNotice ? { revisionNotice, ...(result.terminalClosed ? {} : { nextWake: wakePromptOf(workflowId, status.value) }) } : {}) };
 }
 
 
@@ -346,12 +434,23 @@ const finalKernelAction = (state) => {
   if (state === 'active') return 'active';
   return state === 'wedged' ? 'kernel-wedged' : 'observed';
 };
-const kernelTick = createKernelTick({ api, workflowId, repair, lostSeatWorker, exitedTwice, stopAndRelease, replaceKernel,
-  workerShow, DEAD_WORKER_STATE, settledKernelVerdict, DEAD_VERDICTS, terminalRead, classifyKernelScreen, outputAgeOf,
+const recordRevisionWoken = (notice) => withKernelLedger((ledger) => recordWoken(kernelSeat({ ledger, workflowId, root: revRootOf() }), notice));
+// The replacement is one hand-over: the seat that works is closed only when a start may run now (a launch held or backing off for its cause leaves it as it is).
+// The same readiness the start itself runs (workflow-up --check, the rows a Kernel start needs): a host that cannot start a Kernel keeps the one that works.
+const startPreflight = () => {
+  const checked = runNodeJson(path.join(skillRoot, 'scripts', 'reconciler', 'workflow-up.mjs'), ['--check', '--json'], { timeout: START_TIMEOUT_MS });
+  if (checked.value?.ok !== false) return null;
+  const red = (checked.value.items ?? []).filter((item) => item.status === 'red' && item.required).map((item) => `${item.id}: ${item.detail}`);
+  return { state: 'not-ready', count: red.length, step: 'workflow-host-not-ready', reason: red.join('; ').slice(0, 300) };
+};
+const startHold = () => withKernelLedger((ledger) => startHoldOf(startFailureRun(ledger.db, workflowId), { now: Date.now(), budget: startHoldBudget(), rev: runtimeRevNow() })) ?? startPreflight();
+const kernelRotation = createKernelRotation({ workflowId, openLedger: withKernelLedger, close: closeKernelTerminal, replace: replaceKernel, sender: launchableSender, hold: startHold });
+const kernelTick = createKernelTick({ api, kernelRotation, observeRevision, workflowId, repair, lostSeatWorker, exitedTwice, stopAndRelease, replaceKernel,
+  repeatedWake, menuOf, workerShow, DEAD_WORKER_STATE, settledKernelVerdict, DEAD_VERDICTS, terminalRead, classifyKernelScreen, outputAgeOf,
   staleAwareState, ACTIVE_STALE_MS, exitedAgentPromptRow, DEATH_SETTLE_MS, sleepSync, kernelWakeFailures,
-  wakeFailuresProveDead, replaceWakeDeadKernel, sendEnterWithProof, recordKernelWakeFailed, deliveryFieldsOf,
+  wakeFailuresProveDead, replaceWakeDeadKernel, sendEnterWithProof, recordKernelWakeFailed, deliveryFieldsOf, draftRefused, recordDraftHeld: holdDraft, recordDraftCleared: clearDraftHold, draftHeld, foreignDraft,
   kernelWakeRefusedAt, replaceUnwritableKernel, kernelIdleWakes, escalateIdleStall, replaceIdleKernel,
-  sendWakeWithProof, wakePromptOf, recordKernelWoken, wakeSendRefused, wakeActionOf, finalKernelAction, jsonFromStdout });
+  sendWakeWithProof, wakePromptOf, recordKernelWoken, recordRevisionWoken, wakeSendRefused, wakeActionOf, finalKernelAction, jsonFromStdout });
 const printLineOf = (result) => {
   const terminal = result.terminal ? ` terminal=${result.terminal}` : ''; let restart = '';
   if (/^reload|^already/.test(result.action ?? '')) {

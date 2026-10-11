@@ -79,6 +79,7 @@ Optional keys:
   it instead of serving it; `excludes` names the ask classes that always reach the owner (`engine/config.mjs`
   `ASKS_DEFAULTS`; a handover ask is always excluded; `draw-review` opts drawings out - otherwise a drawing
   the owner did not ask to review is accepted without the owner)
+- `release` — `{suite?}` or null: `suite` is `local` (default) or `ci` — where the full suite of a release is judged ([Where the suite runs](releasing.md#where-the-suite-runs))
 - `uat` — `{maxConcurrent?}` or null: the machine-wide ceiling of concurrent UAT runs (`scripts/uat/uat-slots.mjs`;
   default `engine/config.mjs` `UAT_DEFAULTS`)
 
@@ -307,3 +308,7 @@ A refused dispatch (`host-resources-low`) names the drive, the floor and the key
 is not a line of `secret.env` (which keeps only `SONAR_TOKEN`). `organization` is a key of lowercase letters, digits, `-` and `_`, or `null`; an unknown
 key or another value is refused with `Invalid config.yaml: sonar...`. The environment variable `SONAR_ORGANIZATION` wins over it (CI reads the
 repository variable of the same name). With neither set, the pre-cut check refuses and names `sonar.organization`.
+
+## Where a release's suite runs (`release`)
+
+`release: {suite?: local | ci}` (config.yaml, gitignored) says who judges the full test suite of a release. `local` is the shipped default and today's behaviour: `starci release cut` runs the root suite and the Linux parity container. `ci` is the owner's recorded choice (modules/kernel/owner-rulings.yaml `release-suite-ci`, 2026-10-09): the cut plans neither, the GitHub `ci` workflow runs the suite after the push, and the pre-push gate accepts a record without a local root-suite row only while this file says `ci`. `none` is refused with `Invalid config.yaml: release.suite...`: the suite does not vanish, it moves to CI, so the value says so. An unknown key or another value is refused the same way. The trade is stated in [releasing](releasing.md#where-the-suite-runs).

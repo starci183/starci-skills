@@ -10,8 +10,12 @@ import { readModuleJson } from '../../../../engine/runtime-root.mjs';
 import { filedReportOf, unsteppedFailures, upstreamPlanOf } from '../../terminal-step.mjs';
 import { independentChecksOf } from './check-evidence.mjs';
 import { jobOpOf } from './rows.mjs';
+import { UPSTREAM_ROUTE } from '../../upstream-retry.mjs';
+import { CHECKER_UNAVAILABLE } from '../../critic-hold.mjs';
+import { REJUDGE_REFUSED_EVENT, REJUDGE_ROUTE, admitRejudge } from '../../settle/rejudge.mjs';
+import { workflowWorktreeOf } from '../../../machine/workflow-tree.mjs';
 
-const UPSTREAM_ROUTE = 'upstream-lands-first';
+
 
 /** The workflow's jobs rows as the failure projections read them. */
 const workflowJobsOf = (db, workflowId) => db.prepare("SELECT job_id, workflow_id, unit_id, op_id, status, try_no, retry_of, resume_of, created_at FROM jobs WHERE workflow_id=? AND kind='op'").all(workflowId);
@@ -52,6 +56,12 @@ export function routeFailure({ ledger, job, repo, internals }) {
   const report = filedReportOf(db, job.job_id);
   const ctx = { db, ledger, job, repo, internals };
   const { shape, failure } = shapeOf(ctx, report);
+  // A blocker the runtime owes (a Critic that could not judge) with the finished product preserved: the runtime judges it as the lineage's next attempt, with no op tokens.
+  if (report?.blocker === CHECKER_UNAVAILABLE && job.status === 'failed') {
+    const rejudged = admitRejudge(ledger, job, { internals, workflowTree: workflowWorktreeOf({ env: process.env }, job.workflow_id), repo });
+    if (!rejudged.ok) ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: REJUDGE_REFUSED_EVENT, payload: { code: rejudged.code, detail: rejudged.detail ?? null } });
+    if (rejudged.ok) return { routed: true, step: recordStep(ledger, job, shape, { kind: 'rejudge', route: REJUDGE_ROUTE, counted: false, jobs: [rejudged.jobId], digest: rejudged.digest, reason: `the blocker is a Critic that could not judge and the finished product is preserved (${rejudged.ref}): the runtime restored it and judges it with its own Critic as ${rejudged.jobId}; no op attempt is made` }) };
+  }
   const plan = report?.blocker ? upstreamPlanOf(db, job, report.blocker, readModuleJson('modules', 'models', 'kinds.yaml')) : null;
   if (plan?.action === 'wait') return { routed: false, wait: plan };
   if (plan?.action === 'retry') return { routed: true, step: retryBehind(ctx, shape, plan) };

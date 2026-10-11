@@ -19,8 +19,10 @@ const FLAG_TYPES = new Set(['string', 'boolean', 'number', 'enum', 'list']);
 const FLAG_KEYS = new Set(['name', 'type', 'required', 'summary', 'enum', 'default', 'global']);
 const IMPL_KEYS = new Set(['script', 'args', 'module', 'export']);
 const POS_KEYS = new Set(['name', 'enum', 'required', 'variadic']);
-const GROUP_REQUIRED = ['group', 'summary', 'owner'];
+const GROUP_REQUIRED = ['group', 'summary', 'owner', 'runtimeSide'];
 const GROUP_KEYS = new Set([...GROUP_REQUIRED, 'schema']);
+/** The two sides of a verb: `tree` judges or writes the runtime tree that owns the running bin; `host` serves the product and the host through the located runtime. */
+const RUNTIME_SIDES = new Set(['tree', 'host']);
 const GLOBAL_KEYS = new Set(['schema', 'flags', 'commands']);
 const EDITIONS = ['full', 'lite'];
 const GLOBAL_FLAG_NAMES = new Set(['json', 'cwd', 'quiet', 'help', 'edition']);
@@ -153,6 +155,19 @@ const implementationFindings = (errors, file, doc) => {
   return implementationMapFindings(errors, file, doc.impl);
 };
 
+// The flags a verb's script takes for the runtime's own callers and the CLI refuses with a pointer (packages/cli/src/validate-args.mjs).
+const internalFlagFindings = (errors, file, doc) => {
+  if (!Array.isArray(doc.internalFlags)) { err(errors, file, 'internalFlags must be a list'); return; }
+  const declared = new Set((doc.flags ?? []).map((flag) => flag?.name));
+  for (const entry of doc.internalFlags) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) { err(errors, file, 'internalFlags entry is not a map'); continue; }
+    unknownKeys(errors, file, entry, new Set(['name', 'pointer']), 'internalFlags');
+    if (typeof entry.name !== 'string' || !NAME_RE.test(entry.name)) err(errors, file, `internalFlags: bad flag name ${JSON.stringify(entry.name)}`);
+    else if (declared.has(entry.name)) err(errors, file, `internalFlags: --${entry.name} is also a declared flag`);
+    if (typeof entry.pointer !== 'string' || !entry.pointer.trim() || entry.pointer.length > 240) err(errors, file, `internalFlags: --${entry.name} needs a pointer of 1 to 240 chars`);
+  }
+};
+
 const positionalFindings = (errors, file, positional) => {
   if (!Array.isArray(positional)) { err(errors, file, 'positional must be a list'); return; }
   for (const item of positional) {
@@ -187,11 +202,13 @@ const exitAndEditionFindings = (errors, file, doc) => {
 
 const checkVerb = (errors, file, groupName, doc) => {
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) { err(errors, file, 'not a map'); return null; }
+  if (doc.runtimeSide !== undefined && !RUNTIME_SIDES.has(doc.runtimeSide)) err(errors, file, `runtimeSide must be ${[...RUNTIME_SIDES].join(' | ')}`);
   verbHeaderFindings(errors, file, groupName, doc);
   const moduleImpl = implementationFindings(errors, file, doc);
   checkVerbPolicy(errors, file, doc, moduleImpl);
   if ('flags' in doc) checkFlags(errors, file, doc.flags, `verb ${doc.verb}`);
   if (doc.positional !== undefined) positionalFindings(errors, file, doc.positional);
+  if (doc.internalFlags !== undefined) internalFlagFindings(errors, file, doc);
   exitAndEditionFindings(errors, file, doc);
   return doc;
 };
@@ -233,6 +250,7 @@ const groupDocument = (entry, gdir, errors, read) => {
   unknownKeys(errors, `${entry.name}/_group.yaml`, gdoc, GROUP_KEYS, 'group');
   for (const k of GROUP_REQUIRED) if (!(k in gdoc)) err(errors, `${entry.name}/_group.yaml`, `missing required key "${k}"`);
   if (gdoc.group !== undefined && gdoc.group !== entry.name) err(errors, `${entry.name}/_group.yaml`, `group "${gdoc.group}" does not match the directory name`);
+  if (gdoc.runtimeSide !== undefined && !RUNTIME_SIDES.has(gdoc.runtimeSide)) err(errors, `${entry.name}/_group.yaml`, `runtimeSide must be ${[...RUNTIME_SIDES].join(' | ')}`);
   if (gdoc.owner !== undefined && !OWNERS.has(gdoc.owner)) err(errors, `${entry.name}/_group.yaml`, `owner must be ${[...OWNERS].join(' | ')}`);
   return gdoc;
 };
@@ -264,7 +282,7 @@ const catalogGroups = (dir, errors, read) => {
     const gdir = path.join(dir, entry.name);
     const gdoc = groupDocument(entry, gdir, errors, read);
     const verbs = groupVerbs(entry, gdir, errors, read);
-    groups.push({ group: entry.name, summary: gdoc.summary, owner: gdoc.owner, verbs });
+    groups.push({ group: entry.name, summary: gdoc.summary, owner: gdoc.owner, runtimeSide: gdoc.runtimeSide, verbs });
   }
   return groups;
 };

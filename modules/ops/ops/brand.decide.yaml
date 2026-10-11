@@ -127,7 +127,7 @@ reads:
         model configuration; historical model names are not availability proof. Capabilities are the intersection of actual tools, selected profile policy, op
         permissions and existing task authority.
   - id: standard
-    path: shared
+    path: docs/architecture.md + docs/code-pattern-enforcement.md + knowledge/op-gate.yaml + knowledge/ui/index.yaml + knowledge/grammars/index.yaml + knowledge/patterns/fe/css.yaml
     purpose:
       en: shared
       vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (starci app explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
@@ -292,7 +292,13 @@ steps:
         custom property it declares there, the exact value, its line and the file digest. The brand
         checks pass it as planned-from-reference until the app declares it and refuse it at
         review.verify if the app still does not; the token name must still be one the grammar DNA
-        declares."
+        declares. A token the owner ruled in an ask that is already answered (owner_answers carries
+        `[dispatchId, ...]` and the chosen option's words hold the value) and that no file declares is traced to
+        that ruling: `valueSource: {ruling: <dispatchId>, token: <this brand token>, value: <the ruled
+        value>}`. The checks read the ledger's recorded answer, require it to carry the value and mark the token
+        planned-from-ruling; the declaration in the app theme is then owed to interface.implement, which must
+        write it, and review.verify refuses the token until it does. Such a token is never a question to the
+        owner again and never a blocker."
   - reads:
       - sources
       - knowledge
@@ -393,11 +399,15 @@ steps:
         destination reaches. Report each finding as it is; never edit the navigation to hide one, and never
         type a label the catalogs do not hold. Decide every layout whose chrome is unknown: visible when it
         draws a rail, bar or frame around its children, passthrough when it renders only document,
-        providers or a guard. Serve the app locally and, for every visible layout at desktop and mobile in
-        the light theme (dark only where the tree already carries it - never demanded), render a route directly under it in a real browser with the whole chain above,
-        hide the slot's children and fill the slot element #FF00FF, capture the viewport, and record it
-        with `starci work layout-tree capture --work .starciwork --node <id> --breakpoint <bp>
-        --theme <theme> --file <png> --url <url> --provenance <how> --write`. A layout that marks where the
+        providers or a guard. For every visible layout at desktop and mobile in
+        the light theme (dark only where the tree already carries it - never demanded), get the render from the runtime:
+        `starci work layout-render --work .starciwork [--app <name>] --node <id> --breakpoint <bp> --theme <theme> --write`.
+        The verb serves the app itself (next dev on a free port with no host pin, every URL on localhost - the app's i18n proxy
+        rewrites to localhost, so a server pinned to 127.0.0.1 loops 307 for ever), loads the layout's route with the whole
+        chain above, hides the slot's children (`--slot <selector>`, default `main`, exactly one match) and fills the slot
+        #FF00FF, captures the viewport, stops the server and records the capture as `starci work layout-tree capture`
+        does. Never start next, `npm run dev` or any server by hand and never browse 127.0.0.1: the command guard refuses it
+        and names the verb. A render the verb cannot produce is reported through SHELL_RENDER_UNAVAILABLE. A layout that marks where the
         user is (an active sidebar destination, an active tab) is also captured once per active state, with
         that state active, into layout.destinations: `layout-tree.mjs capture ... --destination <nav or tab
         key> [--route <node-id>]...` (a nav key defaults to its item's target node; a tab names the nodes it is
@@ -507,12 +517,20 @@ proofs:
       en: "starci kernel settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
       vi: "starci kernel settle tự đọc lại read-digest.json đính kèm (check op-proof, proof read-knowledge): done thiếu bản tóm tắt (op-read-digest-missing), không nêu tệp knowledge nào hoặc có bản ghi đã viết thiếu slot hfs (op-read-digest-no-knowledge) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
+judge:
+  - by: machine
+    measures: [declared-checks, work-hygiene, contract-script, brand-consumable, op-proof:read-knowledge]
+    proofs: [direction, shell-capture, read-knowledge]
+    why: "the brand and shell-conformance checks are runtime scripts the settler re-runs over the records, and the READ of the standard is re-read from the digest"
+  - by: owner
+    why: "the brand direction is ready only on the owner's own receipt of its direction review ask for the current revision"
 blockers:
   - code: SHELL_RENDER_UNAVAILABLE
     condition:
-      en: The frontend has a visible layout but it cannot be served or rendered in a browser on this host,
-        so no real layout capture can be taken. Report `blocked` with `environment` and the exact command
-        that failed; never substitute a generated image or a description for the capture.
+      en: "`starci work layout-render` printed code SHELL_RENDER_UNAVAILABLE - the frontend has a visible layout but the
+        runtime could not serve or render it, so no real layout capture can be taken. Report `blocked` with `environment`,
+        the verb's `cause`, its failing `url` and its redirect chain; never start a server by hand, never retry in a loop
+        and never substitute a generated image or a description for the capture."
   - code: BRAND_SOURCE_MISSING
     condition:
       en: A token/style source file this record must read does not exist in the selected repository, or
@@ -520,9 +538,11 @@ blockers:
         path; never substitute a remembered value for an unreadable file.
   - code: BRAND_TOKEN_UNTRACEABLE
     condition:
-      en: A required token value cannot be traced to a declaration in a real source file, or two sources
-        disagree about it. Report `ask` naming the token, the candidate values and the files; never
-        write the value you would have chosen.
+      en: A required token value cannot be traced to a declaration in a real source file, to a reference
+        render (`valueSource.path`) or to an answered ruling (`valueSource.ruling`), or two sources disagree
+        about it. Report `ask` naming the token, the candidate values and the files; never write the value
+        you would have chosen. A value the owner already ruled in an answered ask is traced to that ruling,
+        not asked again and not reported blocked for a declaration a later leg owes.
   - code: BRAND_DECISION_UNRULED
     condition:
       en: An identity decision the record needs - primary hue, whether danger may match primary, the

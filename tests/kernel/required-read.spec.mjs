@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { withKernelIngress } from '../helpers/kernel-ingress-fixture.mjs';
 import { kernelAuthorityOf } from '../../scripts/kernel/verbs/shared/kernel-seat.mjs';
-import { kernelReadManifest, verifyKernelRead, requireKernelRead, unreadFiles } from '../../scripts/kernel/required-read.mjs';
+import { parseYaml } from '../../engine/yaml.mjs';
+import { kernelReadManifest, verifyKernelRead, requireKernelRead, unreadFiles, KERNEL_CONTRACT_FILES } from '../../scripts/kernel/required-read.mjs';
 import { callerAdmission } from '../../scripts/kernel/caller-admission.mjs';
 import ackRev from '../../scripts/kernel/verbs/kernel-ack-rev.mjs';
 import { ENGINE_SCHEMA } from '../../engine/constants.mjs';
@@ -58,9 +59,9 @@ test('dirty relevant bytes at unchanged HEAD and failed read status refuse; unre
 }));
 
 test('large current read set has no lossy path cap; unknown deployed revision is a visible refusal', t => withKernelIngress(t,w => {
-  for(let i=0;i<18;i++)w.write(`modules/cli/commands/kernel/extra-${i}.yaml`,`verb: fixture-${i}`);
+  for(let i=0;i<18;i++)w.write(`modules/ops/ops/big-${i}.yaml`,`id: big-${i}`);
   w.git('add','-A');w.git('commit','-qm','large complete set');
-  const required=kernelReadManifest(w.ledger.db,w.workflowId,options(w));assert.ok(required.files.length>18);verifyKernelRead(required,required);ack(w,required);admitRead(w);
+  const required=kernelReadManifest(w.ledger.db,w.workflowId,{ ...options(w),ops: ['review.verify',...Array.from({ length: 18 },(_,i) => `big-${i}`)] });assert.ok(required.files.length>18);verifyKernelRead(required,required);ack(w,required);admitRead(w);
   const head=fs.readFileSync(path.join(w.runtime,'.git/HEAD'));fs.writeFileSync(path.join(w.runtime,'.git/HEAD'),'not a revision');
   try { assert.throws(() => kernelReadManifest(w.ledger.db,w.workflowId,options(w)),{ code: 'kernel-read-unverified' }); }
   finally { fs.writeFileSync(path.join(w.runtime,'.git/HEAD'),head); }
@@ -116,3 +117,19 @@ test('normal installed no-Git runtime requires actual descriptor custody and exa
   attest(kernelReadManifest(w.ledger.db,w.workflowId,options(w)));admitRead(w);
   } finally { if(saved===undefined)delete process.env.STARCI_KERNEL_REV_ROOT;else process.env.STARCI_KERNEL_REV_ROOT=saved; }
 }));
+
+test('the required READ holds the verb contracts of the seat table only, not the runtime-owned verbs (a fresh life read 55 contract files and spent two million tokens before its first wake)', () => {
+  const policy = parseYaml(fs.readFileSync(path.resolve(import.meta.dirname, '..', '..', 'modules', 'kernel', 'command-policy.yaml'), 'utf8'));
+  const seat = policy.kernel.verbs.kernel;
+  const contracts = KERNEL_CONTRACT_FILES.filter((rel) => rel.startsWith('modules/cli/commands/kernel/'));
+  assert.deepEqual(contracts.map((rel) => path.basename(rel, '.yaml')).sort(), ['_group', ...seat].sort());
+  for (const runtimeOwned of ['enqueue', 'settle', 'dispatch', 'dispatch-ready', 'graph-edit', 'record-checks']) assert.ok(!contracts.some((rel) => rel.endsWith(`/${runtimeOwned}.yaml`)), runtimeOwned);
+  assert.ok(contracts.length < 25);
+});
+
+test('the revision scope names the same verb contracts as the required READ (a Kernel rereads what it reads, no more)', () => {
+  const scope = parseYaml(fs.readFileSync(path.resolve(import.meta.dirname, '..', '..', 'modules', 'kernel', 'revision-scope.yaml'), 'utf8'));
+  const row = scope.paths?.find((entry) => entry.id === 'kernel-cli-seat') ?? scope.rows?.find((entry) => entry.id === 'kernel-cli-seat');
+  assert.ok(row, 'the seat row exists');
+  assert.deepEqual([...row.paths].sort(), KERNEL_CONTRACT_FILES.filter((rel) => rel.startsWith('modules/cli/commands/kernel/')).sort());
+});

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { createUnit, enqueueJob, setJobStatus, startAttempt, fileReport, changeWorkflowPhase } from '../../engine/db/ledger.mjs';
-import controller, { reconcileWorkflow, listWorkflows, planWorkflow, workflowSettings, keyOf } from '../../scripts/reconciler/controllers/workflow.mjs';
+import controller, { reconcileWorkflow, listWorkflows, planWorkflow, workflowSettings, keyOf, REV_WAKE_KEY } from '../../scripts/reconciler/controllers/workflow.mjs';
 import { slaPass, clocksOf } from '../../scripts/reconciler/sla.mjs';
 import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 
@@ -150,7 +150,7 @@ test('asks: dead / stale / unserved are re-parked through starci kernel serve-as
 test('finish-ready (every job settled, handover approved) is starci kernel finish; an ended workflow clears its clocks', (t) => withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {
   seed(ledger, { progressAgoMin: 5 });
   const { ctx, rec } = fakeCtx({ repoRoot, ledgerFile, statusOf: () => status({ frontier: { state: 'finish-ready', actionable: true, openOperations: 0 },
-    kernelRev: { stale: true, acked: 'a7461cbb4952aaaa', current: 'b709a530dffcbbbb', files: ['modules/kernel/driver-loop.yaml'] } }) });
+    revisionNotice: { role: 'kernel', state: 'owed', from: 'a7461cbb4952aaaa', to: 'b709a530dffcbbbb', count: 1, files: ['modules/kernel/driver-loop.yaml'], line: 'kernel owes 1 file(s) of rev x' } }) });
   const key = keyOf(LEDGER, WF);
   await reconcileWorkflow(key, ctx);
   assert.deepEqual(rec.api.map((a) => [a.verb, ...a.argv]), [['finish', '--workflow', WF]]);
@@ -158,7 +158,7 @@ test('finish-ready (every job settled, handover approved) is starci kernel finis
   assert.ok(rec.logs.some((l) => l.kind === 'reconciler.would' && (l.data?.keys ?? []).includes('rev:b709a530dffc')), 'one doorbell carries the new rev');
   assert.ok(clocksOf(ctx, { prefixes: [`workflow:${LEDGER}:${WF}`] }).some((c) => c.state === 'REV_ACK_OVERDUE'));
   const overdue = planWorkflow({ ledgerId: LEDGER, workflowId: WF, now: NOW, settings: workflowSettings(),
-    status: status({ kernelRev: { stale: true, acked: 'a7461cbb4952aaaa', current: 'b709a530dffcbbbb', files: [] } }),
+    status: status({ revisionNotice: { role: 'kernel', state: 'owed', from: 'a7461cbb4952aaaa', to: 'b709a530dffcbbbb', count: 0, files: [], line: 'kernel owes 0 file(s) of rev x' } }),
     clocks: [{ entity: `workflow:${LEDGER}:${WF}`, state: 'REV_ACK_OVERDUE', enteredAt: NOW - workflowSettings().revAckMs - 1 }] });
   assert.deepEqual(overdue.decisions.filter((d) => d.kind === 'rev-ack').map((d) => d.idempotencyKey), [`rev-ack:${WF}:runtime-rev`], 'overdue: one DI per workflow, whatever the rev');
 
@@ -186,3 +186,26 @@ test('stuck[] waits become clocks at their opTelemetry.stuckSla thresholds; the 
   assert.equal(controller.routes['op-settled']({ ledgerId: LEDGER, workflowId: WF, kind: 'op-settled' }), keyOf(LEDGER, WF));
   assert.equal(controller.routes['runtime-rev-acked']({ ledgerId: 'supervisor', workflowId: 'wf-supervisor' }), null);
 });
+
+test('a land-passed event of the Supervisor ledger re-looks at every running workflow at once; a product-ledger event of that kind routes nowhere', async (t) => withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {
+  seed(ledger, { progressAgoMin: 5 });
+  const route = controller.routes['land-passed'];
+  assert.equal(route({ ledgerId: 'supervisor', kind: 'land-passed' }), REV_WAKE_KEY);
+  assert.equal(route({ ledgerId: LEDGER, workflowId: WF, kind: 'land-passed' }), null);
+  const staleStatus = { ...status(), revisionNotice: { role: 'kernel', state: 'owed', from: 'aaaaaaaaaaaa', to: 'bbbbbbbbbbbb', count: 1, files: ['modules/kernel/driver-loop.yaml'], line: 'kernel owes 1 file(s) of rev x' } };
+  const { ctx, rec } = fakeCtx({ repoRoot, ledgerFile, statusOf: () => staleStatus });
+  let dropped = 0;
+  ctx.dropStatusCache = () => { dropped += 1; };
+  const swaps = [];
+  ctx.machine = { log: (row) => swaps.push(row) };
+  const result = await controller.reconcile(REV_WAKE_KEY, ctx);
+  assert.deepEqual(swaps.map((row) => [row.kind, row.data.cause, row.data.applied.map((a) => [a.action, a.count])]),
+    [['signal.runtime-change-applied', 'land', [['workflows-looked-at', 2], ['kernel-doorbells-rung', 2]]]], 'the re-look is one runtime-change-applied signal naming what it did');
+  assert.equal(dropped, 1, 'the status cache is forgotten so the pass reads the new revision');
+  assert.deepEqual(result.looked.sort(), [keyOf(LEDGER, WF), keyOf(LEDGER, PEER)].sort());
+  const bells = rec.logs.filter((l) => l.kind === 'reconciler.would' && l.data?.action === 'doorbell' && l.data.keys.includes('rev:bbbbbbbbbbbb'));
+  assert.deepEqual(bells.map((b) => b.data.workflowId).sort(), [PEER, WF].sort(), 'one doorbell per running workflow');
+  // The same revision twice rings nobody again: one wake per seat per revision.
+  await controller.reconcile(REV_WAKE_KEY, ctx);
+  assert.equal(rec.logs.filter((l) => l.kind === 'reconciler.would' && l.data?.action === 'doorbell' && l.data.keys.includes('rev:bbbbbbbbbbbb')).length, 2);
+}));

@@ -4,7 +4,7 @@
 // token burn per op; and the problems list ordered by the work each blocks. It reads the machine store, the ledgers and the
 // existing read verbs, and never fixes, dispatches or resolves anything; the repetition is the calling chat's /loop.
 //
-//   starci debug digest [--repo <ledger-owner>]... [--workflow <id>]... [--json] [--child-timeout <sec>]
+//   starci debug digest [--repo <ledger-owner>]... [--workflow <id>]... [--json] [--questions] [--child-timeout <sec>]
 //
 // Exit 0 when a digest was printed (problems are its content, not a failure), 1 when the machine store cannot be read, 2 on bad usage.
 import { parseArgs } from 'node:util';
@@ -17,7 +17,7 @@ import { digestNumbers } from './debug-digest-numbers.mjs';
 import { renderText, renderUnavailable } from './debug-digest-render.mjs';
 
 const OPTIONS = { repo: { type: 'string', multiple: true }, workflow: { type: 'string', multiple: true },
-  json: { type: 'boolean' }, 'child-timeout': { type: 'string' } };
+  json: { type: 'boolean' }, questions: { type: 'boolean' }, 'child-timeout': { type: 'string' } };
 
 /** The hold policy table with its bound resolver, as the analysis reads it. */
 const loadPolicy = () => ({ ...incidentPolicy(), resolve: boundValue });
@@ -37,7 +37,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
     return 1;
   }
   const digest = digestOf(snapshot, io);
-  out(values.json ? JSON.stringify(digest) : renderText(digest, { language }));
+  out(values.json ? JSON.stringify(digest) : renderText(digest, { language, questions: values.questions }));
   return 0;
 }
 

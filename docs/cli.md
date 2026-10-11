@@ -369,12 +369,13 @@ run a fixed read-only inspector against the StarCi runtime
 
 ### starci debug digest
 
-print the read-only debug digest, with its problems ordered by blocked work
+print the read-only debug digest with a verdict per role (no error, happy error, BUG)
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | list |  |
 | `--workflow` | list |  |
+| `--questions` | boolean |  |
 | `--child-timeout` | number |  |
 
 exit: 0 digest printed; 1 the machine store cannot be read; 2 bad usage
@@ -384,6 +385,7 @@ json: flag
 ```sh
 starci debug digest
 starci debug digest --json
+starci debug digest --questions
 starci debug digest --repo <path> --workflow <id>
 ```
 
@@ -653,7 +655,7 @@ exit: 0 every assertion passed; 1 an assertion failed; 2 bad usage or the sandbo
 json: none
 
 ```sh
-starci gate install-sandbox --tarball starci-1.0.0-alpha.7.tgz
+starci gate install-sandbox --tarball starci-1.0.0-alpha.9.tgz
 ```
 
 ### starci gate read
@@ -769,7 +771,7 @@ starci gate runtime-coverage tests/cli/catalog.spec.mjs
 
 ### starci gate sonar
 
-inspect, provision and run the local Sonar quality gate
+inspect, provision, run and start the local Sonar quality gate
 
 | flag | type | |
 | --- | --- | --- |
@@ -793,6 +795,7 @@ inspect, provision and run the local Sonar quality gate
 | `--declaration` | string |  |
 | `--host` | string |  |
 | `--stack` | string |  |
+| `--public` | boolean |  |
 
 Positionals: command, arguments?
 
@@ -804,6 +807,8 @@ json: always
 starci gate sonar status
 starci gate sonar scan --cwd <repo> --base <rev> --paths src --wait
 starci gate sonar dashboard --cwd <repo>
+starci gate sonar up
+starci gate sonar up --public
 ```
 
 ### starci gate starcistacks
@@ -938,6 +943,7 @@ verify a lane and fast-forward it onto local main without pushing
 | `--verified-log` | string |  |
 | `--dry-run` | boolean |  |
 | `--lane` | string |  |
+| `--kernel-note` | string |  |
 | `--concurrency` | number (default 4) |  |
 
 Positionals: worktree, ref
@@ -961,6 +967,7 @@ json: starci/git-land@1
 starci git land <worktree> <ref>
 starci git land <worktree> <ref> --verified <sha> --verified-log <file> --concurrency 2
 starci git land <worktree> <ref> --dry-run --json
+starci git land <worktree> <ref> --kernel-note "settle needs --evidence now"
 ```
 
 ### starci git sync
@@ -1322,7 +1329,7 @@ starci kernel cut-seam --repo <path> --reconcile --job <job> --exit-code 0
 
 ### starci kernel decide
 
-open, list or close an entry of the Kernel decision log (hypothesis, action, metric)
+answer one item of the Kernel menu with a typed choice, or keep the decision log
 
 | flag | type | |
 | --- | --- | --- |
@@ -1336,12 +1343,18 @@ open, list or close an entry of the Kernel decision log (hypothesis, action, met
 | `--result` | enum keep|revert |  |
 | `--observed` | string |  |
 | `--list` | boolean |  |
+| `--item` | string |  |
+| `--choice` | string |  |
+| `--reason` | string |  |
+| `--text` | string |  |
+| `--evidence` | string |  |
 
-exit: 0 listed or recorded; 1 refused (incomplete, action already open or reverted, unknown or closed decision); 2 bad usage: a required flag is missing or a flag has no value
+exit: 0 listed, recorded or executed; 1 refused (an item or choice not on the menu, incomplete, action already open or reverted, unknown or closed decision) or a step of the choice failed; 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
+starci kernel decide --repo <path> --workflow <workflow> --item <item> --choice <choice> --reason <why>
 starci kernel decide --repo <path> --workflow <workflow> --list
 starci kernel decide --repo <path> --workflow <workflow> --hypothesis <hypothesis> --action-key <key> --metric <metric>
 starci kernel decide --repo <path> --workflow <workflow> --close <decision> --result keep --observed <observed>
@@ -1353,6 +1366,7 @@ list, open, claim, resolve or escalate Decision Items; the Kernel reads them fir
 
 | flag | type | |
 | --- | --- | --- |
+| `--field` | string |  |
 | `--repo` | string |  |
 | `--workflow` | string |  |
 | `--list` | boolean |  |
@@ -1457,6 +1471,7 @@ enqueue a work-unit job with its op, owned paths, records and retry lineage
 | `--foundation` | string |  |
 | `--new-module` | string |  |
 | `--retry-of` | string |  |
+| `--switch-agent` | boolean |  |
 | `--reopen` | string |  |
 | `--derived-from` | string |  |
 | `--canon-scan` | string |  |
@@ -1703,7 +1718,7 @@ starci kernel incident --repo <path> --workflow <workflow> --attach <incident> -
 
 ### starci kernel kernel-ack-rev
 
-project or attest the complete current Kernel READ manifest
+project or attest the Kernel READ manifest (also spelled revision-ack)
 
 | flag | type | |
 | --- | --- | --- |
@@ -1711,6 +1726,7 @@ project or attest the complete current Kernel READ manifest
 | `--workflow` | string | required |
 | `--rev` | string |  |
 | `--plan` | boolean |  |
+| `--digest` | string |  |
 | `--read-manifest` | string |  |
 | `--op` | string |  |
 
@@ -1720,6 +1736,7 @@ json: flag
 
 ```sh
 starci kernel kernel-ack-rev --repo <path> --workflow <workflow> --plan
+starci kernel kernel-ack-rev --repo <path> --workflow <workflow> --rev <rev> --digest <readToken>
 starci kernel kernel-ack-rev --repo <path> --workflow <workflow> --rev <rev> --read-manifest <file>
 ```
 
@@ -1802,6 +1819,7 @@ list the workflow's typed log rows, oldest first
 
 | flag | type | |
 | --- | --- | --- |
+| `--field` | string |  |
 | `--repo` | string |  |
 | `--workflow` | string | required |
 | `--job` | string |  |
@@ -2218,6 +2236,30 @@ json: flag
 starci kernel retire-ask --repo <path> --workflow <workflow> --dispatch <dispatch> --reason <reason>
 ```
 
+### starci kernel revision-ack
+
+the same verb as kernel-ack-rev: project or attest the Kernel READ manifest
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+| `--workflow` | string | required |
+| `--rev` | string |  |
+| `--plan` | boolean |  |
+| `--digest` | string |  |
+| `--read-manifest` | string |  |
+| `--op` | string |  |
+
+exit: 0 planned or acknowledged; 1 refused or unavailable current identity/READ inputs; 2 bad usage: a required flag is missing or a flag has no value
+
+json: flag
+
+```sh
+starci kernel revision-ack --repo <path> --workflow <workflow> --plan
+starci kernel revision-ack --repo <path> --workflow <workflow> --rev <rev> --digest <readToken>
+starci kernel revision-ack --repo <path> --workflow <workflow> --rev <rev> --read-manifest <file>
+```
+
 ### starci kernel route
 
 resolve and persist the model decision of a job
@@ -2325,6 +2367,8 @@ the live status projection of a workflow (frontier, progress, waits)
 
 | flag | type | |
 | --- | --- | --- |
+| `--field` | string |  |
+| `--full` | boolean |  |
 | `--repo` | string |  |
 | `--workflow` | string | required |
 
@@ -2342,6 +2386,7 @@ the read projection a Kernel scans each wake (jobs, inbox, signals, drift)
 
 | flag | type | |
 | --- | --- | --- |
+| `--field` | string |  |
 | `--repo` | string |  |
 | `--workflow` | string | required |
 | `--deliveries` | boolean |  |
@@ -2750,6 +2795,23 @@ json: flag
 starci reconciler once --controller job --json
 ```
 
+### starci reconciler reopen
+
+put a quarantined service or seat back to declared with a clean restart history
+
+Positionals: name
+
+Roles: lead, owner
+
+exit: 0 the row is declared again; 1 no such row; 2 bad usage
+
+json: flag
+
+```sh
+starci reconciler reopen seat:kernel:<ledger-id>:<workflow-id>
+starci reconciler reopen <service-name>
+```
+
 ### starci reconciler restart
 
 stop the reconciler engine and ensure a new leader
@@ -2865,6 +2927,30 @@ starci release check --final --json
 starci release check --only publish-plan,canon-pins
 ```
 
+### starci release ci-status
+
+the verdict of the GitHub ci workflow, Codecov and Sonar for a release; red is recorded for Debug
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+| `--tag` | string |  |
+| `--wait` | boolean |  |
+
+Conventions:
+
+- Under suite ci the full test suite runs only in this workflow, after the push; this verb is how its verdict comes back.
+- The state is left beside the release record (starci-release/<sha>.ci.json); starci debug digest and starci reconciler up --check show the last release CI.
+
+exit: 0 the ci workflow of the release commit is green; 1 it is red (for a release cut under suite ci: recorded once as runtime-defect:release-ci-red-<tag>); 2 bad usage; 3 no verdict yet - no run, still running, or GitHub could not be read
+
+json: flag
+
+```sh
+starci release ci-status --tag v1.0.0-alpha.9 --wait
+starci release ci-status --json
+```
+
 ### starci release clean-test
 
 test published packages from fresh isolated installs
@@ -2895,6 +2981,8 @@ cut the release, the only way the runtime's remote main and a release tag move
 | `--branch` | string |  |
 | `--plan` | boolean |  |
 | `--tag` | string |  |
+| `--rows` | string |  |
+| `--no-reuse` | boolean |  |
 
 exit: 0 the release was cut and main plus its tag were pushed atomically, or --plan found nothing missing; 1 refused (dirty tree, no or wrong tag, release notes incomplete, version not moved past the remote main, suite red, main moved, secret scan) and nothing was pushed; 2 bad usage
 
@@ -2902,8 +2990,9 @@ json: flag
 
 ```sh
 starci release cut
-starci release cut --plan --tag v1.0.0-alpha.7
-starci release cut --repo <path> --tag v1.0.0-alpha.7 --json
+starci release cut --plan --tag v1.0.0-alpha.9
+starci release cut --tag v1.0.0-alpha.9 --rows "npm test,linux-parity"
+starci release cut --repo <path> --tag v1.0.0-alpha.9 --json
 ```
 
 ### starci release env-test
@@ -3008,8 +3097,8 @@ exit: 0 the notes were printed or written; 1 the CHANGELOG has no finished secti
 json: starci/release-notes@1
 
 ```sh
-starci release notes --tag v1.0.0-alpha.7
-starci release notes --tag v1.0.0-alpha.7 --out notes.md --json
+starci release notes --tag v1.0.0-alpha.9
+starci release notes --tag v1.0.0-alpha.9 --out notes.md --json
 ```
 
 ### starci release proof
@@ -3037,6 +3126,7 @@ plan or perform the owner-run package publication sequence
 
 | flag | type | |
 | --- | --- | --- |
+| `--plan` | boolean |  |
 | `--publish` | boolean |  |
 | `--runtime-package` | boolean |  |
 | `--npm-user` | string |  |
@@ -3065,6 +3155,7 @@ json: starci/release-publish-flow@1
 
 ```sh
 starci release publish
+starci release publish --plan --npm-user <name>
 starci release publish --publish --npm-user <name> --expect-sha <sha>
 starci release publish --runtime-package --publish --npm-user <name> --expect-sha <sha>
 ```
@@ -3146,6 +3237,33 @@ starci runtime architecture <repo-root>
 starci runtime architecture <repo-root> --base <commit>
 ```
 
+### starci runtime artefacts
+
+judge or migrate the artefacts the runtime installs outside its tree
+
+| flag | type | |
+| --- | --- | --- |
+| `--migrate` | boolean |  |
+
+Effect: local-write
+
+Roles: worker, lead, coordinator, release, owner
+
+Conventions:
+
+- without --migrate it only reads; with --migrate it rewrites hooks and generated copies of the live workflows and the host tree
+- it never touches product content, only artefacts listed in modules/kernel/installed-artefacts.yaml
+- a deploy runs it from the new tree after the fast-forward; the engine runs the same migration when it starts
+
+exit: 0 every artefact is current, or was migrated and verified; 1 an artefact is stale in check mode, or a migration was refused; 2 bad usage
+
+json: starci/runtime-artefacts@1
+
+```sh
+starci runtime artefacts
+starci runtime artefacts --migrate --json
+```
+
 ### starci runtime benchmark-snapshot
 
 append one model-pool snapshot file under benchmark/snapshots
@@ -3183,6 +3301,37 @@ json: flag
 ```sh
 starci runtime check
 starci runtime check --only cli-parity -- --root <tree>
+```
+
+### starci runtime deploy
+
+carry a checked runtime revision onto the running host and verify the engine on it
+
+| flag | type | |
+| --- | --- | --- |
+| `--from` | string |  |
+| `--plan` | boolean |  |
+
+Effect: host
+
+Roles: coordinator, owner
+
+Conventions:
+
+- refuses unless the source is clean, a fast-forward of the host and its check and affected specs are proven by a receipt on that commit
+- refuses while a release cut holds the host lock; waits for settles, Critic runs and prepared decisions in flight, stops none
+- several commits are one revision change, with one fast-forward, installed artefacts migrated, one engine restart, then verified
+- journals one runtime-deployed event; --plan prints every step and refusal and changes nothing
+- a failed verification names the host state and the non-destructive way back (git revert of the range), never a reset
+
+exit: 0 the host runs the new revision, verified, and the deploy event is journalled (or the plan has no refusal); 1 refused before any change, or failed after the fast-forward with the host state named; 2 bad usage
+
+json: starci/runtime-deploy@1
+
+```sh
+starci runtime deploy --from <clone> --plan
+starci runtime deploy --from <clone> --json
+starci runtime deploy --from main
 ```
 
 ### starci runtime derived-fields
@@ -3229,7 +3378,7 @@ write or check the generated CLI catalog outputs, docs and shell completions
 | `--check` | boolean |  |
 | `--root` | string |  |
 
-exit: 0 outputs in sync or written; 1 drift listed or a catalog error; 2 neither --write nor --check given or bad usage
+exit: 0 outputs in sync or written; 1 drift listed or a catalog error; 2 neither --write nor --check given, bad usage, or [RUNTIME_TREE_TARGET_FOREIGN]: the located runtime is not the tree that owns this CLI (set STARCI_RUNTIME or --root)
 
 json: none
 
@@ -3275,6 +3424,23 @@ json: always
 ```sh
 starci runtime housekeeping --dry-run
 starci runtime housekeeping --apply --only tmp,logs
+```
+
+### starci runtime import-held-secret
+
+move one sealed member of the old tracked custody from git history into secret.env
+
+| flag | type | |
+| --- | --- | --- |
+| `--member` | string |  |
+| `--rev` | string |  |
+
+exit: 0 the variable was appended to secret.env; 1 refused and nothing written; 2 bad usage
+
+json: flag
+
+```sh
+starci runtime import-held-secret --member <member-path>
 ```
 
 ### starci runtime install
@@ -3392,6 +3558,25 @@ starci runtime readme-blocks --check
 starci runtime readme-blocks --write
 ```
 
+### starci runtime revision-scope
+
+show what a deploy of the runtime tree asks of each role between two revisions
+
+| flag | type | |
+| --- | --- | --- |
+| `--from` | string | required |
+| `--to` | string |  |
+| `--root` | string |  |
+
+exit: 0 scope printed; 2 bad usage
+
+json: flag
+
+```sh
+starci runtime revision-scope --from <sha>
+starci runtime revision-scope --from <sha> --to <sha> --json
+```
+
 ### starci runtime status
 
 the runtime's version, tree root and manifest drift — a read-only summary
@@ -3440,6 +3625,36 @@ json: always
 ```sh
 starci runtime validate .starciwork
 starci runtime validate <work-root> --strict --owned <path>
+```
+
+### starci runtime verify
+
+verify a committed revision - the check AND the affected specs on one commit, one receipt
+
+| flag | type | |
+| --- | --- | --- |
+| `--base` | string |  |
+| `--root` | string |  |
+
+Effect: host
+
+Roles: worker, lead, coordinator, release, owner
+
+Conventions:
+
+- A branch is verified only by this receipt: check N of N and affected specs N of N for base..tip, on the exact commit.
+- A fix lane reports the last line of this verb, not the line of starci runtime check (which never runs a spec).
+- Refuses a tree with uncommitted or untracked changes; the receipt binds a commit.
+- starci git land accepts a partial receipt (0 failed, the lane's changed specs ran, not-started counted); deploy and release need all of them.
+- A spec whose inputs are unchanged since a proven green run is reused; the receipt counts the reused files.
+
+exit: 0 verified: check and every affected spec passed on the exact commit, receipt written; 1 NOT VERIFIED: dirty tree, no base, red check, or a red spec file; 2 bad usage; 3 PARTIAL: nothing red, the lane's own specs ran, some were not started inside the budget (fit to land, not to deploy)
+
+json: starci/runtime-verify@1
+
+```sh
+starci runtime verify --base <tip>
+starci runtime verify --json
 ```
 
 ### starci runtime version
@@ -3669,6 +3884,26 @@ starci supervisor channel inbox --id main --peek
 starci supervisor channel reply --id main --text <text> --to <message-id>
 ```
 
+### starci supervisor decide
+
+answer one item of the Supervisor's menu with one typed choice
+
+| flag | type | |
+| --- | --- | --- |
+| `--item` | string |  |
+| `--choice` | string |  |
+| `--reason` | string |  |
+| `--text` | string |  |
+
+exit: 0 the choice was executed and the item closed; 1 the choice is not on the menu, an input is missing, or a step failed; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor decide --item gate-ruling:<id> --choice not-runtime-fault --reason <evidence>
+starci supervisor decide --item workflow-conflict:<id> --choice rule --text <ruling> --reason <why>
+```
+
 ### starci supervisor direct-commits
 
 find runtime main commits that bypassed the exclusive land gate
@@ -3744,6 +3979,7 @@ run the in-runtime land gate; it fast-forwards local main and never pushes
 | `--full-by-push-git` | boolean |  |
 | `--lane` | string |  |
 | `--notify` | boolean |  |
+| `--foreground` | boolean |  |
 | `--status` | boolean |  |
 | `--wait-ms` | number |  |
 
@@ -3942,6 +4178,26 @@ starci supervisor report --repo <path> --send
 starci supervisor report --json
 ```
 
+### starci supervisor revision-ack
+
+read the files a runtime revision change sends to the Supervisor and attest them
+
+| flag | type | |
+| --- | --- | --- |
+| `--plan` | boolean |  |
+| `--rev` | string |  |
+| `--digest` | string |  |
+| `--read-manifest` | string |  |
+
+exit: 0 planned or acknowledged; 1 refused; 2 bad usage: --plan, or --rev with --read-manifest
+
+json: flag
+
+```sh
+starci supervisor revision-ack --plan
+starci supervisor revision-ack --rev <rev> --read-manifest <file>
+```
+
 ### starci supervisor start
 
 enable and start the one long-lived Supervisor seat
@@ -3962,7 +4218,11 @@ starci supervisor start --plan
 
 ### starci supervisor status
 
-print whether the Supervisor seat is enabled and healthy
+print the Supervisor seat status and its menu of open judgment points
+
+| flag | type | |
+| --- | --- | --- |
+| `--menu` | boolean |  |
 
 exit: 0 status printed; 2 bad usage
 
@@ -3970,6 +4230,7 @@ json: flag
 
 ```sh
 starci supervisor status
+starci supervisor status --json
 ```
 
 ### starci supervisor stop
@@ -4163,6 +4424,50 @@ starci task show harness-tunnel --json
 
 run the bounded L1-L4 test ladder without accidental whole-suite work
 
+### starci test affected
+
+the specs related to the changed functions (--by file: every importer); --run runs each once
+
+| flag | type | |
+| --- | --- | --- |
+| `--base` | string |  |
+| `--changed` | list |  |
+| `--by` | string |  |
+| `--run` | boolean |  |
+| `--plan` | boolean |  |
+| `--receipt-file` | string |  |
+| `--no-cache` | boolean |  |
+| `--concurrency` | number |  |
+| `--root` | string |  |
+
+Effect: host
+
+Roles: worker, lead, coordinator, release, owner
+
+Conventions:
+
+- Everyday verification after npm run check; the whole suite is the merged-tree run and the release cut.
+- The set is computed - each changed .mjs symbol is followed by name through its importers, callers and CLI verbs.
+- What cannot be followed by name (yaml, templates, load-time statements, no base, the depth bound) keeps the file-level rule, named in the report.
+- Selection and --plan JSON carry every symbol, its specs and reasons, and file-level fallbacks; the set is never larger than --by file.
+- A --run machine answer carries the complete selected set, every result and the receipt; the diagnostic graph remains available through --plan.
+- A large set is never refused; it runs in parallel shards inside the printed time budget, and files not started when it ends are listed.
+- The --plan flag prints each selected file with the reason it is in the set; a --run answer carries a receipt (base, tip, passed, total) a gate can require.
+- A generated output maps to its generator's specs; an append-only change to a data file to the specs that name it or its readers.
+- A red file is fixed and run again, then the affected set once; never the whole suite.
+- A spec whose key (import closure, data it names, runner) is unchanged since a green run is reused; the receipt counts reused files; --no-cache runs all.
+- Each file is its own low-priority node process with the four preloads, at the concurrency of test-concurrency.yaml.
+
+exit: 0 selection printed, or every selected file passed; 1 a selected spec file was red; 2 no base to diff against, or the time budget ended before every selected file started
+
+json: starci/test-affected@1
+
+```sh
+starci test affected
+starci test affected --run
+starci test affected --changed scripts/machine/ladder-test.mjs --run
+```
+
 ### starci test run
 
 run the specs selected for one local ladder level
@@ -4262,10 +4567,11 @@ starci uat assisted-runner signal --request <request.yaml> --receipt <receipt.ya
 
 ### starci uat slots
 
-inspect UAT slots or run a command while holding one
+inspect UAT slots, end the ones whose lessee is gone, or run a command while holding one
 
 | flag | type | |
 | --- | --- | --- |
+| `--dry-run` | boolean |  |
 | `--record-dir` | string |  |
 
 Positionals: action, command?
@@ -4276,6 +4582,7 @@ json: none
 
 ```sh
 starci uat slots status
+starci uat slots collect --dry-run
 starci uat slots run --record-dir <dir> -- npm test
 ```
 
@@ -4396,6 +4703,28 @@ json: flag
 
 ```sh
 starci work compose-direction --ui <record> --content <png> --breakpoint mobile --theme light
+```
+
+### starci work decision-critic
+
+judge a decision leg with the Critic and write a verdict (debug aid; settle ignores it)
+
+| flag | type | |
+| --- | --- | --- |
+| `--kind` | enum scope.define|business.decide|architecture.decide | required |
+| `--root` | string | required |
+| `--out` | string | required |
+| `--records` | string |  |
+| `--input` | string |  |
+| `--maker` | string |  |
+| `--json` | boolean |  |
+
+exit: 0 judged and the verdict passes; 1 judged and the verdict fails - fix every failed check and run it again; 2 bad usage; 3 no verdict - a Critic hold; report blocked with the CRITIC_ code
+
+json: flag
+
+```sh
+starci work decision-critic --kind scope.define --root <app> --out <STARCI_JOB_SCRATCH>/critic-verdict.json
 ```
 
 ### starci work draw-acceptance
@@ -4892,6 +5221,31 @@ starci work imagegen --prompt <STARCI_JOB_SCRATCH>/mascot.prompt.txt --out .star
 starci work imagegen --prompt hero.prompt.txt --out ui/home/assets --reference ui/home/assets/hero-ref.png --count 2 --size 1536x1024
 ```
 
+### starci work layout-render
+
+serve the product app and capture one layout in a real browser with its page slot keyed
+
+| flag | type | |
+| --- | --- | --- |
+| `--work` | string |  |
+| `--node` | string |  |
+| `--breakpoint` | string |  |
+| `--theme` | string |  |
+| `--app` | string |  |
+| `--route` | string |  |
+| `--locale` | string |  |
+| `--slot` | string |  |
+| `--out` | string |  |
+| `--write` | boolean |  |
+
+exit: 0 rendered; 1 no render could be produced: code SHELL_RENDER_UNAVAILABLE with a typed cause, the failing URL and the redirect chain; 2 bad usage
+
+json: flag
+
+```sh
+starci work layout-render --work .starciwork --node "/[locale]" --breakpoint desktop --theme light --write --json
+```
+
 ### starci work layout-tree
 
 scan, capture, plan, lock, or inspect a product layout tree
@@ -5263,6 +5617,41 @@ json: flag
 ```sh
 starci workflow define --text "Add password reset"
 starci workflow define --plan --text "Add password reset"
+```
+
+### starci workflow purge
+
+remove what an archived workflow left on the host (plan by default)
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+| `--workflow` | string | required |
+| `--plan` | boolean |  |
+| `--apply` | boolean |  |
+| `--ledger` | boolean |  |
+| `--expect` | string |  |
+
+Effect: host
+
+Roles: owner
+
+Conventions:
+
+- the plan is the default and changes nothing; --apply acts, under the host lock and the gc lock
+- only an archived workflow with no live job, lease, seat or worker is purged; Orca must answer
+- trees, refs, workers and terminals go through the worktree home, the git api and worker-close; never a raw recursive delete
+- a branch is deleted only with its proof (registry row, or name grammar with a tip in main or on the workflow's checkpoint chain); the plan prints every tip
+- what the ledger or Orca cannot tie to the workflow by evidence is listed and never touched
+- the ledger rows are kept unless --ledger archives them to a verified zip and drops them
+
+exit: 0 plan printed, or the purge finished (or was already done); 1 a precondition refused it, or a step failed and the purge can be resumed; 2 bad usage
+
+json: flag
+
+```sh
+starci workflow purge --repo <repo> --workflow <id>
+starci workflow purge --repo <repo> --workflow <id> --apply --expect <sha>
 ```
 
 ### starci workflow start

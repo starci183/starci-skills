@@ -82,7 +82,7 @@ reads:
     purpose:
       en: shared
   - id: standard
-    path: shared
+    path: docs/architecture.md + docs/code-pattern-enforcement.md + knowledge/op-gate.yaml + knowledge/patterns/repo/starciwork.yaml + knowledge/hfs/slots.yaml + knowledge/patterns/be/test.yaml
     purpose:
       en: shared
       vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (starci app explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
@@ -360,6 +360,11 @@ proofs:
       en: "starci kernel settle re-reads the attached doc-gate.json (runtime check op-proof, proof doc-gate): a done without it (op-doc-gate-missing), with a check that could not run (op-doc-gate-tool-failed) or with a finding (op-doc-gate-red) is refused."
       vi: "starci kernel settle tự đọc lại doc-gate.json đính kèm (check op-proof, proof doc-gate): done thiếu nó (op-doc-gate-missing), có bộ kiểm tra không chạy được (op-doc-gate-tool-failed) hoặc có lỗi (op-doc-gate-red) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
+judge:
+  - by: machine
+    measures: [declared-checks, work-hygiene, op-proof:doc-gate, op-proof:read-knowledge]
+    proofs: [launchable, doc-gate, read-knowledge]
+    why: "the settler re-runs the record validator over the records written, the Work files are checked for hygiene, the document gate is re-run natively and the READ of the standard is re-read from the digest"
 blockers:
   - code: SCOPE_UNDETERMINED
     condition:

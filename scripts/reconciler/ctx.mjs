@@ -5,6 +5,7 @@
 //   ctx.ledgers                 [{ledgerId, repo, file}] (sources.mjs ledgersOf)
 //   ctx.read(ledgerId, fn)      fn(db) over a read-only handle (openLedgerReader); null when the ledger is absent
 //   ctx.status(ledgerId, wf)    the cached `starci kernel status --json` value (TTL allocation.reconciler.statusCacheMs, shared)
+//   ctx.dropStatusCache()       forget the cached status reads (the workflow controller after a land)
 //   ctx.statusRead(ledgerId, wf) the same read as {value, failure}: failure names why it gave no value (statusFailureOf)
 //   ctx.api(ledgerId, verb, argv, {timeoutMs})
 //                               `starci kernel <verb> --repo <repo> ...argv --json` as a child with
@@ -38,6 +39,8 @@ import { CONCERN_OWNER } from './owns.mjs';
 import { openClock, slaCatalog } from './sla.mjs';
 import { SKILL_ROOT } from './state.mjs';
 import { clip } from '../lib/clip.mjs';
+import { jsonFromStdout } from '../lib/json.mjs';
+import { decisionRepoRefusal } from './decision-repo.mjs';
 
 export const API_FILE = path.join(SKILL_ROOT, 'scripts', 'kernel', 'cli.mjs');
 export const DECISIONS_FILE = path.join(SKILL_ROOT, 'scripts', 'machine', 'decisions.mjs');
@@ -112,11 +115,13 @@ export function reconcilerLog(m, row, { env = process.env } = {}) {
   return m && !m.readOnly ? m.log(out) : machineLog(out, { env });
 }
 
-/** The last JSON line of a child's stdout, or null. Pure. */
+/** The answer of a child's stdout: the whole text as JSON (a verb prints `--json` indented over many lines), else its last JSON line, else its first-{-to-last-} span, or null. Pure. */
 function lastJsonLine(stdout) {
-  const lines = String(stdout ?? '').trim().split(/\r?\n/).filter(Boolean);
+  const text = String(stdout ?? '').trim();
+  try { return JSON.parse(text); } catch { /* more than one value: a log line before the answer, or an answer after other lines */ }
+  const lines = text.split(/\r?\n/).filter(Boolean);
   for (let i = lines.length - 1; i >= 0; i -= 1) { try { return JSON.parse(lines[i]); } catch { /* not JSON */ } }
-  return null;
+  return jsonFromStdout(text);
 }
 
 function refusalOf(value, stderr) {
@@ -285,6 +290,8 @@ export function createCtx({
       try { return fn(db); } finally { try { db.close(); } catch { /* closed */ } }
     },
     openReader: (file) => reader(file),
+    /** Forget every cached status read: the next read of each workflow spawns a fresh one (a land just moved the runtime revision). */
+    dropStatusCache() { shared.statusCache.clear(); },
     async status(ledgerId, workflowId) { return (await ctx.statusRead(ledgerId, workflowId)).value; },
     /** {value, failure}: the value ctx.status answers (null when the read failed) and statusFailureOf's why; cached alike. */
     async statusRead(ledgerId, workflowId) {
@@ -342,6 +349,12 @@ export function createCtx({
     async openDecision(di) {
       const item = { schema: 'starci/decision-item@1', openedBy: `${controller}-controller`, openedAt: now(), ...di };
       const summary = { kind: item.kind ?? null, decider: item.decider ?? null, idempotencyKey: item.idempotencyKey ?? null, ledgerId: item.ledger ?? null };
+      // An item planned without a repository behind its ledger is refused here, where it is applied, whatever the mode: no reader finds it later.
+      const refusal = decisionRepoRefusal(item, ledgersNow());
+      if (refusal) {
+        log('reconciler.error', `decision ${refusal.error}`, { kind: 'reconciler.decision-refused', code: refusal.code, decision: summary });
+        return { ok: false, refused: true, ...refusal };
+      }
       if (mode !== 'active') return would('decisions --open', [JSON.stringify(summary)], { decision: summary });
       let mod = null;
       try { mod = await loadDecisions(); } catch { mod = null; }

@@ -18,8 +18,10 @@ export function stepItems(attempt: AttemptDetailV3): StepItem[] {
   const at = (step: string) => attempt.timeline.find(item => item.step === step)?.at ?? null;
   const open = isOpen(attempt);
   const startedAt = at('started');
-  const runMs = attempt.reportedAt && startedAt ? attempt.reportedAt - startedAt : null;
-  const runTone: Tone = attempt.endState === 'worker-dead' ? 'failed' : attempt.endState != null && !attempt.reportedAt ? 'skipped' : attempt.reportedAt ? 'success' : attempt.dispatchedAt ? 'running' : 'queued';
+  const runEnd = attempt.terminalEndedAt ?? attempt.reportedAt;
+  const runMs = runEnd != null && startedAt != null ? runEnd - startedAt : null;
+  const closedWithoutReport = attempt.terminalEndedAt != null && attempt.reportedAt == null;
+  const runTone: Tone = attempt.endState === 'worker-dead' ? 'failed' : attempt.endState != null && !attempt.reportedAt ? 'skipped' : attempt.reportedAt ? 'success' : closedWithoutReport ? 'skipped' : attempt.dispatchedAt ? 'running' : 'queued';
   const runUnknown = attempt.endState === 'effect-unknown';
   const reportTone = attempt.reportedAt ? statusTone[statusFromOutcome(attempt.reportOutcome)] : 'queued';
   const checks = verificationSummary(attempt);
@@ -33,7 +35,7 @@ export function stepItems(attempt: AttemptDetailV3): StepItem[] {
   const landDetail = land ? t('Workflow: {state}', { state: land.result === 'landed' ? t('Landed') : land.result }) : t('No workflow land record');
   return [
     { key: 'dispatch', state: stateOf(attempt.dispatchedAt ? 'success' : 'queued'), tone: attempt.dispatchedAt ? 'success' : 'queued', at: attempt.dispatchedAt },
-    { key: 'run', state: runUnknown ? 'unknown' : stateOf(runTone), tone: runUnknown ? 'warning' : runTone, at: startedAt, detail: runUnknown ? t('Launch outcome unknown') : attempt.endState === 'requeued' ? t('Requeued') : runMs != null ? formatSpan(runMs) : open && attempt.dispatchedAt && !attempt.reportedAt ? t('Running') : undefined },
+    { key: 'run', state: runUnknown ? 'unknown' : stateOf(runTone), tone: runUnknown ? 'warning' : runTone, at: startedAt, detail: runUnknown ? t('Launch outcome unknown') : attempt.endState === 'requeued' ? t('Requeued') : closedWithoutReport ? open ? t('Terminal closed · settlement pending') : t('Terminal closed') : runMs != null ? formatSpan(runMs) : open && attempt.dispatchedAt && !attempt.reportedAt ? t('Running') : undefined },
     { key: 'report', state: attempt.reportedAt && !attempt.reportOutcome ? 'unknown' : stateOf(reportTone), tone: reportTone, at: attempt.reportedAt, detail: attempt.reportedAt ? (attempt.reportOutcome ?? t('reported')) : undefined },
     { key: 'checks', state: checks.runtimeTotal === 0 ? 'unknown' : stateOf(checksTone), tone: checksTone, at: at('checked'), detail: checks.runtimeTotal > 0 ? t('Runtime confirmed {pass}/{total} checks', { pass: ok, total: checks.runtimeTotal }) : t('No runtime checks recorded'),
       segments: [{ tone: 'success', n: ok }, { tone: 'failed', n: red }, { tone: 'warning', n: other }] },

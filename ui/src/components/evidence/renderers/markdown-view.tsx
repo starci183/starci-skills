@@ -1,6 +1,7 @@
 import type { Concept } from '../../concept';
 export const concept: Concept = 'C8';
 import type { ReactNode } from 'react';
+import { Card, Link as HeroLink, Separator, Table } from '@heroui/react';
 import { CopyButton, Frame } from './common';
 import { t } from '../../../i18n/t';
 
@@ -11,7 +12,7 @@ const safeHref = (h: string) => /^https?:\/\//i.test(h) ? h : null;
 function Link({ href, children }: Readonly<{ href: string; children: ReactNode }>) {
   const ok = safeHref(href);
   if (!ok) return <>{children}</>;
-  return <a href={ok} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2 break-words">{children}</a>;
+  return <HeroLink href={ok} target="_blank" rel="noopener noreferrer" className="break-words">{children}</HeroLink>;
 }
 
 function inline(text: string, base = 'i'): ReactNode[] {
@@ -22,7 +23,7 @@ function inline(text: string, base = 'i'): ReactNode[] {
     if (idx > at) out.push(text.slice(at, idx));
     const k = `${base}${n++}`;
     const s = m[0];
-    if (m[1]) out.push(<code key={k} className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]">{s.slice(1, -1)}</code>);
+    if (m[1]) out.push(<code key={k} className="rounded bg-default px-1 py-0.5 font-mono text-[0.85em]">{s.slice(1, -1)}</code>);
     else if (m[2]) out.push(<strong key={k}>{inline(s.slice(2, -2), k)}</strong>);
     else if (m[3]) out.push(<em key={k}>{inline(s.slice(1, -1), k)}</em>);
     else if (m[4]) { const lm = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(s); if (lm) out.push(<Link key={k} href={lm[2]}>{inline(lm[1], k)}</Link>); else out.push(s); }
@@ -39,13 +40,13 @@ const LIST_RE = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
 
 function CodeBlock({ code, lang }: Readonly<{ code: string; lang: string }>) {
   return (
-    <div className="overflow-hidden rounded-lg border bg-muted/40">
-      <div className="flex items-center justify-between border-b bg-muted/60 px-2 py-1 text-[11px] text-muted-foreground">
+    <Card variant="transparent" className="evidence-code-frame gap-0 overflow-hidden p-0">
+      <Card.Header className="flex-row items-center justify-between border-b bg-default/60 px-4 py-2 text-xs text-muted-foreground">
         <span className="font-mono">{lang || 'code'}</span>
         <CopyButton value={code} label={t('Copy')} />
-      </div>
-      <pre className="overflow-x-auto p-3 font-mono text-xs leading-5"><code>{code}</code></pre>
-    </div>
+      </Card.Header>
+      <Card.Content><pre className="overflow-x-auto p-4 font-mono text-xs leading-5"><code>{code}</code></pre></Card.Content>
+    </Card>
   );
 }
 
@@ -73,7 +74,7 @@ function blocks(src: string, base: string): ReactNode[] {
       out.push(<Tag key={k} className={`${cls} mt-2`}>{inline(h[2], k)}</Tag>);
       i++; continue;
     }
-    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(l)) { out.push(<hr key={k} className="my-2 border-border" />); i++; continue; }
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(l)) { out.push(<Separator key={k} className="my-2" />); i++; continue; }
     if (/^\s*>/.test(l)) {
       const buf: string[] = [];
       while (i < lines.length && /^\s*>/.test(lines[i])) buf.push(lines[i++].replace(/^\s*>\s?/, ''));
@@ -84,21 +85,23 @@ function blocks(src: string, base: string): ReactNode[] {
       const head = splitRow(l);
       const aligns = splitRow(lines[i + 1]).map(c => c.startsWith(':') && c.endsWith(':') ? 'center' : c.endsWith(':') ? 'right' : 'left');
       i += 2;
-      type Cell = { key: string; text: string; align: 'left' };
-      const cols: Cell[] = head.map((c, j) => ({ key: `${k}h${j}`, text: c, align: aligns[j] as 'left' }));
+      type Cell = { key: string; text: string; align: 'left' | 'center' | 'right' };
+      const cols: Cell[] = head.map((c, j) => ({ key: `${k}h${j}`, text: c, align: aligns[j] as Cell['align'] }));
       const rows: { key: string; cells: Cell[] }[] = [];
       while (i < lines.length && lines[i].trim() && lines[i].includes('|')) {
         const line = i;
         const texts = splitRow(lines[i++]);
-        rows.push({ key: `${k}r${line}`, cells: head.map((_, j) => ({ key: `${k}r${line}c${j}`, text: texts[j] ?? '', align: aligns[j] as 'left' })) });
+        rows.push({ key: `${k}r${line}`, cells: head.map((_, j) => ({ key: `${k}r${line}c${j}`, text: texts[j] ?? '', align: aligns[j] as Cell['align'] })) });
       }
       out.push(
-        <div key={k} className="overflow-x-auto rounded-lg border">
-          <table className="w-full border-collapse text-xs">
-            <thead className="bg-muted/60"><tr>{cols.map(col => <th key={col.key} style={{ textAlign: col.align }} className="border-b px-2 py-2 font-semibold">{inline(col.text, col.key)}</th>)}</tr></thead>
-            <tbody>{rows.map(row => <tr key={row.key} className="border-b last:border-0">{row.cells.map(cell => <td key={cell.key} style={{ textAlign: cell.align }} className="px-2 py-1 align-top">{inline(cell.text, cell.key)}</td>)}</tr>)}</tbody>
-          </table>
-        </div>,
+        <Table key={k} className="text-xs">
+          <Table.ScrollContainer>
+            <Table.Content aria-label={head.filter(Boolean).join(' · ') || t('Evidence')}>
+              <Table.Header>{cols.map((col, index) => <Table.Column key={col.key} id={col.key} isRowHeader={index === 0} style={{ textAlign: col.align }}>{inline(col.text, col.key)}</Table.Column>)}</Table.Header>
+              <Table.Body>{rows.map(row => <Table.Row key={row.key} id={row.key}>{row.cells.map(cell => <Table.Cell key={cell.key} style={{ textAlign: cell.align }} className="whitespace-normal align-top">{inline(cell.text, cell.key)}</Table.Cell>)}</Table.Row>)}</Table.Body>
+            </Table.Content>
+          </Table.ScrollContainer>
+        </Table>,
       );
       continue;
     }
@@ -135,8 +138,8 @@ export function MarkdownView({ text }: Readonly<{ text: string }>) {
   const src = text.replace(/^﻿/, '').replaceAll(/\r\n?/g, '\n');
   return (
     <Frame>
-      <div className="flex justify-end border-b bg-muted/40 px-2 py-2"><CopyButton value={text} label={t('Copy source')} /></div>
-      <div className="max-h-[75vh] space-y-2 overflow-auto bg-background p-4 text-sm">{blocks(src, '')}</div>
+      <Card.Header className="flex-row justify-end border-b bg-default/40 px-4 py-3"><CopyButton value={text} label={t('Copy source')} /></Card.Header>
+      <Card.Content className="max-h-[75vh] space-y-4 overflow-auto bg-background p-4 text-sm">{blocks(src, '')}</Card.Content>
     </Frame>
   );
 }

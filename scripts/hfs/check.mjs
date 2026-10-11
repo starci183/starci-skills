@@ -57,6 +57,7 @@ import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { ARCHITECTURE_RULE_IDS, checkArchitecture } from './architecture/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { readCatalogOnce } from './catalog-once.mjs';
 import { APP_SCOPE, HFS_DECLARATION_FILE, appRelativeMessages, HfsSlotsError, SIDES, createSlotResolver, loadRuleCatalog, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './slots.mjs';
 import { RUNTIME_KIND } from './manifest-shape.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
@@ -114,7 +115,7 @@ const refuse = (code, message, details = {}) => { throw new HfsSlotsError(code, 
 
 /** {code: {title, title_vi, meaning_vi, nextStep_vi}} for the codes asked for, read from the failure-code catalog under `root`. */
 export function readWhy(root = skillRoot, codes = CHECK_CODES) {
-  const catalog = parseYaml(fs.readFileSync(path.join(root, FAILURE_CODES_FILE), 'utf8'));
+  const catalog = readCatalogOnce(path.join(root, FAILURE_CODES_FILE));
   const why = {};
   for (const code of codes) {
     const entry = catalog?.[code];

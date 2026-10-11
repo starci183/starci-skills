@@ -1,0 +1,177 @@
+# storage-convention.yaml — the one convention for what a database row holds (owner ruling 2026-10-09: "assets live in .runtime, the DB holds the ref").
+# Content lives as a file in the content-addressed blob store under the runtime state dir (<runtime root>/.runtime/artifacts, engine/db/blob.mjs); a row holds only
+# the reference (the sha) plus the small scalars it is queried by. Every text column of both stores (the product ledger runtime.sqlite, machine.sqlite) is declared here
+# with the class that bounds what it may hold; the storage-convention check (scripts/checks/check-storage-convention.mjs) refuses a column that is not declared.
+schema: starci/storage-convention@1
+classes:
+  scalar: "an id, a state, a timestamp, a count, a short code or one line of reason: at most scalarBytes"
+  bounded: "free text that is queried or shown whole and stays small: at most inlineBytes; anything longer is content"
+  reference: "holds the sha (or the uri) of a blob, never the content"
+  spill: "a payload that may be any size: the writer (appendEvent, supEvent) keeps the whole payload behind the sha and a small inline form: the bounded view of engine/db/event-compact.mjs for events, the reference stub of engine/db/ref-value.mjs for sup_events"
+  migrate: "holds content inline today (measured above inlineBytes): the target is a reference column; the migration is proposed, not run (a runtime migration verb, idempotent and journalled)"
+scalarBytes: 256
+inlineBytes: 1024
+spillInlineBytes: 16384
+# What is ALWAYS content (a blob, whatever its size): a report, a critique or verdict, a prompt or dispatch contract, a read manifest, a list of files, a log or command
+# output, a menu or digest snapshot, an image or render, a diff. What may stay inline: ids, states, timestamps, counts, short codes, and one-line reasons up to scalarBytes.
+alwaysBlob: [report, critique, verdict, prompt, contract, read-manifest, file-list, log, command-output, menu-snapshot, digest-snapshot, image, render, diff]
+# The columns that hold content inline today, with the largest value seen in the read-only copies of the live stores (2026-10-09): the proposed migration targets.
+migrations:
+  - {column: ledger.contracts.markdown, observedMaxBytes: 334455}
+  - {column: ledger.contracts.context_json, observedMaxBytes: 209185}
+  - {column: machine.host_samples.detail_json, observedMaxBytes: 78883}
+  - {column: machine.machine_logs.data_json, observedMaxBytes: 31639}
+  - {column: ledger.jobs.payload_json, observedMaxBytes: 13656}
+  - {column: machine.sup_jobs.payload_json, observedMaxBytes: 12381}
+  - {column: ledger.goals.json, observedMaxBytes: 11108}
+  - {column: ledger.reports.report_json, observedMaxBytes: 10333}
+  - {column: ledger.work_graph_versions.graph_json, observedMaxBytes: 9521}
+  - {column: ledger.api_requests.result_json, observedMaxBytes: 8479}
+  - {column: machine.seats.detail_json, observedMaxBytes: 7393}
+  - {column: machine.engine_actions.result_json, observedMaxBytes: 5821}
+  - {column: machine.machine_logs.msg, observedMaxBytes: 5396}
+  - {column: ledger.check_runs.summary_json, observedMaxBytes: 3745}
+  - {column: machine.sup_messages.text, observedMaxBytes: 3304}
+  - {column: machine.sup_jobs.brief, observedMaxBytes: 3138}
+  - {column: machine.sup_decision_items.payload_json, observedMaxBytes: 2942}
+  - {column: ledger.op_attempts.why_json, observedMaxBytes: 2610}
+  - {column: machine.sup_reports.report_json, observedMaxBytes: 2514}
+  - {column: machine.sup_decision_items.evidence_json, observedMaxBytes: 2161}
+  - {column: ledger.op_attempts.settle_json, observedMaxBytes: 2117}
+  - {column: ledger.logs.data_json, observedMaxBytes: 1839}
+  - {column: ledger.check_runs.command, observedMaxBytes: 1780}
+  - {column: machine.connectors.config_json, observedMaxBytes: 1643}
+  - {column: ledger.inbox.payload_json, observedMaxBytes: 1507}
+  - {column: machine.sup_learning.detail_json, observedMaxBytes: 1489}
+  - {column: ledger.signals.value_json, observedMaxBytes: 1400}
+  - {column: machine.provider_health_events.detail_json, observedMaxBytes: 1392}
+  - {column: ledger.decision_items.options_json, observedMaxBytes: 1346}
+  - {column: ledger.decision_items.evidence_json, observedMaxBytes: 1238}
+  - {column: ledger.decision_items.payload_json, observedMaxBytes: 1205}
+  - {column: machine.services.last_probe_json, observedMaxBytes: 1186}
+  - {column: ledger.goals.markdown, observedMaxBytes: 1162}
+  - {column: machine.sup_decision_items.options_json, observedMaxBytes: 1035}
+columns:
+  ledger:
+    api_requests: {request_id: scalar, verb: scalar, caller: scalar, workflow_id: scalar, args_sha: reference, status: scalar, result_json: migrate}
+    artifact_proofs: {claims_json: scalar, code_sha: reference, deps_json: bounded}
+    attempt_transcript_snapshots: {workflow_id: scalar, sha256: reference}
+    blob_ref_columns: {table_name: scalar, column_name: scalar}
+    blobs: {sha256: reference, media_type: scalar, encoding: scalar, redaction: scalar, file_uri: reference, archive_ref: reference}
+    check_runs: {workflow_id: scalar, job_id: scalar, op_id: scalar, span_id: scalar, parent_span_id: scalar, name: scalar, phase: scalar, runner: scalar, command: migrate, cwd: scalar, input_digest: scalar, authority: scalar, attribution_json: bounded, status: scalar, stdout_sha: reference, stderr_sha: reference, output_sha: reference, summary_json: migrate, note: bounded}
+    conditions: {workflow_id: scalar, entity_type: scalar, entity_id: scalar, type: scalar, status: scalar, reason: bounded, message: bounded, owner: scalar}
+    contracts: {workflow_id: scalar, job_id: scalar, contract_rev: scalar, markdown: migrate, context_json: migrate}
+    decision_items: {di_id: scalar, idempotency_key: scalar, key_parts_json: scalar, superseded_by: scalar, workflow_id: scalar, kind: scalar, decider: scalar, entity_type: scalar, entity_id: scalar, job_id: scalar, unit_id: scalar, summary: bounded, status: scalar, opened_by: scalar, escalate_to: scalar, claim_by: scalar, resolved_by: scalar, resolution_verb: scalar, decision_id: scalar, evidence_json: migrate, options_json: migrate, allowed_verbs_json: scalar, payload_json: migrate}
+    decisions: {decision_id: scalar, workflow_id: scalar, span_id: scalar, parent_span_id: scalar, decider: scalar, di_id: scalar, subject_type: scalar, subject_id: scalar, choice: bounded, rationale: bounded, result_json: scalar}
+    events: {event_id: scalar, workflow_id: scalar, entity_type: scalar, entity_id: scalar, span_id: scalar, kind: scalar, payload_json: spill, payload_sha: reference, prev_digest: scalar, digest: scalar}
+    foundation_declarations: {workflow_id: scalar, detail: scalar}
+    foundations: {name: scalar, kind: scalar, state: scalar, owner_workflow: scalar, version: scalar, detail: bounded, work_ref: reference}
+    goal_inputs: {workflow_id: scalar, key: scalar, sha256: reference, origin: scalar}
+    goals: {workflow_id: scalar, goal_identity: scalar, markdown: migrate, json: migrate, amendment_json: bounded, approved_by: scalar, approval_ref: reference}
+    inbox: {workflow_id: scalar, kind: scalar, key: scalar, from_ref: reference, payload_json: migrate, status: scalar, disposition_json: bounded}
+    incidents: {incident_id: scalar, workflow_id: scalar, op_id: scalar, job_id: scalar, kind: scalar, detail: bounded, owner: scalar, last_progress: bounded, status: scalar, resolved_reason: scalar}
+    interface_audits: {audit_id: scalar, workflow_id: scalar, feature: scalar, scope_json: bounded, verdict: scalar, findings_json: bounded, route_to: scalar}
+    job_artifacts: {workflow_id: scalar, job_id: scalar, op_id: scalar, cut: scalar, role: scalar, kind: scalar, subkind: scalar, name: scalar, sha256: reference, media_type: scalar, label: scalar, scope_ref: reference, run_id: scalar, origin: scalar, base_sha: reference, head_sha: reference, integrated_sha: reference}
+    job_transitions: {from_status: scalar, to_status: scalar}
+    jobs: {job_id: scalar, workflow_id: scalar, unit_id: scalar, op_id: scalar, retry_of: scalar, resume_of: scalar, retry_class: scalar, kind: scalar, role: scalar, status: scalar, priority_json: bounded, lease_token: scalar, worker_id: scalar, payload_json: migrate}
+    leases: {resource_key: scalar, job_id: scalar, workflow_id: scalar, op_id: scalar, token: scalar, holder: scalar}
+    lifecycle_changes: {workflow_id: scalar, from_phase: scalar, to_phase: scalar, by: scalar, reason: scalar}
+    llm_usage: {workflow_id: scalar, subject_type: scalar, turn_ref: reference, span_id: scalar, provider: scalar, request_model: scalar, response_model: scalar, source: scalar}
+    log_cursors: {name: scalar}
+    logs: {workflow_id: scalar, job_id: scalar, trace_id: scalar, span_id: scalar, actor: scalar, node_id: scalar, level: scalar, kind: scalar, msg: bounded, data_json: migrate, refs_json: scalar, src: scalar}
+    meta: {key: scalar, value: scalar}
+    op_attempts: {workflow_id: scalar, job_id: scalar, unit_id: scalar, op_id: scalar, dispatch_id: scalar, span_id: scalar, parent_span_id: scalar, agent: scalar, provider: scalar, model: scalar, request_model: scalar, model_profile: scalar, pool: scalar, effort: scalar, difficulty: bounded, routed_by: scalar, route_chain_json: bounded, route_rejected_json: bounded, host: scalar, run_id: scalar, task_id: scalar, terminal_handle: scalar, scratch_dir: scalar, runtime_rev: scalar, cli_name: scalar, cli_version: scalar, contract_sha: reference, config_sha: reference, prompt_sha: reference, transcript_sha: reference, session_sha: reference, repo_root: scalar, worktree_path: scalar, branch: scalar, wf_branch: scalar, base_sha: reference, head_sha: reference, integrated_sha: reference, report_outcome: scalar, verdict: scalar, settled_by: scalar, decision_id: scalar, failure_class: scalar, effect_state: scalar, next_step: bounded, settle_json: migrate, end_state: scalar, usage_source: scalar, usage_reason: scalar, why_json: migrate}
+    path_transfers: {path: scalar, from_workflow: scalar, to_workflow: scalar, bridge_id: scalar, state: scalar, detail_json: bounded}
+    record_changes: {change_id: scalar, workflow_id: scalar, record_id: scalar, record_path: scalar, reason: bounded, by: scalar}
+    reports: {workflow_id: scalar, dispatch_id: scalar, job_id: scalar, outcome: scalar, report_json: migrate, from_terminal: scalar}
+    resources: {resource_key: scalar, declared_by: scalar}
+    settle_tails: {workflow_id: scalar, state: scalar, last_error: scalar}
+    signals: {scope: scalar, key: scalar, workflow_id: scalar, token: scalar, value_json: migrate}
+    ui_state_map: {entity: scalar, native: scalar, ui: scalar}
+    ui_states: {ui: scalar}
+    unit_edges: {workflow_id: scalar, from_unit: scalar, to_unit: scalar, kind: scalar, source: scalar}
+    work_citations: {record_id: scalar, record_path: scalar, field: scalar, sha256: reference, role: scalar, record_rev: scalar}
+    work_graph_versions: {workflow_id: scalar, event: scalar, graph_json: migrate, diff_json: bounded, colors_json: bounded, reason: bounded, author_op: scalar, author_job: scalar, digest: scalar}
+    work_units: {workflow_id: scalar, unit_id: scalar, op_id: scalar, subject_key: scalar, title: scalar, cut_id: scalar, repository: scalar, state: scalar, current_job_id: scalar, budget_raised_by: scalar, budget_raised_ref: reference, reopen_reason: bounded, reopened_by: scalar}
+    workflow_purges: {workflow_id: scalar, state: scalar, approved_by: scalar, approval_ref: reference, archive_path: scalar, archive_sha256: reference, manifest_sha256: reference, events_head: scalar, counts_json: bounded}
+    workflow_transitions: {from_phase: scalar, to_phase: scalar}
+    workflows: {workflow_id: scalar, trace_id: scalar, title: scalar, display_name: scalar, phase: scalar, phase_reason: scalar, ledger_mode: scalar, source_roots_json: scalar, goal_identity: scalar, pin_digest: bounded, finished_json: bounded}
+  machine:
+    action_steps: {action_id: scalar, step: scalar, detail: bounded}
+    agent_sessions: {session_id: scalar, agent: scalar, terminal_handle: scalar, ledger_id: scalar, workflow_id: scalar, job_id: scalar, seat_id: scalar, transcript_sha: reference, archive_ref: reference}
+    agents: {agent: scalar, provider: scalar, spawn_card: scalar, cli_name: scalar, source_rev: scalar}
+    archives: {archive_path: scalar, kind: scalar, subject: scalar, sha256: reference, manifest_sha256: reference, integrity: scalar}
+    ask_requests: {ask_id: scalar, ledger_id: scalar, workflow_id: scalar, di_id: scalar, channel: scalar, question: scalar, form_url: scalar, state: scalar, answer_ref: reference}
+    blob_ref_columns: {table_name: scalar, column_name: scalar}
+    blobs: {sha256: reference, media_type: scalar, encoding: scalar, redaction: scalar, file_uri: reference, archive_ref: reference}
+    budget_reservations: {scope_key: scalar, ledger_id: scalar, job_id: scalar}
+    budgets: {scope_key: scalar, window: scalar}
+    claims: {resource_path: scalar, kind: scalar, owner_action_id: scalar, sweep_error: scalar}
+    connectors: {name: scalar, kind: scalar, state: scalar, public_url: scalar, config_json: migrate, cursor_json: bounded}
+    controller_modes: {controller: scalar, mode: scalar, set_by: scalar}
+    deliveries: {message_kind: scalar, message_ref: reference, ledger_id: scalar, seat_id: scalar, terminal_handle: scalar, channel: scalar, outcome: scalar, detail: scalar}
+    engine_actions: {id: scalar, controller: scalar, duty: scalar, key: scalar, verb: scalar, argv_digest: scalar, span_id: scalar, trace_id: scalar, state: scalar, mode: scalar, ledger_id: scalar, workflow_id: scalar, job_id: scalar, request_id: scalar, result_json: migrate, result_sha: reference, stdout_sha: reference, stderr_sha: reference, error_signature: bounded}
+    engine_cursors: {ledger_id: scalar}
+    engine_leader: {name: scalar, holder: scalar, rev: scalar, last_error: scalar}
+    engine_queue: {controller: scalar, key: scalar, reason: scalar, last_error: scalar}
+    env_servers: {server_id: scalar, env: scalar, service: scalar, repo_root: scalar, ledger_id: scalar, workflow_id: scalar, job_id: scalar, command: bounded, cwd: scalar, url: scalar, state: scalar, log_sha: reference}
+    gc_items: {collector: scalar, kind: scalar, target: scalar, owner_ref: reference, action: scalar, reason: scalar, last_error: scalar, outcome: scalar}
+    gc_marks: {sha256: reference, source: scalar}
+    gc_runs: {action_id: scalar, trigger: scalar, collectors_json: bounded, counts_json: bounded, errors_json: bounded, report_sha: reference}
+    guard_jobs: {job_id: scalar, ledger_id: scalar, workflow_id: scalar, allow_json: bounded, hooks_json: bounded}
+    guard_refusals: {ledger_id: scalar, workflow_id: scalar, job_id: scalar, tool: scalar, command: bounded, code: scalar, reason: bounded, remedy: scalar, cwd: scalar}
+    host_leases: {resource_key: scalar, token: scalar, ledger_id: scalar, workflow_id: scalar, job_id: scalar, holder: scalar}
+    host_locks: {name: scalar, holder: scalar, state: scalar}
+    host_resources: {resource_key: scalar}
+    host_samples: {kind: scalar, ledger_id: scalar, workflow_id: scalar, subject: scalar, mode: scalar, detail_json: migrate}
+    invariant_violations: {code: scalar, severity: scalar, entity: scalar, ledger_id: scalar, workflow_id: scalar, di_id: scalar, lesson_id: scalar, detail_json: bounded}
+    land_queue: {ticket_id: scalar, lane: scalar, commit_sha: reference, requested_by: scalar, state: scalar, busy_holder: scalar}
+    land_runs: {ticket_id: scalar, lane: scalar, span_id: scalar, parent_span_id: scalar, commit_sha: reference, landed_sha: reference, commits_json: scalar, result: scalar, reason: scalar, specs_json: scalar, stdout_sha: reference, stderr_sha: reference}
+    lanes: {name: scalar, worktree_path: scalar, branch: scalar, base_sha: reference, head_sha: reference, owner: scalar, sup_job_id: scalar, state: scalar, report_sha: reference}
+    leader_history: {holder: scalar, rev: scalar, acquired_how: scalar, release_reason: scalar}
+    ledgers: {ledger_id: scalar, name: scalar, product: scalar, repo_root: scalar, file: scalar, state: scalar, retired_reason: bounded}
+    llm_usage: {subject_type: scalar, turn_ref: reference, span_id: scalar, provider: scalar, request_model: scalar, response_model: scalar, source: scalar}
+    machine_logs: {actor: scalar, controller: scalar, ledger_id: scalar, workflow_id: scalar, job_id: scalar, action_id: scalar, trace_id: scalar, span_id: scalar, level: scalar, kind: scalar, msg: migrate, data_json: migrate, refs_json: scalar, src: scalar}
+    machine_meta: {key: scalar, value: scalar}
+    metrics_snapshots: {kind: scalar, ledger_id: scalar, workflow_id: scalar, subject: scalar, data_json: bounded, data_sha: reference}
+    mode_changes: {controller: scalar, from_mode: scalar, to_mode: scalar, by: scalar, reason: scalar}
+    models: {profile: scalar, agent: scalar, model: scalar, pool: scalar, roles_json: bounded, cost_json: bounded, source_rev: scalar}
+    notifications: {channel: scalar, kind: scalar, text: bounded, media_sha: reference, delivery: scalar, ref: reference, dedupe_key: scalar}
+    pool_backoff: {pool: scalar, reason: bounded}
+    process_runs: {role: scalar, host: scalar, rev: scalar, parent_action_id: scalar, start_reason: scalar, exit_reason: scalar, killed_by: scalar}
+    provider_health: {provider: scalar, status: scalar, failure_kind: scalar, reason: bounded, detail_json: bounded}
+    provider_health_events: {provider: scalar, from_status: scalar, to_status: scalar, failure_kind: scalar, ledger_id: scalar, detail_json: migrate}
+    provider_reservation_events: {reservation_id: scalar, from_state: scalar, to_state: scalar, proof_json: bounded}
+    provider_reservations: {id: scalar, attempt_id: scalar, provider: scalar, account: scalar, model: scalar, role: scalar, scope_json: scalar, state: scalar, quota_json: bounded, estimate_json: bounded, override_json: bounded, launch_identity: scalar, host_request_id: scalar, handle: scalar, proof_json: bounded}
+    pushes: {repo_root: scalar, branch: scalar, head: scalar, from_sha: reference, to_sha: reference, result: scalar, reason: scalar, failure_signature: scalar, action_id: scalar, scan_json: bounded, stdout_sha: reference, stderr_sha: reference}
+    quotas: {provider: scalar, window: scalar, source: scalar}
+    repositories: {repo_root: scalar, name: scalar, role: scalar, ledger_id: scalar, default_branch: scalar, remote: scalar}
+    schedules: {controller: scalar, duty: scalar, last_result: scalar, last_action_id: scalar, last_result_digest: scalar}
+    seat_transcript_snapshots: {seat_id: scalar, terminal_handle: scalar, sha256: reference}
+    seat_turns: {seat_id: scalar, end_reason: bounded, span_id: scalar}
+    seats: {seat_id: scalar, role: scalar, ledger_id: scalar, workflow_id: scalar, state: scalar, parked_reason: bounded, terminal_handle: scalar, agent: scalar, model: scalar, routed_by: scalar, kernel_rev: scalar, acked_rev: scalar, detail_json: migrate}
+    service_events: {name: scalar, from_state: scalar, to_state: scalar, probe_error: scalar, action: scalar, action_id: scalar}
+    service_probes: {name: scalar, detail_json: bounded}
+    services: {name: scalar, kind: scalar, state: scalar, url: scalar, last_probe_json: migrate}
+    sla_episodes: {entity: scalar, state: scalar, code: scalar, severity: scalar, ledger_id: scalar, workflow_id: scalar, di_id: scalar, clear_reason: scalar}
+    sup_attempts: {job_id: scalar, span_id: scalar, parent_span_id: scalar, agent: scalar, provider: scalar, model: scalar, effort: scalar, terminal_handle: scalar, runtime_rev: scalar, cli_name: scalar, cli_version: scalar, prompt_sha: reference, transcript_sha: reference, worktree_path: scalar, branch: scalar, base_sha: reference, head_sha: reference, landed_sha: reference, report_outcome: scalar, verdict: scalar, failure_class: scalar}
+    sup_bridges: {bridge_id: scalar, ledger_id: scalar, action: scalar, state: scalar, approved_by: scalar, detail_json: bounded}
+    sup_decision_items: {di_id: scalar, idempotency_key: scalar, key_parts_json: scalar, superseded_by: scalar, ledger_id: scalar, workflow_id: scalar, kind: scalar, decider: scalar, entity_type: scalar, entity_id: scalar, summary: bounded, status: scalar, opened_by: scalar, escalate_to: scalar, claim_by: scalar, resolved_by: scalar, resolution_verb: bounded, decision_id: scalar, evidence_json: migrate, options_json: migrate, allowed_verbs_json: scalar, payload_json: migrate}
+    sup_decisions: {decision_id: scalar, di_id: scalar, decider: scalar, span_id: scalar, parent_span_id: scalar, ledger_id: scalar, workflow_id: scalar, subject_type: scalar, subject_id: scalar, choice: bounded, rationale: bounded, result_json: bounded}
+    sup_events: {event_id: scalar, entity_type: scalar, entity_id: scalar, kind: scalar, span_id: scalar, payload_json: spill, payload_sha: reference, prev_digest: scalar, digest: scalar}
+    sup_jobs: {job_id: scalar, trace_id: scalar, kind: scalar, role: scalar, cluster: scalar, title: scalar, status: scalar, lane: scalar, files_json: bounded, brief: migrate, payload_json: migrate}
+    sup_learning: {item_id: scalar, kind: scalar, parent_id: scalar, title: scalar, state: scalar, source_ref: reference, lane: scalar, landed_sha: reference, detail_json: migrate}
+    sup_leases: {path: scalar, job_id: scalar}
+    sup_messages: {msg_id: scalar, direction: scalar, channel: scalar, chat_id: scalar, message_id: bounded, from_ref: reference, to_ref: reference, via: scalar, text: migrate}
+    sup_owed: {owed_id: scalar, kind: scalar, subject: scalar, cluster: scalar, state: scalar, acked_by: scalar, detail_json: bounded}
+    sup_owner_rulings: {ruling_id: scalar, channel: scalar, verbatim: scalar, paraphrase: scalar, applies_to: scalar, contract_ref: reference, recorded_by: scalar}
+    sup_reports: {job_id: scalar, outcome: scalar, report_json: migrate, report_sha: reference}
+    sup_signals: {scope: scalar, key: scalar, token: scalar, value_json: bounded}
+    terminals: {handle: scalar, title: scalar, role: scalar, closed_by: scalar}
+    throttle_decisions: {ledger_id: scalar, workflow_id: scalar, job_id: scalar, reason: bounded}
+    throttle_events: {from_mode: scalar, to_mode: scalar, reason: scalar, writer_rev: scalar, sample_json: scalar}
+    throttle_state: {mode: scalar, reason: scalar, writer: scalar, writer_rev: scalar, slot_targets_json: bounded, priorities_json: bounded}
+    uat_slots: {slot_id: scalar, ledger_id: scalar, workflow_id: scalar, job_id: scalar, browser_profile: scalar}
+    ui_state_map: {entity: scalar, native: scalar, ui: scalar}
+    ui_states: {ui: scalar}
+    worktrees: {path: scalar, kind: scalar, repo_root: scalar, branch: scalar, base_sha: reference, head_sha: reference, ledger_id: scalar, workflow_id: scalar, job_id: scalar, lane: scalar, archived_ref: reference, remove_error: scalar, orca_id: scalar, checkpoint_sha: reference}

@@ -1,5 +1,5 @@
 // The one [Supervisor] kernel, its [Worker] fix agents, the land gate and the chat relay
-// (modules/supervisor/supervise.yaml kernelSeat/workers/landGate/chat, docs/supervisor.md).
+// (modules/supervisor/supervise.yaml kernelSeat and chat, docs/supervisor.md).
 // Every spec runs on a temp supervisor home, a temp STARCI_LOCAL_ROOT and, for git, a temp repository:
 // no live Orca (a [Worker] staging checkout goes through the fake Orca worktree client,
 // tests/helpers/fake-orca-worktrees.mjs), no agent, no network, never the live runtime.
@@ -13,6 +13,7 @@ import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
 import { fakeAdmission } from '../helpers/fake-admission.mjs';
 
+import { exitedAgentPromptRow } from '../../scripts/lib/terminal-liveness.mjs';
 import { launchSupervisor, stopSupervisor, planSupervisorDedupe, doctrineOf, SEAT_DENIED_TOOLS, seatHealth } from '../../scripts/supervisor/start-supervisor.mjs';
 import { seatToolDecision } from '../../scripts/guards/seat-tools.mjs';
 import { withSupervisor, readSupervisor, seatOf, enabledOf, writeSeat, supervisorEvent, SUPERVISOR_ID, SKILL_ROOT } from '../../scripts/machine/home.mjs';
@@ -325,11 +326,12 @@ test('a seat start from the reconciler (no ORCA_TERMINAL_HANDLE) names an existi
 test('the prompt doctrine is built from supervise.yaml kernelSeat', () => {
   const doc = parseYaml(fs.readFileSync(new URL('../../modules/supervisor/supervise.yaml', import.meta.url), 'utf8'));
   const text = doctrineOf(doc);
-  assert.match(text, /single brain/);
+  assert.match(text, /single decision desk/);
   assert.match(text, /never answers|answers an owner ask/);
   assert.ok(doc.guardrails.some((g) => g.id === 'one-supervisor-seat'));
   assert.ok(!doc.guardrails.some((g) => g.id === 'chat-only-debug-mode'), 'the chat-only rule is replaced');
-  for (const key of ['kernelSeat', 'workers', 'landGate', 'chat']) assert.ok(doc[key], key);
+  for (const key of ['kernelSeat', 'chat']) assert.ok(doc[key], key);
+  for (const key of ['workers', 'landGate', 'grammarRelease']) assert.equal(doc[key], undefined, `${key} is removed from the Supervisor's law`);
 });
 
 /* ------------------------------------------------------------ workers */
@@ -925,7 +927,7 @@ test('status block and clustering', (t) => {
 
 /* ------------------------------------------------------------ 2026-09-24 live defects */
 
-test('the Supervisor seat launches with its subagent tool denied; the prompt sends diagnosis to [Worker]s', async (t) => {
+test('the Supervisor seat launches with its subagent tool denied; the prompt says it has no subagents', async (t) => {
   // worker-start takes no provider argv, so the denial is a seat guard bound to the seat's terminal and enforced by
   // the project PreToolUse hook (scripts/guards/seat-tools.mjs) - for that terminal only.
   assert.deepEqual([...SEAT_DENIED_TOOLS.claude], ['Agent', 'Task']);
@@ -945,7 +947,7 @@ test('the Supervisor seat launches with its subagent tool denied; the prompt sen
   const settings = JSON.parse(fs.readFileSync(new URL('../../.claude/settings.json', import.meta.url), 'utf8'));
   assert.match(JSON.stringify(settings.hooks.PreToolUse), /starci\\" guard seat-tools/);
   const prompt = fs.readFileSync(new URL('../../modules/supervisor/supervisor-prompt.md', import.meta.url), 'utf8');
-  assert.match(prompt, /Diagnosis is a \[Worker\] job too/);
+  assert.match(prompt, /You have no subagents/);
   assert.match(fs.readFileSync(new URL('../../modules/supervisor/worker-prompt.md', import.meta.url), 'utf8'), /`diagnosed`/);
 });
 
@@ -1116,7 +1118,7 @@ test('the sweep closes a reported [Worker] and releases its provider reservation
     release: ({ dispatch }) => ({ ok: true, outcome: 'released', dispatch }),
     close: () => { live = false; return { ok: true, proof: 'gone' }; },
     tableOf: () => (live ? [{ pid: 4242, ppid: 1, name: 'claude', created: 1700000000000, exe: 'claude.exe' }] : []),
-    envOf: () => (live ? [{ pid: 4242, values: { ORCA_TERMINAL_HANDLE: 'term_fr' } }] : []),
+    envOf: () => (live ? [{ pid: 4242, readable: true, values: { ORCA_TERMINAL_HANDLE: 'term_fr' } }] : []),
     capture: (pid) => ({ schema: OWNED_PROCESS_SCHEMA, ok: true, outcome: 'captured', proof: 'process-handle-live', pid,
       identity: { pid, birth: '133444736000000000', exe: 'claude.exe' } }),
     sleep: () => {},
@@ -1151,7 +1153,7 @@ test('a cancelled [Worker] releases its provider reservation and records a prove
       release: ({ dispatch: id }) => ({ ok: true, outcome: 'released', dispatch: id }),
       close: () => { live = false; return { ok: true, proof: 'gone' }; },
       tableOf: () => (live ? [{ pid: 4343, ppid: 1, name: 'devin', created: 1700000000000, exe: 'devin.exe' }] : []),
-      envOf: () => (live ? [{ pid: 4343, values: { ORCA_TERMINAL_HANDLE: 'term_cx' } }] : []),
+      envOf: () => (live ? [{ pid: 4343, readable: true, values: { ORCA_TERMINAL_HANDLE: 'term_cx' } }] : []),
       capture: (pid) => ({ schema: OWNED_PROCESS_SCHEMA, ok: true, outcome: 'captured', proof: 'process-handle-live', pid,
         identity: { pid, birth: '133444736000000000', exe: 'devin.exe' } }),
       sleep: () => {},
@@ -1176,4 +1178,33 @@ test('the push scan reads a diff file in chunks and keeps line numbers across ch
     forEachFileLine(file, (l) => scanner.line(l), { chunkBytes: 7 });
     assert.deepEqual(scanner.findings, [{ file: 'src/config.ts', line: 41, pattern: 'assigned-secret' }]);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a seat the host lists as ready whose terminal shows a shell prompt is dead, not live', () => {
+  const seat = { value: { terminal: 'owned-terminal', dispatch: 'owned-dispatch' } };
+  const show = () => ({ ok: true, state: 'ready' });
+  const powershell = ["The '<' operator is reserved for future use.", 'PS D:\Repositories\starci-academy-backend\.claude>'].join('\n');
+  const bash = ["bash: syntax error near unexpected token `newline'", 'user@host:~/repo$'].join('\n');
+  for (const screen of [powershell, bash]) {
+    const health = seatHealth(seat, { show, screen: () => screen, exitedRow: exitedAgentPromptRow });
+    assert.equal(health.live, false);
+    assert.equal(health.dead, true);
+    assert.equal(health.agentExited, true);
+    assert.match(health.reason, /agent exited/);
+  }
+  const agent = ['● done', '─'.repeat(20), '❯', '─'.repeat(20), '  ⏵⏵ bypass permissions on'].join('\n');
+  assert.equal(seatHealth(seat, { show, screen: () => agent, exitedRow: exitedAgentPromptRow }).live, true);
+  assert.equal(seatHealth(seat, { show, screen: () => null, exitedRow: exitedAgentPromptRow }).live, true, 'an unreadable screen proves nothing');
+});
+
+test('the launch replaces a seat whose agent exited instead of answering already-live', async t => {
+  const host = fakeHost({ screens: {} });
+  const env = envOf(t);
+  const first = await launch(env, host);
+  host.screen = () => 'user@host:~/repo$';
+  host.exitedRow = exitedAgentPromptRow;
+  const again = await launch(env, host);
+  assert.notEqual(again.action, 'already-live', JSON.stringify(again));
+  assert.equal(again.action, 'restarted');
+  assert.notEqual(again.terminal, first.terminal);
 });

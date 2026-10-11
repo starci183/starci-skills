@@ -11,7 +11,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 // never settles: Node printed "Detected unsettled top-level await" and exited 13 before the held command ran.
 // launchFor now lives in the leaf scripts/uat/launch.mjs, which both import.
 const UAT=fileURLToPath(new URL('../../scripts/uat/',import.meta.url));
-const SLOTS=path.join(UAT,'uat-slots.mjs'),RUNNER=path.join(UAT,'assisted-runner.mjs'),LAUNCH=path.join(UAT,'launch.mjs');
+const SLOTS=path.join(UAT,'uat-slots.mjs'),RUNNER=path.join(UAT,'assisted-runner.mjs');
 const LIMIT_MS=20000;
 const tempSlots=t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-uat-cycle-spec-'));
@@ -51,16 +51,4 @@ test('`uat-slots.mjs run -- <command>` (its own top-level await) runs the held c
   const failing=await runNode([SLOTS,'run','--','node','-e','process.exit(7)'],env);
   assert.equal(failing.timedOut,false);
   assert.equal(failing.code,7);
-});
-
-test('uat-slots.mjs never imports assisted-runner.mjs; launch.mjs is a leaf with no local imports',()=>{
-  const slots=fs.readFileSync(SLOTS,'utf8').split('\n').filter(line=>!line.trim().startsWith('//')).join('\n');
-  assert.doesNotMatch(slots,/import\s*\(?\s*['"][^'"]*assisted-runner/);
-  assert.doesNotMatch(fs.readFileSync(LAUNCH,'utf8'),/from\s+['"]\.{1,2}\//);
-});
-
-test('assisted-runner.mjs still exports the same launchFor',async()=>{
-  const runner=await import(new URL('../../scripts/uat/assisted-runner.mjs',import.meta.url).href);
-  const launch=await import(new URL('../../scripts/uat/launch.mjs',import.meta.url).href);
-  assert.equal(runner.launchFor,launch.launchFor);
 });

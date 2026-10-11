@@ -65,6 +65,6 @@ export function verbWorkflow(ledger, args) {
 
 /**
  * The `export default` a workflow-scoped api verb shares: { verb, required: ['workflow'], kernelOnly, usageInCore,
- * run }. `run(ctx)` is the verb's body.
+ * run }. `run(ctx)` is the verb's body; `traits` adds spec fields (`reads`, `reacts`).
  */
-export const workflowVerb = (verb, run) => ({ verb, required: ['workflow'], kernelOnly: true, usageInCore: true, run });
+export const workflowVerb = (verb, run, traits = {}) => ({ verb, required: ['workflow'], kernelOnly: true, usageInCore: true, ...traits, run });

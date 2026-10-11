@@ -101,9 +101,11 @@ function claudeUsage(lines) {
   const toolModel = new Map();
   const errSeen = new Set();
   const rows = new Map();
+  const marks = [];
   let sessionId = null;
   const rowOf = (model) => { if (!rows.has(model)) { rows.set(model, emptyRow(model)); } return rows.get(model); };
   for (const line of lines) {
+    if (line === BOUNDARY) { marks.push(claudeCumulative(byId, rows)); continue; }
     const isAssistant = line.includes('"type":"assistant"');
     if (!isAssistant && !line.includes('"is_error":true')) continue;
     const o = parse(line);
@@ -115,8 +117,14 @@ function claudeUsage(lines) {
       recordClaudeToolErrors(o, { toolModel, errSeen, rowOf });
     }
   }
-  addClaudeTotals(byId, rowOf);
-  return { agent: 'claude', sessionId, models: [...rows.values()].filter(hasActivity), turns: byId.size };
+  return { agent: 'claude', sessionId, ...claudeCumulative(byId, rows), marks };
+}
+
+/** The usage so far as {models, turns}: a copy of the per-model rows with the message totals added, so the running state is not changed. */
+function claudeCumulative(byId, rows) {
+  const copy = new Map([...rows].map(([model, row]) => [model, { ...row }]));
+  addClaudeTotals(byId, (model) => { if (!copy.has(model)) { copy.set(model, emptyRow(model)); } return copy.get(model); });
+  return { models: [...copy.values()].filter(hasActivity), turns: byId.size };
 }
 
 const CODEX_TOOL_CALLS = new Set(['function_call', 'custom_tool_call', 'local_shell_call', 'tool_search_call']);
@@ -160,8 +168,10 @@ function addCodexUsage(total, state, rowOf) {
 function codexUsage(lines) {
   const rows = new Map();
   const state = { model: 'unknown', sessionId: null, prev: null, turns: 0 };
+  const marks = [];
   const rowOf = (m) => { if (!rows.has(m)) { rows.set(m, emptyRow(m, { toolErrors: false })); } return rows.get(m); };
   for (const line of lines) {
+    if (line === BOUNDARY) { marks.push({ models: [...rows.values()].map((row) => ({ ...row })).filter(hasActivity), turns: state.turns }); continue; }
     if (!codexEventLine(line)) continue;
     const o = parse(line);
     if (!o) continue;
@@ -170,7 +180,7 @@ function codexUsage(lines) {
     if (!total) continue;
     addCodexUsage(total, state, rowOf);
   }
-  return { agent: 'codex', sessionId: state.sessionId, models: [...rows.values()].filter(hasActivity), turns: state.turns };
+  return { agent: 'codex', sessionId: state.sessionId, models: [...rows.values()].filter(hasActivity), turns: state.turns, marks };
 }
 
 const hasActivity = (row) => COUNT_FIELDS.some((f) => row[f] > 0) || row.turns > 0;
@@ -184,13 +194,41 @@ const UNAVAILABLE_REASON = {
  * {ok:false, source:'unavailable', reason} — an agent without an adapter, an unreadable file or a file that holds no usage
  * record is never given a number.
  */
-export function extractUsage(agent, file) {
+export function extractUsage(agent, file, { cuts = [] } = {}) {
   const extractor = EXTRACTORS[agent];
   if (!extractor) return { ok: false, source: USAGE_UNAVAILABLE, agent: agent ?? null, reason: UNAVAILABLE_REASON[agent] ?? `no usage adapter for agent ${agent ?? 'unknown'}`, definitive: true };
   if (!file || !fs.existsSync(file)) return { ok: false, source: USAGE_UNAVAILABLE, agent, reason: 'session file not found' };
-  const out = extractor(fileLines(file));
+  const { marks, ...out } = extractor(cuts.length ? withBoundaries(fileLines(file), cuts, agent) : fileLines(file));
   if (!out.models.length) return { ok: false, source: USAGE_UNAVAILABLE, agent, reason: 'session file holds no usage record' };
-  return { ok: true, source: USAGE_SOURCE, ...out, file };
+  return { ok: true, source: USAGE_SOURCE, ...out, ...(cuts.length ? { buckets: bucketsOf(marks, out) } : {}), file };
+}
+
+/** The marker a cut leaves in the line stream: the extractor snapshots its running totals when it meets one. */
+const BOUNDARY = Symbol('cut');
+const STAMPED = { claude: '"type":"assistant"', codex: 'token_count' };
+const stampOf = (line) => { const at = Date.parse(parse(line)?.timestamp); return Number.isFinite(at) ? at : null; };
+
+/** The lines of a session with a BOUNDARY before the first usage record stamped later than each cut (ms, ascending); the cuts no record passes close at the end. */
+function* withBoundaries(lines, cuts, agent) {
+  let next = 0;
+  for (const line of lines) {
+    if (next < cuts.length && line.includes(STAMPED[agent])) {
+      const at = stampOf(line);
+      while (at !== null && next < cuts.length && at > cuts[next]) { yield BOUNDARY; next += 1; }
+    }
+    yield line;
+  }
+  while (next < cuts.length) { yield BOUNDARY; next += 1; }
+}
+
+/** The usage between the cuts: [{models, turns}] with bucket 0 before the first cut and bucket i after cut i-1, from the running totals taken at each cut and at the end. */
+function bucketsOf(marks, total) {
+  let before = { models: [], turns: 0 };
+  return [...marks, total].map((cumulative) => {
+    const bucket = { models: deltaRows(cumulative.models, before.models), turns: Math.max(0, cumulative.turns - before.turns) };
+    before = cumulative;
+    return bucket;
+  });
 }
 
 /** Sum of normalized rows (models merged): the totals a status line shows. */

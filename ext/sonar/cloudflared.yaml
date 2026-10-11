@@ -1,8 +1,8 @@
 # Publishes the local SonarQube as the public host URL every product's GitHub
 # CI scans against (see README.md), under the `starci` Compose project. The Cloudflare control plane and API credential live
-# at Source scope; this stack owns only the connector process and its issued run
-# token, mounted read-only from the decrypted
-# `secrets/cloudflare-starci-local-services-tunnel-token.key`.
+# at Source scope; this stack owns only the connector process, which receives its issued run token from the
+# environment (`${CLOUDFLARE_TUNNEL_TOKEN}`, a secret.env variable that `starci gate sonar up --public` passes and
+# requires). No token is stored here or beside it.
 name: starci
 
 services:
@@ -12,9 +12,7 @@ services:
     profiles: [public]
     command: tunnel --no-autoupdate run
     environment:
-      TUNNEL_TOKEN_FILE: /run/secrets/cloudflare-tunnel-token
-    volumes:
-      - ./secrets/cloudflare-starci-local-services-tunnel-token.key:/run/secrets/cloudflare-tunnel-token:ro
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?run through starci gate sonar up --public - CLOUDFLARE_TUNNEL_TOKEN is a secret.env variable}
     depends_on:
       sonarqube:
         condition: service_healthy

@@ -14,6 +14,7 @@ import { launchSupervisor } from '../../scripts/supervisor/start-supervisor.mjs'
 import { readSupervisor, supervisorSettings, SUPERVISOR_ID, SKILL_ROOT } from '../../scripts/machine/home.mjs';
 import { registerSupervisor } from '../../scripts/supervisor/telegram-bridge.mjs';
 import { appendInbox } from '../../scripts/machine/sup-messages.mjs';
+import { exitedAgentPromptRow } from '../../scripts/lib/terminal-liveness.mjs';
 import { watchdogPass, busyScreen, busySignature, frozenBusyFrame, SUBAGENT_INPUT } from '../../scripts/supervisor/supervisor-watchdog.mjs';
 
 const tmp = (t, prefix) => {
@@ -179,4 +180,18 @@ test('busyScreen and SUBAGENT_INPUT read the frozen pane shapes from the inciden
   assert.ok(SUBAGENT_INPUT.test(frozen), 'the input row targeting @general-purpose needs the Escape');
   assert.ok(!SUBAGENT_INPUT.test('❯ \n  ⏵⏵ bypass permissions on'), 'a plain idle input is not subagent-targeted');
   assert.ok(!SUBAGENT_INPUT.test('✽ Thinking… (11m 5s)\n❯ '), 'a spinner frame has no @-targeted input');
+});
+
+test('watchdog: a seat whose terminal shows a shell prompt is replaced and no wake is typed into it', async (t) => {
+  for (const prompt of ['PS D:\Repositories\starci-academy-backend\.claude>', 'user@host:~/repo$']) {
+    const env = envOf(t);
+    const seed = await launch(env, fakeHost());
+    appendInbox(SUPERVISOR_ID, { chatId: null, messageId: null, from: 'desktop', text: 'status?' }, { env });
+    registerSupervisor({ id: SUPERVISOR_ID, label: 'S', terminal: seed.terminal }, { env });
+    const { seat, d } = seatDeps({ state: 'turn-idle', frame: `The '<' operator is reserved for future use.\n${prompt}` });
+    d.exitedRow = exitedAgentPromptRow;
+    const pass = await watchdogPass({ env, d });
+    assert.equal(pass.action, 'restarted', JSON.stringify(pass));
+    assert.deepEqual(seat.order, ['replace'], 'nothing was typed; the seat was replaced');
+  }
 });

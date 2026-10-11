@@ -889,19 +889,58 @@ moduleLocalDocumentKinds:
   - id: starci/module-kernel-op-incident-policy@1
     governs: "What happens when an op asks, hits a rate limit or quota, errors, hangs or is restarted: handler, bound and escalation per situation."
     files: [modules/kernel/op-incident-policy.yaml]
+  - id: starci/module-kernel-critic@1
+    governs: "The Critic as data: the seat whose tier it is picked from, the typed verdict, the codes of its holds and the op kinds that owe a Critic."
+    files: [modules/kernel/critic.yaml]
+  - id: starci/module-kernel-critic-rubrics@1
+    governs: "The rubric, minimum, product globs, cited fields and token budget of the Critic for each decision leg (scope.define, business.decide, architecture.decide)."
+    files: [modules/kernel/critic-rubrics.yaml]
+  - id: starci/module-kernel-op-judges@1
+    governs: "Who judges the product of each op: the kinds of judge, the measures a machine judge may cite, the owner gates and the reviewing legs the op contracts' `judge` field is held to."
+    files: [modules/kernel/op-judges.yaml]
   - id: starci/module-kernel-roles@1
     governs: "The roles contract: the principles, the five roles with their scope, duties, cleanup, never list and reporting chain, and Debug's end condition."
     files: [modules/kernel/roles.yaml]
+  - id: starci/module-kernel-menu@1
+    governs: "The Kernel's menu: its kinds of decision point with their typed options, the classification of every next-action origin and of every frontier state, and the escape and snooze bounds."
+    files: [modules/kernel/kernel-menu.yaml]
+  - id: starci/revision-scope@1
+    governs: "What a change of the runtime tree asks of each role: the rows that say which path concerns which role and the action each takes (none, immediate, admission, restart, reread, contract, boot), the engine entries its loaded set is derived from, the files each seat's launch prompt is built from, and what each settle judge reads."
+    files: [modules/kernel/revision-scope.yaml]
+  - id: starci/storage-convention@1
+    governs: "What a database row holds: the class of every text column of the product ledger and of machine.sqlite (scalar, bounded, reference, spill, migrate), the byte bounds of the classes, the kinds of content that are always a blob, and the columns that still hold content inline with the largest value measured."
+    files: [modules/schemas/storage-convention.yaml]
   - id: starci/module-reconciler-edge-cases@1
     governs: "The registry of every edge case met: family, real occurrence, the rule that handles it, the spec that reproduces it, and its status."
     files: [modules/reconciler/edge-cases.yaml]
+  - id: starci/module-reconciler-readiness@1
+    governs: "Which consumer each readiness row of starci reconciler up gates: the start of a workflow Kernel is gated by the rows a Kernel needs and by none that only the harness UI needs."
+    files: [modules/reconciler/readiness.yaml]
+  - id: starci/module-reconciler-operating-standard@1
+    governs: "The standard path of a workflow as ordered steps (actor, precondition, done-state, bound, evidence, probe), the departure table naming the role, duty and registry entry of each BUG, and the happy errors that are only counted."
+    files: [modules/reconciler/operating-standard.yaml]
+  - id: starci/module-reconciler-debug-questions@1
+    governs: "The questions Debug asks of the system each tick, grouped by edge-case family, each answerable today by a digest check or a documented gap with the signal it needs."
+    files: [modules/reconciler/debug-questions.yaml]
+  - id: starci/installed-artefacts@1
+    governs: "The artefacts the runtime installs outside its own tree (hooks of workflow trees, generated copies, guard files, worktree records), each with its writer, marker, stamp and migration, and the signals that mark a file as an installer."
+    files: [modules/kernel/installed-artefacts.yaml]
   - id: starci/module-kernel-verdict@1
     governs: "What `starci kernel settle` accepts and rejects."
     files: [modules/kernel/verdict-contract.yaml]
+  - id: starci/release-cut@1
+    governs: "The numbers and input sets of `starci release cut`: the L4 schedule pools, the host-budget settings and the row-reuse classes, digests and retention."
+    files: [modules/supervisor/release-cut.yaml]
 
   - id: starci/supervisor@1
-    governs: "The chat-facing observe/analyze/patch/restart loop contract."
+    governs: "The Supervisor's duty contract: the decision desk that answers its menu, records runtime defects and changes no runtime code."
     files: [modules/supervisor/supervise.yaml]
+  - id: starci/module-supervisor-menu@1
+    governs: "The Supervisor's menu: the judgment points waiting on it, the typed options that answer each, and how a Decision Item is routed to a kind."
+    files: [modules/supervisor/supervisor-menu.yaml]
+  - id: starci/module-kernel-gate-loosening@1
+    governs: "What loosens a gate, mechanically: the gate files, the allowlists, the threshold words and the spec markers a change is judged by, and how the owner approves one."
+    files: [modules/kernel/gate-loosening.yaml]
   - id: starci/supervisor-bridging@1
     governs: "Cross-workflow dependency findings and Supervisor bridging actions."
     files: [modules/supervisor/bridging.yaml]

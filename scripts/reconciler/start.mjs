@@ -15,6 +15,7 @@ import { PROFILES, REQUIRED_ACTIVE, SKILL_ROOT, reconcilerConfig, reconcilerNumb
 import { probeOrcaAsync, serviceRegistry, servicePorts, servicePlatformProblem, startService } from './services.mjs';
 import { sleep } from '../lib/sleep.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { buildUi, uiBuildState } from './ui-build.mjs';
+import { DEFAULT_CONSUMER, forConsumer } from './readiness-consumers.mjs';
 export { buildUi, uiBuildState };
 import { loginRows } from './login-items.mjs';
 import { PROFILE, engineItems, profileItems, safeShadowOf, serviceItems } from './start-items.mjs';
@@ -26,6 +27,7 @@ import { repeatInOrder } from '../lib/in-order.mjs';
 import { json, kernelSeatItems, seatNeed, supervisorRow } from './seat-items.mjs';
 import { isLauncherOrTaskRow, healLauncherAndTasks, registerTask, runtimeLink } from './start-heal.mjs';
 import { renderBrief, renderText } from './start-render.mjs';
+import { releaseCiItems } from './release-ci-item.mjs';
 import { tempRoot } from '../../engine/temp-root.mjs';
 export { PROFILE, engineItems, profileItems, safeShadowOf };
 export { engineIsSafe } from './start-items.mjs';
@@ -225,13 +227,13 @@ function orcaRow(orcaProbe) {
  */
 export async function gather({ env = process.env, config = safeRun(() => loadConfig(), null), orca = true, seats = true, workflowSeats = true, seatsRequested = true, depthProbe = null, platform = process.platform, guardProbe } = {}) {
   const items = [];
-  const push = (...rows) => items.push(...rows.flat());
+  const push = (...rows) => items.push(...rows.flat(Infinity));
   // preflight
   push(sqliteItem(), hostPlatformItem(platform), guardCommandRow({ probe: guardProbe }));
   const machine = machineDbRows(env);
   push(machine.rows, ledgerRows(machine.ledgers));
   push(await worktreeItems({ env, repos: machine.ledgers.filter((l) => l.state !== 'retired').map((l) => l.repoRoot) }));
-  push(pinRows(config));
+  push(pinRows(config), releaseCiItems({ repo: SKILL_ROOT }));
   const orcaProbe = orca ? await probeOrcaAsync({ timeoutMs: 30_000 }) : { ok: null };
   // config + engine + controllers + sla
   push(engineRows(env, config));
@@ -342,7 +344,8 @@ export async function applyHost(opts, deps = {}) {
 }
 
 export async function ensureHostRuntime({ env = process.env, waitMs = START_WAIT_MS, workflowSeats = false, check = false, platform = process.platform, ...opts } = {}, deps = {}) {
-  const read = deps.gather ?? gather, apply = deps.applyHost ?? applyHost, wait = deps.sleep ?? sleep, now = deps.now ?? Date.now;
+  // A row only another consumer needs does not gate this start (readiness-consumers.mjs); the Kernel's start never builds the harness UI.
+  const consumer = opts.consumer ?? DEFAULT_CONSUMER, gathered = deps.gather ?? gather, read = async (o) => forConsumer(await gathered(o), consumer), apply = deps.applyHost ?? applyHost, wait = deps.sleep ?? sleep, now = deps.now ?? Date.now;
   const services = opts.scope === 'services';
   const readOptions = { env, workflowSeats, seatsRequested: !check && !services, platform };
   let items = await read(readOptions);
@@ -350,7 +353,7 @@ export async function ensureHostRuntime({ env = process.env, waitMs = START_WAIT
     && !(opts.setProfile && item.group === 'config' && item.id === 'profile'));
   let applied = [];
   if (!check && blockers.length === 0 && (!summarize(items).ok || opts.setProfile || opts.retire || items.some(isLauncherOrTaskRow))) {
-    try { applied = await apply({ env, waitMs, workflowSeats, platform, ...opts }); }
+    try { applied = await apply({ env, waitMs, workflowSeats, platform, ...opts, noBuild: opts.noBuild || consumer === 'kernel-start' }); }
     catch (error) { return { ok: false, summary: summarize(items), applied, items, error: String(error?.message ?? error) }; }
     items = await read(readOptions);
     const until = now() + waitMs;
@@ -385,7 +388,7 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
     return;
   }
   const env = deps.env ?? process.env;
-  const result = await (deps.ensureHostRuntime ?? ensureHostRuntime)({ ...opts, env, workflowSeats: deps.workflowEntry !== true, check: has('--check') });
+  const result = await (deps.ensureHostRuntime ?? ensureHostRuntime)({ ...opts, env, workflowSeats: deps.workflowEntry !== true, check: has('--check'), consumer: deps.workflowEntry === true ? 'kernel-start' : DEFAULT_CONSUMER });
   if (deps.workflowEntry === true) result.hostOk = result.ok;
   const render = has('--brief') ? renderBrief : renderText;
   (deps.print ?? console.log)(has('--json') ? JSON.stringify(result) : render(result.items, { applied: result.applied, summary: result.summary }));

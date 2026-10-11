@@ -39,6 +39,7 @@ import { allocationSettings, loadConfig } from '../../engine/config.mjs'; import
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 import { httpUp } from '../api/http/http-up.mjs';
 import { repeatInOrder } from '../lib/in-order.mjs';
+import { doublingDelay } from '../lib/retry-budget.mjs';
 import { recordNewProbe, recordServiceEvents } from './service-events.mjs';
 import { connectorStartResult, outcomeOf, probeCommand, reopenCommand } from './service-commands.mjs';
 import { auditTasks } from '../machine/task-audit.mjs';
@@ -85,7 +86,7 @@ export function hostSettings(raw = parseYaml(fs.readFileSync(HOST_YAML, 'utf8'))
   return {
     resyncMs: positive(h.resyncMs, 'resyncMs'),
     concurrency: positive(h.concurrency, 'concurrency'),
-    backoff: section('backoff', ['minMs', 'maxMs', 'factor']),
+    backoff: section('backoff', ['minMs', 'maxMs']),
     quarantine: section('quarantine', ['maxRestarts', 'windowMs', 'retryMs']),
     services,
     checkers,
@@ -250,9 +251,6 @@ export const DOWN_STATES = new Set(['starting', 'degraded', 'failed', 'backoff',
 // The states that run the SERVICE_DOWN clock: one bad pass (`degraded`) is not down.
 export const OUTAGE_STATES = new Set(['starting', 'failed', 'backoff', 'quarantined']);
 
-/** Backoff before restart number n+1 (n restarts already in the window): minMs * factor^n, at most maxMs. Pure. */
-export const backoffDelay = (n, { minMs, maxMs, factor }) => Math.min(maxMs, minMs * factor ** Math.max(0, n));
-
 export const newRecord = (name, now) => ({ name, state: 'declared', since: now, restarts: [], failStreak: 0, nextAttemptAt: null, downSince: null, lastProbe: null });
 
 const moveFailureState = (r, now, entry, to) => { switch (r.state) {
@@ -265,7 +263,7 @@ const moveFailureState = (r, now, entry, to) => { switch (r.state) {
 function restartAction(r, now, entry, backoff, quarantine, from, to) {
   let act = null, quarantined = false;
   r.restarts = r.restarts.filter((t) => now - t < quarantine.windowMs);
-  if (r.state === 'failed' && entry.restart !== false) { if (r.restarts.length >= quarantine.maxRestarts) { to('quarantined'); quarantined = true; } else { to('backoff'); r.nextAttemptAt = now + backoffDelay(r.restarts.length, backoff); } }
+  if (r.state === 'failed' && entry.restart !== false) { if (r.restarts.length >= quarantine.maxRestarts) { to('quarantined'); quarantined = true; } else { to('backoff'); r.nextAttemptAt = now + doublingDelay(r.restarts.length + 1, backoff); } }
   if (r.state === 'backoff' && now >= (r.nextAttemptAt ?? 0) && from === 'backoff') { to('starting'); r.restarts.push(now); r.nextAttemptAt = null; act = 'start'; } else if (r.state === 'quarantined' && !quarantined && now - r.since >= quarantine.retryMs && entry.restart !== false) { to('starting'); r.restarts = [now]; act = 'start'; }
   return { act, quarantined };
 }

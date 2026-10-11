@@ -1,6 +1,7 @@
 group: runtime
 verb: update
 owner: runtime
+runtimeSide: host
 summary: bring an installed .claude tree to this package's payload version
 impl:
   script: scripts/install/install.mjs

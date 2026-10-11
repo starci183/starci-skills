@@ -51,7 +51,7 @@ export function kernelDecisionItems(db, workflowId, { now = Date.now(), ageMs = 
     if (!handover && !ownerAct) return [];
     return [{ jobId: it.jobId, op: it.op, attempt: it.attempt, outcome: it.outcome, dispatchId: it.dispatchId,
       reason: handover?.reason ?? 'owner-act',
-      ...(handover?.detail ? { detail: handover.detail } : {}), ageMin: Math.round((now - it.filedAt) / 60_000), consumed: it.consumedAt != null }];
+      ...(handover?.detail ? { detail: handover.detail } : {}), ...(handover?.code ? { code: handover.code } : {}), ageMin: Math.round((now - it.filedAt) / 60_000), consumed: it.consumedAt != null }];
   });
 }
 

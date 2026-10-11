@@ -6,6 +6,7 @@ import { drawReviewBoard, openKnowledgeRequests } from '../../../work/draw-feedb
 import { openGrammarProposals } from '../../../work/grammar-proposal.mjs';
 import { gateConditionView } from '../../gate-conditions.mjs';
 import { jobPayloadOf } from './rows.mjs';
+import { rerunMoveOf, withMove } from '../../next-moves.mjs';
 
 const autoResolvedView = ({ incidentId, kind, holds, evidence }) => ({ incidentId, kind, holds, evidence });
 
@@ -30,14 +31,17 @@ const drawRetriesOf = (s) => {
     const answeredAt = Date.parse(entry.rounds[entry.rounds.length - 1]?.answeredAt ?? '') || 0;
     const takenUp = Number(db.prepare('SELECT MAX(created_at) AS at FROM jobs WHERE workflow_id=? AND op_id=?').get(workflowId, DRAW_REVIEW_OP)?.at ?? 0) > answeredAt;
     if (takenUp || s.graph.nextActions.some((a) => a.op === DRAW_REVIEW_OP && ['retry', 'dispatch'].includes(a.kind) && (!entry.redrawOwed.jobId || a.jobId === entry.redrawOwed.jobId))) continue;
-    s.graph.nextActions.push(drawRetry(entry));
+    s.graph.nextActions.push(drawRetry(entry, s.workflowJobs));
   }
 };
 
-const drawRetry = (entry) => {
+// The redraw repeats the job the owner's answer concerned; an answer that names no job leaves the write set to the Kernel.
+export const drawRetry = (entry, rows) => {
   const retryOf = entry.redrawOwed.jobId ? ` --retry-of ${entry.redrawOwed.jobId}` : '';
-  return { kind: 'retry', op: DRAW_REVIEW_OP, jobId: entry.redrawOwed.jobId ?? null,
-    reason: `the owner asked for a redraw of ${entry.record} in ask ${entry.redrawOwed.dispatchId} (${entry.redrawOwed.notes.length} note(s)): starci kernel enqueue --op ${DRAW_REVIEW_OP}${retryOf} - the packet carries the answer (context.owner_answers); the redraw must address every note (draw-feedback.mjs brief)` };
+  const row = rows.find((job) => job.job_id === entry.redrawOwed.jobId);
+  return withMove({ kind: 'retry', origin: 'draw-redraw', op: DRAW_REVIEW_OP, jobId: entry.redrawOwed.jobId ?? null,
+    reason: `the owner asked for a redraw of ${entry.record} in ask ${entry.redrawOwed.dispatchId} (${entry.redrawOwed.notes.length} note(s)): starci kernel enqueue --op ${DRAW_REVIEW_OP}${retryOf} - the packet carries the answer (context.owner_answers); the redraw must address every note (draw-feedback.mjs brief)` },
+  rerunMoveOf(row, { op: DRAW_REVIEW_OP, reason: `the owner asked for a redraw in ask ${entry.redrawOwed.dispatchId}` }));
 };
 
 // A job a supervisor-gate holds shows where the gate is on the Supervisor ladder: handler, step of steps, deadline and the watched condition.
@@ -79,6 +83,11 @@ export const decorPhase = (s) => {
   if (s.typedUnmeetable.length) unmeetablePhase(s);
 };
 
+// An ordinal that does not reconcile with the landed seam runs again on its own write set and cut: the move of seam-reconcile-red.
+export const seamMoveOf = (action, rows) => (action.origin === 'seam-reconcile-red'
+  ? withMove(action, rerunMoveOf(rows.find((job) => job.job_id === action.jobId), { op: action.op, reason: `cut ${action.cutId} ordinal does not reconcile with the landed seam` }))
+  : action);
+
 // Open cut sets and which ordinal's pass closes each: that pass is the one
 // `starci kernel settle` holds to full-regression-final, so the Kernel runs the whole-set
 // integration gate before it (inc-751dd1ac4492). A set with one open ordinal
@@ -100,7 +109,7 @@ export const cutPhase = (s) => {
   }
   // Seam duties the Kernel moves now: a reconcile owed (or red) against a landed seam, a re-cut of a seam
   // that slipped. They ride before the waits in nextActions and make the frontier actionable.
-  const seamActions = wf.phase === 'finished' ? [] : s.cutSets.flatMap((set) => seamActionsOf(set));
+  const seamActions = wf.phase === 'finished' ? [] : s.cutSets.flatMap((set) => seamActionsOf(set)).map((action) => seamMoveOf(action, s.workflowJobs));
   if (!seamActions.length) return;
   const firstWait = s.graph.nextActions.findIndex((action) => ['owner-gate', 'wait'].includes(action.kind));
   s.graph.nextActions.splice(firstWait < 0 ? s.graph.nextActions.length : firstWait, 0, ...seamActions);

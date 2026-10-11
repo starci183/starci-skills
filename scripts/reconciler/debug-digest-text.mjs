@@ -1,6 +1,9 @@
 // debug-digest-text.mjs — the English source of every line of `starci debug digest`; modules/i18n/messages/debug.yaml carries the
 // Vietnamese of each entry (scripts/lib/i18n.mjs). A problem code of debug-digest-analyze.mjs selects its entry of PROBLEM_TEXT.
+import { STANDARD_PROBLEM_TEXT } from './debug-digest-verdict-text.mjs';
+
 export const PROBLEM_TEXT = Object.freeze({
+  departure: STANDARD_PROBLEM_TEXT,
   'controllers-off': 'Controllers {names} are off although the config asks for them; nothing they own is being done.',
   'leader-missing': 'The reconciler has no leader row; no controller runs.',
   'leader-stale': 'The reconciler leader (pid {pid}) has not beaten for {min} min.',
@@ -12,17 +15,25 @@ export const PROBLEM_TEXT = Object.freeze({
   'supervisor-deaf': 'The Supervisor terminal does not take its inputs.',
   'gate-stale': 'Stale gate {kind} ({decider}) is {min} min past due: {summary}',
   'decision-overdue': 'Decision Item {kind} ({decider}) is {min} min past due: {summary}',
-  'kernel-dead': 'The Kernel of {name} is not alive (job {job}, probe {probe}).',
+  'kernel-dead': 'The Kernel of {name} is not alive (job {job}, probe {probe}){why}.',
   'kernel-rev': 'The Kernel of {name} acked runtime {acked} while {current} is current ({files} file(s) behind).',
   'kernel-idle': 'The Kernel of {name} is idle with {ready} unit(s) of ready work, last woken {min} min ago.',
+  'kernel-wake-budget': 'The Kernel of {name} spent {turns} turns and {tokens} tokens in one wake, over its budget of {budgetTurns} turns and {budgetTokens} tokens ({wakes} wake(s) over): a departure of the Kernel.',
+  'supervisor-wake-budget': 'The Supervisor spent {tokens} tokens in {turns} turns of one wake, over its budget of {budgetTokens} tokens ({wakes} wake(s) over): a departure of the Supervisor.',
+  'seat-empty-wakes': 'The runtime woke {name} {wakes} times and {empty} of them ({percent}%) found nothing to decide: each re-read the whole session for nothing, a departure of the runtime.',
   'hold-overdue': '{op} ({jobId}) is held by {hold} {min} min past its deadline; handler {handler}; the bound is spent and {next} must take over.',
   'hold-unlisted': '{op} ({jobId}) is held by {hold}, which the hold policy table does not list.',
+  'leg-unowned': '{op} ({jobId}) failed {min} min ago and {waiting} job(s) wait on it as dependency-failed, but no incident, Decision Item, retry or Kernel menu item follows it: the runtime owes it a step.',
   'op-no-cause': '{op} is {status} and no cause is recorded for the stop.',
   'op-owner-without-ask': '{op} is {status} waiting on the owner, but no owner ask is open.',
   'op-step-missing': '{op} is {status} for {min} min and neither a retry, a Decision Item nor an incident follows it. {cause}',
   'job-past-deadline': '{op} ({jobId}) runs {min} min past its job deadline.',
   'status-unreadable': 'The status of {name} could not be read: {error}',
   'reservation-leak': 'The {provider} reservation {id} ({state}) is live for {owner}, which is not running; held {min} min.',
+  'action-failing': 'The {controller} controller ran {verb} for {key} and it failed {count} times in a row over {min} min ({error}); nothing else reports it: the runtime owes the role it serves a line, a retry or an item.',
+  'decision-refused': 'The Decision Item {key} ({kind}) was refused {count} times over {min} min ({code}); the role it was for is not being told.',
+  'draft-unowned': 'A draft has stood in the Kernel input of {name} for {min} min ({refusals} wake(s) refused, terminal {terminal}) and no Supervisor Decision Item says so: the runtime owes the Supervisor the item; it never clears or replaces a seat that holds a draft.',
+  'secret-survived': 'A secret survived redaction in {artifact} ({kind}): the {rule} rule still matches {count} time(s) in the stored text.',
 });
 
 export const TEXT = Object.freeze({
@@ -36,7 +47,8 @@ export const TEXT = Object.freeze({
   leaderGone: 'no leader',
   supervisor: 'Supervisor: seat {state}, terminal {terminal}, last seen {seen}, last woken {woken}; {open} open Decision Item(s), {due} past due',
   workflow: 'Workflow {name} ({ledger}) phase {phase}',
-  kernel: '  Kernel: {alive}, last woken {woken}, acked runtime {acked} of {current}, frontier {state}, {ready} unit(s) of ready work',
+  revisionSeat: '  Revision: {line}',
+  kernel: '  Kernel: {alive}, last woken {woken}, frontier {state}, {ready} unit(s) of ready work',
   alive: 'alive',
   notAlive: 'NOT alive',
   running: '  Running: {items}',
@@ -54,6 +66,8 @@ export const TEXT = Object.freeze({
   reasonable: 'reasonable',
   unreasonable: 'NOT reasonable',
   burn: '  Tokens: {items}',
+  acceptanceTrace: '  {line} ({op} {jobId}; report mode)',
+  releaseCi: 'Last release CI: {line}',
   admission: 'Admission: {live} live reservation(s), {leaked} not backed by a running job',
   problems: 'Problems, ordered by the work each blocks:',
   problemLine: '  {n}. [blocks {blocks}] {text}',

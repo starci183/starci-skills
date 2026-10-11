@@ -2,7 +2,11 @@
 import { EVIDENCE_HOST_PATH } from '../../job-artifacts.mjs';
 import { recordSonarJudgment, refusalText } from '../../sonar-settle.mjs';
 import { loopRefusalText, proofRefusalText, recordLoopJudgment, recordProofJudgment } from '../../gate-settle.mjs';
+import { criticRefusalText, recordCriticJudgment } from '../../critic-settle.mjs';
+import { ownedByRuntime } from '../../gate-admission.mjs';
+import { recordTrace } from '../../acceptance-trace.mjs';
 import { refuseVerb } from './verb-exit.mjs';
+import { brandProductCheck, recordBrandProduct, requireBrandProduct } from '../../brand-product.mjs';
 
 function mediaPhase(s, settleProofMedia) {
   const media = !s.replay && s.verdict === 'pass' ? settleProofMedia(s.db, s.jobId, s.repo, null, null) : null;
@@ -36,6 +40,7 @@ function sonarPhase(s, settleSonarGate) {
 async function loopPhase(s, settleOpGate) {
   const loop = !s.replay && s.verdict === 'pass' ? await settleOpGate(s.db, s.jobId, s.repo) : null;
   if (!loop) return;
+  loop.judged = ownedByRuntime(s.db, s.jobId, loop.judged, { op: loop.op, proof: 'op-gate' });
   const recorded = recordLoopJudgment(s.ledger, { attemptId: loop.attemptId, judgment: loop });
   if (!recorded.green) {
     refuseVerb(s, { ok: false, jobId: s.jobId, op: loop.op, reason: recorded.code, code: recorded.code, detail: loop.judged.detail, findings: loop.judged.findings, gateStatus: recorded.status },
@@ -48,12 +53,31 @@ async function loopPhase(s, settleOpGate) {
 async function proofPhase(s, settleOpProofs) {
   const proofs = !s.replay && s.verdict === 'pass' ? await settleOpProofs(s.db, s.jobId, s.repo) : null;
   if (!proofs) return null;
+  proofs.judged = ownedByRuntime(s.db, s.jobId, proofs.judged, { op: proofs.op, proof: 'op-proof' });
   const recorded = recordProofJudgment(s.ledger, { attemptId: proofs.attemptId, judgment: proofs });
   if (!recorded.green) {
     refuseVerb(s, { ok: false, jobId: s.jobId, op: proofs.op, reason: recorded.code, code: recorded.code, proof: proofs.proof, detail: proofs.judged.detail, findings: proofs.judged.findings, proofStatus: recorded.status },
       proofRefusalText(proofs.op, proofs, s.jobId));
   }
   return proofs;
+}
+
+// The independent Critic's verdict of a decision leg (scripts/kernel/critic-settle.mjs): a pass without a fresh passing verdict for exactly
+// the op's records now is refused, recorded as the runtime check op-proof (independent-critic) on the attempt; a failing verdict is the op's error-work.
+function criticPhase(s, settleCriticVerdict) {
+  const critic = !s.replay && s.verdict === 'pass' ? settleCriticVerdict(s.db, s.jobId, s.repo) : null;
+  if (!critic) return;
+  const recorded = recordCriticJudgment(s.ledger, { attemptId: critic.attemptId, judgment: critic });
+  if (!recorded.green) {
+    refuseVerb(s, { ok: false, jobId: s.jobId, op: critic.op, reason: recorded.code, code: recorded.code, detail: critic.judged.detail, findings: critic.judged.findings, criticStatus: recorded.status },
+      criticRefusalText(critic.op, critic.judged, s.jobId));
+  }
+}
+
+// The acceptance trace (report mode): evidence on the attempt, never a refusal.
+function tracePhase(s, settleAcceptanceTrace) {
+  const measured = !s.replay && s.verdict === 'pass' ? settleAcceptanceTrace?.(s.db, s.jobId, s.repo) ?? null : null;
+  if (measured) recordTrace(s.ledger, { attemptId: measured.attemptId, trace: measured.trace });
 }
 
 function drawnPhase(s, settleDrawAcceptance) {
@@ -89,11 +113,18 @@ function hygienePhase(s, settleWorkHygiene) {
  * its frozen decision; a fresh pass returns the exact native proof identity. */
 export async function settlePreflight({ ledger, args, repo, emit, internals, replay, verdict, jobId }) {
   const s = { db: ledger.db, ledger, args, repo, emit, replay, verdict, jobId };
-  const { settleProofMedia, settleSonarGate, settleOpGate, settleOpProofs, settleDrawAcceptance, settleDrawMetrics, settleWorkHygiene } = internals;
+  if (!replay && verdict === 'pass') {
+    const check = brandProductCheck(s.db, jobId, { repo });
+    if (check) recordBrandProduct(ledger, jobId, check);
+    requireBrandProduct(s.db, jobId, { repo });
+  }
+  const { settleProofMedia, settleSonarGate, settleOpGate, settleOpProofs, settleCriticVerdict, settleAcceptanceTrace, settleDrawAcceptance, settleDrawMetrics, settleWorkHygiene } = internals;
   mediaPhase(s, settleProofMedia);
   sonarPhase(s, settleSonarGate);
   await loopPhase(s, settleOpGate);
   const proofs = await proofPhase(s, settleOpProofs);
+  criticPhase(s, settleCriticVerdict);
+  tracePhase(s, settleAcceptanceTrace);
   drawnPhase(s, settleDrawAcceptance);
   await metricsPhase(s, settleDrawMetrics);
   hygienePhase(s, settleWorkHygiene);

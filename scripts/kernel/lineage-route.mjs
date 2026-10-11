@@ -158,6 +158,12 @@ const poolsOf = (attempts) => {
   return pools;
 };
 
+/** The attempts with the one the Kernel chose to replace (a retry enqueued with --switch-agent) made pool-attributable: its pool is demoted for the retry. */
+function replacedAttempts(attempts, job, lineage) {
+  if (!payloadOf(job).switchAgent || !lineage.length) return attempts;
+  return attempts.map((a) => (a.jobId === lineage[0].job_id && !a.attributable ? { ...a, cause: 'kernel-switch-agent', attributable: true, detail: `the Kernel replaced the agent (${a.cause})` } : a));
+}
+
 /**
  * The lineage adjustment for routing `job`: null for a first attempt (no lineage), else
  * {attempts:[{jobId, attempt, pool, cause, attributable, detail}], demote:[pool], exclude:[pool],
@@ -170,10 +176,10 @@ export function lineageRouteAdjust(db, job) {
   // The launches this very row met and the host or provider refused count against their pool like a failed try.
   const refused = rejectionAttemptsOf(db, job);
   if (!lineage.length && !refused.length) return null;
-  const attempts = [...refused, ...lineage.map((row, i) => {
+  const attempts = replacedAttempts([...refused, ...lineage.map((row, i) => {
     const { cause, attributable, detail } = attemptCauseOf(db, row, lineage[i + 1] ?? null);
     return { jobId: row.job_id, attempt: row.attempt, pool: attemptPoolOf(row), cause, attributable, detail };
-  })];
+  })], job, lineage);
   const pools = poolsOf(attempts);
   const entries = Object.entries(pools);
   return {

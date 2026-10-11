@@ -1,0 +1,76 @@
+schema: starci/module-kernel-critic@1
+id: kernel.critic
+
+# The Critic role as data (modules/kernel/roles.yaml#critic says who it is; this file says which work it judges and how its
+# answer is typed). The maker never judges its own work: the Critic is picked through the tier picker (the one picker of
+# scripts/lib/tier-pick.mjs behind scripts/agent/admission.mjs) from the tier that tiers.yaml seats names, with provider
+# independence as a hard filter, and it answers with one typed verdict that is attached to the attempt of the op it judged.
+
+about:
+  en: >-
+    An independent judge of one product of one op. It sees only the product bytes and the rubric handed to it, returns one
+    starci/critic-verdict@1, and is refused (never trusted) when its verdict names other bytes than the attempt's product.
+    Which ops are judged by a Critic is declared once, in the `judge` field of each op contract (modules/kernel/op-judges.yaml); the
+    coverage table below and those declarations are held to each other by the op-judge self-check (RT_OP_JUDGE_UNDECLARED).
+
+seat: critic
+independence: provider
+verdict:
+  schema: starci/critic-verdict@1
+  parts:
+    checks: "every check of the rubric: id, pass or fail, one line of evidence, the concrete fix of a failure"
+    beauty: "the overall score by the rubric's anchors (the drawing rubric names it beauty), capped by a failed gate check"
+    minimum: "the declared minimum the score is read against, and whether the verdict passes it"
+    product: "the digests (sha256) of the product bytes the Critic was handed and judged"
+
+# What each hold of the Critic is called. A refusal before any verdict is a happy error with a row in
+# modules/kernel/op-incident-policy.yaml; a verdict that cannot be trusted is a bug the runtime refuses and records.
+codes:
+  noIndependentMember: "CRITIC_NO_INDEPENDENT_MEMBER"
+  unavailable: "CRITIC_UNAVAILABLE"
+  quotaOut: "CRITIC_QUOTA_OUT"
+  authorUnknown: "CRITIC_AUTHOR_UNKNOWN"
+  noVerdict: "CRITIC_NO_VERDICT"
+  productModified: "CRITIC_PRODUCT_MODIFIED"
+  verdictStale: "CRITIC_VERDICT_STALE"
+  unguarded: "CRITIC_UNGUARDED"
+
+# Which op kinds owe a Critic. `covered`: the Critic runs and its verdict gates the op. `owed`: declared, not built, with the
+# open edge-case entry that tracks it (modules/reconciler/edge-cases.yaml).
+# A covered decision leg (scope.define, business.decide, architecture.decide) has its rubric, minimum, product globs, cited fields and token budget in
+# modules/kernel/critic-rubrics.yaml; its settle gate is scripts/kernel/critic-settle.mjs.
+coverage:
+  - kind: interface.draw
+    status: covered
+    product: "the rendered captures and the HTML (or rendered DOM) of one draw-loop round"
+    rubric: "the product's brand.direction.rubric, else the built-in default rubric (scripts/work/draw-critic.mjs)"
+    minimum: {ref: "modules/models/runtimes.yaml#allocation.drawLoop.beautyMin"}
+    passes: "every round of the loop; finish judges the best round once more when it has no verdict"
+    gate: "scripts/kernel/autopilot-state.mjs drawGateEvidence (DRAW_BEAUTY_BELOW, CRITIC_VERDICT_STALE)"
+  - kind: scope.define
+    status: covered
+    entry: critic-coverage-decision-legs
+    product: "the op's scope record (features/<feature>/index.yaml) and the records its nodes cite"
+    rubric: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=scope.define].checks"}
+    minimum: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=scope.define].minimum"}
+    tokenBudget: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=scope.define].tokenBudget"}
+    passes: "one run per version of the records: the runtime runs the Critic when the op reports done (a verdict the op attaches is ignored), and again for the retry's new records after a failing verdict"
+    gate: "scripts/kernel/critic-settle.mjs judgeCriticVerdict at settle over the runtime Critic run (op-critic-verdict-missing: the runtime owes it, op-critic-verdict-failed, CRITIC_VERDICT_STALE)"
+  - kind: architecture.decide
+    status: covered
+    entry: critic-coverage-decision-legs
+    product: "the op's sds, contract and integration records (features/<feature>/{sds,contract,integration}/**/index.yaml) and the records they cite"
+    rubric: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=architecture.decide].checks"}
+    minimum: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=architecture.decide].minimum"}
+    tokenBudget: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=architecture.decide].tokenBudget"}
+    passes: "one run per version of the records: the runtime runs the Critic when the op reports done (a verdict the op attaches is ignored), and again for the retry's new records after a failing verdict"
+    gate: "scripts/kernel/critic-settle.mjs judgeCriticVerdict at settle over the runtime Critic run (op-critic-verdict-missing: the runtime owes it, op-critic-verdict-failed, CRITIC_VERDICT_STALE)"
+  - kind: business.decide
+    status: covered
+    entry: critic-coverage-decision-legs
+    product: "the op's requirement, rule, criterion, journey, data and decision records (features/<feature>/{fr,nfr,br,decision,data,journey}/**/index.yaml and the feature record) and the scope record they cite"
+    rubric: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=business.decide]"}
+    minimum: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=business.decide].minimum"}
+    tokenBudget: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=business.decide].tokenBudget"}
+    passes: "one run per version of the records: the runtime runs the Critic when the op reports done (a verdict the op attaches is ignored), and again for the retry's new records after a failing verdict"
+    gate: "scripts/kernel/critic-settle.mjs judgeCriticVerdict at settle over the runtime Critic run (op-critic-verdict-missing: the runtime owes it, op-critic-verdict-failed, CRITIC_VERDICT_STALE)"

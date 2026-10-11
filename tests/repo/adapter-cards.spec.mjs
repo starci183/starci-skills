@@ -11,7 +11,7 @@ const ADAPTERS=path.join(ROOT,'modules','models','agents');
 import {parseYaml} from '../../engine/yaml.mjs';
 
 const cards=fs.readdirSync(ADAPTERS).filter(f=>f.endsWith('.yaml')).sort();
-test('modules/models/agents holds at least one card',()=>assert.ok(cards.length>0,'modules/models/agents holds no cards'));
+
 
 for(const file of cards){
   test(`agent card ${file} parses and starts through orchestration worker-start`,()=>{

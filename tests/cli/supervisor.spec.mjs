@@ -5,23 +5,29 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { CATALOG as catalog } from '../../packages/cli/src/catalog.generated.mjs';
 import { main } from '../../scripts/cli/main.mjs';
+import { INTERNAL_FLAGS } from '../../scripts/supervisor/start-supervisor.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const publicVerbs = {
   actions: ['action', 'hold-ms', 'item', 'open', 'reason', 'refs', 'until', 'workflow'],
   bridge: ['blocker', 'bridge', 'dependents', 'dry-run', 'finding', 'foundation', 'goal', 'kind', 'lead', 'merge-into', 'no-notify', 'owner-ok', 'paths', 'reason', 'record', 'releases', 'repo', 'request-only', 'start', 'text', 'title', 'to', 'waiter', 'waits', 'workflow'],
   channel: ['force', 'id', 'label', 'peek', 'repos', 'text', 'text-file', 'timeout-ms', 'to'],
+  decide: ['choice', 'item', 'reason', 'text'],
   'direct-commits': ['repo'],
   'gate-stability': ['base', 'family', 'gate', 'head', 'ledger', 'tree'],
   gc: ['apply', 'dry-run', 'holder', 'only', 'plan', 'trigger'],
-  land: ['commit', 'full-by-push-git', 'job', 'lane', 'notify', 'reason', 'specs', 'status', 'wait-ms'],
+  land: ['commit', 'foreground', 'full-by-push-git', 'job', 'lane', 'notify', 'reason', 'specs', 'status', 'wait-ms'],
   'lesson-actions': ['apply', 'commit', 'evidence', 'experiment', 'lane', 'options', 'reason', 'recommendation', 'send', 'signature', 'specs', 'title', 'wait-ms', 'wrongly-blocked'],
   notify: ['entity', 'item', 'repo', 'text', 'text-file', 'workflow'],
   owed: ['all', 'commits', 'force', 'item', 'reason', 'repo', 'workflow'],
   poll: ['interval-ms', 'once', 'repo', 'stall-minutes', 'workflow'],
   push: ['check', 'repo'],
+  'revision-ack': ['digest', 'plan', 'read-manifest', 'rev'],
   'push-mains': ['dry-run', 'hooks-only', 'repo'],
   'ram-cap': ['op', 'reserve', 'weight', 'workflow'],
+  status: ['menu'],
+  start: ['plan', 'reason'],
+  stop: [],
   report: ['repo', 'send'],
   'telegram-bridge': [],
   tell: ['limit', 'read', 'since', 'timeout-ms', 'wait'],
@@ -38,13 +44,25 @@ test('supervisor catalog resolves every added public handler and its exact local
   }
 });
 
+// The options start-supervisor.mjs reads from its argv, less the ones other verbs own (status, stop) and the universal ones.
+const OTHER_VERBS = new Set(['help', 'json', 'status', 'stop']);
+// The options the script serves for the watchdog and the restart procedure, never as CLI flags.
+const INTERNAL_OPTIONS = ['replace', 'restart', 'rotate'];
+const flagsOfScript = (script) => [...new Set([...fs.readFileSync(path.join(root, script), 'utf8').matchAll(/(?:has|value)\('([a-z-]+)'\)/g)].map((m) => m[1]))].filter((name) => !OTHER_VERBS.has(name) && !INTERNAL_OPTIONS.includes(name)).sort();
+
+test('every supervisor verb of the catalog is listed with its flags, and start declares every public option its script reads', () => {
+  assert.deepEqual(Object.keys(catalog.groups.supervisor.verbs).filter((verb) => !(verb in publicVerbs)), [], 'a verb missing from publicVerbs is never compared');
+  const start = catalog.groups.supervisor.verbs.start;
+  assert.deepEqual(start.flags.map((flag) => flag.name).sort(), flagsOfScript(start.impl.script));
+});
+
 test('supervisor verbs resolve only the public status/start/stop modes', () => {
   const calls = [];
   const runScript = (script, args) => { calls.push({ script, args }); return 0; };
   assert.equal(main(['supervisor', 'status', '--json'], { catalog, runScript }), 0);
   assert.equal(main(['supervisor', 'start', '--plan', '--reason', 'check'], { catalog, runScript }), 0);
   assert.equal(main(['supervisor', 'stop'], { catalog, runScript }), 0);
-  assert.deepEqual(calls.map((call) => call.args), [['--status', '--json'], ['--plan', '--reason', 'check'], ['--stop']]);
+  assert.deepEqual(calls.map((call) => call.args), [['--json'], ['--plan', '--reason', 'check'], ['--stop']]);
 });
 
 test('every added supervisor verb dispatches through the runtime seam', () => {
@@ -78,7 +96,20 @@ test('every added supervisor verb dispatches through the runtime seam', () => {
 
 test('supervisor internal watchdog flags are refused', () => {
   assert.equal(main(['supervisor', 'start', '--replace'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);
+  assert.equal(main(['supervisor', 'start', '--rotate', '--reason', 'handover'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);
   assert.equal(main(['supervisor', 'start', '--restart'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);
   assert.equal(main(['supervisor', 'watchdog', '--once', '--replace'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);
   assert.equal(main(['supervisor', 'watchdog', '--once', '--restart'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);
+});
+
+test('a flag the watchdog passes to the seat script is refused by the CLI with a pointer, and the verb declares exactly the flags the script takes for the runtime', () => {
+  const start = catalog.groups.supervisor.verbs.start;
+  for (const flag of INTERNAL_FLAGS) {
+    const messages = [];
+    assert.equal(main(['supervisor', 'start', `--${flag}`], { catalog, stderr: (text) => messages.push(text), runScript: () => 0 }), 2, flag);
+    assert.match(messages.join(''), new RegExp(`unknown option --${flag}: it is a call of the runtime itself.*starci supervisor stop, then starci supervisor start`), flag);
+  }
+  assert.deepEqual(start.internalFlags.map((flag) => flag.name).toSorted(), [...INTERNAL_FLAGS].toSorted());
+  const declared = new Set(start.flags.map((flag) => flag.name));
+  for (const flag of INTERNAL_FLAGS) assert.ok(!declared.has(flag), `--${flag} is not also a public flag`);
 });

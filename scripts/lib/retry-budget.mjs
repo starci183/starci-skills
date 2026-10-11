@@ -24,6 +24,9 @@ export function nextRetry(budget, { attempts, firstAt = null, now, reason, retry
   return { retry: exhausted === null, attempts, reason, delayMs, dueAt: exhausted === null ? now + delayMs : null, firstAt: started, exhausted };
 }
 
+/** The delay before attempt number `attempts` of a plain doubling backoff {minMs, maxMs}: the budget with no attempt or deadline bound. */
+export const doublingDelay = (attempts, { minMs, maxMs }) => nextRetry({ intervalMs: minMs, maxIntervalMs: maxMs }, { attempts, now: 0, reason: 'backoff' }).delayMs;
+
 /** The attempt that just failed, folded onto the record the caller kept ({attempts, firstAt} or null): the decision for it. */
 export function retryAfterFailure(budget, record, { now, reason, retryAfterMs = null }) {
   return nextRetry(budget, { attempts: (Number(record?.attempts) || 0) + 1, firstAt: record?.firstAt ?? null, now, reason, retryAfterMs });

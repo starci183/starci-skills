@@ -12,6 +12,7 @@ flags:
   - {name: full-by-push-git, type: boolean, summary: authorize the full suite from the push flow}
   - {name: lane, type: string, summary: source lane name}
   - {name: notify, type: boolean, summary: file the land outcome in the Supervisor inbox}
+  - {name: foreground, type: boolean, summary: "wait for the land in this process; without it the land runs in a detached child that outlives the caller's command window"}
   - {name: status, type: boolean, summary: inspect the land queue without landing}
   - {name: wait-ms, type: number, summary: maximum land-queue wait in milliseconds}
 exit: {"0": land passed or status was read, "1": land refused or failed, "2": bad usage}

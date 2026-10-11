@@ -1,3 +1,4 @@
 group: lint
 summary: lint exactly the files or repository scope named by the test ladder
 owner: runtime
+runtimeSide: tree

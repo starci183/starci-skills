@@ -11,3 +11,30 @@ revDriftBlocks: 3
 staleGateBlocks: 5
 kernelIdleWakeMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
 decisionDueMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
+# startLoopMin: failed launches of one step (a Kernel start, a dispatch) since the last success that make a retry loop rather than a retry.
+# bootJitterMs: two engine starts whose boot instants differ by less than this name one host boot.
+# blocksDeparture: the weight of a departure from the operating standard when its workflow has no open work to add to it.
+startLoopMin: 5
+bootJitterMs: 120000
+blocksDeparture: 2
+# wakeActMs: a wake followed by another within this time shares the turns of the second (the agent answers once). wakeGraceMs: a wake younger than this may
+# not have its usage rows yet (the usage sweep runs every five minutes), so it is not judged.
+wakeActMs: 120000
+wakeGraceMs: 600000
+# providerResumeMs: after a provider's circuit has closed (its recovery, or the end of its cooldown), work held behind it must start again inside this time.
+# secretScanArtifacts: how many of each kind of stored artifact (log rows, seat snapshots, Supervisor reports, op attempt transcripts) one digest re-scans for a secret that survived redaction.
+# secretScanBytes: how many bytes of one stored transcript or report the scan reads.
+# signalRows: how many rows of each machine signal (runtime-change-applied, host-ledger-drift, port-claim) one digest reads.
+providerResumeMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
+secretScanArtifacts: 200
+secretScanBytes: 4000000
+signalRows: 500
+# actionFailMin / actionFailMinMs: a reconciler action (a controller's verb for one key) or a refused Decision Item that fails on this many passes in a row over at least this
+# long is a stop the runtime owes a line for, since nothing else tells a role about it. silentFreshMs: such a stop is still happening when its newest failure is this young.
+# silentRows: how many of the newest finished actions and refusal log rows one digest reads.
+actionFailMin: 5
+actionFailMinMs: 1800000
+silentFreshMs: 900000
+silentRows: 20000
+# draftHeldMs: a person's draft that has stood in a Kernel's input this long (the seat's wake-repeat bound) is owed to the Supervisor as one Decision Item; none open is the runtime's departure.
+draftHeldMs: {ref: "modules/reconciler/seat-cost.yaml#kernel.wakeRepeatMs"}

@@ -189,7 +189,7 @@ test('observe records the worker\'s session identity on the job payload', t => {
   seedOrcaTerminal(fx.stateFile, { handle: 'term-sess5', connected: true, writable: true, command: 'claude', tabId: 'tab-5', title: '[Op] docs.author' });
   const session = claudeSessionFile(fx.trustHome, fx.repo, 'eeeeeeee-5555-4555-8555-eeeeeeeeeeee.jsonl', `(job ${jobId}, attempt 1)`);
 
-  const r = runApi(fx.env, 'observe', '--repo', fx.repo, '--job', jobId, '--json');
+  const r = runApi({ ...fx.env, STARCI_ACTOR: 'reconciler/job' }, 'observe', '--repo', fx.repo, '--job', jobId, '--json');
   assert.equal(r.status, 0, r.stderr || r.stdout);
   const stored = read(fx.ledgerFile, (l) => JSON.parse(l.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json ?? '{}'));
   assert.equal(stored?.session?.agent, 'claude');

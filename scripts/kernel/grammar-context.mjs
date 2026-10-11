@@ -14,6 +14,7 @@ import { readBrandRecord } from '../work/brand/brand.mjs';
 import { projectBinding, bindingRepo } from './target-repo.mjs';
 import { isFile, isDir } from '../lib/fs-kind.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { treesInOrder, workDirHolding, workDirsInOrder } from '../lib/roots.mjs';
 
 export const GRAMMAR_PACKAGE = '@starci/grammar';
 const GRAMMAR_KNOWLEDGE_FAMILY = 'starci';
@@ -123,24 +124,34 @@ const componentSources = ({ skillRoot, roots, sources, missing }) => {
   if (heroui) sources.push({ role: 'heroui-styles', path: slash(heroui) });
 };
 
+// The work directory holds a brand record: the same lookup readBrandRecord makes.
+const hasBrandRecord = (dir) => { try { readBrandRecord(dir); return true; } catch { return false; } };
+
+const watchOf = (watch, missing) => [...new Set([...watch, ...missing.map((m) => m.path).filter((p) => typeof p === 'string' && path.isAbsolute(p))])].map(slash);
+
 // { family, sources: [{role, path, files?}], missing: [{role, path?, detail}] }. Paths are absolute.
-export function resolveGrammarContext({ skillRoot, repo, binding = projectBinding(repo), inputs = 'reference' }) {
+// `tree` is the workflow's own checkout of `repo`: the brand record and the captures a finished leg wrote live there until the workflow finishes, so they are read
+// from it first and from the repository's main checkout after.
+export function resolveGrammarContext({ skillRoot, repo, binding = projectBinding(repo), inputs = 'reference', tree = null }) {
   const sources = [];
   const missing = [];
-  const roots = [...new Set([repo, ...(binding?.repos ?? []).map((r) => r.root)].map((r) => path.resolve(r)))];
-  const workDir = path.join(repo, binding?.workDir ?? '.starciwork');
+  const roots = [...new Set([...treesInOrder({ tree, repo }), ...(binding?.repos ?? []).map((r) => r.root).filter(Boolean).map((r) => path.resolve(r))])];
+  const workDirName = binding?.workDir ?? '.starciwork';
+  const workDir = workDirHolding((dir) => isDir(dir) && hasBrandRecord(dir), { tree, repo, workDirName });
 
+  // The files whose appearance or change can cure a refusal: the brand record of the tree and of the checkout, and every file a missing source names.
+  const watch = workDirsInOrder({ tree, repo, workDirName }).map((dir) => path.join(dir, 'brand', 'index.yaml'));
   const family = familyCss({ skillRoot, repo, binding, roots, workDir, sources, missing });
   knowledgeInputs(skillRoot, sources, missing);
 
   if (inputs === 'component-source') {
     componentSources({ skillRoot, roots, sources, missing });
-    return { family, sources, missing, inputs };
+    return { family, sources, missing, inputs, watch: watchOf(watch, missing) };
   }
   const captures = [path.join(workDir, CAPTURES_DIR), ...roots.map((r) => path.join(r, 'node_modules', ...GRAMMAR_PACKAGE.split('/'), 'captures'))].find((p) => isDir(p));
   if (captures) sources.push({ role: 'grammar-captures', path: slash(captures) });
 
-  return { family, sources, missing };
+  return { family, sources, missing, watch: watchOf(watch, missing) };
 }
 
 export const grammarMissingDetail = (missing) => missing

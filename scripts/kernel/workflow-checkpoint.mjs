@@ -51,6 +51,7 @@ import { TERMINAL_JOB_STATUSES } from '../machine/worktree-registry.mjs';
 import { mergeGuard } from '../gates/gate.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { setCheckpoint, markReleasePending } from './workflow-worktree.mjs';
+import { ensureHistoryHook } from '../guards/hook-install.mjs';
 import { gateBaseOf, gateBasesOf, workflowWorktreeAt, workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 import { normalizeOwnedPath } from '../../engine/admission.mjs';
 import { ownedPathsOf } from './verbs/shared/rows.mjs';
@@ -185,6 +186,15 @@ function requireReceiptScope(ctx, rec, receipt) {
   const newer = [...mine, ...stray].filter((file) => !receipt.files.includes(file));
   if (newer.length) throw Object.assign(fail({ code: 'workflow-checkpoint-recovery-conflict' }, `newer files conflict with the prepared effect of ${receipt.opId}: ${newer.slice(0, 3).join(', ')}`), { files: newer });
 }
+/**
+ * Whether the only files newer than a prepared receipt are strays (under no lease): a file a Kernel's shell left in the tree (a redirect to a file named 0) is
+ * not the op's work and must not make a fail decision unrecoverable; the receipt is prepared again so it covers them. A newer file of the op's own scope stays a conflict.
+ */
+function onlyStrayIsNewer(ctx, rec, receipt) {
+  const leases = leasesOf(ctx, receipt);
+  const { mine, stray } = splitChanges(rec.path, { own: receipt.scope, others: leases.others });
+  return stray.some((file) => !receipt.files.includes(file)) && mine.every((file) => receipt.files.includes(file));
+}
 /** The durable applied receipt re-verified against the live tree, or null when the effect was never applied. */
 const appliedReceipt = (ctx, rec, workflowId, head, state) => {
   if (!state?.applied) return null;
@@ -255,7 +265,7 @@ function preserveOwned(ctx, { workflowId, opId }) {
   const leases = leasesOf(ctx, { workflowId, opId });
   const answer = () => { const { mine, stray } = splitChanges(rec.path, leases); return [...mine, ...stray]; };
   let receipt = state?.prepared;
-  if (!receipt) receipt = preparePreserve(ctx, { workflowId, opId, rec, head, state, leases, answer });
+  if (!receipt || (head === receipt.before && onlyStrayIsNewer(ctx, rec, receipt))) receipt = preparePreserve(ctx, { workflowId, opId, rec, head, state, leases, answer });
   if (head !== receipt.before && head !== receipt.resetTo) throw fail({ code: 'workflow-foreign-commit' }, `${rec.branch} moved outside the prepared reset of ${opId}: ${head}`);
   requireReceiptScope(ctx, rec, receipt);
   requireReceiptBytes(rec, receipt, [receipt.sha ?? receipt.before, receipt.resetTo], git);
@@ -266,7 +276,9 @@ function preserveOwned(ctx, { workflowId, opId }) {
   if (head !== receipt.resetTo) {
     // Foreign commits past the checkpoint: the branch goes back; their changes now show against HEAD and are reset below
     // with the op's own. Another op's files are untouched by a soft reset.
-    const soft = git(gitReset, rec.path, ['--soft', receipt.resetTo]);
+    // The history hook keeps a workflow branch append-only; its current version lets this rewind through when the commit it leaves is kept under preserved/.
+    (ctx?.ensureHistoryHook ?? ensureHistoryHook)(rec.path);
+    const soft = git(gitReset, rec.path, ['--soft', receipt.resetTo], { env: { STARCI_BRANCH_REWIND: receipt.resetTo } });
     if (!soft.ok) throw fail({ code: 'workflow-reset-failed' }, `${rec.branch} could not go back to ${receipt.resetTo}: ${soft.stderr.slice(0, 200)}`);
   }
   phaseOf(ctx, 'branch-applied', receipt);

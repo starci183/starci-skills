@@ -94,6 +94,27 @@ export const workerExitProven = (receipt, handle) => Boolean(handle)
 /** Release succeeded and the exact terminal plus measured captured objects have ended. Pure. */
 export const workerClosureProven = (receipt, handle) => receipt?.ok === true && workerExitProven(receipt, handle);
 
+/** Process and readable handle observations cover the same PID set; incomplete coverage cannot prove terminal absence. Pure. */
+function terminalCensusProblem(table, envRows) {
+  if (!Array.isArray(table) || !Array.isArray(envRows)) return 'the process table or the process environments could not be read';
+  const observed = new Set();
+  for (const row of envRows) {
+    if (!Number.isSafeInteger(row?.pid) || row.pid < 0 || observed.has(row.pid) || row.readable !== true
+        || !Object.hasOwn(row.values ?? {}, HANDLE_ENV)
+        || (row.values[HANDLE_ENV] !== null && typeof row.values[HANDLE_ENV] !== 'string'))
+      return 'the terminal environment census is unreadable or contradictory';
+    observed.add(row.pid);
+  }
+  const listed = new Set();
+  for (const row of table) {
+    if (!Number.isSafeInteger(row?.pid) || row.pid < 0 || listed.has(row.pid) || !observed.has(row.pid))
+      return 'the terminal environment census does not cover the process table';
+    listed.add(row.pid);
+  }
+  if (observed.size !== listed.size) return 'the process table does not cover the terminal environment census';
+  return null;
+}
+
 /** Wait for every process of `tree` to end: {gone, table, left[]} or {unreadable}. */
 function processCensusProblem(tree, table) {
   for (const row of table.filter((process) => tree.some((member) => member.pid === process.pid))) {
@@ -110,7 +131,8 @@ function waitGone(tree, { read, environments, terminal, sleep, ms, pollMs }) {
     let envRows;
     try { table = read(); envRows = environments(); }
     catch { return { unreadable: true, reason: 'post-closure process census failed' }; }
-    if (!Array.isArray(table) || !Array.isArray(envRows)) return { unreadable: true, reason: 'post-closure terminal census is unreadable' };
+    const coverageProblem = terminalCensusProblem(table, envRows);
+    if (coverageProblem) return { unreadable: true, reason: coverageProblem };
     const processProblem = processCensusProblem(tree, table);
     if (processProblem) return { unreadable: true, reason: processProblem };
     const census = terminalTree(terminal, { table, envRows }).members;
@@ -138,7 +160,8 @@ function captureIdentities(tree, terminal, { capture, attempt }) {
 function readTerminalTree({ terminal, tableOf, envOf, capture, attempt }) {
   let table, envRows;
   try { table = tableOf(); envRows = envOf(); } catch { table = null; envRows = null; }
-  if (!Array.isArray(table) || !Array.isArray(envRows)) return { tree: null, treeWhy: 'the process table or the process environments could not be read' };
+  const coverageProblem = terminalCensusProblem(table, envRows);
+  if (coverageProblem) return { tree: null, treeCensusIncomplete: true, treeWhy: coverageProblem };
   const found = terminalTree(terminal, { table, envRows }).members;
   if (!found.length) return { tree: null, treeRecheck: true, treeWhy: 'no process carries the terminal handle: its tree cannot be proven' };
   return captureIdentities(found, terminal, { capture, attempt });
@@ -178,7 +201,7 @@ function closedEmptyTerminal({ terminal, closed, tableOf, envOf }) {
   if (closed?.ok !== true || !['gone', 'disconnected'].includes(closed.proof) || !['gone', 'disconnected'].includes(closed.before)) return null;
   let table, envRows;
   try { table = tableOf(); envRows = envOf(); } catch { return null; }
-  if (!Array.isArray(table) || !Array.isArray(envRows)) return null;
+  if (terminalCensusProblem(table, envRows)) return null;
   const census = terminalTree(terminal, { table, envRows }).members;
   return census.length ? null : { verdict: 'none', members: [], census: [], reason: 'the terminal is closed and no process carries its handle' };
 }
@@ -234,10 +257,10 @@ export function closeWorker({ dispatch, handle = null, stopFirst = false, retryR
   try { shown = show({ dispatch }); } catch { shown = null; }
   const terminal = handle ?? shown?.result?.worker?.agentTerminalHandle ?? null;
   const own = Boolean(terminal) && env[HANDLE_ENV] === terminal;
-  const { tree, treeWhy, treeRecheck } = captureWorkerTree({ terminal, own, deps, tableOf, envOf, capture, attempt });
+  const { tree, treeWhy, treeRecheck, treeCensusIncomplete } = captureWorkerTree({ terminal, own, deps, tableOf, envOf, capture, attempt });
 
   // 2 and 3. stop only on the caller's proof, then release
-  const stopped = stopFirst ? attempt(() => stop({ dispatch })) : null;
+  const stopped = stopFirst && !treeCensusIncomplete ? attempt(() => stop({ dispatch })) : null;
   let released = attempt(() => release({ dispatch }));
   let retry = null;
   if (retryRelease && released?.ok !== true) { retry = attempt(() => release({ dispatch })); }
@@ -245,7 +268,7 @@ export function closeWorker({ dispatch, handle = null, stopFirst = false, retryR
 
   // 4. close the terminal and prove it
   let closed = null;
-  if (terminal && !own) closed = attempt(() => close(terminal));
+  if (terminal && !own && !treeCensusIncomplete) closed = attempt(() => close(terminal));
 
   // 5. verify the processes
   const processes = verifyWorkerProcesses({ terminal, own, tree, treeWhy, treeRecheck, closed, tableOf, envOf, sleep, verifyMs, stopVerifyMs, pollMs, stopProcess, attempt });

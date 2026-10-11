@@ -3,15 +3,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 export { withLock, withWorkflowLock } from '../goal/workflow-lock.mjs';
-import { parseJson } from '../lib/json.mjs';
 import { pathKey } from '../lib/path-key.mjs';
 import { add as gitAdd } from '../api/git/add.mjs';
 import { readTree } from '../api/git/read-tree.mjs';
 import { writeTree } from '../api/git/write-tree.mjs';
 import { lsTree } from '../api/git/ls-tree.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
-import { getBlob } from '../../engine/db/blob.mjs';
-import { redactData } from '../lib/redact.mjs';
+import { eventPayloadOf } from '../../engine/db/event-payload.mjs';
 import { jsonClone } from '../lib/json-clone.mjs';
 import { tempPath } from '../api/fs/temp-path.mjs';
 
@@ -19,22 +17,13 @@ const SHA = /^[0-9a-f]{40,64}$/;
 const fail = ({ code }, message) => Object.assign(new Error(message), { code });
 export const literalPaths = (files) => files.map((file) => `:(literal)${file}`);
 
-function receiptPayload(row) {
-  return row?.payload_sha ? JSON.parse(getBlob(row.payload_sha).toString('utf8')) : parseJson(row?.payload_json) ?? null;
-}
-export function appendEffectEvent(ctx, args) {
-  try { return ctx.ledger.appendEvent(args); }
-  catch (error) {
-    if (error.code !== 'STARCI_EVENT_PAYLOAD_TOO_LARGE') throw error;
-    // The event's blob foreign key needs the index row in the same ledger before its durable receipt.
-    return ctx.ledger.transaction(() => {
-      const blob = ctx.ledger.write.storeBlob({ content: Buffer.from(JSON.stringify(redactData(args.payload))), mediaType: 'application/json', redaction: 'v1' });
-      const { sha, before, committed, opId, attemptId, dispatchId, resetTo } = args.payload;
-      return ctx.ledger.appendEvent({ ...args, payload: { spilled: true, sha256: blob.sha256, sha, before, committed, opId, attemptId, dispatchId, resetTo }, payloadSha: blob.sha256 });
-    });
-  }
-}
-export const preparedSettlementOf = (ctx, { workflowId, opId, attemptId }) => receiptPayload(ctx.db.prepare("SELECT payload_json,payload_sha FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=? AND attempt_id IS ? AND kind IN ('workflow-checkpoint-prepared','workflow-op-preserved-prepared') ORDER BY seq DESC LIMIT 1").get(workflowId, opId, attemptId))?.settlement ?? null;
+export const receiptPayload = eventPayloadOf;
+export const appendEffectEvent = (ctx, args) => ctx.ledger.appendEvent(args); // a receipt over the inline bound goes to the blob store inside appendEvent (engine/db/event-compact.mjs)
+/** The event kind that withdraws a prepared preserve receipt the runtime found void (scripts/kernel/settle/prepared-recovery.mjs). */
+export const PREPARED_WITHDRAWN = 'workflow-op-preserved-withdrawn';
+// A prepared receipt counts only while no withdrawal of its attempt is newer than it.
+const NOT_WITHDRAWN = `AND seq>COALESCE((SELECT MAX(w.seq) FROM events w WHERE w.workflow_id=events.workflow_id AND w.entity_id=events.entity_id AND w.attempt_id IS events.attempt_id AND w.kind='${PREPARED_WITHDRAWN}'),0)`;
+export const preparedSettlementOf = (ctx, { workflowId, opId, attemptId }) => receiptPayload(ctx.db.prepare(`SELECT payload_json,payload_sha FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=? AND attempt_id IS ? AND kind IN ('workflow-checkpoint-prepared','workflow-op-preserved-prepared') ${NOT_WITHDRAWN} ORDER BY seq DESC LIMIT 1`).get(workflowId, opId, attemptId))?.settlement ?? null;
 
 /** Read the prepared/applied receipt for the same job dispatch attempt. */
 export function receiptState(ctx, { workflowId, opId }, kind) {
@@ -44,9 +33,9 @@ export function receiptState(ctx, { workflowId, opId }, kind) {
     ? ctx.db.prepare('SELECT attempt_id, dispatch_id FROM op_attempts WHERE workflow_id=? AND job_id=? ORDER BY attempt_id DESC LIMIT 1').get(workflowId, opId)
     : ctx.db.prepare('SELECT attempt_id, dispatch_id FROM op_attempts WHERE workflow_id=? AND job_id=? AND attempt_id=?').get(workflowId, opId, acceptedAttempt);
   const identity = { workflowId, opId, attemptId: attempt?.attempt_id ?? null, dispatchId: attempt?.dispatch_id ?? null };
-  const other = ctx.db.prepare("SELECT kind FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=? AND attempt_id IS ? AND kind IN ('workflow-checkpoint-prepared','workflow-op-preserved-prepared') AND kind<>? LIMIT 1").get(workflowId, opId, identity.attemptId, `${kind}-prepared`);
+  const other = ctx.db.prepare(`SELECT kind FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=? AND attempt_id IS ? AND kind IN ('workflow-checkpoint-prepared','workflow-op-preserved-prepared') AND kind<>? ${NOT_WITHDRAWN} LIMIT 1`).get(workflowId, opId, identity.attemptId, `${kind}-prepared`);
   if (other) throw fail({ code: 'workflow-checkpoint-recovery-conflict' }, `dispatch ${identity.dispatchId ?? opId} must recover its ${other.kind} effect before changing its verdict`);
-  const read = (phase) => receiptPayload(ctx.db.prepare("SELECT payload_json,payload_sha FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=? AND attempt_id IS ? AND kind=? ORDER BY seq DESC LIMIT 1").get(workflowId, opId, identity.attemptId, `${kind}-${phase}`));
+  const read = (phase) => receiptPayload(ctx.db.prepare(`SELECT payload_json,payload_sha FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=? AND attempt_id IS ? AND kind=? ${phase === 'prepared' ? NOT_WITHDRAWN : ''} ORDER BY seq DESC LIMIT 1`).get(workflowId, opId, identity.attemptId, `${kind}-${phase}`));
   return { identity, prepared: read('prepared'), applied: read('applied') };
 }
 export function saveReceipt(ctx, kind, phase, receipt) {

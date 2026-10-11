@@ -24,6 +24,7 @@ import { translator } from '../lib/i18n.mjs';
 import { driftSummary, engineDrift } from './drift.mjs';
 import { CONTROLLER_NAMES, LEADER_NAME, SKILL_ROOT, START_REASON_ENV, configuredMode, reconcilerConfig, reconcilerNumbers } from './state.mjs';
 import { machineUsage } from '../kernel/usage-report.mjs';
+import { machineSeatCost, seatCostLines } from './seat-cost.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { reconcilerTaskScript } from '../machine/task-register.mjs';
 
@@ -234,6 +235,7 @@ export function status({ env = process.env, now = Date.now(), numbers = reconcil
     }, null, { env });
   } catch (error) { out.ok = false; out.error = String(error?.message ?? error).slice(0, 200); effective = {}; }
   out.usage = machineUsage({ env, now });
+  out.seatCost = machineSeatCost({ env, now });
   for (const name of new Set([...CONTROLLER_NAMES, ...Object.keys(effective)])) out.modes[name] = { configured: configuredMode(name, config), effective: out.leader.fresh ? effective[name] ?? 'off' : 'off', setBy: setBy[name] ?? null, setAt: setAt[name] ?? null };
   for (const [concern, owner] of Object.entries(CONCERN_OWNER)) out.concerns[concern] = out.leader.fresh && out.modes[owner]?.effective === 'active';
   out.drift = engineDrift({ leader: out.leader, modes: out.modes, now });
@@ -274,6 +276,7 @@ const describeStatus = (s) => {
     `  queue ${s.queueDepth} (${queue}); open violations ${s.violations.open}; actions 1h ${Object.entries(s.actions).map(([k, n]) => k + ' ' + n).join(', ') || 'none'}; engine starts 24h ${s.starts24h}`,
     `  owned concerns: ${Object.entries(s.concerns).filter(([, v]) => v).map(([k]) => k).join(', ') || 'none (every old loop keeps its duties)'}`,
     ...usageLines(s.usage),
+    ...seatCostLines(s.seatCost),
     `  state ${s.stateFile}`];
   return lines.join('\n');
 };

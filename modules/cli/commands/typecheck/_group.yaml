@@ -1,3 +1,4 @@
 group: typecheck
 summary: typecheck only the projects selected by the test ladder
 owner: runtime
+runtimeSide: tree

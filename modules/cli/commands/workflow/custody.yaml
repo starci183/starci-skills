@@ -14,7 +14,7 @@ flags:
     summary: the workflow_id
   - name: apply
     type: boolean
-    summary: move a tree that is behind its branch onto it (its own work preserved), or make a missing one at the branch; refused while an op is in flight
+    summary: move a tree that is behind its branch onto it (its own work preserved), or make a missing one at the branch; refused while an op has a live worker; the admitted attempts whose tree path was lost are rebound to the tree or ended placement-lost
 exit:
   "0": the state printed (attached, behind or tree-missing without --apply) or the repair applied
   "1": refusal (workflow-custody-diverged, workflow-custody-conflict, workflow-custody-busy) or error

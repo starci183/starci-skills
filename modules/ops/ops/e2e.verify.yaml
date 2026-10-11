@@ -268,6 +268,11 @@ proofs:
       en: "starci kernel settle re-reads the attached test-world run summary (runtime check op-proof, proof test-world, project e2e): a done without it (op-test-world-proof-missing), with a hand-rolled world - no preset world runner, no defineTestWorld declaration, a spec outside the layer's form, docker, testcontainers, a DataSource, process.env or a sleep in a spec (op-test-world-hand-rolled) - or with a run that is not green, ran no test or skipped one (op-test-world-run-red) is refused."
       vi: "starci kernel settle tự đọc lại tóm tắt lần chạy test-world đính kèm (check op-proof, proof test-world, dự án e2e): done thiếu nó (op-test-world-proof-missing), có world tự dựng - không có world runner của preset, không có khai báo defineTestWorld, spec sai dạng của tầng, docker, testcontainers, DataSource, process.env hoặc sleep trong spec (op-test-world-hand-rolled) - hoặc lần chạy không xanh, không chạy test nào hay bỏ qua test (op-test-world-run-red) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
+judge:
+  - by: machine
+    measures: [declared-checks, op-gate, op-proof:test-world, proof-media, acceptance-trace]
+    proofs: [test-world, proof-media, op-gate]
+    why: "settle re-runs the test-world project natively and refuses a hand-rolled world, a skipped spec or a missing screenshot; the scenario specs it runs are written by this op, so a green run is evidence of the world and not an independent judgment of the scenarios unless they trace to acceptance records the op did not write (acceptance-trace, report mode until the first live run)"
 blockers:
   - code: ENVIRONMENT_NOT_READY
     condition:

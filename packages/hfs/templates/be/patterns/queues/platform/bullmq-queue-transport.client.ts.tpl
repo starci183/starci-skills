@@ -67,7 +67,12 @@ export class BullmqQueueTransportClient implements QueueTransport {
     private connection(): BullmqConnection {
         return {
             prefix: this.options.prefix,
-            connection: { host: this.options.redisHost, port: this.options.redisPort, maxRetriesPerRequest: null },
+            connection: {
+                host: this.options.redisHost,
+                port: this.options.redisPort,
+                db: this.options.redisDb,
+                maxRetriesPerRequest: null,
+            },
         }
     }
 

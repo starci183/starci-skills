@@ -1,0 +1,36 @@
+{
+ "schema": "replay-fixture@1",
+ "case": "first-leg",
+ "source": {
+  "copy": "first-leg"
+ },
+ "workflow": {
+  "id": "wf-1",
+  "phase": "running",
+  "goalRevision": 0
+ },
+ "plan": {
+  "legs": [
+   {
+    "op": "request.analyze"
+   },
+   {
+    "op": "scope.define"
+   },
+   {
+    "op": "business.decide"
+   }
+  ],
+  "edges": [
+   [
+    "request.analyze",
+    "scope.define"
+   ],
+   [
+    "scope.define",
+    "business.decide"
+   ]
+  ]
+ },
+ "jobs": []
+}

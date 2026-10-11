@@ -1,0 +1,28 @@
+group: supervisor
+verb: revision-ack
+owner: runtime
+summary: read the files a runtime revision change sends to the Supervisor and attest them
+impl:
+  script: scripts/supervisor/revision-ack.mjs
+flags:
+  - name: plan
+    type: boolean
+    summary: return the files this revision change sends to the Supervisor, with their hashes, without acknowledging
+  - name: rev
+    type: string
+    summary: exact current Git SHA of the runtime revision the plan names
+  - name: digest
+    type: string
+    summary: the readToken --plan returned, after every file it lists was read (no file needed)
+  - name: read-manifest
+    type: string
+    summary: regular JSON file holding the exact manifest --plan returned, after every file in it was read
+exit:
+  "0": planned or acknowledged
+  "1": refused
+  "2": "bad usage: --plan, or --rev with --read-manifest"
+json: flag
+examples:
+  - starci supervisor revision-ack --plan
+  - starci supervisor revision-ack --rev <rev> --read-manifest <file>
+editions: [full]

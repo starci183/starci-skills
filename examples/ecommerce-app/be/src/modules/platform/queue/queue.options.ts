@@ -7,6 +7,8 @@ export interface QueueOptions {
     readonly redisHost: string
     /** The Redis port. */
     readonly redisPort: number
+    /** The Redis database that holds this app's queue state. */
+    readonly redisDb: number
     /** What every BullMQ key starts with: the shared default in a deployment, the run prefix of a test world. */
     readonly prefix: string
     /** The pause between two relay passes over an empty outbox. */

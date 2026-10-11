@@ -20,7 +20,7 @@ export function StatusDot({ status, title }: { readonly status: Status; readonly
 
 const kindLabels: Record<string, string> = { json: 'JSON', yaml: 'YAML', markdown: 'MD', text: 'LOG', diff: 'DIFF', image: t('IMG'), video: 'VIDEO', audio: 'AUDIO', pdf: 'PDF', binary: 'BIN' };
 
-/** File-type badge for evidence rows (tint per kind in style.css). */
+/** Neutral file-type chip for evidence rows; its label comes from the recorded kind. */
 export function FileTypeBadge({ kind }: { readonly kind: string }) {
-  return <span data-kind={kind} className="file-badge">{kindLabels[kind] ?? kind.toUpperCase()}</span>;
+  return <Badge variant="outline" data-kind={kind} className="file-badge">{kindLabels[kind] ?? kind.toUpperCase()}</Badge>;
 }

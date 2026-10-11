@@ -1,4 +1,5 @@
 internal:
+  - {path: scripts/api/orca/terminal-create.mjs, why: "Bounded plain release shell preparation, never an agent launcher", usedBy: [scripts/supervisor/release-terminal.mjs]}
   - {path: scripts/reconciler/workflow-up.mjs, why: "Accepted workflow host startup child", usedBy: [scripts/kernel/workflow-startup.mjs]}
   - {path: scripts/agent/quota/index.mjs, why: "Provider quota probe child", usedBy: [scripts/agent/credential-probe.mjs]}
   - {path: scripts/agent/send.mjs, why: "Agent prompt-delivery helper", usedBy: [scripts/agent/lib.mjs]}
@@ -56,14 +57,24 @@ internal:
   - {path: scripts/checks/check-example-coupling.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-example-render.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-generated-untracked.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-test-spawn-seam.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-installed-artefacts.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-one-allowlist.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-port-once.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-storage-convention.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-held-surfacing.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-op-judge.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-event-spill.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-root-adhoc.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-spec-budget.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-spec-cache-key.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-schema-shared.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-slot-id-shape.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-documented-defaults.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-roles-contract.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-edge-case-registry.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-revision-scope.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-gate-loosening.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-prose-commands.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-removed-vocabulary.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-undeclared-identifiers.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
@@ -99,7 +110,6 @@ internal:
   - {path: scripts/reconciler/controllers/workflow.mjs, why: "Engine-discovered workflow controller", usedBy: [scripts/reconciler/engine.mjs]}
   - {path: scripts/reconciler/ledger-health.mjs, why: "Host ledger-health controller", usedBy: [scripts/reconciler/controllers/host.mjs]}
   - {path: scripts/reconciler/notifier.mjs, why: "Fleet notification controller", usedBy: [scripts/reconciler/controllers/workers.mjs]}
-  - {path: scripts/reconciler/services.mjs, why: "Host service-registry controller", usedBy: [scripts/reconciler/controllers/host.mjs]}
   - {path: scripts/reconciler/sla.mjs, why: "Workflow SLA controller", usedBy: [scripts/reconciler/engine.mjs]}
   - {path: scripts/guards/release-push-gate.mjs, why: "Body of the generated pre-push hook of the runtime repository", usedBy: [scripts/guards/git-hooks.mjs]}
   - {path: scripts/route/route-model.mjs, why: "Model-route selector and --plan preview", usedBy: [scripts/goal/define-goal.mjs]}
@@ -116,3 +126,4 @@ internal:
   - {path: scripts/reconciler/core-watch.mjs, why: "Core-watch probe run by the debug run verb", usedBy: [scripts/cli/lib/debug-run.mjs]}
   - {path: scripts/gates/release-publish.mjs, why: "Publication owner called by the release publish flow", usedBy: [scripts/supervisor/release-publish-flow.mjs]}
   - {path: scripts/hfs/sync-runtime.mjs, why: "Runtime-copy sync owner called by the release sync-runtime verb", usedBy: [scripts/supervisor/release-sync-runtime.mjs]}
+  - {path: scripts/supervisor/release-affected.mjs, why: "The affected tests row of a release cut under suite ci, run as a plan step", usedBy: [modules/supervisor/release-cut.yaml]}

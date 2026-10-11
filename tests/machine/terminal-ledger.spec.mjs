@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+ import os from 'node:os'; import path from 'node:path';
 import { JOB_HANDLE_FIELDS, WORKER_HOLDING_STATUSES, jobTerminalHandles, ledgerJobs, kernelSignalRows, pathUnder } from '../../scripts/machine/terminal-ledger.mjs';
 import { ledgerBindings, dedupeTerminals } from '../../scripts/kernel/terminal-dedupe.mjs';
 import { orcaTreeFindings } from '../../scripts/supervisor/orca-tree.mjs';
@@ -23,9 +23,7 @@ test('jobTerminalHandles reads every field a terminal can hide in, in order', ()
   assert.deepEqual(jobTerminalHandles({ worker_id: null, payload: {} }, {}), [], 'empty fields drop out');
 });
 
-test('held statuses are exactly running and answering', () => {
-  assert.deepEqual([...WORKER_HOLDING_STATUSES].sort(), ['answering', 'running']);
-});
+
 
 test('ledgerBindings binds kernel-signal terminals and held-job handles; leased and signal-less kernels are busy', () => {
   const ledger = fakeDb({

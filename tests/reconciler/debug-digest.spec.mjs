@@ -5,33 +5,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { openMachine } from '../../engine/db/machine.mjs';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
-import { incidentPolicy, boundValue } from '../../scripts/kernel/op-incident-policy.mjs';
-import { analyze } from '../../scripts/reconciler/debug-digest-analyze.mjs';
-import { digestNumbers } from '../../scripts/reconciler/debug-digest-numbers.mjs';
 import { machineFacts } from '../../scripts/reconciler/debug-digest-machine.mjs';
 import { collectSnapshot, ledgerFacts } from '../../scripts/reconciler/debug-digest-collect.mjs';
+import { kernelSeatOf } from '../../scripts/reconciler/seat-cost.mjs';
 import { renderText } from '../../scripts/reconciler/debug-digest-render.mjs';
 import { main } from '../../scripts/reconciler/debug-digest.mjs';
-
-const NOW = 1_800_000_000_000;
-const MIN = 60_000;
-const REV = 'a'.repeat(40);
-const policy = { ...incidentPolicy(), resolve: boundValue };
-const numbers = digestNumbers();
-const digest = (snapshot) => analyze(snapshot, policy, numbers);
-
-const job = (over = {}) => ({ jobId: 'op-x-1', kind: 'op', opId: 'x', status: 'running', tryNo: 1, retryOf: null, workerId: 'w', deadline: null,
-  createdAt: NOW - 60 * MIN, updatedAt: NOW - 5 * MIN, ...over });
-const status = (over = {}) => ({ frontier: { state: 'engaged', openOperations: 1, readyOperations: 0, queued: [] }, legs: [], awaitingOwner: [],
-  kernelRev: { current: REV, acked: REV, stale: false, fileCount: 0 }, usage: { byOp: [{ opId: 'x', tokens: 1200, turns: 3, attempts: 1, costUsd: 0.5 }] }, ...over });
-const workflow = (over = {}) => ({ id: 'wf-1', name: 'Shop', ledger: 'shop', repo: 'work/shop', phase: 'running', jobs: [job(), job({ jobId: 'kernel-wf-1', kind: 'kernel', opId: null })],
-  incidents: [], decisions: [], kernelJob: { status: 'running', updatedAt: NOW - MIN }, kernelSignal: { terminal: 'term_k' }, lastKernelWakeAt: NOW - 2 * MIN,
-  status: status(), statusError: null, seatProbe: { action: 'idle-waiting' }, ...over });
-const snapshot = (over = {}) => ({ now: NOW, liveRev: REV,
-  engine: { leader: { pid: 7, epoch: 3, heartbeatAt: NOW - 10_000, rev: REV }, modes: { job: 'active', host: 'active' }, configured: { job: 'active', host: 'active' }, safe: [], failingQueue: [] },
-  supervisor: { seat: { state: 'live', terminalHandle: 'term_s', lastSeenAt: NOW - MIN, lastInputOkAt: NOW - MIN, deaf: false }, enabled: true, lastWakeAt: NOW - MIN, decisions: [], health: { live: true } },
-  reservations: [], seats: ['supervisor'], supJobs: [], workflows: [workflow()], ...over });
-const keys = (d) => d.problems.map((p) => p.key);
+import { NOW, MIN, REV, policy, digest, job, status, workflow, snapshot, keys } from '../helpers/debug-digest-fixture.mjs';
 
 test('a healthy workflow lists no problem and the digest says so in the owner language', () => {
   const d = digest(snapshot());
@@ -41,6 +20,15 @@ test('a healthy workflow lists no problem and the digest says so in the owner la
   assert.deepEqual(d.workflows[0].usage, [{ op: 'x', tokens: 1200, turns: 3, attempts: 1, costUsd: 0.5 }]);
   assert.match(renderText(d, { language: 'en' }), /No problem found\./);
   assert.match(renderText(d, { language: 'vi' }), /Kh\u00f4ng th\u1ea5y v\u1ea5n \u0111\u1ec1 n\u00e0o\./);
+});
+
+test('acceptance misses remain report evidence in the digest JSON and both owner languages, with no problem or gate', () => {
+  const trace = { op: 'backend.implement', jobId: 'op-impl', line: 'acceptance-trace: 1 of 2 cited, 1 tests uncited', missing: ['ac.task.title.required.empty'] };
+  const d = digest(snapshot({ workflows: [workflow({ status: status({ acceptanceTraces: [trace] }) })] }));
+  assert.deepEqual(d.workflows[0].acceptanceTraces, [trace]);
+  assert.deepEqual(d.problems, []);
+  assert.equal(d.ok, true);
+  for (const language of ['en', 'vi']) assert.ok(renderText(d, { language }).includes(trace.line));
 });
 
 test('a job held past its deadline names the hold, its handler, the step and the overdue time', () => {
@@ -65,7 +53,7 @@ test('a hold the policy table does not list is a problem of its own', () => {
 });
 
 test('a dead Kernel outranks the held work it leaves behind and an idle Kernel with ready work is named', () => {
-  const dead = workflow({ kernelJob: { status: 'failed', updatedAt: NOW }, seatProbe: { action: 'restart-needed' } });
+  const dead = workflow({ kernelJob: { status: 'failed', updatedAt: NOW - 60 * MIN }, seatProbe: { action: 'restart-needed' } });
   const d = digest(snapshot({ workflows: [dead] }));
   assert.equal(d.workflows[0].kernel.alive, false);
   assert.equal(d.problems[0].key, 'kernel-dead-wf-1');
@@ -76,7 +64,7 @@ test('a dead Kernel outranks the held work it leaves behind and an idle Kernel w
 });
 
 test('a Kernel that acked an older runtime than the current one is reported with the files behind', () => {
-  const stale = workflow({ status: status({ kernelRev: { current: REV, acked: 'b'.repeat(40), stale: true, fileCount: 3 } }) });
+  const stale = workflow({ status: status({ revisionNotice: { role: 'kernel', state: 'owed', from: 'b'.repeat(40), to: REV, count: 3, files: [], line: 'kernel owes 3 file(s) of rev x' } }) });
   const d = digest(snapshot({ workflows: [stale] }));
   assert.deepEqual(keys(d), ['kernel-rev-wf-1']);
   assert.equal(d.problems[0].params.files, 3);
@@ -90,7 +78,7 @@ test('a stale Supervisor gate and a Decision Item past due are listed with their
   assert.equal(d.problems[0].code, 'gate-stale');
   assert.equal(d.supervisor.staleGates.length, 1);
   assert.equal(d.supervisor.openDecisions, 2);
-  const dead = digest(snapshot({ supervisor: { ...snapshot().supervisor, decisions, health: { live: false, reason: 'terminal gone' } } }));
+  const dead = digest(snapshot({ supervisor: { ...snapshot().supervisor, seat: { ...snapshot().supervisor.seat, lastSeenAt: NOW - 60 * MIN }, decisions, health: { live: false, reason: 'terminal gone' } } }));
   assert.equal(dead.problems[0].key, 'seat-dead');
 });
 
@@ -108,6 +96,17 @@ test('a reservation live for a job that is not running, a finished Supervisor jo
   assert.deepEqual(d.admission.leaked.map((r) => r.id.replace(/0+$/, '')).sort(), ['ended-fix', 'gone-op', 'kernel-gone', 'seat-gone']);
   assert.equal(d.problems.every((p) => p.code === 'reservation-leak'), true);
   assert.equal(d.problems[0].params.min, 20);
+});
+
+test('the reservation of a seat names the seat it serves and is leaked only when that seat is gone', () => {
+  const reservation = (id, over) => ({ id: id.padEnd(32, '0'), provider: 'claude', model: 'm', role: 'supervisor', state: 'live', jobId: null, seat: null, kernelWorkflow: null,
+    createdAt: NOW - 90 * MIN, updatedAt: NOW - 38 * MIN, releasedAt: null, ...over });
+  const reservations = [reservation('sup-bare'), reservation('kernel-restarting', { role: 'kernel', state: 'launching', kernelWorkflow: 'wf-1' })];
+  const standing = digest(snapshot({ reservations, workflows: [workflow({ jobs: [job(), job({ jobId: 'kernel-wf-1', kind: 'kernel', opId: null, status: 'ready' })] })] }));
+  assert.deepEqual(standing.admission.leaked, [], 'the Supervisor seat stands and the Kernel job is between two incarnations');
+  const gone = digest(snapshot({ reservations, supervisor: { ...snapshot().supervisor, seat: { state: 'empty', terminalHandle: null, deaf: false } },
+    workflows: [workflow({ jobs: [job()] })] }));
+  assert.deepEqual(gone.problems.filter((p) => p.code === 'reservation-leak').map((p) => p.params.owner).sort(), ['the Kernel seat of wf-1', 'the Supervisor seat']);
 });
 
 test('controllers that are off while the config asks for them are the first line, also when the leader is gone', () => {
@@ -129,8 +128,9 @@ test('a stale leader, a leader on other code than the live runtime and failing q
   const stale = digest(snapshot({ engine: { ...snapshot().engine, leader: { pid: 7, epoch: 3, heartbeatAt: NOW - 600_000, rev: REV } } }));
   assert.ok(keys(stale).includes('leader-stale'));
   const drift = digest(snapshot({ engine: { ...snapshot().engine, leader: { pid: 7, epoch: 3, heartbeatAt: NOW - 1000, rev: 'c'.repeat(40) }, failingQueue: [{ controller: 'host', n: 4 }] } }));
-  assert.deepEqual(keys(drift), ['queue-host', 'leader-rev']);
+  assert.deepEqual(keys(drift), ['queue-host']);
   assert.equal(drift.problems[0].blocks, 4);
+  assert.deepEqual(drift.roles.find((r) => r.role === 'runtime').happy, [{ kind: 'runtime-rev-pending', count: 1 }]);
 });
 
 test('a failed op is judged by its recorded cause and by whether the policy next step happened', () => {
@@ -178,7 +178,7 @@ test('the text names every section in both languages and the JSON carries the sa
   const code = await main(['--json'], { collect: async () => snapshot(), print: (line) => printed.push(line), language: 'en' });
   assert.equal(code, 0);
   assert.deepEqual(JSON.parse(printed[0]).problems, []);
-  assert.equal(JSON.parse(printed[0]).schema, 'starci/debug-digest@1');
+  assert.equal(JSON.parse(printed[0]).schema, 'starci/debug-digest@2');
 });
 
 test('the verb exits 1 when the machine store is unreadable and 2 on a bad flag, and passes its filters on', async () => {
@@ -218,6 +218,38 @@ test('the machine facts and the collector read a real store and call only the re
   assert.equal(calls.some((c) => c.includes('--repair')), false);
   assert.deepEqual(await collectSnapshot({ env, machine: () => null }), { unavailable: 'machine store' });
 });
+
+test('refused inputs from before the Supervisor seat booted are belong to the replaced seat: the new seat is not deaf, until it refuses input itself', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-digest-deaf-'));
+  const env = { STARCI_TEST_MACHINE_FILE: path.join(dir, 'machine.sqlite') };
+  const machine = openMachine({ env, now: () => NOW - 40 * MIN });
+  try {
+    machine.upsertSeat({ seatId: 'supervisor', role: 'supervisor', state: 'live', terminalHandle: 'term_old', bootedAt: NOW - 90 * MIN });
+    for (let i = 0; i < 4; i += 1) machine.recordSeatInput({ seatId: 'supervisor', terminal: 'term_old', action: 'kernel-unwritable' });
+    assert.equal(machineFacts({ env }).supervisor.seat.deaf, true, 'the seat that refused input is deaf');
+    machine.upsertSeat({ seatId: 'supervisor', role: 'supervisor', state: 'live', terminalHandle: 'term_new', bootedAt: NOW - 20 * MIN });
+    assert.equal(machineFacts({ env }).supervisor.seat.deaf, false, 'the seat that replaced it has refused nothing');
+  } finally { machine.close(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); }
+});
+
+test('the wakes of an older runtime revision are history: the digest judges the empty-wake share from the revision now leading (Nivo 2026-10-09)', (t) => withLedger(t, (world) => {
+  const { ledger } = world;
+  const env = { STARCI_TEST_MACHINE_FILE: world.machineFile };
+  for (const [rev, at, handover] of [['c'.repeat(40), NOW - 600 * MIN, false], [REV, NOW - 20 * MIN, true]]) {
+    const clocked = openMachine({ env, now: () => at });
+    try { clocked.acquireLeader({ holder: `h-${rev[0]}`, pid: handover ? 2 : 1, leaseMs: 1000, rev, handover }); } finally { clocked.close(); }
+  }
+  const facts = machineFacts({ env });
+  assert.equal(facts.engine.revSince, NOW - 20 * MIN, 'the run of epochs at the live revision starts at its first epoch');
+  const wake = (at) => ({ kind: 'kernel-woken', entityType: 'kernel', entityId: 'wf-w', at });
+  seedWorkflow(ledger, { id: 'wf-w', state: { phase: 'running' }, goal: { revision: 1, markdown: 'g', json: {} },
+    jobs: [{ jobId: 'kernel-wf-w', kind: 'kernel', status: 'running', workerId: 'term_k' }],
+    events: [...Array.from({ length: 12 }, (_, i) => wake(NOW - (500 - 10 * i) * MIN)), wake(NOW - 10 * MIN)] });
+  const all = kernelSeatOf(ledger.db, { workflowId: 'wf-w', now: NOW });
+  const current = kernelSeatOf(ledger.db, { workflowId: 'wf-w', now: NOW, since: facts.engine.revSince });
+  assert.equal(all.wakes, 13);
+  assert.equal(current.wakes, 1, 'only the wake the live revision sent counts');
+}));
 
 test('the ledger facts list the running workflows with their jobs, open incidents, Kernel job and last wake', (t) => withLedger(t, ({ ledger }) => {
   seedWorkflow(ledger, { id: 'wf-run', state: { phase: 'running' }, goal: { revision: 1, markdown: 'g', json: {} },

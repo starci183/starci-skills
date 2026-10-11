@@ -10,7 +10,7 @@
 //     spent backoff.maxAttempts parks (due_at NULL) and runs again only when a new event adds it.
 // The rows persist across a restart (a failing key keeps its backoff); the in-flight set is this process's only.
 
-import { nextRetry, retryAfterFailure } from '../lib/retry-budget.mjs';
+import { doublingDelay, retryAfterFailure } from '../lib/retry-budget.mjs';
 
 /** The engine_queue rows of a machine handle: {get, put, remove, due, all}. A row is {controller, key, due_at, reason, tries, last_error}. */
 export function machineRows(m) {
@@ -66,7 +66,7 @@ export class WorkQueue {
 
   /** Delay after `attempts` failures. Pure. */
   static backoffMs(attempts, { minMs = 1000, maxMs = 300000 } = {}) {
-    return nextRetry({ intervalMs: minMs, maxIntervalMs: maxMs }, { attempts: Number(attempts) || 1, now: 0, reason: 'backoff' }).delayMs;
+    return doublingDelay(Number(attempts) || 1, { minMs, maxMs });
   }
 
   /**

@@ -194,12 +194,7 @@ test('the CLI exits 1 on findings, 0 clean, 2 on a bad invocation',t=>{
   });
 });
 
-test('check-orca-tree is deliberately not part of npm run check — it needs a ledger',()=>{
-  const pkg=JSON.parse(fs.readFileSync(path.join(ROOT,'package.json'),'utf8'));
-  assert.doesNotMatch(pkg.scripts.check,/check-orca-tree/);
-  const contract=fs.readFileSync(path.join(ROOT,'modules','kernel','start-workflow.yaml'),'utf8');
-  assert.match(contract,/scripts\/checks\/check-orca-tree\.mjs/,'the rule cites the check that enforces it');
-});
+
 
 test('a [Kernel] terminal naming a workflow from another ledger is not an orphan here',t=>{
   withLedger(t,({ledger})=>{

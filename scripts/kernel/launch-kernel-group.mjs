@@ -1,11 +1,12 @@
 // Kernel group launch: one admitted attempt, no-effect-only fallback and its ledger receipt.
+import { phase } from './start-phase.mjs';
 import { startAgent } from '../agent/lib.mjs';
 import { updateSignal } from '../../engine/db/ledger.mjs';
 import { commitWorkflowStart } from './workflow-startup.mjs';
 
 /** The failure record of one refused start: the selected member, the effect and every receipt field it left. */
 const failureOf = (spawned, selected) => ({ agent: selected.provider, requestedModel: selected.model, effectState: spawned.effectState ?? 'unknown', admission: spawned.admission ?? null,
-  ...(spawned.errorCode ? { errorCode: spawned.errorCode } : undefined), ...(spawned.hostRequestId ? { hostRequestId: spawned.hostRequestId } : undefined), ...(spawned.dispatchId ? { dispatch: spawned.dispatchId } : undefined),
+  ...(spawned.errorCode ? { errorCode: spawned.errorCode } : undefined), ...(spawned.hostRequestId ? { hostRequestId: spawned.hostRequestId } : undefined), ...(spawned.dispatchId ? { dispatch: spawned.dispatchId } : undefined), ...(spawned.runId ? { runId: spawned.runId } : undefined),
   ...(spawned.cleanup ? { cleanup: spawned.cleanup } : undefined), ...(spawned.observation ? { observation: spawned.observation } : undefined),
   ...(spawned.trust ? { trust: spawned.trust } : undefined) });
 
@@ -37,6 +38,7 @@ const recordFallThrough = ({ ledger, workflowId, spawned, failure, next, selecte
 
 export function launchKernelGroup({ ledger, workflowId, token, expected, route, members, launch, reservationMs,
   hostUnavailableExit, memberLabel, failStart }, { start = startAgent, now = Date.now } = {}) {
+  phase('kernel-launch');
   const fellThrough = [];
   let spawned = null;
   const remaining = [...members];

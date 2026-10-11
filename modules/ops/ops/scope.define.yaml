@@ -42,7 +42,7 @@ reads:
       en: Resolve the working runtime profile against actual available tools. Do not switch providers,
         invent tools or dispatch agents solely from a profile.
   - id: standard
-    path: shared
+    path: docs/architecture.md + docs/code-pattern-enforcement.md + knowledge/op-gate.yaml + knowledge/patterns/repo/starciwork.yaml + knowledge/patterns/repo/folder.yaml + knowledge/hfs/slots.yaml
     purpose:
       en: shared
       vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (starci app explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
@@ -194,6 +194,20 @@ proofs:
       en: "starci kernel settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
       vi: "starci kernel settle tự đọc lại read-digest.json đính kèm (check op-proof, proof read-knowledge): done thiếu bản tóm tắt (op-read-digest-missing), không nêu tệp knowledge nào hoặc có bản ghi đã viết thiếu slot hfs (op-read-digest-no-knowledge) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
+  - id: independent-critic
+    requirement:
+      en: "A Critic of another provider than this op, picked from the Critic tier, judged exactly the scope.define records written here and the records they cite against the rubric of modules/kernel/critic-rubrics.yaml, and its verdict passes the declared minimum. The runtime runs that Critic itself, once per version of the records, when this op reports done (scripts/kernel/settle/critic-run.mjs; the op runs no Critic and a verdict it attaches is ignored) and starci kernel settle judges the verdict of that run against the sha256 of the records now (scripts/kernel/critic-settle.mjs): a run not yet recorded (op-critic-verdict-missing, the runtime owes it), a verdict of other bytes (CRITIC_VERDICT_STALE) or a failing one (op-critic-verdict-failed, error-work: the next attempt is fed the critique) is refused."
+    check: scripts/kernel/critic-settle.mjs
+judge:
+  - by: machine
+    measures: [declared-checks, work-hygiene, op-proof:read-knowledge]
+    proofs: [binding, read-knowledge]
+    why: "the settler re-runs the record validator over the records written, the Work files are checked for hygiene and the READ of the standard is re-read from the digest"
+  - by: critic
+    rubric: "modules/kernel/critic-rubrics.yaml#kinds[id=scope.define]"
+    runs: runtime
+    proofs: [independent-critic]
+    why: "the runtime runs an independent Critic of another provider over the scope record once per version of it, and settle judges its verdict"
 blockers:
   - code: INTENT_UNRESOLVED
     condition:

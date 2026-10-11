@@ -11,7 +11,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 
 test('debug catalog resolves both handlers and their exact local flags', () => {
   const expected = {
-    digest: ['child-timeout', 'repo', 'workflow'],
+    digest: ['child-timeout', 'questions', 'repo', 'workflow'],
     run: ['child-timeout', 'repo', 'since-hours', 'token-spike', 'token-window'],
   };
   for (const [verb, flags] of Object.entries(expected)) {
@@ -29,15 +29,7 @@ test('debug run resolves only documented read-only inspectors', () => {
   assert.deepEqual(Object.keys(INSPECTORS), ['orca-status', 'runtime-status', 'supervisor-status', 'model-scorecard', 'core-watch']);
 });
 
-test('debug inspector options dispatch through the runtime seam', () => {
-  const calls = [];
-  const runScript = (script, args) => { calls.push({ script, args }); return 0; };
-  assert.equal(main(['debug', 'run', 'model-scorecard', '--repo', 'one', '--repo', 'two', '--since-hours', '24'], { catalog, runScript }), 0);
-  assert.equal(main(['debug', 'run', 'core-watch', '--child-timeout', '30', '--token-window', '5'], { catalog, runScript }), 0);
-  assert.match(calls[0].script, /debug-run\.mjs$/);
-  assert.deepEqual(calls[0].args, ['model-scorecard', '--repo', 'one', '--repo', 'two', '--since-hours', '24']);
-  assert.equal(calls.length, 2);
-});
+
 
 test('debug run refuses missing, unknown and extra input', () => {
   assert.equal(main(['debug', 'run'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);

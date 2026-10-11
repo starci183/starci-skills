@@ -120,8 +120,8 @@ reads:
     path: modules/models/registry.yaml with modules/models/runtimes.yaml, the selected runtime and the
       actual host tools
     purpose:
-      en: "Whether this host runs the Playwright capture of `scripts/work/draw-render.mjs` (node and the product's own
-        Playwright install in the product checkout) and which tool was actually invoked. Owner ruling 2026-09-27
+      en: "Whether this host runs the Playwright capture of `scripts/work/draw-render.mjs` (node, and Playwright with its browser
+        and esbuild: the product's install when it has one, else the runtime's own) and which tool was actually invoked. Owner ruling 2026-09-27
         (draw-devin-brand-claude): interface.draw walks the draw order - Devin first, Codex the fallback - and a
         raster region is an artworkSlot interface.asset generates through `starci work imagegen` (the steps keep the drawer
         off raster art)."
@@ -476,8 +476,8 @@ steps:
         .dom.html}, runs EVERY machine metric (the source gate, the capture, the rendered-DOM DNA gate, the taste metrics DRAW_ACCENT_BUDGET /
         DRAW_TOO_MANY_BANDS / DRAW_TOO_MANY_BADGES, copy, badges, actions, the brand palette, the Grammar
         geometry and the ui-proof score) and then an independent critic - a fresh Orca worker the loop starts through worker-start (a
-        worker of your Run: it waits for its worker_done up to the critic's timeoutMs, then releases it) on a model other than the
-        drawer's (runtimes.yaml allocation.drawLoop.critic - Codex when Devin draws - or criticWhenDrawer) with no drawing
+        worker of your Run: it waits for its worker_done up to the critic's timeoutMs, then releases it) of another provider than the
+        drawer's (the Critic tier, tiers.yaml seats.critic - modules/kernel/critic.yaml) with no drawing
         context, only the PNGs, the HTML and the product's brand.direction rubric - scores every rubric check
         and the beauty 1-10, recorded in <out>/round-<n>/{source.html, parts, metrics.json, critique.json}. Fix
         the draw source against metrics.json and critique.json and run round again until the loop stops: every metric
@@ -813,6 +813,21 @@ proofs:
       en: "starci kernel settle re-reads the attached lint.json (runtime check op-proof, proof produced-lint): a done without it (op-lint-proof-missing), with a lint that could not run (op-lint-tool-failed) or with any finding over the produced files (op-lint-findings) is refused."
       vi: "starci kernel settle tự đọc lại lint.json đính kèm (check op-proof, proof produced-lint): done thiếu nó (op-lint-proof-missing), có lint không chạy được (op-lint-tool-failed) hoặc có bất kỳ lỗi nào trên các tệp đã tạo (op-lint-findings) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
+judge:
+  - by: critic
+    rubric: "scripts/work/draw-critic.mjs"
+    runs: in-op
+    proofs: [draw-loop]
+    why: "an independent Critic of another provider judges every round of the draw loop against the brand rubric (the product's brand.direction.rubric, else the built-in default) and the beauty minimum gates the draw"
+  - by: machine
+    measures: [declared-checks, work-hygiene, op-proof:produced-lint, draw-rerun, contract-script]
+    proofs: [draw-gates, draw-quality, draw-loop, shell-conformance, produced-lint]
+    why: "the runtime re-renders every live part and re-runs the machine metrics itself (never the loop's numbers), refuses an asset that is not a token-rendered shape, and re-runs the produced-file lint and the shell-conformance check"
+  - by: owner
+    why: "a drawing is done only on the owner's accept answer to its draw-review ask"
+  - by: next-leg
+    leg: interface.audit
+    why: "interface.audit re-captures the rendered result and compares it with the accepted draws, the installed Grammar and the brand, and routes every drift back"
 blockers:
   - code: APP_SHELL_UNSETTLED
     condition:
@@ -836,8 +851,9 @@ blockers:
         never at the start. Report `blocked` with blocker `brand-gap` naming the layout node and what step 1 could not do.
   - code: RENDER_TOOL_UNAVAILABLE
     condition:
-      en: The draw-render Playwright capture cannot run on this host. Report host-unsupported; do not
-        substitute ImageGen, hand-painted boxes or a prose description.
+      en: The draw-render Playwright capture cannot run on this host although the dispatch admitted it (the dispatch refuses a host without
+        Playwright, its browser and esbuild before it starts the op, so this is a browser that fails to launch). Report host-unsupported with
+        the launch error; do not substitute ImageGen, hand-painted boxes or a prose description.
   - code: IMAGEGEN_TOOL_UNAVAILABLE
     condition:
       en: A raster region is required and it is not declared as an artworkSlots entry with its brief for
@@ -879,9 +895,11 @@ route:
   nodeKinds: [ui]
   phase: [direct, pre-implementation]
   intent: [direction, draw, render, ui-design]
-  # draw-render captures with Playwright in the product checkout (owner ruling 2026-09-27: Devin draws, Codex falls back).
-  riskHints:
-    - host-tool-required:browser-dom
+  # draw-render and layout-render drive Playwright themselves (runtime verbs, no browser tool of the agent): the op declares no host tool of an
+  # agent, so every agent that can run the verbs and read a PNG is eligible. The capture needs Playwright with its browser and esbuild on the
+  # host (the product's install, else the runtime's own): host-capability-required:render makes the dispatch refuse RENDER_TOOL_UNAVAILABLE
+  # before an attempt is spent when the host has none (scripts/work/render-tools.mjs).
+  riskHints: [host-capability-required:render]
   prerequisites:
     - business.decide settled pass (reviewed SRS seed; Work leaves remain todo)
     - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)

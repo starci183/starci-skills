@@ -22,6 +22,10 @@
 //                          'prompt-stalled': worker-start created an exact
 //                          worker whose prompt injection stalled; its process
 //                          exited and release retains only terminal bookkeeping.
+//                          'turn-start-unobserved': worker-start creates the worker and its terminal, whose input box holds the prompt as an
+//                          unsubmitted "[Pasted Content N chars]" chip, and answers outcome_unknown / turn_start_unobserved with no
+//                          terminal handle in the receipt (Codex 0.160, Nivo Kernel 2026-10-09). An Enter-only send submits the chip
+//                          when STARCI_FAKE_ORCA_CHIP_ENTER=submits, else the chip stays.
 //                          'run-create-no-sender': run-create is refused locally with
 //                          no_active_sender_terminal (id local), before any mutation.
 //                          'dead-terminal': terminal show reports the exact
@@ -163,6 +167,7 @@ import path from 'node:path';
 
 const FAKE_ORCA_SOURCE = String.raw`// fake orca — canned terminal + orchestration API for the dispatch specs.
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 const ROOT = __STARCI_ROOT__, FAKE_REPO = process.cwd().replaceAll('\\', '/');
 const argv = process.argv.slice(2);
@@ -390,6 +395,14 @@ else if (verb === 'terminal send' && record(arg('terminal'))?.sendRefused) {
   state.refusedSends = (state.refusedSends || 0) + 1; save();
   fail({ ok: false, error: { code: record(arg('terminal')).sendRefused, message: record(arg('terminal')).sendRefused } });
 }
+// terminals[h].chipUnsubmitted: the input box holds a pasted-content chip; an Enter-only send submits it when chipEnter, else nothing changes.
+else if (verb === 'terminal send' && record(arg('terminal'))?.chipUnsubmitted && !(arg('text') ?? '')) {
+  const r = record(arg('terminal'));
+  state.chipEnters = [...(state.chipEnters || []), { terminal: arg('terminal'), submits: r.chipEnter === true }];
+  if (r.chipEnter) { r.staged = false; r.sent = true; r.chipUnsubmitted = false; }
+  state.sends += 1; save();
+  out({ ok: true, result: { sent: true } });
+}
 // terminals[h].transportFailOnce = '<request id>': the first text+Enter prompt fails ambiguously with that
 // request id in error.data; a reissue carrying --retry-request <id> is applied once and answers the prompt receipt.
 else if (verb === 'terminal send' && record(arg('terminal'))?.transportFailOnce && arg('text') && argv.includes('--enter')) {
@@ -572,10 +585,14 @@ else if (verb === 'orchestration run-use') {
   out({ ok: true, result: { run: { id: arg('id'), coordinator_handle: arg('from') } } });
 }
 else if (verb === 'orchestration run-show')
-  out({ ok: true, result: { run: { id: arg('id'), coordinator_handle: state.runs?.[arg('id')]?.coordinator ?? null } } });
+  out({ ok: true, result: { run: { id: arg('id'), coordinator_handle: (process.env.STARCI_FAKE_ORCA_START_FENCED === 'always' || (process.env.STARCI_FAKE_ORCA_START_FENCED === '1' && !(state.runUses || []).length)) ? null : state.runs?.[arg('id')]?.coordinator ?? null } } });
 else if (verb === 'orchestration run-list')
   out({ ok: true, result: { runs: Object.values(state.runs || {}).map(r => ({ id: r.id, objective: r.objective ?? null, coordinator_handle: r.coordinator ?? null })) } });
 // A Task is filed in a Run (worker-start --spec, task-update) only from that Run's coordinator; a lost Run answers run_not_found.
+// STARCI_FAKE_ORCA_START_FENCED=1: the Run is bound to a coordinator Orca does not name (run-show answers none), so worker-start is refused consumer_fenced until a
+// run-use binds the Run to the caller; STARCI_FAKE_ORCA_START_FENCED=always: the refusal stands whatever run-use did (live, 2026-10-09: the Kernel terminal was not the coordinator Orca had bound; the refusal repeated three times).
+else if (verb === 'orchestration worker-start' && (process.env.STARCI_FAKE_ORCA_START_FENCED === 'always' || (process.env.STARCI_FAKE_ORCA_START_FENCED === '1' && !(state.runUses || []).length)))
+  fail({ ok: false, error: { code: 'consumer_fenced', message: 'worker-start requires the coordinator terminal currently bound to the Task Run.' } });
 else if ((verb === 'orchestration worker-start' || verb === 'orchestration task-update') && state.runs?.[arg('run')]?.lost)
   fail({ ok: false, error: { code: 'run_not_found', message: 'Run ' + arg('run') + ' was not found.' } });
 else if ((verb === 'orchestration worker-start' || verb === 'orchestration task-update') && state.runs?.[arg('run')]
@@ -649,6 +666,12 @@ else if (verb === 'orchestration worker-start') {
   const dispatchId = 'dispatch-fake-' + state.workerStarts.length;
   state.agent = arg('agent'); state.model = arg('model'); state.dispatchId = dispatchId; state.assignee = handle;
   state.assignees = { ...(state.assignees || {}), [dispatchId]: handle };
+  if (mode === 'turn-start-unobserved') {
+    state.workerStates = { ...(state.workerStates || {}), [dispatchId]: 'outcome_unknown' };
+    state.terminals[handle] = { ...state.terminals[handle], staged: true, sent: false, chipUnsubmitted: true, chipEnter: process.env.STARCI_FAKE_ORCA_CHIP_ENTER === 'submits' }; save();
+    fail({ ok: false, error: { code: 'turn_start_unobserved', message: "Dispatch input was written and submitted, but codex's turn start could not be verified during observation (up to 30s)." },
+      result: { runId: arg('run'), taskId, dispatchId, state: 'outcome_unknown', stage: 'turn_start_unobserved', turnStart: 'unobserved' } });
+  }
   state.workerStates = { ...(state.workerStates || {}), [dispatchId]: 'ready' }; save();
   out({ ok: true, result: { runId: arg('run'), taskId, dispatchId,
     state: 'ready', stage: 'ready',
@@ -700,7 +723,11 @@ else if (verb === 'orchestration worker-release') {
         lastError: 'The agent terminal was closed but its process could not be confirmed stopped' } });
   }
   if (!(unknownReleases > 0 && state.releases <= unknownReleases)) {
-    state.workerStates = { ...(state.workerStates || {}), [arg('dispatch')]: 'released' }; save();
+    state.workerStates = { ...(state.workerStates || {}), [arg('dispatch')]: 'released' };
+    // state.releaseClosesTerminal: Orca closes the agent terminal of a Dispatch it releases (the live behaviour); unset, the terminal stays as seeded.
+    const closing = state.releaseClosesTerminal ? state.assignees?.[arg('dispatch')] : null;
+    if (closing && state.terminals?.[closing]) state.terminals[closing] = { ...state.terminals[closing], connected: false, writable: false, closed: true };
+    save();
     out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'released' } });
   }
 }
@@ -709,11 +736,12 @@ else if (verb === 'orchestration worker-abandon')
 // state.workerRows seeds Orca's worker accounting (worker-list row shape): filtered by --run and
 // --terminal-state, paged by --limit with an opaque numeric cursor. A run filter reports scope flag.
 else if (verb === 'orchestration worker-list') {
-  const rows = (state.workerRows || []).filter((w) => (!arg('run') || w.runId === arg('run')) && (!arg('terminal-state') || w.terminalState === arg('terminal-state')));
+  const selectedRun = arg('run') ?? state.workerListBoundRun ?? null;
+  const rows = (state.workerRows || []).filter((w) => (!selectedRun || w.runId === selectedRun) && (!arg('terminal-state') || w.terminalState === arg('terminal-state')));
   const limit = Number(arg('limit')) || 100;
   const start = Number(arg('cursor')) || 0;
   const more = start + limit < rows.length;
-  out({ ok: true, result: { workers: rows.slice(start, start + limit), counts: {}, scope: { source: arg('run') ? 'flag' : 'all' },
+  out({ ok: true, result: { workers: rows.slice(start, start + limit), counts: {}, scope: state.workerListScopes?.[arg('run') ?? '*'] ?? { source: arg('run') ? 'flag' : selectedRun ? 'bound' : 'all', run: selectedRun },
     page: { limit, total: rows.length, hasMore: more, nextCursor: more ? String(start + limit) : null } } });
 }
 // state.workerOutput[dispatch] seeds Orca's worker-read answer: {source: 'transcript'|'terminal', pages: [{rows,
@@ -799,6 +827,21 @@ else if (verb === 'orchestration reply') {
   out({ ok: true, result: { message: { id: 'msg_reply_' + state.replies.length, thread_id: arg('id') } } });
 }
 // ---- misc reads ----
+// state.worktrees seeds Orca's worktree accounting (worktree ps row shape: id, repoId, path, branch, comment, isMainWorktree, liveTerminalCount, status). rm removes a tree the way Orca
+// does (git worktree remove, the tree's own repository named by state.worktreeRepos[repoId]), forgets it, and keeps the branch; a terminal still open in the tree (state.terminals with its path) refuses it.
+else if (verb === 'worktree ps')
+  out({ ok: true, result: { worktrees: state.worktrees || [], truncated: false } });
+else if (verb === 'worktree rm') {
+  const id = String(arg('worktree')).replace(/^id:/, '');
+  const w = (state.worktrees || []).find(x => x.id === id);
+  if (!w) fail({ ok: false, error: { code: 'worktree_not_found', message: 'worktree_not_found' } });
+  const open = Object.values(state.terminals || {}).filter(t => !t.closed && t.worktree === w.path);
+  if (open.length) fail({ ok: false, error: { code: 'worktree_has_live_terminals', message: 'the worktree still has a live terminal: close it, then remove the worktree' } });
+  const removed = spawnSync('git', ['-C', (state.worktreeRepos || {})[w.repoId], 'worktree', 'remove', '--force', w.path], { encoding: 'utf8', windowsHide: true });
+  if (removed.status !== 0) fail({ ok: false, error: { code: 'worktree_remove_failed', message: String(removed.stderr || '').trim() } });
+  state.worktrees = state.worktrees.filter(x => x.id !== id); save();
+  out({ ok: true, result: { removed: true } });
+}
 else if (verb === 'worktree show')
   out({ ok: true, result: { worktree: { id: arg('worktree'), path: arg('worktree') } } });
 else if (verb === 'account list') {

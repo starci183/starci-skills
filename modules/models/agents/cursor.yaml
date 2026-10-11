@@ -8,6 +8,11 @@ start:
   cli: cursor-agent
   bypassFlag: '--yolo'
 readiness: worker-start-receipt
+# Content is a file; what travels is the reference (scripts/agent/prompt-file.mjs): a follow-up prompt above allocation.promptFile.maxChars is written to a
+# file and the terminal is given one line that names it, so no TUI paste heuristic (a folded "[Pasted Content N chars]" chip, a swallowed Enter) is involved.
+delivery:
+  mode: file-reference-above-inline-limit
+  prompt: 'Read <file> completely. It is your dispatched prompt. Follow it exactly.'
 roles:
   - workflow-kernel
   - operation-agent

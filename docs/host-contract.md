@@ -69,9 +69,14 @@ default args (Orca settings `agentDefaultArgs`: claude
 `--dangerously-skip-permissions`, codex `--dangerously-bypass-approvals-and-sandbox`,
 devin `--permission-mode bypass --respect-workspace-trust false`); the runtime
 passes only `--agent`, and `--model`/`--effort` where the card takes them.
-`terminal create` and `orchestration dispatch` are forbidden for the runtime
-(`api.yaml` `forbiddenForStarciOrchestration`), and `scripts/checks/check-host-boundary.mjs`
-rule `agent-launch` fails on any terminal-creating code.
+`terminal create` and `orchestration dispatch` remain forbidden for agent orchestration
+(`api.yaml` `forbiddenForStarciOrchestration`). Owner-authorized release maintenance may prepare
+one plain PowerShell shell in the canonical Source through `scripts/api/orca/terminal-create.mjs`.
+The adapter accepts no input and issues only the fixed worktree/shell/title parameters; it starts no agent
+and types no command. The host-boundary check recognizes only that single native call by its AST shape,
+not a pathname-wide exemption. Receipt loss is unknown custody, never an automatic retry.
+A cut started outside an actual Orca terminal still refuses after preparation; the native terminal
+must run the next cut and inherit its own actual context. A read-only cut plan never creates a shell.
 
 ## Card anatomy
 
@@ -123,7 +128,7 @@ spawnAgent({provider, model, effort, worktree, title, spec, run, from, request})
 startAgent({…, prompt, objective, entry, priorRunId, request})
   run-create(objective, from = entry, --retry-request)
                                        → the agent's own Run (Kernel, Supervisor, [Worker])
-  spawnAgent(spec = prompt, ...)       → spilled to a file past the host argv (task-spec.mjs)
+  spawnAgent(spec = prompt, ...)       → spilled to a file past allocation.promptFile.maxChars (prompt-file.mjs)
 ```
 
 Every mutation declares `replay` in `calls.yaml` (`idempotency`): `request`
@@ -221,7 +226,9 @@ static file under the `public/` folder of the first fe app (`fe/apps/<app>/publi
 
 Each parent creates and coordinates the Run of its child (`run-create --from <its terminal>`). The draw critic is
 placed on a runtime worktree detached at the empty tree (`draw-critic.mjs criticWorkspace`): Orca places a worker
-only on a worktree it resolves, and a bare temp directory is refused `selector_not_found`.
+only on a worktree it resolves, and a bare temp directory is refused `selector_not_found`. The critic's terminal is bound
+to a job guard of role `critic` (`critic-guard.mjs`): its shell, file tools and, on Claude and Devin, its read tools reach
+that directory, its verdict file and the one Task file the runtime wrote for it outside the directory (`reach.taskFile`) and nothing else (`scripts/guards/critic-reach.mjs`, `modules/kernel/command-policy.yaml` `critic`).
 
 ## Checklist for a new agent card
 

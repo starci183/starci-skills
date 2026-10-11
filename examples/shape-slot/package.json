@@ -22,9 +22,9 @@
   },
   "devDependencies": {
     "@nestjs/testing": "11.2.5",
-    "@starci/cli": "1.1.0",
-    "@starci/eslint-canon-be": "3.1.0",
-    "@starci/eslint-canon-fe": "8.1.0",
+    "@starci/cli": "1.2.1",
+    "@starci/eslint-canon-be": "3.2.1",
+    "@starci/eslint-canon-fe": "8.2.1",
     "@starci/jest-preset": "2.2.6",
     "@starci/prettier-config": "1.0.3",
     "@starci/stylelint-canon": "2.0.6",

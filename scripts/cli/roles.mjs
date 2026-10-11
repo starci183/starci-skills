@@ -9,7 +9,7 @@ export const ROLES = ['worker', 'lead', 'coordinator', 'release', 'owner'];
 
 // The rights vocabulary (op, supervisor, lead, coordinator, release) onto the verb vocabulary: an op is a worker, the
 // supervisor and the kernel act as leads, and no rights role at all is the unrestricted owner.
-const VERB_ROLE = Object.freeze({ op: 'worker', supervisor: 'lead', lead: 'lead', coordinator: 'coordinator', release: 'release' });
+const VERB_ROLE = Object.freeze({ op: 'worker', supervisor: 'lead', lead: 'lead', coordinator: 'coordinator', release: 'release', critic: 'critic' });
 
 /** Resolve the caller role; an absent or unknown rights role is the unrestricted owner seat. */
 export function currentRole({ env = process.env, root } = {}) {

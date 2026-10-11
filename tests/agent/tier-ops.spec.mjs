@@ -43,8 +43,8 @@ test('an operation takes the chain of its difficulty tier and the first member w
 
 test('a drawing op takes the tier of its difficulty like every core op: high from its hard floor, frontier at insane, never the call tier',()=>{
   for(const kind of ['interface.draw','interface.asset','brand.decide']){
-    // interface.draw needs the browser-dom host tool (Playwright capture), which Claude's card lacks: its high chain drops to Sol.
-    const [target,modelId]=kind==='interface.draw'?['codex-agent','gpt-6.1-sol']:['claude-agent','claude-sonnet-5-5'];
+    // interface.draw declares no host tool (draw-render and layout-render drive Playwright themselves): Claude leads its high chain like the other drawing ops.
+    const [target,modelId]=['claude-agent','claude-sonnet-5-5'];
     for(const difficulty of ['easy','medium','hard']){
       const r=route({kind,difficulty});
       assert.deepEqual([r.tier,r.target,r.modelId],['high',target,modelId],`${kind} ${difficulty}`);

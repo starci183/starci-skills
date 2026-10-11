@@ -17,6 +17,7 @@ import { randomBytes } from 'node:crypto';
 import { pidAlive, starciLocalRoot } from '../../engine/db/machine.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
+import { onInterrupt } from '../lib/interrupt-cleanup.mjs';
 
 export const HOST_LOCK_SCHEMA = 'starci/host-lock@1';
 export const ROLES = Object.freeze(['release', 'coordinator', 'lead', 'worker']);
@@ -167,15 +168,17 @@ export function releaseHostLock({ token, env = process.env, dir, newToken = () =
 
 /**
  * Run `fn({token, owner})` under the lock and always release it. Returns fn's result, or the refusal of acquireHostLock
- * ({ok: false, reason: 'held', owner}) without running fn. An async fn holds the lock until its promise settles.
+ * ({ok: false, reason: 'held', owner}) without running fn (`options.onInterrupt` is the registration seam). An async fn holds the lock until its promise settles; a signal or an exit meanwhile releases it too (scripts/lib/interrupt-cleanup.mjs).
  */
 export function withHostLock(options, fn) {
   const got = acquireHostLock(options);
   if (!got.ok) return got;
   const release = () => releaseHostLock({ token: got.token, env: options?.env, dir: options?.dir, fs: options?.fs, now: options?.now, isAlive: options?.isAlive, host: options?.host, remove: options?.remove });
+  const dispose = (options?.onInterrupt ?? onInterrupt)(release); // an interrupted holder drops its lock before the process ends
+  const done = () => { dispose(); release(); };
   let out;
-  try { out = fn(got); } catch (error) { release(); throw error; }
-  if (typeof out?.then === 'function') return out.finally(release);
-  release();
+  try { out = fn(got); } catch (error) { done(); throw error; }
+  if (typeof out?.then === 'function') return out.finally(done);
+  done();
   return out;
 }

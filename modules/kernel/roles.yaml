@@ -28,6 +28,7 @@ floor:
     - "detects and counts every situation of the hold policy (modules/kernel/op-incident-policy.yaml) and takes its mechanical steps"
     - "dispatches ready work, retries inside bounds and switches agent on the tier chain"
     - "runs the checks, keeps the ledger, and collects leftovers no seat owns (reservations, leases, worktree records, queue items)"
+    - "wakes a seat only while its menu holds an item and replaces a Kernel or an idle Supervisor that has received afterWakes wakes or spent afterTokens tokens since its boot by a fresh seat that reads the stores (modules/reconciler/seat-cost.yaml), so a seat costs in proportion to its decisions; starci reconciler status prints per seat its wakes, its empty wakes and its tokens per wake"
   never:
     - "decides product intent or a costly-to-reverse choice"
 
@@ -44,12 +45,23 @@ chain:
   ownerQuestion: "An owner-class question goes from the Kernel straight to the owner through the runtime's ask channel; the Supervisor is informed, not a relay (the one exception to P3)."
 
 # The test that attributes a stuck thing to exactly one role, and the shape of what Debug records.
+# Exactly two classes of error exist. A happy error is the system working as designed (a Kernel waits on a question, an Op is blocked with a
+# clear cause, a quota runs out and the next agent takes over, a gate asks for a ruling): the roles handle it inside the chain, Op to Kernel to
+# Supervisor to owner, through the policy, and the Supervisor, Kernel, Op and Critic handle happy errors only. A bug is a role or the runtime not
+# doing what its contract says (a Kernel hangs or dies, a seat ignores ready work, an Op is stuck silently, a mechanism leaves a leftover, a verb
+# misbehaves): a bug is never the chain's to fix, Debug scans every role and the runtime floor, finds it and removes it by changing .claude with a spec.
+errors:
+  happy: "the system working as designed; handled inside the chain by the roles through the policy"
+  bug: "a role or the runtime does not do what its contract says; found and removed by Debug, never worked around by the chain"
+  goal: "every workflow operates completely inside Orca with no bug: no Debug is needed to change .claude"
+  menu: "everything on the Kernel's menu is a happy error for the Kernel to decide; a bug is never offered as a choice: the Kernel's exits are none-fits and the Supervisor's runtime-defect record"
+
 findings:
   test: "When this role met something it could not finish, did it report up through its own channel, with a cause and evidence, inside its bound?"
   verdicts:
-    conforms: "the role did its duties"
-    correct-error: "it met something it could not finish and reported it up with a cause and evidence inside its bound: the system worked as designed, the responsibility moved one level up, and the verdict is now about how the next role handles it. A count of correct errors is information, never a problem line."
-    departs: "it was silent, late, misclassified or mishandled: stuck with no report, question or blocked cause inside its bound; claimed done without evidence; named the wrong cause class; wrote outside its scope; went around the supported path; kept retrying instead of reporting. A stuck thing is attributed to the lowest role that failed the test."
+    conforms: "no error: the role did its duties"
+    correct-error: "a happy error: it met something it could not finish and reported it up with a cause and evidence inside its bound: the system worked as designed, the responsibility moved one level up, and the verdict is now about how the next role handles it. A count of correct errors is information, never a problem line."
+    departs: "a bug: it was silent, late, misclassified or mishandled: stuck with no report, question or blocked cause inside its bound; claimed done without evidence; named the wrong cause class; wrote outside its scope; went around the supported path; kept retrying instead of reporting. A stuck thing is attributed to the lowest role that failed the test."
   shape:
     role: "the role that departed"
     duty: "the field of that role's contract block it broke: does, cleanup, never, reportsUpWhen, or a bound"
@@ -60,6 +72,7 @@ findings:
     - "The remedy is always a change to the contract block or generated prompt, a rule of the policy table, a gate or guard refusal, or a runtime fix. Unblocking the running system by hand keeps work moving, is recorded separately, and never counts as the remedy."
     - "A finding stays open in the edge-case registry until its change is on the host."
     - "An agent report that excuses a failure ('flake', 'spec assumption') is itself a finding, resolved to a cause."
+    - "A fix for a defect found on a live host is not done until a replay spec built from the sequence that showed it passes; a spec built on a fake of the code under test, or one that was never shown to fail where the bug lived, is not that proof."
 
 rulings:
   defect-queue: "One queue of runtime defects: the Supervisor and the runtime's detectors record into it (starci supervisor actions record --item runtime-defect:<cause> --action recorded --reason <text> --refs <evidence>; one item per cause, so a repeat is deduplicated), Debug owns it, fixes each defect and verifies the fix is on the host."
@@ -67,10 +80,40 @@ rulings:
   supervisor-priority: "The Supervisor answers gates and unblocks workflows; anything the machine can resolve does not wait for it."
   kernel-judgment: "The Kernel role is judgment only: dispatch-ready, bounded retry and agent switch belong to the runtime."
   op-reports-to-kernel: "An Op reports into the ledger, addressed to its Kernel; never to a seat's memory or terminal, and never to the Supervisor, the owner, Debug or another workflow."
-  loosening-is-owner-class: "Any change that loosens a gate or check (a check removed from a list, a threshold lowered, an allowlist or baseline entry added, a test deleted or weakened with product code) is owner-class: nobody relaxes a gate to let a workflow pass."
-  critic-coverage: "An independent Critic runs today for drawing. scope.define and architecture.decide are owed one single-pass Critic on the frontier tier from another provider than the op (registry entry critic-coverage-define-architecture)."
+  loosening-is-owner-class: "Any change that loosens a gate or check (a check removed from a list, a threshold lowered, an allowlist or baseline entry added, a test deleted or weakened with product code) is owner-class: nobody relaxes a gate to let a workflow pass. modules/kernel/gate-loosening.yaml defines it mechanically; the land gate refuses such a change and the gate-loosening self-check flags it unless the owner's approval of exactly that loosening (an owner-rulings entry gate-loosening-<fingerprint>) is already in the tree it is judged against."
+  critic-coverage: "Who judges each op's product is declared once, in the required judge field of its contract (modules/kernel/op-judges.yaml): machine, critic, owner or next-leg, never nobody. An independent Critic of another provider, on the frontier tier, runs for drawing (inside the op) and, run by the runtime at settle, for scope.define, business.decide and architecture.decide (modules/kernel/critic.yaml coverage); the op-judge check holds that table and the contracts to each other."
   debug-is-time-boxed: "Debug is a time-boxed auditor of role conformance for the stabilisation phase, bound to a chat session; the runtime is self-sufficient, every edge case Debug meets becomes a rule plus a spec, and the loop is set up no more once the end condition of the debug role holds."
+  updating-the-runtime: "The runtime tree can be updated while workflows run, and no running workflow conflicts with the update. What a change asks of each role is declared once in modules/kernel/revision-scope.yaml and checked against the tree. A change that concerns no role costs no seat anything. A live seat is updated in place by default: woken once per revision change, even with an empty menu, with exactly the changed files that concern it, it reads and attests them (one wake, never a second for the same revision; several commits deployed together are one change). A seat is replaced by a fresh one that boots from the stores only when a rule of its contract was removed or reversed (a line deleted or modified in its declared contract files; a commit may declare an edit wording-only, and the declaration holds only for a file that keeps its structure), when the files its launch prompt is built from changed, or when it is already due for rotation (the revision change folds into that replacement). A replacement happens at the seat's next yield, never in the middle of a decision. An Op is neither updated nor restarted inside an attempt: it keeps the rules of its admission, the next try and the next Critic run are admitted under the new rules, and only guards bite at once. The engine restarts only for the files its process loaded, derived from its import graph; every other command is a new process that reads the tree."
+  debug-fix-lanes: "A runtime defect Debug catches is fixed at once, never queued behind another: Debug splits it by independent cause and opens one fix lane per cause in the same turn, each in its own clone with the files it may touch named, so the lanes run in parallel; each lane's fix reaches the host as soon as `starci runtime verify` prints `verified <sha>` for it (the check AND the affected specs on one commit; the line of `npm run check` alone runs no spec and is never the report), through `starci runtime deploy --from <clone>` (one verified revision change; never a hand fast-forward of the live checkout followed by a hand restart). Nothing a lane found is left listed as later: it is fixed in that round or handed to another lane opened then. The fixes of a day are consolidated into one release cut at the end of that day."
+  debug-replay-before-done: "A fix for a defect found on a live host is not done until a replay spec built from the sequence that showed it passes. The sequence is extracted from a read-only copy of the ledger into a reduced, neutral fixture (tests/helpers/replay-extract.mjs); the spec drives the real controllers, settler and menu builders over it pass by pass through the replay harness (tests/helpers/replay-world.mjs), stubbing only the outermost seams (the agent launch and the terminal) and saying which, including the engine restart and the runtime revision change the live sequence crossed; and it is shown to fail on the revision where the bug lived (tests/helpers/replay-on-revision.mjs) before it is shown to pass on the fix. The case's registry entry carries found: live and names that spec as replay: (the edge-case-registry self-check refuses a covered live case without it)."
   debug-channels: "Debug speaks only through runtime channels (starci supervisor tell; a durable ruling to a Kernel through the Supervisor's notify), never by typing into a seat's terminal, and never to an Op or a Critic."
+
+# What EVERY role block must declare and what must exist in the runtime for it. The `roles-contract` check (scripts/checks/
+# check-roles-contract.mjs) verifies each requirement for each listed role, prints the role x requirement table, and is red
+# for a missing requirement unless the role block carries a dated `pending:` entry that names the lane owning it. The
+# owner's two classes of error are the vocabulary: a HAPPY error is the system working as designed and meeting a stop,
+# handled inside the chain through a policy row; a BUG is a role or the runtime not doing what its contract says, never the
+# chain's to fix, detected by a signal and removed by Debug with a change to .claude and a spec.
+standard:
+  about:
+    en: >-
+      The five roles (the owner stands outside the standard) are described to one shape. A role that lacks a requirement is
+      listed as pending with the lane that is building it, so the gap is visible and never silent.
+  roles: [op, critic, kernel, supervisor, debug]
+  fields: [scope, does, owns, decidesAlone, reportsUpWhen, reportsTo, overseenBy, measure, cleanup, never]
+  requirements:
+    fields: "every field of `fields` above is declared"
+    happy-errors: "`happyErrors`: the happy errors this role handles, each {id, row, what} naming a row, hold or gate cause of modules/kernel/op-incident-policy.yaml"
+    bug-surface: "`bugSurface`: how a bug in this role is detected, each {bug, signal, detectedBy} naming the signal and an existing file or check that reads it"
+    prompt-block: "a surface in `block` mode that exists and carries the generated block of the role"
+    guard-binding: "`guard: {role}` naming a role of modules/kernel/command-policy.yaml roles.bound, or the explicit form `noSeat: true` with a `noSeatReason` for a role that owns no seat or terminal"
+    budget: "`tokenBudget` or `wakeBudget` (turns or tokens per unit of the role's work), or `noBudget` with the reason the role has none"
+    chain: "the role stands in the reporting chain (`chain.reports`, `chain.attached` or `chain.besides`)"
+    revision-ack: "`revisionAck`: how the role learns that the runtime tree changed: a seated role names the verb and event that attest the files it was sent (`scope`, `verb`, `file`, `event`); an Op or a Critic keeps the rules of its admission (`scope`, `admission: true`, `reason`); a role with no runtime to read says why (`noAck`). The table of what concerns whom is modules/kernel/revision-scope.yaml"
+  onBug:
+    chain: "records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec."
+    debug: "removes the bug by changing .claude (contract, prompt, policy row, guard refusal or runtime code) with a spec and an edge-case entry."
+  pendingShape: "{requirements: [<requirement ids>], lane or entry: <the lane building them, or the open edge-case registry entry that tracks what no mechanism yet provides>, since: <date>}"
 
 roles:
   - id: op
@@ -89,7 +132,7 @@ roles:
       status: provisional
       source: "the usage rows of the first real workflows: a decision leg spent 6 to 17 million tokens (10.8 million in the audit of the first real workflow)"
       perAttempt: {default: 6000000}
-      onExceed: "the Kernel acts on the overrun: it reads the attempt's usage, then stops, re-scopes or switches agent"
+      onExceed: "the runtime measures each attempt from its usage rows when it settles, and a running attempt from its session file on the minute poll that snapshots it (the first reading past the budget is one attempt-budget-overrun event); for a job waiting on its Kernel it opens a Decision Item budget-overrun, once: the Kernel continues once, replaces the agent or re-scopes the leg; for an attempt still running it opens one whose only option is to let it finish (a retry is refused while a try is open and no verb stops a live worker), asked again after the snooze, and a second item with the retries opens when the attempt settles and its usage rows measure it"
     cleanup:
       - "its own processes, temp files and servers, before it reports"
     never:
@@ -100,6 +143,22 @@ roles:
       - "addresses anyone but its Kernel: its reports, questions, blocked causes and owner asks all go to its Kernel"
       - "sits stuck without reporting"
     escalatesTo: kernel
+    guard: {role: op}
+    happyErrors:
+      - {id: asks-a-question, row: ask-worker-question, what: "the Op cannot decide inside its contract and reports an ask up to its Kernel, which answers from the goal and the recorded decisions"}
+      - {id: asks-the-owner, row: ask-owner, what: "the matter is the owner's (intent, credentials, spend): the Kernel sends it to the owner and the leg waits"}
+      - {id: red-check, row: error-work, what: "a check is red because the work is not good yet: the Kernel retries with the failure fed back, then on another agent"}
+      - {id: provider-quota, row: quota-or-circuit, what: "the provider quota ran out or its circuit opened: the next agent of the tier takes the job"}
+      - {id: login-expired, row: error-login-expired, what: "the provider login expired: the job moves to the next eligible agent and the owner logs in again in Orca"}
+    bugSurface:
+      - {bug: "an Op addresses a role above its Kernel", signal: "OP_REPORTS_TO_KERNEL when an Op addresses the Supervisor", detectedBy: scripts/cli/roles.mjs}
+      - {bug: "an Op runs a control-plane verb that is not its own", signal: "RIGHTS_OP_CONTROL_PLANE from the command guard", detectedBy: scripts/guards/op-starci.mjs}
+      - {bug: "an Op writes outside the paths its attempt owns", signal: "RIGHTS_OP_OUTSIDE_OWNED from the file-write guard", detectedBy: scripts/guards/op-write-scope.mjs}
+      - {bug: "an Op spends more tokens than its attempt budget", signal: "budget-overrun Decision Item and budgetOverruns in the Kernel status", detectedBy: scripts/reconciler/budget-plan.mjs}
+    revisionAck:
+      scope: op
+      admission: true
+      reason: "an Op keeps the rules of the revision it was admitted under for the whole attempt and is never updated or restarted inside it; the next try is admitted under the new rules"
     binds: [P2, P3, P4, P8]
     contradicts:
       - {pattern: 'starci\s+supervisor\s+(?:tell|channel|notify)', why: "an Op never messages the Supervisor"}
@@ -112,21 +171,45 @@ roles:
     label: Critic
     scope: "One product of one op."
     does:
-      - "Grades that product independently: from a different provider than the op that made it, seeing only the product and the rubric, not the op's context."
-      - "Returns its verdict as evidence attached to the attempt of the op it judged."
+      - "Grades that product independently: from a different provider than the op that made it, picked through the tier picker (tier frontier, modules/models/tiers.yaml seats.critic), seeing only the product bytes and the rubric handed to it, not the op's context."
+      - "Returns ONE typed verdict (starci/critic-verdict@1): pass or fail with evidence for every rubric check, the score against the declared minimum, and the digests of the product bytes it judged. The runtime attaches it to the attempt of the op it judged and the settle gate requires it; a verdict whose digests do not match the attempt's product is refused as stale."
+      - "Is owed by the op kinds listed in modules/kernel/critic.yaml coverage (today interface.draw, scope.define, business.decide and architecture.decide); a decision leg is judged by the Critic the runtime runs itself when the op reports done (scripts/kernel/settle/critic-run.mjs, once per version of the records, event runtime-critic-run) against its rubric in modules/kernel/critic-rubrics.yaml, handed the op's decision records and the records they cite, and `starci kernel settle` refuses its done without a fresh passing verdict of that run for exactly those bytes; a verdict the maker attaches is ignored (event runtime-critic-op-verdict-ignored); a kind declared owed there has no Critic yet."
     owns: "one verdict"
     decidesAlone: "the score by the rubric"
     reportsUpWhen: "always, as the verdict attached to the op's attempt"
     reportsTo: kernel
     overseenBy: [kernel, runtime]
     measure: "its verdict agrees with the later outcome"
+    guard: {role: critic}
+    tokenBudget:
+      status: provisional
+      source: "an estimate for one round (two renders, the HTML source and the rubric), not yet measured from usage rows"
+      perAttempt: {default: 1000000}
+      byKind: "a decision leg declares its own budget in modules/kernel/critic-rubrics.yaml kinds[].tokenBudget (provisional, unmeasured)"
+      onExceed: "the wall bound allocation.drawLoop.criticTimeoutMs stops and releases the worker with no verdict (a happy error, critic-unavailable); the token overrun is read from the usage rows once the attempt budget measurement covers Critic dispatches"
     cleanup:
       - "its placement worktree and processes, before it returns the verdict"
     never:
       - "edits the product"
       - "grades when it shares the maker's provider"
       - "addresses anyone but through the attempt"
+      - "reads anything but the product files and the rubric handed to it: not the op's worktree, the ledger, a transcript or any other path"
+      - "runs anything but the read-only commands and the one write of its verdict file"
+    happyErrors:
+      - {id: failing-verdict, row: error-work, what: "the verdict fails the minimum: the work is not good yet; the op redraws (a decision leg revises its records and runs the Critic again) and the next round is judged again"}
+      - {id: no-independent-member, row: critic-no-independent-member, what: "no member of the Critic tier is of another provider than the maker: the critique is refused with CRITIC_NO_INDEPENDENT_MEMBER and the op's leg reports blocked 'no independent critic available'; the maker's provider never judges"}
+      - {id: critic-unavailable, row: critic-unavailable, what: "the independent members cannot start (login, circuit, capacity, a refused launch, a timeout): the leg reports blocked and finishes again when a member returns"}
+      - {id: critic-quota-out, row: critic-quota-out, what: "every independent member is out of tokens: the next independent member takes over, and when none is left the leg waits for the quota to reset"}
+    bugSurface:
+      - {bug: "the Critic returns no verdict although it reported done", signal: "CRITIC_NO_VERDICT on the round's critique.json (outcome verdict-missing)", detectedBy: scripts/work/critic-verdict.mjs}
+      - {bug: "the Critic edited the product bytes it was handed", signal: "CRITIC_PRODUCT_MODIFIED: the digests of the handed files differ after the run", detectedBy: scripts/work/critic-verdict.mjs}
+      - {bug: "the Critic judged other bytes than the attempt's product", signal: "CRITIC_VERDICT_STALE: the verdict's product digests do not match the installed part (a decision leg: the records the op owns now, judged by scripts/kernel/critic-settle.mjs at settle)", detectedBy: scripts/kernel/autopilot-state.mjs}
+      - {bug: "the Critic reached a path outside its directory", signal: "RIGHTS_CRITIC_REACH refusals of the command guard, logged with the terminal", detectedBy: scripts/guards/critic-reach.mjs}
     escalatesTo: kernel
+    revisionAck:
+      scope: critic
+      admission: true
+      reason: "a Critic is handed its rubric when it is launched and judges under it; the next Critic run reads the new rubric"
     binds: [P2, P3, P7]
     contradicts:
       - {pattern: 'critic (?:may|can|should) (?:edit|fix|repair) the (?:product|screen|draw)', why: "a Critic never edits the product"}
@@ -138,11 +221,18 @@ roles:
     label: Kernel
     scope: "One workflow."
     does:
-      - "Dispatches ops by the plan, settles reports by re-running the checks, decides retry, switch agent or re-plan inside the goal, and answers ops' questions from the goal and the recorded decisions."
+      - "Answers the judgments of its menu: settles a non-green report by re-running the checks, decides retry once the runtime's bounded retry is spent, switch agent or re-plan inside the goal, chooses the write set of a leg the plan leaves open, the checks that reconcile a stub sibling and the re-cut of a slipped seam, routes a defect the owner reported on the handover to the slice it names, and answers ops' questions from the goal and the recorded decisions. The runtime performs what is mechanical: dispatch, bounded retry, the enqueue of a leg whose plan declares its write set, the rework of a red node, the re-run of a stale proof."
       - "Reports up to the Supervisor for: a conflict with another workflow (shared files, ports, provider capacity, a shared foundation); a suspected runtime defect, with evidence, after the workaround; a self-contradicting contract; bounds exhausted inside the workflow; a plan deadlock it cannot re-plan inside the goal. No routine status reports: the Supervisor reads the ledger."
       - "Sends an owner-class question to the owner through the runtime's ask channel."
+    wakeBudget:
+      status: provisional
+      source: "kernel-turn usage rows of the two first real workflows (45 rows): turns p50 11, p75 19, p90 28; tokens (input, output, cache read) p50 3.7 million, p75 5.7 million, p90 9.8 million"
+      perWake: {turns: 20, tokens: 6000000}
+      perBoot: {turns: 40, tokens: 6000000}
+      bootSource: "the boot of a Kernel session reads the two Kernel contract files and the rev-ack manifest (about 20 files) before its first wake: measured 2026-10-09 on the Nivo Kernel, 19 turns and 1.75 million tokens"
+      onExceed: "the digest reports the wake as a departure of the Kernel (a bug): a wake answers the menu and yields"
     owns: "one workflow: its plan, its jobs and its gates"
-    decidesAlone: "dispatch, settle, retry, switch agent, re-plan inside the goal, and answers to ops"
+    decidesAlone: "settle of a non-green report, retry past the runtime's bound, switch agent, re-plan inside the goal, the write set of an open leg, seam duties, the route of handover feedback, and answers to ops"
     reportsUpWhen: "one of the five causes above"
     reportsTo: supervisor
     overseenBy: [runtime, supervisor, debug]
@@ -155,9 +245,30 @@ roles:
       - "touches another workflow"
       - "decides for the owner what is costly to reverse"
       - "leaves ready work or a reported block unhandled"
+      - "runs a mutating verb itself: it answers the items of its menu with starci kernel decide, and the runtime does the rest"
+      - "works around a bug: a bug is none-fits, recorded for Debug"
       - "raises a supervisor-gate before the workaround its gate cause names (the gate ladder refuses it: modules/kernel/op-incident-policy.yaml gateCauses)"
       - "pins a model around a lineage exclusion without a recorded op-override decision"
     escalatesTo: supervisor
+    guard: {role: lead}
+    happyErrors:
+      - {id: worker-question, row: worker-question, what: "an Op asks: the Kernel answers from the goal (menu worker-question) or sends it to the owner"}
+      - {id: worker-stalled, row: worker-stalled, what: "a worker the nudges did not move: the Kernel nudges, replaces or stops it (menu worker-wedged)"}
+      - {id: peer-wait, row: peer-wait, what: "another workflow has not landed what a step needs: the Kernel waits for the typed condition or the peer's message (menu peer-message)"}
+      - {id: supervisor-gate, row: supervisor-gate, what: "a gate the Supervisor rules on: the Kernel waits for the ruling and acts on it"}
+      - {id: owner-gate, row: owner-gate, what: "a matter that is the owner's: the Kernel waits for the answer"}
+      - {id: failed-leg, row: failed-no-step, what: "a leg failed with no recorded step: the Kernel retries, switches agent or re-plans inside the goal (menu job-decision)"}
+      - {id: orphaned-frontier, row: orphaned-frontier, what: "a running workflow with nothing open: the Kernel proposes the next leg (menu decision-item)"}
+    bugSurface:
+      - {bug: "the Kernel runs a command that is not a starci verb or a pure read", signal: "KERNEL_STARCI_ONLY from the seat guard", detectedBy: scripts/guards/kernel-seat.mjs}
+      - {bug: "the Kernel uses a verb the runtime-driven menu replaces", signal: "KERNEL_USE_DECIDE from the seat guard", detectedBy: scripts/guards/kernel-seat.mjs}
+      - {bug: "a Kernel wake spends more than the per-wake budget", signal: "kernel-wake-budget problem line of the digest", detectedBy: scripts/reconciler/debug-digest-analyze.mjs}
+      - {bug: "a Kernel decision names a menu item or choice the menu does not hold, or a step fails", signal: "menu-item-unknown, menu-choice-unknown, menu-direct-option, menu-text-missing, menu-step-failed, menu-step-usage, menu-verb-unknown, menu-unreadable", detectedBy: scripts/kernel/verbs/shared/menu-decide.mjs}
+    revisionAck:
+      scope: kernel
+      verb: starci kernel revision-ack
+      file: scripts/kernel/verbs/revision-ack.mjs
+      event: runtime-rev-noticed
     binds: [P1, P2, P3, P4, P5, P6, P8]
     contradicts:
       - {pattern: 'the Kernel (?:edits|fixes|patches) (?:the )?(?:runtime|\.claude)', why: "the Kernel never changes the runtime"}
@@ -188,6 +299,32 @@ roles:
       - "pushes or releases"
       - "leaves a gate past its acknowledgement bound"
     escalatesTo: owner
+    guard: {role: supervisor}
+    tokenBudget:
+      status: provisional
+      source: "the 55 supervisor-turn usage rows of the first real workflows (machine store copy of the audit): turns p50 9, p75 15, p90 20; tokens (input, output, cache read, cache write) p50 4.3 million, p75 6.2 million, p90 9.7 million"
+      perAttempt: {default: 10000000}
+      unit: wake
+      onExceed: "the usage sweep cuts the Supervisor session at its supervisor-wake events and tags every supervisor-turn row with the wake that owns it; the digest reports a wake over the budget as a departure of the Supervisor (supervisor-wake-budget)"
+    happyErrors:
+      - {id: gate-ruling, row: supervisor-gate, what: "a gate a Kernel raised: the Supervisor rules with fixed, workaround or not-runtime-fault (menu gate-ruling)"}
+      - {id: budget-gate, row: budget-gate, what: "a workflow cap exceeded holds dispatch: the Supervisor extends the budget or hands the matter to the owner"}
+      - {id: workflow-conflict, row: peer-dependency, what: "two workflows want the same files, ports or foundation: the Supervisor decides who goes first (menu workflow-conflict)"}
+      - {id: resource-division, row: pool-full, what: "provider capacity is shared by every workflow: the Supervisor divides it (menu resource-division)"}
+      - {id: runtime-defect, row: runtime-defect, what: "a suspected runtime defect: the Supervisor gives the Kernel a workaround and records the defect for Debug (menu runtime-defect)"}
+      - {id: kernel-escape, row: menu-escape, what: "a Kernel whose menu offered no fitting option escaped it with none-fits: the Supervisor answers with a ruling to the Kernel or records the defect for Debug (menu kernel-escape)"}
+    bugSurface:
+      - {bug: "the Supervisor runs a command that is not a starci verb or a pure read", signal: "SUPERVISOR_STARCI_ONLY from the seat guard", detectedBy: scripts/guards/supervisor-seat.mjs}
+      - {bug: "the Supervisor uses a verb the runtime-driven menu replaces", signal: "SUPERVISOR_USE_DECIDE from the seat guard", detectedBy: scripts/guards/supervisor-seat.mjs}
+      - {bug: "the Supervisor changes .claude", signal: "RUNTIME_CHANGE_OWNED_BY_DEBUG from the command and file guards", detectedBy: scripts/machine/runtime-change.mjs}
+      - {bug: "a menu choice of the Supervisor fails to execute", signal: "SUPERVISOR_MENU_STEP_FAILED", detectedBy: scripts/supervisor/decide.mjs}
+      - {bug: "a gate stands past its acknowledgement bound", signal: "gate-stale departure of the digest", detectedBy: scripts/reconciler/debug-digest-analyze.mjs}
+      - {bug: "a Supervisor wake spends more tokens than its wake budget", signal: "supervisor-wake-budget problem line of the digest", detectedBy: scripts/reconciler/debug-digest-analyze.mjs}
+    revisionAck:
+      scope: supervisor
+      verb: starci supervisor revision-ack
+      file: scripts/supervisor/revision-ack.mjs
+      event: runtime-rev-noticed
     binds: [P1, P3, P4, P5, P6, P7, P8]
     contradicts:
       - {pattern: 'supervisor (?:may|can|should) (?:relax|loosen|waive) (?:a|the) gate', why: "loosening a gate is owner-class"}
@@ -200,8 +337,8 @@ roles:
     label: Debug
     scope: "The owner's eyes: a loop of the owner's chat for a limited stabilisation period, not part of steady-state operation."
     does:
-      - "Audits whether each of the four roles above and the runtime floor did its job, each tick, through the digest: per op its attempt, report, evidence and hold; per Critic that it ran, on another provider, saw only the product, and had its verdict used; per Kernel seat that it is alive, acked the runtime revision, acts on ready work and takes the policy steps; per Supervisor seat that it is alive and answers gates inside their bound. Each stuck thing is a correct error or a departure of exactly one role."
-      - "For every departure records a finding (role, broken duty, evidence, remedy) and changes .claude at once so the role cannot repeat it: the contract block or generated prompt, a policy-table rule, a gate or guard refusal, or a runtime fix with a spec, carried onto the host. Records the case in the edge-case registry in the same change."
+      - "Audits whether each of the four roles above and the runtime floor did its job, each tick, through the digest: per op its attempt, report, evidence and hold; per Critic that it ran, on another provider, saw only the product, and had its verdict used; per Kernel seat that it is alive, acked the runtime revision, acts on ready work and takes the policy steps; per Supervisor seat that it is alive and answers gates inside their bound. Each stuck thing is a happy error or a bug of exactly one role; Debug removes bugs only, and happy errors stay with the chain."
+      - "For every departure records a finding (role, broken duty, evidence, remedy) and changes .claude at once so the role cannot repeat it: the contract block or generated prompt, a policy-table rule, a gate or guard refusal, or a runtime fix with a spec, carried onto the host. Records the case in the edge-case registry in the same change. A fix of a defect found on a live host is done only when a replay spec built from the sequence that showed it passes (ruling debug-replay-before-done)."
       - "Owns the edge-case registry, the operating standard and the queue of runtime defects the Supervisor records. A leftover is evidence that its owner failed its cleanup duty; Debug may trigger the existing collector to unblock, and the finding is still the owner's."
       - "Reports results to the owner, and retires itself when the stable criteria below hold."
     owns: "the edge-case registry, the operating standard and the queue of runtime defects"
@@ -222,11 +359,24 @@ roles:
     escalatesTo: owner
     oversees: [op, critic, kernel, supervisor, runtime]
     endCondition:
-      about: "Debug is set up no more once the system is stable: every criterion holds, and the digest prints the current standing against each."
+      about: "The goal: every workflow operates completely inside Orca with no bug, so no Debug is needed to change .claude. Debug is set up no more once the system is stable: every criterion holds, and the digest prints the current standing against each."
       criteria:
         - {id: clean-workflows, min: 5, rule: "consecutive workflows ran start to handover with zero departures from the operating standard and zero human interventions"}
         - {id: no-open-edge-case, min: 0, rule: "no entry of the edge-case registry is open"}
         - {id: survived-restart, min: 1, rule: "one of those workflows ran across a host restart and resumed without lost or repeated work"}
+    noSeat: true
+    noSeatReason: "Debug is a loop of the owner's own chat session: it has no seat and no bound terminal, so the guard resolves its caller to the owner; its limits are the never list, the channels it speaks through and the gate-loosening check on what it changes"
+    noBudget: "Debug is the owner's chat loop: its turns are the owner's session and no ledger row records them; it is bounded by its time box and its end condition, not by tokens"
+    happyErrors:
+      - {id: owner-matter, row: owner-gate, what: "a matter that is the owner's (credentials, spend, a release): Debug reports it to the owner and does not decide it"}
+      - {id: owner-question, row: ask-owner, what: "a question only the owner can answer: Debug names it in its result and waits"}
+    bugSurface:
+      - {bug: "a departure of a role stands with no edge-case entry", signal: "a departure printed with remedy none in starci debug digest", detectedBy: scripts/reconciler/debug-digest-analyze.mjs}
+      - {bug: "Debug loosens a gate or check to let a workflow pass", signal: "RT_GATE_LOOSENING over the commits since the last release", detectedBy: scripts/checks/check-gate-loosening.mjs}
+      - {bug: "Debug changes the runtime without recording the case", signal: "RT_EDGE_CASE_REGISTRY: a covered entry without its rule and spec", detectedBy: scripts/checks/check-edge-case-registry.mjs}
+      - {bug: "the loop runs on after its end condition holds, or its standing is not printed", signal: "the standing against each end-condition criterion in the digest", detectedBy: scripts/reconciler/debug-questions.mjs}
+    revisionAck:
+      noAck: "Debug is the owner's chat session and reads the tree itself each time it acts; it has no seat the runtime could wake or replace"
     binds: [P1, P5, P6, P7]
     contradicts:
       - {pattern: 'change nothing and fix nothing', why: "Debug fixes .claude so a role cannot repeat a departure"}

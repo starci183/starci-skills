@@ -8,6 +8,7 @@ export type QueueConfig = Omit<QueueOptions, "connections" | "schedulers">
 export const parseQueueConfig = (env: EnvSource): QueueConfig => ({
     redisHost: env.string("QUEUE_REDIS_HOST"),
     redisPort: env.int("QUEUE_REDIS_PORT", 6379),
+    redisDb: env.int("QUEUE_REDIS_DB", 0),
     prefix: env.optional("QUEUE_PREFIX") ?? "queue",
     relayIntervalMs: env.duration("QUEUE_RELAY_INTERVAL", 200),
     relayBatch: env.int("QUEUE_RELAY_BATCH", 50),

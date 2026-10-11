@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
-import { parseYaml } from '../../engine/yaml.mjs';
+import { parseYamlCached } from '../lib/yaml-cached.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { SEMVER } from './manifest-shape.mjs';
 import { enforcerJudgedInEdition, judgedInEdition, ruleEditionProblems } from './edition-slots.mjs';
@@ -153,7 +153,7 @@ const deepFreeze = (value) => { if (value && typeof value === 'object') { Object
  */
 export function loadRuleCatalog({ root = skillRoot, file = path.join(root, HFS_RULES_FILE), text, manifest } = {}) {
   let doc;
-  try { doc = parseYaml(text ?? fs.readFileSync(file, 'utf8')); } catch (error) { fail('HFS_RULES_INVALID', `the rule catalog cannot be read (${String(error?.message ?? error).split('\n')[0]})`, { file }); }
+  try { doc = parseYamlCached(text ?? fs.readFileSync(file, 'utf8')); } catch (error) { fail('HFS_RULES_INVALID', `the rule catalog cannot be read (${String(error?.message ?? error).split('\n')[0]})`, { file }); }
   const problems = ruleCatalogProblems(doc);
   if (problems.length) { fail('HFS_RULES_INVALID', `the rule catalog breaks its schema: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? '; and ' + (problems.length - 5) + ' more' : ''}`, { file, problems }); }
   const [major, minor, patch] = doc.version.split('.').map(Number);

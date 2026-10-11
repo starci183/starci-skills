@@ -104,7 +104,7 @@ test('a shadow controller\'s ctx.api spawns nothing and writes one reconciler.wo
   assert.equal(rows.length, 1, 'the same would-call is recorded once per window');
   const ran = await shadow.run('node', ['scripts/supervisor/gc.mjs', '--apply']);
   assert.equal(ran.shadow, true);
-  const di = await shadow.openDecision({ kind: 'settle-nongreen', idempotencyKey: 'k1', decider: 'kernel' });
+  const di = await shadow.openDecision({ kind: 'settle-nongreen', idempotencyKey: 'k1', decider: 'kernel', ledger: 'shop-be' });
   assert.equal(di.shadow, true);
   assert.equal(spawned.length, 0);
   assert.equal(shadow.owns('job.settle'), false);
@@ -155,20 +155,20 @@ test('an event routes to its key: the first poll starts at MAX(seq), later event
   t.after(() => st.close());
   const led = eventsLedger(st.dir);
   st.own(led);
-  led.append('op-reported', 'op-old'); // before the engine: never replayed
+  led.append('report-filed', 'op-old'); // before the engine: never replayed
   const ledger = { ledgerId: 'shop-be', repo: st.dir, file: led.file };
   st.m.registerLedger({ ledgerId: led.ledgerId, name: 'shop-be', repoRoot: st.dir, file: led.file }); // its cursor is engine_cursors[ledger_id]
   const first = pollLedger(st.db, ledger, { reader: fixtureReader });
   assert.equal(first.first, true);
   assert.equal(first.events.length, 0, 'no replay');
-  led.append('op-reported', 'op-1');
+  led.append('report-filed', 'op-1');
   led.append('land-succeeded', 'land-1', 'wf-supervisor', 'land');
   led.append('op-unrouted', 'op-2');
   const p = pollLedger(st.db, ledger, { reader: fixtureReader });
-  assert.deepEqual(p.events.map((e) => e.kind), ['op-reported', 'land-succeeded', 'op-unrouted']);
+  assert.deepEqual(p.events.map((e) => e.kind), ['report-filed', 'land-succeeded', 'op-unrouted']);
   const controllers = [
-    { name: 'job', routes: { 'op-reported': (ev) => `job:${ev.ledgerId}:${ev.entityId}` } },
-    { name: 'workers', routes: { 'land-*': () => 'workers:land', 'op-reported': () => { throw Error('bad route'); } } },
+    { name: 'job', routes: { 'report-filed': (ev) => `job:${ev.ledgerId}:${ev.entityId}` } },
+    { name: 'workers', routes: { 'land-*': () => 'workers:land', 'report-filed': () => { throw Error('bad route'); } } },
   ];
   const routed = p.events.flatMap((ev) => routeEvent(ev, controllers));
   assert.deepEqual(routed.map((r) => [r.controller, r.key]), [['job', 'job:shop-be:op-1'], ['workers', 'workers:land']]);
@@ -179,11 +179,11 @@ test('an event routes to its key: the first poll starts at MAX(seq), later event
     controllers: [{ name: 'job', module: { name: 'job', routes: controllers[0].routes, reconcile: async () => {} } }], writeLog: () => {}, print: () => {} });
   st.own(e);
   return e.load().then(() => {
-    led.append('op-reported', 'op-9');
+    led.append('report-filed', 'op-9');
     e.pollSources();
     const q = st.m.db.prepare('SELECT controller, key, reason FROM engine_queue').all();
     assert.deepEqual(q.map((r) => [r.controller, r.key]), [['job', 'job:shop-be:op-9']]);
-    assert.match(q[0].reason, /^event:op-reported:shop-be:\d+$/);
+    assert.match(q[0].reason, /^event:report-filed:shop-be:\d+$/);
   });
 });
 

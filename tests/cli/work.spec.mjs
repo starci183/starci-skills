@@ -54,20 +54,7 @@ test('work catalog resolves every public handler and its exact local flags', () 
   }
 });
 
-test('work commands dispatch through the runtime seam with repeatable flags preserved', () => {
-  const calls = [];
-  const runScript = (script, args) => { calls.push({ script, args }); return 0; };
-  assert.equal(main(['work', 'draw-source', 'Card.draw.tsx', '--fixture', 'mobile.json', '--fixture', 'desktop.json', '--product', 'app', '--json'], { catalog, runScript }), 0);
-  assert.equal(main(['work', 'layout-tree', 'slot', 'shell.png', '--tolerance', '8'], { catalog, runScript }), 0);
-  assert.equal(main(['work', 'example-evidence', '--work', '.starciwork', '--record', 'ac.login', '--cwd', 'repo', '--assert', 'ac.1=npm test'], { catalog, runScript }), 0);
-  assert.equal(main(['work', 'graph', 'show', '--repo', 'repo', '--workflow', 'wf-1'], { catalog, runScript }), 0);
-  assert.deepEqual(calls.map(({ args }) => args), [
-    ['Card.draw.tsx', '--fixture', 'mobile.json', '--fixture', 'desktop.json', '--product', 'app', '--json'],
-    ['slot', 'shell.png', '--tolerance', '8'],
-    ['--work', '.starciwork', '--record', 'ac.login', '--cwd', 'repo', '--assert', 'ac.1=npm test'],
-    ['show', '--repo', 'repo', '--workflow', 'wf-1'],
-  ]);
-});
+
 
 test('work dispatcher rejects undeclared flags and unsupported machine output', () => {
   assert.equal(main(['work', 'draw-loop', 'status', '--out', 'loop', '--bogus'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);

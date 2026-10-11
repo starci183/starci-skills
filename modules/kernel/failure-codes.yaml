@@ -1085,6 +1085,9 @@ CAP_STARVED:
   nextStep_vi: "Bộ điều phối mở một mục quyết định cho Supervisor; Supervisor cần cân lại công suất hoặc dừng bớt luồng khác. Đồng hồ tự tắt khi luồng hết bị đói."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: sla-clock
+  surfacedAs: CAP_STARVED
+  surfacedAt: scripts/reconciler/controllers/resource.mjs
 
 CATALOG_DIRTY:
   title: "Feature catalog unreadable"
@@ -1257,6 +1260,9 @@ CONSUME_OVERDUE:
   nextStep_vi: "Mã có trong danh sách đồng hồ nhưng hiện được tính chung vào SETTLE_OVERDUE; nếu xuất hiện, Supervisor cần kiểm tra bộ xử lý chốt."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: sla-clock
+  surfacedAs: CONSUME_OVERDUE
+  surfacedAt: scripts/reconciler/controllers/job.mjs
 
 CONTRACT_EDGE_MISSING:
   title: "Cross-domain contract edge missing"
@@ -1351,6 +1357,9 @@ DEAD_WORKER_UNRECONCILED:
   nextStep_vi: "Đồng hồ SLA mở ra cho Supervisor; cần điều tra và chốt hoặc chạy lại công việc đó."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: sla-clock
+  surfacedAs: DEAD_WORKER_UNRECONCILED
+  surfacedAt: scripts/reconciler/controllers/job.mjs
 
 DECISION_OVERDUE:
   title: "Decision waited too long"
@@ -1362,6 +1371,9 @@ DECISION_OVERDUE:
   nextStep_vi: "Đồng hồ SLA mở; cần Supervisor hoặc chủ sở hữu trả lời mục quyết định để công việc tiếp tục."
   owner: owner
   kind: runtime-fault
+  surfacedBy: sla-clock
+  surfacedAs: DECISION_OVERDUE
+  surfacedAt: scripts/reconciler/controllers/job.mjs
 
 DEPS_DELETE_WHILE_PEER_LEASED:
   title: "Cannot delete node_modules while peers run"
@@ -1477,6 +1489,9 @@ DISK_LOW:
   nextStep_vi: "Đồng hồ SLA mở kèm tên ổ và dung lượng còn lại; Supervisor cần dọn dẹp hoặc mở rộng ổ đĩa."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: sla-clock
+  surfacedAs: DISK_LOW
+  surfacedAt: scripts/reconciler/controllers/resource.mjs
 
 DRAWER_DIRECTION_MISSING:
   title: "Drawer has no valid direction"
@@ -2005,6 +2020,9 @@ EFFECT_UNKNOWN_STUCK:
   nextStep_vi: "Runtime tự chạy đối soát (starci kernel reconcile) để xác định kết quả; nếu vẫn kẹt thì mở sự cố cho Supervisor xử lý."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: sla-clock
+  surfacedAs: EFFECT_UNKNOWN_STUCK
+  surfacedAt: scripts/reconciler/controllers/job.mjs
 
 PROVIDER_RESERVATION_HELD:
   title: "Provider slot held by a launch of unknown outcome"
@@ -2016,6 +2034,9 @@ PROVIDER_RESERVATION_HELD:
   nextStep_vi: "Reaper giải phóng biên nhận khi chứng minh được máy đã khởi động lại hoặc kết quả khởi động là không tác động; nếu vẫn kẹt, Supervisor đọc biên nhận trong provider_reservations và hòa giải tay."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: sla-clock
+  surfacedAs: PROVIDER_RESERVATION_HELD
+  surfacedAt: scripts/machine/provider-reservation-restart.mjs
 
 host-restarted:
   title: "The host restarted after the launch began"
@@ -2026,6 +2047,9 @@ host-restarted:
   nextStep_vi: "Job được đánh dấu thất bại và chỗ đường dẫn được trả; Supervisor đặt job mới nếu việc còn cần."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: sla-clock
+  surfacedAs: PROVIDER_RESERVATION_HELD
+  surfacedAt: scripts/machine/provider-reservation-restart.mjs
 
 provider-login-expired:
   title: "Provider login expired"
@@ -3493,6 +3517,9 @@ LEDGER_CORRUPT:
   nextStep_vi: "Bộ điều phối báo khẩn ngay cho chủ; cần khôi phục ledger từ bản sao lưu hằng đêm."
   owner: owner
   kind: runtime-fault
+  surfacedBy: sla-clock
+  surfacedAs: LEDGER_CORRUPT
+  surfacedAt: scripts/reconciler/controllers/host.mjs
 
 LEDGER_ORPHAN_STATE_ROOT:
   title: "Orphan ledger in the state root"
@@ -4021,6 +4048,9 @@ PEER_WAIT_OVERDUE:
   nextStep_vi: "Bộ điều phối ghi vi phạm quá hạn và đưa lên Supervisor xem xét bên đang bị chờ."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: sla-clock
+  surfacedAs: PEER_WAIT_OVERDUE
+  surfacedAt: scripts/reconciler/workflow-plan.mjs
 
 PERSONA_UNKNOWN:
   title: "Persona not in layout personas"
@@ -4294,6 +4324,9 @@ QUESTION_OVERDUE:
   nextStep_vi: "Bộ điều phối ghi vi phạm quá hạn; Supervisor phải xem và trả lời hoặc chuyển cho chủ dự án."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: sla-clock
+  surfacedAs: QUESTION_OVERDUE
+  surfacedAt: scripts/reconciler/controllers/job.mjs
 
 RAM_CRITICAL:
   title: "Host RAM critically low"
@@ -4305,6 +4338,9 @@ RAM_CRITICAL:
   nextStep_vi: "Bộ điều phối đặt đồng hồ cảnh báo và giảm tải; quá thời hạn thì Supervisor phải xử lý."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: sla-clock
+  surfacedAs: RAM_CRITICAL
+  surfacedAt: scripts/reconciler/controllers/resource.mjs
 
 RAW_TERMINAL_CREATE:
   title: "Raw Orca terminal refused"
@@ -4327,6 +4363,9 @@ READY_UNDISPATCHED:
   nextStep_vi: "Bộ điều phối ghi vi phạm quá hạn; Supervisor kiểm tra vì sao chưa giao."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: sla-clock
+  surfacedAs: READY_UNDISPATCHED
+  surfacedAt: scripts/reconciler/controllers/job.mjs
 
 READ_LINKED:
   title: "READ path crosses a link"
@@ -4570,6 +4609,9 @@ REV_ACK_OVERDUE:
   nextStep_vi: "Bộ điều phối ghi vi phạm; Supervisor xử lý."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: sla-clock
+  surfacedAs: REV_ACK_OVERDUE
+  surfacedAt: scripts/reconciler/workflow-plan.mjs
 
 REV_NOT_MONOTONIC:
   title: "Revision went backwards"
@@ -4655,6 +4697,27 @@ RIGHTS_OP_RUNTIME_WRITE:
     - "Op định sửa mã, cấu hình hoặc tri thức bên trong checkout .claude"
     - "Op phát hiện lỗi harness rồi cố sửa ngay trong phần việc của ứng dụng"
   nextStep_vi: "Lệnh bị từ chối; ghi lesson hoặc upgrade request trong báo cáo để đường owner hoặc supervisor self-upgrade xử lý."
+  owner: op-retry
+  kind: verb-refusal
+
+RIGHTS_OP_OUTSIDE_OWNED:
+  title: "Op write outside its owned paths refused"
+  title_vi: "Từ chối op ghi ngoài đường dẫn được sở hữu"
+  meaning_vi: "Op chỉ ghi trong các đường dẫn mà lượt chạy của nó sở hữu và trong thư mục tạm của runtime; một tệp nằm ngoài các nơi đó không được ghi."
+  causes_vi:
+    - "Op sửa một tệp của ứng dụng nằm ngoài các đường dẫn được giao cho lượt chạy"
+    - "Op tạo tệp tạm trong worktree thay vì thư mục tạm của runtime"
+  nextStep_vi: "Lệnh bị từ chối; đặt tệp tạm trong thư mục tạm của runtime, còn thay đổi cần thiết ngoài phạm vi thì ghi là việc còn nợ trong báo cáo để Kernel cắt thành lượt chạy riêng."
+  owner: op-retry
+  kind: verb-refusal
+
+RIGHTS_OP_CONTROL_PLANE:
+  title: "Op control-plane verb refused"
+  title_vi: "Từ chối op gọi động từ của mặt phẳng điều khiển"
+  meaning_vi: "Op chỉ chạy các động từ năng lực của công việc (máy chủ, kết xuất, tạo ảnh, kiểm thử) và báo cáo cho Kernel; các nhóm supervisor, reconciler, workflow, route và debug do bộ điều khiển, Kernel và Supervisor chạy."
+  causes_vi:
+    - "Op chạy starci supervisor, reconciler, workflow, route hoặc debug"
+  nextStep_vi: "Lệnh bị từ chối; Op dùng động từ năng lực của công việc và nộp báo cáo blocked hoặc ask bằng starci kernel report."
   owner: op-retry
   kind: verb-refusal
 
@@ -4787,6 +4850,8 @@ RT_DEAD_ENTRY:
   nextStep_vi: "Người giám sát xóa dòng đó khỏi mục dead-script-entries của modules/kernel/allowlist.yaml qua một lane đã land."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/checks/check-dead-scripts.mjs
 
 HFS_SOURCE_NOT_ENGLISH:
   title: "Runtime source is not English"
@@ -4798,6 +4863,8 @@ HFS_SOURCE_NOT_ENGLISH:
   nextStep_vi: "Người giám sát chuyển văn bản sang tiếng Anh, đưa bản tiếng Việt vào modules/i18n/messages, qua một lane đã land."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/checks/check-doc-language.mjs
 
 RT_I18N_UNREADABLE:
   title: "I18n catalog file unreadable"
@@ -4808,6 +4875,8 @@ RT_I18N_UNREADABLE:
   nextStep_vi: "Người giám sát sửa cú pháp tệp danh mục qua một lane đã land."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/checks/check-i18n-catalog.mjs
 
 RT_I18N_SCHEMA:
   title: "I18n catalog schema missing"
@@ -4818,6 +4887,8 @@ RT_I18N_SCHEMA:
   nextStep_vi: "Người giám sát thêm dòng schema vào đầu tệp qua một lane đã land."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/checks/check-i18n-catalog.mjs
 
 RT_I18N_AREA:
   title: "I18n catalog area does not match its file"
@@ -4829,6 +4900,8 @@ RT_I18N_AREA:
   nextStep_vi: "Người giám sát đặt area bằng tên tệp không có đuôi qua một lane đã land."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/checks/check-i18n-catalog.mjs
 
 RT_I18N_SCOPE:
   title: "I18n catalog scope is invalid"
@@ -4840,6 +4913,8 @@ RT_I18N_SCOPE:
   nextStep_vi: "Người giám sát khai báo scope runtime hoặc ui qua một lane đã land."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/checks/check-i18n-catalog.mjs
 
 RT_I18N_EMPTY:
   title: "I18n catalog has no messages"
@@ -4850,6 +4925,8 @@ RT_I18N_EMPTY:
   nextStep_vi: "Người giám sát thêm mục en/vi hoặc xóa tệp qua một lane đã land."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/checks/check-i18n-catalog.mjs
 
 RT_I18N_ENTRY:
   title: "I18n catalog entry malformed"
@@ -4861,6 +4938,8 @@ RT_I18N_ENTRY:
   nextStep_vi: "Người giám sát sửa mục thành en/vi đầy đủ qua một lane đã land."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/checks/check-i18n-catalog.mjs
 
 RT_I18N_EN_NOT_ENGLISH:
   title: "I18n source is not English"
@@ -4871,6 +4950,8 @@ RT_I18N_EN_NOT_ENGLISH:
   nextStep_vi: "Người giám sát đặt bản tiếng Anh vào en và bản tiếng Việt vào vi qua một lane đã land."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/checks/check-i18n-catalog.mjs
 
 RT_I18N_PLACEHOLDERS:
   title: "I18n placeholders differ"
@@ -4881,6 +4962,8 @@ RT_I18N_PLACEHOLDERS:
   nextStep_vi: "Người giám sát sửa vi cho khớp các chỗ giữ chỗ của en qua một lane đã land."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/checks/check-i18n-catalog.mjs
 
 RT_I18N_DUPLICATE:
   title: "I18n source translated twice"
@@ -4891,6 +4974,8 @@ RT_I18N_DUPLICATE:
   nextStep_vi: "Người giám sát giữ một mục và xóa mục còn lại qua một lane đã land."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/checks/check-i18n-catalog.mjs
 
 RT_GUIDANCE_REFUSED_COMMAND:
   title: "Agent guidance tells an agent to run a refused command"
@@ -5478,6 +5563,18 @@ SHARED_WORKTREE_DISCARD:
   nextStep_vi: "Lệnh bị từ chối; hãy để nguyên các tệp khác và chỉ commit hoặc khôi phục các đường dẫn do mình sở hữu."
   owner: op-retry
   kind: verb-refusal
+
+SHELL_RENDER_UNAVAILABLE:
+  title: "Layout render unavailable"
+  title_vi: "Không dựng được ảnh chụp bố cục"
+  meaning_vi: "Runtime đã dựng ứng dụng để chụp một bố cục nhưng không lấy được ảnh thật; kết quả kèm nguyên nhân có kiểu, địa chỉ lỗi và chuỗi chuyển hướng."
+  causes_vi:
+    - "Ứng dụng chưa được cài đủ phụ thuộc trong cây của workflow"
+    - "Máy chủ phát triển không phản hồi, hoặc chuyển hướng 307 mãi mãi"
+    - "Ứng dụng ghi lỗi khi dựng trang, hoặc vùng chứa trang không khớp đúng một phần tử"
+  nextStep_vi: "Op báo blocked loại environment kèm kết quả của lệnh; Kernel xử lý theo bảng chính sách sự cố, runtime chuẩn bị môi trường trước khi giao lại."
+  owner: runtime-core
+  kind: blocker
 
 SHELL_BINDING_INVALID:
   title: "Chromeless shell binding lacks reason"
@@ -6225,6 +6322,9 @@ STARCI_LEDGER_NOT_WAL:
   nextStep_vi: "Mở sổ cái bị từ chối; cần đặt dự án ở ổ cục bộ."
   owner: owner
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/reconciler/controllers/host.mjs
 
 STARCI_LEDGER_ROOT_IS_RUNTIME:
   title: "Ledger root is the runtime folder"
@@ -6247,6 +6347,9 @@ STARCI_LEDGER_ROOT_MISMATCH:
   nextStep_vi: "Giữ nguyên tệp cơ sở dữ liệu, không di trú; chủ hệ thống xác định sổ này thuộc kho nào rồi sửa liên kết đăng ký trước khi chạy lại."
   owner: owner
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/reconciler/controllers/host.mjs
 
 STARCI_LEDGER_SCHEMA_REFUSED:
   title: "Ledger schema not supported"
@@ -6258,6 +6361,9 @@ STARCI_LEDGER_SCHEMA_REFUSED:
   nextStep_vi: "Không có bộ chuyển đổi; runtime tạo sổ cái mới ở lần dùng đầu và không coi đây là tệp hỏng."
   owner: owner
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/reconciler/controllers/host.mjs
 
 STARCI_LEDGER_SQLITE_DOWNGRADE:
   title: "Older SQLite opened newer ledger"
@@ -6269,6 +6375,9 @@ STARCI_LEDGER_SQLITE_DOWNGRADE:
   nextStep_vi: "Cần chạy lại bằng bản Node có SQLite bằng hoặc mới hơn."
   owner: owner
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/reconciler/controllers/host.mjs
 
 STARCI_LEDGER_UNKNOWN_COLUMN:
   title: "Ledger write names unknown column"
@@ -6290,6 +6399,9 @@ STARCI_MACHINE_CORRUPT:
   nextStep_vi: "Runtime ghi một sự cố vào machine_logs; cần xử lý hoặc khôi phục từ bản sao lưu."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: digest
+  surfacedAs: leader-missing
+  surfacedAt: scripts/reconciler/debug-digest-analyze.mjs
 
 STARCI_MACHINE_BUSY:
   title: "Machine database busy"
@@ -6301,6 +6413,9 @@ STARCI_MACHINE_BUSY:
   nextStep_vi: "Thử lại sau; land báo gate-busy với why db-busy và không để lại cổng nửa chiếm."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: digest
+  surfacedAs: queue-failing
+  surfacedAt: scripts/reconciler/debug-digest-analyze.mjs
 
 STARCI_MACHINE_DB:
   title: "Machine database refused an operation"
@@ -6333,6 +6448,9 @@ STARCI_MACHINE_NOT_WAL:
   nextStep_vi: "Mở bị từ chối; cần đặt tệp máy trên ổ cục bộ."
   owner: owner
   kind: runtime-fault
+  surfacedBy: digest
+  surfacedAs: leader-missing
+  surfacedAt: scripts/reconciler/debug-digest-analyze.mjs
 
 STARCI_MACHINE_SCHEMA_OLD:
   title: "Machine DB older than runtime"
@@ -6343,6 +6461,9 @@ STARCI_MACHINE_SCHEMA_OLD:
   nextStep_vi: "Mở bị từ chối; tệp giữ nguyên, chủ sở hữu quyết định thay bằng cơ sở dữ liệu máy mới."
   owner: owner
   kind: runtime-fault
+  surfacedBy: digest
+  surfacedAs: leader-missing
+  surfacedAt: scripts/reconciler/debug-digest-analyze.mjs
 
 STARCI_PURGE_NOT_DELETING:
   title: "Purge not in deleting state"
@@ -6439,6 +6560,8 @@ STRAY_TERMINAL:
   nextStep_vi: "Chỉ ghi nhận để nhìn thấy được; cần dọn các terminal thừa."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/supervisor/orca-tree.mjs
 
 SUBSCRIPTION_NOT_WIRED:
   title: "Subscription declared but not wired"
@@ -6565,6 +6688,8 @@ TASK_OUTSIDE_RUN:
   nextStep_vi: "Chỉ là phát hiện cần theo dõi; cần đưa công việc về đúng Run hoặc dọn công việc cũ."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/supervisor/orca-tree.mjs
 
 TEMP_ROOT_UNUSABLE:
   title: "Configured temp root cannot be used"
@@ -6576,15 +6701,17 @@ TEMP_ROOT_UNUSABLE:
   nextStep_vi: "Chủ máy sửa roots.temp trong config.yaml thành một thư mục tạo và ghi được, rồi chạy lại."
   owner: owner
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/api/fs/ensure-temp-root.mjs
 
 TERMINAL_COUNT_DRIFT:
   title: "More terminals than expected"
   title_vi: "Số terminal nhiều hơn dự kiến"
-  meaning_vi: "Số terminal đang mở nhiều hơn số worker mà Orca đang giữ ở trạng thái hoạt động, cộng phần dư cho phép, và tình trạng này kéo dài."
+  meaning_vi: "Số terminal do runtime mở (tab mang tiêu đề [Kernel], [Op], [Worker] hoặc [Supervisor]) nhiều hơn số worker mà Orca đang giữ ở trạng thái hoạt động, cộng phần dư cho phép, và tình trạng này kéo dài. Terminal của chủ máy không được tính."
   causes_vi:
     - "Terminal của worker đã xong chưa được giải phóng"
     - "Shell trống còn sót lại"
-  nextStep_vi: "Sau thời hạn chờ, bộ dọn rác giải phóng các worker Orca báo là có thể thu hồi và đóng các shell trống."
+  nextStep_vi: "Sau thời hạn chờ, bước dedupe của bộ điều phối đóng các terminal StarCi không còn sổ cái nào gắn vào, mỗi cửa sổ thời hạn một lần."
   owner: runtime-core
   kind: runtime-fault
 
@@ -6932,6 +7059,8 @@ WORKER_STAGING_CREATE_FAILED:
   nextStep_vi: "Supervisor xem lỗi trong kết quả spawn hoặc stage, kiểm tra Orca đang chạy rồi spawn lại; job vẫn ở hàng đợi nên không mất việc."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/supervisor/workers.mjs
 
 WORKER_STAGING_REMOVE_FAILED:
   title: "Worker staging checkout could not be removed through Orca"
@@ -6944,6 +7073,8 @@ WORKER_STAGING_REMOVE_FAILED:
   nextStep_vi: "Bộ dọn worktree (gcWorktrees) thử lại ở lượt sau; nếu vẫn lỗi thì Supervisor xem worktree đó trong Orca và lỗi đã ghi trên dòng sổ."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/supervisor/workers.mjs
 
 WORKER_STALLED:
   title: "Worker is stalled"
@@ -7664,6 +7795,8 @@ connector-child-closure-unverified:
   nextStep_vi: "Kiểm tra tiến trình con còn chạy không, dừng đúng danh tính của nó rồi chạy lại lệnh dừng connector."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/connectors/stop.mjs
 
 connector-child-custody-unreconciled:
   title: "Connector child custody unreconciled"
@@ -7674,6 +7807,9 @@ connector-child-custody-unreconciled:
   nextStep_vi: "Chạy lệnh dừng connector để đóng và đối chiếu tiến trình con trước khi khởi động lại."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: service-quarantined
+  surfacedAt: scripts/reconciler/controllers/host.mjs
 
 connector-child-custody-unverified:
   title: "Connector child custody unverified"
@@ -7684,6 +7820,8 @@ connector-child-custody-unverified:
   nextStep_vi: "Kiểm tra tiến trình con bằng tay, dừng nó rồi cập nhật bản ghi connector trước khi chạy lại."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/connectors/stop.mjs
 
 connector-custody-missing:
   title: "Connector custody record missing"
@@ -7694,6 +7832,8 @@ connector-custody-missing:
   nextStep_vi: "Kiểm tra tên connector; nếu tiến trình vẫn chạy thì dừng bằng tay rồi khởi động lại connector."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/connectors/stop.mjs
 
 connector-manager-closure-unverified:
   title: "Connector manager closure unverified"
@@ -7705,6 +7845,8 @@ connector-manager-closure-unverified:
   nextStep_vi: "Kiểm tra tiến trình quản lý còn chạy không, dừng đúng danh tính của nó rồi chạy lại lệnh dừng."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/connectors/stop.mjs
 
 connector-owner-changed:
   title: "Connector owner changed during stop"
@@ -7715,6 +7857,8 @@ connector-owner-changed:
   nextStep_vi: "Đọc lại trạng thái connector rồi chạy lại lệnh dừng khi không còn tiến trình nào khác thao tác."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/connectors/stop.mjs
 
 connector-process-custody-required:
   title: "Connector process identity required"
@@ -7726,6 +7870,8 @@ connector-process-custody-required:
   nextStep_vi: "Xác minh tiến trình bằng tay, dừng nó nếu đúng rồi khởi động lại connector để có bản ghi đầy đủ."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/connectors/stop.mjs
 
 connector-source-conflict:
   title: "Connector source conflict"
@@ -7736,6 +7882,8 @@ connector-source-conflict:
   nextStep_vi: "Dùng đúng nguồn đã khởi động connector để dừng, hoặc đổi tên connector cho khác nhau."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/connectors/stop.mjs
 
 connector-state-unreadable:
   title: "Connector state unreadable"
@@ -7757,6 +7905,8 @@ connector-stop-record-refused:
   nextStep_vi: "Đọc lại bản ghi connector, xác minh tiến trình con rồi chạy lại lệnh dừng để hoàn tất biên nhận."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/connectors/stop.mjs
 
 continue-exists:
   title: "Continuation already exists"
@@ -8273,6 +8423,9 @@ draft-stuck:
   nextStep_vi: "Lần đánh thức bị từ chối để không đè lên chữ đang có; cần người xóa tay ô nhập hoặc chờ lượt sau."
   owner: owner
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: seat-draft-held
+  surfacedAt: scripts/reconciler/draft-plan.mjs
 draw-feedback-unaddressed:
   title: "Owner draw feedback not addressed"
   title_vi: "Chưa xử lý góp ý của chủ về bản vẽ"
@@ -8502,6 +8655,9 @@ failure-signature:
   nextStep_vi: "Không thử lại tự động vì đây không phải lỗi tạm thời; cần xem màn hình phiên làm việc để xử lý nguyên nhân."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/reconciler/gate-plan.mjs
 feedback-empty:
   title: "Feedback text is empty"
   title_vi: "Nội dung phản hồi trống"
@@ -8520,6 +8676,8 @@ foreign-hook:
   nextStep_vi: "Runtime không đè hook đó; người chủ nhập hai hook thành một hoặc cho phép thay thế."
   owner: owner
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/guards/hook-install.mjs
 foreign-input:
   title: "Foreign text in worker input box"
   title_vi: "Ô nhập của nhân viên có chữ lạ"
@@ -8769,6 +8927,9 @@ identity-mismatch:
   nextStep_vi: "Không dùng tệp này; xác định sổ cái đúng của đăng ký và khôi phục hoặc sửa đăng ký."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/reconciler/ledger-identity.mjs
 
 identity-unreadable:
   title: "Ledger file identity cannot be read"
@@ -8780,6 +8941,9 @@ identity-unreadable:
   nextStep_vi: "Giữ nguyên tệp và WAL; xác định đây có phải tệp sổ cái đúng không - nếu đúng thì khôi phục meta.ledger_id theo đăng ký, nếu sai thì đặt lại đúng tệp mà đăng ký trỏ tới."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/reconciler/ledger-identity.mjs
 
 in-flight:
   title: "Repair job already in flight"
@@ -8838,6 +9002,9 @@ integrity-failed:
   nextStep_vi: "Giữ nguyên tệp, khôi phục từ bản sao lưu gần nhất rồi kiểm tra lại."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/reconciler/controllers/host.mjs
 
 invalid-request:
   title: "Secret publication request invalid"
@@ -9009,6 +9176,9 @@ kernel-guard-unbound:
   nextStep_vi: "Kernel vẫn chạy; Supervisor đọc biên nhận guard trên sự kiện kernel-booted, sửa nguyên nhân rồi khởi động lại Kernel để guard được gắn đủ."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: seat-unrecoverable
+  surfacedAt: scripts/reconciler/host-seats.mjs
 kernel-proof-required:
   title: "Recovery needs a Kernel terminal"
   title_vi: "Cần chạy từ cửa sổ Kernel"
@@ -9037,6 +9207,9 @@ kernel-seat-publication-failed:
   nextStep_vi: "Kiểm tra sổ cái ghi được không rồi khởi động lại workflow; xem cleanup trong kết quả nếu chưa rõ worker đã đóng chưa."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: seat-unrecoverable
+  surfacedAt: scripts/reconciler/host-seats.mjs
 
 kernel-stale-cleared:
   title: "Stale Kernel seat cleared"
@@ -9057,6 +9230,9 @@ kernel-stale-terminal-unclosed:
   nextStep_vi: "Một sự cố lỗi runtime được mở cho Supervisor dọn cửa sổ đó thủ công."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: incident
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/start-workflow.mjs
 kernel-start-reservation-lost:
   title: "Kernel start reservation lost"
   title_vi: "Mất giữ chỗ khởi động Kernel"
@@ -9067,6 +9243,9 @@ kernel-start-reservation-lost:
   nextStep_vi: "Khởi động lại workflow để lấy phiếu giữ chỗ mới."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: seat-unrecoverable
+  surfacedAt: scripts/reconciler/host-seats.mjs
 
 kind-invalid:
   title: "Provider kind is invalid"
@@ -9208,6 +9387,8 @@ live-not-on-main:
   nextStep_vi: "Lần land bị từ chối; đưa kho về nhánh main rồi thử lại."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/machine/live-fast-forward.mjs
 live-path-status-failed:
   title: "Could not read live path status"
   title_vi: "Không đọc được trạng thái tệp trong kho chính"
@@ -9217,6 +9398,8 @@ live-path-status-failed:
   nextStep_vi: "Lần land bị từ chối; xử lý lỗi git rồi land lại."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/machine/live-fast-forward.mjs
 live-paths-dirty:
   title: "Live files have local changes"
   title_vi: "Tệp trong kho chính đang có thay đổi dở"
@@ -9226,6 +9409,8 @@ live-paths-dirty:
   nextStep_vi: "Lần land bị từ chối để khỏi ghi đè; xử lý các tệp dở rồi land lại."
   owner: owner
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/machine/live-fast-forward.mjs
 live-deps-missing:
   title: "Live runtime dependencies missing while landing"
   title_vi: "Thiếu thư viện của runtime khi land"
@@ -9339,6 +9524,9 @@ main-checkout-damaged:
   nextStep_vi: "GC đã dừng. Khôi phục checkout chính (git checkout -- các file, cài lại node_modules), tìm liên kết gây lỗi, rồi chạy starci machine worktrees resume."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/reconciler/controllers/gc.mjs
 main-moving:
   title: "Main keeps moving under land"
   title_vi: "Main liên tục thay đổi khi land"
@@ -9412,6 +9600,8 @@ no-budget:
   nextStep_vi: "Việc giữ chỗ thất bại; cần tạo ngân sách rồi thử lại."
   owner: owner
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: engine/db/machine.mjs
 no-declared-checks:
   title: "Report declared no checks"
   title_vi: "Báo cáo không khai kiểm tra nào"
@@ -9449,6 +9639,8 @@ no-dispatch:
   nextStep_vi: "Lệnh observe vẫn trả trạng thái lượt; dùng starci kernel status hoặc đợi báo cáo của việc."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/kernel/verbs/observe.mjs
 no-job:
   title: "Job not found for land"
   title_vi: "Không thấy việc cần land"
@@ -9588,6 +9780,8 @@ publication-held:
   nextStep_vi: "Đọc effectState trong kết quả; nếu không phải none thì xác minh tệp đích rồi chạy lại."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/api/sops/lib.mjs
 
 release-unknown:
   title: "Install lock release unknown"
@@ -9598,6 +9792,8 @@ release-unknown:
   nextStep_vi: "Kiểm tra khóa máy chủ còn bị giữ không và nhả đúng token trước khi chạy lại cài đặt."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/install/initial-age.mjs
 
 retry-exhausted:
   title: "Retry budget spent"
@@ -9609,6 +9805,9 @@ retry-exhausted:
   nextStep_vi: "Người giám sát đọc lý do và lỗi cuối trong hàng đợi, sửa nguyên nhân qua một lane đã land; một sự kiện mới cho khóa đó cấp lại ngân sách."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: digest
+  surfacedAs: queue-failing
+  surfacedAt: scripts/reconciler/debug-digest-analyze.mjs
 
 staging-install-failed:
   title: "npm ci failed in the [Worker] staging checkout"
@@ -9676,6 +9875,8 @@ not-windows:
   nextStep_vi: "Không tạo tác vụ; đăng ký thủ công trên máy Windows."
   owner: owner
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/machine/task-register.mjs
 nothing-reverifiable:
   title: "Nothing left to re-verify"
   title_vi: "Không có gì để kiểm lại"
@@ -9741,6 +9942,8 @@ orchestration-no-kernel-terminal:
   nextStep_vi: "Supervisor khởi động lại Kernel; lần đọc đầu tiên sau đó chép mọi tin còn chờ vào sổ ledger."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/kernel/verbs/shared/worker-messages.mjs
 orphan-kernel-job:
   title: "Orphaned Kernel job cancelled"
   title_vi: "Việc Kernel mồ côi bị hủy"
@@ -9788,6 +9991,9 @@ host-unavailable:
   nextStep_vi: "Không kết luận cửa sổ đã chết; chờ Orca hoạt động lại rồi kiểm tra lại."
   owner: owner
   kind: runtime-fault
+  surfacedBy: sla-clock
+  surfacedAs: ORCA_DOWN
+  surfacedAt: scripts/reconciler/controllers/host.mjs
 hooks-dir-tracked:
   title: "Hooks dir is tracked by git"
   title_vi: "Thư mục hook nằm trong phần git theo dõi"
@@ -9797,6 +10003,8 @@ hooks-dir-tracked:
   nextStep_vi: "Bỏ qua cài hook; cần chỉnh cấu hình hook của kho."
   owner: owner
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/guards/hook-install.mjs
 no-tunnel:
   title: "No public tunnel for owner link"
   title_vi: "Chưa có đường hầm công khai cho liên kết"
@@ -9806,6 +10014,8 @@ no-tunnel:
   nextStep_vi: "Liên kết vẫn được gửi nhưng đánh dấu không công khai; chủ phải mở nó từ máy nội bộ hoặc bật đường hầm."
   owner: owner
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/connectors/telegram.mjs
 outcome-mismatch:
   title: "Report outcome contradicts the flag"
   title_vi: "Kết quả báo cáo mâu thuẫn với cờ khai"
@@ -10414,6 +10624,9 @@ ram-critical:
   nextStep_vi: "Bộ thông báo gửi cảnh báo khẩn; Supervisor giảm tải hoặc dọn tiến trình để máy hồi phục."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: notifier
+  surfacedAs: ram-critical
+  surfacedAt: scripts/reconciler/notifier.mjs
 real-money:
   title: "Ask involving real money"
   title_vi: "Câu hỏi liên quan đến tiền thật"
@@ -10439,6 +10652,15 @@ rebase-conflict:
   causes_vi:
     - "main đã sửa cùng tệp mà workflow cũng sửa"
   nextStep_vi: "Kernel (hoặc Supervisor nếu được đẩy lên) giao một op giải xung đột trên worktree của workflow trước khi finish; finish vẫn từ chối khi còn xung đột."
+  owner: supervisor
+  kind: blocker
+budget-overrun:
+  title: "An Op attempt spent more tokens than its budget"
+  title_vi: "Một lượt chạy của op dùng nhiều token hơn ngân sách"
+  meaning_vi: "Vai trò Op khai báo ngân sách token cho mỗi lượt chạy; runtime đo lượt chạy đã kết thúc từ các dòng usage của nó, và khi job của nó đang chờ Kernel thì mở một Decision Item cho Kernel."
+  causes_vi:
+    - "Op đọc lại nhiều tệp hoặc gọi lặp lại các lệnh trạng thái trong một lượt chạy dài"
+  nextStep_vi: "Kernel chọn một trong ba hướng: tiếp tục một lần, thay agent hoặc thu hẹp phạm vi của lượt chạy."
   owner: supervisor
   kind: blocker
 record-change-not-owner:
@@ -10517,6 +10739,9 @@ registry-file-mismatch:
   nextStep_vi: "Không sao lưu tệp này. Đối chiếu dòng ledgers trong machine.sqlite với đường dẫn thực tế cùng owner: sửa đăng ký về đúng tệp, hoặc đặt lại tệp mà đăng ký trỏ tới."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/reconciler/ledger-identity.mjs
 registry-unavailable:
   title: "Machine registry cannot name the ledger identity"
   title_vi: "Không đọc được sổ đăng ký máy để định danh sổ cái"
@@ -10527,6 +10752,9 @@ registry-unavailable:
   nextStep_vi: "Khôi phục handle machine.sqlite của engine rồi để lượt sau xác minh lại; không có bản sao lưu nào được chụp cho tới khi đăng ký đọc được."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: seat-unrecoverable
+  surfacedAt: scripts/reconciler/host-seats.mjs
 release-from-inside:
   title: "A workflow worktree release was asked from inside it"
   title_vi: "Yêu cầu gỡ cây làm việc của workflow từ bên trong chính nó"
@@ -10834,15 +11062,6 @@ owes-no-step:
   nextStep_vi: "Không cần làm thêm; lệnh chạy lại là vô hại."
   owner: runtime-core
   kind: settle-reason
-owner-wait-no-ask:
-  title: "Owner wait without an ask"
-  title_vi: "Chờ owner nhưng không có câu hỏi"
-  meaning_vi: "Việc dừng ở trạng thái chờ owner nhưng không nộp câu hỏi nào để owner trả lời."
-  causes_vi:
-    - "Op báo chờ owner mà không đính kèm câu hỏi"
-  nextStep_vi: "Mục quyết định retry-decision được giao cho Kernel để chạy lại op và nộp câu hỏi."
-  owner: supervisor
-  kind: blocker
 retry-decision:
   title: "Retry decision needed"
   title_vi: "Cần quyết định có thử lại không"
@@ -10904,6 +11123,8 @@ revert-git:
   nextStep_vi: "Việc hoàn tác dừng lại; Supervisor xem chi tiết lỗi git rồi xử lý tay hoặc chạy lại."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/supervisor/lesson-actions.mjs
 runtime-defect:
   title: "Runtime defect reported"
   title_vi: "Có lỗi trong runtime"
@@ -11249,6 +11470,8 @@ tree-update-failed:
   nextStep_vi: "Kết quả báo lỗi kèm việc hoàn tác; nếu hoàn tác không sạch, Supervisor xử lý tay."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/machine/live-fast-forward.mjs
 uat-slot-aborted:
   title: "UAT slot wait aborted"
   title_vi: "Chờ suất UAT bị huỷ"
@@ -11384,6 +11607,9 @@ unstamped-orphan:
   nextStep_vi: "Chủ xem sự cố worktree.orphan-review trong machine_logs rồi tự gỡ cây (còn việc chưa commit thì lấy ra trước) hoặc nhận lại nó; GC không làm thay."
   owner: owner
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: unregistered-trees
+  surfacedAt: scripts/reconciler/untied-tree-item.mjs
 
 unread-peer:
   title: "Peer message unread"
@@ -11527,6 +11753,9 @@ worker-closure-unproven:
   nextStep_vi: "Kiểm tra terminal của worker còn sống không, đóng qua đường đóng đã xác minh rồi thay lượt lại."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/reconciler/turn-budget.mjs
 
 worker-depth-exceeded:
   title: "Worker would nest deeper than the Orca depth setting"
@@ -12114,6 +12343,25 @@ workflow-worktree-install-failed:
   owner: runtime-core
   kind: verb-refusal
 # Proof: scripts/kernel/workflow-worktree.mjs requireWorkflowPlacement; scripts/kernel/workflow-checkpoint.mjs followCheckpoint; scripts/lib/worktree-record.mjs.
+workflow-worktree-install-locked:
+  title: "A running process holds a file of the workflow tree during npm ci"
+  title_vi: "Một tiến trình đang chạy giữ file trong cây workflow khi npm ci"
+  meaning_vi: "npm ci không xóa được một file native (.node) trong node_modules vì một tiến trình đang tải nó (máy chủ dev, watcher, trình biên dịch), nên cây chưa được cài xong và không được coi là đã cài. Lần khởi động Kernel dừng, reservation được giải phóng; lỗi lặp lại do cùng nguyên nhân sẽ bị giữ lại thành một mục quyết định."
+  causes_vi:
+    - "Một tiến trình của workflow trước hoặc của một op vẫn chạy trong cây (dev server, watcher)"
+    - "Một cài đặt khác hoặc trình chống virus giữ file"
+  nextStep_vi: "Đọc đường dẫn bị khóa và danh sách tiến trình trong phiếu, dừng tiến trình giữ file (cột via nói nó giữ bằng dòng lệnh, thư mục làm việc, file ánh xạ hay module đã nạp) rồi mở lại ghế bằng starci reconciler reopen <ghế>; runtime tự bỏ qua npm ci khi cây đã cài đúng lockfile."
+  owner: runtime-core
+  kind: verb-refusal
+kernel-start-held:
+  title: "The Kernel launch is held after the same failure repeated"
+  title_vi: "Lần khởi động Kernel bị giữ vì cùng một lỗi lặp lại"
+  meaning_vi: "Lần khởi động Kernel đã thất bại đủ số lần đã khai báo vì cùng một nguyên nhân ở cùng một bước. Runtime không thử lại nữa cho đến hết thời gian giữ; ghế bị cách ly và một mục quyết định seat-unrecoverable nêu nguyên nhân, số lần và bằng chứng."
+  causes_vi:
+    - "Một bước khởi động lỗi lặp lại (cài đặt cây, tin cậy khởi chạy, cấp phép) mà thử lại không đổi được"
+  nextStep_vi: "Đọc nguyên nhân trong mục quyết định, sửa gốc rồi mở lại ghế bằng starci reconciler reopen <ghế>; hết thời gian giữ runtime thử đúng một lần."
+  owner: supervisor
+  kind: blocker
 workflow-worktree-missing:
   title: "The op's workflow has no worktree"
   title_vi: "Workflow của op không có cây làm việc"
@@ -12158,11 +12406,12 @@ workflow-custody-conflict:
   kind: verb-refusal
 # Proof: scripts/kernel/workflow-custody-cli.mjs main.
 workflow-custody-busy:
-  title: "An op of the workflow is in flight"
-  title_vi: "Một op của workflow đang chạy"
-  meaning_vi: "starci workflow custody --apply không đổi cây của workflow khi còn op leased, running, answering, reported, deciding hoặc effect_unknown: việc đưa cây về nhánh sẽ thay đổi tệp dưới tay op đó."
+  title: "An op of the workflow has a live worker"
+  title_vi: "Một op của workflow còn worker đang sống"
+  meaning_vi: "starci workflow custody --apply không đổi cây của workflow khi còn op leased, running, answering, reported, deciding hoặc effect_unknown mà worker của nó còn sống hoặc không đọc được: việc đưa cây về nhánh sẽ thay đổi tệp dưới tay worker đó. Một op mà worker đã chết (terminal biến mất sau khi máy khởi động lại) không giữ cây và không chặn việc này."
   causes_vi:
     - "Kernel vẫn đang giao việc trong cây sai"
+    - "Orca không trả lời nên chưa chứng minh được worker đã chết"
   nextStep_vi: "Chờ các op trong chi tiết chốt hoặc dừng Kernel giao thêm việc, rồi chạy lại với --apply."
   owner: runtime-core
   kind: verb-refusal
@@ -12332,6 +12581,16 @@ worker-wedged:
     - "Thiếu cấu hình hoặc biến môi trường"
   nextStep_vi: "Runtime/Supervisor kiểm tra môi trường; khi sẵn sàng Kernel chạy lại op."
   owner: supervisor
+  kind: blocker
+"blocker:checker-unavailable":
+  title: "Blocked: a checker could not run"
+  title_vi: "Bị chặn: bộ kiểm tra không chạy được"
+  meaning_vi: "Critic độc lập hoặc một bộ kiểm tra khác không khởi động hay không trả lời. Đây là việc của runtime, không phải của owner và không phải lỗi của op."
+  causes_vi:
+    - "Critic không khởi động (đăng nhập, mạch ngắt, hết dung lượng, lượt đầu không quan sát được)"
+    - "Không có thành viên độc lập, hoặc hết quota"
+  nextStep_vi: "Runtime mở lại lượt settle và tự chạy Critic trên sản phẩm đã viết; chỉ khi phán quyết trượt mới chạy lại op, kèm lời phê."
+  owner: runtime-core
   kind: blocker
 "blocker:authority":
   title: "Blocked: needs owner authority"
@@ -15298,6 +15557,49 @@ RT_PROSE_RESTATES_SLOTS:
   owner: supervisor
   kind: check-finding
 
+RT_STORAGE_UNDECLARED:
+  title: "A text column of a store has no storage class"
+  title_vi: "Một cột văn bản của kho dữ liệu chưa có lớp lưu trữ"
+  meaning_vi: "Nội dung nằm thành tệp trong kho blob dưới thư mục trạng thái runtime còn hàng trong cơ sở dữ liệu chỉ giữ tham chiếu (sha) và các giá trị nhỏ dùng để truy vấn. Mọi cột văn bản của sổ cái sản phẩm và machine.sqlite phải được khai báo trong modules/schemas/storage-convention.yaml với một lớp: scalar, bounded, reference, spill hoặc migrate. Một cột chưa khai báo, một khai báo trỏ vào cột không còn, một lớp lạ, hoặc lớp migrate không khớp danh sách migrations là đi vòng quy ước."
+  causes_vi:
+    - "Thêm bảng hoặc cột văn bản mới mà không khai báo lớp"
+    - "Cột bị đổi tên hoặc xóa nhưng khai báo vẫn còn"
+  nextStep_vi: "Khai báo cột trong modules/schemas/storage-convention.yaml: nội dung dùng reference (lưu blob, giữ sha), giá trị nhỏ dùng scalar hoặc bounded."
+  owner: supervisor
+  kind: check-finding
+
+RT_OP_JUDGE_UNDECLARED:
+  title: "An op does not declare who judges its product, or declares a judge the runtime does not provide"
+  title_vi: "Một op chưa khai báo ai chấm sản phẩm của nó, hoặc khai báo người chấm mà runtime không có"
+  meaning_vi: "Nguyên tắc P2: người làm không bao giờ tự chấm việc của mình. Hợp đồng của mỗi op (modules/ops/ops/<op>.yaml) có trường bắt buộc judge, danh sách ít nhất một người chấm: machine (phép đo độc lập mà runtime sở hữu và chạy lại lúc chốt, gọi tên trong modules/kernel/op-judges.yaml; tệp test do chính lượt làm viết thì không bao giờ tự nó là người chấm), critic (Critic độc lập, đúng cho những loại op mà bảng modules/kernel/critic.yaml đánh dấu covered), owner (chỉ nơi có cổng của chủ) hoặc next-leg (chặng sau có hợp đồng là duyệt sản phẩm này). Danh sách rỗng, thiếu trường, phép đo lạ, phép đo runtime không áp dụng cho op đó, Critic khai lệch bảng, owner không có cổng hoặc next-leg chưa đăng ký đều bị từ chối."
+  causes_vi:
+    - "Thêm một op mới mà chưa khai báo trường judge"
+    - "Khai báo một phép đo hoặc Critic mà runtime không chạy cho op đó, hoặc bảng của runtime đổi mà hợp đồng chưa đổi theo"
+  nextStep_vi: "Khai báo judge trong hợp đồng của op theo modules/kernel/op-judges.yaml, hoặc sửa bảng tương ứng của runtime cho khớp với hành vi thật."
+  owner: supervisor
+  kind: check-finding
+
+RT_EVENT_SPILL_BYPASS:
+  title: "A ledger event payload is spilled by hand"
+  title_vi: "Một payload sự kiện của sổ cái được tự chuyển sang blob"
+  meaning_vi: "Payload sự kiện lớn theo đầu vào (danh sách tệp, manifest, bản tóm tắt, báo cáo, lời phê bình, menu) chỉ đi vào kho blob qua một đường duy nhất là appendEvent: engine/db/event-compact.mjs giữ bản inline tối đa 16 KiB và toàn bộ payload sau events.payload_sha, người đọc giải qua engine/db/event-payload.mjs. Một tệp nguồn khác truyền payloadSha vào lệnh ghi, bắt lỗi payload quá lớn để tự chuyển, hoặc chèn thẳng vào bảng events là đi vòng."
+  causes_vi:
+    - "Người viết gặp STARCI_EVENT_PAYLOAD_TOO_LARGE rồi tự lưu blob và truyền payloadSha thay vì để appendEvent làm"
+  nextStep_vi: "Bỏ đoạn tự chuyển; gọi appendEvent với payload đầy đủ và đọc lại bằng eventPayloadOf."
+  owner: supervisor
+  kind: check-finding
+
+RT_ROOT_ADHOC:
+  title: "A root is resolved outside the root module"
+  title_vi: "Một thư mục gốc được tự phân giải ngoài mô-đun gốc"
+  meaning_vi: "Thư mục mà một thành phần đọc hoặc ghi chỉ được quyết định ở một mô-đun là scripts/lib/roots.mjs: cây runtime, thư mục trạng thái, thư mục tạm, thư mục nơi lệnh được gọi, tên thư mục Work và thứ tự thử hai cây cùng có thể giữ một bản ghi (cây làm việc trước, bản checkout chính sau). Tệp nguồn runtime tự viết process.cwd() hoặc literal tên thư mục Work là tự phân giải thư mục, và đã bốn lần trong hai ngày một thành phần đọc hay ghi nhầm cây vì vậy."
+  causes_vi:
+    - "Tệp mới nối đường dẫn từ process.cwd() hoặc từ literal .starciwork thay vì gọi mô-đun gốc"
+    - "Tệp đã có sẵn ở bản phát hành trước nhưng nay viết nhiều hơn số lần khi đó"
+  nextStep_vi: "Dùng invocationDir, workDirHolding, workRecordPath hoặc toolSearchDirs của scripts/lib/roots.mjs."
+  owner: supervisor
+  kind: check-finding
+
 RT_PORT_RESTATED:
   title: "A port literal is spelled outside its owner"
   title_vi: "Một literal cổng được viết ngoài tệp chủ sở hữu"
@@ -15535,6 +15837,16 @@ RT_EDGE_CASE_REGISTRY:
   nextStep_vi: "Người giám sát sửa mục cho đúng tệp, hoặc chuyển mục sang open kèm lý do."
   owner: supervisor
   kind: check-finding
+RT_GATE_LOOSENING:
+  title: "A change loosens a gate without the owner's approval"
+  title_vi: "Một thay đổi nới lỏng cổng kiểm mà chưa có chủ phê duyệt"
+  meaning_vi: "Bỏ một kiểm tra khỏi danh sách của cổng, hạ ngưỡng, thêm một mục vào allowlist, xoá hoặc làm yếu một spec cùng lúc với mã sản phẩm là việc của chủ dự án; commit hoặc lần land đó chỉ qua khi cây gốc đã có mục owner-rulings gate-loosening-<dấu vân> của đúng thay đổi này."
+  causes_vi:
+    - "Một lane gỡ kiểm tra hoặc hạ ngưỡng để cho workflow chạy qua"
+    - "Một spec bị xoá hoặc bớt khẳng định trong cùng thay đổi với mã sản phẩm"
+  nextStep_vi: "Khôi phục cổng; nếu chủ thật sự duyệt, chủ thêm mục owner-rulings gate-loosening-<dấu vân> trước, rồi mới land thay đổi."
+  owner: owner
+  kind: check-finding
 OP_REPORTS_TO_KERNEL:
   title: "An Op addressed a role above its Kernel"
   title_vi: "Một Op gửi thẳng lên vai trò cao hơn Kernel của nó"
@@ -15543,6 +15855,35 @@ OP_REPORTS_TO_KERNEL:
     - "Op chạy starci supervisor tell hoặc channel"
   nextStep_vi: "Op nộp báo cáo blocked hoặc ask bằng starci kernel report; Kernel trả lời hoặc nâng lên."
   owner: op-retry
+  kind: blocker
+SUPERVISOR_USE_DECIDE:
+  title: "A Supervisor call outside its menu was refused"
+  title_vi: "Lệnh của Supervisor nằm ngoài thực đơn bị từ chối"
+  meaning_vi: "Supervisor chỉ đọc, trả lời các mục của thực đơn bằng starci supervisor decide, ghi lỗi runtime và chạy các bộ dọn nó sở hữu. Lệnh khác bị từ chối kèm thực đơn hiện tại và cách viết lệnh quyết định."
+  causes_vi:
+    - "Supervisor chạy theo thói quen một lệnh cũ: giải quyết cổng bằng tay, nhận hoặc đóng Decision Item, gửi thông báo tay cho Kernel, đặt ưu tiên tay"
+    - "Supervisor ghi starci supervisor actions record cho một khóa không phải runtime-defect"
+  nextStep_vi: "Lệnh không được chạy; Supervisor chọn một mục trong thực đơn đã in kèm lời từ chối và chạy starci supervisor decide --item <id> --choice <choice> --reason <why>."
+  owner: op-retry
+  kind: verb-refusal
+SUPERVISOR_STARCI_ONLY:
+  title: "A Supervisor program other than starci was refused"
+  title_vi: "Chương trình ngoài starci của Supervisor bị từ chối"
+  meaning_vi: "Supervisor chỉ chạy các động từ starci và các lệnh đọc thuần. Một chương trình ghi, chạy mã hoặc gọi mạng bị từ chối kèm thực đơn hiện tại."
+  causes_vi:
+    - "Supervisor chạy node, cp, mv, curl hoặc một công cụ thô khác"
+  nextStep_vi: "Lệnh không được chạy; Supervisor dùng thực đơn của mình và starci supervisor decide."
+  owner: op-retry
+  kind: verb-refusal
+SUPERVISOR_MENU_STEP_FAILED:
+  title: "A step of a Supervisor menu choice failed"
+  title_vi: "Một bước của lựa chọn thực đơn Supervisor thất bại"
+  meaning_vi: "starci supervisor decide chạy từng bước của lựa chọn bằng động từ starci tương ứng và dừng ở bước đầu tiên thất bại; mục vẫn mở trên thực đơn."
+  causes_vi:
+    - "Động từ của bước từ chối đầu vào (cam kết chưa có trong runtime, kho lưu trữ không đọc được)"
+    - "Sổ cái của workflow không còn khớp với mục"
+  nextStep_vi: "Mục vẫn trên thực đơn; Supervisor đọc lỗi của bước, sửa đầu vào --text rồi chạy lại, hoặc chọn none-fits."
+  owner: supervisor
   kind: blocker
 DOCKER_PORT_POLICY:
   title: "Docker ownership or published-port policy was refused"
@@ -16373,6 +16714,16 @@ kernel-caller-stale:
   owner: supervisor
   kind: verb-refusal
 
+read-verb-write:
+  title: "A read verb tried to write the ledger"
+  title_vi: "Một lệnh chỉ đọc đã cố ghi vào ledger"
+  meaning_vi: "Lệnh đọc (reads: true) chạy qua kết nối ledger chỉ đọc cho người gọi không sở hữu các phản ứng cơ học của nó; nó gọi một thao tác ghi (giao dịch, sự kiện, câu lệnh INSERT/UPDATE/DELETE) nên lệnh thất bại và không ghi gì. Đây là lỗi của lệnh, không phải của người gọi."
+  causes_vi:
+    - "Một pha mới của lệnh đọc ghi vào ledger mà chưa được chặn cho người gọi không phải chủ sở hữu phản ứng"
+  nextStep_vi: "Đưa thao tác ghi sang vai sở hữu nó (Kernel, Supervisor, reconciler) hoặc chặn nó khi ledger chỉ đọc; không mở ledger ghi được cho người đọc."
+  owner: runtime-core
+  kind: runtime-fault
+
 kernel-caller-unknown:
   title: "Managed caller custody is unavailable"
   title_vi: "Không xác minh được quyền của caller"
@@ -16445,6 +16796,9 @@ kernel-launch-custody-incomplete:
   nextStep_vi: "Supervisor đối chiếu Run và worker trên Orca rồi xử lý sự cố; không sửa tay bảng tín hiệu."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/workflow-launch-custody.mjs
 kernel-launch-host-unavailable:
   title: "Orca did not answer for the held Kernel launch Dispatch"
   title_vi: "Orca không trả lời về Dispatch của lần khởi động Kernel đang giữ"
@@ -16454,6 +16808,9 @@ kernel-launch-host-unavailable:
   nextStep_vi: "Đợi Orca phản hồi rồi chạy lại lệnh start."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/workflow-launch-custody.mjs
 kernel-launch-dispatch-unsettled:
   title: "The held Kernel launch Dispatch is not settled"
   title_vi: "Dispatch của lần khởi động Kernel đang giữ chưa kết thúc"
@@ -16463,6 +16820,9 @@ kernel-launch-dispatch-unsettled:
   nextStep_vi: "Supervisor dừng đúng Dispatch đó rồi mới chạy lại lệnh start."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/workflow-launch-custody.mjs
 kernel-launch-terminal-unproven:
   title: "The terminal of the held Kernel launch is not proven gone"
   title_vi: "Chưa chứng minh được cửa sổ của lần khởi động Kernel đang giữ đã đóng"
@@ -16472,6 +16832,9 @@ kernel-launch-terminal-unproven:
   nextStep_vi: "Đóng đúng cửa sổ đó rồi chạy lại lệnh start."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/workflow-launch-custody.mjs
 check-rerun-worktree-unresolved:
   title: "The workflow worktree of a check re-run could not be resolved"
   title_vi: "Không xác định được worktree của workflow để chạy lại check"
@@ -16482,6 +16845,8 @@ check-rerun-worktree-unresolved:
   nextStep_vi: "Chạy starci workflow status để xem worktree của workflow, khôi phục hoặc đăng ký lại worktree đó, rồi chạy lại starci kernel record-checks."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/kernel/verbs/shared/check-evidence.mjs
 kernel-launch-runs-unreadable:
   title: "Orca Run list could not be read"
   title_vi: "Không đọc được danh sách Run của Orca"
@@ -16492,6 +16857,9 @@ kernel-launch-runs-unreadable:
   nextStep_vi: "Đợi Orca phản hồi rồi chạy lại lệnh start."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/workflow-launch-custody.mjs
 kernel-launch-run-exists:
   title: "A Kernel Run of this workflow exists since the held launch"
   title_vi: "Đã có Run Kernel của workflow này kể từ lần khởi động bị giữ"
@@ -16502,6 +16870,9 @@ kernel-launch-run-exists:
   owner: supervisor
   kind: runtime-fault
 # Proof: scripts/kernel/verbs/route.mjs refuseIneligibleOverride — a recorded op-override pin never falls through to another pool.
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/workflow-launch-custody.mjs
 op-override-ineligible:
   title: "Op-override pinned pool is ineligible"
   title_vi: "Pool được ghim bởi op-override không đủ điều kiện"
@@ -16523,6 +16894,8 @@ status-render-empty:
   nextStep_vi: "Chạy lại lệnh status: lỗi đọc giữa land tự hết ở lần đọc sau; nếu lặp lại thì là runtime-defect và Supervisor điều tra đường render."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/kernel/verbs/status.mjs
 # Proof: scripts/kernel/verbs/reconcile.mjs releaseAttemptReservations — a refused no-effect release aborts the reconcile rather than leak the slot.
 provider-reservation-held:
   title: "Provider reservation refused the no-effect release"
@@ -16534,6 +16907,8 @@ provider-reservation-held:
   nextStep_vi: "Supervisor đọc biên nhận đang giữ trong provider_reservations, đối chiếu scope attempt với job rồi giải phóng hoặc hòa giải tay; không ép job chạy lại khi chỗ chưa rõ."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: caller
+  surfacedAt: scripts/kernel/verbs/reconcile.mjs
 
 guard-command-unresolvable:
   title: "The command guard hook cannot run in the host's shell"
@@ -16565,6 +16940,9 @@ op-incident-escalate-supervisor:
   nextStep_vi: "Supervisor đọc bằng chứng, sửa nguyên nhân hoặc trả lời là đã sửa, có cách tránh, hoặc không phải lỗi runtime để trả về Kernel."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/reconciler/gate-plan.mjs
 op-incident-escalate-owner:
   title: "An op incident exhausted every handler and goes to the owner"
   title_vi: "Sự cố op hết mọi bên xử lý và chuyển cho chủ dự án"
@@ -16575,6 +16953,9 @@ op-incident-escalate-owner:
   nextStep_vi: "Chủ dự án trả lời câu hỏi hoặc quyết định tiếp; việc bị giữ chỉ là job bị ảnh hưởng."
   owner: owner
   kind: runtime-fault
+  surfacedBy: notifier
+  surfacedAs: supervisor-di-overdue
+  surfacedAt: scripts/reconciler/notifier.mjs
 pin-lineage-excluded:
   title: "A pinned agent was excluded for this job by its history"
   title_vi: "Agent được ghim đã bị loại cho job này theo lịch sử"
@@ -16595,6 +16976,9 @@ ENGINE_CONFIG_UNREADABLE:
   nextStep_vi: "Sửa config.yaml nếu nó sai, hoặc chạy starci reconciler restart để bộ điều phối chạy trên mã mới."
   owner: owner
   kind: runtime-fault
+  surfacedBy: sla-clock
+  surfacedAs: ENGINE_CONFIG_UNREADABLE
+  surfacedAt: scripts/reconciler/engine-modes.mjs
 gate-cause-required:
   title: "A supervisor-gate raise names no known cause class"
   title_vi: "Lần dựng gate cho Supervisor không nêu nhóm nguyên nhân hợp lệ"
@@ -16766,6 +17150,249 @@ RUNTIME_CHANGE_OWNED_BY_DEBUG:
   owner: supervisor
   kind: blocker
 
+CRITIC_NO_INDEPENDENT_MEMBER:
+  title: "No independent critic available"
+  title_vi: "Không có người chấm độc lập"
+  meaning_vi: "Hạng Critic không có thành viên nào thuộc nhà cung cấp khác với bên làm ra sản phẩm, nên lượt chấm bị từ chối và nhà cung cấp của bên làm ra không bao giờ tự chấm."
+  causes_vi:
+    - "Hạng Critic chỉ còn thành viên của nhà cung cấp đã làm ra sản phẩm"
+    - "Các thành viên khác nhà cung cấp bị gỡ khỏi hạng"
+  nextStep_vi: "Op báo blocked kèm nguyên nhân; Kernel chờ hoặc nâng lên Supervisor để có thành viên khác nhà cung cấp trở lại hạng Critic (modules/models/tiers.yaml seats.critic)."
+  owner: supervisor
+  kind: blocker
+
+CRITIC_UNAVAILABLE:
+  title: "Independent critic unavailable"
+  title_vi: "Người chấm độc lập chưa sẵn sàng"
+  meaning_vi: "Người chấm độc lập không khởi động hoặc không trả lời được: đăng nhập, mạch nhà cung cấp, sức chứa, lần khởi chạy bị từ chối, báo lên hoặc quá thời hạn."
+  causes_vi:
+    - "Nhà cung cấp hết phiên đăng nhập hoặc mạch đang mở"
+    - "Người chấm không trả lời trong thời hạn allocation.drawLoop.criticTimeoutMs"
+    - "Người chấm báo lên vì không thể chấm"
+  nextStep_vi: "Vòng vẽ chạy lại finish sau khi một thành viên độc lập quay lại; Kernel theo dõi báo cáo blocked của Op."
+  owner: op-retry
+  kind: blocker
+
+CRITIC_QUOTA_OUT:
+  title: "Every independent critic is out of tokens"
+  title_vi: "Mọi người chấm độc lập đã hết hạn mức"
+  meaning_vi: "Mọi thành viên độc lập của hạng Critic đều hết token, nên lượt chấm chờ đến khi hạn mức làm mới."
+  causes_vi:
+    - "Hạn mức tuần hoặc phiên của nhà cung cấp đã dùng hết"
+  nextStep_vi: "Bộ chọn tự lấy thành viên độc lập tiếp theo; khi không còn, Op báo blocked và Kernel chờ hạn mức làm mới."
+  owner: supervisor
+  kind: blocker
+
+CRITIC_AUTHOR_UNKNOWN:
+  title: "The maker of the product is unknown"
+  title_vi: "Không biết bên làm ra sản phẩm"
+  meaning_vi: "Runtime không xác định được nhà cung cấp đã làm ra sản phẩm nên không thể chứng minh người chấm độc lập."
+  causes_vi:
+    - "Terminal của Op không gắn với một nhà cung cấp"
+    - "Không truyền --drawer"
+  nextStep_vi: "Chạy vòng vẽ từ terminal đã gắn Op hoặc truyền --drawer <nhà cung cấp>."
+  owner: op-retry
+  kind: check-finding
+
+CRITIC_NO_VERDICT:
+  title: "The critic reported done without a verdict"
+  title_vi: "Người chấm báo xong nhưng không có phán quyết"
+  meaning_vi: "Người chấm báo worker_done mà tệp verdict.json không có hoặc không đọc được; đây là lỗi của vai trò Critic, không phải điểm thấp."
+  causes_vi:
+    - "Người chấm không ghi verdict.json"
+    - "verdict.json không phải JSON đúng dạng starci/draw-critique@1"
+  nextStep_vi: "Runtime từ chối và ghi lại cho Debug; vòng vẽ không có điểm cho đến khi chấm lại."
+  owner: runtime-core
+  kind: runtime-fault
+
+CRITIC_PRODUCT_MODIFIED:
+  title: "The critic changed what it was handed"
+  title_vi: "Người chấm đã sửa tệp được giao"
+  meaning_vi: "Sau khi chạy, các byte sản phẩm hoặc thước chấm trong thư mục của người chấm khác với lúc giao, hoặc có tệp lạ; phán quyết bị từ chối."
+  causes_vi:
+    - "Người chấm sửa hoặc xóa tệp được giao"
+    - "Người chấm tạo thêm tệp ngoài verdict.json"
+  nextStep_vi: "Runtime từ chối phán quyết và ghi lại cho Debug sửa .claude."
+  owner: runtime-core
+  kind: runtime-fault
+
+CRITIC_VERDICT_STALE:
+  title: "The verdict judged other bytes than the product"
+  title_vi: "Phán quyết chấm sai byte của sản phẩm"
+  meaning_vi: "Các dấu vết sha256 trong phán quyết không gồm phần sản phẩm mà lượt làm của Op đang giữ, nên phán quyết bị từ chối."
+  causes_vi:
+    - "Phần vẽ được vẽ lại sau lần chấm"
+    - "Phán quyết không nêu dấu vết sản phẩm"
+  nextStep_vi: "Cổng draw từ chối; chấm lại đúng phần sản phẩm hiện tại bằng finish."
+  owner: runtime-core
+  kind: check-finding
+
+CRITIC_UNGUARDED:
+  title: "The critic terminal is not bound to its guard"
+  title_vi: "Terminal người chấm chưa gắn vào guard"
+  meaning_vi: "Terminal của người chấm không được gắn với guard vai trò critic sau khi khởi chạy, nên phán quyết của nó không được tin."
+  causes_vi:
+    - "Việc ghi guard hoặc gắn terminal thất bại"
+  nextStep_vi: "Runtime từ chối lượt chấm và ghi lại cho Debug."
+  owner: runtime-core
+  kind: runtime-fault
+
+RIGHTS_CRITIC_REACH:
+  title: "Critic reach refused"
+  title_vi: "Từ chối người chấm đọc hoặc ghi ngoài phạm vi"
+  meaning_vi: "Người chấm chỉ đọc trong thư mục của mình và chỉ ghi tệp phán quyết; lệnh, đường dẫn hoặc công cụ khác bị từ chối."
+  causes_vi:
+    - "Người chấm chạy lệnh không chỉ đọc"
+    - "Người chấm đọc hoặc ghi đường dẫn ngoài thư mục được giao"
+  nextStep_vi: "Lệnh bị từ chối; chấm chỉ bằng các tệp trong thư mục của bạn, ghi verdict.json rồi báo worker_done."
+  owner: op-retry
+  kind: verb-refusal
+placement-lost:
+  title: "Attempt ended: its tree path was lost"
+  title_vi: "Lượt chạy kết thúc: đường dẫn cây làm việc đã mất"
+  meaning_vi: "Cây của workflow được tạo lại ở đường dẫn khác, worker của lượt này đã chết và báo cáo của nó chưa nộp hoặc thiếu tệp trong cây mới, nên runtime tự kết thúc lượt, không tính vào số lần thử của op."
+  causes_vi:
+    - "Máy khởi động lại và bộ dọn cây gỡ thư mục cũ của workflow"
+    - "Báo cáo chưa được nộp, hoặc tệp nó nêu không còn trong cây mới"
+  nextStep_vi: "Runtime tự xếp lại lượt kế tiếp bằng đường failed-no-step; không cần ai làm gì thêm."
+  owner: op-retry
+  kind: settle-reason
+tree-reattached:
+  title: "Placement rebound after the tree was re-attached"
+  title_vi: "Vị trí làm việc được gắn lại sau khi cây được dựng lại"
+  meaning_vi: "Cây của workflow được dựng lại ở đường dẫn khác; lượt chạy đã nộp báo cáo và mọi tệp của nó có trong cây mới, nên sự kiện placement-rebound chuyển đường dẫn cũ sang cây mới cho bước chốt và các kiểm tra."
+  causes_vi:
+    - "Máy khởi động lại và cây cũ bị gỡ"
+  nextStep_vi: "Bộ chốt tự chốt lượt này trong cây mới; không cần ai làm gì thêm."
+  owner: runtime-core
+  kind: settle-reason
+KERNEL_USE_DECIDE:
+  title: "A Kernel seat ran a verb that is the runtime's"
+  title_vi: "Kernel seat gọi một động từ thuộc về runtime"
+  meaning_vi: "Kernel seat chỉ chạy các động từ đọc, starci kernel decide và kernel-ack-rev; động từ làm thay đổi workflow do runtime (controller) chạy, và lời từ chối kèm menu của Kernel."
+  causes_vi:
+    - "Kernel gõ starci kernel enqueue, settle, dispatch-ready... trực tiếp theo thói quen cũ"
+  nextStep_vi: "Đọc menu in kèm lời từ chối, trả lời mục bằng starci kernel decide --workflow <workflow> --item <id> --choice <lựa chọn> --reason <lý do>."
+  owner: op-retry
+  kind: verb-refusal
+KERNEL_NO_FILE_WRITE:
+  title: "A Kernel seat redirected output into a file"
+  title_vi: "Kernel seat chuyển hướng đầu ra vào một tệp"
+  meaning_vi: "Kernel không ghi tệp nào: một chuyển hướng (> tệp, 2>tệp, >> tệp) để lại tệp rác trong cây workflow của nó, và quyết định fail của job trong cây đó sau này không phục hồi được."
+  causes_vi:
+    - "Kernel gõ starci ... > 0 hoặc 2>0 thay vì 2>&1 hoặc đọc bằng --field"
+  nextStep_vi: "Đọc trạng thái bằng starci kernel status --field <tên> hoặc starci kernel logs, không chuyển hướng ra tệp."
+  owner: op-retry
+  kind: verb-refusal
+KERNEL_STARCI_ONLY:
+  title: "A Kernel seat ran a program that is not starci"
+  title_vi: "Kernel seat chạy chương trình không phải starci"
+  meaning_vi: "Shell của Kernel là starci và các lệnh đọc thuần; node, git, npm, orca, sleep và mọi chương trình khác bị từ chối."
+  causes_vi:
+    - "Kernel chạy node -e, git, npm, orca hoặc vòng sleep để đọc hay điều khiển trạng thái"
+  nextStep_vi: "Dùng starci kernel status (có --field để chọn trường) hoặc starci kernel decide; không dùng chương trình khác."
+  owner: op-retry
+  kind: verb-refusal
+menu-item-unknown:
+  title: "The item is not on the Kernel menu"
+  title_vi: "Mục không có trên menu của Kernel"
+  meaning_vi: "starci kernel decide --item nêu một mục không mở trong menu hiện tại của workflow; lời từ chối kèm menu hiện tại."
+  causes_vi:
+    - "Mục đã được runtime xử lý hoặc id sai"
+  nextStep_vi: "Đọc menu trong câu trả lời và chọn một mục đang mở."
+  owner: op-retry
+  kind: blocker
+menu-choice-unknown:
+  title: "The choice is not an option of the item"
+  title_vi: "Lựa chọn không thuộc mục"
+  meaning_vi: "starci kernel decide --choice không nằm trong các lựa chọn của mục; lời từ chối kèm menu hiện tại."
+  causes_vi:
+    - "Gõ sai tên lựa chọn hoặc mục đã đổi"
+  nextStep_vi: "Chọn một lựa chọn trong menu, hoặc none-fits kèm lý do."
+  owner: op-retry
+  kind: blocker
+menu-direct-option:
+  title: "The option is run directly"
+  title_vi: "Lựa chọn này được chạy trực tiếp"
+  meaning_vi: "Lựa chọn (xác nhận phiên bản runtime) cần Kernel tự đọc tệp nên không chạy qua starci kernel decide."
+  causes_vi:
+    - "Kernel chọn ack-rev qua decide"
+  nextStep_vi: "Chạy lệnh mà phần effect của lựa chọn nêu."
+  owner: op-retry
+  kind: blocker
+menu-text-missing:
+  title: "The option needs --text"
+  title_vi: "Lựa chọn cần --text"
+  meaning_vi: "Lựa chọn nhận một đầu vào tự do (câu trả lời, đường dẫn, lời nhắn) qua --text nhưng không có."
+  causes_vi:
+    - "Thiếu --text"
+  nextStep_vi: "Gọi lại starci kernel decide kèm --text."
+  owner: op-retry
+  kind: blocker
+menu-text-invalid:
+  title: "The option needs --text as one JSON object"
+  title_vi: "Lựa chọn cần --text là một đối tượng JSON"
+  meaning_vi: "Lựa chọn nhận --text là một đối tượng JSON (đường dẫn ghi và tham số của op) nhưng văn bản không phải JSON hoặc không phải đối tượng."
+  causes_vi:
+    - "--text không phải JSON"
+    - "--text là mảng hoặc giá trị đơn thay vì đối tượng"
+  nextStep_vi: "Gọi lại starci kernel decide với --text là đối tượng JSON như hiệu ứng của lựa chọn mô tả."
+  owner: op-retry
+  kind: blocker
+menu-step-failed:
+  title: "A step of the chosen option failed"
+  title_vi: "Một bước của lựa chọn thất bại"
+  meaning_vi: "Một động từ trong lựa chọn bị từ chối hoặc lỗi; các bước trước đó đã chạy, quyết định được đóng revert."
+  causes_vi:
+    - "Trạng thái đổi giữa lúc đọc menu và lúc chạy"
+  nextStep_vi: "Đọc status để thấy tình huống mới; trả lời lại hoặc none-fits kèm bằng chứng."
+  owner: op-retry
+  kind: blocker
+menu-step-usage:
+  title: "A step of the chosen option lacks an argument"
+  title_vi: "Một bước của lựa chọn thiếu tham số"
+  meaning_vi: "Lựa chọn dựng một động từ thiếu cờ bắt buộc vì mục không đủ dữ kiện."
+  causes_vi:
+    - "Dữ liệu của job thiếu đường dẫn sở hữu"
+  nextStep_vi: "Dùng none-fits kèm bằng chứng; đây là lỗi dữ liệu của runtime."
+  owner: supervisor
+  kind: blocker
+menu-verb-unknown:
+  title: "A step names a verb that does not exist"
+  title_vi: "Một bước gọi động từ không tồn tại"
+  meaning_vi: "Một lựa chọn của menu nêu động từ Kernel không có trong bản runtime này."
+  causes_vi:
+    - "Menu và danh mục động từ lệch nhau"
+  nextStep_vi: "Dùng none-fits kèm bằng chứng; Debug sửa menu."
+  owner: supervisor
+  kind: blocker
+menu-unreadable:
+  title: "The menu could not be read"
+  title_vi: "Không đọc được menu"
+  meaning_vi: "starci kernel decide chạy status trong tiến trình để lấy menu hiện tại nhưng status không trả menu."
+  causes_vi:
+    - "status lỗi hoặc workflow không đọc được"
+  nextStep_vi: "Chạy starci kernel status để thấy lỗi gốc."
+  owner: supervisor
+  kind: blocker
+decide-answer-incomplete:
+  title: "A menu answer needs --choice and --reason"
+  title_vi: "Câu trả lời menu thiếu --choice hoặc --reason"
+  meaning_vi: "starci kernel decide --item cần cả --choice lẫn --reason không rỗng."
+  causes_vi:
+    - "Thiếu --choice hoặc --reason"
+  nextStep_vi: "Gọi lại kèm cả hai."
+  owner: op-retry
+  kind: blocker
+menu-escape:
+  title: "The Kernel found no option that fits"
+  title_vi: "Kernel không thấy lựa chọn nào phù hợp"
+  meaning_vi: "Mục quyết định do none-fits mở cho Supervisor khi menu không có lựa chọn phù hợp, kèm lý do và bằng chứng."
+  causes_vi:
+    - "Một tình huống chỉ có lối đi vòng quanh lỗi, hoặc ngoài các lựa chọn của menu"
+  nextStep_vi: "Supervisor xử lý mục; nếu là lỗi runtime thì ghi runtime-defect cho Debug."
+  owner: supervisor
+  kind: blocker
 STACKS_EXAMPLE_FORM:
   title: "An example declares Sonar in the product form"
   title_vi: "Ví dụ khai báo Sonar theo dạng của sản phẩm"
@@ -16809,3 +17436,716 @@ SCAN_SMELL:
   nextStep_vi: "Sửa đúng dòng được chỉ: chạy các bước độc lập bằng `Promise.all`, gọi tên thứ tự bằng `eachInOrder` của `platform/primitives`, bỏ import thừa, viết lại biểu thức lồng thành câu lệnh riêng, đọc locale qua `next/root-params`, trả `Promise.resolve(...)` thay vì `async` không `await`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
+
+WORK_AUTHOR_PREREQUISITE_UNSETTLED:
+  title: "A leg work.author proves against has not settled"
+  title_vi: "Một chặng mà work.author chứng minh dựa vào chưa settle xanh"
+  meaning_vi: "work.author viết bản ghi triển khai và uat chứng minh các bản ghi yêu cầu, kiến trúc và giao diện; chặng business.decide, architecture.decide hoặc interface.draw của kế hoạch chưa có job settle thành công nên chưa có gì để chứng minh."
+  causes_vi:
+    - "Kernel giao work.author trước khi chặng tiền đề của kế hoạch settle"
+    - "Chặng tiền đề chưa được enqueue, đang chạy hoặc settle đỏ"
+  nextStep_vi: "Runtime từ chối giao work.author và nêu chặng còn thiếu cùng trạng thái job mới nhất của nó; Kernel enqueue hoặc chờ chặng đó settle xanh rồi giao lại."
+  owner: "other-op:business.decide"
+  kind: dispatch-refusal
+
+gate-cause-class-work:
+  title: "A work failure was raised as a runtime fault"
+  title_vi: "Một lỗi của công việc bị nêu như lỗi của runtime"
+  meaning_vi: "Bằng chứng của job là một check thất bại trên sản phẩm của chính op (danh mục mã lỗi xếp vào loại công việc), nên đây là bước của Kernel (thử lại, đổi agent, lập lại kế hoạch), không phải lỗi runtime."
+  causes_vi:
+    - "Kernel dựng supervisor-gate với cause runtime-defect cho job mà bằng chứng là check đỏ của op"
+  nextStep_vi: "Chọn một phương án trong thực đơn của Kernel (continue, split-per-app, settle-fail); chỉ khi bằng chứng là mã runtime-fault thì mới nêu lỗi runtime."
+  owner: op-retry
+  kind: verb-refusal
+ready-undispatched:
+  title: "Ready work stands undispatched past its critical bound"
+  title_vi: "Việc sẵn sàng nằm chưa phát quá ngưỡng nghiêm trọng"
+  meaning_vi: "Mục quyết định mở cho Supervisor khi một việc queued-ready vẫn chờ quá ngưỡng criticalMs của nó dù Kernel còn sống; menu có kind undispatched."
+  causes_vi:
+    - "Kernel không phát việc sẵn sàng sau lần đánh thức đã giao"
+    - "Một từ chối nhận việc lặp lại mà không ai xử lý"
+  nextStep_vi: "Supervisor chọn rule để gửi phán quyết cho Kernel, hoặc record-defect để Debug sửa nếu runtime không phát việc sẵn sàng."
+  owner: supervisor
+  kind: blocker
+stale-peer-wait:
+  title: "A wait on a peer workflow stands past its bound"
+  title_vi: "Một lần chờ workflow ngang hàng quá hạn"
+  meaning_vi: "Mục quyết định mở cho Kernel khi chờ một workflow ngang hàng quá ngưỡng; nếu Kernel để quá hạn, mục leo lên Supervisor."
+  causes_vi:
+    - "Workflow ngang hàng chưa đưa vào main thứ mà bước này cần"
+  nextStep_vi: "Kernel kiểm tra lại điều kiện của peer và giải quyết hoặc gõ lại lần chờ; Supervisor phán quyết khi mục leo lên."
+  owner: op-retry
+  kind: blocker
+move-refused:
+  title: "A move the runtime made for the Kernel was refused"
+  title_vi: "Một bước runtime làm thay Kernel bị từ chối"
+  meaning_vi: "Runtime tự làm các bước cơ học của Kernel (đưa một chặng đã duyệt vào hàng chờ, làm lại một nút đỏ, chạy lại một bằng chứng cũ, hỏi thông tin đăng nhập, vẽ lại, làm lại một phần của lát cắt); khi lệnh đưa việc vào hàng chờ bị từ chối thì runtime mở mục quyết định này cho Kernel."
+  causes_vi:
+    - "Đơn vị việc đã dùng hết lượt thử hoặc đang có một lượt chạy mở"
+    - "Phạm vi ghi hoặc tham số của việc không còn hợp lệ"
+  nextStep_vi: "Kernel đọc lý do từ chối, sửa điều nó nêu (nâng ngân sách qua người có quyền, đổi phạm vi, chờ lượt đang mở) rồi chạy lại lệnh, hoặc chọn hướng khác."
+  owner: supervisor
+  kind: blocker
+op-critic-verdict-missing:
+  title: "The runtime has not yet recorded the Critic run of the decision leg"
+  title_vi: "Runtime chưa ghi lần chạy Critic của chặng quyết định"
+  meaning_vi: "Phán quyết của người chấm độc lập (nhà cung cấp khác, hạng Critic) cho loại op scope.define hoặc architecture.decide do chính runtime chạy khi op báo done (sự kiện runtime-critic-run) và là phán quyết duy nhất được tính; tệp op tự đính kèm không bao giờ được đọc. Lần chạy đó chưa được ghi cho các bản ghi hiện tại nên chưa chốt được."
+  causes_vi:
+    - "Settler chưa chạy tới job này, hoặc người chấm vừa báo một chờ có kiểu (CRITIC_UNAVAILABLE, CRITIC_QUOTA_OUT, CRITIC_NO_INDEPENDENT_MEMBER) và đang được thử lại"
+  nextStep_vi: "Không cần làm gì: settler chạy Critic, cách nhau tail.retryMs và tối đa tail.maxAttempts lần cho cùng các bản ghi, rồi mở một mục cho Supervisor; xem sự kiện runtime-critic-run của job và dòng runtime-critic trong starci kernel status --full."
+  owner: runtime-core
+  kind: settle-reason
+
+op-critic-verdict-failed:
+  title: "The independent Critic's verdict fails the minimum"
+  title_vi: "Phán quyết của người chấm độc lập dưới mức tối thiểu"
+  meaning_vi: "Người chấm độc lập chấm các bản ghi quyết định dưới điểm tối thiểu của thước chấm (modules/kernel/critic-rubrics.yaml): công việc chưa đạt, đây là lỗi vui (error-work) chứ không phải lỗi runtime."
+  causes_vi:
+    - "Một nút phạm vi hoặc thành phần thiết kế không có căn cứ trong yêu cầu hay bản ghi đã quyết"
+    - "Quyết định mâu thuẫn ràng buộc hoặc quyết định trước đó, hoặc thiếu phương án đã cân nhắc"
+  nextStep_vi: "Việc chốt bị từ chối kèm từng kiểm tra trượt, bằng chứng và cách sửa; op sửa các bản ghi theo đó rồi chạy lại starci work decision-critic; lượt thử kế tiếp nhận chính bản phê bình này làm lỗi được đưa lại."
+  owner: op-retry
+  kind: settle-reason
+sonar-host-secret-missing:
+  title: "A secret of the self-hosted Sonar stack is not in secret.env"
+  title_vi: "Một bí mật của stack Sonar tự lưu trữ chưa có trong secret.env"
+  meaning_vi: "`starci gate sonar up`, `status`, `ensure-project` hoặc `scan --isolate` cần một biến của stack Sonar tự lưu trữ (SONARQUBE_DB_PASSWORD, SONARQUBE_ADMIN_PASSWORD, SONARQUBE_ADMIN_TOKEN hoặc, với --public, CLOUDFLARE_TUNNEL_TOKEN) nhưng môi trường đã phân giải từ .claude/secret.env không có hoặc để trống. Stack không giữ bí mật nào trong cây mã nguồn; báo cáo nêu tên biến, không bao giờ nêu giá trị."
+  causes_vi:
+    - "Owner chưa chuyển bí mật cũ của stack sang secret.env"
+    - "Tên biến trong secret.env sai chính tả hoặc còn là mẫu CHANGE_ME"
+  nextStep_vi: "Owner thêm đúng tên biến vào .claude/secret.env (secret.env.example mô tả từng biến); với bản mã hóa cũ, chạy `starci runtime import-held-secret --member <đường dẫn cũ>` một lần cho mỗi thành viên."
+  owner: owner
+  kind: verb-refusal
+
+held-secret-import-refused:
+  title: "A held secret was not moved into secret.env"
+  title_vi: "Một bí mật cũ chưa được chuyển vào secret.env"
+  meaning_vi: "`starci runtime import-held-secret` không ghi gì vào secret.env. Trường `cause` nêu lý do: thành viên không thuộc danh sách, thành viên đã ngừng dùng (không có biến thay thế), biến đã có trong secret.env nên không bị ghi đè, lịch sử git không còn thành viên đó, sops không giải mã được bằng danh tính age của owner, hoặc giá trị giải mã rỗng hay nhiều dòng. Giá trị không bao giờ được in."
+  causes_vi:
+    - "Danh tính age của owner chưa được cung cấp (SOPS_AGE_KEY hoặc SOPS_AGE_KEY_FILE)"
+    - "Biến đã được thêm vào secret.env từ trước"
+    - "--rev trỏ tới một revision không còn chứa thành viên"
+  nextStep_vi: "Đọc `cause`: cung cấp danh tính age, đặt --rev đúng, hoặc sửa tay biến đã có trong secret.env; sau khi chuyển xong, xoay (rotate) mật khẩu quản trị, token quản trị và token tunnel vì bản mã hóa vẫn nằm trong lịch sử git công khai."
+  owner: owner
+  kind: verb-refusal
+
+RELEASE_SUITE_MODE:
+  title: "Release record claims the delegated suite without the config saying so"
+  title_vi: "Bản ghi phát hành nhận suite ủy quyền nhưng cấu hình không nói vậy"
+  meaning_vi: "Bản ghi của commit ghi suite ci (suite đầy đủ do CI chạy sau khi đẩy), nhưng config.yaml của checkout hiện tại không đặt release.suite là ci, hoặc bản ghi không liệt kê npm test là dòng được ủy quyền. Một bản ghi không tự chọn chế độ: chế độ do owner chọn trong config.yaml."
+  causes_vi:
+    - "Bản ghi được cắt khi config.yaml đặt release.suite: ci, rồi giá trị đó bị đổi lại hoặc xóa"
+    - "Bản ghi được ghi tay hoặc bởi một checkout khác"
+  nextStep_vi: "Owner đặt release.suite: ci trong config.yaml (quyết định của owner), hoặc chạy lại starci release cut --tag v<version> với release.suite: local để suite gốc chạy tại chỗ; không sửa tay bản ghi."
+  owner: owner
+  kind: verb-refusal
+
+EXAMPLES_CI_LISTER_UNSAFE:
+  title: "The examples workflow lists its apps unsafely"
+  title_vi: "Job liệt kê ứng dụng của workflow ví dụ khởi động không an toàn"
+  meaning_vi: "Job `apps` phải sinh bản sao runtime của các gói (`starci release sync-runtime`) trước khi chạy CLI, và gán đầu ra lệnh vào biến trước khi ghi vào `$GITHUB_OUTPUT`; `echo \"$(lệnh)\"` nuốt lỗi của lệnh nên ma trận rỗng, các job `app` và `images` biến mất mà run vẫn đỏ không rõ lý do."
+  causes_vi:
+    - "Thiếu bước `release sync-runtime` trước các bước liệt kê"
+    - "Bước liệt kê dùng `echo \"x=$(lệnh)\"` thay vì gán biến trước"
+  nextStep_vi: "Thêm bước `starci release sync-runtime` ngay sau bước cài phụ thuộc và viết bước liệt kê dạng `x=$(lệnh)` rồi `echo \"x=$x\" >> \"$GITHUB_OUTPUT\"`."
+  owner: runtime-core
+  kind: check-finding
+workflow-worktree-install-slot-held:
+  title: "A UAT slot server of the workflow tree could not be stopped before npm ci"
+  title_vi: "Máy chủ UAT slot của cây workflow không dừng được trước khi npm ci"
+  meaning_vi: "Trước npm ci của cây workflow, runtime dừng các máy chủ slot UAT chạy từ chính cây đó (chúng tải file native trong node_modules). Một slot không dừng được, nên npm ci không chạy và không bị thử lại mù; phiếu nêu tên khóa slot và pid còn sống."
+  causes_vi:
+    - "Quyền hệ điều hành không cho dừng tiến trình giữ slot"
+    - "Tiến trình giữ slot đã đổi danh tính (pid được dùng lại) nên runtime từ chối dừng nhầm"
+  nextStep_vi: "Chạy starci uat slots collect (thêm --dry-run để chỉ xem), đọc pid trong phiếu, dừng tiến trình đó rồi mở lại ghế bằng starci reconciler reopen <ghế>."
+  owner: runtime-core
+  kind: verb-refusal
+gate-rejudge-pending:
+  title: "A workaround for a gate was refused: the done report it holds has not been judged under the live runtime"
+  title_vi: "Từ chối workaround cho gate: báo cáo done mà nó giữ chưa được runtime hiện hành phán xét"
+  meaning_vi: "Workaround của một gate là dispatch lại op, nhưng job gate đang giữ đã có báo cáo done. Kết cục đúng của báo cáo done là settle nó, và settler phán xét lại nó một lần cho mỗi bản runtime; dispatch lại một chặng đã xong khi chưa có phán xét đó chỉ làm lại công việc cũ."
+  causes_vi:
+    - "Runtime vừa đổi bản và settler chưa phán xét lại job đang bị giữ"
+  nextStep_vi: "Đợi settler phán xét lại (starci kernel status hiện gate-rejudged trên gate nếu vẫn đỏ), rồi trả lời lại; một phán xét xanh tự settle job và đóng gate."
+  owner: runtime-core
+  kind: verb-refusal
+gate-newer-than-admission:
+  title: "A settle gate is newer than the job it refused: the op owes nothing, the runtime owes the proof"
+  title_vi: "Một cổng settle mới hơn lúc job được nhận: op không nợ gì, runtime nợ bằng chứng"
+  meaning_vi: "Job được nhận và báo cáo trước khi một cổng ra đời (bất kỳ bằng chứng nào cổng đòi: vòng lặp gate, READ, test-world, unit, lint, tài liệu, release, phán quyết Critic); hợp đồng đã nhận của nó chưa bao giờ dạy op bước tạo bằng chứng đó và worker đã mất, nên op không thể chữa lời từ chối. Bằng chứng là của runtime: Critic thì settler tự chạy trên sản phẩm đã báo cáo (một lần cho mỗi digest); bằng chứng khác thì settle được giữ có giới hạn (tail.retryMs, tail.maxAttempts) rồi mở một mục runtime-defect cho Supervisor. Không bao giờ là lựa chọn của Kernel và không bao giờ là lỗi của op."
+  causes_vi:
+    - "Báo cáo done của một chặng được nhận trước khi cổng có hiệu lực"
+  nextStep_vi: "Không cần làm gì với op hay Kernel: settler giữ settle và gọi tên mã này; xem sự kiện job-settle-check-unavailable hoặc runtime-critic-run của job."
+  owner: runtime-core
+  kind: verb-refusal
+runtime-copies-stale:
+  title: "The engine did not lead: the generated package runtime copies are stale and could not be regenerated"
+  title_vi: "Engine không dẫn dắt: bản sao runtime sinh ra của các gói đã cũ và không tạo lại được"
+  meaning_vi: "packages/hfs/runtime và packages/eslint/{be,fe}/runtime là đầu ra sinh từ mã nguồn runtime và bị git bỏ qua; sau khi main di chuyển chúng phải được tạo lại. Engine mới so chúng với nguồn khi khởi động, tạo lại phần lệch, và không dẫn dắt khi việc tạo lại thất bại (RT_GENERATED_DRIFT)."
+  causes_vi:
+    - "Một tệp trong bản sao đang bị tiến trình khác giữ mở hoặc không ghi được"
+  nextStep_vi: "Đóng tiến trình giữ tệp rồi chạy starci release sync-runtime; khởi động lại engine."
+  owner: runtime-core
+  kind: runtime-fault
+decision-item-without-repo:
+  title: "A Decision Item or gate item was planned without a repository behind its ledger and was refused"
+  title_vi: "Một Decision Item hoặc mục gate được lập kế hoạch mà ledger của nó không có kho (repository) nên bị từ chối"
+  meaning_vi: "Mục nêu một ledger sản phẩm (ledger của mục, hoặc refs.ledgerId / productLedger của mục Supervisor) nhưng ledger đó không phân giải được, theo id hay theo tên đã đăng ký, thành một ledger có repoRoot. Các động từ của mục chạy trong kho đó; không có kho thì chúng chạy trên gốc runtime (ledger-root-is-runtime) và một người đọc chỉ thấy lỗi rất lâu sau. Mục bị từ chối ngay nơi nó được áp dụng (ctx.openDecision), mọi chế độ, và ghi vào log reconciler.decision-refused."
+  causes_vi:
+    - "Ledger của workflow đã bị gỡ khỏi sổ đăng ký hoặc đăng ký thiếu repoRoot"
+    - "Bộ lập kế hoạch ghi một tên ledger mà sổ đăng ký không biết"
+  nextStep_vi: "Đăng ký lại ledger với kho của nó (starci machine-db hoặc đường dẫn .workspaces của dự án) rồi để controller lập lại; không mở mục bằng tay."
+  owner: runtime-core
+  kind: runtime-fault
+deploy-source-unresolved:
+  title: "A deploy was refused: the source names no commit"
+  title_vi: "Deploy bị từ chối: nguồn không chỉ tới commit nào"
+  meaning_vi: "Giá trị --from không phải thư mục clone có commit, cũng không phải ref của kho host, nên không có bản runtime nào để đưa lên."
+  causes_vi:
+    - "Đường dẫn clone sai hoặc clone chưa có commit"
+    - "Tên ref không tồn tại trong kho host"
+  nextStep_vi: "Chạy lại starci runtime deploy --from với đường dẫn clone đúng hoặc ref có thật."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-source-dirty:
+  title: "A deploy was refused: the source tree is not committed and clean"
+  title_vi: "Deploy bị từ chối: cây nguồn chưa commit hoặc không sạch"
+  meaning_vi: "Biên nhận kiểm tra gắn với đúng một commit; cây có thay đổi chưa commit, hoặc bước kiểm tra làm thay đổi cây, thì biên nhận không chứng minh được gì cho bản sẽ chạy."
+  causes_vi:
+    - "Clone còn tệp sửa hoặc tệp mới chưa commit"
+    - "Bước kiểm tra sinh ra tệp trong cây nguồn"
+  nextStep_vi: "Commit hoặc bỏ phần thay đổi trong clone, rồi chạy lại starci runtime deploy --from."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-host-dirty:
+  title: "A deploy was refused: the host tree has uncommitted changes to tracked files"
+  title_vi: "Deploy bị từ chối: cây host có thay đổi chưa commit ở tệp được theo dõi"
+  meaning_vi: "Fast-forward cây host sẽ ghi đè hoặc bị git từ chối khi có tệp theo dõi đang bị sửa tay; deploy không chạm vào thay đổi đó."
+  causes_vi:
+    - "Có người sửa tay một tệp trong checkout đang chạy"
+  nextStep_vi: "Đưa thay đổi đó vào một commit trên nhánh của lane (không sửa tay checkout đang chạy), rồi chạy lại deploy."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-host-not-main:
+  title: "A deploy was refused: the host tree is not on main"
+  title_vi: "Deploy bị từ chối: cây host không ở nhánh main"
+  meaning_vi: "Cây host chỉ di chuyển bằng fast-forward của nhánh main; ở nhánh khác hoặc HEAD tách rời thì kết quả không phải bản main."
+  causes_vi:
+    - "Checkout host đang ở một nhánh khác hoặc detached HEAD"
+  nextStep_vi: "Đưa checkout host về main bằng người có thẩm quyền rồi chạy lại deploy."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-not-fast-forward:
+  title: "A deploy was refused: the source is not a fast-forward of the host tree"
+  title_vi: "Deploy bị từ chối: nguồn không phải bản fast-forward của cây host"
+  meaning_vi: "Commit hiện tại của host không nằm trong lịch sử của nguồn (hoặc host đã di chuyển trong lúc chờ), nên đưa nguồn lên sẽ làm mất commit của host."
+  causes_vi:
+    - "Main của host đã có commit mới mà clone chưa gộp"
+    - "Một lane khác đã land trong lúc deploy chờ"
+  nextStep_vi: "Gộp main của host vào nguồn (starci git sync), kiểm tra lại rồi chạy lại deploy."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-check-red:
+  title: "A deploy was refused: the runtime check failed on the source commit"
+  title_vi: "Deploy bị từ chối: kiểm tra runtime đỏ trên commit nguồn"
+  meaning_vi: "Deploy tự chạy starci runtime check trong clone sạch và nó thoát khác 0; bản đó không được đưa lên host."
+  causes_vi:
+    - "Commit làm hỏng một kiểm tra tự động của runtime"
+  nextStep_vi: "Sửa phát hiện đầu tiên trong đuôi kết quả, commit, rồi chạy lại deploy."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-check-unproven:
+  title: "A deploy was refused: no check receipt binds the commit"
+  title_vi: "Deploy bị từ chối: không có biên nhận kiểm tra gắn với commit"
+  meaning_vi: "Nguồn là một ref không có clone để chạy kiểm tra, và không có biên nhận deploy hay ghi chú land xác nhận starci runtime check xanh trên đúng commit đó."
+  causes_vi:
+    - "Ref chưa từng được land hay kiểm tra qua deploy"
+  nextStep_vi: "Chạy deploy từ clone chứa commit đó để verb tự chạy kiểm tra, hoặc land commit bằng starci git land."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-release-cut-running:
+  title: "A deploy was refused: a release cut is running"
+  title_vi: "Deploy bị từ chối: đang có một release cut chạy"
+  meaning_vi: "Release cut giữ khóa host và chạy bộ test đầy đủ trên cây host; đổi cây hoặc khởi động lại engine giữa chừng sẽ làm hỏng kết quả của nó."
+  causes_vi:
+    - "Khóa host có mục đích release-cut còn sống"
+  nextStep_vi: "Đợi release cut kết thúc (starci release cut báo xong), rồi chạy lại deploy."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-host-lock-held:
+  title: "A deploy was refused: another heavy operation holds the host lock"
+  title_vi: "Deploy bị từ chối: một thao tác nặng khác đang giữ khóa host"
+  meaning_vi: "Khóa host chỉ có một người giữ; land, chuẩn bị grammar hoặc một deploy khác đang chạy."
+  causes_vi:
+    - "Một land hoặc deploy khác đang chạy"
+  nextStep_vi: "Đợi thao tác đang giữ khóa xong rồi chạy lại deploy."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-in-flight:
+  title: "A deploy was refused: settles, Critic runs or prepared decisions are still in flight"
+  title_vi: "Deploy bị từ chối: còn bước settle, lượt Critic hoặc quyết định đã chuẩn bị đang chạy"
+  meaning_vi: "Khởi động lại engine giữa chừng sẽ cắt một bước đang làm dở. Deploy đã chờ hết thời hạn khai báo mà các bước vẫn chưa xong; nó không dừng bước nào và không đổi gì."
+  causes_vi:
+    - "Một lượt Critic hoặc settle kéo dài hơn thời hạn chờ của deploy"
+  nextStep_vi: "Chạy lại starci runtime deploy sau khi các bước nêu trong thông báo kết thúc."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-artefact-migration-failed:
+  title: "A deploy fast-forwarded the host but an installed artefact could not be migrated"
+  title_vi: "Deploy đã fast-forward host nhưng không chuyển được một artefact đã cài"
+  meaning_vi: "Một hook hoặc bản sao sinh ra của một workflow đang chạy vẫn mang phiên bản cũ sau khi chạy starci runtime artefacts --migrate từ cây mới; engine chưa được khởi động lại."
+  causes_vi:
+    - "Tệp hook bị khóa hoặc không ghi được"
+  nextStep_vi: "Đọc các dòng refused của starci runtime artefacts, sửa nguyên nhân, chạy lại starci runtime artefacts --migrate rồi starci reconciler restart; hoặc quay về theo hướng dẫn trong thông báo."
+  owner: runtime-core
+  kind: runtime-fault
+deploy-restart-failed:
+  title: "A deploy fast-forwarded and migrated the host but the engine did not restart"
+  title_vi: "Deploy đã fast-forward và chuyển artefact nhưng engine không khởi động lại được"
+  meaning_vi: "Lệnh starci reconciler restart của cây mới trả lỗi; cây host đang ở revision mới."
+  causes_vi:
+    - "Engine mới không khởi động được"
+  nextStep_vi: "Đọc starci reconciler status, sửa lỗi rồi chạy starci reconciler restart; hoặc quay về bằng git revert như thông báo chỉ."
+  owner: runtime-core
+  kind: runtime-fault
+deploy-verify-failed:
+  title: "A deploy restarted the engine but the host did not verify on the new revision"
+  title_vi: "Deploy đã khởi động lại engine nhưng host không xác nhận được trên revision mới"
+  meaning_vi: "Sau restart, leader không báo revision mới với nhịp tim mới, hoặc một controller đổi chế độ, hoặc một ghế chết vì restart. Thông báo nêu từng điểm."
+  causes_vi:
+    - "Engine mới lỗi khi khởi động hoặc ở chế độ an toàn"
+    - "Một ghế không dựng lại được"
+  nextStep_vi: "Đọc starci reconciler status và starci debug digest, sửa nguyên nhân; nếu cần quay về, dùng git revert của dải commit rồi starci reconciler restart."
+  owner: runtime-core
+  kind: runtime-fault
+installed-artefact-failed:
+  title: "An installed artefact could not be read or rewritten for the new revision"
+  title_vi: "Không đọc hoặc ghi lại được một artefact đã cài cho revision mới"
+  meaning_vi: "Việc chuyển artefact (hook, bản sao sinh ra) gặp lỗi khi đọc dấu phiên bản hoặc khi ghi lại."
+  causes_vi:
+    - "Thư mục hook không ghi được hoặc kho git của cây workflow hỏng"
+  nextStep_vi: "Sửa quyền hoặc kho git được nêu, rồi chạy starci runtime artefacts --migrate."
+  owner: runtime-core
+  kind: runtime-fault
+installed-artefact-unverified:
+  title: "An installed artefact was rewritten but does not carry the new revision's stamp"
+  title_vi: "Một artefact đã cài được ghi lại nhưng không mang dấu phiên bản của revision mới"
+  meaning_vi: "Sau khi ghi lại, đọc lại dấu phiên bản vẫn khác phiên bản của cây mới; bước chuyển không được coi là xong."
+  causes_vi:
+    - "Một tiến trình khác ghi đè hook ngay sau khi ghi"
+  nextStep_vi: "Chạy lại starci runtime artefacts --migrate; nếu lặp lại, ghi lại một lỗi runtime kèm đường dẫn nêu trong thông báo."
+  owner: runtime-core
+  kind: runtime-fault
+INSTALLED_ARTEFACT_UNDECLARED:
+  title: "An installer of the runtime is not declared as an installed artefact"
+  title_vi: "Một đoạn mã cài thứ gì đó ra ngoài cây runtime nhưng chưa được khai báo là artefact đã cài"
+  meaning_vi: "Runtime cài ra ngoài cây của nó những thứ mang phiên bản logic của nó (hook git trong cây workflow, bản sao sinh ra). Deploy chỉ chuyển được những gì có trong modules/kernel/installed-artefacts.yaml; một tệp mới phân giải thư mục hook hoặc mang dấu của một artefact đã khai báo mà không phải bên ghi của nó sẽ bị từ chối, và một dòng khai báo thiếu bên ghi hoặc thiếu handler cũng vậy."
+  causes_vi:
+    - "Thêm một đoạn mã cài hook hoặc tệp vào cây sản phẩm mà không thêm dòng khai báo"
+    - "Dòng khai báo trỏ tới tệp hoặc hàm không còn tồn tại"
+  nextStep_vi: "Thêm dòng artefact vào modules/kernel/installed-artefacts.yaml cùng handler trong scripts/reconciler/installed-artefacts.mjs, hoặc sửa dòng đã lệch."
+  owner: runtime-core
+  kind: check-finding
+RT_REVISION_SCOPE:
+  title: "The revision-scope table does not match the runtime tree"
+  title_vi: "Bảng phạm vi bản sửa không khớp với cây runtime"
+  meaning_vi: "Một đường dẫn có trong cây không thuộc dòng nào của bảng phạm vi, bảng gọi tên vai trò hay hành động lạ, một tệp động cơ nạp bị liệt kê tay, tệp dựng lời nhắc khởi động của một ghế không khớp với bộ sinh, hoặc phép so sánh chỉ-sửa-lời-văn cho qua một thay đổi bỏ mục."
+  causes_vi:
+    - "Thêm một tệp hay thư mục mới mà chưa có dòng trong bảng"
+    - "Bộ sinh lời nhắc đọc thêm một tệp mà bảng seatBoot chưa ghi"
+  nextStep_vi: "Thêm dòng cho đường dẫn vào modules/kernel/revision-scope.yaml hoặc sửa seatBoot cho khớp bộ sinh."
+  owner: supervisor
+  kind: check-finding
+revision-nothing-owed:
+  title: "No runtime revision change is owed to this seat"
+  title_vi: "Không có thay đổi nào của runtime cần ghế này đọc"
+  meaning_vi: "Ghế gọi revision-ack khi không có thay đổi nào của cây runtime liên quan đến nó: bản sửa gần nhất không chạm tệp nào thuộc phạm vi của nó, hoặc nó đã xác nhận rồi."
+  causes_vi:
+    - "Ghế đã xác nhận bản sửa này"
+    - "Bản sửa chỉ chạm tệp không thuộc phạm vi của vai trò"
+  nextStep_vi: "Không cần làm gì; xem dòng REVISION trong starci kernel status hoặc starci supervisor status."
+  owner: runtime-core
+  kind: verb-refusal
+revision-read-unverified:
+  title: "The submitted read manifest is not the complete current one"
+  title_vi: "Bản kê các tệp đã đọc không phải bản đầy đủ hiện hành"
+  meaning_vi: "Bản kê ghế nộp khác bản kê runtime tính lại từ các byte đang nằm trên đĩa: thiếu tệp, sai băm hoặc đã có bản sửa mới hơn."
+  causes_vi:
+    - "Ghế bỏ sót một tệp trong danh sách --plan"
+    - "Cây runtime đổi giữa lúc lấy --plan và lúc xác nhận"
+  nextStep_vi: "Chạy lại revision-ack --plan, đọc đủ các tệp rồi nộp đúng bản kê nó trả về."
+  owner: runtime-core
+  kind: verb-refusal
+supervisor-rev-unknown:
+  title: "The revision is not the current deployed commit"
+  title_vi: "Bản sửa không phải commit đang triển khai"
+  meaning_vi: "Giá trị --rev của Supervisor không khớp commit hiện hành của cây runtime."
+  causes_vi:
+    - "Cây runtime đã chuyển sang commit mới sau khi lấy --plan"
+  nextStep_vi: "Chạy lại starci supervisor revision-ack --plan và dùng revision nó nêu."
+  owner: supervisor
+  kind: verb-refusal
+RUNTIME_TREE_TARGET_FOREIGN:
+  title: "A verb that writes the runtime tree would write a tree other than the one that owns the running CLI"
+  title_vi: "Một verb ghi cây runtime sẽ ghi vào một cây khác với cây chứa CLI đang chạy"
+  meaning_vi: "CLI tìm runtime theo thứ tự biến môi trường, bản ghi theo người dùng, thư mục .claude phía trên, bản nhúng; bản ghi theo người dùng thắng bản checkout, nên bin của một bản clone có thể chạy runtime của cây live. Verb ghi cây runtime (sinh catalog, trường dẫn xuất, khối README, bản sao runtime) bị từ chối khi cây tìm được không phải cây của bin và không ai chọn rõ ràng."
+  causes_vi:
+    - "STARCI_RUNTIME không được đặt trong một bản clone trong khi bản ghi ~/.starci/runtime.json trỏ tới cây live"
+  nextStep_vi: "Đặt STARCI_RUNTIME tới cây cần ghi (hoặc truyền --root nếu verb có cờ đó) rồi chạy lại."
+  owner: runtime-core
+  kind: verb-refusal
+RENDER_TOOL_UNAVAILABLE:
+  title: "The host cannot take a capture"
+  title_vi: "Máy chủ không chụp được bản vẽ"
+  meaning_vi: "Op cần chụp một bản render (Playwright cùng trình duyệt của nó và esbuild) nhưng máy chủ không có công cụ nào trong số đó, ở cả cây của dự án lẫn bản cài của runtime, hoặc trình duyệt không khởi động được."
+  causes_vi:
+    - "Runtime chưa cài các phụ thuộc của chính nó (npm install trong thư mục runtime)"
+    - "Playwright có nhưng bản tải trình duyệt chưa có trong bộ nhớ đệm của máy chủ (npx playwright install chromium)"
+    - "Trình duyệt có nhưng không khởi động được trên máy chủ này"
+  nextStep_vi: "Lệnh giao bị từ chối trước khi tốn một lượt thử, job đứng chờ với lý do host-tool-missing; Supervisor là người giữ máy chủ, cài công cụ nêu trong thông báo rồi job tự sẵn sàng lại ở lần đọc trạng thái sau; không cần op hay chủ dự án."
+  owner: supervisor
+  kind: dispatch-refusal
+deploy-affected-red:
+  title: "A deploy was refused: the specs the change can break did not all pass on the source commit"
+  title_vi: "Deploy bị từ chối: các spec mà thay đổi có thể làm hỏng không đạt hết trên commit nguồn"
+  meaning_vi: "Sau khi starci runtime check xanh, deploy chạy starci test affected --run --base <đầu cây host> trong clone nguồn và chỉ nhận biên nhận sạch, ok, đúng commit nguồn. Một spec đỏ, thời hạn kết thúc khi còn tệp chưa chạy (thoát 2), biên nhận của commit khác hoặc cây bị đổi trong lúc chạy đều bị từ chối; không có cờ bỏ qua."
+  causes_vi:
+    - "Một spec liên quan tới các hàm đã đổi đang đỏ"
+    - "Bộ spec lớn không chạy hết trong thời hạn khai báo của modules/supervisor/affected-tests.yaml"
+    - "Clone nguồn đổi HEAD hoặc có tệp mới trong lúc chạy"
+  nextStep_vi: "Sửa spec đỏ đầu tiên trong thông báo, commit, rồi chạy lại starci runtime deploy; với bộ spec quá lớn, chạy starci test affected --run trong clone để thấy tệp nào chưa kịp chạy rồi chạy lại."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-ui-install-failed:
+  title: "A deploy changed the harness UI dependencies and the host could not install and build them"
+  title_vi: "Deploy đổi phụ thuộc của giao diện harness nhưng host không cài và build được"
+  meaning_vi: "ui/package.json hoặc ui/package-lock.json đổi trong dải deploy; sau khi fast-forward, cây mới chạy starci reconciler up --services (cài không phá hủy rồi build) và việc đó đỏ. Cây đã được di chuyển, engine chưa restart."
+  causes_vi:
+    - "Một phụ thuộc mới của ui không cài được trên host (mạng, tệp bị tiến trình giữ)"
+    - "Build của ui lỗi với phụ thuộc mới"
+  nextStep_vi: "Đọc dòng lỗi (thiếu module hoặc tệp bị giữ), sửa nguyên nhân rồi chạy lại starci reconciler up --services; Kernel không phụ thuộc vào UI nên workflow không bị chặn."
+  owner: runtime-core
+  kind: runtime-fault
+TURN_START_UNOBSERVED:
+  title: "A worker's first turn was not seen to start"
+  title_vi: "Không thấy lượt đầu của worker bắt đầu"
+  meaning_vi: "Orca đã tạo worker và gõ Task vào terminal của agent nhưng không xác minh được lượt đầu đã bắt đầu; runtime đã đọc khung hình và nhấn Enter một lần cho đoạn dán chưa gửi, vẫn không thấy lượt chạy."
+  causes_vi:
+    - "TUI của agent gộp đoạn dán lớn thành chip và Enter không gửi được nó"
+    - "Agent chưa sẵn sàng nhận đầu vào khi Task được gõ"
+  nextStep_vi: "Runtime đóng worker và terminal của lần khởi chạy đó trước khi thử lại, và bộ đếm giữ khởi chạy tính nó; không ai phải gõ vào terminal."
+  owner: runtime-core
+  kind: runtime-fault
+
+RT_HELD_UNSURFACED:
+  title: "A runtime fault of the Supervisor or the owner reaches nobody"
+  title_vi: "Lỗi runtime giao cho Supervisor hoặc chủ sở hữu không đến được tay ai"
+  meaning_vi: "Một mã lỗi loại runtime-fault được giao cho Supervisor hoặc chủ sở hữu nhưng mục của nó không nêu cơ chế báo cho họ, hoặc cơ chế được nêu không có thật trong tệp được trỏ tới. Trạng thái bị giữ như vậy đứng im hàng giờ cho đến khi có người đọc mã nguồn."
+  causes_vi:
+    - "Thêm mã runtime-fault mới mà không khai báo surfacedBy"
+    - "surfacedAt trỏ tới tệp không mở Decision Item, không đặt đồng hồ SLA hoặc không nêu dòng digest như đã khai"
+    - "Mã trạng thái chưa có đường báo thì phải ghi surfacedBy open kèm mục đang mở trong sổ ca biên"
+  nextStep_vi: "Khai báo surfacedBy, surfacedAs và surfacedAt trong mục của mã (decision-item, sla-clock, incident, digest, notifier, caller hoặc open) và làm cho tệp được trỏ tới thật sự báo cho vai trò giữ mã; nếu chưa làm được thì ghi open và thêm mục open vào modules/reconciler/edge-cases.yaml nêu đúng lý do."
+  owner: supervisor
+  kind: check-finding
+SPEC_CACHE_KEY_BLIND:
+  title: "The spec cache key does not move with an input class the affected selector knows"
+  title_vi: "Khóa bộ nhớ đệm spec không đổi khi một loại đầu vào mà bộ chọn affected biết bị thay đổi"
+  meaning_vi: "Self-check spec-cache-key dựng một cây nhỏ cho từng loại đầu vào của một spec (import tĩnh, import động theo chuỗi, require, điểm vào được spawn, tệp dữ liệu nêu bằng đường dẫn hoặc cạnh thư mục của nó, thư mục anh em, thư mục và cây được nêu tên, đầu ra sinh ra của một generator, mỗi gốc dữ liệu, tầng runtime và tầng cây, phiên bản node, preload, lockfile), đổi đúng một tệp của loại đó và đòi khóa phải đổi; một khóa đứng yên cho một thay đổi như vậy sẽ cho tái dùng một kết quả xanh cũ, nên bị từ chối."
+  causes_vi:
+    - "Một loại đầu vào mới được thêm vào bộ chọn affected (một mục generated, một gốc dữ liệu) mà khóa chưa tính"
+    - "Bộ đọc dữ liệu của khóa (spec-cache-reads.mjs) bỏ sót một cách một mô-đun nêu tên một tệp"
+  nextStep_vi: "Thêm loại đầu vào đó vào khóa trong scripts/supervisor/spec-cache-key.mjs hoặc spec-cache-reads.mjs rồi chạy lại starci runtime check --only spec-cache-key; không nới check."
+  owner: runtime-core
+  kind: check-finding
+rejudge-not-failed:
+  title: "The job is not a failed leg"
+  title_vi: "Việc không phải là lượt đã lỗi"
+  meaning_vi: "Chỉ lượt đã lỗi (trạng thái cuối) mới được chấm lại."
+  causes_vi:
+    - "Chỉ lượt đã lỗi (trạng thái cuối) mới được chấm lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-blocker-not-runtime-owed:
+  title: "The blocker is not one the runtime owes"
+  title_vi: "Điều chặn không phải việc của runtime"
+  meaning_vi: "Báo cáo bị chặn vì lý do khác: lượt đi theo đường chạy lại."
+  causes_vi:
+    - "Báo cáo bị chặn vì lý do khác: lượt đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-nothing-to-judge:
+  title: "The op owes no runtime Critic"
+  title_vi: "Op không nợ Critic của runtime"
+  meaning_vi: "Loại op này không có phán quyết của Critic để chấm lại."
+  causes_vi:
+    - "Loại op này không có phán quyết của Critic để chấm lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-no-preserved-ref:
+  title: "No preserved product"
+  title_vi: "Không có sản phẩm được giữ lại"
+  meaning_vi: "Lượt lỗi không để lại ref preserved: đi theo đường chạy lại."
+  causes_vi:
+    - "Lượt lỗi không để lại ref preserved: đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-product-mismatch:
+  title: "The preserved ref does not hold the reported files"
+  title_vi: "Ref được giữ không có đủ tệp báo cáo"
+  meaning_vi: "Ref preserved thiếu tệp mà báo cáo nêu: đi theo đường chạy lại."
+  causes_vi:
+    - "Ref preserved thiếu tệp mà báo cáo nêu: đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-already-done:
+  title: "This product was already re-judged"
+  title_vi: "Sản phẩm này đã được chấm lại một lần"
+  meaning_vi: "Mỗi bản băm sản phẩm chỉ được chấm lại một lần."
+  causes_vi:
+    - "Mỗi bản băm sản phẩm chỉ được chấm lại một lần."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-not-enqueued:
+  title: "The lineage refused the next attempt"
+  title_vi: "Dòng dõi từ chối lượt kế tiếp"
+  meaning_vi: "Cổng của đơn vị không cho lượt kế tiếp: đi theo đường chạy lại."
+  causes_vi:
+    - "Cổng của đơn vị không cho lượt kế tiếp: đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-failed:
+  title: "The re-judgment could not be admitted"
+  title_vi: "Không nhận được việc chấm lại"
+  meaning_vi: "Một bước nhận (hợp đồng, bằng chứng READ, khôi phục) lỗi; việc chấm lại kết thúc lỗi và đường chạy lại tiếp quản."
+  causes_vi:
+    - "Một bước nhận (hợp đồng, bằng chứng READ, khôi phục) lỗi; việc chấm lại kết thúc lỗi và đường chạy lại tiếp quản."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-no-mechanical-check:
+  title: "The failed report declared no check the runtime can re-run"
+  title_vi: "Báo cáo lỗi không khai kiểm tra nào runtime chạy lại được"
+  meaning_vi: "Không có bằng chứng cơ học để chấm lại: đi theo đường chạy lại."
+  causes_vi:
+    - "Không có bằng chứng cơ học để chấm lại: đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-read-proof-failed:
+  title: "The READ proof of the restored product failed"
+  title_vi: "Bằng chứng READ của sản phẩm khôi phục lỗi"
+  meaning_vi: "Chạy bằng chứng đọc trên cây đã khôi phục thất bại."
+  causes_vi:
+    - "Chạy bằng chứng đọc trên cây đã khôi phục thất bại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+kernel-launch-worker-live:
+  title: "A held Kernel launch names a worker that may be running"
+  title_vi: "Lần khởi động Kernel đang giữ trỏ tới một worker có thể đang chạy"
+  meaning_vi: "Orca báo Dispatch của lần khởi động này có nhịp tim hoặc trạng thái đang chạy, nên đây có thể là ghế Kernel còn sống; runtime không đóng nó."
+  causes_vi:
+    - "Lượt đầu của worker đã bắt đầu dù câu trả lời của Orca không nêu cửa sổ"
+  nextStep_vi: "Một Decision Item của Supervisor nêu Dispatch và cửa sổ Orca báo; gắn ghế đó làm Kernel hoặc đóng nó bằng tay có kiểm chứng."
+  owner: supervisor
+  kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/workflow-launch-custody.mjs
+kernel-launch-terminal-unnamed:
+  title: "Orca names no terminal for the held launch"
+  title_vi: "Orca không nêu cửa sổ cho lần khởi động đang giữ"
+  meaning_vi: "Orca trả lời về Dispatch của lần khởi động nhưng không nêu cửa sổ của worker, nên không có gì để nhận và đóng."
+  causes_vi:
+    - "Orca tạo worker rồi lỗi trước khi ghi cửa sổ"
+  nextStep_vi: "Supervisor đối chiếu danh sách cửa sổ trên Orca rồi đóng tay có kiểm chứng."
+  owner: supervisor
+  kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/workflow-launch-custody.mjs
+kernel-launch-dispatch-mismatch:
+  title: "Orca answered for another Dispatch"
+  title_vi: "Orca trả lời về Dispatch khác"
+  meaning_vi: "Bản ghi Orca trả về mang mã Dispatch khác với mã lưu trong tín hiệu, nên không thể tin nó thuộc lần khởi động này."
+  causes_vi:
+    - "Mã Dispatch bị dùng lại hoặc đọc nhầm"
+  nextStep_vi: "Supervisor kiểm tra tín hiệu và Dispatch trên Orca; runtime không nhận cửa sổ của bản ghi lạ."
+  owner: supervisor
+  kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/workflow-launch-custody.mjs
+TEST_SPAWN_OUTSIDE_SEAM:
+  title: "A test runner is started outside the one launcher that clears the enclosing spec run"
+  title_vi: "Một bộ chạy test được khởi động ngoài bộ khởi chạy duy nhất xóa dấu của lần chạy spec bao quanh"
+  meaning_vi: "Một node --test con thừa kế NODE_TEST_CONTEXT tưởng mình là test con của lần chạy bao quanh: nó báo về cha và thoát 0 dù test đỏ, nên một verb chạy spec như tiến trình con (starci test affected, cổng land, release cut) sẽ cho spec đỏ qua khi được gọi từ trong một tiến trình test. Chỉ bộ khởi chạy node của scripts/api/node xóa dấu đó; một tệp ngoài scripts/api mang đối số --test và tự spawn, hoặc một bộ khởi chạy không đi qua forChild, bị từ chối."
+  causes_vi:
+    - "Một tệp mới tự gọi child_process hoặc runProgram với --test thay vì runNode, execNode hoặc spawnNode"
+    - "Một bộ khởi chạy trong scripts/api/node/lib.mjs bỏ lời gọi forChild"
+  nextStep_vi: "Khởi chạy test qua scripts/api/node (runNode, execNode, spawnNode) và giữ forChild trong ba bộ khởi chạy."
+  owner: runtime-core
+  kind: check-finding
+
+workflow-purge-unknown:
+  title: "The workflow is in no ledger of this repository"
+  title_vi: "Không có workflow này trong sổ nào của kho"
+  meaning_vi: "Lệnh dọn workflow không tìm thấy mã workflow trong sổ của kho được chỉ định, và nhật ký máy cũng chưa ghi lần dọn nào cho nó."
+  causes_vi:
+    - "Mã workflow hoặc đường dẫn kho gõ sai"
+    - "Workflow thuộc kho khác với kho đang chỉ định"
+  nextStep_vi: "Chủ sở hữu kiểm tra lại mã workflow và --repo rồi chạy lại phần kế hoạch của lệnh dọn."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-not-archived:
+  title: "Only an archived workflow is purged"
+  title_vi: "Chỉ dọn workflow đã lưu trữ"
+  meaning_vi: "Workflow vẫn đang chạy, tạm dừng hoặc mới dừng nhưng chưa lưu trữ, nên lệnh dọn từ chối để không xoá cây làm việc đang dùng."
+  causes_vi:
+    - "Chưa chạy lệnh dừng workflow"
+    - "Workflow đang ở giai đoạn chạy hoặc tạm dừng"
+  nextStep_vi: "Chủ sở hữu dừng workflow bằng lệnh dừng (starci workflow stop) rồi chạy lại lệnh dọn."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-live-job:
+  title: "A job, lease or Kernel signal of the workflow is still live"
+  title_vi: "Workflow còn việc, khoá hoặc tín hiệu Kernel đang sống"
+  meaning_vi: "Sổ vẫn ghi một việc chưa kết thúc, một dòng khoá hoặc tín hiệu Kernel còn giữ cho workflow này, nên chưa chứng minh được là nó đã dừng hẳn."
+  causes_vi:
+    - "Lệnh dừng chưa hoàn tất hoặc chạy dở"
+    - "Một việc đang báo cáo chưa được chốt"
+  nextStep_vi: "Chủ sở hữu đọc danh sách việc trong thông báo, hoàn tất lệnh dừng workflow rồi chạy lại lệnh dọn."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-live-seat:
+  title: "A seat of the workflow is still live"
+  title_vi: "Workflow còn ghế đang sống"
+  meaning_vi: "Bảng ghế của máy vẫn ghi một ghế Kernel của workflow này ở trạng thái đang chạy, nên lệnh dọn không đụng tới cây và terminal của nó."
+  causes_vi:
+    - "Ghế Kernel chưa được đóng sau lệnh dừng"
+  nextStep_vi: "Chủ sở hữu chờ ghế đóng hẳn hoặc đóng nó bằng đường của bộ điều phối rồi chạy lại lệnh dọn."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-worker-live:
+  title: "A worker of the workflow is still active in Orca"
+  title_vi: "Workflow còn worker đang hoạt động trong Orca"
+  meaning_vi: "Orca báo một worker thuộc Run của workflow vẫn đang hoạt động và chưa thoát, nên lệnh dọn từ chối để không cắt ngang việc đang chạy."
+  causes_vi:
+    - "Worker chưa dừng sau lệnh dừng workflow"
+  nextStep_vi: "Chủ sở hữu chờ worker thoát hoặc dừng nó bằng đường của Orca rồi chạy lại lệnh dọn."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-custody-unknown:
+  title: "Unproved custody holds a workflow tree"
+  title_vi: "Cây workflow còn người giữ chưa chứng minh được quyền sở hữu"
+  meaning_vi: "Worker hoặc terminal trong cây chưa được bằng chứng ràng buộc với workflow; mọi bước dọn đều bị giữ lại."
+  causes_vi:
+    - "Run hoặc handle không được sổ hay journal chứng minh"
+  nextStep_vi: "Chủ sở hữu xác minh người giữ cây và để nó rời cây qua đường quản lý của nó trước khi dọn lại."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-archive-incomplete:
+  title: "The complete workflow archive evidence cannot be verified"
+  title_vi: "Không xác minh được đầy đủ bằng chứng của archive workflow"
+  meaning_vi: "Một tham chiếu blob thiếu, hỏng, không đọc được hoặc không xác định được phạm vi workflow; --ledger từ chối trước mọi tác động dọn."
+  causes_vi:
+    - "Blob hoặc metadata không còn đọc lại đúng digest"
+    - "Catalog tham chiếu không có quan hệ sở hữu workflow trong schema"
+  nextStep_vi: "Khôi phục bằng chứng bị thiếu hoặc sửa quan hệ sở hữu trước khi chạy lại --ledger."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-orca-unreadable:
+  title: "Orca did not answer, so no leftover can be proven"
+  title_vi: "Orca không trả lời nên không chứng minh được phần còn sót"
+  meaning_vi: "Lệnh dọn cần đọc được Orca (cây, terminal, worker của từng Run) trước khi xoá bất cứ gì; một lần đọc lỗi không chứng minh được là không còn gì."
+  causes_vi:
+    - "Orca đang tắt hoặc không phản hồi"
+    - "Một Run mà sổ nêu tên không còn trong Orca"
+  nextStep_vi: "Chủ sở hữu mở lại Orca rồi chạy lại lệnh dọn."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-host-busy:
+  title: "The host lock or the gc lock is held"
+  title_vi: "Khoá máy hoặc khoá dọn rác đang có người giữ"
+  meaning_vi: "Một việc nặng khác (đợt phát hành, hợp nhất, đợt dọn rác) đang chạy trên máy, nên lệnh dọn workflow chờ để không giẫm lên nó."
+  causes_vi:
+    - "Đang có đợt phát hành hoặc hợp nhất"
+    - "Đợt dọn rác của bộ điều phối đang chạy"
+  nextStep_vi: "Chủ sở hữu chờ việc kia xong rồi chạy lại lệnh dọn; không cần làm gì khác."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-plan-changed:
+  title: "The plan changed since it was shown"
+  title_vi: "Kế hoạch dọn đã đổi so với bản đã xem"
+  meaning_vi: "Mã băm của kế hoạch lúc thi hành khác với mã chủ sở hữu đã xem, nên không có gì bị xoá."
+  causes_vi:
+    - "Một ref, cây hoặc terminal đổi trạng thái giữa lúc xem kế hoạch và lúc thi hành"
+  nextStep_vi: "Chủ sở hữu đọc lại kế hoạch bằng --plan và thi hành với mã mới."
+  owner: owner
+  kind: verb-refusal
+seat-draft-held:
+  title: "A draft stands in a seat's input box"
+  title_vi: "Có bản nháp trong ô nhập của ghế điều phối"
+  meaning_vi: "Một người đang gõ dở trong ô nhập của ghế Kernel nên lần đánh thức bị từ chối; runtime không bao giờ xóa, đè lên hay thay ghế đang giữ bản nháp."
+  causes_vi:
+    - "Người dùng thật đang gõ trong terminal của ghế"
+    - "Chữ nháp còn sót lại mà không ai gửi đi"
+  nextStep_vi: "Supervisor chọn chờ thêm (mục đóng và mở lại sau một chu kỳ nếu bản nháp còn) hoặc ghi nguyên nhân cho Debug; chọn none-fits để chuyển cho chủ sở hữu. Mục tự đóng khi bản nháp biến mất."
+  owner: supervisor
+  kind: blocker
+unregistered-trees:
+  title: "Trees the runtime cannot tie to a workflow"
+  title_vi: "Cây thư mục runtime không gắn được với workflow nào"
+  meaning_vi: "Dưới thư mục do runtime quản lý có cây worktree không thuộc workflow nào; runtime không xóa thứ nó không tạo ra, việc xóa là việc của con người."
+  causes_vi:
+    - "Cây được tạo trước khi có sổ đăng ký hoặc do một lần chạy bị chết giữa chừng"
+    - "Cây là việc dở của chủ sở hữu"
+  nextStep_vi: "Supervisor chọn để yên (mục đóng cho đến khi tập cây đổi) hoặc ghi nguyên nhân cho Debug; việc xóa do con người làm."
+  owner: supervisor
+  kind: blocker
+terminal-unreadable:
+  title: "The terminal input cannot be read safely"
+  title_vi: "Không đọc được ô nhập của terminal một cách an toàn"
+  meaning_vi: "Runtime chưa chứng minh được ô nhập trống hoặc chỉ giữ chữ của runtime nên không gửi lệnh thoát hay thay ghế."
+  causes_vi:
+    - "Orca không trả lời hoặc lần đọc terminal thất bại"
+  nextStep_vi: "Debug kiểm tra đường đọc terminal rồi thử lại; giữ nguyên bản nháp và ghế trong lúc chưa đọc được."
+  owner: runtime-core
+  kind: runtime-fault
+
+workflow-purge-ledger-dependency:
+  title: "Workflow deletion is held by a retained database dependency"
+  title_vi: "Dọn workflow bị giữ bởi tham chiếu trong sổ phải được giữ lại"
+  meaning_vi: "Preflight giữ tác động host khi phát hiện tham chiếu ngăn xóa hoặc schema chưa được hỗ trợ; kiểm lại trong khóa sổ giữ dòng workflow trước DELETE nếu phụ thuộc xuất hiện sau đó."
+  causes_vi:
+    - "Work còn trỏ tới artifact của workflow"
+    - "Schema chưa hỗ trợ định danh hoặc quan hệ xóa chính xác"
+  nextStep_vi: "Xử lý tham chiếu theo thẩm quyền sản phẩm hoặc sửa bộ kiểm schema rồi đọc lại kế hoạch; không xóa Work để vượt cổng."
+  owner: owner
+  kind: verb-refusal

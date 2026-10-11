@@ -6,6 +6,9 @@ impl:
   script: scripts/supervisor/supervisor-watchdog.mjs
 flags:
   - {name: once, type: boolean, required: true, summary: run one watchdog pass and exit}
+internalFlags:
+  - {name: replace, pointer: "the pass replaces a dead seat itself; to reload the standing prompt run starci supervisor stop, then starci supervisor start"}
+  - {name: restart, pointer: "run starci supervisor stop, then starci supervisor start"}
 exit: {"0": watchdog pass completed, "1": watchdog pass failed, "2": bad usage}
 json: flag
 examples:

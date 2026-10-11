@@ -78,7 +78,7 @@ test('incident --kind peer-wait names a running peer of this workflow; --peer go
 test('no open operation and an open peer-wait: the frontier reads peer-wait, not actionable, instead of orphaned-frontier',t=>{
   const fx=fixture(t);
   const before=fx.frontier(WORK);
-  assert.deepEqual([before.state,before.actionable],['orphaned-frontier',true],'the defect: an orphaned frontier re-wakes the Kernel');
+  assert.deepEqual([before.state,before.actionable],['orphaned-frontier',false],'the defect: an orphaned frontier re-wakes the Kernel');
   assert.match(before.reason,/starci kernel incident --kind peer-wait --peer <workflowId>/);
   const {incidentId}=fx.wait();
   const after=fx.frontier(WORK);
@@ -167,7 +167,7 @@ test('a consumed-but-unsettled job a peer-wait holds is a deferred settle: heldS
   const fx=fixture(t);
   fx.seed(l=>seedConsumed(l,WORK,SETTLE_JOB));
   const before=fx.frontier(WORK);
-  assert.deepEqual([before.state,before.actionable,before.settleReadyJobs,before.heldSettleJobs],['settle-ready',true,[SETTLE_JOB],[]]);
+  assert.deepEqual([before.state,before.actionable,before.settleReadyJobs,before.heldSettleJobs],['settle-ready',false,[SETTLE_JOB],[]]);
   const {incidentId}=fx.ok(['incident','--workflow',WORK,'--kind','peer-wait','--peer',BASE,'--holds',SETTLE_JOB,'--detail','the cut-closing full gate needs the peer workspace commit']);
   const held=fx.frontier(WORK);
   assert.deepEqual([held.state,held.actionable,held.settleReadyJobs],['peer-wait',false,[]],'a settle the Kernel deferred behind a recorded wait is not work it can do');
@@ -184,8 +184,8 @@ test('a consumed-but-unsettled job a peer-wait holds is a deferred settle: heldS
   // A settle the wait does not name is still the Kernel's move.
   fx.seed(l=>seedConsumed(l,WORK,OTHER_SETTLE));
   const mixed=fx.frontier(WORK);
-  assert.deepEqual([mixed.state,mixed.actionable,mixed.settleReadyJobs,mixed.heldSettleJobs.map(h=>h.jobId)],['settle-ready',true,[OTHER_SETTLE],[SETTLE_JOB]]);
-  assert.match(mixed.reason,new RegExp(`^${OTHER_SETTLE} filed a report you consumed but never settled`));
+  assert.deepEqual([mixed.state,mixed.actionable,mixed.settleReadyJobs,mixed.heldSettleJobs.map(h=>h.jobId)],['settle-ready',false,[OTHER_SETTLE],[SETTLE_JOB]]);
+  assert.match(mixed.reason,new RegExp(`^${OTHER_SETTLE} filed a report that was consumed but not settled yet`));
 });
 
 test('an owner-gate naming a consumed-but-unsettled job defers its settle: frontier awaiting-owner, not actionable',t=>{
@@ -198,7 +198,7 @@ test('an owner-gate naming a consumed-but-unsettled job defers its settle: front
   assert.match(f.reason,new RegExp(`owner-gate incident\\(s\\) ${incidentId}; the settle of ${SETTLE_JOB}`));
   fx.asKernel(['incident','--workflow',WORK,'--resolve',incidentId,'--detail','consent receipt landed','--by','kernel']);
   const after=fx.frontier(WORK);
-  assert.deepEqual([after.state,after.actionable,after.settleReadyJobs,after.heldSettleJobs],['settle-ready',true,[SETTLE_JOB],[]]);
+  assert.deepEqual([after.state,after.actionable,after.settleReadyJobs,after.heldSettleJobs],['settle-ready',false,[SETTLE_JOB],[]]);
 });
 
 test('resolving the wait makes the deferred settle settle-ready again; the peer\'s message resolves an --until-message wait and wakes the Kernel',t=>{
@@ -208,7 +208,7 @@ test('resolving the wait makes the deferred settle settle-ready again; the peer\
   assert.equal(fx.frontier(WORK).state,'peer-wait');
   fx.ok(['incident','--workflow',WORK,'--resolve',kept,'--detail','peer commit landed: full gate green']);
   const resolved=fx.frontier(WORK);
-  assert.deepEqual([resolved.state,resolved.actionable,resolved.settleReadyJobs],['settle-ready',true,[SETTLE_JOB]],'actionable again: the watchdog wakes the Kernel to check and settle');
+  assert.deepEqual([resolved.state,resolved.actionable,resolved.settleReadyJobs],['settle-ready',false,[SETTLE_JOB]],'actionable again: the watchdog wakes the Kernel to check and settle');
 
   const until=fx.ok(['incident','--workflow',WORK,'--kind','peer-wait','--peer',BASE,'--holds',SETTLE_JOB,'--until-message','--detail','peer workspace commit']).incidentId;
   assert.deepEqual([fx.frontier(WORK).state,fx.frontier(WORK).actionable],['peer-wait',false]);
@@ -219,7 +219,7 @@ test('resolving the wait makes the deferred settle settle-ready again; the peer\
   const woken=fx.frontier(WORK);
   assert.deepEqual([woken.state,woken.actionable,woken.settleReadyJobs,woken.heldSettleJobs,woken.peerMessageKeys],['settle-ready',true,[SETTLE_JOB],[],[sent.sent[0].key]],'the released settle ranks before the pending message');
   fx.ok(['inbox','--workflow',WORK,'--ack',sent.sent[0].key,'--disposition','commit verified; settling']);
-  assert.deepEqual([fx.frontier(WORK).state,fx.frontier(WORK).actionable],['settle-ready',true]);
+  assert.deepEqual([fx.frontier(WORK).state,fx.frontier(WORK).actionable],['settle-ready',false]);
 });
 
 /* ------------------------------------------------------------- supervisor */

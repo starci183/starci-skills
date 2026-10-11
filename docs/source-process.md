@@ -10,11 +10,13 @@ workflows and ops). The git model (lands, fast-forward pushes of main, CI trigge
 | Level | Scope | When | Who runs it |
 |---|---|---|---|
 | L0 static | format and lint of the staged files, hygiene | every commit, seconds | the pre-commit hook |
-| L1 targeted | the specs of the changed unit and their importers; tsc and lint of the changed files | while working, every op or worker attempt | the op gate, the worker |
+| L1 targeted | the specs of the changed unit and their importers; tsc and lint of the changed files; in the runtime `starci test affected --run` computes the set | while working, every op or worker attempt | the op gate, the worker |
 | L2 dependent | the dependent-spec selection (imports and data paths) of the change against local main | lane to local main (pre-verify, land) | the lane lead (pre-verify), the coordinator (land) |
 | L3 boundary | the affected integration, contract and e2e specs when the change touches IO (database, queue, Kafka, webhook, saga, jobs) | at the land of that change only | the coordinator, opt-in by touched slot |
 | L4 full | every suite: runtime, packages, example unit, integration, e2e and contract, the Docker images, Sonar at zero, coverage per component, the Linux-parity CI jobs run locally | exactly once per release, before the tag | the release cut only |
 | L5 CI | the CI run on Linux | the release push of main and every tag, as the confirmation | the CI service |
+
+Everyday verification of the runtime is `starci runtime check` plus `starci test affected --run`, joined on one commit by `starci runtime verify` (the check alone never runs a spec and is not the proof a branch is fit to merge); the full suite is the lead's one run on the merged tree and the release cut's L4.
 
 On demand only: `unit.verify` and `e2e.verify` (the owner or the goal asks), and a debugging run of ONE red spec file. Never: the whole suite in a lane, a preview, an audit, a
 fresh clone or on main after a land; an install in a worktree someone else is editing; two heavy runs at once on the host (one lock).

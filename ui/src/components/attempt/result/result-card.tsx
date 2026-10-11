@@ -1,4 +1,5 @@
 import { ArrowRight, Gavel } from 'lucide-react';
+import { Link } from '@heroui/react';
 import type { AttemptDetailV3, AttemptManifest } from '../../../contract';
 import type { Concept } from '../../concept';
 import { statusFromVerdict, statusTone } from '../../status';
@@ -71,10 +72,9 @@ function Assertions({ manifest }: Readonly<{ manifest: AttemptManifest }>) {
         {assertion.detail != null ? <p className="m-0 min-w-0 whitespace-pre-line break-words leading-relaxed sm:col-span-2">{assertion.detail}</p> : null}
       </li>)}
     </ul> : <p className="m-0 text-sm text-muted-foreground">{t('The manifest declares no assertions.')}</p>}
-    <details className="mt-3">
-      <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">{t('Full submitted manifest data')}</summary>
-      <div className="mt-3 min-w-0"><TextView text={jsonText(manifest)} query="" /></div>
-    </details>
+    <Advanced className="mt-4" title={t('Full submitted manifest data')} keepMounted>
+      <TextView text={jsonText(manifest)} query="" />
+    </Advanced>
   </section>;
 }
 
@@ -106,19 +106,18 @@ export function ResultCard({ attempt, onShowChecks }: Readonly<{ attempt: Attemp
           {attempt.report ? <span>{t('Stored report #{id}', { id: attempt.report.id })}</span> : null}
           {attempt.reportedAt != null ? <span>{t('Reported at {at}', { at: formatAbsolute(attempt.reportedAt) })}</span> : null}
         </div>
-        {attempt.report?.json != null ? <details className="mt-3">
-          <summary className="cursor-pointer text-sm font-medium hover:underline">{t('Read the full stored report')}</summary>
-          <div className="mt-3 min-w-0"><TextView text={jsonText(attempt.report.json)} query="" /></div>
-        </details> : attempt.reportedAt != null || attempt.report != null ? <p className="mb-0 mt-3 text-xs text-muted-foreground">{t('The reported milestone is recorded, but stored report content was not returned.')}</p> : null}
+        {attempt.report?.json != null ? <Advanced className="mt-4" title={t('Read the full stored report')} keepMounted>
+          <TextView text={jsonText(attempt.report.json)} query="" />
+        </Advanced> : attempt.reportedAt != null || attempt.report != null ? <p className="mb-0 mt-3 text-xs text-muted-foreground">{t('The reported milestone is recorded, but stored report content was not returned.')}</p> : null}
       </section>
 
       <section className="min-w-0 border-t pt-6">
         <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
           <h3 className="m-0 text-sm font-medium">{t('Runtime checks')}</h3>
-          <a href={checksHref} onClick={onShowChecks ? event => {
+          <Link href={checksHref} onClick={onShowChecks ? event => {
             if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
             event.preventDefault(); onShowChecks();
-          } : undefined} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">{t('View recorded checks')}<ArrowRight className="size-3.5" aria-hidden="true" /></a>
+          } : undefined} className="gap-1 text-sm font-medium">{t('View recorded checks')}<ArrowRight className="size-3.5" aria-hidden="true" /></Link>
         </div>
         {checks.runtimeTotal ? <p className="m-0 text-sm leading-relaxed">{t('Runtime check identities: {passed} passed · {failed} failed · {unconfirmed} unconfirmed.', { passed: checks.passed, failed: checks.failed, unconfirmed: checks.unconfirmed })}</p>
           : <p className="m-0 text-sm text-muted-foreground">{t('No runtime check records were returned for this attempt.')}</p>}
@@ -128,7 +127,7 @@ export function ResultCard({ attempt, onShowChecks }: Readonly<{ attempt: Attemp
 
       <CheckpointReceipt attempt={attempt} />
 
-      <section className="min-w-0 border-t pt-6" data-tone={statusTone[verdictStatus]}>
+      <section id="attempt-step-verdict" className="min-w-0 scroll-mt-24 border-t pt-6" data-tone={statusTone[verdictStatus]}>
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <Gavel className="size-4 text-muted-foreground" aria-hidden="true" />
           <h3 className="m-0 text-sm font-medium">{t('Recorded runtime verdict')}</h3>
@@ -146,7 +145,7 @@ export function ResultCard({ attempt, onShowChecks }: Readonly<{ attempt: Attemp
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-4 text-sm">
           <span className="text-muted-foreground">{t('Next step:')}</span>
           <span className="min-w-0 break-words">{settle.nextStep ?? t('No next step recorded yet.')}</span>
-          {nextAttempt ? <a href={nextAttempt.href} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">{t('Next attempt #{id}', { id: nextAttempt.id })}<ArrowRight className="size-3.5" aria-hidden="true" /></a> : null}
+          {nextAttempt ? <Link href={nextAttempt.href} className="gap-1 font-medium">{t('Next attempt #{id}', { id: nextAttempt.id })}<ArrowRight className="size-3.5" aria-hidden="true" /></Link> : null}
         </div>
       </section>
 

@@ -58,6 +58,7 @@ import { readJsonFile } from '../lib/json.mjs';
 import { eachInOrder } from '../lib/in-order.mjs';
 import { groupLiveParts } from './draw-loop-groups.mjs';
 import { insidePath } from '../lib/path-key.mjs';
+import { invocationDir } from '../lib/roots.mjs';
 import { writeJsonFile } from '../api/fs/write-json-file.mjs';
 import { buildFixtureHarness, captureHtml, loadPlaywright, parseViewports } from './draw-render.mjs';
 import { DRAW_SOURCE_SUFFIX, checkDrawSource, rationaleFileFor } from './draw/draw-source.mjs';
@@ -66,6 +67,8 @@ import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { proposalFilesFor } from './draw/draw-dna.mjs';
 import { drawLoopSettings } from './draw/draw-taste.mjs';
 import { contextualCriticFor, runCritic, rubricFor } from './draw-critic.mjs';
+import { roundCritic } from './critic-verdict.mjs';
+import { beautyFindings } from './draw-beauty.mjs';
 import { archetypeOf } from './ui-archetype.mjs';
 import { readProposals, proposalFilesUnder } from './grammar-proposal.mjs';
 import { LOOP_SCHEMA } from './draw/draw-loop-coverage.mjs';
@@ -127,8 +130,8 @@ export function stopOf(rounds, settings) {
 }
 
 async function defaultRender({ html, out, viewports, name, fullPage, repo = null }) {
-  // Playwright is the product's own install (draw-render.mjs): from the source's directory, the product repo, the cwd.
-  const playwright = loadPlaywright([path.dirname(html), ...(repo ? [repo] : []), process.cwd()]);
+  // Playwright resolves as draw-render.mjs does: the source's directory, the product repo, the invocation directory, then the runtime's own install.
+  const playwright = loadPlaywright([path.dirname(html), ...(repo ? [repo] : []), invocationDir()]);
   const source = { mode: 'html', html: { path: html, sha256: sha256File(html) } };
   return captureHtml({ html, out, viewports, theme: 'light', fullPage, name, source, playwright });
 }
@@ -149,7 +152,7 @@ export function fixturesByWidth(values) {
  * bundle per distinct fixture. Keeps the first bundle in `harnessDir` (the browser metrics load its index.html).
  */
 async function defaultComponentRender({ source, fixtures, css = [], productDir, grammar, out, viewports, name, fullPage, harnessDir, rationale = null }) {
-  const playwright = loadPlaywright([productDir, path.dirname(source), process.cwd()]);
+  const playwright = loadPlaywright([productDir, path.dirname(source), invocationDir()]);
   const groups = new Map();
   for (const v of viewports) {
     const f = fixtures.byWidth[String(v.width)] ?? fixtures.default;
@@ -230,7 +233,7 @@ export async function runRound(o) {
   }
   const beauty = critique?.verdict?.beauty ?? null;
   const round = { n, dir: `round-${n}`, at: new Date().toISOString(), htmlSha256: metrics.htmlSha256, failures: metrics.failures, codes: metrics.codes, allPass: metrics.allPass,
-    beauty, criticFailed: critique?.verdict?.failed ?? null, ...(loop.ownerChecks?.length ? { ownerFailed: loop.ownerChecks.filter((id) => critique?.verdict?.checks?.find((c) => c.id === id)?.pass !== true) } : {}), critic: critique ? { model: critique.critic.model, independent: critique.critic.independent, error: critique.error ?? null } : null,
+    beauty, criticFailed: critique?.verdict?.failed ?? null, ...(loop.ownerChecks?.length ? { ownerFailed: loop.ownerChecks.filter((id) => critique?.verdict?.checks?.find((c) => c.id === id)?.pass !== true) } : {}), critic: critique ? roundCritic(critique) : null,
     parts: captures.map((c) => ({ part: stemOf(c.png), width: c.viewport.width, height: c.viewport.height, sha256: c.record?.image?.sha256 ?? sha256File(c.png) })) };
   round.progress = progressed(round, loop.rounds);
   loop.rounds.push(round);
@@ -255,8 +258,8 @@ export async function critiqueRound({ loop, n, roundDir, captures, html, uiDir =
   let critique;
   try {
     critique = pick.error
-      ? { schema: 'starci/draw-critique@1', outcome: 'not-configured', critic: { independent: false }, verdict: null, error: pick.error }
-      : await runCritic({ images: captures.map((c) => ({ path: c.png, label: `${breakpointOf(c.viewport)} ${c.viewport.width}px` })), html, rubric, critic: pick.critic, orca });
+      ? { schema: 'starci/draw-critique@1', outcome: 'not-configured', code: pick.code ?? null, critic: { independent: false }, verdict: null, error: pick.error }
+      : await runCritic({ images: captures.map((c) => ({ path: c.png, label: `${breakpointOf(c.viewport)} ${c.viewport.width}px` })), html, rubric, critic: pick.critic, minimum: Number(settings.beautyMin), orca });
   } catch (error) {
     critique = { schema: 'starci/draw-critique@1', outcome: 'launch-failed', critic: { independent: false }, verdict: null, error: String(error?.message ?? error) };
   }
@@ -285,7 +288,7 @@ export async function critiqueBest({ out, settings = drawLoopSettings(), drawer 
   const ui = loadUi(uiDir);
   const critique = await critiqueRound({ loop, n: best.n, roundDir, captures, html, uiDir, archetype: loop.archetype ?? null, record: ui?.record ?? null, shape: `${loop.base}#${loop.state}`, settings, drawer, orca });
   const beauty = critique?.verdict?.beauty ?? null;
-  Object.assign(best, { beauty, criticFailed: critique?.verdict?.failed ?? null, critic: { model: critique.critic?.model ?? null, independent: critique.critic?.independent ?? false, error: critique.error ?? null, late: true },
+  Object.assign(best, { beauty, criticFailed: critique?.verdict?.failed ?? null, critic: { ...roundCritic(critique), late: true },
     ...(loop.ownerChecks?.length ? { ownerFailed: loop.ownerChecks.filter((id) => critique?.verdict?.checks?.find((c) => c.id === id)?.pass !== true) } : {}) });
   if (loop.stop?.reason !== STOP.maxRounds) loop.stop = stopOf(loop.rounds, settings) ?? loop.stop;
   loop.best = bestRound(loop.rounds)?.n ?? null;
@@ -368,7 +371,7 @@ async function runComponentRound(o) {
   const round = { n, dir: `round-${n}`, at: new Date().toISOString(), mode: 'component', sourceSha256: gate.sha256, grammarSource: gate.grammar.grammarSource ?? null,
     ...(gate.grammar.upgradeOwed ? { grammarUpgradeOwed: gate.grammar.upgradeOwed } : {}), htmlSha256: metrics.htmlSha256, failures: metrics.failures, codes: metrics.codes, allPass: metrics.allPass,
     beauty, criticFailed: critique?.verdict?.failed ?? null, ...(loop.ownerChecks?.length ? { ownerFailed: loop.ownerChecks.filter((id) => critique?.verdict?.checks?.find((c) => c.id === id)?.pass !== true) } : {}),
-    critic: critique ? { model: critique.critic.model, independent: critique.critic.independent, error: critique.error ?? null } : null,
+    critic: critique ? roundCritic(critique) : null,
     parts: captures.map((c) => ({ part: stemOf(c.png), width: c.viewport.width, height: c.viewport.height, sha256: c.record?.image?.sha256 ?? sha256File(c.png) })) };
   round.progress = progressed(round, loop.rounds);
   loop.rounds.push(round);
@@ -506,13 +509,6 @@ function installBestPart(part, context) {
     generation: { tool: 'draw-render', promptPath, mode: 'draw-loop', loop: loopRef } },
     { path: slash(path.relative(relTo, html)), role: 'render-source' });
   appendEvidenceAssets(part, { partsDir, relTo, assets });
-}
-
-function beautyFindings(best, settings) {
-  if (Number.isFinite(best.beauty) && best.beauty >= Number(settings.beautyMin)) return [];
-  if (Number.isFinite(best.beauty)) return [{ code: DRAW_BEAUTY_BELOW, detail: `the critic scored beauty ${best.beauty} (at least ${settings.beautyMin} is the bar)${best.criticFailed?.length ? '; failed ' + best.criticFailed.join(', ') : ''}` }];
-  const error = best.critic?.error ? ': ' + String(best.critic.error).slice(0, 300) : ' (drawn with --no-critic)';
-  return [{ code: DRAW_CRITIC_MISSING, detail: `no critic scored round ${best.n}${error} - run finish without --no-critic (it critiques the best round) or fix the critic (runtimes.yaml allocation.drawLoop.critic)` }];
 }
 
 function ownerFeedbackFindings(best) {

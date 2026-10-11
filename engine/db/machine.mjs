@@ -1,3 +1,5 @@
+import { machineOpenMethods, pragma } from './machine-open.mjs';
+import { openReadOnlyDb } from './ref-value.mjs';
 // engine/db/machine.mjs — the ONE writer of machine.sqlite (DBTREE.sql Part B, schema 'starci/machine@1', user_version MACHINE_VERSION).
 //
 // machine.sqlite is the host's single operational store: the ledger registry, the Supervisor (sup_*), the engine
@@ -35,7 +37,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { putBlob as storeBlob, blobPath, getBlob } from './blob.mjs';
+import { putBlob as storeBlob, blobPath, getBlob } from './blob.mjs'; import { EVENT_LIMITS } from './event-compact.mjs';
 import { redactBytes, redactData, redactText } from '../../scripts/lib/redact.mjs'; import { isMain } from '../../scripts/lib/is-main.mjs';
 import { isSpecRun, readEnv } from '../../scripts/lib/env.mjs';
 import { pathKey } from '../../scripts/lib/path-key.mjs'; import { pidAlive } from '../../scripts/lib/pid-alive.mjs';
@@ -45,7 +47,7 @@ import { sha256 } from '../digest.mjs';
 import { starciLocalRoot } from '../runtime-root.mjs';
 import { machineSchemaMethods } from './machine-schema.mjs';
 import { machineConnectionMethods, corruptDiagnostic, MACHINE_BUSY_TIMEOUT_MS, MACHINE_CORRUPT_CODE, CORRUPT_RETRY_DELAYS_MS,
-  waitForRetry, isCorruptError, isBusyError, errText } from './machine-connection.mjs';
+  waitForRetry, isCorruptError, errText } from './machine-connection.mjs';
 export { MACHINE_BUSY_CODE, isMachineBusy, isBusyError } from './machine-connection.mjs';
 import { providerReservationMethods } from './provider-reservations.mjs';
 import { tempRoot } from '../temp-root.mjs';
@@ -55,7 +57,6 @@ const ENGINE_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const MACHINE_SCHEMA = 'starci/machine@1';
 export const MACHINE_VERSION = 3;
 /** Test seam: STARCI_MACHINE_BUSY_TIMEOUT_MS (a positive integer) replaces the writer's busy_timeout; unset in production. */
-const busyTimeoutOf = (env = process.env) => { const n = Number(env?.STARCI_MACHINE_BUSY_TIMEOUT_MS); return Number.isInteger(n) && n > 0 ? n : MACHINE_BUSY_TIMEOUT_MS; };
 export const INIT_SQL_FILE = path.join(ENGINE_DIR, 'schema', 'machine.sql');
 export const CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host', 'gc', 'workers', 'learning']);
 
@@ -113,9 +114,6 @@ const toJson = (value) => { if (value === undefined || value === null) { return 
 const parse = (text) => { if (text == null) { return null; } try { return JSON.parse(text); } catch { return null; } };
 const int = (v) => (v === undefined || v === null || v === '' ? null : Math.trunc(Number(v)));
 const bool = (v) => { if (v === undefined || v === null) { return null; } return v ? 1 : 0; };
-const writerPragmas = (env) => ({ synchronous: 'NORMAL', busy_timeout: busyTimeoutOf(env), temp_store: 'MEMORY', cache_size: -16000,
-  journal_size_limit: 67108864, trusted_schema: 'OFF' });
-const pragma = (db, name) => { const row = db.prepare(`PRAGMA ${name}`).get(); return row ? Object.values(row)[0] : null; };
 export { pidAlive };
 const { openWithRetry, connectionState } = machineConnectionMethods({ reportIncident: corruptIncident });
 /** Operational failures also persist their incident through a fresh writer or the deferred outbox. */
@@ -152,48 +150,7 @@ export function runtimeRev() {
 const compareRevs = (a, b) => { const t = (r) => (/^\d{13}:/.test(String(r ?? '')) ? Number(String(r).slice(0, 13)) : -1); return t(a) - t(b); };
 
 const { checkSchema, createSchema } = machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_VERSION, initSqlFile: INIT_SQL_FILE, controllers: CONTROLLERS, runtimeRev, pragma });
-
-function openConnection(file, { readOnly = false, env = process.env, now = Date.now, onCorrupt = corruptIncident } = {}) {
-  const { DatabaseSync } = require('node:sqlite');
-  need(typeof file === 'string' && file.trim(), 'openMachine needs a file');
-  if (!readOnly) fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
-  return openWithRetry(() => {
-    let db;
-    try {
-      if (readOnly) {
-        db = new DatabaseSync(file, { readOnly: true, timeout: MACHINE_BUSY_TIMEOUT_MS });
-        db.exec('PRAGMA query_only=ON; PRAGMA temp_store=MEMORY; PRAGMA cache_size=-16000;');
-        checkSchema(db, file);
-        return db;
-      }
-      db = new DatabaseSync(file, { timeout: busyTimeoutOf(env) });
-      const empty = Number(pragma(db, 'user_version')) === 0 && !db.prepare("SELECT 1 FROM sqlite_master WHERE name NOT GLOB 'sqlite_*' LIMIT 1").get();
-      if (!empty) checkSchema(db, file); // Refuse a store that is not exactly the current schema before persistent WAL/facts changes.
-      if (empty) db.exec('PRAGMA page_size=4096; PRAGMA auto_vacuum=INCREMENTAL;');
-      const mode = String(pragma(db, 'journal_mode=WAL')).toLowerCase();
-      need(mode === 'wal', `machine.sqlite journal_mode is '${mode}', not wal (${file})`, 'STARCI_MACHINE_NOT_WAL');
-      db.exec('PRAGMA foreign_keys=ON;');
-      for (const [k, v] of Object.entries(writerPragmas(env))) db.exec(`PRAGMA ${k}=${v};`);
-      // Never an automatic checkpoint: the engine leader's fenced checkpoint() is the only one (header, G17).
-      db.exec('PRAGMA wal_autocheckpoint=0;');
-      if (empty) createSchema(db, { file, env, now });
-      checkSchema(db, file);
-      recordFacts(db);
-      return db;
-    } catch (error) {
-      try { db?.close(); } catch { /* closed */ }
-      throw error;
-    }
-  }, { file, onCorrupt });
-}
-
-function recordFacts(db) {
-  const facts = { sqlite_version: db.prepare('select sqlite_version() v').get().v, node_version: process.version, journal_mode: String(pragma(db, 'journal_mode')).toLowerCase() };
-  const stale = Object.entries(facts).filter(([k, v]) => db.prepare('SELECT value FROM machine_meta WHERE key=?').get(k)?.value !== v);
-  if (!stale.length) return;
-  const put = db.prepare('INSERT INTO machine_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value');
-  try { for (const [k, v] of stale) put.run(k, v); } catch (error) { if (!isBusyError(error)) throw error; /* another writer records them */ }
-}
+const { openConnection } = machineOpenMethods({ checkSchema, createSchema, openWithRetry, corruptIncident });
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Generic row writes (column names are checked against the live table; table names are this module's constants)
@@ -451,13 +408,12 @@ function upsertRepository(m, { repoRoot, name, role, ledgerId = null, defaultBra
  * cannot be opened yields {ledger, error}. Returns the array of results.
  */
 function forEachLedger(m, fn, { state = 'active' } = {}) {
-  const { DatabaseSync } = require('node:sqlite');
   const out = [];
   for (const ledger of listLedgers(m, { state })) {
     let db = null;
     try {
       need(fs.existsSync(ledger.file), `ledger file missing: ${ledger.file}`);
-      db = new DatabaseSync(ledger.file, { readOnly: true, timeout: MACHINE_BUSY_TIMEOUT_MS });
+      db = openReadOnlyDb(ledger.file, MACHINE_BUSY_TIMEOUT_MS);
       db.exec('PRAGMA query_only=ON;');
       out.push({ ledger, result: fn({ ledger, db }) });
     } catch (error) { out.push({ ledger, error: String(error?.message ?? error) }); } finally { try { db?.close(); } catch { /* closed */ } }
@@ -477,7 +433,7 @@ function attachLedgers(m, ledgers = listLedgers(m)) {
 function supEvent(m, { entityType = 'supervisor', entityId = 'main', kind, payload = null, spanId = null, at = m.now(), eventId = null }) {
   need(kind, 'supEvent needs kind');
   return m.transaction((db) => {
-    const { json, sha } = jsonOrBlob(m, payload == null ? null : redactData(payload), 16384);
+    const { json, sha } = jsonOrBlob(m, payload == null ? null : redactData(payload), EVENT_LIMITS.payloadBytes);
     const prev = db.prepare('SELECT digest FROM sup_events ORDER BY seq DESC LIMIT 1').get()?.digest ?? null;
     const id = eventId ?? crypto.randomUUID();
     const digest = sha256([prev ?? '', id, entityType, entityId, kind, json ?? '', sha ?? '', at].join('\n'));
@@ -943,7 +899,7 @@ function setProviderHealth(m, { provider, status, failureKind = null, strikes = 
     const at = m.now();
     upsertRow(db, 'provider_health', { provider, status, failure_kind: failureKind, strikes, strike_limit: strikeLimit, circuit_open_until: circuitOpenUntil,
       recovered_at: status === 'recovered' ? at : undefined, reason, updated_at: at, detail_json: detail }, ['provider']);
-    if (cur?.status !== status) insertRow(db, 'provider_health_events', { provider, at, from_status: cur?.status ?? null, to_status: status, failure_kind: failureKind, ledger_id: ledgerId, attempt_id: attemptId, detail_json: detail });
+    if (cur?.status !== status) insertRow(db, 'provider_health_events', { provider, at, from_status: cur?.status ?? null, to_status: status, failure_kind: failureKind, ledger_id: ledgerId, attempt_id: attemptId, detail_json: circuitOpenUntil == null ? detail : { ...detail, circuitOpenUntil } });
     return { changed: cur?.status !== status };
   });
 }

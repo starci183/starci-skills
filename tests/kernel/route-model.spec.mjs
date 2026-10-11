@@ -175,8 +175,8 @@ test('operation kinds never take the kernel-function step',t=>{
 });
 
 test('drawing and host-tool gate: interface.draw takes the tier of its difficulty; a member lacking a required host tool is dropped by name',t=>{
-  // interface.draw takes the high tier at medium (its hard floor); the Playwright capture needs browser-dom, so a member whose
-  // capabilities.hostTools lacks it is dropped by name. The imagegen call tier is never an op's tier.
+  // interface.draw takes the high tier at medium (its hard floor) and declares no host tool (the runtime verbs drive the browser), so Claude
+  // leads; a member lacking a host tool an op does declare is dropped by name. The imagegen call tier is never an op's tier.
   const ownerRoot=fixture(t).dir();
   const r=run(['--kind','interface.draw','--difficulty','medium','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot});
   assert.equal(r.status,0,r.stderr||r.error?.message);
@@ -184,7 +184,7 @@ test('drawing and host-tool gate: interface.draw takes the tier of its difficult
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
   assert.equal(body.tier?.name,'high');
   assert.deepEqual((body.candidates??[]).map(c=>c.target),['claude-agent','codex-agent']);
-  assert.equal(body.pick?.primary?.target,'codex-agent','Sol carries browser-dom and takes the draw');
+  assert.equal(body.pick?.primary?.target,'claude-agent','no host tool is required of the drawer: Claude leads the high tier');
   // interface.audit needs browser-dom, which the Claude host lacks: its high tier drops Sonnet by name and Sol takes it.
   const audit=out(run(['--kind','interface.audit','--difficulty','hard','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot}));
   assert.deepEqual((audit.candidates??[]).map(x=>x.target),['claude-agent','codex-agent']);

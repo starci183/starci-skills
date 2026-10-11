@@ -1,0 +1,218 @@
+schema: starci/module-reconciler-operating-standard@1
+id: reconciler.operating-standard
+
+# The standard path of a workflow, step by step, as the code runs it. `starci debug digest` (scripts/reconciler/debug-standard.mjs)
+# judges every running workflow against it: each step is done, waiting (inside its bound, or on a party whose wait is the design),
+# or overdue (the bound is spent and the done-state is not observable). The first overdue step is the workflow's firstDeparture, and
+# its actor is the role that owes the next move.
+#
+# A step names: who acts (`actor`: a role id of modules/kernel/roles.yaml, or `runtime` for the floor), what must hold before it
+# (`precondition`), the observable state when it is done (`done`), the time it may take (`bound`: a number, or a ref to the one yaml
+# key that owns it), the ledger or machine rows that prove it (`evidence`), and the digest probe that reads those rows (`probe`,
+# scripts/reconciler/debug-standard-probes.mjs). A step whose actor is the owner never becomes overdue: waiting on the owner is the
+# design.
+
+scopes:
+  host: "once per host"
+  workflow: "once per running workflow"
+  attempt: "once per op attempt of the workflow"
+
+steps:
+  - id: host-ready
+    scope: host
+    actor: runtime
+    precondition: "the machine store is readable"
+    done: "the reconciler leads: its leader row beats inside the bound and every configured controller runs in its configured mode"
+    bound: {ref: "modules/reconciler/debug-digest.yaml#leaderStaleMs"}
+    evidence: "machine.sqlite engine_leader (heartbeat_at, rev) and controller_modes against config.yaml"
+    probe: host-ready
+  - id: supervisor-seat-live
+    scope: host
+    actor: supervisor
+    precondition: "host-ready"
+    done: "the Supervisor seat is live and takes its input"
+    bound: {ref: "modules/reconciler/sla.yaml#codes.SEAT_VACANT.slaMs"}
+    evidence: "machine.sqlite seats (state live, last_input_ok_at) and the seat's health probe"
+    probe: supervisor-seat-live
+  - id: goal-approved
+    scope: workflow
+    actor: owner
+    precondition: "a goal is defined for the workflow"
+    done: "the workflow left awaiting-approval: the owner approved the goal revision"
+    bound: null
+    evidence: "workflows.phase, goals (revision), inbox goal row"
+    probe: goal-approved
+  - id: workflow-started
+    scope: workflow
+    actor: runtime
+    precondition: "goal-approved"
+    done: "workflows.phase is running"
+    bound: {ref: "modules/reconciler/sla.yaml#codes.WORKFLOW_NOT_STARTED.slaMs"}
+    evidence: "workflows.phase and updated_at; event phase-transition (kernel-start)"
+    probe: workflow-started
+  - id: kernel-booted
+    scope: workflow
+    actor: runtime
+    precondition: "workflow-started"
+    done: "the Kernel job runs with a terminal bound in the kernel signal, and the last launch did not fail"
+    bound: {ref: "modules/reconciler/sla.yaml#codes.SEAT_START_STUCK.slaMs"}
+    evidence: "jobs kernel-<workflow> (status running), signals scope kernel, events kernel-booted and kernel-start-failed"
+    probe: kernel-booted
+  - id: kernel-acked-rev
+    scope: workflow
+    actor: kernel
+    precondition: "kernel-booted"
+    done: "the Kernel acked the runtime revision that is current (status.revisionNotice.state is current, not-concerned or acked-legacy)"
+    bound: {ref: "modules/reconciler/sla.yaml#codes.REV_ACK_OVERDUE.slaMs"}
+    evidence: "status revisionNotice, events runtime-rev-acked"
+    probe: kernel-acked-rev
+  - id: leg-enqueued
+    scope: workflow
+    actor: runtime
+    precondition: "workflow-started, and an approved plan leg has no job"
+    done: "no approved leg stands without a job: the Job controller enqueued each leg whose write set the plan or its deferral fixes, and the Kernel answered the leg-ready item of each leg the plan leaves open"
+    bound: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
+    evidence: "status nextActions (origin approved-leg or approved-leg-open), jobs, events job-enqueued, op-settled"
+    probe: leg-enqueued
+  - id: leg-dispatched
+    scope: workflow
+    actor: kernel
+    precondition: "kernel-acked-rev, and a leg is ready"
+    done: "no ready leg waits: each ready leg has a job leased or running and an attempt with a dispatch"
+    bound: {ref: "modules/reconciler/debug-digest.yaml#kernelIdleWakeMs"}
+    evidence: "status frontier (readyOperations, next-ready), jobs, op_attempts.dispatched_at, events route-decided, op-dispatched, kernel-woken"
+    probe: leg-dispatched
+  - id: worker-started
+    scope: attempt
+    actor: runtime
+    precondition: "the attempt was dispatched"
+    done: "the worker reports ready: the attempt has started_at"
+    bound: {ref: "modules/models/runtimes.yaml#allocation.liveness.launchGraceMs"}
+    evidence: "op_attempts.dispatched_at and started_at, event attempt-started"
+    probe: worker-started
+  - id: op-working
+    scope: attempt
+    actor: op
+    precondition: "worker-started"
+    done: "the job runs inside its deadline until it files a report"
+    bound: null
+    evidence: "jobs.status running, jobs.deadline"
+    probe: op-working
+  - id: report-filed
+    scope: attempt
+    actor: op
+    precondition: "op-working"
+    done: "an attempt that ended carries a report (done, partial, failed, ask or blocked) or a typed machine cause"
+    bound: null
+    evidence: "op_attempts.reported_at and report_outcome, reports row, event report-filed, op_attempts.end_state"
+    probe: report-filed
+  - id: checks-rerun
+    scope: attempt
+    actor: runtime
+    precondition: "report-filed with outcome done"
+    done: "the checks ran again in the workflow's tree and were recorded"
+    bound: {ref: "modules/models/runtimes.yaml#allocation.settler.rerunTimeoutMs"}
+    evidence: "check_runs (runner kernel or settler), event checks-recorded"
+    probe: checks-rerun
+  - id: settled
+    scope: attempt
+    actor: runtime
+    precondition: "report-filed"
+    done: "the attempt is settled: pass, or fail or blocked with a recorded cause (a report that is not done is the Kernel's to settle)"
+    bound: {ref: "modules/models/runtimes.yaml#allocation.settler.invariantMaxAgeMs"}
+    boundKernel: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
+    evidence: "op_attempts.settled_at and verdict, event op-settled"
+    probe: settled
+  - id: settle-evidence
+    scope: attempt
+    actor: runtime
+    precondition: "settled with a pass"
+    done: "the settle event names the directory, commit and tree the checks ran in, and that directory is the attempt's tree"
+    bound: null
+    evidence: "event op-settled payload checkedIn against op_attempts.worktree_path"
+    probe: settle-evidence
+  - id: handover
+    scope: workflow
+    actor: kernel
+    precondition: "every leg of the plan is settled"
+    done: "the handover is approved and the workflow finishes (frontier finish-ready leads to phase finished); while the handover ask waits on the owner the step waits (owner-wait), and a due handover that is not enqueued inside the bound is a departure"
+    bound: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
+    evidence: "status frontier finish-ready, events handover-approved and workflow-finished"
+    probe: handover
+  - id: resources-released
+    scope: host
+    actor: runtime
+    precondition: "any workflow, running or finished"
+    done: "no provider reservation is live for a job, a Kernel or a seat that is not running"
+    bound: {ref: "modules/reconciler/sla.yaml#codes.ENDED_WITH_LIVE_WORK.slaMs"}
+    evidence: "machine.sqlite provider_reservations against jobs, seats and sup_jobs"
+    probe: resources-released
+
+# What the digest prints for a role that broke a duty: the role, the field of its contract block that it broke (`does`, `cleanup`,
+# `never`, `reportsUpWhen` or `bound`, modules/kernel/roles.yaml), and the edge-case registry entry that tracks the remedy
+# (modules/reconciler/edge-cases.yaml); `registry: null` is a departure with no entry yet. `role: handler` takes the role from the
+# hold policy's handler (modules/kernel/op-incident-policy.yaml); a handler of `owner` is never a departure.
+departures:
+  leader-missing: {role: runtime, duty: does, registry: null}
+  leader-stale: {role: runtime, duty: does, registry: null}
+  controllers-off: {role: runtime, duty: does, registry: config-unreadable-controllers-off}
+  safe-mode: {role: runtime, duty: does, registry: null}
+  queue-failing: {role: runtime, duty: does, registry: host-controller-actions-fail-forever}
+  reservation-leak: {role: runtime, duty: cleanup, registry: worker-reservations-leaked}
+  secret-survived: {role: runtime, duty: does, registry: debug-questions-lacked-five-signals}
+  hold-unlisted: {role: runtime, duty: does, registry: null}
+  leg-unowned: {role: runtime, duty: does, registry: critic-hold-filed-as-owner-authority}
+  draft-unowned: {role: runtime, duty: does, registry: draft-stuck-refusal-reaches-no-owner-item}
+  action-failing: {role: runtime, duty: does, registry: reconciler-action-fails-on-every-pass-unreported}
+  decision-refused: {role: runtime, duty: does, registry: reconciler-action-fails-on-every-pass-unreported}
+  status-unreadable: {role: runtime, duty: does, registry: null}
+  op-no-cause: {role: runtime, duty: does, registry: null}
+  attempt-no-cause: {role: runtime, duty: does, registry: null}
+  kernel-start-loop: {role: runtime, duty: does, registry: null}
+  workflow-not-started: {role: runtime, duty: does, registry: null}
+  worker-not-started: {role: runtime, duty: does, registry: null}
+  leg-not-enqueued: {role: runtime, duty: does, registry: approved-leg-stands-without-a-job}
+  leg-open-unanswered: {role: kernel, duty: never, registry: approved-leg-stands-without-a-job}
+  dispatch-loop: {role: runtime, duty: does, registry: null}
+  ready-not-dispatched: {role: runtime, duty: does, registry: ready-job-never-dispatched-no-owner}
+  checks-not-rerun: {role: runtime, duty: does, registry: null}
+  settle-overdue: {role: runtime, duty: does, registry: null}
+  placement-lost: {role: runtime, duty: does, registry: admitted-op-placement-names-a-lost-tree-path}
+  checks-ran-outside-tree: {role: runtime, duty: does, registry: checks-rerun-wrong-tree}
+  handover-not-enqueued: {role: runtime, duty: does, registry: handover-never-due-after-intake-or-deferred-leg}
+  handover-stuck: {role: runtime, duty: does, registry: null}
+  supervisor-down: {role: supervisor, duty: does, registry: null}
+  supervisor-dead: {role: supervisor, duty: does, registry: null}
+  supervisor-deaf: {role: supervisor, duty: does, registry: null}
+  gate-stale: {role: supervisor, duty: never, registry: supervisor-gates-left-unanswered-for-fixes}
+  decision-overdue: {role: handler, duty: never, registry: null}
+  hold-overdue: {role: handler, duty: never, registry: null}
+  kernel-dead: {role: kernel, duty: does, registry: null}
+  kernel-rev: {role: kernel, duty: does, registry: null}
+  kernel-idle: {role: kernel, duty: never, registry: null}
+  kernel-wake-budget: {role: kernel, duty: bound, registry: kernel-wake-usage-attribution-coarse}
+  supervisor-wake-budget: {role: supervisor, duty: bound, registry: supervisor-wake-budget-unmeasured}
+  seat-empty-wakes: {role: runtime, duty: does, registry: seat-cost-exceeds-decisions}
+  op-owner-without-ask: {role: kernel, duty: reportsUpWhen, registry: null}
+  op-step-missing: {role: kernel, duty: never, registry: null}
+  settle-overdue-kernel: {role: kernel, duty: never, registry: null}
+  job-past-deadline: {role: op, duty: never, registry: null}
+
+# Stops that are not departures: the design working. Each is counted per role and never listed as a problem.
+happy:
+  op-asked: {role: op, why: "the op reported an ask up to its Kernel"}
+  op-blocked: {role: op, why: "the op reported a blocked cause up to its Kernel"}
+  check-red: {role: op, why: "a check is red because the work is not good yet"}
+  worker-lost: {role: runtime, why: "the worker ended without a report and the runtime settled it with a typed cause"}
+  quota-wait: {role: runtime, why: "a provider quota or circuit is open and the next agent takes over"}
+  dispatch-rejected: {role: runtime, why: "admission refused a launch and the job waits for a slot"}
+  hold-inside-bound: {role: runtime, why: "a held job is inside its policy bound"}
+  step-pending: {role: kernel, why: "a stopped leg is inside the window for its policy next step"}
+  step-taken: {role: kernel, why: "the policy next step happened (a retry, a Decision Item, an incident, a wait on a peer)"}
+  owner-wait: {role: kernel, why: "the matter is the owner's and its ask is open"}
+  rev-pending: {role: kernel, why: "the Kernel has not yet acked the new revision and the ack bound is not spent"}
+  runtime-rev-pending: {role: runtime, why: "the engine runs an older revision than the live tree and picks it up on its next reload"}
+  decision-open: {role: kernel, why: "a Decision Item is open inside its due time"}
+  kernel-starting: {role: runtime, why: "the Kernel seat is being started and the start bound is not spent"}
+  seat-replacing: {role: runtime, why: "the Supervisor seat is being replaced and the seat bound is not spent"}
+  goal-awaiting-approval: {role: owner, why: "the goal waits for the owner's approval"}

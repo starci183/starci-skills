@@ -1,8 +1,10 @@
 import { BlobText } from '../blob-text';
 import { StateChip } from '../state-chip';
+import { Advanced } from '../motion';
+import { SourceWarning } from '../feedback-state';
 import { t } from '../../i18n/t';
 import type { BlobLink, LandRun, Ref, UiState } from '../../contract';
-import { BlobLinkButton, Metric, RefLink, at, dash, number } from './panel';
+import { BlobLinkButton, RefLink, at, dash, number } from './panel';
 
 export const concept = 'frame';
 
@@ -16,7 +18,7 @@ export type Lane = { scope: 'runtime'; name: string; worktree: string | null; br
 export type LandTarget = { kind: 'land-run' | 'commit'; row: LandRun } | { kind: 'land-ticket'; row: LandTicket } | { kind: 'lane'; row: Lane } | { kind: 'push'; row: Push };
 
 function Facts({ rows }: Readonly<{ rows: [string, string][] }>) {
-  return <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">{rows.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="break-words">{value}</dd></div>)}</dl>;
+  return <dl className="grid gap-4 text-sm sm:grid-cols-2">{rows.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 break-words [overflow-wrap:anywhere]">{value}</dd></div>)}</dl>;
 }
 
 export function ServiceFacts({ selected }: Readonly<{ selected: ServiceTarget }>) {
@@ -35,7 +37,7 @@ export function ServiceFacts({ selected }: Readonly<{ selected: ServiceTarget }>
       [t('Booted at'), at(row.bootedAt)], [t('Last seen'), at(row.lastSeenAt)], [t('Replaced count'), number(row.replacedCount)],
       [t('Consecutive input failures'), number(row.inputFailuresConsecutive)], [t('Parked reason'), dash(row.parkedReason)], [t('Snapshot at'), at(row.lastSnapshotAt)],
     ]} /><div className="text-sm">{t('Workflow')}: {workflow ? <RefLink refValue={workflow} /> : dash(row.wf)}</div><div className="text-sm">Terminal: <RefLink refValue={row.terminal} /></div>
-      {row.deaf && <p className="shell-error">{t('Lost signal')}</p>}<BlobLinkButton blob={row.transcript} label={t('Record')} /></div>;
+      {row.deaf && <SourceWarning>{t('Lost signal')}</SourceWarning>}<BlobLinkButton blob={row.transcript} label={t('Record')} /></div>;
   }
   const row = selected.row;
   return <div className="flex flex-col gap-4"><StateChip state={row.ui} /><p className="text-xs text-muted-foreground">{t('Recorded shell inventory and close verification; this is not a live terminal probe.')}</p><Facts rows={[
@@ -75,9 +77,9 @@ export function LandFacts({ selected }: Readonly<{ selected: LandTarget }>) {
     ]} /><div><h3 className="mb-2 font-medium">Stderr</h3><BlobText blob={row.stderr} /></div><div><h3 className="mb-2 font-medium">Stdout</h3><BlobText blob={row.stdout} /></div></div>;
   }
   const row = selected.row;
-  return <div className="flex flex-col gap-4"><StateChip state={row.ui} label={row.result} /><div className="grid grid-cols-2 gap-3"><Metric label="Commit" value={row.commit.slice(0, 12)} /><Metric label={t('SHA after land')} value={row.landedSha?.slice(0, 12) ?? '—'} /></div>
-    <Facts rows={[[t('Scope'), row.scope], ['Lane', dash(row.lane)], ['Ticket', dash(row.ticket)], [t('Started'), at(row.startedAt)], [t('Ended'), at(row.finishedAt)]]} />
-    {row.reason && <p className="shell-error">{row.reason}</p>}<div className="text-sm">Push: <RefLink refValue={row.push} /></div>
-    {row.specs != null && <details><summary>{t('Recorded specs')}</summary><pre className="blob-text">{JSON.stringify(row.specs, null, 2)}</pre></details>}
+  return <div className="flex flex-col gap-4"><StateChip state={row.ui} label={row.result} />
+    <Facts rows={[[t('Scope'), row.scope], ['Lane', dash(row.lane)], ['Ticket', dash(row.ticket)], ['Commit', row.commit], [t('SHA after land'), dash(row.landedSha)], [t('Started'), at(row.startedAt)], [t('Ended'), at(row.finishedAt)]]} />
+    {row.reason && <SourceWarning>{row.reason}</SourceWarning>}<div className="text-sm">Push: <RefLink refValue={row.push} /></div>
+    {row.specs != null && <Advanced title={t('Recorded specs')} keepMounted><pre className="blob-text">{JSON.stringify(row.specs, null, 2)}</pre></Advanced>}
     <div><h3 className="mb-2 font-medium">Stderr</h3><BlobText blob={row.stderr} /></div><div><h3 className="mb-2 font-medium">Stdout</h3><BlobText blob={row.stdout} /></div></div>;
 }

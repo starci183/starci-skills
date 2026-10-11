@@ -28,7 +28,7 @@
 //                                 turnInterruptGraceMs later -> the seat terminal is closed (--turn-replace) and the
 //                                 seat's watchdog pass replaces it.
 //   host:processes                node/git counts over threshold (host-health hostVerdict -> log), orphan runtime loops
-//                                 (ORPHAN_PROCESS -> stop), the footprint scan, the Orca terminal count against Orca's
+//                                 (ORPHAN_PROCESS -> stop), UAT slots whose lessee is gone (host-slot-servers.mjs -> stop), the footprint scan, the Orca terminal count against Orca's
 //                                 own active workers over every Run (worker-list; TERMINAL_COUNT_DRIFT).
 //   host:transcripts              every 60 s (schedules host/transcripts): scrollback snapshots of every live op attempt
 //                                 (scripts/kernel/transcripts.mjs snapshot --repo) and of every live seat (snapshotSeats).
@@ -43,7 +43,7 @@
 import path from 'node:path';
 import {
   SKILL_ROOT, SERVICES_FILE, OUTAGE_STATES, hostSettings, serviceRegistry, servicePorts, openServiceStore, newRecord,
-  stepService, runChild, lastJson, probeOrcaAsync,
+  stepService, runChild, lastJson,
 } from '../services.mjs';
 import { quickCheck, backupDue } from '../ledger-health.mjs';
 import { createLedgerBackup } from '../ledger-identity.mjs';
@@ -55,9 +55,13 @@ import { allocationMs, allocationSettings } from '../../../engine/config.mjs';
 import { claimDue, finishDuty, listSchedules } from '../schedules.mjs';
 import { pathKey } from '../../lib/path-key.mjs';
 import os from 'node:os';
-import { seatStateOf, seatHold } from '../host-seats.mjs';
+import { seatStateOf, seatHold, seatQuarantine } from '../host-seats.mjs';
+import { runtimeRevNow } from '../../kernel/start-hold.mjs';
+import { runTerminalDrift, runtimeTerminalCount } from '../terminal-drift.mjs';
 import { createStaleTerminalStep } from '../host-stale.mjs';
 import { eachInOrder } from '../../lib/in-order.mjs';
+import { reapOrphanProcesses } from '../host-orphans.mjs';
+import { reapSlotServers } from '../host-slot-servers.mjs';
 export { staleTerminalsOf, STALE_RETRY_MS, STALE_ESCALATE_TRIES, CLOSE_VERIFY } from '../host-stale.mjs'; export { seatStateOf };
 
 /**
@@ -192,7 +196,7 @@ export function createHostController(deps = {}) {
     const h = allocationSettings()?.supervisorTick?.host;
     return h ? verdict(procs, h) : { alert: false };
   });
-  const orcaTerminals = deps.orcaTerminals ?? (async () => (await probeOrcaAsync({ timeoutMs: settings().services.orca?.probeTimeoutMs ?? 30_000 })).terminals ?? null);
+  const orcaTerminals = deps.orcaTerminals ?? (async () => runtimeTerminalCount(lastJson((await runChild(process.execPath, [path.join(SKILL_ROOT, TERMINAL_LIST), '--include-visual-layouts'], { timeoutMs: settings().services.orca?.probeTimeoutMs ?? 30_000 })).stdout)));
   const supervisorMode = deps.supervisorMode ?? (async () => { try { return (await import('../../machine/home.mjs')).supervisorMode(); } catch { return 'chat'; } });
   // Orca's active workers over every Run (worker-list), or null when Orca does not answer for every Run.
   const activeWorkers = deps.activeWorkers ?? (async () => (await import('../../machine/worker-list-all.mjs')).activeWorkersAllRuns());
@@ -265,7 +269,7 @@ export function createHostController(deps = {}) {
         idempotencyKey: `service-quarantined:${name}:${next.since}`, severity: entry.ownerPath ? 'critical' : 'warn', ownerPath: entry.ownerPath === true,
         summary: `${name}: more than ${s.quarantine.maxRestarts} restarts in ${Math.round(s.quarantine.windowMs / 60000)} min, quarantined`,
         evidence: [{ ref: `probe:${JSON.stringify(next.lastProbe).slice(0, 200)}` }, { ref: `restarts:${next.restarts.length}` }],
-        options: [{ key: 'reopen', verb: `node ${SERVICES_FILE} --reopen ${name}`, recommended: true }], allowedVerbs: ['reopen'],
+        options: [{ key: 'reopen', verb: `starci reconciler reopen ${name}`, recommended: true }], allowedVerbs: ['reopen'],
       }));
     }
     if (entry.kind === 'checker' && step.to === 'failed' && next.downSince != null && now - next.downSince >= entry.slaMs) {
@@ -325,15 +329,8 @@ export function createHostController(deps = {}) {
     return { seatOut, action, acted };
   }
 
-  // More than maxReplacementsPerHour replacements: the seat is quarantined; the first time, one DI seat-unrecoverable.
-  async function quarantineSeat(ctx, { key, rec, next, ledgerId, workflowId, action, now }) {
-    if (rec.state === 'quarantined') return;
-    await ctx.openDecision(di({
-      kind: 'seat-unrecoverable', ledger: ledgerId, workflowId, entity: { type: 'seat', id: key }, idempotencyKey: `seat-unrecoverable:${key}:${now}`,
-      summary: `${workflowId}: the Kernel seat was replaced ${next.restarts.length} times in an hour; quarantined`,
-      evidence: [{ ref: `action:${action}` }], options: [{ key: 'reopen', verb: `node ${SERVICES_FILE} --reopen ${key}`, recommended: true }], allowedVerbs: ['reopen'],
-    }));
-  }
+  // More than maxReplacementsPerHour replacements, or a launch held for a cause it repeats: the seat is quarantined; the first time, one DI seat-unrecoverable.
+  const quarantineSeat = (ctx, args) => seatQuarantine(ctx, args, { di });
 
   // The seat's SLA clocks: each one runs while the seat is in one of its states and closes otherwise.
   async function seatClocks(ctx, { key, seat, s, ledgerId, workflowId, action }) {
@@ -373,15 +370,17 @@ export function createHostController(deps = {}) {
     const rec = rowOf(key, now);
     const problem = goalProblem(wf.goal, goalRefusal);
     if (problem) return refuseGoal(ctx, { ledgerId, workflowId, wf, rec, problem, now });
-    const hold = seatHold(rec, now, s); if (hold) return hold;
+    const rev = runtimeRevNow();
+    const hold = seatHold(rec, now, s, rev); if (hold) return hold;
     const { seatOut, action, acted } = await runSeatPass(ctx, { ledger, workflowId, s });
     const replaced = ctx.mode === 'active' ? REPLACED.has(action) : acted && action === 'restart-needed';
     const next = { ...rec, restarts: [...(rec.restarts ?? []).filter((t) => now - t < 3_600_000), ...(replaced ? [now] : [])], lastAction: action, lastAt: now, mode: ctx.mode };
     let seat = seatStateOf(action);
-    if (next.restarts.length > s.maxReplacementsPerHour) {
+    if (next.restarts.length > s.maxReplacementsPerHour || action === 'start-held') {
       seat = 'quarantined';
-      await quarantineSeat(ctx, { key, rec, next, ledgerId, workflowId, action, now });
+      await quarantineSeat(ctx, { key, rec, next, ledgerId, workflowId, action, now, hold: seatOut?.hold ?? null });
     }
+    if (seat === 'quarantined') next.quarantinedRev = rev;
     if (next.state !== seat) { next.state = seat; next.since = now; }
     await seatClocks(ctx, { key, seat, s, ledgerId, workflowId, action });
     const stale = seat === 'hostOutage' ? null : await staleTerminalStep(ctx, { ledgerId, workflowId, liveHandle: seatOut?.terminal ?? null });
@@ -465,31 +464,9 @@ export function createHostController(deps = {}) {
     return ids;
   }
 
-  // Each orphan runs an ORPHAN_PROCESS clock and is killed; the clock of a process that is gone closes.
-  async function reapOrphans(ctx, orphans, p) {
-    const seen = new Set();
-    await eachInOrder(orphans, async (o) => {
-      const entity = `process:${o.pid}`;
-      seen.add(entity);
-      await clock(ctx, entity, 'ORPHAN_PROCESS', p.orphanSlaMs, { code: 'ORPHAN_PROCESS', owner: 'host-controller', ledgerId: 'supervisor', repo: o.repo, workflowId: o.workflowId, script: o.script });
-      await ctx.run('taskkill.exe', ['/F', '/T', '/PID', String(o.pid)], { timeoutMs: 120_000 });
-    });
-    await eachInOrder(state.orphanClocks, async (entity) => { if (!seen.has(entity)) await clear(ctx, entity, 'ORPHAN_PROCESS'); });
-    state.orphanClocks = seen;
-  }
-
   // INV-H2: Orca's terminals against the workers Orca itself holds active (every seat, op and [Worker] is a
   // worker-start worker; worker-list is the one count). An Orca that does not answer for every Run proves nothing (null).
-  async function terminalDrift(ctx, p) {
-    const terminals = await orcaTerminals();
-    const active = terminals == null ? null : await activeWorkers();
-    if (terminals == null || !Array.isArray(active)) return null;
-    const expected = active.length + p.terminalSlack;
-    const drift = { count: terminals, expected, workers: active.length };
-    if (terminals > expected) await clock(ctx, 'host:terminals', 'TERMINAL_COUNT_DRIFT', p.terminalDriftSlaMs, { code: 'TERMINAL_COUNT_DRIFT', owner: 'host-controller', ledgerId: 'supervisor', count: terminals, expected });
-    else await clear(ctx, 'host:terminals', 'TERMINAL_COUNT_DRIFT');
-    return drift;
-  }
+  const terminalDrift = (ctx, p) => runTerminalDrift({ ctx, p, state, orcaTerminals, activeWorkers, clock, clear, dedupeArgs: [SERVICES_FILE, '--dedupe', '--json'] });
 
   async function processes(ctx) {
     const now = ctx.now(), p = settings().processes;
@@ -503,7 +480,8 @@ export function createHostController(deps = {}) {
     const known = [...(ctx.ledgers ?? []).map((l) => l.repo).filter(Boolean)];
     const runningIds = await runningIdsOf(ctx);
     const orphans = findOrphans(procs, { knownRepos: known, runningWorkflows: runningIds, now, minAgeMs: p.orphanMinAgeMs, exclude: [process.pid, process.ppid] });
-    await reapOrphans(ctx, orphans, p);
+    await reapOrphanProcesses(ctx, orphans, p, { state, clock, clear });
+    out.slotServers = await reapSlotServers(ctx, procs);
     out.orphans.push(...orphans);
     if (await scanFootprint(ctx, p, now)) out.footprint = true;
     const terminals = await terminalDrift(ctx, p);

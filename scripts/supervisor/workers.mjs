@@ -18,7 +18,7 @@ import {
   SKILL_ROOT, FIX_KIND, WORKER_TITLE_PREFIX, readSupervisor,
   supervisorEvent, supervisorSettings, productRepos, supervisorLog,
 } from '../machine/home.mjs';
-import { openMachine, starciLocalRoot } from '../../engine/db/machine.mjs';
+import { openMachine } from '../../engine/db/machine.mjs';
 import { createOrcaWorktree, removeOrcaWorktree, orcaWorktreeClient } from '../machine/worktree-orca.mjs';
 import { ci } from '../api/npm/ci.mjs'; import { underHostLockWaiting } from './land-lock.mjs';
 import { machineLoad } from '../machine/host-resources.mjs';
@@ -273,7 +273,7 @@ const startJobWorker = async ({ m, deps, env, root, now }, job, route, staging) 
   const guard = (deps.guard ?? workerGuard)(job.job_id, { root, staging: staging.path, files: job.payload.files ?? [] });
   if (typeof guard.receipt?.jobFile !== 'string') supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-guard-missing', payload: { receipt: guard.receipt }, now: now() });
   const spawned = await startWorkerAgent({ route, worktree: staging.path, title, prompt,
-    specFile: path.join(starciLocalRoot(env), 'supervisor', 'workers', `${job.job_id}.prompt.md`), objective: `${title} — ${job.job_id}`, entry: env.ORCA_TERMINAL_HANDLE || null,
+    objective: `${title} — ${job.job_id}`, entry: env.ORCA_TERMINAL_HANDLE || null,
     request: { workerJob: job.job_id, spawnAttempt: (job.payload.spawnAttempts ?? 0) + 1 }, onCreated: (handle) => { if (typeof guard.receipt?.jobFile === 'string') guard.receipt.terminal = (deps.bindGuard ?? bindGuardTerminal)({ skillRoot: root, handle, jobFile: guard.receipt.jobFile }); },
     start: deps.start ?? null, env });
   return { spawned, guard };

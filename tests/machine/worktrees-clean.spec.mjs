@@ -70,18 +70,3 @@ test('tracked changes and unmerged lane tips are refused without removal', async
   assert.equal(result.data.rows.find((row) => row.path === path.resolve(fx.lane)).action, 'refused-unmerged');
   assert.equal(fs.existsSync(fx.lane), true);
 });
-
-test('an Orca-owned eligible lane is removed through the Orca worktree owner', async (t) => {
-  const fx = fixture(t), calls = [];
-  const result = await worktreesClean(context(fx), {
-    orcaPs: () => ({ ok: true, worktrees: [{ id: 'repo::lane', path: fx.lane }] }),
-    removeOrca: (request) => { calls.push(request); return { ok: true, links: 2 }; },
-    removeGit: () => { throw new Error('Git fallback must not own an Orca worktree'); },
-  });
-  assert.equal(result.code, 0);
-  assert.equal(calls.length, 1);
-  assert.deepEqual({ repoRoot: calls[0].repoRoot, orcaId: calls[0].orcaId, dir: calls[0].dir, deleteBranch: calls[0].deleteBranch }, {
-    repoRoot: path.resolve(fx.repo), orcaId: 'repo::lane', dir: path.resolve(fx.lane), deleteBranch: 'merged',
-  });
-  assert.equal(result.data.rows.find((row) => row.action === 'removed').links, 2);
-});

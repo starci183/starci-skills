@@ -11,7 +11,9 @@ const tempTree = (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-roles-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const doc = rolesContract(skillRoot);
-  for (const file of ['modules/kernel/roles.yaml', ...doc.roles.flatMap((r) => r.surfaces.map((s) => s.file))]) {
+  // The role standard reads the incident policy, the command policy, the generated table's document and the files bugSurface names.
+  const standard = ['modules/kernel/op-incident-policy.yaml', 'modules/kernel/command-policy.yaml', 'modules/kernel/revision-scope.yaml', 'modules/reconciler/edge-cases.yaml', 'docs/workflow-kernel.md', ...doc.roles.flatMap((r) => (r.bugSurface ?? []).map((b) => b.detectedBy)), ...doc.roles.map((r) => r.revisionAck?.file).filter(Boolean)];
+  for (const file of new Set(['modules/kernel/roles.yaml', ...standard, ...doc.roles.flatMap((r) => r.surfaces.map((s) => s.file))])) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     fs.copyFileSync(path.join(skillRoot, file), path.join(root, file));
   }
@@ -32,7 +34,7 @@ test('the contract chain follows reportsTo and names only known roles', () => {
 test('RT_ROLES_CONTRACT_DRIFT names a block that differs from the contract and --write repairs it', (t) => {
   const root = tempTree(t);
   const file = path.join(root, 'modules/kernel/kernel-prompt.md');
-  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('Dispatches ops by the plan', 'Does everything'));
+  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('Answers the judgments of its menu', 'Does everything'));
   const findings = checkRolesContract(root);
   assert.equal(findings.length, 1);
   assert.equal(findings[0].code, CODE);

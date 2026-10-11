@@ -14,6 +14,32 @@ The root dotenv is merged below the supplied environment, including explicitly e
 values. Loading returns an environment without mutating `process.env`. The owner sets values locally;
 an agent never reads or prints the file to guide setup.
 
+## Secrets of the self-hosted Sonar stack
+
+The product Sonar server of `ext/sonar` holds no secret in the repository. Its Compose files read the environment of the process that
+runs them, and `starci gate sonar up [--public]` builds that environment from `secret.env` (`secretEnv`) and refuses, naming the
+missing variable (`sonar-host-secret-missing`), before it starts anything. `sonar-local.mjs` reads the admin token from the same
+resolved environment. The names, all in `secret.env.example`: `SONARQUBE_DB_PASSWORD`, `SONARQUBE_ADMIN_PASSWORD`,
+`SONARQUBE_ADMIN_TOKEN` and `CLOUDFLARE_TUNNEL_TOKEN` (only with `--public`). Distinct from `SONAR_TOKEN`, the SonarCloud token.
+
+The previous layout tracked sealed members of this stack; they are deleted, their ciphertext remains in git history. The owner moves each
+value once with his own age identity: `starci runtime import-held-secret --member <old path> [--rev <rev>]` reads the member from git
+history (without `--rev`, from the parent of the commit that deleted it), decrypts it through the sops call owner and appends
+`NAME=value` to `secret.env` without printing it, and it never overwrites a name already there. The member table:
+
+<!-- [removed-list] -->
+| Old member | Variable | Read by |
+| --- | --- | --- |
+| `ext/sonar/secrets/sonarqube-db-password.txt.enc` | `SONARQUBE_DB_PASSWORD` | `ext/sonar/compose.yaml`, through `starci gate sonar up` |
+| `ext/sonar/secrets/sonarqube-admin-password.txt.enc` | `SONARQUBE_ADMIN_PASSWORD` | the bootstrap of `ext/sonar/compose.yaml` |
+| `ext/sonar/secrets/sonarqube-admin-token.key.enc` | `SONARQUBE_ADMIN_TOKEN` | `scripts/gates/sonar-local.mjs` |
+| `ext/sonar/secrets/cloudflare-starci-local-services-tunnel-token.key.enc` | `CLOUDFLARE_TUNNEL_TOKEN` | `ext/sonar/cloudflared.yaml`, through `starci gate sonar up --public` |
+| `ext/sonar/secrets/sonarqube-analysis-token.txt.enc` | none (retired) | nothing reads a server-wide analysis token of the extension; a product reads its own custody |
+| the two demo secrets of the ecommerce example | none (retired) | the example carries demo-only defaults in its compose files |
+
+A ciphertext deleted from the tree stays in the public history, encrypted to the owner's age key: rotate the stack's admin password,
+admin token and tunnel token after the move.
+
 ## Shared age identity
 
 `engine/secrets.mjs` owns `sopsIdentityEnv`. The caller hands it the canonical normalized environment.

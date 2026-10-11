@@ -126,3 +126,45 @@ rulings:
     date: '2026-09-30'
     ruling: "One pattern, no exceptions, no legacy, no backward compatibility: a mechanism that is superseded or unusable is deleted with all its references, never kept as an alias, fallback or second path."
     confirmed: '2026-09-30 owner decision on the starci link removal, task pub1'
+  - id: gate-loosening-d145858bfcc1
+    date: '2026-10-08'
+    ruling: The example apps are analysed on SonarCloud with the runtime's one token and the local self-hosted Sonar solution for the examples is deleted ("xoa giai phap cua local di"); the specs of that removed stack supplier go with it.
+    enforcedBy: [scripts/gates/starcistacks-form.mjs, scripts/hfs/runtime-rules/secret-tracked.mjs]
+  - id: gate-loosening-4c2ebeed9581
+    date: '2026-10-08'
+    ruling: The public runtime repository tracks no secret material, not even ciphertext ("khong muon commit enc cua .claude len"); the seven held .enc members, their allowance and the specs of sealing into ext/sonar are removed.
+    enforcedBy: [scripts/hfs/runtime-rules/secret-tracked.mjs]
+  - id: release-suite-ci
+    date: '2026-10-09'
+    ruling: "The owner's words: add to config.yaml a setting 'full test: none' so the full test is never applied locally and it is pushed to git, letting Codecov handle it, to save time; locally it still runs PARTIAL tests, the tests related to the commit. Recorded as release.suite (local or ci, shipped default local; the value is ci because the suite moves to CI, it does not vanish). Under ci the release cut plans no root suite and no Linux parity row, the pre-push gate accepts a release record without a local npm test row only when the record says suite ci and the checked-out config says ci, and a red CI is fixed forward with the next pre-release. The trade the owner accepts, that a release can reach GitHub and its tag before the suite has run, is stated in docs/releasing.md."
+    enforcedBy: [scripts/guards/release-definition.mjs, scripts/guards/release-suite-mode.mjs, scripts/supervisor/release-ci-rows.mjs, engine/release-config.mjs]
+  - id: acceptance-trace-report-mode
+    date: '2026-10-09'
+    ruling: "The owner delegated the two open gaps of the op judge declarations to the lead (the owner's words, said in Vietnamese in chat: go with your own judgment, asking is not needed; 2026-10-09 ~23:10). Decision: the tests an implementing or verifying op writes must trace to acceptance the maker did not write - the acceptance records (ac.*) of its scope - by the measure acceptance-trace (backend.implement, interface.implement, e2e.verify, integration.verify): every acceptance record is cited by id by at least one test the attempt ran and a test that cites none is not counted toward the proof. For 1.0.0-alpha.9 the measure runs in REPORT mode, because this leg family has never run on a live host: the settle records the result as evidence on the attempt, starci kernel status --full and the debug digest show it, and a miss fails and opens nothing. It becomes enforce after one real workflow run has shown that the record shapes hold."
+    enforcedBy: [scripts/kernel/acceptance-trace.mjs, modules/kernel/op-judges.yaml]
+  - id: business-decide-critic
+    date: '2026-10-09'
+    ruling: "Same delegation (the owner's words, said in Vietnamese in chat: go with your own judgment, asking is not needed; 2026-10-09 ~23:10). business.decide is the first deciding leg after scope and everything downstream builds on it, and its answers are provisional answers to owner-class questions, so it gets the runtime-run independent Critic (single pass, another provider, the same mechanics as scope.define and architecture.decide). This ADDS a gate. test.author declares code.refactor as its next leg where the canonical-workspace chain places it; scope.finish has no owner gate in the policy and stays open; content.generate and perf.verify stay open (outside the two running workflows)."
+    enforcedBy: [modules/kernel/critic.yaml, modules/kernel/critic-rubrics.yaml, scripts/kernel/critic-settle.mjs]
+  - id: gate-loosening-bccaf83fbdc7
+    date: '2026-10-10'
+    ruling: >-
+      The owner's words are "truoc luc tat may thi xoa sach nhung test khong co y nghia nhu fake orca, chap nhan coverage thap hon; giu nhung specs dang giu, va phai giai thich vi sao";
+      the delegation is "theo y tro di, thay cho phep khoi hoi". Under that delegation the lead's completed independent body and replacement review approves exactly the v4 narrowed prune on integration 8da72049bd3c0269c3c17d20aeea448ca2424b9a:
+      71 original-hash-qualified tests (D1 call/stand-in relay, D2 proved replay duplicate, D3 source-text duplicate, D4 empty literal/cardinality proof), recorded in ../../starci-tmp/codex/alpha9-prune-final-v4-candidates.json relative to the lane root.
+      This raw fingerprint binds 55 native findings and the exact candidate diff, before deletion. All twelve reviewed KEEP statements remain whole, including Run selection, parser refusal, Critic cleanup and successful launch recovery;
+      the three export-consequence removals remain Deferred. All changed, new and unreviewed specs, all replay/walk/judge/receipt/cache/owning assertions and the sixteen role-prompt pins remain.
+      Consequences are only unused imports and pure declarations inside the same edited specs and one registry reproducer field pointing to the retained read-attestation replay; production exports, classifier, runtime coverage policy and example coverage are unchanged.
+      There is no approval of unrelated or historical findings and no waiver of a red check. The former shutdown deadline is cancelled.
+    enforcedBy: [scripts/lib/gate-loosening.mjs, scripts/checks/check-gate-loosening.mjs, scripts/supervisor/land-gate-loosening.mjs]
+  - id: purge-deleted-terminal-idempotent
+    date: '2026-10-11'
+    ruling: >-
+      The owner reports that he deleted all Orca terminals and directs, translated from Vietnamese:
+      pruning checks whether the Orca terminal still exists and closes the existing terminals; a terminal that is absent is already deleted, not a cleanup error.
+      Workflow purge acknowledges exact handle absence only from a successful available unscoped terminal inventory, including persisted retry targets.
+      The acknowledgement remains in the public plan and its digest and issues no close or release for the absent target.
+      It proves terminal absence, not physical process exit, and releases no provider capacity by that acknowledgement.
+      Unknown process observations are advisory for deleted terminals; a positively observed process carrying the exact handle still holds destructive cleanup.
+      Existing owned terminals are closed and then verified; failed terminal reads stay unknown, and foreign Dispatch records remain untouched.
+    enforcedBy: [scripts/api/orca/terminal-list.mjs, scripts/machine/workflow-purge-orca.mjs, scripts/machine/workflow-purge-plan.mjs, scripts/machine/workflow-purge-apply.mjs]

@@ -101,7 +101,7 @@ import { WORKER_QUESTION } from './verbs/shared/worker-messages.mjs';
 import { PEER_WAIT, blockingViewOf, leaseCanonOf, openPeerWaits, releaseTypedWaits } from './verbs/shared/peer-waits.mjs';
 import { VerbExit } from './verbs/shared/verb-exit.mjs';
 import { OP_ROLE, callerOf, refuseOpCaller } from '../guards/op-caller.mjs';
-import { callerAdmission, requireAdmittedKernelRead } from './caller-admission.mjs';
+import { callerAdmission, guardedRun, openVerbLedger, receiptLedger, requireAdmittedKernelRead } from './caller-admission.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { releaseSettledSession } from './op-session.mjs';
 import { recordSettledAttemptUsage } from './usage-record.mjs';
@@ -121,7 +121,7 @@ import { squash } from '../lib/clip.mjs';
 import { wakeKernelForTransition } from './wake-delivery.mjs';
 import { FOUNDATION_WAIT, SHELL_FOUNDATION, shellFoundationWaitOf } from './shell-foundation.mjs';
 import {
-  KERNEL_REV_STALE, KERNEL_REV_UNKNOWN, OP_REV_DRIFT, currentRuntimeRev, kernelRevState, opRevDrift, opRevStale, revRootOf,
+  KERNEL_REV_STALE, KERNEL_REV_UNKNOWN, OP_REV_DRIFT, currentRuntimeRev, opRevDrift, opRevHold, revRootOf,
   shortRev,
 } from './runtime-rev.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
@@ -135,7 +135,7 @@ import { QUOTA_FAILURE_KIND, outageSpecsOf, outageInText, outageOnScreen } from 
 import { deferJob, deferralOf as testDeferralOf, ownerSpecs, specsOff } from '../route/spec-deferral.mjs';
 import { admittedVersionOf } from './dispatch-admission.mjs';
 import { baselineWorkInputs, inputDrift } from './input-digests.mjs';
-import { admittedContractOf, latestContractOf } from '../machine/contract-version.mjs';
+import { admittedContractOf, latestContractOf, placedWorktreeOf } from '../machine/contract-version.mjs';
 import { queueSettleMedia } from '../connectors/telegram-media.mjs';
 import { guardLaunch } from '../guards/hook-install.mjs';
 import { attributeRedGate, failingFromText, peerRouteOf } from './gate-attribution.mjs';
@@ -299,7 +299,7 @@ const usage = (code) => {
   coverage --workflow <id>   every FR, shape and proof case of the workflow's scope with its evidence: proven|stale|missing
   verify-proofs --workflow <id>   re-hash every indexed proof file and walk the events digest chain; exit 1 on tampering
   plan     --workflow <id> --file <plan.json>
-  enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--what <short name>] [--risk <r>] [--retry-of <job>] [--reopen <reason>] [--derived-from <jobs>]
+  enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--what <short name>] [--risk <r>] [--retry-of <job> [--switch-agent]] [--reopen <reason>] [--derived-from <jobs>]
            [--repository <repo-id>] [--params '<json>'] [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
            [--new-module <repository-relative dir>,...]   the grant creates these module roots (else every granted directory must already exist)
   estimate --files <n> [--assertions <n>] [--components <n>] [--records <n>]
@@ -389,10 +389,10 @@ const parseArgs = (argv) => {
   return a;
 };
 const need = (cond, msg) => { if (!cond) { console.error(`api: ${msg}`); usage(2); } };
-const openRepoLedger = (repo) => {
+const openRepoLedger = (repo, spec = {}, args = {}) => {
   const file = ledgerFileFor(repo); // throws ledger-root-is-runtime on a runtime root — deliberate
   if (!fs.existsSync(file)) throw Object.assign(new Error(`ledger-missing: ${file} — no .starciwork/runtime.sqlite at that repo`), { code: 'ledger-missing' });
-  return openLedger({ file });
+  return openVerbLedger(spec, file, { openWritable: (target) => openLedger({ file: target }), args });
 };
 
 const emit = (out, human, asJson) => {
@@ -1159,8 +1159,8 @@ function recordOpRevDrift(ledger, job) {
 }
 
 /** The nextActions step a stale Kernel runs first: re-read what changed, then ack the current rev. */
-const rereadActionOf = (rev, workflowId) => ({ kind: 'reread', rev: rev.current, acked: rev.acked, files: rev.full ? ['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml'] : rev.files,
-  reason: `the runtime moved from the rev you acked (${shortRev(rev.acked)}) to ${shortRev(rev.current)}: re-read ${rev.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : rev.files.join(', ')}, then starci kernel kernel-ack-rev --workflow ${workflowId} --plan and submit the complete READ manifest with --rev ${rev.current} --read-manifest <file>; until then enqueue/dispatch of a leg whose op contract changed is refused ${KERNEL_REV_STALE}` });
+const rereadActionOf = (notice, workflowId) => ({ kind: 'reread', origin: 'rev-reread', rev: notice.to, acked: notice.from, files: notice.files,
+  reason: `the runtime moved from the rev you settled (${shortRev(notice.from)}) to ${shortRev(notice.to)}: re-read ${notice.files.join(', ')}, then starci kernel kernel-ack-rev --workflow ${workflowId} --plan and attest with --rev ${notice.to} --digest <readToken>; until then enqueue/dispatch of a leg whose op contract changed is refused ${KERNEL_REV_STALE}` });
 /**
  * The RUNNING legs whose op contract moved on the runtime since their dispatch (op-rev-drift before settle): the
  * worker still runs its brief, is judged by its admission, and hears it on its next nudge. [{jobId, op, attempt, from,
@@ -1185,19 +1185,18 @@ const opRevDriftOf = (db, workflowId, limit = 5) => db.prepare('SELECT entity_id
 
 /**
  * enqueue/dispatch refuse kernel-rev-stale for a leg whose current op contract
- * changed between the runtime rev the Kernel acked and the current one (runtime-rev.mjs opRevStale). Other
+ * changed between the runtime rev the Kernel acked and the current one (runtime-rev.mjs opRevHold). Other
  * legs, a Kernel that never acked (booted before this gate) and an unreadable rev pass.
  */
 function refuseStaleKernelRev(db, workflowId, op, verb) {
   requireAdmittedKernelRead(db, workflowId, op);
   const root = revRootOf();
-  let state = null;
-  try { state = kernelRevState(db, workflowId, { root, ops: [op] }); } catch (error) { throw Object.assign(new Error(`runtime READ comparison unavailable: ${error.message}`), { code: KERNEL_REV_UNKNOWN }); }
-  const hit = opRevStale(state, op, { root });
+  let hit = null;
+  try { hit = opRevHold(db, workflowId, op, { root }); } catch (error) { throw Object.assign(new Error(`runtime READ comparison unavailable: ${error.message}`), { code: KERNEL_REV_UNKNOWN }); }
   if (!hit) return;
   const what = hit.files.join(', ');
-  throw Object.assign(new Error(`${KERNEL_REV_STALE}: ${verb} of ${op} refused - its op contract changed between the runtime rev you acked (${shortRev(state.acked)}) and the current one (${shortRev(state.current)}): ${what}. Re-read ${state.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : state.files.join(', ')}, then starci kernel kernel-ack-rev --workflow ${workflowId} --plan and attest its complete manifest with --rev ${state.current} --read-manifest <file>, then ${verb} again (starci kernel status kernelRev)`),
-    { code: KERNEL_REV_STALE, op, acked: state.acked, current: state.current, files: hit.files });
+  throw Object.assign(new Error(`${KERNEL_REV_STALE}: ${verb} of ${op} refused - its op contract changed between the runtime rev you acked (${shortRev(hit.acked)}) and the current one (${shortRev(hit.current)}): ${what}. Re-read ${hit.files.join(', ')}, then starci kernel kernel-ack-rev --workflow ${workflowId} --plan and attest with --rev ${hit.current} --digest <readToken>, then ${verb} again (starci kernel status revisionNotice)`),
+    { code: KERNEL_REV_STALE, op, acked: hit.acked, current: hit.current, files: hit.files });
 }
 
 /**
@@ -1250,15 +1249,15 @@ function seamActionsOf(set) {
   if (!view) return [];
   const actions = [];
   for (const item of view.reconcile?.owed ?? []) {
-    actions.push({ kind: 'impact-check', op: set.op, jobId: item.jobId, cutId: set.id, seamDuty: 'reconcile',
+    actions.push({ kind: 'impact-check', origin: 'seam-reconcile', op: set.op, jobId: item.jobId, cutId: set.id, seamDuty: 'reconcile',
       reason: `cut ${set.id} seam ${view.jobId} landed after ordinal ${item.ordinal} (${item.jobId}) passed on a stub (${item.mode}): re-verify it against the real seam - rerun its scoped checks (typecheck/build and its slice tests) and record starci kernel cut-seam --reconcile --job ${item.jobId} --exit-code <n> --command "<cmd>"; a light re-check, not a redo` });
   }
   for (const item of view.reconcile?.red ?? []) {
-    actions.push({ kind: 'retry', op: set.op, jobId: item.jobId, cutId: set.id, seamDuty: 'reconcile-red',
+    actions.push({ kind: 'retry', origin: 'seam-reconcile-red', op: set.op, jobId: item.jobId, cutId: set.id, seamDuty: 'reconcile-red',
       reason: `ordinal ${item.ordinal} (${item.jobId}) does not reconcile with the landed seam (${SEAM_RECONCILE_CHECK} red): starci kernel enqueue --op ${set.op} with its paths --cut-id ${set.id} --cut-ordinal ${item.ordinal} --cut-total ${set.total} --retry-of ${item.jobId} (that ordinal only)` });
   }
   if (view.recutPlan) {
-    actions.push({ kind: 'retry', op: set.op, jobId: view.jobId, cutId: set.id, seamDuty: 'recut',
+    actions.push({ kind: 'retry', origin: 'seam-recut', op: set.op, jobId: view.jobId, cutId: set.id, seamDuty: 'recut',
       reason: `cut ${set.id} seam ${view.jobId} slipped (${view.failures} failed attempt(s), now ${view.status}); its siblings already run on a stub - re-cut the seam smaller: ${view.recutPlan.steps.join('; ')}` });
   }
   return actions;
@@ -1631,8 +1630,8 @@ const screenTailOf = (screen) => {
   return rows.length ? rows.join('\n').slice(-1500) : null;
 };
 // The one human-readable line of a refused launch (op attempt settle_json.message, the UI): what step refused it and why.
-const dispatchRejectedMessage = ({ step, signal = null, error = null }) =>
-  'dispatch rejected at ' + (step ?? 'launch') + (signal ? ' (' + signal + ')' : '') + (error ? ': ' + String(error).slice(0, 300) : '') + '; no try spent, the job goes back to ready';
+const dispatchRejectedMessage = ({ step, signal = null, error = null, admission = null }) =>
+  'dispatch rejected at ' + (step ?? 'launch') + (signal ? ' (' + signal + ')' : '') + (error ? ': ' + String(error).slice(0, 300) : '') + (admission ? ' (' + admission.line + ')' : '') + '; no try spent, the job goes back to ready';
 /** The provider circuit a refused launch opens, or null: an outage circuit, the auth circuit, or a strike when the host refused a launch path without saying why. */
 const rejectionCircuit = (db, { outageFailure, authFailure, providerHealthEvidence, model, jobId, step, signal, error, now, credential }) => {
   if (outageFailure) {
@@ -1694,7 +1693,7 @@ const recordRejectionCause = (ledger, { job, op, jobId, attemptId, now, provider
 const rejectDispatch = (ledger, job, jobId, op, model, {
   step, signal = null, error = null, terminal = null, incident = false, attemptId = null,
   effectState = 'none', details = null, providerHealthEvidence = null,
-  settled = null, trust = null,
+  settled = null, trust = null, admission = null,
 }) => {
   // A provider whose card declares an outage key: its outage codes in the failure text, or its outage
   // error row on the refused terminal's screen, open that outage circuit (not the auth one).
@@ -1732,8 +1731,8 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
     const result = {
       reason: 'dispatch-rejected', step, signal, detail: error, provider: model.provider,
       effectState, attemptConsumed: false, retryable: reusable, providerHealth, at: now,
-      message: dispatchRejectedMessage({ step, signal, error }),
-      terminalClosed, ...(closed ? { closed } : {}),
+      message: dispatchRejectedMessage({ step, signal, error, admission }),
+      terminalClosed, ...(closed ? { closed } : {}), ...(admission ? { admission } : {}),
     };
     const db = ledger.db, current = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId)?.status;
     requeueRejectedJob(db, { reusable, jobId, step, now, priorPayload, current, terminal });
@@ -1748,7 +1747,7 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
       payload: { op, step, signal, error, provider: model.provider, model: model.target, terminal,
         effectState, attemptConsumed: false, retryable: reusable, leasesReleased, providerHealth,
         terminalClosed, ...(closed ? { closed } : {}), ...(attemptId != null ? { attemptId } : {}),
-        ...(trust ? { trust } : {}),
+        ...(trust ? { trust } : {}), ...(admission ? { admission } : {}),
         ...(screenTailOf(details?.screen) ? { screenTail: screenTailOf(details.screen) } : {}) },
     });
     recordRejectionCause(ledger, { job, op, jobId, attemptId, now, providerHealth, incident, authFailure, outageFailure, model, signal, error });
@@ -2681,7 +2680,7 @@ const supervisorCapStep = (c, route, s, { autopilot, blocker, evidence }) => {
   const detail = route.to?.needUser
     ? `${op} ${job.job_id}: route ${route.id} (${blocker ?? 'needUser'}) cannot run on its own - a runtime/environment issue for the Supervisor (autopilot); fix it (land to .claude) or decide the retry, then resolve --by supervisor`
     : `${op} ${job.job_id}: route ${route.id} already fired ${fired} of ${limit} times for this node group - a runtime/process issue for the Supervisor (autopilot, gate ${autopilot.gates + 1} of ${autopilot.budget}): read the attempts' reports, fix the root cause (land to .claude) or route the fix to the op that owns it, then resolve --by supervisor and the Kernel retries`;
-  const incidentId = openSupervisorGate(ledger, { workflowId: job.workflow_id, opId: op, holds: [job.job_id], detail, evidence, route: route.id, workaround: { cause: 'retry-cap', noWorkaround: 'retry-cap-spent' } });
+  const incidentId = openSupervisorGate(ledger, { workflowId: job.workflow_id, opId: op, holds: [job.job_id], detail, evidence, route: route.id, workaround: blocker === 'environment' ? { cause: 'host-not-ready', noWorkaround: 'not-provisioned-by-runtime' } : { cause: 'retry-cap', noWorkaround: 'retry-cap-spent' } });
   return record({ kind: SUPERVISOR_GATE, route: route.id, limit, firing: fired, incidentId, reason: detail });
 };
 /** Under the autopilot a spent retry cap is the Supervisor's (supervisor-gate, within supervisorExtraBudget gates per node group), then deferred to the final review; null without the autopilot. */
@@ -3277,8 +3276,8 @@ function reconcileOrphanKernelJobs(ledger, args) {
 // A job's owned paths resolved per target repository, against the dispatch
 // contract's worktree (where the worker was placed) when it recorded one.
 const contractWorktreeOf = (db, job, repo) => {
-  const context = parseJson(latestContractOf(db, job.job_id)?.context_json);
-  return typeof context?.worktree === 'string' ? path.resolve(repo, context.worktree) : null;
+  const placed = placedWorktreeOf(db, latestContractOf(db, job.job_id));
+  return placed ? path.resolve(repo, placed) : null;
 };
 function jobPlacements(db, job, repo) {
   const op = jobOpOf(job), payload = jobPayloadOf(job);
@@ -3346,7 +3345,7 @@ function settleSonarGate(db, jobId, repo) {
   const judgment = judgeJob({ op: s.op, files });
   return judgment ? { ...judgment, workflowId: s.job.workflow_id, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
 }
-const { settleOpGate, settleOpProofs } = mechanismGates({ skillRoot, settleJobContext, settleJobFiles, jobPlacements, opGateBasesOf });
+const { settleOpGate, settleOpProofs, settleCriticVerdict, settleAcceptanceTrace } = mechanismGates({ skillRoot, settleJobContext, settleJobFiles, jobPlacements, opGateBasesOf });
 // The draw acceptance an interface.draw pass owes (scripts/work/draw/draw-acceptance.mjs): every asset the pass binds -
 // written, adopted, inherited or already there - is a token-rendered shape, no drawing names a data status, and the pass
 // drew something under the current contract (a product's op-interface.draw-7c2821e002 adopted 40 image-gen files unchanged).
@@ -3668,7 +3667,7 @@ const API_INTERNALS = Object.freeze({
   heldSettleText, nextActionLabel, opRevDriftOf, poolLoadOf, queuedBecauseOf, recordDependencies,
   renewLiveWorkerLeases, rereadActionOf, seamActionsOf, staleLabel, statusWorkerRowsOf, typedLogWarningsOf,
   prefetchStatusOrcaReads, withStatusSpawnMemo, setStatusAsk: (value) => { statusAsk = value; },
-  refuseSettleBacklog, operationTerminalHandleOf, jobPayloadOf,
+  refuseSettleBacklog, operationTerminalHandleOf, jobPayloadOf, settleCriticVerdict, settleAcceptanceTrace,
   releaseTypedWaits, openPeerWaits, PEER_WAIT,
   goalJsonOf, latestGoal, csvList,
   lineageRouteAdjust, accountList, probeQuotaSafe,
@@ -3688,22 +3687,22 @@ const runExtensionVerb = async (spec, args, repo) => {
   if (typeof spec.validate === 'function') spec.validate(args, need);
   if (spec.ledger === false) return await spec.run({ ledger: null, args, repo, emit, need, caller: null, ext: API_EXT, internals: API_INTERNALS });
   let ledger;
-  try { ledger = openRepoLedger(repo); } catch (error) {
+  try { ledger = openRepoLedger(repo, spec, args); } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) }));
     process.exitCode = 1; return;
   }
   const caller = callerOf(ledger.db, process.env, { file: ledger.path });
-  if (caller.role === OP_ROLE && spec.kernelOnly) {
-    refuseOpCaller(ledger, { cmd: spec.verb, caller, code: 'op-context-refused',
+  if (caller.role === OP_ROLE && spec.kernelOnly && !spec.opCan?.(args)) {
+    refuseOpCaller(receiptLedger(ledger, openLedger), { cmd: spec.verb, caller, code: 'op-context-refused',
       detail: `'${spec.verb}' is a kernel verb and this caller is operation ${caller.jobId ?? '(unbound)'} (${caller.via}); an op files its own starci kernel report and nothing else` });
   }
   if (caller.role === OP_ROLE && spec.jobOwnerOnly && caller.jobId !== args.job) {
-    refuseOpCaller(ledger, { cmd: spec.verb, caller, code: 'report-identity-mismatch',
+    refuseOpCaller(receiptLedger(ledger, openLedger), { cmd: spec.verb, caller, code: 'report-identity-mismatch',
       detail: `operation ${caller.jobId ?? '(unbound)'} (${caller.via}) may file a report only for its own job, not ${args.job}` });
   }
   try {
-    const admitted = callerAdmission(ledger, args, { caller });
-    return await admitted.run(() => spec.run({ ledger, args, repo, emit, need, caller: admitted.caller, ext: API_EXT, internals: API_INTERNALS }));
+    const admitted = callerAdmission(ledger, args, { caller, verb: spec.verb });
+    return await admitted.run(() => guardedRun(ledger, () => spec.run({ ledger, args, repo, emit, need, caller: admitted.caller, ext: API_EXT, internals: API_INTERNALS })));
   } catch (error) {
     if (!(error instanceof VerbExit)) console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));
     process.exitCode = error instanceof VerbExit ? error.exitCode : 1;

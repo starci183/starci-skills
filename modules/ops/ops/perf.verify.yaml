@@ -158,6 +158,11 @@ proofs:
     requirement:
       en: The run changed no product source, no shared target and no expectation; run-owned load and data
         are disposed, and anything left is recorded with a resumable command.
+judge:
+  - by: machine
+    measures: [declared-checks]
+    proofs: [binding]
+    why: "the settler re-runs the record validators; the measurements are observations of the running product taken by the op and are not re-measured by the runtime (registry entry op-judge-substance-unjudged)"
 blockers:
   - code: METRIC_UNDEFINED
     condition:

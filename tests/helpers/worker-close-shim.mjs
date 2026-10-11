@@ -13,7 +13,7 @@ export function closeWorker({ dispatch, handle = null, stopFirst = false, retryR
   return realCloseWorker({ dispatch, handle: terminal, stopFirst, retryRelease, env, deps: {
     tableOf: () => { if (++reads > 1 && !env.STARCI_FAKE_CLOSURE_UNPROVEN) table = []; return table; },
     // Environment rows describe the same live census; old tags cannot invent an uncaptured process after closure.
-    envOf: () => table.map(row => ({ pid: row.pid, values: { ORCA_TERMINAL_HANDLE: terminal } })),
+    envOf: () => table.map(row => ({ pid: row.pid, readable: true, values: { ORCA_TERMINAL_HANDLE: terminal } })),
     capture: pid => ({ schema: 'starci/owned-process@1', pid, ok: true, outcome: 'captured', proof: 'process-handle-live', identity }),
     stopProcess: () => ({ ok: false, outcome: 'unknown' }), sleep: () => {}, verifyMs: 0, stopVerifyMs: 0,
     ...deps,

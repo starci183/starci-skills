@@ -8,8 +8,8 @@ import { fileURLToPath } from "node:url"
  * The browser journey's stack: `up` provisions the dev environment once (ephemeral Keycloak/MinIO env the
  * compose services read, the infra containers, `cli migrate run`, the seeds, then the identity and order apis
  * on the host at the projected ports) so `npm run test:browser` has a real product to drive; `down` stops the
- * apis and the compose project. The sealed `secrets/*.enc` are never read - a browser run owns its stack, so
- * every value it needs is generated fresh for the run and written to the gitignored `runtime/env/` folder.
+ * apis and the compose project. A browser run owns its stack, so every secret value it needs is generated fresh
+ * for the run and handed to Compose and to the apis through the environment; no file holds it.
  *
  * The example runs it dispatch-only in CI (the `browser` job of the root examples workflow); a developer may
  * run it the same way to prove a journey locally. The app build (`npm run build:be`) must exist first: the
@@ -23,7 +23,6 @@ const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const STACK_DIR = path.join(APP_ROOT, ".starcistacks", "dev")
 const COMPOSE_FILE = path.join(STACK_DIR, "infra", "compose", "compose.yaml")
 const METADATA_FILE = path.join(STACK_DIR, "infra", "metadata.json")
-const ENV_DIR = path.join(STACK_DIR, "runtime", "env")
 const LOG_DIR = path.join(STACK_DIR, "runtime", "browser-logs")
 const STATE_FILE = path.join(STACK_DIR, "runtime", "browser-stack.json")
 
@@ -66,7 +65,10 @@ const run = (label, command, args, options = {}) => {
     return result.stdout ?? ""
 }
 
-const compose = (...args) => run("compose", "docker", ["compose", "-f", COMPOSE_FILE, ...args])
+/** The environment the compose calls interpolate: the process environment plus, once `up` generated them, the run's secrets. */
+let composeEnv = process.env
+
+const compose = (...args) => run("compose", "docker", ["compose", "-f", COMPOSE_FILE, ...args], { env: composeEnv })
 
 /** Polls `probe` until it answers true or the deadline passes (message names what was being waited on). */
 const waitFor = async (label, probe, timeoutMs = 180_000) => {
@@ -93,25 +95,23 @@ const composeExecOk = (...args) =>
         .status === 0
 
 /**
- * The gitignored env files the compose services read: fresh random values every `up`, never the sealed demo
- * secrets. The Keycloak realm import substitutes KEYCLOAK_ADMIN_CLIENT_SECRET into the identity-admin client,
- * so the same generated value is also handed to the identity api below - the pair is self-consistent per run.
+ * The secrets of this run: fresh random values every `up`, handed to the compose services through the environment their
+ * compose files interpolate (whose tracked defaults are the DEMO-ONLY values). The Keycloak realm import substitutes
+ * KEYCLOAK_ADMIN_CLIENT_SECRET into the identity-admin client, so the same generated value is also handed to the
+ * identity api below - the pair is self-consistent per run.
  */
-const writeEphemeralEnv = () => {
-    fs.mkdirSync(ENV_DIR, { recursive: true })
+const generateSecrets = () => {
     const values = {
         keycloakAdminPassword: crypto.randomBytes(24).toString("hex"),
         keycloakAdminClientSecret: crypto.randomBytes(24).toString("hex"),
         minioRootPassword: crypto.randomBytes(24).toString("hex"),
     }
-    fs.writeFileSync(
-        path.join(ENV_DIR, "keycloak.env"),
-        `KC_BOOTSTRAP_ADMIN_PASSWORD=${values.keycloakAdminPassword}\nKEYCLOAK_ADMIN_CLIENT_SECRET=${values.keycloakAdminClientSecret}\n`,
-        { mode: 0o600 },
-    )
-    fs.writeFileSync(path.join(ENV_DIR, "minio.env"), `MINIO_ROOT_PASSWORD=${values.minioRootPassword}\n`, {
-        mode: 0o600,
-    })
+    composeEnv = {
+        ...process.env,
+        KC_BOOTSTRAP_ADMIN_PASSWORD: values.keycloakAdminPassword,
+        KEYCLOAK_ADMIN_CLIENT_SECRET: values.keycloakAdminClientSecret,
+        MINIO_ROOT_PASSWORD: values.minioRootPassword,
+    }
     return values
 }
 
@@ -171,8 +171,8 @@ const up = async () => {
         fail(
             `${path.relative(APP_ROOT, STATE_FILE)} exists: the stack is already up (run \`node browser/stack.mjs down\` first)`,
         )
-    const secrets = writeEphemeralEnv()
-    log("ephemeral env written under .starcistacks/dev/runtime/env (never the sealed secrets)")
+    const secrets = generateSecrets()
+    log("secrets generated for this run (environment only, no file)")
     compose("up", "-d", "postgres", "redis", "keycloak", "minio", "kafka")
 
     await waitFor("postgres", () => composeExecOk("postgres", "pg_isready", "-U", "postgres"))

@@ -3,6 +3,9 @@
 
 const COLOUR_REGEX=Object.freeze({percent:new RegExp(['^[-+]?',String.raw`\d*`,String.raw`\.?`,String.raw`\d+%$`].join('')),number:new RegExp(['^[-+]?',String.raw`\d*`,String.raw`\.?`,String.raw`\d+`,String.raw`(?:e[-+]?\d+)?$`].join(''),'i'),important:new RegExp([String.raw`\s*`,'!important$'].join(''),'i'),call:new RegExp(['^(oklch|rgba?)',String.raw`\(`,String.raw`\s*`,'([^)]*)',String.raw`\)$`].join(''),'i')});
 
+/** A brand token matches its source within half a unit of the x100 OKLab distance: below perception, wide enough for hex/oklch rounding. */
+export const TOKEN_TOLERANCE=0.5;
+
 /** `value` without a trailing `!important`. */
 export const stripImportant=value=>value.replace(COLOUR_REGEX.important,'');
 

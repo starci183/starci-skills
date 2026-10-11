@@ -74,7 +74,7 @@ const finding=(result,token='--starci-surface-tertiary')=>result.evidence.tokens
 
 test('the stages are decide and verify, with the op names as aliases and nothing else',()=>{
   assert.deepEqual([...BRAND_STAGES],['decide','verify']);
-  assert.deepEqual([...TOKEN_PASS_STATUSES],['match','planned-from-reference']);
+  assert.deepEqual([...TOKEN_PASS_STATUSES],['match','planned-from-reference','planned-from-ruling']);
   assert.equal(brandStage(undefined),'decide');
   assert.equal(brandStage('brand.decide'),'decide');
   assert.equal(brandStage('review.verify'),'verify');

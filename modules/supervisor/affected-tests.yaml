@@ -1,0 +1,21 @@
+# starci test affected: the set of specs one everyday verification runs. The set is never refused for its size: a set above maxFiles is announced as large and run
+# in parallel shards (the suite runner's own concurrency, test-concurrency.yaml) inside budgetMs; the files not started when the budget ends are listed, not hidden.
+# The land gate's own smoke bound (SMOKE_LIMIT) is separate.
+maxFiles: 120
+# The hard time budget of one --run, in milliseconds, printed before the first file starts.
+budgetMs: 2400000
+# The trees of shared data: a changed file below one is looked up in the runtime modules that read it, and the specs behind those readers join the set.
+dataRoots: [modules, knowledge]
+# The caller chain a changed symbol is followed through (importer of importer ...) before the walk falls back to the file-level rule at the module it stopped at.
+symbolDepth: 4
+# Generated outputs: a change to one selects the specs of its generator (affected-data.mjs), not every importer of every reader. `output` ending in / covers a directory.
+generated:
+  - {output: docs/cli.md, generator: scripts/cli/gen-catalog.mjs}
+  - {output: packages/cli/completions/, generator: scripts/cli/gen-catalog.mjs}
+# Entry modules a symbol reaches only through a module-level statement and whose specs are the verb-level rule's (land-cli-specs.mjs): the CLI bin runs whichever verb it is
+# given, so a change reaching it selects the specs that run the verbs whose handlers the change reaches, not every spec that starts the bin.
+verbCovered: [packages/cli/bin/starci.mjs, packages/cli/src/package-entry.spec.mjs]
+# The per-spec result cache (spec-cache*.mjs): a spec whose key - its import closure, the data it names, the runner - is unchanged since a green run is reused, and the receipt counts it as `reused`.
+# A record unused for keepDays is removed. `--no-cache` runs every file.
+specCache:
+  keepDays: 30

@@ -28,7 +28,32 @@ function chainLines(doc, role) {
 /** The token budget line of a role that declares one. */
 function budgetLines(role) {
   const b = role.tokenBudget;
-  return b ? [`- Token budget (${b.status}): ${b.perAttempt.default} per attempt; over it, ${b.onExceed}.`] : [];
+  const wake = role.wakeBudget;
+  if (b) return [`- Token budget (${b.status}): ${b.perAttempt.default} per ${b.unit ?? 'attempt'}; over it, ${b.onExceed}.`];
+  if (wake) {
+    const boot = wake.perBoot ? `, ${wake.perBoot.turns} turns and ${wake.perBoot.tokens} tokens for its boot (the contract files and the rev-ack manifest)` : '';
+    return [`- Wake budget (${wake.status}): ${wake.perWake.turns} turns and ${wake.perWake.tokens} tokens per wake${boot}; over it, ${wake.onExceed}.`];
+  }
+  return role.noBudget ? [`- No budget: ${role.noBudget}.`] : [];
+}
+
+/** The line that states how a role learns that the runtime tree changed (its revisionAck declaration). */
+function revisionLines(role) {
+  const decl = role.revisionAck;
+  if (!decl) return [];
+  if (decl.noAck) return [`- Runtime changes: ${decl.noAck}.`];
+  if (decl.admission) return [`- Runtime changes: ${decl.reason}.`];
+  return [`- Runtime changes (modules/kernel/revision-scope.yaml): woken once with exactly the changed files that concern it, it reads them and attests with ${decl.verb}; a change that concerns it nothing costs it nothing; it is replaced by a fresh seat, at its next yield, only when a rule of its contract was removed or reversed or its boot prompt changed.`];
+}
+
+/** The guard binding, the happy errors and the bug surface of a role that declares them (the owner's two classes of error). */
+function standardLines(role) {
+  const unbound = role.noSeat ? [`- Guard: none by design; ${role.noSeatReason}.`] : [];
+  const guard = role.guard ? [`- Guard: its terminals are bound as the "${role.guard.role}" role of modules/kernel/command-policy.yaml.`] : unbound;
+  const happy = role.happyErrors?.map((error) => `${error.id} (policy row ${error.row}): ${error.what}`);
+  const bugs = role.bugSurface?.map((entry) => `${entry.bug}: ${entry.signal}`);
+  return [...guard, ...bullets('Happy errors it handles (the system working as designed, handled inside the chain through the policy)', happy),
+    ...bullets('A bug in this role (the chain neither fixes nor works around it; Debug removes it with a change to .claude) is detected by', bugs)];
 }
 
 /** The Debug lines that state whom it audits and when it retires. */
@@ -42,7 +67,7 @@ function debugLines(doc, role) {
 export function renderRoleBlock(doc, id) {
   const role = doc.roles.find((entry) => entry.id === id);
   const lines = [`**${role.label}** (${ROLES_FILE}#${id}): ${role.scope}`, ...bullets('Does', role.does), ...bullets('Must clean up', role.cleanup),
-    ...bullets('Never', role.never), ...chainLines(doc, role), ...budgetLines(role), ...debugLines(doc, role), `- Principles: ${role.binds.join(' ')} (${ROLES_FILE}, principles).`];
+    ...bullets('Never', role.never), ...chainLines(doc, role), ...budgetLines(role), ...revisionLines(role), ...standardLines(role), ...debugLines(doc, role), `- Principles: ${role.binds.join(' ')} (${ROLES_FILE}, principles).`];
   return lines.join('\n');
 }
 

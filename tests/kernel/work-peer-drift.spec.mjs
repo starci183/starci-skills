@@ -226,8 +226,11 @@ test('a breaking change binds only when its owner makes it: ONE targeted follow-
 
   w.engage(S);
   const st=w.status(S);
-  assert.equal(st.frontier.actionable,true);
-  assert.match(st.frontier.reason,/declared its committed change breaking; enqueue ONE follow-up leg for each/);
+  // stale-ready is a mechanical item the Job controller moves (modules/kernel/kernel-menu.yaml): the Kernel's menu holds nothing, so the frontier is not actionable; its reason still names each follow-up.
+  assert.equal(st.frontier.actionable,false);
+  assert.deepEqual(st.menu,[]);
+  assert.match(st.frontier.reason,/declared its committed change breaking; the Job controller enqueues ONE follow-up leg for each/);
+  assert.doesNotMatch(st.frontier.reason,/before yielding/,"a mechanical origin is performed by the runtime: the reason never tells the Kernel to do it first");
   assert.doesNotMatch(st.frontier.reason,/seam-first\)/);
 
   // The follow-up leg: a new attempt of that op and cut ordinal, settled on the owner's revision.

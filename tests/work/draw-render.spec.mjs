@@ -100,15 +100,23 @@ test('fixture props: "[Function]" marks a no-op action; class candidates come fr
   for (const t of ['flex', 'gap-2', 'w-[calc(100%-1rem)]', 'md:grid']) assert.ok(c.includes(t), t);
 });
 
-test('CLI: usage errors and a missing Playwright exit 2, never 0', async () => {
+test('CLI: usage errors and a host with no usable browser exit 2, never 0', async () => {
   await withTmp(async (dir) => {
     assert.equal(cli(['--out', dir], dir).status, 2);
     const html = path.join(dir, 'x.html');
     fs.writeFileSync(html, '<p>x</p>');
     assert.equal(cli(['--html', path.join(dir, 'absent.html'), '--out', dir, '--viewports', '390x844'], dir).status, 2);
-    const r = cli(['--html', html, '--out', path.join(dir, 'out'), '--viewports', '390x844', '--json'], dir);
+    const bare = fs.mkdtempSync(path.join(dir, 'no-browser-'));
+    const r = spawnSync(process.execPath, [CLI, '--html', html, '--out', path.join(dir, 'out'), '--viewports', '390x844', '--json'], { cwd: dir, encoding: 'utf8', timeout: 180_000, env: { ...process.env, PLAYWRIGHT_BROWSERS_PATH: bare, TMPDIR: bare, TEMP: bare, TMP: bare } });
     assert.equal(r.status, 2, r.stderr);
-    assert.match(JSON.parse(r.stdout).error, /no playwright/);
+    assert.match(JSON.parse(r.stdout).error, /RENDER_TOOL_UNAVAILABLE: (chromium launch failed|no playwright)/);
+  });
+});
+
+test('loadPlaywright: no project install and no runtime install is RENDER_TOOL_UNAVAILABLE; the runtime own install serves a project that has none', async () => {
+  await withTmp(async (dir) => {
+    assert.throws(() => loadPlaywright([dir], { runtime: null }), /RENDER_TOOL_UNAVAILABLE: no playwright install resolvable/);
+    if (PW_DIR) assert.equal(loadPlaywright([dir], { runtime: PW_DIR }).root.startsWith(PW_DIR), true, 'the runtime root is the last candidate');
   });
 });
 

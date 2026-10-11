@@ -193,6 +193,31 @@ ORDER BY l.seq DESC LIMIT 50;
 | How many tokens did the Kernel use today? | `SELECT sum(input_tokens) AS tokens_in, sum(output_tokens) AS tokens_out FROM llm_usage WHERE subject_type = 'kernel-turn' AND at > :day0;` |
 | Where does this id appear? | `SELECT * FROM v_search_ids WHERE id = :id;` (in each database) |
 
+## The digest: the standard, the verdicts and the questions
+
+`starci debug digest` judges every running workflow against the operating standard in
+`modules/reconciler/operating-standard.yaml`: the ordered steps of a workflow, each with the role that acts, what must hold before
+it, the observable state when it is done, the time it may take and the rows that prove it. A step is done, waiting (inside its bound,
+or on a party whose wait is the design) or overdue; the first overdue step is the workflow's first departure and its actor owes the
+next move.
+
+Two classes of stop exist, and only two. A happy error is the system working as designed and meeting a stop: an op asked a question,
+a quota ran out and the next agent takes over, a check is red because the work is not good yet. The roles handle it inside the chain
+through the declared policy, and the digest only counts it. A BUG is a role or the runtime not doing what its contract says. The
+digest prints one verdict per role: the Supervisor, each Kernel, each Op attempt, the Critic runs and the Runtime. A verdict is no
+error, happy error (counted), or BUG with the broken duty, the evidence and the state of the remedy in
+`modules/reconciler/edge-cases.yaml`. Only a BUG is a problem line. A role the stores hold nothing for is unobserved and names the
+signal it needs.
+
+`modules/reconciler/debug-questions.yaml` declares the questions Debug asks, grouped by edge-case family. Each is answerable today by
+a check of the digest, or is a documented gap with the signal it needs. `starci debug digest --questions` lists every question with
+its answer or its missing signal. The digest also prints the standing of the debug role against its end condition.
+
+Three signals feed it: the `reconciler.boot` row the engine writes at every start (boot instant, uptime, boot id), the `checkedIn`
+list on the `op-settled` event (the directory, commit and tree of every check that ran), and the `ledger-written-outside-seat` event
+that marks a ledger write by a person at a shell. A verb the runtime itself runs carries a marker (`STARCI_ACTOR`, `STARCI_CALLER` or
+`STARCI_API_CHILD`) and is never counted as a person.
+
 ## Habits
 
 - Read `v_blocking` before anything else; it names who has to act.
@@ -212,8 +237,8 @@ Every failed, blocked, refused, requeued or waiting attempt has a plain-language
 <!-- roles:begin debug -->
 **Debug** (modules/kernel/roles.yaml#debug): The owner's eyes: a loop of the owner's chat for a limited stabilisation period, not part of steady-state operation.
 - Does:
-  - Audits whether each of the four roles above and the runtime floor did its job, each tick, through the digest: per op its attempt, report, evidence and hold; per Critic that it ran, on another provider, saw only the product, and had its verdict used; per Kernel seat that it is alive, acked the runtime revision, acts on ready work and takes the policy steps; per Supervisor seat that it is alive and answers gates inside their bound. Each stuck thing is a correct error or a departure of exactly one role.
-  - For every departure records a finding (role, broken duty, evidence, remedy) and changes .claude at once so the role cannot repeat it: the contract block or generated prompt, a policy-table rule, a gate or guard refusal, or a runtime fix with a spec, carried onto the host. Records the case in the edge-case registry in the same change.
+  - Audits whether each of the four roles above and the runtime floor did its job, each tick, through the digest: per op its attempt, report, evidence and hold; per Critic that it ran, on another provider, saw only the product, and had its verdict used; per Kernel seat that it is alive, acked the runtime revision, acts on ready work and takes the policy steps; per Supervisor seat that it is alive and answers gates inside their bound. Each stuck thing is a happy error or a bug of exactly one role; Debug removes bugs only, and happy errors stay with the chain.
+  - For every departure records a finding (role, broken duty, evidence, remedy) and changes .claude at once so the role cannot repeat it: the contract block or generated prompt, a policy-table rule, a gate or guard refusal, or a runtime fix with a spec, carried onto the host. Records the case in the edge-case registry in the same change. A fix of a defect found on a live host is done only when a replay spec built from the sequence that showed it passes (ruling debug-replay-before-done).
   - Owns the edge-case registry, the operating standard and the queue of runtime defects the Supervisor records. A leftover is evidence that its owner failed its cleanup duty; Debug may trigger the existing collector to unblock, and the finding is still the owner's.
   - Reports results to the owner, and retires itself when the stable criteria below hold.
 - Must clean up:
@@ -228,6 +253,17 @@ Every failed, blocked, refused, requeued or waiting attempt has a plain-language
 - Owns: the edge-case registry, the operating standard and the queue of runtime defects. Decides alone: which role failed which duty, which collector to trigger, the fix lanes it opens, and restarting a seat (the owner's authority).
 - Reports to: Owner (a result, or an owner-only action). Overseen by: Owner.
 - Measure: no edge case reaches it twice.
+- No budget: Debug is the owner's chat loop: its turns are the owner's session and no ledger row records them; it is bounded by its time box and its end condition, not by tokens.
+- Runtime changes: Debug is the owner's chat session and reads the tree itself each time it acts; it has no seat the runtime could wake or replace.
+- Guard: none by design; Debug is a loop of the owner's own chat session: it has no seat and no bound terminal, so the guard resolves its caller to the owner; its limits are the never list, the channels it speaks through and the gate-loosening check on what it changes.
+- Happy errors it handles (the system working as designed, handled inside the chain through the policy):
+  - owner-matter (policy row owner-gate): a matter that is the owner's (credentials, spend, a release): Debug reports it to the owner and does not decide it
+  - owner-question (policy row ask-owner): a question only the owner can answer: Debug names it in its result and waits
+- A bug in this role (the chain neither fixes nor works around it; Debug removes it with a change to .claude) is detected by:
+  - a departure of a role stands with no edge-case entry: a departure printed with remedy none in starci debug digest
+  - Debug loosens a gate or check to let a workflow pass: RT_GATE_LOOSENING over the commits since the last release
+  - Debug changes the runtime without recording the case: RT_EDGE_CASE_REGISTRY: a covered entry without its rule and spec
+  - the loop runs on after its end condition holds, or its standing is not printed: the standing against each end-condition criterion in the digest
 - Audits: Op, Critic, Kernel, Supervisor, the runtime.
 - Retires when:
   - clean-workflows: consecutive workflows ran start to handover with zero departures from the operating standard and zero human interventions

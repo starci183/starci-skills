@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, MotionConfig, animate, motion, useInView, useReducedMotion } from 'motion/react';
-import { ChevronRight } from 'lucide-react';
 import type { Concept } from '../concept';
 import { t } from '../../i18n/t';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
+import { Accordion } from '../ui/collapsible';
 
 export const concept: Concept = 'frame';
 
@@ -43,27 +42,36 @@ export function Lift({ children, className, onClick }: Readonly<{ children: Reac
 
 /**
  * "Advanced": secondary/technical details, collapsed by default. Nothing is removed, only demoted.
- * `summary` is a one-line hint of what is inside; height animates open/closed.
+ * Existing consumers mount details only while expanded. `keepMounted` preserves the retained
+ * children of migrated native disclosures; HeroUI owns their hidden state and animation.
  */
-export function Advanced({ children, summary, title = t('Advanced'), defaultOpen = false, className = '', variant = 'inline' }: Readonly<{
-  children: ReactNode; summary?: ReactNode; title?: ReactNode; defaultOpen?: boolean; className?: string; variant?: 'inline' | 'card';
+export function Advanced({ children, summary, title = t('Advanced'), defaultOpen = false, open: controlledOpen, onOpenChange, className = '', variant = 'inline', keepMounted = false }: Readonly<{
+  children: ReactNode; summary?: ReactNode; title?: ReactNode; defaultOpen?: boolean; open?: boolean; onOpenChange?: (open: boolean) => void; className?: string; variant?: 'inline' | 'card'; keepMounted?: boolean;
 }>) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [localOpen, setLocalOpen] = useState(defaultOpen);
+  const open = controlledOpen ?? localOpen;
   const card = variant === 'card';
-  return <Collapsible open={open} onOpenChange={setOpen} className={`ui-advanced ${card ? 'rounded-xl border bg-card' : 'border-t pt-3'} min-w-0 ${className}`} data-advanced={open ? 'open' : 'closed'} data-advanced-variant={variant}>
-    <CollapsibleTrigger asChild><button type="button"
-      className={`flex w-full min-w-0 items-center gap-2 text-left ${card ? 'rounded-xl px-6 py-4 hover:bg-muted/60' : 'text-xs text-muted-foreground hover:text-foreground'}`}>
-      <motion.span animate={{ rotate: open ? 90 : 0 }} transition={{ duration: DURATION.fast, ease: EASE }} className="inline-flex shrink-0"><ChevronRight className="size-3.5" aria-hidden="true" /></motion.span>
-      <span className={`shrink-0 whitespace-nowrap ${card ? 'text-sm font-semibold' : 'font-medium'}`}>{title}</span>
-      {summary ? <span className="min-w-0 truncate text-xs text-muted-foreground">{summary}</span> : null}
-    </button></CollapsibleTrigger>
-    <AnimatePresence initial={false}>
-      {open ? <CollapsibleContent key="body" forceMount asChild><motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-        transition={{ duration: 0.22, ease: EASE }} className="overflow-hidden">
-        <div className={card ? 'px-6 pb-6' : 'pt-3'}>{children}</div>
-      </motion.div></CollapsibleContent> : null}
-    </AnimatePresence>
-  </Collapsible>;
+  return <Accordion hideSeparator variant={card ? 'surface' : 'default'} expandedKeys={open ? ['advanced'] : []} onExpandedChange={(keys) => {
+    const nextOpen = keys.has('advanced');
+    if (controlledOpen === undefined) setLocalOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+  }}
+    className={`ui-advanced min-w-0 ${className}`} data-advanced={open ? 'open' : 'closed'} data-advanced-variant={variant}>
+    <Accordion.Item id="advanced">
+      <Accordion.Heading>
+        <Accordion.Trigger className="w-full min-w-0 gap-2 text-left">
+          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+            <span className={card ? 'min-w-0 text-sm font-semibold' : 'min-w-0 font-medium'}>{title}</span>
+            {summary ? <span className="min-w-0 truncate text-xs text-muted-foreground">{summary}</span> : null}
+          </span>
+          <Accordion.Indicator />
+        </Accordion.Trigger>
+      </Accordion.Heading>
+      <Accordion.Panel>
+        <Accordion.Body className="min-w-0">{open || keepMounted ? children : null}</Accordion.Body>
+      </Accordion.Panel>
+    </Accordion.Item>
+  </Accordion>;
 }
 
 /** Number that counts up to its value when it first scrolls into view (and on change). */

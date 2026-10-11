@@ -11,10 +11,10 @@ resyncMs: 60000
 concurrency: 1
 
 # Service state machine (DESIGN 9.7): healthy -> degraded on one failed probe; degraded -> failed after failAfter
-# consecutive failed probes; failed -> backoff (minMs doubling by factor up to maxMs) -> starting; starting ->
+# consecutive failed probes; failed -> backoff (minMs doubling up to maxMs, the one retry budget) -> starting; starting ->
 # failed when no probe passes within startTimeoutMs; more than maxRestarts restarts within windowMs -> quarantined
 # (a DI service-quarantined for the Supervisor); quarantined -> starting again after retryMs.
-backoff: {minMs: 1000, maxMs: 300000, factor: 2}
+backoff: {minMs: 1000, maxMs: 300000}
 quarantine: {maxRestarts: 5, windowMs: 1800000, retryMs: 3600000}
 
 # One entry per registry service (services.mjs SERVICES). everyMs: the least time between two probes (the
@@ -45,11 +45,14 @@ allowTaskRepair: false
 checkers: []
 
 # Kernel seats (DESIGN 9.4): more than maxReplacementsPerHour replacements -> quarantined + DI seat-unrecoverable;
-# a quarantined seat is left alone for holdMs (or until `services.mjs --reopen <seat>`). A restart the watchdog answers
+# a quarantined seat is left alone for holdMs (or until `starci reconciler reopen <seat>`). A restart the watchdog answers
 # restart-blocked (no sender terminal to launch from: a refusal only a human opening a terminal changes) is tried again
-# once per blockedRetryMs, not every pass.
+# once per blockedRetryMs, not every pass. A Kernel launch that fails again for the same cause (scripts/kernel/start-hold.mjs) waits
+# startRetryMs, doubling to startRetryMaxMs, between attempts; after startSameCauseMax failures of one cause it is held for
+# startHeldRetryMs and the seat is quarantined with one DI seat-unrecoverable that names the cause (hold `kernel-start-held` of
+# modules/kernel/op-incident-policy.yaml).
 seats:
-  kernel: {maxReplacementsPerHour: 3, holdMs: 3600000, timeoutMs: 900000, vacantSlaMs: 180000, inputSlaMs: 60000, gatedSlaMs: 600000, hostOutageSlaMs: 600000, quarantinedSlaMs: 1800000, blockedRetryMs: 300000}
+  kernel: {maxReplacementsPerHour: 3, holdMs: 3600000, timeoutMs: 900000, vacantSlaMs: 180000, inputSlaMs: 60000, gatedSlaMs: 600000, hostOutageSlaMs: 600000, quarantinedSlaMs: 1800000, blockedRetryMs: 300000, startRetryMs: 60000, startRetryMaxMs: 900000, startSameCauseMax: 3, startHeldRetryMs: 3600000}
   supervisor: {timeoutMs: 900000}
 
 # Turn budget (the numbers are modules/models/runtimes.yaml allocation.liveness kernelTurnBudgetMs,
@@ -67,8 +70,8 @@ turnBudget:
 
 # Processes (DESIGN 8.4): every everyMs. An orphan runtime loop (watchdog.mjs / start-workflow.mjs / serve-ask.mjs
 # whose --repo no managed ledger owns and whose workflow no managed ledger runs) older than orphanMinAgeMs is
-# stopped. The footprint scan runs every footprintEveryMs. More Orca terminals than seats + running workers +
-# terminalSlack -> the TERMINAL_COUNT_DRIFT clock.
+# stopped. The footprint scan runs every footprintEveryMs. More runtime-titled Orca tabs ([Kernel], [Op], [Worker], [Supervisor]; the owner's
+# own terminals are not counted) than active workers + terminalSlack -> the TERMINAL_COUNT_DRIFT clock, and the dedupe pass once per terminalDriftSlaMs.
 processes: {everyMs: 60000, orphanMinAgeMs: 1800000, orphanSlaMs: 60000, footprintEveryMs: 600000, terminalSlack: 5, terminalDriftSlaMs: 600000}
 
 # Ledger health (DESIGN 13): PRAGMA quick_check (read-only) every quickCheckEveryMs; nightly (from backupHour local

@@ -399,7 +399,7 @@ export function apiFrontier(repo, workflowId, { timeoutMs = 120_000 } = {}) {
     { cwd: skillRoot, timeout: timeoutMs, env });
   const value = jsonFromStdout(r.stdout);
   if (r.status !== 0 || !value?.ok) return { ok: false, error: clipLine(value?.error ?? r.stderr ?? r.error?.message ?? `exit ${r.status}`, 160) };
-  return { ok: true, frontier: value.frontier ?? {}, workers: value.workers ?? [], phase: value.phase ?? null, kernelRev: value.kernelRev ?? null, nextActions: value.nextActions ?? [], awaitingOwner: value.awaitingOwner ?? [], stuck: Array.isArray(value.stuck) ? value.stuck : [],
+  return { ok: true, frontier: value.frontier ?? {}, workers: value.workers ?? [], phase: value.phase ?? null, revisionNotice: value.revisionNotice ?? null, nextActions: value.nextActions ?? [], awaitingOwner: value.awaitingOwner ?? [], stuck: Array.isArray(value.stuck) ? value.stuck : [],
     progress: value.progress ?? null, rca: value.rca ?? null };
 }
 

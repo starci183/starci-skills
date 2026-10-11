@@ -1,0 +1,85 @@
+{
+ "schema": "replay-fixture@1",
+ "case": "shape-guard",
+ "source": {
+  "copy": "a8live9"
+ },
+ "workflow": {
+  "id": "wf-1",
+  "phase": "running",
+  "goalRevision": 0
+ },
+ "jobs": [
+  {
+   "id": "job-1",
+   "op": "architecture.decide",
+   "status": "succeeded",
+   "owned": [
+    "own-9"
+   ]
+  },
+  {
+   "id": "job-2",
+   "op": "work.author",
+   "status": "failed",
+   "owned": [
+    "own-1"
+   ],
+   "params": {
+    "maxFiles": 12,
+    "maxProofDemands": 8,
+    "componentsTriggeringCut": 3,
+    "gateRounds": 5
+   },
+   "report": {
+    "outcome": "blocked",
+    "blocker": {
+     "kind": "sds-gap"
+    },
+    "cause": "grant-too-narrow"
+   },
+   "result": {
+    "verdict": "blocked",
+    "nextStep": {
+     "kind": "retry",
+     "route": "upstream-lands-first",
+     "counted": false,
+     "upstream": "architecture.decide",
+     "mode": "landed",
+     "jobs": [
+      "job-3"
+     ]
+    }
+   }
+  },
+  {
+   "id": "job-3",
+   "op": "work.author",
+   "status": "queued",
+   "owned": [
+    "own-1"
+   ],
+   "params": {
+    "maxFiles": 12,
+    "maxProofDemands": 8,
+    "componentsTriggeringCut": 3,
+    "gateRounds": 5
+   },
+   "unit": "job-2",
+   "tryNo": 2,
+   "retryOf": "job-2",
+   "after": [
+    "job-1"
+   ],
+   "routed": {
+    "route": "upstream-lands-first",
+    "from": "job-2",
+    "firing": 1,
+    "limit": 1
+   }
+  }
+ ],
+ "live": {
+  "skippedPushes": 82
+ }
+}

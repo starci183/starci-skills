@@ -5,6 +5,8 @@ export const concept: Concept = 'frame';
 
 import { useState, type ReactNode } from 'react';
 import { Check, Copy } from 'lucide-react';
+import { Chip } from '@heroui/react';
+import { Button } from '../ui/button';
 import { t } from '../../i18n/t';
 
 /** Compact number: 12 345 -> 12,3k. */
@@ -27,7 +29,7 @@ export function InfoRow({ label, children }: Readonly<{ label: string; children:
 }
 
 export function InfoChip({ children, tone }: Readonly<{ children: ReactNode; tone?: Tone }>) {
-  return <span data-tone={tone} className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${tone ? 'border-[var(--tone-line)] bg-[var(--tone-bg)] text-[var(--tone)]' : 'border-border bg-muted text-muted-foreground'} ${tone === 'skipped' ? 'border-dashed' : ''}`}>{children}</span>;
+  return <Chip size="sm" variant="soft" data-tone={tone} className={`text-xs ${tone ? 'bg-[var(--tone-bg)] text-[var(--tone)]' : 'text-muted-foreground'} ${tone === 'skipped' ? 'border border-dashed border-[var(--tone-line)]' : ''}`}><Chip.Label>{children}</Chip.Label></Chip>;
 }
 
 /** Mono id with a copy button (copies `copy ?? value`). */
@@ -36,11 +38,11 @@ export function CopyId({ value, copy, title }: Readonly<{ value: string | null |
   if (!value) return <span className="text-muted-foreground">—</span>;
   const full = copy ?? value;
   return <span className="inline-flex max-w-full flex-wrap items-center gap-1.5">
-    <code className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs [overflow-wrap:anywhere]" title={title ?? full}>{value}</code>
-    <button type="button" className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground" title={t('Copy the full value')}
+    <code className="rounded bg-default px-2 py-1 font-mono text-xs [overflow-wrap:anywhere]" title={title ?? full}>{value}</code>
+    <Button variant="outline" size="xs" type="button" title={t('Copy the full value')}
       onClick={() => { void navigator.clipboard?.writeText(full).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); }, () => undefined); }}>
       {copied ? <Check className="size-3" aria-hidden="true" /> : <Copy className="size-3" aria-hidden="true" />}{copied ? t('Copied') : t('Copy')}
-    </button>
+    </Button>
   </span>;
 }
 

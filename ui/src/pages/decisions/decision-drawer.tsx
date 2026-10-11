@@ -1,4 +1,5 @@
 import { ArrowUpRight, Check, Clock3, Star } from 'lucide-react';
+import { Link } from '@heroui/react';
 import { useApiQuery } from '../../api/query';
 import { ConceptBlock, type Concept } from '../../components/concept';
 import { Advanced } from '../../components/motion';
@@ -9,7 +10,6 @@ import type { DecisionRow, Ref, DecisionDetail } from '../../contract';
 import { formatAbsolute } from '../../i18n/vi';
 import { t } from '../../i18n/t';
 import { Badge } from '../../components/ui/badge';
-import { Button } from '../../components/ui/button';
 import { ReadQuality } from '../../components/charts/chart-card';
 
 export const concept: Concept = 'C12';
@@ -23,9 +23,9 @@ const isRef = (item: Evidence): item is Ref => 'href' in item;
 function EvidenceList({ items, credential }: Readonly<{ items: Evidence[]; credential: boolean }>) {
   if (!items.length) return <p className="text-sm text-muted-foreground">{t('No linked evidence yet.')}</p>;
   return <ul className="flex flex-col gap-2">{items.map((item, index) => <li key={`${isRef(item) ? item.href : item.text}-${index}`}>
-    {isRef(item) ? <a href={item.href} className="inline-flex max-w-full items-center gap-1 rounded-md text-sm font-medium text-primary underline-offset-4 hover:underline">
-      <span className="truncate">{item.kind} · {item.id}</span><ArrowUpRight className="size-3.5 shrink-0" aria-hidden="true" />
-    </a> : <span className="text-sm text-muted-foreground">{credential ? t('Credential details are hidden.') : item.text}</span>}
+    {isRef(item) ? <Link href={item.href} className="max-w-full items-start gap-1 text-sm font-medium">
+      <span className="min-w-0 break-all">{item.kind} · {item.id}</span><ArrowUpRight className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+    </Link> : <span className="break-words text-sm text-muted-foreground">{credential ? t('Credential details are hidden.') : item.text}</span>}
   </li>)}</ul>;
 }
 
@@ -48,7 +48,7 @@ export function DecisionDrawer({ id, store, ledger, onClose }: Readonly<{ id: st
           <div><dt className="text-muted-foreground">{t('Decider')}</dt><dd className="font-medium">{actor(row.decider)}</dd></div>
           <div><dt className="text-muted-foreground">{t('Due')}</dt><dd className={row.overdue ? 'font-medium text-destructive' : ''}>{formatAbsolute(row.dueAt)}</dd></div>
         </dl>
-        {row.project && row.wf && <Button variant="link" size="sm" asChild className="h-auto justify-start self-start px-0"><a href={`#/w/${encodeURIComponent(row.project)}/${encodeURIComponent(row.wf)}?tab=decisions`}>{t('View workflow {wf}', { wf: row.wf })}<ArrowUpRight className="size-3.5" aria-hidden="true" /></a></Button>}
+        {row.project && row.wf && <Link href={`#/w/${encodeURIComponent(row.project)}/${encodeURIComponent(row.wf)}?tab=decisions`} className="self-start gap-1 text-sm">{t('View workflow {wf}', { wf: row.wf })}<ArrowUpRight className="size-3.5 shrink-0" aria-hidden="true" /></Link>}
         <section className="flex flex-col gap-2"><h3 className="font-semibold">{t('Recorded options')}</h3>
           {row.options?.length ? <ul className="flex flex-col divide-y">{row.options.map((option, index) => <li key={`${option.key}-${index}`} className="flex flex-wrap items-center gap-2 py-3 text-sm">
             {option.recommended && <Star className="size-4 text-muted-foreground" fill="currentColor" aria-label={t('Recommended')} />}

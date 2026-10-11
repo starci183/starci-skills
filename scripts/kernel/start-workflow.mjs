@@ -47,14 +47,14 @@ import { expiredKernelStartupHealth } from './kernel-startup-capacity.mjs';
 import { ownerReserveGrant, ownerBiasTrust, planAgentAdmission } from '../agent/admission.mjs';
 import { prepareProviderBudget } from '../agent/provider-budget.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
-import { releaseWorkflowWorker as releaseManagedWorker, recoverWorkflowLaunch } from './workflow-launch-custody.mjs';
+import { releaseWorkflowWorker as releaseManagedWorker, recoverWorkflowLaunch, rollbackUnpublishedKernel } from './workflow-launch-custody.mjs';
 import { DEFAULT_OWNER_LANGUAGE } from '../machine/home.mjs';
 import { parseJson, parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
 import { KERNEL_BOOT_FILES, currentRuntimeRev, revRootOf, shortRev } from './runtime-rev.mjs';
 import { ensureWorkflowWorktree, workflowAppRepo } from './workflow-worktree.mjs';
 import { appendWorktreeEvent } from './workflow-worktree-events.mjs';
-import { ensureWorkflowHost, installWorkflowTree, workflowStartAuthority, commitWorkflowStart, recordWorkflowStartFailure, workflowSender, closedGoalMessage } from './workflow-startup.mjs';
+import { ensureWorkflowHost, installWorkflowTree, workflowStartAuthority, commitWorkflowStart, recordWorkflowStartFailure, workflowSender, closedGoalMessage, startBar } from './workflow-startup.mjs';
 import { guardLaunch, bindGuardTerminal, unbindGuardTerminal, guardReceiptErrors } from '../guards/hook-install.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { arg as argvValue } from '../lib/cli-arg.mjs';
@@ -241,7 +241,7 @@ try {
     goal: ledger.db.prepare('SELECT revision,goal_identity,markdown,json,approved_by FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(target) });
   const { workflow: startWorkflow, goal: startGoal } = startInput();
   const startAuthority = workflowStartAuthority({ workflow: startWorkflow, goal: startGoal });
-  if (!startAuthority.ok) refuse(startAuthority.reason, { workflowId: target, authority: startAuthority });
+  const barred = startBar({ authority: startAuthority, launchedBy, db: ledger.db, workflowId: target }); if (barred) refuse(barred.step, barred.fields);
   const sender = workflowSender({ env: process.env, launchedBy, ledger, workflowId: target }); if (!sender.ok) refuse(sender.reason, { workflowId: target, error: sender.error });
   const hostStartup = await ensureWorkflowHost({ workflow: startWorkflow, goal: startGoal, env: process.env });
   if (hostStartup.ok !== true || hostStartup.ready !== true)
@@ -420,7 +420,7 @@ try {
   let workflowWorktree = null;
   let workflowInstall = null;
   if (appRepo) {
-    const ensured = ensureWorkflowWorktree({ env: process.env }, { workflowId, appRepo, ledgerId: ledger.ledgerId ?? null });
+    const ensured = ensureWorkflowWorktree({ env: process.env }, { workflowId, appRepo, ledgerId: ledger.ledgerId ?? null, ledger });
     if (!ensured.ok) failStart(ensured.reason === 'worktree-cap' ? 'worktree-cap' : 'workflow-worktree', ensured.detail ?? ensured.reason, null,
       { reason: ensured.reason, appRepo, ...(ensured.cap != null ? { live: ensured.live, cap: ensured.cap } : {}) });
     workflowWorktree = ensured.record;
@@ -457,12 +457,11 @@ try {
   // coordinator). worker-start blocks until the agent is ready, so the reservation is stretched past its timeout first.
   const priorManaged = parseJsonOr(priorKernelJob?.payload_json)?.managed ?? null;
   const entry = sender.handle;
-  const specFile = path.join(path.dirname(ledgerFileFor(repo)), 'kernel', `${workflowId}.a${kernelAttemptOf(priorKernelJob) + 1}.prompt.md`);
   const beforeLaunchAuthority = currentStartAuthority();
   if (!beforeLaunchAuthority.ok) failStart(beforeLaunchAuthority.reason, 'the accepted goal changed before Kernel launch', null,
     { reason: beforeLaunchAuthority.reason, authority: beforeLaunchAuthority, startup: hostStartup, workflowWorktree, install: workflowInstall });
   const kernelLaunch = launchKernelGroup({ ledger, workflowId, token, expected: startAuthority, route, members, reservationMs: KERNEL_START_RESERVATION_MS,
-    hostUnavailableExit: EXIT_HOST_UNAVAILABLE, memberLabel, failStart, launch: { worktree: kernelWorktree, title, prompt, specFile, config: route.ownerConfig,
+    hostUnavailableExit: EXIT_HOST_UNAVAILABLE, memberLabel, failStart, launch: { worktree: kernelWorktree, title, prompt, config: route.ownerConfig,
       role: 'kernel', scopeId: `${ledger.ledgerId ?? ledger.path}:${workflowId}:kernel-attempt:${kernelAttemptOf(priorKernelJob) + 1}`,
       bias: kernelBias(parseJsonOr(goal?.json)?.routing_bias, route), ownerGrant: ownerReserveGrant(goal), biasTrusted: ownerBiasTrust(goal) || Boolean(route.pin), tier: route.tier ?? null,
       objective: `[Kernel] ${kernelName} — ${workflowId}`, entry, priorRunId: priorManaged?.runId ?? null, onCreated: bindKernelGuard,
@@ -571,8 +570,7 @@ try {
   }
   if (!publication.ok) {
     // The attested launch is still ours even when approval or the singleton changed while Orca was awaited.
-    const cleanup = releaseManagedWorker(spawned.dispatchId, handle);
-    if (cleanup.ok) { try { unbindGuardTerminal({ skillRoot, handle }); } catch { /* pruned by age later */ } }
+    const cleanup = rollbackUnpublishedKernel({ dispatchId: spawned.dispatchId, handle, unbind: (terminal) => unbindGuardTerminal({ skillRoot, handle: terminal }) });
     failStart(publication.reason, publication.error ?? 'Kernel launch lost its final publication authority', handle,
       { authority: publication.authority ?? null, dispatch: spawned.dispatchId, admission: spawned.admission ?? null,
         effectState: cleanup.ok ? 'none' : 'unknown', cleanup });

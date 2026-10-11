@@ -3,6 +3,7 @@
 import { byCodeUnit } from '../../lib/list.mjs';
 export default {
   verb: 'extensions',
+  reads: true,
   required: [],
   ledger: false,
   usage: '  extensions [--json]   the file-based starci kernel extensions: verbs, status fields, boolean flags, load problems',

@@ -1,11 +1,14 @@
 import type { AgentFamily, AgentRef } from '../../contract';
+import { Avatar, Link } from '@heroui/react';
 import type { Concept } from '../concept';
 import { t } from '../../i18n/t';
-import { AgentMark, familyTint, tintStyle } from './agent-marks';
+import { familyTint, tintStyle } from './agent-marks';
+import devinPng from './logos/devin.png';
 
 export const concept: Concept = 'C6';
 
 const PROVIDER_FAMILY: Record<string, AgentFamily> = { claude: 'claude', anthropic: 'claude', codex: 'codex', openai: 'codex', devin: 'devin', cognition: 'devin' };
+const ORIGINAL_MARKS: Partial<Record<AgentFamily, string>> = { claude: '/logos/claude.png', codex: '/logos/codex.png', devin: devinPng };
 
 type ModelObservation = { requestedModel?: string | null; attestedAt?: number | null; modelAuthority?: 'attested' | 'unobserved' };
 export type LinkedAgent = AgentRef & ModelObservation & { href?: string; live?: boolean };
@@ -28,18 +31,22 @@ const tooltip = (agent: LinkedAgent) => [familyTint[agent.family].name, agent.po
   agent.model ? t(agent.modelAuthority === 'attested' ? 'Attested model: {model}' : 'Recorded model: {model}', { model: agent.model }) : null,
   agent.modelAuthority !== 'attested' ? t('Model attestation has not been observed.') : null].filter(Boolean).join(' · ');
 
-/** Round family mark on a tinted circle. `live` adds a pulsing ring; `href` makes it a link. Tooltip: agent · pool · model. */
+/** Vendor avatar retains the original family marks and recorded identity; live state adds a static ring. */
 export function AgentAvatar({ agent, size = 20, withLabel = false, live = false, href }: Readonly<{ agent: LinkedAgent; size?: number; withLabel?: boolean; live?: boolean; href?: string }>) {
   const tint = familyTint[agent.family];
   const target = href ?? agent.href;
   const isLive = live || agent.live;
-  const circle = <span className="relative inline-grid shrink-0 place-items-center rounded-full border" style={{ width: size, height: size, padding: agent.family === 'devin' ? 0 : Math.max(2, Math.round(size * 0.2)), ...tintStyle(tint.tone) }} data-agent={agent.family}>
+  const mark = ORIGINAL_MARKS[agent.family];
+  const circle = <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
     {isLive ? <span className="pointer-events-none absolute -inset-0.5 rounded-full border-2 opacity-60" style={{ borderColor: 'var(--status-running)' }} aria-hidden="true" /> : null}
-    <AgentMark family={agent.family} initial={(agent.label[0] ?? '?').toUpperCase()} />
+    <Avatar className="shrink-0 rounded-full" style={{ width: size, height: size, ...tintStyle(tint.tone), background: agent.family === 'unknown' ? 'var(--default)' : 'var(--card)' }} data-agent={agent.family}>
+      {mark ? <Avatar.Image src={mark} alt="" aria-hidden="true" className={`size-full ${agent.family === 'claude' ? 'object-contain p-[15%]' : 'object-cover'}`} draggable={false} /> : null}
+      <Avatar.Fallback className="size-full bg-transparent p-0 text-xs" aria-hidden="true">{(agent.label[0] ?? '?').toUpperCase()}</Avatar.Fallback>
+    </Avatar>
   </span>;
   const inner = <>{circle}{withLabel ? <span className="min-w-0 truncate text-xs">{agent.label}</span> : null}</>;
   const cls = 'inline-flex min-w-0 items-center gap-2';
-  return target ? <a href={target} className={`${cls} hover:opacity-80`} title={tooltip(agent)} aria-label={tooltip(agent)}>{inner}</a>
+  return target ? <span title={tooltip(agent)} className="inline-flex min-w-0"><Link href={target} className={`${cls} text-foreground`} aria-label={tooltip(agent)}>{inner}</Link></span>
     : <span className={cls} title={tooltip(agent)}>{inner}</span>;
 }
 

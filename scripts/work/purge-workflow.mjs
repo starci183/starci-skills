@@ -13,8 +13,8 @@
 //      effect_unknown;
 //   2. ARCHIVE to <archive-root>/<product>/<workflowId>-<YYYYMMDD>.zip (product = the repo's folder name): ledger/<table>.ndjson
 //      for every table row of the workflow (events, jobs, reports, checks, incidents, contracts, goals, inbox, job_artifacts,
-//      artifact_proofs, logs, work_graph_versions, leases, signals, ...), the workflows row, blobs/<sha256> for every blob an
-//      artifact of the workflow indexes (patches, images, videos, traces, reports, draw rounds), and manifest.json (sha256 +
+//      artifact_proofs, logs, work_graph_versions, leases, signals, ...), the workflows row, blobs/<sha256> and read metadata
+//      for its complete declared reference closure (including stored content references and bundle members), and manifest.json (sha256 +
 //      bytes of every other entry, the row counts, and the events digest-chain head);
 //   3. VERIFY: the ZIP is re-opened from disk, every entry inflated, its CRC and its sha256 checked against the manifest,
 //      and the manifest's own sha256 recorded; state 'archived', verified_at set. No delete happens before this;
@@ -32,6 +32,7 @@ import { zipWrite } from '../api/fs/zip-write.mjs';
 import { zipVisit } from '../api/fs/zip-visit.mjs';
 import { zipLimits } from '../api/fs/zip-limits.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
+import { workflowArchiveEvidence, workflowArchiveRows, workflowPurgeDependencies } from './workflow-archive-evidence.mjs';
 
 const USAGE = 'Internal entry: spawned by scripts/housekeeping/hk-ledger.mjs; not invoked directly.\nargs: --repo <repo> --workflow <id> [--archive-root <dir>] [--apply --approved-by <who> --approval-ref <ref>] [--json]';
 const PURGE_MANIFEST_SCHEMA = 'starci/workflow-archive@1';
@@ -40,26 +41,9 @@ const LIVE = new Set([...JOB_STATUSES.dispatchable, ...JOB_STATUSES.fenced]);
 const today = () => new Date().toISOString().slice(0, 10).replaceAll('-', '');
 const refuse = (code, message) => Object.assign(new Error(message), { code });
 
-/** Every table of the ledger with a workflow_id column (never workflow_purges, the purge record). */
-function workflowTables(db) {
-  return db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map((r) => r.name)
-    .filter((t) => t !== 'workflow_purges' && db.prepare(`PRAGMA table_info(${t})`).all().some((c) => c.name === 'workflow_id'));
-}
-
 /** Rows of the workflow per table, for the dry run and the archive. */
 function rowCounts(db, workflowId) {
-  const counts = {};
-  for (const t of workflowTables(db)) counts[t] = Number(db.prepare(`SELECT count(*) n FROM ${t} WHERE workflow_id=?`).get(workflowId).n);
-  return counts;
-}
-
-/** The blobs the archive carries: every blob an artifact of the workflow indexes. [{rel: blobs/<sha>, abs, bytes}] and the missing ones. */
-function evidenceFiles(db, repo, workflowId) {
-  const files = [], missing = [];
-  for (const r of db.prepare('SELECT DISTINCT b.sha256, b.file_uri FROM job_artifacts x JOIN blobs b ON b.sha256=x.sha256 WHERE x.workflow_id=? ORDER BY b.sha256').all(workflowId)) {
-    try { const st = fs.statSync(r.file_uri); if (st.isFile()) files.push({ rel: `blobs/${r.sha256}`, abs: r.file_uri, bytes: st.size }); else missing.push(r.sha256); } catch { missing.push(r.sha256); }
-  }
-  return { files, missing };
+  return Object.fromEntries([...workflowArchiveRows(db, workflowId)].map(([table, { rows }]) => [table, rows.length]));
 }
 
 function purgeRow(db, workflowId) { return db.prepare('SELECT * FROM workflow_purges WHERE workflow_id=?').get(workflowId) ?? null; }
@@ -67,9 +51,9 @@ function purgeRow(db, workflowId) { return db.prepare('SELECT * FROM workflow_pu
 /** Exact row bytes used for both publication and the final writer-locked comparison. */
 function workflowEntries(db, workflowId) {
   const entries=[];let total=0;
-  for(const table of ['workflows',...workflowTables(db).filter(t=>t!=='workflows')]){
+  for(const [table,{rows}] of workflowArchiveRows(db,workflowId)){
     const lines=[];let bytes=0;
-    for(const row of db.prepare(`SELECT * FROM ${table} WHERE workflow_id=? ORDER BY rowid`).iterate(workflowId)){
+    for(const row of rows){
       const line=JSON.stringify(row,(key,value)=>value instanceof Uint8Array?{base64:Buffer.from(value).toString('base64')}:value)+'\n';bytes+=Buffer.byteLength(line);
       if(bytes>ZIP_RESOURCE_LIMITS.maxEntryBytes)throw refuse('zip-limit',`ledger/${table}.ndjson exceeds the supported archive entry budget; workflow rows remain`);
       lines.push(line);
@@ -92,8 +76,12 @@ function assertCurrentArchive(db, root, workflowId) {
     throw refuse('archive-verify-failed',`${row.archive_path}: verified archive identity does not read back; workflow rows remain`);
   const archived=new Map(manifest.entries.map(entry=>[entry.name,entry]));
   const current=workflowEntries(db,workflowId).map(entry=>({name:entry.name,sha256:sha256(entry.data),bytes:Buffer.byteLength(entry.data)}));
-  const evidence=evidenceFiles(db,root,workflowId);
-  for(const file of evidence.files)current.push({name:`files/${file.rel}`,sha256:sha256File(file.abs),bytes:file.bytes});
+  const evidence=workflowArchiveEvidence(db,workflowId);
+  for(const file of evidence.files){
+    current.push({name:`files/${file.rel}`,sha256:sha256File(file.abs),bytes:file.bytes});
+    const data=JSON.stringify(file.metadata);
+    current.push({name:`files/${file.rel}.json`,sha256:sha256(data),bytes:Buffer.byteLength(data)});
+  }
   const counts=rowCounts(db,workflowId),head=eventsHead(db,workflowId);
   if(manifest.eventsHead!==head||manifest.eventsHead!==row.events_head||JSON.stringify(manifest.counts)!==JSON.stringify(counts)||JSON.stringify(manifest.counts)!==row.counts_json||JSON.stringify(manifest.missingFiles)!==JSON.stringify(evidence.missing)||archived.size!==manifest.entries.length||current.length!==archived.size||current.some(entry=>{const saved=archived.get(entry.name),actual=checked.entries.find(item=>item.name===entry.name);return !saved||!actual||saved.sha256!==actual.sha256||saved.bytes!==actual.bytes||entry.sha256!==saved.sha256||entry.bytes!==saved.bytes;})||checked.entries.length!==archived.size+1)
     throw refuse('archive-verify-failed',`${workflowId}: workflow changed after archive verification; current rows and archive are retained`);
@@ -137,7 +125,9 @@ function ensureArchive(ledger, db, { workflowId, root, archive, files, missing, 
   if (archiveIsStillGood(row)) return;
   const head = eventsHead(db, workflowId);
   const entries = workflowEntries(db, workflowId);
-  for (const file of files) entries.push({ name: `files/${file.rel}`, file: file.abs });
+  for (const file of files) {
+    entries.push({ name: `files/${file.rel}`, file: file.abs }, { name: `files/${file.rel}.json`, data: JSON.stringify(file.metadata) });
+  }
   fs.mkdirSync(path.dirname(archive), { recursive: true });
   const tmp = `${archive}.partial-${process.pid}`;
   if (entries.length + 1 > ZIP_RESOURCE_LIMITS.maxEntries) throw refuse('zip-limit', 'workflow archive has too many entries; workflow rows remain');
@@ -162,8 +152,12 @@ export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = nu
     const liveJobs = db.prepare('SELECT job_id, status FROM jobs WHERE workflow_id=?').all(workflowId).filter((j) => LIVE.has(j.status));
     // An archived workflow (starci kernel archive: owner or supervisor stop) is ended like a finished one (gc.mjs, owner 2026-09-28).
     const blockers = [...(wf.phase !== 'finished' && wf.archived_at == null ? [`phase is ${wf.phase ?? 'unset'}, not finished or archived`] : []), ...(liveJobs.length ? [`${liveJobs.length} job(s) still ${[...new Set(liveJobs.map((j) => j.status))].join('/')}`] : [])];
+    const dependencies = workflowPurgeDependencies(db, workflowId);
+    const dependencyDetails = dependencies.map(item => `${item.code}: ${item.detail}`);
+    blockers.push(...dependencyDetails);
+    if (apply && dependencies.length) throw refuse(dependencies[0].code, dependencyDetails.join('; '));
     const counts = rowCounts(db, workflowId);
-    const { files, missing } = evidenceFiles(db, root, workflowId);
+    const { files, missing } = workflowArchiveEvidence(db, workflowId);
     const archive = prior?.archive_path ?? path.join(archiveRoot, path.basename(root), `${workflowId}-${date}.zip`);
     const plan = { ok: blockers.length === 0, repo: root, workflowId, dryRun: !apply, blockers, counts, files: files.length, fileBytes: files.reduce((n, f) => n + f.bytes, 0), missingFiles: missing.slice(0, 50), archive, purge: prior };
     if (!apply) return plan;
@@ -176,7 +170,10 @@ export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = nu
     ensureArchive(ledger, db, { workflowId, root, archive, files, missing, counts, approvedBy, approvalRef, now });
 
     // 4. Delete: the guard opens for this workflow only while its row says 'deleting'.
-    const deleted = ledger.transaction(() => { assertCurrentArchive(db,root,workflowId); recordPurge(db, { workflowId, state: 'deleting' }); return deleteWorkflowRows(db, { workflowId }); });
+    const deleted = ledger.transaction(() => {
+      const dependencies = workflowPurgeDependencies(db, workflowId);
+      if (dependencies.length) throw refuse(dependencies[0].code, dependencies.map(item => item.detail).join('; '));
+      assertCurrentArchive(db,root,workflowId); recordPurge(db, { workflowId, state: 'deleting' }); return deleteWorkflowRows(db, { workflowId }); });
     ledger.transaction(() => recordPurge(db, { workflowId, state: 'purged', purgedAt: now(), countsJson: JSON.stringify({ archived: counts, deleted }) }));
     return { ...plan, ok: true, dryRun: false, deleted, purge: purgeRow(db, workflowId) };
   } finally { ledger.close(); }

@@ -6,11 +6,12 @@
 # published port variable are fixed, so the running starci-sonarqube
 # container and its data keep working under this extension.
 #
-# The database password and the published port are NOT stored here: the stack
-# reads `${SONARQUBE_DB_PASSWORD}` and `${STARCI_PORT_SONARQUBE}` from a local,
-# untracked `.env` beside this file, materialized from `secrets/` custody (see
-# README.md). The one-shot bootstrap replaces SonarQube's default admin
-# password from the decrypted `secrets/sonarqube-admin-password.txt`.
+# No secret is stored here or beside it. The stack reads `${SONARQUBE_DB_PASSWORD}` and
+# `${SONARQUBE_ADMIN_PASSWORD}` from the environment of the process that runs Compose: `starci gate sonar up`
+# passes them from the owner's untracked `.claude/secret.env` (engine/secrets.mjs secretEnv) and refuses, naming
+# the variable, when one is missing. The one-shot bootstrap replaces SonarQube's default admin password with
+# SONARQUBE_ADMIN_PASSWORD. The published port variable is `${STARCI_PORT_SONARQUBE}`, which the same verb derives
+# from the host declared in scripts/gates/sonar-local.mjs.
 #
 # Cloudflare routing is published by cloudflared.yaml (profile `public`).
 name: starci
@@ -21,7 +22,7 @@ services:
     container_name: ${STARCI_CONTAINER_PREFIX:-starci-}sonarqube-postgres
     environment:
       POSTGRES_USER: sonarqube
-      POSTGRES_PASSWORD: ${SONARQUBE_DB_PASSWORD:-REPLACE_ME}
+      POSTGRES_PASSWORD: ${SONARQUBE_DB_PASSWORD:?run through starci gate sonar up - SONARQUBE_DB_PASSWORD is a secret.env variable}
       POSTGRES_DB: sonarqube
     volumes:
       - sonarqube-postgres-data:/var/lib/postgresql/data
@@ -43,9 +44,9 @@ services:
     environment:
       SONAR_JDBC_URL: jdbc:postgresql://sonarqube-postgres:5432/sonarqube
       SONAR_JDBC_USERNAME: sonarqube
-      SONAR_JDBC_PASSWORD: ${SONARQUBE_DB_PASSWORD:-REPLACE_ME}
+      SONAR_JDBC_PASSWORD: ${SONARQUBE_DB_PASSWORD:?run through starci gate sonar up - SONARQUBE_DB_PASSWORD is a secret.env variable}
     ports:
-      - "${STARCI_PORT_SONARQUBE}:9000"
+      - "${STARCI_PORT_SONARQUBE:?run through starci gate sonar up - it derives the published port}:9000"
     volumes:
       - sonarqube-data:/opt/sonarqube/data
       - sonarqube-extensions:/opt/sonarqube/extensions
@@ -69,22 +70,21 @@ services:
     depends_on:
       sonarqube:
         condition: service_healthy
-    volumes:
-      - ./secrets/sonarqube-admin-password.txt:/run/secrets/sonarqube-admin-password:ro
+    environment:
+      SONARQUBE_ADMIN_PASSWORD: ${SONARQUBE_ADMIN_PASSWORD:?run through starci gate sonar up - SONARQUBE_ADMIN_PASSWORD is a secret.env variable}
     entrypoint:
       - /bin/sh
       - -ec
     command:
       - |
-        new_password="$$(cat /run/secrets/sonarqube-admin-password)"
-        if curl -fsS -u "admin:$${new_password}" \
+        if curl -fsS -u "admin:$${SONARQUBE_ADMIN_PASSWORD}" \
           http://sonarqube:9000/api/authentication/validate | grep -q '"valid":true'; then
           exit 0
         fi
         curl -fsS -u admin:admin -X POST \
             --data-urlencode 'login=admin' \
             --data-urlencode 'previousPassword=admin' \
-            --data-urlencode "password=$${new_password}" \
+            --data-urlencode "password=$${SONARQUBE_ADMIN_PASSWORD}" \
             http://sonarqube:9000/api/users/change_password
     restart: "no"
 

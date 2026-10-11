@@ -1,11 +1,33 @@
 // Op launch authority: scoped persisted owner constraints plus the already-qualified route.
 import { spawnAgent } from '../../../agent/lib.mjs';
-import { taskSpecOf } from '../../../machine/task-spec.mjs';
+import { taskSpecOf } from '../../../agent/prompt-file.mjs';
 import { biasForRole } from '../../../lib/owner-routing-bias.mjs';
 import { ownerReserveGrant, ownerBiasTrust } from '../../../agent/admission.mjs';
 import { latestGoal, goalJsonOf } from './rows.mjs';
+import { isRunFence, rebindAfterFence } from '../../orca-runs.mjs';
 
-export function spawnOperationAgent({ ledger, job, op, model, launchModel, payload, jobId, prompt, packetFile, ...launch }) {
+/**
+ * The op launch. A launch the host refuses consumer_fenced at worker-start (the Kernel terminal is not the coordinator Orca has bound to the workflow Run) is the
+ * runtime's to repair, never the agent's: the Run is re-bound to the Kernel terminal once and the launch retried once; a second fence is rejected as before.
+ */
+export function spawnOperationAgent(input, { rebind = rebindAfterFence, launch = launchOperationAgent } = {}) {
+  const first = launch(input);
+  if (!isRunFence(first)) return first;
+  const fix = rebind({ runId: input.run, kernelHandle: input.from });
+  if (!fix.rebound) return { ...first, runRebind: fix };
+  recordRunRebound(input, fix);
+  // The refused start released its provider reservation, and a released attempt id is never taken again (attempt-released). The attempt id and the host request id both
+  // derive from the launch request, so the retry is a new admission attempt and a new host start with that one field.
+  return { ...launch({ ...input, request: { ...input.request, fenceRetry: 1 } }), runRebind: fix };
+}
+
+// The re-bind is a ledger fact: the digest and a later reader see why a launch was repeated.
+function recordRunRebound({ ledger, job, jobId, run, from }, fix) {
+  ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'run-rebound',
+    payload: { runId: run, kernelTerminal: from, previousCoordinator: fix.previousCoordinator, by: jobId, reason: 'consumer_fenced at worker-start' } }));
+}
+
+function launchOperationAgent({ ledger, job, op, model, launchModel, payload, jobId, prompt, packetFile, ...launch }) {
   const modelId = launchModel.modelId, effort = launchModel.effort ?? null;
   const ownerGoalRow = latestGoal(ledger.db, job.workflow_id);
   const ownerGoal = goalJsonOf(ownerGoalRow);
@@ -18,8 +40,8 @@ export function spawnOperationAgent({ ledger, job, op, model, launchModel, paylo
   // (the start receipt, else worker-show), its [Op] title, and the attestation that the worker's EFFECTIVE agent/model
   // equal the route - a mismatch is a provider-side defect, rejected with the typed infra-provider incident. No
   // `--parent`: the Run's coordinator places the op under the Kernel (smoke 2026-10-01, launch.report.md). A packet
-  // longer than the host's argv takes is written to the job's evidence directory and the spec points at it
-  // (task-spec.mjs; inc-826e077777de). The start's ledger identity is the job and its lease token (calls.yaml
+  // longer than allocation.promptFile.maxChars is written to dispatch-prompts and the spec points at it
+  // (prompt-file.mjs; inc-826e077777de). The start's ledger identity is the job and its lease token (calls.yaml
   // worker-start replay: request): a lost receipt replays this start, and a new lease is a new start.
   const spec = taskSpecOf({ prompt, file: packetFile, op, jobId, attempt: job.try_no }).spec;
   return spawnAgent({ ...launch, provider: model.provider, model: modelId, effort, spec, taskTitle: `${op} #${job.try_no}`,

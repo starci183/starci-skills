@@ -113,18 +113,18 @@ export const frontierStateOf = (s) => {
 // An unanswered ask never reaches the owner (reserve), but a louder state already in flight still wins.
 const ASK_RESERVE_QUIET = new Set(['transition-ready', 'settle-ready', 'worker-dead', 'worker-nudge-ready', 'worker-wedged', 'peer-message', 'handover-answered', 'finish-ready']);
 
-const reserveReason = (s) => `unanswered ask(s) ${s.askReserve.join(', ')} never reached the owner (not notified on Telegram, and no live form: never served, or the serve-ask ttl expired); park each with starci kernel serve-ask --workflow <id> --dispatch <id> before yielding`;
+const reserveReason = (s) => `unanswered ask(s) ${s.askReserve.join(', ')} never reached the owner (not notified on Telegram, and no live form: never served, or the serve-ask ttl expired); the Workflow controller parks each with starci kernel serve-ask; nothing for the Kernel unless a Decision Item reports a refused move`;
 
 const questionReason = (s) => {
   const asked = s.workerQuestions.map((item) => `${item.jobId} (${item.messageId})`).join(', ');
   return `${asked} asked or escalated to the coordinator through Orca and wait for the answer; run starci kernel questions, then starci kernel reply --message <id> --body <answer> for a technical answer inside the job's authority, or --to-owner when it needs the owner (the worker then files outcome ask and serve-ask carries it)`;
 };
 
-const settleReason = (s) => `${s.settleReady.join(', ')} filed a report you consumed but never settled; run starci kernel record-checks and starci kernel settle for each before yielding`;
+const settleReason = (s) => `${s.settleReady.join(', ')} filed a report that was consumed but not settled yet; the Job controller's settler settles each; nothing for the Kernel unless a Decision Item reports a refused move`;
 
 const deadReason = (s) => {
   const dead = s.deadWorkers.map((worker) => `${worker.jobId} (${worker.liveness})`).join(', ');
-  return `${dead} read running but their worker can never file a report; run starci kernel reconcile --job <id> --dead-worker --settle-failed for each (the watchdog does it on its next tick)`;
+  return `${dead} read running but their worker can never file a report; the Job controller settles each failed on its next tick (starci kernel reconcile --job <id> --dead-worker --settle-failed); nothing for the Kernel unless a Decision Item reports a refused move`;
 };
 
 const wedgedReason = (s) => {
@@ -178,7 +178,7 @@ const peerWaitReason = (s) => {
 const nextReadyReason = (s) => {
   const { NEXT_ACTION_MOVES, nextActionLabel } = s.internals;
   const steps = s.graph.nextActions.filter((action) => NEXT_ACTION_MOVES.includes(action.kind)).map(nextActionLabel).join('; ');
-  return `no operation is open and the ledger names the next steps: ${steps}; run nextActions in order before yielding${credentialSuffix(s)}`;
+  return `no operation is open and the ledger names the next steps: ${steps}; the Workflow and Job controllers perform them, and the menu holds what waits on the Kernel${credentialSuffix(s)}`;
 };
 
 const credentialSuffix = (s) => (s.credentialAsks.length ? `; credential ask(s) ${s.credentialAsks.join(', ')} hold only the live-proof legs: enqueue ${s.mainLineOwed.join(', ')} now with placeholder values (credentialPending)` : '');
@@ -187,23 +187,23 @@ const peerMovableReason = (s) => {
   const waits = s.peerWaits.map((wait) => wait.incidentId).join(', ');
   const held = [...s.peerHeldOps].join(', ');
   const movable = s.peerWaitMovable.join(', ');
-  return `peer-wait ${waits} holds only ${held} (the runtime releases it itself; never resolve it by hand); the approved legs ${movable} are not held: enqueue and dispatch them now in plan order`;
+  return `peer-wait ${waits} holds only ${held} (the runtime releases it itself; never resolve it by hand); the approved legs ${movable} are not held: the Job controller enqueues them in plan order; nothing for the Kernel unless a Decision Item reports a refused move`;
 };
 
 const orphanedReason = (s) => `workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish; a next step that waits on a peer workflow is recorded as starci kernel incident --kind peer-wait --peer <workflowId>, never left orphaned${credentialSuffix(s)}`;
 
-const NUDGE_READY_REASON = 'one or more exact running workers are at an idle provider prompt, hold an unsubmitted paste in their input row, or wait on a host dialog their agent card allowlists, without a report; Kernel must call starci kernel nudge for each listed job now (a staged paste gets one Enter, an allowlisted dialog gets its card answer)';
+const NUDGE_READY_REASON = 'one or more exact running workers are at an idle provider prompt, hold an unsubmitted paste in their input row, or wait on a host dialog their agent card allowlists, without a report; the Job controller nudges each listed job (a staged paste gets one Enter, an allowlisted dialog gets its card answer); nothing for the Kernel unless a Decision Item reports a refused move';
 
 const staleReason = (s) => {
   const { staleLabel } = s.internals;
-  const redo = s.staleRedo.length ? `settled ${s.staleRedo.map((item) => staleLabel(item)).join(', ')} read product records their own workflow owns that changed since they settled with no peer job writing them (not by their own workflow's later legs); re-dispatch each as a new attempt of the same op and cut ordinal (a cut seam-first) before yielding` : null;
-  const followUp = s.staleFollowUp.length ? `the owner of a record ${s.staleFollowUp.map((item) => staleLabel(item)).join(', ')} read declared its committed change breaking; enqueue ONE follow-up leg for each (a new attempt of that op and cut ordinal only - never a seam-first cascade, never a redo of other slices or peers) before yielding` : null;
+  const redo = s.staleRedo.length ? `settled ${s.staleRedo.map((item) => staleLabel(item)).join(', ')} read product records their own workflow owns that changed since they settled with no peer job writing them (not by their own workflow's later legs); the Job controller re-runs each as a new attempt of the same op and cut ordinal (a cut seam-first); the Kernel acts only on a move it refused (menu item move-unbuilt)` : null;
+  const followUp = s.staleFollowUp.length ? `the owner of a record ${s.staleFollowUp.map((item) => staleLabel(item)).join(', ')} read declared its committed change breaking; the Job controller enqueues ONE follow-up leg for each (a new attempt of that op and cut ordinal only - never a seam-first cascade, never a redo of other slices or peers); the Kernel acts only on a move it refused (menu item move-unbuilt)` : null;
   return [redo, followUp].filter(Boolean).join('; ');
 };
 
 const readyReason = (s) => {
   const steps = s.queued.filter((item) => item.policy).map((item) => `${item.jobId} ${item.policy}`);
-  return ['queued or fenced operations are waiting on the Kernel; route/dispatch or reconcile them before yielding', ...steps].join('; ');
+  return ['queued or fenced operations are waiting for dispatch; the Workflow controller routes and dispatches them (starci kernel dispatch-ready); the Kernel acts only on a move it refused', ...steps].join('; ');
 };
 
 const REASON_ORDER = [

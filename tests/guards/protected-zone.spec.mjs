@@ -173,7 +173,7 @@ test('a supervisor is refused every zone and only protected catalog edits', asyn
     'RIGHTS_PROTECTED_ZONE', 'joined MultiEdit text names a protected rule');
 });
 
-test('an op writes only its workflow worktree and owned paths, while other roles have no file-rights refusal', async (t) => {
+test('an op writes only its owned paths and the runtime temp directory, while other roles have no file-rights refusal', async (t) => {
   const runtime = runtimeCheckout(t, 'rights-op-runtime-');
   const workflow = path.join(runtime, 'workflow');
   const ownedFile = path.join(runtime, 'assigned.txt');
@@ -183,7 +183,7 @@ test('an op writes only its workflow worktree and owned paths, while other roles
   const denied = await fileRightsVerdict({ role: 'op', filePath: runtimeOutside, guard });
   assert.equal(denied?.code, 'RIGHTS_OP_RUNTIME_WRITE');
   assert.match(denied.remedy, /lesson|upgrade request/i);
-  assert.equal(await fileRightsVerdict({ role: 'op', filePath: path.join(workflow, 'src', 'inside.ts'), guard }), null);
+  assert.equal((await fileRightsVerdict({ role: 'op', filePath: path.join(workflow, 'src', 'inside.ts'), guard }))?.code, 'RIGHTS_OP_OUTSIDE_OWNED', 'inside the worktree but not owned');
   assert.equal(await fileRightsVerdict({ role: 'op', filePath: ownedFile, guard }), null);
   assert.equal(await fileRightsVerdict({ role: 'op', filePath: path.join(ownedDir, 'child.ts'), guard }), null);
 
@@ -192,8 +192,8 @@ test('an op writes only its workflow worktree and owned paths, while other roles
   fs.mkdirSync(path.dirname(nestedMarker), { recursive: true });
   fs.writeFileSync(nestedMarker, 'slots: []\n');
   const nestedGuard = { ...guard, workflowWorktree: workflowRuntime };
-  assert.equal(await fileRightsVerdict({ role: 'op', filePath: path.join(workflowRuntime, 'scripts', 'app.mjs'), guard: nestedGuard }), null,
-    'a workflow worktree that is itself a runtime checkout remains owned');
+  assert.equal((await fileRightsVerdict({ role: 'op', filePath: path.join(workflowRuntime, 'scripts', 'app.mjs'), guard: nestedGuard }))?.code, 'RIGHTS_OP_OUTSIDE_OWNED',
+    'a workflow worktree that is itself a runtime checkout is not an owned path: the scope refusal, not the runtime-write refusal');
 
   const outside = mkdtemp(t, 'rights-op-outside-');
   assert.equal(await fileRightsVerdict({ role: 'op', filePath: path.join(outside, 'src', 'main.ts'), guard }), null);
@@ -239,12 +239,14 @@ test('shell writers obey the op workflow boundary', async (t) => {
   const inside = path.join(workflow, 'src', 'inside.ts');
   const handle = 'rights-zone-op';
   bind(t, 'terminals', handle, {
-    schema: 'starci/op-guard@1', role: 'op', jobId: 'job-1', workflowId: 'wf-1', op: 'backend.implement', owned: [], workflowWorktree: workflow,
+    schema: 'starci/op-guard@1', role: 'op', jobId: 'job-1', workflowId: 'wf-1', op: 'backend.implement', owned: [path.join(workflow, 'src')], workflowWorktree: workflow,
   });
+  const unowned = path.join(workflow, 'docs', 'unowned.md');
   for (const [tool, label, command] of WRITERS) {
     const refused = await hookDecision(shellCall(tool, command(outside), workflow), { env: envFor(handle) });
     assert.equal(refused?.verdict.code, 'RIGHTS_OP_RUNTIME_WRITE', `${label}: outside worktree`);
-    assert.equal(await hookDecision(shellCall(tool, command(inside), workflow), { env: envFor(handle) }), null, `${label}: inside worktree`);
+    assert.equal((await hookDecision(shellCall(tool, command(unowned), workflow), { env: envFor(handle) }))?.verdict.code, 'RIGHTS_OP_OUTSIDE_OWNED', `${label}: inside worktree, not owned`);
+    assert.equal(await hookDecision(shellCall(tool, command(inside), path.join(workflow, 'src')), { env: envFor(handle) }), null, `${label}: owned`);
   }
 });
 
@@ -261,15 +263,13 @@ test('reading zone paths and ordinary supervisor commands have no false positive
     `ls ${quote(zonePath)}`,
     `sed s/a/b/ ${quote(zonePath)}`,
     'git status --short',
-    'node --check scripts/x.mjs',
-    'npx tsc --noEmit',
     `rg zone ${quote(ordinary)}`,
   ];
   for (const command of commands) {
     assert.equal(await hookDecision(shellCall('Bash', command, runtime), { env: envFor(handle) }), null, command);
   }
   // Raw tools the command policy refuses (R223) are refused for THAT reason, never as a zone write: a git add of a zone file stages it, it does not write it.
-  for (const [command, code] of [['node scripts/x.mjs', 'RIGHTS_RAW_TOOL'], ['npm run build', 'RIGHTS_RAW_TOOL'], [`git add ${quote(zonePath)}`, 'RIGHTS_GIT_COMMIT']]) {
+  for (const [command, code] of [['node scripts/x.mjs', 'SUPERVISOR_STARCI_ONLY'], ['node --check scripts/x.mjs', 'SUPERVISOR_STARCI_ONLY'], ['npm run build', 'RIGHTS_RAW_TOOL'], [`git add ${quote(zonePath)}`, 'RIGHTS_GIT_COMMIT']]) {
     assert.equal((await hookDecision(shellCall('Bash', command, runtime), { env: envFor(handle) }))?.verdict.code, code, command);
   }
 });
@@ -291,7 +291,7 @@ test('Edit, Write, MultiEdit and NotebookEdit keep their tool identity through s
   const op = 'rights-tools-op';
   bind(t, 'seats', supervisor, { schema: 'starci/seat-guard@1', role: 'supervisor', terminal: supervisor, deniedTools: [] });
   bind(t, 'terminals', op, {
-    schema: 'starci/op-guard@1', role: 'op', jobId: 'job-tools', workflowId: 'wf-1', op: 'backend.implement', owned: [], workflowWorktree: workflow,
+    schema: 'starci/op-guard@1', role: 'op', jobId: 'job-tools', workflowId: 'wf-1', op: 'backend.implement', owned: [path.join(workflow, 'src')], workflowWorktree: workflow,
   });
 
   for (const [tool, input] of TOOL_INPUTS(zonePath)) {

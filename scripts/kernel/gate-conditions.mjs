@@ -457,12 +457,12 @@ const resolveTypedIncident = (ledger, incident, evidence, now) => {
  * call resolved (with evidence) and the evaluations of those still open (for status to project).
  * Never throws: a busy ledger or unreadable condition leaves the incident open for the next tick.
  */
-export function autoResolveTypedIncidents(ledger, { repo, workflowId = null, now = Date.now() } = {}) {
+export function autoResolveTypedIncidents(ledger, { repo, workflowId = null, now = Date.now(), resolve = true } = {}) {
   const resolved = [], open = [];
   let evaluated = [];
   try { evaluated = evaluateTypedIncidents(ledger.db, { repo, workflowId }); } catch { return { resolved, open }; }
   for (const incident of evaluated) {
-    if (!incident.met) { open.push(incident); continue; }
+    if (!incident.met || !resolve) { open.push(incident); continue; }
     const evidence = incident.results.map((r) => `${r.condition}: ${r.evidence}`);
     try {
       if (resolveTypedIncident(ledger, incident, evidence, now))

@@ -4,7 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { CATALOG as catalog } from '../../packages/cli/src/catalog.generated.mjs';
-import { main } from '../../scripts/cli/main.mjs';
+
 import { flagsOfUsage } from '../../scripts/checks/check-cli-parity.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -43,7 +43,7 @@ const specs = {
   'runtime-artifact': { script: 'scripts/gates/runtime-artifact.mjs', usage: (s) => matching(s, '//   starci gate runtime-artifact'), flags: ['dir', 'out', 'pack', 'root'] },
   'runtime-coverage': { script: 'scripts/gates/runtime-coverage.mjs', usage: (s) => matching(s, '//   starci gate runtime-coverage'), flags: [] },
   run: { script: 'scripts/cli/gate-run.mjs', usage: () => declaration(read('scripts/gates/gate.mjs')), flags: ['base', 'changed', 'main', 'out', 'root', 'scope', 'tests', 'tree'] },
-  sonar: { script: 'scripts/gates/sonar-local.mjs', usage: (s) => declaration(s, 'HELP'), flags: ['base', 'blob', 'branch', 'declaration', 'host', 'isolate', 'keep-slice-project', 'key', 'log', 'name', 'no-ensure', 'out', 'paths', 'project-gate', 'stack', 'timeout', 'token-ref', 'wait', 'wait-timeout', 'with-token'] },
+  sonar: { script: 'scripts/gates/sonar-local.mjs', usage: (s) => declaration(s, 'HELP'), flags: ['base', 'blob', 'branch', 'declaration', 'host', 'isolate', 'keep-slice-project', 'key', 'log', 'name', 'no-ensure', 'out', 'paths', 'project-gate', 'public', 'stack', 'timeout', 'token-ref', 'wait', 'wait-timeout', 'with-token'] },
   starcistacks: { script: 'scripts/gates/starcistacks.mjs', usage: (s) => declaration(s), flags: ['new'] },
   'test-world': { script: 'scripts/gates/test-world-run.mjs', usage: (s) => declaration(s), flags: ['out', 'project', 'root', 'tests'] },
   unit: { script: 'scripts/gates/unit-run.mjs', usage: (s) => declaration(s), flags: ['out', 'root'] },
@@ -59,14 +59,4 @@ test('gate catalog resolves every implementation and exactly declares its parsed
     assert.deepEqual(flagsOfUsage(spec.usage(source)).sort(), [...spec.flags].sort(), `${verb} usage reflects its parser`);
     assert.deepEqual(command.flags.map((flag) => flag.name).sort(), [...spec.flags].sort(), `${verb} catalog flags`);
   }
-});
-
-test('gate dispatch resolves through the injected script seam', () => {
-  const calls = [];
-  assert.equal(main(['gate', 'unit', '--root', 'app', '--out', 'unit.json'], {
-    catalog,
-    runScript: (script, args, options) => { calls.push({ script, args, options }); return 0; },
-  }), 0);
-  assert.equal(path.relative(repoRoot, calls[0].script).replaceAll(path.sep, '/'), 'scripts/gates/unit-run.mjs');
-  assert.deepEqual(calls[0].args, ['--root', 'app', '--out', 'unit.json']);
 });

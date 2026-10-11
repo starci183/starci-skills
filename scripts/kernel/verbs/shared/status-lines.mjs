@@ -1,9 +1,14 @@
 // The text half of `starci kernel status` (verbs/status.mjs): one line per signal, in the same order the
 // Kernel reads them.
 import { OP_REV_DRIFT, shortRev } from '../../runtime-rev.mjs';
+import { noticeOwes } from '../../kernel-notice.mjs';
 import { nameWithId } from '../../../lib/display-names.mjs';
 import { shortWorkflow } from '../../dependency-graph.mjs';
 import { stuckLine } from '../../../machine/op-metrics.mjs';
+import { menuLines } from './status-menu.mjs';
+import { runtimeCriticLine } from './status-critic.mjs';
+import { seatCostConfig } from '../../seat-wakes.mjs';
+import { judgeTagOf } from '../../op-judge.mjs';
 
 const headline = (s, out) => {
   const mark = s.actionable ? ' ACTIONABLE' : ' (no actionable work)';
@@ -19,15 +24,7 @@ const kernelLine = (s) => {
   return `  kernel: attempt ${k.attempt} on ${k.terminal ?? '-'} (${k.launch ?? '-'} by ${k.launchedBy ?? '-'}${at})${you}`;
 };
 
-const kernelRevLine = (s) => {
-  const k = s.kernelRev;
-  let suffix = '';
-  if (k.stale) {
-    const scope = k.full ? 're-read kernel-prompt.md and driver-loop.yaml in full' : `${k.fileCount} file(s)`;
-    suffix = ` STALE (${scope})`;
-  } else if (k.unacked) suffix = ' (never acked)';
-  return `  kernel rev: acked ${shortRev(k.acked) ?? 'none'} current ${shortRev(k.current) ?? '-'}${suffix}`;
-};
+const revisionLine = (s) => `  REVISION ${s.revisionNotice.line}`;
 
 const opRevLine = (w) => `  warn ${OP_REV_DRIFT}: ${w.jobId} (${w.op} a${w.attempt ?? '-'}) dispatched at ${shortRev(w.from)}, its op contract changed by ${shortRev(w.to)}: ${(w.files ?? []).slice(0, 5).join(', ')}`;
 
@@ -53,10 +50,11 @@ const stuckSummaryLine = (s) => {
   return `  stuck: ${s.stuck.length} wait(s), ${s.stuckPast.length} past SLA (${critical} critical)`;
 };
 
-const legsLine = (s) => {
+/** The legs line of the full status text: every leg with its colour and the one tag of who judges it. */
+export const legsLine = (s) => {
   const legs = s.graph.legs.map((leg) => {
     const deferred = leg.deferred ? '(deferred)' : '';
-    return `${leg.op}(${leg.label}):${leg.color}${deferred}`;
+    return `${leg.op}(${leg.label}):${leg.color}${deferred}[judge:${judgeTagOf(leg.op, s.internals.skillRoot)}]`;
   }).join(' ');
   return `  legs: ${legs}`;
 };
@@ -167,28 +165,47 @@ const staleLine = (s, item) => {
   return `  ${s.internals.staleOperationLine(item)}${held}`;
 };
 
+/**
+ * The bound Kernel seat's default view: the one-line state, the Decide section (at most statusBounds.kernelMenuItems items, the rest counted) and,
+ * when the revision is stale or nothing waits, the line that says so. Everything else is `starci kernel status --full`.
+ */
+export const seatStatusText = (s, out) => {
+  const bounds = seatCostConfig().statusBounds;
+  const total = s.menu?.length ?? 0;
+  const shown = { ...s, menu: (s.menu ?? []).slice(0, bounds.kernelMenuItems) };
+  const decide = menuLines(shown).map((line) => line.replace(/^Decide \(\d+\)/, `Decide (${total})`));
+  const text = [headline(s, out), ...decide,
+    ...(total > shown.menu.length ? [`  +${total - shown.menu.length} more item(s): answer these first, then read the next with starci kernel status`] : []),
+    ...(noticeOwes(s.revisionNotice) ? [revisionLine(s)] : []),
+    ...(s.frontier.reason && !total ? [`  reason: ${s.frontier.reason}`] : []),
+    '  full view: starci kernel status --full'].join('\n');
+  const cut = '\n  ... (cut: starci kernel status --full)';
+  return text.length > bounds.kernelTextChars ? `${text.slice(0, bounds.kernelTextChars - cut.length)}${cut}` : text;
+};
+
 /** The joined status text: every section in the order the Kernel reads them. */
 export const statusText = (s, out) => [
   headline(s, out),
   ...(s.ramThrottle?.line ? [`  ${s.ramThrottle.line}`] : []),
   ...(s.kernel ? [kernelLine(s)] : []),
-  ...(s.kernelRev ? [kernelRevLine(s)] : []),
+  ...menuLines(s),
+  ...(s.revisionNotice ? [revisionLine(s)] : []),
   ...s.opRevDriftWarnings.map(opRevLine),
   ...s.runningRevDrift.map(runningRevLine),
   ...s.outageCircuits.map(outageLine),
   ...s.awaitingOwner.map((item) => `  ${item.jobId} (${item.opId} a${item.attempt}) awaiting-owner — ask ${item.dispatchId ?? '-'} ${item.answer}`),
   handoverLine(s),
-  ...(s.frontier.reason ? [`  reason: ${s.frontier.reason}`] : []),
+  ...(s.frontier.reason && !s.menu?.length ? [`  reason: ${s.frontier.reason}`] : []),
   ...(s.frontier.why ? [`  why: ${s.frontier.why.headline} -> ${s.frontier.why.next}`] : []),
   ...s.graph.legs.filter((leg) => leg.why).map((leg) => `  why ${leg.op}: ${leg.why.headline}`),
   ...(s.kernelNotes.length ? [kernelNotesLine(s)] : []),
   ...(s.stuck.length ? [stuckSummaryLine(s)] : []),
   ...s.stuckPast.slice(0, 8).map((item) => `    ${stuckLine(item)}`),
   ...(s.graph.legs.length ? [legsLine(s)] : []),
+  ...(s.acceptanceTraces ?? []).map((trace) => `  ${trace.line} (${trace.op} ${trace.jobId}; report mode until the first live run)`),
   ...s.graph.terminal.map(terminalLine),
   ...testsDeferredLines(s),
   ...(s.workGraph ? [workGraphLine(s)] : []),
-  ...s.graph.nextActions.map((action, index) => `  next ${index + 1}: ${s.internals.nextActionLabel(action)} — ${action.reason}`),
   ...(s.frontier.ownerGatesNotOwnerWork ?? []).map((g) => `  lint owner-gate-not-owner-work: ${g.incidentId} says "${g.marker}" - not the owner's step; a runtime defect goes to the supervisor as --kind source-runtime-defect (the gate only holds jobs), and it resolves --by kernel|supervisor`),
   ...s.logTypedMissing.slice(0, 5).map((w) => `  warn ${w.code}: ${w.jobId} (${w.op ?? '-'} a${w.attempt ?? '-'}) settled with ${w.opRows} op log row(s); missing ${w.missing.join(', ')}`),
   ...s.assetSlotsOwed.map((slot) => `  asset-slot-owed: ${slot.key} (${slot.opId ?? '-'} ${slot.jobId ?? '-'}, ${slot.html ?? '-'})${slot.requested ? '' : ' NO REQUEST'} - interface.asset fills it (src + data-asset-sha256)`),
@@ -206,7 +223,8 @@ export const statusText = (s, out) => [
   ...s.peerMessages.map((message) => `  peer-message: ${message.key} from ${message.from} [${message.kind}] ${message.subject}`),
   ...s.peerWaits.map(peerWaitLine),
   ...s.heldSettle.map(heldSettleLine),
-  ...s.askReserve.map((dispatchId) => `  ask-reserve: ${dispatchId} never reached the owner; park it: starci kernel serve-ask --repo <repo> --workflow ${s.workflowId} --dispatch ${dispatchId}`),
+  ...(s.runtimeCritics ?? []).map((run) => runtimeCriticLine(run)),
+  ...s.askReserve.map((dispatchId) => `  ask-reserve: ${dispatchId} never reached the owner; the Workflow controller parks it`),
   ...s.askOnDemand.map((dispatchId) => `  ask-on-demand: ${dispatchId} is on Telegram; the owner generates its link (no form until then)`),
   ...s.typedWaits.resolved.map((item) => `  auto-resolved: ${item.incidentId} [${item.kind ?? '-'}] every typed condition holds — ${item.evidence.join('; ').slice(0, 240)}`),
   ...s.typedWaits.open.map(openWaitLine),

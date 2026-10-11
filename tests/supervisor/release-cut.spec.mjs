@@ -8,10 +8,15 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { cutRelease, pushRefusal } from '../../scripts/supervisor/release-cut.mjs';
 import { push } from '../../scripts/api/git/push.mjs';
+import { catFile } from '../../scripts/api/git/cat-file.mjs';
 import { renderRuntimeHooks } from '../../scripts/guards/git-hooks.mjs';
 import { gitCommonDir, l4RecordPath, readL4Record, writeL4Record } from '../../scripts/guards/release-record.mjs';
 import { classifySkip, planL4, runL4, skipReport, skipsOf } from '../../scripts/supervisor/release-l4.mjs';
-import { releaseHostMissing, rootInstallProblem } from '../../scripts/supervisor/release-host.mjs';
+import { skillRoot } from '../../engine/runtime-root.mjs';
+import { releaseHostMissing } from '../../scripts/supervisor/release-host.mjs';
+import { changelogSection } from '../../scripts/hfs/runtime-rules/release-notes.mjs';
+import { rootInstallProblem } from '../../scripts/machine/npm-install-state.mjs';
+import { leftoversRefusal } from '../../scripts/gates/release-leftovers.mjs';
 
 for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_PREFIX']) delete process.env[key];
 const git = (cwd, ...args) => {
@@ -45,7 +50,7 @@ function fixture(t, { changelog = CHANGELOG, version = '1.0.0-alpha.4' } = {}) {
   git(repo, 'commit', '-q', '-m', 'release commit');
   const remoteMain = () => git(origin, 'rev-parse', 'refs/heads/main');
   const remoteTags = () => git(origin, 'tag', '-l').split(/\r?\n/).filter(Boolean);
-  return { base, origin, repo, remoteMain, remoteTags, before: remoteMain(), deps: { host: () => [], suite: green, scan: scanOk, lock: (work) => work(), sonarCloud: async () => [] } };
+  return { base, origin, repo, remoteMain, remoteTags, before: remoteMain(), deps: { host: () => [], suite: green, scan: scanOk, lock: (work) => work(), sonarCloud: async () => [], publishPlan: () => ({ blockers: [], toPublish: [] }), jsonExceptions: () => ({ offenders: [], missingAllowlist: [] }) } };
 }
 const cut = (fx, extra = {}, deps = {}) => cutRelease({ repo: fx.repo, tag: TAG, ...extra, deps: { ...fx.deps, ...deps } });
 const untouched = (fx) => { assert.equal(fx.remoteMain(), fx.before, 'main did not move'); assert.deepEqual(fx.remoteTags(), [], 'no tag was pushed'); };
@@ -72,6 +77,26 @@ test('a green release creates the annotated tag with the CHANGELOG section as it
   assert.match(message, /^## \[1\.0\.0-alpha\.4\]/m, 'the tag message is the CHANGELOG section');
   assert.match(message, /shipped: the release notes/);
   assert.doesNotMatch(message, /older/, 'and only that section');
+});
+
+test('release notes larger than a Windows command line retain their exact Unicode contents in the atomic release tag', async (t) => {
+  const notes = '- shipped: ' + 'Complete Unicode release notes: \u03bb \u{1f680}. '.repeat(2400) + '\n';
+  const changelog = CHANGELOG.replace('- shipped: the release notes\n', notes);
+  const expected = changelogSection(changelog, TAG.slice(1)).body;
+  assert.ok(expected.length > 32767, 'the notes exceed the Windows process command-line limit');
+  const fx = fixture(t, { changelog });
+  const out = await cut(fx);
+  assert.deepEqual([out.ok, out.verdict, out.tagCreated], [true, 'pushed', true], JSON.stringify(out));
+  const head = git(fx.repo, 'rev-parse', 'HEAD');
+  assert.equal(fx.remoteMain(), head);
+  assert.deepEqual(fx.remoteTags(), [TAG]);
+  assert.equal(git(fx.origin, 'cat-file', '-t', `refs/tags/${TAG}`), 'tag');
+  assert.equal(git(fx.origin, 'rev-parse', `refs/tags/${TAG}^{commit}`), head);
+  const object = catFile(['tag', `refs/tags/${TAG}`], { cwd: fx.origin, encoding: 'buffer' });
+  assert.equal(object.status, 0, String(object.stderr));
+  const messageAt = object.stdout.indexOf(Buffer.from('\n\n'));
+  assert.ok(messageAt > 0, 'the annotated tag has its header and message separator');
+  assert.deepEqual(object.stdout.subarray(messageAt + 2), Buffer.from(expected, 'utf8'));
 });
 
 test('an annotated tag already on HEAD is reused; a lightweight one, one on another commit, a missing or non-release tag name are refused', async (t) => {
@@ -318,7 +343,7 @@ test('--plan reports what the cut would run and require and runs, tags and pushe
   const planned = (await cut(fx, { plan: true }, { suite: () => { suites += 1; return green(); } }));
   assert.deepEqual([planned.ok, planned.verdict, planned.tag], [true, 'plan', TAG], JSON.stringify(planned));
   assert.deepEqual(planned.receiptSteps, ['npm test', 'npm run test:packages', 'npm run check']);
-  assert.ok(planned.steps.length > 0 && planned.steps.includes('linux parity'), planned.steps.join(', '));
+  assert.ok(planned.steps.length > 0 && planned.steps.includes('linux-parity'), planned.steps.join(', '));
   assert.match(planned.why, /nothing was run, tagged or pushed/);
   assert.equal(suites, 0);
   assert.equal(git(fx.repo, 'tag', '-l'), '', 'no tag was created');
@@ -345,6 +370,46 @@ test('the cut refuses at once, plan or run, when the host lacks an Orca terminal
   untouched(fx);
 });
 
+test('the cut refuses in seconds, before any suite, when the publish plan reports a package to publish or a blocker; a clean plan lets it go on', async (t) => {
+  const fx = fixture(t);
+  let suites = 0;
+  const suite = () => { suites += 1; return green(); };
+  const dirty = await cut(fx, {}, { suite, publishPlan: () => ({ blockers: ['@starci/canon@1.0.0 is on the registry but its bytes differ'], toPublish: ['@starci/eslint@2.0.0'] }) });
+  assert.equal(dirty.verdict, 'publish-plan', JSON.stringify(dirty));
+  assert.match(dirty.why, /@starci\/canon@1\.0\.0 is on the registry but its bytes differ; @starci\/eslint@2\.0\.0 is not on the registry: publish it/);
+  assert.equal(dirty.findings.length, 2);
+  const planned = await cut(fx, { plan: true }, { suite, publishPlan: () => ({ blockers: [], toPublish: ['@starci/eslint@2.0.0'] }) });
+  assert.equal(planned.verdict, 'publish-plan', 'the plan mode refuses the same way');
+  assert.equal(suites, 0, 'no suite ran');
+  untouched(fx);
+  const clean = await cut(fx, { plan: true }, { suite, publishPlan: () => ({ blockers: [], toPublish: [] }) });
+  assert.equal(clean.verdict, 'plan');
+});
+
+test('the cut refuses in seconds, before the host lock and any suite, when the checkout holds JSON a docs gate would refuse (a file an interrupted cut left), naming the file and the fix', async (t) => {
+  const fx = fixture(t);
+  let suites = 0;
+  const suite = () => { suites += 1; return green(); };
+  const left = { offenders: ['examples/lite-app/reports/lint.sonar.json'], missingAllowlist: [] };
+  for (const plan of [true, false]) {
+    const refused = await cut(fx, { plan }, { suite, jsonExceptions: () => left });
+    assert.equal(refused.verdict, 'tree-leftovers', JSON.stringify(refused));
+    assert.match(refused.why, /examples\/lite-app\/reports\/lint\.sonar\.json is JSON outside modules\/kernel\/allowlist\.yaml.*\(delete examples\/lite-app\/reports\/lint\.sonar\.json if an interrupted cut/);
+  }
+  const gone = await cut(fx, { plan: true }, { suite, jsonExceptions: () => ({ offenders: [], missingAllowlist: ['modules/x.json'] }) });
+  assert.match(gone.why, /modules\/x\.json is registered in modules\/kernel\/allowlist\.yaml but absent on disk/);
+  assert.equal(suites, 0, 'no suite ran');
+  untouched(fx);
+});
+
+test('the leftovers inventory is the docs gate own check script: this clean runtime is not refused, and the refusal lines of a stray file are read as offenders', () => {
+  assert.equal(leftoversRefusal({ repo: skillRoot }), null);
+  const stderr = 'Authored JSON outside modules/kernel/allowlist.yaml (1):\n  examples/lite-app/reports/lint.sonar.json\n';
+  const refused = leftoversRefusal({ repo: skillRoot, deps: { run: () => ({ status: 1, stderr }) } });
+  assert.deepEqual(refused.findings.map((f) => f.fix.split(' if ')[0]), ['delete examples/lite-app/reports/lint.sonar.json']);
+  assert.throws(() => leftoversRefusal({ repo: skillRoot, deps: { run: () => ({ status: 2, stderr: 'boom' }) } }), /could not run \(exit 2\): boom/);
+});
+
 // The second alpha.7 cut ran 40 minutes of checks against a root node_modules that lacked @typescript-eslint/parser, which package-lock.json had gained that day.
 test('the host check refuses a root install that is not the lockfile\'s, naming npm ci, and ignores optional and platform-bound packages', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-root-install-'));
@@ -360,4 +425,41 @@ test('the host check refuses a root install that is not the lockfile\'s, naming 
   assert.equal(rootInstallProblem(root), null);
   const missing = releaseHostMissing({ env: { ORCA_TERMINAL_HANDLE: 't' }, orca: () => ({ ok: true, reachable: true }), docker: () => ({ status: 0 }), root, install: () => 'drift' });
   assert.deepEqual(missing.map((m) => [m.need, m.fix]), [['the lockfile install', 'run npm ci in the runtime root']]);
+});
+
+// Outer-host stand-ins exercise preparation refusal; these are not native/live release receipts.
+test('a read-only cut plan never creates a release shell when the actual terminal is missing', async (t) => {
+  const fx = fixture(t), calls = [];
+  const out = await cut(fx, { plan: true }, {
+    host: () => [{ need: 'an Orca terminal', why: 'actual handle absent', fix: 'use a native shell' }],
+    prepareTerminal: () => { calls.push('create'); throw new Error('plan must never create'); },
+    suite: () => { calls.push('suite'); throw new Error('plan must never run suite'); },
+  });
+  assert.equal(out.verdict, 'release-host'); assert.deepEqual(calls, []); untouched(fx);
+});
+
+test('a real cut may prepare only the missing plain shell and still refuses without suite/tag/push', async (t) => {
+  const fx = fixture(t), calls = [];
+  const evidence = { outcome: 'ok', effectState: 'committed', why: 'stand-in preparation receipt', native: { result: { terminal: { handle: 'fixture-only' } } } };
+  const before = process.env.ORCA_TERMINAL_HANDLE;
+  const out = await cut(fx, {}, {
+    host: () => [{ need: 'an Orca terminal', why: 'actual handle absent', fix: 'use a native shell' }],
+    prepareTerminal: ({ repo }) => { assert.equal(repo, fx.repo); calls.push('create'); return evidence; },
+    suite: () => { calls.push('suite'); throw new Error('preparation is not a ready release host'); },
+  });
+  assert.equal(out.verdict, 'release-host'); assert.equal(out.ok, false);
+  assert.equal(out.terminalPreparation, evidence); assert.deepEqual(calls, ['create']);
+  assert.equal(out.tagCreated, false); assert.equal(process.env.ORCA_TERMINAL_HANDLE, before); untouched(fx);
+});
+
+test('another unmet host prerequisite prevents shell creation and unknown creation custody is retained without retry', async (t) => {
+  const fx = fixture(t), calls = [];
+  const terminal = { need: 'an Orca terminal', why: 'absent', fix: 'use native shell' };
+  const deps = { host: () => [terminal, { need: 'a Docker daemon', why: 'absent', fix: 'start Docker' }],
+    prepareTerminal: () => { calls.push('create'); return { outcome: 'unknown', effectState: 'unknown', why: 'do not retry automatically', native: { receipt: null } }; } };
+  const stopped = await cut(fx, {}, deps);
+  assert.equal(stopped.verdict, 'release-host'); assert.deepEqual(calls, []);
+  const unknown = await cut(fx, {}, { ...deps, host: () => [terminal] });
+  assert.equal(unknown.verdict, 'release-host'); assert.equal(unknown.terminalPreparation.effectState, 'unknown');
+  assert.match(unknown.why, /do not retry automatically/); assert.deepEqual(calls, ['create']); untouched(fx);
 });

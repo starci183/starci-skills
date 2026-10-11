@@ -13,11 +13,14 @@
 //
 //   starci supervisor start [--json] [--plan] [--reason <text>]
 //       enable the seat and launch it unless one is live
-//   starci supervisor start --replace [--json]      (the watchdog's call; never enables)
+//   start-supervisor.mjs --replace [--json]      (internal, the watchdog's call; never enables)
+//   start-supervisor.mjs --rotate --reason <handover> [--json]   (internal, the watchdog's call: close the idle live seat and start the standing prompt again; the seat stays enabled)
 //   starci supervisor status [--json]
 //   starci supervisor stop [--json]         disable, worker-stop + worker-release
-//   starci supervisor start --restart [--json]      stop + start (a contract reload)
+//   start-supervisor.mjs --restart [--json]      (internal) stop + start (a contract reload)
 //
+// The public verbs are status, start (--plan, --reason) and stop; --replace, --rotate and --restart are not CLI flags (the catalog
+// refuses them): the watchdog runs this script for them.
 // Singleton, three fences:
 //   1. a host lock (machine.sqlite host_locks 'supervisor-start'): two launchers never run at once;
 //   2. the seat (machine.sqlite seats row 'supervisor', scripts/machine/home.mjs seatOf/writeSeat): a 'starting'
@@ -25,12 +28,13 @@
 //      worker-show reports live is never replaced; an Orca that does not answer proves nothing (exit 75, nothing touched);
 //   3. dedupe by OWNERSHIP (seat-sessions.mjs): a terminal sup_events records as a seat session that is not the
 //      current seat is a duplicate: quit and closed. A terminal merely titled "[Supervisor]" is never touched.
+import { seatAgentGone, agentGoneHealth } from './seat-agent-gone.mjs';
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { openMachine, openMachineReader, pidAlive, starciLocalRoot } from '../../engine/db/machine.mjs';
+import { openMachine, openMachineReader, pidAlive } from '../../engine/db/machine.mjs';
 import { agentOfTerminal } from '../kernel/quit-agent.mjs';
 import {
   SKILL_ROOT, SUPERVISOR_ID, STARTUP_RESERVATION_MS,
@@ -72,7 +76,7 @@ export function launchAuthorityText({ restart = null } = {}) {
     ? [`LAUNCH AUTHORITY - REPLACEMENT [Supervisor]: ${restart}.`,
       '  Nothing about your mandate changed. Re-register the channel, read the inbox, run one tick and continue.']
     : ['LAUNCH AUTHORITY - the owner approved the single [Supervisor] kernel design on 2026-09-24',
-      '  ("1 Supervisor, many Workers spawned on demand; chat only reads/sends to the supervisor"). This prompt is the go.'];
+      '  ("1 Supervisor; chat only reads/sends to the supervisor"). This prompt is the go.'];
   return [...head,
     '  Watchdog wakes are the runtime cadence, not owner messages: act on each. Never ask the owner for a go to start',
     '  or continue (owner rule: the owner never approves launch gates).'].join('\n');
@@ -92,9 +96,8 @@ function renderSupervisorPrompt({ template, doc, settings, restart = null, skill
 /* ------------------------------------------------------------ the seat's denied tools */
 
 /**
- * Tools the Supervisor's own agent may not use. Its in-process subagents (Claude Code's Agent tool) bypass the design - [Worker]s across four providers, leases, staging, the land gate and /status all
- * see nothing of them (2026-09-24: four "general-purpose" subagents diagnosed clusters). Diagnosis is a
- * [Worker] job too (modules/supervisor/supervisor-prompt.md). worker-start takes no provider argv, so the denial is
+ * Tools the Supervisor's own agent may not use. Its in-process subagents (Claude Code's Agent tool) sit outside the menu and the decision
+ * log: a judgment is one typed choice of the menu (modules/supervisor/supervisor-prompt.md). worker-start takes no provider argv, so the denial is
  * a seat guard bound to the seat's terminal (bindSeatGuard) that the project PreToolUse hook enforces.
  */
 export const SEAT_DENIED_TOOLS = Object.freeze({ claude: Object.freeze(['Agent', 'Task']) });
@@ -147,7 +150,9 @@ export function seatHealth(seat, deps) {
   if (!dispatch) return healthWithoutDispatch(seat, terminal);
   let shown;
   try { shown = deps.show(dispatch); } catch (e) { shown = { ok: false, error: String(e?.message ?? e) }; }
-  return shownWorkerHealth(shown, terminal, dispatch);
+  const health = shownWorkerHealth(shown, terminal, dispatch);
+  const gone = health.live ? seatAgentGone(deps, terminal) : null;
+  return gone ? agentGoneHealth(gone, { terminal, dispatch }) : health;
 }
 
 function healthWithoutDispatch(seat, terminal) {
@@ -337,7 +342,7 @@ async function spawnSeat({ m, d, seat, health, listing, recorded, dedupe, group,
   });
   const spawned = d.start({ provider: group[0].provider, model: group[0].model, effort: settings.effort, worktree: SKILL_ROOT, title: profile.title, prompt, env,
     role: 'supervisor', scopeId: `${profile.id}:attempt:${attempt}`, allowGroup: group, tier: group[0]?.tier ?? null, bias: seatBias(settings), biasTrusted: true,
-    specFile: path.join(starciLocalRoot(env), profile.seatId, `prompt.a${attempt}.md`), objective: `${profile.title} — ${profile.id}`,
+    objective: `${profile.title} — ${profile.id}`,
     entry, priorRunId: seat?.value?.runId ?? null,
     request: { seat: profile.id, attempt, token } });
   if (!spawned?.ok) return recordSpawnFailure({ m, spawned, token, attempt, profile, settings, now });
@@ -352,7 +357,7 @@ async function spawnSeat({ m, d, seat, health, listing, recorded, dedupe, group,
  * enabled). Every host seam is in `deps`. Returns a result object; `exit` is the
  * process exit code it maps to.
  */
-export async function launchSupervisor({ mode = 'start', reason = null, plan: planOnly = false,
+export async function launchSupervisor({ mode = 'start', reason = null, plan: planOnly = false, rotate = false,
   env = process.env, deps = null, settings = supervisorSettings(), template = null, doc = null, now = Date.now,
   profile = SUPERVISOR_SEAT } = {}) {
   const refusal = chatModeRefusal({ env, planOnly, mode });
@@ -372,7 +377,7 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
     const group = launchGroup(settings);
     if (planOnly) return planResult({ seat, health, dedupe, group, settings, profile, env, d, enabled });
 
-    if (health.live) {
+    if (health.live && !rotate) {
       const closed = closeDuplicates(dedupe.close, d, listing);
       return { ok: true, exit: 0, action: health.starting ? 'starting' : 'already-live', terminal: health.terminal, reason: health.reason, ...(closed.length ? { closedDuplicates: closed } : {}) };
     }
@@ -409,6 +414,13 @@ export async function stopSupervisor({ env = process.env, deps = null, now = Dat
 }
 
 
+/** The seat's status: {ok, action: 'status', supervisorMode, enabled, seat, health}. */
+export async function supervisorStatus() {
+  const d = await orcaDeps();
+  const { seat, enabled } = readSupervisor((m) => ({ seat: seatOf(m), enabled: enabledOf(m) }), { seat: null, enabled: null });
+  return { ok: true, action: 'status', supervisorMode: supervisorMode(), enabled, seat: seat?.value ?? null, health: seatHealth(seat, d) };
+}
+
 /* ------------------------------------------------------------ CLI */
 
 const bestEffort = bestEffortCall;
@@ -426,18 +438,17 @@ const describe = (r) => {
   return `[Supervisor] ${r.action}${terminal}${reason}${error}`;
 };
 
+/** The flags this script takes for the runtime's own callers (the watchdog, the owner's restart) and the CLI refuses with a pointer: modules/cli/commands/supervisor/start.yaml internalFlags. */
+export const INTERNAL_FLAGS = Object.freeze(['replace', 'rotate', 'restart']);
+
 async function main() {
   const argv = process.argv.slice(2);
   const has = (n) => argv.includes(`--${n}`);
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const asJson = has('json');
   const out = (r) => { console.log(asJson ? JSON.stringify(r) : describe(r)); process.exitCode = r.exit ?? (r.ok ? 0 : 1); };
-  if (has('help')) { console.log('use: start-supervisor.mjs [--plan] [--reason <t>] | --replace | --status | --stop | --restart  [--json]'); return; }
-  if (has('status')) {
-    const d = await orcaDeps();
-    const { seat, enabled } = readSupervisor((m) => ({ seat: seatOf(m), enabled: enabledOf(m) }), { seat: null, enabled: null });
-    return out({ ok: true, action: 'status', supervisorMode: supervisorMode(), enabled, seat: seat?.value ?? null, health: seatHealth(seat, d) });
-  }
+  if (has('help')) { console.log(`use: start-supervisor.mjs [--plan] [--reason <t>] | ${INTERNAL_FLAGS.map((name) => '--' + name).join(' | ')} | --status | --stop  [--json]`); return; }
+  if (has('status')) return out(await supervisorStatus());
   if (has('stop')) { const r = await stopSupervisor(); supervisorLog('start', describe(r), { data: r }); return out(r); }
   if (has('restart')) {
     const stopped = await stopSupervisor();
@@ -446,8 +457,8 @@ async function main() {
     supervisorLog('start', `restart: ${describe(r)}`, { level: r.ok ? 'info' : 'warn', data: r });
     return out(r);
   }
-  const mode = has('replace') ? 'replace' : 'start';
-  const r = await launchSupervisor({ mode, reason: value('reason'), plan: has('plan') });
+  const mode = has('replace') || has('rotate') ? 'replace' : 'start';
+  const r = await launchSupervisor({ mode, reason: value('reason'), plan: has('plan'), rotate: has('rotate') });
   if (!has('plan')) supervisorLog('start', `${mode}: ${describe(r)}`, { level: r.ok ? 'info' : 'warn', data: r });
   return out(r);
 }

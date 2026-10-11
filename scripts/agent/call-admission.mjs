@@ -19,7 +19,7 @@ const CAPACITY_CODES = new Set(['capacity-full', 'owner-grant-full']);
 const QUOTA_CODES = new Set(['quota-exhausted', 'quota-normal-blocked', 'quota-launch-blocked']);
 
 /** The kind of a refused admission: the reason's own kind, else the one every dropped member shares (all out of slots, all out of tokens). */
-function decisionKind(reason, rejected) {
+export function decisionKind(reason, rejected) {
   const direct = refusalKind(reason);
   if (direct !== 'unavailable' || !rejected.length) return direct;
   const sharedBy = (codes) => rejected.every((row) => row.codes.some((code) => codes.has(code)));

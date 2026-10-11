@@ -252,6 +252,10 @@ proofs:
       en: No product journey, setup effect or cleanup effect ran; no receipt/pass was invented; canonical
         Work remains todo without a completion write, and runtime.sqlite was touched only through
         canonical APIs.
+judge:
+  - by: machine
+    measures: [declared-checks]
+    why: "the settler re-runs the checks it can run itself; the browser-readiness probe and the digest bindings are the op's own observations and the later uat.assisted.verify reproduces them from the immutable receipts"
 blockers:
   - code: NO_HUMAN_GATE
     condition:

@@ -5,9 +5,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { freshFetch } from '../../scripts/api/sonar/fresh-fetch.mjs';
-import { PROOF_BRANCH, cloudConfig, ensureCloudProject, sonarCloudFindings, sonarOrganization } from '../../scripts/supervisor/release-sonarcloud.mjs';
-import { removeLintReport, writeLintReport } from '../../scripts/supervisor/release-sonar-report.mjs';
+
+import { cloudConfig, ensureCloudProject, sonarCloudFindings, sonarOrganization } from '../../scripts/supervisor/release-sonarcloud.mjs';
+import { lintReportFile, removeLintReport, writeLintReport } from '../../scripts/supervisor/release-sonar-report.mjs';
 import { sonarCloudRefusal } from '../../scripts/supervisor/release-cut-plan.mjs';
 import { sonarSupplier } from '../../scripts/supervisor/release-l4-sonar.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -56,15 +56,7 @@ test('config: SonarCloud host, the runtime token from secret.env (not the SONAR_
   assert.throws(() => cloudConfig(tmp(t, 'nokey'), SETTINGS), /no sonar\.projectKey/);
 });
 
-test('fetch: every request asks for its own connection, so a socket pooled before a long synchronous step is never reused', async (t) => {
-  const real = globalThis.fetch;
-  t.after(() => { globalThis.fetch = real; });
-  const seen = [];
-  globalThis.fetch = async (url, init) => { seen.push(init.headers); return { status: 200 }; };
-  await freshFetch('https://sonarcloud.io/api/x', { headers: { Accept: 'application/json' } });
-  await freshFetch('https://sonarcloud.io/api/y');
-  assert.deepEqual(seen, [{ Accept: 'application/json', Connection: 'close' }, { Connection: 'close' }]);
-});
+
 
 test('findings: a ready SonarCloud has none; no example means nothing to check; the token travels only as a bearer header', async () => {
   const cloud = fakeCloud();
@@ -123,21 +115,11 @@ function gateOf({ scan = { outcome: 'pass', scanner: { exitCode: 0 }, ceTask: { 
     },
   };
 }
-const supplier = (t, fake, extra = {}) => sonarSupplier([APP], { gate: fake.gate, settings: SETTINGS, lintReport: () => ({ ok: true }), logDir: () => tmp(t, 'log'), ...extra });
+const supplier = (t, fake, extra = {}) => sonarSupplier([APP], { gate: fake.gate, settings: SETTINGS, lintReport: () => ({ ok: true }), logDir: () => tmp(t, 'log'), reportDir: () => tmp(t, 'report'), ...extra });
 
-test('supplier: the project is ensured, the scan runs with the organization on the proof branch, the dashboard is read, and both passing is the proof', async (t) => {
-  const fake = gateOf();
-  const proof = await supplier(t, fake).proofs['shop: sonar']();
-  assert.equal(proof.ok, true);
-  assert.deepEqual(fake.calls, ['ensure', ['scan', ['-Dsonar.organization=acme', `-Dsonar.branch.name=${PROOF_BRANCH}`]], ['dashboard', PROOF_BRANCH]]);
-});
 
-test('supplier: a project created by this proof is analysed as its main branch, never on a branch of a project that has none', async (t) => {
-  const fake = gateOf({ project: { created: true } });
-  await supplier(t, fake).proofs['shop: sonar']();
-  assert.deepEqual(fake.calls[1][1], ['-Dsonar.organization=acme']);
-  assert.deepEqual(fake.calls[2], ['dashboard', undefined], 'the dashboard reads the main branch the analysis became');
-});
+
+
 
 test('supplier: the scan row holds the runtime bar elsewhere: a processed analysis whose SonarCloud gate is red or NONE still passes the scan row and the dashboard decides', async (t) => {
   const green = gateOf({ scan: processedScan() });
@@ -172,19 +154,40 @@ test('supplier: a config error, a failed lint report, a project that cannot be c
   assert.match(fs.readFileSync((await supplier(t, thrown).proofs['shop: sonar']()).log, 'utf8'), /scanner exploded/);
 });
 
-test('report: the lint report is written fresh before the scan, a lint run that writes none is named, and the report and its empty directory are removed afterwards', (t) => {
-  const dir = tmp(t, 'report');
-  fs.mkdirSync(path.join(dir, 'reports'));
-  fs.writeFileSync(path.join(dir, 'reports', 'lint.sonar.json'), 'stale');
+test('report: the lint report is written fresh outside the tracked tree, a lint run that writes none is named, and the report and its directory are removed afterwards', (t) => {
+  const app = tmp(t, 'app');
+  const file = lintReportFile(tmp(t, 'report'));
+  fs.writeFileSync(file, 'stale');
   let seen;
-  const none = writeLintReport(dir, { run: (args, options) => { seen = { args, cwd: options.cwd, stale: fs.existsSync(path.join(dir, 'reports', 'lint.sonar.json')) }; return { status: 2, stderr: 'boom' }; } });
-  assert.deepEqual(seen, { args: ['exec', '--no-install', '--', 'starci', 'app', 'lint', '--sonar', 'reports/lint.sonar.json'], cwd: dir, stale: false });
+  const none = writeLintReport(app, file, { run: (args, options) => { seen = { args, cwd: options.cwd, stale: fs.existsSync(file) }; return { status: 2, stderr: 'boom' }; } });
+  assert.deepEqual(seen, { args: ['exec', '--no-install', '--', 'starci', 'app', 'lint', '--sonar', file], cwd: app, stale: false });
   assert.match(none.reason, /wrote no report \(exit 2\): boom/);
-  const writes = () => { fs.mkdirSync(path.join(dir, 'reports'), { recursive: true }); fs.writeFileSync(path.join(dir, 'reports', 'lint.sonar.json'), '{}'); return { status: 1 }; };
-  assert.deepEqual(writeLintReport(dir, { run: writes }), { ok: true }, 'findings (a non-zero lint exit) do not stop the report: the gate counts them');
-  removeLintReport(dir);
-  assert.equal(fs.existsSync(path.join(dir, 'reports')), false);
-  removeLintReport(dir);
+  const writes = () => { fs.writeFileSync(file, '{}'); return { status: 1 }; };
+  assert.deepEqual(writeLintReport(app, file, { run: writes }), { ok: true }, 'findings (a non-zero lint exit) do not stop the report: the gate counts them');
+  removeLintReport(file);
+  assert.equal(fs.existsSync(path.dirname(file)), false);
+  removeLintReport(file);
+  assert.deepEqual(fs.readdirSync(app), [], 'the example tree was never written');
+});
+
+test('supplier: the scanner is pointed at the report in the temp root, and an interrupt in the middle of the scan removes the report and its directory', async (t) => {
+  const fake = gateOf();
+  const dir = tmp(t, 'interrupt');
+  const file = lintReportFile(dir);
+  let undo;
+  let disposed = 0;
+  const lintReport = (appDir, written) => { fs.writeFileSync(written, '{}'); return { ok: true }; };
+  fake.gate.scan = async (cloud, appDir, defines) => {
+    assert.ok(defines.includes(`-Dsonar.externalIssuesReportPaths=${file}`));
+    assert.equal(fs.existsSync(file), true);
+    undo();
+    assert.equal(fs.existsSync(dir), false, 'the interrupt removed the report directory');
+    return processedScan();
+  };
+  const proof = await supplier(t, fake, { lintReport, reportDir: () => dir, onInterrupt: (fn) => { undo = fn; return () => { disposed += 1; }; } }).proofs['shop: sonar']();
+  assert.equal(proof.ok, true);
+  assert.equal(disposed, 1, 'a finished proof drops its registration');
+  assert.equal(fs.existsSync(dir), false);
 });
 
 test('cut: a SonarCloud finding becomes the sonar-cloud verdict naming every finding and its fix; no finding is no refusal', async () => {

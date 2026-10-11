@@ -1,6 +1,6 @@
 // controllers/gc.mjs — the reconciler's GC controller (DESIGN §8.5, §15; lane rc-gc-resource).
 //
-// It wraps scripts/supervisor/gc.mjs, never re-implements it. Three triggers:
+// It wraps scripts/supervisor/gc.mjs, never re-implements it. Five triggers, an event and four keys:
 //   1. an event (op-settled, worker-released[-on-report], kernel-stale-cleared, land-succeeded/land-passed,
 //      workflow-finished, workflow-archived) → verify just that entity: its workers (Orca's worker-list of the entity's
 //      Runs: a reclaimable worker on one of its terminals is released per Orca's nextAction, lib/worker-accounting.mjs
@@ -35,13 +35,14 @@ import { parseYaml } from '../../../engine/yaml.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
 import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs';
 import { releasePlan, workerTerminalHandles } from '../../lib/worker-accounting.mjs';
-import { eachInOrder } from '../../lib/in-order.mjs';
+import { eachInOrder } from '../../lib/in-order.mjs'; import { untiedTreesDecision } from '../untied-tree-item.mjs';
+import { reconcileTreeStrays, treeStrayDeps } from '../gc-tree-strays.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const NAME = 'gc';
 const OWNER = 'reconciler/gc';
 export const DEFAULTS = Object.freeze({ resyncMs: 60_000, concurrency: 2, housekeepingEveryMs: 86_400_000, lowResourceGapMs: 3_600_000, eventGraceMs: 60_000,
-  eventMaxTries: 6, blobSweepEveryMs: 86_400_000 });
+  eventMaxTries: 6, blobSweepEveryMs: 86_400_000, treeStraysEveryMs: 600_000, treeStrayMinAgeMs: 1_800_000, treeStrayMaxBytes: 1_048_576 });
 /** MB-14: a retry lands this long after the grace window closes, never exactly on its edge. */
 const GRACE_MARGIN_MS = 5_000;
 const LIVE_JOB = new Set(['queued', 'leased', 'running', 'answering', 'effect_unknown']);
@@ -68,7 +69,7 @@ export const landKey = (jobId) => (clean(jobId) ? `gc:land:${clean(jobId)}` : nu
 /** A key → {type, ledgerId?, id}. The ledger id never holds ':' (a repo basename or 'supervisor'); ids may. */
 export function parseKey(key) {
   const k = String(key ?? '');
-  if (k === 'gc:sweep' || k === 'gc:housekeeping' || k === 'gc:blob-sweep' || k === 'gc:worktrees') return { type: k.slice(3) };
+  if (k === 'gc:sweep' || k === 'gc:housekeeping' || k === 'gc:blob-sweep' || k === 'gc:worktrees' || k === 'gc:tree-strays') return { type: k.slice(3) };
   let m = /^gc:(job|workflow):([^:]+):(.+)$/.exec(k);
   if (m) return { type: m[1], ledgerId: m[2], id: m[3] };
   m = /^gc:land:(.+)$/.exec(k);
@@ -95,6 +96,7 @@ export const ROUTES = Object.freeze({
 /* ------------------------------------------------------------ live deps (lazy: discovery stays cheap) */
 
 const liveDeps = {
+  ...treeStrayDeps,
   gc: () => import('../../supervisor/gc.mjs'),
   // The sweep is a CHILD process, never runGc in the engine: it walks every lane worktree and Orca terminal with synchronous
   // git/CLI calls (minutes on a loaded host) and the engine has one thread (ENGINE-STALL: it stalled the lease at the
@@ -435,7 +437,7 @@ export function createGcController(overrides = {}) {
       return { ok: false, error: String(error?.message ?? error).slice(0, 200) };
     }
     const stop = items.find((i) => i.action === 'stopped');
-    if (stop) await stoppedDecision(ctx, { reason: stop.reason, path: items.find((i) => i.fatal)?.path ?? null, damage: items.find((i) => i.fatal)?.damage ?? [stop.error] });
+    if (stop) await stoppedDecision(ctx, { reason: stop.reason, path: items.find((i) => i.fatal)?.path ?? null, damage: items.find((i) => i.fatal)?.damage ?? [stop.error] }); await untiedTreesDecision(ctx, items, { complete: !stop });
     const removed = items.filter((i) => i.ok === true && i.action === 'remove').length;
     const failed = items.filter((i) => i.ok === false);
     if (items.length) {
@@ -480,14 +482,12 @@ export function createGcController(overrides = {}) {
     resyncMs: settings.resyncMs,
     concurrency: settings.concurrency,
     routes: ROUTES,
-    async list() { return ['gc:sweep', 'gc:housekeeping', 'gc:blob-sweep', 'gc:worktrees']; },
+    async list() { return ['gc:sweep', 'gc:housekeeping', 'gc:blob-sweep', 'gc:worktrees', 'gc:tree-strays']; },
     async reconcile(key, ctx) {
       const k = parseKey(key);
       // The engine runs this controller only when it is not off; ctx.mode decides act (active) or record (shadow).
-      if (k.type === 'sweep') return reconcileSweep(ctx);
-      if (k.type === 'housekeeping') return reconcileHousekeeping(ctx);
-      if (k.type === 'blob-sweep') return reconcileBlobSweep(ctx);
-      if (k.type === 'worktrees') return reconcileWorktrees(ctx);
+      const keyed = { sweep: reconcileSweep, housekeeping: reconcileHousekeeping, 'blob-sweep': reconcileBlobSweep, worktrees: reconcileWorktrees, 'tree-strays': (c) => reconcileTreeStrays(c, { settings, deps, name: NAME, would }) }[k.type];
+      if (keyed) return keyed(ctx);
       if (k.type === 'job') return reconcileJob(ctx, k);
       if (k.type === 'workflow') return reconcileWorkflow(ctx, k);
       if (k.type === 'land') return reconcileSupJob(ctx, { jobId: k.id, sup: (await deps.gc()).supervisorView(), gc: await deps.gc() });

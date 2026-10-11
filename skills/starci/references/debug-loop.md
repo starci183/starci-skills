@@ -76,7 +76,10 @@ State which of the three you used. Do not claim a loop exists until the host con
     that queue, fixes each defect in `.claude` with a spec on a fix lane it opens, and verifies the fix is on the running
     host. The Supervisor changes no runtime code.
   - a seat that is down or drifted: `starci workflow start` or `starci supervisor start` from an Orca terminal;
-    `starci reconciler restart` for an engine on an old revision.
+    `starci runtime deploy --from <clone>` carries a new revision onto the host (below); `starci reconciler restart` alone is for an engine on the revision the host tree already holds.
+- A runtime defect is fixed at once and in parallel: split it by independent cause and open one fix lane per cause in the same turn, each in its own clone with the files it may touch named. Do not feed one lane one defect after another while others wait. Carry each lane's fix onto the host as soon as `starci runtime verify` prints `verified <sha>` for it (the check alone is never that), and leave nothing a lane found listed as later: fix it in that round or open another lane for it then. The fixes of a day are consolidated into one release cut at the end of that day (ruling `debug-fix-lanes` of `modules/kernel/roles.yaml`).
+- A fix lane verifies with `starci runtime verify --base <tip it was cut from>` and reports ITS last line (`verified <sha>: check p/p, affected N/N of <base>..<sha>` or `NOT VERIFIED <sha>: ...`), never the line of `npm run check` (a `PARTIAL` line is fit to land, not to deploy) (which runs no spec): `starci runtime check` and `starci test affected --run` joined on one commit into one receipt. A red file is fixed and run again (`starci test affected --run`, unchanged green files are reused from a proven run at an unchanged key), then `starci runtime verify` once. The whole suite is the merged-tree run and the release cut, never a lane's routine. "Related" means the changed symbols: `starci test affected` follows each changed function through the specs that import it and the specs behind its callers, and falls back to every importer of a file it cannot follow by name (yaml, a template, a statement that runs at load); the report names each fallback.
+- A fix for a defect found on a live host is not done until a replay spec built from the sequence that showed it passes. A spec built on a fake of the code under test has passed before while the fix did not hold on the host, so the proof is a replay: `node tests/helpers/replay-extract.mjs <case> <ledger copy>` reduces a read-only copy of the ledger to a neutral fixture of a few KB (no names, paths or free text; the hygiene scan refuses anything else), a spec of `tests/replay/` builds the throwaway world from it with `tests/helpers/replay-world.mjs` and drives the real controllers, the settler, the Kernel verbs and the menu builders pass by pass, crossing the engine restart (`world.engine`, a fresh process per call) and the runtime revision change (`world.reviseRuntime`) the live sequence crossed, with only the outermost seams stubbed (the Orca binary, the Critic agent launch) and named in the spec header. Show it fail on the revision where the bug lived (`node tests/helpers/replay-on-revision.mjs <sha> tests/replay/<case>.spec.mjs`, which exports that revision into a disposable directory inside the clone) before showing it pass on the fix. The registry entry of the case carries `found: live` and `replay: tests/replay/<case>.spec.mjs`; the `edge-case-registry` self-check refuses a covered live case without it. A case the fix does not yet close stays `open` with the exact failing assertion, and its replay test carries `todo` until the fix lands (ruling `debug-replay-before-done` of `modules/kernel/roles.yaml`).
 - Every edge case met is an entry of the edge-case registry (`modules/reconciler/edge-cases.yaml`), added in the same change
   that resolves it, with the rule that now handles it and the spec that reproduces it. A `covered` entry names both.
 - Never edit a store, a ledger or a product repository by hand, never resolve a gate as someone else, never enter a
@@ -86,13 +89,30 @@ State which of the three you used. Do not claim a loop exists until the host con
   assign.
 - Show the first lines as they are: a controllers alarm is the first line of the digest.
 
+## Carrying a fix onto the host
+
+One verb replaces the hand sequence (a hand fast-forward of the live checkout, `starci reconciler restart`, read the digest):
+
+```
+starci runtime deploy --from <clone-or-ref> --plan     # every step and every refusal, nothing changed
+starci runtime deploy --from <clone-or-ref>            # the deploy
+```
+
+- It refuses unless the source is committed and clean, a fast-forward of the host tree, and proven by a receipt bound to that exact commit that carries BOTH the check and the affected specs for the host head: the verify receipt of the source clone (`starci runtime verify`), a land note with its `Affected:` line, or the proofs the verb runs itself in the clean source (a lane cannot claim green; a check alone is no receipt). It refuses while a release cut holds the host lock.
+- After the check it runs the specs the change can break (`starci test affected --run --base <host head>`, in shards inside the stated budget) and requires a clean receipt on that exact commit: a red spec, a budget that ended with files not started, or a receipt of another tip is a refusal, and there is no bypass. `--plan` states the size of the set and the budget without running it. The run is judged from a receipt file, its progress is printed while it runs, and a receipt already proven for the same base..tip pair (a clean `starci test affected --run` made in the source clone) is accepted instead of a second run. The receipt and the deploy event carry `{base, tip, passed, total}`.
+- It waits for the settles, Critic runs and prepared decisions in flight and stops none of them; when they do not finish in time it refuses and names them.
+- A tip several commits ahead is one revision change: one fast-forward, `starci runtime artefacts --migrate` from the new tree (generated copies and the hooks of every live workflow tree), one engine restart, then the verification (new revision with a fresh heartbeat, every controller in its mode, no seat dead) and one `runtime-deployed` event.
+- A failure after the fast-forward names the host state, the previous revision and the way back without destructive git (a revert of the range, never a reset), which the output of the verb prints.
+
+The first deploy of a tree that does not yet hold the verb (a host older than this section) is the hand sequence once: fast-forward the host checkout to the revision that adds the verb, restart the engine, read the digest. Every later deploy is the verb.
+
 ## The role contract
 
 <!-- roles:begin debug -->
 **Debug** (modules/kernel/roles.yaml#debug): The owner's eyes: a loop of the owner's chat for a limited stabilisation period, not part of steady-state operation.
 - Does:
-  - Audits whether each of the four roles above and the runtime floor did its job, each tick, through the digest: per op its attempt, report, evidence and hold; per Critic that it ran, on another provider, saw only the product, and had its verdict used; per Kernel seat that it is alive, acked the runtime revision, acts on ready work and takes the policy steps; per Supervisor seat that it is alive and answers gates inside their bound. Each stuck thing is a correct error or a departure of exactly one role.
-  - For every departure records a finding (role, broken duty, evidence, remedy) and changes .claude at once so the role cannot repeat it: the contract block or generated prompt, a policy-table rule, a gate or guard refusal, or a runtime fix with a spec, carried onto the host. Records the case in the edge-case registry in the same change.
+  - Audits whether each of the four roles above and the runtime floor did its job, each tick, through the digest: per op its attempt, report, evidence and hold; per Critic that it ran, on another provider, saw only the product, and had its verdict used; per Kernel seat that it is alive, acked the runtime revision, acts on ready work and takes the policy steps; per Supervisor seat that it is alive and answers gates inside their bound. Each stuck thing is a happy error or a bug of exactly one role; Debug removes bugs only, and happy errors stay with the chain.
+  - For every departure records a finding (role, broken duty, evidence, remedy) and changes .claude at once so the role cannot repeat it: the contract block or generated prompt, a policy-table rule, a gate or guard refusal, or a runtime fix with a spec, carried onto the host. Records the case in the edge-case registry in the same change. A fix of a defect found on a live host is done only when a replay spec built from the sequence that showed it passes (ruling debug-replay-before-done).
   - Owns the edge-case registry, the operating standard and the queue of runtime defects the Supervisor records. A leftover is evidence that its owner failed its cleanup duty; Debug may trigger the existing collector to unblock, and the finding is still the owner's.
   - Reports results to the owner, and retires itself when the stable criteria below hold.
 - Must clean up:
@@ -107,6 +127,17 @@ State which of the three you used. Do not claim a loop exists until the host con
 - Owns: the edge-case registry, the operating standard and the queue of runtime defects. Decides alone: which role failed which duty, which collector to trigger, the fix lanes it opens, and restarting a seat (the owner's authority).
 - Reports to: Owner (a result, or an owner-only action). Overseen by: Owner.
 - Measure: no edge case reaches it twice.
+- No budget: Debug is the owner's chat loop: its turns are the owner's session and no ledger row records them; it is bounded by its time box and its end condition, not by tokens.
+- Runtime changes: Debug is the owner's chat session and reads the tree itself each time it acts; it has no seat the runtime could wake or replace.
+- Guard: none by design; Debug is a loop of the owner's own chat session: it has no seat and no bound terminal, so the guard resolves its caller to the owner; its limits are the never list, the channels it speaks through and the gate-loosening check on what it changes.
+- Happy errors it handles (the system working as designed, handled inside the chain through the policy):
+  - owner-matter (policy row owner-gate): a matter that is the owner's (credentials, spend, a release): Debug reports it to the owner and does not decide it
+  - owner-question (policy row ask-owner): a question only the owner can answer: Debug names it in its result and waits
+- A bug in this role (the chain neither fixes nor works around it; Debug removes it with a change to .claude) is detected by:
+  - a departure of a role stands with no edge-case entry: a departure printed with remedy none in starci debug digest
+  - Debug loosens a gate or check to let a workflow pass: RT_GATE_LOOSENING over the commits since the last release
+  - Debug changes the runtime without recording the case: RT_EDGE_CASE_REGISTRY: a covered entry without its rule and spec
+  - the loop runs on after its end condition holds, or its standing is not printed: the standing against each end-condition criterion in the digest
 - Audits: Op, Critic, Kernel, Supervisor, the runtime.
 - Retires when:
   - clean-workflows: consecutive workflows ran start to handover with zero departures from the operating standard and zero human interventions

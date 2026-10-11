@@ -1,9 +1,10 @@
 import type { Concept } from '../../concept';
 export const concept: Concept = 'C8';
 import { useState } from 'react';
-import { ChevronDownIcon, ChevronRightIcon, LinkIcon } from 'lucide-react';
-import type { Tone } from '../../status';
-import { CopyButton, Frame, Toolbar, toolbarBtn, wordTone } from './common';
+import { LinkIcon } from 'lucide-react';
+import { Accordion, Alert } from '@heroui/react';
+import { Button } from '../../ui/button';
+import { CopyButton, Frame, Toolbar, toolbarBtn } from './common';
 import { TextView } from './text-view';
 import { t } from '../../../i18n/t';
 
@@ -29,35 +30,26 @@ function parseJson(text: string): Parsed {
 const isContainer = (v: Json): v is Json[] | { [k: string]: Json } => v !== null && typeof v === 'object';
 const keyPath = (base: string, k: string | number) => typeof k === 'number' ? `${base}[${k}]` : /^[A-Za-z_$][\w$]*$/.test(k) ? `${base}.${k}` : `${base}[${JSON.stringify(k)}]`;
 
-function leafTone(v: Json): Tone | null {
-  if (v === true) return 'success';
-  if (v === false) return 'failed';
-  if (typeof v === 'string') return wordTone(v);
-  return null;
-}
-
 function Leaf({ v }: Readonly<{ v: Json }>) {
   const [more, setMore] = useState(false);
   if (v === null) return <span className="italic text-muted-foreground">null</span>;
-  const tone = leafTone(v);
   if (typeof v === 'string') {
     const long = v.length > LONG && !more;
     return (
-      <span data-tone={tone ?? undefined} className={`whitespace-pre-wrap break-words ${tone ? 'font-medium text-[var(--tone)]' : 'text-foreground'}`}>
+      <span className="whitespace-pre-wrap break-words text-foreground">
         &quot;{long ? v.slice(0, LONG) : v}&quot;
-        {v.length > LONG ? <button type="button" className="ml-1 text-[11px] text-primary underline" onClick={() => setMore(m => !m)}>{more ? t('collapse') : t('… {n} more characters', { n: v.length - LONG })}</button> : null}
+        {v.length > LONG ? <Button type="button" variant="link" size="xs" className="ml-1" onClick={() => setMore(m => !m)}>{more ? t('collapse') : t('… {n} more characters', { n: v.length - LONG })}</Button> : null}
       </span>
     );
   }
-  if (typeof v === 'boolean') return <span data-tone={tone ?? undefined} className="font-medium text-[var(--tone)]">{String(v)}</span>;
-  return <span data-tone="running" className="text-[var(--tone)]">{JSON.stringify(v)}</span>;
+  return <span className="text-foreground">{JSON.stringify(v)}</span>;
 }
 
-/** Hover-revealed on a mouse; on touch (coarse pointer) an always-visible icon pair at the end of the row, in flow so it never covers text. */
-const touchBtn = `${toolbarBtn} pointer-coarse:size-7 pointer-coarse:justify-center pointer-coarse:px-0`;
+/** Copy actions occupy their own row space; coarse pointers retain visible 44px targets. */
+const touchBtn = `${toolbarBtn} pointer-coarse:size-11 pointer-coarse:justify-center pointer-coarse:px-0`;
 function Actions({ value, path }: Readonly<{ value: Json; path: string }>) {
   return (
-    <span className="absolute right-1 top-0 flex shrink-0 gap-1 rounded-md bg-card opacity-0 transition-opacity focus-within:opacity-100 group-hover/row:opacity-100 pointer-coarse:static pointer-coarse:ml-auto pointer-coarse:bg-transparent pointer-coarse:opacity-100">
+    <span className="ml-auto flex shrink-0 gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover/row:opacity-100 pointer-coarse:opacity-100">
       <CopyButton className={touchBtn} labelClassName="pointer-coarse:sr-only" value={() => typeof value === 'string' ? value : JSON.stringify(value, null, 2)} label={t('Value')} title={t('Copy the value')} />
       <CopyButton className={touchBtn} labelClassName="pointer-coarse:sr-only" icon={<LinkIcon className="size-3" />} value={path} label={t('Path')} title={t('Copy path {path}', { path })} />
     </span>
@@ -83,29 +75,35 @@ function Node({ k, v, path, depth, mode }: Readonly<{ k: string | number | null;
   const entries: [string | number, Json][] = isArr ? v.map((x, i) => [i, x]) : Object.entries(v);
   const shown = entries.slice(0, limit);
   return (
-    <div>
-      <div className="group/row relative flex items-start gap-1 py-px">
-        <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="flex min-w-0 items-start gap-0.5 rounded text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring">
-          {open ? <ChevronDownIcon className="mt-0.5 size-3.5 shrink-0" /> : <ChevronRightIcon className="mt-0.5 size-3.5 shrink-0" />}
-          <span>{label}<span className="text-muted-foreground">{isArr ? '[' : '{'}{open ? '' : ` ${entries.length} ${isArr ? t('items') : t('keys')} ${isArr ? ']' : '}'}`}</span></span>
-        </button>
-        <Actions value={v} path={path} />
-      </div>
-      {open ? (
-        <div className="ml-[7px] border-l pl-3">
+    <Accordion hideSeparator expandedKeys={open ? [path] : []} onExpandedChange={keys => setOpen(keys.has(path))}>
+      <Accordion.Item id={path}>
+        <div className="group/row relative flex items-start gap-1">
+          <Accordion.Heading className="min-w-0 flex-1">
+            <Accordion.Trigger className="min-h-9 justify-start gap-1 px-1 py-1 font-mono text-xs pointer-coarse:min-h-11">
+              <Accordion.Indicator className="ms-0 size-3.5" />
+              <span className="min-w-0 break-words">{label}<span className="text-muted-foreground">{isArr ? '[' : '{'}{open ? '' : ` ${entries.length} ${isArr ? t('items') : t('keys')} ${isArr ? ']' : '}'}`}</span></span>
+            </Accordion.Trigger>
+          </Accordion.Heading>
+          <Actions value={v} path={path} />
+        </div>
+        <Accordion.Panel>
+          <Accordion.Body className="ml-2 border-l px-0 pb-0 pl-3 font-mono text-xs text-foreground">
+            {open ? <>
           {entries.length === 0 ? <div className="py-px pl-4 text-muted-foreground">{isArr ? t('empty array') : t('empty object')}</div> : null}
           {shown.map(([ck, cv]) => <Node key={ck} k={ck} v={cv} path={keyPath(path, ck)} depth={depth + 1} mode={mode} />)}
           {entries.length > limit ? (
-            <button type="button" className={`${toolbarBtn} my-1 ml-4`} onClick={() => setLimit(l => l + PAGE)}>{t('more {n} ({remaining} left)', { n: Math.min(PAGE, entries.length - limit), remaining: entries.length - limit })}</button>
+            <Button type="button" variant="outline" size="xs" className="my-2 ml-4" onClick={() => setLimit(l => l + PAGE)}>{t('more {n} ({remaining} left)', { n: Math.min(PAGE, entries.length - limit), remaining: entries.length - limit })}</Button>
           ) : null}
           <div className="py-px pl-4 text-muted-foreground">{isArr ? ']' : '}'}</div>
-        </div>
-      ) : null}
-    </div>
+            </> : null}
+          </Accordion.Body>
+        </Accordion.Panel>
+      </Accordion.Item>
+    </Accordion>
   );
 }
 
-/** JSON / JSONL as a collapsible coloured tree. Invalid JSON falls back to text with a warning. */
+/** JSON literals are source data, independent of runtime status; invalid input retains the raw text. */
 export function JsonView({ text }: Readonly<{ text: string }>) {
   const [mode, setMode] = useState<Mode>({ m: 'default', n: 0 });
   const [raw, setRaw] = useState(false);
@@ -113,7 +111,7 @@ export function JsonView({ text }: Readonly<{ text: string }>) {
   if (!parsed.ok) {
     return (
       <div className="space-y-2">
-        <div data-tone="warning" className="rounded-lg border border-[var(--tone-line)] bg-[var(--tone-bg)] px-3 py-2 text-xs text-[var(--tone)]">{t('Not valid JSON ({error}). Shown as text.', { error: parsed.error })}</div>
+        <Alert status="warning"><Alert.Content><Alert.Description>{t('Not valid JSON ({error}). Shown as text.', { error: parsed.error })}</Alert.Description></Alert.Content></Alert>
         <TextView text={text} query="" />
       </div>
     );
@@ -123,10 +121,10 @@ export function JsonView({ text }: Readonly<{ text: string }>) {
     <Frame className="evidence-code-frame">
       <Toolbar right={<span>{parsed.jsonl ? t('JSONL · {n} lines', { n: parsed.docs.length }) : 'JSON'}</span>}>
         {!raw ? <>
-          <button type="button" className={toolbarBtn} onClick={() => setMode(s => ({ m: 'all', n: s.n + 1 }))}>{t('Expand all')}</button>
-          <button type="button" className={toolbarBtn} onClick={() => setMode(s => ({ m: 'none', n: s.n + 1 }))}>{t('Collapse all')}</button>
+          <Button type="button" variant="outline" size="xs" onClick={() => setMode(s => ({ m: 'all', n: s.n + 1 }))}>{t('Expand all')}</Button>
+          <Button type="button" variant="outline" size="xs" onClick={() => setMode(s => ({ m: 'none', n: s.n + 1 }))}>{t('Collapse all')}</Button>
         </> : null}
-        <button type="button" className={toolbarBtn} aria-pressed={raw} onClick={() => setRaw(r => !r)}>{raw ? t('View tree') : t('View raw')}</button>
+        <Button type="button" variant="outline" size="xs" aria-pressed={raw} onClick={() => setRaw(r => !r)}>{raw ? t('View tree') : t('View raw')}</Button>
         <CopyButton value={text} label={t('Copy all')} />
       </Toolbar>
       {raw ? <TextView text={text} query="" className="rounded-none border-0" /> : (

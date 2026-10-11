@@ -81,21 +81,21 @@ It listens for the signed webhook of the bank transfer notifier (`POST /webhooks
 
 ## keycloak (the stack's identity provider)
 
-| Key | Meaning | Sealed in |
+| Key | Meaning | Demo default (compose) |
 | --- | --- | --- |
-| `KC_BOOTSTRAP_ADMIN_PASSWORD` | Password of the bootstrap `admin` of the master realm | `secrets/keycloak-env.enc` |
-| `KEYCLOAK_ADMIN_CLIENT_SECRET` | Secret of the `identity-admin` client; the realm import reads it, the identity api presents it | `secrets/keycloak-env.enc` |
+| `KC_BOOTSTRAP_ADMIN_PASSWORD` | Password of the bootstrap `admin` of the master realm | `demo-only-keycloak-admin-password` |
+| `KEYCLOAK_ADMIN_CLIENT_SECRET` | Secret of the `identity-admin` client; the realm import reads it, the identity api presents it | `demo-only-identity-admin-client-secret` |
 
 ## minio (the stack's object storage)
 
-| Key | Meaning | Sealed in |
+| Key | Meaning | Demo default (compose) |
 | --- | --- | --- |
-| `MINIO_ROOT_PASSWORD` | Password of the MinIO root user `ecommerce` | `secrets/minio-env.enc` |
-| `RECEIPTS_S3_SECRET_ACCESS_KEY` | The same password, as the order api presents it | `secrets/minio-env.enc` |
+| `MINIO_ROOT_PASSWORD` | Password of the MinIO root user `ecommerce` | `demo-only-minio-root-password` |
+| `RECEIPTS_S3_SECRET_ACCESS_KEY` | The same password, as the order api presents it | `demo-only-minio-root-password` |
 
-DEMO-ONLY: `secrets/keycloak-env.enc` is encrypted to the example identity expected at `runtime/env/demo.agekey`. `starci app secret show`
-reads its members (`starci app secret list` names them), which are written to `runtime/env/keycloak.env`, which Compose reads and git never tracks; `secrets/minio-env.enc`
-likewise gives `runtime/env/minio.env`.
+DEMO-ONLY: these three values belong to a local stack on loopback and are not secrets; the compose files interpolate them with these defaults, so a clean
+clone needs no owner secret. Export `KC_BOOTSTRAP_ADMIN_PASSWORD`, `KEYCLOAK_ADMIN_CLIENT_SECRET` and `MINIO_ROOT_PASSWORD` before `up` to use others
+(`browser/stack.mjs` generates fresh ones per run and hands them to Compose and to the apis through the environment); give the services the same values.
 
 ## cli (`apps/cli`)
 

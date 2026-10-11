@@ -11,7 +11,7 @@
 # `use` names the allowed path (a verb of the CLI catalog, modules/cli/commands); the CLI lane edits the verbs, this file stays
 # the single place.
 roles:
-  bound: [op, lead, supervisor, coordinator]
+  bound: [op, lead, supervisor, coordinator, critic]
   # roles that may run a targeted `node --test <explicit spec files>` (L1 while working on the runtime); an op uses its gate
   node-test: [lead, supervisor, coordinator]
   # ops that may run a whole suite (the full unit / full e2e of an app)
@@ -19,6 +19,13 @@ roles:
   # the only refs a coordinator or the supervisor may push (backup namespace, explicit refspecs)
   backup-roles: [coordinator, supervisor]
   backup-ref: '^refs/backup/\S+$'
+# The Critic (rights role `critic`, a terminal bound to a critic job guard) reaches nothing but its own directory: scripts/guards/critic-reach.mjs.
+# `read` are the programs it may run on paths inside that directory; `write` the programs that may write the verdict file and nothing else.
+# The Orca self-lifecycle verbs (worker_done, escalation) below stay open to it; the rest of this table does not apply to it.
+critic:
+  read: [ls, dir, cat, type, head, tail, wc, file, stat, sha256sum, sha1sum, md5sum, cksum, od, xxd, hexdump, rg, grep, egrep, fgrep, jq, yq, nl, column, pwd, echo, printf, true, false,
+    get-content, gc, get-childitem, gci, get-item, gi, select-string, sls, test-path, resolve-path, get-location, write-output, write-host, measure-object, get-filehash]
+  write: [set-content, sc, out-file, add-content, ac]
 # The runtime's own verbs: the surface every other path is steered to.
 runtime: [starci]
 # Verbs that spend a provider model headlessly (a call tier of modules/models/tiers.yaml calls): a bound role runs one only as an op named
@@ -28,6 +35,47 @@ calls:
     verb: [work, imagegen]
     ops: [interface.draw, interface.asset, brand.decide]
     use: starci work imagegen --prompt <file> --out <dir in the worktree> (interface.draw, interface.asset and brand.decide only)
+# Capability verbs the runtime performs for an op (a served app and a browser): a bound role runs one only as an op named here. The app is
+# served by the verb, on the host name the app's own proxy uses; a server an op starts by hand is refused (raw-tools.next, the node and npm rows).
+renders:
+  layoutRender:
+    verb: [work, layout-render]
+    ops: [brand.decide, interface.draw]
+    use: starci work layout-render --work .starciwork --node <layout node id> --breakpoint <bp> --theme <theme> --write (brand.decide and interface.draw only)
+# The Supervisor seat (a bound caller of role supervisor). The Supervisor judges and answers: it reads, it answers the items of its menu
+# with `starci supervisor decide`, it records a runtime defect for Debug and it runs the collectors it owns. It changes no runtime code
+# (RUNTIME_CHANGE_OWNED_BY_DEBUG) and runs no other mutating verb: a call outside this table is refused with the menu
+# (SUPERVISOR_USE_DECIDE). Every program but starci, the pure reads and the read forms of git and npm is refused (SUPERVISOR_STARCI_ONLY).
+supervisor:
+  # starci <group> <verb> words the Supervisor seat may run
+  verbs:
+    supervisor: [status, decide, poll, actions, channel, workers, gc, revision-ack]
+    machine: [decisions]
+    kernel: [status, logs, questions, messages, survey, hierarchy, artifacts, coverage, usage, observe, peers, foundations, extensions, decisions, inbox, log]
+    workflow: [status]
+    gate: [read]
+  # a verb of several actions allows only these
+  actions:
+    actions: [list, digest, record]
+    channel: [register, inbox, reply]
+    workers: [list, show, cap]
+  # read verbs that also have mutating flags: refused when one of these flags is present
+  read-flags:
+    decisions: [open, claim, resolve, escalate, ring]
+    inbox: [ack]
+  # `supervisor actions record` is the defect queue: allowed for these --item values only
+  record-items: '^runtime-defect:[^ ]+$'
+  # programs whose read forms the general policy judges (git status, npm view); every write form of them is refused there
+  defer: [orca, git, npm, pnpm, yarn, bun]
+  # pure reads that the Supervisor does not get
+  deny-programs: [sleep, node]
+  use: "answer an item of the menu: starci supervisor status prints it, starci supervisor decide --item <id> --choice <choice> --reason <why> [--text <input>] answers it; a defect of the runtime is recorded with starci supervisor actions record --item runtime-defect:<cause> --action recorded --reason <why>"
+# The Op (a bound guard of role op). Its starci calls are its work: the capability verbs (starci app stack and the runtime-slot verbs for servers,
+# starci work draw-render for renders, starci work imagegen for images, starci test run and starci gate unit for tests, the checks) and its
+# report to its Kernel (starci kernel report). These groups are the control plane: the controllers, the Kernel and the Supervisor run them.
+op:
+  deny-groups: [supervisor, reconciler, workflow, route, debug]
+  use: "an Op runs the capability verbs of its work (starci app stack for servers, starci work draw-render for renders, starci work imagegen for images, starci test run or starci gate unit for tests) and reports to its Kernel with starci kernel report"
 # Release path: refused to every bound role.
 release:
   verbs: [cut, publish]
@@ -117,10 +165,10 @@ npm:
     add: {code: RIGHTS_RAW_TOOL, use: starci npm install adds exact-pinned dependencies and is limited to lead or owner}
     update: {code: RIGHTS_RAW_TOOL, use: starci npm install is the owner-controlled dependency-change path using canon pins}
     uninstall: {code: RIGHTS_RAW_TOOL, use: starci npm install is the owner-controlled dependency-change path using canon pins}
-    test: {code: RIGHTS_RAW_TOOL, use: starci test run --level L1|L2 in the runtime or starci gate unit --root <app> in an app}
-    t: {code: RIGHTS_RAW_TOOL, use: starci test run --level L1|L2 in the runtime or starci gate unit --root <app> in an app}
-    run: {code: RIGHTS_RAW_TOOL, use: 'starci test run runs tests; use starci release sync-runtime for package runtime copies and grammar preparation, or starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
-    run-script: {code: RIGHTS_RAW_TOOL, use: 'starci test run runs tests; use starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
+    test: {code: RIGHTS_RAW_TOOL, use: starci test affected --run in the runtime (the specs your change can break; the full suite is the release cut) or starci gate unit --root <app> in an app}
+    t: {code: RIGHTS_RAW_TOOL, use: starci test affected --run in the runtime (the specs your change can break; the full suite is the release cut) or starci gate unit --root <app> in an app}
+    run: {code: RIGHTS_RAW_TOOL, use: 'starci test affected --run runs the specs your change can break; starci work layout-render serves the app for a layout capture; use starci release sync-runtime for package runtime copies and grammar preparation, or starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
+    run-script: {code: RIGHTS_RAW_TOOL, use: 'starci test affected --run runs the specs your change can break; use starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
     start: {code: RIGHTS_RAW_TOOL, use: 'starci app stack'}
     exec: {code: RIGHTS_RAW_TOOL, use: 'starci check run, starci lint run, starci typecheck run, or starci gate run for that tool'}
     link: {code: RIGHTS_RAW_TOOL, use: starci npm install is the dependency path; an agent never makes a package link}
@@ -139,6 +187,7 @@ raw-tools:
   schtasks: {use: 'starci task register, starci task show, or starci task list for runtime scheduled tasks'}
   shutdown: {use: 'ask the owner: a worker never shuts the host down'}
   reboot: {use: 'ask the owner: a worker never reboots the host'}
+  next: {use: 'starci work layout-render serves the product app on localhost and captures a layout (brand.decide and interface.draw); a dev server started by hand renders nothing the runtime can use'}
   jest: {use: starci test run in the runtime or starci gate unit --root <app> in an app}
   vitest: {use: starci test run in the runtime or starci gate unit --root <app> in an app}
   mocha: {use: starci test run in the runtime or starci gate unit --root <app> in an app}
@@ -159,20 +208,42 @@ orca:
   # The Kernel mailbox refusal (install-verdict.mjs KERNEL_ORCA_CHECK) still precedes admission.
   self-lifecycle:
     group: orchestration
-    roles: [op, lead, supervisor, coordinator]
+    roles: [op, lead, supervisor, coordinator, critic]
     verbs:
       send:
         identity: --from
         types: [heartbeat, worker_done, escalation]
+        typesByRole: {critic: [worker_done, escalation]}
         values: [--from, --type, --subject, --body, --to, --run, --priority, --thread-id, --payload, --task-id, --dispatch-id,
           --outcome, --files-modified, --report-path, --phase, --dispatch-capability, --retry-request]
         flags: [--json, --help]
+        # an Op reports to its own Kernel's Run and addresses no one else (modules/kernel/roles.yaml chain.opMayNotAddress)
+        refuse-for: {op: [--to, --run]}
       ask:
+        roles: [op, lead, supervisor, coordinator]
         identity: --from
         values: [--from, --question, --resume, --to, --run, --options, --timeout-ms, --dispatch-capability, --retry-request]
         flags: [--json, --help]
+        refuse-for: {op: [--to, --run]}
       check:
         identity: --terminal
         values: [--terminal, --run, --ack, --types, --timeout-ms, --retry-request]
         flags: [--json, --help, --unread, --peek, --all, --format, --wait]
   use: starci worker start, starci worker show, starci worker read, starci worker list, starci worker stop, starci worker release, or starci worker close
+# The Kernel seat (a bound guard of role kernel). A Kernel judges and answers: it reads, it answers the items of its menu with
+# `starci kernel decide`, and it attests the runtime revision. Every other `starci kernel <verb>` is the runtime's own (the
+# controllers run it) or the lead's and owner's; a Kernel that calls one is refused with the menu (KERNEL_USE_DECIDE). Every program
+# but the pure reads below is refused (KERNEL_STARCI_ONLY): the Kernel's shell is starci.
+kernel:
+  # starci <group> <verb> words the Kernel seat may run
+  verbs:
+    kernel: [status, logs, questions, messages, survey, hierarchy, artifacts, coverage, usage, observe, peers, foundations, extensions, decisions, inbox, log, decide, kernel-ack-rev, revision-ack]
+    workflow: [status]
+    gate: [read]
+  # read verbs that also have mutating flags: refused when one of these flags is present
+  read-flags:
+    decisions: [open, claim, resolve, escalate]
+    inbox: [ack]
+  # pure reads of `read` that the Kernel does not get
+  deny-programs: [sleep]
+  use: "answer an item of the menu: starci kernel status prints it, starci kernel decide --workflow <workflow> --item <id> --choice <choice> --reason <why> answers it"

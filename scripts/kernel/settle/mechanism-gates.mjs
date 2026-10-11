@@ -1,9 +1,13 @@
 // The existing CLI gate consumers share its private placement/evidence owners.
 import { judgeJobLoop, judgeJobProofs } from '../gate-settle.mjs';
+import { judgeCriticVerdict } from '../critic-settle.mjs';
 import { observationContextOf, mechanismObservations } from '../mechanism-observation.mjs';
 import { latestContractOf } from '../../machine/contract-version.mjs';
 import { parseJson } from '../../lib/json.mjs';
 import { jobPayloadOf } from '../verbs/shared/rows.mjs';
+import { reboundBindingOf, reboundMapOf } from '../../machine/placement-rebound.mjs';
+import { runtimeCriticRunOf } from './critic-run.mjs';
+import { acceptanceTraceOf, traceOpsOf, traceRunsOf } from '../acceptance-trace.mjs';
 
 /** Bind the native consumers to the CLI's existing private context and placement
  * functions. The proof consumer stays synchronous for the workflow-lock recheck. */
@@ -19,7 +23,7 @@ async function settleOpGate(db, jobId, repo) {
   const gateBases = opGateBasesOf({ db, env: process.env }, { workflowId: s.job.workflow_id, opId: s.job.job_id });
   const context = parseJson(latestContractOf(db, s.job.job_id)?.context_json);
   const recorded = context?.packet?.context?.gate_binding;
-  const binding = { ...recorded, placements: jobPlacements(db, s.job, repo) };
+  const binding = reboundBindingOf(recorded, reboundMapOf(db, s.filed.attemptId), jobPlacements(db, s.job, repo));
   const judgment = await judgeJobLoop({ op: s.op, files, roots: roots.length ? roots : [repo], gateBases, binding,
     mode: context?.packet?.context?.selected_op?.mode ?? (typeof jobPayloadOf(s.job).params?.mode === 'string' ? jobPayloadOf(s.job).params.mode : null) });
   return judgment ? { ...judgment, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
@@ -39,5 +43,29 @@ function settleOpProofs(db, jobId, repo) {
   const judgment = judgeJobProofs({ op: s.op, files, mode, context, observations: context ? mechanismObservations(db, context) : null });
   return judgment ? { ...judgment, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
 }
-  return { settleOpGate, settleOpProofs };
+// The independent Critic's verdict a decision leg owes at settle (scripts/kernel/critic-settle.mjs over modules/kernel/critic.yaml coverage):
+// null when the op owes none, else the judgment of the runtime's Critic verdict against the op's records now.
+function settleCriticVerdict(db, jobId, repo) {
+  const s = settleJobContext(db, jobId, { requiresReport: true });
+  if (!s) return null;
+  const { roots } = settleJobFiles(db, s.job, repo, s.filed, { jobId: s.job.job_id });
+  const owned = (jobPayloadOf(s.job).owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string' && !p.includes(':'));
+  const runtime = runtimeCriticRunOf(db, s.job.job_id)?.document ?? null;
+  const judged = judgeCriticVerdict({ op: s.op, roots: [...new Set([...roots, repo].filter(Boolean))], owned, runtime });
+  return judged ? { op: s.op, judged, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
+}
+// The acceptance trace an implementing or verifying op's pass records (scripts/kernel/acceptance-trace.mjs, report mode): null when the op is not
+// measured, else {op, attemptId, trace}. Read-only here; a read that fails measures nothing and never fails the settle.
+function settleAcceptanceTrace(db, jobId, repo) {
+  const s = settleJobContext(db, jobId, { requiresReport: true });
+  if (!s || !traceOpsOf(skillRoot).includes(s.op)) return null;
+  try {
+    const { roots } = settleJobFiles(db, s.job, repo, s.filed, { jobId: s.job.job_id });
+    const owned = (jobPayloadOf(s.job).owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string');
+    const context = observationContextOf(db, s.job, { repo, skillRoot });
+    const testRuns = traceRunsOf(mechanismObservations(db, context));
+    return { op: s.op, attemptId: s.filed.attemptId, trace: acceptanceTraceOf({ roots: [...new Set([...roots, repo].filter(Boolean))], owned, testRuns }) };
+  } catch (error) { return { op: s.op, attemptId: s.filed.attemptId, trace: { total: 0, cited: 0, missing: [], tests: 0, uncitedTests: [], unavailable: error.message } }; }
+}
+  return { settleOpGate, settleOpProofs, settleCriticVerdict, settleAcceptanceTrace };
 }

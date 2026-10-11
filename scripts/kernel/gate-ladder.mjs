@@ -8,6 +8,8 @@ import { parseJson } from '../lib/json.mjs';
 import { byCodeUnit, list } from '../lib/list.mjs';
 import { boundValue, incidentPolicy } from './op-incident-policy.mjs';
 import { ladderOf } from './supervisor-di-ladder.mjs';
+import { supervisorGatesOf } from './autopilot-budget.mjs';
+import { GATE_REJUDGED_EVENT } from './gate-holds-ended.mjs';
 
 const ANSWERED_EVENT = 'gate-answered';
 const UNCLASSIFIED = 'unclassified';
@@ -36,9 +38,9 @@ const episodeOf = (db, workflowId, gate) => db.prepare("SELECT entity_id,payload
 /** The subject part of the gate's Decision Item key: one per (cause, scope) episode, so the owner is told once per cause. */
 export const gateSubjectOf = (db, workflowId, gate) => `gate-${gateCauseOf(gate)}-${gateScopeOf(gate)}-${Math.max(0, episodeOf(db, workflowId, gate))}`;
 
-/** The newest Supervisor answer recorded on the gate, or null. */
-const gateAnswerOf = (db, workflowId, incidentId) => {
-  const row = db.prepare(`SELECT created_at,payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='${ANSWERED_EVENT}' ORDER BY seq DESC LIMIT 1`).get(workflowId, incidentId);
+/** The newest event of `kind` recorded on the gate ({at, ...payload}), or null: the Supervisor's answer, the settler's red re-judgment. */
+const gateEventOf = (db, workflowId, incidentId, kind) => {
+  const row = db.prepare("SELECT created_at,payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind=? ORDER BY seq DESC LIMIT 1").get(workflowId, incidentId, kind);
   return row ? { at: row.created_at, ...parseJson(row.payload_json, {}) } : null;
 };
 
@@ -62,15 +64,17 @@ export function gateViewOf(db, workflowId, gate, { now, typed = [], timeoutMs })
   const ladder = { ...ladderOf(), ackMs: gatePolicyOf().ackMs };
   const cause = gateCauseOf(gate);
   const level = levelOf(Math.max(0, now - Number(gate.since)), ladder);
-  const answer = gateAnswerOf(db, workflowId, gate.incidentId);
+  const answer = gateEventOf(db, workflowId, gate.incidentId, ANSWERED_EVENT);
+  const rejudged = gateEventOf(db, workflowId, gate.incidentId, GATE_REJUDGED_EVENT);
   const atOwner = level >= ladder.ownerAfter;
   const waitingForLand = answer?.resolution === 'fixed' && !atOwner;
   let handler = 'supervisor';
   if (atOwner) handler = 'owner';
   if (waitingForLand) handler = 'runtime-auto';
-  return { incidentId: gate.incidentId, opId: gate.opId, holds: gate.holds, since: gate.since, cause, workaround: gate.workaround ?? null, handler, step: level + 1, steps: ladder.ownerAfter + 1,
+  return { incidentId: gate.incidentId, opId: gate.opId, holds: gate.holds, since: gate.since, detail: gate.detail ?? null, cause, workaround: gate.workaround ?? null, handler, step: level + 1, steps: ladder.ownerAfter + 1,
     deadlineAt: atOwner ? Number(gate.since) + timeoutMs : Number(gate.since) + ladder.ackMs + level * ladder.stepMs,
-    ...conditionOf(gate, typed, cause), ...(answer ? { answered: { resolution: answer.resolution, at: answer.at } } : {}) };
+    ...conditionOf(gate, typed, cause), ...(answer ? { answered: { resolution: answer.resolution, at: answer.at } } : {}),
+    ...(rejudged ? { rejudged: { runtimeRev: rejudged.runtimeRev ?? null, reason: rejudged.reason ?? null, detail: rejudged.detail ?? [], at: rejudged.at } } : {}) };
 }
 
 /** Whether the gate's Supervisor Decision Item reached the owner level, so the owner was told (the table's `deferAfter: owner-told`). */
@@ -80,3 +84,10 @@ export function gateOwnerTold(workflowId, gate, { env = process.env } = {}) {
   return readMachine((m) => m.listSupDecisions({ open: false }), [], { env })
     .some((di) => di.idempotency_key.includes(needle) && di.status !== 'superseded' && Number(di.escalations) >= ownerAfter);
 }
+
+/**
+ * The open gates of a workflow read from its ledger alone, each as the status view plus its Decision Item subject: what the Workflow controller opens the
+ * Supervisor's item from when the status cannot be read, so an open gate never lacks its item for a failed read.
+ */
+export const gateViewsFromLedger = (db, workflowId, { now, timeoutMs }) => supervisorGatesOf(db, workflowId)
+  .map((gate) => ({ ...gateViewOf(db, workflowId, gate, { now, typed: [], timeoutMs }), subject: gateSubjectOf(db, workflowId, gate) }));

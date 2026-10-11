@@ -6,8 +6,7 @@
 //     → ensureLaunchTrust → orca orchestration worker-start --spec --agent (Orca creates the Task)
 //     → the agent terminal (start receipt, else worker-show) → terminal rename → worker-show attestation → receipt.
 //   deliverPrompt / awaitSubmission / awaitAttestation: follow-up input to a LIVE agent (agent/send.mjs, nudge).
-import fs from 'node:fs';
-import path from 'node:path';
+import { sha256 } from '../../engine/digest.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
@@ -15,7 +14,8 @@ import { classifyAgentScreen, stagedInputRegion, DEFAULT_STAGED_PATTERN, frameWi
   WAKE_PROOF_READS, WAKE_PROOF_INTERVAL_MS } from '../lib/terminal-liveness.mjs';
 import { squash } from '../lib/clip.mjs';
 import { INPUT_GLYPH_CHARS, INPUT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
-import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
+import { promptFileOf, spillPrompt } from './prompt-file.mjs';
+import { PROMPT_DELIVERY_STALLED } from './turn-start.mjs';
 export { loadAdapter } from './model-registry.mjs';
 
 const regexp = (source, fallback) => {
@@ -278,30 +278,17 @@ export function awaitAttestation(handle, adapter, { delivered = null } = {}) {
   return { ok: true, screen, activitySeen };
 }
 
-// Delivery per card: file-reference-above-inline-limit writes the prompt to a
-// file and sends the card's @file prompt template — multi-kilobyte inline
-// paste is a known provider crash. The artifact dir defaults to a fresh OS
-// temp dir (dispatch artifacts must NOT persist under the worktree's
-// .starciwork tree); the card's delivery.fileDirectory stays an
-// explicit override (relative resolves under the worktree). The returned
-// artifact is deleted by cleanupDeliveryArtifact once submission is attested.
+// Delivery per card: file-reference-above-inline-limit writes a prompt above allocation.promptFile.maxChars to a file
+// (scripts/agent/prompt-file.mjs, the one owner of the bound, the directory and the cleanup) and sends the card's
+// prompt template with the file named — multi-kilobyte inline paste is a known provider crash.
 // `io` {send, read, sleep} replaces the Orca wrappers in unit specs.
-export function deliverPrompt({ handle, adapter, prompt, worktree, dispatchId = 'prompt', io = null }) {
+export function deliverPrompt({ handle, adapter, prompt, dispatchId = 'prompt', io = null }) {
   const d = adapter?.delivery ?? {};
-  const limit = Number(d.maxInlineChars) || 0;
-  // worktree may be an Orca selector ('active') rather than a filesystem path — file-reference delivery only applies when it resolves to a real directory.
-  if (d.mode === 'file-reference-above-inline-limit' && limit && prompt.length > limit && worktree && fs.existsSync(worktree)) {
-    const transient = !(typeof d.fileDirectory === 'string' && d.fileDirectory.trim());
-    let dir;
-    if (transient) dir = makeTempDir('starci-dispatch-');
-    else if (path.isAbsolute(d.fileDirectory)) dir = d.fileDirectory;
-    else dir = path.join(worktree, d.fileDirectory);
-    fs.mkdirSync(dir, { recursive: true });
-    const file = path.join(dir, (d.fileName ?? 'orca-dispatch-<dispatch>.md').replace('<dispatch>', dispatchId));
-    fs.writeFileSync(file, prompt);
-    const sendText = (d.prompt ?? 'Read <file> completely and follow it exactly.')
-      .replace('<file>', file.replaceAll('\\', '/'));
-    return { ...sendPrompt(handle, sendText, adapter, io), sentText: sendText, artifact: { file, dir, transient } };
+  const spill = d.mode === 'file-reference-above-inline-limit'
+    ? spillPrompt({ prompt, file: () => promptFileOf(`send:${handle}:${dispatchId}:${sha256(prompt)}`) }) : { spilled: false };
+  if (spill.spilled) {
+    const sendText = (d.prompt ?? 'Read <file> completely and follow it exactly.').replace('<file>', spill.file.replaceAll('\\', '/'));
+    return { ...sendPrompt(handle, sendText, adapter, io), sentText: sendText, artifact: { file: spill.file } };
   }
   // sentText is what the terminal was given: awaitSubmission and the api's liveness reads find an unsubmitted paste by it (inc-06aeecf432f1).
   return { ...sendPrompt(handle, prompt, adapter, io), sentText: prompt };
@@ -315,7 +302,7 @@ export function deliverPrompt({ handle, adapter, prompt, worktree, dispatchId = 
 // at an empty prompt is a lost send, sent once more; lost again, the send is refused
 // PROMPT_DELIVERY_STALLED, a transient launch fault (never quota, never the model). A terminal whose
 // process incarnation the host no longer accepts is refused TERMINAL_INCARNATION_STALE, never transient.
-export const PROMPT_DELIVERY_STALLED = 'prompt-delivery-stalled';
+export { PROMPT_DELIVERY_STALLED };
 export const TERMINAL_INCARNATION_STALE = 'terminal-incarnation-stale';
 function sendPrompt(handle, text, adapter, io) {
   const send = io?.send ?? terminalSend, read = io?.read ?? terminalRead, sleep = io?.sleep ?? sleepSync;

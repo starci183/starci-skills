@@ -12,9 +12,13 @@ import { slash } from '../lib/path-key.mjs';
 import { SKILL_ROOT } from './guards-root.mjs';
 import { boundGuard, boundSeat, gitListFormRead, gitSubOf, nodeWholeSuite, pushTargets, refusal as baseRefusal, rightsRoleOf } from './rights.mjs';
 import { refusalLines } from './refusals.mjs';
-import { RUNTIME_CHANGE_CODE, runtimeChangeRefusal } from '../machine/runtime-change.mjs';
+import { supervisorSeatVerdict } from './supervisor-seat.mjs';
+import { opStarciVerdict } from './op-starci.mjs';
 import { kernelMailboxVerdict } from './install-verdict.mjs';
-import { orcaSelfLifecycleAllowed } from './orca-self-lifecycle.mjs';
+import { orcaAddressedOption, orcaSelfLifecycleAllowed } from './orca-self-lifecycle.mjs';
+import { criticCommandVerdict } from './critic-reach.mjs';
+import { rolesContract } from '../machine/roles-contract.mjs';
+import { kernelSeatVerdict } from './kernel-seat.mjs';
 
 const policyCache = new Map();
 const compiledCache = new WeakMap();
@@ -70,11 +74,11 @@ const codeOf = (entry, fallback) => (RIGHTS_CODES.has(entry?.code) ? entry.code 
 const genericUse = 'use the starci verb of the action (modules/cli/commands) or ask the owner';
 const raw = (role, text, use = genericUse, what = 'raw tool command') => refusal('RIGHTS_RAW_TOOL', text, `the ${role} role does not run this ${what} directly because side effects go through a starci verb`, use);
 
-/** A headless-call verb (policy.calls) refuses every bound role but the ops the table names. */
+/** A headless-call verb (policy.calls) or a capability verb (policy.renders) refuses every bound role but the ops the table names. */
 const callVerdict = ({ role, program, args, guard, policy, text }) => {
   if (program !== 'starci') return null;
   const words = args.filter((value) => !value.startsWith('-'));
-  const call = Object.values(policy.calls ?? {}).find((entry) => words[0] === entry.verb?.[0] && words[1] === entry.verb?.[1]);
+  const call = [...Object.values(policy.calls ?? {}), ...Object.values(policy.renders ?? {})].find((entry) => words[0] === entry.verb?.[0] && words[1] === entry.verb?.[1]);
   if (!call || (role === 'op' && toSet(call.ops).has(String(guard?.op ?? '')))) return null;
   return refusal('RIGHTS_ROLE_DENIED', text, `${guard?.op ?? role} does not run starci ${call.verb.join(' ')}: only ${[...toSet(call.ops)].join(', ')} call it`, useOf(call, genericUse));
 };
@@ -199,19 +203,22 @@ const npmPolicyVerdict = ({ role, args, p, policy, guard, handle, lockOwner, tex
   return refusal(codeOf(denied, 'RIGHTS_RAW_TOOL'), text, `the ${role} role does not run this package-manager action directly because scripts and dependency changes go through a starci verb`, use);
 };
 
-const nodePolicyVerdict = ({ role, args, p, guard, text }) => {
+const SERVES_APP = /(?:^|[\\/])next(?:\.js)?$/;
+
+const nodePolicyVerdict = ({ role, args, p, policy, guard, text }) => {
   if (hasOption(args, '--eval', '-e', '--print', '-p')) return raw(role, text, 'use the starci verb of the action or check a file with node --check', 'inline Node.js program');
   if (args.length === 1 && ['--version', '-v'].includes(args[0])) return null;
   if (hasOption(args, '--check', '-c')) return null;
   if (args.includes('--test')) {
     if (nodeWholeSuite(args)) {
       if (p.suiteOps.has(String(guard?.op ?? ''))) return null;
-      return refusal('RIGHTS_SUITE_RUN', text, `the ${role} role does not run a whole suite because full suites run only in the release cut or the requested verify ops`, 'run one explicit spec file or use the matching starci verify verb');
+      return refusal('RIGHTS_SUITE_RUN', text, `the ${role} role does not run a whole suite because full suites run only in the release cut or the requested verify ops`, 'starci test affected --run (the specs your change can break), or one explicit spec file');
     }
     const targets = nodeOperands(args).filter((value) => value !== 'test');
     if (p.nodeTest.has(role) && targets.length && targets.every((value) => /\.(?:spec|test)\.[cm]?js$/i.test(value))) return null;
     return raw(role, text, 'starci gate unit --root <app> (the op gate selects the specs of the change)', 'raw test runner');
   }
+  if (nodeOperands(args).some((value) => SERVES_APP.test(slash(value)))) return raw(role, text, useOf(policy['raw-tools']?.next, genericUse), 'app server start');
   return raw(role, text, genericUse, 'Node.js script');
 };
 
@@ -219,6 +226,8 @@ const orcaPolicyVerdict = ({ role, args, p, policy, guard, handle, text }) => {
   const [group, verb] = args;
   const mailbox = kernelMailboxVerdict('orca', args, guard);
   if (mailbox) return mailbox;
+  const addressed = orcaAddressedOption({ role, args, policy });
+  if (addressed) return refusal('OP_REPORTS_TO_KERNEL', text, `an Op reports only to its Kernel: ${addressed} addresses another recipient`, rolesContract().chain.opRefusal.use);
   if (orcaSelfLifecycleAllowed({ role, args, handle, policy })) return null;
   // Implicit current-terminal checks retain their existing read admission; an explicit target must prove self.
   const targetedCheck = group === 'orchestration' && verb === 'check' && hasOption(args.slice(2), '--terminal');
@@ -230,7 +239,7 @@ const specificCommandVerdict = (context) => {
   const { role, program, args, p, policy, guard, handle, lockOwner, text } = context;
   if (program === 'git') return gitPolicyVerdict({ role, args, p, policy, text });
   if (p.npmPrograms.has(program)) return npmPolicyVerdict({ role, args, p, policy, guard, handle, lockOwner, text });
-  if (program === 'node') return nodePolicyVerdict({ role, args, p, guard, text });
+  if (program === 'node') return nodePolicyVerdict({ role, args, p, policy, guard, text });
   if (program === 'orca') return orcaPolicyVerdict({ role, args, p, policy, guard, handle, text });
   return undefined;
 };
@@ -250,6 +259,23 @@ const generalCommandVerdict = ({ role, program, args, p, policy, text }) => {
   return raw(role, text);
 };
 
+/** The Critic's verdict: the Orca self-lifecycle verbs, else only what critic-reach.mjs lets it read and write. */
+function criticPolicyVerdict({ program, args, command, guard, handle, policy }) {
+  if (program === 'orca' && orcaSelfLifecycleAllowed({ role: 'critic', args, handle, policy })) return null;
+  return criticCommandVerdict({ program, args, cwd: command.cwd, guard, critic: policy.critic, text: textOf({ ...command, program, args }) });
+}
+
+/**
+ * The verdict of the seat tables (Supervisor, Op, Kernel). Undefined when the general policy decides: a Kernel seat is decided here in
+ * full (null passes), a Supervisor or Op only when its table refuses.
+ */
+function seatVerdict({ role, guard, handle, policy, program, args, text }) {
+  if (guard?.role === 'kernel') return kernelSeatVerdict({ policy, program, args, text, guard, handle });
+  if (role === 'supervisor') return supervisorSeatVerdict({ policy, program, args, text }) ?? undefined;
+  if (role === 'op') return opStarciVerdict({ policy, program, args, text }) ?? undefined;
+  return undefined;
+}
+
 /**
  * Decide one normalized command for a bound role. Returns null to pass or the shared refusal shape.
  * `lockOwner` is a synchronous reader and is called only for a clean install.
@@ -260,6 +286,7 @@ export function policyVerdict({ role, command, guard = null, handle = null, lock
   let { program, args = [] } = command;
   program = programName(program);
   args = args.map(String);
+  if (role === 'critic') return criticPolicyVerdict({ program, args, command, guard, handle, policy });
   const nested = nestedProgram(program, args);
   if (nested) return policyVerdict({ role, command: { ...nested, cwd: command.cwd }, guard, handle, lockOwner, policy });
   const text = textOf({ ...command, program, args });
@@ -268,8 +295,8 @@ export function policyVerdict({ role, command, guard = null, handle = null, lock
     const use = useOf(policy.release, 'starci release cut');
     return refusal('RIGHTS_RELEASE_CUT', text, `the ${role} role does not cut or publish a release because the release cut is owner-approved and runs once per release`, use);
   }
-  const owned = role === 'supervisor' && program === 'starci' ? runtimeChangeRefusal(args.filter((value) => !value.startsWith('-'))) : null;
-  if (owned) return refusal(RUNTIME_CHANGE_CODE, text, owned.reason, owned.remedy);
+  const seat = seatVerdict({ role, guard, handle, policy, program, args, text });
+  if (seat !== undefined) return seat;
   const call = callVerdict({ role, program, args, guard, policy, text });
   if (call) return call;
   if (p.runtime.has(program)) return null;

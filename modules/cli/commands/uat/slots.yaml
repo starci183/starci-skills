@@ -1,16 +1,18 @@
 group: uat
 verb: slots
 owner: runtime
-summary: inspect UAT slots or run a command while holding one
+summary: inspect UAT slots, end the ones whose lessee is gone, or run a command while holding one
 impl: {script: scripts/uat/uat-slots.mjs}
 positional:
-  - {name: action, enum: [status, run], required: true, variadic: false}
+  - {name: action, enum: [status, collect, run], required: true, variadic: false}
   - {name: command, required: false, variadic: true}
 flags:
+  - {name: dry-run, type: boolean, summary: collect only lists the slots it would end}
   - {name: record-dir, type: string, summary: record directory the held slot is recorded in}
 exit: {"0": status printed or the command passed, "1": "the command failed or could not start (its code passes through)", "2": bad usage, "130": interrupted while holding a slot}
 json: none
 examples:
   - starci uat slots status
+  - starci uat slots collect --dry-run
   - starci uat slots run --record-dir <dir> -- npm test
 editions: [full]

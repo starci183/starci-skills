@@ -10,6 +10,7 @@ import { GATE_CONDITION_PARSERS } from '../../gate-runtime-conditions.mjs';
 import { gateCauseOf, gateResolutions } from '../../gate-ladder.mjs';
 import { supervisorGatesOf } from '../../autopilot-budget.mjs';
 import { wakeKernelForTransition } from '../../wake-delivery.mjs';
+import { pendingRejudgeOf } from '../../gate-holds-ended.mjs';
 
 const MIN_REASON_CHARS = 12;
 const text = (value) => (typeof value === 'string' ? value.trim() : '');
@@ -69,6 +70,8 @@ export function answerGate(ledger, { workflowId, row, args, by, repo, isGate }) 
   const gate = supervisorGatesOf(ledger.db, workflowId).find((entry) => entry.incidentId === row.incident_id);
   if (!gate) return null;
   const answer = answerOf(args);
+  const pending = answer.resolution === 'workaround' ? pendingRejudgeOf(ledger.db, workflowId, gate) : [];
+  if (pending.length) throw refuse(`a workaround would dispatch ${gate.opId ?? 'the op'} again, but the done report of ${pending.join(', ')} has not been judged by the runtime now live: its settle is the outcome, and the settler judges it once per runtime revision - answer after that judgment (it is recorded as gate-rejudged on the gate when red)`, 'gate-rejudge-pending', { jobs: pending });
   const waiting = answer.resolution === 'fixed' && waitForLand(ledger, { workflowId, gate, answer, repo });
   ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'incident', entityId: gate.incidentId, kind: 'gate-answered',
     payload: { ...answer, by, cause: gateCauseOf(gate), holds: gate.holds, evidence: gate.detail } }));

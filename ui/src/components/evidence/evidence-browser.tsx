@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Accordion, Card, Chip, Description, Header, Label, ListBox, type Selection } from '@heroui/react';
 import { Star } from 'lucide-react';
 import type { EvidenceFile, EvidenceFileV3, EvidenceGroup } from '../../contract';
 import type { Concept } from '../concept';
@@ -56,33 +57,31 @@ export function organise(files: EvidenceFile[]) {
 }
 const keyFirst = (list: EvidenceFile[]) => [...list.filter(isKey), ...list.filter(f => !isKey(f))];
 
-function Row({ file, active, onPick, also }: Readonly<{ file: EvidenceFile; active: boolean; onPick: () => void; also?: EvidenceFile[] }>) {
-  return <button type="button" role="option" aria-selected={active} onClick={onPick}
-    className={`flex w-full min-w-0 flex-col gap-1 rounded-md border px-2 py-2 text-left text-sm ${active ? 'border-primary bg-primary/10' : 'border-transparent hover:bg-muted'}`}>
+function Row({ file, also }: Readonly<{ file: EvidenceFile; also?: EvidenceFile[] }>) {
+  return <span className="flex w-full min-w-0 flex-col gap-1 text-left text-sm">
     <span className="flex min-w-0 items-center gap-2">
       <FileTypeBadge kind={file.kind} />
       {isKey(file) ? <Star className="size-3 shrink-0 fill-current text-[var(--status-retry,currentColor)]" aria-label={t('Key file')} /> : null}
-      <span className="min-w-0 flex-1 truncate font-medium" title={file.label ?? file.base}>{file.label ?? file.base}</span>
+      <Label className="min-w-0 flex-1 truncate" title={file.label ?? file.base}>{file.label ?? file.base}</Label>
     </span>
     <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
       <span className="shrink-0 text-xs text-muted-foreground">{formatBytes(file.bytes)}</span>
-      {!isPlainEncoding(file.encoding) ? <span className="shrink-0 rounded border border-border bg-muted px-1 text-[10.5px]">{encodingLabels[file.encoding as string] ?? file.encoding}</span> : null}
+      {!isPlainEncoding(file.encoding) ? <Chip size="sm" variant="soft" className="shrink-0"><Chip.Label>{encodingLabels[file.encoding as string] ?? file.encoding}</Chip.Label></Chip> : null}
     </span>
-    <span className="truncate font-mono text-[11px] text-muted-foreground" title={file.name}>{file.name}</span>
-    {also?.length ? <span className="truncate text-[11px] text-muted-foreground" title={also.map(fileName).join(', ')}>{t('also: {names}', { names: also.map(fileName).join(', ') })}</span> : null}
-  </button>;
+    <Description className="truncate font-mono text-xs" title={file.name}>{file.name}</Description>
+    {also?.length ? <Description className="truncate text-xs" title={also.map(fileName).join(', ')}>{t('also: {names}', { names: also.map(fileName).join(', ') })}</Description> : null}
+  </span>;
 }
 
-function Thumb({ file, active, onPick }: Readonly<{ file: EvidenceFile; active: boolean; onPick: () => void }>) {
-  return <button type="button" role="option" aria-selected={active} onClick={onPick} title={file.name}
-    className={`flex min-w-0 flex-col gap-1 rounded-md border p-1 text-left ${active ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'}`}>
-    <span className="flex aspect-video items-center justify-center overflow-hidden rounded bg-muted">
+function Thumb({ file }: Readonly<{ file: EvidenceFile }>) {
+  return <span className="flex min-w-0 flex-col gap-2 text-left">
+    <span className="flex aspect-video items-center justify-center overflow-hidden rounded bg-default">
       {file.kind === 'image' ? <img src={file.href} alt={file.name} loading="lazy" className="size-full object-cover" />
         : file.kind === 'video' ? <video src={`${file.href}#t=0.1`} muted preload="metadata" className="size-full object-cover" />
         : <FileTypeBadge kind={file.kind} />}
     </span>
-    <span className="flex items-center gap-1"><FileTypeBadge kind={file.kind} /><span className="truncate text-[11px]">{file.label ?? file.base}</span></span>
-  </button>;
+    <span className="flex items-center gap-2"><FileTypeBadge kind={file.kind} /><Label className="min-w-0 truncate text-xs" title={file.name}>{file.label ?? file.base}</Label></span>
+  </span>;
 }
 
 /** Grouped file tree (left) + type-aware viewer frame (right); stacked on mobile. */
@@ -91,16 +90,20 @@ export function EvidenceBrowser({ files, selected, onSelect }: Readonly<{ files:
   const listRef = useRef<HTMLDivElement>(null);
   const org = useMemo(() => organise(files), [files]);
   const [showEmpty, setShowEmpty] = useState(false);
-  const order = useMemo(() => [...GROUPS.flatMap(g => keyFirst(org.visible.filter(f => f.group === g.id))), ...(showEmpty ? org.empty : [])], [org, showEmpty]);
-
-  const onKeyDown = useCallback((event: KeyboardEvent) => {
-    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
-    if ((event.target as HTMLElement).closest('input,textarea')) return;
-    event.preventDefault();
-    const index = order.findIndex(f => f.artifactId === current?.artifactId);
-    const next = order[Math.max(0, Math.min(order.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))];
-    if (next) onSelect(next.artifactId);
-  }, [order, current, onSelect]);
+  const groups = useMemo(() => GROUPS.flatMap(group => {
+    const rows = keyFirst(org.visible.filter(file => file.group === group.id));
+    if (!rows.length) return [];
+    if (group.id !== 'check') return [{ id: group.id, title: group.title, hint: group.hint, rows, media: group.id === 'media' }];
+    return [...new Set(rows.map(file => file.check?.name ?? UNKNOWN_CHECK))].map(name => ({
+      id: `${group.id}:${name}`, title: `${group.title} · ${name}`, hint: group.hint,
+      rows: rows.filter(file => (file.check?.name ?? UNKNOWN_CHECK) === name), media: false,
+    }));
+  }), [org]);
+  const select = (keys: Selection) => {
+    if (keys === 'all') return;
+    const key = keys.values().next().value;
+    if (typeof key === 'number') onSelect(key);
+  };
   useEffect(() => {
     const box = listRef.current;
     const row = box?.querySelector<HTMLElement>('[aria-selected="true"]');
@@ -111,39 +114,39 @@ export function EvidenceBrowser({ files, selected, onSelect }: Readonly<{ files:
     else if (r.bottom > b.bottom) box.scrollTop += r.bottom - b.bottom;
   }, [current?.artifactId]);
 
-  if (files.length === 0) return <div className="rounded-lg border p-4 text-sm text-muted-foreground">{t('This attempt has no evidence files yet.')}</div>;
+  if (files.length === 0) return <Card><Card.Content className="text-sm text-muted-foreground">{t('This attempt has no evidence files yet.')}</Card.Content></Card>;
 
-  return <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(260px,340px)_minmax(0,1fr)]">
-    <div ref={listRef} role="listbox" aria-label={t('Evidence files')} tabIndex={0} onKeyDown={onKeyDown} className="max-h-[70vh] min-w-0 space-y-4 overflow-auto rounded-lg border bg-card p-2">
-      {GROUPS.map(group => {
-        const inGroup = keyFirst(org.visible.filter(f => f.group === group.id));
-        if (inGroup.length === 0) return null;
-        const pick = (f: EvidenceFile) => () => onSelect(f.artifactId);
-        const active = (f: EvidenceFile) => f.artifactId === current?.artifactId;
-        return <section key={group.id} aria-label={group.title}>
-          <h3 className="flex items-center gap-2 px-1 text-sm font-semibold">
-            {group.title}
-            <span className="ml-auto text-xs font-normal text-muted-foreground">{inGroup.length}</span>
-          </h3>
-          <p className="px-1 pb-1 text-xs text-muted-foreground">{group.hint}</p>
-          {group.id === 'media' ? <div className="grid grid-cols-2 gap-2">{inGroup.map(f => <Thumb key={f.artifactId} file={f} active={active(f)} onPick={pick(f)} />)}</div>
-            : group.id === 'check' ? [...new Set(inGroup.map(f => f.check?.name ?? UNKNOWN_CHECK))].map(name => {
-              const rows = inGroup.filter(f => (f.check?.name ?? UNKNOWN_CHECK) === name);
-              const meta = rows[0]?.check;
-              return <div key={name} className="mt-1">
-                <div className="flex items-center gap-2 px-1 py-1"><code className="min-w-0 flex-1 truncate text-xs font-semibold" title={name}>{name}</code>
-                  {meta ? <StatusChip status={meta.status ? statusFromCheck(meta.status) : statusFromUi(meta.ui)} /> : null}</div>
-                <div className="space-y-1 pl-2">{rows.map(f => <Row key={f.artifactId} file={f} active={active(f)} onPick={pick(f)} also={org.also.get(f.artifactId)} />)}</div>
-              </div>;
-            })
-            : <div className="space-y-1">{inGroup.map(f => <Row key={f.artifactId} file={f} active={active(f)} onPick={pick(f)} also={org.also.get(f.artifactId)} />)}</div>}
-        </section>;
-      })}
-      {org.empty.length ? <section aria-label={t('Empty files')}>
-        <button type="button" aria-expanded={showEmpty} onClick={() => setShowEmpty(v => !v)} className="w-full rounded-md border px-2 py-2 text-left text-xs text-muted-foreground hover:bg-muted">{showEmpty ? t('{n} empty files · hide', { n: org.empty.length }) : t('{n} empty files · view', { n: org.empty.length })}</button>
-        {showEmpty ? <div className="mt-1 space-y-1">{org.empty.map(f => <Row key={f.artifactId} file={f} active={f.artifactId === current?.artifactId} onPick={() => onSelect(f.artifactId)} />)}</div> : null}
-      </section> : null}
-    </div>
+  return <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(260px,340px)_minmax(0,1fr)]">
+    <Card className="min-w-0 gap-4 p-4">
+      <Card.Header><Card.Title>{t('Evidence files')}</Card.Title></Card.Header>
+      <Card.Content ref={listRef} className="max-h-[70vh] min-w-0 overflow-auto">
+        <ListBox aria-label={t('Evidence files')} selectionMode="single" selectionBehavior="replace" disallowEmptySelection
+          selectedKeys={current && org.visible.some(file => file.artifactId === current.artifactId) ? [current.artifactId] : []} onSelectionChange={select} className="gap-4">
+          {groups.map(group => <ListBox.Section key={group.id} id={group.id} aria-label={group.title} className={group.media ? 'grid grid-cols-2 gap-2' : 'space-y-1'}>
+            <Header className="col-span-full px-2 pb-2">
+              <span className="flex items-center gap-2 text-sm font-semibold">{group.title}<span className="ml-auto text-xs font-normal text-muted-foreground">{group.rows.length}</span></span>
+              <span className="mt-1 block text-xs font-normal text-muted-foreground">{group.hint}</span>
+              {group.rows[0]?.check ? <StatusChip status={group.rows[0].check.status ? statusFromCheck(group.rows[0].check.status) : statusFromUi(group.rows[0].check.ui)} /> : null}
+            </Header>
+            {group.rows.map(file => <ListBox.Item key={file.artifactId} id={file.artifactId} textValue={file.label ?? file.base} className="min-h-12 min-w-0 p-3 data-[selected=true]:bg-default">
+              {group.media ? <Thumb file={file} /> : <Row file={file} also={org.also.get(file.artifactId)} />}
+              <ListBox.ItemIndicator />
+            </ListBox.Item>)}
+          </ListBox.Section>)}
+        </ListBox>
+        {org.empty.length ? <Accordion hideSeparator expandedKeys={showEmpty ? ['empty'] : []} onExpandedChange={keys => setShowEmpty(keys.has('empty'))}>
+          <Accordion.Item id="empty">
+            <Accordion.Heading><Accordion.Trigger className="px-2 text-sm">{showEmpty ? t('{n} empty files · hide', { n: org.empty.length }) : t('{n} empty files · view', { n: org.empty.length })}<Accordion.Indicator /></Accordion.Trigger></Accordion.Heading>
+            <Accordion.Panel><Accordion.Body className="px-0 pb-0">
+              {showEmpty ? <ListBox aria-label={t('Empty files')} selectionMode="single" selectionBehavior="replace" disallowEmptySelection
+                selectedKeys={current && org.empty.some(file => file.artifactId === current.artifactId) ? [current.artifactId] : []} onSelectionChange={select}>
+                {org.empty.map(file => <ListBox.Item key={file.artifactId} id={file.artifactId} textValue={file.label ?? file.base} className="min-h-12 min-w-0 py-3 data-[selected=true]:bg-default"><Row file={file} /><ListBox.ItemIndicator /></ListBox.Item>)}
+              </ListBox> : null}
+            </Accordion.Body></Accordion.Panel>
+          </Accordion.Item>
+        </Accordion> : null}
+      </Card.Content>
+    </Card>
     {current ? <EvidenceViewer key={current.artifactId} file={current} /> : null}
   </div>;
 }

@@ -4,20 +4,25 @@
 //
 //   logs --workflow <id> [--job <job_id>] [--after <seq>] [--kinds <csv>] [--limit <n>]
 import { LOG_KINDS, openLogs, readLogs, syncLogs } from '../typed-logs.mjs';
+import { fieldEmit } from './shared/field-view.mjs';
 
 export default {
   verb: 'logs',
+  // The logs table lives in the ledger file and the sync below writes it: the roles that own the reactions sync, any other caller reads the rows as they stand.
+  reads: true,
+  reacts: true,
   required: ['workflow'],
   usageInCore: true,
   usage: "  logs     --workflow <id> [--job <job_id>] [--after <seq>] [--kinds <csv>] [--limit <n>]   the workflow's typed log rows (events synced first)",
-  run({ ledger, args, repo, emit, internals }) {
+  run({ ledger, args, repo, emit: rawEmit, internals }) {
+    const emit = fieldEmit(rawEmit, args);
     if (!internals.getWorkflow(ledger.db, args.workflow)) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
     const kinds = args.kinds ? String(args.kinds).split(',').map((k) => k.trim()).filter(Boolean) : null;
     const unknown = (kinds ?? []).filter((k) => !LOG_KINDS[k]);
     if (unknown.length) throw Object.assign(new Error(`unknown log kind(s) ${unknown.join(', ')}`), { code: 'log-kind-unknown' });
-    const logs = openLogs(repo);
+    const logs = ledger.readOnly ? { db: ledger.db, close() {} } : openLogs(repo);
     try {
-      const synced = syncLogs(logs, ledger.db, { repo });
+      const synced = ledger.readOnly ? { derived: { inserted: 0 } } : syncLogs(logs, ledger.db, { repo });
       const out = { ok: true, workflowId: args.workflow, ...readLogs(logs, { workflowId: args.workflow, jobIds: args.job ? [args.job] : null, after: Number(args.after ?? 0), kinds, limit: Number(args.limit ?? 500) }),
         synced: { derived: synced.derived.inserted } };
       const hhmm = (at) => new Date(at).toISOString().slice(11, 19);

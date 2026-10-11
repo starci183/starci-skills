@@ -9,6 +9,8 @@ import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const POLICY = loadCommandPolicy({ root: ROOT });
+// The Critic's lifecycle is narrower (worker_done and escalation only, no ask) and is calibrated in critic-reach.spec.mjs.
+const SELF_ROLES = POLICY.roles.bound.filter((role) => role !== 'critic');
 const HANDLE = 'term-orca-self';
 const send = (type, from = HANDLE) => ['orchestration', 'send', '--from', from, '--type', type,
   '--subject', 'status', '--body', 'own lifecycle', '--task-id', 'task_self', '--dispatch-id', 'ctx_self'];
@@ -17,7 +19,7 @@ const verdict = (args, role = 'op', handle = HANDLE, policy = POLICY) => policyV
 });
 
 test('wrongly blocked: every bound rights role can send its own heartbeat, worker_done, escalation and ask', () => {
-  for (const role of POLICY.roles.bound) {
+  for (const role of SELF_ROLES) {
     for (const type of ['heartbeat', 'worker_done', 'escalation']) {
       const args = send(type);
       if (type === 'heartbeat') args.push('--phase', 'reviewing');
@@ -49,7 +51,7 @@ test('lifecycle calibration keeps impersonation, other message types and all oth
     ['orchestration', 'reply', '--from', HANDLE, '--id', 'message', '--body', 'x'],
     ['terminal', 'close', '--terminal', HANDLE], ['terminal', 'send', '--terminal', HANDLE, '--text', 'x'],
   ];
-  for (const role of POLICY.roles.bound) for (const args of cases) {
+  for (const role of SELF_ROLES) for (const args of cases) {
     assert.equal(verdict(args, role)?.code, 'RIGHTS_RAW_TOOL', `${role}: ${args.join(' ')}`);
   }
   assert.equal(verdict(send('heartbeat'), 'op', null)?.code, 'RIGHTS_RAW_TOOL', 'no caller identity');
@@ -81,14 +83,15 @@ test('wrongly blocked own lifecycle passes both hook and shim for op, Kernel, Su
       fs.mkdirSync(path.join(guards, family), { recursive: true });
       fs.writeFileSync(path.join(guards, family, `${handle}.json`), JSON.stringify({ ...body, terminal: handle, owned: [] }));
     }
+    const refused = binding.name === 'kernel' ? 'KERNEL_STARCI_ONLY' : 'RIGHTS_RAW_TOOL';
     const env = { ...process.env, STARCI_GUARDS_ROOT: guards, ORCA_TERMINAL_HANDLE: handle, STARCI_ROLE: binding.claimed ?? '' };
     const cases = ['heartbeat', 'worker_done', 'escalation'].map((type) => ({ args: send(type, handle), code: null }));
     cases.push(
       { args: ['orchestration', 'ask', '--from', handle, '--question', 'x'], code: null },
       { args: ['orchestration', 'check', '--terminal', handle, '--json'], code: binding.name === 'kernel' ? 'KERNEL_ORCA_CHECK' : null },
       { args: ['orchestration', 'check', '--terminal', handle, '--ack', 'delivery'], code: binding.name === 'kernel' ? 'KERNEL_ORCA_CHECK' : null },
-      { args: send('heartbeat', 'term_other'), code: 'RIGHTS_RAW_TOOL' },
-      { args: ['orchestration', 'worker-start', '--agent', 'codex'], code: 'RIGHTS_RAW_TOOL' },
+      { args: send('heartbeat', 'term_other'), code: refused },
+      { args: ['orchestration', 'worker-start', '--agent', 'codex'], code: refused },
     );
     for (const row of cases) {
       const command = ['orca', ...row.args.map((word) => /\s/.test(word) ? `'${word}'` : word)].join(' ');
@@ -102,6 +105,6 @@ test('wrongly blocked own lifecycle passes both hook and shim for op, Kernel, Su
     }
     const chain = `orca orchestration send --from ${handle} --type heartbeat --subject alive; orca orchestration worker-start --agent codex`;
     const decision = await hookDecision({ tool_name: 'Bash', cwd, tool_input: { command: chain } }, { env, root: ROOT });
-    assert.equal(decision?.verdict?.code, 'RIGHTS_RAW_TOOL', 'each command in a shell chain is still judged');
+    assert.equal(decision?.verdict?.code, refused, 'each command in a shell chain is still judged');
   }
 });

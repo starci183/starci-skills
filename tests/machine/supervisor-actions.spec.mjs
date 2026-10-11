@@ -136,6 +136,6 @@ test('supervise.yaml carries the mission: the loop, every action class, the SLA 
   assert.match(String(doc.mission.message.owner), /digest/);
   assert.ok(doc.kernelSeat.does.some((d) => /actions\.mjs/.test(String(d))));
   const prompt = fs.readFileSync(new URL('../../modules/supervisor/supervisor-prompt.md', import.meta.url), 'utf8');
-  assert.match(prompt, /actions\.mjs list/);
-  assert.match(prompt, /--by supervisor/);
+  assert.match(prompt, /supervisor actions list/);
+  assert.match(prompt, /starci supervisor decide --item <id> --choice <choice> --reason <why>/);
 });

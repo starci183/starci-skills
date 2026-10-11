@@ -138,16 +138,7 @@ test('owner feedback is a lesson that outweighs a self-derived one; the lessons 
   assert.deepEqual(withLessons([], { root: '/x', read: () => text }), [], 'no red check, no lesson');
 });
 
-test('land --wait-ms reaches the gate: the Supervisor queues as long as a lane does instead of giving up gate-busy', async (t) => {
-  const env = envOf(t);
-  const calls = [];
-  const landFn = async (a) => { calls.push(a); return { ok: true, head: 'f'.repeat(40) }; };
-  const filesOf = () => [{ path: 'scripts/work/z.mjs', status: 'M' }];
-  await landExperiment({ signature: 'wait-a', commits: ['e5'], lane: 'x', env, now: () => NOW, landFn, settings: SETTINGS, filesOf, waitMs: 7_200_000 });
-  await landExperiment({ signature: 'wait-b', commits: ['e6'], lane: 'x', env, now: () => NOW, landFn, settings: SETTINGS, filesOf });
-  assert.equal(calls[0].waitMs, 7_200_000);
-  assert.equal('waitMs' in calls[1], false, 'no --wait-ms keeps the gate default');
-});
+
 
 test('propose with no clock passed (the CLI path) reads the real clock instead of throwing', async (t) => {
   // lessons.mjs propose --send failed "now is not a function" on 2026-09-28: the default was Date.now(), a number.

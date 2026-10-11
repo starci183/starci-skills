@@ -1,3 +1,4 @@
+import { phase } from './start-phase.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import path from 'node:path';
 import { execNode } from '../api/node/exec-node.mjs';
@@ -12,6 +13,8 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { runShow } from '../api/orca/run-show.mjs';
 import { SKILL_ROOT, supervisedSeatHandles } from '../machine/home.mjs';
 import { entryTerminalsOf, recordedSeatTerminals } from '../machine/seat-sessions.mjs';
+import { stopSlotsInTree } from '../uat/slot-collect.mjs';
+import { runtimeRevNow, startFailureRun, startHoldBudget, startHoldOf, holdSummary } from './start-hold.mjs';
 
 async function workflowHost({ env }, run = execNode) {
   const args = [path.join(skillRoot, 'scripts/reconciler/workflow-up.mjs'), '--json'];
@@ -49,6 +52,7 @@ export function headlessSenderOf({ listing, recorded = new Set(), seats = new Se
  * Supervisor start is refused without a terminal. The workflow's entry Run (its Kernel job's managed.runId) names the coordinator to prefer.
  */
 export function workflowSender({ env = process.env, launchedBy = 'supervisor', ledger = null, workflowId = null, root = SKILL_ROOT } = {}, { list = terminalList, show = runShow, machine = readMachine } = {}) {
+  phase('sender');
   const handle = String(readEnv('ORCA_TERMINAL_HANDLE', env) ?? '').trim();
   if (handle) return { ok: true, handle, source: 'caller' };
   if (launchedBy !== 'watchdog') return SENDER_MISSING('run starci workflow start inside an Orca terminal (ORCA_TERMINAL_HANDLE is not set here)');
@@ -57,6 +61,16 @@ export function workflowSender({ env = process.env, launchedBy = 'supervisor', l
   if (!listing?.ok) return SENDER_MISSING(`the terminal listing is unavailable (${listing?.error ?? 'host-unavailable'})`);
   const owners = machine((m) => ({ recorded: recordedSeatTerminals(m), seats: supervisedSeatHandles(m) }), { recorded: new Set(), seats: new Set() }, { env });
   return headlessSenderOf({ listing, recorded: owners.recorded, seats: owners.seats, coordinator: runId ? show({ id: runId })?.coordinator ?? null : null, root });
+}
+
+/**
+ * Why a Kernel launch is refused before it touches anything, as {step, fields} for the refusal, or null: the goal is not startable, or the
+ * watchdog's launch is held because the same cause failed it as often as the declared bound allows (start-hold.mjs).
+ */
+export function startBar({ authority, launchedBy, db, workflowId, now = Date.now(), budget = startHoldBudget, rev = runtimeRevNow() }) {
+  if (!authority.ok) return { step: authority.reason, fields: { workflowId, authority } };
+  const hold = launchedBy === 'watchdog' ? startHoldOf(startFailureRun(db, workflowId), { now, budget: budget(), rev }) : null;
+  return hold ? { step: 'kernel-start-held', fields: { workflowId, reason: 'kernel-start-held', error: holdSummary(hold), hold } } : null;
 }
 
 /** Why a finished or archived goal never gets a Kernel again, or null while it is open. */
@@ -106,7 +120,7 @@ export function recordWorkflowStartFailure(ledger, { workflowId, token, holderPi
     const unknown = ['partial', 'unknown'].includes(extra.effectState);
     // An archived ledger rejects further events; the machine owns unresolved host custody after retirement.
     if (workflow?.phase === 'archived' || workflow?.archived_at != null || !workflow) {
-      const payload = { step, error, terminal: handle, ...extra, reservation: token, signalRetained: false };
+      const payload = { step, error, terminal: handle, ...extra, reservation: token, signalRetained: false, runtimeRev: runtimeRevNow() };
       try {
         const custody = machine((m) => m.transaction(() => {
           const event = m.supEvent({ entityType: 'kernel', entityId: workflowId, kind: 'kernel-start-failed', at,
@@ -132,7 +146,7 @@ export function recordWorkflowStartFailure(ledger, { workflowId, token, holderPi
       value: { state: 'launch-unknown', terminal: handle, dispatch: extra.dispatch ?? null,
         admission: extra.admission ?? null, hostRequestId: extra.hostRequestId ?? null, effectState: extra.effectState } }) : false;
     if (!unknown && owns) clearSignal(ledger.db, { scope: 'kernel', key: workflowId, token });
-    const payload = { step, error, terminal: handle, ...extra, reservation: token, signalRetained };
+    const payload = { step, error, terminal: handle, ...extra, reservation: token, signalRetained, runtimeRev: runtimeRevNow() };
     ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation,
       kind: 'kernel-start-failed', payload, createdAt: at });
     if (unknown && !signalRetained) openIncident(ledger.db, { incidentId: `inc-${crypto.randomUUID()}`, workflowId,
@@ -142,6 +156,7 @@ export function recordWorkflowStartFailure(ledger, { workflowId, token, holderPi
 }
 
 export async function ensureWorkflowHost({ workflow, goal, env = process.env, plan = false } = {}, deps = {}) {
+  phase('workflow-host');
   const authority = workflowStartAuthority({ workflow, goal });
   if (!authority.ok) return { ...authority, ready: false };
   if (plan) return { ...authority, planned: true, ready: false };
@@ -153,13 +168,24 @@ export async function ensureWorkflowHost({ workflow, goal, env = process.env, pl
   return { ok: true, ready: true, authority, host };
 }
 
+const slotLine = (slot) => [slot.name, ' (pid ', (slot.survivors.length ? slot.survivors : slot.pids).join(', '), ')'].join('');
+
 export async function installWorkflowTree({ record, env = process.env } = {}, deps = {}) {
+  phase('workflow-worktree-install');
   if (!record?.path) return { ok: false, reason: 'workflow-worktree-missing' };
+  // The runtime's own UAT slot servers run from the tree and load its native files: they are ended (by their recorded identity) before npm ci
+  // deletes node_modules, and a slot that cannot be ended is a typed refusal naming the lease, never a blind retry of the install.
+  const slots = (deps.stopSlots ?? stopSlotsInTree)(record.path, { env }) ?? [];
+  const held = slots.filter((slot) => !slot.released);
+  if (held.length) return { ok: false, installed: false, reason: 'workflow-worktree-install-slot-held', path: record.path, slots: held,
+    error: `the UAT slot server(s) of this tree could not be stopped: ${held.map((slot) => slotLine(slot)).join('; ')}; end the lease with starci uat slots collect` };
   let result;
-  try { result = await (deps.npmCi ?? npmCi)({ cwd: record.path, role: 'coordinator', env, args: {} }); }
+  try { result = await (deps.npmCi ?? npmCi)({ cwd: record.path, role: 'coordinator', env, args: {}, ifNeeded: true }); }
   catch (error) { return { ok: false, installed: false, reason: 'workflow-worktree-install-failed', path: record.path,
     receipt: null, error: String(error?.message ?? error) }; }
   const ok = result?.code === 0 && result?.data?.ok === true;
-  return { ok, installed: ok, path: record.path, receipt: result?.data ?? null,
-    ...(ok ? {} : { reason: 'workflow-worktree-install-failed', error: result?.text ?? 'npm ci did not return a successful receipt' }) };
+  const done = { ok, installed: ok, path: record.path, receipt: result?.data ?? null, ...(slots.length ? { stoppedSlots: slots } : {}) };
+  const error = result?.text ?? 'npm ci did not return a successful receipt';
+  if (ok) return done;
+  return result?.data?.cause === 'file-locked' ? { ...done, reason: 'workflow-worktree-install-locked', error } : { ...done, reason: 'workflow-worktree-install-failed', error };
 }

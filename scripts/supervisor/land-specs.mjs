@@ -17,18 +17,22 @@
 //   2. the specs that import or spawn it (a code line, never a comment) - when the file has at most HUB_IMPORTERS such
 //      specs; for a hub, only the importers that also reference a changed file, or that name an export the change can
 //      reach (changedExports: the top-level declarations the diff touches, closed over the declarations that use them);
-//   3. every importer, whatever the size, when the change cannot be mapped to exports (an added, deleted or renamed file,
+//   3. the specs that spawn a CLI entry (scripts/kernel/cli.mjs, packages/cli/bin/starci.mjs) and name a verb whose handler reaches a changed file
+//      through relative imports (land-cli-specs.mjs): they import nothing the change touched, and counted as graph-only specs they fell outside the
+//      smoke bound while a change broke 13 of them;
+//   4. every importer, whatever the size, when the change cannot be mapped to exports (an added, deleted or renamed file,
 //      a non-JS file, a changed line outside every top-level declaration, an unreadable diff). Never fewer than
 //      `touching` where the answer is not known; the report says which files were narrowed.
 import path from 'node:path';
 import { specsDependingOn, specsReadingData } from '../lib/spec-deps.mjs';
 import { byCodeUnit } from '../../engine/by-code-unit.mjs';
+import { cliSpecsOf } from './land-cli-specs.mjs';
 
 const HUB_IMPORTERS = 40;
 const DECL = /^(export\s+)?(default\s+)?(async\s+)?(function\*?|const|let|var|class)\s+([A-Za-z_$][\w$]*)/;
 const posix = (file) => String(file).replaceAll('\\', '/');
 const stemOf = (file) => path.posix.basename(file).replace(/\.[^.]+$/, '');
-const needleOf = (file) => file.split('/').slice(-2).join('/');
+export const needleOf = (file) => file.split('/').slice(-2).join('/');
 
 /** The text of a spec without comment-only lines: a mention in prose is not a use. */
 export function codeOf(text) {
@@ -79,7 +83,7 @@ function closeChangedDependencies(blocks, hit) {
   }
 }
 
-function addNamedSpecs(file, specs, files) {
+export function addNamedSpecs(file, specs, files) {
   const stem = stemOf(file);
   if (stem.length < 4) return;
   for (const spec of specs) {
@@ -135,7 +139,7 @@ export function changedExports({ source, ranges }) {
  * changedExports result for a hub file (or null to keep every importer). Returns {files, narrowed:[{file, importers,
  * kept, symbols}]}.
  */
-export function specsDirect(changed, { specs, symbolsOf = () => null, hub = HUB_IMPORTERS }) {
+export function specsDirect(changed, { specs, symbolsOf = () => null, hub = HUB_IMPORTERS, root = null }) {
   const norm = changed.map((f) => String(f).replaceAll('\\', '/'));
   const own = norm.filter((f) => /^tests\/[^/]+\.spec\.mjs$/.test(f));
   const source = norm.filter((f) => !f.startsWith('tests/'));
@@ -145,6 +149,7 @@ export function specsDirect(changed, { specs, symbolsOf = () => null, hub = HUB_
     addNamedSpecs(f, specs, files);
     addImporterSpecs(f, { source, specs, symbolsOf, hub, code, files, narrowed });
   }
+  if (root) for (const spec of cliSpecsOf({ root, changed: norm, code })) files.add(spec);
   return { files: [...files], narrowed };
 }
 
@@ -193,7 +198,7 @@ export function smokeSpecs({ dependents, chosen, changed, limit = SMOKE_LIMIT })
  */
 export function touchingSelection(changed, { specs, root = null, symbolsOf = () => null, smokeLimit = SMOKE_LIMIT }) {
   const files = changed.map(posix);
-  const direct = specsDirect(files, { specs, symbolsOf });
+  const direct = specsDirect(files, { specs, symbolsOf, root });
   const names = specs.map((s) => s.file).filter(Boolean);
   const reading = root ? specsReadingData(root, files, names) : [];
   const chosen = new Set([...direct.files, ...specsInvariant(files, { specs }), ...reading]);

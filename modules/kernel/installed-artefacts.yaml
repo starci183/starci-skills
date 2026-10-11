@@ -1,0 +1,53 @@
+# The artefacts the runtime installs OUTSIDE its own source files and that carry a version of its logic. A deploy (starci runtime deploy)
+# and every engine start migrate each artefact of every live workflow tree to the revision they run (scripts/reconciler/installed-artefacts.mjs);
+# the self-check `installed-artefacts` proves that each row has its writer and its handler, and that a file which installs a git hook or
+# carries a declared marker is a declared writer. A new installer outside the tree adds its row here.
+schema: starci/installed-artefacts@1
+# Patterns whose presence in a runtime source file means the file installs something outside the tree.
+writerSignals:
+  - {id: git-hooks-dir, pattern: "--git-path.{1,6}hooks", why: "resolves a repository hooks directory, the place a hook is installed"}
+artefacts:
+  - id: history-hook
+    what: "the reference-transaction hook that keeps a workflow branch append-only and binds an op to its guard"
+    where: "the hooks directory of every repository and worktree of a live workflow"
+    writer: {file: scripts/guards/hook-install.mjs, export: ensureHistoryHook}
+    marker: starci-history-guard
+    stamp: "the version after the marker on the hook's second line"
+    migrate: rewrite
+  - id: work-hook
+    what: "the pre-commit hook that validates the work records a commit stages"
+    where: "the hooks directory of every repository and worktree of a live workflow"
+    writer: {file: scripts/guards/hook-install.mjs, export: ensureWorkHook}
+    marker: starci-work-guard
+    stamp: "the version after the marker on the hook's second line"
+    migrate: rewrite
+  - id: runtime-git-hooks
+    what: "the pre-commit and pre-push hooks of the runtime repository itself"
+    where: "the git hooks directory of the host runtime tree"
+    writer: {file: scripts/guards/git-hooks.mjs, export: installGitHooks}
+    marker: null
+    stamp: "the rendered body: a hook equal to the render of the new tree is current"
+    migrate: rewrite
+  - id: runtime-copies
+    what: "the generated package runtime copies (packages/hfs/runtime and the eslint canons)"
+    where: "the host runtime tree, git-ignored"
+    writer: {file: scripts/hfs/sync-runtime.mjs, export: syncRuntime}
+    marker: null
+    stamp: "driftOfRuntime: no difference against the sources"
+    migrate: rewrite
+  - id: job-guard
+    what: "the guard file of a live job under the guards root"
+    where: "the runtime state directory"
+    writer: {file: scripts/guards/hook-install.mjs, export: writeJobGuard}
+    marker: null
+    stamp: "the schema field starci/op-guard@1"
+    migrate: none
+    reason: "rewritten at every dispatch and read by the new code through its schema; a live job's file keeps working"
+  - id: worktree-record
+    what: "the registry row of a worktree (path, branch, checkpoint)"
+    where: "machine.sqlite worktrees"
+    writer: {file: scripts/machine/worktree-registry.mjs, export: claimWorktree}
+    marker: null
+    stamp: "the table schema of the machine store"
+    migrate: none
+    reason: "data the new code reads as it is; a store at another schema version is refused on open, never migrated by a deploy"

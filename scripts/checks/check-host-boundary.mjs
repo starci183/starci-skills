@@ -18,6 +18,7 @@ import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { walkFiles } from '../lib/walk.mjs';
 import {spawnCalls} from '../lib/spawn-calls.mjs';
+import {releaseTerminalCallRange,releaseTerminalConsumerRanges} from './lib/release-terminal-shape.mjs';
 import {RUNTIME_MANIFEST_FILE,loadSlotManifest,ruleParams} from '../hfs/slots.mjs';
 
 const WRAPPER_DIR='scripts/api/orca';
@@ -61,7 +62,7 @@ const NODE_PATH=/node\s+(\S*orca\S*)/g;
 const LOADS_HOST=/\b(load|loads|loading|read|reads|reading)\b[^.\n]{0,100}modules\/host\/orca/i;
 // (c) agent-launch: every agent launch is orchestration worker-start (modules/kernel/start-workflow.yaml). A terminal the runtime creates itself is the bypass: the terminalCreate wrapper,
 // the calls.yaml `terminal-create` call, a `terminal create` argv or an `orca terminal create` command string. Only
-// code is read, comment lines skipped. There is no exemption list.
+// code is read, comment lines skipped. Only the adapter's one AST-checked plain release-shell call is admitted.
 const LAUNCH_ROOTS=['engine','scripts','bin','init','modules','packages'];
 const TERMINAL_LAUNCH=[
   [/\bterminalCreate\b/,'the terminalCreate wrapper'],
@@ -128,7 +129,11 @@ const launchScan=(root,flag)=>{
   for(const dir of LAUNCH_ROOTS){
     for(const file of walk(path.join(root,dir),f=>f.endsWith('.mjs'))){
       if(rel(root,file)===ALLOW_SELF)continue;
-      fs.readFileSync(file,'utf8').split(/\r?\n/).forEach((line,i)=>{
+      const text=fs.readFileSync(file,'utf8');
+      const admitted=releaseTerminalCallRange(text,rel(root,file));
+      const ranges=admitted?[admitted,...admitted.identifierRanges]:releaseTerminalConsumerRanges(text,rel(root,file));
+      const checked=ranges.sort((a,b)=>b.start-a.start).reduce((value,range)=>value.slice(0,range.start)+' '.repeat(range.end-range.start)+value.slice(range.end),text);
+      checked.split(/\r?\n/).forEach((line,i)=>{
         if(COMMENT_LINE.test(line))return;
         const hit=TERMINAL_LAUNCH.find(([re])=>re.test(line));
         if(hit)flag(file,i+1,'agent-launch',`creates a terminal (${hit[1]}) — every agent launch is ${WRAPPER_DIR}/worker-start.mjs`);

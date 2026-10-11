@@ -1,0 +1,45 @@
+{
+ "schema": "replay-fixture@1",
+ "case": "codex-turn-start",
+ "source": {
+  "copy": "a8live13"
+ },
+ "workflow": {
+  "id": "wf-1",
+  "phase": "running",
+  "goalRevision": 0
+ },
+ "jobs": [
+  {
+   "id": "job-1",
+   "op": "brand.decide",
+   "status": "succeeded",
+   "owned": [
+    "own-9"
+   ]
+  },
+  {
+   "id": "job-2",
+   "op": "interface.draw",
+   "status": "queued",
+   "owned": [
+    "own-1"
+   ],
+   "params": {
+    "candidatesPerScreen": 1,
+    "gateRounds": 5
+   }
+  }
+ ],
+ "tree": {
+  "brand": true
+ },
+ "live": {
+  "kernelStartFailures": 12,
+  "codexKernelStartFailures": 5,
+  "lastStep": "kernel-seat-publication-failed",
+  "lastTerminalNamed": true,
+  "promptChars": 16831,
+  "pasteChip": "Pasted Content"
+ }
+}

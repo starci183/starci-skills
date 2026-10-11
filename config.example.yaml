@@ -185,3 +185,10 @@ sonar: {organization: null}
 #   minFreeRamPct  free-RAM percentage below which no new heavy op starts
 # set them only in the gitignored config.yaml copy, e.g.
 #   resources: {minFreeDiskGb: 5, minFreeDiskPct: 1, minFreeRamPct: 10}
+# release — where the full test suite of a release is judged (scripts/guards/release-suite-mode.mjs; docs/releasing.md "Where the suite runs"). One key:
+#   suite: local   the shipped default: `starci release cut` runs the root suite and the Linux parity container before it pushes, and the pre-push gate asks for their green rows
+#   suite: ci      the owner's recorded choice (2026-10-09): no local full suite and no Linux container; the GitHub ci workflow runs the suite (with coverage, Codecov, SonarCloud) AFTER the push.
+#                  The cut still runs npm run check, npm run test:packages, the specs affected by the release, the live Orca smokes and the example apps; the record lists the root suite as
+#                  delegated, never green. A release can reach GitHub and its tag before the suite has run; a red CI is fixed forward with the next pre-release (starci release ci-status).
+# "none" is refused: the suite does not vanish, it moves to CI. Set it only in the gitignored config.yaml copy: release: {suite: ci}
+release: {suite: local}

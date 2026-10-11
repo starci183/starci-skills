@@ -126,6 +126,9 @@ proofs:
     requirement:
       en: The op ran in the calling chat application and dispatched nothing in the kernel - the intake
         record is the handoff, and workflow execution begins only after the host accepts it.
+judge:
+  - by: owner
+    why: "the op runs in the chat application and dispatches nothing in a workflow: its intake becomes a goal only after the owner replies ok to the goal preview of define-goal"
 blockers:
   - code: INTENT_UNRESOLVED
     condition:

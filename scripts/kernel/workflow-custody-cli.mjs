@@ -6,27 +6,24 @@
 // Reads what the workflow owns in its app repository (scripts/kernel/workflow-custody.mjs) and where its registered tree
 // stands against it. Without --apply nothing is written. --apply runs the same repair `starci workflow start` runs before it
 // launches a Kernel (ensureWorkflowWorktree): a tree behind the branch is moved onto it with its own work preserved, a missing
-// tree is made at the branch; it is refused while an op of the workflow is in flight.
+// tree is made at the branch; it is refused while an op of the workflow has a live worker. Every admitted, unsettled attempt whose
+// recorded tree path is lost is then settled against the registered tree: rebound (a placement-rebound event) or ended (placement-lost).
 import fs from 'node:fs';
 import { arg, flag } from '../lib/cli-arg.mjs';
 import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
-import { TERMINAL_JOB_STATUSES } from '../machine/worktree-registry.mjs';
+import { inFlightOps } from './workflow-in-flight.mjs';
 import { workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 import { ensureWorkflowWorktree, workflowAppRepo } from './workflow-worktree.mjs';
 import { workflowCustody, treeStateOf } from './workflow-custody.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
+const liveOps = (busy) => busy.map((op) => op.jobId + ' (' + op.status + ', worker ' + op.state + ')').join(', ');
 const textOf = (out) => [out.ok ? 'ok' : 'refused', out.reason ?? out.state].join(': ') + (out.detail ? ' - ' + out.detail : '');
 const done = (out, asJson, code) => {
   console.log(asJson ? JSON.stringify(out) : textOf(out));
   process.exit(code);
 };
 const refuse = (reason, detail, asJson, extra = {}) => done({ ok: false, reason, detail, ...extra }, asJson, 1);
-
-function inFlightOps(ledger, workflowId) {
-  const marks = TERMINAL_JOB_STATUSES.map(() => '?').join(',');
-  return ledger.db.prepare(`SELECT job_id FROM jobs WHERE workflow_id=? AND kind='op' AND status IN (${marks})`).all(workflowId, ...TERMINAL_JOB_STATUSES).map((r) => r.job_id);
-}
 
 function report({ workflowId, appRepo, custody, record }) {
   const present = Boolean(record) && fs.existsSync(record.path);
@@ -46,14 +43,17 @@ export function main(argv = process.argv.slice(2)) {
   const custody = workflowCustody({ appRepo, workflowId });
   if (custody.fault) refuse(custody.fault.code, custody.fault.detail, asJson);
   const planned = report({ workflowId, appRepo, custody, record: workflowWorktreeOf({ env: process.env }, workflowId) });
-  if (!flag(argv, 'apply') || planned.state === 'attached') done(planned, asJson, 0);
+  if (!flag(argv, 'apply')) done(planned, asJson, 0);
   const ledger = openLedger({ file: ledgerFileFor(repo) });
-  const busy = inFlightOps(ledger, workflowId);
+  const busy = planned.state === 'attached' ? [] : inFlightOps(ledger.db, workflowId);
+  if (busy.length) {
+    ledger.close();
+    done({ ...planned, ok: false, reason: 'workflow-custody-busy', detail: `ops with a live worker: ${liveOps(busy)}; apply once they settle` }, asJson, 1);
+  }
+  const ensured = ensureWorkflowWorktree({ env: process.env }, { workflowId, appRepo, ledger });
   ledger.close();
-  if (busy.length) done({ ...planned, ok: false, reason: 'workflow-custody-busy', detail: `ops in flight: ${busy.join(', ')}; apply once they settle` }, asJson, 1);
-  const ensured = ensureWorkflowWorktree({ env: process.env }, { workflowId, appRepo });
   if (!ensured.ok) refuse(ensured.reason, ensured.detail, asJson, planned);
-  done({ ...planned, applied: true, created: ensured.created, repaired: ensured.repaired ?? null, tree: { path: ensured.record.path, branch: ensured.record.branch, checkpoint: ensured.record.checkpoint }, state: 'attached' }, asJson, 0);
+  done({ ...planned, applied: true, created: ensured.created, repaired: ensured.repaired ?? null, placements: ensured.placements ?? null, tree: { path: ensured.record.path, branch: ensured.record.branch, checkpoint: ensured.record.checkpoint }, state: 'attached' }, asJson, 0);
 }
 
 if (isMain(import.meta.url)) main();

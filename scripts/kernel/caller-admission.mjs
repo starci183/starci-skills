@@ -5,6 +5,8 @@ import { kernelReadManifest, requireKernelRead } from './required-read.mjs';
 import { revRootOf } from './runtime-rev.mjs';
 import { withMutationFence, mutationAuthority } from '../lib/mutation-fence.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { personActor, recordIntervention } from './intervention.mjs';
+import { reactionOwner, readOnlyLedger } from './read-only-ledger.mjs';
 const refuse = (detail, code = 'kernel-caller-stale') => Object.assign(new Error(detail), { code });
 
 const targetWorkflow = (db, args) => {
@@ -49,6 +51,16 @@ const finishedKernelClose = (ledger, identity, authority) => {
     && ended?.managed?.dispatchId === authority.dispatch && parseJson(end?.payload_json)?.kernelTerminal === authority.terminal;
 };
 
+/**
+ * Whether a file the Kernel was admitted on changed its bytes during the call. A file that is NEW in the current required set is not a change: a menu decision
+ * (`starci kernel decide`) enqueues an op its own arguments do not name, so the ledger write of the nested enqueue adds that op's files to the required set, and the
+ * enqueue's own READ gate (requireAdmittedKernelRead: kernel-read-unverified until this life attested them) judges the new files. Only a changed or vanished file is refused here.
+ */
+function changedReads(before, now) {
+  const current = new Map(now.map((file) => [file.path, JSON.stringify(file)]));
+  return before.some((file) => current.get(file.path) !== JSON.stringify(file));
+}
+
 /** The kernel-role recheck of one mutation: incarnation, workflow scope and READ bytes. */
 const checkKernel = ({ ledger, identity, authority, baseline, args, boundary, authorityOf, manifestOf, root }) => {
   if (boundary?.kind === 'ledger-write' && boundary.db !== ledger.db) throw refuse('Kernel write uses another ledger');
@@ -59,7 +71,7 @@ const checkKernel = ({ ledger, identity, authority, baseline, args, boundary, au
   const targets = targetWorkflow(ledger.db,args);
   if ([...targets].some(id => id !== authority.workflowId)) throw refuse('Kernel mutation targets another workflow');
   const currentReads = manifestOf(ledger.db,identity.workflowId,{ root,authority: current,ops: args.op ? [args.op] : [],clean: false });
-  if (JSON.stringify(currentReads.files) !== JSON.stringify(baseline.files)) throw refuse('required bytes changed during this call', 'kernel-read-unverified');
+  if (changedReads(baseline.files, currentReads.files)) throw refuse('required bytes changed during this call', 'kernel-read-unverified');
 };
 
 /** The op-role recheck of one mutation: the latest attempt row is still this caller's incarnation. */
@@ -69,17 +81,28 @@ const checkOpIncarnation = (ledger, identity) => {
     || latest.dispatch_id !== identity.identity?.dispatch_id) throw refuse('operation report incarnation changed before mutation');
 };
 
+/** Append the intervention event of one call; a failure to record it is reported and never blocks the person's write. Returns whether the call is noted. */
+function noteIntervention(ledger, args, { verb, actor }) {
+  try { recordIntervention(ledger, { targets: targetWorkflow(ledger.db, args), verb, actor }); } catch (error) {
+    console.error(JSON.stringify({ ok: true, warning: `intervention not recorded: ${String(error?.message ?? error)}` }));
+  }
+  return true;
+}
+
 /** Capture existing owners once; each write/effect rechecks against those same actual owners. */
-export function callerAdmission(ledger, args, { env = process.env, root = revRootOf(env), caller = null, resolve = callerOf, authorityOf = kernelAuthorityOf, manifestOf = kernelReadManifest } = {}) {
+export function callerAdmission(ledger, args, { env = process.env, root = revRootOf(env), caller = null, verb = null, resolve = callerOf, authorityOf = kernelAuthorityOf, manifestOf = kernelReadManifest } = {}) {
   const identity = caller ?? resolve(ledger.db,env,{ file: ledger.path });
   if (['unknown','foreign','stale'].includes(identity.role)) throw refuse(`caller custody ${identity.via ?? 'unknown'}`, 'kernel-caller-unknown');
   const { authority, baseline } = admissionBasis({ identity, ledger, args, root, authorityOf, manifestOf });
+  const person = personActor(identity, env);
+  let intervened = false;
   const check = boundary => {
     const fresh = resolve(ledger.db,env,{ file: ledger.path });
     if (fresh.role !== identity.role || fresh.jobId !== identity.jobId || fresh.handle !== identity.handle) throw refuse('caller binding changed before mutation');
     if (identity.role === 'kernel') checkKernel({ ledger, identity, authority, baseline, args, boundary, authorityOf, manifestOf, root });
     else if (identity.role === 'op') checkOpIncarnation(ledger, identity);
     else if (identity.role === 'supervisor' && JSON.stringify(fresh.identity) !== JSON.stringify(identity.identity)) throw refuse('Supervisor incarnation changed before mutation');
+    else if (person && !intervened && boundary?.kind === 'ledger-write' && boundary.db === ledger.db) intervened = noteIntervention(ledger, args, { verb, actor: person });
   };
   const stamp = authority ? Object.freeze(Object.fromEntries(Object.entries(authority).filter(([key]) => key !== 'token'))) : null;
   return { caller: identity, authority: stamp, run: fn => withMutationFence(check,stamp,fn) };
@@ -93,3 +116,25 @@ export function requireAdmittedKernelRead(db, workflowId, op, { root = revRootOf
     requireKernelRead(db,workflowId,{ root,authority,op });
   }
 }
+
+/**
+ * The ledger a verb runs with. A read verb (`reads: true`) is opened read-only; one that also reacts (`reacts: true`) is reopened writable
+ * only when its caller owns the reactions (read-only-ledger.mjs reactionOwner), so a person or Debug reading it writes nothing.
+ */
+export function openVerbLedger(spec, file, { openWritable, env = process.env, resolve = callerOf, openReadOnly = readOnlyLedger, args = {} }) {
+  if (spec.reads !== true || (spec.writesWith ?? []).some((flag) => args[flag] != null && args[flag] !== false)) return openWritable(file);
+  const reader = openReadOnly(file);
+  if (spec.reacts !== true || !reactionOwner(resolve(reader.db, env, { file: reader.path }), env)) return reader;
+  reader.close();
+  return openWritable(file);
+}
+
+/** Run a read verb and fail it with the code `read-verb-write` when it tried to write, even if the verb swallowed the refusal. */
+export async function guardedRun(ledger, run) {
+  const result = await run();
+  if (ledger.attempts?.length) throw Object.assign(new Error(`a read verb tried to write the ledger: ${ledger.attempts.join(', ')}`), { code: 'read-verb-write' });
+  return result;
+}
+
+/** The ledger a refusal's receipt is written through: a read verb refused to an Op still writes it, through a writable connection of its own. */
+export const receiptLedger = (ledger, openWritable) => (ledger.readOnly ? openWritable({ file: ledger.path }) : ledger);

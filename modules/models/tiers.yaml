@@ -28,6 +28,7 @@ seats:
   kernelManager: frontier
   kernel: high
   worker: high
+  critic: frontier
 # The kernel's own model calls (selection.yaml kernelFunctionKinds) take the tier of their seat.
 kindSeats:
   model.assessGoal: planner

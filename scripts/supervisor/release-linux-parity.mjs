@@ -9,13 +9,14 @@
 // out) on a READ-ONLY mount, and extracted to a copy inside the container to write in (then a throwaway git repository, since the checks read git). Docker is spoken
 // only through the scripts/api/docker call files, to a container this run names and removes; no port is published and no other container is touched.
 // A red step, or no docker daemon, is a red L4 step: it blocks the cut.
-// Seams (deps): docker ({version, run, rm}), archive (repo, file -> {ok, error}), workflows (repo -> [{file, doc}]), apps (repo -> [names]; runL4 hands over its example apps), logDir, now.
+// Seams (deps): select (a filter over the planned steps: the spec leg of the cut prepares with the steps before the checks), docker ({version, run, rm}), archive (repo, file -> {ok, error}), workflows (repo -> [{file, doc}]), apps (repo -> [names]; runL4 hands over its example apps), logDir, now.
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { archive } from '../api/git/archive.mjs';
 import { run as dockerRun } from '../api/docker/run.mjs';
 import { containerRm } from '../api/docker/container-rm.mjs';
+import { onInterrupt } from '../lib/interrupt-cleanup.mjs';
 import { version as dockerVersion } from '../api/docker/version.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
@@ -173,6 +174,7 @@ export function runParity(repo, deps = {}) {
   const log = path.join(logDir, `${STEP_NAME}-${t0}.log`);
   const docker = deps.docker ?? { version: dockerVersion, run: dockerRun, rm: containerRm };
   const plan = { ...parityPlan({ workflows: (deps.workflows ?? readWorkflows)(repo), apps: (deps.apps ?? (() => []))(repo) }), specs: [...(deps.specs ?? [])] };
+  if (deps.select) plan.steps = plan.steps.filter((step, index, all) => deps.select(step, index, all));
   const result = (ok, why, extra = {}) => ({ name: STEP_NAME, ok, log, ms: now() - t0, skips: [], image: plan.image, steps: plan.steps.map((s) => s.name), skipped: plan.skipped, ...(why && { why }), ...extra });
   const refuse = (why) => { fs.writeFileSync(log, `${why}\n`); return result(false, why); };
 
@@ -192,9 +194,10 @@ export function runParity(repo, deps = {}) {
     fs.writeFileSync(path.join(work, 'parity.sh'), parityScript(plan), 'utf8');
     const fd = fs.openSync(log, 'w');
     let r;
+    const disposeRm = (deps.onInterrupt ?? onInterrupt)(() => docker.rm(name)); // an interrupted cut removes the container it started
     try {
       r = docker.run(['--name', name, '--mount', `type=bind,source=${work},target=/in,readonly`, plan.image, 'bash', '/in/parity.sh'], { timeout: deps.timeoutMs ?? RUN_TIMEOUT_MS, stdio: ['ignore', fd, fd] });
-    } finally { fs.closeSync(fd); }
+    } finally { fs.closeSync(fd); disposeRm(); }
     docker.rm(name); // this run's own container only, by its exact name: nothing is left behind after a timeout
     const text = fs.readFileSync(log, 'utf8');
     const out = parityOutcome(text);

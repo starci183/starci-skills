@@ -1,0 +1,27 @@
+group: runtime
+verb: deploy
+owner: runtime
+runtimeSide: host
+summary: carry a checked runtime revision onto the running host and verify the engine on it
+impl: {module: scripts/reconciler/runtime-deploy.mjs, export: runtimeDeploy}
+effect: host
+roles: [coordinator, owner]
+conventions:
+  - refuses unless the source is clean, a fast-forward of the host and its check and affected specs are proven by a receipt on that commit
+  - refuses while a release cut holds the host lock; waits for settles, Critic runs and prepared decisions in flight, stops none
+  - several commits are one revision change, with one fast-forward, installed artefacts migrated, one engine restart, then verified
+  - journals one runtime-deployed event; --plan prints every step and refusal and changes nothing
+  - a failed verification names the host state and the non-destructive way back (git revert of the range), never a reset
+flags:
+  - {name: from, type: string, summary: "a clone directory (its HEAD is the revision) or a ref of the host repository"}
+  - {name: plan, type: boolean, summary: print every step and every refusal without changing anything}
+exit:
+  "0": the host runs the new revision, verified, and the deploy event is journalled (or the plan has no refusal)
+  "1": refused before any change, or failed after the fast-forward with the host state named
+  "2": bad usage
+json: starci/runtime-deploy@1
+examples:
+  - starci runtime deploy --from <clone> --plan
+  - starci runtime deploy --from <clone> --json
+  - starci runtime deploy --from main
+editions: [full]

@@ -1,0 +1,24 @@
+group: release
+verb: ci-status
+owner: runtime
+summary: "the verdict of the GitHub ci workflow, Codecov and Sonar for a release; red is recorded for Debug"
+impl:
+  script: scripts/supervisor/release-ci-status-cli.mjs
+flags:
+  - {name: repo, type: string, summary: the repository released (default is the current directory)}
+  - {name: tag, type: string, summary: the release tag v* whose commit is read (default is the newest release tag merged in HEAD)}
+  - {name: wait, type: boolean, summary: "poll until the run ends (modules/supervisor/release-cut.yaml suite.ci pollSeconds, waitMinutes)"}
+exit:
+  "0": "the ci workflow of the release commit is green"
+  "1": "it is red (for a release cut under suite ci: recorded once as runtime-defect:release-ci-red-<tag>)"
+  "2": "bad usage"
+  "3": "no verdict yet - no run, still running, or GitHub could not be read"
+json: flag
+conventions:
+  - "Under suite ci the full test suite runs only in this workflow, after the push; this verb is how its verdict comes back."
+  - "The state is left beside the release record (starci-release/<sha>.ci.json); starci debug digest and starci reconciler up --check show the last release CI."
+examples:
+  - starci release ci-status --tag v1.0.0-alpha.9 --wait
+  - starci release ci-status --json
+editions:
+  - full

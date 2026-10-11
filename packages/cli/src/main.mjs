@@ -3,6 +3,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { retargetNotice, targetOf, treeTargetRefusal } from './runtime-target.mjs';
 import { foreignRuntimeNotice, locateRuntime, ownRuntimeRoot, runtimeEntryOf } from './runtime-locate.mjs';
 import { runtimeEnv } from './shim.mjs';
 
@@ -202,11 +203,16 @@ const hfsDispatch = async (split, group, args, { io, cwd, stdout, stderr }) => {
 };
 
 /** Spawn the located runtime for the resolved verb; its exit status is the command's. */
-const runRuntime = (split, args, { io, cwd, env, home, stderr }) => {
+const runRuntime = (split, args, { io, cwd, env, home, stderr, command }) => {
   const skipped = [];
-  const located = (io.locateRuntime ?? locateRuntime)({ cwd, env, skipped, ...(home ? { home } : {}) });
-  if (!located) return noRuntime(stderr, split.group, skipped);
-  const notice = foreignRuntimeNotice(located, (io.ownRuntimeRoot ?? ownRuntimeRoot)());
+  const record = (io.locateRuntime ?? locateRuntime)({ cwd, env, skipped, ...(home ? { home } : {}) });
+  if (!record) return noRuntime(stderr, split.group, skipped);
+  const own = (io.ownRuntimeRoot ?? ownRuntimeRoot)();
+  const { located, retargeted } = targetOf({ command, args, located: record, own });
+  if (retargeted) writeTo(stderr, retargetNotice(retargeted, own));
+  const refused = treeTargetRefusal({ command, args, located, own });
+  if (refused) return fail(stderr, refused.message, 2);
+  const notice = foreignRuntimeNotice(located, own);
   if (notice) writeTo(stderr, notice);
   const spawn = io.spawn ?? spawnSync;
   let result;
@@ -268,5 +274,5 @@ export async function main(argv = process.argv.slice(2), io = {}) {
   if (runtimeOut !== null) return runtimeOut;
   const hfsOut = await hfsDispatch(split, group, args, { ...ctx, cwd });
   if (hfsOut !== null) return hfsOut;
-  return runRuntime(split, args, { ...ctx, cwd });
+  return runRuntime(split, args, { ...ctx, cwd, command });
 }

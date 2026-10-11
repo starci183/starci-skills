@@ -1,4 +1,6 @@
 // One decision pass over the Kernel seat; the host owns the cadence.
+import { contractReplacement } from '../machine/revision-replace.mjs';
+import { draftSeatResult } from './draft-hold.mjs';
 const noTerminalResult = ({ workflowId, phase, terminal, repair, lostSeatWorker, exitedTwice, stopAndRelease, replaceKernel }) => {
   if (terminal) return null;
   if (!repair) return { ok: true, workflowId, phase, action: 'restart-needed', reason: 'kernel signal/terminal absent' };
@@ -77,14 +79,32 @@ const wakeResultOf = ({ proof, workflowId, phase, terminal, stale, outputAgeMs, 
   receipt: proof.sent?.receipt ?? null, error: proof.ok ? null : (proof.sent?.error || proof.sendErrorCode || null),
 });
 
+/** The proven liveness wake of an idle Kernel and its tick answer (a refused send on a stale frame replaces the seat). */
+const sendIdleWake = (ctx, idle) => {
+  const withheld = ctx.repeatedWake?.(ctx.status.value);
+  if (withheld) return { ok: true, workflowId: ctx.workflowId, phase: ctx.phase, terminal: ctx.terminal, action: 'wake-withheld', reason: withheld.reason, since: withheld.since, outputAgeMs: ctx.outputAgeMs };
+  const { status, workflowId, phase, terminal, stale, outputAgeMs, liveness, dispatch, replaceUnwritableKernel, sendWakeWithProof, wakePromptOf, read,
+    recordKernelWakeFailed, recordKernelWoken, wakeSendRefused, wakeActionOf, deliveryFieldsOf, classified } = ctx;
+  const proof = sendWakeWithProof({ terminal, text: wakePromptOf(workflowId, status.value), before: String(read.screen ?? '') });
+  if (ctx.draftRefused(proof)) ctx.recordDraftHeld(terminal, proof);
+  else if (!proof.ok && proof.delivery !== 'agent-exited') recordKernelWakeFailed(terminal, { state: classified.state, sendErrorCode: proof.sendErrorCode ?? null, delivery: proof.delivery ?? null });
+  if (proof.ok) recordKernelWoken(terminal, { delivery: proof.delivery ?? null, idleWakes: idle.wakes + 1, ...ctx.menuOf?.(status.value) });
+  if (proof.ok && status.value?.revisionNotice?.state === 'owed') ctx.recordRevisionWoken(status.value.revisionNotice);
+  if (!proof.ok && liveness.staleActive && wakeSendRefused(proof))
+    return replaceUnwritableKernel({ phase, terminal, dispatch, stale, outputAgeMs, proof });
+  return wakeResultOf({ proof, workflowId, phase, terminal, stale, outputAgeMs, wakeActionOf, deliveryFieldsOf });
+};
+
 const idleTurnResult = (ctx) => {
   const { classified, status, repair, workflowId, phase, terminal, stale, outputAgeMs, liveness, lastOutputAt,
     dispatch, kernelWakeRefusedAt, replaceUnwritableKernel, kernelWakeFailures, wakeFailuresProveDead, replaceWakeDeadKernel,
-    kernelIdleWakes, escalateIdleStall, replaceIdleKernel, sendWakeWithProof, wakePromptOf, read, recordKernelWakeFailed,
-    recordKernelWoken, wakeSendRefused, wakeActionOf, deliveryFieldsOf } = ctx;
+    kernelIdleWakes, escalateIdleStall, replaceIdleKernel, kernelRotation } = ctx;
   if (classified.state !== 'turn-idle') return null;
-  if (status.value?.frontier?.actionable === false) return { ok: true, workflowId, phase, terminal, action: 'idle-waiting', ...stale, reason: status.value?.frontier?.reason ?? 'frontier not actionable', outputAgeMs };
+  const owes = ['owed', 'replace-due'].includes(status.value?.revisionNotice?.state);
+  if (status.value?.frontier?.actionable === false && !owes) return { ok: true, workflowId, phase, terminal, action: 'idle-waiting', ...stale, reason: status.value?.frontier?.reason ?? 'frontier not actionable', outputAgeMs };
   if (!repair) return { ok: true, workflowId, phase, terminal, action: 'wake-needed', ...stale, outputAgeMs };
+  // A person's draft wins: no replacement, rotation or clearing while one stands (draft-hold.mjs); the wake is tried again and refused again.
+  if (ctx.draftHeld() || ctx.foreignDraft(ctx.read.draft)) return sendIdleWake(ctx, kernelIdleWakes());
   const refusedAt = liveness.staleActive ? kernelWakeRefusedAt(terminal) : null;
   if (refusedAt != null && refusedAt > (lastOutputAt ?? 0))
     return replaceUnwritableKernel({ phase, terminal, dispatch, stale, outputAgeMs, refusedAt });
@@ -92,12 +112,11 @@ const idleTurnResult = (ctx) => {
   if (earlier.dead) return replaceWakeDeadKernel({ phase, terminal, dispatch, stale, outputAgeMs, ...earlier });
   const idle = kernelIdleWakes();
   if (idle.due) return idle.replaced ? escalateIdleStall({ phase, terminal, idle, outputAgeMs }) : replaceIdleKernel({ phase, terminal, dispatch, stale, outputAgeMs, idle });
-  const proof = sendWakeWithProof({ terminal, text: wakePromptOf(workflowId, status.value), before: String(read.screen ?? '') });
-  if (!proof.ok && proof.delivery !== 'agent-exited') recordKernelWakeFailed(terminal, { state: classified.state, sendErrorCode: proof.sendErrorCode ?? null, delivery: proof.delivery ?? null });
-  if (proof.ok) recordKernelWoken(terminal, { delivery: proof.delivery ?? null, idleWakes: idle.wakes + 1 });
-  if (!proof.ok && liveness.staleActive && wakeSendRefused(proof))
-    return replaceUnwritableKernel({ phase, terminal, dispatch, stale, outputAgeMs, proof });
-  return wakeResultOf({ proof, workflowId, phase, terminal, stale, outputAgeMs, wakeActionOf, deliveryFieldsOf });
+  const rotation = kernelRotation.due();
+  if (rotation.due) return kernelRotation.rotate({ phase, terminal, dispatch, stale, outputAgeMs, rotation });
+  const contract = contractReplacement(status.value?.revisionNotice);
+  if (contract) return kernelRotation.rotate({ phase, terminal, dispatch, stale, outputAgeMs, rotation: contract });
+  return sendIdleWake(ctx, idle);
 };
 
 export function createKernelTick(deps) {
@@ -113,6 +132,8 @@ export function createKernelTick(deps) {
     const seatContext = { ...deps, workflowId: deps.workflowId, phase, terminal, signalValue, status, repair: deps.repair };
     const noSeat = noTerminalResult(seatContext);
     if (noSeat) return noSeat;
+    const heldDraft = draftSeatResult(seatContext);
+    if (heldDraft) return heldDraft;
     const noDispatch = noDispatchResult(seatContext);
     if (noDispatch) return noDispatch;
     const deadWorker = deadWorkerResult(seatContext);
@@ -121,6 +142,7 @@ export function createKernelTick(deps) {
     if (verdict.result) return verdict.result;
     const read = deps.terminalRead({ terminal, screen: true });
     if (!read.ok) return { ok: false, workflowId: deps.workflowId, phase, terminal, action: 'terminal-unreadable', error: read.error };
+    deps.observeRevision?.(status);
     const shared = { ...deps, workflowId: deps.workflowId, phase, terminal, dispatch: signalValue.dispatch, read, status };
     const shellPrompt = shellPromptResult(shared);
     if (shellPrompt) return shellPrompt;

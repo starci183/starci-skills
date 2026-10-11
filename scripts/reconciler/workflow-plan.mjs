@@ -4,8 +4,12 @@
 import { clipLine } from '../lib/clip.mjs';
 import { stallNotice } from '../kernel/progress-rca.mjs';
 import { shortRev } from '../kernel/runtime-rev.mjs';
+import { noticeOwes } from '../kernel/kernel-notice.mjs';
 import { CRITICAL_SUFFIX } from './sla.mjs';
 import { planSupervisorGates } from './gate-plan.mjs';
+import { planBudgetOverruns } from './budget-plan.mjs';
+import { planSupervisorOwed } from './owed-plan.mjs';
+import { planDraftHeld } from './draft-plan.mjs';
 
 const DI_SCHEMA = 'starci/decision-item@1';
 const OPENED_BY = 'workflow-controller';
@@ -90,22 +94,22 @@ function planOrphaned(p) {
 
 /**
  * The runtime rev not acked. Every runtime land makes every running Kernel's rev stale: that is no decision. The
- * Kernel's next wake carries the new rev (scripts/kernel/runtime-rev.mjs revWakeLine), so the plan only asks for a
+ * Kernel's next wake carries the new rev (scripts/kernel/kernel-notice.mjs revisionWakeLine), so the plan only asks for a
  * re-wake (out.rewake, one doorbell per rev); ONE rev-ack DI per workflow (subject 'runtime-rev', whatever the rev)
  * opens only once the ack is overdue past REV_ACK_OVERDUE (s.revAckMs), counted from the first stale read.
  */
 function planRev(p) {
-  const rev = p.status?.kernelRev ?? null;
-  if (rev?.stale !== true) return;
+  const rev = p.status?.revisionNotice ?? null;
+  if (!noticeOwes(rev)) return;
   const { s, now, workflowId } = p;
   const since = p.openClock('REV_ACK_OVERDUE')?.enteredAt ?? now;
   p.clock(p.wfEntity, 'REV_ACK_OVERDUE', s.revAckMs, since);
-  const cur = shortRev(rev.current) ?? 'unknown';
+  const cur = shortRev(rev.to) ?? 'unknown';
   if (now - since < s.revAckMs) {
     p.out.rewake = cur;
     p.out.lines.push(`rev-ack pending ${workflowId}: rev ${cur} rides the Kernel's next wake; a decision only after ${Math.round(s.revAckMs / 60_000)}m`);
-  } else p.di({ kind: 'rev-ack', subject: 'runtime-rev', summary: `runtime rev ${cur} not acked (acked ${shortRev(rev.acked) ?? 'none'}); re-read ${rev.full ? 'kernel-prompt.md and driver-loop.yaml in full' : (rev.files ?? []).slice(0, 6).join(', ')} then starci kernel kernel-ack-rev --workflow ${workflowId} --rev ${cur}`,
-    evidence: [`kernelRev acked ${rev.acked ?? 'none'} current ${rev.current ?? '-'}`, ...(rev.changes ?? []).slice(0, 3).map((c) => (typeof c === 'string' ? c : `change ${c.id ?? ''} ${c.summary ?? ''}`))] });
+  } else p.di({ kind: 'rev-ack', subject: 'runtime-rev', summary: `runtime rev ${cur} not settled (settled ${shortRev(rev.from) ?? 'none'}); re-read ${(rev.files ?? []).slice(0, 6).join(', ')} then starci kernel kernel-ack-rev --workflow ${workflowId} --rev ${cur}`,
+    evidence: [`revisionNotice settled ${rev.from ?? 'none'} current ${rev.to ?? '-'}: ${rev.line ?? ''}`] });
 }
 
 /**
@@ -192,7 +196,7 @@ function planFinish(p) {
   if (!hasOpenOperations) p.out.finish = true;
 }
 
-const SECTIONS = [planGoal, planStall, planOrphaned, planRev, planUnreadable, planFindings, planSupervisorGates, planStuckClocks, planAsks, planFinish];
+const SECTIONS = [planGoal, planStall, planOrphaned, planRev, planUnreadable, planFindings, planSupervisorGates, planBudgetOverruns, planSupervisorOwed, planDraftHeld, planStuckClocks, planAsks, planFinish];
 
 /**
  * Everything one pass decides for one running workflow. Pure: no ledger, no clock, no spawn.
@@ -200,18 +204,19 @@ const SECTIONS = [planGoal, planStall, planOrphaned, planRev, planUnreadable, pl
  *   findings  stallFindings of this workflow
  *   goal      {missing: bool, why}
  *   asks      [{dispatchId, liveness, lastServedAt}] (poll.mjs openAsks)
+ *   gates     the open supervisor-gates read from the ledger (gateViewsFromLedger), given when the status is unreadable
  *   clocks    the workflow's open clocks [{entity, state, enteredAt}] (to read an episode's age)
  *   unreadable  {misses, since, error, heldAt} when this pass could not read starci kernel status (holdStatus), else null
  * Returns {clocks: [{entity, state, slaMs, enteredAt}], decisions: [DI], reparks: [dispatchId], finish, stalled, lines}.
  */
-export function planWorkflow({ ledgerId, workflowId, status = null, findings = [], goal = { missing: false }, asks = [], clocks = [], unreadable = null, now, settings }) {
+export function planWorkflow({ draft = null, ledgerId, workflowId, status = null, findings = [], goal = { missing: false }, asks = [], gates = [], clocks = [], unreadable = null, now, settings }) {
   const wfEntity = workflowEntity(ledgerId, workflowId);
   const out = { clocks: [], decisions: [], reparks: [], finish: false, stalled: false, lines: [] };
   const rca = status?.rca ?? null;
   const top = firstUntried(rca);
   const frontier = status?.frontier ?? null;
   const p = {
-    ledgerId, workflowId, status, findings, goal, asks, unreadable, now, s: settings, wfEntity, out, rca, top, frontier,
+    draft, ledgerId, workflowId, status, findings, goal, asks, gates, unreadable, now, s: settings, wfEntity, out, rca, top, frontier,
     clock: (entity, state, slaMs, enteredAt) => { if (Number.isFinite(slaMs)) out.clocks.push({ entity, state, slaMs, enteredAt: Number.isFinite(enteredAt) ? enteredAt : now }); },
     openClock: (state) => clocks.find((c) => c.entity === wfEntity && c.state === state) ?? null,
     di: (args) => out.decisions.push(decisionOf({ ledgerId, workflowId, now, dueMs: settings.decisionDueMs, ...args })),

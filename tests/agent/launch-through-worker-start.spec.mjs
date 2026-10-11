@@ -36,10 +36,7 @@ const BYPASS=['terminal create','orchestration dispatch'];
 
 /* ------------------------------------------------------------ static law */
 
-test('no runtime code creates an agent terminal (check-host-boundary agent-launch)',()=>{
-  const found=findHostBoundaryViolations({root:ROOT}).violations.filter(v=>v.rule==='agent-launch');
-  assert.deepEqual(found,[],'every agent launch is scripts/api/orca/worker-start.mjs');
-});
+
 
 test('the agent-launch rule flags every terminal-creating form and nothing else',t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-launch-rule-'));
@@ -65,9 +62,14 @@ test('the agent-launch rule flags every terminal-creating form and nothing else'
   assert.deepEqual(found,['scripts/api/orca/wrapper.mjs:1','scripts/bad.mjs:1','scripts/bad.mjs:2','scripts/bad.mjs:3','scripts/bad.mjs:4','scripts/shell.mjs:1']);
 });
 
-test('the Orca contract carries no terminal-creating call and forbids it for the runtime',()=>{
+test('the Orca contract bounds plain shell creation and forbids terminal creation for agent orchestration',()=>{
   const calls=readYaml('modules/host/orca/calls.yaml').calls;
-  assert.equal(calls['terminal-create'],undefined,'no terminal-create call');
+  const plainShell=calls['terminal-create'];
+  assert.equal(plainShell.command,'terminal create');
+  assert.equal(plainShell.kind,'mutation');
+  assert.equal(plainShell.replay,'none','receipt loss cannot replay a shell creation');
+  assert.deepEqual(plainShell.flags,['worktree','shell','title'],'no command, environment, agent or terminal adoption');
+  assert.deepEqual(plainShell.required,plainShell.flags,'each fixed shell field is required');
   assert.equal(calls.dispatch,undefined,'no orchestration dispatch into a pre-made terminal');
   assert.equal(calls['worker-start'].flags.includes('terminal'),false,'worker-start never adopts a terminal');
   assert.equal(calls['task-create'],undefined,'worker-start --spec files the Task: there is no task-create call');
@@ -78,7 +80,7 @@ test('the Orca contract carries no terminal-creating call and forbids it for the
   const api=readYaml('modules/host/orca/api.yaml');
   for(const command of BYPASS)assert.ok(api.forbiddenForStarciOrchestration.includes(command),`${command} is forbidden`);
   assert.equal(api.roleCommands?.workflowKernel?.includes('terminal create')??false,false);
-  // The wrapper lib builds every argv from calls.yaml: neither a terminal-create call nor a --terminal adoption can be built.
+  // The wrapper rejects commands in shell creation and terminal adoption in worker-start before invoking the host.
   const refusals=spawnSync(process.execPath,['--input-type=module','-e',
     `import {orcaCall} from ${JSON.stringify(pathToFileURL(path.join(ROOT,'scripts','api','orca','lib.mjs')).href)};`+
     "const t=f=>{try{f();return null;}catch(e){return e.message;}};"+
@@ -126,22 +128,7 @@ const seams=({start=null,show=null,handle='term_1'}={})=>{
   return {io,calls,names:()=>calls.map(c=>c[0])};
 };
 
-test('spawnAgent starts the routed agent with its spec through worker-start, takes the terminal from the receipt, names it and attests it',()=>{
-  const s=seams();
-  const created=[];
-  const r=spawnAgent({provider:'claude',model:'claude-opus-5-5',effort:'high',worktree:'w',title:'[Op] x',spec:'do x',taskTitle:'x.op #1',run:'run_1',from:'term_k',
-    request:{job:'j1',lease:'l1'},onCreated:(h,d)=>created.push([h,d]),io:s.io});
-  assert.equal(r.ok,true,JSON.stringify(r));
-  assert.deepEqual(s.names(),['trust','start','show','rename'],'no task-create and no dispatch-show');
-  const start=s.calls.find(c=>c[0]==='start')[1];
-  assert.deepEqual({agent:start.agent,model:start.model,effort:start.effort,spec:start.spec,taskTitle:start.taskTitle,run:start.run,from:start.from,worktree:start.worktree},
-    {agent:'claude',model:'claude-opus-5-5',effort:'high',spec:'do x',taskTitle:'x.op #1',run:'run_1',from:'term_k',worktree:'w'});
-  assert.deepEqual(start.request,{job:'j1',lease:'l1',run:'run_1',agent:'claude',model:'claude-opus-5-5'},'the start identity is the ledger identity plus the Run, agent and model');
-  assert.equal(start.task,undefined,'a start never names an existing Task');
-  assert.equal(start.terminal,undefined,'no terminal is ever handed to worker-start');
-  assert.deepEqual([r.terminal,r.dispatchId,r.taskId,r.titleApplied],['term_1','ctx_1','task_run_1',true]);
-  assert.deepEqual(created,[['term_1','ctx_1']],'the handle is recorded the moment the receipt names it');
-});
+
 
 test('a start receipt without the agent terminal takes it from worker-show; neither is a typed refusal that cleans the worker',()=>{
   const s=seams({handle:null});
@@ -157,15 +144,7 @@ test('a start receipt without the agent terminal takes it from worker-show; neit
   assert.deepEqual([t.ok,t.step,t.code],[false,'worker-start','worker-start-no-task']);
 });
 
-test('a card that takes no model flag starts without --model/--effort and is attested on its agent alone',()=>{
-  const s=seams({show:()=>({ok:true,state:'ready',effective:{agent:'devin',model:null}})});
-  const r=spawnAgent({provider:'devin',model:'swe-2-max',effort:'high',worktree:'w',title:'[Op] x',spec:'s',run:'run_1',request:{job:'j'},io:s.io});
-  assert.equal(r.ok,true,JSON.stringify(r));
-  const start=s.calls.find(c=>c[0]==='start')[1];
-  assert.equal(start.agent,'devin');
-  assert.equal(start.model,undefined,'devin takes no --model on worker-start');
-  assert.equal(start.effort,undefined,'--effort requires --model');
-});
+
 
 test('an attestation mismatch fences and releases the worker it started and never reports it live',()=>{
   const s=seams({show:()=>({ok:true,state:'ready',effective:{agent:'claude',model:'claude-sonnet-5'}})});

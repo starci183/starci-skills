@@ -5,7 +5,9 @@
 //   3. RELEASE_NOTES holds: the tag's CHANGELOG section exists and has no unfinished entries (scripts/hfs/runtime-rules/release-notes.mjs), and the rest of the release
 //      definition that can hold before the suite ran (scripts/guards/release-definition.mjs: the version moved past the remote main's, a dated heading); `--plan` stops here and reports what the cut would run;
 //      the release host provides what L4 needs (scripts/supervisor/release-host.mjs: an Orca terminal, a reachable Orca, a Docker daemon), else the cut refuses `release-host` at once;
-//   4. the L4 row runs once (scripts/supervisor/release-l4.mjs: the example installs, every spec, lint, checks, tsc, images, the Sonar proof and the Linux parity step), each step to a log recorded in the result;
+//   4. the L4 row runs once (scripts/supervisor/release-l4.mjs: the example installs, every spec, lint, checks, tsc, images, the Sonar proof and the Linux parity step), as a schedule whose rows run together where they are independent,
+//      each step to a log recorded in the result; a row green for this very commit, or green with an identical input set on an earlier commit (scripts/supervisor/release-reuse.mjs; never the rows the pre-push gate requires), is not run again:
+//      `--rows` re-runs named rows alone on the same commit, `--no-reuse` runs every row;
 //      every skipped test is reported with its reason, and a skip from missing infrastructure (or any skip but the declared browser ones) fails L4;
 //   5. main did not move meanwhile; the pushed range passes the secret scan;
 //   6. the ANNOTATED tag is created on HEAD with the CHANGELOG section as its message, and main and the tag are pushed together, atomically: both refs move or neither does.
@@ -26,24 +28,29 @@ import { statusQuery } from '../api/git/status-query.mjs';
 import { symbolicRefQuery } from '../api/git/symbolic-ref-query.mjs';
 import { tag as gitTag } from '../api/git/tag.mjs';
 import { updateRef } from '../api/git/update-ref.mjs';
+import { gitResultOf } from '../lib/git.mjs';
 import { changelogSection, releaseNotesFindings } from '../hfs/runtime-rules/release-notes.mjs';
 import { runL4, skipReport } from './release-l4.mjs';
+import { combine, decisionLines, needsSonar, refusalFor, remember, selectionFor } from './release-cut-rows.mjs';
 import { scanRange } from './push-mains.mjs';
 import { planOf, preSuiteRefusal } from './release-cut-plan.mjs';
 import { releaseHostMissing, releaseHostWhy } from './release-host.mjs';
+import { prepareReleaseTerminal } from './release-terminal.mjs';
 import { withHostLock as holdHostLock } from '../machine/host-lock.mjs';
 import { writeL4Record } from '../guards/release-record.mjs';
+import { suiteModeOf } from '../guards/release-suite-mode.mjs';
+import { writeCiRecord } from './release-ci-status.mjs';
 
 /** A release tag: `v` and a version. Anything else is never pushed by the release flow. */
 const RELEASE_TAG = /^v\d[\w.+-]*$/;
 const GIT_CALLS = { 'symbolic-ref': symbolicRefQuery, status: statusQuery, 'rev-parse': revParseQuery, tag: gitTag, 'cat-file': catFile, 'ls-remote': lsRemote };
 
 /** Run one git verb of the release flow in `cwd`: {ok, stdout, stderr}. */
-function git([verb, ...args], { cwd }) {
+function git([verb, ...args], { cwd, input }) {
   const call = GIT_CALLS[verb];
   if (!call) throw new Error(`git ${verb}: not a call of the release flow`);
-  const r = call(args, { cwd, timeout: 120_000 });
-  return { ok: r.status === 0, stdout: String(r.stdout ?? '').trim(), stderr: String(r.stderr ?? '').trim() };
+  const r = gitResultOf(call(args, { cwd, timeout: 120_000, ...(input === undefined ? {} : { input }) }));
+  return { ok: r.ok, stdout: String(r.stdout).trim(), stderr: r.ok ? '' : r.error };
 }
 
 /**
@@ -74,7 +81,10 @@ const heldWhy = (o) => {
 };
 
 /** The default L4 runner (scripts/supervisor/release-l4.mjs): every step of the L4 row once, each to a log: [{name, ok, log, ms, skips, absent?}]. The Sonar proofs come from the existing gate (release-l4-sonar.mjs), the Linux step from release-linux-parity.mjs. */
-const defaultSuite = (repo, deps = {}) => runL4(repo, { proofs: deps.proofs, supplier: deps.supplier, ...(deps.parity !== undefined ? { parity: deps.parity } : {}), parityDeps: deps.parityDeps ?? {} });
+const defaultSuite = (repo, deps = {}) => runL4(repo, {
+  plan: deps.selection?.plan, proofs: deps.proofs, supplier: deps.supplier,
+  ...(deps.parity !== undefined ? { parity: deps.parity } : {}), parityDeps: deps.parityDeps ?? {}, carry: deps.carry ?? {},
+});
 
 function releaseTagState({ tag, branch, remote, cwd, run, out, refuse }) {
   if (!tag) return { refusal: refuse('no-release-tag', 'name the release tag: v<version>') };
@@ -100,18 +110,32 @@ function releaseTagState({ tag, branch, remote, cwd, run, out, refuse }) {
  * What is already known to stop the cut before the suite runs, as a refusal or null: the release definition (scripts/guards/release-definition.mjs) is what the pre-push hook enforces, and what the
  * L4 row needs from this host (an Orca terminal, a reachable Orca, a Docker daemon) decides whether the row can pass at all: a cut that would fail an hour in refuses in seconds.
  */
-async function beforeSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, refuse }) {
-  const unmet = await preSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps });
+async function beforeSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, refuse, sonar, plan }) {
+  const unmet = await preSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, sonar });
   if (unmet) return refuse(unmet.verdict, unmet.why, { findings: unmet.findings });
-  const hostMissing = (deps.host ?? releaseHostMissing)({ root: cwd });
-  return hostMissing.length ? refuse('release-host', releaseHostWhy(hostMissing), { hostMissing }) : null;
+  const hostMissing = (deps.host ?? releaseHostMissing)({ repo, root: cwd });
+  if (!hostMissing.length) return null;
+  if (plan || hostMissing.length !== 1 || hostMissing[0].need !== 'an Orca terminal')
+    return refuse('release-host', releaseHostWhy(hostMissing), { hostMissing });
+  // A real cut may prepare only the missing shell. It still refuses: no suite, tag, push or invented environment.
+  const terminalPreparation = (deps.prepareTerminal ?? prepareReleaseTerminal)({ repo });
+  return refuse('release-host', releaseHostWhy(hostMissing) + '; ' + terminalPreparation.why, { hostMissing, terminalPreparation });
 }
 
-async function releaseSuite({ repo, deps, out, refuse, lock }) {
-  const ran = await lock(() => (deps.suite ?? defaultSuite)(repo, deps));
+/** The refusal of a `--rows` the plan or the ledger of this commit cannot serve, or null. */
+function rowsRefusal(selection, rows, refuse) {
+  const unservable = refusalFor(selection, rows);
+  return unservable ? refuse(unservable.verdict, unservable.why) : null;
+}
+
+async function releaseSuite({ repo, deps, out, refuse, lock, selection, tag }) {
+  const ran = await lock(() => (deps.suite ?? defaultSuite)(repo, { ...deps, carry: selection.carry, selection }));
   if (heldBy(ran)) return { refusal: refuse('host-lock-held', heldWhy(heldBy(ran))) };
-  const steps = ran;
+  const steps = combine(selection, ran);
   out.suite = steps;
+  out.reused = steps.filter((s) => s.reusedFrom).map((s) => ({ name: s.name, from: s.reusedFrom }));
+  out.rows = decisionLines(selection);
+  remember({ repo, head: out.head, tag, rows: steps, selection, deps });
   const red = steps.filter((s) => !s.ok);
   if (red.length) {
     const names = red.map((s) => `${s.name}${s.absent ? ' (absent)' : ''}`).join(', ');
@@ -132,11 +156,19 @@ async function releaseSuite({ repo, deps, out, refuse, lock }) {
   return { steps };
 }
 
+/** The result of a release that moved: leaves the pending CI record of the commit and names the command that reads CI's verdict (the suite itself under `suite: ci`). */
+function pushedResult({ out, repo, head, tag, branch, remote, mode, deps }) {
+  (deps.writeCi ?? writeCiRecord)({ repo, head, tag, suite: mode, state: 'pending' });
+  const watch = `starci release ci-status --tag ${tag} --wait`;
+  const judged = mode === 'ci' ? `; the full suite now runs only on GitHub (suite: ci) - watch it: ${watch}` : `; CI runs next - ${watch}`;
+  return { ...out, ok: true, verdict: 'pushed', why: `${branch} and ${tag} pushed to ${remote} in one atomic push${judged}`, pushed: true, ciWatch: watch };
+}
+
 /**
  * Cut the release `tag` (v<version>) of `repo`: see the header. Async (the L4 Sonar gate is): a Promise of {ok, verdict, why, tag, head, suite, skips, declaredSkips, pushed, tagCreated}.
  * The tag is required, must be `v*`, and is created here, ANNOTATED, with the CHANGELOG section as its message (an existing annotated tag on HEAD is reused).
  */
-export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag = null, plan = false, deps = {} } = {}) {
+export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag = null, plan = false, rows, reuse, deps = {} } = {}) {
   const run = deps.git ?? git;
   const out = { ok: false, repo: path.basename(repo), verdict: null, why: null, tag, head: null, suite: [], pushed: false, tagCreated: false };
   const refuse = (verdict, why, extra = {}) => ({ ...out, ...extra, verdict, why });
@@ -150,14 +182,17 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   const notes = releaseNotesFindings({ tags: [tag], changelog });
   if (notes.length) return refuse('release-notes', notes.map((f) => f.message).join('; '), { findings: notes });
 
-  const stop = await beforeSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, refuse });
+  const mode = (deps.suiteMode ?? suiteModeOf)(repo);
+  out.suiteMode = mode;
+  const selection = selectionFor({ repo, head, rows, reuse, mode, deps });
+  const stop = rowsRefusal(selection, rows, refuse) ?? await beforeSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, refuse, sonar: needsSonar(selection), plan });
   if (stop) return stop;
-  if (plan) return planOf({ repo, head, tag, remote, branch, out });
+  if (plan) return planOf({ head, tag, remote, branch, out, selection });
 
   // L4 reports every skipped test with its reason, and every test must have passed in at least one leg (the host run or the Linux container run): a skip that passed in the other leg is covered and listed with where it passed;
   // a skip nothing covered (missing infrastructure, a platform no leg has, any undeclared skip) fails L4.
   const lock = deps.lock ?? withHostLock;
-  const suiteResult = await releaseSuite({ repo, deps, out, refuse, lock });
+  const suiteResult = await releaseSuite({ repo, deps, out, refuse, lock, selection, tag });
   if (suiteResult.refusal) return suiteResult.refusal;
   const { steps } = suiteResult;
 
@@ -166,14 +201,14 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   if (!scan.ok) return refuse('secret-scan', scan.error ?? `${scan.findings.length} finding(s) in the pushed range`, { findings: scan.findings });
 
   if (!local) {
-    const made = run(['tag', '-a', tag, '--cleanup=verbatim', '-m', changelogSection(changelog, tag.slice(1)).body], { cwd });
+    const made = run(['tag', '-a', tag, '--cleanup=verbatim', '-F', '-'], { cwd, input: changelogSection(changelog, tag.slice(1)).body });
     if (!made.ok) return refuse('tag-failed', `could not create the annotated tag ${tag}: ${made.stderr.slice(0, 200)}`);
     out.tagCreated = true;
   }
   const refs = [branch, `refs/tags/${tag}`];
   const refusal = pushRefusal({ refs });
   if (refusal) return refuse('push-refused', refusal);
-  const recorded = (deps.recordL4 ?? writeL4Record)({ repo, head, tag, logs: steps.filter((s) => !s.absent) });
+  const recorded = (deps.recordL4 ?? writeL4Record)({ repo, head, tag, logs: steps.filter((s) => !s.absent), suite: mode, delegated: selection.plan.delegated });
   if (!recorded.ok) return refuse('l4-record', `the L4 record of ${head.slice(0, 9)} could not be written (${recorded.reason}): the pre-push gate would refuse the push`);
   out.l4Record = recorded.file ?? null;
   const lifted = pushLiftTarget({ pushUrl: configGet(cwd, `remote.${remote}.pushurl`).stdout, fetchUrl: configGet(cwd, `remote.${remote}.url`).stdout });
@@ -181,5 +216,5 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   if (heldBy(pushed)) return refuse('host-lock-held', heldWhy(heldBy(pushed)));
   if (pushed.status !== 0) return refuse('push-refused', `the atomic push of ${refs.join(' and ')} to ${remote} failed (the local tag stays, nothing moved on the remote): ${String(pushed.stderr ?? '').trim().slice(0, 300)}`);
   if (lifted) updateRef(cwd, `refs/remotes/${remote}/${branch}`, head, { message: `release push of ${tag}` });
-  return { ...out, ok: true, verdict: 'pushed', why: `${branch} and ${tag} pushed to ${remote} in one atomic push`, pushed: true };
+  return pushedResult({ out, repo, head, tag, branch, remote, mode, deps });
 }

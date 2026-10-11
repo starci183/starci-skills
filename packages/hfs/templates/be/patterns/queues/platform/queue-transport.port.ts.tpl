@@ -20,6 +20,8 @@ export interface BullmqRedis {
     readonly host: string
     /** The port. */
     readonly port: number
+    /** The Redis database that holds this app's queue state. */
+    readonly db: number
     /** BullMQ answers to commands only through a client that does not retry on its own. */
     readonly maxRetriesPerRequest: number | null
 }

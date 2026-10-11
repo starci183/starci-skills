@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { runNode } from '../api/node/run-node.mjs';
+export { gateLooseningCheck } from './land-gate-loosening.mjs';
 
 export const FULL_CHECK_ENTRY = 'packages/cli/bin/starci.mjs';
 

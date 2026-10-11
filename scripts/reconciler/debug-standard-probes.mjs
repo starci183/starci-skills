@@ -1,0 +1,236 @@
+// debug-standard-probes.mjs — the digest probes of modules/reconciler/operating-standard.yaml: one function per step, reading one
+// collected snapshot and answering `done`, `waiting` (inside its bound, or on a party whose wait is the design), `overdue` (the bound
+// is spent and the done-state is not observable) or `na` (the precondition does not hold). An overdue answer names the departure
+// code of the operating standard; an attempt-scope probe answers one entry per attempt.
+import { KERNEL_LAUNCH_EVENTS } from '../machine/terminal-ledger.mjs';
+
+const MIN = 60_000;
+const minutes = (ms) => Math.max(0, Math.round(ms / MIN));
+
+const done = (evidence) => ({ state: 'done', evidence });
+const waiting = (evidence, happy = null) => ({ state: 'waiting', evidence, happy });
+const overdue = (evidence, departure) => ({ state: 'overdue', evidence, departure });
+const na = (evidence) => ({ state: 'na', evidence });
+const within = (c, since) => since !== null && since !== undefined && c.now - Number(since) <= c.bound;
+
+const eventsOf = (w, kind) => (w.events ?? []).filter((e) => e.kind === kind);
+const lastAt = (events) => events.reduce((at, e) => Math.max(at, Number(e.at)), 0) || null;
+const groupKey = (e) => `${e.op ?? ''}|${e.step ?? ''}|${e.error ?? ''}`;
+
+/** The last time a Kernel launch stood (booted, restarted or adopted), or null. */
+const lastLaunchAt = (w) => lastAt(KERNEL_LAUNCH_EVENTS.flatMap((kind) => eventsOf(w, kind)));
+
+/**
+ * Failures of one kind since the last success of another, and the largest group of them that failed at the same step with the same error.
+ * `rev` (when given) keeps the failures of that runtime revision, the window the start hold counts (scripts/kernel/start-hold.mjs failuresUnder).
+ */
+function failuresSince(w, failKind, since, rev = null) {
+  const failures = eventsOf(w, failKind).filter((e) => Number(e.at) > (since ?? 0) && (!rev || e.runtimeRev === rev));
+  const groups = new Map();
+  for (const e of failures) groups.set(groupKey(e), [...(groups.get(groupKey(e)) ?? []), e]);
+  const worst = [...groups.values()].sort((a, b) => b.length - a.length)[0] ?? [];
+  return { count: failures.length, worst: worst.length, step: worst[0]?.step ?? null, error: worst[0]?.error ?? null, op: worst[0]?.op ?? null };
+}
+
+const firstLine = (text, size) => String(text ?? '').split('\n')[0].slice(0, size);
+
+function hostReady(c) {
+  const r = c.reconciler;
+  if (!r.leader) return overdue('no reconciler leader row', 'leader-missing');
+  if (!r.leader.alive) return overdue(`the leader beat ${minutes(r.leader.heartbeatAgeMs)} min ago`, 'leader-stale');
+  if (r.alarm) return overdue(`controllers off: ${r.alarm.names.join(', ')}`, 'controllers-off');
+  if (r.safe.length) return overdue(`controllers in safe mode: ${r.safe.join(', ')}`, 'safe-mode');
+  return done(`leader pid ${r.leader.pid} beats; controllers match config`);
+}
+
+/** The departure code of a seat that is not serving: the seat is not live, its terminal is dead, or it takes no input. */
+function seatDeparture(seat, health) {
+  if (seat?.state !== 'live') return 'supervisor-down';
+  return health?.live === false ? 'supervisor-dead' : 'supervisor-deaf';
+}
+
+function supervisorSeatLive(c) {
+  const s = c.supervisor;
+  if (s.enabled === false) return na('the Supervisor is disabled');
+  if (s.seat?.state === 'live' && !s.seat.deaf && s.health?.live !== false) return done(`seat ${s.seat.state}`);
+  const age = s.seat?.lastSeenAgeMs ?? null;
+  if (s.seat && age !== null && age <= c.bound) return waiting(`seat ${s.seat.state}, seen ${minutes(age)} min ago: a replacement is inside its bound`, 'seat-replacing');
+  const seen = age === null ? '' : `, last seen ${minutes(age)} min ago`;
+  return overdue(`seat ${s.seat?.state ?? 'absent'}${seen}`, seatDeparture(s.seat, s.health));
+}
+
+const goalApproved = (c) => (c.workflow.phase === 'awaiting-approval' ? waiting('the goal waits for the owner', 'goal-awaiting-approval') : done(`phase ${c.workflow.phase}`));
+
+function workflowStarted(c) {
+  const w = c.workflow;
+  if (w.phase === 'running') return done('phase running');
+  if (w.phase === 'awaiting-approval') return na('the goal is not approved');
+  const queued = `queued ${minutes(c.now - Number(w.updatedAt))} min`;
+  return within(c, w.updatedAt) ? waiting(queued) : overdue(`${queued} and not started`, 'workflow-not-started');
+}
+
+function kernelBooted(c) {
+  const w = c.workflow;
+  if (w.phase !== 'running') return na(`phase ${w.phase}`);
+  const loop = failuresSince(w, 'kernel-start-failed', lastLaunchAt(w), c.kernel.currentRev);
+  if (loop.worst >= c.n.startLoopMin) return overdue(`${loop.worst} launches failed at ${loop.step}: ${firstLine(loop.error, 90)}`, 'kernel-start-loop');
+  if (c.kernel.alive) return done(`Kernel job ${c.kernel.job}, terminal ${c.kernel.terminal}`);
+  const since = Math.max(Number(w.kernelJob?.updatedAt ?? 0), Number(w.updatedAt ?? 0)) || null;
+  return within(c, since) ? waiting('the Kernel seat is being started', 'kernel-starting') : overdue(`Kernel job ${c.kernel.job ?? 'absent'}, probe ${c.kernel.probe ?? 'none'}`, 'kernel-dead');
+}
+
+function kernelAckedRev(c) {
+  const k = c.kernel;
+  if (!k.alive) return na('no live Kernel');
+  if (!k.revStale) return done(`acked ${String(k.ackedRev ?? '').slice(0, 9)}`);
+  // The incarnation reads the current prompt at its boot and answers the rev-ack item within its bound: the bound counts from whichever came last.
+  const since = Math.max(lastAt(eventsOf(c.workflow, 'runtime-rev-acked')) ?? 0, lastLaunchAt(c.workflow) ?? 0) || null;
+  if (within(c, since)) return waiting(`${k.filesBehind} file(s) behind, inside the ack bound`, 'rev-pending');
+  return overdue(`acked ${String(k.ackedRev).slice(0, 9)} while ${String(k.currentRev).slice(0, 9)} is current`, 'kernel-rev');
+}
+
+/**
+ * A ready op job that nothing dispatched inside the bound: the oldest ready job of the workflow, counted from the latest of its creation and the last
+ * dispatch or settle of the workflow. The runtime's Workflow controller owns the dispatch of ready work, so it is the owner of this line, whatever the
+ * Kernel does (a refusal that lives only in the detached push result is no ledger event, and a stuck job raised none).
+ */
+function readyUndispatched(c) {
+  const w = c.workflow;
+  // Ready is the job's own status, or the Kernel status naming it ready in the queue (a queued row the frontier calls ready).
+  const listed = new Set((w.status?.frontier?.queued ?? []).filter((q) => q.queuedBecause === 'ready').map((q) => q.jobId));
+  const ready = (w.jobs ?? []).filter((job) => job.kind === 'op' && (job.status === 'ready' || listed.has(job.jobId)));
+  if (!ready.length) return null;
+  const progressed = Math.max(lastAt(eventsOf(w, 'op-dispatched')) ?? 0, lastAt(eventsOf(w, 'op-settled')) ?? 0);
+  const oldest = ready.map((job) => Math.max(Number(job.createdAt) || 0, progressed)).sort((a, b) => a - b)[0];
+  const refused = ready.filter((job) => job.refusal).map((job) => {
+    const owner = job.refusal.cause;
+    const upstream = owner ? `; ${owner.op} owns ${owner.field} (${owner.kind}/${owner.cause})` : '';
+    return `${job.jobId} refused ${job.refusal.count}x for ${job.refusal.code}${job.refusal.reason ? ': ' + firstLine(job.refusal.reason, 120) : ''}${upstream}`;
+  });
+  const cause = refused.length ? `; ${refused.join('; ')}` : '';
+  return !refused.length && within(c, oldest) ? null : overdue(`${ready.length} ready job(s) (${ready.map((job) => job.jobId).join(', ')}) not dispatched for ${minutes(c.now - oldest)} min${cause}; the Workflow controller owns the dispatch of ready work`, 'ready-not-dispatched');
+}
+
+function legDispatched(c) {
+  const k = c.kernel;
+  const loop = failuresSince(c.workflow, 'dispatch-rejected', lastAt(eventsOf(c.workflow, 'op-dispatched')));
+  if (loop.worst >= c.n.startLoopMin) return overdue(`${loop.worst} launches of ${loop.op} refused at ${loop.step}: ${firstLine(loop.error, 90)}`, 'dispatch-loop');
+  const stuck = readyUndispatched(c);
+  if (stuck) return stuck;
+  if (k.idleWithReady) return overdue(`${k.readyWork} ready unit(s), Kernel idle, last woken ${minutes(k.lastWakeAgeMs ?? 0)} min ago`, 'kernel-idle');
+  return k.readyWork > 0 ? waiting(`${k.readyWork} ready unit(s) inside the wake bound`) : done('no ready leg waits');
+}
+
+/** The departure code of an approved leg that stands without a job, by the origin of its next action: the runtime's own move, or the Kernel's leg-ready item. */
+const LEG_STANDS = Object.freeze({ 'approved-leg': 'leg-not-enqueued', 'approved-leg-open': 'leg-open-unanswered' });
+
+/**
+ * An approved plan leg with no job: the status names it as a next action. One whose write set the plan (or its deferral) fixes is the Job controller's move; one it leaves open is the
+ * Kernel's leg-ready item. The bound counts from the latest progress of the workflow (a settle, a start of the workflow or of its Kernel), so a new workflow is judged from its start.
+ */
+function legEnqueued(c) {
+  const w = c.workflow;
+  if (w.phase !== 'running') return na(`phase ${w.phase}`);
+  const stands = (w.status?.nextActions ?? []).filter((action) => LEG_STANDS[action.origin] && !action.heldBy);
+  if (!stands.length) return done('no approved leg stands without a job');
+  const since = Math.max(lastAt(eventsOf(w, 'op-settled')) ?? 0, lastAt(eventsOf(w, 'phase-transition')) ?? 0, lastLaunchAt(w) ?? 0, Number(w.updatedAt) || 0) || null;
+  const names = stands.map((action) => action.op).join(', ');
+  if (within(c, since)) return waiting(`approved leg(s) ${names} have no job yet, inside the bound`);
+  const first = stands.find((action) => action.origin === 'approved-leg') ?? stands[0];
+  const owner = first.origin === 'approved-leg' ? 'the Job controller owns the enqueue move' : 'the leg-ready item waits on the Kernel';
+  return overdue(`approved leg(s) ${names} without a job for ${minutes(c.now - since)} min; ${owner}`, LEG_STANDS[first.origin]);
+}
+
+function workerStarted(c) {
+  return c.workflow.attempts.filter((a) => a.dispatchedAt !== null && a.endState === null && a.reportedAt === null).map((a) => {
+    const item = { attemptId: a.attemptId, op: a.op };
+    if (a.startedAt !== null) return { ...item, ...done('worker ready') };
+    const launching = `dispatched ${minutes(c.now - Number(a.dispatchedAt))} min ago`;
+    return { ...item, ...(within(c, a.dispatchedAt) ? waiting('worker launching') : overdue(`${launching}, no worker ready`, 'worker-not-started')) };
+  });
+}
+
+function opWorking(c) {
+  const running = new Map(c.running.map((r) => [r.jobId, r]));
+  return c.workflow.attempts.filter((a) => running.has(a.jobId) && a.reportedAt === null).map((a) => {
+    const r = running.get(a.jobId);
+    return { attemptId: a.attemptId, op: a.op, ...(r.pastDeadline ? overdue(`${minutes(r.ageMs)} min past the job deadline`, 'job-past-deadline') : waiting(`running ${minutes(r.ageMs)} min`)) };
+  });
+}
+
+function reportFiled(c) {
+  return c.workflow.attempts.filter((a) => a.settledAt !== null || a.endState !== null).map((a) => {
+    const item = { attemptId: a.attemptId, op: a.op };
+    if (a.reportedAt !== null) return { ...item, ...done(`report ${a.reportOutcome}`) };
+    if (a.endState === null) return { ...item, ...overdue('settled with no report and no typed cause', 'attempt-no-cause') };
+    return { ...item, ...done(`ended ${a.endState} with a typed cause`), happy: a.endState === 'worker-dead' ? 'worker-lost' : null };
+  });
+}
+
+const checksOf = (w, attemptId) => eventsOf(w, 'checks-recorded').filter((e) => e.attemptId === attemptId);
+
+function checksRerun(c) {
+  return c.workflow.attempts.filter((a) => a.reportedAt !== null && a.reportOutcome === 'done').map((a) => {
+    const item = { attemptId: a.attemptId, op: a.op };
+    if (checksOf(c.workflow, a.attemptId).length) return { ...item, ...done('checks recorded') };
+    if (within(c, a.reportedAt) || a.settledAt !== null) return { ...item, ...waiting('the checks have not run again yet') };
+    return { ...item, ...overdue(`reported ${minutes(c.now - Number(a.reportedAt))} min ago and the checks did not run again`, 'checks-not-rerun') };
+  });
+}
+
+function settled(c) {
+  return c.workflow.attempts.filter((a) => a.reportedAt !== null).map((a) => {
+    const item = { attemptId: a.attemptId, op: a.op };
+    if (a.settledAt !== null) return { ...item, ...done(`settled ${a.verdict} by ${a.settledBy ?? 'unknown'}`) };
+    const handed = (c.workflow.status?.settleDecisions ?? []).find((d) => d.jobId === a.jobId) ?? null;
+    const byRuntime = a.reportOutcome === 'done' && !handed;
+    const bound = byRuntime ? c.bound + c.boundChecks : c.boundKernel;
+    if (c.now - Number(a.reportedAt) <= bound) return { ...item, ...waiting('reported; inside the settle bound') };
+    const stuck = `reported ${minutes(c.now - Number(a.reportedAt))} min ago, outcome ${a.reportOutcome}, not settled`;
+    if (a.treeExists === false) return { ...item, ...overdue(`${stuck}; the tree it was admitted in is gone: ${a.worktreePath}`, 'placement-lost') };
+    if (handed) return { ...item, ...overdue(`${stuck}; the runtime handed it to the Kernel (${handed.reason})`, 'settle-overdue-kernel') };
+    return { ...item, ...overdue(stuck, byRuntime ? 'settle-overdue' : 'settle-overdue-kernel') };
+  });
+}
+
+/** A path with forward slashes, no trailing slash and a lower-case drive letter, so one directory spelled two ways compares equal. */
+function normal(p) {
+  let out = String(p ?? '').replaceAll('\\', '/');
+  while (out.endsWith('/')) out = out.slice(0, -1);
+  return /^[A-Za-z]:/.test(out) ? `${out[0].toLowerCase()}${out.slice(1)}` : out;
+}
+const insideTree = (cwd, tree) => normal(cwd) === normal(tree) || normal(cwd).startsWith(`${normal(tree)}/`);
+
+function settleEvidence(c) {
+  return c.workflow.attempts.filter((a) => a.verdict === 'pass').map((a) => {
+    const item = { attemptId: a.attemptId, op: a.op };
+    const event = eventsOf(c.workflow, 'op-settled').filter((e) => e.attemptId === a.attemptId).pop();
+    if (!event?.checkedIn?.length) return { ...item, ...na(event ? 'the settle event names no directory the checks ran in' : 'no settle event') };
+    const stray = event.checkedIn.filter((r) => !insideTree(r.cwd, a.worktreePath));
+    if (stray.length) return { ...item, ...overdue(`checks ran in ${stray[0].cwd}, the attempt's tree is ${a.worktreePath}`, 'checks-ran-outside-tree') };
+    return { ...item, ...done('the checks ran in the attempt tree') };
+  });
+}
+
+function handover(c) {
+  const h = c.workflow.status?.handover;
+  if (c.workflow.status?.frontier?.state !== 'finish-ready') {
+    if (h?.state === 'awaiting-owner') return waiting('every leg settled; the handover ask waits on the owner', 'owner-wait');
+    if (!h?.due) return done('the workflow is not waiting to finish');
+    const since = lastAt(eventsOf(c.workflow, 'op-settled')) ?? c.workflow.updatedAt;
+    return within(c, since) ? waiting('the handover is due, inside the bound') : overdue(`every leg settled ${minutes(c.now - Number(since))} min ago and handover.review is not enqueued`, 'handover-not-enqueued');
+  }
+  const since = lastAt(eventsOf(c.workflow, 'handover-approved')) ?? c.workflow.updatedAt;
+  return within(c, since) ? waiting('finish-ready, inside the bound') : overdue('the handover is approved and the workflow does not finish', 'handover-stuck');
+}
+
+function resourcesReleased(c) {
+  const leaked = c.admission.leaked;
+  if (!leaked.length) return done('no reservation is leaked');
+  if (leaked.every((r) => r.ageMs <= c.bound)) return waiting(`${leaked.length} reservation(s) inside the release bound`);
+  return overdue(`${leaked.length} reservation(s) live for work that is not running`, 'reservation-leak');
+}
+
+export const PROBES = Object.freeze({ 'host-ready': hostReady, 'supervisor-seat-live': supervisorSeatLive, 'goal-approved': goalApproved, 'workflow-started': workflowStarted,
+  'kernel-booted': kernelBooted, 'kernel-acked-rev': kernelAckedRev, 'leg-enqueued': legEnqueued, 'leg-dispatched': legDispatched, 'worker-started': workerStarted, 'op-working': opWorking,
+  'report-filed': reportFiled, 'checks-rerun': checksRerun, settled, 'settle-evidence': settleEvidence, handover, 'resources-released': resourcesReleased });

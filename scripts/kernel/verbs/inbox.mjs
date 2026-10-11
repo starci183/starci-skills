@@ -6,6 +6,9 @@ const PEER_SENT_LIMIT = 20;
 
 export default {
   verb: 'inbox',
+  // Read unless it acknowledges a message (--ack writes the ledger).
+  reads: true,
+  writesWith: ['ack'],
   required: (args) => ['workflow', ...(args.ack != null ? ['disposition'] : [])],
   kernelOnly: true,
   usageInCore: true,

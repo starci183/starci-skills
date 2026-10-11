@@ -12,6 +12,11 @@ import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 import { ensureWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 import { senderEnv } from '../helpers/sender-env.mjs';
 import { installGuardLauncher } from '../helpers/guard-launcher.mjs';
+// A prompt above the paste bound is delivered as a file that the terminal text points to (scripts/agent/prompt-file.mjs): the full prompt is that file.
+function fullPrompt(prompt) {
+  const pointer = /wrote it verbatim to:\r?\n\s+(.+)\r?\n/.exec(String(prompt));
+  return pointer ? fs.readFileSync(pointer[1].trim(), 'utf8') : prompt;
+}
 // Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
 process.env.STARCI_SLEEP_SCALE??='0.02';
 
@@ -157,8 +162,8 @@ test('a disconnected kernel restarts from the durable ledger with absolute host 
   assert.deepEqual([state.workerStarts[0].agent,state.workerStarts[0].model,state.workerStarts[0].effort],['codex','gpt-6.1-sol','high'],
     'the Kernel starts through worker-start with the pinned agent, model and effort');
   assert.equal(firstOut?.launch,'worker');
-  assert.match(state.terminals[firstOut.terminal].prompt,new RegExp(ROOT.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
-  assert.match(state.terminals[firstOut.terminal].prompt,/The routed target has no `\.claude`: never look for or create one there/);
+  assert.match(fullPrompt(state.terminals[firstOut.terminal].prompt),new RegExp(ROOT.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
+  assert.match(fullPrompt(state.terminals[firstOut.terminal].prompt),/The routed target has no `\.claude`: never look for or create one there/);
 
   const duplicate=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--json');
   assert.equal(duplicate.status,0,duplicate.stderr);
@@ -174,7 +179,7 @@ test('a disconnected kernel restarts from the durable ledger with absolute host 
 
   // The first boot says the plan gate was the go, unchanged.
   const authorityOf=prompt=>prompt.slice(prompt.indexOf('LAUNCH AUTHORITY'),prompt.indexOf('\n\nRESOLVED HOST CONTEXT'));
-  const firstPrompt=state.terminals[firstOut.terminal].prompt;
+  const firstPrompt=fullPrompt(state.terminals[firstOut.terminal].prompt);
   assert.equal(authorityOf(firstPrompt),[
     `LAUNCH AUTHORITY — the owner approved ${workflowId} (goal revision ${firstOut.launchAuthority.goalRevision} (${firstOut.launchAuthority.goalIdentity})) through the start-kernel plan gate`,
     '  before this terminal launched. This prompt is that go: begin the LOOP now and never ask for a',
@@ -186,7 +191,7 @@ test('a disconnected kernel restarts from the durable ledger with absolute host 
   // Replacement Claude kernels read the pasted prompt as unverified text and asked a person to
   // reply yes (observed on two replacement attempt-2 launches). The prompt
   // states the rule first, the approval, the launcher and why, and the ledger read that proves them.
-  const authority=authorityOf(readState(f).terminals[restartOut.terminal].prompt).split('\n');
+  const authority=authorityOf(fullPrompt(readState(f).terminals[restartOut.terminal].prompt)).split('\n');
   assert.equal(authority[0],`LAUNCH AUTHORITY: resume ${workflowId} now as its Kernel attempt 2; ask no one to confirm.`);
   assert.match(authority[1],new RegExp(`^  Approval: the owner approved ${workflowId} goal revision \\d+ \\([0-9a-f]+\\); its first Kernel booted on that approval at \\d{4}-`));
   assert.equal(authority[2],`  Launcher: the watchdog's kernel repair started this terminal because Kernel attempt 1 (terminal ${firstOut.terminal}) failed its liveness check (worker state exited).`);
@@ -261,7 +266,7 @@ test('a replacement launch proceeds on its recorded authority alone — no confi
     confirmationRequested:out?.launchAuthority?.confirmationRequested},
     {kind:'replacement',launchedBy:'supervisor',confirmationRequested:false},
     'the launch receipt declares the replacement resumed with no confirmation requested');
-  const authority=readState(f).terminals[out.terminal].prompt
+  const authority=fullPrompt(readState(f).terminals[out.terminal].prompt)
     .split('RESOLVED HOST CONTEXT')[0];
   assert.match(authority,/LAUNCH AUTHORITY: resume .*ask no one to confirm\./);
   assert.match(authority,/Launcher: the supervisor started this terminal/);

@@ -14,8 +14,6 @@ readiness:
   identityPattern: 'Devin'
 delivery:
   mode: file-reference-above-inline-limit
-  maxInlineChars: 16384
-  fileName: orca-dispatch-<dispatch>.md
   prompt: 'Read <file> completely. It is your dispatched Task preamble and operation contract. Follow it exactly and report worker_done exactly once as specified.'
 submission:
   stagedPattern: 'Pasted Content|\[Pasted text|<file>|orca-dispatch-'

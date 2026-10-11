@@ -179,7 +179,8 @@ test('uncaptured later terminal process and failed post-closure census refuse wi
   const later = { pid: 103, ppid: 101, name: 'node.exe', exe: GRAND.exe, created: 1003 };
   const w = world({ survivors: [AGENT, later] });
   let census = 0;
-  w.deps.envOf = () => ++census === 1 ? envRows : [...envRows, { pid: 103, readable: true, values: { ORCA_TERMINAL_HANDLE: HANDLE } }];
+  w.deps.envOf = () => (++census === 1 ? envRows : [...envRows, { pid: 103, readable: true, values: { ORCA_TERMINAL_HANDLE: HANDLE } }])
+    .filter(row => w.deps.tableOf().some(process => process.pid === row.pid));
   const out = closeWorker({ dispatch: DISPATCH, deps: w.deps, env: {} });
   assert.equal(out.processes.verdict, 'unverifiable');
   assert.match(out.processes.reason, /uncaptured terminal process/);

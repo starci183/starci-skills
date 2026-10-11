@@ -6,6 +6,7 @@ import { refuse } from '../../engine/refuse.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { list } from '../lib/list.mjs';
 import { incidentPolicy } from './op-incident-policy.mjs';
+import { untriedRouteMembers } from './admission-refusal.mjs';
 
 const MIN_ATTEMPT_CHARS = 12;
 
@@ -19,9 +20,7 @@ const reasonList = (cause) => Object.entries(cause.noWorkaround ?? {}).map(([id,
 /** The members of the job's last route decision that are neither its current pool nor rejected there: the agents a no-workaround claim overlooks. */
 const untriedMembersOf = (db, jobId) => {
   const row = db?.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId);
-  const payload = parseJson(row?.payload_json, {}) ?? {};
-  const rejected = new Set(list(payload.routeRejected).map((entry) => entry?.target));
-  return list(payload.routeChain).filter((member) => member !== payload.model && !rejected.has(member));
+  return untriedRouteMembers(parseJson(row?.payload_json, {}) ?? {}, null);
 };
 
 const refuseCause = (id) => refuse(id

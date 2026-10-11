@@ -6,6 +6,8 @@ import { importModule } from '../api/node/import-module.mjs';
 import { runScript } from '../api/node/run-script.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { currentRole, requireRole } from './roles.mjs';
+import { logRefusal } from '../guards/refusals.mjs';
+import { RUNTIME_CHANGE_CODE } from '../machine/runtime-change.mjs';
 import { credentialPreflight } from './lib/credential-preflight.mjs';
 
 const defaultRuntimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -87,6 +89,8 @@ export function main(argv = process.argv.slice(2), io = {}) {
   if (command.roles?.length) {
     const roleRefusal = requireRole({ role, group: split.group, verb: split.verb, roles: command.roles });
     if (roleRefusal) {
+      // A Supervisor or Kernel seat asking for a runtime change leaves a refusal row the Debug digest reads (as-runtime-change-refused).
+      if (roleRefusal.includes(RUNTIME_CHANGE_CODE)) logRefusal({ tool: 'starci', via: 'cli', role, code: RUNTIME_CHANGE_CODE, command: `starci ${split.group} ${split.verb}`, reason: roleRefusal });
       writeTo(stderr, `${roleRefusal}\n`);
       return 2;
     }

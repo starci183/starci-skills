@@ -56,6 +56,12 @@ proofs:                          # what settle verifies
     requirement: {en: "Scoped unit tests pass; backend E2E runs only in an explicitly selected e2e.verify leg …"}
     check: scripts/work/validate/check-work-deep.mjs    # the executable, when one exists
 
+judge:                           # who judges the product, at least one; "nobody" cannot be declared
+  - by: machine                  # machine | critic | owner | next-leg, each with a one-line `why`
+    measures: [declared-checks, op-gate]   # measures the runtime owns and re-runs at settle (modules/kernel/op-judges.yaml)
+    proofs: [op-gate]            # the proofs of this contract the measures rely on
+    why: "…what the runtime re-runs or re-reads at settle…"
+
 blockers:                        # typed escape hatches, not free text
   - code: SCOPE_WIDENING
     condition: {en: "Required operation lies outside selected code-scope."}
@@ -88,6 +94,7 @@ One rule has one place to be done and at most one place to be checked.
 | `writes[].content` | what the written data holds | a rule about how to produce it |
 | `steps[].action` | the rules, each stated once | a number a param already carries |
 | `proofs[].requirement` | what settle verifies | a second copy of the step's rule |
+| `judge[]` | who judges the product (machine, critic, owner, next-leg) and why | the maker itself, or a test file the same attempt wrote as the only judge |
 | `blockers[].condition` | when the op legitimately stops | a repair procedure |
 | `policy` | op-specific policy data | prose an agent is meant to follow |
 
@@ -162,10 +169,11 @@ non-green decisions through `modules/kernel/driver-loop.yaml`
 5. Write each rule once, in the step that applies it.
 6. Write `proofs` that say what settle verifies, with a `check:` when an
    executable proves it.
-7. Declare every legitimate stop as a `blockers` entry.
-8. Put anything op-specific left over under `policy:`.
-9. Fill `route:` so route-op resolves it.
-10. Run `starci runtime check --only op-manifest`, then
+7. Declare who judges the product in `judge` (principle P2: the maker never judges its own work), against `modules/kernel/op-judges.yaml`; `starci runtime check --only op-judge` holds the entries to the runtime's own tables.
+8. Declare every legitimate stop as a `blockers` entry.
+9. Put anything op-specific left over under `policy:`.
+10. Fill `route:` so route-op resolves it.
+11. Run `starci runtime check --only op-manifest`, then
     `starci runtime gen-ops` to regenerate the registry and
     `--check` to verify (never hand-edit it; see
     [ops-source-ownership](ops-source-ownership.md)).
@@ -189,23 +197,52 @@ non-green decisions through `modules/kernel/driver-loop.yaml`
 - Owns: one attempt and its worktree. Decides alone: how to do the work inside its contract.
 - Reports to: Kernel (done, blocked, or a question). Overseen by: Kernel.
 - Measure: passes its gate first time.
-- Token budget (provisional): 6000000 per attempt; over it, the Kernel acts on the overrun: it reads the attempt's usage, then stops, re-scopes or switches agent.
+- Token budget (provisional): 6000000 per attempt; over it, the runtime measures each attempt from its usage rows when it settles, and a running attempt from its session file on the minute poll that snapshots it (the first reading past the budget is one attempt-budget-overrun event); for a job waiting on its Kernel it opens a Decision Item budget-overrun, once: the Kernel continues once, replaces the agent or re-scopes the leg; for an attempt still running it opens one whose only option is to let it finish (a retry is refused while a try is open and no verb stops a live worker), asked again after the snooze, and a second item with the retries opens when the attempt settles and its usage rows measure it.
+- Runtime changes: an Op keeps the rules of the revision it was admitted under for the whole attempt and is never updated or restarted inside it; the next try is admitted under the new rules.
+- Guard: its terminals are bound as the "op" role of modules/kernel/command-policy.yaml.
+- Happy errors it handles (the system working as designed, handled inside the chain through the policy):
+  - asks-a-question (policy row ask-worker-question): the Op cannot decide inside its contract and reports an ask up to its Kernel, which answers from the goal and the recorded decisions
+  - asks-the-owner (policy row ask-owner): the matter is the owner's (intent, credentials, spend): the Kernel sends it to the owner and the leg waits
+  - red-check (policy row error-work): a check is red because the work is not good yet: the Kernel retries with the failure fed back, then on another agent
+  - provider-quota (policy row quota-or-circuit): the provider quota ran out or its circuit opened: the next agent of the tier takes the job
+  - login-expired (policy row error-login-expired): the provider login expired: the job moves to the next eligible agent and the owner logs in again in Orca
+- A bug in this role (the chain neither fixes nor works around it; Debug removes it with a change to .claude) is detected by:
+  - an Op addresses a role above its Kernel: OP_REPORTS_TO_KERNEL when an Op addresses the Supervisor
+  - an Op runs a control-plane verb that is not its own: RIGHTS_OP_CONTROL_PLANE from the command guard
+  - an Op writes outside the paths its attempt owns: RIGHTS_OP_OUTSIDE_OWNED from the file-write guard
+  - an Op spends more tokens than its attempt budget: budget-overrun Decision Item and budgetOverruns in the Kernel status
 - Principles: P2 P3 P4 P8 (modules/kernel/roles.yaml, principles).
 <!-- roles:end op -->
 
 <!-- roles:begin critic -->
 **Critic** (modules/kernel/roles.yaml#critic): One product of one op.
 - Does:
-  - Grades that product independently: from a different provider than the op that made it, seeing only the product and the rubric, not the op's context.
-  - Returns its verdict as evidence attached to the attempt of the op it judged.
+  - Grades that product independently: from a different provider than the op that made it, picked through the tier picker (tier frontier, modules/models/tiers.yaml seats.critic), seeing only the product bytes and the rubric handed to it, not the op's context.
+  - Returns ONE typed verdict (starci/critic-verdict@1): pass or fail with evidence for every rubric check, the score against the declared minimum, and the digests of the product bytes it judged. The runtime attaches it to the attempt of the op it judged and the settle gate requires it; a verdict whose digests do not match the attempt's product is refused as stale.
+  - Is owed by the op kinds listed in modules/kernel/critic.yaml coverage (today interface.draw, scope.define, business.decide and architecture.decide); a decision leg is judged by the Critic the runtime runs itself when the op reports done (scripts/kernel/settle/critic-run.mjs, once per version of the records, event runtime-critic-run) against its rubric in modules/kernel/critic-rubrics.yaml, handed the op's decision records and the records they cite, and `starci kernel settle` refuses its done without a fresh passing verdict of that run for exactly those bytes; a verdict the maker attaches is ignored (event runtime-critic-op-verdict-ignored); a kind declared owed there has no Critic yet.
 - Must clean up:
   - its placement worktree and processes, before it returns the verdict
 - Never:
   - edits the product
   - grades when it shares the maker's provider
   - addresses anyone but through the attempt
+  - reads anything but the product files and the rubric handed to it: not the op's worktree, the ledger, a transcript or any other path
+  - runs anything but the read-only commands and the one write of its verdict file
 - Owns: one verdict. Decides alone: the score by the rubric.
 - Reports to: Kernel (always, as the verdict attached to the op's attempt). Overseen by: Kernel, the runtime.
 - Measure: its verdict agrees with the later outcome.
+- Token budget (provisional): 1000000 per attempt; over it, the wall bound allocation.drawLoop.criticTimeoutMs stops and releases the worker with no verdict (a happy error, critic-unavailable); the token overrun is read from the usage rows once the attempt budget measurement covers Critic dispatches.
+- Runtime changes: a Critic is handed its rubric when it is launched and judges under it; the next Critic run reads the new rubric.
+- Guard: its terminals are bound as the "critic" role of modules/kernel/command-policy.yaml.
+- Happy errors it handles (the system working as designed, handled inside the chain through the policy):
+  - failing-verdict (policy row error-work): the verdict fails the minimum: the work is not good yet; the op redraws (a decision leg revises its records and runs the Critic again) and the next round is judged again
+  - no-independent-member (policy row critic-no-independent-member): no member of the Critic tier is of another provider than the maker: the critique is refused with CRITIC_NO_INDEPENDENT_MEMBER and the op's leg reports blocked 'no independent critic available'; the maker's provider never judges
+  - critic-unavailable (policy row critic-unavailable): the independent members cannot start (login, circuit, capacity, a refused launch, a timeout): the leg reports blocked and finishes again when a member returns
+  - critic-quota-out (policy row critic-quota-out): every independent member is out of tokens: the next independent member takes over, and when none is left the leg waits for the quota to reset
+- A bug in this role (the chain neither fixes nor works around it; Debug removes it with a change to .claude) is detected by:
+  - the Critic returns no verdict although it reported done: CRITIC_NO_VERDICT on the round's critique.json (outcome verdict-missing)
+  - the Critic edited the product bytes it was handed: CRITIC_PRODUCT_MODIFIED: the digests of the handed files differ after the run
+  - the Critic judged other bytes than the attempt's product: CRITIC_VERDICT_STALE: the verdict's product digests do not match the installed part (a decision leg: the records the op owns now, judged by scripts/kernel/critic-settle.mjs at settle)
+  - the Critic reached a path outside its directory: RIGHTS_CRITIC_REACH refusals of the command guard, logged with the terminal
 - Principles: P2 P3 P7 (modules/kernel/roles.yaml, principles).
 <!-- roles:end critic -->

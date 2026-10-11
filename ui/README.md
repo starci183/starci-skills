@@ -2,7 +2,7 @@
 
 This is the public, read-only StarCi control-plane UI. It shows how an approved Goal becomes a Workflow, how a long-lived Kernel seat dispatches short-lived Op agents, what those agents reported, which checks ran, what the settler decided, and whether code landed. It also shows decisions owed to the owner or Supervisor and the reconciler's health.
 
-The interface uses React, Vite, local shadcn/ui components backed by Radix, cmdk search, Geist typography, Lucide icons and Vietnamese labels. Neutral chrome and the original operations layout share one light/dark token system. It is one web app with its API on the same origin. The server reads the host machine database and registered project ledgers through the read-only engine readers. It has no write API, login, answer form, CLI-backed request or live worktree diff.
+The interface uses React, Vite, HeroUI compounds, Geist typography, Lucide icons and Vietnamese labels. Modal, Autocomplete and ListBox own keyboard search. Neutral chrome and the operations layout share one light/dark token system. It is one web app with its API on the same origin. The server reads the host machine database and registered project ledgers through the read-only engine readers. It has no write API, login, answer form, CLI-backed request or live worktree diff.
 
 The visual language and component anatomy are documented in [DESIGN.md](DESIGN.md).
 
@@ -10,8 +10,10 @@ The visual language and component anatomy are documented in [DESIGN.md](DESIGN.m
 
 From the lane's `ui` directory, install its own dependencies under the host lock described in [source management](../docs/source-process.md). Generate the i18n catalog from that lane's runtime source; `prebuild` runs the generator automatically.
 
+Every change to `ui/package.json` or `ui/package-lock.json` requires successful `npm install` and `npm run build` in the changed checkout on this host before committing. Commit the matching manifest and lockfile together, and include the literal text `ui deps changed` in the commit message. After landing, install and build the host's `ui` checkout as well before reporting it ready; each checkout owns its own `node_modules`. Use `npm install` while a development server is running.
+
 ```powershell
-npm ci
+npm install
 npm run build
 $env:STARCI_MACHINE_DB = '<lanes root>/ui/ui/fixtures/seed/machine.sqlite'
 $env:STARCI_ARTIFACT_ROOT = '<tmp>/ui-seed-artifacts'

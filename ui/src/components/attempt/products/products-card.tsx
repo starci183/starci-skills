@@ -1,5 +1,3 @@
-import { useState } from 'react';
-import { ChevronRight } from 'lucide-react';
 import type { AttemptDetailV3, EvidenceFileV3, EvidenceKind } from '../../../contract';
 import type { Concept } from '../../concept';
 import { Advanced } from '../../motion';
@@ -18,6 +16,7 @@ import { formatAbsolute } from '../../../i18n/vi';
 import { ReadWarning } from '../frame/read-warning';
 import { JsonView } from '../../evidence/renderers';
 import { reportTestedHead } from '../checkpoint';
+import { Badge } from '../../ui/badge';
 
 export const concept: Concept = 'C8';
 
@@ -43,20 +42,15 @@ function keyFiles(attempt: AttemptDetailV3): EvidenceFileV3[] {
 }
 
 function KeyEvidence({ file, authorOp, defaultOpen }: Readonly<{ file: EvidenceFileV3; authorOp: string; defaultOpen: boolean }>) {
-  const [open, setOpen] = useState(defaultOpen);
-  const id = `key-${file.artifactId}`;
   return <li className="min-w-0 py-2 first:pt-0 last:pb-0">
-    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2">
-      <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(v => !v)} className="inline-flex size-6 shrink-0 items-center justify-center rounded-md border text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring" title={open ? t('Collapse') : t('Open')}>
-        <ChevronRight className={`size-4 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
-      </button>
+    <Advanced defaultOpen={defaultOpen} title={<span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
       <span className="min-w-0 flex-1 break-all text-sm font-medium">{file.base}</span>
-      {file.schema && SCHEMA_LABELS[file.schema] ? <span className="rounded border px-2 text-[11px] text-muted-foreground" title={file.schema}>{SCHEMA_LABELS[file.schema]}</span> : null}
+      {file.schema && SCHEMA_LABELS[file.schema] ? <Badge variant="outline" title={file.schema}>{SCHEMA_LABELS[file.schema]}</Badge> : null}
       <FileTypeBadge kind={file.kind} />
-      <span className="text-xs tabular-nums text-muted-foreground">{formatBytes(file.bytes)}</span>
-      <PathLink path={file.hostPath} kind="file" label={t('open path')} />
-    </div>
-    {open ? <div id={id} className="mt-2 min-w-0"><EvidenceSchemaView file={file} authorOp={authorOp} /></div> : null}
+      <span className="text-xs font-normal tabular-nums text-muted-foreground">{formatBytes(file.bytes)}</span>
+    </span>}>
+      <div className="grid min-w-0 gap-4"><PathLink path={file.hostPath} kind="file" label={t('open path')} /><EvidenceSchemaView file={file} authorOp={authorOp} /></div>
+    </Advanced>
   </li>;
 }
 
@@ -106,8 +100,8 @@ export function ProductsCard({ project, attempt }: Readonly<{ project: string; a
               <ul className="m-0 flex list-none flex-col divide-y p-0">{files.map(file => <ProductRow key={file.path} file={file} />)}</ul>
             </> : products && !products.error ? <Empty>{t('No file paths are listed for the recorded source.')}</Empty> : null}
         {products?.scope?.truncated ? <p className="mt-2 text-xs text-muted-foreground">{t('Showing {returned} of {listed} recorded file paths; the view is capped.', { returned: products.scope.returned, listed: products.scope.listed })}</p> : null}
-        {other.length ? <details className="mt-3 border-t pt-3 text-sm"><summary className="cursor-pointer text-muted-foreground hover:text-foreground">{t('This commit also changed {n} other files', { n: other.length })}</summary>
-          <ul className="m-0 mt-2 grid list-none gap-1 p-0 text-xs">{other.map(f => <li key={f.path} className="break-all"><span className="mr-2 text-muted-foreground">{f.status}</span><code className="font-mono">{f.path}</code></li>)}</ul></details> : null}
+        {other.length ? <Advanced className="mt-4" title={t('This commit also changed {n} other files', { n: other.length })} keepMounted>
+          <ul className="m-0 grid list-none gap-2 p-0 text-xs">{other.map(f => <li key={f.path} className="break-all"><span className="mr-2 text-muted-foreground">{f.status}</span><code className="font-mono">{f.path}</code></li>)}</ul></Advanced> : null}
       </section>
 
       <Advanced summary={[commit ? `commit ${short(products?.head ?? null)}` : null, t('{n} key evidence files', { n: key.length })].filter(Boolean).join(' · ')}>

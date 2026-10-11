@@ -152,6 +152,13 @@ proofs:
         settle after it, and starci kernel finish refuses a workflow without a handover-approved event newer than
         its last business settle.
     check: scripts/kernel/handover.mjs
+judge:
+  - by: machine
+    measures: [handover-gate]
+    proofs: [handover-ask-shape, must-have-proven]
+    why: "the ask is refused unless it carries the three options in order and no must-have proof is owed"
+  - by: owner
+    why: "a pass settles only on the owner's approve receipt for the latest handover ask, and finish refuses a workflow without a handover-approved event newer than its last business settle"
 blockers:
   - code: NOTHING_DELIVERED
     condition:

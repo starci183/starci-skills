@@ -38,14 +38,9 @@
 //            nothing is typed again - evidence 'draft-submitted';
 //   runtime  runtime wakes piled up or cut short: the box is emptied with Ctrl+U (clear-draft.mjs),
 //            then the wake is typed as usual; a box that shrank but will not empty refuses 'draft-stuck';
-//   foreign  words the runtime never typed: one Ctrl+U probes them (clear-draft.mjs probeDraft); text
-//            that changed is real, the part deleted is typed back and nothing else is typed -
-//            delivery 'foreign-input'.
-// A draft the first Ctrl+U leaves unchanged is stale on Orca's side (sn-foundation term_da5f72b3,
-// 2026-09-25: 'check status' no key could clear, an empty box on screen): it is recorded as the note
-// draftNote 'draft-stale' (staleDraft: its text), never refused, and the wake is typed as if the box
-// were empty; the frames read after the send ignore that same stale text, and the delivery proof
-// stays the backstop. `staleDrafts` names drafts a caller already probed stale (starci kernel nudge).
+//   foreign  words the runtime never typed: delivery 'foreign-input', without sending keys.
+// Runtime-owned text may be stale on Orca's side; its bounded clear records draftNote
+// 'draft-stale'. Unknown text always holds, including a reportedly stale input row.
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
@@ -57,7 +52,9 @@ import { classifyAgentScreen, staleAwareState, outputAgeOf, wakeDeliveryOf, exit
 import { squash } from '../lib/clip.mjs';
 import { clearDraft, probeDraft, sameDraft, DRAFT_STALE, CLEAR_DRAFT_INTERVAL_MS } from './clear-draft.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { kernelRevWakeLine } from './runtime-rev.mjs';
+import { kernelWakeRevLine } from './kernel-notice.mjs';
+import { boundedWake } from './wake-bound.mjs';
+import { gatedWake } from './wake-menu-gate.mjs';
 
 const PROVEN = new Set(['delivered', 'queued']);
 const WAITING_FOR_ENTER = new Set(['staged-input', 'queued-input']);
@@ -150,11 +147,9 @@ function splitRetry({ terminal, text, before, stagedPattern, reads, intervalMs, 
  * `before` is a frame the caller just read (it saves one terminal read).
  * `ownTexts` are other texts the runtime typed into this terminal (a worker's dispatched contract): a
  * draft that is exactly one of them is submitted with one Enter like this wake's own.
- * A draft found before typing can end it early: delivery 'foreign-input' (only the Ctrl+U probe and
- * its restore were typed, `draft` says what sits there, `draftProbe` what the probe did), 'draft-stuck'
- * (Ctrl+U could not empty the box), or evidence 'draft-submitted'. A stale draft (the first Ctrl+U left
- * it unchanged, or it is one of `staleDrafts`) adds draftNote 'draft-stale' and staleDraft, and the
- * wake is typed.
+ * A draft found before typing can end it early: 'foreign-input' sends no keys;
+ * 'draft-stuck' holds runtime text the bounded clear could not empty. Runtime-owned
+ * stale text carries draftNote 'draft-stale'.
  * `deps` ({read, send, sleep}) replaces the Orca wrappers in unit specs.
  */
 export function sendWakeWithProof({ terminal, text, before: beforeScreen = null, stagedPattern = DEFAULT_STAGED_PATTERN, ownTexts = [],
@@ -197,31 +192,29 @@ export function sendWakeWithProof({ terminal, text, before: beforeScreen = null,
 }
 
 // The input-box draft decides before typing: a known-stale one is ignored, an own one submitted, a
-// foreign one probed, a runtime one cleared. The refusal when one applies, else null.
+// foreign one held without keys, a runtime one cleared. The refusal when one applies, else null.
 function draftPhase(s, staleDrafts) {
   const draftDeps = { read: s.deps.read ?? terminalRead, send: s.send, sleep: s.sleep };
   const probeMs = Math.min(s.intervalMs, CLEAR_DRAFT_INTERVAL_MS);
+  if (!s.freshRead?.draft) return null;
+  const owner = draftOwnership(s.freshRead.draft, { texts: [s.text, ...s.ownTexts], stagedPattern: s.stagedPattern });
+  if (owner.kind === 'foreign') return foreignDraft(s, owner, draftDeps);
   const known = s.freshRead?.draft ? staleDrafts.find((stale) => typeof stale === 'string' && sameDraft(stale, s.freshRead.draft)) : null;
   if (known) { s.staleDraft = s.freshRead.draft; s.freshRead = { ...s.freshRead, draft: null, frame: s.freshRead.screen }; }
   if (!s.freshRead?.draft) return null;
-  const owner = draftOwnership(s.freshRead.draft, { texts: [s.text, ...s.ownTexts], stagedPattern: s.stagedPattern });
   if (owner.kind === 'own') return submitDraft({ terminal: s.terminal, draft: s.freshRead.draft, stagedPattern: s.stagedPattern, sentText: s.text,
     reads: s.reads, intervalMs: s.intervalMs, readFrame: s.readFrame, send: s.send, sleep: s.sleep });
-  const refusal = owner.kind === 'foreign' ? foreignDraft(s, owner, probeMs, draftDeps) : runtimeDraft(s, probeMs, draftDeps);
+  const refusal = runtimeDraft(s, probeMs, draftDeps);
   if (refusal) return refusal;
   s.freshRead = s.readFrame() ?? { screen: s.freshRead.screen, draft: null, frame: s.freshRead.screen };
   return null;
 }
 
-function foreignDraft(s, owner, probeMs, draftDeps) {
-  // Foreign text is never cleared: one Ctrl+U tells a real draft (it changes; the deleted part is
-  // typed back) from a stale one (it does not).
-  const probe = probeDraft({ terminal: s.terminal, intervalMs: probeMs, deps: draftDeps });
-  const draftProbe = { verdict: probe.verdict, sends: probe.sends, ...(probe.verdict === 'real' ? { restored: probe.restored, ...(probe.restored ? {} : { removed: probe.removed }) } : {}) };
-  if (probe.verdict === 'real' || probe.verdict === 'unreadable') return { ok: false, delivery: 'foreign-input', evidence: 'draft', draft: clipDraft(probe.draft ?? owner.draft),
+function foreignDraft(s, owner, draftDeps) {
+  const probe = probeDraft({ terminal: s.terminal, deps: draftDeps });
+  const draftProbe = { verdict: probe.verdict, sends: probe.sends };
+  return { ok: false, delivery: 'foreign-input', evidence: 'draft', draft: clipDraft(probe.draft ?? owner.draft),
     draftProbe, ...NO_SEND, screenState: classifyAgentScreen(s.freshRead.frame, { stagedPattern: s.stagedPattern }).state };
-  if (probe.verdict === 'stale') s.staleDraft = probe.draft;
-  return null;
 }
 
 function runtimeDraft(s, probeMs, draftDeps) {
@@ -370,8 +363,8 @@ const kernelAttemptOf = (db, workflowId) => {
 export const wakeIdentity = (workflowId, attempt) =>
   `Runtime wake for Kernel attempt ${attempt} of ${workflowId}: starci kernel status --workflow ${workflowId} shows kernel.attempt ${attempt} and kernel.you true on your terminal.`;
 /**
- * `text`, then the runtime-rev sentence (runtime-rev.mjs revWakeLine: `Runtime rev <short-sha>` and, when the
- * Kernel's acked rev is behind, what to re-read and ack), then the seat's wakeIdentity - which always ends the
+ * `text`, then the runtime-rev sentence (kernel-notice.mjs revisionWakeLine: `Runtime rev <short-sha>` and, while the
+ * Kernel notice is owed, what to re-read and attest), then the seat's wakeIdentity - which always ends the
  * wake. Each part is left out when unknown (no rev line, no kernel attempt in the ledger).
  */
 export const withWakeIdentity = (text, workflowId, attempt, revLine = null) =>
@@ -405,7 +398,7 @@ export function wakeKernel({ db, workflowId, text, pending = 'hold', activeStale
 const revLineOf = (db, workflowId, attempt, deps) => {
   if (attempt == null) return null;
   if (deps.revLine !== undefined) return deps.revLine;
-  return kernelRevWakeLine(db, workflowId);
+  return kernelWakeRevLine(db, workflowId);
 };
 
 // pending 'enter' on a staged/queued input: one proven Enter, never a second wake on top.
@@ -436,7 +429,7 @@ function wakeKernelIn({ db, workflowId, text, pending, activeStaleMs, terminal, 
   // signal shim and a seat-less ledger get none.
   const attempt = kernelAttemptOf(db, workflowId);
   const revLine = revLineOf(db, workflowId, attempt, deps);
-  const fullText = withWakeIdentity(text, workflowId, attempt, revLine);
+  const fullText = boundedWake({ text, workflowId, attempt, revLine, compose: withWakeIdentity });
   const shown = show({ terminal });
   if (!shown?.ok || shown.connected !== true || shown.writable !== true) {
     return { action: 'kernel-unavailable', terminal, delivered: false, error: shown?.error ?? shown?.exitCause ?? null };
@@ -468,7 +461,8 @@ export const transitionWakeText = (workflowId, transition, lines) =>
  * terminal or event failure is the answer, never thrown into the caller's committed transaction.
  */
 export function wakeKernelForTransition(ledger, { workflowId, transition, ids = {}, lines, deps = {} }) {
-  const woke = wakeKernel({ db: ledger.db, workflowId, text: transitionWakeText(workflowId, transition, lines), pending: 'enter', deps });
+  const send = () => wakeKernel({ db: ledger.db, workflowId, text: transitionWakeText(workflowId, transition, lines), pending: 'enter', deps });
+  const { answer: woke } = gatedWake(ledger, { workflowId, cause: `transition:${String(transition).split(':')[0]}`, send, deps });
   if (woke.action !== 'kernel-woken') {
     // A refused wake send is recorded kernel-wake-unwritable (the kernel-side op-worker-unwritable),
     // so the watchdog's next tick closes the stale incarnation instead of typing into it again.

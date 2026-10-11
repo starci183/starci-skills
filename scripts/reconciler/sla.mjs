@@ -29,6 +29,7 @@ import { readSupervisor, supervisorEvent } from '../machine/home.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { eachInOrder } from '../lib/in-order.mjs';
 import { TRANSCRIPT_CODE, clockTruth } from './sla-truth.mjs';
+import { driftRows } from './host-ledger-drift.mjs';
 import { dotGet } from '../lib/dot-path.mjs';
 import { hasTable as sqliteHasTable } from '../lib/sqlite.mjs';
 import { positiveNumber } from '../lib/number.mjs';
@@ -52,7 +53,7 @@ const positiveOrZero = (v) => positiveNumber(v, null, { orZero: true });
 function catalogEntry(code, c, alloc) {
   const base = c.slaKey ? positiveOrZero(dotted(alloc, c.slaKey)) : positiveOrZero(c.slaMs);
   return {
-    code, severity: c.severity === 'critical' ? 'critical' : 'warn', owner: c.owner ?? null, autoAction: c.autoAction ?? null,
+    code, severity: c.severity === 'critical' ? 'critical' : 'warn', owner: c.owner ?? null, autoAction: c.autoAction ?? null, driftKind: c.driftKind ?? null,
     slaMs: base == null ? null : base + (positiveOrZero(c.plusMs) ?? 0),
     criticalMs: c.criticalKey ? positiveOrZero(dotted(alloc, c.criticalKey)) : positiveOrZero(c.criticalMs),
     ...(c.slaKey ? { slaKey: c.slaKey } : {}), ...(c.criticalKey ? { criticalKey: c.criticalKey } : {}),
@@ -105,7 +106,7 @@ function violationEvent(row, { catalog = slaCatalog(), now = Date.now() } = {}) 
     kind: VIOLATED_KIND, code, severity,
     entity: { type: entity.type, id: entity.id, ledger: entity.ledger ?? row.ledger_id ?? null, workflowId: entity.workflowId ?? null },
     state: row.state, enteredAt: Number(row.entered_at), ageMs: Math.max(0, now - Number(row.entered_at)), slaMs: Number(row.sla_ms),
-    owner: spec?.owner ?? null, autoAction: spec?.autoAction ?? null,
+    owner: spec?.owner ?? null, autoAction: spec?.autoAction ?? null, driftKind: spec?.driftKind ?? null,
     evidence: [`clock ${row.entity} ${row.state}`, `entered ${new Date(Number(row.entered_at)).toISOString()}`, `sla ${Number(row.sla_ms)}ms`],
     dedupeKey: dedupeKeyOf(code, row.entity, critical),
   };
@@ -347,6 +348,7 @@ function writeEpisodes(m, { events, clears, now }) {
     m.db.prepare('UPDATE invariant_violations SET cleared_at=? WHERE entity=? AND code=? AND cleared_at IS NULL').run(now, row.entity, ev.code);
   }
   m.log([...toViolate.map(({ ev }) => typedRow(ev, { now })), ...toClear.map(({ ev }) => typedRow(ev, { now, cleared: true }))].map((r) => ({ actor: 'reconciler', ...r })));
+  m.log(driftRows({ toViolate, toClear, now }));
   // Critical delivery stays pending until an actual DI acknowledgement; invariant history remains deduped.
   for (const { row, ev } of events) { m.markSlaViolated(Number(row.episode_id)); if (ev.severity !== 'critical') m.markSlaReported(Number(row.episode_id)); }
   return { toViolate, toClear };

@@ -1,0 +1,53 @@
+# The contract of `starci kernel revision-ack` (scripts/kernel/verbs/revision-ack.mjs). One file per extension verb
+# (scripts/kernel/api-extensions.mjs).
+group: kernel
+verb: revision-ack
+owner: runtime
+summary: "the same verb as kernel-ack-rev: project or attest the Kernel READ manifest"
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - revision-ack
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: workflow
+    type: string
+    required: true
+    summary: workflow id
+  - name: rev
+    type: string
+    summary: exact current Git SHA or installed required-byte revision returned by --plan
+  - name: plan
+    type: boolean
+    summary: return the current server-derived required manifest without acknowledgement
+  - name: digest
+    type: string
+    summary: the readToken --plan returned, after every path it lists was read (no file needed)
+  - name: read-manifest
+    type: string
+    summary: regular JSON file containing the exact complete manifest read by this Kernel
+  - name: op
+    type: string
+    summary: include this declared upcoming op contract in the required READ set
+exit:
+  "0": planned or acknowledged
+  "1": refused or unavailable current identity/READ inputs
+  "2": "bad usage: a required flag is missing or a flag has no value"
+json: flag
+examples:
+  - starci kernel revision-ack --repo <path> --workflow <workflow> --plan
+  - starci kernel revision-ack --repo <path> --workflow <workflow> --rev <rev> --digest <readToken>
+  - starci kernel revision-ack --repo <path> --workflow <workflow> --rev <rev> --read-manifest <file>
+editions:
+  - full
+reads: the workflow ledger's revision records and the bytes of the files the change sends
+writes: one runtime-rev-acked event bound to the exact current incarnation and complete required READ hashes (the same event as kernel-ack-rev)
+returns: '{ok:true, workflowId, state, readManifest (null when nothing is owed)} for --plan; {ok:true, workflowId, rev, count} for an attestation'
+refuses:
+  - workflow-unknown
+  - kernel-rev-unknown
+  - kernel-caller-stale
+  - kernel-read-unverified
+usedBy: the current Kernel woken with the files a runtime revision change sends it

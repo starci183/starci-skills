@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { status as orcaStatus } from '../../scripts/api/orca/status.mjs';
 import { startAgent } from '../../scripts/agent/lib.mjs';
 import { liveLaunchTrust } from '../helpers/live-launch-trust.mjs';
-import { noopAgent } from '../../scripts/kernel/launch-smoke-models.mjs';
+import { noopAgent, SETTLE_SMOKE_PROVIDERS } from '../../scripts/kernel/launch-smoke-models.mjs';
 import { workerOutput } from '../../scripts/machine/worker-output.mjs';
 import { workerShow } from '../../scripts/api/orca/worker-show.mjs';
 import { workerStop } from '../../scripts/api/orca/worker-stop.mjs';
@@ -27,7 +27,7 @@ const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 // A real launch is authorised by the owner's own launchTrust decision (the checkout's config.yaml). The suite preload hides
 // that file from a spec, so a live run reads it from under the checkout root.
 if (process.env.STARCI_ORCA_LIVE === '1' || process.env.STARCI_REQUIRE_ORCA_LIVE === '1') process.env.STARCI_OWNER_CONFIG_WITHIN = ROOT;
-const AGENTS = ['claude', 'codex', 'devin'];
+const AGENTS = SETTLE_SMOKE_PROVIDERS;
 const AGENT_PROCESS_WHERE = "Name='claude.exe' OR Name='codex.exe' OR Name='devin.exe'";
 const NOOP_SPEC = `This is a smoke test. Do not read, edit, create or delete anything. Run exactly one shell command, with your own ids from your Orca worker preamble (your task id, your dispatch id, and your terminal handle as --from): node ${ROOT}scripts/api/orca/send.mjs --task-id <your task id> --dispatch-id <your dispatch id> --from <your terminal handle> --outcome succeeded --report-path smoke . Add --dispatch-capability <its dcap_ value> only if your Orca preamble carries that flag; if it does not, run the command without it. Do not send worker_done any other way. Then stay idle and never exit.`;
 const SETTLED = ['succeeded', 'failed'];

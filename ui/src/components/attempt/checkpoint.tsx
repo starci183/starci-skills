@@ -1,10 +1,12 @@
 import type { AttemptDetailV2, RuntimeCheckpoint } from '../../contract';
+import { Alert } from '@heroui/react';
 import { formatAbsolute } from '../../i18n/vi';
 import { t } from '../../i18n/t';
 import { ShaId } from '../infra/rows';
 import { StatusChip } from '../status-chip';
 import type { Status } from '../status';
 import type { Concept } from '../concept';
+import { Advanced } from '../motion';
 
 export const concept: Concept = 'C11';
 
@@ -28,7 +30,7 @@ export function CheckpointReceipt({ attempt }: Readonly<{ attempt: AttemptDetail
   const state = checkpointState(checkpoint);
   const tested = reportTestedHead(attempt);
   const different = Boolean(checkpoint && tested && checkpoint.sha.toLowerCase() !== tested.toLowerCase());
-  return <section id="attempt-step-commit" data-concept={concept} className="min-w-0 scroll-mt-4 border-t pt-6" aria-labelledby="attempt-checkpoint-heading">
+  return <section id="attempt-step-commit" data-concept={concept} className="min-w-0 scroll-mt-24 border-t pt-6" aria-labelledby="attempt-checkpoint-heading">
     <div className="mb-2 flex flex-wrap items-center gap-2">
       <h3 id="attempt-checkpoint-heading" className="m-0 text-sm font-medium">{t('Runtime checkpoint')}</h3>
       <span className="text-xs text-muted-foreground">{t('Recorded commit action')}</span>
@@ -41,13 +43,12 @@ export function CheckpointReceipt({ attempt }: Readonly<{ attempt: AttemptDetail
       <div className="min-w-0"><dt className="text-xs text-muted-foreground">{t('HEAD tested by the Op')}</dt><dd className="m-0 mt-1"><ShaId sha={tested} /></dd></div>
       <div className="min-w-0"><dt className="text-xs text-muted-foreground">{t('Checkpoint file count')}</dt><dd className="m-0 mt-1">{checkpoint?.files == null ? t('Not recorded') : t('{n} files', { n: checkpoint.files.length })}</dd></div>
     </dl>
-    {different ? <p className="mb-0 mt-3 text-xs text-muted-foreground">{t('The Op-tested HEAD differs from the recorded checkpoint SHA.')}</p> : null}
+    {different ? <Alert status="warning" className="mt-4"><Alert.Content><Alert.Description className="break-words">{t('The Op-tested HEAD differs from the recorded checkpoint SHA.')}</Alert.Description></Alert.Content></Alert> : null}
     <p className="mb-0 mt-3 text-xs text-muted-foreground">{checkpoint ? t('This receipt records a workflow-branch checkpoint; workflow integration, push and deployment require their own receipts.') : t('The verdict does not establish a checkpoint receipt.')}</p>
-    {checkpoint ? <details className="mt-3">
-      <summary className="cursor-pointer text-xs font-medium">{t('Checkpoint scope & files')}</summary>
-      <dl className="m-0 mt-3 grid min-w-0 gap-3 text-xs sm:grid-cols-2">
-        {[{ label: t('Recorded owned paths'), value: checkpoint.scope }, { label: t('Files recorded by the checkpoint'), value: checkpoint.files }].map(({ label, value }) => <div key={label} className="min-w-0"><dt className="text-muted-foreground">{label}</dt><dd className="m-0 mt-1">{value == null ? t('Not recorded') : value.length ? <ul className="m-0 list-none p-0">{value.map((file, index) => <li key={`${index}:${file}`} className="break-all font-mono">{file}</li>)}</ul> : t('Recorded empty list')}</dd></div>)}
+    {checkpoint ? <Advanced className="mt-4" title={t('Checkpoint scope & files')} keepMounted>
+      <dl className="m-0 grid min-w-0 gap-6 text-sm sm:grid-cols-2">
+        {[{ label: t('Recorded owned paths'), value: checkpoint.scope }, { label: t('Files recorded by the checkpoint'), value: checkpoint.files }].map(({ label, value }) => <div key={label} className="min-w-0"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="m-0 mt-2">{value == null ? t('Not recorded') : value.length ? <ul className="m-0 grid list-none gap-2 p-0">{value.map((file, index) => <li key={`${index}:${file}`} className="break-all font-mono text-xs leading-5">{file}</li>)}</ul> : t('Recorded empty list')}</dd></div>)}
       </dl>
-    </details> : null}
+    </Advanced> : null}
   </section>;
 }

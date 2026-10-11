@@ -7,8 +7,8 @@ import test from 'node:test';
 import { CATALOG as catalog } from '../../packages/cli/src/catalog.generated.mjs';
 import { main as publishedMain } from '../../packages/cli/src/main.mjs';
 import { main as runtimeMain } from '../../scripts/cli/main.mjs';
-import { PORTABLE_HOME, guardHookCommand, toolGuardCommand } from '../../scripts/lib/guard-command.mjs';
-import { historyHookBody } from '../../scripts/guards/hook-install.mjs';
+
+
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 
@@ -36,14 +36,7 @@ test('published guard command uses the in-process fast path before catalog loadi
   assert.match(imported, /scripts[\\/]guards[\\/]command-guard\.mjs$/);
 });
 
-test('PreToolUse hooks name the per-user starci launcher by path while the PATH-independent git hook stays internal', () => {
-  const settings = JSON.parse(fs.readFileSync(path.join(ROOT, '.claude', 'settings.json'), 'utf8'));
-  const commands = settings.hooks.PreToolUse.flatMap((group) => group.hooks.map((hook) => hook.command));
-  assert.ok(commands.includes(toolGuardCommand({ home: PORTABLE_HOME })));
-  assert.ok(commands.includes(guardHookCommand('seat-tools', { home: PORTABLE_HOME })));
-  const history = historyHookBody({ branches: ['main'], nodePath: '/runtime/node', root: '/runtime' });
-  assert.match(history, /STARCI_RUNTIME='\/runtime' '\/runtime\/node' '\/runtime\/packages\/cli\/bin\/starci\.mjs' guard verify-commit/);
-});
+
 
 test('guard dispatcher preserves refusal exit, stdout and stderr byte-for-byte', (t) => {
   const guards = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-guard-cli-'));

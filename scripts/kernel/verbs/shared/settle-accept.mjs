@@ -7,6 +7,7 @@ import { AWAITING_OWNER, AWAITING_OWNER_STATUS } from '../../../../engine/admiss
 import { settleCheckpoint } from '../../workflow-settle.mjs';
 import { appendEffectEvent } from '../../workflow-checkpoint-state.mjs';
 import { requireWorkflowPlacement, workflowAppRepo } from '../../workflow-worktree.mjs';
+import { supersedeDirs } from '../../../machine/placement-rebound.mjs';
 import { refuse } from '../../../../engine/refuse.mjs';
 import { parseJson } from '../../../lib/json.mjs';
 import { workRecordFilesOf } from './work-record-files.mjs';
@@ -19,7 +20,11 @@ import { requireObservationFresh } from '../../mechanism-observation.mjs';
 import { isMeasurementLeg, measurementSplit } from '../../verify-failure.mjs';
 import { citeRecords } from '../../../work/validate/work-citations.mjs';
 import { recordWhy } from '../../why-record.mjs';
+import { checkedInOf } from './settle-checked-in.mjs';
 import { readEnv } from '../../../lib/env.mjs';
+import { rejudgedVerdictOf } from '../../critic-hold.mjs';
+import { runtimeCriticRunOf } from '../../settle/critic-run.mjs';
+import { requireBrandProduct } from '../../brand-product.mjs';
 
 // The job_transitions walk from the job's current status to its settled one. A pass settles only a job whose worker
 // filed a report (running/answering/effect_unknown go through reported); a fail or blocked with a filed report goes
@@ -121,6 +126,8 @@ function judgeFiledOutcome(ctx, { job, payload, envelope, measurementLeg, record
     refuseMeasuredFindings({ jobId, job, payload, measuredSplit });
   }
   if (internals.VERDICT_OUTCOMES[verdict].includes(envelope.outcome)) return;
+  // A report blocked on a Critic hold, judged by the runtime's own Critic: that verdict settles it (critic-hold.mjs).
+  if (rejudgedVerdictOf(ctx.db, envelope, jobId, runtimeCriticRunOf) === verdict) { result.rejudged = { by: 'runtime-critic' }; return; }
   if (verdict === 'fail' && envelope.outcome === 'done' && st.checkEvidence.failed > 0) {
     st.claimOverruled = true;
     result.claimOverruled = true;
@@ -158,7 +165,7 @@ function recordCutSet(ctx, { job, payload, recordedChecks, result }) {
 /** A pass needs a filed done report (or a measured one) and independently recorded green checks; a cut slice also its cut checks. */
 function requirePassEvidence(ctx, { job, payload, recordedChecks, result }) {
   const { st, jobId } = ctx;
-  if (st.reportOutcome !== 'done' && !result.measurement) throw refuse(`pass requires a filed done report for ${jobId}`, 'pass-report-missing');
+  if (st.reportOutcome !== 'done' && !result.measurement && !result.rejudged) throw refuse(`pass requires a filed done report for ${jobId}`, 'pass-report-missing');
   if (!st.checkEvidence.green) throw refuse(`pass requires independently recorded green checks for ${jobId}`, 'checks-not-green');
   if (payload.cut) recordCutSet(ctx, { job, payload, recordedChecks, result });
 }
@@ -217,6 +224,7 @@ function acceptSettle(ctx) {
 /** The acceptance a fresh settle makes: the native mechanism proofs still hold, then the acceptance transaction. */
 function freshAcceptance(ctx) {
   const { db, jobId, repo, proofs, internals } = ctx;
+  if (ctx.verdict === 'pass') requireBrandProduct(db, jobId, { repo });
   if (proofs?.nativeCheckIds) {
     const fresh = internals.settleOpProofs(db, jobId, repo);
     if (fresh?.judged.status !== 'pass' || JSON.stringify(fresh.nativeCheckIds) !== JSON.stringify(proofs.nativeCheckIds))
@@ -231,7 +239,7 @@ function settleWorkflowCheckpoint(ctx, locked, replay) {
   const { st, jobId, verdict, repo, emit, args } = ctx;
   const job = st.job;
   const context = parseJson(ctx.replayAttempt?.context_json) ?? {};
-  const placements = [ctx.replayAttempt?.worktree_path, context.worktree, context.packet?.context?.workflow_worktree?.path].filter((dir) => typeof dir === 'string' && dir);
+  const placements = supersedeDirs(ctx.db, ctx.replayAttempt?.attempt_id ?? null, [ctx.replayAttempt?.worktree_path, context.worktree, context.packet?.context?.workflow_worktree?.path].filter((dir) => typeof dir === 'string' && dir).map((dir) => path.resolve(repo, dir)));
   const tree = requireWorkflowPlacement(locked, { workflowId: job.workflow_id, placements: placements.map((dir) => path.resolve(repo, dir)),
     required: Boolean(context.packet?.context?.workflow_worktree || replay || workflowAppRepo(repo) || placements.some((dir) => workflowAppRepo(path.resolve(repo, dir)))) });
   if (!tree) return;
@@ -385,6 +393,7 @@ function recordCutEvents(ctx, accepted) {
 /** The settlement transaction: rows, the `op-settled` event, follow-ups, why, the owner's approval and the cut events. */
 function writeSettle(ctx, locked, accepted) {
   const { db, ledger, st, jobId, verdict } = ctx;
+  const checkedIn = checkedInOf(db, st.settledAttemptId);
   ledger.transaction(() => {
     const { payload, result, status } = accepted;
     const job = st.job;
@@ -392,7 +401,7 @@ function writeSettle(ctx, locked, accepted) {
     closeSettledWork(ctx, accepted);
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId, attemptId: st.settledAttemptId,
-      kind: 'op-settled', payload: { verdict, status, report: st.filedReport, reportFiled: st.reportFiled, reportOutcome: st.reportOutcome, checkEvidence: st.checkEvidence, claimOverruled: st.claimOverruled, awaitingOwner: st.awaitingOwner, leasesReleased: st.released, reportsConsumed: st.reportsConsumed,
+      kind: 'op-settled', payload: { verdict, status, report: st.filedReport, reportFiled: st.reportFiled, reportOutcome: st.reportOutcome, checkEvidence: st.checkEvidence, claimOverruled: st.claimOverruled, awaitingOwner: st.awaitingOwner, leasesReleased: st.released, reportsConsumed: st.reportsConsumed, ...(checkedIn ? { checkedIn } : {}),
         ...(st.citations ? { citations: { cited: st.citations.cited, unresolved: st.citations.unresolved.length } } : {}), ...(result.cutSet ? { cutSet: result.cutSet } : {}), ...(result.peerBlocked ? { peerBlocked: result.peerBlocked } : {}) },
     });
     followUpAfterSettle(ctx, accepted);

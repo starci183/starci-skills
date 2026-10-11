@@ -13,15 +13,18 @@ import { ownedPathsOf, getWorkflow } from './rows.mjs';
 import { releaseTypedWaits } from './peer-waits.mjs';
 import { queuedJobOp, refuseOwnerGate, refusePeerWait, opSlotsOrRefuse } from './job-gates.mjs';
 import { hostResourcesFor, HOST_RESOURCES_LOW } from '../../../machine/host-resources.mjs';
+import { workflowWorktreeOf } from '../../../machine/workflow-tree.mjs';
 import { tempRoot, TEMP_ROOT_ENV } from '../../../../engine/temp-root.mjs';
 import { ensureTempRoot } from '../../../api/fs/ensure-temp-root.mjs';
 import { hostThrottle, noteThrottled, releaseThrottled, DISPATCH_THROTTLED } from '../../../machine/ram-throttle.mjs';
 import { deferredQueueCause } from '../../autopilot-run.mjs';
 import { checkPrerequisites, prerequisiteDetail } from '../../prerequisites.mjs';
+import { unsettledPlanPrerequisites } from '../../plan-prerequisites.mjs';
 import { FOUNDATION_WAIT, gateShellFoundation, shellFoundationNeed } from '../../shell-foundation.mjs';
 import { isSeamCut, seamStubForDispatch } from '../../seam-policy.mjs';
 import { selectDispatchContract } from '../../dispatch-admission.mjs';
 import { refuseVerb } from './verb-exit.mjs';
+import { grammarGapCause } from '../../brand-product.mjs';
 
 /** The queued (or ready) job of the call and its op; an unknown, settled or running job refuses with its code. */
 export function loadQueuedJob(d) {
@@ -36,7 +39,7 @@ export function loadQueuedJob(d) {
   if (!['queued', 'ready'].includes(job.status)) throw Object.assign(new Error(`job ${jobId} cannot dispatch while ${job.status}; settle/reconcile the current worker first`), { code: 'job-not-queued' });
   // A paused, stopped, finished or archived workflow launches nothing (H9: an archived workflow's job ran 25 h).
   requirePhase(getWorkflow(db, job.workflow_id), DISPATCHES, 'dispatch');
-  // SETTLE-FIRST (driver-loop.yaml progress.settleFirst): no new dispatch while filed reports wait unconsumed.
+  // SETTLE-FIRST (driver-loop.yaml menu.settleFirst): no new dispatch while filed reports wait unconsumed.
   const { payload, op } = queuedJobOp(ledger, { job, verb: 'dispatch', liveHint: 'dispatching a duplicate', internals });
   Object.assign(d, { job, payload, op });
 }
@@ -51,8 +54,9 @@ function workflowTreeOf(d) {
 
 /** The grant is re-judged at launch: the tree may have moved since enqueue. */
 function refuseUnsatisfiableGrant(d, dispatchTarget) {
-  const { repo, jobId, op, payload } = d;
-  const grant = checkGrantParents({ op, payload: { ...payload, repository: payload.repository ?? dispatchTarget.repository ?? undefined }, ownedPaths: ownedPathsOf(payload), repo });
+  const { repo, jobId, op, payload, job } = d;
+  const worktree = workflowWorktreeOf({ env: process.env }, job.workflow_id)?.path ?? null;
+  const grant = checkGrantParents({ op, payload: { ...payload, repository: payload.repository ?? dispatchTarget.repository ?? undefined }, ownedPaths: ownedPathsOf(payload), repo, worktree });
   if (grant.ok) return;
   const out = { ok: false, jobId, op, reason: grant.reason, violations: grant.violations.map(({ owned, dir, closest }) => ({ owned, dir, closest })), detail: grant.detail };
   refuseVerb(d, out, `dispatch REFUSED for ${jobId} (${op}): ${out.reason} — ${out.detail}; job stays queued`);
@@ -139,12 +143,12 @@ export function refuseHolds(d) {
  * only end blocked on them is a wasted launch.
  */
 function refuseUnmetPrerequisites(d) {
-  const { repo, jobId, op, payload, briefDoc, dispatchParams } = d;
-  const prerequisites = checkPrerequisites({ brief: briefDoc, payload, repo, params: dispatchParams });
-  if (!prerequisites.unmet.length) return;
-  const designGate = prerequisites.unmet.find((item) => item.kind === 'design-not-settled');
-  const out = { ok: false, jobId, op, reason: 'prerequisite-unmet', ...(designGate ? { code: designGate.code } : {}), unmet: prerequisites.unmet,
-    detail: prerequisiteDetail({ op, jobId, unmet: prerequisites.unmet }) };
+  const { repo, db, job, jobId, op, payload, briefDoc, dispatchParams } = d;
+  const unmet = [...checkPrerequisites({ brief: briefDoc, payload, repo, params: dispatchParams }).unmet, ...unsettledPlanPrerequisites(db, { workflowId: job.workflow_id, op })];
+  if (!unmet.length) return;
+  const coded = unmet.find((item) => item.code);
+  const out = { ok: false, jobId, op, reason: 'prerequisite-unmet', ...(coded ? { code: coded.code } : {}), unmet,
+    detail: prerequisiteDetail({ op, jobId, unmet }) };
   refuseVerb(d, out, `dispatch REFUSED for ${jobId} (${op}): prerequisite-unmet — ${out.detail}`);
 }
 
@@ -187,7 +191,7 @@ export function refuseLaunchInputs(d) {
   }
   if (grammarMissing) {
     const detail = `${op} declares grammarContext: required and ${grammarMissing}. Fix the product's brand.sources or the Source knowledge, then dispatch again. The job stays queued.`;
-    refuseVerb(d, { ok: false, jobId, op, reason: 'grammar-context-missing', missing: grammarContext.missing, detail },
+    refuseVerb(d, { ok: false, jobId, op, reason: 'grammar-context-missing', cause: grammarGapCause(grammarContext.missing), missing: grammarContext.missing, watch: grammarContext.watch ?? [], detail },
       `dispatch REFUSED for ${jobId} (${op}): grammar-context-missing — ${detail}`);
   }
 }

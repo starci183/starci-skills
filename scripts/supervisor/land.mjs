@@ -5,6 +5,7 @@
 //   starci supervisor land --job <jobId> [--specs <csv>] [--notify] [--json]
 //   starci supervisor land --commit <sha>[,<sha>...] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--notify] [--json]
 //   starci supervisor land --status [--json]
+// Without --foreground the land runs in a detached child (land-detach.mjs) and the verb answers at once: a caller whose command window is shorter than the gate cannot kill the land.
 //
 // 1. The land queue in machine.sqlite (engine/db/machine.mjs land_queue): each waiter files a ticket and only the
 //    oldest live ticket enters the gate; a ticket whose process died is cancelled (waits up to --wait-ms, default
@@ -53,7 +54,10 @@ import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { setPriority } from '../api/process/set-priority.mjs';
 import { runNode } from '../api/node/run-node.mjs';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { detachedLandLine, startDetachedLand } from './land-detach.mjs';
+import { landQueue, landStatus } from './land-status.mjs';
+export { landQueue, landStatus };
 import { parseYaml } from '../../engine/yaml.mjs';
 import { allocationMs, allocationSettings, harnessSpecsEnabled } from '../../engine/config.mjs';
 import { git, normPath } from './workers.mjs';
@@ -68,8 +72,9 @@ import { withSwcCache } from '../gates/build-env.mjs';
 import { hostThrottle } from '../machine/ram-throttle.mjs';
 import { buildGrammar } from '../gates/grammar-build.mjs';
 import { SKILL_ROOT, lanesRoot, landRoot } from '../machine/home.mjs';
+import { readSpecs } from '../lib/spec-pool.mjs';
 import { specsDirect, changedExports, headRanges, specsInvariant, touchingSelection, SMOKE_LIMIT } from './land-specs.mjs';
-import { fullCheckStep } from './land-full-check.mjs';
+import { fullCheckStep, gateLooseningCheck } from './land-full-check.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../lib/is-main.mjs'; import { withoutSeatEnv } from '../lib/seat-env.mjs';
 import { tailLines } from '../lib/clip.mjs'; import { underHostLockWaiting } from './land-lock.mjs'; import { selfUpgradeBranchContaining, selfUpgradeIdOf, withSelfUpgradeRef, writeSelfUpgradeRef } from './self-upgrade-ref.mjs'; import { describe, failList, specsRedOnMainOf } from './land-format.mjs'; export { describe };
@@ -363,13 +368,6 @@ export function packageProofCheck({ dir, base, runner = node }) {
   return { name: 'package-clean-test', ok: r.ok, output: tailLines(String(r.stdout) + String(r.stderr) + (r.error ? '\n' + String(r.error) : ''), r.ok ? 4 : 60) };
 }
 
-const readSpecs = (dir) => {
-  const tests = path.join(dir, 'tests');
-  let names = [];
-  try { names = fs.readdirSync(tests, { recursive: true }).map((n) => String(n).split(path.sep).join('/')).filter((n) => n.endsWith('.spec.mjs')); } catch { return []; }
-  return names.map((n) => ({ file: `tests/${n}`, text: (() => { try { return fs.readFileSync(path.join(tests, n), 'utf8'); } catch { return ''; } })() }));
-};
-
 const syntaxChecks = (dir, present) => present.filter((x) => x.endsWith('.mjs')).map((f) => {
   const r = node(['--check', f], { cwd: dir, timeout: 60_000 });
   return { name: `node --check ${f}`, ok: r.ok, ...(r.ok ? {} : { output: tailLines(r.stderr, 10) }) };
@@ -403,7 +401,7 @@ function chooseSpecs({ dir, base, head, rows, changed, specs, specMode }) {
   let extra = [], narrowed = [], smoke = [];
   if (specMode === 'all') extra = pool.map((s) => s.file);
   else if (specMode === 'touching') { const t = touchingSelection(changed, { specs: pool, root: dir, symbolsOf: (file) => symbolsOfChange({ dir, base, head, rows }, file) }); extra = t.files; narrowed = t.narrowed; smoke = t.smoke; }
-  else if (specMode === 'direct') { const d = specsDirect(changed, { specs: pool, symbolsOf: (file) => symbolsOfChange({ dir, base, head, rows }, file) }); extra = [...d.files, ...specsInvariant(changed, { specs: pool })]; narrowed = d.narrowed; }
+  else if (specMode === 'direct') { const d = specsDirect(changed, { specs: pool, root: dir, symbolsOf: (file) => symbolsOfChange({ dir, base, head, rows }, file) }); extra = [...d.files, ...specsInvariant(changed, { specs: pool })]; narrowed = d.narrowed; }
   const allSpecs = specMode === 'none' ? [] : [...new Set([...specs.map(normPath), ...extra])].filter((f) => fs.existsSync(path.join(dir, f)));
   return { allSpecs, narrowed, smoke };
 }
@@ -454,7 +452,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   const changed = rows.map((r) => normPath(r.at(-1)));
   const present = changed.filter((f) => fs.existsSync(path.join(dir, f)));
   const checks = [...syntaxChecks(dir, present), ...parseChecks(dir, present), ...treeChecks(dir, baseline)];
-  for (const step of [mirrorDriftCheck({ dir, changed, baseline }), packageProofCheck({ dir, base }), fullCheckStep(dir)]) if (step) checks.push(step);
+  for (const step of [mirrorDriftCheck({ dir, changed, baseline }), packageProofCheck({ dir, base }), gateLooseningCheck({ dir, base, head }), fullCheckStep(dir)]) if (step) checks.push(step);
   const { allSpecs, narrowed, smoke } = chooseSpecs({ dir, base, head, rows, changed, specs, specMode });
   if (specMode === 'none') checks.push({ name: 'specs skipped', ok: true, advisory: true, output: '--specs none with an explicit --reason: no spec ran (the reason is recorded as specReason on the land run)' });
   const missing = specs.map(normPath).filter((f) => !fs.existsSync(path.join(dir, f)));
@@ -585,11 +583,6 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
     if (landed) return landed;
   }
   return { ...result, reason: 'main-moving', detail: `main moved under the gate ${MAX_MAIN_RETRIES} times` };
-}
-
-/** The open tickets of the land queue, oldest first ({ticketId, lane, commit, state, requestedBy, enqueuedAt}). */
-export function landQueue({ env = process.env } = {}) {
-  return readMachine((m) => m.landQueue().map((t) => ({ ticketId: t.ticket_id, lane: t.lane, commit: t.commit_sha, state: t.state, requestedBy: t.requested_by, enqueuedAt: t.enqueued_at })), [], { env });
 }
 
 const claimGate = (env, ticketId) => {
@@ -734,13 +727,6 @@ export async function land({ jobId = null, commits = null, specs = [], reason = 
   try { return landInsideGate(c, { lock, plan, reason, notify, target, gate }); } finally { lock.release(gate.state); }
 }
 
-/** The gate for /status: {busy, current, queued}. */
-export function landStatus({ env = process.env } = {}) {
-  const queue = landQueue({ env });
-  const current = queue.find((t) => t.state === 'running') ?? null;
-  return { busy: Boolean(current), current, queued: queue.filter((t) => t.state === 'queued').length };
-}
-
 if (isMain(import.meta.url)) {
   setPriority();
   const argv = process.argv.slice(2);
@@ -748,8 +734,11 @@ if (isMain(import.meta.url)) {
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const csv = (v) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : []);
   if (has('status')) console.log(JSON.stringify(landStatus()));
-  else if (!value('job') && !value('commit')) { console.error('use: starci supervisor land --job <id> | --commit <sha>[,<sha>] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--notify] [--json]'); process.exitCode = 2; }
-  else {
+  else if (!value('job') && !value('commit')) { console.error('use: starci supervisor land --job <id> | --commit <sha>[,<sha>] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--notify] [--foreground] [--json]'); process.exitCode = 2; }
+  else if (!has('foreground')) {
+    const started = startDetachedLand({ script: fileURLToPath(import.meta.url), argv });
+    console.log(has('json') ? JSON.stringify({ ok: true, detached: true, ...started }) : detachedLandLine(started));
+  } else {
     const r = await land({ jobId: value('job'), commits: value('commit') ? csv(value('commit')) : null, specs: csv(value('specs')), reason: value('reason'), fullByPushGit: has('full-by-push-git'), lane: value('lane'),
       notify: has('notify'), waitMs: Number(value('wait-ms')) || LAND_WAIT_MS });
     console.log(has('json') ? JSON.stringify(r) : describe(r, { jobId: value('job') }));

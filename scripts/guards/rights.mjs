@@ -19,6 +19,7 @@ import path from 'node:path';
 import { guardsRoot } from './guards-root.mjs';
 import { pathKey, sameOrUnder } from '../lib/path-key.mjs';
 import { RUNTIME_CHANGE_CODE, runtimeWriteRefusal } from '../machine/runtime-change.mjs';
+import { opWriteScopeRefusal } from './op-write-scope.mjs';
 
 const ENV_ROLES = new Set(['op', 'supervisor', 'lead', 'coordinator', 'release']);
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
@@ -61,6 +62,7 @@ export function boundIdentityOf(handle, { root, env = process.env } = {}) {
 export function rightsRoleOf({ guard = null, seat = null, env = process.env, lockOwner = null } = {}) {
   const claimed = String(env?.STARCI_ROLE ?? '').toLowerCase();
   if (guard?.role === 'kernel') return 'lead';
+  if (guard?.role === 'critic') return 'critic';
   if (guard?.role === 'op') return guard.workflowId === 'supervisor' ? 'supervisor' : 'op';
   if (seat?.role === 'supervisor') return 'supervisor';
   // A claim never outranks a bound guard or seat; the release claim holds only while the host lock is held live by role release.
@@ -205,9 +207,8 @@ export function fileWriteVerdict({ role, filePath, tool = 'Edit', edit = null, g
   const file = path.resolve(filePath);
   if (role === 'op') {
     const runtimeRoot = zone?.runtimeRoot ?? runtimeRootOf(file);
-    if (!runtimeRoot) return null;
     const own = [guard?.workflowWorktree, ...(guard?.owned ?? [])].filter(Boolean);
-    if (own.some((dir) => sameOrUnder(pathKey(file), pathKey(dir)))) return null;
+    if (!runtimeRoot || own.some((dir) => sameOrUnder(pathKey(file), pathKey(dir)))) return opScopeVerdict(file, guard);
     return refusal('RIGHTS_OP_RUNTIME_WRITE', file, 'an op works on its app in the workflow worktree and never writes inside the .claude runtime checkout: a defect of the harness is not the op\'s to fix',
       'record a lesson or an upgrade request in your report (kernel report: lessons / upgrade request); the owner path or the supervisor self-upgrade picks it up');
   }
@@ -222,6 +223,12 @@ export function fileWriteVerdict({ role, filePath, tool = 'Edit', edit = null, g
   }
   const change = runtimeWriteRefusal();
   return refusal(RUNTIME_CHANGE_CODE, zone.rel, change.reason, change.remedy);
+}
+
+/** The refusal of an Op write outside its owned paths (op-write-scope.mjs), or null. */
+function opScopeVerdict(file, guard) {
+  const outside = opWriteScopeRefusal({ file, guard });
+  return outside ? refusal(outside.code, file, outside.reason, outside.remedy) : null;
 }
 
 /** The protected-zone refusal for a catalog write, or null when no protected entry is named. */

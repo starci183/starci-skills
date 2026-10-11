@@ -1,0 +1,173 @@
+// workflow-purge-apply.mjs - carries out a purge plan (workflow-purge-plan.mjs) through the house mechanics only, in an order that makes every step
+// safe to repeat: workers and terminals first (a live terminal keeps Orca from removing its tree), then the trees (Orca's removal with its
+// held-file retry, or the git home's link-safe removal; the registry row closed by the same call), then the refs (each deleted only when it still
+// names the tip the plan printed), then the files, the machine Decision Items, and last the one journal event. The plan is stored in machine_meta before
+// the first effect, so a crashed apply is resumed by the next one and the event counts the whole run. Nothing here deletes recursively on its own:
+// no main checkout and no history is touched, and no branch is deleted that the plan did not list as the workflow's.
+import fs from 'node:fs';
+import { canonicalJSON } from '../../engine/canonical-json.mjs';
+import { purgeClosureTargets, purgeResumeScope } from './workflow-purge-plan.mjs';
+import { branchDelete } from '../api/git/branch-delete.mjs';
+import { revParse } from '../api/git/rev-parse.mjs';
+import { closeAndVerify } from './close-verify.mjs';
+import { closeWorker, workerClosureProven } from './worker-close.mjs';
+import { terminalList } from '../api/orca/terminal-list.mjs';
+import { terminalInventoryOf } from '../lib/orca-terminal.mjs';
+import { processEnv } from '../api/process/process-env.mjs';
+import { releaseOrcaSlot, markRemoved, withRegistry } from './worktree-registry.mjs';
+import { removeOrcaWorktree, orcaWorktreeClient } from './worktree-orca.mjs';
+import { removeScratchWorktree } from './worktree-git.mjs';
+import { purgeMetaKey } from './workflow-purge-facts.mjs';
+
+const MAIN = 'main';
+
+const failure = (error) => String(error?.message ?? error).slice(0, 300);
+
+// Purge acknowledges a terminal already deleted by Orca. This is a lifecycle no-op, not a physical process-exit or provider-capacity receipt.
+const absentResult = (processObservation) => ({ ok: true, action: 'already-deleted', proof: 'terminal-absent',
+  processes: { verdict: 'unverifiable', advisory: true, observation: processObservation } });
+
+// Confirm exact absence through a fresh unscoped inventory. Unknown process observations are advisory; observed tagged survivors remain held.
+function verifyAbsence(handles, deps) {
+  let inventory;
+  try { inventory = terminalInventoryOf((deps.orca?.terminals ?? terminalList)()); } catch { inventory = null; }
+  const errors = inventory === null ? ['the fresh terminal inventory is unreadable']
+    : handles.filter(handle => inventory.some(row => row.handle === handle)).map(handle => `terminal ${handle} is still present`);
+  if (errors.length) return { errors, processObservation: 'not-read' };
+  let rows = null;
+  try { rows = (deps.terminalProcesses ?? (() => processEnv({ names: ['ORCA_TERMINAL_HANDLE'] })))(); } catch { /* unknown process observations are advisory for deleted terminals */ }
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (row?.readable === true && handles.includes(row.values?.ORCA_TERMINAL_HANDLE)) errors.push(`process ${row.pid} still carries deleted terminal ${row.values.ORCA_TERMINAL_HANDLE}`);
+  }
+  return { errors, processObservation: Array.isArray(rows) ? 'read' : 'unavailable' };
+}
+
+function closeOneWorker(worker, { env, deps, plan, processObservation }) {
+  if (plan.absentTerminals?.includes(worker.terminal)) return { dispatchId: worker.dispatchId, terminal: worker.terminal, ...absentResult(processObservation) };
+  let r;
+  try { r = (deps.closeWorker ?? closeWorker)({ dispatch: worker.dispatchId, handle: worker.terminal, retryRelease: true, env }); } catch (error) { r = { ok: false, error: failure(error) }; }
+  const survivor = Boolean(r.hygiene) || [r.processes?.survivors, r.processes?.census].some(rows => Array.isArray(rows) && rows.length > 0);
+  const ok = workerClosureProven(r, worker.terminal) && !survivor;
+  // An incomplete host census must not prevent closing an owned terminal. Its physical process proof remains separate.
+  if (!ok && !survivor && r.handle === worker.terminal && r.processes?.verdict === 'unverifiable') {
+    const closed = r.closed == null ? closeOneTerminal({ handle: worker.terminal }, { deps, plan, processObservation }) : r.closed;
+    if (closed.ok) {
+      const verified = verifyAbsence([worker.terminal], deps);
+      if (!verified.errors.length) return { dispatchId: worker.dispatchId, terminal: worker.terminal, ...absentResult(verified.processObservation), closed };
+      return { dispatchId: worker.dispatchId, terminal: worker.terminal, ok: false, closed, error: verified.errors.join('; ') };
+    }
+    return { dispatchId: worker.dispatchId, terminal: worker.terminal, ok: false, closed, error: closed.error ?? closed.reason ?? 'terminal close failed' };
+  }
+  return { dispatchId: worker.dispatchId, terminal: worker.terminal, ok, ...(ok ? { closure: r.processes?.verdict ?? null } : { error: survivor ? 'a process of the worker survived release and close' : r.processes?.reason ?? r?.error ?? 'worker closure proof is missing' }) };
+}
+
+function closeOneTerminal(terminal, { deps, plan, processObservation }) {
+  if (plan.absentTerminals?.includes(terminal.handle)) return { handle: terminal.handle, ...absentResult(processObservation) };
+  let r;
+  try { r = (deps.closeTerminal ?? closeAndVerify)(terminal.handle); } catch (error) { r = { ok: false, reason: failure(error) }; }
+  return { handle: terminal.handle, ok: r?.ok === true, proof: r?.proof ?? null, ...(r?.ok ? {} : { error: r?.reason ?? r?.error ?? 'close failed' }) };
+}
+
+// One tree through the home that made it: Orca (removeOrcaWorktree: links first, `orca worktree rm` with the held-file retry), git, or just its registry row.
+function removeOneTree(tree, { env, deps }) {
+  const base = { path: tree.path, action: tree.action };
+  if (tree.action === 'release-slot') return { ...base, ok: releaseOrcaSlot(tree.path, { env }) };
+  if (tree.action === 'unregister') return { ...base, ok: markRemoved(tree.path, { env }) || !fs.existsSync(tree.path) };
+  const r = tree.action === 'remove-orca'
+    ? removeOrcaWorktree({ repoRoot: tree.repoRoot, orcaId: tree.orcaId, dir: tree.path, branch: tree.branch, deleteBranch: null, preserve: null, env, orca: deps.orcaTree ?? orcaWorktreeClient })
+    : removeScratchWorktree({ repoRoot: tree.repoRoot, dir: tree.path, branch: null, deleteBranch: null, preserve: null, env });
+  return { ...base, ok: r.ok === true, links: r.links ?? 0, ...(r.ok ? {} : { error: r.reason ?? 'remove-failed', detail: r.detail ?? null }), ...(r.fatal ? { fatal: true, damage: r.damage } : {}) };
+}
+
+// One ref: deleted only when it still names the tip the plan printed (a moved ref is the operator's or another run's, and is left).
+function deleteOneRef(ref) {
+  const base = { repoRoot: ref.repoRoot, name: ref.name, tip: ref.tip };
+  const now = revParse(ref.repoRoot, `refs/heads/${ref.name}`);
+  if (!now) return { ...base, ok: true, gone: true };
+  if (now !== ref.tip) return { ...base, ok: false, error: `the ref moved since the plan: it names ${now}` };
+  if (ref.name === MAIN) return { ...base, ok: false, error: 'the main branch is never deleted' };
+  const deleted = branchDelete({ repoRoot: ref.repoRoot, branch: ref.name, mode: 'force', main: MAIN });
+  return { ...base, ok: deleted.ok, ...(deleted.ok ? {} : { error: deleted.detail ?? 'branch delete failed' }) };
+}
+
+function removeOneFile(file) {
+  try { fs.rmSync(file, { force: true }); return { file, ok: true }; } catch (error) { return { file, ok: false, error: failure(error) }; }
+}
+
+function resolveDecisions(diIds, env) {
+  return withRegistry((m) => diIds.map((diId) => ({ diId, ok: m.setSupDecision(diId, { status: 'resolved', by: 'runtime', verb: 'workflow-purged', rationale: 'the workflow was purged: its host leftovers are closed' }).changed })), env);
+}
+
+/** The plan as it is stored while a purge runs: enough to resume it and to journal the whole run. */
+const storedPlanOf = (plan, now) => ({ planSha: plan.sha, startedAt: now, counts: plan.counts, refs: plan.refs.filter((ref) => ref.action === 'delete').map((ref) => ({ repoRoot: ref.repoRoot, name: ref.name, tip: ref.tip })),
+  trees: plan.trees.map((tree) => ({ path: tree.path, branch: tree.branch })), ledger: plan.ledger.mode,
+  closures: { workers: plan.workers.map(({ dispatchId, terminal }) => ({ dispatchId, terminal })), terminals: plan.terminals.map(({ handle }) => ({ handle })) } });
+
+// machine_meta holds the first plan of an unfinished purge; an existing one is kept (the resumed run's smaller plan must not replace the whole run's counts).
+function beginPurge(plan, { env, now }) {
+  return withRegistry((m) => m.transaction((db) => {
+    const key = purgeMetaKey(plan.workflowId);
+    const held = db.prepare('SELECT value FROM machine_meta WHERE key=?').get(key)?.value;
+    if (held) {
+      const stored = JSON.parse(held), closures = purgeClosureTargets(stored, plan);
+      if (closures.error) return { resumed: true, stored, error: closures.error };
+      if (canonicalJSON(purgeResumeScope(stored, plan)) !== canonicalJSON(plan.resume)) return { resumed: true, stored, error: 'the unfinished purge closure scope changed since the plan' };
+      stored.closures = closures;
+      db.prepare('UPDATE machine_meta SET value=? WHERE key=?').run(JSON.stringify(stored), key);
+      return { resumed: true, stored };
+    }
+    const stored = storedPlanOf(plan, now);
+    db.prepare('INSERT INTO machine_meta(key, value) VALUES(?, ?)').run(key, JSON.stringify(stored));
+    return { resumed: false, stored };
+  }), env);
+}
+
+// The one journal event of the purge and the end of its stored plan, in one transaction.
+function journalPurge({ plan, stored, resumed, results, env }) {
+  return withRegistry((m) => m.transaction((db) => {
+    const event = m.supEvent({ entityType: 'workflow', entityId: plan.workflowId, kind: 'workflow-purged',
+      payload: { workflowId: plan.workflowId, repo: plan.repo, planSha: stored.planSha, resumed, counts: stored.counts, refs: stored.refs, trees: stored.trees, ledger: stored.ledger,
+        workers: results.workers.length, terminals: results.terminals.length } });
+    db.prepare('DELETE FROM machine_meta WHERE key=?').run(purgeMetaKey(plan.workflowId));
+    return event;
+  }), env);
+}
+
+/**
+ * Apply `plan`. {ok, resumed, results: {workers, terminals, trees, refs, guards, prompts, decisions, ledger}, errors, event}. A step that fails does not stop the
+ * other independent closes; tree and workflow cleanup require every planned closure to be proven. Later independent steps continue on failure,
+ * except a removal that touched a main checkout (fatal): everything stops. With errors the journal
+ * event is not written and the stored plan stays, so the next apply resumes. Seams (deps): closeWorker, closeTerminal, orcaTree, purgeLedger, now.
+ */
+export function applyPurgePlan({ plan, env = process.env, deps = {} }) {
+  const now = (deps.now ?? Date.now)();
+  const results = { workers: [], terminals: [], trees: [], refs: [], guards: [], prompts: [], decisions: [], ledger: null };
+  let processObservation = 'not-read';
+  if (plan.absentTerminals?.length) {
+    const verified = verifyAbsence(plan.absentTerminals, deps);
+    const { errors } = verified;
+    processObservation = verified.processObservation;
+    if (errors.length) return { ok: false, resumed: Boolean(plan.resume), results, errors, event: null };
+  }
+  const { resumed, stored, error } = beginPurge(plan, { env, now });
+  if (error) return { ok: false, resumed, results, errors: [error], event: null };
+  results.workers = stored.closures.workers.map(worker => closeOneWorker(worker, { env, deps, plan, processObservation }));
+  results.terminals = stored.closures.terminals.map(terminal => closeOneTerminal(terminal, { deps, plan, processObservation }));
+  const closureErrors = [...results.workers, ...results.terminals].filter(item => !item.ok)
+    .map(item => `${item.dispatchId ?? item.handle}: ${item.error ?? 'closure failed'}`);
+  if (closureErrors.length) return { ok: false, resumed, results, errors: closureErrors, event: null };
+  for (const tree of plan.trees) {
+    const done = removeOneTree(tree, { env, deps });
+    results.trees.push(done);
+    if (done.fatal) return { ok: false, resumed, results, errors: [`main checkout damaged while removing ${tree.path}: ${(done.damage ?? []).join('; ')}`], event: null };
+  }
+  results.refs = plan.refs.filter((ref) => ref.action === 'delete').map((ref) => deleteOneRef(ref));
+  results.guards = plan.guards.map((file) => removeOneFile(file));
+  results.prompts = plan.prompts.map((file) => removeOneFile(file));
+  results.decisions = resolveDecisions(plan.decisions, env);
+  const errors = [...results.workers, ...results.terminals, ...results.trees, ...results.refs, ...results.guards, ...results.prompts].filter((item) => item.ok === false).map((item) => `${item.dispatchId ?? item.handle ?? item.path ?? item.name ?? item.file}: ${item.error ?? 'failed'}`);
+  if (!errors.length && plan.ledger.mode === 'purge') results.ledger = deps.purgeLedger({ plan });
+  if (results.ledger && results.ledger.ok === false) errors.push(`ledger: ${results.ledger.error}`);
+  const event = errors.length ? null : journalPurge({ plan, stored, resumed, results, env });
+  return { ok: errors.length === 0, resumed, results, errors, event };
+}

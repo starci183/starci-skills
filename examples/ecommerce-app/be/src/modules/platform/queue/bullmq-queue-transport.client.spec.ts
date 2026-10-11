@@ -10,6 +10,7 @@ import type { BullmqJob, BullmqQueue, BullmqWorker, QueueFactory } from "./queue
 const options: QueueOptions = {
     redisHost: "redis.test",
     redisPort: 6380,
+    redisDb: 7,
     prefix: "spec.",
     relayIntervalMs: 100,
     relayBatch: 50,
@@ -45,7 +46,7 @@ describe("BullmqQueueTransportClient", () => {
         expect(factory.queue).toHaveBeenCalledTimes(1)
         expect(factory.queue).toHaveBeenCalledWith("orders", {
             prefix: "spec.",
-            connection: { host: "redis.test", port: 6380, maxRetriesPerRequest: null },
+            connection: { host: "redis.test", port: 6380, db: 7, maxRetriesPerRequest: null },
         })
         expect(queue.add).toHaveBeenNthCalledWith(1, "orders", payload, {
             jobId: "outbox-1",
@@ -84,7 +85,7 @@ describe("BullmqQueueTransportClient", () => {
 
         expect(factory.worker).toHaveBeenCalledWith("orders", expect.any(Function), {
             prefix: "spec.",
-            connection: { host: "redis.test", port: 6380, maxRetriesPerRequest: null },
+            connection: { host: "redis.test", port: 6380, db: 7, maxRetriesPerRequest: null },
             concurrency: 3,
         })
         const processor = factory.worker.mock.calls[0]?.[1]

@@ -418,7 +418,7 @@ export function newTscFindings(head, baseFindings) {
 function runTests(root, pattern, cache) {
   const cwd = [root, path.join(root, 'be')].find((dir) => JEST_CONFIGS.some((name) => fs.existsSync(path.join(dir, name))) || readManifest(dir)?.jest) ?? root;
   let bin;
-  try { bin = createRequire(path.join(cwd, 'package.json')).resolve('jest/bin/jest.js'); } catch { return { step: { pattern }, findings: [], error: `jest is not installed under ${posixPath(cwd)}` }; }
+  try { bin = createRequire(path.join(cwd, 'package.json')).resolve('jest/bin/jest'); } catch { return { step: { pattern }, findings: [], error: `jest is not installed under ${posixPath(cwd)}` }; }
   const outputFile = path.join(cache.worktree, 'jest.json');
   fs.rmSync(outputFile, { force: true });
   const started = Date.now();
@@ -426,7 +426,7 @@ function runTests(root, pattern, cache) {
   const result = readCache(outputFile);
   if (!result) return { step: { pattern, exit: run.status }, findings: [], error: `jest produced no json result (exit ${run.status}): ${String(run.stderr || run.error?.message || '').trim().split('\n').at(-1)}` };
   const error = jestRunError(result, run);
-  const totals = reduceJest(result);
+  const totals = reduceJest(result, root);
   if (error) return { step: { pattern, exit: run.status, ...totals }, findings: [], error };
   const findings = [];
   for (const suite of result.testResults) {

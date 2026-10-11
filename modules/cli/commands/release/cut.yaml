@@ -10,6 +10,8 @@ flags:
   - {name: branch, type: string, summary: the release branch (default main)}
   - {name: plan, type: boolean, summary: "report what the cut would run and require, and stop; it runs nothing"}
   - {name: tag, type: string, summary: the release tag v* to push (default is the one new annotated v* tag on HEAD)}
+  - {name: rows, type: string, summary: "re-run only these rows (comma separated, names as --plan lists them) on the SAME commit and complete the record when every other row is already green on it; a row that is not green there refuses the cut"}
+  - {name: no-reuse, type: boolean, summary: run every row; stand in for none from an earlier commit or an earlier cut of this one}
 exit:
   "0": the release was cut and main plus its tag were pushed atomically, or --plan found nothing missing
   "1": refused (dirty tree, no or wrong tag, release notes incomplete, version not moved past the remote main, suite red, main moved, secret scan) and nothing was pushed
@@ -17,7 +19,8 @@ exit:
 json: flag
 examples:
   - starci release cut
-  - starci release cut --plan --tag v1.0.0-alpha.7
-  - starci release cut --repo <path> --tag v1.0.0-alpha.7 --json
+  - starci release cut --plan --tag v1.0.0-alpha.9
+  - starci release cut --tag v1.0.0-alpha.9 --rows "npm test,linux-parity"
+  - starci release cut --repo <path> --tag v1.0.0-alpha.9 --json
 editions:
   - full

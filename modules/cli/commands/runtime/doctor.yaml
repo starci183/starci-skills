@@ -1,6 +1,7 @@
 group: runtime
 verb: doctor
 owner: runtime
+runtimeSide: host
 summary: verify installed payload, public entry custody and local runtime capabilities
 impl:
   script: scripts/install/install.mjs

@@ -1,0 +1,134 @@
+schema: starci/module-kernel-op-judges@1
+id: kernel.op-judges
+
+# Who judges the product of each op, as data. Principle P2 (modules/kernel/roles.yaml): the maker never judges its own work;
+# the Op makes, the Critic and the machine checks judge. Every op contract (modules/ops/ops/<op>.yaml) declares its judges in
+# the required field `judge`; this file holds the vocabulary those declarations are read against and the tables they may cite,
+# and the op-judge self-check (scripts/checks/check-op-judge.mjs, RT_OP_JUDGE_UNDECLARED) refuses a declaration that departs
+# from it, so the table and the contracts cannot drift apart. "Nobody" cannot be declared: a contract lists at least one judge.
+
+about:
+  en: >-
+    A judge is one of four kinds. machine: independent, re-runnable measures the runtime owns or an earlier leg or the repository
+    owns, re-run or re-read at settle. critic: an independent Critic of another provider (modules/kernel/critic.yaml). owner: an
+    owner decision or approval is the judgment. next-leg: a later leg whose contract is to review this product. A measure the same
+    attempt authored (a test file the op wrote) is never a machine judge by itself.
+
+kinds:
+  machine: "a measure listed under `measures`, optionally citing the contract proofs it relies on"
+  critic: "the Critic of modules/kernel/critic.yaml coverage: declared exactly for the op kinds that table marks covered"
+  owner: "an owner gate listed under `ownerGates`"
+  next-leg: "a reviewer listed under `reviewers` whose `reviews` names this op"
+
+# The measures a machine judge may cite. `kind` product: the measure reads the product; process: it reads how the op worked (a
+# process measure never stands alone: a machine entry cites at least one product measure). `mode` report: the measure records its
+# result as evidence and judges nothing yet; the check allows no other mode until enforcement is built. `source` is the file that runs it
+# and must exist. `independence`: runtime = the runtime runs or re-reads it, repository = the repository's own tools,
+# the maker supplies only inputs. `applies` says for which ops the measure is declared, and the check holds the contracts to it:
+#   dispatched   every op the workflow dispatches (not an external op, not an owner-act op)
+#   table        the ops of the named list in a knowledge file
+#   policy       the ops whose contract carries the named policy key
+#   opProofs     the proofs of knowledge/op-gate.yaml opProofs for the op (one measure per proof: op-proof:<proof>)
+#   ops          the listed ops
+#   writes       the ops whose contract writes a path that contains one of the listed names
+#   free         any op that may use the measure; the contract's cited proofs say how
+measures:
+  declared-checks:
+    kind: product
+    source: scripts/kernel/settle/job-settle-verify.mjs
+    independence: runtime
+    applies: dispatched
+    what: "every check the report lists that the settler can run itself (a runtime validator, a gate script, a native mechanism) is re-run by the settler with its raw exit; a check only the worker ran is the worker's own admission and never a pass"
+  work-hygiene:
+    kind: product
+    source: scripts/work/validate/work-hygiene.mjs
+    independence: runtime
+    applies: {writes: [.starciwork, .starcistacks]}
+    what: "the files a pass changed under .starciwork or .starcistacks parse, pass the scoped strict validator and carry no literal secret (the check the product repository's pre-commit hook runs)"
+  op-gate:
+    kind: product
+    source: scripts/kernel/gate-settle.mjs
+    independence: runtime
+    applies: {table: "knowledge/op-gate.yaml#enforcedOps"}
+    what: "the attached gate JSON (lint, typecheck, canon and the specs the op names) and READ digest are re-read against the recorded base and the owned slice, and the Kernel re-runs the same gate at landing; the specs the op passes to the gate are the op's own"
+  sonar-gate:
+    kind: product
+    source: scripts/kernel/sonar-settle.mjs
+    independence: runtime
+    applies: {table: "knowledge/sonar-gate.yaml#enforcedOps"}
+    what: "the scanner's own summary of the slice (new code only), judged by the runtime; coverage counts the unit tests the op wrote"
+  proof-media:
+    kind: product
+    source: scripts/kernel/job-artifacts.mjs
+    independence: runtime
+    applies: {policy: proofMedia}
+    what: "a pass owes the screenshots and the browser video its policy names, read from the filed evidence"
+  op-proof:
+    kind: product
+    source: scripts/kernel/gate-settle.mjs
+    independence: runtime
+    applies: opProofs
+    processProofs: [read-knowledge]
+    what: "the native mechanism proof (knowledge/op-gate.yaml opProofs) is re-run or re-read at settle and recorded as the runtime check op-proof; read-knowledge reads how the op worked (the READ digest), every other proof reads the product"
+  brand-consumable:
+    kind: product
+    source: scripts/kernel/brand-product.mjs
+    independence: runtime
+    applies: {ops: [brand.decide]}
+    what: "the settler resolves the brand's family CSS with the interface.draw dispatch resolver, over the workflow tree and bound repositories; every declared non-reference CSS source exists and a family source resolves"
+  draw-rerun:
+    kind: product
+    source: scripts/work/draw-loop-settle.mjs
+    independence: runtime
+    applies: {ops: [interface.draw]}
+    what: "the runtime re-renders every live part and re-runs every machine metric of the draw loop itself, and refuses an asset that is not a token-rendered shape (scripts/work/draw/draw-acceptance.mjs)"
+  canon-parity:
+    kind: product
+    source: scripts/kernel/settle/canon-parity.mjs
+    independence: runtime
+    applies: {ops: [code.refactor]}
+    what: "a canon cut slice the declared checks cannot carry is measured by the settler itself over its owned paths and settles only when nothing is new there"
+  handover-gate:
+    kind: product
+    source: scripts/kernel/handover.mjs
+    independence: runtime
+    applies: {ops: [handover.review]}
+    what: "the handover ask is refused unless it has the three options in order and no must-have is owed (scripts/kernel/proof-integrity.mjs); the pass is the owner's receipt"
+  acceptance-trace:
+    kind: product
+    source: scripts/kernel/acceptance-trace.mjs
+    independence: runtime
+    mode: report
+    applies: {ops: [backend.implement, interface.implement, e2e.verify, integration.verify]}
+    what: "every acceptance record (ac.*) of the op's scope, which its bound implementation record proves directly or through a business rule, should be cited by id in at least one test the attempt ran, and a test that cites none of them is not counted toward the proof; the acceptance records are written by an earlier leg, never by the maker. Report mode until the first live run: the settle records \"acceptance-trace: N of M cited, K tests uncited\" as evidence on the attempt, shown by starci kernel status --full, and a miss fails and opens nothing (owner ruling acceptance-trace-report-mode)"
+  contract-script:
+    kind: product
+    source: scripts/kernel/settle/check-command.mjs
+    independence: runtime
+    applies: free
+    what: "a proof of the contract that names a `check:` script outside the gate settle (a brand, shell, stack-declaration, worktree or head check) is a runtime script the settler re-runs when the report lists it; the contract proofs cited by the entry say which"
+
+# Owner gates: the ops whose judgment is an owner decision, and where that gate is. `anchor` is a literal text that must be
+# present in `at`, so a gate that is renamed away is found.
+ownerGates:
+  handover.review: {at: scripts/kernel/handover.mjs, anchor: "handover-approved", what: "a pass settles only on the owner's approve receipt for the latest handover ask"}
+  interface.draw: {at: scripts/work/draw-review.mjs, anchor: "starci/draw-review@1", what: "a drawing is done only on the owner's accept answer to its draw-review ask"}
+  brand.decide: {at: scripts/work/brand-direction.mjs, anchor: "brand-direction-review", what: "the brand direction is ready only on the owner's own receipt for the current revision"}
+  decision.prepare: {at: modules/kernel/op-incident-policy.yaml, anchor: "ask-owner", what: "the runtime carries the recommendation and the owner overturns it with workflow-answer"}
+  provision.ask: {at: modules/kernel/op-incident-policy.yaml, anchor: "ask-owner", what: "the owner supplies the credential, account, dataset or go-ahead the op names"}
+  goal.revise: {at: modules/ops/ops/goal.revise.yaml, anchor: "authorityWidening: owner-decision-only", what: "a scope or authority change is the owner's decision, never an edit"}
+  request.analyze: {at: modules/goal/define-goal.yaml, anchor: "approve_revision", what: "the intake becomes a goal only after the owner replies ok to the goal preview"}
+
+# Reviewing legs: an op whose contract is to verify other legs' products, and the ops it may be declared as the next leg of. `anchor`
+# is a literal text of the reviewer's goal. The leg is in the planned chain where the archetypes and the legality table put it
+# (modules/goal/archetypes.yaml proofLegs, modules/goal/legality.yaml).
+reviewers:
+  review.verify:
+    anchor: "Independently verify"
+    reviews: [backend.implement, backend.scaffold, interface.scaffold, interface.implement, package.scaffold, code.refactor, workspace.manage]
+  code.refactor:
+    anchor: "the same regression check run before and after"
+    reviews: [test.author]
+  interface.audit:
+    anchor: "Audit selected real interface renders"
+    reviews: [interface.draw, interface.asset, interface.implement]

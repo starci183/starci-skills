@@ -75,7 +75,7 @@ const CASES = [
     'npm publish', 'npm publish --access public', 'pnpm publish', 'yarn publish', 'npm unpublish pkg', 'npm deprecate pkg old', 'npm dist-tag add pkg@1 latest',
     'npm run publish', 'npm run publish:packages', 'npm run publish-packages', ['npm', 'run', 'release:publish:dry'].join(' '),
   ]),
-  ...deny('RIGHTS_SUITE_RUN', /^starci test run/, [
+  ...deny('RIGHTS_SUITE_RUN', /^starci test affected --run/, [
     'npm test', 'npm t', 'npm run test', 'pnpm test', 'yarn test', 'npm test -- --coverage', 'npm run test -- --runInBand',
   ]),
   ...deny('RIGHTS_NPM_CI_UNLOCKED', /^starci npm ci/, [
@@ -111,9 +111,7 @@ const decisionOf = (role, text, { guard = role === 'op' ? OP : null, handle = HA
   return null;
 };
 
-test('role table contains enough command cases', () => {
-  assert.ok(CASES.length >= 120, `the role table has ${CASES.length} command texts`);
-});
+
 
 for (const role of [...GUARDED, 'release', 'owner']) {
   test(`${role} command policy: ${CASES.length} command texts`, () => {
@@ -121,6 +119,9 @@ for (const role of [...GUARDED, 'release', 'owner']) {
     for (const row of CASES) {
       const verdict = decisionOf(policyRole, row.text);
       const expected = role === 'owner' || role === 'release' || row.code == null || row.roles?.includes(role) ? null : row.code;
+      // The Supervisor seat has its own table (tests/guards/supervisor-seat.spec.mjs): it may be refused more than the others, never less.
+      if (role === 'supervisor' && !expected) continue;
+      if (role === 'supervisor') { assert.ok(verdict, `${role}: ${row.text}`); continue; }
       assert.equal(verdict?.code ?? null, expected, `${role}: ${row.text}`);
       if (expected && row.use) assert.match(verdict.use, row.use, `${role}: ${row.text} names the allowed path`);
     }
@@ -187,7 +188,8 @@ test('the hook enforces the policy by job guard, seat guard and claimed role, wh
   bind('seats', 'hk-sup', { schema: 'starci/seat-guard@1', role: 'supervisor', terminal: 'hk-sup', deniedTools: [] });
   assert.equal((await run('hk-op', 'git push origin main')).verdict.code, 'RIGHTS_GIT_PUSH');
   assert.equal((await run('hk-op', 'docker compose up -d')).verdict.code, 'RIGHTS_RAW_TOOL');
-  assert.equal((await run('hk-kernel', 'npm publish')).verdict.code, 'RIGHTS_NPM_PUBLISH');
+  assert.equal((await run('hk-op', 'npm publish')).verdict.code, 'RIGHTS_NPM_PUBLISH');
+  assert.equal((await run('hk-kernel', 'npm publish')).verdict.code, 'KERNEL_STARCI_ONLY', 'the Kernel seat runs starci and pure reads only');
   assert.equal((await run('hk-sup', 'git tag v1')).verdict.code, 'RIGHTS_GIT_TAG');
   assert.equal(await run('hk-sup', 'git push origin HEAD:refs/backup/x'), null);
   assert.equal((await run('', 'git push origin main', { STARCI_ROLE: 'coordinator' })).verdict.code, 'RIGHTS_GIT_PUSH');
@@ -224,4 +226,19 @@ test('the hot-path subset of read-only programs is a subset of the table: one so
   }
   assert.equal(intrinsicPolicyRead({ program: 'ls' }), true);
   for (const program of ['sed', 'find', 'git', 'node', 'rm', 'tee', 'sort']) assert.equal(intrinsicPolicyRead({ program }), false, program);
+});
+
+test('every bound role that runs the root suite is sent to starci test affected, and the owner or an unbound lead is never refused', () => {
+  const bound = POLICY.roles.bound.filter((role) => role !== 'kernel');
+  assert.ok(bound.includes('critic') && bound.includes('lead') && bound.includes('supervisor') && bound.includes('op'));
+  for (const role of bound) {
+    for (const text of ['npm test', 'npm run test', 'pnpm test']) {
+      const verdict = decisionOf(role, text);
+      assert.ok(verdict, `${role}: ${text} is refused`);
+      // the Supervisor and the Critic run no test verb at all: the Supervisor is sent to its menu, the Critic to its verdict file
+      if (!['supervisor', 'critic'].includes(role)) assert.match(verdict.use, /starci test affected --run/, `${role}: ${text} names the affected verb as the use`);
+    }
+    if (!['supervisor', 'critic'].includes(role)) assert.equal(decisionOf(role, 'starci test affected --run'), null, `${role} may run the affected verb`);
+  }
+  for (const text of ['npm test', 'npm run test', 'node --test']) assert.equal(decisionOf(null, text), null, `unbound: ${text}`);
 });

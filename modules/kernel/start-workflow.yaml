@@ -166,8 +166,8 @@ spawn:
     scripts/agent/lib.mjs startAgent). The launching terminal (ORCA_TERMINAL_HANDLE:
     the owner's chat, the Supervisor, the watchdog run) creates the Kernel's entry
     Run ("[Kernel] <Workflow> — <workflow_id>", that terminal its coordinator) and
-    files the Kernel Task whose spec is the kernel prompt (spilled to
-    <ledger dir>/kernel/<workflow>.a<attempt>.prompt.md past the host argv);
+    files the Kernel Task whose spec is the kernel prompt; scripts/agent/prompt-file.mjs
+    owns the terminal bound, file placement and cleanup;
     worker-start --agent <agent> [--model <id> --effort <level>] starts it on the
     workflow's repository. A restart reuses the entry Run while Orca still knows it
     and accepts the new Task, else creates a fresh one. worker-start blocks until

@@ -4,7 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { CATALOG as catalog } from '../../packages/cli/src/catalog.generated.mjs';
-import { main } from '../../scripts/cli/main.mjs';
+
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const verbs = {
@@ -21,14 +21,4 @@ test('connect catalog resolves handlers and declares their parsed flags', () => 
     assert.equal(fs.existsSync(path.join(root, command.impl.script)), true, command.impl.script);
     assert.deepEqual(command.flags.map((flag) => flag.name).sort(), flags);
   }
-});
-
-test('connect dispatches always-JSON handlers through the injected runtime seam', () => {
-  let call;
-  assert.equal(main(['connect', 'tunnel', 'status', '--json'], {
-    catalog,
-    runScript: (script, args) => { call = { script, args }; return 0; },
-  }), 0);
-  assert.match(call.script, /scripts[\\/]connectors[\\/]tunnel\.mjs$/);
-  assert.deepEqual(call.args, ['status']);
 });

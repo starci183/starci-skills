@@ -22,7 +22,7 @@ export function seatToolDecision({ handle, toolName, root = skillRoot }) {
   try { guard = JSON.parse(fs.readFileSync(path.join(guardsRoot(root), 'seats', `${safeName(handle)}.json`), 'utf8')); }
   catch { return null; }
   if (!Array.isArray(guard?.deniedTools) || !guard.deniedTools.includes(toolName)) return null;
-  return { reason: `${toolName} is denied for the ${guard.role ?? 'seat'} (${handle}): in-process subagents bypass [Worker] jobs, leases and the land gate - queue a [Worker] job instead (modules/supervisor/supervisor-prompt.md).` };
+  return { reason: `${toolName} is denied for the ${guard.role ?? 'seat'} (${handle}): in-process subagents are outside the Supervisor's menu - answer the menu with starci supervisor decide, or record a runtime defect with starci supervisor actions record --item runtime-defect:<cause> (modules/supervisor/supervisor-prompt.md).` };
 }
 
 /** Exported hook entry for the published CLI's in-process guard fast path. */

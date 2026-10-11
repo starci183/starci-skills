@@ -135,6 +135,17 @@ test('parity: a red step fails the row and names the step; a container that dies
   assert.match(empty.why, /nothing proves Linux parity/);
 });
 
+test('parity: an interrupt while the container runs removes the container it named, and a finished run drops the registration', (t) => {
+  const docker = fakeDocker();
+  let undo;
+  let disposed = 0;
+  const run = docker.run;
+  docker.run = (args, opts) => { undo(); assert.deepEqual(docker.calls.rm, [args[args.indexOf('--name') + 1]], 'the interrupt removed the named container'); return run(args, opts); };
+  const out = runParity('repo', parityDeps(t, docker, { onInterrupt: (fn) => { undo = fn; return () => { disposed += 1; }; } }));
+  assert.equal(out.ok, true);
+  assert.equal(disposed, 1);
+});
+
 test('L4: the installs run first as a real npm ci (a node_modules link is removed as a link first, a missing lockfile is absent), the Sonar supplier closes after the proofs even when a step throws, and the Linux step ends the row', async (t) => {
   const base = tmp(t, 'wire');
   fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: NODE_TEST, check: 'x' } }));
@@ -160,7 +171,9 @@ test('L4: the installs run first as a real npm ci (a node_modules link is remove
   }));
   assert.equal(order[0], 'shop: npm ci');
   assert.deepEqual(unlinked, ['shop'], 'the link guard runs before the install, only for a runnable install');
-  assert.deepEqual(order.slice(-3), ['sonar blog', 'sonar shop', 'parity']);
+  assert.ok(order.includes('parity') && order.indexOf('parity') < order.indexOf('npm test'), 'the Linux container starts beside the installs, before the suite ends');
+  assert.ok(order.indexOf('npm run check') < order.indexOf('sonar blog'), 'a proof follows the root rows (the apps wait for the suite)');
+  assert.deepEqual(order.slice(-2).sort(), ['sonar blog', 'sonar shop']);
   assert.equal(out.at(-1).name, 'linux-parity');
   assert.equal(closed, 1);
   assert.deepEqual(out.find((s) => s.name === 'blog: npm ci').absent, true);
@@ -240,12 +253,7 @@ test('L4: a fresh CPU and RAM decision reaches the actual runtime process after 
   assert.equal(second[1].concurrency.concurrency, 1);
 });
 
-test('L4: the test script of the runtime repository binds - no lifecycle hook, one direct Node command', () => {
-  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-  const bound = runtimeSpecStep(root, { cmd: 'npm', args: ['test'] }, { concurrency: 4 });
-  assert.equal(typeof bound.cmd, 'string');
-  assert.ok(bound.args.some((word) => String(word).includes('tests/**/*.spec.mjs')), 'the bound command keeps the suite selection');
-});
+
 
 test('L4: runtime binding fails closed for shell commands, lifecycle hooks, and a script that overrides the host budget', (t) => {
   const base = tmp(t, 'script');
@@ -409,7 +417,7 @@ test('the cut runs the default L4 row with its wiring: a red Linux step is a red
     throw new Error(`unexpected git ${verb} ${args.join(' ')}`);
   };
   const changelog = '## [1.0.0-alpha.4] - 2026-10-04\n\n- done\n';
-  const out = (await cutRelease({ repo: base, tag: 'v1.0.0-alpha.4', deps: { host: () => [], sonarCloud: async () => [], git: fakeGit, findings: () => [], changelog: () => changelog, lock: (work) => { calls.push('lock'); return work(); }, suite: () => steps, push: () => { throw new Error('never pushed'); } } }));
+  const out = (await cutRelease({ repo: base, tag: 'v1.0.0-alpha.4', deps: { host: () => [], sonarCloud: async () => [], publishPlan: () => ({ blockers: [], toPublish: [] }), jsonExceptions: () => ({ offenders: [], missingAllowlist: [] }), git: fakeGit, findings: () => [], changelog: () => changelog, lock: (work) => { calls.push('lock'); return work(); }, suite: () => steps, push: () => { throw new Error('never pushed'); } } }));
   assert.deepEqual([out.ok, out.verdict], [false, 'suite-red']);
   assert.match(out.why, /linux-parity red/);
   assert.deepEqual(calls, ['lock']);

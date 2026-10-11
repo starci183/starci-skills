@@ -61,10 +61,18 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       - name: Install runtime dependencies
         run: npm ci --ignore-scripts
+      # packages/hfs/runtime is generated and untracked: the example check imports it, so produce it before anything runs the CLI.
+      - name: Generate the packages' runtime copies
+        run: npm run starci --silent -- release sync-runtime
+      # The command runs in its own assignment: a failing command fails the step (inside echo "$(...)" its failure is swallowed and the matrix comes out empty).
       - id: list
-        run: echo "apps=$(npm run starci --silent -- runtime check --only examples-ci -- --matrix)" >> "$GITHUB_OUTPUT"
+        run: |
+          apps=$(npm run starci --silent -- runtime check --only examples-ci -- --matrix)
+          echo "apps=$apps" >> "$GITHUB_OUTPUT"
       - id: images
-        run: echo "images=$(npm run starci --silent -- runtime check --only examples-ci -- --images)" >> "$GITHUB_OUTPUT"
+        run: |
+          images=$(npm run starci --silent -- runtime check --only examples-ci -- --images)
+          echo "images=$images" >> "$GITHUB_OUTPUT"
 
   # The example trees as records: the runtime's own YAML loader and Work-layout gate (no build: the runtime reads this tree).
   records:
@@ -113,6 +121,9 @@ jobs:
       - name: Install runtime dependencies (repository root)
         working-directory: .
         run: npm ci --ignore-scripts
+      - name: Generate the packages' runtime copies
+        working-directory: .
+        run: npm run starci --silent -- release sync-runtime
       - name: Install app dependencies
         run: npm ci --ignore-scripts
       - name: Read generated test policy

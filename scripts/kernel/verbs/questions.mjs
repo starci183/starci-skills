@@ -14,4 +14,4 @@ export default workflowVerb('questions', ({ ledger, args, emit, internals }) => 
         return `  ${q.messageId} ${q.jobId} (${q.opId} a${q.attempt}): ${q.question}${options}`;
       }),
     ].join('\n'), args.json);
-});
+}, { reads: true, reacts: true });

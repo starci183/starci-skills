@@ -42,7 +42,7 @@ reads:
       en: Read the declared responsibility boundaries and enforcement rules the inspection measures
         against - secret/public value separation, denial handling, ownership boundaries.
   - id: machines
-    path: scripts/gates/gate.mjs + scripts/hfs/architecture/*.mjs
+    path: scripts/gates/gate.mjs
     purpose:
       en: When the selected inspection includes boundary or enforcement checks, read the sealed machines'
         supported arguments, report schema, exit codes and coverage limits and run them read-only
@@ -182,6 +182,11 @@ proofs:
       en: "starci kernel settle re-reads the attached lint.json and security-findings.json (runtime check op-proof, proof security-lint): a done without the lint (op-lint-proof-missing), with a lint that could not run (op-lint-tool-failed), without typed findings (op-security-findings-missing) or with a security canon finding of the lint that the findings drop (op-security-finding-unreported) is refused. A done may carry findings; it may never drop one."
       vi: "starci kernel settle tự đọc lại lint.json và security-findings.json đính kèm (check op-proof, proof security-lint): done thiếu lint (op-lint-proof-missing), có lint không chạy được (op-lint-tool-failed), thiếu danh sách phát hiện có kiểu (op-security-findings-missing) hoặc bỏ sót một lỗi canon bảo mật của lint (op-security-finding-unreported) đều bị từ chối. Done có thể kèm phát hiện; không bao giờ được bỏ sót."
     check: scripts/kernel/gate-settle.mjs
+judge:
+  - by: machine
+    measures: [declared-checks, op-proof:security-lint]
+    proofs: [security-lint]
+    why: "the lint is re-run natively and every security canon finding of it must appear by rule in the typed findings; a finding cannot be dropped"
 blockers:
   - code: INSPECTION_SURFACE_MISSING
     condition:

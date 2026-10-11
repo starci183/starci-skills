@@ -7,6 +7,12 @@ impl:
   args:
     - status
 flags:
+  - name: field
+    type: string
+    summary: comma list of dotted paths of the answer; prints only those fields as JSON
+  - name: full
+    type: boolean
+    summary: the whole text view (every section; the legs line tags each leg [judge:...] with who judges its product, the judge field of its op contract); the Kernel seat's own call prints its one-line state and its Decide section by default
   - name: repo
     type: string
     summary: managed repository whose .starciwork ledger the command uses
@@ -29,11 +35,16 @@ reads: workflows.phase + generation; jobs grouped by status; leases joined to li
   count against min(budgets.maxOps, maxParallelOps), the typed provider-health signal for its routed
   pool, overlapping `path:<owned_path>` lease rows, and the pool's declared maxParallel; the
   stale-input and source-drift projections survey.staleInput / survey.sourceDrift describe
-writes: "Status can resolve met typed waits, sweep autopilot asks and gates, renew leases of live
-  workers, and record provider outages observed on worker screens. Unless the workflow finished, it
-  drains the workflow's Orca Runs into the ledger first (the same drain as starci kernel questions,
-  scripts/kernel/verbs/shared/worker-messages.mjs: orchestration check, one ledger transaction, then
-  --ack). Its projection reflects those transitions in the same call."
+writes: "Status is a read verb (reads: true). Called by the roles that own a workflow's upkeep - its Kernel seat,
+  the Supervisor, and the reconciler, settler and api children that export STARCI_ACTOR reconciler/<controller> or
+  supervisor, STARCI_CALLER or STARCI_API_CHILD - it can resolve met typed waits, sweep autopilot asks and gates,
+  renew leases of live workers, send the blocking heads-up, and record provider outages observed on worker
+  screens. Unless the workflow finished, it drains the workflow's Orca Runs into the ledger first (the same
+  drain as starci kernel questions, scripts/kernel/verbs/shared/worker-messages.mjs: orchestration check, one
+  ledger transaction, then --ack). Its projection reflects those transitions in the same call. Called by anyone
+  else (a person at a shell, Debug, a monitor, an op) it runs none of them: the ledger is opened read-only
+  (scripts/kernel/read-only-ledger.mjs), a met typed wait is projected as met and left open for its owner, the
+  projection carries readOnly: true, and a write attempted anyway fails the call with read-verb-write."
 returns:
   ok: true
   title: "<the workflow's display name: workflows.display_name (starci kernel rename, define-goal), else the
@@ -94,8 +105,8 @@ returns:
   nextActions: "[{kind:reread|retry|root-verify|dispatch|impact-check|supervisor-gate|owner-gate|wait,
     op, jobId?, incidentId?, nodes?, final?, reason, label, displayName?}] (label: the op label,
     modules/ops/_labels.yaml; displayName: the named job's `<op label> · <what> · <workflow name>`)
-    — the Kernel's next steps. reread (first, only while kernelRev.stale): re-read kernelRev.files
-    (or kernel-prompt.md and driver-loop.yaml in full), then starci kernel kernel-ack-rev; it makes the
+    — the Kernel's next steps. reread (first, only while revisionNotice.state is owed): re-read revisionNotice.files,
+    then starci kernel kernel-ack-rev; it makes the
     frontier actionable. The rest in the order it runs them, from ledger rows only
     (scripts/kernel/cli.mjs graphProjectionOf); empty once finished. retry: a failed job whose
     settle recorded a nextStep and that nothing follows (no retry names it, its step queued nothing,
@@ -106,7 +117,9 @@ returns:
     it, once per runnable work-graph node in `nodes` when the workflow has a work graph; a red
     runnable node is a dispatch of the op that last wrote its owned paths, `nodes` naming it.
     impact-check: a staleOperations row without heldBy, or a staleProofs row - a proof whose every
-    piece of evidence is stale re-runs only the check op that made it, as a new attempt.
+    piece of evidence is stale re-runs only the check op that made it, as a new attempt; the Job
+    controller performs the rerun (kernel-menu.yaml stale-ready, stale-proof), the Kernel only
+    when the move was refused.
     supervisor-gate (autopilot): an open supervisor-gate incident - the Supervisor's step, never the
     owner's; keep driving every other leg. owner-gate: an open owner-gate incident or a pending ask;
     under autopilot only the end-of-flow owner step (the handover, its credential checklist). Under
@@ -125,7 +138,7 @@ returns:
     config.yaml specs switches deferred (status succeeded, result verdict deferred, no attempt
     spent) and the plan legs not yet enqueued that will be; starci kernel run-deferred-tests runs them. legs[]
     of a deferred op carry `deferred` too"
-  kernelRev: "{current, acked, ackedAt, ackSource, stale, unacked?, full?, files[], fileCount, revision?, readUnavailable?}: actual Git revision or explicitly installed required-byte revision. The complete required current READ manifest and current Kernel incarnation gate affected enqueue/dispatch. Wakes summarize it; they are never READ acknowledgements."
+  revisionNotice: "{role, state, from, to, action, count, digest, files[], replaceFiles[], line}: the ONE statement of what the last runtime revision change asks of this Kernel, decided by the notice (modules/kernel/revision-scope.yaml): state owed / owed-woken (re-read the files, attest them with starci kernel kernel-ack-rev), replace-due (the runtime replaces the seat at its next yield), current, not-concerned, acked-legacy, no-baseline. Wakes and the menu item rev-ack summarize it; they are never READ acknowledgements. The complete required current READ manifest and the current Kernel incarnation gate affected enqueue/dispatch."
   autopilot: "{on, source, ruling?, provisional[{dispatchId, opId, jobId, class, record, receiptPath,
     label: 'self-accepted provisionally', at}], deferred[{jobId, opId, reason, incidentId?, since}],
     deferredToHandover[{key, dispatchId?, jobId?, opId, deferClass:
@@ -220,11 +233,13 @@ returns:
     jobId, ask:{dispatchId, jobId, attempt, state, decision, answeredBy, byOwner, note,
     receiptPath}|null, approvedSeq, lastBusinessSettleSeq, finishAllowed, finishRefusal?} — the
     owner handover (scripts/kernel/handover.mjs handoverProjection; driver-loop.yaml handoverLoop).
-    With no operation open it decides three frontier states, each actionable: `handover-answered`
+    With no operation open it decides three frontier states: `handover-answered`
     (the latest handover ask was answered and nothing acted on it yet; reason names the move per
-    decision) and `finish-ready` (a handover-approved event newer than the last business settle: run
+    decision; only a reported defect, the decision feedback, wakes the Kernel, an approve or a question is the
+    next action `handover-review` the Job controller performs) and `finish-ready` (a handover-approved event newer than the last business settle: run
     starci kernel finish) stand before ask-reserve; `handover-due` (every approved leg other than the handover
-    holds a succeeded job, no current approval, no other answered ask left to re-enqueue) stands
+    holds a succeeded job, no current approval, no other answered ask left to re-enqueue; the Job controller
+    enqueues handover.review as the next action `handover-review`) stands
     before orphaned-frontier. A pending handover ask is `awaiting-owner` like any other ask"
   frontier.staleOperations: "[{jobId, op, attempt, cut?, heldBy?, followUp?, breakingBy?[], paths[]}]
     — staleInput grouped per job: settled work whose product Work inputs changed in a way that owes

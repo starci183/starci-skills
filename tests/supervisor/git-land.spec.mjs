@@ -44,6 +44,9 @@ const greenDeps = (fx, more = {}) => ({
   runCheck: () => ({ ok: true, pass: 5, total: 5, output: 'green' }),
   changedFiles: () => ['scripts/value.mjs'],
   runSpecs: () => ({ ok: true, selected: 1, pass: 1, rerun: 0, log: path.join(fx.base, 'land.log') }),
+  verifyReceipt: () => ({ ok: true, record: { affected: { passed: 3, total: 3 } } }),
+  announceLand: () => true,
+  syncCopies: () => 540,
   ...more,
 });
 
@@ -83,7 +86,39 @@ test('a green land fast-forwards primary local main and records verification tra
   assert.match(note, new RegExp(`Land-Verified: ${fx.tip}`));
   assert.match(note, /Specs: 1\/1/);
   assert.match(note, /Check: 5\/5/);
+  assert.match(note, new RegExp(`Affected: 3/3 ${fx.main}..${fx.tip}`));
   assert.equal(calls.some((argv) => argv.includes('push')), false, JSON.stringify(calls));
+});
+
+test('a land announces itself once the main moved, and carries its Kernel note as a trailer of the land record, verbatim; absent, no line', async (t) => {
+  const fx = fixture(t), announced = [];
+  const note = 'settle now needs --evidence; re-read driver-loop.yaml before the next wake';
+  const deps = greenDeps(fx, { announceLand: (event) => { announced.push(event); return true; } });
+  const out = await gitLand(context(fx, { 'kernel-note': `  ${note}  ` }), deps);
+  assert.equal(out.code, 0, out.text);
+  assert.deepEqual(announced, [{ landed: fx.tip, lane: null, kernelNote: note }]);
+  assert.match(git(fx.repo, 'notes', '--ref=land', 'show', fx.tip), new RegExp(`^Kernel-Note: ${note}$`, 'm'));
+  const dry = await gitLand(context(fx, { 'dry-run': true, 'kernel-note': note }), deps);
+  assert.equal(announced.length, 1, 'a dry run announces nothing');
+  assert.ok(dry.data.trailers.includes(`Kernel-Note: ${note}`));
+  const plain = fixture(t), plainAnnounced = [];
+  const bare = await gitLand(context(plain), greenDeps(plain, { announceLand: (event) => { plainAnnounced.push(event); return true; } }));
+  assert.equal(bare.code, 0, bare.text);
+  assert.equal(bare.data.trailers.some((line) => line.startsWith('Kernel-Note')), false);
+  assert.doesNotMatch(git(plain.repo, 'notes', '--ref=land', 'show', plain.tip), /Kernel-Note/);
+  assert.equal(plainAnnounced[0].kernelNote, null);
+});
+
+test('a Kernel note that is empty, spans lines or is too long is a usage error before anything runs', async (t) => {
+  const fx = fixture(t);
+  let ran = 0;
+  const deps = greenDeps(fx, { runGate: () => { ran += 1; return { ok: true, base: fx.main, problems: [] }; } });
+  for (const bad of ['', '   ', 'one\ntwo', 'x'.repeat(401), true]) {
+    const out = await gitLand(context(fx, { 'kernel-note': bad }), deps);
+    assert.equal(out.code, 2, JSON.stringify(bad));
+    assert.match(out.text, /--kernel-note/);
+  }
+  assert.equal(ran, 0);
 });
 
 test('every refusal names its typed step and stops before later work', async (t) => {
@@ -126,4 +161,18 @@ test('ff-only refuses when local main moved to a divergent commit while verifica
   assert.equal(out.data.refusal.step, '6-local-main');
   assert.equal(out.data.refusal.cause, 'fast-forward');
   assert.notEqual(git(fx.repo, 'rev-parse', 'HEAD'), fx.tip);
+});
+
+test('a land regenerates the generated runtime copies of the live checkout after main moved, and says so when it cannot', async (t) => {
+  const fx = fixture(t);
+  let synced = 0;
+  const out = await gitLand(context(fx), greenDeps(fx, { syncCopies: () => { synced += 1; return 540; } }));
+  assert.equal(out.code, 0, out.text);
+  assert.equal(synced, 1);
+  assert.deepEqual(out.data.copies, { ok: true, files: 540 });
+  const fx2 = fixture(t);
+  const failing = await gitLand(context(fx2), greenDeps(fx2, { syncCopies: () => { throw new Error('EBUSY'); } }));
+  assert.equal(failing.code, 0, 'the land happened; the copies are reported, not the land refused');
+  assert.equal(failing.data.copies.ok, false);
+  assert.match(failing.text, /runtime copies were NOT regenerated.*starci release sync-runtime/);
 });

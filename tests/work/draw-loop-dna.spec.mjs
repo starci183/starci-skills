@@ -27,6 +27,7 @@ import {
 } from '../../scripts/work/draw-loop.mjs';
 import { DEFAULT_RUBRIC, normaliseVerdict, parseVerdict, rubricFor, runCritic } from '../../scripts/work/draw-critic.mjs';
 import { fakeCriticOrca, passingVerdict } from '../helpers/fake-critic-orca.mjs';
+import { criticFor } from '../../scripts/work/critic-pick.mjs';
 import { settleDrawMetricFindings } from '../../scripts/work/draw-loop-settle.mjs';
 import { ARCHETYPES, archetypeOf, directionReadiness } from '../../scripts/work/ui-archetype.mjs';
 import { DIRECTION_ARCHETYPES } from '../../scripts/work/brand/brand.mjs';
@@ -35,6 +36,9 @@ import { drawQualityFindings } from '../../scripts/work/draw/draw-quality.mjs';
 import { withRationale, writeRationale } from '../helpers/draw-rationale-fixture.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { captureGateBinding } from '../../scripts/kernel/gate-settle.mjs';
+
+// The prompt of a Critic whose Task spec is a pointer: the text of the file the pointer names (the second line after PACKET FILE), read while the worker starts, before the runtime removes it.
+const taskOf = (spec) => { const lines = String(spec).split(String.fromCodePoint(10)).map((line) => line.trim()); const at = lines.findIndex((line) => line.startsWith('PACKET FILE:')); return at < 0 ? String(spec) : fs.readFileSync(lines[at + 1], 'utf8'); };
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const tmp = (t) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-loop-')); t.after(() => fs.rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return d; };
@@ -206,15 +210,16 @@ test('the critic: the product rubric or the default, a verdict parsed and gate-c
   fs.writeFileSync(png, encodePng(blankImage(4, 4, WHITE)));
   fs.writeFileSync(path.join(dir, 'a.html'), GOOD);
   let seen = null;
-  const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9), onStart: (a) => { seen = { dir: a.worktree, files: fs.readdirSync(a.worktree).sort() }; } });
+  const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9), onStart: (a) => { seen = { dir: a.worktree, files: fs.readdirSync(a.worktree).sort(), pointer: a.spec, task: taskOf(a.spec) }; } });
   const critique = await runCritic({ images: [{ path: png, label: 'desktop' }], html: path.join(dir, 'a.html'), rubric: DEFAULT_RUBRIC,
-    critic: { ...allocationSettings().drawLoop.critic, author: { provider: 'devin', model: 'swe-2-max' } }, placement: { tmpRoot: dir }, orca });
+    critic: criticFor(allocationSettings().drawLoop, { provider: 'devin', model: 'swe-2-max' }).critic, placement: { tmpRoot: dir }, orca });
   assert.deepEqual(seen.files, ['render-1.png', 'rubric.yaml', 'screen.html'], 'the critic sees only the PNGs, the HTML and the rubric');
-  const spec = orca.calls.find((c) => c[0] === 'worker-start')[1].spec;
+  assert.ok(!seen.files.includes('TASK.md'), 'the Task file is not in the Critic directory (06c13f369)');
+  const spec = seen.task;
   assert.match(spec, /did NOT draw this screen/);
   assert.equal(critique.outcome, 'judged');
   assert.equal(critique.verdict.beauty, 9);
-  assert.equal(critique.critic.model, 'gpt-6.1-sol');
+  assert.equal(critique.critic.model, 'claude-opus-5-5', 'the Critic tier member of another provider than the Devin drawer');
   assert.equal(critique.critic.promptSha256, sha256(spec), 'the hash is of the exact Task spec');
   assert.equal(critique.critic.prompt, spec.split(seen.dir.replaceAll('\\', '/')).join('<clean-dir>'));
   assert.equal(critique.critic.independent, false, 'a fake Orca client is never recorded as the independent critic');

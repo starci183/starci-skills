@@ -1,0 +1,74 @@
+schema: starci/release-cut@1
+id: release-cut
+title: Release cut schedule and row reuse
+
+# The numbers and input sets of `starci release cut` (scripts/supervisor/release-l4*.mjs, release-reuse.mjs). Nothing here is typed in code.
+
+schedule:
+  # The L4 rows are a graph, not a line. Order: the installs and the test-world build (prep); the Linux parity container starts at once and runs beside everything;
+  # the root rows (the suite, then the packages suites, then the checks) keep the machine; when `appsAfter` has ended the example apps' row chains start together,
+  # each app's own rows in order, and each app's Sonar proof follows its chain. A red row never cancels another one.
+  pools:
+    prep: 4          # installs and the test-world build
+    root: 1          # the root rows, one after another
+    apps: 3          # example app chains running together; the host budget below lowers it
+    proofs: 3        # Sonar proofs running together (network bound)
+    containers: 2    # the Linux parity container and its spec leg
+  appsAfter: npm test
+  # What one running app chain needs of the host (a build, a test run and a docker build at a time): the number of chains is
+  # min(pools.apps, free logical threads / logicalThreads, (free RAM - the reserve of modules/supervisor/test-concurrency.yaml) / ramGiB), at least 1.
+  appChain: {logicalThreads: 3, ramGiB: 4}
+  # The parity spec leg: the container prepares with the workflow steps that come before the first of these and then runs the spec files the host run skipped tests of.
+  parityPrepareUntil: npm run check
+
+reuse:
+  # Bump to invalidate every recorded digest (a change in how rows are judged that the input sets cannot see).
+  digestVersion: 1
+  # A row is reused only when its class, its command and the bytes of its input set are identical between the two commits. A class not listed here, and the installs,
+  # always run. `acrossShas: false` keeps a class to the commit that ran it: a later commit with an identical input set still runs it.
+  required:
+    # The rows the pre-push gate asks to have RUN on the exact pushed commit (scripts/guards/release-definition.mjs RECEIPT_STEPS): never reused from another commit.
+    rows: [npm test, npm run test:packages, npm run check]
+  classes:
+    root:
+      rows: [npm test, npm run test:packages, npm run check]
+      acrossShas: false
+      exclude: [examples/, docs/]
+    whole:
+      rows: [linux-parity]
+      acrossShas: true
+      exclude: []
+    app:
+      acrossShas: true
+      # <app> is the example app a row belongs to: its tree, the lockfiles that pin the published packages it installs, the example index and the helpers the row scripts call.
+      include: [examples/<app>/, examples/index.yaml, package.json, package-lock.json, scripts/gates/build-env.mjs, scripts/supervisor/release-l4-layers.mjs]
+  always: ['<app>: npm ci', 'test-world: npm run build']
+  keep: 6
+
+# The suite mode `ci` (config.yaml release.suite: ci, the owner's recorded choice of 2026-10-09, modules/kernel/owner-rulings.yaml release-suite-ci): the full suite and the Linux parity container are judged by
+# the GitHub workflow after the push, so the cut plans neither. What it keeps running locally is what CI cannot give or what is cheap and catches the most.
+suite:
+  ci:
+    # The rows the cut does not run, and the reason the plan, the result and the release record state for each.
+    delegated:
+      - {name: npm test, why: delegated to CI}
+      - {name: linux-parity, why: delegated to CI}
+    # The commit-bound partial tests: the specs the release range (last release tag..HEAD) can break, chosen by `starci test affected`'s selection. A range over the verb's bound
+    # (modules/supervisor/affected-tests.yaml maxFiles) is run commit by commit: a commit whose affected set already passed (its ledger beside the release record) is not run again.
+    affected:
+      row: affected tests
+      script: scripts/supervisor/release-affected.mjs
+      maxCommits: 80       # commits examined one by one; older ones are listed as not covered locally
+      maxRunFiles: 400     # spec files one cut runs; the rest are listed as not run locally
+    # The live Orca smokes (four real agent launches): CI has no Orca, so they stay local and get a row of their own, with the L4 env.
+    orca:
+      row: orca live smokes
+      specs: [tests/api-orca/orca-settle-live.spec.mjs, tests/api-orca/orca-worktree-rm-live.spec.mjs]
+    # The example apps start after this row (the suite row they wait for in local mode is not planned); the live Orca smokes, the longest local row, run beside the apps.
+    appsAfter: npm run check
+    # The GitHub workflow whose run judges a `suite: ci` release (.github/workflows/ci.yml, name: ci) and the check names read as the Codecov and Sonar verdicts.
+    workflow: ci
+    statusPatterns: [codecov, sonar]
+    # `starci release ci-status --wait`: how often the run is read and how long it is waited for (the workflow's own timeout is 150 minutes).
+    pollSeconds: 30
+    waitMinutes: 160

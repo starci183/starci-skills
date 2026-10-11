@@ -10,8 +10,9 @@ import { stripAnsi } from '../logs/kinds';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../ui/input-group';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Select, ListBox } from '../ui/select';
 import { FeedbackState } from '../feedback-state';
+import { StatusChip } from '../status-chip';
 
 export const concept: Concept = 'C7';
 type Snapshot = { id: number; at: number; lines: number; bytes: number };
@@ -73,23 +74,24 @@ export function TranscriptViewer({ project, attemptId, live }: { readonly projec
     </div>
     <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
       <span className="flex flex-wrap items-center gap-2">
-        {following && data && !transcript.error && !transcript.meta?.stale?.length && <span className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-medium" data-tone="running" style={{ color: 'var(--tone)', background: 'var(--tone-bg)', borderColor: 'var(--tone-line)' }}><span className="status-dot" data-tone="running" aria-hidden="true" /> {t('Live')}</span>}
+        {following && data && !transcript.error && !transcript.meta?.stale?.length && <StatusChip status="running" label={t('Live')} />}
         <span>{data ? t('{lines} lines · {kind}', { lines: total.toLocaleString('vi-VN'), kind: data.final ? t('final copy') : 'snapshot' }) : transcript.error ? t('Transcript unavailable') : t('Reading transcript…')}</span>
         {data ? <span>· {data.timeSource === 'blob' ? t('Blob storage time') : data.timeSource === 'snapshot' ? t('Snapshot capture time') : t('Source time not recorded')}: {formatAbsolute(data.at)}</span> : null}
         {data && <span>· {t('sensitive data redacted, ANSI colour codes stripped')}</span>}
       </span>
-      <div className="flex min-w-0 items-center gap-2"><label htmlFor={`snapshot-${attemptId}`}>{t('At time')}</label><Select value={snapshot || 'latest'} onValueChange={value => { setSnapshot(value === 'latest' ? '' : value); setFrom(1); setTarget(null); }}><SelectTrigger id={`snapshot-${attemptId}`} size="sm" className="max-w-44"><SelectValue /></SelectTrigger><SelectContent position="popper"><SelectItem value="latest">{live ? t('Follow live') : t('Final copy')}</SelectItem>{snapshots.data?.map(item => <SelectItem key={item.id} value={String(item.id)}>{formatAbsolute(item.at)} · {t('{n} lines', { n: item.lines })}</SelectItem>)}</SelectContent></Select></div>
+      <div className="flex min-w-0 items-center gap-2"><span>{t('At time')}</span><Select aria-label={t('At time')} value={snapshot || 'latest'} onChange={key => { if (key == null) return; const value = String(key); setSnapshot(value === 'latest' ? '' : value); setFrom(1); setTarget(null); }} className="min-w-0 max-w-44"><Select.Trigger id={`snapshot-${attemptId}`} className="h-8"><Select.Value /><Select.Indicator /></Select.Trigger><Select.Popover><ListBox><ListBox.Item id="latest" textValue={live ? t('Follow live') : t('Latest recorded copy')}>{live ? t('Follow live') : t('Latest recorded copy')}<ListBox.ItemIndicator /></ListBox.Item>{snapshots.data?.map(item => <ListBox.Item key={item.id} id={String(item.id)} textValue={`${formatAbsolute(item.at)} · ${t('{n} lines', { n: item.lines })}`}>{formatAbsolute(item.at)} · {t('{n} lines', { n: item.lines })}<ListBox.ItemIndicator /></ListBox.Item>)}</ListBox></Select.Popover></Select></div>
     </div>
+    {transcript.observedAt != null ? <p className="m-0 text-xs text-muted-foreground">{t('Last successful API read at {at}', { at: formatAbsolute(transcript.observedAt) })}</p> : null}
     {search && <div className="flex items-center gap-2 text-xs"><span aria-live="polite">{hits.length ? t('{at}/{total} results', { at: hitIndex + 1, total: data?.hitCount ?? hits.length }) : data ? t('No results') : transcript.error ? t('Transcript unavailable') : t('Searching…')}</span><Button type="button" size="icon-xs" variant="outline" disabled={!hits.length} aria-label={t('Previous result')} onClick={() => setHitIndex(index => (index - 1 + hits.length) % hits.length)}><ChevronLeft className="size-3" /></Button><Button type="button" size="icon-xs" variant="outline" disabled={!hits.length} aria-label={t('Next result')} onClick={() => setHitIndex(index => (index + 1) % hits.length)}><ChevronRight className="size-3" /></Button>{activeHit && <span className="truncate text-muted-foreground">{t('line {n}', { n: activeHit.n })}</span>}</div>}
     <ReadWarning read={transcript} url={transcriptUrl} retained={Boolean(data)} />
     <ReadWarning read={snapshots} url={`${base}/snapshots`} retained={Boolean(snapshots.data)} />
     {!data && !transcript.error ? <FeedbackState>{t('Reading transcript…')}</FeedbackState> : null}
-    {data && <div className="max-h-[32rem] min-w-0 overflow-auto rounded-lg border bg-muted/20 font-mono text-xs" role="log" aria-label={t('Transcript with sensitive data redacted')}>
+    {data && <div className="max-h-[32rem] min-w-0 overflow-auto rounded-lg border bg-default font-mono text-xs" role="log" aria-label={t('Transcript with sensitive data redacted')}>
       {lines.map((line, index) => {
         const gap = search && index > 0 && line.n !== lines[index - 1].n + 1;
         const active = line.n === focusLine;
         return <div key={line.n}>
-          {gap && <div className="select-none border-b border-border/30 bg-muted/40 px-2 py-0.5 text-center text-[10px] text-muted-foreground">⋯ {t('{n} hidden lines', { n: (line.n - lines[index - 1].n - 1).toLocaleString('vi-VN') })} ⋯</div>}
+          {gap && <div className="select-none border-b border-border/30 bg-default px-2 py-0.5 text-center text-[10px] text-muted-foreground">⋯ {t('{n} hidden lines', { n: (line.n - lines[index - 1].n - 1).toLocaleString('vi-VN') })} ⋯</div>}
           <div ref={active ? activeRef : undefined} id={`L${line.n}`} className={`flex min-w-max border-b border-border/30 px-2 py-0.5 leading-5 ${active ? 'bg-[color:var(--status-warning)]/25' : line.hit ? 'bg-[color:var(--status-warning)]/10' : ''}`}>
             <span className="mr-3 w-12 shrink-0 select-none text-right tabular-nums text-muted-foreground">{line.n}</span><span className="whitespace-pre">{line.text || ' '}</span>
           </div>

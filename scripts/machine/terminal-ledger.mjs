@@ -29,6 +29,9 @@ export function jobTerminalHandles(row, payload = jobPayload(row)) {
     payload?.hierarchy?.runtime?.terminalHandle].filter(Boolean);
 }
 
+/** The Orca Run ids a job payload names (orca, managed or hierarchy runtime), in that order, empty values dropped. */
+export const jobRunIds = (payload) => [payload?.orca?.runId, payload?.managed?.runId, payload?.hierarchy?.runtime?.runId].filter(Boolean).map(String);
+
 /** Every job row with its payload parsed: [{job_id, workflow_id, op_id, kind, status, worker_id, payload_json, payload}]. */
 export const ledgerJobs = (db) =>
   db.prepare('SELECT job_id, workflow_id, op_id, kind, status, worker_id, payload_json FROM jobs').all()

@@ -110,12 +110,12 @@ export function seatOf(m, now = Date.now(), profile = SUPERVISOR_SEAT) {
   const value = detail.value ?? {};
   return { token: detail.token ?? null, value, at: row.booted_at ?? row.last_seen_at ?? null, expiresAt, pid: row.pid ?? null, expired, starting: value.state === 'starting' && !expired, state: row.state };
 }
-/** Write the seat (replacing it): a {state:'starting'} value is the startup reservation (state booting, with expiry). */
+/** Write the seat (replacing it): a {state:'starting'} value is the startup reservation (state booting, with expiry). A new seat starts with no refused input: the run of failures belongs to the seat it replaced. */
 export function writeSeat(m, { token, value, expiresAt = null, now = Date.now(), profile = SUPERVISOR_SEAT }) {
   const starting = value?.state === 'starting';
   return m.upsertSeat({ seatId: profile.seatId, role: 'supervisor', state: starting ? 'booting' : 'live', parkedReason: null,
     terminalHandle: value?.terminal ?? null, agent: value?.agent ?? null, model: value?.model ?? null, pid: process.pid,
-    bootedAt: now, lastSeenAt: now, detailJson: { token, value, expiresAt } });
+    bootedAt: now, lastSeenAt: now, inputFailuresConsecutive: 0, lastInputFailureAt: null, detailJson: { token, value, expiresAt } });
 }
 /** Empty the seat (only the holder of `token` when given). True when it was cleared. */
 export function clearSeat(m, { token = null, profile = SUPERVISOR_SEAT } = {}) {

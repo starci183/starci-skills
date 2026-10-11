@@ -12,7 +12,7 @@ repeated confirmation. Never supply missing approval from an agent's judgement.
 ## Qualified Source release
 
 1. Finish and qualify bounded lanes, then land locally through the native land owner. Lanes run the
-   targeted and dependent scopes in the test ladder; the coordinator freezes clean local main.
+   targeted and dependent scopes in the test ladder (`starci test affected --run`); the coordinator freezes clean local main.
 2. Follow the existing release owners for the version, finished CHANGELOG, package publication and
    example pins. Preserve actual package, image, UI/UAT and compatibility receipts required by scope.
 3. Invoke the native release cut for the accepted tag:
@@ -28,6 +28,10 @@ repeated confirmation. Never supply missing approval from an agent's judgement.
 
    The cut refuses at once (verdict `release-host`, in `--plan` too) unless the host provides what L4 needs: it is started from an Orca terminal (`ORCA_TERMINAL_HANDLE` set: the live Orca specs and the settle smokes run with `STARCI_REQUIRE_ORCA_LIVE=1`, and a skip from missing infrastructure fails L4), Orca answers, and a Docker daemon answers (the example images, the stack-backed specs and the Linux parity container). Before cutting, run `starci release env-test` there: it is the cut's spec leg alone.
 
+   The L4 rows run as a schedule: the Linux parity container starts first and runs beside the root suite, the three example apps and their SonarCloud proofs run together once the suite has ended, and a red row never cancels another (the result lists every red row). A cut on a new commit reuses a green row of an earlier cut only when the row's declared input set is byte-identical between the two commits (the example apps' rows; `--plan` prints `run`, `carry` or `reuse` with the reason per row); the three required rows (the runtime suite, the packages suite and the runtime check) always run on the pushed commit, and the record lists each reused row with the commit that proved it. `--no-reuse` runs all rows. An env-only red row is re-run alone on the same commit with `starci release cut --tag v<version> --rows "<row>,<row>"`, which completes the record when every other row is already green on it. The numbers and input sets are `modules/supervisor/release-cut.yaml`; the details are in [releasing](../../../docs/releasing.md).
+
+   `config.yaml` `release.suite` chooses where the full suite runs: `local` (default; the cut runs the root suite and the Linux container) or `ci` (the owner's recorded choice of 2026-10-09: the cut plans neither, runs the checks, the packages suites, the affected specs of the release range, the live Orca smokes and the example rows, lists the rest as `delegated` in the record, and the GitHub `ci` workflow judges the suite after the push). The pre-push gate accepts a `suite: ci` record only while the checked-out config says `ci`. The trade: a release can reach GitHub and its tag before the suite has run, and a red CI is fixed forward with the next pre-release; read the verdict with `starci release ci-status --tag v<version> --wait`. Details: [releasing](../../../docs/releasing.md#where-the-suite-runs).
+
    The release cut owns L4, the host lock, Linux parity, main-stability and secret checks, the annotated
    tag and atomic main-plus-tag push. Read its recorded logs and actual result. Do not start a second
    full-suite run in a lane, monitor or maintenance worker, and do not reconstruct this flow manually.
@@ -42,3 +46,12 @@ Product releases follow the same maintained governance for their own accepted sc
 `unit.verify` or `e2e.verify` runs are on-demand goal/owner actions, not an automatic extra release.
 `scripts/supervisor/push-git.mjs` and `push-mains` push product repositories only; they refuse the runtime
 repository, whose main moves only through the release owner.
+
+## Missing release shell
+
+A real runtime cut whose only host prerequisite missing is its actual Orca terminal may prepare
+one plain PowerShell shell in the canonical Source. It still returns a release-host refusal, with
+the complete native receipt; no suite, tag or push starts. Inspect that receipt and run the cut
+inside the newly owned terminal. Never copy a handle into an environment to impersonate its context.
+The plan stays read-only. Unknown creation custody is retained: inspect native terminal inventory
+before any deliberate retry; the adapter has no automatic retry or arbitrary command input.

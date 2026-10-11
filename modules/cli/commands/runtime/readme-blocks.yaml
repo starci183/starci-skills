@@ -3,6 +3,7 @@ verb: readme-blocks
 owner: runtime
 summary: regenerate or check the generated blocks of knowledge/hfs/README.md
 impl: {script: scripts/hfs/readme-blocks.mjs}
+writesRuntimeTree: write
 flags:
   - {name: write, type: boolean, summary: rewrite the stale output in place}
   - {name: check, type: boolean, summary: list the stale output (the default)}

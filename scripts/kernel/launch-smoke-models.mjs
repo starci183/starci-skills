@@ -2,7 +2,7 @@
 import { runtimeProfile } from '../../engine/config.mjs';
 import { loadPrices, priceOf } from '../lib/llm-usage.mjs';
 import { admissionQualityFloor } from '../lib/agent-admission.mjs';
-import { criticFor } from '../work/draw-critic.mjs';
+import { criticFor } from '../work/critic-pick.mjs';
 import { tierSettings } from '../agent/tiers.mjs';
 
 /** The priced USD per million tokens (input + output) of `model`, or null when it has no complete price. */
@@ -12,6 +12,9 @@ function usdPerMTok(model, prices) {
   const total = Number(price.input) + Number(price.output);
   return Number.isFinite(Number(price.input)) && Number.isFinite(Number(price.output)) ? total : null;
 }
+
+/** The providers the live settle smokes launch (tests/api-orca/orca-settle-live.spec.mjs): one no-op agent each. */
+export const SETTLE_SMOKE_PROVIDERS = Object.freeze(['claude', 'codex', 'devin']);
 
 /** The cheapest priced tier member meeting all smoke control-plane role floors, with its tier effort; `provider` limits the pick to that provider's members, and then an unpriced member of it counts, after the priced ones. */
 export function noopAgent({ runtimes = runtimeProfile(), prices = loadPrices(), settings = tierSettings(), provider = null } = {}) {

@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict'; import path from 'node:path';
 import {
-  hostSettings, servicePorts, serviceRegistry, harnessIngress, stepService, newRecord, backoffDelay, memoryStore, machineStore,
+  hostSettings, servicePorts, serviceRegistry, harnessIngress, stepService, newRecord, memoryStore, machineStore,
   orcaRestartScript, cleanEnv, DOWN_STATES, seatAgentOf, httpUp, OUTAGE_STATES, startService, servicePlatformProblem,
 } from '../../scripts/reconciler/services.mjs';
 import { tempState } from '../../scripts/reconciler/testing.mjs';
+import { doublingDelay } from '../../scripts/lib/retry-budget.mjs';
 import { TASK_DEFINITIONS } from '../../scripts/machine/task-register.mjs';
 
 // Lane D rc-host: the ONE host-service registry (scripts/reconciler/services.mjs). The DESIGN 9.7 state machine,
@@ -24,7 +25,7 @@ test('host.yaml carries every number the registry needs', () => {
     assert.ok(S.services[name], name);
     for (const k of ['everyMs', 'probeTimeoutMs', 'failAfter', 'startTimeoutMs', 'slaMs']) assert.ok(S.services[name][k] > 0, `${name}.${k}`);
   }
-  assert.deepEqual(S.backoff, { minMs: 1000, maxMs: 300000, factor: 2 });
+  assert.deepEqual(S.backoff, { minMs: 1000, maxMs: 300000 });
   assert.deepEqual(S.quarantine, { maxRestarts: 5, windowMs: 1800000, retryMs: 3600000 });
   assert.equal(S.allowTaskRepair, false, 'the scheduled task is never re-created unless the owner flips allowTaskRepair');
   assert.throws(() => hostSettings({ resyncMs: 0 }), /resyncMs must be a positive number/);
@@ -101,11 +102,11 @@ test('starting -> failed when no probe passes within startTimeoutMs; a first fai
   assert.equal(r.act, 'start');
   r = stepService(r.rec, { ok: false }, opts(e, 5_000 + e.startTimeoutMs));
   assert.equal(r.to, 'backoff', 'timed out: failed, backoff again');
-  assert.equal(r.rec.nextAttemptAt, 5_000 + e.startTimeoutMs + backoffDelay(1, S.backoff));
+  assert.equal(r.rec.nextAttemptAt, 5_000 + e.startTimeoutMs + doublingDelay(2, S.backoff));
 });
 
 test('backoff is 1 s doubling to at most 5 min', () => {
-  assert.deepEqual([0, 1, 2, 3, 8, 9, 20].map((n) => backoffDelay(n, S.backoff)), [1000, 2000, 4000, 8000, 256000, 300000, 300000]);
+  assert.deepEqual([0, 1, 2, 3, 8, 9, 20].map((n) => doublingDelay(n + 1, S.backoff)), [1000, 2000, 4000, 8000, 256000, 300000, 300000]);
 });
 
 test('more than 5 restarts in 30 minutes: quarantined (once), then retried after retryMs', () => {

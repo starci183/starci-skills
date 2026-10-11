@@ -317,6 +317,11 @@ proofs:
       en: "starci kernel settle re-reads the attached test-world run summary (runtime check op-proof, proof test-world, project integration and contract), every attached summary judged: a done without it (op-test-world-proof-missing), with a hand-rolled world - no preset world runner, no defineTestWorld declaration, a spec outside the layer's form, docker, testcontainers, a DataSource, process.env or a sleep in a spec (op-test-world-hand-rolled) - or with a run that is not green, ran no test or skipped one (op-test-world-run-red) is refused."
       vi: "starci kernel settle tự đọc lại tóm tắt lần chạy test-world đính kèm (check op-proof, proof test-world, dự án integration and contract), mọi tóm tắt đính kèm đều được chấm: done thiếu nó (op-test-world-proof-missing), có world tự dựng - không có world runner của preset, không có khai báo defineTestWorld, spec sai dạng của tầng, docker, testcontainers, DataSource, process.env hoặc sleep trong spec (op-test-world-hand-rolled) - hoặc lần chạy không xanh, không chạy test nào hay bỏ qua test (op-test-world-run-red) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
+judge:
+  - by: machine
+    measures: [declared-checks, op-gate, op-proof:test-world, acceptance-trace]
+    proofs: [live, readback, test-world, op-gate]
+    why: "the exchange reached the provider's own sandbox and was read back through the provider's surface, and settle re-runs the test-world project natively; the contract specs it runs are written by this op, so they count as proof only as they trace to acceptance records it did not write (acceptance-trace, report mode until the first live run)"
 blockers:
   - code: PRODUCT_DEFECT_OWNER
     condition:

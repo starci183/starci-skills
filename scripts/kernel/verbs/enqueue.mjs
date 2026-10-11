@@ -11,6 +11,7 @@ import { slash } from '../../lib/path-key.mjs';
 import { familyGuardOf, familyViolations, familyOwners } from '../write-families.mjs';
 import { enqueueRepository } from '../target-repo.mjs';
 import { checkGrantParents } from '../grant-parents.mjs';
+import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 import { lineageHeadById } from '../gate-conditions.mjs';
 import { normalizeFoundationName, readFoundation } from '../foundation-registry.mjs';
 import { admitUnit, writeUnitTry } from '../units.mjs';
@@ -123,10 +124,11 @@ function cutOf(args) {
  * --new-module grant (scripts/kernel/grant-parents.mjs).
  */
 function targetOf({ args, ownedPaths, repo, workflowId, emit }) {
+  const worktree = workflowWorktreeOf({ env: process.env }, workflowId)?.path ?? null;
   const target = enqueueRepository({ op: args.op, repository: args.repository, ownedPaths, repo });
   if (!target.ok) refuseEnqueue(emit, args, { ok: false, workflowId, op: args.op, reason: target.reason, detail: target.detail });
   const newModules = listOf(args['new-module']);
-  const grant = checkGrantParents({ op: args.op, payload: { repository: target.repository ?? undefined, new_modules: newModules }, ownedPaths, repo });
+  const grant = checkGrantParents({ op: args.op, payload: { repository: target.repository ?? undefined, new_modules: newModules }, ownedPaths, repo, worktree });
   if (!grant.ok) {
     refuseEnqueue(emit, args, { ok: false, workflowId, op: args.op, reason: grant.reason, violations: grant.violations.map(({ owned, dir, closest }) => ({ owned, dir, closest })), detail: grant.detail });
   }
@@ -201,6 +203,7 @@ function jobPayloadFor({ args, jobId, workflowId, wf, goal, plan, admitted, afte
     ...(target.repository && { repository: target.repository }),
     ...(Object.keys(resolvedParams.params).length && { params: resolvedParams.params }),
     ...(cut && { cut }),
+    ...(args['switch-agent'] === true && args['retry-of'] && { switchAgent: true }),
     ...(after.length && { after }),
     ...(foundationLeg && { foundation: foundationLeg }),
     ...(canonPlan && { canonPlan }),

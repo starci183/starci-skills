@@ -22,6 +22,7 @@ const legTokens = (l) => (l.tokens != null ? ` ${tokenLine(l)}` : '');
 
 export default {
   verb: 'usage',
+  reads: true,
   required: [],
   flags: ['legs'],
   usage: '  usage [--workflow <id> [--legs]]   measured tokens by op, model and Kernel of one workflow (--legs: per attempt), or per workflow over the ledger',

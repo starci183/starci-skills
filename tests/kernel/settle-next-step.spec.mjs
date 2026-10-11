@@ -85,7 +85,7 @@ test('a failed report queues its route: the same op again, pinned to the failed 
   assert.equal(retry.payload.routed.route,'failed-retries-the-same-op');
   assert.equal(w.row('j1').result.nextStep.jobs[0],retry.job_id,'the step is recorded on the failed job');
   const s=w.status();
-  assert.deepEqual(s.nextActions[0],{kind:'dispatch',op:'docs.author',jobId:retry.job_id,reason:`ready: starci kernel route --job ${retry.job_id}, then starci kernel dispatch`,
+  assert.deepEqual(s.nextActions[0],{kind:'dispatch',origin:'ready-queued',op:'docs.author',jobId:retry.job_id,reason:`ready: starci kernel route --job ${retry.job_id}, then starci kernel dispatch`,
     label:'Vi\u1ebft t\u00e0i li\u1ec7u',displayName:'Vi\u1ebft t\u00e0i li\u1ec7u · docs · next step'});
   // The leg also carries why of the failed attempt it retries (scripts/kernel/why.mjs), headline first.
   assert.equal(Object.keys(s.legs[0].why)[0],'headline');
@@ -127,7 +127,7 @@ test('past the route limit an owner gate holds that job alone; resolving it name
   assert.equal(resolved.status,0,resolved.stderr);
   s=w.status();
   assert.equal(s.frontier.state,'next-ready');
-  assert.equal(s.frontier.actionable,true);
+  assert.equal(s.frontier.actionable,false);
   assert.deepEqual(s.nextActions.map(a=>[a.kind,a.op,a.jobId]),[['retry','docs.author',last]]);
   // The owner granted another round: the Kernel's retry fails again and the route fires afresh.
   const again=w.api('enqueue','--workflow',w.wf,'--op','docs.author','--paths','docs/','--retry-of',last);

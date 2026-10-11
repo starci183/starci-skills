@@ -12,6 +12,7 @@ import { sweepWorkers } from '../../scripts/supervisor/supervisor-watchdog.mjs';
 import { createJob, jobOf } from '../../scripts/supervisor/workers.mjs';
 import { openLedger } from '../../engine/db/ledger.mjs';
 import { EVENTS } from '../../scripts/kernel/settle/job-settle.mjs';
+import { currentRuntimeRev } from '../../scripts/kernel/runtime-rev.mjs';
 
 const settings = jobSettings({ allocation: {} });
 const NOW = Date.now() + 5_000;
@@ -47,7 +48,7 @@ function fixture({ status = 'running', payload = {}, report = null, handover = n
     for (const next of walk) ledger.db.prepare("UPDATE jobs SET status=? WHERE job_id='op-a'").run(next);
   }
   const ev = (kind, p, ago = 0) => ledger.transaction(() => ledger.appendEvent({ workflowId: 'wf-x', entityType: 'job', entityId: 'op-a', kind, payload: p }));
-  if (handover) ev(EVENTS.needsKernel, { dispatchId: 'ctx_1', reason: handover.reason, ...(handover.code ? { code: handover.code } : {}) });
+  if (handover) ev(EVENTS.needsKernel, { dispatchId: 'ctx_1', reason: handover.reason, runtimeRev: currentRuntimeRev(), ...(handover.code ? { code: handover.code } : {}) });
   for (const e of events) ev(e.kind, e.payload);
   ledger.close();
   const db = new DatabaseSync(file, { readOnly: true });
@@ -61,7 +62,7 @@ test('keys parse and route', () => {
   assert.deepEqual(parseKey('wf:shop-be:wf-x'), { type: 'wf', ledgerId: 'shop-be', id: 'wf-x' });
   assert.equal(parseKey('workers:supervisor').type, 'workers');
   assert.equal(parseKey('nonsense'), null);
-  assert.deepEqual(job.routes['op-reported']({ ledgerId: 'n', entityType: 'job', entityId: 'op-a', workflowId: 'wf-x' }), ['job:n:op-a', 'wf:n:wf-x']);
+  assert.deepEqual(job.routes['report-filed']({ ledgerId: 'n', entityType: 'job', entityId: 'op-a', workflowId: 'wf-x' }), ['job:n:op-a', 'wf:n:wf-x']);
   assert.deepEqual(job.routes['worker-*']({ ledgerId: 'supervisor', entityType: 'job', entityId: 'sup-1' }), ['workers:supervisor']);
   assert.equal(parseKey('overlap:n:42'), null, 'no workflow branch, no overlap key');
   assert.deepEqual(job.concerns, ['job.settle', 'job.worker', 'job.dispatch', 'job.consume-check', 'job.close-verify']);
@@ -95,17 +96,7 @@ test('a red report handed to the Kernel -> one settle-nongreen DI, the same key 
   } finally { fx.close(); }
 });
 
-test('a dead worker -> starci kernel reconcile --dead-worker --settle-failed; a held one -> --release-worker', async () => {
-  const fx = fixture({ report: null });
-  try {
-    const dead = ctxFor(fx, { status: () => ({ frontier: { deadWorkerJobs: ['op-a'] } }) });
-    await job.reconcile('job:shop-be:op-a', dead);
-    assert.deepEqual(dead.calls.api.map((c) => [c.verb, ...c.argv]), [['reconcile', '--job', 'op-a', '--dead-worker', '--settle-failed']]);
-    const held = ctxFor(fx, { status: () => ({ frontier: { heldWorkerJobs: ['op-a'] } }) });
-    await job.reconcile('job:shop-be:op-a', held);
-    assert.deepEqual(held.calls.api.map((c) => [c.verb, ...c.argv]), [['reconcile', '--job', 'op-a', '--release-worker']]);
-  } finally { fx.close(); }
-});
+
 
 test('active but not owning the concern -> nothing acts', async () => {
   const fx = fixture({ report: { outcome: 'done' } });
@@ -208,4 +199,35 @@ test('a worker question the policy table marks owner-only opens its Decision Ite
     assert.equal(byKey['worker-question:op-a:q2'].decider, 'kernel');
     assert.equal(byKey['worker-question:op-a:q2'].escalateTo, 'supervisor');
   } finally { fx.close(); }
+});
+
+test('reported-unsettled: a job that filed its report sits in status reported, and the planner settles it, times it and keys it', async () => {
+  const fx = fixture({ status: 'reported', report: { outcome: 'done', agoMs: 10 * 60_000 } });
+  try {
+    assert.equal(jobFacts(fx.db, 'op-a', { now: NOW, settings }).status, 'reported');
+    assert.ok(listKeysOf(fx.db, 'shop-be', { now: NOW, settings }).includes('job:shop-be:op-a'), 'the resync lists a reported job');
+    const plan = planJob(jobFacts(fx.db, 'op-a', { now: NOW, settings }), { settings });
+    assert.equal(plan.step.kind, 'settle');
+    assert.ok(plan.clocks.some((c) => c.state === 'SETTLE_OVERDUE'), 'the reported-unsettled bound runs');
+    const ctx = ctxFor(fx);
+    const r = await job.reconcile('job:shop-be:op-a', ctx);
+    assert.equal(r.action, 'settle');
+    assert.deepEqual(ctx.calls.run[0].args, [SETTLER_SCRIPT, '--repo', 'shop-be', '--job', 'op-a', '--json']);
+    assert.ok(ctx.calls.clock.some((c) => c.state === 'SETTLE_OVERDUE' && c.entity === 'job:shop-be:op-a'));
+  } finally { fx.close(); }
+});
+
+test('a reported job whose report the settler handed to the Kernel opens one settle-nongreen item, never a second settle', async () => {
+  const fx = fixture({ status: 'reported', report: { outcome: 'done' }, handover: { reason: 'settle-refused', code: 'op-gate-tool-failed' } });
+  try {
+    const ctx = ctxFor(fx);
+    const r = await job.reconcile('job:shop-be:op-a', ctx);
+    assert.equal(r.action, 'settle-nongreen');
+    assert.equal(ctx.calls.run.length, 0);
+    assert.equal(ctx.calls.decisions[0].kind, 'settle-nongreen');
+  } finally { fx.close(); }
+});
+
+test('the filed report is a route of the Job controller', () => {
+  assert.deepEqual(job.routes['report-filed']({ ledgerId: 'n', entityType: 'job', entityId: 'op-a', workflowId: 'wf-x' }), ['job:n:op-a', 'wf:n:wf-x']);
 });

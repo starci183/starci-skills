@@ -42,7 +42,8 @@ const call=(fx,body)=>{
   const script=path.join(fx.root,`case-${Math.random().toString(36).slice(2)}.mjs`);
   fs.writeFileSync(script,`import {orcaCall} from ${JSON.stringify(pathToFileURL(path.join(ROOT,'scripts','api','orca','lib.mjs')).href)};\n`+
     `import {requestShow} from ${JSON.stringify(pathToFileURL(path.join(ROOT,'scripts','api','orca','request-show.mjs')).href)};\n`+
-    `console.log(JSON.stringify((${body})(orcaCall,requestShow)));\n`);
+    `import {terminalList} from ${JSON.stringify(pathToFileURL(path.join(ROOT,'scripts','api','orca','terminal-list.mjs')).href)};\n`+
+    `console.log(JSON.stringify((${body})(orcaCall,requestShow,terminalList)));\n`);
   const r=spawnSync(process.execPath,[script],{encoding:'utf8',env:fx.env,timeout:60000,maxBuffer:CASE_MAX_BUFFER,windowsHide:true});
   const diagnostic=caseDiagnostic(r);
   assert.equal(r.error,undefined,diagnostic);
@@ -53,6 +54,20 @@ const call=(fx,body)=>{
 const logged=fx=>fs.existsSync(fx.log)
   ?fs.readFileSync(fx.log,'utf8').trim().split(/\r?\n/).filter(Boolean).map(l=>JSON.parse(l).argv)
   :[];
+
+test('terminal-list adapter admits only a successful native inventory with complete unique handles',t=>{
+  const answers=[{ok:true,result:{terminals:[]}},{ok:true,result:{terminals:[{handle:'present',connected:true}]}},{ok:false,result:{terminals:[]}},
+    {ok:true,result:{}},{ok:true,result:{terminals:[{}]}},
+    {ok:true,result:{terminals:[{handle:'duplicate'},{handle:'duplicate'}]}}];
+  for(const [index,answer] of answers.entries()) {
+    const fx=stubEnv(t);
+    fs.writeFileSync(path.join(fx.root,'fake-orca.mjs'),`console.log(${JSON.stringify(JSON.stringify(answer))});\n`);
+    const out=call(fx,`(c,show,list)=>list()`);
+    assert.equal(out.ok,index<2,JSON.stringify(answer));
+    assert.deepEqual(out.terminals,index<2?answer.result.terminals:[]);
+    if(index>=2)assert.ok(out.error,'a failed inventory must remain visibly unreadable');
+  }
+});
 
 test('argv is assembled from calls.yaml — declared flags only, in contract order',t=>{
   const fx=stubEnv(t);
@@ -318,16 +333,6 @@ test('the request id is a deterministic UUIDv8: same inputs the same id, another
   for(const id of ids) assert.match(id,/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   assert.equal(ids[1],ids[0]);
   assert.equal(new Set(ids.filter((_,i)=>i!==1)).size,4);
-});
-
-test('a non-UUID --retry-request is refused by the shape check, and the receipt error is the reported reason, not a crashpad stderr line',t=>{
-  const fx=stubEnv(t);
-  const run=spawnSync(process.execPath,[path.join(fx.root,'fake-orca.mjs'),'orchestration','run-create','--objective','o','--retry-request','starci-run-create-0123456789abcdef01234567','--json'],{encoding:'utf8',env:fx.env,windowsHide:true});
-  assert.equal(run.status,1);
-  assert.equal(JSON.parse(run.stdout).error.code,'invalid_argument');
-  assert.match(JSON.parse(run.stdout).error.message,/must be the UUID Orca reported/);
-  const out=call(fx,`c=>c('run-create',{objective:'o',from:'k'},{request:{workflow:'wf-9'}})`);
-  assert.equal(out.outcome,'ok','the runner derives a UUID the fake accepts');
 });
 
 test('a failed call reports the receipt error, not a crashpad line on stderr',t=>{

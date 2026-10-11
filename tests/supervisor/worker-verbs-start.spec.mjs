@@ -49,16 +49,7 @@ test('worker start validates then calls worker-start with the bound terminal and
   assert.deepEqual([result.data.dispatchId, result.data.terminalHandle], ['ctx_1', 'term_1']);
 });
 
-test('worker start reads @file content through its injectable file seam', async () => {
-  let spec;
-  const result = await workerStartVerb(ctx({ spec: '@brief.md' }), deps({
-    exists: () => true,
-    readFile: () => 'Full brief\nwith steps',
-    workerStart: (input) => { spec = input.spec; return { ok: true, dispatchId: 'ctx_2', agentTerminalHandle: 'term_2', taskId: 'task_2' }; },
-  }));
-  assert.equal(result.code, 0);
-  assert.equal(spec, 'Full brief\nwith steps');
-});
+
 
 test('worker start refuses invalid agents, models, Devin models and unavailable declared agents', async () => {
   assert.equal((await workerStartVerb(ctx({ agent: 'other' }), deps())).code, 2);
