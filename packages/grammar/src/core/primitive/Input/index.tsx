@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, type ComponentType, type ReactNode } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react"
 import {
     Description as HeroDescription,
     ErrorMessage as HeroErrorMessage,
@@ -9,7 +9,6 @@ import {
     Skeleton as HeroSkeleton,
     TextField as HeroTextField,
 } from "@heroui/react"
-import { Button } from "../Button/index.js"
 
 export type InputKind = "email" | "tel" | "password" | "newPassword" | "code" | "text"
 export type InputVariant = "primary" | "secondary"
@@ -33,11 +32,16 @@ export type InputProps = {
     readonly isSkeleton?: boolean
     /** The value can be focused, selected and copied but not changed (unlike `isDisabled`, it stays at full contrast). */
     readonly isReadOnly?: boolean
-    /** Adds a copy action after the control that copies the current value; needs `copyLabel` (and `copiedLabel` for the confirmation). */
+    /**
+     * Adds a copy action inside the field, at its end (after the reveal toggle of a secret), that copies the current value;
+     * needs `copyLabel` (its accessible name, and its visible text when no `copyIcon` is given).
+     */
     readonly isCopyable?: boolean
     readonly copyLabel?: string
-    /** Shown on the copy action for a moment after a successful copy. */
+    /** Announced (and shown, without `copiedIcon`) on the copy action for a moment after a successful copy. */
     readonly copiedLabel?: string
+    readonly copyIcon?: InputIcon
+    readonly copiedIcon?: InputIcon
     /** Called with the copied value after it reached the clipboard. */
     readonly onCopy?: (value: string) => void
     readonly revealLabel?: string
@@ -76,6 +80,8 @@ export const Input = ({
     isCopyable = false,
     copyLabel,
     copiedLabel,
+    copyIcon: CopyIcon,
+    copiedIcon: CopiedIcon,
     onCopy,
     revealLabel,
     hideLabel,
@@ -91,6 +97,22 @@ export const Input = ({
     const ToggleIcon = isRevealed ? HideIcon : RevealIcon
     const [isCopied, setIsCopied] = useState(false)
     const canCopy = isCopyable && copyLabel !== undefined
+    const canReveal = isSecret && toggleLabel !== undefined
+    const copyName = isCopied && copiedLabel !== undefined ? copiedLabel : copyLabel
+    const CopyGlyph = isCopied && CopiedIcon !== undefined ? CopiedIcon : CopyIcon
+    // The in-field actions overlay the field's end; the field reserves exactly their measured width so the value never runs under them.
+    const actions = useRef<HTMLSpanElement>(null)
+    const [actionsWidth, setActionsWidth] = useState<number | null>(null)
+    useLayoutEffect(() => {
+        const node = actions.current
+        if (node === null) return
+        const measure = () => setActionsWidth(node.getBoundingClientRect().width)
+        measure()
+        if (typeof ResizeObserver === "undefined") return
+        const observer = new ResizeObserver(measure)
+        observer.observe(node)
+        return () => observer.disconnect()
+    }, [canCopy, canReveal])
 
     useEffect(() => {
         if (!isCopied) return
@@ -145,35 +167,51 @@ export const Input = ({
         >
             <HeroLabel>{label}</HeroLabel>
             {hint == null ? null : <HeroDescription>{hint}</HeroDescription>}
-            <div className="starci-core-input-row" data-copyable={canCopy ? "true" : "false"}>
-                <div className="starci-core-input-control" data-reveal={isSecret && toggleLabel !== undefined ? "true" : "false"}>
-                    <HeroInput
-                        id={id}
-                        name={name}
-                        type={isSecret && isRevealed ? "text" : kind.type}
-                        autoComplete={kind.autoComplete}
-                        inputMode={kind.inputMode}
-                        {...(placeholder === undefined ? {} : { placeholder })}
-                        fullWidth
-                        className="starci-core-input-field"
-                    />
-                    {!isSecret || toggleLabel === undefined ? null : (
-                        <button
-                            type="button"
-                            aria-label={toggleLabel}
-                            disabled={isDisabled}
-                            data-contract="TONE-2"
-                            className="starci-core-input-reveal"
-                            onClick={() => setIsRevealed((current) => !current)}
-                        >
-                            {ToggleIcon === undefined ? <span data-contract="FONT-1" className="starci-core-input-reveal-label">{toggleLabel}</span> : <ToggleIcon className="starci-core-input-reveal-icon" />}
-                        </button>
-                    )}
-                </div>
-                {canCopy ? (
-                    <Button variant="outline" isDisabled={isDisabled} onPress={() => void copy()}>
-                        <span aria-live="polite">{isCopied && copiedLabel !== undefined ? copiedLabel : copyLabel}</span>
-                    </Button>
+            <div
+                className="starci-core-input-control"
+                data-reveal={canReveal ? "true" : "false"}
+                data-copyable={canCopy ? "true" : "false"}
+                style={actionsWidth === null ? undefined : ({ "--starci-core-input-actions-width": `${actionsWidth}px` } as CSSProperties)}
+            >
+                <HeroInput
+                    id={id}
+                    name={name}
+                    type={isSecret && isRevealed ? "text" : kind.type}
+                    autoComplete={kind.autoComplete}
+                    inputMode={kind.inputMode}
+                    {...(placeholder === undefined ? {} : { placeholder })}
+                    fullWidth
+                    className="starci-core-input-field"
+                />
+                {canReveal || canCopy ? (
+                    <span ref={actions} className="starci-core-input-actions">
+                        {canReveal ? (
+                            <button
+                                type="button"
+                                aria-label={toggleLabel}
+                                disabled={isDisabled}
+                                data-contract="TONE-2"
+                                className="starci-core-input-reveal"
+                                onClick={() => setIsRevealed((current) => !current)}
+                            >
+                                {ToggleIcon === undefined ? <span data-contract="FONT-1" className="starci-core-input-reveal-label">{toggleLabel}</span> : <ToggleIcon className="starci-core-input-reveal-icon" />}
+                            </button>
+                        ) : null}
+                        {canCopy ? (
+                            <button
+                                type="button"
+                                aria-label={copyName}
+                                disabled={isDisabled}
+                                data-contract="TONE-2"
+                                data-copied={isCopied ? "true" : "false"}
+                                className="starci-core-input-reveal starci-core-input-copy"
+                                onClick={() => void copy()}
+                            >
+                                {CopyGlyph === undefined ? <span data-contract="FONT-1" className="starci-core-input-reveal-label">{copyName}</span> : <CopyGlyph className="starci-core-input-reveal-icon" />}
+                            </button>
+                        ) : null}
+                        <span className="starci-core-input-live" aria-live="polite">{isCopied ? copiedLabel ?? "" : ""}</span>
+                    </span>
                 ) : null}
             </div>
             {errorMessage == null ? null : <HeroErrorMessage>{errorMessage}</HeroErrorMessage>}

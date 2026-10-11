@@ -91,3 +91,29 @@ describe("Common AlertDialog decisions", () => {
         expect(onConfirm).toHaveBeenCalledTimes(2)
     })
 })
+
+describe("Common dialog container geometry", () => {
+    it("centres the dialog in its full-height container and keeps a short dialog as tall as its content", async () => {
+        const { readFileSync, existsSync } = await import("node:fs")
+        const { resolve } = await import("node:path")
+        const sheet = ["src/common/components-overlays.css", "packages/grammar/src/common/components-overlays.css"]
+            .map((candidate) => resolve(process.cwd(), candidate))
+            .find((candidate) => existsSync(candidate)) ?? ""
+        const text = readFileSync(sheet, "utf8")
+        expect(text).toMatch(/\.starci-core-dialog-container\s*\{[^}]*justify-content: center;/)
+        expect(text).toMatch(/\.starci-core-dialog-container > \.starci-core-dialog\s*\{\s*flex: 0 1 auto;/)
+    })
+
+    it("releases the opposite edge of a placed drawer, so a right drawer is not pinned left by the vendor inset", async () => {
+        const { readFileSync, existsSync } = await import("node:fs")
+        const { resolve } = await import("node:path")
+        const sheet = ["src/common/components-overlays.css", "packages/grammar/src/common/components-overlays.css"]
+            .map((candidate) => resolve(process.cwd(), candidate))
+            .find((candidate) => existsSync(candidate)) ?? ""
+        const text = readFileSync(sheet, "utf8")
+        expect(text).toMatch(/\.starci-core-drawer-content\[data-placement="right"\] \{\s*inset-inline-start: auto;\s*inset-inline-end: 0;\s*\}/)
+        expect(text).toMatch(/\.starci-core-drawer-content\[data-placement="left"\] \{\s*inset-inline-start: 0;\s*inset-inline-end: auto;\s*\}/)
+        expect(text).toMatch(/\.starci-core-drawer-content\[data-placement="top"\] \{\s*top: 0;\s*bottom: auto;\s*\}/)
+        expect(text).toMatch(/\.starci-core-drawer-content\[data-placement="bottom"\] \{\s*top: auto;\s*bottom: 0;\s*\}/)
+    })
+})

@@ -56,6 +56,21 @@ describe("Core Input copy action", () => {
         expect(screen.queryByRole("button", { name: "Copied" })).toBeNull()
     })
 
+    it("puts the copy action inside the field, after the reveal toggle, and reserves room for both", () => {
+        render(<Input id="k" name="k" label="Key" kind="password" defaultValue="secret-value" revealLabel="Show" hideLabel="Hide" isCopyable copyLabel="Copy" />)
+        const control = screen.getByLabelText("Key").closest(".starci-core-input-control")
+        expect(control?.getAttribute("data-copyable")).toBe("true")
+        const buttons = [...(control?.querySelectorAll(".starci-core-input-actions button") ?? [])].map((b) => b.getAttribute("aria-label"))
+        expect(buttons).toEqual(["Show", "Copy"])
+    })
+
+    it("draws the copy glyph when an icon is given and keeps the label as its name", () => {
+        const Glyph = ({ className }: { readonly className?: string }) => <svg data-testid="copy-glyph" className={className} />
+        render(<Input id="g" name="g" label="URL" defaultValue="x" isCopyable copyLabel="Copy" copyIcon={Glyph} />)
+        expect(screen.getByTestId("copy-glyph")).toBeTruthy()
+        expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy()
+    })
+
     it("disables the copy action with the field", () => {
         render(<Input id="d" name="d" label="URL" defaultValue="x" isDisabled isCopyable copyLabel="Copy" />)
         expect((screen.getByRole("button", { name: "Copy" }) as HTMLButtonElement).disabled).toBe(true)

@@ -69,12 +69,18 @@
 
     /* ---------------------------------------------------------------- dialog + alert dialog */
     /* The container is sized to the dialog so a press on the empty backdrop counts as "outside". */
+    /* The vendor container is a full-height column: the dialog is centred in it and stays as tall as its content. */
     .starci-core-dialog-container {
         display: flex;
+        justify-content: center;
         width: min(100%, 32rem);
         max-height: 100%;
         min-width: 0;
         outline: none;
+    }
+
+    .starci-core-dialog-container > .starci-core-dialog {
+        flex: 0 1 auto;
     }
 
     .starci-core-dialog-container[data-size="sm"] {
@@ -222,12 +228,15 @@
         width: min(100%, 24rem);
     }
 
+    /* The vendor content is `inset: 0`; each placement releases the opposite edge so the sized panel sits on its own side. */
     .starci-core-drawer-content[data-placement="right"] {
+        inset-inline-start: auto;
         inset-inline-end: 0;
     }
 
     .starci-core-drawer-content[data-placement="left"] {
         inset-inline-start: 0;
+        inset-inline-end: auto;
     }
 
     .starci-core-drawer-content[data-placement="top"],
@@ -238,9 +247,11 @@
 
     .starci-core-drawer-content[data-placement="top"] {
         top: 0;
+        bottom: auto;
     }
 
     .starci-core-drawer-content[data-placement="bottom"] {
+        top: auto;
         bottom: 0;
     }
 

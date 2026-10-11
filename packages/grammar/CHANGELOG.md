@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.8.5 - 2026-10-11
+
+Patch (nivo-lite connections; owner: the copy action belongs inside the field).
+
+- **The `Input` copy action moves inside the field.** It is now an in-field action at the field's end, after a secret's reveal
+  toggle, like the reveal toggle itself: both live in `.starci-core-input-actions` and the field reserves their measured width
+  (`--starci-core-input-actions-width`), so the value never runs under them. New `copyIcon` / `copiedIcon` draw a glyph instead of
+  the label text (the label stays the accessible name); `copiedLabel` is announced through a polite live region.
+  `.starci-core-input-row` and the outline `Button` beside the control are gone.
+- **Fixed: a short `Dialog` / `AlertDialog` stretched to the viewport height.** The vendor container fills the height and the dialog
+  stretched with it (`flex: 1`); inside `.starci-core-dialog-container` the dialog is now `flex: 0 1 auto` and centred
+  (`justify-content: center`), so it is as tall as its content. Drawers keep filling their edge.
+- **Fixed: a `Drawer` with `placement="right"` (or `bottom`) opened on the left (or top).** The vendor content is `inset: 0` and a
+  fixed width keeps the start edge; each placement now releases the opposite edge (`inset-inline-start: auto` for right, and so on).
+
 ## 0.8.4 - 2026-10-10
 
 Patch, additive (product connections screen; owner approved publishing @starci packages).
