@@ -7,6 +7,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 ## [1.0.0-alpha.9.1] — 2026-10-11
 
 ### Fixed
+- Stylelint's generated token vocabulary matches the current Grammar source, including `--radius-xs`; dependent bundled canon pins receive immutable package versions.
 - The Windows and Ubuntu install sandboxes check out `config.example.yaml` with the dispatcher so the source bootstrap can resolve its default configuration before running the tarball gate.
 - Example app lint writes its Sonar report relative to the selected app directory, matching the scanner's report path.
 - Replays record render readiness and the supported host platform at their fixture boundaries; the missing-browser and real-render cases retain native discovery. Purge replays isolate fake resource process observations from unrelated harness children while retaining captured-worker closure refusals.

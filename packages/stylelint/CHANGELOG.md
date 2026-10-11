@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.7 - 2026-10-11
+
+- Fixed: regenerate the token vocabulary from the current Grammar source, including the vendor `--radius-xs` token. The twin staleness test remains unchanged.
+
 ## 2.0.6 - 2026-10-08
 
 - Changed: a behaviour-preserving clean-up of the plugin source (`String.raw` for the regular expressions, `Number.parseInt`, optional chaining, code-unit ordering through the new `lib/order.mjs`) and a regenerated `lib/grammar-values.generated.mjs` after the grammar dropped the muted-surface compatibility name. No rule changed.

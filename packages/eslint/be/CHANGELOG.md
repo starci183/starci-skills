@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.5 - 2026-10-11
+
+- Changed: refresh bundled canon pins for the Stylelint vocabulary patch; lint rules are unchanged.
+
 ## 3.2.4 - 2026-10-11
 
 - Changed: refresh the bundled canon pins for @starci/grammar 0.9.3; lint rules are unchanged.
