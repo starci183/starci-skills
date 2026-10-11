@@ -77,7 +77,7 @@ rules:
       - id: case-6
         when: A console page leads with a row of key figures (the "ribbon")
         assert: |-
-          Owner ruling 2026-10-11: the figures sit in the ink band - `SurfaceCard treatment="ink"` holding `DescriptionList layout="stat-strip" isDivided` - so the band, not a bare strip on the canvas, carries them; at most four cells, and the band counts as the page's signature moment (DISCIPLINE-3)
+          Owner ruling 2026-10-11 (corrected the same day): the ribbon is an ordinary card - a default `SurfaceCard` (white surface) holding `DescriptionList layout="stat-strip" isDivided` - never a bare strip on the canvas and never the ink band: a full-accent `treatment="ink"` slab under every page header reads as loud and spends the page's colour budget (ACCENT-6) on figures that are not its signature moment; at most four cells
     notThisRule: |-
       which rank a line receives is HIERARCHY-1, and the closed size scale is FONT-1 to FONT-6. Measuring the rendered figures is TASTE-6 case-5.
   - id: DISCIPLINE-3
