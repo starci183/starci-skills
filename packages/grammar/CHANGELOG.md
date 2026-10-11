@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.4 - 2026-10-11
+
+Patch (reported from nivo-lite).
+
+- **Fixed: a layout className on `List`, `ListItem` and `Region` takes effect.** Their element resets (display, gap, margin,
+  padding, list marker) sat in the grammar layer, which a host declares after Tailwind's `utilities`, so `flex`, `grid`, `gap-3`
+  or `py-3` passed as `className` lost and layout had to be wrapped in an inner element. The resets now live in `@layer base`;
+  without a className the shape is unchanged. Region's prop-driven `spacing` stays in the grammar layer.
+
+### Tests
+
+- `src/core/v094.spec.tsx`: the three resets are base-layer rules, Region spacing stays a grammar rule, the className passes
+  through beside the hook class.
+
 ## 0.9.3 - 2026-10-11
 
 Patch, additive (owner, 2026-10-11, from the live nivo.vn connections drawer).

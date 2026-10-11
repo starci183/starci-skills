@@ -2740,11 +2740,6 @@
     }
 
     /* Region, List, ListItem: semantic page structure that draws nothing of its own. */
-    .starci-core-region {
-        display: block;
-        min-width: 0;
-    }
-
     .starci-core-region[data-grammar-region-spacing="spaced"] {
         padding-block-end: 2rem;
     }
@@ -2763,22 +2758,6 @@
     .starci-core-nav-landmark[data-grammar-nav-layout="scrolling"] {
         gap: 0.25rem;
         overflow-x: auto;
-    }
-
-    .starci-core-semantic-list {
-        display: flex;
-        flex-direction: column;
-        gap: 0;
-        margin: 0;
-        padding: 0;
-        list-style: none;
-    }
-
-    .starci-core-semantic-list-item {
-        display: block;
-        min-width: 0;
-        margin: 0;
-        padding: 0;
     }
 
     /* The unlabelled hairline (0.6.0): BOUNDARY-1, one pixel of --separator across its container, no margin. */
@@ -3536,3 +3515,30 @@
     .starci-core-mention-description { font-size: 0.75rem; color: var(--muted, GrayText); }
 }
 
+/*
+ * Element resets of the semantic structure primitives (0.9.4). They live in Tailwind's `base` layer, which a host declares before
+ * `utilities`, so a className the app passes for layout (`flex`, `gap-3`, `py-3`, `grid`) wins over them; without one, the default
+ * shape is unchanged. A host without Tailwind simply gets a `base` layer.
+ */
+@layer base {
+    .starci-core-semantic-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .starci-core-semantic-list-item {
+        display: block;
+        min-width: 0;
+        margin: 0;
+        padding: 0;
+    }
+
+    .starci-core-region {
+        display: block;
+        min-width: 0;
+    }
+}
