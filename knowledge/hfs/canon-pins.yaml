@@ -22,12 +22,12 @@ pins:
     source: packages/heroicons/package.json
     why: 'StarCi custom Heroicons-compatible cuts; eslint-canon-fe (icon.mjs) admits @starci/heroicons/24/outline and /16/solid as icon sources, so an app that uses them gets this exact version.'
   '@starci/grammar':
-    version: 0.8.3
+    version: 0.8.4
     group: starci
     install: registry
     side: fe
     source: packages/grammar/package.json
-    why: 'the grammar front ends read: the brand layer sets `--font-sans` and `--font-mono` and the grammar reads them; it carries the Input tel kind and the IconButton disclosure props. The runtime source version wins for a @starci package.'
+    why: 'the grammar front ends read: the brand layer sets `--font-sans` and `--font-mono` and the grammar reads them; it carries the Input tel kind, the copyable and read-only Input and the IconButton disclosure props. The runtime source version wins for a @starci package.'
   '@starci/eslint-canon-be':
     version: 3.2.1
     group: starci

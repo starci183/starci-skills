@@ -26,14 +26,14 @@ describe("Core Input copy action", () => {
         stubClipboard(writeText)
         const onCopy = vi.fn()
         const Controlled = () => {
-            const [value, setValue] = useState("nivo_first")
+            const [value, setValue] = useState("key_first")
             return <Input id="key" name="key" label="API Key" value={value} onValueChange={setValue} isCopyable copyLabel="Copy" copiedLabel="Copied" onCopy={onCopy} />
         }
         render(<Controlled />)
-        fireEvent.change(screen.getByLabelText("API Key"), { target: { value: "nivo_second" } })
+        fireEvent.change(screen.getByLabelText("API Key"), { target: { value: "key_second" } })
         await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Copy" })) })
-        expect(writeText).toHaveBeenCalledWith("nivo_second")
-        expect(onCopy).toHaveBeenCalledWith("nivo_second")
+        expect(writeText).toHaveBeenCalledWith("key_second")
+        expect(onCopy).toHaveBeenCalledWith("key_second")
         expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy()
     })
 
@@ -48,11 +48,11 @@ describe("Core Input copy action", () => {
 
     it("selects the value when the clipboard is refused", async () => {
         stubClipboard(() => Promise.reject(new Error("denied")))
-        render(<Input id="u" name="u" label="URL" defaultValue="https://nivo.vn/hook" isCopyable copyLabel="Copy" copiedLabel="Copied" />)
+        render(<Input id="u" name="u" label="URL" defaultValue="https://example.com/hook" isCopyable copyLabel="Copy" copiedLabel="Copied" />)
         const field = screen.getByLabelText("URL") as HTMLInputElement
         await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Copy" })) })
         expect(field.selectionStart).toBe(0)
-        expect(field.selectionEnd).toBe("https://nivo.vn/hook".length)
+        expect(field.selectionEnd).toBe("https://example.com/hook".length)
         expect(screen.queryByRole("button", { name: "Copied" })).toBeNull()
     })
 
@@ -65,12 +65,12 @@ describe("Core Input copy action", () => {
 describe("Core Input value ownership", () => {
     it("shows an uncontrolled default value and reports edits", () => {
         const onValueChange = vi.fn()
-        render(<Input id="n" name="n" label="Name" defaultValue="NIVO" onValueChange={onValueChange} />)
+        render(<Input id="n" name="n" label="Name" defaultValue="Acme" onValueChange={onValueChange} />)
         const field = screen.getByLabelText("Name") as HTMLInputElement
-        expect(field.value).toBe("NIVO")
-        fireEvent.change(field, { target: { value: "NIVO OS" } })
-        expect(onValueChange).toHaveBeenLastCalledWith("NIVO OS")
-        expect(field.value).toBe("NIVO OS")
+        expect(field.value).toBe("Acme")
+        fireEvent.change(field, { target: { value: "Acme Co" } })
+        expect(onValueChange).toHaveBeenLastCalledWith("Acme Co")
+        expect(field.value).toBe("Acme Co")
     })
 
     it("follows a controlled value", () => {
@@ -84,7 +84,7 @@ describe("Core Input value ownership", () => {
 describe("Core Input read-only", () => {
     it("keeps the value selectable but not editable, at full contrast", () => {
         const onValueChange = vi.fn()
-        render(<Input id="r" name="r" label="Webhook URL" value="https://nivo.vn/hook" isReadOnly onValueChange={onValueChange} />)
+        render(<Input id="r" name="r" label="Webhook URL" value="https://example.com/hook" isReadOnly onValueChange={onValueChange} />)
         const field = screen.getByLabelText("Webhook URL") as HTMLInputElement
         expect(field.readOnly).toBe(true)
         expect(field.disabled).toBe(false)
@@ -92,7 +92,7 @@ describe("Core Input read-only", () => {
     })
 
     it("marks an editable field as not read-only", () => {
-        render(<Input id="w" name="w" label="Name" defaultValue="NIVO" />)
+        render(<Input id="w" name="w" label="Name" defaultValue="Acme" />)
         expect((screen.getByLabelText("Name") as HTMLInputElement).readOnly).toBe(false)
     })
 })

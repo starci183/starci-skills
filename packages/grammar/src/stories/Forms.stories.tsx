@@ -65,9 +65,9 @@ export const Input: Story = {
 export const InputCopyable: Story = {
   render: () => (
     <div style={{ display: 'grid', gap: '1rem', maxWidth: '36rem' }}>
-      <G.Input id="input-copy-url" name="webhookUrl" label="Webhook URL" variant="secondary" hint="Paste this into the provider." isReadOnly isCopyable copyLabel="Copy" copiedLabel="Copied" defaultValue="https://nivo.vn/api/connections/sepay/26465cdf" />
-      <G.Input id="input-copy-name" name="webhookName" label="Webhook name" variant="secondary" hint="You can change it here." isCopyable copyLabel="Copy" copiedLabel="Copied" defaultValue="NIVO · Main account" />
-      <G.Input id="input-copy-key" name="apiKey" label="API Key" kind="password" variant="secondary" isCopyable copyLabel="Copy" copiedLabel="Copied" revealLabel="Show" hideLabel="Hide" defaultValue="nivo_b564bbce026c88a12f034ecfbee4387" />
+      <G.Input id="input-copy-url" name="webhookUrl" label="Webhook URL" variant="secondary" hint="Paste this into the provider." isReadOnly isCopyable copyLabel="Copy" copiedLabel="Copied" defaultValue="https://example.com/api/hooks/26465cdf" />
+      <G.Input id="input-copy-name" name="webhookName" label="Webhook name" variant="secondary" hint="You can change it here." isCopyable copyLabel="Copy" copiedLabel="Copied" defaultValue="Acme · Main account" />
+      <G.Input id="input-copy-key" name="apiKey" label="API Key" kind="password" variant="secondary" isCopyable copyLabel="Copy" copiedLabel="Copied" revealLabel="Show" hideLabel="Hide" defaultValue="key_b564bbce026c88a12f034ecfbee4387" />
       <G.Input id="input-copy-disabled" name="disabled" label="Disabled" isDisabled isCopyable copyLabel="Copy" defaultValue="Locked value" />
     </div>
   ),
