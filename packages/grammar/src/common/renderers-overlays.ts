@@ -44,7 +44,7 @@ export {
     type ToastQueue,
     type ToastRecord,
 } from "../core/branch/Toast/index.js"
-export { Alert, type AlertAction, type AlertProps, type AlertUrgency } from "../core/composite/Alert/index.js"
+export { Alert, type AlertAction, type AlertAppearance, type AlertProps, type AlertUrgency } from "../core/composite/Alert/index.js"
 export { CloseButton, type CloseButtonProps, type CloseButtonSize } from "../core/primitive/CloseButton/index.js"
 export { KBD_NAMED_KEYS, Kbd, type KbdNamedKey, type KbdProps } from "../core/primitive/Kbd/index.js"
 export { Meter, type MeterProps, type MeterSegments } from "../core/primitive/Meter/index.js"

@@ -30,6 +30,13 @@ export const Alert: Story = {
       <State label="Pending" direction="column">
         <G.Alert tone="pending" title="Syncing" description="This can take a minute." />
       </State>
+      <State label="Soft appearance (tone soft tint at half strength, no shadow)" direction="column">
+        <G.Alert appearance="soft" title="Heads up" description="Informative, soft." />
+        <G.Alert appearance="soft" tone="affirmative" title="Saved" description="Your changes are live." />
+        <G.Alert appearance="soft" tone="cautionary" title="Almost full" description="You have used 90% of your storage." action={{ label: 'Upgrade', onAction: noop }} />
+        <G.Alert appearance="soft" tone="negative" title="Payment failed" description="Update the card on file to keep access." />
+        <G.Alert appearance="soft" tone="neutral" title="Neutral notice" />
+      </State>
       <State label="With action and dismiss" direction="column">
         <G.Alert tone="cautionary" title="New version available" action={{ label: 'Reload', onAction: noop }} dismissLabel="Dismiss" onDismiss={noop} />
       </State>

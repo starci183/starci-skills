@@ -9,6 +9,11 @@ import { CloseButton } from "../../primitive/CloseButton/index.js"
 import { Icon, type IconSource } from "../../primitive/Icon/index.js"
 
 export type AlertUrgency = "polite" | "assertive"
+/**
+ * `surface` (default): the HeroUI white row with the surface shadow. `soft`: the row takes its tone's soft tint at half strength
+ * (`--<tone>-soft` / 50, no shadow), for a notice that must read as part of the region it sits in (owner ruling 2026-10-11).
+ */
+export type AlertAppearance = "surface" | "soft"
 
 export type AlertAction = {
     readonly label: string
@@ -31,6 +36,7 @@ type AlertBase = {
      * `negative` tone, `polite` (`role="status"`) for everything else.
      */
     readonly urgency?: AlertUrgency
+    readonly appearance?: AlertAppearance
 }
 
 /** A dismissible banner must name its close action; a permanent one has neither prop. */
@@ -77,7 +83,7 @@ const alertActionVariantFor = (tone: PresentationState): ButtonVariant => {
  * Contract: root FEEDBACK-3 (status/alert urgency on the owner); actions FEEDBACK-2 (recovery in place).
  */
 export const Alert = (props: AlertProps) => {
-    const { title, description, tone = "informative", action, urgency } = props
+    const { title, description, tone = "informative", action, urgency, appearance = "surface" } = props
     const [isDismissed, setIsDismissed] = useState(false)
     if (isDismissed) return null
 
@@ -92,6 +98,7 @@ export const Alert = (props: AlertProps) => {
             data-tier="composite"
             data-component="Alert"
             data-grammar-tone={tone}
+            data-grammar-appearance={appearance}
             data-urgency={resolvedUrgency}
             data-contract="FEEDBACK-3"
             role={resolvedUrgency === "assertive" ? "alert" : "status"}

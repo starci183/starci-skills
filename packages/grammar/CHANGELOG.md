@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.2 - 2026-10-11
+
+Patch, additive (owner ruling 2026-10-11: an Alert may take its tone's soft tint; amends ACCENT-5 case-5's "the tone never
+fills the Alert's background" for this opt-in appearance only).
+
+- **`Alert` `appearance`** `"surface"` (default, unchanged: the HeroUI white row with the surface shadow) or `"soft"`: the
+  row takes `--<tone>-soft` at half strength (`color-mix(in srgb, var(--<tone>-soft) 50%, transparent)`; informative
+  accent, affirmative success, cautionary warning, negative danger, every other tone default) and drops the shadow, for a
+  notice that reads as part of the region it sits in. Anatomy, title tone, action variant and urgency are unchanged.
+  Hook `data-grammar-appearance`; type `AlertAppearance`. Story "Soft appearance", spec in `Alert/index.spec.tsx`.
+
 ## 0.9.1 - 2026-10-11
 
 Minor, additive (nivo-lite connections: several accounts per provider, read from the UI knowledge - COLLECTION-1/2,
