@@ -1,5 +1,9 @@
 # Changelog
 
+## 8.2.7 - 2026-10-12
+
+- Changed: refresh the bundled canon pins for grammar 0.9.7 and heroicons 0.3.3; behaviour is unchanged.
+
 ## 8.2.6 - 2026-10-11
 
 - Changed: refresh the bundled canon pins for CLI 1.2.5 and HFS 4.2.5; command and lint behavior is unchanged.

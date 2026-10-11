@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.6 - 2026-10-12
+
+- Changed: pin HFS 4.2.6 (canon pins for grammar 0.9.7 and heroicons 0.3.3); command behavior is unchanged.
+
 ## 1.2.5 - 2026-10-11
 
 - Changed: carry runtime version 1.0.0-alpha.10.1 and pin HFS 4.2.5; command behavior is unchanged.
