@@ -4,6 +4,15 @@ All notable changes to StarCi are documented here. The runtime is on the `1.0.0-
 until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
+## [1.0.0-alpha.9.1] — 2026-10-11
+
+### Fixed
+- The Windows and Ubuntu install sandboxes check out `config.example.yaml` with the dispatcher so the source bootstrap can resolve its default configuration before running the tarball gate.
+- Example app lint writes its Sonar report relative to the selected app directory, matching the scanner's report path.
+
+### Known limitations
+- The immutable `alpha.9` tag retains the failed sandbox and example Sonar runs that identified these workflow defects. This release carries their source corrections; the original tag is preserved.
+
 ## [1.0.0-alpha.9] — 2026-10-10
 
 - Release on Windows: native Git reads the full Unicode tag notes from stdin with verbatim cleanup; long sections no longer exceed the process command-line limit. Spawn failures keep their native error through the existing Git result owner. A real temporary atomic release checks the annotated tag message byte for byte.

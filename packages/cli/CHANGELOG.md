@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.2 - 2026-10-11
+
+- Changed: runtime install selects 1.0.0-alpha.9.1, and the app dispatcher depends on HFS 4.2.2.
+
 ## 1.2.1 - 2026-10-10
 
 - Changed: depend on the HFS patch that preserves Redis database identity in scaffolded queue connections.

@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.2.2 - 2026-10-11
+
+- Changed: refresh the bundled canon pins for the alpha.9.1 CLI and lint packages.
+
 ## 4.2.1 - 2026-10-10
 
 - Fixed: queue templates preserve the declared Redis database for both Queue and Worker connections, with a nonzero-database adapter regression.

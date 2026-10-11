@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.2 - 2026-10-11
+
+- Changed: refresh the bundled canon pins for the alpha.9.1 package bindings.
+
 ## 3.2.1 - 2026-10-10
 
 - Changed: refresh the bundled canon pins for the queue-template package patch; lint rules are unchanged.

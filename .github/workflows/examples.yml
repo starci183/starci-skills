@@ -144,7 +144,7 @@ jobs:
       # THE lint of the app (ESLint with both canons, stylelint, starci app check), also written as the one Sonar import file.
       - name: starci app lint
         working-directory: .
-        run: npm run starci --silent -- app lint --cwd "$APP_DIR" --sonar "$APP_DIR/reports/lint.sonar.json"
+        run: npm run starci --silent -- app lint --cwd "$APP_DIR" --sonar "reports/lint.sonar.json"
       - name: Unit tests with coverage (per-file 100 on the logic of be/src/modules/**; writes be/coverage/lcov.info)
         if: ${{ !cancelled() && steps.policy.outputs.tests == 'true' }}
         run: npm test -- --ci
