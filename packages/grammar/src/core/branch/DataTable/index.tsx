@@ -2,6 +2,7 @@
 
 import { Checkbox as HeroCheckbox, Table as HeroTable, type Selection, type SortDescriptor } from "@heroui/react"
 import { useState, type CSSProperties, type ReactNode } from "react"
+import { Skeleton } from "../../primitive/Skeleton/index.js"
 import { navigationClassName } from "../../navigationClassNames.js"
 
 export type DataTableColumn = {
@@ -36,8 +37,13 @@ export type DataTableProps<Row extends DataTableRow> = {
     /** App-owned accessible names of the selection checkboxes in multiple mode. */
     readonly selectAllLabel?: string
     readonly selectRowLabel?: (row: Row) => string
-    /** Replaces the rows with `loadingContent` and marks the table busy. */
+    /**
+     * Marks the table busy and replaces the rows (knowledge STATE-8). With no `loadingContent` the real column headers stay
+     * and the body draws `loadingRows` skeleton rows; `loadingContent` replaces the body with that content instead.
+     */
     readonly isLoading?: boolean
+    /** Skeleton rows drawn while loading without `loadingContent` (default 3, 1 to 12). */
+    readonly loadingRows?: number
     readonly loadingContent?: ReactNode
     /** Shown when there are no rows and the table is not loading. */
     readonly emptyContent: ReactNode
@@ -48,6 +54,9 @@ export type DataTableProps<Row extends DataTableRow> = {
     readonly onRowAction?: (id: string) => void
     readonly className?: string
 }
+
+/** The row primitive filters aria-hidden out of its props, so the skeleton rows take it by ref (knowledge STATE-8). */
+const hideFromAssistiveTechnology = (node: HTMLElement | null) => node?.setAttribute("aria-hidden", "true")
 
 const SELECTION_COLUMN = "starci-data-table-selection"
 
@@ -95,6 +104,7 @@ export const DataTable = <Row extends DataTableRow>({
     selectRowLabel,
     isLoading = false,
     loadingContent,
+    loadingRows = 3,
     emptyContent,
     stickyHeader = false,
     maxBlockSize,
@@ -107,6 +117,8 @@ export const DataTable = <Row extends DataTableRow>({
     const [uncontrolledSelection, setUncontrolledSelection] = useState<ReadonlyArray<string> | "all">(defaultSelectedIds ?? [])
     const selection = selectedIds ?? uncontrolledSelection
     const isRowSelected = (id: string) => selection === "all" || selection.includes(id)
+    const isSkeleton = isLoading && loadingContent === undefined
+    const skeletonRows = isSkeleton ? Array.from({ length: Math.min(12, Math.max(1, Math.floor(Number.isFinite(loadingRows) ? loadingRows : 3))) }, (_, index) => ({ id: `starci-skeleton-${index}` })) : []
     const visibleRows = isLoading ? [] : rows
     const state = isLoading ? "loading" : rows.length === 0 ? "empty" : "ready"
     const scrollStyle = maxBlockSize === undefined ? undefined : { "--starci-core-data-table-max-block-size": maxBlockSize } as CSSProperties
@@ -125,7 +137,7 @@ export const DataTable = <Row extends DataTableRow>({
                     aria-label={label}
                     className="starci-core-data-table-content"
                     data-contract="FOCUS-2 CONTROL-STATE-3"
-                    selectionMode={selectionMode}
+                    selectionMode={isSkeleton ? "none" : selectionMode}
                     {...(sort === undefined ? {} : { sortDescriptor: toSortDescriptor(sort) })}
                     {...(onSortChange === undefined ? {} : {
                         onSortChange: (descriptor: SortDescriptor) => onSortChange({ columnId: String(descriptor.column), direction: descriptor.direction }),
@@ -166,6 +178,14 @@ export const DataTable = <Row extends DataTableRow>({
                             ? <div className="starci-core-data-table-placeholder" data-grammar-table-loading="true" role="status">{loadingContent}</div>
                             : <div className="starci-core-data-table-placeholder" data-contract="STATE-3" data-grammar-table-empty="true">{emptyContent}</div>}
                     >
+                        {skeletonRows.map((row) => (
+                            <HeroTable.Row key={row.id} id={row.id} ref={hideFromAssistiveTechnology} className="starci-core-data-table-row" data-grammar-table-row="true" data-grammar-skeleton="true" data-grammar-selected="false">
+                                {multiple ? <HeroTable.Cell className="starci-core-data-table-cell" data-grammar-table-selection="true">{null}</HeroTable.Cell> : null}
+                                {columns.map((column) => (
+                                    <HeroTable.Cell key={column.id} className="starci-core-data-table-cell" data-grammar-table-align={column.align ?? "start"}><Skeleton shape="text" /></HeroTable.Cell>
+                                ))}
+                            </HeroTable.Row>
+                        ))}
                         {visibleRows.map((row) => (
                             <HeroTable.Row
                                 key={row.id}

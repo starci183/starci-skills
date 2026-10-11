@@ -96,6 +96,9 @@ export const SurfaceListCard: Story = {
           <G.StaticStateRow item={{ id: 'l', label: 'Loading row', state: 'pending' }} />
         </G.SurfaceListCard>
       </State>
+      <State label="Loading (3 skeleton rows by default)" direction="column">
+        <G.SurfaceListCard label="Saved lessons" isLoading />
+      </State>
       <State label="Empty (notice, not a list)" direction="column">
         <G.SurfaceListCard label="Saved" empty={<G.EmptyNotice message="Nothing saved yet." description="Saved lessons appear here." />} />
       </State>

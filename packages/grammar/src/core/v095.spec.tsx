@@ -43,6 +43,22 @@ describe("0.9.5: FlowGraph", () => {
         expect(flowCss).toMatch(/prefers-reduced-motion: reduce\) \{\s*\.starci-core-flow-graph \.react-flow__edge\.animated path \{ animation: none/)
     })
 
+    it("ships the skeleton row geometry and the loading frame", () => {
+        const styles = read("../common/styles.css")
+        expect(styles).toContain('.starci-core-list-row[data-grammar-skeleton="true"] .starci-core-list-row-name')
+        expect(styles).toContain(".starci-core-list-row-skeleton-action {")
+        expect(flowCss).toContain(".starci-core-flow-graph-loading > .starci-core-skeleton")
+    })
+
+    it("wires the loading props to the shared Skeleton atom (knowledge STATE-8)", () => {
+        for (const file of ["composite/ListRow", "composite/DescriptionList", "branch/SurfaceListCard", "branch/DataTable", "branch/FlowGraph"]) {
+            const source = read(`./${file}/index.tsx`)
+            expect(source, file).toMatch(/STATE-8/)
+        }
+        expect(read("./branch/SurfaceListCard/index.tsx")).toContain("DEFAULT_LOADING_ROWS = 3")
+        expect(read("./branch/DataTable/index.tsx")).toContain("loadingRows = 3")
+    })
+
     it("is in the changelog", () => {
         expect(read("../../CHANGELOG.md")).toMatch(/^## 0\.9\.5 - 2026-10-11/m)
     })

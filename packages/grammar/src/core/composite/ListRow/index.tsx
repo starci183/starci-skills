@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import { staticRowClassName } from "../../classNames.js"
+import { Skeleton } from "../../primitive/Skeleton/index.js"
 import { treatmentFor, type PresentationState } from "../../state.js"
 import type { RowVerdict } from "../StaticStateRow/index.js"
 
@@ -20,6 +21,13 @@ export type ListRowProps = {
     readonly state?: PresentationState
     /** In a verdict collection, the outcome this row reports (the collection's leading edge). */
     readonly verdict?: RowVerdict
+    /**
+     * Draw the row as inert geometry while its content is unresolved (knowledge STATE-8): `title` becomes a Skeleton
+     * text line, `description` a second line, `leading` a Skeleton circle and `actions` a small Skeleton footprint,
+     * each only if it is passed, so the loading row has the size of the loaded one. The row is `aria-hidden` and
+     * renders no interactive child, `badges` and `children` included; the collection owns `aria-busy`.
+     */
+    readonly isSkeleton?: boolean
 }
 
 /**
@@ -30,8 +38,32 @@ export type ListRowProps = {
  * between consecutive rows - so static and interactive rows mix in one collection. It is an `<li>`: render it
  * inside a list, never loose. The actions keep their own semantics; the row itself is not a target.
  */
-export const ListRow = ({ title, description, leading, badges, actions, children, state = "neutral", verdict }: ListRowProps) => {
+export const ListRow = ({ title, description, leading, badges, actions, children, state = "neutral", verdict, isSkeleton = false }: ListRowProps) => {
     const treatment = treatmentFor(state)
+    if (isSkeleton) {
+        return (
+            <li
+                aria-hidden="true"
+                className={`${staticRowClassName} starci-core-list-row`}
+                data-grammar-row="true"
+                data-component="ListRow"
+                data-tier="composite"
+                data-grammar-skeleton="true"
+                data-grammar-state="neutral"
+                data-grammar-treatment={treatmentFor("neutral").tone}
+                data-grammar-leading={leading == null ? "false" : "true"}
+                data-grammar-actions={actions == null ? "false" : "true"}
+                data-contract="GAP-3 PADDING-4 BOUNDARY-3 STATE-8"
+            >
+                {leading == null ? null : <span className="starci-core-list-row-leading"><Skeleton shape="circle" size="md" /></span>}
+                <span className="starci-core-list-row-copy" data-contract="GAP-1">
+                    <span className="starci-core-list-row-title"><span className="starci-core-list-row-name"><Skeleton shape="text" /></span></span>
+                    {description == null ? null : <span className="starci-core-list-row-description"><Skeleton shape="text" /></span>}
+                </span>
+                {actions == null ? null : <span className="starci-core-list-row-actions"><span className="starci-core-list-row-skeleton-action"><Skeleton shape="rect" /></span></span>}
+            </li>
+        )
+    }
     return (
         <li
             className={`${staticRowClassName} starci-core-list-row`}

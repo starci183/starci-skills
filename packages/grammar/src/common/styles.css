@@ -1319,6 +1319,12 @@
         gap: var(--grammar-inline-gap, 0.5rem);
     }
 
+    /* Skeleton row (knowledge STATE-8): the copy lines take a share of the row, the action keeps a button footprint. */
+    .starci-core-list-row[data-grammar-skeleton="true"] .starci-core-list-row-name { flex: 0 1 55%; }
+    .starci-core-list-row[data-grammar-skeleton="true"] .starci-core-list-row-description { inline-size: 85%; }
+    .starci-core-list-row-skeleton-action { display: block; inline-size: 4.5rem; block-size: 2rem; }
+    .starci-core-list-row-skeleton-action > .starci-core-skeleton { block-size: 100%; aspect-ratio: auto; border-radius: 0.5rem; }
+
     .starci-core-list-row-detail {
         display: flex;
         min-width: 0;

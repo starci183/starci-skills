@@ -14,6 +14,7 @@ import {
     type NodeTypes,
 } from "@xyflow/react"
 import { memo, useEffect, useMemo, useState, type KeyboardEvent } from "react"
+import { Skeleton } from "../../primitive/Skeleton/index.js"
 import { flowGraphRoot, radialPositions } from "./layout.js"
 import type { FlowGraphEdge, FlowGraphHeight, FlowGraphLayout, FlowGraphNode } from "./types.js"
 
@@ -39,6 +40,8 @@ export type FlowGraphProps = {
     readonly layout?: FlowGraphLayout
     /** Shown instead of the canvas when there are no nodes. */
     readonly emptyLabel?: string
+    /** Unresolved graph (knowledge STATE-8): the frame at its height with a Skeleton block, no React Flow mounted, `aria-busy`. */
+    readonly isLoading?: boolean
     readonly className?: string
 }
 
@@ -105,6 +108,7 @@ export const FlowGraph = ({
     showControls,
     layout = "radial",
     emptyLabel = "Nothing to show yet.",
+    isLoading = false,
     className,
 }: FlowGraphProps) => {
     const [ownSelectedId, setOwnSelectedId] = useState<string | null>(null)
@@ -163,9 +167,12 @@ export const FlowGraph = ({
             data-grammar-flow-interactive={isInteractive ? "true" : "false"}
             data-grammar-flow-layout={layout}
             data-tier="branch"
+            {...(isLoading ? { "aria-busy": true, "data-loading": "true" } : {})}
             onKeyDown={onKeyDown}
         >
-            {nodes.length === 0 ? (
+            {isLoading ? (
+                <div className="starci-core-flow-graph-canvas starci-core-flow-graph-loading" data-grammar-flow-loading="true"><Skeleton shape="rect" /></div>
+            ) : nodes.length === 0 ? (
                 <p className="starci-core-flow-graph-empty" data-contract="STATE-3" data-grammar-flow-empty="true">{emptyLabel}</p>
             ) : (
                 <>

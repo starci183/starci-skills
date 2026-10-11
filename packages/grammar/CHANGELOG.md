@@ -18,10 +18,22 @@ Minor, additive (owner: the NIVO "Second brain" knowledge map must be drawn from
 - **New peer dependency `@xyflow/react` `^12.11.6`** (dev copy `12.11.6` for the tests). It is a peer, not a dependency, so an app keeps a single
   React Flow copy; install it next to `@heroui/react` (`npm i @xyflow/react`). The structural rules React Flow needs are shipped
   inside `common/styles.css`, scoped to `.starci-core-flow-graph`, so **no `@xyflow/react/dist/*.css` import is needed**.
+- **Loading views (knowledge STATE-8): the page own component tree, real labels, inert geometry only where content is unresolved.**
+  - `SurfaceListCard isLoading` draws `loadingRows` (new, default 3, 1 to 12) skeleton rows when it has no children, the collection
+    `aria-busy="true"`; real children still win, and loading beats the `empty` notice.
+  - `ListRow isSkeleton` (new): the same anatomy as inert geometry (title and description Skeleton text, leading Skeleton circle,
+    actions a small Skeleton footprint, each only if passed), `aria-hidden`, no interactive child.
+  - `DescriptionList isLoading` (new, incl. `layout="stat-strip"`): terms stay text, `description` and `meta` become Skeleton text,
+    `unit` is dropped, `aria-busy` on the root.
+  - `DataTable isLoading`: keeps the real column headers and draws `loadingRows` (new, default 3) `aria-hidden` skeleton rows instead of
+    the empty state; passing `loadingContent` keeps the old behaviour (that content replaces the body).
+  - `FlowGraph isLoading` (new): the frame at its height with a Skeleton block, no React Flow mounted, `aria-busy`.
+  Reduced motion comes from the existing Skeleton atom.
 - `package-boundary.spec.mjs` now expects the peer list `@heroui/react`, `@xyflow/react`, `react`; runtime `dependencies` stay empty.
 
 ### Tests
 
+- `src/core/loading.spec.tsx` (default 3 rows, clamping, real labels, aria-hidden and aria-busy for each loading view).
 - `src/core/branch/FlowGraph/index.spec.tsx` (label, node count, hidden list, placeholder hook, click / Enter / Space / Escape, controlled
   selection, empty state, static mode, radial geometry); `src/core/v095.spec.tsx` (peer boundary, client module, token-only CSS, heights,
   reduced motion); catalog 103 to 104; Offset Pop family render table.
