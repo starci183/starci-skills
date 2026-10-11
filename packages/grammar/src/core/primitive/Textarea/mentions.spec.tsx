@@ -66,6 +66,17 @@ describe("Textarea mentions and submit shortcut", () => {
         expect(screen.queryByRole("listbox")).toBeNull()
     })
 
+    it("opens from a change alone (IME, paste, phone keyboard) without a key release", async () => {
+        render(<Composer onSubmit={vi.fn()} />)
+        const field = screen.getByLabelText("Message") as HTMLTextAreaElement
+        await act(async () => {
+            fireEvent.change(field, { target: { value: "@li" } })
+            field.setSelectionRange(3, 3)
+            await Promise.resolve()
+        })
+        expect(screen.getByRole("listbox", { name: "People" }).querySelectorAll('[role="option"]')).toHaveLength(1)
+    })
+
     it("inserts on pointer selection", async () => {
         render(<Composer onSubmit={vi.fn()} />)
         const field = screen.getByLabelText("Message") as HTMLTextAreaElement

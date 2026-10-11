@@ -180,6 +180,13 @@ export const Textarea = ({
             onChange={(next) => {
                 setUncontrolledLength(next.length)
                 onValueChange?.(next)
+                // Text can arrive without a key release (IME, paste, a phone keyboard, dictation): re-read the trigger then too.
+                if (mentions !== undefined) {
+                    queueMicrotask(() => {
+                        const control = document.getElementById(controlId)
+                        if (control instanceof HTMLTextAreaElement) readQuery(control)
+                    })
+                }
             }}
         >
             <FieldLabel isHidden={field.isLabelHidden} isRequired={field.isRequired}>{field.label}</FieldLabel>

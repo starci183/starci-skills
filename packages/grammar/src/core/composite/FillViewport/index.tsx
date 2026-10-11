@@ -17,13 +17,28 @@ export type FillViewportProps = {
     readonly label?: string
 }
 
+/**
+ * Height of the Grammar chrome pinned to the bottom edge right now (WorkspaceShell's compact navigation, BottomNav,
+ * PinnedActionBar mark themselves `data-grammar-bottom-chrome`): the tallest visible fixed or sticky one in the lower half.
+ */
+export const bottomChromeHeight = (): number => {
+    let tallest = 0
+    for (const node of Array.from(document.querySelectorAll<HTMLElement>('[data-grammar-bottom-chrome="true"]'))) {
+        const rect = node.getBoundingClientRect()
+        const position = getComputedStyle(node).position
+        if (rect.height > 0 && (position === "fixed" || position === "sticky") && rect.top >= window.innerHeight / 2) tallest = Math.max(tallest, rect.height)
+    }
+    return Math.round(tallest)
+}
+
 /** Layout effect on the client, plain effect during server rendering (no warning, nothing to measure there). */
 const useIsoLayoutEffect = typeof window === "undefined" ? () => {} : useLayoutEffect
 
 /**
  * Makes its child fill the viewport height left below whatever chrome sits above it (top bar, page header, tabs), and
- * keeps that true when the chrome or the window changes. It measures its own top edge in document coordinates and writes
- * it to `--starci-core-fill-top`; CSS does the rest (`100dvh` minus that offset minus the bottom inset), so the server
+ * keeps that true when the chrome or the window changes. It measures its own top edge in document coordinates into
+ * `--starci-core-fill-top` and any Grammar bottom chrome (a phone navigation bar) into `--starci-core-fill-bottom`; CSS
+ * does the rest (`100dvh` minus both minus the bottom inset), so the server
  * render already has a sensible full-height fallback. Children fill it (a SurfaceCard with `height="fill"`, a
  * ChatWorkspace).
  */
@@ -39,6 +54,7 @@ export const FillViewport = ({ children, minHeight = "md", bottomInset = "page",
             frame = requestAnimationFrame(() => {
                 const top = node.getBoundingClientRect().top + window.scrollY
                 node.style.setProperty("--starci-core-fill-top", `${Math.max(0, Math.round(top))}px`)
+                node.style.setProperty("--starci-core-fill-bottom", `${bottomChromeHeight()}px`)
             })
         }
         measure()

@@ -12,8 +12,10 @@ changed meaning.
   `isHighlight` (focus ring for a jump target) and `id`. The corner on the author's side tightens toward the avatar
   (RADIUS-6); plain text keeps its line breaks. Server-component safe. The thread, grouping and day dividers stay the app's.
 - **New renderer `FillViewport`** (composite, client): fills the viewport height left below whatever chrome sits above it
-  and keeps that true on resize. It measures its own top edge into `--starci-core-fill-top`; CSS computes
-  `100dvh - top - inset`, so the server render already has a full-height fallback. `minHeight` `none|sm|md|lg`
+  and keeps that true on resize. It measures its own top edge into `--starci-core-fill-top` and the visible Grammar
+  bottom chrome (WorkspaceShell's compact navigation, BottomNav and PinnedActionBar now mark themselves
+  `data-grammar-bottom-chrome`) into `--starci-core-fill-bottom`; CSS computes `100dvh - top - bottom - inset`, so the
+  server render already has a full-height fallback. Helper `bottomChromeHeight`. `minHeight` `none|sm|md|lg`
   (20 / 28 / 36rem floor, default `md`), `bottomInset` `page|none`, optional `label` makes it a named region.
 - **`Textarea` mention suggestions and Enter-to-send.** `mentions={{ options, label, trigger?, onSelect? }}`: typing the
   trigger (default `@`) at a word start opens a listbox filtered accent- and case-insensitively on label or description
