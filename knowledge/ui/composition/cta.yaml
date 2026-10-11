@@ -39,6 +39,10 @@ rules:
         when: The same command is offered in two places of one view (the page header and an empty state, a toolbar and a card)
         assert: |-
           Owner ruling 2026-10-11: one view shows one `primary` per command. While the region is empty its `EmptyNotice` owns the command as the primary and the header omits it (STATE-3); once content exists the header owns it and no empty state repeats it. Two filled buttons with the same verb on one screen is a defect, even when they sit in different regions
+      - id: case-6
+        when: A group of peer choices or filters (category chips, audience chips, segmented options)
+        assert: |-
+          Owner ruling 2026-10-11: each choice reads as a secondary control with a visible 1px border, the selected one on accent-soft with an accent border, through the grammar's selectable `TagGroup` (0.9.6) or `SegmentedControl`; never bare text pills, never a primary among them, and never a local chip recipe
     notThisRule: |-
       counting how much dominant emphasis a whole page spends is ACCENT-1.
   - id: CTA-2

@@ -101,6 +101,10 @@ rules:
         when: The moment is placed against the page's focal point
         assert: |-
           It is not the primary focal point unless the page's job is the image itself (HIERARCHY-6), and its accent ground counts inside the page's colour budget (ACCENT-6)
+      - id: case-5
+        when: A promotional strip or banner would sit on a working page (settings, lists, connections)
+        assert: |-
+          Owner ruling 2026-10-11: it does not appear there; a promotion lives on the overview's or the landing's signature moment. A strip appended under the content, outside the page's measure and alignment, is a defect even when dismissible
     notThisRule: |-
       whether the mascot stands where the brand names a slot is BRAND-2, and whether an image earns its place is TASTE-8. Counting the moments in a capture is TASTE-8 case-5.
 doesNotDecide: |-
