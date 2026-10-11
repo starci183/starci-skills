@@ -54,6 +54,9 @@ componentOwnership:
     - component: StaticStateRow
       element: root
       rule: BOUNDARY-3
+    - component: ListRow
+      element: root (shares the static row's separator, so static and interactive rows mix)
+      rule: BOUNDARY-3
     - component: Subnav
       element: root
       rule: BOUNDARY-1

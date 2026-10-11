@@ -30,6 +30,9 @@ const catalog=new Set(ruleCatalog(packageRoot).ids);
  */
 const OUTSIDE_THE_GENERATED_CATALOGUE=Object.freeze({
   'MARGIN-AUTO':'knowledge/ui/presentation/margin.yaml',
+  // The radius ramp (RADIUS-2..9, reserved addresses between) was never carried into the generated
+  // catalogue; ChatBubble (0.9.0) claims the surface corner it draws.
+  'RADIUS-6':'knowledge/ui/presentation/radius.yaml',
 });
 
 const core=(...parts)=>`packages/grammar/src/core/${parts.join('/')}`;

@@ -4,15 +4,20 @@ import { Icon, type IconSource } from "../Icon/index.js"
 /**
  * HeroUI Button variants an icon-only action wears: `tertiary` (default) is the filled round plate;
  * `ghost` is the quiet bare glyph with no fill at rest (HeroUI's ghost: a fill only on hover/press) -
- * for an overflow "..." menu or a secondary glyph action beside a card title.
+ * for an overflow "..." menu or a secondary glyph action beside a card title. `primary` is the accent-filled plate for the
+ * one glyph action that must stand out (a floating assistant or compose button); one per view, like a primary Button.
  */
-export type IconButtonVariant = "tertiary" | "ghost"
+export type IconButtonVariant = "tertiary" | "ghost" | "primary"
 
 export type IconButtonProps = {
     readonly source: IconSource
     /** Required accessible name for the glyph-only action. */
     readonly label: string
     readonly variant?: IconButtonVariant
+    /** `md` (default, 2.25rem) or `lg` (3.5rem), the size of a floating action. */
+    readonly size?: "md" | "lg"
+    /** Lifts the button with the overlay elevation, for an action floating over content (it owns no position). */
+    readonly isFloating?: boolean
     readonly isActive?: boolean
     readonly isDisabled?: boolean
     readonly isSkeleton?: boolean
@@ -50,6 +55,8 @@ export const IconButton = ({
     source,
     label,
     variant = "tertiary",
+    size = "md",
+    isFloating = false,
     isActive = false,
     isDisabled = false,
     isSkeleton = false,
@@ -68,6 +75,8 @@ export const IconButton = ({
         data-contract="A11Y-2 ICON-5"
         data-active={isActive ? "true" : "false"}
         data-variant={variant}
+        data-size={size}
+        data-floating={isFloating ? "true" : "false"}
         data-loading={isSkeleton ? "true" : "false"}
         type="button"
         variant={variant}

@@ -567,3 +567,24 @@ export const IconButtonBadge: Story = {
     </div>
   ),
 };
+
+/** Step mode: one segment per wizard step at the small bar's height; finished and current steps are filled. */
+export const ProgressSteps: Story = {
+  render: () => (
+    <div style={{ display: 'grid', gap: '1rem', maxWidth: '28rem' }}>
+      <G.Progress label="Setup" steps={{ total: 5, completed: 1 }} valueText="Step 1 of 5" />
+      <G.Progress label="Setup" steps={{ total: 5, completed: 3 }} valueText="Step 3 of 5" />
+      <G.Progress label="Setup" steps={{ total: 5, completed: 5 }} valueText="Step 5 of 5" />
+    </div>
+  ),
+};
+
+/** The one action that must stand out: accent plate, large size, floating elevation (the app positions it). */
+export const IconButtonFloating: Story = {
+  render: () => (
+    <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', padding: '1rem' }}>
+      <G.IconButton source={BellGlyph} label="Ask the assistant" variant="primary" size="lg" isFloating onPress={noop} />
+      <G.IconButton source={BellGlyph} label="Ask the assistant" variant="primary" onPress={noop} />
+    </div>
+  ),
+};

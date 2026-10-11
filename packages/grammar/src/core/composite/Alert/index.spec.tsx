@@ -90,3 +90,21 @@ describe.each(GRAMMAR_ROOT_CASES)("Common Alert action icon under $name", ({ Roo
         expect(screen.getByRole("button", { name: "Open log" }).querySelector("[data-component='Icon']")).toBeNull()
     })
 })
+
+describe("Common Alert appearance", () => {
+    it("defaults to the surface row and opts into the soft tint per tone", async () => {
+        const { readFileSync, existsSync } = await import("node:fs")
+        const { resolve } = await import("node:path")
+        const { renderToStaticMarkup } = await import("react-dom/server")
+        expect(renderToStaticMarkup(<Alert title="Plain" />)).toContain('data-grammar-appearance="surface"')
+        expect(renderToStaticMarkup(<Alert title="Soft" tone="cautionary" appearance="soft" />)).toContain('data-grammar-appearance="soft"')
+        const sheet = ["src/common/components-overlays.css", "packages/grammar/src/common/components-overlays.css"]
+            .map((c) => resolve(process.cwd(), c)).find((c) => existsSync(c)) ?? ""
+        const css = readFileSync(sheet, "utf8")
+        expect(css).toMatch(/\.starci-core-alert\[data-grammar-appearance="soft"\] \{[^}]*background: color-mix\(in srgb, var\(--starci-core-alert-soft\) 50%, transparent\);[^}]*box-shadow: none;/)
+        for (const [tone, token] of [["informative", "accent"], ["affirmative", "success"], ["cautionary", "warning"], ["negative", "danger"]] as const) {
+            expect(css).toContain(`.starci-core-alert[data-grammar-appearance="soft"][data-grammar-tone="${tone}"] {
+        --starci-core-alert-soft: var(--${token}-soft`)
+        }
+    })
+})

@@ -119,6 +119,15 @@ componentOwnership:
     - component: StaticStateRow
       element: row copy
       rule: GAP-1
+    - component: ListRow
+      element: root (leading | copy | actions, and the detail region)
+      rule: GAP-3
+    - component: ListRow
+      element: copy (title line and description)
+      rule: GAP-1
+    - component: ListRow
+      element: title line (name and badges), actions
+      rule: GAP-2
     - component: Subnav
       element: identity
       rule: GAP-2

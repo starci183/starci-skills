@@ -189,6 +189,24 @@ observations:
       and touches both edges. Only the row's content is inset by the row's own padding.
       Rows opt into this shipped geometry via `starci-core-static-row` — an app-owned row
       without the class renders no separator at all.
+  - id: list-row-anatomy
+    lane: ui
+    kind: anatomy-detail
+    summary: |-
+      An interactive row in a SurfaceListCard is the grammar `ListRow` (@starci/grammar 0.9.1), never an
+      app-owned `<li>` and never a second `<ul>` nested in the card (the card already renders the list,
+      so a nested list loses the row inset and the separator - the defect that left rows flush against
+      the card edge on the NIVO Connections page, 2026-10-11). Its slots, in reading order: `leading`
+      (an IconTile, an avatar, or a logo; a horizontal bank wordmark takes a fixed 64x40 frame rather
+      than a square tile, which would shrink it to a sliver), `title`, `badges` (at most two,
+      DISCIPLINE-1 case-3), one muted `description`, `actions` (one visible Button, then a DropdownMenu
+      with destructive commands last behind an AlertDialog), and a `children` detail region under the
+      copy for an Alert about the row or revealed values. It carries `starci-core-static-row`, so the
+      inset, row gap and edge-to-edge separator are the static row's. Collapsed by default (the collapse
+      law): mark and copy share the first line, actions and detail take their own; the surface container
+      query at 28.001rem lays it out leading | copy | actions. Several accounts of one provider are one
+      ListRow each, told apart by the leading mark, the name and the account's last digits; the card's
+      `fact` carries the count and `labelEnd` the add action (0.9.1 renders both).
   - id: card-division-and-measure
     lane: ui
     kind: anatomy-detail

@@ -53,6 +53,7 @@ export const ChatBubble = ({
             data-contract="SURFACE-3 SURFACE-4 RADIUS-6"
             data-grammar-bubble-side={side}
             data-grammar-bubble-highlight={isHighlight ? "true" : "false"}
+            data-grammar-bubble-footer={footer == null ? "false" : "true"}
         >
             {avatar == null ? null : <div className="starci-core-chat-bubble-avatar">{avatar}</div>}
             <div className="starci-core-chat-bubble-stack">

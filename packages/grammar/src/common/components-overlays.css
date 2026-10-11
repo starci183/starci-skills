@@ -118,12 +118,19 @@
         outline: none;
     }
 
+    /* The vendor header is `flex flex-col`; the title group and the close action share one row, the action at the end. */
     .starci-core-overlay-header {
-        display: flex;
+        display: flex !important;
         min-width: 0;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: var(--grammar-row-gap, 0.75rem);
+        flex-direction: row !important;
+        align-items: flex-start !important;
+        justify-content: space-between !important;
+        gap: var(--grammar-row-gap, 0.75rem) !important;
+    }
+
+    .starci-core-overlay-header > .starci-core-close-button {
+        flex: none;
+        margin-inline-start: auto;
     }
 
     .starci-core-overlay-heading-group {
@@ -607,6 +614,32 @@
     .starci-core-alert {
         min-width: 0;
         flex-wrap: wrap;
+    }
+
+    /*
+     * appearance="soft" (owner ruling 2026-10-11): the tone's soft tint at half strength under the same anatomy, no shadow.
+     * The title keeps the tone's soft-foreground, which clears 3:1 on the lighter half tint (COLOR-5 case-1a).
+     */
+    .starci-core-alert[data-grammar-appearance="soft"] {
+        --starci-core-alert-soft: var(--default-soft, var(--default, transparent));
+        background: color-mix(in srgb, var(--starci-core-alert-soft) 50%, transparent);
+        box-shadow: none;
+    }
+
+    .starci-core-alert[data-grammar-appearance="soft"][data-grammar-tone="informative"] {
+        --starci-core-alert-soft: var(--accent-soft, var(--default, transparent));
+    }
+
+    .starci-core-alert[data-grammar-appearance="soft"][data-grammar-tone="affirmative"] {
+        --starci-core-alert-soft: var(--success-soft, var(--default, transparent));
+    }
+
+    .starci-core-alert[data-grammar-appearance="soft"][data-grammar-tone="cautionary"] {
+        --starci-core-alert-soft: var(--warning-soft, var(--default, transparent));
+    }
+
+    .starci-core-alert[data-grammar-appearance="soft"][data-grammar-tone="negative"] {
+        --starci-core-alert-soft: var(--danger-soft, var(--default, transparent));
     }
 
     /* HeroUI sizes the content h-full; in a wrapped row that height is circular and pushes the action out of the
