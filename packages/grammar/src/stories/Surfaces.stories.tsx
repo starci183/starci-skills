@@ -120,6 +120,49 @@ const StaticRows = () => (
   </G.SurfaceListCard>
 );
 
+/** `ListRow`: an interactive row on the static row's geometry - leading mark, title with badges, one line, actions, a detail region. */
+export const ListRow: Story = {
+  render: () => (
+    <Matrix maxWidth={720}>
+      <State label="Several accounts of one provider" direction="column">
+        <G.SurfaceListCard label="Bank feed" fact="3 accounts" labelEnd={<G.Button variant="ghost" onPress={noop}>Add</G.Button>}>
+          <G.ListRow
+            leading={<G.IconTile source={BookGlyph} />}
+            title="Main account"
+            badges={<><G.Badge tone="success" isDot>Connected</G.Badge><G.Badge tone="neutral">Test</G.Badge></>}
+            description="Bank A · •••• 4321 · Holder name · Used by: Accounting"
+            actions={<G.IconButton source={PlusGlyph} label="Options for Main account" variant="ghost" onPress={noop} />}
+          />
+          <G.ListRow
+            leading={<G.IconTile source={BookGlyph} />}
+            title="Second account"
+            badges={<G.Badge tone="warning" isDot>Unfinished</G.Badge>}
+            description="Bank A · •••• 1234 · Holder name"
+            actions={<><G.Button variant="secondary" onPress={noop}>Continue</G.Button><G.IconButton source={PlusGlyph} label="Options for Second account" variant="ghost" onPress={noop} /></>}
+            state="cautionary"
+          />
+          <G.ListRow
+            leading={<G.IconTile source={BookGlyph} />}
+            title="Old account"
+            badges={<G.Badge tone="danger" isDot>Needs attention</G.Badge>}
+            description="Bank B · •••• 9876"
+            actions={<G.IconButton source={PlusGlyph} label="Options for Old account" variant="ghost" onPress={noop} />}
+            state="negative"
+          >
+            <G.Alert tone="negative" title="The provider rejected the last delivery" description="Check the key on the provider, then send a test." />
+          </G.ListRow>
+        </G.SurfaceListCard>
+      </State>
+      <State label="Offers without a leading mark, mixed with a static row" direction="column">
+        <G.SurfaceListCard label="Not connected">
+          <G.ListRow title="Chat bot" description="Customers message your bot." actions={<G.Button variant="outline" onPress={noop}>Connect</G.Button>} />
+          <G.StaticStateRow item={{ id: 'static', label: 'Static row', description: 'Shares the same inset and separator' }} />
+        </G.SurfaceListCard>
+      </State>
+    </Matrix>
+  ),
+};
+
 export const StaticStateRow: Story = {
   render: () => (
     <Matrix maxWidth={560}>

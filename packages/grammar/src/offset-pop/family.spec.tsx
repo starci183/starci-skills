@@ -117,6 +117,7 @@ const EVERY_COMMON_RENDERER: Readonly<Record<CommonGrammarComponentName, () => R
     Spinner: () => <C.Spinner label="Loading" size="lg" />,
     StateMark: () => <C.StateMark state="affirmative" />,
     StaticStateRow: () => <ul><C.StaticStateRow item={{ id: "a", label: "Ready", state: "affirmative" }} /></ul>,
+    ListRow: () => <ul><C.ListRow title="Ready" description="Detail" actions={<C.Button variant="outline">Open</C.Button>} /></ul>,
     Stepper: () => <C.Stepper label="Progress" currentStepId="two" steps={[{ id: "one", label: "One", state: "complete" }, { id: "two", label: "Two" }, { id: "three", label: "Three" }]} />,
     Subnav: () => <C.Subnav label="Course" title="Lesson" menuIcon={<span />} openMenuLabel="Open" closeMenuLabel="Close" isMenuOpen={false} />,
     SurfaceAccordionCard: () => (

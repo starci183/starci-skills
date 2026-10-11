@@ -92,9 +92,14 @@ export const SurfaceListCard = (props: SurfaceListCardProps) => {
             data-grammar-surface-depth={depth}
         >
             {label === undefined || labelHidden ? null : (
-                <div className={surfaceLabelClassName} data-contract="GAP-2" data-grammar-surface-label="true">
+                <div
+                    className={surfaceLabelClassName}
+                    data-contract="GAP-2"
+                    data-grammar-surface-label="true"
+                    data-grammar-label-end={labelEnd === undefined ? "false" : "true"}
+                >
                     <Label as={`h${headingLevel}`} id={headingId} depth={depth}>{label}</Label>
-                    {labelEnd ?? (fact === undefined ? null : (
+                    {fact === undefined ? null : (
                         <span
                             className={surfaceFactClassName}
                             data-grammar-surface-depth={depth}
@@ -102,7 +107,8 @@ export const SurfaceListCard = (props: SurfaceListCardProps) => {
                         >
                             {fact}
                         </span>
-                    ))}
+                    )}
+                    {labelEnd === undefined ? null : <span className="starci-core-surface-label-end">{labelEnd}</span>}
                 </div>
             )}
             <div

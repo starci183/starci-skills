@@ -689,6 +689,18 @@
         margin: 0;
     }
 
+    /* A label row carrying both a fact and an end action: label and fact read together, the action holds the end. */
+    .starci-core-surface-label[data-grammar-label-end="true"] {
+        justify-content: flex-start;
+    }
+
+    .starci-core-surface-label-end {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        margin-inline-start: auto;
+    }
+
     .starci-core-label {
         min-width: 0;
         margin: 0;
@@ -1238,6 +1250,108 @@
 
     .starci-core-static-row + .starci-core-static-row {
         border-top: 1px solid var(--separator, var(--border, GrayText));
+    }
+
+    /*
+     * ListRow: an interactive row on the static row's geometry (inset, row gap, edge-to-edge separator).
+     * Collapsed by default (the collapse law): leading mark and copy share the first line, the actions and the
+     * detail take their own lines. A surface wider than 28rem lays it out as leading | copy | actions.
+     */
+    .starci-core-list-row {
+        flex-wrap: wrap;
+        align-items: center;
+        column-gap: var(--grammar-row-gap, 0.75rem);
+        row-gap: var(--grammar-row-gap, 0.75rem);
+    }
+
+    .starci-core-list-row-leading {
+        display: flex;
+        flex: none;
+        align-items: center;
+    }
+
+    .starci-core-list-row-copy {
+        display: flex;
+        min-width: 0;
+        flex: 1 1 0%;
+        flex-direction: column;
+        gap: var(--starci-core-copy-gap, 0.25rem);
+    }
+
+    .starci-core-list-row-title {
+        display: flex;
+        min-width: 0;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--grammar-inline-gap, 0.5rem);
+    }
+
+    .starci-core-list-row-name {
+        min-width: 0;
+        font-weight: 600;
+        overflow-wrap: anywhere;
+    }
+
+    .starci-core-list-row-badges {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--grammar-inline-gap, 0.5rem);
+    }
+
+    .starci-core-list-row-description {
+        min-width: 0;
+        color: var(--muted, GrayText);
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        overflow-wrap: anywhere;
+    }
+
+    .starci-core-list-row-actions {
+        display: flex;
+        flex: 1 1 100%;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--grammar-inline-gap, 0.5rem);
+    }
+
+    .starci-core-list-row-detail {
+        display: flex;
+        min-width: 0;
+        flex: 1 1 100%;
+        flex-direction: column;
+        gap: var(--grammar-row-gap, 0.75rem);
+    }
+
+    @container starci-core-surface (min-width: 28.001rem) {
+        .starci-core-list-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+        }
+
+        .starci-core-list-row[data-grammar-leading="true"] {
+            grid-template-columns: auto minmax(0, 1fr) auto;
+        }
+
+        .starci-core-list-row[data-grammar-actions="false"] {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .starci-core-list-row[data-grammar-leading="true"][data-grammar-actions="false"] {
+            grid-template-columns: auto minmax(0, 1fr);
+        }
+
+        .starci-core-list-row-actions {
+            justify-content: flex-end;
+        }
+
+        .starci-core-list-row-detail {
+            grid-column: 1 / -1;
+        }
+
+        .starci-core-list-row[data-grammar-leading="true"] > .starci-core-list-row-detail {
+            grid-column: 2 / -1;
+        }
     }
 
     .starci-core-list-shell[data-grammar-hover="invariant"] .starci-core-static-row:hover {

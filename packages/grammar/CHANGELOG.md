@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.9.1 - 2026-10-11
+
+Minor, additive (nivo-lite connections: several accounts per provider, read from the UI knowledge - COLLECTION-1/2,
+PADDING-0/4 side contact, BOUNDARY-3, DISCIPLINE-1, ACCENT-2; owner approved publishing @starci packages).
+
+- **`ListRow`** (composite, exported from every entry and the registry; 103 renderers): an interactive `<li>` for
+  `SurfaceListCard` - `leading` (an `IconTile`, avatar or logo tile), `title`, `badges` (at most two), one muted
+  `description`, trailing `actions` (one visible `Button`, then a `DropdownMenu`), and a `children` detail region under
+  the copy (an `Alert` about the row, revealed values). It carries `starci-core-static-row` as well as
+  `starci-core-list-row`, so it shares the row inset (PADDING-4), the row gap and the edge-to-edge separator with
+  `StaticStateRow` and the two mix in one collection. Collapsed by default (collapse law): mark and copy share a line,
+  actions and detail take their own; `@container starci-core-surface (min-width: 28.001rem)` lays it out as
+  leading | copy | actions. `state` and `verdict` expose `data-grammar-state` / `data-verdict` as `StaticStateRow` does.
+- **`SurfaceListCard` label row shows a `fact` and a `labelEnd` together.** Before, `labelEnd` replaced the fact; now
+  the fact reads beside the label (e.g. a count) and the end slot (`.starci-core-surface-label-end`) holds the end
+  (`data-grammar-label-end`). A lone fact renders as before.
+
 ## 0.9.0 - 2026-10-11
 
 Minor, additive (owner, 2026-10-11: "add every gap the conformance lanes reported"). Every grammar gap the app-wide
