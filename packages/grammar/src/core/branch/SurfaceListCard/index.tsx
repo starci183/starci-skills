@@ -1,6 +1,7 @@
 "use client"
 
 import { Children, useId, type ReactNode } from "react"
+import { ListRow } from "../../composite/ListRow/index.js"
 import type { RowVerdict } from "../../composite/StaticStateRow/index.js"
 import { VerticalScrollRegion } from "../../composite/VerticalScrollRegion/index.js"
 import { DEFAULT_SURFACE_HEADING_LEVEL, Label, type SurfaceHeadingLevel } from "../../primitive/Label/index.js"
@@ -27,7 +28,13 @@ type SurfaceListFrameProps = (LabelledSurfaceList | SelfNamedSurfaceList) & {
      * above this surface so the page never skips a level.
      */
     readonly headingLevel?: SurfaceHeadingLevel
+    /**
+     * The collection is loading (knowledge STATE-8). With no `children` it draws `loadingRows` skeleton rows (ListRow
+     * anatomy, `aria-hidden`) and is `aria-busy`; real `children` win over the skeleton rows.
+     */
     readonly isLoading?: boolean
+    /** How many skeleton rows a loading card draws (default 3, 1 to 12). */
+    readonly loadingRows?: number
     /**
      * The collection reports outcomes: it squares its corners and paints each row's verdict edge.
      *
@@ -57,6 +64,9 @@ export type SurfaceListCardProps = SurfaceListFrameProps & {
     readonly empty?: ReactNode
 }
 
+const DEFAULT_LOADING_ROWS = 3
+const clampRows = (rows: number) => Math.min(12, Math.max(1, Math.floor(Number.isFinite(rows) ? rows : DEFAULT_LOADING_ROWS)))
+
 export const SurfaceListCard = (props: SurfaceListCardProps) => {
     const {
         label,
@@ -70,12 +80,15 @@ export const SurfaceListCard = (props: SurfaceListCardProps) => {
         depth = "top",
         headingLevel = DEFAULT_SURFACE_HEADING_LEVEL,
         isLoading = false,
+        loadingRows = DEFAULT_LOADING_ROWS,
         isVerdict = false,
         isScrollable = false,
     } = props
     const headingId = useId()
     const accessibleName = ariaLabel ?? label
-    const isEmpty = empty !== undefined && Children.toArray(children).length === 0
+    const hasRows = Children.toArray(children).length > 0
+    const isSkeleton = isLoading && !hasRows
+    const isEmpty = !isSkeleton && empty !== undefined && !hasRows
     const collectionSemantics = isEmpty
         ? {}
         : isScrollable
@@ -128,9 +141,12 @@ export const SurfaceListCard = (props: SurfaceListCardProps) => {
                     data-grammar-collection={isVerdict ? "verdict" : "list"}
                     data-grammar-list="true"
                     data-loading={String(isLoading)}
+                    {...(isLoading ? { "aria-busy": true } : {})}
                     isScrollable={isScrollable}
                 >
-                    {isEmpty ? empty : children}
+                    {isSkeleton
+                        ? Array.from({ length: clampRows(loadingRows) }, (_, index) => <ListRow key={index} isSkeleton title="" description="" leading="" actions="" />)
+                        : isEmpty ? empty : children}
                 </VerticalScrollRegion>
             </div>
             {footer === undefined ? null : (

@@ -11,6 +11,7 @@ import {
     FieldDescription,
     FieldErrorText,
     FieldLabel,
+    FieldSkeleton,
     fieldVariantAttributes,
     useGrammarPortal,
     vendorFieldProps,
@@ -33,6 +34,11 @@ export type SelectProps = FieldControlProps & {
     readonly onValueChange?: (value: string | null) => void
     /** Options are still arriving. The trigger stays named and focusable, announces pending, and does not open. */
     readonly isPending?: boolean
+    /**
+     * Initial unresolved content (knowledge STATE-8): the label stays real and the trigger becomes a Skeleton field of the
+     * same height, `aria-hidden` and not focusable; the root is `aria-busy`. Unlike `isPending` it does not announce a value.
+     */
+    readonly isSkeleton?: boolean
     /** Layer variant: `secondary` when the control sits on a surface (ANATOMY-2 case-1). */
     readonly variant?: "primary" | "secondary"
 }
@@ -90,6 +96,7 @@ export const Select = ({
     defaultValue,
     onValueChange,
     isPending = false,
+    isSkeleton = false,
     variant = "primary",
     ...field
 }: SelectProps) => {
@@ -99,6 +106,10 @@ export const Select = ({
     const selection = readOnly
         ? { value: value === undefined ? heldValue : value }
         : value === undefined ? defaultValue === undefined ? {} : { defaultValue } : { value }
+
+    if (isSkeleton) {
+        return <FieldSkeleton component="Select" tier="branch" label={field.label} isLabelHidden={field.isLabelHidden} isRequired={field.isRequired} variant={variant} kind="select" className="starci-core-select" />
+    }
 
     return (
         <HeroSelect

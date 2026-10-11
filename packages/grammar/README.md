@@ -17,7 +17,7 @@ npm install @starci/grammar @heroui/react react react-dom
 npm install ./.claude/packages/grammar
 ```
 
-The package needs Node.js 20 or newer. Its peer dependencies are React 18+ and `@heroui/react`
+The package needs Node.js 20 or newer. Its peer dependencies are React 18+, `@xyflow/react` 12 (for `FlowGraph`) and `@heroui/react`
 3.2+. Load the HeroUI stylesheet once in the app, as HeroUI's own setup describes. Then import
 exactly one Grammar family stylesheet. Each family sheet already imports Common anatomy first.
 

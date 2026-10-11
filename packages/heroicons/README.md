@@ -10,7 +10,8 @@ import { MindMapIcon as MindMapSolidIcon } from "@starci/heroicons/16/solid"
 
 Course navigation cuts include `CourseOverviewIcon`, `CourseContentIcon`,
 `PersonalProjectIcon`, `FlashcardsIcon`, `MockInterviewIcon`, `FoundationsIcon`,
-`PlaygroundIcon`, `MindMapIcon`, `CourseLeaderboardIcon`, and `CourseQaIcon`.
+`PlaygroundIcon`, `MindMapIcon`, `CourseLeaderboardIcon`, and `CourseQaIcon`. Product cuts include `BrainIcon`
+(a shared business memory, the "second brain").
 
 Both subpaths export custom StarCi cuts only. Consumers import upstream icons directly from
 `@heroicons/react`; this package never re-exports them. Custom outline cuts use the native

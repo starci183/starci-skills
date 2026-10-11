@@ -142,6 +142,9 @@ export const Textarea: Story = {
       <State label="Default" direction="column">
         <G.Textarea label="Bio" description="A sentence or two." placeholder="Tell people about yourself" rows={3} />
       </State>
+      <State label="Loading (isSkeleton)" direction="column">
+        <G.Textarea label="Bio" rows={3} isSkeleton />
+      </State>
       <State label="Invalid" direction="column">
         <G.Textarea label="Bio" isInvalid errorMessage="Keep it under 20 characters." defaultValue="This bio is a little too long." maxLength={20} />
       </State>
@@ -156,6 +159,9 @@ export const Textarea: Story = {
 export const SearchField: Story = {
   render: () => (
     <Matrix maxWidth={formColumn}>
+      <State label="Loading (isSkeleton)" direction="column">
+        <G.SearchField label="Search" isSkeleton />
+      </State>
       <State label="Default" direction="column">
         <G.SearchField label="Search" isLabelHidden placeholder="Search lessons" clearLabel="Clear search" />
       </State>
@@ -178,6 +184,9 @@ export const SearchField: Story = {
 export const NumberField: Story = {
   render: () => (
     <Matrix maxWidth={formColumn}>
+      <State label="Loading (isSkeleton)" direction="column">
+        <G.NumberField label="Seats" isSkeleton />
+      </State>
       <State label="Default" direction="column">
         <G.NumberField label="Seats" defaultValue={3} minValue={1} maxValue={50} />
       </State>
@@ -220,6 +229,9 @@ export const Checkbox: Story = {
 export const CheckboxGroup: Story = {
   render: () => (
     <Matrix maxWidth={formColumn}>
+      <State label="Loading (isSkeleton)" direction="column">
+        <G.CheckboxGroup label="Notifications" options={choiceOptions} isSkeleton />
+      </State>
       <State label="Default" direction="column">
         <G.CheckboxGroup label="Notifications" description="Choose any." options={choiceOptions} defaultValue={['email']} />
       </State>
@@ -258,6 +270,9 @@ export const RadioGroup: Story = {
 export const Switch: Story = {
   render: () => (
     <Matrix>
+      <State label="Loading (isSkeleton)">
+        <G.Switch label="Dark mode" isSkeleton />
+      </State>
       <State label="Default">
         <G.Switch label="Dark mode" />
       </State>
@@ -377,6 +392,9 @@ export const Select: Story = {
       <State label="Selected" direction="column">
         <G.Select label="Plan" options={planOptions} defaultValue="team" />
       </State>
+      <State label="Loading (isSkeleton)" direction="column">
+        <G.Select label="Plan" options={planOptions} isSkeleton />
+      </State>
       <State label="Pending" direction="column">
         <G.Select label="Plan" options={planOptions} isPending placeholder="Loading plans" />
       </State>
@@ -451,6 +469,9 @@ export const ComboBox: Story = {
 export const SegmentedControl: Story = {
   render: () => (
     <Matrix maxWidth={formColumn}>
+      <State label="Loading (isSkeleton)" direction="column">
+        <G.SegmentedControl label="Range" options={segmentOptions} isSkeleton />
+      </State>
       <State label="Selected" direction="column">
         <G.SegmentedControl label="Range" options={segmentOptions} defaultValue="week" />
       </State>

@@ -299,6 +299,8 @@ export const ChatBubble: Story = {
       >
         {'Draft reply ready.\nIt keeps the original price.'}
       </G.ChatBubble>
+      <G.ChatBubble isSkeleton side="outgoing" />
+      <G.ChatBubbleSkeletons />
     </div>
   ),
 };

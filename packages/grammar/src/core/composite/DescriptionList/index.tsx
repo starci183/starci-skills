@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import { navigationClassName } from "../../navigationClassNames.js"
 import type { IconSource } from "../../primitive/Icon/index.js"
+import { Skeleton } from "../../primitive/Skeleton/index.js"
 import { IconTile } from "../../primitive/IconTile/index.js"
 
 export type DescriptionListItem = {
@@ -43,6 +44,11 @@ type StatStripLayout = {
 export type DescriptionListProps = (PairLayout | StatStripLayout) & {
     /** Draw a separator between pairs (between cells, for `stat-strip`). */
     readonly isDivided?: boolean
+    /**
+     * Unresolved values (knowledge STATE-8): every `term` stays real text, each `description` (and a stat item meta)
+     * becomes a Skeleton text line so the cells keep their size, a stat `unit` is dropped, and the list is `aria-busy`.
+     */
+    readonly isLoading?: boolean
     readonly className?: string
 }
 
@@ -53,7 +59,8 @@ export type DescriptionListProps = (PairLayout | StatStripLayout) & {
  * second `<dd>` of the same term.
  */
 export const DescriptionList = (props: DescriptionListProps) => {
-    const { isDivided = true, className } = props
+    const { isDivided = true, isLoading = false, className } = props
+    const pending = <Skeleton shape="text" />
     const layout: DescriptionListLayout = props.layout ?? "columns"
     return (
         <dl
@@ -61,6 +68,7 @@ export const DescriptionList = (props: DescriptionListProps) => {
             data-component="DescriptionList"
             data-contract="HIERARCHY-3 TRUTH-1"
             data-tier="composite"
+            {...(isLoading ? { "aria-busy": true, "data-loading": "true" } : {})}
             data-grammar-description-layout={layout}
             data-grammar-description-divided={isDivided ? "true" : "false"}
         >
@@ -72,18 +80,18 @@ export const DescriptionList = (props: DescriptionListProps) => {
                             <span>{item.term}</span>
                         </dt>
                         <dd className="starci-core-description-value starci-core-description-figure" data-contract="FONT-5">
-                            <span className="starci-core-description-figure-value">{item.description}</span>
-                            {item.unit === undefined ? null : <span className="starci-core-description-unit">{item.unit}</span>}
+                            <span className="starci-core-description-figure-value">{isLoading ? pending : item.description}</span>
+                            {item.unit === undefined || isLoading ? null : <span className="starci-core-description-unit">{item.unit}</span>}
                         </dd>
                         {item.meta === undefined ? null : (
-                            <dd className="starci-core-description-meta" data-contract="FONT-2">{item.meta}</dd>
+                            <dd className="starci-core-description-meta" data-contract="FONT-2">{isLoading ? pending : item.meta}</dd>
                         )}
                     </div>
                 ))
                 : props.items.map((item) => (
                     <div key={item.id} className="starci-core-description-pair" data-grammar-description-pair="true">
                         <dt className="starci-core-description-term">{item.term}</dt>
-                        <dd className="starci-core-description-value">{item.description}</dd>
+                        <dd className="starci-core-description-value">{isLoading ? pending : item.description}</dd>
                     </div>
                 ))}
         </dl>

@@ -6,6 +6,7 @@ import {
     FieldDescription,
     FieldErrorText,
     FieldLabel,
+    FieldSkeleton,
     fieldVariantAttributes,
     isFieldInvalid,
     vendorFieldProps,
@@ -41,6 +42,11 @@ export type TextareaProps = FieldControlProps & {
     readonly defaultValue?: string
     /** Initial visible lines. The field still grows with the reader's own resize. */
     readonly rows?: number
+    /**
+     * Initial unresolved content (knowledge STATE-8): the label stays real and the field becomes a Skeleton block of the
+     * `rows` height, `aria-hidden` and not focusable; the root is `aria-busy`.
+     */
+    readonly isSkeleton?: boolean
     /** Also shows a live `count / max` beside the guidance. */
     readonly maxLength?: number
     readonly minLength?: number
@@ -89,6 +95,7 @@ export const Textarea = ({
     value,
     defaultValue,
     rows = 4,
+    isSkeleton = false,
     maxLength,
     minLength,
     onValueChange,
@@ -162,6 +169,10 @@ export const Textarea = ({
     }
 
     const activeId = isOpen ? `${listId}-${suggestions[active]?.id ?? ""}` : undefined
+
+    if (isSkeleton) {
+        return <FieldSkeleton component="Textarea" tier="atom" label={field.label} isLabelHidden={field.isLabelHidden} isRequired={field.isRequired} variant={variant} kind="textarea" rows={rows} className="starci-core-textarea" />
+    }
 
     return (
         <HeroTextField

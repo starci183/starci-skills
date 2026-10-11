@@ -398,6 +398,11 @@ export const Link: Story = {
 export const Avatar: Story = {
   render: () => (
     <Matrix>
+      <State label="Loading (isSkeleton)">
+        <G.Avatar name="Alex Morgan" isSkeleton size="sm" />
+        <G.Avatar name="Alex Morgan" isSkeleton />
+        <G.Avatar name="Alex Morgan" isSkeleton size="lg" />
+      </State>
       <State label="Initials fallback and image">
         <G.Avatar name="Alex Morgan" />
         <G.Avatar name="Sam Lee" src={placeholderImage('S', 200)} />
@@ -503,6 +508,9 @@ export const Skeleton: Story = {
 export const Meter: Story = {
   render: () => (
     <Matrix maxWidth={420}>
+      <State label="Loading (isSkeleton)" direction="column">
+        <G.Meter label="Storage" value={32} isSkeleton />
+      </State>
       <State label="Tones" direction="column">
         <G.Meter label="Storage" value={32} tone="neutral" />
         <G.Meter label="Goal" value={80} tone="affirmative" valueLabel="8 of 10 lessons" />

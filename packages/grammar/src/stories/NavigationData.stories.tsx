@@ -77,6 +77,9 @@ export const AvatarGroup: Story = {
 export const Breadcrumbs: Story = {
   render: () => (
     <Matrix>
+      <State label="Current crumb still loading (isSkeleton)">
+        <G.Breadcrumbs label="Breadcrumb" items={[{ id: 'home', label: 'Home', href: '#home' }, { id: 'lessons', label: 'Lessons', href: '#lessons' }, { id: 'lesson', label: '', isSkeleton: true }]} />
+      </State>
       <State label="Trail ending at the current page">
         <G.Breadcrumbs
           label="Breadcrumb"
@@ -158,6 +161,9 @@ export const DataTable: Story = {
       <State label="Loading (pending)" direction="column">
         <G.DataTable label="Lessons loading" columns={lessonColumns} rows={[] as ReadonlyArray<Lesson>} renderCell={lessonCell} isLoading loadingContent="Loading lessons" emptyContent="No lessons." />
       </State>
+      <State label="Loading (3 skeleton rows, real headers)" direction="column">
+        <G.DataTable label="Lessons skeleton" columns={lessonColumns} rows={[] as ReadonlyArray<Lesson>} renderCell={lessonCell} isLoading emptyContent="No lessons." />
+      </State>
       <State label="Empty" direction="column">
         <G.DataTable label="No lessons" columns={lessonColumns} rows={[] as ReadonlyArray<Lesson>} renderCell={lessonCell} emptyContent="No lessons match these filters." />
       </State>
@@ -168,6 +174,12 @@ export const DataTable: Story = {
 export const DescriptionList: Story = {
   render: () => (
     <Matrix maxWidth={560}>
+      <State label="Loading (terms stay, values become skeletons)" direction="column">
+        <G.DescriptionList isLoading items={[{ id: 'plan', term: 'Plan', description: 'Team' }, { id: 'seats', term: 'Seats', description: '8 of 10' }]} />
+      </State>
+      <State label="Loading, stat strip" direction="column">
+        <G.DescriptionList isLoading layout="stat-strip" items={[{ id: 'a', term: 'Revenue', description: '1,200', meta: 'Today' }, { id: 'b', term: 'Users', description: '40', meta: 'Today' }]} />
+      </State>
       <State label="Columns, divided" direction="column">
         <G.DescriptionList
           isDivided
@@ -203,9 +215,55 @@ const listItems: ReadonlyArray<G.ListBoxItem> = [
   { id: 'spam', label: 'Spam', isDisabled: true },
 ];
 
+const brainNodes: ReadonlyArray<G.FlowGraphNode> = [
+  { id: 'brain', label: 'Second brain', size: 'lg', tone: 'accent', isRoot: true },
+  { id: 'people', label: 'People', count: 12, tone: 'success' },
+  { id: 'projects', label: 'Projects', count: 5, tone: 'neutral' },
+  { id: 'ideas', label: 'Ideas', count: 31, tone: 'warning' },
+  { id: 'reading', label: 'Reading list', isPlaceholder: true },
+  { id: 'ada', label: 'Ada', description: 'Mentor', size: 'sm' },
+  { id: 'nivo', label: 'NIVO', size: 'sm', tone: 'accent' },
+  { id: 'journal', label: 'Journal', size: 'sm', isPlaceholder: true },
+];
+const brainEdges: ReadonlyArray<G.FlowGraphEdge> = [
+  { id: 'e1', source: 'brain', target: 'people' },
+  { id: 'e2', source: 'brain', target: 'projects' },
+  { id: 'e3', source: 'brain', target: 'ideas' },
+  { id: 'e4', source: 'brain', target: 'reading', isPlaceholder: true },
+  { id: 'e5', source: 'people', target: 'ada' },
+  { id: 'e6', source: 'projects', target: 'nivo' },
+  { id: 'e7', source: 'ideas', target: 'journal', isPlaceholder: true },
+];
+
+export const FlowGraph: Story = {
+  render: () => {
+    const Demo = () => {
+      const [selectedId, setSelectedId] = useState<string | null>('projects');
+      return <G.FlowGraph label="Second brain" nodes={brainNodes} edges={brainEdges} selectedId={selectedId} onSelect={setSelectedId} />;
+    };
+    return (
+      <Matrix maxWidth={720}>
+        <State label="Radial, selectable" direction="column"><Demo /></State>
+        <State label="Static, no controls" direction="column">
+          <G.FlowGraph label="Second brain (static)" nodes={brainNodes} edges={brainEdges} height="sm" isInteractive={false} />
+        </State>
+        <State label="Loading" direction="column">
+          <G.FlowGraph label="Second brain (loading)" nodes={[]} edges={[]} isLoading />
+        </State>
+        <State label="Empty" direction="column">
+          <G.FlowGraph label="Empty map" nodes={[]} edges={[]} emptyLabel="Nothing connected yet." />
+        </State>
+      </Matrix>
+    );
+  },
+};
+
 export const ListBox: Story = {
   render: () => (
     <Matrix maxWidth={360}>
+      <State label="Loading (isLoading)" direction="column">
+        <G.ListBox label="Folders" items={[]} isLoading />
+      </State>
       <State label="Single selection (selected)" direction="column">
         <G.ListBox label="Folders" items={listItems} selectionMode="single" defaultSelectedIds={['inbox']} />
       </State>
@@ -305,6 +363,9 @@ const steps: ReadonlyArray<G.StepperStep> = [
 export const Stepper: Story = {
   render: () => (
     <Matrix maxWidth={720}>
+      <State label="Loading (isSkeleton)" direction="column">
+        <G.Stepper label="Sign-up progress" steps={steps} currentStepId="profile" isLoading />
+      </State>
       <State label="Horizontal, current step" direction="column">
         <G.Stepper label="Sign-up progress" steps={steps} currentStepId="profile" onStepSelect={noop} />
       </State>
@@ -343,7 +404,7 @@ const RemovableTags = () => {
 export const TagGroup: Story = {
   render: () => (
     <Matrix>
-      <State label="Selectable (selected)">
+      <State label="Selectable (secondary face + border; selected = accent-soft + accent border)">
         <G.TagGroup label="Topics" items={tags} selectionMode="multiple" defaultSelectedIds={['grammar']} />
       </State>
       <State label="Removable"><RemovableTags /></State>
@@ -361,6 +422,9 @@ export const TagGroup: Story = {
 export const Timeline: Story = {
   render: () => (
     <Matrix maxWidth={560}>
+      <State label="Loading (isSkeleton)" direction="column">
+        <G.Timeline label="Order history" items={[]} isLoading />
+      </State>
       <State label="States with a current item" direction="column">
         <G.Timeline
           label="Order history"

@@ -124,6 +124,51 @@
         resize: vertical;
     }
 
+    /*
+     * Loading field (knowledge STATE-8, Select and Textarea `isSkeleton`): the label stays real, the control is one
+     * Skeleton block of the loaded control's height (the select trigger 2.5rem, with the touch floor below; the textarea
+     * `rows` at 1.25rem a line plus its padding, never under the 5rem field minimum). Not focusable: no control exists.
+     */
+    .starci-core-field-skeleton-control { display: block; min-width: 0; }
+
+    .starci-core-field-skeleton-control > .starci-core-skeleton {
+        block-size: 100%;
+        aspect-ratio: auto;
+        border-radius: var(--field-radius, calc(var(--radius, 0.5rem) * 1.5));
+    }
+
+    .starci-core-field-skeleton-control:is([data-grammar-field-skeleton="select"], [data-grammar-field-skeleton="input"]) { block-size: 2.5rem; }
+
+    /* Joined segments: one block, a segment-width (5rem) per option, never wider than the field; `fill` takes the whole row. */
+    .starci-core-field-skeleton-control[data-grammar-field-skeleton="segmented"] {
+        block-size: 2.5rem;
+        inline-size: min(100%, calc(var(--starci-core-skeleton-segments, 2) * 5rem));
+    }
+
+    .starci-core-field-skeleton-control[data-grammar-field-skeleton="segmented"][data-width="fill"] { inline-size: 100%; }
+
+    /* A checkbox box and a switch track beside their real labels. */
+    .starci-core-field-skeleton-control[data-grammar-field-skeleton="choice"] { flex: none; block-size: 1rem; inline-size: 1rem; }
+    .starci-core-field-skeleton-control[data-grammar-field-skeleton="choice"] > .starci-core-skeleton { border-radius: 0.25rem; }
+    .starci-core-field-skeleton-control[data-grammar-field-skeleton="switch"] { flex: none; block-size: 1.25rem; inline-size: 2rem; }
+    .starci-core-field-skeleton-control[data-grammar-field-skeleton="switch"] > .starci-core-skeleton { border-radius: 999px; }
+
+    .starci-core-field-skeleton-choice-label {
+        color: var(--foreground, CanvasText);
+        font-size: 0.875rem;
+        line-height: 1.25;
+    }
+
+    .starci-core-field-skeleton-control[data-grammar-field-skeleton="textarea"] {
+        block-size: max(5rem, calc(var(--starci-core-skeleton-rows, 4) * 1.25rem + 1rem));
+    }
+
+    @media (pointer: coarse), (max-width: 40rem) {
+        .starci-core-field-skeleton-control:is([data-grammar-field-skeleton="select"], [data-grammar-field-skeleton="input"], [data-grammar-field-skeleton="segmented"]) {
+            min-block-size: var(--starci-core-control-min-size, 2.75rem);
+        }
+    }
+
     .starci-core-select-trigger,
     .starci-core-combo-box-group,
     .starci-core-search-field-group,

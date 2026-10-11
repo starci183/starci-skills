@@ -324,6 +324,15 @@
         overflow-wrap: anywhere;
     }
 
+    /* Loading header (knowledge STATE-8): the same ranks and sizes, the copy drawn as Skeleton text, the action as a footprint. */
+    .starci-core-section-skeleton-title > .starci-core-skeleton-group { inline-size: min(60%, 20rem); }
+    .starci-core-section-skeleton-title .starci-core-skeleton { block-size: 1em; }
+    .starci-core-section-skeleton-description > .starci-core-skeleton-group { inline-size: min(90%, 28rem); }
+    .starci-core-section-skeleton-meta > .starci-core-skeleton-group { inline-size: 6rem; }
+    .starci-core-section-skeleton-meta .starci-core-skeleton { block-size: 0.75rem; }
+    .starci-core-section-skeleton-action { display: block; inline-size: 6rem; block-size: 2.5rem; }
+    .starci-core-section-skeleton-action > .starci-core-skeleton { block-size: 100%; aspect-ratio: auto; border-radius: 0.5rem; }
+
     /*
      * Keyboard-reachable scroll owners (VerticalScrollRegion / HorizontalScrollRegion when focusable,
      * the Rail body, fenced code and Markdown table frames) draw the same inset focus ring the chat
@@ -1275,7 +1284,8 @@
     .starci-core-list-row-copy {
         display: flex;
         min-width: 0;
-        flex: 1 1 0%;
+        /* Collapsed (flex) row: the copy keeps at least 12rem before the actions wrap under it (0.9.4). */
+        flex: 1 1 12rem;
         flex-direction: column;
         gap: var(--starci-core-copy-gap, 0.25rem);
     }
@@ -1311,11 +1321,18 @@
 
     .starci-core-list-row-actions {
         display: flex;
-        flex: 1 1 100%;
+        /* Stays at the end of the copy line while leading + 12rem copy + actions fit; wraps only when they do not (0.9.4). */
+        flex: 0 1 auto;
         flex-wrap: wrap;
         align-items: center;
         gap: var(--grammar-inline-gap, 0.5rem);
     }
+
+    /* Skeleton row (knowledge STATE-8): the copy lines take a share of the row, the action keeps a button footprint. */
+    .starci-core-list-row[data-grammar-skeleton="true"] .starci-core-list-row-name { flex: 0 1 55%; }
+    .starci-core-list-row[data-grammar-skeleton="true"] .starci-core-list-row-description { inline-size: 85%; }
+    .starci-core-list-row-skeleton-action { display: block; inline-size: 4.5rem; block-size: 2rem; }
+    .starci-core-list-row-skeleton-action > .starci-core-skeleton { block-size: 100%; aspect-ratio: auto; border-radius: 0.5rem; }
 
     .starci-core-list-row-detail {
         display: flex;
@@ -2740,11 +2757,6 @@
     }
 
     /* Region, List, ListItem: semantic page structure that draws nothing of its own. */
-    .starci-core-region {
-        display: block;
-        min-width: 0;
-    }
-
     .starci-core-region[data-grammar-region-spacing="spaced"] {
         padding-block-end: 2rem;
     }
@@ -2763,22 +2775,6 @@
     .starci-core-nav-landmark[data-grammar-nav-layout="scrolling"] {
         gap: 0.25rem;
         overflow-x: auto;
-    }
-
-    .starci-core-semantic-list {
-        display: flex;
-        flex-direction: column;
-        gap: 0;
-        margin: 0;
-        padding: 0;
-        list-style: none;
-    }
-
-    .starci-core-semantic-list-item {
-        display: block;
-        min-width: 0;
-        margin: 0;
-        padding: 0;
     }
 
     /* The unlabelled hairline (0.6.0): BOUNDARY-1, one pixel of --separator across its container, no margin. */
@@ -3482,6 +3478,11 @@
         .starci-core-chat-bubble-actions { transition: none; }
     }
 
+    /* Loading bubble (knowledge STATE-8): the face on its side with two Skeleton lines; a thread alternates sides. */
+    .starci-core-chat-bubble-skeleton-body { inline-size: min(18rem, 70vw); white-space: normal; }
+    .starci-core-chat-bubble-skeleton-body .starci-core-skeleton { block-size: 0.875rem; }
+    .starci-core-chat-bubble-thread { display: flex; min-width: 0; flex-direction: column; gap: 1rem; }
+
     @media (forced-colors: active) {
         .starci-core-chat-bubble-body { border: 1px solid CanvasText; }
     }
@@ -3536,3 +3537,30 @@
     .starci-core-mention-description { font-size: 0.75rem; color: var(--muted, GrayText); }
 }
 
+/*
+ * Element resets of the semantic structure primitives (0.9.4). They live in Tailwind's `base` layer, which a host declares before
+ * `utilities`, so a className the app passes for layout (`flex`, `gap-3`, `py-3`, `grid`) wins over them; without one, the default
+ * shape is unchanged. A host without Tailwind simply gets a `base` layer.
+ */
+@layer base {
+    .starci-core-semantic-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .starci-core-semantic-list-item {
+        display: block;
+        min-width: 0;
+        margin: 0;
+        padding: 0;
+    }
+
+    .starci-core-region {
+        display: block;
+        min-width: 0;
+    }
+}

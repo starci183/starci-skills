@@ -20,6 +20,7 @@ const RENDERERS: Readonly<Record<keyof typeof COMMON_NAVIGATION_COMPONENTS, stri
     DataTable: "src/core/branch/DataTable/index.tsx",
     DescriptionList: "src/core/composite/DescriptionList/index.tsx",
     Disclosure: "src/core/branch/Disclosure/index.tsx",
+    FlowGraph: "src/core/branch/FlowGraph/index.tsx",
     Footer: "src/core/composition/Footer/index.tsx",
     Image: "src/core/primitive/Image/index.tsx",
     Link: "src/core/primitive/Link/index.tsx",
@@ -53,7 +54,7 @@ describe("Offset Pop navigation-group treatment", () => {
     })
 
     it("targets every component this group adds by its data-component hook", () => {
-        expect(names).toHaveLength(19)
+        expect(names).toHaveLength(20)
         for (const name of names) {
             expect(familyCss, `missing Offset Pop treatment for ${name}`).toContain(`[data-component="${name}"]`)
             expect(read(RENDERERS[name]), `${name} must emit its hook`).toContain(`data-component="${name}"`)
@@ -129,7 +130,7 @@ describe("Common navigation-group anatomy", () => {
             Accordion: ".starci-core-generic-accordion", Avatar: ".starci-core-avatar", AvatarGroup: ".starci-core-avatar-group",
             BottomNav: ".starci-core-bottom-nav", Breadcrumbs: ".starci-core-breadcrumbs", Calendar: ".starci-core-calendar",
             DataTable: ".starci-core-data-table", DescriptionList: ".starci-core-description-list", Disclosure: ".starci-core-disclosure",
-            Footer: ".starci-core-footer", Image: ".starci-core-image", Link: ".starci-core-link", ListBox: ".starci-core-list-box",
+            FlowGraph: ".starci-core-flow-graph", Footer: ".starci-core-footer", Image: ".starci-core-image", Link: ".starci-core-link", ListBox: ".starci-core-list-box",
             Pagination: ".starci-core-pagination", Rating: ".starci-core-rating", Stepper: ".starci-core-stepper",
             TagGroup: ".starci-core-tag-group", Timeline: ".starci-core-timeline", TopBar: ".starci-core-top-bar",
         }

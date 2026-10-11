@@ -96,6 +96,9 @@ export const SurfaceListCard: Story = {
           <G.StaticStateRow item={{ id: 'l', label: 'Loading row', state: 'pending' }} />
         </G.SurfaceListCard>
       </State>
+      <State label="Loading (3 skeleton rows by default)" direction="column">
+        <G.SurfaceListCard label="Saved lessons" isLoading />
+      </State>
       <State label="Empty (notice, not a list)" direction="column">
         <G.SurfaceListCard label="Saved" empty={<G.EmptyNotice message="Nothing saved yet." description="Saved lessons appear here." />} />
       </State>
@@ -281,6 +284,9 @@ export const SectionHeader: Story = {
       </State>
       <State label="Count and trailing source meta" direction="column">
         <G.SectionHeader title="Installations" count={2} meta="Inventoried at 10:00, 26 Sep 2026 (GMT+7)" level={2} />
+      </State>
+      <State label="Loading (isSkeleton)" direction="column">
+        <G.SectionHeader eyebrow="Course" title="Grammar basics" description="Twelve short lessons." meta="Updated now" action={<G.Button variant="secondary" size="sm">Share</G.Button>} level={2} isSkeleton />
       </State>
     </Matrix>
   ),

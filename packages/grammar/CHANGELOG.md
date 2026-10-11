@@ -1,5 +1,113 @@
 # Changelog
 
+## 0.9.7 - 2026-10-11
+
+Minor, additive (owner ruling 2026-10-11, knowledge STATE-8: the loading view is the page's own component tree, labels real, only unresolved content as inert
+geometry). Closes the gaps an app migrating to it found. Same rules as the 0.9.5 loading views: skeleton geometry is `aria-hidden`, the owning region is
+`aria-busy`, no interactive child is drawn, and reduced motion comes from the existing Skeleton atom. No new catalog component (still 104).
+
+- **`SectionHeader isSkeleton`**: title, description and meta become Skeleton text (each only if passed), keeping the heading rank and size; `count` is dropped;
+  `action` keeps a small Skeleton footprint with no control inside; `eyebrow` stays real. The heading is `aria-hidden` with its line (no empty heading is announced); root `aria-busy`.
+- **`Breadcrumbs` item `isSkeleton?: true`**: a data-driven crumb whose label is not known yet draws a short Skeleton text line in place of its `label` and `leading`,
+  `aria-hidden`, never a link. The other crumbs stay real (pass `label: ""` for the unknown one).
+- **`Select isSkeleton`**: the label stays real text (still the name when `isLabelHidden`), the trigger becomes a Skeleton field of the same height (2.5rem, the touch floor on coarse pointers),
+  `aria-hidden`, nothing focusable; root `aria-busy`. Description and error copy are not drawn.
+- **`Textarea isSkeleton`**: label real, the field a Skeleton block of the `rows` height (1.25rem a line plus padding, never under the 5rem field minimum); no `<textarea>` is mounted; root `aria-busy`.
+- **`Meter isSkeleton`** (mirrors `Progress isSkeleton`): label real, the bar a static Skeleton bar of the track height; no `role="meter"`, value or reading is announced; root `aria-busy`.
+- **`ListBox isLoading` / `loadingRows`** (default 3, 1 to 12): with no `items`, skeleton options (a label line and a description line, `aria-hidden`) inside the same named list, which is
+  `aria-busy`; real `items` win and loading beats `emptyContent`.
+- **`ChatBubble isSkeleton`**: the bubble face on its `side` with two Skeleton text lines (a Skeleton circle only if `avatar` is passed); no author, meta, actions or footer; `aria-hidden`.
+  `children` is now optional. New helper **`ChatBubbleSkeletons`** (`count` default 3, 1 to 12; `hasAvatar`): a loading thread of alternating incoming and outgoing skeleton bubbles in one
+  `aria-busy` wrapper, for the `conversation` slot of a `ChatWorkspace` (which lays out whatever the app puts there; it owns no bubbles).
+- **Second pass (same release).**
+  - `NumberField`, `SearchField`, `SegmentedControl`, `CheckboxGroup`, `Switch` take `isSkeleton`: the label stays real, the control becomes `aria-hidden` Skeleton geometry of the
+    loaded size (one-line field 2.5rem with the touch floor; `SegmentedControl` one block, 5rem per option, `fill` stretches it; `CheckboxGroup` keeps every option label real beside a
+    Skeleton box, descriptions are not drawn, `orientation` is kept; `Switch` a Skeleton track beside its real label). Nothing is focusable and no `role` such as `switch` is announced; root `aria-busy`.
+  - `Avatar isSkeleton`: a Skeleton circle at the avatar's `size`, `aria-hidden`, no name or initials.
+  - `Stepper isLoading`: step labels stay real when given (an empty `label` draws a Skeleton text line), each marker is a static Skeleton circle, descriptions are not drawn, no step is
+    current or a button, the landmark is `aria-busy`. A stepper draws no connector line, so none is tinted.
+  - `Timeline isLoading` / `loadingRows` (default 3, 1 to 12): with no `items`, skeleton entries (static marker, title, time and description lines, `aria-hidden`) in the same named, `aria-busy` list, the
+    connector line tinted as skeleton; real `items` win.
+  - Offset Pop: the loading `NumberField`, `SearchField` and `SegmentedControl` keep the ink-outlined field box; a loading checkbox box and switch track keep the ink outline.
+- CSS lives in the group sheets: `styles.css` (SectionHeader, ChatBubble), `components-forms.css` (all loading fields), `components-navigation.css` (Breadcrumbs, ListBox, Avatar, Stepper, Timeline), `components-overlays.css` (Meter).
+  Offset Pop: a loading Select or Textarea keeps the ink-outlined field box and control radius; the loading Meter bar wears the ink-outlined track at the 0.75rem height.
+- Internal: `FieldSkeleton` in the `Field` module is the shared loading anatomy of every loading field.
+
+### Tests
+
+- `src/core/loading.spec.tsx` extended for all the components above under bare Common, Core and Offset Pop; new `src/core/v097.spec.tsx` (version, sheet placement, skeleton field sizes, token-only
+  rules, Offset Pop treatment, no animation of its own), wired into `npm test` after `v096`. `v095.spec` and `v096.spec` accept the 0.9.7 version.
+
+## 0.9.6 - 2026-10-11
+
+Patch (owner: "a group of buttons should use secondary and a border").
+
+- **Selectable `TagGroup` chips read as secondary buttons with a border** (`selectionMode` `single` or `multiple`). Unselected chips take the
+  secondary-button face (`--default`, hover `--default-hover`, default foreground) plus a 1px inset `--border`; selected chips keep
+  `--accent-soft` / `--accent-soft-foreground` and gain a 1px inset `--accent` border. `selectionMode="none"` groups and `isOff` chips are unchanged;
+  `aria-selected` and the `data-grammar-selected` hook are unchanged. The vendor `.tag--default` paint sits in the later `components` layer, so the
+  background (only) is `!important`, driven by `--starci-core-tag-bg` / `--starci-core-tag-bg-hover`. Forced colors: an unselected chip gets a
+  1px `ButtonText` outline (the inset shadow is dropped there) and a selected chip keeps its `Highlight` outline.
+  Offset Pop: the same chips take the ink outline, the family `--default` fill and a small ink offset shadow, like its secondary Button; selected stays pink and lifted.
+- `Select` `isLabelHidden`: already supported (it is part of `FieldControlProps`, rendered by the same `FieldLabel` as `SearchField`: the label stays
+  in the DOM as the accessible name, visually hidden). 0.9.6 adds a spec pinning it; no API change.
+
+## 0.9.5 - 2026-10-11
+
+Minor, additive (owner: the NIVO "Second brain" knowledge map must be drawn from grammar components only).
+
+- **New branch component `FlowGraph`** (Common renderer, 104 in all; exported from `@starci/grammar/common` and `/core`). A node-and-edge
+  map drawn with React Flow (`@xyflow/react`) in grammar tokens: pill nodes tinted by `tone` (`neutral`, `accent`, `success`,
+  `warning`, `danger`, `muted`), a `count` badge, an optional `description`, dashed outline and muted ink for `isPlaceholder`
+  slots; straight `--separator` edges, dashed for placeholder edges; no background grid; no attribution mark.
+  Props: `label` (required), `nodes`, `edges`, `selectedId`, `onSelect(id | null)`, `height` (`sm` 16rem, `md` 24rem, `lg` 32rem),
+  `isInteractive` (pan and zoom, default true), `showControls` (zoom buttons, default follows `isInteractive`), `layout`
+  (`radial` default, or `manual` with `node.position`) and `emptyLabel`. The radial layout puts the root (`isRoot`, else the first
+  node) in the centre, its direct children evenly on a ring and deeper levels on outer rings inside their parent's wedge;
+  `radialPositions(nodes, edges)` is exported for hosts that want the coordinates. The viewport fits on mount and whenever the node set changes.
+  Accessibility: a `figure` named by `label`; nodes are focusable and selectable with Enter or Space (Escape clears); the selected
+  node and keyboard focus use the package focus ring; a visually hidden list repeats every node with its count; edges never animate.
+- **New peer dependency `@xyflow/react` `^12.11.6`** (dev copy `12.11.6` for the tests). It is a peer, not a dependency, so an app keeps a single
+  React Flow copy; install it next to `@heroui/react` (`npm i @xyflow/react`). The structural rules React Flow needs are shipped
+  inside `common/styles.css`, scoped to `.starci-core-flow-graph`, so **no `@xyflow/react/dist/*.css` import is needed**.
+- **Loading views (knowledge STATE-8): the page own component tree, real labels, inert geometry only where content is unresolved.**
+  - `SurfaceListCard isLoading` draws `loadingRows` (new, default 3, 1 to 12) skeleton rows when it has no children, the collection
+    `aria-busy="true"`; real children still win, and loading beats the `empty` notice.
+  - `ListRow isSkeleton` (new): the same anatomy as inert geometry (title and description Skeleton text, leading Skeleton circle,
+    actions a small Skeleton footprint, each only if passed), `aria-hidden`, no interactive child.
+  - `DescriptionList isLoading` (new, incl. `layout="stat-strip"`): terms stay text, `description` and `meta` become Skeleton text,
+    `unit` is dropped, `aria-busy` on the root.
+  - `DataTable isLoading`: keeps the real column headers and draws `loadingRows` (new, default 3) `aria-hidden` skeleton rows instead of
+    the empty state; passing `loadingContent` keeps the old behaviour (that content replaces the body).
+  - `FlowGraph isLoading` (new): the frame at its height with a Skeleton block, no React Flow mounted, `aria-busy`.
+  Reduced motion comes from the existing Skeleton atom.
+- `package-boundary.spec.mjs` now expects the peer list `@heroui/react`, `@xyflow/react`, `react`; runtime `dependencies` stay empty.
+
+### Tests
+
+- `src/core/loading.spec.tsx` (default 3 rows, clamping, real labels, aria-hidden and aria-busy for each loading view).
+- `src/core/branch/FlowGraph/index.spec.tsx` (label, node count, hidden list, placeholder hook, click / Enter / Space / Escape, controlled
+  selection, empty state, static mode, radial geometry); `src/core/v095.spec.tsx` (peer boundary, client module, token-only CSS, heights,
+  reduced motion); catalog 103 to 104; Offset Pop family render table.
+
+## 0.9.4 - 2026-10-11
+
+Patch (reported from nivo-lite).
+
+- **Fixed: a layout className on `List`, `ListItem` and `Region` takes effect.** Their element resets (display, gap, margin,
+  padding, list marker) sat in the grammar layer, which a host declares after Tailwind's `utilities`, so `flex`, `grid`, `gap-3`
+  or `py-3` passed as `className` lost and layout had to be wrapped in an inner element. The resets now live in `@layer base`;
+  without a className the shape is unchanged. Region's prop-driven `spacing` stays in the grammar layer.
+- **Fixed: `ListRow` actions in a narrow container.** Below the 28rem container query the actions took `flex: 1 1 100%`, so one
+  small ghost button got a line of its own and every row of a ~20rem rail grew by a line. The copy now takes `1 1 12rem` and the
+  actions `0 1 auto`: the action stays on the copy line while it fits and wraps only when it does not; the detail region and the
+  28rem grid are unchanged.
+
+### Tests
+
+- `src/core/v094.spec.tsx`: the three resets are base-layer rules, Region spacing stays a grammar rule, the className passes
+  through beside the hook class; the collapsed ListRow copy and actions flex values.
+
 ## 0.9.3 - 2026-10-11
 
 Patch, additive (owner, 2026-10-11, from the live nivo.vn connections drawer).

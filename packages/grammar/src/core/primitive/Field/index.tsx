@@ -5,8 +5,9 @@ import {
     FieldError as HeroFieldError,
     Label as HeroLabel,
 } from "@heroui/react"
-import { useCallback, useId, useState, type ReactNode } from "react"
+import { useCallback, useId, useState, type CSSProperties, type ReactNode } from "react"
 import type { PresentationState } from "../../../common/state.js"
+import { Skeleton } from "../Skeleton/index.js"
 
 /**
  * The one field contract every Grammar form control shares.
@@ -240,6 +241,84 @@ export const Field = ({
                 <span id={errorId} className="starci-core-field-error" data-grammar-field-error="true" data-contract="FEEDBACK-1">
                     {errorMessage}
                 </span>
+            )}
+        </div>
+    )
+}
+
+export type FieldSkeletonKind = "select" | "textarea" | "input" | "segmented" | "choices" | "switch"
+
+/**
+ * Loading view of a field (knowledge STATE-8): the label stays real text, the control becomes Skeleton geometry of the loaded
+ * control's size. The geometry is `aria-hidden` and nothing in it is focusable; the root owns `aria-busy`. Description and error
+ * copy are not drawn (they are content, and nothing is invalid while loading).
+ * `kind`: `select` and `input` a one-line field block, `textarea` the `rows` height, `segmented` a joined-segments block
+ * (`count` segments wide; `fill` stretches it), `choices` one Skeleton box per option beside its real label, `switch` a
+ * Skeleton track beside the real label.
+ */
+export const FieldSkeleton = ({ component, tier, label, isLabelHidden, isRequired, variant, kind, rows, count, fill, choiceLabels, orientation, className }: {
+    readonly component: string
+    readonly tier: "atom" | "branch" | "composite"
+    readonly label: ReactNode
+    readonly isLabelHidden?: boolean | undefined
+    readonly isRequired?: boolean | undefined
+    readonly variant?: FieldVariant | undefined
+    readonly kind: FieldSkeletonKind
+    readonly rows?: number
+    readonly count?: number
+    readonly fill?: boolean
+    readonly choiceLabels?: ReadonlyArray<ReactNode>
+    readonly orientation?: "vertical" | "horizontal"
+    readonly className: string
+}) => {
+    const geometry = (shape: string, style?: CSSProperties, extra?: Record<string, string>) => (
+        <span aria-hidden="true" className="starci-core-field-skeleton-control" data-grammar-field-skeleton={shape} {...(extra ?? {})} {...(style === undefined ? {} : { style })}>
+            <Skeleton shape="rect" />
+        </span>
+    )
+    const labelNode = (
+        <span className={labelClassName(isLabelHidden)} data-grammar-field-label="true">
+            {label}
+            {isRequired === true ? <span aria-hidden="true" className="starci-core-field-required">*</span> : null}
+        </span>
+    )
+    return (
+        <div
+            data-tier={tier}
+            data-component={component}
+            data-contract="A11Y-1 FIELD-1 STATE-8"
+            className={`${kind === "switch" ? "starci-core-choice" : "starci-core-field"} ${className} starci-core-field-skeleton`}
+            {...(variant === undefined ? {} : fieldVariantAttributes(variant))}
+            {...(orientation === undefined ? {} : { "data-grammar-orientation": orientation })}
+            data-grammar-skeleton="true"
+            data-loading="true"
+            aria-busy="true"
+        >
+            {kind === "switch" ? (
+                <span className="starci-core-choice-content">
+                    {geometry("switch")}
+                    {labelNode}
+                </span>
+            ) : (
+                <>
+                    {labelNode}
+                    {kind === "choices" ? (
+                        <div className="starci-core-choice-group-options">
+                            {(choiceLabels ?? []).map((choiceLabel, index) => (
+                                <span key={index} className="starci-core-choice-content">
+                                    {geometry("choice")}
+                                    <span className="starci-core-field-skeleton-choice-label">{choiceLabel}</span>
+                                </span>
+                            ))}
+                        </div>
+                    ) : kind === "textarea" ? (
+                        geometry("textarea", { "--starci-core-skeleton-rows": Math.max(1, Math.round(Number.isFinite(rows) ? (rows as number) : 4)) } as CSSProperties)
+                    ) : kind === "segmented" ? (
+                        geometry("segmented", { "--starci-core-skeleton-segments": Math.max(1, Math.round(count ?? 2)) } as CSSProperties, { "data-width": fill === true ? "fill" : "content" })
+                    ) : (
+                        geometry(kind)
+                    )}
+                </>
             )}
         </div>
     )

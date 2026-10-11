@@ -73,7 +73,8 @@ describe("Core ListRow", () => {
     })
 
     it("collapses by default, widens to three tracks in the surface query, and shares the separator", () => {
-        expect(css).toMatch(/\.starci-core-list-row-actions \{\s*display: flex;\s*flex: 1 1 100%;/)
+        // 0.9.4: collapsed actions keep their own width and wrap only when the copy's 12rem basis no longer fits.
+        expect(css).toMatch(/\.starci-core-list-row-actions \{[\s\S]*?flex: 0 1 auto;/)
         expect(css).toMatch(/@container starci-core-surface \(min-width: 28\.001rem\) \{[\s\S]*?\.starci-core-list-row\[data-grammar-leading="true"\] \{\s*grid-template-columns: auto minmax\(0, 1fr\) auto;/)
         expect(css).toMatch(/\.starci-core-static-row \+ \.starci-core-static-row \{\s*border-top: 1px solid/)
     })

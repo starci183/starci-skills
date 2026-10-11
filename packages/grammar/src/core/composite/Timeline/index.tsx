@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import { assertPresentationState, type PresentationState } from "../../../common/state.js"
 import { navigationClassName } from "../../navigationClassNames.js"
+import { Skeleton } from "../../primitive/Skeleton/index.js"
 
 export type TimelineItem = {
     readonly id: string
@@ -21,6 +22,13 @@ export type TimelineProps = {
     readonly label: string
     readonly items: ReadonlyArray<TimelineItem>
     readonly className?: string
+    /**
+     * The history is loading (knowledge STATE-8). With no `items` it draws `loadingRows` skeleton entries (a static marker, a title line,
+     * a time line and a description line, `aria-hidden`) in the same named list, which is `aria-busy`; real `items` win.
+     */
+    readonly isLoading?: boolean
+    /** How many skeleton entries a loading timeline draws (default 3, 1 to 12). */
+    readonly loadingRows?: number
 }
 
 /**
@@ -28,15 +36,26 @@ export type TimelineProps = {
  * presentation states and `data-grammar-current`; the connector line is drawn by the stylesheet.
  * Contract: list HIERARCHY-3, entry STATE-1 TRUTH-1 (closed presentation states, neutral default), marker ICON-6.
  */
-export const Timeline = ({ label, items, className }: TimelineProps) => (
+export const Timeline = ({ label, items, className, isLoading = false, loadingRows = 3 }: TimelineProps) => (
     <ol
         aria-label={label}
+        data-loading={String(isLoading)}
+        {...(isLoading ? { "aria-busy": true } : {})}
         className={navigationClassName("starci-core-timeline", className)}
         data-component="Timeline"
         data-contract="HIERARCHY-3"
         data-tier="composite"
     >
-        {items.map((item) => {
+        {isLoading && items.length === 0 ? Array.from({ length: Math.min(12, Math.max(1, Math.floor(Number.isFinite(loadingRows) ? loadingRows : 3))) }, (_, index) => (
+            <li key={index} aria-hidden="true" className="starci-core-timeline-item" data-contract="STATE-1 STATE-8" data-grammar-timeline-state="neutral" data-grammar-current="false" data-grammar-skeleton="true">
+                <span aria-hidden="true" className="starci-core-timeline-marker starci-core-timeline-skeleton-marker" data-grammar-timeline-marker="true"><Skeleton shape="circle" size="sm" /></span>
+                <div className="starci-core-timeline-copy">
+                    <p className="starci-core-timeline-title"><Skeleton shape="text" /></p>
+                    <span className="starci-core-timeline-time"><Skeleton shape="text" /></span>
+                    <div className="starci-core-timeline-description"><Skeleton shape="text" /></div>
+                </div>
+            </li>
+        )) : items.map((item) => {
             const state = item.state ?? "neutral"
             assertPresentationState(state)
             return (

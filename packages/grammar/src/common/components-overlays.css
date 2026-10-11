@@ -915,6 +915,15 @@
         transition: width var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1));
     }
 
+    /* Loading meter (knowledge STATE-8, `isSkeleton`): the label stays real, the bar is a static Skeleton bar of the track height. */
+    .starci-core-meter-skeleton-bar { display: block; block-size: 0.5rem; overflow: hidden; border-radius: 999px; }
+
+    .starci-core-meter-skeleton-bar > .starci-core-skeleton {
+        block-size: 100%;
+        aspect-ratio: auto;
+        border-radius: inherit;
+    }
+
     /*
      * Segmented meter (owner ruling 2026-09-27): the track spans the full width of its container,
      * like a Progress track, at HeroUI's h-1 (0.25rem, 4px) - thinner than the plain meter's h-2 -

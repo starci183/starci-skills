@@ -122,6 +122,11 @@
         font-weight: 600;
     }
 
+    /* A crumb whose label is not known yet (knowledge STATE-8): a short Skeleton text line of the label's size. */
+    .starci-core-breadcrumb-skeleton { display: inline-block; inline-size: 6rem; }
+    .starci-core-breadcrumb-skeleton > .starci-core-skeleton-group { gap: 0; }
+    .starci-core-breadcrumb-skeleton .starci-core-skeleton { block-size: 0.875rem; }
+
     @media (max-width: 30rem) {
         .starci-core-breadcrumb-label {
             max-width: 8rem;
@@ -288,6 +293,12 @@
         border-color: var(--danger, Mark);
         color: var(--danger, CanvasText);
     }
+
+    /* Loading stepper (knowledge STATE-8): a static Skeleton circle for the mark, labels stay real. */
+    .starci-core-step-skeleton-marker { border: 0; background: transparent; }
+    .starci-core-step-skeleton-label { display: block; inline-size: 5rem; }
+    .starci-core-step-skeleton-label > .starci-core-skeleton-group { gap: 0; }
+    .starci-core-step-skeleton-label .starci-core-skeleton { block-size: 0.875rem; }
 
     .starci-core-step-copy {
         display: flex;
@@ -641,6 +652,9 @@
         flex: 0 0 auto;
     }
 
+    /* A loading avatar (knowledge STATE-8): the Skeleton circle at the avatar's size. */
+    .starci-core-avatar-skeleton { display: inline-flex; }
+
     .starci-core-avatar[data-grammar-current="true"] {
         box-shadow: 0 0 0 2px var(--background, Canvas), 0 0 0 4px var(--accent, Highlight);
     }
@@ -683,6 +697,42 @@
     .starci-core-tag:has(> [data-grammar-selected="true"]) {
         background: var(--accent-soft, Highlight);
         color: var(--accent-soft-foreground, HighlightText);
+    }
+
+    /*
+     * Selectable chips (0.9.6, selectionMode single or multiple): a group of choices reads as secondary
+     * buttons with a border. Unselected = the secondary-button face (--default, hover --default-hover,
+     * the same tokens `.button--secondary` uses) with a 1px inset --border and the default foreground;
+     * selected = the accent-soft fill plus a 1px inset accent border. Static groups (selectionMode
+     * "none") and off chips are not matched and keep their look. The vendor `.tag--default` paint lives
+     * in the later `components` layer, which beats any earlier layer, so only the background takes
+     * `!important` (the same documented approach as the off chip); a family restyles it through
+     * `--starci-core-tag-bg` and `--starci-core-tag-bg-hover`, never by out-ranking this rule.
+     */
+    .starci-core-tag-group:is([data-grammar-tag-selection="single"], [data-grammar-tag-selection="multiple"]) .starci-core-tag:not([data-grammar-tag-state="off"]) {
+        box-shadow: inset 0 0 0 1px var(--starci-core-tag-ring, var(--border, GrayText));
+    }
+
+    .starci-core-tag-group:is([data-grammar-tag-selection="single"], [data-grammar-tag-selection="multiple"]) .starci-core-tag:not([data-grammar-tag-state="off"]):not([data-selected="true"]):not(:has(> [data-grammar-selected="true"])) {
+        background: var(--starci-core-tag-bg, var(--default, ButtonFace)) !important;
+        color: var(--default-foreground, var(--foreground, ButtonText));
+    }
+
+    @media (hover: hover) {
+        .starci-core-tag-group:is([data-grammar-tag-selection="single"], [data-grammar-tag-selection="multiple"]) .starci-core-tag:not([data-grammar-tag-state="off"]):not([data-selected="true"]):not([data-disabled="true"]):not(:has(> [data-grammar-selected="true"])):is(:hover, [data-hovered="true"]) {
+            background: var(--starci-core-tag-bg-hover, var(--default-hover, ButtonFace)) !important;
+        }
+    }
+
+    .starci-core-tag-group:is([data-grammar-tag-selection="single"], [data-grammar-tag-selection="multiple"]) .starci-core-tag:not([data-grammar-tag-state="off"]):is([data-selected="true"], :has(> [data-grammar-selected="true"])) {
+        --starci-core-tag-ring: var(--accent, Highlight);
+    }
+
+    @media (forced-colors: active) {
+        .starci-core-tag-group:is([data-grammar-tag-selection="single"], [data-grammar-tag-selection="multiple"]) .starci-core-tag:not([data-grammar-tag-state="off"]):not([data-selected="true"]):not(:has(> [data-grammar-selected="true"])):not([data-focus-visible="true"]) {
+            outline: 1px solid ButtonText;
+            outline-offset: -1px;
+        }
     }
 
     /*
@@ -970,6 +1020,22 @@
         flex: 0 0 auto;
     }
 
+    /* Loading options (knowledge STATE-8): a label line and a description line, at the loaded option's height. */
+    .starci-core-list-box-skeleton-option {
+        display: flex;
+        align-items: center;
+        padding-inline: 0.75rem;
+        padding-block: 0.375rem;
+        pointer-events: none;
+    }
+
+    .starci-core-list-box-skeleton-option .starci-core-list-box-label,
+    .starci-core-list-box-skeleton-option .starci-core-list-box-description { display: block; }
+    .starci-core-list-box-skeleton-option .starci-core-list-box-label > .starci-core-skeleton-group { inline-size: 55%; }
+    .starci-core-list-box-skeleton-option .starci-core-list-box-description > .starci-core-skeleton-group { inline-size: 80%; }
+    .starci-core-list-box-skeleton-option .starci-core-skeleton { block-size: 0.75rem; }
+    .starci-core-list-box-skeleton-option .starci-core-skeleton-group { gap: 0; margin-block: 0.125rem; }
+
     .starci-core-list-box-empty {
         padding: var(--grammar-section-gap, 1rem);
         color: var(--muted, GrayText);
@@ -1200,6 +1266,15 @@
         background: currentColor;
     }
 
+    /* Loading timeline (knowledge STATE-8): static mark and connector tint, three Skeleton lines of the entry's rhythm. */
+    .starci-core-timeline-skeleton-marker > .starci-core-skeleton { inline-size: 1rem; block-size: 1rem; }
+    .starci-core-timeline[data-loading="true"] .starci-core-timeline-item:not(:last-child)::before { background: color-mix(in srgb, var(--foreground, CanvasText) 9%, transparent); }
+    .starci-core-timeline-item[data-grammar-skeleton="true"] .starci-core-timeline-title > .starci-core-skeleton-group { inline-size: 50%; }
+    .starci-core-timeline-item[data-grammar-skeleton="true"] .starci-core-timeline-time > .starci-core-skeleton-group { inline-size: 25%; }
+    .starci-core-timeline-item[data-grammar-skeleton="true"] .starci-core-timeline-description > .starci-core-skeleton-group { inline-size: 80%; }
+    .starci-core-timeline-item[data-grammar-skeleton="true"] .starci-core-skeleton-group { gap: 0; }
+    .starci-core-timeline-item[data-grammar-skeleton="true"] .starci-core-skeleton { block-size: 0.8125rem; }
+
     .starci-core-timeline-copy {
         display: flex;
         min-width: 0;
@@ -1273,5 +1348,197 @@
             outline-offset: -2px;
             forced-color-adjust: none;
         }
+    }
+
+    /* ---------- FlowGraph ----------
+     * The structural base rules of React Flow, scoped to the graph so a host needs no @xyflow/react stylesheet import.
+     * Its colours (edges, background, nodes) are replaced by grammar tokens below. */
+    .starci-core-flow-graph {
+        display: block;
+        position: relative;
+        min-width: 0;
+        margin: 0;
+        overflow: hidden;
+        border: 1px solid var(--separator, CanvasText);
+        border-radius: var(--starci-core-surface-radius, 1rem);
+        background: var(--surface, Canvas);
+        color: var(--foreground, CanvasText);
+    }
+
+    .starci-core-flow-graph-canvas {
+        position: relative;
+        inline-size: 100%;
+        block-size: 24rem;
+    }
+
+    .starci-core-flow-graph[data-grammar-flow-height="sm"] .starci-core-flow-graph-canvas { block-size: 16rem; }
+    .starci-core-flow-graph[data-grammar-flow-height="lg"] .starci-core-flow-graph-canvas { block-size: 32rem; }
+
+    .starci-core-flow-graph-loading > .starci-core-skeleton { block-size: 100%; aspect-ratio: auto; border-radius: 0; }
+
+    .starci-core-flow-graph-empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-block-size: 8rem;
+        margin: 0;
+        padding: 1.5rem;
+        color: var(--muted, GrayText);
+        text-align: center;
+    }
+
+    .starci-core-flow-graph .react-flow {
+        direction: ltr;
+        --xy-edge-stroke: var(--separator, CanvasText);
+        --xy-edge-stroke-width: 1.5;
+        --xy-edge-stroke-selected: var(--separator, CanvasText);
+        --xy-background-color: transparent;
+        background: transparent;
+    }
+
+    .starci-core-flow-graph .react-flow__container { position: absolute; inline-size: 100%; block-size: 100%; inset-block-start: 0; inset-inline-start: 0; }
+    .starci-core-flow-graph .react-flow__pane { z-index: 1; touch-action: none; }
+    .starci-core-flow-graph[data-grammar-flow-interactive="true"] .react-flow__pane.draggable { cursor: grab; }
+    .starci-core-flow-graph[data-grammar-flow-interactive="true"] .react-flow__pane.dragging { cursor: grabbing; }
+    .starci-core-flow-graph .react-flow__viewport { transform-origin: 0 0; z-index: 2; pointer-events: none; }
+    .starci-core-flow-graph .react-flow__renderer { z-index: 4; }
+    .starci-core-flow-graph .react-flow__background { pointer-events: none; z-index: -1; }
+    .starci-core-flow-graph .react-flow__edges { position: absolute; }
+    .starci-core-flow-graph .react-flow__edges svg { position: absolute; overflow: visible; pointer-events: none; }
+    .starci-core-flow-graph .react-flow__edge-path { fill: none; stroke: var(--xy-edge-stroke); stroke-width: var(--xy-edge-stroke-width); stroke-linecap: round; }
+    .starci-core-flow-graph .starci-core-flow-graph-edge-placeholder .react-flow__edge-path { stroke-dasharray: 4 5; }
+    .starci-core-flow-graph .react-flow__nodes { pointer-events: none; transform-origin: 0 0; }
+    .starci-core-flow-graph .react-flow__node {
+        position: absolute;
+        box-sizing: border-box;
+        transform-origin: 0 0;
+        pointer-events: all;
+        user-select: none;
+        cursor: default;
+        outline: none;
+    }
+    .starci-core-flow-graph .react-flow__node.selectable { cursor: pointer; }
+    .starci-core-flow-graph .react-flow__panel { position: absolute; z-index: 5; margin: 0.75rem; }
+    .starci-core-flow-graph .react-flow__panel.bottom { inset-block-end: 0; }
+    .starci-core-flow-graph .react-flow__panel.left { inset-inline-start: 0; }
+    .starci-core-flow-graph .react-flow__panel.right { inset-inline-end: 0; }
+    .starci-core-flow-graph .react-flow__panel.top { inset-block-start: 0; }
+
+    /* The edge ends meet at the node centre: the handle is a hidden point in the middle of the card. */
+    .starci-core-flow-graph .starci-core-flow-graph-handle {
+        position: absolute;
+        inset-block-start: 50%;
+        inset-inline-start: 50%;
+        min-inline-size: 1px;
+        min-block-size: 1px;
+        inline-size: 1px;
+        block-size: 1px;
+        border: 0;
+        opacity: 0;
+        pointer-events: none;
+        transform: none;
+        background: transparent;
+    }
+
+    .starci-core-flow-graph-node {
+        --starci-flow-tint: var(--default-soft, transparent);
+        --starci-flow-ink: var(--foreground, CanvasText);
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        max-inline-size: 14rem;
+        padding: 0.375rem 0.875rem;
+        border: 1px solid var(--separator, CanvasText);
+        border-radius: 999px;
+        background-color: var(--surface, Canvas);
+        background-image: linear-gradient(var(--starci-flow-tint), var(--starci-flow-tint));
+        color: var(--starci-flow-ink);
+        font-size: 0.875rem;
+        line-height: 1.25;
+    }
+
+    .starci-core-flow-graph-node[data-size="sm"] { padding: 0.25rem 0.625rem; font-size: 0.75rem; }
+    .starci-core-flow-graph-node[data-size="lg"] { padding: 0.625rem 1.25rem; font-size: 1rem; font-weight: 600; }
+    .starci-core-flow-graph-node[data-tone="accent"] { --starci-flow-tint: var(--accent-soft, transparent); --starci-flow-ink: var(--accent-soft-foreground, CanvasText); }
+    .starci-core-flow-graph-node[data-tone="success"] { --starci-flow-tint: var(--success-soft, transparent); --starci-flow-ink: var(--success-soft-foreground, CanvasText); }
+    .starci-core-flow-graph-node[data-tone="warning"] { --starci-flow-tint: var(--warning-soft, transparent); --starci-flow-ink: var(--warning-soft-foreground, CanvasText); }
+    .starci-core-flow-graph-node[data-tone="danger"] { --starci-flow-tint: var(--danger-soft, transparent); --starci-flow-ink: var(--danger-soft-foreground, CanvasText); }
+    .starci-core-flow-graph-node[data-tone="muted"] { --starci-flow-tint: transparent; --starci-flow-ink: var(--muted, GrayText); }
+    .starci-core-flow-graph-node[data-placeholder="true"] { border-style: dashed; }
+
+    .starci-core-flow-graph-copy {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+    }
+
+    .starci-core-flow-graph-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .starci-core-flow-graph-description {
+        overflow: hidden;
+        color: var(--muted, GrayText);
+        font-size: 0.75rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .starci-core-flow-graph-count {
+        flex: 0 0 auto;
+        min-inline-size: 1.25rem;
+        padding: 0 0.375rem;
+        border-radius: 999px;
+        background: var(--surface, Canvas);
+        color: var(--foreground, CanvasText);
+        font-size: 0.6875rem;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.25rem;
+        text-align: center;
+    }
+
+    /* Selection and keyboard focus draw the package focus ring on the card, not on the React Flow wrapper. */
+    .starci-core-flow-graph-node[data-grammar-selected="true"],
+    .starci-core-flow-graph .react-flow__node:focus-visible > .starci-core-flow-graph-node {
+        outline: 2px solid var(--focus, var(--starci-core-focus, Highlight));
+        outline-offset: 2px;
+    }
+
+    .starci-core-flow-graph-controls {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid var(--separator, CanvasText);
+        border-radius: 0.75rem;
+        background: var(--surface, Canvas);
+    }
+
+    .starci-core-flow-graph-controls .react-flow__controls-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        inline-size: 2rem;
+        block-size: 2rem;
+        padding: 0.375rem;
+        border: 0;
+        background: transparent;
+        color: var(--foreground, CanvasText);
+        cursor: pointer;
+    }
+
+    .starci-core-flow-graph-controls .react-flow__controls-button + .react-flow__controls-button { border-block-start: 1px solid var(--separator, CanvasText); }
+    .starci-core-flow-graph-controls .react-flow__controls-button svg { inline-size: 100%; max-inline-size: 0.75rem; max-block-size: 0.75rem; fill: currentColor; }
+    .starci-core-flow-graph-controls .react-flow__controls-button:focus-visible { outline: 2px solid var(--focus, var(--starci-core-focus, Highlight)); outline-offset: -2px; }
+    .starci-core-flow-graph-controls .react-flow__controls-button:disabled { opacity: 0.4; cursor: default; }
+
+    @media (prefers-reduced-motion: reduce) {
+        .starci-core-flow-graph .react-flow__edge.animated path { animation: none; }
+    }
+
+    @media (forced-colors: active) {
+        .starci-core-flow-graph-node[data-grammar-selected="true"] { outline-color: Highlight; forced-color-adjust: none; }
     }
 }

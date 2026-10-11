@@ -2,7 +2,7 @@
 
 import { ToggleButton as HeroToggleButton, ToggleButtonGroup as HeroToggleButtonGroup, type Key } from "@heroui/react"
 import { useId, useState, type ReactNode } from "react"
-import { fieldStateAttributes, isFieldInvalid, type FieldControlProps } from "../../primitive/Field/index.js"
+import { fieldStateAttributes, FieldSkeleton, isFieldInvalid, type FieldControlProps } from "../../primitive/Field/index.js"
 
 export type SegmentOption = {
     readonly value: string
@@ -19,6 +19,11 @@ export type SegmentedControlProps = FieldControlProps & {
     readonly onValueChange?: (value: string) => void
     /** `fill` stretches the segments across the parent. */
     readonly width?: "content" | "fill"
+    /**
+     * Initial unresolved content (knowledge STATE-8): the label stays real text and the segments become one Skeleton block of the same
+     * height (one segment-width per option; `fill` stretches it), `aria-hidden`, nothing focusable; the root is `aria-busy`.
+     */
+    readonly isSkeleton?: boolean
 }
 
 const firstKey = (keys: Iterable<Key>): string | undefined => {
@@ -46,6 +51,7 @@ export const SegmentedControl = ({
     isDisabled,
     isReadOnly,
     name,
+    isSkeleton = false,
 }: SegmentedControlProps) => {
     const id = useId().replaceAll(":", "")
     const [held, setHeld] = useState<string | undefined>(value ?? defaultValue ?? options[0]?.value)
@@ -55,6 +61,10 @@ export const SegmentedControl = ({
     const descriptionId = description == null ? undefined : `segmented${id}-description`
     const errorId = invalid && errorMessage != null ? `segmented${id}-error` : undefined
     const describedBy = [descriptionId, errorId].filter((part) => part !== undefined).join(" ")
+
+    if (isSkeleton) {
+        return <FieldSkeleton component="SegmentedControl" tier="composite" label={label} isLabelHidden={isLabelHidden} isRequired={isRequired} kind="segmented" count={options.length} fill={width === "fill"} className="starci-core-segmented-control" />
+    }
 
     return (
         <div

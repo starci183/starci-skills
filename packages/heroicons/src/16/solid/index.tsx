@@ -111,3 +111,8 @@ export const PlaygroundIcon = solidIcon("PlaygroundIcon", (
         <path d="M4.47 6.22a.75.75 0 0 1 1.06 0l1.25 1.25a.75.75 0 0 1 0 1.06L5.53 9.78a.75.75 0 0 1-1.06-1.06L5.19 8l-.72-.72a.75.75 0 0 1 0-1.06ZM8.25 9.5a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5H9a.75.75 0 0 1-.75-.75Z" />
     </>
 ))
+
+/** Second-brain micro cut: two filled hemispheres split by the midline. */
+export const BrainIcon = solidIcon("BrainIcon", (
+    <path fillRule="evenodd" d="M7.4 3.2a1.9 1.9 0 0 0-3.55-.6A1.95 1.95 0 0 0 2.3 5.2a2.1 2.1 0 0 0 .05 3.5A1.95 1.95 0 0 0 4.4 12.1a1.9 1.9 0 0 0 3 .7V3.2Zm1.2 0a1.9 1.9 0 0 1 3.55-.6 1.95 1.95 0 0 1 1.55 2.6 2.1 2.1 0 0 1-.05 3.5 1.95 1.95 0 0 1-2.05 3.4 1.9 1.9 0 0 1-3 .7V3.2Z" clipRule="evenodd" />
+))
