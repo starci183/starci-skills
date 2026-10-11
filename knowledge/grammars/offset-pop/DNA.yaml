@@ -13,7 +13,7 @@ appliesTo:
 family: offset-pop
 provenance:
   package: "@starci/grammar"
-  version: "0.8.3"
+  version: "0.9.2"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   captured: "2026-09-23"
   publicEntry: "@starci/grammar/common"
@@ -64,10 +64,10 @@ provenance:
     - path: "packages/grammar/src/offset-pop/components-navigation.css"
       sha256: "81a7918108e2ce0266b4ff17928c79756a8dbe99750e4001c367c9525a1672fa"
     - path: "packages/grammar/src/common/registry.tsx"
-      sha256: "fad9ade65a1c07ed78d60ae5d84dec9ec4fba713788de69b63312b4d4db40d20"
+      sha256: "3934778aac696be9518741e64ee210bfbaa2e9b9818a57ab979b6ef332ce9161"
 identity:
   package: "@starci/grammar"
-  version: "0.8.3"
+  version: "0.9.2"
   familyId: "offset-pop"
   dnaId: "offset-pop"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
@@ -148,9 +148,9 @@ identity:
     renderers added in 0.5.0 are each targeted by a family rule (asserted by the
     `components-{forms,overlays,navigation}.spec.ts` suites).
   counts:
-    renderers: 100
+    renderers: 103
     tokens: 81
-    claimEntries: 418
+    claimEntries: 430
     gaps: 3
 
 observations:
@@ -808,15 +808,15 @@ tokens:
   - name: "--starci-core-band-height"
     value: "calc(4rem + 1px)"
     valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:1715"
+    source: "packages/grammar/src/common/styles.css:1834"
   - name: "--starci-core-band-offset"
     value: "calc(var(--starci-core-band-height, 0rem) + var(--starci-core-band-subnav-height, 0rem))"
     valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:1711"
+    source: "packages/grammar/src/common/styles.css:1830"
   - name: "--starci-core-band-subnav-height"
     value: "calc(3.25rem + 1px)"
     valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:1724"
+    source: "packages/grammar/src/common/styles.css:1843"
   - name: "--starci-core-bottom-nav-block-size"
     value: "calc(4.5rem + var(--offset-pop-outline-width) * 1.5 + var(--offset-pop-shadow-y) * 0.5)"
     valueFrom: "family"
@@ -824,11 +824,11 @@ tokens:
   - name: "--starci-core-rail-offset"
     value: "var(--starci-core-band-offset, 5.5rem)"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1567"
+    source: "packages/grammar/src/common/styles.css:1686"
   - name: "--starci-core-subnav-offset"
     value: "var(--starci-core-band-height, 4rem)"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1871"
+    source: "packages/grammar/src/common/styles.css:1990"
   - name: "--success"
     value: "var(--offset-pop-success)"
     valueFrom: "family"
@@ -895,6 +895,8 @@ renderers:
         type: "IconSource"
       - prop: "urgency"
         values: ["polite", "assertive"]
+      - prop: "appearance"
+        values: ["surface", "soft"]
     claims: ["FEEDBACK-2", "FEEDBACK-3"]
     computedClaims: []
     classes:
@@ -1048,6 +1050,26 @@ renderers:
       - "starci-core-calendar-month"
       - "starci-core-calendar-nav"
       - "starci-core-calendar-weekday"
+  - component: "ChatBubble"
+    propsType: "ChatBubbleProps"
+    kind: "composite"
+    group: "base"
+    source: "packages/grammar/src/core/composite/ChatBubble/index.tsx"
+    closedValues:
+      - prop: "side"
+        values: ["incoming", "outgoing"]
+    claims: ["SURFACE-3", "SURFACE-4"]
+    computedClaims: []
+    classes:
+      - "starci-core-chat-bubble"
+      - "starci-core-chat-bubble-actions"
+      - "starci-core-chat-bubble-author"
+      - "starci-core-chat-bubble-avatar"
+      - "starci-core-chat-bubble-body"
+      - "starci-core-chat-bubble-footer"
+      - "starci-core-chat-bubble-head"
+      - "starci-core-chat-bubble-meta"
+      - "starci-core-chat-bubble-stack"
   - component: "ChatWorkspace"
     propsType: "ChatWorkspaceProps"
     kind: "composition"
@@ -1454,6 +1476,20 @@ renderers:
       - "starci-core-file-dropzone-prompt"
       - "starci-core-file-dropzone-target"
       - "starci-core-form-label--screen-reader"
+  - component: "FillViewport"
+    propsType: "FillViewportProps"
+    kind: "composite"
+    group: "base"
+    source: "packages/grammar/src/core/composite/FillViewport/index.tsx"
+    closedValues:
+      - prop: "minHeight"
+        values: ["none", "sm", "md", "lg"]
+      - prop: "bottomInset"
+        values: ["none", "page"]
+    claims: ["LAYOUT-1", "OVERFLOW-1"]
+    computedClaims: []
+    classes:
+      - "starci-core-fill-viewport"
   - component: "Footer"
     propsType: "FooterProps"
     kind: "composition"
@@ -1547,10 +1583,11 @@ renderers:
         type: "IconSource"
       - prop: "variant"
         values: ["tertiary", "ghost"]
-    claims: ["A11Y-2", "ICON-5"]
+    claims: ["A11Y-2", "ICON-5", "TONE-2"]
     computedClaims: []
     classes:
       - "starci-core-icon-button"
+      - "starci-core-icon-button-badge"
   - component: "IconTile"
     propsType: "IconTileProps"
     kind: "primitive"
@@ -1579,6 +1616,8 @@ renderers:
         values: ["cover", "contain"]
       - prop: "loading"
         values: ["lazy", "eager"]
+      - prop: "plate"
+        values: ["default", "none"]
     claims: ["MEDIA-2", "MEDIA-4", "MEDIA-5", "MOTION-2"]
     computedClaims: []
     classes:
@@ -1609,8 +1648,11 @@ renderers:
     computedClaims: []
     classes:
       - "starci-core-input"
+      - "starci-core-input-actions"
       - "starci-core-input-control"
+      - "starci-core-input-copy"
       - "starci-core-input-field"
+      - "starci-core-input-live"
       - "starci-core-input-resting-control"
       - "starci-core-input-resting-label"
       - "starci-core-input-reveal"
@@ -1709,6 +1751,29 @@ renderers:
     computedClaims: []
     classes:
       - "starci-core-semantic-list-item"
+  - component: "ListRow"
+    propsType: "ListRowProps"
+    kind: "composite"
+    group: "base"
+    source: "packages/grammar/src/core/composite/ListRow/index.tsx"
+    closedValues:
+      - prop: "state"
+        type: "PresentationState"
+      - prop: "verdict"
+        type: "RowVerdict"
+    claims: ["BOUNDARY-3", "FONT-2", "GAP-1", "GAP-2", "GAP-3", "PADDING-4", "TONE-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-list-row"
+      - "starci-core-list-row-actions"
+      - "starci-core-list-row-badges"
+      - "starci-core-list-row-copy"
+      - "starci-core-list-row-description"
+      - "starci-core-list-row-detail"
+      - "starci-core-list-row-leading"
+      - "starci-core-list-row-name"
+      - "starci-core-list-row-title"
+      - "starci-core-static-row"
   - component: "MarkdownArticle"
     propsType: "MarkdownArticleProps"
     kind: "branch"
@@ -1920,6 +1985,8 @@ renderers:
         values: ["start", "stretch"]
       - prop: "collapsedOrder"
         values: ["primary-first", "rail-first"]
+      - prop: "railPosition"
+        values: ["leading", "trailing"]
     claims: ["GAP-5"]
     computedClaims: []
     classes:
@@ -2361,6 +2428,7 @@ renderers:
       - "starci-core-surface-fact"
       - "starci-core-surface-footer"
       - "starci-core-surface-label"
+      - "starci-core-surface-label-end"
       - "starci-core-surface-list"
   - component: "Switch"
     propsType: "SwitchProps"
@@ -2476,7 +2544,12 @@ renderers:
       - "starci-core-field-label"
       - "starci-core-field-meta"
       - "starci-core-form-label--screen-reader"
+      - "starci-core-mention-description"
+      - "starci-core-mention-label"
+      - "starci-core-mention-list"
+      - "starci-core-mention-option"
       - "starci-core-textarea"
+      - "starci-core-textarea-anchor"
       - "starci-core-textarea-control"
   - component: "TimeField"
     propsType: "TimeFieldProps"

@@ -135,7 +135,11 @@ rules:
       - id: case-5
         when: A notice (attention, a last result) carries an outcome tone
         assert: |-
-          The DNA `Alert` carries it as the HeroUI Alert renders it (owner ruling 2026-09-27): the white `--surface` row with its surface shadow, a small indicator glyph on the left of the title and the title itself in the tone's soft-foreground, a muted description, and the grammar `Button` as its action in the variant the grammar Alert gives its tone, as HeroUI's own Alert examples pair them (accent/informative → `primary`, danger/negative → `danger`, every other tone → `secondary`; grammar 0.5.3); the tone never fills the Alert's background and no `IconTile` stands in for its indicator
+          The DNA `Alert` carries it as the HeroUI Alert renders it (owner ruling 2026-09-27): the white `--surface` row with its surface shadow, a small indicator glyph on the left of the title and the title itself in the tone's soft-foreground, a muted description, and the grammar `Button` as its action in the variant the grammar Alert gives its tone, as HeroUI's own Alert examples pair them (accent/informative → `primary`, danger/negative → `danger`, every other tone → `secondary`; grammar 0.5.3); by default (`appearance="surface"`) the tone never fills the Alert's background, and no `IconTile` stands in for its indicator
+      - id: case-6
+        when: A notice must read as part of the surface or band it sits in (a row's detail, a wizard step, a status beside a form) rather than float above it
+        assert: |-
+          Owner ruling 2026-10-11: the DNA `Alert` takes `appearance="soft"` (@starci/grammar 0.9.2) - the same anatomy on its tone's soft tint at half strength (`--<tone>-soft` mixed 50% with transparent: informative accent-soft, affirmative success-soft, cautionary warning-soft, negative danger-soft, other tones default-soft) and no shadow. The tint is the grammar's, never an app class; the tone still reports a real outcome under case-1; an informative soft Alert spends accent-soft and counts inside the ACCENT-6 budget; a page-level notice on the canvas keeps the default `surface` row
   - id: ACCENT-6
     title: The page's colour budget is mostly neutral
     governs: |-

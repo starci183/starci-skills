@@ -144,6 +144,9 @@ componentOwnership:
     - component: StaticStateRow
       element: root
       rule: PADDING-4
+    - component: ListRow
+      element: root (carries starci-core-static-row, @starci/grammar 0.9.1)
+      rule: PADDING-4
     - component: Subnav
       element: root
       rule: PADDING-3

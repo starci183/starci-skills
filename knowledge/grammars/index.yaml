@@ -42,9 +42,9 @@ topics:
     path: common/DNA.yaml
     title: Common Grammar — DNA
     summary: |
-      Snapshot of the `@starci/grammar/common` public entry at 0.5.0: the custom-property names its
-      stylesheet set writes or reads, the 100 renderers it publishes (47 base, 20 forms, 14 overlays,
-      19 navigation) with their class names and stamped rule ids, and the absences read beside them.
+      Snapshot of the `@starci/grammar/common` public entry at 0.9.2: the custom-property names its
+      stylesheet set writes or reads, the 103 renderers its registry holds (20 forms, 14 overlays,
+      19 navigation, the rest base) with their class names and stamped rule ids, and the absences read beside them.
       Common supplies anatomy, not colour. Generated from source and drift-checked.
   - id: starci
     path: starci/index.yaml
