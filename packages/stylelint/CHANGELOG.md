@@ -2,7 +2,7 @@
 
 ## 2.0.7 - 2026-10-11
 
-- Fixed: regenerate the token vocabulary from the current Grammar source, including the vendor `--radius-xs` token. The twin staleness test remains unchanged.
+- Changed: regenerate the grammar vocabulary for @starci/grammar 0.9.3 (FillViewport, IconButton badge and step progress custom properties); rules are unchanged.
 
 ## 2.0.6 - 2026-10-08
 

@@ -2,7 +2,7 @@
 
 ## 1.2.4 - 2026-10-11
 
-- Changed: depend on HFS 4.2.4 with the refreshed Stylelint canon pin.
+- Changed: carry runtime version 1.0.0-alpha.10; behaviour is unchanged.
 
 ## 1.2.3 - 2026-10-11
 

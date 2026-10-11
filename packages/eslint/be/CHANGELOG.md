@@ -2,7 +2,7 @@
 
 ## 3.2.5 - 2026-10-11
 
-- Changed: refresh bundled canon pins for the Stylelint vocabulary patch; lint rules are unchanged.
+- Changed: refresh the bundled canon pins for stylelint-canon 2.0.7 and cli 1.2.4; behaviour is unchanged.
 
 ## 3.2.4 - 2026-10-11
 

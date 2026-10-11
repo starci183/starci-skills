@@ -4,16 +4,28 @@ All notable changes to StarCi are documented here. The runtime is on the `1.0.0-
 until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
-## [1.0.0-alpha.9.1] — 2026-10-11
+## [1.0.0-alpha.10] — 2026-10-11
+
+`1.0.0-alpha.9.1` was never cut: its notes (the Fixed section below) are part of this release, and `1.0.0-alpha.10` is the one release after `1.0.0-alpha.9`.
+
+### Added
+- `@starci/grammar` 0.8.4 → 0.9.3, the pieces the nivo-lite Grammar-conformance work needed instead of app classes: the copyable and read-only `Input` (0.8.4, copy action inside the field in 0.8.5), `ChatBubble`, `FillViewport` (fills the viewport left under the chrome and its bottom phone bar), `Textarea` mention suggestions and Enter-to-send, the `IconButton` count badge, the leading `PrimaryRailLayout` rail and the plate-less `Image` (0.9.0), `ListRow` (0.9.1), the soft `Alert` (0.9.2), and the step mode of `Progress` plus the floating primary `IconButton` (0.9.3).
+- Grammar knowledge: the soft Alert ruling (ACCENT-5), `ListRow` anatomy and ownership rows, `ChatBubble` RADIUS-6, and the grammar DNA refreshed from 0.9.3 (103 renderers).
+
+### Changed
+- The canon pins carry `@starci/grammar` 0.9.3; `@starci/eslint-canon-be` 3.2.5, `@starci/eslint-canon-fe` 8.2.5, `@starci/hfs` 4.2.4, `@starci/stylelint-canon` 2.0.7 (grammar vocabulary regenerated) and `@starci/cli` 1.2.4 (runtime version 1.0.0-alpha.10) republish the refreshed bundled pins (lint and command behaviour unchanged); code-pattern profiles and example pins are rebound to them.
 
 ### Fixed
-- Stylelint's generated token vocabulary matches the current Grammar source, including `--radius-xs`; dependent bundled canon pins receive immutable package versions.
+- Grammar objects that hand the vendor a function or use hooks (`SurfaceCard`, `SurfaceListCard`, `SurfaceAccordionCard`, `Dialog`, `AlertDialog`, `Drawer`, `Rail`, `Subnav`, `Tooltip`, `Alert`) are client modules, so a React Server Component can render them; an uncontrolled `Input` shows its `defaultValue`; `Label` takes the full foreground; overlay headers keep title and close on one row; `ChatBubble` footers stretch; Dialog and Drawer geometry (0.8.5).
+
+### Fixed
 - The Windows and Ubuntu install sandboxes check out `config.example.yaml` with the dispatcher so the source bootstrap can resolve its default configuration before running the tarball gate.
 - Example app lint writes its Sonar report relative to the selected app directory, matching the scanner's report path.
 - Replays record render readiness and the supported host platform at their fixture boundaries; the missing-browser and real-render cases retain native discovery. Purge replays isolate fake resource process observations from unrelated harness children while retaining captured-worker closure refusals.
 - The clean contributor install declares the queue replay's ts-jest and TypeORM dependencies. Scaffold lint runs before parallel build commands create their caches.
 
 ### Known limitations
+- The grammar lanes reached local main as release preparation, not through `starci git land`: every grammar version moves its canon pin, which needs the canon packages republished before `runtime verify` can be green, and publication runs only on main. The release cut's L4 is the gate for them.
 - The immutable `alpha.9` tag retains the failed sandbox, example Sonar and Linux full-suite runs that identified these defects. This release carries their source corrections; the original tag is preserved.
 
 ## [1.0.0-alpha.9] — 2026-10-10
