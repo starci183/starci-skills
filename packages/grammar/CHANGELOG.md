@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.9.3 - 2026-10-11
+
+Patch, additive (owner, 2026-10-11, from the live nivo.vn connections drawer).
+
+- **`Progress` step mode.** `steps={{ total, completed }}` (and `valueText`) draws one segment per wizard step at the small
+  bar's height (0.25rem), the finished and current steps on the accent, the rest on `--default`; one `role="progressbar"`
+  with `aria-valuemax` = total and `aria-valuenow` = completed. Clearer than one long bar for a 3-7 step flow.
+- **`IconButton` `variant="primary"`, `size="lg"` and `isFloating`.** The accent plate for the one glyph action that must
+  stand out (a floating assistant or compose button), a 3.5rem size and the overlay elevation; the app owns the position.
+- **Fixed: `Label` takes the full foreground.** It inherited the muted tone a vendor body passes down (the Drawer body), so
+  section labels read as hints.
+- **Fixed: overlay header on one row.** The vendor's `drawer__header` / `modal__header` is a flex column and pushed the close
+  action under the title; the header now keeps title and close on one row, the action at the end.
+- **Fixed: `ChatBubble` footer width.** A message with a `footer` gets a definite stack width and the footer stretches, so
+  percentage widths inside it (an approval card at `w-full max-w-xl`) no longer collapse in a shrink-to-fit loop (threads
+  of tens of thousands of pixels on nivo.vn). Hook `data-grammar-bubble-footer`.
+
+### Tests
+
+- `src/core/v093.spec.tsx` (step segments, clamping, label colour, overlay header row, bubble footer, floating IconButton);
+  stories `ProgressSteps` and `IconButtonFloating`; the a11y matrix passes them.
+
 ## 0.9.2 - 2026-10-11
 
 Patch, additive (owner ruling 2026-10-11: an Alert may take its tone's soft tint; amends ACCENT-5 case-5's "the tone never

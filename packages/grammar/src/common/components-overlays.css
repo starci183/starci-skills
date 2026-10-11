@@ -118,12 +118,19 @@
         outline: none;
     }
 
+    /* The vendor header is `flex flex-col`; the title group and the close action share one row, the action at the end. */
     .starci-core-overlay-header {
-        display: flex;
+        display: flex !important;
         min-width: 0;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: var(--grammar-row-gap, 0.75rem);
+        flex-direction: row !important;
+        align-items: flex-start !important;
+        justify-content: space-between !important;
+        gap: var(--grammar-row-gap, 0.75rem) !important;
+    }
+
+    .starci-core-overlay-header > .starci-core-close-button {
+        flex: none;
+        margin-inline-start: auto;
     }
 
     .starci-core-overlay-heading-group {

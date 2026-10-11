@@ -7,6 +7,13 @@ export type ProgressProps = {
     readonly value?: number
     /** Initial unresolved-content geometry, not a zero-valued measurement. */
     readonly isSkeleton?: boolean
+    /**
+     * Step mode for a wizard: one segment per step at the bar's own height, the finished and current steps filled.
+     * `completed` counts filled segments (current step included); `value` is ignored in this mode.
+     */
+    readonly steps?: { readonly total: number; readonly completed: number }
+    /** Spoken value in step mode, e.g. "Step 3 of 5"; defaults to "completed / total". */
+    readonly valueText?: string
 }
 
 /**
@@ -18,7 +25,32 @@ const SKELETON_CLASS_NAME = skeletonVariants({ animationType: "shimmer" }).base(
 })
 
 /** Accessible, full-width completion bar with an inert initial-loading shape. */
-export const Progress = ({ label, value = 0, isSkeleton = false }: ProgressProps) => {
+export const Progress = ({ label, value = 0, isSkeleton = false, steps, valueText }: ProgressProps) => {
+    if (steps !== undefined && !isSkeleton) {
+        const total = Math.max(1, Math.round(steps.total))
+        const completed = Math.min(total, Math.max(0, Math.round(steps.completed)))
+        return (
+            <div
+                role="progressbar"
+                aria-label={label}
+                aria-valuemin={0}
+                aria-valuemax={total}
+                aria-valuenow={completed}
+                aria-valuetext={valueText ?? `${completed} / ${total}`}
+                data-tier="atom"
+                data-component="Progress"
+                data-loading="false"
+                data-grammar-progress-mode="steps"
+                data-contract="MEASURE-2"
+                className="starci-core-progress starci-core-progress-steps"
+                style={{ gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))` }}
+            >
+                {Array.from({ length: total }, (_, index) => (
+                    <span key={index} aria-hidden className="starci-core-progress-step" data-grammar-progress-step={index < completed ? "done" : "todo"} />
+                ))}
+            </div>
+        )
+    }
     if (isSkeleton) {
         return (
             <span
