@@ -57,6 +57,10 @@ rules:
         when: The required arrangement has no published composition
         assert: |-
           A `GRAMMAR_REQUIRED` gap names the missing composition, and no substitute arrangement appears in the tree
+      - id: case-7
+        when: A console page reached from a navigation destination opens with its heading
+        assert: |-
+          Owner ruling 2026-10-11: the trail above the heading is `Breadcrumbs` (the parent destination, then the page as current), never a `SectionHeader` eyebrow; the page's command sits in the header's `action` and a pointer to where its sources live in its `meta`, so no loose action row stands between the header and the content as an extra GAP-5 region
     notThisRule: |-
       which of several regions carries the strongest anchor is HIERARCHY-2.
   - id: LAYOUT-2

@@ -74,6 +74,10 @@ rules:
         when: A figure reports a state
         assert: |-
           The figure keeps the default tone and the state is a toned `Badge` beside it (ACCENT-5); no number is painted red, green or amber
+      - id: case-6
+        when: A console page leads with a row of key figures (the "ribbon")
+        assert: |-
+          Owner ruling 2026-10-11: the figures sit in the ink band - `SurfaceCard treatment="ink"` holding `DescriptionList layout="stat-strip" isDivided` - so the band, not a bare strip on the canvas, carries them; at most four cells, and the band counts as the page's signature moment (DISCIPLINE-3)
     notThisRule: |-
       which rank a line receives is HIERARCHY-1, and the closed size scale is FONT-1 to FONT-6. Measuring the rendered figures is TASTE-6 case-5.
   - id: DISCIPLINE-3

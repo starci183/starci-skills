@@ -63,6 +63,10 @@ rules:
         when: The reader has unsaved work elsewhere on the page
         assert: |-
           Only the failed region is replaced, and work outside it survives the recovery
+      - id: case-6
+        when: The empty region's content is a drawing (a map, a chart, a graph)
+        assert: |-
+          Owner ruling 2026-10-11: the drawing still renders from what is already known (the business at the centre, the first kinds waiting dashed) inside a joined `SurfaceCard`, and the `EmptyNotice` is that card's last band after a presentation `Divider`; no loose `EmptyNotice` on the canvas replaces the drawing
   - id: FEEDBACK-3
     title: Settlement must be known before it is claimed
     governs: Governs the moment a result may be stated.
