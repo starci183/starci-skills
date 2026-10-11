@@ -686,6 +686,42 @@
     }
 
     /*
+     * Selectable chips (0.9.6, selectionMode single or multiple): a group of choices reads as secondary
+     * buttons with a border. Unselected = the secondary-button face (--default, hover --default-hover,
+     * the same tokens `.button--secondary` uses) with a 1px inset --border and the default foreground;
+     * selected = the accent-soft fill plus a 1px inset accent border. Static groups (selectionMode
+     * "none") and off chips are not matched and keep their look. The vendor `.tag--default` paint lives
+     * in the later `components` layer, which beats any earlier layer, so only the background takes
+     * `!important` (the same documented approach as the off chip); a family restyles it through
+     * `--starci-core-tag-bg` and `--starci-core-tag-bg-hover`, never by out-ranking this rule.
+     */
+    .starci-core-tag-group:is([data-grammar-tag-selection="single"], [data-grammar-tag-selection="multiple"]) .starci-core-tag:not([data-grammar-tag-state="off"]) {
+        box-shadow: inset 0 0 0 1px var(--starci-core-tag-ring, var(--border, GrayText));
+    }
+
+    .starci-core-tag-group:is([data-grammar-tag-selection="single"], [data-grammar-tag-selection="multiple"]) .starci-core-tag:not([data-grammar-tag-state="off"]):not([data-selected="true"]):not(:has(> [data-grammar-selected="true"])) {
+        background: var(--starci-core-tag-bg, var(--default, ButtonFace)) !important;
+        color: var(--default-foreground, var(--foreground, ButtonText));
+    }
+
+    @media (hover: hover) {
+        .starci-core-tag-group:is([data-grammar-tag-selection="single"], [data-grammar-tag-selection="multiple"]) .starci-core-tag:not([data-grammar-tag-state="off"]):not([data-selected="true"]):not([data-disabled="true"]):not(:has(> [data-grammar-selected="true"])):is(:hover, [data-hovered="true"]) {
+            background: var(--starci-core-tag-bg-hover, var(--default-hover, ButtonFace)) !important;
+        }
+    }
+
+    .starci-core-tag-group:is([data-grammar-tag-selection="single"], [data-grammar-tag-selection="multiple"]) .starci-core-tag:not([data-grammar-tag-state="off"]):is([data-selected="true"], :has(> [data-grammar-selected="true"])) {
+        --starci-core-tag-ring: var(--accent, Highlight);
+    }
+
+    @media (forced-colors: active) {
+        .starci-core-tag-group:is([data-grammar-tag-selection="single"], [data-grammar-tag-selection="multiple"]) .starci-core-tag:not([data-grammar-tag-state="off"]):not([data-selected="true"]):not(:has(> [data-grammar-selected="true"])):not([data-focus-visible="true"]) {
+            outline: 1px solid ButtonText;
+            outline-offset: -1px;
+        }
+    }
+
+    /*
      * An off chip (0.6.0, `TagGroupItem.isOff`): HeroUI's tertiary chip - a transparent ground - with a
      * 1px --border outline and the muted foreground, so it reads as present-but-off beside its filled
      * peers. It stays focusable (no disabled opacity). `!important` because the vendor `.tag--default`

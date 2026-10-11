@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.6 - 2026-10-11
+
+Patch (owner: "a group of buttons should use secondary and a border").
+
+- **Selectable `TagGroup` chips read as secondary buttons with a border** (`selectionMode` `single` or `multiple`). Unselected chips take the
+  secondary-button face (`--default`, hover `--default-hover`, default foreground) plus a 1px inset `--border`; selected chips keep
+  `--accent-soft` / `--accent-soft-foreground` and gain a 1px inset `--accent` border. `selectionMode="none"` groups and `isOff` chips are unchanged;
+  `aria-selected` and the `data-grammar-selected` hook are unchanged. The vendor `.tag--default` paint sits in the later `components` layer, so the
+  background (only) is `!important`, driven by `--starci-core-tag-bg` / `--starci-core-tag-bg-hover`. Forced colors: an unselected chip gets a
+  1px `ButtonText` outline (the inset shadow is dropped there) and a selected chip keeps its `Highlight` outline.
+  Offset Pop: the same chips take the ink outline, the family `--default` fill and a small ink offset shadow, like its secondary Button; selected stays pink and lifted.
+- `Select` `isLabelHidden`: already supported (it is part of `FieldControlProps`, rendered by the same `FieldLabel` as `SearchField`: the label stays
+  in the DOM as the accessible name, visually hidden). 0.9.6 adds a spec pinning it; no API change.
+
 ## 0.9.5 - 2026-10-11
 
 Minor, additive (owner: the NIVO "Second brain" knowledge map must be drawn from grammar components only).

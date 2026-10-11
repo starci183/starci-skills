@@ -173,6 +173,13 @@
         font-weight: 800;
     }
 
+    /* Selectable chips take the secondary-button treatment: --default fill (via the Common token hook), ink outline, a small ink offset. */
+    .grammar-common-root[data-grammar-family="offset-pop"] :is([data-grammar-tag-selection="single"], [data-grammar-tag-selection="multiple"]) [data-grammar-tag]:not([data-grammar-tag-state="off"]) {
+        --starci-core-tag-bg: var(--default);
+        --starci-core-tag-bg-hover: var(--default-hover, var(--default));
+        box-shadow: 0.125rem 0.125rem 0 var(--offset-pop-shadow-ink);
+    }
+
     .grammar-common-root[data-grammar-family="offset-pop"] [data-component="TagGroup"] [data-grammar-tag]:has(> [data-grammar-selected="true"]) {
         background: var(--offset-pop-pink);
         color: var(--accent-foreground);
