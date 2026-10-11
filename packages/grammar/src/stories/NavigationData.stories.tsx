@@ -222,7 +222,7 @@ const brainNodes: ReadonlyArray<G.FlowGraphNode> = [
   { id: 'ideas', label: 'Ideas', count: 31, tone: 'warning' },
   { id: 'reading', label: 'Reading list', isPlaceholder: true },
   { id: 'ada', label: 'Ada', description: 'Mentor', size: 'sm' },
-  { id: 'nivo', label: 'NIVO', size: 'sm', tone: 'accent' },
+  { id: 'atlas', label: 'Atlas', size: 'sm', tone: 'accent' },
   { id: 'journal', label: 'Journal', size: 'sm', isPlaceholder: true },
 ];
 const brainEdges: ReadonlyArray<G.FlowGraphEdge> = [
@@ -231,7 +231,7 @@ const brainEdges: ReadonlyArray<G.FlowGraphEdge> = [
   { id: 'e3', source: 'brain', target: 'ideas' },
   { id: 'e4', source: 'brain', target: 'reading', isPlaceholder: true },
   { id: 'e5', source: 'people', target: 'ada' },
-  { id: 'e6', source: 'projects', target: 'nivo' },
+  { id: 'e6', source: 'projects', target: 'atlas' },
   { id: 'e7', source: 'ideas', target: 'journal', isPlaceholder: true },
 ];
 

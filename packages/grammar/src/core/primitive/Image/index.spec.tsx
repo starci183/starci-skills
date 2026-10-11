@@ -47,9 +47,9 @@ describe.each(FAMILY_WRAPS)("Image under %s", (family, wrap) => {
 
 describe.each(FAMILY_WRAPS)("asset slot attributes under %s", (_family, wrap) => {
     it("passes the Image slot, sha256 and prompt through as data-asset-* on its root", () => {
-        const { container } = render(wrap(<Image src="/hero.png" alt="" assetSlot="nivo.dashboard.overview-art" assetSha256="7f1b56d0" assetPrompt="One white unicorn" />))
+        const { container } = render(wrap(<Image src="/hero.png" alt="" assetSlot="app.dashboard.overview-art" assetSha256="7f1b56d0" assetPrompt="One white unicorn" />))
         const root = container.querySelector("[data-component='Image']")!
-        expect(root.getAttribute("data-asset-slot")).toBe("nivo.dashboard.overview-art")
+        expect(root.getAttribute("data-asset-slot")).toBe("app.dashboard.overview-art")
         expect(root.getAttribute("data-asset-sha256")).toBe("7f1b56d0")
         expect(root.getAttribute("data-asset-prompt")).toBe("One white unicorn")
     })

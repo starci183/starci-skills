@@ -52,7 +52,7 @@ describe("0.9.3 additions", () => {
     })
 
     it("IconButton offers the accent plate, a large size and floating elevation", () => {
-        const html = renderToStaticMarkup(<IconButton source={Glyph} label="Ask NIVO" variant="primary" size="lg" isFloating />)
+        const html = renderToStaticMarkup(<IconButton source={Glyph} label="Ask the assistant" variant="primary" size="lg" isFloating />)
         expect(html).toContain('data-variant="primary"')
         expect(html).toContain('data-size="lg"')
         expect(html).toContain('data-floating="true"')
