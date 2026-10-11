@@ -31,3 +31,11 @@ describe("0.9.4: a layout className on the semantic structure primitives wins", 
         expect(renderToStaticMarkup(<Region label="Leads" className="flex">x</Region>)).toContain('class="starci-core-region flex"')
     })
 })
+
+describe("0.9.4: ListRow actions stay on the copy line in a narrow container", () => {
+    it("gives the collapsed copy a 12rem basis and the actions their own width", () => {
+        expect(css).toMatch(/\.starci-core-list-row-copy \{[\s\S]*?flex: 1 1 12rem;/)
+        expect(css).toMatch(/\.starci-core-list-row-actions \{[\s\S]*?flex: 0 1 auto;/)
+        expect(css).not.toMatch(/\.starci-core-list-row-actions \{\s*display: flex;\s*flex: 1 1 100%;/)
+    })
+})

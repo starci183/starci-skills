@@ -1275,7 +1275,8 @@
     .starci-core-list-row-copy {
         display: flex;
         min-width: 0;
-        flex: 1 1 0%;
+        /* Collapsed (flex) row: the copy keeps at least 12rem before the actions wrap under it (0.9.4). */
+        flex: 1 1 12rem;
         flex-direction: column;
         gap: var(--starci-core-copy-gap, 0.25rem);
     }
@@ -1311,7 +1312,8 @@
 
     .starci-core-list-row-actions {
         display: flex;
-        flex: 1 1 100%;
+        /* Stays at the end of the copy line while leading + 12rem copy + actions fit; wraps only when they do not (0.9.4). */
+        flex: 0 1 auto;
         flex-wrap: wrap;
         align-items: center;
         gap: var(--grammar-inline-gap, 0.5rem);

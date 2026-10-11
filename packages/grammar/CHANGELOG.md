@@ -8,11 +8,15 @@ Patch (reported from nivo-lite).
   padding, list marker) sat in the grammar layer, which a host declares after Tailwind's `utilities`, so `flex`, `grid`, `gap-3`
   or `py-3` passed as `className` lost and layout had to be wrapped in an inner element. The resets now live in `@layer base`;
   without a className the shape is unchanged. Region's prop-driven `spacing` stays in the grammar layer.
+- **Fixed: `ListRow` actions in a narrow container.** Below the 28rem container query the actions took `flex: 1 1 100%`, so one
+  small ghost button got a line of its own and every row of a ~20rem rail grew by a line. The copy now takes `1 1 12rem` and the
+  actions `0 1 auto`: the action stays on the copy line while it fits and wraps only when it does not; the detail region and the
+  28rem grid are unchanged.
 
 ### Tests
 
 - `src/core/v094.spec.tsx`: the three resets are base-layer rules, Region spacing stays a grammar rule, the className passes
-  through beside the hook class.
+  through beside the hook class; the collapsed ListRow copy and actions flex values.
 
 ## 0.9.3 - 2026-10-11
 
