@@ -203,6 +203,46 @@ const listItems: ReadonlyArray<G.ListBoxItem> = [
   { id: 'spam', label: 'Spam', isDisabled: true },
 ];
 
+const brainNodes: ReadonlyArray<G.FlowGraphNode> = [
+  { id: 'brain', label: 'Second brain', size: 'lg', tone: 'accent', isRoot: true },
+  { id: 'people', label: 'People', count: 12, tone: 'success' },
+  { id: 'projects', label: 'Projects', count: 5, tone: 'neutral' },
+  { id: 'ideas', label: 'Ideas', count: 31, tone: 'warning' },
+  { id: 'reading', label: 'Reading list', isPlaceholder: true },
+  { id: 'ada', label: 'Ada', description: 'Mentor', size: 'sm' },
+  { id: 'nivo', label: 'NIVO', size: 'sm', tone: 'accent' },
+  { id: 'journal', label: 'Journal', size: 'sm', isPlaceholder: true },
+];
+const brainEdges: ReadonlyArray<G.FlowGraphEdge> = [
+  { id: 'e1', source: 'brain', target: 'people' },
+  { id: 'e2', source: 'brain', target: 'projects' },
+  { id: 'e3', source: 'brain', target: 'ideas' },
+  { id: 'e4', source: 'brain', target: 'reading', isPlaceholder: true },
+  { id: 'e5', source: 'people', target: 'ada' },
+  { id: 'e6', source: 'projects', target: 'nivo' },
+  { id: 'e7', source: 'ideas', target: 'journal', isPlaceholder: true },
+];
+
+export const FlowGraph: Story = {
+  render: () => {
+    const Demo = () => {
+      const [selectedId, setSelectedId] = useState<string | null>('projects');
+      return <G.FlowGraph label="Second brain" nodes={brainNodes} edges={brainEdges} selectedId={selectedId} onSelect={setSelectedId} />;
+    };
+    return (
+      <Matrix maxWidth={720}>
+        <State label="Radial, selectable" direction="column"><Demo /></State>
+        <State label="Static, no controls" direction="column">
+          <G.FlowGraph label="Second brain (static)" nodes={brainNodes} edges={brainEdges} height="sm" isInteractive={false} />
+        </State>
+        <State label="Empty" direction="column">
+          <G.FlowGraph label="Empty map" nodes={[]} edges={[]} emptyLabel="Nothing connected yet." />
+        </State>
+      </Matrix>
+    );
+  },
+};
+
 export const ListBox: Story = {
   render: () => (
     <Matrix maxWidth={360}>

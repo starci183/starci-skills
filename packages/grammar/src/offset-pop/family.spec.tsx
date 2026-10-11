@@ -64,6 +64,7 @@ const EVERY_COMMON_RENDERER: Readonly<Record<CommonGrammarComponentName, () => R
     Field: () => <C.Field label="Nickname" description="Shown to others" name="nick">{(control) => <input {...control} />}</C.Field>,
     Fieldset: () => <C.Fieldset legend="Details" description="Optional"><C.Input id="first" name="first" label="First" /></C.Fieldset>,
     FileDropzone: () => <C.FileDropzone label="Attachments" prompt="Drop files or browse" accept=".pdf" name="files" />,
+    FlowGraph: () => <C.FlowGraph label="Map" nodes={[{ id: "a", label: "Root" }, { id: "b", label: "Leaf", count: 2 }]} edges={[{ id: "ab", source: "a", target: "b" }]} />,
     Footer: () => <C.Footer label="Footer" brand={<span>Brand</span>} groups={[{ id: "g", label: "About", links: [{ id: "l", label: "Team", href: "/team" }] }]} legal={<small>Legal</small>} />,
     Form: () => <C.Form label="Feedback" onSubmit={noop}><C.Textarea label="Note" /><C.Button type="submit">Send</C.Button></C.Form>,
     GrammarRoot: () => <C.GrammarRoot>Root</C.GrammarRoot>,

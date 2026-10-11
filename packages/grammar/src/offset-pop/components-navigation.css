@@ -371,6 +371,20 @@
     }
 
     /* Reduced motion removes family transforms and transitions. */
+    /*
+     * FlowGraph: the family frame (ink outline, small hard shadow) round the canvas, and the selected node in the
+     * ink outline with its hard shadow; the edges, tints and ring stay on the Common tokens.
+     */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="FlowGraph"] {
+        border: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+        box-shadow: 0.125rem 0.1875rem 0 var(--offset-pop-shadow-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="FlowGraph"] [data-grammar-selected="true"] {
+        border-color: var(--offset-pop-ink);
+        box-shadow: 0.125rem 0.1875rem 0 var(--offset-pop-shadow-ink);
+    }
+
     @media (prefers-reduced-motion: reduce) {
         .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Disclosure"] *,
         .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Accordion"] *,

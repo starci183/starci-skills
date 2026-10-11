@@ -1274,4 +1274,194 @@
             forced-color-adjust: none;
         }
     }
+
+    /* ---------- FlowGraph ----------
+     * The structural base rules of React Flow, scoped to the graph so a host needs no @xyflow/react stylesheet import.
+     * Its colours (edges, background, nodes) are replaced by grammar tokens below. */
+    .starci-core-flow-graph {
+        display: block;
+        position: relative;
+        min-width: 0;
+        margin: 0;
+        overflow: hidden;
+        border: 1px solid var(--separator, CanvasText);
+        border-radius: var(--starci-core-surface-radius, 1rem);
+        background: var(--surface, Canvas);
+        color: var(--foreground, CanvasText);
+    }
+
+    .starci-core-flow-graph-canvas {
+        position: relative;
+        inline-size: 100%;
+        block-size: 24rem;
+    }
+
+    .starci-core-flow-graph[data-grammar-flow-height="sm"] .starci-core-flow-graph-canvas { block-size: 16rem; }
+    .starci-core-flow-graph[data-grammar-flow-height="lg"] .starci-core-flow-graph-canvas { block-size: 32rem; }
+
+    .starci-core-flow-graph-empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-block-size: 8rem;
+        margin: 0;
+        padding: 1.5rem;
+        color: var(--muted, GrayText);
+        text-align: center;
+    }
+
+    .starci-core-flow-graph .react-flow {
+        direction: ltr;
+        --xy-edge-stroke: var(--separator, CanvasText);
+        --xy-edge-stroke-width: 1.5;
+        --xy-edge-stroke-selected: var(--separator, CanvasText);
+        --xy-background-color: transparent;
+        background: transparent;
+    }
+
+    .starci-core-flow-graph .react-flow__container { position: absolute; inline-size: 100%; block-size: 100%; inset-block-start: 0; inset-inline-start: 0; }
+    .starci-core-flow-graph .react-flow__pane { z-index: 1; touch-action: none; }
+    .starci-core-flow-graph[data-grammar-flow-interactive="true"] .react-flow__pane.draggable { cursor: grab; }
+    .starci-core-flow-graph[data-grammar-flow-interactive="true"] .react-flow__pane.dragging { cursor: grabbing; }
+    .starci-core-flow-graph .react-flow__viewport { transform-origin: 0 0; z-index: 2; pointer-events: none; }
+    .starci-core-flow-graph .react-flow__renderer { z-index: 4; }
+    .starci-core-flow-graph .react-flow__background { pointer-events: none; z-index: -1; }
+    .starci-core-flow-graph .react-flow__edges { position: absolute; }
+    .starci-core-flow-graph .react-flow__edges svg { position: absolute; overflow: visible; pointer-events: none; }
+    .starci-core-flow-graph .react-flow__edge-path { fill: none; stroke: var(--xy-edge-stroke); stroke-width: var(--xy-edge-stroke-width); stroke-linecap: round; }
+    .starci-core-flow-graph .starci-core-flow-graph-edge-placeholder .react-flow__edge-path { stroke-dasharray: 4 5; }
+    .starci-core-flow-graph .react-flow__nodes { pointer-events: none; transform-origin: 0 0; }
+    .starci-core-flow-graph .react-flow__node {
+        position: absolute;
+        box-sizing: border-box;
+        transform-origin: 0 0;
+        pointer-events: all;
+        user-select: none;
+        cursor: default;
+        outline: none;
+    }
+    .starci-core-flow-graph .react-flow__node.selectable { cursor: pointer; }
+    .starci-core-flow-graph .react-flow__panel { position: absolute; z-index: 5; margin: 0.75rem; }
+    .starci-core-flow-graph .react-flow__panel.bottom { inset-block-end: 0; }
+    .starci-core-flow-graph .react-flow__panel.left { inset-inline-start: 0; }
+    .starci-core-flow-graph .react-flow__panel.right { inset-inline-end: 0; }
+    .starci-core-flow-graph .react-flow__panel.top { inset-block-start: 0; }
+
+    /* The edge ends meet at the node centre: the handle is a hidden point in the middle of the card. */
+    .starci-core-flow-graph .starci-core-flow-graph-handle {
+        position: absolute;
+        inset-block-start: 50%;
+        inset-inline-start: 50%;
+        min-inline-size: 1px;
+        min-block-size: 1px;
+        inline-size: 1px;
+        block-size: 1px;
+        border: 0;
+        opacity: 0;
+        pointer-events: none;
+        transform: none;
+        background: transparent;
+    }
+
+    .starci-core-flow-graph-node {
+        --starci-flow-tint: var(--default-soft, transparent);
+        --starci-flow-ink: var(--foreground, CanvasText);
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        max-inline-size: 14rem;
+        padding: 0.375rem 0.875rem;
+        border: 1px solid var(--separator, CanvasText);
+        border-radius: 999px;
+        background-color: var(--surface, Canvas);
+        background-image: linear-gradient(var(--starci-flow-tint), var(--starci-flow-tint));
+        color: var(--starci-flow-ink);
+        font-size: 0.875rem;
+        line-height: 1.25;
+    }
+
+    .starci-core-flow-graph-node[data-size="sm"] { padding: 0.25rem 0.625rem; font-size: 0.75rem; }
+    .starci-core-flow-graph-node[data-size="lg"] { padding: 0.625rem 1.25rem; font-size: 1rem; font-weight: 600; }
+    .starci-core-flow-graph-node[data-tone="accent"] { --starci-flow-tint: var(--accent-soft, transparent); --starci-flow-ink: var(--accent-soft-foreground, CanvasText); }
+    .starci-core-flow-graph-node[data-tone="success"] { --starci-flow-tint: var(--success-soft, transparent); --starci-flow-ink: var(--success-soft-foreground, CanvasText); }
+    .starci-core-flow-graph-node[data-tone="warning"] { --starci-flow-tint: var(--warning-soft, transparent); --starci-flow-ink: var(--warning-soft-foreground, CanvasText); }
+    .starci-core-flow-graph-node[data-tone="danger"] { --starci-flow-tint: var(--danger-soft, transparent); --starci-flow-ink: var(--danger-soft-foreground, CanvasText); }
+    .starci-core-flow-graph-node[data-tone="muted"] { --starci-flow-tint: transparent; --starci-flow-ink: var(--muted, GrayText); }
+    .starci-core-flow-graph-node[data-placeholder="true"] { border-style: dashed; }
+
+    .starci-core-flow-graph-copy {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+    }
+
+    .starci-core-flow-graph-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .starci-core-flow-graph-description {
+        overflow: hidden;
+        color: var(--muted, GrayText);
+        font-size: 0.75rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .starci-core-flow-graph-count {
+        flex: 0 0 auto;
+        min-inline-size: 1.25rem;
+        padding: 0 0.375rem;
+        border-radius: 999px;
+        background: var(--surface, Canvas);
+        color: var(--foreground, CanvasText);
+        font-size: 0.6875rem;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.25rem;
+        text-align: center;
+    }
+
+    /* Selection and keyboard focus draw the package focus ring on the card, not on the React Flow wrapper. */
+    .starci-core-flow-graph-node[data-grammar-selected="true"],
+    .starci-core-flow-graph .react-flow__node:focus-visible > .starci-core-flow-graph-node {
+        outline: 2px solid var(--focus, var(--starci-core-focus, Highlight));
+        outline-offset: 2px;
+    }
+
+    .starci-core-flow-graph-controls {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid var(--separator, CanvasText);
+        border-radius: 0.75rem;
+        background: var(--surface, Canvas);
+    }
+
+    .starci-core-flow-graph-controls .react-flow__controls-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        inline-size: 2rem;
+        block-size: 2rem;
+        padding: 0.375rem;
+        border: 0;
+        background: transparent;
+        color: var(--foreground, CanvasText);
+        cursor: pointer;
+    }
+
+    .starci-core-flow-graph-controls .react-flow__controls-button + .react-flow__controls-button { border-block-start: 1px solid var(--separator, CanvasText); }
+    .starci-core-flow-graph-controls .react-flow__controls-button svg { inline-size: 100%; max-inline-size: 0.75rem; max-block-size: 0.75rem; fill: currentColor; }
+    .starci-core-flow-graph-controls .react-flow__controls-button:focus-visible { outline: 2px solid var(--focus, var(--starci-core-focus, Highlight)); outline-offset: -2px; }
+    .starci-core-flow-graph-controls .react-flow__controls-button:disabled { opacity: 0.4; cursor: default; }
+
+    @media (prefers-reduced-motion: reduce) {
+        .starci-core-flow-graph .react-flow__edge.animated path { animation: none; }
+    }
+
+    @media (forced-colors: active) {
+        .starci-core-flow-graph-node[data-grammar-selected="true"] { outline-color: Highlight; forced-color-adjust: none; }
+    }
 }

@@ -4,6 +4,7 @@ import { Accordion } from "../core/branch/Accordion/index.js"
 import { Calendar } from "../core/branch/Calendar/index.js"
 import { DataTable } from "../core/branch/DataTable/index.js"
 import { Disclosure } from "../core/branch/Disclosure/index.js"
+import { FlowGraph } from "../core/branch/FlowGraph/index.js"
 import { ListBox } from "../core/branch/ListBox/index.js"
 import { AvatarGroup } from "../core/composite/AvatarGroup/index.js"
 import { Breadcrumbs } from "../core/composite/Breadcrumbs/index.js"
@@ -24,6 +25,7 @@ export { Accordion, type AccordionItem, type AccordionProps } from "../core/bran
 export { Calendar, type CalendarProps } from "../core/branch/Calendar/index.js"
 export { DataTable, type DataTableColumn, type DataTableProps, type DataTableRow, type DataTableSort } from "../core/branch/DataTable/index.js"
 export { Disclosure, type DisclosureProps } from "../core/branch/Disclosure/index.js"
+export { FlowGraph, radialPositions, type FlowGraphEdge, type FlowGraphHeight, type FlowGraphLayout, type FlowGraphNode, type FlowGraphNodeSize, type FlowGraphProps, type FlowGraphTone } from "../core/branch/FlowGraph/index.js"
 export { ListBox, type ListBoxItem, type ListBoxProps } from "../core/branch/ListBox/index.js"
 export { AvatarGroup, type AvatarGroupItem, type AvatarGroupProps } from "../core/composite/AvatarGroup/index.js"
 export { Breadcrumbs, type BreadcrumbItem, type BreadcrumbsProps } from "../core/composite/Breadcrumbs/index.js"
@@ -43,5 +45,5 @@ export { Rating, type RatingProps } from "../core/primitive/Rating/index.js"
 /** Every navigation-group renderer, spread into `COMMON_GRAMMAR_COMPONENTS`. */
 export const COMMON_NAVIGATION_COMPONENTS = Object.freeze({
     Accordion, Avatar, AvatarGroup, BottomNav, Breadcrumbs, Calendar, DataTable, DescriptionList,
-    Disclosure, Footer, Image, Link, ListBox, Pagination, Rating, Stepper, TagGroup, Timeline, TopBar,
+    Disclosure, FlowGraph, Footer, Image, Link, ListBox, Pagination, Rating, Stepper, TagGroup, Timeline, TopBar,
 } as const)

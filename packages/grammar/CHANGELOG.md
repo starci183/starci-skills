@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.9.5 - 2026-10-11
+
+Minor, additive (owner: the NIVO "Second brain" knowledge map must be drawn from grammar components only).
+
+- **New branch component `FlowGraph`** (Common renderer, 104 in all; exported from `@starci/grammar/common` and `/core`). A node-and-edge
+  map drawn with React Flow (`@xyflow/react`) in grammar tokens: pill nodes tinted by `tone` (`neutral`, `accent`, `success`,
+  `warning`, `danger`, `muted`), a `count` badge, an optional `description`, dashed outline and muted ink for `isPlaceholder`
+  slots; straight `--separator` edges, dashed for placeholder edges; no background grid; no attribution mark.
+  Props: `label` (required), `nodes`, `edges`, `selectedId`, `onSelect(id | null)`, `height` (`sm` 16rem, `md` 24rem, `lg` 32rem),
+  `isInteractive` (pan and zoom, default true), `showControls` (zoom buttons, default follows `isInteractive`), `layout`
+  (`radial` default, or `manual` with `node.position`) and `emptyLabel`. The radial layout puts the root (`isRoot`, else the first
+  node) in the centre, its direct children evenly on a ring and deeper levels on outer rings inside their parent's wedge;
+  `radialPositions(nodes, edges)` is exported for hosts that want the coordinates. The viewport fits on mount and whenever the node set changes.
+  Accessibility: a `figure` named by `label`; nodes are focusable and selectable with Enter or Space (Escape clears); the selected
+  node and keyboard focus use the package focus ring; a visually hidden list repeats every node with its count; edges never animate.
+- **New peer dependency `@xyflow/react` `^12.11.6`** (dev copy `12.11.6` for the tests). It is a peer, not a dependency, so an app keeps a single
+  React Flow copy; install it next to `@heroui/react` (`npm i @xyflow/react`). The structural rules React Flow needs are shipped
+  inside `common/styles.css`, scoped to `.starci-core-flow-graph`, so **no `@xyflow/react/dist/*.css` import is needed**.
+- `package-boundary.spec.mjs` now expects the peer list `@heroui/react`, `@xyflow/react`, `react`; runtime `dependencies` stay empty.
+
+### Tests
+
+- `src/core/branch/FlowGraph/index.spec.tsx` (label, node count, hidden list, placeholder hook, click / Enter / Space / Escape, controlled
+  selection, empty state, static mode, radial geometry); `src/core/v095.spec.tsx` (peer boundary, client module, token-only CSS, heights,
+  reduced motion); catalog 103 to 104; Offset Pop family render table.
+
 ## 0.9.4 - 2026-10-11
 
 Patch (reported from nivo-lite).

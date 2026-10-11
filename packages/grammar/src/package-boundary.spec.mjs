@@ -43,7 +43,8 @@ test("each sibling family has paired runtime, types, and CSS exports", async () 
 test("runtime dependencies stay at the neutral peer boundary", async () => {
     const packageJson = JSON.parse(await readFile(packageUrl, "utf8"))
     assert.deepEqual(Object.keys(packageJson.dependencies ?? {}), [])
-    assert.deepEqual(Object.keys(packageJson.peerDependencies).sort(), ["@heroui/react", "react"])
+    // @xyflow/react is a peer (FlowGraph, 0.9.5), never a dependency: the app owns the single React Flow copy.
+    assert.deepEqual(Object.keys(packageJson.peerDependencies).sort(), ["@heroui/react", "@xyflow/react", "react"])
 })
 
 const packageRoot = new URL("../", import.meta.url)
