@@ -161,6 +161,10 @@ rules:
         when: The canvas behind the page's surfaces is chosen
         assert: |-
           The Grammar default stands - the HeroUI `--background` grey under white surfaces (owner ruling 2026-09-27); a brand-tinted canvas appears only after an owner ruling the brand record carries as a declared token
+      - id: case-5
+        when: On a working (console) page, an accent-filled slab (an ink band, a tinted ribbon, a filled header) would share the first screen with the primary action
+        assert: |-
+          Owner ruling 2026-10-11: the primary action is the one accent mass the eye finds first. A second full-accent area in the same viewport competes with it ("two reds") and reads as alarm on a brand whose accent is red, so figures, headers and summaries stay on neutral surfaces; the ink band is reserved for the product's overview signature moment, never repeated under every page header, and never carries a primary of its own hue. A marketing or entry page (landing, sign-in) may spend its one art band as the signature moment (DISCIPLINE-3) beside the primary, as long as that band holds no button and the page shows one primary per command (CTA-1 case-5)
     notThisRule: |-
       how many dominant accents one decision region holds is ACCENT-1, and which owner carries an outcome is ACCENT-5. Measuring the accent share of a capture is TASTE-5 case-5.
 doesNotDecide: |-

@@ -74,6 +74,10 @@ rules:
         when: A figure reports a state
         assert: |-
           The figure keeps the default tone and the state is a toned `Badge` beside it (ACCENT-5); no number is painted red, green or amber
+      - id: case-6
+        when: A console page leads with a row of key figures (the "ribbon")
+        assert: |-
+          Owner ruling 2026-10-11 (corrected the same day): the ribbon is an ordinary card - a default `SurfaceCard` (white surface) holding `DescriptionList layout="stat-strip" isDivided` - never a bare strip on the canvas and never the ink band: a full-accent `treatment="ink"` slab under every page header reads as loud and spends the page's colour budget (ACCENT-6) on figures that are not its signature moment; at most four cells
     notThisRule: |-
       which rank a line receives is HIERARCHY-1, and the closed size scale is FONT-1 to FONT-6. Measuring the rendered figures is TASTE-6 case-5.
   - id: DISCIPLINE-3
@@ -97,6 +101,10 @@ rules:
         when: The moment is placed against the page's focal point
         assert: |-
           It is not the primary focal point unless the page's job is the image itself (HIERARCHY-6), and its accent ground counts inside the page's colour budget (ACCENT-6)
+      - id: case-5
+        when: A promotional strip or banner would sit on a working page (settings, lists, connections)
+        assert: |-
+          Owner ruling 2026-10-11: it does not appear there; a promotion lives on the overview's or the landing's signature moment. A strip appended under the content, outside the page's measure and alignment, is a defect even when dismissible
     notThisRule: |-
       whether the mascot stands where the brand names a slot is BRAND-2, and whether an image earns its place is TASTE-8. Counting the moments in a capture is TASTE-8 case-5.
 doesNotDecide: |-

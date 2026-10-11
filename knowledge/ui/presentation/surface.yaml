@@ -215,6 +215,11 @@ rules:
         owner: "`—`"
         render: |-
           `<div className="relative isolate min-h-32 overflow-hidden bg-accent">` with an `aria-hidden` image
+      - id: case-2
+        when: The decorative band belongs to a card (a hero card, a welcome card, a brand pane beside a form)
+        owner: "`SurfaceCard composition=\"joined\"`"
+        render: |-
+          Owner ruling 2026-10-11: the band is the joined card's first face (or one column of a two-column joined card), edge to edge with no inset and clipped by the card's radius; the copy bands beside or under it take the band insets of PADDING (outer edge `1rem`, `.75rem` against a separator). The band never sits inset inside a padded single card with square corners
     notThisRule: |-
       any slab carrying text, a label, or a control. Put copy on SURFACE-4 instead, where a paired foreground exists.
 doesNotDecide: |-

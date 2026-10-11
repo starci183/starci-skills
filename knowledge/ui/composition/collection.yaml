@@ -61,6 +61,10 @@ rules:
         when: The grammar publishes no container for the collection the page needs
         assert: |-
           A gap names the missing container, and no substitute card appears in the tree
+      - id: case-7
+        when: A rail lists choices, suggestions or explanatory lines (agent views, items worth adding, how it works)
+        assert: |-
+          Owner ruling 2026-10-11: each list is a `SurfaceListCard` - label outside, its one-line intro as `fact` - whose rows are `ListRow` (a choice or suggestion with its command in `actions`, the current choice marked by a `Badge`) or `StaticStateRow` (a static line); no `SurfaceCard` wrapping a `ListBox` or a `List` with app-drawn `divide-y`/`py-*` rows, and the rail's cards stack at GAP-4
     notThisRule: |-
       which of several regions carries the strongest anchor is HIERARCHY-2, and which face a bounded object
       presents once it is composed is SURFACE-2.

@@ -49,7 +49,7 @@ topics:
   - title: State
     path: state.yaml
     decides: Which conditions exist, and which published carrier holds each one
-    rules: STATE-1 to STATE-7
+    rules: STATE-1 to STATE-8
   - title: Feedback
     path: feedback.yaml
     decides: Who reports a failure, a correction, a recovery, and a result
