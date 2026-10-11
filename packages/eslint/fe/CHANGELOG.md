@@ -1,5 +1,9 @@
 # Changelog
 
+## 8.2.5 - 2026-10-11
+
+- Changed: refresh the bundled canon pins for stylelint-canon 2.0.7 and cli 1.2.4; behaviour is unchanged.
+
 ## 8.2.4 - 2026-10-11
 
 - Changed: refresh the bundled canon pins for @starci/grammar 0.9.3; lint rules are unchanged.

@@ -13,7 +13,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - Grammar knowledge: the soft Alert ruling (ACCENT-5), `ListRow` anatomy and ownership rows, `ChatBubble` RADIUS-6, and the grammar DNA refreshed from 0.9.3 (103 renderers).
 
 ### Changed
-- The canon pins carry `@starci/grammar` 0.9.3; `@starci/eslint-canon-be` 3.2.4, `@starci/eslint-canon-fe` 8.2.4, `@starci/hfs` 4.2.3, `@starci/stylelint-canon` 2.0.7 (grammar vocabulary regenerated) and `@starci/cli` 1.2.4 (runtime version 1.0.0-alpha.10) republish the refreshed bundled pins (lint and command behaviour unchanged); code-pattern profiles and example pins are rebound to them.
+- The canon pins carry `@starci/grammar` 0.9.3; `@starci/eslint-canon-be` 3.2.5, `@starci/eslint-canon-fe` 8.2.5, `@starci/hfs` 4.2.4, `@starci/stylelint-canon` 2.0.7 (grammar vocabulary regenerated) and `@starci/cli` 1.2.4 (runtime version 1.0.0-alpha.10) republish the refreshed bundled pins (lint and command behaviour unchanged); code-pattern profiles and example pins are rebound to them.
 
 ### Fixed
 - Grammar objects that hand the vendor a function or use hooks (`SurfaceCard`, `SurfaceListCard`, `SurfaceAccordionCard`, `Dialog`, `AlertDialog`, `Drawer`, `Rail`, `Subnav`, `Tooltip`, `Alert`) are client modules, so a React Server Component can render them; an uncontrolled `Input` shows its `defaultValue`; `Label` takes the full foreground; overlay headers keep title and close on one row; `ChatBubble` footers stretch; Dialog and Drawer geometry (0.8.5).
