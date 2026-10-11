@@ -160,6 +160,49 @@ rules:
         when: The closed body contains links or controls
         assert: |-
           While closed, nothing inside the body is focusable or announced
+  - id: STATE-8
+    title: Loading and failure keep the page's anatomy
+    governs: |-
+      Governs what a page renders before its data resolves and when it fails: the same page, never a different one.
+      Owner ruling 2026-10-11; it binds every application that consumes this knowledge, including one not built on
+      these code patterns.
+    cases:
+      - id: case-1
+        when: A route or region is loading
+        assert: |-
+          The loading view is the resolved view's own component tree with the data missing - the same layout owners
+          (`PageContainer`, `PrimaryRailLayout`, `Rail`), the same cards in the same places, the same breadcrumbs,
+          headings, card labels and tab labels that are known without data as real text. Only unresolved content swaps
+          to inert geometry: copy to `isSkeleton` on its own `Text`/`Heading`, an image or drawing to `Skeleton
+          shape="rect"` at the resolved ratio, a figure to its owner's skeleton. Build it by rendering the page component
+          in a skeleton mode (data `null`), not by drawing a separate generic layout
+      - id: case-2
+        when: A collection is loading
+        assert: |-
+          It renders three skeleton rows by default in the collection's own container (`SurfaceListCard isLoading`,
+          `DataTable isLoading`, a grid of three skeleton cards), each with the resolved row's anatomy (leading mark,
+          title, description, trailing action footprint); a collection whose size is known renders that many, capped at
+          its first page
+      - id: case-3
+        when: One region fails while the rest of the page resolved
+        assert: |-
+          Only that region changes: its body becomes the failure owner in place - an `EmptyNotice` naming what could not
+          load with a retry when one is safe (FEEDBACK-2), or a negative `Alert` with `appearance="soft"` inside the card -
+          and every other region keeps rendering its data
+      - id: case-4
+        when: The whole route fails (the page data could not load)
+        assert: |-
+          The route keeps its chrome and anatomy: breadcrumbs and the page heading stay real, and the body is one
+          negative `Alert` saying what failed and offering the safe retry (or the way back), placed where the page's
+          first region would be; never a blank frame, a lone error string, a stack trace, or a generic error page that
+          drops the shell
+      - id: case-5
+        when: A generic route-level loading or error file would be quicker
+        assert: |-
+          Each route ships its own loading and error views that follow cases 1-4; a shared fallback is only the last
+          resort for a route that has none, and a page found without its own is a defect
+    notThisRule: |-
+      the wording of an error is FEEDBACK-1/2, and pending on a command that is already running is STATE-2.
 doesNotDecide: |-
   Which regions exist to hold these states is [Layout](layout.yaml), and which branch survives a reflow
   is [Responsive](responsive.yaml). Which control carries a decision, and who owns pending among several
