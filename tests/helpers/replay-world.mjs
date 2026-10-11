@@ -8,8 +8,8 @@
 //   - `world.engine({controllers})`   runs the real reconciler Engine (real controllers, real ctx, real child verbs) for one or more passes in a fresh
 //                                     process (tests/helpers/replay-driver.mjs), so every call is an engine restart;
 //   - `world.reviseRuntime(...)`      commits a change in the runtime root: the runtime revision changes here.
-// STUBBED seams (the only ones): the Orca binary (terminal and agent launch: tests/helpers/fake-orca.mjs through STARCI_ORCA_COMMAND) and, inside the
-// engine driver only, the Critic agent launch (tests/helpers/fake-critic-orca.mjs through the settler's criticSeams). Nothing else is faked.
+// Recorded boundaries: Orca terminal/agent launch, the engine driver's Critic launch, roomy host resources and render readiness at dispatch/status.
+// `renderHost: 'native'` preserves actual browser discovery; drawing commands always use their real rendering tools.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -46,7 +46,7 @@ const BROWSER_CACHE = createRequire(import.meta.url)('playwright-core/lib/coreBu
 /** The seams this harness stubs, named so a spec (and its reader) can state them. */
 /** The scratch directories the runtime leaves in the temp root of a replayed child (the temp-leak check of the spec preloads names them). */
 const SCRATCH_DIRS = ['starci-kernel-scratch', 'starci-job-scratch', 'starci-settler'];
-export const STUBBED = Object.freeze(['orca binary (terminal and agent launch)', 'critic agent launch (engine driver only)']);
+export const STUBBED = Object.freeze(['orca binary (terminal and agent launch)', 'critic agent launch (engine driver only)', 'host resource sample']);
 
 const IDENTITY = { GIT_AUTHOR_NAME: 'replay', GIT_AUTHOR_EMAIL: 'replay@example.test', GIT_COMMITTER_NAME: 'replay', GIT_COMMITTER_EMAIL: 'replay@example.test' };
 const rm = (dir) => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 });
@@ -194,7 +194,8 @@ function seedLedger(ledgerFile, fixture, at, revs, bind, admit) {
  * Builds the world of `fixture` and registers its cleanup on `t`. Options: `tree` (a real workflow tree: a git repository registered as the workflow worktree)
  * and `seed(ledger, ctx)` for rows a case needs beyond the fixture vocabulary (called on an open ledger).
  */
-export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel = true, admit = null, launch = false, linkedTree = false } = {}) {
+export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel = true, admit = null, launch = false, linkedTree = false, renderHost = 'recorded' } = {}) {
+  assert.ok(['recorded', 'native'].includes(renderHost), 'the render host is recorded or native');
   const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-replay-')));
   t.after(() => { rm(base); for (const name of SCRATCH_DIRS) rm(path.join(os.tmpdir(), name)); });
   const repo = path.join(base, 'product');
@@ -221,6 +222,7 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
     // preload in every process that logs a read of the real host (os.freemem, os.cpus, ... ) so a spec can prove none happened.
     [HOST_RESOURCES_ENV]: JSON.stringify(ROOMY_HOST), STARCI_REPLAY_HOST_READS: path.join(base, 'host-reads.jsonl'), STARCI_REPLAY_CHILDREN: path.join(base, 'children.jsonl'),
     NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${pathToFileURL(HOST_TRAP).href} --import=${pathToFileURL(CHILD_TRAP).href}`.trim() });
+  if (renderHost === 'recorded') env.NODE_OPTIONS += ` --import=${pathToFileURL(path.join(ROOT, 'tests', 'helpers', 'recorded-render-host.mjs')).href}`;
   fs.mkdirSync(env[TEMP_ROOT_ENV], { recursive: true });
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB', 'STARCI_STATUS_MEMO', 'STARCI_ACTOR', 'CODEX_HOME']) delete env[key];
   const saved = { ...process.env };
@@ -232,7 +234,8 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
   const ledgerFile = ledgerFileFor(repo, { env });
   const wf = fixture.workflow.id;
   let kernelEnv = {};
-  const world = { base, repo, runtime, env, machineFile, ledgerFile, wf, revs, now, at, tree: null, fixture, stubbed: STUBBED };
+  const world = { base, repo, runtime, env, machineFile, ledgerFile, wf, revs, now, at, tree: null, fixture,
+    stubbed: renderHost === 'recorded' ? [...STUBBED, 'render readiness (dispatch/status only)'] : STUBBED };
   if (tree) {
     const dir = path.join(base, 'tree');
     const branch = `wf-${wf}`;

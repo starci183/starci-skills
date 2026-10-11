@@ -9,9 +9,11 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 ### Fixed
 - The Windows and Ubuntu install sandboxes check out `config.example.yaml` with the dispatcher so the source bootstrap can resolve its default configuration before running the tarball gate.
 - Example app lint writes its Sonar report relative to the selected app directory, matching the scanner's report path.
+- Replays record render readiness and the supported host platform at their fixture boundaries; the missing-browser and real-render cases retain native discovery. Purge replays isolate fake resource process observations from unrelated harness children while retaining captured-worker closure refusals.
+- The clean contributor install declares the queue replay's ts-jest and TypeORM dependencies. Scaffold lint runs before parallel build commands create their caches.
 
 ### Known limitations
-- The immutable `alpha.9` tag retains the failed sandbox and example Sonar runs that identified these workflow defects. This release carries their source corrections; the original tag is preserved.
+- The immutable `alpha.9` tag retains the failed sandbox, example Sonar and Linux full-suite runs that identified these defects. This release carries their source corrections; the original tag is preserved.
 
 ## [1.0.0-alpha.9] — 2026-10-10
 

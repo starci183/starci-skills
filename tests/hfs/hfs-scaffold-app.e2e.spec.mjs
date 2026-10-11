@@ -121,9 +121,10 @@ test('starci app scaffold end to end: npm ci, codegen + typecheck, starci app li
     assert.equal(run.status, 0, `${label} failed (${run.status ?? run.error?.message}):\n${tail(run)}`);
     return run;
   };
+  // Lint reads the scaffold before independent commands create their build caches.
+  await step('npm run lint', ['run', 'lint']);
   await Promise.all([
     step('npm run typecheck', ['run', 'typecheck']),
-    step('npm run lint', ['run', 'lint']),
     // Jest's default cache lives in the OS temp root, which this suite keeps empty: the app's run keeps it inside the fixture.
     step('npm run test', ['test', '--', `--cacheDirectory=${path.join(into, '.jest-cache')}`], { timeout: 900_000 }),
     step('npm run build:be', ['run', 'build:be']),

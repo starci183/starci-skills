@@ -24,7 +24,7 @@ export async function execNode(argv, { env }) {
         const modes = Object.fromEntries(Object.entries(PROFILES.operational).map(([name, mode]) => [name, { configured: mode, effective: mode }]));
         const engine = { leader: { fresh: true, holder: 'recorded-replay-engine', pid: 1, epoch: 1, ageMs: 0, safe: false }, modes, drift: { modes: [], rev: null } };
         const probes = ['orca', 'ask-gateway', 'ask-tunnel', 'telegram-bridge', 'harness-ui', 'harness-tunnel'].map((name) => ({ name, ok: true, detail: { status: 'recorded replay observation' } }));
-        return [sqliteItem(), hostPlatformItem(), guardCommandRow(), database, ...engineItems(engine), ...serviceItems(probes)];
+        return [sqliteItem(), hostPlatformItem('win32'), guardCommandRow(), database, ...engineItems(engine), ...serviceItems(probes)];
       },
       applyHost: () => { throw new Error('replay host actuator forbidden'); }
     }) });

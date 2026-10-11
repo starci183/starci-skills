@@ -27,7 +27,7 @@ const fixture = {
 function stoppedWorld(t) {
   const world = replayWorld(t, fixture);
   // The fake Orca terminals have no OS process tree. Model that boundary while the real close lifecycle proves custody.
-  const closureImport = `data:text/javascript,${encodeURIComponent(`import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/worker-close-loader.mjs', import.meta.url).href)});`)}`;
+  const closureImport = `data:text/javascript,${encodeURIComponent(`import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/purge-process-loader.mjs', import.meta.url).href)});`)}`;
   world.env.NODE_OPTIONS = [world.env.NODE_OPTIONS, `--import=${closureImport}`].filter(Boolean).join(' ');
   const dir = path.join(world.base, 'orca', 'product', `wf-${wf}`);
   fs.mkdirSync(path.dirname(dir), { recursive: true });

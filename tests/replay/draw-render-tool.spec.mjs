@@ -5,7 +5,7 @@
 // Sequences: (1) the op's own failing commands run from the workflow tree - `starci work draw-render` found no Playwright, `starci work draw-source` exited 13 (4); (2) the dispatch of the queued draw on a host with
 // no browser downloaded; (3) the failure route over the blocked report under the autopilot, then the digest's facts of the ledger.
 // Real: the CLI as a child process from the tree (Playwright, esbuild and the Chromium of this host), dispatch-ready and its dispatch child, status, the failure route (reconcile
-// --route-failure), the digest's ledger reader. Stubbed: the Orca binary only. A host with no browser is PLAYWRIGHT_BROWSERS_PATH pointing at an empty directory (Playwright's own
+// --route-failure), the digest's ledger reader. Orca and host resources are recorded; readiness uses native discovery for cases 1/2 and recorded availability for 2b. A host with no browser is PLAYWRIGHT_BROWSERS_PATH pointing at an empty directory (Playwright's own
 // switch). Fixture: tests/fixtures/replay/draw-render-tool.json (extracted from a ledger copy, neutral).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -33,7 +33,7 @@ const emptyBrowserCache = (t) => {
 };
 
 test('1: the op\'s own command renders from a workflow tree that holds no Playwright and no esbuild (the runtime\'s install serves)', { skip: NO_BROWSER }, (t) => {
-  const world = replayWorld(t, fixture, { tree: true });
+  const world = replayWorld(t, fixture, { tree: true, renderHost: 'native' });
   world.tree.write('drawing.html', PAGE);
   const out = path.join(world.tree.dir, 'captures');
   assert.equal(fs.existsSync(path.join(world.tree.dir, 'node_modules')), false, 'the tree is a fresh worktree: no install');
@@ -44,7 +44,7 @@ test('1: the op\'s own command renders from a workflow tree that holds no Playwr
 });
 
 test('2: a host with no browser refuses the dispatch of the draw before an attempt is spent, and status holds the job as host-tool-missing', (t) => {
-  const world = replayWorld(t, queuedDraw, { tree: true, launch: true });
+  const world = replayWorld(t, queuedDraw, { tree: true, launch: true, renderHost: 'native' });
   const bare = emptyBrowserCache(t);
   Object.assign(world.env, bare);
   assert.equal(world.ack([draw.op]).status, 0, 'the Kernel attests its READ of the op');
@@ -71,8 +71,8 @@ test('2b: the same job on a host that has the tools goes on to launch', (t) => {
   const world = replayWorld(t, queuedDraw, { tree: true, launch: true });
   assert.equal(world.ack([draw.op]).status, 0);
   const result = push(world);
-  assert.doesNotMatch(String(result.error ?? ''), /RENDER_TOOL_UNAVAILABLE|host-tool-missing/, `the tools resolve from the runtime: ${result.error}`);
-  assert.equal(typeof result.dispatched, 'boolean');
+  assert.doesNotMatch(String(result.error ?? ''), /RENDER_TOOL_UNAVAILABLE|host-tool-missing/, `the recorded host is ready: ${result.error}`);
+  assert.equal(result.dispatched, true, JSON.stringify(result));
 });
 
 test('3: a blocked environment report under the autopilot opens one supervisor-gate that names the host, not a spent retry cap, and the digest facts see it hold the leg', (t) => {
