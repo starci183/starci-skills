@@ -2,7 +2,7 @@
 
 ## 0.8.4 - 2026-10-10
 
-Patch, additive (nivo-lite connections; owner approved publishing @starci packages).
+Patch, additive (product connections screen; owner approved publishing @starci packages).
 
 - **Copyable and read-only `Input`.** `isCopyable` with `copyLabel` (and `copiedLabel`, `onCopy`) adds a Grammar `Button` after the
   control that copies the current value, controlled or not, masked secrets included without revealing them; when the clipboard is
