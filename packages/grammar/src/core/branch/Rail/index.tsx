@@ -1,3 +1,5 @@
+"use client"
+
 import { createElement, useId, type ReactNode } from "react"
 import { assertPresentationState, treatmentFor, type PresentationState } from "../../state.js"
 import { railBodyClassName, railClassName, railFooterClassName, railFrameClassName } from "./classNames.js"

@@ -1,6 +1,94 @@
 # Changelog
 
-## Unreleased
+## 0.9.1 - 2026-10-11
+
+Minor, additive (nivo-lite connections: several accounts per provider, read from the UI knowledge - COLLECTION-1/2,
+PADDING-0/4 side contact, BOUNDARY-3, DISCIPLINE-1, ACCENT-2; owner approved publishing @starci packages).
+
+- **`ListRow`** (composite, exported from every entry and the registry; 103 renderers): an interactive `<li>` for
+  `SurfaceListCard` - `leading` (an `IconTile`, avatar or logo tile), `title`, `badges` (at most two), one muted
+  `description`, trailing `actions` (one visible `Button`, then a `DropdownMenu`), and a `children` detail region under
+  the copy (an `Alert` about the row, revealed values). It carries `starci-core-static-row` as well as
+  `starci-core-list-row`, so it shares the row inset (PADDING-4), the row gap and the edge-to-edge separator with
+  `StaticStateRow` and the two mix in one collection. Collapsed by default (collapse law): mark and copy share a line,
+  actions and detail take their own; `@container starci-core-surface (min-width: 28.001rem)` lays it out as
+  leading | copy | actions. `state` and `verdict` expose `data-grammar-state` / `data-verdict` as `StaticStateRow` does.
+- **`SurfaceListCard` label row shows a `fact` and a `labelEnd` together.** Before, `labelEnd` replaced the fact; now
+  the fact reads beside the label (e.g. a count) and the end slot (`.starci-core-surface-label-end`) holds the end
+  (`data-grammar-label-end`). A lone fact renders as before.
+
+## 0.9.0 - 2026-10-11
+
+Minor, additive (owner, 2026-10-11: "add every gap the conformance lanes reported"). Every grammar gap the app-wide
+Grammar-conformance refactor had to leave as app classes now has a Grammar piece. No existing prop, default, class or token
+changed meaning.
+
+- **New renderer `ChatBubble`** (composite): one chat message - `side` `incoming` (recessed SURFACE-3 face) or `outgoing`
+  (the reader's own, SURFACE-4 accent-soft pair), `author`, `avatar`, `meta` (time), `status` (e.g. an "AI" Badge), `footer`
+  (an attachment or an approval card under the body), `actions` (revealed on hover and focus-within, always on touch),
+  `isHighlight` (focus ring for a jump target) and `id`. The corner on the author's side tightens toward the avatar
+  (RADIUS-6); plain text keeps its line breaks. Server-component safe. The thread, grouping and day dividers stay the app's.
+- **New renderer `FillViewport`** (composite, client): fills the viewport height left below whatever chrome sits above it
+  and keeps that true on resize. It measures its own top edge into `--starci-core-fill-top` and the visible Grammar
+  bottom chrome (WorkspaceShell's compact navigation, BottomNav and PinnedActionBar now mark themselves
+  `data-grammar-bottom-chrome`) into `--starci-core-fill-bottom`; CSS computes `100dvh - top - bottom - inset`, so the
+  server render already has a full-height fallback. Helper `bottomChromeHeight`. `minHeight` `none|sm|md|lg`
+  (20 / 28 / 36rem floor, default `md`), `bottomInset` `page|none`, optional `label` makes it a named region.
+- **`Textarea` mention suggestions and Enter-to-send.** `mentions={{ options, label, trigger?, onSelect? }}`: typing the
+  trigger (default `@`) at a word start opens a listbox filtered accent- and case-insensitively on label or description
+  (at most eight); ArrowUp/ArrowDown move, Enter/Tab insert `trigger + label + space`, Escape closes, pointer selection works.
+  The textbox carries `aria-autocomplete="list"` and, only while the list exists, `aria-controls` and
+  `aria-activedescendant`. `onSubmitShortcut`: Enter (no Shift, not composing, no open list) submits instead of breaking the
+  line. Exported helpers `findMentionQuery` and `filterMentionOptions`; types `TextareaMentions`, `TextareaMentionOption`.
+- **`IconButton` count badge.** `badge` (number or short text), `badgeLabel` (appended to the accessible name) and
+  `badgeMax` (default 99, larger shows `99+`); `0` or empty draws nothing, and a loading button shows none. The plate is
+  decorative, pinned to the top end corner on the accent pair with a canvas ring. Helper `iconButtonBadgeText`.
+- **`PrimaryRailLayout` `railPosition`** `trailing` (default) or `leading`: the same tracks mirrored for a module switcher
+  or a filter list, the rail drawn first with `order: -1`, reading order and the collapse unchanged.
+- **`Image` `plate`** `default` or `none`: `none` drops the loading plate so cut-out art (a mascot, a logo with alpha) sits
+  directly on its surface.
+- **Fixed: Grammar objects inside React Server Components.** `SurfaceCard`, `SurfaceListCard`, `SurfaceAccordionCard`,
+  `Dialog`, `AlertDialog`, `Drawer`, `Rail`, `Subnav`, `Tooltip` and `Alert` (and the new `FillViewport`, plus `Textarea`)
+  are now `"use client"` modules. They use hooks or hand the vendor a render function, so rendering one directly from a
+  server component failed with "Functions cannot be passed directly to Client Components".
+
+### Tests
+
+- `ChatBubble/index.spec.tsx`, `FillViewport/index.spec.tsx` (server fallback, client measurement, named region),
+  `IconButton/badge.spec.tsx`, `Textarea/mentions.spec.tsx` (query helpers, keyboard and pointer insertion, Escape,
+  Enter / Shift+Enter / IME), `v090.spec.tsx` (leading rail CSS, image plate, client directives).
+- `collapse.spec.tsx` counts the mirrored leading tracks; the Offset Pop render table and the Storybook catalog (102
+  renderers) include `ChatBubble` and `FillViewport`. Stories: `ChatBubble`, `FillViewport`, `PrimaryRailLayoutLeading`,
+  `IconButtonBadge`, `TextareaMentions`; the a11y matrix passes all of them.
+
+## 0.8.5 - 2026-10-11
+
+Patch (nivo-lite connections; owner: the copy action belongs inside the field).
+
+- **The `Input` copy action moves inside the field.** It is now an in-field action at the field's end, after a secret's reveal
+  toggle, like the reveal toggle itself: both live in `.starci-core-input-actions` and the field reserves their measured width
+  (`--starci-core-input-actions-width`), so the value never runs under them. New `copyIcon` / `copiedIcon` draw a glyph instead of
+  the label text (the label stays the accessible name); `copiedLabel` is announced through a polite live region.
+  `.starci-core-input-row` and the outline `Button` beside the control are gone.
+- **Fixed: a short `Dialog` / `AlertDialog` stretched to the viewport height.** The vendor container fills the height and the dialog
+  stretched with it (`flex: 1`); inside `.starci-core-dialog-container` the dialog is now `flex: 0 1 auto` and centred
+  (`justify-content: center`), so it is as tall as its content. Drawers keep filling their edge.
+- **Fixed: a `Drawer` with `placement="right"` (or `bottom`) opened on the left (or top).** The vendor content is `inset: 0` and a
+  fixed width keeps the start edge; each placement now releases the opposite edge (`inset-inline-start: auto` for right, and so on).
+
+## 0.8.4 - 2026-10-10
+
+Patch, additive (product connections screen; owner approved publishing @starci packages).
+
+- **Copyable and read-only `Input`.** `isCopyable` with `copyLabel` (and `copiedLabel`, `onCopy`) adds a Grammar `Button` after the
+  control that copies the current value, controlled or not, masked secrets included without revealing them; when the clipboard is
+  refused the value is selected instead. `isReadOnly` keeps the value focusable and selectable at full contrast but not editable
+  (`data-grammar-readonly`). The control and the action sit in `.starci-core-input-row`.
+- **Fixed: `defaultValue` and edits on an uncontrolled `Input`.** The vendor TextField owned the value and overrode the inner input,
+  so a `defaultValue` rendered empty. `value`, `defaultValue` and the change callback now belong to the TextField.
+
+## 0.8.2 / 0.8.3 - 2026-10-05
+
 
 Minor, additive (lane C0-CANON).
 

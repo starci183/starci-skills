@@ -41,6 +41,7 @@ export const BottomNav = ({ label, items, currentId, onSelect, position = "fixed
         aria-label={label}
         className={navigationClassName("starci-core-bottom-nav", className)}
         data-component="BottomNav"
+        data-grammar-bottom-chrome="true"
         data-contract="LAYOUT-4"
         data-tier="composition"
         data-grammar-bottom-nav-position={position}

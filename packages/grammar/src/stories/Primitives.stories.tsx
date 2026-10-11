@@ -555,3 +555,15 @@ export const GrammarRoot: Story = {
     );
   },
 };
+
+/** A count pinned to the glyph; 0 hides it, numbers above `badgeMax` collapse to `n+`, `badgeLabel` is announced. */
+export const IconButtonBadge: Story = {
+  render: () => (
+    <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+      <G.IconButton source={BellGlyph} label="Notifications" badge={3} badgeLabel="3 unread" onPress={noop} />
+      <G.IconButton source={BellGlyph} label="Notifications" badge={240} badgeLabel="240 unread" onPress={noop} />
+      <G.IconButton source={BellGlyph} label="Notifications" variant="ghost" badge="New" badgeLabel="new items" onPress={noop} />
+      <G.IconButton source={BellGlyph} label="Notifications" badge={0} onPress={noop} />
+    </div>
+  ),
+};

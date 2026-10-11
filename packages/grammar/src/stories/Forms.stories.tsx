@@ -61,6 +61,18 @@ export const Input: Story = {
   ),
 };
 
+/** `isCopyable` adds a copy action after the control (it copies the current value); `isReadOnly` keeps a value selectable but fixed. */
+export const InputCopyable: Story = {
+  render: () => (
+    <div style={{ display: 'grid', gap: '1rem', maxWidth: '36rem' }}>
+      <G.Input id="input-copy-url" name="webhookUrl" label="Webhook URL" variant="secondary" hint="Paste this into the provider." isReadOnly isCopyable copyLabel="Copy" copiedLabel="Copied" defaultValue="https://example.com/api/hooks/26465cdf" />
+      <G.Input id="input-copy-name" name="webhookName" label="Webhook name" variant="secondary" hint="You can change it here." isCopyable copyLabel="Copy" copiedLabel="Copied" defaultValue="Acme · Main account" />
+      <G.Input id="input-copy-key" name="apiKey" label="API Key" kind="password" variant="secondary" isCopyable copyLabel="Copy" copiedLabel="Copied" revealLabel="Show" hideLabel="Hide" defaultValue="key_b564bbce026c88a12f034ecfbee4387" />
+      <G.Input id="input-copy-disabled" name="disabled" label="Disabled" isDisabled isCopyable copyLabel="Copy" defaultValue="Locked value" />
+    </div>
+  ),
+}
+
 /** OtpInput's `label` names the slot group and the input; `describedBy` wires the error text. */
 const LabelledOtp = ({ id, ...props }: { readonly id: string; readonly label: string } & Omit<G.OtpInputProps, 'id' | 'name'>) => (
   <G.OtpInput id={id} name={id} {...props} />
@@ -575,3 +587,31 @@ export const Form: Story = {
     </Matrix>
   ),
 };
+
+const MENTION_PEOPLE = [
+  { id: 'linh', label: 'Linh', description: 'Owner' },
+  { id: 'minh', label: 'Minh', description: 'Sales' },
+  { id: 'sales-ai', label: 'Sales AI', description: 'Agent' },
+] as const;
+
+const MentionComposer = () => {
+  const [value, setValue] = useState('Hi @');
+  const [sent, setSent] = useState<string[]>([]);
+  return (
+    <div style={{ display: 'grid', gap: '0.75rem', maxWidth: '32rem' }}>
+      <G.Textarea
+        label="Message"
+        rows={3}
+        value={value}
+        onValueChange={setValue}
+        description="Type @ to mention someone. Enter sends, Shift+Enter breaks the line."
+        mentions={{ options: MENTION_PEOPLE, label: 'People to mention' }}
+        onSubmitShortcut={() => { setSent((s) => [...s, value]); setValue(''); }}
+      />
+      {sent.map((m, i) => <G.Text key={i} size="sm">{m}</G.Text>)}
+    </div>
+  );
+};
+
+/** Mention suggestions and the Enter-to-send shortcut of a chat composer. */
+export const TextareaMentions: Story = { render: () => <MentionComposer /> };

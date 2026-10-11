@@ -456,6 +456,11 @@
         .starci-core-primary-rail-layout[data-grammar-layout-rail="present"] { grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem); }
         .starci-core-primary-rail-layout[data-grammar-layout-rail="present"][data-grammar-layout-rail-width="compact"] { grid-template-columns: minmax(0, 1fr) minmax(14rem, 16rem); }
         .starci-core-primary-rail-layout[data-grammar-layout-rail="present"][data-grammar-layout-rail-width="wide"] { grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem); }
+        /* Leading rail: the same tracks mirrored, the rail drawn first without changing source (reading) order. */
+        .starci-core-primary-rail-layout[data-grammar-layout-rail="present"][data-grammar-layout-rail-position="leading"] { grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr); }
+        .starci-core-primary-rail-layout[data-grammar-layout-rail="present"][data-grammar-layout-rail-position="leading"][data-grammar-layout-rail-width="compact"] { grid-template-columns: minmax(14rem, 16rem) minmax(0, 1fr); }
+        .starci-core-primary-rail-layout[data-grammar-layout-rail="present"][data-grammar-layout-rail-position="leading"][data-grammar-layout-rail-width="wide"] { grid-template-columns: minmax(20rem, 24rem) minmax(0, 1fr); }
+        .starci-core-primary-rail-layout[data-grammar-layout-rail-position="leading"] > .starci-core-rail-region { order: -1; }
     }
 
     .starci-core-primary-region,
@@ -682,6 +687,18 @@
     .starci-core-surface-label > :first-child {
         min-width: 0;
         margin: 0;
+    }
+
+    /* A label row carrying both a fact and an end action: label and fact read together, the action holds the end. */
+    .starci-core-surface-label[data-grammar-label-end="true"] {
+        justify-content: flex-start;
+    }
+
+    .starci-core-surface-label-end {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        margin-inline-start: auto;
     }
 
     .starci-core-label {
@@ -1233,6 +1250,108 @@
 
     .starci-core-static-row + .starci-core-static-row {
         border-top: 1px solid var(--separator, var(--border, GrayText));
+    }
+
+    /*
+     * ListRow: an interactive row on the static row's geometry (inset, row gap, edge-to-edge separator).
+     * Collapsed by default (the collapse law): leading mark and copy share the first line, the actions and the
+     * detail take their own lines. A surface wider than 28rem lays it out as leading | copy | actions.
+     */
+    .starci-core-list-row {
+        flex-wrap: wrap;
+        align-items: center;
+        column-gap: var(--grammar-row-gap, 0.75rem);
+        row-gap: var(--grammar-row-gap, 0.75rem);
+    }
+
+    .starci-core-list-row-leading {
+        display: flex;
+        flex: none;
+        align-items: center;
+    }
+
+    .starci-core-list-row-copy {
+        display: flex;
+        min-width: 0;
+        flex: 1 1 0%;
+        flex-direction: column;
+        gap: var(--starci-core-copy-gap, 0.25rem);
+    }
+
+    .starci-core-list-row-title {
+        display: flex;
+        min-width: 0;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--grammar-inline-gap, 0.5rem);
+    }
+
+    .starci-core-list-row-name {
+        min-width: 0;
+        font-weight: 600;
+        overflow-wrap: anywhere;
+    }
+
+    .starci-core-list-row-badges {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--grammar-inline-gap, 0.5rem);
+    }
+
+    .starci-core-list-row-description {
+        min-width: 0;
+        color: var(--muted, GrayText);
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        overflow-wrap: anywhere;
+    }
+
+    .starci-core-list-row-actions {
+        display: flex;
+        flex: 1 1 100%;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--grammar-inline-gap, 0.5rem);
+    }
+
+    .starci-core-list-row-detail {
+        display: flex;
+        min-width: 0;
+        flex: 1 1 100%;
+        flex-direction: column;
+        gap: var(--grammar-row-gap, 0.75rem);
+    }
+
+    @container starci-core-surface (min-width: 28.001rem) {
+        .starci-core-list-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+        }
+
+        .starci-core-list-row[data-grammar-leading="true"] {
+            grid-template-columns: auto minmax(0, 1fr) auto;
+        }
+
+        .starci-core-list-row[data-grammar-actions="false"] {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .starci-core-list-row[data-grammar-leading="true"][data-grammar-actions="false"] {
+            grid-template-columns: auto minmax(0, 1fr);
+        }
+
+        .starci-core-list-row-actions {
+            justify-content: flex-end;
+        }
+
+        .starci-core-list-row-detail {
+            grid-column: 1 / -1;
+        }
+
+        .starci-core-list-row[data-grammar-leading="true"] > .starci-core-list-row-detail {
+            grid-column: 2 / -1;
+        }
     }
 
     .starci-core-list-shell[data-grammar-hover="invariant"] .starci-core-static-row:hover {
@@ -2730,6 +2849,33 @@
         border-radius: var(--starci-core-pill-radius, 999px) !important;
     }
 
+    /* A count pinned to the glyph's top end corner; the plate never clips because the button keeps overflow visible. */
+    .starci-core-icon-button[data-grammar-icon-button-badge="present"] {
+        position: relative;
+        overflow: visible !important;
+    }
+
+    .starci-core-icon-button-badge {
+        position: absolute;
+        inset-block-start: -0.25rem;
+        inset-inline-end: -0.25rem;
+        display: inline-flex;
+        min-width: 1.25rem;
+        height: 1.25rem;
+        align-items: center;
+        justify-content: center;
+        padding-inline: 0.25rem;
+        border-radius: var(--starci-core-pill-radius, 999px);
+        background: var(--accent, Highlight);
+        color: var(--accent-foreground, HighlightText);
+        box-shadow: 0 0 0 2px var(--background, Canvas);
+        font-size: 0.6875rem;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+        pointer-events: none;
+    }
+
     /* --- Icon tile --- */
     .starci-core-icon-tile {
         display: inline-flex;
@@ -2799,6 +2945,10 @@
         gap: 0.5rem !important;
     }
 
+    .starci-core-input[data-grammar-readonly="true"] .starci-core-input-field {
+        cursor: text;
+    }
+
     .starci-core-input-control {
         position: relative;
         display: flex;
@@ -2822,6 +2972,53 @@
         background: transparent;
         color: var(--muted, var(--starci-core-muted, GrayText));
         cursor: pointer;
+    }
+
+    /* In-field actions (reveal, copy): one group at the field's end; the field reserves their measured width. */
+    .starci-core-input-actions {
+        position: absolute;
+        inset-inline-end: 0.5rem;
+        top: 50%;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        transform: translateY(-50%);
+    }
+
+    .starci-core-input-actions .starci-core-input-reveal {
+        position: static;
+        transform: none;
+        min-height: 1.75rem;
+        padding-inline: 0.375rem;
+        border-radius: var(--radius-sm, calc(var(--radius, 0.5rem) * 0.5));
+    }
+
+    .starci-core-input-actions .starci-core-input-reveal:not(:disabled):hover {
+        color: var(--foreground, CanvasText);
+        background: var(--default, transparent);
+    }
+
+    .starci-core-input-actions .starci-core-input-reveal:focus-visible {
+        outline: 2px solid var(--focus, Highlight);
+        outline-offset: 1px;
+    }
+
+    .starci-core-input-copy[data-copied="true"] {
+        color: var(--success-foreground, var(--foreground, CanvasText));
+    }
+
+    .starci-core-input-live {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    .starci-core-input-control[data-reveal="true"] .starci-core-input-field,
+    .starci-core-input-control[data-copyable="true"] .starci-core-input-field {
+        padding-inline-end: calc(var(--starci-core-input-actions-width, 2rem) + 0.75rem) !important;
     }
 
     .starci-core-input-reveal:disabled {
@@ -3153,5 +3350,141 @@
         color: inherit;
     }
 
+
+    /* --- ChatBubble: one message; the thread, grouping and scroll belong to the app. --- */
+    .starci-core-chat-bubble {
+        display: flex;
+        min-width: 0;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .starci-core-chat-bubble[data-grammar-bubble-side="outgoing"] { flex-direction: row-reverse; }
+
+    .starci-core-chat-bubble-avatar { flex: none; }
+
+    .starci-core-chat-bubble-stack {
+        position: relative;
+        display: flex;
+        min-width: 0;
+        max-width: min(40rem, 85%);
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+
+    .starci-core-chat-bubble[data-grammar-bubble-side="outgoing"] .starci-core-chat-bubble-stack { align-items: flex-end; }
+
+    .starci-core-chat-bubble-head {
+        display: flex;
+        min-width: 0;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.75rem;
+        line-height: 1rem;
+    }
+
+    .starci-core-chat-bubble-author { font-weight: 600; color: var(--foreground, CanvasText); }
+    .starci-core-chat-bubble-meta { color: var(--muted, GrayText); font-variant-numeric: tabular-nums; }
+
+    .starci-core-chat-bubble-body {
+        min-width: 0;
+        max-width: 100%;
+        padding: 0.5rem 0.75rem;
+        border-radius: 1rem;
+        border-start-start-radius: 0.25rem;
+        background: var(--surface-secondary, Canvas);
+        color: var(--foreground, CanvasText);
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+    }
+
+    .starci-core-chat-bubble[data-grammar-bubble-side="outgoing"] .starci-core-chat-bubble-body {
+        border-start-start-radius: 1rem;
+        border-start-end-radius: 0.25rem;
+        background: var(--accent-soft, Highlight);
+        color: var(--accent-soft-foreground, HighlightText);
+    }
+
+    .starci-core-chat-bubble[data-grammar-bubble-highlight="true"] .starci-core-chat-bubble-body {
+        outline: 2px solid var(--focus, Highlight);
+        outline-offset: 2px;
+    }
+
+    .starci-core-chat-bubble-footer { min-width: 0; max-width: 100%; }
+
+    .starci-core-chat-bubble-actions {
+        display: flex;
+        gap: 0.25rem;
+        opacity: 0;
+        transition: opacity var(--starci-core-motion-duration, 150ms) cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .starci-core-chat-bubble:hover .starci-core-chat-bubble-actions,
+    .starci-core-chat-bubble:focus-within .starci-core-chat-bubble-actions { opacity: 1; }
+
+    @media (hover: none) {
+        .starci-core-chat-bubble-actions { opacity: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .starci-core-chat-bubble-actions { transition: none; }
+    }
+
+    @media (forced-colors: active) {
+        .starci-core-chat-bubble-body { border: 1px solid CanvasText; }
+    }
+
+    /* --- FillViewport: the viewport height left below the chrome, measured into --starci-core-fill-top. --- */
+    .starci-core-fill-viewport {
+        --starci-core-fill-inset: 1.5rem;
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        height: calc(100dvh - var(--starci-core-fill-top, 0px) - var(--starci-core-fill-bottom, 0px) - var(--starci-core-fill-inset));
+    }
+
+    .starci-core-fill-viewport > * { min-height: 0; flex: 1 1 auto; }
+    .starci-core-fill-viewport[data-grammar-fill-inset="none"] { --starci-core-fill-inset: 0px; }
+    .starci-core-fill-viewport[data-grammar-fill-min="sm"] { min-height: 20rem; }
+    .starci-core-fill-viewport[data-grammar-fill-min="md"] { min-height: 28rem; }
+    .starci-core-fill-viewport[data-grammar-fill-min="lg"] { min-height: 36rem; }
+
+    /* --- Textarea mention suggestions: a listbox under the control. --- */
+    .starci-core-textarea-anchor { position: relative; min-width: 0; }
+
+    .starci-core-mention-list {
+        position: absolute;
+        z-index: 30;
+        inset-inline: 0;
+        inset-block-start: calc(100% + 0.25rem);
+        max-height: 16rem;
+        margin: 0;
+        padding: 0.25rem;
+        overflow-y: auto;
+        list-style: none;
+        border: 1px solid var(--border, GrayText);
+        border-radius: var(--radius-lg, var(--radius, 0.5rem));
+        background: var(--overlay, var(--surface, Canvas));
+        color: var(--overlay-foreground, var(--foreground, CanvasText));
+        box-shadow: var(--overlay-shadow, 0 8px 24px rgb(0 0 0 / 0.12));
+    }
+
+    .starci-core-mention-option {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: 0.125rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: var(--radius, 0.5rem);
+        cursor: pointer;
+    }
+
+    .starci-core-mention-option[data-grammar-mention-active="true"] { background: var(--default, var(--surface-secondary, Highlight)); }
+    .starci-core-mention-label { font-size: 0.875rem; font-weight: 500; }
+    .starci-core-mention-description { font-size: 0.75rem; color: var(--muted, GrayText); }
 }
 

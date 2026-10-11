@@ -34,6 +34,8 @@ const EVERY_COMMON_RENDERER: Readonly<Record<CommonGrammarComponentName, () => R
     Button: () => <C.Button variant="primary" onPress={noop}>Continue</C.Button>,
     ButtonGroup: () => <C.ButtonGroup label="Formatting"><C.Button>Bold</C.Button><C.Button>Italic</C.Button></C.ButtonGroup>,
     Calendar: () => <C.Calendar label="Date" defaultValue={new CalendarDate(2026, 1, 15)} previousLabel="Previous" nextLabel="Next" />,
+    ChatBubble: () => <C.ChatBubble author="Tutor" meta="09:12">Hello</C.ChatBubble>,
+    FillViewport: () => <C.FillViewport label="Conversation"><p>Hello</p></C.FillViewport>,
     ChatWorkspace: () => <C.ChatWorkspace label="Tutor" conversation={<p>Hello</p>} conversationLabel="Conversation" composer={<textarea aria-label="Message" />} />,
     Checkbox: () => <C.Checkbox label="Accept" description="Required to continue" name="accept" value="yes" />,
     CheckboxGroup: () => <C.CheckboxGroup label="Channels" options={[{ value: "email", label: "Email" }, { value: "sms", label: "SMS" }]} defaultValue={["email"]} name="channels" />,
@@ -115,6 +117,7 @@ const EVERY_COMMON_RENDERER: Readonly<Record<CommonGrammarComponentName, () => R
     Spinner: () => <C.Spinner label="Loading" size="lg" />,
     StateMark: () => <C.StateMark state="affirmative" />,
     StaticStateRow: () => <ul><C.StaticStateRow item={{ id: "a", label: "Ready", state: "affirmative" }} /></ul>,
+    ListRow: () => <ul><C.ListRow title="Ready" description="Detail" actions={<C.Button variant="outline">Open</C.Button>} /></ul>,
     Stepper: () => <C.Stepper label="Progress" currentStepId="two" steps={[{ id: "one", label: "One", state: "complete" }, { id: "two", label: "Two" }, { id: "three", label: "Three" }]} />,
     Subnav: () => <C.Subnav label="Course" title="Lesson" menuIcon={<span />} openMenuLabel="Open" closeMenuLabel="Close" isMenuOpen={false} />,
     SurfaceAccordionCard: () => (

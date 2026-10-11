@@ -1,3 +1,5 @@
+"use client"
+
 import { AlertDialog as HeroAlertDialog } from "@heroui/react"
 import { useEffect, useId, useRef, useState, type ReactNode } from "react"
 import type { PresentationState } from "../../../common/state.js"

@@ -12,6 +12,11 @@ export type PrimaryRailLayoutProps = {
      * before the content itself. Shipped in the container query, so no consumer reorders by hand.
      */
     readonly collapsedOrder?: "primary-first" | "rail-first"
+    /**
+     * Which side the rail takes in the two-column composition: `trailing` (default, after the content) or `leading`
+     * (before it, e.g. a module switcher or a filter list). Reading order collapses by `collapsedOrder` either way.
+     */
+    readonly railPosition?: "leading" | "trailing"
     readonly className?: string
 }
 
@@ -25,6 +30,7 @@ export const PrimaryRailLayout = ({
     railWidth = "standard",
     align = "start",
     collapsedOrder = "primary-first",
+    railPosition = "trailing",
     className,
 }: PrimaryRailLayoutProps) => (
     <div className={cn("starci-core-primary-rail-container", className)} data-component="PrimaryRailLayout" data-tier="composition">
@@ -35,6 +41,7 @@ export const PrimaryRailLayout = ({
             data-grammar-layout-collapsed-order={collapsedOrder}
             data-grammar-layout-rail={rail === undefined ? "absent" : "present"}
             data-grammar-layout-rail-width={railWidth}
+            data-grammar-layout-rail-position={railPosition}
         >
             <div className="starci-core-primary-region" data-grammar-primary-region="true">{primary}</div>
             {rail === undefined ? null : <div className="starci-core-rail-region" data-grammar-rail-region="true">{rail}</div>}

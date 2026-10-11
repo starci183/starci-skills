@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type ComponentType, type ReactNode } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react"
 import {
     Description as HeroDescription,
     ErrorMessage as HeroErrorMessage,
@@ -30,6 +30,20 @@ export type InputProps = {
     readonly isDisabled?: boolean
     readonly isRequired?: boolean
     readonly isSkeleton?: boolean
+    /** The value can be focused, selected and copied but not changed (unlike `isDisabled`, it stays at full contrast). */
+    readonly isReadOnly?: boolean
+    /**
+     * Adds a copy action inside the field, at its end (after the reveal toggle of a secret), that copies the current value;
+     * needs `copyLabel` (its accessible name, and its visible text when no `copyIcon` is given).
+     */
+    readonly isCopyable?: boolean
+    readonly copyLabel?: string
+    /** Announced (and shown, without `copiedIcon`) on the copy action for a moment after a successful copy. */
+    readonly copiedLabel?: string
+    readonly copyIcon?: InputIcon
+    readonly copiedIcon?: InputIcon
+    /** Called with the copied value after it reached the clipboard. */
+    readonly onCopy?: (value: string) => void
     readonly revealLabel?: string
     readonly hideLabel?: string
     readonly revealIcon?: InputIcon
@@ -62,6 +76,13 @@ export const Input = ({
     isDisabled = false,
     isRequired = false,
     isSkeleton = false,
+    isReadOnly = false,
+    isCopyable = false,
+    copyLabel,
+    copiedLabel,
+    copyIcon: CopyIcon,
+    copiedIcon: CopiedIcon,
+    onCopy,
     revealLabel,
     hideLabel,
     revealIcon: RevealIcon,
@@ -74,6 +95,47 @@ export const Input = ({
     const invalid = isError || errorMessage != null
     const toggleLabel = isRevealed ? hideLabel : revealLabel
     const ToggleIcon = isRevealed ? HideIcon : RevealIcon
+    const [isCopied, setIsCopied] = useState(false)
+    const canCopy = isCopyable && copyLabel !== undefined
+    const canReveal = isSecret && toggleLabel !== undefined
+    const copyName = isCopied && copiedLabel !== undefined ? copiedLabel : copyLabel
+    const CopyGlyph = isCopied && CopiedIcon !== undefined ? CopiedIcon : CopyIcon
+    // The in-field actions overlay the field's end; the field reserves exactly their measured width so the value never runs under them.
+    const actions = useRef<HTMLSpanElement>(null)
+    const [actionsWidth, setActionsWidth] = useState<number | null>(null)
+    useLayoutEffect(() => {
+        const node = actions.current
+        if (node === null) return
+        const measure = () => setActionsWidth(node.getBoundingClientRect().width)
+        measure()
+        if (typeof ResizeObserver === "undefined") return
+        const observer = new ResizeObserver(measure)
+        observer.observe(node)
+        return () => observer.disconnect()
+    }, [canCopy, canReveal])
+
+    useEffect(() => {
+        if (!isCopied) return
+        const timer = setTimeout(() => setIsCopied(false), 2000)
+        return () => clearTimeout(timer)
+    }, [isCopied])
+
+    /**
+     * Copies what the control holds now (controlled or not); when the clipboard is refused, the value is selected instead.
+     * The control is found by its id because the vendor input does not forward a ref.
+     */
+    const copy = async () => {
+        const field = document.getElementById(id)
+        const control = field instanceof HTMLInputElement ? field : null
+        const current = control?.value ?? value ?? ""
+        try {
+            await navigator.clipboard.writeText(current)
+            setIsCopied(true)
+            onCopy?.(current)
+        } catch {
+            control?.select()
+        }
+    }
 
     if (isSkeleton) {
         return (
@@ -94,12 +156,23 @@ export const Input = ({
             isInvalid={invalid}
             isDisabled={isDisabled}
             isRequired={isRequired}
+            isReadOnly={isReadOnly}
+            {...(value === undefined
+                ? defaultValue === undefined ? {} : { defaultValue }
+                : { value })}
+            onChange={(next: string) => onValueChange?.(next)}
+            data-grammar-readonly={isReadOnly ? "true" : "false"}
             data-contract="GAP-2"
             className="starci-core-input"
         >
             <HeroLabel>{label}</HeroLabel>
             {hint == null ? null : <HeroDescription>{hint}</HeroDescription>}
-            <div className="starci-core-input-control" data-reveal={isSecret && toggleLabel !== undefined ? "true" : "false"}>
+            <div
+                className="starci-core-input-control"
+                data-reveal={canReveal ? "true" : "false"}
+                data-copyable={canCopy ? "true" : "false"}
+                style={actionsWidth === null ? undefined : ({ "--starci-core-input-actions-width": `${actionsWidth}px` } as CSSProperties)}
+            >
                 <HeroInput
                     id={id}
                     name={name}
@@ -107,25 +180,39 @@ export const Input = ({
                     autoComplete={kind.autoComplete}
                     inputMode={kind.inputMode}
                     {...(placeholder === undefined ? {} : { placeholder })}
-                    {...(value === undefined
-                        ? defaultValue === undefined ? {} : { defaultValue }
-                        : { value })}
                     fullWidth
                     className="starci-core-input-field"
-                    onChange={(event) => onValueChange?.(event.target.value)}
                 />
-                {!isSecret || toggleLabel === undefined ? null : (
-                    <button
-                        type="button"
-                        aria-label={toggleLabel}
-                        disabled={isDisabled}
-                        data-contract="TONE-2"
-                        className="starci-core-input-reveal"
-                        onClick={() => setIsRevealed((current) => !current)}
-                    >
-                        {ToggleIcon === undefined ? <span data-contract="FONT-1" className="starci-core-input-reveal-label">{toggleLabel}</span> : <ToggleIcon className="starci-core-input-reveal-icon" />}
-                    </button>
-                )}
+                {canReveal || canCopy ? (
+                    <span ref={actions} className="starci-core-input-actions">
+                        {canReveal ? (
+                            <button
+                                type="button"
+                                aria-label={toggleLabel}
+                                disabled={isDisabled}
+                                data-contract="TONE-2"
+                                className="starci-core-input-reveal"
+                                onClick={() => setIsRevealed((current) => !current)}
+                            >
+                                {ToggleIcon === undefined ? <span data-contract="FONT-1" className="starci-core-input-reveal-label">{toggleLabel}</span> : <ToggleIcon className="starci-core-input-reveal-icon" />}
+                            </button>
+                        ) : null}
+                        {canCopy ? (
+                            <button
+                                type="button"
+                                aria-label={copyName}
+                                disabled={isDisabled}
+                                data-contract="TONE-2"
+                                data-copied={isCopied ? "true" : "false"}
+                                className="starci-core-input-reveal starci-core-input-copy"
+                                onClick={() => void copy()}
+                            >
+                                {CopyGlyph === undefined ? <span data-contract="FONT-1" className="starci-core-input-reveal-label">{copyName}</span> : <CopyGlyph className="starci-core-input-reveal-icon" />}
+                            </button>
+                        ) : null}
+                        <span className="starci-core-input-live" aria-live="polite">{isCopied ? copiedLabel ?? "" : ""}</span>
+                    </span>
+                ) : null}
             </div>
             {errorMessage == null ? null : <HeroErrorMessage>{errorMessage}</HeroErrorMessage>}
         </HeroTextField>

@@ -24,6 +24,7 @@ export const PinnedActionBar = ({ children, label, visibility = "narrow" }: Pinn
         aria-label={label}
         className="starci-core-pinned-action-bar"
         data-component="PinnedActionBar"
+        data-grammar-bottom-chrome="true"
         data-contract="BOUNDARY-1"
         data-grammar-pinned-visibility={visibility}
         data-tier="atom"

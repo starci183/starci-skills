@@ -1,3 +1,5 @@
+"use client"
+
 import { Button as HeroButton, cn } from "@heroui/react"
 import type { ComponentPropsWithoutRef, ReactNode } from "react"
 import {

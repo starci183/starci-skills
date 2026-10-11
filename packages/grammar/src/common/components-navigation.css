@@ -1033,6 +1033,9 @@
         background: var(--surface-secondary, transparent);
     }
 
+    /* Cut-out art (alpha channel) sits directly on its surface: no loading plate behind it. */
+    .starci-core-image[data-grammar-image-plate="none"] { background: transparent; }
+
     .starci-core-image[data-grammar-image-aspect="square"] { aspect-ratio: 1 / 1; }
     .starci-core-image[data-grammar-image-aspect="landscape"] { aspect-ratio: 4 / 3; }
     .starci-core-image[data-grammar-image-aspect="portrait"] { aspect-ratio: 3 / 4; }

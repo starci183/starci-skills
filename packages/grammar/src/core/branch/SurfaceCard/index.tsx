@@ -1,3 +1,5 @@
+"use client"
+
 import { Card } from "@heroui/react"
 import { useId, type ReactNode } from "react"
 import { assertPresentationState, treatmentFor, type PresentationState } from "../../state.js"

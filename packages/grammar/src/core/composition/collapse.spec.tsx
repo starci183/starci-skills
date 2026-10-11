@@ -157,7 +157,8 @@ describe("PrimaryRailLayout collapse", () => {
     it("keeps every two-column form inside the widening query, and none in the collapse", () => {
         const wide = rules.filter((rule) => rule.selector.includes(".starci-core-primary-rail-layout")
             && trackCount(declarationOf(rule.body, "grid-template-columns") ?? "") > 1)
-        expect(wide).toHaveLength(3)
+        // Three rail widths, each in the trailing and the mirrored leading position (railPosition, 0.9.0).
+        expect(wide).toHaveLength(6)
         for (const rule of wide) {
             expect(rule.conditions).toContain("@container starci-core-primary-rail (min-width: 56.001rem)")
             expect(rule.selector, "a rail track is only owed to a layout that has a rail").toContain("[data-grammar-layout-rail=\"present\"]")

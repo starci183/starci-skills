@@ -21,6 +21,22 @@ export type IconButtonProps = {
     readonly "aria-controls"?: string
     /** Disclosure: whether that region is open now (`aria-expanded`). */
     readonly "aria-expanded"?: boolean
+    /**
+     * A count pinned to the glyph's top end corner (unread notifications, waiting items). `0`, empty or absent draws nothing;
+     * a number above `badgeMax` shows as `badgeMax+`. The plate is decorative: `badgeLabel` carries the count to assistive tech.
+     */
+    readonly badge?: number | string
+    /** Appended to the accessible name when a badge shows, e.g. "3 unread". Required for a badge to be announced. */
+    readonly badgeLabel?: string
+    /** Largest number shown before it collapses to `n+`. Default 99. */
+    readonly badgeMax?: number
+}
+
+/** What the badge plate prints: nothing for 0 / empty, the capped number, or the given text. */
+export const iconButtonBadgeText = (badge: number | string | undefined, max = 99): string | null => {
+    if (badge === undefined || badge === "" || badge === 0) return null
+    if (typeof badge === "number") return badge > max ? `${max}+` : String(badge)
+    return badge
 }
 
 /**
@@ -40,7 +56,12 @@ export const IconButton = ({
     onPress,
     "aria-controls": controls,
     "aria-expanded": expanded,
-}: IconButtonProps) => (
+    badge,
+    badgeLabel,
+    badgeMax = 99,
+}: IconButtonProps) => {
+    const badgeText = isSkeleton ? null : iconButtonBadgeText(badge, badgeMax)
+    return (
     <HeroButton
         data-tier="atom"
         data-component="IconButton"
@@ -53,11 +74,14 @@ export const IconButton = ({
         className={cn("starci-core-icon-button", isSkeleton ? SKELETON_CLASS_NAME : undefined) ?? "starci-core-icon-button"}
         isIconOnly
         isDisabled={isDisabled || isSkeleton}
-        aria-label={label}
+        aria-label={badgeText !== null && badgeLabel !== undefined ? `${label}, ${badgeLabel}` : label}
+        data-grammar-icon-button-badge={badgeText === null ? "none" : "present"}
         {...(controls === undefined ? {} : { "aria-controls": controls })}
         {...(expanded === undefined ? {} : { "aria-expanded": expanded })}
         {...(isDisabled || isSkeleton || onPress === undefined ? {} : { onPress })}
     >
         {isSkeleton ? null : <Icon source={source} usage="leading" />}
+        {badgeText === null ? null : <span aria-hidden className="starci-core-icon-button-badge" data-contract="TONE-2">{badgeText}</span>}
     </HeroButton>
-)
+    )
+}

@@ -82,7 +82,7 @@ export const WorkspaceShell = (props: WorkspaceShellProps) => {
             {hasNavigation ? <nav aria-label={props.navigationLabel} className={workspaceShellNavigationClassName} data-grammar-workspace-navigation-region="true">{props.navigation}</nav> : null}
             {railPosition === "leading" ? rail : null}{leadingRule}{primary}{railPosition === "trailing" ? rail : null}
         </div>
-        {hasCompactNavigation ? <nav aria-label={props.compactNavigationLabel} className={workspaceShellCompactNavigationClassName} data-contract="BOUNDARY-1" data-grammar-workspace-compact-navigation="true">{props.compactNavigation}</nav> : null}
+        {hasCompactNavigation ? <nav aria-label={props.compactNavigationLabel} className={workspaceShellCompactNavigationClassName} data-contract="BOUNDARY-1" data-grammar-workspace-compact-navigation="true" data-grammar-bottom-chrome="true">{props.compactNavigation}</nav> : null}
         {hasFloatingLayer ? <div className={workspaceShellFloatingLayerClassName} data-contract="OVERFLOW-4" data-grammar-workspace-floating-layer="true">{props.floatingLayer}</div> : null}
     </div>
 }

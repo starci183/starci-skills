@@ -1,5 +1,9 @@
 # Changelog
 
+## 8.2.3 - 2026-10-11
+
+- Changed: refresh the bundled canon pins for @starci/grammar 0.9.1; lint rules are unchanged.
+
 ## 8.2.2 - 2026-10-11
 
 - Changed: refresh the bundled canon pins for the alpha.9.1 package bindings.

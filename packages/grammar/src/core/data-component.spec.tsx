@@ -13,6 +13,7 @@ import { SurfaceListCard } from "./branch/SurfaceListCard/index.js"
 import { Tooltip } from "./branch/Tooltip/index.js"
 import { HorizontalScrollRegion } from "./composite/HorizontalScrollRegion/index.js"
 import { StaticStateRow } from "./composite/StaticStateRow/index.js"
+import { ListRow } from "./composite/ListRow/index.js"
 import { VerticalScrollRegion } from "./composite/VerticalScrollRegion/index.js"
 import { PrimaryRailLayout } from "./composition/PrimaryRailLayout/index.js"
 import { LeadingNumber } from "./LeadingNumber.js"
@@ -87,6 +88,7 @@ describe("the components that emitted none now name themselves in the DOM", () =
         ["IncludedMark", <IncludedMark />],
         ["Tooltip", <Tooltip content="Hint"><button type="button">?</button></Tooltip>],
         ["StaticStateRow", <ul><StaticStateRow item={{ id: "a", label: "Row" }} /></ul>],
+        ["ListRow", <ul><ListRow title="Row" /></ul>],
         ["PrimaryRailLayout", <PrimaryRailLayout primary={<p>Main</p>} />],
         ["LeadingNumber", <LeadingNumber position={1} />],
         ["StateMark", <StateMark state="affirmative" />],

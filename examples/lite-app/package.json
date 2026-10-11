@@ -26,8 +26,8 @@
   },
   "devDependencies": {
     "@starci/cli": "1.2.2",
-    "@starci/eslint-canon-be": "3.2.2",
-    "@starci/eslint-canon-fe": "8.2.2",
+    "@starci/eslint-canon-be": "3.2.3",
+    "@starci/eslint-canon-fe": "8.2.3",
     "@starci/prettier-config": "1.0.3",
     "@starci/stylelint-canon": "2.0.6",
     "@starci/tsconfig": "2.0.3",
