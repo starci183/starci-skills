@@ -1,6 +1,6 @@
 {
   "name": "@starci/cli",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "The single catalog-driven command line for StarCi apps and runtimes.",
   "type": "module",
   "license": "MIT",

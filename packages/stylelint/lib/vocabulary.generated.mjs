@@ -95,6 +95,7 @@ export const VENDOR = [
   "--radius-md",
   "--radius-sm",
   "--radius-xl",
+  "--radius-xs",
   "--trigger-width",
 ]
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.4 - 2026-10-11
+
+- Changed: carry runtime version 1.0.0-alpha.10; behaviour is unchanged.
+
 ## 1.2.3 - 2026-10-11
 
 - Changed: refresh the bundled canon pins for @starci/grammar 0.9.3 and the canon packages; behaviour is unchanged.
