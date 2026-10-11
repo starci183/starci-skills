@@ -11,7 +11,7 @@ afterEach(cleanup)
 const PEOPLE = [
     { id: "linh", label: "Linh", description: "Owner" },
     { id: "minh", label: "Minh", description: "Sales" },
-    { id: "an", label: "Ân", description: "Kế toán" },
+    { id: "zoe", label: "Zoë", description: "Accounts" },
 ]
 
 describe("mention query helpers", () => {
@@ -24,7 +24,7 @@ describe("mention query helpers", () => {
     })
 
     it("filters accent- and case-insensitively, on label or description", () => {
-        expect(filterMentionOptions(PEOPLE, "an").map((o) => o.id)).toEqual(["an"])
+        expect(filterMentionOptions(PEOPLE, "zoe").map((o) => o.id)).toEqual(["zoe"])
         expect(filterMentionOptions(PEOPLE, "SALES").map((o) => o.id)).toEqual(["minh"])
         expect(filterMentionOptions(PEOPLE, "")).toHaveLength(3)
     })
@@ -81,8 +81,8 @@ describe("Textarea mentions and submit shortcut", () => {
         render(<Composer onSubmit={vi.fn()} />)
         const field = screen.getByLabelText("Message") as HTMLTextAreaElement
         typeInto(field, "@")
-        await act(async () => { fireEvent.mouseDown(screen.getByRole("option", { name: /Ân/ })) })
-        expect(field.value).toBe("@Ân ")
+        await act(async () => { fireEvent.mouseDown(screen.getByRole("option", { name: /Zoë/ })) })
+        expect(field.value).toBe("@Zoë ")
     })
 
     it("closes on Escape without submitting", () => {
