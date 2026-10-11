@@ -25,6 +25,11 @@ export type ImageProps = AssetSlotProps & {
     readonly width?: number
     readonly height?: number
     readonly onLoadStateChange?: (state: ImageLoadState) => void
+    /**
+     * `default` paints the neutral loading plate behind the picture; `none` keeps the box transparent for cut-out art
+     * (a mascot or logo with an alpha channel) that must sit directly on its surface.
+     */
+    readonly plate?: "default" | "none"
     readonly className?: string
 }
 
@@ -47,6 +52,7 @@ export const Image = ({
     width,
     height,
     onLoadStateChange,
+    plate = "default",
     className,
     ...assetSlot
 }: ImageProps) => {
@@ -73,6 +79,7 @@ export const Image = ({
             data-grammar-image-aspect={aspect}
             data-grammar-image-fit={fit}
             data-grammar-image-state={state}
+            data-grammar-image-plate={plate}
             {...assetSlotAttributes(assetSlot)}
         >
             {showFallback ? (

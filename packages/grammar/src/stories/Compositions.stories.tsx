@@ -275,3 +275,55 @@ const ChatDemo = () => {
 export const ChatWorkspace: Story = {
   render: () => <ChatDemo />,
 };
+
+/** One message: incoming on the recessed face, outgoing on the accent-soft pair; actions appear on hover or focus. */
+export const ChatBubble: Story = {
+  render: () => (
+    <div style={{ display: 'grid', gap: '0.75rem', maxWidth: '40rem' }}>
+      <G.ChatBubble
+        author="Linh"
+        meta="09:12"
+        avatar={<G.Avatar name="Linh" size="sm" />}
+        actions={<G.Button variant="ghost" size="sm" onPress={noop}>Reply</G.Button>}
+      >
+        Can the order for table 4 move to 19:30?
+      </G.ChatBubble>
+      <G.ChatBubble side="outgoing" meta="09:13">Yes, moved. The kitchen has the new time.</G.ChatBubble>
+      <G.ChatBubble
+        author="Assistant"
+        status={<G.Badge>AI</G.Badge>}
+        meta="09:13"
+        avatar={<G.IconTile source={BellGlyph} size="sm" />}
+        isHighlight
+        footer={<G.Button variant="secondary" size="sm" onPress={noop}>Approve draft</G.Button>}
+      >
+        {'Draft reply ready.\nIt keeps the original price.'}
+      </G.ChatBubble>
+    </div>
+  ),
+};
+
+/** Fills the viewport height left under whatever sits above it; the child takes `h-full`. */
+export const FillViewport: Story = {
+  render: () => (
+    <div style={{ display: 'grid', gap: '1rem' }}>
+      <Placeholder label="Chrome above (top bar, page header)" height={80} />
+      <G.FillViewport minHeight="sm" label="Conversation">
+        <G.SurfaceCard height="fill" label="Conversation">
+          <G.Text tone="muted">This card reaches the bottom of the window.</G.Text>
+        </G.SurfaceCard>
+      </G.FillViewport>
+    </div>
+  ),
+};
+
+/** `railPosition="leading"` draws the rail first (a module switcher, a filter list) without changing reading order. */
+export const PrimaryRailLayoutLeading: Story = {
+  render: () => (
+    <G.PageContainer>
+      <div style={{ padding: '1.5rem 0' }}>
+        <G.PrimaryRailLayout railPosition="leading" railWidth="compact" primary={<Placeholder label="Primary" />} rail={<Placeholder label="Rail" />} />
+      </div>
+    </G.PageContainer>
+  ),
+};

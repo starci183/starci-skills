@@ -587,3 +587,31 @@ export const Form: Story = {
     </Matrix>
   ),
 };
+
+const MENTION_PEOPLE = [
+  { id: 'linh', label: 'Linh', description: 'Owner' },
+  { id: 'minh', label: 'Minh', description: 'Sales' },
+  { id: 'sales-ai', label: 'Sales AI', description: 'Agent' },
+] as const;
+
+const MentionComposer = () => {
+  const [value, setValue] = useState('Hi @');
+  const [sent, setSent] = useState<string[]>([]);
+  return (
+    <div style={{ display: 'grid', gap: '0.75rem', maxWidth: '32rem' }}>
+      <G.Textarea
+        label="Message"
+        rows={3}
+        value={value}
+        onValueChange={setValue}
+        description="Type @ to mention someone. Enter sends, Shift+Enter breaks the line."
+        mentions={{ options: MENTION_PEOPLE, label: 'People to mention' }}
+        onSubmitShortcut={() => { setSent((s) => [...s, value]); setValue(''); }}
+      />
+      {sent.map((m, i) => <G.Text key={i} size="sm">{m}</G.Text>)}
+    </div>
+  );
+};
+
+/** Mention suggestions and the Enter-to-send shortcut of a chat composer. */
+export const TextareaMentions: Story = { render: () => <MentionComposer /> };

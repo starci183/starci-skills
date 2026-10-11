@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.9.0 - 2026-10-11
+
+Minor, additive (owner, 2026-10-11: "add every gap the conformance lanes reported"). Every grammar gap the app-wide
+Grammar-conformance refactor had to leave as app classes now has a Grammar piece. No existing prop, default, class or token
+changed meaning.
+
+- **New renderer `ChatBubble`** (composite): one chat message - `side` `incoming` (recessed SURFACE-3 face) or `outgoing`
+  (the reader's own, SURFACE-4 accent-soft pair), `author`, `avatar`, `meta` (time), `status` (e.g. an "AI" Badge), `footer`
+  (an attachment or an approval card under the body), `actions` (revealed on hover and focus-within, always on touch),
+  `isHighlight` (focus ring for a jump target) and `id`. The corner on the author's side tightens toward the avatar
+  (RADIUS-6); plain text keeps its line breaks. Server-component safe. The thread, grouping and day dividers stay the app's.
+- **New renderer `FillViewport`** (composite, client): fills the viewport height left below whatever chrome sits above it
+  and keeps that true on resize. It measures its own top edge into `--starci-core-fill-top`; CSS computes
+  `100dvh - top - inset`, so the server render already has a full-height fallback. `minHeight` `none|sm|md|lg`
+  (20 / 28 / 36rem floor, default `md`), `bottomInset` `page|none`, optional `label` makes it a named region.
+- **`Textarea` mention suggestions and Enter-to-send.** `mentions={{ options, label, trigger?, onSelect? }}`: typing the
+  trigger (default `@`) at a word start opens a listbox filtered accent- and case-insensitively on label or description
+  (at most eight); ArrowUp/ArrowDown move, Enter/Tab insert `trigger + label + space`, Escape closes, pointer selection works.
+  The textbox carries `aria-autocomplete="list"` and, only while the list exists, `aria-controls` and
+  `aria-activedescendant`. `onSubmitShortcut`: Enter (no Shift, not composing, no open list) submits instead of breaking the
+  line. Exported helpers `findMentionQuery` and `filterMentionOptions`; types `TextareaMentions`, `TextareaMentionOption`.
+- **`IconButton` count badge.** `badge` (number or short text), `badgeLabel` (appended to the accessible name) and
+  `badgeMax` (default 99, larger shows `99+`); `0` or empty draws nothing, and a loading button shows none. The plate is
+  decorative, pinned to the top end corner on the accent pair with a canvas ring. Helper `iconButtonBadgeText`.
+- **`PrimaryRailLayout` `railPosition`** `trailing` (default) or `leading`: the same tracks mirrored for a module switcher
+  or a filter list, the rail drawn first with `order: -1`, reading order and the collapse unchanged.
+- **`Image` `plate`** `default` or `none`: `none` drops the loading plate so cut-out art (a mascot, a logo with alpha) sits
+  directly on its surface.
+- **Fixed: Grammar objects inside React Server Components.** `SurfaceCard`, `SurfaceListCard`, `SurfaceAccordionCard`,
+  `Dialog`, `AlertDialog`, `Drawer`, `Rail`, `Subnav`, `Tooltip` and `Alert` (and the new `FillViewport`, plus `Textarea`)
+  are now `"use client"` modules. They use hooks or hand the vendor a render function, so rendering one directly from a
+  server component failed with "Functions cannot be passed directly to Client Components".
+
+### Tests
+
+- `ChatBubble/index.spec.tsx`, `FillViewport/index.spec.tsx` (server fallback, client measurement, named region),
+  `IconButton/badge.spec.tsx`, `Textarea/mentions.spec.tsx` (query helpers, keyboard and pointer insertion, Escape,
+  Enter / Shift+Enter / IME), `v090.spec.tsx` (leading rail CSS, image plate, client directives).
+- `collapse.spec.tsx` counts the mirrored leading tracks; the Offset Pop render table and the Storybook catalog (102
+  renderers) include `ChatBubble` and `FillViewport`. Stories: `ChatBubble`, `FillViewport`, `PrimaryRailLayoutLeading`,
+  `IconButtonBadge`, `TextareaMentions`; the a11y matrix passes all of them.
+
 ## 0.8.5 - 2026-10-11
 
 Patch (nivo-lite connections; owner: the copy action belongs inside the field).

@@ -1,3 +1,5 @@
+"use client"
+
 import { Children, useId, type ReactNode } from "react"
 import type { RowVerdict } from "../../composite/StaticStateRow/index.js"
 import { VerticalScrollRegion } from "../../composite/VerticalScrollRegion/index.js"

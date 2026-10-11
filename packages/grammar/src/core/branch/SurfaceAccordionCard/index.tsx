@@ -1,3 +1,5 @@
+"use client"
+
 import { Accordion } from "@heroui/react"
 import { type Key, type ReactNode, useId } from "react"
 import { VerticalScrollRegion } from "../../composite/VerticalScrollRegion/index.js"

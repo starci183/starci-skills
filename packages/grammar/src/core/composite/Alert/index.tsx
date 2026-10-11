@@ -1,3 +1,5 @@
+"use client"
+
 import { Alert as HeroAlert, Spinner as HeroSpinner } from "@heroui/react"
 import { useState, type ReactNode } from "react"
 import type { PresentationState } from "../../../common/state.js"

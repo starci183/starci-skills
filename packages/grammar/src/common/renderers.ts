@@ -35,6 +35,8 @@ export { LeadingNumber, type LeadingNumberProps } from "../core/LeadingNumber.js
 export { OtpInput, type OtpInputProps } from "../core/OtpInput.js"
 export { StaticStateRow, type RowVerdict, type StaticStateRowData, type StaticStateRowProps } from "../core/composite/StaticStateRow/index.js"
 export { EmptyNotice, type EmptyNoticeProps } from "../core/composite/EmptyNotice/index.js"
+export { ChatBubble, type ChatBubbleProps, type ChatBubbleSide } from "../core/composite/ChatBubble/index.js"
+export { FillViewport, type FillViewportBottomInset, type FillViewportMinHeight, type FillViewportProps } from "../core/composite/FillViewport/index.js"
 export { HorizontalScrollRegion, type HorizontalScrollRegionProps } from "../core/composite/HorizontalScrollRegion/index.js"
 export { VerticalScrollRegion, type VerticalScrollRegionProps } from "../core/composite/VerticalScrollRegion/index.js"
 export { SurfaceCard, type SurfaceCardProps, type WholeCardAction } from "../core/branch/SurfaceCard/index.js"

@@ -34,6 +34,8 @@ const EVERY_COMMON_RENDERER: Readonly<Record<CommonGrammarComponentName, () => R
     Button: () => <C.Button variant="primary" onPress={noop}>Continue</C.Button>,
     ButtonGroup: () => <C.ButtonGroup label="Formatting"><C.Button>Bold</C.Button><C.Button>Italic</C.Button></C.ButtonGroup>,
     Calendar: () => <C.Calendar label="Date" defaultValue={new CalendarDate(2026, 1, 15)} previousLabel="Previous" nextLabel="Next" />,
+    ChatBubble: () => <C.ChatBubble author="Tutor" meta="09:12">Hello</C.ChatBubble>,
+    FillViewport: () => <C.FillViewport label="Conversation"><p>Hello</p></C.FillViewport>,
     ChatWorkspace: () => <C.ChatWorkspace label="Tutor" conversation={<p>Hello</p>} conversationLabel="Conversation" composer={<textarea aria-label="Message" />} />,
     Checkbox: () => <C.Checkbox label="Accept" description="Required to continue" name="accept" value="yes" />,
     CheckboxGroup: () => <C.CheckboxGroup label="Channels" options={[{ value: "email", label: "Email" }, { value: "sms", label: "SMS" }]} defaultValue={["email"]} name="channels" />,

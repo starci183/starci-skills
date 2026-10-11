@@ -1,3 +1,5 @@
+"use client"
+
 import { Modal as HeroModal } from "@heroui/react"
 import { useId, type ReactNode } from "react"
 import { overlayOpenProps, useOverlayContainer, type OverlayOpenState } from "../../overlayScope.js"
