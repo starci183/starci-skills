@@ -5,6 +5,7 @@ import {
     FieldDescription,
     FieldErrorText,
     FieldLabel,
+    FieldSkeleton,
     vendorFieldProps,
     type FieldControlProps,
 } from "../Field/index.js"
@@ -14,6 +15,11 @@ export type SwitchProps = Omit<FieldControlProps, "isLabelHidden"> & {
     readonly isSelected?: boolean
     readonly defaultSelected?: boolean
     readonly onSelectedChange?: (isSelected: boolean) => void
+    /**
+     * Initial unresolved content (knowledge STATE-8): the label stays real text and the switch track becomes a Skeleton of the same size,
+     * `aria-hidden`, no `role="switch"` and nothing focusable; the root is `aria-busy`.
+     */
+    readonly isSkeleton?: boolean
 }
 
 /*
@@ -26,7 +32,9 @@ export type SwitchProps = Omit<FieldControlProps, "isLabelHidden"> & {
  * An immediate on/off setting (`role="switch"`). Use Checkbox for a choice that only takes effect
  * on submit. The label is part of the hit area; Space toggles.
  */
-export const Switch = ({ value, isSelected, defaultSelected, onSelectedChange, ...field }: SwitchProps) => (
+export const Switch = ({ value, isSelected, defaultSelected, onSelectedChange, isSkeleton = false, ...field }: SwitchProps) => isSkeleton ? (
+    <FieldSkeleton component="Switch" tier="atom" label={field.label} isRequired={field.isRequired} kind="switch" className="starci-core-switch" />
+) : (
     <HeroSwitch
         data-tier="atom"
         data-component="Switch"

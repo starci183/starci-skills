@@ -3,6 +3,7 @@
 import { Breadcrumbs as HeroBreadcrumbs } from "@heroui/react"
 import type { ReactNode } from "react"
 import { navigationClassName } from "../../navigationClassNames.js"
+import { Skeleton } from "../../primitive/Skeleton/index.js"
 
 export type BreadcrumbItem = {
     readonly id: string
@@ -10,6 +11,11 @@ export type BreadcrumbItem = {
     /** Ancestors carry a destination; the last item is the current page and needs none. */
     readonly href?: string
     readonly leading?: ReactNode
+    /**
+     * A data-driven crumb (usually the current page) whose label is not known yet (knowledge STATE-8): it draws a short
+     * Skeleton text line in place of `label` and `leading`, `aria-hidden`, and carries no link. The other crumbs stay real.
+     */
+    readonly isSkeleton?: true
 }
 
 export type BreadcrumbsProps = {
@@ -51,15 +57,21 @@ export const Breadcrumbs = ({ label, items, separator, onAction, className }: Br
                         id={item.id}
                         className="starci-core-breadcrumb"
                         data-contract="ACTION-3"
-                        {...(item.href === undefined || isCurrent ? {} : { href: item.href })}
+                        {...(item.href === undefined || isCurrent || item.isSkeleton === true ? {} : { href: item.href })}
                     >
                         <span
                             className="starci-core-breadcrumb-label"
                             data-grammar-breadcrumb="true"
                             data-grammar-current={isCurrent ? "true" : "false"}
                         >
-                            {item.leading === undefined ? null : <span aria-hidden="true" className="starci-core-breadcrumb-leading" data-contract="ICON-6">{item.leading}</span>}
-                            {item.label}
+                            {item.isSkeleton === true ? (
+                                <span aria-hidden="true" className="starci-core-breadcrumb-skeleton" data-grammar-skeleton="true"><Skeleton shape="text" /></span>
+                            ) : (
+                                <>
+                                    {item.leading === undefined ? null : <span aria-hidden="true" className="starci-core-breadcrumb-leading" data-contract="ICON-6">{item.leading}</span>}
+                                    {item.label}
+                                </>
+                            )}
                         </span>
                     </HeroBreadcrumbs.Item>
                 )

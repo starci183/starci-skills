@@ -2,6 +2,7 @@ import { Label as HeroLabel, Meter as HeroMeter } from "@heroui/react"
 import type { ComponentPropsWithRef } from "react"
 import type { PresentationState } from "../../../common/state.js"
 import { vendorStatusFor } from "../../overlayScope.js"
+import { Skeleton } from "../Skeleton/index.js"
 
 /**
  * How many equal parts a segmented meter draws: a discrete count such as "2 of 3 capabilities".
@@ -30,6 +31,12 @@ export type MeterProps = {
      * accessible name and `aria-value*`. Out-of-range counts from untyped callers clamp to 2..12.
      */
     readonly segments?: MeterSegments
+    /**
+     * Initial unresolved reading (knowledge STATE-8), the twin of `Progress isSkeleton`: the `label` stays real text, the
+     * bar is a static Skeleton bar of the track height, and no `role="meter"`, value or reading is announced (a skeleton is
+     * not a zero measurement). The geometry is `aria-hidden`; the root is `aria-busy`. `value`, `tone` and `segments` are ignored.
+     */
+    readonly isSkeleton?: boolean
 }
 
 const MIN_SEGMENTS = 2
@@ -65,7 +72,27 @@ export const Meter = ({
     tone = "neutral",
     isLabelHidden = false,
     segments,
+    isSkeleton = false,
 }: MeterProps) => {
+    if (isSkeleton) {
+        return (
+            <div
+                data-tier="atom"
+                data-component="Meter"
+                data-loading="true"
+                data-grammar-skeleton="true"
+                data-grammar-tone="neutral"
+                data-contract="A11Y-3 STATE-8"
+                aria-busy="true"
+                className="starci-core-meter starci-core-meter-skeleton"
+            >
+                <span className="starci-core-meter-header">
+                    <span className={isLabelHidden ? "starci-core-meter-label starci-core-form-label--screen-reader" : "starci-core-meter-label"}>{label}</span>
+                </span>
+                <span aria-hidden="true" data-slot="meter-track" className="starci-core-meter-skeleton-bar"><Skeleton shape="rect" /></span>
+            </div>
+        )
+    }
     const status = vendorStatusFor(tone)
     const count = segments === undefined ? undefined : clampSegments(segments)
     const min = count === undefined ? minValue : wholeNumber(minValue, 0)

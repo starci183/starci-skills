@@ -69,6 +69,23 @@
             border-color var(--offset-pop-transition);
     }
 
+    /* A loading Select or Textarea (knowledge STATE-8) keeps the field box: ink outline and control radius around the skeleton block. */
+    .grammar-common-root[data-grammar-family="offset-pop"] :is([data-component="Select"], [data-component="Textarea"], [data-component="NumberField"], [data-component="SearchField"], [data-component="SegmentedControl"]) .starci-core-field-skeleton-control {
+        box-sizing: border-box;
+        border: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+        border-radius: var(--offset-pop-control-radius);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] :is([data-component="Select"], [data-component="Textarea"], [data-component="NumberField"], [data-component="SearchField"], [data-component="SegmentedControl"]) .starci-core-field-skeleton-control > .starci-core-skeleton {
+        border-radius: calc(var(--offset-pop-control-radius) - var(--offset-pop-outline-width));
+    }
+
+    /* A loading checkbox box or switch track keeps the ink outline of the real control. */
+    .grammar-common-root[data-grammar-family="offset-pop"] :is([data-component="CheckboxGroup"], [data-component="Switch"]) .starci-core-field-skeleton-control {
+        box-sizing: border-box;
+        border: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+    }
+
     /* Focus: the hard offset shadow, ink by default, critical while invalid. */
     .grammar-common-root[data-grammar-family="offset-pop"] :is([data-component="Select"], [data-component="ComboBox"], [data-component="SearchField"], [data-component="NumberField"], [data-component="DateField"], [data-component="TimeField"], [data-component="DatePicker"], [data-component="DateRangePicker"], [data-component="Textarea"]) [data-grammar-field-control="true"]:is(:focus-visible, :focus-within, [data-focus-visible="true"], [data-focus-within="true"]),
     .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Field"] [data-grammar-field-control="true"] > :where(input, select, textarea):focus-visible,

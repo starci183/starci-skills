@@ -19,8 +19,8 @@ afterEach(cleanup)
 const blocks = (source: string, selector: string) => [...source.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter((m) => m[1]!.includes(selector)).map((m) => m[2]!)
 
 describe("0.9.6: selectable TagGroup chips", () => {
-    it("is at 0.9.6", () => {
-        expect(packageJson.version).toBe("0.9.6")
+    it("is at least 0.9.6", () => {
+        expect(packageJson.version).toMatch(/^0\.9\.(6|7)$/)
     })
 
     it("paints unselected selectable chips as the secondary button with a 1px border", () => {

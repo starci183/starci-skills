@@ -324,6 +324,15 @@
         overflow-wrap: anywhere;
     }
 
+    /* Loading header (knowledge STATE-8): the same ranks and sizes, the copy drawn as Skeleton text, the action as a footprint. */
+    .starci-core-section-skeleton-title > .starci-core-skeleton-group { inline-size: min(60%, 20rem); }
+    .starci-core-section-skeleton-title .starci-core-skeleton { block-size: 1em; }
+    .starci-core-section-skeleton-description > .starci-core-skeleton-group { inline-size: min(90%, 28rem); }
+    .starci-core-section-skeleton-meta > .starci-core-skeleton-group { inline-size: 6rem; }
+    .starci-core-section-skeleton-meta .starci-core-skeleton { block-size: 0.75rem; }
+    .starci-core-section-skeleton-action { display: block; inline-size: 6rem; block-size: 2.5rem; }
+    .starci-core-section-skeleton-action > .starci-core-skeleton { block-size: 100%; aspect-ratio: auto; border-radius: 0.5rem; }
+
     /*
      * Keyboard-reachable scroll owners (VerticalScrollRegion / HorizontalScrollRegion when focusable,
      * the Rail body, fenced code and Markdown table frames) draw the same inset focus ring the chat
@@ -3468,6 +3477,11 @@
     @media (prefers-reduced-motion: reduce) {
         .starci-core-chat-bubble-actions { transition: none; }
     }
+
+    /* Loading bubble (knowledge STATE-8): the face on its side with two Skeleton lines; a thread alternates sides. */
+    .starci-core-chat-bubble-skeleton-body { inline-size: min(18rem, 70vw); white-space: normal; }
+    .starci-core-chat-bubble-skeleton-body .starci-core-skeleton { block-size: 0.875rem; }
+    .starci-core-chat-bubble-thread { display: flex; min-width: 0; flex-direction: column; gap: 1rem; }
 
     @media (forced-colors: active) {
         .starci-core-chat-bubble-body { border: 1px solid CanvasText; }

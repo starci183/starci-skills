@@ -11,7 +11,7 @@ const packageJson = JSON.parse(read("../../package.json")) as { version: string,
 describe("0.9.5: FlowGraph", () => {
     it("is a Common renderer and the package is at least 0.9.5", () => {
         expect(Object.keys(COMMON_GRAMMAR_COMPONENTS)).toContain("FlowGraph")
-        expect(packageJson.version).toMatch(/^0\.9\.(5|6)$/)
+        expect(packageJson.version).toMatch(/^0\.9\.(5|6|7)$/)
     })
 
     it("keeps @xyflow/react a peer (plus a dev copy for tests), never a dependency", () => {

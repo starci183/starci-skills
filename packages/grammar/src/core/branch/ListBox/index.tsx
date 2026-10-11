@@ -1,8 +1,9 @@
 "use client"
 
 import { ListBox as HeroListBox, type Selection } from "@heroui/react"
-import type { ReactNode } from "react"
+import type { ComponentPropsWithRef, ReactNode } from "react"
 import { navigationClassName } from "../../navigationClassNames.js"
+import { Skeleton } from "../../primitive/Skeleton/index.js"
 
 export type ListBoxItem = {
     readonly id: string
@@ -12,6 +13,8 @@ export type ListBoxItem = {
     readonly trailing?: ReactNode
     readonly isDisabled?: boolean
 }
+
+const clampRows = (rows: number) => Math.min(12, Math.max(1, Math.floor(Number.isFinite(rows) ? rows : 3)))
 
 export type ListBoxProps = {
     /** Names the list, e.g. "Members". */
@@ -24,6 +27,14 @@ export type ListBoxProps = {
     readonly onSelectionChange?: (ids: ReadonlyArray<string>) => void
     readonly onAction?: (id: string) => void
     readonly emptyContent?: ReactNode
+    /**
+     * The options are loading (knowledge STATE-8). With no `items` it draws `loadingRows` skeleton options (a label line and a
+     * description line, `aria-hidden`) inside the same named list, which is `aria-busy`; real `items` win, and loading beats
+     * `emptyContent`.
+     */
+    readonly isLoading?: boolean
+    /** How many skeleton options a loading list draws (default 3, 1 to 12). */
+    readonly loadingRows?: number
     readonly className?: string
 }
 
@@ -42,6 +53,8 @@ export const ListBox = ({
     onSelectionChange,
     onAction,
     emptyContent,
+    isLoading = false,
+    loadingRows = 3,
     className,
 }: ListBoxProps) => (
     <HeroListBox
@@ -50,6 +63,8 @@ export const ListBox = ({
         data-component="ListBox"
         data-contract="FOCUS-2 CONTROL-STATE-3"
         data-tier="branch"
+        data-loading={String(isLoading)}
+        {...(isLoading ? { render: (domProps: ComponentPropsWithRef<"div">) => <div {...domProps} aria-busy="true" /> } : {})}
         data-grammar-list-selection={selectionMode}
         selectionMode={selectionMode}
         {...(selectedIds === undefined ? {} : { selectedKeys: new Set(selectedIds) })}
@@ -58,7 +73,22 @@ export const ListBox = ({
             onSelectionChange: (selection: Selection) => onSelectionChange(selection === "all" ? items.map((item) => item.id) : [...selection].map(String)),
         })}
         {...(onAction === undefined ? {} : { onAction: (key: string | number) => onAction(String(key)) })}
-        {...(emptyContent === undefined ? {} : { renderEmptyState: () => <div className="starci-core-list-box-empty" data-contract="STATE-3" data-grammar-list-empty="true">{emptyContent}</div> })}
+        {...(isLoading
+            ? {
+                renderEmptyState: () => (
+                    <div className="starci-core-list-box-skeleton" data-grammar-list-skeleton="true">
+                        {Array.from({ length: clampRows(loadingRows) }, (_, index) => (
+                            <div key={index} aria-hidden="true" className="starci-core-list-box-item starci-core-list-box-skeleton-option" data-grammar-skeleton="true">
+                                <span className="starci-core-list-box-copy">
+                                    <span className="starci-core-list-box-label"><Skeleton shape="text" /></span>
+                                    <span className="starci-core-list-box-description"><Skeleton shape="text" /></span>
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                ),
+            }
+            : emptyContent === undefined ? {} : { renderEmptyState: () => <div className="starci-core-list-box-empty" data-contract="STATE-3" data-grammar-list-empty="true">{emptyContent}</div> })}
     >
         {items.map((item) => (
             <HeroListBox.Item

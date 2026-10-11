@@ -122,6 +122,11 @@
         font-weight: 600;
     }
 
+    /* A crumb whose label is not known yet (knowledge STATE-8): a short Skeleton text line of the label's size. */
+    .starci-core-breadcrumb-skeleton { display: inline-block; inline-size: 6rem; }
+    .starci-core-breadcrumb-skeleton > .starci-core-skeleton-group { gap: 0; }
+    .starci-core-breadcrumb-skeleton .starci-core-skeleton { block-size: 0.875rem; }
+
     @media (max-width: 30rem) {
         .starci-core-breadcrumb-label {
             max-width: 8rem;
@@ -288,6 +293,12 @@
         border-color: var(--danger, Mark);
         color: var(--danger, CanvasText);
     }
+
+    /* Loading stepper (knowledge STATE-8): a static Skeleton circle for the mark, labels stay real. */
+    .starci-core-step-skeleton-marker { border: 0; background: transparent; }
+    .starci-core-step-skeleton-label { display: block; inline-size: 5rem; }
+    .starci-core-step-skeleton-label > .starci-core-skeleton-group { gap: 0; }
+    .starci-core-step-skeleton-label .starci-core-skeleton { block-size: 0.875rem; }
 
     .starci-core-step-copy {
         display: flex;
@@ -640,6 +651,9 @@
     .starci-core-avatar {
         flex: 0 0 auto;
     }
+
+    /* A loading avatar (knowledge STATE-8): the Skeleton circle at the avatar's size. */
+    .starci-core-avatar-skeleton { display: inline-flex; }
 
     .starci-core-avatar[data-grammar-current="true"] {
         box-shadow: 0 0 0 2px var(--background, Canvas), 0 0 0 4px var(--accent, Highlight);
@@ -1006,6 +1020,22 @@
         flex: 0 0 auto;
     }
 
+    /* Loading options (knowledge STATE-8): a label line and a description line, at the loaded option's height. */
+    .starci-core-list-box-skeleton-option {
+        display: flex;
+        align-items: center;
+        padding-inline: 0.75rem;
+        padding-block: 0.375rem;
+        pointer-events: none;
+    }
+
+    .starci-core-list-box-skeleton-option .starci-core-list-box-label,
+    .starci-core-list-box-skeleton-option .starci-core-list-box-description { display: block; }
+    .starci-core-list-box-skeleton-option .starci-core-list-box-label > .starci-core-skeleton-group { inline-size: 55%; }
+    .starci-core-list-box-skeleton-option .starci-core-list-box-description > .starci-core-skeleton-group { inline-size: 80%; }
+    .starci-core-list-box-skeleton-option .starci-core-skeleton { block-size: 0.75rem; }
+    .starci-core-list-box-skeleton-option .starci-core-skeleton-group { gap: 0; margin-block: 0.125rem; }
+
     .starci-core-list-box-empty {
         padding: var(--grammar-section-gap, 1rem);
         color: var(--muted, GrayText);
@@ -1235,6 +1265,15 @@
     .starci-core-timeline-item[data-grammar-current="true"] .starci-core-timeline-marker:empty::after {
         background: currentColor;
     }
+
+    /* Loading timeline (knowledge STATE-8): static mark and connector tint, three Skeleton lines of the entry's rhythm. */
+    .starci-core-timeline-skeleton-marker > .starci-core-skeleton { inline-size: 1rem; block-size: 1rem; }
+    .starci-core-timeline[data-loading="true"] .starci-core-timeline-item:not(:last-child)::before { background: color-mix(in srgb, var(--foreground, CanvasText) 9%, transparent); }
+    .starci-core-timeline-item[data-grammar-skeleton="true"] .starci-core-timeline-title > .starci-core-skeleton-group { inline-size: 50%; }
+    .starci-core-timeline-item[data-grammar-skeleton="true"] .starci-core-timeline-time > .starci-core-skeleton-group { inline-size: 25%; }
+    .starci-core-timeline-item[data-grammar-skeleton="true"] .starci-core-timeline-description > .starci-core-skeleton-group { inline-size: 80%; }
+    .starci-core-timeline-item[data-grammar-skeleton="true"] .starci-core-skeleton-group { gap: 0; }
+    .starci-core-timeline-item[data-grammar-skeleton="true"] .starci-core-skeleton { block-size: 0.8125rem; }
 
     .starci-core-timeline-copy {
         display: flex;

@@ -3,6 +3,7 @@
 import type { ReactNode } from "react"
 import { moveFocusBetweenPeers } from "../../navigationKeys.js"
 import { navigationClassName } from "../../navigationClassNames.js"
+import { Skeleton } from "../../primitive/Skeleton/index.js"
 
 export type StepperStepState = "complete" | "current" | "upcoming" | "error"
 
@@ -28,6 +29,12 @@ export type StepperProps = {
     /** App-owned marker; defaults to the 1-based step number. */
     readonly renderMarker?: (step: StepperStep, index: number, state: StepperStepState) => ReactNode
     readonly className?: string
+    /**
+     * The flow is loading (knowledge STATE-8): step labels stay real text when given (an empty label draws a Skeleton text line), each
+     * marker becomes a static Skeleton circle, descriptions are not drawn, no step is current or a button, and the landmark is `aria-busy`.
+     * (A stepper draws no connector line, so there is none to tint.)
+     */
+    readonly isLoading?: boolean
 }
 
 /** Position-derived state: before the current step is complete, after it is upcoming. */
@@ -54,7 +61,32 @@ export const Stepper = ({
     stateLabel,
     renderMarker,
     className,
-}: StepperProps) => (
+    isLoading = false,
+}: StepperProps) => isLoading ? (
+    <nav
+        aria-label={label}
+        aria-busy="true"
+        className={navigationClassName("starci-core-stepper", className)}
+        data-component="Stepper"
+        data-tier="composite"
+        data-loading="true"
+        data-grammar-stepper-orientation={orientation}
+        data-grammar-stepper-interactive="false"
+    >
+        <ol className="starci-core-stepper-list" data-contract="HIERARCHY-3 STATE-8">
+            {steps.map((step) => (
+                <li key={step.id} className="starci-core-step" data-contract="STATE-1" data-grammar-step-state="upcoming" data-grammar-current="false" data-grammar-skeleton="true">
+                    <span className="starci-core-step-body">
+                        <span aria-hidden="true" className="starci-core-step-marker starci-core-step-skeleton-marker" data-grammar-step-marker="true"><Skeleton shape="circle" size="sm" /></span>
+                        <span className="starci-core-step-copy">
+                            {step.label === "" ? <span aria-hidden="true" className="starci-core-step-skeleton-label"><Skeleton shape="text" /></span> : <span className="starci-core-step-label" data-grammar-step-label="true">{step.label}</span>}
+                        </span>
+                    </span>
+                </li>
+            ))}
+        </ol>
+    </nav>
+) : (
     <nav
         aria-label={label}
         className={navigationClassName("starci-core-stepper", className)}

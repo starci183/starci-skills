@@ -3,6 +3,7 @@
 import { Avatar as HeroAvatar } from "@heroui/react"
 import type { ReactNode } from "react"
 import { navigationClassName } from "../../navigationClassNames.js"
+import { Skeleton } from "../Skeleton/index.js"
 
 export type AvatarSize = "sm" | "md" | "lg"
 
@@ -18,6 +19,11 @@ export type AvatarProps = {
     /** Selected/current identity, e.g. the active account in a switcher. */
     readonly isCurrent?: boolean
     readonly className?: string
+    /**
+     * Initial unresolved identity (knowledge STATE-8): a Skeleton circle at the avatar's `size`, `aria-hidden` (no name, no image, no
+     * initials). The owning list or card carries `aria-busy`.
+     */
+    readonly isSkeleton?: boolean
 }
 
 /** Up to two initials from a display name; letters only come from the name the app supplied. */
@@ -44,7 +50,20 @@ export const avatarA11yProps = (name: string, isDecorative: boolean) => isDecora
  * A person or entity mark with image, initials fallback and an explicit accessible name.
  * Contract: ICON-6 (named once or aria-hidden when decorative), MEDIA-5 (initials while loading/failed).
  */
-export const Avatar = ({ name, src, fallback, size = "md", isDecorative = false, isCurrent = false, className }: AvatarProps) => (
+export const Avatar = ({ name, src, fallback, size = "md", isDecorative = false, isCurrent = false, className, isSkeleton = false }: AvatarProps) => isSkeleton ? (
+    <span
+        aria-hidden="true"
+        className={navigationClassName("starci-core-avatar starci-core-avatar-skeleton", className)}
+        data-component="Avatar"
+        data-contract="STATE-8"
+        data-tier="atom"
+        data-grammar-avatar-size={size}
+        data-grammar-current="false"
+        data-grammar-skeleton="true"
+    >
+        <Skeleton shape="circle" size={size} />
+    </span>
+) : (
     <HeroAvatar
         {...avatarA11yProps(name, isDecorative)}
         className={navigationClassName("starci-core-avatar", className)}

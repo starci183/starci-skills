@@ -1,11 +1,12 @@
 import type { ReactNode } from "react"
+import { Skeleton } from "../../primitive/Skeleton/index.js"
 
 /** `incoming`: someone else wrote it (start side, recessed face). `outgoing`: the reader's own message (end side, accent-soft face). */
 export type ChatBubbleSide = "incoming" | "outgoing"
 
 export type ChatBubbleProps = {
-    /** The message body. Plain text keeps its line breaks. */
-    readonly children: ReactNode
+    /** The message body. Plain text keeps its line breaks. Ignored (and optional) while `isSkeleton`. */
+    readonly children?: ReactNode
     readonly side?: ChatBubbleSide
     /** Who wrote it, shown above the body. Omit on consecutive messages from the same author. */
     readonly author?: ReactNode
@@ -23,6 +24,13 @@ export type ChatBubbleProps = {
     readonly isHighlight?: boolean
     /** Anchor for links that jump to this message. */
     readonly id?: string
+    /**
+     * Draw the message as inert geometry while it is unresolved (knowledge STATE-8): the bubble face on its `side`, with two
+     * Skeleton text lines in the body and, only if `avatar` is passed, a Skeleton circle in its column. No author, meta, status,
+     * actions or footer are drawn, so no control exists. The bubble is `aria-hidden`; the conversation owns `aria-busy`
+     * (`ChatBubbleSkeletons` draws a whole loading thread).
+     */
+    readonly isSkeleton?: boolean
 }
 
 /**
@@ -42,7 +50,28 @@ export const ChatBubble = ({
     footer,
     isHighlight = false,
     id,
+    isSkeleton = false,
 }: ChatBubbleProps) => {
+    if (isSkeleton) {
+        return (
+            <div
+                aria-hidden="true"
+                className="starci-core-chat-bubble"
+                data-component="ChatBubble"
+                data-tier="composite"
+                data-contract="SURFACE-3 SURFACE-4 RADIUS-6 STATE-8"
+                data-grammar-bubble-side={side}
+                data-grammar-bubble-highlight="false"
+                data-grammar-bubble-footer="false"
+                data-grammar-skeleton="true"
+            >
+                {avatar == null ? null : <div className="starci-core-chat-bubble-avatar"><Skeleton shape="circle" size="sm" /></div>}
+                <div className="starci-core-chat-bubble-stack">
+                    <div className="starci-core-chat-bubble-body starci-core-chat-bubble-skeleton-body"><Skeleton shape="text" lines={2} /></div>
+                </div>
+            </div>
+        )
+    }
     const hasHead = author != null || meta != null || status != null
     return (
         <div
@@ -71,3 +100,22 @@ export const ChatBubble = ({
         </div>
     )
 }
+
+export type ChatBubbleSkeletonsProps = {
+    /** How many bubbles (default 3, 1 to 12). They alternate sides, starting with `incoming`. */
+    readonly count?: number
+    /** Gives every bubble a Skeleton avatar circle in its column. */
+    readonly hasAvatar?: boolean
+}
+
+/**
+ * A loading conversation: `count` skeleton bubbles that alternate incoming and outgoing, inside one `aria-busy` thread.
+ * Place it as the conversation content of a `ChatWorkspace` (or any scroll owner) while the messages are unresolved.
+ */
+export const ChatBubbleSkeletons = ({ count = 3, hasAvatar = false }: ChatBubbleSkeletonsProps) => (
+    <div className="starci-core-chat-bubble-thread" data-grammar-chat-skeleton-thread="true" data-loading="true" aria-busy="true">
+        {Array.from({ length: Math.min(12, Math.max(1, Math.floor(Number.isFinite(count) ? count : 3))) }, (_, index) => (
+            <ChatBubble key={index} isSkeleton side={index % 2 === 0 ? "incoming" : "outgoing"} avatar={hasAvatar && index % 2 === 0 ? <span /> : undefined} />
+        ))}
+    </div>
+)

@@ -6,6 +6,7 @@ import {
     FieldDescription,
     FieldErrorText,
     FieldLabel,
+    FieldSkeleton,
     fieldVariantAttributes,
     vendorFieldProps,
     type FieldControlProps,
@@ -30,6 +31,11 @@ export type CheckboxGroupProps = FieldControlProps & {
     readonly orientation?: ChoiceOrientation
     /** Layer variant: `secondary` when the control sits on a surface (ANATOMY-2 case-1). */
     readonly variant?: "primary" | "secondary"
+    /**
+     * Initial unresolved content (knowledge STATE-8): the group label and each option label stay real text, each checkbox becomes a
+     * Skeleton box of the same size (descriptions are not drawn); `aria-hidden` geometry, nothing focusable, root `aria-busy`.
+     */
+    readonly isSkeleton?: boolean
 }
 
 /*
@@ -55,8 +61,11 @@ export const CheckboxGroup = ({
     onValueChange,
     orientation = "vertical",
     variant = "primary",
+    isSkeleton = false,
     ...field
-}: CheckboxGroupProps) => (
+}: CheckboxGroupProps) => isSkeleton ? (
+    <FieldSkeleton component="CheckboxGroup" tier="composite" label={field.label} isLabelHidden={field.isLabelHidden} isRequired={field.isRequired} variant={variant} kind="choices" choiceLabels={options.map((option) => option.label)} orientation={orientation} className="starci-core-choice-group" />
+) : (
     <HeroCheckboxGroup
         data-tier="composite"
         data-component="CheckboxGroup"

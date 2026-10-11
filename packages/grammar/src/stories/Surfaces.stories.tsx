@@ -285,6 +285,9 @@ export const SectionHeader: Story = {
       <State label="Count and trailing source meta" direction="column">
         <G.SectionHeader title="Installations" count={2} meta="Inventoried at 10:00, 26 Sep 2026 (GMT+7)" level={2} />
       </State>
+      <State label="Loading (isSkeleton)" direction="column">
+        <G.SectionHeader eyebrow="Course" title="Grammar basics" description="Twelve short lessons." meta="Updated now" action={<G.Button variant="secondary" size="sm">Share</G.Button>} level={2} isSkeleton />
+      </State>
     </Matrix>
   ),
 };

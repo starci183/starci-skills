@@ -5,6 +5,7 @@ import {
     FieldDescription,
     FieldErrorText,
     FieldLabel,
+    FieldSkeleton,
     fieldVariantAttributes,
     vendorFieldProps,
     type FieldControlProps,
@@ -26,6 +27,11 @@ export type SearchFieldProps = FieldControlProps & {
     readonly clearLabel?: string
     /** Layer variant: `secondary` when the control sits on a surface (ANATOMY-2 case-1). */
     readonly variant?: "primary" | "secondary"
+    /**
+     * Initial unresolved content (knowledge STATE-8): the label stays real text and the search box becomes Skeleton geometry of the same size,
+     * `aria-hidden` and not focusable; the root is `aria-busy`. Value, description and error copy are not drawn.
+     */
+    readonly isSkeleton?: boolean
 }
 
 /*
@@ -49,8 +55,11 @@ export const SearchField = ({
     isPending = false,
     clearLabel,
     variant = "primary",
+    isSkeleton = false,
     ...field
-}: SearchFieldProps) => (
+}: SearchFieldProps) => isSkeleton ? (
+    <FieldSkeleton component="SearchField" tier="atom" label={field.label} isLabelHidden={field.isLabelHidden} isRequired={field.isRequired} variant={variant} kind="input" className="starci-core-search-field" />
+) : (
     <HeroSearchField
         data-tier="atom"
         data-component="SearchField"

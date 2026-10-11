@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.9.7 - 2026-10-11
+
+Minor, additive (owner ruling 2026-10-11, knowledge STATE-8: the loading view is the page's own component tree, labels real, only unresolved content as inert
+geometry). Closes the gaps an app migrating to it found. Same rules as the 0.9.5 loading views: skeleton geometry is `aria-hidden`, the owning region is
+`aria-busy`, no interactive child is drawn, and reduced motion comes from the existing Skeleton atom. No new catalog component (still 104).
+
+- **`SectionHeader isSkeleton`**: title, description and meta become Skeleton text (each only if passed), keeping the heading rank and size; `count` is dropped;
+  `action` keeps a small Skeleton footprint with no control inside; `eyebrow` stays real. The heading is `aria-hidden` with its line (no empty heading is announced); root `aria-busy`.
+- **`Breadcrumbs` item `isSkeleton?: true`**: a data-driven crumb whose label is not known yet draws a short Skeleton text line in place of its `label` and `leading`,
+  `aria-hidden`, never a link. The other crumbs stay real (pass `label: ""` for the unknown one).
+- **`Select isSkeleton`**: the label stays real text (still the name when `isLabelHidden`), the trigger becomes a Skeleton field of the same height (2.5rem, the touch floor on coarse pointers),
+  `aria-hidden`, nothing focusable; root `aria-busy`. Description and error copy are not drawn.
+- **`Textarea isSkeleton`**: label real, the field a Skeleton block of the `rows` height (1.25rem a line plus padding, never under the 5rem field minimum); no `<textarea>` is mounted; root `aria-busy`.
+- **`Meter isSkeleton`** (mirrors `Progress isSkeleton`): label real, the bar a static Skeleton bar of the track height; no `role="meter"`, value or reading is announced; root `aria-busy`.
+- **`ListBox isLoading` / `loadingRows`** (default 3, 1 to 12): with no `items`, skeleton options (a label line and a description line, `aria-hidden`) inside the same named list, which is
+  `aria-busy`; real `items` win and loading beats `emptyContent`.
+- **`ChatBubble isSkeleton`**: the bubble face on its `side` with two Skeleton text lines (a Skeleton circle only if `avatar` is passed); no author, meta, actions or footer; `aria-hidden`.
+  `children` is now optional. New helper **`ChatBubbleSkeletons`** (`count` default 3, 1 to 12; `hasAvatar`): a loading thread of alternating incoming and outgoing skeleton bubbles in one
+  `aria-busy` wrapper, for the `conversation` slot of a `ChatWorkspace` (which lays out whatever the app puts there; it owns no bubbles).
+- **Second pass (same release).**
+  - `NumberField`, `SearchField`, `SegmentedControl`, `CheckboxGroup`, `Switch` take `isSkeleton`: the label stays real, the control becomes `aria-hidden` Skeleton geometry of the
+    loaded size (one-line field 2.5rem with the touch floor; `SegmentedControl` one block, 5rem per option, `fill` stretches it; `CheckboxGroup` keeps every option label real beside a
+    Skeleton box, descriptions are not drawn, `orientation` is kept; `Switch` a Skeleton track beside its real label). Nothing is focusable and no `role` such as `switch` is announced; root `aria-busy`.
+  - `Avatar isSkeleton`: a Skeleton circle at the avatar's `size`, `aria-hidden`, no name or initials.
+  - `Stepper isLoading`: step labels stay real when given (an empty `label` draws a Skeleton text line), each marker is a static Skeleton circle, descriptions are not drawn, no step is
+    current or a button, the landmark is `aria-busy`. A stepper draws no connector line, so none is tinted.
+  - `Timeline isLoading` / `loadingRows` (default 3, 1 to 12): with no `items`, skeleton entries (static marker, title, time and description lines, `aria-hidden`) in the same named, `aria-busy` list, the
+    connector line tinted as skeleton; real `items` win.
+  - Offset Pop: the loading `NumberField`, `SearchField` and `SegmentedControl` keep the ink-outlined field box; a loading checkbox box and switch track keep the ink outline.
+- CSS lives in the group sheets: `styles.css` (SectionHeader, ChatBubble), `components-forms.css` (all loading fields), `components-navigation.css` (Breadcrumbs, ListBox, Avatar, Stepper, Timeline), `components-overlays.css` (Meter).
+  Offset Pop: a loading Select or Textarea keeps the ink-outlined field box and control radius; the loading Meter bar wears the ink-outlined track at the 0.75rem height.
+- Internal: `FieldSkeleton` in the `Field` module is the shared loading anatomy of every loading field.
+
+### Tests
+
+- `src/core/loading.spec.tsx` extended for all the components above under bare Common, Core and Offset Pop; new `src/core/v097.spec.tsx` (version, sheet placement, skeleton field sizes, token-only
+  rules, Offset Pop treatment, no animation of its own), wired into `npm test` after `v096`. `v095.spec` and `v096.spec` accept the 0.9.7 version.
+
 ## 0.9.6 - 2026-10-11
 
 Patch (owner: "a group of buttons should use secondary and a border").

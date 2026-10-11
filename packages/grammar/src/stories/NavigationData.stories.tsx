@@ -77,6 +77,9 @@ export const AvatarGroup: Story = {
 export const Breadcrumbs: Story = {
   render: () => (
     <Matrix>
+      <State label="Current crumb still loading (isSkeleton)">
+        <G.Breadcrumbs label="Breadcrumb" items={[{ id: 'home', label: 'Home', href: '#home' }, { id: 'lessons', label: 'Lessons', href: '#lessons' }, { id: 'lesson', label: '', isSkeleton: true }]} />
+      </State>
       <State label="Trail ending at the current page">
         <G.Breadcrumbs
           label="Breadcrumb"
@@ -258,6 +261,9 @@ export const FlowGraph: Story = {
 export const ListBox: Story = {
   render: () => (
     <Matrix maxWidth={360}>
+      <State label="Loading (isLoading)" direction="column">
+        <G.ListBox label="Folders" items={[]} isLoading />
+      </State>
       <State label="Single selection (selected)" direction="column">
         <G.ListBox label="Folders" items={listItems} selectionMode="single" defaultSelectedIds={['inbox']} />
       </State>
@@ -357,6 +363,9 @@ const steps: ReadonlyArray<G.StepperStep> = [
 export const Stepper: Story = {
   render: () => (
     <Matrix maxWidth={720}>
+      <State label="Loading (isSkeleton)" direction="column">
+        <G.Stepper label="Sign-up progress" steps={steps} currentStepId="profile" isLoading />
+      </State>
       <State label="Horizontal, current step" direction="column">
         <G.Stepper label="Sign-up progress" steps={steps} currentStepId="profile" onStepSelect={noop} />
       </State>
@@ -413,6 +422,9 @@ export const TagGroup: Story = {
 export const Timeline: Story = {
   render: () => (
     <Matrix maxWidth={560}>
+      <State label="Loading (isSkeleton)" direction="column">
+        <G.Timeline label="Order history" items={[]} isLoading />
+      </State>
       <State label="States with a current item" direction="column">
         <G.Timeline
           label="Order history"
