@@ -32,14 +32,14 @@ export type TabsProps = {
     readonly items: ReadonlyArray<TabItem>
     readonly onSelect?: (key: string) => void
     readonly panelId?: (key: string) => string
-    /** Keep stable labels visible when icon-only navigation would make peer views ambiguous. */
+    /** Keep stable labels visible when icon-only navigation would make peer views ambiguous. A tab with no `leading` icon always shows its label (0.9.11): it has nothing else to show. */
     readonly labelVisibility?: "responsive" | "always"
     /** Page chrome owns whether the peer strip starts at the shared page inset. */
     readonly inset?: "page" | "none"
     /**
      * `primary` (default) is the underline tab bar: the page's main area switcher, at most one per page.
-     * `secondary` is a compact pill strip with the footprint of a SegmentedControl (a soft track, the selected tab an
-     * accent-soft pill): for tabs inside a sub-region (drawer, card, dialog, rail). Same roles, keyboard, panel
+     * `secondary` is HeroUI's own pill tabs, unpainted by the grammar (a soft track, the selected tab a white segment
+     * pill with the surface shadow): for tabs inside a sub-region (drawer, card, dialog, rail). Same roles, keyboard, panel
      * wiring and focus ring either way.
      */
     readonly variant?: "primary" | "secondary"
@@ -109,7 +109,7 @@ export const Tabs = (props: TabsProps) => {
                             >
                                 <span className={tabContentClassName} data-contract="GAP-2" data-grammar-tab-id={item.id}>
                                     {item.leading}
-                                    <span className={tabLabelClassName} style={props.labelVisibility === "always" ? { display: "inline" } : undefined}>{item.label}</span>
+                                    <span className={tabLabelClassName} style={props.labelVisibility === "always" || item.leading == null ? { display: "inline" } : undefined}>{item.label}</span>
                                 </span>
                                 <HeroTabs.Indicator />
                             </HeroTabs.Tab>

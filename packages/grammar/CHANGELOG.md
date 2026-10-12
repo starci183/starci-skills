@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.11 - 2026-10-12
+
+Patch (owner ruling 2026-10-12, STATE-6 case-7). No API change.
+
+- **`Tabs variant="secondary"` is HeroUI's own pill tabs.** The 0.9.9 accent-soft re-paint is gone: a soft `--default` track, the selected tab a white `--segment` pill with the surface shadow and foreground text, as HeroUI ships it. The primary underline geometry (indicator height, flex-end alignment, inline and end padding) is now scoped to `variant="primary"`, so it no longer flattens the pill.
+- **A tab with no `leading` icon always shows its label.** Under `labelVisibility="responsive"` a narrow viewport hid every label, which left icon-less tabs empty.
+
 ## 0.9.10 - 2026-10-12
 
 Patch, no runtime change (owner ruling 2026-10-12: the grammar keeps no tests). Components, CSS and exports are identical to 0.9.9.

@@ -191,6 +191,10 @@ rules:
         when: Tabs are placed
         assert: |-
           Owner ruling 2026-10-12: `Tabs variant="primary"` (the underline bar) switches the page's main areas, sits under the page header, appears at most once per page and may reflect the URL; `Tabs variant="secondary"` (the compact pill strip) switches panels inside a sub-region - a drawer, card, dialog or rail - and never reflects the URL. A tab set nested in another is the secondary one; two tab sets of the same variant are never nested
+      - id: case-7
+        when: The secondary tab strip is painted
+        assert: |-
+          Owner ruling 2026-10-12: `Tabs variant="secondary"` is HeroUI's own pill tabs, unpainted by the grammar - a soft `--default` track, the selected tab a white `--segment` pill with the surface shadow and foreground text. It is never re-painted in the accent-soft chip family: next to a ButtonGroup or selectable chips that paint read as a row of buttons, not a view switcher. A tab with no leading icon always shows its label, at every width
   - id: STATE-7
     title: Controlled disclosure
     governs: Governs a summary that reveals a region.

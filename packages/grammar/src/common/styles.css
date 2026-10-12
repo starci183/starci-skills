@@ -1202,7 +1202,8 @@
         border-bottom-width: 0 !important;
     }
 
-    .starci-core-tabs .tabs__list {
+    /* The underline geometry belongs to the primary bar only; the secondary pill strip keeps HeroUI's own (0.9.11). */
+    .starci-core-tabs-frame[data-grammar-tabs-variant="primary"] .starci-core-tabs .tabs__list {
         align-items: flex-end;
     }
 
@@ -1224,11 +1225,14 @@
         position: relative;
         width: auto !important;
         flex: 0 0 auto !important;
+    }
+
+    .starci-core-tabs-frame[data-grammar-tabs-variant="primary"] .starci-core-tabs .tabs__tab {
         padding-inline: 0.75rem !important;
         padding-block-end: 0 !important;
     }
 
-    .starci-core-tabs .tabs__indicator {
+    .starci-core-tabs-frame[data-grammar-tabs-variant="primary"] .starci-core-tabs .tabs__indicator {
         bottom: 0 !important;
         height: 2px !important;
         margin-block-end: 0 !important;
