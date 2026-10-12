@@ -64,7 +64,7 @@ rules:
       - id: case-8
         when: A drawer or dialog carries options that apply to the whole batch but are rarely changed (topic, tags, audience, module)
         assert: |-
-          Owner ruling 2026-10-12, corrected the same day: they live in one `SurfaceAccordionCard` (depth nested) below the main task, closed by default; its summary names the title and, in words, WHO may read the result ("Ai được dùng: Nội bộ · Dùng cho: Mọi agent"), never bare tokens. The fields open INSIDE that card, never loose on the panel. They never take half of the panel before the task itself
+          Owner ruling 2026-10-12, corrected the same day: they live in one `SurfaceAccordionCard` (depth nested) below the main task, closed by default; its summary names the title and, in words, WHO may read the result ("Who may use: Internal · For: All agents"), never bare tokens. The fields open INSIDE that card, never loose on the panel. They never take half of the panel before the task itself
       - id: case-9
         when: A panel offers several ways to bring content in (files, a cloud picker, links)
         assert: |-

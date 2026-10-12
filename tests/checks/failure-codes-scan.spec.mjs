@@ -96,3 +96,19 @@ test('a kebab-case default for a code parameter is an emitted code', (t) => {
   const found = codes(t, ["export const zipRefuse = (message, code = 'zip-corrupt') => Object.assign(new Error(message), { code });"]);
   assert.ok(found.includes('zip-corrupt'), found.join(', '));
 });
+
+test('a Git ref passed as the revision argument of revParse is not an emitted code; the same literal elsewhere still is', (t) => {
+  const exempt = codes(t, [
+    "const mergeHead = api.revParse(root, 'MERGE_HEAD');",
+    'const orig = revParse(repoRoot, "ORIG_HEAD");',
+  ]);
+  assert.ok(!exempt.includes('MERGE_HEAD'), exempt.join(', '));
+  assert.ok(!exempt.includes('ORIG_HEAD'), exempt.join(', '));
+  const emitted = codes(t, [
+    "const mergeHead = api.revParse(root, 'MERGE_HEAD');",
+    "export const refusal = { code: 'MERGE_HEAD' };",
+    "throw new Error('[MERGE_HEAD_MISSING] no merge in progress');",
+  ]);
+  assert.ok(emitted.includes('MERGE_HEAD'), emitted.join(', '));
+  assert.ok(emitted.includes('MERGE_HEAD_MISSING'), emitted.join(', '));
+});

@@ -79,5 +79,8 @@
     "test:contract": "npm run typecheck:tests && cd be && jest --selectProjects contract",
     "test:stack": "starci app stack",
     "contract:emit": "starci app emit"
+  },
+  "overrides": {
+    "@xyflow/react": "12.11.6"
   }
 }

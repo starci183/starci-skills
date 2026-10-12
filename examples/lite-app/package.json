@@ -77,5 +77,8 @@
     "db:types": "npm run contract:emit",
     "db:lint": "starci app check --fast",
     "contract:emit": "starci app emit"
+  },
+  "overrides": {
+    "@xyflow/react": "12.11.6"
   }
 }

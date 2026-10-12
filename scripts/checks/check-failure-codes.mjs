@@ -128,10 +128,31 @@ const sourceTexts = (base) => {
   return { texts, envNames };
 };
 
+// The revision argument of a git rev-parse call (`revParse(root, 'MERGE_HEAD')`) names a Git ref such as MERGE_HEAD or
+// ORIG_HEAD, not a code. Only that argument position is exempt: the same literal anywhere else is still an emitted code.
+const REV_PARSE_CALL = 'revParse(';
+/** Offsets of the opening quote of the second argument of every revParse(...) call whose first argument is a plain expression (no nested call or comma). */
+function gitRevisionArgs(text) {
+  const out = new Set();
+  for (let at = text.indexOf(REV_PARSE_CALL); at !== -1; at = text.indexOf(REV_PARSE_CALL, at + 1)) {
+    const start = at + REV_PARSE_CALL.length;
+    const comma = text.indexOf(',', start);
+    if (comma === -1) break;
+    const first = text.slice(start, comma);
+    if (first.includes('(') || first.includes(')')) continue;
+    let quote = comma + 1;
+    while (text[quote] === ' ' || text[quote] === '\n' || text[quote] === '\t') quote += 1;
+    if (text[quote] === "'" || text[quote] === '"') out.add(quote);
+  }
+  return out;
+}
+
 /** The codes one scanned source emits, pushed through `add`. */
 const upperCodeFindings = (rel, text, NOT_CODES, envNames, add) => {
+  const revisions = rel.endsWith('.mjs') ? gitRevisionArgs(text) : new Set();
   for (const m of text.matchAll(UPPER_RE)) {
     const code = m[2];
+    if (revisions.has(m.index)) continue;
     if (NOT_CODES.has(code) || NOT_CODE_PREFIX.test(code) || envNames.has(code)) continue;
     add(code, 'upper', rel, lineOf(text, m.index));
   }
