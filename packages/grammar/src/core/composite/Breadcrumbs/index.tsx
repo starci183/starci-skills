@@ -57,22 +57,25 @@ export const Breadcrumbs = ({ label, items, separator, onAction, className }: Br
                         id={item.id}
                         className="starci-core-breadcrumb"
                         data-contract="ACTION-3"
-                        {...(item.href === undefined || isCurrent || item.isSkeleton === true ? {} : { href: item.href })}
+                        {...(item.href === undefined || isCurrent ? {} : { href: item.href })}
                     >
-                        <span
-                            className="starci-core-breadcrumb-label"
-                            data-grammar-breadcrumb="true"
-                            data-grammar-current={isCurrent ? "true" : "false"}
-                        >
-                            {item.isSkeleton === true ? (
-                                <span aria-hidden="true" className="starci-core-breadcrumb-skeleton" data-grammar-skeleton="true"><Skeleton shape="text" /></span>
-                            ) : (
-                                <>
-                                    {item.leading === undefined ? null : <span aria-hidden="true" className="starci-core-breadcrumb-leading" data-contract="ICON-6">{item.leading}</span>}
-                                    {item.label}
-                                </>
-                            )}
-                        </span>
+                        {item.isSkeleton === true ? (
+                            // A function child skips the vendor's link: a nameless (aria-hidden) link is an axe aria-command-name violation.
+                            () => (
+                                <span className="starci-core-breadcrumb-label" data-grammar-breadcrumb="true" data-grammar-current={isCurrent ? "true" : "false"}>
+                                    <span aria-hidden="true" className="starci-core-breadcrumb-skeleton" data-grammar-skeleton="true"><Skeleton shape="text" /></span>
+                                </span>
+                            )
+                        ) : (
+                            <span
+                                className="starci-core-breadcrumb-label"
+                                data-grammar-breadcrumb="true"
+                                data-grammar-current={isCurrent ? "true" : "false"}
+                            >
+                                {item.leading === undefined ? null : <span aria-hidden="true" className="starci-core-breadcrumb-leading" data-contract="ICON-6">{item.leading}</span>}
+                                {item.label}
+                            </span>
+                        )}
                     </HeroBreadcrumbs.Item>
                 )
             })}

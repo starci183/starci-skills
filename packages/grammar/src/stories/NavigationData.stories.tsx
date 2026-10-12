@@ -83,7 +83,7 @@ export const Breadcrumbs: Story = {
   render: () => (
     <Matrix>
       <State label="Current crumb still loading (isSkeleton)">
-        <G.Breadcrumbs label="Breadcrumb" items={[{ id: 'home', label: 'Home', href: '#home' }, { id: 'lessons', label: 'Lessons', href: '#lessons' }, { id: 'lesson', label: '', isSkeleton: true }]} />
+        <G.Breadcrumbs label="Breadcrumb (loading page)" items={[{ id: 'home', label: 'Home', href: '#home' }, { id: 'lessons', label: 'Lessons', href: '#lessons' }, { id: 'lesson', label: '', isSkeleton: true }]} />
       </State>
       <State label="Trail ending at the current page">
         <G.Breadcrumbs
@@ -369,7 +369,7 @@ export const Stepper: Story = {
   render: () => (
     <Matrix maxWidth={720}>
       <State label="Loading (isSkeleton)" direction="column">
-        <G.Stepper label="Sign-up progress" steps={steps} currentStepId="profile" isLoading />
+        <G.Stepper label="Sign-up progress (loading)" steps={steps} currentStepId="profile" isLoading />
       </State>
       <State label="Horizontal, current step" direction="column">
         <G.Stepper label="Sign-up progress" steps={steps} currentStepId="profile" onStepSelect={noop} />
