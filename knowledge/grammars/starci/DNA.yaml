@@ -12,7 +12,7 @@ appliesTo:
 family: starci
 provenance:
   package: "@starci/grammar"
-  version: "0.9.7"
+  version: "0.9.8"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   captured: "2026-09-23"
   publicEntry: "@starci/grammar/common"
@@ -111,7 +111,7 @@ provenance:
       sha256: "3934778aac696be9518741e64ee210bfbaa2e9b9818a57ab979b6ef332ce9161"
 identity:
   package: "@starci/grammar"
-  version: "0.9.7"
+  version: "0.9.8"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   familyId: "core"
   dnaId: "starci-core"
@@ -126,7 +126,7 @@ identity:
     (`--accent`, `--surface`, `--field-*`, `--radius`, `--shadow-surface`, …).
   counts:
     renderers: 104
-    tokens: 118
+    tokens: 119
     claimEntries: 441
     gaps: 13
 
@@ -524,6 +524,10 @@ tokens:
     value: "0.5rem"
     valueFrom: "common-fallback"
     source: "packages/grammar/src/common/styles.css:523"
+  - name: "--starci-core-field-min-height"
+    value: "2.5rem"
+    valueFrom: "common-fallback"
+    source: "packages/grammar/src/common/components-forms.css:94"
   - name: "--starci-core-fill-bottom"
     value: "0px"
     valueFrom: "common-fallback"
@@ -708,11 +712,11 @@ tokens:
   - name: "--starci-core-skeleton-rows"
     value: "4"
     valueFrom: "renderer"
-    source: "packages/grammar/src/common/components-forms.css:163"
+    source: "packages/grammar/src/common/components-forms.css:171"
   - name: "--starci-core-skeleton-segments"
     value: "2"
     valueFrom: "renderer"
-    source: "packages/grammar/src/common/components-forms.css:145"
+    source: "packages/grammar/src/common/components-forms.css:153"
   - name: "--starci-core-subnav-offset"
     value: "var(--starci-core-band-height, 4rem)"
     valueFrom: "common-fallback"
@@ -1376,6 +1380,7 @@ renderers:
       - "starci-core-disclosure-heading"
       - "starci-core-disclosure-indicator"
       - "starci-core-disclosure-panel"
+      - "starci-core-disclosure-summary"
       - "starci-core-disclosure-title"
       - "starci-core-disclosure-trigger"
   - component: "Divider"
@@ -1724,6 +1729,7 @@ renderers:
     claims: ["FONT-1", "GAP-2", "TONE-2"]
     computedClaims: []
     classes:
+      - "starci-core-form-label--screen-reader"
       - "starci-core-input"
       - "starci-core-input-actions"
       - "starci-core-input-control"
@@ -2309,6 +2315,7 @@ renderers:
       - "starci-core-select-indicator"
       - "starci-core-select-trigger"
       - "starci-core-select-value"
+      - "starci-core-select-value-text"
   - component: "Sidebar"
     propsType: "SidebarProps"
     kind: "composition"

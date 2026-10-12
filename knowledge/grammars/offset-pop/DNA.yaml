@@ -13,7 +13,7 @@ appliesTo:
 family: offset-pop
 provenance:
   package: "@starci/grammar"
-  version: "0.9.7"
+  version: "0.9.8"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   captured: "2026-09-23"
   publicEntry: "@starci/grammar/common"
@@ -58,7 +58,7 @@ provenance:
     - path: "packages/grammar/src/offset-pop/styles.css"
       sha256: "e344fc2c880dc8d12d82888d279d12b1e6e2371232b25bcbf732bb88b78f35a0"
     - path: "packages/grammar/src/offset-pop/components-forms.css"
-      sha256: "d2f0a10712d7cff00a94bee21acb8939fd2f1e7dfa61828b5e72b9de98c9efa7"
+      sha256: "ac97dba2f7cb7d32f78d3f30953529cbdb60d6d60f735c085b217d8b5182cb95"
     - path: "packages/grammar/src/offset-pop/components-overlays.css"
       sha256: "0065296a1786a18c5784d3ef777cd64be94dfe88763e24dcbccd3f5346f32ec9"
     - path: "packages/grammar/src/offset-pop/components-navigation.css"
@@ -67,7 +67,7 @@ provenance:
       sha256: "3934778aac696be9518741e64ee210bfbaa2e9b9818a57ab979b6ef332ce9161"
 identity:
   package: "@starci/grammar"
-  version: "0.9.7"
+  version: "0.9.8"
   familyId: "offset-pop"
   dnaId: "offset-pop"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
@@ -1343,6 +1343,7 @@ renderers:
       - "starci-core-disclosure-heading"
       - "starci-core-disclosure-indicator"
       - "starci-core-disclosure-panel"
+      - "starci-core-disclosure-summary"
       - "starci-core-disclosure-title"
       - "starci-core-disclosure-trigger"
   - component: "Divider"
@@ -1691,6 +1692,7 @@ renderers:
     claims: ["FONT-1", "GAP-2", "TONE-2"]
     computedClaims: []
     classes:
+      - "starci-core-form-label--screen-reader"
       - "starci-core-input"
       - "starci-core-input-actions"
       - "starci-core-input-control"
@@ -2276,6 +2278,7 @@ renderers:
       - "starci-core-select-indicator"
       - "starci-core-select-trigger"
       - "starci-core-select-value"
+      - "starci-core-select-value-text"
   - component: "Sidebar"
     propsType: "SidebarProps"
     kind: "composition"
