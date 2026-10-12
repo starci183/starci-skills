@@ -1,8 +1,8 @@
 # Changelog
 
-## 1.2.9 - 2026-10-12
+## 1.2.10 - 2026-10-12
 
-- Changed: pin HFS 4.2.9 (canon pins for grammar 0.9.10); carries runtime 1.0.0-alpha.12; command behavior is unchanged.
+- Changed: pin HFS 4.2.10 (1.2.9 on the registry was published from an unfinished tree) (canon pins for grammar 0.9.10); carries runtime 1.0.0-alpha.12; command behavior is unchanged.
 
 ## 1.2.8 - 2026-10-12
 

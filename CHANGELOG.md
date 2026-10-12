@@ -15,7 +15,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - `tests/work-ui` is green again: the grammar DNA snapshots are refreshed for 0.9.8 and STATE-8 is published outside the generated catalogue.
 
 ### Changed
-- CLI 1.2.9 carries runtime 1.0.0-alpha.12; HFS 4.2.9 and the BE/FE lint canons 3.2.10/8.2.10 carry the refreshed canon pins (grammar 0.9.10).
+- CLI 1.2.10 carries runtime 1.0.0-alpha.12; HFS 4.2.10 and the BE/FE lint canons 3.2.11/8.2.11 carry the refreshed canon pins (grammar 0.9.10).
 
 ### Removed
 - `@starci/grammar` 0.9.10 ships without spec suites (owner ruling 2026-10-12): the specs, test helpers, vitest configs and the Storybook a11y gate are deleted; `test` and `prepack` run typecheck + build, and the grammar-package workflow runs typecheck, pack check and the Storybook build. UI contracts stay in `tests/work-ui` and the DNA snapshot.
