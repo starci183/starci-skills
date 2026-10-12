@@ -61,6 +61,10 @@ rules:
         when: A console page reached from a navigation destination opens with its heading
         assert: |-
           Owner ruling 2026-10-11: the trail above the heading is `Breadcrumbs` (the parent destination, then the page as current), never a `SectionHeader` eyebrow; the page's command sits in the header's `action` and a pointer to where its sources live in its `meta`, so no loose action row stands between the header and the content as an extra GAP-5 region
+      - id: case-8
+        when: A drawer or dialog carries options that apply to the whole batch but are rarely changed (topic, tags, audience, module)
+        assert: |-
+          Owner ruling 2026-10-12: they live in one `Disclosure` below the main task, closed by default, with a one-line summary of the current choices; they never take half of the panel before the task itself
     notThisRule: |-
       which of several regions carries the strongest anchor is HIERARCHY-2.
   - id: LAYOUT-2

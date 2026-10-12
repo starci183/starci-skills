@@ -139,6 +139,10 @@ rules:
           The direction is tempted to wrap the published tabs in its own tab roles
         assert: |-
           No node outside `Tabs` carries composite tab semantics for the same choice
+      - id: case-5
+        when: The choice switches between different screens of content (upload | write | FAQ) rather than setting one value of a form
+        assert: |-
+          Owner ruling 2026-10-12: it is `Tabs`, each tab owning its panel; `SegmentedControl` is reserved for choosing one value inside a form (who may see it, a period, a view density), and is never used to swap whole panels
   - id: STATE-7
     title: Controlled disclosure
     governs: Governs a summary that reveals a region.
