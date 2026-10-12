@@ -27,7 +27,7 @@ export function loadSonarGate({ base = root, file = null, cwd = null } = {}) {
   if (gate?.schema !== GATE_SCHEMA) throw new Error(`${file ?? GATE_FILE}: schema must be ${GATE_SCHEMA}`);
   for (const key of ['gate', 'newCode', 'overall', 'enforcedOps'])
     if (gate[key] == null) throw new Error(`${file ?? GATE_FILE}: ${key} is required`);
-  // Full coverage is a required policy descriptor; only the selected canonical lite block may omit it.
+  // Coverage is a required policy descriptor of the full block; the lite block carries the same descriptor (owner ruling 2026-10-12).
   for (const area of ['newCode', 'overall']) {
     const coverage = gate[area].coverage;
     if (!coverage || typeof coverage.metric !== 'string' || !coverage.metric.trim() || !Number.isFinite(coverage.minPercent) || coverage.minPercent < 0 || coverage.minPercent > 100)
@@ -38,7 +38,7 @@ export function loadSonarGate({ base = root, file = null, cwd = null } = {}) {
   return gateForCwd(gate, { cwd, file });
 }
 
-/** The canonical gate limited to the repository's declared edition (the lite block may omit the coverage descriptor). */
+/** The canonical gate limited to the repository's declared edition (the lite block: its own gate name, the same conditions). */
 const gateForCwd = (gate, { cwd, file }) => {
   let declaration;
   try { declaration = JSON.parse(fs.readFileSync(path.join(cwd, 'hfs.json'), 'utf8')); }

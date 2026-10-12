@@ -207,3 +207,20 @@ files:
     spec: realtime/subscriber-receives-push, realtime/foreign-topic-is-isolated, realtime/disconnect-releases-subscription
     rules: [BE_PATTERN_SPEC_MISSING]
     optional: true
+# Edition lite (owner ruling 2026-10-12, R212 case-1): the same ports and rules, a Supabase adapter behind them.
+liteAdapter:
+  summary: >-
+    Under lite the realtime pattern pushes through Supabase Realtime. A reactor still publishes to the RealtimeHub of
+    platform/realtime; the hub's lite adapter calls realtime.send(payload, event, topic, true) in the caller's transaction, and the
+    client subscribes to the private topic from fe modules/db, authorized by RLS policies on realtime.messages declared in a
+    migration. The be door is transport/supabase/<channel>.subscription.ts (be.feature.realtime.supabase, no @Resolver: R184 is full's): it names the principal's topic and pushes only
+    through Supabase Realtime; the graphql-ws subscription and the socket gateway are forbidden under lite.
+  ports:
+    - {port: RealtimeHub.publish (platform/realtime), adapter: "realtime.send through the shared EntityManager, inside the transaction of the change"}
+    - {port: RealtimeHub.subscribe, adapter: "none in be/: the client's Supabase channel subscription under RLS"}
+    - {port: topic scope, adapter: "the private topic built from the principal (BE_REALTIME_TOPIC_SCOPE) and the realtime.messages policy that admits only that principal"}
+  forbids: [socket.io, "@nestjs/platform-socket.io", graphql-ws, graphql-subscriptions]
+  proof: >-
+    The door's own unit spec (<channel>.subscription.spec.ts) and the hub adapter's spec, as full; the realtime/* scenarios are
+    optional integration specs on `starci supabase start`.
+  see: [knowledge/patterns/be/supabase-queues.yaml]

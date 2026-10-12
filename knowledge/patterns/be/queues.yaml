@@ -234,3 +234,18 @@ files:
     role: "Titles queue/<scenario>: ... prove the pattern."
     spec: queue/enqueue-atomic-with-transaction, queue/relay-job-id-is-outbox-id, queue/scheduler-fires-once
     rules: [BE_PATTERN_SPEC_MISSING]
+# Edition lite (owner ruling 2026-10-12, R212 case-1): the same ports and rules, a Supabase adapter behind them.
+liteAdapter:
+  summary: >-
+    Under lite the queue pattern is unchanged above the port (producers, the outbox written in the caller's transaction, processors,
+    schedulers declared with their queue) and its transport is Supabase Queues (pgmq) instead of BullMQ and Redis.
+  ports:
+    - {port: QueueOutbox (platform/queue), adapter: the same outbox row written through the caller's tx; nothing changes}
+    - {port: queue transport (queue-transport.port.ts), adapter: "pgmq-queue-transport.client.ts: pgmq.send through the shared EntityManager, the outbox id inside the message"}
+    - {port: QueueWorkerRegistry (platform/queue), adapter: "a poll loop per queue: pgmq.read with the policy's visibility timeout, pgmq.delete on success, pgmq.set_vt for backoff, pgmq.archive when read_ct exceeds the attempts"}
+    - {port: schedulers, adapter: "a pg_cron job declared in a supabase migration that calls pgmq.send; no BullMQ job scheduler"}
+  forbids: [bullmq, "@nestjs/bullmq", redis, ioredis, "@nestjs/schedule"]
+  proof: >-
+    Unit specs as full (queue-outbox, relay and worker services, the pgmq client against mockEntityManager); the queue/* scenarios are
+    optional integration specs on `starci supabase start` (R155 is full's).
+  see: [knowledge/patterns/be/supabase-queues.yaml]
