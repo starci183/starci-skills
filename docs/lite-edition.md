@@ -1,12 +1,35 @@
 Owner: knowledge/hfs/slots.yaml
 # HFS lite edition
 
-Lite is the small-product edition of the same HFS standard. It uses the same manifest, rule catalog, lint canons, grammar,
-security model and Docker canon as full. The `edition` field selects a filtered slot and rule view; it does not select a
-different engine or relax rules locally.
+Lite is the full HFS architecture deployed without self-hosted infrastructure (owner ruling 2026-10-12, recorded as R212
+case-1 in `knowledge/hfs/rules.yaml`). It uses the same manifest, rule catalog, lint canons, grammar, security model and Docker
+canon as full, the same monorepo and slots, the same patterns and the same back-end unit specs. The `edition` field selects a
+filtered slot and rule view; it does not select a different engine or relax rules locally.
 
-Use lite for a product that needs one API, one Next app and Supabase, and does not yet need a test world, UAT, background
-workers or event-driven infrastructure. Start with full when those capabilities are already requirements.
+What lite changes is adapters and delivery, all on Supabase:
+
+- persistence: the schema authority is `supabase/migrations`;
+- queue: Supabase Queues (pgmq) behind the same `platform/queue` ports (outbox to queue, processors, retry and backoff by
+  visibility timeout and `read_ct`, archive on dead letter); no BullMQ or Redis;
+- event bus: pgmq-backed topics, or in-process delivery for a single api, behind the same `EventPublisher`/`EventConsumer`
+  ports; no Kafka;
+- realtime: Supabase Realtime, subscribed under RLS by the client; a back-end realtime door only pushes through it;
+- cache and locks: Postgres (advisory locks or an unlogged table); no Redis;
+- scheduling: `pg_cron` (with `pg_net`) or the platform scheduler; never a self-hosted cron host;
+- storage and auth: Supabase.
+
+`knowledge/patterns/be/supabase-queues.yaml` owns the pgmq adapter, and each pattern topic carries its `liteAdapter`.
+
+Tests: back-end unit specs are required exactly as in full (`ruleParams.be.unitRoles`, the logic roles at 100 per file, the
+`@starci/jest-preset` doubles and builders). Integration specs are optional and run only against the local Supabase CLI stack
+(`starci supabase start`), with no toxiproxy and no containers of their own. There is no e2e world, no contract world and no
+e2e workflow (slot `app.ci-e2e`). The front end has no tests in either edition (R97).
+
+Infrastructure: `.starcistacks` under lite holds environment and secret custody only; the stack's one backing service is the
+Supabase project (the local CLI stack or the cloud project).
+
+Use lite for a product whose infrastructure is Supabase. Start with full when the product needs its own stack, the e2e world or
+UAT records.
 
 ## Create a lite app
 
@@ -56,7 +79,9 @@ explicit public name. Supabase Edge Functions are not part of lite.
 - `starci app add table <name> [--fe] [--no-types]` adds a migration and the matching back-end capability. `--fe` adds typed
   front-end readers and writers. Types regenerate by default; `--no-types` deliberately skips that step.
 - `starci app add cli <group>` creates the optional cli app on first use, including the built-in migration and seed groups, and then
-  adds the requested group without test files.
+  adds the requested group with the unit spec of each command beside it.
+- `starci app add queue|job|reactor|saga|projection|webhook|realtime ...` adds the same pattern trees as full; under lite the
+  platform adapters are the Supabase ones (pgmq, Supabase Realtime).
 - `starci app add app <name>` refuses in lite because lite has exactly one front-end app. Upgrade before adding another.
 - `starci app emit` writes the enabled back-end snapshots and the `app.supabase.types` artifact. The local Supabase stack
   must be running for type generation.
@@ -82,14 +107,19 @@ Apply the plan with:
 starci app upgrade --edition full
 ```
 
-The upgrade adds the full-only managed configuration, test layers and required cli support. It does not rewrite product source
-or move the Supabase schema authority. The first full check intentionally reports tests that the product still needs to author;
-the upgrade never creates placeholder tests. Downgrade from full to lite is not supported.
+The upgrade adds the full-only managed configuration (the e2e workflow and scripts), the self-hosted stack and the required cli
+support. It does not rewrite product source or move the Supabase schema authority: swapping an adapter (pgmq to BullMQ, Supabase
+Realtime to a socket door) is a product change behind the same port. The first full check intentionally reports the e2e and
+integration proofs the product still needs to author; the upgrade never creates placeholder tests. Downgrade from full to lite is
+not supported.
 
 ## What lite forbids
 
-R212 forbids test files, test scripts and dependencies, test-tool configuration, UAT records, worker apps, event machinery,
-queues, jobs, projections, sagas and realtime back-end kinds. Lite also forbids Edge Functions and a second front-end app.
+Lite forbids only infrastructure. R212 forbids e2e and contract specs, the `test:e2e`, `test:contract`, `test:stack` and
+`test:browser` scripts, the e2e workflow, the browser journey and UAT records, test containers, toxiproxy and browser-runner
+dependencies, BullMQ, Kafka and Redis dependencies (and their imports, through the lite `infraOwners`), a socket or graphql-ws
+realtime door, and the `.starcistacks` infra, runtime and seeds trees. Lite also forbids Edge Functions and a second front-end
+app.
 
 R213 to R216 forbid a second schema authority, dynamic database DDL, unsafe policies or definer functions, unchecked database
 configuration and stale generated types. R217 to R220 forbid Supabase access outside its owners, untyped or swallowed results,
