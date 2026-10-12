@@ -15,7 +15,7 @@ import { checkArchitecture } from '../../scripts/hfs/architecture/index.mjs';
 const ts = createRequire(import.meta.url)('typescript');
 
 const grammarPackage = (version) => ({
-  'package.json': JSON.stringify({ name: '@starci/grammar', version, peerDependencies: { react: '>=18', '@heroui/react': '>=2' },
+  'package.json': JSON.stringify({ name: '@starci/grammar', version, peerDependencies: { react: '>=18', '@heroui/react': '>=2', '@xyflow/react': '>=12' },
     exports: { './common': { types: './dist/common/index.d.ts', import: './dist/common/index.js' }, './common.css': './dist/common/styles.css', './core.css': './dist/core/styles.css' } }),
   'dist/common/index.js': 'export const Button = () => null\n',
   'dist/common/index.d.ts': 'export declare const Button: () => null\n',
@@ -23,7 +23,8 @@ const grammarPackage = (version) => ({
   'dist/core/styles.css': '@import "../common/styles.css";\n',
 });
 
-const PEERS = { react: '19.0.0', '@heroui/react': '2.0.0' };
+// The grammar's selected peers since FlowGraph (0.9.5): React, HeroUI and React Flow.
+const PEERS = { react: '19.0.0', '@heroui/react': '2.0.0', '@xyflow/react': '12.11.6' };
 const TSCONFIG = JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', skipLibCheck: true, noEmit: true }, include: ['src/**/*'] });
 
 const monorepo = (t) => {
