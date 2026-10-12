@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { runGit } from '../../scripts/api/git/lib.mjs';
 import { gitCommit } from '../../scripts/machine/git-commit.mjs';
+import { gitSync } from '../../scripts/machine/git-sync.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 function git(cwd, args) {
@@ -76,9 +77,78 @@ test('gitCommit refuses invalid subjects and main-branch commits with usage exit
 
 test('gitCommit refuses an empty staged index with findings exit 1', async (t) => {
   const cwd = repo(t, { lane: true });
-  const result = await gitCommit(context(cwd, { type: 'chore', summary: 'record a change' }));
-  assert.equal(result.code, 1);
-  assert.match(result.text, /nothing to commit/);
+  const before = git(cwd, ['rev-parse', 'HEAD']);
+  for (const dryRun of [true, false]) {
+    const result = await gitCommit(context(cwd, { type: 'chore', summary: 'record a change', 'dry-run': dryRun }));
+    assert.equal(result.code, 1);
+    assert.match(result.text, /nothing to commit/);
+    assert.equal(git(cwd, ['rev-parse', 'HEAD']), before);
+    assert.equal(git(cwd, ['diff', '--cached', '--name-only']), '');
+  }
+});
+
+test('gitCommit closes a resolved tree-equal gitSync merge and preserves normal hooks', async (t) => {
+  const cwd = repo(t, { lane: true });
+  const readme = path.join(cwd, 'readme.txt');
+  const laneContent = 'lane\n';
+  fs.writeFileSync(readme, laneContent);
+  git(cwd, ['commit', '-am', 'lane change']);
+  const laneHead = git(cwd, ['rev-parse', 'HEAD']);
+  const laneTree = git(cwd, ['rev-parse', 'HEAD^{tree}']);
+  git(cwd, ['switch', 'main']);
+  fs.writeFileSync(readme, 'main\n');
+  git(cwd, ['commit', '-am', 'main change']);
+  const mainHead = git(cwd, ['rev-parse', 'HEAD']);
+  git(cwd, ['switch', 'lane/git-a']);
+
+  const synced = await gitSync(context(cwd, {}));
+  assert.equal(synced.code, 1);
+  assert.deepEqual(synced.data.conflicts, ['readme.txt']);
+  assert.equal(git(cwd, ['rev-parse', 'MERGE_HEAD']), mainHead);
+  const args = { type: 'chore', summary: 'resolve a tree-equal merge' };
+  for (const dryRun of [true, false]) {
+    const refused = await gitCommit(context(cwd, { ...args, 'dry-run': dryRun }));
+    assert.equal(refused.code, 1);
+    assert.match(refused.text, dryRun ? /unresolved merge paths/ : /git commit failed/);
+    assert.equal(git(cwd, ['rev-parse', 'HEAD']), laneHead);
+    assert.equal(git(cwd, ['rev-parse', 'MERGE_HEAD']), mainHead);
+  }
+
+  fs.writeFileSync(readme, laneContent);
+  git(cwd, ['add', '--', 'readme.txt']);
+  assert.equal(git(cwd, ['diff', '--cached', '--name-only']), '');
+  const indexPath = path.join(cwd, '.git', 'index');
+  const resolvedIndex = fs.readFileSync(indexPath);
+  const preview = await gitCommit(context(cwd, { ...args, 'dry-run': true }));
+  assert.equal(preview.code, 0);
+  assert.equal(preview.data.dryRun, true);
+  assert.equal(preview.data.sha, null);
+  assert.deepEqual(preview.data.paths, []);
+  assert.equal(git(cwd, ['rev-parse', 'HEAD']), laneHead);
+  assert.equal(git(cwd, ['rev-parse', 'MERGE_HEAD']), mainHead);
+  assert.deepEqual(fs.readFileSync(indexPath), resolvedIndex);
+
+  const hooks = path.join(cwd, '.git', 'hooks');
+  git(cwd, ['config', 'core.hooksPath', hooks]);
+  const hook = path.join(hooks, 'pre-commit');
+  fs.writeFileSync(hook, '#!/bin/sh\nexit 1\n');
+  fs.chmodSync(hook, 0o755);
+  const blocked = await gitCommit(context(cwd, args));
+  assert.equal(blocked.code, 1);
+  assert.match(blocked.text, /git commit failed/);
+  assert.equal(git(cwd, ['rev-parse', 'HEAD']), laneHead);
+  assert.equal(git(cwd, ['rev-parse', 'MERGE_HEAD']), mainHead);
+  fs.unlinkSync(hook);
+
+  const committed = await gitCommit(context(cwd, args));
+  assert.equal(committed.code, 0);
+  assert.deepEqual(committed.data.paths, []);
+  assert.equal(committed.data.sha, git(cwd, ['rev-parse', 'HEAD']));
+  assert.notEqual(committed.data.sha, laneHead);
+  assert.deepEqual(git(cwd, ['show', '-s', '--format=%P', 'HEAD']).split(' '), [laneHead, mainHead]);
+  assert.equal(git(cwd, ['rev-parse', 'HEAD^{tree}']), laneTree);
+  assert.equal(runGit(['rev-parse', '--verify', '--quiet', 'MERGE_HEAD'], { cwd }).status, 1);
+  assert.equal(git(cwd, ['status', '--porcelain=v1']), '');
 });
 
 test('gitCommit refuses missing and outside paths before staging', async (t) => {

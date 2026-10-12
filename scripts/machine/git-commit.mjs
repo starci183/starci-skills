@@ -15,8 +15,8 @@ const TYPES = new Set(['feat', 'fix', 'refactor', 'test', 'docs', 'chore', 'land
 
 const slash = (value) => value.split(path.sep).join('/');
 
-function stagedFiles(cwd, gitDiff) {
-  const result = gitDiff(['--cached', '--name-only', '--'], { cwd, config: { 'core.quotepath': 'off' } });
+function stagedFiles(cwd, gitDiff, filter = null) {
+  const result = gitDiff(['--cached', '--name-only', ...(filter ? [`--diff-filter=${filter}`] : []), '--'], { cwd, config: { 'core.quotepath': 'off' } });
   return ok(result) ? output(result).split(/\r?\n/).map((line) => line.trim()).filter(Boolean) : null;
 }
 
@@ -78,7 +78,13 @@ function dryRunPlan({ api, root, addPaths, message, subject, trailers }, refusal
     if (!status.ok) return refusal(`could not inspect --paths: ${status.stderr || 'git status failed'}`, 1);
     preview = [...new Set([...staged, ...statusPaths(status.stdout)])].sort(byCodeUnit);
   }
-  if (!preview.length) return refusal('nothing to commit', 1);
+  const mergeHead = api.revParse(root, 'MERGE_HEAD');
+  if (mergeHead) {
+    const unresolved = stagedFiles(root, api.diff, 'U');
+    if (unresolved == null) return refusal('could not read unresolved merge paths', 1);
+    if (unresolved.length) return refusal(`unresolved merge paths:\n${unresolved.join('\n')}`, 1);
+  }
+  if (!preview.length && !mergeHead) return refusal('nothing to commit', 1);
   return {
     code: 0,
     text: `message:\n${message}\n\nstaged:\n${preview.join('\n')}`,
@@ -86,7 +92,7 @@ function dryRunPlan({ api, root, addPaths, message, subject, trailers }, refusal
   };
 }
 
-/** Commit the requested paths or the existing index with the StarCi subject and trailers. */
+/** Commit requested paths, the existing index or a resolved pending merge with the StarCi subject and trailers. */
 export async function gitCommit(ctx, deps = {}) {
   const refusal = (text, code = 2) => verbRefusal('starci git commit', text, code,
     { schema: 'starci/git-commit@1', ok: false });
@@ -120,7 +126,7 @@ export async function gitCommit(ctx, deps = {}) {
   }
   const paths = stagedFiles(root, api.diff);
   if (paths == null) return refusal('could not read the staged files', 1);
-  if (!paths.length) return refusal('nothing to commit', 1);
+  if (!paths.length && !api.revParse(root, 'MERGE_HEAD')) return refusal('nothing to commit', 1);
   const made = api.commit(['-m', message], { cwd: root });
   if (!ok(made)) return refusal(`git commit failed: ${output(made, 'stderr') || output(made) || 'unknown error'}`, 1);
   const sha = api.revParse(root, 'HEAD');
