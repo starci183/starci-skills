@@ -1190,9 +1190,14 @@
         min-width: 0;
     }
 
-    .starci-core-tabs-frame,
-    .starci-core-tabs .tabs__list,
-    .starci-core-tabs .tabs__list-container {
+    /* The underline bar sits flush on its rule; the secondary pill strip keeps HeroUI's track padding on every side (0.9.12). */
+    .starci-core-tabs-frame {
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    .starci-core-tabs-frame[data-grammar-tabs-variant="primary"] .starci-core-tabs .tabs__list,
+    .starci-core-tabs-frame[data-grammar-tabs-variant="primary"] .starci-core-tabs .tabs__list-container {
         margin-bottom: 0;
         padding-bottom: 0;
     }

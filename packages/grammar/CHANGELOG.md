@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.12 - 2026-10-12
+
+Patch (owner review of nivo.vn, STATE-6 case-7). No API change.
+
+- **The secondary pill strip keeps its track padding on every side.** The zero bottom margin and padding the underline bar needs were applied to every tab list, so the selected pill sat on the bottom edge of the track and the strip looked jammed. They are scoped to `variant="primary"` now.
+
 ## 0.9.11 - 2026-10-12
 
 Patch (owner ruling 2026-10-12, STATE-6 case-7). No API change.
