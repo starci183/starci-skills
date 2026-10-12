@@ -1,8 +1,12 @@
 # Changelog
 
+## 8.2.13 - 2026-10-12
+
+- Changed: carry the merged runtime mirror and canon pins for Grammar 0.9.12, Stylelint canon 2.0.9, HFS 4.2.12 and CLI 1.2.12. The bundled HFS manifest 2.2.0 recognizes declaration-only ambient owners; ESLint rule implementations are unchanged.
+
 ## 8.2.12 - 2026-10-12
 
-- Changed: carry the combined runtime mirror and canon pins for Grammar 0.9.11 and Stylelint canon 2.0.9; ESLint rule implementations are unchanged.
+- Changed: bundled canon pins carry @starci/grammar 0.9.11 (secondary Tabs are HeroUI's own pill tabs).
 
 ## 8.2.11 - 2026-10-12
 

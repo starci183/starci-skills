@@ -12,7 +12,7 @@
   "dependencies": {
     "@heroui/react": "3.2.6",
     "@heroui/styles": "3.2.6",
-    "@starci/grammar": "0.9.9",
+    "@starci/grammar": "0.9.11",
     "@xyflow/react": "12.11.6",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.117.2",

@@ -42,10 +42,9 @@ topics:
     path: common/DNA.yaml
     title: Common Grammar — DNA
     summary: |
-      Snapshot of the `@starci/grammar/common` public entry at 0.9.9: the custom-property names its
-      stylesheet set writes or reads, the 104 renderers its registry holds (20 forms, 14 overlays,
-      20 navigation, the rest base) with their class names and stamped rule ids, and the absences read beside them.
-      Common supplies anatomy, not colour. Generated from source and drift-checked.
+      Generated DNA snapshot of the `@starci/grammar/common` public entry: custom properties,
+      renderer classes, stamped rule ids and recorded gaps. The DNA owns the observed package
+      version and source inventory. Common supplies anatomy, not colour; the snapshot is drift-checked.
   - id: starci
     path: starci/index.yaml
     title: StarCi Core Grammar

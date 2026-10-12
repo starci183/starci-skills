@@ -1,12 +1,19 @@
 # Changelog
 
+## 0.9.12 - 2026-10-12
+
+- Fixed: generate the rule catalogue from authored UI knowledge YAML, including STATE-8 and sparse and nonnumeric addresses; renderer and family claims resolve to active canonical rules without exceptions for retired identifiers.
+- Fixed: preserve function-child loading behavior in Breadcrumbs and ListBox, active canonical renderer claims and scoped FlowGraph slot styling across the runtime merge.
+- Fixed: the stories typecheck overrides the build exclusions so every story is checked. The test and prepack scripts continue to run typecheck plus build; the package carries no spec suites.
+- Fixed: scope the underline bar's bottom padding and border resets to primary Tabs so secondary Tabs retain HeroUI's pill-track inset.
+- Changed: integrate the canonical catalogue and claims with 0.9.11's HeroUI secondary Tabs and visible labels for icon-less tabs; keep the vendor pill paint and the existing public component API.
+
 ## 0.9.11 - 2026-10-12
 
-Combined successor: retain the component features and no-tests policy published in 0.9.10, and integrate the canonical YAML rule catalogue and active renderer claims from the parallel runtime branch.
+Patch (owner ruling 2026-10-12, STATE-6 case-7). No API change.
 
-- Fixed: generate the catalogue from authored YAML rules, including STATE-8 and sparse and nonnumeric addresses; keep active renderer and family claims without exceptions for retired identifiers.
-- Fixed: preserve the Breadcrumbs and ListBox function-child skeleton behavior, canonical decorative accessibility claims and scoped FlowGraph control styling across the merge.
-- Fixed: secondary Tabs apply the canonical radius directly to each tab, and the stories typecheck overrides build exclusions so every story is checked.
+- **`Tabs variant="secondary"` is HeroUI's own pill tabs.** The 0.9.9 accent-soft re-paint is gone: a soft `--default` track, the selected tab a white `--segment` pill with the surface shadow and foreground text, as HeroUI ships it. The primary underline geometry (indicator height, flex-end alignment, inline and end padding) is now scoped to `variant="primary"`, so it no longer flattens the pill.
+- **A tab with no `leading` icon always shows its label.** Under `labelVisibility="responsive"` a narrow viewport hid every label, which left icon-less tabs empty.
 
 ## 0.9.10 - 2026-10-12
 

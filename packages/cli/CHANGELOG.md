@@ -1,8 +1,12 @@
 # Changelog
 
+## 1.2.12 - 2026-10-12
+
+- Changed: pin HFS 4.2.12 for the merged Grammar 0.9.12 and Stylelint canon 2.0.9 closure; carry runtime 1.0.0-alpha.12 and the merged runtime fixes. Command dispatcher implementations are unchanged.
+
 ## 1.2.11 - 2026-10-12
 
-- Changed: pin HFS 4.2.11 for the combined Grammar 0.9.11 and Stylelint canon 2.0.9 closure; carry runtime 1.0.0-alpha.12 and the merged runtime fixes.
+- Changed: pin HFS 4.2.11 (canon pins for grammar 0.9.11); carries runtime 1.0.0-alpha.12; command behavior is unchanged.
 
 ## 1.2.10 - 2026-10-12
 
