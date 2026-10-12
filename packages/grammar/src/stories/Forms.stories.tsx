@@ -70,7 +70,7 @@ export const InputRowHiddenLabel: Story = {
       {[1, 2, 3].map((n) => (
         <div key={n} style={{ display: 'flex', alignItems: 'start', gap: '0.5rem' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <G.Input id={`link-${n}`} name={`link-${n}`} label={`Liên kết ${n}`} isLabelHidden variant="secondary" {...(n === 2 ? { errorMessage: 'Enter a valid link.' } : {})} />
+            <G.Input id={`link-${n}`} name={`link-${n}`} label={`Link ${n}`} isLabelHidden variant="secondary" {...(n === 2 ? { errorMessage: 'Enter a valid link.' } : {})} />
           </div>
           <G.Button variant="secondary">Delete</G.Button>
         </div>

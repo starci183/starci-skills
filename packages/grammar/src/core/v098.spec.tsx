@@ -129,11 +129,11 @@ describe("0.9.8: Input hooks for an app drawer", () => {
     })
 
     it("hides the label visually but keeps it as the accessible name with isLabelHidden", () => {
-        const { container } = render(<Input id="l" name="l" label="Liên kết 1" isLabelHidden />)
-        expect(screen.getByLabelText("Liên kết 1")).toBe(container.querySelector("input"))
+        const { container } = render(<Input id="l" name="l" label="Link 1" isLabelHidden />)
+        expect(screen.getByLabelText("Link 1")).toBe(container.querySelector("input"))
         expect(container.querySelector("label")?.className).toContain("starci-core-form-label--screen-reader")
         cleanup()
-        const shown = render(<Input id="l" name="l" label="Liên kết 1" />)
+        const shown = render(<Input id="l" name="l" label="Link 1" />)
         expect(shown.container.querySelector("label")?.className ?? "").not.toContain("screen-reader")
     })
 
