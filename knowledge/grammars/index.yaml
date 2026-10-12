@@ -43,7 +43,7 @@ topics:
     title: Common Grammar — DNA
     summary: |
       Snapshot of the `@starci/grammar/common` public entry at 0.9.2: the custom-property names its
-      stylesheet set writes or reads, the 103 renderers its registry holds (20 forms, 14 overlays,
+      stylesheet set writes or reads, the 104 renderers its registry holds (20 forms, 14 overlays,
       19 navigation, the rest base) with their class names and stamped rule ids, and the absences read beside them.
       Common supplies anatomy, not colour. Generated from source and drift-checked.
   - id: starci

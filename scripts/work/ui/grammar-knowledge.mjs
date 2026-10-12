@@ -30,6 +30,7 @@ export {loadDnaModule};
 export {cssDeclarations,cssReads,lexSource} from './grammar-knowledge-lex.mjs';
 export {registryNames,ruleCatalog} from './grammar-knowledge-renderers.mjs';
 const GRAMMAR_KNOWLEDGE_CHECK='starci/grammar-knowledge-check@1';
+const CATALOG_RENDERER_COUNT=/\b(\d+) renderers\b/;
 
 /** The families whose snapshot this check owns, and where each one's source and DNA module live. */
 export const GRAMMAR_FAMILIES=Object.freeze([
@@ -320,7 +321,7 @@ function checkCatalog(findings,grammarRoot,measured){
   for(const family of GRAMMAR_FAMILIES)if(!listed.has(family.knowledge))findings.push({file:'index.yaml',what:'families',detail:`no \`${family.knowledge}\` family entry`});
   catalogPathFindings(findings,grammarRoot,catalog);
   const commonSummary=(catalog.topics??[]).find(t=>t.id==='common')?.summary??'';
-  const stated=/\b(\d+) renderers\b/.exec(commonSummary);
+  const stated=CATALOG_RENDERER_COUNT.exec(commonSummary);
   if(!stated||Number(stated[1])!==measured.renderers.length)findings.push({file:'index.yaml',what:'topics.common.summary',detail:`states ${stated?stated[1]:'no'} renderers but the registry holds ${measured.renderers.length}`});
 }
 
@@ -361,9 +362,29 @@ function withVersion(text,version){
   return text;
 }
 
+/** Refresh Common's measured catalog count inside its literal summary, preserving authored text. */
+function withCatalogRendererCount(text,count){
+  const lines=text.split('\n');
+  const topics=topLevelRange(lines,'topics');
+  const start=lines.findIndex((line,i)=>i>topics.start&&i<topics.end&&/^  - id: common\s*$/.test(line));
+  if(start<0)throw new Error('no topics.common entry');
+  const next=lines.findIndex((line,i)=>i>start&&i<topics.end&&/^  - /.test(line));
+  const end=next<0?topics.end:next;
+  const summary=lines.findIndex((line,i)=>i>start&&i<end&&/^    summary: \|[-+]?\s*$/.test(line));
+  if(summary<0)throw new Error('topics.common.summary is not a literal block');
+  const after=lines.findIndex((line,i)=>i>summary&&i<end&&line.trim()&&!/^ {6}/.test(line));
+  const summaryEnd=after<0?end:after;
+  const block=lines.slice(summary+1,summaryEnd).join('\n');
+  if(!CATALOG_RENDERER_COUNT.test(block))throw new Error('topics.common.summary states no renderer count');
+  return [...lines.slice(0,summary+1),block.replace(CATALOG_RENDERER_COUNT,String(count)+' renderers'),...lines.slice(summaryEnd)].join('\n');
+}
+
 export async function writeGrammarKnowledge({packageRoot=defaultPaths().packageRoot,grammarRoot=defaultPaths().grammarRoot}={}){
   const census=await censusGrammar({packageRoot});
   const written=[];
+  const catalogFile=path.join(grammarRoot,'index.yaml');
+  const catalogBefore=read(catalogFile);
+  const catalogAfter=withCatalogRendererCount(catalogBefore,census.renderers.length);
   const commonFile=path.join(grammarRoot,'common','DNA.yaml');
   let text=withVersion(read(commonFile).replaceAll('\r\n','\n'),census.version);
   text=replaceBlock(text,'tokens',yamlCommonTokens(census.commonTokens));
@@ -391,6 +412,7 @@ export async function writeGrammarKnowledge({packageRoot=defaultPaths().packageR
       if(after!==before){fs.writeFileSync(index,after);written.push(`${family.knowledge}/index.yaml`);}
     }
   }
+  if(catalogAfter!==catalogBefore){fs.writeFileSync(catalogFile,catalogAfter);written.push('index.yaml');}
   return {written,census};
 }
 

@@ -105,6 +105,30 @@ test('--write refreshes the stated package version too, so a version bump leaves
   assert.deepEqual(after.findings,[]);
 });
 
+test('--write refreshes the Common catalog renderer count without changing authored catalog text', async t=>{
+  const dir=copyGrammarRoot(t);
+  const index=path.join(dir,'index.yaml');
+  const original=fs.readFileSync(index,'utf8');
+  const authored=original.replace('Common supplies anatomy, not colour.','Common supplies anatomy, not colour. Keep this owner wording.')
+    .replace('Historical snapshot of the StarCi Core family — DNA','Historical snapshot of the StarCi Core family — the 42 renderers remain a historical note — DNA');
+  assert.match(authored,/Keep this owner wording\./);
+  assert.match(readYaml(index).topics.find(topic=>topic.id==='common').summary,/\d+ renderers/);
+  assert.match(authored,/the 42 renderers remain a historical note/);
+  const stale=authored.replace(/the \d+ renderers/,'the 42 renderers');
+  assert.notEqual(stale,authored);
+  fs.writeFileSync(index,stale);
+  const before=await checkGrammarKnowledge({packageRoot,grammarRoot:dir,census});
+  assert.ok(before.findings.some(f=>f.file==='index.yaml'&&f.what==='topics.common.summary'&&f.detail.includes('states 42 renderers')));
+  await writeGrammarKnowledge({packageRoot,grammarRoot:dir});
+  const after=await checkGrammarKnowledge({packageRoot,grammarRoot:dir,census});
+  assert.deepEqual(after.findings,[]);
+  const refreshed=fs.readFileSync(index,'utf8');
+  assert.equal(refreshed,stale.replace('the 42 renderers','the '+census.renderers.length+' renderers'));
+  const again=await writeGrammarKnowledge({packageRoot,grammarRoot:dir});
+  assert.ok(!again.written.includes('index.yaml'));
+  assert.equal(fs.readFileSync(index,'utf8'),refreshed);
+});
+
 test('a package that moves ahead of the snapshot is reported too', async()=>{
   const moved=structuredClone(census);
   moved.renderers.push({...moved.renderers[0],component:'NewRenderer'});
