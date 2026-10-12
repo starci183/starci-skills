@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.9 - 2026-10-12
+
+- Changed: refresh the bundled canon pins for grammar 0.9.9; behaviour is unchanged.
+
 ## 3.2.8 - 2026-10-12
 
 - Changed: refresh the bundled canon pins for grammar 0.9.8; behaviour is unchanged.

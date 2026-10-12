@@ -7,14 +7,15 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 ## [1.0.0-alpha.12] — 2026-10-12
 
 ### Added
+- `@starci/grammar` 0.9.9: `Tabs variant="secondary"` (a pill strip for tabs inside a drawer, card, dialog or rail) and `IconButton variant="danger-soft"` (row-level destructive actions); the Breadcrumbs, ListBox and Stepper loading modes pass axe.
 - `@starci/grammar` 0.9.8: every single-line field (Input, Select, ComboBox, SearchField, NumberField, date fields) shares one anatomy (radius, 2.5rem min-height, inline padding, trigger placement); Select and ComboBox values stay on one line with an ellipsis; `Input` gains `onBlur`, `onPaste`, `autoFocus` and `isLabelHidden`; `Disclosure` gains `summary`; the 0.9.7 skeleton and FlowGraph roots get real rules.
-- Knowledge: owner rulings of 2026-10-12 from the Add documents drawer review — Tabs switch screens and SegmentedControl sets a value (STATE-6), forms in a narrow owner stay one column (RESPONSIVE-1), related commands in a ButtonGroup with no empty-count primary (CTA-1), rarely changed options in a Disclosure (LAYOUT-1), several values of one kind as a list of Inputs (COLLECTION-1); CONTEXT.md gains the choose-the-component-by-the-job table; STATE-8 ownership rows.
+- Knowledge: owner rulings of 2026-10-12 from the Add documents drawer review — Tabs switch screens and SegmentedControl sets a value (STATE-6), forms in a narrow owner stay one column (RESPONSIVE-1), related commands in a ButtonGroup with no empty-count primary (CTA-1), rarely changed options in a Disclosure (LAYOUT-1), several values of one kind as a list of Inputs (COLLECTION-1); a decision with its way out is two separate buttons at gap-2 while ButtonGroup holds only peer commands (CTA-1 case-7, corrected), Tabs primary vs secondary (STATE-6 case-6), and row removal as a danger-soft trash IconButton (CTA-4 case-5); CONTEXT.md gains the choose-the-component-by-the-job table; STATE-8 ownership rows.
 
 ### Fixed
 - `tests/work-ui` is green again: the grammar DNA snapshots are refreshed for 0.9.8 and STATE-8 is published outside the generated catalogue.
 
 ### Changed
-- CLI 1.2.7 carries runtime 1.0.0-alpha.12; HFS 4.2.7 and the BE/FE lint canons 3.2.8/8.2.8 carry the refreshed canon pins (grammar 0.9.8).
+- CLI 1.2.8 carries runtime 1.0.0-alpha.12; HFS 4.2.8 and the BE/FE lint canons 3.2.9/8.2.9 carry the refreshed canon pins (grammar 0.9.9).
 
 ## [1.0.0-alpha.10.1] — 2026-10-12
 
