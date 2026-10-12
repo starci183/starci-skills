@@ -179,16 +179,9 @@ test("a real lite scaffold plans and applies the additive full upgrade", async (
       },
     ],
   );
-  assert.deepEqual(
-    firstPlan.filter((step) => step.op === "rewrite-readme"),
-    [
-      {
-        op: "rewrite-readme",
-        path: "README.md",
-        why: "List the full edition's newly managed top-level scripts in Development without changing other README text.",
-      },
-    ],
-  );
+  // Owner ruling 2026-10-12: the lite README already lists npm test (both editions run the unit specs), so the
+  // Development section names every top-level script full manages and the upgrade leaves README.md alone.
+  assert.deepEqual(firstPlan.filter((step) => step.op === "rewrite-readme"), []);
 
   const secondPlan = await upgradeEdition({
     root,
@@ -212,8 +205,8 @@ test("a real lite scaffold plans and applies the additive full upgrade", async (
   assert.deepEqual(applied, firstPlan, "apply executes the planned operations");
   assert.equal(
     fs.readFileSync(path.join(root, "README.md"), "utf8"),
-    readmeBefore.replace("npm run build:fe\n", "npm run build:fe\nnpm test\n"),
-    "upgrade adds only the newly managed full command to Development",
+    readmeBefore,
+    "the lite README already lists every managed command full has, so the upgrade leaves it byte-for-byte",
   );
   for (const [file, hash] of productBefore)
     assert.equal(

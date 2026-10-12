@@ -14,9 +14,6 @@ const read = (relative) =>
     .replace(/\r\n/g, "\n");
 const PINS_FILE = path.join(import.meta.dirname, "..", "runtime", "knowledge", "hfs", "canon-pins.yaml");
 
-/** Lite has no test world, so the existing cli tree is selected without its colocated full-edition specs. */
-export const selectLiteCliEntries = (entries) =>
-  entries.filter((entry) => !entry.path.endsWith(".spec.ts"));
 
 const managedScripts = (repo) => {
   const fragment = appScripts(repo).replace(/,\s*$/, "");
@@ -71,6 +68,25 @@ export class RunSeedsCli extends CommandRunner {
         await this.seeds.run()
     }
 }
+`;
+
+const SEED_RUN_SPEC = `import { mock } from "@starci/jest-preset"
+import { Test } from "@nestjs/testing"
+import { SeedRunnerService } from "@modules/platform/database"
+import { RunSeedsCli } from "./run.cli"
+
+describe("RunSeedsCli", () => {
+    it("delegates the tracked seed run to the seed runner once", async () => {
+        const seeds = mock<SeedRunnerService>()
+        const moduleRef = await Test.createTestingModule({
+            providers: [RunSeedsCli, { provide: SeedRunnerService, useValue: seeds }],
+        }).compile()
+
+        await expect(moduleRef.get(RunSeedsCli).run()).resolves.toBeUndefined()
+
+        expect(seeds.run).toHaveBeenCalledTimes(1)
+    })
+})
 `;
 
 const SEED_MODULE = `import { Module } from "@nestjs/common"
@@ -188,6 +204,15 @@ export function ensureLiteCli({ root, manifest, repo }) {
       read("be/skeleton-lite/src/modules/platform/database/migration-runner.service.ts"),
     ],
     ["be/src/features/cli/migrate/subs/run.cli.ts", MIGRATE_RUN],
+    // Owner ruling 2026-10-12: each cli command of a lite back end owes its unit spec, as in full (ruleParams.be.unitRoles).
+    [
+      "be/src/features/cli/migrate/migrate.cli.spec.ts",
+      read("be/skeleton/src/features/cli/migrate/migrate.cli.spec.ts"),
+    ],
+    [
+      "be/src/features/cli/migrate/subs/run.cli.spec.ts",
+      read("be/skeleton/src/features/cli/migrate/subs/run.cli.spec.ts"),
+    ],
     [
       "be/src/features/cli/seed/seed.cli.ts",
       read("be/skeleton/src/features/cli/seed/seed.cli.ts"),
@@ -201,6 +226,11 @@ export function ensureLiteCli({ root, manifest, repo }) {
       read("be/skeleton-lite/src/modules/platform/database/seed-runner.service.ts"),
     ],
     ["be/src/features/cli/seed/subs/run.cli.ts", SEED_RUN],
+    [
+      "be/src/features/cli/seed/seed.cli.spec.ts",
+      read("be/skeleton/src/features/cli/seed/seed.cli.spec.ts"),
+    ],
+    ["be/src/features/cli/seed/subs/run.cli.spec.ts", SEED_RUN_SPEC],
   ];
   declaration.sides.be.apps.push({ name: "cli", kind: "cli" });
   declaration.sides.be.kinds = [

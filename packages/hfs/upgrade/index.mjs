@@ -42,7 +42,8 @@ const FULL_DEV_DEPENDENCIES = Object.freeze([
   "ts-jest",
 ]);
 const FULL_DEPENDENCIES = Object.freeze(["nest-commander"]);
-// Upgrade must render the full managed files before it can add/install the full-only Jest preset. These are the preset's two
+// Upgrade must render the full managed files before it can add/install the Jest preset a lite app scaffolded before the 2026-10-12
+// ruling lacks (a current lite app already has it, and the e2e world's @starci/test-world is what full adds). These are the preset's two
 // public sync inputs; once apply resolves the new dependency, normal full sync reads them from @starci/jest-preset again.
 export const UPGRADE_PRESETS = Object.freeze({
   sonarExclusions: "**/*.spec.ts,**/*.e2e-spec.ts,**/dist/**,**/coverage/**",
@@ -349,7 +350,7 @@ async function model({ root, to, presets, manifest }) {
     steps.push({
       op: "rewrite-managed",
       path: "package.json",
-      why: "Add the full test toolchain at canon pins and render the full root scripts.",
+      why: "Add the full test toolchain (the e2e world and any unit tooling a lite app lacks) at canon pins and render the full root scripts.",
       content: jsonText(nextPackage),
       kind: "file",
     });

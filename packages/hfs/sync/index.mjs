@@ -115,9 +115,8 @@ export function render(text, vars, readTemplate = readBundled) {
   });
 }
 
-/** What the app's sync reads from the jest preset it installs for its be side: the Sonar exclusions ({ sonarExclusions }); a lite app installs none. */
-export async function loadPresets(root, edition = 'full') {
-  if (edition === 'lite') return {};
+/** What the app's sync reads from the jest preset it installs for its be side: the Sonar exclusions ({ sonarExclusions }); both editions install it (a lite back end keeps full's unit run, owner ruling 2026-10-12). */
+export async function loadPresets(root) {
   const name = '@starci/jest-preset';
   const require = createRequire(path.join(root, 'package.json'));
   let resolved;
@@ -270,13 +269,14 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
     lintPrefix: lite ? '' : 'npm run codegen --silent && ',
     nodeMajor: String(NODE_MAJOR),
     sonarKey: sonarKey ?? app.project,
-    sonarExclusions: (lite ? ['**/.next/**', '**/node_modules/**', '**/src/messages/**', 'supabase/types/**'] : [presets?.sonarExclusions, '**/.next/**', '**/node_modules/**', '**/src/messages/**']).filter(Boolean).join(','),
+    sonarExclusions: [presets?.sonarExclusions, '**/.next/**', '**/node_modules/**', '**/src/messages/**', ...(lite ? ['supabase/types/**'] : [])].filter(Boolean).join(','),
     sonarSources: ['be/apps', 'be/src', 'fe/apps', ...(packages ? ['fe/packages'] : [])].join(','),
     lcovReport: LCOV_REPORT,
-    jestCoverage: !lite && scope === 'be' ? jestCoverageSource(jestCoverage(manifest, providers)) : '',
-    coverageExclusions: !lite && scope === APP_SCOPE ? sonarCoverageExclusions(manifest, providers).join(',') : '',
-    codecovPaths: !lite && scope === APP_SCOPE ? codecovPaths(manifest, providers).map(glob => `          - ${JSON.stringify(glob)}`).join('\n') : '',
-    codecovComponents: !lite && scope === APP_SCOPE ? componentsYaml(coverageComponents(manifest, { ...source, apps: app.sides.be.apps, providers })) : '',
+    // The coverage scope is the same in both editions: lite measures exactly what full measures (owner ruling 2026-10-12).
+    jestCoverage: scope === 'be' ? jestCoverageSource(jestCoverage(manifest, providers)) : '',
+    coverageExclusions: scope === APP_SCOPE ? sonarCoverageExclusions(manifest, providers).join(',') : '',
+    codecovPaths: scope === APP_SCOPE ? codecovPaths(manifest, providers).map(glob => `          - ${JSON.stringify(glob)}`).join('\n') : '',
+    codecovComponents: scope === APP_SCOPE ? componentsYaml(coverageComponents(manifest, { ...source, apps: app.sides.be.apps, providers })) : '',
     tsconfigPaths: ['be/tsconfig.json', ...fe.apps.map(entry => `fe/apps/${entry.name}/tsconfig.json`), ...(packages ? ['fe/packages/*/tsconfig.json'] : [])].join(','),
     styleGlob: STYLE_GLOB,
     imageMatrix: imageMatrix(app),
@@ -400,7 +400,7 @@ export function loadHfs(root, manifest = loadSlotManifest()) {
 export async function renderRepo(root, { presets, parseYaml, manifest = loadSlotManifest() } = {}) {
   const hfs = loadHfs(root, manifest);
   const sonarKey = await readDeclaredSonarKey(root, { parseYaml, fail: message => { throw new SyncError('HFS_SYNC_SONAR_KEY', message); } });
-  return { hfs, targets: renderTargets(hfs, presets ?? await loadPresets(root, hfs.edition), { sonarKey, manifest, source: appSource(root) }) };
+  return { hfs, targets: renderTargets(hfs, presets ?? await loadPresets(root), { sonarKey, manifest, source: appSource(root) }) };
 }
 
 /** `starci app sync --check | --write [--cwd <dir>]` at the app root; returns 0 clean, 1 drift, 2 usage. */

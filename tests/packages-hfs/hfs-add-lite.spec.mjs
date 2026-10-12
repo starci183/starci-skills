@@ -287,7 +287,7 @@ test("add app refuses a second lite front end and keeps full add-app behavior", 
   );
 });
 
-test("add cli bootstraps the optional lite app, Supabase migrate/seed groups, and a spec-free custom group", () => {
+test("add cli bootstraps the optional lite app, Supabase migrate/seed groups, and a custom group with its unit specs", () => {
   const root = repo();
   fs.mkdirSync(path.join(root, "be"), { recursive: true });
   fs.writeFileSync(
@@ -322,10 +322,9 @@ test("add cli bootstraps the optional lite app, Supabase migrate/seed groups, an
   assert.ok(
     result.created.includes("be/src/features/cli/requeue/subs/run.cli.ts"),
   );
-  assert.equal(
-    result.created.some((file) => file.endsWith(".spec.ts")),
-    false,
-  );
+  // Owner ruling 2026-10-12: every generated cli command carries its unit spec beside it, as in full.
+  for (const command of result.created.filter((file) => file.endsWith(".cli.ts")))
+    assert.ok(result.created.includes(command.replace(/\.ts$/, ".spec.ts")), `${command} has its unit spec`);
   assert.match(
     read(root, "be/src/features/cli/migrate/subs/run.cli.ts"),
     /await this\.migrations\.run\(\)/,
@@ -389,7 +388,8 @@ test("lite add api emits HTTP, and api plus webhook transports are composed in t
   assert.ok(webhook.created.includes("be/src/features/webhooks/calendar/transport/http/calendar-http.module.ts"));
   assert.ok(webhook.created.some(file => /supabase\/migrations\/\d{14}_calendar-inbox\.sql/.test(file)));
   assert.ok(webhook.created.includes("be/src/modules/domain/calendar-inbox/calendar-inbox.service.ts"));
-  assert.equal(webhook.created.some(file => file.endsWith(".spec.ts")), false);
+  for (const spec of ["be/src/features/webhooks/calendar/transport/http/calendar.webhook.spec.ts", "be/src/modules/domain/calendar-inbox/calendar-inbox.service.spec.ts"])
+    assert.ok(webhook.created.includes(spec), `${spec} is generated (owner ruling 2026-10-12: lite keeps the unit specs)`);
   const app = read(root, "be/apps/api/src/app.module.ts");
   assert.match(app, /import \{ BookingsHttpModule \} from "@features\/api\/bookings"/);
   assert.match(app, /import \{ CalendarHttpModule \} from "@features\/webhooks\/calendar"/);

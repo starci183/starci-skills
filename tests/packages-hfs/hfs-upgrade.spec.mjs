@@ -296,7 +296,6 @@ test("upgrade plan is ordered, printable and byte-for-byte read-only; apply exec
   );
   for (const file of [
     ".github/workflows/ci.yml",
-    "be/jest.config.js",
     "codecov.yml",
     "sonar-project.properties",
     ".starcistacks/application-stacks.yaml",
@@ -305,7 +304,6 @@ test("upgrade plan is ordered, printable and byte-for-byte read-only; apply exec
     ".starciwork/features/system-health/index.yaml",
     "be/apps/cli/src/main.ts",
     "be/src/features/cli/migrate/subs/run.cli.ts",
-    "be/src/tests/tsconfig.json",
     "package-lock.json",
   ])
     assert.ok(

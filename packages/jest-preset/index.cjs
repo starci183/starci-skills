@@ -53,8 +53,24 @@ const TS_TRANSFORM = String.raw`^.+\.ts$`
  * does not type-check.
  */
 function transform(tsconfig) {
-  return { [TS_TRANSFORM]: ["ts-jest", { tsconfig, diagnostics: false }] }
+  return { [TS_TRANSFORM]: ["ts-jest", { tsconfig, diagnostics: false }], ...esmDependencyTransform() }
 }
+
+/**
+ * The runtime dependencies of a back end that ship ECMAScript modules only: jest's CommonJS runtime cannot load them, so their
+ * files are compiled to CommonJS like the repository's own (ts-jest with `allowJs`) instead of being skipped as node_modules.
+ * `jose` is the Supabase access-token verifier of every lite back end (be.integrations.supabase); a lite app keeps full's unit
+ * run (owner ruling 2026-10-12), so a spec that imports its guard must load it.
+ */
+const ESM_ONLY_DEPENDENCIES = Object.freeze(["jose"])
+const ESM_DEPENDENCY_TRANSFORM = String.raw`^.+[\\/]node_modules[\\/](?:${ESM_ONLY_DEPENDENCIES.join("|")})[\\/].+\.js$`
+
+function esmDependencyTransform() {
+  return { [ESM_DEPENDENCY_TRANSFORM]: ["ts-jest", { tsconfig: { allowJs: true, module: "commonjs", target: "es2022", esModuleInterop: true }, diagnostics: false }] }
+}
+
+/** node_modules stay untransformed except the ESM-only dependencies above. */
+const TRANSFORM_IGNORE_PATTERNS = Object.freeze([String.raw`[\\/]node_modules[\\/](?!(?:${ESM_ONLY_DEPENDENCIES.join("|")})[\\/])`])
 
 /**
  * The compiler options the UNIT project overlays on the repository tsconfig (ts-jest merges an inline `tsconfig` object over the
@@ -179,6 +195,7 @@ function starciJestConfig(options) {
     rootDir: ".",
     roots: ["<rootDir>/src", "<rootDir>/apps"],
     moduleNameMapper: { ...MODULE_NAME_MAPPER },
+    transformIgnorePatterns: [...TRANSFORM_IGNORE_PATTERNS],
   }
   const suite = (displayName, suffix) => ({
     ...shared,

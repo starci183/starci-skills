@@ -7,7 +7,7 @@ import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
 import { scaffoldBinGaps } from '../helpers/scaffold-bins.mjs';
-import { checkTargets, renderTargets } from '../../packages/hfs/sync/index.mjs';
+import { appSource, checkTargets, renderTargets } from '../../packages/hfs/sync/index.mjs';
 import { checkRepository } from '../../scripts/hfs/check.mjs';
 import { checkDatabase } from '../../scripts/hfs/rules/database.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -27,28 +27,28 @@ const EXPECTED_LITE_FILES = Object.freeze([
   '.starciwork/.gitignore', '.starciwork/features/system-health/index.yaml', '.starciwork/index.yaml',
   '.starciwork/shell/index.yaml', '.starciwork/workspace.yaml', 'README.md',
   'be/apps/api/Dockerfile', 'be/apps/api/src/api.options.ts', 'be/apps/api/src/app.module.ts', 'be/apps/api/src/main.ts',
-  'be/eslint.config.mjs', 'be/nest-cli.json',
+  'be/eslint.config.mjs', 'be/jest.config.js', 'be/nest-cli.json',
   'be/src/features/api/system-health/application/check-liveness.contracts.ts',
   'be/src/features/api/system-health/application/check-liveness.handler.ts',
   'be/src/features/api/system-health/application/check-liveness.query.ts',
   'be/src/features/api/system-health/index.ts', 'be/src/features/api/system-health/system-health.module.ts',
   'be/src/features/api/system-health/transport/http/live.controller.ts',
-  'be/src/features/api/system-health/transport/http/system-health-http.module.ts',
-  'be/src/modules/domain/identity/admission.policy.ts', 'be/src/modules/domain/identity/auth.guard.ts',
+  'be/src/features/api/system-health/transport/http/system-health-http.module.ts', 'be/src/modules/domain/identity/admission.policy.spec.ts',
+  'be/src/modules/domain/identity/admission.policy.ts', 'be/src/modules/domain/identity/auth.guard.spec.ts', 'be/src/modules/domain/identity/auth.guard.ts',
   'be/src/modules/domain/identity/errors/identity.error.ts', 'be/src/modules/domain/identity/identity.contracts.ts',
   'be/src/modules/domain/identity/identity.decorators.ts', 'be/src/modules/domain/identity/identity.module-definition.ts',
   'be/src/modules/domain/identity/identity.module.ts', 'be/src/modules/domain/identity/identity.options.ts',
   'be/src/modules/domain/identity/index.ts', 'be/src/modules/domain/identity/messages/identity.messages.ts',
   'be/src/modules/domain/liveness/index.ts', 'be/src/modules/domain/liveness/liveness.contracts.ts',
   'be/src/modules/domain/liveness/liveness.module-definition.ts', 'be/src/modules/domain/liveness/liveness.module.ts',
-  'be/src/modules/domain/liveness/liveness.options.ts', 'be/src/modules/domain/liveness/liveness.service.ts',
-  'be/src/modules/integrations/supabase/errors/supabase.error.ts', 'be/src/modules/integrations/supabase/index.ts',
+  'be/src/modules/domain/liveness/liveness.options.ts', 'be/src/modules/domain/liveness/liveness.service.spec.ts', 'be/src/modules/domain/liveness/liveness.service.ts',
+  'be/src/modules/integrations/supabase/errors/supabase.error.ts', 'be/src/modules/integrations/supabase/index.ts', 'be/src/modules/integrations/supabase/supabase.client.spec.ts',
   'be/src/modules/integrations/supabase/supabase.client.ts', 'be/src/modules/integrations/supabase/supabase.config.ts',
   'be/src/modules/integrations/supabase/supabase.decorators.ts', 'be/src/modules/integrations/supabase/supabase.jwks.ts',
   'be/src/modules/integrations/supabase/supabase.options.ts',
   'be/src/modules/platform/clock/clock.decorators.ts', 'be/src/modules/platform/clock/clock.module-definition.ts',
   'be/src/modules/platform/clock/clock.module.ts', 'be/src/modules/platform/clock/clock.options.ts',
-  'be/src/modules/platform/clock/clock.port.ts', 'be/src/modules/platform/clock/index.ts',
+  'be/src/modules/platform/clock/clock.port.ts', 'be/src/modules/platform/clock/index.ts', 'be/src/modules/platform/clock/system-clock.service.spec.ts',
   'be/src/modules/platform/clock/system-clock.service.ts',
   'be/src/modules/platform/composition/composition.decorators.ts', 'be/src/modules/platform/composition/index.ts',
   'be/src/modules/platform/config/env-source.config.ts', 'be/src/modules/platform/config/errors/config.error.ts',
@@ -65,13 +65,13 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'be/src/modules/platform/database/primary.config.ts', 'be/src/modules/platform/database/primary.connection.ts',
   'be/src/modules/platform/database/primary.decorators.ts',
   'be/src/modules/platform/errors/domain.error.ts', 'be/src/modules/platform/errors/errors.contracts.ts',
-  'be/src/modules/platform/errors/errors.decorators.ts', 'be/src/modules/platform/errors/errors.filter.ts',
+  'be/src/modules/platform/errors/errors.decorators.ts', 'be/src/modules/platform/errors/errors.filter.spec.ts', 'be/src/modules/platform/errors/errors.filter.ts',
   'be/src/modules/platform/errors/errors.log-events.ts', 'be/src/modules/platform/errors/errors.module-definition.ts',
-  'be/src/modules/platform/errors/errors.module.ts', 'be/src/modules/platform/errors/errors.options.ts',
+  'be/src/modules/platform/errors/errors.module.ts', 'be/src/modules/platform/errors/errors.options.ts', 'be/src/modules/platform/errors/errors.service.spec.ts',
   'be/src/modules/platform/errors/errors.service.ts', 'be/src/modules/platform/errors/errors/errors.error.ts',
   'be/src/modules/platform/errors/http-status.policy.ts', 'be/src/modules/platform/errors/index.ts',
   'be/src/modules/platform/errors/messages/errors.messages.ts',
-  'be/src/modules/platform/http-security/errors/http-security.error.ts',
+  'be/src/modules/platform/http-security/errors/http-security.error.ts', 'be/src/modules/platform/http-security/execution-request.mapper.spec.ts',
   'be/src/modules/platform/http-security/execution-request.mapper.ts',
   'be/src/modules/platform/http-security/http-security.config.ts',
   'be/src/modules/platform/http-security/http-security.decorators.ts',
@@ -79,21 +79,21 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'be/src/modules/platform/http-security/http-security.module.ts',
   'be/src/modules/platform/http-security/http-security.options.ts',
   'be/src/modules/platform/http-security/index.ts',
-  'be/src/modules/platform/http-security/messages/http-security.messages.ts',
-  'be/src/modules/platform/http-security/origin.guard.ts', 'be/src/modules/platform/http-security/rate-limit.guard.ts',
-  'be/src/modules/platform/http-security/request-validation.service.ts',
-  'be/src/modules/platform/http-security/webhook-signature.service.ts',
+  'be/src/modules/platform/http-security/messages/http-security.messages.ts', 'be/src/modules/platform/http-security/origin.guard.spec.ts',
+  'be/src/modules/platform/http-security/origin.guard.ts', 'be/src/modules/platform/http-security/rate-limit.guard.spec.ts', 'be/src/modules/platform/http-security/rate-limit.guard.ts', 'be/src/modules/platform/http-security/request-validation.service.spec.ts',
+  'be/src/modules/platform/http-security/request-validation.service.ts', 'be/src/modules/platform/http-security/webhook-signature.service.spec.ts',
+  'be/src/modules/platform/http-security/webhook-signature.service.ts', 'be/src/modules/platform/i18n/bundle-message-catalog.service.spec.ts',
   'be/src/modules/platform/i18n/bundle-message-catalog.service.ts',
   'be/src/modules/platform/i18n/i18n.contracts.ts', 'be/src/modules/platform/i18n/i18n.decorators.ts',
   'be/src/modules/platform/i18n/i18n.module-definition.ts', 'be/src/modules/platform/i18n/i18n.module.ts',
   'be/src/modules/platform/i18n/i18n.options.ts', 'be/src/modules/platform/i18n/i18n.port.ts',
-  'be/src/modules/platform/i18n/index.ts', 'be/src/modules/platform/i18n/request-locale.service.ts',
-  'be/src/modules/platform/logging/index.ts', 'be/src/modules/platform/logging/json-logger.service.ts',
+  'be/src/modules/platform/i18n/index.ts', 'be/src/modules/platform/i18n/request-locale.service.spec.ts', 'be/src/modules/platform/i18n/request-locale.service.ts',
+  'be/src/modules/platform/logging/index.ts', 'be/src/modules/platform/logging/json-logger.service.spec.ts', 'be/src/modules/platform/logging/json-logger.service.ts',
   'be/src/modules/platform/logging/logging.decorators.ts', 'be/src/modules/platform/logging/logging.log-events.ts',
   'be/src/modules/platform/logging/logging.module-definition.ts', 'be/src/modules/platform/logging/logging.module.ts',
   'be/src/modules/platform/logging/logging.options.ts', 'be/src/modules/platform/logging/logging.port.ts',
-  'be/src/modules/platform/primitives/index.ts', 'be/src/modules/platform/primitives/outcome.contracts.ts',
-  'be/src/modules/platform/primitives/outcome.mapper.ts', 'be/tsconfig.build.json', 'be/tsconfig.json',
+  'be/src/modules/platform/primitives/index.ts', 'be/src/modules/platform/primitives/outcome.contracts.ts', 'be/src/modules/platform/primitives/outcome.mapper.spec.ts',
+  'be/src/modules/platform/primitives/outcome.mapper.ts', 'be/src/tests/tsconfig.json', 'be/tsconfig.build.json', 'be/tsconfig.json', 'codecov.yml',
   'fe/apps/web/next.config.ts', 'fe/apps/web/package.json', 'fe/apps/web/postcss.config.mjs',
   'fe/apps/web/src/app/[locale]/error.tsx', 'fe/apps/web/src/app/[locale]/layout.tsx',
   'fe/apps/web/src/app/[locale]/loading.tsx', 'fe/apps/web/src/app/[locale]/not-found.tsx',
@@ -178,8 +178,10 @@ test('lite scaffold emits the design 8.5 tree and is structurally clean', async 
     '@supabase/supabase-js', 'class-transformer', 'class-validator', 'jose', 'pg', 'reflect-metadata',
     'rxjs', 'tslib', 'typeorm',
   ].sort());
-  for (const forbidden of ['@nestjs/testing', '@starci/jest-preset', '@starci/test-world', '@types/jest', 'jest', 'nest-commander', 'ts-jest']) {
-    assert.equal(pkg.dependencies[forbidden] ?? pkg.devDependencies[forbidden], undefined, `${forbidden} is full-only`);
+  // Owner ruling 2026-10-12: a lite back end keeps the unit run; it runs no test world of its own and has no cli app until add cli.
+  for (const unit of ['@nestjs/testing', '@starci/jest-preset', '@types/jest', 'jest', 'ts-jest']) assert.equal(typeof pkg.devDependencies[unit], 'string', `${unit} is a lite devDependency`);
+  for (const forbidden of ['@starci/test-world', 'nest-commander']) {
+    assert.equal(pkg.dependencies[forbidden] ?? pkg.devDependencies[forbidden], undefined, `${forbidden} is not a lite starter dependency`);
   }
   assert.deepEqual(scaffoldBinGaps(root), [], 'every bin the scaffolded scripts call is installed by a dependency');
   const web = JSON.parse(fs.readFileSync(path.join(root, 'fe', 'apps', 'web', 'package.json'), 'utf8'));
@@ -208,7 +210,7 @@ test('lite scaffold emits the design 8.5 tree and is structurally clean', async 
   assert.doesNotMatch(databaseIndex, /MigrationRunnerService|SeedRunnerService|requireOwnedRow|\bsql\b|InjectPrimaryEntityManager/);
   const securityIndex = fs.readFileSync(path.join(root, ...'be/src/modules/platform/http-security/index.ts'.split('/')), 'utf8');
   assert.doesNotMatch(securityIndex, /parseWebhookProviderConfig|InjectWebhookSignature|\bRateLimit\b|\bRateTier\b|WebhookSignatureService/);
-  assert.deepEqual(checkTargets(root, renderTargets(declaration, undefined)), renderTargets(declaration, undefined).map(target => ({
+  assert.deepEqual(checkTargets(root, renderTargets(declaration, undefined, { source: appSource(root) })), renderTargets(declaration, undefined, { source: appSource(root) }).map(target => ({
     path: target.path,
     status: 'ok',
     expectedHash: target.hash,

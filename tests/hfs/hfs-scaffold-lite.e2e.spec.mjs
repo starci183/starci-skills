@@ -80,19 +80,28 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
   const scaffolded = scaffoldApp({ name: APP_NAME, into, edition: 'lite', lock: registry.lock });
   assert.equal(scaffolded.root, app, 'the lite scaffold wrote the app');
 
-  // Lite has no test layer or test tool. Check before npm ci, so dependencies' own test files are not mistaken for app files.
+  // Owner ruling 2026-10-12: lite keeps the back end's unit specs and runs no e2e, contract or browser world; the front end has
+  // no tests in either edition. Check before npm ci, so dependencies' own test files are not mistaken for app files.
   const files = listFiles(app);
-  const testPath = files.find(file => /(?:^|\/)(?:__tests__|e2e|test-support)(?:\/|$)|(?:^|\/)[^/]*(?:\.spec\.|\.test\.|-spec\.)/i.test(file));
-  assert.equal(testPath, undefined, `lite emitted a test path: ${testPath}`);
+  const testPath = /(?:^|\/)(?:__tests__|e2e|test-support)(?:\/|$)|(?:^|\/)[^/]*(?:\.spec\.|\.test\.|-spec\.)/i;
+  const outsideUnit = files.find(file => testPath.test(file) && !/^be\/(?:apps|src)\/.*\.spec\.ts$/.test(file));
+  assert.equal(outsideUnit, undefined, `lite emitted a test path outside the back-end unit specs: ${outsideUnit}`);
+  assert.ok(files.some(file => /^be\/src\/.*\.spec\.ts$/.test(file)), 'lite emits the back-end unit specs');
   for (const file of files.filter(file => path.posix.basename(file) === 'package.json')) {
     const manifest = JSON.parse(fs.readFileSync(path.join(app, ...file.split('/')), 'utf8'));
     const scripts = manifest.scripts ?? {};
+    const dependencies = { ...manifest.dependencies, ...manifest.devDependencies };
+    if (file === 'package.json') {
+      assert.deepEqual(Object.keys(scripts).filter(name => /^test(?::|$)/.test(name)).sort(), ['test', 'test:affected', 'test:integration'], 'the root runs the unit project and the optional integration project');
+      for (const tool of ['@nestjs/testing', '@starci/jest-preset', '@types/jest', 'jest', 'ts-jest']) assert.equal(typeof dependencies[tool], 'string', `the root installs ${tool}`);
+      for (const tool of ['@playwright/test', '@starci/test-world', 'cypress', 'testcontainers', 'vitest']) assert.equal(dependencies[tool], undefined, `the root has the test-world or browser tool ${tool}`);
+      continue;
+    }
     assert.equal(
       Object.entries(scripts).some(([name, command]) => /^(?:test|spec)(?::|$)/i.test(name) || /\b(?:jest|vitest|playwright|cypress)\b/i.test(String(command))),
       false,
       `${file} has a test script`,
     );
-    const dependencies = { ...manifest.dependencies, ...manifest.devDependencies };
     for (const tool of ['@nestjs/testing', '@playwright/test', '@starci/jest-preset', '@starci/test-world', '@types/jest', 'cypress', 'jest', 'ts-jest', 'vitest']) {
       assert.equal(dependencies[tool], undefined, `${file} has the test tool ${tool}`);
     }
@@ -126,6 +135,8 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
     assert.equal(run.status, 0, `${label} failed (${run.status ?? run.error?.message}); output withheld because it may contain local keys`);
     return run;
   };
+  // The back end's unit run with its per-file coverage thresholds (owner ruling 2026-10-12): every scaffolded logic file is at 100.
+  step('npm test', ['test']);
   step('npm run typecheck', ['run', 'typecheck']);
   step('npm run lint', ['run', 'lint']);
   step('npm run build:be', ['run', 'build:be']);

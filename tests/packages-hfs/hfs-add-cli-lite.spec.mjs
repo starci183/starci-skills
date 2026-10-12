@@ -4,10 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
-import {
-  ensureLiteCli,
-  selectLiteCliEntries,
-} from "../../packages/hfs/scaffold/add-cli-lite.mjs";
+import { ensureLiteCli } from "../../packages/hfs/scaffold/add-cli-lite.mjs";
 import {
   loadSlotManifest,
   readRepoDeclaration,
@@ -100,14 +97,21 @@ const parses = (text) =>
     compilerOptions: { experimentalDecorators: true },
   }).diagnostics.length === 0;
 
-test("selectLiteCliEntries removes colocated specs without changing the input", () => {
-  const entries = [
-    { path: "group/group.module.ts" },
-    { path: "group/subs/run.cli.ts" },
-    { path: "group/subs/run.cli.spec.ts" },
-  ];
-  assert.deepEqual(selectLiteCliEntries(entries), entries.slice(0, 2));
-  assert.equal(entries.length, 3);
+test("ensureLiteCli writes the unit spec of every built-in command, each parseable and naming its command (owner ruling 2026-10-12)", () => {
+  const root = appRoot();
+  const created = ensureLiteCli({ root, manifest, repo: repoAt(root) });
+  const specs = created.filter((relative) => relative.endsWith(".cli.spec.ts")).sort();
+  assert.deepEqual(specs, [
+    "be/src/features/cli/migrate/migrate.cli.spec.ts",
+    "be/src/features/cli/migrate/subs/run.cli.spec.ts",
+    "be/src/features/cli/seed/seed.cli.spec.ts",
+    "be/src/features/cli/seed/subs/run.cli.spec.ts",
+  ]);
+  for (const spec of specs) {
+    assert.equal(parses(read(root, spec)), true, `${spec} parses`);
+    assert.match(read(root, spec), /from "\.\/(?:migrate|seed|run)\.cli"/, `${spec} imports the command beside it`);
+  }
+  assert.match(read(root, "be/src/features/cli/seed/subs/run.cli.spec.ts"), /RunSeedsCli[\s\S]*seeds\.run\)\.toHaveBeenCalledTimes\(1\)/);
 });
 
 test("ensureLiteCli bootstraps the canonical app and groups once, registers configs and scripts, and does not overwrite owned files", () => {
@@ -126,7 +130,9 @@ test("ensureLiteCli bootstraps the canonical app and groups once, registers conf
   ]) {
     assert.ok(created.includes(relative), relative);
   }
-  assert.equal(created.some((relative) => relative.endsWith(".spec.ts")), false);
+  // Owner ruling 2026-10-12: each built-in cli command carries its unit spec, as in full.
+  for (const command of created.filter((relative) => relative.endsWith(".cli.ts")))
+    assert.ok(created.includes(command.replace(/\.ts$/, ".spec.ts")), `${command} has its unit spec`);
   for (const relative of created.filter((entry) => entry.endsWith(".ts"))) {
     assert.equal(parses(read(root, relative)), true, `${relative} parses`);
   }

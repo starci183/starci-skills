@@ -88,7 +88,7 @@ export async function checkEdition({
 
   const full = fullEditionDeclaration(declaration, manifest);
   const tracked = trackedFiles(repoRoot);
-  // A lite app cannot have the full-only Jest preset installed yet. The upgrade model carries the preset's public sync inputs
+  // A lite app scaffolded before the 2026-10-12 ruling has no Jest preset installed. The upgrade model carries the preset's public sync inputs
   // specifically so both the dry full-edition view and the upgrade plan render the same targets before dependencies are added.
   const resolvedPresets = presets ?? UPGRADE_PRESETS;
   const managed = renderTargets(full, resolvedPresets, { manifest });
