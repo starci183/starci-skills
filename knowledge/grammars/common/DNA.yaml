@@ -14,7 +14,7 @@ appliesTo:
 family: common
 provenance:
   package: "@starci/grammar"
-  version: "0.9.12"
+  version: "0.9.14"
   publicEntry: "@starci/grammar/common"
   styleEntrypoint: "@starci/grammar/common/styles.css"
   exportsEntry: "packages/grammar/package.json → ./common (dist/common/index.js), ./common/styles.css"
@@ -100,7 +100,7 @@ provenance:
     - path: "packages/grammar/src/common/styles.css"
       sha256: "2d2b0e4f6534974fb089f214854e04d1e9da68f85b9900ed41594edd18006637"
     - path: "packages/grammar/src/common/components-forms.css"
-      sha256: "0297be62bf238a75562a37773a1c3fa70f8dd6b70bbf7bd6fb4f133af0f3c92f"
+      sha256: "83149625216b77d8d99db2714ba86ad759a4a38752e73f3b187d28ce1fbf25e8"
     - path: "packages/grammar/src/common/components-overlays.css"
       sha256: "7af44ff00e334432ce16b5d7d99ffefa60cad37ba52d9e7eba13d74a21209ba7"
     - path: "packages/grammar/src/common/components-navigation.css"
@@ -119,7 +119,7 @@ provenance:
       sha256: "93b94f62216c656db74d9a88f5aef5837a8ba9a31b8066004b3014a6db6bf79b"
 identity:
   package: "@starci/grammar"
-  version: "0.9.12"
+  version: "0.9.14"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   familyId: "common"
   rootComponent: "GrammarRoot"
@@ -501,7 +501,7 @@ tokens:
   - name: "--focus"
     value: "var(--accent)"
     assignedBy: "common"
-    alsoReadBy: 21
+    alsoReadBy: 22
     source: "packages/grammar/src/common/styles.css:55"
   - name: "--font-mono"
     assignedBy: "host"

@@ -212,6 +212,29 @@
         border-radius: var(--field-radius, calc(var(--radius, 0.5rem) * 1.5));
     }
 
+    /*
+     * ONE FOCUS RING PER FIELD (0.9.14, owner ruling 2026-10-12, FOCUS-1). The ring is drawn once, on the field frame:
+     * the group of SearchField, NumberField, ComboBox and the date fields, the trigger of Select, the control itself
+     * for Input and a native control handed to Field. The inner text input of a grouped field never draws a ring,
+     * outline or shadow of its own, whatever the page's global `:focus-visible` rule says, so the wrapper and the input
+     * are never both outlined. The frame keeps the ring for every way focus arrives (`:focus-within`), so keyboard
+     * focus stays visible; forced-colors draws it as a system outline on the same frame.
+     */
+    :is(.starci-core-search-field-input, .starci-core-number-field-input, .starci-core-combo-box-input):is(:focus, :focus-visible, [data-focused="true"], [data-focus-visible="true"]) {
+        outline: none;
+        box-shadow: none;
+    }
+
+    .starci-core-combo-box-group:focus-within {
+        box-shadow: 0 0 0 2px var(--focus, Highlight);
+    }
+
+    @media (forced-colors: active) {
+        :is(.starci-core-search-field-group, .starci-core-number-field-group, .starci-core-combo-box-group, .starci-core-date-group):focus-within {
+            outline: 2px solid Highlight;
+        }
+    }
+
     .starci-core-select-trigger {
         align-items: center;
         padding-inline: 0.75rem 1.75rem;

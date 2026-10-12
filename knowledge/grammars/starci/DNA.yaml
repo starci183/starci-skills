@@ -12,7 +12,7 @@ appliesTo:
 family: starci
 provenance:
   package: "@starci/grammar"
-  version: "0.9.12"
+  version: "0.9.14"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   captured: "2026-09-23"
   publicEntry: "@starci/grammar/common"
@@ -111,7 +111,7 @@ provenance:
       sha256: "3934778aac696be9518741e64ee210bfbaa2e9b9818a57ab979b6ef332ce9161"
 identity:
   package: "@starci/grammar"
-  version: "0.9.12"
+  version: "0.9.14"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   familyId: "core"
   dnaId: "starci-core"

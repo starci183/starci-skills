@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.14 - 2026-10-12
+
+Patch (owner review of nivo.vn, FOCUS-1). No API change.
+
+- **One focus ring per field, drawn on the field frame.** A focused `SearchField` could show a doubled ring: the wrapper group and the inner input were both outlined. The inner text input of `SearchField`, `NumberField` and `ComboBox` now never draws an outline or ring shadow of its own, and the ring stays on the frame (the group, via `:focus-within`, so keyboard focus remains visible; a system outline in forced-colors). `ComboBox` moves its ring from the vendor input to its input group, the box Common's single-line anatomy already names. `Input`, `Select` and the date fields already draw exactly one ring (checked in every family) and are unchanged.
+
 ## 0.9.12 - 2026-10-12
 
 Patch (owner review of nivo.vn, STATE-6 case-7). No API change.
