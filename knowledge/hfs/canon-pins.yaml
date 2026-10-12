@@ -22,7 +22,7 @@ pins:
     source: packages/heroicons/package.json
     why: 'StarCi custom Heroicons-compatible cuts; eslint-canon-fe (icon.mjs) admits @starci/heroicons/24/outline and /16/solid as icon sources, so an app that uses them gets this exact version.'
   '@starci/grammar':
-    version: 0.9.7
+    version: 0.9.8
     group: starci
     install: registry
     side: fe
