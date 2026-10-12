@@ -1,22 +1,27 @@
 // edition.mjs - L01, the edition rule. An hfs.json edition is `full` or `lite` (absent means full); under lite the standard is a
-// filter plus a few additions over the same manifest, never a second engine. The slot layer already answers the paths lite
-// removed (slots lite excludes, or whose litePresence is forbidden, come back HFS_FORBIDDEN_PRESENT with their goesTo); this
-// rule reports what no path can state:
-//   - inside a package.json: a test script (`test`, `test:*`, `typecheck:tests`, a jest/vitest/playwright/mocha/cypress or
-//     `node --test` command) or a jest/vitest/playwright dependency - the same vocabulary FE_NO_TESTS scans on the fe side;
-//   - a test-tool configuration file no more specific slot already forbids;
-//   - a declaration of what lite does not have: a worker app, an event pattern (event-bus, queue, fenced-job, projection,
-//     saga) or its trigger kinds (saga, reactors, jobs, realtime). The forbidden names are DERIVED - a pattern, trigger or
-//     app kind is gone under lite exactly when every slot that carries it is litePresence: forbidden - so adding or
-//     restoring a kind is a manifest edit, not an edit here.
-// The edition is never tested here: a full app's view forbids none of these names and keeps its tests, so the rule answers [].
+// filter plus a few additions over the same manifest, never a second engine. Lite is the full architecture deployed without
+// self-hosted infrastructure (owner ruling 2026-10-12): the same slots, patterns and unit specs, Supabase adapters behind the same
+// ports, and no e2e or contract world. The slot layer already answers the paths lite removed (slots lite excludes, or whose
+// litePresence is forbidden, come back HFS_FORBIDDEN_PRESENT with their goesTo); this rule reports what no path can state:
+//   - inside a package.json: an e2e, contract, stack or browser script (`test:e2e`, `test:contract`, `test:stack`, `test:browser`,
+//     with a pre/post prefix too) or a dependency of the infrastructure lite does not run - a test-world container or proxy
+//     (testcontainers, toxiproxy) or a browser runner (playwright, cypress), and every library the lite infraOwners own nowhere
+//     while full owns them (BullMQ, Kafka, Redis: lite runs pgmq, Postgres locks and Supabase Realtime instead);
+//   - a declaration of what lite does not have: an app kind, pattern or trigger kind every slot of which is forbidden under
+//     lite. The forbidden names are DERIVED from the manifest, so adding or restoring a kind is a manifest edit, not an edit here
+//     (under the 2026-10-12 ruling no pattern, trigger or app kind is gone).
+// A full app answers []: the rule tests the edition once and a full view forbids none of these names.
 import { found, readJson } from './read.mjs';
-import { DEPENDENCY_SECTIONS, TEST_DEPENDENCY, TEST_RUNNER_COMMAND, TEST_SCRIPT_NAME, TEST_TOOL_FILE } from './fe-no-tests.mjs';
+import { DEPENDENCY_SECTIONS } from './fe-no-tests.mjs';
+import { editionRuleParams } from '../edition-slots.mjs';
 
 export const HFS_EDITION_FORBIDDEN_PRESENT = 'HFS_EDITION_FORBIDDEN_PRESENT';
 
 const PACKAGE_JSON = /(?:^|\/)package\.json$/;
-const TYPECHECK_TESTS = /^(?:pre|post)?typecheck:tests$/;
+/** The scripts of a world lite does not have: the e2e and contract layers, the self-hosted stack and the browser journey. */
+const LITE_FORBIDDEN_SCRIPT = /^(?:pre|post)?test:(?:e2e|contract|stack|browser)$/;
+/** The dependencies of a test infrastructure lite does not run: containers, fault proxies and browser runners. */
+const LITE_FORBIDDEN_TEST_INFRA = /^(?:testcontainers|@testcontainers\/.+|toxiproxy-node-client|playwright|playwright-core|@playwright\/.+|cypress)$/;
 
 /**
  * The names the edition cannot declare: for each of `pattern`, `trigger` and `appKind`, the value is gone when every slot of
@@ -47,32 +52,43 @@ function editionGone(resolver) {
 
 const isPlainObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 
-function testScriptFindings(rel, pkg) {
-  const scripts = isPlainObject(pkg.scripts) ? pkg.scripts : {};
-  return Object.entries(scripts)
-    .filter(([name, command]) => TEST_SCRIPT_NAME.test(name) || TYPECHECK_TESTS.test(name) || TEST_RUNNER_COMMAND.test(String(command)))
-    .map(([name]) => found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} has script ${JSON.stringify(name)}: the lite edition has no tests - a lite app does not typecheck or run a test world`, { name }));
+/**
+ * The specifiers a lite back end may import nowhere although full gives them an owner: the self-hosted infrastructure libraries
+ * the lite infraOwners override removes (bullmq, kafkajs, ioredis, ...). Read from the two rule-parameter views, never listed here.
+ */
+function liteRemovedLibraries(manifest) {
+  const be = manifest?.ruleParams?.be;
+  if (!be) return new Set();
+  const lite = editionRuleParams(be, 'lite').infraOwners ?? {};
+  const full = editionRuleParams(be, 'full').infraOwners ?? {};
+  return new Set(Object.keys(lite).filter((name) => lite[name].length === 0 && (full[name]?.length ?? 0) > 0));
 }
 
-function testDependencyFindings(rel, pkg) {
+function scriptFindings(rel, pkg) {
+  const scripts = isPlainObject(pkg.scripts) ? pkg.scripts : {};
+  return Object.keys(scripts)
+    .filter((name) => LITE_FORBIDDEN_SCRIPT.test(name))
+    .map((name) => found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} has script ${JSON.stringify(name)}: a lite app has unit specs and optional integration specs on the local Supabase stack, never an e2e, contract, stack or browser run`, { name }));
+}
+
+function dependencyFindings(rel, pkg, removed) {
   const findings = [];
   for (const section of DEPENDENCY_SECTIONS) {
     const deps = pkg[section];
     if (!isPlainObject(deps)) continue;
     for (const name of Object.keys(deps)) {
-      if (TEST_DEPENDENCY.test(name)) {
-        findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} ${section} has ${name}: the lite edition has no tests - the dependency belongs to the full edition`, { section, name }));
-      }
+      if (LITE_FORBIDDEN_TEST_INFRA.test(name)) findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} ${section} has ${name}: a lite app runs no test containers, fault proxy or browser journey - its integration specs run against \`supabase start\``, { section, name }));
+      else if (removed.has(name)) findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} ${section} has ${name}: lite runs no self-hosted infrastructure - the pattern's port is implemented on Supabase (pgmq, Postgres locks, Supabase Realtime)`, { section, name }));
     }
   }
   return findings;
 }
 
 /** The findings one package.json's scripts and dependencies produce under lite. */
-function packageFindings(repoRoot, rel) {
+function packageFindings(repoRoot, rel, removed) {
   const pkg = readJson(repoRoot, rel);
   if (!isPlainObject(pkg)) return [];
-  return [...testScriptFindings(rel, pkg), ...testDependencyFindings(rel, pkg)];
+  return [...scriptFindings(rel, pkg), ...dependencyFindings(rel, pkg, removed)];
 }
 
 const goneAppFindings = (repo, gone) => (repo.apps ?? [])
@@ -93,26 +109,22 @@ function declarationFindings(repo, gone) {
 }
 
 /**
- * L01 for one scope (the app root or one side), over `files` (scope-relative). Both questions are answered by the
- * resolver's view of the edition: the names gone from it, and whether any slot of it still has tests. The declaration
- * findings are judged from the be side (its apps, patterns and kinds): the root scope looks at sides.be, a standalone
- * be-side check at its own view. `withDeclaration: false` (a side scope of a whole-app check) skips them: the root scope
- * already reported them on hfs.json, and the side scope would only repeat them on a path that is not this side's.
+ * L01 for one scope (the app root or one side), over `files` (scope-relative). The declaration findings are judged from the be
+ * side (its apps, patterns and kinds): the root scope looks at sides.be, a standalone be-side check at its own view.
+ * `withDeclaration: false` (a side scope of a whole-app check) skips them: the root scope already reported them on hfs.json.
+ * The package findings read every package.json of the scope under lite.
  */
-export function editionFindings({ repoRoot, files, repo, resolver, withDeclaration = true }) {
+export function editionFindings({ repoRoot, files, repo, resolver, manifest, withDeclaration = true }) {
+  if ((repo.edition ?? 'full') !== 'lite') return [];
   const gone = editionGone(resolver);
-  const noTestWorld = resolver.slots().every((slot) => slot.tests === 'none');
   let beView = null;
   if (withDeclaration && repo.profile === 'app') beView = repo.sides?.be;
   else if (withDeclaration && repo.profile === 'be') beView = repo;
   const findings = beView ? declarationFindings(beView, gone) : [];
-  for (const file of noTestWorld ? files : []) {
-    if (file.includes('node_modules/')) continue;
-    if (PACKAGE_JSON.test(file)) {
-      findings.push(...packageFindings(repoRoot, file));
-    } else if (TEST_TOOL_FILE.test(file) && resolver.classifyPath(file).status !== 'forbidden') {
-      findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, file, `${file} is test tooling: the lite edition has no tests - the file belongs to the full edition`));
-    }
+  const removed = liteRemovedLibraries(manifest);
+  for (const file of files) {
+    if (file.includes('node_modules/') || !PACKAGE_JSON.test(file)) continue;
+    findings.push(...packageFindings(repoRoot, file, removed));
   }
   return findings;
 }

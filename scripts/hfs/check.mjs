@@ -23,8 +23,8 @@
 //   BE_TEST_TOPOLOGY              (R47, rules/test-topology.mjs) a `.test` file, a testing/ folder, a second jest configuration
 //   FE_NO_TESTS                   (R97, rules/fe-no-tests.mjs) a front end holds a spec, e2e or test-tool file, a test script or a test dependency; no exception
 //   HFS_LITE_SECRET_CUSTODY       (R220, rules/supabase-secrets.mjs) under edition lite: secret material or a forbidden custody path; the R06 scan itself runs for every edition
-//   HFS_EDITION_FORBIDDEN_PRESENT (R212, rules/edition.mjs) under edition lite: a test script, dependency or tool config in a
-//                                 package.json or the tree, or a declared worker app, event pattern or trigger kind lite does not have
+//   HFS_EDITION_FORBIDDEN_PRESENT (R212, rules/edition.mjs) under edition lite: an e2e, contract, stack or browser script, or a
+//                                 dependency of self-hosted infrastructure (test containers, fault proxy, BullMQ, Kafka, Redis)
 //   DB_MIGRATION_SHAPE ... DB_TYPES_DRIFT (R213-R216, rules/database.mjs, async: passed in as extraFindings) the Supabase migrations, policies, definer functions, buckets, config.toml and generated types
 //   BE_SPEC_PLACEMENT             (R102, rules/spec-placement.mjs) a spec or test file outside the four test layers, scripts/ and tools/ included
 //   HFS_REPO_LOCAL_CHECK          (R103, rules/repo-local-checks.mjs) a local eslint rule or plugin, a `check-*` script, a relative import in eslint.config
@@ -242,11 +242,11 @@ function minimumInstanceFindings(resolver, required, instances) {
   return findings;
 }
 
-function contentRuleFindings({ repoRoot, repo, resolver, files, all, scoped, pins, inScope, isRoot, editionDeclaration }) {
+function contentRuleFindings({ repoRoot, repo, resolver, files, all, scoped, pins, inScope, isRoot, editionDeclaration, manifest }) {
   const findings = [
     ...pinFindings({ repoRoot, files, profile: repo.profile, pins, only: scoped }),
     ...supabaseSecretFindings({ repoRoot, files: files.filter((file) => inScope(file)), resolver, repo }),
-    ...editionFindings({ repoRoot, files: files.filter((file) => inScope(file)), repo, resolver, withDeclaration: editionDeclaration }),
+    ...editionFindings({ repoRoot, files: files.filter((file) => inScope(file)), repo, resolver, manifest, withDeclaration: editionDeclaration }),
     ...repoLocalCheckFindings({ repoRoot, files }),
     ...lintSuppressionFindings({ repoRoot, files }),
   ];
@@ -295,7 +295,7 @@ function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, sco
   if (repo.kind === RUNTIME_KIND) return findings;
 
   const pins = readPins(root);
-  findings.push(...contentRuleFindings({ repoRoot, repo, resolver, files, all, scoped, pins, inScope, isRoot, editionDeclaration }));
+  findings.push(...contentRuleFindings({ repoRoot, repo, resolver, files, all, scoped, pins, inScope, isRoot, editionDeclaration, manifest }));
   if (!isRoot) findings.push(...sizeSoftFindings({ repoRoot, resolver, files, inScope }));
   return findings;
 }

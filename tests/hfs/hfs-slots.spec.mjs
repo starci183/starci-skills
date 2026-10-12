@@ -29,9 +29,9 @@ const APP = app();
 const refusal = (fn, code) => assert.throws(fn, (error) => error instanceof HfsSlotsError && error.code === code, `expected ${code}`);
 const sideOf = (declaration, side, options = {}) => openHfs({ declaration, side, ...options });
 
-test('the shipped manifest is 2.1.0 and validates against its JSON schema and the loader', () => {
+test('the shipped manifest is 2.2.0 and validates against its JSON schema and the loader', () => {
   const doc = parseYaml(manifestText);
-  assert.equal(doc.version, '2.1.0');
+  assert.equal(doc.version, '2.2.0');
   assert.equal(validateManifestSchema(doc), true, JSON.stringify(validateManifestSchema.errors));
   const manifest = loadSlotManifest();
   assert.equal(manifest.major, 2);
@@ -159,7 +159,7 @@ test('a manifest major mismatch is refused, in either direction, with no compati
     assert.equal(error.code, 'HFS_MANIFEST_MAJOR_MISMATCH');
     assert.deepEqual([error.details.pinned, error.details.manifestMajor], [1, 2]);
   }
-  const next = loadSlotManifest({ text: manifestText.replace('schema: starci/hfs-slots@2', 'schema: starci/hfs-slots@3').replace('version: 2.1.0', 'version: 3.0.0') });
+  const next = loadSlotManifest({ text: manifestText.replace('schema: starci/hfs-slots@2', 'schema: starci/hfs-slots@3').replace('version: 2.2.0', 'version: 3.0.0') });
   assert.equal(next.major, 3);
   refusal(() => resolveRepoDeclaration(next, APP), 'HFS_MANIFEST_MAJOR_MISMATCH');           // an app pinned to the old major
   assert.equal(resolveRepoDeclaration(next, { ...APP, hfs: 3 }).hfs, 3);
@@ -460,7 +460,7 @@ test('be.cli is the cli feature root: a feature-tier owner at src/features/cli/,
 });
 
 test('growth is a minor: adding a slot changes no existing answer; every slot pattern owns its own sample', () => {
-  const grown = loadSlotManifest({ text: manifestText.replace('version: 2.1.0', 'version: 2.2.0').replace('\n# Checks that read this manifest', `
+  const grown = loadSlotManifest({ text: manifestText.replace('version: 2.2.0', 'version: 2.3.0').replace('\n# Checks that read this manifest', `
   - id: be.transport.grpc
     profiles: [be]
     path: "src/features/api/<feature>/transport/grpc/"
@@ -469,10 +469,10 @@ test('growth is a minor: adding a slot changes no existing answer; every slot pa
     tier: feature
     tests: unit-beside
     coverage: none
-    since: 2.2.0
+    since: 2.3.0
 
 # Checks that read this manifest`) });
-  assert.equal(grown.minor, 2);
+  assert.equal(grown.minor, 3);
   const before = sideOf(APP, 'be');
   const after = sideOf(app({ be: { ...BE_SIDE, optionalSlots: [...BE_SIDE.optionalSlots, 'be.transport.grpc'] } }), 'be', { manifest: grown });
   for (const p of ['src/features/api/orders/index.ts', 'apps/core/src/main.ts', 'src/modules/domain/a/errors/x.error.ts', 'tsconfig.json', '.env'])

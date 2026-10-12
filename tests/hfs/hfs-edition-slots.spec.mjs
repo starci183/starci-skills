@@ -44,7 +44,7 @@ test('litePresenceOf accepts a bare value and a per-side map with presence fallb
   assert.equal(litePresenceOf(slot, 'app'), 'required');
 });
 
-test('effectiveSlot applies every legal lite overlay field and forces tests to none', () => {
+test('effectiveSlot applies every legal lite overlay field and keeps the slot\'s own tests (owner ruling 2026-10-12: lite keeps the unit specs)', () => {
   const slot = {
     id: 'be.probe',
     path: 'before/',
@@ -64,6 +64,7 @@ test('effectiveSlot applies every legal lite overlay field and forces tests to n
       forbids: ['before.ts'],
       minInstances: 2,
       requiredInstances: { feature: ['after'] },
+      why: 'the lite adapter',
     },
   };
 
@@ -73,12 +74,13 @@ test('effectiveSlot applies every legal lite overlay field and forces tests to n
     path: 'after/',
     presence: 'optional',
     tracked: 'tracked',
-    tests: 'none',
+    tests: 'unit-beside',
     requires: ['after.ts'],
     allows: ['after.ts'],
     forbids: ['before.ts'],
     minInstances: 2,
     requiredInstances: { feature: ['after'] },
+    why: 'the lite adapter',
   });
 });
 
@@ -94,7 +96,7 @@ test('effectiveSlot makes a lite-forbidden slot external and keeps its destinati
   }, 'be', 'lite');
   assert.deepEqual(
     { presence: effective.presence, tracked: effective.tracked, tests: effective.tests, goesTo: effective.goesTo },
-    { presence: 'forbidden', tracked: 'external', tests: 'none', goesTo: 'the full edition' },
+    { presence: 'forbidden', tracked: 'external', tests: 'unit-beside', goesTo: 'the full edition' },
   );
 });
 
@@ -115,6 +117,19 @@ test('editionRuleParams merges the lite override, removes its source key and dee
     schemaAuthority: 'typeorm',
     roles: ['service'],
   });
+});
+
+test('editionRuleParams merges a lite map one level deep over its base map and replaces every other value', () => {
+  const params = {
+    infraOwners: { bullmq: ['platform/queue'], fetch: ['platform/http'] },
+    unitRoles: [{ role: 'service', spec: 'service.spec' }],
+    lite: { infraOwners: { bullmq: [] } },
+  };
+  const lite = editionRuleParams(params, 'lite');
+  assert.deepEqual(lite.infraOwners, { bullmq: [], fetch: ['platform/http'] }, 'lite restates only the specifier whose owner changes');
+  assert.deepEqual(lite.unitRoles, params.unitRoles, 'a key lite does not name stays the base value');
+  assert.deepEqual(editionRuleParams(params, 'full').infraOwners, params.infraOwners);
+  assert.deepEqual(editionRuleParams({ roles: { a: 1 }, lite: { roles: ['x'] } }, 'lite').roles, ['x'], 'a list replaces a map');
 });
 
 test('judgedInEdition keeps uncatalogued and unqualified rules and filters an explicit edition list', () => {
