@@ -43,6 +43,10 @@ rules:
         when: A group of peer choices or filters (category chips, audience chips, segmented options)
         assert: |-
           Owner ruling 2026-10-11: each choice reads as a secondary control with a visible 1px border, the selected one on accent-soft with an accent border, through the grammar's selectable `TagGroup` (0.9.6) or `SegmentedControl`; never bare text pills, never a primary among them, and never a local chip recipe
+      - id: case-7
+        when: Two or more secondary commands act on the same thing (add links, pick from Drive), or a footer pairs cancel with the primary
+        assert: |-
+          Owner ruling 2026-10-12: they sit in one grammar `ButtonGroup` rather than as loose buttons; the primary's label never shows an empty count ("Add 0 documents") and the primary is not left disabled-and-faded as an empty state - the empty case names the command plainly and explains the missing input when pressed
     notThisRule: |-
       counting how much dominant emphasis a whole page spends is ACCENT-1.
   - id: CTA-2

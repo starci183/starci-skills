@@ -65,6 +65,10 @@ rules:
         when: A rail lists choices, suggestions or explanatory lines (agent views, items worth adding, how it works)
         assert: |-
           Owner ruling 2026-10-11: each list is a `SurfaceListCard` - label outside, its one-line intro as `fact` - whose rows are `ListRow` (a choice or suggestion with its command in `actions`, the current choice marked by a `Badge`) or `StaticStateRow` (a static line); no `SurfaceCard` wrapping a `ListBox` or a `List` with app-drawn `divide-y`/`py-*` rows, and the rail's cards stack at GAP-4
+      - id: case-8
+        when: The user enters several values of the same kind (links, emails, phone numbers, tags with structure)
+        assert: |-
+          Owner ruling 2026-10-12: they are a list of single-value fields - one `Input` per value with its own remove action, an "add another" command below, and a paste of several values split into one row each - never one free `Textarea` "one per line"; each row validates and reports its own error
     notThisRule: |-
       which of several regions carries the strongest anchor is HIERARCHY-2, and which face a bounded object
       presents once it is composed is SURFACE-2.

@@ -33,6 +33,9 @@ const OUTSIDE_THE_GENERATED_CATALOGUE=Object.freeze({
   // The radius ramp (RADIUS-2..9, reserved addresses between) was never carried into the generated
   // catalogue; ChatBubble (0.9.0) claims the surface corner it draws.
   'RADIUS-6':'knowledge/ui/presentation/radius.yaml',
+  // STATE-8 (owner ruling 2026-10-11: loading and failure keep the page's anatomy) postdates the last generated catalogue;
+  // the skeleton modes of 0.9.5/0.9.7 claim it.
+  'STATE-8':'knowledge/ui/composition/state.yaml',
 });
 
 const core=(...parts)=>`packages/grammar/src/core/${parts.join('/')}`;

@@ -37,6 +37,10 @@ rules:
         when: The required compact behaviour has no published composition
         assert: |-
           A `GRAMMAR_REQUIRED` gap names the missing behaviour, and no parallel breakpoint is authored in its place
+      - id: case-6
+        when: A form sits in a narrow owner (a drawer, a rail, a dialog) on a wide screen
+        assert: |-
+          Owner ruling 2026-10-12: its fields stay in one column. A viewport breakpoint (`md:grid-cols-2`) must not split fields inside a narrow container - labels wrap to different heights and the fields misalign; multiple field columns appear only through a container query on the form's own owner
   - id: RESPONSIVE-2
     title: The query owner is named, not the device
     governs: Governs which space is actually being observed.
