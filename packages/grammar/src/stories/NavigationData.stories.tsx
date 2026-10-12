@@ -83,7 +83,7 @@ export const Breadcrumbs: Story = {
   render: () => (
     <Matrix>
       <State label="Current crumb still loading (isSkeleton)">
-        <G.Breadcrumbs label="Breadcrumb" items={[{ id: 'home', label: 'Home', href: '#home' }, { id: 'lessons', label: 'Lessons', href: '#lessons' }, { id: 'lesson', label: '', isSkeleton: true }]} />
+        <G.Breadcrumbs label="Breadcrumb (loading page)" items={[{ id: 'home', label: 'Home', href: '#home' }, { id: 'lessons', label: 'Lessons', href: '#lessons' }, { id: 'lesson', label: '', isSkeleton: true }]} />
       </State>
       <State label="Trail ending at the current page">
         <G.Breadcrumbs
@@ -369,7 +369,7 @@ export const Stepper: Story = {
   render: () => (
     <Matrix maxWidth={720}>
       <State label="Loading (isSkeleton)" direction="column">
-        <G.Stepper label="Sign-up progress" steps={steps} currentStepId="profile" isLoading />
+        <G.Stepper label="Sign-up progress (loading)" steps={steps} currentStepId="profile" isLoading />
       </State>
       <State label="Horizontal, current step" direction="column">
         <G.Stepper label="Sign-up progress" steps={steps} currentStepId="profile" onStepSelect={noop} />
@@ -454,13 +454,13 @@ const tabItems: ReadonlyArray<G.TabItem> = [
   { id: 'members', label: 'Members' },
 ];
 
-const TabsDemo = () => {
+const TabsDemo = ({ variant = 'primary' }: { readonly variant?: 'primary' | 'secondary' }) => {
   const [selected, setSelected] = useState('overview');
   return (
     <div>
-      <G.Tabs label="Course sections" items={tabItems} selectedKey={selected} onSelect={setSelected} panelId={(key) => `story-tab-panel-${key}`} labelVisibility="always" />
+      <G.Tabs label={`Course sections (${variant})`} variant={variant} items={tabItems} selectedKey={selected} onSelect={setSelected} panelId={(key) => `story-tab-panel-${variant}-${key}`} labelVisibility="always" />
       {tabItems.map((item) => (
-        <div key={item.id} role="tabpanel" id={`story-tab-panel-${item.id}`} aria-label={item.label} hidden={item.id !== selected} style={{ paddingTop: '1rem' }}>
+        <div key={item.id} role="tabpanel" id={`story-tab-panel-${variant}-${item.id}`} aria-label={item.label} hidden={item.id !== selected} style={{ paddingTop: '1rem' }}>
           <G.Text>{item.label} panel</G.Text>
         </div>
       ))}
@@ -471,7 +471,8 @@ const TabsDemo = () => {
 export const Tabs: Story = {
   render: () => (
     <Matrix maxWidth={560}>
-      <State label="Selected tab controls its panel" direction="column"><TabsDemo /></State>
+      <State label="Primary (default): the page's main area switcher" direction="column"><TabsDemo /></State>
+      <State label="Secondary: a pill strip for a drawer, card, dialog or rail" direction="column"><TabsDemo variant="secondary" /></State>
     </Matrix>
   ),
 };

@@ -2,12 +2,12 @@ name: grammar-package
 
 # Gates for the published @starci/grammar package (packages/grammar), which has its own install and
 # is not part of the root `npm test`. One job, in order:
-#   typecheck         - the shipped sources, plus stories and test helpers (tsconfig.stories.json)
-#   test              - build, node:test suites (incl. package-boundary), vitest node specs
-#   pack:check        - dist and `npm pack --dry-run` hold only the intended files: no stories/specs
-#   test:a11y         - every story, family x theme, axe via addon-a11y; fails on any violation not
-#                       waived in packages/grammar/.storybook/a11y-allowlist.json
+#   typecheck         - the shipped sources plus stories (tsconfig.stories.json)
+#   build             - the dist the package ships
+#   pack:check        - `npm pack --dry-run` of that dist
 #   build-storybook   - the static Storybook still builds
+# The grammar carries no spec suites (owner 2026-10-12): its proof is typecheck + build; the UI contracts live in
+# the runtime (tests/work-ui) and the grammar DNA snapshot.
 # It runs ONCE per release, on the push of a v* tag (and when a person dispatches it): never on a branch push or a pull request (rule CI_TRIGGERS_RELEASE_ONLY).
 
 on:
@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   grammar:
-    name: typecheck + test + pack + a11y + storybook
+    name: typecheck + build + pack + storybook
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -42,20 +42,11 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      - name: Install Chromium for the Storybook browser runs
-        run: node_modules/.bin/playwright install --with-deps chromium
-
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test suite
-        run: npm test
-
-      - name: Pack check (no stories, specs or tests in the tarball)
+      - name: Pack check (no stories in the tarball)
         run: npm run pack:check
-
-      - name: Storybook a11y gate
-        run: npm run test:a11y
 
       - name: Build Storybook
         run: npm run build-storybook

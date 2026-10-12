@@ -1,5 +1,16 @@
 # Changelog
 
+## 4.2.11 - 2026-10-12
+
+- Added: HFS manifest 2.2.0 owns app compiler declarations under types/ambient; only .d.ts files belong there, without an unused runtime entry.
+- Changed: carry the combined runtime mirror and canon pins for Grammar 0.9.11 and Stylelint canon 2.0.9, retaining the no-frontend-tests policy.
+- Fixed: the derived Grammar contract selects all three required peers, react, @heroui/react and @xyflow/react. Full and lite FE scaffolds and the shared UI workspace declare @xyflow/react at the canonical 12.11.6 pin so every Grammar consumer satisfies the peer contract.
+- Fixed: full and lite Next app scaffolds declare CSS imports in the app-owned types module so TypeScript 6 checks pass while missing non-CSS side-effect imports remain errors; the same declarations are present in the four Next app examples.
+
+## 4.2.10 - 2026-10-12
+
+- Changed: bundled canon pins carry @starci/grammar 0.9.10 (the grammar ships without spec suites).
+
 ## 4.2.9 - 2026-10-12
 
 - Changed: refresh the bundled canon pins for CLI 1.2.9 and the BE/FE lint canons 3.2.10/8.2.10 after correcting the CLI runtime install pin; app command implementations are unchanged.

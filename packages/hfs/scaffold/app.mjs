@@ -130,17 +130,17 @@ const LITE_STARTER_DEPENDENCIES = Object.freeze({
 
 /**
  * The runtime dependencies of every fe app workspace of the starter: what its skeleton imports (the two workspace packages at "*",
- * next with next-intl, react, the grammar and the HeroUI styles of its globals.css), @heroui/react (the grammar's peer, which every app
- * declares: the grammar contract) and react-dom (next's peer). `@<project>/<pkg>` names are filled with the project.
+ * next with next-intl, react, the grammar and the HeroUI styles of its globals.css), @heroui/react and @xyflow/react
+ * (the grammar's required peers, which every consumer declares: the grammar contract) and react-dom (next's peer). `@<project>/<pkg>` names are filled with the project.
  */
 const FE_APP_DEPENDENCIES = Object.freeze({
   '@<project>/i18n': '*', '@<project>/ui': '*',
-  '@heroui/react': null, '@heroui/styles': null, '@starci/grammar': null, next: null, 'next-intl': null, react: null, 'react-dom': null,
+  '@heroui/react': null, '@heroui/styles': null, '@starci/grammar': null, '@xyflow/react': null, next: null, 'next-intl': null, react: null, 'react-dom': null,
 });
 
 /** The sole lite FE workspace owns its Supabase clients directly; no shared FE package is emitted. */
 const LITE_FE_APP_DEPENDENCIES = Object.freeze({
-  '@heroui/react': null, '@heroui/styles': null, '@starci/grammar': null, '@supabase/ssr': null,
+  '@heroui/react': null, '@heroui/styles': null, '@starci/grammar': null, '@xyflow/react': null, '@supabase/ssr': null,
   '@supabase/supabase-js': null, next: null, 'next-intl': null, react: null, 'react-dom': null, 'server-only': null,
 });
 
@@ -151,7 +151,7 @@ const LITE_FE_APP_DEPENDENCIES = Object.freeze({
  * ./routing, client-safe: the default locale a client boundary reads).
  */
 const FE_PACKAGES = Object.freeze({
-  ui: { exports: ['.'], dependencies: { '@heroui/react': null, '@starci/grammar': null, 'next-intl': null, react: null } },
+  ui: { exports: ['.'], dependencies: { '@heroui/react': null, '@starci/grammar': null, '@xyflow/react': null, 'next-intl': null, react: null } },
   i18n: { exports: ['.', './proxy', './routing'], dependencies: { next: null, 'next-intl': null, 'server-only': null } },
 });
 
@@ -461,6 +461,10 @@ export function scaffoldApp({ name, into, presets, edition = 'full', manifest = 
     { path: 'package.json', content: packageJsonText(pkg) },
     { path: 'be/nest-cli.json', content: jsonText(nestCli(app)) },
     ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/tsconfig.json`, content: jsonText(nextAppTsconfig()) })),
+    ...app.sides.fe.apps.map(entry => ({
+      path: `fe/apps/${entry.name}/src/modules/types/ambient/styles.d.ts`,
+      content: '/** Declares stylesheets loaded by the Next bundler; non-CSS side-effect imports remain checked. */\ndeclare module "*.css" {}\n',
+    })),
     ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/package.json`, content: packageJsonText(feAppManifest(name, entry.name, pins, app.edition)) })),
     ...imageFiles(app),
     ...(app.edition === 'lite' ? [] : Object.keys(FE_PACKAGES).flatMap(pkg => [

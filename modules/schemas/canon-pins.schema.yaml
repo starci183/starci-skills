@@ -40,6 +40,7 @@ properties:
       - react-dom
       - '@nestjs/core'
       - '@heroui/react'
+      - '@xyflow/react'
 $defs:
   exactVersion:
     type: string

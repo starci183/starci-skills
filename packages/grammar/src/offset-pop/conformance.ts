@@ -11,15 +11,14 @@ import { COMMON_UI_RULE_IDS, defineGrammarRuleConformance } from "../common/inde
  *
  * Inherited on purpose, although the family is close to them:
  * - The spacing and size rules not listed below: the family's only geometry is the short allow-list
- *   `conformance.spec.ts` locks, each entry owned by a claim here.
+ *   the family promises, each entry owned by a claim here.
  * - ACCENT-3 / COLOR-3: one pink fills the decision action, marks the selected or current state and
  *   draws the focus ring, so distinctness rests on Common's carriers (fill on an action, fill inside a
  *   control, outline, soft pairing, underline), not on hue.
  * - BOUNDARY-3: rows claim it, and the seam stays Common's one line between consecutive rows; the family
  *   only repaints that same edge in its 2px outline material (BOUNDARY-5) and adds no edge of its own.
  *
- * Each claim below is proved in `conformance.spec.ts`, which cites the matching assertion in
- * `styles.spec.ts`, the component `components-*.spec.ts` files or the render specs.
+ * Each claim below names the stylesheet rule or renderer that carries it.
  */
 /** Renderer ownership guidance, retained as a source contract rather than a published UI rule claim. */
 export const OFFSET_POP_SOURCE_OWNERSHIP_EVIDENCE = ["Every family edge lands on a hook a Common owner emits (`data-component`, `data-grammar-*`, the HeroUI slot, or the vendor's own state attribute); the family adds no wrapper shell."] as const

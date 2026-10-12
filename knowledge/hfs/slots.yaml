@@ -7,7 +7,7 @@
 # catalog READ this file through scripts/hfs/slots.mjs; none of them hardcodes a path.
 # Shape: modules/schemas/hfs-slots.schema.yaml. The repository side is hfs.json: modules/schemas/hfs-repo.schema.yaml.
 schema: starci/hfs-slots@2
-version: 2.1.0
+version: 2.2.0
 
 versioning:
   # MAJOR.MINOR.PATCH of this manifest. A repository pins only the MAJOR in hfs.json ("hfs": 2).
@@ -1844,6 +1844,18 @@ slots:
     tier: foundation
     tests: none
     why: shared types with no runtime behaviour; a component may import them
+  - id: fe.modules.types.ambient
+    parent: fe.modules.types
+    profiles: [fe]
+    path: "apps/<app>/src/modules/types/ambient/"
+    presence: optional
+    tracked: tracked
+    tier: foundation
+    owner: true
+    allows: ["*.d.ts"]
+    tests: none
+    since: 2.2.0
+    why: global ambient declarations loaded by the app compiler; this owner exposes no runtime API
   - id: fe.modules.db
     profiles: [fe]
     # The db transport of an app on Supabase (the ONLY place that imports @supabase/ssr or @supabase/supabase-js, L10): the

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.9 - 2026-10-12
+
+- Changed: refresh the combined Grammar CSS vocabulary for the declared button properties --button-bg, --button-bg-hover, --button-bg-pressed and --button-fg; Stylelint rule implementations, vendor vocabulary, breakpoints, status tones and theme values are unchanged.
+
 ## 2.0.8 - 2026-10-12
 
 - Changed: regenerate the CSS vocabulary from the combined @starci/grammar 0.9.9 sheets, including the declared FlowGraph and field tokens; Stylelint rule implementations are unchanged.

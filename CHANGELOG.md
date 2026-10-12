@@ -7,16 +7,23 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 ## [1.0.0-alpha.12] — 2026-10-12
 
 ### Added
-- `@starci/grammar` 0.9.9 carries the single-line field family (radius, minimum height, inline padding and trigger placement), one-line Select and ComboBox values, Input event and hidden-label props, and Disclosure summary introduced in 0.9.8.
-- Knowledge: owner rulings of 2026-10-12 from the Add documents drawer review — Tabs switch screens and SegmentedControl sets a value (STATE-6), forms in a narrow owner stay one column (RESPONSIVE-1), related commands use ButtonGroup (CTA-1), rarely changed options use Disclosure (LAYOUT-1), and several values of one kind use a list of Inputs (COLLECTION-1); CONTEXT.md carries the component-selection table and STATE-8 owns loading views.
+- HFS manifest 2.2.0 declares the app-owned types/ambient folder for compiler declarations; runtime source files remain refused there.
+- Grammar 0.9.11 combines the single-line field family, Input event and hidden-label props, Disclosure summary, secondary Tabs for a sub-region, danger-soft IconButton row actions and Breadcrumbs/ListBox loading corrections.
+- Knowledge: owner rulings of 2026-10-12 choose components by their job: Tabs switch screens, SegmentedControl sets a value, forms in a narrow owner stay one column, peer commands use ButtonGroup, decisions keep a separate way out, rarely changed options use Disclosure, several values use a list of Inputs, and stored destructive actions retain their confirmation boundary. STATE-8 owns loading and failure anatomy.
 
 ### Fixed
-- Generate the UI rule catalogue from authored YAML declarations, including STATE-8 and sparse and nonnumeric addresses. Renderer and family stamps resolve to active canonical rules without exceptions; retired claim identifiers are removed while geometry, interaction and source-ownership assertions remain.
+- Generate the UI rule catalogue from authored YAML declarations, including STATE-8 and sparse and nonnumeric addresses. Renderer and family stamps resolve to active canonical rules; retired identifiers are removed without exceptions.
 - Declare the Turbo task cache as one optional, ignored runtime slot; generated cache stays available without being treated as authored source.
-- Regenerate the CLI runtime install pin for 1.0.0-alpha.12; the prior CLI 1.2.8 archive still selected 1.0.0-alpha.10.1.
+- Regenerate the CLI runtime install pin for 1.0.0-alpha.12; the earlier CLI 1.2.8 archive selected 1.0.0-alpha.10.1.
+- HFS selects all three required Grammar peers, react, @heroui/react and @xyflow/react, for installed-package and consumer-declaration checks. Full and lite FE scaffolds and the shared UI workspace declare @xyflow/react at the canonical 12.11.6 pin.
+- Full and lite Next app scaffolds and the four Next app examples declare CSS imports in the app-owned types module, preserving checks for missing non-CSS side-effect imports under TypeScript 6.
+- Secondary Tabs apply their canonical radius directly, and the Grammar stories typecheck includes every story instead of inheriting build exclusions.
 
 ### Changed
-- Grammar 0.9.9 and Stylelint canon 2.0.8 carry the corrected rule catalogue and CSS vocabulary. HFS 4.2.9 and the BE/FE lint canons 3.2.10/8.2.10 carry the refreshed runtime and canon pins; CLI 1.2.9 pins HFS 4.2.9 and selects runtime 1.0.0-alpha.12.
+- Grammar 0.9.11 and Stylelint canon 2.0.9 carry the combined components, canonical rule catalogue and four declared button CSS properties. HFS 4.2.11 and BE/FE lint canons 3.2.12/8.2.12 carry the combined runtime and canon pins; CLI 1.2.11 pins HFS 4.2.11 and selects runtime 1.0.0-alpha.12.
+
+### Removed
+- Grammar carries no spec suites, test helpers, vitest configs or Storybook a11y gate. Its test and prepack scripts run typecheck plus build; UI contracts remain in runtime work-ui checks and Grammar DNA snapshots.
 
 ## [1.0.0-alpha.10.1] — 2026-10-12
 

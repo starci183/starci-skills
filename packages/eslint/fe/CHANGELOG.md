@@ -1,5 +1,13 @@
 # Changelog
 
+## 8.2.12 - 2026-10-12
+
+- Changed: carry the combined runtime mirror and canon pins for Grammar 0.9.11 and Stylelint canon 2.0.9; ESLint rule implementations are unchanged.
+
+## 8.2.11 - 2026-10-12
+
+- Changed: bundled canon pins carry @starci/grammar 0.9.10 (the grammar ships without spec suites).
+
 ## 8.2.10 - 2026-10-12
 
 - Changed: refresh the bundled canon pins for CLI 1.2.9, HFS 4.2.9 and the BE lint canon 3.2.10 after correcting the CLI runtime install pin; ESLint rule implementations are unchanged.

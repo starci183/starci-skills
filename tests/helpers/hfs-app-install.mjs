@@ -65,7 +65,7 @@ export const LINT_DEPENDENCIES = Object.freeze([
   'eslint', '@typescript-eslint/eslint-plugin', '@typescript-eslint/parser', 'eslint-plugin-react-hooks', 'globals', 'typescript',
   'prettier', 'stylelint', 'postcss-value-parser',
   '@nestjs/common', '@nestjs/core', '@nestjs/cqrs', '@nestjs/testing', '@nestjs/typeorm', 'typeorm', 'nest-commander', '@types/express', '@types/jest', '@types/node',
-  'next', 'next-intl', 'react', 'react-dom', '@types/react', '@starci/grammar', '@heroui/react', '@heroui/styles',
+  'next', 'next-intl', 'react', 'react-dom', '@types/react', '@starci/grammar', '@heroui/react', '@heroui/styles', '@xyflow/react',
   'tailwindcss', '@tailwindcss/postcss',
 ]);
 

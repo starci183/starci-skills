@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.11 - 2026-10-12
+
+- Changed: pin HFS 4.2.11 for the combined Grammar 0.9.11 and Stylelint canon 2.0.9 closure; carry runtime 1.0.0-alpha.12 and the merged runtime fixes.
+
+## 1.2.10 - 2026-10-12
+
+- Changed: pin HFS 4.2.10 (canon pins for grammar 0.9.10); carries runtime 1.0.0-alpha.12; command behavior is unchanged.
+
 ## 1.2.9 - 2026-10-12
 
 - Fixed: regenerate the runtime install pin for 1.0.0-alpha.12; 1.2.8 still shipped the 1.0.0-alpha.10.1 pin.

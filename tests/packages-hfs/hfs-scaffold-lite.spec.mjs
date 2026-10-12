@@ -129,6 +129,7 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'fe/apps/web/src/modules/i18n/index.ts', 'fe/apps/web/src/modules/i18n/messages/vi.json',
   'fe/apps/web/src/modules/i18n/request.ts', 'fe/apps/web/src/modules/i18n/routing.ts',
   'fe/apps/web/src/modules/routes/index.ts', 'fe/apps/web/src/modules/routes/safe-next-path.ts',
+  'fe/apps/web/src/modules/types/ambient/styles.d.ts',
   'fe/apps/web/src/proxy.ts', 'fe/apps/web/tsconfig.json', 'fe/eslint.config.mjs',
   'fe/stylelint.config.mjs', 'fe/tsconfig.json', 'hfs.json', 'package-lock.json', 'package.json',
   'scripts/codegen.mjs', 'sonar-project.properties', 'supabase/config.toml',
@@ -184,7 +185,7 @@ test('lite scaffold emits the design 8.5 tree and is structurally clean', async 
   assert.deepEqual(scaffoldBinGaps(root), [], 'every bin the scaffolded scripts call is installed by a dependency');
   const web = JSON.parse(fs.readFileSync(path.join(root, 'fe', 'apps', 'web', 'package.json'), 'utf8'));
   assert.deepEqual(Object.keys(web.dependencies).sort(), [
-    '@heroui/react', '@heroui/styles', '@starci/grammar', '@supabase/ssr', '@supabase/supabase-js',
+    '@heroui/react', '@heroui/styles', '@starci/grammar', '@xyflow/react', '@supabase/ssr', '@supabase/supabase-js',
     'next', 'next-intl', 'react', 'react-dom', 'server-only',
   ].sort());
   assert.equal(fs.readFileSync(path.join(root, ...'supabase/types/database.types.ts'.split('/')), 'utf8'), GENERATED_TYPES);

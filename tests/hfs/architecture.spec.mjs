@@ -798,17 +798,17 @@ test('backend source shape exposes dynamic naming as unavailable coverage', t =>
 });
 
 test('derived Grammar contract binds public code, style entry, peers, and product imports', t => {
-  // The contract is derived: package @starci/grammar (entry /common, style /common.css, peers react and @heroui/react),
+  // The contract is derived: package @starci/grammar (entry /common, style /common.css, peers react, @heroui/react and @xyflow/react),
   // styled from apps/web/src/app/globals.css and consumed by apps/web/package.json.
   const grammarManifest = (extra = {}) => JSON.stringify({ name: '@starci/grammar',
     exports: { './common': './src/common/index.tsx', './common.css': './src/common.css' },
-    peerDependencies: { react: '>=18', '@heroui/react': '>=2', ...extra } });
+    peerDependencies: { react: '>=18', '@heroui/react': '>=2', '@xyflow/react': '^12.11.6', ...extra } });
   const shadow = 'apps/web/src/features/pages/ProductPage/shadow.ts';
   const product = 'apps/web/src/features/pages/ProductPage/index.tsx';
   const globals = 'apps/web/src/app/globals.css';
   const root = fixture(t, 'frontend', {
     'package.json': JSON.stringify({ name: 'fixture-fe', private: true, workspaces: ['apps/*', 'packages/*'] }),
-    'apps/web/package.json': JSON.stringify({ name: '@fixture/web', private: true, dependencies: { '@starci/grammar': '1.0.0', react: '19.0.0', '@heroui/react': '2.0.0' } }),
+    'apps/web/package.json': JSON.stringify({ name: '@fixture/web', private: true, dependencies: { '@starci/grammar': '1.0.0', react: '19.0.0', '@heroui/react': '2.0.0', '@xyflow/react': '12.11.6' } }),
     'apps/web/src/app/page.tsx': 'import { ProductPage } from "@/features/pages/ProductPage"; export default function Route(){ return <ProductPage/> }\n',
     [globals]: '@import "@starci/grammar/common.css";\n',
     [product]: 'import { Button } from "@starci/grammar/common"; export const ProductPage=()=> <Button/>\n',
@@ -828,6 +828,13 @@ test('derived Grammar contract binds public code, style entry, peers, and produc
   bindCommon('packages/grammar/src/common/index.tsx');
   const valid = check(root);
   assert.equal(valid.ok, true, JSON.stringify(valid, null, 2));
+  const consumerManifest = fs.readFileSync(path.join(root, 'apps/web/package.json'), 'utf8');
+  const missingPeerManifest = JSON.parse(consumerManifest);
+  delete missingPeerManifest.dependencies['@xyflow/react'];
+  write('apps/web/package.json', JSON.stringify(missingPeerManifest));
+  const missingPeer = check(root);
+  assert.ok(missingPeer.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_CONTRACT_INVALID' && /does not declare Grammar peer @xyflow\/react/.test(item.message)), JSON.stringify(missingPeer, null, 2));
+  write('apps/web/package.json', consumerManifest);
   const owners = ownerIds(root);
   assert.ok(owners.includes('fe.feature:apps/web/src/features/pages/ProductPage'), JSON.stringify(owners));
   assert.deepEqual(valid.coverage.ownerPublicApi, { status: 'checked', declarations: owners.length });

@@ -413,17 +413,22 @@ test('starci app scaffold writes the app shape and starci app lint finds nothing
 
   // The scaffold type-checks with its own script: every skeleton import resolves.
   assert.deepEqual(typecheck(app), [], 'a fresh scaffold type-checks');
-  // An unresolvable import planted on each side is reported by the same script.
+  // Missing value imports and non-CSS side-effect imports stay errors under the same script.
+  const missingSideEffect = '@/modules/missing-side-effect';
   const unresolvable = { 'be/src/modules/domain/liveness/liveness.service.ts': '@modules/platform/nowhere', 'fe/apps/app/src/features/pages/AppHomePage/component.tsx': '@/modules/nowhere' };
   const originals = {};
   for (const [file, specifier] of Object.entries(unresolvable)) {
     const target = path.join(app, ...file.split('/'));
     originals[file] = fs.readFileSync(target, 'utf8');
-    fs.writeFileSync(target, `import { gone } from "${specifier}"\nvoid gone\n${originals[file]}`);
+    const sideEffect = file.startsWith('fe/') ? `import "${missingSideEffect}"\n` : '';
+    fs.writeFileSync(target, `${sideEffect}import { gone } from "${specifier}"\nvoid gone\n${originals[file]}`);
   }
   const broken = typecheck(app);
   for (const [file, specifier] of Object.entries(unresolvable)) {
     assert.ok(broken.some((line) => line.replace(/\\/g, '/').includes(file) && line.includes('TS2307') && line.includes(specifier)), `${file}: the unresolvable ${specifier} is reported (${broken.join(' | ')})`);
+    if (file.startsWith('fe/')) {
+      assert.ok(broken.some((line) => line.replace(/\\/g, '/').includes(file) && line.includes('TS2882') && line.includes(missingSideEffect)), `${file}: a missing non-CSS side-effect import is reported (${broken.join(' | ')})`);
+    }
     fs.writeFileSync(path.join(app, ...file.split('/')), originals[file]);
   }
 

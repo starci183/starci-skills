@@ -36,6 +36,13 @@ export type TabsProps = {
     readonly labelVisibility?: "responsive" | "always"
     /** Page chrome owns whether the peer strip starts at the shared page inset. */
     readonly inset?: "page" | "none"
+    /**
+     * `primary` (default) is the underline tab bar: the page's main area switcher, at most one per page.
+     * `secondary` is a compact pill strip with the footprint of a SegmentedControl (a soft track, the selected tab an
+     * accent-soft pill): for tabs inside a sub-region (drawer, card, dialog, rail). Same roles, keyboard, panel
+     * wiring and focus ring either way.
+     */
+    readonly variant?: "primary" | "secondary"
 }
 
 /** Render peer tabs through Core's selected, accessible and responsive treatment. */
@@ -78,13 +85,14 @@ export const Tabs = (props: TabsProps) => {
     }, [isClientReady, props.items, props.panelId, props.selectedKey])
 
     const inset = props.inset ?? "none"
+    const variant = props.variant ?? "primary"
     const frameContract = inset === "page" ? "PADDING-5" : undefined
-    if (!isClientReady) return <div aria-hidden="true" className={tabsFrameClassName} data-contract={frameContract} data-component="Tabs" data-tier="branch" data-grammar-tabs="true" data-grammar-tabs-client="pending" data-grammar-tabs-inset={inset} style={{ minHeight: "3rem" }} />
+    if (!isClientReady) return <div aria-hidden="true" className={tabsFrameClassName} data-contract={frameContract} data-component="Tabs" data-tier="branch" data-grammar-tabs="true" data-grammar-tabs-client="pending" data-grammar-tabs-inset={inset} data-grammar-tabs-variant={variant} style={{ minHeight: "3rem" }} />
 
-    return <div ref={frameRef} className={tabsFrameClassName} data-contract={frameContract} data-component="Tabs" data-tier="branch" data-grammar-tabs="true" data-grammar-tabs-client="ready" data-grammar-tabs-inset={inset} data-grammar-tab-labels={props.labelVisibility ?? "responsive"}>
+    return <div ref={frameRef} className={tabsFrameClassName} data-contract={frameContract} data-component="Tabs" data-tier="branch" data-grammar-tabs="true" data-grammar-tabs-client="ready" data-grammar-tabs-inset={inset} data-grammar-tabs-variant={variant} data-grammar-tab-labels={props.labelVisibility ?? "responsive"}>
         <HorizontalScrollRegion className={tabsScrollClassName} overflow="needed" data-grammar-tabs-overflow="scroll" hideScrollBar isFocusable={false}>
             <HeroTabs
-                variant="secondary"
+                variant={variant === "secondary" ? "primary" : "secondary"}
                 selectedKey={props.selectedKey}
                 onSelectionChange={(key) => props.onSelect?.(String(key))}
                 className={tabsClassName ?? ""}

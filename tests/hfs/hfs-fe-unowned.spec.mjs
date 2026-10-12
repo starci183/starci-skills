@@ -23,8 +23,8 @@ const put = (dir, relative, text = 'export {};\n') => {
 };
 const errorsOf = (result, code) => result.findings.filter((f) => f.code === code && f.level === 'error').map((f) => f.path);
 
-test('a clean app (its fe side) has no unowned, unnamed or forbidden file', () => {
-  const result = checkRepository({ repoRoot: repoOf() });
+test('a clean app and its declaration-only ambient owner need no unused runtime entry', () => {
+  const result = checkRepository({ repoRoot: repoOf((dir) => put(dir, 'fe/apps/web/src/modules/types/ambient/styles.d.ts', 'declare module "*.css" {}\n')) });
   assert.deepEqual(result.findings, []);
 });
 
@@ -41,9 +41,9 @@ test('fe/apps/web/src/modules/hooks/x.ts is owned by fe.modules (a capability ma
   assert.deepEqual(errorsOf(result, 'FE_SLOT_FILE_ROLE'), []);
 });
 
-test('a [lang] segment and a page.tsx outside the route slot are FE_SLOT_FILE_ROLE errors', () => {
-  const result = checkRepository({ repoRoot: repoOf((dir) => { put(dir, 'fe/apps/web/src/app/[lang]/page.tsx'); put(dir, 'fe/apps/web/src/hooks/orders/page.tsx'); }) });
-  assert.deepEqual(errorsOf(result, 'FE_SLOT_FILE_ROLE').sort(), ['fe/apps/web/src/app/[lang]/page.tsx', 'fe/apps/web/src/hooks/orders/page.tsx']);
+test('wrong route and hook roles and runtime code in the ambient owner are FE_SLOT_FILE_ROLE errors', () => {
+  const result = checkRepository({ repoRoot: repoOf((dir) => { put(dir, 'fe/apps/web/src/app/[lang]/page.tsx'); put(dir, 'fe/apps/web/src/hooks/orders/page.tsx'); put(dir, 'fe/apps/web/src/modules/types/ambient/runtime.ts'); }) });
+  assert.deepEqual(errorsOf(result, 'FE_SLOT_FILE_ROLE').sort(), ['fe/apps/web/src/app/[lang]/page.tsx', 'fe/apps/web/src/hooks/orders/page.tsx', 'fe/apps/web/src/modules/types/ambient/runtime.ts']);
 });
 
 test('middleware.ts is refused on Next >= 16 (a forbidden slot), naming proxy.ts as the place', () => {

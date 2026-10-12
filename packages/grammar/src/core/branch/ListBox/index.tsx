@@ -16,6 +16,23 @@ export type ListBoxItem = {
 
 const clampRows = (rows: number) => Math.min(12, Math.max(1, Math.floor(Number.isFinite(rows) ? rows : 3)))
 
+/**
+ * Skeleton rows for a loading list. They sit directly inside the busy listbox (an `aria-busy` listbox may be empty), NOT in
+ * `renderEmptyState`: the vendor wraps that in an unnamed `role="option"`, and these rows are `aria-hidden`, so it would be a nameless option.
+ */
+const loadingSkeleton = (rows: number) => (
+    <div className="starci-core-list-box-skeleton" data-grammar-list-skeleton="true">
+        {Array.from({ length: clampRows(rows) }, (_, index) => (
+            <div key={index} aria-hidden="true" className="starci-core-list-box-item starci-core-list-box-skeleton-option" data-grammar-skeleton="true">
+                <span className="starci-core-list-box-copy">
+                    <span className="starci-core-list-box-label"><Skeleton shape="text" /></span>
+                    <span className="starci-core-list-box-description"><Skeleton shape="text" /></span>
+                </span>
+            </div>
+        ))}
+    </div>
+)
+
 export type ListBoxProps = {
     /** Names the list, e.g. "Members". */
     readonly label: string
@@ -64,7 +81,7 @@ export const ListBox = ({
         data-contract="FOCUS-2 STATE-1"
         data-tier="branch"
         data-loading={String(isLoading)}
-        {...(isLoading ? { render: (domProps: ComponentPropsWithRef<"div">) => <div {...domProps} aria-busy="true" /> } : {})}
+        {...(isLoading ? { render: (domProps: ComponentPropsWithRef<"div">) => <div {...domProps} aria-busy="true">{domProps.children}{items.length === 0 ? loadingSkeleton(loadingRows) : null}</div> } : {})}
         data-grammar-list-selection={selectionMode}
         selectionMode={selectionMode}
         {...(selectedIds === undefined ? {} : { selectedKeys: new Set(selectedIds) })}
@@ -74,20 +91,7 @@ export const ListBox = ({
         })}
         {...(onAction === undefined ? {} : { onAction: (key: string | number) => onAction(String(key)) })}
         {...(isLoading
-            ? {
-                renderEmptyState: () => (
-                    <div className="starci-core-list-box-skeleton" data-grammar-list-skeleton="true">
-                        {Array.from({ length: clampRows(loadingRows) }, (_, index) => (
-                            <div key={index} aria-hidden="true" className="starci-core-list-box-item starci-core-list-box-skeleton-option" data-grammar-skeleton="true">
-                                <span className="starci-core-list-box-copy">
-                                    <span className="starci-core-list-box-label"><Skeleton shape="text" /></span>
-                                    <span className="starci-core-list-box-description"><Skeleton shape="text" /></span>
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                ),
-            }
+            ? {}
             : emptyContent === undefined ? {} : { renderEmptyState: () => <div className="starci-core-list-box-empty" data-contract="STATE-3" data-grammar-list-empty="true">{emptyContent}</div> })}
     >
         {items.map((item) => (

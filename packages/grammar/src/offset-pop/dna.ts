@@ -4,10 +4,9 @@
  * Same shape as `STARCI_CORE_DNA`, key for key, plus two family groups: `offset` (the hard
  * offset shadow and ink outline that make the family recognisable) and `palette` (the named
  * inks the semantic colours are drawn from). This is presentation data, not a registry of UI
- * laws, and it is product-neutral. Every value equals the default in `./styles.css`; the
- * styles spec holds the two together.
+ * laws, and it is product-neutral. Every value equals the default in `./styles.css`.
  *
- * WCAG 2.x contrast, recorded here and asserted in `styles.spec.ts`:
+ * WCAG 2.x contrast, recorded here:
  *
  * | pair                                   | light | dark  | need |
  * | -------------------------------------- | ----- | ----- | ---- |

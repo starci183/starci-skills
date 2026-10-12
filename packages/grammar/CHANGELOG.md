@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.9.11 - 2026-10-12
+
+Combined successor: retain the component features and no-tests policy published in 0.9.10, and integrate the canonical YAML rule catalogue and active renderer claims from the parallel runtime branch.
+
+- Fixed: generate the catalogue from authored YAML rules, including STATE-8 and sparse and nonnumeric addresses; keep active renderer and family claims without exceptions for retired identifiers.
+- Fixed: preserve the Breadcrumbs and ListBox function-child skeleton behavior, canonical decorative accessibility claims and scoped FlowGraph control styling across the merge.
+- Fixed: secondary Tabs apply the canonical radius directly to each tab, and the stories typecheck overrides build exclusions so every story is checked.
+
+## 0.9.10 - 2026-10-12
+
+Published component-feature release: secondary Tabs, danger-soft IconButton and the no-tests package policy.
+
+- **`Tabs` `variant?: "primary" | "secondary"`** (default `"primary"`, today's look). `primary` is the underline tab bar: the page's main area switcher, at most one per page.
+  `secondary` is a compact pill strip with the SegmentedControl footprint (a soft `--default` track, 0.25rem padding, 2.5rem tall; the touch floor still wins on coarse pointers) whose selected tab is an
+  `--accent-soft` pill with `--accent-soft-foreground` text, the selectable-chip family. It is for tabs inside a sub-region (drawer, card, dialog, rail). Same `tablist` / `tab` / `tabpanel` wiring (`panelId`),
+  keyboard and focus ring, and it works with `labelVisibility` and `inset`. The frame exposes `data-grammar-tabs-variant`. Offset Pop paints the secondary strip as one ink-outlined unit with the hard offset and a pink selected pill.
+- **`IconButton` `variant="danger-soft"`**: the danger tone's soft tint plate (`--danger-soft` ground, `--danger-soft-foreground` glyph, `--danger-soft-hover` one step stronger on hover) for a reversible or
+  row-level destructive action such as a trash glyph deleting a row. Same sizes, focus ring and required accessible label. A confirmed destructive action inside an AlertDialog still uses the solid `danger` Button.
+  Offset Pop gives it the ink outline and a small hard offset, pressed flat. Grammar ships no trash glyph (it ships no icon registry, only `CircleFill`): the app passes its own `IconSource`, as for every other glyph.
+
+- **Removed: every spec suite, the test helpers (`src/__test__`), the vitest configs and the Storybook a11y gate.** `test` and `prepack` are now `typecheck` + `build`; `pack:check` is `build` + `npm pack --dry-run`. Dev dependencies vitest, @vitest/*, jsdom, @testing-library/react and @storybook/addon-vitest are gone. The UI contracts stay in the runtime (`tests/work-ui`) and the grammar DNA snapshot.
+
 ## 0.9.9 - 2026-10-12
 
 - Fixed: generate the rule catalogue from authored UI knowledge YAML, preserving sparse and nonnumeric addresses and including STATE-8.

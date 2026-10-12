@@ -291,7 +291,7 @@ function derivedGrammar(root, packageRoot, workspaces, apps = []) {
     if (declaresGrammar(pkg)) consumerManifests.push(manifest);
   }
   if (!consumerManifests.length) return null;
-  return { package: GRAMMAR_PACKAGE, entry: `${GRAMMAR_PACKAGE}/common`, styleEntry: `${GRAMMAR_PACKAGE}/common.css`, styleSources, consumerManifests, peers: ['react', '@heroui/react'] };
+  return { package: GRAMMAR_PACKAGE, entry: `${GRAMMAR_PACKAGE}/common`, styleEntry: `${GRAMMAR_PACKAGE}/common.css`, styleSources, consumerManifests, peers: ['react', '@heroui/react', '@xyflow/react'] };
 }
 
 /**

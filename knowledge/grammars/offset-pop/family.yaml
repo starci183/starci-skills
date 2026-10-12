@@ -27,7 +27,7 @@ provenance:
     Historical snapshot only. Before use, inspect the selected repository's manifest/lockfile,
     exported types, renderers and CSS; record actual source/version in .starciwork. If source is
     unavailable, report unverified; do not infer current APIs or defects from these tables. Contrast
-    figures are the ones `src/offset-pop/dna.ts` records and `styles.spec.ts` asserts; they were not
+    figures are the ones `src/offset-pop/dna.ts` records; they were not
     re-measured on a rendered page here.
 identity:
   definedBy: offsetPopGrammar
