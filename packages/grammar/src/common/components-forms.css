@@ -91,10 +91,11 @@
     .starci-core-field-control > :where(input:not([type="checkbox"], [type="radio"], [type="file"], [type="range"]), select, textarea) {
         width: 100%;
         min-width: 0;
-        min-height: 2.25rem;
+        min-height: var(--starci-core-field-min-height, 2.5rem);
         border: var(--field-border-width, 1px) solid var(--field-border, var(--border, ButtonBorder));
         border-radius: var(--field-radius, calc(var(--radius, 0.5rem) * 1.5));
         padding: 0.5rem 0.75rem;
+        box-sizing: border-box;
         background: var(--field-background, var(--surface, Canvas));
         color: var(--field-foreground, var(--foreground, CanvasText));
         box-shadow: var(--field-shadow, none);
@@ -129,6 +130,13 @@
      * Skeleton block of the loaded control's height (the select trigger 2.5rem, with the touch floor below; the textarea
      * `rows` at 1.25rem a line plus its padding, never under the 5rem field minimum). Not focusable: no control exists.
      */
+    /* The loading root (Field, Select, NumberField, SearchField, SegmentedControl, CheckboxGroup, Switch, Textarea): inert geometry that can shrink inside its row or column. */
+    .starci-core-field-skeleton {
+        min-width: 0;
+        pointer-events: none;
+        user-select: none;
+    }
+
     .starci-core-field-skeleton-control { display: block; min-width: 0; }
 
     .starci-core-field-skeleton-control > .starci-core-skeleton {
@@ -183,6 +191,81 @@
     .starci-core-search-field-input,
     .starci-core-number-field-input {
         min-width: 0;
+    }
+
+    /*
+     * ONE SINGLE-LINE FIELD ANATOMY (0.9.8). Input, Select, ComboBox, SearchField, NumberField, DateField, TimeField
+     * (and the pickers built on the date group) draw one box: the same radius token, the same minimum height
+     * (`--starci-core-field-min-height`, 2.5rem: the height the loading skeletons already promise), the same border-box
+     * sizing, the same 0.75rem inline padding, and a trigger or chevron 0.5rem from the inline end. The box of a
+     * ComboBox is its input group, not the vendor's inner input, so it carries the radius and height too and the input
+     * inside inherits the corner (no square right side behind the trigger) and stretches to the group's height.
+     */
+    .starci-core-input-field,
+    .starci-core-select-trigger,
+    .starci-core-combo-box-group,
+    .starci-core-search-field-group,
+    .starci-core-number-field-group,
+    .starci-core-date-group {
+        box-sizing: border-box;
+        min-block-size: var(--starci-core-field-min-height, 2.5rem);
+        border-radius: var(--field-radius, calc(var(--radius, 0.5rem) * 1.5));
+    }
+
+    .starci-core-select-trigger {
+        align-items: center;
+        padding-inline: 0.75rem 1.75rem;
+    }
+
+    .starci-core-combo-box-group {
+        align-items: stretch;
+    }
+
+    .starci-core-combo-box-input {
+        box-sizing: border-box;
+        flex: 1 1 0;
+        border-radius: inherit;
+        padding-inline: 0.75rem 1.75rem;
+        text-overflow: ellipsis;
+    }
+
+    .starci-core-combo-box-trigger {
+        inset-inline-end: 0;
+        padding-inline-end: 0.5rem;
+    }
+
+    /*
+     * The selected value of a Select stays ONE line and keeps the field height: it ellipsizes (the trigger carries the
+     * full text as its title) and shows only the option's label, never its description. Popover options still wrap.
+     */
+    .starci-core-select-value {
+        flex: 1 1 0;
+        overflow: hidden;
+        overflow-wrap: normal;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .starci-core-select-value-text {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .starci-core-select-value .starci-core-list-option-copy {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .starci-core-select-value .starci-core-list-option-label {
+        overflow-wrap: normal;
+    }
+
+    .starci-core-select-value .starci-core-list-option-description,
+    .starci-core-select-value [data-slot="list-box-item-indicator"] {
+        display: none;
     }
 
     .starci-core-date-input {

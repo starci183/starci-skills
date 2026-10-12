@@ -44,6 +44,11 @@ export const Disclosure: Story = {
       <State label="Expanded" direction="column">
         <G.Disclosure title="What is included?" defaultExpanded>Every lesson, offline access and certificates.</G.Disclosure>
       </State>
+      <State label="With a summary (closed, open, long)" direction="column">
+        <G.Disclosure title="Filters" summary="3 active">Status, owner and date.</G.Disclosure>
+        <G.Disclosure title="Filters" summary="3 active" defaultExpanded>Status, owner and date.</G.Disclosure>
+        <G.Disclosure title="Links" summary="https://example.com/a-very-long-link-that-must-truncate-on-one-line-and-never-wrap">Body.</G.Disclosure>
+      </State>
       <State label="Disabled" direction="column">
         <G.Disclosure title="Locked section" isDisabled>Hidden.</G.Disclosure>
       </State>

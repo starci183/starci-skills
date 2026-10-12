@@ -62,6 +62,23 @@ export const Input: Story = {
 };
 
 /** `isCopyable` adds a copy action after the control (it copies the current value); `isReadOnly` keeps a value selectable but fixed. */
+/** 0.9.8: a row of inputs that label themselves by position (`isLabelHidden`), with `onBlur` / `onPaste` / `autoFocus` and a trailing action aligned to the control box. */
+export const InputRowHiddenLabel: Story = {
+  name: 'Input (hidden label row, error beside an action)',
+  render: () => (
+    <div style={{ display: 'grid', gap: '0.75rem', maxWidth: formColumn }}>
+      {[1, 2, 3].map((n) => (
+        <div key={n} style={{ display: 'flex', alignItems: 'start', gap: '0.5rem' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <G.Input id={`link-${n}`} name={`link-${n}`} label={`Liên kết ${n}`} isLabelHidden variant="secondary" {...(n === 2 ? { errorMessage: 'Enter a valid link.' } : {})} />
+          </div>
+          <G.Button variant="secondary">Delete</G.Button>
+        </div>
+      ))}
+    </div>
+  ),
+};
+
 export const InputCopyable: Story = {
   render: () => (
     <div style={{ display: 'grid', gap: '1rem', maxWidth: '36rem' }}>
@@ -462,6 +479,33 @@ export const ComboBox: Story = {
       <State label="Disabled" direction="column">
         <G.ComboBox label="Plan" options={planOptions} isDisabled />
       </State>
+    </Matrix>
+  ),
+};
+
+const longPlanOptions: ReadonlyArray<G.ListOption> = [
+  { id: 'long', label: 'Enterprise annual plan with dedicated onboarding, priority support and a custom data retention agreement' },
+  ...planOptions,
+];
+
+/**
+ * 0.9.8: the single-line fields are one family. On the secondary layer Input, Select, ComboBox, SearchField,
+ * NumberField, DateField and TimeField share one radius, one height and one trigger placement, and a long selected
+ * value of Select / ComboBox stays on one line with an ellipsis (the full text is the title; options may still wrap).
+ */
+export const FieldFamilySecondary: Story = {
+  name: 'Single-line fields: one family (secondary, long value)',
+  render: () => (
+    <Matrix maxWidth={formColumn}>
+      <State label="Input" direction="column"><G.Input id="fam-input" name="fam-input" label="Name" variant="secondary" defaultValue="Ada Lovelace" /></State>
+      <State label="Select" direction="column"><G.Select label="Plan" variant="secondary" options={planOptions} defaultValue="team" /></State>
+      <State label="Select (long value)" direction="column"><G.Select label="Plan" variant="secondary" options={longPlanOptions} defaultValue="long" /></State>
+      <State label="ComboBox" direction="column"><G.ComboBox label="Plan" variant="secondary" options={planOptions} defaultValue="team" /></State>
+      <State label="ComboBox (long value)" direction="column"><G.ComboBox label="Plan" variant="secondary" options={longPlanOptions} defaultValue="long" /></State>
+      <State label="SearchField" direction="column"><G.SearchField label="Search" variant="secondary" /></State>
+      <State label="NumberField" direction="column"><G.NumberField label="Seats" variant="secondary" defaultValue={4} /></State>
+      <State label="DateField" direction="column"><G.DateField label="Due" variant="secondary" /></State>
+      <State label="TimeField" direction="column"><G.TimeField label="At" variant="secondary" /></State>
     </Matrix>
   ),
 };

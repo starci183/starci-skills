@@ -1,7 +1,7 @@
 "use client"
 
 import { TextArea as HeroTextArea, TextField as HeroTextField } from "@heroui/react"
-import { useId, useMemo, useState, type KeyboardEvent } from "react"
+import { useId, useMemo, useState, type ClipboardEvent, type KeyboardEvent } from "react"
 import {
     FieldDescription,
     FieldErrorText,
@@ -59,6 +59,12 @@ export type TextareaProps = FieldControlProps & {
      */
     readonly onSubmitShortcut?: () => void
     readonly mentions?: TextareaMentions
+    /** Focus left the textarea. */
+    readonly onBlur?: () => void
+    /** The native paste event of the textarea. */
+    readonly onPaste?: (event: ClipboardEvent<HTMLTextAreaElement>) => void
+    /** Focuses the textarea when it mounts. */
+    readonly autoFocus?: boolean
 }
 
 type MentionQuery = { readonly start: number; readonly end: number; readonly text: string }
@@ -102,6 +108,9 @@ export const Textarea = ({
     variant = "primary",
     onSubmitShortcut,
     mentions,
+    onBlur,
+    onPaste,
+    autoFocus = false,
     ...field
 }: TextareaProps) => {
     const [uncontrolledLength, setUncontrolledLength] = useState((defaultValue ?? "").length)
@@ -209,6 +218,12 @@ export const Textarea = ({
                     className="starci-core-textarea-control"
                     data-grammar-field-control="true"
                     onKeyDown={onKeyDown}
+                    {...(autoFocus ? { autoFocus: true } : {})}
+                    {...(onPaste === undefined ? {} : { onPaste })}
+                    onBlur={() => {
+                        if (mentions !== undefined) setQuery(null)
+                        onBlur?.()
+                    }}
                     {...(mentions === undefined
                         ? {}
                         : {
@@ -216,7 +231,6 @@ export const Textarea = ({
                                 if (!["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)) readQuery(event.currentTarget)
                             },
                             onClick: (event: { currentTarget: HTMLTextAreaElement }) => readQuery(event.currentTarget),
-                            onBlur: () => setQuery(null),
                             "aria-autocomplete": "list" as const,
                             // A textbox may carry aria-controls / aria-autocomplete / aria-activedescendant, not aria-expanded (ARIA 1.2);
                             // both references are set only while the list exists, so they never point at a missing element.

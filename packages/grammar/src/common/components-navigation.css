@@ -1020,6 +1020,13 @@
         flex: 0 0 auto;
     }
 
+    /* Loading list (knowledge STATE-8): the stack of skeleton options, in the same column the real options use. */
+    .starci-core-list-box-skeleton {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+    }
+
     /* Loading options (knowledge STATE-8): a label line and a description line, at the loaded option's height. */
     .starci-core-list-box-skeleton-option {
         display: flex;
@@ -1076,6 +1083,21 @@
         min-width: 0;
         overflow-wrap: anywhere;
     }
+
+    /* The trailing summary: muted, one line, whatever room the title leaves. */
+    .starci-core-disclosure-summary {
+        min-width: 0;
+        flex: 1 1 0;
+        overflow: hidden;
+        color: var(--muted, GrayText);
+        font-size: 0.875rem;
+        font-weight: 400;
+        text-align: end;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .starci-core-disclosure-title { flex: 0 1 auto; }
 
     .starci-core-disclosure-indicator,
     .starci-core-generic-accordion-indicator {
@@ -1403,9 +1425,13 @@
     .starci-core-flow-graph .react-flow__viewport { transform-origin: 0 0; z-index: 2; pointer-events: none; }
     .starci-core-flow-graph .react-flow__renderer { z-index: 4; }
     .starci-core-flow-graph .react-flow__background { pointer-events: none; z-index: -1; }
+    /* The background layer fills the canvas behind the viewport (the vendor sheet is not shipped, so the fill is ours). */
+    .starci-core-flow-graph .starci-core-flow-graph-background { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; }
     .starci-core-flow-graph .react-flow__edges { position: absolute; }
     .starci-core-flow-graph .react-flow__edges svg { position: absolute; overflow: visible; pointer-events: none; }
     .starci-core-flow-graph .react-flow__edge-path { fill: none; stroke: var(--xy-edge-stroke); stroke-width: var(--xy-edge-stroke-width); stroke-linecap: round; }
+    /* An edge is a decoration: never a pointer or focus target (it is neither selectable nor focusable), and its group draws no fill. */
+    .starci-core-flow-graph .starci-core-flow-graph-edge { fill: none; pointer-events: none; }
     .starci-core-flow-graph .starci-core-flow-graph-edge-placeholder .react-flow__edge-path { stroke-dasharray: 4 5; }
     .starci-core-flow-graph .react-flow__nodes { pointer-events: none; transform-origin: 0 0; }
     .starci-core-flow-graph .react-flow__node {

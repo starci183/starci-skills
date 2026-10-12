@@ -7,7 +7,7 @@ import {
     Spinner as HeroSpinner,
     type Key,
 } from "@heroui/react"
-import type { ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import {
     FieldDescription,
     FieldErrorText,
@@ -79,6 +79,11 @@ export const ComboBox = ({
     ...field
 }: ComboBoxProps) => {
     const { anchor, portalProps } = useGrammarPortal()
+    const [chosen, setChosen] = useState<string | null>(defaultValue ?? null)
+    const [typed, setTyped] = useState<string | null>(null)
+    /** The full text of the field: the one-line input ellipsizes, so it keeps the text as its title. */
+    const shownKey = value === undefined ? chosen : value
+    const fullText = inputValue ?? typed ?? options.find((option) => option.id === shownKey)?.label
     return (
         <HeroComboBox
             data-tier="branch"
@@ -94,8 +99,15 @@ export const ComboBox = ({
             menuTrigger={menuTrigger}
             {...(value === undefined ? defaultValue === undefined ? {} : { defaultValue } : { value })}
             {...(inputValue === undefined ? defaultInputValue === undefined ? {} : { defaultInputValue } : { inputValue })}
-            {...(onInputChange === undefined ? {} : { onInputChange })}
-            onChange={(key: Key | null) => onValueChange?.(key === null ? null : String(key))}
+            onInputChange={(text: string) => {
+                setTyped(text)
+                onInputChange?.(text)
+            }}
+            onChange={(key: Key | null) => {
+                setChosen(key === null ? null : String(key))
+                setTyped(null)
+                onValueChange?.(key === null ? null : String(key))
+            }}
         >
             {anchor}
             <FieldLabel isHidden={field.isLabelHidden} isRequired={field.isRequired}>{field.label}</FieldLabel>
@@ -104,6 +116,7 @@ export const ComboBox = ({
                     {...(id === undefined ? {} : { id })}
                     {...(placeholder === undefined ? {} : { placeholder })}
                     className="starci-core-combo-box-input"
+                    {...(fullText === undefined || fullText === "" ? {} : { title: fullText })}
                     {...(isPending ? { "aria-busy": true } : {})}
                 />
                 <HeroComboBox.Trigger className="starci-core-combo-box-trigger">

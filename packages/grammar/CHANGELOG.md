@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.9.8 - 2026-10-12
+
+Minor, additive (owner feedback from nivo.vn: the fields of one form did not look like one family; a long selected value broke the field height). No new catalog component (still 104).
+
+- **One single-line field anatomy.** Input, Select, ComboBox, SearchField, NumberField, DateField, TimeField (and the pickers on the date group) share one radius token (`--field-radius`), one minimum height
+  (`--starci-core-field-min-height`, default 2.5rem, the height the loading skeletons already promised; the 44px touch floor still wins on coarse pointers), border-box sizing, 0.75rem inline padding and a trigger or chevron
+  0.5rem from the inline end. Defined once in `common/components-forms.css`. The ComboBox box is its input group: the group carries the radius and height, the inner input inherits the corner and stretches (no square right side
+  behind the trigger). Offset Pop paints the ComboBox on the group (ink outline, surface) and leaves the inner input bare, so the secondary tint no longer fills it as a second box.
+- **The selected value stays on one line.** The Select value (label only, never the option description) and the ComboBox input ellipsize and keep the field height; the full text is the value's / input's `title`. Popover options still wrap.
+- **Every emitted class has a rule.** The roots `starci-core-field-skeleton` (forms), `starci-core-list-box-skeleton` (navigation), `starci-core-meter-skeleton` (overlays), `starci-core-flow-graph-background` and
+  `starci-core-flow-graph-edge` (navigation) now have real layout rules (inert loading roots, the list and meter columns, the background fill, a non-interactive edge). No consumer-hook entries were added.
+- **`Input` `onBlur`, `onPaste` (the native ClipboardEvent) and `autoFocus`**, forwarded to the underlying input; `SearchField` and `Textarea` take the same three (the textarea keeps its mention-list close on blur).
+- **`Input` `isLabelHidden`**: the label stays the accessible name and is visually hidden (the same `starci-core-form-label--screen-reader` as Select, SearchField and Field).
+- **`Disclosure` `summary`**: muted, one-line (ellipsis) text at the trailing end of the trigger row, visible closed and open, the trigger's `aria-describedby` (not part of its name).
+- **Input error alignment.** The error is the last row of the field and reserves no space, so the control box never moves when it appears. The control box carries `data-grammar-input-control="true"`, the hook a row with a trailing action
+  (input plus Delete) aligns to.
+
 ## 0.9.7 - 2026-10-11
 
 Minor, additive (owner ruling 2026-10-11, knowledge STATE-8: the loading view is the page's own component tree, labels real, only unresolved content as inert

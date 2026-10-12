@@ -915,6 +915,14 @@
         transition: width var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1));
     }
 
+    /* The loading meter root keeps the meter's column (label above the bar) and is inert. */
+    .starci-core-meter-skeleton {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        pointer-events: none;
+    }
+
     /* Loading meter (knowledge STATE-8, `isSkeleton`): the label stays real, the bar is a static Skeleton bar of the track height. */
     .starci-core-meter-skeleton-bar { display: block; block-size: 0.5rem; overflow: hidden; border-radius: 999px; }
 
