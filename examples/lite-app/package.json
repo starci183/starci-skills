@@ -25,9 +25,9 @@
     "nest-commander": "3.21.0"
   },
   "devDependencies": {
-    "@starci/cli": "1.2.8",
-    "@starci/eslint-canon-be": "3.2.9",
-    "@starci/eslint-canon-fe": "8.2.9",
+    "@starci/cli": "1.2.9",
+    "@starci/eslint-canon-be": "3.2.10",
+    "@starci/eslint-canon-fe": "8.2.10",
     "@starci/prettier-config": "1.0.3",
     "@starci/stylelint-canon": "2.0.8",
     "@starci/tsconfig": "2.0.3",
