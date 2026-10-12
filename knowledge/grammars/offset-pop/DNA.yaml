@@ -13,7 +13,7 @@ appliesTo:
 family: offset-pop
 provenance:
   package: "@starci/grammar"
-  version: "0.9.8"
+  version: "0.9.9"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   captured: "2026-09-23"
   publicEntry: "@starci/grammar/common"
@@ -56,18 +56,18 @@ provenance:
     - path: "packages/grammar/src/offset-pop/conformance.ts"
       sha256: "b00eee49ac2f40d08a1632c878c581d43e1b030034639ac7821c172e52eecc0b"
     - path: "packages/grammar/src/offset-pop/styles.css"
-      sha256: "e344fc2c880dc8d12d82888d279d12b1e6e2371232b25bcbf732bb88b78f35a0"
+      sha256: "89a59dddb67d5a1e9a033ed2133da66a3f751e12fa19ede5ae62280f925ce8f6"
     - path: "packages/grammar/src/offset-pop/components-forms.css"
       sha256: "ac97dba2f7cb7d32f78d3f30953529cbdb60d6d60f735c085b217d8b5182cb95"
     - path: "packages/grammar/src/offset-pop/components-overlays.css"
       sha256: "0065296a1786a18c5784d3ef777cd64be94dfe88763e24dcbccd3f5346f32ec9"
     - path: "packages/grammar/src/offset-pop/components-navigation.css"
-      sha256: "4d015181854344af6f8b4aafc7a8b36027ec4dfef08c6716bbc65eb38b1dadd7"
+      sha256: "a41527e6fb77188689aa3a8b98c098b7e368e870f250f16a6387225529e0802f"
     - path: "packages/grammar/src/common/registry.tsx"
       sha256: "3934778aac696be9518741e64ee210bfbaa2e9b9818a57ab979b6ef332ce9161"
 identity:
   package: "@starci/grammar"
-  version: "0.9.8"
+  version: "0.9.9"
   familyId: "offset-pop"
   dnaId: "offset-pop"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
@@ -1625,7 +1625,7 @@ renderers:
       - prop: "source"
         type: "IconSource"
       - prop: "variant"
-        values: ["tertiary", "ghost", "primary"]
+        values: ["tertiary", "ghost", "primary", "danger-soft"]
       - prop: "size"
         values: ["md", "lg"]
     claims: ["A11Y-2", "ICON-5", "TONE-2"]
@@ -2550,6 +2550,8 @@ renderers:
         values: ["responsive", "always"]
       - prop: "inset"
         values: ["page", "none"]
+      - prop: "variant"
+        values: ["primary", "secondary"]
     claims: ["FLOW-2", "GAP-2", "PADDING-3"]
     computedClaims: ["PADDING-5"]
     classes:

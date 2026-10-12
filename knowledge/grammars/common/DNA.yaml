@@ -14,7 +14,7 @@ appliesTo:
 family: common
 provenance:
   package: "@starci/grammar"
-  version: "0.9.8"
+  version: "0.9.9"
   publicEntry: "@starci/grammar/common"
   styleEntrypoint: "@starci/grammar/common/styles.css"
   exportsEntry: "packages/grammar/package.json → ./common (dist/common/index.js), ./common/styles.css"
@@ -98,13 +98,13 @@ provenance:
     - path: "packages/grammar/src/common/registry.tsx"
       sha256: "3934778aac696be9518741e64ee210bfbaa2e9b9818a57ab979b6ef332ce9161"
     - path: "packages/grammar/src/common/styles.css"
-      sha256: "62010ac1eaa636f230a6da55049328fea5271982df58332b66142fdcb39f34c4"
+      sha256: "f5685e61887ceaeb8d34df6d4cdb69aaad82c645b3395d52b615feb518f9aca2"
     - path: "packages/grammar/src/common/components-forms.css"
       sha256: "0297be62bf238a75562a37773a1c3fa70f8dd6b70bbf7bd6fb4f133af0f3c92f"
     - path: "packages/grammar/src/common/components-overlays.css"
       sha256: "7af44ff00e334432ce16b5d7d99ffefa60cad37ba52d9e7eba13d74a21209ba7"
     - path: "packages/grammar/src/common/components-navigation.css"
-      sha256: "b5f389292abae29a8b2087d423a23bac7208ad443c53803d983ae2ec93d2cb31"
+      sha256: "22c6e1835fb16dc07f66f841fc9e98188d3a91a5ba3162ef6b605d99406b7d35"
     - path: "packages/grammar/src/common/spacing.ts"
       sha256: "f0cbd5f51ef0aaf3db529c349489021c009c88d3187ae0946c24bd3be3168f5d"
     - path: "packages/grammar/src/common/state.ts"
@@ -119,7 +119,7 @@ provenance:
       sha256: "93b94f62216c656db74d9a88f5aef5837a8ba9a31b8066004b3014a6db6bf79b"
 identity:
   package: "@starci/grammar"
-  version: "0.9.8"
+  version: "0.9.9"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   familyId: "common"
   rootComponent: "GrammarRoot"
@@ -175,12 +175,12 @@ identity:
     navigation: "19 renderers, COMMON_NAVIGATION_COMPONENTS in src/common/renderers-navigation.ts"
   counts:
     renderers: 104
-    tokens: 174
-    tokensAssignedByCommon: 106
-    tokensAssignedAndAlsoReadByCommon: 75
+    tokens: 179
+    tokensAssignedByCommon: 110
+    tokensAssignedAndAlsoReadByCommon: 76
     tokensWrittenByRenderers: 5
-    tokensReadOnlyByCommon: 68
-    tokensReadByCommon: 143
+    tokensReadOnlyByCommon: 69
+    tokensReadByCommon: 145
     claimEntries: 441
     distinctClaimIds: 93
     emittedClasses: 468
@@ -308,13 +308,13 @@ tokens:
     value: "color-mix(in oklab, var(--accent) 15%, transparent)"
     valueRules: 3
     assignedBy: "common"
-    alsoReadBy: 13
+    alsoReadBy: 14
     source: "packages/grammar/src/common/styles.css:87"
   - name: "--accent-soft-foreground"
     value: "color-mix(in oklab, var(--accent) 70%, var(--foreground) 30%)"
     valueRules: 2
     assignedBy: "common"
-    alsoReadBy: 13
+    alsoReadBy: 14
     source: "packages/grammar/src/common/styles.css:88"
   - name: "--accent-soft-hover"
     value: "color-mix(in oklab, var(--accent-soft) 94%, var(--accent))"
@@ -357,6 +357,22 @@ tokens:
     value: "color-mix(in oklab, var(--surface) 66%, var(--surface-foreground) 34%)"
     assignedBy: "common"
     source: "packages/grammar/src/common/styles.css:105"
+  - name: "--button-bg"
+    value: "var(--danger-soft, transparent)"
+    assignedBy: "common"
+    source: "packages/grammar/src/common/styles.css:2867"
+  - name: "--button-bg-hover"
+    value: "var(--danger-soft-hover, var(--danger-soft, transparent))"
+    assignedBy: "common"
+    source: "packages/grammar/src/common/styles.css:2868"
+  - name: "--button-bg-pressed"
+    value: "var(--danger-soft-hover, var(--danger-soft, transparent))"
+    assignedBy: "common"
+    source: "packages/grammar/src/common/styles.css:2869"
+  - name: "--button-fg"
+    value: "var(--danger-soft-foreground, var(--danger, CanvasText))"
+    assignedBy: "common"
+    source: "packages/grammar/src/common/styles.css:2870"
   - name: "--code-surface"
     assignedBy: "host"
     readBy: "common"
@@ -367,7 +383,7 @@ tokens:
     value: "oklch(55% 0.215 26)"
     valueRules: 3
     assignedBy: "common"
-    alsoReadBy: 24
+    alsoReadBy: 25
     source: "packages/grammar/src/common/styles.css:45"
   - name: "--danger-foreground"
     value: "oklch(99.11% 0 0)"
@@ -384,23 +400,24 @@ tokens:
     value: "color-mix(in oklab, var(--danger) 15%, transparent)"
     valueRules: 2
     assignedBy: "common"
-    alsoReadBy: 3
+    alsoReadBy: 6
     source: "packages/grammar/src/common/styles.css:96"
   - name: "--danger-soft-foreground"
     value: "color-mix(in oklab, var(--danger) 65%, var(--foreground) 35%)"
     valueRules: 3
     assignedBy: "common"
-    alsoReadBy: 2
+    alsoReadBy: 3
     source: "packages/grammar/src/common/styles.css:97"
   - name: "--danger-soft-hover"
     value: "color-mix(in oklab, var(--danger) 20%, transparent)"
     assignedBy: "common"
+    alsoReadBy: 2
     source: "packages/grammar/src/common/styles.css:98"
   - name: "--default"
     value: "color-mix(in oklab, var(--surface-secondary) 98%, var(--foreground))"
     valueRules: 2
     assignedBy: "common"
-    alsoReadBy: 16
+    alsoReadBy: 17
     source: "packages/grammar/src/common/styles.css:63"
   - name: "--default-foreground"
     value: "var(--foreground)"
@@ -577,7 +594,7 @@ tokens:
     value: "oklch(49.5% 0.0138 285.94)"
     valueRules: 4
     assignedBy: "common"
-    alsoReadBy: 63
+    alsoReadBy: 64
     source: "packages/grammar/src/common/styles.css:36"
   - name: "--muted-surface"
     assignedBy: "host"
@@ -605,20 +622,20 @@ tokens:
     assignedBy: "host"
     readBy: "common"
     commonFallback: "0.5rem"
-    uses: 21
+    uses: 22
     source: "packages/grammar/src/common/styles.css:556"
   - name: "--radius-lg"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--radius, 0.5rem)"
     uses: 2
-    source: "packages/grammar/src/common/styles.css:2904"
+    source: "packages/grammar/src/common/styles.css:2916"
   - name: "--radius-md"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "calc(var(--radius, 0.5rem) * 0.75)"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:3080"
+    source: "packages/grammar/src/common/styles.css:3092"
   - name: "--radius-sm"
     assignedBy: "host"
     readBy: "common"
@@ -636,7 +653,7 @@ tokens:
     readBy: "common"
     commonFallback: "0.125rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2950"
+    source: "packages/grammar/src/common/styles.css:2962"
   - name: "--scrollbar-color"
     value: "var(--scrollbar-thumb) var(--scrollbar-track)"
     assignedBy: "common"
@@ -754,7 +771,7 @@ tokens:
     assignedBy: "family"
     readBy: "common"
     commonFallback: "2.75rem"
-    uses: 15
+    uses: 16
     source: "packages/grammar/src/common/styles.css:1947"
   - name: "--starci-core-control-radius"
     assignedBy: "family"
@@ -804,19 +821,19 @@ tokens:
     readBy: "common"
     commonFallback: "0px"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:3496"
+    source: "packages/grammar/src/common/styles.css:3508"
   - name: "--starci-core-fill-inset"
     value: "1.5rem"
     valueRules: 2
     assignedBy: "common"
     alsoReadBy: 1
-    source: "packages/grammar/src/common/styles.css:3492"
+    source: "packages/grammar/src/common/styles.css:3504"
   - name: "--starci-core-fill-top"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "0px"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:3496"
+    source: "packages/grammar/src/common/styles.css:3508"
   - name: "--starci-core-focus"
     assignedBy: "family"
     readBy: "common"
@@ -857,7 +874,7 @@ tokens:
     readBy: "common"
     commonFallback: "2rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:3060"
+    source: "packages/grammar/src/common/styles.css:3072"
   - name: "--starci-core-motion-duration"
     assignedBy: "family"
     readBy: "common"
@@ -959,6 +976,12 @@ tokens:
     commonFallback: "1rem"
     uses: 2
     source: "packages/grammar/src/common/styles.css:1259"
+  - name: "--starci-core-segmented-radius"
+    assignedBy: "family"
+    readBy: "common"
+    commonFallback: "calc(var(--radius, 0.5rem) * 2)"
+    uses: 1
+    source: "packages/grammar/src/common/components-navigation.css:1590"
   - name: "--starci-core-separator"
     value: "var(--grammar-ink-band-separator)"
     assignedBy: "common"
