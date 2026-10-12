@@ -135,6 +135,12 @@ jobs:
           else
             echo "tests=false" >> "$GITHUB_OUTPUT"
           fi
+          # A lite example (hfs.json edition lite) has unit specs and no e2e world (owner ruling 2026-10-12).
+          if grep -Eq '"edition"[[:space:]]*:[[:space:]]*"lite"' "$APP_DIR/hfs.json"; then
+            echo "e2e=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "e2e=true" >> "$GITHUB_OUTPUT"
+          fi
       # The generated inputs (gitignored) first: the fe apps import the typed document table codegen writes, before any type-check or lint.
       - name: Codegen
         run: npm run codegen --silent
@@ -173,7 +179,7 @@ jobs:
         if: ${{ steps.policy.outputs.tests == 'true' && github.event_name == 'workflow_dispatch' && contains(inputs.layers, 'integration') }}
         run: npm run test:integration -- --ci
       - name: E2E tests (test world, manual)
-        if: ${{ steps.policy.outputs.tests == 'true' && github.event_name == 'workflow_dispatch' && contains(inputs.layers, 'e2e') }}
+        if: ${{ steps.policy.outputs.tests == 'true' && steps.policy.outputs.e2e == 'true' && github.event_name == 'workflow_dispatch' && contains(inputs.layers, 'e2e') }}
         run: npm run test:e2e -- --ci
       - name: Sonar scan
         if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_ORGANIZATION != '' }}

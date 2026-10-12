@@ -270,11 +270,11 @@ test('L4: runtime binding fails closed for shell commands, lifecycle hooks, and 
   assert.throws(() => bind({ test: 'echo test' }), /direct node --test command/);
 });
 
-test('L4: a lite app is planned without the test scripts it cannot have, a full app that lacks one is absent and fails the row, and the edition comes from hfs.json', (t) => {
+test('L4: a lite app is planned with its unit run and without the e2e and contract scripts it cannot have, a full app that lacks one is absent and fails the row, and the edition comes from hfs.json', (t) => {
   const base = tmp(t, 'lite');
   fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: NODE_TEST, check: 'x' } }));
-  const lite = ['codegen', 'typecheck', 'lint', 'format:check', 'build:be', 'build:fe', 'docker:build'];
-  const full = [...lite, 'typecheck:tests', 'test', 'test:contract', 'test:integration', 'test:e2e'];
+  const lite = ['codegen', 'typecheck', 'lint', 'format:check', 'test', 'build:be', 'build:fe', 'docker:build'];
+  const full = [...lite, 'typecheck:tests', 'test:contract', 'test:integration', 'test:e2e'];
   for (const [name, edition, scripts] of [['tiny', 'lite', lite], ['big', undefined, full.filter((s) => s !== 'test:e2e')]]) {
     const dir = path.join(base, 'examples', name);
     fs.mkdirSync(dir, { recursive: true });
@@ -290,11 +290,11 @@ test('L4: a lite app is planned without the test scripts it cannot have, a full 
   assert.deepEqual(exampleApps(base).map((a) => [a.name, a.edition]), [['big', 'full'], ['tiny', 'lite']]);
   const plan = planL4(base, { runtimeRoot: base });
   const rows = (app) => plan.steps.filter((s) => s.name.startsWith(`${app}: npm run `)).map((s) => [s.name.replace(`${app}: npm run `, ''), s.absent ?? false]);
-  assert.deepEqual(rows('tiny'), lite.map((s) => [s, false]), 'the lite row has the seven scripts and no absent step');
+  assert.deepEqual(rows('tiny'), lite.map((s) => [s, false]), 'the lite row has the eight scripts (the unit run included) and no absent step');
   assert.deepEqual(rows('big').filter(([, absent]) => absent), [['test:e2e', true]], 'a full app that lacks a script is absent, never skipped by silence');
   assert.equal(rows('big').length, 12);
   assert.deepEqual(scriptsOf({ edition: 'full' }).length, 12);
-  assert.deepEqual(plan.notPlanned, [], 'an app that holds a spec file in every layer has every row');
+  assert.deepEqual(plan.notPlanned.map((n) => n.name), ['tiny: npm run typecheck:tests', 'tiny: npm run test:integration'], 'an app that holds a spec file in every layer has every row; the lite app names the layers it holds no file in, never e2e or contract');
 });
 
 test('L4: a full app is planned only the test rows its files can run, each omission is named with its reason, and a layer that holds a spec file keeps its row', (t) => {
