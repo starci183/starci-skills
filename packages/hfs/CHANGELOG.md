@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.2.7 - 2026-10-12
+
+- Changed: refresh the bundled canon pins for grammar 0.9.8; behaviour is unchanged.
+
 ## 4.2.6 - 2026-10-12
 
 - Changed: refresh the bundled canon pins for grammar 0.9.7 and heroicons 0.3.3; behaviour is unchanged.
