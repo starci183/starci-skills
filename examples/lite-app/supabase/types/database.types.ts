@@ -1,4 +1,4 @@
-// migrations-sha256: abe25bacaec005c06f2efbab3b66e06a14565782968834dedcb870a1febd9a14
+// migrations-sha256: c9366100269d8812e3545f5117999653a79099319385e11eefe6b669995e6163
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
@@ -65,6 +65,19 @@ isOneToOne: false
                   }
                   Update: {
                     "created_at"?: string,"id"?: string,"owner_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+
+                  ]
+                },"jobs": {
+                  Row: {
+                    "claimed_by": string | null,"created_at": string,"current_step": string | null,"error": string | null,"fencing_token": number,"id": string,"job_key": string,"kind": string,"lease_expires_at": string | null,"payload": NonNullable<Json>,"status": string,"updated_at": string
+                  }
+                  Insert: {
+                    "claimed_by"?: string | null,"created_at": string,"current_step"?: string | null,"error"?: string | null,"fencing_token": number,"id"?: string,"job_key": string,"kind": string,"lease_expires_at"?: string | null,"payload": NonNullable<Json>,"status": string,"updated_at": string
+                  }
+                  Update: {
+                    "claimed_by"?: string | null,"created_at"?: string,"current_step"?: string | null,"error"?: string | null,"fencing_token"?: number,"id"?: string,"job_key"?: string,"kind"?: string,"lease_expires_at"?: string | null,"payload"?: NonNullable<Json>,"status"?: string,"updated_at"?: string
                   }
                   Relationships: [
 

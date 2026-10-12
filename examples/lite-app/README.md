@@ -40,7 +40,7 @@ The API reads `PORT`, `HTTP_SECURITY_ALLOWED_ORIGINS`, `PRIMARY_DB_URL`, `PRIMAR
 
 ## Queues
 
-`be/src/modules/platform/queue` has the ports of the full example (`QueueOutbox`, the relay, the worker registry, the retry policy) over a pgmq transport. A producer writes its job in its own business transaction: one row of `public.queue` and one `pgmq.send`, both on the `primary` connection, so the job exists exactly when the change commits. Workers read with a visibility timeout, archive a completed message, make a failed one visible again after a backoff that doubles with its read count, and archive it as dead after five attempts. The example job is `confirm-booking`: a new booking is `pending` and the processor of the `booking_confirmation` queue marks it `confirmed`.
+`be/src/modules/platform/queue` has the ports of the full example (`QueueOutbox`, the relay, the worker registry, the retry policy) over a pgmq transport. A producer writes its job in its own business transaction: one row of `public.queue` and one `pgmq.send`, both on the `primary` connection, so the job exists exactly when the change commits. Workers read with a visibility timeout, archive a completed message, make a failed one visible again after a backoff that doubles with its read count, and archive it as dead after five attempts. Jobs run through the fence of `be/src/modules/platform/jobs` exactly as in full: the runner claims each delivery in `public.jobs` (the claim bumps the fencing token), the step records itself under that token before its effect, and a worker that lost its claim is fenced out. The example job is `confirm-booking`: a new booking is `pending` and the processor of the `booking_confirmation` queue marks it `confirmed`.
 
 ## Database changes
 

@@ -1,15 +1,15 @@
 import { Module } from "@nestjs/common"
 import type { OnModuleInit } from "@nestjs/common"
-import { InjectQueueWorkerRegistry } from "@modules/platform/queue"
-import type { QueueWorkerRegistry } from "@modules/platform/queue"
+import { InjectJobProcessorRegistry } from "@modules/platform/jobs"
+import type { JobProcessorRegistry } from "@modules/platform/jobs"
 import { ConfirmBookingModule } from "../../confirm-booking.module"
 import { ConfirmBookingProcessor } from "./confirm-booking.processor"
 
 @Module({ imports: [ConfirmBookingModule], providers: [ConfirmBookingProcessor] })
-/** The queue transport of the confirm-booking job: registers its processor with the queue workers of the app; a new booking enqueues it. */
+/** The queue transport of the confirm-booking job: registers its processor with the job runner, which an api or worker app composes; a new booking enqueues it. */
 export class ConfirmBookingQueueModule implements OnModuleInit {
     constructor(
-        @InjectQueueWorkerRegistry() private readonly registry: QueueWorkerRegistry,
+        @InjectJobProcessorRegistry() private readonly registry: JobProcessorRegistry,
         private readonly processor: ConfirmBookingProcessor,
     ) {}
 

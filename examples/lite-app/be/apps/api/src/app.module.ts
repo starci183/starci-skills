@@ -25,6 +25,7 @@ import {
 } from "@modules/platform/http-security"
 import { I18nModule } from "@modules/platform/i18n"
 import { LoggingModule } from "@modules/platform/logging"
+import { JOBS_ERROR_KINDS, JOBS_MESSAGES, JobsModule } from "@modules/platform/jobs"
 import { QueueModule } from "@modules/platform/queue"
 import type { ApiOptions } from "./api.options"
 import { RESOURCES_ERROR_KINDS, ResourcesModule } from "@modules/domain/resources"
@@ -54,7 +55,7 @@ export class AppModule {
                 LoggingModule.register({ isGlobal: true }),
                 I18nModule.register({
                     isGlobal: true,
-                    bundles: [ERRORS_MESSAGES, HTTP_SECURITY_MESSAGES, IDENTITY_MESSAGES],
+                    bundles: [ERRORS_MESSAGES, HTTP_SECURITY_MESSAGES, IDENTITY_MESSAGES, JOBS_MESSAGES],
                 }),
                 ErrorsModule.register({
                     isGlobal: true,
@@ -65,6 +66,7 @@ export class AppModule {
                         CONFIG_ERROR_KINDS,
                         DATABASE_ERROR_KINDS,
                         HTTP_SECURITY_ERROR_KINDS,
+                        JOBS_ERROR_KINDS,
                         IDENTITY_ERROR_KINDS,
                         SUPABASE_ERROR_KINDS,
                     ],
@@ -83,6 +85,11 @@ export class AppModule {
                     connections: [PRIMARY_ENTITY_MANAGER],
                     schedulers: [],
                     ...options.queue,
+                }),
+                JobsModule.register({
+                    isGlobal: true,
+                    connection: PRIMARY_ENTITY_MANAGER,
+                    ...options.jobs,
                 }),
                 ConfirmBookingQueueModule,
                 IdentityModule.register({ isGlobal: true, verifyAccessToken }),

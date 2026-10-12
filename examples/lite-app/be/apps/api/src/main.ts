@@ -8,6 +8,7 @@ import {
     RequestValidationService,
 } from "@modules/platform/http-security"
 import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
+import { parseJobsConfig } from "@modules/platform/jobs"
 import { parseQueueConfig } from "@modules/platform/queue"
 import { parseSupabaseConfig } from "@modules/integrations/supabase"
 import { AppModule } from "./app.module"
@@ -27,6 +28,7 @@ const bootstrap = async (): Promise<void> => {
         database: parsePrimaryDatabaseConfig(env),
         supabase: parseSupabaseConfig(env),
         queue: parseQueueConfig(env),
+        jobs: parseJobsConfig(env),
     }
     const app = await NestFactory.create(AppModule.register(options), { rawBody: true })
     app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })

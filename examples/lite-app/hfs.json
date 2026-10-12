@@ -32,7 +32,7 @@
         }
       ],
       "reads": ["supabase/types/"],
-      "patterns": ["webhooks", "queue"]
+      "patterns": ["webhooks", "queue", "fenced-job"]
     },
     "fe": {
       "apps": [
