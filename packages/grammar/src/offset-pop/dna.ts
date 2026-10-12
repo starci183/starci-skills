@@ -7,7 +7,7 @@
  * laws, and it is product-neutral. Every value equals the default in `./styles.css`; the
  * styles spec holds the two together.
  *
- * WCAG 2.x contrast, recorded here and asserted in `styles.spec.ts`:
+ * WCAG 2.x contrast, recorded here:
  *
  * | pair                                   | light | dark  | need |
  * | -------------------------------------- | ----- | ----- | ---- |

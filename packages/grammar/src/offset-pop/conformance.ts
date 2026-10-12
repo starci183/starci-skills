@@ -11,15 +11,14 @@ import { COMMON_UI_RULE_IDS, defineGrammarRuleConformance } from "../common/inde
  *
  * Inherited on purpose, although the family is close to them:
  * - The spacing and size rules not listed below: the family's only geometry is the short allow-list
- *   `conformance.spec.ts` locks, each entry owned by a claim here.
+ *   the family promises, each entry owned by a claim here.
  * - ACCENT-3 / COLOR-3: one pink fills the decision action, marks the selected or current state and
  *   draws the focus ring, so distinctness rests on Common's carriers (fill on an action, fill inside a
  *   control, outline, soft pairing, underline), not on hue.
  * - BOUNDARY-3: rows claim it, and the seam stays Common's one line between consecutive rows; the family
  *   only repaints that same edge in its 2px outline material (BOUNDARY-5) and adds no edge of its own.
  *
- * Each claim below is proved in `conformance.spec.ts`, which cites the matching assertion in
- * `styles.spec.ts`, the component `components-*.spec.ts` files or the render specs.
+ * Each claim below names the stylesheet rule or renderer that carries it.
  */
 export const OFFSET_POP_FAMILY_EVIDENCE = {
     "ACCENT-1": ["`--accent` binds the one pink. The family fills with it only the decision it marks: the dialog confirm, toast and alert action (the single action in each), a checked, selected or current state inside a control, and a real measurement (slider, meter, rating, spinner); it never paints text with it."],

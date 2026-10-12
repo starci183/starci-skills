@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.2.9 - 2026-10-12
+
+- Changed: bundled canon pins carry @starci/grammar 0.9.10 (the grammar ships without spec suites).
+
 ## 4.2.8 - 2026-10-12
 
 - Changed: refresh the bundled canon pins for grammar 0.9.9; behaviour is unchanged.

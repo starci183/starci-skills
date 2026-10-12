@@ -193,8 +193,8 @@ observations:
       `.grammar-common-root`, the band geometry, the workspace tracks, the highlight angle, the verdict
       edge, the overlay tone (`--starci-core-overlay-tone`, a pointer to a semantic variable such as
       `var(--danger, …)`, never a literal colour) and the BottomNav offset. None is a colour literal.
-      `src/common/styles.spec.ts` enforces that by asserting the sheet does not contain
-      `--starci-core-accent: #7547ff`, so this is owned direction, not an oversight of this version.
+      The sheet does not contain `--starci-core-accent: #7547ff`: this is owned direction, not an
+      oversight of this version.
   - id: the-rhythm-reaches-the-new-anatomy-only
     observation: |
       The three component sheets read the published rhythm directly (`var(--grammar-row-gap, 0.75rem)`
@@ -245,17 +245,16 @@ observations:
       `Select.Popover`, `Modal`, `Table`, `Typography` for Heading) and the vendor's own class names
       appear on the same elements as the grammar's. Where a grammar rule must win over the vendor's
       `components` layer, the Common sheets re-state the box in their own `@layer` with `!important`
-      rather than relying on a consumer's Tailwind scan — the debt `src/shipped-geometry.spec.ts` and
-      `src/common/styles.spec.ts` refuse.
+      rather than relying on a consumer's Tailwind scan.
   - id: every-renderer-stamps-rule-ids
     observation: |
       Every one of the 100 renderers stamps at least one `data-contract` rule id (`claims` /
       `computedClaims` per renderer above; `tests/work-ui/grammar-contracts.spec.mjs` holds it). The base
-      renderers mostly claim paint - spacing, font, tone, surface, boundary, overflow ids that
-      `src/__test__/styleClaims.ts` checks against the shipped declaration. The 53 renderers added in
+      renderers mostly claim paint - spacing, font, tone, surface, boundary, overflow ids the
+      shipped declaration carries. The 53 renderers added in
       0.5.0 claim behaviour instead: A11Y, FOCUS, FIELD, CONTROL-STATE, STATE, FEEDBACK, ICON, MEDIA,
       MOTION, LAYOUT-4 and CORE-BOUNDARY-4 on the node that implements each (a field root, a roving
-      list, a modal surface), proved by their render specs rather than by a declaration. Families still
+      list, a modal surface), carried by the renderer rather than by a declaration. Families still
       select them through `data-component`, `data-tier` and the `data-grammar-*` state hooks.
 guidance:
   - id: common-is-not-a-family

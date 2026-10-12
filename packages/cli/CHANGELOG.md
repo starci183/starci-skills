@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.9 - 2026-10-12
+
+- Changed: pin HFS 4.2.9 (canon pins for grammar 0.9.10); carries runtime 1.0.0-alpha.12; command behavior is unchanged.
+
 ## 1.2.8 - 2026-10-12
 
 - Changed: pin HFS 4.2.8 (canon pins for grammar 0.9.9); carries runtime 1.0.0-alpha.12; command behavior is unchanged.

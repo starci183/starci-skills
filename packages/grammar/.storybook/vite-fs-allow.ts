@@ -3,7 +3,7 @@ import path from 'node:path';
 import { searchForWorkspaceRoot } from 'vite';
 
 /**
- * Vite's `server.fs.allow` for the Storybook dev server and the vitest browser runs.
+ * Vite's `server.fs.allow` for the Storybook dev server.
  *
  * Vite resolves modules to their real paths, so when `node_modules` is a junction/symlink into
  * another checkout (a git worktree sharing one install) every dependency lives outside the

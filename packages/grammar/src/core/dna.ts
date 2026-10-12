@@ -5,8 +5,8 @@
  * outside the package; consumers use these values to render the same StarCi
  * family without rebuilding its palette, geometry or motion from memory.
  *
- * Every colour pair the family's CSS combines clears WCAG AA in light and dark; `styles.spec.ts`
- * measures them through the resolved scope, HeroUI's vendor variables included. `accent` is the
+ * Every colour pair the family's CSS combines clears WCAG AA in light and dark, measured
+ * through the resolved scope, HeroUI's vendor variables included. `accent` is the
  * brand FILL (white text on it, and the focus ring); where the accent is painted as TEXT - links,
  * the current tab and bottom-nav label, the section eyebrow, the soft accent pairing - the family
  * reads `accentText`, which is themed because the violet fill is too dark to read on the dark

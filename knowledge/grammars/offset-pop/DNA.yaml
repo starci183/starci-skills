@@ -118,7 +118,7 @@ identity:
     - TONE-3
     - TRUTH-1
   contrast:
-    source: "src/offset-pop/dna.ts header table, asserted in src/offset-pop/styles.spec.ts"
+    source: "src/offset-pop/dna.ts header table"
     pairs:
       - pair: "foreground on canvas / surface / surfaceSecondary"
         light: "16.86 / 17.49 / 13.78"

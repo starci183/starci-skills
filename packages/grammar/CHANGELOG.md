@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.10 - 2026-10-12
+
+Patch, no runtime change (owner ruling 2026-10-12: the grammar keeps no tests). Components, CSS and exports are identical to 0.9.9.
+
+- **Removed: every spec suite, the test helpers (`src/__test__`), the vitest configs and the Storybook a11y gate.** `test` and `prepack` are now `typecheck` + `build`; `pack:check` is `build` + `npm pack --dry-run`. Dev dependencies vitest, @vitest/*, jsdom, @testing-library/react and @storybook/addon-vitest are gone. The UI contracts stay in the runtime (`tests/work-ui`) and the grammar DNA snapshot.
+
 ## 0.9.9 - 2026-10-12
 
 Minor, additive (owner rulings 2026-10-12). No new catalog component (still 104).

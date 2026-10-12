@@ -3104,7 +3104,7 @@
      * through `--h4` from the vendor's own sheet. Until 0.4.12 the family answered that with the
      * Tailwind utility classes on the component alone - and a utility class exists only where the
      * CONSUMER's Tailwind build scanned this package's dist, which is the same debt
-     * `shipped-geometry.spec.ts` already refuses for layout. A consumer whose scan stopped finding
+     * the family already refuses for layout. A consumer whose scan stopped finding
      * the package measured 36px under a `FONT-4` stamp and 30px under `FONT-3`: the vendor's sizes,
      * under the family's promise. The scale is the family's, so the family's sheet draws it, the way
      * `.starci-core-text` above already draws its own.

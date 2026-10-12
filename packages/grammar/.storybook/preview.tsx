@@ -100,7 +100,7 @@ const preview: Preview = {
     },
   },
   initialGlobals: {
-    // The vitest run sweeps families/themes through these env overrides.
+    // Families/themes can be switched at launch through these env overrides.
     grammarFamily: import.meta.env.VITE_GRAMMAR_FAMILY ?? 'core',
     grammarTheme: import.meta.env.VITE_GRAMMAR_THEME ?? 'light',
   },
@@ -113,8 +113,7 @@ const preview: Preview = {
       },
     },
     a11y: {
-      // `todo` reports violations in the UI and test output without failing; set
-      // VITE_A11Y_TEST=error to make the vitest run fail on them.
+      // `todo` reports violations in the addon panel without failing.
       test: import.meta.env.VITE_A11Y_TEST === 'error' ? 'error' : 'todo',
     },
   },

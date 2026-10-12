@@ -452,9 +452,6 @@ json-exceptions:
     - path: packages/fe-kit/tsconfig.json
       reason: >
         TypeScript toolchain config inside the packages workspace project; tsc reads JSON (with comments).
-    - path: packages/grammar/.storybook/a11y-allowlist.json
-      reason: >
-        Reviewed a11y-gate waivers for the grammar Storybook; .storybook/a11y-gate.ts imports it as a JSON module through Vite.
     - path: packages/grammar/package-lock.json
       reason: >
         npm lockfile inside the packages workspace project; npm writes JSON by contract.
