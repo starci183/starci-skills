@@ -24,7 +24,7 @@ const only = (hook: string, home: keyof typeof sheets) => {
 
 describe("0.9.7: loading views for the remaining components (knowledge STATE-8)", () => {
     it("is at 0.9.7 with a changelog entry and adds no catalog component", () => {
-        expect(packageJson.version).toMatch(/^0.9.(7|8)$/)
+        expect(packageJson.version).toMatch(/^0.9.(7|8|9)$/)
         expect(changelog).toContain("## 0.9.7 - 2026-10-11")
         expect(Object.keys(COMMON_GRAMMAR_COMPONENTS)).toHaveLength(104)
     })

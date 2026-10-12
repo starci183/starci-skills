@@ -1567,4 +1567,63 @@
     @media (forced-colors: active) {
         .starci-core-flow-graph-node[data-grammar-selected="true"] { outline-color: Highlight; forced-color-adjust: none; }
     }
+
+    /*
+     * Tabs variant="secondary" (0.9.9): a compact pill strip for tabs inside a sub-region (drawer, card, dialog, rail).
+     * It is the vendor pill tabs (a soft --default track, a sliding indicator) re-painted in the selectable-chip family:
+     * the selected tab is an --accent-soft pill with --accent-soft-foreground text, the SegmentedControl footprint (a
+     * 2.5rem strip, 0.25rem track padding, 2rem tabs; the touch floor still wins on coarse pointers). The primary
+     * underline bar is untouched. The vendor paint lives in the later `components` layer, so the few properties this
+     * re-cuts are `!important` (the documented approach used for the selectable chip).
+     */
+    .starci-core-tabs-frame[data-grammar-tabs-variant="secondary"] {
+        width: fit-content;
+        max-width: 100%;
+    }
+
+    .starci-core-tabs-frame[data-grammar-tabs-variant="secondary"] .starci-core-tabs {
+        min-width: 0;
+    }
+
+    .starci-core-tabs-frame[data-grammar-tabs-variant="secondary"] .tabs__list-container {
+        background: var(--default, ButtonFace) !important;
+        border-radius: var(--starci-core-segmented-radius, calc(var(--radius, 0.5rem) * 2)) !important;
+    }
+
+    .starci-core-tabs-frame[data-grammar-tabs-variant="secondary"] .tabs__list {
+        padding: 0.25rem !important;
+    }
+
+    .starci-core-tabs-frame[data-grammar-tabs-variant="secondary"] .tabs__tab {
+        min-block-size: 2rem;
+        border-radius: inherit !important;
+        color: var(--muted, GrayText);
+    }
+
+    .starci-core-tabs-frame[data-grammar-tabs-variant="secondary"] .tabs__tab[data-selected="true"] {
+        color: var(--accent-soft-foreground, HighlightText) !important;
+    }
+
+    .starci-core-tabs-frame[data-grammar-tabs-variant="secondary"] .tabs__indicator {
+        top: 0 !important;
+        bottom: auto !important;
+        height: 100% !important;
+        border-radius: inherit !important;
+        background: var(--accent-soft, Highlight) !important;
+        box-shadow: none !important;
+    }
+
+    @media (pointer: coarse), (max-width: 40rem) {
+        .starci-core-tabs-frame[data-grammar-tabs-variant="secondary"] .tabs__tab {
+            min-block-size: calc(var(--starci-core-control-min-size, 2.75rem) - 0.5rem);
+        }
+    }
+
+    @media (forced-colors: active) {
+        .starci-core-tabs-frame[data-grammar-tabs-variant="secondary"] .tabs__indicator {
+            outline: 1px solid Highlight;
+            outline-offset: -1px;
+            forced-color-adjust: none;
+        }
+    }
 }

@@ -6,8 +6,11 @@ import { Icon, type IconSource } from "../Icon/index.js"
  * `ghost` is the quiet bare glyph with no fill at rest (HeroUI's ghost: a fill only on hover/press) -
  * for an overflow "..." menu or a secondary glyph action beside a card title. `primary` is the accent-filled plate for the
  * one glyph action that must stand out (a floating assistant or compose button); one per view, like a primary Button.
+ * `danger-soft` is the danger tone's soft tint plate (`--danger-soft` ground, `--danger-soft-foreground` glyph, one step
+ * stronger on hover): use it for a reversible or row-level destructive action, such as a trash glyph that deletes a row.
+ * A confirmed destructive action inside an AlertDialog uses the solid `danger` Button instead.
  */
-export type IconButtonVariant = "tertiary" | "ghost" | "primary"
+export type IconButtonVariant = "tertiary" | "ghost" | "primary" | "danger-soft"
 
 export type IconButtonProps = {
     readonly source: IconSource

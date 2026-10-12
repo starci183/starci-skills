@@ -12,6 +12,7 @@ import {
     Button,
     DataTable,
     Divider,
+    IconButton,
     EmptyNotice,
     Heading,
     HorizontalScrollRegion,
@@ -133,6 +134,9 @@ const HOOK_GALLERY = (
         <Rail label="Details">Rail content</Rail>
         <SectionHeader eyebrow="Eyebrow" title="Section" />
         <TextAction appearance="tab" href="/tab" isCurrent>Tab</TextAction>
+        <IconButton source={Glyph} label="Delete row" variant="danger-soft" />
+        {/* The client-ready Tabs tree (vendor list, tab and indicator) is not server-rendered, so its anatomy is mounted by hand. */}
+        <div data-component="Tabs" data-grammar-tabs-variant="secondary" dangerouslySetInnerHTML={{ __html: '<div class="tabs__list-container"><div class="tabs__list"><button class="tabs__tab" data-selected="true">One<span class="tabs__indicator"></span></button></div></div>' }} />
         <NavigationFeatureNav
             identity={<span>Brand</span>}
             navigation={<a href="/learn">Learn</a>}

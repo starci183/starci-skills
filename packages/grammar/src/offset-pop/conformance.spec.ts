@@ -193,7 +193,7 @@ const PROOF: Readonly<Record<keyof typeof OFFSET_POP_FAMILY_EVIDENCE, () => void
     "ACCENT-1": () => {
         expect(rootTokens.get("--accent")).toBe("var(--offset-pop-accent)")
         expect(OFFSET_POP_DNA.color.accent).toBe(OFFSET_POP_DNA.palette.pink)
-        const DECISION = /overlay-action="confirm"|toast-action|alert-actions|data-selected|data-grammar-selected|data-indeterminate|data-grammar-current|data-current="true"|data-grammar-step-state="current"|aria-expanded="true"|disclosure-state="open"|data-grammar-drag="over"|slider-fill|meter-fill|meter-segment="filled"|rating-fill|"Spinner"|"ProgressCircle"|"Link"|overlay-backdrop/
+        const DECISION = /overlay-action="confirm"|toast-action|alert-actions|data-selected|data-grammar-selected|data-indeterminate|data-grammar-current|data-current="true"|data-grammar-step-state="current"|aria-expanded="true"|disclosure-state="open"|data-grammar-drag="over"|slider-fill|meter-fill|meter-segment="filled"|rating-fill|"Spinner"|"ProgressCircle"|"Link"|overlay-backdrop|tabs__indicator/
         const accentPaint = painted.filter((d) => FILL_ACCENT.test(d.value))
         expect(accentPaint.length).toBeGreaterThan(10)
         expect(accentPaint.filter((d) => !DECISION.test(d.selector)).map((d) => `${d.property} in ${short(d.selector)}`)).toEqual([])
@@ -544,7 +544,8 @@ describe("Offset Pop rule conformance: inherited rules really are Common's", () 
 
     it("targets no icon, media or field-label renderer outside the claimed treatments (ICON, MEDIA)", () => {
         for (const component of ["Icon", "IconTile", "IconButton", "RankArtwork"]) {
-            expect(familyRules.some((rule) => rule.selector.includes(`[data-component="${component}"]`)), component).toBe(false)
+            // 0.9.9: the one claimed IconButton treatment is the destructive `danger-soft` plate (ink outline + hard offset).
+            expect(familyRules.some((rule) => rule.selector.includes(`[data-component="${component}"]`) && !(component === "IconButton" && rule.selector.includes('[data-variant="danger-soft"]'))), component).toBe(false)
         }
     })
 

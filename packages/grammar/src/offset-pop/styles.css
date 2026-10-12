@@ -285,6 +285,17 @@
         border-inline-end: var(--offset-pop-outline-width) solid var(--border);
     }
 
+    /* IconButton "danger-soft" (a destructive row action): the danger tint plate wears the family's ink outline and a small hard offset, pressed flat. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="IconButton"][data-variant="danger-soft"] {
+        border: var(--offset-pop-outline-width) solid var(--border);
+        box-shadow: 0.125rem 0.125rem 0 var(--offset-pop-shadow-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="IconButton"][data-variant="danger-soft"]:active:not([disabled]) {
+        box-shadow: 0 0 0 var(--offset-pop-shadow-ink);
+        transform: translate(0.125rem, 0.125rem);
+    }
+
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-navigation-feature-nav] {
         border-block-end-width: var(--offset-pop-outline-width);
         border-block-end-color: var(--border);

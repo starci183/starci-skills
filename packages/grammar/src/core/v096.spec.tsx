@@ -20,7 +20,7 @@ const blocks = (source: string, selector: string) => [...source.matchAll(/([^{}]
 
 describe("0.9.6: selectable TagGroup chips", () => {
     it("is at least 0.9.6", () => {
-        expect(packageJson.version).toMatch(/^0\.9\.(6|7|8)$/)
+        expect(packageJson.version).toMatch(/^0\.9\.(6|7|8|9)$/)
     })
 
     it("paints unselected selectable chips as the secondary button with a 1px border", () => {

@@ -2858,6 +2858,18 @@
         height: 1.5rem;
     }
 
+    /*
+     * `danger-soft` (0.9.9): the danger tone's soft tint plate - --danger-soft ground, --danger-soft-foreground glyph,
+     * --danger-soft-hover (one step stronger) on hover and press - for a reversible or row-level destructive action.
+     * Same sizes, focus ring and accessible label as every IconButton.
+     */
+    .starci-core-icon-button[data-variant="danger-soft"] {
+        --button-bg: var(--danger-soft, transparent);
+        --button-bg-hover: var(--danger-soft-hover, var(--danger-soft, transparent));
+        --button-bg-pressed: var(--danger-soft-hover, var(--danger-soft, transparent));
+        --button-fg: var(--danger-soft-foreground, var(--danger, CanvasText));
+    }
+
     .starci-core-icon-button[data-floating="true"] {
         box-shadow: var(--overlay-shadow, 0 8px 24px rgb(0 0 0 / 0.16)) !important;
     }

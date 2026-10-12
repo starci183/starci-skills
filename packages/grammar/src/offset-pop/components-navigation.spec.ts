@@ -33,7 +33,8 @@ const RENDERERS: Readonly<Record<keyof typeof COMMON_NAVIGATION_COMPONENTS, stri
     TopBar: "src/core/composition/TopBar/index.tsx",
 }
 
-const rendererSource = Object.values(RENDERERS).map(read).join("\n")
+/** Tabs (a branch, not a member of this group) is read too: the secondary strip's `data-grammar-tabs-variant` hook is named by this sheet. */
+const rendererSource = [...Object.values(RENDERERS), "src/core/branch/Tabs/index.tsx"].map(read).join("\n")
 const names = Object.keys(COMMON_NAVIGATION_COMPONENTS) as ReadonlyArray<keyof typeof COMMON_NAVIGATION_COMPONENTS>
 
 const selectorLines = (css: string) => css

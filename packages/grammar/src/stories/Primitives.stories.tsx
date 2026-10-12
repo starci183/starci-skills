@@ -9,6 +9,7 @@ import {
   SearchGlyph,
   SettingsGlyph,
   StarGlyph,
+  TrashGlyph,
   State,
   familyScope,
   noop,
@@ -207,6 +208,10 @@ export const IconButton: Story = {
       </State>
       <State label="Quiet (ghost) - an overflow menu glyph">
         <G.IconButton source={SettingsGlyph} label="More actions" variant="ghost" onPress={noop} />
+      </State>
+      <State label="Danger-soft - a reversible or row-level delete (an AlertDialog confirm uses the solid danger Button)">
+        <G.IconButton source={TrashGlyph} label="Delete row" variant="danger-soft" onPress={noop} />
+        <G.IconButton source={TrashGlyph} label="Delete row unavailable" variant="danger-soft" isDisabled />
       </State>
       <State label="Disabled">
         <G.IconButton source={SearchGlyph} label="Search unavailable" isDisabled />
