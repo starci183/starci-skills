@@ -2,7 +2,7 @@
 
 ## 1.2.7 - 2026-10-12
 
-- Changed: pin HFS 4.2.7, carrying the repaired Grammar canon pins; command behavior is unchanged.
+- Changed: pin HFS 4.2.7 (canon pins for grammar 0.9.8); carries runtime 1.0.0-alpha.12; command behavior is unchanged.
 
 ## 1.2.6 - 2026-10-12
 

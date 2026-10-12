@@ -69,6 +69,18 @@
             border-color var(--offset-pop-transition);
     }
 
+    /*
+     * A ComboBox draws its box on the input group (ink outline, surface paint, control radius, the one field height of
+     * Common's anatomy). The vendor input inside is only the text: no paint of its own (the secondary layer's tint
+     * would otherwise fill the group and read as a second, differently cornered box), no outline, the group's corner.
+     */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="ComboBox"] .starci-core-combo-box-input {
+        border: 0;
+        border-radius: inherit;
+        background: transparent;
+        box-shadow: none;
+    }
+
     /* A loading Select or Textarea (knowledge STATE-8) keeps the field box: ink outline and control radius around the skeleton block. */
     .grammar-common-root[data-grammar-family="offset-pop"] :is([data-component="Select"], [data-component="Textarea"], [data-component="NumberField"], [data-component="SearchField"], [data-component="SegmentedControl"]) .starci-core-field-skeleton-control {
         box-sizing: border-box;

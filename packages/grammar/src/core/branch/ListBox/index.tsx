@@ -76,7 +76,7 @@ export const ListBox = ({
         {...(isLoading
             ? {
                 renderEmptyState: () => (
-                    <div data-grammar-list-skeleton="true">
+                    <div className="starci-core-list-box-skeleton" data-grammar-list-skeleton="true">
                         {Array.from({ length: clampRows(loadingRows) }, (_, index) => (
                             <div key={index} aria-hidden="true" className="starci-core-list-box-item starci-core-list-box-skeleton-option" data-grammar-skeleton="true">
                                 <span className="starci-core-list-box-copy">

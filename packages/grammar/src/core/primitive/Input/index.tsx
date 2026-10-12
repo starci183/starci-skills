@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useLayoutEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type ComponentType, type CSSProperties, type ReactNode } from "react"
 import {
     Description as HeroDescription,
     ErrorMessage as HeroErrorMessage,
@@ -19,6 +19,8 @@ export type InputProps = {
     readonly id: string
     readonly name: string
     readonly label: ReactNode
+    /** Keeps the label as the accessible name but hides it visually (a row of inputs that label themselves by position). */
+    readonly isLabelHidden?: boolean
     readonly kind?: InputKind
     readonly variant?: InputVariant
     readonly placeholder?: string
@@ -49,6 +51,12 @@ export type InputProps = {
     readonly revealIcon?: InputIcon
     readonly hideIcon?: InputIcon
     readonly onValueChange?: (value: string) => void
+    /** Focus left the input itself (not an in-field action). Forwarded to the underlying input. */
+    readonly onBlur?: () => void
+    /** The native paste event of the input, before the value changes; `preventDefault()` keeps the vendor from inserting. */
+    readonly onPaste?: (event: ClipboardEvent<HTMLInputElement>) => void
+    /** Focuses the input when it mounts (a row that was just added, a drawer that just opened). */
+    readonly autoFocus?: boolean
 }
 
 const KINDS = {
@@ -60,11 +68,21 @@ const KINDS = {
     text: { type: "text", autoComplete: "off", inputMode: "text" },
 } as const
 
-/** Core ownership boundary for label, guidance, control state, and validation copy. */
+/**
+ * Core ownership boundary for label, guidance, control state, and validation copy.
+ *
+ * Layout: the field is a grid of label, hint, control box and error. The error message is the LAST row and reserves no
+ * space until it exists, so showing or clearing it moves nothing above it: the control box keeps its position and height.
+ * A row that puts a trailing action beside the field (an input and a Delete button) aligns that action to the control
+ * box, not to the whole field: `[data-grammar-input-control="true"]` is the control box (the input and its in-field
+ * actions). Give the row `align-items: start` and align the action to that box (offset by the label and hint above it),
+ * so an error appearing under the field never shifts the action.
+ */
 export const Input = ({
     id,
     name,
     label,
+    isLabelHidden = false,
     kind: kindName = "text",
     variant = "primary",
     placeholder,
@@ -88,6 +106,9 @@ export const Input = ({
     revealIcon: RevealIcon,
     hideIcon: HideIcon,
     onValueChange,
+    onBlur,
+    onPaste,
+    autoFocus = false,
 }: InputProps) => {
     const [isRevealed, setIsRevealed] = useState(false)
     const kind = KINDS[kindName]
@@ -140,7 +161,7 @@ export const Input = ({
     if (isSkeleton) {
         return (
             <div data-tier="atom" data-component="Input" data-state="skeleton" data-contract="GAP-2" className="starci-core-input">
-                <HeroSkeleton className="starci-core-input-resting-label" />
+                {isLabelHidden ? null : <HeroSkeleton className="starci-core-input-resting-label" />}
                 <HeroSkeleton className="starci-core-input-resting-control" />
             </div>
         )
@@ -165,10 +186,11 @@ export const Input = ({
             data-contract="GAP-2"
             className="starci-core-input"
         >
-            <HeroLabel>{label}</HeroLabel>
+            <HeroLabel {...(isLabelHidden ? { className: "starci-core-form-label--screen-reader" } : {})}>{label}</HeroLabel>
             {hint == null ? null : <HeroDescription>{hint}</HeroDescription>}
             <div
                 className="starci-core-input-control"
+                data-grammar-input-control="true"
                 data-reveal={canReveal ? "true" : "false"}
                 data-copyable={canCopy ? "true" : "false"}
                 style={actionsWidth === null ? undefined : ({ "--starci-core-input-actions-width": `${actionsWidth}px` } as CSSProperties)}
@@ -182,6 +204,9 @@ export const Input = ({
                     {...(placeholder === undefined ? {} : { placeholder })}
                     fullWidth
                     className="starci-core-input-field"
+                    {...(autoFocus ? { autoFocus: true } : {})}
+                    {...(onBlur === undefined ? {} : { onBlur: () => onBlur() })}
+                    {...(onPaste === undefined ? {} : { onPaste })}
                 />
                 {canReveal || canCopy ? (
                     <span ref={actions} className="starci-core-input-actions">

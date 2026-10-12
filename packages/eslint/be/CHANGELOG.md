@@ -2,7 +2,7 @@
 
 ## 3.2.8 - 2026-10-12
 
-- Changed: refresh the bundled canon pins for the repaired Grammar and its dependent package patch versions; behavior is unchanged.
+- Changed: refresh the bundled canon pins for grammar 0.9.8; behaviour is unchanged.
 
 ## 3.2.7 - 2026-10-12
 

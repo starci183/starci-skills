@@ -1,6 +1,7 @@
 "use client"
 
 import { SearchField as HeroSearchField, Spinner as HeroSpinner } from "@heroui/react"
+import type { ClipboardEvent } from "react"
 import {
     FieldDescription,
     FieldErrorText,
@@ -32,6 +33,12 @@ export type SearchFieldProps = FieldControlProps & {
      * `aria-hidden` and not focusable; the root is `aria-busy`. Value, description and error copy are not drawn.
      */
     readonly isSkeleton?: boolean
+    /** Focus left the input. */
+    readonly onBlur?: () => void
+    /** The native paste event of the input. */
+    readonly onPaste?: (event: ClipboardEvent<HTMLInputElement>) => void
+    /** Focuses the input when it mounts. */
+    readonly autoFocus?: boolean
 }
 
 /*
@@ -56,6 +63,9 @@ export const SearchField = ({
     clearLabel,
     variant = "primary",
     isSkeleton = false,
+    onBlur,
+    onPaste,
+    autoFocus = false,
     ...field
 }: SearchFieldProps) => isSkeleton ? (
     <FieldSkeleton component="SearchField" tier="atom" label={field.label} isLabelHidden={field.isLabelHidden} isRequired={field.isRequired} variant={variant} kind="input" className="starci-core-search-field" />
@@ -82,6 +92,9 @@ export const SearchField = ({
                 {...(id === undefined ? {} : { id })}
                 {...(placeholder === undefined ? {} : { placeholder })}
                 className="starci-core-search-field-input"
+                {...(autoFocus ? { autoFocus: true } : {})}
+                {...(onBlur === undefined ? {} : { onBlur: () => onBlur() })}
+                {...(onPaste === undefined ? {} : { onPaste })}
                 {...(isPending ? { "aria-busy": true } : {})}
             />
             {isPending ? <HeroSpinner size="sm" color="current" aria-hidden="true" className="starci-core-field-spinner" /> : null}

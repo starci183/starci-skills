@@ -1,13 +1,18 @@
 "use client"
 
 import { Disclosure as HeroDisclosure } from "@heroui/react"
-import { useState, type ReactNode } from "react"
+import { useId, useState, type ReactNode } from "react"
 import { navigationClassName } from "../../navigationClassNames.js"
 
 export type DisclosureProps = {
     /** The always-visible trigger text. */
     readonly title: ReactNode
     readonly children: ReactNode
+    /**
+     * Muted one-line text at the trailing end of the trigger row (truncated with an ellipsis), visible closed and open: a
+     * count, a current value, a status. It is the trigger's accessible DESCRIPTION (`aria-describedby`), not part of its name.
+     */
+    readonly summary?: ReactNode
     /** Controlled expansion. Omit for uncontrolled use with `defaultExpanded`. */
     readonly isExpanded?: boolean
     readonly defaultExpanded?: boolean
@@ -33,6 +38,7 @@ export type DisclosureProps = {
 export const Disclosure = ({
     title,
     children,
+    summary,
     isExpanded,
     defaultExpanded = false,
     onExpandedChange,
@@ -42,6 +48,8 @@ export const Disclosure = ({
 }: DisclosureProps) => {
     const [uncontrolled, setUncontrolled] = useState(defaultExpanded)
     const expanded = isExpanded ?? uncontrolled
+    const summaryId = useId()
+    const hasSummary = summary !== undefined && summary !== null && summary !== false && summary !== ""
     return (
         <HeroDisclosure
             className={navigationClassName("starci-core-disclosure", className)}
@@ -57,8 +65,9 @@ export const Disclosure = ({
             }}
         >
             <HeroDisclosure.Heading className="starci-core-disclosure-heading" level={headingLevel}>
-                <HeroDisclosure.Trigger className="starci-core-disclosure-trigger" data-contract="FOCUS-1" data-grammar-disclosure-trigger="true">
+                <HeroDisclosure.Trigger className="starci-core-disclosure-trigger" data-contract="FOCUS-1" data-grammar-disclosure-trigger="true" {...(hasSummary ? { "aria-describedby": summaryId } : {})}>
                     <span className="starci-core-disclosure-title">{title}</span>
+                    {hasSummary ? <span id={summaryId} aria-hidden="true" className="starci-core-disclosure-summary" data-grammar-disclosure-summary="true">{summary}</span> : null}
                     <HeroDisclosure.Indicator className="starci-core-disclosure-indicator" data-contract="MOTION-2" />
                 </HeroDisclosure.Trigger>
             </HeroDisclosure.Heading>

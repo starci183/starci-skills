@@ -101,6 +101,10 @@ export const Select = ({
     ...field
 }: SelectProps) => {
     const [heldValue] = useState<string | null>(value ?? defaultValue ?? null)
+    const [chosen, setChosen] = useState<string | null>(defaultValue ?? null)
+    const shownKey = value === undefined ? chosen : value
+    /** The full selected text: the one-line value ellipsizes, so the trigger keeps it as its title. */
+    const selectedText = options.find((option) => option.id === shownKey)?.label
     const { anchor, portalProps } = useGrammarPortal()
     const readOnly = field.isReadOnly === true
     const selection = readOnly
@@ -125,7 +129,10 @@ export const Select = ({
             {...selection}
             {...(readOnly ? { isOpen: false } : {})}
             onChange={(key: Key | null) => {
-                if (!readOnly) onValueChange?.(toValue(key))
+                if (!readOnly) {
+                    setChosen(toValue(key))
+                    onValueChange?.(toValue(key))
+                }
             }}
         >
             {anchor}
@@ -135,7 +142,13 @@ export const Select = ({
                 data-grammar-field-control="true"
                 isPending={isPending}
             >
-                <HeroSelect.Value className="starci-core-select-value" />
+                <HeroSelect.Value className="starci-core-select-value">
+                    {({ defaultChildren, isPlaceholder }: { readonly defaultChildren: ReactNode; readonly isPlaceholder: boolean }) => (
+                        selectedText === undefined || isPlaceholder
+                            ? defaultChildren
+                            : <span className="starci-core-select-value-text" title={selectedText}>{defaultChildren}</span>
+                    )}
+                </HeroSelect.Value>
                 {isPending
                     ? <HeroSpinner size="sm" color="current" aria-hidden="true" className="starci-core-field-spinner" />
                     : <HeroSelect.Indicator className="starci-core-select-indicator" />}

@@ -287,7 +287,7 @@ export const FieldSkeleton = ({ component, tier, label, isLabelHidden, isRequire
             data-tier={tier}
             data-component={component}
             data-contract="A11Y-1 STATE-8"
-            className={`${kind === "switch" ? "starci-core-choice" : "starci-core-field"} ${className}`}
+            className={`${kind === "switch" ? "starci-core-choice" : "starci-core-field"} ${className} starci-core-field-skeleton`}
             {...(variant === undefined ? {} : fieldVariantAttributes(variant))}
             {...(orientation === undefined ? {} : { "data-grammar-orientation": orientation })}
             data-grammar-skeleton="true"

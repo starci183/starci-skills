@@ -12,6 +12,50 @@ purpose: |-
   become one fact, and a fact with no carrier becomes a guess, so the compiling step is the rule.
   Applicability: API examples belong to the documented Grammar family; verify installed source and
   the selected `.starciwork` specification before use. Gap labels here are findings, not dispatch commands.
+componentOwnership:
+  title: Loading anatomy the grammar already owns
+  notes: |-
+    Retained ownership reference, not proof of the current package/API. Verify actual installed source/props before use. Each row is a published loading or skeleton mode that keeps the resolved anatomy (STATE-8 case-1/2); the application only passes the flag.
+  rows:
+    - component: SurfaceListCard
+      element: collection, isLoading (loadingRows, default 3)
+      rule: STATE-8
+    - component: ListRow
+      element: root, isSkeleton
+      rule: STATE-8
+    - component: DataTable
+      element: body, isLoading (loadingRows, default 3)
+      rule: STATE-8
+    - component: DescriptionList
+      element: description and meta, isLoading
+      rule: STATE-8
+    - component: FlowGraph
+      element: frame, isLoading
+      rule: STATE-8
+    - component: ListBox
+      element: options, isLoading
+      rule: STATE-8
+    - component: Timeline
+      element: entries, isLoading
+      rule: STATE-8
+    - component: Stepper
+      element: markers, isLoading
+      rule: STATE-8
+    - component: SectionHeader
+      element: title, description, meta, isSkeleton
+      rule: STATE-8
+    - component: Field
+      element: control, isSkeleton (Select, Textarea, NumberField, SearchField, SegmentedControl, CheckboxGroup, Switch)
+      rule: STATE-8
+    - component: Meter
+      element: bar, isSkeleton
+      rule: STATE-8
+    - component: Avatar
+      element: root, isSkeleton
+      rule: STATE-8
+    - component: ChatBubble
+      element: bubble, isSkeleton (ChatBubbleSkeletons)
+      rule: STATE-8
 guidance:
   - id: the-five-kinds
     title: The five kinds
@@ -139,6 +183,10 @@ rules:
           The direction is tempted to wrap the published tabs in its own tab roles
         assert: |-
           No node outside `Tabs` carries composite tab semantics for the same choice
+      - id: case-5
+        when: The choice switches between different screens of content (upload | write | FAQ) rather than setting one value of a form
+        assert: |-
+          Owner ruling 2026-10-12: it is `Tabs`, each tab owning its panel; `SegmentedControl` is reserved for choosing one value inside a form (who may see it, a period, a view density), and is never used to swap whole panels
   - id: STATE-7
     title: Controlled disclosure
     governs: Governs a summary that reveals a region.

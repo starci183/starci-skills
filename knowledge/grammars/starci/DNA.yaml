@@ -126,7 +126,7 @@ identity:
     (`--accent`, `--surface`, `--field-*`, `--radius`, `--shadow-surface`, …).
   counts:
     renderers: 104
-    tokens: 118
+    tokens: 119
     claimEntries: 409
     gaps: 13
 
@@ -524,6 +524,10 @@ tokens:
     value: "0.5rem"
     valueFrom: "common-fallback"
     source: "packages/grammar/src/common/styles.css:523"
+  - name: "--starci-core-field-min-height"
+    value: "2.5rem"
+    valueFrom: "common-fallback"
+    source: "packages/grammar/src/common/components-forms.css:94"
   - name: "--starci-core-fill-bottom"
     value: "0px"
     valueFrom: "common-fallback"
@@ -708,11 +712,11 @@ tokens:
   - name: "--starci-core-skeleton-rows"
     value: "4"
     valueFrom: "renderer"
-    source: "packages/grammar/src/common/components-forms.css:163"
+    source: "packages/grammar/src/common/components-forms.css:171"
   - name: "--starci-core-skeleton-segments"
     value: "2"
     valueFrom: "renderer"
-    source: "packages/grammar/src/common/components-forms.css:145"
+    source: "packages/grammar/src/common/components-forms.css:153"
   - name: "--starci-core-subnav-offset"
     value: "var(--starci-core-band-height, 4rem)"
     valueFrom: "common-fallback"
@@ -1173,6 +1177,7 @@ renderers:
       - "starci-core-field-description"
       - "starci-core-field-error"
       - "starci-core-field-required"
+      - "starci-core-field-skeleton"
       - "starci-core-field-skeleton-choice-label"
       - "starci-core-field-skeleton-control"
   - component: "CloseButton"
@@ -1375,6 +1380,7 @@ renderers:
       - "starci-core-disclosure-heading"
       - "starci-core-disclosure-indicator"
       - "starci-core-disclosure-panel"
+      - "starci-core-disclosure-summary"
       - "starci-core-disclosure-title"
       - "starci-core-disclosure-trigger"
   - component: "Divider"
@@ -1481,6 +1487,7 @@ renderers:
       - "starci-core-field-error"
       - "starci-core-field-label"
       - "starci-core-field-required"
+      - "starci-core-field-skeleton"
       - "starci-core-field-skeleton-choice-label"
       - "starci-core-field-skeleton-control"
       - "starci-core-form-label--screen-reader"
@@ -1722,6 +1729,7 @@ renderers:
     claims: ["FONT-1", "GAP-2", "TONE-2"]
     computedClaims: []
     classes:
+      - "starci-core-form-label--screen-reader"
       - "starci-core-input"
       - "starci-core-input-actions"
       - "starci-core-input-control"
@@ -1815,6 +1823,7 @@ renderers:
       - "starci-core-list-box-label"
       - "starci-core-list-box-leading"
       - "starci-core-list-box-row"
+      - "starci-core-list-box-skeleton"
       - "starci-core-list-box-skeleton-option"
       - "starci-core-list-box-trailing"
   - component: "ListItem"
@@ -1918,6 +1927,7 @@ renderers:
       - "starci-core-meter-output"
       - "starci-core-meter-segment"
       - "starci-core-meter-segments"
+      - "starci-core-meter-skeleton"
       - "starci-core-meter-skeleton-bar"
       - "starci-core-meter-track"
   - component: "NavLandmark"
@@ -1968,6 +1978,7 @@ renderers:
       - "starci-core-field-description"
       - "starci-core-field-error"
       - "starci-core-field-required"
+      - "starci-core-field-skeleton"
       - "starci-core-field-skeleton-choice-label"
       - "starci-core-field-skeleton-control"
       - "starci-core-number-field"
@@ -2212,6 +2223,7 @@ renderers:
       - "starci-core-field-description"
       - "starci-core-field-error"
       - "starci-core-field-required"
+      - "starci-core-field-skeleton"
       - "starci-core-field-skeleton-choice-label"
       - "starci-core-field-skeleton-control"
       - "starci-core-field-spinner"
@@ -2263,6 +2275,7 @@ renderers:
       - "starci-core-field-error"
       - "starci-core-field-label"
       - "starci-core-field-required"
+      - "starci-core-field-skeleton"
       - "starci-core-field-skeleton-choice-label"
       - "starci-core-field-skeleton-control"
       - "starci-core-form-label--screen-reader"
@@ -2288,6 +2301,7 @@ renderers:
       - "starci-core-field-description"
       - "starci-core-field-error"
       - "starci-core-field-required"
+      - "starci-core-field-skeleton"
       - "starci-core-field-skeleton-choice-label"
       - "starci-core-field-skeleton-control"
       - "starci-core-field-spinner"
@@ -2301,6 +2315,7 @@ renderers:
       - "starci-core-select-indicator"
       - "starci-core-select-trigger"
       - "starci-core-select-value"
+      - "starci-core-select-value-text"
   - component: "Sidebar"
     propsType: "SidebarProps"
     kind: "composition"
@@ -2558,6 +2573,7 @@ renderers:
       - "starci-core-field-description"
       - "starci-core-field-error"
       - "starci-core-field-required"
+      - "starci-core-field-skeleton"
       - "starci-core-field-skeleton-choice-label"
       - "starci-core-field-skeleton-control"
       - "starci-core-switch"
@@ -2663,6 +2679,7 @@ renderers:
       - "starci-core-field-label"
       - "starci-core-field-meta"
       - "starci-core-field-required"
+      - "starci-core-field-skeleton"
       - "starci-core-field-skeleton-choice-label"
       - "starci-core-field-skeleton-control"
       - "starci-core-form-label--screen-reader"
