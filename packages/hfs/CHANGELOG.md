@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.2.9 - 2026-10-12
+
+- Changed: refresh the bundled canon pins for CLI 1.2.9 and the BE/FE lint canons 3.2.10/8.2.10 after correcting the CLI runtime install pin; app command implementations are unchanged.
+
 ## 4.2.8 - 2026-10-12
 
 - Changed: refresh the bundled runtime and canon pins for grammar 0.9.9, the BE/FE lint canons 3.2.9/8.2.9, stylelint-canon 2.0.8 and CLI 1.2.8; app command implementations are unchanged.

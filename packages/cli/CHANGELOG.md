@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.9 - 2026-10-12
+
+- Fixed: regenerate the runtime install pin for 1.0.0-alpha.12; 1.2.8 still shipped the 1.0.0-alpha.10.1 pin.
+- Changed: pin HFS 4.2.9 with the refreshed canon closure; command dispatch is unchanged.
+
 ## 1.2.8 - 2026-10-12
 
 - Changed: pin HFS 4.2.8 with the refreshed canon closure and carry runtime 1.0.0-alpha.12; command dispatch is unchanged.

@@ -1,5 +1,9 @@
 # Changelog
 
+## 8.2.10 - 2026-10-12
+
+- Changed: refresh the bundled canon pins for CLI 1.2.9, HFS 4.2.9 and the BE lint canon 3.2.10 after correcting the CLI runtime install pin; ESLint rule implementations are unchanged.
+
 ## 8.2.9 - 2026-10-12
 
 - Changed: refresh the bundled runtime and canon pins for grammar 0.9.9, stylelint-canon 2.0.8, CLI 1.2.8 and HFS 4.2.8; ESLint rule implementations are unchanged.

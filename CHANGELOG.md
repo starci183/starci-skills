@@ -13,9 +13,10 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 ### Fixed
 - Generate the UI rule catalogue from authored YAML declarations, including STATE-8 and sparse and nonnumeric addresses. Renderer and family stamps resolve to active canonical rules without exceptions; retired claim identifiers are removed while geometry, interaction and source-ownership assertions remain.
 - Declare the Turbo task cache as one optional, ignored runtime slot; generated cache stays available without being treated as authored source.
+- Regenerate the CLI runtime install pin for 1.0.0-alpha.12; the prior CLI 1.2.8 archive still selected 1.0.0-alpha.10.1.
 
 ### Changed
-- Grammar 0.9.9 and Stylelint canon 2.0.8 carry the corrected rule catalogue and CSS vocabulary. HFS 4.2.8 and the BE/FE lint canons 3.2.9/8.2.9 carry the refreshed runtime and canon pins; CLI 1.2.8 pins HFS 4.2.8 and carries runtime 1.0.0-alpha.12.
+- Grammar 0.9.9 and Stylelint canon 2.0.8 carry the corrected rule catalogue and CSS vocabulary. HFS 4.2.9 and the BE/FE lint canons 3.2.10/8.2.10 carry the refreshed runtime and canon pins; CLI 1.2.9 pins HFS 4.2.9 and selects runtime 1.0.0-alpha.12.
 
 ## [1.0.0-alpha.10.1] — 2026-10-12
 
