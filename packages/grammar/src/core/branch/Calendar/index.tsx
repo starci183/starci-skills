@@ -31,7 +31,7 @@ export type CalendarProps = {
  * A standalone month calendar (not a date field). Arrow keys move by day/week, Page Up/Down by
  * month, Home/End to the week edges; today, the selected date and unavailable dates are exposed by
  * the vendor as `data-*` states on each cell, with `aria-selected` on the chosen day.
- * Contract: root CONTROL-STATE-3 (app-owned date), grid FOCUS-2, nav A11Y-2 ICON-5, day TRUTH-2.
+ * Contract: root STATE-1 (app-owned date), grid FOCUS-2, nav A11Y-2, day TRUTH-2.
  */
 export const Calendar = ({
     label,
@@ -51,7 +51,7 @@ export const Calendar = ({
         aria-label={label}
         className={navigationClassName("starci-core-calendar", className)}
         data-component="Calendar"
-        data-contract="CONTROL-STATE-3"
+        data-contract="STATE-1"
         data-tier="branch"
         isDisabled={isDisabled}
         isReadOnly={isReadOnly}
@@ -63,9 +63,9 @@ export const Calendar = ({
         {...(isDateUnavailable === undefined ? {} : { isDateUnavailable })}
     >
         <HeroCalendar.Header className="starci-core-calendar-header">
-            <HeroCalendar.NavButton aria-label={previousLabel} className="starci-core-calendar-nav" data-contract="A11Y-2 ICON-5" slot="previous" />
+            <HeroCalendar.NavButton aria-label={previousLabel} className="starci-core-calendar-nav" data-contract="A11Y-2" slot="previous" />
             <HeroCalendar.Heading className="starci-core-calendar-heading" />
-            <HeroCalendar.NavButton aria-label={nextLabel} className="starci-core-calendar-nav" data-contract="A11Y-2 ICON-5" slot="next" />
+            <HeroCalendar.NavButton aria-label={nextLabel} className="starci-core-calendar-nav" data-contract="A11Y-2" slot="next" />
         </HeroCalendar.Header>
         <HeroCalendar.Grid className="starci-core-calendar-month" data-contract="FOCUS-2">
             <HeroCalendar.GridHeader>

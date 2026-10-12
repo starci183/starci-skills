@@ -1,25 +1,36 @@
 import { describe, expect, it } from "vitest"
 import { COMMON_UI_RULE_IDS, defineGrammarRuleConformance } from "./conformance.js"
 
-describe("Common UI X-n conformance catalog", () => {
-    it("contains the complete canonical UI rule set exactly once", () => {
-        expect(COMMON_UI_RULE_IDS).toHaveLength(150)
-        expect(new Set(COMMON_UI_RULE_IDS).size).toBe(150)
-        expect(COMMON_UI_RULE_IDS).toContain("ACTION-3")
-        expect(COMMON_UI_RULE_IDS).toContain("LAYOUT-5")
-        expect(COMMON_UI_RULE_IDS).toContain("SURFACE-5")
+describe("Common UI rule conformance", () => {
+    it("accepts the complete declared set through inherited rules or family evidence", () => {
+        const inherited = defineGrammarRuleConformance({
+            familyId: "inherited",
+            inheritedCommonRules: COMMON_UI_RULE_IDS,
+            familyEvidence: {},
+        })
+        expect(inherited.inheritedCommonRules).toEqual(COMMON_UI_RULE_IDS)
+        expect(Object.isFrozen(inherited.inheritedCommonRules)).toBe(true)
+        const evidence = Object.fromEntries(COMMON_UI_RULE_IDS.map((id) => [id, ["measured in this family"]]))
+        expect(() => defineGrammarRuleConformance({
+            familyId: "family-owned",
+            inheritedCommonRules: [],
+            familyEvidence: evidence,
+        })).not.toThrow()
     })
 
-    it("rejects missing and unknown family evidence", () => {
+    it("names a missing declared rule and rejects invented or retired family evidence", () => {
+        const [missing, ...rest] = COMMON_UI_RULE_IDS
         expect(() => defineGrammarRuleConformance({
             familyId: "incomplete",
-            inheritedCommonRules: [],
+            inheritedCommonRules: rest,
             familyEvidence: {},
-        })).toThrow(/missing=/)
-        expect(() => defineGrammarRuleConformance({
-            familyId: "unknown",
-            inheritedCommonRules: COMMON_UI_RULE_IDS,
-            familyEvidence: { "MADE-UP-1": ["none"] },
-        })).toThrow(/unknown=/)
+        })).toThrow(`missing=[${missing}]`)
+        for (const id of ["MADE-UP-1", "STATE-4"]) {
+            expect(() => defineGrammarRuleConformance({
+                familyId: "unknown",
+                inheritedCommonRules: COMMON_UI_RULE_IDS,
+                familyEvidence: { [id]: ["none"] },
+            })).toThrow(`unknown=[${id}]`)
+        }
     })
 })

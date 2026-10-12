@@ -34,7 +34,7 @@ export type TimelineProps = {
 /**
  * An ordered history of events. Each entry exposes `data-grammar-timeline-state` from the Common
  * presentation states and `data-grammar-current`; the connector line is drawn by the stylesheet.
- * Contract: list HIERARCHY-3, entry STATE-1 TRUTH-1 (closed presentation states, neutral default), marker ICON-6.
+ * Contract: list HIERARCHY-3, entry STATE-1 TRUTH-1 (closed presentation states, neutral default), marker A11Y-2.
  */
 export const Timeline = ({ label, items, className, isLoading = false, loadingRows = 3 }: TimelineProps) => (
     <ol
@@ -67,7 +67,7 @@ export const Timeline = ({ label, items, className, isLoading = false, loadingRo
                     data-grammar-timeline-state={state}
                     data-grammar-current={item.isCurrent ? "true" : "false"}
                 >
-                    <span aria-hidden="true" className="starci-core-timeline-marker" data-contract="ICON-6" data-grammar-timeline-marker="true">{item.marker}</span>
+                    <span aria-hidden="true" className="starci-core-timeline-marker" data-contract="A11Y-2" data-grammar-timeline-marker="true">{item.marker}</span>
                     <div className="starci-core-timeline-copy">
                         <p className="starci-core-timeline-title">{item.title}</p>
                         {item.timeLabel === undefined ? null : (

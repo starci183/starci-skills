@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.8 - 2026-10-12
+
+- Fixed: generate the rule catalogue from current YAML, migrate retired renderer claims, remove redundant skeleton aliases, and bind FlowGraph paint to its Grammar slots.
+
 ## 0.9.7 - 2026-10-11
 
 Minor, additive (owner ruling 2026-10-11, knowledge STATE-8: the loading view is the page's own component tree, labels real, only unresolved content as inert

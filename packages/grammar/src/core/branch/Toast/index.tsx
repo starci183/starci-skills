@@ -101,7 +101,7 @@ export type ToastProps = {
  *
  * Escape dismisses a focused toast. The timer counts only while not paused, and restarts when the
  * toast is updated. Tone is echoed on `data-grammar-tone`.
- * Contract: A11Y-4 (decisions never time out) FOCUS-5 (Escape = close button) CORE-BOUNDARY-4 MOTION-2.
+ * Contract: A11Y-4 (decisions never time out) FOCUS-5 (Escape = close button) BOUNDARY-6 MOTION-2.
  */
 export const Toast = ({ toast, dismissLabel, onDismiss, isPaused = false }: ToastProps) => {
     const tone = toast.tone ?? "neutral"
@@ -138,15 +138,15 @@ export const Toast = ({ toast, dismissLabel, onDismiss, isPaused = false }: Toas
             data-grammar-tone={tone}
             data-grammar-overlay-surface="toast"
             data-persistent={timeout <= 0 ? "true" : "false"}
-            data-contract="A11Y-4 FOCUS-5 CORE-BOUNDARY-4 MOTION-2"
+            data-contract="A11Y-4 FOCUS-5 BOUNDARY-6 MOTION-2"
             className="starci-core-toast"
             onKeyDown={onKeyDown}
         >
             {tone === "pending" ? (
-                <span className="starci-core-toast-indicator" aria-hidden="true" data-contract="ICON-6">
+                <span className="starci-core-toast-indicator" aria-hidden="true" data-contract="A11Y-2">
                     <HeroSpinner role="presentation" aria-hidden="true" size="sm" color="current" />
                 </span>
-            ) : <span className="starci-core-toast-indicator" data-grammar-toast-indicator={tone} aria-hidden="true" data-contract="ICON-6" />}
+            ) : <span className="starci-core-toast-indicator" data-grammar-toast-indicator={tone} aria-hidden="true" data-contract="A11Y-2" />}
             <div className="starci-core-toast-copy">
                 <p className="starci-core-toast-title">{toast.title}</p>
                 {toast.description === undefined ? null : <p className="starci-core-toast-description">{toast.description}</p>}

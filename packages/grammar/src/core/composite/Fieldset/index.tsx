@@ -29,7 +29,7 @@ export const Fieldset = ({ legend, isLegendHidden = false, description, errorMes
         <HeroFieldset
             data-tier="composite"
             data-component="Fieldset"
-            data-contract="A11Y-1 FIELD-2"
+            data-contract="A11Y-1 FEEDBACK-1"
             className="starci-core-fieldset"
             disabled={isDisabled}
             {...(describedBy === "" ? {} : { "aria-describedby": describedBy })}

@@ -69,7 +69,7 @@ export const CheckboxGroup = ({
     <HeroCheckboxGroup
         data-tier="composite"
         data-component="CheckboxGroup"
-        data-contract="A11Y-1 FIELD-1 FIELD-2 CONTROL-STATE-3"
+        data-contract="A11Y-1 FEEDBACK-1 STATE-1"
         data-grammar-orientation={orientation}
         className="starci-core-field starci-core-choice-group"
         variant={variant}

@@ -6,7 +6,7 @@ import { COMMON_UI_RULE_IDS } from "../common/index.js"
 import { CANONICAL_RULE_IDS } from "../common/rule-catalog.generated.js"
 import { coreRuleConformance } from "../core/index.js"
 import { heritageRuleConformance } from "../heritage/index.js"
-import { OFFSET_POP_FAMILY_EVIDENCE, offsetPopRuleConformance } from "./conformance.js"
+import { OFFSET_POP_FAMILY_EVIDENCE, OFFSET_POP_SOURCE_OWNERSHIP_EVIDENCE, offsetPopRuleConformance } from "./conformance.js"
 import { OFFSET_POP_DNA } from "./dna.js"
 import * as entry from "./index.js"
 
@@ -170,8 +170,8 @@ describe("Offset Pop rule conformance: coverage", () => {
             expect(heritageRuleConformance.familyEvidence).toHaveProperty(rule)
             expect(offsetPopRuleConformance.familyEvidence).toHaveProperty(rule)
         }
-        // Heritage's Brand-only claims are not Offset Pop's: the family ships no extension renderer.
-        for (const rule of ["A11Y-4", "MEDIA-6", "GAP-2"]) expect(offsetPopRuleConformance.familyEvidence).not.toHaveProperty(rule)
+        // Heritage's extension geometry claims are not Offset Pop's: the family ships no extension renderer.
+        for (const rule of ["A11Y-4", "GAP-2"]) expect(offsetPopRuleConformance.familyEvidence).not.toHaveProperty(rule)
     })
 
     it("reads every family sheet styles.css imports", () => {
@@ -241,6 +241,12 @@ const PROOF: Readonly<Record<keyof typeof OFFSET_POP_FAMILY_EVIDENCE, () => void
         expect(rootTokens.get("--offset-pop-surface-shadow")).toBe("var(--offset-pop-shadow-x) var(--offset-pop-shadow-y) 0 var(--offset-pop-shadow-ink)")
         expect(forcedTokens.get("--shadow-surface")).toBe("none")
         for (const hook of ["[data-component=\"DataTable\"]", "[data-component=\"Calendar\"]"]) expect(declared(hook).get("box-shadow"), hook).toBe("var(--shadow-surface)")
+        // Retained assertions from CORE-BOUNDARY-4; the current BOUNDARY-6 claim owns this concern.
+        expect(painted.filter((d) => /^(?:z-index|position|isolation)$/.test(d.property)).map((d) => short(d.selector))).toEqual([])
+        expect(declared(`${BOUNDED}[data-grammar-surface-depth="nested"]`).get("box-shadow")).toBe("none")
+        expect(forcedTokens.get("--offset-pop-surface-shadow")).toBe("none")
+        const shadows = painted.filter((d) => d.property === "box-shadow" && !/^(?:none|inset|var\(--shadow-surface\))/.test(d.value))
+        for (const d of shadows) expect(d.value, short(d.selector)).toMatch(/ 0 (?:var\(--offset-pop-outline-width\) )?var\(--offset-pop-(?:shadow-ink|field-ring|pink)/)
     },
     // styles.spec "sets, in light, dark, system-dark and forced colours, every token Core sets there" and "meets WCAG AA contrast in light|dark mode".
     "COLOR-5": () => {
@@ -262,46 +268,13 @@ const PROOF: Readonly<Record<keyof typeof OFFSET_POP_FAMILY_EVIDENCE, () => void
         for (const ground of [color.dark.canvas, color.dark.surface, color.dark.surfaceSecondary]) expect(contrast(dark, rgb(ground)), ground).toBeGreaterThanOrEqual(4.5)
     },
     // shipped-claims "takes a pending|unavailable whole-action surface out of the focus order" and "keeps Button press, pending and disabled ownership".
-    "CONTROL-STATE-2": () => {
+    "STATE-1": () => {
+        // These two family hooks preserve distinct unavailable and pending facts; broader rule proof remains separate.
         const unavailable = declared("[data-grammar-state=\"unavailable\"]")
         const pending = declared("[data-grammar-state=\"pending\"]")
         // Unavailable is not disabled: its copy reads in the muted ink (AA) instead of fading to ~2.3:1.
         expect(Object.fromEntries(unavailable)).toEqual({ "box-shadow": "none", color: "var(--muted)", transform: "none", cursor: "not-allowed" })
         expect(Object.fromEntries(pending)).toEqual({ "pointer-events": "none" })
-    },
-    // styles.spec "targets only hooks emitted by Common public renderers"; shipped-claims "reaches a rendered Common node with every family selector".
-    "CORE-BOUNDARY-1": () => {
-        const edges = painted.filter((d) => /^border(?!-radius)/.test(d.property) && d.value !== "0")
-        expect(edges.length).toBeGreaterThan(20)
-        for (const edge of edges) {
-            const hooks = edge.selector.slice(SCOPE.length)
-            expect(hooks, short(edge.selector)).toMatch(/\[(?:data-component|data-grammar-[a-z-]+|data-slot)[=\]]/)
-            expect(hooks, short(edge.selector)).not.toMatch(/(?:^|\s)(?:div|span|section)(?:\s|$)/)
-        }
-    },
-    "CORE-BOUNDARY-4": () => {
-        expect(painted.filter((d) => /^(?:z-index|position|isolation)$/.test(d.property)).map((d) => short(d.selector))).toEqual([])
-        expect(declared(`${BOUNDED}[data-grammar-surface-depth="nested"]`).get("box-shadow")).toBe("none")
-        expect(forcedTokens.get("--offset-pop-surface-shadow")).toBe("none")
-        const shadows = painted.filter((d) => d.property === "box-shadow" && !/^(?:none|inset|var\(--shadow-surface\))/.test(d.value))
-        for (const d of shadows) expect(d.value, short(d.selector)).toMatch(/ 0 (?:var\(--offset-pop-outline-width\) )?var\(--offset-pop-(?:shadow-ink|field-ring|pink)/)
-    },
-    // styles.spec "uses invariant spacing for focus, press, responsive, and reduced-motion vectors".
-    "CORE-BOUNDARY-5": () => {
-        const widthQueries = [...new Set(familyRules.flatMap((rule) => rule.media).filter((prelude) => /width/.test(prelude)))]
-        expect(widthQueries.sort()).toEqual(["@media (max-width: 30rem)", "@media (max-width: 40rem)"])
-        const underWidth = painted.filter((d) => d.media.some((prelude) => /width/.test(prelude)))
-        expect(underWidth.map((d) => d.property)).toEqual(["box-shadow", "box-shadow"])
-        expect(narrow.flatMap((rule) => rule.declarations).every((d) => d.property.startsWith("--"))).toBe(true)
-    },
-    // surface-card-family "renders the HeroUI v3 Card compound root, header, and content slots inside the family scope".
-    "CORE-SURFACE-2": () => {
-        expect(Object.fromEntries(declared(CARD_ROOT))).toEqual({ border: "0", background: "transparent", "box-shadow": "none" })
-        for (const hook of [BOUNDED, "[data-grammar-surface]"]) {
-            const shell = declared(hook)
-            expect(shell.get("background"), hook).toBe("var(--surface)")
-            expect(shell.get("border-radius"), hook).toBe("var(--offset-pop-surface-radius)")
-        }
     },
     "FLOW-2": () => {
         expect(declared("[data-component=\"Heading\"][data-scale=\"display\"]").get("text-wrap")).toBe("balance")
@@ -423,6 +396,13 @@ const PROOF: Readonly<Record<keyof typeof OFFSET_POP_FAMILY_EVIDENCE, () => void
         const narrower = inMedia("@media (max-width: 30rem)")
         expect(narrower.map((rule) => short(rule.selector))).toEqual(["§ [data-component=\"DataTable\"]", "§ [data-component=\"Calendar\"]"])
         expect(painted.some((d) => d.media.some((prelude) => /width/.test(prelude)) && /^(?:display|visibility|content)$/.test(d.property))).toBe(false)
+        // Retained assertions from CORE-BOUNDARY-5; the current RESPONSIVE-1 claim owns this concern.
+        // styles.spec "uses invariant spacing for focus, press, responsive, and reduced-motion vectors".
+        const widthQueries = [...new Set(familyRules.flatMap((rule) => rule.media).filter((prelude) => /width/.test(prelude)))]
+        expect(widthQueries.sort()).toEqual(["@media (max-width: 30rem)", "@media (max-width: 40rem)"])
+        const underWidth = painted.filter((d) => d.media.some((prelude) => /width/.test(prelude)))
+        expect(underWidth.map((d) => d.property)).toEqual(["box-shadow", "box-shadow"])
+        expect(narrow.flatMap((rule) => rule.declarations).every((d) => d.property.startsWith("--"))).toBe(true)
     },
     // surface-card-family "stays static without a whole action".
     "STATE-5": () => {
@@ -442,6 +422,14 @@ const PROOF: Readonly<Record<keyof typeof OFFSET_POP_FAMILY_EVIDENCE, () => void
             expect([shell.get("background"), shell.get("color")], hook).toEqual(["var(--surface)", "var(--surface-foreground)"])
         }
         expect([rootTokens.get("--surface"), rootTokens.get("--surface-foreground")]).toEqual(["var(--offset-pop-surface)", "var(--offset-pop-foreground)"])
+        // Retained assertions from CORE-SURFACE-2; the current SURFACE-2 claim owns this concern.
+        // surface-card-family "renders the HeroUI v3 Card compound root, header, and content slots inside the family scope".
+        expect(Object.fromEntries(declared(CARD_ROOT))).toEqual({ border: "0", background: "transparent", "box-shadow": "none" })
+        for (const hook of [BOUNDED, "[data-grammar-surface]"]) {
+            const shell = declared(hook)
+            expect(shell.get("background"), hook).toBe("var(--surface)")
+            expect(shell.get("border-radius"), hook).toBe("var(--offset-pop-surface-radius)")
+        }
     },
     // styles.spec "binds semantic Common variables and preserves hard family surface geometry" (nested box-shadow: none).
     "SURFACE-3": () => {
@@ -499,6 +487,19 @@ const PROOF: Readonly<Record<keyof typeof OFFSET_POP_FAMILY_EVIDENCE, () => void
 }
 
 describe("Offset Pop rule conformance: every family claim is proved against the family CSS", () => {
+    // styles.spec "targets only hooks emitted by Common public renderers"; shipped-claims "reaches a rendered Common node with every family selector".
+    it("keeps family paint on emitted Common hooks without adding wrapper shells", () => {
+        expect(OFFSET_POP_SOURCE_OWNERSHIP_EVIDENCE.length).toBeGreaterThan(0)
+        for (const evidence of OFFSET_POP_SOURCE_OWNERSHIP_EVIDENCE) expect(evidence.trim().length).toBeGreaterThan(20)
+        const edges = painted.filter((d) => /^border(?!-radius)/.test(d.property) && d.value !== "0")
+        expect(edges.length).toBeGreaterThan(20)
+        for (const edge of edges) {
+            const hooks = edge.selector.slice(SCOPE.length)
+            expect(hooks, short(edge.selector)).toMatch(/\[(?:data-component|data-grammar-[a-z-]+|data-slot)[=\]]/)
+            expect(hooks, short(edge.selector)).not.toMatch(/(?:^|\s)(?:div|span|section)(?:\s|$)/)
+        }
+    })
+
     it("has exactly one proof per claim", () => {
         expect(Object.keys(PROOF).sort()).toEqual(Object.keys(OFFSET_POP_FAMILY_EVIDENCE).sort())
     })
@@ -542,7 +543,7 @@ describe("Offset Pop rule conformance: inherited rules really are Common's", () 
         expect(painted.filter((d) => d.property === "line-height").map((d) => d.selector)).toEqual([`${SCOPE} [data-component="Heading"][data-scale="display"]`])
     })
 
-    it("targets no icon, media or field-label renderer outside the claimed treatments (ICON, MEDIA)", () => {
+    it("targets no icon, media or field-label renderer outside the claimed treatments", () => {
         for (const component of ["Icon", "IconTile", "IconButton", "RankArtwork"]) {
             expect(familyRules.some((rule) => rule.selector.includes(`[data-component="${component}"]`)), component).toBe(false)
         }

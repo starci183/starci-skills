@@ -99,7 +99,7 @@ export const AlertDialog = ({
                             data-component="AlertDialog"
                             data-grammar-tone={tone}
                             data-grammar-overlay-surface="dialog"
-                            data-contract="FOCUS-3 LAYOUT-4 CORE-BOUNDARY-4"
+                            data-contract="FOCUS-3 LAYOUT-4 BOUNDARY-6"
                             {...(description === undefined ? {} : { "aria-describedby": descriptionId })}
                             className="starci-core-dialog starci-core-alert-dialog"
                         >

@@ -1,117 +1,132 @@
 /**
- * Regenerate the Common UI rule catalog from the canonical knowledge tree.
- *
- * WHY THIS EXISTS. A hand-written copy of somebody else's catalog is only ever correct on the day
- * it is typed, and every conformance check goes on passing against it.
- *
- * WHAT A FAMILY IS. One topic file under `ui/composition`, `ui/presentation`, `ui/proof` or
- * `grammars/starci`. Translations (`*.vi.md`), directory indexes (`INDEX.md`) and files still
- * parked under a `_pending-` name are not topics and are skipped.
- *
- * WHAT A RULE IS. A heading whose text starts with an id of the form `PREFIX-n`. The prefix is
- * read from the heading rather than inferred from the filename, because the two disagree on
- * purpose: `accessibility.md` publishes `A11Y-n`, `render-truth.md` publishes `TRUTH-n`, and
- * `text-flow.md` publishes `FLOW-n`. Numbering is read rather than assumed for the same reason -
- * the spacing families start at `-0`, so `1..count` would invent a rule and drop a real one.
- *
- * Usage: node packages/grammar/scripts/generate-rule-catalog.mjs [knowledgeDir]
- *        STARCI_KNOWLEDGE_DIR=<path> node packages/grammar/scripts/generate-rule-catalog.mjs
+ * Generate Common's catalog from authored YAML rules[].id, never from references or case ids.
+ * Stable addresses stay exactly as declared, including sparse numbering and MARGIN-AUTO. Before
+ * replacing the catalog, require every production rule-id string to resolve to current authority.
+ * Retired catalog ids are reported explicitly; deciding their semantic consumer migration remains
+ * an owner review, not a claim this static generator can establish.
  */
-import { readdirSync, readFileSync, writeFileSync } from "node:fs"
-import { dirname, join, resolve } from "node:path"
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { dirname, join, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import { readEnv } from '../../../scripts/lib/env.mjs';
+import { parseYaml } from "../../../engine/yaml.mjs"
+import { readEnv } from "../../../scripts/lib/env.mjs"
+import { byCodeUnit } from "../../../scripts/lib/list.mjs"
+import { isMain } from "../../../scripts/lib/is-main.mjs"
+import { lexSource } from "../../../scripts/work/ui/grammar-knowledge-lex.mjs"
+import { RULE_ID, ruleCatalog } from "../../../scripts/work/ui/grammar-knowledge-renderers.mjs"
 
-const here = dirname(fileURLToPath(import.meta.url))
-const packageRoot = resolve(here, "..")
-
-/** The knowledge tree of the checkout this package sits in (<checkout root>/knowledge). */
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const DEFAULT_KNOWLEDGE_DIR = resolve(packageRoot, "../../knowledge")
-const knowledgeDir = resolve(process.argv[2] ?? readEnv('STARCI_KNOWLEDGE_DIR') ?? DEFAULT_KNOWLEDGE_DIR)
+const FAMILY_DIRECTORIES = ["ui/composition", "ui/presentation", "ui/proof", "grammars/starci"]
+const isTopicFile = (name) => name.endsWith(".yaml") && !name.endsWith(".vi.yaml") && name.toLowerCase() !== "index.yaml" && !name.startsWith("_pending-")
+const prefixOf = (id) => id.slice(0, id.lastIndexOf("-"))
 
-/** Directories whose topic files each publish one rule family. */
-const FAMILY_DIRECTORIES = [
-    "ui/composition",
-    "ui/presentation",
-    "ui/proof",
-    "grammars/starci",
-]
-
-/** A topic file: markdown, not a translation, not an index, not parked for a move. */
-const isTopicFile = (name) =>
-    name.endsWith(".md") && !name.endsWith(".vi.md") && name !== "INDEX.md" && !name.startsWith("_pending-")
-
-const RULE_HEADING = /^#{1,6}\s+([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d+)\b/
-
-/** Every rule id a topic file publishes, in the order the file publishes them. */
-const ruleIdsIn = (file) => {
-    const ids = []
-    for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
-        const hit = RULE_HEADING.exec(line)
-        if (hit !== null && !ids.includes(hit[1])) ids.push(hit[1])
-    }
-    return ids
+/** Read top-level rule declarations; a malformed rules field or id refuses generation. */
+function topicRuleIds(file) {
+    const topic = parseYaml(readFileSync(file, "utf8"))
+    if (topic?.rules === undefined) return []
+    if (topic.schema !== "starci/knowledge-source@1" || !Array.isArray(topic.rules)) throw new Error("Invalid rule topic: " + file)
+    return topic.rules.map((rule) => {
+        if (typeof rule?.id !== "string" || !RULE_ID.test(rule.id)) throw new Error("Invalid rule id in " + file + ": " + String(rule?.id))
+        return rule.id
+    })
 }
 
-const families = []
-for (const relative of FAMILY_DIRECTORIES) {
-    const directory = join(knowledgeDir, relative)
-    let entries
-    try {
-        entries = readdirSync(directory).filter(isTopicFile).sort()
-    } catch {
-        throw new Error(`Knowledge directory not found: ${directory}. Pass the tree path as the first argument or set STARCI_KNOWLEDGE_DIR.`)
+/** Collect unique declarations without writing, grouping mixed topics by their actual id prefixes. */
+export function collectRuleCatalog({ knowledgeDir }) {
+    const familiesByPrefix = new Map()
+    const seen = new Map()
+    for (const relative of FAMILY_DIRECTORIES) {
+        for (const name of readdirSync(join(knowledgeDir, relative)).filter(isTopicFile).sort(byCodeUnit)) {
+            const source = relative + "/" + name
+            for (const id of topicRuleIds(join(knowledgeDir, source))) {
+                if (seen.has(id)) throw new Error("Rule id declared twice: " + id + " (" + seen.get(id) + ", " + source + ")")
+                seen.set(id, source)
+                const family = prefixOf(id)
+                if (!familiesByPrefix.has(family)) familiesByPrefix.set(family, { family, ids: [], sources: [] })
+                const row = familiesByPrefix.get(family)
+                row.ids.push(id)
+                if (!row.sources.includes(source)) row.sources.push(source)
+            }
+        }
     }
-    for (const name of entries) {
-        const ids = ruleIdsIn(join(directory, name))
-        if (ids.length === 0) continue
-        const prefixes = new Set(ids.map((id) => id.slice(0, id.lastIndexOf("-"))))
-        if (prefixes.size > 1) throw new Error(`${relative}/${name} publishes more than one family prefix: ${[...prefixes].join(", ")}`)
-        families.push({ source: `${relative}/${name}`, family: [...prefixes][0], ids })
-    }
+    if (seen.size === 0) throw new Error("Knowledge topics declare no rules: " + knowledgeDir)
+    const families = [...familiesByPrefix.values()].sort((one, other) => byCodeUnit(one.family, other.family))
+    return { families, ids: families.flatMap(({ ids }) => ids) }
 }
 
-families.sort((one, other) => one.family.localeCompare(other.family))
-
-const duplicates = new Set()
-const seen = new Set()
-for (const { ids } of families) for (const id of ids) (seen.has(id) ? duplicates : seen).add(id)
-if (duplicates.size > 0) throw new Error(`Rule ids published by more than one family: ${[...duplicates].join(", ")}`)
-
-const quote = (value) => `"${value}"`
-const familyLine = ({ family, ids, source }) => `    ${JSON.stringify(family)}: ${ids.length}, // ${source}`
-const idsBlock = families
-    .map(({ family, ids }) => `    // ${family}\n${ids.map((id) => `    ${quote(id)},`).join("\n")}`)
-    .join("\n")
-
-const output = `/*
- * GENERATED FILE - do not edit by hand.
- *
- * Regenerate with \`node scripts/generate-rule-catalog.mjs [knowledgeDir]\` from the package root.
- * The source of truth is the knowledge tree's \`ui/composition\`, \`ui/presentation\`, \`ui/proof\`
- * and \`grammars/starci\` topic files; a family that publishes no \`PREFIX-n\` heading contributes
- * no rules and therefore does not appear here.
- *
- * ${families.length} families, ${seen.size} rules.
- */
-
-/** How many rule ids each family publishes. Reported for coverage summaries, never expanded. */
-export const RULE_FAMILY_COUNTS = Object.freeze({
-${families.map(familyLine).join("\n")}
-} as const)
+/** Render only the collected declarations, without inventing addresses from family counts. */
+export function renderRuleCatalog({ families, ids }) {
+    const counts = families.map(({ family, ids, sources }) =>
+        "    " + JSON.stringify(family) + ": " + ids.length + ", // " + sources.join(", ")).join("\n")
+    const entries = families.map(({ family, ids }) =>
+        "    // " + family + "\n" + ids.map((id) => "    " + JSON.stringify(id) + ",").join("\n")).join("\n")
+    return "/*\n" +
+        " * GENERATED FILE - do not edit by hand.\n" +
+        " * Regenerate with node packages/grammar/scripts/generate-rule-catalog.mjs [knowledgeDir].\n" +
+        " * Canonical declarations are rules[].id in the YAML knowledge topics.\n" +
+        " * References, scale rows, cases and closed addresses contribute no additional rules.\n" +
+        " * " + families.length + " families, " + ids.length + " rules.\n" +
+        " */\n\n" +
+        "/** The number of declared rule ids in each family, never expanded into addresses. */\n" +
+        "export const RULE_FAMILY_COUNTS = Object.freeze({\n" + counts + "\n} as const)\n\n" +
+        "/** Every declared canonical rule id, preserving each topic's authored order. */\n" +
+        "export const CANONICAL_RULE_IDS: ReadonlyArray<string> = Object.freeze([\n" + entries + "\n])\n"
+}
 
 /**
- * Every canonical rule id, exactly as the tree spells it.
- *
- * The ids are listed rather than expanded from the counts above: the spacing families start at
- * \`-0\`, so a \`1..count\` expansion would both invent \`PADDING-9\` and lose \`PADDING-0\`.
+ * Read production literal and computed rule-id strings with the owning census lexer. Comments,
+ * stories, test modules and the generated declaration table are not consumer claims. Existence
+ * checking is conservative: every rule-shaped production string must resolve, even off the registry.
  */
-export const CANONICAL_RULE_IDS: ReadonlyArray<string> = Object.freeze([
-${idsBlock}
-])
-`
+export function collectPackageRuleClaims({ packageRoot }) {
+    const claims = []
+    const walk = (directory) => {
+        for (const entry of readdirSync(directory, { withFileTypes: true }).sort((one, other) => byCodeUnit(one.name, other.name))) {
+            const full = join(directory, entry.name)
+            if (entry.isDirectory()) {
+                if (!["stories", "__test__", "node_modules"].includes(entry.name)) walk(full)
+                continue
+            }
+            if (!entry.isFile() || !/\.(?:tsx?|mts)$/.test(entry.name) || /\.(?:spec|test)\./.test(entry.name) || entry.name === "rule-catalog.generated.ts") continue
+            const source = relative(packageRoot, full).replaceAll("\\", "/")
+            for (const { value } of lexSource(readFileSync(full, "utf8")).strings) {
+                for (const id of value.split(/[\s,]+/).filter((token) => RULE_ID.test(token))) claims.push({ id, source })
+            }
+        }
+    }
+    walk(join(packageRoot, "src"))
+    return claims
+}
 
-const target = join(packageRoot, "src/common/rule-catalog.generated.ts")
-writeFileSync(target, output, "utf8")
-process.stdout.write(`${target}\n${families.length} families, ${seen.size} rules\n`)
-for (const { family, ids, source } of families) process.stdout.write(`  ${family}: ${ids.length} (${source})\n`)
+/**
+ * Validate authority, prior catalog and all production claims before the first write. Retired ids
+ * may disappear only after consumers no longer claim them; the returned delta makes that explicit.
+ */
+export function generateRuleCatalog({ knowledgeDir, packageRoot, target = join(packageRoot, "src/common/rule-catalog.generated.ts") }) {
+    const catalog = collectRuleCatalog({ knowledgeDir })
+    const ids = new Set(catalog.ids)
+    const published = existsSync(target) ? ruleCatalog(packageRoot, { file: target }).ids : []
+    const unknown = collectPackageRuleClaims({ packageRoot }).filter(({ id }) => !ids.has(id))
+    if (unknown.length > 0) throw new Error("Production rule claims have no current declaration: " + unknown.map(({ id, source }) => id + " (" + source + ")").join(", "))
+    const retiredIds = published.filter((id) => !ids.has(id))
+    const addedIds = catalog.ids.filter((id) => !published.includes(id))
+    const output = renderRuleCatalog(catalog)
+    const changed = !existsSync(target) || readFileSync(target, "utf8") !== output
+    if (changed) writeFileSync(target, output, "utf8")
+    return { ...catalog, retiredIds, addedIds, changed }
+}
+
+/** Write this package's catalog only after validating inputs and migrated production claims. */
+export function main(argv = process.argv.slice(2)) {
+    if (argv.length > 1) throw new Error("Usage: node packages/grammar/scripts/generate-rule-catalog.mjs [knowledgeDir]")
+    const knowledgeDir = resolve(argv[0] ?? readEnv("STARCI_KNOWLEDGE_DIR") ?? DEFAULT_KNOWLEDGE_DIR)
+    const target = join(packageRoot, "src/common/rule-catalog.generated.ts")
+    const { families, ids, retiredIds, addedIds, changed } = generateRuleCatalog({ knowledgeDir, packageRoot, target })
+    process.stdout.write(target + "\n" + families.length + " families, " + ids.length + " rules; changed=" + changed + "\n")
+    process.stdout.write("Retired catalog ids (no remaining production claims): " + (retiredIds.join(", ") || "none") + "\n")
+    process.stdout.write("Added declared ids: " + (addedIds.join(", ") || "none") + "\n")
+    for (const { family, ids, sources } of families) process.stdout.write("  " + family + ": " + ids.length + " (" + sources.join(", ") + ")\n")
+}
+
+if (isMain(import.meta.url)) main()

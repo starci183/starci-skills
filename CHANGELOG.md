@@ -7,7 +7,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 ## [1.0.0-alpha.10.1] — 2026-10-12
 
 ### Added
-- `@starci/grammar` 0.9.4 → 0.9.7: a layout `className` on `List`, `ListItem` and `Region` takes effect (their resets move to `@layer base`) and `ListRow` actions stay on the copy line in a narrow container (0.9.4); `FlowGraph`, the React Flow knowledge map, and loading views per knowledge STATE-8 (0.9.5); selectable `TagGroup` chips read as bordered secondary buttons (0.9.6); loading views for the remaining components (0.9.7).
+- `@starci/grammar` 0.9.4 → 0.9.8: a layout `className` on `List`, `ListItem` and `Region` takes effect (their resets move to `@layer base`) and `ListRow` actions stay on the copy line in a narrow container (0.9.4); `FlowGraph`, the React Flow knowledge map, and loading views per knowledge STATE-8 (0.9.5); selectable `TagGroup` chips read as bordered secondary buttons (0.9.6); loading views for the remaining components (0.9.7); the YAML rule catalogue, retired renderer claims and component paint contracts repaired (0.9.8).
 - `@starci/heroicons` 0.3.3: `BrainIcon` in the 24 outline and 16 solid cuts.
 - Knowledge: owner rulings of 2026-10-11 from the NIVO entry and Brain reviews — STATE-8 (loading and failure keep the page's anatomy), one primary per command per view, ACCENT-6 case-5 scoped to working pages, the DISCIPLINE-2 case-6 correction, and the CONTEXT.md frontend standard (compose-only grammar, gated publishing).
 
@@ -15,7 +15,8 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - The main CI runtime scan consumes the successful test job's exact coverage artifact in a dependent Sonar job. The full suite and scanner retain their existing limits and scope; their work no longer shares the test job's wall-clock budget. Coverage is bound to the run, source commit and producer attempt, and its content hash is checked before scanning.
 
 ### Changed
-- CLI 1.2.6 carries runtime 1.0.0-alpha.10.1; HFS 4.2.6 and the BE/FE lint canons 3.2.7/8.2.7 carry the refreshed command and canon pins (grammar 0.9.7, heroicons 0.3.3).
+- Stylelint canon 2.0.8 regenerates the vocabulary for Grammar 0.9.8's six declared FlowGraph colour and React Flow custom properties; lint rules, grammar values and status tones are unchanged.
+- CLI 1.2.7 carries runtime 1.0.0-alpha.10.1; HFS 4.2.7 and the BE/FE lint canons 3.2.8/8.2.8 carry the refreshed command and canon pins (grammar 0.9.8, heroicons 0.3.3, stylelint 2.0.8).
 
 ## [1.0.0-alpha.10] — 2026-10-11
 

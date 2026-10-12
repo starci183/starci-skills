@@ -26,7 +26,10 @@ const HeritageGrammarRootRenderer: GrammarComponentRenderer<GrammarRootProps> = 
     return createElement(CommonGrammarRoot, { ...props, "data-grammar-family": "heritage" })
 }
 
-/** Family extension for non-interactive brand content inside a consumer-owned destination. */
+/**
+ * Family extension for non-interactive brand content inside a consumer-owned destination.
+ * Brand receives approved logo identity; asset generation remains outside Grammar.
+ */
 const HeritageBrandRenderer: GrammarComponentRenderer<HeritageBrandProps> = ({ name, descriptor, logo }) => (
     <span data-family-component="Brand">
         <span data-family-part="brand-mark" aria-hidden="true">
@@ -62,7 +65,6 @@ const HERITAGE_FAMILY_EVIDENCE = {
     "COLOR-5": ["Heritage owns scoped light, dark, system, and forced-color variables."],
     "FOCUS-1": ["Heritage binds the shared visible focus variable without replacing focus ownership."],
     "GAP-2": ["Brand anatomy uses the invariant Common spacing tokens."],
-    "MEDIA-6": ["Brand receives approved logo identity; asset generation remains outside Grammar."],
 } as const
 
 export const heritageRuleConformance = defineGrammarRuleConformance({

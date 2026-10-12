@@ -8,7 +8,7 @@ export type IncludedMarkProps = Omit<ComponentPropsWithoutRef<"svg">, "children"
 /**
  * Purpose-named offering marker: an outlined 20px circle-check in inherited
  * foreground. It deliberately does not reuse affirmative/completion state (TRUTH-1), and it is named
- * only when given a label, silent otherwise (ICON-6).
+ * only when given a label, silent otherwise (A11Y-2).
  */
 export const IncludedMark = ({ className, label, ...props }: IncludedMarkProps) => (
     <svg
@@ -16,7 +16,7 @@ export const IncludedMark = ({ className, label, ...props }: IncludedMarkProps) 
         aria-hidden={label === undefined ? "true" : undefined}
         aria-label={label}
         className={cn("starci-core-included-mark", className)}
-        data-contract="ICON-6 TRUTH-1"
+        data-contract="A11Y-2 TRUTH-1"
         data-grammar-included-mark="true"
         data-component="IncludedMark"
         data-tier="atom"

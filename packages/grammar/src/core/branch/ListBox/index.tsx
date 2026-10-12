@@ -42,7 +42,7 @@ export type ListBoxProps = {
  * A list of selectable or actionable rows (`role="listbox"`). Arrow keys, Home/End and typeahead
  * move between rows; Space/Enter select. Each row exposes `data-grammar-selected` and the
  * vendor `aria-selected`; long labels truncate and descriptions wrap at narrow widths.
- * Contract: list FOCUS-2 CONTROL-STATE-3, empty STATE-3, leading glyph ICON-6.
+ * Contract: list FOCUS-2 STATE-1, empty STATE-3, leading glyph A11Y-2.
  */
 export const ListBox = ({
     label,
@@ -61,7 +61,7 @@ export const ListBox = ({
         aria-label={label}
         className={navigationClassName("starci-core-list-box", className)}
         data-component="ListBox"
-        data-contract="FOCUS-2 CONTROL-STATE-3"
+        data-contract="FOCUS-2 STATE-1"
         data-tier="branch"
         data-loading={String(isLoading)}
         {...(isLoading ? { render: (domProps: ComponentPropsWithRef<"div">) => <div {...domProps} aria-busy="true" /> } : {})}
@@ -76,7 +76,7 @@ export const ListBox = ({
         {...(isLoading
             ? {
                 renderEmptyState: () => (
-                    <div className="starci-core-list-box-skeleton" data-grammar-list-skeleton="true">
+                    <div data-grammar-list-skeleton="true">
                         {Array.from({ length: clampRows(loadingRows) }, (_, index) => (
                             <div key={index} aria-hidden="true" className="starci-core-list-box-item starci-core-list-box-skeleton-option" data-grammar-skeleton="true">
                                 <span className="starci-core-list-box-copy">
@@ -101,7 +101,7 @@ export const ListBox = ({
             >
                 {({ isSelected }: { readonly isSelected: boolean }) => (
                     <span className="starci-core-list-box-row" data-grammar-selected={isSelected ? "true" : "false"}>
-                        {item.leading === undefined ? null : <span aria-hidden="true" className="starci-core-list-box-leading" data-contract="ICON-6">{item.leading}</span>}
+                        {item.leading === undefined ? null : <span aria-hidden="true" className="starci-core-list-box-leading" data-contract="A11Y-2">{item.leading}</span>}
                         <span className="starci-core-list-box-copy">
                             <span className="starci-core-list-box-label">{item.label}</span>
                             {item.description === undefined ? null : <span className="starci-core-list-box-description">{item.description}</span>}

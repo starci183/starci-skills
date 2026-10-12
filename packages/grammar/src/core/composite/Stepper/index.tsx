@@ -50,7 +50,7 @@ export const stepStateFor = (steps: ReadonlyArray<StepperStep>, currentStepId: s
  * A multi-step flow's progress. The current step carries `aria-current="step"`; each step exposes
  * `data-grammar-step-state`. With `onStepSelect` the steps are buttons and the arrow keys move
  * between them. Below 30rem a horizontal stepper keeps only the current step's label in the paint.
- * Contract: list HIERARCHY-3 (+FOCUS-2 when interactive), step STATE-1, marker ICON-6, control FOCUS-1.
+ * Contract: list HIERARCHY-3 (+FOCUS-2 when interactive), step STATE-1, marker A11Y-2, control FOCUS-1.
  */
 export const Stepper = ({
     label,
@@ -104,7 +104,7 @@ export const Stepper = ({
                 const state = stepStateFor(steps, currentStepId, index)
                 const announcement = stateLabel?.(state)
                 const content = <>
-                    <span aria-hidden="true" className="starci-core-step-marker" data-contract="ICON-6" data-grammar-step-marker="true">
+                    <span aria-hidden="true" className="starci-core-step-marker" data-contract="A11Y-2" data-grammar-step-marker="true">
                         {renderMarker === undefined ? index + 1 : renderMarker(step, index, state)}
                     </span>
                     <span className="starci-core-step-copy">

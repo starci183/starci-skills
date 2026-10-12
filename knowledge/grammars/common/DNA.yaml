@@ -14,7 +14,7 @@ appliesTo:
 family: common
 provenance:
   package: "@starci/grammar"
-  version: "0.9.7"
+  version: "0.9.8"
   publicEntry: "@starci/grammar/common"
   styleEntrypoint: "@starci/grammar/common/styles.css"
   exportsEntry: "packages/grammar/package.json → ./common (dist/common/index.js), ./common/styles.css"
@@ -104,7 +104,7 @@ provenance:
     - path: "packages/grammar/src/common/components-overlays.css"
       sha256: "11b6dc530f6e23e12b357893ae8211265ff25386ea6623087f3aea9216766641"
     - path: "packages/grammar/src/common/components-navigation.css"
-      sha256: "516a0ae3e7c3c97ab91e108599efbdbd7e3bb9817af991b5440c3fde287d9371"
+      sha256: "1b6476cbe8b59569c84e08b658d0c239f9a195a53a1d00122d02394158effa8a"
     - path: "packages/grammar/src/common/spacing.ts"
       sha256: "f0cbd5f51ef0aaf3db529c349489021c009c88d3187ae0946c24bd3be3168f5d"
     - path: "packages/grammar/src/common/state.ts"
@@ -112,14 +112,14 @@ provenance:
     - path: "packages/grammar/src/common/conformance.ts"
       sha256: "db30b77ca7ea36469e8eac8f05adc08f5e51c19020a42a14c9f0ae8b5a3906b7"
     - path: "packages/grammar/src/common/rule-catalog.generated.ts"
-      sha256: "5bdee2105eb112e6b74c051bc92e24b83fd721608023be38701487528e8a0c99"
+      sha256: "a7a6035541b22ba3622131cfdef6ea2e6b8e8e1cdb3813677da4b64bb3fa6264"
     - path: "packages/grammar/src/core/overlayScope.tsx"
       sha256: "592a9d247accd87bb18be002831936789b970b7bc47ab4a92c6f92f1b571294e"
     - path: "packages/grammar/src/core/classNames.ts"
       sha256: "93b94f62216c656db74d9a88f5aef5837a8ba9a31b8066004b3014a6db6bf79b"
 identity:
   package: "@starci/grammar"
-  version: "0.9.7"
+  version: "0.9.8"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   familyId: "common"
   rootComponent: "GrammarRoot"
@@ -181,10 +181,10 @@ identity:
     tokensWrittenByRenderers: 5
     tokensReadOnlyByCommon: 67
     tokensReadByCommon: 142
-    claimEntries: 441
-    distinctClaimIds: 93
-    emittedClasses: 466
-    classesWithARuleInAShippedSheet: 429
+    claimEntries: 409
+    distinctClaimIds: 81
+    emittedClasses: 463
+    classesWithARuleInAShippedSheet: 431
     gaps: 10
 observations:
   - id: common-supplies-no-colour
@@ -1282,7 +1282,7 @@ renderers:
     kind: "branch"
     group: "overlays"
     source: "packages/grammar/src/core/branch/AlertDialog/index.tsx"
-    claims: ["ACTION-2", "CORE-BOUNDARY-4", "CTA-4", "FEEDBACK-3", "FOCUS-3", "LAYOUT-4", "MOTION-2"]
+    claims: ["ACTION-2", "BOUNDARY-6", "CTA-4", "FEEDBACK-3", "FOCUS-3", "LAYOUT-4", "MOTION-2"]
     computedClaims: []
     classes:
       - "starci-core-alert-dialog"
@@ -1301,7 +1301,7 @@ renderers:
     kind: "primitive"
     group: "navigation"
     source: "packages/grammar/src/core/primitive/Avatar/index.tsx"
-    claims: ["ICON-6", "MEDIA-5", "STATE-8"]
+    claims: ["A11Y-2", "STATE-8"]
     computedClaims: []
     classes:
       - "starci-core-avatar"
@@ -1311,7 +1311,7 @@ renderers:
     kind: "composite"
     group: "navigation"
     source: "packages/grammar/src/core/composite/AvatarGroup/index.tsx"
-    claims: ["ICON-6", "MEDIA-5"]
+    claims: ["A11Y-2"]
     computedClaims: []
     classes:
       - "starci-core-avatar"
@@ -1321,7 +1321,7 @@ renderers:
     kind: "primitive"
     group: "base"
     source: "packages/grammar/src/core/primitive/Badge/index.tsx"
-    claims: ["ICON-2", "TRUTH-1"]
+    claims: ["TRUTH-1"]
     computedClaims: []
     classes:
       - "starci-core-badge-dot"
@@ -1330,7 +1330,7 @@ renderers:
     kind: "composition"
     group: "navigation"
     source: "packages/grammar/src/core/composition/BottomNav/index.tsx"
-    claims: ["ACTION-3", "FOCUS-1", "FOCUS-2", "ICON-6", "LAYOUT-4"]
+    claims: ["A11Y-2", "ACTION-3", "FOCUS-1", "FOCUS-2", "LAYOUT-4"]
     computedClaims: []
     classes:
       - "starci-core-bottom-nav"
@@ -1346,7 +1346,7 @@ renderers:
     kind: "composite"
     group: "navigation"
     source: "packages/grammar/src/core/composite/Breadcrumbs/index.tsx"
-    claims: ["ACTION-3", "ICON-6", "LAYOUT-3", "OVERFLOW-3"]
+    claims: ["A11Y-2", "ACTION-3", "LAYOUT-3", "OVERFLOW-3"]
     computedClaims: []
     classes:
       - "starci-core-breadcrumb"
@@ -1378,7 +1378,7 @@ renderers:
     kind: "branch"
     group: "navigation"
     source: "packages/grammar/src/core/branch/Calendar/index.tsx"
-    claims: ["A11Y-2", "CONTROL-STATE-3", "FOCUS-2", "ICON-5", "TRUTH-2"]
+    claims: ["A11Y-2", "FOCUS-2", "STATE-1", "TRUTH-2"]
     computedClaims: []
     classes:
       - "starci-core-calendar"
@@ -1393,7 +1393,7 @@ renderers:
     kind: "composite"
     group: "base"
     source: "packages/grammar/src/core/composite/ChatBubble/index.tsx"
-    claims: ["STATE-8", "SURFACE-3", "SURFACE-4"]
+    claims: ["RADIUS-6", "STATE-8", "SURFACE-3", "SURFACE-4"]
     computedClaims: []
     classes:
       - "starci-core-chat-bubble"
@@ -1435,7 +1435,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/Checkbox/index.tsx"
-    claims: ["A11Y-1", "CONTROL-STATE-3", "FIELD-1"]
+    claims: ["A11Y-1", "STATE-1"]
     computedClaims: []
     classes:
       - "starci-core-checkbox"
@@ -1449,7 +1449,7 @@ renderers:
     kind: "composite"
     group: "forms"
     source: "packages/grammar/src/core/composite/CheckboxGroup/index.tsx"
-    claims: ["A11Y-1", "CONTROL-STATE-3", "FIELD-1", "FIELD-2"]
+    claims: ["A11Y-1", "FEEDBACK-1", "STATE-1"]
     computedClaims: []
     classes:
       - "starci-core-checkbox"
@@ -1462,7 +1462,6 @@ renderers:
       - "starci-core-field-description"
       - "starci-core-field-error"
       - "starci-core-field-required"
-      - "starci-core-field-skeleton"
       - "starci-core-field-skeleton-choice-label"
       - "starci-core-field-skeleton-control"
   - component: "CloseButton"
@@ -1470,7 +1469,7 @@ renderers:
     kind: "primitive"
     group: "overlays"
     source: "packages/grammar/src/core/primitive/CloseButton/index.tsx"
-    claims: ["A11Y-2", "FOCUS-1", "ICON-5"]
+    claims: ["A11Y-2", "FOCUS-1"]
     computedClaims: []
     classes:
       - "starci-core-close-button"
@@ -1479,7 +1478,7 @@ renderers:
     kind: "branch"
     group: "forms"
     source: "packages/grammar/src/core/branch/ComboBox/index.tsx"
-    claims: ["A11Y-1", "CONTROL-STATE-2", "FIELD-1", "FIELD-2", "LAYOUT-4", "STATE-3"]
+    claims: ["A11Y-1", "FEEDBACK-1", "LAYOUT-4", "STATE-1", "STATE-3"]
     computedClaims: []
     classes:
       - "grammar-common-root"
@@ -1503,7 +1502,7 @@ renderers:
     kind: "branch"
     group: "navigation"
     source: "packages/grammar/src/core/branch/DataTable/index.tsx"
-    claims: ["CONTROL-STATE-3", "FOCUS-1", "FOCUS-2", "LAYOUT-3", "STATE-3"]
+    claims: ["FOCUS-1", "FOCUS-2", "LAYOUT-3", "STATE-1", "STATE-3"]
     computedClaims: []
     classes:
       - "starci-core-data-table"
@@ -1522,7 +1521,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/DateField/index.tsx"
-    claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FIELD-3"]
+    claims: ["A11Y-1", "FEEDBACK-1", "STATE-1"]
     computedClaims: []
     classes:
       - "starci-core-date-field"
@@ -1539,7 +1538,7 @@ renderers:
     kind: "branch"
     group: "forms"
     source: "packages/grammar/src/core/branch/DatePicker/index.tsx"
-    claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FOCUS-3", "LAYOUT-4"]
+    claims: ["A11Y-1", "FEEDBACK-1", "FOCUS-3", "LAYOUT-4"]
     computedClaims: []
     classes:
       - "grammar-common-root"
@@ -1562,7 +1561,7 @@ renderers:
     kind: "branch"
     group: "forms"
     source: "packages/grammar/src/core/branch/DateRangePicker/index.tsx"
-    claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FOCUS-3", "LAYOUT-4"]
+    claims: ["A11Y-1", "FEEDBACK-1", "FOCUS-3", "LAYOUT-4"]
     computedClaims: []
     classes:
       - "grammar-common-root"
@@ -1603,7 +1602,7 @@ renderers:
     kind: "branch"
     group: "overlays"
     source: "packages/grammar/src/core/branch/Dialog/index.tsx"
-    claims: ["CORE-BOUNDARY-4", "FOCUS-3", "LAYOUT-4", "MOTION-2"]
+    claims: ["BOUNDARY-6", "FOCUS-3", "LAYOUT-4", "MOTION-2"]
     computedClaims: []
     classes:
       - "starci-core-dialog"
@@ -1646,7 +1645,7 @@ renderers:
     kind: "branch"
     group: "overlays"
     source: "packages/grammar/src/core/branch/Drawer/index.tsx"
-    claims: ["CORE-BOUNDARY-4", "FOCUS-3", "LAYOUT-4", "MOTION-2"]
+    claims: ["BOUNDARY-6", "FOCUS-3", "LAYOUT-4", "MOTION-2"]
     computedClaims: []
     classes:
       - "starci-core-drawer"
@@ -1665,8 +1664,8 @@ renderers:
     kind: "branch"
     group: "overlays"
     source: "packages/grammar/src/core/branch/DropdownMenu/index.tsx"
-    claims: ["CORE-BOUNDARY-4", "CTA-2", "FOCUS-1", "FOCUS-2", "FOCUS-5", "LAYOUT-4", "MOTION-2"]
-    computedClaims: ["CONTROL-STATE-3"]
+    claims: ["BOUNDARY-6", "CTA-2", "FOCUS-1", "FOCUS-2", "FOCUS-5", "LAYOUT-4", "MOTION-2"]
+    computedClaims: ["STATE-1"]
     classes:
       - "starci-core-menu"
       - "starci-core-menu-indicator"
@@ -1705,7 +1704,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/Field/index.tsx"
-    claims: ["A11Y-1", "FEEDBACK-1", "FIELD-1", "FIELD-2", "STATE-8"]
+    claims: ["A11Y-1", "FEEDBACK-1", "STATE-8"]
     computedClaims: []
     classes:
       - "grammar-common-root"
@@ -1718,7 +1717,6 @@ renderers:
       - "starci-core-field-error"
       - "starci-core-field-label"
       - "starci-core-field-required"
-      - "starci-core-field-skeleton"
       - "starci-core-field-skeleton-choice-label"
       - "starci-core-field-skeleton-control"
       - "starci-core-form-label--screen-reader"
@@ -1727,7 +1725,7 @@ renderers:
     kind: "composite"
     group: "forms"
     source: "packages/grammar/src/core/composite/Fieldset/index.tsx"
-    claims: ["A11Y-1", "FEEDBACK-1", "FIELD-2"]
+    claims: ["A11Y-1", "FEEDBACK-1"]
     computedClaims: []
     classes:
       - "starci-core-field-description"
@@ -1742,7 +1740,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/FileDropzone/index.tsx"
-    claims: ["A11Y-1", "FEEDBACK-1", "FIELD-1", "FIELD-2", "FIELD-3", "FOCUS-5", "ICON-6"]
+    claims: ["A11Y-1", "A11Y-2", "FEEDBACK-1", "FOCUS-5", "STATE-1"]
     computedClaims: []
     classes:
       - "starci-core-field"
@@ -1771,7 +1769,7 @@ renderers:
     kind: "branch"
     group: "navigation"
     source: "packages/grammar/src/core/branch/FlowGraph/index.tsx"
-    claims: ["CONTROL-STATE-3", "FOCUS-2", "STATE-3"]
+    claims: ["FOCUS-2", "STATE-1", "STATE-3"]
     computedClaims: []
     classes:
       - "starci-core-flow-graph"
@@ -1845,7 +1843,7 @@ renderers:
     kind: "primitive"
     group: "base"
     source: "packages/grammar/src/core/primitive/Icon/index.tsx"
-    claims: ["ICON-1", "ICON-6"]
+    claims: ["A11Y-2"]
     computedClaims: []
     classes:
       - "starci-core-icon"
@@ -1855,7 +1853,7 @@ renderers:
     kind: "primitive"
     group: "base"
     source: "packages/grammar/src/core/primitive/IconButton/index.tsx"
-    claims: ["A11Y-2", "ICON-5", "TONE-2"]
+    claims: ["A11Y-2", "TONE-2"]
     computedClaims: []
     classes:
       - "starci-core-icon-button"
@@ -1874,7 +1872,7 @@ renderers:
     kind: "primitive"
     group: "navigation"
     source: "packages/grammar/src/core/primitive/Image/index.tsx"
-    claims: ["MEDIA-2", "MEDIA-4", "MEDIA-5", "MOTION-2"]
+    claims: ["MOTION-2"]
     computedClaims: []
     classes:
       - "starci-core-image"
@@ -1885,7 +1883,7 @@ renderers:
     kind: "primitive"
     group: "base"
     source: "packages/grammar/src/core/primitive/IncludedMark/index.tsx"
-    claims: ["ICON-6", "TRUTH-1"]
+    claims: ["A11Y-2", "TRUTH-1"]
     computedClaims: []
     classes:
       - "starci-core-included-mark"
@@ -1913,7 +1911,7 @@ renderers:
     kind: "primitive"
     group: "overlays"
     source: "packages/grammar/src/core/primitive/Kbd/index.tsx"
-    claims: ["ICON-6"]
+    claims: ["TRUTH-1"]
     computedClaims: []
     classes:
       - "starci-core-kbd"
@@ -1940,7 +1938,7 @@ renderers:
     kind: "primitive"
     group: "navigation"
     source: "packages/grammar/src/core/primitive/Link/index.tsx"
-    claims: ["ACTION-3", "FOCUS-1", "ICON-6"]
+    claims: ["A11Y-2", "ACTION-3", "FOCUS-1"]
     computedClaims: []
     classes:
       - "starci-core-link"
@@ -1960,7 +1958,7 @@ renderers:
     kind: "branch"
     group: "navigation"
     source: "packages/grammar/src/core/branch/ListBox/index.tsx"
-    claims: ["CONTROL-STATE-3", "FOCUS-2", "ICON-6", "STATE-3"]
+    claims: ["A11Y-2", "FOCUS-2", "STATE-1", "STATE-3"]
     computedClaims: []
     classes:
       - "starci-core-list-box"
@@ -1972,7 +1970,6 @@ renderers:
       - "starci-core-list-box-label"
       - "starci-core-list-box-leading"
       - "starci-core-list-box-row"
-      - "starci-core-list-box-skeleton"
       - "starci-core-list-box-skeleton-option"
       - "starci-core-list-box-trailing"
   - component: "ListItem"
@@ -2054,7 +2051,6 @@ renderers:
       - "starci-core-meter-output"
       - "starci-core-meter-segment"
       - "starci-core-meter-segments"
-      - "starci-core-meter-skeleton"
       - "starci-core-meter-skeleton-bar"
       - "starci-core-meter-track"
   - component: "NavLandmark"
@@ -2086,7 +2082,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/NumberField/index.tsx"
-    claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FIELD-3"]
+    claims: ["A11Y-1", "FEEDBACK-1", "STATE-1"]
     computedClaims: []
     classes:
       - "starci-core-choice"
@@ -2096,7 +2092,6 @@ renderers:
       - "starci-core-field-description"
       - "starci-core-field-error"
       - "starci-core-field-required"
-      - "starci-core-field-skeleton"
       - "starci-core-field-skeleton-choice-label"
       - "starci-core-field-skeleton-control"
       - "starci-core-number-field"
@@ -2129,7 +2124,7 @@ renderers:
     kind: "composite"
     group: "navigation"
     source: "packages/grammar/src/core/composite/Pagination/index.tsx"
-    claims: ["A11Y-2", "CONTROL-STATE-3", "FOCUS-1", "FOCUS-2"]
+    claims: ["A11Y-2", "FOCUS-1", "FOCUS-2", "STATE-1"]
     computedClaims: []
     classes:
       - "starci-core-pagination"
@@ -2153,7 +2148,7 @@ renderers:
     kind: "branch"
     group: "overlays"
     source: "packages/grammar/src/core/branch/Popover/index.tsx"
-    claims: ["CORE-BOUNDARY-4", "FOCUS-3", "LAYOUT-4", "MOTION-2"]
+    claims: ["BOUNDARY-6", "FOCUS-3", "LAYOUT-4", "MOTION-2"]
     computedClaims: []
     classes:
       - "starci-core-overlay-title"
@@ -2210,7 +2205,7 @@ renderers:
     kind: "composite"
     group: "forms"
     source: "packages/grammar/src/core/composite/RadioGroup/index.tsx"
-    claims: ["A11Y-1", "FIELD-1", "FOCUS-2", "STATE-6"]
+    claims: ["A11Y-1", "FOCUS-2", "STATE-6"]
     computedClaims: []
     classes:
       - "starci-core-choice"
@@ -2240,7 +2235,7 @@ renderers:
     kind: "primitive"
     group: "base"
     source: "packages/grammar/src/core/primitive/RankArtwork/index.tsx"
-    claims: ["ICON-6"]
+    claims: ["A11Y-2"]
     computedClaims: []
     classes:
       - "starci-core-rank-artwork"
@@ -2249,7 +2244,7 @@ renderers:
     kind: "primitive"
     group: "navigation"
     source: "packages/grammar/src/core/primitive/Rating/index.tsx"
-    claims: ["A11Y-3", "CONTROL-STATE-3", "FOCUS-1", "FOCUS-2", "ICON-6"]
+    claims: ["A11Y-2", "A11Y-3", "FOCUS-1", "FOCUS-2", "STATE-1"]
     computedClaims: []
     classes:
       - "starci-core-rating"
@@ -2270,7 +2265,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/SearchField/index.tsx"
-    claims: ["A11Y-1", "CONTROL-STATE-2", "FIELD-1", "FIELD-2"]
+    claims: ["A11Y-1", "FEEDBACK-1", "STATE-1"]
     computedClaims: []
     classes:
       - "starci-core-choice"
@@ -2280,7 +2275,6 @@ renderers:
       - "starci-core-field-description"
       - "starci-core-field-error"
       - "starci-core-field-required"
-      - "starci-core-field-skeleton"
       - "starci-core-field-skeleton-choice-label"
       - "starci-core-field-skeleton-control"
       - "starci-core-field-spinner"
@@ -2313,7 +2307,7 @@ renderers:
     kind: "composite"
     group: "forms"
     source: "packages/grammar/src/core/composite/SegmentedControl/index.tsx"
-    claims: ["A11Y-1", "FEEDBACK-1", "FIELD-2", "FOCUS-2", "STATE-6"]
+    claims: ["A11Y-1", "FEEDBACK-1", "FOCUS-2", "STATE-6"]
     computedClaims: []
     classes:
       - "starci-core-choice"
@@ -2324,7 +2318,6 @@ renderers:
       - "starci-core-field-error"
       - "starci-core-field-label"
       - "starci-core-field-required"
-      - "starci-core-field-skeleton"
       - "starci-core-field-skeleton-choice-label"
       - "starci-core-field-skeleton-control"
       - "starci-core-form-label--screen-reader"
@@ -2336,7 +2329,7 @@ renderers:
     kind: "branch"
     group: "forms"
     source: "packages/grammar/src/core/branch/Select/index.tsx"
-    claims: ["A11Y-1", "CONTROL-STATE-2", "FIELD-3", "LAYOUT-4", "STATE-6"]
+    claims: ["A11Y-1", "LAYOUT-4", "STATE-1", "STATE-6"]
     computedClaims: []
     classes:
       - "grammar-common-root"
@@ -2347,7 +2340,6 @@ renderers:
       - "starci-core-field-description"
       - "starci-core-field-error"
       - "starci-core-field-required"
-      - "starci-core-field-skeleton"
       - "starci-core-field-skeleton-choice-label"
       - "starci-core-field-skeleton-control"
       - "starci-core-field-spinner"
@@ -2384,7 +2376,7 @@ renderers:
     kind: "primitive"
     group: "overlays"
     source: "packages/grammar/src/core/primitive/Skeleton/index.tsx"
-    claims: ["MEDIA-5", "MOTION-2", "STATE-2"]
+    claims: ["MOTION-2", "STATE-2"]
     computedClaims: []
     classes:
       - "starci-core-skeleton"
@@ -2394,7 +2386,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/Slider/index.tsx"
-    claims: ["A11Y-1", "A11Y-3", "FEEDBACK-1", "FIELD-3"]
+    claims: ["A11Y-1", "A11Y-3", "FEEDBACK-1", "STATE-1"]
     computedClaims: []
     classes:
       - "starci-core-field"
@@ -2422,7 +2414,7 @@ renderers:
     kind: "core"
     group: "base"
     source: "packages/grammar/src/core/StateMark.tsx"
-    claims: ["ICON-6", "STATE-1"]
+    claims: ["A11Y-2", "STATE-1"]
     computedClaims: []
     classes: []
   - component: "StaticStateRow"
@@ -2440,7 +2432,7 @@ renderers:
     kind: "composite"
     group: "navigation"
     source: "packages/grammar/src/core/composite/Stepper/index.tsx"
-    claims: ["FOCUS-1", "HIERARCHY-3", "ICON-6", "STATE-1", "STATE-8"]
+    claims: ["A11Y-2", "FOCUS-1", "HIERARCHY-3", "STATE-1", "STATE-8"]
     computedClaims: ["FOCUS-2"]
     classes:
       - "starci-core-nav-visually-hidden"
@@ -2536,7 +2528,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/Switch/index.tsx"
-    claims: ["A11Y-1", "CONTROL-STATE-3", "FIELD-1"]
+    claims: ["A11Y-1", "STATE-1"]
     computedClaims: []
     classes:
       - "starci-core-choice"
@@ -2547,7 +2539,6 @@ renderers:
       - "starci-core-field-description"
       - "starci-core-field-error"
       - "starci-core-field-required"
-      - "starci-core-field-skeleton"
       - "starci-core-field-skeleton-choice-label"
       - "starci-core-field-skeleton-control"
       - "starci-core-switch"
@@ -2570,7 +2561,7 @@ renderers:
     kind: "composite"
     group: "navigation"
     source: "packages/grammar/src/core/composite/TagGroup/index.tsx"
-    claims: ["A11Y-2", "CONTROL-STATE-3", "FOCUS-1", "FOCUS-2", "ICON-5", "ICON-6", "STATE-3"]
+    claims: ["A11Y-2", "FOCUS-1", "FOCUS-2", "STATE-1", "STATE-3"]
     computedClaims: []
     classes:
       - "starci-core-tag"
@@ -2605,7 +2596,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/Textarea/index.tsx"
-    claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FIELD-3"]
+    claims: ["A11Y-1", "FEEDBACK-1", "STATE-1"]
     computedClaims: []
     classes:
       - "starci-core-choice"
@@ -2618,7 +2609,6 @@ renderers:
       - "starci-core-field-label"
       - "starci-core-field-meta"
       - "starci-core-field-required"
-      - "starci-core-field-skeleton"
       - "starci-core-field-skeleton-choice-label"
       - "starci-core-field-skeleton-control"
       - "starci-core-form-label--screen-reader"
@@ -2634,7 +2624,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/TimeField/index.tsx"
-    claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FIELD-3"]
+    claims: ["A11Y-1", "FEEDBACK-1", "STATE-1"]
     computedClaims: []
     classes:
       - "starci-core-field"
@@ -2648,7 +2638,7 @@ renderers:
     kind: "composite"
     group: "navigation"
     source: "packages/grammar/src/core/composite/Timeline/index.tsx"
-    claims: ["HIERARCHY-3", "ICON-6", "STATE-1", "STATE-8", "TRUTH-1"]
+    claims: ["A11Y-2", "HIERARCHY-3", "STATE-1", "STATE-8", "TRUTH-1"]
     computedClaims: []
     classes:
       - "starci-core-timeline"
@@ -2664,7 +2654,7 @@ renderers:
     kind: "branch"
     group: "overlays"
     source: "packages/grammar/src/core/branch/Toast/index.tsx"
-    claims: ["A11Y-4", "CORE-BOUNDARY-4", "FEEDBACK-3", "FOCUS-5", "ICON-6", "LAYOUT-4", "MOTION-2"]
+    claims: ["A11Y-2", "A11Y-4", "BOUNDARY-6", "FEEDBACK-3", "FOCUS-5", "LAYOUT-4", "MOTION-2"]
     computedClaims: []
     classes:
       - "starci-core-toast"
@@ -2682,7 +2672,7 @@ renderers:
     kind: "branch"
     group: "overlays"
     source: "packages/grammar/src/core/branch/Toast/index.tsx"
-    claims: ["A11Y-4", "CORE-BOUNDARY-4", "FEEDBACK-3", "FOCUS-5", "ICON-6", "LAYOUT-4", "MOTION-2"]
+    claims: ["A11Y-2", "A11Y-4", "BOUNDARY-6", "FEEDBACK-3", "FOCUS-5", "LAYOUT-4", "MOTION-2"]
     computedClaims: []
     classes:
       - "starci-core-toast"
@@ -2710,7 +2700,7 @@ renderers:
     kind: "composition"
     group: "navigation"
     source: "packages/grammar/src/core/composition/TopBar/index.tsx"
-    claims: ["A11Y-2", "ICON-5", "STATE-7"]
+    claims: ["A11Y-2", "STATE-7"]
     computedClaims: []
     classes:
       - "starci-core-top-bar"

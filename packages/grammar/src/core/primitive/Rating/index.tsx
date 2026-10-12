@@ -23,7 +23,7 @@ export type RatingProps = {
 }
 
 const StarGlyph = () => (
-    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" className="starci-core-rating-glyph" data-contract="ICON-6">
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" className="starci-core-rating-glyph" data-contract="A11Y-2">
         <path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.3L12 17.1l-5.7 3.1 1.2-6.3-4.7-4.4 6.4-.8z" />
     </svg>
 )
@@ -37,7 +37,7 @@ const fillFor = (position: number, value: number): "full" | "half" | "empty" => 
 /**
  * A 1..max rating. Interactive ratings are a native radio set, so arrow keys, form submission and
  * the radiogroup semantics come from the platform; read-only ratings are one labelled image.
- * Contract: read-only A11Y-3; radiogroup A11Y-3 FOCUS-2 CONTROL-STATE-3; option FOCUS-1; glyph ICON-6.
+ * Contract: read-only A11Y-3; radiogroup A11Y-3 FOCUS-2 STATE-1; option FOCUS-1; glyph A11Y-2.
  */
 export const Rating = ({
     label,
@@ -89,7 +89,7 @@ export const Rating = ({
             className={navigationClassName("starci-core-rating", className)}
             data-component="Rating"
             data-tier="atom"
-            data-contract="A11Y-3 FOCUS-2 CONTROL-STATE-3"
+            data-contract="A11Y-3 FOCUS-2 STATE-1"
             data-grammar-rating-mode="interactive"
             data-grammar-disabled={isDisabled ? "true" : "false"}
             onPointerLeave={() => setPreview(null)}

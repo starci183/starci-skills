@@ -57,7 +57,7 @@ export const FileDropzone = ({
         <div
             data-tier="atom"
             data-component="FileDropzone"
-            data-contract="A11Y-1 FIELD-1 FIELD-2 FIELD-3"
+            data-contract="A11Y-1 FEEDBACK-1 STATE-1"
             className="starci-core-field starci-core-file-dropzone"
             {...fieldStateAttributes({ isInvalid: invalid, isDisabled, isReadOnly, isRequired })}
         >
@@ -106,7 +106,7 @@ export const FileDropzone = ({
                     }}
                 />
                 <span className="starci-core-file-dropzone-prompt">
-                    {icon == null ? null : <span aria-hidden="true" className="starci-core-file-dropzone-icon" data-contract="ICON-6">{icon}</span>}
+                    {icon == null ? null : <span aria-hidden="true" className="starci-core-file-dropzone-icon" data-contract="A11Y-2">{icon}</span>}
                     <span>{prompt}</span>
                 </span>
             </div>

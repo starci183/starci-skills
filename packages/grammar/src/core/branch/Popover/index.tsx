@@ -26,7 +26,7 @@ export type PopoverProps = PopoverBase & (TitledPopover | LabelledPopover)
  * Unlike `Tooltip` (a description), a popover holds focusable content. React Aria moves focus into
  * the panel, contains Tab while open, dismisses on Escape or an outside press, and returns focus to
  * the trigger. The panel portals into the nearest Grammar root so the family scope still applies.
- * Contract: panel LAYOUT-4 CORE-BOUNDARY-4 MOTION-2 (portal, shadow, reduced motion); dialog FOCUS-3.
+ * Contract: panel LAYOUT-4 BOUNDARY-6 MOTION-2 (portal, shadow, reduced motion); dialog FOCUS-3.
  */
 export const Popover = ({
     trigger,
@@ -49,7 +49,7 @@ export const Popover = ({
                     placement={placement}
                     offset={8}
                     data-grammar-overlay-surface="popover"
-                    data-contract="LAYOUT-4 CORE-BOUNDARY-4 MOTION-2"
+                    data-contract="LAYOUT-4 BOUNDARY-6 MOTION-2"
                     className="starci-core-popover"
                 >
                     {showArrow ? (

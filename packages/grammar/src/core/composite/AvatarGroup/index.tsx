@@ -24,7 +24,7 @@ export type AvatarGroupProps = {
 
 /**
  * A stacked set of avatars with one accessible overflow count.
- * Contract: each avatar ICON-6 MEDIA-5 (named once, initials fallback), count ICON-6 (named, digits silent).
+ * Contract: each avatar and count A11Y-2 (named once, fallback initials and overflow digits silent).
  */
 export const AvatarGroup = ({ label, items, max = 4, size = "md", overflowLabel, className }: AvatarGroupProps) => {
     const visible = items.slice(0, Math.max(0, max))
@@ -46,14 +46,14 @@ export const AvatarGroup = ({ label, items, max = 4, size = "md", overflowLabel,
                     {...avatarA11yProps(item.name, false)}
                     className="starci-core-avatar"
                     data-component="Avatar"
-                    data-contract="ICON-6 MEDIA-5"
+                    data-contract="A11Y-2"
                     data-grammar-avatar-size={size}
                 >
                     {avatarParts(item.name, item.src, undefined)}
                 </HeroAvatar>
             ))}
             {hidden > 0 ? (
-                <HeroAvatarGroup.Count aria-label={overflowLabel(hidden)} data-contract="ICON-6" data-grammar-avatar-count="true" role="img">
+                <HeroAvatarGroup.Count aria-label={overflowLabel(hidden)} data-contract="A11Y-2" data-grammar-avatar-count="true" role="img">
                     <span aria-hidden="true">{`+${hidden}`}</span>
                 </HeroAvatarGroup.Count>
             ) : null}

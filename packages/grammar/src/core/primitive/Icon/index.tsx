@@ -49,7 +49,7 @@ const SKELETON_CLASS_NAME = skeletonVariants({ animationType: "shimmer" }).base(
 /**
  * Product-neutral icon carrier; semantic glyph names and libraries remain app authority.
  *
- * Contract: ICON-1 (the app resolves the glyph, Common owns its box) and ICON-6 (named once when it
+ * The app resolves the glyph and Common owns its usage box. Contract: A11Y-2 (named once when it
  * carries meaning, `aria-hidden` when it does not).
  */
 export const Icon = ({ source: Source, usage = "chip", ariaLabel, isSkeleton = false }: IconProps) => {
@@ -65,7 +65,7 @@ export const Icon = ({ source: Source, usage = "chip", ariaLabel, isSkeleton = f
             data-tier="atom"
             data-component="Icon"
             data-usage={usage}
-            data-contract="ICON-1 ICON-6"
+            data-contract="A11Y-2"
             focusable="false"
             className={ICON_CLASS_NAME}
             {...(ariaLabel === undefined

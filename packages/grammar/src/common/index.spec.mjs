@@ -9,10 +9,13 @@ test("exports the neutral presentation state vocabulary", () => {
     assert.throws(() => assertPresentationState("unknown"), TypeError)
 })
 
-test("owns the shared family base and canonical X-n catalog", () => {
+test("owns the shared family base and current canonical rule addresses", () => {
     assert.equal(COMMON_GRAMMAR_COMPONENTS.TextAction, TextAction)
     assert.equal(typeof defineGrammarFamily, "function")
-    assert.equal(COMMON_UI_RULE_IDS.length, 150)
+    assert.ok(COMMON_UI_RULE_IDS.includes("STATE-8"))
+    assert.ok(COMMON_UI_RULE_IDS.includes("MARGIN-AUTO"))
+    assert.ok(COMMON_UI_RULE_IDS.includes("RADIUS-6"))
+    assert.equal(COMMON_UI_RULE_IDS.includes("STATE-4"), false)
 })
 
 test("exports anonymous shared renderers from the common authority", () => {

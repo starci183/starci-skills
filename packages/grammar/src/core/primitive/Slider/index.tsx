@@ -73,7 +73,7 @@ export const Slider = ({
         <HeroSlider
             data-tier="atom"
             data-component="Slider"
-            data-contract="A11Y-1 A11Y-3 FIELD-3"
+            data-contract="A11Y-1 A11Y-3 STATE-1"
             data-grammar-orientation={orientation}
             className="starci-core-field starci-core-slider"
             {...fieldStateAttributes({ isInvalid: invalid, isDisabled, isReadOnly, isRequired })}

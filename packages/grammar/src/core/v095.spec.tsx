@@ -9,9 +9,8 @@ const flowCss = css.slice(css.indexOf("/* ---------- FlowGraph"))
 const packageJson = JSON.parse(read("../../package.json")) as { version: string, dependencies?: object, peerDependencies: Record<string, string>, devDependencies: Record<string, string> }
 
 describe("0.9.5: FlowGraph", () => {
-    it("is a Common renderer and the package is at least 0.9.5", () => {
+    it("publishes FlowGraph as a Common renderer", () => {
         expect(Object.keys(COMMON_GRAMMAR_COMPONENTS)).toContain("FlowGraph")
-        expect(packageJson.version).toMatch(/^0\.9\.(5|6|7)$/)
     })
 
     it("keeps @xyflow/react a peer (plus a dev copy for tests), never a dependency", () => {

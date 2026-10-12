@@ -115,7 +115,7 @@ export const Select = ({
         <HeroSelect
             data-tier="branch"
             data-component="Select"
-            data-contract="A11Y-1 FIELD-3 STATE-6 CONTROL-STATE-2"
+            data-contract="A11Y-1 STATE-1 STATE-6"
             className="starci-core-field starci-core-select"
             fullWidth
             variant={variant}

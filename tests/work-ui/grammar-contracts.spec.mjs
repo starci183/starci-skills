@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {parseYaml} from '../../engine/yaml.mjs';
 import {censusGrammar,ruleCatalog} from '../../scripts/work/ui/grammar-knowledge.mjs';
 
 /**
@@ -21,19 +22,6 @@ const root=fileURLToPath(new URL('../..',import.meta.url));
 const packageRoot=path.join(root,'packages','grammar');
 const census=await censusGrammar({packageRoot});
 const catalog=new Set(ruleCatalog(packageRoot).ids);
-
-/**
- * Ids a renderer may stamp although the generated catalogue does not list them. The generator only
- * reads `PREFIX-n` headings, so `MARGIN-AUTO` (published by knowledge/ui/presentation/margin.yaml,
- * claimed by PageContainer for its `margin-inline: auto`) cannot be expressed there. Each entry must
- * still be a rule the knowledge tree publishes.
- */
-const OUTSIDE_THE_GENERATED_CATALOGUE=Object.freeze({
-  'MARGIN-AUTO':'knowledge/ui/presentation/margin.yaml',
-  // The radius ramp (RADIUS-2..9, reserved addresses between) was never carried into the generated
-  // catalogue; ChatBubble (0.9.0) claims the surface corner it draws.
-  'RADIUS-6':'knowledge/ui/presentation/radius.yaml',
-});
 
 const core=(...parts)=>`packages/grammar/src/core/${parts.join('/')}`;
 
@@ -100,7 +88,7 @@ const literalContractTokens=()=>{
   return tokens;
 };
 
-const known=id=>catalog.has(id)||Object.hasOwn(OUTSIDE_THE_GENERATED_CATALOGUE,id);
+const known=id=>catalog.has(id);
 
 
 
@@ -113,15 +101,19 @@ test('every stamped rule id exists in the canonical catalogue', ()=>{
   const unknown=census.renderers.flatMap(r=>[...r.claims,...r.computedClaims].filter(id=>!known(id)).map(id=>`${r.component}: ${id}`));
   assert.deepEqual(unknown,[],`ids the catalogue does not publish:\n${unknown.join('\n')}`);
   // The census only credits ids whose prefix the catalogue knows; a literal with an invented family
-  // (`LIST-1`, `TASTE-3`) would pass it silently, so every literal token is read here as well.
+  // (`LIST-1`, `INVENTED-1`) would pass it silently, so every literal token is read here as well.
   const invented=literalContractTokens().filter(({token})=>!known(token)).map(({token,file})=>`${file}: ${token}`);
   assert.deepEqual(invented,[],`literal data-contract tokens outside the catalogue:\n${invented.join('\n')}`);
 });
 
-test('each id stamped outside the generated catalogue is still a rule the knowledge tree publishes', ()=>{
-  for(const [id,file] of Object.entries(OUTSIDE_THE_GENERATED_CATALOGUE)){
-    assert.equal(catalog.has(id),false,`${id} is in the catalogue now; drop it from the exception list`);
-    assert.match(fs.readFileSync(path.join(root,file),'utf8'),new RegExp(`rule: ${id}\\b`),`${file} no longer publishes ${id}`);
+test('nonnumeric and sparse stamped addresses belong to the generated catalog and authored YAML', ()=>{
+  for(const [id,file] of [
+    ['MARGIN-AUTO','knowledge/ui/presentation/margin.yaml'],
+    ['RADIUS-6','knowledge/ui/presentation/radius.yaml'],
+  ]){
+    assert.ok(catalog.has(id),`${id} must be canonical without a renderer exception`);
+    const topic=parseYaml(fs.readFileSync(path.join(root,file),'utf8'));
+    assert.ok(topic.rules.some(rule=>rule.id===id),`${file} declares ${id}`);
   }
 });
 

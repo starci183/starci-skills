@@ -87,7 +87,7 @@ const SelectionCheckbox = ({ label }: { readonly label: string | undefined }) =>
  * Tabular data with sortable columns (`aria-sort`), row selection (`aria-selected`,
  * `data-grammar-selected`), empty and loading states, an optional sticky header, and its own
  * horizontal scroll so a wide table never widens a 360px page.
- * Contract: scroll LAYOUT-3, grid FOCUS-2 CONTROL-STATE-3, row FOCUS-1, empty STATE-3.
+ * Contract: scroll LAYOUT-3, grid FOCUS-2 STATE-1, row FOCUS-1, empty STATE-3.
  */
 export const DataTable = <Row extends DataTableRow>({
     label,
@@ -136,7 +136,7 @@ export const DataTable = <Row extends DataTableRow>({
                 <HeroTable.Content
                     aria-label={label}
                     className="starci-core-data-table-content"
-                    data-contract="FOCUS-2 CONTROL-STATE-3"
+                    data-contract="FOCUS-2 STATE-1"
                     selectionMode={isSkeleton ? "none" : selectionMode}
                     {...(sort === undefined ? {} : { sortDescriptor: toSortDescriptor(sort) })}
                     {...(onSortChange === undefined ? {} : {

@@ -84,7 +84,7 @@ export const Meter = ({
                 data-grammar-tone="neutral"
                 data-contract="A11Y-3 STATE-8"
                 aria-busy="true"
-                className="starci-core-meter starci-core-meter-skeleton"
+                className="starci-core-meter"
             >
                 <span className="starci-core-meter-header">
                     <span className={isLabelHidden ? "starci-core-meter-label starci-core-form-label--screen-reader" : "starci-core-meter-label"}>{label}</span>

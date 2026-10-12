@@ -57,7 +57,7 @@ const toIds = (selection: Selection, items: ReadonlyArray<TagGroupItem>): Readon
  * Built on the vendor TagGroup, so arrow keys move between chips, Space/Enter toggle selection
  * and Delete/Backspace remove. Each chip exposes `data-grammar-selected`; chips wrap onto new lines
  * at narrow widths instead of overflowing.
- * Contract: root CONTROL-STATE-3, list FOCUS-2, chip FOCUS-1, remove A11Y-2 ICON-5, empty STATE-3.
+ * Contract: root STATE-1, list FOCUS-2, chip FOCUS-1, remove A11Y-2, empty STATE-3.
  */
 export const TagGroup = ({
     label,
@@ -76,7 +76,7 @@ export const TagGroup = ({
         aria-label={label}
         className={navigationClassName("starci-core-tag-group", className)}
         data-component="TagGroup"
-        data-contract="CONTROL-STATE-3"
+        data-contract="STATE-1"
         data-tier="composite"
         data-grammar-tag-selection={selectionMode}
         data-grammar-tag-removable={onRemove === undefined ? "false" : "true"}
@@ -105,11 +105,11 @@ export const TagGroup = ({
                 >
                     {({ isSelected, allowsRemoving }) => <>
                         <span className="starci-core-tag-label" data-grammar-tag-label="true" data-grammar-selected={isSelected ? "true" : "false"}>
-                            {item.leading === undefined ? null : <span aria-hidden="true" className="starci-core-tag-leading" data-contract="ICON-6">{item.leading}</span>}
+                            {item.leading === undefined ? null : <span aria-hidden="true" className="starci-core-tag-leading" data-contract="A11Y-2">{item.leading}</span>}
                             {item.label}
                             {item.isOff === true && item.offLabel !== undefined ? <span className="starci-core-visually-hidden" data-grammar-tag-off-label="true">{`, ${item.offLabel}`}</span> : null}
                         </span>
-                        {allowsRemoving ? <HeroTag.RemoveButton aria-label={removeLabel?.(item.label) ?? item.label} className="starci-core-tag-remove" data-contract="A11Y-2 ICON-5" data-grammar-tag-remove="true" /> : null}
+                        {allowsRemoving ? <HeroTag.RemoveButton aria-label={removeLabel?.(item.label) ?? item.label} className="starci-core-tag-remove" data-contract="A11Y-2" data-grammar-tag-remove="true" /> : null}
                     </>}
                 </HeroTag>
             ))}

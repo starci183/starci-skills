@@ -95,7 +95,7 @@ const labelFor = (node: FlowGraphNode) => node.count === undefined || node.count
  * A node-and-edge map drawn with React Flow (`@xyflow/react`, a peer dependency) in grammar tokens. The radial layout
  * puts the root in the centre with its children on a ring and their children on an outer ring around them. Nodes are
  * keyboard focusable (Tab) and selectable with Enter or Space; a visually hidden list repeats the nodes for screen readers.
- * Contract: focus FOCUS-2, selection CONTROL-STATE-3, empty STATE-3.
+ * Contract: focus FOCUS-2, selection STATE-1, empty STATE-3.
  */
 export const FlowGraph = ({
     label,
@@ -162,7 +162,7 @@ export const FlowGraph = ({
             aria-label={label}
             className={["starci-core-flow-graph", className].filter(Boolean).join(" ")}
             data-component="FlowGraph"
-            data-contract="FOCUS-2 CONTROL-STATE-3 STATE-3"
+            data-contract="FOCUS-2 STATE-1 STATE-3"
             data-grammar-flow-height={height}
             data-grammar-flow-interactive={isInteractive ? "true" : "false"}
             data-grammar-flow-layout={layout}

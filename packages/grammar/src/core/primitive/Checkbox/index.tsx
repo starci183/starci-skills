@@ -65,7 +65,7 @@ export const Checkbox = ({
     <HeroCheckbox
         data-tier="atom"
         data-component="Checkbox"
-        data-contract="A11Y-1 FIELD-1 CONTROL-STATE-3"
+        data-contract="A11Y-1 STATE-1"
         className="starci-core-choice starci-core-checkbox"
         variant={variant}
         {...fieldVariantAttributes(variant)}

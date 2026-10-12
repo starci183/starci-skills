@@ -49,7 +49,7 @@ export const RadioGroup = ({
     <HeroRadioGroup
         data-tier="composite"
         data-component="RadioGroup"
-        data-contract="A11Y-1 FIELD-1 STATE-6 FOCUS-2"
+        data-contract="A11Y-1 STATE-6 FOCUS-2"
         data-grammar-orientation={orientation}
         className="starci-core-field starci-core-choice-group"
         orientation={orientation}

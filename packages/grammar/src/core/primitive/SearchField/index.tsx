@@ -63,7 +63,7 @@ export const SearchField = ({
     <HeroSearchField
         data-tier="atom"
         data-component="SearchField"
-        data-contract="A11Y-1 FIELD-1 FIELD-2 CONTROL-STATE-2"
+        data-contract="A11Y-1 FEEDBACK-1 STATE-1"
         className="starci-core-field starci-core-search-field"
         fullWidth
         variant={variant}

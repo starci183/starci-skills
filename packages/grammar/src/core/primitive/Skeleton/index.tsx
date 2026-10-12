@@ -57,7 +57,7 @@ export const Skeleton = ({ shape = "text", lines = 1, ratio = "landscape", size 
             data-shape={shape}
             {...(shape === "rect" ? { "data-ratio": ratio } : { "data-size": size })}
             aria-hidden="true"
-            data-contract="STATE-2 MEDIA-5 MOTION-2"
+            data-contract="STATE-2 MOTION-2"
             className="starci-core-skeleton"
         />
     )

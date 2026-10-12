@@ -33,14 +33,14 @@ const SKELETON_CLASS_NAME = skeletonVariants({ animationType: "shimmer" }).base(
  * Compact semantic status or figure; product glyph identity remains app-owned. `isDot` adds the
  * Grammar's own leading status dot (a 6px `CircleFill` in the tone colour, class `starci-core-badge-dot`).
  *
- * Contract: ICON-2 (the glyph and its words share one status owner) and TRUTH-1 (the tone is stated,
- * never inferred, and defaults to neutral).
+ * The glyph and its words share one status owner. Contract: TRUTH-1 (the tone is stated, never
+ * inferred, and defaults to neutral).
  */
 export const Badge = ({ children, startContent, tone = "neutral", isDot = false, isSkeleton = false }: BadgeProps) => (
     <Chip
         data-tier="atom"
         data-component="Badge"
-        data-contract="ICON-2 TRUTH-1"
+        data-contract="TRUTH-1"
         data-tone={tone}
         data-grammar-badge-dot={isDot && !isSkeleton ? "true" : undefined}
         data-loading={isSkeleton ? "true" : "false"}

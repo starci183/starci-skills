@@ -208,7 +208,7 @@ export const Field = ({
         <div
             data-tier="atom"
             data-component="Field"
-            data-contract="A11Y-1 FIELD-1 FIELD-2"
+            data-contract="A11Y-1 FEEDBACK-1"
             className="starci-core-field"
             {...fieldStateAttributes({ isInvalid: invalid, isDisabled, isReadOnly, isRequired })}
         >
@@ -286,8 +286,8 @@ export const FieldSkeleton = ({ component, tier, label, isLabelHidden, isRequire
         <div
             data-tier={tier}
             data-component={component}
-            data-contract="A11Y-1 FIELD-1 STATE-8"
-            className={`${kind === "switch" ? "starci-core-choice" : "starci-core-field"} ${className} starci-core-field-skeleton`}
+            data-contract="A11Y-1 STATE-8"
+            className={`${kind === "switch" ? "starci-core-choice" : "starci-core-field"} ${className}`}
             {...(variant === undefined ? {} : fieldVariantAttributes(variant))}
             {...(orientation === undefined ? {} : { "data-grammar-orientation": orientation })}
             data-grammar-skeleton="true"

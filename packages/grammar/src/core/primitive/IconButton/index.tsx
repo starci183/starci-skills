@@ -50,7 +50,7 @@ export const iconButtonBadgeText = (badge: number | string | undefined, max = 99
  */
 const SKELETON_CLASS_NAME = skeletonVariants({ animationType: "shimmer" }).base()
 
-/** Circular glyph-only action with a mandatory accessible name (A11Y-2, ICON-5). */
+/** Circular glyph-only action with a mandatory accessible name (A11Y-2). */
 export const IconButton = ({
     source,
     label,
@@ -72,7 +72,7 @@ export const IconButton = ({
     <HeroButton
         data-tier="atom"
         data-component="IconButton"
-        data-contract="A11Y-2 ICON-5"
+        data-contract="A11Y-2"
         data-active={isActive ? "true" : "false"}
         data-variant={variant}
         data-size={size}

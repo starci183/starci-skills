@@ -38,7 +38,7 @@ export const Switch = ({ value, isSelected, defaultSelected, onSelectedChange, i
     <HeroSwitch
         data-tier="atom"
         data-component="Switch"
-        data-contract="A11Y-1 FIELD-1 CONTROL-STATE-3"
+        data-contract="A11Y-1 STATE-1"
         className="starci-core-choice starci-core-switch"
         {...vendorFieldProps(field)}
         isReadOnly={field.isReadOnly === true}

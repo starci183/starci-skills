@@ -83,7 +83,7 @@ export const ComboBox = ({
         <HeroComboBox
             data-tier="branch"
             data-component="ComboBox"
-            data-contract="A11Y-1 FIELD-1 FIELD-2 CONTROL-STATE-2"
+            data-contract="A11Y-1 FEEDBACK-1 STATE-1"
             className="starci-core-field starci-core-combo-box"
             fullWidth
             variant={variant}

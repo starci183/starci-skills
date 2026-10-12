@@ -77,8 +77,8 @@ const collectItems = (entries: readonly DropdownMenuEntry[], into = new Map<stri
  * React Aria owns the keyboard model (arrow keys, Home/End, typeahead, Enter/Space, ArrowRight into
  * a submenu, Escape and outside press dismiss, focus returns to the trigger). The menu and every
  * submenu portal into the nearest Grammar root so the family scope still applies.
- * Contract: menu FOCUS-2 FOCUS-5; popover LAYOUT-4 CORE-BOUNDARY-4 MOTION-2; item FOCUS-1 CTA-2 (ring,
- * link vs command); a selectable section CONTROL-STATE-3 (app-owned selectedIds).
+ * Contract: menu FOCUS-2 FOCUS-5; popover LAYOUT-4 BOUNDARY-6 MOTION-2; item FOCUS-1 CTA-2 (ring,
+ * link vs command); a selectable section STATE-1 (app-owned selectedIds).
  */
 export const DropdownMenu = ({
     trigger,
@@ -143,7 +143,7 @@ export const DropdownMenu = ({
                   */}
                 <HeroDropdown.Popover
                     data-grammar-overlay-surface="menu"
-                    data-contract="LAYOUT-4 CORE-BOUNDARY-4 MOTION-2"
+                    data-contract="LAYOUT-4 BOUNDARY-6 MOTION-2"
                     className="starci-core-menu-popover"
                 >
                     <HeroDropdown.Menu
@@ -177,7 +177,7 @@ export const DropdownMenu = ({
                     },
                 })}
                 data-grammar-menu-section="true"
-                data-contract={selection === undefined ? undefined : "CONTROL-STATE-3"}
+                data-contract={selection === undefined ? undefined : "STATE-1"}
                 className="starci-core-menu-section"
             >
                 {entry.label === undefined ? null : <HeroHeader className="starci-core-menu-section-label">{entry.label}</HeroHeader>}
@@ -195,7 +195,7 @@ export const DropdownMenu = ({
                     UNSTABLE_portalContainer={container}
                     placement={placement}
                     data-grammar-overlay-surface="menu"
-                    data-contract="LAYOUT-4 CORE-BOUNDARY-4 MOTION-2"
+                    data-contract="LAYOUT-4 BOUNDARY-6 MOTION-2"
                     className="starci-core-menu-popover"
                 >
                     <HeroDropdown.Menu

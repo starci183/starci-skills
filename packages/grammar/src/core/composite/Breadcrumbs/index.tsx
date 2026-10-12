@@ -34,7 +34,7 @@ export type BreadcrumbsProps = {
  *
  * The last item is the current page (`aria-current="page"`, not a link). At narrow widths the trail
  * keeps one line and scrolls instead of wrapping, and long ancestor labels truncate.
- * Contract: nav LAYOUT-3 OVERFLOW-3 (owns its inline scroll), item ACTION-3 (link vs current), leading ICON-6.
+ * Contract: nav LAYOUT-3 OVERFLOW-3 (owns its inline scroll), item ACTION-3 (link vs current), leading A11Y-2.
  */
 export const Breadcrumbs = ({ label, items, separator, onAction, className }: BreadcrumbsProps) => (
     <nav
@@ -68,7 +68,7 @@ export const Breadcrumbs = ({ label, items, separator, onAction, className }: Br
                                 <span aria-hidden="true" className="starci-core-breadcrumb-skeleton" data-grammar-skeleton="true"><Skeleton shape="text" /></span>
                             ) : (
                                 <>
-                                    {item.leading === undefined ? null : <span aria-hidden="true" className="starci-core-breadcrumb-leading" data-contract="ICON-6">{item.leading}</span>}
+                                    {item.leading === undefined ? null : <span aria-hidden="true" className="starci-core-breadcrumb-leading" data-contract="A11Y-2">{item.leading}</span>}
                                     {item.label}
                                 </>
                             )}

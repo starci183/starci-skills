@@ -67,7 +67,7 @@ describe("@starci/grammar/heritage", () => {
         expect(covered).toEqual(new Set(COMMON_UI_RULE_IDS))
         expect(heritageRuleConformance.familyEvidence).toHaveProperty("GAP-2")
         expect(heritageRuleConformance.familyEvidence).toHaveProperty("COLOR-5")
-        expect(heritageRuleConformance.familyEvidence).toHaveProperty("MEDIA-6")
+        expect(heritageRuleConformance.familyEvidence).not.toHaveProperty("MEDIA-6")
     })
 
     it("keeps Brand non-interactive and its image decorative", () => {

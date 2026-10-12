@@ -60,6 +60,8 @@ export const DECLARED = [
   "--separator-secondary",
   "--separator-tertiary",
   "--shadow-surface",
+  "--starci-flow-ink",
+  "--starci-flow-tint",
   "--starci-surface-tertiary",
   "--starci-surface-tertiary-foreground",
   "--success",
@@ -82,6 +84,10 @@ export const DECLARED = [
   "--warning-soft",
   "--warning-soft-foreground",
   "--warning-soft-hover",
+  "--xy-background-color",
+  "--xy-edge-stroke",
+  "--xy-edge-stroke-selected",
+  "--xy-edge-stroke-width",
 ]
 
 /** Un-prefixed custom properties the grammar reads but a vendor layer declares. */

@@ -53,7 +53,7 @@ export const paginationTokens = (page: number, pageCount: number, siblingCount =
  * The current page carries `aria-current="page"`. Below 30rem the previous/next labels and the
  * non-adjacent page numbers leave the paint (the first, last and current page stay), so the strip
  * fits a 360px viewport without horizontal scroll.
- * Contract: list FOCUS-2 (tab order = page order), steps A11Y-2 FOCUS-1, pages FOCUS-1 CONTROL-STATE-3.
+ * Contract: list FOCUS-2 (tab order = page order), steps A11Y-2 FOCUS-1, pages FOCUS-1 STATE-1.
  */
 export const Pagination = ({
     label,
@@ -100,7 +100,7 @@ export const Pagination = ({
                         <HeroPagination.Link
                             aria-label={pageLabel(token)}
                             className="starci-core-pagination-page"
-                            data-contract="FOCUS-1 CONTROL-STATE-3"
+                            data-contract="FOCUS-1 STATE-1"
                             data-grammar-current={token === page ? "true" : "false"}
                             isActive={token === page}
                             onPress={() => { if (token !== page) onPageChange(token) }}

@@ -70,7 +70,7 @@ export const SegmentedControl = ({
         <div
             data-tier="composite"
             data-component="SegmentedControl"
-            data-contract="A11Y-1 FIELD-2"
+            data-contract="A11Y-1 FEEDBACK-1"
             data-width={width}
             className="starci-core-field starci-core-segmented-control"
             {...fieldStateAttributes({ isInvalid: invalid, isDisabled, isReadOnly, isRequired })}

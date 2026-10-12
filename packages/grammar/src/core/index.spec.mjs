@@ -36,7 +36,7 @@ test("exports Core DNA and the typed family registry boundary", () => {
     assert.equal(typeof core.defineGrammarFamily, "function")
     assert.equal(core.coreGrammar.id, "core")
     assert.deepEqual(core.coreGrammar.scopeProps, { "data-grammar-family": "core" })
-    assert.equal(core.coreRuleConformance.inheritedCommonRules.length, 150)
+    assert.deepEqual(core.coreRuleConformance.inheritedCommonRules, common.COMMON_UI_RULE_IDS)
 })
 
 test("resolves a scoped family and re-exports every Common renderer from Core", () => {

@@ -178,7 +178,7 @@ export const Textarea = ({
         <HeroTextField
             data-tier="atom"
             data-component="Textarea"
-            data-contract="A11Y-1 FIELD-1 FIELD-2 FIELD-3"
+            data-contract="A11Y-1 FEEDBACK-1 STATE-1"
             className="starci-core-field starci-core-textarea"
             fullWidth
             variant={variant}

@@ -1402,10 +1402,10 @@
     .starci-core-flow-graph[data-grammar-flow-interactive="true"] .react-flow__pane.dragging { cursor: grabbing; }
     .starci-core-flow-graph .react-flow__viewport { transform-origin: 0 0; z-index: 2; pointer-events: none; }
     .starci-core-flow-graph .react-flow__renderer { z-index: 4; }
-    .starci-core-flow-graph .react-flow__background { pointer-events: none; z-index: -1; }
+    .starci-core-flow-graph .starci-core-flow-graph-background { pointer-events: none; z-index: -1; }
     .starci-core-flow-graph .react-flow__edges { position: absolute; }
     .starci-core-flow-graph .react-flow__edges svg { position: absolute; overflow: visible; pointer-events: none; }
-    .starci-core-flow-graph .react-flow__edge-path { fill: none; stroke: var(--xy-edge-stroke); stroke-width: var(--xy-edge-stroke-width); stroke-linecap: round; }
+    .starci-core-flow-graph :where(.starci-core-flow-graph-edge) .react-flow__edge-path { fill: none; stroke: var(--xy-edge-stroke); stroke-width: var(--xy-edge-stroke-width); stroke-linecap: round; }
     .starci-core-flow-graph .starci-core-flow-graph-edge-placeholder .react-flow__edge-path { stroke-dasharray: 4 5; }
     .starci-core-flow-graph .react-flow__nodes { pointer-events: none; transform-origin: 0 0; }
     .starci-core-flow-graph .react-flow__node {

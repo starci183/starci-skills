@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {slash} from '../../lib/path-key.mjs';
 import {byCodeUnit} from '../../lib/list.mjs';
-import {lexSource,read,uniq} from './grammar-knowledge-lex.mjs';
+import {lexSource,read} from './grammar-knowledge-lex.mjs';
 
 /**
  * The Common renderer registry of the grammar knowledge census (grammar-knowledge.mjs): the registered
@@ -18,7 +18,8 @@ const WORD='[a-z0-9]+';
 const DASHED=`${WORD}(?:-${WORD})*`;
 const LITERAL=String.raw`(?:"[^"]*"|\d+)`;
 const LITERAL_UNION=String.raw`${LITERAL}(?:\s*\|\s*${LITERAL})*`;
-const RULE_ID=/^[A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)*-(?:\d+|AUTO)$/;
+/** Stable rule-address syntax shared by the knowledge catalog generator and renderer census. */
+export const RULE_ID=/^[A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)*-(?:\d+|AUTO)$/;
 const CLASS_LITERAL=new RegExp(String.raw`(?<![\w-])((?:starci-core|grammar)-${DASHED}(?:--${DASHED})?)(?![\w-])`,'g');
 const LITERAL_ALIAS=new RegExp(String.raw`^(?:export\s+)?type\s+([A-Z]\w*)\s*=\s*(${LITERAL_UNION})\s*$`,'gm');
 const LITERAL_UNION_ONLY=new RegExp(`^${LITERAL_UNION}$`);
@@ -74,11 +75,18 @@ function barrelExports(packageRoot){
   return exported;
 }
 
-/** The canonical rule ids and the prefixes they use, from the generated catalog. */
-export function ruleCatalog(packageRoot){
-  const text=read(path.join(packageRoot,'src','common','rule-catalog.generated.ts'));
-  const ids=uniq([...text.matchAll(/"([A-Z][A-Z0-9-]*-\d+)"/g)].map(m=>m[1]));
-  const prefixes=new Set(ids.map(id=>id.replace(/-\d+$/,'')));
+/**
+ * Numeric and AUTO canonical addresses and prefixes from a generated declaration array. The default
+ * is the package's catalog; a generator may name its pending target via file. Malformed, empty or
+ * duplicate arrays refuse rather than silently shrinking the census. This function only reads.
+ */
+export function ruleCatalog(packageRoot,{file=path.join(packageRoot,'src','common','rule-catalog.generated.ts')}={}){
+  const text=lexSource(read(file)).code;
+  const body=/CANONICAL_RULE_IDS[^=]*=\s*Object\.freeze\(\[([\s\S]*?)\]\)/.exec(text);
+  if(!body)throw new Error('Canonical rule id array was not found in the generated catalog');
+  const ids=lexSource(body[1]).strings.map(string=>string.value);
+  if(ids.length===0||ids.some(id=>!RULE_ID.test(id))||new Set(ids).size!==ids.length)throw new Error('Invalid canonical rule id array in the generated catalog');
+  const prefixes=new Set(ids.map(id=>id.replace(/-(?:\d+|AUTO)$/,'')));
   return {ids,prefixes};
 }
 

@@ -34,7 +34,7 @@ export type BottomNavProps = {
  * The mobile tab bar: 3-5 primary destinations with icon + label, a 44px minimum target, the
  * device safe-area inset, and `aria-current="page"` plus `data-grammar-current` on the current
  * destination. Left/Right/Home/End move between items; every item also stays in the Tab order.
- * Contract: nav LAYOUT-4 (fixed bar), list FOCUS-2, item FOCUS-1 ACTION-3 (anchor vs button), icon ICON-6.
+ * Contract: nav LAYOUT-4 (fixed bar), list FOCUS-2, item FOCUS-1 ACTION-3 (anchor vs button), icon A11Y-2.
  */
 export const BottomNav = ({ label, items, currentId, onSelect, position = "fixed", visibility = "compact", className }: BottomNavProps) => (
     <nav
@@ -58,7 +58,7 @@ export const BottomNav = ({ label, items, currentId, onSelect, position = "fixed
                     "data-grammar-current": isCurrent ? "true" : "false",
                 }
                 const content = <>
-                    <span aria-hidden="true" className="starci-core-bottom-nav-icon" data-contract="ICON-6">
+                    <span aria-hidden="true" className="starci-core-bottom-nav-icon" data-contract="A11Y-2">
                         {item.icon}
                         {item.badge === undefined ? null : <span className="starci-core-bottom-nav-badge" data-grammar-bottom-nav-badge="true">{item.badge}</span>}
                     </span>
