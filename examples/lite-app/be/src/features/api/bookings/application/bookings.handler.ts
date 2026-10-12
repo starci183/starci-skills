@@ -7,7 +7,7 @@ import type { BookingsResult } from "./bookings.contracts"
 import { BookingsCommand } from "./bookings.command"
 
 @CommandHandler(BookingsCommand)
-/** Runs bookings for the authenticated principal through one domain-service call. */
+/** Books a resource for the authenticated principal through one domain-service call; the booking enqueues its confirmation. */
 export class BookingsHandler extends ICQRSHandler<BookingsCommand, BookingsResult> {
     constructor(
         @InjectLogger() logger: Logger,
@@ -17,6 +17,6 @@ export class BookingsHandler extends ICQRSHandler<BookingsCommand, BookingsResul
     }
 
     protected override process(command: BookingsCommand): Promise<BookingsResult> {
-        return this.bookingsService.bookings(command.params.principal.id, command.params.request.id)
+        return this.bookingsService.createBooking(command.params.principal.id, command.params.request)
     }
 }

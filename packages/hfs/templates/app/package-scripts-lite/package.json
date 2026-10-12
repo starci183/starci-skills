@@ -3,6 +3,8 @@
     "prepare": "husky",
     {{appScripts}}
 {{> app/package-scripts/core.json}}
+    "test": "cd be && jest --selectProjects unit --coverage",
+    "test:affected": "cd be && jest --selectProjects unit --passWithNoTests",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",

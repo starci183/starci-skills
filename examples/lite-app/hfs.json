@@ -21,7 +21,7 @@
           "kind": "cli"
         }
       ],
-      "kinds": ["api", "cli", "webhooks"],
+      "kinds": ["api", "cli", "jobs", "webhooks"],
       "connections": [
         {
           "name": "primary",
@@ -32,7 +32,7 @@
         }
       ],
       "reads": ["supabase/types/"],
-      "patterns": ["webhooks"]
+      "patterns": ["webhooks", "queue"]
     },
     "fe": {
       "apps": [

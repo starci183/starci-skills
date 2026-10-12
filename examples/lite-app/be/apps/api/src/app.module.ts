@@ -14,7 +14,7 @@ import { LivenessModule } from "@modules/domain/liveness"
 import { ClockModule } from "@modules/platform/clock"
 import { CONFIG_ERROR_KINDS } from "@modules/platform/config"
 import { CqrsModule } from "@modules/platform/cqrs"
-import { DATABASE_ERROR_KINDS, DatabaseModule } from "@modules/platform/database"
+import { DATABASE_ERROR_KINDS, DatabaseModule, PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
 import { ERRORS_MESSAGES, ErrorsFilter, ErrorsModule } from "@modules/platform/errors"
 import {
     HTTP_SECURITY_ERROR_KINDS,
@@ -25,6 +25,7 @@ import {
 } from "@modules/platform/http-security"
 import { I18nModule } from "@modules/platform/i18n"
 import { LoggingModule } from "@modules/platform/logging"
+import { QueueModule } from "@modules/platform/queue"
 import type { ApiOptions } from "./api.options"
 import { RESOURCES_ERROR_KINDS, ResourcesModule } from "@modules/domain/resources"
 import { BOOKINGS_ERROR_KINDS, BookingsModule } from "@modules/domain/bookings"
@@ -32,6 +33,7 @@ import { CALENDARS_ERROR_KINDS, CalendarsModule } from "@modules/domain/calendar
 import { BookingsHttpModule } from "@features/api/bookings"
 import { CalendarHttpModule } from "@features/webhooks/calendar"
 import { CalendarInboxModule } from "@modules/domain/calendar-inbox"
+import { ConfirmBookingQueueModule } from "@features/jobs/confirm-booking"
 
 @Module({})
 /** Composition root of the API: every capability is registered once and the three guards run in a fixed order. */
@@ -76,6 +78,13 @@ export class AppModule {
                     isGlobal: true,
                     connections: [options.database],
                 }),
+                QueueModule.register({
+                    isGlobal: true,
+                    connections: [PRIMARY_ENTITY_MANAGER],
+                    schedulers: [],
+                    ...options.queue,
+                }),
+                ConfirmBookingQueueModule,
                 IdentityModule.register({ isGlobal: true, verifyAccessToken }),
                 LivenessModule.register({ isGlobal: true }),
                 SystemHealthHttpModule,
