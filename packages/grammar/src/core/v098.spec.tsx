@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { installDomShims } from "../__test__/grammarRoots.js"
-import { COMMON_GRAMMAR_COMPONENTS, ComboBox, Disclosure, Input, SearchField, Select, Textarea } from "../common/index.js"
+import { COMMON_GRAMMAR_COMPONENTS, ComboBox, Disclosure, Input, ListBox, Meter, SearchField, Select, Textarea } from "../common/index.js"
 
 installDomShims()
 afterEach(cleanup)
@@ -99,13 +99,18 @@ describe("0.9.8: the selected value stays on one line", () => {
 })
 
 describe("0.9.8: every emitted skeleton and flow-graph root has a rule", () => {
-    it("styles the roots in their group sheets", () => {
+    it("binds the loading roots to their group sheets and keeps the graph paint", () => {
         expect(forms).toMatch(/\.starci-core-field-skeleton \{/)
         expect(body(forms, ".starci-core-field-skeleton {")).toContain("pointer-events: none")
         expect(body(navigation, ".starci-core-list-box-skeleton {")).toContain("flex-direction: column")
         expect(body(overlays, ".starci-core-meter-skeleton {")).toContain("flex-direction: column")
         expect(body(navigation, ".starci-core-flow-graph-background")).toContain("position: absolute")
         expect(body(navigation, ".starci-core-flow-graph .starci-core-flow-graph-edge {")).toContain("pointer-events: none")
+        const { container } = render(<><Select label="Plan" options={[]} isSkeleton /><ListBox label="Members" items={[]} isLoading /><Meter label="Storage" value={40} isSkeleton /></>)
+        // A shipped rule alone is insufficient: the loading DOM must match it or its inert/column paint never applies.
+        expect(container.querySelector('[data-component="Select"][data-grammar-skeleton="true"]')?.matches(".starci-core-field-skeleton")).toBe(true)
+        expect(container.querySelector('[data-grammar-list-skeleton="true"]')?.matches(".starci-core-list-box-skeleton")).toBe(true)
+        expect(container.querySelector('[data-component="Meter"][data-grammar-skeleton="true"]')?.matches(".starci-core-meter-skeleton")).toBe(true)
     })
 })
 

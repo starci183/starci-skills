@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.9 - 2026-10-12
+
+- Changed: refresh the bundled runtime and canon pins for grammar 0.9.9, stylelint-canon 2.0.8, CLI 1.2.8 and HFS 4.2.8; ESLint rule implementations are unchanged.
+
 ## 3.2.8 - 2026-10-12
 
 - Changed: refresh the bundled canon pins for grammar 0.9.8; behaviour is unchanged.

@@ -7,14 +7,15 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 ## [1.0.0-alpha.12] — 2026-10-12
 
 ### Added
-- `@starci/grammar` 0.9.8: every single-line field (Input, Select, ComboBox, SearchField, NumberField, date fields) shares one anatomy (radius, 2.5rem min-height, inline padding, trigger placement); Select and ComboBox values stay on one line with an ellipsis; `Input` gains `onBlur`, `onPaste`, `autoFocus` and `isLabelHidden`; `Disclosure` gains `summary`; the 0.9.7 skeleton and FlowGraph roots get real rules.
-- Knowledge: owner rulings of 2026-10-12 from the Add documents drawer review — Tabs switch screens and SegmentedControl sets a value (STATE-6), forms in a narrow owner stay one column (RESPONSIVE-1), related commands in a ButtonGroup with no empty-count primary (CTA-1), rarely changed options in a Disclosure (LAYOUT-1), several values of one kind as a list of Inputs (COLLECTION-1); CONTEXT.md gains the choose-the-component-by-the-job table; STATE-8 ownership rows.
+- `@starci/grammar` 0.9.9 carries the single-line field family (radius, minimum height, inline padding and trigger placement), one-line Select and ComboBox values, Input event and hidden-label props, and Disclosure summary introduced in 0.9.8.
+- Knowledge: owner rulings of 2026-10-12 from the Add documents drawer review — Tabs switch screens and SegmentedControl sets a value (STATE-6), forms in a narrow owner stay one column (RESPONSIVE-1), related commands use ButtonGroup (CTA-1), rarely changed options use Disclosure (LAYOUT-1), and several values of one kind use a list of Inputs (COLLECTION-1); CONTEXT.md carries the component-selection table and STATE-8 owns loading views.
 
 ### Fixed
-- `tests/work-ui` is green again: the grammar DNA snapshots are refreshed for 0.9.8 and STATE-8 is published outside the generated catalogue.
+- Generate the UI rule catalogue from authored YAML declarations, including STATE-8 and sparse and nonnumeric addresses. Renderer and family stamps resolve to active canonical rules without exceptions; retired claim identifiers are removed while geometry, interaction and source-ownership assertions remain.
+- Declare the Turbo task cache as one optional, ignored runtime slot; generated cache stays available without being treated as authored source.
 
 ### Changed
-- CLI 1.2.7 carries runtime 1.0.0-alpha.12; HFS 4.2.7 and the BE/FE lint canons 3.2.8/8.2.8 carry the refreshed canon pins (grammar 0.9.8).
+- Grammar 0.9.9 and Stylelint canon 2.0.8 carry the corrected rule catalogue and CSS vocabulary. HFS 4.2.8 and the BE/FE lint canons 3.2.9/8.2.9 carry the refreshed runtime and canon pins; CLI 1.2.8 pins HFS 4.2.8 and carries runtime 1.0.0-alpha.12.
 
 ## [1.0.0-alpha.10.1] — 2026-10-12
 

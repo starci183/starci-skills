@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.9 - 2026-10-12
+
+- Fixed: generate the rule catalogue from authored UI knowledge YAML, preserving sparse and nonnumeric addresses and including STATE-8.
+- Changed: migrate renderer and family contract stamps to active canonical rules; preserve geometry, interaction and source-ownership assertions without exceptions for unknown rule ids.
+
 ## 0.9.8 - 2026-10-12
 
 Minor, additive (owner feedback from nivo.vn: the fields of one form did not look like one family; a long selected value broke the field height). No new catalog component (still 104).

@@ -8,7 +8,7 @@
 # named section of it and only shrinks.
 schema: starci/runtime-slots@1
 kind: runtime
-version: 1.3.0
+version: 1.4.0
 
 versioning:
   patch: wording, why text, examples; no check result can change.
@@ -282,6 +282,14 @@ slots:
     tracked: ignored
     tier: none
     tests: none
+  - id: runtime.task-cache
+    profiles: [runtime]
+    path: .turbo/
+    presence: optional
+    tracked: ignored
+    tier: none
+    tests: none
+    why: Turbo task cache written by frontend build and verification tools.
   - id: runtime.state-in-tree
     profiles: [runtime]
     path: "{runtime/,worktrees/,mcp/,.starciwork/,.secrets/,.venv/,ex-testing/,ui/.secrets/,ui/.git-starci-status-backup}"

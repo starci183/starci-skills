@@ -2,7 +2,7 @@
 
 ## 2.0.8 - 2026-10-12
 
-- Changed: regenerate the vocabulary for @starci/grammar 0.9.8, admitting its six declared FlowGraph colour and React Flow custom properties; lint rules and the generated grammar values and status tones are unchanged.
+- Changed: regenerate the CSS vocabulary from the combined @starci/grammar 0.9.9 sheets, including the declared FlowGraph and field tokens; Stylelint rule implementations are unchanged.
 
 ## 2.0.7 - 2026-10-11
 

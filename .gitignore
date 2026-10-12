@@ -35,6 +35,7 @@ settings.local.json
 
 # Dependencies and process-local generated state
 node_modules/
+/.turbo/
 __pycache__/
 /scheduled_tasks.lock
 
