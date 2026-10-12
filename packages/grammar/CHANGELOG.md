@@ -1,12 +1,18 @@
 # Changelog
 
-## 0.9.12 - 2026-10-12
+## 0.9.13 - 2026-10-12
 
 - Fixed: generate the rule catalogue from authored UI knowledge YAML, including STATE-8 and sparse and nonnumeric addresses; renderer and family claims resolve to active canonical rules without exceptions for retired identifiers.
 - Fixed: preserve function-child loading behavior in Breadcrumbs and ListBox, active canonical renderer claims and scoped FlowGraph slot styling across the runtime merge.
 - Fixed: the stories typecheck overrides the build exclusions so every story is checked. The test and prepack scripts continue to run typecheck plus build; the package carries no spec suites.
 - Fixed: scope the underline bar's bottom padding and border resets to primary Tabs so secondary Tabs retain HeroUI's pill-track inset.
 - Changed: integrate the canonical catalogue and claims with 0.9.11's HeroUI secondary Tabs and visible labels for icon-less tabs; keep the vendor pill paint and the existing public component API.
+
+## 0.9.12 - 2026-10-12
+
+Patch (owner review of nivo.vn, STATE-6 case-7). No API change.
+
+- **The secondary pill strip keeps its track padding on every side.** The zero bottom margin and padding the underline bar needs were applied to every tab list, so the selected pill sat on the bottom edge of the track and the strip looked jammed. They are scoped to `variant="primary"` now.
 
 ## 0.9.11 - 2026-10-12
 

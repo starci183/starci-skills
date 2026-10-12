@@ -194,7 +194,7 @@ rules:
       - id: case-7
         when: The secondary tab strip is painted
         assert: |-
-          Owner ruling 2026-10-12: `Tabs variant="secondary"` is HeroUI's own pill tabs, unpainted by the grammar - a soft `--default` track, the selected tab a white `--segment` pill with the surface shadow and foreground text. It is never re-painted in the accent-soft chip family: next to a ButtonGroup or selectable chips that paint read as a row of buttons, not a view switcher. A tab with no leading icon always shows its label, at every width
+          Owner ruling 2026-10-12: `Tabs variant="secondary"` is HeroUI's own pill tabs, unpainted by the grammar - a soft `--default` track, the selected tab a white `--segment` pill with the surface shadow and foreground text. It is never re-painted in the accent-soft chip family: next to a ButtonGroup or selectable chips that paint read as a row of buttons, not a view switcher. A tab with no leading icon always shows its label, at every width. The track keeps its padding on every side: the selected pill never sits on the track's edge
   - id: STATE-7
     title: Controlled disclosure
     governs: Governs a summary that reveals a region.

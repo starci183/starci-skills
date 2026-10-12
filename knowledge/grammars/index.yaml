@@ -43,7 +43,7 @@ topics:
     title: Common Grammar — DNA
     summary: |
       Generated DNA snapshot of the `@starci/grammar/common` public entry: custom properties,
-      renderer classes, stamped rule ids and recorded gaps. The DNA owns the observed package
+      its registry of 104 renderers, their classes, stamped rule ids and recorded gaps. The DNA owns the observed package
       version and source inventory. Common supplies anatomy, not colour; the snapshot is drift-checked.
   - id: starci
     path: starci/index.yaml

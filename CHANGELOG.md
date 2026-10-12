@@ -7,9 +7,9 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 ## [1.0.0-alpha.12] — 2026-10-12
 
 ### Added
-- Grammar 0.9.12 combines the single-line field family, Input event and hidden-label props, Disclosure summary, danger-soft IconButton row actions and Breadcrumbs/ListBox loading corrections with the HeroUI secondary Tabs and icon-less tab labels published in 0.9.11. Secondary Tabs retain the vendor pill paint (STATE-6 case-7).
+- Grammar 0.9.13 combines the single-line field family, Input event and hidden-label props, Disclosure summary, danger-soft IconButton row actions and Breadcrumbs/ListBox loading corrections with the HeroUI secondary Tabs and icon-less tab labels published in 0.9.11. Secondary Tabs retain the vendor pill paint (STATE-6 case-7).
 - HFS manifest 2.2.0 declares a declaration-only ambient owner for app compiler declarations; runtime source files remain refused there.
-- Knowledge: owner rulings of 2026-10-12 choose components by their job: Tabs switch screens, SegmentedControl sets a value, forms in a narrow owner stay one column, peer commands use ButtonGroup, decisions keep a separate way out, rarely changed options use Disclosure, several values use a list of Inputs, and stored destructive actions retain their confirmation boundary. STATE-8 owns loading and failure anatomy.
+- Knowledge: owner rulings of 2026-10-12 choose components by their job: Tabs switch screens, SegmentedControl sets a value, forms in a narrow owner stay one column, peer commands use ButtonGroup, decisions keep a separate way out, rarely changed batch options use a nested SurfaceAccordionCard, several values use a list of Inputs, and stored destructive actions retain their confirmation boundary. STATE-8 owns loading and failure anatomy. File, cloud and link inputs stay with their source kind (LAYOUT-1 case-9).
 
 ### Fixed
 - Commit a resolved pending Git merge even when its tree is unchanged, retaining normal commit hooks and conflict refusals.
@@ -21,7 +21,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - The Grammar stories typecheck includes every story instead of inheriting build exclusions.
 
 ### Changed
-- Grammar 0.9.12 carries the merged components and canonical rule catalogue; Stylelint canon 2.0.9 carries the vocabulary for the four declared button CSS properties. HFS 4.2.12 and BE/FE lint canons 3.2.13/8.2.13 carry the merged runtime and canon pins; CLI 1.2.12 pins HFS 4.2.12 and selects runtime 1.0.0-alpha.12. ESLint rule implementations are unchanged; the bundled HFS manifest recognizes the new declaration-only owner.
+- Grammar 0.9.13 carries the merged components and canonical rule catalogue; Stylelint canon 2.0.9 carries the vocabulary for the four declared button CSS properties. HFS 4.2.13 and BE/FE lint canons 3.2.14/8.2.14 carry the merged runtime and canon pins; CLI 1.2.13 pins HFS 4.2.13 and selects runtime 1.0.0-alpha.12. ESLint rule implementations are unchanged; the bundled HFS manifest recognizes the new declaration-only owner.
 
 ### Removed
 - Grammar carries no spec suites, test helpers, vitest configs or Storybook a11y gate. Its test and prepack scripts run typecheck plus build; UI contracts remain in runtime work-ui checks and Grammar DNA snapshots.
