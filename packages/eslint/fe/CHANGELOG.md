@@ -1,5 +1,9 @@
 # Changelog
 
+## 8.2.13 - 2026-10-12
+
+- Changed: bundled canon pins carry @starci/grammar 0.9.12 (the secondary tab track keeps its padding).
+
 ## 8.2.12 - 2026-10-12
 
 - Changed: bundled canon pins carry @starci/grammar 0.9.11 (secondary Tabs are HeroUI's own pill tabs).

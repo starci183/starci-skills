@@ -7,6 +7,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 ## [1.0.0-alpha.12] — 2026-10-12
 
 ### Added
+- `@starci/grammar` 0.9.12: the secondary tab track keeps its padding on every side (the selected pill no longer sits on its edge). Knowledge: batch options open inside a `SurfaceAccordionCard` whose summary names who may read (LAYOUT-1 case-8, corrected), and content sources sit with their kind (LAYOUT-1 case-9).
 - `@starci/grammar` 0.9.11: `Tabs variant="secondary"` is HeroUI's own pill tabs (the 0.9.9 accent-soft re-paint read as a row of buttons; STATE-6 case-7), and a tab with no leading icon always shows its label.
 - `@starci/grammar` 0.9.9: `Tabs variant="secondary"` (a pill strip for tabs inside a drawer, card, dialog or rail) and `IconButton variant="danger-soft"` (row-level destructive actions); the Breadcrumbs, ListBox and Stepper loading modes pass axe.
 - `@starci/grammar` 0.9.8: every single-line field (Input, Select, ComboBox, SearchField, NumberField, date fields) shares one anatomy (radius, 2.5rem min-height, inline padding, trigger placement); Select and ComboBox values stay on one line with an ellipsis; `Input` gains `onBlur`, `onPaste`, `autoFocus` and `isLabelHidden`; `Disclosure` gains `summary`; the 0.9.7 skeleton and FlowGraph roots get real rules.
@@ -16,7 +17,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - `tests/work-ui` is green again: the grammar DNA snapshots are refreshed for 0.9.8 and STATE-8 is published outside the generated catalogue.
 
 ### Changed
-- CLI 1.2.11 carries runtime 1.0.0-alpha.12; HFS 4.2.11 and the BE/FE lint canons 3.2.12/8.2.12 carry the refreshed canon pins (grammar 0.9.11).
+- CLI 1.2.12 carries runtime 1.0.0-alpha.12; HFS 4.2.12 and the BE/FE lint canons 3.2.13/8.2.13 carry the refreshed canon pins (grammar 0.9.12).
 
 ### Removed
 - `@starci/grammar` 0.9.10 ships without spec suites (owner ruling 2026-10-12): the specs, test helpers, vitest configs and the Storybook a11y gate are deleted; `test` and `prepack` run typecheck + build, and the grammar-package workflow runs typecheck, pack check and the Storybook build. UI contracts stay in `tests/work-ui` and the DNA snapshot.
