@@ -12,7 +12,10 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - Knowledge: owner rulings of 2026-10-12 choose components by their job: Tabs switch screens, SegmentedControl sets a value, forms in a narrow owner stay one column, peer commands use ButtonGroup, decisions keep a separate way out, rarely changed batch options use a nested SurfaceAccordionCard, several values use a list of Inputs, and stored destructive actions retain their confirmation boundary. STATE-8 owns loading and failure anatomy. File, cloud and link inputs stay with their source kind (LAYOUT-1 case-9).
 
 ### Fixed
-- Commit a resolved pending Git merge even when its tree is unchanged, retaining normal commit hooks and conflict refusals.
+- Commit a resolved Git merge in progress even when its tree is unchanged, retaining normal commit hooks and conflict refusals.
+- The failure-code scanner exempts only the revision argument of `revParse(...)` (Git refs such as MERGE_HEAD); the same literal anywhere else is still an emitted code.
+- lite-app and shape-slot pin @xyflow/react to the canonical 12.11.6 through a root override, removing the hoisted 12.12.0 version skew.
+- The Grammar catalog summary states its renderer count in the form the knowledge writer refreshes, and the monorepo architecture fixture declares the React Flow peer.
 - Generate the UI rule catalogue from authored YAML declarations, including STATE-8 and sparse and nonnumeric addresses. Renderer and family stamps resolve to active canonical rules; retired identifiers are removed without exceptions.
 - Declare the Turbo task cache as one optional, ignored runtime slot; generated cache stays available without being treated as authored source.
 - Regenerate the CLI runtime install pin for 1.0.0-alpha.12; the earlier CLI 1.2.8 archive selected 1.0.0-alpha.10.1.
