@@ -13,7 +13,7 @@ appliesTo:
 family: offset-pop
 provenance:
   package: "@starci/grammar"
-  version: "0.9.3"
+  version: "0.9.7"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   captured: "2026-09-23"
   publicEntry: "@starci/grammar/common"
@@ -58,16 +58,16 @@ provenance:
     - path: "packages/grammar/src/offset-pop/styles.css"
       sha256: "e344fc2c880dc8d12d82888d279d12b1e6e2371232b25bcbf732bb88b78f35a0"
     - path: "packages/grammar/src/offset-pop/components-forms.css"
-      sha256: "24368e768487519abdf303eae744127b25242c87b3a7311df2a0da86135d804b"
+      sha256: "d2f0a10712d7cff00a94bee21acb8939fd2f1e7dfa61828b5e72b9de98c9efa7"
     - path: "packages/grammar/src/offset-pop/components-overlays.css"
       sha256: "0065296a1786a18c5784d3ef777cd64be94dfe88763e24dcbccd3f5346f32ec9"
     - path: "packages/grammar/src/offset-pop/components-navigation.css"
-      sha256: "81a7918108e2ce0266b4ff17928c79756a8dbe99750e4001c367c9525a1672fa"
+      sha256: "4d015181854344af6f8b4aafc7a8b36027ec4dfef08c6716bbc65eb38b1dadd7"
     - path: "packages/grammar/src/common/registry.tsx"
       sha256: "3934778aac696be9518741e64ee210bfbaa2e9b9818a57ab979b6ef332ce9161"
 identity:
   package: "@starci/grammar"
-  version: "0.9.3"
+  version: "0.9.7"
   familyId: "offset-pop"
   dnaId: "offset-pop"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
@@ -148,9 +148,9 @@ identity:
     renderers added in 0.5.0 are each targeted by a family rule (asserted by the
     `components-{forms,overlays,navigation}.spec.ts` suites).
   counts:
-    renderers: 103
+    renderers: 104
     tokens: 81
-    claimEntries: 430
+    claimEntries: 441
     gaps: 3
 
 observations:
@@ -808,15 +808,15 @@ tokens:
   - name: "--starci-core-band-height"
     value: "calc(4rem + 1px)"
     valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:1836"
+    source: "packages/grammar/src/common/styles.css:1853"
   - name: "--starci-core-band-offset"
     value: "calc(var(--starci-core-band-height, 0rem) + var(--starci-core-band-subnav-height, 0rem))"
     valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:1832"
+    source: "packages/grammar/src/common/styles.css:1849"
   - name: "--starci-core-band-subnav-height"
     value: "calc(3.25rem + 1px)"
     valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:1845"
+    source: "packages/grammar/src/common/styles.css:1862"
   - name: "--starci-core-bottom-nav-block-size"
     value: "calc(4.5rem + var(--offset-pop-outline-width) * 1.5 + var(--offset-pop-shadow-y) * 0.5)"
     valueFrom: "family"
@@ -824,11 +824,11 @@ tokens:
   - name: "--starci-core-rail-offset"
     value: "var(--starci-core-band-offset, 5.5rem)"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1688"
+    source: "packages/grammar/src/common/styles.css:1705"
   - name: "--starci-core-subnav-offset"
     value: "var(--starci-core-band-height, 4rem)"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1992"
+    source: "packages/grammar/src/common/styles.css:2009"
   - name: "--success"
     value: "var(--offset-pop-success)"
     valueFrom: "family"
@@ -936,10 +936,11 @@ renderers:
     closedValues:
       - prop: "size"
         values: ["sm", "md", "lg"]
-    claims: ["ICON-6", "MEDIA-5"]
+    claims: ["ICON-6", "MEDIA-5", "STATE-8"]
     computedClaims: []
     classes:
       - "starci-core-avatar"
+      - "starci-core-avatar-skeleton"
   - component: "AvatarGroup"
     propsType: "AvatarGroupProps"
     kind: "composite"
@@ -998,6 +999,7 @@ renderers:
       - "starci-core-breadcrumb"
       - "starci-core-breadcrumb-label"
       - "starci-core-breadcrumb-leading"
+      - "starci-core-breadcrumb-skeleton"
       - "starci-core-breadcrumbs"
       - "starci-core-breadcrumbs-list"
   - component: "Button"
@@ -1058,7 +1060,7 @@ renderers:
     closedValues:
       - prop: "side"
         values: ["incoming", "outgoing"]
-    claims: ["SURFACE-3", "SURFACE-4"]
+    claims: ["STATE-8", "SURFACE-3", "SURFACE-4"]
     computedClaims: []
     classes:
       - "starci-core-chat-bubble"
@@ -1069,7 +1071,9 @@ renderers:
       - "starci-core-chat-bubble-footer"
       - "starci-core-chat-bubble-head"
       - "starci-core-chat-bubble-meta"
+      - "starci-core-chat-bubble-skeleton-body"
       - "starci-core-chat-bubble-stack"
+      - "starci-core-chat-bubble-thread"
   - component: "ChatWorkspace"
     propsType: "ChatWorkspaceProps"
     kind: "composition"
@@ -1135,6 +1139,10 @@ renderers:
       - "starci-core-field"
       - "starci-core-field-description"
       - "starci-core-field-error"
+      - "starci-core-field-required"
+      - "starci-core-field-skeleton"
+      - "starci-core-field-skeleton-choice-label"
+      - "starci-core-field-skeleton-control"
   - component: "CloseButton"
     propsType: "CloseButtonProps"
     kind: "primitive"
@@ -1428,16 +1436,22 @@ renderers:
     group: "forms"
     source: "packages/grammar/src/core/primitive/Field/index.tsx"
     closedValues: []
-    claims: ["A11Y-1", "FEEDBACK-1", "FIELD-1", "FIELD-2"]
+    claims: ["A11Y-1", "FEEDBACK-1", "FIELD-1", "FIELD-2", "STATE-8"]
     computedClaims: []
     classes:
       - "grammar-common-root"
+      - "starci-core-choice"
+      - "starci-core-choice-content"
+      - "starci-core-choice-group-options"
       - "starci-core-field"
       - "starci-core-field-control"
       - "starci-core-field-description"
       - "starci-core-field-error"
       - "starci-core-field-label"
       - "starci-core-field-required"
+      - "starci-core-field-skeleton"
+      - "starci-core-field-skeleton-choice-label"
+      - "starci-core-field-skeleton-control"
       - "starci-core-form-label--screen-reader"
   - component: "Fieldset"
     propsType: "FieldsetProps"
@@ -1490,6 +1504,34 @@ renderers:
     computedClaims: []
     classes:
       - "starci-core-fill-viewport"
+  - component: "FlowGraph"
+    propsType: "FlowGraphProps"
+    kind: "branch"
+    group: "navigation"
+    source: "packages/grammar/src/core/branch/FlowGraph/index.tsx"
+    closedValues:
+      - prop: "height"
+        values: ["sm", "md", "lg"]
+      - prop: "layout"
+        values: ["radial", "manual"]
+    claims: ["CONTROL-STATE-3", "FOCUS-2", "STATE-3"]
+    computedClaims: []
+    classes:
+      - "starci-core-flow-graph"
+      - "starci-core-flow-graph-background"
+      - "starci-core-flow-graph-canvas"
+      - "starci-core-flow-graph-controls"
+      - "starci-core-flow-graph-copy"
+      - "starci-core-flow-graph-count"
+      - "starci-core-flow-graph-description"
+      - "starci-core-flow-graph-edge"
+      - "starci-core-flow-graph-edge-placeholder"
+      - "starci-core-flow-graph-empty"
+      - "starci-core-flow-graph-handle"
+      - "starci-core-flow-graph-label"
+      - "starci-core-flow-graph-loading"
+      - "starci-core-flow-graph-node"
+      - "starci-core-visually-hidden"
   - component: "Footer"
     propsType: "FooterProps"
     kind: "composition"
@@ -1742,6 +1784,8 @@ renderers:
       - "starci-core-list-box-label"
       - "starci-core-list-box-leading"
       - "starci-core-list-box-row"
+      - "starci-core-list-box-skeleton"
+      - "starci-core-list-box-skeleton-option"
       - "starci-core-list-box-trailing"
   - component: "ListItem"
     propsType: "ListItemProps"
@@ -1763,7 +1807,7 @@ renderers:
         type: "PresentationState"
       - prop: "verdict"
         type: "RowVerdict"
-    claims: ["BOUNDARY-3", "FONT-2", "GAP-1", "GAP-2", "GAP-3", "PADDING-4", "TONE-2"]
+    claims: ["BOUNDARY-3", "FONT-2", "GAP-1", "GAP-2", "GAP-3", "PADDING-4", "STATE-8", "TONE-2"]
     computedClaims: []
     classes:
       - "starci-core-list-row"
@@ -1774,6 +1818,7 @@ renderers:
       - "starci-core-list-row-detail"
       - "starci-core-list-row-leading"
       - "starci-core-list-row-name"
+      - "starci-core-list-row-skeleton-action"
       - "starci-core-list-row-title"
       - "starci-core-static-row"
   - component: "MarkdownArticle"
@@ -1832,9 +1877,10 @@ renderers:
         type: "PresentationState"
       - prop: "segments"
         values: ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
-    claims: ["A11Y-3", "ACCENT-4", "MOTION-2"]
+    claims: ["A11Y-3", "ACCENT-4", "MOTION-2", "STATE-8"]
     computedClaims: []
     classes:
+      - "starci-core-form-label--screen-reader"
       - "starci-core-meter"
       - "starci-core-meter-fill"
       - "starci-core-meter-header"
@@ -1842,6 +1888,8 @@ renderers:
       - "starci-core-meter-output"
       - "starci-core-meter-segment"
       - "starci-core-meter-segments"
+      - "starci-core-meter-skeleton"
+      - "starci-core-meter-skeleton-bar"
       - "starci-core-meter-track"
   - component: "NavLandmark"
     propsType: "NavLandmarkProps"
@@ -1884,9 +1932,16 @@ renderers:
     claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FIELD-3"]
     computedClaims: []
     classes:
+      - "starci-core-choice"
+      - "starci-core-choice-content"
+      - "starci-core-choice-group-options"
       - "starci-core-field"
       - "starci-core-field-description"
       - "starci-core-field-error"
+      - "starci-core-field-required"
+      - "starci-core-field-skeleton"
+      - "starci-core-field-skeleton-choice-label"
+      - "starci-core-field-skeleton-control"
       - "starci-core-number-field"
       - "starci-core-number-field-group"
       - "starci-core-number-field-input"
@@ -2122,9 +2177,16 @@ renderers:
     claims: ["A11Y-1", "CONTROL-STATE-2", "FIELD-1", "FIELD-2"]
     computedClaims: []
     classes:
+      - "starci-core-choice"
+      - "starci-core-choice-content"
+      - "starci-core-choice-group-options"
       - "starci-core-field"
       - "starci-core-field-description"
       - "starci-core-field-error"
+      - "starci-core-field-required"
+      - "starci-core-field-skeleton"
+      - "starci-core-field-skeleton-choice-label"
+      - "starci-core-field-skeleton-control"
       - "starci-core-field-spinner"
       - "starci-core-search-field"
       - "starci-core-search-field-clear"
@@ -2140,7 +2202,7 @@ renderers:
         values: ["1", "2", "3", "4", "5", "6"]
       - prop: "composition"
         values: ["section-header", "context-intro"]
-    claims: ["FONT-1", "GAP-2", "GAP-5", "TONE-2"]
+    claims: ["FONT-1", "GAP-2", "GAP-5", "STATE-8", "TONE-2"]
     computedClaims: ["FLOW-3", "MARGIN-0"]
     classes:
       - "starci-core-section-action"
@@ -2150,6 +2212,10 @@ renderers:
       - "starci-core-section-header"
       - "starci-core-section-header-copy"
       - "starci-core-section-meta"
+      - "starci-core-section-skeleton-action"
+      - "starci-core-section-skeleton-description"
+      - "starci-core-section-skeleton-meta"
+      - "starci-core-section-skeleton-title"
       - "starci-core-section-title"
   - component: "SegmentedControl"
     propsType: "SegmentedControlProps"
@@ -2162,10 +2228,17 @@ renderers:
     claims: ["A11Y-1", "FEEDBACK-1", "FIELD-2", "FOCUS-2", "STATE-6"]
     computedClaims: []
     classes:
+      - "starci-core-choice"
+      - "starci-core-choice-content"
+      - "starci-core-choice-group-options"
       - "starci-core-field"
       - "starci-core-field-description"
       - "starci-core-field-error"
       - "starci-core-field-label"
+      - "starci-core-field-required"
+      - "starci-core-field-skeleton"
+      - "starci-core-field-skeleton-choice-label"
+      - "starci-core-field-skeleton-control"
       - "starci-core-form-label--screen-reader"
       - "starci-core-segment"
       - "starci-core-segmented-control"
@@ -2182,9 +2255,16 @@ renderers:
     computedClaims: []
     classes:
       - "grammar-common-root"
+      - "starci-core-choice"
+      - "starci-core-choice-content"
+      - "starci-core-choice-group-options"
       - "starci-core-field"
       - "starci-core-field-description"
       - "starci-core-field-error"
+      - "starci-core-field-required"
+      - "starci-core-field-skeleton"
+      - "starci-core-field-skeleton-choice-label"
+      - "starci-core-field-skeleton-control"
       - "starci-core-field-spinner"
       - "starci-core-list"
       - "starci-core-list-option"
@@ -2306,8 +2386,8 @@ renderers:
     closedValues:
       - prop: "orientation"
         values: ["horizontal", "vertical"]
-    claims: ["FOCUS-1", "ICON-6", "STATE-1"]
-    computedClaims: ["FOCUS-2", "HIERARCHY-3"]
+    claims: ["FOCUS-1", "HIERARCHY-3", "ICON-6", "STATE-1", "STATE-8"]
+    computedClaims: ["FOCUS-2"]
     classes:
       - "starci-core-nav-visually-hidden"
       - "starci-core-step"
@@ -2317,6 +2397,8 @@ renderers:
       - "starci-core-step-description"
       - "starci-core-step-label"
       - "starci-core-step-marker"
+      - "starci-core-step-skeleton-label"
+      - "starci-core-step-skeleton-marker"
       - "starci-core-stepper"
       - "starci-core-stepper-list"
   - component: "Subnav"
@@ -2446,8 +2528,14 @@ renderers:
       - "starci-core-choice"
       - "starci-core-choice-content"
       - "starci-core-choice-control"
+      - "starci-core-choice-group-options"
+      - "starci-core-field"
       - "starci-core-field-description"
       - "starci-core-field-error"
+      - "starci-core-field-required"
+      - "starci-core-field-skeleton"
+      - "starci-core-field-skeleton-choice-label"
+      - "starci-core-field-skeleton-control"
       - "starci-core-switch"
   - component: "Tabs"
     propsType: "TabsProps"
@@ -2541,12 +2629,19 @@ renderers:
     claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FIELD-3"]
     computedClaims: []
     classes:
+      - "starci-core-choice"
+      - "starci-core-choice-content"
+      - "starci-core-choice-group-options"
       - "starci-core-field"
       - "starci-core-field-count"
       - "starci-core-field-description"
       - "starci-core-field-error"
       - "starci-core-field-label"
       - "starci-core-field-meta"
+      - "starci-core-field-required"
+      - "starci-core-field-skeleton"
+      - "starci-core-field-skeleton-choice-label"
+      - "starci-core-field-skeleton-control"
       - "starci-core-form-label--screen-reader"
       - "starci-core-mention-description"
       - "starci-core-mention-label"
@@ -2582,7 +2677,7 @@ renderers:
     group: "navigation"
     source: "packages/grammar/src/core/composite/Timeline/index.tsx"
     closedValues: []
-    claims: ["HIERARCHY-3", "ICON-6", "STATE-1", "TRUTH-1"]
+    claims: ["HIERARCHY-3", "ICON-6", "STATE-1", "STATE-8", "TRUTH-1"]
     computedClaims: []
     classes:
       - "starci-core-timeline"
@@ -2590,6 +2685,7 @@ renderers:
       - "starci-core-timeline-description"
       - "starci-core-timeline-item"
       - "starci-core-timeline-marker"
+      - "starci-core-timeline-skeleton-marker"
       - "starci-core-timeline-time"
       - "starci-core-timeline-title"
   - component: "Toast"
