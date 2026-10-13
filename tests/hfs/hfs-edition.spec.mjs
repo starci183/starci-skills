@@ -236,7 +236,7 @@ test('R212 case-2: a lite front end owns no back-end API client and serves no AP
   ]) {
     const c = lite.classifyPath(p);
     assert.deepEqual([c.status, c.slot], ['forbidden', slot], p);
-    assert.match(c.goesTo, /modules\/db\/.*write-\*\.ts.*SECURITY DEFINER rpc.*pgmq\.send/, `${p}: the goesTo names the lite fe -> be path`);
+    assert.match(c.goesTo, /modules\/db\/.*write-\*.*SECURITY DEFINER rpc.*pgmq\.send/, `${p}: the goesTo names the lite fe -> be path`);
     assert.notEqual(full.classifyPath(p).status, 'forbidden', `${p} stays legal under full`);
   }
   // fe.route allows (FE_SLOT_FILE_ROLE): only health/live is a route handler of a lite app (the auth callback is fe.route.callback)

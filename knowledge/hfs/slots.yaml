@@ -1790,7 +1790,7 @@ slots:
     path: "apps/<app>/src/modules/api/"
     presence: optional
     litePresence: forbidden     # in a lite app Next.js never calls the back-end API (owner ruling 2026-10-13, R212 case-2)
-    goesTo: "apps/<app>/src/modules/db/ (fe.modules.db): a lite front end never calls the back end; it reads through <domain>/read-*.ts, writes through RLS Server Actions in <domain>/write-*.ts, and hands back-end-only work to a SECURITY DEFINER rpc that pgmq.send()s a command a be job consumes"
+    goesTo: "apps/<app>/src/modules/db/ (fe.modules.db): reads read-*, RLS Server Actions write-*, be-only work through a SECURITY DEFINER rpc that pgmq.send()s a be job command (R212 case-2)"
     tracked: tracked
     tier: transport
     # The app's reads of the one client. A repository has exactly ONE transport client and ONE Outcome union: the app's
@@ -1806,7 +1806,7 @@ slots:
     path: "apps/<app>/src/modules/api/client.ts"
     presence: optional
     litePresence: forbidden     # in a lite app Next.js never calls the back-end API (owner ruling 2026-10-13, R212 case-2)
-    goesTo: "apps/<app>/src/modules/db/ (fe.modules.db): a lite front end never calls the back end; it reads through <domain>/read-*.ts, writes through RLS Server Actions in <domain>/write-*.ts, and hands back-end-only work to a SECURITY DEFINER rpc that pgmq.send()s a command a be job consumes"
+    goesTo: "apps/<app>/src/modules/db/ (fe.modules.db): reads read-*, RLS Server Actions write-*, be-only work through a SECURITY DEFINER rpc that pgmq.send()s a be job command (R212 case-2)"
     tracked: tracked
     tier: transport
     tests: none
@@ -1817,7 +1817,7 @@ slots:
     path: "apps/<app>/src/modules/api/outcome.ts"
     presence: optional
     litePresence: forbidden     # in a lite app Next.js never calls the back-end API (owner ruling 2026-10-13, R212 case-2)
-    goesTo: "apps/<app>/src/modules/db/ (fe.modules.db): a lite front end never calls the back end; it reads through <domain>/read-*.ts, writes through RLS Server Actions in <domain>/write-*.ts, and hands back-end-only work to a SECURITY DEFINER rpc that pgmq.send()s a command a be job consumes"
+    goesTo: "apps/<app>/src/modules/db/ (fe.modules.db): reads read-*, RLS Server Actions write-*, be-only work through a SECURITY DEFINER rpc that pgmq.send()s a be job command (R212 case-2)"
     tracked: tracked
     tier: transport
     outcomeHome: true
@@ -1937,7 +1937,7 @@ slots:
     path: "packages/<family>-api/"
     presence: opt-in
     litePresence: forbidden     # in a lite app Next.js never calls the back-end API (owner ruling 2026-10-13, R212 case-2)
-    goesTo: "apps/<app>/src/modules/db/ (fe.modules.db): a lite front end never calls the back end; it reads through <domain>/read-*.ts, writes through RLS Server Actions in <domain>/write-*.ts, and hands back-end-only work to a SECURITY DEFINER rpc that pgmq.send()s a command a be job consumes"
+    goesTo: "apps/<app>/src/modules/db/ (fe.modules.db): reads read-*, RLS Server Actions write-*, be-only work through a SECURITY DEFINER rpc that pgmq.send()s a be job command (R212 case-2)"
     tracked: tracked
     tier: package
     owner: true
@@ -1950,7 +1950,7 @@ slots:
     path: "packages/<family>-api/src/client.ts"
     presence: optional     # enabled with its package (fe.package.api is the opt-in)
     litePresence: forbidden     # in a lite app Next.js never calls the back-end API (owner ruling 2026-10-13, R212 case-2)
-    goesTo: "apps/<app>/src/modules/db/ (fe.modules.db): a lite front end never calls the back end; it reads through <domain>/read-*.ts, writes through RLS Server Actions in <domain>/write-*.ts, and hands back-end-only work to a SECURITY DEFINER rpc that pgmq.send()s a command a be job consumes"
+    goesTo: "apps/<app>/src/modules/db/ (fe.modules.db): reads read-*, RLS Server Actions write-*, be-only work through a SECURITY DEFINER rpc that pgmq.send()s a be job command (R212 case-2)"
     tracked: tracked
     tier: package
     tests: none
@@ -1961,7 +1961,7 @@ slots:
     path: "packages/<family>-api/src/outcome.ts"
     presence: optional     # enabled with its package (fe.package.api is the opt-in)
     litePresence: forbidden     # in a lite app Next.js never calls the back-end API (owner ruling 2026-10-13, R212 case-2)
-    goesTo: "apps/<app>/src/modules/db/ (fe.modules.db): a lite front end never calls the back end; it reads through <domain>/read-*.ts, writes through RLS Server Actions in <domain>/write-*.ts, and hands back-end-only work to a SECURITY DEFINER rpc that pgmq.send()s a command a be job consumes"
+    goesTo: "apps/<app>/src/modules/db/ (fe.modules.db): reads read-*, RLS Server Actions write-*, be-only work through a SECURITY DEFINER rpc that pgmq.send()s a be job command (R212 case-2)"
     tracked: tracked
     tier: package
     outcomeHome: true
