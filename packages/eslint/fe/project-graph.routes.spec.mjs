@@ -143,7 +143,8 @@ test("transport-owner: a package client folder next to an app client folder", (t
 })
 
 test("transport-owner: two apps that keep one app client folder with no package: the shared client belongs to the package", (t) => {
-    const files = { "apps/web/src/modules/api/graphql/clients/index.ts": CLIENT, ...NOTHING("admin") }
+    // admin calls the back end too (an operation file of its own modules/api), so the one app client folder is shared by two callers
+    const files = { "apps/web/src/modules/api/graphql/clients/index.ts": CLIENT, "apps/admin/src/modules/api/graphql/queries/query-course.ts": "export const queryCourse = () => 1;\n", ...NOTHING("admin") }
     const { tester, ok, bad } = repo(t, files, packaged(files))
     tester.run("transport-owner", rules["transport-owner"], {
         valid: [ok("apps/admin/src/hooks/course/useNothing.ts")],
