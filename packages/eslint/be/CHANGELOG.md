@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.16 - 2026-10-13
+
+- Changed: republish of 3.2.15 with the same rules; the release resumed after a partial publish, so the bundled canon-pins copy moves with the packages published after it (release-plan bundling rule).
+
 ## 3.2.15 - 2026-10-13
 
 - Changed: carry the runtime mirror of HFS manifest 3.0.0 (the lite edition re-ruled as full minus self-hosted infrastructure) and the canon pins for Grammar 0.9.14, HFS 4.2.14, jest-preset 2.2.7 and CLI 1.2.14. ESLint rule implementations are unchanged.
