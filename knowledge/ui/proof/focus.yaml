@@ -31,7 +31,7 @@ rules:
         observe: The indicator is not clipped by any ancestor's overflow
       - id: case-6
         when: |-
-          A single-line field (Input, SearchField, NumberField, ComboBox, Select, DateField, TimeField) takes focus. Owner ruling 2026-10-12 (nivo.vn review: a focused SearchField showed a doubled ring, wrapper and inner input both outlined; @starci/grammar 0.9.14)
+          A single-line field (Input, SearchField, NumberField, ComboBox, Select, DateField, TimeField) takes focus. Owner ruling 2026-10-12 (nivo.vn review: a focused SearchField showed a doubled ring, wrapper and inner input both outlined)
         observe: |-
           Exactly one focus ring is drawn, on the field frame (the group or trigger that carries the border), never also on the inner text input. Two nested rings, or a ring on the inner input and none on the frame, falsifies it; the single ring stays visible for keyboard focus
       - id: case-4

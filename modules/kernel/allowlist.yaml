@@ -355,6 +355,9 @@ json-exceptions:
     - path: examples/lite-app/be/nest-cli.json
       reason: >
         Nest CLI monorepo map inside the lite-app back end; the Nest toolchain reads JSON.
+    - path: examples/lite-app/be/src/tests/tsconfig.json
+      reason: >
+        TypeScript config for the lite-app back-end test tree (src/tests); tsc reads JSON (with comments).
     - path: examples/lite-app/be/tsconfig.build.json
       reason: >
         TypeScript build config inside the lite-app back end; tsc reads JSON (with comments).
