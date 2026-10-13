@@ -4,7 +4,7 @@ import { Test } from "@nestjs/testing"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
 import { CalendarsService } from "./calendars.service"
 import { CalendarsErrorCode } from "./errors/calendars.error"
-import { FIND_CALENDARS, FIND_DELIVERY_CALENDAR } from "./persistence/calendars.sql"
+import { FIND_CALENDARS, FIND_DELIVERY_CALENDAR, INSERT_CALENDARS } from "./persistence/calendars.sql"
 
 const build = async (entityManager: MockEntityManager) => {
     const moduleRef = await Test.createTestingModule({
@@ -28,6 +28,23 @@ describe("CalendarsService", () => {
             await expect((await build(em)).calendars("person-1", "calendar-9")).rejects.toMatchObject({
                 code: CalendarsErrorCode.NotFound,
                 params: { id: "calendar-9" },
+            })
+        })
+    })
+
+    describe("createCalendar", () => {
+        it("inserts one calendar owned by the principal and answers its id", async () => {
+            const em = mockEntityManager({ query: [INSERT_CALENDARS, [{ id: "calendar-1" }]] })
+
+            await expect((await build(em)).createCalendar("person-1")).resolves.toEqual({ id: "calendar-1" })
+            expect(em.query).toHaveBeenCalledWith(INSERT_CALENDARS, ["person-1"])
+        })
+
+        it("answers not created when the insert returns no row", async () => {
+            const em = mockEntityManager({ query: [INSERT_CALENDARS, []] })
+
+            await expect((await build(em)).createCalendar("person-1")).rejects.toMatchObject({
+                code: CalendarsErrorCode.NotCreated,
             })
         })
     })

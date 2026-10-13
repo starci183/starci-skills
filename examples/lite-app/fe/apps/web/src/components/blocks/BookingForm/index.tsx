@@ -1,61 +1,66 @@
 "use client"
 
 import { useTranslations } from "next-intl"
-import { useState, useTransition } from "react"
-import { writeBookings } from "@/modules/db/bookings/write-bookings"
-import { writeResources } from "@/modules/db/resources/write-resources"
+import { useSession } from "@/hooks/auth"
+import { useBookingStatus, useWorkspaceCommands } from "@/hooks/bookings"
+import { useBookingForm } from "@/hooks/rhf"
 import { BookingFormBase } from "./component"
 
-type FormFailure = "refused" | "not-found" | "invalid" | "unavailable"
-type FormResult = "created" | FormFailure | undefined
-
-const valueOf = (input: FormData, name: string): string => {
-    const value = input.get(name)
-    return typeof value === "string" ? value : ""
-}
-
-/** The connected booking block writes resources and resource intervals through principal-aware Server Actions. */
+/**
+ * The connected booking workspace of a signed-in reader: resources and calendars are created and bookings are made through
+ * the back end's GraphQL API (hooks only); a new booking's status is polled until its confirmation job ran.
+ */
 export const BookingForm = () => {
+    const session = useSession()
     const t = useTranslations("app.booking")
-    const [resourcePending, startResourceTransition] = useTransition()
-    const [bookingPending, startBookingTransition] = useTransition()
-    const [resourceResult, setResourceResult] = useState<FormResult>()
-    const [bookingResult, setBookingResult] = useState<FormResult>()
-    const addResource = (input: FormData) => {
-        startResourceTransition(async () => {
-            const result = await writeResources({ id: valueOf(input, "resourceId") })
-            setResourceResult(result.kind === "ok" ? "created" : result.kind)
-        })
-    }
-    const addBooking = (input: FormData) => {
-        startBookingTransition(async () => {
-            const result = await writeBookings({
-                id: valueOf(input, "bookingId"),
-                resourceId: valueOf(input, "bookingResourceId"),
-                startsAt: valueOf(input, "startsAt"),
-                endsAt: valueOf(input, "endsAt"),
-            })
-            setBookingResult(result.kind === "ok" ? "created" : result.kind)
-        })
-    }
-    const messageOf = (result: FormResult) => (result === undefined ? undefined : t(result))
+    const workspace = useTranslations("app.workspace")
+    const { resource, calendar } = useWorkspaceCommands()
+    const { fields, submit, isSubmitting, bookingId } = useBookingForm()
+    const status = useBookingStatus(bookingId)
+    if (session.status !== "signed-in") return null
+    const statusText =
+        bookingId === undefined
+            ? undefined
+            : (status.error ?? t("status", { id: bookingId, status: status.status ?? t("statusUnknown") }))
     return (
         <BookingFormBase
             props={{
-                title: t("title"),
+                title: workspace("title"),
+                commandsLabel: workspace("commands"),
+                addResourceLabel: resource.isCreating ? workspace("working") : workspace("addResource"),
+                addCalendarLabel: calendar.isCreating ? workspace("working") : workspace("addCalendar"),
+                resourcePending: resource.isCreating,
+                calendarPending: calendar.isCreating,
+                lastResource:
+                    resource.createdId === undefined
+                        ? undefined
+                        : workspace("lastResource", { id: resource.createdId }),
+                lastCalendar:
+                    calendar.createdId === undefined
+                        ? undefined
+                        : workspace("lastCalendar", { id: calendar.createdId }),
+                bookingTitle: t("title"),
                 resourceLabel: t("resource"),
-                bookingLabel: t("booking"),
-                bookingResourceLabel: t("bookingResource"),
                 startsAtLabel: t("startsAt"),
                 endsAtLabel: t("endsAt"),
-                addResourceLabel: resourcePending ? t("working") : t("addResource"),
-                addBookingLabel: bookingPending ? t("working") : t("addBooking"),
-                resourcePending,
-                bookingPending,
-                resourceMessage: messageOf(resourceResult),
-                bookingMessage: messageOf(bookingResult),
+                submitLabel: isSubmitting ? t("working") : t("submit"),
+                bookingPending: isSubmitting,
+                bookingStatus: statusText,
+                resourceId: { value: fields.resourceId.value, errorMessage: fields.resourceId.errorMessage },
+                startsAt: { value: fields.startsAt.value, errorMessage: fields.startsAt.errorMessage },
+                endsAt: { value: fields.endsAt.value, errorMessage: fields.endsAt.errorMessage },
             }}
-            on={{ resource: addResource, booking: addBooking }}
+            on={{
+                addResource: () => void resource.create(),
+                addCalendar: () => void calendar.create(),
+                book: () => void submit(),
+                resourceIdChange: fields.resourceId.change,
+                resourceIdBlur: fields.resourceId.blur,
+                startsAtChange: fields.startsAt.change,
+                startsAtBlur: fields.startsAt.blur,
+                endsAtChange: fields.endsAt.change,
+                endsAtBlur: fields.endsAt.blur,
+            }}
         />
     )
 }

@@ -5,11 +5,14 @@ import type { ErrorKind } from "@modules/platform/errors"
 export enum ResourcesErrorCode {
     /** No row owned by the authenticated principal has the requested id. */
     NotFound = "RESOURCES_NOT_FOUND",
+    /** The database accepted the insert of a new row but answered no id. */
+    NotCreated = "RESOURCES_NOT_CREATED",
 }
 
 /** How each resources code travels. */
 export const RESOURCES_ERROR_KINDS: Record<ResourcesErrorCode, ErrorKind> = {
     [ResourcesErrorCode.NotFound]: "not-found",
+    [ResourcesErrorCode.NotCreated]: "unavailable",
 }
 
 /** The one error class of the resources capability. */

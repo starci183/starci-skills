@@ -5,5 +5,8 @@ export const INSERT_BOOKING = sql`INSERT INTO public.bookings (owner_id, resourc
 VALUES ($1, $2, $3, $4)
 RETURNING id, resource_id, starts_at, ends_at, status`
 
+/** Reads the confirmation status of one public.bookings row by id and owner ($1 id, $2 owner). */
+export const FIND_BOOKING_STATUS = sql`SELECT id, status FROM public.bookings WHERE id = $1 AND owner_id = $2 LIMIT 1`
+
 /** Moves one pending booking to confirmed; a confirmed booking is left as it is, so a repeated job changes nothing ($1 id). */
 export const CONFIRM_BOOKING = sql`UPDATE public.bookings SET status = 'confirmed' WHERE id = $1 AND status = 'pending'`

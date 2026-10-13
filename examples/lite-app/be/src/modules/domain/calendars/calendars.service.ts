@@ -3,7 +3,7 @@ import type { EntityManager } from "typeorm"
 import { InjectPrimaryEntityManager, requireOwnedRow } from "@modules/platform/database"
 import { CalendarsError, CalendarsErrorCode } from "./errors/calendars.error"
 import type { CalendarsRow } from "./persistence/calendars.rows"
-import { FIND_CALENDARS, FIND_DELIVERY_CALENDAR } from "./persistence/calendars.sql"
+import { FIND_CALENDARS, FIND_DELIVERY_CALENDAR, INSERT_CALENDARS } from "./persistence/calendars.sql"
 
 interface CalendarDelivery {
     readonly id: string
@@ -23,6 +23,13 @@ export class CalendarsService {
         return requireOwnedRow<Pick<CalendarsRow, "id">>(this.entityManager, FIND_CALENDARS, id, principalId, () => {
             throw new CalendarsError({ code: CalendarsErrorCode.NotFound, params: { id } })
         })
+    }
+
+    /** Creates one row owned by the authenticated principal and answers its id. */
+    async createCalendar(principalId: string): Promise<CalendarsResult> {
+        const [row] = await this.entityManager.query<Array<Pick<CalendarsRow, "id">>>(INSERT_CALENDARS, [principalId])
+        if (row === undefined) throw new CalendarsError({ code: CalendarsErrorCode.NotCreated })
+        return { id: row.id }
     }
 
     /** Resolves one verified delivery target; the inbox generator supplies its transaction manager. */

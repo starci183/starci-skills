@@ -5,28 +5,7 @@
       "brand": "lite-app"
     },
     "home": {
-      "title": "Home",
-      "signedIn": "Signed in",
-      "resources": "Resources: {count}",
-      "calendars": "Calendars: {count}",
-      "bookings": "Bookings: {count}",
-      "unavailable": "unavailable"
-    },
-    "booking": {
-      "title": "Booking workspace",
-      "resource": "Resource UUID",
-      "booking": "Booking UUID",
-      "bookingResource": "Resource UUID for this booking",
-      "startsAt": "Starts at (UTC ISO timestamp)",
-      "endsAt": "Ends at (UTC ISO timestamp)",
-      "addResource": "Add resource",
-      "addBooking": "Add booking",
-      "working": "Saving",
-      "created": "Created.",
-      "refused": "The request was refused.",
-      "not-found": "The resource was not found.",
-      "invalid": "Use valid UUIDs and a start time before the end time.",
-      "unavailable": "The booking service is unavailable. Try again shortly."
+      "title": "Home"
     },
     "signIn": {
       "title": "Sign in",
@@ -35,17 +14,54 @@
       "submit": "Continue",
       "working": "Signing in",
       "refused": "The credentials were refused.",
-      "not-found": "The credentials were refused.",
       "invalid": "Enter a valid email and password.",
-      "unavailable": "Sign-in is unavailable. Try again shortly."
+      "unavailable": "Sign-in is unavailable. Try again shortly.",
+      "emailInvalid": "Enter a valid email address.",
+      "passwordShort": "The password has at least 8 characters.",
+      "passwordLong": "The password has at most 256 characters."
     },
     "signOut": {
+      "signedIn": "Signed in",
       "submit": "Sign out",
       "working": "Signing out",
       "refused": "The session has already ended.",
-      "not-found": "The session has already ended.",
       "invalid": "The session could not be ended.",
       "unavailable": "Sign-out is unavailable. Try again shortly."
+    },
+    "workspace": {
+      "title": "Booking workspace",
+      "commands": "Create",
+      "addResource": "Add resource",
+      "addCalendar": "Add calendar",
+      "working": "Saving",
+      "resourceCreated": "The resource was created.",
+      "calendarCreated": "The calendar was created.",
+      "lastResource": "New resource: {id}",
+      "lastCalendar": "New calendar: {id}"
+    },
+    "booking": {
+      "title": "Book a resource",
+      "resource": "Resource UUID",
+      "startsAt": "Starts at (UTC ISO timestamp)",
+      "endsAt": "Ends at (UTC ISO timestamp)",
+      "submit": "Book",
+      "working": "Booking",
+      "queued": "The booking waits for its confirmation.",
+      "confirmedTitle": "Confirmed",
+      "confirmed": "The booking is confirmed.",
+      "status": "Booking {id}: {status}",
+      "statusUnknown": "checking",
+      "resourceInvalid": "Enter the UUID of one of your resources.",
+      "dateInvalid": "Enter a UTC ISO timestamp, such as 2026-10-04T09:00:00Z.",
+      "intervalInvalid": "The end comes after the start."
+    },
+    "toast": {
+      "successTitle": "Done",
+      "errorTitle": "Error",
+      "unauthorizedTitle": "Not signed in",
+      "unauthorizedDescription": "Sign in to continue.",
+      "defaultSuccess": "The change was saved.",
+      "defaultError": "Something went wrong."
     },
     "loading": {
       "message": "Loading"

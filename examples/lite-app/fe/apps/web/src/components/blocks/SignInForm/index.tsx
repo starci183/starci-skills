@@ -1,12 +1,10 @@
 "use client"
 
 import { useTranslations } from "next-intl"
-import { useState, useTransition } from "react"
-import { writeSignIn } from "@/modules/db/auth/write-sign-in"
-import { navigation } from "@/modules/i18n"
+import { useSession } from "@/hooks/auth"
+import { useSignInForm } from "@/hooks/rhf"
+import type { SignInFailure } from "@/hooks/rhf"
 import { SignInFormBase } from "./component"
-
-type SignInFailure = "refused" | "not-found" | "invalid" | "unavailable"
 
 /** The state the form shows: working while a request runs, failed after a refusal, else ready. */
 const stateOf = (pending: boolean, failure: SignInFailure | undefined): "working" | "ready" | "failed" => {
@@ -14,34 +12,31 @@ const stateOf = (pending: boolean, failure: SignInFailure | undefined): "working
     return failure === undefined ? "ready" : "failed"
 }
 
-/** The interactive sign-in form wired to the schema-checked Server Action. */
+/** The sign-in form of a signed-out reader (hooks/rhf); the session effect updates redux on success. */
 export const SignInForm = () => {
-    const router = navigation.useRouter()
+    const session = useSession()
     const t = useTranslations("app.signIn")
-    const [failure, setFailure] = useState<SignInFailure>()
-    const [pending, startTransition] = useTransition()
-    const submit = (input: FormData) => {
-        startTransition(async () => {
-            const outcome = await writeSignIn(input)
-            if (outcome.kind === "ok") {
-                setFailure(undefined)
-                router.refresh()
-                return
-            }
-            setFailure(outcome.kind)
-        })
-    }
+    const { fields, submit, isSubmitting, failure } = useSignInForm()
+    if (session.status !== "signed-out") return null
     return (
         <SignInFormBase
-            state={stateOf(pending, failure)}
+            state={stateOf(isSubmitting, failure)}
             props={{
                 title: t("title"),
                 emailLabel: t("email"),
                 passwordLabel: t("password"),
-                submitLabel: pending ? t("working") : t("submit"),
+                submitLabel: isSubmitting ? t("working") : t("submit"),
                 failure: failure === undefined ? undefined : t(failure),
+                email: { value: fields.email.value, errorMessage: fields.email.errorMessage },
+                password: { value: fields.password.value, errorMessage: fields.password.errorMessage },
             }}
-            on={{ submit }}
+            on={{
+                submit: () => void submit(),
+                emailChange: fields.email.change,
+                emailBlur: fields.email.blur,
+                passwordChange: fields.password.change,
+                passwordBlur: fields.password.blur,
+            }}
         />
     )
 }

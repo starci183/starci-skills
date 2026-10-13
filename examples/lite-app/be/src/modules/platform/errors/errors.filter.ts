@@ -7,15 +7,19 @@ import { InjectErrorsService } from "./errors.decorators"
 import type { ErrorsService } from "./errors.service"
 
 @Catch()
-/** The one exception filter of an app: answers `{ code, kind, message, params }` with the status of the kind. */
+/**
+ * The one REST exception filter of an app: answers `{ code, kind, message, params }` with the status of the kind. In a GraphQL
+ * context it hands the failure back untouched, so the GraphQL error formatter (platform/graphql) answers it.
+ */
 export class ErrorsFilter implements ExceptionFilter {
     constructor(
         @InjectErrorsService() private readonly errors: ErrorsService,
         @InjectRequestLocale() private readonly requestLocale: RequestLocale,
     ) {}
 
-    /** Writes the description of `exception` on the HTTP response. */
-    catch(exception: unknown, host: ArgumentsHost): void {
+    /** Writes the description of `exception` on the HTTP response, or returns it unchanged for GraphQL. */
+    catch(exception: unknown, host: ArgumentsHost): unknown {
+        if (host.getType<string>() === "graphql") return exception
         const http = host.switchToHttp()
         const request = http.getRequest<Request>()
         const description = this.errors.describe(exception)
@@ -28,5 +32,6 @@ export class ErrorsFilter implements ExceptionFilter {
                 message: this.errors.text(description.code, description.params, locale),
                 params: description.params,
             })
+        return undefined
     }
 }

@@ -1,35 +1,21 @@
 "use client"
 
 import { useTranslations } from "next-intl"
-import { useState, useTransition } from "react"
-import { writeSignOut } from "@/modules/db/auth/write-sign-out"
-import { navigation } from "@/modules/i18n"
+import { useSession, useSignOut } from "@/hooks/auth"
 import { SignOutButtonBase } from "./component"
 
-type SignOutFailure = "refused" | "not-found" | "invalid" | "unavailable"
-
-/** The connected control that ends the current browser session. */
+/** The signed-in reader and the control that ends the browser session (hooks/auth). */
 export const SignOutButton = () => {
-    const router = navigation.useRouter()
+    const session = useSession()
     const t = useTranslations("app.signOut")
-    const [failure, setFailure] = useState<SignOutFailure>()
-    const [pending, startTransition] = useTransition()
-    const signOut = () => {
-        startTransition(async () => {
-            const outcome = await writeSignOut()
-            if (outcome.kind !== "ok") {
-                setFailure(outcome.kind)
-                return
-            }
-            setFailure(undefined)
-            router.refresh()
-        })
-    }
+    const { signOut, isPending, failure } = useSignOut()
+    if (session.status !== "signed-in") return null
     return (
         <SignOutButtonBase
             props={{
-                label: pending ? t("working") : t("submit"),
-                pending,
+                principal: session.session?.email ?? t("signedIn"),
+                label: isPending ? t("working") : t("submit"),
+                pending: isPending,
                 failure: failure === undefined ? undefined : t(failure),
             }}
             on={{ press: signOut }}

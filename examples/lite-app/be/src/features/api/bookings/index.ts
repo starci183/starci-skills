@@ -1,1 +1,1 @@
-export { BookingsHttpModule } from "./transport/http/bookings-http.module"
+export { BookingsGraphqlModule } from "./transport/graphql/bookings-graphql.module"

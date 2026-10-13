@@ -8,6 +8,14 @@ export interface CreateBookingParams {
     readonly endsAt: string
 }
 
+/** The confirmation status of one booking: what a caller polls after booking. */
+export interface BookingStatusResult {
+    /** The booking id. */
+    readonly id: string
+    /** `pending` until the confirm-booking job ran, then `confirmed`. */
+    readonly status: string
+}
+
 /** One booking as the capability answers it. */
 export interface BookingResult {
     /** The booking id. */

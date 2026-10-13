@@ -3,7 +3,7 @@ import type { EntityManager } from "typeorm"
 import { InjectPrimaryEntityManager, requireOwnedRow } from "@modules/platform/database"
 import { ResourcesError, ResourcesErrorCode } from "./errors/resources.error"
 import type { ResourcesRow } from "./persistence/resources.rows"
-import { FIND_RESOURCES } from "./persistence/resources.sql"
+import { FIND_RESOURCES, INSERT_RESOURCES } from "./persistence/resources.sql"
 
 interface ResourcesResult {
     readonly id: string
@@ -19,5 +19,12 @@ export class ResourcesService {
         return requireOwnedRow<Pick<ResourcesRow, "id">>(this.entityManager, FIND_RESOURCES, id, principalId, () => {
             throw new ResourcesError({ code: ResourcesErrorCode.NotFound, params: { id } })
         })
+    }
+
+    /** Creates one row owned by the authenticated principal and answers its id. */
+    async createResource(principalId: string): Promise<ResourcesResult> {
+        const [row] = await this.entityManager.query<Array<Pick<ResourcesRow, "id">>>(INSERT_RESOURCES, [principalId])
+        if (row === undefined) throw new ResourcesError({ code: ResourcesErrorCode.NotCreated })
+        return { id: row.id }
     }
 }

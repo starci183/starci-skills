@@ -1,12 +1,12 @@
 import { Injectable } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
 import { ResourcesService } from "@modules/domain/resources"
-import { InjectPrimaryEntityManager } from "@modules/platform/database"
+import { InjectPrimaryEntityManager, requireOwnedRow } from "@modules/platform/database"
 import { BookingConfirmationQueue, isConfirmBookingPayload } from "@modules/queues/booking-confirmation"
-import type { BookingResult, CreateBookingParams } from "./bookings.contracts"
+import type { BookingResult, BookingStatusResult, CreateBookingParams } from "./bookings.contracts"
 import { BookingsError, BookingsErrorCode } from "./errors/bookings.error"
 import type { BookingsRow } from "./persistence/bookings.rows"
-import { CONFIRM_BOOKING, INSERT_BOOKING } from "./persistence/bookings.sql"
+import { CONFIRM_BOOKING, FIND_BOOKING_STATUS, INSERT_BOOKING } from "./persistence/bookings.sql"
 
 /** The PostgreSQL code of an exclusion-constraint violation: the interval overlaps another booking of the resource. */
 const EXCLUSION_VIOLATION = "23P01"
@@ -56,6 +56,16 @@ export class BookingsService {
                 endsAt: row.ends_at,
                 status: row.status,
             }
+        })
+    }
+
+    /**
+     * The confirmation status of one booking the caller owns, polled after booking until the confirm-booking job ran; absent and
+     * denied bookings share one typed not-found result.
+     */
+    bookingStatus(principalId: string, id: string): Promise<BookingStatusResult> {
+        return requireOwnedRow<BookingStatusResult>(this.entityManager, FIND_BOOKING_STATUS, id, principalId, () => {
+            throw new BookingsError({ code: BookingsErrorCode.NotFound, params: { id } })
         })
     }
 

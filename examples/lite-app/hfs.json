@@ -7,7 +7,7 @@
     "enableSignup": false,
     "jwtExpiry": 3600,
     "siteUrl": "http://127.0.0.1:3000",
-    "redirectUrls": ["http://127.0.0.1:3000/auth/callback"]
+    "redirectUrls": ["http://127.0.0.1:3000/"]
   },
   "sides": {
     "be": {
@@ -32,7 +32,8 @@
         }
       ],
       "reads": ["supabase/types/"],
-      "patterns": ["webhooks", "queue", "fenced-job"]
+      "optionalSlots": ["be.contract.graphql"],
+      "patterns": ["fenced-job", "queue", "webhooks"]
     },
     "fe": {
       "apps": [

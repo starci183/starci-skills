@@ -31,10 +31,13 @@ import type { ApiOptions } from "./api.options"
 import { RESOURCES_ERROR_KINDS, ResourcesModule } from "@modules/domain/resources"
 import { BOOKINGS_ERROR_KINDS, BookingsModule } from "@modules/domain/bookings"
 import { CALENDARS_ERROR_KINDS, CalendarsModule } from "@modules/domain/calendars"
-import { BookingsHttpModule } from "@features/api/bookings"
 import { CalendarHttpModule } from "@features/webhooks/calendar"
 import { CalendarInboxModule } from "@modules/domain/calendar-inbox"
 import { ConfirmBookingQueueModule } from "@features/jobs/confirm-booking"
+import { GraphqlModule } from "@modules/platform/graphql"
+import { BookingsGraphqlModule } from "@features/api/bookings"
+import { CalendarsGraphqlModule } from "@features/api/calendars"
+import { ResourcesGraphqlModule } from "@features/api/resources"
 
 @Module({})
 /** Composition root of the API: every capability is registered once and the three guards run in a fixed order. */
@@ -45,9 +48,12 @@ export class AppModule {
         return {
             module: AppModule,
             imports: [
+                ResourcesGraphqlModule,
+                CalendarsGraphqlModule,
+                BookingsGraphqlModule,
+                GraphqlModule.register({ isGlobal: true }),
                 CalendarInboxModule.register({ isGlobal: true }),
                 CalendarHttpModule,
-                BookingsHttpModule,
                 CalendarsModule.register({ isGlobal: true }),
                 BookingsModule.register({ isGlobal: true }),
                 ResourcesModule.register({ isGlobal: true }),

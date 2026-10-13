@@ -2,6 +2,7 @@
 // Database types hook, offline: the app compiles against the committed supabase/types/database.types.ts, which `npm run contract:emit`
 // regenerates from the local stack and stamps with the digest of the migrations it was generated from. This refuses a missing or
 // stale file, so lint, typecheck, dev and build never run against types older than the migrations; it starts nothing and needs no stack.
+// `--graphql` runs only the GraphQL wire types below (`npm run codegen:graphql`).
 import { createHash } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
@@ -15,18 +16,55 @@ const fail = (message) => {
     process.exit(1)
 }
 
-const hash = createHash("sha256")
-for (const name of (fs.existsSync(MIGRATIONS) ? fs.readdirSync(MIGRATIONS) : [])
-    .filter((file) => file.endsWith(".sql"))
-    .sort()) {
-    hash.update(`${name}\0${fs.readFileSync(path.join(MIGRATIONS, name), "utf8").replace(/\r\n/g, "\n")}\0`)
-}
-const digest = hash.digest("hex")
+if (!process.argv.includes("--graphql")) {
+    const hash = createHash("sha256")
+    for (const name of (fs.existsSync(MIGRATIONS) ? fs.readdirSync(MIGRATIONS) : [])
+        .filter((file) => file.endsWith(".sql"))
+        .sort()) {
+        hash.update(`${name}\0${fs.readFileSync(path.join(MIGRATIONS, name), "utf8").replace(/\r\n/g, "\n")}\0`)
+    }
+    const digest = hash.digest("hex")
 
-if (!fs.existsSync(TYPES))
-    fail(`${TYPES} is missing; start the local stack and run \`npm run contract:emit\`, then commit it`)
-const stamped = STAMP.exec(fs.readFileSync(TYPES, "utf8").split(/\r?\n/, 1)[0])?.[1]
-if (stamped !== digest)
-    fail(
-        `${TYPES} is ${stamped === undefined ? "not stamped" : "older than the migrations"}; run \`npm run contract:emit\` and commit the regenerated types`,
+    if (!fs.existsSync(TYPES))
+        fail(`${TYPES} is missing; start the local stack and run \`npm run contract:emit\`, then commit it`)
+    const stamped = STAMP.exec(fs.readFileSync(TYPES, "utf8").split(/\r?\n/, 1)[0])?.[1]
+    if (stamped !== digest)
+        fail(
+            `${TYPES} is ${stamped === undefined ? "not stamped" : "older than the migrations"}; run \`npm run contract:emit\` and commit the regenerated types`,
+        )
+}
+
+// GraphQL wire types, the same in both editions (owner ruling 2026-10-13): every fe app with operations under
+// src/modules/api/graphql/{queries,mutations} gets its typed documents generated from the contract snapshots the back end emits
+// (be/contracts/<app>/schema.graphql, `npm run contract:emit`) into the gitignored src/modules/api/graphql/__generated__/.
+// Nothing to generate (no snapshot yet, or no fe app with a modules/api/graphql folder) is not an error.
+const CONTRACTS = path.join("be", "contracts")
+const FE_APPS = path.join("fe", "apps")
+const posix = (file) => file.split(path.sep).join("/")
+const schemas = (fs.existsSync(CONTRACTS) ? fs.readdirSync(CONTRACTS) : [])
+    .map((app) => path.join(CONTRACTS, app, "schema.graphql"))
+    .filter((file) => fs.existsSync(file))
+    .sort()
+    .map(posix)
+const operationRoots = (fs.existsSync(FE_APPS) ? fs.readdirSync(FE_APPS) : [])
+    .map((app) => path.join(FE_APPS, app, "src", "modules", "api", "graphql"))
+    .filter((dir) => fs.existsSync(dir))
+    .sort()
+    .map(posix)
+if (schemas.length === 0 || operationRoots.length === 0) {
+    process.stdout.write("codegen: no GraphQL contract under be/contracts yet\n")
+} else {
+    const { generate } = await import("@graphql-codegen/cli")
+    const generates = Object.fromEntries(
+        operationRoots.map((root) => [
+            `${root}/__generated__/`,
+            {
+                preset: "client",
+                documents: [`${root}/queries/*.ts`, `${root}/mutations/*.ts`],
+                presetConfig: { fragmentMasking: false },
+                config: { useTypeImports: true, enumsAsTypes: true, avoidOptionals: true },
+            },
+        ]),
     )
+    await generate({ schema: schemas, generates, ignoreNoDocuments: true, silent: true }, true)
+}

@@ -1,0 +1,58 @@
+input CreateBookingInput {
+  endsAt: String!
+  resourceId: ID!
+  startsAt: String!
+}
+
+type CreateBookingType {
+  endsAt: String!
+  id: ID!
+  resourceId: ID!
+  startsAt: String!
+  status: String!
+}
+
+type CreateCalendarType {
+  id: ID!
+}
+
+type CreateResourceType {
+  id: ID!
+}
+
+input GetBookingStatusInput {
+  id: ID!
+}
+
+type GetBookingStatusType {
+  id: ID!
+  status: String!
+}
+
+input GetCalendarInput {
+  id: ID!
+}
+
+type GetCalendarType {
+  id: ID!
+}
+
+input GetResourceInput {
+  id: ID!
+}
+
+type GetResourceType {
+  id: ID!
+}
+
+type Mutation {
+  createBooking(input: CreateBookingInput!): CreateBookingType!
+  createCalendar: CreateCalendarType!
+  createResource: CreateResourceType!
+}
+
+type Query {
+  bookingStatus(input: GetBookingStatusInput!): GetBookingStatusType!
+  calendar(input: GetCalendarInput!): GetCalendarType!
+  resource(input: GetResourceInput!): GetResourceType!
+}

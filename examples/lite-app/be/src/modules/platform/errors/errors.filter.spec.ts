@@ -1,30 +1,31 @@
 import type { ArgumentsHost } from "@nestjs/common"
-import { Test } from "@nestjs/testing"
 import { mock } from "@starci/jest-preset"
 import type { Request, Response } from "express"
 import type { RequestLocale } from "@modules/platform/i18n"
-import { REQUEST_LOCALE } from "@modules/platform/i18n"
-import { ERRORS_SERVICE } from "./errors.decorators"
 import { ErrorsFilter } from "./errors.filter"
 import type { ErrorsService } from "./errors.service"
 
-const build = async () => {
+const build = () => {
     const errors = mock<ErrorsService>()
     const requestLocale = mock<RequestLocale>()
-    const moduleRef = await Test.createTestingModule({
-        providers: [
-            ErrorsFilter,
-            { provide: ERRORS_SERVICE, useValue: errors },
-            { provide: REQUEST_LOCALE, useValue: requestLocale },
-        ],
-    }).compile()
-    return { filter: moduleRef.get(ErrorsFilter), errors, requestLocale }
+    return { filter: new ErrorsFilter(errors, requestLocale), errors, requestLocale }
 }
 
 describe("ErrorsFilter", () => {
-    it("writes a localized description and its status to an HTTP response", async () => {
-        const { filter, errors, requestLocale } = await build()
-        const failure = new Error("calendar missing")
+    it("hands a failure in a GraphQL context back untouched for the GraphQL error formatter", () => {
+        const { filter, errors } = build()
+        const failure = new Error("resolver failed")
+        const host = mock<ArgumentsHost>()
+        host.getType.mockReturnValue("graphql")
+
+        expect(filter.catch(failure, host)).toBe(failure)
+        expect(errors.describe).not.toHaveBeenCalled()
+        expect(host.switchToHttp).not.toHaveBeenCalled()
+    })
+
+    it("writes a localized description and its status to an HTTP response", () => {
+        const { filter, errors, requestLocale } = build()
+        const failure = new Error("note missing")
         const request = mock<Request>({ headers: { "accept-language": "en-US,en;q=0.9" } })
         const response = mock<Response>()
         response.status.mockReturnValue(response)
@@ -34,25 +35,25 @@ describe("ErrorsFilter", () => {
         const host = mock<ArgumentsHost>()
         host.switchToHttp.mockReturnValue(http)
         errors.describe.mockReturnValue({
-            code: "CALENDARS_NOT_FOUND",
+            code: "NOTE_NOT_FOUND",
             kind: "not-found",
             status: 404,
-            params: { id: "calendar-1" },
+            params: { noteId: "note-1" },
         })
         requestLocale.of.mockReturnValue("en")
-        errors.text.mockReturnValue("The calendar was not found")
+        errors.text.mockReturnValue("The note was not found")
 
         expect(filter.catch(failure, host)).toBeUndefined()
 
         expect(errors.describe).toHaveBeenCalledWith(failure)
         expect(requestLocale.of).toHaveBeenCalledWith("en-US,en;q=0.9")
-        expect(errors.text).toHaveBeenCalledWith("CALENDARS_NOT_FOUND", { id: "calendar-1" }, "en")
+        expect(errors.text).toHaveBeenCalledWith("NOTE_NOT_FOUND", { noteId: "note-1" }, "en")
         expect(response.status).toHaveBeenCalledWith(404)
         expect(response.json).toHaveBeenCalledWith({
-            code: "CALENDARS_NOT_FOUND",
+            code: "NOTE_NOT_FOUND",
             kind: "not-found",
-            message: "The calendar was not found",
-            params: { id: "calendar-1" },
+            message: "The note was not found",
+            params: { noteId: "note-1" },
         })
     })
 })

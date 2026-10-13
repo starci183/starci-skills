@@ -8,14 +8,19 @@
     "fe/packages/*"
   ],
   "dependencies": {
+    "@apollo/server": "5.5.1",
+    "@as-integrations/express5": "1.1.2",
+    "@nestjs/apollo": "13.4.5",
     "@nestjs/common": "11.2.5",
     "@nestjs/core": "11.2.5",
     "@nestjs/cqrs": "11.0.3",
+    "@nestjs/graphql": "13.4.5",
     "@nestjs/platform-express": "11.2.5",
     "@nestjs/typeorm": "11.0.3",
     "@supabase/supabase-js": "2.117.2",
     "class-transformer": "0.5.1",
     "class-validator": "0.15.1",
+    "graphql": "16.14.2",
     "jose": "6.2.12",
     "nest-commander": "3.21.0",
     "pg": "8.23.1",
@@ -25,6 +30,8 @@
     "typeorm": "0.3.31"
   },
   "devDependencies": {
+    "@graphql-codegen/cli": "7.4.6",
+    "@graphql-codegen/client-preset": "6.2.3",
     "@nestjs/testing": "11.2.5",
     "@starci/cli": "1.2.13",
     "@starci/eslint-canon-be": "3.2.14",
@@ -58,7 +65,7 @@
   "scripts": {
     "prepare": "husky",
     "dev:be": "cd be && ts-node-dev --respawn -r tsconfig-paths/register apps/api/src/main.ts",
-    "dev:fe": "turbo run dev --filter=@lite-app/web",
+    "dev:fe": "npm run codegen --silent && turbo run dev --filter=@lite-app/web",
     "start:api": "node be/dist/apps/api/src/main.js",
     "cli": "node be/dist/apps/cli/src/main.js",
     "migrate": "node be/dist/apps/cli/src/main.js migrate run",
@@ -67,11 +74,12 @@
     "docker:build:api": "docker build -f be/apps/api/Dockerfile -t lite-app/api:dev .",
     "docker:build:cli": "docker build -f be/apps/cli/Dockerfile -t lite-app/cli:dev .",
     "build:be": "cd be && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
-    "build:fe": "turbo run build --filter=./fe/apps/*",
+    "build:fe": "npm run codegen --silent && turbo run build --filter=./fe/apps/*",
     "codegen": "node scripts/codegen.mjs",
-    "typecheck": "tsc -p be/tsconfig.json && turbo run typecheck",
-    "lint": "starci app lint",
-    "lint:fix": "starci app lint --fix",
+    "codegen:graphql": "node scripts/codegen.mjs --graphql",
+    "typecheck": "npm run codegen --silent && tsc -p be/tsconfig.json && turbo run typecheck",
+    "lint": "npm run codegen --silent && starci app lint",
+    "lint:fix": "npm run codegen --silent && starci app lint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck:tests": "tsc -p be/src/tests/tsconfig.json",
@@ -88,6 +96,9 @@
     "contract:emit": "starci app emit"
   },
   "overrides": {
-    "@xyflow/react": "12.11.6"
+    "@xyflow/react": "12.11.6",
+    "dayjs": "1.11.21",
+    "zod": "4.4.3",
+    "zustand": "5.0.12"
   }
 }

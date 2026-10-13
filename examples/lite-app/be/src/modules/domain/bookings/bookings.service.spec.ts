@@ -8,7 +8,7 @@ import { BOOKING_CONFIRMATION_QUEUE, BookingConfirmationQueue } from "@modules/q
 import type { CreateBookingParams } from "./bookings.contracts"
 import { BookingsService } from "./bookings.service"
 import { BookingsErrorCode } from "./errors/bookings.error"
-import { CONFIRM_BOOKING, INSERT_BOOKING } from "./persistence/bookings.sql"
+import { CONFIRM_BOOKING, FIND_BOOKING_STATUS, INSERT_BOOKING } from "./persistence/bookings.sql"
 
 const paramsOf = builder<CreateBookingParams>({
     resourceId: "resource-1",
@@ -129,6 +129,29 @@ describe("BookingsService", () => {
 
             expect(tx.rollbacks).toBe(1)
             expect(tx.committedWrites).toEqual([])
+        })
+    })
+
+    describe("bookingStatus", () => {
+        it("answers the status of a booking the principal owns", async () => {
+            const em = mockEntityManager({ query: [FIND_BOOKING_STATUS, [{ id: "booking-1", status: "confirmed" }]] })
+            const { bookings } = await build(em)
+
+            await expect(bookings.bookingStatus("person-1", "booking-1")).resolves.toEqual({
+                id: "booking-1",
+                status: "confirmed",
+            })
+            expect(em.query).toHaveBeenCalledWith(FIND_BOOKING_STATUS, ["booking-1", "person-1"])
+        })
+
+        it("answers not found for a booking that is absent or owned by someone else", async () => {
+            const em = mockEntityManager({ query: [FIND_BOOKING_STATUS, []] })
+            const { bookings } = await build(em)
+
+            await expect(bookings.bookingStatus("person-1", "booking-9")).rejects.toMatchObject({
+                code: BookingsErrorCode.NotFound,
+                params: { id: "booking-9" },
+            })
         })
     })
 
