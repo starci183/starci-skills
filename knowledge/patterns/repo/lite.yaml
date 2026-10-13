@@ -41,11 +41,7 @@ rules:
       (+ pg_net); storage and auth on Supabase. Integration specs are optional and run only on `starci supabase start`. A lite app holds
       none of the infrastructure lite does not run: no e2e or contract spec or script, no e2e workflow or browser journey, no
       UAT record, no test container, toxiproxy, BullMQ, Kafka or Redis dependency, no `.starcistacks/<env>/infra` and no
-      `supabase/functions`. The front end is the full front end, with no tests (R97), except that it never calls the back end
-      (R212 case-2): no `modules/api` or `<family>-api` client, no route handler beyond health/live and the auth callback, no
-      `fetch` and no `Authorization: Bearer` header. It reads through `modules/db` `read-*`, writes through RLS Server Actions in
-      `modules/db` `write-*`, and hands work only the back end may do to a SECURITY DEFINER rpc that `pgmq.send()`s a command a
-      back-end job consumes.
+      `supabase/functions`. The front end is the full front end, with no tests (R97).
     rationale: |
       One manifest and one catalog keep a lite app upgradable to full by additions only: swap the adapters, add the e2e and
       contract world and the stack.
@@ -60,12 +56,6 @@ rules:
           adapter behind them is Supabase - platform/queue sends to pgmq, a processor reads with a visibility timeout and archives
           on dead letter, a schedule is a pg_cron job, a be push goes out on Supabase Realtime. Each service and cli command has its
           unit spec beside it; there is no e2e spec.
-      - id: case-3
-        when: "Owner ruling 2026-10-13: a lite page needs data or work the back end owns"
-        write: >-
-          Never fetch the back end from Next.js. Read rows through a `modules/db/<domain>/read-*.ts` reader under RLS; write through a
-          Server Action in `modules/db/<domain>/write-*.ts` under RLS; for work only the back end may do, call a SECURITY DEFINER
-          rpc from that Server Action which `pgmq.send()`s a command, and let a be job (a queue processor) consume it.
     verification:
       automated:
         - HFS_EDITION_INVALID

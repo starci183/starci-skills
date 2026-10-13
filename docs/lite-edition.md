@@ -49,9 +49,6 @@ The app is still one monorepo. The `app.sides` slot contains a back-end side and
 Supabase is an app-level concern because both sides depend on it. `app.supabase.migrations` is the schema authority and
 `app.supabase.types` is the committed generated contract. Front-end access belongs to `fe.modules.db`; back-end administrative
 integration belongs to `be.integrations.supabase`. The slot manifest remains the source for every concrete location.
-The front end never calls the back end (R212 case-2): it reads through `fe.modules.db` readers, writes through Server Actions under
-row level security, and hands work only the back end may do to a SECURITY DEFINER rpc that `pgmq.send()`s a command a back-end
-job consumes.
 The types file starts with the digest of the migrations it was generated from. The managed codegen step is offline: it
 only compares that digest with the migrations and refuses missing or stale types, so lint, typecheck, build and CI need no stack.
 Regenerating the types (`starci app emit`) is the one step that starts the local stack.
@@ -118,12 +115,11 @@ not supported.
 
 ## What lite forbids
 
-Lite forbids infrastructure and the front end's back-end API client. R212 forbids e2e and contract specs, the `test:e2e`, `test:contract`, `test:stack` and
+Lite forbids only infrastructure. R212 forbids e2e and contract specs, the `test:e2e`, `test:contract`, `test:stack` and
 `test:browser` scripts, the e2e workflow, the browser journey and UAT records, test containers, toxiproxy and browser-runner
 dependencies, BullMQ, Kafka and Redis dependencies (and their imports, through the lite `infraOwners`), a socket or graphql-ws
-realtime door, the `.starcistacks` infra, runtime and seeds trees, the front end's `modules/api` and `<family>-api` client, any
-front-end route handler beyond health/live and the auth callback, and a front-end `fetch` call or `Authorization: Bearer` header.
-Lite also forbids Edge Functions and a second front-end app.
+realtime door, and the `.starcistacks` infra, runtime and seeds trees. Lite also forbids Edge Functions and a second front-end
+app.
 
 R213 to R216 forbid a second schema authority, dynamic database DDL, unsafe policies or definer functions, unchecked database
 configuration and stale generated types. R217 to R220 forbid Supabase access outside its owners, untyped or swallowed results,

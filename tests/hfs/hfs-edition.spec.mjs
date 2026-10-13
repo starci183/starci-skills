@@ -5,7 +5,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { allowsFile } from '../../scripts/hfs/allows.mjs';
 import { checkRepo } from '../../scripts/hfs/check.mjs';
 import { managedScriptNames } from '../../scripts/hfs/architecture/managed-scripts.mjs';
 import { managedGroupOf } from '../../scripts/hfs/edition-slots.mjs';
@@ -220,50 +219,6 @@ test('L01: a clean lite app produces no edition finding', (t) => {
   const files = ['package.json', 'be/src/features/api/orders/index.ts', 'fe/apps/web/src/app/[locale]/page.tsx'];
   const findings = checkRepo({ repoRoot, declaration: app({ edition: 'lite', be: { ...BE, kinds: ['api', 'cli'] } }), files, tree: false }).findings;
   assert.equal(findings.some((f) => f.code.startsWith('HFS_EDITION')), false, JSON.stringify(findings.filter((f) => f.code.startsWith('HFS_EDITION'))));
-});
-
-test('R212 case-2: a lite front end owns no back-end API client and serves no API route; full keeps both', () => {
-  const lite = openHfs({ declaration: app({ edition: 'lite' }), side: 'fe' });
-  const full = openHfs({ declaration: app(), side: 'fe' });
-  for (const [p, slot] of [
-    ['apps/web/src/modules/api/index.ts', 'fe.modules.api'],
-    ['apps/web/src/modules/api/bookings/read-bookings.ts', 'fe.modules.api'],
-    ['apps/web/src/modules/api/client.ts', 'fe.transport.client'],
-    ['apps/web/src/modules/api/outcome.ts', 'fe.transport.outcome'],
-    ['packages/demo-api/package.json', 'fe.package.api'],
-    ['packages/demo-api/src/client.ts', 'fe.package.api.client'],
-    ['packages/demo-api/src/outcome.ts', 'fe.package.api.outcome'],
-  ]) {
-    const c = lite.classifyPath(p);
-    assert.deepEqual([c.status, c.slot], ['forbidden', slot], p);
-    assert.match(c.goesTo, /modules\/db\/.*write-\*.*SECURITY DEFINER rpc.*pgmq\.send/, `${p}: the goesTo names the lite fe -> be path`);
-    assert.notEqual(full.classifyPath(p).status, 'forbidden', `${p} stays legal under full`);
-  }
-  // fe.route allows (FE_SLOT_FILE_ROLE): only health/live is a route handler of a lite app (the auth callback is fe.route.callback)
-  for (const p of ['apps/web/src/app/api/bookings/route.ts', 'apps/web/src/app/[locale]/bookings/route.ts', 'apps/web/src/app/health/ready/route.ts']) {
-    assert.deepEqual([allowsFile(lite, p)?.slot, allowsFile(lite, p)?.allowed], ['fe.route', false], `${p} is no legal lite route`);
-    assert.equal(allowsFile(full, p)?.allowed, true, `${p} stays a full fe.route file`);
-  }
-  for (const p of ['apps/web/src/app/health/live/route.ts', 'apps/web/src/app/[locale]/bookings/page.tsx']) assert.equal(allowsFile(lite, p)?.allowed, true, p);
-});
-
-test('R212 case-2: under lite a front-end fetch call or Authorization Bearer header is a finding; a comment, the back end and full are not', (t) => {
-  const sources = {
-    'fe/apps/web/src/features/pages/Bookings/index.tsx': 'export const load = async () => {\n  const response = await fetch(`${apiUrl}/bookings`)\n  return response.json()\n}\n',
-    'fe/apps/web/src/modules/db/bookings/write-booking.ts': '"use server"\nexport const send = () => window.fetch("/x", { headers: { Authorization: `Bearer ${token}` } })\n',
-    'fe/apps/web/src/modules/db/bookings/read-bookings.ts': '// never fetch( the back end: rows come from the RLS client\nexport const prefetch = (refetch: () => void) => refetch()\n',
-    'be/src/modules/integrations/calendar/calendar.client.ts': 'export const call = () => fetch("https://calendar.invalid", { headers: { Authorization: "Bearer x" } })\n',
-  };
-  const repoRoot = tree(t, sources);
-  const files = Object.keys(sources);
-  const at = (decl) => checkRepo({ repoRoot, declaration: decl, files, tree: false }).findings
-    .filter((f) => f.code === 'HFS_EDITION_FORBIDDEN_PRESENT').map((f) => [f.path, f.line, f.call]).sort();
-  assert.deepEqual(at(app({ edition: 'lite' })), [
-    ['fe/apps/web/src/features/pages/Bookings/index.tsx', 2, 'fetch'],
-    ['fe/apps/web/src/modules/db/bookings/write-booking.ts', 2, 'bearer'],
-    ['fe/apps/web/src/modules/db/bookings/write-booking.ts', 2, 'fetch'],
-  ]);
-  assert.deepEqual(at(app()), [], 'full keeps its fetch owner (modules/api)');
 });
 
 test('managedGroupOf: the one template-group answer of sync and the README check - liteManagedBy in lite, managedBy otherwise', () => {
