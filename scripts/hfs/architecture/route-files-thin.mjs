@@ -24,6 +24,9 @@ const HOOK_ROUTES = new Set([...MOUNTING_ROUTES, 'page']);
 const HOOK_NAME = /^use[A-Z0-9]/u;
 const HOOKS_SLOT = 'fe.hooks';
 
+/** The client providers (fe.components.providers) wrap the mounted owner like a package shell; they are not a second owner. */
+const PROVIDERS_SLOT = 'fe.components.providers';
+const isFeatureOwner = target => target?.tier === 'feature' && target.slot !== PROVIDERS_SLOT;
 const isFunction = (ts, node) => ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node);
 const jsxOf = (ts, node) => ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
 
@@ -68,7 +71,7 @@ function reportRoute(violations, kit, file, stem, node, message, extra = {}) {
 function inspectMountingTag(tag, { graph, kit, ts, file, stem, checker, violations, state }) {
   if (ts.isIdentifier(tag) && /^[a-z]/u.test(tag.text)) {
     reportRoute(violations, kit, file, stem, tag, `<${tag.text}> is drawing in a ${stem} route file; a route file mounts one feature and draws nothing. Move the markup into the feature.`);
-  } else if (kit.declarationsOf(checker, ts.isPropertyAccessExpression(tag) ? tag.name : tag).some(declaration => graph.files.get(kit.graphPath(declaration) ?? '')?.tier === 'feature')) {
+  } else if (kit.declarationsOf(checker, ts.isPropertyAccessExpression(tag) ? tag.name : tag).some(declaration => isFeatureOwner(graph.files.get(kit.graphPath(declaration) ?? '')))) {
     state.owners += 1;
   }
 }
