@@ -1,0 +1,39 @@
+schema: starci/knowledge-source@1
+id: fe.markdown
+title: Markdown
+purpose: |-
+  How is markdown rendered? react-markdown with remark-gfm (and remark-directive) in a block.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: []
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+  limitations: |-
+    FE_STACK_FORBIDDEN proves that no forbidden alternative is declared or imported; it does not prove the canonical
+    library is used well. starci-academy illustrates the usage; the catalog decides.
+rules:
+  - id: FE-MARKDOWN
+    title: "react-markdown with remark-gfm"
+    kind: mandatory
+    hfsRules: [R244]
+    requirement: |-
+      Markdown renders through react-markdown with remark-gfm (remark-directive for directives), mapping elements to
+      grammar components; marked, markdown-it, showdown and dangerouslySetInnerHTML are refused.
+    rationale: |-
+      Rendering to React elements avoids injected HTML and keeps grammar typography.
+    cases:
+      - id: case-1
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a block rendered markdown as HTML"
+        write: "Render it with react-markdown."
+    verification:
+      automated:
+        - FE_STACK_FORBIDDEN
+      manual: []
+    relatedExamples: []

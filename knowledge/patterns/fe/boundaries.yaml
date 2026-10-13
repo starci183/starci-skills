@@ -54,13 +54,14 @@ rules:
         - Trigger a render error and an unknown route and confirm the boundaries render and recover.
     relatedExamples: []
   - id: FE-BOUNDARY-2
-    title: Boundaries render an Outcome, not an error status
+    title: Boundaries render a slot, not an error status
     kind: mandatory
     hfsRules: [R51, R53, R92]
     requirement: |-
-      A boundary and a connected block turn an `Outcome` or a caught error into a slot through `toSlot(outcome)`; they never
-      read `error.status`. A `refused` outcome shows the forbidden notice or navigates to sign-in, `unavailable` with
-      `retryable` offers a retry that re-runs exactly that read, and copy comes from the i18n catalog by code.
+      A boundary and a connected block turn an SWR read (its data, its error and the GraphQLResponse it carries) or a caught
+      error into a slot through `toSlot`; they never read `error.status`. A refused read shows the forbidden notice or
+      navigates to sign-in, any other failure offers a retry that re-runs exactly that read (the hook's mutate), and copy
+      comes from the i18n catalog.
     rationale: |-
       One adapter renders every failure the same way, and the recovery action stays explicit.
     cases:
@@ -126,20 +127,24 @@ rules:
     kind: mandatory
     hfsRules: [R107]
     requirement: |-
-      A cookie is written by server code through Next's response cookies (`response.cookies.set` in a route handler,
-      `(await cookies()).set` in a server action) with one `as const` options constant declared by the module that owns
-      the cookie. That constant states `httpOnly: true` for a session (`false` only for a preference page script must
-      read), `secure` from `modules/config` and `sameSite` `lax` or `strict`. A session token never reaches page script.
+      A session cookie is written by the back end only (an HttpOnly refresh-token cookie of the auth endpoint, sent back by
+      the Apollo http link and axios with credentials); the front end serves no route handler or Server Action that could
+      set one (FE-ROUTE). A cookie the front end writes itself (a locale or preference set in `proxy.ts` through
+      `response.cookies.set`) uses one `as const` options constant declared by the module that owns the cookie, stating
+      `httpOnly` as a literal, `secure` from `modules/config` and `sameSite` `lax` or `strict`. A session token never reaches
+      page script outside modules/auth.
     rationale: |-
       A cookie left to the defaults is readable by any script on the page and rides cross-site requests, so one injected
       script or one forged form takes the session.
     cases:
       - id: case-1
-        when: The session door signs in
-        write: 'response.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS) with SESSION_COOKIE_OPTIONS = { httpOnly: true, sameSite: "lax", path: "/", secure: SESSION_COOKIE_SECURE } as const in modules/session.'
+        when: proxy.ts remembers the locale
+        write: 'response.cookies.set(LOCALE_COOKIE, locale, LOCALE_COOKIE_OPTIONS) with LOCALE_COOKIE_OPTIONS = { httpOnly: false, sameSite: "lax", path: "/", secure: LOCALE_COOKIE_SECURE } as const in modules/i18n.'
       - id: case-2
-        when: The session door signs out
-        write: 'response.cookies.set(SESSION_COOKIE, "", { ...SESSION_COOKIE_OPTIONS, maxAge: 0 })'
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a front end set the session cookie in a sign-in route handler or Server Action"
+        write: 'The back end sets the HttpOnly session cookie on its auth endpoint (or modules/auth holds the provider session); the front-end door is removed.'
     verification:
       automated:
         - FE_COOKIE_ATTRIBUTES

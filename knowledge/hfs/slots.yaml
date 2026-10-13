@@ -43,7 +43,6 @@ versioning:
 #   tier        node of the import direction matrix (tiers below); none = takes no part in import checks;
 #               inherit = the tier of the enclosing owner.
 #   owner       true when every directory matching the slot is an owner: the unit cross-owner imports and cycles use.
-#   anonymousActions  on a directory slot: the Server Action files (relative to it) that authenticate or end a session and so run for an anonymous principal (FE_AUTH_SESSION_TRUST exempts them from refusing it; they still parse their input).
 #   entries     on a directory slot that sits inside an owner (not an owner itself): the files, besides the owner's index.ts, an importer
 #               outside the owner may enter through (a client-safe entry of a module whose barrel is server-only). Each is a relative
 #               path the slot allows. Everything else of the owner is entered through index.ts only (ARCH_OWNER_EXPORT_BYPASS).
@@ -1195,7 +1194,7 @@ slots:
     pattern: realtime
     tracked: tracked
     tier: feature
-    goesTo: "src/features/realtime/<channel>/transport/supabase/ (be.feature.realtime.supabase): under lite a be realtime door pushes through Supabase Realtime"
+    goesTo: "src/features/realtime/<channel>/transport/websocket/ (be.feature.realtime.websocket): both editions push through the socket.io gateway; lite runs it in the api process"
     requires: ["<channel>-graphql.module.ts", "<channel>.subscription.ts", "<channel>.subscription.spec.ts"]
     allows: ["<channel>-graphql.module.ts", "<channel>.subscription.ts", "<channel>.subscription.spec.ts", dto/]
     tests: unit-beside            # the door's own spec beside the door (a subscription has no service of its own)
@@ -1211,7 +1210,7 @@ slots:
     pattern: realtime
     tracked: tracked
     tier: feature
-    goesTo: "src/features/realtime/<channel>/transport/supabase/ (be.feature.realtime.supabase): under lite a be realtime door pushes through Supabase Realtime"
+    goesTo: "src/features/realtime/<channel>/transport/websocket/ (be.feature.realtime.websocket): both editions push through the socket.io gateway; lite runs it in the api process"
     allows: ["<name>.{input,type,args}.ts"]
     tests: none
     coverage: none

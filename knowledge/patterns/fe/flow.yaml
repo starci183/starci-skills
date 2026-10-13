@@ -1,0 +1,39 @@
+schema: starci/knowledge-source@1
+id: fe.flow
+title: Flow canvas
+purpose: |-
+  Which library draws graphs and flows? @xyflow/react, behind the grammar FlowGraph.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: []
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+  limitations: |-
+    FE_STACK_FORBIDDEN proves that no forbidden alternative is declared or imported; it does not prove the canonical
+    library is used well. starci-academy illustrates the usage; the catalog decides.
+rules:
+  - id: FE-FLOW
+    title: "@xyflow/react behind the grammar FlowGraph"
+    kind: mandatory
+    hfsRules: [R244]
+    requirement: |-
+      A graph or flow canvas is the grammar FlowGraph over @xyflow/react; reactflow (the old package name) and cytoscape
+      are refused.
+    rationale: |-
+      One canvas keeps node and edge drawing in the grammar.
+    cases:
+      - id: case-1
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a feature imported React Flow directly"
+        write: "Render it through the grammar FlowGraph."
+    verification:
+      automated:
+        - FE_STACK_FORBIDDEN
+      manual: []
+    relatedExamples: []

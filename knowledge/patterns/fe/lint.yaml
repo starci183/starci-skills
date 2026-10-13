@@ -1,0 +1,40 @@
+schema: starci/knowledge-source@1
+id: fe.lint
+title: Lint and format
+purpose: |-
+  How is front-end code linted and formatted? eslint with @starci/eslint-canon-fe and prettier with @starci/prettier-
+  config.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [fe.tool-config]
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+  limitations: |-
+    FE_STACK_FORBIDDEN proves that no forbidden alternative is declared or imported; it does not prove the canonical
+    library is used well. starci-academy illustrates the usage; the catalog decides.
+rules:
+  - id: FE-LINT
+    title: "The canon lint and format configuration"
+    kind: mandatory
+    hfsRules: [R244]
+    requirement: |-
+      The front end lints with eslint and the @starci/eslint-canon-fe config and formats with prettier and
+      @starci/prettier-config at their canon pins; no local rule override or inline suppression.
+    rationale: |-
+      One canon makes every finding the same in every app.
+    cases:
+      - id: case-1
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: an app added its own eslint rules"
+        write: "Remove them; a missing rule is added to the canon."
+    verification:
+      automated:
+        - FE_STACK_FORBIDDEN
+      manual: []
+    relatedExamples: []

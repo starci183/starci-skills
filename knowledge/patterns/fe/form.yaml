@@ -1,0 +1,52 @@
+schema: starci/knowledge-source@1
+id: fe.form
+title: Forms
+purpose: |-
+  How is a form built and submitted? react-hook-form with a zod schema carrying next-intl messages, in hooks/rhf,
+  submitting through an SWR mutation and the toast.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [fe.hooks.rhf]
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+    - "starci-lab/starci-academy origin/main: src/hooks/rhf/useContactForm.ts"
+  limitations: |-
+    FE_STACK_FORBIDDEN proves that no forbidden alternative is declared or imported; it does not prove the canonical
+    library is used well. starci-academy illustrates the usage; the catalog decides.
+rules:
+  - id: FE-FORM
+    title: "react-hook-form with zod in hooks/rhf, submitted through an SWR mutation"
+    kind: mandatory
+    hfsRules: [R56, R244]
+    requirement: |-
+      A form is a hook hooks/rhf/use<X>Form.ts: useForm with zodResolver over a zod schema built in useMemo with
+      useTranslations messages, default values, and an onSubmit made by form.handleSubmit that triggers the
+      useMutate<X>Swr hook inside useGraphQLWithToast. The connected half calls the hook and hands XBase resolved values
+      and errors; the pure half renders grammar fields. formik, yup and final-form are refused.
+    rationale: |-
+      One form shape keeps validation messages translated, submission tied to the mutation cache and feedback in the
+      toast.
+    cases:
+      - id: case-1
+        when: "A contact form"
+        write: "export const useContactForm = () => { const t = useTranslations(); const runGraphQL = useGraphQLWithToast(); const submitContactSwr = useMutateSubmitContactSwr(); const schema = useMemo(() => z.object({ email: z.string().trim().email(t(\"contact.form.emailInvalid\")) }), [t]); const form = useForm({ resolver: zodResolver(schema) }); const onSubmit = form.handleSubmit(async (value) => { await runGraphQL(...) }) } (starci-academy)"
+      - id: case-2
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a lite form posted to a Server Action"
+        write: "The same form hook submits through useMutate<X>Swr and useGraphQLWithToast."
+    verification:
+      automated:
+        - FE_HOOKS_ARE_HOOKS
+        - FE_CUSTOM_HOOK_LOCATION
+        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
+        - FE_COMPONENT_DEEP_HOOK_IMPORT
+        - FE_STACK_FORBIDDEN
+      manual:
+        - "Confirm every server-side validation failure reaches the field or the toast."
+    relatedExamples: []

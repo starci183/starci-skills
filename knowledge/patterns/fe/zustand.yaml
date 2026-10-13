@@ -1,0 +1,49 @@
+schema: starci/knowledge-source@1
+id: fe.zustand
+title: Local state
+purpose: |-
+  Where does feature-local client state live? One zustand store per folder in hooks/zustand/<store>.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [fe.hooks.zustand]
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+    - "starci-lab/starci-academy origin/main: src/hooks/zustand/**"
+  limitations: |-
+    FE_STACK_FORBIDDEN proves that no forbidden alternative is declared or imported; it does not prove the canonical
+    library is used well. starci-academy illustrates the usage; the catalog decides.
+rules:
+  - id: FE-STATE-ZUSTAND
+    title: "Feature-local state in hooks/zustand/<store>"
+    kind: mandatory
+    hfsRules: [R56, R244]
+    requirement: |-
+      UI, wizard and editor state that one feature owns but several of its components read lives in
+      hooks/zustand/<store>/store.ts (create<State>()), re-exported by index.ts, with use<X>.ts helpers beside it. A
+      store holds no server data (that is SWR) and no app-wide state (that is redux). Persisted values go through
+      modules/storage, never raw localStorage or document.cookie in a component.
+    rationale: |-
+      A small store per feature avoids prop drilling without growing the global store.
+    cases:
+      - id: case-1
+        when: "A cookie-consent banner"
+        write: "hooks/zustand/cookieConsent/{store.ts,index.ts}: export const useCookieConsentStore = create<CookieConsentStoreState>((set, get) => ({ decided: null, acceptAll: () => commit(true), ... })) (starci-academy)"
+      - id: case-2
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: feature-local wizard state was kept in redux"
+        write: "Move it to hooks/zustand/<store>; redux keeps only what several features share."
+    verification:
+      automated:
+        - FE_HOOKS_ARE_HOOKS
+        - FE_CUSTOM_HOOK_LOCATION
+        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
+        - FE_COMPONENT_DEEP_HOOK_IMPORT
+        - FE_STACK_FORBIDDEN
+      manual: []
+    relatedExamples: []

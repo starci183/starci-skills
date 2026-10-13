@@ -2,8 +2,9 @@ schema: starci/knowledge-source@1
 id: fe.error
 title: Error
 purpose: |
-  Given a failure in the frontend, how is it represented and where does it go? A failure is an Outcome from the client,
-  becomes a slot status in the connected half, and reaches a boundary only when it is a render failure.
+  Given a failure in the frontend, how is it represented and where does it go? A failure is a GraphQLResponse (or an
+  error the SWR hook holds), becomes a slot status or a toast in the connected half, and reaches a boundary only when it is
+  a render failure.
 appliesTo:
   - frontend
 family: fe
@@ -19,7 +20,7 @@ provenance:
     - knowledge/grammars/starci/playbook.yaml
     - https://nextjs.org/docs/app/getting-started/error-handling
   limitations: |
-    Static checks prove that failures are mapped through Outcome and slots and that boundaries exist. Whether failure copy
+    Static checks prove that failures are mapped through the response envelope and slots and that boundaries exist. Whether failure copy
     and recovery match business policy is reviewed against the accepted SRS and the UI evidence.
 rules:
   - id: FE-ERROR-1
@@ -27,7 +28,7 @@ rules:
     kind: mandatory
     hfsRules: [R51, R53, R92]
     requirement: |
-      A read failure is a slot status, never a shape: the connected half folds each Outcome with `toSlot`, retaining a
+      A read failure is a slot status, never a shape: the connected half folds each SWR read with `toSlot`, retaining a
       refused read's status as unauthorized for 401 and forbidden for 403; any other failure becomes isError. The pure
       half renders `SlotView` by the family state-recipes (knowledge/grammars/starci/playbook.yaml); retry re-runs that
       read. A command failure is
@@ -79,29 +80,31 @@ rules:
       - connected-block
 
   - id: FE-ERROR-2
-    title: Failures cross the client as an Outcome
+    title: Failures cross the client as a GraphQLResponse
     kind: mandatory
     hfsRules: [R51, R52]
     requirement: |
-      The one client of the app returns `Outcome<T>` (ok, refused, invalid, not-found, unavailable). A reader or hook
-      handles the outcome before returning data, valid empty data stays a value, and required missing data is `unavailable`
-      or a hard stop (FE-ERROR-3). A GraphQL error is mapped by its extensions code to one of the outcomes; the message is
-      never shown. Normal business dispositions such as pending or refused-by-policy remain typed data of the result.
+      Every operation of modules/api returns the one `GraphQLResponse<T>` envelope (`success`, `message`, `error`, `data`).
+      The SWR hook handles it before returning data: valid empty data stays a value, a response without data or with
+      `success: false` is a failure the hook throws (SWR holds it) or the toast reports, and required missing data is a hard
+      stop (FE-ERROR-3). The error link maps UNAUTHENTICATED and FORBIDDEN extension codes to `refused` (one token refresh,
+      then sign-in); a raw server error text is never shown as the reason. Normal business dispositions such as pending or
+      refused-by-policy remain typed data of the result.
     rationale: |
       One vocabulary keeps failure distinct from valid empty data and keeps server text out of the interface.
     cases:
       - id: case-1
         when: "A read allows empty data"
-        write: "handle the outcome first; returning the empty value is then valid"
+        write: "check success and data first; returning the empty value is then valid"
       - id: case-2
         when: "A write with feedback"
         write: >
-          runWithToast(action, options) returns a boolean after surfacing the refused or unavailable outcome through the
-          toast module; the caller flips local state
+          useGraphQLWithToast()(action, options) returns a boolean after showGraphQLToast reports the response (FE-TOAST);
+          the caller flips local state
       - id: case-3
         when: "Default copy"
         write: >
-          copy comes from the catalog by outcome code (refused, unavailable, invalid); no default English strings in code
+          copy comes from the toast namespace of the catalog or the response message; no default English strings in code
     verification:
       automated:
         - FE_HTTP_STATUS_COLLAPSE
@@ -160,7 +163,7 @@ rules:
         write: "not caught; SWR stores the failure and the connected half reads it and calls toSlot"
       - id: case-2
         when: "Selected feedback write"
-        write: "runWithToast returns false and toasts; the caller flips a local state"
+        write: "the use*WithToast hook returns false and toasts; the caller flips a local state"
       - id: case-3
         when: "Render crash"
         write: "fe/apps/<app>/src/app/global-error.tsx and app/[locale]/error.tsx"

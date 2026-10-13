@@ -1,0 +1,57 @@
+schema: starci/knowledge-source@1
+id: fe.realtime
+title: Realtime
+purpose: |-
+  How does the front end receive pushes from the back end? socket.io-client singletons per namespace and one side-effect
+  component, in both editions; lite runs the gateway inside the be api process.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [fe.hooks.socketio, fe.components.providers]
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+    - "starci-lab/starci-academy origin/main: src/hooks/socketio/{sockets.ts,SocketIoSideEffects.tsx,utils.ts}"
+    - "knowledge/patterns/be/realtime.yaml"
+  limitations: |-
+    FE_STACK_FORBIDDEN proves that no forbidden alternative is declared or imported; it does not prove the canonical
+    library is used well. starci-academy illustrates the usage; the catalog decides.
+rules:
+  - id: FE-REALTIME
+    title: "socket.io-client singletons and one side-effect component"
+    kind: mandatory
+    hfsRules: [R65, R244]
+    requirement: |-
+      hooks/socketio/sockets.ts creates one module-level socket per back-end namespace from one Manager (autoConnect
+      false, reconnection with backoff, the access token supplied per attempt through socket.auth).
+      SocketIoSideEffects.tsx, mounted once by components/providers, connects on sign-in and disconnects on sign-out,
+      registers the listeners, and dispatches each event to redux or mutates the SWR keys it changes; enums/ name the
+      publication and subscription events and types/ their payloads. Consumers get a socket through a use<X>SocketIo
+      hook only to emit. A resource is refreshed by the socket or by polling, never both. graphql-ws, raw WebSocket,
+      Supabase Realtime and other push SDKs are refused in both editions.
+    rationale: |-
+      One connection per namespace and one place that turns events into state avoid duplicate listeners and leaked
+      connections.
+    cases:
+      - id: case-1
+        when: "A namespace"
+        write: "const jobNotificationsManager = createManager(); export const jobNotificationsSocket: Socket = jobNotificationsManager.socket(\"/job_notifications\") (starci-academy)"
+      - id: case-2
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a lite app subscribed to Supabase Realtime from the front end"
+        write: "The back end serves the same socket.io gateway from its api process (be.feature.realtime.websocket, one instance, no Redis adapter); the front end listens through hooks/socketio as in full."
+    verification:
+      automated:
+        - FE_SIZE_AND_STATE_BUDGET
+        - FE_LIST_KEY
+        - FE_EFFECT_CLEANUP
+        - FE_SWALLOWED_ERROR
+        - FE_CONSOLE_CALL
+        - FE_STACK_FORBIDDEN
+      manual:
+        - "Confirm every listener registered on connect is removed on disconnect."
+    relatedExamples: []

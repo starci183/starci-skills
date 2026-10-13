@@ -1,0 +1,65 @@
+schema: starci/knowledge-source@1
+id: fe.route
+title: Framework and routes
+purpose: |-
+  Which framework surface does a front end use, and what may a route file do? Next App Router with thin routes; the
+  front end serves no API: no Server Action and no route handler beyond health/live and the auth callback slot, in every
+  app and edition.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [fe.route, fe.route.callback, fe.source-root-pinned]
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+    - "knowledge/hfs/slots.yaml"
+    - "https://nextjs.org/docs/app/getting-started/project-structure"
+  limitations: |-
+    FE_SERVER_ACTION_FORBIDDEN and FE_ROUTE_HANDLER_FORBIDDEN prove where code runs; they do not prove that the back-end
+    operation that replaced a route authorizes correctly.
+rules:
+  - id: FE-ROUTE
+    title: "App Router, thin routes, and the front end serves no API"
+    kind: mandatory
+    hfsRules: [R54, R243, R244]
+    requirement: |-
+      The front end is a Next App Router app (fe-stack framework). Route files mount one owner (FE-FOLDER-3). The front
+      end serves no API: no file under fe/ carries a "use server" directive, and the only route handlers are
+      app/health/live/route.ts and, when the auth flow truly needs a server code exchange, the fe.route.callback slot
+      (prefer the client-side PKCE exchange in modules/auth). Reads and writes go through modules/api and the SWR hooks;
+      a webhook, cron, public API or third-party callback is a back-end feature (REST under be/src/features/webhooks or
+      the public api). The pages router is not used.
+    rationale: |-
+      A Server Action or a route handler is a second back end hidden inside the front end: it bypasses the GraphQL
+      contract, the back-end authorization and the job pipeline, and it would differ between editions.
+    cases:
+      - id: case-1
+        when: "Liveness"
+        write: "app/health/live/route.ts: export const GET = () => new Response(\"ok\")"
+      - id: case-2
+        when: "A form submits"
+        write: "useContactForm (hooks/rhf) triggers useMutateSubmitContactSwr, which calls mutateSubmitContact of modules/api/graphql/mutations; no \"use server\" anywhere (starci-academy)"
+      - id: case-3
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a lite app kept Server Actions and app/api route handlers over a Supabase data layer"
+        write: "Delete them: the back-end feature exposes GraphQL, the front end calls it through modules/api and hooks/swr, and FE_SERVER_ACTION_FORBIDDEN and FE_ROUTE_HANDLER_FORBIDDEN refuse what remains."
+    verification:
+      automated:
+        - FE_ROUTE_FILES_THIN
+        - FE_NEXT_CONVENTIONS
+        - FE_PAGE_METADATA_MISSING
+        - FE_ROUTE_ONE_PAGE
+        - FE_ROUTE_DRAWING_DECISION
+        - FE_ROUTE_CLIENT_BOUNDARY
+        - FE_ROUTE_CLIENT_HOOK
+        - FE_ROUTE_DEFAULT_EXPORT
+        - FE_SERVER_ACTION_FORBIDDEN
+        - FE_ROUTE_HANDLER_FORBIDDEN
+        - FE_STACK_FORBIDDEN
+      manual:
+        - "Confirm a remaining fe.route.callback is needed because the provider requires a server code exchange."
+    relatedExamples: []

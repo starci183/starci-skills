@@ -1,0 +1,40 @@
+schema: starci/knowledge-source@1
+id: fe.utils
+title: Utilities
+purpose: |-
+  Which generic helpers does the front end use? Per-method lodash imports in modules/utils and reusable hooks in
+  hooks/reuseables.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [fe.modules, fe.hooks.reuseables]
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+  limitations: |-
+    FE_STACK_FORBIDDEN proves that no forbidden alternative is declared or imported; it does not prove the canonical
+    library is used well. starci-academy illustrates the usage; the catalog decides.
+rules:
+  - id: FE-UTILS
+    title: "lodash per method and usehooks-ts"
+    kind: mandatory
+    hfsRules: [R244]
+    requirement: |-
+      Generic helpers import lodash per method (lodash/debounce) inside modules/utils; generic hooks (useDebounceValue,
+      useMediaQuery) come from usehooks-ts or live in hooks/reuseables. underscore, ramda and lodash-es are refused.
+    rationale: |-
+      One helper library avoids duplicate implementations and bundle weight.
+    cases:
+      - id: case-1
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a component wrote its own debounce"
+        write: "Use lodash/debounce through modules/utils or a usehooks-ts hook."
+    verification:
+      automated:
+        - FE_STACK_FORBIDDEN
+      manual: []
+    relatedExamples: []

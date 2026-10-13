@@ -1,0 +1,40 @@
+schema: starci/knowledge-source@1
+id: fe.observe
+title: Observability
+purpose: |-
+  How are front-end errors reported? @sentry/nextjs through sentry.*.config.ts and instrumentation.ts.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [fe.source-root-pinned]
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+  limitations: |-
+    FE_STACK_FORBIDDEN proves that no forbidden alternative is declared or imported; it does not prove the canonical
+    library is used well. starci-academy illustrates the usage; the catalog decides.
+rules:
+  - id: FE-OBSERVE
+    title: "@sentry/nextjs for error reporting"
+    kind: mandatory
+    hfsRules: [R244]
+    requirement: |-
+      Front-end errors are reported by @sentry/nextjs, configured in sentry.server.config.ts, sentry.edge.config.ts,
+      instrumentation.ts and instrumentation-client.ts at the source root, with the DSN from modules/config; console-
+      only error reporting, LogRocket, Bugsnag and Datadog RUM are refused.
+    rationale: |-
+      One reporter makes front-end failures visible in one place.
+    cases:
+      - id: case-1
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: an error boundary only logged to the console"
+        write: "Report it through Sentry."
+    verification:
+      automated:
+        - FE_STACK_FORBIDDEN
+      manual: []
+    relatedExamples: []

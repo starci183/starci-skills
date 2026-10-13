@@ -122,7 +122,7 @@ Agent review asks whether the design meets the product invariant. Scripts check 
 
 ## DP-12 — Resource policy and scoped authority
 
-**Use:** Authenticate the caller, then authorize the action on the resolved resource/scope. Apply the policy across HTTP/GraphQL, server actions, jobs and service calls as applicable. A caller-provided workspace ID is data, not permission. Choose least privilege and deny unspecified access. [OWASP authorization guidance](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html).
+**Use:** Authenticate the caller, then authorize the action on the resolved resource/scope. Apply the policy across HTTP/GraphQL, socket handlers, jobs and service calls as applicable. A caller-provided workspace ID is data, not permission. Choose least privilege and deny unspecified access. [OWASP authorization guidance](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html).
 
 **Avoid:** UI hiding as access control, a guard decorator as the whole policy, or trusting an internal network as service identity. Domain/resource policies belong to their capability; transport identity parsing belongs to the adapter; token/key mechanisms are shared modules.
 
@@ -138,7 +138,7 @@ Agent review asks whether the design meets the product invariant. Scripts check 
 
 ## DP-14 — FE state ownership, safe data boundary and optimistic mutation
 
-**Use:** Keep server-only authority/data access separate from client rendering. Return the minimal safe representation and re-authorize mutations; a server action is an entry point. With a Nest-owned backend, Next's server-side adapter calls the owned API rather than duplicating domain persistence. [Next data security](https://nextjs.org/docs/app/guides/data-security).
+**Use:** Keep authority and data access in the back end, separate from client rendering. The front end reaches the owned API only through its GraphQL operations and SWR hooks (knowledge/hfs/fe-stack.yaml); it serves no Server Action or BFF route handler (R243), and the back end re-authorizes every mutation and returns the minimal safe representation. [Next data security](https://nextjs.org/docs/app/guides/data-security).
 
 **Avoid:** Two sources of truth for the same server state, identity-insensitive cache keys, server secrets in public config/props, and optimistic success for irreversible or externally unsettled work.
 

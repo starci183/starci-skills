@@ -147,7 +147,7 @@ topics:
   - id: be.supabase-queues
     title: Supabase adapters of the lite edition
     path: supabase-queues.yaml
-    decides: Under edition lite the same ports on Supabase - the queue and event-bus transport on Supabase Queues (pgmq) behind the outbox relay, retry and backoff by visibility timeout, dead letter by read_ct and archive, a queue per consumer group, schedules on pg_cron, cache and locks on Postgres, realtime pushes by realtime.send, unit specs as full and optional integration specs on starci supabase start
+    decides: Under edition lite the same ports on Supabase - the queue and event-bus transport on Supabase Queues (pgmq) behind the outbox relay, retry and backoff by visibility timeout, dead letter by read_ct and archive, a queue per consumer group, schedules on pg_cron, cache and locks on Postgres, realtime on the socket.io gateway of the api process, unit specs as full and optional integration specs on starci supabase start
     rules: BE-SUPABASE-QUEUES-1 … BE-SUPABASE-QUEUES-6
   - id: be.webhooks
     title: Provider webhooks

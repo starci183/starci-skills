@@ -1,0 +1,43 @@
+schema: starci/knowledge-source@1
+id: fe.date
+title: Dates
+purpose: |-
+  How are dates computed and shown? dayjs in modules/dayjs for math and parsing; the next-intl formatter for display.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [fe.modules, fe.modules.i18n]
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+  limitations: |-
+    FE_STACK_FORBIDDEN proves that no forbidden alternative is declared or imported; it does not prove the canonical
+    library is used well. starci-academy illustrates the usage; the catalog decides.
+rules:
+  - id: FE-DATE
+    title: "dayjs for date math, next-intl for display"
+    kind: mandatory
+    hfsRules: [R244]
+    requirement: |-
+      Date arithmetic and parsing use the dayjs instance of modules/dayjs (plugins extended once); display goes through
+      the next-intl formatter (useFormatter dateTime and relativeTime) in the active locale. moment, date-fns and luxon
+      are refused, and toLocaleString is not used for display.
+    rationale: |-
+      One date library and one formatter keep time zones and locale formatting consistent.
+    cases:
+      - id: case-1
+        when: "The module"
+        write: "modules/dayjs/index.ts: dayjs.extend(utc); dayjs.extend(duration); export { dayjs } (starci-academy)"
+      - id: case-2
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a component formatted a date with toLocaleString"
+        write: "Format it with the next-intl formatter; compute with modules/dayjs."
+    verification:
+      automated:
+        - FE_STACK_FORBIDDEN
+      manual: []
+    relatedExamples: []

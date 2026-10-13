@@ -1,0 +1,42 @@
+schema: starci/knowledge-source@1
+id: fe.icon
+title: Icons
+purpose: |-
+  Which icon set does the front end use? One: @phosphor-icons/react, reached through the icon leaf.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: []
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+  limitations: |-
+    FE_STACK_FORBIDDEN proves that no forbidden alternative is declared or imported; it does not prove the canonical
+    library is used well. starci-academy illustrates the usage; the catalog decides.
+rules:
+  - id: FE-ICON
+    title: "One icon set: @phosphor-icons/react"
+    kind: mandatory
+    hfsRules: [R244]
+    requirement: |-
+      Application icons come from @phosphor-icons/react through the components/leaves icon owner (or the grammar);
+      react-icons, lucide-react, iconify, gravity, tabler and fontawesome are refused.
+    rationale: |-
+      One icon set keeps stroke, size and metaphor consistent.
+    cases:
+      - id: case-1
+        when: "An icon"
+        write: "import { Bell } from \"@phosphor-icons/react\" inside the icon leaf"
+      - id: case-2
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a page mixed icons of two sets"
+        write: "Replace them with the phosphor equivalent through the icon leaf."
+    verification:
+      automated:
+        - FE_STACK_FORBIDDEN
+      manual: []
+    relatedExamples: []

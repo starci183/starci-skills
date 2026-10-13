@@ -1,0 +1,53 @@
+schema: starci/knowledge-source@1
+id: fe.auth
+title: Auth client
+purpose: |-
+  Who owns sign-in, the session and the access token on the front end? modules/auth, the identity-provider client; with
+  Supabase it is the only front-end importer of @supabase/supabase-js and uses its auth API only.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [fe.modules.auth, fe.route.callback, fe.hooks.effects]
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+    - "knowledge/hfs/slots.yaml"
+    - "starci-lab/starci-academy origin/main: src/modules/api/graphql/clients/links/attach-access-token.ts"
+  limitations: |-
+    FE_SUPABASE_CLIENT_OWNER proves who imports Supabase and which API it calls; token refresh timing is reviewed.
+rules:
+  - id: FE-AUTH
+    title: "modules/auth yields the session and the access token, never data"
+    kind: mandatory
+    hfsRules: [R217, R244]
+    requirement: |-
+      modules/auth is the identity-provider client: lite - the @supabase/supabase-js auth client (sign-in, sign-out,
+      onAuthStateChange, the session for the access token, the client-side PKCE exchange); full - the identity provider
+      client of the app. It exposes the session, the signed-in state and an access-token getter that the attach-access-
+      token link of the Apollo client and the socket.io auth read. It never calls .from, .rpc, .storage or .channel:
+      data goes through modules/api to the back end, which verifies the token against the JWKS (R219). No other front-
+      end file imports @supabase/*, and fe/ holds no service-role key or secret. An auth bootstrap effect
+      (hooks/effects) dispatches the signed-in user into redux.
+    rationale: |-
+      The back end authorizes every read and write; the front end only proves who the user is.
+    cases:
+      - id: case-1
+        when: "The Apollo link needs the token"
+        write: "createAttachAccessTokenLink reads the access token from modules/auth and sets Authorization: Bearer <token>"
+      - id: case-2
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a lite front end read rows with supabase.from under RLS"
+        write: "The back-end feature exposes the read as a GraphQL query; modules/auth keeps the Supabase client for the session only."
+    verification:
+      automated:
+        - FE_SUPABASE_CLIENT_OWNER
+        - BE_SUPABASE_CLIENT_OWNER
+        - FE_SERVICE_ROLE_FORBIDDEN
+        - FE_STACK_FORBIDDEN
+      manual:
+        - "Confirm sign-out clears the session, the redux user and the SWR cache."
+    relatedExamples: []

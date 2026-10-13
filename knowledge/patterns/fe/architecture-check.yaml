@@ -135,7 +135,7 @@ rules:
         write: Keep one client visual component unless reuse reveals a meaningful separate contract.
       - id: case-3
         when: A hook sends a request
-        write: Call a function of modules/api, never fetch directly.
+        write: Wrap one operation of modules/api in a hooks/swr hook; never fetch directly.
     verification:
       automated:
         - FE_CLIENT_BOUNDARY

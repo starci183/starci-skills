@@ -1,0 +1,53 @@
+schema: starci/knowledge-source@1
+id: fe.toast
+title: Toast feedback
+purpose: |-
+  How is the outcome of a mutation reported to the user? modules/toast: showGraphQLToast over a GraphQLResponse and the
+  use*WithToast hooks with next-intl labels.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [fe.modules.toast, fe.components.providers]
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+    - "starci-lab/starci-academy origin/main: src/modules/toast/{toast.tsx,api.ts,hooks.ts}"
+  limitations: |-
+    FE_STACK_FORBIDDEN proves that no forbidden alternative is declared or imported; it does not prove the canonical
+    library is used well. starci-academy illustrates the usage; the catalog decides.
+rules:
+  - id: FE-TOAST
+    title: "Mutation outcomes go through modules/toast"
+    kind: mandatory
+    hfsRules: [R58, R244]
+    requirement: |-
+      modules/toast holds toast.tsx (the HeroUI toast wrapper), api.ts (pure helpers: showGraphQLToast(response,
+      messages) on the success flag of a GraphQLResponse, showUnauthorizedToast, runGraphQLWithToast, runRestWithToast)
+      and hooks.ts (useGraphQLWithToast, useRestWithToast, which inject the labels of the next-intl toast namespace).
+      Every write a user starts runs through one of the hooks; the description is the response message or a catalog
+      default, never an English literal in code. The HeroUI toast region is mounted once in components/providers.
+      sonner, react-toastify, react-hot-toast, notistack and alert() are refused.
+    rationale: |-
+      One feedback path makes every success and failure visible in the same way and keeps copy in the catalog.
+    cases:
+      - id: case-1
+        when: "A GraphQL write"
+        write: "const runGraphQL = useGraphQLWithToast(); await runGraphQL(async () => (await submitContactSwr.trigger(values))?.data?.submitContact) (starci-academy)"
+      - id: case-2
+        when: "A REST write"
+        write: "const runRest = useRestWithToast(); await runRest(() => axios.put(presignedUrl, file))"
+      - id: case-3
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a lite app reported mutation outcomes inline from Server Action results"
+        write: "The SWR mutation runs through useGraphQLWithToast; the toast labels come from the toast namespace of the catalog."
+    verification:
+      automated:
+        - FE_I18N_LITERAL
+        - FE_STACK_FORBIDDEN
+      manual:
+        - "Confirm a silent success (no toast) is intended for that write."
+    relatedExamples: []

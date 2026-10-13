@@ -13,8 +13,8 @@ provenance:
     - knowledge/hfs/README.md
     - knowledge/patterns/fe/folder.yaml
   limitations: |
-    A name does not prove responsibility. A file named use*.ts that holds a server reader is a finding of FE_HOOKS_ARE_HOOKS
-    even when the name matches.
+    A name does not prove responsibility. A file named use*.ts that holds a transport call instead of a hook is a finding of
+    FE_HOOKS_ARE_HOOKS even when the name matches.
 rules:
   - id: FE-NAMING-1
     title: Unit folder and applicable exports
@@ -154,24 +154,27 @@ rules:
     relatedExamples: []
 
   - id: FE-NAMING-4
-    title: Hooks, readers and cache keys
+    title: Hooks, operations and cache keys
     kind: mandatory
     hfsRules: [R56, R50, R21]
     requirement: |
-      Every authored hook lives in hooks/<domain>/, starts with use, and names the lifecycle it owns; one hook per file, the
-      file named after the hook. Read hooks are `useQuery<X>Swr` and write hooks `useMutate<X>Swr`; key constants are
-      `QUERY_<X>_SWR_KEY` and `MUTATE_<X>_SWR_KEY`. The one shared helper file of a domain is `<domain>.shared.ts`. Server
-      readers are `modules/api/<domain>/read-<x>.ts` exporting `read<X>`. GraphQL documents are `.graphql` files and generated
-      names remain generator-owned.
+      Every authored hook lives under hooks/ (hooks/swr, hooks/rhf, hooks/zustand/<store>, hooks/socketio, hooks/effects,
+      hooks/reuseables or hooks/<domain>), starts with use, and names the lifecycle it owns; one hook per file, the file named
+      after the hook. Data hooks are `hooks/swr/api/graphql/queries/useQuery<X>Swr.ts` and
+      `hooks/swr/api/graphql/mutations/useMutate<X>Swr.ts` (REST: `useGet<X>Swr`, `usePost<X>Swr`, `usePut<X>Swr`,
+      `usePatch<X>Swr`, `useDelete<X>Swr`); key constants are `QUERY_<X>_SWR_KEY` and `MUTATE_<X>_SWR_KEY`. Forms are
+      `hooks/rhf/use<X>Form.ts`. The one shared helper file of a domain is `<domain>.shared.ts`. Operations are
+      `modules/api/graphql/queries/query-<x>.ts` exporting `query<X>` and `modules/api/graphql/mutations/mutation-<x>.ts`
+      exporting `mutate<X>`; generated names remain generator-owned.
     rationale: |
       Names reveal whether a file is a hook, a reader or a shared helper, and make a duplicated helper visible.
     cases:
       - id: case-1
         when: "Read hook"
-        write: "hooks/sales/useQuerySalesSummarySwr.ts"
+        write: "hooks/swr/api/graphql/queries/useQuerySalesSummarySwr.ts"
       - id: case-2
         when: "Write hook"
-        write: "hooks/sales/useMutateSendHandoffSwr.ts"
+        write: "hooks/swr/api/graphql/mutations/useMutateSendHandoffSwr.ts"
       - id: case-3
         when: "Key constant"
         write: 'export const QUERY_SALES_SUMMARY_SWR_KEY = "QUERY_SALES_SUMMARY_SWR"'
@@ -179,8 +182,8 @@ rules:
         when: "Shared helper of a domain"
         write: "hooks/sales/sales.shared.ts exporting salesAccessToken once"
       - id: case-5
-        when: "Server reader"
-        write: "modules/api/sales/read-sales-summary.ts exporting readSalesSummary"
+        when: "An operation"
+        write: "modules/api/graphql/queries/query-sales-summary.ts exporting querySalesSummary"
       - id: case-6
         when: "Non-data hooks"
         write: "useAuthentication under hooks/authentication; useSessionToken under hooks/session"

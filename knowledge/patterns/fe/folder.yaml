@@ -29,8 +29,11 @@ rules:
       `hfs.json` `sides.fe.apps` with kind `next` (slot `fe.app.next`; the scaffold writes `landing` and `app`) — and all
       product source lives under fe/apps/<app>/src. An fe/src/ does not exist. Each Next source root
       (fe/apps/<app>/src) uses app/ for framework adapters; features/{pages,layouts,overlays} for route-facing product
-      composition; components/{blocks,composites,branches,leaves} for product visuals; hooks/<domain> for React hooks;
-      and modules/<capability> for cohesive reusable technical and domain capabilities. Every app carries the required
+      composition; components/{blocks,composites,branches,leaves} for product visuals and components/providers for the
+      client providers the root layout mounts; hooks/ for React hooks (swr, rhf, zustand, socketio, effects, reuseables and
+      <domain>); redux/ for the app-wide store; and modules/<capability> for cohesive reusable technical and domain
+      capabilities (api, auth, toast, i18n, config, routes, brand, types, storage, superjson, dayjs, utils). Each concern's
+      library and home is knowledge/hfs/fe-stack.yaml. Every app carries the required
       module instances of slot `fe.modules` and one brand.css under modules/brand when it sets brand tokens
       (`fe.modules.brand`). No other empty role
       folder is required. Grammar remains a separate product-agnostic package. The only files that may sit directly in the
@@ -78,9 +81,10 @@ rules:
         when: "A routed authentication scenario"
         write: "fe/apps/<app>/src/features/pages/AuthenticationPage/index.tsx"
       - id: case-2
-        when: "A reusable API client, reader or session capability"
+        when: "A back-end call or the session"
         write: >
-          fe/apps/<app>/src/modules/api/ or fe/apps/<app>/src/modules/session/ with one explicit public index.ts entry
+          slot fe.modules.api (one file per query or mutation) or slot fe.modules.auth, each with one explicit public index.ts
+          entry
       - id: case-3
         when: "A reusable product visual without scenario ownership"
         write: "an owner folder of slot `fe.components` under the layer it belongs to — for example fe/apps/<app>/src/components/leaves/<Name>/index.tsx"
@@ -257,7 +261,7 @@ rules:
         when: "Global app files"
         write: >
           app/globals.css, app/global-error.tsx, app/[locale]/error.tsx, app/[locale]/not-found.tsx, app/sitemap.ts,
-          app/robots.ts, app/health/{live,ready}/route.ts
+          app/robots.ts, app/health/live/route.ts (the one route handler, FE-ROUTE)
     verification:
       automated:
         - FE_ERROR_BOUNDARY_MISSING
@@ -287,33 +291,35 @@ rules:
     relatedExamples: []
 
   - id: FE-FOLDER-4
-    title: Hooks are hooks; readers and transport live in modules
+    title: Hooks are hooks; operations and transport live in modules
     kind: mandatory
     hfsRules: [R56, R50, R49, R21, R26]
     requirement: |
-      hooks/<domain>/ holds React hooks (use*.ts, one hook per file) and exactly one <domain>.shared.ts for shared
-      non-hook helpers of that domain (key builders, token readers). A file in hooks/ that is not a hook and is not the shared
-      file is a finding. Server-side readers (fetch and map, no React) live in modules/api/<domain>/read-*.ts and are
-      wrapped in React cache() when several blocks call them in one request. Generic client plumbing, the Outcome type,
-      the generated wire types (from be/contracts/, through the root codegen) live in modules/api; environment reading lives in modules/config; every
-      href builder lives in modules/routes; locale routing lives in modules/i18n; colour values live in modules/brand.
+      hooks/ holds React hooks (use*.ts, one hook per file): hooks/swr (one SWR wrapper per modules/api operation, plus
+      SwrSideEffects.tsx), hooks/rhf (forms), hooks/zustand/<store> (a store and its hooks), hooks/socketio (sockets.ts,
+      SocketIoSideEffects.tsx, enums/, types/), hooks/effects (app-wide side effects), hooks/reuseables (generic hooks) and
+      hooks/<domain>/ with exactly one <domain>.shared.ts for shared non-hook helpers of that domain. A file in hooks/ that is
+      none of these is a finding. The Apollo clients and their links, one file per query and mutation, the GraphQLResponse
+      envelope, the generated wire types (from be/contracts/, through the root codegen) and the axios calls live in
+      modules/api; the session lives in modules/auth; mutation feedback in modules/toast; environment reading in
+      modules/config; every href builder in modules/routes; locale routing in modules/i18n; colour values in modules/brand.
       A helper name defined twice across hook files is a finding.
     rationale: |
       A rule that says what a hooks folder is also says where everything else goes, so nobody copies a helper sixteen
-      times or fills hooks/ with server fetch functions.
+      times or fills hooks/ with transport calls.
     cases:
       - id: case-1
-        when: "Authentication request lifecycle"
-        write: "fe/apps/<app>/src/hooks/authentication/useAuthentication.ts"
+        when: "A query the sales page reads"
+        write: "fe/apps/<app>/src/hooks/swr/api/graphql/queries/useQuerySalesSummarySwr.ts over modules/api/graphql/queries/query-sales-summary.ts"
       - id: case-2
         when: "A helper shared by the hooks of one domain"
         write: "fe/apps/<app>/src/hooks/sales/sales.shared.ts, for example useSalesAccessToken's token reader"
       - id: case-3
-        when: "A server read used by several blocks"
-        write: "fe/apps/<app>/src/modules/api/sales/read-sales-summary.ts, exported through modules/api/index.ts"
+        when: "A form"
+        write: "fe/apps/<app>/src/hooks/rhf/useSendHandoffForm.ts"
       - id: case-4
         when: "The API client"
-        write: "fe/apps/<app>/src/modules/api/client.ts and fe/apps/<app>/src/modules/api/outcome.ts"
+        write: "fe/apps/<app>/src/modules/api/graphql/clients/ (auth and no-auth Apollo clients, links/) and fe/apps/<app>/src/modules/api/graphql/types.ts"
       - id: case-5
         when: "Intrinsic custom helper"
         write: "fe/apps/<app>/src/hooks/ui/useAutoScroll.ts; direct useRef and useState calls may remain in their visual owner"

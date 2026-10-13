@@ -2,162 +2,107 @@ schema: starci/knowledge-source@1
 id: fe.transport
 title: Frontend data transport
 purpose: |-
-  Given a frontend read or write, which code calls the network, what does it return and where do the wire types come
-  from? One client per app, one Outcome vocabulary, types generated from the backend contract, server first.
+  Given a frontend read or write, which code calls the back end, what does it return and where do the wire types come
+  from? The browser calls the back end directly through the Apollo clients of modules/api/graphql (one file per operation)
+  and, for uploads, presigned URLs and auth endpoints only, the one axios instance of modules/api/rest; the wire types are
+  generated from be/contracts. The same in lite and full (R212 case-2, knowledge/hfs/fe-stack.yaml graphql and codegen).
 appliesTo:
   - frontend
 family: fe
 # The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
 # into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
-slots: [fe.hooks, fe.modules.api, fe.transport, fe.package.api]
+slots: [fe.modules.api, fe.transport, fe.transport.client, fe.transport.outcome, fe.package.api]
 provenance:
-  reviewedAt: 2026-09-29
+  reviewedAt: 2026-10-13
   sources:
-    - knowledge/hfs/README.md
+    - knowledge/hfs/fe-stack.yaml
     - knowledge/hfs/slots.yaml
-    - https://nextjs.org/docs/app/getting-started/fetching-data
-    - https://swr.vercel.app/docs/getting-started
+    - "starci-lab/starci-academy origin/main: src/modules/api/graphql/{clients,queries,mutations,types.ts}"
+    - https://www.apollographql.com/docs/react/api/link/introduction
     - https://the-guild.dev/graphql/codegen
   limitations: |-
-    Static checks prove where fetch is called, that statuses are not collapsed and that wire types are generated. They do
-    not prove that the contract matches the running backend beyond the committed copy, or that retry and refresh behavior
-    fits the product. Contract drift is checked by comparing the copy with the backend snapshot hash.
+    Static checks prove where the back end is called, that failures are not collapsed and that wire types are generated.
+    They do not prove that the contract matches the running back end beyond the committed snapshot, or that the retry and
+    timeout budgets fit the product. starci-academy illustrates the layout; it hand-types its wire types, which this
+    standard replaces with codegen.
 rules:
-  - id: FE-TRANSPORT-1
-    title: One client per app
+  - id: FE-API-GRAPHQL
+    title: The browser calls the back end through the Apollo clients, one file per operation
     kind: mandatory
-    hfsRules: [R50]
+    hfsRules: [R50, R51]
     requirement: |-
-      `modules/api/client.ts` is the only `fetch` of the app. It applies a timeout and an `AbortSignal`, takes the token and
-      locale as arguments or context, and keeps no module-level `let` holding a token, locale or session. The base URL comes
-      from `modules/config`. Nothing else in the app calls `fetch`, `axios` or a GraphQL client directly.
+      `modules/api/graphql/clients/` holds the auth and the no-auth Apollo client (`clients/{auth,no-auth}.ts`) built from one
+      link chain (`links/`): retry, error, timeout, token refresh (`links/refresh-token/`), attach access token, attach
+      device fingerprint when the app uses one, and the terminal http link. The access token comes from `modules/auth` (lite:
+      the Supabase session token). Each operation is one file: `queries/query-<x>.ts` exporting `query<X>` and
+      `mutations/mutation-<x>.ts` exporting `mutate<X>`, each with its `gql` document map keyed by an enum and typed request
+      and response (`types/`). Every operation returns the one `GraphQLResponse<T>` envelope of `graphql/types.ts`
+      (`success`, `message`, `error`, `data`); UNAUTHENTICATED or FORBIDDEN becomes `refused` after one token refresh, and a
+      failure is never returned as empty data. Nothing else in the app calls `fetch`, another HTTP or GraphQL client, a
+      Server Action or a front-end route handler, and Supabase on the front end never reads data.
     rationale: |-
-      Several transports produce several result shapes and several ways of failing. One client makes timeout, headers and
-      errors a single decision.
+      One link chain makes timeout, retry, refresh and headers a single decision, and one file per operation keeps every call
+      the back end serves discoverable and replaceable.
     cases:
       - id: case-1
-        when: A request
-        write: 'export const request = async <T>(input: RequestInput, signal?: AbortSignal): Promise<Outcome<T>> => { ... } in modules/api/client.ts, with AbortSignal.timeout(config.requestTimeoutMs) combined with signal.'
+        when: A query
+        write: >-
+          modules/api/graphql/queries/query-course-leaderboard.ts: const query1 = gql`query CourseLeaderboard($request:
+          LeaderboardRequest!) { courseLeaderboard(request: $request) { success message error data { ... } } }`; export const
+          queryCourseLeaderboard = async ({ query = QueryCourseLeaderboard.Query1, request, headers, signal }:
+          QueryParams<QueryCourseLeaderboard, CourseLeaderboardRequest>) => createAuthApolloClient({ headers, signal })
+          .query<QueryCourseLeaderboardResponse>({ query: queryMap[query], variables: { request } }) (starci-academy)
       - id: case-2
-        when: A credential
-        write: Pass the token as an argument of the reader or hook that calls request; never store it in a module variable.
+        when: The envelope
+        write: 'export interface GraphQLResponse<TData = undefined> { success: boolean; message: string; error?: string; data?: TData } in modules/api/graphql/types.ts'
+      - id: case-3
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a lite front end needs data (it used to read through a Supabase data layer, Server Actions or a route handler)"
+        write: >-
+          The back-end feature exposes a GraphQL resolver (be.transport.graphql) and the front end calls it through
+          query-<x>.ts or mutation-<x>.ts and an SWR hook, exactly as in full; Supabase on the front end stays auth only and
+          the front end serves no API (R243).
     verification:
       automated:
         - FE_TRANSPORT_OWNER
         - FE_EFFECT_FETCH
         - FE_SWR_KEY_IDENTITY
         - FE_SWR_MUTATION_RESOURCE_IDENTITY
-      manual: []
-    relatedExamples: []
-  - id: FE-TRANSPORT-2
-    title: One Outcome vocabulary, and 401 and 403 are refused
-    kind: mandatory
-    hfsRules: [R51]
-    requirement: |-
-      The client returns `Outcome<T>` from `modules/api/outcome.ts`: `ok` (value), `refused` (401 or 403, code), `invalid`
-      (issues), `not-found` and `unavailable` (code, retryable). A status is never collapsed into null or into one
-      failure branch, `if (!response.ok) return null` is forbidden, and server text is never returned as a display reason;
-      the reason is a code that i18n turns into copy. The `refused` outcome reaches the session check in the data layer,
-      which navigates to sign-in.
-    rationale: |-
-      When 401 is folded into "unavailable" the signed-out state can never be reached against the real backend, and a stubbed
-      e2e that answers 200 hides the defect.
-    cases:
-      - id: case-1
-        when: The type
-        write: 'export type Outcome<T> = { kind: "ok"; value: T } | { kind: "refused"; status: 401 | 403; code: string } | { kind: "invalid"; issues: ReadonlyArray<Issue> } | { kind: "not-found" } | { kind: "unavailable"; code: string; retryable: boolean }'
-      - id: case-2
-        when: A status mapping
-        write: 'if (response.status === 401 || response.status === 403) return { kind: "refused", status: response.status, code }'
-      - id: case-3
-        when: A block consumes it
-        write: '`toSlot(outcome)` maps ok to data, a refused 401 to unauthorized, a refused 403 to forbidden and the rest to isError; `SlotView` follows the family state-recipes. The required data-layer session check still navigates a session refusal to sign-in.'
-    verification:
-      automated:
         - FE_HTTP_STATUS_COLLAPSE
         - FE_OUTCOME_KIND_UNHANDLED
       manual:
-        - Confirm every refused outcome leads somewhere the user can act, such as sign-in.
+        - Confirm every refused answer leads somewhere the user can act, such as sign-in.
     relatedExamples: []
-  - id: FE-TRANSPORT-3
+  - id: FE-WIRE-GENERATED
     title: Wire types are generated from be/contracts
     kind: mandatory
     hfsRules: [R52, R23]
     requirement: |-
-      The back end commits `be/contracts/<app>/schema.graphql` (or `openapi.json`), written by `starci app emit`
-      (`starci app emit`). The front end reads it in place (`hfs.json` `sides.fe.reads: [be/contracts/]`) and keeps no
-      copy. The root `codegen` script (`<repo>/scripts/codegen.mjs`) writes the ignored `modules/api/__generated__/` from it; `lint`,
-      `typecheck`, `build:fe` and the op gate run `codegen` first. GraphQL documents live in `.graphql` files. A handwritten
-      wire type, `as GraphqlResult<T>` and an enum typed as `string` are forbidden.
+      The back end commits `be/contracts/<app>/schema.graphql`, written by `starci app emit`. The front end reads it in
+      place (`hfs.json` `sides.fe.reads: [be/contracts/]`) and keeps no copy. graphql-codegen (the root `codegen` script)
+      writes the ignored `modules/api/graphql/__generated__/` from it; `lint`, `typecheck`, `build:fe` and the op gate run
+      `codegen` first. The request and response types under `queries/types/` and `mutations/types/` re-export or narrow the
+      generated types; a hand-written wire type, a cast of a response and an enum typed as `string` are forbidden.
     rationale: |-
       Types written by hand drift from the back end without a signal; the committed snapshot makes the interface between the
-      sides an explicit reviewable artifact in the same commit as the change that moved it.
+      sides a reviewable artifact in the same commit as the change that moved it.
     cases:
       - id: case-1
-        when: A new read
-        write: Add sales/summary.graphql, run codegen, and call the generated typed document from modules/api/sales/read-sales-summary.ts.
+        when: A new operation
+        write: Add the resolver on the back end, run starci app emit, run npm run codegen, then write mutation-<x>.ts with its gql document and the generated types.
       - id: case-2
         when: The back-end contract changed
-        write: Run npm run contract:emit, review the diff of be/contracts/, then npm run codegen; HFS_CONTRACT_SNAPSHOT_DRIFT fails a stale or missing snapshot.
+        write: Run starci app emit, review the diff of be/contracts/, then npm run codegen; HFS_CONTRACT_SNAPSHOT_DRIFT fails a stale or missing snapshot.
+      - id: case-3
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: starci-academy types its responses by hand"
+        write: The layout follows starci-academy; the types come from graphql-codegen over be/contracts/<app>/schema.graphql instead.
     verification:
       automated:
         - FE_WIRE_GENERATED
         - HFS_CONTRACT_SNAPSHOT_DRIFT
       manual:
         - Review contract diffs for breaking changes before regenerating.
-    relatedExamples: []
-  - id: FE-TRANSPORT-4
-    title: Server reads and client reads share the client
-    kind: mandatory
-    hfsRules: [R50, R56]
-    requirement: |-
-      A server read is a reader in `modules/api/<domain>/read-*.ts` that calls the client and maps the outcome, wrapped in
-      React `cache()` when several blocks call it in one request. A client read is a hook `useQuery<X>Swr` in
-      `hooks/<domain>/` that calls the same client. The session check sits in the data layer (a `refused` outcome navigates
-      to sign-in), not only in a layout, because a layout does not run again on client navigation.
-    rationale: |-
-      Server-first rendering ships less client code, and one client keeps both paths consistent.
-    cases:
-      - id: case-1
-        when: A server block
-        write: 'const summary = await readSalesSummary(); return <SalesSummaryBase state={...} props={{ summary: toSlot(summary) }} />'
-      - id: case-2
-        when: A client hook
-        write: 'useSWR(token === undefined ? null : [QUERY_SALES_SUMMARY_SWR_KEY, token], () => request(salesSummaryDocument, { token }))'
-    verification:
-      automated:
-        - FE_TRANSPORT_OWNER
-        - FE_EFFECT_FETCH
-        - FE_SWR_KEY_IDENTITY
-        - FE_SWR_MUTATION_RESOURCE_IDENTITY
-        - FE_HOOKS_ARE_HOOKS
-        - FE_CUSTOM_HOOK_LOCATION
-        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
-        - FE_COMPONENT_DEEP_HOOK_IMPORT
-      manual:
-        - Confirm that a refused outcome reaches sign-in on both server and client paths.
-    relatedExamples: []
-  - id: FE-TRANSPORT-5
-    title: One refresh mechanism per resource
-    kind: mandatory
-    hfsRules: [R65]
-    requirement: |-
-      A resource is refreshed by polling or by a socket, never both, and never by a hand-written poll loop in a component
-      (`setInterval`, recursive `setTimeout`). Polling uses the data client's refresh interval; a socket goes through one
-      module with cleanup on unmount.
-    rationale: |-
-      Duplicate refresh paths cause redundant requests and states that disagree.
-    cases:
-      - id: case-1
-        when: A status that changes on the server
-        write: 'useSWR(key, fetcher, { refreshInterval: 5000 }) in the hook; the component holds no timer.'
-    verification:
-      automated:
-        - FE_SIZE_AND_STATE_BUDGET
-        - FE_LIST_KEY
-        - FE_EFFECT_CLEANUP
-        - FE_SWALLOWED_ERROR
-        - FE_CONSOLE_CALL
-      manual:
-        - Confirm the chosen mechanism and interval fit the product need.
     relatedExamples: []

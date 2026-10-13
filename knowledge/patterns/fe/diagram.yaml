@@ -1,0 +1,39 @@
+schema: starci/knowledge-source@1
+id: fe.diagram
+title: Diagrams
+purpose: |-
+  How are text diagrams rendered? mermaid, in a block.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: []
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+  limitations: |-
+    FE_STACK_FORBIDDEN proves that no forbidden alternative is declared or imported; it does not prove the canonical
+    library is used well. starci-academy illustrates the usage; the catalog decides.
+rules:
+  - id: FE-DIAGRAM
+    title: "mermaid in a block"
+    kind: mandatory
+    hfsRules: [R244]
+    requirement: |-
+      Text diagrams render through mermaid in a client block, initialised once with the theme; no second diagram
+      renderer.
+    rationale: |-
+      One diagram renderer keeps diagram syntax and theming consistent.
+    cases:
+      - id: case-1
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a page needed a sequence diagram"
+        write: "Render it with mermaid in a block."
+    verification:
+      automated:
+        - FE_STACK_FORBIDDEN
+      manual: []
+    relatedExamples: []

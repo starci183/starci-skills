@@ -82,9 +82,9 @@ rules:
     kind: mandatory
     hfsRules: [R56, R50, R26, R92]
     requirement: |
-      Every authored hook lives under hooks/<domain>. Feature owners and connected blocks import those hooks through a resolved
+      Every authored hook lives under hooks/ (FE-NAMING-4). Feature owners and connected blocks import those hooks through a resolved
       hooks public entry; hooks reach transport and domain capabilities through module public entries (`@/modules/api`).
-      Server blocks import readers from `@/modules/api`. Leaves, branches and composites may call a hooks/ui intrinsic hook
+      Leaves, branches and composites may call a hooks/ui intrinsic hook
       whose resolved implementation stays free of product, session and API lifecycle. They do not call product hooks.
     rationale: |
       One hook location makes declaration ownership auditable while resolved implementation closure keeps intrinsic UI
@@ -95,7 +95,7 @@ rules:
         write: 'import { useAuthentication } from "@/hooks/authentication"; its declaration is under fe/apps/<app>/src/hooks/authentication/useAuthentication.ts'
       - id: case-2
         when: "A hook reaches GraphQL"
-        write: "Import the typed operation and client through @/modules/api; do not import transport from presentation."
+        write: "A hooks/swr hook imports the operation (query<X> or mutate<X>) of modules/api; presentation never imports transport."
       - id: case-3
         when: "A presentation needs a feature model"
         write: "Import the feature or view type through the feature entry, never a generated wire type."
@@ -166,7 +166,7 @@ rules:
     kind: mandatory
     hfsRules: [R62, R61, R93]
     requirement: |
-      Only the Icon leaf imports @heroicons/react. Headings come from Grammar Heading, never a raw h2. Form controls come from
+      Only the Icon leaf imports the icon set of knowledge/hfs/fe-stack.yaml (@phosphor-icons/react). Headings come from Grammar Heading, never a raw h2. Form controls come from
       the Grammar renderers, never a raw select, input, textarea or button. Grammar peerDependencies are exactly @heroui/react
       and react.
     rationale: |
@@ -174,7 +174,7 @@ rules:
     cases:
       - id: case-1
         when: "Glyphs"
-        write: "only the Icon leaf imports @heroicons/react; everything else takes the Grammar Icon with a source prop"
+        write: "only the Icon leaf imports @phosphor-icons/react; everything else takes the Grammar Icon with a source prop"
       - id: case-2
         when: "Headings"
         write: "Heading from Grammar, never a raw h2"

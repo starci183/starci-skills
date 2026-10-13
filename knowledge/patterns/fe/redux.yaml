@@ -1,0 +1,48 @@
+schema: starci/knowledge-source@1
+id: fe.redux
+title: Global state
+purpose: |-
+  Where does app-wide shared state live? A redux toolkit store in redux/ with typed hooks and one file per slice.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [fe.redux, fe.components.providers, fe.hooks.effects]
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+    - "starci-lab/starci-academy origin/main: src/redux/{store.ts,hooks.ts,ReduxProvider.tsx,slices/*.ts}"
+  limitations: |-
+    FE_STACK_FORBIDDEN proves that no forbidden alternative is declared or imported; it does not prove the canonical
+    library is used well. starci-academy illustrates the usage; the catalog decides.
+rules:
+  - id: FE-STATE-REDUX
+    title: "App-wide state in redux slices"
+    kind: mandatory
+    hfsRules: [R244]
+    requirement: |-
+      redux/ holds store.ts (configureStore), hooks.ts (useAppDispatch = useDispatch.withTypes<AppDispatch>(),
+      useAppSelector = useSelector.withTypes<RootState>()), ReduxProvider.tsx mounted by components/providers, and
+      slices/<slice>.ts. Redux holds state several features share: the selected entity synced from the route
+      (hooks/effects), the signed-in user, entities pushed by a socket or hydrated by an SWR query. A component reads
+      through useAppSelector; server data stays owned by its SWR hook, which may dispatch into a slice. mobx, recoil,
+      jotai, valtio and redux-saga are refused; React context is not a store.
+    rationale: |-
+      One store with typed hooks makes shared state traceable; keeping feature-local UI state out of it keeps it small.
+    cases:
+      - id: case-1
+        when: "Typed hooks"
+        write: "export const useAppDispatch = useDispatch.withTypes<AppDispatch>(); export const useAppSelector = useSelector.withTypes<RootState>() (starci-academy redux/hooks.ts)"
+      - id: case-2
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a front end shared state through a context provider"
+        write: "Move it into a slice of redux/slices and read it with useAppSelector."
+    verification:
+      automated:
+        - FE_STACK_FORBIDDEN
+      manual:
+        - "Confirm the state is shared by more than one feature; otherwise it belongs in zustand."
+    relatedExamples: []

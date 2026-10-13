@@ -13366,21 +13366,21 @@ FE_ENV_OWNER:
   kind: check-finding
 
 FE_TRANSPORT_OWNER:
-  title: "One `fetch`, in the repository's one transport client, with timeout and abort"
-  title_vi: "fetch ngoài client duy nhất"
-  meaning_vi: "`fetch` ở `<file>` ngoài client truyền tải duy nhất của repository (gọi, gán lại hoặc truyền như giá trị), thư viện HTTP khác được import, reader `read-*.ts` không đi qua client, repository có nhiều hơn một client hoặc nhiều hơn một union `Outcome` (mỗi app giữ một bản, hoặc gói api cộng thêm một bản của app), hoặc state dùng chung dạng `let`."
+  title: "One transport: the Apollo clients and the one axios instance of modules/api"
+  title_vi: "Gọi back end ngoài transport duy nhất"
+  meaning_vi: "`fetch` hoặc thư viện HTTP/GraphQL khác ở `<file>` ngoài transport duy nhất của repository (gọi, gán lại hoặc truyền như giá trị), repository có nhiều hơn một thư mục client hoặc nhiều hơn một envelope `GraphQLResponse` (mỗi app giữ một bản, hoặc gói api cộng thêm một bản của app), hoặc state dùng chung dạng `let` giữ token/locale."
   causes_vi:
-    - "Vi phạm luật R50: Mỗi repository đúng một client `fetch`, có timeout + `AbortSignal`: `packages/<family>-api/src/client.ts` khi các app dùng chung, hoặc `modules/api/client.ts` của app duy nhất; không singleton `let` giữ token/locale; credential truyền bằng tham số/context."
+    - "Vi phạm luật R50: Mỗi repository đúng một transport: client Apollo auth/no-auth với chuỗi link (retry, error, timeout, refresh, access token, http) trong `modules/api/graphql/clients/` của app duy nhất hoặc `packages/<family>-api/src/graphql/clients/` khi các app dùng chung, và một instance axios trong `modules/api/rest` cho upload, presigned URL và endpoint auth; component đọc qua hook `hooks/swr`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
 
 FE_HTTP_STATUS_COLLAPSE:
-  title: "One `Outcome<T>`; 401 and 403 become `refused`"
-  title_vi: "Gộp mọi mã HTTP thành một nhánh"
-  meaning_vi: "`<file>` gộp mọi mã HTTP thành một nhánh. 401/403 phải thành `refused`."
+  title: "One `GraphQLResponse<T>` envelope; 401 and 403 become `refused`"
+  title_vi: "Gộp mọi lỗi thành một nhánh"
+  meaning_vi: "`<file>` gộp mọi lỗi thành một nhánh hoặc biến lỗi thành dữ liệu rỗng. UNAUTHENTICATED/FORBIDDEN (401/403) phải thành `refused`."
   causes_vi:
-    - "Vi phạm luật R51: Client trả `Outcome<T>` duy nhất (`ok`/`refused`/`invalid`/`not-found`/`unavailable`); 401/403 → `refused`; cấm `if (!response.ok) return null`; không trả nguyên văn lỗi server làm `reason`."
+    - "Vi phạm luật R51: Một envelope `GraphQLResponse<T>` (`success`, `message`, `error`, `data`) trong `modules/api/graphql/types.ts`; 401/403 → `refused` (error link làm mới token một lần rồi đưa về đăng nhập); cấm `return null` khi lỗi; không hiển thị nguyên văn lỗi server làm lý do."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
@@ -13388,9 +13388,9 @@ FE_HTTP_STATUS_COLLAPSE:
 FE_WIRE_GENERATED:
   title: "Wire types generated from the be contract snapshots the fe side reads"
   title_vi: "Kiểu wire gõ tay"
-  meaning_vi: "`<file>` tự gõ kiểu wire/ép kiểu phản hồi, hoặc kiểu sinh ra cũ hơn ảnh chụp hợp đồng. Dùng kiểu sinh từ `be/contracts/`."
+  meaning_vi: "`<file>` tự gõ kiểu wire/ép kiểu phản hồi, hoặc kiểu sinh ra cũ hơn ảnh chụp hợp đồng. Dùng kiểu do graphql-codegen sinh từ `be/contracts/<app>/schema.graphql`."
   causes_vi:
-    - "Vi phạm luật R52: Kiểu wire sinh từ ảnh chụp hợp đồng của be (`be/contracts/`, chạy `starci gate run --root <app>` ở gốc app); tài liệu GraphQL trong `.graphql`; cấm `as GraphqlResult<T>`; enum wire không phải `string`."
+    - "Vi phạm luật R52: Kiểu wire do graphql-codegen sinh từ `be/contracts/<app>/schema.graphql` (đọc tại chỗ, không chép) vào `modules/api/graphql/__generated__`; kiểu request/response của mỗi operation re-export kiểu sinh; cấm ép kiểu phản hồi; enum wire không phải `string`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
@@ -13430,9 +13430,9 @@ FE_CLIENT_BOUNDARY:
 FE_HOOKS_ARE_HOOKS:
   title: "`hooks/` hold hooks and one shared file per domain"
   title_vi: "hooks/ chứa thứ không phải hook"
-  meaning_vi: "`<file>` trong `hooks/` không phải React hook, hoặc một domain có nhiều hơn một tệp `.shared.ts` (hay tệp shared không mang tên domain), hoặc một helper được khai báo ở nhiều tệp của domain. Reader server về `modules/api`, helper về `<domain>.shared.ts`."
+  meaning_vi: "`<file>` trong `hooks/` không phải React hook, hoặc một domain có nhiều hơn một tệp `.shared.ts` (hay tệp shared không mang tên domain), hoặc một helper được khai báo ở nhiều tệp của domain. Hàm gọi mạng về `modules/api`, helper về `<domain>.shared.ts`."
   causes_vi:
-    - "Vi phạm luật R56: `hooks/<domain>/` chỉ chứa `use*.ts` và một `<domain>.shared.ts` cho helper dùng chung; reader server nằm ở `modules/api/<domain>/read-*.ts` (bọc `cache()`)."
+    - "Vi phạm luật R56: `hooks/` chỉ chứa hook: `hooks/swr` (mỗi operation của `modules/api` một hook SWR), `hooks/rhf`, `hooks/zustand/<store>`, `hooks/socketio`, `hooks/effects`, `hooks/reuseables` và `hooks/<domain>/` với một `<domain>.shared.ts` cho helper dùng chung."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -13443,8 +13443,8 @@ FE_CLIENT_REACHES_SERVER:
   meaning_vi: "Một mô-đun có chỉ thị `\"use client\"` với tới, qua chuỗi import chạy thật (nhiều bước, không tính import chỉ-kiểu), một mô-đun import `server-only`, `next/headers`, `next/server`, `next-intl/server`, `node:*` hoặc `fs`. Lời nhắn nêu client đầu vào và cả chuỗi import."
   causes_vi:
     - "Hook hoặc module dùng chung được client component import gián tiếp lại đọc request ở máy chủ"
-    - "Reader máy chủ bị import từ đường đi của một client component thay vì chỉ từ server component"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để đọc dữ liệu ở server component và truyền xuống bằng props, hoặc đưa import ra khỏi đồ thị client theo lời nhắn; không thêm ngoại lệ."
+    - "Module chỉ chạy ở máy chủ bị import từ đường đi của một client component"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để đọc dữ liệu qua hook SWR gọi `modules/api`, hoặc đưa import ra khỏi đồ thị client theo lời nhắn; không thêm ngoại lệ."
   owner: op-retry
   kind: check-finding
 
@@ -13592,7 +13592,7 @@ FE_EFFECT_FETCH:
   title_vi: "Tải dữ liệu trong useEffect"
   meaning_vi: "`useEffect` ở `<file>` gọi `await`, `fetch` hoặc `.then`. Effect không có cache, không gộp request, không có trạng thái loading/lỗi và không huỷ được."
   causes_vi:
-    - "Vi phạm luật R50: Đọc dữ liệu ở client bằng SWR gọi client của app (thư mục `hooks/`); đọc dữ liệu cho route bằng server reader `modules/api/<domain>/read-*.ts`."
+    - "Vi phạm luật R50: Đọc dữ liệu bằng hook SWR trong `hooks/swr` gọi operation của `modules/api`; component chỉ gọi hook."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
   owner: op-retry
   kind: check-finding
@@ -13630,9 +13630,9 @@ FE_PAGE_METADATA_MISSING:
 FE_CLIENT_SERVER_IMPORT:
   title: "A client component imports nothing server-only"
   title_vi: "Client component nhập mã chỉ chạy ở server"
-  meaning_vi: "Tệp `\"use client\"` ở `<file>` nhập `<what>` (`server-only`, `next/headers`, module Node hoặc server reader), thứ chỉ tồn tại ở server."
+  meaning_vi: "Tệp `\"use client\"` ở `<file>` nhập `<what>` (`server-only`, `next/headers`, module Node), thứ chỉ tồn tại ở server."
   causes_vi:
-    - "Vi phạm luật R55: Client component không nhập `server-only`, `next/headers`, module Node hay `modules/api/**/read-*`; đọc dữ liệu ở server component rồi truyền xuống bằng props, hoặc gọi client của app qua SWR."
+    - "Vi phạm luật R55: Client component không nhập `server-only`, `next/headers` hay module Node; dữ liệu đến từ hook SWR trong `hooks/swr` gọi `modules/api`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
   owner: op-retry
   kind: check-finding
@@ -14339,7 +14339,7 @@ HFS_REQUIRED_FILE_MISSING:
   title_vi: "Thiếu tệp, thư mục hoặc số lượng tối thiểu bắt buộc theo bảng kê"
   meaning_vi: "Bảng kê HFS đòi một tệp hoặc thư mục phải có trong mỗi phần của kho (gói dùng chung, module frontend, api, i18n, tuyến, layout...), hoặc đòi kho có ít nhất một ứng dụng hay tính năng thuộc loại bắt buộc. Mục đó không tồn tại; khi là số lượng tối thiểu thì báo tại hfs.json. Thiếu nó thì phần liên quan chưa hoạt động đầy đủ hoặc kho chưa phải một sản phẩm hoàn chỉnh."
   causes_vi:
-    - "Tạo thư mục mới nhưng chưa thêm tệp bắt buộc như index.ts, client.ts, outcome.ts hoặc package.json"
+    - "Tạo thư mục mới nhưng chưa thêm tệp bắt buộc như index.ts, store.ts, toast.tsx hoặc package.json"
     - "Tệp có nhưng tên hoặc chỗ đặt khác với bảng kê"
     - "Kho chưa có tính năng hoặc ứng dụng nào của loại bắt buộc"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để tạo tệp còn thiếu đúng chỗ bảng kê chỉ định; nếu cấu trúc hiện có là chủ ý thì đó là việc sửa bảng kê, do người giám sát làm, không phải kho tự đổi."
@@ -16605,12 +16605,12 @@ DB_TYPES_DRIFT:
   kind: check-finding
 
 FE_SUPABASE_CLIENT_OWNER:
-  title: "A front-end Supabase client, import or call is outside the db owner, or is not typed with `Database`"
-  title_vi: "Supabase client phía front end sai chủ sở hữu hoặc thiếu kiểu Database"
-  meaning_vi: "Import/call Supabase ở `<path>` không thuộc ô `fe.modules.db`/`fe.package.db`, hoặc client được tạo mà không mang kiểu `Database` đã sinh."
+  title: "A front-end Supabase import or call is outside `fe.modules.auth`, or reaches past the auth API"
+  title_vi: "Supabase phía front end ngoài modules/auth hoặc dùng ngoài API auth"
+  meaning_vi: "Import/call Supabase ở `<path>` không thuộc ô `fe.modules.auth`, hoặc gọi API ngoài auth (`.from`, `.rpc`, `.storage`, `.channel`): front end không đọc hay ghi dữ liệu qua Supabase."
   causes_vi:
-    - "Vi phạm L10: chỉ các ô db được import/call `@supabase/ssr` hay `@supabase/supabase-js`; mọi client là `SupabaseClient<Database>`/`create*Client<Database>`."
-  nextStep_vi: "Chuyển factory và truy vấn vào ô db đúng của app/gói, import API công khai của ô đó, và thêm kiểu `Database`; không thêm ngoại lệ."
+    - "Vi phạm luật R217: Supabase trên front end chỉ là xác thực (đăng nhập, phiên, access token) trong `modules/auth`; dữ liệu đi qua `modules/api` (Apollo GraphQL) và hook SWR tới back end (R212 case-2)."
+  nextStep_vi: "Chuyển client Supabase vào `modules/auth` và chỉ giữ API auth; đọc/ghi dữ liệu bằng query/mutation GraphQL trong `modules/api` và hook `hooks/swr`; không thêm ngoại lệ."
   owner: op-retry
   kind: check-finding
 
@@ -16624,26 +16624,6 @@ BE_SUPABASE_CLIENT_OWNER:
   owner: op-retry
   kind: check-finding
 
-FE_DB_RESULT_TYPED:
-  title: "A Supabase result is cast, explicitly generic, or an unbounded list read"
-  title_vi: "Kết quả Supabase bị ép kiểu hoặc truy vấn danh sách không giới hạn"
-  meaning_vi: "Truy vấn ở `<path>` dùng generic trên `single/maybeSingle/returns`, ép kiểu/non-null assertion, hoặc đọc danh sách không có `limit` hay biên keyset."
-  causes_vi:
-    - "Vi phạm L11: kiểu hàng phải suy ra từ `Database`; mọi đọc nhiều dòng phải có giới hạn tĩnh."
-  nextStep_vi: "Bỏ generic/cast/assertion, sửa type nguồn trong `database.types.ts`, và thêm `.limit()` hoặc biên keyset."
-  owner: op-retry
-  kind: check-finding
-
-FE_DB_ERROR_HANDLED:
-  title: "An awaited Supabase result drops `error` or collapses failure to empty data"
-  title_vi: "Kết quả Supabase bỏ qua error hoặc gộp lỗi thành dữ liệu rỗng"
-  meaning_vi: "Kết quả await ở `<path>` không đọc `error`, không được truyền nguyên vẹn vào `toOutcome`, hoặc dùng `data ?? []` nên `refused`/`unavailable` biến thành dữ liệu rỗng."
-  causes_vi:
-    - "Vi phạm L12: mọi `{data,error}` đi qua một Outcome có kiểu; không destructure chỉ data và không nuốt lỗi."
-  nextStep_vi: "Đọc và ánh xạ `error`, hoặc truyền toàn bộ result vào `toOutcome(result)` rồi xử lý đủ các nhánh Outcome."
-  owner: op-retry
-  kind: check-finding
-
 FE_SERVICE_ROLE_FORBIDDEN:
   title: "A service-role or credential-shaped environment value enters the front end"
   title_vi: "Service role hoặc biến môi trường bí mật đi vào front end"
@@ -16654,33 +16634,33 @@ FE_SERVICE_ROLE_FORBIDDEN:
   owner: op-retry
   kind: check-finding
 
-FE_AUTH_SESSION_TRUST:
-  title: "Server code trusts `getSession`, or a Server Action does not establish and refuse an anonymous principal"
-  title_vi: "Mã server tin getSession hoặc Server Action không xác thực principal"
-  meaning_vi: "`<path>` gọi `auth.getSession()` trên server, write action không bắt đầu bằng `await getPrincipal()`, không trả Outcome `refused` cho anonymous (trừ `fe.modules.db/auth/write-sign-in.ts` đang xác thực chính caller anonymous), hoặc mutation nhạy cảm không gọi `auth.getUser()`."
-  causes_vi:
-    - "Vi phạm L14: server dùng claims đã kiểm tra; write action xác thực principal trước mọi việc và mutation nhạy cảm kiểm tra user từ Auth server."
-  nextStep_vi: "Dùng `getPrincipal()`/`getClaims()`, từ chối anonymous bằng Outcome có kiểu, và gọi `auth.getUser()` cho tiền, bảo mật tài khoản hay đổi role."
-  owner: op-retry
-  kind: check-finding
-
-FE_DB_WRITE_SHAPE:
-  title: "A Supabase Server Action uses input before schema parsing, or a write module exports no action"
-  title_vi: "Server Action dùng input trước khi schema parse"
-  meaning_vi: "Write module ở `<path>` không export Server Action, hoặc tham số được dùng trước lần gọi `schema.parse`/`schema.safeParse` đầu tiên."
-  causes_vi:
-    - "Vi phạm phần write-shape của L14: input không được tin trước validation."
-  nextStep_vi: "Export action async trong `write-*.ts` và để lần dùng input đầu tiên là `schema.parse(input)` hoặc `schema.safeParse(input)`."
-  owner: op-retry
-  kind: check-finding
-
 FE_ROUTE_HANDLER_FORBIDDEN:
-  title: "A front-end route handler is not health/live or the Supabase auth callback slot"
+  title: "A front-end route handler is not health/live or the auth callback slot"
   title_vi: "Route handler phía front end không thuộc hai cửa được phép"
-  meaning_vi: "`<path>` là `route.ts` phía fe nhưng không phải `health/live` và không thuộc ô `fe.route.callback`."
+  meaning_vi: "`<path>` là `route.ts` phía fe nhưng không phải `app/health/live/route.ts` và không thuộc ô `fe.route.callback`; front end của mọi app không phục vụ API."
   causes_vi:
-    - "Vi phạm L15: webhook, cron, public API và callback bên thứ ba là feature của back end."
-  nextStep_vi: "Chuyển handler sang feature back end; chỉ giữ health/live và callback PKCE trong ô `fe.route.callback`."
+    - "Vi phạm luật R243: front end không có route handler nào ngoài health/live và callback auth; webhook, cron, public API và callback bên thứ ba là feature của back end, dữ liệu đi qua `modules/api` và hook SWR."
+  nextStep_vi: "Chuyển handler sang feature back end (GraphQL cho front end, REST cho webhook/public/OAuth) và gọi nó từ `modules/api`; chỉ giữ health/live và callback trong ô `fe.route.callback`."
+  owner: op-retry
+  kind: check-finding
+
+FE_SERVER_ACTION_FORBIDDEN:
+  title: "A front-end file carries a `\"use server\"` directive"
+  title_vi: "Front end có Server Action (\"use server\")"
+  meaning_vi: "`<path>` mang chỉ thị `\"use server\"` (ở đầu module hoặc trong một hàm); front end của mọi app không có Server Action."
+  causes_vi:
+    - "Vi phạm luật R243: front end gọi back end qua mutation GraphQL trong `modules/api/graphql/mutations` bọc bởi hook `useMutate*Swr`, kết quả báo bằng `modules/toast` (R212 case-2)."
+  nextStep_vi: "Xoá Server Action, thêm mutation GraphQL ở back end và `mutation-<x>.ts` trong `modules/api`, gọi qua `useMutate<X>Swr` và `useGraphQLWithToast`; việc nặng là mutation đưa job vào hàng đợi rồi theo dõi bằng status query hoặc socket."
+  owner: op-retry
+  kind: check-finding
+
+FE_STACK_FORBIDDEN:
+  title: "A front end depends on or imports a package that knowledge/hfs/fe-stack.yaml forbids"
+  title_vi: "Front end dùng thư viện bị fe-stack cấm"
+  meaning_vi: "`<path>` khai báo phụ thuộc hoặc import `<package>`, thư viện nằm trong `forbids` của concern `<concern>` trong knowledge/hfs/fe-stack.yaml; mỗi concern chỉ có một thư viện chuẩn."
+  causes_vi:
+    - "Vi phạm luật R244: front end dùng đúng thư viện chuẩn của từng concern trong fe-stack.yaml (phiên bản ở canon-pins.yaml), không cài thư viện thay thế bên cạnh."
+  nextStep_vi: "Gỡ `<package>` khỏi package.json và thay import bằng thư viện chuẩn của concern đó; nếu cần một concern mới, thêm nó vào fe-stack.yaml và canon-pins.yaml trước."
   owner: op-retry
   kind: check-finding
 

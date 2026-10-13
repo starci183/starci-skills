@@ -5,7 +5,8 @@ purpose: |
   knowledge/ui/ decides what the interface must be: which Grammar object renders, which gap, which tone.
   knowledge/patterns/fe/ decides how the code that produces that interface is written: where a unit lives, what its files are
   called, how a component function is shaped, where a class string sits, how a failure is represented, where data, text and colour come from. A pattern rule never chooses a visual; a ui/ rule never chooses a file name. Read
-  knowledge/hfs/README.md (HFS) section 6 first. Follow docs/architecture.md and docs/code-pattern-enforcement.md. Each rule cites the HFS rule ids it
+  knowledge/hfs/README.md (HFS) section 6 first; knowledge/hfs/fe-stack.yaml names the one library, home and pattern of each
+  front-end concern, the same for lite and full. Follow docs/architecture.md and docs/code-pattern-enforcement.md. Each rule cites the HFS rule ids it
   implements (hfsRules) and the finding codes that judge it (verification.automated).
 appliesTo:
   - frontend
@@ -15,6 +16,7 @@ provenance:
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
+    - knowledge/hfs/fe-stack.yaml
     - knowledge/grammars/starci/playbook.yaml
     - "Lint canon consulted for rule names only: @starci/eslint-canon-fe."
   limitations: |
@@ -33,7 +35,7 @@ topics:
     rules: "FE-FOLDER-1 … FE-FOLDER-6"
   - path: naming.yaml
     title: Naming
-    decides: "Folder, export, props type, class-name export, hook, reader and constant names"
+    decides: "Folder, export, props type, class-name export, hook, operation and constant names"
     rules: "FE-NAMING-1 … FE-NAMING-7"
   - path: function.yaml
     title: Function
@@ -53,12 +55,48 @@ topics:
     rules: "FE-TYPING-1 … FE-TYPING-8"
   - path: error.yaml
     title: Error
-    decides: "Failure as an Outcome and a slot status, hard stops, propagation and ownership"
+    decides: "Failure as a GraphQLResponse and a slot status, hard stops, propagation and ownership"
     rules: "FE-ERROR-1 … FE-ERROR-5"
   - path: transport.yaml
     title: Data transport
-    decides: "One client, the Outcome vocabulary, generated wire types from be/contracts, server and client reads, one refresh mechanism"
-    rules: "FE-TRANSPORT-1 … FE-TRANSPORT-5"
+    decides: "The Apollo clients and link chain, one file per operation, the GraphQLResponse envelope, generated wire types from be/contracts"
+    rules: "FE-API-GRAPHQL, FE-WIRE-GENERATED"
+  - path: route.yaml
+    title: Framework and routes
+    decides: "App Router, thin routes, no Server Action and no route handler beyond health/live and the auth callback"
+    rules: "FE-ROUTE"
+  - path: rest.yaml
+    title: REST calls
+    decides: "axios in modules/api/rest for uploads, presigned URLs and auth endpoints only"
+    rules: "FE-API-REST"
+  - path: data.yaml
+    title: Data hooks
+    decides: "One SWR hook per operation in hooks/swr, keys, refresh by refreshInterval or socket, job progress"
+    rules: "FE-DATA-SWR"
+  - path: toast.yaml
+    title: Toast feedback
+    decides: "modules/toast: showGraphQLToast and the use*WithToast hooks"
+    rules: "FE-TOAST"
+  - path: form.yaml
+    title: Forms
+    decides: "react-hook-form with zod in hooks/rhf, submitted through an SWR mutation and the toast"
+    rules: "FE-FORM"
+  - path: redux.yaml
+    title: Global state
+    decides: "The redux store, typed hooks and slices"
+    rules: "FE-STATE-REDUX"
+  - path: zustand.yaml
+    title: Local state
+    decides: "Feature-local zustand stores in hooks/zustand/<store>"
+    rules: "FE-STATE-ZUSTAND"
+  - path: realtime.yaml
+    title: Realtime
+    decides: "socket.io-client singletons per namespace and one side-effect component"
+    rules: "FE-REALTIME"
+  - path: auth.yaml
+    title: Auth client
+    decides: "modules/auth: session and access token, never data"
+    rules: "FE-AUTH"
   - path: boundaries.yaml
     title: Boundaries
     decides: "Mandatory error, not-found and loading boundaries, Outcome rendering in boundaries, server-first components"
@@ -66,7 +104,7 @@ topics:
   - path: i18n.yaml
     title: Internationalization
     decides: "next-intl, [locale], default locale vi, as-needed prefix, proxy.ts, no display text outside catalogs, catalog parity"
-    rules: "FE-I18N-1 … FE-I18N-4"
+    rules: "FE-I18N, FE-I18N-1 … FE-I18N-4"
   - path: css.yaml
     title: CSS and tokens
     decides: "globals.css imports only, colour only in brand.css, forbidden CSS forms, Grammar owns family tokens"
@@ -79,3 +117,71 @@ topics:
     title: Multiple apps
     decides: "Independent apps under fe/apps/<app>, drafts as branches, ui-screen records that name their app"
     rules: "FE-APPS-1 … FE-APPS-3"
+  - path: ui.yaml
+    title: UI kit
+    decides: "The grammar over HeroUI and Tailwind, no second kit"
+    rules: "FE-UI"
+  - path: icon.yaml
+    title: Icons
+    decides: "One icon set"
+    rules: "FE-ICON"
+  - path: theme.yaml
+    title: Theme
+    decides: "next-themes in components/providers"
+    rules: "FE-THEME"
+  - path: motion.yaml
+    title: Motion
+    decides: "One motion library"
+    rules: "FE-MOTION"
+  - path: date.yaml
+    title: Dates
+    decides: "dayjs for math, the next-intl formatter for display"
+    rules: "FE-DATE"
+  - path: number.yaml
+    title: Money and decimals
+    decides: "decimal.js for money, the next-intl formatter for display"
+    rules: "FE-NUMBER"
+  - path: storage.yaml
+    title: Browser storage
+    decides: "modules/storage with superjson"
+    rules: "FE-STORAGE"
+  - path: utils.yaml
+    title: Utilities
+    decides: "Per-method lodash and usehooks-ts"
+    rules: "FE-UTILS"
+  - path: chart.yaml
+    title: Charts
+    decides: "recharts styled by the dataviz grammar"
+    rules: "FE-CHART"
+  - path: flow.yaml
+    title: Flow canvas
+    decides: "@xyflow/react behind the grammar FlowGraph"
+    rules: "FE-FLOW"
+  - path: markdown.yaml
+    title: Markdown
+    decides: "react-markdown with remark-gfm"
+    rules: "FE-MARKDOWN"
+  - path: code.yaml
+    title: Code highlight and editor
+    decides: "react-shiki and Monaco"
+    rules: "FE-CODE"
+  - path: diagram.yaml
+    title: Diagrams
+    decides: "mermaid in a block"
+    rules: "FE-DIAGRAM"
+  - path: upload.yaml
+    title: File upload
+    decides: "react-dropzone and a presigned PUT"
+    rules: "FE-UPLOAD"
+  - path: pdf.yaml
+    title: PDF view
+    decides: "react-pdf in a block"
+    rules: "FE-PDF"
+  - path: observe.yaml
+    title: Observability
+    decides: "@sentry/nextjs"
+    rules: "FE-OBSERVE"
+  - path: lint.yaml
+    title: Lint and format
+    decides: "The canon eslint and prettier configuration"
+    rules: "FE-LINT"

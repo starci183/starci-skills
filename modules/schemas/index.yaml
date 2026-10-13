@@ -702,6 +702,19 @@ schemas:
       whenNot: Not a lockfile and not a statement that a repository was upgraded; it names the target, the repository proves the result.
       selectedBy: check-canon-pins reads it; the pin-drift gate compares a repository with it.
 
+  - id: starci/fe-stack@1
+    file: modules/schemas/fe-stack.schema.yaml
+    dialect: json-schema
+    subsystem: gate
+    governs: "The front-end stack catalog - per concern one canonical library (tier core or opt), its HFS home slots, the pattern id that teaches it and the forbidden alternatives; versions stay in canon-pins.yaml."
+    binds: knowledge/hfs/fe-stack.yaml
+    usedBy: [scripts/hfs/rules/fe-stack.mjs, packages/eslint/fe/fe-stack.mjs]
+    business:
+      question: "Which library does a front end use for this concern, where does its code live, and which alternatives are refused?"
+      whenNeeded: Adding a front-end dependency, scaffolding a front end, or judging a front end for FE_STACK_FORBIDDEN (R244).
+      whenNot: Not a version list (canon-pins.yaml) and not a slot manifest (slots.yaml); it names libraries and points at both.
+      selectedBy: starci app check (scripts/hfs/rules/fe-stack.mjs) and the canon eslint rule fe-stack-import read it.
+
   - id: starci/protected-installations@1
     file: modules/schemas/protected-installations.schema.yaml
     dialect: json-schema
@@ -844,6 +857,7 @@ moduleLocalDocumentKinds:
       - modules/schemas/allowlist.schema.yaml
       - modules/schemas/application-stacks.schema.yaml
       - modules/schemas/canon-pins.schema.yaml
+      - modules/schemas/fe-stack.schema.yaml
       - modules/schemas/hfs-peer-integrations.schema.yaml
       - modules/schemas/goal-plan.yaml
       - modules/schemas/interface-audit-operation.yaml

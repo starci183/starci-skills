@@ -1,0 +1,39 @@
+schema: starci/knowledge-source@1
+id: fe.code
+title: Code highlight and editor
+purpose: |-
+  How is code highlighted or edited? react-shiki for highlighting, @monaco-editor/react for editing.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: []
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+  limitations: |-
+    FE_STACK_FORBIDDEN proves that no forbidden alternative is declared or imported; it does not prove the canonical
+    library is used well. starci-academy illustrates the usage; the catalog decides.
+rules:
+  - id: FE-CODE
+    title: "react-shiki to highlight, Monaco to edit"
+    kind: mandatory
+    hfsRules: [R244]
+    requirement: |-
+      Code blocks highlight with react-shiki; an editable code surface uses @monaco-editor/react, loaded lazily; prism,
+      react-syntax-highlighter, highlight.js and codemirror are refused.
+    rationale: |-
+      One highlighter and one editor keep themes and languages consistent.
+    cases:
+      - id: case-1
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a page added a second highlighter"
+        write: "Use react-shiki."
+    verification:
+      automated:
+        - FE_STACK_FORBIDDEN
+      manual: []
+    relatedExamples: []

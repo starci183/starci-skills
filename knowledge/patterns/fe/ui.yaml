@@ -1,0 +1,43 @@
+schema: starci/knowledge-source@1
+id: fe.ui
+title: UI kit
+purpose: |-
+  Which UI kit and styling does the front end use? The @starci/grammar renderers over HeroUI and Tailwind; no second kit
+  and no CSS-in-JS.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [fe.components, fe.feature]
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+    - "knowledge/ui/index.yaml"
+    - "knowledge/patterns/fe/css.yaml"
+  limitations: |-
+    FE_STACK_FORBIDDEN proves that no forbidden alternative is declared or imported; it does not prove the canonical
+    library is used well. starci-academy illustrates the usage; the catalog decides.
+rules:
+  - id: FE-UI
+    title: "The grammar over HeroUI and Tailwind, nothing beside it"
+    kind: mandatory
+    hfsRules: [R244]
+    requirement: |-
+      Components compose @starci/grammar (HeroUI and Tailwind underneath, knowledge/ui/**); app classNames carry layout
+      only (css.yaml). mantine, MUI, Chakra, antd, styled-components and emotion are refused; a missing capability is
+      added to the grammar.
+    rationale: |-
+      One kit keeps one design language and one token source.
+    cases:
+      - id: case-1
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a feature needed a component the grammar lacks"
+        write: "Add it to @starci/grammar and publish it; never install a second UI kit in the app."
+    verification:
+      automated:
+        - FE_STACK_FORBIDDEN
+      manual: []
+    relatedExamples: []

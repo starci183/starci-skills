@@ -1,0 +1,57 @@
+schema: starci/knowledge-source@1
+id: fe.rest
+title: REST calls
+purpose: |-
+  Which front-end call uses REST instead of GraphQL, and how? axios in modules/api/rest/<area>/*.ts for uploads,
+  presigned URLs and auth endpoints only.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [fe.modules.api, fe.hooks.swr]
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+    - "starci-lab/starci-academy origin/main: src/modules/api/rest/**"
+  limitations: |-
+    FE_STACK_FORBIDDEN proves that no forbidden alternative is declared or imported; it does not prove the canonical
+    library is used well. starci-academy illustrates the usage; the catalog decides.
+rules:
+  - id: FE-API-REST
+    title: "axios for uploads, presigned URLs and auth endpoints only"
+    kind: mandatory
+    hfsRules: [R50, R244]
+    requirement: |-
+      A call the GraphQL contract cannot carry - a binary upload to a presigned URL, a presigned-URL request, an auth
+      endpoint of the identity provider - is one file under modules/api/rest/<area>/ (with its types.ts) that uses the
+      one axios instance of modules/api/rest (base URL from modules/config, credentials when the auth flow needs the
+      HttpOnly cookie). It is wrapped by a hook of hooks/swr/api/rest/{queries,mutations} (useGet<X>Swr, usePost<X>Swr,
+      usePut, usePatch or useDelete<X>Swr) and reported through useRestWithToast. fetch(), ky, superagent and other HTTP
+      clients are refused; every other call is GraphQL.
+    rationale: |-
+      One HTTP client keeps headers, credentials and failure handling in one place, and keeping REST to the calls
+      GraphQL cannot carry keeps one contract.
+    cases:
+      - id: case-1
+        when: "A presigned upload URL"
+        write: "modules/api/rest/admin-presigned-url/{presigned-url.ts,types.ts}: axiosInstance.post<AdminPresignedUrlResponse>(url, request) (starci-academy)"
+      - id: case-2
+        when: "The upload itself"
+        write: "await runRest(() => axios.put(presignedUrl, file)) with runRest = useRestWithToast()"
+      - id: case-3
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a front end reached for fetch() for a non-GraphQL call"
+        write: "Use the axios instance of modules/api/rest and a hooks/swr/api/rest hook; the Apollo http link is the only fetch."
+    verification:
+      automated:
+        - FE_TRANSPORT_OWNER
+        - FE_EFFECT_FETCH
+        - FE_SWR_KEY_IDENTITY
+        - FE_SWR_MUTATION_RESOURCE_IDENTITY
+        - FE_STACK_FORBIDDEN
+      manual:
+        - "Confirm the call cannot be a GraphQL operation."
+    relatedExamples: []

@@ -3,24 +3,26 @@ id: repo.lite
 title: Lite edition
 purpose: |
   Given a small product on Supabase, which part of the one HFS standard still applies and how is it kept? All of it: a lite app
-  is the full architecture deployed without self-hosted infrastructure (owner ruling 2026-10-12, R212 case-1), seen through a
-  filtered slot and rule view (`edition: lite` in hfs.json). The same monorepo, slots, patterns and back-end unit specs; every
-  pattern port implemented on Supabase (knowledge/patterns/be/supabase-queues.yaml and the lite adapter of each pattern topic);
-  no e2e or contract world and no stack of its own.
+  is the full code structure deployed without self-hosted infrastructure (owner rulings 2026-10-12 and 2026-10-13, R212 cases
+  1-3), seen through a filtered slot and rule view (`edition: lite` in hfs.json). The same monorepo, slots, patterns and
+  back-end unit specs; every pattern port implemented on Supabase (knowledge/patterns/be/supabase-queues.yaml and the lite
+  adapter of each pattern topic); the same front end (knowledge/hfs/fe-stack.yaml); no e2e or contract world and no stack of
+  its own.
 appliesTo:
   - backend
   - frontend
 family: repo
 provenance:
-  reviewedAt: 2026-10-12
+  reviewedAt: 2026-10-13
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
     - knowledge/hfs/rules.yaml
     - docs/lite-edition.md
     - owner ruling 2026-10-12 (lite = full minus self-hosted infrastructure; queue transport Supabase Queues/pgmq)
+    - owner rulings 2026-10-13 (one code structure and one front end for both editions; the HFS standard, migration baseline and assets policies)
+    - knowledge/hfs/fe-stack.yaml
     - https://supabase.com/docs/guides/database/postgres/row-level-security
-    - https://supabase.com/docs/guides/auth/server-side/nextjs
   limitations: |
     The lite rules judge source text, migrations and configuration. They do not certify that a policy expresses the intended access
     model; a person still reads every policy. The local database proof belongs to the app, not to the standard.
@@ -37,11 +39,13 @@ rules:
       shape, every pattern (queue, event bus, saga, reactors, projection, realtime, webhooks, fenced job) declared the same way,
       and the back-end unit specs exactly as full (ruleParams.be.unitRoles, logicRoles at 100 per file, @starci/jest-preset
       doubles, builders). Only adapters and delivery differ, all on Supabase: schema authority in `supabase/migrations`; queue and
-      event bus on Supabase Queues (pgmq); realtime on Supabase Realtime; cache and locks on Postgres; schedules on pg_cron
-      (+ pg_net); storage and auth on Supabase. Integration specs are optional and run only on `starci supabase start`. A lite app holds
+      event bus on Supabase Queues (pgmq); realtime on the same socket.io gateway run inside the api process (one instance, no
+      Redis adapter); cache and locks on Postgres; schedules on pg_cron (+ pg_net); storage and auth on Supabase. Integration specs are optional and run only on `starci supabase start`. A lite app holds
       none of the infrastructure lite does not run: no e2e or contract spec or script, no e2e workflow or browser journey, no
       UAT record, no test container, toxiproxy, BullMQ, Kafka or Redis dependency, no `.starcistacks/<env>/infra` and no
-      `supabase/functions`. The front end is the full front end, with no tests (R97).
+      `supabase/functions`. The front end is the one front-end standard of knowledge/hfs/fe-stack.yaml, identical to full and
+      with no tests (R97): Apollo GraphQL and SWR to the back end, modules/auth as the only Supabase importer (auth only), no
+      Server Action and no route handler beyond health/live and the auth callback (R243).
     rationale: |
       One manifest and one catalog keep a lite app upgradable to full by additions only: swap the adapters, add the e2e and
       contract world and the stack.
@@ -54,8 +58,16 @@ rules:
         write: >-
           Declare the pattern in hfs.json exactly as in full (queue, event-bus, saga, realtime ...) and write the same ports; the
           adapter behind them is Supabase - platform/queue sends to pgmq, a processor reads with a visibility timeout and archives
-          on dead letter, a schedule is a pg_cron job, a be push goes out on Supabase Realtime. Each service and cli command has its
-          unit spec beside it; there is no e2e spec.
+          on dead letter, a schedule is a pg_cron job, a be push goes out on the socket.io gateway of the api process. Each
+          service and cli command has its unit spec beside it; there is no e2e spec.
+      - id: case-3
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: the lite front end read through a Supabase data layer and wrote through Server Actions"
+        write: >-
+          The back-end feature exposes GraphQL (be.transport.graphql); the front end calls it through modules/api/graphql and
+          hooks/swr exactly as in full, reports writes through modules/toast, keeps Supabase for auth only in modules/auth, and
+          follows heavy work (a mutation that enqueues a pgmq job) through a status query polled by SWR or a socket namespace.
     verification:
       automated:
         - HFS_EDITION_INVALID
@@ -76,7 +88,15 @@ rules:
     cases:
       - id: case-1
         when: A new owner-scoped table
-        write: One migration that creates the table, enables RLS, adds owner policies, and grants only the columns the client writes.
+        write: One migration that creates the table, enables RLS, adds owner policies, and grants only what the back-end role needs.
+      - id: case-2
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: an existing app moves onto the standard and its old migrations break the rules"
+        write: >-
+          Dump the live schema into one baseline migration written to the current standard and mark it applied on production
+          (no re-run); move the older files to supabase/migrations/_archive/ (app.supabase.migrations.archive: never applied
+          by the Supabase CLI and never judged by the migration rules); new migrations append after the baseline.
     verification:
       automated:
         - DB_MIGRATION_SHAPE
@@ -105,31 +125,31 @@ rules:
       manual: []
     relatedExamples: []
   - id: REPO-LITE-4
-    title: One door to the database and a typed, verified result
+    title: Supabase is one door per side and the front end is auth only
     kind: mandatory
-    hfsRules: [R217, R218, R219]
+    hfsRules: [R217, R219, R243]
     requirement: |
-      Only the front-end db module (and the back-end Supabase integration) imports a Supabase client; no route handler and no
-      service-role key reaches the browser side. Every result is typed by inference and its error is read; server code verifies
-      the principal through `getPrincipal()` and never trusts `getSession()`; a write Server Action awaits the principal first and
-      parses its input.
+      On the front end only modules/auth imports a Supabase client, and only for the session and the access token; it never
+      reads or writes data, and no service-role key reaches fe/. On the back end only the Supabase integration imports the
+      client, and the principal is the access token verified against the project JWKS. The front end serves no API: no Server
+      Action and no route handler beyond health/live and the auth callback slot.
     rationale: |
-      A single door is the only place where the session, the result shape and the authorization check can be enforced.
+      The back end is the one place where the session, the authorization check and the data shape are enforced, in both
+      editions.
     cases:
       - id: case-1
-        when: A page saves a row
-        write: A `write-*.ts` Server Action in the db module that awaits getPrincipal, parses input, and returns an Outcome.
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a page saves a row"
+        write: A GraphQL mutation of the back-end feature, called by mutation-<x>.ts in modules/api through useMutate<X>Swr and useGraphQLWithToast; the resolver verifies the principal.
     verification:
       automated:
         - FE_SUPABASE_CLIENT_OWNER
         - BE_SUPABASE_CLIENT_OWNER
-        - FE_ROUTE_HANDLER_FORBIDDEN
         - FE_SERVICE_ROLE_FORBIDDEN
-        - FE_DB_RESULT_TYPED
-        - FE_DB_ERROR_HANDLED
-        - FE_AUTH_SESSION_TRUST
-        - FE_DB_WRITE_SHAPE
         - BE_SUPABASE_JWT_VERIFIED
+        - FE_SERVER_ACTION_FORBIDDEN
+        - FE_ROUTE_HANDLER_FORBIDDEN
       manual: []
     relatedExamples: []
   - id: REPO-LITE-5
@@ -145,5 +165,30 @@ rules:
     verification:
       automated:
         - HFS_LITE_SECRET_CUSTODY
+      manual: []
+    relatedExamples: []
+  - id: REPO-LITE-6
+    title: Templates, small assets and media each have one place
+    kind: mandatory
+    hfsRules: [R212]
+    requirement: |
+      In both editions, static templates, copy and presets are TS constants in the owning domain capability
+      (`<x>.templates.ts` of be.domain) and user-editable ones are seed rows; small binaries bundled with the build (fonts a
+      renderer embeds, a watermark) live in be.assets (`be/src/assets/<kind>/`); large or user media (music, video, uploads)
+      live in object storage (Supabase Storage in lite, S3-compatible storage in full) and are fetched at runtime. There is no
+      `be/resources/` folder.
+    rationale: |
+      A template beside the capability that renders it changes with it; binaries in the image stay small; media in storage
+      stay out of the build.
+    cases:
+      - id: case-1
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a back end kept fonts, message templates and music under be/resources/"
+        write: Fonts move to be/src/assets/fonts/, the message templates to <capability>.templates.ts of their domain capability, and the music to object storage.
+    verification:
+      automated:
+        - HFS_EDITION_INVALID
+        - HFS_EDITION_FORBIDDEN_PRESENT
       manual: []
     relatedExamples: []

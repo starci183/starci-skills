@@ -12,8 +12,9 @@ family: fe
 # into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
 slots: [fe.modules.i18n, fe.package.i18n]
 provenance:
-  reviewedAt: 2026-09-29
+  reviewedAt: 2026-10-13
   sources:
+    - knowledge/hfs/fe-stack.yaml
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
     - https://next-intl.dev/docs/routing/setup
@@ -24,6 +25,31 @@ provenance:
     have the same key set. They do not prove that translations are correct or idiomatic; the product owner and the UI
     evidence review copy.
 rules:
+  - id: FE-I18N
+    title: next-intl is the one i18n library, with its formatter for numbers, dates and currency
+    kind: mandatory
+    hfsRules: [R244]
+    requirement: |-
+      Copy reaches the screen through next-intl only (useTranslations, getTranslations in a server route file) and numbers,
+      dates, relative times and currency through its formatter (useFormatter); the catalogs are
+      modules/i18n/messages/{vi,en}.json (FE-I18N-1). i18next, react-i18next, next-i18next, react-intl and lingui are
+      refused, and a string literal on screen is FE_I18N_LITERAL.
+    rationale: |-
+      One library keeps one catalog, one plural syntax and one formatter per locale.
+    cases:
+      - id: case-1
+        when: A toast label
+        write: 'const t = useTranslations("toast"); messages.successTitle = t("successTitle") in modules/toast/hooks.ts (starci-academy)'
+      - id: case-2
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a front end formatted money with toLocaleString"
+        write: Format it with the next-intl formatter in the active locale.
+    verification:
+      automated:
+        - FE_STACK_FORBIDDEN
+      manual: []
+    relatedExamples: []
   - id: FE-I18N-1
     title: One placement in every app
     kind: mandatory

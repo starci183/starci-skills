@@ -3,31 +3,30 @@ id: be.supabase-queues
 title: Supabase adapters of the lite edition
 purpose: |-
   Given a lite app (hfs.json `edition: lite`), how do the queue, event-bus, realtime, cache, lock and scheduling ports run without
-  self-hosted infrastructure? Lite is the full architecture deployed on Supabase (owner ruling 2026-10-12, R212 case-1): the
+  self-hosted infrastructure? Lite is the full code structure deployed on Supabase (owner rulings 2026-10-12 and 2026-10-13, R212 cases 1-3): the
   ports, slots, folders, producers, processors, consumers and unit specs are exactly full's, and only the adapter behind each
   port changes. The queue and event-bus transport is Supabase Queues (pgmq, confirmed by the owner the same day): the outbox
   relay of `platform/outbox` sends committed rows to pgmq through the shared EntityManager, a processor or consumer reads with a
   visibility timeout, a failed delivery is retried when the timeout lapses (backoff by extending it), and a message read more
-  times than the budget is archived (the dead letter). Realtime is Supabase Realtime, cache and locks are Postgres, schedules
-  are pg_cron. This topic is the one authority for those adapters; each pattern topic's `liteAdapter` cites it.
+  times than the budget is archived (the dead letter). Realtime is the full socket.io gateway run inside the api process (one
+  instance, no Redis adapter), cache and locks are Postgres, schedules are pg_cron. This topic is the one authority for those adapters; each pattern topic's `liteAdapter` cites it.
 appliesTo:
   - backend
 family: be
 # The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
 # into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
-slots: [be.platform.queue, be.platform.event-bus, be.queues, be.feature.jobs, be.transport.message, be.feature.realtime.supabase]
+slots: [be.platform.queue, be.platform.event-bus, be.queues, be.feature.jobs, be.transport.message]
 provenance:
-  reviewedAt: 2026-10-12
+  reviewedAt: 2026-10-13
   sources:
     - knowledge/hfs/slots.yaml
     - knowledge/hfs/rules.yaml
     - owner ruling 2026-10-12 (lite = full architecture minus self-hosted infrastructure; queue transport Supabase Queues/pgmq)
     - https://supabase.com/docs/guides/queues
     - https://github.com/pgmq/pgmq
-    - https://supabase.com/docs/guides/realtime/broadcast
     - https://supabase.com/docs/guides/cron
   limitations: |-
-    Static checks prove that a lite back end imports no BullMQ, Kafka, Redis or socket library (the lite infraOwners) and that
+    Static checks prove that a lite back end imports no BullMQ, Kafka, Redis or graphql-ws library (the lite infraOwners) and that
     the outbox is written in the caller's transaction. They do not prove visibility timeouts, retry budgets or that a pg_cron
     cadence suits the business; an optional integration spec on `starci supabase start` proves delivery against the real pgmq.
 rules:
@@ -38,9 +37,10 @@ rules:
     requirement: |-
       A lite back end declares its patterns in hfs.json exactly as full and writes the same ports: `QueueOutbox` and
       `QueueWorkerRegistry` of `platform/queue`, `EventPublisher`/`EventConsumer` of `platform/event-bus`, `RealtimeHub` of
-      `platform/realtime`, the cache and lock ports of their owner. Under lite the adapter behind each port is a Supabase one, and
-      `bullmq`, `@nestjs/bullmq`, `kafkajs`, `redis`, `ioredis`, `socket.io`, `@nestjs/platform-socket.io`, `graphql-ws` and
-      `graphql-subscriptions` are owned nowhere (ruleParams.be.lite.infraOwners) and absent from package.json (R212).
+      `platform/realtime`, the cache and lock ports of their owner. Under lite the adapter behind each port is a Supabase one (the
+      realtime hub keeps the socket.io server of the api process, one instance), and `bullmq`, `@nestjs/bullmq`, `kafkajs`,
+      `redis`, `ioredis`, `graphql-ws` and `graphql-subscriptions` are owned nowhere (ruleParams.be.lite.infraOwners) and absent
+      from package.json (R212).
     rationale: |-
       Domain services, handlers, processors and their unit specs never see the transport, so lite -> full is an adapter swap and a
       test-world addition, never a rewrite.
@@ -126,18 +126,19 @@ rules:
       manual: []
     relatedExamples: []
   - id: BE-SUPABASE-QUEUES-5
-    title: Schedules, cache, locks and realtime run on Supabase
+    title: Schedules, cache and locks run on Supabase; realtime runs in the api process
     kind: mandatory
     hfsRules: [R90, R212]
     requirement: |-
       A schedule is a pg_cron job declared in a supabase migration (`cron.schedule(name, cadence, $$select pgmq.send(...)$$)`),
       or `pg_net` calling a webhook door, or the platform scheduler of the host; never `@nestjs/schedule` and never a cron
       process of its own. Cache is Postgres (an unlogged table owned by the cache capability) and a lock or lease is a Postgres
-      advisory lock (`pg_try_advisory_xact_lock`) or a row claim. Realtime pushes go through `realtime.send(payload, event, topic,
-      true)` called by the RealtimeHub adapter in the transaction; clients subscribe to the private topic, authorized by RLS
-      policies on `realtime.messages` declared in a migration.
+      advisory lock (`pg_try_advisory_xact_lock`) or a row claim. Realtime is the socket.io gateway of be.feature.realtime.websocket
+      inside the api process, one instance with no Redis adapter (knowledge/patterns/be/realtime.yaml liteAdapter); a push that
+      must follow a commit is published by a reactor of the committed event.
     rationale: |-
-      Every one of these is a feature of the Supabase project the app already has, so lite runs no second piece of infrastructure.
+      Every one of these is a feature of the Supabase project or the api process the app already has, so lite runs no second
+      piece of infrastructure.
     cases:
       - id: case-1
         when: Expire unpaid orders every five minutes in a lite app

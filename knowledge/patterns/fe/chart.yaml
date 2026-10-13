@@ -1,0 +1,39 @@
+schema: starci/knowledge-source@1
+id: fe.chart
+title: Charts
+purpose: |-
+  Which chart library does the front end use? recharts, styled by the dataviz grammar.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: []
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+  limitations: |-
+    FE_STACK_FORBIDDEN proves that no forbidden alternative is declared or imported; it does not prove the canonical
+    library is used well. starci-academy illustrates the usage; the catalog decides.
+rules:
+  - id: FE-CHART
+    title: "recharts styled by the dataviz grammar"
+    kind: mandatory
+    hfsRules: [R244]
+    requirement: |-
+      Charts use recharts inside a block, coloured and laid out by the dataviz grammar; chart.js, nivo, d3 and echarts
+      are refused.
+    rationale: |-
+      One chart library keeps axes, tooltips and colours consistent.
+    cases:
+      - id: case-1
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a dashboard added a second chart library"
+        write: "Rebuild the chart with recharts."
+    verification:
+      automated:
+        - FE_STACK_FORBIDDEN
+      manual: []
+    relatedExamples: []

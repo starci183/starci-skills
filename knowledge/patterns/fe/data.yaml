@@ -1,0 +1,74 @@
+schema: starci/knowledge-source@1
+id: fe.data
+title: Data hooks
+purpose: |-
+  How does a component read and write back-end data? Through one SWR hook per modules/api operation in hooks/swr;
+  components call hooks only.
+appliesTo:
+  - frontend
+family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [fe.hooks.swr, fe.hooks, fe.components.providers]
+provenance:
+  reviewedAt: 2026-10-13
+  sources:
+    - "knowledge/hfs/fe-stack.yaml"
+    - "starci-lab/starci-academy origin/main: src/hooks/swr/**"
+    - "https://swr.vercel.app/docs/getting-started"
+  limitations: |-
+    Lint proves where the transport is called and that keys carry identity; whether a key carries every identity that
+    changes the result is reviewed.
+rules:
+  - id: FE-DATA-SWR
+    title: "One SWR hook per operation; components call hooks only"
+    kind: mandatory
+    hfsRules: [R50, R56, R65, R244]
+    requirement: |-
+      Each modules/api operation has one hook: hooks/swr/api/graphql/queries/useQuery<X>Swr.ts wraps useSWR around
+      query<X>, hooks/swr/api/graphql/mutations/useMutate<X>Swr.ts wraps useSWRMutation around mutate<X> (REST:
+      hooks/swr/api/rest). The key is QUERY_<X>_SWR_KEY or MUTATE_<X>_SWR_KEY plus every identity that changes the
+      result (viewer, route ids); a missing input gives a null key. A query hook may dispatch its result into a redux
+      slice; a mutation calls mutate on the keys it changes when it succeeds. App-wide queries with no component
+      consumer run once in SwrSideEffects.tsx, mounted by components/providers. A status that changes on the server is
+      refreshed by SWR refreshInterval or by a socket event, never both and never by a hand-written timer; heavy work is
+      a mutation that enqueues a back-end job, followed through a status query polled by refreshInterval or a socket
+      namespace. Components, features and forms never call modules/api directly, never fetch in useEffect, and never use
+      react-query.
+    rationale: |-
+      Cache identity, deduplication and revalidation are one decision per resource; a component that calls the transport
+      repeats it and drifts.
+    cases:
+      - id: case-1
+        when: "A query"
+        write: "export const useQueryCourseEnrollmentStatusSwr = () => useSWR(course?.id && authenticated ? [\"QUERY_COURSE_ENROLLMENT_STATUS_SWR\", course.id, authenticated] : null, async () => { const data = await queryCourseEnrollmentStatus({ request: { courseId: course.id } }); dispatch(setEnrollment(...)); return data.data }) (starci-academy)"
+      - id: case-2
+        when: "A mutation"
+        write: "export const useMutateSubmitContactSwr = () => useSWRMutation(MUTATE_SUBMIT_CONTACT_SWR_KEY, (_key, { arg }) => mutateSubmitContact({ request: arg })) (starci-academy)"
+      - id: case-3
+        when: "A job in progress"
+        write: "useQueryImportStatusSwr(jobId) with { refreshInterval: (data) => data?.done ? 0 : 2000 }; the component holds no timer"
+      - id: case-4
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: the lite rpc + polling command pattern"
+        write: "A mutation enqueues the back-end job (fenced job or saga) and returns its id; the front end polls the GraphQL status query through SWR refreshInterval or listens on the socket namespace."
+    verification:
+      automated:
+        - FE_TRANSPORT_OWNER
+        - FE_EFFECT_FETCH
+        - FE_SWR_KEY_IDENTITY
+        - FE_SWR_MUTATION_RESOURCE_IDENTITY
+        - FE_HOOKS_ARE_HOOKS
+        - FE_CUSTOM_HOOK_LOCATION
+        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
+        - FE_COMPONENT_DEEP_HOOK_IMPORT
+        - FE_SIZE_AND_STATE_BUDGET
+        - FE_LIST_KEY
+        - FE_EFFECT_CLEANUP
+        - FE_SWALLOWED_ERROR
+        - FE_CONSOLE_CALL
+        - FE_STACK_FORBIDDEN
+      manual:
+        - "Confirm the chosen refresh mechanism and interval fit the product need."
+    relatedExamples: []

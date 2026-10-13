@@ -266,3 +266,46 @@ removed:
     use: 'probeDraft reads only and returns verdict, draft and sends; a foreign draft receives no keys'
     since: 1.0.0-alpha.9
     match: '\b(?:draftProbe|probeDraft)\.(?:restore|restored|removed|after)\b'
+  - id: code-fe-db-result-typed
+    kind: code
+    name: FE_DB_RESULT_TYPED
+    use: 'the front end reads no data through Supabase (R217, auth only in fe.modules.auth); reads are GraphQL queries of modules/api wrapped by hooks/swr, typed by graphql-codegen (R52 FE_WIRE_GENERATED)'
+    since: 1.0.0-alpha.13
+  - id: code-fe-db-error-handled
+    kind: code
+    name: FE_DB_ERROR_HANDLED
+    use: 'a failure arrives as the GraphQLResponse envelope of modules/api/graphql/types.ts and is never collapsed into empty data (R51 FE_HTTP_STATUS_COLLAPSE)'
+    since: 1.0.0-alpha.13
+  - id: code-fe-auth-session-trust
+    kind: code
+    name: FE_AUTH_SESSION_TRUST
+    use: 'the front end runs no server code that trusts a session (R243 FE_SERVER_ACTION_FORBIDDEN); the back end verifies the access token against the JWKS (R219 BE_SUPABASE_JWT_VERIFIED)'
+    since: 1.0.0-alpha.13
+  - id: code-fe-db-write-shape
+    kind: code
+    name: FE_DB_WRITE_SHAPE
+    use: 'a write is a GraphQL mutation of modules/api wrapped by a useMutate<X>Swr hook and reported by modules/toast; Server Actions are refused (R243 FE_SERVER_ACTION_FORBIDDEN)'
+    since: 1.0.0-alpha.13
+  - id: slot-fe-modules-db
+    kind: vocabulary
+    name: fe.modules.db
+    use: 'the front end reads and writes through the back end GraphQL API in fe.modules.api, wrapped by hooks/swr; Supabase on the front end is fe.modules.auth only (owner ruling 2026-10-13)'
+    since: 1.0.0-alpha.13
+    match: '\bfe\.modules\.db\b'
+  - id: slot-fe-package-db
+    kind: vocabulary
+    name: fe.package.db
+    use: 'a shared front-end data client is fe.package.api (Apollo clients and the GraphQLResponse union); Supabase on the front end is fe.modules.auth only'
+    since: 1.0.0-alpha.13
+    match: '\bfe\.package\.db\b'
+  - id: slot-be-feature-realtime-supabase
+    kind: vocabulary
+    name: be.feature.realtime.supabase
+    use: 'both editions push through the socket.io gateway be.feature.realtime.websocket; lite runs it in the api process'
+    since: 1.0.0-alpha.13
+    match: '\bbe\.feature\.realtime\.supabase\b'
+  - id: slot-key-anonymous-actions
+    kind: vocabulary
+    name: anonymousActions
+    use: 'the front end holds no Server Action (R243 FE_SERVER_ACTION_FORBIDDEN), so no slot lists anonymous ones'
+    since: 1.0.0-alpha.13
