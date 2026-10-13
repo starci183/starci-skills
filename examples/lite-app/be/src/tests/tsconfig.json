@@ -1,0 +1,5 @@
+{
+  "extends": ["../../tsconfig.json", "@starci/tsconfig/e2e.json"],
+  "include": ["./**/*.ts"],
+  "exclude": []
+}

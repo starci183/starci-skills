@@ -4,7 +4,7 @@ import type { RawBodyRequest } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
 import type { Request } from "express"
 import { @@Provider@@InboxService } from "@modules/domain/@@provider@@-inbox"
-import { CLOCK } from "@modules/platform/clock"
+import { CLOCK, ClockModule } from "@modules/platform/clock"
 import { Secret } from "@modules/platform/config"
 import { HttpSecurityModule } from "@modules/platform/http-security"
 import { @@Event@@Request } from "./dto/@@event@@.request"
@@ -32,6 +32,7 @@ const sign = (rawBody: Buffer, timestamp: string): string =>
 const build = async (deliveries: @@Provider@@InboxService) => {
     const moduleRef = await Test.createTestingModule({
         imports: [
+            ClockModule.register({ isGlobal: true }),
             HttpSecurityModule.register({
                 allowedOrigins: [],
                 rateLimit: { windowMs: 60_000, defaultLimit: 100, strictLimit: 100 },
@@ -40,10 +41,12 @@ const build = async (deliveries: @@Provider@@InboxService) => {
         ],
         controllers: [@@Provider@@Webhook],
         providers: [
-            { provide: CLOCK, useValue: new FakeClock(AT) },
             { provide: @@Provider@@InboxService, useValue: deliveries },
         ],
-    }).compile()
+    })
+        .overrideProvider(CLOCK)
+        .useValue(new FakeClock(AT))
+        .compile()
     return moduleRef.get(@@Provider@@Webhook)
 }
 
