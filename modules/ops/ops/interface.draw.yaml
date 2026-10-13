@@ -382,7 +382,7 @@ steps:
         atoms, local helper components allowed, exported as <XBase>) composing ONLY @starci/grammar[/<family>]
         exports with their real props and closed variants (Alert, Meter segments, Badge, Button variant,
         SurfaceCard, IconTile, SectionHeader, Text, Heading, DescriptionList, TagGroup, PageContainer ...), icons
-        only as the source of Icon/IconTile/IconButton (@heroicons/react/*), artwork only as a relative raster
+        only as the source of Icon/IconTile/IconButton (@phosphor-icons/react), artwork only as a relative raster
         import into Image/MediaFrame - plus one fixture JSON per state ({state, props, on}; a
         <XBase>.<state>.<width>.fixture.json when a viewport needs other data). HTML is layout only (div,
         section, article, header, footer, main, aside, nav, ul, ol, li) with layout classes on the grammar

@@ -13578,9 +13578,10 @@ FE_TYPE_ESCAPE:
 FE_VENDOR_BOUNDARY:
   title: "Vendor primitive or icon used outside its owner"
   title_vi: "Thư viện giao diện bên ngoài dùng ngoài chủ sở hữu"
-  meaning_vi: "Biểu tượng heroicons chỉ đến component qua lá icon với kích thước theo thang glyph; mỗi primitive của thư viện ngoài nằm sau một chủ sở hữu có tên."
+  meaning_vi: "Biểu tượng của bộ icon ứng dụng (@phosphor-icons/react) chỉ đến component qua lá icon với kích thước theo thang glyph; mỗi primitive của thư viện ngoài nằm sau một chủ sở hữu có tên."
   causes_vi:
-    - "Import thẳng @heroicons trong component"
+    - "Import thẳng @phosphor-icons/react trong component thay vì qua lá icon"
+    - "Dùng bộ glyph thứ hai ngoài @phosphor-icons/react"
     - "Dùng kích thước biểu tượng ngoài thang"
     - "Primitive thư viện ngoài dùng trực tiếp ở nhiều nơi"
   nextStep_vi: "Dùng lá icon và chủ sở hữu primitive có sẵn; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."

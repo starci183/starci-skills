@@ -14,13 +14,8 @@ purpose: >-
 pins:
   # --- @starci packages. Every @starci package is a PUBLISHED npm package (install: registry): a product repository
   # installs the exact pinned version from the npm registry in the root and every workspace package.json, never `file:`.
-  '@starci/heroicons':
-    version: 0.3.3
-    group: starci
-    install: registry
-    side: fe
-    source: packages/heroicons/package.json
-    why: 'StarCi custom Heroicons-compatible cuts; eslint-canon-fe (icon.mjs) admits @starci/heroicons/24/outline and /16/solid as icon sources, so an app that uses them gets this exact version.'
+  # @starci/heroicons has no pin since 1.0.0-alpha.13: the application icon set is @phosphor-icons/react (fe-stack.yaml
+  # icons) and eslint-canon-fe one-icon-set refuses every other glyph catalogue, so no product repository installs it.
   '@starci/grammar':
     version: 0.9.14
     group: starci

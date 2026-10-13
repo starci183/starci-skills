@@ -26,14 +26,18 @@ const repo = (t, files, extra = {}) => {
 
 // ------------------------------------------------------------------------------------------------ transport-owner
 
+// The one Apollo client folder (fe.transport.client, modules/api/graphql/clients/) and the one GraphQLResponse union
+// (fe.transport.outcome, modules/api/graphql/types.ts) of a one-app repository, or the api package's (fe.package.api.client
+// src/graphql/clients/, fe.package.api.outcome src/graphql/types.ts) when the apps share it; tests/repo/architecture-transport-owner.spec.mjs.
 const API = "apps/web/src/modules/api"
-const CLIENT = "export const client = { get: (url: string, signal: AbortSignal) => fetch(url, { signal }) };\n"
-const READER = "import { client } from '../client';\nexport const readCourse = (id: string) => client.get(`/courses/${id}`, AbortSignal.timeout(8000));\n"
-const OUTCOME = "export type Outcome<T> = { kind: 'ok'; value: T } | { kind: 'refused' };\n"
+const CLIENT = "import { ApolloClient } from '@apollo/client';\nexport const authClient = new ApolloClient({ uri: '/graphql', fetch: (input: string) => fetch(input) });\n"
+const OUTCOME = "export type GraphQLResponse<T> = { success: boolean; message: string; error?: string; data?: T };\n"
+const QUERY = "import { authClient } from '../clients';\nexport const queryCourse = (id: string) => authClient.query({ query: id });\n"
 const GOOD_TRANSPORT = {
-    [`${API}/client.ts`]: CLIENT,
-    [`${API}/course/read-course.ts`]: READER,
-    "apps/web/src/hooks/course/useCourse.ts": "import { readCourse } from '../../modules/api/course/read-course';\nexport const useCourse = (id: string) => readCourse(id);\n",
+    [`${API}/graphql/clients/index.ts`]: CLIENT,
+    [`${API}/graphql/queries/query-course.ts`]: QUERY,
+    [`${API}/rest/uploads/presign.ts`]: "import axios from 'axios';\nexport const presign = (name: string) => axios.post('/uploads', { name });\n",
+    "apps/web/src/hooks/course/useCourse.ts": "import { queryCourse } from '../../modules/api/graphql/queries/query-course';\nexport const useCourse = (id: string) => queryCourse(id);\n",
 }
 const TWO_APPS = [{ name: "web", kind: "next" }, { name: "admin", kind: "next" }]
 const PKG = "packages/shop-api"
@@ -44,18 +48,18 @@ const PACKAGE = {
     }, null, 2)}\n`,
     [`${PKG}/package.json`]: JSON.stringify({ name: "@shop/api", private: true }),
     [`${PKG}/tsconfig.json`]: "{}\n",
-    [`${PKG}/src/index.ts`]: "export { client } from './client';\nexport type { Outcome } from './outcome';\n",
-    [`${PKG}/src/client.ts`]: CLIENT,
-    [`${PKG}/src/outcome.ts`]: OUTCOME,
+    [`${PKG}/src/index.ts`]: "export { authClient } from './graphql/clients';\nexport type { GraphQLResponse } from './graphql/types';\n",
+    [`${PKG}/src/graphql/clients/index.ts`]: CLIENT,
+    [`${PKG}/src/graphql/types.ts`]: OUTCOME,
 }
-const appReader = (app) => ({ [`apps/${app}/src/modules/api/course/read-course.ts`]: "import { client } from '@shop/api';\nexport const readCourse = (id: string) => client.get(`/courses/${id}`, AbortSignal.timeout(8000));\n" })
+const appOperation = (app) => ({ [`apps/${app}/src/modules/api/graphql/queries/query-course.ts`]: "import { authClient } from '@shop/api';\nexport const queryCourse = (id: string) => authClient.query({ query: id });\n" })
 const NOTHING = (app) => ({ [`apps/${app}/src/hooks/course/useNothing.ts`]: "export const useNothing = () => 1;\n" })
 const packaged = (files, apps = TWO_APPS) => ({ apps, declaration: { optionalSlots: ["fe.package.api"] }, files })
 
-test("transport-owner: one client owns the global fetch, no app imports an HTTP library, every reader imports the client", (t) => {
+test("transport-owner: one client folder owns the global fetch, axios stays in modules/api/rest, every operation imports the client", (t) => {
     const files = {
         ...GOOD_TRANSPORT,
-        [`${API}/outcome.ts`]: OUTCOME,
+        [`${API}/graphql/types.ts`]: OUTCOME,
         "apps/web/src/hooks/course/useCalled.ts": "export const useCalled = () => fetch('/x');\n",
         "apps/web/src/hooks/course/useMember.ts": "export const useMember = () => globalThis.fetch('/x');\n",
         "apps/web/src/hooks/course/useAliased.ts": "const send = fetch;\nexport const useAliased = () => send('/x');\n",
@@ -65,13 +69,14 @@ test("transport-owner: one client owns the global fetch, no app imports an HTTP 
         "apps/web/src/hooks/course/useProperty.ts": "export const useProperty = (repo: { fetch: () => void }) => repo.fetch();\n",
         "apps/web/src/hooks/course/useAxios.ts": "import axios from 'axios';\nexport const useAxios = () => axios;\n",
         "apps/web/src/hooks/course/useKy.ts": "export const useKy = () => import('ky');\n",
-        [`${API}/course/read-got.ts`]: "declare function require(name: string): unknown;\nimport { client } from '../client';\nexport const readGot = () => [client, require('got')];\n",
+        [`${API}/rest/uploads/got.ts`]: "declare function require(name: string): unknown;\nexport const viaGot = () => require('got');\n",
     }
     const { tester, ok, bad } = repo(t, files)
     tester.run("transport-owner", rules["transport-owner"], {
         valid: [
-            // the client is the one module that references fetch; readers import it; hooks never touch it
-            ok(`${API}/client.ts`), ok(`${API}/course/read-course.ts`), ok("apps/web/src/hooks/course/useCourse.ts"), ok(`${API}/outcome.ts`),
+            // the client folder is the one place that references fetch; operations import it; hooks never touch it; axios is the rest owner's
+            ok(`${API}/graphql/clients/index.ts`), ok(`${API}/graphql/queries/query-course.ts`), ok(`${API}/rest/uploads/presign.ts`),
+            ok("apps/web/src/hooks/course/useCourse.ts"), ok(`${API}/graphql/types.ts`),
             // a local function named fetch, a type query and a property named fetch are not the global transport
             ok("apps/web/src/hooks/course/useLocal.ts"), ok("apps/web/src/hooks/course/useType.ts"), ok("apps/web/src/hooks/course/useProperty.ts"),
         ],
@@ -79,79 +84,88 @@ test("transport-owner: one client owns the global fetch, no app imports an HTTP 
             bad("apps/web/src/hooks/course/useCalled.ts"), bad("apps/web/src/hooks/course/useMember.ts"),
             bad("apps/web/src/hooks/course/useAliased.ts"), bad("apps/web/src/hooks/course/useSwr.ts"),
             bad("apps/web/src/hooks/course/useAxios.ts", saying(/axios/)), bad("apps/web/src/hooks/course/useKy.ts", saying(/ky/)),
-            bad(`${API}/course/read-got.ts`, saying(/got/)),
+            bad(`${API}/rest/uploads/got.ts`, saying(/got/)),
         ],
     })
 })
 
-test("transport-owner: a reader that does not import the client, and a client that never calls fetch", (t) => {
+test("transport-owner: an operation that does not import the client, and an ApolloClient constructed outside the client folder", (t) => {
     const files = {
         ...GOOD_TRANSPORT,
-        [`${API}/client.ts`]: "export const client = { get: (url: string) => url };\n",
-        [`${API}/course/read-lonely.ts`]: "export const readLonely = () => 1;\n",
+        [`${API}/graphql/mutations/mutation-lonely.ts`]: "export const mutationLonely = () => 1;\n",
+        "apps/web/src/hooks/course/useOwnClient.ts": "import { ApolloClient } from '@apollo/client';\nexport const useOwnClient = () => new ApolloClient({ uri: '/graphql' });\n",
     }
     const { tester, ok, bad } = repo(t, files)
     tester.run("transport-owner", rules["transport-owner"], {
-        valid: [ok(`${API}/course/read-course.ts`), ok("apps/web/src/hooks/course/useCourse.ts")],
-        invalid: [bad(`${API}/course/read-lonely.ts`, saying(/does not import/)), bad(`${API}/client.ts`, saying(/never calls the global fetch/))],
+        valid: [ok(`${API}/graphql/queries/query-course.ts`), ok("apps/web/src/hooks/course/useCourse.ts")],
+        invalid: [
+            bad(`${API}/graphql/mutations/mutation-lonely.ts`, saying(/does not import the transport client/)),
+            bad("apps/web/src/hooks/course/useOwnClient.ts", saying(/constructs an ApolloClient outside/)),
+        ],
     })
 })
 
-test("transport-owner: one client and one Outcome union in the api package, readers in the apps", (t) => {
+test("transport-owner: one client folder and one GraphQLResponse union in the api package, operations in the apps", (t) => {
     const files = {
-        ...PACKAGE, ...appReader("web"), ...appReader("admin"),
+        ...PACKAGE, ...appOperation("web"), ...appOperation("admin"),
         "apps/admin/src/hooks/course/useCalled.ts": "export const useCalled = () => fetch('/x');\n",
     }
     const { tester, ok, bad } = repo(t, files, packaged(files))
     tester.run("transport-owner", rules["transport-owner"], {
-        valid: [ok(`${PKG}/src/client.ts`), ok(`${PKG}/src/outcome.ts`), ok(`${PKG}/src/index.ts`), ok("apps/web/src/modules/api/course/read-course.ts"), ok("apps/admin/src/modules/api/course/read-course.ts")],
-        // a fetch outside the package client is the finding, the client itself is not
+        valid: [
+            ok(`${PKG}/src/graphql/clients/index.ts`), ok(`${PKG}/src/graphql/types.ts`), ok(`${PKG}/src/index.ts`),
+            ok("apps/web/src/modules/api/graphql/queries/query-course.ts"), ok("apps/admin/src/modules/api/graphql/queries/query-course.ts"),
+        ],
+        // a fetch outside the package client folder is the finding, the client itself is not
         invalid: [bad("apps/admin/src/hooks/course/useCalled.ts")],
     })
 })
 
-test("transport-owner: two apps that each keep their own client", (t) => {
-    const files = { "apps/web/src/modules/api/client.ts": CLIENT, "apps/admin/src/modules/api/client.ts": CLIENT, ...NOTHING("web") }
+test("transport-owner: two apps that each keep their own client folder", (t) => {
+    const files = { "apps/web/src/modules/api/graphql/clients/index.ts": CLIENT, "apps/admin/src/modules/api/graphql/clients/index.ts": CLIENT, ...NOTHING("web") }
     const { tester, ok, bad } = repo(t, files, packaged(files))
     tester.run("transport-owner", rules["transport-owner"], {
         valid: [ok("apps/web/src/hooks/course/useNothing.ts")],
-        invalid: [bad("apps/web/src/modules/api/client.ts", saying(/2 transport clients/)), bad("apps/admin/src/modules/api/client.ts", saying(/2 transport clients/))],
+        invalid: [
+            bad("apps/web/src/modules/api/graphql/clients/index.ts", saying(/2 transport clients/)),
+            bad("apps/admin/src/modules/api/graphql/clients/index.ts", saying(/2 transport clients/)),
+        ],
     })
 })
 
-test("transport-owner: a package client next to an app client", (t) => {
-    const files = { ...PACKAGE, "apps/web/src/modules/api/client.ts": CLIENT }
+test("transport-owner: a package client folder next to an app client folder", (t) => {
+    const files = { ...PACKAGE, "apps/web/src/modules/api/graphql/clients/index.ts": CLIENT }
     const { tester, ok, bad } = repo(t, files, packaged(files, [TWO_APPS[0]]))
     tester.run("transport-owner", rules["transport-owner"], {
-        valid: [ok(`${PKG}/src/index.ts`), ok(`${PKG}/src/outcome.ts`)],
-        invalid: [bad("apps/web/src/modules/api/client.ts"), bad(`${PKG}/src/client.ts`)],
+        valid: [ok(`${PKG}/src/index.ts`), ok(`${PKG}/src/graphql/types.ts`)],
+        invalid: [bad("apps/web/src/modules/api/graphql/clients/index.ts"), bad(`${PKG}/src/graphql/clients/index.ts`)],
     })
 })
 
-test("transport-owner: two apps that keep one app client with no package: the shared client belongs to the package", (t) => {
-    const files = { "apps/web/src/modules/api/client.ts": CLIENT, ...NOTHING("admin") }
+test("transport-owner: two apps that keep one app client folder with no package: the shared client belongs to the package", (t) => {
+    const files = { "apps/web/src/modules/api/graphql/clients/index.ts": CLIENT, ...NOTHING("admin") }
     const { tester, ok, bad } = repo(t, files, packaged(files))
     tester.run("transport-owner", rules["transport-owner"], {
         valid: [ok("apps/admin/src/hooks/course/useNothing.ts")],
-        invalid: [bad("apps/web/src/modules/api/client.ts", saying(/repository of 2 apps/))],
+        invalid: [bad("apps/web/src/modules/api/graphql/clients/index.ts", saying(/repository of 2 apps/))],
     })
 })
 
-test("transport-owner: two Outcome unions, a package one and an app one", (t) => {
-    const files = { ...PACKAGE, "apps/web/src/modules/api/outcome.ts": OUTCOME }
+test("transport-owner: two GraphQLResponse unions, a package one and an app one", (t) => {
+    const files = { ...PACKAGE, "apps/web/src/modules/api/graphql/types.ts": OUTCOME }
     const { tester, ok, bad } = repo(t, files, packaged(files, [TWO_APPS[0]]))
     tester.run("transport-owner", rules["transport-owner"], {
-        valid: [ok(`${PKG}/src/client.ts`), ok(`${PKG}/src/index.ts`)],
-        invalid: [bad("apps/web/src/modules/api/outcome.ts"), bad(`${PKG}/src/outcome.ts`)],
+        valid: [ok(`${PKG}/src/graphql/clients/index.ts`), ok(`${PKG}/src/index.ts`)],
+        invalid: [bad("apps/web/src/modules/api/graphql/types.ts"), bad(`${PKG}/src/graphql/types.ts`)],
     })
 })
 
-test("transport-owner: an app Outcome union in a two-app repository", (t) => {
-    const files = { ...PACKAGE, "apps/admin/src/modules/api/outcome.ts": OUTCOME }
+test("transport-owner: an app GraphQLResponse union in a two-app repository", (t) => {
+    const files = { ...PACKAGE, "apps/admin/src/modules/api/graphql/types.ts": OUTCOME }
     const { tester, ok, bad } = repo(t, files, packaged(files))
     tester.run("transport-owner", rules["transport-owner"], {
-        valid: [ok(`${PKG}/src/client.ts`)],
-        invalid: [bad("apps/admin/src/modules/api/outcome.ts"), bad(`${PKG}/src/outcome.ts`)],
+        valid: [ok(`${PKG}/src/graphql/clients/index.ts`)],
+        invalid: [bad("apps/admin/src/modules/api/graphql/types.ts"), bad(`${PKG}/src/graphql/types.ts`)],
     })
 })
 

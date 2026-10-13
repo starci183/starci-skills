@@ -81,13 +81,13 @@ test('the AST gate: only grammar components and layout HTML; raw styled HTML, fo
   assert.deepEqual(sourceFindings(GOOD_DRAW, { file: 'LedgerBase.draw.tsx' }).findings, []);
   const bad = `import { Button } from "@starci/grammar/core"
 import { motion } from "framer-motion"
-import { PlusIcon } from "@heroicons/react/24/outline"
+import { Plus } from "@phosphor-icons/react"
 import "./local.css"
 export const Ledger = () => (
   <div className="flex gap-5 bg-surface rounded-3xl" style={{ padding: 13 }}>
     <p>Hand-made text</p>
     <Card />
-    <PlusIcon />
+    <Plus />
     <Button variant="primary">Go</Button>
   </div>
 )
@@ -97,7 +97,7 @@ export const Ledger = () => (
   const detail = r.findings.map((f) => f.detail).join('\n');
   assert.match(detail, /<p> is raw HTML/);
   assert.match(detail, /<Card> is neither a @starci\/grammar export/);
-  assert.match(detail, /<PlusIcon> renders an icon module raw/);
+  assert.match(detail, /<Plus> renders an icon module raw/);
   assert.match(detail, /framer-motion/);
   assert.match(detail, /local\.css for its side effects/);
   assert.match(detail, /className="bg-surface"> paints/);

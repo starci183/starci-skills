@@ -2141,11 +2141,12 @@ rules:
   - id: R243
     code: "FE_SERVER_ACTION_FORBIDDEN"
     law: "The front end serves no API, in every app and edition (R212 case-2): no file under `fe/` carries a `\"use server\"` directive (module or function level), and the only route handlers are `app/health/live/route.ts` and the auth callback of the `fe.route.callback` slot; reads and writes reach the back end through `modules/api` and the SWR hooks, and a webhook, cron, public API or third-party callback is a back-end feature."
-    kinds: [check]
-    gates: [pre-push, settle, land, ci]
+    kinds: [check, lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["FE_SERVER_ACTION_FORBIDDEN", "FE_ROUTE_HANDLER_FORBIDDEN"]
     enforcers:
       - {kind: machine, id: server-action-forbidden, at: scripts/hfs/architecture/server-action.mjs}
+      - {kind: eslint-fe, id: no-server-action}
   - id: R244
     code: "FE_STACK_FORBIDDEN"
     law: "A front end uses the one canonical library of each concern of knowledge/hfs/fe-stack.yaml: no front-end package.json (an app or a `fe/packages/*` package) depends on, and no source file under `fe/` imports, a package that the catalog lists under a concern's `forbids`; a missing concern is added to the catalog (with its pin in canon-pins.yaml), never installed beside it."

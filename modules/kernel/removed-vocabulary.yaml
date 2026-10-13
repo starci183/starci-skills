@@ -309,3 +309,8 @@ removed:
     name: anonymousActions
     use: 'the front end holds no Server Action (R243 FE_SERVER_ACTION_FORBIDDEN), so no slot lists anonymous ones'
     since: 1.0.0-alpha.13
+  - id: lint-heroicons-is-the-glyph-vendor
+    kind: vocabulary
+    name: heroicons-is-the-glyph-vendor
+    use: 'the eslint-fe rule is one-icon-set: the application icon set is @phosphor-icons/react (knowledge/hfs/fe-stack.yaml icons), imported only by the Icon leaf; the grammar Icon takes whatever glyph the app supplies'
+    since: 1.0.0-alpha.13
