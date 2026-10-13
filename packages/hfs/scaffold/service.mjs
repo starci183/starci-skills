@@ -15,8 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { explainPath } from '../runtime/scripts/hfs/check.mjs';
-import { createSlotResolver, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
-import { refuseInEdition } from './edition-gate.mjs';
+import { loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { byCodeUnit } from '../report/order.mjs';
 
 export class ScaffoldError extends Error {
@@ -320,9 +319,8 @@ const writeNew = (repoRoot, relative, text) => {
 
 /** `starci app new spec be/<file>.service.ts` at the app root: writes the spec skeleton of an existing service; returns the created app-relative paths. */
 export function newSpec({ repoRoot: appRoot, file, ts, manifest = loadSlotManifest() }) {
-  const { repo, beRoot: repoRoot } = backEndOf(appRoot, manifest);
-  // `new spec` writes a unit spec: the test world it belongs to (be.tests.*) is a full-edition capability.
-  refuseInEdition({ resolver: createSlotResolver(manifest, repo), slotIds: ['be.tests.world'], command: 'new spec' });
+  // A unit spec belongs to both editions (owner ruling 2026-10-12): a lite back end keeps full's unit specs.
+  const { beRoot: repoRoot } = backEndOf(appRoot, manifest);
   const relative = belowBackEnd(file);
   if (!relative.endsWith('.service.ts')) throw new ScaffoldError('HFS_NEW_NOT_A_SERVICE', `${relative} is not a *.service.ts file: only services have a unit spec`);
   const absolute = path.join(repoRoot, relative);
@@ -335,9 +333,8 @@ export function newSpec({ repoRoot: appRoot, file, ts, manifest = loadSlotManife
 
 /** `starci app new service be/<dir> <name> [--inject ...]` at the app root: writes the service and its spec skeleton; returns the created app-relative paths. */
 export function newService({ repoRoot: appRoot, dir, name, inject = [], ts, manifest = loadSlotManifest() }) {
-  const { repo, beRoot: repoRoot } = backEndOf(appRoot, manifest);
-  // `new service` writes the service and its unit spec: the test world (be.tests.*) is a full-edition capability.
-  refuseInEdition({ resolver: createSlotResolver(manifest, repo), slotIds: ['be.tests.world'], command: 'new service' });
+  // The service and its unit spec belong to both editions (owner ruling 2026-10-12).
+  const { beRoot: repoRoot } = backEndOf(appRoot, manifest);
   if (!SERVICE_NAME.test(name)) throw new ScaffoldError('HFS_NEW_NAME_INVALID', `the service name ${name} must be kebab-case (member-profile), without the .service suffix`);
   const relative = path.posix.join(belowBackEnd(dir), `${name}.service.ts`);
   requireSlot(repoRoot, relative);

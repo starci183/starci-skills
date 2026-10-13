@@ -10,9 +10,10 @@ import { managedScriptNames } from '../../scripts/hfs/architecture/managed-scrip
 import { managedGroupOf } from '../../scripts/hfs/edition-slots.mjs';
 import { HfsSlotsError, loadRuleCatalog, loadSlotManifest, openHfs, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
 
-// The edition mechanism (L01, manifest 2.1.0): hfs.json names `edition: full|lite` (absent means full), and lite is the same
-// manifest filtered (a slot's `editions`, `litePresence` and `lite` overlay), never a second engine. Full is the byte-for-byte
-// behavior of before; lite drops the test world, the event patterns and the app kinds the filter forbids, and a `supabase`
+// The edition mechanism (L01, manifest 2.1.0, re-ruled in 2.3.0): hfs.json names `edition: full|lite` (absent means full), and lite is
+// the same manifest filtered (a slot's `editions`, `litePresence` and `lite` overlay), never a second engine. Owner ruling 2026-10-12:
+// lite is the full architecture deployed without self-hosted infrastructure - it keeps every pattern, the worker app and the back-end
+// unit specs, and drops only the e2e and contract world, the browser journey, UAT records and the self-hosted stack; a `supabase`
 // connection provider enables the Supabase slots (app.supabase*, be.integrations.supabase, fe.modules.db, fe.package.db).
 
 const root = path.resolve(import.meta.dirname, '..', '..');
@@ -58,30 +59,38 @@ test('lite removes the slots its editions exclude, keeps the rest, and adds its 
   const manifest = loadSlotManifest();
   for (const slot of manifest.slots) assert.ok(slot.editions === undefined || slot.editions.every((e) => ['full', 'lite'].includes(e)), `${slot.id}: unknown edition`);
   const liteOnly = manifest.slots.filter((s) => s.editions?.includes('lite') && !s.editions.includes('full')).map((s) => s.id);
-  assert.deepEqual(liteOnly.sort(), ['app.starciwork.uat', 'fe.modules.db.outcome', 'repo.tests-forbidden'], 'the lite-only slots');
+  assert.deepEqual(liteOnly.sort(), ['app.starciwork.uat', 'be.feature.realtime.supabase', 'fe.modules.db.outcome'], 'the lite-only slots');
   const liteBe = openHfs({ declaration: app({ edition: 'lite' }), side: 'be' });
   const fullBe = openHfs({ declaration: app(), side: 'be' });
-  assert.equal(liteBe.slot('repo.tests-forbidden').presence, 'forbidden', 'the lite-only forbidden slot exists under lite');
-  assert.equal(fullBe.slot('repo.tests-forbidden'), null, 'under full it does not exist: the forbidden answers of full stay full\'s');
-  assert.equal(fullBe.slot('be.tests.world').presence, 'optional');
-  assert.equal(liteBe.slot('be.tests.world').presence, 'forbidden', 'litePresence replaces presence under lite');
-  assert.equal(liteBe.slot('be.tests.world').tracked, 'external', 'a forbidden slot holds no tracked path: it points out (goesTo)');
-  assert.equal(typeof liteBe.slot('be.tests.world').goesTo, 'string', 'every lite-forbidden slot says where the content goes');
-  // tests is none on every slot lite sees: the lite edition has no test world
-  for (const slot of liteBe.slots()) assert.equal(slot.tests, 'none', `${slot.id}.tests`);
-  for (const slot of openHfs({ declaration: app({ edition: 'lite' }), side: 'fe' }).slots()) assert.equal(slot.tests, 'none', `${slot.id}.tests`);
-  // the lite overlay replaces the fields it names: application/ exists only under features/api/ (the other kind roots are forbidden slots)
-  assert.equal(fullBe.slot('be.feature.application').path, 'src/features/{api/,jobs/,reactors/,saga/}<feature>/application/');
-  assert.equal(liteBe.slot('be.feature.application').path, 'src/features/api/<feature>/application/');
-  // ruleParams merge their lite overrides over the base
+  assert.equal(liteBe.slot('be.feature.realtime.supabase').presence, 'opt-in', 'the lite-only realtime door exists under lite');
+  assert.equal(fullBe.slot('be.feature.realtime.supabase'), null, 'under full it does not exist');
+  // owner ruling 2026-10-12: the test world of the optional integration specs and the unit fixtures stay; e2e and contract go
+  assert.equal(liteBe.slot('be.tests.world').presence, 'optional');
+  assert.equal(liteBe.slot('be.tests.fixtures.builders').presence, 'optional');
+  assert.equal(liteBe.slot('be.tests.integration').presence, 'optional');
+  for (const id of ['be.tests.e2e', 'be.tests.contract']) {
+    assert.equal(liteBe.slot(id).presence, 'forbidden', `${id}: litePresence replaces presence under lite`);
+    assert.equal(liteBe.slot(id).tracked, 'external', `${id}: a forbidden slot holds no tracked path: it points out (goesTo)`);
+    assert.equal(typeof liteBe.slot(id).goesTo, 'string', `${id}: every lite-forbidden slot says where the content goes`);
+  }
+  // a lite slot owes exactly the unit specs its full slot owes
+  for (const slot of liteBe.slots()) assert.equal(slot.tests, fullBe.slot(slot.id)?.tests ?? slot.tests, `${slot.id}.tests`);
+  assert.equal(liteBe.slot('be.domain').tests, 'unit-beside');
+  // the lite overlay replaces the fields it names; the trigger kinds keep their application/ roots
+  assert.equal(liteBe.slot('be.feature.application').path, fullBe.slot('be.feature.application').path);
+  assert.deepEqual(liteBe.slot('be.projections').requires, ['index.ts', '<name>.module.ts', '<name>.projection.ts'], 'a lite read model has no TypeORM projection entity');
+  assert.match(liteBe.slot('be.platform.queue').why, /pgmq/, 'the lite why names the Supabase adapter');
+  // ruleParams merge their lite overrides over the base: the schema authority and the self-hosted libraries change, the unit roles do not
   assert.equal(fullBe.ruleParams().schemaAuthority, undefined);
   assert.equal(liteBe.ruleParams().schemaAuthority, 'supabase');
-  // no test world: no unit role owes a spec under lite (the unit-spec lint reads ruleParams.unitRoles through the same view)
-  assert.deepEqual(liteBe.ruleParams().unitRoles, []);
-  assert.ok(fullBe.ruleParams().unitRoles.length > 0);
+  assert.deepEqual(liteBe.ruleParams().unitRoles, fullBe.ruleParams().unitRoles);
+  assert.ok(liteBe.ruleParams().unitRoles.length > 0);
+  assert.deepEqual(liteBe.ruleParams().infraOwners.bullmq, []);
+  assert.deepEqual(fullBe.ruleParams().infraOwners.bullmq, ['platform/queue']);
+  assert.deepEqual(liteBe.ruleParams().infraOwners.fetch, fullBe.ruleParams().infraOwners.fetch, 'a specifier lite does not restate keeps its owner');
 });
 
-test('lite classification: the test tree, the worker app and the event patterns are forbidden paths with a goesTo', () => {
+test('lite classification: e2e, contract, the socket realtime doors and the browser journey are forbidden paths with a goesTo; the patterns and the worker are not', () => {
   const be = openHfs({ declaration: app({ edition: 'lite' }), side: 'be' });
   const fe = openHfs({ declaration: app({ edition: 'lite' }), side: 'fe' });
   const whole = openHfs({ declaration: app({ edition: 'lite' }) });
@@ -90,42 +99,46 @@ test('lite classification: the test tree, the worker app and the event patterns 
     assert.deepEqual([c.status, c.slot], ['forbidden', slot], p);
     assert.equal(typeof c.goesTo, 'string', `${p}: a forbidden path says where it goes`);
   };
-  // the test world under lite: the old test slots themselves are forbidden (the deeper match wins), a test-tool file a slot
-  // does not already forbid is the lite-only repo.tests-forbidden's, and a spec inside an owned tree stays owned - with
-  // tests forced to none, BE_SPEC_PLACEMENT (be) and FE_NO_TESTS (fe) report it
-  for (const p of ['src/tests/world/use-test-world.ts']) forbidden(be, p, 'be.tests.world');
   forbidden(be, 'src/tests/e2e/orders/place.e2e-spec.ts', 'be.tests.e2e');
-  for (const p of ['vitest.config.ts', 'src/__tests__/x.ts']) forbidden(be, p, 'repo.tests-forbidden');
-  assert.equal(be.classifyPath('apps/cli/src/run.cli.spec.ts').slot, 'be.app.cli', 'a spec beside its command is the slot\'s, and the slot has no tests under lite');
-  assert.equal(be.classifyPath('jest.config.e2e.js').slot, 'be.tool-config-local', 'a test configuration the lite tool-config no longer lists is the forbidden local config\'s');
+  forbidden(be, 'src/tests/contract/stripe/charge.contract-spec.ts', 'be.tests.contract');
+  forbidden(be, 'src/features/realtime/chat/transport/websocket/chat.gateway.ts', 'be.feature.realtime.websocket');
+  forbidden(be, 'src/features/realtime/chat/transport/graphql/chat.subscription.ts', 'be.feature.realtime.graphql');
+  assert.equal(be.classifyPath('jest.config.e2e.js').slot, 'be.tool-config-local');
   assert.equal(be.classifyPath('e2e/probe.ts').slot, 'be.root-e2e');
-  forbidden(fe, 'apps/web/vitest.setup.ts', 'repo.tests-forbidden');
-  assert.equal(fe.classifyPath('apps/web/src/components/leaves/Text/index.spec.tsx').slot, 'fe.components');
-  // the event patterns and their kinds are forbidden slots, each naming where the content goes
-  forbidden(be, 'src/features/saga/checkout/index.ts', 'be.feature.saga');
-  forbidden(be, 'src/features/realtime/chat/index.ts', 'be.feature.realtime');
-  forbidden(be, 'src/features/jobs/send/send.processor.ts', 'be.feature.jobs');
-  forbidden(be, 'src/modules/events/orders/order-paid.event.ts', 'be.events');
-  forbidden(be, 'src/modules/platform/event-bus/index.ts', 'be.platform.event-bus');
-  forbidden(be, 'contracts/core/events.json', 'be.contract.events');
-  forbidden(be, 'e2e/probe.spec.ts', 'be.root-e2e');
-  // a worker app no declaration names is an unknown path (the slot binds <app> to a declared worker); a declared one is forbidden
-  assert.equal(be.classifyPath('apps/worker/src/main.ts').status, 'no-slot');
+  // what lite keeps: the unit world, the integration world, the patterns and their kinds (opt-in, enabled by a declaration)
+  assert.equal(be.classifyPath('jest.config.js').slot, 'be.tool-config', 'lite renders the jest unit config');
+  assert.equal(be.classifyPath('src/tests/tsconfig.json').slot, 'be.tool-config');
+  assert.equal(be.classifyPath('src/tests/world/use-test-world.ts').slot, 'be.tests.world');
+  assert.equal(be.classifyPath('src/tests/fixtures/builders/order.builder.ts').slot, 'be.tests.fixtures.builders');
+  for (const [p, slot] of [
+    ['src/features/saga/checkout/index.ts', 'be.feature.saga'], ['src/features/realtime/chat/index.ts', 'be.feature.realtime'],
+    ['src/features/realtime/chat/transport/supabase/chat.subscription.ts', 'be.feature.realtime.supabase'],
+    ['src/features/jobs/send/index.ts', 'be.feature.jobs'], ['src/modules/events/orders/order-paid.event.ts', 'be.events'],
+    ['src/modules/platform/event-bus/index.ts', 'be.platform.event-bus'], ['src/modules/platform/queue/index.ts', 'be.platform.queue'],
+    ['contracts/core/events.json', 'be.contract.events'],
+  ]) {
+    const c = be.classifyPath(p);
+    assert.equal(c.slot, slot, p);
+    assert.notEqual(c.status, 'forbidden', `${p} is not forbidden under lite`);
+  }
   const withWorker = openHfs({ declaration: app({ edition: 'lite', be: { ...BE, apps: [...BE.apps, { name: 'jobs', kind: 'worker' }] } }), side: 'be' });
-  forbidden(withWorker, 'apps/jobs/src/main.ts', 'be.app.worker');
-  // at the app root: the e2e workflow is forbidden, the UAT records of .starciwork are the lite-only slot's
+  assert.equal(withWorker.classifyPath('apps/jobs/src/main.ts').slot, 'be.app.worker');
+  assert.notEqual(withWorker.classifyPath('apps/jobs/src/main.ts').status, 'forbidden', 'the optional worker app is legal under lite');
+  // at the app root: the e2e workflow and the browser journey are forbidden, the UAT records of .starciwork are the lite-only slot's
   assert.deepEqual([whole.classifyPath('.github/workflows/e2e.yml').status, whole.classifyPath('.github/workflows/e2e.yml').slot], ['forbidden', 'app.ci-e2e']);
+  assert.deepEqual([whole.classifyPath('browser/playwright.config.ts').status, whole.classifyPath('browser/playwright.config.ts').slot], ['forbidden', 'app.browser']);
+  assert.equal(whole.classifyPath('codecov.yml').slot, 'app.quality-config', 'lite keeps codecov.yml');
   assert.equal(whole.classifyPath('.starciwork/_resources/identities/users.yaml').slot, 'app.starciwork.uat');
   assert.equal(whole.classifyPath('.starciwork/_resources/identities/users.yaml').status, 'forbidden');
-  // what lite keeps answers as before
   assert.equal(be.classifyPath('src/features/api/orders/index.ts').slot, 'be.feature');
   assert.equal(be.classifyPath('apps/cli/src/main.ts').slot, 'be.app.cli', 'a cli app is optional under lite, not forbidden');
   assert.equal(fe.classifyPath('apps/web/src/app/auth/callback/route.ts').slot, 'fe.route.callback', 'the OAuth callback route exists under lite');
+  assert.equal(fe.classifyPath('apps/web/src/components/leaves/Text/index.spec.tsx').slot, 'fe.components', 'the front end is full\'s: a spec there is FE_NO_TESTS, as in full');
 });
 
 test('full is untouched: no lite-only slot exists, every presence and path answers as before', () => {
   const be = openHfs({ declaration: app(), side: 'be' });
-  assert.equal(be.slot('repo.tests-forbidden'), null);
+  assert.equal(be.slot('be.feature.realtime.supabase'), null);
   assert.equal(openHfs({ declaration: app() }).slot('app.starciwork.uat'), null);
   for (const [p, slot] of [
     ['src/tests/world/use-test-world.ts', 'be.tests.world'], ['src/features/realtime/chat/index.ts', 'be.feature.realtime'],
@@ -171,33 +184,28 @@ test('a supabase connection provider enables the supabase slots of every profile
   refusal(() => resolveRepoDeclaration(loadSlotManifest(), app({ be: { ...BE, connections: [{ ...CONNECTION, provider: 'turso' }] } })), 'HFS_DECLARATION_INVALID');
 });
 
-test('L01: under lite a test script, a test dependency, a test-tool file, a worker app and a gone pattern or kind are findings', (t) => {
+test('L01: under lite an e2e, contract, stack or browser script and a test-infrastructure or self-hosted library dependency are findings; the unit run is not', (t) => {
   const repoRoot = tree(t, {
-    'package.json': { name: 'demo', scripts: { build: 'tsc -b', test: 'vitest run', 'typecheck:tests': 'tsc -p tsconfig.tests.json', 'check:quality': 'node --test scripts/' }, devDependencies: { vitest: '3.0.0', typescript: '6.0.0' }, dependencies: { '@playwright/test': '1.0.0', next: '16.0.0' } },
-    'fe/apps/web/package.json': { name: 'web', scripts: { 'test:e2e': 'playwright test' } },
+    'package.json': {
+      name: 'demo',
+      scripts: { build: 'tsc -b', test: 'cd be && jest --selectProjects unit --coverage', 'typecheck:tests': 'tsc -p be/src/tests/tsconfig.json', 'test:integration': 'cd be && jest --selectProjects integration', 'test:e2e': 'cd be && jest --selectProjects e2e', 'test:contract': 'x', 'test:stack': 'starci app stack' },
+      devDependencies: { jest: '30.0.0', '@starci/jest-preset': '1.0.0', testcontainers: '10.0.0', typescript: '6.0.0' },
+      dependencies: { bullmq: '5.0.0', kafkajs: '2.0.0', ioredis: '5.0.0', pg: '8.0.0', next: '16.0.0' },
+    },
   });
-  const liteDecl = { ...app({ edition: 'lite' }), sides: { be: { ...BE, apps: [...BE.apps, { name: 'jobs', kind: 'worker' }], patterns: ['event-bus'], kinds: ['api', 'cli', 'realtime'] }, fe: FE } };
-  const files = ['package.json', 'fe/apps/web/package.json', 'vitest.config.ts', 'be/apps/jobs/src/main.ts', 'be/src/tests/e2e/x.e2e-spec.ts', 'be/src/features/api/orders/index.ts'];
+  const liteDecl = { ...app({ edition: 'lite' }), sides: { be: { ...BE, apps: [...BE.apps, { name: 'jobs', kind: 'worker' }], patterns: ['event-bus', 'queue'], kinds: ['api', 'cli', 'reactors'] }, fe: FE } };
+  const files = ['package.json', 'be/jest.config.js', 'be/src/tests/e2e/orders/x.e2e-spec.ts', 'be/src/features/api/orders/index.ts'];
   const findings = checkRepo({ repoRoot, declaration: liteDecl, files, tree: false }).findings;
   const editionFindings = findings.filter((f) => f.code === 'HFS_EDITION_FORBIDDEN_PRESENT');
   const on = (p) => editionFindings.filter((f) => f.path === p);
-  // package.json: one finding per test script and per test dependency
-  assert.equal(on('package.json').length, 5, JSON.stringify(on('package.json').map((f) => f.message)));
-  assert.equal(on('fe/apps/web/package.json').length, 1);
-  // a root-level test-tool file no slot already forbids
-  assert.equal(on('vitest.config.ts').length, 1);
-  // the declaration: one hfs.json finding at the root for the worker app, the pattern and the kind - never doubled under be/
-  const declared = on('hfs.json');
-  assert.equal(declared.length, 3, JSON.stringify(declared.map((f) => f.message)));
-  assert.ok(declared.some((f) => /worker app jobs/.test(f.message)));
-  assert.ok(declared.some((f) => /event-bus pattern/.test(f.message)));
-  assert.ok(declared.some((f) => /realtime trigger/.test(f.message)));
-  assert.equal(findings.some((f) => f.path === 'be/hfs.json'), false, 'the side scope does not repeat the declaration findings');
-  // the forbidden paths come from the slot machinery, as HFS_FORBIDDEN_PRESENT, not L01
-  assert.equal(findings.some((f) => f.path === 'be/apps/jobs/src/main.ts' && f.code === 'HFS_FORBIDDEN_PRESENT'), true);
-  assert.equal(findings.some((f) => f.path === 'be/src/tests/e2e/x.e2e-spec.ts' && f.code === 'HFS_FORBIDDEN_PRESENT'), true);
-  assert.equal(on('be/src/tests/e2e/x.e2e-spec.ts').length, 0, 'the slot layer owns the path finding');
-  // the full view forbids none of it, so the same tree and the same declaration produce no edition finding (the rule tests no edition)
+  const named = on('package.json').map((f) => f.name).sort();
+  assert.deepEqual(named, ['bullmq', 'ioredis', 'kafkajs', 'test:contract', 'test:e2e', 'test:stack', 'testcontainers'], JSON.stringify(on('package.json').map((f) => f.message)));
+  // the declaration: the worker app, the event patterns and the reactors kind are full architecture, legal under lite
+  assert.deepEqual(on('hfs.json'), []);
+  // the forbidden e2e path comes from the slot machinery, as HFS_FORBIDDEN_PRESENT, not L01
+  assert.equal(findings.some((f) => f.path === 'be/src/tests/e2e/orders/x.e2e-spec.ts' && f.code === 'HFS_FORBIDDEN_PRESENT'), true);
+  assert.equal(on('be/src/tests/e2e/orders/x.e2e-spec.ts').length, 0, 'the slot layer owns the path finding');
+  // the full view answers [] for the same tree and declaration (the rule tests the edition once)
   const fullDecl = { ...app(), sides: { be: liteDecl.sides.be, fe: FE } };
   const full = checkRepo({ repoRoot, declaration: fullDecl, files, tree: false }).findings;
   assert.equal(full.some((f) => f.code === 'HFS_EDITION_FORBIDDEN_PRESENT'), false);
@@ -231,20 +239,24 @@ test('managedGroupOf: the one template-group answer of sync and the README check
 test('rule catalog: `editions` names the rules lite does not judge; a rule without it is judged by both', () => {
   const catalog = loadRuleCatalog();
   const fullOnly = catalog.rules.filter((r) => r.editions && !r.editions.includes('lite')).map((r) => r.id);
-  for (const id of ['R47', 'R48', 'R98', 'R102', 'R155', 'R167', 'R173', 'R151', 'R160', 'R169', 'R177']) assert.ok(fullOnly.includes(id), `${id} is full only`);
-  for (const id of ['R10', 'R11', 'R34', 'R35', 'R74', 'R97', 'R147', 'R156', 'R174', 'R180']) assert.ok(!fullOnly.includes(id), `${id} stays in lite (relaxed by slot data, not dropped)`);
-  assert.equal(catalog.judgedIn('BE_TEST_TOPOLOGY', 'lite'), false);
-  assert.equal(catalog.judgedIn('BE_TEST_TOPOLOGY', 'full'), true);
+  // owner ruling 2026-10-12: only the proofs that need the e2e or integration world stay full only
+  assert.deepEqual(fullOnly.sort(), ['R112', 'R155', 'R167', 'R173', 'R184'].sort());
+  for (const id of ['R46', 'R47', 'R48', 'R98', 'R102', 'R151', 'R160', 'R169', 'R177', 'R10', 'R34', 'R97']) assert.ok(!fullOnly.includes(id), `${id} is judged in lite`);
+  assert.equal(catalog.judgedIn('BE_TEST_TOPOLOGY', 'lite'), true);
+  assert.equal(catalog.judgedIn('BE_PATTERN_SPEC_MISSING', 'lite'), false);
+  assert.equal(catalog.judgedIn('BE_PATTERN_SPEC_MISSING', 'full'), true);
   assert.equal(catalog.judgedIn('FE_NO_TESTS', 'lite'), true);
   assert.equal(catalog.judgedIn('HFS_REPO_UNREADABLE', 'lite'), true, 'a code outside the catalog is always judged');
+  assert.equal(catalog.rule('R212').cases[0].date, '2026-10-12', 'the edition ruling is recorded as a dated owner case on R212');
   assert.throws(() => loadRuleCatalog({ text: fs.readFileSync(path.join(root, 'knowledge/hfs/rules.yaml'), 'utf8').replace('editions: [full]', 'editions: [basic]') }), (e) => e.code === 'HFS_RULES_INVALID');
+  assert.throws(() => loadRuleCatalog({ text: fs.readFileSync(path.join(root, 'knowledge/hfs/rules.yaml'), 'utf8').replace('        source: owner', '        source: agent') }), (e) => e.code === 'HFS_RULES_INVALID', 'a case is an owner ruling');
 });
 
 test('checkRepo: the one findings filter drops the codes of rules the edition does not judge, and only for that edition', () => {
-  const files = ['hfs.json', 'be/src/tests/world/test-world.config.ts', 'be/jest.config.js'];
+  const files = ['hfs.json', 'be/src/tests/e2e/orders/place.e2e-spec.ts'];
   const lite = checkRepo({ repoRoot: root, declaration: app({ edition: 'lite' }), files, tree: false });
-  assert.ok(lite.findings.some((f) => f.code === 'HFS_FORBIDDEN_PRESENT'), 'the forbidden test tree is a finding of lite');
-  assert.ok(!lite.findings.some((f) => f.code === 'BE_TEST_TOPOLOGY'), 'a code of a full-only rule is not reported under lite');
+  assert.ok(lite.findings.some((f) => f.code === 'HFS_FORBIDDEN_PRESENT'), 'the forbidden e2e tree is a finding of lite');
+  assert.ok(!lite.findings.some((f) => f.code === 'BE_PATTERN_SPEC_MISSING' || f.code === 'BE_INTEGRATION_SPEC_MISSING'), 'a code of a full-only rule is not reported under lite');
 });
 
 test('hfs.json supabase block: the auth posture is declared data (jwtExpiry 3600 at most), unknown keys refused', () => {

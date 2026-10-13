@@ -64,6 +64,26 @@ properties:
     oneOf:
       - type: array
       - type: object
+  liteAdapter:
+    type: object
+    additionalProperties: false
+    required: [summary, ports]
+    description: The Supabase implementation of the pattern's ports under edition lite (owner ruling 2026-10-12, R212 case-1); the ports, slots and rules of the topic stay the same.
+    properties:
+      summary: {type: string, minLength: 1}
+      ports:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          additionalProperties: false
+          required: [port, adapter]
+          properties:
+            port: {type: string, minLength: 1}
+            adapter: {type: string, minLength: 1}
+      forbids: {type: array, items: {type: string, minLength: 1}}
+      proof: {type: string, minLength: 1}
+      see: {type: array, items: {type: string, minLength: 1}}
   schema:
     const: starci/knowledge-source@1
   id:

@@ -25,12 +25,18 @@ const template = (relative, values) => {
   });
 };
 
-/** Lite replaces only the webhook door; the full-edition pattern remains byte-identical. */
+/** The lite templates of the webhook door and its unit spec: the door hands the delivery id to the provider inbox. */
+const LITE_WEBHOOK_TEMPLATES = Object.freeze({
+  "webhooks/webhook.door.ts.tpl": "../inbox/webhook-door.ts.tpl",
+  "webhooks/webhook.door.spec.ts.tpl": "../inbox/webhook-door.spec.ts.tpl",
+});
+
+/** Lite replaces only the webhook door and its spec; the full-edition pattern remains byte-identical. */
 export const selectLiteWebhookEntries = (entries) =>
   entries.map((entry) =>
-    entry.template === "webhooks/webhook.door.ts.tpl"
-      ? { ...entry, template: "../inbox/webhook-door.ts.tpl" }
-      : entry,
+    LITE_WEBHOOK_TEMPLATES[entry.template] === undefined
+      ? entry
+      : { ...entry, template: LITE_WEBHOOK_TEMPLATES[entry.template] },
   );
 
 const matchingBrace = (text, open) => {
@@ -253,6 +259,10 @@ export function addLiteWebhookInbox({
       text: template("service.ts.tpl", renderValues),
     },
     {
+      relative: `${base}/${provider}-inbox.service.spec.ts`,
+      text: template("service.spec.ts.tpl", renderValues),
+    },
+    {
       relative: `${base}/persistence/${provider}-inbox.sql.ts`,
       text: template("sql.ts.tpl", renderValues),
     },
@@ -280,10 +290,16 @@ export function addLiteWebhookInbox({
     "webhook-inbox.client.ts",
   );
   if (!fs.existsSync(databaseClient))
-    planned.push({
-      relative: "be/src/modules/platform/database/webhook-inbox.client.ts",
-      text: template("database-client.ts.tpl", renderValues),
-    });
+    planned.push(
+      {
+        relative: "be/src/modules/platform/database/webhook-inbox.client.ts",
+        text: template("database-client.ts.tpl", renderValues),
+      },
+      {
+        relative: "be/src/modules/platform/database/webhook-inbox.client.spec.ts",
+        text: template("database-client.spec.ts.tpl", renderValues),
+      },
+    );
   const clashes = planned
     .filter((entry) => fs.existsSync(path.join(root, ...entry.relative.split("/"))))
     .map((entry) => entry.relative);

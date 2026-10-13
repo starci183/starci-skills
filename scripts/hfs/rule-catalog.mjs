@@ -15,7 +15,9 @@ const RULE_KINDS = Object.freeze(['codemod', 'lint', 'check', 'design']);
 const FINDING_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/;
 const ENFORCER_ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 const FILE_ENFORCERS = new Set(['machine', 'hfs', 'work-validate', 'sonar', 'runtime']);
-const RULE_KEYS = new Set(['id', 'code', 'law', 'scope', 'kinds', 'gates', 'failureCodes', 'editions', 'enforcers']);
+const RULE_KEYS = new Set(['id', 'code', 'law', 'scope', 'kinds', 'gates', 'failureCodes', 'editions', 'enforcers', 'cases']);
+const CASE_KEYS = new Set(['id', 'date', 'source', 'ruling', 'quote']);
+const CASE_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ENFORCER_KEYS = new Set(['kind', 'id', 'status', 'at', 'editions']);
 
 function vocabularyProblems(catalog, key, names, bad) {
@@ -57,6 +59,23 @@ function checkRuleText(rule, label, bad) {
   if (typeof rule.law !== 'string' || !rule.law.trim()) bad.push(`${label}.law is missing`);
   if (typeof rule.law === 'string' && rule.law.includes('\n')) bad.push(`${label}.law must be one line`);
   if (rule.scope !== undefined && rule.scope !== 'runtime') bad.push(`${label}.scope is absent or runtime`);
+}
+
+/** The dated owner cases of a rule: each {id case-N, date, source owner, ruling, quote?}, ids unique (an owner ruling recorded where the law lives). */
+function checkRuleCases(rule, label, bad) {
+  if (rule.cases === undefined) return;
+  if (!Array.isArray(rule.cases) || !rule.cases.length) { bad.push(`${label}.cases must be a non-empty list`); return; }
+  const ids = new Set();
+  rule.cases.forEach((item, index) => {
+    const at = `${label}.cases[${index}]`;
+    if (!isPlainObject(item)) { bad.push(`${at} is not a map`); return; }
+    for (const key of Object.keys(item)) if (!CASE_KEYS.has(key)) bad.push(`${at} has unknown key ${key}`);
+    if (typeof item.id !== 'string' || !/^case-[1-9][0-9]*$/.test(item.id) || ids.has(item.id)) bad.push(`${at}.id must be a unique case-N`);
+    ids.add(item.id);
+    if (typeof item.date !== 'string' || !CASE_DATE.test(item.date)) bad.push(`${at}.date must be YYYY-MM-DD`);
+    if (item.source !== 'owner') bad.push(`${at}.source must be owner`);
+    for (const key of ['ruling', ...(item.quote === undefined ? [] : ['quote'])]) if (typeof item[key] !== 'string' || !item[key].trim()) bad.push(`${at}.${key} must be text`);
+  });
 }
 
 function checkRuleGates(label, gates, bad) {
@@ -120,6 +139,7 @@ function checkRule(rule, index, catalog, codeOwner, bad) {
   }
   checkRuleIdentity(rule, index, catalog, at, label, bad);
   checkRuleText(rule, label, bad);
+  checkRuleCases(rule, label, bad);
   enumListProblems(rule, label, 'kinds', RULE_KINDS, bad);
   bad.push(...ruleEditionProblems(rule, label));
   const gates = enumListProblems(rule, label, 'gates', RULE_GATES, bad);

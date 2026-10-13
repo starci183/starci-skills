@@ -138,3 +138,11 @@ files:
   - path: src/tests/e2e/<area>/<event>.e2e-spec.ts
     slot: be.tests.e2e
     role: The reactor's event flow through the bus, redelivery included.
+# Edition lite (owner ruling 2026-10-12, R212 case-1): the same ports and rules, a Supabase adapter behind them.
+liteAdapter:
+  summary: >-
+    Under lite a reactor is unchanged: a thin consumer of another context's events that dispatches one command. Its deliveries
+    come from the lite event bus (its own pgmq queue per consumer group).
+  ports:
+    - {port: EventConsumer delivery, adapter: "the reactor's pgmq queue (see event-bus.yaml liteAdapter)"}
+  see: [knowledge/patterns/be/supabase-queues.yaml]

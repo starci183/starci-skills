@@ -29,8 +29,9 @@ test('the repository: every example app is in the derived matrix and has a flag;
   assert.deepEqual(checkExamplesCi(ROOT).findings, []);
   const flags = parseYaml(fs.readFileSync(path.join(ROOT, CODECOV), 'utf8')).flag_management.individual_flags;
   assert.deepEqual(flags.map((flag) => flag.name), [...coverageExampleApps(ROOT), RUNTIME_FLAG]);
-  assert.equal(exampleHasTests('lite-app', ROOT), false);
-  assert.equal(fs.existsSync(path.join(ROOT, 'examples', 'lite-app', 'codecov.yml')), false);
+  // Owner ruling 2026-10-12: a lite app keeps full's unit run and coverage, so the lite example has its flag and its own codecov.yml.
+  assert.equal(exampleHasTests('lite-app', ROOT), true);
+  assert.equal(fs.existsSync(path.join(ROOT, 'examples', 'lite-app', 'codecov.yml')), true);
   const workflow = parseYaml(fs.readFileSync(path.join(ROOT, WORKFLOW), 'utf8'));
   assert.equal(workflow.jobs.app.strategy.matrix.app, '${{ fromJSON(needs.apps.outputs.apps) }}');
   for (const gone of ['example-unit.yml', 'todo' + '-app-example.yml', 'todo' + '-app-live-e2e.yml']) assert.ok(!fs.existsSync(path.join(ROOT, '.github', 'workflows', gone)), `${gone} is folded in`);
@@ -46,12 +47,12 @@ test('the root codecov flag of each app is its own codecov.yml scope under examp
   }
   const liteSonar = readProperties(path.join(ROOT, 'examples', 'lite-app', 'sonar-project.properties'));
   assert.equal('sonar.coverage.inclusions' in liteSonar, false);
-  assert.equal('sonar.coverage.exclusions' in liteSonar, false);
+  assert.equal('sonar.coverage.exclusions' in liteSonar, true, 'the lite example measures what full measures');
   const rules = parseYaml(fs.readFileSync(path.join(ROOT, CODECOV), 'utf8')).flag_management.default_rules.statuses;
   assert.deepEqual(rules.map((rule) => [rule.type, rule.target]), [['project', '100%'], ['patch', '100%']]);
 });
 
-test('every executable be file of each full-edition example is measured or matched by a Sonar coverage exclusion, never both, never neither; Sonar and Codecov describe one file set', () => {
+test('every executable be file of each example (both editions) is measured or matched by a Sonar coverage exclusion, never both, never neither; Sonar and Codecov describe one file set', () => {
   const manifest = loadSlotManifest();
   for (const app of coverageExampleApps(ROOT)) {
     const dir = path.join(ROOT, 'examples', app);

@@ -4,6 +4,15 @@ All notable changes to StarCi are documented here. The runtime is on the `1.0.0-
 until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
+## [Unreleased]
+
+### Changed
+- The lite edition is re-ruled (owner ruling 2026-10-12, R212 case-1): lite is the full architecture deployed without self-hosted infrastructure. Slot manifest 2.3.0: the worker app, queue, event bus, saga, reactors, fenced jobs, projections, the realtime kind and the event contracts are legal under lite again, each pattern slot naming its Supabase adapter in a `lite.why` overlay (Supabase Queues/pgmq, Supabase Realtime through `realtime.send`, Postgres locks, pg_cron); the unit world (be.tool-config with jest and the tests tsconfig, fixtures, builders, the test world of optional integration specs) and `ruleParams.be.unitRoles` are full's; only the e2e and contract layers, the e2e workflow, the browser journey, UAT records, the socket and graphql-ws realtime doors and the self-hosted stack stay forbidden. `ruleParams.be.lite.infraOwners` owns BullMQ, Kafka, Redis and the socket libraries nowhere (a lite map now merges one level deep over its base). The new lite-only slot `be.feature.realtime.supabase` is the lite realtime door; `repo.tests-forbidden` is removed.
+- Rules: R46-R48, R98-R102, R151-R154, R157-R162, R166, R169-R172 and R177 are judged in lite; R112, R155, R167 and R173 (proofs that need the e2e or integration world) and R184 (the socket and graphql-ws door shapes) stay full only. R212 (L01) now reports e2e/contract/stack/browser scripts and test-container, toxiproxy, browser-runner, BullMQ, Kafka and Redis dependencies; the rule catalog gains dated owner `cases`.
+- `starci app sync` renders lite with full's unit run: `test`, `test:affected`, `test:integration` and `typecheck:tests` scripts, `be/jest.config.js` and `be/src/tests/tsconfig.json`, the quality files with coverage and Codecov (the `quality-config-lite` group is removed), and a CI unit step with the coverage upload; the lite Sonar gate carries full's coverage conditions.
+- `starci app scaffold --edition lite`, `add cli`, `add webhook` and `new service|spec` write the unit specs (lite skeleton specs for the identity policy, guard and Supabase client; the inbox service, inbox client and lite webhook door specs; the cli command specs); a pattern noun whose topic carries a `liteAdapter` refuses in lite with a message naming the adapter topic, since the package carries only the full adapter's templates.
+- Knowledge: `knowledge/patterns/be/supabase-queues.yaml` owns the Supabase adapters; queues, event-bus, realtime, saga, jobs, reactors, projections, background and infra carry a `liteAdapter` section; CONTEXT.md, docs/lite-edition.md and the HFS README state the lite = full minus infrastructure rule. The examples CI gives the lite example a Codecov flag and skips only its e2e step; the L4 release row of a lite app runs its unit tests.
+
 ## [1.0.0-alpha.12] — 2026-10-12
 
 ### Added

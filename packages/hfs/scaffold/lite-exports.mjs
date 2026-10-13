@@ -43,9 +43,10 @@ const REGISTRATIONS = Object.freeze({
       beforeSource: "./errors/database.error",
     },
     {
+      // PRIMARY_ENTITY_MANAGER: the token the inbox service's unit spec provides its EntityManager double under.
       file: "be/src/modules/platform/database/index.ts",
       source: "./primary.decorators",
-      names: ["InjectPrimaryEntityManager"],
+      names: ["InjectPrimaryEntityManager", "PRIMARY_ENTITY_MANAGER"],
     },
     {
       file: "be/src/modules/platform/http-security/index.ts",

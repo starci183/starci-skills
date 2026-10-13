@@ -84,7 +84,7 @@ function checkout(t) {
     const dir = path.join(base, 'examples', name);
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'hfs.json'), JSON.stringify({ kind: 'app', edition: 'lite' }));
-    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name, scripts: Object.fromEntries(['codegen', 'typecheck', 'lint', 'format:check', 'build:be', 'build:fe', 'docker:build'].map((s) => [s, 'x'])) }));
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name, scripts: Object.fromEntries(['codegen', 'typecheck', 'lint', 'format:check', 'test', 'build:be', 'build:fe', 'docker:build'].map((s) => [s, 'x'])) }));
     fs.writeFileSync(path.join(dir, 'package-lock.json'), '{}');
   }
   return { base, plan: planL4(base, { runtimeRoot: base }) };
@@ -134,7 +134,7 @@ test('L4 order: a red row cancels nothing - every other row of the run still run
   assert.deepEqual(out.filter((row) => !row.ok).map((row) => row.name), ['npm test', 'bb: npm run lint', 'cc: sonar']);
   assert.ok(at(events, 'end bb: npm run docker:build') > at(events, 'end bb: npm run lint'), 'bb went on after its red lint');
   assert.ok(at(events, 'end npm run check') > 0 && at(events, 'end aa: sonar') > 0 && at(events, 'end linux-parity') > 0, 'the checks, a proof and parity ran after the red suite');
-  assert.equal(out.length, 3 + 21 + 3 + 3 + 1, 'every row of the plan has its result');
+  assert.equal(out.length, 3 + 24 + 3 + 3 + 1, 'every row of the plan has its result (three lite apps of eight rows each: the unit run included)');
 });
 
 test('L4 order: the host bounds the app chains - one at a time on a starved host, each chain still in order', async (t) => {

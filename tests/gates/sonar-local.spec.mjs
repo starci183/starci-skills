@@ -1560,39 +1560,43 @@ test('dashboard --branch reads the measures of that branch, and without it the m
   assert.ok(main.branches.every(branch=>branch===undefined),JSON.stringify(main.branches));
 });
 
-test('lite Sonar selects its canonical conditions and requires an actual processed project gate plus the non-coverage dashboard',async t=>{
+test('lite Sonar selects its own gate name with full\'s conditions, coverage included (owner ruling 2026-10-12), and requires an actual processed project gate',async t=>{
   const root=temporary(t,'lite-policy'),custody=fakeCustody(root),repo=fakeRepo(root);
   write(repo,'hfs.json',JSON.stringify({hfs:2,kind:'app',edition:'lite'}));
   const full=loadSonarGate(),lite=loadSonarGate({cwd:repo});
   assert.equal(lite.gate.name,'starci-quality-lite');
-  assert.equal(lite.newCode.coverage,undefined);assert.equal(lite.overall.coverage,undefined);
+  assert.deepEqual([lite.newCode.coverage,lite.overall.coverage],[full.newCode.coverage,full.overall.coverage],'a lite back end keeps full\'s unit run and its coverage');
+  assert.deepEqual(serverConditions(lite),serverConditions(full),'every threshold of the lite gate equals full\'s');
   assert.deepEqual(loadSonarGate(),full,'selecting a lite repository never contaminates the cached full policy');
-  assert.equal(serverConditions(full).filter(row=>/coverage/.test(row.metric)).length,2);
   const {host,state}=await fakeSonar(t,{projectMeasures:{bugs:0,code_smells:0,vulnerabilities:0,security_hotspots:0,duplicated_lines_density:0}});
-  const cfg=configFor(host,custody,{coverageRunner:()=>{throw Error('a lite app has no test world');}});
+  const cfg=configFor(host,custody);
   const report=await scan(resolveConfig(cfg,PATH_ENV),{cwd:repo,wait:true,projectGate:true,ensure:true});
   assert.equal(report.outcome,'pass',JSON.stringify(report));
   assert.deepEqual([report.scanner.exitCode,report.ceTask.status,report.analysisId,report.projectGate.status],[0,'SUCCESS','AN-1','OK']);
   assert.equal(state.gateSelected.get('product-repo'),'starci-quality-lite');
-  assert.deepEqual([...state.gateConditions.keys()].sort(),['duplicated_lines_density','new_blocker_violations','new_critical_violations','new_duplicated_lines_density','new_security_hotspots_reviewed','security_hotspots_reviewed','violations'].sort());
+  assert.deepEqual([...state.gateConditions.keys()].sort(),serverConditions(full).map(row=>row.metric).sort());
   assert.deepEqual(state.gateConditions.get('violations').error,'0');
-  const dash=await sonarLocalMain(['dashboard','--cwd',repo],{config:cfg});
-  assert.equal(dash.exitCode,0,JSON.stringify(dash.report));
-  assert.deepEqual([dash.report.coverage.applied,dash.report.coverage.status,dash.report.coverage.files],[false,'not-required',[]]);
-  assert.equal('coverage' in dash.report.numbers,false,'no synthetic covered percentage');
-  assert.ok(!state.requests.some(row=>row.path==='/api/measures/component_tree'),'lite has no coverage measure to query');
-  assertNoSecret(report,'lite scan');assertNoSecret(dash.report,'lite dashboard');
+  assert.deepEqual(state.gateConditions.get('coverage').error,'100','the lite server gate holds the overall coverage at 100');
+  assertNoSecret(report,'lite scan');
 });
 
-test('lite slice coverage is not-required by policy and is distinct from an owner disabling unit tests',async t=>{
-  const root=temporary(t,'lite-slice'),custody=fakeCustody(root),repo=fakeRepo(root,{services:true});
-  write(repo,'hfs.json',JSON.stringify({hfs:2,kind:'app',edition:'lite'}));
-  const {host}=await fakeSonar(t,{sources:serviceSources()});
-  const out=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(host,custody,{coverageRunner:()=>{throw Error('coverage runner must not run for lite');}})});
-  assert.equal(out.exitCode,0,JSON.stringify(out.report));
-  assert.deepEqual([out.report.coverageRun.judged,out.report.slice.coverage.status,out.report.slice.coverage.files],[false,'not-required',[]]);
-  assert.equal(out.report.ownerMode,undefined,'declared lite policy is not specs.unit=false');
-  assert.equal(fs.existsSync(path.join(repo,'coverage','lcov.info')),false);
+test('lite slice coverage is judged exactly as full: the unit run measures the touched services, one below 100 fails and all at 100 pass (owner ruling 2026-10-12)',async t=>{
+  const custody=fakeCustody(temporary(t,'lite-slice-custody'));
+  const liteRepo=(label)=>{const repo=fakeRepo(temporary(t,label),{services:true});write(repo,'hfs.json',JSON.stringify({hfs:2,kind:'app',edition:'lite'}));return repo;};
+  const red=await fakeSonar(t,{sources:serviceSources(),coverage:{'src/orders/order.service.js':100,'src/orders/payment.service.js':87.5}});
+  const runner=lcovRunner();
+  const failed=await sonarLocalMain(['scan','--cwd',liteRepo('lite-slice-red'),'--wait'],{config:configFor(red.host,custody,{coverageRunner:runner})});
+  assert.equal(failed.exitCode,1,JSON.stringify(failed.report.slice));
+  assert.equal(failed.report.outcome,'fail');
+  assert.deepEqual(failed.report.slice.coverage.failures,['coverage of src/orders/payment.service.js 87.5% < 100%']);
+  assert.deepEqual(runner.calls.map(c=>c.files.sort()),[['src/orders/order.service.js','src/orders/payment.service.js']],'the lite unit run measured the slice');
+  assert.deepEqual([failed.report.coverageRun.lcov,failed.report.coverageRun.written,failed.report.coverageRun.judged],['coverage/lcov.info',true,true]);
+  assert.match(failed.report.reason,/coverage of src\/orders\/payment\.service\.js 87\.5% < 100%/);
+  const green=await fakeSonar(t,{sources:serviceSources(),coverage:{'src/orders/order.service.js':100,'src/orders/payment.service.js':100}});
+  const passed=await sonarLocalMain(['scan','--cwd',liteRepo('lite-slice-green'),'--wait'],{config:configFor(green.host,custody,{coverageRunner:lcovRunner()})});
+  assert.equal(passed.exitCode,0,JSON.stringify(passed.report.slice));
+  assert.deepEqual([passed.report.slice.coverage.failures,passed.report.slice.coverage.status],[[],'green']);
+  assert.equal(passed.report.ownerMode,undefined,'a declared lite policy is not specs.unit=false');
 });
 
 test('lite still refuses a red project gate and blocked server; submission alone is never qualification',async t=>{
@@ -1606,15 +1610,15 @@ test('lite still refuses a red project gate and blocked server; submission alone
   }
 });
 
-test('lite dashboard retains issues, reviewed-hotspot and missing-measure refusals without requiring coverage',async t=>{
-  const clean={bugs:0,code_smells:0,vulnerabilities:0,security_hotspots:2,security_hotspots_reviewed:100,duplicated_lines_density:0};
+test('lite dashboard retains issues, reviewed-hotspot and missing-measure refusals and requires coverage like full',async t=>{
+  const clean={bugs:0,code_smells:0,vulnerabilities:0,security_hotspots:2,security_hotspots_reviewed:100,duplicated_lines_density:0,coverage:100};
   for(const [label,measures,why] of [['bugs',{...clean,bugs:1},/bugs 1 > 0/],['hotspots',{...clean,security_hotspots_reviewed:50},/security_hotspots_reviewed 50% < 100%/],['missing',{...clean,code_smells:undefined},/code_smells is not measured/]]){
-    const root=temporary(t,`lite-dashboard-${label}`),custody=fakeCustody(root),repo=fakeRepo(root);
+    const root=temporary(t,`lite-dashboard-${label}`),custody=fakeCustody(root),repo=fakeRepo(root,{services:true});
     write(repo,'hfs.json',JSON.stringify({hfs:2,kind:'app',edition:'lite'}));
-    const {host}=await fakeSonar(t,{projectMeasures:measures});
+    const {host}=await fakeSonar(t,{projectMeasures:measures,coverage:{'src/orders/order.service.js':100,'src/orders/payment.service.js':100}});
     const out=await sonarLocalMain(['dashboard','--cwd',repo],{config:configFor(host,custody)});
     assert.equal(out.exitCode,1,JSON.stringify(out));assert.match(out.report.reason,why);
-    assert.equal(out.report.coverage.status,'not-required');
+    assert.equal(out.report.coverage.files.length,2,'lite per-file coverage is required, as in full');
   }
 });
 
@@ -1656,8 +1660,7 @@ test('both full and lite dashboards reject excessive or missing duplication and 
     assert.equal(out.exitCode,code,JSON.stringify(out));
     assert.ok(state.requests.some(row=>row.path==='/api/measures/component'&&row.query.metricKeys.split(',').includes('duplicated_lines_density')),'the real dashboard requests the mandatory measure');
     if(why)assert.match(out.report.reason,why);else assert.equal(out.report.numbers.duplicated_lines_density,3);
-    if(edition==='lite')assert.equal(out.report.coverage.status,'not-required');
-    else assert.equal(out.report.coverage.files.length,2,'full per-file coverage remains required');
+    assert.equal(out.report.coverage.files.length,2,`${edition}: per-file coverage is required in both editions`);
   }
 });
 

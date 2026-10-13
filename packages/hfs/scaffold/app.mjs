@@ -110,7 +110,7 @@ const STARTER_DEPENDENCIES = Object.freeze({
   },
 });
 
-/** Lite keeps the production stack and canon tools, but has no test runtime or test types. */
+/** Lite keeps the production stack, the canon tools and the back end's unit run (owner ruling 2026-10-12); it runs no test world of its own (no @starci/test-world). */
 const LITE_STARTER_DEPENDENCIES = Object.freeze({
   dependencies: {
     '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': null,
@@ -119,11 +119,11 @@ const LITE_STARTER_DEPENDENCIES = Object.freeze({
     'reflect-metadata': null, rxjs: null, tslib: null, typeorm: null,
   },
   devDependencies: {
-    turbo: null, '@starci/eslint-canon-be': null, '@starci/eslint-canon-fe': null, '@starci/cli': null,
-    '@starci/prettier-config': null, '@starci/stylelint-canon': null, '@starci/tsconfig': null, '@tailwindcss/postcss': null,
-    '@types/express': null, '@types/node': null, '@types/react': null, '@types/react-dom': null,
-    eslint: null, 'eslint-plugin-react-hooks': null, husky: null, 'postcss-value-parser': null, prettier: null,
-    stylelint: null, supabase: null, tailwindcss: null, 'ts-node-dev': null, 'tsc-alias': null,
+    turbo: null, '@nestjs/testing': null, '@starci/eslint-canon-be': null, '@starci/eslint-canon-fe': null, '@starci/cli': null,
+    '@starci/jest-preset': null, '@starci/prettier-config': null, '@starci/stylelint-canon': null, '@starci/tsconfig': null, '@tailwindcss/postcss': null,
+    '@types/express': null, '@types/jest': null, '@types/node': null, '@types/react': null, '@types/react-dom': null,
+    eslint: null, 'eslint-plugin-react-hooks': null, husky: null, jest: null, 'postcss-value-parser': null, prettier: null,
+    stylelint: null, supabase: null, tailwindcss: null, 'ts-jest': null, 'ts-node-dev': null, 'tsc-alias': null,
     'tsconfig-paths': null, typescript: null,
   },
 });
@@ -269,10 +269,7 @@ const LITE_DEFERRED_GENERATOR_FILES = new Set([
   'src/modules/platform/database/migration-runner.service.ts',
   'src/modules/platform/database/seed-runner.service.ts',
 ]);
-const liteBaseFile = (scope, rel) => {
-  if (scope === 'app') return LITE_APP_REUSED.has(rel);
-  if (scope === 'fe') return false;
-  return !rel.startsWith('apps/cli/')
+const liteBaseSource = (rel) => !rel.startsWith('apps/cli/')
     && !rel.startsWith('src/features/cli/')
     && !rel.startsWith('src/modules/domain/note/')
     && rel !== 'src/modules/platform/database/connection-source.client.ts'
@@ -280,8 +277,22 @@ const liteBaseFile = (scope, rel) => {
     && rel !== 'src/modules/platform/database/seed-connections.client.ts'
     && rel !== 'src/modules/platform/primitives/sequence.policy.ts'
     && !LITE_DEFERRED_GENERATOR_FILES.has(rel)
-    && !rel.startsWith('src/tests/')
-    && !rel.endsWith('.spec.ts');
+    && !rel.startsWith('src/tests/');
+/** The be files the lite overlay replaces: a base unit spec of such a file tests the full variant, so lite carries its own. */
+const liteOverlaid = (() => {
+  let set = null;
+  return () => (set ??= new Set(listFiles(path.join(TEMPLATES_DIR, 'be', 'skeleton-lite'))));
+})();
+/**
+ * A base be file lite reuses: a source file of the shared shape, and the unit spec beside a reused source file that the lite overlay
+ * does not replace (owner ruling 2026-10-12: a lite back end keeps full's unit specs).
+ */
+const liteBaseFile = (scope, rel) => {
+  if (scope === 'app') return LITE_APP_REUSED.has(rel);
+  if (scope === 'fe') return false;
+  if (!rel.endsWith('.spec.ts')) return liteBaseSource(rel);
+  const subject = rel.replace(/\.spec\.ts$/, '.ts');
+  return liteBaseSource(subject) && !liteOverlaid().has(subject);
 };
 const liteOverlayFile = (scope, rel) => scope !== 'be' || !LITE_DEFERRED_GENERATOR_FILES.has(rel);
 

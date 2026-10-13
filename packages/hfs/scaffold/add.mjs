@@ -20,10 +20,10 @@ import { createSlotResolver, loadSlotManifest, readRepoDeclaration, ruleParams }
 import { parseYaml } from '../runtime/engine/yaml.mjs';
 import { TEMPLATES_DIR } from '../sync/index.mjs';
 import { ScaffoldError, pascalOf } from './service.mjs';
-import { refuseInEdition } from './edition-gate.mjs';
+import { refuseFullAdapterInLite, refuseInEdition } from './edition-gate.mjs';
 import { addTable } from './add-table.mjs';
 import { addApp } from './add-app.mjs';
-import { ensureLiteCli, selectLiteCliEntries } from './add-cli-lite.mjs';
+import { ensureLiteCli } from './add-cli-lite.mjs';
 import { addLiteWebhookInbox, selectLiteWebhookEntries } from './add-inbox-lite.mjs';
 import { jsonText } from './app.mjs';
 import { byCodeUnit } from '../report/order.mjs';
@@ -46,6 +46,9 @@ function readTree(topic) {
   if (!Array.isArray(doc?.files)) throw new ScaffoldError('HFS_ADD_TREE_MISSING', `knowledge/patterns/be/${topic}.yaml has no files tree`);
   return doc.files;
 }
+
+/** The parsed document of the topic `topic` (knowledge/patterns/be/<topic>.yaml) the package carries. */
+const readTopic = (topic) => ({ id: topic, doc: parseYaml(fs.readFileSync(path.join(TOPICS_DIR, `${topic}.yaml`), 'utf8')) });
 
 const selectLiteApiEntries = entries => [
   ...entries.filter(entry => !entry.path.includes('/transport/graphql/')).map(entry => {
@@ -147,8 +150,11 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
   const topics = new Set([...specs.map(([, eachSpec]) => eachSpec.topic), ...topicsOfPatterns(patterns)]);
   const liteCli = noun === 'cli' && repo.edition === 'lite';
   const liteApi = noun === 'api' && repo.edition === 'lite';
+  // Lite has every pattern (owner ruling 2026-10-12), but a topic with a liteAdapter is generated only from full templates.
+  refuseFullAdapterInLite({ edition: repo.edition, topics: [...topics].map(readTopic), command: `add ${noun}` });
   const trees = new Map([...topics].map((topic) => {
-    const entries = repo.edition === 'lite' ? selectLiteWebhookEntries(selectLiteCliEntries(readTree(topic))) : readTree(topic);
+    // Lite keeps every colocated unit spec of a tree (owner ruling 2026-10-12); only the webhook door and its spec are lite's own.
+    const entries = repo.edition === 'lite' ? selectLiteWebhookEntries(readTree(topic)) : readTree(topic);
     return [topic, liteApi && topic === spec.topic ? selectLiteApiEntries(entries) : entries];
   }));
   // The slots the noun's trees name decide whether the edition has the noun (a slot lite does not carry or forbids

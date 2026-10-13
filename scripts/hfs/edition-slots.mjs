@@ -1,5 +1,7 @@
 // edition.mjs - the one edition filter shared by the HFS slot resolver, declaration validation, rule catalog and
 // edition-specific rule parameters. Full is the default; lite changes data views, never the checks that consume them.
+// Lite is the full architecture deployed without self-hosted infrastructure (owner ruling 2026-10-12): its overlays swap
+// adapters and remove the infra and e2e world, and every slot keeps its own `tests`.
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { EDITIONS } from './manifest-shape.mjs';
 
@@ -15,7 +17,7 @@ export function slotInEdition(manifest, slot, edition) {
   return (slot.editions ?? manifest.editions ?? EDITIONS).includes(edition);
 }
 
-/** The slot as `edition` sees it: lite overlays its data, presence and tracking while forbidding every test world. */
+/** The slot as `edition` sees it: lite overlays its data, presence and tracking; `tests` stays the slot's own (lite keeps the unit specs). */
 export function effectiveSlot(slot, profile, edition) {
   if (edition !== 'lite') return slot;
   const { lite, litePresence, ...base } = slot;
@@ -23,7 +25,7 @@ export function effectiveSlot(slot, profile, edition) {
   let tracked = slot.tracked;
   if (presence === 'forbidden') tracked = 'external';
   else if (tracked === 'external') tracked = 'tracked';
-  return { ...base, ...lite, presence, tracked, tests: 'none' };
+  return { ...base, ...lite, presence, tracked };
 }
 
 /** The template group starci app sync renders `slot` from under `edition`: `liteManagedBy` (else `managedBy`) in lite, `managedBy` otherwise; undefined when unmanaged. */
@@ -59,10 +61,17 @@ export function enforcerJudgedInEdition(rules, kind, id, edition = 'full') {
   return owners.every((rule) => judgedInEdition(rule, edition) && rule.enforcers.filter((enforcer) => enforcer.kind === kind && enforcer.id === id).every((enforcer) => judgedInEdition(enforcer, edition)));
 }
 
-/** A frozen copy of one profile's parameters, with its lite overrides applied only in the lite edition. */
+/**
+ * A frozen copy of one profile's parameters, with its lite overrides applied only in the lite edition. A lite key whose base
+ * value and override are both maps merges one level deep (lite.infraOwners restates only the specifiers whose owner changes);
+ * any other value replaces the base.
+ */
 export function editionRuleParams(params, edition) {
   const { lite, ...base } = params;
-  const merged = edition === 'lite' && lite ? { ...base, ...lite } : base;
+  const merged = edition === 'lite' && lite ? { ...base } : base;
+  if (edition === 'lite' && lite) {
+    for (const [key, value] of Object.entries(lite)) merged[key] = isPlainObject(value) && isPlainObject(base[key]) ? { ...base[key], ...value } : value;
+  }
   const deepFreeze = (value) => { if (value && typeof value === 'object') { Object.values(value).forEach(deepFreeze); } return Object.freeze(value); };
   return deepFreeze(structuredClone(merged));
 }

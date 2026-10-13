@@ -63,7 +63,7 @@ test('every lite workflow is structurally valid and pins each action version', (
   }
 });
 
-test('lite workflow semantics stay inside the declared no-test CI surface', () => {
+test('lite workflow semantics: the unit run and its coverage upload, never an e2e, integration or browser run (owner ruling 2026-10-12)', () => {
   const ci = workflows['.github/workflows/ci.yml'];
   const dbTypes = ci.jobs['db-types'];
   assert.equal(ci.jobs.changes, undefined, 'no path-filter job: the tag run checks the database types unconditionally');
@@ -73,8 +73,10 @@ test('lite workflow semantics stay inside the declared no-test CI surface', () =
 
   const runs = Object.values(workflows).flatMap(workflow => workflowSteps(workflow).map(step => step.run).filter(Boolean));
   for (const command of runs) {
-    assert.doesNotMatch(command, /\b(?:jest|vitest|playwright|test|coverage|codecov)\b/i, command);
+    assert.doesNotMatch(command, /\b(?:vitest|playwright|test:e2e|test:contract|test:integration|test:stack|test:browser)\b/i, command);
   }
+  assert.ok(runs.includes('npm test -- --ci'), 'ci.yml runs the unit project');
+  assert.ok(workflowSteps(ci).some(step => /codecov\/codecov-action@/.test(step.uses ?? '')), 'ci.yml uploads the unit coverage');
 
   const deploy = workflows['.github/workflows/db-deploy.yml'];
   assert.deepEqual(Object.keys(deploy.on), ['workflow_dispatch']);
@@ -108,8 +110,10 @@ test('both lite hooks are valid sh', t => {
   }
 });
 
-test('lite package scripts exclude tests and use only the approved database command surface', () => {
-  assert.deepEqual(Object.keys(scripts).filter(name => /^test(?::|$)/.test(name)), []);
+test('lite package scripts carry the unit run and the optional integration run, never e2e or contract, and use only the approved database command surface', () => {
+  assert.deepEqual(Object.keys(scripts).filter(name => /^test(?::|$)/.test(name)).sort(), ['test', 'test:affected', 'test:integration']);
+  assert.equal(scripts.test, 'cd be && jest --selectProjects unit --coverage');
+  assert.equal(scripts['typecheck:tests'], 'tsc -p be/src/tests/tsconfig.json');
 
   const allowedSupabaseSubcommands = new Set([
     'start',
@@ -167,9 +171,11 @@ test('the generated codegen accepts types stamped with the migrations digest and
   }
 });
 
-test('lite Sonar configuration has no coverage keys and names only implied source directories', () => {
+test('lite Sonar configuration imports the unit coverage like full and names only implied source directories', () => {
   const sonar = targets['sonar-project.properties'].content;
-  assert.doesNotMatch(sonar, /^sonar\..*(?:coverage|lcov|test(?:s|\.inclusions))/im);
+  assert.match(sonar, /^sonar\.javascript\.lcov\.reportPaths=be\/coverage\/lcov\.info$/m);
+  assert.match(sonar, /^sonar\.coverage\.exclusions=.+$/m);
+  assert.equal(typeof targets['codecov.yml']?.content, 'string', 'lite renders codecov.yml');
   const sourceLine = /^sonar\.sources=(.+)$/m.exec(sonar);
   assert.ok(sourceLine, 'sonar.sources is missing');
   const sources = sourceLine[1].split(',');

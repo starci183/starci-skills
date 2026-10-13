@@ -7,10 +7,29 @@
 
 /** The refusal of a verb a non-full edition does not carry: printed verbatim by the CLI, exit 2, nothing written. */
 export class EditionRefusal extends Error {
-  constructor(command) {
-    super(`${command}: full edition only; run starci app upgrade --edition full`);
+  constructor(command, message = `${command}: full edition only; run starci app upgrade --edition full`) {
+    super(message);
     this.name = 'EditionRefusal';
   }
+}
+
+/**
+ * The refusal of a pattern noun in a lite app whose topic carries a `liteAdapter` (owner ruling 2026-10-12): lite HAS the pattern,
+ * but the package's templates are the full adapter (BullMQ, Kafka, sockets, TypeORM entities, e2e proofs), so generating them would
+ * write what lite forbids. The pattern is written by hand on its Supabase adapter until the package carries a lite template.
+ */
+export class LiteAdapterRefusal extends EditionRefusal {
+  constructor(command, topics) {
+    super(command, `${command}: the package carries only the full adapter of ${topics.join(', ')}; in a lite app write it on its Supabase adapter (knowledge/patterns/be/${topics[0]}.yaml liteAdapter, knowledge/patterns/be/supabase-queues.yaml)`);
+    this.name = 'LiteAdapterRefusal';
+  }
+}
+
+/** Refuses `command` in a lite app when one of `topics` (pattern topic ids with their parsed documents) carries a `liteAdapter`. */
+export function refuseFullAdapterInLite({ edition, topics, command }) {
+  if (edition !== 'lite') return;
+  const adapted = topics.filter(({ doc }) => doc?.liteAdapter !== undefined).map(({ id }) => id).sort();
+  if (adapted.length) throw new LiteAdapterRefusal(command, adapted);
 }
 
 /**

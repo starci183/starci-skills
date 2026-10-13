@@ -5,14 +5,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { main } from '../../packages/hfs/src/main.mjs';
 import { addKind } from '../../packages/hfs/scaffold/add.mjs';
-import { EditionRefusal, refuseInEdition } from '../../packages/hfs/scaffold/edition-gate.mjs';
+import { EditionRefusal, LiteAdapterRefusal, refuseInEdition } from '../../packages/hfs/scaffold/edition-gate.mjs';
 import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
 import { cleanup, installTypeScript } from '../helpers/hfs-cli-fixture.mjs';
 
 // The edition gate of `starci app add` and `starci app new` (design 8.6 R8): in a lite app a noun whose file tree lands in a slot the
 // lite edition does not have (the slot's `editions` exclude it, or its `litePresence` is forbidden) refuses with exit 2
 // and "<verb> <noun>: full edition only; run starci app upgrade --edition full" on stderr, nothing written. The slot
-// resolver of the app decides - never a noun list.
+// resolver of the app decides - never a noun list. Owner ruling 2026-10-12: lite has every pattern; a pattern noun whose topic
+// carries a `liteAdapter` refuses only because the package carries the full adapter's templates (LiteAdapterRefusal).
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const made = [];
@@ -48,23 +49,22 @@ test('the gate reads the slot resolver of the app: a slot the edition lacks or f
     () => refuseInEdition({ resolver, slotIds, command }),
     (error) => error instanceof EditionRefusal && error.message === `${command}: full edition only; run starci app upgrade --edition full`,
     `${command} over ${slotIds}`);
-  // a slot lite forbids (litePresence), the lite-only forbidden slot itself, and an id the manifest never had all refuse
-  refuses(lite, ['be.feature.saga'], 'add saga');
-  refuses(lite, ['be.tests.world'], 'new spec');
-  refuses(lite, ['repo.tests-forbidden'], 'add x');
-  refuses(lite, ['be.feature', 'be.feature.saga'], 'add saga'); // one forbidden slot among legal ones is enough
+  // a slot lite forbids (litePresence: the e2e and contract world, the socket realtime doors) and an id the manifest never had refuse
   refuses(lite, ['be.tests.e2e'], 'add x');
+  refuses(lite, ['be.tests.contract'], 'add x');
+  refuses(lite, ['be.feature', 'be.feature.realtime.websocket'], 'add realtime'); // one forbidden slot among legal ones is enough
   refuses(lite, ['be.no.such.slot'], 'add x');
-  // a slot that exists under lite - whatever its presence - does not refuse
-  for (const slotIds of [['be.feature', 'be.feature.application', 'be.transport.graphql'], ['be.feature.webhooks.http'], ['be.cli'], ['be.app.cli'], ['be.contract.graphql']]) {
+  // a slot that exists under lite - whatever its presence - does not refuse: the patterns and the unit world are lite's too
+  for (const slotIds of [['be.feature', 'be.feature.application', 'be.transport.graphql'], ['be.feature.webhooks.http'], ['be.cli'], ['be.app.cli'], ['be.contract.graphql'],
+    ['be.feature.saga'], ['be.tests.world'], ['be.platform.queue', 'be.queues', 'be.feature.jobs'], ['be.feature.realtime.supabase']]) {
     assert.equal(refuseInEdition({ resolver: lite, slotIds, command: 'add x' }), undefined, slotIds.join(', '));
   }
   // under full the gate never fires over the slots lite forbids, and an id the view does not answer refuses exactly as under lite
-  assert.equal(refuseInEdition({ resolver: full, slotIds: ['be.feature.saga', 'be.tests.world'], command: 'add saga' }), undefined);
+  assert.equal(refuseInEdition({ resolver: full, slotIds: ['be.tests.e2e', 'be.feature.realtime.websocket'], command: 'add realtime' }), undefined);
   refuses(full, ['be.no.such.slot'], 'add x');
 });
 
-test('a lite app refuses every add noun whose tree writes a slot lite does not have - exit 2, the exact message, nothing written', async () => {
+test('a lite app refuses every pattern noun whose topic carries a liteAdapter: the package has only the full adapter - exit 2, the message names the topic, nothing written', async () => {
   const cases = [
     ['job', 'send-receipt'],
     ['queue', 'receipt'],
@@ -76,13 +76,14 @@ test('a lite app refuses every add noun whose tree writes a slot lite does not h
   for (const [noun, name, ...opts] of cases) {
     const dir = repo(LITE);
     const result = await cli(['add', noun, name, ...opts, '--cwd', dir]);
-    assert.deepEqual([result.code, result.out, result.err], [2, '', `add ${noun}: full edition only; run starci app upgrade --edition full\n`], noun);
+    assert.deepEqual([result.code, result.out], [2, ''], noun);
+    assert.match(result.err, new RegExp(`^add ${noun}: the package carries only the full adapter of [a-z, -]+; in a lite app write it on its Supabase adapter \\(knowledge/patterns/be/[a-z-]+\\.yaml liteAdapter, knowledge/patterns/be/supabase-queues\\.yaml\\)\\n$`), noun);
     assert.deepEqual(tree(dir), ['hfs.json'], `${noun}: nothing written, no partial state`);
-    assert.throws(() => addKind({ repoRoot: dir, noun, name }), EditionRefusal, `${noun}: the exported function refuses, not only the CLI`);
+    assert.throws(() => addKind({ repoRoot: dir, noun, name }), LiteAdapterRefusal, `${noun}: the exported function refuses, not only the CLI`);
   }
   // the refusal precedes the noun's option validation: a saga without its --owner answers the same
   const dir = repo(LITE);
-  assert.equal((await cli(['add', 'saga', 'fulfil', '--cwd', dir])).err, 'add saga: full edition only; run starci app upgrade --edition full\n');
+  assert.match((await cli(['add', 'saga', 'fulfil', '--cwd', dir])).err, /^add saga: the package carries only the full adapter of /);
   assert.deepEqual(tree(dir), ['hfs.json']);
   // `event` is no noun in any edition: the unknown-noun refusal stays as before
   const event = await cli(['add', 'event', 'order-paid', '--cwd', repo(LITE)]);
@@ -90,14 +91,13 @@ test('a lite app refuses every add noun whose tree writes a slot lite does not h
   assert.match(event.err, /HFS_ADD_NOUN_UNKNOWN/);
 });
 
-test('a lite app refuses `new service` and `new spec` - the unit spec they write has no test world there', async () => {
-  // No node_modules: the refusal precedes even the repository's own TypeScript load.
+test('a lite app writes `new service` with its unit spec - a lite back end keeps full\'s unit specs (owner ruling 2026-10-12)', async () => {
   const dir = repo(LITE);
-  for (const args of [['service', 'be/src/modules/domain/commission', 'commission'], ['spec', 'be/src/modules/domain/commission/commission.service.ts']]) {
-    const result = await cli(['new', ...args, '--cwd', dir]);
-    assert.deepEqual([result.code, result.out, result.err], [2, '', `new ${args[0]}: full edition only; run starci app upgrade --edition full\n`], args[0]);
-  }
-  assert.deepEqual(tree(dir), ['hfs.json'], 'nothing written');
+  installTypeScript(dir);
+  const result = await cli(['new', 'service', 'be/src/modules/domain/commission', 'commission', '--cwd', dir]);
+  assert.equal(result.code, 0, result.err);
+  assert.ok(exists(dir, 'be/src/modules/domain/commission/commission.service.ts'));
+  assert.ok(exists(dir, 'be/src/modules/domain/commission/commission.service.spec.ts'));
 });
 
 test('the nouns lite keeps are untouched: add api, add webhook and add cli still write their trees', async () => {
@@ -142,7 +142,7 @@ test('the nouns lite keeps are untouched: add api, add webhook and add cli still
   assert.equal((await cli(['new', 'image', '--cwd', repo(LITE)])).code, 0);
 });
 
-test('a full app is unaffected: the nouns lite refuses write as before', async () => {
+test('a full app is unaffected: the pattern nouns write their full adapter as before', async () => {
   const dir = repo(FULL);
   const queue = await cli(['add', 'queue', 'receipt', '--cwd', dir]);
   assert.equal(queue.code, 0, queue.err);

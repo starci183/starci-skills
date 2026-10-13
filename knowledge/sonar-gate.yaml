@@ -81,13 +81,17 @@ overall:
   cognitiveComplexity:
     rule: typescript:S3776
     via: overall.issues
-# Lite is the same quality policy without a test or coverage world. Readers select this block from hfs.json edition;
-# keeping both gates in this document makes every threshold data, never a branch-local restatement.
+# Lite is the same quality policy, coverage included: a lite back end keeps full's unit run and its 100 per file on the measured
+# logic files (owner ruling 2026-10-12, R212 case-1). Readers select this block from hfs.json edition; the gate keeps its own
+# name so a lite project's server gate stays a separate object, and every threshold below equals full's.
 lite:
   gate:
     name: starci-quality-lite
     newCodePeriod: {type: NUMBER_OF_DAYS, value: 30}
   newCode:
+    coverage:
+      metric: new_coverage
+      minPercent: 100
     ignoreBelowChangedLines: 20
     duplication:
       metric: new_duplicated_lines_density
@@ -109,6 +113,10 @@ lite:
     hotspots:
       metric: security_hotspots_reviewed
       minReviewedPercent: 100
+    coverage:
+      metric: coverage
+      minPercent: 100
+      perFile: true
     duplication:
       metric: duplicated_lines_density
       maxPercent: 3

@@ -32,10 +32,10 @@ import { affectedRowExtras, ciPlan, ciSettings } from './release-ci-rows.mjs';
 const BROWSER_SKIPS = Object.freeze(['draw-render', 'draw-rationale', 'draw-layer']);
 const INFRASTRUCTURE = /\b(?:docker|postgres(?:ql)?|supabase|kafka|redis|minio|keycloak|compose|stack|orca|port|socket|network|database|infrastructure|unavailable|not installed|not reachable)\b/i;
 const EXAMPLE_SCRIPTS = Object.freeze(['codegen', 'typecheck', 'typecheck:tests', 'lint', 'format:check', 'test', 'test:contract', 'test:integration', 'test:e2e', 'build:be', 'build:fe', 'docker:build']);
-/** A lite app holds no tests (lite holds no tests): its row is the full row without them; the lite scaffold e2e inside the spec run is its behaviour proof. */
-const LITE_NO_SCRIPTS = Object.freeze(['typecheck:tests', 'test', 'test:contract', 'test:integration', 'test:e2e']);
-/** The scripts of an app's row: a lite app has no test scripts, a full app has none for a test layer it holds no spec file in (`layers`, read from the checkout by exampleApps; absent means every layer). */
-export const scriptsOf = (app) => (app.edition === 'lite' ? EXAMPLE_SCRIPTS.filter((script) => !LITE_NO_SCRIPTS.includes(script)) : EXAMPLE_SCRIPTS.filter((script) => !idleScripts(app.layers).some((idle) => idle.script === script)));
+/** A lite app has the unit run and optional integration specs but no e2e or contract world (owner ruling 2026-10-12): its row is the full row without those two scripts. */
+const LITE_NO_SCRIPTS = Object.freeze(['test:contract', 'test:e2e']);
+/** The scripts of an app's row: none for a test layer the app holds no spec file in (`layers`, read from the checkout by exampleApps; absent means every layer), and a lite app never has the e2e or contract script. */
+export const scriptsOf = (app) => EXAMPLE_SCRIPTS.filter((script) => !(app.edition === 'lite' && LITE_NO_SCRIPTS.includes(script)) && !idleScripts(app.layers).some((idle) => idle.script === script));
 /** The proofs of the checks column that only a tool outside npm scripts can give (Sonar: release-l4-sonar.mjs): each must answer {ok, log}. */
 const L4_PROOFS = Object.freeze(['sonar']);
 const STEP_TIMEOUT_MS = 60 * 60_000;
@@ -134,7 +134,7 @@ export function skipReport(steps, opts) {
   return { skips, failures, covered, declared: [...new Set(skips.filter((k) => k.class === 'declared').map((k) => k.name))].sort(byCodeUnit) };
 }
 
-/** The example apps of `repo` (examples/<name>/hfs.json of kind app): [{name, dir, edition, layers?}], the edition `lite` or `full`, the test layers a full app holds (testLayersOf). */
+/** The example apps of `repo` (examples/<name>/hfs.json of kind app): [{name, dir, edition, layers}], the edition `lite` or `full`, the test layers the app holds (testLayersOf). */
 export function exampleApps(repo) {
   const root = path.join(repo, 'examples');
   if (!fs.existsSync(root)) return [];
@@ -143,7 +143,7 @@ export function exampleApps(repo) {
       const hfs = JSON.parse(fs.readFileSync(path.join(root, e.name, 'hfs.json'), 'utf8'));
       if (hfs.kind !== 'app') return [];
       const dir = path.join(root, e.name), edition = hfs.edition === 'lite' ? 'lite' : 'full';
-      return [{ name: e.name, dir, edition, ...(edition === 'full' ? { layers: testLayersOf(dir) } : {}) }];
+      return [{ name: e.name, dir, edition, layers: testLayersOf(dir) }];
     } catch { return []; }
   });
 }
@@ -196,7 +196,7 @@ export function planL4(repo, { runtimeRoot, mode = 'local' } = {}) {
       const name = `${app.name}: npm run ${script}`;
       steps.push(scripts[script] ? { name, cmd: 'npm', args: ['run', script], cwd: app.dir, nextBuild: true } : { name, absent: true, cwd: app.dir });
     }
-    notPlanned.push(...(app.edition === 'lite' ? [] : idleScripts(app.layers)).map((idle) => ({ name: `${app.name}: npm run ${idle.script}`, why: idle.why })));
+    notPlanned.push(...idleScripts(app.layers).filter((idle) => !(app.edition === 'lite' && LITE_NO_SCRIPTS.includes(idle.script))).map((idle) => ({ name: `${app.name}: npm run ${idle.script}`, why: idle.why })));
   }
   const planned = { steps, notPlanned, proofs: apps.flatMap((app) => L4_PROOFS.map((proof) => `${app.name}: ${proof}`)), linux: true, mode: 'local', delegated: [] };
   return mode === 'ci' ? ciPlan({ plan: planned, repo, env }) : planned;

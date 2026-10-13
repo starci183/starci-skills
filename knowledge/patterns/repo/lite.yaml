@@ -2,20 +2,23 @@ schema: starci/knowledge-source@1
 id: repo.lite
 title: Lite edition
 purpose: |
-  Given a small product on Supabase, which part of the one HFS standard still applies and how is it kept? A lite app is the same
-  standard through a filtered slot and rule view (`edition: lite` in hfs.json): the database is the Supabase project, the
-  front end is the one door to it, and nothing a lite app does not have is present.
+  Given a small product on Supabase, which part of the one HFS standard still applies and how is it kept? All of it: a lite app
+  is the full architecture deployed without self-hosted infrastructure (owner ruling 2026-10-12, R212 case-1), seen through a
+  filtered slot and rule view (`edition: lite` in hfs.json). The same monorepo, slots, patterns and back-end unit specs; every
+  pattern port implemented on Supabase (knowledge/patterns/be/supabase-queues.yaml and the lite adapter of each pattern topic);
+  no e2e or contract world and no stack of its own.
 appliesTo:
   - backend
   - frontend
 family: repo
 provenance:
-  reviewedAt: 2026-10-03
+  reviewedAt: 2026-10-12
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
     - knowledge/hfs/rules.yaml
     - docs/lite-edition.md
+    - owner ruling 2026-10-12 (lite = full minus self-hosted infrastructure; queue transport Supabase Queues/pgmq)
     - https://supabase.com/docs/guides/database/postgres/row-level-security
     - https://supabase.com/docs/guides/auth/server-side/nextjs
   limitations: |
@@ -28,14 +31,31 @@ rules:
     hfsRules: [R212]
     requirement: |
       `hfs.json` names its edition (`full`, or `lite`; absent means `full`). The edition selects which slots and rules are in
-      view; it never selects another engine or relaxes a rule locally. A lite app holds none of what lite does not have: no
-      spec or test file, test script, test dependency or test-tool config, no UAT record, no `supabase/functions`.
+      view; it never selects another engine or relaxes a rule locally. Lite keeps the full monorepo (the api, cli and optional
+      worker apps, the features and modules of the back end, the front-end apps and packages, the Supabase project, the stack
+      declaration and the Work tree), the CQRS
+      shape, every pattern (queue, event bus, saga, reactors, projection, realtime, webhooks, fenced job) declared the same way,
+      and the back-end unit specs exactly as full (ruleParams.be.unitRoles, logicRoles at 100 per file, @starci/jest-preset
+      doubles, builders). Only adapters and delivery differ, all on Supabase: schema authority in `supabase/migrations`; queue and
+      event bus on Supabase Queues (pgmq); realtime on Supabase Realtime; cache and locks on Postgres; schedules on pg_cron
+      (+ pg_net); storage and auth on Supabase. Integration specs are optional and run only on `starci supabase start`. A lite app holds
+      none of the infrastructure lite does not run: no e2e or contract spec or script, no e2e workflow or browser journey, no
+      UAT record, no test container, toxiproxy, BullMQ, Kafka or Redis dependency, no `.starcistacks/<env>/infra` and no
+      `supabase/functions`. The front end is the full front end, with no tests (R97).
     rationale: |
-      One manifest and one catalog keep a lite app upgradable to full by additions only.
+      One manifest and one catalog keep a lite app upgradable to full by additions only: swap the adapters, add the e2e and
+      contract world and the stack.
     cases:
       - id: case-1
         when: A product outgrows lite
         write: Run the upgrade verb with the full edition; it adds the full slots and removes nothing.
+      - id: case-2
+        when: "Owner ruling 2026-10-12: a lite app needs background work, events or a push channel"
+        write: >-
+          Declare the pattern in hfs.json exactly as in full (queue, event-bus, saga, realtime ...) and write the same ports; the
+          adapter behind them is Supabase - platform/queue sends to pgmq, a processor reads with a visibility timeout and archives
+          on dead letter, a schedule is a pg_cron job, a be push goes out on Supabase Realtime. Each service and cli command has its
+          unit spec beside it; there is no e2e spec.
     verification:
       automated:
         - HFS_EDITION_INVALID

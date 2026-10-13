@@ -88,7 +88,7 @@ const strList = (v) => stringList(v);
 
 const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'pattern', 'trigger', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'liteManagedBy', 'rules', 'goesTo', 'why', 'since', 'perConnection', 'parent', 'editions', 'litePresence', 'lite', 'provider', 'coverage', 'entries', 'outcomeHome', 'anonymousActions'];
 /** The fields a slot's `lite` overlay may hold: the same keys it would carry in the slot body, resolved under edition lite. */
-const LITE_OVERLAY_KEYS = ['path', 'requires', 'allows', 'forbids', 'minInstances', 'requiredInstances'];
+const LITE_OVERLAY_KEYS = ['path', 'requires', 'allows', 'forbids', 'minInstances', 'requiredInstances', 'why'];
 /** A runtime slot has no app kind, side composition, layer or managed template; it may name the generator of a generated copy. */
 const RUNTIME_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'minInstances', 'requires', 'allows', 'forbids', 'budget', 'rules', 'goesTo', 'why', 'since', 'generatedBy', 'parent', 'coverage'];
 
@@ -197,6 +197,7 @@ function slotLiteOverlayProblems(slot, at) {
   if (slot.lite === undefined) return [];
   const ok = isPlainObject(slot.lite) && Object.keys(slot.lite).length && Object.keys(slot.lite).every((key) => LITE_OVERLAY_KEYS.includes(key))
     && (slot.lite.path === undefined || (typeof slot.lite.path === 'string' && slot.lite.path))
+    && (slot.lite.why === undefined || (typeof slot.lite.why === 'string' && slot.lite.why.trim()))
     && ['requires', 'allows', 'forbids'].every((key) => slot.lite[key] === undefined || strList(slot.lite[key]))
     && (slot.lite.minInstances === undefined || (Number.isInteger(slot.lite.minInstances) && slot.lite.minInstances >= 1))
     && (slot.lite.requiredInstances === undefined || (isPlainObject(slot.lite.requiredInstances) && Object.values(slot.lite.requiredInstances).every((v) => strList(v) && v.length)));

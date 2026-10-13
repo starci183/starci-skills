@@ -236,7 +236,7 @@ $defs:
               lite:
                 type: object
                 minProperties: 1
-                description: 'The ruleParams.be keys edition lite overrides (each shaped as above; schemaAuthority: supabase makes supabase/migrations the one schema authority).'
+                description: 'The ruleParams.be keys edition lite overrides (each shaped as above; schemaAuthority: supabase makes supabase/migrations the one schema authority). A map value (infraOwners) merges one level deep over the base map; any other value replaces it.'
           fe:
             type: object
             additionalProperties: false
@@ -538,6 +538,7 @@ $defs:
           requiredInstances:
             type: object
             additionalProperties: {type: array, minItems: 1, uniqueItems: true, items: {type: string, minLength: 1}}
+          why: {type: string, minLength: 1, description: 'the why of the slot under lite: the Supabase adapter that implements the slot''s ports there'}
       provider:
         enum: [postgres, supabase]
         description: 'the connection provider that enables this opt-in slot (a connection in hfs.json with that provider); never an app kind'

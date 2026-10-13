@@ -85,6 +85,21 @@ $defs:
         type: array
         minItems: 1
         items: {$ref: '#/$defs/enforcer'}
+      cases:
+        type: array
+        minItems: 1
+        items: {$ref: '#/$defs/case'}
+        description: 'The dated owner rulings that shaped the rule, oldest first: a ruling is recorded where its law lives, never in a side document.'
+  case:
+    type: object
+    additionalProperties: false
+    required: [id, date, source, ruling]
+    properties:
+      id: {type: string, pattern: '^case-[1-9][0-9]*$'}
+      date: {type: string, pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'}
+      source: {const: owner}
+      ruling: {type: string, minLength: 1, description: The ruling in English, as the rule now applies it.}
+      quote: {type: string, minLength: 1, description: 'The owner''s words, in English (an owner message in Vietnamese is quoted in translation: the knowledge is English, R96).'}
   enforcer:
     type: object
     additionalProperties: false

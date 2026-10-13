@@ -176,3 +176,13 @@ files:
     role: "Titles projection/<scenario>: ... prove the pattern."
     spec: projection/recompute-is-idempotent, projection/replay-rebuilds
     rules: [BE_PATTERN_SPEC_MISSING]
+# Edition lite (owner ruling 2026-10-12, R212 case-1): the same ports and rules, a Supabase adapter behind them.
+liteAdapter:
+  summary: >-
+    Under lite a projection is unchanged in behaviour (only it writes its table, recompute is idempotent and replayable, readers
+    use get*); its table is a supabase migration with a rows type, so the slot carries no projection entity (be.projections lite
+    overlay), and it is kept current by a reactor or a job on the lite transport.
+  ports:
+    - {port: read model table, adapter: "a supabase migration plus <name>.sql.ts and <name>.rows.ts under persistence/"}
+  proof: Unit specs as full (the projection is a logic role at 100 per file); the projection/* scenarios are optional integration specs.
+  see: [knowledge/patterns/be/supabase-queues.yaml]

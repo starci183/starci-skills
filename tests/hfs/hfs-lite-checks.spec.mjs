@@ -33,13 +33,14 @@ const withReadme = (t, text) => {
 };
 const developmentFindings = (dir, edition) => checkRepoPresentation({ root: dir, runtime: false, tree: { top: new Set(), hasFile: (f) => ['README.md', '.gitattributes'].includes(f), hasDir: () => false, source: 'test' }, edition }).violations.filter((v) => v.ruleId === 'HFS_README_DEVELOPMENT_INCOMPLETE');
 
-test('README Development: the managed script names of the edition decide (no npm test in lite, typecheck and lint in both)', (t) => {
-  const liteCommands = ['npm install', 'npm run typecheck', 'npm run lint'];
-  const lite = withReadme(t, readme(liteCommands));
-  assert.deepEqual(developmentFindings(lite, 'lite'), []);
-  assert.equal(developmentFindings(lite, 'full').length, 1, 'full still wants npm test');
-  const full = withReadme(t, readme([...liteCommands, 'npm test']));
+test('README Development: the managed script names of the edition decide (npm test in both since the 2026-10-12 ruling, typecheck and lint in both)', (t) => {
+  const commands = ['npm install', 'npm run typecheck', 'npm run lint'];
+  const untested = withReadme(t, readme(commands));
+  assert.equal(developmentFindings(untested, 'lite').length, 1, 'lite wants npm test: a lite back end keeps the unit run');
+  assert.equal(developmentFindings(untested, 'full').length, 1, 'full wants npm test');
+  const full = withReadme(t, readme([...commands, 'npm test']));
   assert.deepEqual(developmentFindings(full, 'full'), []);
+  assert.deepEqual(developmentFindings(full, 'lite'), []);
   const missing = withReadme(t, readme(['npm install', 'npm run lint']));
   assert.equal(developmentFindings(missing, 'lite').length, 1, 'typecheck stays required in lite (the partial scripts are read, not skipped)');
   assert.equal(developmentFindings(missing, 'full').length, 1);
