@@ -125,15 +125,12 @@ test("addTable accepts kebab, snake-case, plural, and reserved names and every a
       sql,
       new RegExp(`revoke all on table public\\.${sqlTable} from public, anon`),
     );
+    // the back end is the only reader and writer of a table (owner ruling 2026-10-13); the front end holds no grant
     assert.match(
       sql,
-      new RegExp(`grant update \\(updated_at\\) on table public\\.${sqlTable} to authenticated`),
+      new RegExp(`grant select, insert, update, delete on table public\\.${sqlTable} to app_be`),
     );
-    assert.doesNotMatch(
-      sql,
-      new RegExp(`grant select, insert, update, delete on table public\\.${sqlTable} to authenticated`),
-      "table-level update is not granted",
-    );
+    assert.doesNotMatch(sql, /to authenticated/, "the front end holds no table grant");
     const service = read(root, `be/src/modules/domain/${feature}/${feature}.service.ts`);
     assert.match(service, /\(principalId: string, id: string\)/);
     assert.match(service, /requireOwnedRow[^\n]+this\.entityManager, [A-Z0-9_]+, id, principalId,/);

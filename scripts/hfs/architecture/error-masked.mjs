@@ -33,13 +33,22 @@ const isGraphqlRegistration = (kit, checker, node) => kit.ts.isCallExpression(no
   && ['forRoot', 'forRootAsync'].includes(node.expression.name.text)
   && kit.isImportOf(checker, node.expression.expression, 'GraphQLModule', '@nestjs/graphql');
 
+/**
+ * The formatter a `formatError` value names: the value itself, or the callee of an arrow whose body only calls it (an arrow that
+ * binds the errors service, `(formatted, error) => formatGraphqlError(errors, formatted, error)`).
+ */
+function formatterOf(ts, value) {
+  if (value && ts.isArrowFunction(value) && ts.isCallExpression(value.body)) return value.body.expression;
+  return value;
+}
+
 function passesMaskedFormatError(kit, inErrors, checker, call) {
   const { ts } = kit;
   let masked = false;
   for (const argument of call.arguments) {
     kit.walk(argument, inner => {
       if ((ts.isPropertyAssignment(inner) || ts.isShorthandPropertyAssignment(inner)) && kit.propertyNameText(inner.name) === 'formatError'
-        && inErrors(checker, kit.valueOfProperty(inner))) masked = true;
+        && inErrors(checker, formatterOf(ts, kit.valueOfProperty(inner)))) masked = true;
     });
   }
   return masked;

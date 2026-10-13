@@ -21,11 +21,11 @@ import { parseYaml } from '../runtime/engine/yaml.mjs';
 import { TEMPLATES_DIR } from '../sync/index.mjs';
 import { ScaffoldError, pascalOf } from './service.mjs';
 import { refuseFullAdapterInLite, refuseInEdition } from './edition-gate.mjs';
-import { addTable } from './add-table.mjs';
+import { addTable, graphqlPlatformFiles } from './add-table.mjs';
 import { addApp } from './add-app.mjs';
 import { ensureLiteCli } from './add-cli-lite.mjs';
 import { addLiteWebhookInbox, selectLiteWebhookEntries } from './add-inbox-lite.mjs';
-import { jsonText } from './app.mjs';
+import { bundledPins, jsonText, packageJsonText, peerDependencies } from './app.mjs';
 import { byCodeUnit } from '../report/order.mjs';
 import { registerLiteDomainService, registerLiteExports } from './lite-exports.mjs';
 
@@ -200,8 +200,27 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
   if (spec.wire) wire({ beRoot, wire: spec.wire, forms, noun, name });
   const platformCreated = repo.edition === 'lite' && (noun === 'api' || noun === 'webhook') ? wireLiteFeature({ repoRoot, repo, noun, name }) : [];
   const inboxCreated = addLiteWebhookInbox({ root: repoRoot, repo, noun, provider: name, values, now });
-  const registered = register({ declarationFile, spec: { patterns, trigger: spec.trigger } });
-  return { created: [...bootstrapCreated, ...planned.map((file) => `be/${file.target}`), ...platformCreated, ...inboxCreated], registered };
+  const graphqlDoor = noun === 'api' ? ensureGraphqlPeers(repoRoot) : [];
+  const registered = register({ declarationFile, spec: { patterns, trigger: spec.trigger, optionalSlots: noun === 'api' ? [GRAPHQL_CONTRACT_SLOT] : [] } });
+  return { created: [...bootstrapCreated, ...planned.map((file) => `be/${file.target}`), ...platformCreated, ...inboxCreated, ...graphqlDoor], registered };
+}
+
+/** The slot of the emitted GraphQL snapshot (contracts/<app>/schema.graphql), which an app serving a GraphQL api feature opts into. */
+const GRAPHQL_CONTRACT_SLOT = 'be.contract.graphql';
+
+/**
+ * Declares, in the app root package.json, the runtime peers its GraphQL api needs (R111, knowledge/hfs/peer-integrations.yaml) at
+ * their canon pins; returns ['package.json'] when it changed, else []. Both editions.
+ */
+function ensureGraphqlPeers(repoRoot) {
+  const file = path.join(repoRoot, 'package.json');
+  if (!fs.existsSync(file)) throw new ScaffoldError('HFS_ADD_NOT_AN_APP', 'add api needs the app root package.json');
+  const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const peers = peerDependencies(pkg, bundledPins());
+  if (!Object.keys(peers).length) return [];
+  pkg.dependencies = Object.fromEntries(Object.entries({ ...pkg.dependencies, ...peers }).sort(([a], [b]) => a.localeCompare(b)));
+  fs.writeFileSync(file, packageJsonText(pkg));
+  return ['package.json'];
 }
 
 /** Adds `importLine` and one `symbol` entry of the `imports` array of a module file's lines, once. */
@@ -217,15 +236,14 @@ function addModuleImport(lines, { importLine, entry, relative, noun }) {
 
 /** The GraphQL server capability (be/src/modules/platform/graphql), written whole by the first GraphQL feature of an app that has none. */
 function ensureGraphqlPlatform(repoRoot) {
-  const target = path.join(repoRoot, 'be', 'src', 'modules', 'platform', 'graphql');
-  if (fs.existsSync(path.join(target, 'index.ts'))) return [];
-  const source = path.join(TEMPLATES_DIR, 'be', 'platform', 'graphql');
-  fs.mkdirSync(target, { recursive: true });
+  if (fs.existsSync(path.join(repoRoot, 'be', 'src', 'modules', 'platform', 'graphql', 'index.ts'))) return [];
   const written = [];
-  for (const file of fs.readdirSync(source).sort(byCodeUnit)) {
-    if (fs.existsSync(path.join(target, file))) continue;
-    fs.writeFileSync(path.join(target, file), fs.readFileSync(path.join(source, file), 'utf8').replace(/\r\n/g, '\n'));
-    written.push(`be/src/modules/platform/graphql/${file}`);
+  for (const { relative, body } of graphqlPlatformFiles()) {
+    const file = path.join(repoRoot, ...relative.split('/'));
+    if (fs.existsSync(file)) continue;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, body);
+    written.push(relative);
   }
   registerLiteExports({ root: repoRoot, generator: 'graphql' });
   return written;
@@ -318,7 +336,7 @@ function topicsOfPatterns(patterns) {
   return topics;
 }
 
-/** Adds the patterns and the trigger kind of the noun to sides.be of hfs.json, keeping its other content and key order. */
+/** Adds the patterns, the trigger kind and the opt-in slots of the noun to sides.be of hfs.json, keeping its other content and key order. */
 function register({ declarationFile, spec }) {
   const declaration = JSON.parse(fs.readFileSync(declarationFile, 'utf8'));
   const be = declaration.sides.be;
@@ -326,6 +344,7 @@ function register({ declarationFile, spec }) {
   const kinds = [...new Set([...(be.kinds ?? []), ...(spec.trigger ? [spec.trigger] : [])])].sort(byCodeUnit);
   be.patterns = patterns;
   if (kinds.length) be.kinds = kinds;
+  if (spec.optionalSlots.some(slot => !(be.optionalSlots ?? []).includes(slot))) be.optionalSlots = [...new Set([...(be.optionalSlots ?? []), ...spec.optionalSlots])].sort(byCodeUnit);
   fs.writeFileSync(declarationFile, jsonText(declaration));
   return { patterns, kinds };
 }

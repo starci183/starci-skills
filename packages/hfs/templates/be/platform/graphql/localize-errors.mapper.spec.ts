@@ -50,6 +50,18 @@ describe("localizeError", () => {
         expect(localizeError(errors, "en", error)).toEqual({ ...error, message: "The item was not found" })
         expect(errors.text).toHaveBeenCalledWith("ITEM_NOT_FOUND", { id: "i-1", retries: 2 }, "en")
     })
+
+    it.each([undefined, null, ["i-1"], "i-1"])("interpolates no params when extensions.params is %p", (params) => {
+        const errors = mock<ErrorsService>()
+        errors.text.mockReturnValue("The item was not found")
+        const error: GraphQLFormattedError = {
+            message: "ITEM_NOT_FOUND",
+            extensions: { code: "ITEM_NOT_FOUND", params },
+        }
+
+        expect(localizeError(errors, "en", error).message).toBe("The item was not found")
+        expect(errors.text).toHaveBeenCalledWith("ITEM_NOT_FOUND", {}, "en")
+    })
 })
 
 describe("localizeErrorsPlugin", () => {
@@ -70,6 +82,25 @@ describe("localizeErrorsPlugin", () => {
             { ...coded, message: "localized: not found" },
         ])
     })
+
+    it.each([{}, { "x-locale": "" }])(
+        "falls back to Accept-Language when the x-locale header is absent or empty (%p)",
+        async (declared) => {
+            const errors = mock<ErrorsService>()
+            const requestLocale = mock<RequestLocale>()
+            requestLocale.of.mockReturnValue("en")
+            errors.text.mockReturnValue("The item was not found")
+            const coded: GraphQLFormattedError = { message: "ITEM_NOT_FOUND", extensions: { code: "ITEM_NOT_FOUND" } }
+
+            await sendResponse(
+                errors,
+                requestLocale,
+                requestContext(singleResponse([coded]), { ...declared, "accept-language": "en" }),
+            )
+
+            expect(requestLocale.of).toHaveBeenCalledWith("en")
+        },
+    )
 
     it("leaves a response without errors alone", async () => {
         const errors = mock<ErrorsService>()

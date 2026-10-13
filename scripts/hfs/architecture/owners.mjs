@@ -2,16 +2,23 @@ import path from 'node:path';
 import { canonical, isInside } from './config.mjs';
 import { relativePath, workspaceExportSources } from './typescript.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
+import { globExpression } from '../../lib/glob.mjs';
+import { posixPath } from '../../lib/path-key.mjs';
 
 function absolute(root, relative) {
   return canonical(path.resolve(root, ...relative.split('/')));
 }
 
-/** The extra public entries the slot manifest declares for the owner (slot field `entries`, on the slot that holds its entry file), as absolute paths. */
+/**
+ * The extra public entries the slot manifest declares for the owner (slot field `entries`, on the slot that holds its entry file):
+ * exact files as absolute paths, and the entries holding a `*` (one file per operation, `graphql/queries/query-*.ts`) as patterns.
+ */
 function slotEntries(config, owner) {
   const found = config.hfs?.classifyPath?.(owner.entry);
   const names = found?.slot ? config.hfs.slot(found.slot)?.entries ?? [] : [];
-  return names.map(name => absolute(config.root, `${found.root}/${name}`));
+  const exact = names.filter(name => !name.includes('*')).map(name => absolute(config.root, `${found.root}/${name}`));
+  const patterns = names.filter(name => name.includes('*')).map(name => globExpression(`${posixPath(absolute(config.root, found.root))}/${name}`));
+  return { exact, patterns };
 }
 
 /** The owner's public entries: its declared entry, the `entries` its slot declares, plus every source file its package.json `exports` maps when the owner is a workspace package. */
@@ -20,9 +27,10 @@ function ownerDeclarations(config, context) {
     const root = absolute(config.root, owner.root);
     const entry = absolute(config.root, owner.entry);
     const workspace = context.workspaces?.find(item => item.root === root);
-    const declared = slotEntries(config, owner);
+    const { exact: declared, patterns } = slotEntries(config, owner);
     const entries = new Set([entry, ...declared, ...(workspace ? workspaceExportSources(context.ts, workspace) : [])]);
-    return { ...owner, root, entry, entries, declared };
+    const isEntry = file => entries.has(file) || patterns.some(pattern => pattern.test(posixPath(file)));
+    return { ...owner, root, entry, entries, isEntry, declared };
   }).sort((a, b) => b.root.length - a.root.length);
 }
 
@@ -43,7 +51,7 @@ function privateOwnerChain(context, owners, edge) {
     if (visited.has(current.file)) continue;
     visited.add(current.file);
     const owner = ownerOf(owners, current.file);
-    if (owner && sourceOwner?.id !== owner.id) return owner.entries.has(current.file) ? null : { owner, chain: current.chain };
+    if (owner && sourceOwner?.id !== owner.id) return owner.isEntry(current.file) ? null : { owner, chain: current.chain };
     queue.push(...reexportSteps(context, current));
   }
   return null;

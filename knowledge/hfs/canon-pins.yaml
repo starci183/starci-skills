@@ -481,6 +481,11 @@ pins:
     group: framework
     side: be
     why: 'the socket.io platform of @nestjs/websockets; the @nestjs/core pin line.'
+  '@as-integrations/express5':
+    version: 1.1.2
+    group: framework
+    side: be
+    why: 'the Express 5 integration @nestjs/apollo loads at boot (R111 nestjs-apollo-express5, knowledge/hfs/peer-integrations.yaml); every api app that serves GraphQL installs it; the latest registry version on 2026-10-13.'
   # --- Supabase lite
   '@supabase/ssr':
     version: 0.12.7

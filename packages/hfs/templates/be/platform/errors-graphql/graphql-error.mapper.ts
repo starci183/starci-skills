@@ -1,6 +1,6 @@
 import { GraphQLError } from "graphql"
 import type { GraphQLFormattedError } from "graphql"
-import type { ErrorsService } from "@modules/platform/errors"
+import type { ErrorsService } from "./errors.service"
 
 /**
  * The one GraphQL error formatter: a failure thrown by a resolver or a guard becomes `errors[].extensions.{code,kind,params}`

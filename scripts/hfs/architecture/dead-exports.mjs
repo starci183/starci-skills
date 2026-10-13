@@ -34,6 +34,7 @@ import fs from 'node:fs';
 import { canonical } from './config.mjs';
 import path from 'node:path';
 import { treeOf } from './required-files.mjs';
+import { globExpression } from '../../lib/glob.mjs';
 
 export const DEAD_EXPORT_RULE_IDS = ['HFS_UNUSED_EXPORT', 'HFS_UNUSED_FILE'];
 
@@ -59,7 +60,10 @@ export function entryOf(graph, config, key, owner) {
 /** The additional public entry files (repository-relative, in the graph) the slot manifest declares for the owner (slot field `entries`, on the slot that holds its entry file). */
 function extraEntries(graph, entry) {
   const found = graph.resolver.classifyPath(entry);
-  return (found.slot ? graph.resolver.slot(found.slot)?.entries ?? [] : []).map(name => `${found.root}/${name}`).filter(rel => graph.files.has(rel));
+  const names = found.slot ? graph.resolver.slot(found.slot)?.entries ?? [] : [];
+  // an entry holding `*` (one file per operation) names every graph file it matches
+  const matches = name => [...graph.files.keys()].filter(rel => globExpression(`${found.root}/${name}`).test(rel));
+  return names.flatMap(name => (name.includes('*') ? matches(name) : [`${found.root}/${name}`].filter(rel => graph.files.has(rel))));
 }
 
 const importBindings = (ts, declaration) => {

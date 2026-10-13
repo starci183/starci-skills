@@ -103,11 +103,15 @@ test('a lite app writes `new service` with its unit spec - a lite back end keeps
 test('the nouns lite keeps are untouched: add api, add webhook and add cli still write their trees', async () => {
   const dir = repo(LITE);
   // the lite scaffold's barrels the generated transports register their exports in
-  for (const relative of ['domain/identity/index.ts', 'platform/cqrs/index.ts', 'platform/database/database.module.ts', 'platform/database/index.ts', 'platform/http-security/index.ts']) {
+  for (const relative of ['domain/identity/index.ts', 'platform/cqrs/index.ts', 'platform/database/database.module.ts', 'platform/database/index.ts', 'platform/http-security/index.ts', 'platform/i18n/index.ts']) {
     const target = path.join(dir, 'be', 'src', 'modules', ...relative.split('/'));
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.copyFileSync(path.join(ROOT, 'packages', 'hfs', 'templates', 'be', 'skeleton-lite', 'src', 'modules', ...relative.split('/')), target);
   }
+  // the platform errors barrel lite reuses from the full skeleton (the GraphQL setup of add api registers its exports there)
+  const platformErrors = path.join(dir, 'be', 'src', 'modules', 'platform', 'errors');
+  fs.mkdirSync(platformErrors, { recursive: true });
+  fs.copyFileSync(path.join(ROOT, 'packages', 'hfs', 'templates', 'be', 'skeleton', 'src', 'modules', 'platform', 'errors', 'index.ts'), path.join(platformErrors, 'index.ts'));
   const databaseErrors = path.join(dir, 'be', 'src', 'modules', 'platform', 'database', 'errors');
   fs.mkdirSync(databaseErrors, { recursive: true });
   fs.copyFileSync(path.join(ROOT, 'packages', 'hfs', 'templates', 'be', 'skeleton', 'src', 'modules', 'platform', 'database', 'errors', 'database.error.ts'), path.join(databaseErrors, 'database.error.ts'));
@@ -124,16 +128,17 @@ test('the nouns lite keeps are untouched: add api, add webhook and add cli still
   fs.mkdirSync(path.join(dir, 'be', 'apps', 'core', 'src'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'be', 'apps', 'core', 'src', 'app.module.ts'), ['import { Module } from "@nestjs/common"', '', '@Module({', '  imports: [', '  ],', '})', 'export class AppModule {}', ''].join('\n'));
   fs.writeFileSync(path.join(dir, 'be', 'apps', 'core', 'src', 'main.ts'), ['import { parseHttpSecurityConfig } from "@modules/platform/http-security"', 'const options = { httpSecurity: parseHttpSecurityConfig(env) }', 'NestFactory.create(AppModule.register(options))', ''].join('\n'));
+  // the app root package.json add api records the GraphQL peer integrations in
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'demo', private: true, scripts: {}, dependencies: {}, devDependencies: {} }));
   const api = await cli(['add', 'api', 'checkout', '--service', 'CheckoutService=@modules/domain/order', '--cwd', dir]);
   assert.equal(api.code, 0, api.err);
-  assert.ok(exists(dir, 'be/src/features/api/checkout/transport/http/checkout-http.module.ts'));
+  assert.ok(exists(dir, 'be/src/features/api/checkout/transport/graphql/checkout-graphql.module.ts'), 'add api writes the GraphQL transport the front end calls');
   const webhook = await cli(['add', 'webhook', 'payment-gateway', '--service', 'PaymentService=@modules/domain/payment', '--cwd', dir]);
   assert.equal(webhook.code, 0, webhook.err);
   assert.ok(exists(dir, 'be/src/features/webhooks/payment-gateway/transport/http/payment-gateway.webhook.ts'));
   // a lite app has no cli app until the first `add cli`, which bootstraps apps/cli and its static cli feature root, then wires the group in
   fs.mkdirSync(path.join(dir, 'be'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'be', 'nest-cli.json'), JSON.stringify({ collection: '@nestjs/schematics', monorepo: true, root: 'apps/api', sourceRoot: 'apps/api/src', projects: { api: { type: 'application', root: 'apps/api', entryFile: 'main', sourceRoot: 'apps/api/src' } } }));
-  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'demo', private: true, scripts: {}, dependencies: {}, devDependencies: {} }));
   const addCli = await cli(['add', 'cli', 'requeue', '--service', 'DeadLetterService=@modules/domain/order', '--cwd', dir]);
   assert.equal(addCli.code, 0, addCli.err);
   assert.ok(exists(dir, 'be/src/features/cli/requeue/requeue.cli.ts'));

@@ -1,6 +1,6 @@
 import { mock } from "@starci/jest-preset"
 import { GraphQLError } from "graphql"
-import type { ErrorsService } from "@modules/platform/errors"
+import type { ErrorsService } from "./errors.service"
 import { formatGraphqlError } from "./graphql-error.mapper"
 
 const formatted = { message: "raw", path: ["item"], locations: [{ line: 1, column: 3 }] }

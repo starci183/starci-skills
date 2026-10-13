@@ -241,6 +241,7 @@ test('starci app add api writes a feature with one operation: the application, t
   assert.equal(exists(dir, `${base}/transport/http`), false, 'an optional entry is not generated');
   assert.deepEqual(hfsJson(dir).sides.be.patterns ?? [], []);
   assert.deepEqual(hfsJson(dir).sides.be.kinds, ['api']);
+  assert.ok(hfsJson(dir).sides.be.optionalSlots.includes('be.contract.graphql'), 'the GraphQL api opts into its emitted schema snapshot');
 });
 
 test('starci app add cli writes a command group with its first sub-command and registers it in the static cli module', async () => {

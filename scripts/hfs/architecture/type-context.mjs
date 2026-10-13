@@ -156,7 +156,10 @@ function unresolvedReferenceFinding(reference, sourceFile, project, config, work
   const codeLike = !helpers.assetExtension.test(reference.specifier);
   const workspaceImport = [...workspaceNames].some(name => helpers.sameOrUnder(reference.specifier, name));
   const internal = reference.specifier.startsWith('.') || helpers.pathAliasMatches(reference.specifier, project.options.paths) || workspaceImport;
-  if (codeLike && internal) errors.push({
+  // A __generated__/ folder is the gitignored output of the app's codegen step (the GraphQL wire types, fe-stack codegen): it
+  // exists after `npm run codegen`, which lint, typecheck and build run first, and the compiler proves those imports there.
+  const generated = /(?:^|\/)__generated__(?:\/|$)/.test(reference.specifier);
+  if (codeLike && internal && !generated) errors.push({
     ruleId: 'ARCH_INTERNAL_IMPORT_UNRESOLVED',
     project: project.relative,
     path: helpers.relativePath(config.root, sourceFile.fileName),

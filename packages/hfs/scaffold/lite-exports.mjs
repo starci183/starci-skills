@@ -101,6 +101,11 @@ const REGISTRATIONS = Object.freeze({
     },
     {
       file: "be/src/modules/platform/errors/index.ts",
+      source: "./graphql-error.mapper",
+      names: ["formatGraphqlError"],
+    },
+    {
+      file: "be/src/modules/platform/errors/index.ts",
       source: "./errors.service",
       names: ["ErrorsService"],
       type: true,

@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 import { addTable } from "../../packages/hfs/scaffold/add-table.mjs";
 import { addApp } from "../../packages/hfs/scaffold/add-app.mjs";
 import { addKind } from "../../packages/hfs/scaffold/add.mjs";
+import { peerDependencies } from "../../packages/hfs/scaffold/app.mjs";
 import { main } from "../../packages/hfs/src/main.mjs";
 import { checkDatabase } from "../../scripts/hfs/rules/database.mjs";
 
@@ -429,6 +430,11 @@ test("lite add api emits full's GraphQL door, and api plus webhook transports ar
   assert.ok(api.created.includes("be/src/features/api/bookings/transport/graphql/bookings.resolver.ts"));
   assert.ok(api.created.includes("be/src/features/api/bookings/transport/graphql/bookings-graphql.module.ts"));
   assert.ok(api.created.includes("be/src/modules/platform/graphql/graphql.module.ts"), "the GraphQL server on first use");
+  assert.deepEqual(
+    JSON.parse(read(root, "hfs.json")).sides.be.optionalSlots,
+    ["be.contract.graphql"],
+    "the GraphQL api opts into its emitted schema snapshot, as in full",
+  );
   assert.equal(api.created.some(file => file.includes("/transport/http/")), false);
   assert.match(read(root, "be/src/features/api/bookings/index.ts"), /BookingsGraphqlModule/);
   assert.match(read(root, "be/src/features/api/bookings/transport/graphql/bookings-graphql.module.ts"), /imports: \[BookingsApiModule\]/);
@@ -469,6 +475,17 @@ test("lite add api emits full's GraphQL door, and api plus webhook transports ar
   assert.match(security, /InjectWebhookSignature/);
   assert.match(security, /RateLimit, RateLimitGuard, RateTier/);
   assert.match(security, /WebhookSignatureService/);
+});
+
+test("add api and the scaffold declare the runtime peer of a driver integration pair the app depends on (R111), at its pin", () => {
+  const pairs = [{ id: "apollo-express5", when: [{ package: "@nestjs/apollo" }, { package: "@nestjs/platform-express", major: 11 }], requires: "@as-integrations/express5" }];
+  const pins = { "@as-integrations/express5": { version: "1.1.2" } };
+  const graphql = { dependencies: { "@nestjs/apollo": "13.4.5", "@nestjs/platform-express": "11.2.5" } };
+  assert.deepEqual(peerDependencies(graphql, pins, pairs), { "@as-integrations/express5": "1.1.2" });
+  assert.deepEqual(peerDependencies({ dependencies: { ...graphql.dependencies, "@as-integrations/express5": "1.1.2" } }, pins, pairs), {}, "a declared peer is kept");
+  assert.deepEqual(peerDependencies({ dependencies: { "@nestjs/apollo": "13.4.5", "@nestjs/platform-express": "10.4.0" } }, pins, pairs), {}, "another major is not the pair");
+  assert.deepEqual(peerDependencies({ dependencies: { "@nestjs/platform-express": "11.2.5" } }, pins, pairs), {}, "no GraphQL, no peer");
+  assert.throws(() => peerDependencies(graphql, {}, pairs), { code: "HFS_SCAFFOLD_PIN_MISSING" }, "a peer without a canon pin fails closed");
 });
 
 test("the lite API skeleton installs one typed global validation pipe", () => {

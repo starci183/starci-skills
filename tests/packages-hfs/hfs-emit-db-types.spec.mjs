@@ -60,6 +60,13 @@ test('emitDbTypes returns the generated text and narrows it to the [api] schemas
   assert.deepEqual(calls, [{ file: 'supabase', args: ['gen', 'types', 'typescript', '--local', '--schema', 'public,storage'], cwd: dir }]);
 });
 
+test('emitDbTypes strips the trailing whitespace the CLI pads blank and closing lines with, so the committed file passes git diff --check', () => {
+  const dir = appRoot({}, null);
+  const padded = ['export type Database = {', '  public: {', '    ', '    Tables: {}  ', '  }\t', '}', ''].join('\n');
+  const clean = ['export type Database = {', '  public: {', '', '    Tables: {}', '  }', '}', ''].join('\n');
+  assert.equal(emitDbTypes({ root: dir, run: fakeRun([], padded) }), `${TYPES_STAMP}${migrationsDigest(dir)}\n${clean}`);
+});
+
 test('emitDbTypes passes no --schema without a config.toml, and a failing run raises HFS_EMIT_DB_TYPES_FAILED naming the first stderr line', () => {
   const dir = appRoot({}, null);
   const calls = [];

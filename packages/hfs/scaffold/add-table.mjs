@@ -212,13 +212,20 @@ const wireGraphqlFeature = (text, relative, name) =>
 
 /** The platform GraphQL server capability (templates/be/platform/graphql), whole or absent: written once, by the first GraphQL feature. */
 const GRAPHQL_PLATFORM = "be/src/modules/platform/graphql";
-const graphqlPlatformFiles = () => {
-  const dir = path.join(TEMPLATES_DIR, "be", "platform", "graphql");
-  return fs.readdirSync(dir).sort().map((file) => ({
-    relative: `${GRAPHQL_PLATFORM}/${file}`,
-    body: fs.readFileSync(path.join(dir, file), "utf8").replace(/\r\n/g, "\n"),
-  }));
-};
+/** The GraphQL error formatter the errors capability owns (BE_ERROR_MASKED: the registration passes platform/errors' formatter). */
+const ERRORS_PLATFORM = "be/src/modules/platform/errors";
+/** Every file the first GraphQL feature writes: platform/graphql whole and the GraphQL formatter of platform/errors. */
+export const graphqlPlatformFiles = () =>
+  [
+    ["graphql", GRAPHQL_PLATFORM],
+    ["errors-graphql", ERRORS_PLATFORM],
+  ].flatMap(([templates, target]) => {
+    const dir = path.join(TEMPLATES_DIR, "be", "platform", templates);
+    return fs.readdirSync(dir).sort().map((file) => ({
+      relative: `${target}/${file}`,
+      body: fs.readFileSync(path.join(dir, file), "utf8").replace(/\r\n/g, "\n"),
+    }));
+  });
 
 /** The be api feature of a table (owner ruling 2026-10-13, lite = full): get-<singular> and create-<singular> over GraphQL. */
 const apiFeatureFiles = (values) => {
@@ -272,7 +279,9 @@ const feBarrels = (app, values) => {
     [`${swr}/api/graphql/index.ts`, 'export * from "./mutations"'],
     [`${swr}/api/graphql/index.ts`, 'export * from "./queries"'],
     [`${swr}/api/index.ts`, 'export * from "./graphql"'],
-    [`${swr}/index.ts`, 'export * from "./api"'],
+    // the owner's public entry names its hooks explicitly (ARCH_OWNER_EXPORT_STAR); the inner barrels may re-export whole
+    [`${swr}/index.ts`, `export { QUERY_${values.singularUpper}_SWR_KEY, useQuery${values.Singular}Swr } from "./api"`],
+    [`${swr}/index.ts`, `export { MUTATE_CREATE_${values.singularUpper}_SWR_KEY, useMutateCreate${values.Singular}Swr } from "./api"`],
   ];
 };
 

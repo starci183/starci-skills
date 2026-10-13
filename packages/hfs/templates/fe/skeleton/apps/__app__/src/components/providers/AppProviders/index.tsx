@@ -2,30 +2,47 @@
 
 import { ToastProvider } from "@heroui/react"
 import type { ReactNode } from "react"
-import { SwrProvider } from "@/components/providers/SwrProvider"
+import { SWRConfig } from "swr"
 import { ThemeProvider } from "@/components/providers/ThemeProvider"
 import { useAuthSessionEffect } from "@/hooks/effects"
 import { SwrSideEffects } from "@/hooks/swr"
 import { ReduxProvider } from "@/redux"
 
-/** The app-wide effects: the session kept in redux and the app-wide SWR queries. Renders nothing of its own. */
-const AppEffects = () => {
+/** What the app providers wrap: the routed tree. */
+type AppProvidersProps = { readonly children: ReactNode }
+
+/**
+ * The SWR defaults of the app: no refetch on focus or reconnect (a hook that needs fresh data opts in with its own
+ * refreshInterval), duplicate requests collapsed for a minute, at most two retries of a failing key, and no stale data
+ * across a key change (the loading state shows instead).
+ */
+const SWR_DEFAULTS = {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    dedupingInterval: 60_000,
+    errorRetryCount: 2,
+    keepPreviousData: false,
+} as const
+
+/** The app-wide session effect: modules/auth's session kept in redux. Renders nothing. */
+const AuthSessionEffect = () => {
     useAuthSessionEffect()
-    return <SwrSideEffects />
+    return null
 }
 
 /**
- * The client providers the locale layout mounts once, outer to inner: the theme, the redux store, the SWR defaults, the
- * app-wide effects and the HeroUI toast region modules/toast writes to.
+ * The client providers the locale layout mounts once, outer to inner: the theme, the redux store, the SWR defaults (inline),
+ * the app-wide effects and the HeroUI toast region modules/toast writes to.
  */
-export const AppProviders = (props: { readonly children: ReactNode }) => (
+export const AppProviders = (props: AppProvidersProps) => (
     <ThemeProvider>
         <ReduxProvider>
-            <SwrProvider>
-                <AppEffects />
+            <SWRConfig value={SWR_DEFAULTS}>
+                <AuthSessionEffect />
+                <SwrSideEffects />
                 {props.children}
                 <ToastProvider />
-            </SwrProvider>
+            </SWRConfig>
         </ReduxProvider>
     </ThemeProvider>
 )

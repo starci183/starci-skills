@@ -112,7 +112,6 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'fe/apps/web/src/components/composites/SiteShell/classNames.ts',
   'fe/apps/web/src/components/composites/SiteShell/index.tsx',
   'fe/apps/web/src/components/providers/AppProviders/index.tsx',
-  'fe/apps/web/src/components/providers/SwrProvider/index.tsx',
   'fe/apps/web/src/components/providers/ThemeProvider/index.tsx',
   'fe/apps/web/src/features/layouts/AppLayout/index.tsx',
   'fe/apps/web/src/features/pages/AppErrorPage/component.tsx',
@@ -199,10 +198,14 @@ test('lite scaffold emits the design 8.5 tree and is structurally clean', async 
   });
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   assert.deepEqual(Object.keys(pkg.dependencies).sort(), [
-    '@apollo/server', '@nestjs/apollo', '@nestjs/common', '@nestjs/core', '@nestjs/cqrs', '@nestjs/graphql',
+    '@apollo/server', '@as-integrations/express5', '@nestjs/apollo', '@nestjs/common', '@nestjs/core', '@nestjs/cqrs', '@nestjs/graphql',
     '@nestjs/platform-express', '@nestjs/typeorm', '@supabase/supabase-js', 'class-transformer', 'class-validator',
     'graphql', 'jose', 'pg', 'reflect-metadata', 'rxjs', 'tslib', 'typeorm',
   ].sort());
+  // R111: the GraphQL api's runtime peer (knowledge/hfs/peer-integrations.yaml) is declared at its pin, as in full.
+  assert.equal(pkg.dependencies['@as-integrations/express5'], PINS['@as-integrations/express5'].version);
+  // One version of each skew-prone fe-stack package across the whole install, at its canon pin, as in full.
+  assert.deepEqual(pkg.overrides, Object.fromEntries(['@xyflow/react', 'dayjs', 'zod', 'zustand'].map(name => [name, PINS[name].version])));
   // The fe stack's root tools (fe-stack.yaml tier core: codegen and lint) at their canon pins, as in full.
   for (const tool of ['@graphql-codegen/cli', '@graphql-codegen/client-preset', 'eslint', 'prettier', 'typescript'])
     assert.equal(pkg.devDependencies[tool], PINS[tool].version, `${tool} is a root devDependency at its pin`);

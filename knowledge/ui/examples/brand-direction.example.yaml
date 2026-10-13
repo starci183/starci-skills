@@ -701,7 +701,7 @@ direction:
           - proof/taste.yaml TASTE-7 case-2, case-3 and case-5
       - id: B4
         group: brand
-        test: Every entity card and summary cell has a Heroicons glyph in a 32/40px IconTile; identity and
+        test: Every entity card and summary cell has a glyph of the app icon set (@phosphor-icons/react) in a 32/40px IconTile; identity and
           summary tiles are neutral; only real outcomes are toned
         cites:
           - composition/accent.yaml ACCENT-2 case-1 and case-5

@@ -109,7 +109,8 @@ function emitDbTypesWithRunner({ root, run }) {
     const cause = firstLine(stderr) ?? firstLine(result?.error?.message ?? result?.error) ?? 'no output';
     throw new DbTypesError(`\`${command}\` failed${result?.status !== undefined && result?.status !== null ? ` (exit ${result.status})` : ''}: ${cause}; the local Supabase stack must be up (supabase start)`, { file: dbTypesPath, stderr });
   }
-  return `${TYPES_STAMP}${migrationsDigest(root)}\n${stdout}`;
+  // The CLI pads blank lines with spaces; the committed file carries none (git diff --check refuses trailing whitespace).
+  return `${TYPES_STAMP}${migrationsDigest(root)}\n${stdout.replace(/[ \t]+$/gm, '')}`;
 }
 
 export function emitDbTypes({ root, run = spawn, platform = process.platform } = {}) {

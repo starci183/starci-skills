@@ -43,8 +43,11 @@ const FE_STACK_FILES = [
   path.join(import.meta.dirname, '..', '..', '..', 'knowledge', 'hfs', 'fe-stack.yaml'),
 ];
 const SONAR_GATE_FILE = path.join(import.meta.dirname, '..', 'runtime', 'knowledge', 'sonar-gate.yaml');
+/** The runtime-peer catalog (knowledge/hfs/peer-integrations.yaml, R111) the package carries. */
+const PEERS_FILE = path.join(import.meta.dirname, '..', 'runtime', 'knowledge', 'hfs', 'peer-integrations.yaml');
 const pascal = name => name.split('-').map(part => part[0].toUpperCase() + part.slice(1)).join('');
-const bundledPins = () => parseYaml(fs.readFileSync(PINS_FILE, 'utf8')).pins;
+/** The canon pins (knowledge/hfs/canon-pins.yaml) the package carries. */
+export const bundledPins = () => parseYaml(fs.readFileSync(PINS_FILE, 'utf8')).pins;
 
 /** The parsed front-end stack catalog; a package without it cannot know what every front end installs. */
 function bundledFeStack() {
@@ -233,11 +236,39 @@ function pinnedSection(entries, pins) {
   return Object.fromEntries(Object.entries(entries).sort(([a], [b]) => a.localeCompare(b)).map(([dependency, range]) => [dependency, pinned(dependency, range)]));
 }
 
-/** The root package.json of a new app, the monorepo root: name, workspaces, npm, its edition's dependencies and the fe stack's root tools, at canon pins. */
+/**
+ * The runtime peers (R111, knowledge/hfs/peer-integrations.yaml) a root package.json needs and does not declare in its
+ * dependencies: the `requires` of every pair whose `when` packages it declares (at the named major, read from the declared
+ * exact pin), each at its canon pin. Both editions alike: @nestjs/apollo on @nestjs/platform-express 11 needs
+ * @as-integrations/express5.
+ */
+export function peerDependencies(pkg, pins, pairs = parseYaml(fs.readFileSync(PEERS_FILE, 'utf8')).pairs) {
+  const runtime = pkg.dependencies ?? {};
+  const declared = { ...pkg.devDependencies, ...runtime };
+  const major = version => Number(/^\D*(\d+)/.exec(String(version))?.[1]);
+  const needed = pairs.filter(pair => typeof runtime[pair.requires] !== 'string'
+    && pair.when.every(entry => typeof declared[entry.package] === 'string' && (entry.major === undefined || major(declared[entry.package]) === entry.major)));
+  return pinnedSection(Object.fromEntries(needed.map(pair => [pair.requires, null])), pins);
+}
+
+/**
+ * The fe-stack core packages one version of which the whole install resolves (npm `overrides`, at their canon pins): a
+ * transitive dependency otherwise brings its own (zustand 4 under @xyflow/react, dayjs under typeorm, a hoisted newer zod
+ * that breaks the zodResolver types), and @xyflow/react itself stays the grammar's one version.
+ */
+const ROOT_OVERRIDES = Object.freeze(['@xyflow/react', 'dayjs', 'zod', 'zustand']);
+
+/**
+ * The root package.json of a new app, the monorepo root: name, workspaces, npm, its edition's dependencies with their runtime
+ * peers, the fe stack's root tools and the one-version overrides, at canon pins.
+ */
 function packageManifest(name, pins, edition, stack = coreFeStackPackages()) {
   const dependencies = edition === 'lite' ? LITE_STARTER_DEPENDENCIES : STARTER_DEPENDENCIES;
   const devDependencies = { ...dependencies.devDependencies, ...Object.fromEntries(stack.root.map(dependency => [dependency, null])) };
-  return { name, version: '0.0.0', private: true, packageManager: PACKAGE_MANAGER, workspaces: [...WORKSPACES], dependencies: pinnedSection(dependencies.dependencies, pins), devDependencies: pinnedSection(devDependencies, pins) };
+  const pkg = { name, version: '0.0.0', private: true, packageManager: PACKAGE_MANAGER, workspaces: [...WORKSPACES], dependencies: pinnedSection(dependencies.dependencies, pins), devDependencies: pinnedSection(devDependencies, pins) };
+  pkg.dependencies = pinnedSection({ ...pkg.dependencies, ...peerDependencies(pkg, pins) }, pins);
+  pkg.overrides = pinnedSection(Object.fromEntries(ROOT_OVERRIDES.map(dependency => [dependency, null])), pins);
+  return pkg;
 }
 
 /** A dependency section of an fe workspace with `@<project>/` names filled and the canon pins taken. */

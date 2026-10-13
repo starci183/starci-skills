@@ -156,8 +156,9 @@ test("add table --fe stays database- and architecture-clean for every accepted t
     assert.match(sql, new RegExp(`create trigger ${item.table}_set_updated_at[\\s\\S]*before update on public\\.${sqlTable}`));
     assert.match(sql, new RegExp(`create policy "${item.table}_app_be_select"[\\s\\S]*to app_be[\\s\\S]*using \\(owner_id is not null\\)`));
     assert.match(sql, new RegExp(`revoke all on table public\\.${sqlTable} from public, anon`));
-    assert.match(sql, new RegExp(`grant update \\(updated_at\\) on table public\\.${sqlTable} to authenticated`));
-    assert.match(sql, new RegExp(`grant select on table public\\.${sqlTable} to app_be`));
+    // the back end is the only reader and writer of a table (owner ruling 2026-10-13); the front end holds no grant
+    assert.match(sql, new RegExp(`grant select, insert, update, delete on table public\\.${sqlTable} to app_be`));
+    assert.doesNotMatch(sql, /to authenticated/);
     if (RESERVED.has(item.table)) {
       assert.doesNotMatch(sql, new RegExp(`public\\.${item.table}\\b`));
     }

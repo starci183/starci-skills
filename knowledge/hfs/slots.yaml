@@ -1927,6 +1927,8 @@ slots:
     allows: [index.ts, graphql/index.ts, graphql/types.ts, "graphql/clients/**", "graphql/queries/query-*.ts", "graphql/queries/types/*.ts",
              "graphql/mutations/mutation-*.ts", "graphql/mutations/types/*.ts", "graphql/__generated__/**", "rest/index.ts", "rest/<area>/*.ts"]
     roles: {entry: index.ts, query: "query-*.ts", mutation: "mutation-*.ts"}
+    # A hook imports its one operation file directly (one file per operation, FE-API-GRAPHQL), never through a barrel of every operation.
+    entries: ["graphql/queries/query-*.ts", "graphql/queries/types/*.ts", "graphql/mutations/mutation-*.ts", "graphql/mutations/types/*.ts"]
     tests: none
     rules: [FE_TRANSPORT_OWNER, FE_HTTP_STATUS_COLLAPSE, FE_WIRE_GENERATED]
   - id: fe.transport.client
