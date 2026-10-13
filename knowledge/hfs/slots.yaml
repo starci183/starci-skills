@@ -2090,3 +2090,14 @@ slots:
     tests: none
     why: the next-intl stack (routing, navigation, request config) written once, exported as the createAppI18n factory every app calls
     rules: [FE_I18N_PLACEMENT, FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT]
+
+# Checks that read this manifest (all ship from .claude; none keeps its own path list)
+consumers:
+  - scripts/hfs/slots.mjs                  # the loader every consumer below goes through
+  - scripts/hfs/check.mjs                  # starci app check: HFS_SLOT_* / tracked / external, the side view per side
+  - scripts/hfs/architecture.mjs            # tiers, direction matrix, cycles, reachability
+  - packages/eslint/be starciBeConfig({hfs})   # file globs for rules come from slots
+  - packages/eslint/fe starciFeConfig({hfs})
+  - packages/stylelint                         # @starci/stylelint-canon: colour and brand allowances from fe.modules.brand
+  - packages/hfs/sync                          # renders managedBy templates (starci app sync) and judges them (starci app check)
+  - modules/kernel/failure-codes.yaml          # every rule id listed above has a Vietnamese why

@@ -23,7 +23,8 @@ const schemaAccepts = (id, patch) => {
 };
 
 test('the manifest declares the GraphQLResponse homes as data and no second owner entry, and both the shape check and the schema accept them', () => {
-  assert.deepEqual(MANIFEST.slots.filter((candidate) => candidate.entries).map((candidate) => candidate.id), [], 'fe.modules.db (the one slot with entries) is removed: Supabase on the front end is auth only');
+  // fe.modules.api names its operation files as entries: a hook imports its one operation file directly (FE-API-GRAPHQL)
+  assert.deepEqual(MANIFEST.slots.filter((candidate) => candidate.entries).map((candidate) => candidate.id), ['fe.modules.api']);
   assert.deepEqual(MANIFEST.slots.filter((candidate) => candidate.outcomeHome).map((candidate) => candidate.id).sort(), ['fe.package.api.outcome', 'fe.transport.outcome']);
   assert.equal(validateSlotsSchema(RAW), true, JSON.stringify(validateSlotsSchema.errors));
   for (const id of ['fe.transport.outcome', 'fe.package.api.outcome', 'fe.modules.api', 'fe.modules.auth', 'fe.modules.toast']) assert.deepEqual(slotProblems(slot(id), 0, APP_KIND, SCOPE), [], id);

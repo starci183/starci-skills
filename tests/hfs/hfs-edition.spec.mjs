@@ -240,8 +240,9 @@ test('managedGroupOf: the one template-group answer of sync and the README check
 test('rule catalog: `editions` names the rules lite does not judge; a rule without it is judged by both', () => {
   const catalog = loadRuleCatalog();
   const fullOnly = catalog.rules.filter((r) => r.editions && !r.editions.includes('lite')).map((r) => r.id);
-  // owner ruling 2026-10-12: only the proofs that need the e2e or integration world stay full only
-  assert.deepEqual(fullOnly.sort(), ['R112', 'R155', 'R167', 'R173', 'R184'].sort());
+  // owner rulings 2026-10-12/13: only the proofs that need the e2e or integration world stay full only (the socket.io door, R184,
+  // is judged in lite too: lite runs the same gateway in its api process)
+  assert.deepEqual(fullOnly.sort(), ['R112', 'R155', 'R167', 'R173'].sort());
   for (const id of ['R46', 'R47', 'R48', 'R98', 'R102', 'R151', 'R160', 'R169', 'R177', 'R10', 'R34', 'R97']) assert.ok(!fullOnly.includes(id), `${id} is judged in lite`);
   assert.equal(catalog.judgedIn('BE_TEST_TOPOLOGY', 'lite'), true);
   assert.equal(catalog.judgedIn('BE_PATTERN_SPEC_MISSING', 'lite'), false);
