@@ -25,8 +25,10 @@ versioning:
 # overlays and `provider`, and `sides.<side>.reads` of an app-root tree) and the lite slots; an app without `edition` in its
 # hfs.json is edition full and every answer for it is unchanged.
 # 2.2.0 adds the declaration-only fe.modules.types.ambient owner.
-# 2.3.0 re-rules the lite edition only (owner ruling 2026-10-12, recorded on R212): lite is the full architecture deployed without
-# self-hosted infrastructure. A full app's answers are unchanged; a lite app gains the full slots, patterns and unit specs back.
+# 2.3.0 re-rules the editions (owner rulings 2026-10-12 and 2026-10-13, R212 cases 1-2): lite is the full code structure deployed
+# without self-hosted infrastructure and without e2e. The front end is one standard for both editions (knowledge/hfs/fe-stack.yaml):
+# Apollo GraphQL in modules/api, SWR, RHF, zustand and socket.io hooks, redux, modules/auth and modules/toast; modules/db, Server
+# Actions and route handlers other than health/live are gone in both editions.
 
 # Field meaning, per slot.
 #   id          stable name, never changes meaning inside a major.
@@ -320,8 +322,8 @@ ruleParams:
     # migration or entity under be/ (R34/R35 read schemaAuthority; be.persistence's lite overlay allows neither). The unit roles,
     # logic roles and spec doubles are full's (owner ruling 2026-10-12). infraOwners: the self-hosted libraries are owned nowhere -
     # platform/queue and platform/event-bus run Supabase Queues (pgmq) through the shared EntityManager, cache and locks are
-    # Postgres (advisory locks or an unlogged table), and platform/realtime pushes through Supabase Realtime by calling
-    # realtime.send in the caller's transaction (clients subscribe to private channels under RLS), never a socket server.
+    # Postgres (advisory locks or an unlogged table), and realtime is the same socket.io gateway as full, run inside the api
+    # process with no Redis adapter (owner ruling 2026-10-13).
     lite:
       schemaAuthority: supabase
       infraOwners:
@@ -330,8 +332,6 @@ ruleParams:
         kafkajs: []
         redis: []
         ioredis: []
-        "@nestjs/platform-socket.io": []
-        socket.io: []
         graphql-subscriptions: []
         graphql-ws: []
 
@@ -1168,9 +1168,9 @@ slots:
     tests: none
     lite:
       why: >-
-        a push channel on Supabase Realtime: the client subscribes to the private channel under RLS (fe modules/db), a reactor
-        pushes through the RealtimeHub port of platform/realtime, whose lite adapter calls realtime.send in the transaction, and
-        the one door is transport/supabase - never a socket server of its own (knowledge/patterns/be/realtime.yaml, liteAdapter)
+        a push channel on the same socket.io gateway as full (owner ruling 2026-10-13): lite runs the gateway inside the be api
+        process, one instance and no Redis adapter; the front end listens through hooks/socketio
+        (knowledge/patterns/be/realtime.yaml, liteAdapter)
     coverage: none
     rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
     since: 1.0.0
@@ -1208,12 +1208,10 @@ slots:
   - id: be.feature.realtime.websocket
     profiles: [be]
     path: "src/features/realtime/<channel>/transport/websocket/"
-    presence: opt-in              # a socket gateway
-    litePresence: forbidden       # a socket server is self-hosted push infrastructure: lite pushes through Supabase Realtime
+    presence: opt-in              # a socket.io gateway; lite runs it in the api process (owner ruling 2026-10-13)
     pattern: realtime
     tracked: tracked
     tier: feature
-    goesTo: "src/features/realtime/<channel>/transport/supabase/ (be.feature.realtime.supabase): under lite a be realtime door pushes through Supabase Realtime"
     requires: ["<channel>-websocket.module.ts", "<channel>.gateway.ts", "<channel>.gateway.spec.ts"]
     allows: ["<channel>-websocket.module.ts", "<channel>.gateway.ts", "<channel>.gateway.spec.ts"]
     tests: unit-beside            # the door's own spec beside the door (a gateway has no service of its own)
@@ -1221,25 +1219,6 @@ slots:
     composedBy: [api]
     rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE, BE_DEFAULT_DENY]
     since: 1.0.0
-  - id: be.feature.realtime.supabase
-    profiles: [be]
-    # The realtime door of a lite app (owner ruling 2026-10-12): `<channel>.subscription.ts` names the private Supabase Realtime topic
-    # of the channel for a principal (BE_REALTIME_TOPIC_SCOPE) and pushes only through Supabase Realtime (the RealtimeHub port of
-    # platform/realtime, whose lite adapter calls realtime.send); clients subscribe under RLS from fe modules/db. It is no @Resolver
-    # and serves no socket (R184 BE_REALTIME_SHAPE is full's). It reads and pushes only (BE_REALTIME_WRITES).
-    editions: [lite]
-    path: "src/features/realtime/<channel>/transport/supabase/"
-    presence: opt-in
-    pattern: realtime
-    tracked: tracked
-    tier: feature
-    requires: ["<channel>-supabase.module.ts", "<channel>.subscription.ts", "<channel>.subscription.spec.ts"]
-    allows: ["<channel>-supabase.module.ts", "<channel>.subscription.ts", "<channel>.subscription.spec.ts"]
-    tests: unit-beside            # the door's own spec beside the door (a subscription has no service of its own)
-    coverage: none
-    composedBy: [api]
-    rules: [BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE, BE_DEFAULT_DENY]
-    since: 2.3.0
   - id: be.cli
     profiles: [be]
     # The cli feature root: every one-off action of the back end, compiled only into apps/cli. A group is a nest-commander
@@ -1685,22 +1664,25 @@ slots:
     presence: required
     tracked: tracked
     tier: route
-    allows: ["[locale]/**/{page,layout,template,loading,error,not-found,default}.tsx", "[locale]/**/route.ts", "[locale]/providers.tsx",
+    # Owner ruling 2026-10-13 (R212 case-2, lite = full): routes are thin and the front end serves no API - health/live is the one
+    # route handler of this slot, the Supabase auth callback is fe.route.callback, and no file holds a Server Action
+    # (FE_ROUTE_HANDLER_FORBIDDEN, FE_SERVER_ACTION_FORBIDDEN).
+    allows: ["[locale]/**/{page,layout,template,loading,error,not-found,default}.tsx", "[locale]/providers.tsx",
              global-error.tsx, page.tsx,   # the root page.tsx only redirects (FE_ROUTE_FILES_THIN)
              not-found.tsx, layout.tsx,    # next-intl: a request outside every locale renders the root not-found inside a root layout
-             "health/{live,ready}/route.ts", "api/**/route.ts", "_*/**", providers.tsx, globals.css,
+             health/live/route.ts, "_*/**", providers.tsx, globals.css,
              "{icon,favicon,apple-icon,opengraph-image,twitter-image}.*", robots.ts, sitemap.ts, manifest.ts]
     # providers.tsx (root or [locale]) is the client wrapper the server layout renders around its children to host context providers.
     roles: {page: page.tsx, layout: layout.tsx, template: template.tsx, loading: loading.tsx, error: error.tsx, not-found: not-found.tsx, default: default.tsx, route: route.ts, global-error: global-error.tsx, providers: providers.tsx}
     tests: none
-    rules: [FE_ROUTE_FILES_THIN, FE_CLIENT_BOUNDARY, FE_OWNER_REACHABLE]
+    rules: [FE_ROUTE_FILES_THIN, FE_CLIENT_BOUNDARY, FE_OWNER_REACHABLE, FE_ROUTE_HANDLER_FORBIDDEN, FE_SERVER_ACTION_FORBIDDEN]
   - id: fe.source-root-pinned
     profiles: [fe]
-    path: "apps/<app>/src/{proxy.ts,instrumentation.ts,instrumentation-client.ts}"
+    path: "apps/<app>/src/{proxy.ts,instrumentation.ts,instrumentation-client.ts,sentry.server.config.ts,sentry.edge.config.ts}"
     presence: optional
     tracked: tracked
     tier: route
-    roles: {proxy: proxy.ts, instrumentation: instrumentation.ts, instrumentation-client: instrumentation-client.ts}
+    roles: {proxy: proxy.ts, instrumentation: instrumentation.ts, instrumentation-client: instrumentation-client.ts, sentry: "sentry.*.config.ts"}
     tests: none
     rules: [FE_NEXT_CONVENTIONS]   # middleware.ts is refused on Next >= 16 (fe.source-root-middleware)
   - id: fe.source-root-middleware
@@ -1714,9 +1696,9 @@ slots:
     rules: [FE_NEXT_CONVENTIONS]
   - id: fe.route.callback
     profiles: [fe]
-    # The auth callback of a Supabase session (the PKCE code exchange): the one non-health route handler of an app with a Supabase
-    # connection, in either edition (an upgrade lite -> full leaves it as it is, fe/** is never touched); an app without one has no
-    # route handler in fe/ (L15).
+    # The auth callback of a Supabase session (the PKCE code exchange), kept only when the auth flow truly needs a server exchange
+    # (prefer the client-side PKCE exchange in fe.modules.auth): the one non-health route handler of an app with a Supabase
+    # connection; an app without one has no route handler in fe/ (L15).
     path: "apps/<app>/src/app/auth/callback/route.ts"
     presence: opt-in
     provider: supabase
@@ -1752,6 +1734,22 @@ slots:
     tests: none
     budget: {component.tsx: 300, index.tsx: 200, dataHooks: 6, useState: 6}
     rules: [FE_CONNECTED_BLOCK_RENDER_PAIR, FE_I18N_LITERAL, FE_NATIVE_FORM_CONTROL, FE_CLIENT_BOUNDARY]
+  - id: fe.components.providers
+    profiles: [fe]
+    # The client providers the root layout mounts once (owner ruling 2026-10-13, fe-stack theme/state-global/data): the redux store,
+    # the SWR configuration, the theme (next-themes), the HeroUI toast region and the side-effect components (SwrSideEffects,
+    # SocketIoSideEffects). A provider wires state, so it sits at the feature tier, above components.
+    path: "apps/<app>/src/components/providers/<name>/"
+    presence: optional
+    tracked: tracked
+    tier: feature
+    owner: true
+    requires: [index.tsx]
+    allows: [index.tsx]
+    roles: {entry: index.tsx}
+    tests: none
+    since: 2.3.0
+    rules: [FE_CLIENT_BOUNDARY]
   - id: fe.hooks
     profiles: [fe]
     path: "apps/<app>/src/hooks/<domain>/"
@@ -1765,6 +1763,115 @@ slots:
     tests: none
     budget: {file: 200, dataHooks: 6, useState: 6}
     rules: [FE_HOOKS_ARE_HOOKS, FE_DATA_FRESHNESS]
+  - id: fe.hooks.swr
+    profiles: [fe]
+    # The data hooks (fe-stack data, FE-DATA-SWR): one useSWR / useSWRMutation wrapper per modules/api operation, keyed
+    # QUERY_<X>_SWR_KEY / MUTATE_<X>_SWR_KEY plus the identity of the request; SwrSideEffects.tsx runs the app-wide hooks once.
+    path: "apps/<app>/src/hooks/swr/"
+    presence: optional
+    tracked: tracked
+    tier: hooks
+    owner: true
+    requires: [index.ts]
+    allows: [index.ts, SwrSideEffects.tsx, api/index.ts, "api/{graphql,rest}/index.ts", "api/{graphql,rest}/{queries,mutations}/index.ts",
+             "api/graphql/queries/useQuery*Swr.ts", "api/graphql/mutations/useMutate*Swr.ts",
+             "api/rest/queries/useGet*Swr.ts", "api/rest/mutations/use{Post,Put,Patch,Delete}*Swr.ts"]
+    roles: {entry: index.ts, effects: SwrSideEffects.tsx}
+    tests: none
+    budget: {file: 200}
+    since: 2.3.0
+    rules: [FE_HOOKS_ARE_HOOKS, FE_DATA_FRESHNESS]
+  - id: fe.hooks.rhf
+    profiles: [fe]
+    # The forms (fe-stack forms, FE-FORM): react-hook-form with the zod resolver; the schema carries next-intl messages and the
+    # submit runs an SWR mutation through modules/toast.
+    path: "apps/<app>/src/hooks/rhf/"
+    presence: optional
+    tracked: tracked
+    tier: hooks
+    owner: true
+    requires: [index.ts]
+    allows: [index.ts, "use*Form.ts"]
+    roles: {entry: index.ts}
+    tests: none
+    budget: {file: 200}
+    since: 2.3.0
+    rules: [FE_HOOKS_ARE_HOOKS]
+  - id: fe.hooks.zustand
+    profiles: [fe]
+    # Feature-local client state (fe-stack state-local, FE-STATE-ZUSTAND): one store per folder.
+    path: "apps/<app>/src/hooks/zustand/<store>/"
+    presence: optional
+    tracked: tracked
+    tier: hooks
+    owner: true
+    requires: [index.ts, store.ts]
+    allows: [index.ts, store.ts, "use*.ts"]
+    roles: {entry: index.ts, store: store.ts}
+    tests: none
+    budget: {file: 200}
+    since: 2.3.0
+    rules: [FE_HOOKS_ARE_HOOKS]
+  - id: fe.hooks.socketio
+    profiles: [fe]
+    # Realtime (fe-stack realtime, FE-REALTIME): one socket.io-client singleton per namespace in sockets.ts and one side-effect
+    # component that wires the listeners to redux and SWR.
+    path: "apps/<app>/src/hooks/socketio/"
+    presence: optional
+    tracked: tracked
+    tier: hooks
+    owner: true
+    requires: [index.ts, sockets.ts, SocketIoSideEffects.tsx]
+    allows: [index.ts, sockets.ts, SocketIoSideEffects.tsx, connectionStore.ts, "enums/*.ts", "types/*.ts", "use*.ts"]
+    roles: {entry: index.ts, effects: SocketIoSideEffects.tsx}
+    tests: none
+    budget: {file: 200}
+    since: 2.3.0
+    rules: [FE_HOOKS_ARE_HOOKS]
+  - id: fe.hooks.effects
+    profiles: [fe]
+    # App-wide side effects (route params synced into redux, the auth bootstrap).
+    path: "apps/<app>/src/hooks/effects/"
+    presence: optional
+    tracked: tracked
+    tier: hooks
+    owner: true
+    requires: [index.ts]
+    allows: [index.ts, "use*.ts"]
+    roles: {entry: index.ts}
+    tests: none
+    budget: {file: 200}
+    since: 2.3.0
+    rules: [FE_HOOKS_ARE_HOOKS]
+  - id: fe.hooks.reuseables
+    profiles: [fe]
+    # Reusable generic hooks (fe-stack utils): no domain, no data.
+    path: "apps/<app>/src/hooks/reuseables/"
+    presence: optional
+    tracked: tracked
+    tier: hooks
+    owner: true
+    requires: [index.ts]
+    allows: [index.ts, "use*.ts"]
+    roles: {entry: index.ts}
+    tests: none
+    budget: {file: 200}
+    since: 2.3.0
+    rules: [FE_HOOKS_ARE_HOOKS]
+  - id: fe.redux
+    profiles: [fe]
+    # App-wide shared state (fe-stack state-global, FE-STATE-REDUX): the store, its typed hooks, the provider and one file per slice.
+    path: "apps/<app>/src/redux/"
+    presence: optional
+    tracked: tracked
+    tier: modules
+    owner: true
+    requires: [index.ts, store.ts, hooks.ts]
+    allows: [index.ts, store.ts, hooks.ts, ReduxProvider.tsx, "slices/*.ts"]
+    roles: {entry: index.ts, store: store.ts}
+    tests: none
+    budget: {file: 400}
+    since: 2.3.0
   - id: fe.modules
     profiles: [fe]
     path: "apps/<app>/src/modules/<capability>/"
@@ -1783,32 +1890,36 @@ slots:
     presence: optional
     tracked: tracked
     tier: transport
-    # The app's reads of the one client. A repository has exactly ONE transport client and ONE Outcome union: the app's
-    # client.ts/outcome.ts (fe.transport.client/outcome) in a one-app repository, or the api package's
-    # (fe.package.api.client/outcome) when the repository shares it (FE_TRANSPORT_OWNER, machine).
+    # The browser's calls to the back end (owner ruling 2026-10-13, fe-stack graphql/rest/codegen, FE-API-GRAPHQL): the auth and
+    # no-auth Apollo clients with their link chain (graphql/clients), one file per operation (graphql/queries/query-<x>.ts,
+    # graphql/mutations/mutation-<x>.ts with its gql document map and typed request/response in types/), the generated wire types
+    # (graphql/__generated__) and the axios calls (rest/<area>/*.ts) for uploads, presigned URLs and auth endpoints. A repository has
+    # exactly ONE client folder and ONE GraphQLResponse union: the app's (fe.transport.client/outcome) in a one-app repository, or
+    # the api package's (fe.package.api.client/outcome) when the repository shares it (FE_TRANSPORT_OWNER, machine).
     requires: [index.ts]
-    allows: [index.ts, client.ts, outcome.ts, "<domain>/read-*.ts", "<domain>/*.graphql", "<domain>/<domain>.mapper.ts", __generated__/]
-    roles: {entry: index.ts, reader: "read-*.ts"}   # a reader is a server module (FE_CLIENT_REACHES_SERVER)
+    allows: [index.ts, graphql/index.ts, graphql/types.ts, "graphql/clients/**", "graphql/queries/query-*.ts", "graphql/queries/types/*.ts",
+             "graphql/mutations/mutation-*.ts", "graphql/mutations/types/*.ts", "graphql/__generated__/**", "rest/index.ts", "rest/<area>/*.ts"]
+    roles: {entry: index.ts, query: "query-*.ts", mutation: "mutation-*.ts"}
     tests: none
     rules: [FE_TRANSPORT_OWNER, FE_HTTP_STATUS_COLLAPSE, FE_WIRE_GENERATED]
   - id: fe.transport.client
     profiles: [fe]
-    path: "apps/<app>/src/modules/api/client.ts"
+    path: "apps/<app>/src/modules/api/graphql/clients/"
     presence: optional
     tracked: tracked
     tier: transport
     tests: none
-    why: the one fetch of a one-app repository (timeout, abort, 401/403 -> refused); a shared client is fe.package.api.client
+    why: the auth and no-auth Apollo clients and their link chain (retry, error, timeout, token refresh, attach access token, http) of a one-app repository; a shared client is fe.package.api.client
     rules: [FE_TRANSPORT_OWNER]
   - id: fe.transport.outcome
     profiles: [fe]
-    path: "apps/<app>/src/modules/api/outcome.ts"
+    path: "apps/<app>/src/modules/api/graphql/types.ts"
     presence: optional
     tracked: tracked
     tier: transport
     outcomeHome: true
     tests: none
-    why: the one Outcome union of a one-app repository; a shared union is fe.package.api.outcome
+    why: the one GraphQLResponse union ({success, message, error, data}) of a one-app repository; a shared union is fe.package.api.outcome
     rules: [FE_HTTP_STATUS_COLLAPSE]
   - id: fe.modules.config
     profiles: [fe]
@@ -1867,47 +1978,37 @@ slots:
     tests: none
     since: 2.2.0
     why: global ambient declarations loaded by the app compiler; this owner exposes no runtime API
-  - id: fe.modules.db
+  - id: fe.modules.auth
     profiles: [fe]
-    # The db transport of an app on Supabase (the ONLY place that imports @supabase/ssr or @supabase/supabase-js, L10): the
-    # server client factory (cookies, anon key, RLS applies), the browser client factory, getPrincipal() (React cache,
-    # auth.getClaims()) and toOutcome() mapping {data, error} into the same Outcome vocabulary modules/api uses. Readers
-    # live in <domain>/read-*.ts, Server Actions (schema-parsed input) in <domain>/write-*.ts; the row types come from
-    # supabase/types/database.types.ts (sides.fe.reads). The barrel index.ts is server-only (it re-exports server code), so
-    # browser.ts, the browser client factory a client hook imports, is a second public entry of the owner (`entries`).
-    path: "apps/<app>/src/modules/db/"
-    presence: opt-in              # enabled by a connection with provider: supabase; required under edition lite
-    provider: supabase
-    litePresence: required
+    # The identity-provider client (fe-stack auth, FE-AUTH): the session, the access token the Apollo link attaches and the
+    # sign-in/sign-out calls. With a Supabase connection it is the ONLY fe importer of @supabase/supabase-js and uses its auth API
+    # only; Supabase on the front end never reads or writes data (owner ruling 2026-10-13).
+    path: "apps/<app>/src/modules/auth/"
+    presence: optional
     tracked: tracked
-    tier: transport
-    requires: [index.ts, server.ts, browser.ts, principal.ts]
-    allows: [index.ts, server.ts, browser.ts, principal.ts, outcome.ts, "<domain>/read-*.ts", "<domain>/write-*.ts", "<domain>/<domain>.mapper.ts"]
-    entries: [browser.ts]
-    anonymousActions: [auth/write-sign-in.ts, auth/write-sign-out.ts]     # the Server Actions that run for an anonymous principal by design (FE_AUTH_SESSION_TRUST)
+    tier: modules
+    owner: true
+    requires: [index.ts]
     tests: none
-    since: 2.1.0
-  - id: fe.modules.db.outcome
+    since: 2.3.0
+    rules: [FE_SUPABASE_CLIENT_OWNER, FE_SERVICE_ROLE_FORBIDDEN]
+  - id: fe.modules.toast
     profiles: [fe]
-    # A lite app has no modules/api: its db transport is the transport, so the one Outcome union lives here (toOutcome maps
-    # {data, error} into it). Under full the union stays fe.transport.outcome / fe.package.api.outcome.
-    editions: [lite]
-    path: "apps/<app>/src/modules/db/outcome.ts"
-    presence: opt-in
-    provider: supabase
-    litePresence: optional
+    # Mutation feedback (fe-stack toast, FE-TOAST): the HeroUI toast wrapper, showGraphQLToast over a GraphQLResponse and the
+    # use*WithToast hooks with next-intl labels.
+    path: "apps/<app>/src/modules/toast/"
+    presence: optional
     tracked: tracked
-    tier: transport
-    outcomeHome: true
+    tier: modules
+    owner: true
+    requires: [index.ts, toast.tsx, api.ts, hooks.ts]
+    allows: [index.ts, toast.tsx, api.ts, hooks.ts]
     tests: none
-    why: the one Outcome union of a lite app; its db owner is the transport
-    rules: [FE_HTTP_STATUS_COLLAPSE]
-    since: 2.1.0
+    since: 2.3.0
   - id: fe.package.ui
     profiles: [fe]
     path: "packages/<family>-ui/"
     presence: opt-in
-    litePresence: optional        # a lite app scaffolds no packages; one appears by need, without an optionalSlots entry
     tracked: tracked
     tier: package
     owner: true
@@ -1922,38 +2023,36 @@ slots:
     profiles: [fe]
     path: "packages/<family>-api/"
     presence: opt-in
-    litePresence: optional
     tracked: tracked
     tier: package
     owner: true
-    requires: [package.json, src/index.ts, src/client.ts, src/outcome.ts, tsconfig.json]
+    requires: [package.json, src/index.ts, src/graphql/clients/index.ts, src/graphql/types.ts, tsconfig.json]
     tests: none
     why: the one transport client and the one Outcome union shared by every app of the repository; no app keeps its own
     rules: [FE_TRANSPORT_OWNER, FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT]
   - id: fe.package.api.client
     profiles: [fe]
-    path: "packages/<family>-api/src/client.ts"
+    path: "packages/<family>-api/src/graphql/clients/"
     presence: optional     # enabled with its package (fe.package.api is the opt-in)
     tracked: tracked
     tier: package
     tests: none
-    why: the repository's one fetch (timeout, abort, 401/403 -> refused)
+    why: the repository's one pair of Apollo clients and their link chain
     rules: [FE_TRANSPORT_OWNER]
   - id: fe.package.api.outcome
     profiles: [fe]
-    path: "packages/<family>-api/src/outcome.ts"
+    path: "packages/<family>-api/src/graphql/types.ts"
     presence: optional     # enabled with its package (fe.package.api is the opt-in)
     tracked: tracked
     tier: package
     outcomeHome: true
     tests: none
-    why: the repository's one Outcome union
+    why: the repository's one GraphQLResponse union
     rules: [FE_HTTP_STATUS_COLLAPSE]
   - id: fe.package.i18n
     profiles: [fe]
     path: "packages/<family>-i18n/"
     presence: opt-in
-    litePresence: optional
     tracked: tracked
     tier: package
     owner: true
@@ -1961,28 +2060,3 @@ slots:
     tests: none
     why: the next-intl stack (routing, navigation, request config) written once, exported as the createAppI18n factory every app calls
     rules: [FE_I18N_PLACEMENT, FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT]
-  - id: fe.package.db
-    profiles: [fe]
-    # The shared Supabase client factories once a second fe app needs them (server, browser, principal, toOutcome) -
-    # mirroring fe.transport.client vs fe.package.api.client; the one Outcome union is re-exported from
-    # fe.package.api.outcome when the api package exists.
-    path: "packages/<family>-db/"
-    presence: opt-in
-    provider: supabase
-    tracked: tracked
-    tier: package
-    owner: true
-    requires: [package.json, src/index.ts, tsconfig.json]
-    tests: none
-    since: 2.1.0
-
-# Checks that read this manifest (all ship from .claude; none keeps its own path list)
-consumers:
-  - scripts/hfs/slots.mjs                  # the loader every consumer below goes through
-  - scripts/hfs/check.mjs                  # starci app check: HFS_SLOT_* / tracked / external, the side view per side
-  - scripts/hfs/architecture.mjs            # tiers, direction matrix, cycles, reachability
-  - packages/eslint/be starciBeConfig({hfs})   # file globs for rules come from slots
-  - packages/eslint/fe starciFeConfig({hfs})
-  - packages/stylelint                         # @starci/stylelint-canon: colour and brand allowances from fe.modules.brand
-  - packages/hfs/sync                          # renders managedBy templates (starci app sync) and judges them (starci app check)
-  - modules/kernel/failure-codes.yaml          # every rule id listed above has a Vietnamese why

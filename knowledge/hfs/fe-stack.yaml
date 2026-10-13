@@ -1,0 +1,218 @@
+schema: starci/fe-stack@1
+purpose: >-
+  The front-end stack of every app, lite and full alike (owner ruling 2026-10-13, R212 case-2): for each common front-end concern the
+  ONE canonical library, its HFS home (slot ids of knowledge/hfs/slots.yaml), the pattern id that teaches it
+  (knowledge/patterns/fe/*.yaml) and the alternatives a front end never depends on or imports. Versions live in
+  knowledge/hfs/canon-pins.yaml only. `tier: core` packages are installed by every scaffold; `opt` packages are added when a feature
+  needs the concern. Source example: starci-lab/starci-academy (origin/main, 2026-10-13); it illustrates, this file decides.
+concerns:
+  - id: framework
+    tier: core
+    packages: [next, react, react-dom, typescript]
+    home: [fe.route, fe.source-root-pinned]
+    pattern: FE-ROUTE
+    forbids: []
+    why: App Router with thin routes; route handlers (except health/live and the auth callback slot) and Server Actions are refused by FE_ROUTE_HANDLER_FORBIDDEN and FE_SERVER_ACTION_FORBIDDEN.
+  - id: graphql
+    tier: core
+    packages: ['@apollo/client', graphql]
+    home: [fe.modules.api, fe.transport.client, fe.transport.outcome]
+    pattern: FE-API-GRAPHQL
+    forbids: [urql, graphql-request, '@urql/core', graphql-hooks, apollo-boost]
+    why: one file per operation under modules/api/graphql/{queries,mutations}, run by the auth or no-auth Apollo client with the link chain.
+  - id: codegen
+    tier: core
+    packages: ['@graphql-codegen/cli', '@graphql-codegen/client-preset']
+    home: [fe.modules.api]
+    pattern: FE-WIRE-GENERATED
+    forbids: []
+    why: the wire types are generated from be/contracts/<app>/schema.graphql into modules/api/graphql/__generated__, never typed by hand.
+  - id: rest
+    tier: core
+    packages: [axios]
+    home: [fe.modules.api]
+    pattern: FE-API-REST
+    forbids: [ky, superagent, node-fetch, cross-fetch, isomorphic-fetch]
+    why: modules/api/rest/<area>/*.ts for uploads, presigned URLs and auth endpoints only; GraphQL carries every other call.
+  - id: data
+    tier: core
+    packages: [swr]
+    home: [fe.hooks.swr]
+    pattern: FE-DATA-SWR
+    forbids: ['@tanstack/react-query', react-query]
+    why: hooks/swr/api/{graphql,rest}/{queries,mutations}/use*Swr.ts wrap one operation each; components call hooks only.
+  - id: toast
+    tier: core
+    packages: ['@heroui/react']
+    home: [fe.modules.toast]
+    pattern: FE-TOAST
+    forbids: [sonner, react-toastify, react-hot-toast, notistack]
+    why: mutation outcomes are reported by modules/toast (showGraphQLToast, use*WithToast) with next-intl labels.
+  - id: forms
+    tier: core
+    packages: [react-hook-form, '@hookform/resolvers', zod]
+    home: [fe.hooks.rhf]
+    pattern: FE-FORM
+    forbids: [formik, yup, final-form, react-final-form]
+    why: hooks/rhf/use<X>Form.ts builds a zod schema with next-intl messages and submits through an SWR mutation and the toast.
+  - id: state-global
+    tier: core
+    packages: ['@reduxjs/toolkit', react-redux]
+    home: [fe.redux]
+    pattern: FE-STATE-REDUX
+    forbids: [mobx, mobx-react, mobx-react-lite, recoil, jotai, valtio, redux-saga]
+    why: app-wide shared state (selected ids synced from the route, server-pushed entities) lives in redux/slices.
+  - id: state-local
+    tier: core
+    packages: [zustand]
+    home: [fe.hooks.zustand]
+    pattern: FE-STATE-ZUSTAND
+    forbids: []
+    why: feature-local UI, wizard and editor state lives in hooks/zustand/<store>.
+  - id: realtime
+    tier: opt
+    packages: [socket.io-client, eventemitter2]
+    home: [fe.hooks.socketio]
+    pattern: FE-REALTIME
+    forbids: [graphql-ws, subscriptions-transport-ws, '@supabase/realtime-js', pusher-js, ably]
+    why: one socket.io-client singleton per namespace and one side-effect component that dispatches to redux and SWR; lite runs the gateway in the be api process.
+  - id: auth
+    tier: core
+    packages: []
+    home: [fe.modules.auth]
+    pattern: FE-AUTH
+    forbids: []
+    why: modules/auth is the identity-provider client (lite - the @supabase/supabase-js auth client; full - the app's IdP client); it yields the session and the access token for the Apollo link and never reads data.
+  - id: i18n
+    tier: core
+    packages: [next-intl]
+    home: [fe.modules.i18n]
+    pattern: FE-I18N
+    forbids: [i18next, react-i18next, next-i18next, react-intl, '@lingui/react']
+    why: useTranslations for copy and the next-intl formatter for numbers, dates and currency.
+  - id: ui
+    tier: core
+    packages: ['@heroui/react', '@heroui/styles', tailwindcss, '@starci/grammar']
+    home: [fe.components, fe.feature]
+    pattern: FE-UI
+    forbids: ['@mantine/core', '@mui/material', '@chakra-ui/react', antd, styled-components, '@emotion/react', '@emotion/styled']
+    why: the grammar renderers over HeroUI and Tailwind; no second UI kit and no CSS-in-JS.
+  - id: icons
+    tier: core
+    packages: ['@phosphor-icons/react']
+    home: [fe.components]
+    pattern: FE-ICON
+    forbids: [react-icons, lucide-react, '@iconify/react', '@gravity-ui/icons', '@tabler/icons-react', '@fortawesome/react-fontawesome']
+    why: one application icon set.
+  - id: theme
+    tier: core
+    packages: [next-themes]
+    home: [fe.components.providers]
+    pattern: FE-THEME
+    forbids: []
+    why: the theme provider lives in components/providers.
+  - id: motion
+    tier: opt
+    packages: [framer-motion]
+    home: [fe.components]
+    pattern: FE-MOTION
+    forbids: [react-spring, '@react-spring/web', gsap]
+    why: one motion library.
+  - id: dates
+    tier: core
+    packages: [dayjs]
+    home: [fe.modules]
+    pattern: FE-DATE
+    forbids: [moment, moment-timezone, date-fns, luxon]
+    why: dayjs (modules/dayjs) for date math and parsing; display through the next-intl formatter.
+  - id: numbers
+    tier: opt
+    packages: [decimal.js]
+    home: [fe.modules]
+    pattern: FE-NUMBER
+    forbids: [big.js, bignumber.js, numeral]
+    why: decimal.js for money arithmetic in modules/utils; display through the next-intl formatter.
+  - id: storage
+    tier: core
+    packages: [superjson]
+    home: [fe.modules]
+    pattern: FE-STORAGE
+    forbids: [localforage, store2]
+    why: modules/storage (local and session storage) serializes through modules/superjson; components never touch storage directly.
+  - id: utils
+    tier: opt
+    packages: [lodash, usehooks-ts]
+    home: [fe.modules, fe.hooks.reuseables]
+    pattern: FE-UTILS
+    forbids: [underscore, ramda, lodash-es]
+    why: per-method lodash imports in modules/utils and reusable hooks in hooks/reuseables.
+  - id: charts
+    tier: opt
+    packages: [recharts]
+    home: [fe.components]
+    pattern: FE-CHART
+    forbids: [chart.js, react-chartjs-2, '@nivo/core', d3, echarts, echarts-for-react]
+    why: one chart library, styled by the dataviz grammar.
+  - id: flow
+    tier: opt
+    packages: ['@xyflow/react']
+    home: [fe.components]
+    pattern: FE-FLOW
+    forbids: [reactflow, cytoscape]
+    why: graph canvases go through the grammar FlowGraph over React Flow.
+  - id: markdown
+    tier: opt
+    packages: [react-markdown, remark-gfm, remark-directive]
+    home: [fe.components]
+    pattern: FE-MARKDOWN
+    forbids: [marked, markdown-it, showdown]
+    why: markdown renders through react-markdown, never dangerouslySetInnerHTML.
+  - id: code
+    tier: opt
+    packages: [react-shiki, '@monaco-editor/react']
+    home: [fe.components]
+    pattern: FE-CODE
+    forbids: [prismjs, react-syntax-highlighter, highlight.js, '@uiw/react-codemirror', codemirror]
+    why: react-shiki highlights and Monaco edits.
+  - id: diagrams
+    tier: opt
+    packages: [mermaid]
+    home: [fe.components]
+    pattern: FE-DIAGRAM
+    forbids: []
+    why: diagrams render through mermaid in a block.
+  - id: upload
+    tier: opt
+    packages: [react-dropzone]
+    home: [fe.components, fe.modules.api]
+    pattern: FE-UPLOAD
+    forbids: [react-dropzone-uploader, filepond, react-filepond, uppy]
+    why: react-dropzone in a block and a presigned PUT through modules/api/rest.
+  - id: pdf
+    tier: opt
+    packages: [react-pdf]
+    home: [fe.components]
+    pattern: FE-PDF
+    forbids: ['@react-pdf-viewer/core', pdfjs-dist]
+    why: PDF viewing through react-pdf in a block.
+  - id: device-id
+    tier: opt
+    packages: ['@fingerprintjs/fingerprintjs']
+    home: [fe.transport.client]
+    pattern: FE-API-GRAPHQL
+    forbids: []
+    why: the fingerprint link of the Apollo client attaches the device id.
+  - id: observability
+    tier: opt
+    packages: ['@sentry/nextjs']
+    home: [fe.source-root-pinned]
+    pattern: FE-OBSERVE
+    forbids: [logrocket, bugsnag-js, '@bugsnag/js', '@datadog/browser-rum']
+    why: errors are reported through @sentry/nextjs (sentry.*.config.ts, instrumentation.ts), never console-only.
+  - id: lint
+    tier: core
+    packages: [eslint, prettier, '@starci/eslint-canon-fe', '@starci/prettier-config']
+    home: [fe.tool-config]
+    pattern: FE-LINT
+    forbids: []
+    why: the canon lint and format configuration.

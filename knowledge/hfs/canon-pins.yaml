@@ -299,6 +299,193 @@ pins:
     group: ui
     side: fe
     why: 'the PostCSS plugin tailwindcss 4 runs through; the reference app declares ^4 and resolves 4.3.3.'
+  # --- front-end stack (knowledge/hfs/fe-stack.yaml; owner ruling 2026-10-13: lite = full)
+  '@apollo/client':
+    version: 4.1.6
+    group: framework
+    side: fe
+    why: 'the GraphQL client of every front end (fe-stack graphql): auth and no-auth clients with the link chain in modules/api/graphql; version read from the starci-academy package-lock on 2026-10-13.'
+  '@graphql-codegen/cli':
+    version: 7.4.6
+    group: tooling
+    side: fe
+    why: 'generates the front-end wire types from be/contracts/<app>/schema.graphql into modules/api/graphql/__generated__ (fe-stack codegen); the latest registry version on 2026-10-13, academy has none.'
+  '@graphql-codegen/client-preset':
+    version: 6.2.3
+    group: tooling
+    side: fe
+    why: 'the codegen preset of the front-end wire types (fe-stack codegen); the latest registry version on 2026-10-13.'
+  'axios':
+    version: 1.15.2
+    group: framework
+    side: fe
+    why: 'the REST client of the front end for uploads, presigned URLs and auth endpoints (fe-stack rest); version read from the starci-academy package-lock on 2026-10-13.'
+  'swr':
+    version: 2.4.2
+    group: framework
+    side: fe
+    why: 'the data hooks and cache of every front end, hooks/swr (fe-stack data); version read from the starci-academy package-lock on 2026-10-13.'
+  'react-hook-form':
+    version: 7.77.0
+    group: framework
+    side: fe
+    why: 'the form library, hooks/rhf (fe-stack forms); version read from the starci-academy package-lock on 2026-10-13.'
+  '@hookform/resolvers':
+    version: 5.4.0
+    group: framework
+    side: fe
+    why: 'the zod resolver of react-hook-form (fe-stack forms); version read from the starci-academy package-lock on 2026-10-13.'
+  'zod':
+    version: 4.4.3
+    group: framework
+    side: fe
+    why: 'the schema library of front-end forms and boundary parsing (fe-stack forms); version read from the starci-academy package-lock on 2026-10-13.'
+  '@reduxjs/toolkit':
+    version: 2.11.2
+    group: framework
+    side: fe
+    why: 'app-wide shared state, redux/ (fe-stack state-global); version read from the starci-academy package-lock on 2026-10-13.'
+  'react-redux':
+    version: 9.2.0
+    group: framework
+    side: fe
+    why: 'the React binding of the app-wide store (fe-stack state-global); version read from the starci-academy package-lock on 2026-10-13.'
+  'zustand':
+    version: 5.0.12
+    group: framework
+    side: fe
+    why: 'feature-local client state, hooks/zustand (fe-stack state-local); version read from the starci-academy package-lock on 2026-10-13.'
+  'socket.io-client':
+    version: 4.8.3
+    group: framework
+    side: fe
+    why: 'the realtime client, hooks/socketio (fe-stack realtime); version read from the starci-academy package-lock on 2026-10-13.'
+  'eventemitter2':
+    version: 6.4.9
+    group: framework
+    side: fe
+    why: 'the fan-out emitter behind the socket side-effect component (fe-stack realtime); version read from the starci-academy package-lock on 2026-10-13.'
+  '@phosphor-icons/react':
+    version: 2.1.10
+    group: ui
+    side: fe
+    why: 'the one application icon set (fe-stack icons); version read from the starci-academy package-lock on 2026-10-13.'
+  'next-themes':
+    version: 0.4.6
+    group: ui
+    side: fe
+    why: 'light and dark theme switching in components/providers (fe-stack theme); version read from the starci-academy package-lock on 2026-10-13.'
+  'framer-motion':
+    version: 12.42.2
+    group: ui
+    side: fe
+    why: 'motion (fe-stack motion); version read from the starci-academy package-lock on 2026-10-13.'
+  'dayjs':
+    version: 1.11.21
+    group: framework
+    side: fe
+    why: 'date math and parsing, modules/dayjs (fe-stack dates); display goes through the next-intl formatter; version read from the starci-academy package-lock on 2026-10-13.'
+  'decimal.js':
+    version: 10.6.0
+    group: framework
+    side: fe
+    why: 'money and decimal arithmetic, modules/utils (fe-stack numbers); version read from the starci-academy package-lock on 2026-10-13.'
+  'superjson':
+    version: 2.2.6
+    group: framework
+    side: fe
+    why: 'serialization of stored values, modules/superjson and modules/storage (fe-stack storage); version read from the starci-academy package-lock on 2026-10-13.'
+  'lodash':
+    version: 4.17.23
+    group: framework
+    side: fe
+    why: 'per-method utilities, modules/utils (fe-stack utils); version read from the starci-academy package-lock on 2026-10-13.'
+  'usehooks-ts':
+    version: 3.1.1
+    group: framework
+    side: fe
+    why: 'reusable React hooks, hooks/reuseables (fe-stack utils); version read from the starci-academy package-lock on 2026-10-13.'
+  'recharts':
+    version: 3.8.1
+    group: ui
+    side: fe
+    why: 'charts (fe-stack charts); version read from the starci-academy package-lock on 2026-10-13.'
+  'react-markdown':
+    version: 10.1.0
+    group: ui
+    side: fe
+    why: 'markdown rendering (fe-stack markdown); version read from the starci-academy package-lock on 2026-10-13.'
+  'remark-gfm':
+    version: 4.0.1
+    group: ui
+    side: fe
+    why: 'GitHub-flavoured markdown for react-markdown (fe-stack markdown); version read from the starci-academy package-lock on 2026-10-13.'
+  'remark-directive':
+    version: 4.0.0
+    group: ui
+    side: fe
+    why: 'markdown directives for react-markdown (fe-stack markdown); version read from the starci-academy package-lock on 2026-10-13.'
+  'react-shiki':
+    version: 0.9.2
+    group: ui
+    side: fe
+    why: 'code highlighting (fe-stack code); version read from the starci-academy package-lock on 2026-10-13.'
+  '@monaco-editor/react':
+    version: 4.7.0
+    group: ui
+    side: fe
+    why: 'the code editor (fe-stack code); version read from the starci-academy package-lock on 2026-10-13.'
+  'mermaid':
+    version: 11.16.0
+    group: ui
+    side: fe
+    why: 'diagrams (fe-stack diagrams); version read from the starci-academy package-lock on 2026-10-13.'
+  'react-dropzone':
+    version: 15.0.0
+    group: ui
+    side: fe
+    why: 'file drop zones of uploads (fe-stack upload); version read from the starci-academy package-lock on 2026-10-13.'
+  'react-pdf':
+    version: 10.4.1
+    group: ui
+    side: fe
+    why: 'PDF viewing (fe-stack pdf); version read from the starci-academy package-lock on 2026-10-13.'
+  '@fingerprintjs/fingerprintjs':
+    version: 5.2.0
+    group: framework
+    side: fe
+    why: 'the device id of the GraphQL fingerprint link (fe-stack device-id); version read from the starci-academy package-lock on 2026-10-13.'
+  '@sentry/nextjs':
+    version: 11.7.0
+    group: framework
+    side: fe
+    why: 'error reporting through sentry.*.config.ts and instrumentation.ts (fe-stack observability); the latest registry version on 2026-10-13, academy has none.'
+  # --- back-end transports the front end calls, and the realtime gateway
+  '@nestjs/graphql':
+    version: 13.4.5
+    group: framework
+    side: be
+    why: 'the GraphQL transport of every back end (be.transport.graphql) that the front end calls; the ecommerce-app resolution on 2026-10-13.'
+  '@nestjs/apollo':
+    version: 13.4.5
+    group: framework
+    side: be
+    why: 'the Apollo driver of @nestjs/graphql; the ecommerce-app resolution on 2026-10-13.'
+  '@apollo/server':
+    version: 5.5.1
+    group: framework
+    side: be
+    why: 'the Apollo server behind @nestjs/apollo; the ecommerce-app resolution on 2026-10-13.'
+  '@nestjs/websockets':
+    version: 11.2.5
+    group: framework
+    side: be
+    why: 'the socket.io gateway of a realtime back end (lite runs it in the api process, owner ruling 2026-10-13); the @nestjs/core pin line.'
+  '@nestjs/platform-socket.io':
+    version: 11.2.5
+    group: framework
+    side: be
+    why: 'the socket.io platform of @nestjs/websockets; the @nestjs/core pin line.'
   # --- Supabase lite
   '@supabase/ssr':
     version: 0.12.7
