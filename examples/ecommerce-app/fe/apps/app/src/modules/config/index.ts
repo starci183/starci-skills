@@ -1,7 +1,7 @@
 /**
  * The back-end services the shop's browser calls, and nothing else: the only reader of the shop's `NEXT_PUBLIC_*`
  * environment. The browser calls the identity and order GraphQL APIs directly (owner ruling 2026-10-13), so each base URL is
- * a public value inlined at build time - the app root serve script (scripts/serve.mjs) fills it from the product's resolved projection
+ * a public value inlined at build time - the serve script at the app root fills it from the product's resolved projection
  * (`.starcistacks/dev/infra/metadata.json`) when it starts the app, and a deployment passes it as a build argument. A
  * missing value fails the first call that needs it, naming the variable; there is no localhost fallback.
  */
