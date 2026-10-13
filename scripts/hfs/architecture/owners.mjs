@@ -2,7 +2,6 @@ import path from 'node:path';
 import { canonical, isInside } from './config.mjs';
 import { relativePath, workspaceExportSources } from './typescript.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
-import { isServerActionModule } from './server-action.mjs';
 
 function absolute(root, relative) {
   return canonical(path.resolve(root, ...relative.split('/')));
@@ -35,7 +34,7 @@ function reexportSteps(context, current) {
   return (context.edges.get(current.file) ?? []).filter(candidate => candidate.reexport).map(candidate => ({ file: candidate.to, chain: [...current.chain, candidate.to] }));
 }
 
-function privateOwnerChain(context, owners, actionEntries, edge) {
+function privateOwnerChain(context, owners, edge) {
   const sourceOwner = ownerOf(owners, edge.from);
   const queue = [{ file: edge.to, chain: [edge.from, edge.to] }];
   const visited = new Set();
@@ -44,7 +43,7 @@ function privateOwnerChain(context, owners, actionEntries, edge) {
     if (visited.has(current.file)) continue;
     visited.add(current.file);
     const owner = ownerOf(owners, current.file);
-    if (owner && sourceOwner?.id !== owner.id) return owner.entries.has(current.file) || actionEntries.has(current.file) ? null : { owner, chain: current.chain };
+    if (owner && sourceOwner?.id !== owner.id) return owner.entries.has(current.file) ? null : { owner, chain: current.chain };
     queue.push(...reexportSteps(context, current));
   }
   return null;
@@ -61,7 +60,7 @@ function arrangesSchema(config, from, to) {
     && resolver.classifyPath(relativePath(config.root, to)).slot === 'be.persistence';
 }
 
-function publicEntryViolations(config, context, owners, sourceFiles, actionEntries) {
+function publicEntryViolations(config, context, owners, sourceFiles) {
   const violations = [];
   for (const owner of owners) {
     const sourceFile = sourceFiles.get(owner.entry);
@@ -73,7 +72,6 @@ function publicEntryViolations(config, context, owners, sourceFiles, actionEntri
     const publicFiles = new Set([
       sourceFile,
       ...owner.declared.map(file => sourceFiles.get(file)).filter(Boolean),
-      ...[...actionEntries].filter(file => isInside(owner.root, file)).map(file => sourceFiles.get(file)).filter(Boolean),
     ]);
     for (const entryFile of publicFiles) {
       for (const statement of entryFile.statements) if (context.ts.isExportDeclaration(statement) && !statement.exportClause) {
@@ -90,12 +88,12 @@ function publicEntryViolations(config, context, owners, sourceFiles, actionEntri
   return violations;
 }
 
-function ownerImportViolations(config, context, owners, actionEntries) {
+function ownerImportViolations(config, context, owners) {
   const violations = [];
   for (const sourceFile of context.files) {
     const from = canonical(sourceFile.fileName);
     for (const edge of context.edges.get(from) ?? []) {
-      const bypass = privateOwnerChain(context, owners, actionEntries, edge);
+      const bypass = privateOwnerChain(context, owners, edge);
       if (!bypass) continue;
       if (arrangesSchema(config, from, bypass.chain.at(-1))) continue;
       violations.push({
@@ -119,11 +117,8 @@ export function checkOwners(config, context) {
   if (!config.owners?.length) return [];
   const owners = ownerDeclarations(config, context);
   const sourceFiles = new Map(context.files.map(file => [canonical(file.fileName), file]));
-  const actionEntries = new Set(config.kinds.includes('frontend')
-    ? [...sourceFiles].filter(([, file]) => isServerActionModule(context.ts, file)).map(([name]) => name)
-    : []);
   return [
-    ...publicEntryViolations(config, context, owners, sourceFiles, actionEntries),
-    ...ownerImportViolations(config, context, owners, actionEntries),
+    ...publicEntryViolations(config, context, owners, sourceFiles),
+    ...ownerImportViolations(config, context, owners),
   ];
 }

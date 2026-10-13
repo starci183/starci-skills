@@ -1,6 +1,5 @@
 import { builtinModules } from 'node:module';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
-import { isServerActionModule } from './server-action.mjs';
 
 /**
  * R55 `client-reaches-server` (FE_CLIENT_REACHES_SERVER), the repository half of the eslint rule `client-no-server-import`,
@@ -58,7 +57,6 @@ const scanClientEntry = (entry, { ts, graph, runtime, violations }) => {
   const seen = new Map([[entry.rel, { chain: [entry.rel], first: null }]]);
   const queue = [entry.rel];
   for (const rel of queue) {
-    if (isServerActionModule(ts, graph.files.get(rel).sourceFile)) continue;
     const state = seen.get(rel);
     for (const hit of runtime.serverOf(rel)) {
       const at = state.first ?? sourceLocation(graph.files.get(rel).sourceFile, hit.node);

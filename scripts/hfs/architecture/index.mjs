@@ -48,6 +48,7 @@ import { checkFeSlotAllows, FE_SLOT_ALLOWS_RULE_IDS } from './fe-slot-allows.mjs
 import { checkI18nKeys, I18N_KEYS_RULE_IDS } from './i18n-keys.mjs';
 import { checkDocLanguage, DOC_LANGUAGE_RULE_IDS } from './doc-language.mjs';
 import { checkBackendSupabase, checkFrontendSupabase, BACKEND_SUPABASE_RULE_IDS, FRONTEND_SUPABASE_RULE_IDS } from './supabase.mjs';
+import { checkServerActions, SERVER_ACTION_RULE_IDS } from './server-action.mjs';
 import { LINT_CODES, onLintSurface } from './surface.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 
@@ -98,6 +99,7 @@ const FRONTEND_MACHINE = {
   feSlotAllows: [checkFeSlotAllows, FE_SLOT_ALLOWS_RULE_IDS],
   i18nKeys: [checkI18nKeys, I18N_KEYS_RULE_IDS],
   supabaseFrontend: [checkFrontendSupabase, FRONTEND_SUPABASE_RULE_IDS],
+  serverActions: [checkServerActions, SERVER_ACTION_RULE_IDS],
 };
 
 /** Errors the machine reports when a program cannot be built or an edge cannot be proven: it cannot judge, so it refuses. */

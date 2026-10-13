@@ -34,7 +34,7 @@ const typeFromSupabase = (checker, node) => {
   return false;
 };
 
-export const signatureFromSupabase = (checker, call) => {
+const signatureFromSupabase = (checker, call) => {
   try { return declarationFromSupabase(checker.getResolvedSignature(call)?.declaration); } catch { return false; }
 };
 
@@ -45,7 +45,7 @@ export const unwrap = (ts, node) => {
   return current;
 };
 
-export const isSupabaseValue = (kit, checker, node) => {
+const isSupabaseValue = (kit, checker, node) => {
   const current = unwrap(kit.ts, node);
   if (!current) return false;
   if (importedFrom(kit, checker, current, SUPABASE_MODULES)) return true;

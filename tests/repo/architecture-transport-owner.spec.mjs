@@ -2,28 +2,45 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { appDeclaration, archFixture, runArch, findings } from '../helpers/hfs-arch-fixture.mjs';
 
-// R50 transport-owner (FE_TRANSPORT_OWNER): the machine half of the eslint fetch rules. modules/api/client.ts is the one module
-// of an app that references the global fetch (call, alias or value), no app file imports an HTTP library, and every server
-// reader imports the client.
+// R50 transport-owner (FE_TRANSPORT_OWNER): the browser calls the back end through Apollo GraphQL and axios (owner ruling
+// 2026-10-13). modules/api/graphql/clients/ is the one Apollo client folder of an app (the only place the global fetch and
+// `new ApolloClient` appear), modules/api/graphql/types.ts the one GraphQLResponse union, axios lives only in the api owner, and
+// every GraphQL operation imports the client.
 const API = 'apps/web/src/modules/api';
-const CLIENT = 'export const client = { get: (url: string, signal: AbortSignal) => fetch(url, { signal }) };\n';
-const READER = "import { client } from '../client';\nexport const readCourse = (id: string) => client.get(`/courses/${id}`, AbortSignal.timeout(8000));\n";
+const CLIENT = "import { ApolloClient } from '@apollo/client';\nexport const authClient = new ApolloClient({ uri: '/graphql', fetch: (input: string) => fetch(input) });\n";
+const OUTCOME = 'export type GraphQLResponse<T> = { success: boolean; message: string; error?: string; data?: T };\n';
+const QUERY = "import { authClient } from '../clients';\nexport const queryCourse = (id: string) => authClient.query({ query: id });\n";
+const REST = "import axios from 'axios';\nexport const presign = (name: string) => axios.post('/uploads', { name });\n";
 const GOOD = {
-  [`${API}/client.ts`]: CLIENT,
-  [`${API}/course/read-course.ts`]: READER,
-  'apps/web/src/hooks/course/useCourse.ts': "import { readCourse } from '../../modules/api/course/read-course';\nexport const useCourse = (id: string) => readCourse(id);\n",
+  [`${API}/graphql/clients/index.ts`]: CLIENT,
+  [`${API}/graphql/types.ts`]: OUTCOME,
+  [`${API}/graphql/queries/query-course.ts`]: QUERY,
+  [`${API}/rest/uploads/presign.ts`]: REST,
+  'apps/web/src/hooks/course/useCourse.ts': "import { queryCourse } from '../../modules/api/graphql/queries/query-course';\nexport const useCourse = (id: string) => queryCourse(id);\n",
 };
 const hits = report => findings(report, 'FE_TRANSPORT_OWNER');
 const run = (t, files) => runArch(archFixture(t, { profile: 'fe', files: { ...GOOD, ...files } }));
+const messages = report => hits(report).map(item => `${item.path}: ${item.message}`);
 
-test('a client that owns fetch, readers that import it and hooks that never touch it raise no FE_TRANSPORT_OWNER', t => {
+test('one Apollo client folder, one GraphQLResponse union, an operation that imports the client and axios inside modules/api/rest raise no FE_TRANSPORT_OWNER', t => {
   const report = run(t, {});
   assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
   const coverage = report.coverage.hfsMachine.transportOwner;
   assert.equal(coverage.status, 'checked');
   assert.equal(coverage.apps, 1);
-  assert.equal(coverage.readers, 1);
+  assert.equal(coverage.operations, 1);
+  assert.equal(coverage.clients, 1);
+  assert.equal(coverage.outcomes, 1);
   assert.ok(report.coverage.checkedRuleIds.includes('FE_TRANSPORT_OWNER'));
+});
+
+test('several files of one client folder (clients, links) are one client, and fetch inside the folder is the client\'s own', t => {
+  const report = run(t, {
+    [`${API}/graphql/clients/links/http.ts`]: "export const httpFetch = (input: string) => globalThis.fetch(input);\n",
+    [`${API}/graphql/clients/clients/no-auth.ts`]: "import { ApolloClient } from '@apollo/client';\nexport const noAuthClient = new ApolloClient({ uri: '/graphql' });\n",
+  });
+  assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
+  assert.equal(report.coverage.hfsMachine.transportOwner.clients, 1);
 });
 
 test('a fetch call, globalThis.fetch and a fetch passed as a value outside the client are FE_TRANSPORT_OWNER', t => {
@@ -46,29 +63,29 @@ test('a local function named fetch and a property named fetch are not the global
   assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
 });
 
-test('an HTTP library imported, dynamically imported or required anywhere in the app is FE_TRANSPORT_OWNER', t => {
+test('axios outside the api owner, and any other HTTP library anywhere (import, import() or require), are FE_TRANSPORT_OWNER', t => {
   const report = run(t, {
     'apps/web/src/hooks/course/useAxios.ts': "import axios from 'axios';\nexport const useAxios = () => axios;\n",
     'apps/web/src/hooks/course/useKy.ts': "export const useKy = () => import('ky');\n",
-    [`${API}/course/read-got.ts`]: "declare function require(name: string): unknown;\nimport { client } from '../client';\nexport const readGot = () => [client, require('got')];\n",
+    [`${API}/rest/uploads/got.ts`]: "declare function require(name: string): unknown;\nexport const viaGot = () => require('got');\n",
   });
   assert.deepEqual(hits(report).map(item => item.library).sort(), ['axios', 'got', 'ky']);
+  assert.equal(hits(report).some(item => item.path === `${API}/rest/uploads/presign.ts`), false, 'axios inside modules/api/rest is the rest transport');
 });
 
-test('a reader that does not import the client, and a client that never calls fetch, are FE_TRANSPORT_OWNER', t => {
+test('an operation that does not import the client, and an ApolloClient constructed outside the client folder, are FE_TRANSPORT_OWNER', t => {
   const report = run(t, {
-    [`${API}/course/read-lonely.ts`]: 'export const readLonely = () => 1;\n',
-    [`${API}/client.ts`]: 'export const client = { get: (url: string) => url };\n',
+    [`${API}/graphql/mutations/mutation-lonely.ts`]: 'export const mutationLonely = () => 1;\n',
+    'apps/web/src/hooks/course/useOwnClient.ts': "import { ApolloClient } from '@apollo/client';\nexport const useOwnClient = () => new ApolloClient({ uri: '/graphql' });\n",
   });
-  const messages = hits(report).map(item => `${item.path}: ${item.message}`);
-  assert.ok(messages.some(text => /read-lonely\.ts: .*does not import/.test(text)), messages.join('\n'));
-  assert.ok(messages.some(text => /client\.ts: .*never calls the global fetch/.test(text)), messages.join('\n'));
+  const found = messages(report);
+  assert.ok(found.some(text => /mutation-lonely\.ts: .*does not import the transport client/.test(text)), found.join('\n'));
+  assert.ok(found.some(text => /useOwnClient\.ts: .*constructs an ApolloClient outside/.test(text)), found.join('\n'));
 });
 
-// Exactly ONE transport client and ONE Outcome union per repository, named by slot: the api package's, or the only app's.
+// Exactly ONE client folder and ONE GraphQLResponse union per repository, named by slot: the api package's, or the only app's.
 const TWO_APPS = [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }];
 const PKG = 'packages/shop-api';
-const OUTCOME = "export type Outcome<T> = { kind: 'ok'; value: T } | { kind: 'refused' };\n";
 const TSCONFIG = `${JSON.stringify({
   compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', allowJs: true, skipLibCheck: true, noEmit: true, paths: { '@shop/api': [`${PKG}/src/index.ts`] } },
   include: ['src/**/*', 'apps/**/*', 'packages/**/*'],
@@ -77,51 +94,44 @@ const PACKAGE = {
   'tsconfig.json': TSCONFIG,
   [`${PKG}/package.json`]: JSON.stringify({ name: '@shop/api', private: true }),
   [`${PKG}/tsconfig.json`]: '{}\n',
-  [`${PKG}/src/index.ts`]: "export { client } from './client';\nexport type { Outcome } from './outcome';\n",
-  [`${PKG}/src/client.ts`]: CLIENT,
-  [`${PKG}/src/outcome.ts`]: OUTCOME,
+  [`${PKG}/src/index.ts`]: "export { authClient } from './graphql/clients';\nexport type { GraphQLResponse } from './graphql/types';\n",
+  [`${PKG}/src/graphql/clients/index.ts`]: CLIENT,
+  [`${PKG}/src/graphql/types.ts`]: OUTCOME,
 };
-const APP_READER = app => ({ [`apps/${app}/src/modules/api/course/read-course.ts`]: "import { client } from '@shop/api';\nexport const readCourse = (id: string) => client.get(`/courses/${id}`, AbortSignal.timeout(8000));\n" });
+const APP_OPERATION = app => ({ [`apps/${app}/src/modules/api/graphql/queries/query-course.ts`]: "import { authClient } from '@shop/api';\nexport const queryCourse = (id: string) => authClient.query({ query: id });\n" });
 const runShape = (t, files, apps = TWO_APPS) => runArch(archFixture(t, { profile: 'fe', apps, declaration: { optionalSlots: ['fe.package.api'] }, files }));
-const messages = report => hits(report).map(item => `${item.path}: ${item.message}`);
 
-test('a two-app repository whose one client and one Outcome union live in the api package, with readers in the apps, raises no FE_TRANSPORT_OWNER', t => {
-  const report = runShape(t, { ...PACKAGE, ...APP_READER('web'), ...APP_READER('admin') });
+test('a two-app repository whose one client folder and one union live in the api package, with operations in the apps, raises no FE_TRANSPORT_OWNER', t => {
+  const report = runShape(t, { ...PACKAGE, ...APP_OPERATION('web'), ...APP_OPERATION('admin') });
   assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
   const coverage = report.coverage.hfsMachine.transportOwner;
   assert.equal(coverage.clients, 1);
   assert.equal(coverage.outcomes, 1);
-  assert.equal(coverage.readers, 2);
+  assert.equal(coverage.operations, 2);
 });
 
-test('a one-app repository whose client and Outcome union are the app\'s own raises no FE_TRANSPORT_OWNER', t => {
-  const report = run(t, { [`${API}/outcome.ts`]: OUTCOME });
-  assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
-  assert.equal(report.coverage.hfsMachine.transportOwner.outcomes, 1);
-});
-
-test('two apps that each keep their own client are FE_TRANSPORT_OWNER on both clients', t => {
-  const report = runShape(t, { 'apps/web/src/modules/api/client.ts': CLIENT, 'apps/admin/src/modules/api/client.ts': CLIENT });
-  assert.deepEqual(hits(report).map(item => item.path).sort(), ['apps/admin/src/modules/api/client.ts', 'apps/web/src/modules/api/client.ts']);
+test('two apps that each keep their own client folder are FE_TRANSPORT_OWNER on both', t => {
+  const report = runShape(t, { 'apps/web/src/modules/api/graphql/clients/index.ts': CLIENT, 'apps/admin/src/modules/api/graphql/clients/index.ts': CLIENT });
+  assert.deepEqual(hits(report).map(item => item.path).sort(), ['apps/admin/src/modules/api/graphql/clients/index.ts', 'apps/web/src/modules/api/graphql/clients/index.ts']);
   assert.match(messages(report)[0], /2 transport clients/);
 });
 
-test('a package client next to an app client is FE_TRANSPORT_OWNER on both', t => {
-  const report = runShape(t, { ...PACKAGE, 'apps/web/src/modules/api/client.ts': CLIENT }, [TWO_APPS[0]]);
-  assert.deepEqual(hits(report).map(item => item.path).sort(), ['apps/web/src/modules/api/client.ts', `${PKG}/src/client.ts`]);
+test('a package client folder next to an app client folder is FE_TRANSPORT_OWNER on both', t => {
+  const report = runShape(t, { ...PACKAGE, 'apps/web/src/modules/api/graphql/clients/index.ts': CLIENT }, [TWO_APPS[0]]);
+  assert.deepEqual(hits(report).map(item => item.path).sort(), ['apps/web/src/modules/api/graphql/clients/index.ts', `${PKG}/src/graphql/clients/index.ts`]);
 });
 
-test('two apps that keep one app client, with no package, are FE_TRANSPORT_OWNER: the shared client belongs to the package', t => {
-  const report = runShape(t, { 'apps/web/src/modules/api/client.ts': CLIENT });
-  assert.deepEqual(hits(report).map(item => item.path), ['apps/web/src/modules/api/client.ts']);
+test('two apps that keep one app client folder, with no package, are FE_TRANSPORT_OWNER: the shared client belongs to the package', t => {
+  const report = runShape(t, { 'apps/web/src/modules/api/graphql/clients/index.ts': CLIENT });
+  assert.deepEqual(hits(report).map(item => item.path), ['apps/web/src/modules/api/graphql/clients/index.ts']);
   assert.match(messages(report)[0], /repository of 2 apps/);
 });
 
-test('two Outcome unions (a package one and an app one), or an app one in a two-app repository, are FE_TRANSPORT_OWNER', t => {
-  const twice = runShape(t, { ...PACKAGE, 'apps/web/src/modules/api/outcome.ts': OUTCOME }, [TWO_APPS[0]]);
-  assert.deepEqual(hits(twice).map(item => item.path).sort(), ['apps/web/src/modules/api/outcome.ts', `${PKG}/src/outcome.ts`]);
-  const shared = runShape(t, { ...PACKAGE, 'apps/admin/src/modules/api/outcome.ts': OUTCOME });
-  assert.deepEqual(hits(shared).map(item => item.path).sort(), ['apps/admin/src/modules/api/outcome.ts', `${PKG}/src/outcome.ts`]);
+test('two GraphQLResponse unions (a package one and an app one), or an app one in a two-app repository, are FE_TRANSPORT_OWNER', t => {
+  const twice = runShape(t, { ...PACKAGE, 'apps/web/src/modules/api/graphql/types.ts': OUTCOME }, [TWO_APPS[0]]);
+  assert.deepEqual(hits(twice).map(item => item.path).sort(), ['apps/web/src/modules/api/graphql/types.ts', `${PKG}/src/graphql/types.ts`]);
+  const shared = runShape(t, { ...PACKAGE, 'apps/admin/src/modules/api/graphql/types.ts': OUTCOME });
+  assert.deepEqual(hits(shared).map(item => item.path).sort(), ['apps/admin/src/modules/api/graphql/types.ts', `${PKG}/src/graphql/types.ts`]);
 });
 
 test('a module that fetches in a repository with no client is FE_TRANSPORT_OWNER and says the repository has no client', t => {
@@ -135,34 +145,21 @@ test('a repository with no client and no fetch has nothing to own and raises no 
   assert.deepEqual(hits(report), []);
 });
 
-test('a fetch outside the package client in a package-client repository is FE_TRANSPORT_OWNER, the client itself is not', t => {
+test('a fetch outside the package client folder in a package-client repository is FE_TRANSPORT_OWNER, the client itself is not', t => {
   const report = runShape(t, { ...PACKAGE, 'apps/admin/src/hooks/course/useCalled.ts': "export const useCalled = () => fetch('/x');\n" });
   assert.deepEqual(hits(report).map(item => item.path), ['apps/admin/src/hooks/course/useCalled.ts']);
 });
 
-// The Outcome homes are the slots the manifest marks `outcomeHome`; the lite edition adds fe.modules.db.outcome (modules/db/outcome.ts).
-const DB_OUTCOME = 'apps/web/src/modules/db/outcome.ts';
-const runEdition = (t, edition, files) => {
-  const declaration = appDeclaration('fe', { apps: [{ name: 'web', kind: 'next' }] });
-  if (edition) declaration.edition = edition;
-  declaration.sides.be.connections = [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'schema', provider: 'supabase' }];
-  return runArch(archFixture(t, { profile: 'fe', files: { '../hfs.json': `${JSON.stringify(declaration, null, 2)}\n`, 'apps/web/src/modules/db/index.ts': 'export const db = 1;\n', ...files } }));
-};
-
-test('lite: the db owner outcome is THE Outcome union (counted), alone it raises no FE_TRANSPORT_OWNER', t => {
-  const report = runEdition(t, 'lite', { [DB_OUTCOME]: OUTCOME });
-  assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
-  assert.equal(report.coverage.hfsMachine.transportOwner.outcomes, 1);
-});
-
-test('lite: a second Outcome union next to the db owner one is FE_TRANSPORT_OWNER on both', t => {
-  const report = runEdition(t, 'lite', { [DB_OUTCOME]: OUTCOME, [`${API}/outcome.ts`]: OUTCOME });
-  assert.deepEqual(hits(report).map(item => item.path).sort(), [DB_OUTCOME, `${API}/outcome.ts`].sort());
-  assert.match(messages(report)[0], /2 Outcome unions/);
-});
-
-test('full: modules/db/outcome.ts is plain db owner content, not an Outcome home, so the one api outcome raises no FE_TRANSPORT_OWNER', t => {
-  const report = runEdition(t, null, { [DB_OUTCOME]: OUTCOME, [`${API}/outcome.ts`]: OUTCOME });
-  assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
-  assert.equal(report.coverage.hfsMachine.transportOwner.outcomes, 1);
+test('lite judges the transport exactly as full: the same client folder and union raise nothing, a fetch outside the client is a finding', t => {
+  const lite = (files) => {
+    const declaration = appDeclaration('fe', { apps: [{ name: 'web', kind: 'next' }] });
+    declaration.edition = 'lite';
+    declaration.sides.be.connections = [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'schema', provider: 'supabase' }];
+    return runArch(archFixture(t, { profile: 'fe', files: { ...GOOD, '../hfs.json': `${JSON.stringify(declaration, null, 2)}\n`, ...files } }));
+  };
+  const clean = lite({});
+  assert.deepEqual(hits(clean), [], JSON.stringify(hits(clean), null, 1));
+  assert.equal(clean.coverage.hfsMachine.transportOwner.outcomes, 1);
+  const fetching = lite({ 'apps/web/src/hooks/course/useCalled.ts': "export const useCalled = () => fetch('/x');\n" });
+  assert.deepEqual(hits(fetching).map(item => item.path), ['apps/web/src/hooks/course/useCalled.ts']);
 });

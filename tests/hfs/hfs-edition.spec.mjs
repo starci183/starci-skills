@@ -14,7 +14,8 @@ import { HfsSlotsError, loadRuleCatalog, loadSlotManifest, openHfs, resolveRepoD
 // the same manifest filtered (a slot's `editions`, `litePresence` and `lite` overlay), never a second engine. Owner ruling 2026-10-12:
 // lite is the full architecture deployed without self-hosted infrastructure - it keeps every pattern, the worker app and the back-end
 // unit specs, and drops only the e2e and contract world, the browser journey, UAT records and the self-hosted stack; a `supabase`
-// connection provider enables the Supabase slots (app.supabase*, be.integrations.supabase, fe.modules.db, fe.package.db).
+// connection provider enables the Supabase slots (app.supabase*, be.integrations.supabase, fe.route.callback). Owner ruling 2026-10-13:
+// the front end is one standard for both editions (no fe lite overlay) and lite runs the socket.io gateway in the api process.
 
 const root = path.resolve(import.meta.dirname, '..', '..');
 const Ajv2020 = (() => { const loaded = createRequire(import.meta.url)('ajv/dist/2020.js'); return loaded.default ?? loaded; })();
@@ -59,11 +60,13 @@ test('lite removes the slots its editions exclude, keeps the rest, and adds its 
   const manifest = loadSlotManifest();
   for (const slot of manifest.slots) assert.ok(slot.editions === undefined || slot.editions.every((e) => ['full', 'lite'].includes(e)), `${slot.id}: unknown edition`);
   const liteOnly = manifest.slots.filter((s) => s.editions?.includes('lite') && !s.editions.includes('full')).map((s) => s.id);
-  assert.deepEqual(liteOnly.sort(), ['app.starciwork.uat', 'be.feature.realtime.supabase', 'fe.modules.db.outcome'], 'the lite-only slots');
+  assert.deepEqual(liteOnly.sort(), ['app.starciwork.uat'], 'the lite-only slots');
+  const fe = loadSlotManifest().slots.filter((s) => s.id.startsWith('fe.'));
+  assert.deepEqual(fe.filter((s) => s.editions || s.litePresence || s.lite).map((s) => s.id), [], 'the front end has no edition overlay: lite = full (owner ruling 2026-10-13)');
   const liteBe = openHfs({ declaration: app({ edition: 'lite' }), side: 'be' });
   const fullBe = openHfs({ declaration: app(), side: 'be' });
-  assert.equal(liteBe.slot('be.feature.realtime.supabase').presence, 'opt-in', 'the lite-only realtime door exists under lite');
-  assert.equal(fullBe.slot('be.feature.realtime.supabase'), null, 'under full it does not exist');
+  assert.equal(liteBe.slot('be.feature.realtime.websocket').presence, 'opt-in', 'the socket.io gateway is legal under lite (in the api process)');
+  assert.deepEqual(liteBe.ruleParams().infraOwners['socket.io'], fullBe.ruleParams().infraOwners['socket.io'], 'lite owns socket.io where full does');
   // owner ruling 2026-10-12: the test world of the optional integration specs and the unit fixtures stay; e2e and contract go
   assert.equal(liteBe.slot('be.tests.world').presence, 'optional');
   assert.equal(liteBe.slot('be.tests.fixtures.builders').presence, 'optional');
@@ -90,7 +93,7 @@ test('lite removes the slots its editions exclude, keeps the rest, and adds its 
   assert.deepEqual(liteBe.ruleParams().infraOwners.fetch, fullBe.ruleParams().infraOwners.fetch, 'a specifier lite does not restate keeps its owner');
 });
 
-test('lite classification: e2e, contract, the socket realtime doors and the browser journey are forbidden paths with a goesTo; the patterns and the worker are not', () => {
+test('lite classification: e2e, contract, the GraphQL subscription door and the browser journey are forbidden paths with a goesTo; the patterns, the socket gateway and the worker are not', () => {
   const be = openHfs({ declaration: app({ edition: 'lite' }), side: 'be' });
   const fe = openHfs({ declaration: app({ edition: 'lite' }), side: 'fe' });
   const whole = openHfs({ declaration: app({ edition: 'lite' }) });
@@ -101,7 +104,6 @@ test('lite classification: e2e, contract, the socket realtime doors and the brow
   };
   forbidden(be, 'src/tests/e2e/orders/place.e2e-spec.ts', 'be.tests.e2e');
   forbidden(be, 'src/tests/contract/stripe/charge.contract-spec.ts', 'be.tests.contract');
-  forbidden(be, 'src/features/realtime/chat/transport/websocket/chat.gateway.ts', 'be.feature.realtime.websocket');
   forbidden(be, 'src/features/realtime/chat/transport/graphql/chat.subscription.ts', 'be.feature.realtime.graphql');
   assert.equal(be.classifyPath('jest.config.e2e.js').slot, 'be.tool-config-local');
   assert.equal(be.classifyPath('e2e/probe.ts').slot, 'be.root-e2e');
@@ -112,7 +114,7 @@ test('lite classification: e2e, contract, the socket realtime doors and the brow
   assert.equal(be.classifyPath('src/tests/fixtures/builders/order.builder.ts').slot, 'be.tests.fixtures.builders');
   for (const [p, slot] of [
     ['src/features/saga/checkout/index.ts', 'be.feature.saga'], ['src/features/realtime/chat/index.ts', 'be.feature.realtime'],
-    ['src/features/realtime/chat/transport/supabase/chat.subscription.ts', 'be.feature.realtime.supabase'],
+    ['src/features/realtime/chat/transport/websocket/chat.gateway.ts', 'be.feature.realtime.websocket'],
     ['src/features/jobs/send/index.ts', 'be.feature.jobs'], ['src/modules/events/orders/order-paid.event.ts', 'be.events'],
     ['src/modules/platform/event-bus/index.ts', 'be.platform.event-bus'], ['src/modules/platform/queue/index.ts', 'be.platform.queue'],
     ['contracts/core/events.json', 'be.contract.events'],
@@ -138,7 +140,7 @@ test('lite classification: e2e, contract, the socket realtime doors and the brow
 
 test('full is untouched: no lite-only slot exists, every presence and path answers as before', () => {
   const be = openHfs({ declaration: app(), side: 'be' });
-  assert.equal(be.slot('be.feature.realtime.supabase'), null);
+  assert.equal(be.slot('be.feature.realtime.supabase'), null, 'the lite Supabase Realtime door is removed: the slot is unknown');
   assert.equal(openHfs({ declaration: app() }).slot('app.starciwork.uat'), null);
   for (const [p, slot] of [
     ['src/tests/world/use-test-world.ts', 'be.tests.world'], ['src/features/realtime/chat/index.ts', 'be.feature.realtime'],
@@ -166,15 +168,14 @@ test('a supabase connection provider enables the supabase slots of every profile
     ['supabase/seed.sql', 'app.supabase.seed'],
     ['supabase/types/database.types.ts', 'app.supabase.types'],
     ['be/src/modules/integrations/supabase/index.ts', 'be.integrations.supabase'],
-    ['fe/apps/web/src/modules/db/index.ts', 'fe.modules.db'],
-    ['fe/packages/app-db/src/index.ts', 'fe.package.db'],
+    ['fe/apps/web/src/app/auth/callback/route.ts', 'fe.route.callback'],
   ]) assert.deepEqual([whole.classifyPath(p).status, whole.classifyPath(p).slot], ['owned', slot], p);
   // under lite the supabase tree is required: migrations is the schema authority of a lite app
   const paths = whole.requiredPaths().paths.map((e) => e.path);
   for (const p of ['supabase/', 'supabase/config.toml', 'supabase/types/database.types.ts']) assert.equal(paths.includes(p), true, `required under lite+supabase: ${p}`);
   // without the provider the same paths are opt-in slots the app did not enable
   const plain = openHfs({ declaration: app({ edition: 'lite' }) });
-  for (const p of ['supabase/config.toml', 'be/src/modules/integrations/supabase/index.ts', 'fe/apps/web/src/modules/db/index.ts']) {
+  for (const p of ['supabase/config.toml', 'be/src/modules/integrations/supabase/index.ts', 'fe/apps/web/src/app/auth/callback/route.ts']) {
     assert.equal(plain.classifyPath(p).status, 'not-enabled', p);
   }
   // the provider also enables the slots under full (provider gating is not a lite thing)

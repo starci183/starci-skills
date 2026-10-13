@@ -6,7 +6,7 @@
 //   - inside a package.json: an e2e, contract, stack or browser script (`test:e2e`, `test:contract`, `test:stack`, `test:browser`,
 //     with a pre/post prefix too) or a dependency of the infrastructure lite does not run - a test-world container or proxy
 //     (testcontainers, toxiproxy) or a browser runner (playwright, cypress), and every library the lite infraOwners own nowhere
-//     while full owns them (BullMQ, Kafka, Redis: lite runs pgmq, Postgres locks and Supabase Realtime instead);
+//     while full owns them (BullMQ, Kafka, Redis: lite runs pgmq and Postgres locks instead);
 //   - a declaration of what lite does not have: an app kind, pattern or trigger kind every slot of which is forbidden under
 //     lite. The forbidden names are DERIVED from the manifest, so adding or restoring a kind is a manifest edit, not an edit here
 //     (under the 2026-10-12 ruling no pattern, trigger or app kind is gone).
@@ -78,7 +78,7 @@ function dependencyFindings(rel, pkg, removed) {
     if (!isPlainObject(deps)) continue;
     for (const name of Object.keys(deps)) {
       if (LITE_FORBIDDEN_TEST_INFRA.test(name)) findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} ${section} has ${name}: a lite app runs no test containers, fault proxy or browser journey - its integration specs run against \`supabase start\``, { section, name }));
-      else if (removed.has(name)) findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} ${section} has ${name}: lite runs no self-hosted infrastructure - the pattern's port is implemented on Supabase (pgmq, Postgres locks, Supabase Realtime)`, { section, name }));
+      else if (removed.has(name)) findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} ${section} has ${name}: lite runs no self-hosted infrastructure - the pattern's port is implemented on Supabase (pgmq, Postgres locks)`, { section, name }));
     }
   }
   return findings;

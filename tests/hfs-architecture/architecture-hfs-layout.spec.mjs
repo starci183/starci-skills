@@ -57,10 +57,10 @@ test('HFS_ROOT_SRC_FORBIDDEN_FE: an fe side with a src/ tree is a finding; the b
   assert.deepEqual(ids(run(t, 'be', { ...ROOT_BE, 'src/modules/domain/alpha/alpha.service.ts': 'export const a = 1;\n' }), 'HFS_ROOT_SRC_FORBIDDEN_FE'), []);
 });
 
-test('HFS_SRC_LAYOUT_INVALID: a back-end src/ child other than features, modules and tests, and a tests/ child other than world, fixtures, integration, e2e and contract, are findings', t => {
-  const bad = run(t, 'be', { ...ROOT_BE, 'src/utils/x.ts': 'export const a = 1;\n', 'src/tests/helpers/y.ts': 'export const b = 1;\n', 'src/features/api/f/.keep': '', 'src/modules/domain/.keep': '' });
-  assert.deepEqual(ids(bad, 'HFS_SRC_LAYOUT_INVALID'), ['src/tests/helpers', 'src/utils']);
-  const good = run(t, 'be', { ...ROOT_BE, 'src/features/api/f/.keep': '', 'src/modules/domain/.keep': '', 'src/tests/world/.keep': '', 'src/tests/integration/.keep': '', 'src/tests/e2e/.keep': '', 'src/tests/contract/.keep': '', 'src/tests/fixtures/.keep': '', 'src/tests/tsconfig.json': '{}\n' });
+test('HFS_SRC_LAYOUT_INVALID: a back-end src/ child no be slot knows (features, modules, tests, assets; never resources), and a tests/ child other than world, fixtures, integration, e2e and contract, are findings', t => {
+  const bad = run(t, 'be', { ...ROOT_BE, 'src/utils/x.ts': 'export const a = 1;\n', 'src/resources/fonts/a.ttf': 'font', 'src/tests/helpers/y.ts': 'export const b = 1;\n', 'src/features/api/f/.keep': '', 'src/modules/domain/.keep': '' });
+  assert.deepEqual(ids(bad, 'HFS_SRC_LAYOUT_INVALID'), ['src/resources', 'src/tests/helpers', 'src/utils']);
+  const good = run(t, 'be', { ...ROOT_BE, 'src/features/api/f/.keep': '', 'src/modules/domain/.keep': '', 'src/assets/fonts/inter.ttf': 'font', 'src/tests/world/.keep': '', 'src/tests/integration/.keep': '', 'src/tests/e2e/.keep': '', 'src/tests/contract/.keep': '', 'src/tests/fixtures/.keep': '', 'src/tests/tsconfig.json': '{}\n' });
   assert.deepEqual(ids(good, 'HFS_SRC_LAYOUT_INVALID'), [], 'src/tests/tsconfig.json is the file be.tool-config owns there');
   const stray = run(t, 'be', { ...ROOT_BE, 'src/features/api/f/.keep': '', 'src/modules/domain/.keep': '', 'src/tests/jest.json': '{}\n' });
   assert.deepEqual(ids(stray, 'HFS_SRC_LAYOUT_INVALID'), ['src/tests/jest.json']);

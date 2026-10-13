@@ -22,6 +22,8 @@
 //   HFS_CONTRACT_SNAPSHOT_DRIFT   (R23, rules/contract.mjs) an uncommitted back-end snapshot, or a front-end copy that differs from it
 //   BE_TEST_TOPOLOGY              (R47, rules/test-topology.mjs) a `.test` file, a testing/ folder, a second jest configuration
 //   FE_NO_TESTS                   (R97, rules/fe-no-tests.mjs) a front end holds a spec, e2e or test-tool file, a test script or a test dependency; no exception
+//   FE_STACK_FORBIDDEN            (rules/fe-stack.mjs) a front-end manifest (the fe side's, or the app root's minus the back end's own libraries)
+//                                 declares a package knowledge/hfs/fe-stack.yaml forbids
 //   HFS_LITE_SECRET_CUSTODY       (R220, rules/supabase-secrets.mjs) under edition lite: secret material or a forbidden custody path; the R06 scan itself runs for every edition
 //   HFS_EDITION_FORBIDDEN_PRESENT (R212, rules/edition.mjs) under edition lite: an e2e, contract, stack or browser script, or a
 //                                 dependency of self-hosted infrastructure (test containers, fault proxy, BullMQ, Kafka, Redis)
@@ -78,6 +80,7 @@ import { checkAppRoot, trackedTreeView } from './architecture/hfs.mjs';
 import { testTopologyFindings } from './rules/test-topology.mjs';
 import { feNoTestsFindings } from './rules/fe-no-tests.mjs';
 import { editionFindings } from './rules/edition.mjs';
+import { feStackFindings } from './rules/fe-stack.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { pinFindings } from './pin-findings.mjs';
 // The database rules (R213-R216) read SQL through a WASM parser, so they are async: `starci app check` calls them beside the other emitters and passes the findings in as `extraFindings`.
@@ -100,7 +103,7 @@ export const CHECK_CODES = Object.freeze([
   'HFS_MANAGED_FILE_DRIFT', 'HFS_TOOL_CONFIG_LOCAL', 'HFS_RULE_OFF_WITHOUT_REPLACEMENT', 'HFS_TS_STRICT',
   'HFS_PLAINTEXT_SECRET', 'HFS_STACKS_SHAPE', 'HFS_CI_MISSING_CANON', 'HFS_DEP_VERSION_SKEW', 'HFS_CONTRACT_SNAPSHOT_DRIFT',
   'BE_TEST_TOPOLOGY', 'BE_SPEC_PLACEMENT', 'HFS_REPO_LOCAL_CHECK', 'HFS_LINT_SUPPRESSION_FILE', 'HFS_PROOF_COMMAND_FILE_MISSING', 'HFS_PEER_INTEGRATION_MISSING', 'BE_INTEGRATION_SPEC_MISSING', 'FE_GRAPHQL_CONTRACT', 'FE_NO_TESTS', 'HFS_MONO_WORKSPACES', 'HFS_MONO_FE_WORKSPACE', 'HFS_MONO_NEST_PROJECTS', 'HFS_MONO_WORKSPACE_DEP', 'BE_CLI_REQUIRED', 'FE_WIRE_GENERATED', 'FE_I18N_PLACEMENT', 'FE_I18N_CATALOG', 'HFS_SERVICE_PLACEMENT', 'HFS_IMAGE_UNPINNED', 'HFS_SERVICE_STACK_DECLARATION', 'HFS_EVENT_CONTRACT', 'BE_ASYNC_SPEC_MISSING', 'BE_SAGA_STEP_COMPENSATION', 'BE_SAGA_STATE_VERSIONED', 'BE_SAGA_EVENT_CONTRACT', 'BE_SAGA_CONSUMER_DEDUPE', 'BE_EVENT_CLASS_CONTRACT', 'BE_PATTERN_SPEC_MISSING', 'BE_CONTRACT_BREAKING', 'BE_KIND_DECLARATION', 'BE_KIND_EMPTY', 'HFS_DOCKER_BUILD_CONTEXT', 'HFS_DOCKER_STAGES', 'HFS_DOCKER_ENTRY', 'HFS_DOCKER_BASE_PIN', 'HFS_DOCKER_SECRETS', 'BE_SAGA_E2E_MISSING',
-  'HFS_EDITION_FORBIDDEN_PRESENT', 'HFS_LITE_SECRET_CUSTODY',
+  'FE_STACK_FORBIDDEN', 'HFS_EDITION_FORBIDDEN_PRESENT', 'HFS_LITE_SECRET_CUSTODY',
   'DB_MIGRATION_SHAPE', 'DB_RLS_REQUIRED', 'DB_DYNAMIC_DDL', 'DB_POLICY_SHAPE', 'DB_DEFINER_SAFE', 'DB_STORAGE_POLICY', 'DB_CONFIG_POLICY', 'DB_TYPES_DRIFT',
   'HFS_GITIGNORE_BLOCK_DRIFT', 'HFS_SONAR_CONFIG', 'HFS_COVERAGE_SCOPE_DRIFT', 'HFS_FORMAT',
   'HFS_EMPTY_DIR', 'HFS_GHOST_TREE', 'HFS_UNTRACKED_ROOT_ENTRY',
@@ -247,6 +250,7 @@ function contentRuleFindings({ repoRoot, repo, resolver, files, all, scoped, pin
     ...pinFindings({ repoRoot, files, profile: repo.profile, pins, only: scoped }),
     ...supabaseSecretFindings({ repoRoot, files: files.filter((file) => inScope(file)), resolver, repo }),
     ...editionFindings({ repoRoot, files: files.filter((file) => inScope(file)), repo, resolver, manifest, withDeclaration: editionDeclaration }),
+    ...feStackFindings({ repoRoot, files: files.filter((file) => inScope(file)), repo, manifest }),
     ...repoLocalCheckFindings({ repoRoot, files }),
     ...lintSuppressionFindings({ repoRoot, files }),
   ];

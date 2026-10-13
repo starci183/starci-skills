@@ -8,7 +8,7 @@
  *                      so a file only a spec imports is dead, on purpose. Type-only imports reach a file.
  *
  * Owner = every graph.ownerRoots unit whose tier is not `app` and whose public entry file is in the graph (index.ts or
- * index.tsx, a package's src/index.ts). The `entries` its slot declares (slot data, e.g. fe.modules.db browser.ts) are further
+ * index.tsx, a package's src/index.ts). The `entries` its slot declares (slot data: a second public entry file of the owner) are further
  * public entries of the same owner, judged exactly like the entry. The exported names of an entry are its named exports, `export { a as b }`,
  * `export { x } from`, declarations with `export`, and `default` for `export default`. `export *` is refused by owners.mjs
  * and contributes no name here.

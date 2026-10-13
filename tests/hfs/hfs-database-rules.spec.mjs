@@ -148,6 +148,21 @@ test('DB_MIGRATION_SHAPE: without a base ref ordering and immutability are simpl
   assert.deepEqual(findings, []);
 });
 
+test('L02-L08 skip supabase/migrations/_archive/: an archived file is never judged, and a base migration moved there at a baseline cutover is retired, not removed', async () => {
+  const archived = `${MIGRATIONS}/_archive/20260101120000_old.sql`;
+  const loose = repo({ [archived]: 'create table public.legacy (id int);\n', [`${MIGRATIONS}/_archive/not a migration.sql`]: 'select 1;\n' });
+  assert.deepEqual(await checkDatabase({ repoRoot: loose, files: [archived, `${MIGRATIONS}/_archive/not a migration.sql`], git: noRemote }), [], 'no name, RLS or policy rule judges an archived file');
+  const dir = committedRepo(migration('20260101120000_old.sql', 'select 1;\n'));
+  fs.mkdirSync(path.join(dir, MIGRATIONS, '_archive'), { recursive: true });
+  fs.renameSync(path.join(dir, MIGRATIONS, '20260101120000_old.sql'), path.join(dir, archived));
+  fs.writeFileSync(path.join(dir, MIGRATIONS, '20261001120000_baseline.sql'), 'select 1;\n');
+  const cutover = only(await checkDatabase({ repoRoot: dir, files: [archived, `${MIGRATIONS}/20261001120000_baseline.sql`] }), 'DB_MIGRATION_SHAPE');
+  assert.deepEqual(cutover, [], JSON.stringify(cutover));
+  fs.rmSync(path.join(dir, archived));
+  const gone = only(await checkDatabase({ repoRoot: dir, files: [`${MIGRATIONS}/20261001120000_baseline.sql`] }), 'DB_MIGRATION_SHAPE');
+  assert.ok(gone.some((f) => f.message.includes('is gone here')), 'a base migration deleted outright is still refused');
+});
+
 // ------------------------------------------------------------------------------------------------ L03 DB_RLS_REQUIRED
 
 const RLS = 'DB_RLS_REQUIRED';

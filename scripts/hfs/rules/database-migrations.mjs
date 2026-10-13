@@ -8,7 +8,7 @@ import { withoutGitLocalEnv } from '../../lib/git.mjs';
 import { eachInOrder, findInOrder } from '../../lib/in-order.mjs';
 import { sameText } from '../../lib/same-text.mjs';
 import { found, readText } from './read.mjs';
-import { DB_MIGRATION_SHAPE, MIGRATIONS_DIR } from './database-constants.mjs';
+import { DB_MIGRATION_SHAPE, isActiveMigration, MIGRATIONS_ARCHIVE_DIR, MIGRATIONS_DIR } from './database-constants.mjs';
 const MIGRATION_NAME = /^(\d{14})_([a-z0-9]+(?:-[a-z0-9]+)*)\.sql$/;
 
 /** `<ts14>` -> the UTC instant it names, or null when the digits are no real time (month 13, day 32, ...). */
@@ -49,7 +49,7 @@ async function baseMigrationNames(git, repoRoot, sha) {
   const result = await runGit(git, repoRoot, ['ls-tree', '-r', '--name-only', '-z', sha, '--', MIGRATIONS_DIR]);
   if (!result.ok) return [];
   const prefix = `${MIGRATIONS_DIR}/`;
-  return result.stdout.split('\0').filter(Boolean).map((entry) => (entry.startsWith(prefix) ? entry.slice(prefix.length) : entry));
+  return result.stdout.split('\0').filter(Boolean).filter(isActiveMigration).map((entry) => entry.slice(prefix.length));
 }
 
 async function baseFileText(git, repoRoot, sha, file) {
@@ -102,16 +102,20 @@ async function baseMigrationEntryFindings(entry, repoRoot, git, baseSha, onBase,
   return [];
 }
 
-function removedMigrationFindings(local, baseNames, baseSha) {
+function removedMigrationFindings(local, retired, baseNames, baseSha) {
   const findings = [];
   for (const name of baseNames) {
-    if (!local.some((entry) => entry.name === name)) findings.push(found(DB_MIGRATION_SHAPE, `${MIGRATIONS_DIR}/${name}`, `${MIGRATIONS_DIR}/${name} exists on ${baseSha.ref} but is gone here; a migration on the base branch is immutable - restore it`, { base: baseSha.ref }));
+    if (!local.some((entry) => entry.name === name) && !retired.has(name)) findings.push(found(DB_MIGRATION_SHAPE, `${MIGRATIONS_DIR}/${name}`, `${MIGRATIONS_DIR}/${name} exists on ${baseSha.ref} but is gone here; a migration on the base branch is immutable - restore it`, { base: baseSha.ref }));
   }
   return findings;
 }
 
-/** L02 findings for names, stamps, ordering and immutability of supabase/migrations/*.sql. */
-export async function migrationShapeFindings({ repoRoot, migrations, git, base, now }) {
+/**
+ * L02 findings for names, stamps, ordering and immutability of supabase/migrations/*.sql. `archived` are the files of
+ * supabase/migrations/_archive/ (app.supabase.migrations.archive): never judged, and a base migration moved there at a baseline
+ * cutover is retired, not removed.
+ */
+export async function migrationShapeFindings({ repoRoot, migrations, archived = [], git, base, now }) {
   const prefix = `${MIGRATIONS_DIR}/`;
   const local = migrations.map((file) => {
     const name = file.startsWith(prefix) ? file.slice(prefix.length) : file;
@@ -127,6 +131,7 @@ export async function migrationShapeFindings({ repoRoot, migrations, git, base, 
   await eachInOrder(local, async (entry) => {
     findings.push(...await baseMigrationEntryFindings(entry, repoRoot, git, baseSha, onBase, baseMax));
   });
-  findings.push(...removedMigrationFindings(local, baseNames, baseSha));
+  const retired = new Set(archived.map((file) => file.slice(MIGRATIONS_ARCHIVE_DIR.length + 1)));
+  findings.push(...removedMigrationFindings(local, retired, baseNames, baseSha));
   return findings;
 }

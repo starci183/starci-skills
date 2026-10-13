@@ -2,10 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { appDeclaration, archFixture, runArch } from '../helpers/hfs-arch-fixture.mjs';
 
-const FE_CODES = new Set([
-  'FE_SUPABASE_CLIENT_OWNER', 'FE_DB_RESULT_TYPED', 'FE_DB_ERROR_HANDLED', 'FE_SERVICE_ROLE_FORBIDDEN',
-  'FE_AUTH_SESSION_TRUST', 'FE_DB_WRITE_SHAPE', 'FE_ROUTE_HANDLER_FORBIDDEN',
-]);
+// Supabase on the front end is auth only (owner ruling 2026-10-13): modules/auth (fe.modules.auth) is the one importer of
+// @supabase/* and calls only the auth API; FE_SERVICE_ROLE_FORBIDDEN keeps the service role and credentials out of fe/.
+const FE_CODES = new Set(['FE_SUPABASE_CLIENT_OWNER', 'FE_SERVICE_ROLE_FORBIDDEN']);
 const BE_CODES = new Set(['BE_SUPABASE_CLIENT_OWNER', 'BE_SUPABASE_JWT_VERIFIED']);
 
 const declaration = profile => {
@@ -24,9 +23,10 @@ export interface QueryBuilder<T=unknown> extends PromiseLike<QueryResult<T>>{
   lt(column:string,value:unknown):this; lte(column:string,value:unknown):this; limit(rows:number):this; range(from:number,to:number):this;
   single<R=never>():QueryBuilder<R>; maybeSingle<R=never>():QueryBuilder<R>; returns<R>():QueryBuilder<R>;
 }
-export interface AuthClient{getSession():Promise<QueryResult<{session:unknown}>>;getClaims():Promise<QueryResult<{claims:unknown}>>;getUser():Promise<QueryResult<{user:unknown}>>}
+export interface AuthClient{getSession():Promise<QueryResult<{session:unknown}>>;getClaims():Promise<QueryResult<{claims:unknown}>>;getUser():Promise<QueryResult<{user:unknown}>>;signOut():Promise<QueryResult<null>>}
 export interface StorageClient{from(bucket:string):{upload(path:string,value:unknown):Promise<QueryResult<unknown>>}}
-export interface SupabaseClient<Database>{from(table:string):QueryBuilder<unknown>;rpc(name:string,args?:unknown):QueryBuilder<unknown>;auth:AuthClient;storage:StorageClient}
+export interface Channel{on(event:string,handler:()=>void):Channel;subscribe():Channel}
+export interface SupabaseClient<Database>{from(table:string):QueryBuilder<unknown>;rpc(name:string,args?:unknown):QueryBuilder<unknown>;auth:AuthClient;storage:StorageClient;channel(name:string):Channel;removeChannel(channel:Channel):Promise<string>}
 export declare function createClient<Database>(url:string,key:string):SupabaseClient<Database>;
 `;
 
@@ -37,9 +37,11 @@ const moduleFiles = {
   '../node_modules/@supabase/ssr/index.d.ts': `import type {SupabaseClient} from '@supabase/supabase-js';
 export declare function createServerClient<Database>(url:string,key:string):SupabaseClient<Database>;
 export declare function createBrowserClient<Database>(url:string,key:string):SupabaseClient<Database>;`,
+  '../node_modules/@supabase/realtime-js/package.json': JSON.stringify({ name: '@supabase/realtime-js', version: '2.0.0', types: 'index.d.ts' }),
+  '../node_modules/@supabase/realtime-js/index.d.ts': 'export declare class RealtimeClient{constructor(url:string)}\n',
   '../node_modules/other-client/package.json': JSON.stringify({ name: 'other-client', version: '1.0.0', types: 'index.d.ts' }),
   '../node_modules/other-client/index.d.ts': `export interface SupabaseClient<T>{value:T}
-export interface SessionClient{auth:{getSession():Promise<{error:Error|null}>}}
+export interface SessionClient{auth:{getSession():Promise<{error:Error|null}>};from(table:string):unknown}
 export interface Decoder{decode(value:string):unknown}
 `,
 };
@@ -48,107 +50,43 @@ const uniqueCodes = (report, path, allowed) => [...new Set(report.violations
   .filter(item => item.path === path && allowed.has(item.ruleId))
   .map(item => item.ruleId))].sort();
 
-const queryImports = `import {client} from '../server'; import {toOutcome} from '../outcome';`;
-
-test('L10-L15 adversarial FE matrix has exact findings for 55 realistic call, result, auth, action, env and route cases', t => {
+test('L10/L13 adversarial FE matrix: Supabase is auth only inside modules/auth, data calls and imports elsewhere are refused, secrets stay out', t => {
   const cases = [
-    { name: 'destructured error is read', path: 'apps/web/src/modules/db/cases/read-01.ts', source: `${queryImports}
-export const read=async()=>{const {data,error}=await client.from('items').select().limit(20);if(error)return {kind:'unavailable' as const};return {kind:'ok' as const,data}};`, expected: [] },
-    { name: 'renamed destructured error is read', path: 'apps/web/src/modules/db/cases/read-02.ts', source: `${queryImports}
-export const read=async()=>{const {data,error:queryError}=await client.from('items').select().limit(20);if(queryError)return {kind:'unavailable' as const};return {kind:'ok' as const,data}};`, expected: [] },
-    { name: 'optional error access is read', path: 'apps/web/src/modules/db/cases/read-03.ts', source: `${queryImports}
-export const read=async()=>{const result=await client.from('items').select().limit(20);if(result?.error)return {kind:'unavailable' as const};return {kind:'ok' as const,data:result.data}};`, expected: [] },
-    { name: 'element error access is read', path: 'apps/web/src/modules/db/cases/read-04.ts', source: `${queryImports}
-export const read=async()=>{const result=await client.from('items').select().limit(20);if(result['error'])return {kind:'unavailable' as const};return {kind:'ok' as const,data:result.data}};`, expected: [] },
-    { name: 'whole variable result reaches toOutcome', path: 'apps/web/src/modules/db/cases/read-05.ts', source: `${queryImports}
-export const read=async()=>{const result=await client.from('items').select().limit(20);return toOutcome(result)};`, expected: [] },
-    { name: 'whole awaited result reaches toOutcome', path: 'apps/web/src/modules/db/cases/read-06.ts', source: `${queryImports}
-export const read=async()=>toOutcome(await client.from('items').select().limit(20));`, expected: [] },
-    { name: 'data-only destructuring is refused', path: 'apps/web/src/modules/db/cases/read-07.ts', source: `${queryImports}
-export const read=async()=>{const {data}=await client.from('items').select().limit(20);return data};`, expected: ['FE_DB_ERROR_HANDLED'] },
-    { name: 'empty-array collapse is refused after error handling', path: 'apps/web/src/modules/db/cases/read-08.ts', source: `${queryImports}
-export const read=async()=>{const {data,error}=await client.from('items').select().limit(20);if(error)return {kind:'unavailable' as const};return data??[]};`, expected: ['FE_DB_ERROR_HANDLED'] },
-    { name: 'query builder alias preserves error tracking', path: 'apps/web/src/modules/db/cases/read-09.ts', source: `${queryImports}
-export const read=async()=>{const query=client.from('items').select().limit(20);const {data,error}=await query;if(error)return {kind:'unavailable' as const};return {kind:'ok' as const,data}};`, expected: [] },
-    { name: 'limit bounds a list', path: 'apps/web/src/modules/db/cases/read-10.ts', source: `${queryImports}
-export const read=async()=>{const result=await client.from('items').select().limit(1);return toOutcome(result)};`, expected: [] },
-    { name: 'range bounds a list', path: 'apps/web/src/modules/db/cases/read-11.ts', source: `${queryImports}
-export const read=async()=>{const result=await client.from('items').select().range(0,19);return toOutcome(result)};`, expected: [] },
-    { name: 'gt keyset bounds a list', path: 'apps/web/src/modules/db/cases/read-12.ts', source: `${queryImports}
-export const read=async()=>{const result=await client.from('items').select().gt('id','1');return toOutcome(result)};`, expected: [] },
-    { name: 'gte keyset bounds a list', path: 'apps/web/src/modules/db/cases/read-13.ts', source: `${queryImports}
-export const read=async()=>{const result=await client.from('items').select().gte('id','1');return toOutcome(result)};`, expected: [] },
-    { name: 'lt keyset bounds a list', path: 'apps/web/src/modules/db/cases/read-14.ts', source: `${queryImports}
-export const read=async()=>{const result=await client.from('items').select().lt('id','9');return toOutcome(result)};`, expected: [] },
-    { name: 'lte keyset bounds a list', path: 'apps/web/src/modules/db/cases/read-15.ts', source: `${queryImports}
-export const read=async()=>{const result=await client.from('items').select().lte('id','9');return toOutcome(result)};`, expected: [] },
-    { name: 'unbounded list is refused', path: 'apps/web/src/modules/db/cases/read-16.ts', source: `${queryImports}
-export const read=async()=>{const result=await client.from('items').select();return toOutcome(result)};`, expected: ['FE_DB_RESULT_TYPED'] },
-    { name: 'single is not a list', path: 'apps/web/src/modules/db/cases/read-17.ts', source: `${queryImports}
-export const read=async()=>{const result=await client.from('items').select().single();return toOutcome(result)};`, expected: [] },
-    { name: 'maybeSingle is not a list', path: 'apps/web/src/modules/db/cases/read-18.ts', source: `${queryImports}
-export const read=async()=>{const result=await client.from('items').select().maybeSingle();return toOutcome(result)};`, expected: [] },
-    { name: 'rpc whole result is handled', path: 'apps/web/src/modules/db/cases/read-19.ts', source: `${queryImports}
-export const read=async()=>{const result=await client.rpc('summary');return toOutcome(result)};`, expected: [] },
-    { name: 'storage upload whole result is handled', path: 'apps/web/src/modules/db/cases/read-20.ts', source: `${queryImports}
-export const read=async()=>{const result=await client.storage.from('docs').upload('a.txt','body');return toOutcome(result)};`, expected: [] },
-    { name: 'single result generic is refused', path: 'apps/web/src/modules/db/cases/read-21.ts', source: `${queryImports} type Row={id:string};
-export const read=async()=>{const result=await client.from('items').select().single<Row>();return toOutcome(result)};`, expected: ['FE_DB_RESULT_TYPED'] },
-    { name: 'maybeSingle result generic is refused', path: 'apps/web/src/modules/db/cases/read-22.ts', source: `${queryImports} type Row={id:string};
-export const read=async()=>{const result=await client.from('items').select().maybeSingle<Row>();return toOutcome(result)};`, expected: ['FE_DB_RESULT_TYPED'] },
-    { name: 'returns result generic is refused', path: 'apps/web/src/modules/db/cases/read-23.ts', source: `${queryImports} type Row={id:string};
-export const read=async()=>{const result=await client.from('items').select().limit(1).returns<Row[]>();return toOutcome(result)};`, expected: ['FE_DB_RESULT_TYPED'] },
-    { name: 'rpc outside db owner is refused', path: 'apps/web/src/features/case-rpc.ts', source: `import {client} from '../modules/db/server';export const run=()=>client.rpc('admin');`, expected: ['FE_SUPABASE_CLIENT_OWNER'] },
-    { name: 'storage outside db owner is refused', path: 'apps/web/src/components/case-storage.ts', source: `import {client} from '../modules/db/server';export const run=()=>client.storage.from('docs').upload('x','y');`, expected: ['FE_SUPABASE_CLIENT_OWNER'] },
-    { name: 'server getSession is refused', path: 'apps/web/src/modules/db/cases/read-26.ts', source: `${queryImports}
-export const read=async()=>{const result=await client.auth.getSession();if(result.error)throw result.error;return result.data};`, expected: ['FE_AUTH_SESSION_TRUST'] },
-    { name: 'getSession comments strings and local object are ignored', path: 'apps/web/src/modules/types/session-lookalikes.ts', source: `const note='auth.getSession()';// auth.getSession()
-const local={auth:{getSession:async()=>({error:null})}};export const read=()=>local.auth.getSession();`, expected: [] },
-    { name: 'client getSession is allowed', path: 'apps/web/src/modules/db/cases/read-28.ts', source: `'use client';${queryImports}
-export const read=async()=>{const result=await client.auth.getSession();if(result.error)throw result.error;return result.data};`, expected: [] },
+    { name: 'the auth owner creates the browser client', path: 'apps/web/src/modules/auth/client.ts', source: `import {createBrowserClient} from '@supabase/ssr';export const authClient=createBrowserClient('https://fixture.invalid','public-anon');`, expected: [] },
+    { name: 'the auth owner reads the session', path: 'apps/web/src/modules/auth/session.ts', source: `import {authClient} from './client';export const accessToken=async()=>{const result=await authClient.auth.getSession();return result.error?null:result.data.session};`, expected: [] },
+    { name: 'the auth owner signs out', path: 'apps/web/src/modules/auth/sign-out.ts', source: `import {authClient} from './client';export const signOut=()=>authClient.auth.signOut();`, expected: [] },
+    { name: 'the auth owner imports a Supabase type', path: 'apps/web/src/modules/auth/types.ts', source: `import type {SupabaseClient} from '@supabase/supabase-js';export type AuthClient=SupabaseClient<unknown>;`, expected: [] },
+    { name: 'from inside the auth owner is refused', path: 'apps/web/src/modules/auth/read-items.ts', source: `import {authClient} from './client';export const read=()=>authClient.from('items').select().limit(20);`, expected: ['FE_SUPABASE_CLIENT_OWNER'] },
+    { name: 'rpc inside the auth owner is refused', path: 'apps/web/src/modules/auth/rpc.ts', source: `import {authClient} from './client';export const run=()=>authClient.rpc('summary');`, expected: ['FE_SUPABASE_CLIENT_OWNER'] },
+    { name: 'storage inside the auth owner is refused', path: 'apps/web/src/modules/auth/upload.ts', source: `import {authClient} from './client';export const run=()=>authClient.storage.from('docs').upload('a.txt','body');`, expected: ['FE_SUPABASE_CLIENT_OWNER'] },
+    { name: 'a realtime channel inside the auth owner is refused', path: 'apps/web/src/modules/auth/channel.ts', source: `import {authClient} from './client';export const run=()=>authClient.channel('room').on('x',()=>undefined).subscribe();`, expected: ['FE_SUPABASE_CLIENT_OWNER'] },
+    { name: 'removeChannel inside the auth owner is refused', path: 'apps/web/src/modules/auth/unsubscribe.ts', source: `import {authClient} from './client';export const run=()=>authClient.removeChannel(authClient.channel('room'));`, expected: ['FE_SUPABASE_CLIENT_OWNER'] },
+    { name: '@supabase/supabase-js imported by a hook is refused', path: 'apps/web/src/hooks/session/useSupabase.ts', source: `import {createClient} from '@supabase/supabase-js';export const useSupabase=()=>createClient('u','k');`, expected: ['FE_SUPABASE_CLIENT_OWNER'] },
+    { name: '@supabase/ssr imported by modules/api is refused', path: 'apps/web/src/modules/api/graphql/clients/supabase.ts', source: `import {createServerClient} from '@supabase/ssr';export const leak=()=>createServerClient('u','k');`, expected: ['FE_SUPABASE_CLIENT_OWNER'] },
+    { name: 'any other @supabase package outside the owner is refused', path: 'apps/web/src/hooks/realtime/useRealtime.ts', source: `import {RealtimeClient} from '@supabase/realtime-js';export const useRealtime=()=>new RealtimeClient('wss://fixture.invalid');`, expected: ['FE_SUPABASE_CLIENT_OWNER'] },
+    { name: 'a type-only Supabase import outside the owner is refused', path: 'apps/web/src/modules/types/supabase.ts', source: `import type {SupabaseClient} from '@supabase/supabase-js';export type Leak=SupabaseClient<unknown>;`, expected: ['FE_SUPABASE_CLIENT_OWNER'] },
+    { name: 'an auth call through the re-exported client outside the owner is refused', path: 'apps/web/src/hooks/session/useClaims.ts', source: `import {authClient} from '../../modules/auth/client';export const useClaims=()=>authClient.auth.getClaims();`, expected: ['FE_SUPABASE_CLIENT_OWNER'] },
+    { name: 'a data call through the re-exported client outside the owner is refused', path: 'apps/web/src/features/pages/Items/index.ts', source: `import {authClient} from '../../../modules/auth/client';export const items=()=>authClient.from('items').select();`, expected: ['FE_SUPABASE_CLIENT_OWNER'] },
+    { name: 'a hook that calls the owner public function is accepted', path: 'apps/web/src/hooks/session/useAccessToken.ts', source: `import {accessToken} from '../../modules/auth/session';export const useAccessToken=()=>accessToken();`, expected: [] },
+    { name: 'another library getSession and from are ignored', path: 'apps/web/src/modules/types/other-session.ts', source: `import type {SessionClient} from 'other-client';export const read=async(client:SessionClient)=>{await client.auth.getSession();return client.from('items')};`, expected: [] },
+    { name: 'another library SupabaseClient type is ignored', path: 'apps/web/src/modules/types/other-client.ts', source: `import type {SupabaseClient} from 'other-client';export type Other=SupabaseClient<string>;`, expected: [] },
+    { name: 'a local object with from and auth is ignored', path: 'apps/web/src/modules/types/lookalike.ts', source: `const local={from:(t:string)=>t,auth:{getSession:async()=>({error:null})}};export const read=()=>[local.from('items'),local.auth.getSession()];`, expected: [] },
+    { name: 'Supabase calls named in strings and comments are ignored', path: 'apps/web/src/modules/types/notes.ts', source: `// client.from('items') in a comment
+export const note="client.rpc('x') and supabase.channel('y') in a string";`, expected: [] },
     { name: 'core public env is allowed', path: 'apps/web/src/features/public-env.ts', source: `export const url=process.env.NEXT_PUBLIC_SUPABASE_URL;`, expected: [] },
     { name: 'service-role comment and unrelated word are ignored', path: 'apps/web/src/features/service-copy.ts', source: `// service_role is named in documentation.
 export const label='customer_service_roleplay';`, expected: [] },
     { name: 'exact service role string is refused', path: 'apps/web/src/features/service-leak.ts', source: `export const label='service_role';`, expected: ['FE_SERVICE_ROLE_FORBIDDEN'] },
+    { name: 'a SERVICE_ROLE identifier is refused', path: 'apps/web/src/features/service-name.ts', source: `const SUPABASE_SERVICE_ROLE='x';export const key=SUPABASE_SERVICE_ROLE;`, expected: ['FE_SERVICE_ROLE_FORBIDDEN'] },
     { name: 'credential env suffix is refused', path: 'apps/web/src/features/secret-env.ts', source: `export const key=process.env.NEXT_PUBLIC_PROVIDER_SECRET;`, expected: ['FE_SERVICE_ROLE_FORBIDDEN'] },
-    { name: 'typed server client is accepted', path: 'apps/web/src/modules/db/typed-client.ts', source: `import {createServerClient} from '@supabase/ssr';import type {Database} from '../../../../../supabase/types/database.types';export const typed=createServerClient<Database>('u','k');`, expected: [] },
-    { name: 'untyped server client is refused', path: 'apps/web/src/modules/db/untyped-client.ts', source: `import {createServerClient} from '@supabase/ssr';export const untyped=createServerClient('u','k');`, expected: ['FE_SUPABASE_CLIENT_OWNER'] },
-    { name: 'other library SupabaseClient is ignored', path: 'apps/web/src/modules/types/other-client.ts', source: `import type {SupabaseClient} from 'other-client';export type Other=SupabaseClient<string>;`, expected: [] },
-    { name: 'sensitive action verifies user', path: 'apps/web/src/modules/db/billing/write-get-user.ts', source: `'use server';import {getPrincipal} from '../principal';import {client} from '../server';const schema={parse:(v:unknown)=>String(v)};
-export const write=async(input:unknown)=>{const principal=await getPrincipal();if(principal.kind==='anonymous')return {kind:'refused' as const};const parsed=schema.parse(input);const identity=await client.auth.getUser();if(identity.error)return {kind:'refused' as const};return {kind:'ok' as const,data:{parsed,user:identity.data.user}}};`, expected: [] },
-    { name: 'sensitive action without getUser is refused', path: 'apps/web/src/modules/db/role/write-missing-user.ts', source: `'use server';import {getPrincipal} from '../principal';const schema={parse:(v:unknown)=>String(v)};
-export const write=async(input:unknown)=>{const principal=await getPrincipal();if(principal.kind==='anonymous')return {kind:'refused' as const};return {kind:'ok' as const,data:schema.parse(input)}};`, expected: ['FE_AUTH_SESSION_TRUST'] },
-    { name: 'file-level server action is accepted', path: 'apps/web/src/modules/db/cases/write-file-level.ts', source: `'use server';import {getPrincipal} from '../principal';const schema={parse:(v:unknown)=>String(v)};
-export const write=async(input:unknown)=>{const principal=await getPrincipal();if(principal.kind==='anonymous')return {kind:'refused' as const};return {kind:'ok' as const,data:schema.parse(input)}};`, expected: [] },
-    { name: 'function-level server action is accepted', path: 'apps/web/src/modules/db/cases/write-function-level.ts', source: `import {getPrincipal} from '../principal';const schema={parse:(v:unknown)=>String(v)};
-export const write=async(input:unknown)=>{'use server';const principal=await getPrincipal();if(principal.kind==='anonymous')return {kind:'refused' as const};return {kind:'ok' as const,data:schema.parse(input)}};`, expected: [] },
-    { name: 'late principal is refused', path: 'apps/web/src/modules/db/cases/write-late-principal.ts', source: `'use server';import {getPrincipal} from '../principal';const schema={parse:(v:unknown)=>String(v)};
-export const write=async(input:unknown)=>{const parsed=schema.parse(input);const principal=await getPrincipal();if(principal.kind==='anonymous')return {kind:'refused' as const};return {kind:'ok' as const,data:parsed}};`, expected: ['FE_AUTH_SESSION_TRUST'] },
-    { name: 'input use before parse is refused', path: 'apps/web/src/modules/db/cases/write-unparsed.ts', source: `'use server';import {getPrincipal} from '../principal';
-export const write=async(input:unknown)=>{const principal=await getPrincipal();if(principal.kind==='anonymous')return {kind:'refused' as const};return {kind:'ok' as const,data:String(input)}};`, expected: ['FE_DB_WRITE_SHAPE'] },
-    { name: 'health live route is allowed', path: 'apps/web/src/app/health/live/route.ts', source: `export const GET=()=>new Response('ok');`, expected: [] },
-    { name: 'auth callback slot is allowed', path: 'apps/web/src/app/auth/callback/route.ts', source: `export const GET=()=>new Response('ok');`, expected: [] },
-    { name: 'a route handler under app/api is refused', path: 'apps/web/src/app/api/export/route.ts', source: `export const GET=()=>new Response('no');`, expected: ['FE_ROUTE_HANDLER_FORBIDDEN'] },
-    { name: 'route tsx is not a Next route handler', path: 'apps/web/src/app/api/export/route.tsx', source: `export const Route=()=>null;`, expected: [] },
-    { name: 'getPrincipal uses getClaims', path: 'apps/web/src/modules/db/principal.ts', source: `import {client} from './server';export const getPrincipal=async()=>{const result=await client.auth.getClaims();if(result.error)return {kind:'anonymous' as const};return {kind:'member' as const,claims:result.data.claims}};`, expected: [] },
     { name: 'product public config is accepted by config owner', path: 'apps/web/src/modules/config/index.ts', source: `export const analytics=process.env.NEXT_PUBLIC_ANALYTICS_ID;`, expected: [] },
     { name: 'product public config outside config owner is refused', path: 'apps/web/src/features/public-product-env.ts', source: `export const analytics=process.env.NEXT_PUBLIC_ANALYTICS_ID;`, expected: ['FE_SERVICE_ROLE_FORBIDDEN'] },
-    { name: 'other library getSession is ignored', path: 'apps/web/src/modules/types/other-session.ts', source: `import type {SessionClient} from 'other-client';export const read=async(client:SessionClient)=>{const result=await client.auth.getSession();if(result.error)throw result.error;return result};`, expected: [] },
-    { name: 'contextually typed server client is accepted', path: 'apps/web/src/modules/db/context-client.ts', source: `import {createServerClient} from '@supabase/ssr';import type {SupabaseClient} from '@supabase/supabase-js';import type {Database} from '../../../../../supabase/types/database.types';export const contextual:SupabaseClient<Database>=createServerClient('u','k');`, expected: [] },
-    { name: 'auth call outside db owner is refused', path: 'apps/web/src/features/case-auth.ts', source: `import {client} from '../modules/db/server';export const run=()=>client.auth.getClaims();`, expected: ['FE_SUPABASE_CLIENT_OWNER'] },
-    { name: 'from call outside db owner is refused', path: 'apps/web/src/features/case-from.ts', source: `import {client} from '../modules/db/server';export const run=()=>client.from('items').select();`, expected: ['FE_SUPABASE_CLIENT_OWNER'] },
-    { name: 'getPrincipal without getClaims is refused', path: 'apps/web/src/modules/db/principal-missing.ts', source: `export const getPrincipal=async()=>({kind:'member' as const});`, expected: ['FE_AUTH_SESSION_TRUST'] },
-    { name: 'write export without a Server Action directive is refused', path: 'apps/web/src/modules/db/cases/write-no-directive.ts', source: `import {getPrincipal} from '../principal';const schema={parse:(v:unknown)=>String(v)};export const write=async(input:unknown)=>{const principal=await getPrincipal();if(principal.kind==='anonymous')return {kind:'refused' as const};return {kind:'ok' as const,data:schema.parse(input)}};`, expected: ['FE_DB_WRITE_SHAPE'] },
-    { name: 'unrelated getPrincipal outside db owner is ignored', path: 'apps/web/src/features/local-principal.ts', source: `export const getPrincipal=async()=>({kind:'local' as const});`, expected: [] },
   ];
-  assert.equal(cases.length, 55);
+  assert.equal(cases.length, 27);
   const files = {
     '../hfs.json': declaration('fe'),
-    '../supabase/types/database.types.ts': 'export interface Database { public: { Tables: { items: { Row: { id: string } } } } }\n',
     ...moduleFiles,
-    'apps/web/src/modules/db/index.ts': `export * from './server';export * from './principal';export * from './outcome';`,
-    'apps/web/src/modules/db/server.ts': `import {createServerClient} from '@supabase/ssr';import type {Database} from '../../../../../supabase/types/database.types';export const client=createServerClient<Database>('https://fixture.invalid','public-anon');`,
-    'apps/web/src/modules/db/outcome.ts': `export const toOutcome=<T>(result:{data:T;error:Error|null})=>result.error?{kind:'unavailable' as const}:{kind:'ok' as const,data:result.data};`,
+    'apps/web/src/modules/auth/index.ts': `export {accessToken} from './session';export {signOut} from './sign-out';`,
     ...Object.fromEntries(cases.map(item => [item.path, item.source])),
   };
   const report = runArch(archFixture(t, { profile: 'fe', files }));

@@ -2,36 +2,43 @@ import path from 'node:path';
 import { machineKit } from './machine-ast.mjs';
 
 /**
- * R50 `transport-owner` (FE_TRANSPORT_OWNER), the machine half of the eslint rules `fetch-only-in-api-client` and
- * `client-fetch-has-signal`. ESLint judges one file at a time by the spelling of a call; the machine judges the repository by
- * what the checker resolves. A repository has exactly ONE transport client and ONE Outcome union, both named by slot (never
- * by a path spelled here): the api package's (`fe.package.api.client`, `fe.package.api.outcome`) when the repository shares
- * it, or the only app's (`fe.transport.client`, `fe.transport.outcome`) when the repository declares exactly one app. The
- * Outcome homes are the slots the manifest marks `outcomeHome` (the lite edition adds `fe.modules.db.outcome`), not a list kept here.
+ * R50 `transport-owner` (FE_TRANSPORT_OWNER), the machine half of the eslint transport rules. ESLint judges one file at a time by
+ * the spelling of a call; the machine judges the repository by what the checker resolves. The browser calls the back end through
+ * Apollo GraphQL and axios (owner ruling 2026-10-13, both editions). A repository has exactly ONE transport client folder (the auth
+ * and no-auth Apollo clients with their link chain) and ONE GraphQLResponse union, both named by slot (never by a path spelled here):
+ * the api package's (`fe.package.api.client`, `fe.package.api.outcome`) when the repository shares it, or the only app's
+ * (`fe.transport.client`, `fe.transport.outcome`) when the repository declares exactly one app. The union homes are the slots the
+ * manifest marks `outcomeHome`, not a list kept here.
  *
- *   - two or more clients, or two or more Outcome unions, in the repository (two apps each keeping one, or a package one plus
- *     an app one) are findings on every copy;
- *   - an app client or app Outcome union in a repository that declares more than one app is a finding (it belongs to the package);
- *   - the client calls the global `fetch` (a client that never calls it has its transport somewhere else);
- *   - no other file references the global `fetch`: a call, `globalThis.fetch`, `window.fetch`, or a reference passed as a value
- *     (`useSWR(key, fetch)`, `const send = fetch`), all of which a spelling-based rule misses; with no client at all every such
- *     reference is a finding that says the repository has no client;
- *   - no file imports an HTTP library, by static import, `import()` or `require()`;
- *   - every server reader (`modules/api/<domain>/read-*.ts`) imports the client (or the api package that holds it), so a reader
- *     is a caller of the one transport and not a second one.
+ *   - two or more client folders, or two or more unions, in the repository (two apps each keeping one, or a package one plus an
+ *     app one) are findings on every copy;
+ *   - an app client or app union in a repository that declares more than one app is a finding (it belongs to the package);
+ *   - no file outside the client folder references the global `fetch`: a call, `globalThis.fetch`, `window.fetch`, or a
+ *     reference passed as a value (`useSWR(key, fetch)`, `const send = fetch`), all of which a spelling-based rule misses; with no
+ *     client at all every such reference is a finding that says the repository has no client;
+ *   - axios is imported only by the api owner (modules/api, the api package) for its rest calls; every other HTTP library is a
+ *     second transport wherever it is imported, by static import, `import()` or `require()`;
+ *   - an `ApolloClient` is constructed only inside the client folder;
+ *   - every GraphQL operation (`graphql/queries/query-*.ts`, `graphql/mutations/mutation-*.ts`) imports the client (or the api
+ *     package that holds it), so an operation is a caller of the one transport and not a second one.
  */
 export const TRANSPORT_OWNER_RULE_IDS = ['FE_TRANSPORT_OWNER'];
 
 const RULE = 'FE_TRANSPORT_OWNER';
-/** Packages that send HTTP requests: a second transport when a file imports one. */
+/** Packages that send HTTP requests: a second transport when a file imports one (axios only outside the api owner). */
 const HTTP_LIBRARIES = new Set(['axios', 'ky', 'ky-universal', 'got', 'node-fetch', 'undici', 'cross-fetch', 'isomorphic-fetch', 'superagent', 'ofetch', 'whatwg-fetch']);
+const REST_LIBRARY = 'axios';
 const GLOBAL_OBJECTS = new Set(['globalThis', 'window', 'self', 'global']);
-const API_SLOT = 'fe.modules.api';
 const APP_CLIENT_SLOT = 'fe.transport.client';
 const APP_OUTCOME_SLOT = 'fe.transport.outcome';
 const PACKAGE_API_SLOT = 'fe.package.api';
 const CLIENT_SLOTS = new Set([APP_CLIENT_SLOT, 'fe.package.api.client']);
-const NO_CLIENT = "the repository has no transport client. Create the one client (packages/<family>-api/src/client.ts, or the only app's modules/api/client.ts) and call it.";
+/** The api owner: the slots whose files may import axios (the rest calls and the client's own links). */
+const API_OWNER_SLOTS = new Set(['fe.modules.api', PACKAGE_API_SLOT, ...CLIENT_SLOTS]);
+/** The slots that hold the GraphQL operations of an app or of the api package. */
+const OPERATION_SLOTS = new Set(['fe.modules.api', PACKAGE_API_SLOT]);
+const OPERATION_FILE = /^(?:query|mutation)-[^/]+\.ts$/u;
+const NO_CLIENT = "the repository has no transport client. Create the one Apollo client folder (packages/<family>-api/src/graphql/clients/, or the only app's modules/api/graphql/clients/) and call the back end through it.";
 
 /** True when `node` names the global fetch: no import, and no declaration outside a lib declaration file. */
 function isGlobalObjectFetch(ts, node) {
@@ -59,12 +66,14 @@ function isGlobalFetch(ts, kit, checker, node) {
   return declarations.every(declaration => declaration.getSourceFile().isDeclarationFile);
 }
 
-function reportMultiplicity(items, noun, nextApps, report, list) {
-  for (const file of items) {
+/** Findings on every copy when there are several, and on an app's own copy in a repository of several apps. */
+function reportMultiplicity(items, noun, nextApps, report) {
+  const list = items.map(item => item.root).join(', ');
+  for (const item of items) {
     if (items.length > 1) {
-      report(file, file.sourceFile, `The repository has ${items.length} ${noun}s (${list(items)}); it has exactly one: the api package's (packages/<family>-api/src/) when the apps share it, or the only app's. Keep one and delete the others.`);
-    } else if ((file.slot === APP_CLIENT_SLOT || file.slot === APP_OUTCOME_SLOT) && nextApps.length > 1) {
-      report(file, file.sourceFile, `${file.rel} is an app's ${noun} in a repository of ${nextApps.length} apps; a repository with several apps keeps its one ${noun} in the api package (packages/<family>-api/src/).`);
+      report(item, item.sourceFile, `The repository has ${items.length} ${noun}s (${list}); it has exactly one: the api package's (packages/<family>-api/src/graphql/) when the apps share it, or the only app's. Keep one and delete the others.`);
+    } else if ((item.slot === APP_CLIENT_SLOT || item.slot === APP_OUTCOME_SLOT) && nextApps.length > 1) {
+      report(item, item.sourceFile, `${item.root} is an app's ${noun} in a repository of ${nextApps.length} apps; a repository with several apps keeps its one ${noun} in the api package (packages/<family>-api/src/graphql/).`);
     }
   }
 }
@@ -81,40 +90,66 @@ function moduleSpecifierOf(ts, node) {
   return null;
 }
 
-function inspectTransportNode({ ts, kit, checker, file, node, isClient, clientCalls, clients, owned, report }) {
+function isApolloClientConstruction(ts, kit, checker, node) {
+  if (!ts.isNewExpression(node)) return false;
+  const binding = kit.importBinding(checker, node.expression);
+  return Boolean(binding && binding.name === 'ApolloClient' && binding.module.startsWith('@apollo/client'));
+}
+
+function inspectLibraryImport({ ts, file, node, transport, report }) {
+  const specifier = moduleSpecifierOf(ts, node);
+  if (!specifier || !ts.isStringLiteralLike(specifier)) return;
+  const library = specifier.text.split('/')[0];
+  if (!HTTP_LIBRARIES.has(library) || (library === REST_LIBRARY && API_OWNER_SLOTS.has(file.slot))) return;
+  const where = library === REST_LIBRARY
+    ? 'axios belongs to the api owner only (modules/api/rest, the api package): call its rest functions'
+    : `the transport is Apollo GraphQL (${transport}) with axios for the rest calls of modules/api/rest`;
+  report(file, node, `${specifier.text} is a second HTTP transport in ${file.rel}; ${where}.`, { library: specifier.text });
+}
+
+function inspectTransportNode(scope, node) {
+  const { ts, kit, checker, file, isClient, owned, report } = scope;
   const fetchUse = globalFetchUse(ts, kit, checker, node);
   if (fetchUse !== null) {
-    if (isClient) clientCalls.value += 1;
-    else if (fetchUse === 'property') report(file, node, `${node.getText(file.sourceFile)} reaches the global fetch outside the transport client; ${owned}`);
+    if (isClient) return false;
+    if (fetchUse === 'property') report(file, node, `${node.getText(file.sourceFile)} reaches the global fetch outside the transport client; ${owned}`);
     else report(file, node, `fetch is used outside the transport client (called, aliased or passed as a value); ${owned}`);
     return false;
   }
-  const specifier = moduleSpecifierOf(ts, node);
-  if (specifier && ts.isStringLiteralLike(specifier) && HTTP_LIBRARIES.has(specifier.text.split('/')[0])) {
-    report(file, node, `${specifier.text} is a second HTTP transport; the repository's one transport is built on fetch (${clients.length ? clients.map(item => item.rel).join(', ') : 'no client exists yet'}). Use the client.`, { library: specifier.text });
-  }
+  if (!isClient && isApolloClientConstruction(ts, kit, checker, node)) report(file, node, `${file.rel} constructs an ApolloClient outside the transport client folder; ${owned}`);
+  inspectLibraryImport({ ...scope, node });
   return true;
 }
 
-function inspectTransportFiles({ files, graph, kit, ts, clientRels, clients, owned, report }) {
+/** True when the operation imports the client folder, or (from an app) the api package that holds it. */
+function reachesClient(graph, file, clientRels) {
+  return graph.edges.some(edge => {
+    if (edge.from !== file.rel || !edge.runtime) return false;
+    if (clientRels.has(edge.to)) return true;
+    return file.slot !== PACKAGE_API_SLOT && (graph.files.get(edge.to)?.slot ?? '').startsWith(PACKAGE_API_SLOT);
+  });
+}
+
+function inspectTransportFiles({ files, graph, kit, ts, clientRels, transport, owned, report }) {
   const appsWithFiles = new Set();
-  let readers = 0;
+  let operations = 0;
   for (const file of files) {
-    const bindings = kit.resolver.classifyPath(file.rel).bindings;
-    if (bindings?.app) appsWithFiles.add(bindings.app);
-    const checker = kit.checkerOf(file.sourceFile);
-    const isClient = clientRels.has(file.rel);
-    const clientCalls = { value: 0 };
-    kit.walk(file.sourceFile, node => inspectTransportNode({ ts, kit, checker, file, node, isClient, clientCalls, clients, owned, report }));
-    if (isClient && clientCalls.value === 0) report(file, file.sourceFile, `${file.rel} never calls the global fetch; the client is the one module that owns fetch, with its timeout and abort signal.`);
-    if (file.slot === API_SLOT && bindings?.app && path.posix.basename(file.rel).startsWith('read-')) {
-      readers += 1;
-      const reachesClient = graph.edges.some(edge => edge.from === file.rel && edge.runtime
-        && (clientRels.has(edge.to) || graph.files.get(edge.to)?.slot === PACKAGE_API_SLOT));
-      if (!reachesClient) report(file, file.sourceFile, `${file.rel} is a server reader that does not import the transport client; a reader fetches through the repository's one client, never through its own transport.`);
+    if (file.bindings?.app) appsWithFiles.add(file.bindings.app);
+    const scope = { ts, kit, checker: kit.checkerOf(file.sourceFile), file, isClient: clientRels.has(file.rel), transport, owned, report };
+    kit.walk(file.sourceFile, node => inspectTransportNode(scope, node));
+    if (OPERATION_SLOTS.has(file.slot) && OPERATION_FILE.test(path.posix.basename(file.rel))) {
+      operations += 1;
+      if (!reachesClient(graph, file, clientRels)) report(file, file.sourceFile, `${file.rel} is a GraphQL operation that does not import the transport client; an operation runs through the repository's one Apollo client, never through its own transport.`);
     }
   }
-  return { appsWithFiles, readers };
+  return { appsWithFiles, operations };
+}
+
+/** One instance per client folder (its slot root), carried by the folder's first file. */
+function clientInstances(clients) {
+  const byRoot = new Map();
+  for (const file of [...clients].sort((a, b) => a.rel.localeCompare(b.rel))) if (!byRoot.has(file.root)) byRoot.set(file.root, file);
+  return [...byRoot.values()];
 }
 
 export function checkTransportOwner(input) {
@@ -124,16 +159,21 @@ export function checkTransportOwner(input) {
   const violations = [];
   const report = (file, node, message, extra = {}) => violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, node), message, ...extra });
   const nextApps = resolver.repo.apps.filter(item => item.kind === 'next');
-  const files = [...graph.files.values()].filter(file => file.slot && file.tier !== 'e2e');
+  const files = [...graph.files.values()].filter(file => file.slot && file.tier !== 'e2e').map(file => {
+    const classified = resolver.classifyPath(file.rel);
+    return { ...file, root: classified.root ?? file.rel, bindings: classified.bindings };
+  });
   const clients = files.filter(file => CLIENT_SLOTS.has(file.slot));
-  const outcomes = files.filter(file => resolver.slot(file.slot)?.outcomeHome === true);
+  const instances = clientInstances(clients);
+  const outcomes = files.filter(file => resolver.slot(file.slot)?.outcomeHome === true).map(file => ({ ...file, root: file.rel }));
   const clientRels = new Set(clients.map(file => file.rel));
-  const list = items => items.map(item => item.rel).join(', ');
-  const owned = clients.length ? `the repository has one transport (${list(clients)}). Call the client and take its Outcome.` : NO_CLIENT;
+  const transport = instances.length ? instances.map(item => item.root).join(', ') : 'no client exists yet';
+  const owned = instances.length ? `the repository has one transport (${transport}). Call the back end through a modules/api operation and take its GraphQLResponse.` : NO_CLIENT;
 
-  // Exactly one client and one Outcome union per repository.
-  for (const [items, noun] of [[clients, 'transport client'], [outcomes, 'Outcome union']]) reportMultiplicity(items, noun, nextApps, report, list);
+  // Exactly one client folder and one GraphQLResponse union per repository.
+  reportMultiplicity(instances, 'transport client', nextApps, report);
+  reportMultiplicity(outcomes, 'GraphQLResponse union', nextApps, report);
 
-  const { appsWithFiles, readers } = inspectTransportFiles({ files, graph, kit, ts, clientRels, clients, owned, report });
-  return { violations, coverage: { status: 'checked', apps: appsWithFiles.size, readers, clients: clients.length, outcomes: outcomes.length } };
+  const { appsWithFiles, operations } = inspectTransportFiles({ files, graph, kit, ts, clientRels, transport, owned, report });
+  return { violations, coverage: { status: 'checked', apps: appsWithFiles.size, operations, clients: instances.length, outcomes: outcomes.length } };
 }

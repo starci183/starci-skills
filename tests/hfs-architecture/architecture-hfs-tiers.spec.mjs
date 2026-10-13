@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appDeclaration, archFixture, runArch, findings } from '../helpers/hfs-arch-fixture.mjs';
+import { archFixture, runArch, findings } from '../helpers/hfs-arch-fixture.mjs';
 import { stronglyConnected } from '../../scripts/hfs/architecture/tiers.mjs';
 
 // HFS checks 1 and 2: the tier direction matrix of knowledge/hfs/slots.yaml and owner cycles.
@@ -181,22 +181,20 @@ test('FE: a component may import config but not the api transport; a hook reache
   assert.deepEqual(bypass, ['apps/web/src/hooks/orders/index.ts -> apps/web/src/hooks/cart/useDeep.ts']);
 });
 
-test('FE: a connected block may import a db Server Action directly, but not a non-action db transport', t => {
-  const declaration = appDeclaration('fe', { apps: [{ name: 'web', kind: 'next' }] });
-  declaration.edition = 'lite';
-  declaration.sides.be.connections = [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'schema', provider: 'supabase' }];
+test('FE: a "use server" module has no tier or owner-entry exemption: a block reaching into it is judged like any deep import', t => {
   const root = archFixture(t, {
     profile: 'fe',
     files: {
-      '../hfs.json': `${JSON.stringify(declaration, null, 2)}\n`,
-      'apps/web/src/components/blocks/Order/index.tsx': "import { writeOrder } from '../../../modules/db/orders/write-order';\nimport { readOrder } from '../../../modules/db/orders/read-order';\nexport const Order = [writeOrder, readOrder];\n",
-      'apps/web/src/modules/db/index.ts': "export { readOrder } from './orders/read-order';\n",
-      'apps/web/src/modules/db/orders/write-order.ts': "'use server';\nimport 'server-only';\nexport const writeOrder = async () => 1;\n",
-      'apps/web/src/modules/db/orders/read-order.ts': 'export const readOrder = async () => 1;\n',
+      'apps/web/src/components/blocks/Order/index.tsx': "import { writeOrder } from '../../../modules/orders/write-order';\nexport const Order = [writeOrder];\n",
+      'apps/web/src/modules/orders/index.ts': 'export const orders = 1;\n',
+      'apps/web/src/modules/orders/write-order.ts': "'use server';\nexport const writeOrder = async () => 1;\n",
     },
   });
-  const found = findings(runArch(root), 'FE_TIER_DIRECTION');
-  assert.deepEqual(found.map(item => item.resolvedPath), ['apps/web/src/modules/db/orders/read-order.ts']);
+  const report = runArch(root);
+  const edge = item => `${item.path} -> ${item.resolvedPath}`;
+  assert.deepEqual(findings(report, 'FE_TIER_DIRECTION').map(edge), ['apps/web/src/components/blocks/Order/index.tsx -> apps/web/src/modules/orders/write-order.ts']);
+  assert.deepEqual(findings(report, 'ARCH_OWNER_EXPORT_BYPASS').map(edge), ['apps/web/src/components/blocks/Order/index.tsx -> apps/web/src/modules/orders/write-order.ts']);
+  assert.deepEqual(findings(report, 'FE_SERVER_ACTION_FORBIDDEN').map(item => item.path), ['apps/web/src/modules/orders/write-order.ts']);
 });
 
 test('stronglyConnected finds only multi-node components', () => {

@@ -57,7 +57,7 @@ test('a type-only import of a server module, and a type-only edge to the server 
   assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
 });
 
-test('a file-level Server Action cuts the client graph, while an inner directive or no directive does not', t => {
+test('a "use server" module does not cut the client graph: its server imports reach the client and the directive is FE_SERVER_ACTION_FORBIDDEN', t => {
   const report = run(t, {
     'apps/web/src/components/blocks/Action/index.tsx': "'use client';\nimport { writeOrder } from '../../../modules/orders/write-order';\nexport const Action = () => writeOrder('1');\n",
     'apps/web/src/modules/orders/write-order.ts': "'use server';\nimport 'server-only';\nimport { headers } from 'next/headers';\nexport const writeOrder = async (id: string) => [id, await headers()];\n",
@@ -66,10 +66,13 @@ test('a file-level Server Action cuts the client graph, while an inner directive
     'apps/web/src/components/blocks/Plain/index.tsx': "'use client';\nimport { writePlain } from '../../../modules/orders/write-plain';\nexport const Plain = () => writePlain();\n",
     'apps/web/src/modules/orders/write-plain.ts': "import { readFile } from 'node:fs';\nexport const writePlain = async () => readFile;\n",
   });
-  const found = hits(report);
-  assert.deepEqual(found.map(item => item.path).sort(), [
+  assert.deepEqual([...new Set(hits(report).map(item => item.path))].sort(), [
+    'apps/web/src/components/blocks/Action/index.tsx',
     'apps/web/src/components/blocks/Inner/index.tsx',
     'apps/web/src/components/blocks/Plain/index.tsx',
   ]);
-  assert.deepEqual(found.map(item => item.specifier).sort(), ['node:fs', 'server-only']);
+  assert.deepEqual(findings(report, 'FE_SERVER_ACTION_FORBIDDEN').map(item => item.path).sort(), [
+    'apps/web/src/modules/orders/write-inner.ts',
+    'apps/web/src/modules/orders/write-order.ts',
+  ]);
 });

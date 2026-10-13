@@ -317,7 +317,7 @@ test('FE side with two apps', () => {
   assert.equal(owner('apps/web/src/features/pages/Home/index.tsx'), 'fe.feature');
   assert.equal(owner('apps/web/src/components/blocks/Header/component.tsx'), 'fe.components');
   assert.equal(owner('apps/web/src/hooks/orders/useOrders.ts'), 'fe.hooks');
-  assert.equal(owner('apps/web/src/modules/api/client.ts'), 'fe.transport.client');
+  assert.equal(owner('apps/web/src/modules/api/graphql/clients/clients/auth.ts'), 'fe.transport.client');
   assert.equal(owner('apps/web/src/modules/api/contract/core.graphql'), 'fe.modules.api', 'no contract copy slot: the fe side reads be/contracts/ in place');
   assert.equal(owner('apps/web/src/modules/api/read/orders.ts'), 'fe.modules.api');
   assert.equal(owner('apps/web/src/modules/i18n/messages/en.json'), 'fe.modules.i18n');
@@ -354,7 +354,7 @@ test('FE side with two apps', () => {
   assert.equal(ok('apps/web/src/components/leaves/Button/component.tsx', 'apps/web/src/components/blocks/Header/index.tsx').reason, 'layerOrder');
   assert.equal(ok('apps/web/src/components/blocks/Header/component.tsx', 'apps/web/src/components/leaves/Button/component.tsx').reason, 'notPublicEntry');
   assert.equal(ok('apps/web/src/hooks/orders/useOrders.ts', 'apps/web/src/modules/api/index.ts').allowed, true);
-  assert.equal(ok('apps/web/src/modules/api/client.ts', 'apps/web/src/hooks/orders/useOrders.ts').reason, 'tierDirection');
+  assert.equal(ok('apps/web/src/modules/api/graphql/clients/index.ts', 'apps/web/src/hooks/orders/useOrders.ts').reason, 'tierDirection');
   // components reach foundation modules (config, routes, i18n, types) but never the api transport or a data module
   for (const capability of ['config', 'routes', 'i18n', 'types']) assert.equal(ok('apps/web/src/components/leaves/Button/index.tsx', `apps/web/src/modules/${capability}/index.ts`).allowed, true, capability);
   assert.equal(ok('apps/web/src/components/leaves/Button/index.tsx', 'apps/web/src/modules/api/index.ts').reason, 'tierDirection');
@@ -535,11 +535,11 @@ test('ruleParams: the parameters the canon lint lanes read, per side', () => {
   assert.throws(() => { ruleParams(manifest, 'be').fileLines.soft = 1; }, TypeError);
   // the transport client and the Outcome union are slots of their own, in an app or in the shared api package
   const feHfs = sideOf(app({ fe: { ...FE_SIDE, optionalSlots: ['repo.packages', 'fe.package.ui', 'fe.package.api', 'fe.package.i18n'] } }), 'fe');
-  assert.equal(feHfs.classifyPath('apps/web/src/modules/api/client.ts').slot, 'fe.transport.client');
-  assert.equal(feHfs.classifyPath('apps/web/src/modules/api/outcome.ts').slot, 'fe.transport.outcome');
-  assert.equal(feHfs.classifyPath('packages/app-api/src/client.ts').slot, 'fe.package.api.client');
-  assert.equal(feHfs.classifyPath('packages/app-api/src/outcome.ts').slot, 'fe.package.api.outcome');
-  assert.equal(feHfs.classifyPath('packages/app-api/src/graphql.ts').slot, 'fe.package.api');
+  assert.equal(feHfs.classifyPath('apps/web/src/modules/api/graphql/clients/links/http.ts').slot, 'fe.transport.client');
+  assert.equal(feHfs.classifyPath('apps/web/src/modules/api/graphql/types.ts').slot, 'fe.transport.outcome');
+  assert.equal(feHfs.classifyPath('packages/app-api/src/graphql/clients/index.ts').slot, 'fe.package.api.client');
+  assert.equal(feHfs.classifyPath('packages/app-api/src/graphql/types.ts').slot, 'fe.package.api.outcome');
+  assert.equal(feHfs.classifyPath('packages/app-api/src/graphql/queries/query-orders.ts').slot, 'fe.package.api');
   assert.equal(feHfs.classifyPath('packages/app-i18n/src/app.ts').slot, 'fe.package.i18n');
   // schema and loader agree that ruleParams is required and closed
   for (const mutate of [(d) => { delete d.ruleParams; }, (d) => { d.ruleParams.common.fileLines.soft = 0; }, (d) => { delete d.ruleParams.common.duplicateBlock; }, (d) => { d.ruleParams.common.duplicateBlock = { lines: 1, tokens: 60 }; }, (d) => { d.ruleParams.common.extra = 1; }, (d) => { d.ruleParams.fe = { extra: 1 }; }, (d) => { d.ruleParams.fe = { duplicateBlock: { lines: 1, tokens: 60 } }; }, (d) => { d.ruleParams.be.duplicateBlockLines = 25; }, (d) => { d.ruleParams.be.duplicateBlock = { lines: 1, tokens: 60 }; }, (d) => { delete d.ruleParams.be.paramNames; }, (d) => { d.ruleParams.be.paramNames = []; }, (d) => { d.ruleParams.be.paramNames[0].names = ['Clock']; }, (d) => { d.ruleParams.be.paramNames[0].typeSuffix = 'Port'; }, (d) => { d.ruleParams.be.paramNames[0].extra = 1; }]) {

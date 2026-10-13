@@ -4,7 +4,7 @@ import { found, readJson, readText } from './read.mjs';
 import { configFindings, parseToml, typesFindings } from './database-config.mjs';
 import { defaultGit, migrationShapeFindings } from './database-migrations.mjs';
 import { migrationSetPolicyFindings, sqlAnalysis } from './database-sql.mjs';
-import { CONFIG_FILE, DB_CONFIG_POLICY, DB_MIGRATION_SHAPE, MIGRATIONS_DIR, TYPES_FILE } from './database-constants.mjs';
+import { CONFIG_FILE, DB_CONFIG_POLICY, DB_MIGRATION_SHAPE, isActiveMigration, MIGRATIONS_ARCHIVE_DIR, TYPES_FILE } from './database-constants.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 import { eachInOrder } from '../../lib/in-order.mjs';
 
@@ -53,7 +53,8 @@ async function migrationAnalyses({ repoRoot, migrations, exposed, forceRls, find
  */
 export async function checkDatabase({ repoRoot, files, base, git, edition, supabase, emitTypes, now = () => Date.now() } = {}) {
   const findings = [];
-  const migrations = files.filter((file) => file.startsWith(`${MIGRATIONS_DIR}/`)).sort(byCodeUnit);
+  const migrations = files.filter(isActiveMigration).sort(byCodeUnit);
+  const archived = files.filter((file) => file.startsWith(`${MIGRATIONS_ARCHIVE_DIR}/`));
   const declaration = readJson(repoRoot, 'hfs.json');
   const declared = supabase === undefined ? declaration?.supabase : supabase;
   const hasConfig = files.includes(CONFIG_FILE);
@@ -70,7 +71,7 @@ export async function checkDatabase({ repoRoot, files, base, git, edition, supab
   const apiSchemas = (config?.api?.schemas ?? []).filter((schema) => typeof schema === 'string');
   const exposed = new Set(['public', ...apiSchemas]);
   const forceRls = new Set((declared?.forceRls ?? []).map((name) => (name.includes('.') ? name : `public.${name}`)));
-  findings.push(...await migrationShapeFindings({ repoRoot, migrations, git: git ?? defaultGit, base, now }));
+  findings.push(...await migrationShapeFindings({ repoRoot, migrations, archived, git: git ?? defaultGit, base, now }));
 
   const analyses = await migrationAnalyses({ repoRoot, migrations, exposed, forceRls, findings });
   findings.push(

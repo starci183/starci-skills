@@ -88,8 +88,8 @@ const NEXT = {
   'apps/web/src/app/global-error.tsx': 'export {};\n',
   'apps/web/src/app/[locale]/layout.tsx': 'export {};\n',
   'apps/web/src/modules/api/index.ts': 'export const api = 1;\n',
-  'apps/web/src/modules/api/client.ts': 'export const client = 1;\n',
-  'apps/web/src/modules/api/outcome.ts': 'export const outcome = 1;\n',
+  'apps/web/src/modules/api/graphql/clients/index.ts': 'export const client = 1;\n',
+  'apps/web/src/modules/api/graphql/types.ts': 'export const outcome = 1;\n',
   'apps/web/src/modules/i18n/index.ts': 'export const i18n = 1;\n',
   'apps/web/src/modules/i18n/config.ts': 'export const c = 1;\n',
   'apps/web/src/modules/i18n/routing.ts': 'export const r = 1;\n',
@@ -123,8 +123,8 @@ test('FE: a complete Next app raises no required-file finding', () => {
   assert.deepEqual(findings(report, 'HFS_REQUIRED_FILE_MISSING'), []);
 });
 
-test('FE: a missing layout.tsx is HFS_REQUIRED_FILE_MISSING; api client.ts and i18n request.ts are optional (shared by a package) and raise nothing', () => {
-  const files = { 'apps/web/src/app/[locale]/layout.tsx': null, 'apps/web/src/modules/api/client.ts': null, 'apps/web/src/modules/i18n/request.ts': null };
+test('FE: a missing layout.tsx is HFS_REQUIRED_FILE_MISSING; the api client folder and i18n request.ts are optional (shared by a package) and raise nothing', () => {
+  const files = { 'apps/web/src/app/[locale]/layout.tsx': null, 'apps/web/src/modules/api/graphql/clients': null, 'apps/web/src/modules/i18n/request.ts': null };
   const report = runFe(files);
   assert.deepEqual(paths(report, 'HFS_REQUIRED_FILE_MISSING'), ['apps/web/src/app/[locale]/layout.tsx']);
   assert.deepEqual(findings(report, 'FE_ERROR_BOUNDARY_MISSING'), []);

@@ -43,7 +43,8 @@ export const HFS_RULE_IDS = [
 
 const NON_NPM_ENTRIES = new Set(['pnpm-lock.yaml', 'pnpm-workspace.yaml', 'yarn.lock', 'bun.lock', 'bun.lockb']);
 const HUSKY_HOOKS_PATH = /^\.husky(?:\/_)?\/?$/u;
-const BACKEND_SRC_CHILDREN = new Set(['features', 'modules', 'tests']);
+/** The folders of a back end's src/ the slot manifest knows (features, modules, tests, assets): read from the be slot paths, never listed here. */
+const backendSrcChildrenOf = resolver => new Set(resolver.slots().filter(slot => slot.profiles.includes('be')).flatMap(slot => braceVariants(slot.path)).map(variant => /^src\/([a-z][a-z-]*)\//.exec(variant)?.[1]).filter(Boolean));
 const moduleTiersOf = resolver => new Set(resolver.slots().filter(slot => slot.profiles.includes('be')).flatMap(slot => braceVariants(slot.path)).map(variant => /^src\/modules\/([a-z][a-z-]*)\//.exec(variant)?.[1]).filter(Boolean)); // the folders of src/modules/ the slot manifest knows (domain, platform, integrations, events, queues, projections)
 // Owner test layout 2026-09-30: unit `<name>.spec.ts`, integration, e2e and contract by folder and suffix; int-spec and harness-spec stay banned.
 const UNSUPPORTED_TEST_SUFFIX = /\.(?:int|harness)-spec\.[cm]?[jt]sx?$/u;
@@ -274,9 +275,11 @@ function checkApplications(state) {
 function checkBackendSourceLayout(state) {
   if (!state.backend) return;
   const { tree, resolver, finding } = state;
+  const srcChildren = backendSrcChildrenOf(resolver);
+  const srcList = [...srcChildren].sort(byCodeUnit).map(name => name + '/').join(', ');
   for (const child of tree.children('src').sort(byCodeUnit)) {
-    if (!BACKEND_SRC_CHILDREN.has(child))
-      finding('HFS_SRC_LAYOUT_INVALID', `src/${child}`, `Backend src/ holds only features/, modules/ and tests/; ${child} must move to its owner.`);
+    if (!srcChildren.has(child))
+      finding('HFS_SRC_LAYOUT_INVALID', `src/${child}`, `Backend src/ holds only ${srcList}; ${child} must move to its owner.`);
   }
   for (const tier of tree.children('src/modules').sort(byCodeUnit)) {
     if (!moduleTiersOf(resolver).has(tier))

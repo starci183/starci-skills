@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { appDeclaration, archFixture, findings, runArch } from '../helpers/hfs-arch-fixture.mjs';
 
-const FE_CODES = [
-  'FE_SUPABASE_CLIENT_OWNER', 'FE_DB_RESULT_TYPED', 'FE_DB_ERROR_HANDLED', 'FE_SERVICE_ROLE_FORBIDDEN',
-  'FE_AUTH_SESSION_TRUST', 'FE_DB_WRITE_SHAPE', 'FE_ROUTE_HANDLER_FORBIDDEN',
-];
+// Supabase on the front end is auth only (owner ruling 2026-10-13): fe.modules.auth imports @supabase/* and calls its auth API;
+// data, storage, rpc and realtime go through the back end. The four fe data codes of RETIRED_FE_CODES are removed; the route
+// handler ban is provider-independent (server-action.mjs).
+const FE_CODES = ['FE_SUPABASE_CLIENT_OWNER', 'FE_SERVICE_ROLE_FORBIDDEN'];
+const RETIRED_FE_CODES = ['FE_DB_RESULT_TYPED', 'FE_DB_ERROR_HANDLED', 'FE_AUTH_SESSION_TRUST', 'FE_DB_WRITE_SHAPE']; // removed 2026-10-13
 const BE_CODES = ['BE_SUPABASE_CLIENT_OWNER', 'BE_SUPABASE_JWT_VERIFIED'];
 
 const declaration = (profile) => {
@@ -26,7 +27,8 @@ export interface QueryBuilder<T=unknown> extends PromiseLike<QueryResult<T>>{
 }
 export interface AuthClient{getSession():Promise<QueryResult<{session:unknown}>>;getClaims():Promise<QueryResult<{claims:unknown}>>;getUser():Promise<QueryResult<{user:unknown}>>}
 export interface StorageClient{from(bucket:string):{upload(path:string,value:unknown):Promise<QueryResult<unknown>>}}
-export interface SupabaseClient<Database>{from(table:string):QueryBuilder<unknown>;rpc(name:string,args?:unknown):QueryBuilder<unknown>;auth:AuthClient;storage:StorageClient}
+export interface Channel{on(event:string,handler:()=>void):Channel;subscribe():Channel}
+export interface SupabaseClient<Database>{from(table:string):QueryBuilder<unknown>;rpc(name:string,args?:unknown):QueryBuilder<unknown>;auth:AuthClient;storage:StorageClient;channel(name:string):Channel}
 export declare function createClient<Database>(url:string,key:string):SupabaseClient<Database>;
 `;
 
@@ -43,25 +45,18 @@ export declare function createBrowserClient<Database>(url:string,key:string):Sup
 
 const feClean = (extra = {}) => ({
   '../hfs.json': declaration('fe'),
-  '../supabase/types/database.types.ts': 'export interface Database { public: { Tables: { items: { Row: { id: string } } } } }\n',
   ...moduleFiles,
-  'apps/web/src/modules/db/index.ts': `export * from './server'; export * from './browser'; export * from './principal'; export * from './outcome';\n`,
-  'apps/web/src/modules/db/server.ts': `import {createServerClient} from '@supabase/ssr'; import type {Database} from '../../../../../supabase/types/database.types';
-export const client=createServerClient<Database>('https://fixture.invalid','public-anon');\n`,
-  'apps/web/src/modules/db/browser.ts': `import {createBrowserClient} from '@supabase/ssr'; import type {Database} from '../../../../../supabase/types/database.types';
-export const browserClient=createBrowserClient<Database>('https://fixture.invalid','public-anon');\n`,
-  'apps/web/src/modules/db/principal.ts': `import {client} from './server'; export const getPrincipal=async()=>{const result=await client.auth.getClaims();if(result.error)return {kind:'anonymous' as const};return {kind:'member' as const,claims:result.data.claims}};\n`,
-  'apps/web/src/modules/db/outcome.ts': `export const toOutcome=<T>(result:{data:T;error:Error|null})=>result.error?{kind:'unavailable' as const}:{kind:'ok' as const,data:result.data};\n`,
-  'apps/web/src/modules/db/items/read-items.ts': `import {client} from '../server'; import {toOutcome} from '../outcome';
-export const readItems=async()=>{const result=await client.from('items').select().limit(20);return toOutcome(result)};\n`,
-  'apps/web/src/modules/db/items/write-item.ts': `'use server'; import {client} from '../server'; import {getPrincipal} from '../principal'; import {toOutcome} from '../outcome';
-const schema={parse:(value:unknown)=>({id:String(value)})}; export const writeItem=async(input:unknown)=>{const principal=await getPrincipal();
-if(principal.kind==='anonymous')return {kind:'refused' as const};const parsed=schema.parse(input);const result=await client.from('items').update(parsed).eq('id',parsed.id).select().single();return toOutcome(result)};\n`,
+  'apps/web/src/modules/auth/index.ts': `export {accessToken} from './session';\n`,
+  'apps/web/src/modules/auth/client.ts': `import {createBrowserClient} from '@supabase/ssr';
+export const authClient=createBrowserClient('https://fixture.invalid','public-anon');\n`,
+  'apps/web/src/modules/auth/session.ts': `import {authClient} from './client';
+export const accessToken=async()=>{const result=await authClient.auth.getSession();return result.error?null:result.data.session};\n`,
+  'apps/web/src/hooks/session/useAccessToken.ts': `import {accessToken} from '../../modules/auth';\nexport const useAccessToken=()=>accessToken();\n`,
   'apps/web/src/app/health/live/route.ts': `export const GET=()=>new Response('ok');\n`,
   'apps/web/src/app/auth/callback/route.ts': `export const GET=()=>new Response('ok');\n`,
   'apps/web/src/modules/config/index.ts': `export const analytics=process.env.NEXT_PUBLIC_ANALYTICS_ID;\n`,
   'apps/web/src/modules/types/other.ts': `import type {SupabaseClient,Decoder} from 'other-client';
-export const note='.single<Row>() and auth.getSession() in a string'; export type Other=SupabaseClient<string>; export const useDecoder=(d:Decoder)=>d.decode('value');
+export const note='client.from(items) and auth.getSession() in a string'; export type Other=SupabaseClient<string>; export const useDecoder=(d:Decoder)=>d.decode('value');
 // service_role in a comment is not executable source.\n`,
   ...extra,
 });
@@ -69,45 +64,44 @@ export const note='.single<Row>() and auth.getSession() in a string'; export typ
 const freshFe = (t, extra = {}) => archFixture(t, { profile: 'fe', files: feClean(extra) });
 const newFindings = report => report.violations.filter(item => FE_CODES.includes(item.ruleId));
 
-test('L10-L15: a slot-owned, typed and bounded FE Supabase path is clean, including both permitted routes and unrelated lookalikes', t => {
+test('L10/L13: an auth-only Supabase client inside modules/auth, both permitted routes and unrelated lookalikes are clean', t => {
   const report = runArch(freshFe(t));
   assert.deepEqual(newFindings(report), [], JSON.stringify(newFindings(report), null, 2));
+  assert.deepEqual(findings(report, 'FE_ROUTE_HANDLER_FORBIDDEN'), [], 'health/live and the callback slot are the permitted route handlers');
   for (const code of FE_CODES) assert.ok(report.coverage.checkedRuleIds.includes(code), `${code} was not recorded as checked`);
 });
 
-test('L10 FE_SUPABASE_CLIENT_OWNER: imports, untyped clients and calls outside the db slots are findings', t => {
+test('the retired front-end Supabase data codes are refused as unknown: the machine never checks or emits them', t => {
+  const report = runArch(freshFe(t, {
+    'apps/web/src/modules/auth/read-items.ts': `import {authClient} from './client'; export const readItems=async()=>{const {data}=await authClient.from('items').select().single<{id:string}>();return data??[]};\n`,
+  }));
+  for (const code of RETIRED_FE_CODES) {
+    assert.equal(report.coverage.checkedRuleIds.includes(code), false, `${code} is removed and must not be checked`);
+    assert.deepEqual(findings(report, code), [], `${code} is removed and must not be reported`);
+  }
+});
+
+test('L10 FE_SUPABASE_CLIENT_OWNER: a Supabase import outside modules/auth and an auth call through a re-exported client are findings', t => {
   const root = freshFe(t, {
-    'apps/web/src/features/pages/Leak/index.ts': `import {createClient} from '@supabase/supabase-js'; const client=createClient('u','k'); export const leak=()=>client.from('items').select();\n`,
-    'apps/web/src/modules/db/server.ts': `import {createServerClient} from '@supabase/ssr'; export const client=createServerClient('u','k');\n`,
+    'apps/web/src/features/pages/Leak/index.ts': `import {createClient} from '@supabase/supabase-js'; const client=createClient('u','k'); export const leak=()=>client.auth.getClaims();\n`,
+    'apps/web/src/hooks/session/useClaims.ts': `import {authClient} from '../../modules/auth/client'; export const useClaims=()=>authClient.auth.getClaims();\n`,
   });
   const owned = findings(runArch(root), 'FE_SUPABASE_CLIENT_OWNER');
-  assert.ok(owned.some(item => /imported by/.test(item.message)), JSON.stringify(owned, null, 2));
-  assert.ok(owned.some(item => /untyped Supabase client/.test(item.message)), JSON.stringify(owned, null, 2));
-  assert.ok(owned.some(item => /call is made/.test(item.message)), JSON.stringify(owned, null, 2));
+  assert.ok(owned.some(item => item.path.endsWith('pages/Leak/index.ts') && /imported by/.test(item.message)), JSON.stringify(owned, null, 2));
+  assert.ok(owned.some(item => item.path.endsWith('useClaims.ts') && /auth call is made from/.test(item.message)), JSON.stringify(owned, null, 2));
   assert.equal(owned.some(item => item.path.endsWith('modules/types/other.ts')), false, 'a type named SupabaseClient from another library is not Supabase');
 });
 
-test('L11 FE_DB_RESULT_TYPED: explicit result generics, result casts and unbounded list reads are refused while unrelated generics are ignored', t => {
+test('L10 FE_SUPABASE_CLIENT_OWNER: data, rpc, storage and realtime calls are refused even inside modules/auth', t => {
   const root = freshFe(t, {
-    'apps/web/src/modules/db/items/read-items.ts': `import {client} from '../server'; import {toOutcome} from '../outcome'; type Row={id:string};
-const unrelated={single:<T>()=>null as T|null}; export const local=()=>unrelated.single<Row>();
-export const readItems=async()=>{const one=await client.from('items').select().single<Row>();if(one.error)return toOutcome(one);
-const list=(await client.from('items').select()) as {data:Array<Row>;error:Error|null};return toOutcome(list)};\n`,
+    'apps/web/src/modules/auth/read-items.ts': `import {authClient} from './client'; export const readItems=()=>authClient.from('items').select().limit(20);\n`,
+    'apps/web/src/modules/auth/run-rpc.ts': `import {authClient} from './client'; export const runRpc=()=>authClient.rpc('summary');\n`,
+    'apps/web/src/modules/auth/upload.ts': `import {authClient} from './client'; export const upload=()=>authClient.storage.from('docs').upload('a.txt','body');\n`,
+    'apps/web/src/modules/auth/listen.ts': `import {authClient} from './client'; export const listen=()=>authClient.channel('room').subscribe();\n`,
   });
-  const typed = findings(runArch(root), 'FE_DB_RESULT_TYPED');
-  assert.ok(typed.some(item => /single<T>/.test(item.message)), JSON.stringify(typed, null, 2));
-  assert.ok(typed.some(item => /cast or non-null/.test(item.message)), JSON.stringify(typed, null, 2));
-  assert.ok(typed.some(item => /list read/.test(item.message)), JSON.stringify(typed, null, 2));
-  assert.equal(typed.some(item => item.line === 2 && /single<T>/.test(item.message)), false, 'the unrelated generic method is not Supabase');
-});
-
-test('L12 FE_DB_ERROR_HANDLED: data-only destructuring and ?? [] cannot erase a Supabase refusal', t => {
-  const root = freshFe(t, {
-    'apps/web/src/modules/db/items/read-items.ts': `import {client} from '../server'; export const readItems=async()=>{const {data}=await client.from('items').select().limit(20);return data??[]};\n`,
-  });
-  const handled = findings(runArch(root), 'FE_DB_ERROR_HANDLED');
-  assert.ok(handled.some(item => /does not read its error/.test(item.message)), JSON.stringify(handled, null, 2));
-  assert.ok(handled.some(item => /collapsed with \?\? \[\]/.test(item.message)), JSON.stringify(handled, null, 2));
+  const owned = findings(runArch(root), 'FE_SUPABASE_CLIENT_OWNER');
+  assert.deepEqual(owned.map(item => item.member).sort(), ['channel', 'from', 'rpc', 'storage'], JSON.stringify(owned, null, 2));
+  assert.ok(owned.every(item => /auth only/.test(item.message)), JSON.stringify(owned, null, 2));
 });
 
 test('L13 FE_SERVICE_ROLE_FORBIDDEN: service-role text and credential env reads are refused, while config-owned public declarations are allowed', t => {
@@ -121,71 +115,8 @@ test('L13 FE_SERVICE_ROLE_FORBIDDEN: service-role text and credential env reads 
   assert.equal(secret.some(item => /comment/.test(item.path)), false);
 });
 
-test('L14 auth trust and write shape: server getSession, missing principal/refusal, unparsed input and sensitive writes without getUser are findings', t => {
-  const root = freshFe(t, {
-    'apps/web/src/modules/db/items/read-session.ts': `import {client} from '../server'; export const readSession=async()=>{const result=await client.auth.getSession();if(result.error)throw result.error;return result.data};\n`,
-    'apps/web/src/modules/db/items/write-item.ts': `'use server'; import {client} from '../server'; export const writeItem=async(input:unknown)=>{const value=String(input);const result=await client.from('items').update({value}).select().single();if(result.error)return {kind:'unavailable' as const};return {kind:'ok' as const,data:result.data}};\n`,
-    'apps/web/src/modules/db/role/write-role.ts': `'use server'; import {getPrincipal} from '../principal'; const schema={parse:(v:unknown)=>v};
-export const writeRole=async(input:unknown)=>{const principal=await getPrincipal();if(principal.kind==='anonymous')return {kind:'refused' as const};return {kind:'ok' as const,data:schema.parse(input)}};\n`,
-  });
-  const report = runArch(root);
-  const auth = findings(report, 'FE_AUTH_SESSION_TRUST');
-  assert.ok(auth.some(item => /getSession/.test(item.message)), JSON.stringify(auth, null, 2));
-  assert.ok(auth.some(item => /begin with/.test(item.message)), JSON.stringify(auth, null, 2));
-  assert.ok(auth.some(item => /must call auth\.getUser/.test(item.message)), JSON.stringify(auth, null, 2));
-  assert.ok(findings(report, 'FE_DB_WRITE_SHAPE').some(item => /used before schema/.test(item.message)), JSON.stringify(report.violations, null, 2));
-});
-
-test('L14 permits only auth/write-sign-in.ts to authenticate anonymous after principal-first and schema-first checks', t => {
-  const root = freshFe(t, {
-    'apps/web/src/modules/db/auth/write-sign-in.ts': `'use server'; import {getPrincipal} from '../principal'; const schema={parse:(value:unknown)=>String(value)};
-export const writeSignIn=async(input:unknown)=>{const principal=await getPrincipal();const parsed=schema.parse(input);return {kind:'ok' as const,data:{principal,parsed}}};\n`,
-    'apps/web/src/modules/db/items/write-without-refusal.ts': `'use server'; import {getPrincipal} from '../principal'; const schema={parse:(value:unknown)=>String(value)};
-export const writeItem=async(input:unknown)=>{const principal=await getPrincipal();const parsed=schema.parse(input);return {kind:'ok' as const,data:{principal,parsed}}};\n`,
-  });
-  const report = runArch(root);
-  const trust = findings(report, 'FE_AUTH_SESSION_TRUST');
-  assert.equal(trust.some(item => item.path.endsWith('/auth/write-sign-in.ts')), false, JSON.stringify(trust, null, 2));
-  assert.ok(trust.some(item => item.path.endsWith('/items/write-without-refusal.ts') && /refuse an anonymous/.test(item.message)), JSON.stringify(trust, null, 2));
-  const shape = findings(report, 'FE_DB_WRITE_SHAPE');
-  assert.equal(shape.some(item => item.path.endsWith('/auth/write-sign-in.ts')), false, JSON.stringify(shape, null, 2));
-});
-
-test('L14 a function-level "use server" directive is the prologue: the principal is the first statement after it', t => {
-  const root = freshFe(t, {
-    'apps/web/src/modules/db/items/write-directive.ts': `import {getPrincipal} from '../principal'; const schema={parse:(value:unknown)=>String(value)};
-export const writeItem=async(input:unknown)=>{'use server';const principal=await getPrincipal();if(principal.kind==='anonymous')return {kind:'refused' as const};return {kind:'ok' as const,data:schema.parse(input)}};
-`,
-    'apps/web/src/modules/db/items/write-late.ts': `import {getPrincipal} from '../principal'; const schema={parse:(value:unknown)=>String(value)};
-export const writeLate=async(input:unknown)=>{'use server';const parsed=schema.parse(input);const principal=await getPrincipal();if(principal.kind==='anonymous')return {kind:'refused' as const};return {kind:'ok' as const,data:parsed}};
-`,
-  });
-  const trust = findings(runArch(root), 'FE_AUTH_SESSION_TRUST');
-  assert.equal(trust.some(item => item.path.endsWith('/items/write-directive.ts')), false, JSON.stringify(trust, null, 2));
-  assert.ok(trust.some(item => item.path.endsWith('/items/write-late.ts') && /must begin with/.test(item.message)), JSON.stringify(trust, null, 2));
-});
-
-test('L14 the anonymous Server Actions are slot data (anonymousActions): sign-in and sign-out run for an anonymous principal, any other write module must refuse it', t => {
-  const root = freshFe(t, {
-    'apps/web/src/modules/db/auth/write-sign-out.ts': `'use server'; import {getPrincipal} from '../principal'; const schema={parse:(value:unknown)=>String(value)};
-export const writeSignOut=async(input:unknown)=>{const principal=await getPrincipal();const parsed=schema.parse(input);return {kind:'ok' as const,data:{principal,parsed}}};\n`,
-    'apps/web/src/modules/db/items/write-other.ts': `'use server'; import {getPrincipal} from '../principal'; const schema={parse:(value:unknown)=>String(value)};
-export const writeOther=async(input:unknown)=>{const principal=await getPrincipal();const parsed=schema.parse(input);return {kind:'ok' as const,data:{principal,parsed}}};\n`,
-  });
-  const trust = findings(runArch(root), 'FE_AUTH_SESSION_TRUST');
-  assert.equal(trust.some(item => item.path.endsWith('/auth/write-sign-out.ts')), false, JSON.stringify(trust, null, 2));
-  assert.ok(trust.some(item => item.path.endsWith('/items/write-other.ts') && /refuse an anonymous/.test(item.message)), JSON.stringify(trust, null, 2));
-});
-
-test('L15 FE_ROUTE_HANDLER_FORBIDDEN: any FE route beyond health/live and the callback slot is refused', t => {
-  const root = freshFe(t, { 'apps/web/src/app/api/export/route.ts': `export const POST=()=>new Response('no');\n` });
-  const routes = findings(runArch(root), 'FE_ROUTE_HANDLER_FORBIDDEN');
-  assert.deepEqual(routes.map(item => item.path), ['apps/web/src/app/api/export/route.ts']);
-});
-
-test('the new Supabase machine is not applicable to a full app with no supabase provider', t => {
+test('the front-end Supabase machine is not applicable to a full app with no supabase provider', t => {
   const root = archFixture(t, { profile: 'fe', files: {
-    'apps/web/src/app/api/existing/route.ts': `export const GET=()=>new Response('existing full route');\n`,
     'apps/web/src/modules/types/lookalike.ts': `export const serviceRole='service_role';\n`,
   } });
   const report = runArch(root);
@@ -194,7 +125,7 @@ test('the new Supabase machine is not applicable to a full app with no supabase 
   assert.equal(FE_CODES.some(code => report.coverage.checkedRuleIds.includes(code)), false);
 });
 
-test('the Supabase machine is enabled by the resolved Supabase slot in a full app with the provider', t => {
+test('the front-end Supabase machine is enabled by the supabase provider in a full app too', t => {
   const full = JSON.parse(declaration('fe'));
   delete full.edition;
   const report = runArch(freshFe(t, { '../hfs.json': `${JSON.stringify(full, null, 2)}\n` }));
