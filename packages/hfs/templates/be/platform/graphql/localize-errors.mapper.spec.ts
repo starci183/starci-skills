@@ -57,7 +57,7 @@ describe("localizeErrorsPlugin", () => {
         const errors = mock<ErrorsService>()
         const requestLocale = mock<RequestLocale>()
         requestLocale.of.mockReturnValue("vi")
-        errors.text.mockReturnValue("Không tìm thấy")
+        errors.text.mockReturnValue("localized: not found")
         const coded: GraphQLFormattedError = { message: "ITEM_NOT_FOUND", extensions: { code: "ITEM_NOT_FOUND" } }
         const response = singleResponse([coded])
 
@@ -67,7 +67,7 @@ describe("localizeErrorsPlugin", () => {
 
         expect(requestLocale.of).toHaveBeenCalledWith("vi")
         expect(response.body.kind === "single" && response.body.singleResult.errors).toEqual([
-            { ...coded, message: "Không tìm thấy" },
+            { ...coded, message: "localized: not found" },
         ])
     })
 

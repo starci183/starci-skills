@@ -47,7 +47,7 @@ const pascal = name => name.split('-').map(part => part[0].toUpperCase() + part.
 const bundledPins = () => parseYaml(fs.readFileSync(PINS_FILE, 'utf8')).pins;
 
 /** The parsed front-end stack catalog; a package without it cannot know what every front end installs. */
-export function bundledFeStack() {
+function bundledFeStack() {
   const file = FE_STACK_FILES.find(candidate => fs.existsSync(candidate));
   if (!file) throw new ScaffoldError('HFS_SCAFFOLD_STACK_MISSING', 'knowledge/hfs/fe-stack.yaml is not carried by this package; regenerate the runtime copy');
   return parseYaml(fs.readFileSync(file, 'utf8'));
@@ -57,7 +57,7 @@ export function bundledFeStack() {
  * The marketing fe app of the full starter: it calls no back end, so the shared app core (`apps/__app__/`) is not written into
  * it and the repository keeps one transport client folder (FE_TRANSPORT_OWNER).
  */
-export const MARKETING_FE_APPS = Object.freeze(new Set(['landing']));
+const MARKETING_FE_APPS = Object.freeze(new Set(['landing']));
 /** The fe apps that carry the shared app core: every declared Next app but the marketing one. */
 export const coreFeApps = apps => apps.filter(entry => entry.kind === 'next' && !MARKETING_FE_APPS.has(entry.name));
 
@@ -247,7 +247,7 @@ const workspaceSection = (entries, project, pins) => pinnedSection(Object.fromEn
  * The package.json of the fe app workspace `app` of the app `project`: @<project>/<app>, private, the workspace scripts, its own
  * dependencies. A product app (`core`, it carries the shared app core) also takes every core runtime package of the fe stack.
  */
-export function feAppManifest(project, app, pins, edition, { core = true, stack = coreFeStackPackages() } = {}) {
+function feAppManifest(project, app, pins, edition, { core = true, stack = coreFeStackPackages() } = {}) {
   const base = edition === 'lite' ? LITE_FE_APP_DEPENDENCIES : FE_APP_DEPENDENCIES;
   const dependencies = { ...base, ...(core ? Object.fromEntries(stack.app.filter(name => !Object.hasOwn(base, name)).map(name => [name, null])) : {}) };
   return { name: feAppPackageName(project, app), version: '0.0.0', private: true, scripts: { ...FE_APP_SCRIPTS }, dependencies: workspaceSection(dependencies, project, pins) };
