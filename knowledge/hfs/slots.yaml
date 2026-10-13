@@ -1921,8 +1921,8 @@ slots:
     # no-auth Apollo clients with their link chain (graphql/clients), one file per operation (graphql/queries/query-<x>.ts,
     # graphql/mutations/mutation-<x>.ts with its gql document map and typed request/response in types/), the generated wire types
     # (graphql/__generated__) and the axios calls (rest/<area>/*.ts) for uploads, presigned URLs and auth endpoints. A repository has
-    # exactly ONE client folder and ONE GraphQLResponse union: the app's (fe.transport.client/outcome) in a one-app repository, or
-    # the api package's (fe.package.api.client/outcome) when the repository shares it (FE_TRANSPORT_OWNER, machine).
+    # exactly ONE client folder and ONE GraphQLResponse union: the app's (fe.transport.client/outcome) when one app calls the back end,
+    # or the api package's (fe.package.api.client/outcome) when several do (FE_TRANSPORT_OWNER, machine).
     requires: [index.ts]
     allows: [index.ts, graphql/index.ts, graphql/types.ts, "graphql/clients/**", "graphql/queries/query-*.ts", "graphql/queries/types/*.ts",
              "graphql/mutations/mutation-*.ts", "graphql/mutations/types/*.ts", "graphql/__generated__/**", "rest/index.ts", "rest/<area>/*.ts"]
@@ -1938,7 +1938,7 @@ slots:
     tracked: tracked
     tier: transport
     tests: none
-    why: the auth and no-auth Apollo clients and their link chain (retry, error, timeout, token refresh, attach access token, http) of a one-app repository; a shared client is fe.package.api.client
+    why: the auth and no-auth Apollo clients and their link chain (retry, error, timeout, token refresh, attach access token, http) of the one app that calls the back end; when several apps do, the shared client is fe.package.api.client
     rules: [FE_TRANSPORT_OWNER]
   - id: fe.transport.outcome
     profiles: [fe]
@@ -1948,7 +1948,7 @@ slots:
     tier: transport
     outcomeHome: true
     tests: none
-    why: the one GraphQLResponse union ({success, message, error, data}) of a one-app repository; a shared union is fe.package.api.outcome
+    why: the one GraphQLResponse union ({success, message, error, data}) of the one app that calls the back end; when several apps do, the shared union is fe.package.api.outcome
     rules: [FE_HTTP_STATUS_COLLAPSE]
   - id: fe.modules.config
     profiles: [fe]

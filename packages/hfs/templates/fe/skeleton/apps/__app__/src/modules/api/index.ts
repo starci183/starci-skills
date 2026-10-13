@@ -1,1 +1,1 @@
-export type { GraphQLFailure, GraphQLResponse, GraphQLSuccess, OperationParams } from "./graphql"
+export type { GraphQLResponse } from "./graphql"

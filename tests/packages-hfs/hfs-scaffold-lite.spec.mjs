@@ -112,7 +112,6 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'fe/apps/web/src/components/composites/SiteShell/classNames.ts',
   'fe/apps/web/src/components/composites/SiteShell/index.tsx',
   'fe/apps/web/src/components/providers/AppProviders/index.tsx',
-  'fe/apps/web/src/components/providers/ThemeProvider/index.tsx',
   'fe/apps/web/src/features/layouts/AppLayout/index.tsx',
   'fe/apps/web/src/features/pages/AppErrorPage/component.tsx',
   'fe/apps/web/src/features/pages/AppErrorPage/index.tsx',
@@ -121,25 +120,12 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'fe/apps/web/src/features/pages/AppHomePage/index.tsx',
   'fe/apps/web/src/features/pages/AppLoadingPage/index.tsx',
   'fe/apps/web/src/features/pages/AppNotFoundPage/index.tsx',
+  'fe/apps/web/src/hooks/auth/index.ts', 'fe/apps/web/src/hooks/auth/useSession.ts',
+  'fe/apps/web/src/hooks/auth/useSignIn.ts', 'fe/apps/web/src/hooks/auth/useSignOut.ts',
   'fe/apps/web/src/hooks/effects/index.ts', 'fe/apps/web/src/hooks/effects/useAuthSessionEffect.ts',
   'fe/apps/web/src/hooks/swr/SwrSideEffects.tsx', 'fe/apps/web/src/hooks/swr/index.ts',
-  'fe/apps/web/src/modules/api/graphql/clients/clients/auth.ts',
-  'fe/apps/web/src/modules/api/graphql/clients/clients/index.ts',
-  'fe/apps/web/src/modules/api/graphql/clients/clients/no-auth.ts',
-  'fe/apps/web/src/modules/api/graphql/clients/index.ts',
-  'fe/apps/web/src/modules/api/graphql/clients/links/attach-access-token.ts',
-  'fe/apps/web/src/modules/api/graphql/clients/links/error.ts',
-  'fe/apps/web/src/modules/api/graphql/clients/links/http.ts',
-  'fe/apps/web/src/modules/api/graphql/clients/links/index.ts',
-  'fe/apps/web/src/modules/api/graphql/clients/links/locale.ts',
-  'fe/apps/web/src/modules/api/graphql/clients/links/options.ts',
-  'fe/apps/web/src/modules/api/graphql/clients/links/refresh-token.ts',
-  'fe/apps/web/src/modules/api/graphql/clients/links/retry.ts',
-  'fe/apps/web/src/modules/api/graphql/clients/links/timeout.ts',
-  'fe/apps/web/src/modules/api/graphql/clients/response.ts',
   'fe/apps/web/src/modules/api/graphql/index.ts', 'fe/apps/web/src/modules/api/graphql/types.ts',
   'fe/apps/web/src/modules/api/index.ts',
-  'fe/apps/web/src/modules/api/rest/client/axios.ts', 'fe/apps/web/src/modules/api/rest/index.ts',
   'fe/apps/web/src/modules/auth/client.ts', 'fe/apps/web/src/modules/auth/contracts.ts',
   'fe/apps/web/src/modules/auth/index.ts',
   'fe/apps/web/src/modules/brand/brand.css', 'fe/apps/web/src/modules/brand/index.ts',
@@ -231,9 +217,11 @@ test('lite scaffold emits the design 8.5 tree and is structurally clean', async 
   assert.match(baselineSql, /create function private\.set_updated_at\(\)[\s\S]*returns trigger[\s\S]*language plpgsql[\s\S]*set search_path = ''/);
   assert.doesNotMatch(baselineSql, /security definer/);
   assert.match(baselineSql, /create trigger profiles_set_updated_at[\s\S]*before update on public\.profiles[\s\S]*execute function private\.set_updated_at\(\)/);
-  assert.match(baselineSql, /revoke all on table public\.profiles from public, anon/);
-  assert.match(baselineSql, /grant update \(display_name\) on table public\.profiles to authenticated/);
-  assert.doesNotMatch(baselineSql, /grant select, insert, update on table public\.profiles to authenticated/);
+  // The back end is the only reader and writer of a table (owner ruling 2026-10-13): app_be holds the grants, authenticated none.
+  assert.match(baselineSql, /revoke all on table public\.profiles from public, anon, authenticated/);
+  assert.match(baselineSql, /grant select, insert on table public\.profiles to app_be/);
+  assert.match(baselineSql, /grant update \(display_name\) on table public\.profiles to app_be/);
+  assert.doesNotMatch(baselineSql, /\bto authenticated\b/);
   assert.equal(fs.existsSync(path.join(root, ...'be/src/modules/platform/database/migration-runner.service.ts'.split('/'))), false);
   assert.equal(fs.existsSync(path.join(root, ...'be/src/modules/platform/database/seed-runner.service.ts'.split('/'))), false);
   assert.equal(fs.existsSync(path.join(root, ...'be/src/modules/platform/database/database.sql.ts'.split('/'))), false);

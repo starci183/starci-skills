@@ -150,8 +150,6 @@ test("add table --fe writes one policy-complete migration, the GraphQL api featu
     "be/src/features/api/orders/transport/graphql/orders-graphql.module.ts",
     "be/src/modules/platform/graphql/graphql-depth.policy.spec.ts",
     "be/src/modules/platform/graphql/graphql-depth.policy.ts",
-    "be/src/modules/platform/graphql/graphql-error.mapper.spec.ts",
-    "be/src/modules/platform/graphql/graphql-error.mapper.ts",
     "be/src/modules/platform/graphql/graphql.contracts.ts",
     "be/src/modules/platform/graphql/graphql.module-definition.ts",
     "be/src/modules/platform/graphql/graphql.module.ts",
@@ -159,6 +157,22 @@ test("add table --fe writes one policy-complete migration, the GraphQL api featu
     "be/src/modules/platform/graphql/index.ts",
     "be/src/modules/platform/graphql/localize-errors.mapper.spec.ts",
     "be/src/modules/platform/graphql/localize-errors.mapper.ts",
+    "be/src/modules/platform/errors/graphql-error.mapper.spec.ts",
+    "be/src/modules/platform/errors/graphql-error.mapper.ts",
+    "fe/apps/web/src/modules/api/graphql/clients/clients/auth.ts",
+    "fe/apps/web/src/modules/api/graphql/clients/clients/index.ts",
+    "fe/apps/web/src/modules/api/graphql/clients/clients/no-auth.ts",
+    "fe/apps/web/src/modules/api/graphql/clients/index.ts",
+    "fe/apps/web/src/modules/api/graphql/clients/links/attach-access-token.ts",
+    "fe/apps/web/src/modules/api/graphql/clients/links/error.ts",
+    "fe/apps/web/src/modules/api/graphql/clients/links/http.ts",
+    "fe/apps/web/src/modules/api/graphql/clients/links/index.ts",
+    "fe/apps/web/src/modules/api/graphql/clients/links/locale.ts",
+    "fe/apps/web/src/modules/api/graphql/clients/links/options.ts",
+    "fe/apps/web/src/modules/api/graphql/clients/links/refresh-token.ts",
+    "fe/apps/web/src/modules/api/graphql/clients/links/retry.ts",
+    "fe/apps/web/src/modules/api/graphql/clients/links/timeout.ts",
+    "fe/apps/web/src/modules/api/graphql/clients/response.ts",
     "fe/apps/web/src/modules/api/graphql/queries/query-order.ts",
     "fe/apps/web/src/modules/api/graphql/queries/types/order.ts",
     "fe/apps/web/src/modules/api/graphql/mutations/mutation-create-order.ts",
@@ -183,7 +197,8 @@ test("add table --fe writes one policy-complete migration, the GraphQL api featu
   assert.match(read(root, "fe/apps/web/src/hooks/swr/api/graphql/queries/useQueryOrderSwr.ts"), /\[QUERY_ORDER_SWR_KEY, id\]/);
   assert.match(read(root, "fe/apps/web/src/hooks/swr/api/graphql/mutations/useMutateCreateOrderSwr.ts"), /useSWRMutation\(MUTATE_CREATE_ORDER_SWR_KEY/);
   assert.match(read(root, "fe/apps/web/src/hooks/swr/api/graphql/queries/index.ts"), /export \{ QUERY_ORDER_SWR_KEY, useQueryOrderSwr \}/);
-  assert.match(read(root, "fe/apps/web/src/hooks/swr/index.ts"), /export \* from "\.\/api"/);
+  // the owner's public entry names its hooks (ARCH_OWNER_EXPORT_STAR); only the inner barrels re-export whole
+  assert.match(read(root, "fe/apps/web/src/hooks/swr/index.ts"), /export \{ QUERY_ORDER_SWR_KEY, useQueryOrderSwr \} from "\.\/api"/);
   assert.match(read(root, "be/src/features/api/orders/transport/graphql/get-order.resolver.ts"), /@Query\(\(\) => GetOrderType, \{ name: "order" \}\)/);
   assert.match(read(root, "be/src/features/api/orders/transport/graphql/create-order.resolver.ts"), /@Mutation\(\(\) => CreateOrderType, \{ name: "createOrder" \}\)/);
   assert.match(read(root, "be/src/modules/domain/orders/orders.service.ts"), /createOrder\(principalId: string\)/);
@@ -299,7 +314,7 @@ test("add app adds a second front end in lite and in full (owner ruling 2026-10-
     `${JSON.stringify({ name: "@demo/web", private: true, scripts: { build: "next build" }, dependencies: { next: "16.0.0" } }, null, 2)}\n`,
   );
   const lite = addApp({ root, name: "admin" });
-  assert.ok(lite.created.includes("fe/apps/admin/src/modules/api/graphql/clients/clients/auth.ts"));
+  assert.ok(lite.created.includes("fe/apps/admin/src/modules/api/graphql/types.ts"));
   assert.match(read(root, "fe/apps/admin/src/modules/auth/client.ts"), /flowType: "pkce"/);
   assert.equal(lite.created.some((file) => file.includes("/modules/db/")), false);
   assert.deepEqual(JSON.parse(read(root, "hfs.json")).sides.fe.apps, [

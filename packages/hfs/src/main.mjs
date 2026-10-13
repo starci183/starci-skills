@@ -309,7 +309,7 @@ export async function main(argv, {
       const [name, ...extra] = opts.positional;
       if (!name || extra.length) throw new Error('starci app scaffold takes `<name> [--into <dir>] [--edition full|lite]`');
       const edition = global.edition ?? 'full';
-      const { root: created, files } = scaffoldApp({ name, into: path.resolve(global.cwd, opts.into ?? '.'), edition, presets: presets ?? (edition === 'lite' ? undefined : await scaffoldPresets()), ...(lock ? { lock } : {}) });
+      const { root: created, files } = scaffoldApp({ name, into: path.resolve(global.cwd, opts.into ?? '.'), edition, presets: presets ?? await scaffoldPresets(), ...(lock ? { lock } : {}) });
       out(`starci app scaffold: created ${created} (${files.length} files); next: npm ci, then starci app lint\n`);
       return 0;
     }

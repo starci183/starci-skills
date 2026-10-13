@@ -1,16 +1,17 @@
 import { Heading } from "@starci/grammar/common"
-import type { ReactNode } from "react"
+import { SignInForm } from "@/components/blocks/SignInForm"
+import { SignOutButton } from "@/components/blocks/SignOutButton"
 
-/** Props for the home page: its title and the session surface the entry composes. */
+/** Props for the home page: its title. */
 export type AppHomePageBaseProps = {
     readonly props: { readonly title: string }
-    readonly session: ReactNode
 }
 
-/** Draws the front door. */
+/** Draws the front door: the sign-in form for a signed-out reader, the reader and sign-out once signed in. */
 export const AppHomePageBase = (props: AppHomePageBaseProps) => (
     <>
         <Heading level={1}>{props.props.title}</Heading>
-        {props.session}
+        <SignInForm />
+        <SignOutButton />
     </>
 )

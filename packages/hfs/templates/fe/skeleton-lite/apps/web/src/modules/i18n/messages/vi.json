@@ -20,10 +20,7 @@
     "signOut": {
       "signedIn": "Signed in",
       "submit": "Sign out",
-      "working": "Signing out",
-      "refused": "The session has already ended.",
-      "invalid": "The session could not be ended.",
-      "unavailable": "Sign-out is unavailable. Try again shortly."
+      "working": "Signing out"
     },
     "toast": {
       "successTitle": "Done",

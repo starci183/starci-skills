@@ -1,7 +1,7 @@
-import type { AuthClient, AuthOutcome } from "./contracts"
+import type { AuthClient, AuthFailure } from "./contracts"
 
-/** The answer of every call until the app wires its identity provider. */
-const NOT_CONFIGURED: AuthOutcome = { kind: "unavailable", code: "AUTH_PROVIDER_NOT_CONFIGURED" }
+/** The failure of every sign-in until the app wires its identity provider. */
+const NOT_CONFIGURED: AuthFailure = { code: "AUTH_PROVIDER_NOT_CONFIGURED", kind: "unavailable", message: "" }
 
 /**
  * The identity-provider client of a full app: a stub with the interface every edition shares, answering "no session" until
@@ -13,7 +13,7 @@ export const authClient: AuthClient = {
     accessToken: () => Promise.resolve(undefined),
     refreshAccessToken: () => Promise.resolve(undefined),
     signInWithPassword: () => Promise.resolve(NOT_CONFIGURED),
-    signOut: () => Promise.resolve({ kind: "ok" }),
+    signOut: () => Promise.resolve(undefined),
     onChange: (listener) => {
         listener(undefined)
         return () => undefined

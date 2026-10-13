@@ -62,9 +62,8 @@ test("addApp adds a second lite front end with the lite app skeleton and the sha
   for (const relative of [
     "fe/apps/admin/src/app/[locale]/layout.tsx",
     "fe/apps/admin/src/app/health/live/route.ts",
-    "fe/apps/admin/src/modules/api/graphql/clients/clients/auth.ts",
     "fe/apps/admin/src/modules/api/graphql/types.ts",
-    "fe/apps/admin/src/modules/api/rest/client/axios.ts",
+    "fe/apps/admin/src/hooks/auth/useSignIn.ts",
     "fe/apps/admin/src/modules/auth/client.ts",
     "fe/apps/admin/src/modules/toast/hooks.ts",
     "fe/apps/admin/src/redux/store.ts",
@@ -108,7 +107,7 @@ test("addApp keeps the full-edition scaffold and registration behavior", () => {
   const workspace = JSON.parse(read(root, "fe/apps/admin/package.json"));
   assert.equal(workspace.name, "@demo/admin");
   assert.deepEqual(workspace.dependencies, { next: "16.0.0", react: "19.2.0" });
-  assert.ok(result.created.includes("fe/apps/admin/src/modules/api/graphql/clients/clients/auth.ts"), "the shared app core");
+  assert.ok(result.created.includes("fe/apps/admin/src/modules/api/graphql/types.ts"), "the shared app core");
   assert.doesNotMatch(read(root, "fe/apps/admin/src/modules/auth/client.ts"), /@supabase/, "full keeps the IdP stub");
   assert.doesNotMatch(read(root, "fe/apps/admin/src/features/layouts/AppLayout/index.tsx"), /\{\{> /, "partials are rendered");
 });

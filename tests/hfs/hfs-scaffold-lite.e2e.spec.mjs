@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
 import { supabasePortVars } from '../../packages/hfs/scaffold/supabase-ports.mjs';
@@ -27,6 +28,8 @@ const listFiles = (dir, base = dir) => fs.readdirSync(dir, { withFileTypes: true
 const gitStatus = cwd => execFileSync('git', ['status', '--porcelain=v1'], { cwd, encoding: 'utf8' });
 
 const APP_NAME = 'litedemo';
+/** What sync loads from the installed @starci/jest-preset (both editions install it): the Sonar exclusions the app's lint renders too. */
+const PRESETS = { sonarExclusions: createRequire(import.meta.url)('../../packages/jest-preset/index.cjs').sonarExclusions() };
 
 /** The one prerequisite that may skip: Docker answering. A busy port never skips; it fails (below). */
 const dockerProbe = spawnSync('docker', ['info'], { encoding: 'utf8', windowsHide: true, timeout: 60_000 });
@@ -47,13 +50,14 @@ const holderOf = (port) => {
 };
 
 test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, type drift and full-upgrade view', { skip: skipReason, timeout: 1_800_000 }, async (t) => {
-  // The installed SQL parser extracts one Bun-built native binding at the isolated temp root. It is process infrastructure,
-  // not an app fixture, but this spec owns the installed command that creates it and therefore removes it before the leak guard.
+  // The installed SQL parser extracts one Bun-built native binding at the isolated temp root, and the app's `npm test` leaves jest's
+  // default cache (`<temp>/jest`) there. Both are process infrastructure, not app fixtures, but this spec owns the installed commands
+  // that create them and therefore removes them before the leak guard.
   t.after(() => {
     const isolated = process.env.STARCI_TEST_TEMP_DIR;
     if (!isolated || !fs.existsSync(isolated)) return;
-    for (const entry of fs.readdirSync(isolated).filter(name => /^\.bun-[\w-]+\.node$/u.test(name))) {
-      fs.rmSync(path.join(isolated, entry), { force: true });
+    for (const entry of fs.readdirSync(isolated).filter(name => /^\.bun-[\w-]+\.node$/u.test(name) || name === 'jest')) {
+      fs.rmSync(path.join(isolated, entry), { recursive: true, force: true });
     }
   });
   // The scaffold writes its own port block into supabase/config.toml (one block per project name), so the stack runs beside any other.
@@ -77,7 +81,7 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
   const registry = await startSourceCanonRegistry();
   t.after(() => registry.close());
 
-  const scaffolded = scaffoldApp({ name: APP_NAME, into, edition: 'lite', lock: registry.lock });
+  const scaffolded = scaffoldApp({ name: APP_NAME, into, edition: 'lite', presets: PRESETS, lock: registry.lock });
   assert.equal(scaffolded.root, app, 'the lite scaffold wrote the app');
 
   // Owner ruling 2026-10-12: lite keeps the back end's unit specs and runs no e2e, contract or browser world; the front end has
@@ -186,7 +190,8 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
 
   // Take the product CLI prefix from the managed lite script, so the proof follows the one template-owned binary spelling.
   const rootManifest = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8'));
-  const lintCommand = rootManifest.scripts.lint.trim().split(/\s+/);
+  // The lint script runs codegen first (`npm run codegen --silent && starci app lint`): the CLI is its last command.
+  const lintCommand = rootManifest.scripts.lint.split('&&').pop().trim().split(/\s+/);
   assert.equal(lintCommand.pop(), 'lint', 'the managed lint script names the app lint verb');
   const runAppCli = (args, timeout = 600_000) => runNpx([...lintCommand, ...args], {
     cwd: app, timeout, maxBuffer: 64 * 1024 * 1024,

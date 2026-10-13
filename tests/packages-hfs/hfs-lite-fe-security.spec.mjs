@@ -46,11 +46,12 @@ function loadAuthClient() {
 
 test("the lite auth client reaches only the Supabase auth API, never data, rpc, storage or realtime", async () => {
     const { authClient, touched, options } = loadAuthClient()
-    assert.deepEqual(await authClient.session(), { userId: "u1", email: "a@example.com" })
+    // the client runs in its own vm realm: its objects are compared by their own enumerable properties
+    assert.deepEqual({ ...(await authClient.session()) }, { userId: "u1", email: "a@example.com" })
     assert.equal(await authClient.accessToken(), "token")
     assert.equal(await authClient.refreshAccessToken(), "fresh")
-    assert.deepEqual(await authClient.signInWithPassword("a@example.com", "password"), { kind: "ok" })
-    assert.deepEqual(await authClient.signOut(), { kind: "ok" })
+    assert.equal(await authClient.signInWithPassword("a@example.com", "password"), undefined, "a sign-in that succeeded has no failure")
+    assert.equal(await authClient.signOut(), undefined)
     const stop = authClient.onChange(() => undefined)
     stop()
     assert.ok(touched.length > 0, "the client was used")

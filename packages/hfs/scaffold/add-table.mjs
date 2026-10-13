@@ -7,7 +7,8 @@ import {
 } from "../runtime/scripts/hfs/slots.mjs";
 import { render, TEMPLATES_DIR } from "../sync/index.mjs";
 import { ScaffoldError, pascalOf } from "./service.mjs";
-import { registerLiteDomainService, registerLiteExports, registrationFiles } from "./lite-exports.mjs";
+import { filesBelow, registerLiteDomainService, registerLiteExports, registrationFiles } from "./lite-exports.mjs";
+import { byCodeUnit } from "../report/order.mjs";
 import { coreFeApps } from "./app.mjs";
 
 const NAME = /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$/;
@@ -227,6 +228,32 @@ export const graphqlPlatformFiles = () =>
     }));
   });
 
+/**
+ * The fe GraphQL transport of one product app (templates/fe/transport/graphql/clients): the auth and no-auth Apollo clients,
+ * their link chain and the GraphQLResponse mapping, whole or absent, written once by the first GraphQL operation of the app,
+ * as platform/graphql is on the back end. A new app has no operation, so it carries no client.
+ */
+const feTransportFiles = (app) => {
+  const dir = path.join(TEMPLATES_DIR, "fe", "transport", "graphql", "clients");
+  return filesBelow(dir)
+    .map((file) => path.relative(dir, file).split(path.sep).join("/"))
+    .sort(byCodeUnit)
+    .map((rel) => ({
+      relative: `fe/apps/${app}/src/modules/api/graphql/clients/${rel}`,
+      body: fs.readFileSync(path.join(dir, ...rel.split("/")), "utf8").replace(/\r\n/g, "\n"),
+    }));
+};
+
+/** The env reader the transport's http link calls (modules/config, the app's one process.env reader), added with the transport. */
+const GRAPHQL_URL_READER = [
+  "/** The back end's GraphQL endpoint, the terminal link of modules/api; throws when `NEXT_PUBLIC_GRAPHQL_URL` is not set. */",
+  'export const graphqlUrl = (): string => required("NEXT_PUBLIC_GRAPHQL_URL", process.env.NEXT_PUBLIC_GRAPHQL_URL)',
+].join("\n");
+
+/** An app's modules/config text with graphqlUrl appended once. */
+const withGraphqlUrl = (text) =>
+  /^export const graphqlUrl\b/m.test(text) ? text : `${text.replace(/\s*$/, "")}\n${GRAPHQL_URL_READER}\n`;
+
 /** The be api feature of a table (owner ruling 2026-10-13, lite = full): get-<singular> and create-<singular> over GraphQL. */
 const apiFeatureFiles = (values) => {
   const base = `be/src/features/api/${values.name}`;
@@ -387,7 +414,10 @@ export function addTable({
   if (fe) {
     planned.push(...apiFeatureFiles(values));
     if (!fs.existsSync(at(root, `${GRAPHQL_PLATFORM}/index.ts`))) planned.push(...graphqlPlatformFiles());
-    for (const app of apps) planned.push(...feOperationFiles(app.name, values));
+    for (const app of apps) {
+      if (!fs.existsSync(at(root, `fe/apps/${app.name}/src/modules/api/graphql/clients/index.ts`))) planned.push(...feTransportFiles(app.name));
+      planned.push(...feOperationFiles(app.name, values));
+    }
   }
 
   const clash = planned
@@ -438,8 +468,10 @@ export function addTable({
     if (fe) {
       registerLiteDomainService({ root, moduleSpecifier: `@modules/domain/${feature}`, service: `${values.Name}Service` });
       edit(ownerRelative, (text) => wireGraphqlFeature(text, ownerRelative, feature));
-      for (const app of apps)
+      for (const app of apps) {
         for (const [relative, line] of feBarrels(app.name, values)) edit(relative, (text) => withExport(text, line));
+        edit(`fe/apps/${app.name}/src/modules/config/index.ts`, withGraphqlUrl);
+      }
     }
   } catch (error) {
     for (const [file, before] of touched) {

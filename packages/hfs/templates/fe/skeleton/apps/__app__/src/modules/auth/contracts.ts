@@ -4,20 +4,24 @@ export interface AuthSession {
     readonly email?: string
 }
 
-/** The answer of a sign-in or sign-out: done, or why not (`refused` credentials, `invalid` input, provider `unavailable`). */
-export type AuthOutcome =
-    { readonly kind: "ok" } | { readonly kind: "refused" | "invalid" | "unavailable"; readonly code: string }
+/** Why a sign-in or sign-out failed: the provider's code, its kind (`refused`, `invalid`, `unavailable`) and its message. */
+export interface AuthFailure {
+    readonly code: string
+    readonly kind: string
+    readonly message: string
+}
 
 /**
  * The identity-provider client of the app, the same interface in every edition: the session, the access token the Apollo
- * link attaches, one forced refresh for the UNAUTHENTICATED replay, the sign-in and sign-out calls and a change listener.
+ * link attaches, one forced refresh for the UNAUTHENTICATED replay, the sign-in and sign-out calls (each answers its failure,
+ * or undefined when it succeeded) and a change listener that reports the current session on subscribe, then every change.
  * It never reads or writes application data; data goes through modules/api.
  */
 export interface AuthClient {
     session(): Promise<AuthSession | undefined>
     accessToken(): Promise<string | undefined>
     refreshAccessToken(): Promise<string | undefined>
-    signInWithPassword(email: string, password: string): Promise<AuthOutcome>
-    signOut(): Promise<AuthOutcome>
+    signInWithPassword(email: string, password: string): Promise<AuthFailure | undefined>
+    signOut(): Promise<AuthFailure | undefined>
     onChange(listener: (session: AuthSession | undefined) => void): () => void
 }

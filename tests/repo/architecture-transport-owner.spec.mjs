@@ -121,10 +121,19 @@ test('a package client folder next to an app client folder is FE_TRANSPORT_OWNER
   assert.deepEqual(hits(report).map(item => item.path).sort(), ['apps/web/src/modules/api/graphql/clients/index.ts', `${PKG}/src/graphql/clients/index.ts`]);
 });
 
-test('two apps that keep one app client folder, with no package, are FE_TRANSPORT_OWNER: the shared client belongs to the package', t => {
-  const report = runShape(t, { 'apps/web/src/modules/api/graphql/clients/index.ts': CLIENT });
+test('two apps that both call the back end, one app client folder and no package, are FE_TRANSPORT_OWNER: the shared client belongs to the package', t => {
+  const report = runShape(t, { 'apps/web/src/modules/api/graphql/clients/index.ts': CLIENT, 'apps/admin/src/modules/api/index.ts': 'export type Course = { readonly id: string };\n' });
   assert.deepEqual(hits(report).map(item => item.path), ['apps/web/src/modules/api/graphql/clients/index.ts']);
-  assert.match(messages(report)[0], /repository of 2 apps/);
+  assert.match(messages(report)[0], /repository of 2 apps that call the back end \(web, admin\)/);
+});
+
+test('an app client folder and union beside an app that calls no back end (a marketing landing) raise no FE_TRANSPORT_OWNER', t => {
+  const report = runShape(t, {
+    'apps/web/src/modules/api/graphql/clients/index.ts': CLIENT,
+    'apps/web/src/modules/api/graphql/types.ts': OUTCOME,
+    'apps/admin/src/hooks/course/useNothing.ts': 'export const useNothing = () => 1;\n',
+  });
+  assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
 });
 
 test('two GraphQLResponse unions (a package one and an app one), or an app one in a two-app repository, are FE_TRANSPORT_OWNER', t => {

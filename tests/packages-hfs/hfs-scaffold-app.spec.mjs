@@ -343,7 +343,10 @@ test('a scaffolded app imports the be lcov into Sonar and Codecov with exactly t
     }
   }
   assert.equal(landing.dependencies['@apollo/client'], undefined, 'the landing carries no transport');
-  assert.ok(files.includes('fe/apps/app/src/modules/api/graphql/clients/clients/auth.ts') && !files.some((file) => file.startsWith('fe/apps/landing/src/modules/api/')), 'one transport client folder: the product app');
+  // The product app carries the one outcome union; the Apollo clients arrive with its first GraphQL operation (add table --fe), as
+  // platform/graphql does on the back end, so a fresh scaffold holds no transport nobody calls. The landing carries neither.
+  assert.ok(files.includes('fe/apps/app/src/modules/api/graphql/types.ts') && !files.some((file) => file.startsWith('fe/apps/landing/src/modules/api/')), 'one outcome union: the product app');
+  assert.ok(!files.some((file) => file.includes('/modules/api/graphql/clients/') || file.includes('/modules/api/rest/')), 'no transport client before the first operation');
   assert.equal(manifest.scripts['codegen:graphql'], 'node scripts/codegen.mjs --graphql');
   assertCoverageContract(root);
   // The be unit run is the preset's: it writes lcov into be/coverage, the path both imports read.
@@ -445,7 +448,10 @@ test('starci app scaffold writes the app shape and starci app lint finds nothing
   for (const [file, specifier] of Object.entries(unresolvable)) {
     assert.ok(broken.some((line) => line.replace(/\\/g, '/').includes(file) && line.includes('TS2307') && line.includes(specifier)), `${file}: the unresolvable ${specifier} is reported (${broken.join(' | ')})`);
     if (file.startsWith('fe/')) {
-      assert.ok(broken.some((line) => line.replace(/\\/g, '/').includes(file) && line.includes('TS2882') && line.includes(missingSideEffect)), `${file}: a missing non-CSS side-effect import is reported (${broken.join(' | ')})`);
+      // noUncheckedSideEffectImports (the @starci/tsconfig next preset) is what reports it: without it a side-effect import is never
+      // resolved. The pinned TypeScript 5.9 reports it as TS2307 on the side-effect line; TypeScript 6 gives it its own code, TS2882.
+      const sideEffectLine = new RegExp(`\\(1,\\d+\\): error TS(?:2307|2882): .*'${missingSideEffect}'`);
+      assert.ok(broken.some((line) => line.replace(/\\/g, '/').includes(file) && sideEffectLine.test(line)), `${file}: a missing non-CSS side-effect import is reported (${broken.join(' | ')})`);
     }
     fs.writeFileSync(path.join(app, ...file.split('/')), originals[file]);
   }

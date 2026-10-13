@@ -1,9 +1,9 @@
 "use client"
 
 import { ToastProvider } from "@heroui/react"
+import { ThemeProvider } from "next-themes"
 import type { ReactNode } from "react"
 import { SWRConfig } from "swr"
-import { ThemeProvider } from "@/components/providers/ThemeProvider"
 import { useAuthSessionEffect } from "@/hooks/effects"
 import { SwrSideEffects } from "@/hooks/swr"
 import { ReduxProvider } from "@/redux"
@@ -31,11 +31,12 @@ const AuthSessionEffect = () => {
 }
 
 /**
- * The client providers the locale layout mounts once, outer to inner: the theme, the redux store, the SWR defaults (inline),
- * the app-wide effects and the HeroUI toast region modules/toast writes to.
+ * The one client provider stack the locale layout mounts, outer to inner: the theme (light and dark through the `.light` /
+ * `.dark` class the grammar and the brand layer read, the system theme by default), the redux store, the SWR defaults, the
+ * app-wide effects and the HeroUI toast region modules/toast writes to. Each part is composed here, in its one owner.
  */
 export const AppProviders = (props: AppProvidersProps) => (
-    <ThemeProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
         <ReduxProvider>
             <SWRConfig value={SWR_DEFAULTS}>
                 <AuthSessionEffect />

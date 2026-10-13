@@ -20,5 +20,7 @@ export const sessionSlice = createSlice({
     },
 })
 
+/** The one action of the session slice: modules/auth reported a session (or none). */
 export const { sessionChanged } = sessionSlice.actions
+/** The reducer the store mounts under `session`. */
 export const sessionReducer = sessionSlice.reducer

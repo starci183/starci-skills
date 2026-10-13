@@ -6,7 +6,6 @@ export interface SignOutButtonBaseProps {
         readonly principal: string
         readonly label: string
         readonly pending: boolean
-        readonly failure?: string
     }
     readonly on: { readonly press: () => void }
 }
@@ -18,6 +17,5 @@ export const SignOutButtonBase = (props: SignOutButtonBaseProps) => (
         <Button variant="secondary" isPending={props.props.pending} onPress={props.on.press}>
             {props.props.label}
         </Button>
-        {props.props.failure === undefined ? null : <Text live="assertive">{props.props.failure}</Text>}
     </>
 )

@@ -208,6 +208,13 @@ test("addTable --fe writes the GraphQL feature, the fe operation files and SWR h
   for (const relative of result.created.filter((file) => file.startsWith("fe/")))
     assert.doesNotMatch(read(root, relative), /use server|@supabase|server-only/, `${relative} reaches data only through GraphQL`);
   assert.equal(result.created.some((file) => file.includes("/modules/db/")), false);
+  // The first GraphQL operation brings the app's Apollo clients and the env reader their http link calls; a second one reuses them.
+  for (const relative of ["fe/apps/web/src/modules/api/graphql/clients/clients/auth.ts", "fe/apps/web/src/modules/api/graphql/clients/links/http.ts"])
+    assert.ok(result.created.includes(relative), relative);
+  assert.match(read(root, "fe/apps/web/src/modules/config/index.ts"), /^export const graphqlUrl = /m);
+  const second = addTable({ root, name: "audit-notes", fe: true, emitTypes: false, now: () => at + 1000 });
+  assert.equal(second.created.some((file) => file.includes("/graphql/clients/")), false, "the clients are written once");
+  assert.equal(read(root, "fe/apps/web/src/modules/config/index.ts").match(/export const graphqlUrl/g).length, 1);
 });
 
 test("addTable --fe writes the fe operations into every product app, never into the marketing landing", () => {

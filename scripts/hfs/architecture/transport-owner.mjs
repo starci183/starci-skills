@@ -6,13 +6,14 @@ import { machineKit } from './machine-ast.mjs';
  * the spelling of a call; the machine judges the repository by what the checker resolves. The browser calls the back end through
  * Apollo GraphQL and axios (owner ruling 2026-10-13, both editions). A repository has exactly ONE transport client folder (the auth
  * and no-auth Apollo clients with their link chain) and ONE GraphQLResponse union, both named by slot (never by a path spelled here):
- * the api package's (`fe.package.api.client`, `fe.package.api.outcome`) when the repository shares it, or the only app's
- * (`fe.transport.client`, `fe.transport.outcome`) when the repository declares exactly one app. The union homes are the slots the
- * manifest marks `outcomeHome`, not a list kept here.
+ * the api package's (`fe.package.api.client`, `fe.package.api.outcome`) when several apps call the back end, or the app's own
+ * (`fe.transport.client`, `fe.transport.outcome`) when exactly one app does. An app calls the back end when it holds a file of the
+ * api owner (modules/api, its client and union) or imports the api package; an app that holds neither (a marketing landing) shares
+ * no transport and is not counted. The union homes are the slots the manifest marks `outcomeHome`, not a list kept here.
  *
  *   - two or more client folders, or two or more unions, in the repository (two apps each keeping one, or a package one plus an
  *     app one) are findings on every copy;
- *   - an app client or app union in a repository that declares more than one app is a finding (it belongs to the package);
+ *   - an app client or app union in a repository where more than one app calls the back end is a finding (it belongs to the package);
  *   - no file outside the client folder references the global `fetch`: a call, `globalThis.fetch`, `window.fetch`, or a
  *     reference passed as a value (`useSWR(key, fetch)`, `const send = fetch`), all of which a spelling-based rule misses; with no
  *     client at all every such reference is a finding that says the repository has no client;
@@ -66,14 +67,14 @@ function isGlobalFetch(ts, kit, checker, node) {
   return declarations.every(declaration => declaration.getSourceFile().isDeclarationFile);
 }
 
-/** Findings on every copy when there are several, and on an app's own copy in a repository of several apps. */
-function reportMultiplicity(items, noun, nextApps, report) {
+/** Findings on every copy when there are several, and on an app's own copy in a repository where several apps call the back end. */
+function reportMultiplicity(items, noun, callingApps, report) {
   const list = items.map(item => item.root).join(', ');
   for (const item of items) {
     if (items.length > 1) {
       report(item, item.sourceFile, `The repository has ${items.length} ${noun}s (${list}); it has exactly one: the api package's (packages/<family>-api/src/graphql/) when the apps share it, or the only app's. Keep one and delete the others.`);
-    } else if ((item.slot === APP_CLIENT_SLOT || item.slot === APP_OUTCOME_SLOT) && nextApps.length > 1) {
-      report(item, item.sourceFile, `${item.root} is an app's ${noun} in a repository of ${nextApps.length} apps; a repository with several apps keeps its one ${noun} in the api package (packages/<family>-api/src/graphql/).`);
+    } else if ((item.slot === APP_CLIENT_SLOT || item.slot === APP_OUTCOME_SLOT) && callingApps.length > 1) {
+      report(item, item.sourceFile, `${item.root} is an app's ${noun} in a repository of ${callingApps.length} apps that call the back end (${callingApps.join(', ')}); a repository where several apps call the back end keeps its one ${noun} in the api package (packages/<family>-api/src/graphql/).`);
     }
   }
 }
@@ -145,6 +146,20 @@ function inspectTransportFiles({ files, graph, kit, ts, clientRels, transport, o
   return { appsWithFiles, operations };
 }
 
+/**
+ * The declared Next apps that call the back end: those holding a file of an api owner slot (modules/api, the app client, the app
+ * union) or importing a file of the api package. An app with neither shares no transport.
+ */
+function transportApps(nextApps, files, graph) {
+  const byRel = new Map(files.map(file => [file.rel, file]));
+  const calling = new Set(files.filter(file => API_OWNER_SLOTS.has(file.slot) && file.slot !== PACKAGE_API_SLOT).map(file => file.bindings?.app));
+  for (const edge of graph.edges) {
+    const app = byRel.get(edge.from)?.bindings?.app;
+    if (app && (byRel.get(edge.to)?.slot ?? '').startsWith(PACKAGE_API_SLOT)) calling.add(app);
+  }
+  return nextApps.map(item => item.name).filter(name => calling.has(name));
+}
+
 /** One instance per client folder (its slot root), carried by the folder's first file. */
 function clientInstances(clients) {
   const byRoot = new Map();
@@ -171,8 +186,9 @@ export function checkTransportOwner(input) {
   const owned = instances.length ? `the repository has one transport (${transport}). Call the back end through a modules/api operation and take its GraphQLResponse.` : NO_CLIENT;
 
   // Exactly one client folder and one GraphQLResponse union per repository.
-  reportMultiplicity(instances, 'transport client', nextApps, report);
-  reportMultiplicity(outcomes, 'GraphQLResponse union', nextApps, report);
+  const calling = transportApps(nextApps, files, graph);
+  reportMultiplicity(instances, 'transport client', calling, report);
+  reportMultiplicity(outcomes, 'GraphQLResponse union', calling, report);
 
   const { appsWithFiles, operations } = inspectTransportFiles({ files, graph, kit, ts, clientRels, transport, owned, report });
   return { violations, coverage: { status: 'checked', apps: appsWithFiles.size, operations, clients: instances.length, outcomes: outcomes.length } };

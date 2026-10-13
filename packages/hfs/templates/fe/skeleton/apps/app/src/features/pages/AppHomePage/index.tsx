@@ -8,7 +8,7 @@ export const appHomeMetadata = async (): Promise<Metadata> => {
     return { title: t("title") }
 }
 
-/** The first page of the product app: a server component, so no catalog is shipped for it. */
+/** The first page of the product app: a server component; the session surface it draws runs on the client. */
 export const AppHomePage = async () => {
     const t = await getTranslations("app.home")
     return <AppHomePageBase props={{ title: t("title") }} />
