@@ -1,7 +1,0 @@
-query Account {
-    account {
-        personId
-        email
-        hasOrders
-    }
-}

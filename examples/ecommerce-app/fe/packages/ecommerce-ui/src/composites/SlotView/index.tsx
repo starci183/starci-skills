@@ -1,9 +1,13 @@
 import type { ReactNode } from "react"
 import { StateBlock } from "../../leaves/StateBlock"
+import { LoadingNotice } from "../LoadingNotice"
 
-/** Settled data status of one server read, separate from the page's drawn shape. */
+/** Data status of one read - still loading, or settled - separate from the page's drawn shape. */
 export type Slot<T> =
-    { readonly status: "error" } | { readonly status: "empty" } | { readonly status: "ready"; readonly items: T }
+    | { readonly status: "loading" }
+    | { readonly status: "error" }
+    | { readonly status: "empty" }
+    | { readonly status: "ready"; readonly items: T }
 
 /** Fold a successful collection or a failed read into one settled slot. */
 export const collectionSlot = <T,>(items: ReadonlyArray<T> | null): Slot<ReadonlyArray<T>> => {
@@ -12,8 +16,9 @@ export const collectionSlot = <T,>(items: ReadonlyArray<T> | null): Slot<Readonl
     return { status: "ready", items }
 }
 
-/** The words a settled data slot says when it is empty and when its read failed. */
+/** The words a data slot says while its read is loading, when it is empty and when its read failed. */
 export type SlotLabels = {
+    readonly loadingLabel: string
     readonly emptyTitle: string
     readonly emptyDescription: string
     readonly errorTitle: string
@@ -32,6 +37,7 @@ export type SlotViewProps<T> = {
 /** Shared data status recipe; each page supplies only its ready tree and resolved copy. */
 export const SlotView = <T,>(props: SlotViewProps<T>) => {
     const { slot, labels, emptyMascot, emptyAction, children } = props
+    if (slot.status === "loading") return <LoadingNotice label={labels.loadingLabel} />
     if (slot.status === "error") {
         return <StateBlock title={labels.errorTitle} description={labels.errorDescription} />
     }

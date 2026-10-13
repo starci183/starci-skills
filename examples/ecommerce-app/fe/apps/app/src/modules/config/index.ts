@@ -1,27 +1,27 @@
-import "server-only"
-import { readProjectedOrigins } from "@ecommerce/api"
-
 /**
- * Backend endpoints the shop talks to, and the facts of its session cookie; the endpoints are read when a request needs them.
- *
- * A component or page never touches `process.env` and never hardcodes a host: each service base URL is one
- * `NEXT_PUBLIC_*_API_URL` env value, and the fallback is the product's resolved projection
- * (`.starcistacks/dev/infra/metadata.json`, `ports.orderApi`/`ports.identityApi`) - the
- * same file the backend services boot from, so no literal port exists in this repository to drift against
- * the allocation. `ECOMMERCE_APP_METADATA` injects the projection's path when a deployment or a test
- * needs to. Point the shop at a deployed stack by setting the env vars.
+ * The back-end services the shop's browser calls, and nothing else: the only reader of the shop's `NEXT_PUBLIC_*`
+ * environment. The browser calls the identity and order GraphQL APIs directly (owner ruling 2026-10-13), so each base URL is
+ * a public value inlined at build time - `scripts/serve.mjs` fills it from the product's resolved projection
+ * (`.starcistacks/dev/infra/metadata.json`) when it starts the app, and a deployment passes it as a build argument. A
+ * missing value fails the first call that needs it, naming the variable; there is no localhost fallback.
  */
 
-/** Order service: catalogue reads and the cart/checkout/orders writes behind them; read per call, never when the module loads (an image build has no projection). */
-export const orderApiUrl = (): string =>
-    process.env.NEXT_PUBLIC_ORDER_API_URL ?? readProjectedOrigins(process.env.ECOMMERCE_APP_METADATA).orderApi
+/** The value of one public variable, or a failure naming it. */
+const required = (name: string, value: string | undefined): string => {
+    if (value === undefined || value === "")
+        throw new Error(`${name} is not set; start the shop with scripts/serve.mjs or set it.`)
+    return value
+}
 
-/** Identity service: who the shopper is; read per call like the order service. */
+/** Identity service: registration, sign-in, the session and the shopper's account. */
 export const identityApiUrl = (): string =>
-    process.env.NEXT_PUBLIC_IDENTITY_API_URL ?? readProjectedOrigins(process.env.ECOMMERCE_APP_METADATA).identityApi
+    required("NEXT_PUBLIC_IDENTITY_API_URL", process.env.NEXT_PUBLIC_IDENTITY_API_URL)
 
-/** The parent domain the session cookie is shared on when the two apps are served on separate hostnames; host-only when unset. */
-export const SESSION_COOKIE_DOMAIN: string | undefined = process.env.SHOP_SESSION_COOKIE_DOMAIN
+/** Order service: the catalogue, the cart, the orders and their receipts. */
+export const orderApiUrl = (): string => required("NEXT_PUBLIC_ORDER_API_URL", process.env.NEXT_PUBLIC_ORDER_API_URL)
 
-/** Whether the session cookie is `secure`; off because the dev topology is plain `http://localhost`, on where HTTPS terminates. */
-export const SESSION_COOKIE_SECURE: boolean = process.env.SHOP_SESSION_COOKIE_SECURE === "true"
+/** The identity service's GraphQL endpoint. */
+export const identityGraphqlUrl = (): string => `${identityApiUrl()}/graphql`
+
+/** The order service's GraphQL endpoint. */
+export const orderGraphqlUrl = (): string => `${orderApiUrl()}/graphql`

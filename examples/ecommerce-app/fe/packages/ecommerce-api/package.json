@@ -14,6 +14,11 @@
     "lint": "starci app lint --workspace .",
     "typecheck": "tsc --noEmit --pretty false"
   },
+  "dependencies": {
+    "@apollo/client": "4.1.6",
+    "graphql": "16.14.2",
+    "rxjs": "7.8.2"
+  },
   "devDependencies": {
     "@types/node": "22.20.4",
     "typescript": "5.9.3"

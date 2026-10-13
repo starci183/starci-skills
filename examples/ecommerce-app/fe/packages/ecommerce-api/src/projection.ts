@@ -1,5 +1,3 @@
-import { isRecord } from "./client"
-
 /**
  * Node built-ins are taken from `process.getBuiltinModule` when the reader runs, not imported at module
  * scope: this module rides in the package entry that client components also import, and a top-level
@@ -20,6 +18,10 @@ const path = () => process.getBuiltinModule("node:path")
  * projection throws rather than guessing.
  */
 const PROJECTION_REL = [".starcistacks", "dev", "infra", "metadata.json"]
+
+/** True for a plain JSON object. */
+const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+    typeof value === "object" && value !== null && !Array.isArray(value)
 
 /** The origin of each service and app of the product, as the projection allocates them. */
 export interface ProjectedOrigins {

@@ -1,3 +1,3 @@
-export { isRecord, parseList, parseOutcome, request, requestGraphql } from "./client"
-export type { Outcome } from "./outcome"
+export { createAuthApolloClient, createNoAuthApolloClient, graphqlResponseOf } from "./graphql"
+export type { GraphQLFailure, GraphQLResponse, OperationParams } from "./graphql"
 export { readProjectedOrigins } from "./projection"

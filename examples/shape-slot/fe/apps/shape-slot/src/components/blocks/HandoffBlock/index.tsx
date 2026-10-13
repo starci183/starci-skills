@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import { useFormatter, useTranslations } from "next-intl"
-import { useQueryHandoffSwr, useQueryOrderSwr, useSendHandoffForm } from "@/hooks/sales"
+import { useSendHandoffForm } from "@/hooks/rhf"
+import { useGetHandoffSwr, useGetOrderSwr } from "@/hooks/swr"
 import { toSlot, useSlotLabels } from "@/hooks/slot"
 import type { HandoffStatus, OrderView, SendInput, Slot } from "@/modules/types"
 
@@ -27,8 +28,8 @@ export const HandoffBlock = (props: HandoffBlockProps) => {
     const tSend = useTranslations("sales.send")
     const slotLabels = useSlotLabels()
     const format = useFormatter()
-    const order = useQueryOrderSwr({ handoffId: props.handoffId })
-    const handoff = useQueryHandoffSwr({ handoffId: props.handoffId })
+    const order = useGetOrderSwr({ handoffId: props.handoffId })
+    const handoff = useGetHandoffSwr({ handoffId: props.handoffId })
     const [sendSession, setSendSession] = useState<HandoffSendSession>()
     const activeSend = sendSession?.handoffId === props.handoffId ? sendSession : undefined
     const closeSend = () => {

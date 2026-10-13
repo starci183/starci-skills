@@ -1,2 +1,2 @@
-export { useSessionForm } from "./useSessionForm"
+export { useSession } from "./useSession"
 export { useSignOutAction } from "./useSignOutAction"

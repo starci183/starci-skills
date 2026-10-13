@@ -2,7 +2,7 @@ schema: work/layout-tree@1
 id: shell
 kind: shell
 state: todo
-rev: 1
+rev: 2
 origin: repository
 productLocale:
   default: en
@@ -28,8 +28,8 @@ apps:
     localeParam: locale
     source:
       scanner: scripts/work/layout-tree.mjs
-      digest: f12c234802499a536bbb2c0fe82d77c34c7358b47caa2710e8b7e74dddf961b8
-      scannedAt: 2026-10-01T02:57:29Z
+      digest: 24fa682ae8b5f9d7f54905e14be84c49142b447ac19ee0a62b04989f9b65e585
+      scannedAt: 2026-10-13T07:30:56Z
     i18n:
       catalogs:
         - locale: en
@@ -70,7 +70,7 @@ apps:
             sha256: ecca02e7cea3ba01885d8e1588728630dfa3320e80fb2b4bf02ad1a462bd7c81
           error:
             path: fe/apps/landing/src/app/[locale]/error.tsx
-            sha256: 38c3198edc07f81ccf96a3d216e68f46c6f280257213c6da60793f876c3ffb9f
+            sha256: 9845194139c1f1023b2ea01344e4ef6ce066ebef0db1fdd2d839346c3a42a8f9
           not-found:
             path: fe/apps/landing/src/app/[locale]/not-found.tsx
             sha256: 6c3fcab4a2f74d601ea478404efd81823d184eb1b65872277896b43634c2510a
@@ -79,23 +79,23 @@ apps:
           chrome: unknown
           state: todo
           rev: 1
-  - name: shop
+  - name: app
     root: fe/apps/app
     appDir: fe/apps/app/src/app
     framework: next-app-router
     localeParam: locale
     source:
       scanner: scripts/work/layout-tree.mjs
-      digest: d837cd8cff4effc66b97ad412fe0a4a5ee04f9e8f2af96cc227527618e52f691
-      scannedAt: 2026-10-01T02:57:29Z
+      digest: f6ec65edb7c58209040781826011f91417ce0ca0d280c2fd8761b7599eaf4ae5
+      scannedAt: 2026-10-13T07:30:56Z
     i18n:
       catalogs:
         - locale: en
           path: fe/apps/app/src/modules/i18n/messages/en.json
-          sha256: 3d9fb2a4d2b7890288db472d66d236f9277f23dba53ad227f49866dfacfb169c
+          sha256: 5ec430e3c1b2733b339c3b6f2a6b51732143fcd4daf9cc18d68159ddd4c36c4a
         - locale: vi
           path: fe/apps/app/src/modules/i18n/messages/vi.json
-          sha256: 01bbf029668ad8fb44bd7a778069884a9c65d7d4bb9fda3b2cabed81a8a5896c
+          sha256: 150091b477fe5688170d6f2f8e6dcc472c40f35c623e46973b13128af26c4bfd
       used:
         keys: []
         locales:
@@ -119,7 +119,7 @@ apps:
         files:
           layout:
             path: fe/apps/app/src/app/[locale]/layout.tsx
-            sha256: 553d9610ba1ff3f2e63a11c11ce0703ae456f579a7aced95e211f66887a402c3
+            sha256: e8b9305a383486e06fb4cb9b4a9c6c36bae61654d9dddcb5040825579054ccee
           page:
             path: fe/apps/app/src/app/[locale]/page.tsx
             sha256: f5dd1c3289f1177624c2500b6fd4632b3a67806703ba552ea101d8d1cd47907a
@@ -128,7 +128,7 @@ apps:
             sha256: 879cd4fe3a22027ba27feab44a470af767f9e4be91fdbb7ae7ccb567b6fd92b7
           error:
             path: fe/apps/app/src/app/[locale]/error.tsx
-            sha256: 9e88dcb94266729ab995f4ddba392529b3b7396cf060fba50c0ca29bd51ccc69
+            sha256: 2a02aa0c585ace8eaeb64437039e73c3fd2460338b2ff57d31c11993a54a7e24
           not-found:
             path: fe/apps/app/src/app/[locale]/not-found.tsx
             sha256: 00bfcbde2a1c363e2b71bafff158abc9c7d26126bc9494e02c3f28016558f21a
@@ -146,7 +146,7 @@ apps:
         files:
           page:
             path: fe/apps/app/src/app/[locale]/account/page.tsx
-            sha256: bb666a4d734e3bf28085f7b717d0005b2d7d8a8938ac89f03bca997ece90314e
+            sha256: c4a4bdd3e0359cdce4325a67ba94af360effd752892e9efae6f5ff2e2474de44
       - id: /[locale]/browse
         parent: /[locale]
         segment: browse
@@ -156,7 +156,7 @@ apps:
         files:
           page:
             path: fe/apps/app/src/app/[locale]/browse/page.tsx
-            sha256: cea1394502eb7da108c85d12b858a8010b235f50cafafdd18e083597a957e10d
+            sha256: 0d08f51f90ac300b75239768dc8d5835fec3ca14c4f2bfeb104983b1a868d7cb
       - id: /[locale]/cart
         parent: /[locale]
         segment: cart
@@ -166,7 +166,7 @@ apps:
         files:
           page:
             path: fe/apps/app/src/app/[locale]/cart/page.tsx
-            sha256: a5e2513dad9c9be96a51433a6531ccafaa37b4115898e5b4213482b96039417d
+            sha256: 267e5a2a610789486a27e10a2295ef28cc1235dc1992c2d47f926ca48500f4d3
       - id: /[locale]/checkout
         parent: /[locale]
         segment: checkout
@@ -176,55 +176,27 @@ apps:
         files:
           page:
             path: fe/apps/app/src/app/[locale]/checkout/page.tsx
-            sha256: 5f6a56710f7c33028d365caed9e21a9cd43a1ec676a28f25fa5bcbd3ea0db93a
-      - id: /api
+            sha256: c291e08fc323a5e09e8155979a1ea77e3518a934df65db9e1a5ad8dec4a6ee33
+      - id: /health
         parent: /
-        segment: api
+        segment: health
         segmentKind: static
-        url: /api
+        url: /health
         origin: repository
-      - id: /api/cart
-        parent: /api
-        segment: cart
+      - id: /health/live
+        parent: /health
+        segment: live
         segmentKind: static
-        url: /api/cart
-        origin: repository
-        files:
-          route:
-            path: fe/apps/app/src/app/api/cart/route.ts
-            sha256: 5c2a2541539488e0b5dd03f66066e7afb6b9a092d051db7b4a2dcbc4419b0a62
-      - id: /api/cart/items
-        parent: /api/cart
-        segment: items
-        segmentKind: static
-        url: /api/cart/items
+        url: /health/live
         origin: repository
         files:
           route:
-            path: fe/apps/app/src/app/api/cart/items/route.ts
-            sha256: d1080d12fc69c52a9af3eee7b3a3ef314ba21e2c95780ab52b22b5466b0836ed
-      - id: /api/orders
-        parent: /api
-        segment: orders
-        segmentKind: static
-        url: /api/orders
-        origin: repository
-        files:
-          route:
-            path: fe/apps/app/src/app/api/orders/route.ts
-            sha256: 779f1aeb77c410885993bfab37a648496bca11850d12d0ecb82c32ba0ae8481f
-      - id: /api/session
-        parent: /api
-        segment: session
-        segmentKind: static
-        url: /api/session
-        origin: repository
-        files:
-          route:
-            path: fe/apps/app/src/app/api/session/route.ts
-            sha256: 3da50fdfb6986ab5158ffa0d636a7f15cf5aef693922645bd37a74c20d3835a4
+            path: fe/apps/app/src/app/health/live/route.ts
+            sha256: 0f75274eb0e1833d402247676bec264c4f1df3a8ae6ee4d73b66a9f1b15c4b18
 change:
-  rev: 1
-  kind: initial
-  at: 2026-10-01T02:57:29Z
-  reason: First scan of the frontend app/ directories into the layout tree.
+  rev: 2
+  kind: clarifying
+  at: 2026-10-13T07:30:56Z
+  reason: "Re-scanned app/ (app: /: new root segment; app: /[locale]: new dynamic segment; app:
+    /[locale]/account: new static segment; app: /[locale]/browse: new static segment; app:
+    /[locale]/cart: new static segment; app: /[locale]/checkout: new static segment)."

@@ -3,6 +3,7 @@ import { readLocaleSegment } from "@ecommerce/i18n/layout"
 import "../globals.css"
 import "../../modules/brand"
 import { LocaleShell } from "@ecommerce/ui"
+import { AppProviders } from "../../components/providers/AppProviders"
 import { ShopLayout } from "../../features/layouts/ShopLayout"
 
 type LayoutProps = {
@@ -11,16 +12,18 @@ type LayoutProps = {
 }
 
 /**
- * NOT PRE-RENDERED, and saying so is the point: the request locale resolves per request, and the service reads
- * under this shell are per-request too, so the shell renders dynamically rather than pre-building a page for a
- * segment the build cannot guess.
+ * NOT PRE-RENDERED, and saying so is the point: the request locale resolves per request, so the shell renders
+ * dynamically rather than pre-building a page for a segment the build cannot guess. The pages read their data in the
+ * browser, through the client providers mounted here.
  */
 export const dynamic = "force-dynamic"
 
-/** Mount the shared runtime context for the language the address states and hand the routed tree to the shop shell. */
+/** Mount the shared runtime context for the language the address states, the client providers and the shop shell. */
 const Layout = async (props: LayoutProps) => (
     <LocaleShell {...await readLocaleSegment(props.params)}>
-        <ShopLayout content={props.children} />
+        <AppProviders>
+            <ShopLayout content={props.children} />
+        </AppProviders>
     </LocaleShell>
 )
 

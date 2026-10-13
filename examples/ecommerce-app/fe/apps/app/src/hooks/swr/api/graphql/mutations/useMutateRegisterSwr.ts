@@ -1,0 +1,13 @@
+import useSWRMutation from "swr/mutation"
+import { mutateRegister } from "@/modules/api"
+import type { MutationRegisterRequest } from "@/modules/api"
+
+/** What one trigger of the mutation carries: its request. */
+type Trigger = { readonly arg: MutationRegisterRequest }
+
+/** The SWR key of the `register` mutation. */
+const MUTATE_REGISTER_SWR_KEY = "MUTATE_REGISTER_SWR"
+
+/** Creates an account (identity `register`). */
+export const useMutateRegisterSwr = () =>
+    useSWRMutation(MUTATE_REGISTER_SWR_KEY, (_key: string, { arg }: Trigger) => mutateRegister({ request: arg }))

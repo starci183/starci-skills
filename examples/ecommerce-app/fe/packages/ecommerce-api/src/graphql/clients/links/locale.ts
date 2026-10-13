@@ -1,0 +1,16 @@
+import { SetContextLink } from "@apollo/client/link/context"
+
+/** The language of the document the reader is on (`<html lang>`, set by the locale layout); undefined outside a browser. */
+const documentLocale = (): string | undefined =>
+    typeof document === "undefined" || document.documentElement.lang === "" ? undefined : document.documentElement.lang
+
+/**
+ * The one writer of `Accept-Language`: every operation declares the language the back end localizes its errors in (the
+ * back ends read that header, platform/i18n RequestLocale).
+ */
+export const createAttachLocaleLink = (locale: () => string | undefined = documentLocale) =>
+    new SetContextLink((context) => {
+        const value = locale()
+        if (value === undefined) return {}
+        return { headers: { ...context.headers, "accept-language": value } }
+    })

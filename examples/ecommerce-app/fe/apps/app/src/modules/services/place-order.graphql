@@ -1,9 +1,0 @@
-mutation ShopPlaceOrder($input: PlaceOrderInput!) {
-    placeOrder(input: $input) {
-        orderId
-        status
-        totalMinorUnits
-        currency
-        replayed
-    }
-}

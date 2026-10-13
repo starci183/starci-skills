@@ -1,8 +1,0 @@
-mutation ShopAddCartItem($input: AddCartItemInput!) {
-    addCartItem(input: $input) {
-        item {
-            productId
-            quantity
-        }
-    }
-}

@@ -18,7 +18,8 @@
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
     "tslib": "2.8.1",
-    "typeorm": "0.3.31"
+    "typeorm": "0.3.31",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@nestjs/testing": "11.2.5",
@@ -66,12 +67,13 @@
     "build:be": "cd be && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "build:fe": "npm run codegen --silent && turbo run build --filter=./fe/apps/*",
     "codegen": "node scripts/codegen.mjs",
+    "codegen:graphql": "node scripts/codegen.mjs --graphql",
     "typecheck": "npm run codegen --silent && tsc -p be/tsconfig.json && turbo run typecheck",
-    "typecheck:tests": "tsc -p be/src/tests/tsconfig.json",
     "lint": "npm run codegen --silent && starci app lint",
     "lint:fix": "npm run codegen --silent && starci app lint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "typecheck:tests": "tsc -p be/src/tests/tsconfig.json",
     "test": "cd be && jest --selectProjects unit --coverage",
     "test:affected": "cd be && jest --selectProjects unit --passWithNoTests",
     "test:integration": "npm run typecheck:tests && cd be && jest --selectProjects integration",

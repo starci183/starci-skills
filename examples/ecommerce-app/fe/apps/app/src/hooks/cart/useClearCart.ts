@@ -1,27 +1,23 @@
 import { useState } from "react"
-import { callDoor } from "../../modules/doors"
-import { useLocaleRouter } from "../navigation"
+import { useTranslations } from "next-intl"
+import { useGraphQLWithToast } from "@/modules/toast"
+import { useMutateClearCartSwr, useQueryCartSwr } from "../swr"
 
 /**
- * Owns the cart's clear press: it runs the real `clearCart` mutation through the shop's cart door and
- * refreshes the server render so the page re-reads the now-empty cart; a refusal is named inline and
- * nothing is pretended empty.
+ * Owns the cart's clear press: it runs the real `clearCart` mutation and revalidates the cart query so the page re-reads
+ * the now-empty cart; a refusal is named inline and nothing is pretended empty.
  */
 export const useClearCart = () => {
-    const router = useLocaleRouter()
+    const t = useTranslations("shop.cart")
+    const runGraphQL = useGraphQLWithToast()
+    const cart = useQueryCartSwr()
+    const clear = useMutateClearCartSwr()
     const [refused, setRefused] = useState(false)
-    const [pending, setPending] = useState(false)
     const onPress = () => {
-        setPending(true)
-        void callDoor("cart", "DELETE").then((outcome) => {
-            setPending(false)
-            if (outcome.kind === "ok") {
-                setRefused(false)
-                router.refresh()
-            } else {
-                setRefused(true)
-            }
+        void runGraphQL(() => clear.trigger(), { successMessage: t("cleared") }).then(async (response) => {
+            setRefused(!response.success)
+            if (response.success) await cart.mutate()
         })
     }
-    return { props: { refused, pending }, on: { onPress } }
+    return { props: { refused, pending: clear.isMutating }, on: { onPress } }
 }

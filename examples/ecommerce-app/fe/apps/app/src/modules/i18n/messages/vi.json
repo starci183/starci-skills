@@ -44,6 +44,7 @@
       "clearLabel": "Xóa giỏ hàng",
       "clearingLabel": "Đang xóa…",
       "clearRefused": "Order service đã từ chối — giỏ hàng không đổi.",
+      "cleared": "Giỏ hàng đã trống.",
       "checkoutCta": "Tới thanh toán →",
       "empty": {
         "title": "Giỏ hàng trống",
@@ -126,7 +127,9 @@
         "taken": "Email đó đã có tài khoản — hãy đăng nhập.",
         "invalid": "Nhập email và mật khẩu để tiếp tục.",
         "unavailable": "Không kết nối được account service.",
-        "signOut": "Đăng xuất"
+        "signOut": "Đăng xuất",
+        "signedIn": "Bạn đã đăng nhập.",
+        "signedOut": "Bạn đã đăng xuất."
       },
       "ordersTitle": "Đơn hàng",
       "ordersSignedOut": {
@@ -159,6 +162,14 @@
     },
     "loading": {
       "message": "Đang tải"
+    },
+    "toast": {
+      "successTitle": "Xong",
+      "errorTitle": "Đã có lỗi",
+      "unauthorizedTitle": "Cần đăng nhập",
+      "unauthorizedDescription": "Phiên của bạn đã hết hạn. Hãy đăng nhập ở trang tài khoản rồi thử lại.",
+      "defaultSuccess": "Dịch vụ đã nhận thay đổi.",
+      "defaultError": "Không kết nối được dịch vụ. Hãy thử lại sau giây lát."
     },
     "notFound": {
       "title": "Không tìm thấy trang",

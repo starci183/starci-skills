@@ -64,15 +64,15 @@ ui:
       only; omit from production UI.
   controls:
   - label: Email
-    destination: Email field in the sign-in/register form (blocks/SessionForm)
-    status: Wired. Bound to the SessionForm's controlled state; browser type=email validation applies.
+    destination: Email field in the sign-in/register form (the SessionFormPanel of blocks/AccountOverview)
+    status: Wired. Bound to the react-hook-form session form (hooks/rhf/useSessionForm, zod schema); browser type=email validation applies.
   - label: Password
     destination: Password field with masked input (kind=password / newPassword in register mode)
-    status: Wired. Bound to the SessionForm's controlled state; submit withheld while either field is empty.
+    status: Wired. Bound to the react-hook-form session form; submit withheld while either field is empty.
   - label: Sign in
     destination: Submit credentials under fr.identity.sign-in
-    status: Wired. Posts to the shop's own /api/session door, which calls the identity GraphQL signIn
-      mutation server-side and stores the minted bearer in the httpOnly northwind-session cookie;
+    status: Wired. The browser calls the identity GraphQL signIn mutation directly (Apollo no-auth client,
+      SWR mutation hook) and modules/auth keeps the minted bearer in browser storage for the Apollo link;
       INVALID_CREDENTIALS renders the one uniform refusal naming neither half.
   - label: Back to browse
     destination: http://localhost:4069/en/browse

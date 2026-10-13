@@ -1,6 +1,0 @@
-query ShopOrderReceipt($input: OrderReceiptInput!) {
-    orderReceipt(input: $input) {
-        url
-        expiresAt
-    }
-}

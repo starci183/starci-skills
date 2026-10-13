@@ -1,5 +1,0 @@
-query VerifySession($input: VerifySessionInput!) {
-    verifySession(input: $input) {
-        personId
-    }
-}

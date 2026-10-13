@@ -21,11 +21,15 @@ RUN npm ci --ignore-scripts
 
 COPY turbo.json ./
 COPY scripts scripts
+COPY be/contracts be/contracts
 COPY fe/tsconfig.json fe/tsconfig.json
 COPY fe/packages fe/packages
 COPY fe/apps/app fe/apps/app
 RUN mkdir -p fe/apps/app/public
 RUN npm run codegen --silent
+# The browser calls the identity and order GraphQL APIs directly, so their public base URLs are inlined at build time.
+ARG NEXT_PUBLIC_IDENTITY_API_URL
+ARG NEXT_PUBLIC_ORDER_API_URL
 RUN node_modules/.bin/turbo run build --filter=@ecommerce-app/app
 
 FROM node:22.14.0-alpine3.21 AS runtime

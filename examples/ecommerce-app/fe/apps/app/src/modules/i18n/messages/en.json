@@ -44,6 +44,7 @@
       "clearLabel": "Clear cart",
       "clearingLabel": "Clearing…",
       "clearRefused": "The order service refused the clear — your cart is unchanged.",
+      "cleared": "Your cart is empty now.",
       "checkoutCta": "Go to checkout →",
       "empty": {
         "title": "Your cart is empty",
@@ -126,7 +127,9 @@
         "taken": "That email already has an account — sign in instead.",
         "invalid": "Enter an email and a password to continue.",
         "unavailable": "The account service could not be reached.",
-        "signOut": "Sign out"
+        "signOut": "Sign out",
+        "signedIn": "You are signed in.",
+        "signedOut": "You are signed out."
       },
       "ordersTitle": "Orders",
       "ordersSignedOut": {
@@ -159,6 +162,14 @@
     },
     "loading": {
       "message": "Loading"
+    },
+    "toast": {
+      "successTitle": "Done",
+      "errorTitle": "Something went wrong",
+      "unauthorizedTitle": "Sign in required",
+      "unauthorizedDescription": "Your session is not live. Sign in on your account, then try again.",
+      "defaultSuccess": "The service accepted the change.",
+      "defaultError": "The service could not be reached. Try again in a moment."
     },
     "notFound": {
       "title": "Page not found",

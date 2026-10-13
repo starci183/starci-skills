@@ -1,33 +1,25 @@
 import { useState } from "react"
-import { parseOutcome } from "@ecommerce/api"
-import { callDoor } from "../../modules/doors"
-import { toReceiptLink } from "../../modules/order"
-
-/** Why the last receipt press did not download: the archive has not taken the receipt yet, or the session may not read it. */
-export type ReceiptFailure = "notReady" | "refused" | null
+import { useTranslations } from "next-intl"
+import { useQueryOrderReceiptSwr } from "../swr"
 
 /**
- * Owns the receipt press of one confirmed order: it asks the shop's receipt door for a fresh download link and sends the
+ * Owns the receipt press of one confirmed order: it asks the order service for a fresh download link and sends the
  * browser to it. A receipt the archive has not taken yet is named as not ready (a press later succeeds); any other
  * refusal is named as refused.
  */
 export const useDownloadReceipt = (orderId: string) => {
-    const [failure, setFailure] = useState<ReceiptFailure>(null)
-    const [pending, setPending] = useState(false)
+    const t = useTranslations("shop.checkout.confirmed.receipt")
+    const receipt = useQueryOrderReceiptSwr(orderId)
+    const [failure, setFailure] = useState<string | null>(null)
     const onPress = () => {
-        setPending(true)
-        void callDoor("orderReceipt", "POST", { orderId }).then((answer) => {
-            const outcome = parseOutcome(answer, toReceiptLink)
-            setPending(false)
-            if (outcome.kind === "ok") {
+        void receipt.trigger().then((response) => {
+            if (response.success) {
                 setFailure(null)
-                window.location.assign(outcome.data.url)
+                window.location.assign(response.data.url)
                 return
             }
-            setFailure(
-                outcome.kind === "invalid" && outcome.code === "ORDER_RECEIPT_NOT_READY" ? "notReady" : "refused",
-            )
+            setFailure(response.error === "ORDER_RECEIPT_NOT_READY" ? t("notReady") : t("refused"))
         })
     }
-    return { props: { failure, pending }, on: { onPress } }
+    return { props: { failure, pending: receipt.isMutating }, on: { onPress } }
 }

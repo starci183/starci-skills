@@ -11,6 +11,8 @@ async function bootstrap(): Promise<void> {
     const options = parseOrderAppOptions(EnvSource.fromProcess())
     const app = await NestFactory.create(AppModule.register(options))
     app.enableShutdownHooks()
+    // The shop's browser calls this GraphQL API directly (owner ruling 2026-10-13): the allowlisted origins may.
+    app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
     await app.listen(options.port)
     createJsonLogger(new SystemClock()).info(LoggingLogEvent.ServerStarted, {
         service: "order",
