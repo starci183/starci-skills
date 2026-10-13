@@ -260,7 +260,7 @@ ruleParams:
     # R89 BE_SOURCE_FORM: the closed role-suffix vocabulary of a source file name (<kebab-name>.<suffix>.ts; BE-CONVENTION 1.15)
     # and the suffixes that are never a role. index.ts, main.ts, app.module.ts and the migrations of be.persistence are the
     # only names outside it.
-    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, compensation, saga-state, saga-step, saga, contracts, port, resolver, controller, gateway, webhook, subscription, consumer, cli, event, queue, projection, projection-entity, processor, step, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
+    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, templates, compensation, saga-state, saga-step, saga, contracts, port, resolver, controller, gateway, webhook, subscription, consumer, cli, event, queue, projection, projection-entity, processor, step, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
     # R47 BE_CONTRACT_UNGUARDED: the world's shape vocabulary. `helper` names the function a contract spec imports to erase the values of a JSON
     # payload (`shapeOf`); a contract spec proves a fake's fixtures by asserting helper(real) equals helper(fixture).
     contractShape: {helper: shapeOf}
@@ -680,6 +680,19 @@ slots:
     tier: none
     tests: none
     since: 2.1.0
+  - id: app.supabase.migrations.archive
+    profiles: [app]
+    # The migrations an existing app retired at its cutover (owner ruling 2026-10-13, migration baseline policy): the live schema is
+    # dumped into ONE baseline migration written to the current standard, marked applied on production without a re-run, and the
+    # older files move here. The Supabase CLI applies only supabase/migrations/<stamp>_<name>.sql, never this folder, and no
+    # migration rule (L02-L08) judges it; new migrations append after the baseline.
+    path: "supabase/migrations/_archive/"
+    presence: opt-in
+    provider: supabase
+    tracked: tracked
+    tier: none
+    tests: none
+    since: 2.3.0
   - id: app.supabase.seed
     profiles: [app]
     path: "supabase/seed.sql"
@@ -1242,6 +1255,18 @@ slots:
     coverage: none
     rules: [BE_CLI_COMMAND_SHAPE, BE_CLI_OWNER, BE_CLI_REQUIRED, BE_MODULE_SHAPE, BE_SCHEMA_AUTHORITY]
 
+  - id: be.assets
+    profiles: [be]
+    # Small binary assets bundled with the build (fonts a renderer embeds, a watermark): one folder per kind (owner ruling
+    # 2026-10-13, HFS assets policy). Large or user media (music, video, uploads) live in object storage and are fetched at runtime;
+    # templates and copy are TS constants in the owning capability (*.templates.ts). There is no be/resources/.
+    path: "src/assets/<kind>/"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+    coverage: none
+    since: 2.3.0
   # ----- BE: modules (three tiers, closed set) -----------------------------------------------------------
   - id: be.domain
     profiles: [be]
@@ -1251,7 +1276,9 @@ slots:
     tier: domain
     owner: true
     requires: [index.ts]
-    allows: ["<capability>.module.ts", "<capability>.config.ts", "<capability>.options.ts", errors/, messages/, persistence/, policies/, "*.service.ts", "*.service.spec.ts", "*.contracts.ts"]
+    # <name>.templates.ts holds the capability's static templates, copy and presets as TS constants (owner ruling 2026-10-13);
+    # user-editable ones are seed rows, large or user media live in object storage.
+    allows: ["<capability>.module.ts", "<capability>.config.ts", "<capability>.options.ts", errors/, messages/, persistence/, policies/, "*.service.ts", "*.service.spec.ts", "*.contracts.ts", "*.templates.ts"]
     forbids: [testing/, exceptions/, utils/, helpers/, shared/]
     tests: unit-beside            # <name>.service.spec.ts beside each <name>.service.ts, nothing else
     coverage: required
