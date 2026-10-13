@@ -140,19 +140,19 @@ rulings:
     enforcedBy: [scripts/checks/check-json-exceptions.mjs]
   - id: gate-loosening-9b68d921f23e
     date: '2026-10-13'
-    ruling: Commit a631629 removes the lite-only no-api route-handler spec case of tests/hfs/architecture-supabase.spec.mjs, superseded by the owner ruling of 2026-10-13 (one fe standard for lite and full); the owner approved this loosening in chat ("Duyet", Vietnamese for "approved", typed in reply to the alpha.13 coordinator listing exactly these four loosenings).
+    ruling: "Commit a631629 removes the lite-only no-api route-handler spec case of tests/hfs/architecture-supabase.spec.mjs, superseded by the owner ruling of 2026-10-13 (one fe standard for lite and full); the owner approved this loosening in chat (\"Duyet\", Vietnamese for \"approved\", typed in reply to the alpha.13 coordinator listing exactly these four loosenings)."
     enforcedBy: [scripts/hfs/architecture/supabase.mjs]
   - id: gate-loosening-a52e4e7c327c
     date: '2026-10-13'
-    ruling: Commit 2f53dbe removes the assertions of fe.modules.db readers and writers, Server Actions and the db owner entries (architecture-supabase, lite-canon-adversarial, hfs-slot-entries, architecture-hfs-dead-exports, architecture-owner-export-entries), which the owner ruling of 2026-10-13 removed with the slots; the owner approved this loosening in chat ("Duyet", Vietnamese for "approved", typed in reply to the alpha.13 coordinator listing exactly these four loosenings).
+    ruling: "Commit 2f53dbe removes the assertions of fe.modules.db readers and writers, Server Actions and the db owner entries (architecture-supabase, lite-canon-adversarial, hfs-slot-entries, architecture-hfs-dead-exports, architecture-owner-export-entries), which the owner ruling of 2026-10-13 removed with the slots; the owner approved this loosening in chat (\"Duyet\", Vietnamese for \"approved\", typed in reply to the alpha.13 coordinator listing exactly these four loosenings)."
     enforcedBy: [scripts/hfs/architecture/server-action.mjs, scripts/hfs/architecture/supabase.mjs]
   - id: gate-loosening-6a6b539ea67d
     date: '2026-10-13'
-    ruling: Commit 5dd7904 removes rule R218 (FE_DB_RESULT_TYPED, FE_DB_ERROR_HANDLED), the supabase-result machine enforcer and the eslint enforcer heroicons-is-the-glyph-vendor: the front end reads no data through Supabase and @phosphor-icons/react is the one icon set (owner ruling 2026-10-13); the owner approved this loosening in chat ("Duyet", Vietnamese for "approved", typed in reply to the alpha.13 coordinator listing exactly these four loosenings).
+    ruling: "Commit 5dd7904 removes rule R218 (FE_DB_RESULT_TYPED, FE_DB_ERROR_HANDLED), the supabase-result machine enforcer and the eslint enforcer heroicons-is-the-glyph-vendor: the front end reads no data through Supabase and @phosphor-icons/react is the one icon set (owner ruling 2026-10-13); the owner approved this loosening in chat (\"Duyet\", Vietnamese for \"approved\", typed in reply to the alpha.13 coordinator listing exactly these four loosenings)."
     enforcedBy: [knowledge/hfs/rules.yaml]
   - id: gate-loosening-fa80eadaa449
     date: '2026-10-13'
-    ruling: Commit cfa2fad removes the lite fe modules/db and Server Action security cases of tests/packages-hfs/hfs-lite-fe-security.spec.mjs, gone with the one fe standard (owner ruling 2026-10-13); the owner approved this loosening in chat ("Duyet", Vietnamese for "approved", typed in reply to the alpha.13 coordinator listing exactly these four loosenings).
+    ruling: "Commit cfa2fad removes the lite fe modules/db and Server Action security cases of tests/packages-hfs/hfs-lite-fe-security.spec.mjs, gone with the one fe standard (owner ruling 2026-10-13); the owner approved this loosening in chat (\"Duyet\", Vietnamese for \"approved\", typed in reply to the alpha.13 coordinator listing exactly these four loosenings)."
     enforcedBy: [scripts/hfs/architecture/server-action.mjs]
   - id: release-suite-ci
     date: '2026-10-09'
