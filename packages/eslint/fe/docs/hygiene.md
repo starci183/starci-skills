@@ -57,7 +57,7 @@ const subscribe = (listener: () => void) => {
 
 ## `starci-fe/no-data-fetch-in-effect`
 
-An effect body starts no promise: no `await`, `fetch`, `.then`, `void load()`, `mutate()` or `refresh()`; read through SWR or a server reader. The call is judged when it runs synchronously in the body (an immediately-invoked function counts); a promise started inside a listener or timer callback the effect registers, or in the cleanup, is that callback's work. A call is a load when its type is a promise, when it is `.then`-ed, or when it is `void`-ed and untyped; a platform promise other than `fetch` (`audio.play()`, `clipboard.writeText()`) is not a data load. Data freshness comes from the SWR key: an SWR `mutate()` or `refresh()` called directly in the effect body is a finding too; run it from the event that changed the data (a handler, a socket message).
+An effect body starts no promise: no `await`, `fetch`, `.then`, `void load()`, `mutate()` or `refresh()`; read through an SWR hook (`hooks/swr`) over an operation of `modules/api`. The call is judged when it runs synchronously in the body (an immediately-invoked function counts); a promise started inside a listener or timer callback the effect registers, or in the cleanup, is that callback's work. A call is a load when its type is a promise, when it is `.then`-ed, or when it is `void`-ed and untyped; a platform promise other than `fetch` (`audio.play()`, `clipboard.writeText()`) is not a data load. Data freshness comes from the SWR key: an SWR `mutate()` or `refresh()` called directly in the effect body is a finding too; run it from the event that changed the data (a handler, a socket message).
 
 **Invalid** (`src/components/blocks/Feed/component.tsx`)
 
@@ -75,7 +75,7 @@ const { data } = useSWR(key, fetcher)
 
 **Why:** `useEffect` in `<file>` loads data (`await`, `fetch`, `.then`): no cache, no request merging, no loading/error state, no cancellation.
 
-**Fix:** Read on the client with SWR calling the app client (`hooks/`), and on the route side with a server reader `modules/api/<domain>/read-*.ts`.
+**Fix:** Read with an SWR hook of `hooks/swr` over an operation of `modules/api`, keyed by what changes; call `mutate()` from the event that changes the data (handler, socket message).
 
 ## `starci-fe/no-empty-catch`
 

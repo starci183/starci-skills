@@ -10,13 +10,13 @@ Every rule below is an error in `starciFeConfig`; none can be switched off or su
 
 No cast through `unknown`; it turns checking off at the boundary.
 
-**Invalid** (`src/modules/api/read-course.ts`)
+**Invalid** (`src/modules/api/graphql/queries/query-course.ts`)
 
 ```tsx
 const row = payload as unknown as CourseRow
 ```
 
-**Valid** (`src/modules/api/read-course.ts`)
+**Valid** (`src/modules/api/graphql/queries/query-course.ts`)
 
 ```tsx
 const row = parseCourseRow(payload)
@@ -32,13 +32,13 @@ const row = parseCourseRow(payload)
 
 No `as T` or `<T>x`; narrow with a check, a guard or a parser.
 
-**Invalid** (`src/modules/api/read-course.ts`)
+**Invalid** (`src/modules/api/graphql/queries/query-course.ts`)
 
 ```tsx
 const row = payload as CourseRow
 ```
 
-**Valid** (`src/modules/api/read-course.ts`)
+**Valid** (`src/modules/api/graphql/queries/query-course.ts`)
 
 ```tsx
 const row = isCourseRow(payload) ? payload : null
@@ -76,13 +76,13 @@ const first = rows[0] ?? fallbackRow
 
 No `any`; use a real type or `unknown` and narrow.
 
-**Invalid** (`src/modules/api/read-course.ts`)
+**Invalid** (`src/modules/api/graphql/queries/query-course.ts`)
 
 ```tsx
 const parse = (value: any) => value.id
 ```
 
-**Valid** (`src/modules/api/read-course.ts`)
+**Valid** (`src/modules/api/graphql/queries/query-course.ts`)
 
 ```tsx
 const parse = (value: unknown) => (isCourseRow(value) ? value.id : null)

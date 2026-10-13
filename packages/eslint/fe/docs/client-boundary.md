@@ -2,13 +2,13 @@
 
 Law module: `client-boundary.mjs`. Catalogue: R55 FE_CLIENT_BOUNDARY.
 
-Server first. `"use client"` appears only on the `index.tsx` of an interactive block (or overlay), on a leaf whose interaction is intrinsic, on a branch or leaf of a workspace package (`packages/<pkg>/src/{branches,leaves}/`, where the grammar tiers sit directly under `src/`), and on `error.tsx` / `global-error.tsx`, which Next requires to be client components. Routes, pages and layouts are server components.
+Server first. `"use client"` appears only on the `index.tsx` of an interactive block (or overlay), on a leaf whose interaction is intrinsic, on a branch or leaf of a workspace package (`packages/<pkg>/src/{branches,leaves}/`, where the grammar tiers sit directly under `src/`), on `error.tsx` / `global-error.tsx`, which Next requires to be client components, on the route tree's `providers.tsx`, and on the client state a layout mounts once: a provider (`components/providers/<name>/index.tsx`), `redux/ReduxProvider.tsx`, the toast region `modules/toast/toast.tsx` and the side-effect components `hooks/swr/SwrSideEffects.tsx` and `hooks/socketio/SocketIoSideEffects.tsx`. Routes, pages and layouts are server components; the hooks, slices and modules below a client boundary are already client and carry no directive.
 
 Every rule below is an error in `starciFeConfig`; none can be switched off or suppressed inline.
 
 ## `starci-fe/use-client-only-at-boundary`
 
-`"use client"` appears only at a block index, a leaf, or a Next error boundary.
+`"use client"` appears only at a block index, a leaf, a Next error boundary, or the client state a layout mounts once (a provider, a side-effect component, the redux provider, the toast region).
 
 **Invalid** (`src/app/[locale]/layout.tsx`)
 
@@ -32,7 +32,7 @@ export const Feed = () => null
 
 ## `starci-fe/client-no-server-import`
 
-A `"use client"` file does not import `server-only`, `next/headers`, `next/server`, `next-intl/server`, a Node built-in or a server reader (sub-check `FE_CLIENT_SERVER_IMPORT`).
+A `"use client"` file does not import `server-only`, `next/headers`, `next/server`, `next-intl/server` or a Node built-in (sub-check `FE_CLIENT_SERVER_IMPORT`).
 
 **Invalid** (`src/components/blocks/Feed/index.tsx`)
 
@@ -50,27 +50,27 @@ import useSWR from "swr"
 
 **Finding code:** `FE_CLIENT_SERVER_IMPORT`
 
-**Why:** The client component at `<file>` imports code that exists only on the server (`server-only`, `next/headers`, Node modules, a server reader).
+**Why:** A client component in `<file>` imports code that exists only on the server (`server-only`, `next/headers`, a Node module, a server-only module).
 
-**Fix:** Read data in a server component or server reader and pass it down as props; or use SWR calling the app client.
+**Fix:** Read the data through an SWR hook of `hooks/swr` over an operation of `modules/api`; keep request-scoped server APIs in server components.
 
 ## `starci-fe/server-module-marks-server-only`
 
 A module that imports `next/headers`, `next/server` (a value import), `next-intl/server`, a Node built-in, or a module that is itself server-only starts with `import "server-only"` (sub-check `FE_SERVER_ONLY_MARK`). A module is server-only when the TypeScript module resolution of the import specifier reaches a source file whose first statement is `import "server-only"`; `import type` and `import { type X }` carry no runtime and are not judged. Route files are server components by construction and need no marker: they are recognized by their slot (`fe.route`, `fe.source-root-pinned`), not by their name. A `"use client"` file that imports the server is `client-no-server-import`'s finding. The multi-hop client reachability (a client block reaching a marked module through a hook) is the architecture machine's.
 
-**Invalid** (`src/modules/api/courses/read-courses.ts`)
+**Invalid** (`src/modules/i18n/request-locale.ts`)
 
 ```ts
 import { headers } from "next/headers"
-export const readCourses = async () => (await headers()).get("x-locale")
+export const requestLocale = async () => (await headers()).get("accept-language")
 ```
 
-**Valid** (`src/modules/api/courses/read-courses.ts`)
+**Valid** (`src/modules/i18n/request-locale.ts`)
 
 ```ts
 import "server-only"
 import { headers } from "next/headers"
-export const readCourses = async () => (await headers()).get("x-locale")
+export const requestLocale = async () => (await headers()).get("accept-language")
 ```
 
 **Finding code:** `FE_SERVER_ONLY_MARK`

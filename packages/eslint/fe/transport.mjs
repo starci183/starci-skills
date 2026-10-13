@@ -2,41 +2,54 @@
  * The rules that hold `transport.md` (HFS R50 `FE_TRANSPORT_OWNER`, R51 `FE_HTTP_STATUS_COLLAPSE`,
  * R52 `FE_WIRE_GENERATED`).
  *
- * ONE WIRE, ONE VOCABULARY. A repository talks to its backend through exactly one module, the api client (HFS slot
- * `fe.transport.client`: `modules/api/client.ts`, or `fe.package.api.client`: the shared api package's `src/client.ts`),
- * and that module answers in exactly one vocabulary, `Outcome<T>` (slot `fe.transport.outcome` / `fe.package.api.outcome`). The
- * defects the three halves prevent were measured on real apps: seven transports and six result
- * shapes in one repository, and in another a client that folded every non-2xx into "could not
- * read", so the state a real backend produces for a signed-out reader - 401, which must become
- * `refused` and send the reader to sign in - was unreachable, while a test double hid it by
- * answering 200.
+ * ONE WIRE, ONE VOCABULARY. A front end talks to its back end only through its API layer, `modules/api` (HFS slot
+ * `fe.modules.api`, or the shared api package `fe.package.api`): the auth and no-auth Apollo clients with their link chain are
+ * the transport owner (slot `fe.transport.client`: `modules/api/graphql/clients/`, or `fe.package.api.client`), one file per
+ * GraphQL operation runs on them, and the few REST calls (uploads, presigned URLs, auth endpoints) are axios calls in
+ * `modules/api/rest/`. The layer answers in exactly one vocabulary, `GraphQLResponse` (slot `fe.transport.outcome`:
+ * `modules/api/graphql/types.ts`, or `fe.package.api.outcome`). The defects the three halves prevent were measured on real
+ * apps: seven transports and six result shapes in one repository, and in another a client that folded every non-2xx into
+ * "could not read", so the state a real backend produces for a signed-out reader - 401, which must become `refused` and
+ * send the reader to sign in - was unreachable, while a test double hid it by answering 200.
  *
  * WHAT THESE RULES CANNOT SEE. They read one file at a time, so they cannot tell that a client's
  * timeout is long enough or that a `refused` outcome is routed to the sign-in page - the module's
- * spec proves that. They hold the shapes that make it provable: one `fetch`, an abort signal on
- * it, no shared mutable state, a 401/403 branch, and no null standing in for a status.
+ * spec proves that. They hold the shapes that make it provable: the HTTP libraries and `fetch` only in the API layer, an
+ * abort signal on every `fetch`, no shared mutable state, a 401/403 branch where a raw `fetch` is answered, and no null
+ * standing in for a status.
  */
 
 import ts from "typescript"
 import { hfsOf } from "./lib/hfs.mjs"
-import { globalReferences, isApiClient, isOutcomeModule, slotOfFile } from "./lib/scope.mjs"
+import { forbiddingConcern, packageNameOf } from "./lib/fe-stack.mjs"
+import { globalReferences, inSlot, isApiClient, isApiLayer, isApiRest, isOutcomeModule } from "./lib/scope.mjs"
 import { typed } from "./lib/types.mjs"
 
-/** Packages that send an HTTP request: a second transport is a second owner. Matched on the module specifier, never on a file name. */
+/**
+ * The canonical transport libraries and the one place each may be imported (fe-stack graphql, rest and realtime): Apollo in
+ * the API layer, axios in its REST calls, socket.io-client in `hooks/socketio`. Matched on the package a specifier names.
+ */
+const PLACED_TRANSPORTS = new Map([
+  ["@apollo/client", { where: "the API layer (`modules/api`)", allowed: (context) => isApiLayer(context) }],
+  ["axios", { where: "the REST calls of the API layer (`modules/api/rest/`)", allowed: (context) => isApiRest(context) }],
+  ["socket.io-client", { where: "`hooks/socketio/`", allowed: (context) => inSlot(context, "fe.hooks.socketio") }],
+])
+
+/**
+ * Packages that send an HTTP request or open a channel of their own and are no canonical transport: a second transport is a
+ * second owner. A package the fe-stack catalog forbids is refused by `fe-stack-import`, so it is not reported twice here.
+ */
 const TRANSPORT_PACKAGES = new Set([
-  "axios", "ky", "ky-universal", "got", "node-fetch", "undici", "cross-fetch", "isomorphic-fetch", "superagent", "ofetch",
+  "ky", "ky-universal", "got", "node-fetch", "undici", "cross-fetch", "isomorphic-fetch", "superagent", "ofetch",
   "whatwg-fetch", "graphql-request", "urql", "next-urql", "apollo-client",
 ])
 
-/** Package scopes and prefixes whose every package is a GraphQL/HTTP client of its own (`@apollo/client`, `@urql/core`, `apollo-link-http`). */
+/** Package scopes and prefixes whose every package is a GraphQL/HTTP client of its own (`@urql/core`, `apollo-link-http`); `@apollo/client` is placed, the rest of `@apollo/` is not a front-end transport. */
 const TRANSPORT_SCOPES = ["@apollo/", "@urql/", "apollo-"]
 
-/** True when a module specifier resolves to an HTTP client library. */
-const isTransportLibrary = (specifier) => {
-  const parts = String(specifier).split("/")
-  const name = specifier.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0]
-  return TRANSPORT_PACKAGES.has(name) || TRANSPORT_SCOPES.some((prefix) => name.startsWith(prefix))
-}
+/** True when a package name is an HTTP client library no canonical slot owns. */
+const isStrayTransport = (name) =>
+  !PLACED_TRANSPORTS.has(name) && (TRANSPORT_PACKAGES.has(name) || TRANSPORT_SCOPES.some((prefix) => name.startsWith(prefix)))
 
 /** The global objects that carry the same globals as the bare names. */
 const GLOBAL_OBJECTS = new Set(["globalThis", "window", "self", "global"])
@@ -95,38 +108,45 @@ const transportUses = (context) => {
 // -- FE-TRANSPORT-1 --------------------------------------------------------------------------------
 
 /**
- * `fetch` is reached in one file per repository, and no other HTTP library exists.
+ * `fetch` is reached only in the API layer, each canonical transport library only in its home, and no other HTTP library exists.
  *
- * The one file is the one whose HFS slot is `fe.transport.client` (`apps/<app>/src/modules/api/client.ts`, a one-app repository)
- * or `fe.package.api.client` (`packages/<family>-api/src/client.ts`, the shared client of a multi-app repository). Every other
- * file, including another file of the same package, is a finding.
+ * The API layer is every file of the slots `fe.modules.api`, `fe.transport.client`, `fe.transport.outcome` (an app's
+ * `modules/api/`) and `fe.package.api*` (the shared api package): the Apollo clients and their links, the operations and the
+ * REST calls. `@apollo/client` is imported there and nowhere else, `axios` only by its REST calls (`modules/api/rest/`),
+ * `socket.io-client` only by `hooks/socketio/`. Every other file reaches the back end through an SWR hook over an operation.
  */
 export const fetchOnlyInApiClient = {
   meta: {
     type: "problem",
-    docs: { description: "The repository's single `fetch` (and `Request`, `EventSource`, `sendBeacon`) lives in the api client slot." },
+    docs: { description: "`fetch` (and `Request`, `EventSource`, `sendBeacon`) lives in the API layer (`modules/api`); Apollo, axios and socket.io-client are imported only in their homes; no other HTTP library exists." },
     schema: [],
     messages: {
       outside:
-        "`fetch` outside the api client (`modules/api/client.ts`, or the shared api package's `src/client.ts`). The repository has exactly one transport; a second one is a second place that must remember the timeout, the credential and the status mapping, and it will forget one. Call the client and take its `Outcome`.",
+        "`fetch` outside the API layer (`modules/api`, or the shared api package). The front end reaches its back end through one layer: the Apollo clients in `modules/api/graphql/clients/` carry every GraphQL operation and the axios calls in `modules/api/rest/` the few REST ones; a second path is a second place that must remember the timeout, the credential and the status mapping, and it will forget one. Call an operation of `modules/api` through its SWR hook (`hooks/swr/`).",
       channel:
-        "`{{name}}` opens a connection outside the api client. `Request`, `EventSource` and `navigator.sendBeacon` are transports of their own; the repository's one client owns every request. Call the client and take its `Outcome`.",
+        "`{{name}}` opens a connection outside the API layer. `Request`, `EventSource` and `navigator.sendBeacon` are transports of their own; the API layer (`modules/api`) owns every request, and realtime is the socket.io client of `hooks/socketio/`. Call an operation of `modules/api` through its SWR hook.",
       library:
-        "`{{name}}` is a second HTTP transport. The repository's one client (`modules/api/client.ts` or the api package's `src/client.ts`) is built on `fetch`; another library is another set of timeout, retry and error rules. Use the client.",
-      xhr: "`XMLHttpRequest` is a second transport. Use the repository's api client.",
+        "`{{name}}` is a second HTTP transport. The front end talks to its back end through Apollo (`modules/api/graphql`) and the axios REST calls (`modules/api/rest`); another library is another set of timeout, retry and error rules. Use an operation of `modules/api`.",
+      placed:
+        "`{{name}}` is imported outside {{where}}, the one place the front-end stack gives it. A component or hook that holds the transport itself skips the link chain (token, locale, retry, timeout) and the one result vocabulary. Call an operation of `modules/api` through its SWR hook (`hooks/swr/`), or listen through `hooks/socketio/`.",
+      xhr: "`XMLHttpRequest` is a second transport. Use an operation of the API layer (`modules/api`).",
     },
   },
   create(context) {
-    const filename = context.filename || context.getFilename()
-    const client = isApiClient(context)
+    const layer = isApiLayer(context)
     const library = (node, source) => {
-      if (typeof source === "string" && isTransportLibrary(source)) context.report({ node, messageId: "library", data: { name: source } })
+      const name = packageNameOf(source)
+      if (name === null || forbiddingConcern(source)) return
+      const placed = PLACED_TRANSPORTS.get(name)
+      if (placed) {
+        if (!placed.allowed(context)) context.report({ node, messageId: "placed", data: { name, where: placed.where } })
+      } else if (isStrayTransport(name)) context.report({ node, messageId: "library", data: { name: source } })
     }
     return {
       "Program:exit"() {
         for (const use of transportUses(context)) {
           if (use.kind === "xhr") context.report({ node: use.node, messageId: "xhr" })
-          else if (client) continue
+          else if (layer) continue
           else if (use.kind === "fetch") context.report({ node: use.node, messageId: "outside" })
           else context.report({ node: use.node, messageId: "channel", data: { name: use.name } })
         }
@@ -154,11 +174,11 @@ export const fetchOnlyInApiClient = {
 
 // -- FE-TRANSPORT-2 --------------------------------------------------------------------------------
 
-/** The client's `fetch` carries an abort signal, so a hung backend cannot hang a reader. */
+/** Every `fetch` of the API layer (a custom fetch handed to the Apollo http link, a raw call) carries an abort signal, so a hung backend cannot hang a reader. */
 export const clientFetchHasSignal = {
   meta: {
     type: "problem",
-    docs: { description: "Every `fetch` in `modules/api/client.ts` passes an AbortSignal (timeout or caller)." },
+    docs: { description: "Every `fetch` in the API layer (`modules/api`) passes an AbortSignal (timeout or caller)." },
     schema: [],
     messages: {
       signal:
@@ -166,7 +186,7 @@ export const clientFetchHasSignal = {
     },
   },
   create(context) {
-    if (!isApiClient(context)) return {}
+    if (!isApiLayer(context)) return {}
     return {
       "Program:exit"() {
         // The global `fetch` however it is reached; a request built as `new Request(url, init)` carries its signal in `init`.
@@ -191,22 +211,11 @@ export const clientFetchHasSignal = {
   },
 }
 
-/** The slots that make up the API layer: the app's `modules/api` and the shared api package. */
-const API_LAYER_SLOTS = ["fe.modules.api", "fe.transport.client", "fe.transport.outcome", "fe.package.api", "fe.package.api.client", "fe.package.api.outcome"]
-
 /**
- * True for a file of the API layer, except the data folders its slot allows (`__generated__/`: the types generated from the be
+ * True for a file of the API layer, except the generated wire types (`graphql/__generated__/`: types generated from the be
  * contract snapshots are data, not code the wire law governs).
  */
-const isTransportFile = (context) => {
-  const slotId = slotOfFile(context)
-  if (!API_LAYER_SLOTS.includes(slotId)) return false
-  const hfs = hfsOf(context)
-  const dataFolders = (hfs.slot(slotId).allows ?? []).filter((entry) => entry.endsWith("/")).map((entry) => entry.slice(0, -1))
-  const { root } = hfs.classify(context.filename || context.getFilename())
-  const below = hfs.relative(context.filename || context.getFilename()).slice(root.length + 1).split("/")
-  return !dataFolders.includes(below[0])
-}
+const isTransportFile = (context) => isApiLayer(context) && !hfsOf(context).relative(context.filename || context.getFilename()).split("/").includes("__generated__")
 
 // -- FE-TRANSPORT-3 --------------------------------------------------------------------------------
 
@@ -214,7 +223,7 @@ const isTransportFile = (context) => {
 export const noSharedTransportState = {
   meta: {
     type: "problem",
-    docs: { description: "`modules/api/**` holds no module-level `let`/`var`." },
+    docs: { description: "The API layer (`modules/api/**`) holds no module-level `let`/`var`." },
     schema: [],
     messages: {
       shared:
@@ -222,7 +231,6 @@ export const noSharedTransportState = {
     },
   },
   create(context) {
-    const filename = context.filename || context.getFilename()
     if (!isTransportFile(context)) return {}
     const check = (node) => {
       const declaration = node.type === "VariableDeclaration" ? node : node.declaration
@@ -378,9 +386,11 @@ const buildsRefused = (node) => {
 }
 
 /**
- * The client maps 401 and 403 to `refused`, so "sign in" is a state a reader can reach.
+ * A raw `fetch` answered in the transport owner maps 401 and 403 to `refused`, so "sign in" is a state a reader can reach.
  *
- * It judges a real branch in the client file: a comparison of the fetch response's status (typed as a `Response`) with 401 and with
+ * The Apollo clients reach the network through the http link and map an unauthenticated answer in the error link; the rule
+ * speaks only when a file of the clients folder (`fe.transport.client`, `fe.package.api.client`) calls `fetch` itself. It judges
+ * a real branch in that file: a comparison of the fetch response's status (typed as a `Response`) with 401 and with
  * 403 (`===`, `||`, a literal list, a `switch` with both cases), whose consequent builds an object with `kind: "refused"`. The three
  * literals lying anywhere in the file do not pass. A mapping delegated to a function in another file is not visible here and does
  * not pass either: the client is the one file that owns the status meaning.
@@ -388,7 +398,7 @@ const buildsRefused = (node) => {
 export const clientMapsAuthToRefused = {
   meta: {
     type: "problem",
-    docs: { description: "The api client branches on the response status 401 and 403 and builds a `refused` outcome there." },
+    docs: { description: "A file of the Apollo clients folder that calls `fetch` itself branches on the response status 401 and 403 and builds a `refused` outcome there." },
     schema: [],
     messages: {
       refused:
@@ -561,7 +571,10 @@ const constInit = (scope, identifier) => {
   return null
 }
 
-/** Wire types are generated from the contract; nobody types the wire by hand. */
+/**
+ * Wire types are generated from the contract; nobody types the wire by hand, and a GraphQL document is written only in the API
+ * layer (one file per operation, `modules/api/graphql/{queries,mutations}/`), where codegen reads it.
+ */
 export const noHandTypedWire = {
   meta: {
     type: "problem",
@@ -571,12 +584,12 @@ export const noHandTypedWire = {
       cast:
         "A response body is typed by hand here. An assertion or annotation is a claim nobody checks: when the backend changes the shape this still compiles and fails at a reader's screen. Narrow the body from `unknown` (`(await response.json()) as unknown`, then a check), or use the type generated from the be contract snapshot (`be/contracts/`, imported from `__generated__/`), and validate at the client.",
       document:
-        "A GraphQL document written inline in TypeScript. Documents live in `.graphql` files so codegen can generate their types and the contract check can read them.",
+        "A GraphQL document written outside the API layer. Each operation has one file in `modules/api/graphql/queries/` or `modules/api/graphql/mutations/` (`query-<x>.ts`, `mutation-<x>.ts`), where codegen generates its types and the contract check reads it; a component or hook calls that operation through its SWR hook.",
     },
   },
   create(context) {
-    const filename = context.filename || context.getFilename()
     const source = context.sourceCode ?? context.getSourceCode()
+    const documents = !isApiLayer(context)
     /** Local names of the type imports that resolve into a `__generated__/` directory. */
     const generated = new Set()
     /** True when a type node is `unknown` or names a type imported from the generated wire module. */
@@ -612,17 +625,17 @@ export const noHandTypedWire = {
         if (annotation && node.init && readsResponse(node.init) && !sanctioned(annotation)) context.report({ node, messageId: "cast" })
       },
       TaggedTemplateExpression(node) {
-        if (node.tag.type === "Identifier" && /^(?:gql|graphql)$/.test(node.tag.name)) {
+        if (documents && node.tag.type === "Identifier" && /^(?:gql|graphql)$/.test(node.tag.name)) {
           context.report({ node, messageId: "document" })
         }
       },
       TemplateLiteral(node) {
-        if (node.parent && node.parent.type === "TaggedTemplateExpression") return
+        if (!documents || (node.parent && node.parent.type === "TaggedTemplateExpression")) return
         const text = node.quasis[0] && node.quasis[0].value.cooked
         if (typeof text === "string" && GRAPHQL_TEXT.test(text)) context.report({ node, messageId: "document" })
       },
       Literal(node) {
-        if (typeof node.value === "string" && GRAPHQL_TEXT.test(node.value) && node.value.includes("}")) {
+        if (documents && typeof node.value === "string" && GRAPHQL_TEXT.test(node.value) && node.value.includes("}")) {
           context.report({ node, messageId: "document" })
         }
       },
@@ -678,10 +691,11 @@ const literalsOf = (checker, type, name, location) => {
 }
 
 /**
- * A result union is declared once per repository: `Outcome<T>` in the file of the slot the manifest marks `outcomeHome` (`fe.transport.outcome`, `fe.package.api.outcome`, or `fe.modules.db.outcome` in a lite app).
+ * A result vocabulary is declared once per repository: `GraphQLResponse` in the file of the slot the manifest marks `outcomeHome`
+ * (`fe.transport.outcome`: `modules/api/graphql/types.ts`, or `fe.package.api.outcome`: the api package's `src/graphql/types.ts`).
  *
  * A union type alias is a result union when its members are object types that ALL carry the same literal-typed discriminant, in the
- * result vocabulary: `ok` (both `true` and `false` among the members) or `kind` (a member of kind `"ok"` beside at least one failure
+ * result vocabulary: `success` or `ok` (both `true` and `false` among the members) or `kind` (a member of kind `"ok"` beside at least one failure
  * kind of the Outcome vocabulary: refused, forbidden, invalid, not-found, unavailable). A view union that a mapper derives from an
  * Outcome (`{ kind: "ready" } | { kind: "not-found" }`, no `ok` arm) is a screen state, not a second result vocabulary. The check reads the resolved members through the checker, so
  * `Ok<T> | Failure` and an intersection are seen as what they are, and no name (`*Outcome`, `*Result`) decides anything.
@@ -692,11 +706,11 @@ const literalsOf = (checker, type, name, location) => {
 export const oneOutcomeUnion = {
   meta: {
     type: "problem",
-    docs: { description: "A result union (`ok` / `kind` discriminant) is declared only in the outcome slot; elsewhere the code composes `Outcome<T>`." },
+    docs: { description: "A result union (`success` / `ok` / `kind` discriminant) is declared only in the outcome slot (`modules/api/graphql/types.ts`); elsewhere the code composes `GraphQLResponse<T>`." },
     schema: [],
     messages: {
       second:
-        "`{{name}}` is a second result union ({{discriminant}}). The repository has one vocabulary, `Outcome<T>`, declared in the one Outcome home of the repository (`modules/api/outcome.ts`, the api package's `src/outcome.ts`, or `modules/db/outcome.ts` in a lite app); a bespoke union here is a result shape the client, the status mapping and `outcome-kinds-exhaustive` know nothing about. Compose `Outcome<T>` (add the domain detail as its second parameter) instead of declaring another.",
+        "`{{name}}` is a second result union ({{discriminant}}). The repository has one result vocabulary, `GraphQLResponse<T>`, declared in its one outcome home (`modules/api/graphql/types.ts`, or the api package's `src/graphql/types.ts`); a bespoke union here is a result shape the Apollo clients, the toast (`showGraphQLToast`) and the SWR hooks know nothing about. Compose `GraphQLResponse<T>` (the domain detail goes in its `data`) instead of declaring another.",
     },
   },
   create(context) {
@@ -713,13 +727,13 @@ export const oneOutcomeUnion = {
         if (!type.isUnion?.() || type.types.length < 2) return
         // The members must all be object types (an object, or an intersection of them).
         if (!type.types.every((member) => (member.flags & (ts.TypeFlags.Object | ts.TypeFlags.Intersection)) !== 0)) return
-        for (const discriminant of ["ok", "kind"]) {
+        for (const discriminant of ["success", "ok", "kind"]) {
           const values = type.types.map((member) => literalsOf(checker, member, discriminant, tsNode))
           if (values.some((entry) => entry === null)) continue
           const flat = values.flat()
-          // `ok` is a discriminant only when each member pins it to one value; `{ ok: boolean }` on every member is a flag, not a tag.
+          // `success` / `ok` is a discriminant only when each member pins it to one value; `{ ok: boolean }` on every member is a flag, not a tag.
           const isResult =
-            discriminant === "ok"
+            discriminant !== "kind"
               ? values.every((entry) => entry.length === 1) && flat.includes(true) && flat.includes(false)
               : flat.includes("ok") && flat.some((value) => value !== "ok" && RESULT_KINDS.has(value))
           if (isResult) {

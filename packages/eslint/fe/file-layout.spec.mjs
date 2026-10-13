@@ -78,16 +78,15 @@ test("FILE-6: the routing tree holds route files and nothing else", () => {
       { filename: at(`${A}/not-found.tsx`), code: "export default () => null" },
       { filename: at(`${A}/layout.tsx`), code: "export default ({ children }) => children" },
       { filename: at(`${A}/opengraph-image.tsx`), code: "export default () => null" },
-      // Server code and the Next opt-out folder are not screens and are not this rule business.
-      { filename: at(`${A}/api/health/route.ts`), code: "export const GET = () => null" },
+      // The one route handler of the route tree (health/live) and the Next opt-out folder are not screens and are not this rule business.
+      { filename: at(`${A}/health/live/route.ts`), code: "export const GET = () => null" },
       { filename: at(`${A}/_lib/token.ts`), code: "export const t = 1" },
       // A page owner in the tier that groups it with its siblings.
       { filename: at(`${F}/pages/ProvisioningPage/component.tsx`), code: cmp },
       // The second app of the repository has its own routing tree, judged the same way.
       { filename: at("apps/admin/src/app/[locale]/dashboard/page.tsx"), code: "export default () => null" },
-      // a default slot and a nested route handler
+      // a default slot
       { filename: at(`${L}/@modal/default.tsx`), code: "export default () => null" },
-      { filename: at(`${L}/api/webhook/route.ts`), code: "export const POST = () => null" },
       // a folder called `app` that no slot owns is not a routing tree
       { filename: at("apps/web/src/modules/app/helper.ts"), code: "export const t = 1" },
     ],
@@ -96,6 +95,10 @@ test("FILE-6: the routing tree holds route files and nothing else", () => {
       { filename: at(`${A}/error.tsx`), code: "export default () => null", errors: [{ messageId: "stray" }] },
       { filename: at(`${A}/loading.tsx`), code: "export default () => null", errors: [{ messageId: "stray" }] },
       { filename: at(`${A}/[lang]/page.tsx`), code: "export default () => null", errors: [{ messageId: "stray" }] },
+      // the front end serves no API: a route handler other than health/live is no file of the route tree (FE_ROUTE_HANDLER_FORBIDDEN)
+      { filename: at(`${A}/api/health/route.ts`), code: "export const GET = () => null", errors: [{ messageId: "stray" }] },
+      { filename: at(`${L}/api/webhook/route.ts`), code: "export const POST = () => null", errors: [{ messageId: "stray" }] },
+      { filename: at(`${A}/health/ready/route.ts`), code: "export const GET = () => null", errors: [{ messageId: "stray" }] },
       // The exact file this rule was written for: it built, linted, typechecked and was approved.
       { filename: at(`${L}/provisioning/workers-page.tsx`), code: "export const WorkersPage = () => null", errors: [{ messageId: "stray" }] },
       { filename: at(`${L}/dashboard/DashboardHeader.tsx`), code: "export const H = () => null", errors: [{ messageId: "stray" }] },

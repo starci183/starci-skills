@@ -55,7 +55,7 @@ test("FE-NEXT-2: the locale segment is [locale]", () => {
     valid: [
       { filename: at("apps/web/src/app/[locale]/page.tsx"), code: "export default function P() {}" },
       { filename: at("apps/web/src/app/[locale]/courses/[slug]/page.tsx"), code: "export default function P() {}" },
-      { filename: at("apps/web/src/app/api/route.ts"), code: "export const GET = 1" },
+      { filename: at("apps/web/src/app/health/live/route.ts"), code: "export const GET = 1" },
       // a folder named [lang] that the route slot does not own is not a locale segment
       { filename: at("apps/web/src/components/app/[lang]/page.tsx"), code: "export default function P() {}" },
     ],
@@ -74,12 +74,15 @@ test("FE-NEXT-3: next-intl is the only i18n stack", () => {
       { code: "import { useTranslations } from \"next-intl\"" },
       { code: "import { getTranslations } from \"next-intl/server\"" },
       { code: "import { useState } from \"react\"" },
+      // an i18n stack the fe-stack catalog forbids by name is fe-stack-import's finding, judged once there
+      { code: "import { useTranslation } from \"react-i18next\"" },
+      { code: "import i18n from \"i18next\"" },
+      { code: "import { useIntl } from \"react-intl\"" },
     ],
     invalid: [
-      { code: "import { useTranslation } from \"react-i18next\"", errors: [{ messageId: "stack" }] },
-      { code: "import i18n from \"i18next\"", errors: [{ messageId: "stack" }] },
-      { code: "import { useIntl } from \"react-intl\"", errors: [{ messageId: "stack" }] },
       { code: "import { t } from \"@lingui/core\"", errors: [{ messageId: "stack" }] },
+      { code: "import useTranslation from \"next-translate/useTranslation\"", errors: [{ messageId: "stack" }] },
+      { code: "import { createI18n } from \"typesafe-i18n\"", errors: [{ messageId: "stack" }] },
     ],
   })
 })

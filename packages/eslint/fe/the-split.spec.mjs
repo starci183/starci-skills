@@ -16,7 +16,7 @@ const tester = slotTester()
 
 const DRAWING = at("apps/web/src/components/blocks/dashboard/DailyQuest/component.tsx")
 const CONNECTED = at("apps/web/src/components/blocks/dashboard/DailyQuest/index.tsx")
-const HOOK = at("apps/web/src/hooks/swr/useQueryMyDailyQuestSwr.ts")
+const HOOK = at("apps/web/src/hooks/swr/api/graphql/queries/useQueryMyDailyQuestSwr.ts")
 const NOT_A_BLOCK = at("apps/web/src/modules/components/blocks/DailyQuest/index.tsx")
 const NOT_A_DRAWING = at("apps/web/src/modules/components/blocks/DailyQuest/component.tsx")
 
@@ -39,6 +39,7 @@ test("SPLIT-1: the drawing half receives everything and asks for nothing", () =>
       { filename: HOOK, code: "const data = useSWR(key, fetcher)" },
       // a call that merely looks similar is not reaching for anything
       { filename: DRAWING, code: "const rows = useMemo(() => build(input), [input])" },
+      { filename: DRAWING, code: "const p = usePlatform()\nconst s = useFormStatus()" },
       // a `component.tsx` that no slot owns is not a drawing half
       { filename: NOT_A_DRAWING, code: "const q = useQueryMyDailyQuestSwr()" },
       // the pure half is not the drawing role of another owner's entry
@@ -49,6 +50,16 @@ test("SPLIT-1: the drawing half receives everything and asks for nothing", () =>
       { filename: DRAWING, code: "const t = useTranslations(\"quest\")", errors: [{ messageId: "reaches" }] },
       { filename: DRAWING, code: "const l = useLocale()", errors: [{ messageId: "reaches" }] },
       { filename: DRAWING, code: "const r = queryResolveRoute({ request })", errors: [{ messageId: "reaches" }] },
+      // the data, form, state, socket and toast hooks of the front-end stack reach for the world too
+      { filename: DRAWING, code: "const m = useMutateClaimDailyQuestRewardSwr()", errors: [{ messageId: "reaches" }] },
+      { filename: DRAWING, code: "const u = usePostUploadSwr()", errors: [{ messageId: "reaches" }] },
+      { filename: DRAWING, code: "const form = useContactForm()", errors: [{ messageId: "reaches" }] },
+      { filename: DRAWING, code: "const form = useFormContext()", errors: [{ messageId: "reaches" }] },
+      { filename: DRAWING, code: "const dispatch = useAppDispatch()", errors: [{ messageId: "reaches" }] },
+      { filename: DRAWING, code: "const n = useCartStore((state) => state.count)", errors: [{ messageId: "reaches" }] },
+      { filename: DRAWING, code: "const chat = useCommunityChatSocketIo()", errors: [{ messageId: "reaches" }] },
+      { filename: DRAWING, code: "const enroll = useEnrollWithToast()", errors: [{ messageId: "reaches" }] },
+      { filename: DRAWING, code: "const { data } = useQuery(QUERY_COURSE)", errors: [{ messageId: "reaches" }] },
       // every owner that splits has a drawing half: a feature page and a shared-package leaf too
       { filename: at("apps/web/src/features/pages/Home/component.tsx"), code: "const l = useLocale()", errors: [{ messageId: "reaches" }] },
       { filename: at("packages/nivo-ui/src/leaves/Badge/component.tsx"), code: "const l = useLocale()", errors: [{ messageId: "reaches" }] },

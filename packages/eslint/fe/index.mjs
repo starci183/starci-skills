@@ -20,6 +20,7 @@ import { recommended as clientBoundaryRecommended, rules as clientBoundaryRules 
 import { recommended as commentsRecommended, rules as commentsRules } from "./comments.mjs"
 import { recommended as classNamesRecommended, rules as classNamesRules } from "./class-names.mjs"
 import { recommended as envOwnerRecommended, rules as envOwnerRules } from "./env-owner.mjs"
+import { recommended as feStackRecommended, rules as feStackRules } from "./fe-stack.mjs"
 import { recommended as fileLayoutRecommended, rules as fileLayoutRules } from "./file-layout.mjs"
 import { recommended as grammarBoundaryRecommended, rules as grammarBoundaryRules } from "./grammar-boundary.mjs"
 import { recommended as formattingRecommended, rules as formattingRules } from "./formatting.mjs"
@@ -63,6 +64,7 @@ const CONTRIBUTIONS = [
     recommended: classNamesRecommended,
   },
   { law: "env-owner", rules: envOwnerRules, recommended: envOwnerRecommended },
+  { law: "fe-stack", rules: feStackRules, recommended: feStackRecommended },
   { law: "file-layout", rules: fileLayoutRules, recommended: fileLayoutRecommended },
   { law: "grammar-boundary", rules: grammarBoundaryRules, recommended: grammarBoundaryRecommended },
   { law: "formatting", rules: formattingRules, recommended: formattingRecommended },

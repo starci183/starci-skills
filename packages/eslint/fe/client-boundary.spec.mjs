@@ -8,6 +8,7 @@ import test from "node:test"
 import { at, slotTester, typedTester } from "./fixtures/typed/tester.mjs"
 import {
   clientNoServerImport,
+  noServerAction,
   serverModuleMarksServerOnly,
   noDangerousHtml,
   responseCookieAttributes,
@@ -43,6 +44,20 @@ test("FE-CLIENT-1: the directive sits only at an interaction boundary", () => {
       // the providers wrapper the server layout renders around its children (role `providers` of fe.route)
       { filename: at("apps/web/src/app/[locale]/providers.tsx"), code: DIRECTIVE },
       { filename: at("apps/web/src/app/providers.tsx"), code: DIRECTIVE },
+      // the client state of the stack runs only in the browser: a provider, every file of hooks/, redux/ and modules/toast/
+      { filename: at("apps/web/src/components/providers/Theme/index.tsx"), code: DIRECTIVE },
+      { filename: at("apps/web/src/redux/ReduxProvider.tsx"), code: DIRECTIVE },
+      { filename: at("apps/web/src/redux/hooks.ts"), code: DIRECTIVE },
+      { filename: at("apps/web/src/redux/slices/course.ts"), code: DIRECTIVE },
+      { filename: at("apps/web/src/modules/toast/toast.tsx"), code: DIRECTIVE },
+      { filename: at("apps/web/src/modules/toast/hooks.ts"), code: DIRECTIVE },
+      { filename: at("apps/web/src/hooks/swr/SwrSideEffects.tsx"), code: DIRECTIVE },
+      { filename: at("apps/web/src/hooks/socketio/SocketIoSideEffects.tsx"), code: DIRECTIVE },
+      { filename: at("apps/web/src/hooks/swr/api/graphql/queries/useQueryCourseSwr.ts"), code: DIRECTIVE },
+      { filename: at("apps/web/src/hooks/rhf/useContactForm.ts"), code: DIRECTIVE },
+      { filename: at("apps/web/src/hooks/socketio/sockets.ts"), code: DIRECTIVE },
+      { filename: at("apps/web/src/hooks/zustand/cart/store.ts"), code: DIRECTIVE },
+      { filename: at("apps/web/src/hooks/session/useSession.ts"), code: DIRECTIVE },
       // no directive, no finding, wherever the file sits
       { filename: at("apps/web/src/app/[locale]/layout.tsx"), code: PLAIN },
       { filename: at("apps/web/src/app/[locale]/page.tsx"), code: PLAIN },
@@ -68,8 +83,10 @@ test("FE-CLIENT-1: the directive sits only at an interaction boundary", () => {
       { filename: at("apps/web/src/leaves/Menu/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
       { filename: at("apps/web/src/components/branches/Rail/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
       { filename: at("apps/web/src/components/blocks/Feed/component.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
-      { filename: at("apps/web/src/hooks/session/useSession.ts"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
-      { filename: at("apps/web/src/modules/api/client.ts"), code: "'use client'\nexport const x = 1", errors: [{ messageId: "elsewhere" }] },
+      { filename: at("apps/web/src/modules/api/graphql/clients/index.ts"), code: "'use client'\nexport const x = 1", errors: [{ messageId: "elsewhere" }] },
+      // a module that is not client state: the auth client, an operation of the API layer
+      { filename: at("apps/web/src/modules/auth/index.ts"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
+      { filename: at("apps/web/src/modules/api/graphql/queries/query-course.ts"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
     ],
   })
 })
@@ -79,12 +96,14 @@ test("FE-CLIENT-2: a client component imports nothing that exists only on the se
   slots.run("client-no-server-import", clientNoServerImport, {
     valid: [
       { filename: CLIENT, code: '"use client"\nimport { useState } from "react"' },
-      { filename: CLIENT, code: '"use client"\nimport useSWR from "swr"\nimport { readCourses } from "@/hooks/courses/useCourses"' },
+      { filename: CLIENT, code: '"use client"\nimport useSWR from "swr"\nimport { useQueryCoursesSwr } from "@/hooks/swr"' },
+      // an operation of modules/api runs in the browser through its SWR hook
+      { filename: CLIENT, code: '"use client"\nimport { queryCourses } from "@/modules/api/graphql/queries/query-courses"' },
       { filename: CLIENT, code: '"use client"\nimport type { Headers } from "next/headers"' },
       // a server component may import all of it
-      { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: 'import { headers } from "next/headers"\nimport { readCourses } from "@/modules/api/courses/read-courses"' },
+      { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: 'import { headers } from "next/headers"\nimport { getTranslations } from "next-intl/server"' },
       { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: 'import "server-only"' },
-      // a `read-` file outside the api module is not a server reader
+      // a file named like a reader is not server code by its name
       { filename: CLIENT, code: '"use client"\nimport { readLocal } from "@/modules/storage/read-local"' },
     ],
     invalid: [
@@ -94,11 +113,26 @@ test("FE-CLIENT-2: a client component imports nothing that exists only on the se
       { filename: CLIENT, code: '"use client"\nimport { getTranslations } from "next-intl/server"', errors: [{ messageId: "server" }] },
       { filename: CLIENT, code: '"use client"\nimport { NextResponse } from "next/server"', errors: [{ messageId: "server" }] },
       { filename: CLIENT, code: '"use client"\nimport { join } from "path"', errors: [{ messageId: "server" }] },
-      {
-        filename: CLIENT,
-        code: '"use client"\nimport { readCourses } from "@/modules/api/courses/read-courses"',
-        errors: [{ messageId: "server" }],
-      },
+    ],
+  })
+})
+
+test("FE-CLIENT-2c: the front end holds no Server Action", () => {
+  slots.run("no-server-action", noServerAction, {
+    valid: [
+      { filename: at("apps/web/src/modules/api/graphql/mutations/mutation-enroll.ts"), code: "export const mutationEnroll = () => 1" },
+      // a string that merely reads like the directive is not one
+      { filename: at("apps/web/src/hooks/course/useCourse.ts"), code: "const s = \"use server\"\nexport const useCourse = () => s" },
+      { filename: at("apps/web/src/hooks/course/useCourse.ts"), code: "export const useCourse = () => { const s = 1; \"use server\"; return s }" },
+      { filename: at("apps/web/src/components/blocks/Feed/index.tsx"), code: DIRECTIVE },
+    ],
+    invalid: [
+      { filename: at("apps/web/src/features/onboarding/actions.ts"), code: "\"use server\"\nexport const save = async () => 1", errors: [{ messageId: "action" }] },
+      { filename: at("apps/web/src/modules/orders/actions.ts"), code: "\"use strict\"\n\"use server\"\nexport const save = async () => 1", errors: [{ messageId: "action" }] },
+      // the function-level form, in a declaration, an expression and an arrow
+      { filename: at("apps/web/src/components/blocks/Feed/index.tsx"), code: "export async function save() { \"use server\"; return 1 }", errors: [{ messageId: "action" }] },
+      { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: "const save = async function () { \"use server\" }", errors: [{ messageId: "action" }] },
+      { filename: at("apps/web/src/app/[locale]/page.tsx"), code: "const save = async () => { \"use server\" }", errors: [{ messageId: "action" }] },
     ],
   })
 })
@@ -150,8 +184,8 @@ test("FE-CLIENT-2b: a module that uses the server marks itself server-only", () 
       { filename: MODULE, code: MARKED + 'import { getTranslations } from "next-intl/server"\nexport const t = () => getTranslations()' },
       { filename: MODULE, code: MARKED + 'import { readFile } from "node:fs/promises"\nexport const r = readFile' },
       { filename: MODULE, code: '/** The reader. */\nimport "server-only"\nimport { NextResponse } from "next/server"\nexport const r = NextResponse' },
-      // a file-level "use server" directive is the prologue: the marker follows it (Next requires the directive at the top of a Server Action module)
-      { filename: MODULE, code: '"use server"\nimport "server-only"\nimport { headers } from "next/headers"\nexport const read = async () => headers()' },
+      // a file-level directive is the prologue: the marker follows it
+      { filename: MODULE, code: '"use strict"\nimport "server-only"\nimport { headers } from "next/headers"\nexport const read = async () => headers()' },
       // importing a marked module from a marked module
       { filename: MODULE, code: MARKED + 'import { readMarked } from "../marked/read-marked"\nexport const r = readMarked' },
       // a module with no server import needs no marker; importing an unmarked module does not make one
@@ -163,14 +197,14 @@ test("FE-CLIENT-2b: a module that uses the server marks itself server-only", () 
       { filename: MODULE, code: 'import type { readMarked } from "../marked/read-marked"\nexport type R = typeof readMarked' },
       // route files are server components by construction: decided by the slot, not the name
       { filename: at("apps/web/src/app/[locale]/page.tsx"), code: 'import { headers } from "next/headers"\nexport default async function Page() { await headers(); return null }' },
-      { filename: at("apps/web/src/app/[locale]/api/x/route.ts"), code: 'import { NextResponse } from "next/server"\nexport const GET = () => NextResponse.json({})' },
+      { filename: at("apps/web/src/app/health/live/route.ts"), code: 'import { NextResponse } from "next/server"\nexport const GET = () => NextResponse.json({})' },
       { filename: at("apps/web/src/proxy.ts"), code: 'import { NextResponse } from "next/server"\nexport const proxy = () => NextResponse.next()' },
       // a server COMPONENT (feature page, connected block) is judged by reachability (FE_CLIENT_REACHES_SERVER), not by a marker:
       // a components/blocks/<name>/index.tsx that imports a marked reader needs no marker of its own
       { filename: FEATURE, code: 'import { getTranslations } from "next-intl/server"\nexport default async function Home() { await getTranslations(); return null }' },
       { filename: at("apps/web/src/components/blocks/Sections/index.tsx"), code: 'import { readMarked } from "../../../modules/marked/read-marked"\nexport const Sections = async () => { await readMarked(); return null }' },
-      // a marked reader passes
-      { filename: at("apps/web/src/modules/api/course/read-course.ts"), code: MARKED + 'import { get } from "../client"\nexport const readCourse = () => get("/course")' },
+      // an operation of the API layer runs in the browser: it imports no server API and needs no marker
+      { filename: at("apps/web/src/modules/api/graphql/queries/query-course.ts"), code: 'import { createAuthClient } from "../clients"\nexport const queryCourse = () => createAuthClient()' },
       // a client file is client-no-server-import's business
       { filename: HOOK, code: '"use client"\nimport { headers } from "next/headers"\nexport const useX = () => headers' },
       // files no slot owns are not judged
@@ -184,15 +218,15 @@ test("FE-CLIENT-2b: a module that uses the server marks itself server-only", () 
       { filename: MODULE, code: 'import { readFile } from "node:fs/promises"\nexport const r = readFile', errors: [{ messageId: "mark" }] },
       { filename: MODULE, code: 'import fs from "fs"\nexport const r = fs', errors: [{ messageId: "mark" }] },
       // the marker must come first: after other imports it is not "starts with"
-      { filename: MODULE, code: '"use server"\nimport { headers } from "next/headers"\nimport "server-only"\nexport const read = async () => headers()', errors: [{ messageId: "mark" }] },
+      { filename: MODULE, code: '"use strict"\nimport { headers } from "next/headers"\nimport "server-only"\nexport const read = async () => headers()', errors: [{ messageId: "mark" }] },
       { filename: MODULE, code: 'import { headers } from "next/headers"\nimport "server-only"\nexport const r = headers', errors: [{ messageId: "mark" }] },
       // a module reached through a resolved import that is itself server-only
       { filename: MODULE, code: 'import { readMarked } from "../marked/read-marked"\nexport const r = readMarked', errors: [{ messageId: "mark" }] },
       { filename: HOOK, code: 'import { readMarked } from "../../modules/marked/read-marked"\nexport const useX = () => readMarked()', errors: [{ messageId: "mark" }] },
       { filename: MODULE, code: 'export { readMarked } from "../marked/read-marked"', errors: [{ messageId: "mark" }] },
       { filename: MODULE, code: 'export * from "../marked/read-marked"', errors: [{ messageId: "mark" }] },
-      // a server reader is server-only by its role, even when it imports only the client
-      { filename: at("apps/web/src/modules/api/course/read-course.ts"), code: 'import { get } from "../client"\nexport const readCourse = () => get("/course")', errors: [{ messageId: "mark" }] },
+      // a file of the API layer that reaches a server API is a server module like any other
+      { filename: at("apps/web/src/modules/api/graphql/queries/query-course.ts"), code: 'import { headers } from "next/headers"\nexport const queryCourse = () => headers()', errors: [{ messageId: "mark" }] },
       // one report per server import
       { filename: MODULE, code: 'import { headers } from "next/headers"\nimport fs from "node:fs"\nexport const r = [headers, fs]', errors: [{ messageId: "mark" }, { messageId: "mark" }] },
     ],
@@ -200,7 +234,7 @@ test("FE-CLIENT-2b: a module that uses the server marks itself server-only", () 
 })
 
 const cookieTester = typedTester()
-const ROUTE = at("apps/web/src/app/api/session/route.ts")
+const ROUTE = at("apps/web/src/app/auth/callback/route.ts")
 const SESSION = [
   'import { NextResponse } from "next/server"',
   'import { cookies } from "next/headers"',
@@ -215,7 +249,7 @@ test("FE-CLIENT-5: a written cookie states httpOnly and is secure and same-site"
       { filename: ROUTE, code: `${SESSION}const response = NextResponse.json({ ok: true })\nresponse.cookies.set("app-session", "t", SESSION_OPTIONS)` },
       // clearing keeps the attributes through a spread of the as-const constant
       { filename: ROUTE, code: `${SESSION}const response = NextResponse.json({ ok: true })\nresponse.cookies.set("app-session", "", { ...SESSION_OPTIONS, maxAge: 0 })` },
-      // the object form, and a server action writing through cookies()
+      // the object form, and a function writing through cookies()
       { filename: ROUTE, code: `${SESSION}const response = NextResponse.json({ ok: true })\nresponse.cookies.set({ name: "app-session", value: "t", ...SESSION_OPTIONS })` },
       { filename: ROUTE, code: `${SESSION}export const signOut = async () => { (await cookies()).set("app-session", "", { ...SESSION_OPTIONS, maxAge: 0 }) }` },
       // a preference page script must read states httpOnly false on purpose

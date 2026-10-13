@@ -10,18 +10,33 @@
  * The directive is allowed in exactly the places the framework or the interaction requires:
  *   - the `index.tsx` of an interactive block (or overlay), which is the connected half;
  *   - a leaf, whose interactivity is intrinsic (a menu, a tooltip trigger);
- *   - `error.tsx` and `global-error.tsx`, which Next requires to be client components.
+ *   - `error.tsx` and `global-error.tsx`, which Next requires to be client components;
+ *   - the client state of the front-end stack, which only ever runs in the browser: a provider of
+ *     `components/providers/<name>/index.tsx`, every file of `hooks/` (the SWR, form, store, socket and effect hooks and the
+ *     side-effect components), the redux store (`redux/`) and the toast module (`modules/toast/`). A directive there states
+ *     what the file already is; it ships nothing a server component would have kept.
  * Everything below a client block is already on the client and needs no directive; everything
  * above it is a server component and must not have one.
  */
 
 import ts from "typescript"
-import { classifyImport, fileOf, isProductSource, kindOfFile, roleOfFile, slotOfFile, tierOfFile } from "./lib/scope.mjs"
+import { isProductSource, kindOfFile, roleOfFile, slotOfFile, tierOfFile } from "./lib/scope.mjs"
 import { typed } from "./lib/types.mjs"
 
-/** The route roles that are client-only by the framework's own rule: `error` and `global-error`. */
 /** Route-tree roles that are client components by construction: the error boundaries, and the providers wrapper a layout renders. */
 const FRAMEWORK_CLIENT_ROLES = new Set(["error", "global-error", "providers"])
+
+/** The slots of client state outside the hooks tier: the redux store and the toast module (fe-stack state-global, toast). */
+const CLIENT_STATE_SLOTS = new Set(["fe.redux", "fe.modules.toast"])
+
+/**
+ * The client state of the front-end stack, which runs only in the browser, so the directive states what the file already is: a
+ * provider entry (`fe.components.providers`), every file of the hooks tier, the redux store and the toast module.
+ */
+const isClientState = (context) =>
+  (slotOfFile(context) === "fe.components.providers" && roleOfFile(context) === "entry") ||
+  tierOfFile(context) === "hooks" ||
+  CLIENT_STATE_SLOTS.has(slotOfFile(context))
 
 /** True when the program opens with the `"use client"` directive. */
 const clientDirective = (program) =>
@@ -41,7 +56,8 @@ const isInteractionBoundary = (context) => {
 }
 
 /** Where the directive is a legitimate boundary. */
-const isBoundary = (context) => (slotOfFile(context) === "fe.route" && FRAMEWORK_CLIENT_ROLES.has(roleOfFile(context))) || isInteractionBoundary(context)
+const isBoundary = (context) =>
+  (slotOfFile(context) === "fe.route" && FRAMEWORK_CLIENT_ROLES.has(roleOfFile(context))) || isInteractionBoundary(context) || isClientState(context)
 
 /** The slot a file fills in the route tree (its role in `fe.route`, or the page or layout owner of a feature), when it fills one. */
 const routeFill = (context) => {
@@ -55,13 +71,13 @@ const routeFill = (context) => {
 export const useClientOnlyAtBoundary = {
   meta: {
     type: "problem",
-    docs: { description: "`\"use client\"` appears only at a block index, a leaf, or a Next error boundary." },
+    docs: { description: "`\"use client\"` appears only at a block index, a leaf, a Next error boundary, or the client state of the stack (a provider, `hooks/`, `redux/`, `modules/toast/`)." },
     schema: [],
     messages: {
       slot:
         "`\"use client\"` on a {{slot}}. Routes, pages and layouts are server components: making one a client component ships its whole subtree, including the message catalog, to every reader and stops it reading data on the server. Move the interaction into a block below it and put the directive on that block's `index.tsx`; context providers go in the route tree's `providers.tsx`.",
       elsewhere:
-        "`\"use client\"` here is not at an interaction boundary. The directive belongs on the `index.tsx` of the interactive block (or overlay), on a leaf whose interaction is intrinsic, on `error.tsx`/`global-error.tsx`, or on the route tree's `providers.tsx` (the context providers a layout renders around its children). Below a client block the file is already client; above one it must stay a server component.",
+        "`\"use client\"` here is not at an interaction boundary. The directive belongs on the `index.tsx` of the interactive block (or overlay), on a leaf whose interaction is intrinsic, on `error.tsx`/`global-error.tsx`, on the route tree's `providers.tsx` (the context providers a layout renders around its children), or on the client state of the stack (`components/providers/<name>/index.tsx`, `hooks/`, `redux/`, `modules/toast/`). Below a client block the file is already client; above one it must stay a server component.",
     },
   },
   create(context) {
@@ -92,25 +108,18 @@ const serverApiReason = (source) => {
   return null
 }
 
-/** A server-only source: the marker package, a server API, a server reader (role `reader` of slot `fe.modules.api`). */
-const serverOnlyReason = (context, source) => {
-  if (source === "server-only") return "`server-only`"
-  const api = serverApiReason(source)
-  if (api) return api
-  const target = classifyImport(context, source)
-  if (target?.slot === "fe.modules.api" && target.role === "reader") return `the server reader \`${source}\``
-  return null
-}
+/** A server-only source: the marker package or a server API. */
+const serverOnlyReason = (source) => (source === "server-only" ? "`server-only`" : serverApiReason(source))
 
 /** A client component imports nothing that only exists on the server. */
 export const clientNoServerImport = {
   meta: {
     type: "problem",
-    docs: { description: "A `\"use client\"` file does not import `server-only`, `next/headers`, a Node built-in or a server reader." },
+    docs: { description: "A `\"use client\"` file does not import `server-only`, `next/headers`, `next/server`, `next-intl/server` or a Node built-in." },
     schema: [],
     messages: {
       server:
-        "This client component imports {{what}}, which exists only on the server. The build either fails or, worse, pulls server code and its secrets toward the browser bundle. Read the data in a server component or a server reader and pass the result down as props, or call the app client through SWR.",
+        "This client component imports {{what}}, which exists only on the server. The build either fails or, worse, pulls server code and its secrets toward the browser bundle. Read the data through an SWR hook of `hooks/swr` over an operation of `modules/api`, and keep request-scoped server APIs in server components.",
     },
   },
   create(context) {
@@ -121,7 +130,7 @@ export const clientNoServerImport = {
       },
       ImportDeclaration(node) {
         if (!client || node.importKind === "type") return
-        const what = serverOnlyReason(context, String(node.source.value))
+        const what = serverOnlyReason(String(node.source.value))
         if (what) context.report({ node, messageId: "server", data: { what } })
       },
     }
@@ -139,7 +148,7 @@ const isMarkerStatement = (statement) =>
 
 /** True when a TypeScript source file opens with `import "server-only"`. */
 const tsFileIsMarked = (file) => {
-  // a file-level directive ("use server") is the prologue: the marker is the first statement after it
+  // a file-level directive ("use strict") is the prologue: the marker is the first statement after it
   const first = file.statements.find((statement) => !(ts.isExpressionStatement(statement) && ts.isStringLiteral(statement.expression)))
   return Boolean(first) && ts.isImportDeclaration(first) && !first.importClause && ts.isStringLiteral(first.moduleSpecifier) && first.moduleSpecifier.text === "server-only"
 }
@@ -177,14 +186,13 @@ export const serverModuleMarksServerOnly = {
     // A block or a page is a server or client COMPONENT, not a server module: whether client code reaches the server through it is
     // the machine's multi-hop question (FE_CLIENT_REACHES_SERVER). The marker belongs to the modules that hold server work.
     if (COMPONENT_TIERS.has(tierOfFile(context))) return {}
-    const reader = roleOfFile(context) === "reader"
     let client = false
     let marked = false
     const uses = []
     return {
       Program(program) {
         client = clientDirective(program) !== null
-        // a file-level directive ("use server") is the prologue, not a statement: the marker is the first statement after it
+        // a file-level directive ("use strict") is the prologue, not a statement: the marker is the first statement after it
         marked = isMarkerStatement(program.body.find((statement) => !(statement.type === "ExpressionStatement" && typeof statement.directive === "string")))
       },
       "ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration"(node) {
@@ -204,10 +212,44 @@ export const serverModuleMarksServerOnly = {
       "Program:exit"() {
         // a "use client" file that imports the server is client-no-server-import's finding, not a missing marker
         if (client || marked) return
-        // A server reader (`read-*.ts`, role `reader` of the api slot) is server-only by its role, whatever it imports.
-        if (reader && uses.length === 0) context.report({ node: context.sourceCode.ast, messageId: "mark", data: { what: "the request (it is a server reader)" } })
         for (const use of uses) context.report({ node: use.node, messageId: "mark", data: { what: use.what } })
       },
+    }
+  },
+}
+
+// -- FE-CLIENT-2c (R243 FE_SERVER_ACTION_FORBIDDEN) ------------------------------------------------
+
+/**
+ * The front end serves no API: no `"use server"` directive, at the top of a module or as the first statement of a function.
+ * Reads and writes reach the back end through the operations of `modules/api` and the SWR hooks; a write that must run on a
+ * server is a GraphQL mutation of the back end.
+ */
+export const noServerAction = {
+  meta: {
+    type: "problem",
+    docs: { description: "No `\"use server\"` directive (module or function level): the front end holds no Server Action." },
+    schema: [],
+    messages: {
+      action:
+        "`\"use server\"` makes this a Server Action: an HTTP endpoint the front end serves, with its own input parsing, credential and error mapping beside the back end's. The front end serves no API. Write it as a GraphQL mutation of the back end, call it through its operation in `modules/api/graphql/mutations/` and its SWR hook (`hooks/swr/`), and report the outcome through `modules/toast`.",
+    },
+  },
+  create(context) {
+    const check = (statements) => {
+      for (const statement of statements ?? []) {
+        if (statement.type !== "ExpressionStatement" || typeof statement.directive !== "string") return
+        if (statement.directive === "use server") context.report({ node: statement, messageId: "action" })
+      }
+    }
+    const body = (node) => {
+      if (node.body?.type === "BlockStatement") check(node.body.body)
+    }
+    return {
+      Program: (program) => check(program.body),
+      FunctionDeclaration: body,
+      FunctionExpression: body,
+      ArrowFunctionExpression: body,
     }
   },
 }
@@ -348,6 +390,7 @@ export const rules = {
   "use-client-only-at-boundary": useClientOnlyAtBoundary,
   "client-no-server-import": clientNoServerImport,
   "server-module-marks-server-only": serverModuleMarksServerOnly,
+  "no-server-action": noServerAction,
   "web-storage-only-in-modules": webStorageOnlyInModules,
   "no-dangerous-html": noDangerousHtml,
   "response-cookie-attributes": responseCookieAttributes,

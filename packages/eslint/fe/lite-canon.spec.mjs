@@ -28,7 +28,7 @@ test("one app may own shell composites while two apps must share them", () => {
   })
 })
 
-test("the Outcome home follows slot data rather than a remembered slot id", () => {
+test("the result vocabulary home follows slot data rather than a remembered slot id", () => {
   const context = (slot, outcomeHome) => ({
     filename: at("apps/web/src/modules/custom/result.ts"),
     settings: { starci: { hfs: {
@@ -45,12 +45,12 @@ test("the Outcome home follows slot data rather than a remembered slot id", () =
 test("the server-only marker follows a BOM/CRLF directive prologue", () => {
   typedTester().run("server marker after directives", serverModuleMarksServerOnly, {
     valid: [{
-      filename: at("apps/web/src/modules/orders/write-order.ts"),
-      code: '\uFEFF"use strict";\r\n"use server";\r\nimport "server-only";\r\nimport { headers } from "next/headers";\r\nexport const writeOrder = async () => headers();\r\n',
+      filename: at("apps/web/src/modules/orders/order-headers.ts"),
+      code: '\uFEFF"use strict";\r\nimport "server-only";\r\nimport { headers } from "next/headers";\r\nexport const orderHeaders = async () => headers();\r\n',
     }],
     invalid: [{
-      filename: at("apps/web/src/modules/orders/write-order.ts"),
-      code: 'import { headers } from "next/headers";\r\n"use server";\r\nimport "server-only";\r\nexport const writeOrder = async () => headers();\r\n',
+      filename: at("apps/web/src/modules/orders/order-headers.ts"),
+      code: 'import { headers } from "next/headers";\r\n"use strict";\r\nimport "server-only";\r\nexport const orderHeaders = async () => headers();\r\n',
       errors: [{ messageId: "mark" }],
     }],
   })

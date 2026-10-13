@@ -27,11 +27,14 @@ const connectedBlock = (context) => {
 /**
  * Calls that reach for the world instead of receiving it.
  *
- * Four families: a request, a store, the translation runtime, and a direct query. Each is a
+ * Six families of the front-end stack: a request (SWR, `useQuery<X>Swr` / `useMutate<X>Swr` and the REST
+ * `use{Get,Post,Put,Patch,Delete}<X>Swr` of `hooks/swr`, the Apollo hooks, an operation of `modules/api` called directly), a
+ * form (react-hook-form and the `use<X>Form` hooks of `hooks/rhf`), a store (redux, the zustand `use<X>Store`), a socket
+ * (`use<X>SocketIo` of `hooks/socketio`), a toast (`use<X>WithToast` of `modules/toast`) and the translation runtime. Each is a
  * dependency the drawing half cannot be rendered from a fixture without.
  */
 const REACHES_FOR_THE_WORLD =
-  /^(?:useSWR|useSWRMutation|use[A-Za-z0-9]*Swr|useAppSelector|useDispatch|use[A-Za-z0-9]*Store|useTranslations|useLocale|useFormatter|query[A-Z][A-Za-z0-9]*|mutation[A-Z][A-Za-z0-9]*)$/
+  /^(?:useSWR|useSWRMutation|useSWRConfig|use[A-Za-z0-9]*Swr|useQuery|useLazyQuery|useMutation|useSubscription|useApolloClient|useForm|useFormContext|useController|useWatch|use[A-Za-z0-9]*Form|useAppSelector|useAppDispatch|useSelector|useDispatch|use[A-Za-z0-9]*Store|use[A-Za-z0-9]*SocketIo|use[A-Za-z0-9]*WithToast|useTranslations|useLocale|useFormatter|query[A-Z][A-Za-z0-9]*|mutation[A-Z][A-Za-z0-9]*)$/
 
 // -- SPLIT-1 ---------------------------------------------------------------------------------------
 

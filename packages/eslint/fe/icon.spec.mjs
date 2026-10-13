@@ -11,10 +11,10 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { at, slotTester } from "./fixtures/typed/tester.mjs"
 import {
-  heroiconsIsTheGlyphVendor,
   noDecorativeIconInMetricCell,
   noOffScaleGlyphSize,
   noVendorIconOutsideIconLeaf,
+  oneIconSet,
   rules,
 } from "./icon.mjs"
 
@@ -40,20 +40,25 @@ test("every rule this law declares is exported under its published name", () => 
 test("ICON-6: the icon leaf owns the library, and a subpath does not walk around it", () => {
   tester.run("no-vendor-icon-outside-icon-leaf", noVendorIconOutsideIconLeaf, {
     valid: [
-      { filename: ICON_LEAF, code: "import { FireIcon } from \"@heroicons/react/24/outline\"" },
+      { filename: ICON_LEAF, code: "import { Fire } from \"@phosphor-icons/react\"" },
+      { filename: ICON_LEAF, code: "import { Fire } from \"@phosphor-icons/react/dist/ssr\"" },
       // a second file INSIDE the leaf folder is still the leaf
       { filename: ICON_LEAF_BRANDS, code: "import type { SVGProps } from \"react\"" },
       { filename: OTHER_LEAF, code: "import { Icon } from \"@/components/leaves/Icon\"" },
       { filename: BLOCK, code: "import { Link as HeroLink } from \"@heroui/react\"" },
       // tooling is out of scope
       { filename: SCRIPT, code: "import { X } from \"lucide-react\"" },
+      // the toast region draws the status glyph of each toast; the modules tier cannot ask the icon leaf
+      { filename: at("apps/web/src/modules/toast/toast.tsx"), code: "import { CheckCircle, XCircle } from \"@phosphor-icons/react\"" },
       // the icon leaf of the shared package owns the map there too
-      { filename: PACKAGE_ICON_LEAF, code: "import { FireIcon } from \"@heroicons/react/24/outline\"" },
+      { filename: PACKAGE_ICON_LEAF, code: "import { Fire } from \"@phosphor-icons/react\"" },
     ],
     invalid: [
       // a file called like the icon leaf that no leaf slot owns is not the icon leaf, and neither is a block called Icon
       { filename: NOT_A_LEAF, code: "import { Star } from \"lucide-react\"", errors: [{ messageId: "vendor" }] },
       { filename: ICON_BLOCK, code: "import { Star } from \"lucide-react\"", errors: [{ messageId: "vendor" }] },
+      // another module is not the toast module
+      { filename: at("apps/web/src/modules/utils/glyphs.ts"), code: "import { Star } from \"@phosphor-icons/react\"", errors: [{ messageId: "vendor" }] },
       {
         // the exact escape these rules were written for
         filename: OTHER_LEAF,
@@ -69,7 +74,7 @@ test("ICON-6: the icon leaf owns the library, and a subpath does not walk around
       { filename: BLOCK, code: "import { FaBeer } from \"react-icons/fa\"", errors: [{ messageId: "vendor" }] },
       {
         filename: ICON_LEAF_BRANDS,
-        code: "import { GoogleIcon } from \"@heroicons/react/24/outline\"",
+        code: "import { GoogleLogo } from \"@phosphor-icons/react\"",
         errors: [{ messageId: "vendor" }],
       },
       {
@@ -86,47 +91,27 @@ test("ICON-6: the icon leaf owns the library, and a subpath does not walk around
   })
 })
 
-test("ICON-7: upstream Heroicons plus the custom-only StarCi extension are the whole glyph surface", () => {
-  tester.run("heroicons-is-the-glyph-vendor", heroiconsIsTheGlyphVendor, {
+test("ICON-7: the one application icon set of the front-end stack is the whole glyph surface", () => {
+  tester.run("one-icon-set", oneIconSet, {
     valid: [
-      { filename: ICON_LEAF, code: "import { FireIcon } from \"@heroicons/react/24/outline\"" },
-      { filename: ICON_LEAF, code: "import { FireIcon } from \"@heroicons/react/16/solid\"" },
-      { filename: ICON_LEAF, code: "import { MindMapIcon } from \"@starci/heroicons/24/outline\"" },
-      { filename: ICON_LEAF, code: "import { MindMapIcon } from \"@starci/heroicons/16/solid\"" },
+      { filename: ICON_LEAF, code: "import { Fire } from \"@phosphor-icons/react\"" },
+      // the server-component entry of the same set is the same set
+      { filename: ICON_LEAF, code: "import { Fire } from \"@phosphor-icons/react/dist/ssr\"" },
+      { filename: PACKAGE_ICON_LEAF, code: "import { Fire } from \"@phosphor-icons/react\"" },
       { filename: ICON_LEAF_BRANDS, code: "import type { SVGProps } from \"react\"" },
-      { filename: SCRIPT, code: "import { X } from \"lucide-react\"" },
+      { filename: SCRIPT, code: "import { FireIcon } from \"@heroicons/react/24/outline\"" },
+      // a glyph package the fe-stack catalog forbids by name is fe-stack-import's finding, judged once there
+      { filename: ICON_LEAF, code: "import { Flame } from \"lucide-react\"" },
+      { filename: ICON_LEAF, code: "import { Trophy } from \"@iconify/react\"" },
     ],
     invalid: [
-      {
-        filename: ICON_LEAF,
-        code: "import { FireIcon } from \"@phosphor-icons/react\"",
-        errors: [{ messageId: "vendor" }],
-      },
-      {
-        filename: ICON_LEAF,
-        code: "import { Flame } from \"lucide-react\"",
-        errors: [{ messageId: "vendor" }],
-      },
-      {
-        filename: ICON_LEAF,
-        code: "import { FireIcon } from \"@heroicons/react/20/solid\"",
-        errors: [{ messageId: "vendor" }],
-      },
-      {
-        filename: ICON_LEAF,
-        code: "import { FireIcon } from \"@heroicons/react/24/solid\"",
-        errors: [{ messageId: "vendor" }],
-      },
-      {
-        filename: ICON_LEAF,
-        code: "import { Trophy } from \"@iconify/react\"",
-        errors: [{ messageId: "vendor" }],
-      },
-      {
-        filename: ICON_LEAF,
-        code: "import { Custom } from \"@starci/heroicons/20/solid\"",
-        errors: [{ messageId: "vendor" }],
-      },
+      // a second catalogue no list names in advance: Heroicons, the StarCi cuts, Material, an unknown one
+      { filename: ICON_LEAF, code: "import { FireIcon } from \"@heroicons/react/24/outline\"", errors: [{ messageId: "vendor" }] },
+      { filename: ICON_LEAF, code: "import { FireIcon } from \"@heroicons/react/16/solid\"", errors: [{ messageId: "vendor" }] },
+      { filename: ICON_LEAF, code: "import { MindMapIcon } from \"@starci/heroicons/24/outline\"", errors: [{ messageId: "vendor" }] },
+      { filename: ICON_LEAF, code: "import Home from \"@mui/icons-material/Home\"", errors: [{ messageId: "vendor" }] },
+      { filename: ICON_LEAF, code: "import { Home } from \"some-glyph-catalogue\"", errors: [{ messageId: "vendor" }] },
+      { filename: BLOCK, code: "import { FaBeer } from \"react-icons-kit/fa\"", errors: [{ messageId: "vendor" }] },
     ],
   })
 })

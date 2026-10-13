@@ -125,6 +125,7 @@ test("the factory's config lints a real file: a hardcoded copy string is an erro
 /** Laws whose every rule carries a catalogue code, and so a why. */
 const CATALOGUED_LAWS = [
   "env-owner",
+  "fe-stack",
   "transport",
   "client-boundary",
   "hooks-folder",
@@ -172,7 +173,7 @@ test("no why names a rule that does not exist", () => {
   assert.deepEqual(orphans, [])
 })
 
-test("the codes are the catalogue's codes for R18, R22, R49-R52, R55, R56, R58, R60-R62, R65", () => {
+test("the codes are the catalogue's codes for R18, R22, R49-R52, R55, R56, R58, R60-R62, R65 and the fe-stack catalog", () => {
   const codes = new Set(Object.values(why).map((entry) => entry.code))
   for (const code of [
     "FE_ENV_OWNER",
@@ -202,6 +203,8 @@ test("the codes are the catalogue's codes for R18, R22, R49-R52, R55, R56, R58, 
     "FE_DANGEROUS_HTML",
     "FE_NATIVE_IMAGE",
     "FE_OUTCOME_KIND_UNHANDLED",
+    "FE_STACK_FORBIDDEN",
+    "FE_SERVER_ACTION_FORBIDDEN",
   ]) {
     assert.ok(codes.has(code), `no rule reports under ${code}`)
   }

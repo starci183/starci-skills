@@ -11,7 +11,7 @@
  * `fix` strings are the keys of `modules/i18n/messages/canon.yaml`, so `translator('vi')(entry.en)` and
  * `translator('vi')(entry.fix)` hand back the Vietnamese of the same sentence.
  *
- * Every rule that carries a catalogue id (R18, R22, R49-R59, R60-R62, R65) has an entry;
+ * Every rule that carries a catalogue id (R18, R22, R49-R59, R60-R62, R65, the fe-stack catalog) has an entry;
  * the twin test refuses a rule of those laws with no entry and an entry for a rule that does not exist.
  */
 
@@ -31,12 +31,12 @@ export const why = {
   },
   "fetch-only-in-api-client": {
     code: "FE_TRANSPORT_OWNER",
-    en: "`fetch` (or `Request`, `EventSource`, `sendBeacon`, another HTTP library) in `<file>` sits outside the one client (`modules/api/client.ts`, or `src/client.ts` of the shared api package). A repo has exactly one transport.",
-    fix: "Call the repo's client and receive `Outcome<T>`; do not call `fetch` yourself.",
+    en: "`<file>` reaches the back end outside the API layer: `fetch` (or `Request`, `EventSource`, `sendBeacon`, another HTTP library) outside `modules/api`, or Apollo, axios or socket.io-client outside its home (`modules/api`, `modules/api/rest`, `hooks/socketio`).",
+    fix: "Call an operation of `modules/api` (Apollo GraphQL, or axios in `modules/api/rest`) through its SWR hook in `hooks/swr`; listen to realtime through `hooks/socketio`.",
   },
   "client-fetch-has-signal": {
     code: "FE_TRANSPORT_OWNER",
-    en: "`fetch` in `<file>` has no `signal`. The client must carry a timeout and an `AbortSignal`.",
+    en: "`fetch` in `<file>` has no `signal`. Every request of the API layer must carry a timeout and an `AbortSignal`.",
     fix: "Pass `signal` (`AbortSignal.timeout(...)` combined with the caller's signal).",
   },
   "no-shared-transport-state": {
@@ -56,8 +56,8 @@ export const why = {
   },
   "no-hand-typed-wire": {
     code: "FE_WIRE_GENERATED",
-    en: "`<file>` hand-types a wire type or casts a response. Use the types generated from `be/contracts/`.",
-    fix: "Run codegen from the be contract snapshot (`be/contracts/`) and import the generated types; put GraphQL documents in `.graphql` files.",
+    en: "`<file>` hand-types a wire type, casts a response, or writes a GraphQL document outside the API layer. Use the types generated from `be/contracts/`.",
+    fix: "Run codegen from the be contract snapshot (`be/contracts/`) and import the generated types; write each GraphQL document in its operation file under `modules/api/graphql/queries` or `modules/api/graphql/mutations`.",
   },
   "use-client-only-at-boundary": {
     code: "FE_CLIENT_BOUNDARY",
@@ -66,8 +66,8 @@ export const why = {
   },
   "hooks-folder-holds-hooks-only": {
     code: "FE_HOOKS_ARE_HOOKS",
-    en: "`<file>` inside `hooks/` is not a React hook. A server reader goes to `modules/api`, a helper to `<domain>.shared.ts`.",
-    fix: "One hook per `use*.ts` file; a shared helper goes in `<domain>.shared.ts`; a server reader goes in `modules/api/<domain>/read-*.ts`.",
+    en: "`<file>` inside `hooks/` is not a React hook, or is not a file its hooks family names. A call to the back end goes to `modules/api`, a helper to `<domain>.shared.ts`.",
+    fix: "One hook per `use*.ts` file under the name its family gives it (`hooks/swr/api/graphql/queries/useQuery<X>Swr.ts`, `hooks/rhf/use<X>Form.ts`, ...); a shared helper goes in `<domain>.shared.ts`; a back-end call is an operation of `modules/api`.",
   },
   "no-middleware-file": {
     code: "FE_NEXT_CONVENTIONS",
@@ -172,7 +172,7 @@ export const why = {
   "no-data-fetch-in-effect": {
     code: "FE_EFFECT_FETCH",
     en: "`useEffect` in `<file>` starts a promise (`await`, `fetch`, `.then`, `void load()`, `mutate()`/`refresh()` called directly): no cache, no request merging, no loading/error state, no abort. Freshness of data comes from the SWR key, not from an effect.",
-    fix: "Read on the client with SWR calling the app's client (`hooks/`) keyed by what changes; call `mutate()` from the event that changes the data (handler, socket message); on the route use the server reader `modules/api/<domain>/read-*.ts`.",
+    fix: "Read with an SWR hook of `hooks/swr` over an operation of `modules/api`, keyed by what changes; call `mutate()` from the event that changes the data (handler, socket message).",
   },
   "no-empty-catch": {
     code: "FE_SWALLOWED_ERROR",
@@ -216,13 +216,18 @@ export const why = {
   },
   "client-no-server-import": {
     code: "FE_CLIENT_SERVER_IMPORT",
-    en: "A client component in `<file>` imports code that exists only on the server (`server-only`, `next/headers`, a Node module, a server reader).",
-    fix: "Read the data in a server component or a server reader and pass it down as props; or use SWR calling the app's client.",
+    en: "A client component in `<file>` imports code that exists only on the server (`server-only`, `next/headers`, a Node module, a server-only module).",
+    fix: "Read the data through an SWR hook of `hooks/swr` over an operation of `modules/api`; keep request-scoped server APIs in server components.",
   },
   "server-module-marks-server-only": {
     code: "FE_SERVER_ONLY_MARK",
     en: "Module `<file>` imports a server-only API (`next/headers`, `next/server`, `next-intl/server`, a Node module or an already server-only module) but does not open with `import \"server-only\"`.",
     fix: "Make `import \"server-only\"` the file's first statement; route files (`page`, `layout`, `route`, `proxy`) are server components already and need none.",
+  },
+  "no-server-action": {
+    code: "FE_SERVER_ACTION_FORBIDDEN",
+    en: "`<file>` carries a `\"use server\"` directive: a Server Action, an endpoint the front end serves. The front end serves no API.",
+    fix: "Write it as a GraphQL mutation of the back end and call it through its operation in `modules/api` and its SWR hook in `hooks/swr`.",
   },
   "web-storage-only-in-modules": {
     code: "FE_STORAGE_OUTSIDE_MODULES",
@@ -261,8 +266,8 @@ export const why = {
   },
   "one-outcome-union": {
     code: "FE_HTTP_STATUS_COLLAPSE",
-    en: "`<file>` declares another result union (`ok` or `kind`) outside `outcome.ts`. A repo has only one `Outcome<T>`.",
-    fix: "Use `Outcome<T>` of `modules/api/outcome.ts` (or the shared api package); add business detail through the second parameter instead of declaring a new union.",
+    en: "`<file>` declares another result union (`success`, `ok` or `kind`) outside `modules/api/graphql/types.ts`. A repo has only one result vocabulary, `GraphQLResponse<T>`.",
+    fix: "Use `GraphQLResponse<T>` of `modules/api/graphql/types.ts` (or the shared api package); put the business detail in its `data` instead of declaring a new union.",
   },
   "i18n-stack-in-one-module": {
     code: "FE_I18N_PLACEMENT",
@@ -273,6 +278,11 @@ export const why = {
     code: "FE_NATIVE_FORM_CONTROL",
     en: "Raw `<tag>` in `<file>`. Page structure and text are composed from grammar components, not hand-written HTML.",
     fix: "Replace it with the matching grammar component (`Heading`, `Text`, `SurfaceCard`, ...); if grammar lacks it, add it to grammar or the ui package instead of drawing it in place.",
+  },
+  "fe-stack-import": {
+    code: "FE_STACK_FORBIDDEN",
+    en: "`<file>` imports `<what>`, a library the front-end stack forbids (a second library for a concern that has one), or a Supabase package outside `modules/auth`.",
+    fix: "Use the concern's canonical library from `knowledge/hfs/fe-stack.yaml` (the message names it); Supabase on the front end is the auth client in `modules/auth` only, data goes through `modules/api`.",
   },
   "file-size-growth": {
     code: "HFS_SIZE_GROWTH",

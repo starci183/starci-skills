@@ -60,10 +60,31 @@ export const isComponentPath = (context, file) => {
 /** The one place that may read the environment: slot `fe.modules.config`. */
 export const isConfigModule = (context) => inSlot(context, "fe.modules.config")
 
-/** The one place that may call `fetch`: slot `fe.transport.client` (one-app repository) or `fe.package.api.client` (shared package). */
+/**
+ * The transport owner: the folder of the auth and no-auth Apollo clients and their link chain, slot `fe.transport.client`
+ * (`modules/api/graphql/clients/`, one-app repository) or `fe.package.api.client` (`src/graphql/clients/` of the shared api package).
+ */
 export const isApiClient = (context) => inSlot(context, "fe.transport.client", "fe.package.api.client")
 
-/** The file that may declare the one Outcome union: the file of the slot the manifest marks `outcomeHome`. */
+/** The slots of the API layer: the app's `modules/api` (with its clients folder and its GraphQLResponse file) and the shared api package. */
+const API_LAYER_SLOTS = Object.freeze(["fe.modules.api", "fe.transport.client", "fe.transport.outcome", "fe.package.api", "fe.package.api.client", "fe.package.api.outcome"])
+
+/** True when the linted file sits in the API layer: the only place that talks to the back end (Apollo, axios, `fetch`). */
+export const isApiLayer = (context) => inSlot(context, ...API_LAYER_SLOTS)
+
+/**
+ * True when the linted file is a REST call of the API layer: `modules/api/rest/**` of an app (slot `fe.modules.api`) or
+ * `src/rest/**` of the shared api package (slot `fe.package.api`), the one home of axios.
+ */
+export const isApiRest = (context) => {
+  if (!inSlot(context, "fe.modules.api", "fe.package.api")) return false
+  const hfs = hfsOf(context)
+  const file = fileOf(context)
+  const below = hfs.relative(file).slice(hfs.classify(file).root.length + 1).split("/")
+  return (below[0] === "src" ? below[1] : below[0]) === "rest"
+}
+
+/** The file that may declare the one result vocabulary (`GraphQLResponse`): the file of the slot the manifest marks `outcomeHome`. */
 export const isOutcomeModule = (context) => {
   const hfs = hfsOf(context)
   const slot = slotOfFile(context)

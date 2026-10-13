@@ -10,11 +10,13 @@
  *
  * WHAT IS REFUSED. `toLocaleString`, `toLocaleDateString`, `toLocaleTimeString`; `new Intl.*Format`;
  * `toFixed` when the result is shown (inside JSX or a template); a currency symbol glued to a
- * substitution in a template; and the date libraries (`moment`, `dayjs`, `date-fns`, `luxon`).
- * `modules/i18n/**` is exempt: it is where the formatters are configured.
+ * substitution in a template; and `dayjs` outside `modules/dayjs` (the front-end stack's date-math home; its display
+ * goes through the formatter). The other date libraries (`moment`, `date-fns`, `luxon`) are forbidden alternatives of the
+ * stack and refused by `fe-stack-import`. `modules/i18n/**` is exempt: it is where the formatters are configured.
  */
 
-import { fileOf, inSlot } from "./lib/scope.mjs"
+import { forbiddingConcern } from "./lib/fe-stack.mjs"
+import { classOf, inSlot } from "./lib/scope.mjs"
 
 /** The locale-sensitive `Date` and `Number` methods. */
 const LOCALE_METHODS = new Set(["toLocaleString", "toLocaleDateString", "toLocaleTimeString"])
@@ -23,7 +25,10 @@ const LOCALE_METHODS = new Set(["toLocaleString", "toLocaleDateString", "toLocal
 const INTL_FORMATTERS = new Set(["NumberFormat", "DateTimeFormat", "RelativeTimeFormat", "ListFormat", "PluralRules"])
 
 /** Date libraries that format on their own locale. */
-const DATE_LIBRARIES = /^(?:moment(?:-timezone)?|dayjs|date-fns(?:\/.+)?|luxon)$/
+const DATE_LIBRARIES = /^(?:moment(?:-timezone)?|dayjs(?:\/.+)?|date-fns(?:\/.+)?|luxon)$/
+
+/** The date-math home of the front-end stack (fe-stack `dates`): the capability `dayjs` of slot `fe.modules` (`modules/dayjs/`). */
+const isDayjsHome = (context) => inSlot(context, "fe.modules") && classOf(context).bindings?.capability === "dayjs"
 
 /** A currency mark or code beside a substitution. */
 const CURRENCY = /[₫€£¥]|\b(?:VND|USD|EUR)\b/
@@ -53,7 +58,7 @@ export const useIntlFormatter = {
       currency:
         "A currency mark glued to a substitution in a template writes the symbol on the wrong side for half of the locales and skips grouping. Use `useFormatter().number(value, { style: \"currency\", currency })`.",
       library:
-        "`{{name}}` formats dates on its own locale data, next to `next-intl`'s. One library decides the language of a date: use the `next-intl` formatter (`dateTime`, `relativeTime`).",
+        "`{{name}}` is imported outside `modules/dayjs`. It formats dates on its own locale data, next to `next-intl`'s, and one library decides the language of a date: do date math through `modules/dayjs` and display with the `next-intl` formatter (`dateTime`, `relativeTime`).",
     },
   },
   create(context) {
@@ -61,7 +66,8 @@ export const useIntlFormatter = {
     return {
       ImportDeclaration(node) {
         const source = String(node.source.value)
-        if (DATE_LIBRARIES.test(source)) context.report({ node, messageId: "library", data: { name: source } })
+        // a date library the stack forbids is fe-stack-import's finding; dayjs is legal in its home
+        if (DATE_LIBRARIES.test(source) && !forbiddingConcern(source) && !isDayjsHome(context)) context.report({ node, messageId: "library", data: { name: source } })
       },
       CallExpression(node) {
         const callee = node.callee

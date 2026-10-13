@@ -7,7 +7,7 @@
  *   - a timer, listener, observer, socket or subscription started by an effect that never releases it
  *     keeps running after the component is gone and sets state on nothing;
  *   - a fetch started in an effect has no cache, no dedupe, no error state and no cancel, which is
- *     what SWR and the server readers already give for free (R50: client reads use SWR);
+ *     what the SWR hooks over the `modules/api` operations already give for free (R50: reads use SWR);
  *   - an empty `catch` turns a failure into a blank screen with no trace;
  *   - `console.*` is a log nobody reads, in a place no log pipeline sees.
  *
@@ -413,15 +413,15 @@ const loadStartedBy = (context, effect) => {
   return found
 }
 
-/** No data loading inside `useEffect`; SWR on the client, a reader on the server. */
+/** No data loading inside `useEffect`; data is read through an SWR hook over an operation of `modules/api`. */
 export const noDataFetchInEffect = {
   meta: {
     type: "problem",
-    docs: { description: "An effect body starts no promise: no `await`, `fetch`, `.then`, `void load()`, `mutate()` or `refresh()`; read through SWR or a server reader." },
+    docs: { description: "An effect body starts no promise: no `await`, `fetch`, `.then`, `void load()`, `mutate()` or `refresh()`; read through an SWR hook (`hooks/swr`) over an operation of `modules/api`." },
     schema: [],
     messages: {
       fetch:
-        "This effect starts a load: it awaits, calls `fetch`, chains `.then`, or calls a function that returns a promise (`void load()`, an SWR `mutate()` or `refresh()` too). An effect has no cache, no request dedupe, no error or loading state and no cancel, so two components asking for the same thing fetch twice and a slow first answer overwrites a fast second one. Data freshness comes from the SWR key, not from an effect: call the app client through SWR (`hooks/`) keyed on what changes, run `mutate()` from the event that changed the data (a handler, a socket message), and read what a route needs in a server reader (`modules/api/<domain>/read-*.ts`).",
+        "This effect starts a load: it awaits, calls `fetch`, chains `.then`, or calls a function that returns a promise (`void load()`, an SWR `mutate()` or `refresh()` too). An effect has no cache, no request dedupe, no error or loading state and no cancel, so two components asking for the same thing fetch twice and a slow first answer overwrites a fast second one. Data freshness comes from the SWR key, not from an effect: read through the SWR hook of the operation (`hooks/swr/`, over `modules/api`) keyed on what changes, and run `mutate()` from the event that changed the data (a handler, a socket message).",
     },
   },
   create(context) {

@@ -29,6 +29,11 @@ test("FORMAT-1: numbers, money and dates go through the next-intl formatter", ()
       { filename: at("apps/web/src/modules/i18n/request.ts"), code: "const f = new Intl.NumberFormat(locale)" },
       // the i18n module of another app is the same slot
       { filename: at("apps/admin/src/modules/i18n/request.ts"), code: "const f = new Intl.NumberFormat(locale)" },
+      // dayjs is the date-math library of the front-end stack, at home in modules/dayjs (its plugins too)
+      { filename: at("apps/web/src/modules/dayjs/index.ts"), code: "import dayjs from 'dayjs'\nimport utc from 'dayjs/plugin/utc'" },
+      // a date library the stack forbids by name is fe-stack-import's finding, judged once there
+      { filename: BLOCK, code: "import { format } from 'date-fns/format'" },
+      { filename: BLOCK, code: "import moment from 'moment'" },
     ],
     invalid: [
       // a folder named i18n outside the module slot is not the i18n module
@@ -45,9 +50,11 @@ test("FORMAT-1: numbers, money and dates go through the next-intl formatter", ()
       { filename: BLOCK, code: "const s = `$${amount}`", errors: [{ messageId: "currency" }] },
       { filename: BLOCK, code: "const s = `${amount} ₫`", errors: [{ messageId: "currency" }] },
       { filename: BLOCK, code: "const s = `${amount} VND`", errors: [{ messageId: "currency" }] },
+      // dayjs outside its home formats on its own locale data
       { filename: BLOCK, code: "import dayjs from 'dayjs'", errors: [{ messageId: "library" }] },
-      { filename: BLOCK, code: "import { format } from 'date-fns/format'", errors: [{ messageId: "library" }] },
-      { filename: BLOCK, code: "import moment from 'moment'", errors: [{ messageId: "library" }] },
+      { filename: at("apps/web/src/hooks/lesson/useLesson.ts"), code: "import relativeTime from 'dayjs/plugin/relativeTime'", errors: [{ messageId: "library" }] },
+      // another module is not the dayjs home
+      { filename: at("apps/web/src/modules/utils/date.ts"), code: "import dayjs from 'dayjs'", errors: [{ messageId: "library" }] },
     ],
   })
 })

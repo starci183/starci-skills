@@ -18,9 +18,9 @@
  * unconditionally satisfies both and is wrong. That case is a review question and LOCALE-2 is where
  * it is argued; pretending otherwise would be the rule claiming a guarantee it does not have.
  *
- * WHY THE FIRST RULE KEYS ON THE TERMINAL LINK RATHER THAN ON THE SLOT. A repository may name
- * its client folder anything below `modules/api`, and a pattern that guessed wrong would either miss the real chain
- * or fire on every helper beside it. The chain is identifiable by what it does: it builds the link
+ * WHY THE FIRST RULE KEYS ON THE TERMINAL LINK RATHER THAN ON A FILE NAME. The clients folder (`modules/api/graphql/clients/`,
+ * slot `fe.transport.client`) holds the clients, their options and every link, and a file-name pattern that guessed which of
+ * them assembles the chain would either miss the real chain or fire on every helper beside it. The chain is identifiable by what it does: it builds the link
  * that talks to the network.
  *
  * WITH ONE EXEMPTION THAT WAS FOUND BY RUNNING IT, NOT BY THINKING ABOUT IT. "Constructs the
@@ -32,20 +32,17 @@
  */
 
 import { hfsOf } from "./lib/hfs.mjs"
-import { fileOf, inSlot, stem } from "./lib/scope.mjs"
-
-/** The slots that hold transport: the app's `modules/api` and the shared api package. Neither slot names its links, see the note on `linkFileName`. */
-const TRANSPORT_SLOTS = ["fe.modules.api", "fe.package.api"]
+import { fileOf, isApiLayer, stem } from "./lib/scope.mjs"
 
 /**
- * The name of the file when it sits directly in a `links/` folder of a transport slot, else null.
+ * The name of the file when it sits directly in a `links/` folder of the API layer, else null.
  *
- * NO SLOT NAMES A LINK. `fe.modules.api` and `fe.package.api` own their whole tree, so the transport slots decide WHERE a
- * link may be (a transport file) and the folder called `links` is the one fact left to the rule; the manifest would
+ * NO SLOT NAMES A LINK. The clients slots (`fe.transport.client`, `fe.package.api.client`) own their whole folder, so the API
+ * layer decides WHERE a link may be and the folder called `links` is the one fact left to the rule; the manifest would
  * carry it as a role (`locale-link: links/locale.ts`) and this function would ask for that role instead.
  */
 const linkFileName = (context) => {
-  if (!inSlot(context, ...TRANSPORT_SLOTS)) return null
+  if (!isApiLayer(context)) return null
   const parts = hfsOf(context).relative(fileOf(context)).split("/")
   return parts.at(-2) === "links" ? parts.at(-1) : null
 }
@@ -76,7 +73,7 @@ const isLocaleLinkFile = (context) => {
  */
 const isLinkImplementationFile = (context) => linkFileName(context) !== null
 
-/** The header a request declares its language in. */
+/** The header a request declares its language in (HTTP header names are case-insensitive: `X-Locale` is the same header). */
 export const LOCALE_HEADER = "x-locale"
 
 /** Callee names that construct the terminal link - the one that actually reaches the network. */
@@ -162,7 +159,7 @@ export const rules = {
       if (isLocaleLinkFile(context)) return {}
       return {
         Property(node) {
-          if (propertyKeyOf(node) === LOCALE_HEADER) {
+          if (propertyKeyOf(node)?.toLowerCase() === LOCALE_HEADER) {
             context.report({ node, messageId: "elsewhere" })
           }
         },

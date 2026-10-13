@@ -23,7 +23,7 @@ const API = "apps/web/src/modules/api/graphql/clients"
 const CLIENT = at(`${API}/create-apollo-client.ts`)
 const LOCALE_LINK = at(`${API}/links/locale.ts`)
 const HTTP_LINK = at(`${API}/links/http.ts`)
-const HOOK = at("apps/web/src/hooks/swr/useQueryCourseSwr.ts")
+const HOOK = at("apps/web/src/hooks/swr/api/graphql/queries/useQueryCourseSwr.ts")
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -79,6 +79,11 @@ export default chain`,
       filename: at("packages/nivo-api/src/links/http.ts"),
       code: `export const createHttpLink = (params) => new HttpLink(params)`,
     },
+    {
+      // The same in the shared package's clients folder (slot fe.package.api.client).
+      filename: at("packages/nivo-api/src/graphql/clients/links/http.ts"),
+      code: `export const createHttpLink = (params) => new HttpLink(params)`,
+    },
   ],
   invalid: [
     {
@@ -128,6 +133,12 @@ export default headers`,
       code: `const headers = { "x-locale": locale }
 export default headers`,
     },
+    {
+      // The locale link of the shared package's clients folder, in the header's canonical spelling.
+      filename: at("packages/nivo-api/src/graphql/clients/links/locale.ts"),
+      code: `const headers = { "X-Locale": locale }
+export default headers`,
+    },
   ],
   invalid: [
     {
@@ -155,6 +166,13 @@ export default headers`,
       // The computed-key spelling reads identically to the server, so it is refused identically.
       filename: HOOK,
       code: `const headers = { ["x-locale"]: locale }
+export default headers`,
+      errors: [{ messageId: "elsewhere" }],
+    },
+    {
+      // A header name is case-insensitive: `X-Locale` is the same header.
+      filename: HOOK,
+      code: `const headers = { "X-Locale": "vi" }
 export default headers`,
       errors: [{ messageId: "elsewhere" }],
     },

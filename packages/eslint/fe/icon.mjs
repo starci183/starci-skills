@@ -13,8 +13,9 @@
  */
 
 import { isClassAttribute, staticText } from "./lib/ast.mjs"
+import { canonicalPackages, forbiddingConcern, packageNameOf } from "./lib/fe-stack.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
-import { fileOf, isComponentFile, isProductSource, kindOfFile, roleOfFile } from "./lib/scope.mjs"
+import { fileOf, inSlot, isComponentFile, isProductSource, kindOfFile, roleOfFile } from "./lib/scope.mjs"
 
 /** The one module allowed to name a glyph from a library: the entry of the leaf owner named `Icon`. */
 const ICON_LEAF = { kind: "leaves", owner: "Icon" }
@@ -44,13 +45,11 @@ const GLYPH_PACKAGES = [
 /** Package-name signal for a glyph catalogue not yet listed explicitly. */
 const GLYPH_PACKAGE_NAME = /(?:icon|glyph|lucide|feather|tabler|fortawesome)/i
 
-/** Upstream Heroicons plus StarCi's custom-only extension, each on the same two optical families. */
-const HEROICON_PACKAGES = new Set([
-  "@heroicons/react/24/outline",
-  "@heroicons/react/16/solid",
-  "@starci/heroicons/24/outline",
-  "@starci/heroicons/16/solid",
-])
+/**
+ * True when an import names the one application icon set (fe-stack `icons`, `@phosphor-icons/react`), subpaths included
+ * (`@phosphor-icons/react/dist/ssr` is its server-component entry). Read from the catalog, so the set is named once.
+ */
+const isCanonicalIconSet = (source) => canonicalPackages("icons").includes(packageNameOf(source) ?? "")
 
 /**
  * True when the file is the entry (slot role `entry`) of the component owner named `owner` in the layer `kind`.
@@ -60,8 +59,11 @@ const isEntryOf = (context, { kind, owner }) =>
   isComponentFile(context) && kindOfFile(context) === kind && roleOfFile(context) === "entry" &&
   hfsOf(context).relative(fileOf(context)).split("/").slice(-2)[0] === owner
 
-/** True when this file is the icon leaf, which owns the meaning-to-glyph map. */
-const isIconLeafFile = (context) => isEntryOf(context, ICON_LEAF)
+/**
+ * True when this file owns glyphs: the icon leaf, which owns the meaning-to-glyph map, or the toast module (`fe.modules.toast`),
+ * whose region draws the status glyph of each toast and sits in the modules tier, below every component it could ask.
+ */
+const isIconLeafFile = (context) => isEntryOf(context, ICON_LEAF) || inSlot(context, "fe.modules.toast")
 
 /** True for the reusable repeated metric cell whose reference contains no decorative glyph. */
 const isLabelledProgressRowFile = (context) => isEntryOf(context, LABELLED_PROGRESS_ROW)
@@ -104,15 +106,20 @@ export const noVendorIconOutsideIconLeaf = {
 
 // -- ICON-7 ----------------------------------------------------------------------------------------
 
-/** The icon leaf owns the map, but that ownership does not license a second glyph vocabulary. */
-export const heroiconsIsTheGlyphVendor = {
+/**
+ * The icon leaf owns the map, but that ownership does not license a second glyph vocabulary: every glyph comes from the one
+ * application icon set of the front-end stack (fe-stack `icons`). A glyph package the catalog forbids by name is
+ * `fe-stack-import`'s finding; this rule refuses every other glyph catalogue (Heroicons, Iconify, ...), which no list can name
+ * in advance.
+ */
+export const oneIconSet = {
   meta: {
     type: "problem",
-    docs: { description: "Only the Heroicons heading and micro families may supply product glyphs." },
+    docs: { description: "Product glyphs come only from the one application icon set of the front-end stack (`@phosphor-icons/react`)." },
     schema: [],
     messages: {
       vendor:
-        "`{{source}}` is outside StarCi's closed glyph surface. Use upstream `@heroicons/react/24/outline` or `16/solid` when the icon exists; use the matching `@starci/heroicons` subpath only for a custom cut missing upstream. The StarCi package never re-exports upstream icons. Iconify, Phosphor and every other glyph catalogue are refused.",
+        "`{{source}}` is a second glyph catalogue. The front end has one application icon set, {{canonical}}: two sets draw the same meaning with two strokes, two grids and two weights, and the screen looks assembled from parts. Take the glyph from {{canonical}} in the icon leaf.",
     },
   },
   create(context) {
@@ -120,8 +127,9 @@ export const heroiconsIsTheGlyphVendor = {
     return {
       ImportDeclaration(node) {
         const source = node.source && node.source.value
-        if (!isGlyphImport(source) || HEROICON_PACKAGES.has(String(source))) return
-        context.report({ node, messageId: "vendor", data: { source } })
+        if (!isGlyphImport(source) || isCanonicalIconSet(source) || forbiddingConcern(source)) return
+        const canonical = canonicalPackages("icons").map((name) => `\`${name}\``).join(", ")
+        context.report({ node, messageId: "vendor", data: { source, canonical } })
       },
     }
   },
@@ -187,7 +195,7 @@ export const noDecorativeIconInMetricCell = {
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-vendor-icon-outside-icon-leaf": noVendorIconOutsideIconLeaf,
-  "heroicons-is-the-glyph-vendor": heroiconsIsTheGlyphVendor,
+  "one-icon-set": oneIconSet,
   "no-off-scale-glyph-size": noOffScaleGlyphSize,
   "no-decorative-icon-in-metric-cell": noDecorativeIconInMetricCell,
 }

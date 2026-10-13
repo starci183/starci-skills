@@ -12,11 +12,12 @@
  */
 
 import { attribute, attributeValue, calleeName, leadingTextOf, stringOf } from "./lib/ast.mjs"
+import { forbiddingConcern } from "./lib/fe-stack.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { baseName, classOf, fileOf, inSlot, roleOfFile, slotOfFile, stem } from "./lib/scope.mjs"
 
-/** Another i18n stack: a second place that decides which language a reader sees. */
-const OTHER_I18N = /^(?:react-i18next|i18next|next-i18next|react-intl|next-translate|@lingui\/.+|typesafe-i18n|rosetta)$/
+/** Another i18n stack: a second place that decides which language a reader sees (one the fe-stack catalog forbids by name is fe-stack-import's finding). */
+const OTHER_I18N = /^(?:react-i18next|i18next|next-i18next|react-intl|next-translate|@lingui\/.+|typesafe-i18n|rosetta)(?:\/.*)?$/
 
 // -- FE-NEXT-1 -------------------------------------------------------------------------------------
 
@@ -96,7 +97,7 @@ export const noSecondI18nStack = {
     return {
       ImportDeclaration(node) {
         const source = String(node.source.value)
-        if (OTHER_I18N.test(source)) context.report({ node, messageId: "stack", data: { name: source } })
+        if (OTHER_I18N.test(source) && !forbiddingConcern(source)) context.report({ node, messageId: "stack", data: { name: source } })
       },
     }
   },
