@@ -183,6 +183,21 @@ test('L15 FE_ROUTE_HANDLER_FORBIDDEN: any FE route beyond health/live and the ca
   assert.deepEqual(routes.map(item => item.path), ['apps/web/src/app/api/export/route.ts']);
 });
 
+test('L15 FE_ROUTE_HANDLER_FORBIDDEN refuses every other app/**/route.ts of a lite app: api, locale, ready and root handlers (R212 case-2)', t => {
+  const refused = [
+    'apps/web/src/app/api/bookings/route.ts',
+    'apps/web/src/app/api/bookings/[id]/route.ts',
+    'apps/web/src/app/[locale]/bookings/route.ts',
+    'apps/web/src/app/[locale]/route.ts',
+    'apps/web/src/app/health/ready/route.ts',
+    'apps/web/src/app/route.ts',
+    'apps/web/src/app/auth/other/route.ts',
+  ];
+  const root = freshFe(t, Object.fromEntries(refused.map(rel => [rel, `export const GET=()=>new Response('no');\n`])));
+  const routes = findings(runArch(root), 'FE_ROUTE_HANDLER_FORBIDDEN');
+  assert.deepEqual(routes.map(item => item.path).sort(), [...refused].sort(), JSON.stringify(routes, null, 2));
+});
+
 test('the new Supabase machine is not applicable to a full app with no supabase provider', t => {
   const root = archFixture(t, { profile: 'fe', files: {
     'apps/web/src/app/api/existing/route.ts': `export const GET=()=>new Response('existing full route');\n`,

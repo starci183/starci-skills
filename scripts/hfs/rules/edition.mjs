@@ -7,11 +7,14 @@
 //     with a pre/post prefix too) or a dependency of the infrastructure lite does not run - a test-world container or proxy
 //     (testcontainers, toxiproxy) or a browser runner (playwright, cypress), and every library the lite infraOwners own nowhere
 //     while full owns them (BullMQ, Kafka, Redis: lite runs pgmq, Postgres locks and Supabase Realtime instead);
+//   - inside a front-end source file: a `fetch(` call or an `Authorization: Bearer` header. A lite front end never calls the back
+//     end (R212 case-2): it has no modules/api or <family>-api owner of a fetch, reads through modules/db, writes through RLS
+//     Server Actions and hands back-end-only work to a SECURITY DEFINER rpc that pgmq.send()s a command a be job consumes;
 //   - a declaration of what lite does not have: an app kind, pattern or trigger kind every slot of which is forbidden under
 //     lite. The forbidden names are DERIVED from the manifest, so adding or restoring a kind is a manifest edit, not an edit here
 //     (under the 2026-10-12 ruling no pattern, trigger or app kind is gone).
 // A full app answers []: the rule tests the edition once and a full view forbids none of these names.
-import { found, readJson } from './read.mjs';
+import { found, readJson, readText } from './read.mjs';
 import { DEPENDENCY_SECTIONS } from './fe-no-tests.mjs';
 import { editionRuleParams } from '../edition-slots.mjs';
 
@@ -22,6 +25,31 @@ const PACKAGE_JSON = /(?:^|\/)package\.json$/;
 const LITE_FORBIDDEN_SCRIPT = /^(?:pre|post)?test:(?:e2e|contract|stack|browser)$/;
 /** The dependencies of a test infrastructure lite does not run: containers, fault proxies and browser runners. */
 const LITE_FORBIDDEN_TEST_INFRA = /^(?:testcontainers|@testcontainers\/.+|toxiproxy-node-client|playwright|playwright-core|@playwright\/.+|cypress)$/;
+
+/** A front-end source file a lite front end is read for: TypeScript or JavaScript, not a declaration file. */
+const FE_SOURCE = /\.(?:[cm]?[jt]sx?)$/;
+const DECLARATION_FILE = /\.d\.[cm]?ts$/;
+/** A call of the global fetch (or window/globalThis.fetch), and a Bearer credential written into a header value. */
+const FETCH_CALL = /(?<![\w$.])(?:(?:globalThis|window|self)\.)?fetch\s*\(/g;
+const BEARER_HEADER = /["'`]Bearer\s/g;
+/** The text of `source` with its comments blanked (line structure kept), so a comment that names fetch is no call. */
+const withoutComments = (source) => source.replace(/\/\*[\s\S]*?\*\/|(?<![:"'`\\])\/\/[^\n]*/g, (comment) => comment.replace(/[^\n]/g, ' '));
+const lineOf = (text, index) => text.slice(0, index).split('\n').length;
+
+/** The back-end calls one lite front-end source file makes: every fetch call and every Bearer header, with its line. */
+function backendCallFindings(repoRoot, rel) {
+  const source = readText(repoRoot, rel);
+  if (source === null) return [];
+  const text = withoutComments(source);
+  const findings = [];
+  const path = 'modules/db: reads in <domain>/read-*.ts, writes as RLS Server Actions in <domain>/write-*.ts, back-end-only work through a SECURITY DEFINER rpc that pgmq.send()s a command a be job consumes';
+  for (const match of text.matchAll(FETCH_CALL)) findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel}:${lineOf(text, match.index)} calls fetch: a lite front end never calls the back-end API and owns no fetch (no modules/api); it goes through ${path}`, { line: lineOf(text, match.index), call: 'fetch' }));
+  for (const match of text.matchAll(BEARER_HEADER)) findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel}:${lineOf(text, match.index)} writes an Authorization Bearer header: a lite front end sends no token to a back end; it goes through ${path}`, { line: lineOf(text, match.index), call: 'bearer' }));
+  return findings;
+}
+
+/** A front-end source file of the scope: every source file of a fe side (or standalone fe) scope. */
+const isFrontendSource = (repo, file) => repo.profile === 'fe' && FE_SOURCE.test(file) && !DECLARATION_FILE.test(file) && !file.includes('node_modules/');
 
 /**
  * The names the edition cannot declare: for each of `pattern`, `trigger` and `appKind`, the value is gone when every slot of
@@ -123,6 +151,7 @@ export function editionFindings({ repoRoot, files, repo, resolver, manifest, wit
   const findings = beView ? declarationFindings(beView, gone) : [];
   const removed = liteRemovedLibraries(manifest);
   for (const file of files) {
+    if (isFrontendSource(repo, file)) findings.push(...backendCallFindings(repoRoot, file));
     if (file.includes('node_modules/') || !PACKAGE_JSON.test(file)) continue;
     findings.push(...packageFindings(repoRoot, file, removed));
   }
