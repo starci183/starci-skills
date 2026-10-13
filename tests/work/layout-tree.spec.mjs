@@ -182,5 +182,5 @@ test('the ecommerce example carries an honestly unsettled layout tree', () => {
   assert.equal(example.state, 'todo');
   // appDir names the App Router directory relative to the app root: the example's first fe app, landing, lives in fe/apps/landing.
   assert.equal(example.apps[0].appDir, 'fe/apps/landing/src/app');
-  assert.ok(nodeById(treeOf(example, 'shop'), '/[locale]/cart'), 'the scan holds the example frontend routes');
+  assert.ok(nodeById(treeOf(example, 'app'), '/[locale]/cart'), 'the scan holds the example frontend routes');
 });
