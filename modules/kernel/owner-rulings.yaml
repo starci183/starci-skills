@@ -134,6 +134,10 @@ rulings:
     date: '2026-10-08'
     ruling: The public runtime repository tracks no secret material, not even ciphertext ("khong muon commit enc cua .claude len"); the seven held .enc members, their allowance and the specs of sealing into ext/sonar are removed.
     enforcedBy: [scripts/hfs/runtime-rules/secret-tracked.mjs]
+  - id: gate-loosening-d7dedf2f9c47
+    date: '2026-10-13'
+    ruling: The lite example's back-end test tsconfig (examples/lite-app/be/src/tests/tsconfig.json, the be.tool-config file the lite standard requires) is allowlisted as authored JSON like the other examples' test tsconfigs; the owner approved the pending items in chat ("Cho phép cờ hết", relayed by the alpha.13 coordinator).
+    enforcedBy: [scripts/checks/check-json-exceptions.mjs]
   - id: release-suite-ci
     date: '2026-10-09'
     ruling: "The owner's words: add to config.yaml a setting 'full test: none' so the full test is never applied locally and it is pushed to git, letting Codecov handle it, to save time; locally it still runs PARTIAL tests, the tests related to the commit. Recorded as release.suite (local or ci, shipped default local; the value is ci because the suite moves to CI, it does not vanish). Under ci the release cut plans no root suite and no Linux parity row, the pre-push gate accepts a release record without a local npm test row only when the record says suite ci and the checked-out config says ci, and a red CI is fixed forward with the next pre-release. The trade the owner accepts, that a release can reach GitHub and its tag before the suite has run, is stated in docs/releasing.md."
