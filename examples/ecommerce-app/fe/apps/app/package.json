@@ -20,7 +20,7 @@
     "@hookform/resolvers": "5.4.0",
     "@phosphor-icons/react": "2.1.10",
     "@reduxjs/toolkit": "2.11.2",
-    "@starci/grammar": "0.9.13",
+    "@starci/grammar": "0.9.14",
     "@xyflow/react": "12.11.6",
     "graphql": "16.14.2",
     "next": "16.1.6",
