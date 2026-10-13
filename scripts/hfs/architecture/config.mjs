@@ -199,7 +199,8 @@ function inferredLayout(root, workspaces) {
     features: collect('src/features'),
     components: [...new Set(components)],
     hooks: collect('src/hooks'),
-    modules: collect('src/modules'),
+    // src/redux/ (fe.redux) is a modules-tier owner beside src/modules/ (owner ruling 2026-10-13, fe-stack state-global).
+    modules: [...collect('src/modules'), ...collect('src/redux')],
     transport: collect('src/modules/api'),
   };
 }

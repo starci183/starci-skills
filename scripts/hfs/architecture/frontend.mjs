@@ -139,8 +139,15 @@ function reportExportedHooks(state) {
   }
 }
 
+/** True when the slot that owns this file names it as its `hooks` role (redux/hooks.ts, modules/toast/hooks.ts): the owner's own typed hooks. */
+function slotHooksRole(config, fileName) {
+  const found = config.hfs?.classifyPath?.(relativePath(config.root, fileName));
+  const role = found?.slot ? config.hfs.slot(found.slot)?.roles?.hooks : undefined;
+  return typeof role === 'string' && path.basename(fileName) === role;
+}
+
 function checkCustomHookLocations(config, context, sourceFile, roots) {
-  if (insideAny(roots.hooks, sourceFile.fileName)) return [];
+  if (insideAny(roots.hooks, sourceFile.fileName) || slotHooksRole(config, sourceFile.fileName)) return [];
   const { ts } = context;
   const state = { ts, config, sourceFile, checker: context.checkerFor(sourceFile.fileName), violations: [], seen: new Set() };
   visitHookDeclarations(state, sourceFile);

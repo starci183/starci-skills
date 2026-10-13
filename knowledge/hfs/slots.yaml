@@ -1856,15 +1856,16 @@ slots:
     rules: [FE_HOOKS_ARE_HOOKS]
   - id: fe.hooks.effects
     profiles: [fe]
-    # App-wide side effects (route params synced into redux, the auth bootstrap).
+    # App-wide side effects (route params synced into redux, the auth bootstrap): use<X>.ts hooks and the <X>SideEffect(s).tsx
+    # components that run them once; a provider in components/providers mounts those components (a route never imports hooks).
     path: "apps/<app>/src/hooks/effects/"
     presence: optional
     tracked: tracked
     tier: hooks
     owner: true
     requires: [index.ts]
-    allows: [index.ts, "use*.ts"]
-    roles: {entry: index.ts}
+    allows: [index.ts, "use*.ts", "*SideEffect.tsx", "*SideEffects.tsx"]
+    roles: {entry: index.ts, effects: "*SideEffect.tsx"}
     tests: none
     budget: {file: 200}
     since: 2.3.0
@@ -1894,7 +1895,7 @@ slots:
     owner: true
     requires: [index.ts, store.ts, hooks.ts]
     allows: [index.ts, store.ts, hooks.ts, ReduxProvider.tsx, "slices/*.ts"]
-    roles: {entry: index.ts, store: store.ts}
+    roles: {entry: index.ts, store: store.ts, hooks: hooks.ts}   # hooks.ts: the typed useAppDispatch/useAppSelector of the store
     tests: none
     budget: {file: 400}
     since: 2.3.0
@@ -2029,6 +2030,7 @@ slots:
     owner: true
     requires: [index.ts, toast.tsx, api.ts, hooks.ts]
     allows: [index.ts, toast.tsx, api.ts, hooks.ts]
+    roles: {entry: index.ts, hooks: hooks.ts}   # hooks.ts: the use*WithToast hooks of the toast module
     tests: none
     since: 2.3.0
   - id: fe.package.ui
