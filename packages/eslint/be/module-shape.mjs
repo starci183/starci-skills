@@ -6,7 +6,7 @@
  *
  *   - `no-global-decorator` refuses `@Global()` anywhere, specs included.
  *   - `is-global-only-in-app` refuses `isGlobal: true` (and a dynamic module literal `global: true`) outside
- *     `apps/<app>/src/app.module.ts`.
+ *     `apps/<app>/src/app.module.ts` and the composition groups `apps/<app>/src/compose/<area>.ts` it spreads.
  *   - `no-cross-owner-module-import` refuses a `@Module({ imports })` entry whose module class is declared by another
  *     owner of the repository (the declaring owner is found by resolving the class, not by reading its name): a
  *     capability's representative module is reached through its `Inject*()` decorators, never by import. One owner may
@@ -28,6 +28,7 @@
 import ts from "typescript"
 import { decoratorName, keyName, walk } from "./lib/ast.mjs"
 import { importsFrom } from "./lib/declared.mjs"
+import { isAppComposition } from "./lib/app-roles.mjs"
 import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { isDeclarationFile, isSpecFile, normalizePath } from "./lib/path.mjs"
 import { typed } from "./lib/types.mjs"
@@ -61,8 +62,8 @@ export const noGlobalDecorator = {
     },
 }
 
-/** The app composition file: `apps/<app>/src/app.module.ts`, judged by the app slot and the file's role name. */
-const isAppModule = (hfs, filename) => (hfs.slotOf(filename) ?? "").startsWith("be.app.") && filename.split("/").at(-1) === "app.module.ts"
+/** The app composition files: `apps/<app>/src/app.module.ts` and its groups `compose/<area>.ts`, judged by the app slot's entries. */
+const isAppModule = isAppComposition
 
 /**
  * The test world (slot `be.tests.world`, `src/tests/world`) is the TEST COMPOSITION ROOT: `use-test-world.ts` assembles
@@ -77,10 +78,10 @@ const isTrue = (node) => node?.type === "Literal" && node.value === true
 export const isGlobalOnlyInApp = {
     meta: {
         type: "problem",
-        docs: { description: "`isGlobal: true` appears only in `apps/<app>/src/app.module.ts`." },
+        docs: { description: "`isGlobal: true` appears only in `apps/<app>/src/app.module.ts` and its composition groups `compose/<area>.ts`." },
         schema: [],
         messages: {
-            isGlobal: "`{{key}}: true` outside `apps/<app>/src/app.module.ts` makes a module global from the wrong place. Only the app registers a capability, once, with `isGlobal: true`; here keep the module's own default.",
+            isGlobal: "`{{key}}: true` outside `apps/<app>/src/app.module.ts` and its `compose/<area>.ts` groups makes a module global from the wrong place. Only the app registers a capability, once, with `isGlobal: true`; here keep the module's own default.",
         },
     },
     create(context) {

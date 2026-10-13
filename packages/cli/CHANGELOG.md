@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.16 - 2026-10-14
+
+- Changed: pin HFS 4.3.0 (manifest 3.1.0: the app composition standard, `compose/<area>.ts` groups and the composition budgets). Command dispatcher implementations are unchanged.
+
 ## 1.2.15 - 2026-10-13
 
 - Changed: pin HFS 4.2.15 (the toast skeleton and the core fe stack take the heroicons family as the one icon set) and carry runtime 1.0.0-alpha.13. Command dispatcher implementations are unchanged.

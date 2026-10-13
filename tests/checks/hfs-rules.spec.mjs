@@ -20,9 +20,9 @@ const doc = () => parseYaml(catalogText);
 const withPlanned = (d) => { d.rules[0].enforcers = [{ kind: 'hfs', id: 'slot-undeclared', status: 'planned' }]; return d; };
 const load = (mutate) => { const d = doc(); mutate(d); return () => loadRuleCatalog({ text: JSON.stringify(d) }); };
 
-test('the shipped catalog is 3.0.0, validates against its JSON schema and loads with the slot manifest major', () => {
+test('the shipped catalog is 3.1.0, validates against its JSON schema and loads with the slot manifest major', () => {
   const d = doc();
-  assert.equal(d.version, '3.0.0');
+  assert.equal(d.version, '3.1.0');
   assert.equal(validateSchema(d), true, JSON.stringify(validateSchema.errors));
   const catalog = loadRuleCatalog({ manifest: loadSlotManifest() });
   assert.equal(catalog.major, 3);

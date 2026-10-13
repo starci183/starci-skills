@@ -23,8 +23,7 @@ const RUNNER_KINDS = new Set(['migrate', 'cli']);
 const compositionsOf = (kit, resolver, model, appOf) => {
   const composed = new Map(resolver.repo.apps.map(app => [app.name, { items: [], unresolved: false }]));
   for (const app of resolver.repo.apps) {
-    const { root, items } = connectionsComposedBy(kit, app.name);
-    for (const item of items) composed.get(app.name).items.push({ ...item, file: root });
+    for (const item of connectionsComposedBy(kit, app.name).items) composed.get(app.name).items.push(item);
   }
   for (const site of model.registrations) {
     const app = appOf(site.file.rel);

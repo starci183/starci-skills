@@ -54,7 +54,7 @@ examples:
       - be/src/modules/platform/jobs/job-runner.service.ts
       - be/src/modules/queues/receipt/receipt.queue.ts
       - be/src/modules/domain/order/receipt.service.ts
-      - be/apps/order/src/app.module.ts
+      - be/apps/order/src/compose/background.ts
       - be/src/modules/platform/jobs/job-claim.service.spec.ts
       - be/src/modules/platform/jobs/job-runner.service.spec.ts
       - be/src/modules/platform/jobs/fenced.processor.spec.ts

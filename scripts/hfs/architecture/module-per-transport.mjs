@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { machineKit } from './machine-ast.mjs';
+import { isComposeGroup, machineKit } from './machine-ast.mjs';
 import { treeOf } from './required-files.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 import { trimTrailingSlashes } from '../trailing-slashes.mjs';
@@ -13,8 +13,9 @@ import { trimTrailingSlashes } from '../trailing-slashes.mjs';
  *     anywhere in a feature, and an `@Module` class (or a `ConfigurableModuleBuilder`/`ConfigurableModuleClass` use) in a
  *     feature file that is neither the application module nor the transport module of its own folder are refused;
  *   - apps import only transport modules, of the kinds their app kind allows: the `composedBy` list of each transport slot
- *     in knowledge/hfs/slots.yaml (api: graphql, http, websocket; worker: schedule, message). An app root that
- *     lists a feature's application module, or the transport module of another kind, is refused;
+ *     in knowledge/hfs/slots.yaml (api: graphql, http, websocket; worker: schedule, message). An app root (app.module.ts
+ *     or a composition group of its compose/ folder) that lists a feature's application module, or the transport module
+ *     of another kind, is refused;
  *   - a composed root (an owner slot with `composedBy`, be.cli) holds one static module per folder, named after the folder
  *     (cli.module.ts, <group>/<group>.module.ts); an app of a composing kind lists the root module only, and an app of any
  *     other kind lists none of its modules.
@@ -22,7 +23,6 @@ import { trimTrailingSlashes } from '../trailing-slashes.mjs';
 export const MODULE_PER_TRANSPORT_RULE_IDS = ['BE_MODULE_SHAPE'];
 
 const RULE = 'BE_MODULE_SHAPE';
-const APP_ROOT_FILE = 'app.module.ts';
 
 function featureOwnerOf(resolver, rel) {
   const owner = resolver.ownerOf(rel);
@@ -152,25 +152,34 @@ function inspectModuleDeclarations(checker, target, node, root, app, scan, seen)
   return references;
 }
 
-function inspectAppRoot(app, scan) {
-  const { graph, kit, ts } = scan;
-  const root = graph.files.get(`apps/${app.name}/src/${APP_ROOT_FILE}`);
-  if (!root) return 0;
-  const checker = kit.checkerOf(root.sourceFile);
-  const seen = new Set();
+/** The module references of one composition file: the root's `imports` lists, or every array of a composition group (its module list). */
+function inspectCompositionFile(file, app, scan, seen) {
+  const { kit, ts } = scan;
+  const checker = kit.checkerOf(file.sourceFile);
+  const group = isComposeGroup(file.rel);
   let references = 0;
   const judge = node => {
     const call = ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'register';
     if (ts.isCallExpression(node) && !call) return;
     const target = call ? node.expression.expression : node;
-    references += inspectModuleDeclarations(checker, target, node, root, app, scan, seen);
+    references += inspectModuleDeclarations(checker, target, node, file, app, scan, seen);
   };
-  kit.walk(root.sourceFile, node => {
+  kit.walk(file.sourceFile, node => {
     if (ts.isPropertyAssignment(node) && kit.propertyNameText(node.name) === 'imports' && ts.isArrayLiteralExpression(node.initializer)) {
       for (const element of node.initializer.elements) judge(element);
+    } else if (group && ts.isArrayLiteralExpression(node)) {
+      for (const element of node.elements) judge(element);
     } else if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'register') judge(node);
     return true;
   });
+  return references;
+}
+
+/** The module references of an app: its root `apps/<app>/src/app.module.ts` and the composition groups of `compose/` it spreads. */
+function inspectAppRoot(app, scan) {
+  const seen = new Set();
+  let references = 0;
+  for (const file of scan.kit.appCompositionFiles(app.name)) references += inspectCompositionFile(file, app, scan, seen);
   return references;
 }
 

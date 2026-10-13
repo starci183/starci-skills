@@ -12,7 +12,7 @@ appliesTo:
 family: be
 # The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
 # into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
-slots: [be.feature, be.feature.application]
+slots: [be.feature, be.feature.application, be.app.api]
 provenance:
   reviewedAt: 2026-10-02
   sources:
@@ -21,6 +21,7 @@ provenance:
     - knowledge/hfs/rules.yaml
     - owner-locked BE convention 2026-09-30
     - owner decision 2026-10-02 (features grouped by trigger kind; synchronous inside a context)
+    - owner ruling 2026-10-14 (app composition standard: options, compose/<area>.ts groups, budgets)
     - https://docs.nestjs.com/recipes/cqrs
   limitations: |-
     Static checks prove the shape of a feature, a message, its handler and the dispatch, and that SQL touches only tables its
@@ -244,6 +245,53 @@ rules:
         - BE_DEFAULT_DENY
       manual:
         - Confirm the spec asserts the error code of each refusal, not only a status.
+    relatedExamples: [api]
+  - id: BE-API-4
+    title: An api app composes in area groups; its options hold env-derived values and port bindings only
+    kind: mandatory
+    hfsRules: [R245, R246, R32, R45, R43]
+    requirement: |-
+      An app's `src/` (slot `be.app.api`, and alike `be.app.worker` and `be.app.cli`) holds four composition roles, each within the
+      line budget its slot names (owner ruling 2026-10-14):
+      - `main.ts` (80 lines) reads the environment once (`EnvSource`), builds the options and boots the app.
+      - `<app>.options.ts` (200) is what the app reads from its environment plus its port bindings: provider maps such as
+        `{ approvalGate: ApprovalGateAdapter }`. It never holds an array of Nest modules, queue registrations or scheduler
+        entries, and no `imports`, `modules`, `schedulers` or `processors` list (`BE_APP_OPTIONS_COMPOSITION`).
+      - `compose/<area>.ts` (120) is a composition group: it exports the module list of one area of the app (the platform, the
+        background mechanisms with their message and queue doors, a product area), as a function of the options when it needs
+        them, and the providers of the area's global ports when it has any. It is composition only: no business logic, no
+        environment read (no `parse<C>Config`, no `process.env`), and its `X.register({ isGlobal: true, ...options.x })` calls
+        count as the app root's registrations (R45).
+      - `app.module.ts` (250) imports the groups and spreads them into its `imports` (`...platformModules(options)`), registers
+        what is left, and binds the app-wide guards and filter.
+      A file over its budget is `BE_APP_COMPOSITION_BUDGET`; the budget is absolute, so an app root that outgrows 250 lines
+      moves an area into a new group, never into the options.
+    rationale: |-
+      A long app root invites moving its module lists into the options file, which then mixes configuration with composition
+      and grows without a bound. One group per area keeps each composition reviewable, the options pure data, and the root a
+      table of contents.
+    cases:
+      - id: case-1
+        when: A new api app is scaffolded
+        write: 'apps/api/src/compose/platform.ts exports platformModules(options) (clock, logging, i18n, errors, cqrs, http security, database), and app.module.ts spreads ...platformModules(options) before the domain modules and the guards.'
+      - id: case-2
+        when: The app root passes 250 lines because every module is listed in it
+        write: 'Move one area into apps/<app>/src/compose/<area>.ts (for example compose/background.ts with the event bus, the queue and its schedulers, the jobs and the message and queue doors) and spread it in app.module.ts.'
+      - id: case-3
+        when: 'api.options.ts exports `modules: [...]`, a `BullModule.registerQueue(...)` list or `schedulers: [orderExpirySchedulerOf(...)]`'
+        write: 'Refused (BE_APP_OPTIONS_COMPOSITION): keep only the parsed values (orderExpiry: { everyMs, olderThanMs }) and the port map in the options; the list goes into compose/<area>.ts.'
+    verification:
+      automated:
+        - BE_APP_OPTIONS_COMPOSITION
+        - BE_APP_COMPOSITION_BUDGET
+        - BE_APP_COMPOSITION_ONLY
+        - BE_APP_BUSINESS_ROLE
+        - BE_MODULE_SHAPE
+        - BE_MODULE_HANDLER_REGISTRATION
+        - BE_MODULE_PROVIDER_REREGISTRATION
+        - BE_CONFIG_OWNER
+      manual:
+        - Confirm each group is one area of the app and holds no decision a capability should own.
     relatedExamples: [api]
   - id: BE-OPERATIONS-1
     title: A versioned operation is declared once in the app's typed operation table

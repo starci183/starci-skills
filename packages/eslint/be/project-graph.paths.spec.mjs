@@ -73,11 +73,15 @@ test("a source file name is index.ts, main.ts, a migration or <kebab-name>.<suff
         "src/tests/fixtures/builders/order.fixture.ts",
         "src/stray/Not_Owned.ts",
         "apps/core/src/core.options.ts",
+        "apps/core/src/compose/platform.ts",
+        "apps/core/src/compose/Bad_Group.ts",
     ])
     s.tester.run("source-suffix", rules["source-suffix"], {
         valid: [
             s.good("apps/core/src/main.ts"),
             s.good("apps/core/src/core.options.ts"),
+            // a composition group is named by its area alone (slot entry compose/<area>.ts, R245)
+            s.good("apps/core/src/compose/platform.ts"),
             s.good("src/features/api/orders/application/cancel-order.command.ts"),
             s.good("src/features/api/orders/application/cancel-order.query.ts"),
             s.good("src/features/api/orders/application/cancel-order.handler.spec.ts"),
@@ -93,6 +97,7 @@ test("a source file name is index.ts, main.ts, a migration or <kebab-name>.<suff
             s.good("src/stray/Not_Owned.ts"),
         ],
         invalid: [
+            "apps/core/src/compose/Bad_Group.ts",
             "src/features/api/orders/application/cancel-order.use-case.ts",
             "src/features/api/orders/application/order.types.ts",
             "src/features/api/orders/application/CancelOrder.handler.ts",

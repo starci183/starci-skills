@@ -53,6 +53,8 @@ test("isGlobal: true is written only in apps/<app>/src/app.module.ts", () => {
     tester.run("is-global-only-in-app", isGlobalOnlyInApp, {
         valid: [
             { filename: APP, code: "const m = [CatalogModule.register({ isGlobal: true, ...options.catalog })]" },
+            // a composition group of compose/ is part of the app root: the root spreads its module list
+            { filename: at("apps/api/src/compose/platform.ts"), code: "export const platformModules = [CatalogModule.register({ isGlobal: true })]" },
             { filename: MODULE, code: "const b = builder.setExtras({ isGlobal: false }, (d, e) => ({ ...d, global: e.isGlobal }))" },
             { filename: MODULE, code: "const m = CatalogModule.register({ isGlobal: false })" },
             { filename: MODULE, code: "const flag = { isGlobal }" },

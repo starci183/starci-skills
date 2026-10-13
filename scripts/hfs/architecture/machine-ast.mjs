@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { canonical } from './config.mjs';
 import { hasAnyFlag, sourceLocation } from '../../lib/ts-ast.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 const HELPER_DEPTH = 4;
 
@@ -110,6 +111,21 @@ const at = (env, rel, sourceFile, node, extra = {}) => ({ path: rel, ...sourceLo
 /** The app root file of an app (apps/<name>/src/app.module.ts), or null when the program does not hold it. */
 const appRoot = (env, name) => graphFile(env, `apps/${name}/src/app.module.ts`);
 
+/**
+ * Whether a repository-relative file is a composition group of an app: `apps/<app>/src/compose/<area>.ts`, the module list of
+ * one area that the app root spreads into its imports (slot allows `compose/<area>.ts` of every be.app.* slot).
+ */
+export const isComposeGroup = rel => /^apps\/[^/]+\/src\/compose\/[^/]+\.ts$/.test(rel) && !/\.(?:spec|d)\.ts$/.test(rel);
+
+/** The app root and the composition groups of an app, in path order (the root first); [] when the program holds no root. */
+const appCompositionFiles = (env, name) => {
+  const root = appRoot(env, name);
+  if (!root) return [];
+  const prefix = `apps/${name}/src/compose/`;
+  const groups = [...env.graph.files.values()].filter(file => file.rel.startsWith(prefix) && isComposeGroup(file.rel));
+  return [root, ...groups.sort((a, b) => byCodeUnit(a.rel, b.rel))];
+};
+
 /** The body a call or a spread identifier resolves to when it is a function or a const declared in a file of the program (not a package), else null. */
 function helperBodyOf(env, checker, node) {
   const { ts } = env;
@@ -200,6 +216,7 @@ export function machineKit({ context, graph }) {
     valueOfProperty: bound(valueOfProperty),
     at: bound(at),
     appRoot: bound(appRoot),
+    appCompositionFiles: bound(appCompositionFiles),
   };
 }
 

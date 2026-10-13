@@ -217,6 +217,29 @@ test("addTable --fe writes the GraphQL feature, the fe operation files and SWR h
   assert.equal(read(root, "fe/apps/web/src/modules/config/index.ts").match(/export const graphqlUrl/g).length, 1);
 });
 
+test("addTable lists the error kinds in the compose/ group that holds them when the app root has none (R245)", () => {
+  const root = appRoot();
+  const owner = "be/apps/api/src/app.module.ts";
+  const group = "be/apps/api/src/compose/platform.ts";
+  fs.writeFileSync(
+    path.join(root, ...owner.split("/")),
+    'import { Module } from "@nestjs/common"\nimport { platformModules } from "./compose/platform"\n\n@Module({})\nexport class AppModule {\n    static register() {\n        return {\n            module: AppModule,\n            imports: [\n                ...platformModules(),\n            ],\n        }\n    }\n}\n',
+  );
+  fs.mkdirSync(path.join(root, "be", "apps", "api", "src", "compose"), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, ...group.split("/")),
+    'import { ErrorsModule } from "@modules/platform/errors"\n\nexport const platformModules = () => [\n    ErrorsModule.register({\n        kinds: [\n        ],\n    }),\n]\n',
+  );
+  addTable({ root, name: "ledgers", emitTypes: false, now: () => at });
+  const app = read(root, owner);
+  assert.match(app, /import \{ LedgersModule \} from "@modules\/domain\/ledgers"/);
+  assert.match(app, /imports: \[\n\s+LedgersModule\.register\(\{ isGlobal: true \}\),/);
+  assert.doesNotMatch(app, /LEDGERS_ERROR_KINDS/);
+  const platform = read(root, group);
+  assert.match(platform, /import \{ LEDGERS_ERROR_KINDS \} from "@modules\/domain\/ledgers"/);
+  assert.match(platform, /kinds: \[\n\s+LEDGERS_ERROR_KINDS,/);
+});
+
 test("addTable --fe writes the fe operations into every product app, never into the marketing landing", () => {
   const root = appRoot();
   const declaration = JSON.parse(read(root, "hfs.json"));

@@ -282,30 +282,35 @@ const composedConnection = (kit, declared, checker, inner) => {
   return value !== null && declared.has(value) ? value : null;
 };
 
-const collectComposedConnections = (kit, declared, checker, call, items) => {
+const collectComposedConnections = (kit, declared, checker, call, file, items) => {
   for (const argument of call.arguments) {
     kit.walk(argument, inner => {
       const value = composedConnection(kit, declared, checker, inner);
       if (value === null) return true;
-      items.push({ connection: value, node: inner });
+      items.push({ connection: value, node: inner, file });
       return false;
     });
   }
 };
 
-/** The declared connection names the composition root of `app` passes to the database module registration, as [{connection, node}] in source order. */
+/**
+ * The declared connection names the composition of `app` (its root app.module.ts and the composition groups of compose/) passes to
+ * the database module registration, as [{connection, node, file}] in path then source order.
+ */
 export function connectionsComposedBy(kit, app) {
   const { ts } = kit;
-  const root = kit.appRoot(app);
-  if (!root) return { root: null, items: [] };
+  const files = kit.appCompositionFiles(app);
+  if (!files.length) return { root: null, items: [] };
   const declared = new Set(kit.resolver.repo.connections.map(connection => connection.name));
-  const checker = kit.checkerOf(root.sourceFile);
   const items = [];
-  kit.walk(root.sourceFile, node => {
-    if (!(ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'register')) return;
-    const owner = kit.declarationsOf(checker, node.expression.expression).map(kit.ownerOfDeclaration).find(Boolean);
-    if (owner?.tier !== 'platform' || owner.name !== 'database') return;
-    collectComposedConnections(kit, declared, checker, node, items);
-  });
-  return { root, items };
+  for (const file of files) {
+    const checker = kit.checkerOf(file.sourceFile);
+    kit.walk(file.sourceFile, node => {
+      if (!(ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'register')) return;
+      const owner = kit.declarationsOf(checker, node.expression.expression).map(kit.ownerOfDeclaration).find(Boolean);
+      if (owner?.tier !== 'platform' || owner.name !== 'database') return;
+      collectComposedConnections(kit, declared, checker, node, file, items);
+    });
+  }
+  return { root: files[0], items };
 }

@@ -186,13 +186,48 @@ function wireImport(text, relative, { importLine, symbol, entry, kinds }) {
   return `${lines.join("\n").replace(/\n+$/, "")}\n`;
 }
 
-/** The api app root after the table's domain module is registered (its module and error kinds). */
-const wireDomainModule = (text, relative, name) =>
+/** A line that opens the error kinds array of the errors registration. */
+const KINDS_LINE = /^\s*kinds: \[$/;
+
+/**
+ * The composition file of an api app that holds its error kinds array: the root `app.module.ts`, or else the composition group
+ * `compose/<area>.ts` of the same app that holds it (the platform group of a scaffolded app). Repository-relative.
+ */
+function kindsHomeOf(root, appRelative) {
+  const holdsKinds = (relative) => fs.readFileSync(at(root, relative), "utf8").replace(/\r\n/g, "\n").split("\n").some((line) => KINDS_LINE.test(line));
+  if (holdsKinds(appRelative)) return appRelative;
+  const composeRelative = `${path.posix.dirname(appRelative)}/compose`;
+  const groups = fs.existsSync(at(root, composeRelative)) ? fs.readdirSync(at(root, composeRelative)).filter((file) => file.endsWith(".ts")).sort(byCodeUnit) : [];
+  const home = groups.map((file) => `${composeRelative}/${file}`).find(holdsKinds);
+  if (!home) throw new ScaffoldError("HFS_ADD_WIRE_INVALID", `add table could not find the error kinds array in ${appRelative} or a group of its compose/`);
+  return home;
+}
+
+/** A composition group after `kinds` is listed first in its error kinds array and imported from `specifier`. Returns the new text. */
+function wireKinds(text, relative, { kinds, specifier }) {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  if (lines.some((line) => line.startsWith("import ") && new RegExp(`\\b${kinds}\\b`).test(line))) return text;
+  const lastImport = lines.reduce((last, line, index) => (line.startsWith("import ") ? index : last), -1);
+  const kindsAt = lines.findIndex((line) => KINDS_LINE.test(line));
+  if (lastImport < 0 || kindsAt < 0) throw new ScaffoldError("HFS_ADD_WIRE_INVALID", `add table could not find the error kinds array in ${relative}`);
+  const kindsIndent = /^(\s*)/.exec(lines[kindsAt])?.[1] ?? "";
+  lines.splice(kindsAt + 1, 0, `${kindsIndent}    ${kinds},`);
+  lines.splice(lastImport + 1, 0, `import { ${kinds} } from "${specifier}"`);
+  return `${lines.join("\n").replace(/\n+$/, "")}\n`;
+}
+
+/**
+ * The api app root after the table's domain module is registered: its module, and its error kinds too when the root holds the
+ * kinds array (`kindsInRoot`); otherwise wireKinds lists them in the composition group that does.
+ */
+const wireDomainModule = (text, relative, name, { kindsInRoot = true } = {}) =>
   wireImport(text, relative, {
-    importLine: `import { ${snakeOf(name).toUpperCase()}_ERROR_KINDS, ${pascalOf(name)}Module } from "@modules/domain/${name}"`,
+    importLine: kindsInRoot
+      ? `import { ${snakeOf(name).toUpperCase()}_ERROR_KINDS, ${pascalOf(name)}Module } from "@modules/domain/${name}"`
+      : `import { ${pascalOf(name)}Module } from "@modules/domain/${name}"`,
     symbol: `${pascalOf(name)}Module`,
     entry: `${pascalOf(name)}Module.register({ isGlobal: true })`,
-    kinds: `${snakeOf(name).toUpperCase()}_ERROR_KINDS`,
+    ...(kindsInRoot ? { kinds: `${snakeOf(name).toUpperCase()}_ERROR_KINDS` } : {}),
   });
 
 /** The api app root after the GraphQL server (platform/graphql) and the table's GraphQL transport are registered. */
@@ -458,7 +493,11 @@ export function addTable({
       const generated = emitTypes({ root });
       if (typeof generated === "string") edit(dbTypesPath, () => generated);
     }
-    edit(ownerRelative, (text) => wireDomainModule(text, ownerRelative, feature));
+    const kindsHome = kindsHomeOf(root, ownerRelative);
+    const kindsInRoot = kindsHome === ownerRelative;
+    edit(ownerRelative, (text) => wireDomainModule(text, ownerRelative, feature, { kindsInRoot }));
+    if (!kindsInRoot)
+      edit(kindsHome, (text) => wireKinds(text, kindsHome, { kinds: `${snakeOf(feature).toUpperCase()}_ERROR_KINDS`, specifier: `@modules/domain/${feature}` }));
     const registrations = [
       ...(repo.edition === "lite" ? ["table"] : []),
       ...(fe ? ["api", "graphql"] : []),

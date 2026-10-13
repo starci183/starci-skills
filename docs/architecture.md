@@ -264,8 +264,9 @@ hops), hooks hidden beside visuals (every authored custom hook lives under `hook
 machinery that owns nothing (a presentational twin, a forwarding service, a command for its own
 sake).
 
-The **back end** instantiates it in Nest/TypeScript: apps compose processes (the `be.app.*` slots),
-an api feature exposes operations as typed commands and queries with one handler each
+The **back end** instantiates it in Nest/TypeScript: apps compose processes (the `be.app.*` slots:
+`main.ts`, env-derived `<app>.options.ts`, one `compose/<area>.ts` group per area and the
+`app.module.ts` root that spreads them, each within its line budget, R245 and R246), an api feature exposes operations as typed commands and queries with one handler each
 (`transport -> command -> handler -> domain`, one transaction inside a bounded context, an event
 only to cross contexts or carry async work), and each capability module registers exactly once per
 app with typed options (`register`, `ConfigurableModuleBuilder`, `isGlobal: true` only in app

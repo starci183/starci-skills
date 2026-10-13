@@ -47,8 +47,8 @@ topics:
   - id: be.api
     title: Api features
     path: api.yaml
-    decides: The api trigger kind, a flat feature of plain CQRS and thin graphql or http transports, the typed operation table, the e2e flow of every operation
-    rules: BE-API-1, BE-API-2, BE-OPERATIONS-1
+    decides: The api trigger kind, a flat feature of plain CQRS and thin graphql or http transports, the typed operation table, the e2e flow of every operation, the app composition files (options, compose/<area>.ts groups, the root)
+    rules: BE-API-1 … BE-API-4, BE-OPERATIONS-1
   - id: be.cli
     title: Operator commands
     path: cli.yaml

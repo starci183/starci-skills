@@ -31,7 +31,8 @@ function sourceFormContext(file, resolver, suffixes, bannedSuffixes) {
   if ([...(slot?.requires ?? []), ...(slot?.allows ?? [])].includes(base)) return null;
   const admitted = allowsFile(resolver, file);
   if (admitted?.allowed && admitted.entry?.includes('/') && path.posix.basename(admitted.entry) === base) return null;
-  if (admitted?.allowed && PLAIN_ENTRY.test(admitted.entry ?? '') && KEBAB.test(base.slice(0, -'.ts'.length))) return null;
+  // A plain entry names its file by a variable only (`<x>.ts`, or `compose/<area>.ts` of an app slot): a kebab name is its form.
+  if (admitted?.allowed && PLAIN_ENTRY.test(path.posix.basename(admitted.entry ?? '')) && KEBAB.test(base.slice(0, -'.ts'.length))) return null;
   if (c.slot === 'be.persistence' && path.posix.basename(path.posix.dirname(file)) === 'migrations') return null;
   return { c, base, suffixes, bannedSuffixes };
 }

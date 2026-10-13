@@ -483,14 +483,23 @@ module; never one module per operation.
 
 A capability module is `@Module` extending `ConfigurableModuleClass` from a typed `ConfigurableModuleBuilder<Options>`, and
 its only registration method is `register`. Each capability has one representative module, registered exactly once per app
-in `be/apps/<app>/src/app.module.ts` as `X.register({ isGlobal: true, ...options.x })`; it may import its own sub-modules as
+in `be/apps/<app>/src/app.module.ts` (or a `compose/<area>.ts` group it spreads) as `X.register({ isGlobal: true, ...options.x })`; it may import its own sub-modules as
 plain imports. No module imports another capability's representative module; other capabilities reach it through its
 injectors. `isGlobal: true` appears only at an app root and `@Global()` nowhere (R45).
 
 Every infrastructure dependency arrives through a zero-argument `Inject<Thing>()` exported from its owner's
 `<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(`, `ModuleRef`, `forwardRef` and property injection do
 not exist (R85). Every feature and every transport module is composed by at least one app. Apps hold only `main.ts`,
-`app.module.ts` and `<app>.options.ts`; an app has no spec (the e2e world boots it). Entrypoints exist only in `be/apps/*/src` (R33).
+`app.module.ts`, `<app>.options.ts` and the composition groups `compose/<area>.ts`; an app has no spec (the e2e world boots it).
+Entrypoints exist only in `be/apps/*/src` (R33).
+
+The composition files of an app have one role each and a line budget in their app slot (owner ruling 2026-10-14, R245, R246): `main.ts`
+(80) reads the environment once and boots; `<app>.options.ts` (200) holds env-derived options plus port bindings (provider maps
+such as `{ approvalGate: X }`) only, never an array of Nest modules, queue registrations or scheduler entries
+(`BE_APP_OPTIONS_COMPOSITION`); `compose/<area>.ts` (120) exports the module list of one area (and the providers of its global
+ports when it has any), composition only, with no business logic and no environment read; `app.module.ts` (250) imports the
+groups and spreads them, and binds the app-wide guards and filter. A group's registrations are the app root's (`isGlobal: true`
+is legal there). The budget is absolute (`BE_APP_COMPOSITION_BUDGET`): an app root that outgrows it moves an area into a new group.
 
 ### 5.9 Query, transport and runtime safety (R68 to R77, R89, R90)
 
@@ -711,7 +720,8 @@ no contract copy under `fe/`.
   react, next and grammar, no nested copies (R14, R15). Raising a version is a change in `.claude` first, then each app
   moves to the new pin in its own upgrade lane. `tsconfig` extends `@starci/tsconfig` with `strict`, `noUncheckedIndexedAccess`,
   `noImplicitOverride`, `noFallthroughCasesInSwitch`, `allowJs: false` and never lowers a flag (R22).
-- **Size budgets.** Backend file 500 lines, function 80, `app.module.ts` 250, `index.ts` 60 exports, feature 250 source
+- **Size budgets.** Backend file 500 lines, function 80, `app.module.ts` 250, `<app>.options.ts` 200, `compose/<area>.ts` 120,
+  `main.ts` 80 (absolute, R246), `index.ts` 60 exports, feature 250 source
   files. Frontend component 300, connected `index.tsx` 200, hook 200, module 400. The mechanism is no-growth
   (`HFS_SIZE_GROWTH`): a new file is inside the budget, a file already over its budget gains no lines against its parent
   commit. There is no baseline and no allowlist (R20). A duplicated block at or above the one threshold
@@ -972,4 +982,6 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R242 | `RT_OP_JUDGE_UNDECLARED` | Every op declares who judges its product (principle P2: the maker never judges its own work). The contract of each op (modules/ops/ops/<op>.yaml) carries the required field `judge`, a list of at least one entry, each with a one-line why: machine (independent measures the runtime owns or re-runs at settle, named from modules/kernel/op-judges.yaml, and the contract proofs they rely on; a test file the same attempt wrote is never one by itself), critic (the independent Critic and its rubric, declared exactly for the op kinds that modules/kernel/critic.yaml coverage marks covered), owner (only where modules/kernel/op-judges.yaml ownerGates holds an owner gate) and next-leg (a registered reviewing leg whose contract is to review this product). Nobody cannot be declared. The registry and the contracts are checked against the runtime's own tables (op-gate and sonar-gate enforcedOps, opProofs, proof media, the Critic coverage), so the declarations and what the runtime does cannot drift apart. Surfaced in the full status text of a leg and in the op prompt. | runtime |
 | R243 | `FE_SERVER_ACTION_FORBIDDEN` | The front end serves no API, in every app and edition (R212 case-2): no file under `fe/` carries a `"use server"` directive (module or function level), and the only route handlers are `app/health/live/route.ts` and the auth callback of the `fe.route.callback` slot; reads and writes reach the back end through `modules/api` and the SWR hooks, and a webhook, cron, public API or third-party callback is a back-end feature. | product |
 | R244 | `FE_STACK_FORBIDDEN` | A front end uses the one canonical library of each concern of knowledge/hfs/fe-stack.yaml: no front-end package.json (an app or a `fe/packages/*` package) depends on, and no source file under `fe/` imports, a package that the catalog lists under a concern's `forbids`; a missing concern is added to the catalog (with its pin in canon-pins.yaml), never installed beside it. | product |
+| R245 | `BE_APP_OPTIONS_COMPOSITION` | An app's `src/` holds four composition roles (owner ruling 2026-10-14): `main.ts` reads the environment once and boots; `<app>.options.ts` holds env-derived options plus port bindings (provider maps such as `{ approvalGate: X }`) only, never an array of Nest modules, queue registrations or scheduler entries, and no `imports`, `modules`, `schedulers` or `processors` list; `compose/<area>.ts` exports the module list of one area (and the providers of its global ports when it has any), composition only, with no business logic and no environment read; `app.module.ts` imports the groups and spreads them and binds the app-wide guards and filter. | product |
+| R246 | `BE_APP_COMPOSITION_BUDGET` | Each composition file of an app stays within the line budget its `be.app.*` slot names (`budget`, keyed by the slot entry the file matches): `main.ts` 80, `<app>.options.ts` 200, `compose/<area>.ts` 120, `app.module.ts` 250. The budget is absolute, not a ratchet: an app root that outgrows it moves an area into a new `compose/<area>.ts` group, never into the options. | product |
 <!-- hfs:generated-end rules -->

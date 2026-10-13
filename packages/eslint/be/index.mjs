@@ -19,6 +19,7 @@
 import { buildBeConfig } from "./lib/config.mjs"
 import { pluginForEdition } from "./lib/edition.mjs"
 import { recommended as ambientIdRecommended, rules as ambientIdRules } from "./ambient-id.mjs"
+import { recommended as appCompositionRecommended, rules as appCompositionRules } from "./app-composition.mjs"
 import { recommended as asyncDisciplineRecommended, rules as asyncDisciplineRules } from "./async-discipline.mjs"
 import { recommended as authorizationRecommended, rules as authorizationRules } from "./authorization.mjs"
 import { recommended as buildersRecommended, rules as buildersRules } from "./builders.mjs"
@@ -71,6 +72,7 @@ import { recommended as sonarParityRecommended, rules as sonarParityRules } from
 const CONTRIBUTIONS = [
     { law: "project-graph", rules: projectGraphRules, recommended: projectGraphRecommended },
     { law: "ambient-id", rules: ambientIdRules, recommended: ambientIdRecommended },
+    { law: "app-composition", rules: appCompositionRules, recommended: appCompositionRecommended },
     { law: "async-discipline", rules: asyncDisciplineRules, recommended: asyncDisciplineRecommended },
     { law: "authorization", rules: authorizationRules, recommended: authorizationRecommended },
     { law: "builders", rules: buildersRules, recommended: buildersRecommended },

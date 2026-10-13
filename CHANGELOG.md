@@ -4,6 +4,11 @@ All notable changes to StarCi are documented here. The runtime is on the `1.0.0-
 until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
+## [Unreleased]
+
+### Added
+- The back-end app composition standard (owner ruling 2026-10-14, R245 and R246, slot manifest and rule catalog 3.1.0): an app's `src/` holds `main.ts`, `<app>.options.ts` (env-derived options plus port bindings only), the composition groups `compose/<area>.ts` (one area's module list each, composition only) and `app.module.ts` (imports the groups and spreads them), with line budgets of 80, 200, 120 and 250. `@starci/eslint-canon-be` 3.3.0 adds `app-options-composition-free` (`BE_APP_OPTIONS_COMPOSITION`: no module, queue or scheduler list in the options) and `app-file-budget` (`BE_APP_COMPOSITION_BUDGET`); the architecture machine reads a root and its groups as one composition. `@starci/hfs` 4.3.0 scaffolds `compose/platform.ts`; the lite-app api, the ecommerce order api and the shape-slot core app compose in groups. `@starci/eslint-canon-fe` 8.2.17 and `@starci/cli` 1.2.16 carry the new mirror and pins. Knowledge: BE-API-4, the HFS README section 5.8.
+
 ## [1.0.0-alpha.13] — 2026-10-13
 
 The lite standard and one front end: a lite app is the full code structure deployed without self-hosted infrastructure and without e2e, and every front end, lite or full, follows one stack (owner rulings 2026-10-12 and 2026-10-13). alpha.12 is not published; alpha.13 supersedes it.

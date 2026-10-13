@@ -678,8 +678,12 @@ describe('starci app scaffold: the first tree', () => {
     assert.match(module, /static register\(options: CoreOptions\): DynamicModule/);
     assert.match(module, /APP_FILTER, useClass: ErrorsFilter[\s\S]*APP_GUARD, useClass: RateLimitGuard[\s\S]*APP_GUARD, useClass: OriginGuard[\s\S]*APP_GUARD, useClass: AuthGuard/, 'throttler, then the CSRF origin guard, then AuthGuard');
     assert.match(read(root, 'be/apps/core/src/main.ts'), /EnvSource\.fromProcess\(\)/);
-    // The core app opens the primary connection with the note capability's arrays; the cli app migrates the same arrays.
-    assert.match(module, /DatabaseModule\.register\(\{[\s\S]*connections: \[\{ \.\.\.options\.database, entities: noteEntities, migrations: noteMigrations \}\]/);
+    // The core app composes in groups (R245): the root spreads compose/platform.ts, which opens the primary connection with the
+    // note capability's arrays; the cli app migrates the same arrays.
+    assert.match(module, /imports: \[\n\s+\.\.\.platformModules\(options\),/);
+    const platform = read(root, 'be/apps/core/src/compose/platform.ts');
+    assert.match(platform, /export const platformModules = \(options: CoreOptions\): Array<DynamicModule> => \[/);
+    assert.match(platform, /DatabaseModule\.register\(\{[\s\S]*connections: \[\{ \.\.\.options\.database, entities: noteEntities, migrations: noteMigrations \}\]/);
     assert.match(read(root, 'be/apps/cli/src/cli.options.ts'), /entities: noteEntities,\s*migrations: noteMigrations/);
     assert.match(read(root, 'be/apps/cli/src/main.ts'), /CommandFactory\.run\(/);
     assert.doesNotMatch(filesUnder(root).map(file => read(root, file)).join('\n'), /\{\{(project|app|appPascal|sonarGate)\}\}/i, 'no skeleton variable is left');

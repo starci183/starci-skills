@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.3.0 - 2026-10-14
+
+- Added: HFS manifest 3.1.0 (rule catalog 3.1.0, owner ruling 2026-10-14, R245 and R246): every `be.app.*` slot allows the composition groups `compose/<area>.ts` and budgets its composition files (`app.module.ts` 250, `<app>.options.ts` 200, `compose/<area>.ts` 120, `main.ts` 80); `<app>.options.ts` holds env-derived options and port bindings only (`BE_APP_OPTIONS_COMPOSITION`, `BE_APP_COMPOSITION_BUDGET`).
+- Changed: `starci app scaffold` writes `apps/<api app>/src/compose/platform.ts` (the platform capabilities as one group, `platformModules(options)`) in both editions, and the scaffolded `app.module.ts` spreads it before the domain modules and the guards.
+- Changed: `add table` lists the table's error kinds where the app keeps its error kinds array: the root `app.module.ts`, or else the `compose/` group that holds it.
+- Changed: the architecture machine reads an app's root and its `compose/` groups as one composition (register-once, module-per-transport, the connection and context maps).
+
 ## 4.2.15 - 2026-10-13
 
 - Changed: the heroicons family is the one application icon set (owner ruling 2026-10-13): the scaffold installs `@heroicons/react` 2.2.0 and `@starci/heroicons` 0.3.3 (fe-stack `icons`, tier core) in every product fe app in place of `@phosphor-icons/react`, and the `modules/toast` skeleton draws its status indicators with `@heroicons/react/24/outline` (CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, InformationCircleIcon). Carry the canon pins of eslint-canon-be 3.2.17, eslint-canon-fe 8.2.16 and CLI 1.2.15.

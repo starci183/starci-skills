@@ -39,7 +39,7 @@ rules:
     cases:
       - id: case-1
         when: A service app
-        write: 'be/apps/order/src/app.module.ts imports PaymentStatusMessageModule and SendReceiptModule next to its api transport modules.'
+        write: 'be/apps/order/src/compose/background.ts lists OrderPaymentStatusMessageModule and SendReceiptQueueModule (with the queue and its schedulers), and the root app.module.ts spreads that group next to its api transport modules.'
     verification:
       automated:
         - BE_BACKGROUND_UNOWNED

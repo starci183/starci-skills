@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { machineKit } from './machine-ast.mjs';
+import { isComposeGroup, machineKit } from './machine-ast.mjs';
 import { callName } from './supabase-ast.mjs';
 import { isTestWorldSlot } from '../test-world-slot.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
@@ -7,7 +7,8 @@ import { byCodeUnit } from '../../lib/list.mjs';
 /**
  * R45 `register-once` (BE_MODULE_SHAPE), the module graph read from the app roots (owner rule of 2026-09-30, the
  * reference's `CodingModule imports DeviceModule` shape). Each capability has one representative module: the only module
- * of the capability an app registers, once, in `apps/<app>/src/app.module.ts` as `X.register({ isGlobal: true, ... })`.
+ * of the capability an app registers, once, in `apps/<app>/src/app.module.ts` as `X.register({ isGlobal: true, ... })`, or in a
+ * composition group `apps/<app>/src/compose/<area>.ts` the root spreads (an app root here means the root and its groups).
  * It may split itself into sub-modules imported as plain `imports: [Sub]`; a sub-module is never in an app and has one
  * importer, its parent. Over every `@Module` class of the program:
  *
@@ -57,6 +58,7 @@ function enclosingModule(ts, modules, node) {
 /** Records the reference an element of an imports list, or a register call, makes to a module. */
 function noteReference(scan, element, viaImports) {
   const { ts, kit, modules, checker, file, seen, references, isAppRoot } = scan;
+  if (seen.has(element)) return;
   const call = callName(ts, element) === 'register';
   if (ts.isCallExpression(element) && !call) return;
   const target = targetOf(kit, modules, checker, call ? element.expression.expression : element);
@@ -72,14 +74,19 @@ const isImportsList = (scan, node) => scan.ts.isPropertyAssignment(node) && scan
 const isStrayGlobal = (scan, node) => scan.ts.isPropertyAssignment(node) && scan.kit.propertyNameText(node.name) === 'isGlobal'
   && node.initializer.kind === scan.ts.SyntaxKind.TrueKeyword && !scan.isAppRoot(scan.file) && !scan.isWorld(scan.file);
 
+// A composition group's module list is any array of the group: the root spreads it into its imports.
+const isGroupList = (scan, node) => scan.ts.isArrayLiteralExpression(node) && isComposeGroup(scan.file.rel);
+
 function visitReferenceNode(scan, node) {
   if (isImportsList(scan, node)) {
     for (const element of node.initializer.elements) noteReference(scan, element, true);
+  } else if (isGroupList(scan, node)) {
+    for (const element of node.elements) noteReference(scan, element, true);
   } else if (callName(scan.ts, node) === 'register' && !scan.seen.has(node)) {
     noteReference(scan, node, false);
   }
   if (isStrayGlobal(scan, node)) {
-    scan.report(scan.file, node, '`isGlobal: true` appears only in the app root (apps/<app>/src/app.module.ts), where the representative module of a capability is registered; a module never decides its own globality.');
+    scan.report(scan.file, node, '`isGlobal: true` appears only in the app root (apps/<app>/src/app.module.ts or a group of apps/<app>/src/compose/), where the representative module of a capability is registered; a module never decides its own globality.');
   }
   return true;
 }
@@ -170,11 +177,12 @@ export function checkRegisterOnce(input) {
   const { ts } = kit;
   const violations = [];
   const report = (file, node, message, extra = {}) => violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, node), message, ...extra });
-  const isAppRoot = file => Boolean(file.slot?.startsWith('be.app.')) && path.posix.basename(file.rel) === 'app.module.ts';
+  const isAppRoot = file => Boolean(file.slot?.startsWith('be.app.')) && (path.posix.basename(file.rel) === 'app.module.ts' || isComposeGroup(file.rel));
   // The test world (slot be.tests.world) is the test composition root: useTestWorld registers capability modules with
   // `isGlobal: true` the way an app root does. A spec (integration, contract, e2e) is not a composition root.
   const isWorld = file => isTestWorldSlot(file.slot);
-  const appOf = file => config.apps.find(app => file.rel === `apps/${app.name}/src/app.module.ts`)?.name ?? null;
+  const appOf = file => config.apps.find(app => file.rel === `apps/${app.name}/src/app.module.ts`
+    || (isComposeGroup(file.rel) && file.rel.startsWith(`apps/${app.name}/src/compose/`)))?.name ?? null;
   const modules = moduleDeclarations(graph, kit, ts);
   const references = moduleReferences(graph, kit, ts, modules, isWorld, isAppRoot, report);
   const rootReferences = references.filter(item => item.root);

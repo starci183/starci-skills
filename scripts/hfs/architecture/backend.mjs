@@ -376,7 +376,7 @@ function checkApplicationComposition(config, ts, sourceFile, fileName, app, viol
       path: relativePath(config.root, fileName),
       line: 1,
       column: 1,
-      message: `Application source ${app.relative} is not a file its app slot requires or allows (main.ts, app.module.ts, <app>.options.ts).`,
+      message: `Application source ${app.relative} is not a file its app slot requires or allows (main.ts, app.module.ts, <app>.options.ts, compose/<area>.ts).`,
     });
   }
 }

@@ -27,7 +27,7 @@ const EXPECTED_LITE_FILES = Object.freeze([
   '.prettierrc', '.sops.yaml', '.starcistacks/dev/environment.json', '.starcistacks/dev/secrets/.gitkeep',
   '.starciwork/.gitignore', '.starciwork/features/system-health/index.yaml', '.starciwork/index.yaml',
   '.starciwork/shell/index.yaml', '.starciwork/workspace.yaml', 'README.md',
-  'be/apps/api/Dockerfile', 'be/apps/api/src/api.options.ts', 'be/apps/api/src/app.module.ts', 'be/apps/api/src/main.ts',
+  'be/apps/api/Dockerfile', 'be/apps/api/src/api.options.ts', 'be/apps/api/src/app.module.ts', 'be/apps/api/src/compose/platform.ts', 'be/apps/api/src/main.ts',
   'be/eslint.config.mjs', 'be/jest.config.js', 'be/nest-cli.json',
   'be/src/features/api/system-health/application/check-liveness.contracts.ts',
   'be/src/features/api/system-health/application/check-liveness.handler.ts',

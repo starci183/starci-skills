@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.3.0 - 2026-10-14
+
+- Added: law `app-composition` (R245 and R246, owner ruling 2026-10-14). `app-options-composition-free` (`BE_APP_OPTIONS_COMPOSITION`) keeps `apps/<app>/src/<app>.options.ts` to env-derived options and port bindings (provider maps such as `{ approvalGate: X }`): an array that lists a `*Module` class, a `X.register(...)`/`forRoot(...)`/`registerQueue(...)` call, a `*SchedulerOf(...)`/`*Queue(...)` entry or a spread of such a list, and an `imports`, `modules`, `schedulers` or `processors` array are refused, pointing to `compose/<area>.ts`. `app-file-budget` (`BE_APP_COMPOSITION_BUDGET`) holds `main.ts` (80), `<app>.options.ts` (200), `compose/<area>.ts` (120) and `app.module.ts` (250) to the `budget` of their app slot; the budget is absolute. The role of an app file is the slot entry it matches (`lib/app-roles.mjs`), never a path list.
+- Changed: `is-global-only-in-app` accepts `isGlobal: true` in the composition groups `apps/<app>/src/compose/<area>.ts` (they are part of the app root), and the bundled architecture machine reads an app's root and its groups as one composition (register-once, module-per-transport, the connection and context maps).
+- Changed: carry the runtime mirror of HFS manifest 3.1.0 (rule catalog 3.1.0) and the canon pins of eslint-canon-fe 8.2.17, HFS 4.3.0 and CLI 1.2.16.
+
 ## 3.2.17 - 2026-10-13
 
 - Changed: the bundled canon-pins copy carries `@heroicons/react` 2.2.0 and `@starci/heroicons` 0.3.3 in place of `@phosphor-icons/react` (the heroicons family is the one icon set, owner ruling 2026-10-13) and the pins of eslint-canon-fe 8.2.16, HFS 4.2.15 and CLI 1.2.15. ESLint rule implementations are unchanged.

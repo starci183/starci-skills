@@ -7,7 +7,7 @@
 # catalog READ this file through scripts/hfs/slots.mjs; none of them hardcodes a path.
 # Shape: modules/schemas/hfs-slots.schema.yaml. The repository side is hfs.json: modules/schemas/hfs-repo.schema.yaml.
 schema: starci/hfs-slots@3
-version: 3.0.0
+version: 3.1.0
 
 versioning:
   # MAJOR.MINOR.PATCH of this manifest. A repository pins only the MAJOR in hfs.json ("hfs": 3).
@@ -31,6 +31,9 @@ versioning:
 # is the socket.io gateway in both editions), fe.route holds pages, layouts and the one health/live route handler, and the slots
 # marked `since: 3.0.0` are added: the Apollo, SWR, RHF, zustand and socket.io hooks, redux, modules/auth, modules/toast, the
 # providers, be.assets and the migration archive.
+# 3.1.0 is a minor (owner ruling 2026-10-14, R245 and R246): every be.app.* slot allows the composition groups `compose/<area>.ts` and
+# budgets its composition files (`app.module.ts` 250, `<app>.options.ts` 200, `compose/<area>.ts` 120, `main.ts` 80);
+# `<app>.options.ts` holds env-derived options and port bindings only (BE_APP_OPTIONS_COMPOSITION).
 
 # Field meaning, per slot.
 #   id          stable name, never changes meaning inside a major.
@@ -959,6 +962,14 @@ slots:
     rules: [BE_CONTRACT_BREAKING]
 
   # ----- BE: apps (one slot per app kind; a new kind = a new slot, minor bump) ---------------------------
+  # The composition files of every app (owner ruling 2026-10-14, R245 and R246, since 3.1.0), each with a line budget that
+  # BE_APP_COMPOSITION_BUDGET holds absolutely (not a ratchet):
+  #   main.ts            the entry: reads the environment once (EnvSource), builds the options and boots the app.
+  #   <app>.options.ts   the options: env-derived options plus port bindings (provider maps such as { approvalGate: X }) only;
+  #                      an array of Nest modules, queue registrations or scheduler entries is BE_APP_OPTIONS_COMPOSITION.
+  #   compose/<area>.ts  a composition group: exports the module list of one area (an imports array, and the providers of the
+  #                      area's global ports when it has any); composition only, no business logic and no environment read.
+  #   app.module.ts      the composition root: imports the groups and spreads them, binds the app-wide guards and filter.
   - id: be.app.api
     profiles: [be]
     path: "apps/<app>/src/"
@@ -969,11 +980,11 @@ slots:
     owner: true
     minInstances: 1
     requires: [main.ts, app.module.ts]
-    allows: [main.ts, app.module.ts, "<app>.options.ts", operations.ts]
+    allows: [main.ts, app.module.ts, "<app>.options.ts", "compose/<area>.ts", operations.ts]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
     coverage: none
-    budget: {app.module.ts: 250, main.ts: 80}
-    rules: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE, BE_DEFAULT_DENY, BE_ERROR_MASKED, BE_FEATURE_NOT_COMPOSED, BE_CONTEXT_OWNER]
+    budget: {app.module.ts: 250, main.ts: 80, "<app>.options.ts": 200, "compose/<area>.ts": 120}
+    rules: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE, BE_APP_OPTIONS_COMPOSITION, BE_APP_COMPOSITION_BUDGET, BE_DEFAULT_DENY, BE_ERROR_MASKED, BE_FEATURE_NOT_COMPOSED, BE_CONTEXT_OWNER]
   - id: be.app.worker
     profiles: [be]
     path: "apps/<app>/src/"
@@ -983,10 +994,11 @@ slots:
     tier: app
     owner: true
     requires: [main.ts, app.module.ts]
-    allows: [main.ts, app.module.ts, "<app>.options.ts"]
+    allows: [main.ts, app.module.ts, "<app>.options.ts", "compose/<area>.ts"]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
     coverage: none
-    rules: [BE_APP_COMPOSITION_ONLY, BE_BACKGROUND_UNOWNED, BE_CONTEXT_OWNER]
+    budget: {app.module.ts: 250, main.ts: 80, "<app>.options.ts": 200, "compose/<area>.ts": 120}
+    rules: [BE_APP_COMPOSITION_ONLY, BE_APP_OPTIONS_COMPOSITION, BE_APP_COMPOSITION_BUDGET, BE_BACKGROUND_UNOWNED, BE_CONTEXT_OWNER]
   - id: be.app.cli
     profiles: [be]
     # The ONE app of every one-off action (migrate, seed, sync, backup, any operator command): be/apps/cli, on nest-commander.
@@ -1002,10 +1014,11 @@ slots:
     tier: app
     owner: true
     requires: [main.ts, app.module.ts]
-    allows: [main.ts, app.module.ts, "<app>.options.ts"]
+    allows: [main.ts, app.module.ts, "<app>.options.ts", "compose/<area>.ts"]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
     coverage: none
-    rules: [BE_CLI_REQUIRED, BE_CLI_BOOTSTRAP, BE_CLI_OWNER, BE_SCHEMA_AUTHORITY]
+    budget: {app.module.ts: 250, main.ts: 80, "<app>.options.ts": 200, "compose/<area>.ts": 120}
+    rules: [BE_CLI_REQUIRED, BE_CLI_BOOTSTRAP, BE_CLI_OWNER, BE_SCHEMA_AUTHORITY, BE_APP_OPTIONS_COMPOSITION, BE_APP_COMPOSITION_BUDGET]
 
   # ----- BE: features ------------------------------------------------------------------------------------
   # src/features/ is grouped by TRIGGER KIND (owner decision 2026-10-02): features/api/<feature>/ (a request: application/ and

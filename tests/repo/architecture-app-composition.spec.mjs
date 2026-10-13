@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { archFixture, findings, runArch } from '../helpers/hfs-arch-fixture.mjs';
 
-// R32 BE_APP_COMPOSITION_ONLY: apps/<app>/src holds composition only (main.ts, app.module.ts, <app>.options.ts);
+// R32 BE_APP_COMPOSITION_ONLY: apps/<app>/src holds composition only (main.ts, app.module.ts, <app>.options.ts, compose/<area>.ts);
 // any other source file there is business code in the wrong place.
 const APP = {
   'apps/core/src/main.ts': "import { AppModule } from './app.module';\nexport const boot = AppModule;\n",
@@ -25,4 +25,13 @@ test('a helper file in an app root is BE_APP_COMPOSITION_ONLY', (t) => {
 test('the <app>.options.ts the api app slot allows is not BE_APP_COMPOSITION_ONLY; another app-named file is', (t) => {
   const report = runArch(archFixture(t, { files: { ...APP, 'apps/core/src/core.options.ts': 'export interface CoreOptions { readonly port: number }\n', 'apps/core/src/other.options.ts': 'export interface OtherOptions { readonly port: number }\n' } }));
   assert.deepEqual(findings(report, 'BE_APP_COMPOSITION_ONLY').map(item => item.path), ['apps/core/src/other.options.ts']);
+});
+
+test('a composition group compose/<area>.ts is an app file; a nested folder under compose/ is not (R245)', (t) => {
+  const report = runArch(archFixture(t, { files: {
+    ...APP,
+    'apps/core/src/compose/platform.ts': 'export const platformModules = (): Array<unknown> => [];\n',
+    'apps/core/src/compose/nested/extra.ts': 'export const extra = 1;\n',
+  } }));
+  assert.deepEqual(findings(report, 'BE_APP_COMPOSITION_ONLY').map(item => item.path), ['apps/core/src/compose/nested/extra.ts']);
 });

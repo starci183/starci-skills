@@ -17,7 +17,7 @@
 # modules/kernel/allowlist.yaml, held by RT_ALLOWLIST_SPRAWL. Codes are quoted: the failure-code
 # scanner reads this file as an emitter of every code it names.
 schema: starci/hfs-rules@3
-version: 3.0.0
+version: 3.1.0
 gates:
   pre-commit: the managed .husky/pre-commit at the app root - starci app hygiene (staged .starciwork and .starcistacks paths, secrets guard), typecheck, ESLint per side and stylelint on the staged files, prettier --check, the unit specs the staged files touch
   pre-push: typecheck, lint (starci app lint), format:check and the unit specs affected since origin/main; runs every pre-commit rule again
@@ -2156,3 +2156,19 @@ rules:
     enforcers:
       - {kind: hfs, id: fe-stack, at: scripts/hfs/rules/fe-stack.mjs}
       - {kind: eslint-fe, id: fe-stack-import}
+  - id: R245
+    code: "BE_APP_OPTIONS_COMPOSITION"
+    law: "An app's `src/` holds four composition roles (owner ruling 2026-10-14): `main.ts` reads the environment once and boots; `<app>.options.ts` holds env-derived options plus port bindings (provider maps such as `{ approvalGate: X }`) only, never an array of Nest modules, queue registrations or scheduler entries, and no `imports`, `modules`, `schedulers` or `processors` list; `compose/<area>.ts` exports the module list of one area (and the providers of its global ports when it has any), composition only, with no business logic and no environment read; `app.module.ts` imports the groups and spreads them and binds the app-wide guards and filter."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_APP_OPTIONS_COMPOSITION"]
+    enforcers:
+      - {kind: eslint-be, id: app-options-composition-free}
+  - id: R246
+    code: "BE_APP_COMPOSITION_BUDGET"
+    law: "Each composition file of an app stays within the line budget its `be.app.*` slot names (`budget`, keyed by the slot entry the file matches): `main.ts` 80, `<app>.options.ts` 200, `compose/<area>.ts` 120, `app.module.ts` 250. The budget is absolute, not a ratchet: an app root that outgrows it moves an area into a new `compose/<area>.ts` group, never into the options."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_APP_COMPOSITION_BUDGET"]
+    enforcers:
+      - {kind: eslint-be, id: app-file-budget}

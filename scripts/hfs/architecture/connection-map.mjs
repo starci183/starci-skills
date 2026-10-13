@@ -226,18 +226,20 @@ const passConnections = (argument, scope) => {
 const checkAppRegistrations = (config, kit, ts, byName, report) => {
   let registrations = 0;
   for (const app of config.apps) {
-    const root = kit.appRoot(app.name);
-    if (!root) continue;
-    const checker = kit.checkerOf(root.sourceFile);
-    const scope = { ts, kit, checker, byName, passed: new Map(), root, app, report };
-    kit.walk(root.sourceFile, node => {
-      const receiver = registerReceiver(ts, node);
-      if (!receiver) return;
-      const owner = kit.declarationsOf(checker, receiver).map(kit.ownerOfDeclaration).find(Boolean);
-      if (owner?.tier !== 'platform' || owner.name !== 'database') return;
-      registrations += 1;
-      for (const argument of node.arguments) passConnections(argument, scope);
-    });
+    // The root and its composition groups (compose/<area>.ts) are one composition: a connection is passed once across them.
+    const passed = new Map();
+    for (const root of kit.appCompositionFiles(app.name)) {
+      const checker = kit.checkerOf(root.sourceFile);
+      const scope = { ts, kit, checker, byName, passed, root, app, report };
+      kit.walk(root.sourceFile, node => {
+        const receiver = registerReceiver(ts, node);
+        if (!receiver) return;
+        const owner = kit.declarationsOf(checker, receiver).map(kit.ownerOfDeclaration).find(Boolean);
+        if (owner?.tier !== 'platform' || owner.name !== 'database') return;
+        registrations += 1;
+        for (const argument of node.arguments) passConnections(argument, scope);
+      });
+    }
   }
   return registrations;
 };
