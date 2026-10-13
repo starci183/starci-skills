@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.4 - 2026-10-13
+
+- Fixed: next.json sets `noUncheckedSideEffectImports`, so a missing non-CSS side-effect import of a Next app is a type error (TS2882); stylesheets are declared by the app's ambient owner (the alpha.12 CI red of the registry-install scaffold spec).
+
 ## 2.0.1 - 2026-10-01
 
 - Changed: pins typescript for its own tests and carries a lockfile (lane PKGT clean proof); no config change. The published package.json differs from 2.0.0, so the version moves.

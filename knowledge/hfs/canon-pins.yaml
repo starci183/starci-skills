@@ -45,7 +45,7 @@ pins:
     source: packages/stylelint/package.json
     why: 'the front-end stylelint canon: no-class-selector refuses a compound class selector (`div.card`); the brand layer accepts `--font-sans` and `--font-mono`; status-contrast measures the HeroUI soft pairs per theme; brand-layer-shape reads the shared :root,.light,.dark block and the info soft pair; appTokens come from loadAppTokens(import.meta.url) for the managed one-line stylelint.config.mjs.'
   '@starci/tsconfig':
-    version: 2.0.3
+    version: 2.0.4
     group: starci
     install: registry
     side: both

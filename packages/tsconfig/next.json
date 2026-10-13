@@ -8,6 +8,7 @@
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "noEmit": true,
+    "noUncheckedSideEffectImports": true,
     "incremental": true,
     "plugins": [{ "name": "next" }]
   }

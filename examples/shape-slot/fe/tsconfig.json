@@ -1,7 +1,4 @@
 {
   "extends": "@starci/tsconfig/next.json",
-  "compilerOptions": {
-    "noUncheckedSideEffectImports": true
-  },
   "exclude": ["node_modules"]
 }

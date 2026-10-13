@@ -376,10 +376,11 @@ examples:
       - fe/apps/shape-slot/src/components/blocks/HandoffBlock/index.tsx
       - fe/apps/shape-slot/src/components/blocks/HandoffBlock/component.tsx
       - fe/apps/shape-slot/src/components/blocks/HandoffBlock/classNames.ts
-      - fe/apps/shape-slot/src/hooks/sales/index.ts
-      - fe/apps/shape-slot/src/hooks/sales/useQueryHandoffSwr.ts
-      - fe/apps/shape-slot/src/hooks/sales/useQueryOrderSwr.ts
-      - fe/apps/shape-slot/src/hooks/sales/useSendHandoffForm.ts
+      - fe/apps/shape-slot/src/hooks/swr/index.ts
+      - fe/apps/shape-slot/src/hooks/swr/api/rest/queries/useGetHandoffSwr.ts
+      - fe/apps/shape-slot/src/hooks/swr/api/rest/queries/useGetOrderSwr.ts
+      - fe/apps/shape-slot/src/hooks/rhf/index.ts
+      - fe/apps/shape-slot/src/hooks/rhf/useSendHandoffForm.ts
       - fe/apps/shape-slot/src/hooks/slot/index.ts
       - fe/apps/shape-slot/src/hooks/slot/slot.shared.ts
       - fe/apps/shape-slot/src/hooks/slot/useSlotLabels.ts

@@ -438,7 +438,7 @@ describe('the be side tool configuration', () => {
 describe('the package.json scripts of the app', () => {
   it('are the fixed scripts of both sides, a be script run from be/, an fe script through its workspace, plus dev, start per app and the cli', () => {
     const scripts = scriptsOf();
-    assert.deepEqual(Object.keys(scripts).sort(), ['build:be', 'build:fe', 'cli', 'codegen', 'contract:emit', 'dev:be', 'dev:fe:admin', 'dev:fe:app', 'docker:build', 'docker:build:admin', 'docker:build:app', 'docker:build:cli', 'docker:build:core', 'format', 'format:check', 'lint', 'lint:fix', 'prepare', 'start:admin', 'start:app', 'start:core', 'test', 'test:affected', 'test:contract', 'test:e2e', 'test:integration', 'test:stack', 'typecheck', 'typecheck:tests']);
+    assert.deepEqual(Object.keys(scripts).sort(), ['build:be', 'build:fe', 'cli', 'codegen', 'codegen:graphql', 'contract:emit', 'dev:be', 'dev:fe:admin', 'dev:fe:app', 'docker:build', 'docker:build:admin', 'docker:build:app', 'docker:build:cli', 'docker:build:core', 'format', 'format:check', 'lint', 'lint:fix', 'prepare', 'start:admin', 'start:app', 'start:core', 'test', 'test:affected', 'test:contract', 'test:e2e', 'test:integration', 'test:stack', 'typecheck', 'typecheck:tests']);
     assert.equal(scripts['start:core'], 'node be/dist/apps/core/src/main.js');
     assert.equal(scripts.cli, 'node be/dist/apps/cli/src/main.js', 'the cli app runs a command: npm run cli -- <group> <command>');
     assert.equal(scripts.migrate, undefined, 'no connection, nothing to migrate');
