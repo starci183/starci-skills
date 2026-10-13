@@ -81,13 +81,13 @@ test('the AST gate: only grammar components and layout HTML; raw styled HTML, fo
   assert.deepEqual(sourceFindings(GOOD_DRAW, { file: 'LedgerBase.draw.tsx' }).findings, []);
   const bad = `import { Button } from "@starci/grammar/core"
 import { motion } from "framer-motion"
-import { Plus } from "@phosphor-icons/react"
+import { PlusIcon } from "@heroicons/react/24/outline"
 import "./local.css"
 export const Ledger = () => (
   <div className="flex gap-5 bg-surface rounded-3xl" style={{ padding: 13 }}>
     <p>Hand-made text</p>
     <Card />
-    <Plus />
+    <PlusIcon />
     <Button variant="primary">Go</Button>
   </div>
 )
@@ -97,7 +97,7 @@ export const Ledger = () => (
   const detail = r.findings.map((f) => f.detail).join('\n');
   assert.match(detail, /<p> is raw HTML/);
   assert.match(detail, /<Card> is neither a @starci\/grammar export/);
-  assert.match(detail, /<Plus> renders an icon module raw/);
+  assert.match(detail, /<PlusIcon> renders an icon module raw/);
   assert.match(detail, /framer-motion/);
   assert.match(detail, /local\.css for its side effects/);
   assert.match(detail, /className="bg-surface"> paints/);
@@ -109,6 +109,11 @@ export const Ledger = () => (
   assert.ok(sourceFindings(bad, { file: 'Ledger.draw.tsx', rationale: [{ ...why[0], rules: [] }] }).findings.some((f) => f.code === DRAW_LAYOUT_VALUE_UNJUSTIFIED), 'a decision without a rule id justifies nothing');
   // A non-literal className cannot be read by the gate.
   assert.match(sourceFindings('export const XBase = ({ c }: { c: string }) => <div className={c} />\n', { file: 'X.draw.tsx' }).findings[0].detail, /not a string literal/);
+  // The heroicons family on its two cuts is the icon set; Phosphor and a third heroicons cut are refused imports.
+  assert.deepEqual(sourceFindings('import { MindMapIcon } from "@starci/heroicons/16/solid"\nimport { Icon } from "@starci/grammar/core"\nexport const XBase = () => <Icon source={MindMapIcon} />\n', { file: 'X.draw.tsx' }).findings, []);
+  for (const refused of ['@phosphor-icons/react', '@heroicons/react/20/solid']) {
+    assert.match(sourceFindings(`import { Star } from "${refused}"\nexport const XBase = () => <div />\n`, { file: 'X.draw.tsx' }).findings.map((f) => f.detail).join('\n'), /a drawing composes only/);
+  }
   // Art is a relative raster import; a type-only import is free.
   assert.deepEqual(sourceFindings('import hero from "./assets/hero.png"\nimport type { X } from "../types"\nimport { Image } from "@starci/grammar/core"\nexport const XBase = () => <Image src={hero} alt="" />\n', { file: 'X.draw.tsx' }).findings, []);
 });

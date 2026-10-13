@@ -27,7 +27,7 @@ test('FE_STACK_FORBIDDEN: the canonical libraries of every concern raise nothing
   const files = {
     'package.json': { name: 'demo', dependencies: { graphql: '16.0.0', 'graphql-ws': '6.0.0', moment: '2.30.0' }, devDependencies: { typescript: '6.0.0' } },
     'fe/apps/web/package.json': { name: '@demo/web', dependencies: { next: '16.0.0', '@apollo/client': '4.0.0', swr: '2.3.0', axios: '1.12.0', 'react-hook-form': '7.60.0', zod: '4.0.0', '@reduxjs/toolkit': '2.8.0', zustand: '5.0.0', 'socket.io-client': '4.8.0', dayjs: '1.11.0', 'next-intl': '4.0.0' } },
-    'fe/packages/demo-ui/package.json': { name: '@demo/ui', dependencies: { '@heroui/react': '3.0.0', '@phosphor-icons/react': '2.1.0', recharts: '3.0.0' } },
+    'fe/packages/demo-ui/package.json': { name: '@demo/ui', dependencies: { '@heroui/react': '3.0.0', '@heroicons/react': '2.2.0', '@starci/heroicons': '0.3.3', recharts: '3.0.0' } },
   };
   const repoRoot = tree(t, files);
   assert.deepEqual(stack(repoRoot, Object.keys(files)), []);

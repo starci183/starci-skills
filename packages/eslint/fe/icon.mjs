@@ -13,7 +13,7 @@
  */
 
 import { isClassAttribute, staticText } from "./lib/ast.mjs"
-import { canonicalPackages, forbiddingConcern, packageNameOf } from "./lib/fe-stack.mjs"
+import { canonicalPackages } from "./lib/fe-stack.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { fileOf, inSlot, isComponentFile, isProductSource, kindOfFile, roleOfFile } from "./lib/scope.mjs"
 
@@ -45,11 +45,15 @@ const GLYPH_PACKAGES = [
 /** Package-name signal for a glyph catalogue not yet listed explicitly. */
 const GLYPH_PACKAGE_NAME = /(?:icon|glyph|lucide|feather|tabler|fortawesome)/i
 
+/** The two optical families of the heroicons family: the 24px outline heading cut and the 16px solid micro cut. */
+const GLYPH_CUTS = ["24/outline", "16/solid"]
+
 /**
- * True when an import names the one application icon set (fe-stack `icons`, `@phosphor-icons/react`), subpaths included
- * (`@phosphor-icons/react/dist/ssr` is its server-component entry). Read from the catalog, so the set is named once.
+ * The closed glyph surface: each package of the one application icon set (fe-stack `icons`: upstream `@heroicons/react`,
+ * used first, and StarCi's custom-only `@starci/heroicons` for the glyphs it lacks) on each of the two cuts. Read from the
+ * catalog, so the set is named once.
  */
-const isCanonicalIconSet = (source) => canonicalPackages("icons").includes(packageNameOf(source) ?? "")
+const glyphSurface = () => canonicalPackages("icons").flatMap((name) => GLYPH_CUTS.map((cut) => `${name}/${cut}`))
 
 /**
  * True when the file is the entry (slot role `entry`) of the component owner named `owner` in the layer `kind`.
@@ -107,19 +111,18 @@ export const noVendorIconOutsideIconLeaf = {
 // -- ICON-7 ----------------------------------------------------------------------------------------
 
 /**
- * The icon leaf owns the map, but that ownership does not license a second glyph vocabulary: every glyph comes from the one
- * application icon set of the front-end stack (fe-stack `icons`). A glyph package the catalog forbids by name is
- * `fe-stack-import`'s finding; this rule refuses every other glyph catalogue (Heroicons, Iconify, ...), which no list can name
- * in advance.
+ * The icon leaf owns the map, but that ownership does not license a second glyph vocabulary: every glyph comes from the
+ * heroicons family on its two cuts. Phosphor, Iconify, Lucide and every other glyph catalogue are refused, including the
+ * ones no list can name in advance.
  */
-export const oneIconSet = {
+export const heroiconsIsTheGlyphVendor = {
   meta: {
     type: "problem",
-    docs: { description: "Product glyphs come only from the one application icon set of the front-end stack (`@phosphor-icons/react`)." },
+    docs: { description: "Only the Heroicons heading and micro families (`@heroicons/react`, then `@starci/heroicons`) may supply product glyphs." },
     schema: [],
     messages: {
       vendor:
-        "`{{source}}` is a second glyph catalogue. The front end has one application icon set, {{canonical}}: two sets draw the same meaning with two strokes, two grids and two weights, and the screen looks assembled from parts. Take the glyph from {{canonical}} in the icon leaf.",
+        "`{{source}}` is outside StarCi's closed glyph surface ({{surface}}). Use upstream `@heroicons/react/24/outline` or `16/solid` when the icon exists; use the matching `@starci/heroicons` subpath only for a custom cut missing upstream, and add a missing glyph there. The StarCi package never re-exports upstream icons. Phosphor, Iconify and every other glyph catalogue are refused: two sets draw the same meaning with two strokes, two grids and two weights.",
     },
   },
   create(context) {
@@ -127,9 +130,9 @@ export const oneIconSet = {
     return {
       ImportDeclaration(node) {
         const source = node.source && node.source.value
-        if (!isGlyphImport(source) || isCanonicalIconSet(source) || forbiddingConcern(source)) return
-        const canonical = canonicalPackages("icons").map((name) => `\`${name}\``).join(", ")
-        context.report({ node, messageId: "vendor", data: { source, canonical } })
+        const surface = glyphSurface()
+        if (!isGlyphImport(source) || surface.includes(String(source))) return
+        context.report({ node, messageId: "vendor", data: { source, surface: surface.map((name) => `\`${name}\``).join(", ") } })
       },
     }
   },
@@ -195,7 +198,7 @@ export const noDecorativeIconInMetricCell = {
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-vendor-icon-outside-icon-leaf": noVendorIconOutsideIconLeaf,
-  "one-icon-set": oneIconSet,
+  "heroicons-is-the-glyph-vendor": heroiconsIsTheGlyphVendor,
   "no-off-scale-glyph-size": noOffScaleGlyphSize,
   "no-decorative-icon-in-metric-cell": noDecorativeIconInMetricCell,
 }

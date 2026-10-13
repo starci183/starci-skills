@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.2.15 - 2026-10-13
+
+- Changed: the heroicons family is the one application icon set (owner ruling 2026-10-13): the scaffold installs `@heroicons/react` 2.2.0 and `@starci/heroicons` 0.3.3 (fe-stack `icons`, tier core) in every product fe app in place of `@phosphor-icons/react`, and the `modules/toast` skeleton draws its status indicators with `@heroicons/react/24/outline` (CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, InformationCircleIcon). Carry the canon pins of eslint-canon-be 3.2.17, eslint-canon-fe 8.2.16 and CLI 1.2.15.
+
 ## 4.2.14 - 2026-10-13
 
 - Breaking: HFS manifest 3.0.0 (schema `starci/hfs-slots@3`, rule catalog `starci/hfs-rules@3` 3.0.0). Removing the front-end database slots and the Supabase realtime feature slot and narrowing `fe.route` change answers for existing apps, so the manifest takes a major: every app pins `"hfs": 3` (scaffold writes it), and an app still pinned to 2 is refused with `HFS_MANIFEST_MAJOR_MISMATCH`.

@@ -99,11 +99,14 @@ concerns:
     why: the grammar renderers over HeroUI and Tailwind; no second UI kit and no CSS-in-JS.
   - id: icons
     tier: core
-    packages: ['@phosphor-icons/react']
+    packages: ['@heroicons/react', '@starci/heroicons']
     home: [fe.components]
     pattern: FE-ICON
-    forbids: [react-icons, lucide-react, '@iconify/react', '@gravity-ui/icons', '@tabler/icons-react', '@fortawesome/react-fontawesome']
-    why: one application icon set.
+    forbids: ['@phosphor-icons/react', react-icons, lucide-react, '@iconify/react', '@gravity-ui/icons', '@tabler/icons-react', '@fortawesome/react-fontawesome']
+    why: >-
+      one application icon set, the heroicons family (owner ruling 2026-10-13), on the 24/outline and 16/solid cuts. @heroicons/react
+      is the base set and is used first; @starci/heroicons holds only the glyphs heroicons lacks (brand or domain glyphs drawn in
+      heroicons style), never duplicates a heroicons glyph, and a missing glyph is added to it.
   - id: theme
     tier: core
     packages: [next-themes]

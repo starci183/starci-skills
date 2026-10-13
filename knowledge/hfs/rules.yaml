@@ -987,13 +987,13 @@ rules:
       - {kind: eslint-fe, id: component-purity}
   - id: R93
     code: "FE_VENDOR_BOUNDARY"
-    law: "Vendor primitives and icons reach components only through their named owner: the one icon set of knowledge/hfs/fe-stack.yaml through the icon leaf at the glyph scale, every vendor primitive behind a named owner; the Grammar package is imported only through its selected code and style entry and keeps its declared contract."
+    law: "Vendor primitives and icons reach components only through their named owner: the one icon set of knowledge/hfs/fe-stack.yaml (the heroicons family) through the icon leaf at the glyph scale, every vendor primitive behind a named owner; the Grammar package is imported only through its selected code and style entry and keeps its declared contract."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["FE_VENDOR_BOUNDARY", "ARCH_GRAMMAR_CONTRACT_INVALID", "ARCH_GRAMMAR_EXPORT_BYPASS"]
     enforcers:
       - {kind: eslint-fe, id: no-vendor-icon-outside-icon-leaf}
-      - {kind: eslint-fe, id: one-icon-set}
+      - {kind: eslint-fe, id: heroicons-is-the-glyph-vendor}
       - {kind: eslint-fe, id: no-off-scale-glyph-size}
       - {kind: eslint-fe, id: no-decorative-icon-in-metric-cell}
       - {kind: eslint-fe, id: vendor-primitive-has-named-owner}

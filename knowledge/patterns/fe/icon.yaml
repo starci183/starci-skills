@@ -2,7 +2,8 @@ schema: starci/knowledge-source@1
 id: fe.icon
 title: Icons
 purpose: |-
-  Which icon set does the front end use? One: @phosphor-icons/react, reached through the icon leaf.
+  Which icon set does the front end use? One: the heroicons family, reached through the icon leaf. @heroicons/react is the
+  base set and is used first; @starci/heroicons holds only the glyphs heroicons lacks.
 appliesTo:
   - frontend
 family: fe
@@ -18,25 +19,52 @@ provenance:
     library is used well. starci-academy illustrates the usage; the catalog decides.
 rules:
   - id: FE-ICON
-    title: "One icon set: @phosphor-icons/react"
+    title: "One icon set: the heroicons family (@heroicons/react first, @starci/heroicons for what it lacks)"
     kind: mandatory
-    hfsRules: [R244]
+    hfsRules: [R244, R93]
     requirement: |-
-      Application icons come from @phosphor-icons/react through the components/leaves icon owner (or the grammar);
-      react-icons, lucide-react, iconify, gravity, tabler and fontawesome are refused.
+      Application icons come from the heroicons family through the components/leaves icon owner (or the grammar), on the two
+      cuts 24/outline and 16/solid. @heroicons/react is the base set and is used first; @starci/heroicons supplies only a
+      glyph absent from @heroicons/react (a brand or domain glyph drawn in heroicons style), never a copy of a heroicons
+      glyph; a glyph missing from both is added to @starci/heroicons. Phosphor, react-icons, lucide-react, iconify, gravity,
+      tabler and fontawesome are refused.
     rationale: |-
-      One icon set keeps stroke, size and metaphor consistent.
+      One icon set keeps stroke, size and metaphor consistent; a custom cut that only fills the gaps of the base set never
+      competes with it for the same meaning.
     cases:
       - id: case-1
-        when: "An icon"
-        write: "import { Bell } from \"@phosphor-icons/react\" inside the icon leaf"
+        when: "An icon heroicons has"
+        write: "import { BellIcon } from \"@heroicons/react/24/outline\" inside the icon leaf"
       - id: case-2
         date: "2026-10-13"
         source: owner
         when: "Owner ruling 2026-10-13: a page mixed icons of two sets"
-        write: "Replace them with the phosphor equivalent through the icon leaf."
+        write: "Replace them with the heroicons equivalent through the icon leaf."
+      - id: case-3
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a glyph exists in both @heroicons/react and @starci/heroicons"
+        write: "Prefer @heroicons/react; take the glyph from @heroicons/react/24/outline or /16/solid."
+      - id: case-4
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a glyph heroicons does not have (a brand or domain glyph)"
+        write: "import { MindMapIcon } from \"@starci/heroicons/24/outline\" inside the icon leaf; @starci/heroicons is used only for a glyph absent from heroicons."
+      - id: case-5
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: a new custom cut would redraw a glyph heroicons already ships"
+        write: "Do not add it: @starci/heroicons never duplicates a heroicons glyph (its package spec refuses an export named like a @heroicons/react icon)."
+      - id: case-6
+        date: "2026-10-13"
+        source: owner
+        when: "Owner ruling 2026-10-13: the needed glyph is in neither package"
+        write: "Add the glyph to @starci/heroicons (24/outline and 16/solid cuts in heroicons style) and release it; never take it from a second icon set."
     verification:
       automated:
         - FE_STACK_FORBIDDEN
+        - FE_VENDOR_BOUNDARY
+        - ARCH_GRAMMAR_CONTRACT_INVALID
+        - ARCH_GRAMMAR_EXPORT_BYPASS
       manual: []
     relatedExamples: []

@@ -14,7 +14,9 @@ Course navigation cuts include `CourseOverviewIcon`, `CourseContentIcon`,
 (a shared business memory, the "second brain").
 
 Both subpaths export custom StarCi cuts only. Consumers import upstream icons directly from
-`@heroicons/react`; this package never re-exports them. Custom outline cuts use the native
+`@heroicons/react`, which is used first; this package never re-exports them and never redraws one of them: its
+package spec (run by `prepack`) refuses a custom cut named like any `@heroicons/react` icon. A glyph missing from both is
+added here. Custom outline cuts use the native
 `24 × 24`, `1.5` round-stroke grammar. Custom
 micro cuts use the native `16 × 16` solid grammar. Every glyph inherits `currentColor`.
 

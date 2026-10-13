@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.15 - 2026-10-13
+
+- Changed: pin HFS 4.2.15 (the toast skeleton and the core fe stack take the heroicons family as the one icon set) and carry runtime 1.0.0-alpha.13. Command dispatcher implementations are unchanged.
+
 ## 1.2.14 - 2026-10-13
 
 - Changed: pin HFS 4.2.14 (manifest 3.0.0, the lite edition re-ruled as full minus self-hosted infrastructure) and carry runtime 1.0.0-alpha.13. Command dispatcher implementations are unchanged.

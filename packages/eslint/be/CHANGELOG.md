@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.17 - 2026-10-13
+
+- Changed: the bundled canon-pins copy carries `@heroicons/react` 2.2.0 and `@starci/heroicons` 0.3.3 in place of `@phosphor-icons/react` (the heroicons family is the one icon set, owner ruling 2026-10-13) and the pins of eslint-canon-fe 8.2.16, HFS 4.2.15 and CLI 1.2.15. ESLint rule implementations are unchanged.
+
 ## 3.2.16 - 2026-10-13
 
 - Changed: republish of 3.2.15 with the same rules; the release resumed after a partial publish, so the bundled canon-pins copy moves with the packages published after it (release-plan bundling rule).

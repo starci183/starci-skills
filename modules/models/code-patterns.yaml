@@ -876,7 +876,7 @@ profiles:
           check:
             kind: eslint
             sourceOnly: true
-            ruleIds: [starci-fe/no-vendor-icon-outside-icon-leaf, starci-fe/one-icon-set, starci-fe/no-heading-tag-outside-heading-component, starci-fe/no-hand-rolled-heading, starci-fe/vendor-primitive-has-named-owner]
+            ruleIds: [starci-fe/no-vendor-icon-outside-icon-leaf, starci-fe/heroicons-is-the-glyph-vendor, starci-fe/no-heading-tag-outside-heading-component, starci-fe/no-hand-rolled-heading, starci-fe/vendor-primitive-has-named-owner]
             expected: { severity: error }
         semantic:
           guidance: docs/architecture.md

@@ -1,5 +1,9 @@
 # Changelog
 
+## 8.2.16 - 2026-10-13
+
+- Changed: the heroicons family is the one application icon set again (owner ruling 2026-10-13): `heroicons-is-the-glyph-vendor` admits exactly `@heroicons/react/24/outline`, `@heroicons/react/16/solid` and the matching `@starci/heroicons` subpaths (read from the fe-stack `icons` concern), and refuses Phosphor and every other glyph catalogue, a package the catalog forbids included; `one-icon-set` (8.2.15) is gone. Only the Icon leaf and the toast module import a glyph. The bundled runtime mirror carries the fe-stack catalog and the canon pins with `@heroicons/react` 2.2.0 and `@starci/heroicons` 0.3.3.
+
 ## 8.2.15 - 2026-10-13
 
 - Changed: carry the runtime mirror of HFS manifest 3.0.0 (one front-end standard for the lite and the full edition, owner ruling 2026-10-13) and the canon pins for Grammar 0.9.14, HFS 4.2.14, jest-preset 2.2.7 and CLI 1.2.14.

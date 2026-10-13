@@ -65,7 +65,7 @@ test("FE-STACK-2: one library per concern; Supabase only in modules/auth", () =>
       { filename: BLOCK, code: "import { useForm } from \"react-hook-form\"\nimport { z } from \"zod\"" },
       { filename: BLOCK, code: "import { create } from \"zustand\"\nimport { useSelector } from \"react-redux\"" },
       { filename: BLOCK, code: "import { motion } from \"framer-motion\"\nimport { LineChart } from \"recharts\"" },
-      { filename: BLOCK, code: "import { House } from \"@phosphor-icons/react\"" },
+      { filename: BLOCK, code: "import { HomeIcon } from \"@heroicons/react/24/outline\"" },
       { filename: BLOCK, code: "import { useTranslations } from \"next-intl\"" },
       { filename: API, code: "import { ApolloClient } from \"@apollo/client\"" },
       // a package that starts like a forbidden one is another package

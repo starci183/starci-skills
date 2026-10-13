@@ -204,8 +204,8 @@ test('lite scaffold emits the design 8.5 tree and is structurally clean', async 
   const web = JSON.parse(fs.readFileSync(path.join(root, 'fe', 'apps', 'web', 'package.json'), 'utf8'));
   // Every core runtime package of fe-stack.yaml at its pin (owner ruling 2026-10-13: lite = full), plus lite's Auth adapter.
   assert.deepEqual(Object.keys(web.dependencies).sort(), [
-    '@apollo/client', '@heroui/react', '@heroui/styles', '@hookform/resolvers', '@phosphor-icons/react', '@reduxjs/toolkit',
-    '@starci/grammar', '@supabase/supabase-js', '@xyflow/react', 'axios', 'dayjs', 'graphql', 'next', 'next-intl',
+    '@apollo/client', '@heroicons/react', '@heroui/react', '@heroui/styles', '@hookform/resolvers', '@reduxjs/toolkit',
+    '@starci/grammar', '@starci/heroicons', '@supabase/supabase-js', '@xyflow/react', 'axios', 'dayjs', 'graphql', 'next', 'next-intl',
     'next-themes', 'react', 'react-dom', 'react-hook-form', 'react-redux', 'server-only', 'superjson', 'swr', 'zod', 'zustand',
   ].sort());
   for (const [name, version] of Object.entries(web.dependencies)) assert.equal(version, PINS[name].version, `${name} takes its canon pin`);

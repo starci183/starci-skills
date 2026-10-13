@@ -22,8 +22,9 @@
 //                                   applies to a className handed to a grammar component (PageContainer,
 //                                   DescriptionList, MediaFrame ... accept one for placement only).
 //   DRAW_IMPORT_OFF_GRAMMAR         (AST) a value import from anything but @starci/grammar[/<family>], react and the
-//                                   icon set @phosphor-icons/react (knowledge/hfs/fe-stack.yaml icons). A type-only
-//                                   import is free.
+//                                   icon set, the heroicons family on its two cuts (@heroicons/react/24/outline,
+//                                   /16/solid and the matching @starci/heroicons subpaths: knowledge/hfs/fe-stack.yaml
+//                                   icons). A type-only import is free.
 //   DRAW_LAYOUT_VALUE_UNJUSTIFIED   (AST) a free spacing value - a Tailwind gap/padding/margin/space step outside the
 //                                   grammar GAP/PADDING scale (0 1 2 3 4 6 8: knowledge/ui/presentation gap.yaml,
 //                                   padding.yaml) or an arbitrary [..] value - that no rationale.json decision of kind
@@ -57,7 +58,7 @@ export const DRAW_BASE_SIGNATURE = 'DRAW_BASE_SIGNATURE';
 export const DRAW_SOURCE_SUFFIX = '.draw.tsx';
 export const GRAMMAR_PACKAGE = '@starci/grammar';
 const GRAMMAR_MODULE_RX = /^@starci\/grammar(?:\/[a-z][a-z-]*)?$/;
-const ICON_MODULE_RX = /^@phosphor-icons\/react(?:\/[\w/-]+)?$/;
+const ICON_MODULE_RX = /^@(?:heroicons\/react|starci\/heroicons)\/(?:24\/outline|16\/solid)$/;
 const REACT_MODULES = Object.freeze(['react']);
 /** A relative raster import: the art-slot placeholder of a MediaFrame/Image (data-asset-slot; interface.asset owes the art). */
 const ASSET_MODULE_RX = /^\.{1,2}\/[^?#]+\.(?:png|jpe?g|webp|gif|avif)$/i;

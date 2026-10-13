@@ -166,7 +166,7 @@ rules:
     kind: mandatory
     hfsRules: [R62, R61, R93]
     requirement: |
-      Only the Icon leaf imports the icon set of knowledge/hfs/fe-stack.yaml (@phosphor-icons/react). Headings come from Grammar Heading, never a raw h2. Form controls come from
+      Only the Icon leaf imports the icon set of knowledge/hfs/fe-stack.yaml (the heroicons family: @heroicons/react, then @starci/heroicons). Headings come from Grammar Heading, never a raw h2. Form controls come from
       the Grammar renderers, never a raw select, input, textarea or button. Grammar peerDependencies are exactly @heroui/react
       and react.
     rationale: |
@@ -174,7 +174,7 @@ rules:
     cases:
       - id: case-1
         when: "Glyphs"
-        write: "only the Icon leaf imports @phosphor-icons/react; everything else takes the Grammar Icon with a source prop"
+        write: "only the Icon leaf imports @heroicons/react or @starci/heroicons; everything else takes the Grammar Icon with a source prop"
       - id: case-2
         when: "Headings"
         write: "Heading from Grammar, never a raw h2"

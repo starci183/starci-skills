@@ -1,5 +1,10 @@
+import {
+    CheckCircleIcon,
+    ExclamationTriangleIcon,
+    InformationCircleIcon,
+    XCircleIcon,
+} from "@heroicons/react/24/outline"
 import { toast as heroToast } from "@heroui/react"
-import { CheckCircleIcon, InfoIcon, WarningIcon, XCircleIcon } from "@phosphor-icons/react"
 import type { ReactNode } from "react"
 
 /** The options a status toast takes: HeroUI's, minus the variant the status already names. */
@@ -9,8 +14,8 @@ type StatusToastOptions = Parameters<typeof heroToast.success>[1]
 const INDICATOR: Record<"success" | "danger" | "warning" | "info", ReactNode> = {
     success: <CheckCircleIcon className="size-6 text-success-soft-foreground" />,
     danger: <XCircleIcon className="size-6 text-danger-soft-foreground" />,
-    warning: <WarningIcon className="size-6 text-warning-soft-foreground" />,
-    info: <InfoIcon className="size-6 text-accent" />,
+    warning: <ExclamationTriangleIcon className="size-6 text-warning-soft-foreground" />,
+    info: <InformationCircleIcon className="size-6 text-accent" />,
 }
 
 /** The app's toast: HeroUI's imperative toast with the status indicator injected; the region is mounted by the providers. */

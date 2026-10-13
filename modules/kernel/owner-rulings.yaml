@@ -188,3 +188,7 @@ rulings:
       Unknown process observations are advisory for deleted terminals; a positively observed process carrying the exact handle still holds destructive cleanup.
       Existing owned terminals are closed and then verified; failed terminal reads stay unknown, and foreign Dispatch records remain untouched.
     enforcedBy: [scripts/api/orca/terminal-list.mjs, scripts/machine/workflow-purge-orca.mjs, scripts/machine/workflow-purge-plan.mjs, scripts/machine/workflow-purge-apply.mjs]
+  - id: heroicons-family-icon-set
+    date: '2026-10-13'
+    ruling: "The one application icon set is the heroicons family, not Phosphor: @heroicons/react is the base set and is used first, @starci/heroicons holds only the glyphs heroicons lacks (brand or domain glyphs drawn in heroicons style), never duplicates a heroicons glyph, and a missing glyph is added to @starci/heroicons; both are imported on the 24/outline and 16/solid cuts through the icon leaf."
+    enforcedBy: [knowledge/hfs/fe-stack.yaml, packages/eslint/fe/icon.mjs, scripts/work/draw/draw-source.mjs, packages/heroicons/src/package-boundary.spec.mjs]
