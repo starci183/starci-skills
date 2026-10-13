@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.2.14 - 2026-10-13
+
+- Changed: HFS manifest 2.3.0 re-rules the lite edition (owner ruling 2026-10-12, R212): lite is the full architecture deployed without self-hosted infrastructure. Lite regains the worker app, queue, event bus, saga, reactors, fenced jobs, projections, realtime and event contracts through their Supabase adapters, and full's unit world; only the e2e and contract layers, the browser journey, UAT records, the socket and graphql-ws doors and the self-hosted stack stay forbidden. The lite-only `be.feature.realtime.supabase` door is added and `repo.tests-forbidden` is removed.
+- Changed: lite sync, scaffold and `add` render full's unit run (test scripts, jest config, the tests tsconfig, coverage and the CI unit step with the Codecov upload) and the lite unit specs; the lite identity module owns its access-token verifier token.
+- Changed: carry the canon pins for Grammar 0.9.14, the BE/FE lint canons 3.2.15/8.2.15, jest-preset 2.2.7 and CLI 1.2.14.
+
 ## 4.2.13 - 2026-10-12
 
 - Added: HFS manifest 2.2.0 owns app compiler declarations under the declaration-only types/ambient slot, without a runtime entry; runtime source files remain refused there.

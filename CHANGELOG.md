@@ -4,7 +4,13 @@ All notable changes to StarCi are documented here. The runtime is on the `1.0.0-
 until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
-## [Unreleased]
+## [1.0.0-alpha.13] — 2026-10-13
+
+The lite standard: lite is the full architecture deployed without self-hosted infrastructure (owner ruling 2026-10-12).
+
+### Added
+- `@starci/grammar` 0.9.14 (on 0.9.13): one focus ring per field, drawn on the field frame. The inner input of `SearchField`, `NumberField` and `ComboBox` no longer draws a ring of its own; `ComboBox` rings its input group. Knowledge: FOCUS-1 case-6 records the owner ruling; the grammar DNA snapshots are regenerated from the 0.9.14 build.
+- `examples/lite-app` is the lite reference app under the new standard: a pgmq queue with its outbox, relay and worker, the confirm-booking queue, fenced jobs on the primary Supabase PostgreSQL as in full, and unit specs for every logic module, including the calendar webhook door spec; `starci app sync` renders its unit run, codecov.yml and the coverage Sonar properties, and `starci app check` reports no finding against the published canon pins.
 
 ### Changed
 - The lite edition is re-ruled (owner ruling 2026-10-12, R212 case-1): lite is the full architecture deployed without self-hosted infrastructure. Slot manifest 2.3.0: the worker app, queue, event bus, saga, reactors, fenced jobs, projections, the realtime kind and the event contracts are legal under lite again, each pattern slot naming its Supabase adapter in a `lite.why` overlay (Supabase Queues/pgmq, Supabase Realtime through `realtime.send`, Postgres locks, pg_cron); the unit world (be.tool-config with jest and the tests tsconfig, fixtures, builders, the test world of optional integration specs) and `ruleParams.be.unitRoles` are full's; only the e2e and contract layers, the e2e workflow, the browser journey, UAT records, the socket and graphql-ws realtime doors and the self-hosted stack stay forbidden. `ruleParams.be.lite.infraOwners` owns BullMQ, Kafka, Redis and the socket libraries nowhere (a lite map now merges one level deep over its base). The new lite-only slot `be.feature.realtime.supabase` is the lite realtime door; `repo.tests-forbidden` is removed.
@@ -12,6 +18,14 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - `starci app sync` renders lite with full's unit run: `test`, `test:affected`, `test:integration` and `typecheck:tests` scripts, `be/jest.config.js` and `be/src/tests/tsconfig.json`, the quality files with coverage and Codecov (the `quality-config-lite` group is removed), and a CI unit step with the coverage upload; the lite Sonar gate carries full's coverage conditions.
 - `starci app scaffold --edition lite`, `add cli`, `add webhook` and `new service|spec` write the unit specs (lite skeleton specs for the identity policy, guard and Supabase client; the inbox service, inbox client and lite webhook door specs; the cli command specs); a pattern noun whose topic carries a `liteAdapter` refuses in lite with a message naming the adapter topic, since the package carries only the full adapter's templates.
 - Knowledge: `knowledge/patterns/be/supabase-queues.yaml` owns the Supabase adapters; queues, event-bus, realtime, saga, jobs, reactors, projections, background and infra carry a `liteAdapter` section; CONTEXT.md, docs/lite-edition.md and the HFS README state the lite = full minus infrastructure rule. The examples CI gives the lite example a Codecov flag and skips only its e2e step; the L4 release row of a lite app runs its unit tests.
+
+### Fixed
+- The webhook door spec templates (`inbox/webhook-door.spec.ts.tpl`, `patterns/webhooks/webhook.door.spec.ts.tpl`) register `ClockModule` globally and override its `CLOCK` with the fake clock, so the signature service inside `HttpSecurityModule` resolves its clock; the rendered spec failed with an unresolved `CLOCK` before.
+- The lite skeleton's identity module owns its access-token verifier token (`ACCESS_TOKEN_VERIFIER`), and the guard spec provides that token.
+
+### Release
+- Slot manifest 2.3.0 carries the lite re-ruling on top of 2.2.0 (the ambient declarations owner published with alpha.12).
+- The canon packages need version bumps and rebinding at publish: `@starci/hfs` 4.2.14, `@starci/eslint-canon-be` 3.2.15, `@starci/eslint-canon-fe` 8.2.15, `@starci/jest-preset` 2.2.7 (the ESM `jose` transform the lite unit run needs), `@starci/cli` 1.2.14 (pins HFS 4.2.14, carries runtime 1.0.0-alpha.13) and `@starci/grammar` 0.9.14. `knowledge/hfs/canon-pins.yaml` and the package manifests carry these versions; the example apps keep the published pins until the publish rebinds them and reinstalls their lockfiles.
 
 ## [1.0.0-alpha.12] — 2026-10-12
 

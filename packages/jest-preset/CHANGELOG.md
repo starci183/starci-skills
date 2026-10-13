@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.7 - 2026-10-13
+
+- Fixed: the ESM-only runtime dependency `jose` (the Supabase access-token verifier of every lite back end) is compiled to CommonJS by ts-jest instead of being skipped with node_modules, so a lite app's unit run can load its guard (owner ruling 2026-10-12: lite keeps full's unit run).
+
 ## 2.2.6 - 2026-10-08
 
 - Fixed: the `integration`, `e2e` and `contract` projects match `**/src/tests/<layer>/**/*.<layer>-spec.ts` instead of a pattern prefixed with the root path. On Windows a root that holds a dot-named folder (a checkout under `.claude`) turned the path separator before it into a glob escape, so the contract run found 0 spec files ("No tests found") although they exist.

@@ -1,5 +1,9 @@
 # Changelog
 
+## 8.2.15 - 2026-10-13
+
+- Changed: carry the runtime mirror of HFS manifest 2.3.0 (the lite edition re-ruled as full minus self-hosted infrastructure) and the canon pins for Grammar 0.9.14, HFS 4.2.14, jest-preset 2.2.7 and CLI 1.2.14. ESLint rule implementations are unchanged.
+
 ## 8.2.14 - 2026-10-12
 
 - Changed: carry the merged runtime mirror and canon pins for Grammar 0.9.13, Stylelint canon 2.0.9, HFS 4.2.13 and CLI 1.2.13. The bundled HFS manifest 2.2.0 recognizes declaration-only ambient owners; ESLint rule implementations are unchanged.
