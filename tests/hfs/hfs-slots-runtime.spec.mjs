@@ -59,7 +59,7 @@ test('hfs.json of kind runtime resolves to the runtime profile; its schema accep
   refused(() => resolveRepoDeclaration(m, { hfs: 1, kind: 'runtime', project: 'starci', sides: {} }), 'HFS_DECLARATION_INVALID');
   refused(() => resolveRepoDeclaration(m, { hfs: 2, kind: 'runtime', project: 'starci' }), 'HFS_MANIFEST_MAJOR_MISMATCH');
   const product = loadSlotManifest({ root: ROOT });
-  refused(() => resolveRepoDeclaration(product, { hfs: 2, kind: 'runtime', project: 'starci' }), 'HFS_DECLARATION_INVALID');
+  refused(() => resolveRepoDeclaration(product, { hfs: 3, kind: 'runtime', project: 'starci' }), 'HFS_DECLARATION_INVALID');
 });
 
 test('the runtime resolver: slots, tiers, owners, the forbidden current paths and a runtime owner imported file by file', () => {

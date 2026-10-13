@@ -20,7 +20,7 @@ function appRoot({ edition = "lite", provider = "supabase" } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "hfs-add-table-"));
   made.push(root);
   const declaration = {
-    hfs: 2,
+    hfs: 3,
     kind: "app",
     ...(edition === "full" ? {} : { edition }),
     project: "demo",

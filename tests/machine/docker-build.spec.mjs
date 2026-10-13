@@ -7,7 +7,7 @@ import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 function app(t, project = 'shop') {
   const cwd = mkdtemp(t, 'starci-docker-build-');
-  fs.writeFileSync(path.join(cwd, 'hfs.json'), `${JSON.stringify({ hfs: 2, kind: 'app', project, sides: { be: { apps: [{ name: 'api', kind: 'api' }] }, fe: { apps: [{ name: 'web', kind: 'next' }] } } })}\n`);
+  fs.writeFileSync(path.join(cwd, 'hfs.json'), `${JSON.stringify({ hfs: 3, kind: 'app', project, sides: { be: { apps: [{ name: 'api', kind: 'api' }] }, fe: { apps: [{ name: 'web', kind: 'next' }] } } })}\n`);
   for (const file of ['be/apps/api/Dockerfile', 'fe/apps/web/Dockerfile']) {
     fs.mkdirSync(path.dirname(path.join(cwd, file)), { recursive: true });
     fs.writeFileSync(path.join(cwd, file), 'FROM scratch\n');

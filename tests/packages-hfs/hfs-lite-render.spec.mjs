@@ -22,7 +22,7 @@ const RAW_MANIFEST = parseYaml(fs.readFileSync(path.join(ROOT, 'knowledge/hfs/sl
 const MANIFEST = loadSlotManifest();
 const CONNECTION = { name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'api', isolation: 'schema', provider: 'supabase' };
 const LITE = {
-  hfs: 2,
+  hfs: 3,
   kind: 'app',
   edition: 'lite',
   project: 'demo',

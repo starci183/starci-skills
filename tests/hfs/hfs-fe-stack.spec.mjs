@@ -10,7 +10,7 @@ import { checkRepo } from '../../scripts/hfs/check.mjs';
 // package.json carries both sides, so a library the back end owns (be infraOwners, e.g. graphql-ws, moment) is not a fe finding there.
 const BE = { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database' }] };
 const FE = { apps: [{ name: 'web', kind: 'next' }] };
-const app = (edition) => ({ hfs: 2, kind: 'app', project: 'demo', ...(edition ? { edition } : {}), sides: { be: BE, fe: FE } });
+const app = (edition) => ({ hfs: 3, kind: 'app', project: 'demo', ...(edition ? { edition } : {}), sides: { be: BE, fe: FE } });
 
 const tree = (t, files) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-fe-stack-'));

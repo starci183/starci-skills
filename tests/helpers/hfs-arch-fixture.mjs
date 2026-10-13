@@ -32,7 +32,7 @@ export function gitCommit(root, message = 'fixture', env = {}) {
 /** The app hfs.json of a fixture about one side: `fields` (apps, optionalSlots, connections, reads) for `side`, the smallest other side. */
 export function appDeclaration(side, fields, project = 'fixture') {
   const other = { be: { apps: [{ name: 'core', kind: 'api' }] }, fe: { apps: [{ name: 'web', kind: 'next' }] } };
-  return { hfs: 2, kind: 'app', project, sides: { ...other, [side]: fields } };
+  return { hfs: 3, kind: 'app', project, sides: { ...other, [side]: fields } };
 }
 
 /**

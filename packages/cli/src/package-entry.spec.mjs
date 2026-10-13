@@ -33,7 +33,7 @@ test('the exact installed HFS dependency loads its real published module graph',
 test('the real binary dispatches finite app explanations through installed HFS', (t) => {
   const cwd = mkdtempSync(path.join(os.tmpdir(), 'starci-app-main-'));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
-  const declaration = JSON.stringify({ hfs: 2, kind: 'app', project: 'package-entry', sides: {
+  const declaration = JSON.stringify({ hfs: 3, kind: 'app', project: 'package-entry', sides: {
     be: { apps: [{ name: 'api', kind: 'api' }] },
     fe: { apps: [{ name: 'web', kind: 'next' }], reads: ['be/contracts/'] },
   } });

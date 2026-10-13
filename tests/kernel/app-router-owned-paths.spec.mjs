@@ -62,7 +62,7 @@ const routeCheckout=(repo)=>{
   git(repo,'config','core.autocrlf','false');
   git(repo,'checkout','--quiet','-b','main');
   write(repo,'.gitignore','.starciwork/\n');
-  write(repo,'hfs.json',JSON.stringify({hfs:2,kind:'app',project:'router-fixture',sides:{be:{apps:[{name:'api',kind:'api'}]},fe:{apps:[{name:'web',kind:'next'}],reads:['be/contracts/']}}}));
+  write(repo,'hfs.json',JSON.stringify({hfs:3,kind:'app',project:'router-fixture',sides:{be:{apps:[{name:'api',kind:'api'}]},fe:{apps:[{name:'web',kind:'next'}],reads:['be/contracts/']}}}));
   for(const {dir,twin} of FORMS){
     write(repo,pageOf(dir),'export default function Page() { return null; }\n');
     if(twin)write(repo,twin,'twin\n');

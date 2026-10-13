@@ -10,7 +10,7 @@ const OTHER = { be: { apps: [{ name: "core", kind: "api" }] }, fe: { apps: [{ na
  * @returns {object} The app hfs.json object.
  */
 export const appDeclaration = (side, fields) => ({
-    hfs: 2,
+    hfs: 3,
     kind: "app",
     project: "fixture",
     sides: { ...OTHER, [side]: fields },

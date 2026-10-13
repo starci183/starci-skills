@@ -8,7 +8,7 @@ import { feNoTestsFindings, isFeTestPath } from '../../scripts/hfs/rules/fe-no-t
 
 // FE_NO_TESTS (R97): the front end (the fe side of an app) has no tests by standard, and no exception. feNoTestsFindings judges
 // side-relative paths; starci app check runs it over the fe side of the app and reports app-relative paths.
-const APP = { hfs: 2, kind: 'app', project: 'demo', sides: { be: { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }] }, fe: { apps: [{ name: 'web', kind: 'next' }] } } };
+const APP = { hfs: 3, kind: 'app', project: 'demo', sides: { be: { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }] }, fe: { apps: [{ name: 'web', kind: 'next' }] } } };
 
 const tree = (t, files) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-fe-no-tests-'));

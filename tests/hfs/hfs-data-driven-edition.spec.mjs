@@ -8,7 +8,7 @@ import { loadRuleCatalog, loadSlotManifest } from '../../scripts/hfs/slots.mjs';
 
 const root = path.resolve(import.meta.dirname, '..', '..');
 const declaration = (edition) => ({
-  hfs: 2,
+  hfs: 3,
   kind: 'app',
   project: 'demo',
   ...(edition === undefined ? {} : { edition }),

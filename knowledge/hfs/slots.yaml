@@ -1,16 +1,16 @@
 # HFS slot manifest (owner-approved 2026-09-29, decisions 1-10 in the owner decisions record).
 # The one place that says what may exist in a StarCi product repository and where. A product is ONE app repository
-# (hfs 4, manifest major 2): the app root holds the one package.json, lockfile and node_modules, the hfs.json of kind app,
+# (hfs 4, manifest major 3): the app root holds the one package.json, lockfile and node_modules, the hfs.json of kind app,
 # the CI, the hooks and .starciwork (slots of profile `app`); `be/` and `fe/` are its two sides, each laid out as a
 # standalone repository root (slots of profile be or fe, paths relative to the side folder). Every tracked path of every
 # repository must match exactly one slot. Checks, lint factories, the architecture machine, templates and the why
 # catalog READ this file through scripts/hfs/slots.mjs; none of them hardcodes a path.
 # Shape: modules/schemas/hfs-slots.schema.yaml. The repository side is hfs.json: modules/schemas/hfs-repo.schema.yaml.
-schema: starci/hfs-slots@2
-version: 2.3.0
+schema: starci/hfs-slots@3
+version: 3.0.0
 
 versioning:
-  # MAJOR.MINOR.PATCH of this manifest. A repository pins only the MAJOR in hfs.json ("hfs": 2).
+  # MAJOR.MINOR.PATCH of this manifest. A repository pins only the MAJOR in hfs.json ("hfs": 3).
   patch: wording, why text, examples; no check result can change.
   minor: >-
     add a slot (always presence optional or opt-in), add an app kind or protocol slot, add a rule at severity warn,
@@ -25,10 +25,12 @@ versioning:
 # overlays and `provider`, and `sides.<side>.reads` of an app-root tree) and the lite slots; an app without `edition` in its
 # hfs.json is edition full and every answer for it is unchanged.
 # 2.2.0 adds the declaration-only fe.modules.types.ambient owner.
-# 2.3.0 re-rules the editions (owner rulings 2026-10-12 and 2026-10-13, R212 cases 1-2): lite is the full code structure deployed
-# without self-hosted infrastructure and without e2e. The front end is one standard for both editions (knowledge/hfs/fe-stack.yaml):
-# Apollo GraphQL in modules/api, SWR, RHF, zustand and socket.io hooks, redux, modules/auth and modules/toast; modules/db, Server
-# Actions and route handlers other than health/live are gone in both editions.
+# 3.0.0 is a major (owner decision 2026-10-13, R212 cases 1-2): lite is the full code structure deployed without self-hosted
+# infrastructure and without e2e, and the front end is one standard for both editions (knowledge/hfs/fe-stack.yaml). The
+# front-end database slots and the Supabase realtime feature slot are removed (Supabase on the front end is auth only, realtime
+# is the socket.io gateway in both editions), fe.route holds pages, layouts and the one health/live route handler, and the slots
+# marked `since: 3.0.0` are added: the Apollo, SWR, RHF, zustand and socket.io hooks, redux, modules/auth, modules/toast, the
+# providers, be.assets and the migration archive.
 
 # Field meaning, per slot.
 #   id          stable name, never changes meaning inside a major.
@@ -691,7 +693,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    since: 2.3.0
+    since: 3.0.0
   - id: app.supabase.seed
     profiles: [app]
     path: "supabase/seed.sql"
@@ -1265,7 +1267,7 @@ slots:
     tier: none
     tests: none
     coverage: none
-    since: 2.3.0
+    since: 3.0.0
   # ----- BE: modules (three tiers, closed set) -----------------------------------------------------------
   - id: be.domain
     profiles: [be]
@@ -1774,7 +1776,7 @@ slots:
     allows: [index.tsx]
     roles: {entry: index.tsx}
     tests: none
-    since: 2.3.0
+    since: 3.0.0
     rules: [FE_CLIENT_BOUNDARY]
   - id: fe.hooks
     profiles: [fe]
@@ -1805,7 +1807,7 @@ slots:
     roles: {entry: index.ts, effects: SwrSideEffects.tsx}
     tests: none
     budget: {file: 200}
-    since: 2.3.0
+    since: 3.0.0
     rules: [FE_HOOKS_ARE_HOOKS, FE_DATA_FRESHNESS]
   - id: fe.hooks.rhf
     profiles: [fe]
@@ -1821,7 +1823,7 @@ slots:
     roles: {entry: index.ts}
     tests: none
     budget: {file: 200}
-    since: 2.3.0
+    since: 3.0.0
     rules: [FE_HOOKS_ARE_HOOKS]
   - id: fe.hooks.zustand
     profiles: [fe]
@@ -1836,7 +1838,7 @@ slots:
     roles: {entry: index.ts, store: store.ts}
     tests: none
     budget: {file: 200}
-    since: 2.3.0
+    since: 3.0.0
     rules: [FE_HOOKS_ARE_HOOKS]
   - id: fe.hooks.socketio
     profiles: [fe]
@@ -1852,7 +1854,7 @@ slots:
     roles: {entry: index.ts, effects: SocketIoSideEffects.tsx}
     tests: none
     budget: {file: 200}
-    since: 2.3.0
+    since: 3.0.0
     rules: [FE_HOOKS_ARE_HOOKS]
   - id: fe.hooks.effects
     profiles: [fe]
@@ -1868,7 +1870,7 @@ slots:
     roles: {entry: index.ts, effects: "*SideEffect.tsx"}
     tests: none
     budget: {file: 200}
-    since: 2.3.0
+    since: 3.0.0
     rules: [FE_HOOKS_ARE_HOOKS]
   - id: fe.hooks.reuseables
     profiles: [fe]
@@ -1883,7 +1885,7 @@ slots:
     roles: {entry: index.ts}
     tests: none
     budget: {file: 200}
-    since: 2.3.0
+    since: 3.0.0
     rules: [FE_HOOKS_ARE_HOOKS]
   - id: fe.redux
     profiles: [fe]
@@ -1898,7 +1900,7 @@ slots:
     roles: {entry: index.ts, store: store.ts, hooks: hooks.ts}   # hooks.ts: the typed useAppDispatch/useAppSelector of the store
     tests: none
     budget: {file: 400}
-    since: 2.3.0
+    since: 3.0.0
   - id: fe.modules
     profiles: [fe]
     path: "apps/<app>/src/modules/<capability>/"
@@ -2019,7 +2021,7 @@ slots:
     owner: true
     requires: [index.ts]
     tests: none
-    since: 2.3.0
+    since: 3.0.0
     rules: [FE_SUPABASE_CLIENT_OWNER, FE_SERVICE_ROLE_FORBIDDEN]
   - id: fe.modules.toast
     profiles: [fe]
@@ -2034,7 +2036,7 @@ slots:
     allows: [index.ts, toast.tsx, api.ts, hooks.ts]
     roles: {entry: index.ts, hooks: hooks.ts}   # hooks.ts: the use*WithToast hooks of the toast module
     tests: none
-    since: 2.3.0
+    since: 3.0.0
   - id: fe.package.ui
     profiles: [fe]
     path: "packages/<family>-ui/"

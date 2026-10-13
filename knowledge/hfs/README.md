@@ -68,7 +68,7 @@ A slot has an `id`, the `profiles` it exists in, a `path` pattern, a `presence`,
   a budget that no pinned app exceeds. Every app on the same major stays green without edits.
 - **Major**: change or remove a slot, make an optional slot required, raise a rule from `warn` to `error`, change the
   direction matrix. It needs owner approval and one migration lane per app.
-- An app pins only the major (`"hfs": 2`) and always runs the newest minor of that major.
+- An app pins only the major (`"hfs": 3`) and always runs the newest minor of that major.
 
 ### 2.2 Adding something without breaking HFS
 
@@ -96,7 +96,7 @@ reads and (back end only) the database connections.
 
 ```json
 {
-  "hfs": 2,
+  "hfs": 3,
   "kind": "app",
   "project": "nivo",
   "sides": {

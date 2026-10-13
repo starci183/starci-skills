@@ -12,7 +12,7 @@ import { secretHits } from '../../scripts/lib/secret-patterns.mjs';
 // R147 (the cli app is the Supabase CLI's job under lite), the README Development section (the managed script names of the
 // edition), and the secret scan (`env(NAME)` in supabase/config.toml is a reference, not a value).
 
-const declaration = (edition) => ({ hfs: 2, kind: 'app', project: 'demo', ...(edition ? { edition } : {}), sides: { be: { apps: [{ name: 'api', kind: 'api' }], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'api', isolation: 'schema', provider: 'supabase' }] }, fe: { apps: [{ name: 'web', kind: 'next' }] } } });
+const declaration = (edition) => ({ hfs: 3, kind: 'app', project: 'demo', ...(edition ? { edition } : {}), sides: { be: { apps: [{ name: 'api', kind: 'api' }], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'api', isolation: 'schema', provider: 'supabase' }] }, fe: { apps: [{ name: 'web', kind: 'next' }] } } });
 const open = (edition) => { const manifest = loadSlotManifest(); const repo = resolveRepoDeclaration(manifest, declaration(edition)); return { repo, resolver: createSlotResolver(manifest, repo) }; };
 
 test('R147: a connection forces the cli app in full and not in lite; a tracked command forces it in both', () => {

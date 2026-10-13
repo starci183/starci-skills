@@ -624,7 +624,7 @@ schemas:
   # CODE-PATTERN ENFORCEMENT — executable rule conformance
   # --------------------------------------------------------------------------
 
-  - id: urn:starci:hfs-slots:2
+  - id: urn:starci:hfs-slots:3
     file: modules/schemas/hfs-slots.schema.yaml
     dialect: json-schema
     subsystem: gate
@@ -634,10 +634,10 @@ schemas:
     business:
       question: "What may exist in a product repository, where, and what may import what?"
       whenNeeded: Every HFS check, lint factory and template that needs a path, tier or required file.
-      whenNot: Not per-repository - an app declares itself in hfs.json (urn:starci:hfs-repo:2) and never edits the manifest.
+      whenNot: Not per-repository - an app declares itself in hfs.json (urn:starci:hfs-repo:3) and never edits the manifest.
       selectedBy: scripts/hfs/slots.mjs; owner-approved HFS decisions.
 
-  - id: urn:starci:hfs-rules:2
+  - id: urn:starci:hfs-rules:3
     file: modules/schemas/hfs-rules.schema.yaml
     dialect: json-schema
     subsystem: gate
@@ -650,7 +650,7 @@ schemas:
       whenNot: Not per-repository - a repository never edits the catalog and switches no rule off.
       selectedBy: scripts/hfs/slots.mjs; owner-approved HFS decisions.
 
-  - id: urn:starci:hfs-repo:2
+  - id: urn:starci:hfs-repo:3
     file: modules/schemas/hfs-repo.schema.yaml
     dialect: json-schema
     subsystem: gate

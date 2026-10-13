@@ -1,5 +1,5 @@
 $schema: https://json-schema.org/draft/2020-12/schema
-$id: urn:starci:hfs-slots:2
+$id: urn:starci:hfs-slots:3
 title: HFS slot manifest (kind app or runtime)
 description: >-
   The shape of knowledge/hfs/slots.yaml. Semantic rules JSON Schema cannot state (unique ids, every tier named by a
@@ -15,7 +15,7 @@ $defs:
     additionalProperties: false
     required: [schema, version, versioning, presenceValues, trackedValues, testValues, editions, sides, appKinds, tiers, ruleParams, slots]
     properties:
-      schema: {const: starci/hfs-slots@2}
+      schema: {const: starci/hfs-slots@3}
       editions:
         const: [full, lite]
         description: The editions an app declaration may name in hfs.json (absent means full); slots and rules carry `editions` subsets of this list.

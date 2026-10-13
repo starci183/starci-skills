@@ -14,7 +14,7 @@ function appRoot(edition) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "hfs-add-app-lite-"));
   made.push(root);
   const declaration = {
-    hfs: 2,
+    hfs: 3,
     kind: "app",
     ...(edition === "lite" ? { edition } : {}),
     project: "demo",

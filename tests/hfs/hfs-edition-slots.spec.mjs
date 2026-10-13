@@ -21,7 +21,7 @@ const SIDES = {
   fe: { apps: [{ name: 'web', kind: 'next' }] },
 };
 const declaration = (edition) => ({
-  hfs: 2,
+  hfs: 3,
   kind: 'app',
   project: 'demo',
   ...(edition === undefined ? {} : { edition }),

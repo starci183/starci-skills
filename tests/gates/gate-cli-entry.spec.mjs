@@ -27,7 +27,7 @@ function laneApp(t) {
   for (const [k, v] of [['user.email', 'spec@starci.test'], ['user.name', 'spec'], ['core.autocrlf', 'false'], ['commit.gpgsign', 'false']]) git('config', k, v);
   put(root, '.gitignore', 'node_modules/\n');
   put(root, 'package.json', JSON.stringify({ name: 'app', private: true, workspaces: ['be'] }, null, 2));
-  put(root, 'hfs.json', JSON.stringify({ hfs: 2, kind: 'app', project: 'app', sides: { be: { apps: [{ name: 'core', kind: 'api' }], kinds: ['api'] } } }, null, 2));
+  put(root, 'hfs.json', JSON.stringify({ hfs: 3, kind: 'app', project: 'app', sides: { be: { apps: [{ name: 'core', kind: 'api' }], kinds: ['api'] } } }, null, 2));
   put(root, 'be/package.json', JSON.stringify({ name: '@app/be', private: true }));
   put(root, 'be/src/a.ts', 'export const a = 1;\n');
   put(root, 'be/src/b.ts', 'export const b = 1;\n');

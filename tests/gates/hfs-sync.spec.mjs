@@ -29,7 +29,7 @@ const jestPreset = require('../../packages/jest-preset/index.cjs');
 const Ajv2020 = (() => { const loaded = require('ajv/dist/2020.js'); return loaded?.default ?? loaded; })();
 const validateWorkspace = addWorkCommon(new Ajv2020({ strict: false, allErrors: true, logger: false })).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-workspace.schema.yaml'), 'utf8')));
 
-const app = ({ be = { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }] }, fe = { apps: [{ name: 'app', kind: 'next' }, { name: 'admin', kind: 'next' }] } } = {}) => ({ hfs: 2, kind: 'app', project: 'nivo', sides: { be, fe } });
+const app = ({ be = { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }] }, fe = { apps: [{ name: 'app', kind: 'next' }, { name: 'admin', kind: 'next' }] } } = {}) => ({ hfs: 3, kind: 'app', project: 'nivo', sides: { be, fe } });
 const APP = app();
 const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 const MANIFEST = loadSlotManifest();
@@ -80,8 +80,8 @@ describe('the template renderer', () => {
 describe('hfs.json validation', () => {
   it('accepts an app and refuses everything else, the standalone back-end and front-end kinds included', () => {
     assert.doesNotThrow(() => validateHfs(APP));
-    for (const bad of [null, { ...APP, hfs: 1 }, { ...APP, kind: 'be' }, { ...APP, project: 'Shop Be' }, app({ fe: { apps: [] } }), app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'core', kind: 'cli' }] } }),
-      { hfs: 2, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }] }, { ...APP, stacks: '../shop-be' }]) {
+    for (const bad of [null, { ...APP, hfs: 2 }, { ...APP, kind: 'be' }, { ...APP, project: 'Shop Be' }, app({ fe: { apps: [] } }), app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'core', kind: 'cli' }] } }),
+      { hfs: 3, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }] }, { ...APP, stacks: '../shop-be' }]) {
       assert.throws(() => validateHfs(bad), /HFS_SYNC_HFS_INVALID/);
     }
   });

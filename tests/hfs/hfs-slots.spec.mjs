@@ -23,7 +23,7 @@ const validateRepoSchema = ajv.compile(readSchema('hfs-repo.schema.yaml'));
 
 const BE_SIDE = { apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'cli', kind: 'cli' }], optionalSlots: ['be.contract.graphql', 'repo.docs'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database' }, { name: 'secondary', envPrefix: 'SECONDARY_DB', owner: 'core', isolation: 'database' }] };
 const FE_SIDE = { apps: [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }], optionalSlots: ['repo.packages', 'fe.package.ui'], reads: ['be/contracts/'] };
-const app = ({ be = BE_SIDE, fe = FE_SIDE, ...rest } = {}) => ({ hfs: 2, kind: 'app', project: 'my-app', sides: { be, fe }, ...rest });
+const app = ({ be = BE_SIDE, fe = FE_SIDE, ...rest } = {}) => ({ hfs: 3, kind: 'app', project: 'my-app', sides: { be, fe }, ...rest });
 const APP = app();
 
 const refusal = (fn, code) => assert.throws(fn, (error) => error instanceof HfsSlotsError && error.code === code, `expected ${code}`);
@@ -34,7 +34,7 @@ test('the shipped manifest validates against its JSON schema and the loader', ()
   assert.equal(validateManifestSchema(doc), true, JSON.stringify(validateManifestSchema.errors));
   const manifest = loadSlotManifest();
   assert.equal(manifest.version, doc.version);
-  assert.equal(manifest.major, 2);
+  assert.equal(manifest.major, 3);
   for (const slot of manifest.slots) {
     for (const field of ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests']) assert.notEqual(slot[field], undefined, `${slot.id} lacks ${field}`);
     if (slot.profiles.includes('app')) assert.deepEqual(slot.profiles, ['app'], `${slot.id}: a slot of the app root belongs to no side`);
@@ -65,7 +65,7 @@ test('the slot-manifest loader also refuses what only semantics can see', () => 
   refusal(load((d) => { d.slots[0].tier = 'nowhere'; }), 'HFS_MANIFEST_INVALID');
   refusal(load((d) => { d.tiers.be.app.mayImport.push('ghost'); }), 'HFS_MANIFEST_INVALID');
   refusal(load((d) => { d.appKinds.be.push('lambda'); }), 'HFS_MANIFEST_INVALID');
-  refusal(load((d) => { d.schema = 'starci/hfs-slots@3'; }), 'HFS_MANIFEST_INVALID');
+  refusal(load((d) => { d.schema = 'starci/hfs-slots@4'; }), 'HFS_MANIFEST_INVALID');
   refusal(load((d) => { d.slots.find((s) => s.id === 'be.transport.http').requires = ['<nope>.module.ts']; }), 'HFS_MANIFEST_INVALID');
   refusal(load((d) => { d.slots.push({ ...d.slots.find((s) => s.id === 'app.readme'), id: 'app.readme-twin' }); }), 'HFS_MANIFEST_INVALID');
   refusal(load((d) => { d.sides.fe.reads = ['contracts']; }), 'HFS_MANIFEST_INVALID');                       // a read is a <side>/<dir>/ path
@@ -76,7 +76,7 @@ test('hfs.json: schema and loader agree', () => {
   const manifest = loadSlotManifest();
   const bad = {
     'missing hfs': { ...APP, hfs: undefined },
-    'a standalone back end (profile)': { hfs: 2, profile: 'be', project: 'my-app', apps: [{ name: 'core', kind: 'api' }] },
+    'a standalone back end (profile)': { hfs: 3, profile: 'be', project: 'my-app', apps: [{ name: 'core', kind: 'api' }] },
     'kind other than app': { ...APP, kind: 'be' },
     'one side only': { ...APP, sides: { be: BE_SIDE } },
     'fe with connections': app({ fe: { ...FE_SIDE, connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database' }] } }),
@@ -153,19 +153,19 @@ test('readRepoDeclaration reads the app hfs.json at the app root, the side view 
 test('a manifest major mismatch is refused, in either direction, with no compatibility window', () => {
   const manifest = loadSlotManifest();
   try {
-    resolveRepoDeclaration(manifest, { ...APP, hfs: 1 });
-    assert.fail('major 1 was accepted by a 2.x manifest');
+    resolveRepoDeclaration(manifest, { ...APP, hfs: 2 });
+    assert.fail('major 2 was accepted by a 3.x manifest');
   } catch (error) {
     assert.equal(error.code, 'HFS_MANIFEST_MAJOR_MISMATCH');
-    assert.deepEqual([error.details.pinned, error.details.manifestMajor], [1, 2]);
+    assert.deepEqual([error.details.pinned, error.details.manifestMajor], [2, 3]);
   }
   const nextDoc = parseYaml(manifestText);
-  nextDoc.schema = 'starci/hfs-slots@3';
-  nextDoc.version = '3.0.0';
+  nextDoc.schema = 'starci/hfs-slots@4';
+  nextDoc.version = '4.0.0';
   const next = loadSlotManifest({ text: JSON.stringify(nextDoc) });
-  assert.equal(next.major, 3);
+  assert.equal(next.major, 4);
   refusal(() => resolveRepoDeclaration(next, APP), 'HFS_MANIFEST_MAJOR_MISMATCH');           // an app pinned to the old major
-  assert.equal(resolveRepoDeclaration(next, { ...APP, hfs: 3 }).hfs, 3);
+  assert.equal(resolveRepoDeclaration(next, { ...APP, hfs: 4 }).hfs, 4);
 });
 
 test('the app root: its own slots, a side path through the side, and the files of the old repository root forbidden in a side', () => {

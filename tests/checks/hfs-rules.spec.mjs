@@ -20,12 +20,12 @@ const doc = () => parseYaml(catalogText);
 const withPlanned = (d) => { d.rules[0].enforcers = [{ kind: 'hfs', id: 'slot-undeclared', status: 'planned' }]; return d; };
 const load = (mutate) => { const d = doc(); mutate(d); return () => loadRuleCatalog({ text: JSON.stringify(d) }); };
 
-test('the shipped catalog is 2.0.0, validates against its JSON schema and loads with the slot manifest major', () => {
+test('the shipped catalog is 3.0.0, validates against its JSON schema and loads with the slot manifest major', () => {
   const d = doc();
-  assert.equal(d.version, '2.0.0');
+  assert.equal(d.version, '3.0.0');
   assert.equal(validateSchema(d), true, JSON.stringify(validateSchema.errors));
   const catalog = loadRuleCatalog({ manifest: loadSlotManifest() });
-  assert.equal(catalog.major, 2);
+  assert.equal(catalog.major, 3);
   assert.deepEqual(catalog.rules.map((r) => r.id), [...catalog.rules.map((r) => r.id)].sort((x, y) => Number(x.slice(1)) - Number(y.slice(1))), 'ids increase; a retired rule leaves its id unused, so there may be gaps');
   assert.equal(new Set(catalog.rules.map((r) => r.id)).size, catalog.rules.length);
   for (const rule of catalog.rules) {
@@ -65,7 +65,7 @@ test('rules() and openHfs().rules() give the same frozen catalog', () => {
   const list = rules();
   assert.equal(list.length, loadRuleCatalog().rules.length);
   assert.ok(Object.isFrozen(list) && Object.isFrozen(list[0]) && Object.isFrozen(list[0].enforcers));
-  const app = { hfs: 2, kind: 'app', project: 'nivo', sides: {
+  const app = { hfs: 3, kind: 'app', project: 'nivo', sides: {
     be: { apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'cli', kind: 'cli' }], optionalSlots: ['be.contract.graphql', 'repo.docs'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database' }, { name: 'agentos', envPrefix: 'AGENTOS_DB', owner: 'core', isolation: 'database' }] },
     fe: { apps: [{ name: 'web', kind: 'next' }], reads: ['be/contracts/'] },
   } };
@@ -109,15 +109,15 @@ test('the rule-catalog loader also refuses what only semantics can see', () => {
   refusal(owing((d) => { d.rules[0].enforcers[0].status = undefined; }), 'HFS_RULES_INVALID');
   refusal(load((d) => { d.rules[0].enforcers.push({ ...d.rules[0].enforcers[0] }); }), 'HFS_RULES_INVALID');
   refusal(load((d) => { d.rules[0].law = 'one\ntwo'; }), 'HFS_RULES_INVALID');
-  refusal(load((d) => { d.schema = 'starci/hfs-rules@3'; }), 'HFS_RULES_INVALID');
+  refusal(load((d) => { d.schema = 'starci/hfs-rules@4'; }), 'HFS_RULES_INVALID');
   refusal(load((d) => { d.gates = { land: 'x' }; }), 'HFS_RULES_INVALID');
   refusal(() => loadRuleCatalog({ text: '{ not: [valid' }), 'HFS_RULES_INVALID');
 });
 
 test('a catalog whose major differs from the slot manifest is refused', () => {
   const d = doc();
-  d.version = '3.0.0';
-  d.schema = 'starci/hfs-rules@3';
+  d.version = '4.0.0';
+  d.schema = 'starci/hfs-rules@4';
   refusal(() => loadRuleCatalog({ text: JSON.stringify(d), manifest: loadSlotManifest() }), 'HFS_MANIFEST_MAJOR_MISMATCH');
 });
 

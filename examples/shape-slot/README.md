@@ -4,7 +4,7 @@ The reference app for the shape + slot pattern: one StarCi app whose front end w
 
 ## Overview
 
-An app repo following HFS (`hfs: 2`, `kind: app`): a generated `be/` side (Nest, `core` + `cli`, `primary` connection) and the hand-written `fe/apps/shape-slot` source, the slot-teaching fixture the grammar and the knowledge read. Each FE layer has a real example; `starci-fe/*` lint and `starci app check` are the two gates proving this sample correct.
+An app repo following HFS (`hfs: 3`, `kind: app`): a generated `be/` side (Nest, `core` + `cli`, `primary` connection) and the hand-written `fe/apps/shape-slot` source, the slot-teaching fixture the grammar and the knowledge read. Each FE layer has a real example; `starci-fe/*` lint and `starci app check` are the two gates proving this sample correct.
 
 ## Stack
 

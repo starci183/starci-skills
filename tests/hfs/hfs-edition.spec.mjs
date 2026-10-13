@@ -10,7 +10,7 @@ import { managedScriptNames } from '../../scripts/hfs/architecture/managed-scrip
 import { managedGroupOf } from '../../scripts/hfs/edition-slots.mjs';
 import { HfsSlotsError, loadRuleCatalog, loadSlotManifest, openHfs, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
 
-// The edition mechanism (L01, manifest 2.1.0, re-ruled in 2.3.0): hfs.json names `edition: full|lite` (absent means full), and lite is
+// The edition mechanism (L01, manifest 2.1.0, re-ruled in 3.0.0): hfs.json names `edition: full|lite` (absent means full), and lite is
 // the same manifest filtered (a slot's `editions`, `litePresence` and `lite` overlay), never a second engine. Owner ruling 2026-10-12:
 // lite is the full architecture deployed without self-hosted infrastructure - it keeps every pattern, the worker app and the back-end
 // unit specs, and drops only the e2e and contract world, the browser journey, UAT records and the self-hosted stack; a `supabase`
@@ -24,7 +24,7 @@ const validateRepoSchema = new Ajv2020({ strict: false, allErrors: true, logger:
 const CONNECTION = { name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database' };
 const BE = { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }], connections: [CONNECTION] };
 const FE = { apps: [{ name: 'web', kind: 'next' }] };
-const app = ({ edition, be = BE, fe = FE } = {}) => ({ hfs: 2, kind: 'app', project: 'demo', ...(edition === undefined ? {} : { edition }), sides: { be, fe } });
+const app = ({ edition, be = BE, fe = FE } = {}) => ({ hfs: 3, kind: 'app', project: 'demo', ...(edition === undefined ? {} : { edition }), sides: { be, fe } });
 
 const refusal = (fn, code) => assert.throws(fn, (error) => error instanceof HfsSlotsError && error.code === code, `expected ${code}`);
 const tree = (t, files) => {

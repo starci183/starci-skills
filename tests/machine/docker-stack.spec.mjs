@@ -9,7 +9,7 @@ const success = (stdout = '') => ({ status: 0, stdout, stderr: '' });
 
 function app(t, project = 'shop') {
   const cwd = mkdtemp(t, 'starci-docker-stack-');
-  fs.writeFileSync(path.join(cwd, 'hfs.json'), `${JSON.stringify({ hfs: 2, kind: 'app', project, sides: { be: { apps: [] }, fe: { apps: [] } } })}\n`);
+  fs.writeFileSync(path.join(cwd, 'hfs.json'), `${JSON.stringify({ hfs: 3, kind: 'app', project, sides: { be: { apps: [] }, fe: { apps: [] } } })}\n`);
   const composeDir = path.join(cwd, '.starcistacks', 'dev', 'infra', 'compose');
   fs.mkdirSync(composeDir, { recursive: true });
   fs.writeFileSync(path.join(composeDir, 'api.yaml'), 'services: {}\n');

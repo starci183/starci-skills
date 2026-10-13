@@ -30,7 +30,7 @@ test('global options use cwd and upgrade refuses a lite target with its typed us
   let err = '';
   assert.equal(await main(['upgrade', '--edition', 'lite'], { stderr: (text) => { err += text; } }), 2);
   assert.match(err, /^HFS_UPGRADE_TARGET_INVALID: .*--edition full\n$/);
-  const declaration = { hfs: 2, kind: 'app', project: 'app', sides: { be: { apps: [{ name: 'core', kind: 'api' }] }, fe: { apps: [{ name: 'landing', kind: 'next' }], reads: ['be/contracts/'] } } };
+  const declaration = { hfs: 3, kind: 'app', project: 'app', sides: { be: { apps: [{ name: 'core', kind: 'api' }] }, fe: { apps: [{ name: 'landing', kind: 'next' }], reads: ['be/contracts/'] } } };
   const declared = JSON.stringify(declaration);
   fs.writeFileSync(path.join(wanted, 'hfs.json'), declared);
   err = '';

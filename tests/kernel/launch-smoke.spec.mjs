@@ -42,7 +42,7 @@ function git(dir, ...args) {
 /** A scratch app: hfs.json with one fe application (web), be/ and fe/ sources on main, an ignored node_modules with one package. */
 function scratchApp(tmp) {
   const app = path.join(tmp, 'app');
-  for (const [rel, text] of [['be/src/main.ts', 'export const be = 1;\n'], ['fe/apps/web/page.tsx', 'export const fe = 1;\n'], ['.gitignore', 'node_modules/\n'], ['hfs.json', `${JSON.stringify({ hfs: 2, kind: 'app', sides: { fe: { apps: [{ name: 'web', kind: 'next' }] } } })}\n`], ['node_modules/left-pad/index.js', 'module.exports = 1;\n']]) {
+  for (const [rel, text] of [['be/src/main.ts', 'export const be = 1;\n'], ['fe/apps/web/page.tsx', 'export const fe = 1;\n'], ['.gitignore', 'node_modules/\n'], ['hfs.json', `${JSON.stringify({ hfs: 3, kind: 'app', sides: { fe: { apps: [{ name: 'web', kind: 'next' }] } } })}\n`], ['node_modules/left-pad/index.js', 'module.exports = 1;\n']]) {
     fs.mkdirSync(path.dirname(path.join(app, rel)), { recursive: true });
     fs.writeFileSync(path.join(app, rel), text);
   }

@@ -9,7 +9,7 @@ const success = (stdout = '') => ({ status: 0, stdout, stderr: '' });
 
 function app(t, { project = 'shop', dockerfile = 'FROM scratch\n' } = {}) {
   const root = mkdtemp(t, 'starci-release-images-');
-  fs.writeFileSync(path.join(root, 'hfs.json'), `${JSON.stringify({ hfs: 2, kind: 'app', project })}\n`);
+  fs.writeFileSync(path.join(root, 'hfs.json'), `${JSON.stringify({ hfs: 3, kind: 'app', project })}\n`);
   fs.writeFileSync(path.join(root, 'package.json'), `${JSON.stringify({ name: project, private: true })}\n`);
   fs.mkdirSync(path.join(root, 'be', 'apps', 'api'), { recursive: true });
   fs.writeFileSync(path.join(root, 'be', 'apps', 'api', 'Dockerfile'), dockerfile);

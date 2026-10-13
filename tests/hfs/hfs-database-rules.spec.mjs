@@ -27,7 +27,7 @@ const SUPABASE = { enableSignup: false, siteUrl: 'http://localhost:3000', jwtExp
 function repo(contents, { supabase = SUPABASE, edition = 'lite' } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-db-'));
   made.push(dir);
-  fs.writeFileSync(path.join(dir, 'hfs.json'), JSON.stringify({ hfs: 2, kind: 'app', project: 'demo', edition, ...(supabase ? { supabase } : {}), sides: { be: { apps: [] }, fe: { apps: [] } } }));
+  fs.writeFileSync(path.join(dir, 'hfs.json'), JSON.stringify({ hfs: 3, kind: 'app', project: 'demo', edition, ...(supabase ? { supabase } : {}), sides: { be: { apps: [] }, fe: { apps: [] } } }));
   for (const [file, text] of Object.entries(contents)) {
     const target = path.join(dir, ...file.split('/'));
     fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -133,7 +133,7 @@ test('DB_MIGRATION_SHAPE: a migration on the base is immutable - an edit and a r
 });
 
 test('DB_MIGRATION_SHAPE: an app nested in a larger repository reads the base content from its own root, so an untouched migration is not a finding and an edit is', async () => {
-  const hfs = JSON.stringify({ hfs: 2, kind: 'app', project: 'demo', edition: 'lite', supabase: SUPABASE, sides: { be: { apps: [] }, fe: { apps: [] } } });
+  const hfs = JSON.stringify({ hfs: 3, kind: 'app', project: 'demo', edition: 'lite', supabase: SUPABASE, sides: { be: { apps: [] }, fe: { apps: [] } } });
   const outer = committedRepo({ ...migration('20260101120000_old.sql', 'select 0;\n'), 'examples/demo/hfs.json': hfs, [`examples/demo/${MIGRATIONS}/20260101120000_old.sql`]: 'select 1;\n' });
   const app = path.join(outer, 'examples', 'demo');
   const file = `${MIGRATIONS}/20260101120000_old.sql`;

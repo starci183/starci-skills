@@ -109,7 +109,7 @@ test('offline runtime installation binds the real shim to the installed host and
     });
   }
   fs.mkdirSync(cwd, { recursive: true });
-  const declaration = JSON.stringify({ hfs: 2, kind: 'app', project: 'installed-shim', sides: {
+  const declaration = JSON.stringify({ hfs: 3, kind: 'app', project: 'installed-shim', sides: {
     be: { apps: [{ name: 'api', kind: 'api' }] },
     fe: { apps: [{ name: 'web', kind: 'next' }], reads: ['be/contracts/'] },
   } });

@@ -20,8 +20,8 @@ const made = [];
 test.after(() => cleanup(made));
 
 const SIDES = { be: { apps: [{ name: 'core', kind: 'api' }], kinds: ['api'] }, fe: { apps: [{ name: 'web', kind: 'next' }] } };
-const LITE = { hfs: 2, kind: 'app', edition: 'lite', project: 'demo', sides: SIDES };
-const FULL = { hfs: 2, kind: 'app', project: 'demo', sides: SIDES };
+const LITE = { hfs: 3, kind: 'app', edition: 'lite', project: 'demo', sides: SIDES };
+const FULL = { hfs: 3, kind: 'app', project: 'demo', sides: SIDES };
 
 const repo = (declaration) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-gate-'));

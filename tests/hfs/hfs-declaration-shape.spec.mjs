@@ -17,7 +17,7 @@ const validateSchema = new Ajv2020({ strict: false, allErrors: true, logger: fal
 const manifest = loadSlotManifest();
 
 const BASE = {
-  hfs: 2,
+  hfs: 3,
   kind: 'app',
   project: 'demo',
   sides: {
@@ -63,7 +63,7 @@ test('declarationShapeProblems covers top-level and side refusal paths', () => {
     assert.ok(problems.some((problem) => problem.includes(message)), `${message}: ${problems.join('; ')}`);
   }
 
-  const runtime = { hfs: 2, kind: 'runtime', project: 'starci', edition: 'lite' };
+  const runtime = { hfs: 3, kind: 'runtime', project: 'starci', edition: 'lite' };
   assert.deepEqual(declarationShapeProblems(runtime, ['be', 'fe']), [
     'unknown key edition (a runtime declaration is {hfs, kind, project})',
   ]);

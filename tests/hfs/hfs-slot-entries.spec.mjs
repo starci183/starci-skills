@@ -32,7 +32,7 @@ test('the manifest declares the GraphQLResponse homes as data and no second owne
 
 test('modules/api/graphql/types.ts is the one GraphQLResponse home of an app in both editions', () => {
   const connection = { name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'schema', provider: 'supabase' };
-  const declaration = (edition) => ({ hfs: 2, kind: 'app', project: 'demo', ...(edition ? { edition } : {}), sides: { be: { apps: [{ name: 'core', kind: 'api' }], connections: [connection] }, fe: { apps: [{ name: 'web', kind: 'next' }] } } });
+  const declaration = (edition) => ({ hfs: 3, kind: 'app', project: 'demo', ...(edition ? { edition } : {}), sides: { be: { apps: [{ name: 'core', kind: 'api' }], connections: [connection] }, fe: { apps: [{ name: 'web', kind: 'next' }] } } });
   for (const edition of [undefined, 'lite']) {
     const found = openHfs({ declaration: declaration(edition) }).classifyPath('fe/apps/web/src/modules/api/graphql/types.ts');
     assert.deepEqual([found.status, found.slot], ['owned', 'fe.transport.outcome'], edition ?? 'full');
@@ -68,7 +68,7 @@ test('importAllowed: a slot-declared entry of an owner is a public entry, any ot
   const raw = structuredClone(RAW);
   raw.slots.find((candidate) => candidate.id === 'fe.modules.api').entries = ['rest/index.ts'];
   const manifest = loadSlotManifest({ text: JSON.stringify(raw) });
-  const declaration = { hfs: 2, kind: 'app', project: 'demo', sides: { be: { apps: [{ name: 'core', kind: 'api' }] }, fe: { apps: [{ name: 'web', kind: 'next' }] } } };
+  const declaration = { hfs: 3, kind: 'app', project: 'demo', sides: { be: { apps: [{ name: 'core', kind: 'api' }] }, fe: { apps: [{ name: 'web', kind: 'next' }] } } };
   const hfs = openHfs({ declaration, manifest });
   const hook = 'fe/apps/web/src/hooks/orders/useOrders.ts';
   assert.equal(hfs.importAllowed(hook, 'fe/apps/web/src/modules/api/rest/index.ts').reason, 'allowed');

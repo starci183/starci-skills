@@ -2,7 +2,7 @@
 
 ## 3.2.15 - 2026-10-13
 
-- Changed: carry the runtime mirror of HFS manifest 2.3.0 (the lite edition re-ruled as full minus self-hosted infrastructure) and the canon pins for Grammar 0.9.14, HFS 4.2.14, jest-preset 2.2.7 and CLI 1.2.14. ESLint rule implementations are unchanged.
+- Changed: carry the runtime mirror of HFS manifest 3.0.0 (the lite edition re-ruled as full minus self-hosted infrastructure) and the canon pins for Grammar 0.9.14, HFS 4.2.14, jest-preset 2.2.7 and CLI 1.2.14. ESLint rule implementations are unchanged.
 
 ## 3.2.14 - 2026-10-12
 

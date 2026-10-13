@@ -1,5 +1,5 @@
 $schema: https://json-schema.org/draft/2020-12/schema
-$id: urn:starci:hfs-repo:2
+$id: urn:starci:hfs-repo:3
 title: HFS declaration (hfs.json)
 description: >-
   The one file an app repository adds at its root to say which HFS it follows. A product is ONE app repository of kind `app`

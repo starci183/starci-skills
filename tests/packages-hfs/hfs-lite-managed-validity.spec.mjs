@@ -14,7 +14,7 @@ import { renderTargets } from '../../packages/hfs/sync/index.mjs';
 const MANIFEST = loadSlotManifest();
 const CONNECTION = { name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'api', isolation: 'schema', provider: 'supabase' };
 const LITE = {
-  hfs: 2,
+  hfs: 3,
   kind: 'app',
   edition: 'lite',
   project: 'managed-validity',

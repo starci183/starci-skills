@@ -49,7 +49,7 @@ function examples(names) {
   made.push(dir);
   for (const name of names) {
     fs.mkdirSync(path.join(dir, name));
-    fs.writeFileSync(path.join(dir, name, 'hfs.json'), '{ "hfs": 2, "kind": "app" }\n');
+    fs.writeFileSync(path.join(dir, name, 'hfs.json'), '{ "hfs": 3, "kind": "app" }\n');
   }
   fs.mkdirSync(path.join(dir, 'not-an-example'));
   fs.writeFileSync(path.join(dir, 'not-an-example', 'README.md'), '# nothing\n');

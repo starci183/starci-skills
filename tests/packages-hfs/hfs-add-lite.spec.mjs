@@ -19,7 +19,7 @@ test.after(() => {
 });
 
 const declaration = {
-  hfs: 2,
+  hfs: 3,
   kind: "app",
   edition: "lite",
   project: "demo",

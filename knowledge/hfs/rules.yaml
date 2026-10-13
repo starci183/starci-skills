@@ -12,12 +12,12 @@
 # (`at`) that emits one of the rule's codes. scripts/checks/check-hfs-rules.mjs holds all of this to the packages, the
 # scripts and modules/kernel/failure-codes.yaml.
 #
-# Every rule is an error from 2.0. There is no baseline, allowlist or suppression file for a product. The runtime gate
+# Every rule is an error. There is no baseline, allowlist or suppression file for a product. The runtime gate
 # (the StarCi runtime repository judged by knowledge/hfs/runtime-slots.yaml) has exactly one, the shrink-only sections of
 # modules/kernel/allowlist.yaml, held by RT_ALLOWLIST_SPRAWL. Codes are quoted: the failure-code
 # scanner reads this file as an emitter of every code it names.
-schema: starci/hfs-rules@2
-version: 2.0.0
+schema: starci/hfs-rules@3
+version: 3.0.0
 gates:
   pre-commit: the managed .husky/pre-commit at the app root - starci app hygiene (staged .starciwork and .starcistacks paths, secrets guard), typecheck, ESLint per side and stylelint on the staged files, prettier --check, the unit specs the staged files touch
   pre-push: typecheck, lint (starci app lint), format:check and the unit specs affected since origin/main; runs every pre-commit rule again

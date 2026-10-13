@@ -33,7 +33,7 @@ const fakeRun = (calls, text = GENERATED, failure = null) => (file, args, opts) 
 
 const CONNECTION = { name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database' };
 const declaration = (provider) => ({
-  hfs: 2, kind: 'app', project: 'demo',
+  hfs: 3, kind: 'app', project: 'demo',
   sides: {
     be: { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }], connections: [{ ...CONNECTION, ...(provider ? { provider } : {}) }] },
     fe: { apps: [{ name: 'web', kind: 'next' }] },

@@ -21,7 +21,7 @@ function repo(contents, supabase) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-db-adversarial-'));
   made.push(dir);
   const declaration = {
-    hfs: 2,
+    hfs: 3,
     kind: 'app',
     project: 'adversarial',
     edition: 'lite',

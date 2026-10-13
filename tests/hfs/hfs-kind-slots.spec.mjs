@@ -9,7 +9,7 @@ import { allowsFile } from '../../scripts/hfs/allows.mjs';
 
 const BE_SIDE = { apps: [{ name: 'core', kind: 'api' }] };
 const FE_SIDE = { apps: [{ name: 'web', kind: 'next' }] };
-const declaration = (patterns) => ({ hfs: 2, kind: 'app', project: 'shop', sides: { be: { ...BE_SIDE, ...(patterns ? { patterns } : {}) }, fe: FE_SIDE } });
+const declaration = (patterns) => ({ hfs: 3, kind: 'app', project: 'shop', sides: { be: { ...BE_SIDE, ...(patterns ? { patterns } : {}) }, fe: FE_SIDE } });
 const classify = (patterns, file) => {
   const c = openHfs({ declaration: declaration(patterns), side: 'be' }).classifyPath(file);
   return `${c.status}:${c.slot ?? ''}`;
