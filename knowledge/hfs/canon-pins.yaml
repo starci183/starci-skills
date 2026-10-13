@@ -15,7 +15,7 @@ pins:
   # --- @starci packages. Every @starci package is a PUBLISHED npm package (install: registry): a product repository
   # installs the exact pinned version from the npm registry in the root and every workspace package.json, never `file:`.
   '@starci/heroicons':
-    version: 0.3.3
+    version: 0.3.4
     group: starci
     install: registry
     side: fe
