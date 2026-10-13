@@ -5,8 +5,7 @@
       "brand": "{{project}}"
     },
     "home": {
-      "title": "Home",
-      "signedIn": "Signed in"
+      "title": "Home"
     },
     "signIn": {
       "title": "Sign in",
@@ -15,17 +14,24 @@
       "submit": "Continue",
       "working": "Signing in",
       "refused": "The credentials were refused.",
-      "not-found": "The credentials were refused.",
       "invalid": "Enter a valid email and password.",
       "unavailable": "Sign-in is unavailable. Try again shortly."
     },
     "signOut": {
+      "signedIn": "Signed in",
       "submit": "Sign out",
       "working": "Signing out",
       "refused": "The session has already ended.",
-      "not-found": "The session has already ended.",
       "invalid": "The session could not be ended.",
       "unavailable": "Sign-out is unavailable. Try again shortly."
+    },
+    "toast": {
+      "successTitle": "Done",
+      "errorTitle": "Error",
+      "unauthorizedTitle": "Not signed in",
+      "unauthorizedDescription": "Sign in to continue.",
+      "defaultSuccess": "The change was saved.",
+      "defaultError": "Something went wrong."
     },
     "loading": {
       "message": "Loading"

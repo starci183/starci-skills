@@ -30,27 +30,26 @@ before update on public.profiles
 for each row
 execute function private.set_updated_at();
 
-create policy profiles_authenticated_select
+create policy profiles_app_be_select
 on public.profiles
 for select
-to authenticated
-using ((select auth.uid()) = id);
+to app_be
+using (id is not null);
 
-create policy profiles_authenticated_insert
+create policy profiles_app_be_insert
 on public.profiles
 for insert
-to authenticated
-with check ((select auth.uid()) = id);
+to app_be
+with check (id is not null);
 
-create policy profiles_authenticated_update
+create policy profiles_app_be_update
 on public.profiles
 for update
-to authenticated
-using ((select auth.uid()) = id)
-with check ((select auth.uid()) = id);
+to app_be
+using (id is not null)
+with check (id is not null);
 
-grant usage on schema public to authenticated;
 grant usage on schema public to app_be;
-revoke all on table public.profiles from public, anon;
-grant select, insert on table public.profiles to authenticated;
-grant update (display_name) on table public.profiles to authenticated;
+revoke all on table public.profiles from public, anon, authenticated;
+grant select, insert on table public.profiles to app_be;
+grant update (display_name) on table public.profiles to app_be;

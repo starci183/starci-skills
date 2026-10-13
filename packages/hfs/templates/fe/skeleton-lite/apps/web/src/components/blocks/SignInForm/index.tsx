@@ -2,11 +2,11 @@
 
 import { useTranslations } from "next-intl"
 import { useState, useTransition } from "react"
-import { writeSignIn } from "@/modules/db/auth/write-sign-in"
-import { navigation } from "@/modules/i18n"
+import { authClient } from "@/modules/auth"
+import { useAppSelector } from "@/redux"
 import { SignInFormBase } from "./component"
 
-type SignInFailure = "refused" | "not-found" | "invalid" | "unavailable"
+type SignInFailure = "refused" | "invalid" | "unavailable"
 
 /** The state the form shows: working while a request runs, failed after a refusal, else ready. */
 const stateOf = (pending: boolean, failure: SignInFailure | undefined): "working" | "ready" | "failed" => {
@@ -14,21 +14,29 @@ const stateOf = (pending: boolean, failure: SignInFailure | undefined): "working
     return failure === undefined ? "ready" : "failed"
 }
 
-/** The interactive sign-in form wired to the schema-checked Server Action. */
+/** The fields of the submitted form, or undefined when one is missing. */
+const credentialsOf = (input: FormData): { readonly email: string; readonly password: string } | undefined => {
+    const email = input.get("email")
+    const password = input.get("password")
+    return typeof email === "string" && typeof password === "string" ? { email, password } : undefined
+}
+
+/** The sign-in form of a signed-out reader, wired to modules/auth; the session effect updates redux on success. */
 export const SignInForm = () => {
-    const router = navigation.useRouter()
+    const status = useAppSelector((state) => state.session.status)
     const t = useTranslations("app.signIn")
     const [failure, setFailure] = useState<SignInFailure>()
     const [pending, startTransition] = useTransition()
+    if (status !== "signed-out") return null
     const submit = (input: FormData) => {
+        const credentials = credentialsOf(input)
+        if (credentials === undefined) {
+            setFailure("invalid")
+            return
+        }
         startTransition(async () => {
-            const outcome = await writeSignIn(input)
-            if (outcome.kind === "ok") {
-                setFailure(undefined)
-                router.refresh()
-                return
-            }
-            setFailure(outcome.kind)
+            const outcome = await authClient.signInWithPassword(credentials.email, credentials.password)
+            setFailure(outcome.kind === "ok" ? undefined : outcome.kind)
         })
     }
     return (

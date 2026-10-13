@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { coreFeStackPackages } from '../../packages/hfs/scaffold/app.mjs';
 
 export const RUNTIME = path.resolve(import.meta.dirname, '..', '..');
 
@@ -61,13 +62,15 @@ export const STARCI_PACKAGES = Object.freeze({
 });
 
 /** What the lint of a scaffolded app loads: the linters, the formatter, the compilers and the frameworks its skeleton imports. */
-export const LINT_DEPENDENCIES = Object.freeze([
+export const LINT_DEPENDENCIES = Object.freeze([...new Set([
   'eslint', '@typescript-eslint/eslint-plugin', '@typescript-eslint/parser', 'eslint-plugin-react-hooks', 'globals', 'typescript',
   'prettier', 'stylelint', 'postcss-value-parser',
   '@nestjs/common', '@nestjs/core', '@nestjs/cqrs', '@nestjs/testing', '@nestjs/typeorm', 'typeorm', 'nest-commander', '@types/express', '@types/jest', '@types/node',
   'next', 'next-intl', 'react', 'react-dom', '@types/react', '@starci/grammar', '@heroui/react', '@heroui/styles', '@xyflow/react',
   'tailwindcss', '@tailwindcss/postcss',
-]);
+  // the core front-end stack every scaffold installs (knowledge/hfs/fe-stack.yaml), read from the catalog, never listed here
+  ...coreFeStackPackages().app,
+])]);
 
 const has = (dir, name) => fs.existsSync(path.join(dir, ...name.split('/'), 'package.json'));
 

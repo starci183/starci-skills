@@ -2,6 +2,7 @@
 // Database types hook, offline: the app compiles against the committed supabase/types/database.types.ts, which `npm run contract:emit`
 // regenerates from the local stack and stamps with the digest of the migrations it was generated from. This refuses a missing or
 // stale file, so lint, typecheck, dev and build never run against types older than the migrations; it starts nothing and needs no stack.
+// `--graphql` runs only the GraphQL wire types below (`npm run codegen:graphql`).
 import { createHash } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
@@ -15,18 +16,22 @@ const fail = (message) => {
     process.exit(1)
 }
 
-const hash = createHash("sha256")
-for (const name of (fs.existsSync(MIGRATIONS) ? fs.readdirSync(MIGRATIONS) : [])
-    .filter((file) => file.endsWith(".sql"))
-    .sort()) {
-    hash.update(`${name}\0${fs.readFileSync(path.join(MIGRATIONS, name), "utf8").replace(/\r\n/g, "\n")}\0`)
-}
-const digest = hash.digest("hex")
+if (!process.argv.includes("--graphql")) {
+    const hash = createHash("sha256")
+    for (const name of (fs.existsSync(MIGRATIONS) ? fs.readdirSync(MIGRATIONS) : [])
+        .filter((file) => file.endsWith(".sql"))
+        .sort()) {
+        hash.update(`${name}\0${fs.readFileSync(path.join(MIGRATIONS, name), "utf8").replace(/\r\n/g, "\n")}\0`)
+    }
+    const digest = hash.digest("hex")
 
-if (!fs.existsSync(TYPES))
-    fail(`${TYPES} is missing; start the local stack and run \`npm run contract:emit\`, then commit it`)
-const stamped = STAMP.exec(fs.readFileSync(TYPES, "utf8").split(/\r?\n/, 1)[0])?.[1]
-if (stamped !== digest)
-    fail(
-        `${TYPES} is ${stamped === undefined ? "not stamped" : "older than the migrations"}; run \`npm run contract:emit\` and commit the regenerated types`,
-    )
+    if (!fs.existsSync(TYPES))
+        fail(`${TYPES} is missing; start the local stack and run \`npm run contract:emit\`, then commit it`)
+    const stamped = STAMP.exec(fs.readFileSync(TYPES, "utf8").split(/\r?\n/, 1)[0])?.[1]
+    if (stamped !== digest)
+        fail(
+            `${TYPES} is ${stamped === undefined ? "not stamped" : "older than the migrations"}; run \`npm run contract:emit\` and commit the regenerated types`,
+        )
+}
+
+// {{> app/codegen-graphql.mjs.partial}}

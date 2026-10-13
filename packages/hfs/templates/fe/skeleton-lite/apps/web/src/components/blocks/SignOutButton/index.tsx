@@ -2,32 +2,29 @@
 
 import { useTranslations } from "next-intl"
 import { useState, useTransition } from "react"
-import { writeSignOut } from "@/modules/db/auth/write-sign-out"
-import { navigation } from "@/modules/i18n"
+import { authClient } from "@/modules/auth"
+import { useAppSelector } from "@/redux"
 import { SignOutButtonBase } from "./component"
 
-type SignOutFailure = "refused" | "not-found" | "invalid" | "unavailable"
+type SignOutFailure = "refused" | "invalid" | "unavailable"
 
-/** The connected control that ends the current browser session. */
+/** The signed-in reader and the control that ends the browser session through modules/auth. */
 export const SignOutButton = () => {
-    const router = navigation.useRouter()
+    const session = useAppSelector((state) => state.session)
     const t = useTranslations("app.signOut")
     const [failure, setFailure] = useState<SignOutFailure>()
     const [pending, startTransition] = useTransition()
+    if (session.status !== "signed-in") return null
     const signOut = () => {
         startTransition(async () => {
-            const outcome = await writeSignOut()
-            if (outcome.kind !== "ok") {
-                setFailure(outcome.kind)
-                return
-            }
-            setFailure(undefined)
-            router.refresh()
+            const outcome = await authClient.signOut()
+            setFailure(outcome.kind === "ok" ? undefined : outcome.kind)
         })
     }
     return (
         <SignOutButtonBase
             props={{
+                principal: session.session?.email ?? t("signedIn"),
                 label: pending ? t("working") : t("submit"),
                 pending,
                 failure: failure === undefined ? undefined : t(failure),

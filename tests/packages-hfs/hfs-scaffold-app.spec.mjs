@@ -327,6 +327,22 @@ test('a scaffolded app imports the be lcov into Sonar and Codecov with exactly t
   for (const dependency of VALIDATION_DEPENDENCIES) {
     assert.equal(typeof manifest.dependencies[dependency], 'string', `the validation pipe installs ${dependency}`);
   }
+  // Owner ruling 2026-10-13 (lite = full): the api app serves GraphQL, and every `tier: core` package of knowledge/hfs/fe-stack.yaml is
+  // installed at its canon pin, the runtime ones in the product app, the tools at the root; the marketing landing calls no back end.
+  const stack = parseYaml(fs.readFileSync(path.join(RUNTIME, 'knowledge', 'hfs', 'fe-stack.yaml'), 'utf8'));
+  const PINS = parseYaml(fs.readFileSync(path.join(RUNTIME, 'knowledge', 'hfs', 'canon-pins.yaml'), 'utf8')).pins;
+  for (const dependency of ['@nestjs/graphql', '@nestjs/apollo', '@apollo/server', 'graphql']) assert.equal(manifest.dependencies[dependency], PINS[dependency].version, `the api app's GraphQL stack installs ${dependency}`);
+  const product = JSON.parse(fs.readFileSync(path.join(root, 'fe', 'apps', 'app', 'package.json'), 'utf8'));
+  const landing = JSON.parse(fs.readFileSync(path.join(root, 'fe', 'apps', 'landing', 'package.json'), 'utf8'));
+  for (const concern of stack.concerns.filter((entry) => entry.tier === 'core')) {
+    for (const name of concern.packages) {
+      const installed = product.dependencies[name] ?? manifest.devDependencies[name];
+      assert.equal(installed, PINS[name].version, `fe-stack ${concern.id}: ${name} is installed at its canon pin`);
+    }
+  }
+  assert.equal(landing.dependencies['@apollo/client'], undefined, 'the landing carries no transport');
+  assert.ok(files.includes('fe/apps/app/src/modules/api/graphql/clients/clients/auth.ts') && !files.some((file) => file.startsWith('fe/apps/landing/src/modules/api/')), 'one transport client folder: the product app');
+  assert.equal(manifest.scripts['codegen:graphql'], 'node scripts/codegen.mjs --graphql');
   assertCoverageContract(root);
   // The be unit run is the preset's: it writes lcov into be/coverage, the path both imports read.
   assert.equal(fs.readFileSync(path.join(root, 'be', 'jest.config.js'), 'utf8'), `module.exports = require("@starci/jest-preset").starciJestConfig({\n    coverage: ${jestCoverageSource(jestCoverage(MANIFEST))},\n})\n`);

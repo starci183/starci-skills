@@ -19,7 +19,8 @@ const GENERATED_TYPES = 'export type Database = { public: { Tables: Record<strin
 const jestPreset = createRequire(import.meta.url)('../../packages/jest-preset/index.cjs');
 const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 
-// Design 8.5's exact file-level output, with <ts> fixed by CREATED_AT. Empty brand/ is a directory, not a file.
+// Design 8.5's exact file-level output, with <ts> fixed by CREATED_AT. Empty brand/ is a directory, not a file. The web app carries the
+// shared app core of both editions (owner ruling 2026-10-13): no modules/db, no Server Action and no auth callback route.
 const EXPECTED_LITE_FILES = Object.freeze([
   '.dockerignore', '.editorconfig', '.gitattributes', '.github/workflows/ci.yml', '.github/workflows/db-deploy.yml',
   '.github/workflows/images.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.nvmrc', '.prettierignore',
@@ -98,7 +99,6 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'fe/apps/web/src/app/[locale]/error.tsx', 'fe/apps/web/src/app/[locale]/layout.tsx',
   'fe/apps/web/src/app/[locale]/loading.tsx', 'fe/apps/web/src/app/[locale]/not-found.tsx',
   'fe/apps/web/src/app/[locale]/page.tsx', 'fe/apps/web/src/app/[locale]/providers.tsx',
-  'fe/apps/web/src/app/auth/callback/route.ts',
   'fe/apps/web/src/app/global-error.tsx', 'fe/apps/web/src/app/globals.css',
   'fe/apps/web/src/app/health/live/route.ts',
   'fe/apps/web/src/components/blocks/SignInForm/component.tsx',
@@ -111,6 +111,9 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'fe/apps/web/src/components/composites/NotFoundNotice/index.tsx',
   'fe/apps/web/src/components/composites/SiteShell/classNames.ts',
   'fe/apps/web/src/components/composites/SiteShell/index.tsx',
+  'fe/apps/web/src/components/providers/AppProviders/index.tsx',
+  'fe/apps/web/src/components/providers/SwrProvider/index.tsx',
+  'fe/apps/web/src/components/providers/ThemeProvider/index.tsx',
   'fe/apps/web/src/features/layouts/AppLayout/index.tsx',
   'fe/apps/web/src/features/pages/AppErrorPage/component.tsx',
   'fe/apps/web/src/features/pages/AppErrorPage/index.tsx',
@@ -119,18 +122,39 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'fe/apps/web/src/features/pages/AppHomePage/index.tsx',
   'fe/apps/web/src/features/pages/AppLoadingPage/index.tsx',
   'fe/apps/web/src/features/pages/AppNotFoundPage/index.tsx',
+  'fe/apps/web/src/hooks/effects/index.ts', 'fe/apps/web/src/hooks/effects/useAuthSessionEffect.ts',
+  'fe/apps/web/src/hooks/swr/SwrSideEffects.tsx', 'fe/apps/web/src/hooks/swr/index.ts',
+  'fe/apps/web/src/modules/api/graphql/clients/clients/auth.ts',
+  'fe/apps/web/src/modules/api/graphql/clients/clients/index.ts',
+  'fe/apps/web/src/modules/api/graphql/clients/clients/no-auth.ts',
+  'fe/apps/web/src/modules/api/graphql/clients/index.ts',
+  'fe/apps/web/src/modules/api/graphql/clients/links/attach-access-token.ts',
+  'fe/apps/web/src/modules/api/graphql/clients/links/error.ts',
+  'fe/apps/web/src/modules/api/graphql/clients/links/http.ts',
+  'fe/apps/web/src/modules/api/graphql/clients/links/index.ts',
+  'fe/apps/web/src/modules/api/graphql/clients/links/locale.ts',
+  'fe/apps/web/src/modules/api/graphql/clients/links/options.ts',
+  'fe/apps/web/src/modules/api/graphql/clients/links/refresh-token.ts',
+  'fe/apps/web/src/modules/api/graphql/clients/links/retry.ts',
+  'fe/apps/web/src/modules/api/graphql/clients/links/timeout.ts',
+  'fe/apps/web/src/modules/api/graphql/clients/response.ts',
+  'fe/apps/web/src/modules/api/graphql/index.ts', 'fe/apps/web/src/modules/api/graphql/types.ts',
+  'fe/apps/web/src/modules/api/index.ts',
+  'fe/apps/web/src/modules/api/rest/client/axios.ts', 'fe/apps/web/src/modules/api/rest/index.ts',
+  'fe/apps/web/src/modules/auth/client.ts', 'fe/apps/web/src/modules/auth/contracts.ts',
+  'fe/apps/web/src/modules/auth/index.ts',
   'fe/apps/web/src/modules/brand/brand.css', 'fe/apps/web/src/modules/brand/index.ts',
-  'fe/apps/web/src/modules/config/index.ts', 'fe/apps/web/src/modules/db/auth/read-session.ts',
-  'fe/apps/web/src/modules/db/auth/write-sign-in.ts', 'fe/apps/web/src/modules/db/auth/write-sign-out.ts',
-  'fe/apps/web/src/modules/db/browser.ts',
-  'fe/apps/web/src/modules/db/index.ts', 'fe/apps/web/src/modules/db/outcome.ts',
-  'fe/apps/web/src/modules/db/principal.ts', 'fe/apps/web/src/modules/db/server.ts',
-  'fe/apps/web/src/modules/db/validation/validation.mapper.ts',
+  'fe/apps/web/src/modules/config/index.ts',
   'fe/apps/web/src/modules/i18n/index.ts', 'fe/apps/web/src/modules/i18n/messages/vi.json',
   'fe/apps/web/src/modules/i18n/request.ts', 'fe/apps/web/src/modules/i18n/routing.ts',
-  'fe/apps/web/src/modules/routes/index.ts', 'fe/apps/web/src/modules/routes/safe-next-path.ts',
+  'fe/apps/web/src/modules/routes/index.ts',
+  'fe/apps/web/src/modules/toast/api.ts', 'fe/apps/web/src/modules/toast/hooks.ts',
+  'fe/apps/web/src/modules/toast/index.ts', 'fe/apps/web/src/modules/toast/toast.tsx',
   'fe/apps/web/src/modules/types/ambient/styles.d.ts',
-  'fe/apps/web/src/proxy.ts', 'fe/apps/web/tsconfig.json', 'fe/eslint.config.mjs',
+  'fe/apps/web/src/proxy.ts',
+  'fe/apps/web/src/redux/ReduxProvider.tsx', 'fe/apps/web/src/redux/hooks.ts', 'fe/apps/web/src/redux/index.ts',
+  'fe/apps/web/src/redux/slices/session.ts', 'fe/apps/web/src/redux/store.ts',
+  'fe/apps/web/tsconfig.json', 'fe/eslint.config.mjs',
   'fe/stylelint.config.mjs', 'fe/tsconfig.json', 'hfs.json', 'package-lock.json', 'package.json',
   'scripts/codegen.mjs', 'sonar-project.properties', 'supabase/config.toml',
   'supabase/migrations/20261002123456_baseline.sql', 'supabase/seed.sql',
@@ -162,7 +186,7 @@ test('lite scaffold emits the design 8.5 tree and is structurally clean', async 
     enableSignup: false,
     jwtExpiry: 3600,
     siteUrl: 'http://127.0.0.1:3000',
-    redirectUrls: ['http://127.0.0.1:3000/auth/callback'],
+    redirectUrls: ['http://127.0.0.1:3000/'],
   });
   assert.deepEqual(declaration.sides, {
     be: {
@@ -175,10 +199,13 @@ test('lite scaffold emits the design 8.5 tree and is structurally clean', async 
   });
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   assert.deepEqual(Object.keys(pkg.dependencies).sort(), [
-    '@nestjs/common', '@nestjs/core', '@nestjs/cqrs', '@nestjs/platform-express', '@nestjs/typeorm',
-    '@supabase/supabase-js', 'class-transformer', 'class-validator', 'jose', 'pg', 'reflect-metadata',
-    'rxjs', 'tslib', 'typeorm',
+    '@apollo/server', '@nestjs/apollo', '@nestjs/common', '@nestjs/core', '@nestjs/cqrs', '@nestjs/graphql',
+    '@nestjs/platform-express', '@nestjs/typeorm', '@supabase/supabase-js', 'class-transformer', 'class-validator',
+    'graphql', 'jose', 'pg', 'reflect-metadata', 'rxjs', 'tslib', 'typeorm',
   ].sort());
+  // The fe stack's root tools (fe-stack.yaml tier core: codegen and lint) at their canon pins, as in full.
+  for (const tool of ['@graphql-codegen/cli', '@graphql-codegen/client-preset', 'eslint', 'prettier', 'typescript'])
+    assert.equal(pkg.devDependencies[tool], PINS[tool].version, `${tool} is a root devDependency at its pin`);
   // Owner ruling 2026-10-12: a lite back end keeps the unit run; it runs no test world of its own and has no cli app until add cli.
   for (const unit of ['@nestjs/testing', '@starci/jest-preset', '@types/jest', 'jest', 'ts-jest']) assert.equal(typeof pkg.devDependencies[unit], 'string', `${unit} is a lite devDependency`);
   for (const forbidden of ['@starci/test-world', 'nest-commander']) {
@@ -186,10 +213,14 @@ test('lite scaffold emits the design 8.5 tree and is structurally clean', async 
   }
   assert.deepEqual(scaffoldBinGaps(root), [], 'every bin the scaffolded scripts call is installed by a dependency');
   const web = JSON.parse(fs.readFileSync(path.join(root, 'fe', 'apps', 'web', 'package.json'), 'utf8'));
+  // Every core runtime package of fe-stack.yaml at its pin (owner ruling 2026-10-13: lite = full), plus lite's Auth adapter.
   assert.deepEqual(Object.keys(web.dependencies).sort(), [
-    '@heroui/react', '@heroui/styles', '@starci/grammar', '@xyflow/react', '@supabase/ssr', '@supabase/supabase-js',
-    'next', 'next-intl', 'react', 'react-dom', 'server-only',
+    '@apollo/client', '@heroui/react', '@heroui/styles', '@hookform/resolvers', '@phosphor-icons/react', '@reduxjs/toolkit',
+    '@starci/grammar', '@supabase/supabase-js', '@xyflow/react', 'axios', 'dayjs', 'graphql', 'next', 'next-intl',
+    'next-themes', 'react', 'react-dom', 'react-hook-form', 'react-redux', 'server-only', 'superjson', 'swr', 'zod', 'zustand',
   ].sort());
+  for (const [name, version] of Object.entries(web.dependencies)) assert.equal(version, PINS[name].version, `${name} takes its canon pin`);
+  assert.match(fs.readFileSync(path.join(root, ...'fe/apps/web/src/modules/auth/client.ts'.split('/')), 'utf8'), /flowType: "pkce"/);
   assert.equal(fs.readFileSync(path.join(root, ...'supabase/types/database.types.ts'.split('/')), 'utf8'), GENERATED_TYPES);
   const baselineSql = fs.readFileSync(path.join(root, ...'supabase/migrations/20261002123456_baseline.sql'.split('/')), 'utf8');
   assert.match(baselineSql, /drop role if exists app_be;\s*create role app_be login noinherit;/);

@@ -36,11 +36,15 @@ the app it began instead of leaving a partial tree.
 
 The lite additions are deliberately narrow:
 
-- `starci app add table <name> [--fe] [--no-types]` adds the migration and matching back-end capability. `--fe` also adds typed readers
-  and writers through the front-end database owner; types regenerate by default, while `--no-types` is the explicit opt-out.
+- `starci app add table <name> [--fe] [--no-types]` adds the migration and matching back-end capability. `--fe` also adds the table's
+  api feature over GraphQL (get-<singular> query, create-<singular> mutation, the GraphQL server capability on first use) and, in
+  every product Next app, one operation file per operation under `modules/api/graphql` and its `useQuery*Swr` / `useMutate*Swr`
+  hook under `hooks/swr/api/graphql`; never a Server Action or a Supabase reader. Types regenerate by default, while `--no-types` is
+  the explicit opt-out.
 - `starci app add cli <group>` creates the optional cli app on first use, including its built-in migration and seed groups, then adds
   the requested group without full-edition specs.
-- `starci app add app <name>` refuses in lite because lite has exactly one front-end app. Upgrade before adding another.
+- `starci app add app <name>` adds another Next app in either edition: the edition's app skeleton plus the shared app core
+  (modules/api, auth, toast, redux, the providers and the hooks), one fe structure for lite and full (owner ruling 2026-10-13).
 - An `add` or `new` whose target slot is unavailable in lite stops before writing with `<verb> <noun>: full edition only`.
 
 `starci app emit` continues to emit the enabled back-end snapshots and also writes `supabase/types/database.types.ts` when

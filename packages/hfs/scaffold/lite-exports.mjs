@@ -91,6 +91,26 @@ const REGISTRATIONS = Object.freeze({
       names: ["WebhookSignatureService"],
     },
   ],
+  // The GraphQL server capability (be/src/modules/platform/graphql, written by the first GraphQL feature): the errors service and
+  // the request locale it formats and localizes errors with.
+  graphql: [
+    {
+      file: "be/src/modules/platform/errors/index.ts",
+      source: "./errors.decorators",
+      names: ["ERRORS_SERVICE"],
+    },
+    {
+      file: "be/src/modules/platform/errors/index.ts",
+      source: "./errors.service",
+      names: ["ErrorsService"],
+      type: true,
+    },
+    {
+      file: "be/src/modules/platform/i18n/index.ts",
+      source: "./i18n.decorators",
+      names: ["REQUEST_LOCALE"],
+    },
+  ],
   cli: [
     {
       file: "be/src/modules/platform/database/index.ts",
@@ -138,6 +158,9 @@ function addExport(text, registration) {
   }
   return `${text.replace(/\n+$/, "")}\n${added}\n`
 }
+
+/** The app-relative barrels one generator's registrations edit (a caller snapshots them before registerLiteExports). */
+export const registrationFiles = (generator) => [...new Set((REGISTRATIONS[generator] ?? []).map((registration) => registration.file))]
 
 /** Adds only the barrel exports first consumed by one generator; full webhooks share the same optional platform API. */
 export function registerLiteExports({ root, generator }) {

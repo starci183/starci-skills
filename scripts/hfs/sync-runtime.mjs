@@ -77,12 +77,12 @@ const RULE_CATALOG_FILE = 'knowledge/hfs/rules.yaml';
  * canons run the machine behind the project-graph law: the managed package-scripts templates (README script names) and
  * the pin and Sonar gate declarations. Without them the canon's rules fail to load outside the runtime checkout.
  */
-const MACHINE_DATA = Object.freeze(['packages/hfs/templates/app/package-scripts/package.json', 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml']);
+const MACHINE_DATA = Object.freeze(['packages/hfs/templates/app/package-scripts/package.json', 'knowledge/hfs/canon-pins.yaml', 'knowledge/hfs/fe-stack.yaml', 'knowledge/sonar-gate.yaml']);
 /** The shipped config example the bundled engine/config.mjs falls back to (loadConfig, read by the temp-root owner on every child spawn). */
 const CONFIG_EXAMPLE = 'config.example.yaml';
 /** bundle directory (runtime-relative) -> the files it copies and whether it carries the failure-code slice. */
 export const BUNDLES = Object.freeze({
-  'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml', CONFIG_EXAMPLE, RULE_CATALOG_FILE, ...patternTopicFiles()])].sort(byCodeUnit)), catalog: true }),
+  'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml', 'knowledge/hfs/fe-stack.yaml', 'knowledge/sonar-gate.yaml', CONFIG_EXAMPLE, RULE_CATALOG_FILE, ...patternTopicFiles()])].sort(byCodeUnit)), catalog: true }),
   'packages/eslint/be/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/language.mjs', 'scripts/lib/jsdoc.mjs', 'scripts/lib/sonar-syntax-rules.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA, CONFIG_EXAMPLE, RULE_CATALOG_FILE])].sort(byCodeUnit)), catalog: false }),
   'packages/eslint/fe/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/next-contract.mjs', 'scripts/lib/language.mjs', 'scripts/lib/jsdoc.mjs', 'scripts/lib/sonar-syntax-rules.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA, CONFIG_EXAMPLE])].sort(byCodeUnit)), catalog: false }),
 });

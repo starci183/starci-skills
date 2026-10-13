@@ -40,6 +40,8 @@ const CASES = Object.freeze([
   { input: "v2-events", feature: "v2-events", table: "v2_events" },
 ]);
 const RESERVED = new Set(["order", "user"]);
+/** The singular `add table` names a row by (get-<singular>, create-<singular>): the feature without one trailing `s`. */
+const singularOf = (feature) => (feature.endsWith("s") ? feature.slice(0, -1) : feature);
 
 test.after(() => {
   for (const dir of made) fs.rmSync(dir, { recursive: true, force: true });
@@ -136,11 +138,16 @@ test("add table --fe stays database- and architecture-clean for every accepted t
     });
     const migration = `supabase/migrations/${stamp}_${item.feature}.sql`;
     assert.equal(result.created[0], migration);
-    assert.ok(
-      result.created.includes(
-        `fe/apps/web/src/modules/db/${item.feature}/write-${item.feature}.ts`,
-      ),
-    );
+    const singular = singularOf(item.feature);
+    // Owner ruling 2026-10-13: the fe reaches the table through the back end's GraphQL feature, never a Supabase reader or Server Action.
+    for (const relative of [
+      `be/src/features/api/${item.feature}/transport/graphql/get-${singular}.resolver.ts`,
+      `be/src/features/api/${item.feature}/transport/graphql/create-${singular}.resolver.ts`,
+      `fe/apps/web/src/modules/api/graphql/queries/query-${singular}.ts`,
+      `fe/apps/web/src/modules/api/graphql/mutations/mutation-create-${singular}.ts`,
+    ])
+      assert.ok(result.created.includes(relative), relative);
+    assert.equal(result.created.some((file) => file.includes("/modules/db/")), false);
     const sql = fs.readFileSync(path.join(root, ...migration.split("/")), "utf8");
     const sqlTable = RESERVED.has(item.table) ? `"${item.table}"` : item.table;
     assert.match(sql, new RegExp(`public\\.${sqlTable}`));
@@ -197,11 +204,13 @@ test("add table --fe stays database- and architecture-clean for every accepted t
   exposeRepoTsconfig(root);
   for (const side of ["be", "fe"]) {
     await t.test(`${side} architecture machine accepts the generated tree`, (subtest) => {
-      const paths = CASES.map((item) =>
+      const paths =
         side === "be"
-          ? `src/modules/domain/${item.feature}`
-          : `apps/web/src/modules/db/${item.feature}`,
-      );
+          ? [
+              ...CASES.flatMap((item) => [`src/modules/domain/${item.feature}`, `src/features/api/${item.feature}`]),
+              "src/modules/platform/graphql",
+            ]
+          : ["apps/web/src/modules/api", "apps/web/src/hooks/swr"];
       const report = checkArchitecture({
         repositoryRoot: path.join(root, side),
         injectedTypeScript: ts,

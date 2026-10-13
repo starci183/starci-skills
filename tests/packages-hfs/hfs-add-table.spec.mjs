@@ -49,12 +49,20 @@ function appRoot({ edition = "lite", provider = "supabase" } = {}) {
     `${JSON.stringify(declaration, null, 2)}\n`,
   );
   if (edition === "lite") {
-    const databaseIndex = path.join(root, "be", "src", "modules", "platform", "database", "index.ts");
-    fs.mkdirSync(path.dirname(databaseIndex), { recursive: true });
-    fs.copyFileSync(
-      path.join(ROOT, "packages", "hfs", "templates", "be", "skeleton-lite", "src", "modules", "platform", "database", "index.ts"),
-      databaseIndex,
-    );
+    // The barrels `add table` (and, with --fe, its GraphQL feature) registers exports in: lite's overlay, else the shared skeleton's.
+    const templates = path.join(ROOT, "packages", "hfs", "templates", "be");
+    for (const relative of [
+      "src/modules/domain/identity/index.ts",
+      "src/modules/platform/cqrs/index.ts",
+      "src/modules/platform/database/index.ts",
+      "src/modules/platform/errors/index.ts",
+      "src/modules/platform/i18n/index.ts",
+    ]) {
+      const target = path.join(root, "be", ...relative.split("/"));
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      const lite = path.join(templates, "skeleton-lite", ...relative.split("/"));
+      fs.copyFileSync(fs.existsSync(lite) ? lite : path.join(templates, "skeleton", ...relative.split("/")), target);
+    }
   }
   const appModule = path.join(root, "be", "apps", "api", "src", "app.module.ts");
   fs.mkdirSync(path.dirname(appModule), { recursive: true });
@@ -174,7 +182,7 @@ test("addTable refuses uppercase and a second non-increasing timestamp", () => {
   );
 });
 
-test("addTable --fe writes TypeScript readers and writers, while --no-types skips emission", () => {
+test("addTable --fe writes the GraphQL feature, the fe operation files and SWR hooks (never Server Actions), while --no-types skips emission", () => {
   const root = appRoot();
   const result = addTable({
     root,
@@ -186,12 +194,33 @@ test("addTable --fe writes TypeScript readers and writers, while --no-types skip
   assert.equal(result.types, "skipped");
   assert.equal(has(root, "supabase/types/database.types.ts"), false);
   for (const relative of [
-    "fe/apps/web/src/modules/db/audit-events/read-audit-events.ts",
-    "fe/apps/web/src/modules/db/audit-events/write-audit-events.ts",
+    "be/src/features/api/audit-events/transport/graphql/get-audit-event.resolver.ts",
+    "be/src/features/api/audit-events/transport/graphql/create-audit-event.resolver.ts",
+    "be/src/features/api/audit-events/transport/graphql/audit-events-graphql.module.ts",
+    "be/src/modules/platform/graphql/graphql.module.ts",
+    "fe/apps/web/src/modules/api/graphql/queries/query-audit-event.ts",
+    "fe/apps/web/src/modules/api/graphql/queries/types/audit-event.ts",
+    "fe/apps/web/src/modules/api/graphql/mutations/mutation-create-audit-event.ts",
+    "fe/apps/web/src/modules/api/graphql/mutations/types/create-audit-event.ts",
+    "fe/apps/web/src/hooks/swr/api/graphql/queries/useQueryAuditEventSwr.ts",
+    "fe/apps/web/src/hooks/swr/api/graphql/mutations/useMutateCreateAuditEventSwr.ts",
   ]) {
-    assert.ok(result.created.includes(relative));
+    assert.ok(result.created.includes(relative), relative);
     assert.equal(parses(read(root, relative)), true, `${relative} parses`);
   }
+  for (const relative of result.created.filter((file) => file.startsWith("fe/")))
+    assert.doesNotMatch(read(root, relative), /use server|@supabase|server-only/, `${relative} reaches data only through GraphQL`);
+  assert.equal(result.created.some((file) => file.includes("/modules/db/")), false);
+});
+
+test("addTable --fe writes the fe operations into every product app, never into the marketing landing", () => {
+  const root = appRoot();
+  const declaration = JSON.parse(read(root, "hfs.json"));
+  declaration.sides.fe.apps = [{ name: "landing", kind: "next" }, { name: "web", kind: "next" }];
+  fs.writeFileSync(path.join(root, "hfs.json"), `${JSON.stringify(declaration, null, 2)}\n`);
+  const result = addTable({ root, name: "orders", fe: true, emitTypes: false, now: () => at });
+  assert.ok(result.created.includes("fe/apps/web/src/modules/api/graphql/queries/query-order.ts"));
+  assert.equal(result.created.some((file) => file.startsWith("fe/apps/landing/")), false);
 });
 
 test("addTable removes every partial file and restores app-owned state when types emission fails", () => {
@@ -219,7 +248,10 @@ test("addTable removes every partial file and restores app-owned state when type
   );
   assert.equal(has(root, "supabase/migrations/20261002123456_invoices.sql"), false);
   assert.equal(has(root, "be/src/modules/domain/invoices"), false);
-  assert.equal(has(root, "fe/apps/web/src/modules/db/invoices"), false);
+  assert.equal(has(root, "be/src/features/api/invoices"), false);
+  assert.equal(has(root, "be/src/modules/platform/graphql"), false);
+  assert.equal(has(root, "fe/apps/web/src/modules/api/graphql/queries/query-invoice.ts"), false);
+  assert.equal(has(root, "fe/apps/web/src/hooks/swr"), false);
   assert.equal(read(root, owner), ownerBefore);
   assert.equal(read(root, "supabase/types/database.types.ts"), "// existing types\n");
 });

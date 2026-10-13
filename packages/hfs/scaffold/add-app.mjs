@@ -5,9 +5,15 @@ import {
   readRepoDeclaration,
   resolveRepoDeclaration,
 } from "../runtime/scripts/hfs/slots.mjs";
-import { imageFiles, TEMPLATES_DIR } from "../sync/index.mjs";
+import { imageFiles, render, TEMPLATES_DIR } from "../sync/index.mjs";
 import { ScaffoldError, pascalOf } from "./service.mjs";
-import { jsonText, packageJsonText } from "./app.mjs";
+import { PARTIAL_VARIABLES, coreFeApps, jsonText, packageJsonText } from "./app.mjs";
+
+/** The shared fe app core (modules/api, auth, toast, redux, the providers, the hooks): the base tree, then the edition overlay. */
+const CORE_DIRS = Object.freeze({
+  full: ["skeleton/apps/__app__"],
+  lite: ["skeleton/apps/__app__", "skeleton-lite/apps/__app__"],
+});
 
 const NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
@@ -30,8 +36,9 @@ const fill = (text, values, file) =>
   });
 
 /**
- * Adds one Next workspace from the edition's canonical app skeleton, then registers it in hfs.json.
- * The root workspace glob is added only when an older app manifest does not already carry it.
+ * Adds one Next workspace from the edition's canonical app skeleton and the shared app core (both editions, owner ruling
+ * 2026-10-13: lite and full have one fe structure), then registers it in hfs.json. The root workspace glob is added only when an
+ * older app manifest does not already carry it.
  */
 export function addApp({ root, name }) {
   if (!NAME.test(String(name)))
@@ -52,11 +59,6 @@ export function addApp({ root, name }) {
     throw new ScaffoldError(
       "HFS_ADD_NO_FRONT_END",
       "this app has no front-end side",
-    );
-  if (repo.edition === "lite")
-    throw new ScaffoldError(
-      "HFS_ADD_LITE_SINGLE_APP",
-      "a lite app has one front-end app; a second app needs the shared <project>-ui and <project>-i18n packages: run starci app upgrade --edition full",
     );
   if (repo.sides.fe.apps.some((app) => app.name === name))
     throw new ScaffoldError(
@@ -80,18 +82,22 @@ export function addApp({ root, name }) {
     appPascal: pascalOf(name),
   };
   const targetBase = `fe/apps/${name}`;
-  const planned = listFiles(source).map((relative) => ({
-    relative: `${targetBase}/${relative}`,
-    body: fill(
-      fs
-        .readFileSync(path.join(source, ...relative.split("/")), "utf8")
-        .replace(/\r\n/g, "\n"),
+  const readTemplate = (dir, relative) =>
+    fill(
+      render(fs.readFileSync(path.join(dir, ...relative.split("/")), "utf8").replace(/\r\n/g, "\n"), PARTIAL_VARIABLES),
       values,
       relative,
-    ),
-  }));
+    );
+  // The app skeleton, then the shared core, then the edition overlay: a later tree replaces an earlier file of the same path.
+  const byPath = new Map();
+  for (const dir of [source, ...CORE_DIRS[repo.edition === "lite" ? "lite" : "full"].map((core) => path.join(TEMPLATES_DIR, "fe", ...core.split("/")))]) {
+    if (!fs.existsSync(dir)) continue;
+    for (const relative of listFiles(dir)) byPath.set(relative, { relative: `${targetBase}/${relative}`, body: readTemplate(dir, relative) });
+  }
+  const planned = [...byPath.values()];
 
-  const firstApp = repo.sides.fe.apps.find((app) => app.kind === "next");
+  // The dependency source is a product app (it carries the core's fe-stack packages), else the first Next app.
+  const firstApp = coreFeApps(repo.sides.fe.apps)[0] ?? repo.sides.fe.apps.find((app) => app.kind === "next");
   const firstPackage = firstApp
     ? path.join(root, "fe", "apps", firstApp.name, "package.json")
     : null;

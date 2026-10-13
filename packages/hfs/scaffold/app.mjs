@@ -2,9 +2,10 @@
 // The selected edition owns the app root and its be/fe sides under knowledge/hfs/slots.yaml.
 //
 // The skeleton files are written once from templates/<app|be|fe>/skeleton ({{project}}, {{app}} and {{appPascal}} filled). Path
-// variables: a `__app__` folder is written once per app of the side, named after it; an fe `apps/<name>/` folder is the skeleton of
-// the declared fe app <name> alone (landing and app differ); `__project__` in a path is the project name (packages/__project__-ui is
-// packages/<name>-ui). The workspace manifests and every tsconfig.json are written from code, never kept as template files (a
+// variables: a `__app__` folder is written once per app of the side, named after it (on the fe side: once per product app, every
+// declared Next app but the marketing landing, which calls no back end: the shared app core of both editions, modules/api, auth,
+// toast, redux, the providers and the hooks); an fe `apps/<name>/` folder is the skeleton of the declared fe app <name> alone
+// (landing and app differ); `__project__` in a path is the project name (packages/__project__-ui is packages/<name>-ui). The workspace manifests and every tsconfig.json are written from code, never kept as template files (a
 // tsconfig.json under templates/ would be a TypeScript project of this repository); the managed files are the render of `starci app sync` (sync/index.mjs), so a fresh app
 // is in sync by construction. The lockfile is never written by hand: once the files are written, npm resolves the real one
 // (`npm install --package-lock-only`, no node_modules, no scripts), so `npm ci` installs the new app as it is. When npm cannot
@@ -33,9 +34,55 @@ const APP_DIR = '__app__';
 const PROJECT_DIR = '__project__';
 const TIMESTAMP = '__timestamp__';
 const PINS_FILE = path.join(import.meta.dirname, '..', 'runtime', 'knowledge', 'hfs', 'canon-pins.yaml');
+/**
+ * The front-end stack catalog (knowledge/hfs/fe-stack.yaml): the bundled runtime copy, else the runtime checkout's own file (the
+ * package inside the StarCi repository before the runtime copy carries it).
+ */
+const FE_STACK_FILES = [
+  path.join(import.meta.dirname, '..', 'runtime', 'knowledge', 'hfs', 'fe-stack.yaml'),
+  path.join(import.meta.dirname, '..', '..', '..', 'knowledge', 'hfs', 'fe-stack.yaml'),
+];
 const SONAR_GATE_FILE = path.join(import.meta.dirname, '..', 'runtime', 'knowledge', 'sonar-gate.yaml');
 const pascal = name => name.split('-').map(part => part[0].toUpperCase() + part.slice(1)).join('');
 const bundledPins = () => parseYaml(fs.readFileSync(PINS_FILE, 'utf8')).pins;
+
+/** The parsed front-end stack catalog; a package without it cannot know what every front end installs. */
+export function bundledFeStack() {
+  const file = FE_STACK_FILES.find(candidate => fs.existsSync(candidate));
+  if (!file) throw new ScaffoldError('HFS_SCAFFOLD_STACK_MISSING', 'knowledge/hfs/fe-stack.yaml is not carried by this package; regenerate the runtime copy');
+  return parseYaml(fs.readFileSync(file, 'utf8'));
+}
+
+/**
+ * The marketing fe app of the full starter: it calls no back end, so the shared app core (`apps/__app__/`) is not written into
+ * it and the repository keeps one transport client folder (FE_TRANSPORT_OWNER).
+ */
+export const MARKETING_FE_APPS = Object.freeze(new Set(['landing']));
+/** The fe apps that carry the shared app core: every declared Next app but the marketing one. */
+export const coreFeApps = apps => apps.filter(entry => entry.kind === 'next' && !MARKETING_FE_APPS.has(entry.name));
+
+/**
+ * The tool packages of the fe stack, installed once at the app root (devDependencies) and never in an fe workspace: the
+ * concerns whose packages only the root scripts run (the GraphQL codegen, lint and format), plus the compiler and the CSS engine.
+ */
+const FE_ROOT_TOOL_CONCERNS = Object.freeze(new Set(['codegen', 'lint']));
+const FE_ROOT_TOOL_PACKAGES = Object.freeze(new Set(['typescript', 'tailwindcss']));
+
+/**
+ * The `tier: core` packages of the fe stack every scaffold installs, read from fe-stack.yaml (never listed here), split into
+ * `app` (the runtime imports of each product fe app workspace) and `root` (the tools at the app root). Both editions alike.
+ */
+export function coreFeStackPackages(stack = bundledFeStack()) {
+  const app = new Set();
+  const root = new Set();
+  for (const concern of stack.concerns ?? []) {
+    if (concern.tier !== 'core') continue;
+    for (const name of concern.packages ?? []) {
+      (FE_ROOT_TOOL_CONCERNS.has(concern.id) || FE_ROOT_TOOL_PACKAGES.has(name) ? root : app).add(name);
+    }
+  }
+  return { app: [...app].sort(byCodeUnit), root: [...root].sort(byCodeUnit) };
+}
 
 /**
  * A JSON file as prettier prints it (the app's format check judges every file the scaffold writes): an object one key per line, an
@@ -87,7 +134,7 @@ const LITE_STARTER_SUPABASE = Object.freeze({
   enableSignup: false,
   jwtExpiry: 3600,
   siteUrl: 'http://127.0.0.1:3000',
-  redirectUrls: ['http://127.0.0.1:3000/auth/callback'],
+  redirectUrls: ['http://127.0.0.1:3000/'],
 });
 
 /**
@@ -97,8 +144,8 @@ const LITE_STARTER_SUPABASE = Object.freeze({
  */
 const STARTER_DEPENDENCIES = Object.freeze({
   dependencies: {
-    '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': null,
-    '@nestjs/platform-express': null, '@nestjs/typeorm': null, 'nest-commander': null, pg: null,
+    '@apollo/server': null, '@nestjs/apollo': null, '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': null, '@nestjs/graphql': null,
+    '@nestjs/platform-express': null, '@nestjs/typeorm': null, 'nest-commander': null, pg: null, graphql: null,
     'class-transformer': null, 'class-validator': null, 'reflect-metadata': null, rxjs: null, tslib: null, typeorm: null,
   },
   devDependencies: {
@@ -110,12 +157,16 @@ const STARTER_DEPENDENCIES = Object.freeze({
   },
 });
 
-/** Lite keeps the production stack, the canon tools and the back end's unit run (owner ruling 2026-10-12); it runs no test world of its own (no @starci/test-world). */
+/**
+ * Lite keeps the production stack, the canon tools and the back end's unit run (owner ruling 2026-10-12); it runs no test world of
+ * its own (no @starci/test-world). Both editions serve GraphQL from the api app (@nestjs/graphql over Apollo, owner ruling
+ * 2026-10-13); the fe stack's root tools are added from fe-stack.yaml by packageManifest.
+ */
 const LITE_STARTER_DEPENDENCIES = Object.freeze({
   dependencies: {
-    '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': null,
+    '@apollo/server': null, '@nestjs/apollo': null, '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': null, '@nestjs/graphql': null,
     '@nestjs/platform-express': null, '@nestjs/typeorm': null, '@supabase/supabase-js': null,
-    'class-transformer': null, 'class-validator': null, jose: null, pg: null,
+    'class-transformer': null, 'class-validator': null, graphql: null, jose: null, pg: null,
     'reflect-metadata': null, rxjs: null, tslib: null, typeorm: null,
   },
   devDependencies: {
@@ -129,18 +180,22 @@ const LITE_STARTER_DEPENDENCIES = Object.freeze({
 });
 
 /**
- * The runtime dependencies of every fe app workspace of the starter: what its skeleton imports (the two workspace packages at "*",
- * next with next-intl, react, the grammar and the HeroUI styles of its globals.css), @heroui/react and @xyflow/react
- * (the grammar's required peers, which every consumer declares: the grammar contract) and react-dom (next's peer). `@<project>/<pkg>` names are filled with the project.
+ * The runtime dependencies of every fe app workspace of the starter beyond the fe stack's core packages (fe-stack.yaml, added by
+ * feAppManifest for a product app): the two workspace packages at "*", the grammar and its required peers (@heroui/react,
+ * @xyflow/react: the grammar contract), next with next-intl, react and react-dom (next's peer). `@<project>/<pkg>` names are
+ * filled with the project. The marketing landing takes exactly these.
  */
 const FE_APP_DEPENDENCIES = Object.freeze({
   '@<project>/i18n': '*', '@<project>/ui': '*',
   '@heroui/react': null, '@heroui/styles': null, '@starci/grammar': null, '@xyflow/react': null, next: null, 'next-intl': null, react: null, 'react-dom': null,
 });
 
-/** The sole lite FE workspace owns its Supabase clients directly; no shared FE package is emitted. */
+/**
+ * The lite fe workspace: the same base without the shared packages, plus its infra adapter (owner ruling 2026-10-13: Supabase on
+ * the front end is the Auth client of modules/auth only) and server-only for its own next-intl request config.
+ */
 const LITE_FE_APP_DEPENDENCIES = Object.freeze({
-  '@heroui/react': null, '@heroui/styles': null, '@starci/grammar': null, '@xyflow/react': null, '@supabase/ssr': null,
+  '@heroui/react': null, '@heroui/styles': null, '@starci/grammar': null, '@xyflow/react': null,
   '@supabase/supabase-js': null, next: null, 'next-intl': null, react: null, 'react-dom': null, 'server-only': null,
 });
 
@@ -178,18 +233,23 @@ function pinnedSection(entries, pins) {
   return Object.fromEntries(Object.entries(entries).sort(([a], [b]) => a.localeCompare(b)).map(([dependency, range]) => [dependency, pinned(dependency, range)]));
 }
 
-/** The root package.json of a new app, the monorepo root: name, workspaces, npm and its edition's dependencies at canon pins. */
-function packageManifest(name, pins, edition) {
+/** The root package.json of a new app, the monorepo root: name, workspaces, npm, its edition's dependencies and the fe stack's root tools, at canon pins. */
+function packageManifest(name, pins, edition, stack = coreFeStackPackages()) {
   const dependencies = edition === 'lite' ? LITE_STARTER_DEPENDENCIES : STARTER_DEPENDENCIES;
-  return { name, version: '0.0.0', private: true, packageManager: PACKAGE_MANAGER, workspaces: [...WORKSPACES], dependencies: pinnedSection(dependencies.dependencies, pins), devDependencies: pinnedSection(dependencies.devDependencies, pins) };
+  const devDependencies = { ...dependencies.devDependencies, ...Object.fromEntries(stack.root.map(dependency => [dependency, null])) };
+  return { name, version: '0.0.0', private: true, packageManager: PACKAGE_MANAGER, workspaces: [...WORKSPACES], dependencies: pinnedSection(dependencies.dependencies, pins), devDependencies: pinnedSection(devDependencies, pins) };
 }
 
 /** A dependency section of an fe workspace with `@<project>/` names filled and the canon pins taken. */
 const workspaceSection = (entries, project, pins) => pinnedSection(Object.fromEntries(Object.entries(entries).map(([name, range]) => [name.replace('@<project>/', `@${project}/`), range])), pins);
 
-/** The package.json of the fe app workspace `app` of the app `project`: @<project>/<app>, private, the workspace scripts, its own dependencies. */
-function feAppManifest(project, app, pins, edition) {
-  const dependencies = edition === 'lite' ? LITE_FE_APP_DEPENDENCIES : FE_APP_DEPENDENCIES;
+/**
+ * The package.json of the fe app workspace `app` of the app `project`: @<project>/<app>, private, the workspace scripts, its own
+ * dependencies. A product app (`core`, it carries the shared app core) also takes every core runtime package of the fe stack.
+ */
+export function feAppManifest(project, app, pins, edition, { core = true, stack = coreFeStackPackages() } = {}) {
+  const base = edition === 'lite' ? LITE_FE_APP_DEPENDENCIES : FE_APP_DEPENDENCIES;
+  const dependencies = { ...base, ...(core ? Object.fromEntries(stack.app.filter(name => !Object.hasOwn(base, name)).map(name => [name, null])) : {}) };
   return { name: feAppPackageName(project, app), version: '0.0.0', private: true, scripts: { ...FE_APP_SCRIPTS }, dependencies: workspaceSection(dependencies, project, pins) };
 }
 
@@ -253,7 +313,7 @@ function fill(source, vars, file) {
 }
 
 /** Let sync's renderer expand partials first while leaving every source placeholder for `fill` to validate or preserve. */
-const PARTIAL_VARIABLES = new Proxy(Object.create(null), {
+export const PARTIAL_VARIABLES = new Proxy(Object.create(null), {
   get: (_target, key) => `{{${String(key)}}}`,
   getOwnPropertyDescriptor: (_target, key) => ({ configurable: true, value: `{{${String(key)}}}` }),
 });
@@ -289,7 +349,8 @@ const liteOverlaid = (() => {
  */
 const liteBaseFile = (scope, rel) => {
   if (scope === 'app') return LITE_APP_REUSED.has(rel);
-  if (scope === 'fe') return false;
+  // The shared fe app core (apps/__app__/) is one tree for both editions; the lite overlay replaces only modules/auth/client.ts.
+  if (scope === 'fe') return rel.startsWith(`apps/${APP_DIR}/`);
   if (!rel.endsWith('.spec.ts')) return liteBaseSource(rel);
   const subject = rel.replace(/\.spec\.ts$/, '.ts');
   return liteBaseSource(subject) && !liteOverlaid().has(subject);
@@ -301,6 +362,7 @@ function skeletonDirectory(scope, directory, app, vars, include = () => true) {
   const dir = path.join(TEMPLATES_DIR, scope, directory);
   if (!fs.existsSync(dir)) throw new ScaffoldError('HFS_SCAFFOLD_SKELETON_MISSING', `no skeleton templates in templates/${scope}/${directory}`);
   const apps = scope === 'app' ? [] : app.sides[scope].apps.filter(entry => scope === 'fe' || entry.kind === 'api');
+  const appsOf = rel => (scope === 'fe' && rel.includes(APP_DIR) ? coreFeApps(apps) : apps);
   const prefix = scope === 'app' ? '' : `${scope}/`;
   const files = [];
   for (const rel of listFiles(dir).filter(include)) {
@@ -315,7 +377,7 @@ function skeletonDirectory(scope, directory, app, vars, include = () => true) {
       files.push({ path: `${prefix}${output(rel)}`, content: fill(source, { ...once, ...appVars }, `${directory}/${rel}`) });
       continue;
     }
-    for (const entry of apps) files.push({ path: `${prefix}${output(rel.split(APP_DIR).join(entry.name))}`, content: fill(source, { ...once, app: entry.name, appPascal: pascal(entry.name) }, `${directory}/${rel}`) });
+    for (const entry of appsOf(rel)) files.push({ path: `${prefix}${output(rel.split(APP_DIR).join(entry.name))}`, content: fill(source, { ...once, app: entry.name, appPascal: pascal(entry.name) }, `${directory}/${rel}`) });
   }
   return files;
 }
@@ -328,7 +390,7 @@ export function scaffoldWorkSeeds(project) {
 
 /**
  * The skeleton files of one scope (app root, be, fe): [{ path, content }], app-relative; a `__app__` file once per api app of the
- * be side (once per app of the fe side), the be `apps/cli/` folder once when the cli app is declared, an fe `apps/<name>/` folder
+ * be side (once per product app of the fe side, coreFeApps), the be `apps/cli/` folder once when the cli app is declared, an fe `apps/<name>/` folder
  * once for the declared fe app <name> (none other), `__project__` in a path replaced by the project name.
  */
 function skeletonOf(scope, app, vars) {
@@ -476,7 +538,7 @@ export function scaffoldApp({ name, into, presets, edition = 'full', manifest = 
       path: `fe/apps/${entry.name}/src/modules/types/ambient/styles.d.ts`,
       content: '/** Declares stylesheets loaded by the Next bundler; non-CSS side-effect imports remain checked. */\ndeclare module "*.css" {}\n',
     })),
-    ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/package.json`, content: packageJsonText(feAppManifest(name, entry.name, pins, app.edition)) })),
+    ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/package.json`, content: packageJsonText(feAppManifest(name, entry.name, pins, app.edition, { core: coreFeApps([entry]).length === 1 })) })),
     ...imageFiles(app),
     ...(app.edition === 'lite' ? [] : Object.keys(FE_PACKAGES).flatMap(pkg => [
       { path: `fe/packages/${name}-${pkg}/package.json`, content: packageJsonText(fePackageManifest(name, pkg, pins)) },

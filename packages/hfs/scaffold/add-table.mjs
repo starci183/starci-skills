@@ -7,7 +7,8 @@ import {
 } from "../runtime/scripts/hfs/slots.mjs";
 import { render, TEMPLATES_DIR } from "../sync/index.mjs";
 import { ScaffoldError, pascalOf } from "./service.mjs";
-import { registerLiteExports } from "./lite-exports.mjs";
+import { registerLiteDomainService, registerLiteExports, registrationFiles } from "./lite-exports.mjs";
+import { coreFeApps } from "./app.mjs";
 
 const NAME = /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$/;
 const MIGRATION = /^(\d{14})_[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.sql$/;
@@ -158,34 +159,133 @@ function removeEmptyParents(file, stop) {
   }
 }
 
-function wireApiModule(root, app, name) {
-  const relative = `be/apps/${app}/src/app.module.ts`;
-  const file = path.join(root, ...relative.split("/"));
-  if (!fs.existsSync(file))
-    throw new ScaffoldError("HFS_ADD_WIRE_MISSING", `add table registers ${name} in ${relative}, which does not exist`);
-  const symbol = `${pascalOf(name)}Module`;
-  const errorKinds = `${snakeOf(name).toUpperCase()}_ERROR_KINDS`;
-  const importLine = `import { ${errorKinds}, ${symbol} } from "@modules/domain/${name}"`;
-  const lines = fs.readFileSync(file, "utf8").replace(/\r\n/g, "\n").split("\n");
-  const lastImport = lines.reduce((last, line, index) => (line.startsWith("import ") ? index : last), -1);
-  const imports = lines.findIndex((line) => /^\s*imports: \[$/.test(line));
-  const kinds = lines.findIndex((line) => /^\s*kinds: \[$/.test(line));
-  if (lastImport < 0 || imports < 0 || kinds < 0)
-    throw new ScaffoldError("HFS_ADD_WIRE_INVALID", `add table could not find the imports and error kinds arrays in ${relative}`);
-  if (!lines.includes(importLine)) {
-    lines.splice(lastImport + 1, 0, importLine);
-    const shiftedImports = lines.findIndex((line) => /^\s*imports: \[$/.test(line));
-    const indent = /^(\s*)/.exec(lines[shiftedImports])?.[1] ?? "";
-    lines.splice(shiftedImports + 1, 0, `${indent}    ${symbol}.register({ isGlobal: true }),`);
-    const shiftedKinds = lines.findIndex((line) => /^\s*kinds: \[$/.test(line));
-    const kindsIndent = /^(\s*)/.exec(lines[shiftedKinds])?.[1] ?? "";
-    lines.splice(shiftedKinds + 1, 0, `${kindsIndent}    ${errorKinds},`);
-  }
-  fs.writeFileSync(file, `${lines.join("\n").replace(/\n+$/, "")}\n`);
-}
+/** The app-root relative path of a file under the app (posix). */
+const at = (root, relative) => path.join(root, ...relative.split("/"));
 
 /**
- * Adds one Supabase table migration and, with `fe`, one typed reader/writer pair to every declared Next app.
+ * Registers `entry` in the `imports` array of a Nest module file (one import line after the last import, one array entry right
+ * after `imports: [`), unless `symbol` is already imported. Returns the new text.
+ */
+function wireImport(text, relative, { importLine, symbol, entry, kinds }) {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  if (lines.some((line) => line.startsWith("import ") && new RegExp(`\\b${symbol}\\b`).test(line))) return text;
+  const lastImport = lines.reduce((last, line, index) => (line.startsWith("import ") ? index : last), -1);
+  if (lastImport < 0 || lines.findIndex((line) => /^\s*imports: \[$/.test(line)) < 0)
+    throw new ScaffoldError("HFS_ADD_WIRE_INVALID", `add table could not find the imports array in ${relative}`);
+  lines.splice(lastImport + 1, 0, importLine);
+  const imports = lines.findIndex((line) => /^\s*imports: \[$/.test(line));
+  const indent = /^(\s*)/.exec(lines[imports])?.[1] ?? "";
+  lines.splice(imports + 1, 0, `${indent}    ${entry},`);
+  if (kinds !== undefined) {
+    const kindsAt = lines.findIndex((line) => /^\s*kinds: \[$/.test(line));
+    if (kindsAt < 0) throw new ScaffoldError("HFS_ADD_WIRE_INVALID", `add table could not find the error kinds array in ${relative}`);
+    const kindsIndent = /^(\s*)/.exec(lines[kindsAt])?.[1] ?? "";
+    lines.splice(kindsAt + 1, 0, `${kindsIndent}    ${kinds},`);
+  }
+  return `${lines.join("\n").replace(/\n+$/, "")}\n`;
+}
+
+/** The api app root after the table's domain module is registered (its module and error kinds). */
+const wireDomainModule = (text, relative, name) =>
+  wireImport(text, relative, {
+    importLine: `import { ${snakeOf(name).toUpperCase()}_ERROR_KINDS, ${pascalOf(name)}Module } from "@modules/domain/${name}"`,
+    symbol: `${pascalOf(name)}Module`,
+    entry: `${pascalOf(name)}Module.register({ isGlobal: true })`,
+    kinds: `${snakeOf(name).toUpperCase()}_ERROR_KINDS`,
+  });
+
+/** The api app root after the GraphQL server (platform/graphql) and the table's GraphQL transport are registered. */
+const wireGraphqlFeature = (text, relative, name) =>
+  wireImport(
+    wireImport(text, relative, {
+      importLine: 'import { GraphqlModule } from "@modules/platform/graphql"',
+      symbol: "GraphqlModule",
+      entry: "GraphqlModule.register({ isGlobal: true })",
+    }),
+    relative,
+    {
+      importLine: `import { ${pascalOf(name)}GraphqlModule } from "@features/api/${name}"`,
+      symbol: `${pascalOf(name)}GraphqlModule`,
+      entry: `${pascalOf(name)}GraphqlModule`,
+    },
+  );
+
+/** The platform GraphQL server capability (templates/be/platform/graphql), whole or absent: written once, by the first GraphQL feature. */
+const GRAPHQL_PLATFORM = "be/src/modules/platform/graphql";
+const graphqlPlatformFiles = () => {
+  const dir = path.join(TEMPLATES_DIR, "be", "platform", "graphql");
+  return fs.readdirSync(dir).sort().map((file) => ({
+    relative: `${GRAPHQL_PLATFORM}/${file}`,
+    body: fs.readFileSync(path.join(dir, file), "utf8").replace(/\r\n/g, "\n"),
+  }));
+};
+
+/** The be api feature of a table (owner ruling 2026-10-13, lite = full): get-<singular> and create-<singular> over GraphQL. */
+const apiFeatureFiles = (values) => {
+  const base = `be/src/features/api/${values.name}`;
+  const get = `get-${values.singular}`;
+  const create = `create-${values.singular}`;
+  return [
+    [`${base}/index.ts`, "feature.index.ts.tpl"],
+    [`${base}/${values.name}.module.ts`, "feature.module.ts.tpl"],
+    [`${base}/application/${get}.query.ts`, "get.query.ts.tpl"],
+    [`${base}/application/${get}.handler.ts`, "get.handler.ts.tpl"],
+    [`${base}/application/${get}.contracts.ts`, "get.contracts.ts.tpl"],
+    [`${base}/application/${create}.command.ts`, "create.command.ts.tpl"],
+    [`${base}/application/${create}.handler.ts`, "create.handler.ts.tpl"],
+    [`${base}/application/${create}.contracts.ts`, "create.contracts.ts.tpl"],
+    [`${base}/transport/graphql/${get}.resolver.ts`, "get.resolver.ts.tpl"],
+    [`${base}/transport/graphql/${get}.mapper.ts`, "get.mapper.ts.tpl"],
+    [`${base}/transport/graphql/dto/${get}.input.ts`, "get.input.ts.tpl"],
+    [`${base}/transport/graphql/dto/${get}.type.ts`, "get.type.ts.tpl"],
+    [`${base}/transport/graphql/${create}.resolver.ts`, "create.resolver.ts.tpl"],
+    [`${base}/transport/graphql/${create}.mapper.ts`, "create.mapper.ts.tpl"],
+    [`${base}/transport/graphql/dto/${create}.type.ts`, "create.type.ts.tpl"],
+    [`${base}/transport/graphql/${values.name}-graphql.module.ts`, "graphql.module.ts.tpl"],
+  ].map(([relative, file]) => ({ relative, body: template(`be/table/api/${file}`, values) }));
+};
+
+/**
+ * The fe data code of a table in one product app: one GraphQL operation file per operation (modules/api/graphql/{queries,
+ * mutations}, its request/data types from the generated wire types) and one SWR hook per operation (hooks/swr/api/graphql).
+ * Never a Server Action and never a Supabase reader: Supabase on the front end is the Auth client only.
+ */
+const feOperationFiles = (app, values) => {
+  const api = `fe/apps/${app}/src/modules/api/graphql`;
+  const swr = `fe/apps/${app}/src/hooks/swr/api/graphql`;
+  return [
+    [`${api}/queries/query-${values.singular}.ts`, "query.ts.tpl"],
+    [`${api}/queries/types/${values.singular}.ts`, "query.types.ts.tpl"],
+    [`${api}/mutations/mutation-create-${values.singular}.ts`, "mutation.ts.tpl"],
+    [`${api}/mutations/types/create-${values.singular}.ts`, "mutation.types.ts.tpl"],
+    [`${swr}/queries/useQuery${values.Singular}Swr.ts`, "useQuerySwr.ts.tpl"],
+    [`${swr}/mutations/useMutateCreate${values.Singular}Swr.ts`, "useMutateSwr.ts.tpl"],
+  ].map(([relative, file]) => ({ relative, body: template(`fe/table/graphql/${file}`, values) }));
+};
+
+/** The barrel lines that make one table's SWR hooks reachable from hooks/swr (each barrel created when absent). */
+const feBarrels = (app, values) => {
+  const swr = `fe/apps/${app}/src/hooks/swr`;
+  return [
+    [`${swr}/api/graphql/queries/index.ts`, `export { QUERY_${values.singularUpper}_SWR_KEY, useQuery${values.Singular}Swr } from "./useQuery${values.Singular}Swr"`],
+    [`${swr}/api/graphql/mutations/index.ts`, `export { MUTATE_CREATE_${values.singularUpper}_SWR_KEY, useMutateCreate${values.Singular}Swr } from "./useMutateCreate${values.Singular}Swr"`],
+    [`${swr}/api/graphql/index.ts`, 'export * from "./mutations"'],
+    [`${swr}/api/graphql/index.ts`, 'export * from "./queries"'],
+    [`${swr}/api/index.ts`, 'export * from "./graphql"'],
+    [`${swr}/index.ts`, 'export * from "./api"'],
+  ];
+};
+
+/** A barrel text with `line` added once, kept in code-unit order. */
+const withExport = (text, line) => {
+  const lines = text.replace(/\r\n/g, "\n").split("\n").filter(Boolean);
+  if (lines.includes(line)) return text;
+  return `${[...lines, line].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join("\n")}\n`;
+};
+
+/**
+ * Adds one Supabase table migration and its domain capability; with `fe`, the table's api feature over GraphQL (the GraphQL
+ * server capability on first use) and, in every product Next app, its operation files and SWR hooks.
  * `emitTypes` returns the generated database.types.ts text; false is the explicit `--no-types` seam.
  */
 export function addTable({
@@ -233,6 +333,7 @@ export function addTable({
       `the current UTC timestamp ${stamp} is not later than the latest migration ${latest}; fix the clock or wait for the next second`,
     );
 
+  const singular = singularOf(feature);
   const values = {
     name: feature,
     table,
@@ -240,57 +341,48 @@ export function addTable({
     Name: pascalOf(feature),
     nameCamel: camelOf(feature),
     upper: table.toUpperCase(),
-    singular: singularOf(feature),
-    Singular: pascalOf(singularOf(feature)),
+    singular,
+    Singular: pascalOf(singular),
+    singularCamel: camelOf(singular),
+    singularUpper: snakeOf(singular).toUpperCase(),
   };
+  const apps = fe ? coreFeApps(repo.sides?.fe?.apps ?? []) : [];
+  if (fe && !apps.length)
+    throw new ScaffoldError(
+      "HFS_ADD_NO_FRONT_END",
+      "add table --fe needs at least one declared product Next app",
+    );
+  const api = fe ? ".api" : "";
+  const domain = `be/src/modules/domain/${feature}`;
   const planned = [
     {
       relative: `supabase/migrations/${stamp}_${feature}.sql`,
       body: template("be/table/migration.sql.tpl", values),
     },
-    { relative: `be/src/modules/domain/${feature}/index.ts`, body: template("be/table/index.ts.tpl", values) },
-    { relative: `be/src/modules/domain/${feature}/errors/${feature}.error.ts`, body: template("be/table/error.ts.tpl", values) },
-    { relative: `be/src/modules/domain/${feature}/${feature}.module.ts`, body: template("be/table/module.ts.tpl", values) },
-    { relative: `be/src/modules/domain/${feature}/${feature}.module-definition.ts`, body: template("be/table/module-definition.ts.tpl", values) },
-    { relative: `be/src/modules/domain/${feature}/${feature}.options.ts`, body: template("be/table/options.ts.tpl", values) },
-    { relative: `be/src/modules/domain/${feature}/${feature}.service.ts`, body: template("be/table/service.ts.tpl", values) },
-    { relative: `be/src/modules/domain/${feature}/persistence/${feature}.rows.ts`, body: template("be/table/rows.ts.tpl", values) },
-    { relative: `be/src/modules/domain/${feature}/persistence/${feature}.sql.ts`, body: template("be/table/sql.ts.tpl", values) },
+    { relative: `${domain}/index.ts`, body: template("be/table/index.ts.tpl", values) },
+    { relative: `${domain}/errors/${feature}.error.ts`, body: template(`be/table/error${api}.ts.tpl`, values) },
+    { relative: `${domain}/${feature}.module.ts`, body: template("be/table/module.ts.tpl", values) },
+    { relative: `${domain}/${feature}.module-definition.ts`, body: template("be/table/module-definition.ts.tpl", values) },
+    { relative: `${domain}/${feature}.options.ts`, body: template("be/table/options.ts.tpl", values) },
+    { relative: `${domain}/${feature}.service.ts`, body: template(`be/table/service${api}.ts.tpl`, values) },
+    { relative: `${domain}/persistence/${feature}.rows.ts`, body: template("be/table/rows.ts.tpl", values) },
+    { relative: `${domain}/persistence/${feature}.sql.ts`, body: template(`be/table/sql${api}.ts.tpl`, values) },
   ];
   const databaseSql = "be/src/modules/platform/database/database.sql.ts";
-  if (repo.edition === "lite" && !fs.existsSync(path.join(root, ...databaseSql.split("/")))) {
+  if (repo.edition === "lite" && !fs.existsSync(at(root, databaseSql))) {
     planned.splice(1, 0, {
       relative: databaseSql,
       body: render(fs.readFileSync(path.join(TEMPLATES_DIR, "be", "skeleton-lite", "src", "modules", "platform", "database", "database.sql.ts"), "utf8"), {}),
     });
   }
   if (fe) {
-    const apps =
-      repo.sides?.fe?.apps?.filter((app) => app.kind === "next") ?? [];
-    if (!apps.length)
-      throw new ScaffoldError(
-        "HFS_ADD_NO_FRONT_END",
-        "add table --fe needs at least one declared Next app",
-      );
-    for (const app of apps) {
-      const base = `fe/apps/${app.name}/src/modules/db/${feature}`;
-      planned.push(
-        {
-          relative: `${base}/read-${feature}.ts`,
-          body: template("fe/table/read.ts.tpl", values),
-        },
-        {
-          relative: `${base}/write-${feature}.ts`,
-          body: template("fe/table/write.ts.tpl", values),
-        },
-      );
-    }
+    planned.push(...apiFeatureFiles(values));
+    if (!fs.existsSync(at(root, `${GRAPHQL_PLATFORM}/index.ts`))) planned.push(...graphqlPlatformFiles());
+    for (const app of apps) planned.push(...feOperationFiles(app.name, values));
   }
 
   const clash = planned
-    .filter((file) =>
-      fs.existsSync(path.join(root, ...file.relative.split("/"))),
-    )
+    .filter((file) => fs.existsSync(at(root, file.relative)))
     .map((file) => file.relative);
   if (clash.length)
     throw new ScaffoldError(
@@ -300,41 +392,56 @@ export function addTable({
   const owner = repo.sides.be.apps.find((app) => app.name === connection.owner && app.kind === "api");
   if (!owner)
     throw new ScaffoldError("HFS_ADD_NO_API_OWNER", `add table needs the Supabase connection owner ${connection.owner} to be a declared api app`);
-  const ownerFile = path.join(root, "be", "apps", owner.name, "src", "app.module.ts");
-  if (!fs.existsSync(ownerFile))
-    throw new ScaffoldError("HFS_ADD_WIRE_MISSING", `add table registers ${name} in be/apps/${owner.name}/src/app.module.ts, which does not exist`);
-  const ownerBefore = fs.readFileSync(ownerFile, "utf8");
-  const databaseIndex = path.join(root, "be", "src", "modules", "platform", "database", "index.ts");
-  const databaseIndexBefore = repo.edition === "lite" && fs.existsSync(databaseIndex) ? fs.readFileSync(databaseIndex) : null;
-  const typesFile = path.join(root, ...dbTypesPath.split("/"));
-  const typesBefore = fs.existsSync(typesFile) ? fs.readFileSync(typesFile) : null;
+  const ownerRelative = `be/apps/${owner.name}/src/app.module.ts`;
+  if (!fs.existsSync(at(root, ownerRelative)))
+    throw new ScaffoldError("HFS_ADD_WIRE_MISSING", `add table registers ${name} in ${ownerRelative}, which does not exist`);
+
+  // Every existing file this run edits, as it was: restored on any failure, with every created file removed.
+  const touched = new Map();
+  const edit = (relative, change) => {
+    const file = at(root, relative);
+    if (!touched.has(file)) touched.set(file, fs.existsSync(file) ? fs.readFileSync(file) : null);
+    const before = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+    const after = change(before);
+    if (after === before) return;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, after);
+  };
   const created = [];
   try {
     for (const file of planned) {
-      const target = path.join(root, ...file.relative.split("/"));
+      const target = at(root, file.relative);
       fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.writeFileSync(target, file.body);
       created.push(target);
     }
     if (typeof emitTypes === "function") {
       const generated = emitTypes({ root });
-      if (typeof generated === "string") {
-        const target = path.join(root, ...dbTypesPath.split("/"));
-        fs.mkdirSync(path.dirname(target), { recursive: true });
-        fs.writeFileSync(target, generated);
-      }
+      if (typeof generated === "string") edit(dbTypesPath, () => generated);
     }
-    wireApiModule(root, owner.name, feature);
-    if (repo.edition === "lite") registerLiteExports({ root, generator: "table" });
+    edit(ownerRelative, (text) => wireDomainModule(text, ownerRelative, feature));
+    const registrations = [
+      ...(repo.edition === "lite" ? ["table"] : []),
+      ...(fe ? ["api", "graphql"] : []),
+    ];
+    for (const generator of registrations) for (const relative of registrationFiles(generator)) edit(relative, (text) => text);
+    for (const generator of registrations) registerLiteExports({ root, generator });
+    if (fe) {
+      registerLiteDomainService({ root, moduleSpecifier: `@modules/domain/${feature}`, service: `${values.Name}Service` });
+      edit(ownerRelative, (text) => wireGraphqlFeature(text, ownerRelative, feature));
+      for (const app of apps)
+        for (const [relative, line] of feBarrels(app.name, values)) edit(relative, (text) => withExport(text, line));
+    }
   } catch (error) {
-    fs.writeFileSync(ownerFile, ownerBefore);
-    if (databaseIndexBefore !== null) fs.writeFileSync(databaseIndex, databaseIndexBefore);
-    if (typesBefore === null) fs.rmSync(typesFile, { force: true });
-    else fs.writeFileSync(typesFile, typesBefore);
+    for (const [file, before] of touched) {
+      if (before === null) fs.rmSync(file, { force: true });
+      else fs.writeFileSync(file, before);
+    }
     for (const file of [...created].reverse()) {
       if (fs.existsSync(file)) fs.rmSync(file);
       removeEmptyParents(file, root);
     }
+    for (const [file, before] of touched) if (before === null) removeEmptyParents(file, root);
     throw error;
   }
   return {

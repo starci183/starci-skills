@@ -4,7 +4,7 @@ One StarCi lite app: a Nest API in `be/`, one Next web app in `fe/`, and Supabas
 
 ## Overview
 
-The starter keeps one deployable API and one web app. The browser uses only the public Supabase client under row-level security; privileged Auth and Storage operations stay behind the API.
+The starter keeps one deployable API and one web app, with the same code structure as a full app: the web app calls the API over GraphQL (`src/modules/api`, SWR hooks under `src/hooks/swr`) and uses Supabase only for Auth in the browser (`src/modules/auth`); every data read and write goes through the API, which verifies the access token.
 
 ## Stack
 
@@ -14,7 +14,7 @@ TypeScript everywhere, NestJS in `be/`, Next.js with next-intl in `fe/`, Supabas
 
 - `supabase/`: local configuration, forward-only SQL migrations, seed data, and generated database types.
 - `be/`: the API, shared platform capabilities, verified identity admission, and privileged Supabase integrations.
-- `fe/`: the web app; all Supabase access is owned by `src/modules/db`.
+- `fe/`: the web app; the only Supabase client is the Auth client of `src/modules/auth`, data goes through `src/modules/api`.
 - `.starcistacks/`: value-free environment metadata and encrypted-secret custody.
 - `.starciwork/`: product workspace, brand, and shell records.
 
@@ -30,13 +30,13 @@ npm run build:be
 npm run build:fe
 ```
 
-The API reads `PORT`, `HTTP_SECURITY_ALLOWED_ORIGINS`, `PRIMARY_DB_URL`, `PRIMARY_DB_SCHEMA`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`. The web app reads `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Missing configuration stops the relevant process with a named error; no template supplies credential defaults.
+The API reads `PORT`, `HTTP_SECURITY_ALLOWED_ORIGINS`, `PRIMARY_DB_URL`, `PRIMARY_DB_SCHEMA`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`. The web app reads `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_GRAPHQL_URL`, `NEXT_PUBLIC_REST_URL`, `NEXT_PUBLIC_SUPABASE_URL`, and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Missing configuration stops the relevant process with a named error; no template supplies credential defaults.
 
 `npm test` runs the back end's unit specs with per-file coverage. Optional integration specs run with `npm run test:integration` against the local Supabase stack (`npm run db:start`); a lite app has no e2e world.
 
 ## Database changes
 
-Create a forward-only migration under `supabase/migrations`, keep each table's RLS policies and grants beside the table, and run `npm run contract:emit` to refresh `supabase/types/database.types.ts`.
+Create a forward-only migration under `supabase/migrations`, keep each table's RLS policies and grants beside the table, and run `npm run contract:emit` to refresh `supabase/types/database.types.ts`. `starci app add table <name> --fe` adds the table with its GraphQL feature on the API and its operations and SWR hooks in the web app; `npm run codegen:graphql` regenerates the web app's wire types from `be/contracts/<app>/schema.graphql`.
 
 ## Work
 

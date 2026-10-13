@@ -50,21 +50,17 @@ function readTree(topic) {
 /** The parsed document of the topic `topic` (knowledge/patterns/be/<topic>.yaml) the package carries. */
 const readTopic = (topic) => ({ id: topic, doc: parseYaml(fs.readFileSync(path.join(TOPICS_DIR, `${topic}.yaml`), 'utf8')) });
 
-const selectLiteApiEntries = entries => [
-  ...entries.filter(entry => !entry.path.includes('/transport/graphql/')).map(entry => {
-    if (entry.path === 'src/features/api/<feature>/index.ts') return { ...entry, template: 'api/feature.index.http.ts.tpl' };
-    if (entry.path === 'src/features/api/<feature>/application/<action>.command.ts') return { ...entry, template: 'api/application.command.http.ts.tpl' };
-    if (entry.path === 'src/features/api/<feature>/application/<action>.handler.ts') return { ...entry, template: 'api/application.handler.http.ts.tpl' };
-    return entry;
-  }),
-  { path: 'src/features/api/<feature>/transport/http/<action>.controller.ts', slot: 'be.transport.http', template: 'api/http.controller.ts.tpl' },
-  { path: 'src/features/api/<feature>/transport/http/<action>.mapper.ts', slot: 'be.transport.http', template: 'api/http.mapper.ts.tpl' },
-  { path: 'src/features/api/<feature>/transport/http/dto/<action>.request.ts', slot: 'be.transport.http', template: 'api/http.request.ts.tpl' },
-  { path: 'src/features/api/<feature>/transport/http/dto/<action>.response.ts', slot: 'be.transport.http', template: 'api/http.response.ts.tpl' },
-  { path: 'src/features/api/<feature>/transport/http/<feature>-http.module.ts', slot: 'be.transport.http', template: 'api/http.module.ts.tpl' },
-];
+/**
+ * The lite api tree: the full tree, GraphQL door included (owner ruling 2026-10-13: lite and full have one code structure), with
+ * the command and handler that hand the verified Supabase principal to the domain service (lite's identity adapter).
+ */
+const selectLiteApiEntries = entries => entries.map(entry => {
+  if (entry.path === 'src/features/api/<feature>/application/<action>.command.ts') return { ...entry, template: 'api/application.command.principal.ts.tpl' };
+  if (entry.path === 'src/features/api/<feature>/application/<action>.handler.ts') return { ...entry, template: 'api/application.handler.principal.ts.tpl' };
+  return entry;
+});
 
-/** The templates the lite api tree names beyond the pattern topic's own files tree (the HTTP door replaces the GraphQL one): the template set stays one set with the topics' (tests/packages-hfs/hfs-add.spec.mjs). */
+/** The templates the lite api tree names beyond the pattern topic's own files tree (the principal-aware command and handler): the template set stays one set with the topics' (tests/packages-hfs/hfs-add.spec.mjs). */
 export const liteApiTemplates = () => selectLiteApiEntries(readTree('api')).map(entry => entry.template).filter(Boolean);
 
 /** Fills the `<name>` variables of a path; returns null when a variable has no value. */
@@ -202,34 +198,63 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
     registerLiteDomainService({ root: repoRoot, moduleSpecifier: values.serviceModule, service: values.service });
   }
   if (spec.wire) wire({ beRoot, wire: spec.wire, forms, noun, name });
-  if (repo.edition === 'lite' && (noun === 'api' || noun === 'webhook')) wireLiteFeature({ repoRoot, repo, noun, name });
+  const platformCreated = repo.edition === 'lite' && (noun === 'api' || noun === 'webhook') ? wireLiteFeature({ repoRoot, repo, noun, name }) : [];
   const inboxCreated = addLiteWebhookInbox({ root: repoRoot, repo, noun, provider: name, values, now });
   const registered = register({ declarationFile, spec: { patterns, trigger: spec.trigger } });
-  return { created: [...bootstrapCreated, ...planned.map((file) => `be/${file.target}`), ...inboxCreated], registered };
+  return { created: [...bootstrapCreated, ...planned.map((file) => `be/${file.target}`), ...platformCreated, ...inboxCreated], registered };
 }
 
-/** Lite has one API app; compose each generated API or webhook transport into that app immediately. */
+/** Adds `importLine` and one `symbol` entry of the `imports` array of a module file's lines, once. */
+function addModuleImport(lines, { importLine, entry, relative, noun }) {
+  if (lines.includes(importLine)) return;
+  const lastImport = lines.reduce((last, line, index) => line.startsWith('import ') ? index : last, -1);
+  if (lastImport < 0 || lines.findIndex(line => /^\s*imports: \[$/.test(line)) < 0) throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add ${noun} could not find the imports array in ${relative}`);
+  lines.splice(lastImport + 1, 0, importLine);
+  const imports = lines.findIndex(line => /^\s*imports: \[$/.test(line));
+  const indent = /^(\s*)/.exec(lines[imports])?.[1] ?? '';
+  lines.splice(imports + 1, 0, `${indent}    ${entry},`);
+}
+
+/** The GraphQL server capability (be/src/modules/platform/graphql), written whole by the first GraphQL feature of an app that has none. */
+function ensureGraphqlPlatform(repoRoot) {
+  const target = path.join(repoRoot, 'be', 'src', 'modules', 'platform', 'graphql');
+  if (fs.existsSync(path.join(target, 'index.ts'))) return [];
+  const source = path.join(TEMPLATES_DIR, 'be', 'platform', 'graphql');
+  fs.mkdirSync(target, { recursive: true });
+  const written = [];
+  for (const file of fs.readdirSync(source).sort(byCodeUnit)) {
+    if (fs.existsSync(path.join(target, file))) continue;
+    fs.writeFileSync(path.join(target, file), fs.readFileSync(path.join(source, file), 'utf8').replace(/\r\n/g, '\n'));
+    written.push(`be/src/modules/platform/graphql/${file}`);
+  }
+  registerLiteExports({ root: repoRoot, generator: 'graphql' });
+  return written;
+}
+
+/**
+ * Lite has one API app; compose each generated transport into that app immediately: an api feature's GraphQL module (with the
+ * GraphQL server on first use), a webhook's HTTP door.
+ */
 function wireLiteFeature({ repoRoot, repo, noun, name }) {
   const app = repo.sides.be.apps.find(entry => entry.kind === 'api');
   if (!app) throw new ScaffoldError('HFS_ADD_NO_API_OWNER', `add ${noun} needs a declared lite api app`);
   const relative = `be/apps/${app.name}/src/app.module.ts`;
   const file = path.join(repoRoot, ...relative.split('/'));
   if (!fs.existsSync(file)) throw new ScaffoldError('HFS_ADD_WIRE_MISSING', `add ${noun} registers its transport in ${relative}, which does not exist`);
-  const symbol = `${pascalOf(name)}HttpModule`;
-  const owner = noun === 'api' ? 'api' : 'webhooks';
-  const importLine = `import { ${symbol} } from "@features/${owner}/${name}"`;
   const lines = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n').split('\n');
-  const lastImport = lines.reduce((last, line, index) => line.startsWith('import ') ? index : last, -1);
-  const imports = lines.findIndex(line => /^\s*imports: \[$/.test(line));
-  if (lastImport < 0 || imports < 0) throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add ${noun} could not find the imports array in ${relative}`);
-  if (!lines.includes(importLine)) {
-    lines.splice(lastImport + 1, 0, importLine);
-    const shiftedImports = imports > lastImport ? imports + 1 : imports;
-    const indent = /^(\s*)/.exec(lines[shiftedImports])?.[1] ?? '';
-    lines.splice(shiftedImports + 1, 0, `${indent}    ${symbol},`);
+  const created = [];
+  if (noun === 'api') {
+    created.push(...ensureGraphqlPlatform(repoRoot));
+    addModuleImport(lines, { importLine: 'import { GraphqlModule } from "@modules/platform/graphql"', entry: 'GraphqlModule.register({ isGlobal: true })', relative, noun });
+    const symbol = `${pascalOf(name)}GraphqlModule`;
+    addModuleImport(lines, { importLine: `import { ${symbol} } from "@features/api/${name}"`, entry: symbol, relative, noun });
+  } else {
+    const symbol = `${pascalOf(name)}HttpModule`;
+    addModuleImport(lines, { importLine: `import { ${symbol} } from "@features/webhooks/${name}"`, entry: symbol, relative, noun });
   }
   fs.writeFileSync(file, `${lines.join('\n').replace(/\n+$/, '')}\n`);
   if (noun === 'webhook') wireLiteWebhookConfig({ repoRoot, app: app.name, provider: name });
+  return created;
 }
 
 /** Adds one generated webhook provider to the lite API's parsed options and enables exact raw-body verification. */

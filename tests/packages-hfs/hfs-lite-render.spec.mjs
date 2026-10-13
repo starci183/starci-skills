@@ -61,10 +61,12 @@ test('the lite managed set carries the unit run and its coverage world (owner ru
   assert.deepEqual(['db:start', 'db:stop', 'db:reset', 'db:new', 'db:push', 'db:types', 'db:lint'].filter(name => !(name in scripts)), []);
   assert.equal(scripts['db:types'], 'npm run contract:emit');
   assert.equal(scripts['db:lint'], 'starci app check --fast');
-  assert.equal(scripts.lint, 'starci app lint');
-  assert.equal(scripts.typecheck, 'tsc -p be/tsconfig.json && turbo run typecheck');
-  assert.equal(scripts['build:fe'], 'turbo run build --filter=./fe/apps/*');
-  assert.equal(scripts['dev:fe'], 'turbo run dev --filter=@demo/web');
+  // Owner ruling 2026-10-13 (lite = full): both editions generate (the fe's GraphQL wire types, the Supabase types check) before they run.
+  assert.equal(scripts.lint, 'npm run codegen --silent && starci app lint');
+  assert.equal(scripts.typecheck, 'npm run codegen --silent && tsc -p be/tsconfig.json && turbo run typecheck');
+  assert.equal(scripts['build:fe'], 'npm run codegen --silent && turbo run build --filter=./fe/apps/*');
+  assert.equal(scripts['dev:fe'], 'npm run codegen --silent && turbo run dev --filter=@demo/web');
+  assert.equal(scripts['codegen:graphql'], 'node scripts/codegen.mjs --graphql');
   assert.equal(scripts['typecheck:tests'], 'tsc -p be/src/tests/tsconfig.json');
   assert.deepEqual(Object.keys(scripts).filter(name => name === 'test' || name.startsWith('test:')).sort(), ['test', 'test:affected', 'test:integration']);
 
@@ -96,6 +98,7 @@ test('the lite managed set carries the unit run and its coverage world (owner ru
   const codegen = targets['scripts/codegen.mjs'].content;
   assert.doesNotMatch(codegen, /child_process/, 'the lite codegen is offline: it reads the committed types and starts nothing');
   assert.match(codegen, /migrations-sha256/);
+  assert.match(codegen, /be", "contracts"[\s\S]*__generated__/, 'the lite codegen generates the GraphQL wire types like full');
 });
 
 test('lite render reads the Jest preset like full, writeTargets reaches a no-op, and managed drift uses the same render', async t => {

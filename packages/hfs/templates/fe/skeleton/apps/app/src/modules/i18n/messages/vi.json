@@ -7,6 +7,14 @@
     "home": {
       "title": "Trang chủ"
     },
+    "toast": {
+      "successTitle": "Thành công",
+      "errorTitle": "Lỗi",
+      "unauthorizedTitle": "Chưa đăng nhập",
+      "unauthorizedDescription": "Hãy đăng nhập để tiếp tục.",
+      "defaultSuccess": "Đã hoàn tất.",
+      "defaultError": "Đã xảy ra lỗi."
+    },
     "loading": {
       "message": "Đang tải"
     },

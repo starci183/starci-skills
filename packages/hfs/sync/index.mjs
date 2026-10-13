@@ -106,9 +106,12 @@ function readBundled(name) {
   return lf(fs.readFileSync(path.join(TEMPLATES_DIR, name), 'utf8'));
 }
 
-/** Fill `{{name}}` from vars and expand `{{> partial}}` lines. An unknown name is an error, never an empty string. */
+/**
+ * Fill `{{name}}` from vars and expand `{{> partial}}` lines. A partial line may be written as a line comment (`// {{> partial}}`)
+ * so a JavaScript template stays valid source before rendering. An unknown name is an error, never an empty string.
+ */
 export function render(text, vars, readTemplate = readBundled) {
-  const withPartials = text.replace(/^\{\{> ([\w./-]+)\}\}\n/gm, (_, name) => render(readTemplate(name), vars, readTemplate).replace(/\n*$/, '\n'));
+  const withPartials = text.replace(/^(?:\/\/ )?\{\{> ([\w./-]+)\}\}\n/gm, (_, name) => render(readTemplate(name), vars, readTemplate).replace(/\n*$/, '\n'));
   return withPartials.replace(/\{\{([A-Za-z]\w*)\}\}/g, (_, key) => {
     if (!Object.hasOwn(vars, key)) throw new SyncError('HFS_SYNC_TEMPLATE_VARIABLE', `template names {{${key}}}, which sync does not provide`);
     return vars[key];
@@ -189,7 +192,8 @@ export function appScripts(app) {
   const watch = entry => `cd be && ts-node-dev --respawn -r tsconfig-paths/register apps/${entry.name}/src/main.ts`;
   const built = entry => `node be/dist/apps/${entry.name}/src/main.js`;
   const workspace = entry => feAppPackageName(app.project, entry.name);
-  const dev = entry => `${app.edition === 'lite' ? '' : 'npm run codegen --silent && '}turbo run dev --filter=${workspace(entry)}`;
+  // Both editions generate before they run (owner ruling 2026-10-13): the fe's GraphQL wire types, and under lite the Supabase types check.
+  const dev = entry => `npm run codegen --silent && turbo run dev --filter=${workspace(entry)}`;
   const images = imageEntries(app);
   const imageCommand = ({ side, entry }) => `docker build -f ${dockerfilePath(side, entry.name)} -t ${app.project}/${entry.name}:dev .`;
   return [
@@ -263,10 +267,10 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
     appBinary: APP_BINARY,
     appScripts: appScripts(app),
     // turbo builds every fe app workspace; ^build (turbo.json) builds the packages each app imports first, and caches both.
-    buildFe: `${lite ? '' : 'npm run codegen --silent && '}turbo run build --filter=./fe/apps/*`,
+    buildFe: 'npm run codegen --silent && turbo run build --filter=./fe/apps/*',
     // The be side with its tsc; every fe workspace with its own typecheck script through turbo (the packages are built first: ^build).
-    typecheck: `${lite ? '' : 'npm run codegen --silent && '}tsc -p be/tsconfig.json && turbo run typecheck`,
-    lintPrefix: lite ? '' : 'npm run codegen --silent && ',
+    typecheck: 'npm run codegen --silent && tsc -p be/tsconfig.json && turbo run typecheck',
+    lintPrefix: 'npm run codegen --silent && ',
     nodeMajor: String(NODE_MAJOR),
     sonarKey: sonarKey ?? app.project,
     sonarExclusions: [presets?.sonarExclusions, '**/.next/**', '**/node_modules/**', '**/src/messages/**', ...(lite ? ['supabase/types/**'] : [])].filter(Boolean).join(','),

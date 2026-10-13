@@ -1,0 +1,34 @@
+// GraphQL wire types, the same in both editions (owner ruling 2026-10-13): every fe app with operations under
+// src/modules/api/graphql/{queries,mutations} gets its typed documents generated from the contract snapshots the back end emits
+// (be/contracts/<app>/schema.graphql, `npm run contract:emit`) into the gitignored src/modules/api/graphql/__generated__/.
+// Nothing to generate (no snapshot yet, or no fe app with a modules/api/graphql folder) is not an error.
+const CONTRACTS = path.join("be", "contracts")
+const FE_APPS = path.join("fe", "apps")
+const posix = (file) => file.split(path.sep).join("/")
+const schemas = (fs.existsSync(CONTRACTS) ? fs.readdirSync(CONTRACTS) : [])
+    .map((app) => path.join(CONTRACTS, app, "schema.graphql"))
+    .filter((file) => fs.existsSync(file))
+    .sort()
+    .map(posix)
+const operationRoots = (fs.existsSync(FE_APPS) ? fs.readdirSync(FE_APPS) : [])
+    .map((app) => path.join(FE_APPS, app, "src", "modules", "api", "graphql"))
+    .filter((dir) => fs.existsSync(dir))
+    .sort()
+    .map(posix)
+if (schemas.length === 0 || operationRoots.length === 0) {
+    process.stdout.write("codegen: no GraphQL contract under be/contracts yet\n")
+} else {
+    const { generate } = await import("@graphql-codegen/cli")
+    const generates = Object.fromEntries(
+        operationRoots.map((root) => [
+            `${root}/__generated__/`,
+            {
+                preset: "client",
+                documents: [`${root}/queries/*.ts`, `${root}/mutations/*.ts`],
+                presetConfig: { fragmentMasking: false },
+                config: { useTypeImports: true, enumsAsTypes: true, avoidOptionals: true },
+            },
+        ]),
+    )
+    await generate({ schema: schemas, generates, ignoreNoDocuments: true, silent: true }, true)
+}

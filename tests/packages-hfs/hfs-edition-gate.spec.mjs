@@ -49,18 +49,18 @@ test('the gate reads the slot resolver of the app: a slot the edition lacks or f
     () => refuseInEdition({ resolver, slotIds, command }),
     (error) => error instanceof EditionRefusal && error.message === `${command}: full edition only; run starci app upgrade --edition full`,
     `${command} over ${slotIds}`);
-  // a slot lite forbids (litePresence: the e2e and contract world, the socket realtime doors) and an id the manifest never had refuse
+  // a slot lite forbids (litePresence: the e2e and contract world, the GraphQL subscription door) and an id the manifest never had refuse
   refuses(lite, ['be.tests.e2e'], 'add x');
   refuses(lite, ['be.tests.contract'], 'add x');
-  refuses(lite, ['be.feature', 'be.feature.realtime.websocket'], 'add realtime'); // one forbidden slot among legal ones is enough
+  refuses(lite, ['be.feature', 'be.feature.realtime.graphql'], 'add realtime'); // one forbidden slot among legal ones is enough
   refuses(lite, ['be.no.such.slot'], 'add x');
   // a slot that exists under lite - whatever its presence - does not refuse: the patterns and the unit world are lite's too
   for (const slotIds of [['be.feature', 'be.feature.application', 'be.transport.graphql'], ['be.feature.webhooks.http'], ['be.cli'], ['be.app.cli'], ['be.contract.graphql'],
-    ['be.feature.saga'], ['be.tests.world'], ['be.platform.queue', 'be.queues', 'be.feature.jobs'], ['be.feature.realtime.supabase']]) {
+    ['be.feature.saga'], ['be.tests.world'], ['be.platform.queue', 'be.queues', 'be.feature.jobs'], ['be.feature.realtime.websocket']]) {
     assert.equal(refuseInEdition({ resolver: lite, slotIds, command: 'add x' }), undefined, slotIds.join(', '));
   }
   // under full the gate never fires over the slots lite forbids, and an id the view does not answer refuses exactly as under lite
-  assert.equal(refuseInEdition({ resolver: full, slotIds: ['be.tests.e2e', 'be.feature.realtime.websocket'], command: 'add realtime' }), undefined);
+  assert.equal(refuseInEdition({ resolver: full, slotIds: ['be.tests.e2e', 'be.feature.realtime.graphql'], command: 'add realtime' }), undefined);
   refuses(full, ['be.no.such.slot'], 'add x');
 });
 

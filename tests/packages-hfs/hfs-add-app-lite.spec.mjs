@@ -56,20 +56,34 @@ function appRoot(edition) {
 const read = (root, relative) =>
   fs.readFileSync(path.join(root, ...relative.split("/")), "utf8");
 
-test("addApp refuses the second lite front end with the single-app message and changes nothing", () => {
+test("addApp adds a second lite front end with the lite app skeleton and the shared app core (owner ruling 2026-10-13: one fe structure)", () => {
   const root = appRoot("lite");
-  const declarationBefore = read(root, "hfs.json");
-  const packageBefore = read(root, "package.json");
-  assert.throws(
-    () => addApp({ root, name: "admin" }),
-    (error) =>
-      error?.code === "HFS_ADD_LITE_SINGLE_APP" &&
-      error.message ===
-        "a lite app has one front-end app; a second app needs the shared <project>-ui and <project>-i18n packages: run starci app upgrade --edition full",
-  );
-  assert.equal(fs.existsSync(path.join(root, "fe", "apps", "admin")), false);
-  assert.equal(read(root, "hfs.json"), declarationBefore);
-  assert.equal(read(root, "package.json"), packageBefore);
+  const result = addApp({ root, name: "admin" });
+  for (const relative of [
+    "fe/apps/admin/src/app/[locale]/layout.tsx",
+    "fe/apps/admin/src/app/health/live/route.ts",
+    "fe/apps/admin/src/modules/api/graphql/clients/clients/auth.ts",
+    "fe/apps/admin/src/modules/api/graphql/types.ts",
+    "fe/apps/admin/src/modules/api/rest/client/axios.ts",
+    "fe/apps/admin/src/modules/auth/client.ts",
+    "fe/apps/admin/src/modules/toast/hooks.ts",
+    "fe/apps/admin/src/redux/store.ts",
+    "fe/apps/admin/src/components/providers/AppProviders/index.tsx",
+    "fe/apps/admin/src/hooks/swr/SwrSideEffects.tsx",
+    "fe/apps/admin/package.json",
+    "fe/apps/admin/tsconfig.json",
+  ]) {
+    assert.ok(result.created.includes(relative), relative);
+  }
+  assert.equal(result.created.some((relative) => relative.includes("/modules/db/") || relative.includes("/auth/callback/")), false);
+  assert.equal(result.created.includes("fe/apps/admin/Dockerfile"), false, "a lite app deploys no front-end image");
+  assert.match(read(root, "fe/apps/admin/src/modules/auth/client.ts"), /@supabase\/supabase-js/);
+  assert.doesNotMatch(read(root, "fe/apps/admin/src/components/composites/SiteShell/index.tsx"), /\{\{> /, "partials are rendered");
+  assert.deepEqual(JSON.parse(read(root, "hfs.json")).sides.fe.apps, [
+    { name: "web", kind: "next" },
+    { name: "admin", kind: "next" },
+  ]);
+  assert.equal(JSON.parse(read(root, "fe/apps/admin/package.json")).name, "@demo/admin");
 });
 
 test("addApp keeps the full-edition scaffold and registration behavior", () => {
@@ -94,4 +108,7 @@ test("addApp keeps the full-edition scaffold and registration behavior", () => {
   const workspace = JSON.parse(read(root, "fe/apps/admin/package.json"));
   assert.equal(workspace.name, "@demo/admin");
   assert.deepEqual(workspace.dependencies, { next: "16.0.0", react: "19.2.0" });
+  assert.ok(result.created.includes("fe/apps/admin/src/modules/api/graphql/clients/clients/auth.ts"), "the shared app core");
+  assert.doesNotMatch(read(root, "fe/apps/admin/src/modules/auth/client.ts"), /@supabase/, "full keeps the IdP stub");
+  assert.doesNotMatch(read(root, "fe/apps/admin/src/features/layouts/AppLayout/index.tsx"), /\{\{> /, "partials are rendered");
 });

@@ -1,14 +1,16 @@
-import { Heading, Text } from "@starci/grammar/common"
+import { Heading } from "@starci/grammar/common"
+import type { ReactNode } from "react"
 
-/** Props for the signed-in home page. */
+/** Props for the home page: its title and the session surface the entry composes. */
 export type AppHomePageBaseProps = {
-    readonly props: { readonly title: string; readonly principal: string }
+    readonly props: { readonly title: string }
+    readonly session: ReactNode
 }
 
-/** Draws the signed-in front door. */
+/** Draws the front door. */
 export const AppHomePageBase = (props: AppHomePageBaseProps) => (
     <>
         <Heading level={1}>{props.props.title}</Heading>
-        <Text>{props.props.principal}</Text>
+        {props.session}
     </>
 )

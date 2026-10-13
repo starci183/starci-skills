@@ -12,6 +12,17 @@ const build = () => {
 }
 
 describe("ErrorsFilter", () => {
+    it("hands a failure in a GraphQL context back untouched for the GraphQL error formatter", () => {
+        const { filter, errors } = build()
+        const failure = new Error("resolver failed")
+        const host = mock<ArgumentsHost>()
+        host.getType.mockReturnValue("graphql")
+
+        expect(filter.catch(failure, host)).toBe(failure)
+        expect(errors.describe).not.toHaveBeenCalled()
+        expect(host.switchToHttp).not.toHaveBeenCalled()
+    })
+
     it("writes a localized description and its status to an HTTP response", () => {
         const { filter, errors, requestLocale } = build()
         const failure = new Error("note missing")

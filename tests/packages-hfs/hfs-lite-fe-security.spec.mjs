@@ -5,91 +5,56 @@ import path from "node:path"
 import vm from "node:vm"
 import { createRequire } from "node:module"
 
+// Owner ruling 2026-10-13: Supabase on the front end is auth only. The lite skeleton's identity-provider client
+// (modules/auth/client.ts, slot fe.modules.auth) is run against a recording Supabase double: every authClient call touches the
+// client's `auth` API and nothing else (no from, rpc, storage, channel), and the PKCE flow runs in the browser.
 const ROOT = path.resolve(import.meta.dirname, "..", "..")
-const TEMPLATE_ROOT = path.join(ROOT, "packages", "hfs", "templates", "fe", "skeleton-lite", "apps", "web", "src")
-const TABLE_TEMPLATE = path.join(ROOT, "packages", "hfs", "templates", "fe", "table", "write.ts.tpl")
+const AUTH_CLIENT = path.join(ROOT, "packages", "hfs", "templates", "fe", "skeleton-lite", "apps", "__app__", "src", "modules", "auth", "client.ts")
 const ts = createRequire(import.meta.url)("typescript")
 
-const templateText = (relative) => fs.readFileSync(path.join(TEMPLATE_ROOT, ...relative.split("/")), "utf8")
-
-const evaluateTemplate = (relative) => {
-  const compiled = ts.transpileModule(templateText(relative), {
-    fileName: relative,
-    reportDiagnostics: true,
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-  })
-  assert.deepEqual(compiled.diagnostics, [], `${relative} has valid TypeScript syntax`)
-  const module = { exports: {} }
-  vm.runInNewContext(compiled.outputText, { module, exports: module.exports, URL, decodeURIComponent }, { filename: relative })
-  return module.exports
+/** The template's exports, run with a recording @supabase/supabase-js double; `touched` lists the client members it reached. */
+function loadAuthClient() {
+    const touched = []
+    const options = []
+    const result = (data) => Promise.resolve({ data, error: null })
+    const auth = {
+        getSession: () => result({ session: { access_token: "token", user: { id: "u1", email: "a@example.com" } } }),
+        refreshSession: () => result({ session: { access_token: "fresh", user: { id: "u1" } } }),
+        signInWithPassword: () => result({}),
+        signOut: () => result({}),
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => undefined } } }),
+    }
+    const client = new Proxy({ auth }, { get: (target, name) => { touched.push(String(name)); return target[name] } })
+    const modules = {
+        "@supabase/supabase-js": { createClient: (url, key, settings) => { options.push(settings); return client } },
+        "@/modules/config": { supabaseUrl: () => "https://fixture.invalid", supabaseAnonKey: () => "public-anon" },
+    }
+    const compiled = ts.transpileModule(fs.readFileSync(AUTH_CLIENT, "utf8"), {
+        fileName: "client.ts",
+        reportDiagnostics: true,
+        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    })
+    assert.deepEqual(compiled.diagnostics, [], "modules/auth/client.ts has valid TypeScript syntax")
+    const module = { exports: {} }
+    const require = (name) => {
+        if (!(name in modules)) throw new Error(`modules/auth/client.ts imports ${name}, which the auth owner does not need`)
+        return modules[name]
+    }
+    vm.runInNewContext(compiled.outputText, { module, exports: module.exports, require }, { filename: "client.ts" })
+    return { authClient: module.exports.authClient, touched, options }
 }
 
-test("safeNextPath keeps callback redirects on the request origin", () => {
-  const { safeNextPath } = evaluateTemplate("modules/routes/safe-next-path.ts")
-  const origin = "https://app.example"
-  const cases = [
-    [null, "/"],
-    ["/\\evil.com", "/"],
-    ["//evil.com", "/"],
-    ["https://x", "/"],
-    ["/\u0009evil.com", "/"],
-    ["/%5Cevil.com", "/"],
-    ["/%2F%2Fevil.com", "/"],
-    ["/%00evil.com", "/"],
-    ["/%E0%A4%A", "/"],
-    ["/ok", "/ok"],
-    ["/a/b?c=d", "/a/b?c=d"],
-  ]
-  for (const [candidate, expected] of cases) assert.equal(safeNextPath(candidate, origin), expected, String(candidate))
-  assert.match(templateText("app/auth/callback/route.ts"), /safeNextPath\([^,]+, request\.nextUrl\.origin\)/)
-})
-
-test("the shared schemas bound UUIDs and sign-in credentials before transport", () => {
-  const { rowSchema, signInInputSchema } = evaluateTemplate("modules/db/validation/validation.mapper.ts")
-  for (const id of [
-    "123e4567-e89b-12d3-a456-426614174000",
-    "123E4567-E89B-12D3-A456-426614174000",
-  ]) {
-    assert.equal(rowSchema.safeParse({ id }).success, true)
-  }
-  for (const id of [
-    "",
-    "123e4567e89b12d3a456426614174000",
-    "123e4567-e89b-12d3-a456-42661417400",
-    "123e4567-e89b-12d3-a456-4266141740000",
-    "123e4567-e89b-12d3-a456-42661417400g",
-  ]) {
-    assert.equal(rowSchema.safeParse({ id }).success, false)
-  }
-
-  const form = (email, password) => ({ get: (name) => name === "email" ? email : password })
-  assert.equal(signInInputSchema.safeParse(form(`${"a".repeat(242)}@example.com`, "p".repeat(8))).success, true)
-  assert.equal(signInInputSchema.safeParse(form(`${"a".repeat(243)}@example.com`, "p".repeat(8))).success, false)
-  assert.equal(signInInputSchema.safeParse(form("a@example.com", "p".repeat(7))).success, false)
-  assert.equal(signInInputSchema.safeParse(form("a@example.com", "p".repeat(256))).success, true)
-  assert.equal(signInInputSchema.safeParse(form("a@example.com", "p".repeat(257))).success, false)
-
-  const writer = fs.readFileSync(TABLE_TEMPLATE, "utf8")
-  assert.match(writer, /import \{ rowSchema \} from "\.\.\/validation\/validation\.mapper"/)
-  assert.match(writer, /if \(!parsed\.success\) return dbFailure\("invalid", "\{\{table\}\}-input"\)/)
-})
-
-test("sign-out uses the server client while the browser client refresh hook stays live", () => {
-  const action = templateText("modules/db/auth/write-sign-out.ts")
-  assert.match(action, /const principal = await getPrincipal\(\)[\s\S]*createServerDbClient\(\)[\s\S]*auth\.signOut\(\)/)
-  assert.match(action, /dbFailure\(result\.error\.status === 401 \? "refused" : "unavailable"/)
-
-  const signOut = templateText("components/blocks/SignOutButton/index.tsx")
-  assert.match(signOut, /import \{ writeSignOut \} from "@\/modules\/db\/auth\/write-sign-out"/)
-  assert.match(signOut, /await writeSignOut\(\)/)
-
-  const browser = templateText("modules/db/browser.ts")
-  assert.match(browser, /const createBrowserDbClient/)
-  assert.match(browser, /createBrowserDbClient\(\)\.auth\.onAuthStateChange\(refresh\)/)
-  assert.match(browser, /subscription\.unsubscribe\(\)/)
-  assert.doesNotMatch(browser, /auth\.signOut/)
-
-  const providers = templateText("app/[locale]/providers.tsx")
-  assert.match(providers, /subscribeToAuthRefresh\(\(\) => router\.refresh\(\)\)/)
-  assert.doesNotMatch(providers, /\.auth\./)
+test("the lite auth client reaches only the Supabase auth API, never data, rpc, storage or realtime", async () => {
+    const { authClient, touched, options } = loadAuthClient()
+    assert.deepEqual(await authClient.session(), { userId: "u1", email: "a@example.com" })
+    assert.equal(await authClient.accessToken(), "token")
+    assert.equal(await authClient.refreshAccessToken(), "fresh")
+    assert.deepEqual(await authClient.signInWithPassword("a@example.com", "password"), { kind: "ok" })
+    assert.deepEqual(await authClient.signOut(), { kind: "ok" })
+    const stop = authClient.onChange(() => undefined)
+    stop()
+    assert.ok(touched.length > 0, "the client was used")
+    assert.deepEqual([...new Set(touched)], ["auth"], `members touched: ${touched.join(", ")}`)
+    assert.equal(options.length, 1, "one Supabase client per browser")
+    assert.equal(options[0].auth.flowType, "pkce", "the PKCE code exchange runs in the browser: no route handler")
 })

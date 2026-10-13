@@ -55,11 +55,16 @@ const repo = () => {
     "src/modules/platform/cqrs/index.ts",
     "src/modules/platform/database/database.module.ts",
     "src/modules/platform/database/index.ts",
+    "src/modules/platform/errors/index.ts",
     "src/modules/platform/http-security/index.ts",
+    "src/modules/platform/i18n/index.ts",
   ]) {
     const target = path.join(root, "be", ...relative.split("/"));
     fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.copyFileSync(path.join(ROOT, "packages", "hfs", "templates", "be", "skeleton-lite", ...relative.split("/")), target);
+    // The lite overlay's barrel where lite has one, else the shared skeleton's (lite reuses it).
+    const templates = path.join(ROOT, "packages", "hfs", "templates", "be");
+    const lite = path.join(templates, "skeleton-lite", ...relative.split("/"));
+    fs.copyFileSync(fs.existsSync(lite) ? lite : path.join(templates, "skeleton", ...relative.split("/")), target);
   }
   fs.writeFileSync(path.join(root, "package.json"), '{"dependencies":{}}\n');
   fs.mkdirSync(path.join(root, "be", "apps", "api", "src"), { recursive: true });
@@ -103,7 +108,7 @@ const prepareWebhookDependencies = (root) => {
   );
 };
 
-test("add table writes one policy-complete migration, FE db modules, and regenerated types", async () => {
+test("add table --fe writes one policy-complete migration, the GraphQL api feature, the fe operations and SWR hooks, and regenerated types", async () => {
   const root = repo();
   const generated =
     "export type Database = { public: { Tables: { orders: { Row: { id: string } } } } }\n";
@@ -126,22 +131,61 @@ test("add table writes one policy-complete migration, FE db modules, and regener
     "be/src/modules/domain/orders/orders.service.ts",
     "be/src/modules/domain/orders/persistence/orders.rows.ts",
     "be/src/modules/domain/orders/persistence/orders.sql.ts",
-    "fe/apps/web/src/modules/db/orders/read-orders.ts",
-    "fe/apps/web/src/modules/db/orders/write-orders.ts",
+    "be/src/features/api/orders/index.ts",
+    "be/src/features/api/orders/orders.module.ts",
+    "be/src/features/api/orders/application/get-order.query.ts",
+    "be/src/features/api/orders/application/get-order.handler.ts",
+    "be/src/features/api/orders/application/get-order.contracts.ts",
+    "be/src/features/api/orders/application/create-order.command.ts",
+    "be/src/features/api/orders/application/create-order.handler.ts",
+    "be/src/features/api/orders/application/create-order.contracts.ts",
+    "be/src/features/api/orders/transport/graphql/get-order.resolver.ts",
+    "be/src/features/api/orders/transport/graphql/get-order.mapper.ts",
+    "be/src/features/api/orders/transport/graphql/dto/get-order.input.ts",
+    "be/src/features/api/orders/transport/graphql/dto/get-order.type.ts",
+    "be/src/features/api/orders/transport/graphql/create-order.resolver.ts",
+    "be/src/features/api/orders/transport/graphql/create-order.mapper.ts",
+    "be/src/features/api/orders/transport/graphql/dto/create-order.type.ts",
+    "be/src/features/api/orders/transport/graphql/orders-graphql.module.ts",
+    "be/src/modules/platform/graphql/graphql-depth.policy.spec.ts",
+    "be/src/modules/platform/graphql/graphql-depth.policy.ts",
+    "be/src/modules/platform/graphql/graphql-error.mapper.spec.ts",
+    "be/src/modules/platform/graphql/graphql-error.mapper.ts",
+    "be/src/modules/platform/graphql/graphql.contracts.ts",
+    "be/src/modules/platform/graphql/graphql.module-definition.ts",
+    "be/src/modules/platform/graphql/graphql.module.ts",
+    "be/src/modules/platform/graphql/graphql.options.ts",
+    "be/src/modules/platform/graphql/index.ts",
+    "be/src/modules/platform/graphql/localize-errors.mapper.spec.ts",
+    "be/src/modules/platform/graphql/localize-errors.mapper.ts",
+    "fe/apps/web/src/modules/api/graphql/queries/query-order.ts",
+    "fe/apps/web/src/modules/api/graphql/queries/types/order.ts",
+    "fe/apps/web/src/modules/api/graphql/mutations/mutation-create-order.ts",
+    "fe/apps/web/src/modules/api/graphql/mutations/types/create-order.ts",
+    "fe/apps/web/src/hooks/swr/api/graphql/queries/useQueryOrderSwr.ts",
+    "fe/apps/web/src/hooks/swr/api/graphql/mutations/useMutateCreateOrderSwr.ts",
   ]);
+  // Owner ruling 2026-10-13: the front end reaches data through the back end's GraphQL only.
+  assert.equal(result.created.some((file) => file.includes("/modules/db/")), false, "no Supabase reader or Server Action");
   assert.equal(read(root, "supabase/types/database.types.ts"), generated);
-  assert.match(
-    read(root, migration),
-    /create policy "orders_authenticated_update"/,
-  );
-  assert.match(
-    read(root, "fe/apps/web/src/modules/db/orders/read-orders.ts"),
-    /\.limit\(100\)/,
-  );
-  assert.match(
-    read(root, "fe/apps/web/src/modules/db/orders/write-orders.ts"),
-    /insertRow\(parsed\.data\.id, principal\.value\.id/,
-  );
+  // the back end is the only reader and writer of a table; the front end holds no table grant (owner ruling 2026-10-13)
+  assert.match(read(root, migration), /create policy "orders_app_be_update"/);
+  assert.match(read(root, migration), /create policy "orders_app_be_insert"/);
+  assert.match(read(root, migration), /grant select, insert, update, delete on table public\.orders to app_be;/);
+  assert.doesNotMatch(read(root, migration), /to authenticated/);
+  const query = read(root, "fe/apps/web/src/modules/api/graphql/queries/query-order.ts");
+  assert.match(query, /query Order\(\$input: GetOrderInput!\)/);
+  assert.match(query, /createAuthApolloClient\(\{ signal \}\)\.query/);
+  assert.doesNotMatch(query, /use server|@supabase/);
+  assert.match(read(root, "fe/apps/web/src/modules/api/graphql/queries/types/order.ts"), /from "\.\.\/\.\.\/__generated__\/graphql"/);
+  assert.match(read(root, "fe/apps/web/src/modules/api/graphql/mutations/mutation-create-order.ts"), /mutation CreateOrder \{/);
+  assert.match(read(root, "fe/apps/web/src/hooks/swr/api/graphql/queries/useQueryOrderSwr.ts"), /\[QUERY_ORDER_SWR_KEY, id\]/);
+  assert.match(read(root, "fe/apps/web/src/hooks/swr/api/graphql/mutations/useMutateCreateOrderSwr.ts"), /useSWRMutation\(MUTATE_CREATE_ORDER_SWR_KEY/);
+  assert.match(read(root, "fe/apps/web/src/hooks/swr/api/graphql/queries/index.ts"), /export \{ QUERY_ORDER_SWR_KEY, useQueryOrderSwr \}/);
+  assert.match(read(root, "fe/apps/web/src/hooks/swr/index.ts"), /export \* from "\.\/api"/);
+  assert.match(read(root, "be/src/features/api/orders/transport/graphql/get-order.resolver.ts"), /@Query\(\(\) => GetOrderType, \{ name: "order" \}\)/);
+  assert.match(read(root, "be/src/features/api/orders/transport/graphql/create-order.resolver.ts"), /@Mutation\(\(\) => CreateOrderType, \{ name: "createOrder" \}\)/);
+  assert.match(read(root, "be/src/modules/domain/orders/orders.service.ts"), /createOrder\(principalId: string\)/);
   assert.match(read(root, "be/src/modules/domain/orders/orders.service.ts"), /InjectPrimaryEntityManager/);
   assert.match(
     read(root, "be/src/modules/domain/orders/orders.service.ts"),
@@ -157,12 +201,23 @@ test("add table writes one policy-complete migration, FE db modules, and regener
   );
   assert.match(read(root, "be/apps/api/src/app.module.ts"), /OrdersModule\.register\(\{ isGlobal: true \}\)/);
   assert.match(read(root, "be/apps/api/src/app.module.ts"), /ORDERS_ERROR_KINDS/);
-  assert.doesNotMatch(read(root, "be/src/modules/domain/orders/index.ts"), /OrdersService/);
+  assert.match(read(root, "be/src/modules/domain/orders/index.ts"), /export \{ OrdersService \}/);
+  const app = read(root, "be/apps/api/src/app.module.ts");
+  assert.match(app, /import \{ GraphqlModule \} from "@modules\/platform\/graphql"/);
+  assert.match(app, /GraphqlModule\.register\(\{ isGlobal: true \}\)/);
+  assert.match(app, /import \{ OrdersGraphqlModule \} from "@features\/api\/orders"/);
+  assert.match(read(root, "be/src/modules/platform/errors/index.ts"), /export \{ ERRORS_SERVICE \}/);
+  assert.match(read(root, "be/src/modules/platform/i18n/index.ts"), /REQUEST_LOCALE/);
   assert.match(read(root, "be/src/modules/platform/database/index.ts"), /export \{ requireOwnedRow, sql \}/);
   assert.match(read(root, "be/src/modules/platform/database/index.ts"), /export \{ InjectPrimaryEntityManager \}/);
   for (const file of result.created.filter((entry) => entry.endsWith(".ts"))) {
     assert.equal(parses(read(root, file)), true, `${file} parses`);
   }
+  // A second GraphQL table reuses the server capability and its wiring.
+  const second = addTable({ root, name: "invoices", fe: true, now: () => Date.UTC(2026, 9, 2, 12, 34, 58), emitTypes: false });
+  assert.equal(second.created.some((file) => file.startsWith("be/src/modules/platform/graphql/")), false);
+  assert.equal(read(root, "be/apps/api/src/app.module.ts").match(/GraphqlModule\.register/g).length, 1);
+  assert.match(read(root, "fe/apps/web/src/hooks/swr/api/graphql/queries/index.ts"), /useQueryInvoiceSwr/);
   const findings = await checkDatabase({
     repoRoot: root,
     files: [migration, "supabase/types/database.types.ts"],
@@ -226,12 +281,12 @@ test("the add table CLI accepts --fe and --no-types and reports its created file
   assert.match(out, /created supabase\/migrations\/\d{14}_audit-events\.sql/);
   assert.match(
     out,
-    /created fe\/apps\/web\/src\/modules\/db\/audit-events\/write-audit-events\.ts/,
+    /created fe\/apps\/web\/src\/hooks\/swr\/api\/graphql\/queries\/useQueryAuditEventSwr\.ts/,
   );
   assert.equal(has(root, "supabase/types/database.types.ts"), false);
 });
 
-test("add app refuses a second lite front end and keeps full add-app behavior", () => {
+test("add app adds a second front end in lite and in full (owner ruling 2026-10-13: lite and full share one fe structure)", () => {
   const root = repo();
   fs.writeFileSync(
     path.join(root, "package.json"),
@@ -242,14 +297,14 @@ test("add app refuses a second lite front end and keeps full add-app behavior", 
     path.join(root, "fe", "apps", "web", "package.json"),
     `${JSON.stringify({ name: "@demo/web", private: true, scripts: { build: "next build" }, dependencies: { next: "16.0.0" } }, null, 2)}\n`,
   );
-  assert.throws(
-    () => addApp({ root, name: "admin" }),
-    (error) =>
-      error?.code === "HFS_ADD_LITE_SINGLE_APP" &&
-      error.message ===
-        "a lite app has one front-end app; a second app needs the shared <project>-ui and <project>-i18n packages: run starci app upgrade --edition full",
-  );
-  assert.equal(has(root, "fe/apps/admin"), false);
+  const lite = addApp({ root, name: "admin" });
+  assert.ok(lite.created.includes("fe/apps/admin/src/modules/api/graphql/clients/clients/auth.ts"));
+  assert.match(read(root, "fe/apps/admin/src/modules/auth/client.ts"), /flowType: "pkce"/);
+  assert.equal(lite.created.some((file) => file.includes("/modules/db/")), false);
+  assert.deepEqual(JSON.parse(read(root, "hfs.json")).sides.fe.apps, [
+    { name: "web", kind: "next" },
+    { name: "admin", kind: "next" },
+  ]);
 
   const fullRoot = repo();
   const fullDeclaration = JSON.parse(read(fullRoot, "hfs.json"));
@@ -367,14 +422,16 @@ test("add cli migrate bootstraps the built-in lite groups without a domain servi
   assert.throws(() => addKind({ repoRoot: root, noun: "cli", name: "migrate" }), error => error?.code === "HFS_ADD_EXISTS");
 });
 
-test("lite add api emits HTTP, and api plus webhook transports are composed in the API app", () => {
+test("lite add api emits full's GraphQL door, and api plus webhook transports are composed in the API app", () => {
   const root = repo();
   addTable({ root, name: "bookings", emitTypes: false, now: () => Date.UTC(2026, 9, 2, 12, 34, 56) });
   const api = addKind({ repoRoot: root, noun: "api", name: "bookings", options: { service: "BookingsService=@modules/domain/bookings" } });
-  assert.ok(api.created.includes("be/src/features/api/bookings/transport/http/bookings.controller.ts"));
-  assert.ok(api.created.includes("be/src/features/api/bookings/transport/http/bookings-http.module.ts"));
-  assert.equal(api.created.some(file => file.includes("/graphql/")), false);
-  assert.match(read(root, "be/src/features/api/bookings/index.ts"), /BookingsHttpModule/);
+  assert.ok(api.created.includes("be/src/features/api/bookings/transport/graphql/bookings.resolver.ts"));
+  assert.ok(api.created.includes("be/src/features/api/bookings/transport/graphql/bookings-graphql.module.ts"));
+  assert.ok(api.created.includes("be/src/modules/platform/graphql/graphql.module.ts"), "the GraphQL server on first use");
+  assert.equal(api.created.some(file => file.includes("/transport/http/")), false);
+  assert.match(read(root, "be/src/features/api/bookings/index.ts"), /BookingsGraphqlModule/);
+  assert.match(read(root, "be/src/features/api/bookings/transport/graphql/bookings-graphql.module.ts"), /imports: \[BookingsApiModule\]/);
   assert.match(read(root, "be/src/modules/domain/bookings/index.ts"), /BookingsService/);
   assert.match(read(root, "be/src/modules/domain/identity/index.ts"), /CurrentPrincipal/);
   assert.match(read(root, "be/src/modules/platform/cqrs/index.ts"), /ExecuteParams/);
@@ -391,9 +448,10 @@ test("lite add api emits HTTP, and api plus webhook transports are composed in t
   for (const spec of ["be/src/features/webhooks/calendar/transport/http/calendar.webhook.spec.ts", "be/src/modules/domain/calendar-inbox/calendar-inbox.service.spec.ts"])
     assert.ok(webhook.created.includes(spec), `${spec} is generated (owner ruling 2026-10-12: lite keeps the unit specs)`);
   const app = read(root, "be/apps/api/src/app.module.ts");
-  assert.match(app, /import \{ BookingsHttpModule \} from "@features\/api\/bookings"/);
+  assert.match(app, /import \{ BookingsGraphqlModule \} from "@features\/api\/bookings"/);
+  assert.match(app, /import \{ GraphqlModule \} from "@modules\/platform\/graphql"/);
   assert.match(app, /import \{ CalendarHttpModule \} from "@features\/webhooks\/calendar"/);
-  assert.match(app, /imports: \[\s+CalendarInboxModule\.register\(\{ isGlobal: true \}\),\s+CalendarHttpModule,\s+BookingsHttpModule,/);
+  assert.match(app, /imports: \[\s+CalendarInboxModule\.register\(\{ isGlobal: true \}\),\s+CalendarHttpModule,\s+BookingsGraphqlModule,\s+GraphqlModule\.register\(\{ isGlobal: true \}\),/);
   assert.match(
     read(root, "be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts"),
     /@Headers\("x-calendar-delivery-id"\) deliveryId/,

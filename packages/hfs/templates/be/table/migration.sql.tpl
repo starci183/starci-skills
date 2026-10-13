@@ -14,38 +14,30 @@ before update on public.{{tableSql}}
 for each row
 execute function private.set_updated_at();
 
-create policy "{{table}}_authenticated_select"
-on public.{{tableSql}}
-for select
-to authenticated
-using (owner_id = (select auth.uid()));
-
-create policy "{{table}}_authenticated_insert"
-on public.{{tableSql}}
-for insert
-to authenticated
-with check (owner_id = (select auth.uid()));
-
-create policy "{{table}}_authenticated_update"
-on public.{{tableSql}}
-for update
-to authenticated
-using (owner_id = (select auth.uid()))
-with check (owner_id = (select auth.uid()));
-
-create policy "{{table}}_authenticated_delete"
-on public.{{tableSql}}
-for delete
-to authenticated
-using (owner_id = (select auth.uid()));
-
 create policy "{{table}}_app_be_select"
 on public.{{tableSql}}
 for select
 to app_be
 using (owner_id is not null);
 
-revoke all on table public.{{tableSql}} from public, anon;
-grant select, insert, delete on table public.{{tableSql}} to authenticated;
-grant update (updated_at) on table public.{{tableSql}} to authenticated;
-grant select on table public.{{tableSql}} to app_be;
+create policy "{{table}}_app_be_insert"
+on public.{{tableSql}}
+for insert
+to app_be
+with check (owner_id is not null);
+
+create policy "{{table}}_app_be_update"
+on public.{{tableSql}}
+for update
+to app_be
+using (owner_id is not null)
+with check (owner_id is not null);
+
+create policy "{{table}}_app_be_delete"
+on public.{{tableSql}}
+for delete
+to app_be
+using (owner_id is not null);
+
+revoke all on table public.{{tableSql}} from public, anon, authenticated;
+grant select, insert, update, delete on table public.{{tableSql}} to app_be;
