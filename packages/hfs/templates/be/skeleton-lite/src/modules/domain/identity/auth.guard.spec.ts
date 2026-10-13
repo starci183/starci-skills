@@ -5,12 +5,13 @@ import type { Request } from "express"
 import { mock } from "@starci/jest-preset"
 import type { Principal } from "@modules/platform/cqrs"
 import { ok, refused } from "@modules/platform/primitives"
-import { SUPABASE_ACCESS_TOKEN_VERIFIER, SupabaseErrorCode } from "@modules/integrations/supabase"
+import { SupabaseErrorCode } from "@modules/integrations/supabase"
 import type { VerifySupabaseAccessToken } from "@modules/integrations/supabase"
 import { AuthGuard } from "./auth.guard"
 import { IdentityErrorCode } from "./errors/identity.error"
 import type { PublicMetadata } from "./identity.contracts"
 import { PublicReason } from "./identity.contracts"
+import { ACCESS_TOKEN_VERIFIER } from "./identity.decorators"
 
 const principal: Principal = { id: "user-1", role: "authenticated" }
 
@@ -21,7 +22,7 @@ const build = async (metadata: PublicMetadata | undefined, verify: VerifySupabas
         providers: [
             AuthGuard,
             { provide: Reflector, useValue: reflector },
-            { provide: SUPABASE_ACCESS_TOKEN_VERIFIER, useValue: verify },
+            { provide: ACCESS_TOKEN_VERIFIER, useValue: verify },
         ],
     }).compile()
     return moduleRef.get(AuthGuard)

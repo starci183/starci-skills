@@ -36,6 +36,8 @@ jobs:
         run: npm run format:check
       - name: typecheck
         run: npm run typecheck
+      - name: unit
+        run: npm test -- --ci
       - name: build be
         run: npm run build:be
       - name: build fe

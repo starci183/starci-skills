@@ -13,7 +13,7 @@ import { BookingsResponse } from "./dto/bookings.response"
 export class BookingsController {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
-    /** Runs bookings for the authenticated caller. */
+    /** Books a resource of the authenticated caller; the booking is pending until its confirmation job ran. */
     @Post()
     async bookings(
         @CurrentPrincipal() principal: Principal,

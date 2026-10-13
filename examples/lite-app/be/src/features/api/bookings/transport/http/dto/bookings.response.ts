@@ -8,4 +8,6 @@ export class BookingsResponse {
     startsAt!: string
     /** The exclusive end of the booking interval. */
     endsAt!: string
+    /** `pending` until the confirm-booking job ran, then `confirmed`. */
+    status!: string
 }

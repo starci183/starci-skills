@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
-import { SUPABASE_ACCESS_TOKEN_VERIFIER } from "@modules/integrations/supabase"
 import { AuthGuard } from "./auth.guard"
+import { ACCESS_TOKEN_VERIFIER } from "./identity.decorators"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./identity.module-definition"
 
 @Module({})
@@ -15,7 +15,7 @@ export class IdentityModule extends ConfigurableModuleClass {
             providers: [
                 ...(base.providers ?? []),
                 {
-                    provide: SUPABASE_ACCESS_TOKEN_VERIFIER,
+                    provide: ACCESS_TOKEN_VERIFIER,
                     useValue: options.verifyAccessToken,
                 },
                 AuthGuard,
