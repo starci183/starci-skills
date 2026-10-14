@@ -10,6 +10,7 @@ const NEGATIVE = /\b(?:invalid|violat\w*|refus\w*|reject\w*|deni\w*|fail\w*|nega
 const POSITIVE = /\b(?:valid|pass\w*|accept\w*|conform\w*|positive|clean)\b/i;
 const assertions = new Set(['ok', 'equal', 'strictEqual', 'deepEqual', 'deepStrictEqual', 'match', 'throws', 'rejects', 'doesNotThrow', 'doesNotReject', 'notEqual', 'notDeepEqual']);
 const sourceFamilies = new Set(['machine', 'hfs', 'runtime', 'work-validate', 'sonar']);
+const analysisCaches = new WeakMap();
 
 export function claimsProof(text, code, edition) {
   return text.split(/\r?\n/).some((line) => /^\s*\/\/\s*proves:\s*/.test(line)
@@ -66,10 +67,18 @@ function testerRun(context, index, node) {
     complete: Boolean(Array.isArray(cases?.valid) && cases.valid.length && Array.isArray(cases?.invalid) && cases.invalid.length) };
 }
 
-function nodeContainsCode(context, file, nodes, code) {
+function nodeContainsCode(context, file, nodes, code, reached) {
   const source = sourceIndex(context, file);
-  return nodes.some((node) => node.type === 'Literal' && typeof node.value === 'string' && node.value.includes(code))
+  return nodes.some((node) => codeLiteral(node, code) || importedCode(context, source, node, code, reached))
     || !source.tree;
+}
+
+const codeLiteral = (node, code) => node?.type === 'Literal' && typeof node.value === 'string' && node.value.includes(code);
+
+function importedCode(context, index, node, code, reached) {
+  if (node.type !== 'Identifier' || !index.imports.has(node.name)) return false;
+  const resolved = resolvedExpression(context, index, node);
+  return codeLiteral(resolved.node, code) && reached.get(resolved.index.file)?.includes(resolved.node);
 }
 
 function reachedExportKeys(context, file, nodes) {
@@ -79,20 +88,18 @@ function reachedExportKeys(context, file, nodes) {
     .map(([name]) => `${file}#${name}`);
 }
 
-function assertionTargets(context, index, node, code) {
+function assertionTargets(context, assertion, code) {
   const out = new Set();
-  const actual = node.arguments[0];
-  for (const [file, reached] of resultReach(context, index, actual)) {
-    if (file === index.file || !nodeContainsCode(context, file, reached, code)) continue;
+  for (const [file, reached] of assertion.reached) {
+    if (file === assertion.index.file || !nodeContainsCode(context, file, reached, code, assertion.reached)) continue;
     out.add(file);
     reachedExportKeys(context, file, reached).forEach((key) => out.add(key));
   }
   return out;
 }
 
-function expectationRole(context, index, node, title, code) {
+function expectationRole(node, title, code, expected) {
   const out = new Set();
-  const expected = evaluate(context, index, node.arguments[1]);
   const role = expectedRole(expected, code);
   if (role) out.add(role);
   if (['throws', 'rejects'].includes(nodeName(node.callee.property))) out.add('violating');
@@ -111,32 +118,61 @@ function expectedRole(expected, code) {
   return expected === code ? 'violating' : null;
 }
 
-function assertionClaimsCode(context, index, assertion, code) {
+function assertionClaims(context, index, assertion) {
   const name = nodeName(assertion.callee.property) ?? assertion.callee.name;
   const argumentsToCheck = assertion.arguments.slice(0, name === 'ok' ? 1 : 2);
-  return argumentsToCheck.some((argument) => [...resultReach(context, index, argument, { helpersOnly: true }).values()]
-    .some((nodes) => nodes.some((node) => node.type === 'Literal' && node.value === code)));
+  const out = new Set();
+  for (const argument of argumentsToCheck) {
+    for (const nodes of resultReach(context, index, argument, { helpersOnly: true }).values()) {
+      for (const node of nodes) if (node.type === 'Literal') out.add(node.value);
+    }
+  }
+  return out;
 }
 
-function testEvidence(context, index, test, code) {
-  const roles = new Map();
+function testAnalysis(context, index, test) {
+  const checked = [];
   const runs = [];
   const callback = resolvedExpression(context, test.index ?? index, test.node);
   scopedWalk(context, localScope(callback.index), callback.node?.body, (current, node) => {
     const run = testerRun(context, current, node);
     if (run) runs.push(run);
     if (!assertionCall(current, node)) return;
-    const claimed = assertionClaimsCode(context, current, node, code);
-    for (const target of assertionTargets(context, current, node, code)) {
+    checked.push({ index: current, node, expected: evaluate(context, current, node.arguments[1]),
+      reached: resultReach(context, current, node.arguments[0]),
+      claims: assertionClaims(context, current, node) });
+    return false;
+  });
+  return { checked, runs, title: test.title };
+}
+
+function testEvidence(context, analysis, code) {
+  const roles = new Map();
+  for (const assertion of analysis.checked) {
+    for (const target of assertionTargets(context, assertion, code)) {
       const proven = roles.get(target) ?? new Set();
-      expectationRole(context, current, node, test.title, code).forEach((role) => {
-        if (role !== 'violating' || claimed) proven.add(role);
+      expectationRole(assertion.node, analysis.title, code, assertion.expected).forEach((role) => {
+        if (role !== 'violating' || assertion.claims.has(code)) proven.add(role);
       });
       roles.set(target, proven);
     }
-    return false;
-  });
-  return { roles, runs };
+  }
+  return { roles, runs: analysis.runs };
+}
+
+function cachedTests(context, file, edition) {
+  let cache = analysisCaches.get(context.files);
+  if (!cache || cache.sources.size !== context.files.size
+    || ![...cache.sources].every(([name, text]) => context.files.get(name) === text)) {
+    cache = { sources: new Map(context.files), tests: new Map() };
+    analysisCaches.set(context.files, cache);
+  }
+  const key = `${file}@${edition}`;
+  if (!cache.tests.has(key)) {
+    const index = sourceIndex(context, file);
+    cache.tests.set(key, testsInEdition(context, index, edition).map((test) => testAnalysis(context, index, test)));
+  }
+  return cache.tests.get(key);
 }
 
 function sourceEvidence(context, rule, code, edition) {
@@ -146,8 +182,8 @@ function sourceEvidence(context, rule, code, edition) {
     for (const file of evidenceFiles(context.files, ref).filter((name) => name.endsWith('.spec.mjs'))) {
       const index = sourceIndex(context, file);
       if (!claimsProof(index.text, code, edition)) continue;
-      const tests = testsInEdition(context, index, edition);
-      proofs.push({ file, tests: tests.map((entry) => testEvidence(context, index, entry, code)) });
+      const tests = cachedTests(context, file, edition);
+      proofs.push({ file, tests: tests.map((entry) => testEvidence(context, entry, code)) });
     }
   }
   return proofs;
@@ -213,18 +249,22 @@ export function coverageProofFindings(context, rule, code, edition) {
 /** Spec evidence can also name a helper; its edition claim must still exercise and assert a checker. */
 export function claimedSpecProof(context, ref, code, edition) {
   if (!evidenceInEdition(ref, edition)) return false;
+  const direct = sourceEvidence(context, { proves: [ref] }, code, edition);
+  if (direct.some(completeClaimedProof)) return true;
   const specs = helperSpecs(context, ref).filter((file) => helperIsUsed(context, file, ref, edition));
   const proofs = sourceEvidence(context, { proves: [ref, ...specs] }, code, edition);
-  return proofs.some((proof) => {
-    const passing = new Set();
-    const violating = new Set();
-    for (const test of proof.tests) {
-      if (test.runs.some((run) => run.complete)) return true;
-      for (const [file, roles] of test.roles) {
-        if (roles.has('passing')) passing.add(file);
-        if (roles.has('violating')) violating.add(file);
-      }
+  return proofs.some(completeClaimedProof);
+}
+
+function completeClaimedProof(proof) {
+  const passing = new Set();
+  const violating = new Set();
+  for (const test of proof.tests) {
+    if (test.runs.some((run) => run.complete)) return true;
+    for (const [file, roles] of test.roles) {
+      if (roles.has('passing')) passing.add(file);
+      if (roles.has('violating')) violating.add(file);
     }
-    return [...passing].some((file) => violating.has(file));
-  });
+  }
+  return [...passing].some((file) => violating.has(file));
 }

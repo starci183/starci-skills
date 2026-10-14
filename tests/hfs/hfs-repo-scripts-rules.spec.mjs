@@ -1,11 +1,13 @@
 // The repository-hygiene tree checks of `starci app check` (scripts/hfs/rules): R102 BE_SPEC_PLACEMENT, R103 HFS_REPO_LOCAL_CHECK,
 // R104 HFS_LINT_SUPPRESSION_FILE, R105 HFS_PROOF_COMMAND_FILE_MISSING, R111 HFS_PEER_INTEGRATION_MISSING, and the slot app.scripts that holds the app root `scripts/` folder.
 // Each has a violating and a passing tree; the clean app of tests/helpers/hfs-cli-fixture.mjs is the passing base, checked at its root.
+// proves: BE_INTEGRATION_SPEC_MISSING@full
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { checkRepo } from '../../scripts/hfs/check.mjs';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 import { APP } from '../helpers/hfs-cli-fixture.mjs';
 import { createHfsRepoScriptsRulesFixture } from '../helpers/hfs-hfs-repo-scripts-rules-fixture.mjs';
 
@@ -13,7 +15,7 @@ const { basePackage, dispose, put, repoOf } = createHfsRepoScriptsRulesFixture()
 test.after(dispose);
 const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
 const only = (result, code) => result.findings.filter((f) => f.code === code);
-const pathsOf = (result, code) => only(result, code).map((f) => f.path).sort();
+const pathsOf = (result, code) => only(result, code).map((f) => f.path).sort(byCodeUnit);
 const slotFindings = (result) => result.findings.filter((f) => f.code === 'HFS_SLOT_UNDECLARED' || f.code === 'HFS_FORBIDDEN_PRESENT');
 
 // ------------------------------------------------------------------------------------------------ slot app.scripts
@@ -109,7 +111,11 @@ test('HFS_LINT_SUPPRESSION_FILE: plain eslint scripts and the standard config ar
 
 // ------------------------------------------------------------------------------------------------ R105 HFS_PROOF_COMMAND_FILE_MISSING
 
-const RECORD = (commands, repository) => `schema: work/implementation@1\nid: impl.demo.gate\nstate: todo\n${repository ? `repository: ${repository}\n` : ''}requiresProof:\n${Object.entries(commands).map(([kind, command]) => `  ${kind}:\n    required: true\n    command: ${JSON.stringify(command)}\n`).join('')}`;
+const RECORD = (commands, repository) => {
+  const repositoryLine = repository ? `repository: ${repository}\n` : '';
+  const commandLines = Object.entries(commands).map(([kind, command]) => `  ${kind}:\n    required: true\n    command: ${JSON.stringify(command)}\n`).join('');
+  return `schema: work/implementation@1\nid: impl.demo.gate\nstate: todo\n${repositoryLine}requiresProof:\n${commandLines}`;
+};
 
 test('HFS_PROOF_COMMAND_FILE_MISSING: a proof command that runs a deleted script or spec is refused, one finding per kind and path', () => {
   const result = checkRepo({ repoRoot: repoOf(APP, (dir) => {
@@ -119,8 +125,8 @@ test('HFS_PROOF_COMMAND_FILE_MISSING: a proof command that runs a deleted script
     }));
   }) });
   const found = only(result, 'HFS_PROOF_COMMAND_FILE_MISSING');
-  assert.deepEqual(found.map((f) => f.missing).sort(), ['be/src/tests/e2e/login/gate.e2e-spec.ts', 'scripts/provision.spec.mjs']);
-  assert.deepEqual(found.map((f) => f.kind).sort(), ['live', 'unit']);
+  assert.deepEqual(found.map((f) => f.missing).sort(byCodeUnit), ['be/src/tests/e2e/login/gate.e2e-spec.ts', 'scripts/provision.spec.mjs']);
+  assert.deepEqual(found.map((f) => f.kind).sort(byCodeUnit), ['live', 'unit']);
 });
 
 test('HFS_PROOF_COMMAND_FILE_MISSING: a command whose files exist, flags, globs, other repositories and build products are clean', () => {
@@ -143,7 +149,7 @@ test('HFS_PROOF_COMMAND_FILE_MISSING: a record of the be or fe side is judged ag
     put(dir, '.starciwork/features/login/impl/demo/page/index.yaml', RECORD({ typecheck: 'tsc -p fe/apps/gone/tsconfig.json --noEmit' }, 'fe'));
   }) });
   const found = only(result, 'HFS_PROOF_COMMAND_FILE_MISSING');
-  assert.deepEqual(found.map((f) => [f.path, f.missing]).sort(), [
+  assert.deepEqual(found.map((f) => [f.path, f.missing]).sort(byCodeUnit), [
     ['.starciwork/features/login/impl/demo/gate/index.yaml', 'be/src/tests/e2e/login/gate.e2e-spec.ts'],
     ['.starciwork/features/login/impl/demo/page/index.yaml', 'fe/apps/gone/tsconfig.json'],
   ]);
@@ -159,7 +165,7 @@ test('HFS_PROOF_COMMAND_FILE_MISSING: a record of an implementation in another r
 // ------------------------------------------------------------------------------------------------ R111 HFS_PEER_INTEGRATION_MISSING
 
 const withDependencies = (dependencies, devDependencies = {}) => (dir) => {
-  put(dir, 'package.json', json({ ...basePackage, dependencies: { ...(basePackage.dependencies ?? {}), ...dependencies }, devDependencies: { ...(basePackage.devDependencies ?? {}), ...devDependencies } }));
+  put(dir, 'package.json', json({ ...basePackage, dependencies: { ...basePackage.dependencies, ...dependencies }, devDependencies: { ...basePackage.devDependencies, ...devDependencies } }));
 };
 const APOLLO_ON_EXPRESS5 = { '@nestjs/apollo': '^13.4.5', '@nestjs/platform-express': '11.2.5' };
 
@@ -223,26 +229,26 @@ const specText = ({ modules, refusal = "await expect(Promise.reject({ code: PayE
 ].join('\n');
 const r112 = (mutate) => only(checkRepo({ repoRoot: repoOf(APP, mutate) }), 'BE_INTEGRATION_SPEC_MISSING');
 
-test('BE_INTEGRATION_SPEC_MISSING: an integration without an integration spec is refused on its folder', () => {
+test('BE_INTEGRATION_SPEC_MISSING (full): an integration without an integration spec is refused on its folder', () => {
   const findings = r112(withPayIntegration());
   assert.deepEqual(findings.map((f) => [f.path, f.provider, f.missing]), [[`${PAY}/`, 'pay', ['spec']]]);
 });
 
-test('BE_INTEGRATION_SPEC_MISSING: a spec that does not register the integration module, by origin not by name, is refused', () => {
+test('BE_INTEGRATION_SPEC_MISSING (full): a spec that does not register the integration module, by origin not by name, is refused', () => {
   const local = specText({ modules: '[() => PayModule.register({})]' }).replace("import { PayErrorCode, PayModule } from '../../../modules/integrations/pay';", "import { PayErrorCode } from '../../../modules/integrations/pay';\nclass PayModule { static register(o: object): object { return o; } }");
   assert.deepEqual(r112(withPayIntegration({ [PAY_SPEC]: local })).map((f) => f.missing), [['modules']]);
   const other = specText({ modules: '[() => OtherModule.register({})]', head: "import { OtherModule } from '../../../modules/platform/other';" });
   assert.deepEqual(r112(withPayIntegration({ [PAY_SPEC]: other, 'be/src/modules/platform/other/index.ts': 'export class OtherModule { static register(o: object): object { return o; } }\n' })).map((f) => f.missing), [['modules']]);
 });
 
-test('BE_INTEGRATION_SPEC_MISSING: a spec with no ErrorCode enum reference or no world outage is refused, naming what it lacks', () => {
+test('BE_INTEGRATION_SPEC_MISSING (full): a spec with no ErrorCode enum reference or no world outage is refused, naming what it lacks', () => {
   const noEnum = specText({ modules: '[() => PayModule.register({})]', refusal: "expect(PayModule).toBeDefined()" });
   assert.deepEqual(r112(withPayIntegration({ [PAY_SPEC]: noEnum })).map((f) => f.missing), [['errorCode']]);
   const readOnly = specText({ modules: '[() => PayModule.register({})]', outage: 'await world.infra.redis.size()' });
   assert.deepEqual(r112(withPayIntegration({ [PAY_SPEC]: readOnly })).map((f) => f.missing), [['outage']]);
 });
 
-test('BE_INTEGRATION_SPEC_MISSING: a correct pair passes, inline or through an exported factory list of another file', () => {
+test('BE_INTEGRATION_SPEC_MISSING (full): a correct pair passes, inline or through an exported factory list of another file', () => {
   assert.deepEqual(r112(withPayIntegration({ [PAY_SPEC]: specText({ modules: '[() => PayModule.register({})]' }) })), []);
   const viaList = specText({ modules: 'PAY_MODULES', head: "import { PAY_MODULES } from '../../world/test-capabilities.options';" }).replace("import { PayErrorCode, PayModule } from '../../../modules/integrations/pay';", "import { PayErrorCode } from '../../../modules/integrations/pay';");
   assert.deepEqual(r112(withPayIntegration({

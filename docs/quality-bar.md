@@ -118,6 +118,8 @@ checkout. The draft checklist above keeps its existing status.
 - **R291 HFS_FUNCTION_BUDGET:** A back-end or front-end function, method or arrow body has at most 80 physical lines, including comments and blank lines, in both editions.
 - **R292 HFS_FEATURE_FILE_BUDGET:** A feature owner has at most 250 tracked files, including nested files, in both editions.
 
+<a id="coverage-matrix"></a>
+
 R247 reports `RT_COVERAGE_MATRIX` when its inventory cannot be parsed. For an
 applicable rule and edition, `RT_COVERAGE_NO_ENFORCER` identifies an absent
 running enforcer, `RT_COVERAGE_NO_SPEC` a missing named proof header,
@@ -144,6 +146,8 @@ when its profile's ESLint plugin has no enforcer that handles it.
 A rule with no scaffolded surface may declare `templateNa` with a reason instead
 of citing an unrelated template. Required and managed slot templates still need
 their own evidence.
+
+<a id="r112"></a>
 
 Rules before R247 without any coverage metadata remain warnings in the legacy
 backlog. Adding any of `editions`, `docs`, `exemplifiedBy`, `proves` or `witness`

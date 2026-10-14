@@ -88,6 +88,18 @@ test('HFS_LITE_SECRET_CUSTODY (lite): root env/custody entries and sealed files 
   assert.ok(findings.every(item => item.code === 'HFS_LITE_SECRET_CUSTODY' && item.level === 'error'));
 });
 
+test('HFS_LITE_SECRET_CUSTODY (lite): direct sealed stack members and ordinary source files pass', t => {
+  const encrypted = 'ENC[AES256_GCM,data:AA==,iv:AA==,tag:AA==,type:str]';
+  const contents = {
+    '.starcistacks/dev/secrets/app.enc': JSON.stringify({ data: encrypted, sops: { mac: encrypted } }),
+    'be/apps/api/src/main.ts': 'export const port = 3000;\n',
+  };
+  const root = tree(t, contents);
+  const input = { repoRoot: root, files: Object.keys(contents), repo: app('lite'), resolver };
+  assert.deepEqual(liteSecretCustodyFindings(input), []);
+  assert.deepEqual(secretFindings(input), [], 'the fixture also satisfies the generic sealed-envelope contract');
+});
+
 test('HFS_LITE_SECRET_CUSTODY (lite): Supabase tokens, long eyJ service material and password-bearing connection strings under fe/ are refused', t => {
   const source = [
     `export const publishable = 'sbp_${'A'.repeat(24)}'`,

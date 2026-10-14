@@ -163,8 +163,9 @@ for (const edition of ["lite", "full"]) {
     ]);
   });
 
-  test(`HFS_AGE_KEY_CUSTODY (${edition}): no tracked identity file, no finding`, (t) => {
+  test(`HFS_AGE_KEY_CUSTODY (${edition}): an untracked host identity and ordinary source files pass`, (t) => {
     const { root } = app(t);
+    write(root, ".claude/secret.env", `SOPS_AGE_KEY=${PRIVATE_KEY}\n`);
     write(root, "src/index.ts");
     assert.deepEqual(
       ageKeyCustodyFindings(ctx(root, ["src/index.ts"], edition)),

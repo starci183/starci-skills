@@ -33,6 +33,10 @@ function builtinDependencies(current) {
   return out;
 }
 
+function appendDependencies(pending, dependencies) {
+  for (const dependency of dependencies) pending.push(dependency);
+}
+
 export function resultReach(context, index, node, { helpersOnly = false } = {}) {
   const out = new Map();
   const pending = node ? [{ index, node, stack: new Set() }] : [];
@@ -49,9 +53,12 @@ export function resultReach(context, index, node, { helpersOnly = false } = {}) 
     if (current.terminal) continue;
     const resolved = resolvedExpression(context, current.index, current.node);
     if (resolved.node !== current.node && resolved.node) { pending.push({ ...current, ...resolved }); continue; }
-    if (current.node.type === 'CallExpression') { pending.push(...callDependencies(context, current, helpersOnly)); continue; }
+    if (current.node.type === 'CallExpression') {
+      appendDependencies(pending, callDependencies(context, current, helpersOnly));
+      continue;
+    }
     if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(current.node.type)) continue;
-    pending.push(...astChildren(current.node).map((child) => ({ ...current, node: child })));
+    for (const child of astChildren(current.node)) pending.push({ ...current, node: child });
   }
   return out;
 }

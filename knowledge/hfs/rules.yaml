@@ -1151,6 +1151,15 @@ rules:
       - {kind: hfs, id: peer-integrations, at: scripts/hfs/rules/peer-integrations.mjs}
   - id: R112
     code: "BE_INTEGRATION_SPEC_MISSING"
+    editionWhy: "ruling:R212/case-3 keeps lite outside the full test world; ruling:lite-production-swarm amends hosting and ruling:lite-contract-specs permits contract specs while preserving that e2e boundary. R284 owns lite's integration proof lane; this rule judges provider module, error-code and outage proofs through the full world."
+    docs: [docs/quality-bar.md#r112]
+    templateNa: "Provider-specific module registration, refusal mapping and outage scenarios must be authored for each integration; the app scaffold has no provider-specific integration proof to generate."
+    proves:
+      - {path: tests/hfs/hfs-repo-scripts-rules.spec.mjs, edition: full}
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-repo-scripts-rules.spec.mjs, edition: full}
+    witness:
+      - {path: tests/hfs/hfs-repo-scripts-rules.spec.mjs, edition: full}
     law: "Every integration of a back end (`src/modules/integrations/<provider>/` holding `<provider>.config.ts`) has at least one `src/tests/integration/<provider>/*.integration-spec.ts` that, read as a syntax tree, calls `useTestWorld({ modules })` with a factory registering the integration's own module (`<Provider>Module.register`, imported from the integration folder; an inline array, a local const or an exported const of another file), references the ErrorCode enum the integration exports, and drives an outage through the world (`world.infra.<service>.cut|latency|during|connection`, `world.fake.<name>.failNext`, `world.apps.<peer>.during`, `world.interruptDatabase`); the finding sits on the integration folder."
     kinds: [check]
     gates: [land, ci]
@@ -1487,6 +1496,15 @@ rules:
       - {kind: hfs, id: services-event-contract, at: scripts/hfs/rules/services.mjs}
   - id: R167
     code: "BE_ASYNC_SPEC_MISSING"
+    editionWhy: "ruling:lite-contract-specs preserves the full-only e2e boundary. R284 owns lite's integration proof lane; this rule requires consumed-event scenarios through the full test world."
+    docs: [docs/microservices.md#r167]
+    templateNa: "Consumed-event and compensation scenarios depend on the product's event contracts and effects; the app scaffold has no product-specific asynchronous e2e scenario to generate."
+    proves:
+      - {path: tests/hfs/hfs-microservice-rules.spec.mjs, edition: full}
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-microservice-rules.spec.mjs, edition: full}
+    witness:
+      - {path: tests/hfs/hfs-microservice-rules.spec.mjs, edition: full}
     law: "Every event an app consumes (an entry of its `consumes.ts`) is named by an e2e spec, a file `be/src/tests/e2e/<area>/*.e2e-spec.ts` that boots the apps through `useTestWorld` (it publishes the event, reads the effect back and redelivers it); when the contract of the event declares `compensates: \"<event>\"` it is a saga step, and a spec naming it also names the compensated event, so the spec drives the whole flow: the step, the failure, then the compensated state."
     kinds: [check]
     gates: [land, ci]
@@ -1536,6 +1554,15 @@ rules:
       - {kind: hfs, id: saga-consumer-dedupe, at: scripts/hfs/rules/saga.mjs}
   - id: R173
     code: "BE_SAGA_E2E_MISSING"
+    editionWhy: "ruling:lite-contract-specs preserves the full-only e2e boundary. R284 owns lite's integration proof lane; this rule requires compensation fault scenarios through the full test world."
+    docs: [docs/microservices.md#r173]
+    templateNa: "Compensation events and injected-fault scenarios depend on the product's saga; the app scaffold has no product-specific compensation e2e scenario to generate."
+    proves:
+      - {path: tests/hfs/hfs-saga-rules.spec.mjs, edition: full}
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-saga-rules.spec.mjs, edition: full}
+    witness:
+      - {path: tests/hfs/hfs-saga-rules.spec.mjs, edition: full}
     law: "Every compensation path of a saga has an e2e spec (`be/src/tests/e2e/<area>/*.e2e-spec.ts` through `useTestWorld`) that names the event of the compensation and injects a failure through the world (an outage of an infra service or an app with `during`, `cut` or `latency`, a fake's `failNext`, `interruptDatabase`): the compensation is proven under a fault, not only on the happy flow."
     kinds: [check]
     gates: [land, ci]
@@ -1932,9 +1959,18 @@ rules:
   - id: R220
     code: "HFS_LITE_SECRET_CUSTODY"
     editions: [lite]
+    editionWhy: "ruling:lite-backing-services assigns Supabase backing to lite; R220 adds lite's reduced custody tree and Supabase/FE literal scan, while R06 governs plaintext secret material in both editions."
+    docs: [docs/host-secrets.md#application-secret-rules]
+    proves:
+      - {path: tests/hfs/hfs-supabase-secrets.spec.mjs, edition: lite}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/skeleton-lite/.sops.yaml, edition: lite}
+      - {path: tests/hfs/hfs-supabase-secrets.spec.mjs, edition: lite}
+    witness:
+      - {path: tests/hfs/hfs-supabase-secrets.spec.mjs, edition: lite}
     law: "A lite app holds no secret material in the tree: root `.env*`, `secrets.env`, `.secrets/` and an `.enc` file outside `.starcistacks/<env>/secrets` are forbidden, and `fe/` and `supabase/` hold no Supabase token, JWT or connection string with a password; the one custody is the sealed `.starcistacks/<env>/secrets/<slug>.enc`."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_LITE_SECRET_CUSTODY"]
     enforcers:
       - {kind: hfs, id: lite-secret-custody, at: scripts/hfs/rules/supabase-secrets.mjs}
@@ -2188,82 +2224,189 @@ rules:
     code: "RT_COVERAGE_MATRIX"
     law: "Every surface and rule has an existing enforcer, edition-specific spec proof, documentation, template, example and mutation witness in each applicable edition; edition differences cite their owner ruling, Work schemas have full example records, gate claims match their commands, superseded rulings are not cited alone and hard documentation requirements are ledgered."
     scope: runtime
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#coverage-matrix]
+    templateNa: "The runtime coverage checker judges authored catalogs and proof metadata; app scaffolds do not contain this runtime surface."
+    proves: [tests/checks/hfs-coverage.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/checks/hfs-coverage.spec.mjs, edition: lite}
+      - {path: tests/checks/hfs-coverage.spec.mjs, edition: full}
+    witness:
+      - {path: tests/checks/hfs-coverage.spec.mjs, edition: lite}
+      - {path: tests/checks/hfs-coverage.spec.mjs, edition: full}
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_COVERAGE_MATRIX", "RT_COVERAGE_NO_ENFORCER", "RT_COVERAGE_NO_SPEC", "RT_COVERAGE_NO_WITNESS", "RT_COVERAGE_NO_DOC", "RT_COVERAGE_NO_TEMPLATE", "RT_COVERAGE_NO_EXAMPLE", "RT_COVERAGE_EDITION_ASYMMETRY", "RT_COVERAGE_SCHEMA_NO_RECORD", "RT_COVERAGE_GATE_LIE", "RT_COVERAGE_SUPERSEDED_CITE", "RT_COVERAGE_SURFACE_UNMAPPED", "RT_COVERAGE_REQUIREMENT_UNLEDGERED", "RT_COVERAGE_PROOF_VACUOUS", "RT_COVERAGE_CODE_UNROUTED"]
     enforcers:
       - {kind: runtime, id: hfs-coverage, at: scripts/checks/check-hfs-coverage.mjs}
   - id: R248
     code: "ENV_REQUIRED_UNSET"
+    editions: [lite, full]
+    docs: [docs/host-secrets.md#r248]
+    proves:
+      - {path: tests/hfs/hfs-env-parity.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton-lite/apps/api/src/api.env.ts, edition: lite}
+      - {path: packages/hfs/templates/be/skeleton/apps/__app__/src/__app__.env.ts, edition: full}
+      - {path: tests/hfs/hfs-env-parity.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-env-parity.spec.mjs, editions: [lite, full]}
     law: "The environment keys a back end reads through its typed `EnvSource` (`<app>.env.ts` and the capability `*.config.ts` parse helpers, resolved by a static TypeScript walk that substitutes the literal arguments of a reader's call sites into a template key such as `${prefix}_WEBHOOK_SECRET`), the key names sealed in `.starcistacks/<env>/secrets/*.enc` and the keys the stack declares or passes (`KEYS.md`, `environment:`/`env:` entries, `runtimeSecrets`, `vars[].name`) are one set, compared by name only in both editions: a required read is sealed or declared (ENV_REQUIRED_UNSET), a sealed key is read or has a declared consumer (ENV_SEALED_UNREAD), one key lives in one member (ENV_DUPLICATE), no `NEXT_PUBLIC_*` key is sealed (ENV_PUBLIC_SEALED) and every `*.env.example` key is read (ENV_EXAMPLE_DRIFT)."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["ENV_REQUIRED_UNSET", "ENV_SEALED_UNREAD", "ENV_DUPLICATE", "ENV_PUBLIC_SEALED", "ENV_EXAMPLE_DRIFT"]
     enforcers:
       - {kind: hfs, id: env-parity, at: scripts/hfs/rules/env-parity.mjs}
   - id: R249
     code: "ENV_VALUE_SHAPE"
+    editions: [lite, full]
+    docs: [docs/host-secrets.md#r249]
+    proves:
+      - {path: tests/hfs/hfs-env-parity.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton-lite/apps/api/src/api.env.ts, edition: lite}
+      - {path: packages/hfs/templates/be/skeleton/apps/__app__/src/__app__.env.ts, edition: full}
+      - {path: tests/hfs/hfs-env-parity.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-env-parity.spec.mjs, editions: [lite, full]}
     law: "A stored environment value parses as the type its `EnvSource` reader declares (an integer, `true`/`false`, an absolute URL, a duration `250`/`30s`/`5m`/`2h`, a member of the declared enum, a nonempty string or secret): `starci app secret verify <env>` decrypts every member in memory and reports each key and its violated shape, never a value, and a concrete (non-placeholder) value of a `*.env.example` parses the same way."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["ENV_VALUE_SHAPE"]
     enforcers:
       - {kind: hfs, id: env-value-shape, at: scripts/hfs/rules/env-value-shape.mjs}
 
   - id: R250
     code: "HFS_HOST_CRON"
+    editions: [lite, full]
+    docs:
+      - {path: docs/application-stacks.md#r250-deploy-scan, editions: [lite, full]}
+    proves:
+      - {path: tests/hfs/hfs-deploy-scan.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/ci-workflows-lite/github/workflows/ci.yml, edition: lite}
+      - {path: packages/hfs/templates/app/ci-workflows/github/workflows/ci.yml, edition: full}
+      - {path: tests/hfs/hfs-deploy-scan.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-deploy-scan.spec.mjs, editions: [lite, full]}
     law: "In lite and full apps, scheduled work belongs to the back-end scheduler, pgmq/pg_cron or a declared replicated-job. Deployment files, scripts, workflows, compose files and Dockerfiles install no host crontab, cron.d entry, systemd timer, @reboot job or at job; a workflow does not schedule app work. Docker compose up, down and pull run only against an explicitly dev environment. Deploy shell scripts delegate to docker, starci or the app CLI, and contain no node -e, psql, inline SQL or downloaded shell logic."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_HOST_CRON", "HFS_DEPLOY_NO_LOGIC", "HFS_DEPLOY_COMPOSE_ON_VPS", "HFS_DEPLOY_SCHEDULER"]
     enforcers:
       - {kind: hfs, id: deploy-scan, at: scripts/hfs/rules/deploy-scan.mjs}
   - id: R251
     code: "HFS_DEPLOY_WORKFLOW"
+    editions: [lite, full]
+    docs:
+      - {path: docs/application-stacks.md#r251-deploy-workflow, editions: [lite, full]}
+    proves:
+      - {path: tests/hfs/hfs-deploy-workflow.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/ci-workflows-lite/github/workflows/db-deploy.yml, edition: lite}
+      - {path: packages/hfs/templates/app/ci-workflows/github/workflows/ci.yml, edition: full}
+      - {path: tests/hfs/hfs-deploy-workflow.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-deploy-workflow.spec.mjs, editions: [lite, full]}
     law: "In lite and full apps, deployment jobs declare a protected environment, explicit permissions and concurrency, materialize sealed secrets through SOPS_AGE_KEY or starci app secret materialize, and reference only the age key and transport SSH key/known_hosts secrets. They never embed a dotenv blob or write a dotenv file. Every remote workflow action uses a 40-hex commit SHA; installed tools are checksum or digest verified, or supplied by a pinned action. App workflows start only on release tags [v*] or workflow_dispatch, never on a branch push."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_DEPLOY_WORKFLOW", "HFS_WORKFLOW_PIN", "HFS_CI_TOOL_INSTALL", "HFS_APP_WORKFLOW_TRIGGER"]
     enforcers:
       - {kind: hfs, id: deploy-workflow, at: scripts/hfs/rules/deploy-workflow.mjs}
   - id: R252
     code: "HFS_SCRIPT_PLAINTEXT_LOAD"
+    editions: [lite, full]
+    docs:
+      - {path: docs/application-stacks.md#r252-script-hygiene, editions: [lite, full]}
+    proves:
+      - {path: tests/hfs/hfs-script-hygiene.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/ci-workflows-lite/github/workflows/db-deploy.yml, edition: lite}
+      - {path: packages/hfs/templates/app/ci-workflows/github/workflows/ci.yml, edition: full}
+      - {path: tests/hfs/hfs-script-hygiene.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-script-hygiene.spec.mjs, editions: [lite, full]}
     law: "In lite and full apps, executable scripts and workflow commands never load plaintext secrets.env, secret.env, .env secret files or a home-directory credential file, enable shell xtrace or request --reveal. Service-role references belong only to the back-end Supabase integration; deployment scripts and source outside that integration never use the service role. Scanners inspect source references and report paths without reading secret files or printing their values."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_SCRIPT_PLAINTEXT_LOAD", "HFS_SCRIPT_XTRACE", "HFS_SERVICE_ROLE_SCOPE"]
     enforcers:
       - {kind: hfs, id: script-hygiene, at: scripts/hfs/rules/script-hygiene.mjs}
   - id: R253
     code: "HFS_AGE_KEY_CUSTODY"
+    editions: [lite, full]
+    docs: [docs/host-secrets.md#application-secret-rules]
+    proves:
+      - {path: tests/hfs/hfs-secret-custody.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton/src/modules/platform/config/env-source.config.ts, editions: [lite, full]}
+      - {path: packages/hfs/templates/be/skeleton/src/modules/platform/http-security/origin.guard.ts, editions: [lite, full]}
+      - {path: packages/hfs/templates/be/skeleton/src/modules/platform/http-security/webhook-signature.service.ts, editions: [lite, full]}
+      - {path: tests/hfs/hfs-secret-custody.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-secret-custody.spec.mjs, editions: [lite, full]}
     law: "The age identity that seals and opens an app's `.starcistacks/<env>/secrets/*.enc` is host-local custody only: it lives in the untracked `.claude/secret.env` (as `SOPS_AGE_KEY`, which wins over the legacy `keys.txt` and is handed to sops through the `SOPS_AGE_KEY` child environment, never as an argument and never printed) or in the sops config dir's `keys.txt`; a tracked `.claude/secret.env`, `keys.txt` or `*.agekey` is the identity committed. The three files the secret custody depends on - `src/modules/platform/config/env-source.config.ts`, `src/modules/platform/http-security/origin.guard.ts` and `src/modules/platform/http-security/webhook-signature.service.ts` - are hash-sensitive canon, not files to edit: their bytes equal the `be/skeleton` template they were scaffolded from, judged by sha256."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_AGE_KEY_CUSTODY", "HFS_CANON_COPY_DRIFT"]
     enforcers:
       - {kind: hfs, id: secret-age-key-custody, at: scripts/hfs/rules/secrets.mjs}
       - {kind: hfs, id: canon-copy-drift, at: scripts/hfs/rules/canon-copy-drift.mjs}
   - id: R254
     code: "DB_BE_ONLY_ACCESS"
+    editions: [lite]
+    editionWhy: "owner:lite-backing-services makes Supabase lite's database backing; these SQL access requirements apply to that backing."
+    docs: [docs/microservices.md#r254]
+    templateNa: "Browser grants, policies and publication membership belong to product-authored Supabase migrations, rather than a scaffolded SQL surface."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-database-access.spec.mjs, edition: lite, codes: [DB_BE_ONLY_ACCESS, DB_REALTIME_UNLISTED]}
+    proves:
+      - {path: tests/hfs/hfs-database-access.spec.mjs, edition: lite, codes: [DB_BE_ONLY_ACCESS, DB_REALTIME_UNLISTED]}
+    witness:
+      - {path: tests/hfs/hfs-database-access.spec.mjs, edition: lite, codes: [DB_BE_ONLY_ACCESS, DB_REALTIME_UNLISTED]}
     law: "In lite and full, browser data access stays closed on exposed schemas: authenticated receives neither table or sequence privileges nor data policies, and anon reads only through a select policy named *_public_read. A table listed in hfs.json supabase.directAccess is an explicit exception. A table joins supabase_realtime only when that direct access is declared. The front end uses Supabase for Auth and reaches product data through the back end."
     kinds: [check]
-    gates: [pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["DB_BE_ONLY_ACCESS", "DB_REALTIME_UNLISTED"]
     enforcers:
       - {kind: hfs, id: db-be-only-access, at: scripts/hfs/rules/database-access.mjs}
   - id: R255
     code: "DB_APP_ROLE"
+    editions: [lite]
+    editionWhy: "owner:lite-backing-services makes Supabase lite's database backing; application-role and forced-RLS requirements apply to that backing."
+    docs: [docs/microservices.md#r255]
+    templateNa: "Application roles and table ownership are product-authored Supabase migration content, rather than a scaffolded SQL surface."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-database-access.spec.mjs, edition: lite, codes: [DB_APP_ROLE, DB_FORCE_RLS_DEFAULT]}
+    proves:
+      - {path: tests/hfs/hfs-database-access.spec.mjs, edition: lite, codes: [DB_APP_ROLE, DB_FORCE_RLS_DEFAULT]}
+    witness:
+      - {path: tests/hfs/hfs-database-access.spec.mjs, edition: lite, codes: [DB_APP_ROLE, DB_FORCE_RLS_DEFAULT]}
     law: "The declared back-end database role (hfs.json supabase.appRole, app_be by default) has only the privileges it needs: role declarations refuse superuser and bypassrls, require noinherit and nobypassrls, and never grant all schema or table privileges. Tables owned by that role enable and force row level security by default; a forceRls exemption identifies the table and carries a nonempty reason. This applies to every edition that declares Supabase."
     kinds: [check]
-    gates: [pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["DB_APP_ROLE", "DB_FORCE_RLS_DEFAULT"]
     enforcers:
       - {kind: hfs, id: db-app-role, at: scripts/hfs/rules/database-access.mjs}
   - id: R256
     code: "DB_POLICY_TAUTOLOGY"
+    editions: [lite]
+    editionWhy: "owner:lite-backing-services makes Supabase lite's database backing; access-policy, view, definer and storage SQL requirements apply to that backing."
+    docs: [docs/microservices.md#r256]
+    templateNa: "Access policies, views, definers and storage policies belong to product-authored Supabase migrations, rather than a scaffolded SQL surface."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-database-access.spec.mjs, edition: lite, codes: [DB_POLICY_TAUTOLOGY, DB_VIEW_UNSAFE, DB_STORAGE_PREFIX]}
+      - {path: tests/hfs/hfs-database-rules.spec.mjs, edition: lite, codes: [DB_DEFINER_REVOKE]}
+    proves:
+      - {path: tests/hfs/hfs-database-access.spec.mjs, edition: lite, codes: [DB_POLICY_TAUTOLOGY, DB_VIEW_UNSAFE, DB_STORAGE_PREFIX]}
+      - {path: tests/hfs/hfs-database-rules.spec.mjs, edition: lite, codes: [DB_DEFINER_REVOKE]}
+    witness:
+      - {path: tests/hfs/hfs-database-access.spec.mjs, edition: lite, codes: [DB_POLICY_TAUTOLOGY, DB_VIEW_UNSAFE, DB_STORAGE_PREFIX]}
+      - {path: tests/hfs/hfs-database-rules.spec.mjs, edition: lite, codes: [DB_DEFINER_REVOKE]}
     law: "Exposed database objects keep their access boundaries in lite and full. Policies refuse tautological true, is-not-null and self-equality predicates; policies for browser roles prove a principal predicate. An exposed view or materialized view uses security_invoker or the migration set ends with access revoked from anon and authenticated. Disabling RLS or moving a table into an exposed schema preserves the R214 RLS obligation. A security definer declaration, including alter function, preserves R215 safety checks and the migration set ends with execute revoked from authenticated when exposed, in addition to R215's public and anon revocation. A storage.objects policy scopes an ownership prefix to the principal unless its bucket id ends _public."
     kinds: [check]
-    gates: [pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["DB_POLICY_TAUTOLOGY", "DB_VIEW_UNSAFE", "DB_DEFINER_REVOKE", "DB_STORAGE_PREFIX"]
     enforcers:
       - {kind: hfs, id: db-policy-hardening, at: scripts/hfs/rules/database-access.mjs}
@@ -2271,6 +2414,16 @@ rules:
 
   - id: R257
     code: "DB_BASELINE_SHAPE"
+    editions: [lite]
+    editionWhy: "owner:lite-backing-services makes Supabase lite's database backing; baseline and archive requirements apply to its migration history."
+    docs: [docs/microservices.md#r257]
+    templateNa: "A baseline is derived from a product's existing Supabase migration history and cannot be supplied by a scaffold template."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-database-baseline.spec.mjs, edition: lite, codes: [DB_BASELINE_SHAPE, DB_ARCHIVE_MUTATED]}
+    proves:
+      - {path: tests/hfs/hfs-database-baseline.spec.mjs, edition: lite, codes: [DB_BASELINE_SHAPE, DB_ARCHIVE_MUTATED]}
+    witness:
+      - {path: tests/hfs/hfs-database-baseline.spec.mjs, edition: lite, codes: [DB_BASELINE_SHAPE, DB_ARCHIVE_MUTATED]}
     law: "An archived migration chain has exactly one active baseline marked -- starci:baseline <archived-last-stamp>, with a later valid stamp or an explicit restamp. Archive contents are immutable against repository history; an active migration enters the archive unchanged only in the same diff that adds the replacement baseline. The app db baseline, restamp and plan verbs are read-only unless --apply is explicit."
     kinds: [check]
     gates: [settle, land, ci]
@@ -2279,6 +2432,16 @@ rules:
       - {kind: hfs, id: db-baseline-shape, at: scripts/hfs/rules/database-baseline.mjs}
   - id: R258
     code: "DB_PGMQ_DECLARED"
+    editions: [lite]
+    editionWhy: "owner:lite-backing-services makes Supabase lite's database backing; pgmq and pg_cron ownership requirements apply to that backing."
+    docs: [docs/microservices.md#r258]
+    templateNa: "Queue declarations and enqueue-only cron commands depend on product-owned work and are authored in its Supabase migrations."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-database-queues.spec.mjs, edition: lite, codes: [DB_PGMQ_DECLARED, DB_CRON_OWNED]}
+    proves:
+      - {path: tests/hfs/hfs-database-queues.spec.mjs, edition: lite, codes: [DB_PGMQ_DECLARED, DB_CRON_OWNED]}
+    witness:
+      - {path: tests/hfs/hfs-database-queues.spec.mjs, edition: lite, codes: [DB_PGMQ_DECLARED, DB_CRON_OWNED]}
     law: "DB_QUEUE_CRON: every pgmq queue constant has an active migration creating the queue and every created queue has a constant. Queue objects are granted only to the application role. A uniquely named pg_cron job belongs to a migration and only enqueues to an existing queue directly or through one enqueue-only *_tick function; it executes no business DML or HTTP request and shares no tick with an app scheduler. Removing a tick unschedules its job."
     kinds: [check]
     gates: [settle, land, ci]
@@ -2287,6 +2450,16 @@ rules:
       - {kind: hfs, id: db-queue-cron, at: scripts/hfs/rules/database-queues.mjs}
   - id: R259
     code: "DB_EXTENSION_ALLOWED"
+    editions: [lite]
+    editionWhy: "owner:lite-backing-services makes Supabase lite's database backing; database configuration, extension, migration and seed requirements apply to that backing."
+    docs: [docs/microservices.md#r259]
+    templateNa: "Extension use, contract migrations, vault operations and seed literals are product-authored Supabase content, rather than a scaffolded SQL surface."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-database-config.spec.mjs, edition: lite, codes: [DB_EXTENSION_ALLOWED, DB_API_EXPOSED, DB_MIGRATION_DESTRUCTIVE, HFS_SEED_PII, DB_VAULT_WRITE]}
+    proves:
+      - {path: tests/hfs/hfs-database-config.spec.mjs, edition: lite, codes: [DB_EXTENSION_ALLOWED, DB_API_EXPOSED, DB_MIGRATION_DESTRUCTIVE, HFS_SEED_PII, DB_VAULT_WRITE]}
+    witness:
+      - {path: tests/hfs/hfs-database-config.spec.mjs, edition: lite, codes: [DB_EXTENSION_ALLOWED, DB_API_EXPOSED, DB_MIGRATION_DESTRUCTIVE, HFS_SEED_PII, DB_VAULT_WRITE]}
     law: "DB_CONFIG_EXT: extensions belong to the database allowlist, vault writes and migration role passwords are refused, pgmq schemas are never exposed through the API, and lite API access is closed except for explicit public-read policies. R216 DB_CONFIG_POLICY also checks API schema allowlisting, existing seed paths, anonymous sign-ins, disabled edge runtime, bounded storage uploads and the database major-version pin. Destructive DDL belongs only to *_contract_* migrations whose targets are no longer referenced by back-end SQL or entities. Seeds contain no real email or phone literals."
     kinds: [check]
     gates: [settle, land, ci]

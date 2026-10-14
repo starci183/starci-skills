@@ -262,14 +262,12 @@ function allowedSuccessors(key, index) {
 }
 
 /** Synchronous static R247 findings. The caller supplies already-read safe repository texts. */
-function collectFinding(path, text, findings, seen) {
-  return (offset, message, rules = []) => {
-    const line = text.slice(0, offset).split('\n').length;
-    const key = `${path}:${line}:${message}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    findings.push({ code: CODE, level: 'error', path, line, message, rules });
-  };
+function collectFinding(path, text, findings, seen, offset, message, rules = []) {
+  const line = text.slice(0, offset).split('\n').length;
+  const key = `${path}:${line}:${message}`;
+  if (seen.has(key)) return;
+  seen.add(key);
+  findings.push({ code: CODE, level: 'error', path, line, message, rules });
 }
 
 function paragraphCites(paragraph, index, add) {
@@ -293,7 +291,7 @@ function chunkPatterns(chunk, patterns, index, add) {
 }
 
 function fileCites(path, text, index, patterns, findings, seen) {
-  const add = collectFinding(path, text, findings, seen);
+  const add = (offset, message, rules) => collectFinding(path, text, findings, seen, offset, message, rules);
   for (const chunk of proseChunks(path, text)) {
     for (const paragraph of paragraphs(chunk)) paragraphCites(paragraph, index, add);
     chunkPatterns(chunk, patterns, index, add);
