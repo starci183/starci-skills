@@ -296,7 +296,7 @@ for (const [name, file, codes] of migrationCases) {
   test(`adversarial migration: ${name}`, () => expectCodes({ contents: { [file]: 'select 1;' }, codes }));
 }
 
-test('adversarial migration: tracked stamp cannot be later than the file commit', async () => {
+test('adversarial migration: a tracked stamp may be later than the file commit', async () => {
   const file = `${MIGRATIONS}/20210101000000_after-commit.sql`;
   const dir = repo({ [file]: 'select 1;' });
   git(dir, ['init', '-b', 'main', '-q']);
@@ -306,6 +306,7 @@ test('adversarial migration: tracked stamp cannot be later than the file commit'
     GIT_COMMITTER_DATE: '2020-01-01T00:00:00Z',
   });
   const findings = await checkDatabase({ repoRoot: dir, files: [file] });
-  assert.deepEqual(uniqueCodes(findings), ['DB_MIGRATION_SHAPE'], JSON.stringify(findings, null, 2));
-  assert.ok(findings.some((finding) => finding.tracked === true && finding.message.includes("file's commit time")));
+  assert.deepEqual(findings, []);
+  assert.ok(findings.every((finding) => finding.tracked !== true), 'no finding judges the stamp against the file commit time');
+  assert.equal(uniqueCodes(findings).includes('DB_MIGRATION_SHAPE'), false);
 });

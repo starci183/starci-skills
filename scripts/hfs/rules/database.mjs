@@ -51,7 +51,7 @@ async function migrationAnalyses({ repoRoot, migrations, exposed, forceRls, find
  * starts neither Docker nor the Supabase CLI. A full app is judged when it declares a Supabase connection, while
  * lite apps are judged even before their initial Supabase files have all been scaffolded.
  */
-export async function checkDatabase({ repoRoot, files, base, git, edition, supabase, emitTypes, now = () => Date.now() } = {}) {
+export async function checkDatabase({ repoRoot, files, base, git, edition, supabase, emitTypes } = {}) {
   const findings = [];
   const migrations = files.filter(isActiveMigration).sort(byCodeUnit);
   const archived = files.filter((file) => file.startsWith(`${MIGRATIONS_ARCHIVE_DIR}/`));
@@ -71,7 +71,7 @@ export async function checkDatabase({ repoRoot, files, base, git, edition, supab
   const apiSchemas = (config?.api?.schemas ?? []).filter((schema) => typeof schema === 'string');
   const exposed = new Set(['public', ...apiSchemas]);
   const forceRls = new Set((declared?.forceRls ?? []).map((name) => (name.includes('.') ? name : `public.${name}`)));
-  findings.push(...await migrationShapeFindings({ repoRoot, migrations, archived, git: git ?? defaultGit, base, now }));
+  findings.push(...await migrationShapeFindings({ repoRoot, migrations, archived, git: git ?? defaultGit, base }));
 
   const analyses = await migrationAnalyses({ repoRoot, migrations, exposed, forceRls, findings });
   findings.push(
