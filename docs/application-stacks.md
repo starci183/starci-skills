@@ -222,11 +222,13 @@ These requirements apply to lite and full; the rule catalog and its enforcers pr
 
 - R250 `HFS_DEPLOY_SCAN`: refuse host cron, production Compose, host scheduler loops and business logic in deploy scripts (`HFS_HOST_CRON`, `HFS_DEPLOY_NO_LOGIC`, `HFS_DEPLOY_COMPOSE_ON_VPS`, `HFS_DEPLOY_SCHEDULER`).
 - R251 `HFS_DEPLOY_WORKFLOW`: require protected deployment environments, permissions, concurrency and allowlisted credentials, full-SHA action pins, pinned tool installs and release-tag/manual app triggers (`HFS_DEPLOY_WORKFLOW`, `HFS_WORKFLOW_PIN`, `HFS_CI_TOOL_INSTALL`, `HFS_APP_WORKFLOW_TRIGGER`).
-- R266 `STACKS_SWARM_HARDENING`: require external versioned secrets via file pointers, one ingress with declared DNS/TLS and routes, stateful placement, real healthchecks and update policies; only that ingress publishes ports.
+- R266 `STACKS_SWARM_HARDENING`: `STACKS_SECRET_NOT_EXTERNAL` requires external Swarm secrets, `STACKS_SECRET_UNVERSIONED` requires immutable declared versions, and `STACKS_SECRET_ENV_LITERAL` refuses secret environment literals. `STACKS_PORT_PUBLISHED` confines published ports to the ingress and `STACKS_SECOND_INGRESS` refuses a second ingress. `STACKS_DNS_UNDECLARED`, `STACKS_HOST_UNROUTED` and `STACKS_TLS_UNDECLARED` require DNS ownership, host routes and TLS evidence. `STACKS_PLACEMENT_MISSING`, `STACKS_HEALTHCHECK_MISSING` and `STACKS_UPDATE_POLICY_MISSING` require stateful placement, real healthchecks and update, rollback and restart policies. `STACKS_REALTIME_SCALED` confines a lite realtime API to one replica.
 - R267 `STACKS_RELEASE_BACKUP`: declare immutable releases and backup ownership, target, retention and restore proof, and supply the rendered model (`STACKS_RELEASE_UNDECLARED`, `BACKUP_UNDECLARED`, `BACKUP_PROOF_MISSING`, `STACKS_MODEL_UNAVAILABLE`).
 - R268 `HFS_SCHEDULE_DECLARED`: declare each app scheduler, pg_cron tick or replicated-job schedule with its app-owned command (`HFS_SCHEDULE_UNDECLARED`).
 - R269 `HFS_SUPPLY_CHAIN`: require Dependabot, a production dependency audit step and an image SBOM (`HFS_DEPENDABOT_MISSING`, `HFS_AUDIT_STEP_MISSING`, `HFS_SBOM_MISSING`).
 - R271 `HFS_RELEASE_PROVENANCE`: bind the release tag to the package version and image tags, and guard database deployment to that release (`HFS_RELEASE_TAG_MISMATCH`, `HFS_DB_DEPLOY_UNGUARDED`).
+- R275 `STACKS_INGRESS_DECLARED`: `STACKS_INGRESS_UNDECLARED` requires one declared ingress and its hosts; `STACKS_INGRESS_UNKNOWN` refuses an unknown component, wrong role or unsupported image. Both digest-pinned Traefik and Caddy are accepted.
+- R276 `STACKS_LITE_BACKING`: `STACKS_LITE_SELFHOSTED_DB` refuses self-hosted backing databases in lite; `STACKS_SIDECAR_VOLUME_UNDECLARED` requires a declared and mounted persistent volume for a SQLite sidecar; `STACKS_SIDECAR_DB_UNSUPPORTED` refuses a sidecar's non-SQLite database requirement. Full keeps its declared backing topology.
 
 ## Reference pattern
 

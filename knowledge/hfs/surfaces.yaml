@@ -195,6 +195,7 @@ surfaces:
         - fe.redux
         - fe.modules
         - fe.modules.api
+        - fe.transport.generated
         - fe.transport.client
         - fe.transport.outcome
         - fe.modules.config
@@ -255,6 +256,7 @@ surfaces:
         - fe.redux
         - fe.modules
         - fe.modules.api
+        - fe.transport.generated
         - fe.transport.client
         - fe.transport.outcome
         - fe.modules.config
@@ -1692,7 +1694,6 @@ surfaces:
       - WDD/1.6/V1
     owedRules:
       - R251
-      - R269
       - R271
     lite:
       rules:
@@ -1703,15 +1704,18 @@ surfaces:
         - R188
         - R190
         - R191
+        - R269
       slots:
         - app.package-manifest
         - app.lockfile
         - app.github-meta
+        - app.dependabot
         - app.ci
         - app.ci-images
         - repo.app-image
       examples:
         - examples/lite-app/package.json
+        - examples/lite-app/.github/dependabot.yml
         - examples/lite-app/.github/workflows/ci.yml
         - examples/lite-app/be/apps/api/Dockerfile
       gap:
@@ -1726,15 +1730,18 @@ surfaces:
         - R188
         - R190
         - R191
+        - R269
       slots:
         - app.package-manifest
         - app.lockfile
         - app.github-meta
+        - app.dependabot
         - app.ci
         - app.ci-images
         - repo.app-image
       examples:
         - examples/ecommerce-app/package.json
+        - examples/ecommerce-app/.github/dependabot.yml
         - examples/ecommerce-app/.github/workflows/images.yml
         - examples/ecommerce-app/be/apps/order/Dockerfile
       gap:
@@ -2218,6 +2225,7 @@ surfaces:
         - R225
       slots:
         - app.tool-config
+        - app.gitattributes
         - app.git-meta
         - app.sops
         - app.hooks
@@ -2225,6 +2233,7 @@ surfaces:
         - be.tool-config
         - fe.tool-config
       examples:
+        - examples/lite-app/.gitattributes
         - examples/lite-app/.husky/pre-commit
         - examples/lite-app/.husky/pre-push
         - examples/lite-app/sonar-project.properties
@@ -2242,6 +2251,7 @@ surfaces:
         - R225
       slots:
         - app.tool-config
+        - app.gitattributes
         - app.git-meta
         - app.sops
         - app.hooks
@@ -2249,6 +2259,7 @@ surfaces:
         - be.tool-config
         - fe.tool-config
       examples:
+        - examples/ecommerce-app/.gitattributes
         - examples/ecommerce-app/.husky/pre-commit
         - examples/ecommerce-app/.husky/pre-push
         - examples/ecommerce-app/sonar-project.properties

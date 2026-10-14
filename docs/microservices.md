@@ -6,21 +6,22 @@ policy the `starci app check` rules R163 to R168 enforce and the way the referen
 
 The code requirements apply equally to lite and full. The database requirements below apply when the product declares Supabase.
 
-- R254 `DB_BE_ONLY_ACCESS`: Supabase data goes through the back end; browser grants, policies and realtime publication membership require declared exceptions, with anonymous reads limited to `_public_read` policies.
-- R255 `DB_APP_ROLE`: use one least-privilege application role without superuser, RLS bypass or broad grants, and force RLS on its tables unless a reasoned exemption is declared.
-- R256 `DB_POLICY_HARDENING`: preserve RLS, reject tautological policies, protect exposed views and definers from browser roles, and scope private storage policies to an ownership prefix.
-- R257 `DB_BASELINE_SHAPE`: retiring migrations requires exactly one marked active baseline in the same diff; archived history remains immutable and accepts no new archive-only migration.
-- R258 `DB_QUEUE_CRON`: queue constants and migration-created pgmq queues agree; each uniquely named pg_cron tick has one owner and only enqueues work.
-- R259 `DB_CONFIG_EXT`: allowlist extensions and exposed schemas, validate database and auth configuration and seed paths, exclude seed PII and SQL vault/password writes, and restrict destructive DDL to contract migrations.
+- R254 `DB_BE_ONLY_ACCESS`: Supabase data goes through the back end; browser grants and policies require declared exceptions, with anonymous reads limited to `_public_read` policies. `DB_REALTIME_UNLISTED` refuses realtime publication membership without a declared direct-access exception.
+- R255 `DB_APP_ROLE`: use one least-privilege application role without superuser, RLS bypass or broad grants. `DB_FORCE_RLS_DEFAULT` requires forced RLS on its tables unless a reasoned exemption is declared.
+- R256 `DB_POLICY_HARDENING`: preserve the existing RLS obligation. `DB_POLICY_TAUTOLOGY` refuses policies without a meaningful principal boundary; `DB_VIEW_UNSAFE` requires exposed views to preserve caller access or revoke browser access; `DB_DEFINER_REVOKE` requires exposed definers to revoke authenticated execution; `DB_STORAGE_PREFIX` scopes private storage policies to a principal's ownership prefix.
+- R257 `DB_BASELINE_SHAPE`: retiring migrations requires exactly one marked active baseline in the same diff. `DB_ARCHIVE_MUTATED` refuses changed archive history or a new archive-only migration.
+- R258 `DB_QUEUE_CRON`: `DB_PGMQ_DECLARED` requires queue constants and migration-created pgmq queues to agree; `DB_CRON_OWNED` requires each uniquely named pg_cron tick to have one owner and only enqueue work.
+- R259 `DB_CONFIG_EXT`: `DB_EXTENSION_ALLOWED` enforces the extension allowlist; `DB_API_EXPOSED` closes undeclared API schema access; `DB_MIGRATION_DESTRUCTIVE` confines destructive DDL to contract migrations without live references; `HFS_SEED_PII` refuses real personal email or phone literals in seeds; `DB_VAULT_WRITE` refuses SQL vault writes and role passwords. R216 continues to validate database and auth configuration and seed paths.
 - R260 `BE_JWT_ALG_PINNED`: JWT verification pins literal asymmetric algorithms, derives the issuer from configuration and rejects a Supabase principal whose role is not `authenticated`.
-- R261 `BE_EDGE_HARDENING`: API apps apply an explicit CORS allowlist, security headers, disabled `x-powered-by` and a declared bounded trust-proxy policy.
-- R262 `BE_HEALTH_READY`: API apps expose live and ready probes; readiness checks required dependencies with bounded timeouts, and Docker HEALTHCHECK reaches a real live route.
-- R263 `BE_WEBHOOK_SCOPE`: signed-webhook reasons belong to verified webhook doors or declared verifiers, and inbox deduplication uses the delivery, event or message identifier.
+- R261 `BE_EDGE_HARDENING`: `BE_CORS_ALLOWLIST` requires exact browser origins; `BE_SECURITY_HEADERS` requires platform response hardening and disabled `x-powered-by`; `BE_TRUST_PROXY` requires a declared nonnegative proxy hop count.
+- R262 `BE_HEALTH_READY`: `BE_HEALTH_SIGNALS` requires distinct live and ready probes; `BE_READY_REAL` requires readiness to check a dependency with a bounded failure timeout; `HFS_DOCKER_HEALTHCHECK_FAKE` refuses an always-successful health command or a nonexistent live route.
+- R263 `BE_WEBHOOK_SCOPE`: signed-webhook reasons belong to verified webhook doors or declared verifiers. `BE_WEBHOOK_INBOX_KEY` requires intake to deduplicate by the stable delivery identifier, commit its inbox receipt and typed outbox event, and hand processing to a reactor or job after commit.
 - R264 `HFS_FEATURE_LOGIC_ROLE`: every feature-tier support role stays thin; branching and business logic belong in capability modules.
-- R265 `BE_COMPOSITION_TYPED`: typed module, provider, queue and scheduler collections live in `compose/<area>.ts`, never in `main.ts`, environment or options files.
-- R278 `BE_REST_DOOR_EVIDENCE`: each REST route carries evidence for an allowed exception to GraphQL, and public REST operations appear in the typed operations table in both editions.
+- R265 `BE_COMPOSITION_UNTYPED`: typed module, provider, queue and scheduler collections live in `compose/<area>.ts`, never in `main.ts`, environment or options files; ownership follows resolved types rather than names.
+- R278 `BE_REST_DOOR_EVIDENCE`: each REST route carries evidence for an allowed exception to GraphQL in both editions. `BE_REST_ROUTE_UNDECLARED` refuses a public REST operation absent from the typed operations table.
 - R279 `BE_THIRD_PARTY_OWNER`: vendor SDK ownership derives from package dependencies; SDK calls stay in their owning integration, with declared pure-library exceptions.
 - R281 `BE_SPEC_FORM_ALL_ROLES`: every logic-role unit spec gets its subject from a providers-only TestingModule with doubles and asserts exact outcomes, without constructing the subject or mocking modules.
+- R289 `BE_APP_ENV_REQUIRED`: each back-end app owns a typed `<app>.env.ts` reader and `main.ts` delegates environment reads to it. `BE_APP_MODULE_LIST_INLINE` requires the app module to spread its typed composition groups rather than declare an inline module list.
 
 ## One place for a service
 

@@ -10,6 +10,7 @@ import { eachInOrder } from '../../lib/in-order.mjs';
 import { judgedInEdition } from '../../hfs/edition-slots.mjs';
 import { checkRepository } from '../../hfs/check.mjs';
 import { coverageSafePath } from './coverage-inventory.mjs';
+import { coverageRuleFindingLevel } from './coverage-ratchet.mjs';
 
 const CODE = 'RT_COVERAGE_NO_WITNESS';
 const PREFIX = 'hfs-coverage-witness-';
@@ -18,7 +19,7 @@ const GENERATED = /(?:^|\/)(?:runtime|dist|coverage|\.runtimes|artifacts|generat
 const UNSAFE_COMPONENT = /[\u0000-\u001f<>:"|?*]|[. ]$|^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
 class WitnessRefusal extends Error {}
 const refuse = (message) => { throw new WitnessRefusal(message); };
-const finding = (rule, edition, index, message) => ({ code: CODE, level: 'warning', rule: rule.id, edition,
+const finding = (rule, edition, index, message) => ({ code: CODE, level: coverageRuleFindingLevel(rule, CODE), rule: rule.id, edition,
   path: 'knowledge/hfs/rules.yaml', message: `${rule.id} witness ${index + 1}: ${message}` });
 
 function relativePath(value, label) {

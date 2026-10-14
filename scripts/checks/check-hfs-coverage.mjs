@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // R247 RT_COVERAGE_MATRIX: every applicable edition has a complete chain of coverage evidence.
 //   starci runtime check --only hfs-coverage -- [--json] [--witness]
-// NO_WITNESS and NO_EXAMPLE remain report-only until the Z01 backfill switches them to gates.
+// Metadata-free rules older than R247 report warnings; adopting rules enter the coverage gate.
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -12,13 +12,14 @@ import { coverageRuleFindings, REPORT_ONLY_CODES } from './lib/coverage-rules.mj
 import { coverageLedgerFindings } from './lib/coverage-ledgers.mjs';
 import { coverageCiteFindings } from './lib/coverage-cites.mjs';
 import { runCoverageWitnesses } from './lib/coverage-witness.mjs';
+import { applyCoverageRatchet } from './lib/coverage-ratchet.mjs';
 
 export const CODE = 'RT_COVERAGE_MATRIX';
 export { REPORT_ONLY_CODES };
 
 /** One catalog-driven static pass; fixture catalogs use the same path as the real repository. */
 export function hfsCoverageFindings(context) {
-  return [...coverageRuleFindings(context), ...coverageLedgerFindings(context), ...coverageCiteFindings(context)];
+  return applyCoverageRatchet(context, [...coverageRuleFindings(context), ...coverageLedgerFindings(context), ...coverageCiteFindings(context)]);
 }
 
 /** Read only authored, non-secret sources. Missing ledgers remain coverage findings until their batches land. */
@@ -37,7 +38,11 @@ export function loadCoverageContext(root = skillRoot) {
 export function coverageReport(findings, inventory = {}) {
   const errors = findings.filter((item) => item.level !== 'warning');
   const warnings = findings.filter((item) => item.level === 'warning');
-  return { ok: errors.length === 0, ...inventory, errors: errors.length, warnings: warnings.length, findings };
+  const legacy = warnings.filter((item) => item.legacy);
+  const byCode = {};
+  for (const item of legacy) byCode[item.code] = (byCode[item.code] ?? 0) + 1;
+  return { ok: errors.length === 0, ...inventory, errors: errors.length, warnings: warnings.length,
+    legacyBacklog: { total: legacy.length, byCode }, findings };
 }
 
 export async function checkHfsCoverage(root = skillRoot, { witness = false, judge } = {}) {
@@ -48,7 +53,7 @@ export async function checkHfsCoverage(root = skillRoot, { witness = false, judg
       message: error instanceof HfsSlotsError ? error.message : 'The coverage inventory cannot be parsed; repair its catalog or source declarations.' } };
   }
   const findings = hfsCoverageFindings(context);
-  if (witness) findings.push(...await runCoverageWitnesses(context, judge ? { judge } : {}));
+  if (witness) findings.push(...applyCoverageRatchet(context, await runCoverageWitnesses(context, judge ? { judge } : {})));
   return coverageReport(findings, { rules: context.catalog.rules.length, slots: context.manifest.slots.length,
     examples: context.examples.length, schemas: context.schemas.length, witness });
 }
@@ -56,6 +61,9 @@ export async function checkHfsCoverage(root = skillRoot, { witness = false, judg
 export function formatCoverageReport(report) {
   if (report.refusal) return `${report.refusal.code}: ${report.refusal.message}\n`;
   const lines = [`HFS coverage: ${report.ok ? 'OK' : 'FAIL'}; ${report.rules ?? 0} rules, ${report.slots ?? 0} slots, ${report.errors} errors, ${report.warnings} warnings.`];
+  const backlog = report.legacyBacklog ?? { total: 0, byCode: {} };
+  const counts = Object.entries(backlog.byCode).sort(([left], [right]) => left.localeCompare(right)).map(([code, count]) => `${code} ${count}`);
+  lines.push(`Legacy backlog: ${backlog.total} warnings${counts.length ? '; ' + counts.join(', ') : ''}.`);
   for (const finding of report.findings) {
     const at = finding.line ? `:${finding.line}` : '';
     lines.push(`${finding.level.toUpperCase()} ${finding.code} ${finding.path}${at}: ${finding.message}`);

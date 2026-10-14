@@ -1,3 +1,7 @@
+// proves: HFS_AGE_KEY_CUSTODY@lite HFS_AGE_KEY_CUSTODY@full
+// proves: HFS_CANON_COPY_DRIFT@lite HFS_CANON_COPY_DRIFT@full
+// proves: HFS_SECRET_PLAINTEXT_FILE@lite HFS_SECRET_PLAINTEXT_FILE@full
+// proves: HFS_SECRET_OUTSIDE_ENC@full
 // Names and paths may be printed. Compare private test data only as booleans.
 import test from "node:test";
 import assert from "node:assert/strict";
