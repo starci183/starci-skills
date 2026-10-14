@@ -16,7 +16,7 @@ const RULE_KINDS = Object.freeze(['codemod', 'lint', 'check', 'design']);
 const FINDING_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/;
 const ENFORCER_ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 const FILE_ENFORCERS = new Set(['machine', 'hfs', 'work-validate', 'sonar', 'runtime']);
-const RULE_KEYS = new Set(['id', 'code', 'law', 'scope', 'kinds', 'gates', 'failureCodes', 'editions', 'codeEditions', 'enforcers', 'cases', 'docs', 'exemplifiedBy', 'proves', 'witness', 'editionWhy', 'amendedBy']);
+const RULE_KEYS = new Set(['id', 'code', 'law', 'scope', 'kinds', 'gates', 'failureCodes', 'editions', 'codeEditions', 'enforcers', 'cases', 'docs', 'exemplifiedBy', 'proves', 'witness', 'editionWhy', 'amendedBy', 'templateNa']);
 const CASE_KEYS = new Set(['id', 'date', 'source', 'ruling', 'quote', 'supersedes', 'status', 'staleWhen', 'amendedBy']);
 const CASE_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ENFORCER_KEYS = new Set(['kind', 'id', 'status', 'at', 'editions', 'editionWhy']);
@@ -277,6 +277,7 @@ function checkRule(rule, index, catalog, codeOwner, bad) {
   checkRuleCases(rule, label, bad);
   if (rule.amendedBy !== undefined) caseReferenceProblems(rule.amendedBy, `${label}.amendedBy`, bad);
   optionalText(rule, 'editionWhy', label, bad);
+  optionalText(rule, 'templateNa', label, bad);
   for (const key of ['docs', 'exemplifiedBy', 'proves']) evidenceProblems(rule, key, label, bad);
   witnessProblems(rule, label, bad);
   enumListProblems(rule, label, 'kinds', RULE_KINDS, bad);

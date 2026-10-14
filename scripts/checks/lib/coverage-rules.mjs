@@ -103,7 +103,8 @@ function ruleEvidence(context, rule, edition, templates) {
   const owned = relatedSlots(rule, slotViews(context.manifest, edition));
   const hasTemplate = refsIn(rule.exemplifiedBy, edition).some((ref) => templateEvidence(context.files, ref).length)
     || owned.some(({ slot }) => templates.templates.get(slot.id)?.length);
-  if (!hasTemplate) add('RT_COVERAGE_NO_TEMPLATE', 'no existing template or managed slot template covers this edition');
+  const templateNa = typeof rule.templateNa === 'string' && rule.templateNa.trim().length > 0;
+  if (!hasTemplate && !templateNa) add('RT_COVERAGE_NO_TEMPLATE', 'no existing template, managed slot template or templateNa reason covers this edition');
   if (!refsIn(rule.exemplifiedBy, edition).some((ref) => exampleEvidence(context, ref, edition).length
     || fixtureEvidence(context, ref, edition, codes))) add('RT_COVERAGE_NO_EXAMPLE', 'no existing example or dedicated fixture is named for this edition');
   out.push(...coverageGateFindings(context, rule, edition));

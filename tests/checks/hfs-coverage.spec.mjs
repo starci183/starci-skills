@@ -7,9 +7,10 @@ import { createRequire } from 'node:module';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { loadRuleCatalog } from '../../scripts/hfs/rule-catalog.mjs';
 import { hfsRulesFindings } from '../../scripts/checks/check-hfs-rules.mjs';
-import { coverageReport, formatCoverageReport, hfsCoverageFindings, loadCoverageContext } from '../../scripts/checks/check-hfs-coverage.mjs';
+import { checkHfsCoverage, coverageReport, formatCoverageReport, hfsCoverageFindings, loadCoverageContext } from '../../scripts/checks/check-hfs-coverage.mjs';
 import { runCoverageWitnesses } from '../../scripts/checks/lib/coverage-witness.mjs';
 
+// proves: RT_COVERAGE_MATRIX@lite RT_COVERAGE_MATRIX@full
 // proves: RT_COVERAGE_NO_ENFORCER@lite RT_COVERAGE_NO_ENFORCER@full
 // proves: RT_COVERAGE_NO_SPEC@lite RT_COVERAGE_NO_SPEC@full
 // proves: RT_COVERAGE_NO_WITNESS@lite RT_COVERAGE_NO_WITNESS@full
@@ -624,6 +625,35 @@ function tempFixture(t) {
     fs.writeFileSync(file, text);
   };
   return { fixtureRoot, scratch, write };
+}
+
+function matrixFixture(t, edition) {
+  const fixture = tempFixture(t);
+  fixture.write('knowledge/hfs/slots.yaml', fs.readFileSync(path.join(root, 'knowledge/hfs/slots.yaml'), 'utf8'));
+  fixture.write('knowledge/hfs/rules.yaml', JSON.stringify(metadataCatalog()));
+  fixture.write(`${examplePath(edition)}/hfs.json`, JSON.stringify({ hfs: 3, kind: 'app', edition }));
+  return fixture;
+}
+
+for (const edition of EDITIONS) {
+  test(`RT_COVERAGE_MATRIX refuses an invalid ${edition} inventory without exposing its source`, async (t) => {
+    const { fixtureRoot, write } = matrixFixture(t, edition);
+    write('knowledge/hfs/surfaces.yaml', 'surfaces: [invalid-inventory-marker\n');
+    const report = await checkHfsCoverage(fixtureRoot);
+    assert.equal(report.refusal.code, 'RT_COVERAGE_MATRIX');
+    assert.equal(report.ok, false);
+    assert.equal(report.errors, 1);
+    assert.ok(!report.refusal.message.includes('invalid-inventory-marker'));
+  });
+
+  test(`RT_COVERAGE_MATRIX accepts a parseable ${edition} inventory`, async (t) => {
+    const { fixtureRoot, write } = matrixFixture(t, edition);
+    write('knowledge/hfs/surfaces.yaml', 'surfaces: []\n');
+    const report = await checkHfsCoverage(fixtureRoot);
+    assert.equal(report.refusal, undefined);
+    assert.equal(report.rules, 1);
+    assert.ok(!report.findings.some((finding) => finding.code === 'RT_COVERAGE_MATRIX'));
+  });
 }
 
 test('the coverage context loader inventories authored sources and excludes custody and generated copies', (t) => {
