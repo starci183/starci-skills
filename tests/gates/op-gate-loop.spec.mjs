@@ -568,7 +568,8 @@ test('actual bound gate and READ bytes are selected from extensionless blobs by 
 test('the READ topic map derives from the topics\' own slots fields, in index.yaml order, with longest-prefix lookup', () => {
   const always = ['knowledge/patterns/be/index.yaml', 'knowledge/patterns/be/folder.yaml', 'knowledge/patterns/be/naming.yaml', 'knowledge/patterns/be/imports.yaml', 'knowledge/patterns/be/typing.yaml', 'knowledge/patterns/be/function.yaml', 'knowledge/patterns/be/comment.yaml'];
   assert.deepEqual(patternsForSlot('be.app'), [...always, 'knowledge/patterns/be/architecture-check.yaml', 'knowledge/patterns/be/injection.yaml', 'knowledge/patterns/be/config.yaml', 'knowledge/patterns/be/services.yaml']);
-  assert.deepEqual(patternsForSlot('be.app.api'), patternsForSlot('be.app'), 'an unlisted sub-slot reads the longest covered prefix');
+  assert.deepEqual(patternsForSlot('be.app.api'), [...always, 'knowledge/patterns/be/architecture-check.yaml', 'knowledge/patterns/be/injection.yaml', 'knowledge/patterns/be/api.yaml', 'knowledge/patterns/be/config.yaml', 'knowledge/patterns/be/services.yaml'], 'a sub-slot with its own topic is listed beside the app topics it needs');
+  assert.deepEqual(patternsForSlot('be.app.unlisted'), patternsForSlot('be.app'), 'an unlisted sub-slot reads the longest covered prefix');
   assert.deepEqual(patternsForSlot('app.format-config'), ['knowledge/patterns/repo/index.yaml', 'knowledge/patterns/repo/folder.yaml', 'knowledge/patterns/repo/tooling.yaml', 'knowledge/patterns/repo/formatter.yaml']);
   assert.deepEqual(patternsForSlot('be.app.cli'), [...always, 'knowledge/patterns/be/architecture-check.yaml', 'knowledge/patterns/be/cli.yaml', 'knowledge/patterns/be/config.yaml']);
   assert.deepEqual(patternsForSlot(null), []);

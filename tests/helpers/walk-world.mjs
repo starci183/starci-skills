@@ -43,7 +43,11 @@ export function scratchOf(world, jobId) {
 function scaffoldApp(dir) {
   const lite = path.join(ROOT, 'examples', 'lite-app');
   fs.cpSync(lite, dir, { recursive: true, filter: (src) => !/[\\/](node_modules|\.git|\.husky)([\\/]|$)/.test(src) });
-  fs.copyFileSync(path.join(ROOT, 'examples', 'ecommerce-app', '.starciwork', 'workspace.yaml'), path.join(dir, '.starciwork', 'workspace.yaml'));
+  // The walk drives the full Work lifecycle (catalog, shell, features), which a lite app's .starciwork no longer holds: the tree carries the full Work root fixture under the full edition.
+  fs.rmSync(path.join(dir, '.starciwork'), { recursive: true, force: true });
+  fs.cpSync(path.join(ROOT, 'tests', 'fixtures', 'walk-work-root'), path.join(dir, '.starciwork'), { recursive: true });
+  const declaration = path.join(dir, 'hfs.json');
+  fs.writeFileSync(declaration, fs.readFileSync(declaration, 'utf8').replace('"edition": "lite",', '"edition": "full",'));
 }
 
 /** The walk over `world`: verbs the Kernel, the engine and the op stand-in call. */

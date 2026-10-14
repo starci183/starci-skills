@@ -163,11 +163,16 @@ test("a real lite scaffold plans and applies the additive full upgrade", async (
   assert.ok(firstPlan.length > 0, "the lite scaffold has full-only additions");
   assert.ok(
     firstPlan.every((step) =>
-      ["add", "remove-field", "rewrite-managed", "rewrite-readme"].includes(
+      ["add", "keep", "remove-field", "rewrite-managed", "rewrite-readme"].includes(
         step.op,
       ),
     ),
     JSON.stringify(firstPlan, null, 2),
+  );
+  assert.deepEqual(
+    firstPlan.filter((step) => step.op === "keep").map((step) => step.path),
+    [".starcistacks/application-stacks.yaml"],
+    "the lite stack declaration is kept as the app wrote it",
   );
   assert.deepEqual(
     firstPlan.filter((step) => step.op === "remove-field"),
