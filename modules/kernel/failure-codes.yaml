@@ -18969,6 +18969,8 @@ HFS_SBOM_MISSING:
   causes_vi:
     - "Vi phạm R269: bản dựng không tạo cả danh mục thành phần và bằng chứng nguồn gốc."
   nextStep_vi: "Bật sbom và provenance trong bước build image hoặc tạo SBOM cùng chứng thực nguồn gốc bằng công cụ/action đã ghim."
+  owner: op-retry
+  kind: check-finding
 ENV_REQUIRED_UNSET:
   title: "A required env key is neither sealed nor declared"
   title_vi: "Khoá môi trường bắt buộc chưa được niêm phong hay khai báo"
