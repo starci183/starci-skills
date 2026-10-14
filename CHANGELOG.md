@@ -14,7 +14,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - Front end: pages compose overlays and blocks (kind-scoped tier edge) and non-block pure halves take `render*` callbacks; a pure re-export `index.ts` has a 400-line barrel budget; an `fe.modules` instance of CSS or assets needs no `index.ts`.
 
 ### Changed
-- A lite app's `.starciwork/` holds only `.gitignore` and `brand/**` and is optional; the work readers skip the removed records under lite.
+- A lite app's `.starciwork/` holds only `.gitignore`, `workspace.yaml` and `brand/**` and is optional; the work readers skip the removed records under lite.
 - Lint precision: `BE_BACKGROUND_UNOWNED` by context instead of method name, webhook doors may start with a declared domain verifier, `HFS_DUPLICATE_CODE` ignores canon scaffold shapes, `HFS_UNUSED_EXPORT` counts staged consumers, `FE_I18N_KEYS` reads in-segment template keys.
 - The scaffolded pre-commit hook lints and formats staged files in chunks of 50; `DB_MIGRATION_SHAPE` orders new migrations against HEAD.
 

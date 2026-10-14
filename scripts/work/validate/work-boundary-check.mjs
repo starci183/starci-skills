@@ -33,19 +33,19 @@ function reportBoundaryGroup(key,count,resolveRoot,problems,warnings){
   }
 }
 
-/** Judge tracked product paths in full Work; lite forbids every non-brand root entry on disk. */
+/** Judge tracked product paths in full Work; lite allows only .gitignore, workspace.yaml and brand/** on disk. */
 export function checkStarciworkBoundary(workRoot,problems,warnings=[],resolveRoot=workRoot){
   if(isLiteWorkRoot(resolveRoot)){
     if(!workPathAllowed(resolveRoot,workRoot,{dir:true})){
       const shown=path.relative(root,workRoot).replaceAll('\\','/');
-      problems.push(`${shown}: lite .starciwork holds only brand/ [HFS_STARCIWORK_LITE_FORBIDDEN]`);
+      problems.push(`${shown}: lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore) [HFS_STARCIWORK_LITE_FORBIDDEN]`);
       return;
     }
     for(const file of liteWorkForbiddenPaths(resolveRoot)){
       const rel=path.relative(workRoot,file);
       if(workRoot!==resolveRoot&&(rel==='..'||rel.startsWith(`..${path.sep}`)||path.isAbsolute(rel)))continue;
       const shown=path.relative(root,file).replaceAll('\\','/');
-      problems.push(`${shown}: lite .starciwork holds only brand/ [HFS_STARCIWORK_LITE_FORBIDDEN]`);
+      problems.push(`${shown}: lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore) [HFS_STARCIWORK_LITE_FORBIDDEN]`);
     }
     return;
   }

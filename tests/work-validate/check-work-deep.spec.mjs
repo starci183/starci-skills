@@ -64,9 +64,10 @@ function liteTree(t, { brand = true } = {}) {
   return {app, workRoot: path.join(app, '.starciwork'), write};
 }
 
-test('lite deep checks read brand without requiring the catalog or opening retired Work records and baselines', t => {
+test('lite deep checks accept workspace plus brand without a catalog and skip retired records and baselines', t => {
   const {workRoot, write} = liteTree(t);
-  for (const rel of ['index.yaml', 'workspace.yaml', 'shell/index.yaml', 'features/retired/index.yaml'])
+  write('.starciwork/workspace.yaml', 'schema: work/workspace@1\nid: example\nproject: example\nrepositories:\n  - {role: fe, name: fe}\n');
+  for (const rel of ['index.yaml', 'shell/index.yaml', 'features/retired/index.yaml'])
     write(`.starciwork/${rel}`, 'retired: [unreadable\n');
   write('.starciwork/_derived/deep-baseline.json', 'retired baseline is not JSON');
   write('.starciwork/features/retired/evidence.yaml', 'schema: work/evidence@1\nrecord: brand\nassertions:\n  - command: npm run gone\n');
@@ -80,7 +81,7 @@ test('lite deep baseline writes refuse before creating _derived', t => {
   const {workRoot} = liteTree(t);
   const run = spawnSync(process.execPath, ['scripts/work/validate/check-work-deep.mjs', '--tree', workRoot, '--write-baseline'], {cwd: ROOT, encoding: 'utf8', windowsHide: true});
   assert.equal(run.status, 1, run.stderr + run.stdout);
-  assert.match(run.stdout, /lite \.starciwork holds only brand\//);
+  assert.match(run.stdout, /lite \.starciwork holds only workspace\.yaml and brand\//);
   assert.match(run.stdout, /\[HFS_STARCIWORK_LITE_FORBIDDEN\]/);
   assert.equal(fs.existsSync(path.join(workRoot, '_derived')), false);
 });

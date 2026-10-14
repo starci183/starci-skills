@@ -126,10 +126,14 @@ test('lite classification: e2e, contract, the GraphQL subscription door and the 
   const withWorker = openHfs({ declaration: app({ edition: 'lite', be: { ...BE, apps: [...BE.apps, { name: 'jobs', kind: 'worker' }] } }), side: 'be' });
   assert.equal(withWorker.classifyPath('apps/jobs/src/main.ts').slot, 'be.app.worker');
   assert.notEqual(withWorker.classifyPath('apps/jobs/src/main.ts').status, 'forbidden', 'the optional worker app is legal under lite');
-  // at the app root: the e2e workflow and browser journey are forbidden; Work's admission list owns its brand-only boundary
+  // at the app root: the e2e workflow and browser journey are forbidden; Work admits workspace.yaml and brand records
   assert.deepEqual([whole.classifyPath('.github/workflows/e2e.yml').status, whole.classifyPath('.github/workflows/e2e.yml').slot], ['forbidden', 'app.ci-e2e']);
   assert.deepEqual([whole.classifyPath('browser/playwright.config.ts').status, whole.classifyPath('browser/playwright.config.ts').slot], ['forbidden', 'app.browser']);
   assert.equal(whole.classifyPath('codecov.yml').slot, 'app.quality-config', 'lite keeps codecov.yml');
+  assert.deepEqual(whole.slot('app.starciwork').allows, ['workspace.yaml', 'brand/**']);
+  const liteWork = ['.starciwork/.gitignore', '.starciwork/workspace.yaml', '.starciwork/brand/index.yaml'];
+  const admittedWork = checkRepo({ repoRoot: root, declaration: app({ edition: 'lite' }), files: liteWork, tree: false });
+  assert.deepEqual(admittedWork.findings.filter((finding) => finding.path?.startsWith('.starciwork')), []);
   assert.equal(whole.classifyPath('.starciwork/_resources/identities/users.yaml').slot, 'app.starciwork');
   const work = checkRepo({ repoRoot: root, declaration: app({ edition: 'lite' }), files: ['.starciwork/_resources/identities/users.yaml'], tree: false });
   assert.equal(work.findings.some((finding) => finding.path === '.starciwork/_resources/identities/users.yaml' && finding.code === 'HFS_STARCIWORK_LITE_FORBIDDEN'), true);

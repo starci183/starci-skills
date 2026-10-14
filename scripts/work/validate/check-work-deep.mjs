@@ -218,7 +218,7 @@ if (isMain(import.meta.url)) {
       const written = writeBaseline(workRoot);
       if (written) console.log(`baseline written: ${written}`);
       else {
-        console.log(`REFUSE  ${fromRoot(path.join(workRoot, '_derived', 'deep-baseline.json'))}: lite .starciwork holds only brand/ [HFS_STARCIWORK_LITE_FORBIDDEN]`);
+        console.log(`REFUSE  ${fromRoot(path.join(workRoot, '_derived', 'deep-baseline.json'))}: lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore) [HFS_STARCIWORK_LITE_FORBIDDEN]`);
         refused = true;
       }
     }

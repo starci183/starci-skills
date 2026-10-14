@@ -20,7 +20,7 @@ export function workCli({ usage, run, report, wrote, stale }) {
   const workRoot = path.resolve(workArg);
   const result = run(workRoot, { write });
   if (result.skipped) {
-    console.log('SKIP lite .starciwork holds only brand/');
+    console.log('SKIP lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore)');
     return;
   }
   report(result);

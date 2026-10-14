@@ -27,9 +27,10 @@ function liteTree() {
 
 test('Work record discovery keeps lite brand records and ignores forbidden migration leftovers', t => {
   const work = liteTree();
+  const workspace = write(work, 'workspace.yaml', 'schema: work/workspace@1\nid: lite-app\nproject: lite-app\nrepositories: [{name: fe, role: fe}]\n');
   const brand = write(work, 'brand/index.yaml', 'schema: work/brand@1\nid: brand.demo\n');
   write(work, 'brand/evidence.yaml', 'schema: work/evidence@1\nrecord: brand.demo\noutcome: pass\n');
-  for (const relative of ['workspace.yaml', 'index.yaml', 'shell/index.yaml', 'features/legacy/index.yaml', '_resources/index.yaml', 'uat/index.yaml', 'br/index.yaml']) {
+  for (const relative of ['index.yaml', 'shell/index.yaml', 'features/legacy/index.yaml', '_resources/index.yaml', 'uat/index.yaml', 'br/index.yaml']) {
     write(work, relative, 'schema: work/feature@1\nid: legacy\nstate: todo\n');
   }
   const readFile = fs.readFileSync;
@@ -37,16 +38,18 @@ test('Work record discovery keeps lite brand records and ignores forbidden migra
   t.mock.method(fs, 'readFileSync', (file, ...args) => {
     if (typeof file === 'string') {
       const relative = path.relative(work, file).replaceAll('\\', '/');
-      if (relative && !relative.startsWith('../') && !relative.startsWith('brand/')) forbiddenReads.push(relative);
+      if (relative && !relative.startsWith('../') && relative !== 'workspace.yaml' && !relative.startsWith('brand/')) forbiddenReads.push(relative);
     }
     return readFile(file, ...args);
   });
   const {records, evidenceByDir} = readWorkTree(work);
-  assert.deepEqual([...records.keys()], ['brand.demo']);
+  assert.deepEqual([...records.keys()].sort(), ['brand.demo', 'lite-app']);
+  assert.equal(records.get('lite-app').file, workspace);
+  assert.equal(records.get('lite-app').data.project, 'lite-app');
   assert.deepEqual([...evidenceByDir.keys()], ['brand']);
   assert.equal(findRecordFile(work, 'brand.demo'), brand);
   assert.equal(findRecordFile(work, 'legacy'), null);
-  assert.deepEqual([...computeDerived(work).records.keys()], ['brand.demo']);
+  assert.deepEqual([...computeDerived(work).records.keys()].sort(), ['brand.demo', 'lite-app']);
   assert.deepEqual(computeCritique(work).findings, []);
   assert.deepEqual(forbiddenReads, [], 'forbidden migration leftovers are never opened by readers');
 });
@@ -78,7 +81,7 @@ test('generated Work CLIs report a successful lite skip without claiming generat
     const script = fileURLToPath(new URL(`../../scripts/example/${filename}`, import.meta.url));
     for (const args of [[], ['--write']]) {
       const output = execFileSync(process.execPath, [script, '--work', work, ...args], {encoding: 'utf8'});
-      assert.match(output, /SKIP lite \.starciwork holds only brand\//);
+      assert.match(output, /SKIP lite \.starciwork holds only workspace\.yaml and brand\/ \(plus \.gitignore\)/);
       assert.doesNotMatch(output, /wrote |REFUSED/);
     }
   }

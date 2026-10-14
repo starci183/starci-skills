@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSyncOverride } from '../../scripts/api/process/spawn-sync-override.mjs';
 import { committedReader, createOwnership } from '../../scripts/kernel/work-ownership.mjs';
 import { proposedLegPaths } from '../../scripts/kernel/leg-proposal.mjs';
 import { findRecord, resolveRootOwner } from '../../scripts/kernel/verify-failure.mjs';
@@ -58,13 +59,22 @@ test('lite ignores stale catalog ownership and feature write proposals; full kee
   }
 });
 
-test('lite root-cause resolution does not use stale workspace or feature records', (t) => {
+test('lite root-cause resolution reads workspace metadata but skips stale feature records', (t) => {
   for (const edition of ['lite', 'full']) {
     const repo = app(t, edition), record = findRecord(repo, 'impl.health.be.check');
+    const reads = [];
+    const original = fs.readFileSync;
+    const reader = t.mock.method(fs, 'readFileSync', (file, ...args) => {
+      if (String(file).startsWith(path.join(repo, '.starciwork'))) reads.push(file);
+      return original(file, ...args);
+    });
     const result = resolveRootOwner({ repo, rootCause: { node: 'impl.health.be.check' }, kinds: { kinds: { 'backend.implement': { family: 'build' } } } });
+    reader.mock.restore();
+    assert.ok(reads.includes(path.join(repo, '.starciwork/workspace.yaml')), `${edition} reads repository roles from workspace.yaml`);
     if (edition === 'lite') {
       assert.equal(record, null);
       assert.equal(result, null);
+      assert.deepEqual(reads, [path.join(repo, '.starciwork/workspace.yaml')]);
     } else {
       assert.equal(record, path.join(repo, impl, 'index.yaml'));
       assert.equal(result.op, 'backend.implement');
@@ -75,8 +85,25 @@ test('lite root-cause resolution does not use stale workspace or feature records
 
 test('a committed lite reader drops forbidden metadata before a git read', (t) => {
   const repo = app(t);
-  const records = committedReader(repo)(['.starciwork/workspace.yaml', '.starciwork/index.yaml', `${feature}/index.yaml`]);
-  assert.deepEqual([...records], [], 'an uncommitted lite app needs no git lookup for forbidden metadata');
+  const records = spawnSyncOverride(() => () => assert.fail('forbidden lite metadata must not trigger a git read'),
+    () => committedReader(repo)(['.starciwork/index.yaml', `${feature}/index.yaml`, '.starciwork/shell/index.yaml', '.starciwork/_resources/environment/resource.yaml', '.starciwork/uat/index.yaml', '.starciwork/br/index.yaml']));
+  assert.deepEqual([...records], []);
+});
+
+test('a committed lite reader reads workspace.yaml through git while filtering forbidden metadata', (t) => {
+  const repo = app(t), workspace = '.starciwork/workspace.yaml';
+  const bytes = Buffer.from('schema: work/workspace@1\nproject: health\nrepositories: [{name: fe, role: fe}]\n');
+  const batchObject = (type, body) => Buffer.concat([Buffer.from(`${'a'.repeat(40)} ${type} ${body.length}\n`), body, Buffer.from('\n')]);
+  const reads = [];
+  const records = spawnSyncOverride(() => (_file, args, options) => {
+    reads.push({ args, input: options.input });
+    return { status: 0, stdout: Buffer.concat([batchObject('tree', Buffer.alloc(0)), batchObject('blob', bytes)]) };
+  }, () => committedReader(repo)([workspace, '.starciwork/index.yaml', `${feature}/index.yaml`]));
+  assert.equal(reads.length, 1);
+  assert.deepEqual(reads[0].args, ['-C', repo, 'cat-file', '--batch']);
+  assert.equal(reads[0].input, `HEAD:./.starciwork\nHEAD:./${workspace}\n`);
+  assert.deepEqual([...records.keys()], [workspace]);
+  assert.deepEqual(records.get(workspace), bytes);
 });
 
 test('lite acceptance tracing skips explicit owned feature indexes', (t) => {
@@ -113,14 +140,14 @@ test('forbidden lite record waits are obsolete even when stale bytes exist; bran
   const repo = app(t), cond = { type: 'record', path: `${feature}/index.yaml` };
   const result = evaluateCondition(db, cond, { repo });
   assert.equal(result.met, false);
-  assert.match(result.unmeetable, /lite \.starciwork holds only brand\//);
+  assert.match(result.unmeetable, /lite \.starciwork holds only workspace\.yaml and brand\/ \(plus \.gitignore\)/);
   assert.equal(evaluateCondition(db, { type: 'record', path: '.starciwork/brand', state: 'done', minRev: 2 }, { repo }).met, true);
   write(repo, '.starciwork/index.yaml', 'schema: work/catalog@1\nstate: done\nrev: 2\n');
-  assert.match(evaluateCondition(db, { type: 'record', path: '.starciwork', state: 'done', minRev: 2 }, { repo }).unmeetable, /lite \.starciwork holds only brand\//);
+  assert.match(evaluateCondition(db, { type: 'record', path: '.starciwork', state: 'done', minRev: 2 }, { repo }).unmeetable, /lite \.starciwork holds only workspace\.yaml and brand\/ \(plus \.gitignore\)/);
   const gate = { text: `Wait for ${feature}/index.yaml`, holds: [], raisedAt: Date.now() - 60_000 };
   const judged = judgeGate({ db, workflowId: 'wf-base', repo, gate, graceMs: 0 });
   assert.equal(judged.stale, true);
-  assert.match(judged.reasons[0], /lite \.starciwork holds only brand\//);
+  assert.match(judged.reasons[0], /lite \.starciwork holds only workspace\.yaml and brand\/ \(plus \.gitignore\)/);
   assert.deepEqual(judged.waits, []);
   write(repo, 'hfs.json', JSON.stringify({ kind: 'app', edition: 'full' }));
   assert.equal(evaluateCondition(db, cond, { repo }).met, true);
@@ -131,9 +158,11 @@ test('forbidden lite record waits are obsolete even when stale bytes exist; bran
 test('lite prompts use the brand direction without instructing a shell read', (t) => {
   const repo = app(t), packet = { op: 'brand.decide', brief: 'modules/ops/ops/brand.decide.yaml', context: { records: [], owned_paths: [] }, constraints: { model: 'm' } };
   const localeLine = () => buildOpPrompt({ skillRoot: ROOT, packet, repo }).split('\n').find(line => line.startsWith('product_locale:'));
-  assert.match(localeLine(), /lite \.starciwork holds only brand\//);
+  assert.match(localeLine(), /lite \.starciwork holds only workspace\.yaml and brand\/ \(plus \.gitignore\)/);
   assert.doesNotMatch(localeLine(), /shell\/index\.yaml/);
   assert.match(buildOpPrompt({ skillRoot: ROOT, packet, repo }), /edition: lite.*Skip the brief.*reads, writes, steps and proofs.*brand\.decide uses brand\/\*\*/);
+  assert.match(buildOpPrompt({ skillRoot: ROOT, packet, repo }), /Read workspace\.yaml normally for project identity and repository roles/);
+  assert.doesNotMatch(buildOpPrompt({ skillRoot: ROOT, packet, repo }), /Skip the brief[^\n]*workspace\.yaml/);
   write(repo, 'hfs.json', JSON.stringify({ kind: 'app', edition: 'full' }));
   assert.match(localeLine(), /shell\/index\.yaml verbatim/);
 });

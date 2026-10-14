@@ -140,16 +140,17 @@ test('missing, malformed and unreadable scoped canonical FRs remain unresolved i
   try{assert.throws(f.coverage,/private read refusal/);}finally{fs.readFileSync=native;}
 });
 
-test('lite proof coverage and baselines ignore forbidden stale Work records while retaining brand dependencies',t=>{
+test('lite proof coverage and baselines ignore stale full Work records while retaining workspace and brand dependencies',t=>{
   const f=mustProofFixture(t),db=f.ledger.db,job=db.prepare("SELECT * FROM jobs WHERE job_id='job-proof'").get();
   fs.writeFileSync(path.join(f.repoRoot,'hfs.json'),JSON.stringify({kind:'app',edition:'lite'}));
   fs.writeFileSync(f.index,'id: [stale malformed FR');
+  fs.writeFileSync(path.join(f.repoRoot,'.starciwork','workspace.yaml'),'schema: work/workspace@1\nid: proof\nproject: proof\nrepositories:\n  - {role: fe, name: fe}\n');
   const brand=path.join(f.repoRoot,'.starciwork','brand');fs.mkdirSync(brand,{recursive:true});
   fs.writeFileSync(path.join(brand,'index.yaml'),'id: brand.proof\n');
   const work=path.join(f.repoRoot,'.starciwork'),native=fs.readFileSync;
   fs.readFileSync=function(file,...args){
     const rel=path.relative(work,path.resolve(String(file))).replaceAll('\\','/');
-    if(rel&&!rel.startsWith('../')&&!path.isAbsolute(rel)&&rel!=='.gitignore'&&!rel.startsWith('brand/'))throw new Error(`forbidden lite Work read: ${rel}`);
+    if(rel&&!rel.startsWith('../')&&!path.isAbsolute(rel)&&rel!=='.gitignore'&&rel!=='workspace.yaml'&&!rel.startsWith('brand/'))throw new Error(`forbidden lite Work read: ${rel}`);
     return native.call(this,file,...args);
   };
   try{
@@ -164,7 +165,8 @@ test('lite proof coverage and baselines ignore forbidden stale Work records whil
     const row=db.prepare('SELECT claims_json,deps_json FROM artifact_proofs WHERE artifact_id=?').get(artifactId);
     const claims=JSON.parse(row.claims_json),deps=JSON.parse(row.deps_json);
     assert.deepEqual(claims.frs,[]);assert.deepEqual(claims.shapes,[]);
-    assert.deepEqual(deps.filter(dep=>dep.kind==='work').map(dep=>dep.path),['.starciwork/brand']);
+    assert.deepEqual(deps.filter(dep=>dep.kind==='work').map(dep=>dep.path).sort(),['.starciwork/brand','.starciwork/workspace.yaml']);
+    assert.match(deps.find(dep=>dep.path==='.starciwork/workspace.yaml').digest,/^[a-f0-9]{64}$/,'workspace identity and roles have a real proof baseline');
     assert.ok(deps.some(dep=>dep.kind==='code'&&dep.path==='tests/unit.spec.mjs'),'the actual proof spec still counts');
   }finally{fs.readFileSync=native;}
 });

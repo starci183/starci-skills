@@ -217,7 +217,6 @@ export function environmentIdsOfPaths(repo, paths) {
 /** The local checkouts of the workspace's repositories: the ledger repo and its named siblings. */
 function workspaceRoots(repo) {
   const roots = [path.resolve(repo)];
-  if (isLiteWorkRoot(path.join(repo, WORK_DIR_NAME))) return roots;
   const ws = readYaml(path.join(repo, WORK_DIR_NAME, 'workspace.yaml'));
   for (const r of Array.isArray(ws?.repositories) ? ws.repositories : []) {
     const sibling = path.join(path.dirname(path.resolve(repo)), String(r?.name ?? ''));

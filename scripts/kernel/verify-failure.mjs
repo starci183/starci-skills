@@ -216,7 +216,6 @@ const resolvedOwnedPaths = (ownedPaths, declared, role, kind, reporterPayload, f
 
 /** The workspace repositories {name → role} of a ledger repo (.starciwork/workspace.yaml). */
 function workspaceRoles(repo) {
-  if (isLiteWorkRoot(path.join(repo, WORK_DIR_NAME))) return {};
   const doc = readYaml(path.join(repo, '.starciwork', 'workspace.yaml'));
   const out = {};
   for (const r of Array.isArray(doc?.repositories) ? doc.repositories : []) if (r?.name) out[r.name] = r.role ?? null;

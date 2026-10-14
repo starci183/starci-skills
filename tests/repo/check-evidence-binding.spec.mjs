@@ -249,7 +249,7 @@ test('an unowned digest path resolves at the app root and returns a typed missin
 });
 
 
-test('lite evidence checks accept optional and brand-only Work without catalog or workspace', t => {
+test('lite evidence checks accept optional Work and workspace plus brand without a catalog', t => {
   const repo = mkdtemp(t, 'evidence-binding-lite-');
   fs.writeFileSync(path.join(repo, 'hfs.json'), JSON.stringify({kind: 'app', edition: 'lite'}));
   const workRoot = path.join(repo, '.starciwork');
@@ -257,6 +257,7 @@ test('lite evidence checks accept optional and brand-only Work without catalog o
   assert.equal(absent.status, 0, absent.stderr);
   assert.deepEqual(JSON.parse(absent.stdout), {findings: []});
   fs.mkdirSync(path.join(workRoot, 'brand'), {recursive: true});
+  fs.writeFileSync(path.join(workRoot, 'workspace.yaml'), 'schema: work/workspace@1\nid: example\nproject: example\nrepositories:\n  - {role: fe, name: fe}\n');
   fs.writeFileSync(path.join(workRoot, 'brand', 'index.yaml'), JSON.stringify({schema: 'work/brand@1',
     id: 'brand', state: 'done', verificationSource: 'authored-claim'}));
   fs.mkdirSync(path.join(workRoot, 'features', 'stale'), {recursive: true});

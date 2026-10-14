@@ -386,7 +386,7 @@ export function checkShellConformance(target) {
   const resolved = path.resolve(target);
   const dir = fs.existsSync(resolved) && fs.statSync(resolved).isFile() ? path.dirname(resolved) : resolved;
   const workRoot = workRootOf(dir);
-  if (isLiteWorkRoot(workRoot)) return { schema: 'starci/shell-conformance@2', ok: true, skipped: true, mode: 'lite', target: slash(dir), workRoot: slash(workRoot), refused: [], suspect: [], info: ['SKIP: lite .starciwork holds only brand/'], findings: [] };
+  if (isLiteWorkRoot(workRoot)) return { schema: 'starci/shell-conformance@2', ok: true, skipped: true, mode: 'lite', target: slash(dir), workRoot: slash(workRoot), refused: [], suspect: [], info: ['SKIP: lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore)'], findings: [] };
   const shell = readShell(workRoot);
   const indexFile = path.join(dir, 'index.yaml');
   const own = fs.existsSync(indexFile) ? readRecord(indexFile) : null;

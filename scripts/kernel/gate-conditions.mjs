@@ -265,7 +265,7 @@ const forbiddenRecordCondition = (workRoot, file, label, { directory = false, in
   if (workPathAllowed(workRoot, file)) return null;
   if (directory && workPathAllowed(workRoot, file, { dir: true })) return null;
   const requirement = index ? 'cannot require an index' : 'cannot be required';
-  const evidence = `${label} ${requirement}: lite .starciwork holds only brand/`;
+  const evidence = `${label} ${requirement}: lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore)`;
   return { met: false, evidence, unmeetable: evidence };
 };
 

@@ -986,7 +986,7 @@ export function layoutTreeMain(argv = []) {
       return { exitCode: 2, text: 'Usage: starci work layout-tree <scan|capture|plan|destinations|lockup|slot> --work <.starciwork> [...] [--write] [--json]\n' };
     }
     const workRoot = path.resolve(work);
-    if (isLiteWorkRoot(workRoot)) return out({ ok: true, skipped: true, reason: 'lite .starciwork holds only brand/' }, 'SKIP: lite .starciwork holds only brand/');
+    if (isLiteWorkRoot(workRoot)) return out({ ok: true, skipped: true, reason: 'lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore)' }, 'SKIP: lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore)');
     const shell = readShellRecord(workRoot);
     if (shell?.error) { return { exitCode: 1, text: `${shell.file}: ${shell.error}\n` }; }
     const existing = shell?.record ?? null;

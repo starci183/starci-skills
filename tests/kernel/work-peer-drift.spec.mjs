@@ -158,14 +158,17 @@ test('pieces: change notes, committed matching across line ends, owner declarati
   assert.equal(ownerDeclarationFor(changes,'.starciwork/index.yaml',{owner:L,after:0}),null,'a record file never covers its parent directory');
 });
 
-test('lite digests and historical input drift skip stale full Work records and retain brand', t => {
+test('lite digests and historical input drift skip stale full Work records and retain workspace and brand', t => {
   const w = world(t);
   w.work('hfs.json', JSON.stringify({ kind: 'app', edition: 'lite' }));
+  w.work('.starciwork/workspace.yaml', 'schema: work/workspace@1\nid: example\nproject: example\nrepositories:\n  - {role: fe, name: fe}\n');
   w.work('.starciwork/brand/index.yaml', 'schema: work/brand@1\nid: brand.example\n');
   const digest = createWorkDigester(w.repo);
-  for (const rel of ['.starciwork/workspace.yaml', '.starciwork/index.yaml', '.starciwork/shell/index.yaml', '.starciwork/features', SUB]) {
+  for (const rel of ['.starciwork/index.yaml', '.starciwork/shell/index.yaml', '.starciwork/features', SUB]) {
     assert.equal(digest(rel), ABSENT, rel); assert.deepEqual(digest.files(rel), {});
   }
+  assert.match(digest('.starciwork/workspace.yaml'), /^[a-f0-9]{64}$/);
+  assert.deepEqual(Object.keys(digest.files('.starciwork/workspace.yaml')), ['.starciwork/workspace.yaml']);
   assert.notEqual(digest('.starciwork/brand'), ABSENT);
   assert.deepEqual(Object.keys(digest.files('.starciwork/brand')), ['.starciwork/brand/index.yaml']);
   assert.deepEqual(w.drift(F), { stale: [], sourceDrift: [], peerDrift: [] }, 'old full-record baselines do not create lite follow-up work');

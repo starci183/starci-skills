@@ -6,7 +6,7 @@ import { list } from '../lib/list.mjs';
 import { renameOver } from '../api/fs/rename-over.mjs';
 import { underWorktrees } from '../lib/worktree-exclude.mjs';
 import { valueAfter } from '../lib/cli-arg.mjs';
-import { workPathAllowed } from '../lib/work-edition.mjs';
+import { isLiteWorkRoot, workPathAllowed } from '../lib/work-edition.mjs';
 export { slash } from '../lib/path-key.mjs';
 
 /** How many directories below its start a record walk descends (features/<f>/ui/<r> is 3). */
@@ -43,14 +43,16 @@ export function parseUiRef(ref) {
   return m ? { id: m[1], path: m[2] } : null;
 }
 
-/** The Work root enclosing `dir`: the nearest `.starciwork`, or the nearest directory with a workspace.yaml; null when none. */
+/** The Work root enclosing `dir`: the nearest workspace or `.starciwork`; an enclosing lite `.starciwork` owns its whole tree. */
 export function workRootOf(dir) {
+  let workspaceRoot = null;
   for (let at = path.resolve(dir), prev = null; ; prev = at, at = path.dirname(at)) {
     // A product worktree lives at <repo>/.starciwork/worktrees/<wf>/<op> (DESIGN §16.7): the `.starciwork` holding the
     // worktrees container is never the Work root of a path inside one of them.
-    if (path.basename(at) === '.starciwork' && prev && path.basename(prev) === 'worktrees') return null;
-    if (path.basename(at) === '.starciwork' || fs.existsSync(path.join(at, 'workspace.yaml'))) return at;
-    if (path.dirname(at) === at) return null;
+    if (path.basename(at) === '.starciwork' && prev && path.basename(prev) === 'worktrees') return workspaceRoot;
+    if (path.basename(at) === '.starciwork') return isLiteWorkRoot(at) ? at : workspaceRoot ?? at;
+    if (!workspaceRoot && fs.existsSync(path.join(at, 'workspace.yaml'))) workspaceRoot = at;
+    if (path.dirname(at) === at) return workspaceRoot;
   }
 }
 
@@ -59,6 +61,7 @@ export function indexFilesUnder(root) {
   const out = [];
   const workRoot = workRootOf(root);
   const walk = (dir, depth) => {
+    if (!workPathAllowed(workRoot, dir, { dir: true })) return;
     let entries = [];
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
     for (const e of entries) {

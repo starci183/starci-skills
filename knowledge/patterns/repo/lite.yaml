@@ -34,8 +34,8 @@ rules:
     requirement: |
       `hfs.json` names its edition (`full`, or `lite`; absent means `full`). The edition selects which slots and rules are in
       view; it never selects another engine or relaxes a rule locally. Lite keeps the full monorepo (the api, cli and optional
-      worker apps, the features and modules of the back end, the front-end apps and packages, the Supabase project, the stack
-      declaration and the Work tree), the CQRS
+      worker apps, the features and modules of the back end, the front-end apps and packages, the Supabase project and the stack
+      declaration), the CQRS
       shape, every pattern (queue, event bus, saga, reactors, projection, realtime, webhooks, fenced job) declared the same way,
       and the back-end unit specs exactly as full (ruleParams.be.unitRoles, logicRoles at 100 per file, @starci/jest-preset
       doubles, builders). Only adapters and delivery differ, all on Supabase: schema authority in `supabase/migrations`; queue and
@@ -46,6 +46,10 @@ rules:
       `supabase/functions`. The front end is the one front-end standard of knowledge/hfs/fe-stack.yaml, identical to full and
       with no tests (R97): Apollo GraphQL and SWR to the back end, modules/auth as the only Supabase importer (auth only), no
       Server Action and no route handler beyond health/live and the auth callback (R243).
+      Lite's `.starciwork` is required only when brand records exist and permits only `.gitignore`, optional `workspace.yaml`
+      metadata and `brand/**`. Readers read workspace metadata normally for the project id and repo roles used by app-root
+      detection and front-end role mapping. The catalog (`index.yaml`), `shell/`, `features/`, `_resources/`, `uat` and `br`
+      are forbidden.
     rationale: |
       One manifest and one catalog keep a lite app upgradable to full by additions only: swap the adapters, add the e2e and
       contract world and the stack.

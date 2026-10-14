@@ -75,8 +75,8 @@ test('the lite managed set carries the unit run and its coverage world (owner ru
   assert.doesNotMatch(hookText, /test:affected|jest|playwright|vitest/);
   assert.match(targets['.gitignore'].content, /^supabase\/\.temp\/$/m);
   assert.match(targets['.gitignore'].content, /^supabase\/\.branches\/$/m);
-  assert.match(targets['.starciwork/.gitignore'].content, /lite \.starciwork holds only brand\//);
-  assert.doesNotMatch(targets['.starciwork/.gitignore'].content, /workspace\.yaml|index\.yaml|shell|features|_resources|_derived/);
+  assert.match(targets['.starciwork/.gitignore'].content, /lite \.starciwork holds only workspace\.yaml and brand\//);
+  assert.doesNotMatch(targets['.starciwork/.gitignore'].content, /index\.yaml|shell|features|_resources|_derived/);
   const ci = parseYaml(targets['.github/workflows/ci.yml'].content);
   assert.ok(ci.jobs['db-types']);
   assert.deepEqual(ci.on.push.tags, ['v*'], 'CI runs on release tags and manual dispatch only');
@@ -115,7 +115,7 @@ test('lite render reads the Jest preset like full, writeTargets reaches a no-op,
   assert.equal(writeTargets(dir, targets).length, targets.length);
   assert.deepEqual(checkTargets(dir, targets).map(result => result.status), Array(targets.length).fill('ok'));
   assert.deepEqual(writeTargets(dir, targets), [], 'a second sync write is a no-op');
-  assert.equal(fs.existsSync(path.join(dir, '.starciwork')), false, 'sync preserves the absence of an optional lite brand tree');
+  assert.equal(fs.existsSync(path.join(dir, '.starciwork')), false, 'sync preserves the absence of an optional lite Work tree');
 
   const tracked = ['hfs.json', ...targets.map(target => target.path)];
   assert.deepEqual(await managedFindings({ repoRoot: dir, tracked, manifest: MANIFEST, presets: PRESETS }), []);
@@ -134,15 +134,30 @@ test('lite brand trees get their managed ignore file and admit every nested bran
   assert.deepEqual(await managedFindings({ repoRoot: dir, tracked: ['hfs.json', ...targets.map(target => target.path)], manifest: MANIFEST, presets: PRESETS }), []);
   const initialized = spawnSync('git', ['init', '-q'], { cwd: dir, encoding: 'utf8', windowsHide: true });
   assert.equal(initialized.status, 0, initialized.stderr);
-  const allowed = ['.starciwork/.gitignore', '.starciwork/brand/index.yaml', '.starciwork/brand/references/palette.yaml',
+  const allowed = ['.starciwork/.gitignore', '.starciwork/workspace.yaml', '.starciwork/brand/index.yaml', '.starciwork/brand/references/palette.yaml',
     '.starciwork/brand/assets/refs/reference.webp', '.starciwork/brand/drawings/home/desktop.png'];
-  const forbidden = ['.starciwork/workspace.yaml', '.starciwork/index.yaml', '.starciwork/shell/index.yaml',
+  const forbidden = ['.starciwork/index.yaml', '.starciwork/shell/index.yaml',
     '.starciwork/features/system-health/index.yaml', '.starciwork/_resources/environment.yaml', '.starciwork/uat/index.yaml', '.starciwork/br/index.yaml'];
   const ignored = spawnSync('git', ['check-ignore', '--no-index', '-z', '--stdin'], {
     cwd: dir, input: [...allowed, ...forbidden].join('\0'), encoding: 'utf8', windowsHide: true,
   });
   assert.equal(ignored.status, 0, ignored.stderr);
   assert.deepEqual(ignored.stdout.split('\0').filter(Boolean).sort(), forbidden.sort());
+});
+
+test('sync preserves a lite workspace declaration and does not create forbidden Work records', async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-lite-workspace-render-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(dir, 'hfs.json'), `${JSON.stringify(LITE, null, 2)}\n`);
+  const workspace = 'schema: work/workspace@1\nid: authored\nproject: demo\ndescription: The demo frontend workspace.\nrepositories:\n  - role: fe\n    name: fe\n';
+  fs.mkdirSync(path.join(dir, '.starciwork'));
+  fs.writeFileSync(path.join(dir, '.starciwork/workspace.yaml'), workspace);
+  const { targets } = await renderRepo(dir, { manifest: MANIFEST, presets: PRESETS });
+  assert.deepEqual(targets.filter(target => target.path.startsWith('.starciwork/')).map(target => target.path), ['.starciwork/.gitignore']);
+  writeTargets(dir, targets);
+  assert.equal(fs.readFileSync(path.join(dir, '.starciwork/workspace.yaml'), 'utf8'), workspace);
+  assert.deepEqual(fs.readdirSync(path.join(dir, '.starciwork')).sort(), ['.gitignore', 'workspace.yaml']);
+  assert.deepEqual(await managedFindings({ repoRoot: dir, tracked: ['hfs.json', '.starciwork/workspace.yaml', ...targets.map(target => target.path)], manifest: MANIFEST, presets: PRESETS }), []);
 });
 
 test('the full managed render of both examples is the committed one (every managed file in sync, edition full explicit or not)', () => {

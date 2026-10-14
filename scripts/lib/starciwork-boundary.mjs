@@ -84,10 +84,10 @@ export function isProductPath(rel) {
   return PRODUCT_PATTERNS.some((p) => matchFile(p, parts));
 }
 
-/** The lite app boundary: its optional Work tree holds .gitignore and brand/** only. */
+/** The lite app boundary: its optional Work tree holds .gitignore, workspace.yaml and brand/** only. */
 export function isLiteProductPath(rel, { dir = false } = {}) {
   const parts = segs(rel);
-  return (!dir && parts.length === 1 && parts[0] === '.gitignore')
+  return (!dir && parts.length === 1 && ['.gitignore', 'workspace.yaml'].includes(parts[0]))
     || (parts[0] === 'brand' && (parts.length > 1 || dir));
 }
 

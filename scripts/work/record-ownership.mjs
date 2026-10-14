@@ -4,7 +4,7 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {readYamlFile} from '../lib/read-yaml.mjs';
 import {sha256, sha256File} from '../../engine/digest.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
-import { isLiteWorkRoot, workPathAllowed } from '../lib/work-edition.mjs';
+import { workPathAllowed } from '../lib/work-edition.mjs';
 
 /**
  * Shared resolution of "what directories does this record's code live under" - the question concepts 1
@@ -28,7 +28,7 @@ export function moduleRootOf(rawPath) {
   return p;
 }
 
-export const readWorkspace = (workRoot) => isLiteWorkRoot(workRoot) ? null : readYamlFile(path.join(workRoot, 'workspace.yaml'));
+export const readWorkspace = (workRoot) => readYamlFile(path.join(workRoot, 'workspace.yaml'));
 
 /**
  * Whether a yaml file's `schema:` marker names a Work record at all. Every record schema this layout

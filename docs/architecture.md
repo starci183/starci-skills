@@ -48,7 +48,7 @@ Rules that hold everywhere:
   and triggers refuse every transition they do not list, whatever the calling code does. Reports and
   artifacts are immutable; histories are append-only.
 - **No JSON state files and no text logs.** A fact is a row.
-- **`.starciwork` holds product content only**: full's Work records, SRS/SDS, UI specifications and brand; lite's brand only
+- **`.starciwork` holds product content only**: full's Work records, SRS/SDS, UI specifications and brand; lite's workspace metadata and brand
   (slot `app.starciwork`, R212).
   Agent output lives in SQL and blobs; a Work record cites it by artifact id and sha256.
 
@@ -192,7 +192,7 @@ standalone host entry retains repair of already-running workflows. Debugging is 
 
 The host owns `.claude/`, the `.workspaces` project registry and the bootstrap written from
 `init/AGENTS.md`. A project is one app repository: its root owns the project's only `.starciwork` —
-product records for both `be/` and `fe/` in full, or optional brand records in lite (`app.starciwork`, R212).
+product records for both `be/` and `fe/` in full, or workspace metadata and optional brand records in lite (`app.starciwork`, R212).
 The runtime ledger is outside every repository, so no
 worktree can copy it and no re-clone loses it. Secrets stay in the app root's `.starcistacks`
 custody, encrypted with sops; they never enter a database or a blob.
@@ -245,10 +245,11 @@ A routed app carries the host's `.claude/CONTEXT.md` marker and never grows a se
 `fe/` (`HFS_WORK_IN_FE`) or a `.starcistacks` inside a side (`HFS_STACKS_IN_SIDE`). A Kernel
 workflow's worktree lives outside the app checkout, one per workflow ([workflow kernel](workflow-kernel.md)).
 
-Lite's `app.starciwork` slot is optional when the app has no brand records. It permits only `.gitignore` and `brand/**`
-(R212, owner ruling 2026-10-14): brand drawing records, references and assets use the existing brand tooling layout.
-Lite readers skip the workspace, catalog, shell and feature indexes; every other entry fails with
-`HFS_STARCIWORK_LITE_FORBIDDEN`, "lite .starciwork holds only brand/". Full retains the complete Work layout of
+Lite's `app.starciwork` slot is optional when the app has no brand records. It permits only `.gitignore`, `workspace.yaml` and
+`brand/**` (R212, owner amendment 2026-10-14). Optional workspace metadata supplies the project id and repo roles that Work
+tools use to locate the app root and tie brand records to the front end; brand drawing records, references and assets use
+the existing brand tooling layout. Lite readers read workspace metadata normally and skip the catalog, shell and feature
+indexes; every other entry fails with `HFS_STARCIWORK_LITE_FORBIDDEN`, "lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore)". Full retains the complete Work layout of
 `modules/schemas/work-layout.yaml`.
 
 ## The responsibility graph

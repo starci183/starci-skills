@@ -5,9 +5,11 @@ identity: stable metadata id; folder path is not identity
 shape:
   editions:
     full: "The Work shape and productPaths below apply to full edition unchanged."
-    lite: "An optional .starciwork holds only .gitignore and brand/**, including the brand drawing records, references
-      and assets in their existing layout. Create the tree only when the app has brand records. workspace.yaml, index.yaml,
-      shell/, features/, _resources/, uat and br are forbidden [HFS_STARCIWORK_LITE_FORBIDDEN]: lite .starciwork holds only brand/.
+    lite: "An optional .starciwork holds only .gitignore, optional workspace.yaml metadata and brand/**, including the brand
+      drawing records, references and assets in their existing layout. The tree is required only when the app has brand
+      records. workspace.yaml supplies the project id and repo roles for app-root detection and front-end role mapping;
+      runtime readers read it normally. index.yaml, shell/, features/, _resources/, uat and br are forbidden
+      [HFS_STARCIWORK_LITE_FORBIDDEN]: lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore).
       Runtime readers skip these full-edition records under lite; workflow state stays in the external ledger."
   workspace: workspace.yaml
   brand: brand/index.yaml

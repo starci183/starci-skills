@@ -11,10 +11,11 @@ rules:
     entering another repository or worktree.
   - Resolve source-relative repository paths from Source, not from .claude or the current target
     checkout. Verify each actual Git remote against the declared repository before effects.
-  - A selected project has exactly one canonical Work root at .starciwork. Full edition carries
-    workspace metadata there; lite may omit the tree and keeps only .gitignore and brand/** when
-    brand records exist. Project identity is stored in routing references and the external ledger,
-    never in a project-name directory inside Work.
+  - A selected project has exactly one canonical Work root at .starciwork. Both editions permit
+    workspace.yaml metadata there. Lite may omit the tree when no brand records exist and permits only
+    .gitignore, optional workspace.yaml and brand/**. Workspace metadata supplies the project id and repo roles
+    for app-root detection and front-end role mapping. Project identity is also stored in routing references
+    and the external ledger, never in a project-name directory inside Work.
   - In full edition, all product features are owned below features/<feature>/; business, architecture, UI,
     implementation and UAT belong inside that feature. Never bind a feature as a separate workspace
     or place feature business at .starciwork/business/ or .starciwork/features/business/.
@@ -29,13 +30,13 @@ rules:
     binding explicitly. Directory changes and AGENTS.md discovery in an app do not discover
     instructions in a separate host automatically.
   - Each full app project retains its own durable Work tree; a lite app retains its optional
-    brand-only tree. .workspaces stores routing references,
+    workspace metadata and brand tree. .workspaces stores routing references,
     never business progress, evidence or workflow history.
   - If a binding or target is missing, inspect existing project route files and propose the exact
     mapping; never silently use an illustrative outputs workspace as project Work.
   - Use the resolved app Work root for schema validation and brand records; resolve workflow goals,
-    evidence and completion through the external project ledger. Lite readers do not need
-    workspace.yaml, index.yaml, shell/index.yaml or features/<feature>/index.yaml.
+    evidence and completion through the external project ledger. Lite readers read workspace.yaml normally
+    when present and skip index.yaml, shell/index.yaml and features/<feature>/index.yaml.
   - Validate the app checkout and both side directories against this routing contract before workflow
     effects. A failed source binding never authorizes creating another runtime, stack or Work tree.
   - Before new workspace creation, inspect app storage for `.work`/`.starci` names —

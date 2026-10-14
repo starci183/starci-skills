@@ -20,17 +20,23 @@ const hygiene = (root) => {
   return result;
 };
 
-test('full scaffolds the Work catalog and feature while lite needs only its product source', (t) => {
+test('both editions scaffold a workspace while only full carries the Work catalog and feature', (t) => {
   const into = mkdtemp(t, 'hfs-work-seeds-');
   for (const edition of ['full', 'lite']) {
     const created = scaffold(into, `work-${edition}`, edition);
+    assert.ok(created.files.includes('.starciwork/.gitignore'));
+    assert.ok(created.files.includes('.starciwork/workspace.yaml'));
     assert.equal(created.files.includes('.starciwork/index.yaml'), edition === 'full');
     assert.equal(created.files.includes('.starciwork/features/system-health/index.yaml'), edition === 'full');
     assert.ok(!created.files.includes('.starciwork/features/index.yaml'));
     assert.ok(fs.existsSync(path.join(created.root, 'be/src/features/api/system-health/transport/http/live.controller.ts')));
     if (edition === 'full') {
       for (const seed of scaffoldWorkSeeds(`work-${edition}`)) assert.equal(fs.readFileSync(path.join(created.root, seed.path), 'utf8'), seed.content);
-    } else assert.equal(fs.existsSync(path.join(created.root, '.starciwork')), false);
+    } else {
+      assert.deepEqual(fs.readdirSync(path.join(created.root, '.starciwork')).sort(), ['.gitignore', 'workspace.yaml']);
+      const workspace = scaffoldWorkSeeds('work-lite').find((file) => file.path === '.starciwork/workspace.yaml');
+      assert.equal(fs.readFileSync(path.join(created.root, workspace.path), 'utf8'), workspace.content);
+    }
     hygiene(created.root);
   }
 });
@@ -38,11 +44,26 @@ test('full scaffolds the Work catalog and feature while lite needs only its prod
 test('upgrading a lite app without Work adds the full workspace, catalog and feature and passes hygiene', async (t) => {
   const into = mkdtemp(t, 'hfs-work-upgrade-');
   const { root } = scaffold(into, 'reseed-lite', 'lite');
+  fs.rmSync(path.join(root, '.starciwork'), { recursive: true });
   assert.equal(fs.existsSync(path.join(root, '.starciwork')), false);
   const plan = await upgradeEdition({ root, to: 'full', plan: true, presets: PRESETS });
   for (const seed of scaffoldWorkSeeds('reseed-lite')) assert.ok(plan.some((step) => step.path === seed.path));
   await upgradeEdition({ root, to: 'full', presets: PRESETS, prettier: FORMATTED, lock });
   for (const seed of scaffoldWorkSeeds('reseed-lite')) assert.equal(fs.readFileSync(path.join(root, seed.path), 'utf8'), seed.content);
+  hygiene(root);
+});
+
+test('upgrade preserves the lite workspace id and authored repo roles while adding the full Work catalog', async (t) => {
+  const into = mkdtemp(t, 'hfs-work-workspace-');
+  const { root } = scaffold(into, 'workspace-lite', 'lite');
+  const workspace = path.join(root, '.starciwork/workspace.yaml');
+  fs.writeFileSync(workspace, fs.readFileSync(workspace, 'utf8').replace('id: workspace-lite\n', 'id: durable-workspace\n') + '  - role: docs\n    name: docs\n');
+  const before = fs.readFileSync(workspace);
+  const plan = await upgradeEdition({ root, to: 'full', plan: true, presets: PRESETS });
+  assert.ok(plan.every((step) => step.path !== '.starciwork/workspace.yaml'));
+  assert.ok(plan.some((step) => step.path === '.starciwork/index.yaml'));
+  await upgradeEdition({ root, to: 'full', presets: PRESETS, prettier: FORMATTED, lock });
+  assert.deepEqual(fs.readFileSync(workspace), before);
   hygiene(root);
 });
 
@@ -75,7 +96,7 @@ test('a missing catalog is filled while an existing authored system-health featu
   const before = fs.readFileSync(feature);
   const plan = await upgradeEdition({ root, to: 'full', plan: true, presets: PRESETS });
   assert.ok(plan.some((step) => step.path === '.starciwork/index.yaml'));
-  assert.ok(plan.some((step) => step.path === '.starciwork/workspace.yaml'));
+  assert.ok(plan.every((step) => step.path !== '.starciwork/workspace.yaml'));
   assert.ok(plan.every((step) => step.path !== '.starciwork/features/system-health/index.yaml'));
   await upgradeEdition({ root, to: 'full', presets: PRESETS, prettier: FORMATTED, lock });
   assert.deepEqual(fs.readFileSync(feature), before);

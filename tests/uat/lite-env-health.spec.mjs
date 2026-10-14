@@ -26,7 +26,7 @@ const legacyWork = repo => {
 
 const ownedFlow = '.starciwork/features/login/uat/password-sign-in';
 
-test('lite env-health ignores absent and legacy Work metadata, including explicit resources inside .starciwork', async t => {
+test('lite env-health reads workspace.yaml and ignores forbidden Work metadata and explicit Work resources', async t => {
   const repo = fixture(t, 'lite');
   let result = await checkEnvironments({ repo, paths: [ownedFlow] });
   assert.deepEqual([result.ready, result.declared, result.environments], [true, false, []]);
@@ -44,14 +44,14 @@ test('lite env-health ignores absent and legacy Work metadata, including explici
   result = await checkEnvironments({ repo, ids: ['environment.t.local', environment] });
   assert.deepEqual(result.environments, []);
   assert.deepEqual(result.unresolved, ['environment.t.local', environment]);
-  assert.deepEqual(reads, [], 'lite does not read forbidden Work YAML left over from an earlier layout');
+  assert.deepEqual([...new Set(reads)], [path.join(repo, '.starciwork', 'workspace.yaml')], 'lite reads workspace.yaml and skips forbidden Work YAML left over from an earlier layout');
 
   const external = path.join(repo, 'environment.yaml');
   fs.writeFileSync(external, 'schema: work/resource@1\nid: environment.t.external\nprobes: []\n');
   result = await checkEnvironments({ repo, ids: [external] });
   assert.equal(result.ready, true);
   assert.equal(result.environments[0].id, 'environment.t.external');
-  assert.deepEqual(reads, []);
+  assert.deepEqual([...new Set(reads)], [path.join(repo, '.starciwork', 'workspace.yaml')]);
 });
 
 test('full env-health keeps discovering Work record environment refs and workspace metadata', async t => {

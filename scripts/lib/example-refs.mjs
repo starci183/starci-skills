@@ -172,10 +172,10 @@ export function exampleArtifactReadOptions(runtimeRoot, workRoot, { resolveRoot 
   referenceFile(base, `${EXAMPLES_ROOT}/${app}/hfs.json`, { exact: true });
   const ownWork = path.join(base, EXAMPLES_ROOT, app, '.starciwork');
   if (!isLiteWorkRoot(ownWork)) referenceFile(base, `${EXAMPLES_ROOT}/${app}/.starciwork/index.yaml`, { exact: true });
-  if (!workPathAllowed(ownWork, target, { dir: true })) throw new Error('lite .starciwork holds only brand/');
+  if (!workPathAllowed(ownWork, target, { dir: true })) throw new Error('lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore)');
   referenceFile(base, relative, { directory: true, exact: true });
   const resolution = path.resolve(resolveRoot);
-  if (!workPathAllowed(ownWork, resolution, { dir: true })) throw new Error('lite .starciwork holds only brand/');
+  if (!workPathAllowed(ownWork, resolution, { dir: true })) throw new Error('lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore)');
   if (!insidePath(resolution, target, { includeSelf: true }) || !insidePath(ownWork, resolution, { includeSelf: true }))
     throw new Error('selected example validation and resolution must share its own Work root');
   referenceFile(base, slash(path.relative(base, resolution)), { directory: true, exact: true });

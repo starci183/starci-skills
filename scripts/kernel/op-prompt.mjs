@@ -121,10 +121,10 @@ function productPromptLines({ repo, context }) {
   let locale = '(unset - no shell or brand locale)';
   if (context.product_locale) locale = context.product_locale.locale + ' (' + context.product_locale.source + ')';
   else if (lite) locale = '(unset - no brand locale)';
-  const direction = lite ? '; lite .starciwork holds only brand/; use the brand records for product direction'
+  const direction = lite ? '; lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore); use the brand records for product direction'
     : '; chrome, nav labels and the demo persona come from .starciwork/shell/index.yaml verbatim';
   const lines = [`product_locale: ${locale} — every string a product user reads (UI copy, labels, sample data in prompts, message files) is written in this locale, never in owner_language${direction}`];
-  if (lite) lines.push('edition: lite — .starciwork/ is optional and holds only .gitignore and brand/** (drawing records, references and assets). Skip the brief’s full-edition workspace.yaml, root index.yaml, shell/, features/, _resources/, uat/ and br/ reads, writes, steps and proofs; these paths are forbidden in lite. brand.decide uses brand/** and retains its brand drawing, reference and asset proofs.');
+  if (lite) lines.push('edition: lite — .starciwork/ is optional and holds only .gitignore, workspace.yaml and brand/** (drawing records, references and assets). Read workspace.yaml normally for project identity and repository roles. Skip the brief’s full-edition root index.yaml, shell/, features/, _resources/, uat/ and br/ reads, writes, steps and proofs; these paths are forbidden in lite. brand.decide uses brand/** and retains its brand drawing, reference and asset proofs.');
   return lines;
 }
 

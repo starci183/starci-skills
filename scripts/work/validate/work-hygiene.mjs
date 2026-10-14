@@ -28,6 +28,7 @@ import { samePath } from '../../lib/path-key.mjs';
 import { readEnv } from '../../lib/env.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 import { trimTrailing } from './trailing-text.mjs';
+import { isWorkTemplatePath } from '../../lib/work-edition.mjs';
 
 export const WORK_YAML_UNPARSEABLE = 'WORK_YAML_UNPARSEABLE';
 export const WORK_VALIDATE_REFUSED = 'WORK_VALIDATE_REFUSED';
@@ -196,8 +197,10 @@ function parseWorkYaml(rels, reader, checked, findings) {
 
 // Validate: each directory that holds a parsed file, once; a refusal counts only when it names one of the given files.
 function validateParsedDirs(root, parsed, strict, checked, findings) {
-  const dirs = [...new Set(parsed.map((rel) => path.dirname(path.join(root, rel))))].filter((d) => fs.existsSync(d));
-  const owned = parsed.map((rel) => path.join(root, rel));
+  // The normal Work tree checks exclude scaffold templates; hygiene still parses and scans their bytes.
+  const records = parsed.map((rel) => path.join(root, rel)).filter((file) => !isWorkTemplatePath(file));
+  const dirs = [...new Set(records.map((file) => path.dirname(file)))].filter((d) => fs.existsSync(d));
+  const owned = records;
   for (const dir of dirs) {
     let report;
     try { report = scopeToOwned(validateWork(dir, { strict }), owned); }

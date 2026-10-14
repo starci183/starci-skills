@@ -228,7 +228,7 @@ the `storage-convention` check (`RT_STORAGE_UNDECLARED`) and the `event-spill` c
 ## 6. `.starciwork`
 
 Full's `.starciwork` keeps Work records, SRS/SDS, UI specifications and brand. Lite's `app.starciwork` slot is optional
-when there are no brand records and holds only `.gitignore` and `brand/**` (R212).
+when there are no brand records and holds only `.gitignore`, optional `workspace.yaml` metadata and `brand/**` (R212).
 `modules/schemas/work-layout.yaml` owns the full record layout; the slot manifest owns the edition boundary. A Work
 record cites agent output by artifact id and sha256 (`work_citations`); the bytes are a blob.
 

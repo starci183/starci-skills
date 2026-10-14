@@ -121,7 +121,7 @@ function hostCompositeOf(host, bp, theme, state = null) {
  */
 export function composeDirection(options) {
   try {
-    if (isLiteWorkRoot(workRootOf(options.uiDir))) return { ok: true, skipped: true, reason: 'lite .starciwork holds only brand/' };
+    if (isLiteWorkRoot(workRootOf(options.uiDir))) return { ok: true, skipped: true, reason: 'lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore)' };
     return composeOne(options);
   } catch (error) { return { ok: false, error: String(error?.message ?? error) }; }
 }

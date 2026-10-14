@@ -25,6 +25,7 @@ const EXPECTED_LITE_FILES = Object.freeze([
   '.dockerignore', '.editorconfig', '.gitattributes', '.github/workflows/ci.yml', '.github/workflows/db-deploy.yml',
   '.github/workflows/images.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.nvmrc', '.prettierignore',
   '.prettierrc', '.sops.yaml', '.starcistacks/dev/environment.json', '.starcistacks/dev/secrets/.gitkeep',
+  '.starciwork/.gitignore', '.starciwork/workspace.yaml',
   'README.md',
   'be/apps/api/Dockerfile', 'be/apps/api/src/api.env.ts', 'be/apps/api/src/api.options.ts', 'be/apps/api/src/app.module.ts', 'be/apps/api/src/compose/platform.ts', 'be/apps/api/src/main.ts',
   'be/eslint.config.mjs', 'be/jest.config.js', 'be/nest-cli.json',
@@ -160,7 +161,7 @@ const scaffoldLite = into => scaffoldApp({
   now: () => CREATED_AT,
 });
 
-test('lite scaffold emits the brand-only Work tree and is structurally clean', async (t) => {
+test('lite scaffold emits its workspace declaration and is structurally clean', async (t) => {
   const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-lite-'));
   t.after(() => fs.rmSync(into, { recursive: true, force: true }));
   const { root, files } = scaffoldLite(into);
@@ -176,7 +177,12 @@ test('lite scaffold emits the brand-only Work tree and is structurally clean', a
   assert.ok(env.trimEnd().split('\n').length <= 150, 'the API env reader stays within its 150-line budget');
   assert.doesNotMatch(env, /parseApiEnv|localhost|127\.0\.0\.1|process\.env/);
   assert.doesNotMatch(env, /from "@features\/|\b\w+Module\b|\.(?:register|forRoot)\(/);
-  assert.equal(fs.existsSync(path.join(root, '.starciwork')), false, 'the starter has no brand records, so no Work tree is required');
+  assert.deepEqual(fs.readdirSync(path.join(root, '.starciwork')).sort(), ['.gitignore', 'workspace.yaml']);
+  assert.deepEqual(parseYaml(fs.readFileSync(path.join(root, '.starciwork/workspace.yaml'), 'utf8')), {
+    schema: 'work/workspace@1', id: 'demo', project: 'demo',
+    description: 'The Work records of demo, one StarCi app with its back end in be/ and its front end in fe/.',
+    repositories: [{ role: 'be', name: 'be' }, { role: 'fe', name: 'fe' }],
+  });
   const declaration = JSON.parse(fs.readFileSync(path.join(root, 'hfs.json'), 'utf8'));
   assert.deepEqual(declaration.supabase, {
     enableSignup: false,

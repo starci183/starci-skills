@@ -603,11 +603,12 @@ slots:
              "features/<feature>/ui/<name>/assets/<approved-file>", "features/<feature>/uat/<name>/{index,accounts,fixtures}.yaml",
              "features/<feature>/uat/<name>/{seed,cleanup}.sql", "_resources/{identities,environments,fixtures}/<slug>/resource.yaml"]
     forbids: [evidence/, logs/, reports/, captures/, runs/, "kernel-*/", "*.sqlite*", _derived/]
-    # Owner ruling 2026-10-14: lite keeps only brand drawing records, references and assets. No brand means no Work tree is needed.
+    # Owner amendment 2026-10-14: lite keeps workspace.yaml for project identity and repo roles, plus brand drawing records,
+    # references and assets. No brand means no Work tree is needed; workspace.yaml is legal but optional.
     litePresence: optional
     lite:
       requires: [.gitignore]
-      allows: ["brand/**"]
+      allows: [workspace.yaml, "brand/**"]
     rules: [HFS_AGENT_DATA_TRACKED, HFS_IDENTITY_CUSTODY]
   - id: app.starcistacks
     profiles: [app]

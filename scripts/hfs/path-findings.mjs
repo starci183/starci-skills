@@ -111,7 +111,7 @@ export function liteStarciworkFinding(file, resolver, { dir = false } = {}) {
   if (!p.startsWith('.starciwork/')) return null;
   const admitted = allowsFile(resolver, dir ? `${p}/.probe` : p);
   if (admitted?.slot === 'app.starciwork' && admitted.allowed) return null;
-  return { code: 'HFS_STARCIWORK_LITE_FORBIDDEN', level: 'error', path: p, slot: 'app.starciwork', message: `${p}: lite .starciwork holds only brand/ (and .gitignore); remove this path or use the full edition` };
+  return { code: 'HFS_STARCIWORK_LITE_FORBIDDEN', level: 'error', path: p, slot: 'app.starciwork', message: `${p}: lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore); remove this path or use the full edition` };
 }
 
 /** Local lite Work leftovers, including metadata ignored by an old full-edition .gitignore. */

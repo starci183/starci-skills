@@ -59,20 +59,23 @@ test('direction mode with no resolvable family refuses naming the missing bindin
   });
 });
 
-test('lite identity admission ignores absent and stale full Work metadata and follows the brand-only contract', t => {
+test('lite identity admission accepts workspace metadata and ignores stale full Work records', t => {
   const dir = repo(t);
   fs.writeFileSync(path.join(dir, 'hfs.json'), JSON.stringify({ hfs: 3, kind: 'app', edition: 'lite' }));
   fs.rmSync(path.join(dir, '.starciwork'), { recursive: true });
   assert.ok(admit(dir, {}).inputs.digests.length > 0, 'identity can be admitted before the optional brand tree exists');
   fs.mkdirSync(path.join(dir, '.starciwork', 'shell'), { recursive: true });
   fs.mkdirSync(path.join(dir, '.starciwork', 'features', 'legacy', 'br', 'old'), { recursive: true });
-  for (const rel of ['workspace.yaml', 'index.yaml', 'shell/index.yaml', 'features/legacy/index.yaml', 'features/legacy/br/old/index.yaml']) {
+  fs.writeFileSync(path.join(dir, '.starciwork', 'workspace.yaml'), 'schema: work/workspace@1\nid: example\nproject: example\nrepositories:\n  - {role: fe, name: fe}\n');
+  for (const rel of ['index.yaml', 'shell/index.yaml', 'features/legacy/index.yaml', 'features/legacy/br/old/index.yaml']) {
     fs.writeFileSync(path.join(dir, '.starciwork', rel), 'invalid: [yaml');
   }
   const { inputs } = admit(dir, {});
-  assert.ok(!inputs.digests.some(d => ['.starciwork/workspace.yaml', '.starciwork/index.yaml', '.starciwork/shell/', '.starciwork/features/'].some(prefix => d.path.startsWith(prefix))), 'forbidden records never become dispatch input digests');
+  assert.ok(!inputs.digests.some(d => ['.starciwork/index.yaml', '.starciwork/shell/', '.starciwork/features/'].some(prefix => d.path.startsWith(prefix))), 'forbidden records never become dispatch input digests');
   const selected = selectDispatchContract(ROOT, OP, { records: [], params: {} });
-  assert.ok(selected.brief.steps[0].action.en.includes('In lite, .starciwork is optional') && selected.brief.steps[0].action.en.includes('holds only .gitignore and brand/**'));
+  const liteAction = selected.brief.steps[0].action.en;
+  assert.match(liteAction, /In lite, \.starciwork is required only when brand records exist/);
+  for (const allowed of ['.gitignore', 'workspace.yaml', 'brand/**']) assert.ok(liteAction.includes(allowed), allowed);
   const shellStep = selected.brief.steps.find(step => step.writes.includes('shellNode'));
   assert.ok(shellStep.action.en.startsWith('Full edition only.'));
 });

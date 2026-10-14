@@ -1,4 +1,4 @@
-// The record-path evidence behind a free-text gate. Lite paths outside brand are obsolete waits.
+// The record-path evidence behind a free-text gate. Forbidden lite paths are obsolete waits; workspace.yaml and brand remain readable.
 import fs from 'node:fs';
 import path from 'node:path';
 import { workPathAllowed } from '../lib/work-edition.mjs';
@@ -49,7 +49,7 @@ export const pathVerdict = (repo, gate, paths) => {
     if (repo) {
       const workRoot = path.join(repo, WORK_DIR_NAME), file = path.join(repo, rel);
       if (!workPathAllowed(workRoot, file) && !workPathAllowed(workRoot, file, { dir: true })) {
-        reasons.push(`${rel} cannot be required: lite .starciwork holds only brand/`);
+        reasons.push(`${rel} cannot be required: lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore)`);
         continue;
       }
     }

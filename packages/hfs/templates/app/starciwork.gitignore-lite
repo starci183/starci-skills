@@ -1,5 +1,6 @@
-# StarCi lite .starciwork holds only brand/ records, references and assets.
+# StarCi lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore).
 # Runtime output lives in runtime.sqlite rows and blobs outside the repository.
 /*
 !/.gitignore
+!/workspace.yaml
 !/brand/

@@ -53,13 +53,19 @@ test('a missing repo degrades to exists:false + a signal, exit 0',t=>{
   assert.ok((body.signals??[]).some(s=>/does not exist/i.test(s)),`expected a missing-path signal, got: ${r.stdout}`);
 });
 
-test('lite assessment treats Work as optional brand records and ignores stale full records', t => {
+test('lite assessment accepts optional workspace and brand metadata and ignores stale full records', t => {
   const repo = fixture(t).dir();
   fs.writeFileSync(path.join(repo, 'hfs.json'), JSON.stringify({ kind: 'app', edition: 'lite' }));
   const assess = () => { const result = run('--repo', repo, '--json'); assert.equal(result.status, 0, result.stderr); return out(result); };
   assert.equal(assess().signals.some(signal => signal.startsWith('starciwork-artifacts:')), false, 'lite needs no Work directory');
   const work = path.join(repo, '.starciwork');
-  for (const file of ['workspace.yaml', 'index.yaml', 'shell/index.yaml', 'features/f/index.yaml', 'features/f/uat/flow/index.yaml', 'features/f/evidence/capture.png', 'brand/index.yaml', 'brand/assets/refs/logo.webp']) {
+  fs.mkdirSync(work);
+  fs.writeFileSync(path.join(work, 'workspace.yaml'), 'schema: work/workspace@1\nid: example\nproject: example\nrepositories:\n  - {role: fe, name: fe}\n');
+  const workspaceOnly = assess();
+  assert.deepEqual(workspaceOnly.starciwork, { present: true, nodeCount: 0, uatCount: 0, evidenceCount: 0, mediaCount: 0 });
+  assert.equal(workspaceOnly.size.files, 2, 'the permitted workspace participates in the app scan beside hfs.json');
+  assert.equal(workspaceOnly.signals.some(signal => signal.startsWith('starciwork-artifacts:')), false);
+  for (const file of ['index.yaml', 'shell/index.yaml', 'features/f/index.yaml', 'features/f/uat/flow/index.yaml', 'features/f/evidence/capture.png', 'brand/index.yaml', 'brand/assets/refs/logo.webp']) {
     const abs = path.join(work, file); fs.mkdirSync(path.dirname(abs), { recursive: true }); fs.writeFileSync(abs, 'x');
   }
   const body = assess();

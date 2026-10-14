@@ -312,10 +312,11 @@ test('the check refuses a missing or unreadable root instead of reporting about 
   assert.throws(()=>checkWorkChange({workRoot:path.join(world(t),'absent')}),WorkChangeInputError);
 });
 
-test('lite change checks read only brand records and never open retired Work indices', t => {
+test('lite change checks retain brand records beside workspace metadata and skip retired Work indices', t => {
   const app = world(t), root = path.join(app, '.starciwork');
   write(path.join(app, 'hfs.json'), JSON.stringify({kind: 'app', edition: 'lite'}));
   plant(root);
+  write(path.join(root, 'workspace.yaml'), 'schema: work/workspace@1\nid: example\nproject: example\nrepositories:\n  - {role: fe, name: fe}\n');
   write(path.join(root, 'brand/index.yaml'), 'schema: work/brand@1\nid: brand\nstate: todo\n');
   write(path.join(root, 'index.yaml'), 'retired: [unreadable\n');
   write(path.join(root, 'shell/index.yaml'), 'retired: [unreadable\n');

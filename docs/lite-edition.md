@@ -35,9 +35,11 @@ Tests: back-end unit specs are required exactly as in full (`ruleParams.be.unitR
 (`starci supabase start`), with no toxiproxy and no containers of their own. There is no e2e world, no contract world and no
 e2e workflow (slot `app.ci-e2e`). The front end has no tests in either edition (R97).
 
-Work: lite's `app.starciwork` slot holds only `.gitignore` and `brand/**` (R212, owner ruling 2026-10-14). The tree is optional
-when the app has no brand records. Brand drawing records, references and assets keep their existing layout: the brand tooling
-reads the brand record directly, without workspace metadata or a feature catalog. Full keeps its complete Work tree.
+Work: lite's `app.starciwork` slot holds only `.gitignore`, `workspace.yaml` and `brand/**` (R212, owner amendment 2026-10-14).
+The tree is optional when the app has no brand records, and `workspace.yaml` is optional when the tree exists. Workspace
+metadata supplies the project id and repo roles that Work tools use to locate the app root and tie brand records to the
+front end. Brand drawing records, references and assets keep their existing layout; brand tooling reads the brand record
+directly. Full keeps its complete Work tree.
 
 Use lite for a product whose infrastructure is Supabase. Start with full when the product needs its own stack, the e2e world or
 UAT records.
@@ -52,8 +54,9 @@ The scaffold creates the minimum live product and generates the `app.supabase.ty
 stack. Docker must be available. If type generation fails, the command removes the app it began rather than leaving a partial
 scaffold.
 
-The lite scaffold creates at most the brand area and its ignore file under `app.starciwork`; it creates no workspace metadata,
-feature catalog, shell, feature, resource, UAT or business-rule records there.
+The lite scaffold creates `.gitignore` and `workspace.yaml` under `app.starciwork`, with the project id and repo roles used
+by the full scaffold. It retains `brand/` only when present and creates no feature catalog, shell, feature, resource, UAT or
+business-rule records there.
 
 ## The tree in words
 
@@ -145,10 +148,10 @@ not supported.
 
 ## What lite forbids
 
-R212 restricts `app.starciwork` to its brand boundary. Workspace metadata, the feature catalog, shell, features, resources,
-UAT and business-rule records are forbidden there; any content outside `.gitignore` and `brand/**` fails with
-`HFS_STARCIWORK_LITE_FORBIDDEN`: "lite .starciwork holds only brand/". Lite readers skip the full-edition workspace, catalog,
-shell and feature indexes.
+R212 permits only `.gitignore`, optional `workspace.yaml` metadata and `brand/**` in `app.starciwork`. The feature catalog,
+shell, features, resources, UAT and business-rule records are forbidden there; any other content fails with
+`HFS_STARCIWORK_LITE_FORBIDDEN`: "lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore)". Lite readers read
+workspace metadata normally and skip the full-edition catalog, shell and feature indexes.
 
 R212 also forbids e2e and contract specs, the `test:e2e`, `test:contract`, `test:stack` and
 `test:browser` scripts, the e2e workflow, the browser journey and UAT records, test containers, toxiproxy and browser-runner

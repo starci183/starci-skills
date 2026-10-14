@@ -33,7 +33,7 @@ test('lite Work is optional without brand; a present brand tree requires only .g
   const lite = openHfs({ declaration: app() });
   assert.equal(lite.slot('app.starciwork').presence, 'optional');
   assert.deepEqual(lite.slot('app.starciwork').requires, ['.gitignore']);
-  assert.deepEqual(lite.slot('app.starciwork').allows, ['brand/**']);
+  assert.deepEqual(lite.slot('app.starciwork').allows, ['workspace.yaml', 'brand/**']);
   assert.equal(lite.slot('app.starciwork.uat'), null);
   assert.equal(lite.requiredPaths().paths.some((entry) => entry.path.startsWith('.starciwork')), false);
   assert.deepEqual(workFindings(check(repoRoot, [])), []);
@@ -42,12 +42,13 @@ test('lite Work is optional without brand; a present brand tree requires only .g
   assert.deepEqual(missing.map((finding) => [finding.code, finding.path]), [['HFS_SLOT_REQUIRED_MISSING', '.starciwork/.gitignore']]);
   assert.deepEqual(workFindings(check(repoRoot, ['.starciwork/.gitignore', brand])), []);
   assert.deepEqual(workFindings(check(repoRoot, ['.starciwork/.gitignore'])), []);
+  assert.deepEqual(workFindings(check(repoRoot, ['.starciwork/.gitignore', '.starciwork/workspace.yaml'])), []);
 });
 
-test('lite Work admits brand drawings, evidence, references and assets at arbitrary depth', (t) => {
+test('lite Work admits workspace metadata and brand drawings, evidence, references and assets at arbitrary depth', (t) => {
   const repoRoot = tree(t);
   const files = [
-    '.starciwork/.gitignore', '.starciwork/brand/index.yaml',
+    '.starciwork/.gitignore', '.starciwork/workspace.yaml', '.starciwork/brand/index.yaml',
     '.starciwork/brand/evidence.yaml', '.starciwork/brand/assets/refs/reference.webp',
     '.starciwork/brand/assets/refs/group/deeper/reference.webp',
     '.starciwork/brand/drawings/mobile/evidence/approval.yaml',
@@ -61,28 +62,30 @@ test('lite Work admits brand drawings, evidence, references and assets at arbitr
   }
 });
 
-test('lite Work explanation admits brand directories and refuses a .gitignore directory', (t) => {
+test('lite Work explanation admits brand directories and refuses directories named for admitted files', (t) => {
   const repoRoot = tree(t);
   for (const input of ['.starciwork/brand/', '.starciwork\\brand\\']) {
     assert.equal(explainPath({ repoRoot, input, declaration: app() }).status, 'owned', input);
   }
-  for (const input of ['.starciwork/.gitignore/', '.starciwork\\.gitignore\\']) {
+  for (const input of ['.starciwork/.gitignore/', '.starciwork\\.gitignore\\', '.starciwork/workspace.yaml/', '.starciwork\\workspace.yaml\\']) {
     const explained = explainPath({ repoRoot, input, declaration: app() });
     assert.equal(explained.status, 'forbidden', input);
     assert.equal(explained.code, 'HFS_STARCIWORK_LITE_FORBIDDEN', input);
   }
   fs.mkdirSync(path.join(repoRoot, '.starciwork', 'brand'), { recursive: true });
-  fs.mkdirSync(path.join(repoRoot, '.starciwork', '.gitignore'));
   assert.equal(explainPath({ repoRoot, input: '.starciwork/brand', declaration: app() }).status, 'owned', 'an existing directory needs no trailing separator');
-  const explained = explainPath({ repoRoot, input: '.starciwork/.gitignore', declaration: app() });
-  assert.equal(explained.status, 'forbidden');
-  assert.equal(explained.code, 'HFS_STARCIWORK_LITE_FORBIDDEN');
+  for (const file of ['.gitignore', 'workspace.yaml']) {
+    fs.mkdirSync(path.join(repoRoot, '.starciwork', file));
+    const explained = explainPath({ repoRoot, input: `.starciwork/${file}`, declaration: app() });
+    assert.equal(explained.status, 'forbidden', file);
+    assert.equal(explained.code, 'HFS_STARCIWORK_LITE_FORBIDDEN', file);
+  }
 });
 
-test('every other lite Work path reports the brand-only failure, including narrower slots', (t) => {
+test('every other lite Work path reports the workspace-and-brand boundary, including narrower slots', (t) => {
   const repoRoot = tree(t);
   const forbidden = [
-    '.starciwork/workspace.yaml', '.starciwork/index.yaml',
+    '.starciwork/index.yaml', '.starciwork/workspace.yaml/extra.yaml',
     '.starciwork/shell/index.yaml', '.starciwork/features/system-health/index.yaml',
     '.starciwork/features/system-health/ui/card/assets/approved.webp',
     '.starciwork/_resources/identities/demo/resource.yaml',
@@ -100,7 +103,7 @@ test('every other lite Work path reports the brand-only failure, including narro
     const explained = explainPath({ repoRoot, input, declaration: app() });
     assert.equal(explained.status, 'forbidden', input);
     assert.equal(explained.code, 'HFS_STARCIWORK_LITE_FORBIDDEN', input);
-    assert.match(explained.message, /lite \.starciwork holds only brand\//);
+    assert.match(explained.message, /lite \.starciwork holds only workspace\.yaml and brand\/ \(plus \.gitignore\)/);
     assert.ok(explained.titleVi && explained.whyVi, input);
   }
 });
@@ -117,24 +120,28 @@ test('lite Work admission follows the slot manifest rather than a copied path li
 
 test('lite Work also rejects ignored and untracked leftovers in the local tree', (t) => {
   const files = {
-    '.starciwork/.gitignore': '/workspace.yaml\n/index.yaml\n/shell/\n/features/\n',
+    '.starciwork/.gitignore': '/workspace.yaml\n/index.yaml\n/shell/\n/features/\n/_resources/\n/uat/\n/br/\n',
     '.starciwork/brand/index.yaml': {},
     '.starciwork/brand/assets/refs/reference.webp': 'image',
     '.starciwork/workspace.yaml': {}, '.starciwork/index.yaml': {},
     '.starciwork/shell/index.yaml': {}, '.starciwork/features/demo/index.yaml': {},
+    '.starciwork/_resources/identities/demo/resource.yaml': {},
+    '.starciwork/uat/demo/index.yaml': {}, '.starciwork/br/demo/index.yaml': {},
     '.starciwork/other/index.yaml': {},
   };
   const repoRoot = tree(t, files);
   execFileSync('git', ['-C', repoRoot, 'init', '-q'], { stdio: 'ignore' });
   execFileSync('git', ['-C', repoRoot, 'add', '--', '.starciwork/.gitignore', '.starciwork/brand'], { stdio: 'ignore' });
   const ignored = execFileSync('git', ['-C', repoRoot, 'ls-files', '--others', '--ignored', '--exclude-standard'], { encoding: 'utf8' }).trim().split(/\r?\n/);
-  assert.equal(ignored.length, 4, 'the fixture really hides the stale Work metadata from git');
+  assert.equal(ignored.length, 7, 'the fixture hides workspace metadata and stale full Work records from git');
   const result = checkRepo({ repoRoot, declaration: app() });
   const forbidden = workFindings(result).filter((finding) => finding.code === 'HFS_STARCIWORK_LITE_FORBIDDEN');
   assert.deepEqual(forbidden.map((finding) => finding.path).sort(), [
-    '.starciwork/features', '.starciwork/index.yaml', '.starciwork/other', '.starciwork/shell', '.starciwork/workspace.yaml',
+    '.starciwork/_resources', '.starciwork/br', '.starciwork/features', '.starciwork/index.yaml',
+    '.starciwork/other', '.starciwork/shell', '.starciwork/uat',
   ]);
   assert.equal(workFindings(result).some((finding) => finding.path.startsWith('.starciwork/brand')), false);
+  assert.equal(workFindings(result).some((finding) => finding.path === '.starciwork/workspace.yaml'), false);
 });
 
 test('full Work retains workspace, index, shell, feature and UAT records and their proof checks', (t) => {

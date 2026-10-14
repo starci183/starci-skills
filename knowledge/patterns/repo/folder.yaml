@@ -180,7 +180,8 @@ rules:
     hfsRules: [R07, R10, R01]
     requirement: |
       The app root owns slot `app.starciwork`: required for full's product records, optional for lite when there are no
-      brand records. R212 restricts lite to the brand boundary described in starciwork.yaml.
+      brand records. R212 permits only `.gitignore`, optional `workspace.yaml` metadata and `brand/**` in lite, as described
+      in starciwork.yaml.
       `.starcistacks/` and `.sops.yaml` (slots `app.starcistacks`, `app.sops`) are required at the app root.
       Neither side holds any of them (slot `repo.side-root-forbidden`; `.starcistacks` in a side is refused,
       HFS_STACKS_IN_SIDE, and `fe/` holds no `.starciwork`, HFS_WORK_IN_FE). See
