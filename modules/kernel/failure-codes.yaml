@@ -18693,6 +18693,8 @@ HFS_DOCKER_HEALTHCHECK_FAKE:
   causes_vi:
     - "HEALTHCHECK CMD true hoặc lệnh không kiểm tra thành công của route live đã đăng ký"
   nextStep_vi: "Dùng healthcheck HTTP kiểm tra thành công của route liveness thật của API và giữ lỗi probe thành exit code khác không."
+  owner: op-retry
+  kind: check-finding
 BE_WEBHOOK_SCOPE:
   title: "Public webhook traffic bypasses the webhook door"
   title_vi: "Lưu lượng webhook công khai đi ngoài cửa webhook"

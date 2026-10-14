@@ -2244,6 +2244,31 @@ rules:
       - {kind: eslint-be, id: health-signals}
       - {kind: hfs, id: docker-health-reachability, at: scripts/hfs/rules/docker.mjs}
 
+  - id: R263
+    code: "BE_WEBHOOK_SCOPE"
+    law: "SignedWebhook public metadata belongs only to a webhook HTTP door or an exact domain verifier declared in its HTTP module's exported webhookVerifiers array. A public controller route containing webhook, callback or events belongs in the webhook door. Domain intake methods identified by a first *Id parameter or DTO property, or raw-body signature input, claim the shared Inbox with the stable delivery key and return early on a duplicate before doing work. The receipt transaction records the inbox delivery and publishes its typed outbox event; process callbacks, domain processing and command dispatch run only after commit in a reactor or job."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_WEBHOOK_SCOPE", "BE_WEBHOOK_INBOX_KEY"]
+    enforcers:
+      - {kind: eslint-be, id: webhook-scope}
+      - {kind: eslint-be, id: webhook-inbox-key}
+  - id: R264
+    code: "HFS_FEATURE_LOGIC_ROLE"
+    law: "A non-door role in the feature tier declares data, types and DTO metadata only: a support policy, guard, client, filter, interceptor, projection or contracts file cannot hide a decision, loop, computation or executable call by changing its suffix. Business logic belongs in tested modules; thin feature roles remain governed by R203 and feature module composition keeps its module laws."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_FEATURE_LOGIC_ROLE"]
+    enforcers:
+      - {kind: eslint-be, id: feature-logic-role}
+  - id: R265
+    code: "BE_COMPOSITION_UNTYPED"
+    law: "App composition is identified by resolved module, DynamicModule, Provider, queue and scheduler entry types, independently of class, helper or registration method names. Composition lists and maps live in explicitly typed compose/<area>.ts groups, never in main.ts, <app>.env.ts or <app>.options.ts. The bootstrap may pass its app module to NestFactory, options may bind ports, and app.module.ts spreads the groups. starci app add writes and updates the generated feature's typed area group."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_COMPOSITION_UNTYPED"]
+    enforcers:
+      - {kind: eslint-be, id: app-composition-typed}
   - id: R270
     code: "HFS_DOC_PATH_MISSING"
     law: "In lite and full products, READMEs, docs and stack READMEs cite existing repository paths, npm scripts, starci app verbs, environment keys declared by typed readers or KEYS.md, and rule ids from the HFS catalog. Documentation changes with the product it describes."
@@ -2353,6 +2378,17 @@ rules:
     enforcers:
       - {kind: hfs, id: fe-stack-allowlist, at: scripts/hfs/rules/fe-stack.mjs}
 
+  - id: R289
+    code: "BE_APP_ENV_REQUIRED"
+    law: "Every declared back-end app owns a tracked apps/<app>/src/<app>.env.ts exporting its typed environment interface and read<App>Env(env: EnvSource). main.ts constructs EnvSource once and delegates its reads to that reader, with no inline parsing. app.module.ts composes module lists only by spreading compose/<area>.ts groups; its own providers are limited to app-wide guards and filters."
+    kinds: [check, lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_APP_ENV_REQUIRED", "BE_APP_MODULE_LIST_INLINE"]
+    enforcers:
+      - {kind: hfs, id: app-env-required, at: scripts/hfs/rules/app-env-required.mjs}
+      - {kind: eslint-be, id: app-env-required}
+      - {kind: eslint-be, id: app-module-list-inline}
+
   - id: R291
     code: "HFS_FUNCTION_BUDGET"
     law: "Every back-end and front-end function, method or arrow body stays within ruleParams.functionLines (80 physical lines), including comments and blank lines, in lite and full; split a larger body by responsibility. This is an absolute budget."
@@ -2370,38 +2406,3 @@ rules:
     failureCodes: ["HFS_FEATURE_FILE_BUDGET"]
     enforcers:
       - {kind: hfs, id: feature-files, at: scripts/hfs/rules/feature-files.mjs}
-  - id: R263
-    code: "BE_WEBHOOK_SCOPE"
-    law: "SignedWebhook public metadata belongs only to a webhook HTTP door or an exact domain verifier declared in its HTTP module's exported webhookVerifiers array. A public controller route containing webhook, callback or events belongs in the webhook door. Domain intake methods identified by a first *Id parameter or DTO property, or raw-body signature input, claim the shared Inbox with the stable delivery key and return early on a duplicate before doing work. The receipt transaction records the inbox delivery and publishes its typed outbox event; process callbacks, domain processing and command dispatch run only after commit in a reactor or job."
-    kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["BE_WEBHOOK_SCOPE", "BE_WEBHOOK_INBOX_KEY"]
-    enforcers:
-      - {kind: eslint-be, id: webhook-scope}
-      - {kind: eslint-be, id: webhook-inbox-key}
-  - id: R264
-    code: "HFS_FEATURE_LOGIC_ROLE"
-    law: "A non-door role in the feature tier declares data, types and DTO metadata only: a support policy, guard, client, filter, interceptor, projection or contracts file cannot hide a decision, loop, computation or executable call by changing its suffix. Business logic belongs in tested modules; thin feature roles remain governed by R203 and feature module composition keeps its module laws."
-    kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["HFS_FEATURE_LOGIC_ROLE"]
-    enforcers:
-      - {kind: eslint-be, id: feature-logic-role}
-  - id: R265
-    code: "BE_COMPOSITION_UNTYPED"
-    law: "App composition is identified by resolved module, DynamicModule, Provider, queue and scheduler entry types, independently of class, helper or registration method names. Composition lists and maps live in explicitly typed compose/<area>.ts groups, never in main.ts, <app>.env.ts or <app>.options.ts. The bootstrap may pass its app module to NestFactory, options may bind ports, and app.module.ts spreads the groups. starci app add writes and updates the generated feature's typed area group."
-    kinds: [lint, codemod]
-    gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["BE_COMPOSITION_UNTYPED"]
-    enforcers:
-      - {kind: eslint-be, id: app-composition-typed}
-  - id: R289
-    code: "BE_APP_ENV_REQUIRED"
-    law: "Every declared back-end app owns a tracked apps/<app>/src/<app>.env.ts exporting its typed environment interface and read<App>Env(env: EnvSource). main.ts constructs EnvSource once and delegates its reads to that reader, with no inline parsing. app.module.ts composes module lists only by spreading compose/<area>.ts groups; its own providers are limited to app-wide guards and filters."
-    kinds: [check, lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["BE_APP_ENV_REQUIRED", "BE_APP_MODULE_LIST_INLINE"]
-    enforcers:
-      - {kind: hfs, id: app-env-required, at: scripts/hfs/rules/app-env-required.mjs}
-      - {kind: eslint-be, id: app-env-required}
-      - {kind: eslint-be, id: app-module-list-inline}
