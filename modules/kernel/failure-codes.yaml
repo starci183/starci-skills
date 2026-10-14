@@ -18550,5 +18550,57 @@ DB_VAULT_WRITE:
   causes_vi:
     - "Vi phạm R259: migration được dùng để tạo hoặc thay đổi giá trị bí mật."
   nextStep_vi: "Bỏ thao tác ghi bí mật khỏi migration và dùng luồng app secret; chỉ giữ khai báo vai trò không chứa mật khẩu."
+HFS_DOC_PATH_MISSING:
+  title: "Product documentation cites a missing path"
+  title_vi: "Tài liệu sản phẩm dẫn đường dẫn không còn tồn tại"
+  meaning_vi: "README, tài liệu hoặc README của stack dẫn một tệp hay thư mục mà cây sản phẩm không có, trong cả lite và full."
+  causes_vi:
+    - "Đổi hoặc xóa đường dẫn nhưng chưa cập nhật tài liệu theo luật R270."
+  nextStep_vi: "Sửa đường dẫn được dẫn hoặc khôi phục tệp đúng trong sản phẩm rồi chạy lại kiểm tra."
+  owner: op-retry
+  kind: check-finding
+HFS_DOC_COMMAND_UNKNOWN:
+  title: "Product documentation cites an unknown command"
+  title_vi: "Tài liệu sản phẩm dẫn lệnh không tồn tại"
+  meaning_vi: "Lệnh npm run không có script tương ứng trong package.json hoặc verb starci app không có trong catalog CLI."
+  causes_vi:
+    - "Script hoặc verb được đổi hay bỏ nhưng tài liệu chưa đổi theo luật R270."
+  nextStep_vi: "Dùng lệnh hiện có trong package.json hoặc catalog CLI, hoặc khai báo script sản phẩm còn thiếu."
+  owner: op-retry
+  kind: check-finding
+HFS_DOC_ENV_UNKNOWN:
+  title: "Product documentation cites an undeclared environment key"
+  title_vi: "Tài liệu sản phẩm dẫn khóa môi trường chưa khai báo"
+  meaning_vi: "Tên khóa được tài liệu dẫn không có trong bộ đọc môi trường có kiểu hoặc KEYS.md; kiểm tra chỉ đọc tên, không đọc giá trị bí mật."
+  causes_vi:
+    - "Tên khóa cũ còn trong tài liệu hoặc bộ đọc chưa khai báo khóa theo luật R270."
+  nextStep_vi: "Cập nhật tên khóa hoặc khai báo khóa trong bộ đọc môi trường và KEYS.md, không đưa giá trị bí mật vào tài liệu."
+  owner: op-retry
+  kind: check-finding
+HFS_DOC_RULE_UNKNOWN:
+  title: "Product documentation cites an unknown HFS rule"
+  title_vi: "Tài liệu sản phẩm dẫn luật HFS không tồn tại"
+  meaning_vi: "Mã R được dẫn không có trong catalog luật HFS hiện hành của runtime."
+  causes_vi:
+    - "Dẫn sai mã luật hoặc dùng mã chưa được đăng ký theo luật R270."
+  nextStep_vi: "Dùng đúng mã luật hiện có trong knowledge/hfs/rules.yaml và cập nhật đoạn tài liệu liên quan."
+  owner: op-retry
+  kind: check-finding
+HFS_RELEASE_TAG_MISMATCH:
+  title: "Product release tag does not match its version or image tag"
+  title_vi: "Tag phát hành sản phẩm không khớp phiên bản hoặc tag image"
+  meaning_vi: "Tag phát hành phải có dạng v cộng phiên bản package.json; workflow images.yml phải dùng tag phát hành đó cho image trong lite và full."
+  causes_vi:
+    - "Phiên bản package và tag khác nhau hoặc image dùng tag khác theo luật R271."
+  nextStep_vi: "Đồng bộ phiên bản package và tag phát hành, rồi dùng cùng tag trong workflow xây image."
+  owner: op-retry
+  kind: check-finding
+HFS_DB_DEPLOY_UNGUARDED:
+  title: "Database deployment accepts a non-tag ref"
+  title_vi: "Triển khai cơ sở dữ liệu chấp nhận ref không phải tag"
+  meaning_vi: "Mỗi đường chạy triển khai migration phải từ chối ref không phải tag phát hành trước khi tác động cơ sở dữ liệu."
+  causes_vi:
+    - "Workflow db-deploy thiếu chốt kiểm tag hoặc chốt không chặn đường chạy migration theo luật R271."
+  nextStep_vi: "Thêm chốt kiểm ref tag trước mỗi bước triển khai migration, rồi chứng minh ref nhánh bị từ chối."
   owner: op-retry
   kind: check-finding
