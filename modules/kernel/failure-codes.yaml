@@ -18292,6 +18292,7 @@ RT_COVERAGE_REQUIREMENT_UNLEDGERED:
     - "Danh mục hoặc bằng chứng của chuẩn chưa được cập nhật theo hành vi thực tế"
   nextStep_vi: "Đưa yêu cầu vào sổ cùng luật hoặc trạng thái có lý do và dẫn neo tài liệu."
   owner: runtime-core
+  kind: check-finding
 BE_REST_DOOR_EVIDENCE:
   title: "A REST route has no route-level reason"
   title_vi: "Route REST thiếu lý do ngay tại phương thức"
@@ -18333,6 +18334,8 @@ BE_SPEC_FORM_ALL_ROLES:
     - "Spec new đối tượng kiểm thử hoặc mock module của ứng dụng"
     - "Spec chỉ kiểm tra đối tượng tồn tại"
   nextStep_vi: "Dựng đối tượng bằng Test.createTestingModule với provider và double phù hợp, lấy bằng moduleRef.get, gọi hành vi rồi so sánh kết quả hoặc trạng thái cụ thể."
+  owner: op-retry
+  kind: check-finding
 HFS_FUNCTION_BUDGET:
   title: "A function body exceeds its line budget"
   title_vi: "Thân hàm vượt hạn mức dòng"
