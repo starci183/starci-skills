@@ -81,6 +81,45 @@ $defs:
         uniqueItems: true
         items: {enum: [full, lite]}
         description: The editions that judge this rule (default both). A rule that names editions without lite is not judged in a lite app, and its finding codes are dropped by the one findings filter (checkRepo and checkRepository); an app cannot opt out of a rule, it can only pick an edition (R16, R17).
+      editionWhy:
+        type: string
+        minLength: 1
+        description: The reason for an edition difference, citing the owner ruling case that authorizes it; the coverage check resolves the citation.
+      docs:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          oneOf:
+            - {$ref: '#/$defs/docPath'}
+            - {$ref: '#/$defs/docEvidence'}
+        description: Repository-relative documentation paths with optional anchors; a string covers both editions, a map can select one edition or an editions list.
+      exemplifiedBy:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          oneOf:
+            - {$ref: '#/$defs/repoPath'}
+            - {$ref: '#/$defs/evidence'}
+        description: Repository-relative example paths or globs containing a conforming instance, optionally scoped to editions.
+      proves:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          oneOf:
+            - {$ref: '#/$defs/repoPath'}
+            - {$ref: '#/$defs/proof'}
+        description: Spec paths, optionally scoped to editions, finding codes and fixture ids; the coverage check reads the spec's proves headers.
+      witness:
+        oneOf:
+          - type: array
+            minItems: 1
+            uniqueItems: true
+            items: {$ref: '#/$defs/witness'}
+          - {$ref: '#/$defs/unreachableWitness'}
+        description: Mutations that make a conforming example emit the expected codes, or a dated explanation of why a mutation cannot reach this rule.
       enforcers:
         type: array
         minItems: 1
@@ -100,6 +139,19 @@ $defs:
       source: {const: owner}
       ruling: {type: string, minLength: 1, description: The ruling in English, as the rule now applies it.}
       quote: {type: string, minLength: 1, description: 'The owner''s words, in English (an owner message in Vietnamese is quoted in translation: the knowledge is English, R96).'}
+      supersedes:
+        $ref: '#/$defs/caseReferences'
+        description: Earlier cases or owner rulings replaced by this case; case-N refers to this rule.
+      status: {enum: [live, superseded, amended], description: 'The current state of this ruling; absent means live.'}
+      staleWhen:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items: {type: string, minLength: 1}
+        description: Case-insensitive JavaScript regexes for obsolete wording; the loader checks regex syntax and the coverage check finds stale citations outside the case and CHANGELOGs.
+      amendedBy:
+        $ref: '#/$defs/caseReferences'
+        description: Successor cases or owner rulings that amend this case.
   enforcer:
     type: object
     additionalProperties: false
@@ -113,5 +165,105 @@ $defs:
         uniqueItems: true
         items: {enum: [full, lite]}
         description: 'The editions this ONE enforcer runs in (default the editions of its rule); lets a rule that stays in lite keep a single full-only lint rule, for example the GraphQL-preference law of the doors.'
+      editionWhy:
+        type: string
+        minLength: 1
+        description: The reason for this enforcer's edition difference, citing the owner ruling case that authorizes it.
       status: {const: planned, description: Present only while the enforcer is owed; absent means it exists.}
       at: {type: string, minLength: 1, description: Repository-relative file that emits one of the rule's failure codes; only an existing machine, hfs, work-validate or runtime enforcer carries it.}
+  repoPath:
+    type: string
+    minLength: 1
+    pattern: '^(?!\s)(?!.*\s$)(?!.*(?:^|/)\.\.?(?:/|$))[^/\\#:\r\n\u0000]+(?:/[^/\\#:\r\n\u0000]+)*$'
+    description: A repository-relative path using forward slashes, without empty, dot or parent segments; glob segments are accepted for example references.
+  docPath:
+    type: string
+    minLength: 1
+    pattern: '^(?!\s)(?!.*\s$)(?!.*(?:^|/)\.\.?(?:/|#|$))[^/\\#:\r\n\u0000]+(?:/[^/\\#:\r\n\u0000]+)*(?:#[A-Za-z0-9][A-Za-z0-9_.:-]*)?$'
+  editions:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items: {enum: [full, lite]}
+  findingCodes:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items: {type: string, pattern: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$'}
+  evidence:
+    type: object
+    additionalProperties: false
+    required: [path]
+    not: {required: [edition, editions]}
+    properties:
+      path: {$ref: '#/$defs/repoPath'}
+      edition: {enum: [full, lite]}
+      editions: {$ref: '#/$defs/editions'}
+  docEvidence:
+    type: object
+    additionalProperties: false
+    required: [path]
+    not: {required: [edition, editions]}
+    properties:
+      path: {$ref: '#/$defs/docPath'}
+      edition: {enum: [full, lite]}
+      editions: {$ref: '#/$defs/editions'}
+  proof:
+    type: object
+    additionalProperties: false
+    required: [path]
+    not: {required: [edition, editions]}
+    properties:
+      path: {$ref: '#/$defs/repoPath'}
+      edition: {enum: [full, lite]}
+      editions: {$ref: '#/$defs/editions'}
+      codes: {$ref: '#/$defs/findingCodes'}
+      fixtures:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items: {type: string, minLength: 1}
+  witness:
+    type: object
+    additionalProperties: false
+    required: [edition, base, mutate, expect]
+    properties:
+      edition: {enum: [full, lite]}
+      base: {$ref: '#/$defs/repoPath'}
+      mutate:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items: {$ref: '#/$defs/mutation'}
+      expect: {$ref: '#/$defs/findingCodes'}
+  mutation:
+    type: object
+    additionalProperties: false
+    required: [op, path]
+    properties:
+      op: {enum: [add, edit, delete]}
+      path: {$ref: '#/$defs/repoPath'}
+      content: {type: string}
+    allOf:
+      - if: {properties: {op: {enum: [add, edit]}}, required: [op]}
+        then: {required: [content]}
+      - if: {properties: {op: {const: delete}}, required: [op]}
+        then: {not: {required: [content]}}
+  unreachableWitness:
+    type: object
+    additionalProperties: false
+    required: [status, reason, date]
+    properties:
+      status: {const: unreachable}
+      reason: {type: string, minLength: 1}
+      date: {type: string, pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$', description: A valid calendar date, checked by the loader.}
+  caseReference:
+    type: string
+    pattern: '^(?:case-[1-9][0-9]*|(?:ruling:)?R[0-9]{2,3}(?:/case-[1-9][0-9]*)?|owner:[a-z][a-z0-9]*(?:-[a-z0-9]+)*)$'
+  caseReferences:
+    oneOf:
+      - {$ref: '#/$defs/caseReference'}
+      - type: array
+        minItems: 1
+        uniqueItems: true
+        items: {$ref: '#/$defs/caseReference'}

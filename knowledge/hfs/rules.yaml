@@ -2179,3 +2179,12 @@ rules:
     failureCodes: ["BE_APP_COMPOSITION_BUDGET"]
     enforcers:
       - {kind: eslint-be, id: app-file-budget}
+  - id: R247
+    code: "RT_COVERAGE_MATRIX"
+    law: "Every surface and rule has an existing enforcer, edition-specific spec proof, documentation, template, example and mutation witness in each applicable edition; edition differences cite their owner ruling, Work schemas have full example records, gate claims match their commands, superseded rulings are not cited alone and hard documentation requirements are ledgered."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_COVERAGE_MATRIX", "RT_COVERAGE_NO_ENFORCER", "RT_COVERAGE_NO_SPEC", "RT_COVERAGE_NO_WITNESS", "RT_COVERAGE_NO_DOC", "RT_COVERAGE_NO_TEMPLATE", "RT_COVERAGE_NO_EXAMPLE", "RT_COVERAGE_EDITION_ASYMMETRY", "RT_COVERAGE_SCHEMA_NO_RECORD", "RT_COVERAGE_GATE_LIE", "RT_COVERAGE_SUPERSEDED_CITE", "RT_COVERAGE_SURFACE_UNMAPPED", "RT_COVERAGE_REQUIREMENT_UNLEDGERED"]
+    enforcers:
+      - {kind: runtime, id: hfs-coverage, at: scripts/checks/check-hfs-coverage.mjs}

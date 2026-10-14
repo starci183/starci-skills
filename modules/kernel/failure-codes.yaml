@@ -18163,3 +18163,133 @@ workflow-purge-ledger-dependency:
   nextStep_vi: "Xử lý tham chiếu theo thẩm quyền sản phẩm hoặc sửa bộ kiểm schema rồi đọc lại kế hoạch; không xóa Work để vượt cổng."
   owner: owner
   kind: verb-refusal
+
+RT_COVERAGE_MATRIX:
+  title: "The HFS standard has a missing coverage link"
+  title_vi: "Chuẩn HFS thiếu mắt xích kiểm chứng"
+  meaning_vi: "Bảng bao phủ chưa nối đủ luật, bộ kiểm tra và bằng chứng cho từng phiên bản."
+  causes_vi:
+    - "Danh mục hoặc bằng chứng của chuẩn chưa được cập nhật theo hành vi thực tế"
+  nextStep_vi: "Sửa các phát hiện RT_COVERAGE trong báo cáo rồi chạy lại bộ kiểm tra."
+  owner: runtime-core
+  kind: check-finding
+
+RT_COVERAGE_NO_ENFORCER:
+  title: "A rule has no enforcer in an applicable edition"
+  title_vi: "Luật thiếu bộ kiểm tra trong phiên bản áp dụng"
+  meaning_vi: "Luật không có bộ kiểm tra đã tồn tại và chạy trong phiên bản được khai báo."
+  causes_vi:
+    - "Danh mục hoặc bằng chứng của chuẩn chưa được cập nhật theo hành vi thực tế"
+  nextStep_vi: "Xây dựng và đăng ký bộ kiểm tra đúng phiên bản của luật."
+  owner: runtime-core
+  kind: check-finding
+
+RT_COVERAGE_NO_SPEC:
+  title: "A failure code has no edition-specific spec proof"
+  title_vi: "Mã lỗi thiếu đặc tả chứng minh theo phiên bản"
+  meaning_vi: "Mã lỗi chưa có đặc tả được khai báo với nhãn proves cho phiên bản áp dụng."
+  causes_vi:
+    - "Danh mục hoặc bằng chứng của chuẩn chưa được cập nhật theo hành vi thực tế"
+  nextStep_vi: "Thêm ca vi phạm và ca đạt, ghi nhãn proves: CODE@edition và dẫn tệp trong luật."
+  owner: runtime-core
+  kind: check-finding
+
+RT_COVERAGE_NO_WITNESS:
+  title: "A rule has no mutation witness"
+  title_vi: "Luật thiếu ca đột biến làm chứng"
+  meaning_vi: "Luật chưa có đột biến từ ví dụ đúng làm phát sinh mã lỗi hoặc lý do có ngày cho trường hợp không thể kích hoạt."
+  causes_vi:
+    - "Danh mục hoặc bằng chứng của chuẩn chưa được cập nhật theo hành vi thực tế"
+  nextStep_vi: "Thêm đột biến có mã lỗi mong đợi cho từng phiên bản hoặc ghi lý do không thể kích hoạt kèm ngày."
+  owner: runtime-core
+  kind: check-finding
+
+RT_COVERAGE_NO_DOC:
+  title: "A rule has no documentation evidence"
+  title_vi: "Luật thiếu bằng chứng tài liệu"
+  meaning_vi: "Tài liệu được luật dẫn không tồn tại hoặc không giải thích mã lỗi trong phiên bản áp dụng."
+  causes_vi:
+    - "Danh mục hoặc bằng chứng của chuẩn chưa được cập nhật theo hành vi thực tế"
+  nextStep_vi: "Dẫn tài liệu thật và giải thích từng mã lỗi của luật."
+  owner: runtime-core
+  kind: check-finding
+
+RT_COVERAGE_NO_TEMPLATE:
+  title: "A rule or slot has no template"
+  title_vi: "Luật hoặc ô thiếu mẫu chuẩn"
+  meaning_vi: "Luật hoặc ô bắt buộc chưa có mẫu hay đường dẫn scaffold thật trong phiên bản áp dụng."
+  causes_vi:
+    - "Danh mục hoặc bằng chứng của chuẩn chưa được cập nhật theo hành vi thực tế"
+  nextStep_vi: "Bổ sung mẫu đúng phiên bản và nối mẫu với ô hoặc luật."
+  owner: runtime-core
+  kind: check-finding
+
+RT_COVERAGE_NO_EXAMPLE:
+  title: "A rule or slot has no example"
+  title_vi: "Luật hoặc ô thiếu ví dụ"
+  meaning_vi: "Không có tệp ví dụ đúng phiên bản thể hiện cấu trúc mà luật hoặc ô yêu cầu."
+  causes_vi:
+    - "Danh mục hoặc bằng chứng của chuẩn chưa được cập nhật theo hành vi thực tế"
+  nextStep_vi: "Thêm cấu trúc vào ví dụ đúng phiên bản và dẫn tệp thật trong danh mục."
+  owner: runtime-core
+  kind: check-finding
+
+RT_COVERAGE_EDITION_ASYMMETRY:
+  title: "An edition difference has no ruling justification"
+  title_vi: "Khác biệt phiên bản thiếu căn cứ quyết định"
+  meaning_vi: "Luật, ô hoặc bộ kiểm tra khác nhau giữa lite và full nhưng chưa dẫn quyết định của chủ sở hữu."
+  causes_vi:
+    - "Danh mục hoặc bằng chứng của chuẩn chưa được cập nhật theo hành vi thực tế"
+  nextStep_vi: "Ghi editionWhy với quyết định có thật giải thích khác biệt."
+  owner: runtime-core
+  kind: check-finding
+
+RT_COVERAGE_SCHEMA_NO_RECORD:
+  title: "A Work schema has no full-edition example record"
+  title_vi: "Schema Work thiếu bản ghi ví dụ full"
+  meaning_vi: "Một họ bản ghi Work chưa có bản ghi trong ví dụ full và chưa được đánh dấu là dữ liệu sinh."
+  causes_vi:
+    - "Danh mục hoặc bằng chứng của chuẩn chưa được cập nhật theo hành vi thực tế"
+  nextStep_vi: "Thêm bản ghi ví dụ theo schema hoặc khai báo generated cho họ dữ liệu sinh."
+  owner: runtime-core
+  kind: check-finding
+
+RT_COVERAGE_GATE_LIE:
+  title: "A catalog gate claim has no corresponding command"
+  title_vi: "Cổng khai báo không có lệnh kiểm tra tương ứng"
+  meaning_vi: "Luật tuyên bố chạy ở một cổng nhưng lệnh thật của cổng không chạy bộ kiểm tra áp dụng."
+  causes_vi:
+    - "Danh mục hoặc bằng chứng của chuẩn chưa được cập nhật theo hành vi thực tế"
+  nextStep_vi: "Đối chiếu hook, cổng và workflow rồi sửa lệnh hoặc khai báo cho đúng."
+  owner: runtime-core
+  kind: check-finding
+
+RT_COVERAGE_SUPERSEDED_CITE:
+  title: "A citation uses a superseded ruling"
+  title_vi: "Trích dẫn dùng quyết định đã bị thay thế"
+  meaning_vi: "Tài liệu còn dẫn quyết định cũ mà thiếu quyết định kế tiếp trong cùng đoạn hoặc còn cách diễn đạt đã bị bỏ."
+  causes_vi:
+    - "Danh mục hoặc bằng chứng của chuẩn chưa được cập nhật theo hành vi thực tế"
+  nextStep_vi: "Đổi sang quyết định hiện hành hoặc nêu quyết định kế tiếp trong cùng đoạn."
+  owner: runtime-core
+  kind: check-finding
+
+RT_COVERAGE_SURFACE_UNMAPPED:
+  title: "A surface has no rule and slot mapping"
+  title_vi: "Bề mặt chưa nối với luật và ô"
+  meaning_vi: "Một ô theo phiên bản hoặc bề mặt khai báo chưa có luật và ô áp dụng, cũng chưa có lý do thiếu."
+  causes_vi:
+    - "Danh mục hoặc bằng chứng của chuẩn chưa được cập nhật theo hành vi thực tế"
+  nextStep_vi: "Nối bề mặt với luật và ô đúng phiên bản hoặc ghi gap với lý do cụ thể."
+  owner: runtime-core
+  kind: check-finding
+
+RT_COVERAGE_REQUIREMENT_UNLEDGERED:
+  title: "A hard documentation requirement is not ledgered"
+  title_vi: "Yêu cầu bắt buộc trong tài liệu chưa vào sổ"
+  meaning_vi: "Một câu yêu cầu bắt buộc không có mục sổ hợp lệ hoặc neo tài liệu được luật dẫn."
+  causes_vi:
+    - "Danh mục hoặc bằng chứng của chuẩn chưa được cập nhật theo hành vi thực tế"
+  nextStep_vi: "Đưa yêu cầu vào sổ cùng luật hoặc trạng thái có lý do và dẫn neo tài liệu."
+  owner: runtime-core
+  kind: check-finding
