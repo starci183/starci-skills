@@ -3,8 +3,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { imageFiles } from '../../packages/hfs/sync/index.mjs';
+import { appSource, imageFiles, renderTargets } from '../../packages/hfs/sync/index.mjs';
+import { parseYaml } from '../../engine/yaml.mjs';
 import { loadSlotManifest, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -38,4 +40,27 @@ test('every image of a lite back end copies the generated Supabase types after t
 test('the lite skeleton api image, written by the scaffold, copies the generated Supabase types too', () => {
   const text = fs.readFileSync(path.join(ROOT, 'packages', 'hfs', 'templates', 'be', 'skeleton-lite', 'apps', 'api', 'Dockerfile'), 'utf8');
   assert.match(text, /COPY be\/src be\/src\nCOPY supabase\/types supabase\/types\n/);
+});
+
+test('lite sync includes an authored Next image in build scripts and CI while a hosted front end stays optional', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-lite-optional-image-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const hfs = JSON.parse(fs.readFileSync(path.join(ROOT, 'examples', 'lite-app', 'hfs.json'), 'utf8'));
+  const app = resolveRepoDeclaration(MANIFEST, hfs);
+  const rendered = () => renderTargets(hfs, { sonarExclusions: [] }, { source: appSource(root) });
+  const scripts = targets => targets.find(target => target.path === 'package.json').scripts;
+  const matrix = targets => parseYaml(targets.find(target => target.path === '.github/workflows/images.yml').content).jobs.image.strategy.matrix.include;
+  const hosted = rendered();
+  assert.equal(scripts(hosted)['docker:build:web'], undefined);
+  assert.equal(matrix(hosted).some(image => image.name === 'web'), false);
+  const file = path.join(root, 'fe', 'apps', 'web', 'Dockerfile');
+  fs.mkdirSync(file, { recursive: true });
+  assert.equal(appSource(root).hasImage('fe/apps/web/Dockerfile'), false, 'an image build requires a regular Dockerfile');
+  fs.rmdirSync(file);
+  fs.writeFileSync(file, 'FROM node:22.14.0-alpine3.21\n');
+  const swarm = rendered();
+  assert.equal(scripts(swarm)['docker:build:web'], 'docker build -f fe/apps/web/Dockerfile -t lite-app/web:dev .');
+  assert.ok(scripts(swarm)['docker:build'].includes('npm run docker:build:web'));
+  assert.ok(matrix(swarm).some(image => image.name === 'web' && image.file === 'fe/apps/web/Dockerfile'));
+  assert.ok(imageFiles(app, appSource(root)).some(image => image.path === 'fe/apps/web/Dockerfile'));
 });

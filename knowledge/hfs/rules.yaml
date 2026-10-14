@@ -112,12 +112,16 @@ rules:
       - {kind: work-validate, id: identity-custody-role, at: scripts/work/validate/check-example-work.mjs}
   - id: R10
     code: "HFS_STACKS_SHAPE"
-    law: "`.starcistacks` has the standard shape and the host Sonar owner."
+    law: "`.starcistacks` has the edition-aware standard shape and the host Sonar owner; Swarm stacks have digest-pinned images, healthchecks, rollout, rollback and restart policies, versioned external secrets, ingress-only published ports and declared schedulers for replicated jobs. Recurring work is app-owned; host crontab installation is forbidden. Lite declares Supabase as managed backing and runs no duplicate backing-service component."
     kinds: [check, codemod]
     gates: [settle, land, ci]
     failureCodes: ["HFS_STACKS_SHAPE"]
     enforcers:
       - {kind: hfs, id: stacks-shape, at: scripts/hfs/rules/stacks.mjs}
+      - {kind: hfs, id: stacks-runtime, at: scripts/hfs/rules/stacks-runtime.mjs}
+      - {kind: hfs, id: stacks-evidence-runtime, at: scripts/gates/stacks-gate.mjs}
+      - {kind: hfs, id: starcistacks-runtime, at: scripts/gates/starcistacks-runtime.mjs}
+      - {kind: hfs, id: starcistacks-runtime-gate, at: scripts/gates/starcistacks.mjs}
   - id: R11
     code: "HFS_SONAR_CONFIG"
     law: "Sonar config is generated, with no host URL, importing the be lcov with the logic of be/src/modules (the coverage scope derived from the slot manifest) as the only coverage scope."
@@ -1846,7 +1850,7 @@ rules:
       - {kind: runtime, id: slot-id-shape, at: scripts/checks/check-slot-id-shape.mjs}
   - id: R212
     code: "HFS_EDITION_INVALID"
-    law: "hfs.json names an edition the manifest knows (full, or lite; absent means full). Lite = full minus self-hosted infrastructure: the same monorepo, code structure, slots, patterns and back-end unit specs, every pattern port implemented on Supabase (Postgres, Auth, Storage, Supabase Queues/pgmq for queue and event bus, Postgres locks, pg_cron), the realtime pattern on the same socket.io gateway run inside the be api process (one instance, no Redis adapter), and one front-end standard for both editions (knowledge/hfs/fe-stack.yaml); a lite app holds none of the infrastructure lite does not run: no e2e or contract spec, no `test:e2e`, `test:contract`, `test:stack` or `test:browser` script, no e2e workflow or browser journey, no Work catalog, shell, features, resources, UAT or br records, no test container, toxiproxy or browser-runner dependency, no BullMQ, Kafka, Redis or graphql-ws dependency (the libraries lite infraOwners own nowhere), no .starcistacks infra/runtime/seeds tree and no supabase/functions. Its .starciwork is optional and admits only .gitignore, workspace.yaml and brand/**; workspace.yaml is optional and carries project identity and repo roles for the Work tools."
+    law: "hfs.json names an edition the manifest knows (full, or lite; absent means full). Lite follows the 2026-10-13 ruling: the same monorepo, code structure, slots, patterns and back-end unit specs, with only backing infrastructure swapped for managed Supabase (Postgres, Auth, Storage, Supabase Queues/pgmq for queue and event bus, Postgres locks, pg_cron); the api and sidecars run on docker-swarm on a VPS. The realtime pattern uses the same socket.io gateway inside the be api process (one instance, no Redis adapter), and both editions share knowledge/hfs/fe-stack.yaml. Lite requires application-stacks.yaml and permits environment metadata, runbooks, infra/swarm and encrypted-secret custody, while refusing infra/compose, infra/k8s, infra/terraform, runtime, seeds and components duplicating Supabase backing services. It has no e2e or contract spec, `test:e2e`, `test:contract`, `test:stack` or `test:browser` script, e2e workflow, browser journey, Work catalog, shell, features, resources, UAT or br records, test container, toxiproxy, browser-runner, BullMQ, Kafka, Redis or graphql-ws dependency, or supabase/functions. Its .starciwork is optional and admits only .gitignore, workspace.yaml and brand/**; workspace.yaml is optional and carries project identity and repo roles for the Work tools."
     kinds: [check]
     gates: [pre-push, settle, land, ci]
     failureCodes: ["HFS_EDITION_INVALID", "HFS_EDITION_FORBIDDEN_PRESENT", "HFS_STARCIWORK_LITE_FORBIDDEN"]

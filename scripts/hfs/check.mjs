@@ -16,7 +16,7 @@
 //   HFS_SLOT_REQUIRED_MISSING     a file or directory a required slot (or an instance of one) must contain
 //   HFS_MIN_INSTANCES             fewer instances of a slot than minInstances
 //   HFS_PLAINTEXT_SECRET          (R06, rules/secrets.mjs) a plaintext secret file or value in a tracked file; a `.enc` that is no sops envelope
-//   HFS_STACKS_SHAPE              (R10, rules/stacks.mjs) a `.starcistacks` path outside the standard shape, or a Sonar owner that is not the host
+//   HFS_STACKS_SHAPE              (R10, rules/stacks.mjs) invalid stack shape, Swarm runtime policy, host crontab installation or lite backing duplication
 //   HFS_CI_MISSING_CANON          (R13, rules/pipeline.mjs) CI without the pinned `starci app check`, pre-push without typecheck or lint
 //   HFS_DEP_VERSION_SKEW          (R14, rules/deps.mjs) a dependency at two versions in the workspace, or a nested copy in the lockfile
 //   HFS_CONTRACT_SNAPSHOT_DRIFT   (R23, rules/contract.mjs) an uncommitted back-end snapshot, or a front-end copy that differs from it
@@ -25,7 +25,7 @@
 //   FE_STACK_FORBIDDEN            (rules/fe-stack.mjs) a front-end manifest (the fe side's, or the app root's minus the back end's own libraries)
 //                                 declares a package knowledge/hfs/fe-stack.yaml forbids
 //   HFS_LITE_SECRET_CUSTODY       (R220, rules/supabase-secrets.mjs) under edition lite: secret material or a forbidden custody path; the R06 scan itself runs for every edition
-//   HFS_EDITION_FORBIDDEN_PRESENT (R212, rules/edition.mjs) under edition lite: an e2e, contract, stack or browser script, or a
+//   HFS_EDITION_FORBIDDEN_PRESENT (R212, rules/edition.mjs) under edition lite: an e2e, contract, test-stack or browser script, or a
 //                                 dependency of self-hosted infrastructure (test containers, fault proxy, BullMQ, Kafka, Redis)
 //   DB_MIGRATION_SHAPE ... DB_TYPES_DRIFT (R213-R216, rules/database.mjs, async: passed in as extraFindings) the Supabase migrations, policies, definer functions, buckets, config.toml and generated types
 //   BE_SPEC_PLACEMENT             (R102, rules/spec-placement.mjs) a spec or test file outside the four test layers, scripts/ and tools/ included

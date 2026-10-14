@@ -619,16 +619,16 @@ slots:
     tier: none
     tests: none
     requires: [application-stacks.yaml]
-    allows: [application-stacks.yaml, "<env>/README.md", "<env>/environment.json", "<env>/infra/{compose,k8s,terraform}/**", "<env>/infra/metadata.json",
+    allows: [application-stacks.yaml, "<env>/README.md", "<env>/environment.json", "<env>/infra/{compose,k8s,terraform,swarm}/**", "<env>/infra/metadata.json",
              "<env>/runtime/{config,env}/**", "<env>/runtime/env/KEYS.md", "<env>/secrets/<slug>.enc", "<env>/secrets/.gitkeep", "<env>/seeds/**"]
     forbids: ["<env>/runtime/files/**", "**/*.enc outside <env>/secrets/", DESIGN.md, deployment.json, "k8s/ at root"]
-    # Lite has no self-hosted infrastructure (owner ruling 2026-10-12): .starcistacks holds env and secret custody only - the stack
-    # declaration, the environment descriptor and the sealed secrets; the stack's one backing service is the Supabase project (the
-    # local CLI stack or the cloud project). infra/ (compose, k8s, terraform), runtime/ and seeds/ are the full edition's.
+    # Lite keeps full's code structure with backing infrastructure replaced by Supabase (owner ruling 2026-10-13). The api and
+    # sidecars run on docker-swarm; its value-free stack belongs in <env>/infra/swarm/. The checker also refuses components whose
+    # images duplicate Supabase services: postgres, redis, kafka, keycloak, minio, rabbitmq, mysql and mongo.
     lite:
-      requires: []
-      allows: [application-stacks.yaml, "<env>/README.md", "<env>/environment.json", "<env>/secrets/<slug>.enc", "<env>/secrets/.gitkeep"]
-      forbids: ["<env>/runtime/files/**", "**/*.enc outside <env>/secrets/", DESIGN.md, deployment.json, "k8s/ at root"]
+      requires: [application-stacks.yaml]
+      allows: [application-stacks.yaml, "<env>/README.md", "<env>/environment.json", "<env>/infra/swarm/**", "<env>/secrets/<slug>.enc", "<env>/secrets/.gitkeep"]
+      forbids: ["<env>/infra/{compose,k8s,terraform}/**", "<env>/runtime/**", "<env>/seeds/**", "**/*.enc outside <env>/secrets/", DESIGN.md, deployment.json, "k8s/ at root"]
     rules: [HFS_STACKS_SHAPE, HFS_STACKS_IN_SIDE, HFS_PLAINTEXT_SECRET, HFS_IDENTITY_CUSTODY]
   - id: app.sops
     profiles: [app]

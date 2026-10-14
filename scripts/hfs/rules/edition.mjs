@@ -1,6 +1,6 @@
 // edition.mjs - L01, the edition rule. An hfs.json edition is `full` or `lite` (absent means full); under lite the standard is a
-// filter plus a few additions over the same manifest, never a second engine. Lite is the full architecture deployed without
-// self-hosted infrastructure (owner ruling 2026-10-12): the same slots, patterns and unit specs, Supabase adapters behind the same
+// filter plus a few additions over the same manifest, never a second engine. Lite keeps the full code structure and swaps only
+// backing infrastructure for Supabase (owner ruling 2026-10-13): the api and sidecars run on Swarm, with the same slots, patterns and unit specs behind the same
 // ports, and no e2e or contract world. The slot layer already answers the paths lite removed (slots lite excludes, or whose
 // litePresence is forbidden, come back HFS_FORBIDDEN_PRESENT with their goesTo); this rule reports what no path can state:
 //   - inside a package.json: an e2e, contract, stack or browser script (`test:e2e`, `test:contract`, `test:stack`, `test:browser`,
@@ -9,7 +9,7 @@
 //     while full owns them (BullMQ, Kafka, Redis: lite runs pgmq and Postgres locks instead);
 //   - a declaration of what lite does not have: an app kind, pattern or trigger kind every slot of which is forbidden under
 //     lite. The forbidden names are DERIVED from the manifest, so adding or restoring a kind is a manifest edit, not an edit here
-//     (under the 2026-10-12 ruling no pattern, trigger or app kind is gone).
+//     (under the 2026-10-13 ruling no pattern, trigger or app kind is gone).
 // A full app answers []: the rule tests the edition once and a full view forbids none of these names.
 import { found, readJson } from './read.mjs';
 import { DEPENDENCY_SECTIONS } from './fe-no-tests.mjs';
@@ -18,7 +18,7 @@ import { editionRuleParams } from '../edition-slots.mjs';
 export const HFS_EDITION_FORBIDDEN_PRESENT = 'HFS_EDITION_FORBIDDEN_PRESENT';
 
 const PACKAGE_JSON = /(?:^|\/)package\.json$/;
-/** The scripts of a world lite does not have: the e2e and contract layers, the self-hosted stack and the browser journey. */
+/** The scripts of a test world lite does not have: e2e, contract, test-stack and browser journeys. Production Swarm deployment is legal. */
 const LITE_FORBIDDEN_SCRIPT = /^(?:pre|post)?test:(?:e2e|contract|stack|browser)$/;
 /** The dependencies of a test infrastructure lite does not run: containers, fault proxies and browser runners. */
 const LITE_FORBIDDEN_TEST_INFRA = /^(?:testcontainers|@testcontainers\/.+|toxiproxy-node-client|playwright|playwright-core|@playwright\/.+|cypress)$/;
@@ -78,7 +78,7 @@ function dependencyFindings(rel, pkg, removed) {
     if (!isPlainObject(deps)) continue;
     for (const name of Object.keys(deps)) {
       if (LITE_FORBIDDEN_TEST_INFRA.test(name)) findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} ${section} has ${name}: a lite app runs no test containers, fault proxy or browser journey - its integration specs run against \`supabase start\``, { section, name }));
-      else if (removed.has(name)) findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} ${section} has ${name}: lite runs no self-hosted infrastructure - the pattern's port is implemented on Supabase (pgmq, Postgres locks)`, { section, name }));
+      else if (removed.has(name)) findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} ${section} has ${name}: lite replaces backing infrastructure with Supabase - the pattern's port is implemented on Supabase (pgmq, Postgres locks)`, { section, name }));
     }
   }
   return findings;

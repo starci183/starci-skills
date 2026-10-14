@@ -12,12 +12,13 @@ family: be
 # into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
 slots: [be.app.worker, be.transport.message, be.feature.jobs]
 provenance:
-  reviewedAt: 2026-09-30
+  reviewedAt: 2026-10-14
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
     - knowledge/hfs/rules.yaml
     - owner-locked BE convention 2026-09-30
+    - owner-approved Swarm canon 2026-10-14 (application-owned schedules, no host crontab)
     - docs/architecture.md
     - https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html
   limitations: |-
@@ -74,9 +75,10 @@ rules:
 liteAdapter:
   summary: >-
     Under lite background work keeps its runners: processors and consumers are composed by the api app or by the optional worker
-    app, exactly as full. A schedule is a pg_cron job (or pg_net, or the host's scheduler) that enqueues, never a cron process of
-    the app's own.
+    app, exactly as full. Recurring work is app-owned: a back-end scheduler, pgmq jobs or pg_cron ticks that enqueue work.
+    Deployment never installs a host crontab. A scheduled CLI batch follows the replicated-job and declared swarm-cronjob
+    scheduler contract of repo.starcistacks or is converted to an application scheduler.
   ports:
     - {port: schedule, adapter: "pg_cron in a supabase migration calling pgmq.send"}
     - {port: runner, adapter: the api app or the optional worker app polling its pgmq queues}
-  see: [knowledge/patterns/be/supabase-queues.yaml]
+  see: [knowledge/patterns/be/supabase-queues.yaml, knowledge/patterns/repo/starcistacks.yaml]

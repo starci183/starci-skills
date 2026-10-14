@@ -1,14 +1,16 @@
-// stacks.mjs - HFS_STACKS_SHAPE (R10): `.starcistacks` has the standard shape and the host Sonar owner.
+// stacks.mjs - HFS_STACKS_SHAPE (R10): standard stack shape, Sonar owner and deployment runtime consistency.
 //   - every tracked path under the app root's `.starcistacks/` is one the app.starcistacks slot allows (its `allows` list is the shape:
-//     application-stacks.yaml and <env>/{README.md, environment.json, infra/{compose,k8s,terraform}, runtime/{config,env},
+//     application-stacks.yaml and <env>/{README.md, environment.json, infra/{compose,swarm,k8s,terraform}, runtime/{config,env},
 //     secrets/<slug>.enc, seeds}); a `.enc` outside <env>/secrets/ is never allowed, `runtime/files/`, a root `DESIGN.md`,
 //     `deployment.json` and `k8s/` are not in the list, so they fall out of it;
 //   - the declaration (read by scripts/lib/stack-declaration.mjs, the one reader of it) states a sonar service, a local
 //     Sonar is owned by the host (`stack.owner: host`, root `.claude/ext/sonar`).
-// The declaration's services contract (custody, CI wiring, project keys) stays check-starcistacks's; this file judges shape only.
+// The lite overlay admits Swarm compute and managed Supabase backing. Runtime rules are shared with the stack gates.
+// The declaration's quality/delivery services contract (custody, CI wiring, project keys) stays check-starcistacks's.
 import { braceVariants, globExpression } from '../../lib/glob.mjs';
 import { declaredStack, findStackDeclaration, STACK_ROOT, text } from '../../lib/stack-declaration.mjs';
 import { found } from './read.mjs';
+import { hostCrontabFindings, stacksRuntimeFindings } from './stacks-runtime.mjs';
 
 const STACKS_SHAPE = 'HFS_STACKS_SHAPE';
 const STACKS_SLOT = 'app.starcistacks';
@@ -30,11 +32,10 @@ function treeFindings(files, allowed, prefix) {
   return findings;
 }
 
-function declarationFindings(repoRoot, files, prefix) {
+function declarationFindings(files, prefix, declaration) {
   const declared = `${prefix}application-stacks.yaml`;
   if (!files.includes(declared)) return [];
   const findings = [];
-  const declaration = findStackDeclaration(repoRoot);
   if (declaration.error) return [shapeFinding(declared, `${declared} cannot be read: ${declaration.error}`)];
   const services = declaration.doc?.services;
   if (services === undefined || typeof services.sonar !== 'object' || services.sonar === null) {
@@ -55,7 +56,11 @@ export function stacksFindings({ repoRoot, files, resolver }) {
   const slot = resolver.slot(STACKS_SLOT);
   if (!slot) return [];
   const prefix = `${STACK_ROOT}/`;
-  const findings = treeFindings(files, allowedExpressions(slot.allows ?? []), prefix);
-  findings.push(...declarationFindings(repoRoot, files, prefix));
-  return findings;
+  const declaration = findStackDeclaration(repoRoot);
+  return [
+    ...treeFindings(files, allowedExpressions(slot.allows ?? []), prefix),
+    ...declarationFindings(files, prefix, declaration),
+    ...hostCrontabFindings({ repoRoot, files }),
+    ...(declaration.doc ? stacksRuntimeFindings({ repoRoot, files, doc: declaration.doc, edition: resolver.repo?.edition }) : []),
+  ];
 }

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { resolveRepoDeclaration } from "../runtime/scripts/hfs/slots.mjs";
 import { parseYaml } from "../runtime/engine/yaml.mjs";
-import { appScripts, imageFiles, TEMPLATES_DIR } from "../sync/index.mjs";
+import { appScripts, appSource, imageFiles, TEMPLATES_DIR } from "../sync/index.mjs";
 import { ScaffoldError } from "./service.mjs";
 import { jsonText, packageJsonText } from "./app.mjs";
 import { registerLiteExports } from "./lite-exports.mjs";
@@ -15,8 +15,8 @@ const read = (relative) =>
 const PINS_FILE = path.join(import.meta.dirname, "..", "runtime", "knowledge", "hfs", "canon-pins.yaml");
 
 
-const managedScripts = (repo) => {
-  const fragment = appScripts(repo).replace(/,\s*$/, "");
+const managedScripts = (repo, source) => {
+  const fragment = appScripts(repo, source).replace(/,\s*$/, "");
   return fragment === "" ? {} : JSON.parse(`{${fragment}}`);
 };
 
@@ -272,7 +272,7 @@ export function ensureLiteCli({ root, manifest, repo }) {
   packageManifest.dependencies = { ...(packageManifest.dependencies ?? {}), "nest-commander": pin };
   packageManifest.scripts = {
     ...(packageManifest.scripts ?? {}),
-    ...managedScripts(resolved),
+    ...managedScripts(resolved, appSource(root)),
   };
   for (const [relative, body] of files) {
     const target = path.join(root, ...relative.split("/"));

@@ -29,11 +29,35 @@ properties:
       additionalProperties: false
       required: [role]
       properties:
-        role: {type: string, minLength: 1}
+        role:
+          description: >-
+            Component classification, including service, stateful, observability, ingress, scheduler
+            and job. Free text preserves older declarations.
+          type: string
+          minLength: 1
         image: {type: string, minLength: 1}
         compose: {type: string, minLength: 1}
         purpose: {type: string}
         required: {type: boolean}
+        mode: {enum: [service, replicated-job], default: service}
+        scheduler:
+          description: Component id of the declared scheduler that triggers a replicated-job.
+          type: string
+          minLength: 1
+        schedule:
+          description: Cron expression consumed by the declared scheduler.
+          type: string
+          minLength: 1
+  backing:
+    description: Managed backing services declared as dependencies, never run as stack components.
+    type: object
+    additionalProperties:
+      type: object
+      additionalProperties: false
+      required: [provider, managed]
+      properties:
+        provider: {type: string, minLength: 1}
+        managed: {const: true}
   environments:
     type: object
     minProperties: 1

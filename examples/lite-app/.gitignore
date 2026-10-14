@@ -53,6 +53,7 @@ next-env.d.ts
 !.starcistacks/*/infra/compose/**
 !.starcistacks/*/infra/k8s/**
 !.starcistacks/*/infra/terraform/**
+!.starcistacks/*/infra/swarm/**
 .starcistacks/*/infra/**/.env
 .starcistacks/*/infra/**/.env.*
 .starcistacks/*/infra/**/*.env

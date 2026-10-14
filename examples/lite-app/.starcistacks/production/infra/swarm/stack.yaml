@@ -1,0 +1,123 @@
+# Value-free release fixture. Replace the illustrative image digests with published release
+# digests in this file and application-stacks.yaml before deployment; README.md owns preparation.
+version: "3.8"
+services:
+  api:
+    image: ghcr.io/starci183/lite-app-api@sha256:b51a608233c882567a3aabdc8e314d17c528524a45445919b875f7072e1eed44
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HTTP_SECURITY_ALLOWED_ORIGINS: "${SITE_ORIGIN:?export SITE_ORIGIN}"
+      PRIMARY_DB_SCHEMA: public
+      PRIMARY_DB_URL_FILE: /run/secrets/database-url
+      SUPABASE_URL: "${SUPABASE_URL:?export SUPABASE_URL}"
+      SUPABASE_SERVICE_ROLE_KEY_FILE: /run/secrets/supabase-service-role-key
+    secrets:
+      - {source: database-url, target: database-url}
+      - {source: supabase-service-role-key, target: supabase-service-role-key}
+    networks: [application]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+        monitor: 30s
+      rollback_config:
+        parallelism: 1
+        order: stop-first
+        monitor: 30s
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 60s
+  web:
+    image: ghcr.io/starci183/lite-app-web@sha256:67e4aee26e8f897b1c89a323e31cb2c313e1adad575ae01d43965964c674cacc
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+    networks: [application]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+        monitor: 30s
+      rollback_config:
+        parallelism: 1
+        order: stop-first
+        monitor: 30s
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 60s
+  ingress:
+    image: caddy:2-alpine@sha256:301aeb914f3ac159f0b5c610fba096136702862905c7e557c98f17f663752d41
+    environment:
+      SITE_HOST: "${SITE_HOST:?export SITE_HOST}"
+    configs:
+      - {source: ingress-config, target: /etc/caddy/Caddyfile}
+    volumes:
+      - ingress-data:/data
+      - ingress-state:/config
+    ports:
+      - {target: 80, published: 80, protocol: tcp, mode: ingress}
+      - {target: 443, published: 443, protocol: tcp, mode: ingress}
+    networks: [application]
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:2019/config/]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      update_config:
+        parallelism: 1
+        order: stop-first
+        failure_action: rollback
+        monitor: 30s
+      rollback_config:
+        parallelism: 1
+        order: stop-first
+        monitor: 30s
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 60s
+networks:
+  application:
+    driver: overlay
+configs:
+  ingress-config:
+    name: lite-app-ingress-v1
+    file: ./Caddyfile
+volumes:
+  ingress-data: {}
+  ingress-state: {}
+secrets:
+  database-url:
+    external: true
+    name: lite-app-database-url-v1
+  supabase-service-role-key:
+    external: true
+    name: lite-app-supabase-service-role-key-v1

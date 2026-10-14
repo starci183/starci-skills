@@ -2,11 +2,11 @@
 // (templates/<side>/image/<kind>, the same render starci app scaffold uses). It never overwrites a file.
 import fs from 'node:fs';
 import path from 'node:path';
-import { imageFiles, loadHfs, validateHfs } from '../sync/index.mjs';
+import { appSource, imageFiles, loadHfs, validateHfs } from '../sync/index.mjs';
 
 /** Writes the missing Dockerfiles of the app at `repoRoot` (the folder of hfs.json); the app-relative paths written. */
 export function newImages({ repoRoot }) {
-  const files = imageFiles(validateHfs(loadHfs(repoRoot)));
+  const files = imageFiles(validateHfs(loadHfs(repoRoot)), appSource(repoRoot));
   const written = [];
   for (const file of files) {
     const target = path.join(repoRoot, ...file.path.split('/'));
