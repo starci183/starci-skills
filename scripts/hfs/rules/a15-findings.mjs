@@ -3,10 +3,14 @@
 // and is wired here by appending ONE import line and ONE entry to FINDERS. Nothing else in this file changes; the file is union-merged.
 // A finder judges its own edition (`repo.edition`): lite and full are both in scope unless the rule says otherwise.
 // finders-import-begin
+import { bootProofFindings } from './boot-proof.mjs';
+import { coverageBelowFindings } from './coverage-below.mjs';
 // finders-import-end
 
 export const FINDERS = [
   // finders-begin
+  bootProofFindings,
+  coverageBelowFindings,
   // finders-end
 ];
 
@@ -14,3 +18,6 @@ export const FINDERS = [
 export function a15Findings(context) {
   return FINDERS.flatMap((finder) => finder(context));
 }
+
+/** Codes emitted by the finders (coordinator-managed). */
+export const A15_CODES = [];
