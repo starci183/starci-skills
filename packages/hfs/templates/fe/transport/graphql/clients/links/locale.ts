@@ -4,10 +4,10 @@ import { SetContextLink } from "@apollo/client/link/context"
 const documentLocale = (): string | undefined =>
     typeof document === "undefined" || document.documentElement.lang === "" ? undefined : document.documentElement.lang
 
-/** The one writer of `x-locale`: every operation declares the language the back end answers and localizes its errors in. */
+/** The one writer of `Accept-Language`: every operation declares the language the back end answers and localizes its errors in. */
 export const createAttachLocaleLink = (locale: () => string | undefined = documentLocale) =>
     new SetContextLink((context) => {
         const value = locale()
         if (value === undefined) return {}
-        return { headers: { ...context.headers, "x-locale": value } }
+        return { headers: { ...context.headers, "Accept-Language": value } }
     })
