@@ -1,0 +1,356 @@
+# HFS owner decisions, including the historical clauses their successors amend.
+# Rule cases retain their catalog identity; the canonical case citation is ruling:R212/case-4.
+# Dates identify the recorded decision, not the date a worker implements its enforcer.
+# enforcedBy names rule owners; it does not claim that another alpha.15 batch has already landed.
+# Structured rule/case links have the same meaning as R212/case-4 in the ruling-cite index.
+schema: starci/hfs-rulings@1
+
+rulings:
+  - id: hfs-complete-standard
+    date: '2026-10-14'
+    topic: standard.coverage
+    status: live
+    ownerRuling: 1
+    source: A15-STANDARD section 0.1 item 1
+    statement: >-
+      Alpha.15 is the complete HFS standard for lite and full; every applicable surface in each edition
+      needs its requirement, rule, enforcer, template, example, documentation and proof.
+    supersedes: []
+    enforcedBy: [R247, R274]
+
+  - id: lite-production-swarm
+    date: '2026-10-14'
+    topic: deploy.lite-production
+    status: live
+    ownerRuling: 2
+    source: A15-STANDARD section 0.1 item 2
+    statement: >-
+      Lite production declares runtime docker-swarm in .starcistacks/application-stacks.yaml and tracks
+      the rendered stack under .starcistacks/production/infra/swarm/. The VPS runs neither Compose nor
+      a host crontab; scheduling is app-owned through the back-end scheduler, pgmq or a pg_cron tick,
+      or through a declared replicated-job.
+    supersedes:
+      - {rule: R212, case: case-1}
+      - {rule: R212, case: case-2}
+      - {rule: R212, case: case-3}
+    amendmentScope: Lite hosting, stack layout and scheduling clauses only.
+    enforcedBy: [R10, R212, R250, R266, R267, R268]
+
+  - id: single-declared-ingress
+    date: '2026-10-14'
+    topic: deploy.ingress
+    status: live
+    ownerRuling: 3
+    source: A15-STANDARD section 0.1 item 3
+    statement: >-
+      Any single declared ingress component is accepted, including Traefik or Caddy, with its image
+      pinned by digest; the canon selects no particular ingress implementation.
+    supersedes: []
+    enforcedBy: [R266, R275]
+
+  - id: lite-backing-services
+    date: '2026-10-14'
+    topic: deploy.lite-backing-services
+    status: live
+    ownerRuling: 4
+    source: A15-STANDARD section 0.1 item 4
+    statement: >-
+      Lite uses Supabase and has no self-hosted Postgres. A sidecar that needs a database uses SQLite
+      on a declared persistent volume; a sidecar requiring Postgres, Redis or Mongo is refused.
+    supersedes: []
+    enforcedBy: [R276]
+
+  - id: sealed-secret-custody
+    date: '2026-10-14'
+    topic: security.secret-custody
+    status: live
+    ownerRuling: 5
+    source: A15-STANDARD section 0.1 item 5
+    statement: >-
+      Product secrets exist only as sops/age sealed .starcistacks/<env>/secrets/*.enc members.
+      Plaintext secret files are never tracked, placed in deploy/ or put in a workflow; the private age
+      identity is held only as SOPS_AGE_KEY in the owner's untracked .claude/secret.env.
+    supersedes: [platform-age-file-custody]
+    enforcedBy: [R06, R253, R277]
+
+  - id: R212/case-4
+    date: '2026-10-14'
+    topic: work.lite-boundary
+    status: live
+    ownerRuling: 6
+    source: knowledge/hfs/rules.yaml R212 cases.case-4; A15-STANDARD section 0.1 item 6
+    statement: >-
+      Lite .starciwork admits only .gitignore, optional workspace.yaml and brand/** in the existing brand
+      tooling layout. workspace.yaml may carry project identity and repository roles; readers skip full
+      catalog, shell and feature metadata. The tree is optional without brand records; full keeps its Work tree.
+    supersedes:
+      - {rule: R212, case: case-1}
+      - {rule: R212, case: case-2}
+      - lite-work-brand-only
+    amendmentScope: The lite Work boundary; other historical code and adapter clauses keep their own successors.
+    enforcedBy: [R212]
+
+  - id: typed-app-environment
+    date: '2026-10-14'
+    topic: code.be-environment
+    status: live
+    ownerRuling: 7
+    source: A15-STANDARD section 0.1 item 7
+    statement: >-
+      Every back-end app has apps/<app>/src/<app>.env.ts with an interface and read<App>Env(env: EnvSource).
+      The app reads its environment through that boundary; main.ts delegates and holds no parsing of its own,
+      and app.module.ts spreads composition groups instead of holding an inline module list.
+    supersedes: [R245]
+    amendmentScope: The optional inline parsing clause of R245; the other app-role restrictions remain in force.
+    enforcedBy: [R248, R289]
+
+  - id: fe-auth-only
+    date: '2026-10-13'
+    topic: security.fe-data-door
+    status: live
+    ownerRuling: 8
+    source: A15-STANDARD section 0.1 item 8; knowledge/hfs/rules.yaml R212 cases.case-2
+    statement: >-
+      The front end uses Supabase for Auth only and accesses application data through the back end.
+      The front-end client boundary and the database grants, policies and realtime publication boundary
+      enforce this decision; declared direct-access exceptions are explicit and listed.
+    supersedes: []
+    enforcedBy: [R217, R254]
+
+  - id: graphql-default-door
+    date: '2026-10-13'
+    topic: code.be-transport
+    status: live
+    ownerRuling: 9
+    source: A15-STANDARD section 0.1 item 9
+    statement: >-
+      GraphQL is the default application door. REST is reserved for probes, auth handshakes, signed
+      webhooks, byte streams and the public v1 table; the reason and route evidence apply in both editions.
+    supersedes: []
+    enforcedBy: [R278, R290]
+
+  - id: owner-run-steps
+    date: '2026-10-14'
+    topic: deploy.owner-steps
+    status: live
+    ownerRuling: 10
+    source: A15-STANDARD section 0.1 item 10
+    statement: >-
+      DNS changes, provider URIs, docker swarm init and key rotation remain owner-run steps.
+      The standard requires those steps and their evidence to be declared and never automates them.
+    supersedes: []
+    enforcedBy: [R266, R267]
+
+  - id: lite-contract-specs
+    date: '2026-10-14'
+    topic: proof.lite-contract
+    status: live
+    source: A15-STANDARD section 2.2 decision 1
+    statement: >-
+      Lite may have tests/contract and test:contract. The owner's HFS standard relaxes the older contract
+      refusal in R212, be.tests.contract and edition.mjs; e2e, stack and browser runs remain full-only.
+    supersedes:
+      - {rule: R212, case: case-1}
+    amendmentScope: The lite contract-world prohibition only; the full-only e2e boundary remains.
+    enforcedBy: [R212]
+
+  - id: lite-webhook-after-commit
+    date: '2026-10-14'
+    topic: code.be-webhook-handoff
+    status: live
+    source: A15-STANDARD section 2.2 decision 2
+    statement: >-
+      Lite webhook intake records its receipt and typed outbox event in the transaction. A reactor or job
+      processes the event after commit; processing never runs inside the intake transaction.
+    supersedes: []
+    enforcedBy: [R263]
+
+  - id: locale-accept-language
+    date: '2026-10-14'
+    topic: code.fe-locale-header
+    status: live
+    source: A15-STANDARD section 2.2 decision 3
+    statement: >-
+      The single front-end locale writer sends Accept-Language, and back-end localization reads that
+      header; the previous custom locale header is retired in templates, lint and examples.
+    supersedes: []
+    enforcedBy: [R50]
+
+  - id: lite-fe-app-cardinality
+    date: '2026-10-14'
+    topic: code.fe-app-cardinality
+    status: live
+    source: A15-STANDARD section 2.2 decision 4
+    statement: Lite may have more than one front-end app; the earlier single-app wording is removed.
+    supersedes: []
+    enforcedBy: [R212]
+
+  - id: code-function-feature-budgets
+    date: '2026-10-14'
+    topic: code.size-budgets
+    status: live
+    source: A15-STANDARD section 2.2 decision 5
+    statement: A function is at most 80 lines in back-end and front-end code, and a feature holds at most 250 files.
+    supersedes: []
+    enforcedBy: [R291, R292]
+
+  - id: R265
+    date: '2026-10-14'
+    topic: code.be-composition
+    status: live
+    source: A15-STANDARD section 2 R265 and section 2.1 R245 text
+    statement: >-
+      App module composition is type-based, including aliased imports, saved registrations and typed
+      scheduler arrays. compose/<area>.ts holds composition only; business branches or arrows belong
+      in their feature or domain role, and app.module.ts spreads the composition groups.
+    supersedes: [R245]
+    amendmentScope: The name-based composition detector only; the app-role restrictions remain in force.
+    enforcedBy: [R32, R265, R289]
+
+  - id: R246
+    date: '2026-10-14'
+    topic: code.be-app-file-budgets
+    status: live
+    source: knowledge/hfs/rules.yaml R246
+    statement: >-
+      App-role budgets are absolute: main.ts 80 lines, <app>.env.ts 150, <app>.options.ts 200,
+      compose/<area>.ts 120 and app.module.ts 250. Parsing and composition move to their owning
+      roles when an app file outgrows its budget.
+    supersedes: []
+    enforcedBy: [R246]
+
+  - id: observability-required-signals
+    date: '2026-10-14'
+    topic: observability.required
+    status: live
+    source: A15-STANDARD section 0.2 observability decisions
+    statement: The logger port, live and ready probes, and Docker HEALTHCHECK are mandatory in both editions.
+    supersedes: []
+    enforcedBy: [R40, R71, R189, R262]
+
+  - id: observability-deferred-signals
+    date: '2026-10-14'
+    topic: observability.deferred
+    status: live
+    source: A15-STANDARD section 0.2 observability decisions; section 6
+    statement: >-
+      Request-id correlation, metrics and tracing are outside alpha.15; their mandatory status remains
+      pending an owner decision and creates no new alpha.15 failure code.
+    supersedes: []
+    enforcedBy: []
+    gap: P2 owner decision pending; no mandatory request-id, metrics or tracing enforcer is scheduled.
+
+  - id: fe-error-reporter-optional
+    date: '2026-10-14'
+    topic: observability.fe-reporter
+    status: live
+    source: A15-STANDARD section 0.2 observability decisions
+    statement: >-
+      A front-end error reporter is documented optional and declared through hfs.json observe.reporter;
+      FE_OBSERVE_MISSING is not introduced unless the owner makes the reporter mandatory.
+    supersedes: []
+    enforcedBy: []
+    gap: Optional declaration only; no missing-reporter finding is authorized.
+
+  - id: R212/case-1
+    date: '2026-10-12'
+    topic: edition.shared-architecture
+    status: amended
+    source: knowledge/hfs/rules.yaml R212 cases.case-1
+    statement: >-
+      The initial lite decision keeps the full monorepo and code architecture, unit-spec requirements,
+      Supabase adapters and an additive upgrade path. Its hosting, realtime, contract and Work clauses
+      are historical and are amended by the successors below.
+    supersedes: []
+    amendedBy: [R212/case-2, R212/case-4, lite-production-swarm, lite-contract-specs]
+    amendmentScope: Realtime adapter, lite Work boundary, production stack and scheduling, and contract specs.
+    enforcedBy: [R212]
+
+  - id: R212/case-2
+    date: '2026-10-13'
+    topic: edition.shared-frontend-and-realtime
+    status: amended
+    source: knowledge/hfs/rules.yaml R212 cases.case-2
+    statement: >-
+      Lite and full share the same front-end standard and code structure. Lite realtime uses a socket.io
+      gateway inside one back-end api process without a Redis adapter; the front end uses Supabase for
+      Auth only. Later decisions amend the hosting and lite Work clauses while retaining those boundaries.
+    supersedes:
+      - {rule: R212, case: case-1}
+    amendedBy: [R212/case-4, lite-production-swarm]
+    amendmentScope: The lite Work and production hosting clauses only.
+    enforcedBy: [R212, R217]
+
+  - id: R212/case-3
+    date: '2026-10-13'
+    topic: edition.adapters-baseline-and-assets
+    status: amended
+    source: knowledge/hfs/rules.yaml R212 cases.case-3
+    statement: >-
+      Both editions share the HFS tree above the platform and integration seam, with different database,
+      identity, storage, queue, realtime and event-bus adapters. Existing apps cut over through a baseline
+      marked applied without re-running it and archive prior migrations. Static templates are domain-owned
+      TypeScript constants; small build-time binaries are be.assets, and large or user media use object storage.
+    supersedes: []
+    amendedBy: [lite-production-swarm]
+    amendmentScope: The lite production hosting clause; adapter, baseline and asset policies remain.
+    enforcedBy: [R212, R213, R257, R282]
+
+  - id: R245
+    date: '2026-10-14'
+    topic: code.be-app-roles
+    status: amended
+    source: knowledge/hfs/rules.yaml R245; A15-STANDARD section 0.1 item 7
+    statement: >-
+      The app roles separate boot, typed environment, options, composition groups and the app module.
+      The older option to parse environment inline in main.ts is replaced by a required typed app environment
+      boundary, and the name-based composition detector is replaced by type-based checks.
+    supersedes: []
+    amendedBy: [typed-app-environment, R265, R289]
+    amendmentScope: Optional inline environment parsing and the name-based composition detector.
+    enforcedBy: [R245, R265, R289]
+
+  - id: lite-work-brand-only
+    date: '2026-10-14'
+    topic: work.lite-boundary
+    status: superseded
+    source: knowledge/hfs/rules.yaml R212 cases.case-4 quote and amended ruling
+    statement: The initial restriction to brand records was clarified to permit .gitignore and optional workspace.yaml too.
+    supersedes: []
+    amendedBy: [R212/case-4]
+    enforcedBy: [R212]
+
+  - id: platform-age-file-custody
+    date: '2026-10-14'
+    topic: security.age-key-custody
+    status: superseded
+    source: knowledge/patterns/repo/secrets.yaml provenance.limitations and REPO-SECRETS-4; A15-STANDARD section 3 seeds
+    statement: >-
+      The dated repository-secrets guidance retained the platform default age identity file outside Git.
+      The standard replaces that custody guidance with SOPS_AGE_KEY in .claude/secret.env.
+    supersedes: []
+    amendedBy: [sealed-secret-custody]
+    enforcedBy: [R253]
+
+  - id: heroicons-family-icon-set
+    date: '2026-10-13'
+    topic: code.fe-glyph-source
+    status: live
+    source: modules/kernel/owner-rulings.yaml heroicons-family-icon-set; A15-STANDARD section 2.1 R286
+    statement: >-
+      The heroicons family is the application icon set. @heroicons/react supplies the base glyphs and
+      @starci/heroicons supplies missing brand or domain glyphs in the same style, through the Icon leaf.
+      Only a leaf declared as a brand mark in hfs.json may hold inline path artwork.
+    supersedes: [gate-loosening-6a6b539ea67d]
+    enforcedBy: [R93, R286]
+
+  - id: gate-loosening-6a6b539ea67d
+    date: '2026-10-13'
+    topic: code.fe-glyph-source
+    status: amended
+    source: modules/kernel/owner-rulings.yaml gate-loosening-6a6b539ea67d
+    statement: The earlier icon-vendor choice is replaced by the owner's heroicons-family decision of the same day.
+    supersedes: []
+    amendedBy: [heroicons-family-icon-set]
+    amendmentScope: The icon-vendor clause only; the front-end Supabase data-door removals remain.
+    enforcedBy: [R93, R217]
