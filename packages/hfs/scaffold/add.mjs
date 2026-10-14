@@ -277,7 +277,10 @@ function wireLiteFeature({ repoRoot, repo, noun, name }) {
 
 /** Adds one generated webhook provider to the lite API's parsed options and enables exact raw-body verification. */
 function wireLiteWebhookConfig({ repoRoot, app, provider }) {
-  const relative = `be/apps/${app}/src/main.ts`;
+  const envRelative = `be/apps/${app}/src/${app}.env.ts`;
+  const relative = fs.existsSync(path.join(repoRoot, ...envRelative.split('/')))
+    ? envRelative
+    : `be/apps/${app}/src/main.ts`;
   const file = path.join(repoRoot, ...relative.split('/'));
   let text = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
   const httpSecurityImport = /^import \{ ([^}]+) \} from "@modules\/platform\/http-security"$/m;
@@ -290,11 +293,12 @@ function wireLiteWebhookConfig({ repoRoot, app, provider }) {
     text = text.replace(httpSecurityImport, `import { ${imported.join(', ')} } from "@modules/platform/http-security"`);
   }
   const providerKey = /^[a-z][a-z0-9]*$/.test(provider) ? provider : JSON.stringify(provider);
-  const providerLine = `                ${providerKey}: parseWebhookProviderConfig(env, ${JSON.stringify(formsOf({ provider }).providerUpper)}),`;
+  const indent = /^([ \t]*)httpSecurity:/m.exec(text)?.[1] ?? '        ';
+  const providerLine = `${indent}        ${providerKey}: parseWebhookProviderConfig(env, ${JSON.stringify(formsOf({ provider }).providerUpper)}),`;
   if (!text.includes(providerLine)) {
     const empty = /httpSecurity:\s*parseHttpSecurityConfig\(env\)/;
     if (empty.test(text)) {
-      text = text.replace(empty, ['httpSecurity: {', '            ...parseHttpSecurityConfig(env),', '            webhooks: {', providerLine, '            },', '        }'].join('\n'));
+      text = text.replace(empty, ['httpSecurity: {', `${indent}    ...parseHttpSecurityConfig(env),`, `${indent}    webhooks: {`, providerLine, `${indent}    },`, `${indent}}`].join('\n'));
     } else {
       const found = /^\s*webhooks: \{$/m.exec(text);
       if (!found) throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add webhook could not find httpSecurity options in ${relative}`);
@@ -304,6 +308,11 @@ function wireLiteWebhookConfig({ repoRoot, app, provider }) {
   }
   text = text.replace('NestFactory.create(AppModule.register(options))', 'NestFactory.create(AppModule.register(options), { rawBody: true })');
   fs.writeFileSync(file, text);
+  if (relative === envRelative) {
+    const main = path.join(repoRoot, 'be', 'apps', app, 'src', 'main.ts');
+    const entry = fs.readFileSync(main, 'utf8').replace('NestFactory.create(AppModule.register(options))', 'NestFactory.create(AppModule.register(options), { rawBody: true })');
+    fs.writeFileSync(main, entry);
+  }
 }
 
 /**

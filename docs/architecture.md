@@ -273,8 +273,11 @@ machinery that owns nothing (a presentational twin, a forwarding service, a comm
 sake).
 
 The **back end** instantiates it in Nest/TypeScript: apps compose processes (the `be.app.*` slots:
-`main.ts`, env-derived `<app>.options.ts`, one `compose/<area>.ts` group per area and the
-`app.module.ts` root that spreads them, each within its line budget, R245 and R246), an api feature exposes operations as typed commands and queries with one handler each
+`main.ts` (80 lines), typed, fail-fast parsing in `<app>.env.ts` (150), env-derived values and port bindings in
+`<app>.options.ts` (200), one `compose/<area>.ts` group per area (120) and the `app.module.ts` root that spreads them (250),
+R245 and R246). Only `main.ts` and `<app>.env.ts` may read the app's environment, through `EnvSource` and capability parse
+helpers; the env file holds parsing only, with no logic, module composition, business code or feature imports, and the
+options file holds no parsing. An api feature exposes operations as typed commands and queries with one handler each
 (`transport -> command -> handler -> domain`, one transaction inside a bounded context, an event
 only to cross contexts or carry async work), and each capability module registers exactly once per
 app with typed options (`register`, `ConfigurableModuleBuilder`, `isGlobal: true` only in app

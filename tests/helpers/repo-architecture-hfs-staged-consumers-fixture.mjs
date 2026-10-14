@@ -27,7 +27,7 @@ export function stagedConsumersFixture(registerCleanup) {
     [ENTRY]: `${ENTRY_TEXT}export const sameCommit = 1;\n`,
     [consumer('same-commit')]: use('sameCommit'),
     [consumer('added')]: use('added'),
-    [consumer('disk-edited', 'policy')]: `${use('diskEdited')}// Un lecteur du dépôt: café.\n`,
+    [consumer('disk-edited', 'policy')]: `${use('diskEdited')}// A repository consumer: cafe.\n`,
     [consumer('disk-missing')]: use('diskMissing'),
     [consumer('modified')]: use('modified'),
     'src/modules/domain/index-consumers/inside.policy.spec.ts': "import { insideOwner } from './index';\nvoid insideOwner;\n",

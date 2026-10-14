@@ -2166,7 +2166,7 @@ rules:
       - {kind: eslint-fe, id: fe-stack-import}
   - id: R245
     code: "BE_APP_OPTIONS_COMPOSITION"
-    law: "An app's `src/` holds four composition roles (owner ruling 2026-10-14): `main.ts` reads the environment once and boots; `<app>.options.ts` holds env-derived options plus port bindings (provider maps such as `{ approvalGate: X }`) only, never an array of Nest modules, queue registrations or scheduler entries, and no `imports`, `modules`, `schedulers` or `processors` list; `compose/<area>.ts` exports the module list of one area (and the providers of its global ports when it has any), composition only, with no business logic and no environment read; `app.module.ts` imports the groups and spreads them and binds the app-wide guards and filter."
+    law: "An app's `src/` holds five app roles (owner ruling 2026-10-14): `main.ts` builds `EnvSource` once, parses inline or imports `<app>.env.ts`, builds options and boots; `<app>.env.ts` holds typed, fail-fast environment parsing only, via `EnvSource` and capability parse helpers, with no logic, module composition, business code or feature imports; only `main.ts` and `<app>.env.ts` may read the app's environment; `<app>.options.ts` holds env-derived options plus port bindings (provider maps such as `{ approvalGate: X }`) only, with no parsing; neither the env nor options file holds an array listing `*Module` classes, module or queue registrations (`register`, `forRoot`, `registerQueue`) or scheduler entries, or an `imports`, `modules`, `schedulers` or `processors` list; the env file also refuses standalone module or queue registration calls; `compose/<area>.ts` exports the module list of one area (and the providers of its global ports when it has any), composition only, with no business logic and no environment read; `app.module.ts` imports the groups and spreads them and binds the app-wide guards and filter."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_APP_OPTIONS_COMPOSITION"]
@@ -2174,7 +2174,7 @@ rules:
       - {kind: eslint-be, id: app-options-composition-free}
   - id: R246
     code: "BE_APP_COMPOSITION_BUDGET"
-    law: "Each composition file of an app stays within the line budget its `be.app.*` slot names (`budget`, keyed by the slot entry the file matches): `main.ts` 80, `<app>.options.ts` 200, `compose/<area>.ts` 120, `app.module.ts` 250. The budget is absolute, not a ratchet: an app root that outgrows it moves an area into a new `compose/<area>.ts` group, never into the options."
+    law: "Each app file stays within the line budget its `be.app.*` slot names (`budget`, keyed by the slot entry the file matches): `main.ts` 80, `<app>.env.ts` 150, `<app>.options.ts` 200, `compose/<area>.ts` 120, `app.module.ts` 250. The budget is absolute, not a ratchet: an entrypoint that outgrows it moves typed, fail-fast parsing into `<app>.env.ts`; an app root that outgrows it moves an area into a new `compose/<area>.ts` group, never into the env or options file."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_APP_COMPOSITION_BUDGET"]

@@ -33,8 +33,11 @@ the root, whose workspaces are the front end's packages (`fe/packages/*`). The d
 
 ## Repository layout
 
-- `be/apps/<app>/src`: `main.ts` (parses the environment once), `app.module.ts` (`AppModule.register(options)`, every
-  capability registered once with `isGlobal: true`), `<app>.options.ts`. An app only composes; the e2e world proves it boots.
+- `be/apps/<app>/src`: `main.ts` (80 lines, parses inline or calls `<app>.env.ts`), `<app>.env.ts` (150, typed, fail-fast parsing
+  through `EnvSource` and capability parse helpers only), `<app>.options.ts` (200, env-derived values and port bindings with no
+  parsing), `compose/<area>.ts` (120, one area's module list) and `app.module.ts` (250, `AppModule.register(options)` spreads the
+  groups; every capability registered once with `isGlobal: true`). Only `main.ts` and `<app>.env.ts` may read the app's
+  environment, and the env file holds no logic, module composition, business code or feature imports. The e2e world proves it boots.
 - `be/src/features/api/<feature>/`: `application/` (command/query + thin handler + contracts) and `transport/{graphql,http}/`. A handler maps its input and calls one method of one service; a resolver or controller dispatches one bus message.
 - `be/src/modules/domain`: account, session, identity (guards), catalog, cart, order (checkout, cancellation and order services), payment, invoice (billing), member; each owns its business logic in its `*.service.ts`, its entities, migrations,
   `.sql.ts` constants and errors under `persistence/` and `errors/`.

@@ -1,5 +1,7 @@
 // supabase-ast.mjs - shared TypeScript-symbol and expression helpers for the front-end and back-end Supabase
 // architecture checks. Recognition follows imported declarations and inferred types, never local spelling alone.
+import { unwrapExpression } from '../../lib/ts-analysis.mjs';
+
 export const SUPABASE_MODULES = new Set(['@supabase/ssr', '@supabase/supabase-js']);
 
 export const moduleNameOf = (ts, node) => {
@@ -38,12 +40,7 @@ const signatureFromSupabase = (checker, call) => {
   try { return declarationFromSupabase(checker.getResolvedSignature(call)?.declaration); } catch { return false; }
 };
 
-export const unwrap = (ts, node) => {
-  let current = node;
-  while (current && (ts.isParenthesizedExpression(current) || ts.isAwaitExpression(current) || ts.isAsExpression(current)
-    || ts.isTypeAssertionExpression(current) || ts.isNonNullExpression(current))) current = current.expression;
-  return current;
-};
+export const unwrap = (ts, node) => unwrapExpression(ts, node, { awaitExpressions: true, satisfiesExpressions: false });
 
 const isSupabaseValue = (kit, checker, node) => {
   const current = unwrap(kit.ts, node);

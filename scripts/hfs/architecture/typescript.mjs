@@ -9,6 +9,7 @@ import { createTypeScriptProgram, readTypeScriptProject, resolveTypeScriptModule
 import { readJsonFile } from '../../lib/json.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
 import { locateDeclaration } from '../slots.mjs';
+export { unwrapExpression } from '../../lib/ts-analysis.mjs';
 
 const CODE_EXTENSIONS = /\.(?:[cm]?[jt]sx?)$/i;
 const SCRIPT_TAIL = '[cm]?[jt]sx?';
@@ -398,14 +399,6 @@ export function reachableViolation(edges, firstEdge, forbidden, { follow = () =>
 
 /** A framework identity the checkers cannot prove statically. */
 export const UNPROVEN_FRAMEWORK = '(unproven framework identity)';
-
-/** The expression under parentheses, type assertions, non-null and satisfies wrappers. */
-export function unwrapExpression(ts, expression) {
-  while (expression && (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression)
-    || ts.isTypeAssertionExpression(expression) || ts.isNonNullExpression(expression)
-    || (ts.isSatisfiesExpression?.(expression) ?? false))) expression = expression.expression;
-  return expression;
-}
 
 /* ---- the AST walks every architecture checker shares ---- */
 

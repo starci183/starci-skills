@@ -13,6 +13,11 @@ export type Url = string & { readonly __brand: "Url" }
 
 /** The only reader of the process environment (fixture). */
 export class EnvSource {
+    /** A source built from the process environment once at boot (fixture). */
+    static fromProcess(): EnvSource {
+        return new EnvSource()
+    }
+
     /** A required string. */
     string(key: string): string {
         return key

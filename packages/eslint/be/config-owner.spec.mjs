@@ -21,6 +21,9 @@ const SERVICE = at("src/modules/domain/plan/plan.service.ts")
 const CONFIG = at("src/modules/domain/plan/plan.config.ts")
 const ENV_SOURCE = at("src/modules/platform/config/env-source.ts")
 const MAIN = at("apps/api/src/main.ts")
+const ENV = at("apps/api/src/api.env.ts")
+const OPTIONS = at("apps/api/src/api.options.ts")
+const GROUP = at("apps/api/src/compose/platform.ts")
 
 test("the process environment is read only by the file that declares EnvSource in platform/config", () => {
     tester.run("no-direct-env-read", noDirectEnvRead, {
@@ -46,6 +49,7 @@ test("the process environment is read only by the file that declares EnvSource i
             { filename: CONFIG, code: "const env = process.env", errors: [{ messageId: "env" }] },
             { filename: SERVICE, code: "const x = process['env']", errors: [{ messageId: "env" }] },
             { filename: MAIN, code: "const x = process.env.PORT", errors: [{ messageId: "env" }] },
+            { filename: ENV, code: "const x = process.env.PORT", errors: [{ messageId: "env" }] },
             { filename: at("apps/api/src/api.options.ts"), code: 'import { readFileSync } from "node:fs"\nconst path = process.env.PLAN_API_KEY_FILE\nexport const options = { apiKey: path === undefined ? undefined : readFileSync(path, "utf8") }', errors: [{ messageId: "env" }] },
             { filename: SERVICE, code: "const { env } = process", errors: [{ messageId: "env" }] },
             { filename: SERVICE, code: "const { env: e, argv } = process", errors: [{ messageId: "env" }] },
@@ -158,8 +162,9 @@ const HELPER = importLine("buildPlatformOptions", `${CONFIG_MODULE}/platform.hel
 const PLATFORM_CONFIG_FILE = at("src/modules/platform/config/platform.config.ts")
 const CONFIG_SPEC = at("src/modules/platform/config/platform.config.spec.ts")
 const WORLD = at("src/tests/world/use-test-world.ts")
+const APP_ENV = importLine("parseApiEnv", "./api.env") + importLine("EnvSource", CONFIG_MODULE) + "declare const env: EnvSource\n"
 
-test("a function exported by a <c>.config.ts is called only by main.ts, its config file, its config spec and the test world", () => {
+test("a config parser is called only by main.ts, the matching app env file, its config file or spec and composing tests", () => {
     tester.run("config-parsed-in-main", configParsedInMain, {
         valid: [
             { filename: MAIN, code: `${PLATFORM_CONFIG}export const options = parsePlatformConfig(env)` },
@@ -169,8 +174,13 @@ test("a function exported by a <c>.config.ts is called only by main.ts, its conf
             { filename: PLATFORM_CONFIG_FILE, code: readFileSync(PLATFORM_CONFIG_FILE, "utf8") },
             { filename: CONFIG_SPEC, code: `${PLATFORM_CONFIG}const options = parsePlatformConfig(env)` },
             { filename: WORLD, code: `${PLATFORM_CONFIG}export const options = parsePlatformConfig(env)` },
-            // the app's own options file composes the capability parsers for main.ts
-            { filename: at("apps/api/src/api.options.ts"), code: `${PLATFORM_CONFIG}export const parseApiOptions = (env: EnvSource) => ({ platform: parsePlatformConfig(env) })` },
+            // Keep the real env fixture's exported parser visible to the project service for indirect-call cases below.
+            // It covers capability parsers, owned EnvSource readers and source acquisition in the matching env file.
+            { filename: ENV, code: readFileSync(ENV, "utf8") },
+            { filename: at("apps/cli/src/cli.env.ts"), code: `${PLATFORM_CONFIG}const options = parsePlatformConfig(env)` },
+            { filename: MAIN, code: `${APP_ENV}const options = parseApiEnv(env)` },
+            { filename: MAIN, code: `${PLATFORM_CONFIG}const port = env.int('PORT')` },
+            { filename: MAIN, code: `${PLATFORM_CONFIG}const source = EnvSource.fromProcess()` },
             // a provider contract spec registers a module with options parsed from the sandbox keys
             { filename: at("src/tests/contract/stripe/stripe.contract-spec.ts"), code: `${PLATFORM_CONFIG}export const options = parsePlatformConfig(env)` },
             // a method of the EnvSource class (declared in a *.config.ts) is a reader, not a config getter
@@ -181,6 +191,17 @@ test("a function exported by a <c>.config.ts is called only by main.ts, its conf
             { filename: SERVICE, code: `${HELPER}export const make = () => buildPlatformOptions()` },
         ],
         invalid: [
+            { filename: OPTIONS, code: `${PLATFORM_CONFIG}export const parseApiOptions = (env: EnvSource) => ({ platform: parsePlatformConfig(env) })`, errors: [{ messageId: "parsed" }] },
+            { filename: GROUP, code: `${PLATFORM_CONFIG}const options = parsePlatformConfig(env)`, errors: [{ messageId: "parsed" }] },
+            { filename: at("apps/api/src/app.module.ts"), code: `${PLATFORM_CONFIG}const options = parsePlatformConfig(env)`, errors: [{ messageId: "parsed" }] },
+            // a matching suffix alone is not the env role of this app's slot
+            { filename: at("apps/api/src/other.env.ts"), code: `${PLATFORM_CONFIG}const options = parsePlatformConfig(env)`, errors: [{ messageId: "parsed" }] },
+            { filename: OPTIONS, code: `${PLATFORM_CONFIG}const port = env.int('PORT')`, errors: [{ messageId: "parsed" }] },
+            { filename: GROUP, code: `${PLATFORM_CONFIG}const port = env.string('PORT')`, errors: [{ messageId: "parsed" }] },
+            { filename: OPTIONS, code: `${PLATFORM_CONFIG}const source = EnvSource.fromProcess()`, errors: [{ messageId: "parsed" }] },
+            // calling the app env helper would read env indirectly in an options file or group
+            { filename: OPTIONS, code: `${APP_ENV}const options = parseApiEnv(env)`, errors: [{ messageId: "parsed" }] },
+            { filename: GROUP, code: `${importLine("parseApiEnv as parse", "../api.env")}${importLine("EnvSource", CONFIG_MODULE)}declare const env: EnvSource\nconst options = parse(env)`, errors: [{ messageId: "parsed" }] },
             // module scope
             { filename: SERVICE, code: `${PLATFORM_CONFIG}const x = platformConfig().isProduction`, errors: [{ messageId: "parsed" }] },
             // lazily inside a service method

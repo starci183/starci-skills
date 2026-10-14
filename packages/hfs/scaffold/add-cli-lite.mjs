@@ -20,9 +20,7 @@ const managedScripts = (repo) => {
   return fragment === "" ? {} : JSON.parse(`{${fragment}}`);
 };
 
-const CLI_OPTIONS = `import type { EnvSource } from "@modules/platform/config"
-import { parsePrimaryDatabaseConfig } from "@modules/platform/database"
-import type { DatabaseConnectionOptions } from "@modules/platform/database"
+const CLI_OPTIONS = `import type { DatabaseConnectionOptions } from "@modules/platform/database"
 
 /** Everything the lite cli needs: the least-privilege Supabase PostgreSQL connection. */
 export interface CliAppOptions {
@@ -30,9 +28,9 @@ export interface CliAppOptions {
     readonly connections: ReadonlyArray<DatabaseConnectionOptions>
 }
 
-/** Reads the one declared connection without adding entities or TypeORM migrations. */
-export const parseCliAppOptions = (env: EnvSource): CliAppOptions => ({
-    connections: [parsePrimaryDatabaseConfig(env)],
+/** Uses the parsed connection without adding entities or TypeORM migrations. */
+export const createCliAppOptions = (primary: DatabaseConnectionOptions): CliAppOptions => ({
+    connections: [primary],
 })
 `;
 
@@ -182,6 +180,7 @@ export function ensureLiteCli({ root, manifest, repo }) {
       "be/apps/cli/src/app.module.ts",
       read("be/skeleton/apps/cli/src/app.module.ts"),
     ],
+    ["be/apps/cli/src/cli.env.ts", read("be/skeleton/apps/cli/src/cli.env.ts")],
     ["be/apps/cli/src/cli.options.ts", CLI_OPTIONS],
     [
       "be/src/features/cli/index.ts",

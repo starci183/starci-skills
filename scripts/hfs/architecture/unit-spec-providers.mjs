@@ -4,6 +4,7 @@ import { machineKit } from './machine-ast.mjs';
 import { constructorDependencies } from './constructor-deps.mjs';
 import { treeOf } from './required-files.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
+import { importsOf } from '../../lib/ts-analysis.mjs';
 
 /**
  * R48 `unit-spec-providers` (BE_SPEC_QUALITY), the unit test standard's rule 3: the unit spec of a service builds its
@@ -24,17 +25,6 @@ export const UNIT_SPEC_PROVIDERS_RULE_IDS = ['BE_SPEC_QUALITY'];
 
 const RULE = 'BE_SPEC_QUALITY';
 const SPEC_ROOT = /^(?:src|apps)\//u;
-
-/** local name -> {name, module} for every named import of a source file. */
-function importsOf(ts, sourceFile) {
-  const imports = new Map();
-  for (const statement of sourceFile.statements) {
-    const bindings = ts.isImportDeclaration(statement) ? statement.importClause?.namedBindings : null;
-    if (!bindings || !ts.isNamedImports(bindings)) continue;
-    for (const element of bindings.elements) imports.set(element.name.text, { name: (element.propertyName ?? element.name).text, module: statement.moduleSpecifier.text });
-  }
-  return imports;
-}
 
 /** The `Test.createTestingModule(...)` calls of a spec. */
 function testingModules(ts, sourceFile) {

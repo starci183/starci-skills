@@ -9,9 +9,10 @@
  *     `.starcistacks` are refused everywhere else. The test world (slot `be.tests.world`) may read and write `process.env`:
  *     it hands the run state file path to the jest workers. A config getter that reads `process.env` itself is caught here at its
  *     definition.
- *   - `config-parsed-in-main` keeps the parsing of configuration in `main.ts`: a call of a function exported by a
+ *   - `config-parsed-in-main` keeps the parsing of configuration in `main.ts` or `<app>.env.ts`: a call of a function exported by a
  *     `<capability>.config.ts` (or of a function returning a `<capability>.options.ts` type, at module scope) is refused
- *     outside the app entry (`main.ts` and `<app>.options.ts`), the config file itself, its own spec, the test world and a provider contract spec. The callee is found through the type
+ *     outside the app entry (`main.ts` and the matching `<app>.env.ts`), the config file itself, its own spec, the test world and a provider contract spec.
+ *     Other app files also cannot call the app's env parser or the typed `EnvSource` readers. The callee is found through the type
  *     checker, so no function name is matched.
  *   - `no-secret-default` refuses a default for a value typed `Secret` or `Url` by `platform/config`: a default argument
  *     to an `EnvSource` reader, a `??`/`||` fallback on such a value, and a string literal default (`""`, `"localhost"`,
@@ -24,6 +25,7 @@
  * No test lane is exempt: a spec builds its `EnvSource` from a literal record and never touches the process environment.
  */
 import ts from "typescript"
+import { APP_ENV_ROLE, appRoleOf } from "./lib/app-roles.mjs"
 import { keyName, staticText, walk, wordsOf } from "./lib/ast.mjs"
 import { isOwnedBy, isOwnedType, originsOf } from "./lib/declared.mjs"
 import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
@@ -57,7 +59,7 @@ export const noDirectEnvRead = {
         schema: [],
         messages: {
             env: "The process environment is read outside the `EnvSource` of `platform/config`. Add the key to the capability's `<capability>.config.ts` (`parse<C>Config(env: EnvSource)`) and receive the value through its `<capability>.options.ts`.",
-            package: "`{{source}}` is a second config path. Configuration is parsed once in `main.ts` by `platform/config` typed readers and reaches a module through `register(options)`.",
+            package: "`{{source}}` is a second config path. Configuration is parsed once in `main.ts` or `<app>.env.ts` by `platform/config` typed readers and reaches a module through `register(options)`.",
             cwdPath: "A path built from `process.cwd()` and `{{segment}}` depends on where the process was started. Resolve it from a configured root.",
         },
     },
@@ -166,15 +168,15 @@ const isModuleScope = (node) => {
     return true
 }
 
-/** Config is parsed once, in `main.ts`; nothing else calls a config parser or getter. */
+/** Config is parsed once, in `main.ts` or its app's env file; other app roles do not read the environment. */
 export const configParsedInMain = {
     meta: {
         type: "problem",
-        docs: { description: "A function of a `<capability>.config.ts` is called only from the app entry, its own config file or spec, and the test world." },
+        docs: { description: "Configuration is parsed in `main.ts` or its matching `<app>.env.ts`; other app files do not call parsers or EnvSource readers." },
         schema: [],
         messages: {
-            parsed: "`{{name}}` is declared by `{{file}}` and parses configuration. Configuration is parsed once in `apps/<app>/src/main.ts` and reaches a module through `register(options)`; read it here with `Inject<C>Options()`.",
-            moduleScope: "`{{name}}` returns configuration options and is called when the module loads. Options are built once in `main.ts` and injected with `Inject<C>Options()`.",
+            parsed: "`{{name}}` is declared by `{{file}}` and parses configuration. Configuration is parsed once in `apps/<app>/src/main.ts` or its matching `<app>.env.ts` and reaches a module through `register(options)`; receive typed options here.",
+            moduleScope: "`{{name}}` returns configuration options and is called when the module loads. Options are built once in `main.ts` or its matching `<app>.env.ts` and injected with `Inject<C>Options()`.",
         },
     },
     create(context) {
@@ -182,11 +184,13 @@ export const configParsedInMain = {
         if (isDeclarationFile(filename)) return {}
         const hfs = hfsOf(context)
         const slot = hfs.slotOf(filename) ?? ""
-        // the composition roots: the app entry and its `<app>.options.ts` (which `main.ts` calls to build `AppOptions`), the test world,
-        // and a provider contract spec (it registers one module with options parsed from the declared sandbox keys, as the world does)
-        const isEntry = slot.startsWith("be.app.") && (baseOf(filename) === "main.ts" || baseOf(filename).endsWith(OPTIONS_SUFFIX))
+        // The app entry and its matching env file parse options; options files and composition groups only consume them.
+        // The test world and provider contract specs parse the declared sandbox keys to register their modules.
+        const inApp = slot.startsWith("be.app.")
+        const role = appRoleOf(hfs, filename)?.entry
+        const isEntry = role === "main.ts" || role === APP_ENV_ROLE
         const isComposingTest = isTestWorld(hfs, filename) || slot === "be.tests.contract"
-        const isOwnSpec = baseOf(filename).endsWith(CONFIG_SPEC_SUFFIX)
+        const isOwnSpec = !inApp && baseOf(filename).endsWith(CONFIG_SPEC_SUFFIX)
         if (isEntry || isComposingTest || isOwnSpec) return {}
         const { checker, toTs } = typed(context)
         return {
@@ -194,11 +198,20 @@ export const configParsedInMain = {
                 const tsCall = toTs(node)
                 if (!tsCall) return
                 const signature = checker.getResolvedSignature(tsCall)
-                const declaration = functionDeclarationOf(signature?.declaration)
+                const resolvedDeclaration = signature?.declaration
+                if (inApp && resolvedDeclaration && ts.isMethodDeclaration(resolvedDeclaration)
+                    && ts.isClassDeclaration(resolvedDeclaration.parent) && resolvedDeclaration.parent.name?.text === "EnvSource") {
+                    const declaredIn = normalizePath(resolvedDeclaration.getSourceFile().fileName)
+                    if (isOwnedBy(hfs, declaredIn, "platform", "config")) {
+                        context.report({ node, messageId: "parsed", data: { name: context.sourceCode.getText(node.callee), file: baseOf(declaredIn) } })
+                        return
+                    }
+                }
+                const declaration = functionDeclarationOf(resolvedDeclaration)
                 if (!declaration) return
                 const declaredIn = normalizePath(declaration.getSourceFile().fileName)
                 const name = context.sourceCode.getText(node.callee)
-                if (isConfigFile(hfs, declaredIn)) {
+                if (isConfigFile(hfs, declaredIn) || appRoleOf(hfs, declaredIn)?.entry === APP_ENV_ROLE) {
                     if (declaredIn !== filename) context.report({ node, messageId: "parsed", data: { name, file: baseOf(declaredIn) } })
                     return
                 }

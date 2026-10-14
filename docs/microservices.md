@@ -6,7 +6,10 @@ policy the `starci app check` rules R163 to R168 enforce and the way the referen
 
 ## One place for a service
 
-Every back-end service is a Nest app at `be/apps/<service>/` (`main.ts`, `app.module.ts`, its options, its `compose/<area>.ts` groups, its `Dockerfile`). The apps
+Every back-end service is a Nest app at `be/apps/<service>/` (`main.ts`, `<service>.env.ts` for typed, fail-fast parsing,
+`<service>.options.ts` for env-derived values and port bindings, `app.module.ts`, its `compose/<area>.ts` groups, its `Dockerfile`).
+Only `main.ts` and `<service>.env.ts` may read the app's environment through `EnvSource` and capability parse helpers; the env
+file holds no logic, module composition, business code or feature imports, and the options file holds no parsing. The apps
 share the libraries under `be/src` (`features/`, `modules/{domain,integrations,platform}/`) and nothing else:
 
 - a folder with a `Dockerfile` or a `package.json` of its own outside `be/apps/<service>/` is a second service root and a finding

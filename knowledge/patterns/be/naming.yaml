@@ -62,7 +62,7 @@ rules:
         write: 'unit `commission.service.spec.ts` beside `commission.service.ts`; e2e `place-order.e2e-spec.ts` under be/src/tests/e2e/checkout/'
       - id: case-8
         when: App
-        write: 'main.ts, app.module.ts, api.options.ts'
+        write: 'main.ts, app.module.ts, api.env.ts, api.options.ts, compose/platform.ts'
     verification:
       automated:
         - HFS_SLOT_UNDECLARED

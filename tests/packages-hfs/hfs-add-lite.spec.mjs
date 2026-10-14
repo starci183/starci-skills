@@ -77,6 +77,10 @@ const repo = () => {
     path.join(root, "be", "apps", "api", "src", "main.ts"),
     'import { NestFactory } from "@nestjs/core"\nimport { parseHttpSecurityConfig } from "@modules/platform/http-security"\n\nconst env = {}\nconst options = { httpSecurity: parseHttpSecurityConfig(env) }\nvoid NestFactory.create(AppModule.register(options))\n',
   );
+  fs.writeFileSync(
+    path.join(root, "be", "apps", "api", "src", "api.env.ts"),
+    'import { parseHttpSecurityConfig } from "@modules/platform/http-security"\n\nexport const parseApiEnv = (env: EnvSource): ApiOptions => ({\n    httpSecurity: parseHttpSecurityConfig(env),\n})\n',
+  );
   return root;
 };
 const has = (root, relative) =>
@@ -482,8 +486,10 @@ test("lite add api emits full's GraphQL door, and api plus webhook transports ar
     /entityManager: EntityManager = this\.entityManager/,
   );
   const main = read(root, "be/apps/api/src/main.ts");
-  assert.match(main, /parseWebhookProviderConfig/);
-  assert.match(main, /calendar: parseWebhookProviderConfig\(env, "CALENDAR"\)/);
+  const env = read(root, "be/apps/api/src/api.env.ts");
+  assert.match(env, /parseWebhookProviderConfig/);
+  assert.match(env, /calendar: parseWebhookProviderConfig\(env, "CALENDAR"\)/);
+  assert.doesNotMatch(main, /parseWebhookProviderConfig/);
   assert.match(main, /rawBody: true/);
   const security = read(root, "be/src/modules/platform/http-security/index.ts");
   assert.match(security, /parseWebhookProviderConfig/);

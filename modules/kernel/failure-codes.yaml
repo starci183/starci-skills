@@ -521,7 +521,7 @@ BE_APP_BUSINESS_ROLE:
 BE_APP_COMPOSITION_ONLY:
   title: "Composition root has stray source"
   title_vi: "Gốc ghép nối có tệp lạc chỗ"
-  meaning_vi: "Mã trong ứng dụng gốc không phải tệp mà slot ứng dụng cho phép (main.ts, app.module.ts, <app>.options.ts, compose/<area>.ts; operations.ts ở ứng dụng API)."
+  meaning_vi: "Mã trong ứng dụng gốc không phải tệp mà slot ứng dụng cho phép (main.ts, app.module.ts, <app>.env.ts, <app>.options.ts, compose/<area>.ts; operations.ts ở ứng dụng API)."
   causes_vi:
     - "Thêm tệp không đúng tên vào thư mục ứng dụng gốc"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
@@ -529,9 +529,9 @@ BE_APP_COMPOSITION_ONLY:
   kind: check-finding
 
 BE_APP_OPTIONS_COMPOSITION:
-  title: "App options list modules, queues or schedulers"
+  title: "App env or options holds module, queue or scheduler composition"
   title_vi: "Tệp options của ứng dụng chứa danh sách module, queue hoặc scheduler"
-  meaning_vi: "`apps/<app>/src/<app>.options.ts` chứa một mảng module Nest (lớp `*Module`, lời gọi `X.register(...)`, `forRoot(...)`, `registerQueue(...)`), một mục queue hoặc scheduler (`*SchedulerOf(...)`), hoặc một danh sách `imports`, `modules`, `schedulers`, `processors`. Tệp options chỉ giữ các giá trị đọc từ môi trường và các ràng buộc cổng (map provider như `{ approvalGate: X }`); danh sách ghép nối thuộc về `compose/<area>.ts`."
+  meaning_vi: "`apps/<app>/src/<app>.env.ts` or `apps/<app>/src/<app>.options.ts` chứa một mảng module Nest (lớp `*Module`, lời gọi `X.register(...)`, `forRoot(...)`, `registerQueue(...)`), một mục queue hoặc scheduler (`*SchedulerOf(...)`), hoặc một danh sách `imports`, `modules`, `schedulers`, `processors`. Tệp options chỉ giữ các giá trị đọc từ môi trường và các ràng buộc cổng (map provider như `{ approvalGate: X }`); danh sách ghép nối thuộc về `compose/<area>.ts`. The env file allows typed, fail-fast parsing through EnvSource and capability parse helpers only and also refuses standalone module or queue registration calls; the options file holds env-derived values and port bindings with no parsing."
   causes_vi:
     - "Vi phạm luật R245: dồn danh sách module, queue hoặc scheduler vào <app>.options.ts để app.module.ts ngắn lại"
   nextStep_vi: "Chuyển danh sách vào `apps/<app>/src/compose/<area>.ts` (mỗi khu vực một nhóm, xuất mảng module của khu vực đó) và spread nhóm trong `app.module.ts`; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
@@ -541,7 +541,7 @@ BE_APP_OPTIONS_COMPOSITION:
 BE_APP_COMPOSITION_BUDGET:
   title: "An app composition file is over its line budget"
   title_vi: "Tệp ghép nối của ứng dụng vượt ngân sách dòng"
-  meaning_vi: "Một tệp ghép nối của ứng dụng vượt ngân sách dòng mà slot `be.app.*` đặt ra (`app.module.ts` 250, `<app>.options.ts` 200, `compose/<area>.ts` 120, `main.ts` 80). Ngân sách là tuyệt đối, không phải kiểu không-được-tăng."
+  meaning_vi: "Một tệp ghép nối của ứng dụng vượt ngân sách dòng mà slot `be.app.*` đặt ra (`app.module.ts` 250, `<app>.env.ts` 150, `<app>.options.ts` 200, `compose/<area>.ts` 120, `main.ts` 80). Ngân sách là tuyệt đối, không phải kiểu không-được-tăng."
   causes_vi:
     - "Vi phạm luật R246: mọi module của ứng dụng được liệt kê trực tiếp trong app.module.ts"
     - "Một nhóm compose/<area>.ts gom nhiều khu vực vào một tệp"

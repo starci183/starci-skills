@@ -26,7 +26,7 @@ const EXPECTED_LITE_FILES = Object.freeze([
   '.github/workflows/images.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.nvmrc', '.prettierignore',
   '.prettierrc', '.sops.yaml', '.starcistacks/dev/environment.json', '.starcistacks/dev/secrets/.gitkeep',
   'README.md',
-  'be/apps/api/Dockerfile', 'be/apps/api/src/api.options.ts', 'be/apps/api/src/app.module.ts', 'be/apps/api/src/compose/platform.ts', 'be/apps/api/src/main.ts',
+  'be/apps/api/Dockerfile', 'be/apps/api/src/api.env.ts', 'be/apps/api/src/api.options.ts', 'be/apps/api/src/app.module.ts', 'be/apps/api/src/compose/platform.ts', 'be/apps/api/src/main.ts',
   'be/eslint.config.mjs', 'be/jest.config.js', 'be/nest-cli.json',
   'be/src/features/api/system-health/application/check-liveness.contracts.ts',
   'be/src/features/api/system-health/application/check-liveness.handler.ts',
@@ -165,6 +165,12 @@ test('lite scaffold emits the brand-only Work tree and is structurally clean', a
   t.after(() => fs.rmSync(into, { recursive: true, force: true }));
   const { root, files } = scaffoldLite(into);
   assert.deepEqual(files, EXPECTED_LITE_FILES);
+  const entry = fs.readFileSync(path.join(root, 'be/apps/api/src/main.ts'), 'utf8');
+  const env = fs.readFileSync(path.join(root, 'be/apps/api/src/api.env.ts'), 'utf8');
+  assert.match(entry, /parseApiEnv\(env\)/);
+  assert.doesNotMatch(entry, /parse(?:Server|HttpSecurity|PrimaryDatabase|Supabase)Config/);
+  assert.match(env, /parseApiEnv = \(env: EnvSource\): ApiOptions/);
+  assert.doesNotMatch(env, /from "@features\/|\b\w+Module\b|\.(?:register|forRoot)\(/);
   assert.equal(fs.existsSync(path.join(root, '.starciwork')), false, 'the starter has no brand records, so no Work tree is required');
   const declaration = JSON.parse(fs.readFileSync(path.join(root, 'hfs.json'), 'utf8'));
   assert.deepEqual(declaration.supabase, {

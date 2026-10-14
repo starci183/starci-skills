@@ -3,7 +3,7 @@ id: be.config
 title: Backend configuration and secrets
 purpose: |-
   Given a value a backend needs from its environment, who reads it, who parses it and how does it reach the code that
-  uses it? One reader, one typed parse per capability in `main.ts`, options through the `Inject<Cap>Options()` injector, and
+  uses it? One reader, one typed parse per capability in `main.ts` or `<app>.env.ts`, options through the `Inject<Cap>Options()` injector, and
   no default for a secret, a credential or an address.
 appliesTo:
   - backend
@@ -34,7 +34,10 @@ rules:
       file contents take priority over `<KEY>`; an empty or unreadable path stops boot, without falling back or trimming
       the contents. Otherwise it reads `<KEY>`. It offers the typed readers `env.string`, `env.int`, `env.bool`, `env.url`, `env.secret`, `env.enum`, `env.duration`,
       `optional(...)` and `anyDeclared(keys)`. `be/apps/<app>/src/main.ts` builds `EnvSource` once and calls the capability
-      parsers into `AppOptions`. A module factory never reads the environment. `envConfig()`, `ConfigService`,
+      parsers inline or through `<app>.env.ts` (at most 150 lines), which holds typed, fail-fast parsing only: no logic, module
+      composition, business code or feature imports. These are the only app files that may read the environment.
+      `<app>.options.ts` holds env-derived values and port bindings, with no parsing; `main.ts` builds `AppOptions` from them.
+      A module factory and `compose/<area>.ts` never read the environment. `envConfig()`, `ConfigService`,
       `@nestjs/config`, dotenv or preload files and module-level config reads do not exist, and `platform/config` imports no
       domain or integration type.
     rationale: |-
@@ -43,6 +46,9 @@ rules:
       - id: case-1
         when: Bootstrap
         write: 'const env = EnvSource.fromProcess(); const options: AppOptions = { purchase: parsePurchaseConfig(env), identity: parseIdentityConfig(env) }; const app = await NestFactory.create(AppModule.register(options))'
+      - id: case-2
+        when: Capability parsing makes main.ts exceed its 80-line budget
+        write: 'api.env.ts exports parseApiEnv(env: EnvSource) with a typed result built only from capability parse helpers; main.ts calls it once, builds AppOptions from the parsed values and port bindings, and boots.'
     verification:
       automated:
         - BE_CONFIG_OWNER

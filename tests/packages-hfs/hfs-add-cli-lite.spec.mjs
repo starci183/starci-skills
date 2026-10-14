@@ -121,6 +121,7 @@ test("ensureLiteCli bootstraps the canonical app and groups once, registers conf
   for (const relative of [
     "be/apps/cli/src/main.ts",
     "be/apps/cli/src/app.module.ts",
+    "be/apps/cli/src/cli.env.ts",
     "be/apps/cli/src/cli.options.ts",
     "be/apps/cli/Dockerfile",
     "be/src/features/cli/migrate/subs/run.cli.ts",
@@ -178,6 +179,38 @@ test("ensureLiteCli bootstraps the canonical app and groups once, registers conf
     [],
   );
   assert.equal(fs.readFileSync(main, "utf8"), "// app-owned sentinel\n");
+});
+
+test("ensureLiteCli separates fail-fast environment parsing from its connection options", () => {
+  const root = appRoot();
+  ensureLiteCli({ root, manifest, repo: repoAt(root) });
+
+  const main = read(root, "be/apps/cli/src/main.ts");
+  const env = read(root, "be/apps/cli/src/cli.env.ts");
+  const options = read(root, "be/apps/cli/src/cli.options.ts");
+  assert.match(main, /from "\.\/cli\.env"/);
+  assert.match(main, /createCliAppOptions\(parseCliEnv\(EnvSource\.fromProcess\(\)\)\)/);
+  assert.equal((main.match(/EnvSource\.fromProcess\(\)/g) ?? []).length, 1);
+  assert.match(env, /parseCliEnv = \(env: EnvSource\): ReturnType<typeof parsePrimaryDatabaseConfig> => parsePrimaryDatabaseConfig\(env\)/);
+  assert.doesNotMatch(env, /import type \{ DatabaseConnectionConfig/);
+  assert.doesNotMatch(env, /@features\/|@modules\/domain\/|\b(?:register|forRoot)\s*\(|\b[A-Za-z]*Module\b/);
+  assert.match(options, /createCliAppOptions = \(primary: DatabaseConnectionOptions\): CliAppOptions/);
+  assert.match(options, /connections: \[primary\]/);
+  assert.doesNotMatch(options, /EnvSource|parsePrimaryDatabaseConfig|noteEntities|noteMigrations/);
+});
+
+test("the full cli template binds domain entities and migrations after environment parsing", () => {
+  const cli = "packages/hfs/templates/be/skeleton/apps/cli/src";
+  const env = read(ROOT, `${cli}/cli.env.ts`);
+  const options = read(ROOT, `${cli}/cli.options.ts`);
+  assert.equal(parses(env), true);
+  assert.equal(parses(options), true);
+  assert.match(env, /parsePrimaryDatabaseConfig\(env\)/);
+  assert.doesNotMatch(env, /noteEntities|noteMigrations/);
+  assert.match(options, /primaryConnectionOf = \(primary: DatabaseConnectionConfig\): DatabaseConnectionOptions/);
+  assert.match(options, /\.\.\.primary,[\s\S]*entities: noteEntities,[\s\S]*migrations: noteMigrations/);
+  assert.match(options, /connections: \[primaryConnectionOf\(primary\)\]/);
+  assert.doesNotMatch(options, /EnvSource|parsePrimaryDatabaseConfig/);
 });
 
 test("ensureLiteCli refuses undeclared or foreign cli trees instead of adopting them", () => {

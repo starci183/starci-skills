@@ -28,6 +28,20 @@ test('BE: NestFactory.create* outside an app main.ts is refused wherever it is',
   assert.deepEqual(hits(report).map(item => item.path).sort(), ['apps/core/src/other.ts', 'src/features/api/a/index.ts', 'src/tests/fixtures/boot.ts']);
 });
 
+test('BE: an admitted app environment file still cannot start a process', t => {
+  const report = runArch(archFixture(t, {
+    files: {
+      'apps/core/src/main.ts': MAIN,
+      'apps/core/src/app.module.ts': 'export class AppModule {}\n',
+      'apps/core/src/core.env.ts': "import { NestFactory } from '@nestjs/core';\nexport const boot = (module: unknown) => NestFactory.createApplicationContext(module);\ndeclare function bootstrap(): Promise<void>;\nvoid bootstrap();\n",
+    },
+  }));
+  const violations = hits(report);
+  assert.equal(violations.length, 2, JSON.stringify(violations));
+  assert.ok(violations.every(item => item.path === 'apps/core/src/core.env.ts'));
+  assert.deepEqual(findings(report, 'BE_APP_COMPOSITION_ONLY'), []);
+});
+
 test('BE: a top-level bootstrap() call outside main.ts is refused in its plain, void and chained forms', t => {
   const report = runArch(archFixture(t, {
     files: {

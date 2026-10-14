@@ -23,22 +23,38 @@ const repo = (t, options) => {
 test("app-composition-only: an app holds composition files only", (t) => {
     const f = repo(t, {
         files: {
-            "apps/core/src/main.ts": "import { AppModule } from './app.module';\nexport const boot = AppModule;\n",
+            "apps/core/src/main.ts": "import { AppModule } from './app.module';\nimport { env } from './core.env';\nexport const boot = { module: AppModule, env };\n",
             "apps/core/src/app.module.ts": "export class AppModule {}\n",
+            "apps/core/src/core.env.ts": "export const env = { port: 3000 };\n",
             "apps/core/src/core.options.ts": "export interface CoreOptions { readonly port: number }\n",
             "apps/core/src/other.options.ts": "export interface OtherOptions { readonly port: number }\n",
+            "apps/core/src/other.env.ts": "export const env = { port: 3000 };\n",
             "apps/core/src/pricing.ts": "export const price = (n: number) => n * 2;\n",
             "apps/core/src/leaky.service.ts": "export class LeakyService { run() { return 1 } }\n",
             "src/features/api/a/index.ts": "export const a = 1;\n",
         },
     })
     f.tester.run("app-composition-only", rules["app-composition-only"], {
-        valid: ok(f, ["apps/core/src/main.ts", "apps/core/src/app.module.ts", "apps/core/src/core.options.ts", "src/features/api/a/index.ts"]),
+        valid: ok(f, ["apps/core/src/main.ts", "apps/core/src/app.module.ts", "apps/core/src/core.env.ts", "apps/core/src/core.options.ts", "src/features/api/a/index.ts"]),
         invalid: [...bad(f, [
             ["apps/core/src/pricing.ts", [1, /BE_APP_COMPOSITION_ONLY/]],
             ["apps/core/src/other.options.ts", [1, /BE_APP_COMPOSITION_ONLY/]],
+            ["apps/core/src/other.env.ts", [1, /BE_APP_COMPOSITION_ONLY/]],
             ["apps/core/src/leaky.service.ts", [1, /BE_APP_BUSINESS_ROLE/]],
         ])],
+    })
+})
+
+test("app-composition-only: an app env parser imports no feature", (t) => {
+    const f = repo(t, {
+        files: {
+            "apps/core/src/core.env.ts": "import { feature } from '../../../src/features/api/a';\nexport const env = { feature };\n",
+            "src/features/api/a/index.ts": "export const feature = 1;\n",
+        },
+    })
+    f.tester.run("app-composition-only", rules["app-composition-only"], {
+        valid: ok(f, ["apps/core/src/main.ts", "apps/core/src/app.module.ts", "src/features/api/a/index.ts"]),
+        invalid: bad(f, [["apps/core/src/core.env.ts", [1, /BE_APP_COMPOSITION_ONLY/]]]),
     })
 })
 
@@ -52,6 +68,7 @@ test("entrypoint-only-in-apps: NestFactory and bootstrap() live in an app main f
             "src/features/api/a/index.ts": "import { NestFactory } from '@nestjs/core';\nexport const start = (module: unknown) => NestFactory.createApplicationContext(module);\n",
             "src/tests/fixtures/boot.ts": "import * as nest from '@nestjs/core';\nexport const boot = (module: unknown) => nest.NestFactory.create(module);\n",
             "apps/core/src/other.ts": "import { NestFactory as Factory } from '@nestjs/core';\nexport const other = (module: unknown) => Factory.createMicroservice(module);\n",
+            "apps/core/src/core.env.ts": boot,
             "src/features/api/a/one.ts": "declare function bootstrap(): Promise<void>;\nbootstrap();\n",
             "src/features/api/a/two.ts": "declare function bootstrap(): Promise<void>;\nvoid bootstrap();\n",
             "src/features/api/a/three.ts": "declare function bootstrap(): Promise<void>;\nbootstrap().catch(() => undefined);\n",
@@ -71,6 +88,7 @@ test("entrypoint-only-in-apps: NestFactory and bootstrap() live in an app main f
             ["src/features/api/a/index.ts", 2],
             ["src/tests/fixtures/boot.ts", 2],
             ["apps/core/src/other.ts", 2],
+            ["apps/core/src/core.env.ts", 2],
             ["src/features/api/a/one.ts", 2],
             ["src/features/api/a/two.ts", 2],
             ["src/features/api/a/three.ts", 2],

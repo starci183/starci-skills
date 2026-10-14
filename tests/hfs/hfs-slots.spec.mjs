@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { braceVariants } from '../../scripts/lib/glob.mjs';
+import { allowsFile } from '../../scripts/hfs/allows.mjs';
 import { HfsSlotsError, appRelativeMessages, loadSlotManifest, ruleParams, openHfs, readRepoDeclaration, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
 
 // The slot manifest (knowledge/hfs/slots.yaml) and its resolver. A product is ONE app: the app root holds the slots of profile app
@@ -40,6 +41,25 @@ test('the shipped manifest validates against its JSON schema and the loader', ()
     if (slot.profiles.includes('app')) assert.deepEqual(slot.profiles, ['app'], `${slot.id}: a slot of the app root belongs to no side`);
   }
   assert.equal(new Set(manifest.slots.map((s) => s.id)).size, manifest.slots.length);
+});
+
+test('every back-end app kind allows its own env file with the 150-line app budget in both editions', () => {
+  const manifest = loadSlotManifest();
+  const appSlots = manifest.slots.filter((slot) => slot.id.startsWith('be.app.'));
+  assert.deepEqual(appSlots.map((slot) => slot.appKind).sort(), [...manifest.appKinds.be].sort());
+  for (const slot of appSlots) {
+    assert.ok(slot.allows.includes('<app>.env.ts'), `${slot.id} allows an env file`);
+    assert.equal(slot.requires.includes('<app>.env.ts'), false, `${slot.id}: the env file is optional`);
+    assert.deepEqual(slot.budget, { 'app.module.ts': 250, 'main.ts': 80, '<app>.env.ts': 150, '<app>.options.ts': 200, 'compose/<area>.ts': 120 });
+    const appName = BE_SIDE.apps.find((entry) => entry.kind === slot.appKind).name;
+    for (const edition of ['full', 'lite']) {
+      const resolver = sideOf(app({ edition }), 'be');
+      const file = `apps/${appName}/src/${appName}.env.ts`;
+      assert.equal(resolver.classifyPath(file).slot, slot.id, `${edition}: ${file}`);
+      assert.equal(allowsFile(resolver, file).allowed, true, `${edition}: ${file} is allowed`);
+      assert.equal(allowsFile(resolver, `apps/${appName}/src/another.env.ts`).allowed, false, `${edition}: an env file uses its app name`);
+    }
+  }
 });
 
 test('schema and loader agree on a broken manifest', () => {

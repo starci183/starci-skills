@@ -4,28 +4,13 @@
  * or an extra statement still goes through the clone check.
  */
 import { nameText } from '../../lib/ts-ast.mjs';
+import { importsOf, unwrapExpression } from '../../lib/ts-analysis.mjs';
 import { nodeDecorators } from './ast-walks.mjs';
 import { canonJsxCloneNodes } from './canon-jsx-clones.mjs';
 
 const READ_METHODS = new Set(['find', 'findBy', 'findAndCount', 'findOne', 'findOneBy', 'findOneOrFail', 'findOneByOrFail']);
 
-const unwrap = (ts, node) => {
-  let current = node;
-  while (current && (ts.isParenthesizedExpression(current) || ts.isAsExpression(current)
-    || ts.isSatisfiesExpression(current) || ts.isNonNullExpression(current) || ts.isAwaitExpression(current))) current = current.expression;
-  return current;
-};
-
-function importsOf(ts, sourceFile) {
-  const imports = new Map();
-  for (const statement of sourceFile.statements) {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteralLike(statement.moduleSpecifier)) continue;
-    const bindings = statement.importClause?.namedBindings;
-    if (!bindings || !ts.isNamedImports(bindings)) continue;
-    for (const binding of bindings.elements) imports.set(binding.name.text, { name: (binding.propertyName ?? binding.name).text, source: statement.moduleSpecifier.text });
-  }
-  return imports;
-}
+const unwrap = (ts, node) => unwrapExpression(ts, node, { awaitExpressions: true, typeAssertions: false });
 
 const imported = (env, node, name, source) => {
   if (!node || !env.ts.isIdentifier(node)) return false;
@@ -214,7 +199,7 @@ function queueDefinition(env, node) {
 }
 
 function canonEnvironment(ts, sourceFile) {
-  const env = { ts, imports: importsOf(ts, sourceFile), mappers: new Set(), topLevelVariables: new Set(), topLevelClasses: new Set(sourceFile.statements.filter(ts.isClassDeclaration)) };
+  const env = { ts, imports: importsOf(ts, sourceFile, { moduleKey: 'source', stringLiteralsOnly: true }), mappers: new Set(), topLevelVariables: new Set(), topLevelClasses: new Set(sourceFile.statements.filter(ts.isClassDeclaration)) };
   for (const statement of sourceFile.statements) {
     if (!ts.isVariableStatement(statement)) continue;
     for (const variable of statement.declarationList.declarations) {

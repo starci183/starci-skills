@@ -247,16 +247,21 @@ rules:
         - Confirm the spec asserts the error code of each refusal, not only a status.
     relatedExamples: [api]
   - id: BE-API-4
-    title: An api app composes in area groups; its options hold env-derived values and port bindings only
+    title: An api app parses env separately and composes in area groups; its options hold values and port bindings only
     kind: mandatory
     hfsRules: [R245, R246, R32, R45, R43]
     requirement: |-
-      An app's `src/` (slot `be.app.api`, and alike `be.app.worker` and `be.app.cli`) holds four composition roles, each within the
+      An app's `src/` (slot `be.app.api`, and alike `be.app.worker` and `be.app.cli`) holds five app roles, each within the
       line budget its slot names (owner ruling 2026-10-14):
-      - `main.ts` (80 lines) reads the environment once (`EnvSource`), builds the options and boots the app.
-      - `<app>.options.ts` (200) is what the app reads from its environment plus its port bindings: provider maps such as
-        `{ approvalGate: ApprovalGateAdapter }`. It never holds an array of Nest modules, queue registrations or scheduler
-        entries, and no `imports`, `modules`, `schedulers` or `processors` list (`BE_APP_OPTIONS_COMPOSITION`).
+      - `main.ts` (80 lines) builds `EnvSource` once, parses inline or imports `<app>.env.ts`, builds the options and boots the app.
+      - `<app>.env.ts` (150) holds typed, fail-fast environment parsing only, via the app's `EnvSource` and capability parse
+        helpers. It holds no logic, module composition, business code or feature imports. Only this app file and `main.ts` may
+        read the environment; the `platform/config` owner remains the only code that touches `process.env`.
+      - `<app>.options.ts` (200) holds the env-derived values plus its port bindings: provider maps such as
+        `{ approvalGate: ApprovalGateAdapter }`, with no environment parsing. Neither it nor `<app>.env.ts` holds an array
+        listing `*Module` classes, module or queue registrations (`register`, `forRoot`, `registerQueue`) or scheduler entries,
+        or an `imports`, `modules`, `schedulers` or `processors` list. The env file also refuses standalone module or queue
+        registration calls (`BE_APP_OPTIONS_COMPOSITION`).
       - `compose/<area>.ts` (120) is a composition group: it exports the module list of one area of the app (the platform, the
         background mechanisms with their message and queue doors, a product area), as a function of the options when it needs
         them, and the providers of the area's global ports when it has any. It is composition only: no business logic, no
@@ -265,11 +270,11 @@ rules:
       - `app.module.ts` (250) imports the groups and spreads them into its `imports` (`...platformModules(options)`), registers
         what is left, and binds the app-wide guards and filter.
       A file over its budget is `BE_APP_COMPOSITION_BUDGET`; the budget is absolute, so an app root that outgrows 250 lines
-      moves an area into a new group, never into the options.
+      moves an area into a new group, never into the env or options file. An entrypoint over 80 moves its parsing into the env file.
     rationale: |-
       A long app root invites moving its module lists into the options file, which then mixes configuration with composition
       and grows without a bound. One group per area keeps each composition reviewable, the options pure data, and the root a
-      table of contents.
+      table of contents. The env file keeps typed, fail-fast parsing visible while the entrypoint stays within 80 lines.
     cases:
       - id: case-1
         when: A new api app is scaffolded
@@ -280,6 +285,9 @@ rules:
       - id: case-3
         when: 'api.options.ts exports `modules: [...]`, a `BullModule.registerQueue(...)` list or `schedulers: [orderExpirySchedulerOf(...)]`'
         write: 'Refused (BE_APP_OPTIONS_COMPOSITION): keep only the parsed values (orderExpiry: { everyMs, olderThanMs }) and the port map in the options; the list goes into compose/<area>.ts.'
+      - id: case-4
+        when: main.ts exceeds 80 lines because it calls many capability config parsers
+        write: 'Move only typed, fail-fast parsing into api.env.ts (at most 150 lines), pass EnvSource to it from main.ts, and build AppOptions from its parsed values and the port bindings. No module list or feature import goes into api.env.ts.'
     verification:
       automated:
         - BE_APP_OPTIONS_COMPOSITION

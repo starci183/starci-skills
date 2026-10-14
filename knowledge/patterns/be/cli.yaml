@@ -41,8 +41,10 @@ rules:
       nest-commander and never serves: no `NestFactory.create*`, no `.listen()`, no microservice connection, no
       `@nestjs/platform-*` adapter and no `@nestjs/microservices`. `apps/cli/src/app.module.ts` composes the platform modules
       the commands need (the database capability over every connection with its entities and migrations, like an api app) and
-      the static cli feature root module `CliModule`; `apps/cli/src/cli.options.ts` carries what the cli reads from the
-      environment, the connections it migrates among them.
+      the static cli feature root module `CliModule`; `main.ts` can delegate typed, fail-fast parsing through `EnvSource` and
+      capability parse helpers to `apps/cli/src/cli.env.ts` (at most 150 lines), with no logic, module composition, business
+      code or feature imports. Only these two app files may read the environment. `apps/cli/src/cli.options.ts` carries the
+      env-derived values and port bindings, the connections it migrates among them, with no parsing.
     rationale: |-
       One image for every operator action gives one place to find, deploy and audit them, and a process that never listens
       cannot become a second, unguarded door into the application.
@@ -52,7 +54,9 @@ rules:
         write: |-
           // be/apps/cli/src/main.ts
           async function bootstrap(): Promise<void> {
-              await CommandFactory.run(AppModule.register(parseCliOptions(EnvSource.fromProcess())), new JsonLinesLogger())
+              const env = EnvSource.fromProcess()
+              const options = createCliAppOptions(parseCliEnv(env))
+              await CommandFactory.run(AppModule.register(options), new JsonLinesLogger())
           }
           void bootstrap()
       - id: case-2
@@ -196,10 +200,18 @@ files:
   - path: apps/cli/src/cli.options.ts
     slot: be.app.cli
     optional: true
-    role: what the cli reads from the environment, the connection list it migrates among them
+    role: env-derived values and port bindings without parsing, the connection list it migrates among them
     rules:
       - BE_CLI_REQUIRED
       - BE_SCHEMA_AUTHORITY
+  - path: apps/cli/src/cli.env.ts
+    slot: be.app.cli
+    optional: true
+    role: typed, fail-fast parsing through EnvSource and capability parse helpers only; no logic, composition, business code or feature imports
+    rules:
+      - BE_CONFIG_OWNER
+      - BE_APP_OPTIONS_COMPOSITION
+      - BE_APP_COMPOSITION_BUDGET
   - path: src/features/cli/index.ts
     slot: be.cli
     optional: true

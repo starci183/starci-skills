@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { isInside } from './config.mjs';
-import { slotAdmitsFile } from '../allows.mjs';
+import { allowsFile, slotAdmitsFile } from '../allows.mjs';
 import { reachableViolation, relativePath } from './typescript.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
@@ -376,8 +376,20 @@ function checkApplicationComposition(config, ts, sourceFile, fileName, app, viol
       path: relativePath(config.root, fileName),
       line: 1,
       column: 1,
-      message: `Application source ${app.relative} is not a file its app slot requires or allows (main.ts, app.module.ts, <app>.options.ts, compose/<area>.ts).`,
+      message: `Application source ${app.relative} is not a file its app slot requires or allows (main.ts, app.module.ts, <app>.env.ts, <app>.options.ts, compose/<area>.ts).`,
     });
+  }
+}
+
+/** The app's environment parser never depends on features, even through a type import or an internal barrel. */
+function checkApplicationEnvEdges(config, context, fileName, violations) {
+  const role = allowsFile(config.hfs, relativePath(config.root, fileName));
+  if (!role?.allowed || role.entry !== '<app>.env.ts') return;
+  const isFeature = target => config.hfs.tierOf(relativePath(config.root, target)) === 'feature';
+  for (const edge of context.edges.get(fileName) ?? []) {
+    const featureChain = reachableViolation(context.edges, edge, isFeature);
+    if (featureChain) violations.push(finding(config, edge, 'BE_APP_COMPOSITION_ONLY',
+      'The app environment file holds typed, fail-fast environment parsing only; it cannot depend on features, including through a type import or an internal barrel.', featureChain));
   }
 }
 
@@ -409,7 +421,10 @@ function checkBackendSource(config, context, sourceFiles, roots, sourceFile, vio
   const fromFeatures = insideAny(featureRoots, fileName);
   const fromApplication = fromFeatures && insideFeatureLayer(featureRoots, fileName, 'application');
   const app = !fromModules && !fromFeatures ? appSource(config, fileName, nonAppRoots) : null;
-  if (app) checkApplicationComposition(config, context.ts, sourceFile, fileName, app, violations);
+  if (app) {
+    checkApplicationComposition(config, context.ts, sourceFile, fileName, app, violations);
+    checkApplicationEnvEdges(config, context, fileName, violations);
+  }
   if (!fromModules && !fromFeatures) return;
   if (fromApplication) checkApplicationTransport(config, context, sourceFile, fileName, violations);
   if (fromApplication) checkFeatureTransportEdges(config, context, sourceFiles, featureRoots, fileName, violations);

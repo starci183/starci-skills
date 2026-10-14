@@ -1,13 +1,9 @@
 /** Imported JSX components receive repeated data contracts; executable prop values remain compared. */
+import { unwrapExpression as unwrap } from '../../lib/ts-analysis.mjs';
+
 const TRANSLATION_MODULES = new Set(['next-intl', 'next-intl/server']);
 const TRANSLATION_FACTORIES = new Set(['useTranslations', 'getTranslations']);
 const uppercase = (name) => /^[A-Z]/.test(name);
-
-function unwrap(ts, node) {
-  while (node && (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)
-    || ts.isNonNullExpression(node) || ts.isSatisfiesExpression?.(node))) node = node.expression;
-  return node;
-}
 
 function bindName(ts, scope, name, binding) {
   if (ts.isIdentifier(name)) scope.bindings.set(name.text, binding);
