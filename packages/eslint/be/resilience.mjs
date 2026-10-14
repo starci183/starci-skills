@@ -8,10 +8,10 @@
  * - `no-hand-rolled-retry` (R81 `BE_HAND_ROLLED_RETRY`): a loop that catches an error and waits before trying
  *   again re-implements retry by hand, outside `platform/retry`'s bounded, jittered, abortable helper.
  *
- * A call whose options are not an object literal cannot be judged from syntax, so it is left alone.
+ * A config held in a variable or returned by a helper proves its deadline through its type.
  */
 import ts from "typescript"
-import { keyName, walk } from "./lib/ast.mjs"
+import { keyName, staticText, walk } from "./lib/ast.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { isOwnedBy } from "./lib/ports.mjs"
 import { isPackageType, isTypeNamed, typed } from "./lib/types.mjs"
@@ -25,10 +25,47 @@ const HTTP_CLIENT_TYPES = Object.freeze([["AxiosInstance", "axios"], ["AxiosStat
 /** Whether the node's TYPE is an outbound HTTP client (an axios instance or the Nest `HttpService`), whatever it is called. */
 const isHttpClient = (context, node) => HTTP_CLIENT_TYPES.some(([name, pkg]) => isPackageType(context, node, name, pkg))
 
-const hasKey = (objectNode, names) =>
-  objectNode.properties.some((property) => property.type === "Property" && names.includes(keyName(property.key)))
-
 const hasSpread = (objectNode) => objectNode.properties.some((property) => property.type === "SpreadElement")
+
+/** A deadline value cannot be absent in any branch of its type. */
+const mayBeAbsent = (type) => type.isUnion()
+  ? type.types.some(mayBeAbsent)
+  : (type.flags & (ts.TypeFlags.Undefined | ts.TypeFlags.Null | ts.TypeFlags.Void)) !== 0
+
+/** A non-literal config promises a present deadline in every possible branch, including a generic's constraint. */
+const typeHasDeadline = (checker, type, atNode, names) => {
+  if ((type.flags & ts.TypeFlags.TypeParameter) !== 0) {
+    const constraint = checker.getBaseConstraintOfType(type)
+    return Boolean(constraint && constraint !== type) && typeHasDeadline(checker, constraint, atNode, names)
+  }
+  if (type.isUnion()) return type.types.every((part) => typeHasDeadline(checker, part, atNode, names))
+  if ((type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never)) !== 0 || mayBeAbsent(type)) return false
+  return names.some((name) => {
+    const property = checker.getPropertyOfType(type, name)
+    if (!property || (property.flags & ts.SymbolFlags.Optional) !== 0) return false
+    const valueType = checker.getTypeOfSymbolAtLocation(property, atNode)
+    return !mayBeAbsent(valueType) && (valueType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never)) === 0
+  })
+}
+
+/** Literal keys state a deadline directly; other configs must prove it with a required, present typed member. */
+const hasDeadline = (context, config, names) => {
+  if (!config) return false
+  const { checker, toTs } = typed(context)
+  if (config.type === "ObjectExpression" && !hasSpread(config)) {
+    return names.some((name) => {
+      const property = config.properties.findLast((entry) => entry.type === "Property"
+        && (entry.computed ? staticText(entry.key) : keyName(entry.key)) === name)
+      if (!property) return false
+      let expression = property.value
+      while (["TSAsExpression", "TSTypeAssertion", "TSNonNullExpression", "TSSatisfiesExpression"].includes(expression.type)) expression = expression.expression
+      const value = toTs(expression)
+      return Boolean(value) && !mayBeAbsent(checker.getTypeAtLocation(value))
+    })
+  }
+  const configNode = toTs(config)
+  return Boolean(configNode) && typeHasDeadline(checker, checker.getTypeAtLocation(configNode), configNode, names)
+}
 
 /** Every outbound HTTP call carries a deadline. */
 export const httpNeedsTimeout = {
@@ -53,11 +90,7 @@ export const httpNeedsTimeout = {
         const { callee } = node
         if (callee.type === "Identifier" && callee.name === "fetch") {
           const init = node.arguments[1]
-          if (!init) {
-            context.report({ node, messageId: "fetchNoSignal" })
-          } else if (init.type === "ObjectExpression" && !hasSpread(init) && !hasKey(init, ["signal"])) {
-            context.report({ node, messageId: "fetchNoSignal" })
-          }
+          if (!hasDeadline(context, init, ["signal"])) context.report({ node, messageId: "fetchNoSignal" })
           return
         }
         if (callee.type !== "MemberExpression" || callee.computed || callee.property.type !== "Identifier") return
@@ -66,7 +99,7 @@ export const httpNeedsTimeout = {
         const receiver = callee.object.type === "Identifier" ? callee.object.name : "client"
         if (method === "create" && isPackageType(context, callee.object, "AxiosStatic", "axios")) {
           const config = node.arguments[0]
-          if (!config || (config.type === "ObjectExpression" && !hasSpread(config) && !hasKey(config, ["timeout", "signal"]))) {
+          if (!hasDeadline(context, config, ["timeout", "signal"])) {
             context.report({ node, messageId: "createNoTimeout" })
           }
           return
@@ -74,9 +107,7 @@ export const httpNeedsTimeout = {
         if (!HTTP_METHODS.has(method)) return
         const configAt = method === "request" ? 0 : ["post", "put", "patch"].includes(method) ? 2 : 1
         const config = node.arguments[configAt]
-        if (config === undefined) {
-          context.report({ node, messageId: "clientNoTimeout", data: { call: `${receiver}.${method}` } })
-        } else if (config.type === "ObjectExpression" && !hasSpread(config) && !hasKey(config, ["timeout", "signal"])) {
+        if (!hasDeadline(context, config, ["timeout", "signal"])) {
           context.report({ node, messageId: "clientNoTimeout", data: { call: `${receiver}.${method}` } })
         }
       },

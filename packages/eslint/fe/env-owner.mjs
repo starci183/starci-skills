@@ -52,6 +52,101 @@ const URL_TEXT = /^(?:https?:)?\/\/\S+/i
 /** Variable names whose value is a secret or an address: a default for one is a hole in a deployment. */
 const SENSITIVE_NAME = /(?:SECRET|TOKEN|PASSWORD|PASSWD|API_?KEY|PRIVATE_?KEY|URL|URI|HOST|ENDPOINT|ORIGIN)$/i
 
+/** Type assertions and optional chains preserve the identity of the wrapped value. */
+const unwrapped = (node) => {
+  while (node && ["TSAsExpression", "TSTypeAssertion", "TSNonNullExpression", "TSSatisfiesExpression", "ChainExpression"].includes(node.type)) node = node.expression
+  return node
+}
+
+/** The binding of this identifier, rather than every variable with the same spelling. */
+const bindingOf = (sourceCode, identifier) => {
+  for (let scope = sourceCode.getScope(identifier); scope; scope = scope.upper) {
+    const variable = scope.set.get(identifier.name)
+    if (variable) return variable
+  }
+  return null
+}
+
+/** Prior writes in the use's execution scope or its parents; a closure can capture a later initializer. */
+const writeBefore = (sourceCode, variable, node) => {
+  const scopes = new Set()
+  for (let scope = sourceCode.getScope(node); scope; scope = scope.upper) scopes.add(scope.variableScope)
+  const writes = variable.references.filter((reference) => reference.isWrite()
+    && scopes.has(reference.from.variableScope)
+    && !(reference.writeExpr && reference.writeExpr.range[0] <= node.range[0] && node.range[1] <= reference.writeExpr.range[1]))
+  return writes
+    .filter((reference) => reference.identifier.range[0] < node.range[0])
+    .sort((left, right) => right.identifier.range[0] - left.identifier.range[0])[0]
+    ?? writes.find((reference) => reference.init)
+}
+
+/** Property extraction between a write's source and its destructured binding. */
+const propertyPath = (identifier) => {
+  const properties = []
+  for (let node = identifier; node.parent; node = node.parent) {
+    const parent = node.parent
+    if (parent.type === "Property" && parent.value === node) properties.unshift(parent)
+    else if (parent.type !== "ObjectPattern" && !(parent.type === "AssignmentPattern" && parent.left === node)) break
+  }
+  return properties
+}
+
+/** Known environment containers and constant computed keys, followed through local aliases. */
+const environmentIdentity = (sourceCode) => {
+  const textOf = (node, seen = new Set()) => {
+    node = unwrapped(node)
+    if (!node || seen.has(node)) return null
+    if (node.type === "Literal" && typeof node.value === "string") return node.value
+    if (node.type === "TemplateLiteral" && node.expressions.length === 0) return node.quasis[0].value.cooked
+    if (node.type !== "Identifier") return null
+    const variable = bindingOf(sourceCode, node)
+    if (!variable) return null
+    const write = writeBefore(sourceCode, variable, node)
+    if (!write?.writeExpr || propertyPath(write.identifier).length > 0) return null
+    return textOf(write.writeExpr, new Set([...seen, node]))
+  }
+  const keyOf = (node) => node.computed ? textOf(node.key ?? node.property) : (node.key ?? node.property).name ?? (node.key ?? node.property).value
+  const propertyKind = (kind, key) => {
+    if (kind === "global" && key === "process") return "process"
+    if ((kind === "process" || kind === "meta") && key === "env") return "env"
+    return null
+  }
+  const kindOf = (node, seen = new Set()) => {
+    node = unwrapped(node)
+    if (!node || seen.has(node)) return null
+    if (node.type === "MetaProperty" && node.meta.name === "import" && node.property.name === "meta") return "meta"
+    if (node.type === "MemberExpression") return propertyKind(kindOf(node.object, new Set([...seen, node])), keyOf(node))
+    if (node.type !== "Identifier") return null
+    const variable = bindingOf(sourceCode, node)
+    if (!variable || variable.defs.length === 0) {
+      if (node.name === "process") return "process"
+      return ["globalThis", "global"].includes(node.name) ? "global" : null
+    }
+    const imported = variable.defs.find((definition) => definition.type === "ImportBinding" && ["process", "node:process"].includes(definition.parent.source.value))
+    if (imported) {
+      if (imported.parent.importKind === "type" || imported.node.importKind === "type") return null
+      if (imported.node.type !== "ImportSpecifier") return "process"
+      const name = imported.node.imported.name ?? imported.node.imported.value
+      return name === "default" ? "process" : name === "env" ? "env" : null
+    }
+    const write = writeBefore(sourceCode, variable, node)
+    if (!write?.writeExpr) return null
+    let kind = kindOf(write.writeExpr, new Set([...seen, node]))
+    for (const property of propertyPath(write.identifier)) kind = propertyKind(kind, keyOf(property))
+    return kind
+  }
+  const readsEnv = (pattern, kind) => {
+    if (pattern.type === "AssignmentPattern") return readsEnv(pattern.left, kind)
+    if (pattern.type !== "ObjectPattern") return false
+    return pattern.properties.some((property) => {
+      if (property.type !== "Property") return false
+      const valueKind = propertyKind(kind, keyOf(property))
+      return valueKind === "env" || readsEnv(property.value, valueKind)
+    })
+  }
+  return { kindOf, readsEnv }
+}
+
 // -- FE-ENV-1 --------------------------------------------------------------------------------------
 
 /** Only `modules/config` reads the environment. */
@@ -66,20 +161,36 @@ export const noEnvOutsideConfig = {
     },
   },
   create(context) {
-    const filename = context.filename || context.getFilename()
     if (isConfigModule(context)) return {}
+    const members = []
+    const destructures = []
     return {
+      ImportDeclaration(node) {
+        if (node.importKind === "type" || !["process", "node:process"].includes(node.source.value)) return
+        for (const specifier of node.specifiers) {
+          if (specifier.type === "ImportSpecifier" && specifier.importKind !== "type" && (specifier.imported.name ?? specifier.imported.value) === "env") context.report({ node: specifier, messageId: "env" })
+        }
+      },
       MemberExpression(node) {
-        if (isEnvObject(node)) context.report({ node, messageId: "env" })
+        members.push(node)
       },
       VariableDeclarator(node) {
-        // `const { env } = process` reads the environment without the member expression.
-        if (node.id.type !== "ObjectPattern" || !node.init) return
-        if (node.init.type !== "Identifier" || node.init.name !== "process") return
-        const reads = node.id.properties.some(
-          (property) => property.type === "Property" && property.key.type === "Identifier" && property.key.name === "env",
-        )
-        if (reads) context.report({ node, messageId: "env" })
+        if (node.id.type === "ObjectPattern" && node.init) destructures.push({ node, pattern: node.id, value: node.init })
+      },
+      AssignmentExpression(node) {
+        if (node.operator === "=" && node.left.type === "ObjectPattern") destructures.push({ node, pattern: node.left, value: node.right })
+      },
+      AssignmentPattern(node) {
+        if (node.left.type === "ObjectPattern") destructures.push({ node, pattern: node.left, value: node.right })
+      },
+      "Program:exit"() {
+        const { kindOf, readsEnv } = environmentIdentity(context.sourceCode ?? context.getSourceCode())
+        for (const node of members) {
+          if (kindOf(node) === "env") context.report({ node, messageId: "env" })
+        }
+        for (const { node, pattern, value } of destructures) {
+          if (readsEnv(pattern, kindOf(value))) context.report({ node, messageId: "env" })
+        }
       },
     }
   },

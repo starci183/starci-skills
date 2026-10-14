@@ -40,14 +40,6 @@ const PROCESS_MODULES = new Set(["process", "node:process"])
 /** `@nestjs/config`, `dotenv` and their subpaths. */
 const isConfigPackage = (source) => /^(?:@nestjs\/config|dotenv)(?:\/|$)/.test(source)
 
-/** `globalThis.process` and `global.process`. */
-const isGlobalProcess = (node) =>
-    node.type === "MemberExpression" &&
-    !node.computed &&
-    keyName(node.property) === "process" &&
-    node.object.type === "Identifier" &&
-    (node.object.name === "globalThis" || node.object.name === "global")
-
 /** True when the property of a member expression spells `env`. */
 const spellsEnv = (node) => (node.computed ? staticText(node.property) === "env" : keyName(node.property) === "env")
 
@@ -69,15 +61,49 @@ export const noDirectEnvRead = {
         const hfs = hfsOf(context)
         const inConfigOwner = isOwnedBy(hfs, filename, "platform", "config")
         let declaresEnvSource = false
-        const processNames = new Set(["process"])
-        const isLocal = (identifier) => {
+        const variableOf = (identifier) => {
             for (let scope = context.sourceCode.getScope(identifier); scope; scope = scope.upper) {
                 const variable = scope.set.get(identifier.name)
-                if (variable) return variable.defs.length > 0 && !variable.defs.every((definition) => definition.type === "ImportBinding")
+                if (variable) return variable
             }
-            return false
+            return null
         }
-        const isProcess = (node) => (node.type === "Identifier" && processNames.has(node.name) && !isLocal(node)) || isGlobalProcess(node)
+        const isGlobal = (node) => node?.type === "Identifier" && ["globalThis", "global"].includes(node.name) && !variableOf(node)?.defs.length
+        // Resolve aliases by their lexical binding: an identically named local or parameter is not Node's process.
+        const isProcess = (node, seen = new Set()) => {
+            if (!node) return false
+            if (["TSAsExpression", "TSTypeAssertion", "TSNonNullExpression", "TSSatisfiesExpression", "ChainExpression"].includes(node.type)) return isProcess(node.expression, seen)
+            if (node.type === "MemberExpression") {
+                return isGlobal(node.object) && (node.computed ? staticText(node.property) : keyName(node.property)) === "process"
+            }
+            if (node.type !== "Identifier") return false
+            const variable = variableOf(node)
+            if (!variable?.defs.length) return node.name === "process"
+            if (seen.has(node)) return false
+            seen.add(node)
+            return variable.defs.some((definition) => {
+                if (definition.type === "ImportBinding") {
+                    const specifier = definition.node
+                    return PROCESS_MODULES.has(definition.parent.source.value)
+                        && (specifier.type !== "ImportSpecifier" || keyName(specifier.imported) === "default")
+                }
+                if (definition.type !== "Variable") return false
+                const readScope = context.sourceCode.getScope(node).variableScope
+                const write = variable.references.filter((reference) => reference.isWrite()
+                    && [readScope, variable.scope.variableScope].includes(reference.from.variableScope)
+                    && reference.writeExpr?.range[1] <= node.range[0])
+                    .sort((left, right) => right.identifier.range[0] - left.identifier.range[0])[0]
+                // A const captured by a function keeps its initializer even when the function is declared first.
+                const source = write?.writeExpr ?? (definition.parent.kind === "const" ? definition.node.init : null)
+                if (!source) return false
+                const identifier = write?.identifier ?? definition.name
+                const parent = identifier.parent
+                if (parent.type === "Property" && parent.value === identifier && parent.parent.type === "ObjectPattern") {
+                    return isGlobal(source) && (parent.computed ? staticText(parent.key) : keyName(parent.key)) === "process"
+                }
+                return isProcess(source, seen)
+            })
+        }
         const isEnvSourceFile = () => inConfigOwner && declaresEnvSource
         const inWorld = isTestWorld(hfs, filename)
         const appRole = appRoleOf(hfs, filename)?.entry
@@ -101,7 +127,6 @@ export const noDirectEnvRead = {
                 if (!PROCESS_MODULES.has(source)) return
                 for (const specifier of node.specifiers) {
                     if (specifier.type === "ImportSpecifier" && (specifier.imported.name ?? specifier.imported.value) === "env") reportEnv(specifier)
-                    else if (specifier.type !== "ImportSpecifier" || (specifier.imported.name ?? specifier.imported.value) === "default") processNames.add(specifier.local.name)
                 }
             },
             ImportExpression(node) {
@@ -113,7 +138,11 @@ export const noDirectEnvRead = {
             },
             VariableDeclarator(node) {
                 if (!node.init || !isProcess(node.init) || node.id.type !== "ObjectPattern") return
-                if (node.id.properties.some((property) => property.type === "Property" && keyName(property.key) === "env")) reportEnv(node)
+                if (node.id.properties.some((property) => property.type === "Property" && (property.computed ? staticText(property.key) : keyName(property.key)) === "env")) reportEnv(node)
+            },
+            AssignmentExpression(node) {
+                if (node.operator !== "=" || node.left.type !== "ObjectPattern" || !isProcess(node.right)) return
+                if (node.left.properties.some((property) => property.type === "Property" && (property.computed ? staticText(property.key) : keyName(property.key)) === "env")) reportEnv(node)
             },
             CallExpression(node) {
                 const callee = node.callee

@@ -14,7 +14,7 @@
  *
  * WHAT THEY CANNOT HOLD, stated rather than implied. Neither rule can tell whether the value the link
  * computes is CORRECT - whether it reads the address, the cookie or a constant - because that is
- * inside a function these rules only see the name of. A link that attaches `x-locale: "en"`
+ * inside a function these rules only see the name of. A link that attaches `Accept-Language: "en"`
  * unconditionally satisfies both and is wrong. That case is a review question and LOCALE-2 is where
  * it is argued; pretending otherwise would be the rule claiming a guarantee it does not have.
  *
@@ -73,8 +73,11 @@ const isLocaleLinkFile = (context) => {
  */
 const isLinkImplementationFile = (context) => linkFileName(context) !== null
 
-/** The header a request declares its language in (HTTP header names are case-insensitive: `X-Locale` is the same header). */
-export const LOCALE_HEADER = "x-locale"
+/** The header a request declares its language in; HTTP header names are case-insensitive. */
+export const LOCALE_HEADER = "Accept-Language"
+
+/** The retired locale header is refused everywhere, including the locale link. */
+const RETIRED_LOCALE_HEADER = "x-locale"
 
 /** Callee names that construct the terminal link - the one that actually reaches the network. */
 const TERMINAL_LINK_CALLEES = new Set(["createHttpLink", "HttpLink", "createUploadLink", "BatchHttpLink"])
@@ -93,14 +96,57 @@ const calleeName = (node) => {
   return null
 }
 
-/** Every string-ish key a property can carry, so `"x-locale"` and `["x-locale"]` read the same. */
+/** Literal and expression-free template spellings identify the same header. */
+const stringOf = (node) => {
+  if (node?.type === "Literal" && typeof node.value === "string") return node.value
+  if (node?.type === "TemplateLiteral" && node.expressions.length === 0) return node.quasis[0].value.cooked
+  return null
+}
+
+/** Every static property spelling, without treating a computed variable as its identifier's name. */
+const keyOf = (node) => node?.property?.type === "Identifier" && !node.computed ? node.property.name : stringOf(node?.property)
+
+/** Every string-ish key a property can carry, so `"Accept-Language"` and `["Accept-Language"]` read the same. */
 const propertyKeyOf = (property) => {
   if (!property || property.type !== "Property") return null
   const key = property.key
   if (!key) return null
   if (key.type === "Identifier" && !property.computed) return key.name
-  if (key.type === "Literal" && typeof key.value === "string") return key.value
+  return stringOf(key)
+}
+
+/** Resolve a receiver's binding, so an unrelated local `Headers` or `set` method stays unrelated. */
+const variableOf = (node, sourceCode) => {
+  for (let scope = sourceCode.getScope(node); scope; scope = scope.upper) {
+    const variable = scope.set.get(node.name)
+    if (variable) return variable
+  }
   return null
+}
+
+/** Global browser constructors and globals may be qualified, but cannot be shadowed. */
+const isNativeName = (node, name, sourceCode) => {
+  if (node?.type === "Identifier") return node.name === name && !variableOf(node, sourceCode)?.defs.length
+  return node?.type === "MemberExpression" && keyOf(node) === name &&
+    ["globalThis", "window"].some((global) => isNativeName(node.object, global, sourceCode))
+}
+
+/** Syntax establishes native Headers values and stable aliases; unknown or reassigned receivers are left alone. */
+const isNativeInstance = (node, name, sourceCode, seen = new Set()) => {
+  if (!node || seen.has(node)) return false
+  seen.add(node)
+  const annotation = node.typeAnnotation?.typeAnnotation ?? node.typeAnnotation
+  if (annotation?.type === "TSTypeReference" && isNativeName(annotation.typeName, name, sourceCode)) return true
+  if (["TSAsExpression", "TSNonNullExpression", "ChainExpression"].includes(node.type)) return isNativeInstance(node.expression, name, sourceCode, seen)
+  if (node.type === "NewExpression") return isNativeName(node.callee, name, sourceCode)
+  if (name === "Headers" && node.type === "MemberExpression" && keyOf(node) === "headers") {
+    return ["Request", "Response"].some((owner) => isNativeInstance(node.object, owner, sourceCode, new Set(seen)))
+  }
+  if (node.type !== "Identifier") return false
+  const variable = variableOf(node, sourceCode)
+  if (variable?.references.some((reference) => reference.isWrite() && !reference.init)) return false
+  return (variable?.identifiers ?? []).some((identifier) => isNativeInstance(identifier, name, sourceCode, seen)) ||
+    (variable?.defs ?? []).some((definition) => definition.type === "Variable" && isNativeInstance(definition.node.init, name, sourceCode, seen))
 }
 
 export const rules = {
@@ -152,15 +198,33 @@ export const rules = {
       schema: [],
       messages: {
         elsewhere:
-          "Only the locale link may write `x-locale`. Setting it here is a second answer to which language this request is in, and the two diverge the first time one of them is updated - usually leaving a single hook correct and the rest of the surface on the server's default. Let the transport attach it.",
+          "Only the locale link may write `Accept-Language`. Setting it here is a second answer to which language this request is in, and the two diverge the first time one of them is updated - usually leaving a single hook correct and the rest of the surface on the server's default. Let the transport attach it.",
+        retired:
+          "The `x-locale` header is retired. Declare the reader's language with `Accept-Language` in the locale link, the one place that owns it.",
       },
     },
     create(context) {
-      if (isLocaleLinkFile(context)) return {}
+      const ownsLocale = isLocaleLinkFile(context)
+      const sourceCode = context.sourceCode ?? context.getSourceCode()
+      const checkHeader = (node, key) => {
+        const header = key?.toLowerCase()
+        if (header === RETIRED_LOCALE_HEADER) {
+          context.report({ node, messageId: "retired" })
+        } else if (header === LOCALE_HEADER.toLowerCase() && !ownsLocale) {
+          context.report({ node, messageId: "elsewhere" })
+        }
+      }
       return {
         Property(node) {
-          if (propertyKeyOf(node)?.toLowerCase() === LOCALE_HEADER) {
-            context.report({ node, messageId: "elsewhere" })
+          checkHeader(node, propertyKeyOf(node))
+        },
+        AssignmentExpression(node) {
+          if (node.left.type === "MemberExpression") checkHeader(node, keyOf(node.left))
+        },
+        CallExpression(node) {
+          const callee = node.callee
+          if (callee.type === "MemberExpression" && ["set", "append"].includes(keyOf(callee)) && isNativeInstance(callee.object, "Headers", sourceCode)) {
+            checkHeader(node, stringOf(node.arguments[0]))
           }
         },
       }
