@@ -2349,6 +2349,34 @@ rules:
     failureCodes: ["BE_COMPOSITION_UNTYPED"]
     enforcers:
       - {kind: eslint-be, id: app-composition-typed}
+  - id: R266
+    code: "STACKS_SECRET_NOT_EXTERNAL"
+    law: "Every rendered Swarm deployment uses external immutable secrets whose names match the declared runtimeName and positive version; services carry no secret environment literals. Only the one declared ingress publishes ports; its hosts have routes, DNS ownership receipts and TLS ownership evidence. Stateful services declare placement constraints, and runnable services declare healthchecks and update, rollback and restart policies. A lite api app composing be.feature.realtime.* pins deploy.replicas to 1; full is unaffected by that replica restriction."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["STACKS_SECRET_NOT_EXTERNAL", "STACKS_SECRET_UNVERSIONED", "STACKS_SECRET_ENV_LITERAL", "STACKS_PORT_PUBLISHED", "STACKS_SECOND_INGRESS", "STACKS_DNS_UNDECLARED", "STACKS_HOST_UNROUTED", "STACKS_TLS_UNDECLARED", "STACKS_PLACEMENT_MISSING", "STACKS_HEALTHCHECK_MISSING", "STACKS_UPDATE_POLICY_MISSING", "STACKS_REALTIME_SCALED"]
+    enforcers:
+      - {kind: hfs, id: stacks-swarm, at: scripts/hfs/rules/stacks-swarm.mjs}
+      - {kind: hfs, id: stacks-second-ingress, at: scripts/hfs/rules/stacks-ingress.mjs}
+
+  - id: R267
+    code: "STACKS_RELEASE_UNDECLARED"
+    law: "Each Swarm environment declares an immutable images lock, active and previous release pointers and nonempty health assertions. Every stateful component and declared managed backing dependency declares backup target, retention and owner with a tracked restore proof. The rendered deployment model must be available and valid; an unavailable model is a finding, never a skipped check."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["STACKS_RELEASE_UNDECLARED", "BACKUP_UNDECLARED", "BACKUP_PROOF_MISSING", "STACKS_MODEL_UNAVAILABLE"]
+    enforcers:
+      - {kind: hfs, id: stacks-release, at: scripts/hfs/rules/stacks-release.mjs}
+
+  - id: R268
+    code: "HFS_SCHEDULE_UNDECLARED"
+    law: "Every app scheduler, active pg_cron schedule, selected scheduled component and rendered replicated-job has a matching top-level jobs declaration with its schedule and invocation of a named back-end CLI action. A rendered replicated-job uses the same declared CLI invocation; inline JavaScript and shell chaining are refused. Scheduling is app-owned; a manifest entry never grants host crontab or deployment business logic."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_SCHEDULE_UNDECLARED"]
+    enforcers:
+      - {kind: hfs, id: stacks-release, at: scripts/hfs/rules/stacks-release.mjs}
+
   - id: R269
     code: "HFS_DEPENDABOT_MISSING"
     law: "In lite and full apps, .github/dependabot.yml declares scheduled npm, github-actions and docker updates. The CI workflow runs npm audit --omit=dev as an enabled gate whose failure stops the job. The images workflow generates an SBOM and provenance for release images; a disabled step, comment or label is not evidence."
@@ -2401,6 +2429,24 @@ rules:
     failureCodes: ["RT_RULING_STALE_CITE"]
     enforcers:
       - {kind: runtime, id: ruling-cites, at: scripts/checks/check-ruling-cites.mjs}
+
+  - id: R275
+    code: "STACKS_INGRESS_UNDECLARED"
+    law: "Every Swarm environment declares its one ingress component and hosts. The named component has role ingress and a digest-pinned supported ingress image; Traefik and Caddy are both accepted without a preferred product. An absent declaration, unknown component or unsupported image is refused."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["STACKS_INGRESS_UNDECLARED", "STACKS_INGRESS_UNKNOWN"]
+    enforcers:
+      - {kind: hfs, id: stacks-ingress, at: scripts/hfs/rules/stacks-ingress.mjs}
+
+  - id: R276
+    code: "STACKS_LITE_SELFHOSTED_DB"
+    law: "Lite uses managed Supabase and runs no PostgreSQL, Redis or MongoDB backing image. A sidecar that needs a database uses SQLite on a named persistent volume declared by its component and mounted in the rendered model; a sidecar requiring another database is refused. Full retains its declared backing topology."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["STACKS_LITE_SELFHOSTED_DB", "STACKS_SIDECAR_VOLUME_UNDECLARED", "STACKS_SIDECAR_DB_UNSUPPORTED"]
+    enforcers:
+      - {kind: hfs, id: stacks-lite-backing, at: scripts/hfs/rules/stacks-lite-backing.mjs}
 
   - id: R277
     code: "HFS_SECRET_PLAINTEXT_FILE"
