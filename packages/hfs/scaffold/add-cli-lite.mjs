@@ -180,7 +180,7 @@ export function ensureLiteCli({ root, manifest, repo }) {
       "be/apps/cli/src/app.module.ts",
       read("be/skeleton/apps/cli/src/app.module.ts"),
     ],
-    ["be/apps/cli/src/cli.env.ts", read("be/skeleton/apps/cli/src/cli.env.ts")],
+    ["be/apps/cli/src/cli.env.ts", read("be/skeleton-lite/apps/cli/src/cli.env.ts")],
     ["be/apps/cli/src/cli.options.ts", CLI_OPTIONS],
     [
       "be/src/features/cli/index.ts",

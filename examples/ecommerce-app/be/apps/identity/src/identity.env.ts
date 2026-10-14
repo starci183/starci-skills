@@ -5,10 +5,24 @@ import { parseOrderApiConfig } from "@modules/integrations/order-api"
 import type { EnvSource } from "@modules/platform/config"
 import { parseIdentityDatabaseConfig } from "@modules/platform/database"
 import { parseHttpSecurityConfig } from "@modules/platform/http-security"
-import type { IdentityAppOptions } from "./identity.options"
 
 /** The identity environment values parsed before app composition. */
-export interface IdentityEnv extends IdentityAppOptions {}
+export interface IdentityEnv {
+    /** The port the API listens on. */
+    readonly port: number
+    /** The identity database connection. */
+    readonly database: ReturnType<typeof parseIdentityDatabaseConfig>
+    /** The Redis session store. */
+    readonly cache: ReturnType<typeof parseCacheConfig>
+    /** The realm's password grant shoppers sign in with. */
+    readonly keycloak: ReturnType<typeof parseKeycloakConfig>
+    /** The Keycloak admin API shoppers are created through. */
+    readonly keycloakAdmin: ReturnType<typeof parseKeycloakAdminConfig>
+    /** Where the order service answers. */
+    readonly orderApi: ReturnType<typeof parseOrderApiConfig>
+    /** The origin allowlist and rate limits. */
+    readonly httpSecurity: ReturnType<typeof parseHttpSecurityConfig>
+}
 
 /** Reads the identity environment; missing or invalid values fail boot and secret readers prefer mounted files. */
 export const readIdentityEnv = (env: EnvSource): IdentityEnv => ({

@@ -36,8 +36,9 @@ rules:
       When `<NAME>_FILE` is absent, it reads plain `<NAME>`. It offers the typed readers `env.string`, `env.int`, `env.bool`,
       `env.url`, `env.secret`, `env.enum`, `env.duration`, `optional(...)` and `anyDeclared(keys)`.
       `be/apps/<app>/src/<app>.env.ts` exports an explicit typed `<App>Env` interface and
-      `read<App>Env(env: EnvSource): <App>Env` (for example `ApiEnv` and `readApiEnv`); the interface may extend the app's
-      options type. The file stays at most 150 lines and holds fail-fast environment parsing only, through the typed
+      `read<App>Env(env: EnvSource): <App>Env` (for example `ApiEnv` and `readApiEnv`); the interface declares its own
+      readonly parsed members, typed from the capability parsers and structurally compatible with the app's options.
+      The file stays at most 150 lines and holds fail-fast environment parsing only, through the typed
       readers and capability parse helpers, with no localhost or default host fallback, logic, module composition,
       business code or feature imports. The role name stays `<app>.env.ts`, never `env.ts`.
       `main.ts` (at most 80 lines) builds `EnvSource` once, imports and calls the reader, then builds `AppOptions` and boots.
@@ -54,7 +55,26 @@ rules:
         write: 'const env = EnvSource.fromProcess(); const options = createApiAppOptions(readApiEnv(env)); const app = await NestFactory.create(AppModule.register(options))'
       - id: case-2
         when: An api app needs environment values
-        write: 'api.env.ts exports interface ApiEnv and readApiEnv(env: EnvSource): ApiEnv built only from typed readers and capability parse helpers; main.ts calls it once, builds AppOptions from the parsed values and port bindings, and boots within 80 lines.'
+        write: |-
+          // be/apps/api/src/api.env.ts
+          import type { EnvSource } from "@modules/platform/config"
+          import { parseServerConfig } from "@modules/platform/config"
+          import { parsePrimaryDatabaseConfig } from "@modules/platform/database"
+          import { parseHttpSecurityConfig } from "@modules/platform/http-security"
+
+          export interface ApiEnv {
+              readonly server: ReturnType<typeof parseServerConfig>
+              readonly database: ReturnType<typeof parsePrimaryDatabaseConfig>
+              readonly httpSecurity: ReturnType<typeof parseHttpSecurityConfig>
+          }
+
+          export const readApiEnv = (env: EnvSource): ApiEnv => ({
+              server: parseServerConfig(env),
+              database: parsePrimaryDatabaseConfig(env),
+              httpSecurity: parseHttpSecurityConfig(env),
+          })
+
+          // main.ts calls readApiEnv once, builds AppOptions from these values and port bindings, and boots within 80 lines.
     verification:
       automated:
         - BE_CONFIG_OWNER

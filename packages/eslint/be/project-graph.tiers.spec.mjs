@@ -1,6 +1,8 @@
 import test from "node:test"
+import { readFileSync } from "node:fs"
 import { projectFixture } from "./fixtures/project/tester.mjs"
 import { rules } from "./project-graph.mjs"
+import { render } from "../../hfs/sync/index.mjs"
 
 /** The cases of one repository: `rels` are clean files, `lines` maps a violating file to the lines the machine names. */
 const ok = (f, files, rels) => rels.map((rel) => ({ filename: f.at(rel), code: files[rel] }))
@@ -618,6 +620,68 @@ test("an exported const, type or interface that only renames another declaration
         invalid: [...bad(f, files, { "src/modules/domain/x/aliases.ts": [3, 4, 5, 6, 7, 8, 9] })],
     })
     f.cleanup()
+})
+
+test("scaffold env templates declare their own fields, while an empty options extension remains an alias", (t) => {
+    const template = (relative) => render(readFileSync(new URL(`../../hfs/templates/${relative}`, import.meta.url), "utf8"), { app: "api", appPascal: "Api" })
+    const modules = {
+        "tsconfig.json": JSON.stringify({
+            compilerOptions: {
+                target: "ES2022", module: "ESNext", moduleResolution: "Bundler", noEmit: true,
+                baseUrl: ".", paths: { "@modules/*": ["src/modules/*"] },
+            },
+            include: ["src/**/*", "apps/**/*"],
+        }),
+        "src/modules/platform/config/index.ts": [
+            "export interface EnvSource { readonly key: string }",
+            "export interface Secret { readonly value: string }",
+            "export interface ServerOptions { readonly port: number }",
+            "export declare const parseServerConfig: (env: EnvSource) => ServerOptions;",
+        ].join("\n"),
+        "src/modules/platform/database/index.ts": [
+            "import type { EnvSource, Secret } from '../config';",
+            "export interface DatabaseConnectionConfig { readonly name: string; readonly provider: 'supabase'; readonly url: Secret }",
+            "export interface DatabaseConnectionOptions extends DatabaseConnectionConfig { readonly schema?: string }",
+            "export declare const parsePrimaryDatabaseConfig: (env: EnvSource) => DatabaseConnectionOptions;",
+        ].join("\n"),
+        "src/modules/platform/http-security/index.ts": [
+            "import type { EnvSource } from '../config';",
+            "export interface HttpSecurityOptions { readonly origins: ReadonlyArray<string> }",
+            "export declare const parseHttpSecurityConfig: (env: EnvSource) => HttpSecurityOptions;",
+        ].join("\n"),
+        "src/modules/integrations/supabase/index.ts": [
+            "import type { EnvSource } from '../../platform/config';",
+            "export interface SupabaseOptions { readonly url: string }",
+            "export declare const parseSupabaseConfig: (env: EnvSource) => SupabaseOptions;",
+        ].join("\n"),
+    }
+    const apps = [{ name: "api", kind: "api" }, { name: "cli", kind: "cli" }]
+    const make = (edition, env) => projectFixture({ edition, apps, files: { ...modules, ...env } })
+    const lite = {
+        "apps/api/src/api.env.ts": template("be/skeleton-lite/apps/api/src/api.env.ts"),
+        "apps/api/src/api.options.ts": template("be/skeleton-lite/apps/api/src/api.options.ts"),
+        "apps/cli/src/cli.env.ts": template("be/skeleton-lite/apps/cli/src/cli.env.ts"),
+    }
+    const full = {
+        "apps/api/src/api.env.ts": template("be/skeleton/apps/__app__/src/__app__.env.ts"),
+        "apps/api/src/api.options.ts": template("be/skeleton/apps/__app__/src/__app__.options.ts"),
+        "apps/cli/src/cli.env.ts": template("be/skeleton/apps/cli/src/cli.env.ts"),
+    }
+    for (const [edition, files] of [["lite", lite], ["full", full]]) {
+        const f = make(edition, files)
+        t.after(f.cleanup)
+        f.tester.run(`${edition} scaffold alias-reexport`, rules["alias-reexport"], {
+            valid: ok(f, files, ["apps/api/src/api.env.ts", "apps/cli/src/cli.env.ts"]),
+            invalid: [],
+        })
+    }
+    const aliasFiles = { ...lite, "apps/api/src/api.env.ts": 'import type { ApiOptions } from "./api.options"\nexport interface ApiEnv extends ApiOptions {}\n' }
+    const alias = make("lite", aliasFiles)
+    t.after(alias.cleanup)
+    alias.tester.run("empty env extension alias-reexport", rules["alias-reexport"], {
+        valid: [],
+        invalid: bad(alias, aliasFiles, { "apps/api/src/api.env.ts": [2] }),
+    })
 })
 
 test("no feature kind imports another kind: the kinds meet through the event bus", () => {

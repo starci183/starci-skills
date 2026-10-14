@@ -192,7 +192,12 @@ test("ensureLiteCli separates fail-fast environment parsing from its connection 
   assert.match(main, /from "\.\/cli\.env"/);
   assert.match(main, /createCliAppOptions\(readCliEnv\(EnvSource\.fromProcess\(\)\)\)/);
   assert.equal((main.match(/EnvSource\.fromProcess\(\)/g) ?? []).length, 1);
-  assert.match(env, /export interface CliEnv extends ReturnType<typeof parsePrimaryDatabaseConfig>/);
+  assert.match(env, /export interface CliEnv \{/);
+  assert.match(env, /readonly name: string/);
+  assert.match(env, /readonly url: Secret/);
+  assert.match(env, /readonly provider: "supabase"/);
+  assert.match(env, /readonly schema\?: string/);
+  assert.doesNotMatch(env, /CliEnv extends/);
   assert.match(env, /export const readCliEnv = \(env: EnvSource\): CliEnv => parsePrimaryDatabaseConfig\(env\)/);
   assert.ok(main.trimEnd().split("\n").length <= 80, "the CLI bootstrap stays within its 80-line budget");
   assert.ok(env.trimEnd().split("\n").length <= 150, "the CLI env reader stays within its 150-line budget");
@@ -210,7 +215,10 @@ test("the full cli template binds domain entities and migrations after environme
   const options = read(ROOT, `${cli}/cli.options.ts`);
   assert.equal(parses(env), true);
   assert.equal(parses(options), true);
-  assert.match(env, /export interface CliEnv extends ReturnType<typeof parsePrimaryDatabaseConfig>/);
+  assert.match(env, /export interface CliEnv \{/);
+  assert.match(env, /readonly name: string/);
+  assert.match(env, /readonly url: Secret/);
+  assert.doesNotMatch(env, /CliEnv extends/);
   assert.match(env, /export const readCliEnv = \(env: EnvSource\): CliEnv/);
   assert.match(env, /parsePrimaryDatabaseConfig\(env\)/);
   assert.doesNotMatch(env, /noteEntities|noteMigrations/);
@@ -228,7 +236,10 @@ test("the full HTTP template gives a named app a typed, bounded environment read
 
   assert.equal(parses(env), true);
   assert.equal(parses(main), true);
-  assert.match(env, /export interface CatalogApiEnv extends CatalogApiOptions/);
+  assert.match(env, /export interface CatalogApiEnv \{/);
+  for (const [field, parser] of [["server", "parseServerConfig"], ["httpSecurity", "parseHttpSecurityConfig"], ["database", "parsePrimaryDatabaseConfig"]])
+    assert.ok(env.includes(`readonly ${field}: ReturnType<typeof ${parser}>`));
+  assert.doesNotMatch(env, /CatalogApiEnv extends|from "\.\/catalog-api\.options"/);
   assert.match(env, /export const readCatalogApiEnv = \(env: EnvSource\): CatalogApiEnv/);
   assert.match(main, /import \{ readCatalogApiEnv \} from "\.\/catalog-api\.env"/);
   assert.match(main, /readCatalogApiEnv\(env\)/);

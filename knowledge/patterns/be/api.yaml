@@ -261,7 +261,8 @@ rules:
         `EnvSource` resolves `<NAME>_FILE` first for `.starcistacks` custody, then plain `<NAME>` when the file key is absent.
         It holds no logic, module composition, business code or feature imports. Only this app file and `main.ts` may read
         `process.env` or `EnvSource`; `platform/config` owns the standard `EnvSource` reader. The role name stays
-        `<app>.env.ts`, never `env.ts`; its interface may extend the options type.
+        `<app>.env.ts`, never `env.ts`; its interface declares its own readonly parsed members, such as
+        `readonly server: ReturnType<typeof parseServerConfig>`, structurally compatible with the app's options.
       - `<app>.options.ts` (200) holds the env-derived values plus its port bindings: provider maps such as
         `{ approvalGate: ApprovalGateAdapter }`, with no environment parsing or reads of `process.env` or `EnvSource`.
         Neither it nor `<app>.env.ts` holds an array

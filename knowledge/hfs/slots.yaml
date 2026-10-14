@@ -1000,7 +1000,8 @@ slots:
   #   <app>.env.ts       exports interface <App>Env and read<App>Env(env: EnvSource): <App>Env (for example ApiEnv/readApiEnv);
   #                      fail-fast environment parsing only, via EnvSource and unchanged capability parse helpers; no localhost
   #                      or default host fallback, logic, module composition, business code or feature imports. Only main.ts
-  #                      and this app file may read process.env or EnvSource. The interface may extend the options type;
+  #                      and this app file may read process.env or EnvSource. The interface declares its own readonly parsed
+  #                      members with parser-derived types, structurally compatible with the app's options;
   #                      the role name stays <app>.env.ts, never env.ts. Secrets use EnvSource.secret(): <NAME>_FILE first
   #                      for .starcistacks custody, plain <NAME> only when the file key is absent. A declared file supplies
   #                      exact contents; an empty or unreadable path stops boot without fallback.

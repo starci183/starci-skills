@@ -172,7 +172,10 @@ test('lite scaffold emits its workspace declaration and is structurally clean', 
   assert.equal((entry.match(/EnvSource\.fromProcess\(\)/g) ?? []).length, 1);
   assert.ok(entry.trimEnd().split('\n').length <= 80, 'the API bootstrap stays within its 80-line budget');
   assert.doesNotMatch(entry, /parse(?:Server|HttpSecurity|PrimaryDatabase|Supabase)Config/);
-  assert.match(env, /export interface ApiEnv extends ApiOptions/);
+  assert.match(env, /export interface ApiEnv \{/);
+  for (const [field, parser] of [['server', 'parseServerConfig'], ['httpSecurity', 'parseHttpSecurityConfig'], ['database', 'parsePrimaryDatabaseConfig'], ['supabase', 'parseSupabaseConfig']])
+    assert.ok(env.includes(`readonly ${field}: ReturnType<typeof ${parser}>`));
+  assert.doesNotMatch(env, /ApiEnv extends|from "\.\/api\.options"/);
   assert.match(env, /export const readApiEnv = \(env: EnvSource\): ApiEnv/);
   assert.ok(env.trimEnd().split('\n').length <= 150, 'the API env reader stays within its 150-line budget');
   assert.doesNotMatch(env, /parseApiEnv|localhost|127\.0\.0\.1|process\.env/);

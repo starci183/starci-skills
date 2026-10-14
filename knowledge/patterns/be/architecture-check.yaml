@@ -77,7 +77,9 @@ rules:
       An app directory `be/apps/<app>/src` holds `main.ts` (at most 80 lines), `<app>.env.ts` (150), `<app>.options.ts` (200),
       `compose/<area>.ts` (120) and `app.module.ts` (250, with `static register(options: AppOptions)`); an app has no spec of its
       own (BE-TEST-1). `<app>.env.ts` exports an explicit typed `<App>Env` interface and
-      `read<App>Env(env: EnvSource): <App>Env`, with no localhost or default host fallback. Secrets use `env.secret`:
+      `read<App>Env(env: EnvSource): <App>Env`. The interface declares its own readonly parsed members, typed from
+      capability parsers and structurally compatible with the app's options, with no localhost or default host fallback.
+      Secrets use `env.secret`:
       `EnvSource` resolves `<NAME>_FILE` first for `.starcistacks` custody and plain `<NAME>` only when the file key is absent.
       The role name stays `<app>.env.ts`, never `env.ts`; capability `<capability>.config.ts` parsers remain unchanged.
       `main.ts` builds `EnvSource` once, imports and calls the reader from `<app>.env.ts`, builds `AppOptions`, calls

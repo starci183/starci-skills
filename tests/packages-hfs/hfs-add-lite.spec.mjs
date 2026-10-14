@@ -79,7 +79,7 @@ const repo = () => {
   );
   fs.writeFileSync(
     path.join(root, "be", "apps", "api", "src", "api.env.ts"),
-    'import type { EnvSource } from "@modules/platform/config"\nimport { parseHttpSecurityConfig } from "@modules/platform/http-security"\nimport type { ApiOptions } from "./api.options"\n\nexport interface ApiEnv extends ApiOptions {}\n\nexport const readApiEnv = (env: EnvSource): ApiEnv => ({\n    httpSecurity: parseHttpSecurityConfig(env),\n})\n',
+    'import type { EnvSource } from "@modules/platform/config"\nimport { parseHttpSecurityConfig } from "@modules/platform/http-security"\n\nexport interface ApiEnv {\n    readonly httpSecurity: ReturnType<typeof parseHttpSecurityConfig>\n}\n\nexport const readApiEnv = (env: EnvSource): ApiEnv => ({\n    httpSecurity: parseHttpSecurityConfig(env),\n})\n',
   );
   return root;
 };
@@ -487,7 +487,9 @@ test("lite add api emits full's GraphQL door, and api plus webhook transports ar
   );
   const main = read(root, "be/apps/api/src/main.ts");
   const env = read(root, "be/apps/api/src/api.env.ts");
-  assert.match(env, /export interface ApiEnv extends ApiOptions/);
+  assert.match(env, /export interface ApiEnv \{/);
+  assert.match(env, /readonly httpSecurity: ReturnType<typeof parseHttpSecurityConfig>/);
+  assert.doesNotMatch(env, /ApiEnv extends|from "\.\/api\.options"/);
   assert.match(env, /export const readApiEnv = \(env: EnvSource\): ApiEnv/);
   assert.match(env, /parseWebhookProviderConfig/);
   assert.match(env, /calendar: parseWebhookProviderConfig\(env, "CALENDAR"\)/);

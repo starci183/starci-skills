@@ -281,7 +281,9 @@ R245 and R246). `main.ts` builds `EnvSource` once, imports and calls the reader,
 `main.ts` and its matching `<app>.env.ts` may read the app's `process.env` or `EnvSource`; compose groups and
 `<app>.options.ts` never read either. The env file holds fail-fast parsing only, through typed readers and unchanged
 capability `parse<C>Config` helpers, with no localhost or default host fallback, logic, module composition, business code
-or feature imports. Its interface may extend the options type; the role name stays `<app>.env.ts` (`api.env.ts`,
+or feature imports. Its interface declares its own readonly parsed members, such as
+`readonly server: ReturnType<typeof parseServerConfig>`, and stays structurally compatible with the app's options;
+the role name stays `<app>.env.ts` (`api.env.ts`,
 `worker.env.ts`, `cli.env.ts`). Secrets use `EnvSource.secret()`: `EnvSource.fromProcess()` resolves `<NAME>_FILE` first
 for `.starcistacks` custody and reads plain `<NAME>` only when the file key is absent. A declared file supplies its exact
 contents; an empty or unreadable path fails startup without falling back. The options file holds no parsing.

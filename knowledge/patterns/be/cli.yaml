@@ -43,6 +43,8 @@ rules:
       the commands need (the database capability over every connection with its entities and migrations, like an api app) and
       the static cli feature root module `CliModule`. `apps/cli/src/cli.env.ts` (at most 150 lines) exports an explicit typed
       `CliEnv` interface and `readCliEnv(env: EnvSource): CliEnv` using `EnvSource` and unchanged capability parse helpers.
+      The interface declares its own readonly parsed members with types matching those helpers; the options factory binds
+      these values to its connection list.
       It holds fail-fast parsing only, with no localhost or default host fallback, logic, module composition, business code
       or feature imports. Secrets use `env.secret`, with `<NAME>_FILE` first for `.starcistacks` custody, then plain `<NAME>`
       when the file key is absent. `main.ts` (at most 80 lines) builds `EnvSource` once and imports and calls `readCliEnv`.
