@@ -16,9 +16,9 @@
 // `@@vCamel@@` its camelCase, `@@vUpper@@` its UPPER_SNAKE and `@@vSnake@@` its snake_case; the option `--service Class=module` gives `@@service@@` (the class) and `@@serviceModule@@`.
 import fs from 'node:fs';
 import path from 'node:path';
-import { TEMPLATES_DIR } from '../sync/index.mjs';
 import { ScaffoldError, pascalOf } from './service.mjs';
 import { addTable, graphqlPlatformFiles } from './add-table.mjs';
+import { addModuleImport, compositionCode, readComposeGroup, writeComposeGroup } from './add-compose.mjs';
 import { addApp } from './add-app.mjs';
 import { ensureLiteCli } from './add-cli-lite.mjs';
 import { addLiteWebhookInbox } from './add-inbox-lite.mjs';
@@ -92,30 +92,6 @@ function ensureGraphqlPeers(repoRoot) {
   return ['package.json'];
 }
 
-/** Adds `importLine` and one `symbol` entry of the `imports` array of a module file's lines, once. */
-function addModuleImport(lines, { importLine, entry, relative, noun }) {
-  const active = compositionCode(lines.join('\n')).split('\n');
-  const imported = active.some(line => line.replace(/;\s*$/, '') === importLine);
-  const registered = active.some(line => line.trim() === `${entry},` ||
-    (/\bimports:\s*\[/.test(line) && !line.trim().startsWith('//') && line.replace(/\s+/g, '').includes(entry.replace(/\s+/g, ''))));
-  if (imported && registered) return;
-  const lastImport = active.reduce((last, line, index) => line.startsWith('import ') ? index : last, -1);
-  const importsLine = line => /\bimports:\s*\[/.test(line) && !line.trim().startsWith('//');
-  if (lastImport < 0 || active.findIndex(importsLine) < 0) throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add ${noun} could not find the imports array in ${relative}`);
-  if (!imported) lines.splice(lastImport + 1, 0, importLine);
-  if (registered) return;
-  const imports = compositionCode(lines.join('\n')).split('\n').findIndex(importsLine);
-  const indent = /^(\s*)/.exec(lines[imports])?.[1] ?? '';
-  if (/^\s*imports: \[$/.test(lines[imports])) lines.splice(imports + 1, 0, `${indent}    ${entry},`);
-  else lines[imports] = lines[imports].replace(/(\bimports:\s*\[)\s*/, `$1${entry}, `);
-}
-
-/** Masks comments without changing offsets or treating quoted module specifiers as comments. */
-function compositionCode(text) {
-  return text.replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,
-    value => value.startsWith('/') ? value.replace(/[^\r\n]/g, ' ') : value);
-}
-
 /** The skeleton registrations that move into area groups when the first transport is added. */
 function skeletonComposition(lines, edition) {
   const active = compositionCode(lines.join('\n')).split('\n');
@@ -127,6 +103,12 @@ function skeletonComposition(lines, edition) {
   ];
   if (edition === 'full') candidates.push({ area: 'domain', symbol: 'NoteModule', source: '@modules/domain/note', entry: 'NoteModule.register({ isGlobal: true })' });
   return candidates.filter(({ entry }) => active.some(line => line.trim() === `${entry},`));
+}
+
+/** Existing groups that the root spreads must survive when another area is generated. */
+function referencedComposeAreas(lines) {
+  const code = compositionCode(lines.join('\n'));
+  return ['domain', 'system', 'api', 'webhooks'].filter((area) => code.includes(`...${area}Modules(`));
 }
 
 function featureCompositionRoot({ repoRoot, repo, noun }) {
@@ -146,7 +128,7 @@ function preflightFeatureComposition({ repoRoot, repo, noun, name }) {
       throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add webhook needs a multiline imports array in ${relative}`);
     planLiteWebhookConfig({ repoRoot, app: app.name, provider: name });
   }
-  const areas = new Set([noun === 'api' ? 'api' : 'webhooks', ...skeletonComposition(lines, repo.edition).map(entry => entry.area)]);
+  const areas = new Set([noun === 'api' ? 'api' : 'webhooks', ...referencedComposeAreas(lines), ...skeletonComposition(lines, repo.edition).map(entry => entry.area)]);
   for (const area of areas) {
     readComposeGroup({ repoRoot, repo, app: app.name, area, noun });
     const argument = area === 'domain' && repo.edition === 'lite' ? 'verifyAccessToken' : '';
@@ -180,6 +162,30 @@ function ensureGraphqlPlatform(repoRoot) {
   return written;
 }
 
+/** The typed area members of one transport, including lite transactional handoff capabilities. */
+function transportComposition(noun, name, edition) {
+  const entries = [];
+  if (noun === 'api') {
+    entries.push({ importLine: 'import { GraphqlModule } from "@modules/platform/graphql"', entry: 'GraphqlModule.register({ isGlobal: true })' });
+    const symbol = `${pascalOf(name)}GraphqlModule`;
+    entries.push({ importLine: `import { ${symbol} } from "@features/api/${name}"`, entry: symbol });
+  } else {
+    const symbol = `${pascalOf(name)}HttpModule`;
+    entries.push({ importLine: `import { ${symbol} } from "@features/webhooks/${name}"`, entry: symbol });
+    if (edition === 'lite') {
+      const inbox = `${pascalOf(name)}InboxModule`;
+      const importLine = `import { ${inbox} } from "@modules/domain/${name}-inbox"`;
+      const entry = `${inbox}.register({ isGlobal: true })`;
+      entries.push({ importLine, entry });
+      for (const platform of ['InboxModule', 'EventBusModule']) {
+        const capability = platform === 'InboxModule' ? 'inbox' : 'event-bus';
+        entries.push({ importLine: `import { ${platform} } from "@modules/platform/${capability}"`, entry: `${platform}.register({ isGlobal: true })` });
+      }
+    }
+  }
+  return entries;
+}
+
 /**
  * Compose each generated transport in its declared API owner through an explicitly typed area group. The root only spreads
  * the group; it never acquires a second feature list. Lite's inbox capability belongs to its webhook group as well.
@@ -188,7 +194,7 @@ function wireFeature({ repoRoot, repo, noun, name }) {
   const { app, relative, file, lines } = featureCompositionRoot({ repoRoot, repo, noun });
   const created = [];
   const area = noun === 'api' ? 'api' : 'webhooks';
-  const groups = new Map([[area, []]]);
+  const groups = new Map([...referencedComposeAreas(lines), area].map((group) => [group, []]));
   for (const migration of skeletonComposition(lines, repo.edition)) {
     const entries = groups.get(migration.area) ?? [];
     entries.push({ importLine: `import { ${migration.symbol} } from "${migration.source}"`, entry: migration.entry });
@@ -196,78 +202,52 @@ function wireFeature({ repoRoot, repo, noun, name }) {
     removeSkeletonRegistration(lines, migration);
   }
   const entries = groups.get(area);
-  if (noun === 'api') {
-    created.push(...ensureGraphqlPlatform(repoRoot));
-    entries.push({ importLine: 'import { GraphqlModule } from "@modules/platform/graphql"', entry: 'GraphqlModule.register({ isGlobal: true })' });
-    const symbol = `${pascalOf(name)}GraphqlModule`;
-    entries.push({ importLine: `import { ${symbol} } from "@features/api/${name}"`, entry: symbol });
-  } else {
-    const symbol = `${pascalOf(name)}HttpModule`;
-    entries.push({ importLine: `import { ${symbol} } from "@features/webhooks/${name}"`, entry: symbol });
-    if (repo.edition === 'lite') {
-      const inbox = `${pascalOf(name)}InboxModule`;
-      const importLine = `import { ${inbox} } from "@modules/domain/${name}-inbox"`;
-      const entry = `${inbox}.register({ isGlobal: true })`;
-      entries.push({ importLine, entry });
-      // The existing inbox generator registers in the root. Move exactly that generated registration into the area group.
-      const importAt = lines.indexOf(importLine);
-      if (importAt >= 0) lines.splice(importAt, 1);
-      const entryAt = lines.findIndex(line => line.trim() === `${entry},`);
-      if (entryAt >= 0) lines.splice(entryAt, 1);
-    }
-  }
+  if (noun === 'api') created.push(...ensureGraphqlPlatform(repoRoot));
+  entries.push(...transportComposition(noun, name, repo.edition));
   for (const [group, members] of groups) {
     const symbol = `${group}Modules`;
     const argument = group === 'domain' && repo.edition === 'lite' ? 'verifyAccessToken' : '';
     addModuleImport(lines, { importLine: `import { ${symbol} } from "./compose/${group}"`, entry: `...${symbol}(${argument})`, relative, noun });
     created.push(...writeComposeGroup({ repoRoot, repo, app: app.name, area: group, entries: members, noun }));
   }
-  fs.writeFileSync(file, `${lines.join('\n').replace(/\n+$/, '')}\n`);
+  fs.writeFileSync(file, `${lines.join('\n').trimEnd()}\n`);
   if (noun === 'webhook' && repo.edition === 'lite') wireLiteWebhookConfig({ repoRoot, app: app.name, provider: name });
   return created;
 }
 
-/** Reads the explicitly typed expression body of a group without treating comments as active declarations. */
-function readComposeGroup({ repoRoot, repo, app, area, noun }) {
-  const relative = `be/apps/${app}/src/compose/${area}.ts`;
-  const file = path.join(repoRoot, ...relative.split('/'));
-  const exists = fs.existsSync(file);
-  const skeleton = repo.edition === 'lite' ? 'skeleton-lite/apps/api' : 'skeleton/apps/__app__';
-  const template = path.join(TEMPLATES_DIR, 'be', ...skeleton.split('/'), 'src', 'compose', `${area}.ts`);
-  const text = fs.readFileSync(exists ? file : template, 'utf8').replace(/\r\n/g, '\n');
-  const argument = area === 'domain' && repo.edition === 'lite' ? 'verifyAccessToken: VerifySupabaseAccessToken' : '';
-  const marker = `export const ${area}Modules = (${argument}): Array<Type<unknown> | DynamicModule> => [`;
-  const declarationAt = compositionCode(text).indexOf(`\n${marker}`);
-  const active = declarationAt >= 0;
-  const body = active ? text.slice(declarationAt + 1 + marker.length).match(/^([\s\S]*)\]\s*;?\s*$/)?.[1] : undefined;
-  if (body === undefined) throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add ${noun} needs the typed ${area}Modules group in ${relative}`);
-  return { relative, file, exists, text, marker, body };
+/** Adds the provider config reader to the existing typed HTTP security import. */
+function webhookConfigImport(text, relative) {
+  const httpSecurityImport = /^import \{ ([^}]+) \} from "@modules\/platform\/http-security";?$/m;
+  const importMatch = httpSecurityImport.exec(text);
+  if (!importMatch) throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add webhook could not find the HTTP security import in ${relative}`);
+  const imported = importMatch[1].split(',').map(symbol => symbol.trim()).filter(Boolean);
+  if (!imported.includes('parseWebhookProviderConfig')) {
+    const configIndex = imported.indexOf('parseHttpSecurityConfig');
+    imported.splice(configIndex < 0 ? imported.length : configIndex + 1, 0, 'parseWebhookProviderConfig');
+    text = text.replace(httpSecurityImport, `import { ${imported.join(', ')} } from "@modules/platform/http-security"`);
+  }
+  return text;
 }
 
-/** Creates a typed group from the edition's template, or adds members without duplicating inline registrations or semicolon imports. */
-function writeComposeGroup(input) {
-  const { relative, file, exists, marker, body, text: original } = readComposeGroup(input);
-  let text = original;
-  let compactBody = compositionCode(body).replace(/\s+/g, '');
-  for (const { importLine, entry } of input.entries) {
-    const lines = text.split('\n');
-    if (!lines.some(line => line.replace(/;\s*$/, '') === importLine)) {
-      const lastImport = lines.reduce((last, line, index) => line.startsWith('import ') ? index : last, -1);
-      lines.splice(lastImport + 1, 0, importLine);
-      text = lines.join('\n');
-    }
-    const compactEntry = entry.replace(/\s+/g, '');
-    const escapedEntry = compactEntry.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    if (!new RegExp(`(?:^|,)${escapedEntry}(?=,|$)`).test(compactBody)) {
-      const afterMarker = compositionCode(text).indexOf(marker) + marker.length;
-      const empty = text.slice(afterMarker).startsWith(']');
-      text = `${text.slice(0, afterMarker)}\n    ${entry},${empty ? '\n' : ''}${text.slice(afterMarker)}`;
-      compactBody = `${compactEntry},${compactBody}`;
-    }
+/** Declares a signing key by name and leaves custody/provisioning to the environment owner. */
+function webhookRosterPatches(repoRoot, provider) {
+  const stacks = path.join(repoRoot, '.starcistacks');
+  if (!fs.existsSync(stacks)) return [];
+  const key = formsOf({ provider }).providerUpper + '_WEBHOOK_SECRET';
+  const patches = [];
+  for (const entry of fs.readdirSync(stacks, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const file = path.join(stacks, entry.name, 'runtime', 'env', 'KEYS.md');
+    if (!fs.existsSync(file)) continue;
+    const before = fs.readFileSync(file, 'utf8');
+    if (before.includes('\x60' + key + '\x60')) continue;
+    const lines = before.replace(/\r\n/g, '\n').split('\n');
+    const lastRow = lines.reduce((last, line, index) => line.startsWith('|') ? index : last, -1);
+    const row = '| \x60' + key + '\x60 | API signed ' + provider + ' webhook; owner must seal this key and provision its versioned external runtime secret before deployment |';
+    lines.splice(lastRow + 1, 0, row);
+    patches.push({ file, text: lines.join('\n') });
   }
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, text);
-  return exists ? [] : [relative];
+  return patches;
 }
 
 /** Adds one generated webhook provider to the lite API's typed env reader (or an existing inline bootstrap) and enables exact raw-body verification. */
@@ -279,15 +259,7 @@ function planLiteWebhookConfig({ repoRoot, app, provider }) {
   const file = path.join(repoRoot, ...relative.split('/'));
   if (!fs.existsSync(file)) throw new ScaffoldError('HFS_ADD_WIRE_MISSING', `add webhook needs ${relative}`);
   let text = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
-  const httpSecurityImport = /^import \{ ([^}]+) \} from "@modules\/platform\/http-security";?$/m;
-  const importMatch = httpSecurityImport.exec(text);
-  if (!importMatch) throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add webhook could not find the HTTP security import in ${relative}`);
-  const imported = importMatch[1].split(',').map(symbol => symbol.trim()).filter(Boolean);
-  if (!imported.includes('parseWebhookProviderConfig')) {
-    const configIndex = imported.indexOf('parseHttpSecurityConfig');
-    imported.splice(configIndex < 0 ? imported.length : configIndex + 1, 0, 'parseWebhookProviderConfig');
-    text = text.replace(httpSecurityImport, `import { ${imported.join(', ')} } from "@modules/platform/http-security"`);
-  }
+  text = webhookConfigImport(text, relative);
   const providerKey = /^[a-z][a-z0-9]*$/.test(provider) ? provider : JSON.stringify(provider);
   const indent = /^([ \t]*)httpSecurity:/m.exec(text)?.[1] ?? '        ';
   const providerLine = `${indent}        ${providerKey}: parseWebhookProviderConfig(env, ${JSON.stringify(formsOf({ provider }).providerUpper)}),`;
@@ -296,7 +268,7 @@ function planLiteWebhookConfig({ repoRoot, app, provider }) {
     if (empty.test(text)) {
       text = text.replace(empty, ['httpSecurity: {', `${indent}    ...parseHttpSecurityConfig(env),`, `${indent}    webhooks: {`, providerLine, `${indent}    },`, `${indent}}`].join('\n'));
     } else {
-      const found = /^\s*webhooks: \{$/m.exec(text);
+      const found = /^[ \t]*webhooks: \{$/m.exec(text);
       if (!found) throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add webhook could not find httpSecurity options in ${relative}`);
       const insertAt = found.index + found[0].length;
       text = `${text.slice(0, insertAt)}\n${providerLine}${text.slice(insertAt)}`;
@@ -310,12 +282,20 @@ function planLiteWebhookConfig({ repoRoot, app, provider }) {
     const entry = fs.readFileSync(main, 'utf8').replace('NestFactory.create(AppModule.register(options))', 'NestFactory.create(AppModule.register(options), { rawBody: true })');
     planned.push({ file: main, text: entry });
   }
+  planned.push(...webhookRosterPatches(repoRoot, provider));
   return planned;
 }
 
 /** Applies the preflighted provider configuration and exact raw-body bootstrap option. */
 function wireLiteWebhookConfig(input) {
-  for (const { file, text } of planLiteWebhookConfig(input)) fs.writeFileSync(file, text);
+  const patches = planLiteWebhookConfig(input);
+  const originals = new Map(patches.map(({ file }) => [file, fs.readFileSync(file)]));
+  try {
+    for (const { file, text } of patches) fs.writeFileSync(file, text);
+  } catch (error) {
+    for (const [file, text] of originals) fs.writeFileSync(file, text);
+    throw error;
+  }
 }
 
 /**
@@ -328,7 +308,7 @@ function wire({ beRoot, wire: target, forms, noun, name }) {
   const fill = (text) => fillKnownForms(text, forms);
   const symbol = fill(target.symbol);
   let text = fs.readFileSync(file, 'utf8');
-  if (new RegExp(`\\b${symbol}\\b`).test(text)) return;
+  if (new RegExp(String.raw`\b${symbol}\b`).test(text)) return;
   const array = /@Module\(\{ imports: \[([^\]]*)\] \}\)/.exec(text);
   const lines = text.split('\n');
   const lastImport = lines.map((line) => line.startsWith('import ')).lastIndexOf(true);

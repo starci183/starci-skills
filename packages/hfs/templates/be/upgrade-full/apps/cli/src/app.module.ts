@@ -1,13 +1,11 @@
 import { Module } from "@nestjs/common";
-import { CliModule } from "@features/cli";
-import { ClockModule } from "@modules/platform/clock";
-import { LoggingModule } from "@modules/platform/logging";
+import { cliModules } from "./compose/cli";
+import { platformModules } from "./compose/platform";
 
 @Module({
   imports: [
-    ClockModule.register({ isGlobal: true }),
-    LoggingModule.register({ isGlobal: true }),
-    CliModule,
+    ...platformModules(),
+    ...cliModules(),
   ],
 })
 /** The cli composition root; database schema changes remain delegated to the Supabase CLI. */

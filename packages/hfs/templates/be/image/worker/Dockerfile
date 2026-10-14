@@ -32,5 +32,5 @@ RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY --from=build /app/be/dist be/dist
 
 USER node
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD pgrep -f "apps/{{app}}/src/main.js" > /dev/null || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD ["node", "-e", "const fs=require('node:fs');const args=fs.readFileSync('/proc/1/cmdline','utf8').split(String.fromCharCode(0));process.exit(args.includes('be/dist/apps/{{app}}/src/main.js')?0:1)"]
 CMD ["node", "be/dist/apps/{{app}}/src/main.js"]

@@ -10,6 +10,8 @@ import { ScaffoldError, pascalOf } from "./service.mjs";
 import { filesBelow, registerLiteDomainService, registerLiteExports, registrationFiles } from "./lite-exports.mjs";
 import { byCodeUnit } from "../report/order.mjs";
 import { coreFeApps } from "./app.mjs";
+import { addModuleImport, planComposeGroup } from "./add-compose.mjs";
+import { withSqlIdentifierError } from "./add-database-lite.mjs";
 
 const NAME = /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$/;
 const MIGRATION = /^(\d{14})_[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.sql$/;
@@ -163,29 +165,6 @@ function removeEmptyParents(file, stop) {
 /** The app-root relative path of a file under the app (posix). */
 const at = (root, relative) => path.join(root, ...relative.split("/"));
 
-/**
- * Registers `entry` in the `imports` array of a Nest module file (one import line after the last import, one array entry right
- * after `imports: [`), unless `symbol` is already imported. Returns the new text.
- */
-function wireImport(text, relative, { importLine, symbol, entry, kinds }) {
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
-  if (lines.some((line) => line.startsWith("import ") && new RegExp(`\\b${symbol}\\b`).test(line))) return text;
-  const lastImport = lines.reduce((last, line, index) => (line.startsWith("import ") ? index : last), -1);
-  if (lastImport < 0 || lines.findIndex((line) => /^\s*imports: \[$/.test(line)) < 0)
-    throw new ScaffoldError("HFS_ADD_WIRE_INVALID", `add table could not find the imports array in ${relative}`);
-  lines.splice(lastImport + 1, 0, importLine);
-  const imports = lines.findIndex((line) => /^\s*imports: \[$/.test(line));
-  const indent = /^(\s*)/.exec(lines[imports])?.[1] ?? "";
-  lines.splice(imports + 1, 0, `${indent}    ${entry},`);
-  if (kinds !== undefined) {
-    const kindsAt = lines.findIndex((line) => /^\s*kinds: \[$/.test(line));
-    if (kindsAt < 0) throw new ScaffoldError("HFS_ADD_WIRE_INVALID", `add table could not find the error kinds array in ${relative}`);
-    const kindsIndent = /^(\s*)/.exec(lines[kindsAt])?.[1] ?? "";
-    lines.splice(kindsAt + 1, 0, `${kindsIndent}    ${kinds},`);
-  }
-  return `${lines.join("\n").replace(/\n+$/, "")}\n`;
-}
-
 /** A line that opens the error kinds array of the errors registration. */
 const KINDS_LINE = /^\s*kinds: \[$/;
 
@@ -206,45 +185,33 @@ function kindsHomeOf(root, appRelative) {
 /** A composition group after `kinds` is listed first in its error kinds array and imported from `specifier`. Returns the new text. */
 function wireKinds(text, relative, { kinds, specifier }) {
   const lines = text.replace(/\r\n/g, "\n").split("\n");
-  if (lines.some((line) => line.startsWith("import ") && new RegExp(`\\b${kinds}\\b`).test(line))) return text;
+  if (lines.some((line) => line.startsWith("import ") && new RegExp(String.raw`\b${kinds}\b`).test(line))) return text;
   const lastImport = lines.reduce((last, line, index) => (line.startsWith("import ") ? index : last), -1);
   const kindsAt = lines.findIndex((line) => KINDS_LINE.test(line));
   if (lastImport < 0 || kindsAt < 0) throw new ScaffoldError("HFS_ADD_WIRE_INVALID", `add table could not find the error kinds array in ${relative}`);
   const kindsIndent = /^(\s*)/.exec(lines[kindsAt])?.[1] ?? "";
   lines.splice(kindsAt + 1, 0, `${kindsIndent}    ${kinds},`);
   lines.splice(lastImport + 1, 0, `import { ${kinds} } from "${specifier}"`);
-  return `${lines.join("\n").replace(/\n+$/, "")}\n`;
+  return `${lines.join("\n").trimEnd()}\n`;
 }
 
-/**
- * The api app root after the table's domain module is registered: its module, and its error kinds too when the root holds the
- * kinds array (`kindsInRoot`); otherwise wireKinds lists them in the composition group that does.
- */
-const wireDomainModule = (text, relative, name, { kindsInRoot = true } = {}) =>
-  wireImport(text, relative, {
-    importLine: kindsInRoot
-      ? `import { ${snakeOf(name).toUpperCase()}_ERROR_KINDS, ${pascalOf(name)}Module } from "@modules/domain/${name}"`
-      : `import { ${pascalOf(name)}Module } from "@modules/domain/${name}"`,
-    symbol: `${pascalOf(name)}Module`,
-    entry: `${pascalOf(name)}Module.register({ isGlobal: true })`,
-    ...(kindsInRoot ? { kinds: `${snakeOf(name).toUpperCase()}_ERROR_KINDS` } : {}),
+/** Plans the domain and API area groups of the connection owner, keeping registrations out of app.module.ts. */
+function tableComposition({ root, repo, owner, feature, fe, ownerRelative }) {
+  const domain = { importLine: `import { ${pascalOf(feature)}Module } from "@modules/domain/${feature}"`, entry: `${pascalOf(feature)}Module.register({ isGlobal: true })` };
+  const groups = [['domain', [domain]]];
+  if (fe) groups.push(['api', [
+    { importLine: 'import { GraphqlModule } from "@modules/platform/graphql"', entry: 'GraphqlModule.register({ isGlobal: true })' },
+    { importLine: `import { ${pascalOf(feature)}GraphqlModule } from "@features/api/${feature}"`, entry: `${pascalOf(feature)}GraphqlModule` },
+  ]]);
+  const lines = fs.readFileSync(at(root, ownerRelative), 'utf8').replace(/\r\n/g, '\n').split('\n');
+  const patches = groups.map(([area, entries]) => {
+    const argument = area === 'domain' && repo.edition === 'lite' ? 'verifyAccessToken' : '';
+    addModuleImport(lines, { importLine: `import { ${area}Modules } from "./compose/${area}"`, entry: `...${area}Modules(${argument})`, relative: ownerRelative, noun: 'table' });
+    return planComposeGroup({ repoRoot: root, repo, app: owner.name, area, noun: 'table', entries });
   });
-
-/** The api app root after the GraphQL server (platform/graphql) and the table's GraphQL transport are registered. */
-const wireGraphqlFeature = (text, relative, name) =>
-  wireImport(
-    wireImport(text, relative, {
-      importLine: 'import { GraphqlModule } from "@modules/platform/graphql"',
-      symbol: "GraphqlModule",
-      entry: "GraphqlModule.register({ isGlobal: true })",
-    }),
-    relative,
-    {
-      importLine: `import { ${pascalOf(name)}GraphqlModule } from "@features/api/${name}"`,
-      symbol: `${pascalOf(name)}GraphqlModule`,
-      entry: `${pascalOf(name)}GraphqlModule`,
-    },
-  );
+  patches.push({ relative: ownerRelative, text: lines.join('\n') });
+  return patches;
+}
 
 /** The platform GraphQL server capability (templates/be/platform/graphql), whole or absent: written once, by the first GraphQL feature. */
 const GRAPHQL_PLATFORM = "be/src/modules/platform/graphql";
@@ -287,7 +254,7 @@ const GRAPHQL_URL_READER = [
 
 /** An app's modules/config text with graphqlUrl appended once. */
 const withGraphqlUrl = (text) =>
-  /^export const graphqlUrl\b/m.test(text) ? text : `${text.replace(/\s*$/, "")}\n${GRAPHQL_URL_READER}\n`;
+  /^export const graphqlUrl\b/m.test(text) ? text : `${text.trimEnd()}\n${GRAPHQL_URL_READER}\n`;
 
 /** The be api feature of a table (owner ruling 2026-10-13, lite = full): get-<singular> and create-<singular> over GraphQL. */
 const apiFeatureFiles = (values) => {
@@ -351,7 +318,7 @@ const feBarrels = (app, values) => {
 const withExport = (text, line) => {
   const lines = text.replace(/\r\n/g, "\n").split("\n").filter(Boolean);
   if (lines.includes(line)) return text;
-  return `${[...lines, line].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join("\n")}\n`;
+  return `${[...lines, line].sort(byCodeUnit).join("\n")}\n`;
 };
 
 /**
@@ -359,13 +326,7 @@ const withExport = (text, line) => {
  * server capability on first use) and, in every product Next app, its operation files and SWR hooks.
  * `emitTypes` returns the generated database.types.ts text; false is the explicit `--no-types` seam.
  */
-export function addTable({
-  root,
-  name,
-  fe = false,
-  emitTypes = emitDbTypes,
-  now = Date.now,
-}) {
+function tableContext({ root, name }) {
   const requestedName = String(name);
   if (!NAME.test(requestedName))
     throw new ScaffoldError(
@@ -384,12 +345,16 @@ export function addTable({
     );
   }
 
+  return { root, name, requestedName, feature, table, repo, connection };
+}
+
+function nextMigration({ root, feature, requestedName, now }) {
   const migrationsDir = path.join(root, "supabase", "migrations");
   const migrations = fs.existsSync(migrationsDir)
     ? fs
         .readdirSync(migrationsDir)
         .filter((file) => MIGRATION.test(file))
-        .sort()
+        .sort(byCodeUnit)
     : [];
   if (migrations.some((file) => file.endsWith(`_${feature}.sql`)))
     throw new ScaffoldError(
@@ -404,6 +369,10 @@ export function addTable({
       `the current UTC timestamp ${stamp} is not later than the latest migration ${latest}; fix the clock or wait for the next second`,
     );
 
+  return stamp;
+}
+
+function tableValues({ feature, table }) {
   const singular = singularOf(feature);
   const values = {
     name: feature,
@@ -417,12 +386,20 @@ export function addTable({
     singularCamel: camelOf(singular),
     singularUpper: snakeOf(singular).toUpperCase(),
   };
+  return values;
+}
+
+function productApps(repo, fe) {
   const apps = fe ? coreFeApps(repo.sides?.fe?.apps ?? []) : [];
   if (fe && !apps.length)
     throw new ScaffoldError(
       "HFS_ADD_NO_FRONT_END",
       "add table --fe needs at least one declared product Next app",
     );
+  return apps;
+}
+
+function tableFiles({ root, repo, feature, stamp, values, fe, apps }) {
   const api = fe ? ".api" : "";
   const domain = `be/src/modules/domain/${feature}`;
   const planned = [
@@ -455,6 +432,10 @@ export function addTable({
     }
   }
 
+  return planned;
+}
+
+function tableOwner({ root, repo, connection, name, requestedName, planned }) {
   const clash = planned
     .filter((file) => fs.existsSync(at(root, file.relative)))
     .map((file) => file.relative);
@@ -470,8 +451,10 @@ export function addTable({
   if (!fs.existsSync(at(root, ownerRelative)))
     throw new ScaffoldError("HFS_ADD_WIRE_MISSING", `add table registers ${name} in ${ownerRelative}, which does not exist`);
 
-  // Every existing file this run edits, as it was: restored on any failure, with every created file removed.
-  const touched = new Map();
+  return { owner, ownerRelative };
+}
+
+function tableEditor(root, touched) {
   const edit = (relative, change) => {
     const file = at(root, relative);
     if (!touched.has(file)) touched.set(file, fs.existsSync(file) ? fs.readFileSync(file) : null);
@@ -481,38 +464,51 @@ export function addTable({
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, after);
   };
-  const created = [];
-  try {
-    for (const file of planned) {
-      const target = at(root, file.relative);
-      fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.writeFileSync(target, file.body);
-      created.push(target);
-    }
-    if (typeof emitTypes === "function") {
-      const generated = emitTypes({ root });
-      if (typeof generated === "string") edit(dbTypesPath, () => generated);
-    }
-    const kindsHome = kindsHomeOf(root, ownerRelative);
-    const kindsInRoot = kindsHome === ownerRelative;
-    edit(ownerRelative, (text) => wireDomainModule(text, ownerRelative, feature, { kindsInRoot }));
-    if (!kindsInRoot)
-      edit(kindsHome, (text) => wireKinds(text, kindsHome, { kinds: `${snakeOf(feature).toUpperCase()}_ERROR_KINDS`, specifier: `@modules/domain/${feature}` }));
+  return edit;
+}
+
+function writeTableFiles({ root, planned, emitTypes, edit }, created) {
+  for (const file of planned) {
+    const target = at(root, file.relative);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, file.body);
+    created.push(target);
+  }
+  if (typeof emitTypes === "function") {
+    const generated = emitTypes({ root });
+    if (typeof generated === "string") edit(dbTypesPath, () => generated);
+  }
+
+}
+
+function tableRegistrations({ root, repo, fe, edit }) {
+  const errorFile = "be/src/modules/platform/database/errors/database.error.ts";
+  if (repo.edition === "lite" && fs.existsSync(at(root, errorFile))) edit(errorFile, withSqlIdentifierError);
     const registrations = [
       ...(repo.edition === "lite" ? ["table"] : []),
       ...(fe ? ["api", "graphql"] : []),
     ];
     for (const generator of registrations) for (const relative of registrationFiles(generator)) edit(relative, (text) => text);
     for (const generator of registrations) registerLiteExports({ root, generator });
-    if (fe) {
+}
+
+function wireTableFrontends({ root, feature, values, apps, edit }) {
       registerLiteDomainService({ root, moduleSpecifier: `@modules/domain/${feature}`, service: `${values.Name}Service` });
-      edit(ownerRelative, (text) => wireGraphqlFeature(text, ownerRelative, feature));
       for (const app of apps) {
         for (const [relative, line] of feBarrels(app.name, values)) edit(relative, (text) => withExport(text, line));
         edit(`fe/apps/${app.name}/src/modules/config/index.ts`, withGraphqlUrl);
       }
-    }
-  } catch (error) {
+}
+
+function wireTable({ root, repo, feature, values, ownerRelative, composition, fe, apps, edit }) {
+    const kindsHome = kindsHomeOf(root, ownerRelative);
+    for (const patch of composition) edit(patch.relative, () => patch.text);
+    edit(kindsHome, (text) => wireKinds(text, kindsHome, { kinds: `${snakeOf(feature).toUpperCase()}_ERROR_KINDS`, specifier: `@modules/domain/${feature}` }));
+  tableRegistrations({ root, repo, fe, edit });
+  if (fe) wireTableFrontends({ root, feature, values, apps, edit });
+}
+
+function rollbackTable(root, touched, created) {
     for (const [file, before] of touched) {
       if (before === null) fs.rmSync(file, { force: true });
       else fs.writeFileSync(file, before);
@@ -522,10 +518,33 @@ export function addTable({
       removeEmptyParents(file, root);
     }
     for (const [file, before] of touched) if (before === null) removeEmptyParents(file, root);
+}
+
+function applyTable(context) {
+  const touched = new Map();
+  const created = [];
+  const edit = tableEditor(context.root, touched);
+  try {
+    writeTableFiles({ ...context, edit }, created);
+    wireTable({ ...context, edit });
+  } catch (error) {
+    rollbackTable(context.root, touched, created);
     throw error;
   }
+}
+
+/** Adds one table through typed domain/API groups and restores every touched byte on failure. */
+export function addTable({ root, name, fe = false, emitTypes = emitDbTypes, now = Date.now }) {
+  const context = tableContext({ root, name });
+  const stamp = nextMigration({ ...context, now });
+  const values = tableValues(context);
+  const apps = productApps(context.repo, fe);
+  const planned = tableFiles({ ...context, stamp, values, apps, fe });
+  const owner = tableOwner({ ...context, planned });
+  const composition = tableComposition({ ...context, ...owner, fe });
+  applyTable({ ...context, ...owner, planned, composition, apps, values, fe, emitTypes });
   return {
-    created: planned.map((file) => file.relative),
+    created: [...planned.map((file) => file.relative), ...composition.filter((patch) => patch.exists === false).map((patch) => patch.relative)],
     types: typeof emitTypes === "function" ? dbTypesPath : "skipped",
   };
 }

@@ -1,11 +1,66 @@
-# The stack declaration of the app, at the app root beside be/, fe/ and .starciwork (never under a side).
+# The app declares its topology before any owner provisions a deployment.
 schema: starci/application-stacks@1
+sources:
+  - repository: "{{project}}"
+components:
+  core:
+    role: service
+    image: "{{project}}/core:v0.0.0"
+  app:
+    role: service
+    image: "{{project}}/app:v0.0.0"
+  landing:
+    role: service
+    image: "{{project}}/landing:v0.0.0"
+  ingress:
+    role: ingress
+    image: caddy:2.10.2@sha256:c3d7ee5d2b11f9dc54f947f68a734c84e9c9666c92c88a7f30b9cba5da182adb
+    purpose: The single public entry point; TLS state stays on its declared persistent volume.
+  postgres:
+    role: stateful
+    image: postgres:16@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
+    purpose: The full development database; production uses an owner-provisioned external PostgreSQL connection.
+environments:
+  dev:
+    status: supported
+    runtime: docker-compose
+    composeFiles: [infra/compose/stack.yaml]
+    components:
+      core: { port: 3001 }
+      app: { port: 3000 }
+      landing: { port: 3002 }
+      postgres: { port: 5432 }
+    runbook: README.md
+    # Custody starts empty; add real sealed members after owner provisioning.
+    secrets: []
+  production:
+    status: supported
+    runtime: docker-swarm
+    composeFiles: [infra/swarm/stack.yaml]
+    components:
+      core: { port: 3001 }
+      app: { port: 3000 }
+      landing: { port: 3002 }
+      ingress: { httpPort: 80, httpsPort: 443 }
+    runbook: README.md
+    # External Swarm secret names are declared in the model. Real sealed members are owner-provisioned.
+    secrets: []
+k8s:
+  status: deferred
+  reason: This starter declares Docker Swarm production; no Kubernetes environment is provisioned.
 services:
   sonar:
     provider: sonarqube
     mode: local
     qualityGate: {{sonarGate}}
+    host: { local: http://127.0.0.1:9000 }
     stack:
       owner: host
       root: .claude/ext/sonar
       environment: dev
+      compose: compose.yaml
+    auth: token
+    ci: { wiring: optional-follow-up }
+    ownerAction:
+      needed: Provision the shared host Sonar project and its analysis credential through sealed custody.
+      reason: A fresh app declares its quality service without fabricating credentials or a successful analysis.

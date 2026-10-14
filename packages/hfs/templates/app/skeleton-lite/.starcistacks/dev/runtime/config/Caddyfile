@@ -1,0 +1,16 @@
+{
+    admin 127.0.0.1:2019
+    auto_https off
+}
+
+:80 {
+    handle /graphql* {
+        reverse_proxy api:3001
+    }
+    handle /health/* {
+        reverse_proxy api:3001
+    }
+    handle {
+        reverse_proxy web:3000
+    }
+}

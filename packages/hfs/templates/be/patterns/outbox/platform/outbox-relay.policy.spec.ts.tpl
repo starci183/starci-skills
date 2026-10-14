@@ -1,6 +1,10 @@
+import { Test } from "@nestjs/testing"
 import { fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
 import type { EntityManager } from "typeorm"
+import { injector } from "@modules/platform/composition"
+import type { TypedParameterDecorator } from "@modules/platform/composition"
+import { InjectLogger, LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { OutboxLogEvent } from "./outbox.log-events"
 import { OutboxRelayPolicy } from "./outbox-relay.policy"
@@ -9,25 +13,37 @@ interface Row {
     readonly id: string
 }
 
+const OUTBOX_MANAGERS: unique symbol = Symbol("spec.outbox.managers")
+
+/** Injects the entity managers of the test relay. Parameter type: ReadonlyArray<EntityManager>. */
+const InjectOutboxManagers = (): TypedParameterDecorator<ReadonlyArray<EntityManager>> =>
+    injector<ReadonlyArray<EntityManager>>(OUTBOX_MANAGERS)
+
 class ProbeRelay extends OutboxRelayPolicy<Row> {
     readonly select = jest.fn<Promise<Array<Row>>, [EntityManager]>()
     readonly deliver = jest.fn<Promise<void>, [ReadonlyArray<Row>]>()
     readonly mark = jest.fn<Promise<void>, [EntityManager, ReadonlyArray<Row>]>()
     readonly idle = jest.fn<Promise<void>, []>()
+    protected readonly outbox = "probe"
 
     constructor(
-        protected readonly managers: ReadonlyArray<EntityManager>,
-        protected readonly logger: Logger,
-        protected readonly outbox = "probe",
+        @InjectOutboxManagers() protected readonly managers: ReadonlyArray<EntityManager>,
+        @InjectLogger() protected readonly logger: Logger,
     ) {
         super()
     }
 }
 
-const build = (...managers: Array<MockEntityManager>) => {
+const build = async (...managers: Array<MockEntityManager>) => {
     const logger = mock<Logger>()
-    const relay = new ProbeRelay(managers, logger)
-    return { relay, logger }
+    const moduleRef = await Test.createTestingModule({
+        providers: [
+            ProbeRelay,
+            { provide: OUTBOX_MANAGERS, useValue: [...managers] },
+            { provide: LOGGER, useValue: logger },
+        ],
+    }).compile()
+    return { relay: moduleRef.get(ProbeRelay), logger }
 }
 
 describe("OutboxRelayPolicy", () => {
@@ -35,7 +51,7 @@ describe("OutboxRelayPolicy", () => {
         it("delivers and marks every connection's waiting rows in its own transaction", async () => {
             const first = fakeTransaction(mockEntityManager())
             const second = fakeTransaction(mockEntityManager())
-            const { relay } = build(first.em, second.em)
+            const { relay } = await build(first.em, second.em)
             const rows = [{ id: "row-1" }, { id: "row-2" }]
             relay.select.mockResolvedValueOnce(rows).mockResolvedValueOnce([])
             relay.deliver.mockResolvedValue(undefined)
@@ -52,7 +68,7 @@ describe("OutboxRelayPolicy", () => {
 
         it("leaves the rows unmarked when delivery fails", async () => {
             const transaction = fakeTransaction(mockEntityManager())
-            const { relay } = build(transaction.em)
+            const { relay } = await build(transaction.em)
             const failure = new Error("transport down")
             relay.select.mockResolvedValue([{ id: "row-1" }])
             relay.deliver.mockRejectedValue(failure)
@@ -66,7 +82,7 @@ describe("OutboxRelayPolicy", () => {
 
     describe("the loop", () => {
         it("repeats immediately after work, idles after an empty or failed pass, logs the failure and stops on shutdown", async () => {
-            const { relay, logger } = build()
+            const { relay, logger } = await build()
             const failure = new Error("outbox unreadable")
             jest.spyOn(relay, "relay").mockResolvedValueOnce(1).mockResolvedValueOnce(0).mockRejectedValueOnce(failure)
             let waits = 0

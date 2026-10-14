@@ -1,5 +1,12 @@
-drop role if exists app_be;
-create role app_be login noinherit;
+do $$
+begin
+    if not exists (select 1 from pg_catalog.pg_roles where rolname = 'app_be') then
+        create role app_be login noinherit nosuperuser nobypassrls nocreatedb nocreaterole;
+    end if;
+end;
+$$;
+
+alter role app_be login noinherit nosuperuser nobypassrls nocreatedb nocreaterole;
 
 create schema if not exists private;
 
@@ -24,6 +31,7 @@ create table public.profiles (
 );
 
 alter table public.profiles enable row level security;
+alter table public.profiles force row level security;
 
 create trigger profiles_set_updated_at
 before update on public.profiles
@@ -34,20 +42,20 @@ create policy profiles_app_be_select
 on public.profiles
 for select
 to app_be
-using (id is not null);
+using (current_user = 'app_be');
 
 create policy profiles_app_be_insert
 on public.profiles
 for insert
 to app_be
-with check (id is not null);
+with check (current_user = 'app_be');
 
 create policy profiles_app_be_update
 on public.profiles
 for update
 to app_be
-using (id is not null)
-with check (id is not null);
+using (current_user = 'app_be')
+with check (current_user = 'app_be');
 
 grant usage on schema public to app_be;
 revoke all on table public.profiles from public, anon, authenticated;

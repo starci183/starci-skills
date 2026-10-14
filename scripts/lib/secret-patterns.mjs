@@ -83,8 +83,10 @@ export const SECRET_PATTERNS = [
   // form password and a mocked accessToken once refused a push): the heuristic skips spec files too.
   { name: 'assigned-secret', re: ASSIGNED_QUOTED, placeholder: /fixture|stub|fake|dummy|placeholder|example|sample|changeme|redacted|mock/i,
     skipFile: /\.(?:spec|test|e2e-spec)\.[cm]?[jt]sx?$/ },
+  // An unquoted value in TypeScript or JavaScript source is an identifier or a type (`token: InjectionToken`,
+  // `MODULE_OPTIONS_TOKEN: DATABASE_OPTIONS_TOKEN`), never a literal; the unquoted form is the dotenv, compose and toml shape.
   { name: 'assigned-secret', re: ASSIGNED_UNQUOTED, placeholder: /fixture|stub|fake|dummy|placeholder|example|sample|changeme|redacted|mock/i,
-    skipFile: /\.(?:spec|test|e2e-spec)\.[cm]?[jt]sx?$/ },
+    skipFile: /\.(?:spec|test|e2e-spec)\.[cm]?[jt]sx?$|\.[cm]?[jt]sx?$/ },
 ];
 
 

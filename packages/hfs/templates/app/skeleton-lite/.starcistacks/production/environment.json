@@ -1,0 +1,5 @@
+{
+  "environment": "production",
+  "provider": "supabase",
+  "project": "{{project}}"
+}

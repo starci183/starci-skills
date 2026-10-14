@@ -169,17 +169,15 @@ export function addApp({ root, name }) {
   const planned = [...planAppTemplates(repo, name), ...planWorkspaceManifests(root, repo, name)];
   const declaration = JSON.parse(fs.readFileSync(declarationFile, "utf8"));
   declaration.sides.fe.apps.push({ name, kind: "next" });
-  if (repo.edition === "full") {
-    const image = imageFiles(
-      resolveRepoDeclaration(manifest, declaration),
-    ).find((file) => file.path === `${targetBase}/Dockerfile`);
-    if (!image)
-      throw new ScaffoldError(
-        "HFS_ADD_TEMPLATE_MISSING",
-        `the Dockerfile of front-end app ${name} did not render`,
-      );
-    planned.push({ relative: image.path, body: image.content });
-  }
+  const image = imageFiles(
+    resolveRepoDeclaration(manifest, declaration),
+  ).find((file) => file.path === `${targetBase}/Dockerfile`);
+  if (!image)
+    throw new ScaffoldError(
+      "HFS_ADD_TEMPLATE_MISSING",
+      `the Dockerfile of front-end app ${name} did not render`,
+    );
+  planned.push({ relative: image.path, body: image.content });
 
   const clashes = planned
     .filter((file) =>

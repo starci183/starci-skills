@@ -1,0 +1,71 @@
+# Rendered development model. App images and owner infrastructure must be provisioned before use.
+version: "3.8"
+services:
+  core:
+    image: "{{project}}/core:v0.0.0"
+    environment:
+      NODE_ENV: development
+      PORT: "3001"
+      HTTP_SECURITY_ALLOWED_ORIGINS: http://127.0.0.1:3000
+      PRIMARY_DB_URL_FILE: /run/secrets/primary-db-url
+    secrets:
+      - source: primary-db-url
+        target: primary-db-url
+    ports: ["3001:3001"]
+    networks: [app]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+  app:
+    image: "{{project}}/app:v0.0.0"
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
+    ports: ["3000:3000"]
+    networks: [app]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+  landing:
+    image: "{{project}}/landing:v0.0.0"
+    environment:
+      NODE_ENV: development
+      PORT: "3002"
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+    ports: ["3002:3002"]
+    networks: [app]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+  postgres:
+    image: postgres:16@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
+    environment:
+      POSTGRES_DB: "{{project}}"
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    networks: [app]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d {{project}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+networks:
+  app:
+    driver: bridge
+secrets:
+  primary-db-url:
+    file: /run/starci-secrets/{{project}}/dev/primary-db-url
+volumes:
+  postgres-data:

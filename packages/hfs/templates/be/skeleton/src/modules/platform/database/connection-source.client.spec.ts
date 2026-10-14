@@ -19,7 +19,7 @@ describe("openConnectionSource", () => {
     it("opens an isolated PostgreSQL data source with the connection's entities and migrations", () => {
         const connection: DatabaseConnectionOptions = {
             name: "primary",
-            url: new Secret("postgres://user:password@database.test:5432/primary"),
+            url: new Secret("postgres://app_be@database.test:5432/primary"),
             entities: [NoteEntity],
             migrations: [CreateNotes],
         }
@@ -29,7 +29,7 @@ describe("openConnectionSource", () => {
         expect(source).toMatchObject({
             options: {
                 type: "postgres",
-                url: "postgres://user:password@database.test:5432/primary",
+                url: "postgres://app_be@database.test:5432/primary",
                 entities: [NoteEntity],
                 migrations: [CreateNotes],
                 migrationsTableName: "primary_migrations",

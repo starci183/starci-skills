@@ -7,6 +7,7 @@ create table public.inbox (
 );
 
 alter table public.inbox enable row level security;
+alter table public.inbox force row level security;
 
 create policy "inbox_app_be_select"
 on public.inbox for select to app_be
@@ -28,6 +29,7 @@ create table public.event_bus (
 );
 
 alter table public.event_bus enable row level security;
+alter table public.event_bus force row level security;
 
 create policy "event_bus_app_be_select"
 on public.event_bus for select to app_be
