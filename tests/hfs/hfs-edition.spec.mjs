@@ -60,7 +60,7 @@ test('lite removes the slots its editions exclude, keeps the rest, and adds its 
   const manifest = loadSlotManifest();
   for (const slot of manifest.slots) assert.ok(slot.editions === undefined || slot.editions.every((e) => ['full', 'lite'].includes(e)), `${slot.id}: unknown edition`);
   const liteOnly = manifest.slots.filter((s) => s.editions?.includes('lite') && !s.editions.includes('full')).map((s) => s.id);
-  assert.deepEqual(liteOnly.sort(), ['app.starciwork.uat'], 'the lite-only slots');
+  assert.deepEqual(liteOnly.sort(), [], 'lite filters and overlays the same slots; Work has no separate UAT slot');
   const fe = loadSlotManifest().slots.filter((s) => s.id.startsWith('fe.'));
   assert.deepEqual(fe.filter((s) => s.editions || s.litePresence || s.lite).map((s) => s.id), [], 'the front end has no edition overlay: lite = full (owner ruling 2026-10-13)');
   const liteBe = openHfs({ declaration: app({ edition: 'lite' }), side: 'be' });
@@ -126,12 +126,13 @@ test('lite classification: e2e, contract, the GraphQL subscription door and the 
   const withWorker = openHfs({ declaration: app({ edition: 'lite', be: { ...BE, apps: [...BE.apps, { name: 'jobs', kind: 'worker' }] } }), side: 'be' });
   assert.equal(withWorker.classifyPath('apps/jobs/src/main.ts').slot, 'be.app.worker');
   assert.notEqual(withWorker.classifyPath('apps/jobs/src/main.ts').status, 'forbidden', 'the optional worker app is legal under lite');
-  // at the app root: the e2e workflow and the browser journey are forbidden, the UAT records of .starciwork are the lite-only slot's
+  // at the app root: the e2e workflow and browser journey are forbidden; Work's admission list owns its brand-only boundary
   assert.deepEqual([whole.classifyPath('.github/workflows/e2e.yml').status, whole.classifyPath('.github/workflows/e2e.yml').slot], ['forbidden', 'app.ci-e2e']);
   assert.deepEqual([whole.classifyPath('browser/playwright.config.ts').status, whole.classifyPath('browser/playwright.config.ts').slot], ['forbidden', 'app.browser']);
   assert.equal(whole.classifyPath('codecov.yml').slot, 'app.quality-config', 'lite keeps codecov.yml');
-  assert.equal(whole.classifyPath('.starciwork/_resources/identities/users.yaml').slot, 'app.starciwork.uat');
-  assert.equal(whole.classifyPath('.starciwork/_resources/identities/users.yaml').status, 'forbidden');
+  assert.equal(whole.classifyPath('.starciwork/_resources/identities/users.yaml').slot, 'app.starciwork');
+  const work = checkRepo({ repoRoot: root, declaration: app({ edition: 'lite' }), files: ['.starciwork/_resources/identities/users.yaml'], tree: false });
+  assert.equal(work.findings.some((finding) => finding.path === '.starciwork/_resources/identities/users.yaml' && finding.code === 'HFS_STARCIWORK_LITE_FORBIDDEN'), true);
   assert.equal(be.classifyPath('src/features/api/orders/index.ts').slot, 'be.feature');
   assert.equal(be.classifyPath('apps/cli/src/main.ts').slot, 'be.app.cli', 'a cli app is optional under lite, not forbidden');
   assert.equal(fe.classifyPath('apps/web/src/app/auth/callback/route.ts').slot, 'fe.route.callback', 'the OAuth callback route exists under lite');

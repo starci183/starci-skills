@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {walk} from './check-example-work.mjs';
+import { exampleWorkRoots } from '../../lib/example-refs.mjs';
 import {APP_SIDES, readWorkspace, resolveOwnedDirs, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../record-ownership.mjs'; import { isMain } from '../../lib/is-main.mjs';
 import {declaredSubscriptions,wiredSubscriptions,reportWiredSubscriptionDiff,reportFeaturesWithoutSubscribers,appendRepoSurfaceMap,appendSurfaceTotals} from './work-surface-reporting.mjs';
 import {fromRoot, repoRoot} from './work-consistency-shared.mjs';
@@ -142,7 +143,7 @@ if (isMain(import.meta.url)) {
   const args = process.argv.slice(2);
   const treeArg = args.includes('--tree') ? args[args.indexOf('--tree') + 1] : null;
   const trees = treeArg ? [path.resolve(treeArg)]
-    : walk(path.join(root, 'examples')).filter(f => f.endsWith(`.starciwork${path.sep}index.yaml`)).map(dir => path.dirname(dir));
+    : exampleWorkRoots(root);
 
   const out = {refuse: [], suspect: [], info: [], map: []};
   for (const workRoot of trees) checkWorkSurfaces(workRoot, out);

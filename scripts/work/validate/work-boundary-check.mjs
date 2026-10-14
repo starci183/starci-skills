@@ -2,6 +2,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {isProductPath, agentDataCategory} from '../../lib/starciwork-boundary.mjs';
 import {lsFiles} from '../../api/git/ls-files.mjs';
+import {isLiteWorkRoot, liteWorkForbiddenPaths, workPathAllowed} from '../../lib/work-edition.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..','..','..');
 const BOUNDARY_TRANSITIONAL=Object.freeze([]);
@@ -32,8 +33,22 @@ function reportBoundaryGroup(key,count,resolveRoot,problems,warnings){
   }
 }
 
-/** Judge tracked paths in one .starciwork tree against its declared product path boundary. */
+/** Judge tracked product paths in full Work; lite forbids every non-brand root entry on disk. */
 export function checkStarciworkBoundary(workRoot,problems,warnings=[],resolveRoot=workRoot){
+  if(isLiteWorkRoot(resolveRoot)){
+    if(!workPathAllowed(resolveRoot,workRoot,{dir:true})){
+      const shown=path.relative(root,workRoot).replaceAll('\\','/');
+      problems.push(`${shown}: lite .starciwork holds only brand/ [HFS_STARCIWORK_LITE_FORBIDDEN]`);
+      return;
+    }
+    for(const file of liteWorkForbiddenPaths(resolveRoot)){
+      const rel=path.relative(workRoot,file);
+      if(workRoot!==resolveRoot&&(rel==='..'||rel.startsWith(`..${path.sep}`)||path.isAbsolute(rel)))continue;
+      const shown=path.relative(root,file).replaceAll('\\','/');
+      problems.push(`${shown}: lite .starciwork holds only brand/ [HFS_STARCIWORK_LITE_FORBIDDEN]`);
+    }
+    return;
+  }
   const groups=new Map();
   for(const file of trackedFilesUnder(workRoot)){
     const rel=path.relative(resolveRoot,file).replaceAll('\\','/');

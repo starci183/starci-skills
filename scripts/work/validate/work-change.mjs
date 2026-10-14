@@ -5,6 +5,7 @@ import {canonicalJSON} from '../../../engine/canonical-json.mjs';import {sha256}
 import {slash} from '../../lib/path-key.mjs';
 import {list, byCodeUnit} from '../../lib/list.mjs';
 import {isDir,isFile} from '../../lib/fs-kind.mjs';
+import {isLiteWorkRoot,workPathAllowed} from '../../lib/work-edition.mjs';
 
 /**
  * The change record: the part of the Work model that decides how far an edit travels.
@@ -130,6 +131,7 @@ function addReadableRecord(target,resolved,records,unreadable){
 function collectWorkRecords(dir,resolved,records,unreadable){
   for(const entry of fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){
     const target=path.join(dir,entry.name);
+    if(!workPathAllowed(resolved,target,{dir:entry.isDirectory()}))continue;
     if(entry.isDirectory()){
       if(!SKIP_DIRECTORY.test(entry.name)&&isDir(target,{followLinks:false}))collectWorkRecords(target,resolved,records,unreadable);
       continue;
@@ -149,6 +151,7 @@ function attachAcceptanceCriteria(records){
 
 export function readWorkTree(root){
   const resolved=path.resolve(root);
+  if(!fs.existsSync(resolved)&&isLiteWorkRoot(resolved))return {root:resolved,records:new Map(),unreadable:[]};
   if(!isDir(resolved,{followLinks:false}))throw new WorkChangeInputError(`Not a readable Work root: ${slash(root)}`);
   const records=new Map(),unreadable=[];
   collectWorkRecords(resolved,resolved,records,unreadable);

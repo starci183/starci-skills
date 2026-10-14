@@ -11,7 +11,7 @@ import { PRESETS, FORMATTED } from '../helpers/hfs-cli-fixture.mjs';
 const lock = () => ({ ok: true });
 const scaffold = (into, name, edition) => scaffoldApp({ name, into, edition, presets: PRESETS, lock,
   emitTypes: () => 'export interface Database { public: { Tables: Record<string, never> } }\n' });
-const workFiles = (root) => fs.readdirSync(path.join(root, '.starciwork'), { recursive: true, withFileTypes: true })
+const workFiles = (root) => !fs.existsSync(path.join(root, '.starciwork')) ? [] : fs.readdirSync(path.join(root, '.starciwork'), { recursive: true, withFileTypes: true })
   .filter((entry) => entry.isFile() && entry.name.endsWith('.yaml'))
   .map((entry) => path.relative(root, path.join(entry.parentPath, entry.name)).replaceAll('\\', '/'));
 const hygiene = (root) => {
@@ -20,23 +20,25 @@ const hygiene = (root) => {
   return result;
 };
 
-test('both rendered app editions have a root catalog with a real feature node and pass scoped Work hygiene', (t) => {
+test('full scaffolds the Work catalog and feature while lite needs only its product source', (t) => {
   const into = mkdtemp(t, 'hfs-work-seeds-');
   for (const edition of ['full', 'lite']) {
     const created = scaffold(into, `work-${edition}`, edition);
-    assert.ok(created.files.includes('.starciwork/index.yaml'));
-    assert.ok(created.files.includes('.starciwork/features/system-health/index.yaml'));
+    assert.equal(created.files.includes('.starciwork/index.yaml'), edition === 'full');
+    assert.equal(created.files.includes('.starciwork/features/system-health/index.yaml'), edition === 'full');
     assert.ok(!created.files.includes('.starciwork/features/index.yaml'));
     assert.ok(fs.existsSync(path.join(created.root, 'be/src/features/api/system-health/transport/http/live.controller.ts')));
-    for (const seed of scaffoldWorkSeeds(`work-${edition}`)) assert.equal(fs.readFileSync(path.join(created.root, seed.path), 'utf8'), seed.content);
+    if (edition === 'full') {
+      for (const seed of scaffoldWorkSeeds(`work-${edition}`)) assert.equal(fs.readFileSync(path.join(created.root, seed.path), 'utf8'), seed.content);
+    } else assert.equal(fs.existsSync(path.join(created.root, '.starciwork')), false);
     hygiene(created.root);
   }
 });
 
-test('upgrading an older lite app adds those exact canonical Work seeds and passes hygiene', async (t) => {
+test('upgrading a lite app without Work adds the full workspace, catalog and feature and passes hygiene', async (t) => {
   const into = mkdtemp(t, 'hfs-work-upgrade-');
   const { root } = scaffold(into, 'reseed-lite', 'lite');
-  for (const seed of scaffoldWorkSeeds('reseed-lite')) fs.rmSync(path.join(root, seed.path));
+  assert.equal(fs.existsSync(path.join(root, '.starciwork')), false);
   const plan = await upgradeEdition({ root, to: 'full', plan: true, presets: PRESETS });
   for (const seed of scaffoldWorkSeeds('reseed-lite')) assert.ok(plan.some((step) => step.path === seed.path));
   await upgradeEdition({ root, to: 'full', presets: PRESETS, prettier: FORMATTED, lock });
@@ -44,9 +46,14 @@ test('upgrading an older lite app adds those exact canonical Work seeds and pass
   hygiene(root);
 });
 
-test('upgrade preserves an authored catalog and feature bytes without adding another catalog', async (t) => {
+test('upgrade preserves a legacy lite authored catalog and feature bytes without adding another catalog', async (t) => {
   const into = mkdtemp(t, 'hfs-work-authored-');
   const { root } = scaffold(into, 'authored-lite', 'lite');
+  // A pre-ruling lite app still migrates without overwriting its owner-authored full Work records.
+  for (const seed of scaffoldWorkSeeds('authored-lite')) {
+    fs.mkdirSync(path.dirname(path.join(root, seed.path)), { recursive: true });
+    fs.writeFileSync(path.join(root, seed.path), seed.content);
+  }
   const catalog = path.join(root, '.starciwork/index.yaml');
   fs.appendFileSync(catalog, '# Owner-authored orientation stays in this catalog.\n');
   const before = new Map(workFiles(root).map((file) => [file, fs.readFileSync(path.join(root, file))]));
@@ -60,12 +67,15 @@ test('upgrade preserves an authored catalog and feature bytes without adding ano
 test('a missing catalog is filled while an existing authored system-health feature remains untouched', async (t) => {
   const into = mkdtemp(t, 'hfs-work-partial-');
   const { root } = scaffold(into, 'partial-lite', 'lite');
-  fs.rmSync(path.join(root, '.starciwork/index.yaml'));
   const feature = path.join(root, '.starciwork/features/system-health/index.yaml');
+  const seed = scaffoldWorkSeeds('partial-lite').find((file) => file.path.endsWith('system-health/index.yaml'));
+  fs.mkdirSync(path.dirname(feature), { recursive: true });
+  fs.writeFileSync(feature, seed.content);
   fs.appendFileSync(feature, '# Owner-authored feature orientation.\n');
   const before = fs.readFileSync(feature);
   const plan = await upgradeEdition({ root, to: 'full', plan: true, presets: PRESETS });
   assert.ok(plan.some((step) => step.path === '.starciwork/index.yaml'));
+  assert.ok(plan.some((step) => step.path === '.starciwork/workspace.yaml'));
   assert.ok(plan.every((step) => step.path !== '.starciwork/features/system-health/index.yaml'));
   await upgradeEdition({ root, to: 'full', presets: PRESETS, prettier: FORMATTED, lock });
   assert.deepEqual(fs.readFileSync(feature), before);

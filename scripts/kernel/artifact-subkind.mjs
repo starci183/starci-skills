@@ -30,6 +30,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { resolvedKey, slash } from '../lib/path-key.mjs';
+import { workPathAllowed } from '../lib/work-edition.mjs';
+import { WORK_DIR_NAME } from '../lib/roots.mjs';
 const DRAW_RENDER_SCHEMA = 'starci/draw-render@1';
 
 const UAT_OPS = new Set(['uat.verify', 'uat.assisted.prepare', 'uat.assisted.verify']);
@@ -122,6 +124,7 @@ function recordToolIndex(repo, recordDir) {
 export function manifestToolOf(repo, rel) {
   if (!repo) return null;
   const file = slash(rel);
+  if (!workPathAllowed(path.join(repo, WORK_DIR_NAME), path.resolve(repo, file))) return null;
   const m = /^(\.starciwork\/features\/[^/]+\/(?:ui|impl))(\/[^/]+)?\//.exec(file);
   if (!m) return null;
   // The record: features/<f>/ui (or impl) when it is one record itself, else features/<f>/ui/<surface>.
@@ -159,7 +162,7 @@ const nameSubkind = (kind, base) => {
 /** The capture subkind of one image, or null. */
 const imageSubkind = ({ lower, paths, segs, op, repo, file }) => {
   if (segs.some((s) => TOKEN_DIR.test(s))) return 'draw-render';
-  if (repo && hasDrawRenderRecord(path.join(repo, file))) return 'draw-render';
+  if (repo && workPathAllowed(path.join(repo, WORK_DIR_NAME), path.join(repo, file)) && hasDrawRenderRecord(path.join(repo, file))) return 'draw-render';
   if (op === 'interface.asset') return 'asset-gen';
   if (UAT_OPS.has(op) || paths.some((p) => /(?:^|\/)features\/[^/]+\/uat\//.test(p))) return 'uat-capture';
   if (E2E_OPS.has(op) || paths.some((p) => /(?:^|\/)features\/[^/]+\/e2e\//.test(p))) return 'e2e-capture';

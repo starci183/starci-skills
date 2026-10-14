@@ -38,6 +38,8 @@ import { walkFiles } from '../lib/walk.mjs';
 import { opCli } from '../lib/cli-arg.mjs';
 import { declaredReadTokens, resolveReadReference } from './read-refs.mjs';
 import { EXAMPLE_CATALOG_FILE, exampleSourcePaths } from '../lib/example-refs.mjs';
+import { workPathAllowed } from '../lib/work-edition.mjs';
+import { WORK_DIR_NAME } from '../lib/roots.mjs';
 
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
@@ -50,17 +52,18 @@ const walk = dir => (fs.existsSync(dir) ? walkFiles(dir) : []);
 
 /** Bounded file listing under one owned dir — cap is enforced by the caller
  *  across all dirs; `budget` is how many more files may still be collected. */
-function listFiles(abs, budget) {
+function listFiles(abs, budget, workRoot) {
   const out = [];
   const visit = dir => {
     if (out.length >= budget) return;
+    if (!workPathAllowed(workRoot, dir, { dir: true })) return;
     let entries;
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
     for (const e of entries) {
       if (out.length >= budget) return;
       const p = path.join(dir, e.name);
       if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name) && !underWorktrees(abs, p)) visit(p); }
-      else if (e.isFile()) out.push(p);
+      else if (e.isFile() && workPathAllowed(workRoot, p)) out.push(p);
     }
   };
   visit(abs);
@@ -110,7 +113,7 @@ const declaredReadList = (declared, contextDecl, addReference) => {
     for (const token of declaredReadTokens(entry?.path)) {
       const result = addReference(token, `brief read [${entry.id ?? '?'}] — ${why}`, entry?.mustExist === true);
       resolved.push(...result.resolved.map((row) => row.path));
-      if (!result.resolved.length && !result.missing.length) placeholders.push(token);
+      if (!result.resolved.length && !result.missing.length && result.kind !== 'skipped') placeholders.push(token);
     }
     declaredReads.push({ id: entry?.id ?? null, path: summarize(entry?.path, 200), why, resolved, placeholders });
   }
@@ -132,13 +135,14 @@ const addDeclaredRefs = (briefDoc, addReference) => {
 /** The files the owned write set currently holds on disk, repo-relative, capped at fileCap. */
 const ownedFileList = (ownedPaths, repoBase, fileCap) => {
   const ownedFiles = [];
+  const workRoot = path.join(repoBase, WORK_DIR_NAME);
   let truncated = false;
   for (const o of ownedPaths) {
     const abs = o.abs ?? path.join(repoBase, o.path);
     if (!fs.existsSync(abs)) continue;
-    const files = fs.statSync(abs).isDirectory()
-      ? listFiles(abs, fileCap + 1 - ownedFiles.length)
-      : [abs];
+    let files = [];
+    if (fs.statSync(abs).isDirectory()) files = listFiles(abs, fileCap + 1 - ownedFiles.length, workRoot);
+    else if (workPathAllowed(workRoot, abs)) files = [abs];
     for (const f of files) ownedFiles.push(path.relative(repoBase, f).replaceAll('\\', '/'));
     if (ownedFiles.length > fileCap) { ownedFiles.length = fileCap; truncated = true; break; }
   }

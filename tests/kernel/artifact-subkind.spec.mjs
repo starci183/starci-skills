@@ -70,6 +70,17 @@ test('subkind rules: name conventions, op ids and paths; unknown stays null', ()
   for (const [kind, p, op] of [['image', 'a/b.png', 'interface.asset'], ['trace', 'x/trace.zip', null], ['report', 'r.json', null]]) assert.ok(JOB_ARTIFACT_SUBKINDS.includes(subkindOf({ kind, path: p, opId: op })));
 });
 
+test('lite artifact classification does not read stale feature manifests or draw sidecars', t => {
+  const repo = tmp(t);
+  write(repo, 'hfs.json', json({ kind: 'app', edition: 'lite' }));
+  const rel = '.starciwork/features/f/ui/s/assets/a.png';
+  write(repo, '.starciwork/features/f/ui/s/index.yaml', 'assets:\n  - path: assets/a.png\n    generation: {tool: image_gen.imagegen}\n');
+  write(repo, rel.replace(/\.png$/, '.json'), json({ schema: 'starci/draw-render@1' }));
+  clearManifestCache();
+  assert.equal(manifestToolOf(repo, rel), null);
+  assert.equal(subkindOf({ kind: 'image', path: rel, repo }), null);
+});
+
 test('manifests decide a drawing: index.yaml generation.tool, draws.yaml provenance.tool, a draw-render record beside the PNG', (t) => {
   const repo = tmp(t);
   clearManifestCache();

@@ -22,6 +22,8 @@ import { normRel } from '../lib/path-key.mjs';
 import { readParamName } from '../context/read-refs.mjs';
 import { planPrerequisiteLine } from './plan-prerequisites.mjs';
 import { hostCapabilityGaps } from './host-capabilities.mjs';
+import { workPathAllowed } from '../lib/work-edition.mjs';
+import { WORK_DIR_NAME } from '../lib/roots.mjs';
 
 /** The refusal code of the design gate (unmet kind design-not-settled). */
 export const DESIGN_NOT_SETTLED = 'DESIGN_NOT_SETTLED';
@@ -102,18 +104,23 @@ const readGaps = ({ reads, bindings, repo, params }) => {
   const unmet = [], unknown = [];
   for (const read of reads) {
     if (read?.mustExist !== true) continue;
-    const param = readParamName(read.path);
-    if (param !== null) {
-      if (!Object.hasOwn(params ?? {}, param) || params?.[param] == null) unmet.push({ kind: 'instance-missing', read: read.id, path: read.path });
-      continue;
-    }
-    const resolved = resolveReadPath(read.path, bindings);
-    if (!resolved.length) { unknown.push({ kind: 'read-unbound', read: read.id, path: read.path }); continue; }
-    for (const rel of resolved) {
-      if (!fs.existsSync(path.join(repo, rel))) unmet.push({ kind: 'record-missing', read: read.id, path: rel });
-    }
+    addReadGap(read, { bindings, repo, params, unmet, unknown });
   }
   return { unmet, unknown };
+};
+
+const addReadGap = (read, { bindings, repo, params, unmet, unknown }) => {
+  const param = readParamName(read.path);
+  if (param !== null) {
+    if (!Object.hasOwn(params ?? {}, param) || params?.[param] == null) unmet.push({ kind: 'instance-missing', read: read.id, path: read.path });
+    return;
+  }
+  const resolved = resolveReadPath(read.path, bindings);
+  if (!resolved.length) { unknown.push({ kind: 'read-unbound', read: read.id, path: read.path }); return; }
+  for (const rel of resolved) {
+    if (!workPathAllowed(path.join(repo, WORK_DIR_NAME), path.join(repo, rel))) continue;
+    if (!fs.existsSync(path.join(repo, rel))) unmet.push({ kind: 'record-missing', read: read.id, path: rel });
+  }
 };
 
 /** The one-paragraph instruction a refused Kernel acts on. */
@@ -144,6 +151,7 @@ export function designVerdicts(repo, records) {
   const verdicts = [];
   for (const { parts, workParts } of boundRecordPaths(records, 'impl', { unique: false })) {
     const file = path.join(repo, ...parts, 'index.yaml');
+    if (!workPathAllowed(path.join(repo, ...workParts), file)) continue;
     if (!fs.existsSync(file)) continue;
     let impl = null;
     try { impl = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; }
@@ -183,6 +191,7 @@ export function directionVerdicts(repo, bindings, { workflowId = null } = {}) {
   const verdicts = [];
   for (const { record, parts, workParts } of boundRecordPaths(bindings, 'ui')) {
     const file = path.join(repo, ...parts, 'index.yaml');
+    if (!workPathAllowed(path.join(repo, ...workParts), file)) continue;
     if (!fs.existsSync(file)) { verdicts.push({ record, unknown: 'the ui record does not exist yet' }); continue; }
     let ui = null;
     try { ui = parseYaml(fs.readFileSync(file, 'utf8')); } catch { verdicts.push({ record, unknown: 'the ui record does not parse' }); continue; }

@@ -34,6 +34,10 @@ out the test world and event machinery.
 `app.supabase.types` artifact from the app's local Supabase stack; if that generation cannot run, scaffolding fails and removes
 the app it began instead of leaving a partial tree.
 
+The lite `app.starciwork` slot is optional when the app has no brand records. When present, it holds only `.gitignore` and
+`brand/**` (R212): the existing brand record, drawing records, references and assets. Brand tools read the brand record
+directly; lite uses no workspace, feature catalog or shell records. The scaffold creates no other Work content.
+
 The lite additions are deliberately narrow:
 
 - `starci app add table <name> [--fe] [--no-types]` adds the migration and matching back-end capability. `--fe` also adds the table's
@@ -77,6 +81,7 @@ Its own checks (`scripts/hfs/check.mjs`, `scripts/hfs/rules/`; the rendered-file
 | `HFS_SLOT_AMBIGUOUS` | error | two slots own the path equally (a manifest gap) |
 | `HFS_TRACKED_MUST_BE_IGNORED` | error | a tracked path in an `ignored` slot (build output, generated) |
 | `HFS_FORBIDDEN_PRESENT` | error | a tracked path in a forbidden / `external` slot |
+| `HFS_STARCIWORK_LITE_FORBIDDEN` | error | content outside the lite `app.starciwork` brand boundary: "lite .starciwork holds only brand/" (R212) |
 | `HFS_SLOT_REQUIRED_MISSING` | error | a file or directory a required slot, app or instance must contain |
 | `HFS_MIN_INSTANCES` | error | fewer instances of a slot than `minInstances` |
 | `HFS_CANON_PIN_DRIFT` | error | a dependency not at the exact version of `knowledge/hfs/canon-pins.yaml` |

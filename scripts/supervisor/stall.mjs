@@ -49,7 +49,6 @@
 // (the owning Kernel first, the supervisor when that fails, the owner only for owner waits),
 // reading the structured fields each finding carries beside its line.
 
-import fs from 'node:fs';
 import path from 'node:path';
 import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
@@ -64,6 +63,8 @@ import { minutes } from '../lib/time.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 import { isSpecRun } from '../lib/env.mjs';
 import { PEER_WAIT_KIND, clock, peerWaitFinding, unreadPeerFindings, gateFinding, staleWaitFindings, statusUnreadableFinding, supervisorWaitFinding, stalledFinding } from './stall-findings.mjs';
+import { namedPaths, pathVerdict } from './stall-paths.mjs';
+export { namedPaths } from './stall-paths.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const API_FILE = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
@@ -186,55 +187,12 @@ export const openAskDispatches = (db, workflowId) => db.prepare(
 
 /* ------------------------------------------------------------ what a gate's text names */
 
-/** `.starciwork/...` paths an incident names, trailing punctuation dropped. */
-export const namedPaths = (text) => [...new Set((String(text ?? '').match(/\.starciwork\/[A-Za-z0-9._@\-/]+/g) ?? [])
-  .map((p) => p.replace(new RegExp(['[./-', ']+$'].join('')), '')).filter((p) => p.length > '.starciwork/'.length))];
 /** A gate that waits on an owner ask or decision (only such a gate is released by the ask closing). */
 const ASK_GATE = /\bask\b|\bowner(?:'s)? (?:decision|answer|choice|approval|ruling)\b|\bdecision pending\b/i;
 /** Workflow ids an incident names. */
 export const namedWorkflows = (text) => [...new Set(String(text ?? '').match(/\bwf-[a-z0-9][a-z0-9-]*[a-z0-9]\b/gi) ?? [])];
 /** Job ids an incident names (op-<op>-<10 hex>). */
 const namedJobs = (text) => [...new Set(String(text ?? '').match(/\bop-[a-z0-9.-]+-[0-9a-f]{10}\b/gi) ?? [])];
-
-/** Record states that mean the thing a gate waited for has landed. */
-const LANDED_STATES = new Set(['done', 'settled', 'decided', 'approved', 'accepted', 'final', 'complete', 'completed', 'passed', 'ready']);
-const landedPathReason = (ev, raisedAt) => {
-  const state = ev.state ? ' (' + ev.state + ')' : '';
-  let when;
-  if (ev.created) {
-    when = 'created ' + clock(ev.born);
-    if (ev.written - ev.born > 60_000) when += ', written ' + clock(ev.written);
-  } else when = 'written ' + clock(ev.written);
-  return `${ev.path} exists${state}, ${when} after the gate (${clock(raisedAt)})`;
-};
-
-/**
- * What a path an incident names looks like now, against the time the gate was raised:
- * {path, exists, landed, waiting, at, created, state}. `landed`: it exists, was created or written
- * after the gate, and its record state (a yaml `state:`/`status:` line, when it has one) is a
- * landed state - the condition the gate waited for may be met. `waiting`: it is absent, or its
- * record state is not landed yet - the gate still has something to wait for. A path that already
- * existed unchanged is neither.
- */
-function pathEvidence(repo, rel, raisedAt) {
-  const none = { path: rel, exists: false, landed: false, waiting: true, at: null, born: null, written: null, created: false, state: null };
-  if (!repo) return { ...none, waiting: false };
-  let file = path.join(repo, rel);
-  let st;
-  try { st = fs.statSync(file); } catch { return none; }
-  if (st.isDirectory()) {
-    const index = path.join(file, 'index.yaml');
-    try { st = fs.statSync(index); file = index; } catch { /* a bare directory */ }
-  }
-  let state = null;
-  if (st.isFile() && /\.ya?ml$/i.test(file) && st.size < 2_000_000) {
-    try { state = /^(?:state|status):\s*['"]?([A-Za-z0-9_-]+)/m.exec(fs.readFileSync(file, 'utf8'))?.[1] ?? null; } catch { /* unreadable */ }
-  }
-  const born = Number.isFinite(st.birthtimeMs) && st.birthtimeMs > 0 ? st.birthtimeMs : st.mtimeMs;
-  const at = Math.max(born, st.mtimeMs);
-  const settledState = !state || LANDED_STATES.has(state.toLowerCase());
-  return { path: rel, exists: true, landed: at > raisedAt && settledState, waiting: !settledState, at, born, written: st.mtimeMs, created: born > raisedAt, state };
-}
 
 /** Peer messages delivered to `workflowId` after `since`, from one of `peers` (ledger inbox rows). */
 const peerDeliveries = (db, workflowId, peers, since) => (peers.length ? db.prepare(
@@ -254,17 +212,6 @@ const openAsksOf = (db, dbOf, workflowId, peers) => {
     try { for (const a of openAskDispatches(peerDb, wf)) asks.push({ workflowId: wf, dispatchId: a.dispatch_id }); } catch { /* not in that ledger */ }
   }
   return asks;
-};
-
-/** What the paths a gate names say: `reasons` for each that landed, `waits` for each still absent or unsettled. */
-const pathVerdict = (repo, gate, paths) => {
-  const reasons = [], waits = [];
-  for (const rel of paths) {
-    const ev = pathEvidence(repo, rel, gate.raisedAt);
-    if (ev.landed) reasons.push(landedPathReason(ev, gate.raisedAt));
-    else if (ev.waiting) waits.push(ev.path + ' ' + (ev.exists ? 'is ' + ev.state : 'is absent'));
-  }
-  return { reasons, waits };
 };
 
 /** The job row `id` in the gate's workflow or the first peer ledger that holds it, or null. */

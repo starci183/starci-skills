@@ -19,6 +19,10 @@ export function workCli({ usage, run, report, wrote, stale }) {
   }
   const workRoot = path.resolve(workArg);
   const result = run(workRoot, { write });
+  if (result.skipped) {
+    console.log('SKIP lite .starciwork holds only brand/');
+    return;
+  }
   report(result);
   if (write) console.log(wrote(workRoot));
   else if (!result.ok) {

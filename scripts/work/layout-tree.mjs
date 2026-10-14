@@ -14,10 +14,8 @@
 // prompt and not a hand-kept list: one node per segment directory under app/ with its special files
 // (layout, template, page, loading, error, not-found, default, route) and their digests, route groups
 // (x), parallel slots @x and intercepting routes (.)x as nodes of their own. The app's fe side is
-// only ever READ, and every path the record holds is app-relative (fe/apps/<name>/src/app/...); `--write` writes the one record .starciwork/shell/index.yaml (work/layout-tree@1) and,
-// for `capture`, the capture bytes under .starciwork/shell/assets/. A re-scan keeps what the owning op
-// decided (chrome, captures, personas, lockups, planned nodes) and marks a layout whose file changed as
-// needing a re-capture, so the record is regenerated rather than hand-maintained.
+// only ever READ. Paths are app-relative (fe/apps/<name>/src/app/...); `--write` writes .starciwork/shell/index.yaml.
+// Captures are cited blobs. Re-scanning keeps decisions and planned nodes, and marks changed layouts for re-capture.
 //
 // Navigation labels come from the route tree plus the i18n message catalogs: the destination registry is
 // read out of the source a layout imports (objects with a key and a route), each destination's label is
@@ -35,6 +33,7 @@ import { cropImage, decodePng, encodePng, keyRect } from './png.mjs';
 import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, drawingAcceptance } from './direction-part.mjs';
 import { scanTools } from './layout-tree-scan.mjs';
 import { driftChanges, keyedI18n, usedI18nKeys } from './layout-tree-drift.mjs';
+import { isLiteWorkRoot } from '../lib/work-edition.mjs';
 import {
   SLOT_FILL_MIN, assetsOf, flag, flags, indexFilesUnder, list, parseUiRef, readYamlOrNull, sha256File, sha256Of, slash, writeRecordFile,
 } from './work-io.mjs';
@@ -92,6 +91,7 @@ const shellFileOf = (workRoot) => path.join(workRoot, 'shell', 'index.yaml');
 
 /** The tree's shell record: {file, dir, record} when it exists, {error} when it does not parse, null when absent. */
 export function readShellRecord(workRoot) {
+  if (isLiteWorkRoot(workRoot)) return null;
   const file = shellFileOf(workRoot);
   if (!fs.existsSync(file)) return null;
   const record = readYamlOrNull(file);
@@ -824,7 +824,6 @@ export function addPlanned(record, { node: id, files = [], design = null }) {
 // CLI
 // ---------------------------------------------------------------------------------------------------------
 
-
 /** One-screen summary of a record: every app's tree, layouts with chrome and captures, nav with findings, special files. */
 export function summarize(record) {
   const lines = [`layout tree (origin ${record.origin}, rev ${record.rev}, state ${record.state}) - ${appsOf(record).length} app${appsOf(record).length === 1 ? '' : 's'}`];
@@ -987,6 +986,7 @@ export function layoutTreeMain(argv = []) {
       return { exitCode: 2, text: 'Usage: starci work layout-tree <scan|capture|plan|destinations|lockup|slot> --work <.starciwork> [...] [--write] [--json]\n' };
     }
     const workRoot = path.resolve(work);
+    if (isLiteWorkRoot(workRoot)) return out({ ok: true, skipped: true, reason: 'lite .starciwork holds only brand/' }, 'SKIP: lite .starciwork holds only brand/');
     const shell = readShellRecord(workRoot);
     if (shell?.error) { return { exitCode: 1, text: `${shell.file}: ${shell.error}\n` }; }
     const existing = shell?.record ?? null;

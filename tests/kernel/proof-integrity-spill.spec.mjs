@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {ledgerFileFor,openLedger,ensureWorkflow,appendEvent,storeBlob} from '../../engine/db/ledger.mjs';
 import {putArtifact,stageBlob} from '../../scripts/machine/evidence-store.mjs';
-import {verifyProofs,coverageOf,recordArtifactProofs,proofAcceptanceOf} from '../../scripts/kernel/proof-integrity.mjs';
+import {verifyProofs,coverageOf,recordArtifactProofs,proofAcceptanceOf,staleProofsOf} from '../../scripts/kernel/proof-integrity.mjs';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {fileReport,writeContract} from '../../engine/db/ledger.mjs';
 import {recordCheck} from '../../scripts/machine/evidence-store.mjs';
@@ -138,6 +138,35 @@ test('missing, malformed and unreadable scoped canonical FRs remain unresolved i
   fs.writeFileSync(f.index,bytes);const native=fs.readFileSync;
   fs.readFileSync=function(file,...args){if(path.resolve(String(file))===f.index)throw Object.assign(new Error('private read refusal'),{code:'EACCES'});return native.call(this,file,...args);};
   try{assert.throws(f.coverage,/private read refusal/);}finally{fs.readFileSync=native;}
+});
+
+test('lite proof coverage and baselines ignore forbidden stale Work records while retaining brand dependencies',t=>{
+  const f=mustProofFixture(t),db=f.ledger.db,job=db.prepare("SELECT * FROM jobs WHERE job_id='job-proof'").get();
+  fs.writeFileSync(path.join(f.repoRoot,'hfs.json'),JSON.stringify({kind:'app',edition:'lite'}));
+  fs.writeFileSync(f.index,'id: [stale malformed FR');
+  const brand=path.join(f.repoRoot,'.starciwork','brand');fs.mkdirSync(brand,{recursive:true});
+  fs.writeFileSync(path.join(brand,'index.yaml'),'id: brand.proof\n');
+  const work=path.join(f.repoRoot,'.starciwork'),native=fs.readFileSync;
+  fs.readFileSync=function(file,...args){
+    const rel=path.relative(work,path.resolve(String(file))).replaceAll('\\','/');
+    if(rel&&!rel.startsWith('../')&&!path.isAbsolute(rel)&&rel!=='.gitignore'&&!rel.startsWith('brand/'))throw new Error(`forbidden lite Work read: ${rel}`);
+    return native.call(this,file,...args);
+  };
+  try{
+    assert.deepEqual(f.coverage().items,[],'qualified coverage has no obligations from stale feature bindings');
+    assert.deepEqual(staleProofsOf(db,f.wf,{repo:f.repoRoot}),[],'a forbidden old dependency cannot stale a lite proof');
+    const {artifactId}=putArtifact(db,{workflowId:f.wf,attemptId:f.attemptId,role:'check-stdout',name:'lite-output.txt',blob:f.blob,origin:'op'});
+    recordArtifactProofs(db,{repo:f.repoRoot,job,
+      payload:{records:['.starciwork/workspace.yaml','.starciwork/index.yaml','.starciwork/shell/index.yaml',
+        '.starciwork/features/proof/fr/required','.starciwork/features/proof/ui/page','.starciwork/features/proof/uat/read','.starciwork/brand'],owned_paths:['tests/']},
+      envelope:{outcome:'done',checks:[{name:'unit',command:f.commands.unit,exitCode:0}]},
+      artifacts:[{artifactId,name:'lite-output.txt',kind:'image',label:'page@desktop',abs:f.blob.fileUri}]});
+    const row=db.prepare('SELECT claims_json,deps_json FROM artifact_proofs WHERE artifact_id=?').get(artifactId);
+    const claims=JSON.parse(row.claims_json),deps=JSON.parse(row.deps_json);
+    assert.deepEqual(claims.frs,[]);assert.deepEqual(claims.shapes,[]);
+    assert.deepEqual(deps.filter(dep=>dep.kind==='work').map(dep=>dep.path),['.starciwork/brand']);
+    assert.ok(deps.some(dep=>dep.kind==='code'&&dep.path==='tests/unit.spec.mjs'),'the actual proof spec still counts');
+  }finally{fs.readFileSync=native;}
 });
 
 test('qualified command matching preserves whitespace inside quoted argv',t=>{

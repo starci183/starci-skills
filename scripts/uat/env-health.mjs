@@ -49,6 +49,8 @@ import { readEnv } from '../lib/env.mjs';
 import { normPath } from '../lib/path-key.mjs';
 import { eachInOrder, mapInOrder, repeatInOrder, findInOrder } from '../lib/in-order.mjs';
 import { tempRoot } from '../../engine/temp-root.mjs';
+import { isLiteWorkRoot, workPathAllowed } from '../lib/work-edition.mjs';
+import { WORK_DIR_NAME } from '../lib/roots.mjs';
 
 const ENV_HEALTH_SCHEMA = 'starci/env-health@1';
 const EXIT_READY = 0, EXIT_NOT_READY = 3;
@@ -167,10 +169,8 @@ const collectEnvIds = (value, out) => {
   if (value && typeof value === 'object') for (const v of Object.values(value)) collectEnvIds(v, out);
 };
 
-/** The resource file of an environment id under <repo>/.starciwork/_resources, or null. */
-function environmentFile(repo, id) {
-  if (/\.ya?ml$/i.test(id) && fs.existsSync(path.resolve(repo, id))) return path.resolve(repo, id);
-  const resources = path.join(repo, '.starciwork', '_resources');
+/** Resolve a declared environment id within the full edition's resources tree. */
+function findEnvironmentResource(resources, id) {
   const name = String(id).split('.').pop();
   const direct = path.join(resources, 'environments', name, 'resource.yaml');
   if (fs.existsSync(direct) && readYaml(direct)?.id === id) return direct;
@@ -187,13 +187,25 @@ function environmentFile(repo, id) {
   return null;
 }
 
+/** The environment's resource file, allowing explicit external YAML paths in either edition. */
+function environmentFile(repo, id) {
+  const workRoot = path.join(repo, WORK_DIR_NAME);
+  if (/\.ya?ml$/i.test(id) && fs.existsSync(path.resolve(repo, id))) {
+    const file = path.resolve(repo, id);
+    return workPathAllowed(workRoot, file) ? file : null;
+  }
+  if (isLiteWorkRoot(workRoot)) return null;
+  return findEnvironmentResource(path.join(workRoot, '_resources'), id);
+}
+
 /** Environment ids a job's owned uat/e2e/integration record paths reference. */
 export function environmentIdsOfPaths(repo, paths) {
+  if (isLiteWorkRoot(path.join(repo, WORK_DIR_NAME))) return [];
   const ids = new Set();
   for (const raw of paths ?? []) {
     const p = String(typeof raw === 'string' ? raw : raw?.path ?? '').replaceAll('\\', '/').replace(/\/\*\*$/, '');
     if (!/^\.starciwork\/features\/[^/]+\/(uat|e2e|integration)(\/|$)/.test(p)) continue;
-    for (let dir = path.join(repo, p); dir.startsWith(path.join(repo, '.starciwork', 'features')); dir = path.dirname(dir)) {
+    for (let dir = path.join(repo, p); dir.startsWith(path.join(repo, WORK_DIR_NAME, 'features')); dir = path.dirname(dir)) {
       const doc = readYaml(path.join(dir, 'index.yaml'));
       if (doc) collectEnvIds(doc, ids);
       if (/[\\/](uat|e2e|integration)$/.test(dir)) break;
@@ -205,7 +217,8 @@ export function environmentIdsOfPaths(repo, paths) {
 /** The local checkouts of the workspace's repositories: the ledger repo and its named siblings. */
 function workspaceRoots(repo) {
   const roots = [path.resolve(repo)];
-  const ws = readYaml(path.join(repo, '.starciwork', 'workspace.yaml'));
+  if (isLiteWorkRoot(path.join(repo, WORK_DIR_NAME))) return roots;
+  const ws = readYaml(path.join(repo, WORK_DIR_NAME, 'workspace.yaml'));
   for (const r of Array.isArray(ws?.repositories) ? ws.repositories : []) {
     const sibling = path.join(path.dirname(path.resolve(repo)), String(r?.name ?? ''));
     if (r?.name && fs.existsSync(sibling) && !roots.includes(sibling)) roots.push(sibling);

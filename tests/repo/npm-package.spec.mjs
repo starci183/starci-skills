@@ -84,7 +84,6 @@ test('actual npm tarball installs a runnable source command without development 
     'scripts/install/install.mjs',
     'scripts/kernel/cli.mjs',
     'engine/db/ledger.mjs',
-    'examples/lite-app/.starciwork/features/system-health/index.yaml',
     'examples/shape-slot/.starciwork/features/system-health/index.yaml',
     'scripts/gates/stacks-gate.mjs',
   ])
@@ -93,7 +92,8 @@ test('actual npm tarball installs a runnable source command without development 
   assert.equal([...shipped].some(file=>file.startsWith('packages/cli/')&&file.endsWith('.spec.mjs')),false,'npm tarball must not ship CLI source specs');
   assert.deepEqual([...shipped].filter(file=>file.split('/').includes('node_modules')),[],'npm tarball must not ship node_modules');
   assert.deepEqual([...shipped].filter(file=>file==='ext/sonar/secrets'||file.startsWith('ext/sonar/secrets/')),[],'npm tarball must not ship private Sonar custody');
-  assert.equal(selectedExamples.size,18,'only BASIC13, three own Work catalog indexes and two declared system-health seeds are literal example inputs');
+  assert.equal(selectedExamples.size,16,'only BASIC13, two full Work catalog indexes and one full system-health seed are literal example inputs');
+  assert.equal([...shipped].some(file=>file.startsWith('examples/lite-app/.starciwork/')),false,'lite ships no catalog or feature Work records');
   // The hfs scaffold templates are the package's own source and ship whole; every other .starciwork file is a declared example index.
   const scaffold=file=>file.startsWith('packages/hfs/templates/app/');
   assert.deepEqual([...shipped].filter(file=>file.split('/').includes('.starciwork')&&!scaffold(file)).sort(),

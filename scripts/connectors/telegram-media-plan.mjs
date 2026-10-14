@@ -11,6 +11,8 @@ import { isFile, isDir } from '../lib/fs-kind.mjs';
 import { readYamlFile } from '../lib/read-yaml.mjs';
 import { translator } from '../lib/i18n.mjs';
 import { inspectLedger } from '../../engine/db/ledger.mjs';
+import { workPathAllowed } from '../lib/work-edition.mjs';
+import { WORK_DIR_NAME } from '../lib/roots.mjs';
 const DRAW_OPS = new Set(['interface.draw', 'interface.asset']);
 const UAT_OPS = new Set(['uat.verify', 'uat.assisted.prepare', 'uat.assisted.verify', 'e2e.verify']);
 
@@ -30,7 +32,11 @@ const isVideo = (file) => VIDEO.has(extOf(file));
 const posix = slash;
 const keyOf = pathKey;
 const parse = parseJson;
-const readYaml = readYamlFile;
+const allowedFile = (file, options) => {
+  const workRoot = /^(.*[\\/]\.starciwork)(?:[\\/]|$)/.exec(String(file))?.[1];
+  return !workRoot || workPathAllowed(workRoot, file, options);
+};
+const readYaml = (file) => allowedFile(file) ? readYamlFile(file) : null;
 
 const sizeOf = (file) => { try { return fs.statSync(file).size; } catch { return -1; } };
 const firstFile = (candidates) => candidates.find((c) => c && isFile(c)) ?? null;
@@ -95,6 +101,7 @@ const resolveIn = (p, roots) => {
 function expand(entries, { seen = new Map(), max = LIMITS.walkFiles } = {}) {
   const walk = (dir, depth) => {
     if (depth > LIMITS.walkDepth || seen.size >= max) return;
+    if (!allowedFile(dir, { dir: true })) return;
     let list = [];
     try { list = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
     for (const entry of list) {
@@ -102,13 +109,13 @@ function expand(entries, { seen = new Map(), max = LIMITS.walkFiles } = {}) {
       if (entry.name === 'node_modules' || entry.name === '.git') continue;
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(full, depth + 1);
-      else if (entry.isFile() && !seen.has(keyOf(full))) seen.set(keyOf(full), full);
+      else if (entry.isFile() && allowedFile(full) && !seen.has(keyOf(full))) seen.set(keyOf(full), full);
     }
   };
   for (const entry of entries) {
     if (!entry) continue;
     if (isDir(entry)) walk(entry, 0);
-    else if (isFile(entry) && !seen.has(keyOf(entry))) seen.set(keyOf(entry), path.resolve(entry));
+    else if (allowedFile(entry) && isFile(entry) && !seen.has(keyOf(entry))) seen.set(keyOf(entry), path.resolve(entry));
   }
   return seen;
 }
@@ -117,7 +124,7 @@ function expand(entries, { seen = new Map(), max = LIMITS.walkFiles } = {}) {
 function uiNodeDirOf(file) {
   let dir = path.dirname(file);
   for (let i = 0; i < 6; i++) {
-    if (/\/ui(\/|$)/.test(posix(dir)) && isFile(path.join(dir, 'index.yaml'))) return dir;
+    if (/\/ui(\/|$)/.test(posix(dir)) && allowedFile(path.join(dir, 'index.yaml')) && isFile(path.join(dir, 'index.yaml'))) return dir;
     const up = path.dirname(dir);
     if (up === dir) break;
     dir = up;
@@ -305,8 +312,9 @@ const flowFromRecord = (file, slug) => {
 
 /** The uat record a node id names (uat.<feature>.<flow>), under <repo>/.starciwork. */
 const recordOfNodeId = (id, repo) => {
+  if (!workPathAllowed(path.join(repo, WORK_DIR_NAME), path.join(repo, WORK_DIR_NAME, 'features'), { dir: true })) return null;
   const m = /^uat\.([^.]+)\.(.+)$/.exec(String(id ?? ''));
-  return m ? firstFile([path.join(repo, '.starciwork', 'features', m[1], 'uat', m[2], 'index.yaml')]) : null;
+  return m ? firstFile([path.join(repo, WORK_DIR_NAME, 'features', m[1], 'uat', m[2], 'index.yaml')]) : null;
 };
 
 /**
@@ -324,7 +332,7 @@ const flowFromNamedRecord = (file) => {
   if (!match) return null;
   const base = path.basename(file, path.extname(file));
   const record = `${match[1]}/${base}/index.yaml`;
-  return isFile(record) ? flowFromRecord(record, base) : null;
+  return allowedFile(record) && isFile(record) ? flowFromRecord(record, base) : null;
 };
 
 const flowFromRequestData = (request, file, repo) => {

@@ -18,6 +18,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { FAILURE_CLASSES } from './report-envelope.mjs';
+import { isLiteWorkRoot } from '../lib/work-edition.mjs';
+import { WORK_DIR_NAME } from '../lib/roots.mjs';
 /** The verify ops whose red is, by default, a defect in what they walked or measured - never in the walk. */
 const VERIFY_OPS = new Set(['uat.verify', 'uat.assisted.verify', 'e2e.verify', 'integration.verify', 'interface.audit', 'review.verify', 'security.verify', 'perf.verify', 'unit.verify']);
 /** The ops that walk a served stack: `starci kernel dispatch` runs the environment pre-step (scripts/uat/env-health.mjs) for them. */
@@ -214,6 +216,7 @@ const resolvedOwnedPaths = (ownedPaths, declared, role, kind, reporterPayload, f
 
 /** The workspace repositories {name → role} of a ledger repo (.starciwork/workspace.yaml). */
 function workspaceRoles(repo) {
+  if (isLiteWorkRoot(path.join(repo, WORK_DIR_NAME))) return {};
   const doc = readYaml(path.join(repo, '.starciwork', 'workspace.yaml'));
   const out = {};
   for (const r of Array.isArray(doc?.repositories) ? doc.repositories : []) if (r?.name) out[r.name] = r.role ?? null;
@@ -222,6 +225,7 @@ function workspaceRoles(repo) {
 
 /** The record file of a Work record id, or null: the id's own path first, then a bounded scan of its feature. */
 export function findRecord(repo, id) {
+  if (isLiteWorkRoot(path.join(repo, WORK_DIR_NAME))) return null;
   const m = /^([a-z]+)\.([a-z0-9-]+)\.(.+)$/.exec(String(id ?? '').split('#')[0]);
   if (!m) return null;
   const [, family, feature, rest] = m;

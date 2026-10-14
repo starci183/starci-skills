@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {walk} from './check-example-work.mjs';
+import { exampleWorkRoots } from '../../lib/example-refs.mjs';
 import {loadRecords, indexInlineCriteria, resolveRecordRef} from '../record-ownership.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 import { workCommonDef } from '../../lib/work-schemas.mjs';
@@ -301,7 +302,7 @@ if (isMain(import.meta.url)) {
   const args = process.argv.slice(2);
   const treeArg = args.includes('--tree') ? args[args.indexOf('--tree') + 1] : null;
   const workRoots = treeArg ? [path.resolve(treeArg)]
-    : walk(path.join(root, 'examples')).filter(file => file.endsWith(`.starciwork${path.sep}index.yaml`)).map(dir => path.dirname(dir));
+    : exampleWorkRoots(root);
 
   const sink = {refuse: [], suspect: [], info: []};
   const perTree = [];

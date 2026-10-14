@@ -23,8 +23,9 @@ import { sha256File } from '../work/work-io.mjs';
 import { staleRefusal } from '../work/critic-verdict.mjs';
 import { AUTOPILOT_BY, AUTOPILOT_RULING, SUPERVISOR_GATE, openIncidents, kindOf, supervisorGatesOf } from './autopilot-budget.mjs';
 import { gateOwnerTold } from './gate-ladder.mjs';
-import { treesInOrder, workDirHolding } from '../lib/roots.mjs';
+import { treesInOrder, workDirHolding, workDirsInOrder } from '../lib/roots.mjs';
 import { workflowWorktreeOf } from '../machine/workflow-tree.mjs';
+import { workPathAllowed } from '../lib/work-edition.mjs';
 
 export const HANDOVER_CREDENTIALS_SUBJECT = 'handover-credentials';
 export const PROVISIONAL_LABEL = 'self-accepted provisional';
@@ -183,6 +184,8 @@ const staleFindings = ({ rel, best, sha }) => {
   return stale ? [{ code: stale.code, detail: `${rel}: ${stale.detail}` }] : [];
 };
 
+const drawRecordFile = (candidate) => path.basename(candidate) === 'index.yaml' ? candidate : path.join(candidate, 'index.yaml');
+
 /**
  * The machine gates of one drawn ui record (owner rulings 2026-09-27: draw loop metrics, the independent critic's
  * beauty at least beautyMin, rationale evidence, DNA - the loop's metrics include the DNA gate): {ok, record,
@@ -191,8 +194,15 @@ const staleFindings = ({ rel, best, sha }) => {
 export function drawGateEvidence({ repo, tree = null, recordPath, reviewed = [], beautyMin = null }) {
   const findings = [];
   const asked = String(recordPath ?? '');
-  const file = treesInOrder({ tree, repo }).map((base) => path.resolve(base, asked)).find((candidate) => fs.existsSync(candidate)) ?? path.resolve(repo, asked);
-  const dir = path.basename(file) === 'index.yaml' ? path.dirname(file) : file;
+  const bases = treesInOrder({ tree, repo });
+  const workRoots = workDirsInOrder({ tree, repo });
+  const skipped = () => ({ ok: true, skipped: true, record: null, parts: [], findings: [], beautyMin });
+  const askedAt = path.resolve(bases[0] ?? repo, asked);
+  const askedFile = drawRecordFile(askedAt);
+  if (!workPathAllowed(workRoots[0], askedFile)) return skipped();
+  const file = bases.map((base) => path.resolve(base, asked)).find((candidate) => fs.existsSync(candidate)) ?? path.resolve(repo, asked);
+  const dir = path.dirname(drawRecordFile(file));
+  if (workRoots.some(root => !workPathAllowed(root, path.join(dir, 'index.yaml')))) return skipped();
   let record = null;
   try { record = parseYaml(fs.readFileSync(path.join(dir, 'index.yaml'), 'utf8')); } catch (error) { return { ok: false, record: null, parts: [], findings: [{ code: 'RECORD_UNREADABLE', detail: `${slash(path.relative(repo, dir))}/index.yaml: ${error.message}` }], beautyMin }; }
   let min = beautyMin;

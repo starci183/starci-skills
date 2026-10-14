@@ -101,6 +101,30 @@ test('literal brace READs require every file and linked prefixes cannot leave a 
   }
 });
 
+test('lite READs and owned-file lists skip stale Work records and retain required brand/app reads', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-context-lite-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const appRoot = path.join(dir, 'app'), stateDir = path.join(appRoot, '.starciwork');
+  const write = (file, content = 'stale: true\n') => { const abs = path.join(appRoot, file); fs.mkdirSync(path.dirname(abs), { recursive: true }); fs.writeFileSync(abs, content); };
+  write('hfs.json', JSON.stringify({ kind: 'app', edition: 'lite' }));
+  for (const file of ['workspace.yaml', 'index.yaml', 'shell/index.yaml', 'features/f/index.yaml']) write(`.starciwork/${file}`);
+  write('.starciwork/brand/index.yaml', 'schema: work/brand@1\nid: brand.example\n');
+  write('.starciwork/.gitignore', '*\n!brand/\n');
+  const roots = { sourceRoot: ROOT, appRoot, stateDir };
+  for (const token of ['.starciwork/workspace.yaml', '.starciwork/index.yaml', '.starciwork/shell/index.yaml', '.starciwork/features/<feature>/index.yaml', '.starciwork/features/**/*.yaml', '<app>/.starciwork/index.yaml']) {
+    const ref = resolveReadReference(token, roots);
+    assert.equal(ref.kind, 'skipped', token); assert.deepEqual(ref.resolved, []); assert.deepEqual(ref.missing, []);
+  }
+  assert.deepEqual(resolveReadReference('.starciwork/**', roots).resolved.map(row => row.path), ['.starciwork/.gitignore', '.starciwork/brand/index.yaml']);
+  assert.deepEqual(resolveReadReference('.starciwork/brand/missing/*.yaml', roots).missing, ['brand/missing/*.yaml']);
+  assert.deepEqual(resolveReadReference('<app>/be/nonexistent/*.ts', roots).missing, ['be/nonexistent/*.ts']);
+  const briefDoc = { id: 'code.refactor', reads: [{ id: 'legacy', path: '.starciwork/features/<feature>/index.yaml', mustExist: true }], writes: [], proofs: [], blockers: [] };
+  const context = buildContext({ op: briefDoc.id, skillRoot: ROOT, appRoot, stateDir, briefDoc, ownedPaths: [{ path: '.starciwork', record: 'work', via: 'test' }] });
+  assert.deepEqual(context.requiredMissing, []);
+  assert.deepEqual(context.declaredReads[0].placeholders, []);
+  assert.deepEqual(context.ownedFiles.sort(), ['.starciwork/.gitignore', '.starciwork/brand/index.yaml']);
+});
+
 test('a declared catalog files its actual source/compiler/test union under canonical Source with exact hashes', (t) => {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-context-reference-')));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));

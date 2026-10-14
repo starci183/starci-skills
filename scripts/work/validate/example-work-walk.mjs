@@ -5,6 +5,7 @@ import path from 'node:path';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { readWorkspace, isWorkRecordSchema, splitRef } from '../record-ownership.mjs';
 import { walkFiles } from '../../lib/walk.mjs';
+import { workPathAllowed } from '../../lib/work-edition.mjs';
 import { EXEMPT, FAMILIES, ID_RE, KERNEL_CUSTODY_ROOTS, expectedId, placeDepthFinding, plannedDesignPointers } from './example-work-ids.mjs';
 
 /** A drawn shape name: `XBase#state` per work-ui-screen ui.shapes (base ^[A-Z][A-Za-z0-9]*Base$, state a
@@ -54,7 +55,7 @@ const recordEntry = (record, file, shown) => ({
 export const collectRecordMap = (scopeRoot, root) => {
   const map = new Map();
   const wsDoc = readWorkspace(scopeRoot);
-  for (const file of walkFiles(scopeRoot).filter(f => f.endsWith('.yaml'))) {
+  for (const file of walkFiles(scopeRoot, { exclude: (_name, file, entry) => !workPathAllowed(scopeRoot, file, { dir: entry.isDirectory() }) }).filter(f => f.endsWith('.yaml'))) {
     const rel = path.relative(scopeRoot, file).replaceAll('\\', '/');
     const record = resolvableRecordAt(file, rel, wsDoc);
     if (record && typeof record.id === 'string' && record.id) map.set(record.id, recordEntry(record, file, path.relative(root, file).replaceAll('\\', '/')));
@@ -124,6 +125,7 @@ function classifyRecord(ctx, { record, rel, shown, file }) {
 /** Reads one yaml file of the walk; resolves 1 when it was an artifact payload, else 0. */
 function visitYaml(ctx, file) {
   const { workRoot, root, problems } = ctx;
+  if (!workPathAllowed(ctx.resolveRoot ?? workRoot, file)) return 0;
   const rel = path.relative(workRoot, file).replaceAll('\\', '/');
   const rootSegment = rel.split('/')[0];
   // Kernel custody and generated projections have their own lifetime and
@@ -145,6 +147,8 @@ function visitYaml(ctx, file) {
 /** Walks the validating tree into `ctx.records`, `ctx.refs`, `ctx.evidenceFiles` and `ctx.plannedDesigns`; returns the payload count. */
 export function walkWorkRecords(ctx) {
   let payloads = 0;
-  for (const file of walkFiles(ctx.workRoot).filter(f => f.endsWith('.yaml'))) payloads += visitYaml(ctx, file);
+  const resolveRoot = ctx.resolveRoot ?? ctx.workRoot;
+  if (!fs.existsSync(ctx.workRoot) || !workPathAllowed(resolveRoot, ctx.workRoot, { dir: true })) return 0;
+  for (const file of walkFiles(ctx.workRoot, { exclude: (_name, file, entry) => !workPathAllowed(resolveRoot, file, { dir: entry.isDirectory() }) }).filter(f => f.endsWith('.yaml'))) payloads += visitYaml(ctx, file);
   return payloads;
 }

@@ -8,8 +8,9 @@ import { normWork } from '../../lib/path-key.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 import { RECORD_CHANGE_REFUSED } from '../dependency-graph.mjs';
 import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
+import { workPathAllowed } from '../../lib/work-edition.mjs';
 
-const recordRevs = (tree, workDir, keys) => keys.map((file) => { try { return changeNoteOf(fs.readFileSync(path.join(tree, workDir, file.slice('.starciwork/'.length)), 'utf8'))?.rev ?? null; } catch { return null; } }).filter((rev) => rev != null);
+const recordRevs = (tree, workDir, keys) => keys.map((file) => { const absolute = path.join(tree, workDir, file.slice('.starciwork/'.length)); if (!workPathAllowed(path.join(tree, workDir), absolute)) return null; try { return changeNoteOf(fs.readFileSync(absolute, 'utf8'))?.rev ?? null; } catch { return null; } }).filter((rev) => rev != null);
 
 function recordChangeReachOf(args) {
   const reach = String(args.reach ?? '').trim();

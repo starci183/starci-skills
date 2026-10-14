@@ -1846,12 +1846,14 @@ rules:
       - {kind: runtime, id: slot-id-shape, at: scripts/checks/check-slot-id-shape.mjs}
   - id: R212
     code: "HFS_EDITION_INVALID"
-    law: "hfs.json names an edition the manifest knows (full, or lite; absent means full). Lite = full minus self-hosted infrastructure: the same monorepo, code structure, slots, patterns and back-end unit specs, every pattern port implemented on Supabase (Postgres, Auth, Storage, Supabase Queues/pgmq for queue and event bus, Postgres locks, pg_cron), the realtime pattern on the same socket.io gateway run inside the be api process (one instance, no Redis adapter), and one front-end standard for both editions (knowledge/hfs/fe-stack.yaml); a lite app holds none of the infrastructure lite does not run: no e2e or contract spec, no `test:e2e`, `test:contract`, `test:stack` or `test:browser` script, no e2e workflow or browser journey, no UAT record, no test container, toxiproxy or browser-runner dependency, no BullMQ, Kafka, Redis or graphql-ws dependency (the libraries lite infraOwners own nowhere), no .starcistacks infra/runtime/seeds tree and no supabase/functions."
+    law: "hfs.json names an edition the manifest knows (full, or lite; absent means full). Lite = full minus self-hosted infrastructure: the same monorepo, code structure, slots, patterns and back-end unit specs, every pattern port implemented on Supabase (Postgres, Auth, Storage, Supabase Queues/pgmq for queue and event bus, Postgres locks, pg_cron), the realtime pattern on the same socket.io gateway run inside the be api process (one instance, no Redis adapter), and one front-end standard for both editions (knowledge/hfs/fe-stack.yaml); a lite app holds none of the infrastructure lite does not run: no e2e or contract spec, no `test:e2e`, `test:contract`, `test:stack` or `test:browser` script, no e2e workflow or browser journey, no non-brand Work record (workspace, catalog, shell, features, resources, UAT or br), no test container, toxiproxy or browser-runner dependency, no BullMQ, Kafka, Redis or graphql-ws dependency (the libraries lite infraOwners own nowhere), no .starcistacks infra/runtime/seeds tree and no supabase/functions. Its .starciwork is optional and admits only .gitignore and brand/**."
     kinds: [check]
     gates: [pre-push, settle, land, ci]
-    failureCodes: ["HFS_EDITION_INVALID", "HFS_EDITION_FORBIDDEN_PRESENT"]
+    failureCodes: ["HFS_EDITION_INVALID", "HFS_EDITION_FORBIDDEN_PRESENT", "HFS_STARCIWORK_LITE_FORBIDDEN"]
     enforcers:
       - {kind: hfs, id: edition, at: scripts/hfs/rules/edition.mjs}
+      - {kind: hfs, id: lite-brand-work, at: scripts/hfs/path-findings.mjs}
+      - {kind: work-validate, id: lite-brand-work, at: scripts/work/validate/work-boundary-check.mjs}
     cases:
       - id: case-1
         date: "2026-10-12"
@@ -1868,6 +1870,12 @@ rules:
         source: owner
         quote: "As the student proposes. (translated from Vietnamese; the owner adopted the proposed HFS standard for front end and back end, lite = full)"
         ruling: "One HFS tree for both editions: the repository root, be/ (apps, contracts, features, modules, tests) and fe/apps/<app>/src have the same shape in lite and full, and code above the platform/integrations seam is the same. The editions differ only behind that seam: the database and its migration authority (lite supabase/migrations; full TypeORM entities and migrations in be.persistence), the auth provider (lite Supabase Auth through fe.modules.auth and a JWKS-verified back end; full the app's identity provider), object storage (lite Supabase Storage; full S3-compatible storage), queue and jobs (lite pgmq and pg_cron; full BullMQ) behind platform/queue, realtime (lite the socket.io gateway in the api process, one instance; full socket.io scaled with a Redis adapter), the event-bus adapter (lite outbox and pgmq; full outbox and Kafka) and hosting; lite has no e2e. Migration baseline at the cutover of an existing app: the live schema is dumped into one baseline migration written to the current standard and marked applied on production without a re-run, the older migrations move to app.supabase.migrations.archive (supabase/migrations/_archive/, never applied and never judged), and new migrations append after the baseline. Assets: static templates, copy and presets are TS constants in the owning domain capability (<x>.templates.ts) and user-editable ones are seed rows; small build-time binaries such as fonts live in be.assets (be/src/assets/<kind>/); large and user media live in object storage and are fetched at runtime; there is no be/resources/."
+
+      - id: case-4
+        date: "2026-10-14"
+        source: owner
+        quote: "In a lite app, .starciwork keeps only the brand records."
+        ruling: "Under lite, .starciwork is optional when the app has no brand records and admits only .gitignore and brand/** in the existing brand tooling layout, including drawing records, references and assets. workspace.yaml, index.yaml, shell/, features/, _resources/, uat and br are forbidden there. Lite readers skip this full-edition metadata; lite scaffolding creates at most brand/ and .gitignore. Full edition is unchanged."
 
   - id: R213
     code: "DB_MIGRATION_SHAPE"

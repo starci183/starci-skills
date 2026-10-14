@@ -3,7 +3,7 @@ id: brand.decide
 goal:
   en: Settle one product's visual identity in the single brand record - colour tokens traced to the
     real source files, typography, mascot, logo, iconography, imagery rules, voice and motion - and
-    write the product's layout tree in the single shell record (interface.draw writes it too when it
+    in full edition write the product's layout tree in the single shell record (interface.draw writes it too when it
     starts from a todo shell - owner ruling 2026-09-29 draw-from-todo, layout capture is not
     this op's exclusive gate, a draw never waits for it) - scanned from the frontend's app/
     directory (or planned before one exists), each visible layout captured at desktop and mobile in the
@@ -14,7 +14,7 @@ nodeKinds: [brand]
 completionProfile: brand
 sideEffects:
   - generated placeholder mascot/logo asset bytes under the brand record's own assets
-  - local renders of the real frontend's layouts (page slot keyed) and brand lockup, captured under the shell record's own assets
+  - full edition only - local renders of the real frontend's layouts (page slot keyed) and brand lockup, captured under the shell record's own assets
 graphPolicy:
   mode: read-only
   location: shared
@@ -90,7 +90,7 @@ reads:
   - id: shell
     path: .starciwork/shell/index.yaml
     purpose:
-      en: "The product's layout tree (work/layout-tree@1) with its rev, nodes, per-layout revs and captures
+      en: "Full edition: the product's layout tree (work/layout-tree@1) with its rev, nodes, per-layout revs and captures
         (cited blobs, engine/db/blob.mjs). Absent until the tree is first scanned or planned; this op then writes it at rev 1."
   - id: shellSource
     path: <app>/<bound-paths>
@@ -196,7 +196,7 @@ writes:
       - review
       - change
     content:
-      en: "The one layout tree (schema work/layout-tree@1, id shell), generated, never hand-listed: `node
+      en: "Full edition only: the one layout tree (schema work/layout-tree@1, id shell), generated, never hand-listed: `node
         scripts/work/layout-tree.mjs scan --work .starciwork --write` writes app, source digest, i18n
         catalogs and, for each app the workspace declares, one node per app/ segment with its special files and digests, the component each
         layout renders and the navigation it imports with labels per locale and its findings. This op then
@@ -246,7 +246,7 @@ steps:
   - reads: [standard, knowledge]
     writes: [read-digest]
     action:
-      en: "READ the standard before deciding (knowledge/op-gate.yaml proofs.read-knowledge): run starci gate read --root <app> --touch <every record this op will write> --knowledge knowledge/ui/index.yaml knowledge/grammars/index.yaml knowledge/grammars/<the product family>/* knowledge/patterns/fe/css.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, and read what it records - the knowledge files in place and the hfs slot map of each record (slot, tier, rules). Every token, tone pair and asset rule the brand record settles cites the grammar or ui knowledge entry it follows (the HeroUI solid and soft tone pairs, contrast-aa thresholds); a value the grammar forbids is an owner question, never a silent override. A record the op comes to write later is added with --touch and read the same way; REPORT with read-digest.json attached."
+      en: "Resolve the app edition from hfs.json first. In lite, .starciwork is optional until brand records exist and holds only .gitignore and brand/**: the existing brand records, references and assets. Skip all workspace, catalog, feature, resource and shell reads/writes, layout-tree planning/rendering and shell proofs below; run the brand checks and keep their evidence in the external ledger. READ the standard before deciding (knowledge/op-gate.yaml proofs.read-knowledge): run starci gate read --root <app> --touch <every record this op will write> --knowledge knowledge/ui/index.yaml knowledge/grammars/index.yaml knowledge/grammars/<the product family>/* knowledge/patterns/fe/css.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, and read what it records - the knowledge files in place and the hfs slot map of each record (slot, tier, rules). Every token, tone pair and asset rule the brand record settles cites the grammar or ui knowledge entry it follows (the HeroUI solid and soft tone pairs, contrast-aa thresholds); a value the grammar forbids is an owner question, never a silent override. A record the op comes to write later is added with --touch and read the same way; REPORT with read-digest.json attached."
       vi: "ĐỌC chuẩn trước khi quyết định (knowledge/op-gate.yaml proofs.read-knowledge): chạy starci gate read --root <app> --touch <mọi bản ghi op sẽ viết> --knowledge knowledge/ui/index.yaml knowledge/grammars/index.yaml knowledge/grammars/<họ của sản phẩm>/* knowledge/patterns/fe/css.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, rồi đọc những gì nó ghi - các tệp knowledge tại chỗ và bản đồ slot hfs của từng bản ghi (slot, tầng, luật). Mọi token, cặp tông và luật tài sản mà bản ghi thương hiệu chốt đều dẫn mục grammar hoặc ui knowledge nó theo (cặp tông solid và soft của HeroUI, ngưỡng contrast-aa); giá trị mà grammar cấm là câu hỏi cho chủ sở hữu, không bao giờ ghi đè ngầm. Bản ghi phát sinh về sau được thêm bằng --touch và đọc theo cùng cách; BÁO CÁO kèm read-digest.json."
   - reads:
       - target
@@ -390,7 +390,7 @@ steps:
       - profile
     writes: [shellNode, shellAssets, evidence]
     action:
-      en: "Write the layout tree (not exclusively: interface.draw scans, draws or captures it itself when it starts from a
+      en: "Full edition only. Write the layout tree (not exclusively: interface.draw scans, draws or captures it itself when it starts from a
         todo shell, and only one workflow at a time draws the shared shell foundation - a tree another workflow's draw is
         settling is left to it). When the frontend exists, run `starci work layout-tree scan --work
         .starciwork --write` and read what it
@@ -439,7 +439,7 @@ steps:
         match their declared sources, every declared text pair holds the contrast floor (a status soft pair and its glyph, the
         soft floor) or an owner-receipted contrast exception, primary and danger are distinct unless the policy permits
         otherwise, every declared mascot asset exists
-        with its recorded hash, and the icon set is the only one named; run `node
+        with its recorded hash, and the icon set is the only one named; in full edition run `node
         scripts/work/ui/shell-conformance.mjs .starciwork/shell/index.yaml` and keep its output as
         STARCI_JOB_SCRATCH/shell-conformance.txt, attached at starci kernel report. Bump `rev` and record what
         changed. Report `done` exactly once with the new `rev`, the checks and the token-to-source
@@ -496,7 +496,7 @@ proofs:
     check: scripts/work/brand/brand.mjs
   - id: shell-capture
     requirement:
-      en: "`starci work shell-conformance .starciwork/shell/index.yaml` exits 0 on the written layout
+      en: "Full edition only: `starci work shell-conformance .starciwork/shell/index.yaml` exits 0 on the written layout
         tree: it is a work/layout-tree@1 record and done, a re-scan of app/ still matches its source digest,
         every visible layout has a slot-measured capture at desktop and mobile in the light theme (dark
         optional) on disk with its

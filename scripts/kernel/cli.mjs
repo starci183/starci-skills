@@ -103,6 +103,7 @@ import { VerbExit } from './verbs/shared/verb-exit.mjs';
 import { OP_ROLE, callerOf, refuseOpCaller } from '../guards/op-caller.mjs';
 import { callerAdmission, guardedRun, openVerbLedger, receiptLedger, requireAdmittedKernelRead } from './caller-admission.mjs';
 import { slash } from '../lib/path-key.mjs';
+import { workPathAllowed } from '../lib/work-edition.mjs';
 import { releaseSettledSession } from './op-session.mjs';
 import { recordSettledAttemptUsage } from './usage-record.mjs';
 import {
@@ -848,7 +849,6 @@ const heldWaitLabel = (length) => length === 1 ? 'its wait' : 'those waits'; con
  * can never be met by it, so it is the Kernel's move again (frontier.peerWaitsDead).
  */
 const approvedLegOps = (goalJson) => planGraphOf(goalJson ?? {}).ops;
-/** One queued job's blocking cause and the id that holds it. */
 /**
  * Work-record order the kernel already declared: a job owns record
  * directories (owned_paths holding an index.yaml with an id); when one of its
@@ -862,7 +862,7 @@ function recordDependencies(repo, workflowJobs) {
   for (const row of workflowJobs) {
     const owned = (jobPayloadOf(row).owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
     for (const rel of owned) {
-      if (!rel.startsWith('.starciwork/')) continue;
+      if (!rel.startsWith('.starciwork/') || !workPathAllowed(path.join(repo, workDirOf(repo)), path.join(repo, stripSlashes(rel), 'index.yaml'))) continue;
       let doc = null;
       try { doc = parseYaml(fs.readFileSync(path.join(repo, stripSlashes(rel), 'index.yaml'), 'utf8')); } catch { continue; }
       if (!doc?.id) continue;
@@ -2598,7 +2598,7 @@ const recordOwnerJobOf = (db, job, node, repo) => {
   const rows = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND COALESCE(op_id,'')<>? AND status IN (${FINAL_SETTLED.map(() => '?').join(',')}) AND status<>'cancelled' ORDER BY created_at DESC`)
     .all(job.workflow_id, jobOpOf(job) ?? '', ...FINAL_SETTLED);
   for (const row of rows) {
-    for (const rel of recordPathsOf(jobPayloadOf(row))) {
+    for (const rel of recordPathsOf(jobPayloadOf(row))) { if (!workPathAllowed(path.join(repo, workDirOf(repo)), path.join(repo, stripSlashes(rel), 'index.yaml'))) continue;
       try {
         const doc = parseYaml(fs.readFileSync(path.join(repo, stripSlashes(rel), 'index.yaml'), 'utf8'));
         if (doc?.id === id) return row;

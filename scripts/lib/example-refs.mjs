@@ -11,6 +11,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { validateAgainstSchema } from './json-schema.mjs';
 import { insidePath, samePath, slash } from './path-key.mjs';
 import { byCodeUnit } from './list.mjs';
+import { isLiteWorkRoot, workPathAllowed } from './work-edition.mjs';
 
 /** The runtime's example tree root. */
 export const EXAMPLES_ROOT = 'examples';
@@ -150,7 +151,9 @@ export function exampleWorkRoots(root) {
     const directory = path.dirname(path.join(root, relative)), stat = fs.lstatSync(directory, { throwIfNoEntry: false });
     if (!stat) return [];
     if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error(`invalid example Work directory: ${app}`);
-    return [path.dirname(referenceFile(root, relative))];
+    referenceFile(root, `${EXAMPLES_ROOT}/${app}/.starciwork`, { directory: true });
+    if (!isLiteWorkRoot(directory)) referenceFile(root, relative);
+    return [directory];
   });
 }
 
@@ -167,9 +170,12 @@ export function exampleArtifactReadOptions(runtimeRoot, workRoot, { resolveRoot 
     || !discoverExampleApps(base).includes(app) || parts[2] !== '.starciwork')
     throw new Error(`invalid example Work artifact context: ${relative}`);
   referenceFile(base, `${EXAMPLES_ROOT}/${app}/hfs.json`, { exact: true });
-  referenceFile(base, `${EXAMPLES_ROOT}/${app}/.starciwork/index.yaml`, { exact: true });
+  const ownWork = path.join(base, EXAMPLES_ROOT, app, '.starciwork');
+  if (!isLiteWorkRoot(ownWork)) referenceFile(base, `${EXAMPLES_ROOT}/${app}/.starciwork/index.yaml`, { exact: true });
+  if (!workPathAllowed(ownWork, target, { dir: true })) throw new Error('lite .starciwork holds only brand/');
   referenceFile(base, relative, { directory: true, exact: true });
-  const resolution = path.resolve(resolveRoot), ownWork = path.join(base, EXAMPLES_ROOT, app, '.starciwork');
+  const resolution = path.resolve(resolveRoot);
+  if (!workPathAllowed(ownWork, resolution, { dir: true })) throw new Error('lite .starciwork holds only brand/');
   if (!insidePath(resolution, target, { includeSelf: true }) || !insidePath(ownWork, resolution, { includeSelf: true }))
     throw new Error('selected example validation and resolution must share its own Work root');
   referenceFile(base, slash(path.relative(base, resolution)), { directory: true, exact: true });

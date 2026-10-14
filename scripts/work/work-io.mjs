@@ -6,6 +6,7 @@ import { list } from '../lib/list.mjs';
 import { renameOver } from '../api/fs/rename-over.mjs';
 import { underWorktrees } from '../lib/worktree-exclude.mjs';
 import { valueAfter } from '../lib/cli-arg.mjs';
+import { workPathAllowed } from '../lib/work-edition.mjs';
 export { slash } from '../lib/path-key.mjs';
 
 /** How many directories below its start a record walk descends (features/<f>/ui/<r> is 3). */
@@ -56,11 +57,13 @@ export function workRootOf(dir) {
 /** Every index.yaml under `root` (itself included), at most RECORD_DEPTH directories down, never inside RECORD_SKIP. */
 export function indexFilesUnder(root) {
   const out = [];
+  const workRoot = workRootOf(root);
   const walk = (dir, depth) => {
     let entries = [];
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
     for (const e of entries) {
       const full = path.join(dir, e.name);
+      if (!workPathAllowed(workRoot, full, { dir: e.isDirectory() })) continue;
       if (e.isDirectory()) { if (depth < RECORD_DEPTH && !RECORD_SKIP.includes(e.name) && !underWorktrees(root, full)) walk(full, depth + 1); }
       else if (e.name === 'index.yaml') out.push(full);
     }

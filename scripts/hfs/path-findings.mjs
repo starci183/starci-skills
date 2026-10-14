@@ -3,6 +3,7 @@
 // (scripts/hfs/project-graph.mjs) runs it over the same tree and serves the findings on a TypeScript file as ESLint reports.
 //   HFS_SLOT_UNDECLARED / HFS_SLOT_AMBIGUOUS / HFS_SLOT_NOT_ENABLED / HFS_FORBIDDEN_PRESENT / HFS_TOOL_CONFIG_LOCAL / HFS_TRACKED_MUST_BE_IGNORED (R01, R16)
 //   BE_SOURCE_FORM (R89, the file name), BE_SPEC_PLACEMENT (R102)
+import fs from 'node:fs';
 import path from 'node:path';
 import { allowsFile } from './allows.mjs';
 import { isFeTestPath } from './rules/fe-no-tests.mjs';
@@ -87,6 +88,8 @@ function forbiddenPathFinding(file, c, resolver) {
 }
 
 function pathStatusFinding(file, resolver) {
+  const liteWork = liteStarciworkFinding(file, resolver);
+  if (liteWork) return liteWork;
   const c = resolver.classifyPath(file);
   if (c.status === 'no-slot') {
     const nearestNote = c.nearest ? `; nearest slot ${c.nearest.slot} (${c.nearest.pattern}), matched ${c.nearest.matchedPrefix || '.'} then expected ${c.nearest.expectedNext ?? 'nothing'}` : '';
@@ -97,6 +100,30 @@ function pathStatusFinding(file, resolver) {
   if (c.status === 'forbidden') return forbiddenPathFinding(file, c, resolver);
   if (c.tracking === 'ignored') return { code: 'HFS_TRACKED_MUST_BE_IGNORED', level: 'error', path: file, slot: c.slot, message: `${file} is tracked but ${c.slot} must be gitignored` };
   return null;
+}
+
+/** The lite Work boundary, read from app.starciwork's edition-specific admission list, including paths a narrower slot owns. */
+export function liteStarciworkFinding(file, resolver, { dir = false } = {}) {
+  if (resolver.repo?.edition !== 'lite' || !resolver.slot('app.starciwork')) return null;
+  const p = resolver.classifyPath(file).path;
+  if (!p.startsWith('.starciwork/')) return null;
+  const admitted = allowsFile(resolver, dir ? `${p}/.probe` : p);
+  if (admitted?.slot === 'app.starciwork' && admitted.allowed) return null;
+  return { code: 'HFS_STARCIWORK_LITE_FORBIDDEN', level: 'error', path: p, slot: 'app.starciwork', message: `${p}: lite .starciwork holds only brand/ (and .gitignore); remove this path or use the full edition` };
+}
+
+/** Local lite Work leftovers, including metadata ignored by an old full-edition .gitignore. */
+export function liteStarciworkTreeFindings(repoRoot, resolver, tracked) {
+  if (resolver.repo?.edition !== 'lite' || !resolver.slot('app.starciwork')) return [];
+  let entries = [];
+  try { entries = fs.readdirSync(path.join(repoRoot, '.starciwork'), { withFileTypes: true }); } catch { /* Work is optional. */ }
+  const trackedSet = new Set(tracked);
+  return entries.flatMap(entry => {
+    const file = `.starciwork/${entry.name}`;
+    if (trackedSet.has(file)) return [];
+    const finding = liteStarciworkFinding(file, resolver, { dir: entry.isDirectory() });
+    return finding ? [finding] : [];
+  });
 }
 
 /** The findings of the slot manifest over `files` (repository-relative tracked paths) of a repository of `profile`. */

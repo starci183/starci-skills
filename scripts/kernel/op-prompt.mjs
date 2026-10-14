@@ -22,6 +22,8 @@ import { opVerbsOfBrief } from './op-prompt-verbs.mjs';
 import { renderRoleLines } from '../machine/roles-contract.mjs';
 import { judgePromptLine } from './op-judge.mjs';
 import { tracePromptLines } from './acceptance-trace.mjs';
+import { isLiteWorkRoot } from '../lib/work-edition.mjs';
+import { WORK_DIR_NAME } from '../lib/roots.mjs';
 
 // The Op's role (scope, never, clean up, reporting) is modules/kernel/roles.yaml#op; the prompt prints it from there.
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
@@ -114,6 +116,18 @@ function kernelOverrideLines(o) {
   return out.length > 1 ? out : [];
 }
 
+function productPromptLines({ repo, context }) {
+  const lite = Boolean(repo && isLiteWorkRoot(path.join(repo, WORK_DIR_NAME)));
+  let locale = '(unset - no shell or brand locale)';
+  if (context.product_locale) locale = context.product_locale.locale + ' (' + context.product_locale.source + ')';
+  else if (lite) locale = '(unset - no brand locale)';
+  const direction = lite ? '; lite .starciwork holds only brand/; use the brand records for product direction'
+    : '; chrome, nav labels and the demo persona come from .starciwork/shell/index.yaml verbatim';
+  const lines = [`product_locale: ${locale} — every string a product user reads (UI copy, labels, sample data in prompts, message files) is written in this locale, never in owner_language${direction}`];
+  if (lite) lines.push('edition: lite — .starciwork/ is optional and holds only .gitignore and brand/** (drawing records, references and assets). Skip the brief’s full-edition workspace.yaml, root index.yaml, shell/, features/, _resources/, uat/ and br/ reads, writes, steps and proofs; these paths are forbidden in lite. brand.decide uses brand/** and retains its brand drawing, reference and asset proofs.');
+  return lines;
+}
+
 export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, priorFailures = [], cwd = repo, contextPack = null, scratchDir = null }) {
   const jobLabel = jobId ?? '<job-id>';
   const repoLabel = repo ?? '<target-repo>';
@@ -174,7 +188,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   ...(packet.params ? [`params: ${Object.entries(packet.params).map(([k, v]) => k + '=' + JSON.stringify(v)).join(' ')} — the resolved tunables for this dispatch; use these values, never a number you read in prose`] : []),
   `workflow: ${packet.context.workflow?.id ?? '(unbound — packet preview)'} goal_revision=${packet.context.workflow?.goal_revision ?? '(unbound)'} goal_identity=${packet.context.workflow?.goal_identity ?? '(unbound)'}`,
   `owner_language: ${packet.context.owner_language ?? ownerLanguage()} — every string the owner reads (ask text, option and pick labels, owner-facing summaries) is written in this language in plain words; canonical records stay English`,
-  `product_locale: ${packet.context.product_locale ? packet.context.product_locale.locale + ' (' + packet.context.product_locale.source + ')' : '(unset - no shell or brand locale)'} — every string a product user reads (UI copy, labels, sample data in prompts, message files) is written in this locale, never in owner_language; chrome, nav labels and the demo persona come from .starciwork/shell/index.yaml verbatim`,
+  ...productPromptLines({ repo, context: packet.context }),
   ...(packet.context.owner_delegation ? [`owner_delegation: the owner delegated ask answers to ${packet.context.owner_delegation.asks} until ${packet.context.owner_delegation.until} (config.yaml delegation); an answer receipt with answeredBy ${packet.context.owner_delegation.asks} inside that window IS the owner's answer, except for the excluded classes ${JSON.stringify(packet.context.owner_delegation.excludes)} which stay owner-only`] : []),
   `records: ${packet.context.records.join(', ') || '(none bound)'}`,
   ...renderGrammarContext(packet.context.grammar),

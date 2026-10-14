@@ -3,6 +3,12 @@ format: YAML 1.2
 node: index.yaml
 identity: stable metadata id; folder path is not identity
 shape:
+  editions:
+    full: "The Work shape and productPaths below apply to full edition unchanged."
+    lite: "An optional .starciwork holds only .gitignore and brand/**, including the brand drawing records, references
+      and assets in their existing layout. Create the tree only when the app has brand records. workspace.yaml, index.yaml,
+      shell/, features/, _resources/, uat and br are forbidden [HFS_STARCIWORK_LITE_FORBIDDEN]: lite .starciwork holds only brand/.
+      Runtime readers skip these full-edition records under lite; workflow state stays in the external ledger."
   workspace: workspace.yaml
   brand: brand/index.yaml
   brandAssets: brand/assets/**/<file-in-original-format>
@@ -84,7 +90,7 @@ shape:
     stays local/synthetic, and each entry names {role, identity} (an _resources identity id);
     a literal password is refused."
   productPaths:
-    - "The EXPLICIT list of what an app repository's .starciwork holds (docs/ledger-db.md); its executable
+    - "The EXPLICIT list of what a full app repository's .starciwork holds (docs/ledger-db.md); its executable
       form is scripts/lib/starciwork-boundary.mjs (isProductPath). Everything else is agent data or drift."
     - .gitignore, .gitattributes, workspace.yaml, index.yaml
     - brand/{index.yaml,evidence.yaml}, brand/assets/**
@@ -123,7 +129,7 @@ shape:
       shell/index.yaml cites {name, sha256}. Every reader resolves them through engine/db/blob.mjs. The final
       directions the owner accepts stay product content under ui/<screen>/assets (decision Q2)."
   starciworkIgnore:
-    - "The .starciwork/.gitignore of an app repository (starciwork-boundary.mjs
+    - "The full .starciwork/.gitignore of an app repository (starciwork-boundary.mjs
       STARCIWORK_GITIGNORE): deny the root,
       re-admit the productPaths roots, deny agent output inside them. Side folders have no .starciwork."
     - "/*"

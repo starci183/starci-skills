@@ -241,6 +241,22 @@ test('draw gates: the record is read from the workflow tree first, then the main
   assert.deepEqual(drawGateEvidence({ repo: inMain.dir, ...args }).findings.map((f) => f.code), ['DRAW_BEAUTY_BELOW'], 'no tree reads the main checkout');
 });
 
+test('draw gates: lite skips stale feature records and still checks brand drawing records', (t) => {
+  const repo=fs.mkdtempSync(path.join(os.tmpdir(),'starci-autopilot-lite-'));
+  t.after(()=>fs.rmSync(repo,{recursive:true,force:true}));
+  fs.writeFileSync(path.join(repo,'hfs.json'),JSON.stringify({kind:'app',edition:'lite'}));
+  const stale=path.join(repo,'.starciwork','features','old','ui','page');fs.mkdirSync(stale,{recursive:true});
+  fs.writeFileSync(path.join(stale,'index.yaml'),'id: [stale malformed UI');
+  const result=drawGateEvidence({repo,recordPath:'.starciwork/features/old/ui/page',beautyMin:8});
+  assert.equal(result.ok,true);assert.equal(result.skipped,true);assert.deepEqual(result.findings,[]);assert.deepEqual(result.parts,[]);
+  assert.equal(drawGateEvidence({repo,tree:loopRecord(t).dir,recordPath:path.join(stale,'index.yaml'),beautyMin:8}).skipped,true,'an absolute stale main-checkout path is skipped too');
+  assert.equal(drawGateEvidence({repo,recordPath:'.starciwork/features/missing/ui/page',beautyMin:8}).skipped,true,'lite never requires a feature record');
+  const brand=path.join(repo,'.starciwork','brand','drawings','page');fs.mkdirSync(brand,{recursive:true});
+  fs.writeFileSync(path.join(brand,'index.yaml'),stringifyYaml({schema:'work/ui-screen@1',id:'ui.brand.page',assets:[]}));
+  const checked=drawGateEvidence({repo,recordPath:'.starciwork/brand/drawings/page',beautyMin:8});
+  assert.equal(checked.skipped,undefined);assert.equal(checked.ok,false);assert.deepEqual(checked.findings.map(f=>f.code),['DRAW_LOOP_MISSING']);
+});
+
 test('draw gates: a verdict is accepted only for the bytes it judged; another digest or none is CRITIC_VERDICT_STALE', (t) => {
   const other = loopRecord(t, { judged: ['e'.repeat(64)] });
   assert.deepEqual(drawGateEvidence({ repo: other.dir, recordPath: 'index.yaml', beautyMin: 8 }).findings.map((f) => f.code), ['CRITIC_VERDICT_STALE']);

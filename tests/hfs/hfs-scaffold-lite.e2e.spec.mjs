@@ -83,6 +83,7 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
 
   const scaffolded = scaffoldApp({ name: APP_NAME, into, edition: 'lite', presets: PRESETS, lock: registry.lock });
   assert.equal(scaffolded.root, app, 'the lite scaffold wrote the app');
+  assert.equal(fs.existsSync(path.join(app, '.starciwork')), false, 'a lite starter without brand records needs no Work tree');
 
   // Owner ruling 2026-10-12: lite keeps the back end's unit specs and runs no e2e, contract or browser world; the front end has
   // no tests in either edition. Check before npm ci, so dependencies' own test files are not mistaken for app files.

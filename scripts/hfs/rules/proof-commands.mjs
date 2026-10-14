@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { found, readText } from './read.mjs';
+import { liteStarciworkFinding } from '../path-findings.mjs';
 
 const PROOF_COMMAND_FILE_MISSING = 'HFS_PROOF_COMMAND_FILE_MISSING';
 const RECORD = /^\.starciwork\/.+\.ya?ml$/;
@@ -62,6 +63,7 @@ export function proofCommandFindings({ repoRoot, files, resolver, sides }) {
   const own = new Set(sides);
   for (const file of files) {
     if (!RECORD.test(file)) continue;
+    if (liteStarciworkFinding(file, resolver)) continue;
     const text = readText(repoRoot, file);
     if (text === null || !text.includes('requiresProof')) continue;
     let record;

@@ -3,10 +3,9 @@ import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { workCli } from '../lib/work-cli.mjs';
 import {isPlainObject} from '../../engine/plain-object.mjs';
-import {parseYaml} from '../../engine/yaml.mjs';
 import {computeDerived, runGenerated} from './example-derive.mjs';
 import { readWorkTree } from '../lib/work-tree.mjs';
-import {APP_SIDES, appRootOf, indexInlineCriteria, repoRootFor, resolveRecordRef} from '../work/record-ownership.mjs';
+import {APP_SIDES, appRootOf, indexInlineCriteria, readWorkspace, repoRootFor, resolveRecordRef} from '../work/record-ownership.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { computeBlockerCycleFindings } from './example-blocker-cycles.mjs';
 
@@ -56,8 +55,7 @@ const LEFTOVER_GAP_TEXT_RE = /\bunbuilt\b|\bnot built\b/i;
  */
 function resolveRepositories(workRoot) {
   const appRoot = appRootOf(workRoot);
-  let workspace = null;
-  try { workspace = parseYaml(fs.readFileSync(path.join(workRoot, 'workspace.yaml'), 'utf8')); } catch { workspace = null; }
+  const workspace = readWorkspace(workRoot);
   const sides = new Set(APP_SIDES.filter(side => {
     const root = repoRootFor(workRoot, side, workspace);
     return root && fs.existsSync(root);
@@ -492,6 +490,7 @@ export function runCritique(workRoot, {write} = {}) {
       '# Regenerate with: starci work example-critique --work <path-to-.starciwork> --write\n',
     compute: computeCritique, buildDoc: buildCritiqueYamlDocument, buildText: buildCritiqueMarkdown,
   });
+  if (run.skipped) return run;
   if (run.wrote) return {wrote: true, critique: run.computed, yamlDoc: run.doc, markdown: run.text};
   return {ok: run.ok, critique: run.computed, yamlDoc: run.doc, markdown: run.text, onDiskYaml: run.onDiskDoc, onDiskMd: run.onDiskText?.toString('utf8') ?? null};
 }

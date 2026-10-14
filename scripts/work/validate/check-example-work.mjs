@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { WORK_DIR_NAME } from '../../lib/roots.mjs';
 import { fileURLToPath } from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {readWorkspace, indexInlineCriteria, resolveRecordRef} from '../record-ownership.mjs';
@@ -15,6 +16,7 @@ import { surfaceRules } from './example-work-rules-surface.mjs';
 import { checkRenderProofs, checkUatFlowResources } from './example-work-resources.mjs';
 import { sealedLocationProblem } from './check-work-artifacts.mjs';
 import { checkBlockerGraph } from './example-work-blockers.mjs';
+import { isLiteWorkRoot, workPathAllowed } from '../../lib/work-edition.mjs';
 // The exported boundary checker delegates HFS_AGENT_DATA_TRACKED findings to this sibling module.
 import { checkStarciworkBoundary } from './work-boundary-check.mjs';
 export {checkStarciworkBoundary} from './work-boundary-check.mjs';
@@ -36,7 +38,18 @@ export { FAMILIES, ID_RE, MIN_ID_SEGMENTS, DEFAULT_MIN_ID_SEGMENTS, placeDepthFi
  */
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
-export const walk = dir => walkFiles(dir);
+/** A Work walk respects the owning app's edition before descending into its records. */
+export const walk = dir => {
+  let workRoot = path.resolve(dir);
+  while (path.basename(workRoot) !== WORK_DIR_NAME) {
+    const parent = path.dirname(workRoot);
+    if (parent === workRoot) return walkFiles(dir);
+    workRoot = parent;
+  }
+  if (!isLiteWorkRoot(workRoot)) return walkFiles(dir);
+  if (!fs.existsSync(dir) || !workPathAllowed(workRoot, dir, { dir: true })) return [];
+  return walkFiles(dir, { exclude: (_name, file, entry) => !workPathAllowed(workRoot, file, { dir: entry.isDirectory() }) });
+};
 
 // ---- an identity points its secret at .starcistacks/<env>/secrets/identity-<slug>.enc (R09) ----
 // <slug> is the folder the identity record sits in (_resources/identities/<slug>/resource.yaml); the path is app-relative

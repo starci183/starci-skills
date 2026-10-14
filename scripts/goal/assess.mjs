@@ -15,6 +15,8 @@ import path from 'node:path';
 import { readJsonFile as readJson } from '../lib/json.mjs';
 import { isWorktreesPath } from '../lib/worktree-exclude.mjs';
 import { slash as relPath } from '../lib/path-key.mjs';
+import { isLiteWorkRoot, workPathAllowed } from '../lib/work-edition.mjs';
+import { WORK_DIR_NAME } from '../lib/roots.mjs';
 
 const FILE_CAP = 20000;          // max files enumerated per tree walk
 const CONTENT_CAP = 2000;        // max files content-grepped (eslint-disable / any)
@@ -29,12 +31,12 @@ const IMG_RE = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
 // Iterative readdir(withFileTypes). Never throws: unreadable/locked dirs are
 // collected into `notes` and the walk continues.
 /** Push subdirectories onto the stack and files onto the list; true once the file cap is hit. */
-function collectEntries(entries, rel, stack, files) {
+function collectEntries(entries, rel, stack, files, root, allowed) {
   for (const ent of entries) {
     const relPath = rel ? `${rel}/${ent.name}` : ent.name;
     if (ent.isDirectory()) {
-      if (!SKIP_DIRS.has(ent.name) && !isWorktreesPath(relPath)) stack.push(relPath);
-    } else if (ent.isFile()) {
+      if (!SKIP_DIRS.has(ent.name) && !isWorktreesPath(relPath) && allowed(path.join(root, relPath), { dir: true })) stack.push(relPath);
+    } else if (ent.isFile() && allowed(path.join(root, relPath))) {
       files.push(relPath);
       if (files.length >= FILE_CAP) return true;
     }
@@ -42,7 +44,7 @@ function collectEntries(entries, rel, stack, files) {
   return false;
 }
 
-function walk(root) {
+function walk(root, allowed = () => true) {
   const files = [];
   const notes = [];
   let truncated = false;
@@ -54,7 +56,7 @@ function walk(root) {
     let entries;
     try { entries = fs.readdirSync(abs, { withFileTypes: true }); }
     catch (e) { notes.push(`unreadable dir: ${rel || '.'} (${e.code || e.message})`); continue; }
-    if (collectEntries(entries, rel, stack, files)) { truncated = true; break; }
+    if (collectEntries(entries, rel, stack, files, root, allowed)) { truncated = true; break; }
   }
   return { files, truncated, notes };
 }
@@ -67,7 +69,7 @@ const daysOld = (f) => {
 };
 
 // ------------------------------------------------------------ assessment --
-const inStarciwork = (f) => relPath(f).split('/')[0] === '.starciwork';
+const inStarciwork = (f) => relPath(f).split('/')[0] === WORK_DIR_NAME;
 const base = (f) => path.basename(f).toLowerCase();
 
 /** File counts and the test/lint config markers discovered anywhere in the tree (monorepo-safe). */
@@ -147,10 +149,10 @@ function scanLoc(out, repo, locFiles) {
 
 /** The .starciwork subtree: presence, index/UAT/evidence/media counts. */
 function assessStarciwork(out, repo) {
-  const swRoot = path.join(repo, '.starciwork');
+  const swRoot = path.join(repo, WORK_DIR_NAME);
   if (!exists(swRoot)) return;
   out.starciwork.present = true;
-  const sw = walk(swRoot);
+  const sw = walk(swRoot, (file, options) => workPathAllowed(swRoot, file, options));
   out.notes.push(...sw.notes.slice(0, 5).map(n => `.starciwork: ${n}`));
   for (const f of sw.files) {
     const b = base(f), r = relPath(f);
@@ -189,6 +191,7 @@ const pushStaticSignals = (out, signals) => {
 };
 
 const pushStarciworkSignals = (out, signals) => {
+  if (isLiteWorkRoot(path.join(out.repo, WORK_DIR_NAME))) return;
   const work = out.starciwork;
   if (!work.present) signals.push('starciwork-artifacts: starciwork missing');
   else {
@@ -236,7 +239,8 @@ function assessRepo(repoPath) {
   const pkg = readJson(path.join(repo, 'package.json')) || {};
 
   // -- full-tree walk (bounded) -------------------------------------------
-  const { files, truncated, notes } = walk(repo);
+  const workRoot = path.join(repo, WORK_DIR_NAME);
+  const { files, truncated, notes } = walk(repo, (file, options) => workPathAllowed(workRoot, file, options));
   out.notes.push(...notes.slice(0, 10));
   if (notes.length > 10) out.notes.push(`(+${notes.length - 10} more unreadable dirs)`);
   if (truncated) out.notes.push(`file scan truncated at ${FILE_CAP}`);

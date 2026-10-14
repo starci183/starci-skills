@@ -9,6 +9,7 @@ import path from 'node:path';
 import { readOpManifest } from '../lib/op-shared.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { workflowWorktreeOf } from '../machine/workflow-tree.mjs';
+import { isLiteWorkRoot } from '../lib/work-edition.mjs';
 
 const FEATURE_WRITE = /^\.starciwork\/features\/<feature>\/([^<{/]+)\//;
 const WORK = '.starciwork';
@@ -51,6 +52,7 @@ export function resourceDirsOf(brief) {
 
 /** The features a tree holds: the directories of `.starciwork/features` that carry an index.yaml. */
 function featuresIn(root) {
+  if (isLiteWorkRoot(path.join(root, WORK))) return [];
   const dir = path.join(root, WORK, 'features');
   try { return fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory() && fs.existsSync(path.join(dir, e.name, 'index.yaml'))).map((e) => e.name); } catch { return []; }
 }
@@ -61,6 +63,7 @@ function featuresIn(root) {
  * the features they name narrow the proposal to that node (a node that names none leaves every feature).
  */
 export function proposedLegPaths({ skillRoot, op, trees, nodePaths = [] }) {
+  if ((trees ?? []).filter(Boolean).some((root) => isLiteWorkRoot(path.join(root, WORK)))) return '';
   let brief;
   try { brief = readOpManifest(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`)); } catch { return ''; }
   const families = featureFamiliesOf(brief);

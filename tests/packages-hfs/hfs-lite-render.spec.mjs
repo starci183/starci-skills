@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -74,6 +75,8 @@ test('the lite managed set carries the unit run and its coverage world (owner ru
   assert.doesNotMatch(hookText, /test:affected|jest|playwright|vitest/);
   assert.match(targets['.gitignore'].content, /^supabase\/\.temp\/$/m);
   assert.match(targets['.gitignore'].content, /^supabase\/\.branches\/$/m);
+  assert.match(targets['.starciwork/.gitignore'].content, /lite \.starciwork holds only brand\//);
+  assert.doesNotMatch(targets['.starciwork/.gitignore'].content, /workspace\.yaml|index\.yaml|shell|features|_resources|_derived/);
   const ci = parseYaml(targets['.github/workflows/ci.yml'].content);
   assert.ok(ci.jobs['db-types']);
   assert.deepEqual(ci.on.push.tags, ['v*'], 'CI runs on release tags and manual dispatch only');
@@ -107,15 +110,39 @@ test('lite render reads the Jest preset like full, writeTargets reaches a no-op,
   fs.writeFileSync(path.join(dir, 'hfs.json'), `${JSON.stringify(LITE, null, 2)}\n`);
   await assert.rejects(renderRepo(dir, { manifest: MANIFEST }), /HFS_SYNC_PRESET_MISSING|@starci\/jest-preset/, 'a lite back end installs @starci/jest-preset for its unit run');
   const { targets } = await renderRepo(dir, { manifest: MANIFEST, presets: PRESETS });
-  assert.equal(targets.length, 23);
+  assert.equal(targets.length, 22);
+  assert.equal(targets.some(target => target.path.startsWith('.starciwork/')), false);
   assert.equal(writeTargets(dir, targets).length, targets.length);
   assert.deepEqual(checkTargets(dir, targets).map(result => result.status), Array(targets.length).fill('ok'));
   assert.deepEqual(writeTargets(dir, targets), [], 'a second sync write is a no-op');
+  assert.equal(fs.existsSync(path.join(dir, '.starciwork')), false, 'sync preserves the absence of an optional lite brand tree');
 
   const tracked = ['hfs.json', ...targets.map(target => target.path)];
   assert.deepEqual(await managedFindings({ repoRoot: dir, tracked, manifest: MANIFEST, presets: PRESETS }), []);
   fs.appendFileSync(path.join(dir, '.husky', 'pre-push'), 'npm test\n');
   assert.deepEqual((await managedFindings({ repoRoot: dir, tracked, manifest: MANIFEST, presets: PRESETS })).map(finding => [finding.code, finding.path]), [['HFS_MANAGED_FILE_DRIFT', '.husky/pre-push']]);
+});
+
+test('lite brand trees get their managed ignore file and admit every nested brand record, reference and asset', async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-lite-brand-render-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(dir, 'hfs.json'), `${JSON.stringify(LITE, null, 2)}\n`);
+  fs.mkdirSync(path.join(dir, '.starciwork', 'brand', 'assets', 'refs'), { recursive: true });
+  const { targets } = await renderRepo(dir, { manifest: MANIFEST, presets: PRESETS });
+  assert.ok(targets.some(target => target.path === '.starciwork/.gitignore'));
+  writeTargets(dir, targets);
+  assert.deepEqual(await managedFindings({ repoRoot: dir, tracked: ['hfs.json', ...targets.map(target => target.path)], manifest: MANIFEST, presets: PRESETS }), []);
+  const initialized = spawnSync('git', ['init', '-q'], { cwd: dir, encoding: 'utf8', windowsHide: true });
+  assert.equal(initialized.status, 0, initialized.stderr);
+  const allowed = ['.starciwork/.gitignore', '.starciwork/brand/index.yaml', '.starciwork/brand/references/palette.yaml',
+    '.starciwork/brand/assets/refs/reference.webp', '.starciwork/brand/drawings/home/desktop.png'];
+  const forbidden = ['.starciwork/workspace.yaml', '.starciwork/index.yaml', '.starciwork/shell/index.yaml',
+    '.starciwork/features/system-health/index.yaml', '.starciwork/_resources/environment.yaml', '.starciwork/uat/index.yaml', '.starciwork/br/index.yaml'];
+  const ignored = spawnSync('git', ['check-ignore', '--no-index', '-z', '--stdin'], {
+    cwd: dir, input: [...allowed, ...forbidden].join('\0'), encoding: 'utf8', windowsHide: true,
+  });
+  assert.equal(ignored.status, 0, ignored.stderr);
+  assert.deepEqual(ignored.stdout.split('\0').filter(Boolean).sort(), forbidden.sort());
 });
 
 test('the full managed render of both examples is the committed one (every managed file in sync, edition full explicit or not)', () => {

@@ -79,8 +79,8 @@ export function targetsOf(scope, { edition = 'full', manifest = loadSlotManifest
     }
   }
   const unlisted = scope === APP_SCOPE
-    ? UNLISTED_TARGETS.map(target => edition === 'lite' && target.path === '.gitignore'
-      ? { ...target, template: 'app/gitignore-lite' }
+    ? UNLISTED_TARGETS.map(target => edition === 'lite'
+      ? { ...target, template: target.path === '.gitignore' ? 'app/gitignore-lite' : 'app/starciwork.gitignore-lite' }
       : { ...target })
     : [];
   return [...listed, ...unlisted];
@@ -139,7 +139,8 @@ const SOURCE_SKIPPED = new Set(['node_modules', 'dist', 'coverage']);
 
 /**
  * The be source of the app at `root` the coverage components read: { files, read }, `files` be-relative posix paths of every `*.ts` file under
- * be/apps and be/src (build output and dependencies skipped) and `read` their text. An app with no be folder has no files.
+ * be/apps and be/src (build output and dependencies skipped) and `read` their text. `workPresent` records whether the optional
+ * lite brand tree exists, so sync can preserve its absence. An app with no be folder has no files.
  */
 export function appSource(root) {
   const files = [];
@@ -152,7 +153,7 @@ export function appSource(root) {
     }
   };
   for (const dir of ['apps', 'src']) walk(dir);
-  return { files: files.sort(byCodeUnit), read: file => fs.readFileSync(path.join(root, 'be', file), 'utf8') };
+  return { files: files.sort(byCodeUnit), read: file => fs.readFileSync(path.join(root, 'be', file), 'utf8'), workPresent: fs.existsSync(path.join(root, '.starciwork')) };
 }
 
 /**
@@ -310,7 +311,9 @@ export function renderTargets(hfs, presets, { sonarKey, readTemplate = readBundl
   const hasTemplate = name => { try { return readTemplate(name) !== undefined; } catch { return false; } };
   return SCOPES.flatMap(scope => {
     const vars = variables(app, scope, presets, sonarKey, manifest, source);
-    return targetsOf(scope, { edition: app.edition, manifest, hasTemplate }).map(target => {
+    const targets = targetsOf(scope, { edition: app.edition, manifest, hasTemplate })
+      .filter(target => !(app.edition === 'lite' && source?.workPresent === false && target.path === '.starciwork/.gitignore'));
+    return targets.map(target => {
       const body = render(readTemplate(target.template), vars, readTemplate);
       const where = onSide(scope, target.path);
       if (target.mode === 'scripts') {

@@ -573,6 +573,8 @@ test('a Work record dependsOn owned by another open job holds the job as depende
   seed(repo,ledger=>moveJob(ledger,base,'succeeded'));
   assert.equal(because(tasks).queuedBecause,'ready','the succeeded owner releases its dependents');
   assert.deepEqual(because(approval).blockedBy,{op:'docs.author',job:tasks});
+  fs.writeFileSync(path.join(repo,'hfs.json'),JSON.stringify({kind:'app',edition:'lite'}));
+  assert.equal(because(approval).queuedBecause,'ready','lite ignores stale feature record dependencies');
 });
 
 // The Modules tax ask's serve-ask form hit its ttl while the kernel waited on

@@ -20,6 +20,7 @@ import { RenderRefusal, captureViewport } from './layout-render-page.mjs';
 import { RENDER_HOST, freePort, logTail, nextBinOf, serverErrors, startDevServer, stopDevServer, waitReady } from './layout-render-serve.mjs';
 import { appNamesOf, appsOf, frontendOf, layoutTreeMain, nodeById, readShellRecord, treeOf } from './layout-tree.mjs';
 import { flag } from './work-io.mjs';
+import { isLiteWorkRoot } from '../lib/work-edition.mjs';
 
 export const REFUSAL_CODE = 'SHELL_RENDER_UNAVAILABLE';
 const DEFAULT_SLOT = 'main';
@@ -115,6 +116,7 @@ async function renderLayout(request) {
 export async function layoutRenderMain(argv = []) {
   let request;
   try { request = requestOf(argv); } catch (error) { return { exitCode: 2, text: `layout-render: ${error.message}\n${USAGE}` }; }
+  if (isLiteWorkRoot(request.work)) return { exitCode: 0, text: request.json ? `${JSON.stringify({ ok: true, skipped: true, reason: 'lite .starciwork holds only brand/' }, null, 2)}\n` : 'SKIP: lite .starciwork holds only brand/\n' };
   try {
     const result = await renderLayout(request);
     return { exitCode: 0, text: successText(result, request.json) };

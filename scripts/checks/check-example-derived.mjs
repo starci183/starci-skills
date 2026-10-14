@@ -8,6 +8,7 @@ import {runCritique} from '../example/example-critique.mjs';
 import {isProductPath} from '../lib/starciwork-boundary.mjs';
 import { exampleWorkRoots } from '../lib/example-refs.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { isLiteWorkRoot } from '../lib/work-edition.mjs';
 
 /**
  * A separate gate rather than a line inside scripts/work/validate/check-example-work.mjs: another lane owns that file's
@@ -46,6 +47,7 @@ const authoredFieldProblems = (workRoot, problems) => {
 };
 
 export function checkExampleDerived(workRoot, problems) {
+  if (isLiteWorkRoot(workRoot)) return {checked: false, skipped: true};
   for (const rel of ['_derived/index.yaml', '_derived/frontier.md', '_derived/critique.yaml', '_derived/critique.md']) {
     if (!isProductPath(rel)) problems.push(`${rel}: generated Work output is outside the product boundary`);
   }

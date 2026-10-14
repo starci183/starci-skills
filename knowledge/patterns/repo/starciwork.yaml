@@ -3,8 +3,8 @@ id: repo.starciwork
 title: App .starciwork
 purpose: |
   Given content that describes a product (requirements, design, screens, implementation records, UAT), what may live in the
-  app's `.starciwork` (at the app root, one per app, for both sides) and what may not? Product records only, flat families,
-  no agent data.
+  app's `.starciwork` (at the app root, one per app, for both sides) and what may not? Full holds product records in flat
+  families; lite holds brand only. Neither holds agent data.
 appliesTo:
   - backend
   - frontend
@@ -26,15 +26,17 @@ rules:
   - id: REPO-WORK-1
     title: Product records only
     kind: mandatory
-    hfsRules: [R07, R01, R105]
+    hfsRules: [R07, R01, R105, R212]
     requirement: |
-      The app root's `.starciwork/` holds exactly the paths that scripts/lib/starciwork-boundary.mjs `isProductPath` accepts:
+      Full's app-root `.starciwork/` holds exactly the paths that scripts/lib/starciwork-boundary.mjs `isProductPath` accepts:
       `workspace.yaml`, `index.yaml`, `brand/`, `shell/index.yaml`, `features/<feature>/index.yaml`, flat records
       `features/<feature>/<family>/<name>/index.yaml`, `features/<feature>/br/<rule>/ac/<name>/`,
       `features/<feature>/ui/<name>/assets/<approved-file>`, `features/<feature>/uat/<name>/{index,accounts,fixtures}.yaml` with
       `seed.sql` and `cleanup.sql`, and `_resources/{identities,environments,fixtures}/<slug>/resource.yaml`.
-      `.starciwork/.gitignore` is exactly `starciworkGitignoreText()`. The tracked image of a ui-screen is the accepted design
-      direction only.
+      Its ignore file uses the edition's managed template. The tracked image of a ui-screen is the accepted design
+      direction only. Under lite, slot `app.starciwork` is optional when the app has no brand records and permits only
+      `.gitignore` and `brand/**` (R212). Brand drawing records, references and assets keep the brand tooling's layout;
+      workspace, catalog, shell, features, resources, UAT and business-rule records are forbidden.
     rationale: |
       One canonical Work tree per app keeps product records authoritative and reviewable in a pull request.
     cases:
@@ -60,6 +62,9 @@ rules:
         - HFS_WORK_IN_FE
         - HFS_STACKS_IN_SIDE
         - HFS_PROOF_COMMAND_FILE_MISSING
+        - HFS_EDITION_INVALID
+        - HFS_EDITION_FORBIDDEN_PRESENT
+        - HFS_STARCIWORK_LITE_FORBIDDEN
       manual:
         - starci runtime validate <app>/.starciwork passes.
     relatedExamples: []
@@ -92,7 +97,7 @@ rules:
     kind: mandatory
     hfsRules: [R64]
     requirement: |
-      Every record is a flat family record `features/<feature>/<family>/<name>/index.yaml` of a family in
+      Every full-edition feature record is a flat family record `features/<feature>/<family>/<name>/index.yaml` of a family in
       modules/schemas/work-layout.yaml. A ui-screen record declares `app`, a name from
       `hfs.json` `apps`.
     rationale: |
@@ -111,7 +116,7 @@ rules:
     kind: mandatory
     hfsRules: [R09, R06]
     requirement: |
-      `_resources/identities/<slug>/resource.yaml` holds the role, provider and realm and `custody.sealed`, exactly
+      In full edition, `_resources/identities/<slug>/resource.yaml` holds the role, provider and realm and `custody.sealed`, exactly
       `.starcistacks/<env>/secrets/identity-<slug>.enc` (app-relative); an identity that holds no secret uses `custody.provider: none` and
       carries no sealed key. UAT `accounts.yaml` selects an identity by role, so several flows share one identity per role and
       no identity is created per flow. No identity file holds a value.

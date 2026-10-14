@@ -54,3 +54,40 @@ test('PROOF_COMMAND_DEAD judges only the commands that must run now: requiresPro
   assert.ok(!dead.some(l => l.includes('/fr/alive/')), run.stdout);
   assert.equal(run.status, 1, run.stderr);
 });
+
+function liteTree(t, { brand = true } = {}) {
+  const app = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-work-deep-lite-'));
+  t.after(() => fs.rmSync(app, {recursive: true, force: true}));
+  const write = (rel, body) => { const file = path.join(app, rel); fs.mkdirSync(path.dirname(file), {recursive: true}); fs.writeFileSync(file, body); };
+  write('hfs.json', JSON.stringify({kind: 'app', edition: 'lite'}));
+  if (brand) write('.starciwork/brand/index.yaml', 'schema: work/brand@1\nid: brand\nstate: todo\n');
+  return {app, workRoot: path.join(app, '.starciwork'), write};
+}
+
+test('lite deep checks read brand without requiring the catalog or opening retired Work records and baselines', t => {
+  const {workRoot, write} = liteTree(t);
+  for (const rel of ['index.yaml', 'workspace.yaml', 'shell/index.yaml', 'features/retired/index.yaml'])
+    write(`.starciwork/${rel}`, 'retired: [unreadable\n');
+  write('.starciwork/_derived/deep-baseline.json', 'retired baseline is not JSON');
+  write('.starciwork/features/retired/evidence.yaml', 'schema: work/evidence@1\nrecord: brand\nassertions:\n  - command: npm run gone\n');
+  const run = spawnSync(process.execPath, ['scripts/work/validate/check-work-deep.mjs', '--tree', workRoot], {cwd: ROOT, encoding: 'utf8', windowsHide: true});
+  assert.equal(run.status, 0, run.stderr + run.stdout);
+  assert.match(run.stdout, /0 refused, 0 suspect, 0 info/);
+  assert.doesNotMatch(run.stdout, /CATALOG_DRIFT|NO_BASELINE|PROOF_COMMAND_DEAD/);
+});
+
+test('lite deep baseline writes refuse before creating _derived', t => {
+  const {workRoot} = liteTree(t);
+  const run = spawnSync(process.execPath, ['scripts/work/validate/check-work-deep.mjs', '--tree', workRoot, '--write-baseline'], {cwd: ROOT, encoding: 'utf8', windowsHide: true});
+  assert.equal(run.status, 1, run.stderr + run.stdout);
+  assert.match(run.stdout, /lite \.starciwork holds only brand\//);
+  assert.match(run.stdout, /\[HFS_STARCIWORK_LITE_FORBIDDEN\]/);
+  assert.equal(fs.existsSync(path.join(workRoot, '_derived')), false);
+});
+
+test('lite deep checks accept an absent optional Work tree', t => {
+  const {workRoot} = liteTree(t, {brand: false});
+  const run = spawnSync(process.execPath, ['scripts/work/validate/check-work-deep.mjs', '--tree', workRoot], {cwd: ROOT, encoding: 'utf8', windowsHide: true});
+  assert.equal(run.status, 0, run.stderr + run.stdout);
+  assert.equal(fs.existsSync(workRoot), false);
+});

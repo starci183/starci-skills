@@ -3,8 +3,10 @@
 // (work-graph-model.mjs validateGraph) checks coverage against it.
 import fs from 'node:fs';
 import path from 'node:path';
+import { WORK_DIR_NAME } from '../lib/roots.mjs';
 import { indexFilesUnder, list, readYamlOrNull } from './work-io.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { isLiteWorkRoot } from '../lib/work-edition.mjs';
 
 const recordsUnder = (dir) => (fs.existsSync(dir) ? indexFilesUnder(dir).filter((f) => path.dirname(f) !== dir).map(readYamlOrNull).filter(Boolean) : []);
 
@@ -20,7 +22,8 @@ function collectFeatureContext(features, domain, frs, shapes, excluded) {
 
 /** {frs, shapes} over the domains (feature ids) under `<repo>/.starciwork/features`. */
 export function workGraphContext(repo, domains) {
-  const features = path.join(repo, '.starciwork', 'features');
+  if (isLiteWorkRoot(path.join(repo, WORK_DIR_NAME))) return { frs: [], shapes: [] };
+  const features = path.join(repo, WORK_DIR_NAME, 'features');
   const frs = new Set(), shapes = new Set(), excluded = new Set();
   for (const domain of domains) collectFeatureContext(features, domain, frs, shapes, excluded);
   return { frs: [...frs].filter((id) => !excluded.has(id)).sort(byCodeUnit), shapes: [...shapes].sort(byCodeUnit) };

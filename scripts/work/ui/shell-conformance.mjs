@@ -54,6 +54,7 @@ import { isPartName } from '../direction-part.mjs';
 import { assetsOf, indexFilesUnder, list, readYamlOrNull as readRecord, sha256File, slash, workRootOf as enclosingWorkRoot } from '../work-io.mjs'; import { isMain } from '../../lib/is-main.mjs';
 import { checkUiRecord } from './shell-conformance-ui.mjs';
 import { finding, shown } from './shell-findings.mjs';
+import { isLiteWorkRoot } from '../../lib/work-edition.mjs';
 
 export { checkDrawGeometry } from './shell-conformance-geometry.mjs';
 
@@ -342,6 +343,7 @@ const uiRecordsUnder = (root) => indexFilesUnder(root).map((file) => ({ file, re
  * hold together is refused. Composite pixels are not re-derived here - that is the op proof's.
  */
 export function shellBindingFindings(root, workRoot = workRootOf(root)) {
+  if (isLiteWorkRoot(workRoot)) return [];
   const shell = readShell(workRoot);
   const uiRecords = loadUiRecords(workRoot);
   const out = uiRecordsUnder(root).flatMap(({ file, record }) => checkUiRecord(workRoot, file, record, shell, { mode: 'validate', uiRecords }));
@@ -384,6 +386,7 @@ export function checkShellConformance(target) {
   const resolved = path.resolve(target);
   const dir = fs.existsSync(resolved) && fs.statSync(resolved).isFile() ? path.dirname(resolved) : resolved;
   const workRoot = workRootOf(dir);
+  if (isLiteWorkRoot(workRoot)) return { schema: 'starci/shell-conformance@2', ok: true, skipped: true, mode: 'lite', target: slash(dir), workRoot: slash(workRoot), refused: [], suspect: [], info: ['SKIP: lite .starciwork holds only brand/'], findings: [] };
   const shell = readShell(workRoot);
   const indexFile = path.join(dir, 'index.yaml');
   const own = fs.existsSync(indexFile) ? readRecord(indexFile) : null;

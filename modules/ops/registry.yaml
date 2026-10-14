@@ -172,9 +172,9 @@ ops:
     kindInferred: scaffold
   - id: brand.decide
     family: brand
-    goal: "Settle one product's visual identity in the single brand record - colour tokens traced to the
+    goal: Settle one product's visual identity in the single brand record - colour tokens traced to the
       real source files, typography, mascot, logo, iconography, imagery rules, voice and motion -
-      and write the "
+      and in full ed
     params:
       ownerRulings:
         default: ""

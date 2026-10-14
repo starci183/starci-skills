@@ -353,8 +353,7 @@ export const PARTIAL_VARIABLES = new Proxy(Object.create(null), {
 const CLI_APP_DIR = 'apps/cli/';
 const declaresCliApp = app => app.sides.be.apps.some(entry => entry.kind === 'cli' && entry.name === 'cli');
 
-const LITE_APP_REUSED = new Set(['.editorconfig', '.gitattributes', '.nvmrc', '.starciwork/workspace.yaml',
-  '.starciwork/index.yaml', '.starciwork/features/system-health/index.yaml']);
+const LITE_APP_REUSED = new Set(['.editorconfig', '.gitattributes', '.nvmrc']);
 const LITE_DEFERRED_GENERATOR_FILES = new Set([
   'src/modules/platform/database/database.sql.ts',
   'src/modules/platform/database/migration-runner.service.ts',
@@ -413,10 +412,10 @@ function skeletonDirectory(scope, directory, app, vars, include = () => true) {
   return files;
 }
 
-/** The canonical product catalog and feature nodes shared by scaffold and upgrades of older lite apps. */
+/** The canonical full Work workspace, catalog and feature nodes an edition upgrade may need. */
 export function scaffoldWorkSeeds(project) {
   return skeletonDirectory('app', 'skeleton', { project }, {},
-    rel => rel === '.starciwork/index.yaml' || rel.startsWith('.starciwork/features/'));
+    rel => rel === '.starciwork/workspace.yaml' || rel === '.starciwork/index.yaml' || rel.startsWith('.starciwork/features/'));
 }
 
 /**

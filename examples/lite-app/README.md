@@ -19,7 +19,7 @@ TypeScript everywhere, NestJS in `be/`, Next.js with next-intl in `fe/`, Supabas
 - `fe/`: the web app; the only Supabase client is the Auth client of `src/modules/auth`, data goes through `src/modules/api`.
 - `be/contracts/api/schema.graphql`: the emitted GraphQL contract the web app's codegen reads (`npm run contract:emit`).
 - `.starcistacks/`: value-free environment metadata and encrypted-secret custody only (no infra).
-- `.starciwork/`: product workspace, brand, and shell records.
+- `.starciwork/brand/`: optional brand drawing records, references, and assets; `.starciwork/` holds only this tree and `.gitignore`.
 
 ## Development
 
@@ -49,4 +49,4 @@ Create a forward-only migration under `supabase/migrations`, keep each table's R
 
 ## Work
 
-The product's Work records live in `.starciwork`.
+Brand records live in `.starciwork/brand/`. A lite app needs no `.starciwork/` until it has brand records.

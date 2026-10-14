@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { fromRoot } from './work-consistency-shared.mjs';
+import { isLiteWorkRoot } from '../../lib/work-edition.mjs';
 
 const normaliseSentence = value => {
   let text = String(value ?? '').trim();
@@ -43,6 +44,7 @@ function checkCatalogEntry({ workRoot, refuse, suspect }, catalogShown, entry) {
 }
 
 export function checkCatalog(ctx) {
+  if (isLiteWorkRoot(ctx.workRoot)) return;
   const catalogFile = path.join(ctx.workRoot, 'index.yaml');
   let catalog = null;
   try { catalog = parseYaml(fs.readFileSync(catalogFile, 'utf8')); } catch { catalog = null; }

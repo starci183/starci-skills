@@ -6,6 +6,7 @@ import { admittedContractOf } from '../machine/contract-version.mjs';
 import { changeNoteOf, committedMatches, createOwnership, inside, ownedOf, ownerDeclarationFor, readRecordChanges, workflowCommittedReader } from './work-ownership.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { workPathAllowed } from '../lib/work-edition.mjs';
 
 export const INPUT_DIGEST_SCHEMA = 'starci/input-digests@1';
 export const WORK_PREFIX = '.starciwork/';
@@ -92,7 +93,7 @@ const sourceDriftOf = ({ row, entry, cut, digest, admittedOf }) => {
     recorded: entry.digest, current, admittedAt: Number.isFinite(admitted.at) ? admitted.at : null };
 };
 
-const measureCandidateInputs = ({ row, newest, groupOf, db, digest, workDigest, attributed }) => {
+const measureCandidateInputs = ({ row, newest, groupOf, db, digest, workDigest, attributed, allowedWork }) => {
   if (!row.inputs || newest.get(groupOf(row)) !== row.job_id) return { sourceDrift: [], workChanged: [] };
   const record = parseJson(row.inputs);
   if (record?.schema !== INPUT_DIGEST_SCHEMA || !Array.isArray(record.digests)) return { sourceDrift: [], workChanged: [] };
@@ -101,6 +102,7 @@ const measureCandidateInputs = ({ row, newest, groupOf, db, digest, workDigest, 
   const admittedOf = () => (admitted ??= admittedContractOf(db, row));
   for (const entry of record.digests) {
     if (typeof entry?.path !== 'string' || typeof entry.digest !== 'string' || entry.path.includes('..')) continue;
+    if (inputKindOf(entry) === 'work' && !allowedWork(entry.path)) continue;
     const source = sourceDriftOf({ row, entry, cut, digest, admittedOf });
     if (source) sourceDrift.push(source);
     const work = workChangeOf(row, entry, cut, workDigest, attributed);
@@ -186,6 +188,7 @@ const classifyWorkChanges = ({ workChanged, db, repo, workDir, workflowId, owner
   let declarations;
   const declarationsOf = () => (declarations ??= recordChanges ?? readRecordChanges(db));
   const textOf = (file) => {
+    if (repo && !workPathAllowed(path.join(repo, workDir), path.join(repo, workDir, file.slice(WORK_PREFIX.length)))) return null;
     if (heads) return heads.get(file)?.toString('utf8') ?? null;
     try { return fs.readFileSync(path.join(repo, workDir, file.slice(WORK_PREFIX.length)), 'utf8'); } catch { return null; }
   };
@@ -231,8 +234,9 @@ export function inputDrift(db, workflowId, { root, repo = null, workDir = '.star
       SELECT 1 FROM reports r WHERE r.job_id=j.job_id AND r.outcome='partial')))
     ORDER BY j.op_id,j.created_at,j.job_id`).all(workflowId).map(({ context_json: context, ...row }) => ({ ...row, inputs: inputsOf(context) }));
   const sourceDrift = [], workChanged = [];
+  const allowedWork = (rel) => !repo || workPathAllowed(path.join(repo, workDir), path.join(repo, workDir, rel.slice(WORK_PREFIX.length)), { dir: true }) || workPathAllowed(path.join(repo, workDir), path.join(repo, workDir, rel.slice(WORK_PREFIX.length)));
   for (const row of candidates) {
-    const measured = measureCandidateInputs({ row, newest, groupOf, db, digest, workDigest, attributed });
+    const measured = measureCandidateInputs({ row, newest, groupOf, db, digest, workDigest, attributed, allowedWork });
     sourceDrift.push(...measured.sourceDrift);
     workChanged.push(...measured.workChanged);
   }
