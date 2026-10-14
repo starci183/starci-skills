@@ -13,7 +13,7 @@ _starci() {
     fi
     if [ "$COMP_CWORD" -eq 2 ]; then
         case "$group" in
-        app) COMPREPLY=( $(compgen -W "add check emit explain hygiene lint new scaffold secret stack sync upgrade" -- "$cur") );;
+        app) COMPREPLY=( $(compgen -W "add check db emit explain hygiene lint new scaffold secret stack sync upgrade" -- "$cur") );;
         check) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
         connect) COMPREPLY=( $(compgen -W "ask-gateway telegram telegram-media tunnel" -- "$cur") );;
         debug) COMPREPLY=( $(compgen -W "digest run" -- "$cur") );;
@@ -60,6 +60,9 @@ _starci() {
         app:add:--failed) return 0;;
         app:add:--done) return 0;;
         app:check:--base) return 0;;
+        app:check:--coverage-from) return 0;;
+        app:db:--stamp) return 0;;
+        app:db:--map) return 0;;
         app:lint:--changed) return 0;;
         app:lint:--workspace) return 0;;
         app:lint:--format) COMPREPLY=( $(compgen -W "text json" -- "$cur") ); return 0;;
@@ -976,7 +979,8 @@ _starci() {
     esac
     case "$group:$verb" in
         app:add) COMPREPLY=( $(compgen -W "--event --from --service --connection --owner --failed --done --fe --no-types --json --cwd --quiet --help --edition" -- "$cur") );;
-        app:check) COMPREPLY=( $(compgen -W "--fast --base --json --cwd --quiet --help --edition" -- "$cur") );;
+        app:check) COMPREPLY=( $(compgen -W "--fast --base --wiring --coverage-from --json --cwd --quiet --help --edition" -- "$cur") );;
+        app:db) COMPREPLY=( $(compgen -W "--stamp --map --apply --local --json --cwd --quiet --help --edition" -- "$cur") );;
         app:emit) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         app:explain) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         app:hygiene) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;

@@ -6,7 +6,9 @@ impl: null
 flags:
   - {name: fast, type: boolean, summary: judge only paths changed since the merge base}
   - {name: base, type: string, summary: merge-base ref used by --fast (refused without it)}
+  - {name: wiring, type: boolean, summary: compile the lite backend module graph with test doubles}
+  - {name: coverage-from, type: string, summary: judge measured logic-file coverage from an LCOV report}
 exit: {"0": clean, "1": findings, "2": refusal or bad usage}
 json: flag
-examples: ['starci app check', 'starci app check --fast', 'starci app check --json']
+examples: ['starci app check', 'starci app check --fast', 'starci app check --json', 'starci app check --wiring', 'starci app check --coverage-from coverage/lcov.info']
 editions: [full, lite]

@@ -127,3 +127,7 @@ internal:
   - {path: scripts/gates/release-publish.mjs, why: "Publication owner called by the release publish flow", usedBy: [scripts/supervisor/release-publish-flow.mjs]}
   - {path: scripts/hfs/sync-runtime.mjs, why: "Runtime-copy sync owner called by the release sync-runtime verb", usedBy: [scripts/supervisor/release-sync-runtime.mjs]}
   - {path: scripts/supervisor/release-affected.mjs, why: "The affected tests row of a release cut under suite ci, run as a plan step", usedBy: [modules/supervisor/release-cut.yaml]}
+  - {path: scripts/checks/check-hfs-coverage.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-ruling-cites.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/hfs/app-wiring.mjs, why: "Lite backend boot proof behind app check --wiring", usedBy: [scripts/hfs/check.mjs]}
+  - {path: scripts/hfs/coverage-from.mjs, why: "Logic-file LCOV evidence behind app check --coverage-from", usedBy: [packages/hfs/src/main.mjs]}

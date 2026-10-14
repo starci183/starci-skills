@@ -56,6 +56,8 @@
 // findings fail the check.
 import fs from 'node:fs';
 import path from 'node:path';
+import { appWiring, BOOT_PROOF_CODE } from './app-wiring.mjs';
+import { coverageFrom as coverageFromReport } from './coverage-from.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { ARCHITECTURE_RULE_IDS, checkArchitecture } from './architecture/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -384,7 +386,7 @@ function machineFindings(report) {
  * templates or run the formatter (packages/hfs/sync), judged with checkRepo's own. `machine` is injectable for specs. A missing
  * merge-base under `fast` is an Error, never a silent full pass. `repoRoot` may also be a side folder: that side alone is checked.
  */
-export function checkRepository({ repoRoot, root = skillRoot, fast = false, base, extraFindings = [], manifest = loadSlotManifest({ root }), machine = checkArchitecture }) {
+export function checkRepository({ repoRoot, root = skillRoot, fast = false, base, extraFindings = [], manifest = loadSlotManifest({ root }), machine = checkArchitecture, wiring = false, coverageFrom }) {
   const changed = fast ? changedSince(repoRoot, base) : null;
   const slotResult = checkRepo({ repoRoot, root, manifest, extraFindings, surface: 'check', ...(changed ? { only: changed.files, tree: false } : {}) });
   if (slotResult.profile === null) return { ...slotResult, machine: { status: 'skipped', reason: 'hfs.json is not valid' } };
@@ -403,7 +405,7 @@ export function checkRepository({ repoRoot, root = skillRoot, fast = false, base
   const findings = [...slotResult.findings, ...withWhy(judgedFindings(found, repo.edition ?? 'full', root), why)];
   const counts = summarize(findings);
   const ran = runs.filter((info) => info.status === 'ran');
-  return {
+  const result = {
     ...slotResult,
     ok: counts.error === 0,
     findings,
@@ -413,6 +415,26 @@ export function checkRepository({ repoRoot, root = skillRoot, fast = false, base
       : { status: 'skipped', reason: runs.map((info) => info.reason).join('; '), sides: runs, ...(changed ? { base: changed.base } : {}) },
     ...(changed ? { fast: { base: changed.base, changed: changed.files.length } } : {}),
   };
+  return withCheckProofs(result, { repoRoot, root, manifest, wiring, coverageFrom });
+}
+
+/** Optional CLI proofs run over the whole tracked tree, including after a dry edition override. */
+export function withCheckProofs(result, { repoRoot, root = skillRoot, manifest = loadSlotManifest({ root }), wiring = false, coverageFrom, edition } = {}) {
+  if ((!wiring && coverageFrom === undefined) || result.profile === null) return result;
+  const declared = readRepoDeclaration(manifest, repoRoot);
+  const repo = { ...declared, edition: result.editionOverride?.judged ?? edition ?? declared.edition };
+  if (repo.sides) repo.sides = Object.fromEntries(Object.entries(repo.sides).map(([side, declaration]) => [side, { ...declaration, edition: repo.edition }]));
+  const context = { repoRoot, repo, manifest, files: trackedFiles(repoRoot) };
+  const reports = {};
+  if (wiring) reports.wiring = appWiring(context);
+  if (coverageFrom !== undefined) reports.coverage = coverageFromReport({ ...context, coverageFrom });
+  const proofFindings = Object.values(reports).flatMap(report => report.findings);
+  const why = readWhy(root, [...new Set(proofFindings.map(finding => finding.code))]);
+  // The explicit whole-tree wiring proof supersedes the ordinary finder's scoped result.
+  const previous = result.findings.filter(finding => !wiring || finding.code !== BOOT_PROOF_CODE);
+  const findings = [...previous, ...withWhy(judgedFindings(proofFindings, repo.edition ?? 'full', root), why)];
+  const counts = summarize(findings);
+  return { ...result, ...reports, findings, counts, ok: counts.error === 0 };
 }
 
 /** The architecture machine over one scope (a side folder): `{ info, findings }`, finding paths app-relative. */

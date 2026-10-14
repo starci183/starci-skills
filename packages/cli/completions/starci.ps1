@@ -3,7 +3,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
     $groups = @('app','check','connect','debug','docker','gate','git','guard','harness','kernel','lint','machine','npm','orca','reconciler','release','route','runtime','smoke','supabase','supervisor','task','test','typecheck','uat','work','worker','workflow','help','completion','explain')
     $verbs = @{
-        'app' = @('add','check','emit','explain','hygiene','lint','new','scaffold','secret','stack','sync','upgrade')
+        'app' = @('add','check','db','emit','explain','hygiene','lint','new','scaffold','secret','stack','sync','upgrade')
         'check' = @('run')
         'connect' = @('ask-gateway','telegram','telegram-media','tunnel')
         'debug' = @('digest','run')
@@ -37,7 +37,8 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
     }
     $flags = @{
         'app add' = @('--event','--from','--service','--connection','--owner','--failed','--done','--fe','--no-types','--json','--cwd','--quiet','--help','--edition')
-        'app check' = @('--fast','--base','--json','--cwd','--quiet','--help','--edition')
+        'app check' = @('--fast','--base','--wiring','--coverage-from','--json','--cwd','--quiet','--help','--edition')
+        'app db' = @('--stamp','--map','--apply','--local','--json','--cwd','--quiet','--help','--edition')
         'app emit' = @('--json','--cwd','--quiet','--help','--edition')
         'app explain' = @('--json','--cwd','--quiet','--help','--edition')
         'app hygiene' = @('--json','--cwd','--quiet','--help','--edition')
@@ -298,6 +299,9 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
         'app add --failed' = @()
         'app add --done' = @()
         'app check --base' = @()
+        'app check --coverage-from' = @()
+        'app db --stamp' = @()
+        'app db --map' = @()
         'app lint --changed' = @()
         'app lint --workspace' = @()
         'app lint --format' = @('text','json')

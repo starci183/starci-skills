@@ -14,19 +14,19 @@ const capture = () => {
 
 test('the app secret catalog exposes current verbs and both editions, with help describing private file output', async () => {
   const command = CATALOG.groups.app.verbs.secret;
-  assert.deepEqual(command.positional[0].enum, ['init', 'set', 'get', 'materialize', 'list']);
+  assert.deepEqual(command.positional[0].enum, ['init', 'set', 'get', 'materialize', 'list', 'verify']);
   assert.deepEqual(command.editions, ['full', 'lite']);
   assert.equal(command.json, 'none');
   const help = capture();
   assert.equal(await cliMain(['app', 'secret', '--help'], help), 0);
-  for (const name of ['init', 'set', 'get', 'materialize', 'list', '--generate', '--to-file', '--reveal']) assert.ok(help.value.out.includes(name), `secret help exposes ${name}`);
+  for (const name of ['init', 'set', 'get', 'materialize', 'list', 'verify', '--generate', '--to-file', '--reveal']) assert.ok(help.value.out.includes(name), `secret help exposes ${name}`);
 });
 
 test('the package dispatcher accepts each secret verb in lite, forwards local flags, and preserves caller context', async t => {
   const cwd = mkdtemp(t, 'starci-secret-dispatch-');
   const env = { STARCI_ROLE: 'owner', FIXTURE_CONTEXT: 'kept' };
   const stdin = () => 'private-dispatch-input';
-  for (const args of [['init'], ['set', 'production', 'app-be-db', 'DB_PASSWORD', '--generate', '32'], ['get', 'production', 'app-be-db', 'DB_PASSWORD', '--to-file'], ['materialize', 'production'], ['list', 'production']]) {
+  await Promise.all([['init'], ['set', 'production', 'app-be-db', 'DB_PASSWORD', '--generate', '32'], ['get', 'production', 'app-be-db', 'DB_PASSWORD', '--to-file'], ['materialize', 'production'], ['list', 'production'], ['verify', 'production']].map(async args => {
     const output = capture(); let received;
     const code = await cliMain(['app', 'secret', ...args, '--edition', 'lite', '--cwd', cwd], {
       ...output, cwd, env, stdin,
@@ -38,11 +38,11 @@ test('the package dispatcher accepts each secret verb in lite, forwards local fl
     assert.equal(received.argv[0], 'secret');
     for (const arg of args) assert.ok(received.argv.includes(arg), 'all secret arguments reach HFS');
     assert.equal(received.io.cwd, cwd); assert.equal(received.io.env, env); assert.equal(received.io.stdin, stdin);
-  }
+  }));
 });
 
 test('obsolete verbs, unknown flags, missing action and JSON refuse before HFS dispatch', async () => {
-  for (const args of [[], ['show', 'token'], ['gen', 'token'], ['list', 'dev', '--unknown'], ['list', 'dev', '--json']]) {
+  await Promise.all([[], ['show', 'token'], ['gen', 'token'], ['list', 'dev', '--unknown'], ['list', 'dev', '--json']].map(async args => {
     const output = capture();
     const code = await cliMain(['app', 'secret', ...args], { ...output,
       importHfs: async () => assert.fail('invalid input must not load HFS'),
@@ -50,7 +50,7 @@ test('obsolete verbs, unknown flags, missing action and JSON refuse before HFS d
     });
     assert.equal(code, 2);
     assert.ok(output.value.err.length > 0);
-  }
+  }));
 });
 
 test('CLI set and get use caller stdin, sops and external local data paths without exposing values', async t => {

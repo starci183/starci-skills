@@ -1,6 +1,6 @@
 // The @starci/hfs implementation behind `starci app`: one repository, `<app>/`, with one package.json, lockfile and node_modules
 // at its root and two sides, be/ and fe/, declared by the one hfs.json of kind app. Every verb runs at the app root.
-//   starci app check [--cwd <dir>] [--json] [--fast] [--base <ref>]
+//   starci app check [--cwd <dir>] [--json] [--fast] [--base <ref>] [--wiring] [--coverage-from <lcov>]
 //                                            every tracked path has a slot; required files exist; nothing forbidden or
 //                                            tracked-that-must-be-ignored; pins match; every managed file equals its render
 //                                            (sync/managed.mjs, the .gitignore block and sonar-project.properties included); no empty or ghost
@@ -37,9 +37,11 @@
 //   starci app new image [--cwd <dir>]                  the Dockerfile of every declared app that has none, from the image canon (scaffold/image.mjs); never overwrites
 //   starci app new spec <file>.service.ts [--cwd <dir>]  the spec skeleton of an existing service, read from its constructor with the repository's TypeScript
 //   starci app secret init | set <env> <slug> <KEY> [--generate <bytes>] | get <env> <slug> [KEY] --to-file [--reveal]
-//   starci app secret materialize <env> | list <env>
+//   starci app secret materialize <env> | list <env> | verify <env>
 //                                            dotenv custody in .starcistacks, public age rule initialization, private KEY files outside Git;
 //                                            values reach stdout only when get explicitly receives --reveal.
+//   starci app db baseline | restamp --map <restamp.yaml> | plan
+//                                            preview the database cutover or compare its state with the repo; baseline and restamp mutate only with --apply.
 //   starci app add <api|webhook|realtime|saga|job|reactor|queue|projection> <name> [--event <event> --from <service> --service <Class>=<module>] [--owner <service> --failed <event> --done <event>] [--connection <name>] [--cwd <dir>]
 //                                            exactly that kind's file tree, generated FROM the files: tree of its pattern topic (knowledge/patterns/be) with the
 //                                            one template body of each entry (templates/be/patterns), plus the platform capabilities it needs when they are missing;
@@ -51,8 +53,12 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isMain } from '../runtime/scripts/lib/is-main.mjs';
-import { checkDatabase, checkRepository, explainPath, trackedFiles } from '../runtime/scripts/hfs/check.mjs';
+import { checkDatabase, checkRepository, explainPath, trackedFiles, withCheckProofs } from '../runtime/scripts/hfs/check.mjs';
 import { secretMain } from '../runtime/scripts/hfs/secret.mjs';
+import { dbBaselineMain } from '../runtime/scripts/hfs/db-baseline-verb.mjs';
+import { dbRestampMain } from '../runtime/scripts/hfs/db-restamp-verb.mjs';
+import { dbPlanMain } from '../runtime/scripts/hfs/db-plan-verb.mjs';
+import { formatCoverageReport } from '../runtime/scripts/hfs/coverage-from.mjs';
 import { HFS_DECLARATION_FILE, HfsSlotsError, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { formatFindings } from '../sync/format.mjs';
 import { main as syncMain } from '../sync/cli.mjs';
@@ -71,13 +77,17 @@ import { writeReport } from '../report/sonar.mjs';
 import { checkEdition } from '../upgrade/check.mjs';
 import { UpgradeError, upgradeMain } from '../upgrade/index.mjs';
 
-export const VERBS = Object.freeze(['scaffold', 'add', 'lint', 'sync', 'check', 'upgrade', 'stack', 'explain', 'emit', 'new', 'secret', 'hygiene']);
+export const VERBS = Object.freeze(['scaffold', 'add', 'lint', 'sync', 'check', 'upgrade', 'stack', 'explain', 'emit', 'new', 'secret', 'db', 'hygiene']);
+const DATABASE_VERBS = new Map([['baseline', dbBaselineMain], ['restamp', dbRestampMain], ['plan', dbPlanMain]]);
 
 const USAGE = `starci app scaffold <name> [--into <dir>] [--cwd <dir>]
 starci app add <api|webhook|realtime|saga|job|reactor|queue|projection|cli|table|app> <name> [options] [--cwd <dir>]
 starci app lint [--cwd <dir>] [--changed <file>...] [--workspace <dir>] [--fix] [--format text|json] [--sonar <file>]
 starci app sync (--check | --write) [--cwd <dir>]
-starci app check [--cwd <dir>] [--json] [--fast] [--base <ref>] [--edition full] [--db-types]
+starci app check [--cwd <dir>] [--json] [--fast] [--base <ref>] [--edition full] [--db-types] [--wiring] [--coverage-from <lcov>]
+starci app db baseline [--stamp <version>] [--local] [--apply] [--cwd <dir>]
+starci app db restamp --map <restamp.yaml> [--local] [--apply] [--cwd <dir>]
+starci app db plan [--local] [--json] [--cwd <dir>]
 starci app upgrade --edition full [--plan] [--cwd <dir>]
 starci app stack <up|down|status> [--stack <dir>] [--services <list>] [--k3d] [--force] [--json] [--cwd <dir>]
 starci app explain <path> [--cwd <dir>] [--json]
@@ -90,22 +100,40 @@ starci app secret set <env> <slug> <KEY> [--generate <bytes>] [--cwd <dir>]
 starci app secret get <env> <slug> [KEY] --to-file [--reveal] [--cwd <dir>]
 starci app secret materialize <env> [--cwd <dir>]
 starci app secret list <env> [--cwd <dir>]
+starci app secret verify <env> [--cwd <dir>]
 starci app hygiene [--cwd <dir>]
 `;
 const PER_CODE_LIMIT = 25;
-const VALUE_FLAGS = new Set(['--base', '--inject', '--into', '--event', '--from', '--service', '--connection', '--owner', '--failed', '--done']);
+const VALUE_FLAGS = new Set(['--base', '--inject', '--into', '--event', '--from', '--service', '--connection', '--owner', '--failed', '--done', '--coverage-from']);
 /** Flags that may repeat: their values are collected in order. */
 const LIST_FLAGS = new Set(['--inject']);
-const BOOL_FLAGS = new Set(['--json', '--fast', '--fe', '--no-types', '--db-types']);
+const BOOL_FLAGS = new Set(['--json', '--fast', '--fe', '--no-types', '--db-types', '--wiring']);
+
+function coverageArgument(arg, args, opts) {
+  const inline = arg.startsWith('--coverage-from=');
+  const value = inline ? arg.slice('--coverage-from='.length) : args.next().value;
+  if (!value || value.startsWith('--')) throw new Error('--coverage-from needs a value');
+  if (opts['coverage-from'] !== undefined) throw new Error('--coverage-from may be given only once');
+  opts['coverage-from'] = value;
+}
+
+function valueArgument(arg, args, opts) {
+  const value = args.next().value;
+  if (value === undefined) throw new Error(`${arg} needs a value`);
+  const key = arg.slice(2);
+  opts[key] = LIST_FLAGS.has(arg) ? [...(opts[key] ?? []), value] : value;
+}
 
 function parse(argv) {
   const opts = { positional: [] };
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
+  const args = argv.values();
+  for (const arg of args) {
+    if (arg === '--coverage-from' || arg.startsWith('--coverage-from=')) {
+      coverageArgument(arg, args, opts);
+      continue;
+    }
     if (VALUE_FLAGS.has(arg)) {
-      if (argv[i + 1] === undefined) throw new Error(`${arg} needs a value`);
-      opts[arg.slice(2)] = LIST_FLAGS.has(arg) ? [...(opts[arg.slice(2)] ?? []), argv[i + 1]] : argv[i + 1];
-      i += 1;
+      valueArgument(arg, args, opts);
     }
     else if (BOOL_FLAGS.has(arg)) opts[arg.slice(2)] = true;
     else if (arg.startsWith('--')) throw new Error(`unknown flag ${arg}`);
@@ -114,34 +142,57 @@ function parse(argv) {
   return opts;
 }
 
-function printCheck(result, out) {
-  const { counts } = result;
+function machineDescription(machine) {
+  if (machine.status !== 'ran') return `skipped, ${machine.reason}`;
+  const owners = machine.paths ? ` (owners ${machine.paths.join(', ')})` : '';
+  return `ran over ${machine.files} source files${owners}`;
+}
+
+function contractDescription(contracts) {
+  if (contracts.status !== 'checked') return `skipped, ${contracts.reason}`;
+  const apps = contracts.apps.map((app) => `${app.app}/${app.artifact} ${app.status}`).join(', ') || 'no api app';
+  return `emitted and compared, ${apps}`;
+}
+
+function printCheckOverview(result, out) {
   out(`starci app check${result.fast ? ' --fast' : ''} ${result.repoRoot} (profile ${result.profile ?? 'unknown'}, manifest ${result.manifest}, ${result.tracked} tracked paths)\n`);
   if (result.fast) out(`  ${result.fast.changed} path${result.fast.changed === 1 ? '' : 's'} changed since ${result.fast.base.slice(0, 12)}\n`);
-  out(`  architecture machine: ${result.machine.status === 'ran' ? `ran over ${result.machine.files} source files${result.machine.paths ? ` (owners ${result.machine.paths.join(', ')})` : ''}` : `skipped, ${result.machine.reason}`}\n`);
-  if (result.contracts) out(`  contract snapshots: ${result.contracts.status === 'checked' ? `emitted and compared, ${result.contracts.apps.map((a) => `${a.app}/${a.artifact} ${a.status}`).join(', ') || 'no api app'}` : `skipped, ${result.contracts.reason}`}
-`);
+  out(`  architecture machine: ${machineDescription(result.machine)}\n`);
+  if (result.contracts) out(`  contract snapshots: ${contractDescription(result.contracts)}\n`);
+}
+
+function printFindingGroup(code, list, out) {
+  const first = list[0];
+  out(`\n[${first.level.toUpperCase()}] ${code} x${list.length}: ${first.titleVi}\n  ${first.whyVi}\n  -> ${first.nextStepVi}\n`);
+  for (const finding of list.slice(0, PER_CODE_LIMIT)) out(`  - ${finding.message}\n`);
+  if (list.length > PER_CODE_LIMIT) out(`  ... and ${list.length - PER_CODE_LIMIT} more (use --json for all)\n`);
+}
+
+function printCheck(result, out) {
+  const { counts } = result;
+  printCheckOverview(result, out);
   const byCode = new Map();
   for (const f of result.findings) byCode.set(f.code, [...(byCode.get(f.code) ?? []), f]);
-  for (const [code, list] of byCode) {
-    const first = list[0];
-    out(`\n[${first.level.toUpperCase()}] ${code} x${list.length}: ${first.titleVi}\n  ${first.whyVi}\n  -> ${first.nextStepVi}\n`);
-    for (const f of list.slice(0, PER_CODE_LIMIT)) out(`  - ${f.message}\n`);
-    if (list.length > PER_CODE_LIMIT) out(`  ... and ${list.length - PER_CODE_LIMIT} more (use --json for all)\n`);
-  }
+  for (const [code, list] of byCode) printFindingGroup(code, list, out);
   out(`\n${counts.error} error finding${counts.error === 1 ? '' : 's'}, ${counts.warning} warning${counts.warning === 1 ? '' : 's'}, ${counts.info} report-only\n`);
+}
+
+function printNoSlot(e, out) {
+  out(`  no slot owns this path (${e.code}): ${e.titleVi}\n  ${e.whyVi}\n`);
+  if (e.nearest) out(`  nearest slot ${e.nearest.slot}, pattern ${e.nearest.pattern}; matched ${e.nearest.matchedPrefix || '.'}, then expected ${e.nearest.expectedNext ?? 'nothing'}\n`);
 }
 
 function printExplain(e, out) {
   out(`${e.path}\n`);
   if (e.status === 'no-slot') {
-    out(`  no slot owns this path (${e.code}): ${e.titleVi}\n  ${e.whyVi}\n`);
-    if (e.nearest) out(`  nearest slot ${e.nearest.slot}, pattern ${e.nearest.pattern}; matched ${e.nearest.matchedPrefix || '.'}, then expected ${e.nearest.expectedNext ?? 'nothing'}\n`);
+    printNoSlot(e, out);
     return;
   }
   if (e.status === 'ambiguous') { out(`  owned equally by ${e.candidates.join(', ')} (${e.code}): ${e.titleVi}\n`); return; }
-  out(`  slot       ${e.slot}  (${e.pattern})\n  presence   ${e.presence}, ${e.tracking}\n  tier       ${e.tier}${e.owner ? `  owner ${e.owner.root} (${e.owner.slot})` : ''}\n`);
-  out(`  imports    ${e.allowedImports ? `may import ${e.allowedImports.join(', ')}; ${e.importRule}` : (e.importRule ?? 'not applicable')}\n`);
+  const owner = e.owner ? `  owner ${e.owner.root} (${e.owner.slot})` : '';
+  const imports = e.allowedImports ? `may import ${e.allowedImports.join(', ')}; ${e.importRule}` : (e.importRule ?? 'not applicable');
+  out(`  slot       ${e.slot}  (${e.pattern})\n  presence   ${e.presence}, ${e.tracking}\n  tier       ${e.tier}${owner}\n`);
+  out(`  imports    ${imports}\n`);
   out(`  tests      ${e.tests}: ${e.testsMeaning}\n`);
   if (e.requiredFiles.length) out(`  requires   ${e.requiredFiles.join(', ')}\n`);
   if (e.goesTo) out(`  belongs at ${e.goesTo}\n`);
@@ -212,27 +263,29 @@ async function scaffoldPresets() {
   }
 }
 
+function globalValueArgument(arg, args) {
+  const inline = arg.startsWith('--cwd=') || arg.startsWith('--edition=');
+  const flag = inline ? arg.slice(0, arg.indexOf('=')) : arg;
+  if (flag !== '--cwd' && flag !== '--edition') return null;
+  const value = inline ? arg.slice(arg.indexOf('=') + 1) : args.next().value;
+  if (!value || value.startsWith('--')) throw new Error(`${flag} needs a value`);
+  if (flag === '--edition' && !['full', 'lite'].includes(value)) throw new Error('--edition accepts full or lite');
+  return { flag, value };
+}
+
 function globalOptions(argv, baseCwd) {
-  const rest = [];
-  let cwd = baseCwd;
-  let quiet = false;
-  let help = false;
-  let edition;
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    const inline = arg.startsWith('--cwd=') || arg.startsWith('--edition=') ? arg.slice(arg.indexOf('=') + 1) : null;
-    const flag = inline === null ? arg : arg.slice(0, arg.indexOf('='));
-    if (flag === '--cwd' || flag === '--edition') {
-      const value = inline ?? argv[++i];
-      if (!value || value.startsWith('--')) throw new Error(`${flag} needs a value`);
-      if (flag === '--edition' && !['full', 'lite'].includes(value)) throw new Error('--edition accepts full or lite');
-      if (flag === '--edition') edition = value;
-      if (flag === '--cwd') cwd = path.resolve(baseCwd, value);
-    } else if (flag === '--quiet') quiet = true;
-    else if (flag === '--help') help = true;
-    else rest.push(arg);
+  const options = { argv: [], cwd: baseCwd, quiet: false, help: false, edition: undefined };
+  const args = argv.values();
+  for (const arg of args) {
+    const valued = globalValueArgument(arg, args);
+    if (valued) {
+      if (valued.flag === '--cwd') options.cwd = path.resolve(baseCwd, valued.value);
+      else options.edition = valued.value;
+    } else if (arg === '--quiet') options.quiet = true;
+    else if (arg === '--help') options.help = true;
+    else options.argv.push(arg);
   }
-  return { argv: rest, cwd, quiet, help, edition };
+  return options;
 }
 
 async function installedStackMain(cwd) {
@@ -247,7 +300,105 @@ async function installedStackMain(cwd) {
   return candidate;
 }
 
-/** `cwd`, `presets`, `prettier`, `lock`, `run` and `stackMain` are test seams (`run` is the Supabase types command runner); stdout and stderr never have to be process globals. */
+function databaseMain(argv, io) {
+  const [verb, ...rest] = argv;
+  const dispatch = DATABASE_VERBS.get(verb);
+  if (!dispatch) throw new Error('starci app db takes baseline, restamp or plan');
+  return dispatch(rest, io);
+}
+
+function printCheckProofs(result, out) {
+  if (result.wiring) out(`boot wiring: ${result.wiring.status}, ${result.wiring.apps.length} app(s), ${result.wiring.findings.length} failure(s)\n`);
+  if (result.coverage) out(formatCoverageReport(result.coverage));
+}
+
+async function checkMain(opts, { cwd: repoRoot, edition, stdout: out, presets, prettier }) {
+  if (opts.positional.length) throw new Error('starci app check takes no path');
+  if (opts.base !== undefined && opts.fast !== true) throw new Error('--base names the ref --fast compares with; it needs --fast');
+  const checked = await checkEdition({ repoRoot, edition, normal: () => runCheck({ repoRoot, fast: opts.fast === true, base: opts.base, presets, prettier, dbTypes: opts['db-types'] === true }), presets, prettier });
+  const result = withCheckProofs(checked, { repoRoot, edition, wiring: opts.wiring === true, coverageFrom: opts['coverage-from'] });
+  if (opts.json) out(`${JSON.stringify(result, null, 2)}\n`);
+  else { printCheck(result, out); printCheckProofs(result, out); }
+  return result.ok ? 0 : 1;
+}
+
+function emitMain(opts, { cwd: repoRoot, stdout: out, run }) {
+  if (opts.positional.length) throw new Error('starci app emit takes no path');
+  const be = readRepoDeclaration(loadSlotManifest(), repoRoot).sides?.be;
+  if (!be) throw new Error('starci app emit runs at the app root (the folder of hfs.json)');
+  const { written, skipped, standIns } = emitContracts({ repoRoot: path.join(repoRoot, 'be'), declaration: be, run });
+  for (const file of written) out(`wrote be/${file}\n`);
+  const skipSummary = skipped.length ? `, ${skipped.join(', ')} serve no GraphQL` : '';
+  out(`starci app emit: ${written.length} written${skipSummary}\n`);
+  for (const [app, lines] of Object.entries(standIns)) {
+    out(`${app}: ${lines.length} dependenc${lines.length === 1 ? 'y' : 'ies'} of the resolvers could not load here and stood in (no GraphQL type is affected):\n`);
+    for (const line of lines) out(`  ${line}\n`);
+  }
+  return 0;
+}
+
+function newMain(opts, { cwd: repoRoot, stdout: out }) {
+  const [kind, ...args] = opts.positional;
+  let written;
+  if (kind === 'service' && args.length === 2) written = newService({ repoRoot, dir: args[0], name: args[1], inject: opts.inject ?? [] });
+  else if (kind === 'spec' && args.length === 1 && opts.inject === undefined) written = newSpec({ repoRoot, file: args[0] });
+  else if (kind === 'image' && args.length === 0 && opts.inject === undefined) written = newImages({ repoRoot });
+  else throw new Error('starci app new takes `service <dir> <name> [--inject ...]`, `spec <file>.service.ts` or `image`');
+  for (const file of written) out(`created ${file}\n`);
+  return 0;
+}
+
+function addMain(opts, { cwd: repoRoot, stdout: out }) {
+  const [noun, name, ...extra] = opts.positional;
+  if (!noun || !name || extra.length) throw new Error('starci app add takes `<noun> <name>` and the options of the noun');
+  const { created, registered } = addKind({ repoRoot, noun, name, options: { event: opts.event, from: opts.from, service: opts.service, connection: opts.connection, owner: opts.owner, failed: opts.failed, done: opts.done, fe: opts.fe, noTypes: opts['no-types'] } });
+  for (const file of created) out(`created ${file}\n`);
+  const kinds = registered.kinds.length ? `; kinds ${registered.kinds.join(', ')}` : '';
+  out(`starci app add ${noun}: registered patterns ${registered.patterns.join(', ')}${kinds}\n`);
+  return 0;
+}
+
+async function scaffoldMain(opts, { cwd, edition = 'full', presets, lock, stdout: out }) {
+  const [name, ...extra] = opts.positional;
+  if (!name || extra.length) throw new Error('starci app scaffold takes `<name> [--into <dir>] [--edition full|lite]`');
+  const { root: created, files } = scaffoldApp({ name, into: path.resolve(cwd, opts.into ?? '.'), edition, presets: presets ?? await scaffoldPresets(), ...(lock ? { lock } : {}) });
+  out(`starci app scaffold: created ${created} (${files.length} files); next: npm ci, then starci app lint\n`);
+  return 0;
+}
+
+function explainMain(opts, { cwd: repoRoot, stdout: out }) {
+  if (opts.positional.length !== 1) throw new Error('starci app explain takes exactly one path');
+  const explained = explainPath({ repoRoot, input: opts.positional[0] });
+  if (opts.json) out(`${JSON.stringify(explained, null, 2)}\n`); else printExplain(explained, out);
+  return explained.status === 'no-slot' || explained.status === 'ambiguous' ? 1 : 0;
+}
+
+function upgradeAppMain(argv, { cwd, edition, stdout, presets }) {
+  return upgradeMain(['--repo', cwd, ...(edition ? ['--edition', edition] : []), ...argv], { stdout, presets });
+}
+
+async function stackAppMain(argv, { cwd, stackMain, stdout: out, stderr: err }) {
+  const run = stackMain ?? await installedStackMain(cwd);
+  return run(argv, { cwd, out, err });
+}
+
+const DIRECT_VERBS = new Map([['lint', lintMain], ['secret', secretMain], ['db', databaseMain], ['upgrade', upgradeAppMain], ['stack', stackAppMain]]);
+const PARSED_VERBS = new Map([['check', checkMain], ['emit', emitMain], ['new', newMain], ['add', addMain], ['scaffold', scaffoldMain], ['explain', explainMain]]);
+
+function dispatchMain(verb, argv, io) {
+  if (verb === 'sync' || verb === 'hygiene') return syncMain([verb, ...argv], io);
+  const direct = DIRECT_VERBS.get(verb);
+  if (direct) return direct(argv, io);
+  return PARSED_VERBS.get(verb)(parse(argv), io);
+}
+
+function errorMessage(error) {
+  if (error instanceof EditionRefusal || error instanceof UpgradeError || error instanceof HfsSlotsError || error instanceof SyncError) return `${error.message}\n`;
+  if (error instanceof ScaffoldError) return `${error.code}: ${error.message}\n`;
+  return `starci app: ${error.message}\n${USAGE}`;
+}
+
+/** `run` injects the Supabase command runner; IO and tool seams keep every verb independently testable. */
 export async function main(argv, {
   cwd: baseCwd = process.cwd(), stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier, lock, run, stackMain,
   env = process.env, stdin, sops, tools, platform,
@@ -258,73 +409,9 @@ export async function main(argv, {
     const out = global.quiet ? () => {} : stdout;
     if (global.help) { out(USAGE); return 0; }
     if (!VERBS.includes(verb)) { stderr(USAGE); return 2; }
-    if (verb === 'sync' || verb === 'hygiene') return await syncMain([verb, ...rest], { cwd: global.cwd, stdout: out });
-    if (verb === 'lint') return await lintMain(rest, { cwd: global.cwd, stdout: out, presets, prettier });
-    if (verb === 'secret') return secretMain(rest, { stdout: out, stderr, cwd: global.cwd, env, stdin, sops, tools, platform });
-    if (verb === 'upgrade') return await upgradeMain(['--repo', global.cwd, ...(global.edition ? ['--edition', global.edition] : []), ...rest], { stdout: out, presets });
-    if (verb === 'stack') {
-      const run = stackMain ?? await installedStackMain(global.cwd);
-      return await run(rest, { cwd: global.cwd, out, err: stderr });
-    }
-    const opts = parse(rest);
-    const repoRoot = global.cwd;
-    if (verb === 'check') {
-      if (opts.positional.length) throw new Error('starci app check takes no path');
-      if (opts.base !== undefined && opts.fast !== true) throw new Error('--base names the ref --fast compares with; it needs --fast');
-      const result = await checkEdition({ repoRoot, edition: global.edition, normal: () => runCheck({ repoRoot, fast: opts.fast === true, base: opts.base, presets, prettier, dbTypes: opts['db-types'] === true }), presets, prettier });
-      if (opts.json) out(`${JSON.stringify(result, null, 2)}\n`); else printCheck(result, out);
-      return result.ok ? 0 : 1;
-    }
-    if (verb === 'emit') {
-      if (opts.positional.length) throw new Error('starci app emit takes no path');
-      const be = readRepoDeclaration(loadSlotManifest(), repoRoot).sides?.be;
-      if (!be) throw new Error('starci app emit runs at the app root (the folder of hfs.json)');
-      const { written, skipped, standIns } = emitContracts({ repoRoot: path.join(repoRoot, 'be'), declaration: be, run });
-      for (const file of written) out(`wrote be/${file}
-`);
-      out(`starci app emit: ${written.length} written${skipped.length ? `, ${skipped.join(', ')} serve no GraphQL` : ''}
-`);
-      for (const [app, lines] of Object.entries(standIns)) {
-        out(`${app}: ${lines.length} dependenc${lines.length === 1 ? 'y' : 'ies'} of the resolvers could not load here and stood in (no GraphQL type is affected):\n`);
-        for (const line of lines) out(`  ${line}\n`);
-      }
-      return 0;
-    }
-    if (verb === 'new') {
-      const [kind, ...args] = opts.positional;
-      let written;
-      if (kind === 'service' && args.length === 2) written = newService({ repoRoot, dir: args[0], name: args[1], inject: opts.inject ?? [] });
-      else if (kind === 'spec' && args.length === 1 && opts.inject === undefined) written = newSpec({ repoRoot, file: args[0] });
-      else if (kind === 'image' && args.length === 0 && opts.inject === undefined) written = newImages({ repoRoot });
-      else throw new Error('starci app new takes `service <dir> <name> [--inject ...]`, `spec <file>.service.ts` or `image`');
-      for (const file of written) out(`created ${file}
-`);
-      return 0;
-    }
-    if (verb === 'add') {
-      const [noun, name, ...extra] = opts.positional;
-      if (!noun || !name || extra.length) throw new Error('starci app add takes `<noun> <name>` and the options of the noun');
-      const { created, registered } = addKind({ repoRoot, noun, name, options: { event: opts.event, from: opts.from, service: opts.service, connection: opts.connection, owner: opts.owner, failed: opts.failed, done: opts.done, fe: opts.fe, noTypes: opts['no-types'] } });
-      for (const file of created) out(`created ${file}
-`);
-      out(`starci app add ${noun}: registered patterns ${registered.patterns.join(', ')}${registered.kinds.length ? `; kinds ${registered.kinds.join(', ')}` : ''}
-`);
-      return 0;
-    }
-    if (verb === 'scaffold') {
-      const [name, ...extra] = opts.positional;
-      if (!name || extra.length) throw new Error('starci app scaffold takes `<name> [--into <dir>] [--edition full|lite]`');
-      const edition = global.edition ?? 'full';
-      const { root: created, files } = scaffoldApp({ name, into: path.resolve(global.cwd, opts.into ?? '.'), edition, presets: presets ?? await scaffoldPresets(), ...(lock ? { lock } : {}) });
-      out(`starci app scaffold: created ${created} (${files.length} files); next: npm ci, then starci app lint\n`);
-      return 0;
-    }
-    if (opts.positional.length !== 1) throw new Error('starci app explain takes exactly one path');
-    const explained = explainPath({ repoRoot, input: opts.positional[0] });
-    if (opts.json) out(`${JSON.stringify(explained, null, 2)}\n`); else printExplain(explained, out);
-    return explained.status === 'no-slot' || explained.status === 'ambiguous' ? 1 : 0;
+    return await dispatchMain(verb, rest, { cwd: global.cwd, edition: global.edition, stdout: out, stderr, presets, prettier, lock, run, stackMain, env, stdin, sops, tools, platform });
   } catch (error) {
-    stderr(error instanceof EditionRefusal || error instanceof UpgradeError ? `${error.message}\n` : error instanceof HfsSlotsError || error instanceof SyncError ? `${error.message}\n` : error instanceof ScaffoldError ? `${error.code}: ${error.message}\n` : `starci app: ${error.message}\n${USAGE}`);
+    stderr(errorMessage(error));
     return 2;
   }
 }
