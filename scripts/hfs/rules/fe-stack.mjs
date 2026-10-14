@@ -13,6 +13,8 @@ import { DEPENDENCY_SECTIONS } from './fe-no-tests.mjs';
 import { editionRuleParams } from '../edition-slots.mjs';
 
 export const FE_STACK_FORBIDDEN = 'FE_STACK_FORBIDDEN';
+export const FE_STACK_UNLISTED = 'FE_STACK_UNLISTED';
+export const FE_STACK_CORE_MISSING = 'FE_STACK_CORE_MISSING';
 const CATALOG_FILE = new URL('../../../knowledge/hfs/fe-stack.yaml', import.meta.url);
 const PACKAGE_JSON = /(?:^|\/)package\.json$/;
 const APP_ROOT_MANIFEST = 'package.json';
@@ -68,4 +70,59 @@ export function feStackFindings({ repoRoot, files, repo, manifest }) {
   const skip = atRoot ? backendOwned(manifest) : new Set();
   const manifests = files.filter((file) => !file.includes('node_modules/') && (atRoot ? file === APP_ROOT_MANIFEST : PACKAGE_JSON.test(file)));
   return manifests.flatMap((rel) => manifestFindings(repoRoot, rel, skip));
+}
+
+/** R288 uses the same catalog as the scaffold, including tools installed once at the app root. */
+function stackCatalog() {
+  const catalog = parseYaml(fs.readFileSync(CATALOG_FILE, 'utf8'));
+  const allowed = new Set();
+  const core = new Map();
+  for (const concern of catalog.concerns) {
+    const rootTool = ['codegen', 'lint'].includes(concern.id);
+    for (const name of concern.packages ?? []) {
+      allowed.add(name);
+      if (concern.tier === 'core') core.set(name, { concern: concern.id, rootTool: rootTool || ['typescript', 'tailwindcss'].includes(name) });
+    }
+  }
+  return { allowed, core };
+}
+
+const dependenciesOf = pkg => new Set(DEPENDENCY_SECTIONS.flatMap(section => Object.keys(pkg?.[section] ?? {})));
+
+function extraPackages(declaration) {
+  const entries = declaration?.fe?.extraPackages ?? [];
+  return new Set((Array.isArray(entries) ? entries : []).filter(entry => typeof entry?.name === 'string'
+    && typeof entry.reason === 'string' && entry.reason.trim()).map(entry => entry.name));
+}
+
+function unlistedFindings(rel, pkg, allowed, extras, workspaces) {
+  const findings = [];
+  for (const section of DEPENDENCY_SECTIONS) for (const name of Object.keys(pkg?.[section] ?? {})) {
+    if (allowed.has(name) || extras.has(name) || workspaces.has(name) || forbiddenPackages().has(name)) continue;
+    findings.push(found(FE_STACK_UNLISTED, rel, `${rel} ${section} declares ${name}, absent from knowledge/hfs/fe-stack.yaml; add a canonical concern or declare fe.extraPackages with its name and a nonempty reason in hfs.json`, { section, dependency: name }));
+  }
+  return findings;
+}
+
+/** Closed FE catalog and core presence over the front-end side (the mixed root also holds BE tools). */
+export function feStackAllowlistFindings({ repoRoot, files, all = files, repo, inScope = () => true }) {
+  if (repo.profile !== 'fe' || repo.kind === 'runtime') return [];
+  const declaration = readJson(repoRoot, '../hfs.json') ?? repo;
+  const manifests = all.filter(file => PACKAGE_JSON.test(file) && !file.includes('node_modules/'));
+  const packages = new Map(manifests.map(file => [file, readJson(repoRoot, file)]));
+  const workspaces = new Set([...packages].filter(([file]) => file.startsWith('packages/')).map(([, pkg]) => pkg?.name).filter(Boolean));
+  const { allowed, core } = stackCatalog();
+  const extras = extraPackages(declaration);
+  const findings = [...packages].filter(([file]) => inScope(file)).flatMap(([file, pkg]) => unlistedFindings(file, pkg, allowed, extras, workspaces));
+  const rootTools = dependenciesOf(readJson(repoRoot, '../package.json'));
+  for (const app of repo.apps ?? []) {
+    if (app.kind !== 'next' || ((repo.edition ?? 'full') === 'full' && app.name === 'landing')) continue;
+    const rel = `apps/${app.name}/package.json`;
+    const installed = dependenciesOf(packages.get(rel));
+    for (const [name, entry] of core) {
+      if (installed.has(name) || (entry.rootTool && rootTools.has(name))) continue;
+      findings.push(found(FE_STACK_CORE_MISSING, rel, `${rel} lacks core package ${name} for ${entry.concern} in knowledge/hfs/fe-stack.yaml; declare it ${entry.rootTool ? 'in the app root devDependencies or this workspace' : 'in this product workspace'}`, { dependency: name, concern: entry.concern }));
+    }
+  }
+  return findings;
 }

@@ -12,6 +12,7 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { APP, TWO_FE_APPS, STACKS_DECLARATION, appOf } from '../helpers/hfs-cli-fixture.mjs';
 import { hfsTreeRulesFixture } from '../helpers/hfs-hfs-tree-rules-fixture.mjs';
+import { appFrontendFindings, wireSchemaDigest, WIRE_SCHEMA_STAMP } from '../../scripts/hfs/rules/frontend-tree.mjs';
 
 const root = path.resolve(import.meta.dirname, '..', '..');
 const pins = parseYaml(fs.readFileSync(path.join(root, 'knowledge/hfs/canon-pins.yaml'), 'utf8')).pins;
@@ -93,6 +94,11 @@ test('HFS_STACKS_SHAPE: the standard tree with a host-owned Sonar is clean', () 
   const result = checkRepo({ repoRoot: repoOf(APP, (dir) => {
     for (const file of STANDARD_TREE) put(dir, file, file.endsWith('.json') ? '{}\n' : 'x\n');
     put(dir, '.starcistacks/dev/secrets/uat.enc', SOPS_ENVELOPE);
+    const catalog = parseYaml(fs.readFileSync(path.join(root, 'knowledge/hfs/fe-stack.yaml'), 'utf8'));
+    const core = catalog.concerns.filter((concern) => concern.tier === 'core').flatMap((concern) => concern.packages);
+    const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'fe/apps/web/package.json'), 'utf8'));
+    manifest.dependencies = Object.fromEntries(core.map((name) => [name, pins[name].version]));
+    put(dir, 'fe/apps/web/package.json', json(manifest));
   }) });
   assert.deepEqual(only(result, 'HFS_STACKS_SHAPE'), []);
   assert.equal(result.ok, true, JSON.stringify(result.findings.slice(0, 3)));
@@ -261,28 +267,100 @@ test('BE_TEST_TOPOLOGY: unit specs beside their subject, the be jest.config.js a
 
 // ------------------------------------------------------------------------------------------------ R52 FE_WIRE_GENERATED
 
-const GENERATED = 'fe/apps/web/src/modules/api/__generated__';
+const GENERATED = 'fe/apps/web/src/modules/api/graphql/__generated__';
+const WIRE_QUERY = 'fe/apps/web/src/modules/api/graphql/queries/query-ping.ts';
+const WIRE_DOCUMENT = 'export const ping = gql`query Ping { ping }`;\n';
 
-test('FE_WIRE_GENERATED: be contract snapshots with no codegen script at the root, and generated types older than a snapshot, are refused', () => {
+test('FE_WIRE_GENERATED: be contract snapshots require a codegen script at the root', () => {
   const none = checkRepo({ repoRoot: repoOf(WITH_CONTRACT, (dir) => { put(dir, SNAPSHOT, SCHEMA); put(dir, 'package.json', ROOT()); }) });
   assert.deepEqual(only(none, 'FE_WIRE_GENERATED').map((f) => f.path), ['package.json']);
   assert.match(only(none, 'FE_WIRE_GENERATED')[0].message, /no `codegen` script/);
-  const dir = repoOf(WITH_CONTRACT, (d) => put(d, SNAPSHOT, SCHEMA));
-  put(dir, `${GENERATED}/types.ts`);
-  const old = new Date(Date.now() - 3_600_000);
-  fs.utimesSync(path.join(dir, `${GENERATED}/types.ts`), old, old);
-  const stale = checkRepo({ repoRoot: dir });
-  assert.deepEqual(only(stale, 'FE_WIRE_GENERATED').map((f) => f.path), [GENERATED]);
 });
 
-test('FE_WIRE_GENERATED: generated types newer than the snapshots, and an app with no snapshot, are clean', () => {
-  const dir = repoOf(WITH_CONTRACT, (d) => put(d, SNAPSHOT, SCHEMA));
-  put(dir, `${GENERATED}/types.ts`);
-  const future = new Date(Date.now() + 60_000);
-  fs.utimesSync(path.join(dir, `${GENERATED}/types.ts`), future, future);
-  assert.deepEqual(only(checkRepo({ repoRoot: dir }), 'FE_WIRE_GENERATED'), []);
+test('FE_WIRE_GENERATED: an app with no snapshot or operations is clean', () => {
   assert.deepEqual(only(checkRepo({ repoRoot: repoOf(APP) }), 'FE_WIRE_GENERATED'), []);
 });
+
+// Generated output is gitignored; finder fixtures deliberately leave it out of `files`.
+function wireTree(edition, { snapshots = true, operations = true, apps = ['web'] } = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-wire-digest-'));
+  made.push(dir);
+  const files = ['package.json', 'fe/apps/web/package.json'];
+  put(dir, 'package.json', json({ scripts: { codegen: 'node scripts/codegen.mjs' } }));
+  put(dir, 'fe/apps/web/package.json', json({ dependencies: { 'next-intl': '4.0.0' } }));
+  if (snapshots) { put(dir, SNAPSHOT, SCHEMA); files.push(SNAPSHOT); }
+  if (operations) { put(dir, WIRE_QUERY, WIRE_DOCUMENT); files.push(WIRE_QUERY); }
+  const repo = { edition, sides: { fe: { reads: ['be/contracts/'], apps: apps.map((name) => ({ name, kind: 'next' })) } } };
+  return { dir, files, check: () => appFrontendFindings({ repoRoot: dir, files, repo }).filter((finding) => finding.code === 'FE_WIRE_GENERATED') };
+}
+
+function generatedWire(dir, files = [SNAPSHOT], generated = GENERATED) {
+  put(dir, `${generated}/graphql.ts`, 'export type Query = { ping: string };\n');
+  put(dir, `${generated}/${WIRE_SCHEMA_STAMP}`, `${wireSchemaDigest(dir, files)}\n`);
+}
+
+for (const edition of ['lite', 'full']) {
+  test(`FE_WIRE_GENERATED (${edition}): operations require output at the canonical GraphQL path`, () => {
+    const { dir, check } = wireTree(edition);
+    // The obsolete location and a stamp without types cannot satisfy generation.
+    put(dir, 'fe/apps/web/src/modules/api/__generated__/types.ts');
+    put(dir, `${GENERATED}/${WIRE_SCHEMA_STAMP}`, `${wireSchemaDigest(dir, [SNAPSHOT])}\n`);
+    assert.deepEqual(check().map((finding) => finding.path), [GENERATED]);
+    assert.match(check()[0].message, /no generated wire types/);
+    generatedWire(dir);
+    assert.deepEqual(check(), []);
+  });
+
+  test(`FE_WIRE_GENERATED (${edition}): missing, malformed and stale schema digests are refused regardless of mtime`, () => {
+    const { dir, check } = wireTree(edition);
+    generatedWire(dir);
+    drop(dir, `${GENERATED}/${WIRE_SCHEMA_STAMP}`);
+    assert.match(check()[0].message, /no valid schema digest/);
+    put(dir, `${GENERATED}/${WIRE_SCHEMA_STAMP}`, 'not-a-digest\n');
+    assert.match(check()[0].message, /no valid schema digest/);
+    generatedWire(dir);
+    put(dir, SNAPSHOT, 'type Query { ping: String pong: String }\n');
+    const future = new Date(Date.now() + 60_000);
+    fs.utimesSync(path.join(dir, `${GENERATED}/graphql.ts`), future, future);
+    fs.utimesSync(path.join(dir, `${GENERATED}/${WIRE_SCHEMA_STAMP}`), future, future);
+    assert.deepEqual(check().map((finding) => finding.path), [GENERATED]);
+    assert.match(check()[0].message, /different schema digest/);
+    generatedWire(dir);
+    assert.deepEqual(check(), []);
+  });
+
+  test(`FE_WIRE_GENERATED (${edition}): matching schema digests survive checkout timestamps and CRLF conversion`, () => {
+    const { dir, check } = wireTree(edition);
+    generatedWire(dir);
+    const old = new Date(Date.now() - 3_600_000);
+    fs.utimesSync(path.join(dir, `${GENERATED}/graphql.ts`), old, old);
+    fs.utimesSync(path.join(dir, `${GENERATED}/${WIRE_SCHEMA_STAMP}`), old, old);
+    put(dir, SNAPSHOT, SCHEMA.replace(/\n/g, '\r\n'));
+    assert.deepEqual(check(), []);
+  });
+
+  test(`FE_WIRE_GENERATED (${edition}): only apps with operations need output, even before a snapshot exists`, () => {
+    assert.deepEqual(wireTree(edition, { operations: false }).check(), []);
+    const withoutSchema = wireTree(edition, { snapshots: false });
+    assert.deepEqual(withoutSchema.check().map((finding) => finding.path), [GENERATED]);
+    const { dir, check } = wireTree(edition, { apps: ['web', 'admin'] });
+    generatedWire(dir);
+    assert.deepEqual(check(), [], 'the admin app has no operation documents');
+  });
+
+  test(`FE_WIRE_GENERATED (${edition}): every schema participates in the deterministic digest`, () => {
+    const { dir, files, check } = wireTree(edition);
+    assert.equal(wireSchemaDigest(dir, [SNAPSHOT]), 'abf6cbbd50201381861413fd6ae3b69f94dfd715bff06ec451cb121240efb813', 'the digest protocol has a stable reference value');
+    const second = 'be/contracts/extra/schema.graphql';
+    put(dir, second, 'type Query { extra: String }\n');
+    files.push(second);
+    generatedWire(dir, [second, SNAPSHOT]);
+    assert.equal(wireSchemaDigest(dir, [second, SNAPSHOT]), wireSchemaDigest(dir, [SNAPSHOT, second]));
+    assert.deepEqual(check(), []);
+    put(dir, second, 'type Query { extra: Boolean }\n');
+    assert.match(check()[0].message, /different schema digest/);
+  });
+}
 
 // ------------------------------------------------------------------------------------------------ R59 FE_I18N_PLACEMENT
 

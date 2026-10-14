@@ -219,3 +219,24 @@ concerns:
     pattern: FE-LINT
     forbids: []
     why: the canon lint and format configuration.
+  - id: auth-supabase
+    tier: opt
+    packages: ['@supabase/supabase-js']
+    home: [fe.modules.auth]
+    pattern: FE-AUTH
+    forbids: []
+    why: the lite auth provider client, confined to modules/auth; data still goes through the back end.
+  - id: framework-support
+    tier: opt
+    packages: [server-only, rxjs]
+    home: [fe.source-root-pinned]
+    pattern: FE-ROUTE
+    forbids: []
+    why: the Next server boundary marker and Apollo peer support used by canonical workspaces.
+  - id: tool-support
+    tier: opt
+    packages: ['@types/node', '@types/react', '@types/react-dom', '@starci/tsconfig', '@starci/stylelint-canon', '@tailwindcss/postcss', postcss-value-parser, stylelint, eslint-plugin-react-hooks]
+    home: [fe.tool-config]
+    pattern: FE-LINT
+    forbids: []
+    why: the compiler, CSS and lint support packages of the canonical front-end configs.

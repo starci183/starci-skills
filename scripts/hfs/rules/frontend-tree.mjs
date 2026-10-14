@@ -6,13 +6,14 @@
 // Over the whole app (the root scope, app-relative paths: the one package.json and the be contract snapshots sit outside the fe side):
 //   FE_WIRE_GENERATED (R52)     wire types come from the be contract snapshots the fe side reads in place (its declared reads,
 //                               `be/contracts/`): the root package.json declares the `codegen` script, and each fe app's generated
-//                               types on disk (`modules/api/__generated__/`, never tracked) are not older than any snapshot
+//                               types on disk (`modules/api/graphql/__generated__/`, never tracked) record the schema digest
 //   FE_I18N_PLACEMENT (R59)     `next-intl` is a dependency of an fe workspace (an fe app manifest, or a shared i18n package under fe/packages/)
 // The files each app must hold (routing.ts, navigation.ts, request.ts, messages/, the [locale] layout) are the slot manifest's requires
 // (HFS_SLOT_REQUIRED_MISSING); which source may hold display text and how copy resolves is eslint-fe's.
 import fs from 'node:fs';
 import path from 'node:path';
-import { found, readJson } from './read.mjs';
+import { createHash } from 'node:crypto';
+import { found, readJson, readText } from './read.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 
 const WIRE_GENERATED = 'FE_WIRE_GENERATED';
@@ -21,7 +22,7 @@ const I18N_CATALOG = 'FE_I18N_CATALOG';
 export const DEFAULT_LOCALE = 'vi';
 const ROUTE_FILE = /\/(?:page|layout|template|loading|error|not-found)\.[jt]sx?$/;
 const LOCALE = /^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/;
-const STALE_MS = 1000;
+export const WIRE_SCHEMA_STAMP = '.schema-sha256';
 
 /** Every leaf key of a parsed catalog as a dotted path. */
 function catalogKeys(value, prefix = '') {
@@ -30,40 +31,55 @@ function catalogKeys(value, prefix = '') {
   return entries.length ? entries.flatMap(([key, child]) => catalogKeys(child, prefix ? `${prefix}.${key}` : key)) : [prefix];
 }
 
-/** The newest modification time (ms) of any file below `dir`, or null when it holds none. */
-function newestBelow(dir) {
-  let newest = null;
-  const walk = (current) => {
-    let entries;
-    try { entries = fs.readdirSync(current, { withFileTypes: true }); } catch { return; }
-    for (const entry of entries) {
-      const target = path.join(current, entry.name);
-      if (entry.isDirectory()) walk(target);
-      else try { newest = Math.max(newest ?? 0, fs.statSync(target).mtimeMs); } catch { /* vanished while reading */ }
-    }
-  };
-  walk(dir);
-  return newest;
+/** Digest protocol for codegen: sorted app-relative schema path, NUL, LF-normalized source, NUL. */
+export function wireSchemaDigest(repoRoot, snapshots) {
+  const hash = createHash('sha256');
+  for (const snapshot of [...snapshots].sort(byCodeUnit)) {
+    let source;
+    try { source = fs.readFileSync(path.join(repoRoot, snapshot), 'utf8'); } catch { return null; }
+    hash.update(`${snapshot}\0${source.replace(/\r\n/g, '\n')}\0`);
+  }
+  return hash.digest('hex');
+}
+
+/** Generated output is untracked, so inspect disk; the digest sidecar alone is not generated wire types. */
+function hasGeneratedTypes(directory) {
+  let entries;
+  try { entries = fs.readdirSync(directory, { withFileTypes: true }); } catch { return false; }
+  return entries.some((entry) => entry.isDirectory() ? hasGeneratedTypes(path.join(directory, entry.name)) : entry.isFile() && entry.name.endsWith('.ts'));
 }
 
 const scriptsOf = (repoRoot, file) => readJson(repoRoot, file)?.scripts ?? {};
 
-/** R52 over the app: the codegen script of the root and the age of each fe app's generated types against the be snapshots. */
-function wireFindings({ repoRoot, files, apps, reads }) {
-  const snapshots = files.filter((file) => reads.some((read) => file.startsWith(read)));
-  if (!snapshots.length) return [];
-  const findings = [];
-  if (typeof scriptsOf(repoRoot, 'package.json').codegen !== 'string') findings.push(found(WIRE_GENERATED, 'package.json', `the app keeps contract snapshots (${reads.join(', ')}) but its package.json declares no \`codegen\` script; wire types are generated from the snapshots, never typed by hand`));
-  for (const app of apps) {
-    const generated = `fe/apps/${app}/src/modules/api/__generated__`;
-    const built = newestBelow(path.join(repoRoot, generated));
-    if (built === null) continue;
-    for (const snapshot of snapshots) {
-      let changed;
-      try { changed = fs.statSync(path.join(repoRoot, snapshot)).mtimeMs; } catch { continue; }
-      if (built + STALE_MS < changed) findings.push(found(WIRE_GENERATED, generated, `${generated} is older than ${snapshot}; run \`npm run codegen\` so the wire types match the contract snapshot`, { app, snapshot }));
-    }
+function wireDigestProblem(digest, stamped) {
+  if (digest === null) return 'cannot be verified against unreadable contract snapshots';
+  if (!/^[0-9a-f]{64}$/.test(stamped ?? '')) return 'has no valid schema digest recorded by codegen';
+  if (stamped !== digest) return 'records a different schema digest from the contract snapshots';
+  return null;
+}
+
+function appWireFindings({ repoRoot, files, app, snapshots, digest }) {
+  const graphql = `fe/apps/${app}/src/modules/api/graphql/`;
+  const generated = `${graphql}__generated__`;
+  if (!hasGeneratedTypes(path.join(repoRoot, generated))) {
+    const operations = files.some((file) => file.startsWith(graphql) && /^(?:(?:queries|mutations)\/[^/]+\.ts|(?!(?:__generated__|node_modules)\/).*\.graphql)$/.test(file.slice(graphql.length)));
+    if (operations) return [found(WIRE_GENERATED, generated, `${app} keeps GraphQL operations but ${generated} has no generated wire types; run \`npm run codegen\``, { app })];
+    return [];
   }
+  if (!snapshots.length) return [];
+  const stamped = readText(repoRoot, `${generated}/${WIRE_SCHEMA_STAMP}`)?.trim();
+  const problem = wireDigestProblem(digest, stamped);
+  if (problem === null) return [];
+  return [found(WIRE_GENERATED, generated, `${generated} ${problem}; run \`npm run codegen\` so its wire types and ${WIRE_SCHEMA_STAMP} match the schema`, { app, snapshots })];
+}
+
+/** R52 over the app: root codegen, required operation output, and its recorded schema digest. */
+function wireFindings({ repoRoot, files, apps, reads }) {
+  const snapshots = files.filter((file) => file.endsWith('/schema.graphql') && reads.some((read) => file.startsWith(read)));
+  const findings = [];
+  if (snapshots.length && typeof scriptsOf(repoRoot, 'package.json').codegen !== 'string') findings.push(found(WIRE_GENERATED, 'package.json', `the app keeps contract snapshots (${reads.join(', ')}) but its package.json declares no \`codegen\` script; wire types are generated from the snapshots, never typed by hand`));
+  const digest = snapshots.length ? wireSchemaDigest(repoRoot, snapshots) : null;
+  findings.push(...apps.flatMap((app) => appWireFindings({ repoRoot, files, app, snapshots, digest })));
   return findings;
 }
 
@@ -74,7 +90,7 @@ function intlDependencyFindings({ repoRoot, files }) {
   return workspaces.some(declares) ? [] : [found(I18N_PLACEMENT, 'package.json', 'no fe workspace depends on next-intl (an fe app or a shared fe package declares it); every fe app uses next-intl with the [locale] segment')];
 }
 
-function placementFindings({ repoRoot, app, tracked }) {
+function placementFindings({ app, tracked }) {
   const base = `apps/${app}`;
   const findings = [];
   if (!tracked.includes(`${base}/src/proxy.ts`)) findings.push(found(I18N_PLACEMENT, `${base}/src/proxy.ts`, `${app} has no src/proxy.ts; locale routing lives in proxy.ts`, { app }));
