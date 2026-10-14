@@ -1,7 +1,7 @@
 // app db restamp: an explicit version map previews file renames and history repairs.
 import fs from 'node:fs';
 import path from 'node:path';
-import { parse } from 'yaml';
+import { parseYaml } from '../../engine/yaml.mjs';
 import { invocationDir } from '../lib/roots.mjs';
 import { migrationStamp } from './rules/database-migrations.mjs';
 import { MIGRATIONS_DIR, MIGRATIONS_ARCHIVE_DIR } from './rules/database-constants.mjs';
@@ -11,7 +11,7 @@ import { DbVerbError, dbOptions, dbAppRoot, dbSqlFiles, runDbSupabase, repairArg
 export function restampPlan(root, mapFile) {
   if (!mapFile) throw new DbVerbError('restamp requires --map <restamp.yaml>');
   let document;
-  try { document = parse(fs.readFileSync(path.resolve(root, mapFile), 'utf8'), { uniqueKeys: true }); }
+  try { document = parseYaml(fs.readFileSync(path.resolve(root, mapFile), 'utf8')); }
   catch { throw new DbVerbError('restamp map must be readable YAML with unique version keys'); }
   const mapping = document?.versions ?? document;
   if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping) || !Object.keys(mapping).length) throw new DbVerbError('restamp map must contain old-to-new version pairs');

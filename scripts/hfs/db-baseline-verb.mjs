@@ -41,7 +41,7 @@ export function dbAppRoot(cwd, opts) {
   const root = path.resolve(cwd, opts.cwd ?? '.');
   let declaration;
   try { declaration = JSON.parse(fs.readFileSync(path.join(root, 'hfs.json'), 'utf8')); } catch { throw new DbVerbError('run at an app root containing hfs.json'); }
-  if (declaration.kind !== 'app' || !['lite', 'full'].includes(declaration.edition)) throw new DbVerbError('database verbs require a lite or full app');
+  if (declaration.kind !== 'app' || !['lite', 'full'].includes(declaration.edition ?? 'full')) throw new DbVerbError('database verbs require a lite or full app');
   return root;
 }
 
