@@ -7,12 +7,12 @@ import { byCodeUnit } from '../../lib/list.mjs';
  *      is the one direction with its own code (BE_FEATURE_IMPORTS_FEATURE, R28), never BE_TIER_DIRECTION, and a feature of one trigger
  *      kind (slot field `trigger`: api, webhooks, realtime, saga, reactors, jobs, cli) importing a feature of another is
  *      BE_KIND_ISOLATION, whose fix is the event bus,
- *      an app never imports another app (FE_APP_ISOLATION), and a component layer imports only the layers after it;
+ *      an app never imports another app (BE_SERVICE_ISOLATION / FE_APP_ISOLATION), and a component layer imports only the layers after it;
  *   2. owner cycles: a strongly connected component of the owner graph, type-only imports included (ARCH_OWNER_CYCLE),
  *      reported with the cycle path and the import that closes each hop.
  * Importing inside one owner is always allowed; the public-entry rule stays with owners.mjs (ARCH_OWNER_EXPORT_BYPASS).
  */
-export const TIER_RULE_IDS = ['BE_TIER_DIRECTION', 'BE_FEATURE_IMPORTS_FEATURE', 'BE_KIND_ISOLATION', 'FE_TIER_DIRECTION', 'FE_APP_ISOLATION', 'ARCH_OWNER_CYCLE'];
+export const TIER_RULE_IDS = ['BE_TIER_DIRECTION', 'BE_FEATURE_IMPORTS_FEATURE', 'BE_KIND_ISOLATION', 'BE_SERVICE_ISOLATION', 'FE_TIER_DIRECTION', 'FE_APP_ISOLATION', 'ARCH_OWNER_CYCLE'];
 
 function tierDirectionText({ fromTier, toTier, mayImport, kindRestriction, fromKind, toKind }) {
   if (!kindRestriction) return `a ${fromTier} may import only ${mayImport.join(', ') || 'nothing'}; it imports a ${toTier}`;
@@ -118,7 +118,7 @@ function reportReasonedTierViolation(graph, edge, verdict, tierRule, counts, vio
   let ruleId = tierRule;
   if (featureToFeature) ruleId = 'BE_FEATURE_IMPORTS_FEATURE';
   if (crossKind) ruleId = 'BE_KIND_ISOLATION';
-  if (verdict.reason === 'crossApp') ruleId = 'FE_APP_ISOLATION';
+  if (verdict.reason === 'crossApp') ruleId = graph.profile === 'be' ? 'BE_SERVICE_ISOLATION' : 'FE_APP_ISOLATION';
   const typeOnly = edge.runtime ? '' : ' (type-only imports count)';
   const message = crossKind
     ? `${edge.from} -> ${edge.to}: a ${fromKind} feature imports a ${toKind} feature; no kind imports another, every cross-kind call is an event published with eventBus.publish(event, tx) from a domain service${typeOnly}.`

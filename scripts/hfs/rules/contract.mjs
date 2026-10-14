@@ -9,13 +9,68 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { found, readText } from './read.mjs';
 import { safeRemove } from '../../api/fs/safe-remove.mjs';
 import { makeTempDir } from '../../api/fs/make-temp-dir.mjs';
+import { loadTypescript } from '../../lib/package-at.mjs';
 
 export const CONTRACT_SNAPSHOT_DRIFT = 'HFS_CONTRACT_SNAPSHOT_DRIFT';
 const GRAPHQL_TRANSPORT_SLOT = 'be.transport.graphql';
 const SNAPSHOT_OF = { graphql: 'schema.graphql', json: 'openapi.json' };
+const GRAPHQL_PLATFORM = /^src\/modules\/platform\/graphql(?:\/|\.ts$|$)/;
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+
+/** A side-relative source import through a relative path or the canonical backend aliases. */
+function sourcePath(from, specifier) {
+  const alias = [['@modules/', 'src/modules/'], ['@features/', 'src/features/']].find(([prefix]) => specifier.startsWith(prefix));
+  let relative = null;
+  if (alias) relative = `${alias[1]}${specifier.slice(alias[0].length)}`;
+  else if (specifier.startsWith('.')) relative = path.posix.join(path.posix.dirname(from), specifier);
+  return relative === null ? null : path.posix.normalize(relative).replace(/\.js$/, '.ts');
+}
+
+/** A tracked source file of an import, including directory entries and JavaScript-extension TypeScript imports. */
+function sourceOf(base, tracked) {
+  return [base, `${base}.ts`, `${base}/index.ts`].find(file => tracked.has(file)) ?? null;
+}
+
+/** Runtime imports and re-exports, parsed by the same TypeScript loader as the neighbouring content rules. */
+function runtimeSpecifiers(ts, file, text) {
+  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const specifiers = [];
+  const visit = node => {
+    if (ts.isImportTypeNode(node)) return;
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+      const clause = node.importClause ?? node;
+      const bindings = ts.isImportDeclaration(node) ? clause.namedBindings : node.exportClause;
+      const onlyTypes = clause.isTypeOnly || (!clause.name && bindings?.elements?.length && bindings.elements.every(item => item.isTypeOnly));
+      if (!onlyTypes && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) specifiers.push(node.moduleSpecifier.text);
+      return;
+    }
+    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword && node.arguments[0] && ts.isStringLiteral(node.arguments[0])) specifiers.push(node.arguments[0].text);
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return specifiers;
+}
+
+/** The import closure of one app's composition, including its groups and the feature transports it owns. */
+function servesGraphql(app, tracked, classified, sources) {
+  if ([...classified.values()].some(file => file.slot === GRAPHQL_TRANSPORT_SLOT && file.bindings?.app === app.name)) return true;
+  const pending = [`apps/${app.name}/src/app.module.ts`];
+  const seen = new Set();
+  while (pending.length) {
+    const file = pending.pop();
+    if (seen.has(file) || !tracked.has(file)) continue;
+    seen.add(file);
+    if (classified.get(file)?.slot === GRAPHQL_TRANSPORT_SLOT) return true;
+    const bases = sources(file).map(specifier => sourcePath(file, specifier)).filter(base => base !== null);
+    if (bases.some(base => GRAPHQL_PLATFORM.test(base))) return true;
+    pending.push(...bases.map(base => sourceOf(base, tracked)).filter(Boolean));
+  }
+  return false;
+}
 
 /** sha256 of a file's text with line endings folded, or null when it cannot be read. */
 function contractHash(file) {
@@ -26,13 +81,19 @@ function contractHash(file) {
 export function contractFindings({ repoRoot, files, repo, resolver }) {
   const findings = [];
   if (repo.profile !== 'be') return findings;
-  const serves = files.some((file) => resolver.classifyPath(file).slot === GRAPHQL_TRANSPORT_SLOT);
   const tracked = new Set(files);
+  const classified = new Map(files.map(file => [file, resolver.classifyPath(file)]));
+  const ts = loadTypescript(repoRoot, HERE);
+  const imports = new Map();
+  const sources = file => {
+    if (!imports.has(file)) imports.set(file, ts ? runtimeSpecifiers(ts, file, readText(repoRoot, file) ?? '') : []);
+    return imports.get(file);
+  };
   for (const app of repo.apps.filter((a) => a.kind === 'api')) {
     const operations = `contracts/${app.name}/${SNAPSHOT_OF.json}`;
     if (tracked.has(`apps/${app.name}/src/operations.ts`) && !tracked.has(operations)) findings.push(found(CONTRACT_SNAPSHOT_DRIFT, operations, `${app.name} declares an operation table (apps/${app.name}/src/operations.ts) but ${operations} is not committed; declare be.contract.openapi in hfs.json sides.be.optionalSlots, run \`npm run contract:emit\` and commit the snapshot`, { app: app.name }));
-    // An app serves GraphQL when its root module composes the platform graphql capability; a repository with a GraphQL transport slot does not make every api app one.
-    if (!serves || !(readText(repoRoot, `apps/${app.name}/src/app.module.ts`) ?? '').includes('platform/graphql')) continue;
+    // Composition groups and transport ownership are app-specific: another service's GraphQL files do not apply here.
+    if (!servesGraphql(app, tracked, classified, sources)) continue;
     const snapshot = `contracts/${app.name}/${SNAPSHOT_OF.graphql}`;
     if (!tracked.has(snapshot)) findings.push(found(CONTRACT_SNAPSHOT_DRIFT, snapshot, `${app.name} serves GraphQL but ${snapshot} is not committed; declare be.contract.graphql in hfs.json sides.be.optionalSlots, run \`npm run contract:emit\` and commit the snapshot`, { app: app.name }));
   }
@@ -62,8 +123,8 @@ function artifactFindings({ repoRoot, tracked, scratch, app, artifact, what, emi
   }
   const fresh = contractHash(path.join(scratch, snapshot));
   if (committed === null) {
-    // the uncommitted snapshot itself is reported by contractFindings above; here it only counts as not judged
     apps.push({ app: app.name, artifact, status: 'not-committed' });
+    findings.push(found(CONTRACT_SNAPSHOT_DRIFT, snapshot, `${app.name} emits ${snapshot} but it is not committed or readable; run \`npm run contract:emit\` and commit the snapshot`, { app: app.name, drift: 'not-committed' }));
   } else if (committed === fresh) {
     apps.push({ app: app.name, artifact, status: 'fresh' });
   } else {
@@ -76,7 +137,7 @@ function artifactFindings({ repoRoot, tracked, scratch, app, artifact, what, emi
  * R23, full pass: each committed `contracts/<app>/schema.graphql` and `contracts/<app>/openapi.json` equals what `emit` writes for
  * the app now. `emit({ repoRoot, declaration, outDir })` is `emitContracts` of packages/hfs/emit and answers `{ written, skipped }`;
  * it is injected because the runtime scripts do not import the hfs package. Every api app is emitted on its own into a temp
- * directory, so one app that cannot emit does not hide the others; an uncommitted snapshot is contractFindings' finding. Answers
+ * directory, so one app that cannot emit does not hide the others; an uncommitted emitted snapshot is a finding here too. Answers
  * `{ findings, apps }`, `apps` being what was judged: `[{ app, artifact, status }]`, `artifact` being `schema.graphql` or
  * `openapi.json` and `status` one of `fresh`, `stale`, `not-committed`, `none` (nothing emitted, nothing committed; GraphQL only),
  * `left-behind` (committed, nothing emitted) or `emit-failed`.

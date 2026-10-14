@@ -4,7 +4,7 @@ import { sourceLocation } from '../../lib/ts-ast.mjs';
 /**
  * R55 `client-reaches-server` (FE_CLIENT_REACHES_SERVER), the repository half of the eslint rule `client-no-server-import`,
  * which sees one hop from a file that carries the directive. The machine walks the resolved import graph from every module
- * whose first statement is the `"use client"` directive, over runtime edges only (a type-only import vanishes at build), and
+ * whose directive prologue contains `"use client"`, over runtime edges only (a type-only import vanishes at build), and
  * reports any reachable module (the entry itself included) that imports a server-only surface:
  *
  *   - `server-only`, `next/headers`, `next/server`, `next-intl/server`;
@@ -22,8 +22,11 @@ const NODE_BUILTINS = new Set(builtinModules.map(name => name.replace(/^node:/u,
 
 const isServerSpecifier = specifier => SERVER_MODULES.has(specifier) || specifier.startsWith('node:') || NODE_BUILTINS.has(specifier.split('/')[0]);
 const isClientEntry = (ts, file) => {
-  const first = file.sourceFile.statements[0];
-  return Boolean(first) && ts.isExpressionStatement(first) && ts.isStringLiteral(first.expression) && first.expression.text === 'use client';
+  for (const statement of file.sourceFile.statements) {
+    if (!ts.isExpressionStatement(statement) || !ts.isStringLiteral(statement.expression)) return false;
+    if (statement.expression.text === 'use client') return true;
+  }
+  return false;
 };
 
 const reachesBundle = (ts, declaration) => {
