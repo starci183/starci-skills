@@ -72,7 +72,7 @@ test("assigned-secret flags the required names and unquoted values, never config
     "- API_SECRET=s3cr3t-v4lu3-extra",
   ];
   for (const line of flagged)
-    assert.ok(secretHits("src/app.ts", line).includes("assigned-secret"), line);
+    assert.ok(secretHits(line.includes('"') ? "src/app.ts" : ".env", line).includes("assigned-secret"), line);
   const benign = [
     'PASSWORD_MIN_LENGTH = "16"',
     'SECRET_FILE = "averylongpathnamehere"',
@@ -409,4 +409,10 @@ test("an empty SOPS_AGE_KEY in secret.env refuses instead of falling back to key
   assert.match(result.err, /SOPS_AGE_KEY/);
   assert.equal(calls.length, 0, "no sops process launches");
   privateAbsent(result, [OTHER_KEY]);
+});
+
+test("assigned-secret ignores identifiers and types in TypeScript source (DI tokens, public error codes)", () => {
+  for (const line of ["readonly verifyAccessToken: VerifySupabaseAccessToken", "token: InjectionToken", "MODULE_OPTIONS_TOKEN: DATABASE_OPTIONS_TOKEN"])
+    assert.deepEqual(secretHits("src/file.ts", line), [], line);
+  assert.ok(secretHits(".env", "DB_PASSWORD=hunter2hunter2hunter2").includes("assigned-secret"));
 });
