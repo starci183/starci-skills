@@ -56,7 +56,7 @@ const isStrayTransport = (name) =>
 const GLOBAL_OBJECTS = new Set(["globalThis", "window", "self", "global"])
 
 /** The bare globals that open a connection. */
-const TRANSPORT_GLOBALS = new Set(["fetch", "Request", "EventSource", "XMLHttpRequest", "navigator"])
+const TRANSPORT_GLOBALS = new Set(["fetch", "Request", "EventSource", "WebSocket", "XMLHttpRequest", "navigator"])
 
 /** The static name of a member's property, else null. */
 const propertyName = (member) => {
@@ -64,43 +64,71 @@ const propertyName = (member) => {
   return member.property.type === "Literal" && typeof member.property.value === "string" ? member.property.value : null
 }
 
+/** The call of a value used directly as a callee, else null. */
+const calledBy = (node) => (node.parent?.type === "CallExpression" && node.parent.callee === node ? node.parent : null)
+
+/** True when a value is used directly as a constructor. */
+const constructedBy = (node) => node.parent?.type === "NewExpression" && node.parent.callee === node
+
+/** A use of one global transport, or null when the value does not open a connection. */
+const transportUse = (node, name) => {
+  if (name === "fetch") return { node, kind: "fetch", name, call: calledBy(node) }
+  // A reference may save the constructor for a later call. Native realtime has no FE owner, even in the API layer.
+  if (name === "WebSocket") return { node, kind: "websocket", name, call: null }
+  if ((name === "Request" || name === "EventSource") && constructedBy(node)) return { node, kind: "channel", name, call: null }
+  if (name === "XMLHttpRequest" && constructedBy(node)) return { node, kind: "xhr", name, call: null }
+  if (name !== "navigator") return null
+  const parent = node.parent
+  if (parent?.type !== "MemberExpression" || parent.object !== node || propertyName(parent) !== "sendBeacon") return null
+  return { node: parent, kind: "channel", name: "navigator.sendBeacon", call: calledBy(parent) }
+}
+
+/** References obtained by destructuring a global object; aliasing keeps the same transport ownership. */
+const destructuredTransports = (pattern) => {
+  const uses = []
+  for (const property of pattern.properties) {
+    if (property.type !== "Property") continue
+    let name = null
+    if (!property.computed && property.key.type === "Identifier") name = property.key.name
+    else if (property.key.type === "Literal") name = property.key.value
+    if (name !== "fetch" && name !== "WebSocket") continue
+    if (name === "fetch" && (property.computed || property.key.type !== "Identifier")) continue
+    uses.push(transportUse(property, name))
+  }
+  return uses
+}
+
+/** References reached through a global object, including static element access and destructuring. */
+const globalObjectTransports = (id) => {
+  const parent = id.parent
+  if (parent?.type === "MemberExpression" && parent.object === id) {
+    const use = transportUse(parent, propertyName(parent))
+    return use ? [use] : []
+  }
+  if (parent?.type === "VariableDeclarator" && parent.init === id && parent.id.type === "ObjectPattern") {
+    return destructuredTransports(parent.id)
+  }
+  return []
+}
+
 /**
  * Every use of a global transport in the file, found by scope resolution (an imported, declared or parameter `fetch` is not
  * one): `fetch` however it is reached (`fetch(...)`, `globalThis.fetch`, `window.fetch`, `const f = fetch`,
- * `const { fetch } = globalThis`), `new Request`, `new EventSource`, `navigator.sendBeacon`, `new XMLHttpRequest`.
+ * `const { fetch } = globalThis`), `new Request`, `new EventSource`, `navigator.sendBeacon`, `new XMLHttpRequest`,
+ * and a native `WebSocket` constructor reached directly or saved under another name.
  *
  * @param {object} context - The ESLint rule context.
- * @returns {Array<{ node: object, kind: "fetch" | "channel" | "xhr", name: string, call: object | null }>} The uses; `call` is the call of `fetch` when it is called there.
+ * @returns {Array<{ node: object, kind: "fetch" | "channel" | "websocket" | "xhr", name: string, call: object | null }>} The uses; `call` is the call of `fetch` when it is called there.
  */
 const transportUses = (context) => {
   const uses = []
-  const calledBy = (node) => (node.parent?.type === "CallExpression" && node.parent.callee === node ? node.parent : null)
-  const constructedBy = (node) => node.parent?.type === "NewExpression" && node.parent.callee === node
-  const classify = (node, name) => {
-    if (name === "fetch") uses.push({ node, kind: "fetch", name, call: calledBy(node) })
-    else if ((name === "Request" || name === "EventSource") && constructedBy(node)) uses.push({ node, kind: "channel", name, call: null })
-    else if (name === "XMLHttpRequest" && constructedBy(node)) uses.push({ node, kind: "xhr", name, call: null })
-    else if (name === "navigator" && node.parent?.type === "MemberExpression" && node.parent.object === node && propertyName(node.parent) === "sendBeacon") {
-      uses.push({ node: node.parent, kind: "channel", name: "navigator.sendBeacon", call: calledBy(node.parent) })
-    }
-  }
   for (const id of globalReferences(context, new Set([...TRANSPORT_GLOBALS, ...GLOBAL_OBJECTS]))) {
     // `typeof fetch` names the type of the function; it does not call it.
     if (id.parent?.type === "TSTypeQuery") continue
-    if (!GLOBAL_OBJECTS.has(id.name)) {
-      classify(id, id.name)
-      continue
-    }
-    const parent = id.parent
-    if (parent?.type === "MemberExpression" && parent.object === id) {
-      const name = propertyName(parent)
-      if (name !== null && TRANSPORT_GLOBALS.has(name)) classify(parent, name)
-    } else if (parent?.type === "VariableDeclarator" && parent.init === id && parent.id.type === "ObjectPattern") {
-      for (const property of parent.id.properties) {
-        if (property.type === "Property" && !property.computed && property.key.type === "Identifier" && property.key.name === "fetch") {
-          uses.push({ node: property, kind: "fetch", name: "fetch", call: null })
-        }
-      }
+    if (GLOBAL_OBJECTS.has(id.name)) uses.push(...globalObjectTransports(id))
+    else {
+      const use = transportUse(id, id.name)
+      if (use) uses.push(use)
     }
   }
   return uses
@@ -114,12 +142,13 @@ const transportUses = (context) => {
  * The API layer is every file of the slots `fe.modules.api`, `fe.transport.client`, `fe.transport.outcome` (an app's
  * `modules/api/`) and `fe.package.api*` (the shared api package): the Apollo clients and their links, the operations and the
  * REST calls. `@apollo/client` is imported there and nowhere else, `axios` only by its REST calls (`modules/api/rest/`),
- * `socket.io-client` only by `hooks/socketio/`. Every other file reaches the back end through an SWR hook over an operation.
+ * `socket.io-client` only by `hooks/socketio/`. Native `WebSocket` is refused everywhere, including the API layer.
+ * Every other file reaches the back end through an SWR hook over an operation.
  */
 export const fetchOnlyInApiClient = {
   meta: {
     type: "problem",
-    docs: { description: "`fetch` (and `Request`, `EventSource`, `sendBeacon`) lives in the API layer (`modules/api`); Apollo, axios and socket.io-client are imported only in their homes; no other HTTP library exists." },
+    docs: { description: "`fetch` (and `Request`, `EventSource`, `sendBeacon`) lives in the API layer (`modules/api`); native WebSocket is refused; Apollo, axios and socket.io-client are imported only in their homes; no other HTTP library exists." },
     schema: [],
     messages: {
       outside:
@@ -131,6 +160,7 @@ export const fetchOnlyInApiClient = {
       placed:
         "`{{name}}` is imported outside {{where}}, the one place the front-end stack gives it. A component or hook that holds the transport itself skips the link chain (token, locale, retry, timeout) and the one result vocabulary. Call an operation of `modules/api` through its SWR hook (`hooks/swr/`), or listen through `hooks/socketio/`.",
       xhr: "`XMLHttpRequest` is a second transport. Use an operation of the API layer (`modules/api`).",
+      websocket: "Native `WebSocket` is a second realtime transport. Use socket.io-client in `hooks/socketio/`, the front end's realtime owner.",
     },
   },
   create(context) {
@@ -147,6 +177,7 @@ export const fetchOnlyInApiClient = {
       "Program:exit"() {
         for (const use of transportUses(context)) {
           if (use.kind === "xhr") context.report({ node: use.node, messageId: "xhr" })
+          else if (use.kind === "websocket") context.report({ node: use.node, messageId: "websocket" })
           else if (layer) continue
           else if (use.kind === "fetch") context.report({ node: use.node, messageId: "outside" })
           else context.report({ node: use.node, messageId: "channel", data: { name: use.name } })
@@ -289,15 +320,28 @@ const isResponseLike = (context, node) => {
  * A parameter stands for the response status when its function is called in this file, and every call passes a response status in
  * that position: `const failureForResponse = (status: number) => ...` called as `failureForResponse(response.status)`.
  */
+const functionBinding = (fn) => {
+  if (fn.type === "FunctionDeclaration") return fn.id
+  if (fn.parent?.type === "VariableDeclarator" && fn.parent.init === fn) return fn.parent.id
+  return null
+}
+
 const isStatusParameter = (context, definition, depth) => {
   const fn = definition.node
   const index = fn.params?.findIndex((param) => param === definition.name || (param.type === "AssignmentPattern" && param.left === definition.name))
   if (index === undefined || index < 0) return false
-  const binding = fn.type === "FunctionDeclaration" ? fn.id : fn.parent?.type === "VariableDeclarator" && fn.parent.init === fn ? fn.parent.id : null
+  const binding = functionBinding(fn)
   if (!binding || binding.type !== "Identifier") return false
   const variable = variableOf(context, binding)
   const calls = (variable?.references ?? []).map((reference) => reference.identifier.parent).filter((parent) => parent?.type === "CallExpression" && parent.callee.type === "Identifier" && parent.callee.name === binding.name)
   return calls.length > 0 && calls.every((call) => call.arguments[index] !== undefined && isResponseStatus(context, call.arguments[index], depth + 1))
+}
+
+/** The static name or value of an object property key. */
+const keyValue = (key) => {
+  if (key?.type === "Identifier") return key.name
+  if (key?.type === "Literal") return key.value
+  return null
 }
 
 const isResponseStatus = (context, node, depth = 0) => {
@@ -307,15 +351,14 @@ const isResponseStatus = (context, node, depth = 0) => {
   if (expression.type !== "Identifier") return false
   const definition = variableOf(context, expression)?.defs[0]
   if (definition?.type === "Parameter") return isStatusParameter(context, definition, depth)
-  if (!definition || definition.type !== "Variable") return false
+  if (definition?.type !== "Variable") return false
   const declarator = definition.node
   if (declarator.id === definition.name) return declarator.init ? isResponseStatus(context, declarator.init, depth + 1) : false
   if (declarator.id.type !== "ObjectPattern" || !declarator.init) return false
   const bound = declarator.id.properties.find(
     (property) => property.type === "Property" && (property.value === definition.name || (property.value.type === "AssignmentPattern" && property.value.left === definition.name)),
   )
-  const key = bound?.key
-  const keyName = key?.type === "Identifier" ? key.name : key?.type === "Literal" ? key.value : null
+  const keyName = keyValue(bound?.key)
   return keyName === "status" && isResponseLike(context, unwrap(declarator.init.type === "AwaitExpression" ? declarator.init.argument : declarator.init))
 }
 
@@ -341,6 +384,21 @@ const numbersOf = (context, node, depth = 0) => {
  * The status codes a test is true for, when it is a plain status comparison: `status === 401`, `a || b` of such, or a literal list
  * containing the status (`[401, 403].includes(status)`, `new Set([401, 403]).has(status)`). Null for anything else.
  */
+const comparedCodes = (context, expression) => {
+  for (const [side, other] of [[expression.left, expression.right], [expression.right, expression.left]]) {
+    const literal = unwrap(other)
+    if (literal?.type === "Literal" && typeof literal.value === "number" && isResponseStatus(context, side)) return new Set([literal.value])
+  }
+  return null
+}
+
+const includedCodes = (context, expression) => {
+  if (expression.callee.type !== "MemberExpression" || expression.arguments.length !== 1) return null
+  const method = propertyName(expression.callee)
+  if ((method === "includes" || method === "has") && isResponseStatus(context, expression.arguments[0])) return numbersOf(context, expression.callee.object)
+  return null
+}
+
 const codesOf = (context, test) => {
   const expression = unwrap(test)
   if (!expression) return null
@@ -350,17 +408,19 @@ const codesOf = (context, test) => {
     return left && right ? new Set([...left, ...right]) : null
   }
   if (expression.type === "BinaryExpression" && (expression.operator === "===" || expression.operator === "==")) {
-    for (const [side, other] of [[expression.left, expression.right], [expression.right, expression.left]]) {
-      const literal = unwrap(other)
-      if (literal?.type === "Literal" && typeof literal.value === "number" && isResponseStatus(context, side)) return new Set([literal.value])
-    }
-    return null
+    return comparedCodes(context, expression)
   }
-  if (expression.type === "CallExpression" && expression.callee.type === "MemberExpression" && expression.arguments.length === 1) {
-    const method = propertyName(expression.callee)
-    if ((method === "includes" || method === "has") && isResponseStatus(context, expression.arguments[0])) return numbersOf(context, expression.callee.object)
-  }
+  if (expression.type === "CallExpression") return includedCodes(context, expression)
   return null
+}
+
+/** A single node that spells the refused kind in an outcome property or constructor call. */
+const namesRefused = (node) => {
+  if (node.type === "Property" && !node.computed) {
+    const value = unwrap(node.value)
+    return keyValue(node.key) === "kind" && value?.type === "Literal" && value.value === "refused"
+  }
+  return node.type === "CallExpression" && node.arguments[0]?.type === "Literal" && node.arguments[0].value === "refused"
 }
 
 /** True when a subtree builds an outcome of kind `"refused"`: an object whose `kind` is that literal, or a call whose first argument is it. */
@@ -368,18 +428,12 @@ const buildsRefused = (node) => {
   let found = false
   const visit = (current) => {
     if (found || !current || typeof current.type !== "string") return
-    if (current.type === "Property" && !current.computed) {
-      const key = current.key
-      const named = (key.type === "Identifier" && key.name === "kind") || (key.type === "Literal" && key.value === "kind")
-      const value = unwrap(current.value)
-      if (named && value?.type === "Literal" && value.value === "refused") found = true
-    }
     // A constructor of the Outcome vocabulary named by its kind: `failed("refused", { ... })`.
-    if (current.type === "CallExpression" && current.arguments[0]?.type === "Literal" && current.arguments[0].value === "refused") found = true
+    if (namesRefused(current)) found = true
     for (const [name, child] of Object.entries(current)) {
       if (name === "parent") continue
       if (Array.isArray(child)) child.forEach(visit)
-      else if (child && typeof child.type === "string") visit(child)
+      else if (typeof child?.type === "string") visit(child)
     }
   }
   visit(node)
@@ -460,6 +514,19 @@ const isEmptyValue = (node) => {
  * `!res.ok`, `res.ok === false`, `res.ok !== true` and, since a status compare is the same collapse
  * spelled with a number, `res.status !== 200`, `res.status >= 400` or `res.status === 404`.
  */
+const booleanFailureSubject = (side, other, operator) => {
+  const subject = okSubject(side)
+  if (!subject || other.type !== "Literal") return null
+  if ((operator === "===" || operator === "==") && other.value === false) return subject
+  if ((operator === "!==" || operator === "!=") && other.value === true) return subject
+  return null
+}
+
+const statusFailureSubject = (side, other) => {
+  const isStatus = side.type === "MemberExpression" && !side.computed && side.property.name === "status"
+  return isStatus && other.type === "Literal" && typeof other.value === "number" ? side.object : null
+}
+
 const failureSubject = (test) => {
   if (test.type === "UnaryExpression" && test.operator === "!") return okSubject(test.argument)
   if (test.type !== "BinaryExpression") return null
@@ -467,14 +534,11 @@ const failureSubject = (test) => {
     [test.left, test.right],
     [test.right, test.left],
   ]) {
-    const subject = okSubject(side)
-    if (subject && other.type === "Literal") {
-      if ((test.operator === "===" || test.operator === "==") && other.value === false) return subject
-      if ((test.operator === "!==" || test.operator === "!=") && other.value === true) return subject
-    }
-    const isStatus = side.type === "MemberExpression" && !side.computed && side.property.name === "status"
-    if (isStatus && other.type === "Literal" && typeof other.value === "number") {
-      if (side === test.left) return side.object
+    const subject = booleanFailureSubject(side, other, test.operator)
+    if (subject) return subject
+    if (side === test.left) {
+      const status = statusFailureSubject(side, other)
+      if (status) return status
     }
   }
   return null
@@ -485,7 +549,7 @@ const bodyStatements = (node) => (node.type === "BlockStatement" ? node.body : [
 
 /** True when a subtree mentions a status, an Outcome reason or kind, or the tested value itself, so it can tell the failures apart. */
 const inspectsResponse = (text, subjectName) =>
-  /\bstatus\b|\.(?:reason|kind)\b/.test(text) || (subjectName !== null && new RegExp(`\\b${subjectName}\\b`).test(text))
+  /\bstatus\b|\.(?:reason|kind)\b/.test(text) || (subjectName !== null && new RegExp(String.raw`\b${subjectName}\b`).test(text))
 
 /** A failure (a non-ok HTTP response or a failed `Outcome`) is not one branch, and never `null`: its reason survives to the screen. */
 export const noFailureCollapse = {

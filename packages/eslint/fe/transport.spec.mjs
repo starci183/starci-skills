@@ -21,7 +21,7 @@ import {
   outcomeKindsExhaustive,
   rules,
 } from "./transport.mjs"
-import { LITE_FE_DECLARATION, at, slotTester, typedTester } from "./fixtures/typed/tester.mjs"
+import { LITE_FE_DECLARATION, at, fixtureHfs, slotTester, typedTester } from "./fixtures/typed/tester.mjs"
 
 // Rules that read the slot of the file (fetch-only-in-api-client, ...) run under the fixture repository: two apps and the
 // shared packages, so `at("apps/web/...")` is an app file and `at("packages/shop-api/...")` the shared api package.
@@ -48,7 +48,7 @@ const SWR_HOOK = at("apps/web/src/hooks/swr/api/graphql/queries/useQueryCourseSw
 const SOCKETS = at("apps/web/src/hooks/socketio/sockets.ts")
 
 test("every rule this law declares is a rule", () => {
-  for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
+  for (const [name, rule] of Object.entries(rules)) assert.ok(rule?.meta && rule.create, `${name} is not a rule`)
 })
 
 test("FE-TRANSPORT-1: fetch is reached in the API layer and nowhere else; Apollo, axios and socket.io-client only in their homes", () => {
@@ -138,6 +138,48 @@ test("FE-TRANSPORT-1: fetch is reached in the API layer and nowhere else; Apollo
     ],
   })
 })
+
+// proves: FE_TRANSPORT_OWNER@lite, FE_TRANSPORT_OWNER@full
+test("FE_TRANSPORT_OWNER: native WebSocket is refused and socket.io-client belongs to hooks/socketio in lite and full", () => {
+  for (const edition of ["lite", "full"]) {
+    const declaration = edition === "lite" ? LITE_FE_DECLARATION : undefined
+    const settings = { starci: { hfs: fixtureHfs(declaration, { lite: edition === "lite" }) } }
+    const run = new RuleTester({ languageOptions: testerConfig(), settings })
+    run.run("fetch-only-in-api-client", fetchOnlyInApiClient, {
+      valid: [
+        { filename: SOCKETS, code: 'import { io } from "socket.io-client"; const socket = io(url)' },
+        { filename: SOCKETS, code: 'const { io } = await import("socket.io-client")' },
+        { filename: SOCKETS, code: 'export { io } from "socket.io-client"' },
+        { filename: CLIENT, code: "const r = await fetch(url, { signal })" },
+        // Scope resolution keeps local constructors and unrelated object properties out of the native-global rule.
+        { filename: HOOK, code: 'import { WebSocket } from "./socket"; new WebSocket(url)' },
+        { filename: HOOK, code: "const connect = (WebSocket) => new WebSocket(url)" },
+        { filename: HOOK, code: "const socket = new client.WebSocket(url)" },
+        { filename: HOOK, code: "const window = client; new window.WebSocket(url)" },
+        { filename: SOCKETS, code: "type Socket = WebSocket; type Constructor = typeof WebSocket" },
+      ],
+      invalid: [
+        { filename: HOOK, code: "const socket = new WebSocket(url)", errors: [{ messageId: "websocket" }] },
+        { filename: CLIENT, code: "const socket = new WebSocket(url)", errors: [{ messageId: "websocket" }] },
+        { filename: SOCKETS, code: "const socket = new WebSocket(url)", errors: [{ messageId: "websocket" }] },
+        { filename: CLIENT, code: "const socket = new globalThis.WebSocket(url)", errors: [{ messageId: "websocket" }] },
+        { filename: HOOK, code: "const socket = new window.WebSocket(url)", errors: [{ messageId: "websocket" }] },
+        { filename: HOOK, code: 'const socket = new self["WebSocket"](url)', errors: [{ messageId: "websocket" }] },
+        { filename: SOCKETS, code: "const NativeSocket = WebSocket; new NativeSocket(url)", errors: [{ messageId: "websocket" }] },
+        { filename: CLIENT, code: "const NativeSocket = global.WebSocket; new NativeSocket(url)", errors: [{ messageId: "websocket" }] },
+        { filename: HOOK, code: "const { WebSocket: NativeSocket } = globalThis; new NativeSocket(url)", errors: [{ messageId: "websocket" }] },
+        { filename: CLIENT, code: 'const { ["WebSocket"]: NativeSocket } = window; new NativeSocket(url)', errors: [{ messageId: "websocket" }] },
+        { filename: HOOK, code: 'import { io } from "socket.io-client"', errors: [{ messageId: "placed" }] },
+        { filename: CLIENT, code: 'const { io } = await import("socket.io-client")', errors: [{ messageId: "placed" }] },
+        { filename: SWR_HOOK, code: 'export * from "socket.io-client"', errors: [{ messageId: "placed" }] },
+      ],
+    })
+  }
+})
+
+function testerConfig() {
+  return { parser: tsParser, ecmaVersion: 2022, sourceType: "module" }
+}
 
 test("FE-TRANSPORT-2: every fetch of the API layer carries an abort signal", () => {
   slots.run("client-fetch-has-signal", clientFetchHasSignal, {
