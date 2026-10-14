@@ -11,6 +11,7 @@ export function legacyCoverageRule(rule) {
 }
 
 export function coverageRuleFindingLevel(rule, code) {
+  if (code === 'RT_COVERAGE_NO_ENFORCER') return 'error';
   if (legacyCoverageRule(rule)) return 'warning';
   if (!REPORT_ONLY_CODES.includes(code)) return 'error';
   return ruleNumber(rule) >= 247 && ruleNumber(rule) <= 292 ? 'error' : 'warning';
@@ -40,6 +41,7 @@ function findingReferences(finding, context, index) {
 export function applyCoverageRatchet(context, findings) {
   const index = referenceIndex(context.catalog.rules);
   return findings.map((finding) => {
+    if (finding.code === 'RT_COVERAGE_NO_ENFORCER') return { ...finding, level: 'error' };
     const references = findingReferences(finding, context, index);
     const rules = references.map((reference) => index.get(reference));
     const legacy = rules.length > 0 && rules.every((rule) => rule && legacyCoverageRule(rule));
