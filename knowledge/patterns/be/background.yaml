@@ -49,12 +49,14 @@ rules:
       manual: []
     relatedExamples: []
   - id: BE-BACKGROUND-2
-    title: Every sweep has a runner
+    title: Every background task has a runner
     kind: mandatory
     hfsRules: [R46]
     requirement: |-
-      A method named `sweep*`, `deliver*`, `reconcile*`, `retry*` or `relay*` must be reachable from a consumer or a processor that an
-      app composes. A method with no runner is a finding even when it is tested, because durable recovery that nothing invokes
+      A job processor, scheduler, saga or event handler (including a consumer), and methods called from it directly or
+      transitively, are background work. Its runner must be composed by an app of kind `worker` or `api`. Resolvers and
+      controllers are never background; method names such as `retry*` or `replay*` alone do not establish background work.
+      A background method with no runner is a finding even when it is tested, because durable recovery that nothing invokes
       does not recover anything.
     rationale: |-
       A built and unit-tested sweep or reconcile that nothing schedules gives the false impression of durable recovery.

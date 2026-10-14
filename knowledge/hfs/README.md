@@ -464,8 +464,10 @@ Background work is a transport. `transport/message/<event>.consumer.ts` (an `Eve
 `features/jobs/<job>/transport/queue/<job>.processor.ts` (a `FencedProcessor` of `platform/jobs`) dispatch one command exactly as a resolver does.
 Mechanisms live in `platform/event-bus` (Kafka behind a transactional outbox, with inbox, retry and dead letter), `platform/queue`
 (BullMQ with the outbox relay and job schedulers) and `platform/jobs` (the fencing token). An app of kind `api` or `worker`
-composes them; `@Cron`, `@Interval` and `@Timeout` exist nowhere, a schedule is a BullMQ job scheduler. A method named
-`sweep*`, `deliver*`, `reconcile*`, `retry*` or `relay*` that no processor or consumer calls is a failure. A domain service
+composes them; `@Cron`, `@Interval` and `@Timeout` exist nowhere, a schedule is a BullMQ job scheduler. R46 identifies background
+work by job processor, scheduler, saga or event-handler context (including consumers), and follows methods called from it
+directly or transitively. A background runner that no api or worker app composes is a failure. Resolvers and controllers are
+never background; method names such as `retry*` or `replay*` alone do not establish background work. A domain service
 publishes `eventBus.publish(event, tx)` or enqueues `enqueueX(payload, tx)` inside its own transaction (knowledge/patterns/be/event-bus.yaml, queues.yaml, jobs.yaml).
 
 ### 5.8 Modules, features and injection (R29 to R33, R45, R85, R87, R88)
