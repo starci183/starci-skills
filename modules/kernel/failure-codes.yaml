@@ -18760,6 +18760,7 @@ BE_APP_MODULE_LIST_INLINE:
     - "Danh sách ghép nối được đặt trong biến của module gốc để tránh nhóm compose"
   nextStep_vi: "Chuyển danh sách vào nhóm có kiểu trong compose/<area>.ts rồi spread nhóm trong app.module.ts; chỉ giữ guard và filter toàn ứng dụng tại module gốc."
   owner: op-retry
+  kind: check-finding
 HFS_AGE_KEY_CUSTODY:
   title: "A tracked file holds the sops/age identity"
   title_vi: "Khoá age/sops bị commit trong kho"
