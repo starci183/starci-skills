@@ -18418,5 +18418,44 @@ FE_CALLBACK_SHAPE:
     - "Callback gọi operation API hoặc xử lý dữ liệu sản phẩm"
     - "Callback trả JSON hoặc định nghĩa thêm handler"
   nextStep_vi: "Giữ callback ở việc đọc mã, tạo client xác thực, đổi mã và chuyển hướng; chuyển logic sản phẩm về back end hoặc hook phù hợp."
+HFS_UNUSED_SYMBOL:
+  title: "An enum member, queue constant, error code or catalog key has no production consumer"
+  title_vi: "Ký hiệu không có nơi dùng trong mã chạy thực tế"
+  meaning_vi: "Thành viên enum, hằng hàng đợi, mã lỗi hoặc khóa danh mục được khai báo nhưng không được mã chạy thực tế sử dụng; bảng mô tả lỗi và tham chiếu chỉ trong kiểm thử không đủ."
+  causes_vi:
+    - "Ký hiệu còn sót lại sau khi xóa hoặc đổi luồng nghiệp vụ."
+    - "Import namespace hoặc bảng ánh xạ che mất ký hiệu không còn dùng."
+  nextStep_vi: "Xóa ký hiệu và ánh xạ thừa, hoặc nối nó vào luồng chạy thực tế nếu nghiệp vụ vẫn cần."
+  owner: op-retry
+  kind: check-finding
+
+HFS_ASSET_OVERSIZE:
+  title: "A back-end build asset exceeds its per-file byte budget"
+  title_vi: "Tệp tài nguyên back end vượt giới hạn dung lượng"
+  meaning_vi: "Tệp tài nguyên dùng lúc dựng back end lớn hơn giới hạn từng tệp; mặc định là 512000 byte. Tệp lớn phải nằm trong kho đối tượng và được tải lúc chạy."
+  causes_vi:
+    - "Đưa tệp lớn vào be/src/assets thay vì kho đối tượng."
+  nextStep_vi: "Giảm dung lượng tài nguyên dựng hoặc chuyển tệp lớn sang kho đối tượng rồi tải lúc chạy."
+  owner: op-retry
+  kind: check-finding
+
+HFS_ASSET_KIND:
+  title: "A back-end asset has a forbidden kind or location"
+  title_vi: "Loại hoặc vị trí tài nguyên back end bị cấm"
+  meaning_vi: "Back end chỉ giữ tài nguyên dựng nhỏ thuộc danh sách phần mở rộng cho phép. Media nghiệp vụ ở kho đối tượng; trọng số mô hình và bộ dữ liệu không được đưa vào Git. Media tài liệu theo slot vẫn hợp lệ."
+  causes_vi:
+    - "Đưa ảnh, âm thanh hoặc video nghiệp vụ vào mã back end."
+    - "Đưa trọng số mô hình, bộ dữ liệu hoặc loại tệp ngoài danh sách vào tài nguyên dựng."
+  nextStep_vi: "Chuyển media sang kho đối tượng và bỏ trọng số mô hình, bộ dữ liệu khỏi cây back end; giữ tài nguyên dựng nhỏ đúng slot và loại tệp."
+  owner: op-retry
+  kind: check-finding
+
+HFS_APP_LEXICON:
+  title: "App source or documentation uses a removed product word"
+  title_vi: "Mã hoặc tài liệu dùng từ sản phẩm đã bỏ"
+  meaning_vi: "Tệp nguồn hoặc tài liệu dùng từ nằm trong hfs.json lexicon.removed, kể cả trong tên định danh, chú thích và nội dung giao diện."
+  causes_vi:
+    - "Đổi thuật ngữ sản phẩm nhưng chưa cập nhật toàn bộ mã và tài liệu."
+  nextStep_vi: "Thay từ đã bỏ bằng thuật ngữ sản phẩm hiện hành tại đường dẫn và dòng được báo."
   owner: op-retry
   kind: check-finding

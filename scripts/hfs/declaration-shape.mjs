@@ -73,13 +73,33 @@ function declarationSideProblems(side, value, names) {
   return bad;
 }
 
-const DECLARATION_KEYS = new Set(['hfs', 'kind', 'project', 'edition', 'supabase', 'sides', 'browser']);
+/** Product vocabulary is a declaration, never a switch for a rule. */
+function lexiconBlockProblems(lexicon) {
+  if (lexicon === undefined) return [];
+  if (!isPlainObject(lexicon)) return ['lexicon must be an object'];
+  const bad = [];
+  for (const key of Object.keys(lexicon)) if (key !== 'removed') bad.push(`lexicon has unknown key ${key}`);
+  if (isBadUniqueList(lexicon.removed, (word) => typeof word === 'string' && word.trim().length > 0)) bad.push('lexicon.removed must be a unique list of nonempty words');
+  return bad;
+}
+
+/** Front-end error reporting remains optional in both editions. */
+function observeBlockProblems(observe) {
+  if (observe === undefined) return [];
+  if (!isPlainObject(observe)) return ['observe must be an object'];
+  const bad = [];
+  for (const key of Object.keys(observe)) if (key !== 'reporter') bad.push(`observe has unknown key ${key}`);
+  if (observe.reporter !== undefined && (typeof observe.reporter !== 'string' || !observe.reporter.trim())) bad.push('observe.reporter must name the optional error reporter');
+  return bad;
+}
+
+const DECLARATION_KEYS = new Set(['hfs', 'kind', 'project', 'edition', 'supabase', 'sides', 'browser', 'lexicon', 'observe']);
 const RUNTIME_DECLARATION_KEYS = new Set(['hfs', 'kind', 'project']);
 
 function productDeclarationProblems(declaration, profiles) {
   const bad = [];
   for (const key of Object.keys(declaration)) if (!DECLARATION_KEYS.has(key)) bad.push(`unknown key ${key}`);
-  bad.push(...supabaseBlockProblems(declaration.supabase));
+  bad.push(...supabaseBlockProblems(declaration.supabase), ...lexiconBlockProblems(declaration.lexicon), ...observeBlockProblems(declaration.observe));
   if (declaration.browser !== undefined && declaration.browser !== true) bad.push('browser is `true` when the app has a browser journey (slot app.browser), and is left out otherwise');
   if (declaration.kind !== APP_KIND) bad.push(`kind must be ${APP_KIND} (a product is one app repository with a be and an fe side) or ${RUNTIME_KIND} (the StarCi runtime repository)`);
   if (!isPlainObject(declaration.sides) || Object.keys(declaration.sides).sort(byCodeUnit).join() !== profiles.join()) { bad.push('sides must declare exactly be and fe'); return bad; }

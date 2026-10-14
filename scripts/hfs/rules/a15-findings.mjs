@@ -4,6 +4,9 @@
 // A finder judges its own edition (`repo.edition`): lite and full are both in scope unless the rule says otherwise.
 // finders-import-begin
 import { featureFileFindings } from './feature-files.mjs';
+import { lexiconFindings } from './lexicon.mjs';
+import { assetsFindings } from './assets.mjs';
+import { unusedSymbolFindings } from './unused-symbol.mjs';
 // finders-import-end
 
 /** The failure codes the finders above emit, so `starci app check` ships their labels (check.mjs adds them to CHECK_CODES). Append-only; the coordinator regenerates it at merge time. */
@@ -16,6 +19,9 @@ export const A15_CODES = [
 export const FINDERS = [
   // finders-begin
   featureFileFindings,
+  lexiconFindings,
+  assetsFindings,
+  unusedSymbolFindings,
   // finders-end
 ];
 
@@ -23,3 +29,6 @@ export const FINDERS = [
 export function a15Findings(context) {
   return FINDERS.flatMap((finder) => finder(context));
 }
+
+/** Codes emitted by the finders (coordinator-managed). */
+export const A15_CODES = [];

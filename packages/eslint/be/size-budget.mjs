@@ -4,7 +4,8 @@
  * A source file has a hard-growth budget of `fileLines.hardGrowth` lines (`ruleParams.be.fileLines` of the
  * slot manifest, read through `settings.starci.hfs`, see `lib/hfs.mjs`). `file-size-growth` is the ratchet and fails only on a file that must not
  * be this long: a NEW file over the budget, or an existing file over the budget that is longer than its recorded size.
- * The recorded size is the file's line count at the parent commit (`git show HEAD:<file>`). A file may stay as large
+ * The recorded size is the file's line count at `merge-base HEAD <base>` (STARCI_BASE_REF, origin/main, then main).
+ * Only staged lint text in a commit hook is compared with HEAD. An unavailable baseline is reported. A file may stay as large
  * as it is; it may not grow, and it may not be born large. The rule takes no option: the budget is the manifest's, the
  * baseline is git's.
  *
@@ -33,7 +34,8 @@ export const fileSizeGrowth = {
         schema: [],
         messages: {
             born: "This new file has {{lines}} lines, over the budget of {{max}}. A new file starts within the budget: split it by responsibility.",
-            grew: "This file has {{lines}} lines, over the budget of {{max}}, and it was {{recorded}} at the parent commit. A file over the budget may not grow: move the new code into its own file.",
+            grew: "This file has {{lines}} lines, over the budget of {{max}}, and it was {{recorded}} at the recorded revision. A file over the budget may not grow: move the new code into its own file.",
+            unavailable: "The recorded size of this over-budget file is unavailable. Make STARCI_BASE_REF, origin/main or main and its merge-base history available before linting.",
         },
     },
     create(context) {
@@ -43,11 +45,13 @@ export const fileSizeGrowth = {
         const max = hardGrowthLines(hfs.ruleParams.fileLines)
         return {
             "Program:exit"(node) {
-                const lines = lineCount((context.sourceCode || context.getSourceCode()).text)
+                const source = (context.sourceCode || context.getSourceCode()).text
+                const lines = lineCount(source)
                 if (lines <= max) return
-                const recorded = recordedLines(filename)
+                const recorded = recordedLines(filename, { source })
                 const loc = { line: 1, column: 0 }
-                if (recorded === null) context.report({ node, loc, messageId: "born", data: { lines, max } })
+                if (recorded === "unavailable") context.report({ node, loc, messageId: "unavailable" })
+                else if (recorded === null) context.report({ node, loc, messageId: "born", data: { lines, max } })
                 else if (lines > recorded) context.report({ node, loc, messageId: "grew", data: { lines, max, recorded } })
             },
         }

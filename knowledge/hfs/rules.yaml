@@ -2264,3 +2264,27 @@ rules:
     failureCodes: ["FE_CALLBACK_SHAPE"]
     enforcers:
       - {kind: eslint-fe, id: callback-shape}
+  - id: R280
+    code: "HFS_UNUSED_SYMBOL"
+    law: "Every enum member, queue constant, error code and catalog key has a production consumer; an error's kind or message mapping and a test-only reference do not keep a dead symbol alive. Namespace imports consume the members actually read."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_UNUSED_SYMBOL"]
+    enforcers:
+      - {kind: hfs, id: unused-symbol, at: scripts/hfs/rules/unused-symbol.mjs}
+  - id: R282
+    code: "HFS_ASSET_OVERSIZE"
+    law: "Back-end build assets stay within the per-file asset budget (512000 bytes by default) and the build-asset extension allowlist; ordinary media lives in object storage, and model weights and datasets are never tracked in the back end. Declared documentation media remains allowed."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_ASSET_OVERSIZE", "HFS_ASSET_KIND"]
+    enforcers:
+      - {kind: hfs, id: assets, at: scripts/hfs/rules/assets.mjs}
+  - id: R283
+    code: "HFS_APP_LEXICON"
+    law: "An app's source and documentation use the current product vocabulary: a word declared in hfs.json lexicon.removed is refused as a whole word or identifier segment, in both editions."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_APP_LEXICON"]
+    enforcers:
+      - {kind: hfs, id: lexicon, at: scripts/hfs/rules/lexicon.mjs}
