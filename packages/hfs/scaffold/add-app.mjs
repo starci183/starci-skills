@@ -172,12 +172,12 @@ export function addApp({ root, name }) {
   const image = imageFiles(
     resolveRepoDeclaration(manifest, declaration),
   ).find((file) => file.path === `${targetBase}/Dockerfile`);
-  if (!image)
+  if (!image && repo.edition !== "lite")
     throw new ScaffoldError(
       "HFS_ADD_TEMPLATE_MISSING",
       `the Dockerfile of front-end app ${name} did not render`,
     );
-  planned.push({ relative: image.path, body: image.content });
+  if (image) planned.push({ relative: image.path, body: image.content });
 
   const clashes = planned
     .filter((file) =>

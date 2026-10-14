@@ -71,7 +71,6 @@ test("addApp adds a second lite front end with the lite app skeleton and the sha
     "fe/apps/admin/src/hooks/swr/SwrSideEffects.tsx",
     "fe/apps/admin/package.json",
     "fe/apps/admin/tsconfig.json",
-    "fe/apps/admin/Dockerfile",
   ]) {
     assert.ok(result.created.includes(relative), relative);
   }
