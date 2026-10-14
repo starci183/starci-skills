@@ -23,7 +23,7 @@ test('a Next image creates its public folder in the build stage, before the runt
 });
 
 test('every image of a lite back end copies the generated Supabase types after the sources, and a full back end image never does', () => {
-  const lite = imageFiles(declared('lite-app'));
+  const lite = imageFiles(declared('lite-app')).filter((file) => file.path.startsWith('be/'));
   assert.deepEqual(lite.map((image) => image.path), ['be/apps/api/Dockerfile', 'be/apps/cli/Dockerfile']);
   for (const image of lite) {
     const text = lines(image.content);

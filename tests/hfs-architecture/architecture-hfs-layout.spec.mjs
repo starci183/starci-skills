@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { checkHfsWithoutConfig, checkRepoPresentation } from '../../scripts/hfs/architecture/hfs.mjs';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 
 // The tree rules of the HFS machine (knowledge/hfs/README.md) over a side folder of an app, judged as the root it was when products
 // were split in two repositories: HFS_APPS_REQUIRED, HFS_APP_LAYOUT_INVALID, HFS_ROOT_ENTRY_MISSING, HFS_ROOT_ENTRY_FORBIDDEN,
@@ -20,7 +21,7 @@ const ROOT_BE = { ...APP_ROOT, 'eslint.config.mjs': 'export default [];\n', 'tsc
 const run = (t, profile, files) => runArch(archFixture(t, { profile, files }));
 /** The app-root tree findings over the app whose side folder `side` is. */
 const rootRun = (t, files) => checkHfsWithoutConfig(path.dirname(archFixture(t, { profile: 'fe', files })));
-const ids = (report, id) => findings(report, id).map(item => item.path).sort();
+const ids = (report, id) => findings(report, id).map(item => item.path).sort(byCodeUnit);
 
 test('HFS_APPS_REQUIRED: a side with no apps/ directory is a finding; one application under apps/ is not', t => {
   const none = run(t, 'fe', { 'apps/web/src/app/.keep': null, 'apps/web/package.json': null, 'src/.keep': '' });
@@ -84,10 +85,13 @@ test('HFS_ROOT_MARKDOWN_FORBIDDEN: an app-root Markdown file other than README.m
 
 // The app layout, the root allowlist and the tests/ children are read from the slots (knowledge/hfs/slots.yaml), not from a list in the check.
 const CLI_APPS = [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }];
-const CORE_FILES = {};
+const CORE_FILES = {
+  'apps/core/src/core.env.ts': 'export interface CoreEnv {}\n',
+  'apps/cli/src/cli.env.ts': 'export interface CliEnv {}\n',
+};
 const withCli = (t, files) => runArch(archFixture(t, { profile: 'be', apps: CLI_APPS, declaration: { connections: [{ name: 'primary', envPrefix: 'PRIMARY', owner: 'core', isolation: 'database' }] }, files: { ...ROOT_BE, ...CORE_FILES, ...files } }));
 
-test('HFS_APP_LAYOUT_INVALID: the cli app needs main.ts and app.module.ts, like an api app', t => {
+test('HFS_APP_LAYOUT_INVALID: the cli app needs main.ts, app.module.ts and its typed env, like an api app', t => {
   const cli = withCli(t, { 'apps/cli/src/main.ts': 'void 0;\n', 'apps/cli/src/app.module.ts': 'export {};\n' });
   assert.deepEqual(ids(cli, 'HFS_APP_LAYOUT_INVALID'), []);
   const incomplete = withCli(t, { 'apps/cli/src/main.ts': 'void 0;\n' });
@@ -96,6 +100,9 @@ test('HFS_APP_LAYOUT_INVALID: the cli app needs main.ts and app.module.ts, like 
   const api = withCli(t, { 'apps/cli/src/main.ts': 'void 0;\n', 'apps/cli/src/app.module.ts': 'export {};\n', 'apps/core/src/app.module.ts': null });
   assert.deepEqual(ids(api, 'HFS_APP_LAYOUT_INVALID'), ['apps/core']);
   assert.match(findings(api, 'HFS_APP_LAYOUT_INVALID')[0].message, /app\.module\.ts/);
+  const noEnv = withCli(t, { 'apps/cli/src/main.ts': 'void 0;\n', 'apps/cli/src/app.module.ts': 'export {};\n', 'apps/cli/src/cli.env.ts': null });
+  assert.deepEqual(ids(noEnv, 'HFS_APP_LAYOUT_INVALID'), ['apps/cli']);
+  assert.match(findings(noEnv, 'HFS_APP_LAYOUT_INVALID')[0].message, /cli\.env\.ts/);
 });
 
 test('HFS_ROOT_ENTRY_FORBIDDEN: contracts/ (slot be.contract.graphql) is a be side entry; an entry no slot names is still a finding', t => {
