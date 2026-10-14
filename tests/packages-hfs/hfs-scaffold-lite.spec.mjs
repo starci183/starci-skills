@@ -22,7 +22,7 @@ const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 // The lite starter's exact file-level output, with <ts> fixed by CREATED_AT. Its brand tree is optional. The web app carries the
 // shared app core of both editions (owner ruling 2026-10-13): no modules/db, no Server Action and no auth callback route.
 const EXPECTED_LITE_FILES = Object.freeze([
-  '.dockerignore', '.editorconfig', '.gitattributes', '.github/workflows/ci.yml', '.github/workflows/db-deploy.yml',
+  '.dockerignore', '.editorconfig', '.gitattributes', '.github/dependabot.yml', '.github/workflows/ci.yml', '.github/workflows/db-deploy.yml',
   '.github/workflows/images.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.nvmrc', '.prettierignore',
   '.prettierrc', '.sops.yaml', '.starcistacks/dev/environment.json', '.starcistacks/dev/secrets/.gitkeep',
   '.starciwork/.gitignore', '.starciwork/workspace.yaml',

@@ -4,7 +4,8 @@
 // kind app, CI, the hooks, the formatter and Sonar configuration and .starciwork; its sides be/ and fe/ hold each side's tool
 // configuration. The managed set is read from the slot manifest (knowledge/hfs/slots.yaml): every slot that names `managedBy`
 // lists, in its `path`, the whole files sync renders, and `managedBy` names the template directory they are rendered from:
-// templates/<scope or common>/<managedBy>/<file path with each leading dot dropped>, the scope being app for a root slot and the
+// templates/<scope or common>/<managedBy>/<file path with each leading dot dropped>, with dotted skeleton paths tried when no
+// undotted template exists. The scope is app for a root slot and the
 // side (be, fe) for a side slot, whose files land under that side's folder. Two targets are not whole files of a managedBy slot
 // and are listed in this module: the marked block of the root .gitignore, and .starciwork/.gitignore, which lives inside the
 // .starciwork directory slot. Every file is rendered with the app's hfs.json (both sides and their apps) and, for the Sonar
@@ -58,6 +59,13 @@ const UNLISTED_TARGETS = Object.freeze([
 const templateName = (scope, group, file) => `${scope}/${group}/${file.split('/').map(segment => segment.replace(/^\./, '')).join('/')}`;
 const onSide = (scope, file) => (scope === APP_SCOPE ? file : `${scope}/${file}`);
 
+function managedTemplate(scope, group, file, hasTemplate) {
+  const directories = [scope, 'common'];
+  const undotted = directories.map(dir => templateName(dir, group, file)).find(hasTemplate);
+  if (undotted || !['skeleton', 'skeleton-lite'].includes(group)) return undotted;
+  return directories.map(dir => `${dir}/${group}/${file}`).find(hasTemplate);
+}
+
 /**
  * Every target of `scope` (app, be or fe), its path relative to that scope's folder: the files the manifest's managedBy slots
  * list, then (app root) the unlisted ones. A slot that names managedBy lists literal files only, and each has a template under
@@ -73,7 +81,7 @@ export function targetsOf(scope, { edition = 'full', manifest = loadSlotManifest
     const effectivePath = edition === 'lite' ? (slot.lite?.path ?? slot.path) : slot.path;
     for (const file of braceVariants(effectivePath)) {
       if (!LITERAL_FILE.test(file)) throw new SyncError('HFS_SYNC_MANIFEST_MANAGED', `slot ${slot.id} names ${edition === 'lite' && slot.liteManagedBy !== undefined ? 'liteManagedBy' : 'managedBy'} but its path ${effectivePath} is not a list of literal files (${file})`);
-      const template = [scope, 'common'].map(dir => templateName(dir, group, file)).find(hasTemplate);
+      const template = managedTemplate(scope, group, file, hasTemplate);
       if (!template) throw new SyncError('HFS_SYNC_TEMPLATE_MISSING', `slot ${slot.id} manages ${file} for ${scope}, but templates/{${scope},common}/${group} has no template for it`);
       listed.push({ path: file, template, mode: MODE_OF_GROUP[group] ?? 'file', slot: slot.id });
     }
