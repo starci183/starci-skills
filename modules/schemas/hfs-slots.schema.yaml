@@ -81,6 +81,8 @@ $defs:
             description: The parameters both sides share (ruleParams(profile) merges common under the profile); a side restates one of them only to override it.
             properties:
               fileLines: {$ref: '#/$defs/fileLines'}
+              functionLines: {type: integer, minimum: 1}
+              featureFiles: {type: integer, minimum: 1}
               duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
           be:
             type: object
@@ -88,6 +90,8 @@ $defs:
             required: [infraOwners, eventBus, specDoubles, paramNames, suffixes, bannedSuffixes, contractShape, unitRoles, logicRoles, thinRoles, patternScenarios, kindPatterns, addKinds]
             properties:
               fileLines: {$ref: '#/$defs/fileLines'}
+              functionLines: {type: integer, minimum: 1}
+              featureFiles: {type: integer, minimum: 1}
               duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
               infraOwners:
                 type: object
@@ -237,17 +241,25 @@ $defs:
                 type: object
                 minProperties: 1
                 description: 'The ruleParams.be keys edition lite overrides (each shaped as above; schemaAuthority: supabase makes supabase/migrations the one schema authority). A map value (infraOwners) merges one level deep over the base map; any other value replaces it.'
+                properties:
+                  functionLines: {type: integer, minimum: 1}
+                  featureFiles: {type: integer, minimum: 1}
           fe:
             type: object
             additionalProperties: false
             description: The fe overrides of ruleParams.common, when a side needs its own value.
             properties:
               fileLines: {$ref: '#/$defs/fileLines'}
+              functionLines: {type: integer, minimum: 1}
+              featureFiles: {type: integer, minimum: 1}
               duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
               lite:
                 type: object
                 minProperties: 1
                 description: 'The ruleParams.fe keys edition lite overrides (each shaped as above).'
+                properties:
+                  functionLines: {type: integer, minimum: 1}
+                  featureFiles: {type: integer, minimum: 1}
       crossOwner: {type: string}
       crossApp: {type: string}
       slots:

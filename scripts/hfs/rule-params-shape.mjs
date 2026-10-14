@@ -12,9 +12,18 @@ const BE_OWN = ['infraOwners', 'eventBus', 'specDoubles', 'paramNames', 'suffixe
 const FORM_NAMES = new Set(['call', 'new', 'curried', 'object', 'primitive', 'array']);
 const blockOk = (v) => isPlainObject(v) && Number.isInteger(v.lines) && v.lines >= 2 && Number.isInteger(v.tokens) && v.tokens >= 1 && Object.keys(v).length === 2;
 const fileLinesOk = (v) => isPlainObject(v) && Number.isInteger(v.soft) && v.soft >= 1 && typeof v.hardGrowth === 'boolean' && Object.keys(v).length === 2;
-const sharedParam = (key, v) => (key === 'fileLines' ? fileLinesOk(v) : blockOk(v));
-const sideOk = (side, own, extra = []) => own.every((k) => side[k] !== undefined) && Object.entries(side).every(([k, v]) => own.includes(k) || extra.includes(k) || (['fileLines', 'duplicateBlock'].includes(k) && sharedParam(k, v)));
-const liteOk = (lite, keys) => lite === undefined || (isPlainObject(lite) && Object.keys(lite).length > 0 && Object.keys(lite).every((k) => k !== 'lite' && keys.includes(k)));
+const SHARED_PARAMS = {
+  fileLines: fileLinesOk,
+  duplicateBlock: blockOk,
+  functionLines: v => Number.isInteger(v) && v >= 1,
+  featureFiles: v => Number.isInteger(v) && v >= 1,
+};
+const SHARED_KEYS = Object.keys(SHARED_PARAMS);
+const sharedParam = (key, v) => Object.hasOwn(SHARED_PARAMS, key) && SHARED_PARAMS[key](v);
+const sideOk = (side, own, extra = []) => own.every((k) => side[k] !== undefined) && Object.entries(side).every(([k, v]) => own.includes(k) || extra.includes(k) || sharedParam(k, v));
+const liteKeyOk = (lite, key, keys) => key !== 'lite' && keys.includes(key)
+  && (!['functionLines', 'featureFiles'].includes(key) || sharedParam(key, lite[key]));
+const liteOk = (lite, keys) => lite === undefined || (isPlainObject(lite) && Object.keys(lite).length > 0 && Object.keys(lite).every((k) => liteKeyOk(lite, k, keys)));
 const memberMap = (v, allowEmpty) => isPlainObject(v) && Object.keys(v).length > 0 && Object.values(v).every((list) => Array.isArray(list) && (allowEmpty || list.length > 0) && list.every((x) => /^[A-Z][A-Za-z0-9]*$/.test(String(x))) && new Set(list).size === list.length);
 const roleList = (v) => Array.isArray(v) && v.length > 0 && v.every((x) => /^[a-z][a-z0-9-]*$/.test(String(x))) && new Set(v).size === v.length;
 const formsOk = (v) => Array.isArray(v) && v.length > 0 && v.every((x) => FORM_NAMES.has(x)) && new Set(v).size === v.length;
@@ -47,10 +56,10 @@ export function ruleParamsProblems(m) {
   else {
     // common holds the parameters both sides share; a side may restate one of them (a valid value) as an override, nothing else.
     // Edition lite: a side's optional `lite` map overrides keys of the same side (never `lite` itself) when the app declares edition lite.
-    if (Object.keys(rp.common).length !== 2 || !fileLinesOk(rp.common.fileLines) || !blockOk(rp.common.duplicateBlock)) bad.push('ruleParams.common needs exactly fileLines {soft, hardGrowth} and duplicateBlock {lines >= 2, tokens >= 1}');
-    if (!sideOk(rp.be, BE_OWN, ['schemaAuthority', 'lite']) || (rp.be.schemaAuthority !== undefined && !SCHEMA_AUTHORITIES.includes(rp.be.schemaAuthority)) || !liteOk(rp.be.lite, [...BE_OWN, 'fileLines', 'duplicateBlock', 'schemaAuthority'])) bad.push('ruleParams.be needs infraOwners, eventBus, specDoubles, paramNames, suffixes, bannedSuffixes, contractShape {helper}, unitRoles, logicRoles, thinRoles, patternScenarios, kindPatterns and addKinds (fileLines and duplicateBlock live in ruleParams.common, a side may override them); optional: schemaAuthority (' + SCHEMA_AUTHORITIES.join(' | ') + ') and lite (overrides of the same keys)'); else bad.push(...unitRolesProblems(rp.be), ...roleListProblems(rp.be));
+    if (!sideOk(rp.common, []) || !fileLinesOk(rp.common.fileLines) || !blockOk(rp.common.duplicateBlock)) bad.push('ruleParams.common needs fileLines {soft, hardGrowth} and duplicateBlock {lines >= 2, tokens >= 1}; optional functionLines and featureFiles must be positive integers');
+    if (!sideOk(rp.be, BE_OWN, ['schemaAuthority', 'lite']) || (rp.be.schemaAuthority !== undefined && !SCHEMA_AUTHORITIES.includes(rp.be.schemaAuthority)) || !liteOk(rp.be.lite, [...BE_OWN, ...SHARED_KEYS, 'schemaAuthority'])) bad.push('ruleParams.be needs infraOwners, eventBus, specDoubles, paramNames, suffixes, bannedSuffixes, contractShape {helper}, unitRoles, logicRoles, thinRoles, patternScenarios, kindPatterns and addKinds (shared parameters live in ruleParams.common, a side may override them); optional: schemaAuthority (' + SCHEMA_AUTHORITIES.join(' | ') + ') and lite (overrides of the same keys)'); else bad.push(...unitRolesProblems(rp.be), ...roleListProblems(rp.be));
     bad.push(...beSpecificProblems(rp.be, m));
-    if (rp.fe !== undefined && (!sideOk(rp.fe, [], ['lite']) || !liteOk(rp.fe.lite, ['fileLines', 'duplicateBlock']))) bad.push('ruleParams.fe may only restate fileLines and duplicateBlock of ruleParams.common, and carry a lite override of them');
+    if (rp.fe !== undefined && (!sideOk(rp.fe, [], ['lite']) || !liteOk(rp.fe.lite, SHARED_KEYS))) bad.push('ruleParams.fe may only restate the shared parameters of ruleParams.common, and carry a lite override of them');
   }
   return bad;
 }
