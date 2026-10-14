@@ -8,6 +8,7 @@ import path from 'node:path';
 import { checkRepo } from '../../scripts/hfs/check.mjs';
 import { FE_APP_SCRIPTS, WORKSPACE_LINT } from '../../scripts/hfs/rules/monorepo.mjs';
 import { APP, appOf, cleanup, gitAdd, installTypeScript, writeCleanRepo } from '../helpers/hfs-cli-fixture.mjs';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 
 const made = [];
 test.after(() => cleanup(made));
@@ -104,10 +105,15 @@ test('HFS_MONO_NEST_PROJECTS: one project per declared app, the default an api a
 test('HFS_MONO_WORKSPACE_DEP: a package an fe app imports but does not declare is refused, a sibling workspace package named for "*"', () => {
   const dir = repoOf(WITH_UI, (d) => {
     uiPackage()(d);
+    editJson('fe/apps/web/package.json', (pkg) => {
+      const dependencies = { ...pkg.dependencies };
+      delete dependencies.next;
+      return { ...pkg, dependencies };
+    })(d);
     put(d, 'fe/apps/web/src/app/[locale]/page.tsx', 'import { useTranslations } from "next-intl";\nimport Link from "next/link";\nimport { Card } from "@demo/ui";\nexport default function Page() { return [useTranslations, Link, Card]; }\n');
   });
   const found = only(checkRepo({ repoRoot: dir }), 'HFS_MONO_WORKSPACE_DEP');
-  assert.deepEqual(found.map((f) => f.dependency).sort(), ['@demo/ui', 'next']);
+  assert.deepEqual(found.map((f) => f.dependency).sort(byCodeUnit), ['@demo/ui', 'next']);
   assert.match(found.find((f) => f.dependency === '@demo/ui').message, /as "\*"/);
 });
 

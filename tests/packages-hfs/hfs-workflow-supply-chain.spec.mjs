@@ -24,8 +24,8 @@ function workflows(edition) {
   }));
 }
 
-function assertReleaseTrigger(workflow) {
-  assert.deepEqual(Object.keys(workflow.on), ['push', 'workflow_dispatch']);
+function assertReleaseTrigger(workflow, events) {
+  assert.deepEqual(Object.keys(workflow.on), events);
   assert.deepEqual(workflow.on.push.tags, ['v*']);
   assert.equal(workflow.concurrency['cancel-in-progress'], false);
 }
@@ -46,7 +46,7 @@ for (const edition of ['lite', 'full']) {
     assert.ok(install >= 0 && audit > install && lint > audit);
     assert.equal(steps[audit].if, undefined, 'a release always runs the audit');
     assert.equal(steps[audit]['continue-on-error'], undefined, 'audit failures fail CI');
-    assertReleaseTrigger(ci);
+    assertReleaseTrigger(ci, ['push', 'workflow_dispatch']);
     assertPinnedActions(ci);
   });
 
@@ -68,7 +68,7 @@ for (const edition of ['lite', 'full']) {
     assert.match(upload.with.name, /matrix\.name/);
     assert.equal(upload.if, undefined, 'every built image retains its attestations');
     assert.equal(images.permissions.contents, 'read');
-    assertReleaseTrigger(images);
+    assertReleaseTrigger(images, ['push']);
     assertPinnedActions(images);
   });
 }

@@ -85,12 +85,12 @@ test('the lite managed set carries the unit run and its coverage world (owner ru
   assert.deepEqual(Object.keys(ci.on), ['push', 'workflow_dispatch']);
   assert.equal(ci.jobs['db-types'].if, undefined, 'the tag run regenerates and checks the database types unconditionally');
   assert.doesNotMatch(targets['.github/workflows/ci.yml'].content, /test:e2e|test:contract|test:integration|playwright/i);
-  const ciRuns = ci.jobs.ci.steps.map(step => step.run).filter(Boolean);
-  for (const command of ['npm ci --ignore-scripts', 'npm run lint', 'npm run lint -- --sonar reports/lint.sonar.json', 'npm run format:check', 'npm run typecheck', 'npm test -- --ci', 'npm run build:be', 'npm run build:fe', 'npm run db:lint']) assert.ok(ciRuns.includes(command), command);
+  const ciRuns = new Set(ci.jobs.ci.steps.map(step => step.run).filter(Boolean));
+  for (const command of ['npm ci --ignore-scripts', 'npm run lint', 'npm run lint -- --sonar reports/lint.sonar.json', 'npm run format:check', 'npm run typecheck', 'npm test -- --ci', 'npm run build:be', 'npm run build:fe', 'npm run db:lint']) assert.ok(ciRuns.has(command), command);
   assert.ok(ci.jobs.ci.steps.some(step => /codecov\/codecov-action@/.test(step.uses ?? '')), 'the unit coverage is uploaded on the tag');
 
   const images = parseYaml(targets['.github/workflows/images.yml'].content).jobs.image.strategy.matrix.include;
-  assert.deepEqual(images.map(entry => [entry.name, entry.file]), [['api', 'be/apps/api/Dockerfile']]);
+  assert.deepEqual(images.map(entry => [entry.name, entry.file]), [['api', 'be/apps/api/Dockerfile'], ['web', 'fe/apps/web/Dockerfile']]);
   const deploy = parseYaml(targets['.github/workflows/db-deploy.yml'].content);
   assert.deepEqual(Object.keys(deploy.on), ['workflow_dispatch']);
   assert.equal(deploy.jobs.deploy.environment, '${{ inputs.environment }}');
@@ -144,7 +144,8 @@ test('lite brand trees get their managed ignore file and admit every nested bran
     cwd: dir, input: [...allowed, ...forbidden].join('\0'), encoding: 'utf8', windowsHide: true,
   });
   assert.equal(ignored.status, 0, ignored.stderr);
-  assert.deepEqual(ignored.stdout.split('\0').filter(Boolean).sort(), forbidden.sort());
+  const byPath = (left, right) => left.localeCompare(right);
+  assert.deepEqual(ignored.stdout.split('\0').filter(Boolean).sort(byPath), forbidden.sort(byPath));
 });
 
 test('sync preserves a lite workspace declaration and does not create forbidden Work records', async t => {
@@ -194,7 +195,8 @@ test('the one Sonar gate document carries a readable lite gate with full\'s cove
 
 test('the managed turbo.json passes the SWC cache variable through to task processes in both editions', () => {
   for (const hfs of [LITE, JSON.parse(fs.readFileSync(path.join(ROOT, 'examples', 'shape-slot', 'hfs.json'), 'utf8'))]) {
-    const turbo = JSON.parse(targetMap(hfs)['turbo.json'].content.replace(/^\s*\/\/.*$/gm, ''));
+    const content = targetMap(hfs)['turbo.json'].content.split('\n').filter(line => !line.trimStart().startsWith('//')).join('\n');
+    const turbo = JSON.parse(content);
     assert.ok(turbo.globalPassThroughEnv.includes('SWC_NATIVE_BINDING_CACHE'), `${hfs.edition ?? 'full'}: turbo strips undeclared env, so next would lose the runtime-managed SWC cache`);
   }
 });

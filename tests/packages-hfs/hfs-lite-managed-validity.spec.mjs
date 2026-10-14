@@ -31,11 +31,23 @@ const workflows = Object.fromEntries(Object.entries(targets)
 const hooks = Object.fromEntries(Object.entries(targets).filter(([file]) => file.startsWith('.husky/')));
 const scripts = targets['package.json'].scripts;
 
-const asArray = value => value === undefined ? [] : Array.isArray(value) ? value : [value];
+const asArray = value => {
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value : [value];
+};
 const workflowSteps = workflow => Object.values(workflow.jobs).flatMap(job => job.steps ?? []);
 const npmRuns = text => [...String(text).matchAll(/\bnpm\s+run\s+([A-Za-z0-9:_-]+)/g)].map(match => match[1]);
+const byImageName = ([left], [right]) => left.localeCompare(right);
 
-test('every lite workflow is structurally valid and pins each action version', () => {
+function assertWorkflowStep(file, step) {
+  if (step.uses) assert.match(step.uses, /@[0-9a-f]{40}$/, `${file}: ${step.uses} is not SHA-pinned`);
+  const uploadIdentity = `${step.name ?? ''} ${step.uses ?? ''}`;
+  if (/upload|codecov|sonar|artifact|scan|quality[- ]gate/i.test(uploadIdentity)) {
+    assert.doesNotMatch(String(step.if ?? ''), /\bsecrets\s*\./, `${file}: an upload step reads secrets in if`);
+  }
+}
+
+test('every lite workflow is structurally valid and pins each action by SHA', () => {
   assert.deepEqual(Object.keys(workflows).sort(), [
     '.github/workflows/ci.yml',
     '.github/workflows/db-deploy.yml',
@@ -52,13 +64,7 @@ test('every lite workflow is structurally valid and pins each action version', (
       for (const dependency of asArray(job.needs)) {
         assert.ok(jobNames.has(dependency), `${file}: ${jobName} needs unknown job ${dependency}`);
       }
-      for (const step of job.steps ?? []) {
-        if (step.uses) assert.match(step.uses, /@(?:v\d+(?:\.\d+)*|[0-9a-f]{40})$/, `${file}: ${step.uses} is not version-pinned`);
-        const uploadIdentity = `${step.name ?? ''} ${step.uses ?? ''}`;
-        if (/upload|codecov|sonar|artifact|scan|quality[- ]gate/i.test(uploadIdentity)) {
-          assert.doesNotMatch(String(step.if ?? ''), /\bsecrets\s*\./, `${file}: an upload step reads secrets in if`);
-        }
-      }
+      for (const step of job.steps ?? []) assertWorkflowStep(file, step);
     }
   }
 });
@@ -83,8 +89,11 @@ test('lite workflow semantics: the unit run and its coverage upload, never an e2
 
   const images = workflows['.github/workflows/images.yml'].jobs.image.strategy.matrix.include;
   assert.deepEqual(
-    images.map(entry => [entry.name, entry.file]).sort(),
-    LITE.sides.be.apps.map(app => [app.name, `be/apps/${app.name}/Dockerfile`]).sort(),
+    images.map(entry => [entry.name, entry.file]).sort(byImageName),
+    [
+      ...LITE.sides.be.apps.map(app => [app.name, `be/apps/${app.name}/Dockerfile`]),
+      ...LITE.sides.fe.apps.map(app => [app.name, `fe/apps/${app.name}/Dockerfile`]),
+    ].sort(byImageName),
   );
 });
 
