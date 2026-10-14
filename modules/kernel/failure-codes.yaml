@@ -18830,6 +18830,8 @@ HFS_COVERAGE_BELOW:
     - "Có dòng, hàm hoặc nhánh chưa được chạy trong một tệp logic thuộc phạm vi đo"
     - "Báo cáo thiếu tệp nguồn, thiếu số liệu, sai định dạng hoặc không đọc được"
   nextStep_vi: "Bổ sung unit test cho tệp được nêu, tạo lại báo cáo lcov đầy đủ rồi chạy starci app check --coverage-from <lcov>; features, cli và webhooks ngoài phạm vi đo vẫn được liệt kê."
+  owner: op-retry
+  kind: check-finding
 HFS_HOST_CRON:
   title: "Apps do not install host cron or timer jobs"
   title_vi: "Ứng dụng cài lịch chạy trên máy chủ"
