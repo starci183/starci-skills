@@ -38,6 +38,19 @@ const aggregateHash = (targets) => createHash('sha256').update(JSON.stringify(ta
 // C04 updates these templates; C02/C03 own their committed example copies.
 const C04_TEMPLATE_TARGETS = new Set(['.editorconfig', '.gitattributes', '.github/dependabot.yml', '.nvmrc', '.github/workflows/ci.yml', '.github/workflows/images.yml']);
 
+function assertSealedDatabaseDeployment(deploy) {
+  const pushStep = deploy.jobs.deploy.steps.find(step => step.run?.split('\n').some(command => command.trim() === 'npm run db:push'));
+  assert.ok(pushStep, 'the deployment step applies the database migrations');
+  assert.equal(pushStep.shell, 'bash');
+  const commands = pushStep.run.split('\n').map(command => command.trim());
+  const materialize = commands.indexOf('npx --no-install starci app secret materialize "$STACK_ENVIRONMENT"');
+  const dryRun = commands.indexOf('npm run db:push -- --dry-run');
+  const push = commands.indexOf('npm run db:push');
+  assert.ok(materialize >= 0, 'the deployment materializes sealed custody');
+  assert.ok(dryRun > materialize, 'the migration dry run follows sealed custody materialization');
+  assert.ok(push > dryRun, 'the migrations are applied after the dry run in the same step');
+}
+
 test('liteManagedBy is a template id field of app slots', () => {
   const slot = MANIFEST.slots.find(candidate => candidate.id === 'app.ci');
   assert.equal(slot.liteManagedBy, 'ci-workflows-lite');
@@ -94,7 +107,7 @@ test('the lite managed set carries the unit run and its coverage world (owner ru
   const deploy = parseYaml(targets['.github/workflows/db-deploy.yml'].content);
   assert.deepEqual(Object.keys(deploy.on), ['workflow_dispatch']);
   assert.equal(deploy.jobs.deploy.environment, '${{ inputs.environment }}');
-  assert.ok(deploy.jobs.deploy.steps.some(step => step.run === 'npm run db:push'));
+  assertSealedDatabaseDeployment(deploy);
 
   const sonar = targets['sonar-project.properties'].content;
   assert.match(sonar, /^sonar\.exclusions=.*,supabase\/types\/\*\*$/m);
