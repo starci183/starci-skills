@@ -46,10 +46,10 @@ rules:
       `supabase/functions`. The front end is the one front-end standard of knowledge/hfs/fe-stack.yaml, identical to full and
       with no tests (R97): Apollo GraphQL and SWR to the back end, modules/auth as the only Supabase importer (auth only), no
       Server Action and no route handler beyond health/live and the auth callback (R243).
-      Lite's `.starciwork` is required only when brand records exist and permits only `.gitignore`, optional `workspace.yaml`
-      metadata and `brand/**`. Readers read workspace metadata normally for the project id and repo roles used by app-root
-      detection and front-end role mapping. The catalog (`index.yaml`), `shell/`, `features/`, `_resources/`, `uat` and `br`
-      are forbidden.
+      Lite's Work tree (slot app.starciwork) is required only when brand records exist and permits only the workspace
+      metadata and the brand records. Readers read workspace metadata normally for the project id and repo roles used by
+      app-root detection and front-end role mapping. The catalog, shell, features, resources, UAT and br records are
+      forbidden (HFS_STARCIWORK_LITE_FORBIDDEN).
     rationale: |
       One manifest and one catalog keep a lite app upgradable to full by additions only: swap the adapters, add the e2e and
       contract world and the stack.
