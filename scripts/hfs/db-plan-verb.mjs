@@ -9,8 +9,8 @@ import { DbVerbError, dbOptions, dbAppRoot, dbSqlFiles, runDbSupabase, dbFailure
 
 await pg.loadModule();
 
-// Supabase CLI 2.119.0 uses positional SQL, --output json and --agent no for a plain rows array.
-// Contract: supabase/cli apps/cli/src/commands/db/query/{query.command,query.handler}.ts at v2.119.0.
+// The pinned Supabase CLI uses positional SQL, --output json and --agent no for a plain rows array.
+// Contract: supabase/cli apps/cli/src/commands/db/query/{query.command,query.handler}.ts at the pinned CLI tag.
 const PRESENCE_SQL = `select
   pg_catalog.to_regclass('supabase_migrations.schema_migrations') is not null as migrations,
   pg_catalog.to_regclass('cron.job') is not null as cron,
@@ -216,7 +216,7 @@ function repositoryState(root) {
 }
 
 function queryRows(root, sql, local, ports) {
-  // CLI 2.119.0 otherwise creates this cache in its linked-query finalizer.
+  // The pinned CLI otherwise creates this cache in its linked-query finalizer.
   // Existing metadata is sufficient; never inspect the cache or credential files.
   if (!local && !ports.runSupabase && !ports.run && !fs.existsSync(path.join(root, 'supabase/.temp/linked-project.json'))) throw new DbVerbError('link the existing project before running a read-only database plan');
   const output = runDbSupabase(root, ['db', 'query', sql, local ? '--local' : '--linked', '--output', 'json', '--agent', 'no'], ports);
