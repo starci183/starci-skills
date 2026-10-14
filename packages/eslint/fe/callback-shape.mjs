@@ -4,7 +4,8 @@
  * This syntax check follows lexical bindings and local aliases rather than trusting a method's spelling.
  */
 import { stringOf, walk } from "./lib/ast.mjs"
-import { classifyImport, inSlot } from "./lib/scope.mjs"
+import { normalizePath } from "./lib/path.mjs"
+import { classifyImport, inSlot, resolveImport } from "./lib/scope.mjs"
 
 /** Runtime expression wrappers that preserve the value's source. */
 const unwrap = (node) => {
@@ -45,150 +46,247 @@ const CONFIG_EXPORTS = new Set(["runtime", "dynamic", "revalidate", "fetchCache"
 const FUNCTIONS = new Set(["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"])
 const FORBIDDEN = new Set(["AssignmentExpression", "UpdateExpression", "ImportExpression", "TaggedTemplateExpression", "ClassDeclaration", "ClassExpression", "ForStatement", "ForInStatement", "ForOfStatement", "WhileStatement", "DoWhileStatement", "ThrowStatement", "YieldExpression", "SpreadElement", "ArrayPattern", "JSXElement", "JSXFragment"])
 const TEXT = new Set(["text", "code"])
+const CALLS = new Set(["factory", "exchange", "redirect", "params-get", "params-has", "text-guard"])
+const URL_TEXT = new Set(["origin", "href", "pathname", "search", "hash", "host", "hostname", "protocol"])
+const CALL_RESULTS = new Map([["factory", "client"], ["exchange", "exchange-result"], ["redirect", "redirect-result"], ["params-has", "scalar"], ["text-guard", "scalar"]])
+const MEMBERS = new Map([
+  ["request", new Map([["nextUrl", "url"], ["url", "text"]])],
+  ["url", new Map([["searchParams", "params"], ...[...URL_TEXT].map((key) => [key, "text"])])],
+  ["params", new Map([["get", "params-get"], ["has", "params-has"]])],
+  ["client", new Map([["auth", "auth"]])],
+  ["auth", new Map([["exchangeCodeForSession", "exchange"]])],
+  ["next-response", new Map([["redirect", "redirect"]])],
+  ["exchange-result", new Map([["error", "exchange-error"]])],
+])
 
-/** Find the one locally implemented GET export, refusing reexports and additional runtime exports. */
-const handlerOf = (program, sourceCode) => {
+/** A locally exported binding's implementation. */
+const exportValue = (sourceCode, entry) => {
+  const definition = bindingOf(sourceCode, entry.local)?.defs[0]?.node
+  return unwrap(definition?.type === "VariableDeclarator" ? definition.init : definition)
+}
+
+/** The runtime names introduced by one local named export. */
+const namedExports = (statement, sourceCode) => {
+  const declaration = statement.declaration
+  if (declaration?.type === "FunctionDeclaration") return [{ name: declaration.id.name, value: declaration }]
+  if (declaration?.type === "VariableDeclaration") {
+    if (declaration.declarations.some((entry) => entry.id.type !== "Identifier")) return null
+    return declaration.declarations.map((entry) => ({ name: entry.id.name, value: unwrap(entry.init) }))
+  }
+  if (declaration) return []
+  return statement.specifiers.filter((entry) => entry.exportKind !== "type")
+    .map((entry) => ({ name: entry.exported.name ?? entry.exported.value, value: exportValue(sourceCode, entry) }))
+}
+
+/** Collect runtime exports, refusing reexports and default exports. */
+const exportsOf = (program, sourceCode) => {
   const exported = []
   for (const statement of program.body) {
     if (statement.type === "ExportDefaultDeclaration" || statement.type === "ExportAllDeclaration") return null
     if (statement.type !== "ExportNamedDeclaration" || statement.exportKind === "type") continue
     if (statement.source) return null
-    const declaration = statement.declaration
-    if (declaration?.type === "FunctionDeclaration") exported.push({ name: declaration.id.name, value: declaration })
-    else if (declaration?.type === "VariableDeclaration") {
-      for (const entry of declaration.declarations) {
-        if (entry.id.type !== "Identifier") return null
-        exported.push({ name: entry.id.name, value: unwrap(entry.init) })
-      }
-    } else if (!declaration) {
-      for (const entry of statement.specifiers) {
-        if (entry.exportKind === "type") continue
-        const definition = bindingOf(sourceCode, entry.local)?.defs[0]
-        exported.push({ name: entry.exported.name ?? entry.exported.value, value: unwrap(definition?.node.type === "VariableDeclarator" ? definition.node.init : definition?.node) })
-      }
-    }
+    const entries = namedExports(statement, sourceCode)
+    if (!entries) return null
+    exported.push(...entries)
   }
-  const handlers = exported.filter((entry) => entry.name === "GET")
-  if (handlers.length !== 1 || exported.some((entry) => entry.name !== "GET" && !CONFIG_EXPORTS.has(entry.name))) return null
-  const handler = handlers[0].value
-  return handler && FUNCTIONS.has(handler.type) && handler.async && !handler.generator && handler.params.length === 1 && handler.params[0].type === "Identifier" ? handler : null
+  return exported
 }
 
-/** The only executable callback operations, with provenance for requests, query values, auth clients and redirects. */
+/** Find the one locally implemented GET export and its single request parameter. */
+const handlerOf = (program, sourceCode) => {
+  const exported = exportsOf(program, sourceCode)
+  if (!exported || exported.some((entry) => entry.name !== "GET" && !CONFIG_EXPORTS.has(entry.name))) return null
+  const handlers = exported.filter((entry) => entry.name === "GET")
+  if (handlers.length !== 1) return null
+  const handler = handlers[0].value
+  if (!handler || !FUNCTIONS.has(handler.type) || !handler.async || handler.generator) return null
+  return handler.params.length === 1 && handler.params[0].type === "Identifier" ? handler : null
+}
+
+/** Framework imports retain their actual owner even under a local alias. */
+const frameworkImportKind = (source, name) => {
+  if (source === "next/server" && name === "NextResponse") return "next-response"
+  if (source === "next/server" && name === "NextRequest") return "request-type"
+  if (source === "next/navigation" && name === "redirect") return "redirect"
+  return null
+}
+
+/** Only the server auth entry exposes the cookie-owning exchangeAuthCode helper. */
+const isServerAuthImport = (context, source) => {
+  const target = normalizePath(resolveImport(context, source))
+  return target.endsWith("/modules/auth/server") || target.endsWith("/modules/auth/server.ts")
+}
+
+/** A directory import resolves to its index, before the generic modules slot's hypothetical routes.ts. */
+const isRoutesImport = (context, source, slot) => slot === "fe.modules.routes" || classifyImport(context, `${source}/index`)?.slot === "fe.modules.routes"
+
+/** Auth helpers and static route values must come from their declared HFS owners. */
+const ownerImportKind = (context, source, name) => {
+  const slot = classifyImport(context, source)?.slot
+  if (name === "APP_ROUTES" && isRoutesImport(context, source, slot)) return "routes"
+  if (slot !== "fe.modules.auth") return null
+  if (name === "exchangeAuthCode" && isServerAuthImport(context, source)) return "exchange"
+  if (name === "exchangeCodeForSession") return "exchange"
+  if (/^(?:create|get)\w*Client$/.test(name ?? "")) return "factory"
+  if (["supabase", "supabaseClient", "authClient"].includes(name)) return "client"
+  return null
+}
+
+/** Register the allowed bindings in a single import statement. */
+const addImportBindings = (context, sourceCode, statement, imports) => {
+  const source = String(statement.source.value)
+  if (source === "server-only" && statement.specifiers.length === 0) return true
+  if (statement.specifiers.length === 0) return false
+  const variables = sourceCode.getDeclaredVariables(statement)
+  for (const specifier of statement.specifiers) {
+    if (specifier.importKind === "type") continue
+    const name = specifier.imported?.name ?? specifier.imported?.value
+    const kind = frameworkImportKind(source, name) ?? ownerImportKind(context, source, name)
+    if (!kind) return false
+    imports.set(variables.find((entry) => entry.name === specifier.local.name), kind)
+  }
+  return true
+}
+
+/** Every runtime import is restricted, even if it is unused in the handler. */
+const importsOf = (context, program, sourceCode) => {
+  const imports = new Map()
+  for (const statement of program.body) {
+    if (statement.type !== "ImportDeclaration" || statement.importKind === "type") continue
+    if (!addImportBindings(context, sourceCode, statement, imports)) return null
+  }
+  return imports
+}
+
+/** Select a known property without granting arbitrary methods on the selected value. */
+const memberKind = (kind, key) => {
+  if (kind === "routes" && typeof key === "string" && !["__proto__", "constructor", "prototype"].includes(key)) return "text"
+  if (TEXT.has(kind) && ["startsWith", "endsWith", "includes"].includes(key)) return "text-guard"
+  return MEMBERS.get(kind)?.get(key) ?? null
+}
+
+/** An identifier keeps the provenance of its one initializer or the GET request parameter. */
+const identifierOrigin = (node, seen, env, origin) => {
+  const variable = bindingOf(env.sourceCode, node)
+  if (env.imports.has(variable)) return env.imports.get(variable)
+  if (!variable || seen.has(variable) || variable.defs.length !== 1) return null
+  const definition = variable.defs[0]
+  if (definition.type === "Parameter" && definition.node === env.handler) return "request"
+  if (definition.node.type !== "VariableDeclarator") return null
+  const path = patternPath(definition.node.id, node.name)
+  const nextSeen = new Set([...seen, variable])
+  return path?.reduce((kind, key) => memberKind(kind, key), origin(definition.node.init, nextSeen)) ?? null
+}
+
+/** Combining known primitive values cannot introduce user-defined coercion. */
+const combinedOrigin = (kinds, conditional = false) => {
+  if (conditional && kinds[0] === kinds[1]) return kinds[0]
+  if (kinds.every((kind) => TEXT.has(kind))) return "text"
+  if (!conditional && kinds.every((kind) => TEXT.has(kind) || kind === "scalar")) return "scalar"
+  return null
+}
+
+/** The source of a call's return value, independent of argument validation. */
+const callOrigin = (node, seen, origin) => {
+  const kind = origin(node.callee, seen)
+  if (kind === "params-get") return stringOf(node.arguments[0]) === "code" ? "code" : "text"
+  return CALL_RESULTS.get(kind) ?? null
+}
+
+/** Composite expressions retain provenance only for supported primitive operations. */
+const expressionOrigin = (node, seen, env, origin) => {
+  if (node.type === "TemplateLiteral") return node.expressions.every((expression) => TEXT.has(origin(expression, seen)) || origin(expression, seen) === "scalar") ? "text" : null
+  if (node.type === "MemberExpression") return memberKind(origin(node.object, seen), memberName(node))
+  if (node.type === "NewExpression" && isGlobal(env.sourceCode, node.callee, "URL")) return "url"
+  if (node.type === "LogicalExpression" || node.type === "BinaryExpression") return combinedOrigin([origin(node.left, seen), origin(node.right, seen)])
+  if (node.type === "ConditionalExpression") return combinedOrigin([origin(node.consequent, seen), origin(node.alternate, seen)], true)
+  if (node.type === "CallExpression") return callOrigin(node, seen, origin)
+  return null
+}
+
+/** Follow lexical aliases rather than trusting the spelling of an identifier. */
+const originOf = (env) => {
+  const origin = (input, seen = new Set()) => {
+    const node = unwrap(input)
+    if (!node) return null
+    if (node.type === "Identifier") return identifierOrigin(node, seen, env, origin)
+    if (node.type === "Literal") return typeof node.value === "string" ? "text" : "scalar"
+    return expressionOrigin(node, seen, env, origin)
+  }
+  return origin
+}
+
+/** The closest enclosing function must be the GET handler. */
+const insideHandler = (node, handler) => {
+  for (let parent = node.parent; parent; parent = parent.parent) if (FUNCTIONS.has(parent.type)) return parent === handler
+  return false
+}
+
+/** Await must wrap the actual exchange call before its enclosing statement ends. */
+const isAwaited = (node, handler) => {
+  for (let parent = node.parent; parent && parent !== handler; parent = parent.parent) {
+    if (parent.type === "AwaitExpression") return true
+    if (parent.type.endsWith("Statement")) return false
+  }
+  return false
+}
+
+/** Only a literal redirect status is allowed in an options object. */
+const isRedirectStatus = (property) => {
+  if (property.type !== "Property" || property.computed || property.method || property.kind !== "init") return false
+  return (property.key.name ?? property.key.value) === "status" && property.value.type === "Literal" && [301, 302, 303, 307, 308].includes(property.value.value)
+}
+
+/** Arbitrary objects can invoke getters or toString during coercion; only redirect options belong here. */
+const isRedirectOptions = (node, origin) => node.parent.type === "CallExpression" && origin(node.parent.callee) === "redirect" && node.parent.arguments[1] === node && node.properties.every(isRedirectStatus)
+
+/** Non-call expressions must preserve the callback's narrow set of values and effects. */
+const validExpression = (node, env, origin) => {
+  if (node.type === "MemberExpression") return Boolean(origin(node))
+  if (node.type === "ObjectExpression") return isRedirectOptions(node, origin)
+  if (node.type === "VariableDeclarator" && node.id.type === "ObjectPattern") return env.sourceCode.getDeclaredVariables(node).every((variable) => origin(variable.identifiers[0]))
+  if (node.type === "NewExpression") return isGlobal(env.sourceCode, node.callee, "URL") && node.arguments.length >= 1 && node.arguments.length <= 2 && node.arguments.every((argument) => TEXT.has(origin(argument)))
+  if (node.type === "ReturnStatement") return insideHandler(node, env.handler) && origin(node.argument) === "redirect-result"
+  if (node === env.handler && node.body.type !== "BlockStatement") return origin(node.body) === "redirect-result"
+  return true
+}
+
+/** Validate arguments to each permitted operation. */
+const validCall = (node, kind, env, origin) => {
+  if (!insideHandler(node, env.handler) || !CALLS.has(kind) || node.arguments.some((argument) => argument.type === "SpreadElement")) return false
+  if (kind === "exchange") return isAwaited(node, env.handler) && node.arguments.length === 1 && origin(node.arguments[0]) === "code"
+  if (kind === "redirect") return node.arguments.length >= 1 && node.arguments.length <= 2 && ["text", "url"].includes(origin(node.arguments[0]))
+  if (kind === "factory") return node.arguments.length <= 1 && node.arguments.every((argument) => origin(argument) === "request")
+  return node.arguments.length === 1 && TEXT.has(origin(node.arguments[0]))
+}
+
+/** Syntactic forms that add work beyond the one handler are refused outright. */
+const forbiddenNode = (node, handler) => FORBIDDEN.has(node.type) || (FUNCTIONS.has(node.type) && node !== handler) || (node.type === "UnaryExpression" && node.operator === "delete")
+
+/** Walk all runtime syntax, counting the single exchange and permitted redirects. */
+const validOperations = (program, env) => {
+  const origin = originOf(env)
+  const counts = new Map()
+  let valid = true
+  walk(env.sourceCode, program, (node) => {
+    if (!valid) return false
+    valid = !forbiddenNode(node, env.handler) && validExpression(node, env, origin)
+    if (!valid || node.type !== "CallExpression") return undefined
+    const kind = origin(node.callee)
+    valid = validCall(node, kind, env, origin)
+    counts.set(kind, (counts.get(kind) ?? 0) + 1)
+    return undefined
+  })
+  return valid && counts.get("exchange") === 1 && (counts.get("factory") ?? 0) <= 1 && counts.get("redirect") > 0
+}
+
+/** The callback's request, imports and operations must all have known owners. */
 const callbackVerdict = (context, program) => {
   const sourceCode = context.sourceCode ?? context.getSourceCode()
   const handler = handlerOf(program, sourceCode)
   if (!handler) return false
-  const imports = new Map()
-  for (const statement of program.body) {
-    if (statement.type !== "ImportDeclaration" || statement.importKind === "type") continue
-    const source = String(statement.source.value)
-    if (source === "server-only" && statement.specifiers.length === 0) continue
-    const authOwner = classifyImport(context, source)?.slot === "fe.modules.auth"
-    if (statement.specifiers.length === 0) return false
-    for (const specifier of statement.specifiers) {
-      if (specifier.importKind === "type") continue
-      const name = specifier.imported?.name ?? specifier.imported?.value
-      let kind = null
-      if (source === "next/server" && name === "NextResponse") kind = "next-response"
-      else if (source === "next/server" && name === "NextRequest") kind = "request-type"
-      else if (source === "next/navigation" && name === "redirect") kind = "redirect"
-      else if (authOwner && /^(?:create|get)\w*Client$/.test(name ?? "")) kind = "factory"
-      else if (authOwner && name === "exchangeCodeForSession") kind = "exchange"
-      else if (authOwner && /^(?:supabase|supabaseClient|authClient)$/.test(name ?? "")) kind = "client"
-      if (!kind) return false
-      const variable = sourceCode.getDeclaredVariables(statement).find((entry) => entry.name === specifier.local.name)
-      imports.set(variable, kind)
-    }
-  }
-  const memberKind = (kind, key) => {
-    if (kind === "request" && key === "nextUrl") return "url"
-    if (kind === "request" && key === "url") return "text"
-    if (kind === "url" && key === "searchParams") return "params"
-    if (kind === "url" && ["origin", "href", "pathname", "search", "hash", "host", "hostname", "protocol"].includes(key)) return "text"
-    if (kind === "params" && ["get", "has"].includes(key)) return `params-${key}`
-    if (kind === "client" && key === "auth") return "auth"
-    if (kind === "auth" && key === "exchangeCodeForSession") return "exchange"
-    if (kind === "next-response" && key === "redirect") return "redirect"
-    if (kind === "exchange-result" && key === "error") return "exchange-error"
-    if (TEXT.has(kind) && ["startsWith", "endsWith", "includes"].includes(key)) return "text-guard"
-    return null
-  }
-  const origin = (input, seen = new Set()) => {
-    const node = unwrap(input)
-    if (!node) return null
-    if (node.type === "Identifier") {
-      const variable = bindingOf(sourceCode, node)
-      if (imports.has(variable)) return imports.get(variable)
-      if (!variable || seen.has(variable) || variable.defs.length !== 1) return null
-      const definition = variable.defs[0]
-      if (definition.type === "Parameter" && definition.node === handler) return "request"
-      if (definition.node.type !== "VariableDeclarator") return null
-      const path = patternPath(definition.node.id, node.name)
-      const nextSeen = new Set([...seen, variable])
-      return path?.reduce((kind, key) => memberKind(kind, key), origin(definition.node.init, nextSeen)) ?? null
-    }
-    if (node.type === "Literal") return typeof node.value === "string" ? "text" : "scalar"
-    if (node.type === "TemplateLiteral") return node.expressions.every((expression) => TEXT.has(origin(expression, seen)) || origin(expression, seen) === "scalar") ? "text" : null
-    if (node.type === "MemberExpression") return memberKind(origin(node.object, seen), memberName(node))
-    if (node.type === "NewExpression" && isGlobal(sourceCode, node.callee, "URL")) return "url"
-    if (node.type === "LogicalExpression" || node.type === "BinaryExpression") {
-      const kinds = [origin(node.left, seen), origin(node.right, seen)]
-      return kinds.every((kind) => TEXT.has(kind)) ? "text" : kinds.every((kind) => TEXT.has(kind) || kind === "scalar") ? "scalar" : null
-    }
-    if (node.type === "ConditionalExpression") {
-      const kinds = [origin(node.consequent, seen), origin(node.alternate, seen)]
-      return kinds[0] === kinds[1] ? kinds[0] : kinds.every((kind) => TEXT.has(kind)) ? "text" : null
-    }
-    if (node.type === "CallExpression") {
-      const kind = origin(node.callee, seen)
-      if (kind === "factory") return "client"
-      if (kind === "exchange") return "exchange-result"
-      if (kind === "redirect") return "redirect-result"
-      if (kind === "params-get") return stringOf(node.arguments[0]) === "code" ? "code" : "text"
-      if (kind === "params-has" || kind === "text-guard") return "scalar"
-    }
-    return null
-  }
-  const insideHandler = (node) => {
-    for (let parent = node.parent; parent; parent = parent.parent) if (FUNCTIONS.has(parent.type)) return parent === handler
-    return false
-  }
-  let valid = true
-  let exchanges = 0
-  let redirects = 0
-  let factories = 0
-  walk(sourceCode, program, (node) => {
-    if (!valid) return false
-    if (FORBIDDEN.has(node.type) || (FUNCTIONS.has(node.type) && node !== handler) || (node.type === "UnaryExpression" && node.operator === "delete")) valid = false
-    if (node.type === "MemberExpression" && !origin(node)) valid = false
-    // An arbitrary object can invoke a getter or a supplied toString implicitly during coercion. Only static redirect options belong here.
-    if (node.type === "ObjectExpression" && !(node.parent.type === "CallExpression" && origin(node.parent.callee) === "redirect" && node.parent.arguments[1] === node && node.properties.every((property) => property.type === "Property" && !property.computed && !property.method && property.kind === "init" && (property.key.name ?? property.key.value) === "status" && property.value.type === "Literal" && [301, 302, 303, 307, 308].includes(property.value.value)))) valid = false
-    if (node.type === "VariableDeclarator" && node.id.type === "ObjectPattern" && sourceCode.getDeclaredVariables(node).some((variable) => !origin(variable.identifiers[0]))) valid = false
-    if (node.type === "NewExpression" && (!isGlobal(sourceCode, node.callee, "URL") || node.arguments.length < 1 || node.arguments.length > 2 || !node.arguments.every((argument) => TEXT.has(origin(argument))))) valid = false
-    if (node.type === "ReturnStatement" && (!insideHandler(node) || origin(node.argument) !== "redirect-result")) valid = false
-    if (node === handler && node.body.type !== "BlockStatement" && origin(node.body) !== "redirect-result") valid = false
-    if (node.type !== "CallExpression") return undefined
-    const kind = origin(node.callee)
-    if (!insideHandler(node) || !["factory", "exchange", "redirect", "params-get", "params-has", "text-guard"].includes(kind) || node.arguments.some((argument) => argument.type === "SpreadElement")) valid = false
-    else if (kind === "exchange") {
-      let awaited = false
-      for (let parent = node.parent; parent && parent !== handler; parent = parent.parent) {
-        if (parent.type === "AwaitExpression") awaited = true
-        if (parent.type.endsWith("Statement")) break
-      }
-      if (!awaited || node.arguments.length !== 1 || origin(node.arguments[0]) !== "code") valid = false
-      exchanges += 1
-    } else if (kind === "redirect") {
-      if (node.arguments.length < 1 || node.arguments.length > 2 || !["text", "url"].includes(origin(node.arguments[0]))) valid = false
-      redirects += 1
-    } else if (kind === "factory") {
-      if (node.arguments.length > 1 || node.arguments.some((argument) => origin(argument) !== "request")) valid = false
-      factories += 1
-    } else if (node.arguments.length !== 1 || !TEXT.has(origin(node.arguments[0]))) valid = false
-    return undefined
-  })
-  return valid && exchanges === 1 && factories <= 1 && redirects > 0
+  const imports = importsOf(context, program, sourceCode)
+  return imports !== null && validOperations(program, { sourceCode, handler, imports })
 }
 
 /** A callback stays a PKCE exchange and redirect, with every side effect owned by the auth helper. */
@@ -198,7 +296,7 @@ export const callbackShape = {
     docs: { description: "R287 FE_CALLBACK_SHAPE: the Supabase callback reads the PKCE code, exchanges it through modules/auth, and redirects only." },
     schema: [],
     messages: {
-      shape: "FE_CALLBACK_SHAPE: the auth callback must export an async GET that reads the query code, awaits one auth.exchangeCodeForSession(code), and redirects with NextResponse.redirect or next/navigation redirect. Create the client in modules/auth; keep data access, cookie writes, other calls and additional HTTP handlers outside the callback.",
+      shape: "FE_CALLBACK_SHAPE: the auth callback must export an async GET that reads the query code, awaits one exchangeAuthCode(code) from modules/auth/server or auth.exchangeCodeForSession(code), and redirects with NextResponse.redirect or next/navigation redirect. Create the client in modules/auth; keep data access, cookie writes, other calls and additional HTTP handlers outside the callback.",
     },
   },
   create(context) {
