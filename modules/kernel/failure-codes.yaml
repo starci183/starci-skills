@@ -18799,6 +18799,7 @@ HFS_SECRET_OUTSIDE_ENC:
     - "Vi phạm luật R277: chỉ `.starcistacks/<env>/secrets/**.enc` được giữ envelope; `.enc` ở chỗ khác là custody sai (với lite lỗi này đã là HFS_LITE_SECRET_CUSTODY)."
   nextStep_vi: "Chuyển envelope về `.starcistacks/<env>/secrets/<slug>.enc` (hoặc niêm phong lại bằng `starci app secret set`) rồi gỡ bản `.enc` lạc chỗ khỏi index."
   owner: owner
+  kind: check-finding
 RT_RULING_STALE_CITE:
   title: "A live statement cites a superseded or unknown owner ruling"
   title_vi: "Nội dung hiện hành dẫn quyết định đã bị thay thế hoặc chưa được ghi nhận"

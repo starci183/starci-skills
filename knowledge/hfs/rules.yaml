@@ -2295,6 +2295,16 @@ rules:
     enforcers:
       - {kind: hfs, id: release-provenance, at: scripts/hfs/rules/release-provenance.mjs}
 
+  - id: R274
+    code: "RT_RULING_STALE_CITE"
+    law: "Live prose, source comments and spec titles cite current owner rulings using ruling:R212/case-4 or a stable owner id. A superseded or amended ruling needs its live successor in the same paragraph; staleWhen statements outside historical case text and CHANGELOGs are refused, and a bare owner ruling date must match a catalog case or owner ruling."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_RULING_STALE_CITE"]
+    enforcers:
+      - {kind: runtime, id: ruling-cites, at: scripts/checks/check-ruling-cites.mjs}
+
   - id: R277
     code: "HFS_SECRET_PLAINTEXT_FILE"
     law: "In every edition the only custody a tracked secret may take is a sops envelope at `.starcistacks/<env>/secrets/**.enc`. A tracked plaintext secret file is refused by being: `secrets.env` or `.secret(s).env` at any depth, a non-dot `*.env` or `*.env.<profile>` holding secret keys (deploy-side dotenv included), and a plaintext member of a `secrets/` directory; a sealed `.enc` outside the one sealed home is refused too (for lite it is already `HFS_LITE_SECRET_CUSTODY`)."
@@ -2424,13 +2434,3 @@ rules:
     failureCodes: ["HFS_FEATURE_FILE_BUDGET"]
     enforcers:
       - {kind: hfs, id: feature-files, at: scripts/hfs/rules/feature-files.mjs}
-
-  - id: R274
-    code: "RT_RULING_STALE_CITE"
-    law: "Live prose, source comments and spec titles cite current owner rulings using ruling:R212/case-4 or a stable owner id. A superseded or amended ruling needs its live successor in the same paragraph; staleWhen statements outside historical case text and CHANGELOGs are refused, and a bare owner ruling date must match a catalog case or owner ruling."
-    scope: runtime
-    kinds: [check]
-    gates: [land, runtime]
-    failureCodes: ["RT_RULING_STALE_CITE"]
-    enforcers:
-      - {kind: runtime, id: ruling-cites, at: scripts/checks/check-ruling-cites.mjs}
