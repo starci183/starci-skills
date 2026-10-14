@@ -1,5 +1,6 @@
 {
   "environment": "production",
   "provider": "supabase",
-  "project": "{{project}}"
+  "project": "{{project}}",
+  "runtime": "docker-swarm"
 }

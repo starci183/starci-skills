@@ -24,8 +24,12 @@ const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 const EXPECTED_LITE_FILES = Object.freeze([
   '.dockerignore', '.editorconfig', '.gitattributes', '.github/dependabot.yml', '.github/workflows/ci.yml', '.github/workflows/db-deploy.yml',
   '.github/workflows/images.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.nvmrc', '.prettierignore',
-  '.prettierrc', '.sops.yaml', '.starcistacks/application-stacks.yaml', '.starcistacks/dev/environment.json', '.starcistacks/dev/secrets/.gitkeep',
-  '.starciwork/.gitignore', '.starciwork/workspace.yaml',
+  '.prettierrc', '.sops.yaml', '.starcistacks/application-stacks.yaml', '.starcistacks/dev/README.md',
+  '.starcistacks/dev/environment.json', '.starcistacks/dev/infra/swarm/stack.yaml', '.starcistacks/dev/runtime/config/Caddyfile',
+  '.starcistacks/dev/runtime/env/KEYS.md', '.starcistacks/dev/secrets/.gitkeep', '.starcistacks/production/README.md',
+  '.starcistacks/production/environment.json', '.starcistacks/production/infra/swarm/stack.yaml',
+  '.starcistacks/production/runtime/config/Caddyfile', '.starcistacks/production/runtime/env/KEYS.md',
+  '.starciwork/.gitignore', '.starciwork/brand/index.yaml', '.starciwork/workspace.yaml',
   'README.md',
   'be/apps/api/Dockerfile', 'be/apps/api/src/api.env.ts', 'be/apps/api/src/api.options.ts', 'be/apps/api/src/app.module.ts',
   'be/apps/api/src/compose/api.ts', 'be/apps/api/src/compose/domain.ts', 'be/apps/api/src/compose/integrations.ts',
@@ -102,7 +106,7 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'be/src/modules/platform/primitives/index.ts', 'be/src/modules/platform/primitives/outcome.contracts.ts', 'be/src/modules/platform/primitives/outcome.mapper.spec.ts',
   'be/src/modules/platform/primitives/outcome.mapper.ts', 'be/src/tests/fixtures/builders/api.builder.ts',
   'be/src/tests/tsconfig.json', 'be/tsconfig.build.json', 'be/tsconfig.json', 'codecov.yml',
-  'fe/apps/web/Dockerfile', 'fe/apps/web/next.config.ts', 'fe/apps/web/package.json', 'fe/apps/web/postcss.config.mjs',
+  'fe/apps/web/next.config.ts', 'fe/apps/web/package.json', 'fe/apps/web/postcss.config.mjs',
   'fe/apps/web/src/app/[locale]/error.tsx', 'fe/apps/web/src/app/[locale]/layout.tsx',
   'fe/apps/web/src/app/[locale]/loading.tsx', 'fe/apps/web/src/app/[locale]/not-found.tsx',
   'fe/apps/web/src/app/[locale]/page.tsx', 'fe/apps/web/src/app/[locale]/providers.tsx',
@@ -182,9 +186,18 @@ test('lite scaffold emits its workspace and required stack declarations and is s
   assert.equal(stacks.services.sonar.provider, 'sonarqube');
   assert.equal(stacks.services.sonar.mode, 'local');
   assert.deepEqual(stacks.services.sonar.stack, { owner: 'host', root: '.claude/ext/sonar', environment: 'dev' });
-  assert.equal(stacks.components, undefined, 'the starter declares no unoperated compute');
-  assert.equal(stacks.environments, undefined, 'production delivery is authored when operated');
-  assert.equal(fs.existsSync(path.join(root, '.starcistacks/production')), false);
+  assert.deepEqual(Object.keys(stacks.components), ['api', 'web', 'ingress']);
+  assert.equal(stacks.components.ingress.role, 'ingress');
+  for (const environment of ['dev', 'production']) {
+    const spec = stacks.environments[environment];
+    assert.equal(spec.runtime, 'docker-swarm');
+    assert.deepEqual(spec.composeFiles, ['infra/swarm/stack.yaml']);
+    assert.equal(spec.runbook, 'README.md');
+    assert.deepEqual(Object.keys(spec.components), ['api', 'web', 'ingress']);
+    const directory = path.join(root, '.starcistacks', environment);
+    assert.ok(fs.existsSync(path.join(directory, 'runtime/config/Caddyfile')));
+    assert.ok(fs.existsSync(path.join(directory, 'runtime/env/KEYS.md')));
+  }
   const entry = fs.readFileSync(path.join(root, 'be/apps/api/src/main.ts'), 'utf8');
   const env = fs.readFileSync(path.join(root, 'be/apps/api/src/api.env.ts'), 'utf8');
   assert.match(entry, /readApiEnv\(env\)/);

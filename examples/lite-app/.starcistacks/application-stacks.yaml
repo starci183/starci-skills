@@ -23,6 +23,12 @@
 schema: starci/application-stacks@1
 sources:
   - repository: lite-app
+backing:
+  supabase:
+    provider: supabase
+    managed: true
+# Application image digests are illustrative all-zero placeholders, never a completed release.
+# The owner replaces them with verified published digests before deployment.
 components:
   supabase:
     role: stateful
@@ -30,13 +36,13 @@ components:
     required: true
   api:
     role: service
-    image: lite-app/api:1.0.0
+    image: lite-app/api:1.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000
     compose: infra/swarm/stack.yaml
     purpose: The Nest api (GraphQL, the signed calendar webhook, the pgmq relay and workers). Liveness /health/live, readiness /health/ready.
     required: true
   web:
     role: service
-    image: lite-app/web:1.0.0
+    image: lite-app/web:1.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000
     compose: infra/swarm/stack.yaml
     purpose: The Next.js app (standalone output); no runtime secret, its NEXT_PUBLIC_* values are build arguments. Liveness /health/live.
     required: true

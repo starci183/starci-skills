@@ -1,8 +1,9 @@
-# Owner-provisioned release image digests and public certificate contact are required inputs.
+# Application digests are illustrative all-zero placeholders; replace them with verified published release digests.
+# The public certificate contact remains an owner-provisioned renderer input.
 version: "3.8"
 services:
   api:
-    image: "${LITE_APP_API_IMAGE:?set the verified API image digest}"
+    image: lite-app/api:1.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000
     environment:
       NODE_ENV: production
       PORT: "8787"
@@ -35,7 +36,7 @@ services:
       rollback_config: { parallelism: 1, order: stop-first }
       restart_policy: { condition: on-failure, delay: 5s }
   web:
-    image: "${LITE_APP_WEB_IMAGE:?set the verified web image digest}"
+    image: lite-app/web:1.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000
     environment:
       NODE_ENV: production
       PORT: "3000"

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { imageFiles, renderTargets, writeTargets } from "../../packages/hfs/sync/index.mjs";
+import { TEMPLATES_DIR, imageFiles, render, renderTargets, writeTargets } from "../../packages/hfs/sync/index.mjs";
 import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from "../../scripts/hfs/slots.mjs";
 import { FE_APP_SCRIPTS, PACKAGE_MANAGER, WORKSPACES, feAppPackageName } from "../../scripts/hfs/rules/monorepo.mjs";
 
@@ -48,6 +48,29 @@ export const put = (root, file, text = "export {};\n") => {
   fs.writeFileSync(target, text);
 };
 const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
+
+function requiredContent(file) {
+  if (file.endsWith(".json")) return "{}\n";
+  if (file.endsWith(".yaml") || file.endsWith(".yml"))
+    return "schema: fixture/v1\n";
+  if (file.endsWith(".toml")) return 'project_id = "demo"\n';
+  if (file.endsWith(".md")) return "# Demo\n";
+  return "export {};\n";
+}
+
+/** Materialize the real composition and health source that an additive upgrade must preserve. */
+function writeBackendTemplate(root, directory, relative, project) {
+  const source = path.join(TEMPLATES_DIR, "be", directory, relative);
+  for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+    const file = `${relative}/${entry.name}`;
+    if (entry.isDirectory()) {
+      writeBackendTemplate(root, directory, file, project);
+      continue;
+    }
+    const text = fs.readFileSync(path.join(source, entry.name), "utf8");
+    put(root, `be/${file}`, render(text, { project, app: "api", appPascal: "Api" }));
+  }
+}
 
 export function fakeLock(root) {
   const pkg = JSON.parse(
@@ -137,20 +160,10 @@ export function syntheticLite(t, name = "demo") {
       fs.existsSync(path.join(root, ...file.split("/")))
     )
       continue;
-    put(
-      root,
-      file,
-      file.endsWith(".json")
-        ? "{}\n"
-        : file.endsWith(".yaml") || file.endsWith(".yml")
-          ? "schema: fixture/v1\n"
-          : file.endsWith(".toml")
-            ? 'project_id = "demo"\n'
-            : file.endsWith(".md")
-              ? "# Demo\n"
-              : "export {};\n",
-    );
+    put(root, file, requiredContent(file));
   }
+  writeBackendTemplate(root, "skeleton-lite", "apps/api/src", name);
+  writeBackendTemplate(root, "skeleton", "src/features/api/system-health", name);
   put(
     root,
     "be/nest-cli.json",

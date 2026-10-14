@@ -105,7 +105,7 @@ test("upgrade plan is ordered, printable and byte-for-byte read-only; apply exec
       "be/apps/api/src/compose/api.ts",
       "be/src/features/api/system-health/index.ts",
       "be/src/features/api/system-health/system-health.module.ts",
-      "be/src/features/api/system-health/application/liveness.contracts.ts",
+      "be/src/features/api/system-health/application/check-liveness.contracts.ts",
       "be/src/features/api/system-health/transport/http/system-health-http.module.ts",
       "be/src/features/api/system-health/transport/http/live.controller.ts",
       "be/src/modules/domain/sample/sample.service.ts",

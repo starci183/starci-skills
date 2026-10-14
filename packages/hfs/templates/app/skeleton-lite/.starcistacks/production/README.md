@@ -3,6 +3,7 @@
 The tracked model declares Docker Swarm application services and one digest-pinned Caddy ingress.
 Supabase supplies PostgreSQL, Auth and pgmq. This stack runs no PostgreSQL, Redis or MongoDB service.
 The model is a deployment declaration. It contains no owner credentials, real DNS receipt, completed release or restore proof.
+Its application image references contain illustrative all-zero digests; they identify no published image and must be replaced before deployment.
 
 | Command | Operation |
 | --- | --- |
@@ -27,7 +28,7 @@ Every item is pending. Swarm initialization, provider URIs, DNS changes and key 
 | Secret custody | Seal real values only into `.starcistacks/production/secrets/*.enc`; record their keys in the environment inventory and add the real sealed members to the manifest. The age identity stays only in the host's untracked `.claude/secret.env`. |
 | External secrets | Materialize the sealed members in owner custody and create `{{project}}-production-primary-db-url-v1` and `{{project}}-production-supabase-service-role-key-v1`. The API reads mounted files; rotation creates new versioned names before updating the model. |
 | Public build configuration | Build the front end with its declared public site and GraphQL URLs, the Supabase public URL and anonymous key. Public browser values stay outside sealed secret custody. |
-| Immutable release | Replace starter `:v0.0.0` image slots with the digests produced by the verified release. Store each rendered release under `/srv/{{project}}/releases/<digest>`; move the current pointer after verification and retain the previous release for rollback. |
+| Immutable release | Replace the illustrative all-zero application digests with the digests produced by the verified release. Store each rendered release under `/srv/{{project}}/releases/<digest>`; move the current pointer after verification and retain the previous release for rollback. |
 | Rollback | Retain the previous model and images, redeploy that model if convergence or health fails, and record the resulting convergence receipt. Database changes follow an expand/contract sequence. |
 | Backup | Back up the external database and ingress volumes to an owner-provisioned off-host destination; record retention, recovery owner, encryption and restore procedure. |
 | Restore proof | Perform a restore into isolated infrastructure, verify the restored database and ingress state, and attach a dated receipt with artifact digests. No restore has been run by scaffolding. |

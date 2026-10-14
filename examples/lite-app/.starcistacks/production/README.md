@@ -5,6 +5,9 @@ is the environment's custody: `environment.json` describes it, `.starcistacks/pr
 `runtime/env/KEYS.md` is the environment key roster, and `secrets/*.enc` are the sealed secret members (sops, the
 project age recipient in `../../.sops.yaml`).
 
+The application image references contain illustrative all-zero digests. They identify no published image and must
+be replaced in the declaration and stack source by verified release digests before deployment.
+
 ## Owner actions (declared, never automated)
 
 1. DNS at the registrar: A records for `lite-app.example` and `api.lite-app.example` → the VPS. Receipt: `nslookup`.
@@ -32,7 +35,7 @@ docker secret create lite-app-CALENDAR_WEBHOOK_SECRET-v1 -
 
 # Create the immutable routes config and deploy.
 docker config create lite-app-routes-c1 infra/swarm/edge/routes.yml
-# Export the public operator contact and verified image digests from the deployment roster.
+# Replace illustrative application digests and export the public operator contact from the deployment roster.
 docker stack deploy --with-registry-auth -c infra/swarm/stack.yaml lite-app
 ```
 
@@ -50,7 +53,7 @@ it.
 
 | Command      | Operation                                                                                                                                              |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| prepare      | Complete the owner actions, provision external secrets and configs, and export the public deployment inputs.                                           |
+| prepare      | Complete the owner actions, replace illustrative image digests, provision external secrets and configs, and export the public deployment inputs.       |
 | doctor       | From this directory, run `docker stack config -c infra/swarm/stack.yaml` and confirm the external secrets, config and volumes on the labelled manager. |
 | up           | Run the deploy command above after reviewing the rendered model and release digests.                                                                   |
 | status       | Run `docker stack services lite-app` and retain the convergence result.                                                                                |

@@ -107,9 +107,10 @@ test('app.starcistacks requires the declaration in both editions and lite owns i
   assert.deepEqual(lite.requires, ['application-stacks.yaml']);
   assert.deepEqual(lite.allows, [
     'application-stacks.yaml', '<env>/README.md', '<env>/environment.json', '<env>/infra/swarm/**',
-    '<env>/secrets/<slug>.enc', '<env>/secrets/.gitkeep',
+    '<env>/infra/metadata.json', '<env>/runtime/{config,env}/**', '<env>/runtime/env/KEYS.md',
+    '<env>/secrets/<slug>.enc', '<env>/secrets/.gitkeep', '<env>/seeds/**',
   ]);
-  for (const forbidden of ['<env>/infra/{compose,k8s,terraform}/**', '<env>/runtime/**', '<env>/seeds/**']) {
+  for (const forbidden of ['<env>/runtime/files/**', '**/*.enc outside <env>/secrets/', 'DESIGN.md']) {
     assert.ok(lite.forbids.includes(forbidden), forbidden);
   }
   assert.deepEqual(effectiveSlot(slot, 'app', 'full').requires, ['application-stacks.yaml']);

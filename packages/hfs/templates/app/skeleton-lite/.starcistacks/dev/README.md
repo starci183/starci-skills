@@ -1,7 +1,7 @@
 # Development stack
 
 The app services may run in a local Docker Swarm; local Supabase is started separately with its CLI and supplies the database and broker. The tracked model contains no self-hosted database.
-Starter release images and external secrets must be prepared before starting the container model. Replace its starter `SUPABASE_URL` with the local Supabase endpoint reachable from the Swarm node, and seal that local database connection and integration credential; a container cannot use the host's loopback address without owner-configured networking. Local source development remains available through the app scripts.
+The application image references contain illustrative all-zero digests. Replace them with verified published release digests and prepare external secrets before starting the container model. Replace its starter `SUPABASE_URL` with the local Supabase endpoint reachable from the Swarm node, and seal that local database connection and integration credential; a container cannot use the host's loopback address without owner-configured networking. Local source development remains available through the app scripts.
 
 | Command | Operation |
 | --- | --- |

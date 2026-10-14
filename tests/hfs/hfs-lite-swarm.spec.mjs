@@ -21,11 +21,21 @@ test('both editions run the Swarm runtime checks', t => {
   }
 });
 
-test('lite refuses compose, Kubernetes, terraform, runtime and seeds paths', t => {
+test('lite accepts runtime config, env rosters and seeds beside its Swarm tree', t => {
   const f = swarmFixture(t);
-  for (const area of ['infra/compose', 'infra/k8s', 'infra/terraform', 'runtime/config', 'seeds'])
+  for (const file of ['runtime/config/Caddyfile', 'runtime/env/KEYS.md', 'seeds/notes.sql'])
+    f.put(`.starcistacks/production/${file}`, '# authored fixture\n');
+  assert.deepEqual(f.check(), []);
+});
+
+test('lite refuses compose, Kubernetes, terraform, runtime files and misplaced sealed paths', t => {
+  const f = swarmFixture(t);
+  for (const area of ['infra/compose', 'infra/k8s', 'infra/terraform', 'runtime/files'])
     f.put(`.starcistacks/production/${area}/extra.yaml`, 'services: {}\n');
-  assert.equal(f.check().filter(item => /not part of/.test(item.message)).length, 5);
+  f.put('.starcistacks/production/runtime/env/api.enc', '');
+  const findings = f.check();
+  assert.equal(findings.filter(item => /not part of/.test(item.message)).length, 4);
+  assert.ok(findings.some(item => /sealed secret outside/.test(item.message)));
 });
 
 test('lite refuses namespaced managed backing images in the inventory and stack', t => {

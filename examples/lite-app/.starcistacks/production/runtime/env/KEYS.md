@@ -53,5 +53,6 @@ The external secret names and routes config name are versioned references declar
 | Key                  | Semantics                                                                                      |
 | -------------------- | ---------------------------------------------------------------------------------------------- |
 | `ACME_EMAIL`         | Public operator contact for certificate renewal notices.                                       |
-| `LITE_APP_API_IMAGE` | Immutable API image digest produced by a verified release.                                     |
-| `LITE_APP_WEB_IMAGE` | Immutable web image digest produced by a verified release with its public build configuration. |
+
+The illustrative all-zero application image digests in the declaration and stack source must be replaced by
+verified published release digests before deployment. They are authored image references, not environment keys.
