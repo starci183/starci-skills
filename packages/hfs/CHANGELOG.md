@@ -1,6 +1,16 @@
 # Changelog
 
 ## 4.3.0 - 2026-10-14
+- Added: the app file role `<app>.env.ts` (`apps/<app>/src/`, every `be.app.*` slot, budget 150): the typed, fail-fast parse of the environment, imported by `main.ts` so the entry stays within its 80 lines. Only `main.ts` and the app's own env file read the environment; the env file lists no module and imports no feature. The api, lite api and cli scaffolds write it.
+- Added: `starci app secret` custody verbs `init`, `set <env> <slug> <KEY>` (stdin or `--generate <bytes>`), `get <env> <slug> [KEY] --to-file [--reveal]`, `materialize <env>` and `list <env>` over sops dotenv files under `.starcistacks/<env>/secrets/`; the age identity lives outside the repository, materialized values go under the local StarCi secrets directory for `*_FILE` reading, and no value reaches stdout unless `--reveal`. The scaffolded `.sops.yaml` carries the `init` instruction and the be config template reads `<NAME>_FILE` before `<NAME>`. An untracked root `secrets.env` of a lite app is an `HFS_PLAINTEXT_SECRET` warning.
+- Added: lite delivery slots `app.deploy` (`deploy/`), `app.ci-deploy`, `app.ci-authorize-deploy-key` and `app.scripts.delivery`; R06 scans all of them.
+- Added: fe tier edge `feature -> feature` narrowed by `mayImportKinds` (pages compose overlays and blocks) and render props in the pure half (`render*` callbacks in `props` of a non-block component); `FE_CONNECTED_BLOCK_RENDER_PAIR` reads the exact sibling `XBase` twin.
+- Changed: a lite app's `.starciwork/` holds only `.gitignore` and `brand/**` and is optional; the work readers (validate, kernel, uat, example refs) skip the removed workspace, index, shell and feature records under lite, and the lite scaffold and example no longer write them.
+- Changed: a pure re-export `index.ts` gets the 400-line `barrel` budget (hooks slots); an `fe.modules` instance with no `.ts`/`.tsx` file needs no `index.ts` (`HFS_REQUIRED_FILE_MISSING`, `HFS_SLOT_REQUIRED_MISSING`).
+- Changed: `BE_BACKGROUND_UNOWNED` decides by context (job processor, scheduler, saga, event handler and what they call), never by a `retry*`/`replay*` method name; resolvers and controllers are never background.
+- Changed: `HFS_DUPLICATE_CODE` drops canon scaffold shapes; `HFS_UNUSED_EXPORT` counts staged test consumers; `FE_I18N_KEYS` reads in-segment template keys (`t(`stage_${x}`)`) as globs.
+- Changed: the scaffolded pre-commit hook passes staged files to eslint and prettier in chunks of 50 (Windows command-line limit); `DB_MIGRATION_SHAPE` orders a new migration against HEAD's active migrations, not the clock or the base branch.
+
 
 - Added: HFS manifest 3.1.0 (rule catalog 3.1.0, owner ruling 2026-10-14, R245 and R246): every `be.app.*` slot allows the composition groups `compose/<area>.ts` and budgets its composition files (`app.module.ts` 250, `<app>.options.ts` 200, `compose/<area>.ts` 120, `main.ts` 80); `<app>.options.ts` holds env-derived options and port bindings only (`BE_APP_OPTIONS_COMPOSITION`, `BE_APP_COMPOSITION_BUDGET`).
 - Changed: `starci app scaffold` writes `apps/<api app>/src/compose/platform.ts` (the platform capabilities as one group, `platformModules(options)`) in both editions, and the scaffolded `app.module.ts` spreads it before the domain modules and the guards.

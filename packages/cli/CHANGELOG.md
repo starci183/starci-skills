@@ -1,6 +1,8 @@
 # Changelog
 
 ## 1.2.16 - 2026-10-14
+- Added: `starci app secret init|set|get|materialize|list` (the generated catalog, docs and shell completions), replacing `list|show|set|gen`.
+
 
 - Changed: pin HFS 4.3.0 (manifest 3.1.0: the app composition standard, `compose/<area>.ts` groups and the composition budgets). Command dispatcher implementations are unchanged.
 

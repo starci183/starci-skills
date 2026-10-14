@@ -1,6 +1,11 @@
 # Changelog
 
 ## 3.3.0 - 2026-10-14
+- Added: the app file role `<app>.env.ts` (150-line budget, `app-file-budget`): `config-owner` lets `main.ts` and the app's env file parse the environment; `app-options-composition-free` also refuses a module list or `register`/`forRoot` call in it, and it imports no feature.
+- Changed: `background-unowned` decides by context (processor, scheduler, saga, event handler and what they call; a resolver or controller is never background) instead of by method name.
+- Changed: `webhook-verify-first` and `webhook-shape` accept a first call to a declared domain verifier (`...Verifier` service or a verifier the webhook module declares) beside `WebhookSignatureService.verify`; `feature-thin` treats that proof as a gate call.
+- Changed: the bundled architecture machine carries `HFS_DUPLICATE_CODE` canon-shape exclusions, staged dead-export consumers and the `<app>.env.ts` role.
+
 
 - Added: law `app-composition` (R245 and R246, owner ruling 2026-10-14). `app-options-composition-free` (`BE_APP_OPTIONS_COMPOSITION`) keeps `apps/<app>/src/<app>.options.ts` to env-derived options and port bindings (provider maps such as `{ approvalGate: X }`): an array that lists a `*Module` class, a `X.register(...)`/`forRoot(...)`/`registerQueue(...)` call, a `*SchedulerOf(...)`/`*Queue(...)` entry or a spread of such a list, and an `imports`, `modules`, `schedulers` or `processors` array are refused, pointing to `compose/<area>.ts`. `app-file-budget` (`BE_APP_COMPOSITION_BUDGET`) holds `main.ts` (80), `<app>.options.ts` (200), `compose/<area>.ts` (120) and `app.module.ts` (250) to the `budget` of their app slot; the budget is absolute. The role of an app file is the slot entry it matches (`lib/app-roles.mjs`), never a path list.
 - Changed: `is-global-only-in-app` accepts `isGlobal: true` in the composition groups `apps/<app>/src/compose/<area>.ts` (they are part of the app root), and the bundled architecture machine reads an app's root and its groups as one composition (register-once, module-per-transport, the connection and context maps).

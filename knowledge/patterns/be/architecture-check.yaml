@@ -104,8 +104,6 @@ rules:
       automated:
         - BE_APP_COMPOSITION_ONLY
         - BE_APP_BUSINESS_ROLE
-        - BE_APP_OPTIONS_COMPOSITION
-        - BE_APP_COMPOSITION_BUDGET
         - BE_ENTRYPOINT_ONLY_IN_APPS
         - HFS_SLOT_REQUIRED_MISSING
         - HFS_MIN_INSTANCES
@@ -121,6 +119,8 @@ rules:
         - HFS_README_WORK_POINTER_MISSING
         - HFS_README_PRIVATE_URL
         - HFS_README_BADGE_NOT_LIVE
+        - BE_APP_OPTIONS_COMPOSITION
+        - BE_APP_COMPOSITION_BUDGET
       manual:
         - Verify that the e2e run of the app fails when a module or provider is missing.
     relatedExamples: []

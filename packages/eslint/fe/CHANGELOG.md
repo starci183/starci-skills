@@ -1,6 +1,8 @@
 # Changelog
 
 ## 8.2.17 - 2026-10-14
+- Changed: `component-line-budget` gives a pure re-export `index.ts` the slot's `barrel` budget (400); `basePropsAtom` admits named `render*` callbacks in `props` of non-block pure halves for feature composition; the bundled machine carries the kind-scoped feature tier edge, canon-shape clone exclusions and in-segment i18n template reads.
+
 
 - Changed: carry the runtime mirror of HFS manifest 3.1.0 (the back-end app composition standard, R245 and R246) and the canon pins of eslint-canon-be 3.3.0, HFS 4.3.0 and CLI 1.2.16. ESLint rule implementations are unchanged.
 
