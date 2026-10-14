@@ -1,11 +1,10 @@
 import { Test } from "@nestjs/testing"
-import { builder, fakeTransaction, mock, mockEntityManager, recordingQueueOutbox } from "@starci/jest-preset"
-import type { MockEntityManager, RecordingQueueOutbox } from "@starci/jest-preset"
+import { builder, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import type { MockEntityManager } from "@starci/jest-preset"
 import { ResourcesService } from "@modules/domain/resources"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
-import { QUEUE_OUTBOX } from "@modules/platform/queue"
-import { BOOKING_CONFIRMATION_QUEUE, BookingConfirmationQueue } from "@modules/queues/booking-confirmation"
-import { BOOKING_REMINDER_QUEUE, BookingReminderQueue } from "@modules/queues/booking-reminder"
+import { BookingConfirmationQueue } from "@modules/queues/booking-confirmation"
+import { BookingReminderQueue } from "@modules/queues/booking-reminder"
 import type { CreateBookingParams } from "./bookings.contracts"
 import { BookingsService } from "./bookings.service"
 import { BookingsErrorCode } from "./errors/bookings.error"
@@ -28,25 +27,30 @@ const INSERTED = {
 const build = async (entityManager: MockEntityManager) => {
     const resources = mock<ResourcesService>()
     resources.resources.mockResolvedValue({ id: "resource-1" })
-    const outbox: RecordingQueueOutbox = recordingQueueOutbox()
+    const confirmations = mock<BookingConfirmationQueue>()
+    const reminders = mock<BookingReminderQueue>()
     const moduleRef = await Test.createTestingModule({
         providers: [
             BookingsService,
-            BookingConfirmationQueue,
-            BookingReminderQueue,
             { provide: PRIMARY_ENTITY_MANAGER, useValue: entityManager },
             { provide: ResourcesService, useValue: resources },
-            { provide: QUEUE_OUTBOX, useValue: outbox },
+            { provide: BookingConfirmationQueue, useValue: confirmations },
+            { provide: BookingReminderQueue, useValue: reminders },
         ],
     }).compile()
-    return { bookings: moduleRef.get(BookingsService), resources, outbox }
+    return { bookings: moduleRef.get(BookingsService), resources, confirmations, reminders }
 }
 
 describe("BookingsService", () => {
     describe("createBooking", () => {
         it("writes the pending booking and enqueues its confirmation and reminder in the same transaction", async () => {
             const tx = fakeTransaction(mockEntityManager({ query: [INSERT_BOOKING, [INSERTED]] }))
-            const { bookings, resources, outbox } = await build(tx.em)
+            const { bookings, resources, confirmations, reminders } = await build(tx.em)
+            let outcomesAtEnqueue: ReadonlyArray<string> = []
+            confirmations.enqueueConfirmBooking.mockImplementation(() => {
+                outcomesAtEnqueue = tx.outcomes
+                return Promise.resolve()
+            })
 
             await expect(bookings.createBooking("person-1", paramsOf())).resolves.toEqual({
                 id: "booking-1",
@@ -63,26 +67,32 @@ describe("BookingsService", () => {
                 "2026-10-13T10:00:00.000Z",
                 "2026-10-13T11:00:00.000Z",
             ])
-            expect(outbox.jobsOf(BOOKING_CONFIRMATION_QUEUE)).toEqual([
-                { queue: BOOKING_CONFIRMATION_QUEUE, payload: { bookingId: "booking-1" } },
-            ])
-            expect(outbox.jobsOf(BOOKING_REMINDER_QUEUE)).toEqual([
-                { queue: BOOKING_REMINDER_QUEUE, payload: { bookingId: "booking-1" } },
-            ])
-            expect(outbox.allInTransaction).toBe(true)
+            expect(confirmations.enqueueConfirmBooking).toHaveBeenCalledTimes(1)
+            expect(confirmations.enqueueConfirmBooking).toHaveBeenCalledWith(
+                { bookingId: "booking-1" },
+                expect.anything(),
+            )
+            expect(confirmations.enqueueConfirmBooking.mock.calls[0]?.[1]).not.toBe(tx.em)
+            expect(outcomesAtEnqueue).toEqual(["pending"])
+            expect(reminders.enqueueRemindBooking).toHaveBeenCalledTimes(1)
+            expect(reminders.enqueueRemindBooking).toHaveBeenCalledWith(
+                { bookingId: "booking-1" },
+                expect.anything(),
+            )
+            expect(reminders.enqueueRemindBooking.mock.calls[0]?.[1]).not.toBe(tx.em)
             expect(tx.commits).toBe(1)
         })
 
         it("writes nothing for a resource the caller does not own", async () => {
             const tx = fakeTransaction(mockEntityManager())
-            const { bookings, resources, outbox } = await build(tx.em)
+            const { bookings, resources, confirmations } = await build(tx.em)
             const notFound = new Error("RESOURCES_NOT_FOUND")
             resources.resources.mockRejectedValue(notFound)
 
             await expect(bookings.createBooking("person-1", paramsOf())).rejects.toBe(notFound)
 
             expect(tx.outcomes).toEqual([])
-            expect(outbox.jobs).toEqual([])
+            expect(confirmations.enqueueConfirmBooking).not.toHaveBeenCalled()
         })
 
         it("refuses an interval that overlaps another booking of the resource and enqueues nothing", async () => {
@@ -91,7 +101,7 @@ describe("BookingsService", () => {
                 code: "23P01",
             })
             tx.em.query.mockRejectedValueOnce(overlap)
-            const { bookings, outbox } = await build(tx.em)
+            const { bookings, confirmations } = await build(tx.em)
 
             await expect(bookings.createBooking("person-1", paramsOf())).rejects.toMatchObject({
                 code: BookingsErrorCode.IntervalTaken,
@@ -99,7 +109,7 @@ describe("BookingsService", () => {
             })
 
             expect(tx.rollbacks).toBe(1)
-            expect(outbox.jobs).toEqual([])
+            expect(confirmations.enqueueConfirmBooking).not.toHaveBeenCalled()
         })
 
         it("rethrows any other database failure as it is", async () => {
@@ -115,20 +125,20 @@ describe("BookingsService", () => {
 
         it("refuses when the insert answers no row", async () => {
             const tx = fakeTransaction(mockEntityManager({ query: [INSERT_BOOKING, []] }))
-            const { bookings, outbox } = await build(tx.em)
+            const { bookings, confirmations } = await build(tx.em)
 
             await expect(bookings.createBooking("person-1", paramsOf())).rejects.toMatchObject({
                 code: BookingsErrorCode.NotCreated,
             })
 
-            expect(outbox.jobs).toEqual([])
+            expect(confirmations.enqueueConfirmBooking).not.toHaveBeenCalled()
         })
 
         it("rolls the booking back when its confirmation cannot be enqueued", async () => {
             const tx = fakeTransaction(mockEntityManager({ query: [INSERT_BOOKING, [INSERTED]] }))
-            const { bookings, outbox } = await build(tx.em)
+            const { bookings, confirmations } = await build(tx.em)
             const failure = new Error("queue missing")
-            outbox.failNext("write", failure)
+            confirmations.enqueueConfirmBooking.mockRejectedValueOnce(failure)
 
             await expect(bookings.createBooking("person-1", paramsOf())).rejects.toBe(failure)
 

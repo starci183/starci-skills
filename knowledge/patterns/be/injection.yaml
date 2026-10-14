@@ -10,7 +10,7 @@ appliesTo:
 family: be
 # The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
 # into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
-slots: [be.app, be.feature, be.feature.application]
+slots: [be.app, be.app.api, be.feature, be.feature.application]
 provenance:
   reviewedAt: 2026-09-30
   sources:

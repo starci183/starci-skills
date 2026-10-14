@@ -1,20 +1,27 @@
 "use client"
 
-import { useCallback, useState, useTransition } from "react"
+import { useTransition } from "react"
+import type { GraphQLResponse } from "@/modules/api"
 import { authClient } from "@/modules/auth"
+import type { AuthFailure } from "@/modules/auth"
+import { useGraphQLWithToast } from "@/modules/toast"
 
-/** Why a sign-out did not end the session: refused, rejected or the provider unavailable. */
-type SignOutFailure = "refused" | "invalid" | "unavailable"
+/** The app's one outcome of an auth call, so modules/toast reports it like any other write. */
+const responseOf = (failure: AuthFailure | undefined): GraphQLResponse<null> =>
+    failure === undefined
+        ? { success: true, data: null }
+        : { success: false, error: failure.code, kind: failure.kind, message: failure.message }
 
-/** Ends the browser session through modules/auth; the session effect moves redux to signed-out on success. */
+/**
+ * Ends the reader's session through modules/auth: whether the request runs and the sign-out itself. A failure is reported by
+ * modules/toast; a success needs no toast, the session effect moves the reader to signed out.
+ */
 export const useSignOut = () => {
-    const [failure, setFailure] = useState<SignOutFailure>()
-    const [isPending, startTransition] = useTransition()
-    const signOut = useCallback(() => {
+    const withToast = useGraphQLWithToast()
+    const [pending, startTransition] = useTransition()
+    const signOut = () =>
         startTransition(async () => {
-            const outcome = await authClient.signOut()
-            setFailure(outcome.kind === "ok" ? undefined : outcome.kind)
+            await withToast(async () => responseOf(await authClient.signOut()), { showSuccessToast: false })
         })
-    }, [])
-    return { signOut, isPending, failure }
+    return { pending, signOut }
 }

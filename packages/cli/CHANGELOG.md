@@ -1,10 +1,21 @@
 # Changelog
 
+## 1.3.0 - 2026-10-15
+- Changed: depends on @starci/hfs 4.3.0; `starci gate starcistacks` and `starci app check` validate the lite docker-swarm production stack (catalog regenerated), rebased onto alpha.13 (cli 1.2.17).
+
 ## 1.2.16 - 2026-10-14
 - Added: `starci app secret init|set|get|materialize|list` (the generated catalog, docs and shell completions), replacing `list|show|set|gen`.
 
 
 - Changed: pin HFS 4.3.0 (manifest 3.1.0: the app composition standard, `compose/<area>.ts` groups and the composition budgets). Command dispatcher implementations are unchanged.
+
+## 1.2.17 - 2026-10-14
+
+- Changed: pin HFS 4.2.17 (the webhook door spec template signs with a per-run key). Command dispatcher implementations are unchanged.
+
+## 1.2.16 - 2026-10-14
+
+- Changed: pin HFS 4.2.16 (templates the published canons accept). Command dispatcher implementations are unchanged.
 
 ## 1.2.15 - 2026-10-13
 

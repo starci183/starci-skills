@@ -23,10 +23,7 @@
     "signOut": {
       "signedIn": "Đã đăng nhập",
       "submit": "Đăng xuất",
-      "working": "Đang đăng xuất",
-      "refused": "Phiên đăng nhập đã kết thúc.",
-      "invalid": "Không thể kết thúc phiên đăng nhập.",
-      "unavailable": "Hiện không thể đăng xuất. Vui lòng thử lại sau ít phút."
+      "working": "Đang đăng xuất"
     },
     "workspace": {
       "title": "Không gian đặt lịch",

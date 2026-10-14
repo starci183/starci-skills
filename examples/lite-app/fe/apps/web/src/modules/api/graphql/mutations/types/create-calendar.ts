@@ -1,7 +1,4 @@
-import type { CreateCalendarMutation, CreateCalendarMutationVariables } from "../../__generated__/graphql"
+import type { CreateCalendarMutation } from "../../__generated__/graphql"
 
-/** What mutateCreateCalendar takes: the variables of the `createCalendar` mutation (none: the caller owns the row). */
-export type MutateCreateCalendarRequest = CreateCalendarMutationVariables
-
-/** What mutateCreateCalendar answers: the `createCalendar` field. */
+/** What mutateCreateCalendar answers: the `createCalendar` field (generated from the back end's contract). */
 export type MutateCreateCalendarData = CreateCalendarMutation["createCalendar"]

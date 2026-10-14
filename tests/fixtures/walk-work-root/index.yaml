@@ -1,0 +1,7 @@
+schema: work/catalog@1
+id: "lite-app"
+description: The application's product feature catalog.
+features:
+  - id: system-health
+    directory: features/system-health
+    description: The liveness probe the platform asks before it routes traffic to the app.

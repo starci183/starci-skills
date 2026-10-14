@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl"
 import { useCallback, useMemo } from "react"
-import type { GraphQLResponse } from "@ecommerce/api"
+import type { GraphQLResponse } from "@/modules/api"
 import { runGraphQLWithToast } from "./api"
 import type { RunWithToastOptions, ToastMessages } from "./api"
 

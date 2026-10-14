@@ -9,7 +9,10 @@
  *
  * Owner = every graph.ownerRoots unit whose tier is not `app` and whose public entry file is in the graph (index.ts or
  * index.tsx, a package's src/index.ts). The `entries` its slot declares (slot data: a second public entry file of the owner) are further
- * public entries of the same owner, judged exactly like the entry. The exported names of an entry are its named exports, `export { a as b }`,
+ * public entries of the same owner, judged like the entry, with one addition: a name another declared entry of the owner
+ * imports (not re-exports) is used, because it is part of that entry's public signature (an operation file
+ * `graphql/queries/query-<x>.ts` typing its request and answer with `graphql/queries/types/<x>.ts`). A barrel or any other
+ * non-entry file of the owner still does not count. The exported names of an entry are its named exports, `export { a as b }`,
  * `export { x } from`, declarations with `export`, and `default` for `export default`. `export *` is refused by owners.mjs
  * and contributes no name here.
  *
@@ -449,11 +452,22 @@ const unusedExportViolation = (publicEntry, name, line, owner) => ({
   message: `${publicEntry} exports ${name}, but no production file outside ${owner.root || 'the repository root'} imports it; remove the export (only a unit role spec, a fixture builder, a test world file, or an integration spec of this integration's own provider folder counts besides production files).`,
 });
 
-/** The unused-export violations and the export count of one public entry of an owner. */
-const publicEntryExports = (context, key, owner, publicEntry) => {
+/** Adds to `used` what another declared entry of the same owner imports from `publicEntry`: that entry's signature makes it public. */
+const addSiblingEntryUses = (context, publicEntry, declared, used) => {
+  for (const edge of context.edgesTo.get(publicEntry) ?? []) {
+    if (edge.reexport || edge.from === publicEntry || !declared.has(edge.from)) continue;
+    const bindings = bindingsOf(context.ts, edge.edge.declaration);
+    if (bindings.all) used.all = true;
+    for (const pair of bindings.pairs) used.names.add(pair.imported);
+  }
+};
+
+/** The unused-export violations and the export count of one public entry of an owner (`declared`: its slot's extra entries). */
+const publicEntryExports = (context, key, owner, publicEntry, declared) => {
   const names = exportedNames(context.ts, context.graph.files.get(publicEntry).sourceFile);
   const used = consumedNames(context, publicEntry, key, 0, new Set([publicEntry]));
   addReexportedUses(context, key, publicEntry, used);
+  if (declared.has(publicEntry)) addSiblingEntryUses(context, publicEntry, declared, used);
   const violations = [...names]
     .filter(([name]) => !(used.all || used.names.has(name)))
     .map(([name, line]) => unusedExportViolation(publicEntry, name, line, owner));
@@ -470,8 +484,9 @@ const ownerExportFindings = (context, config) => {
     const entry = entryOf(graph, config, key, owner);
     if (!entry) continue;
     owners += 1;
-    for (const publicEntry of [entry, ...extraEntries(graph, entry)]) {
-      const found = publicEntryExports(context, key, owner, publicEntry);
+    const declared = new Set(extraEntries(graph, entry));
+    for (const publicEntry of [entry, ...declared]) {
+      const found = publicEntryExports(context, key, owner, publicEntry, declared);
       exports += found.exports;
       violations.push(...found.violations);
     }

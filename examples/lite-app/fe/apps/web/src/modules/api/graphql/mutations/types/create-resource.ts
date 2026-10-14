@@ -1,7 +1,4 @@
-import type { CreateResourceMutation, CreateResourceMutationVariables } from "../../__generated__/graphql"
+import type { CreateResourceMutation } from "../../__generated__/graphql"
 
-/** What mutateCreateResource takes: the variables of the `createResource` mutation (none: the caller owns the row). */
-export type MutateCreateResourceRequest = CreateResourceMutationVariables
-
-/** What mutateCreateResource answers: the `createResource` field. */
+/** What mutateCreateResource answers: the `createResource` field (generated from the back end's contract). */
 export type MutateCreateResourceData = CreateResourceMutation["createResource"]

@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useFormatter, useTranslations } from "next-intl"
-import type { GraphQLFailure } from "@ecommerce/api"
+import type { GraphQLFailure } from "@/modules/api"
 import { useGraphQLWithToast } from "@/modules/toast"
 import { useMutatePlaceOrderSwr } from "../swr"
 

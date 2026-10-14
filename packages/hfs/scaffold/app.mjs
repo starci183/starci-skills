@@ -27,6 +27,7 @@ import { revParseQuery } from '../runtime/scripts/api/git/rev-parse-query.mjs';
 import { lsFiles } from '../runtime/scripts/api/git/ls-files.mjs';
 import { insidePath, samePath } from '../runtime/scripts/lib/path-key.mjs';
 import { byCodeUnit } from '../report/order.mjs';
+import { sonarGateName } from '../sync/sonar-key.mjs';
 
 const NAME = /^[a-z][a-z0-9-]*$/;
 const APP_DIR = '__app__';
@@ -650,7 +651,7 @@ export function scaffoldApp({ name, into, presets, edition = 'full', authCallbac
       { path: `fe/packages/${name}-${pkg}/tsconfig.json`, content: jsonText(fePackageTsconfig()) },
       { path: `fe/packages/${name}-${pkg}/tsconfig.build.json`, content: jsonText(fePackageBuildTsconfig()) },
     ])),
-    ...['app', 'be', 'fe'].flatMap(scope => skeletonOf(scope, app, { sonarGate: parseYaml(fs.readFileSync(SONAR_GATE_FILE, 'utf8')).gate.name, timestamp, ...supabasePortVars(name) })),
+    ...['app', 'be', 'fe'].flatMap(scope => skeletonOf(scope, app, { sonarGate: sonarGateName(parseYaml(fs.readFileSync(SONAR_GATE_FILE, 'utf8')), app.edition), timestamp, ...supabasePortVars(name) })),
   ];
   const writes = scaffoldWrites(root, original);
   try {

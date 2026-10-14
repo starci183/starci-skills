@@ -1,7 +1,4 @@
-import type { CalendarQuery, CalendarQueryVariables } from "../../__generated__/graphql"
+import type { CalendarQuery } from "../../__generated__/graphql"
 
-/** What queryCalendar takes: the input of the `calendar` query (generated from the back end's contract). */
-export type QueryCalendarRequest = CalendarQueryVariables["input"]
-
-/** What queryCalendar answers: the `calendar` field. */
+/** What queryCalendar answers: the `calendar` field (generated from the back end's contract). */
 export type QueryCalendarData = CalendarQuery["calendar"]

@@ -11,7 +11,7 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: a56602f797fda8047fcdee98f992789a2f6930adf0e7b3d0cd9be9af54ebc41c
+        value: 202316ab3bff9049a44f2728611f87887ea19b80675021cf5c05f282d1643652
         files: 239
     sourceRuleRoots:
       - knowledge/patterns/be
@@ -710,13 +710,13 @@ profiles:
     title: StarCi Next.js code pattern
     canon:
       package: '@starci/eslint-canon-fe'
-      version: 8.2.17
+      version: 8.3.0
       contentDigest:
         algorithm: sha256
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: 4234c8a0135d2eea905f68151c6be905131ab83c97291f3b94ff21084dbe9cb4
+        value: 4560d1cb6a8fa8640679290741bca732a55bc3921d6bbd42a273d3241529e4b1
         files: 233
     sourceRuleRoots:
       - knowledge/patterns/fe

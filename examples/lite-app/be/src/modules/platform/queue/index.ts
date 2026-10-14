@@ -1,6 +1,6 @@
 export { parseQueueConfig } from "./queue.config"
 export type { QueueConfig } from "./queue.config"
 export type { QueueDelivery } from "./queue.contracts"
-export { InjectQueueOutbox, InjectQueueWorkerRegistry, QUEUE_OUTBOX, QUEUE_WORKER_REGISTRY } from "./queue.decorators"
+export { InjectQueueOutbox, InjectQueueWorkerRegistry, QUEUE_WORKER_REGISTRY } from "./queue.decorators"
 export { QueueModule } from "./queue.module"
 export type { QueueOutbox, QueueWorkerRegistry } from "./queue.port"

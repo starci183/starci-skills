@@ -86,12 +86,12 @@ function assertScaffoldTestLanes(app) {
 
 test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, type drift and full-upgrade view', { skip: skipReason, timeout: 1_800_000 }, async (t) => {
   // The installed SQL parser extracts one Bun-built native binding at the isolated temp root, and the app's `npm test` leaves jest's
-  // default cache (`<temp>/jest`) there. Both are process infrastructure, not app fixtures, but this spec owns the installed commands
+  // default cache (`<temp>/jest`, and `<temp>/jest_rt` for its runtime cache) there. Both are process infrastructure, not app fixtures, but this spec owns the installed commands
   // that create them and therefore removes them before the leak guard.
   t.after(() => {
     const isolated = process.env.STARCI_TEST_TEMP_DIR;
     if (!isolated || !fs.existsSync(isolated)) return;
-    for (const entry of fs.readdirSync(isolated).filter(name => /^\.bun-[\w-]+\.node$/u.test(name) || name === 'jest')) {
+    for (const entry of fs.readdirSync(isolated).filter(name => /^\.bun-[\w-]+\.node$/u.test(name) || name === 'jest' || name === 'jest_rt')) {
       fs.rmSync(path.join(isolated, entry), { recursive: true, force: true });
     }
   });

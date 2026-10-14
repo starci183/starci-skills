@@ -1,0 +1,9 @@
+schema: work/workspace@1
+id: lite-app
+project: lite-app
+description: The Work records of lite-app, one StarCi app with its back end in be/ and its front end in fe/.
+repositories:
+  - role: be
+    name: be
+  - role: fe
+    name: fe

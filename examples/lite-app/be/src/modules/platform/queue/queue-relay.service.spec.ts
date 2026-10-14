@@ -1,5 +1,5 @@
 import { Test } from "@nestjs/testing"
-import { FakeClock, builder, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import { FakeClock, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
 import { LOGGER } from "@modules/platform/logging"
@@ -13,14 +13,14 @@ import { MARK_ROWS_SENT, SELECT_WAITING_ROWS } from "./persistence/queue.sql"
 
 const AT = "2026-02-03T04:05:06.000Z"
 
-const optionsOf = builder<QueueOptions>({
+const options: QueueOptions = {
     relayIntervalMs: 100,
     relayBatch: 2,
     concurrency: 1,
     pollIntervalMs: 100,
     visibilityTimeoutMs: 30_000,
     connections: [],
-})
+}
 
 const row = (id: string) => ({ id, queue: "mail", payload: { id: `m-${id}` } })
 
@@ -30,7 +30,7 @@ const build = async (manager: MockEntityManager) => {
     const moduleRef = await Test.createTestingModule({
         providers: [
             QueueRelayService,
-            { provide: QUEUE_OPTIONS, useValue: optionsOf() },
+            { provide: QUEUE_OPTIONS, useValue: options },
             { provide: QUEUE_RELAY_MANAGERS, useValue: [manager] },
             { provide: QUEUE_TRANSPORT, useValue: transport },
             { provide: CLOCK, useValue: new FakeClock(AT) },

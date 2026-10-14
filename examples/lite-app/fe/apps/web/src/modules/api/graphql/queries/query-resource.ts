@@ -3,7 +3,7 @@ import type { TypedDocumentNode } from "@apollo/client"
 import type { ResourceQuery, ResourceQueryVariables } from "../__generated__/graphql"
 import { createAuthApolloClient, graphqlResponseOf } from "../clients"
 import type { GraphQLResponse, OperationParams } from "../types"
-import type { QueryResourceData, QueryResourceRequest } from "./types/resource"
+import type { QueryResourceData } from "./types/resource"
 
 /** The `resource` query of the back end (be/src/features/api/resources, get-resource). */
 const QUERY_RESOURCE: TypedDocumentNode<ResourceQuery, ResourceQueryVariables> = gql`
@@ -18,7 +18,7 @@ const QUERY_RESOURCE: TypedDocumentNode<ResourceQuery, ResourceQueryVariables> =
 export const queryResource = async ({
     request,
     signal,
-}: OperationParams<QueryResourceRequest>): Promise<GraphQLResponse<QueryResourceData>> =>
+}: OperationParams<ResourceQueryVariables["input"]>): Promise<GraphQLResponse<QueryResourceData>> =>
     graphqlResponseOf(
         await createAuthApolloClient({ signal }).query({ query: QUERY_RESOURCE, variables: { input: request } }),
         (data) => data.resource,
