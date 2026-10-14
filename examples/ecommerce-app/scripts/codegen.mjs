@@ -4,6 +4,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import { createHash } from "node:crypto"
 
 // GraphQL wire types, the same in both editions (owner ruling 2026-10-13): every fe app with operations under
 // src/modules/api/graphql/{queries,mutations} gets its typed documents generated from the contract snapshots the back end emits
@@ -15,15 +16,19 @@ process.chdir(path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."))
 const CONTRACTS = path.join("be", "contracts")
 const FE_APPS = path.join("fe", "apps")
 const posix = (file) => file.split(path.sep).join("/")
+const byCodeUnit = (left, right) => {
+    if (left === right) return 0
+    return left < right ? -1 : 1
+}
 const schemas = (fs.existsSync(CONTRACTS) ? fs.readdirSync(CONTRACTS) : [])
     .map((app) => path.join(CONTRACTS, app, "schema.graphql"))
     .filter((file) => fs.existsSync(file))
-    .sort()
+    .sort(byCodeUnit)
     .map(posix)
 const operationRoots = (fs.existsSync(FE_APPS) ? fs.readdirSync(FE_APPS) : [])
     .map((app) => path.join(FE_APPS, app, "src", "modules", "api", "graphql"))
     .filter((dir) => fs.existsSync(dir))
-    .sort()
+    .sort(byCodeUnit)
     .map(posix)
 if (schemas.length === 0 || operationRoots.length === 0) {
     process.stdout.write("codegen: no GraphQL contract under be/contracts yet\n")
@@ -41,4 +46,14 @@ if (schemas.length === 0 || operationRoots.length === 0) {
         ]),
     )
     await generate({ schema: schemas, generates, ignoreNoDocuments: true, silent: true }, true)
+    const hash = createHash("sha256")
+    for (const schema of schemas) {
+        const source = fs.readFileSync(schema, "utf8").replaceAll("\r\n", "\n")
+        hash.update(`${schema}\0${source}\0`)
+    }
+    const digest = hash.digest("hex")
+    for (const root of operationRoots) {
+        const generated = `${root}/__generated__`
+        if (fs.existsSync(generated)) fs.writeFileSync(`${generated}/.schema-sha256`, `${digest}\n`)
+    }
 }

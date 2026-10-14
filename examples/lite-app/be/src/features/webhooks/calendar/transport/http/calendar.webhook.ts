@@ -10,7 +10,8 @@ import { CalendarRequest } from "./dto/calendar.request"
 @Controller("webhooks/calendar")
 /**
  * POST /webhooks/calendar, the signed intake door of the calendar notifier. The signature and replay window are proven
- * first; the verified delivery goes to one domain intake that claims its inbox row and processes it in one transaction.
+ * first; the verified delivery goes to one intake that records its receipt and typed queue handoff in one transaction.
+ * The fenced delivery job processes the committed receipt after this door acknowledges it.
  */
 export class CalendarWebhook {
     constructor(

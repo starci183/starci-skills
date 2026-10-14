@@ -1,0 +1,145 @@
+# Owner-provisioned release image digests and public certificate contact are required inputs.
+version: "3.8"
+services:
+  api:
+    image: "${LITE_APP_API_IMAGE:?set the verified API image digest}"
+    environment:
+      NODE_ENV: production
+      PORT: "8787"
+      HTTP_SECURITY_ALLOWED_ORIGINS: https://lite-app.example
+      PRIMARY_DB_URL_FILE: /run/secrets/primary-db-url
+      PRIMARY_DB_SCHEMA: public
+      SUPABASE_URL: https://lite-app.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY_FILE: /run/secrets/supabase-service-role-key
+      CALENDAR_WEBHOOK_SECRET_FILE: /run/secrets/calendar-webhook-secret
+    secrets:
+      - { source: primary-db-url, target: primary-db-url }
+      - { source: supabase-service-role-key, target: supabase-service-role-key }
+      - { source: calendar-webhook-secret, target: calendar-webhook-secret }
+    networks: [app]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8787/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    deploy:
+      replicas: 1
+      update_config: { parallelism: 1, order: start-first, failure_action: rollback, monitor: 30s }
+      rollback_config: { parallelism: 1, order: stop-first }
+      restart_policy: { condition: on-failure, delay: 5s }
+  web:
+    image: "${LITE_APP_WEB_IMAGE:?set the verified web image digest}"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_SITE_URL: https://lite-app.example
+    networks: [app]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    deploy:
+      replicas: 1
+      update_config: { parallelism: 1, order: start-first, failure_action: rollback, monitor: 30s }
+      rollback_config: { parallelism: 1, order: stop-first }
+      restart_policy: { condition: on-failure, delay: 5s }
+  ingress:
+    image: traefik:v3.6@sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d
+    command:
+      - --providers.file.filename=/etc/traefik/routes.yml
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --certificatesresolvers.production.acme.email=${ACME_EMAIL:?set the public operator contact}
+      - --certificatesresolvers.production.acme.storage=/acme/acme.json
+      - --certificatesresolvers.production.acme.httpchallenge.entrypoint=web
+      - --ping=true
+    configs:
+      - { source: routes, target: /etc/traefik/routes.yml }
+    ports:
+      - { target: 80, published: 80, protocol: tcp, mode: host }
+      - { target: 443, published: 443, protocol: tcp, mode: host }
+    volumes:
+      - acme:/acme
+    networks: [app]
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      replicas: 1
+      placement:
+        constraints: ["node.role == manager", "node.labels.lite-app == production"]
+      update_config: { parallelism: 1, order: stop-first, failure_action: rollback, monitor: 30s }
+      rollback_config: { parallelism: 1, order: stop-first }
+      restart_policy: { condition: on-failure, delay: 5s }
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:1.64.3@sha256:4d9116228d426ce24c442a744e9c11ee7c1187713f93f21dd5a34a12584708c1
+    environment:
+      DB_TYPE: sqlite
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+    volumes:
+      - n8n-data:/home/node/.n8n
+    networks: [app]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:5678/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    deploy:
+      replicas: 1
+      placement:
+        constraints: ["node.role == manager", "node.labels.lite-app == production"]
+      update_config: { parallelism: 1, order: stop-first, failure_action: rollback, monitor: 30s }
+      rollback_config: { parallelism: 1, order: stop-first }
+      restart_policy: { condition: on-failure, delay: 5s }
+networks:
+  app:
+    driver: overlay
+secrets:
+  primary-db-url:
+    external: true
+    name: lite-app-PRIMARY_DB_URL-v1
+  supabase-service-role-key:
+    external: true
+    name: lite-app-SUPABASE_SERVICE_ROLE_KEY-v1
+  calendar-webhook-secret:
+    external: true
+    name: lite-app-CALENDAR_WEBHOOK_SECRET-v1
+configs:
+  routes:
+    external: true
+    name: lite-app-routes-c1
+volumes:
+  acme:
+    external: true
+    name: lite-app-production-acme
+  n8n-data:
+    external: true
+    name: lite-app-production-n8n-data

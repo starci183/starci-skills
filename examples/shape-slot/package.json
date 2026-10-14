@@ -22,6 +22,8 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@graphql-codegen/cli": "7.4.6",
+    "@graphql-codegen/client-preset": "6.2.3",
     "@nestjs/testing": "11.2.5",
     "@starci/cli": "1.2.16",
     "@starci/eslint-canon-be": "3.3.0",

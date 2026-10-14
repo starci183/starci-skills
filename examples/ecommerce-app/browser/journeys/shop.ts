@@ -23,7 +23,7 @@ const typeInto = async (page: Page, label: string, value: string): Promise<void>
 test("browse the catalogue, add to the cart, and place the order", async ({ page }) => {
     // A fresh person per run: reruns on the same stack never collide on an existing email or a leftover cart.
     const run = randomUUID().replaceAll("-", "").slice(0, 12)
-    const email = `browser-${run}@ecommerce.dev`
+    const email = `browser-${run}@example.test`
     const password = `pw-${randomUUID()}`
 
     // The catalogue is read through the session, so a signed-out browser meets the gate first.

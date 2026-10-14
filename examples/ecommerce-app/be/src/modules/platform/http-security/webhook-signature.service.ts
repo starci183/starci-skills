@@ -6,68 +6,61 @@ import { HttpSecurityError, HttpSecurityErrorCode } from "./errors/http-security
 import { InjectHttpSecurityOptions } from "./http-security.decorators"
 import type { HttpSecurityOptions } from "./http-security.options"
 
-/** What a provider delivery carries for its proof. */
+/** The exact signed material of one webhook delivery. */
 export interface WebhookDelivery {
-    /** The provider key the app configured the secret under. */
+    /** The configured provider whose secret signs this delivery. */
     readonly provider: string
-    /** The exact bytes of the request body, as received (never a re-serialized body). */
+    /** The unparsed request bytes covered by the signature. */
     readonly rawBody: Buffer | undefined
-    /** The `sha256=<hex>` signature header. */
+    /** The provider signature header, when supplied. */
     readonly signature: string | undefined
-    /** The signed timestamp header, epoch milliseconds. */
+    /** The provider timestamp header used for replay protection, when supplied. */
     readonly timestamp: string | undefined
 }
 
-const SIGNATURE_PREFIX = "sha256="
-
-/** True when both hex digests have the same bytes, compared in constant time on equal-length buffers. */
 const sameDigest = (given: string, expected: string): boolean => {
-    const a = Buffer.from(given, "utf8")
-    const b = Buffer.from(expected, "utf8")
-    return a.length === b.length && timingSafeEqual(a, b)
+    const actual = Buffer.from(given, "utf8")
+    const wanted = Buffer.from(expected, "utf8")
+    return actual.length === wanted.length && timingSafeEqual(actual, wanted)
 }
 
 @Injectable()
-/**
- * The proof of a signed webhook: an HMAC-SHA256 over `<timestamp>.<raw body>` compared in constant time, and a replay
- * window on the signed timestamp. It is the only code that reads a webhook secret; a door calls `verify` first and is
- * never reached with an unproven delivery.
- */
+/** Verifies an HMAC-SHA256 over `<timestamp>.<raw body>` and its replay window before any domain intake runs. */
 export class WebhookSignatureService {
     constructor(
         @InjectHttpSecurityOptions() private readonly options: HttpSecurityOptions,
         @InjectClock() private readonly clock: Clock,
     ) {}
 
-    /** Throws when the delivery is not signed by the provider's secret, or was signed outside the replay window. */
+    /** Throws unless the delivery carries a configured provider's current, constant-time-equal signature. */
     verify(delivery: WebhookDelivery): void {
         const provider = this.options.webhooks[delivery.provider]
-        if (provider === undefined) {
+        if (!provider) {
             throw new HttpSecurityError({
                 code: HttpSecurityErrorCode.WebhookProviderUnknown,
                 params: { provider: delivery.provider },
             })
         }
         const signedAt = Number(delivery.timestamp)
-        const { rawBody, signature } = delivery
-        if (
-            rawBody === undefined ||
-            signature === undefined ||
-            delivery.timestamp === undefined ||
-            !Number.isFinite(signedAt)
-        ) {
-            throw new HttpSecurityError({ code: HttpSecurityErrorCode.WebhookSignatureInvalid })
+        if (!delivery.rawBody || !delivery.signature || !delivery.timestamp || !Number.isFinite(signedAt)) {
+            throw new HttpSecurityError({
+                code: HttpSecurityErrorCode.WebhookSignatureInvalid,
+            })
         }
         const expected = createHmac("sha256", provider.secret.reveal())
             .update(`${delivery.timestamp}.`)
-            .update(rawBody)
+            .update(delivery.rawBody)
             .digest("hex")
-        const given = signature.startsWith(SIGNATURE_PREFIX) ? signature.slice(SIGNATURE_PREFIX.length) : ""
+        const given = delivery.signature.startsWith("sha256=") ? delivery.signature.slice("sha256=".length) : ""
         if (!sameDigest(given, expected)) {
-            throw new HttpSecurityError({ code: HttpSecurityErrorCode.WebhookSignatureInvalid })
+            throw new HttpSecurityError({
+                code: HttpSecurityErrorCode.WebhookSignatureInvalid,
+            })
         }
         if (Math.abs(this.clock.now().getTime() - signedAt) > provider.toleranceMs) {
-            throw new HttpSecurityError({ code: HttpSecurityErrorCode.WebhookReplayed })
+            throw new HttpSecurityError({
+                code: HttpSecurityErrorCode.WebhookReplayed,
+            })
         }
     }
 }

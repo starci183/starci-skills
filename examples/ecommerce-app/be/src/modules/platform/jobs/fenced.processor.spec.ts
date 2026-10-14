@@ -1,3 +1,4 @@
+import { Test } from "@nestjs/testing"
 import type { ClaimedJob } from "./jobs.contracts"
 import { FencedProcessor } from "./fenced.processor"
 
@@ -21,7 +22,8 @@ class MailProcessor extends FencedProcessor {
 
 describe("FencedProcessor", () => {
     it("lets a processor declare its queue and process a claimed job", async () => {
-        const processor = new MailProcessor()
+        const moduleRef = await Test.createTestingModule({ providers: [MailProcessor] }).compile()
+        const processor = moduleRef.get(MailProcessor)
 
         await processor.process(claimedJob)
 

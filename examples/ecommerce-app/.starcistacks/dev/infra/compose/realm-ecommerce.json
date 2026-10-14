@@ -36,8 +36,8 @@
   "users": [
     {
       "id": "4f1c2b7e-8a3d-4e5f-9b6a-0c1d2e3f4a5b",
-      "username": "demo@ecommerce.dev",
-      "email": "demo@ecommerce.dev",
+      "username": "demo@example.test",
+      "email": "demo@example.test",
       "enabled": true,
       "emailVerified": true,
       "requiredActions": [],

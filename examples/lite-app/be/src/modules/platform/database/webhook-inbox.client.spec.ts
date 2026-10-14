@@ -2,83 +2,78 @@ import { fakeTransaction, mockEntityManager } from "@starci/jest-preset"
 import type { EntityManager } from "typeorm"
 import { sql } from "./database.sql"
 import { DatabaseErrorCode } from "./errors/database.error"
-import { acceptWebhookDelivery } from "./webhook-inbox.client"
+import { recordWebhookDelivery } from "./webhook-inbox.client"
 
 const INSERT = sql`INSERT INTO public.spec_inbox (provider, delivery_id, payload) VALUES ($1, $2, $3::jsonb) RETURNING id`
-const COMPLETE = sql`UPDATE public.spec_inbox SET processed_at = now() WHERE id = $1 RETURNING id`
 
 const build = (claimed: ReadonlyArray<{ id: string }>) =>
     fakeTransaction(
         mockEntityManager({
-            query: [
-                [INSERT, claimed],
-                [COMPLETE, claimed],
-            ],
+            query: [[INSERT, claimed]],
         }),
     )
 
-const accept = (entityManager: EntityManager, deliveryId: string | undefined, intake: jest.Mock) =>
-    acceptWebhookDelivery({
-        entityManager,
+const record = (manager: EntityManager, deliveryId: string | undefined) =>
+    recordWebhookDelivery({
+        manager,
         insert: INSERT,
-        complete: COMPLETE,
         provider: "calendar",
         deliveryId,
         payload: { id: "calendar-1" },
-        process: intake,
     })
 
-describe("acceptWebhookDelivery", () => {
-    it("claims a new delivery by its trimmed id, processes it in the transaction and marks it complete", async () => {
+describe("recordWebhookDelivery", () => {
+    it("returns the pending receipt without completing it or starting a transaction", async () => {
         const tx = build([{ id: "inbox-1" }])
-        const intake = jest.fn().mockResolvedValue(undefined)
 
-        await accept(tx.em, "  delivery-1  ", intake)
+        await expect(record(tx.em, "  delivery-1  ")).resolves.toBe("inbox-1")
 
-        expect(tx.commits).toBe(1)
-        expect(tx.em.query).toHaveBeenNthCalledWith(1, INSERT, [
+        expect(tx.outcomes).toEqual([])
+        expect(tx.em.query).toHaveBeenCalledTimes(1)
+        expect(tx.em.query).toHaveBeenCalledWith(INSERT, [
             "calendar",
             "delivery-1",
             JSON.stringify({ id: "calendar-1" }),
         ])
-        expect(intake).toHaveBeenCalledTimes(1)
-        expect(tx.em.query).toHaveBeenNthCalledWith(2, COMPLETE, ["inbox-1"])
     })
 
-    it("acknowledges a redelivery without processing it again", async () => {
+    it("returns no receipt for a duplicate delivery", async () => {
         const tx = build([])
-        const intake = jest.fn().mockResolvedValue(undefined)
 
-        await accept(tx.em, "delivery-1", intake)
+        await expect(record(tx.em, "delivery-1")).resolves.toBeUndefined()
 
-        expect(tx.commits).toBe(1)
-        expect(intake).not.toHaveBeenCalled()
+        expect(tx.outcomes).toEqual([])
         expect(tx.em.query).toHaveBeenCalledTimes(1)
     })
 
-    it("rolls the claim back when processing fails", async () => {
+    it("lets the caller atomically roll a recorded receipt back with its handoff", async () => {
         const tx = build([{ id: "inbox-1" }])
-        const failure = new TypeError("intake failed")
-        const intake = jest.fn().mockRejectedValue(failure)
+        const failure = new TypeError("handoff failed")
 
-        await expect(accept(tx.em, "delivery-1", intake)).rejects.toBe(failure)
+        await expect(
+            tx.em.transaction(async (manager) => {
+                await record(manager, "delivery-1")
+                throw failure
+            }),
+        ).rejects.toBe(failure)
 
         expect(tx.rollbacks).toBe(1)
+        expect(tx.committedWrites).toEqual([])
+        expect(tx.rolledBackWrites).toHaveLength(1)
         expect(tx.em.query).toHaveBeenCalledTimes(1)
     })
 
     it.each([undefined, "", "   "])(
-        "refuses a delivery without an id (%p) before touching the database",
+        "refuses a receipt without a delivery id (%p) before touching the database",
         async (id) => {
             const tx = build([{ id: "inbox-1" }])
-            const intake = jest.fn().mockResolvedValue(undefined)
 
-            await expect(accept(tx.em, id, intake)).rejects.toMatchObject({
+            await expect(record(tx.em, id)).rejects.toMatchObject({
                 code: DatabaseErrorCode.WebhookDeliveryIdRequired,
             })
 
             expect(tx.outcomes).toEqual([])
-            expect(intake).not.toHaveBeenCalled()
+            expect(tx.em.query).not.toHaveBeenCalled()
         },
     )
 })

@@ -25,7 +25,7 @@ const home = process.cwd();
 process.chdir(withWorld);
 test.after(() => { process.chdir(home); fs.rmSync(withWorld, { recursive: true, force: true }); fs.rmSync(withoutWorld, { recursive: true, force: true }); });
 
-test('a repository without its test world gets the unit project only, so unit specs run with the managed config', () => {
+test('a repository without a declared lite proof lane or test world gets the unit project only', () => {
   process.chdir(withoutWorld);
   try {
     assert.deepEqual(preset.starciJestConfig(OPTIONS).projects.map((p) => p.displayName), ['unit']);
@@ -33,6 +33,97 @@ test('a repository without its test world gets the unit project only, so unit sp
     process.chdir(withWorld);
   }
   assert.deepEqual(preset.starciJestConfig(OPTIONS).projects.map((p) => p.displayName), ['unit', 'integration', 'e2e', 'contract']);
+});
+
+/** An app-shaped fixture: the jest config runs in be/, below hfs.json. */
+function proofRepo(edition) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'preset-proof-'));
+  const be = path.join(root, 'be');
+  const put = (file, source) => {
+    const target = path.join(be, file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, source);
+  };
+  if (edition) fs.writeFileSync(path.join(root, 'hfs.json'), JSON.stringify({ edition }));
+  put('apps/.keep', '');
+  put('src/tests/tsconfig.json', JSON.stringify({ compilerOptions: { module: 'commonjs', target: 'es2022', isolatedModules: true } }));
+  return { root, be, put };
+}
+
+function proofConfig(be) {
+  const previous = process.cwd();
+  process.chdir(be);
+  try {
+    return preset.starciJestConfig(OPTIONS);
+  } finally {
+    process.chdir(previous);
+  }
+}
+
+test('lite creates integration and contract projects only for matching specs, without a world or e2e project', () => {
+  const { root, be, put } = proofRepo('lite');
+  try {
+    for (const name of ['integration', 'contract']) fs.mkdirSync(path.join(be, 'src/tests', name), { recursive: true });
+    assert.deepEqual(proofConfig(be).projects.map((project) => project.displayName), ['unit']);
+    put('src/tests/integration/queue/helper.spec.ts', '');
+    put('src/tests/contract/provider/helper.integration-spec.ts', '');
+    put('src/tests/e2e/api/boot.e2e-spec.ts', '');
+    assert.deepEqual(proofConfig(be).projects.map((project) => project.displayName), ['unit']);
+    put('src/tests/integration/queue/delivery.integration-spec.ts', '');
+    assert.deepEqual(proofConfig(be).projects.map((project) => project.displayName), ['unit', 'integration']);
+    put('src/tests/contract/provider/nested/payload.contract-spec.ts', '');
+    const config = proofConfig(be);
+    assert.deepEqual(config.projects.map((project) => project.displayName), ['unit', 'integration', 'contract']);
+    for (const project of config.projects.slice(1)) {
+      assert.deepEqual(project.testMatch, [`**/src/tests/${project.displayName}/**/*.${project.displayName}-spec.ts`]);
+      assert.equal(project.transform[String.raw`^.+\.ts$`][1].tsconfig, 'src/tests/tsconfig.json');
+      for (const option of ['runner', 'globalSetup', 'globalTeardown', 'setupFilesAfterEnv']) assert.equal(option in project, false, option);
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('full and undeclared repositories without a world keep unit-only config even when proof specs exist', () => {
+  const { root, be, put } = proofRepo('full');
+  const declaration = path.join(root, 'hfs.json');
+  try {
+    put('src/tests/integration/queue/delivery.integration-spec.ts', '');
+    put('src/tests/contract/provider/payload.contract-spec.ts', '');
+    assert.deepEqual(proofConfig(be).projects.map((project) => project.displayName), ['unit']);
+    fs.rmSync(declaration);
+    assert.deepEqual(proofConfig(be).projects.map((project) => project.displayName), ['unit']);
+    fs.writeFileSync(declaration, '{');
+    assert.deepEqual(proofConfig(be).projects.map((project) => project.displayName), ['unit']);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('jest runs selected lite integration and contract specs with TypeScript and no world state', () => {
+  const { root, be, put } = proofRepo('lite');
+  try {
+    for (const name of ['integration', 'contract']) put(`src/tests/${name}/proof/pass.${name}-spec.ts`, 'const value: number = 42; test("proof", () => expect(value).toBe(42));\n');
+    // Resolve peer modules from this spec's install, preserving the preset's transform settings.
+    put('jest.config.js', `const config = require(${JSON.stringify(require.resolve('./index.cjs'))}).starciJestConfig(${JSON.stringify(OPTIONS)})
+for (const project of config.projects) {
+  delete project.preset
+  for (const entry of Object.values(project.transform)) entry[0] = require.resolve(entry[0])
+}
+module.exports = config
+`);
+    const jestPackage = require.resolve('jest/package.json');
+    const result = spawnSync(process.execPath, [path.join(path.dirname(jestPackage), 'bin', 'jest.js'), '--selectProjects', 'integration', 'contract', '--runInBand', '--ci', '--json', '--outputFile', path.join(be, 'report.json'), '--cacheDirectory', path.join(be, '.jest-cache')], {
+      cwd: be, encoding: 'utf8', env: { ...process.env, NODE_PATH: path.dirname(path.dirname(jestPackage)) }, timeout: 120_000,
+    });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const report = JSON.parse(fs.readFileSync(path.join(be, 'report.json'), 'utf8'));
+    assert.equal(report.numPassedTestSuites, 2);
+    assert.equal(report.numPassedTests, 2);
+    assert.equal(fs.existsSync(path.join(be, 'src/tests/world')), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 const { createMock } = require('./mock.cjs');
 
@@ -461,16 +552,16 @@ test('recordingEventBus read side: scripted pending retries, dead letters, reque
   await bus.requeue('d-1');
   assert.deepEqual(bus.requeued, ['d-1']);
   const boom = new Error('down');
-  for (const [operation, call] of Object.entries({
+  await Promise.all(Object.entries({
     publish: () => bus.publish(new PlacedEvent('z'), {}),
     pendingRetries: () => bus.pendingRetries(PlacedEvent),
     deadLetters: () => bus.deadLetters(PlacedEvent),
     requeue: () => bus.requeue('d-1'),
-  })) {
+  }).map(async ([operation, call]) => {
     bus.failNext(operation, boom);
     await assert.rejects(call(), /down/, operation);
     await call();
-  }
+  }));
   bus.failNext('requeue', boom);
   bus.clear();
   assert.deepEqual([bus.requeued, bus.writes], [[], []]);
@@ -560,7 +651,7 @@ class TypeMetadataStorageHost {
   constructor() { this.types = new Map() }
   add(name, target) {
     const known = this.types.get(name)
-    if (known !== undefined && known !== target) throw new Error("Cannot determine a GraphQL output type for the \\"" + name + "\\": two classes declare it")
+    if (known !== undefined && known !== target) throw new Error('Cannot determine a GraphQL output type for the "' + name + '": two classes declare it')
     this.types.set(name, target)
   }
 }
@@ -631,7 +722,8 @@ function spawnE2e(root, extra) {
     env: { ...process.env, NODE_PATH: path.dirname(path.dirname(jestPackage)) },
     timeout: 240_000,
   });
-  return { status: result.status, output: `${result.stdout}\n${result.stderr}${result.error ? `\n${result.error.message}` : ''}` };
+  const error = result.error ? '\n' + result.error.message : '';
+  return { status: result.status, output: `${result.stdout}\n${result.stderr}${error}` };
 }
 
 /** Runs the repository's jest on the e2e project and answers its JSON report. */
@@ -672,7 +764,7 @@ test('e2e isolation: in one preset run, three e2e files that each register a Gra
     for (const extra of [[], ['--runInBand'], ['--maxWorkers=2']]) {
       const { status, report, output } = runE2e(root, extra);
       const results = resultsOf(report);
-      assert.deepEqual(Object.keys(results).sort(), ['first.e2e-spec.ts', 'second.e2e-spec.ts', 'third.e2e-spec.ts'], `${extra.join(' ')}\n${output}`);
+      assert.deepEqual(Object.keys(results).sort((left, right) => left.localeCompare(right)), ['first.e2e-spec.ts', 'second.e2e-spec.ts', 'third.e2e-spec.ts'], `${extra.join(' ')}\n${output}`);
       for (const [file, result] of Object.entries(results)) assert.equal(result.status, 'passed', `${extra.join(' ') || 'default'}: ${file}: ${result.message}`);
       assert.equal(status, 0, output);
     }
@@ -687,7 +779,7 @@ test('e2e isolation is the runner: on the stock in-band runner the same files co
     const { status, report } = runE2e(root, ['--runInBand']);
     const results = resultsOf(report);
     // jest orders the files itself: whichever runs first passes, the one after it inherits the registry and fails to boot.
-    const outcomes = Object.values(results).map((result) => result.status).sort();
+    const outcomes = Object.values(results).map((result) => result.status).sort((left, right) => left.localeCompare(right));
     assert.deepEqual(outcomes, ['failed', 'failed', 'passed']);
     assert.match(Object.values(results).find((result) => result.status === 'failed').message, /Cannot determine a GraphQL output type/);
     assert.equal(status, 1);
@@ -705,7 +797,8 @@ test('the world runner runs up to min(--maxWorkers, slots) files at once, each i
       assert.equal(status, 0, output);
       const events = timelineOf(root);
       assert.equal(events.length, 6, output);
-      assert.equal(concurrencyOf(events), width, `${extra.join(' ')}: ${events.map((e) => `${e.event} ${e.label}@${e.slot}`).join(', ')}`);
+      const timeline = events.map((e) => `${e.event} ${e.label}@${e.slot}`).join(', ');
+      assert.equal(concurrencyOf(events), width, `${extra.join(' ')}: ${timeline}`);
       for (const entry of events) assert.ok(['1', '2'].slice(0, width).includes(entry.slot), `${entry.label} ran on slot ${entry.slot}`);
       assert.equal(new Set(events.map((entry) => entry.pid)).size, 3, 'each file ran in a process of its own');
     }
@@ -721,7 +814,7 @@ test('the world runner widens with the slots the world provisioned: three slots 
     assert.equal(status, 0, output);
     const events = timelineOf(root);
     assert.equal(concurrencyOf(events), 3, events.map((e) => `${e.event} ${e.label}@${e.slot}`).join(', '));
-    assert.deepEqual([...new Set(events.map((entry) => entry.slot))].sort(), ['1', '2', '3']);
+    assert.deepEqual([...new Set(events.map((entry) => entry.slot))].sort((left, right) => left.localeCompare(right)), ['1', '2', '3']);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -734,7 +827,8 @@ test('a state file of another test-world protocol is a typed pair mismatch namin
       const { status, output } = spawnE2e(root, ['--maxWorkers=2']);
       assert.notEqual(status, 0, output);
       assert.match(output, /JEST_PRESET_WORLD_PAIR_MISMATCH/);
-      assert.match(output, new RegExp(`@starci/jest-preset@${require('./package.json').version.replace(/\./g, '\\.')}`));
+      const version = require('./package.json').version.replaceAll('.', String.raw`\.`);
+      assert.match(output, new RegExp(`@starci/jest-preset@${version}`));
       assert.match(output, state.library === undefined ? /@starci\/test-world before 1\.1\.0/ : /@starci\/test-world@9\.0\.0/);
       assert.match(output, /canon-pins/);
       assert.equal(fs.existsSync(path.join(root, 'timeline.log')), false, 'no file ran');

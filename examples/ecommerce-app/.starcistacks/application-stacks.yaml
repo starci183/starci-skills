@@ -59,9 +59,9 @@ environments:
       billing:
         port: 7070
     runbook: README.md
-    # The local Postgres runs with trust auth; Keycloak's bootstrap admin password, the identity-admin client secret and MinIO's
-    # root password are DEMO-ONLY defaults carried by the compose files (demo-only-...). An example runs from a clean clone with
-    # no owner secret, so it declares no sealed secret.
+    # The local Postgres uses trust auth. Keycloak and MinIO require runtime credentials;
+    # browser/stack.mjs generates ephemeral values for an isolated browser run.
+    # Production secret custody is outside this dev-only example scope.
     secrets: []
 # Delivery/quality services (contract change starcistacks-services). Sonar points to the shared host extension;
 # CI does not scan this example.

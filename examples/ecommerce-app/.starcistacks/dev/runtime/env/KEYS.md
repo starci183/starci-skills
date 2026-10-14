@@ -18,7 +18,7 @@ only. Every key without a default is required: a missing or malformed key stops 
 | `KEYCLOAK_ADMIN_URL` | Base URL of the Keycloak server shoppers are created on | none |
 | `KEYCLOAK_ADMIN_REALM` | Realm the shoppers live in | none |
 | `KEYCLOAK_ADMIN_CLIENT_ID` | Confidential client whose service account creates the realm's users (`identity-admin`) | none |
-| `KEYCLOAK_ADMIN_CLIENT_SECRET` | Credential of that client; supply at runtime, or use the local Compose demo credential | none |
+| `KEYCLOAK_ADMIN_CLIENT_SECRET` | Credential of that client; supply at runtime and share with the realm import | none |
 | `KEYCLOAK_ADMIN_TIMEOUT` | Deadline of a call to Keycloak (`250`, `3s`) | `3s` |
 | `ORDER_API_URL` | Base URL of the order service | none |
 | `ORDER_API_TIMEOUT` | Deadline of a call to the order service (`250`, `3s`) | `3s` |
@@ -41,7 +41,7 @@ The order service verifies every bearer token through identity `verifySession`, 
 | `RECEIPTS_S3_ENDPOINT` | MinIO (S3) endpoint the receipts are archived in; buyers' download links point at it | none |
 | `RECEIPTS_S3_BUCKET` | Private bucket of the receipts | none |
 | `RECEIPTS_S3_ACCESS_KEY_ID` | Access key id (the MinIO root user `ecommerce` in dev) | none |
-| `RECEIPTS_S3_SECRET_ACCESS_KEY` | Credential of the object-storage client; supply at runtime, or use the local Compose demo credential | none |
+| `RECEIPTS_S3_SECRET_ACCESS_KEY` | Credential of the object-storage client; supply at runtime and share with MinIO | none |
 | `RECEIPTS_S3_REGION` | Region the requests are signed for | `us-east-1` |
 | `RECEIPTS_LINK_TTL` | Lifetime of a receipt download link (`5m`) | `5m` |
 | `RECEIPTS_S3_TIMEOUT` | Deadline of a call to MinIO | `15s` |
@@ -82,21 +82,20 @@ It listens for the signed webhook of the bank transfer notifier (`POST /webhooks
 
 ## keycloak (the stack's identity provider)
 
-| Key | Meaning | Demo default (compose) |
+| Key | Meaning | Default |
 | --- | --- | --- |
-| `KC_BOOTSTRAP_ADMIN_PASSWORD` | Password of the bootstrap `admin` of the master realm | `demo-only-keycloak-admin-password` |
-| `KEYCLOAK_ADMIN_CLIENT_SECRET` | Secret of the `identity-admin` client; the realm import reads it, the identity api presents it | `demo-only-identity-admin-client-secret` |
+| `KC_BOOTSTRAP_ADMIN_PASSWORD` | Password of the bootstrap `admin` of the master realm | none |
+| `KEYCLOAK_ADMIN_CLIENT_SECRET` | Secret of the `identity-admin` client; the realm import reads it, the identity api presents it | none |
 
 ## minio (the stack's object storage)
 
-| Key | Meaning | Demo default (compose) |
+| Key | Meaning | Default |
 | --- | --- | --- |
-| `MINIO_ROOT_PASSWORD` | Password of the MinIO root user `ecommerce` | `demo-only-minio-root-password` |
-| `RECEIPTS_S3_SECRET_ACCESS_KEY` | The same password, as the order api presents it | `demo-only-minio-root-password` |
+| `MINIO_ROOT_PASSWORD` | Password of the MinIO root user `ecommerce` | none |
+| `RECEIPTS_S3_SECRET_ACCESS_KEY` | The same password, as the order api presents it | none |
 
-DEMO-ONLY: these three values belong to a local stack on loopback and are not secrets; the compose files interpolate them with these defaults, so a clean
-clone needs no owner secret. Export `KC_BOOTSTRAP_ADMIN_PASSWORD`, `KEYCLOAK_ADMIN_CLIENT_SECRET` and `MINIO_ROOT_PASSWORD` before `up` to use others
-(`browser/stack.mjs` generates fresh ones per run and hands them to Compose and to the apis through the environment); give the services the same values.
+Export `KC_BOOTSTRAP_ADMIN_PASSWORD`, `KEYCLOAK_ADMIN_CLIENT_SECRET` and `MINIO_ROOT_PASSWORD` before `up`; Compose refuses to start when they are missing.
+The browser stack helper generates fresh values per run and hands them to Compose and to the APIs through the environment; the services receive the same values.
 
 ## cli (`apps/cli`)
 
@@ -115,4 +114,4 @@ never put a credential in them. `scripts/serve.mjs` derives defaults from the de
 | `ECOMMERCE_APP_METADATA` | Server-side projection reader and serve script | ancestor `.starcistacks/dev/infra/metadata.json` |
 
 This example declares no sealed members. A production operator must declare a production runtime and sealed custody
-before supplying real credentials; the local demo defaults do not demonstrate production secret custody.
+before deployment; ephemeral browser-run credentials do not demonstrate production secret custody.

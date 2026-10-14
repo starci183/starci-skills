@@ -114,7 +114,7 @@ const underTests = (folder) => String.raw`[\\/]src[\\/]tests[\\/]` + folder + St
  * test tree compiles against `src/tests/tsconfig.json`, the nearest config of every file under `src/tests/`. The
  * integration, e2e and contract projects share the world's `global-setup.ts`/`global-teardown.ts` (`src/tests/world/`) and
  * run their spec files up to `min(--maxWorkers, slots)` at once, each in a worker process of its own bound to one data slot
- * of the test world (`world-runner.cjs`; a slot's data is reset when a file boots, so no two files ever share a slot); the unit project alone has a `setupFilesAfterEnv` (the Outcome matchers).
+ * of the test world (`world-runner.cjs`; a slot's data is reset when a file boots, so no two files ever share a slot). A declared lite app instead runs its existing integration and contract specs without a world, on jest's stock runner. The unit project alone has a `setupFilesAfterEnv` (the Outcome matchers).
  * Coverage is collected from the logic roles of the measured roots only (`coverage` option), with a per-file threshold of 100 on lines, branches, functions and
  * statements: the `test` script runs the unit project with `--coverage`, fails below it and writes `coverage/lcov.info` for Sonar. It uses v8: istanbul instruments the helpers TypeScript emits (`__decorate`, `__param`, `__awaiter`, interop wrappers)
  * as thousands of branches no spec can cover, while v8 measures the real source.
@@ -125,6 +125,16 @@ const WORLD_RUNNER = require.resolve("./world-runner.cjs")
 /** True when the repository at `root` has the test world's global setup (`src/tests/world/global-setup.ts`). */
 function hasTestWorld(root) {
   return require("node:fs").existsSync(require("node:path").join(root, "src", "tests", "world", "global-setup.ts"))
+}
+
+/** The managed config runs in `be/`, one level below the app's edition declaration. */
+function isLiteApp(root) {
+  try {
+    const file = require("node:path").join(root, "..", "hfs.json")
+    return JSON.parse(require("node:fs").readFileSync(file, "utf8")).edition === "lite"
+  } catch {
+    return false
+  }
 }
 
 /** Every alternative a `{a,b}` pattern spells, braces expanded left to right. */
@@ -189,6 +199,8 @@ function coverageOf(options) {
 
 function starciJestConfig(options) {
   const coverage = coverageOf(options)
+  const root = process.cwd()
+  const world = hasTestWorld(root)
   const shared = {
     preset: "ts-jest",
     testEnvironment: "node",
@@ -201,15 +213,22 @@ function starciJestConfig(options) {
     ...shared,
     transform: transform("src/tests/tsconfig.json"),
     displayName,
-    // Every spec file in a process of its own (never in band): nothing one file or the globalSetup put on a process global
-    // (a framework registry such as @nestjs/graphql's type metadata) reaches another file. See world-runner.cjs.
-    runner: WORLD_RUNNER,
     // A glob without the root's absolute path: jest's roots (src, apps) already bound the search, and a root path that holds a dot-named folder (a checkout under `.claude`) turns its backslash separator into a glob escape on Windows, so a path-prefixed pattern would match no file.
     testMatch: [`**/src/tests/${displayName}/**/*.${suffix}.ts`],
-    // The one test world: started once per run of a project that has a test to run, torn down after it.
-    globalSetup: "<rootDir>/src/tests/world/global-setup.ts",
-    globalTeardown: "<rootDir>/src/tests/world/global-teardown.ts",
+    // Full's world gives every spec file its own process and data slot; lite needs neither its runner nor its hooks.
+    ...(world ? {
+      runner: WORLD_RUNNER,
+      globalSetup: "<rootDir>/src/tests/world/global-setup.ts",
+      globalTeardown: "<rootDir>/src/tests/world/global-teardown.ts",
+    } : {}),
   })
+  const testProjects = world ? [suite("integration", "integration-spec"), suite("e2e", "e2e-spec"), suite("contract", "contract-spec")] : []
+  if (!world && isLiteApp(root)) {
+    for (const name of ["integration", "contract"]) {
+      const suffix = `${name}-spec`
+      if (hasCoverageSubjects(root, `src/tests/${name}/**/*.${suffix}.ts`)) testProjects.push(suite(name, suffix))
+    }
+  }
   return {
     testTimeout: 120_000,
     coverageProvider: "v8",
@@ -230,10 +249,9 @@ function starciJestConfig(options) {
         testMatch: ["**/*.spec.ts"],
         testPathIgnorePatterns: ["/node_modules/", ...TEST_KIND_FOLDERS.map(underTests)],
       },
-      // The integration, e2e and contract projects exist only where the repository has its test world: jest validates
-      // every project's globalSetup even under --selectProjects unit, so a repository whose world is not written yet
-      // would otherwise fail to run its unit specs with the managed config.
-      ...(hasTestWorld(process.cwd()) ? [suite("integration", "integration-spec"), suite("e2e", "e2e-spec"), suite("contract", "contract-spec")] : []),
+      // Jest validates every project's world hooks even under --selectProjects unit. An unfinished full scaffold
+      // keeps only unit; a lite app's present integration/contract lanes need no test world.
+      ...testProjects,
     ],
   }
 }

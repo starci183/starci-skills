@@ -26,7 +26,7 @@ const ids = fakeIds()
  * Run: npm run test:e2e -- identity/sign-up-sign-in
  */
 describe("identity sign-up and sign-in journey", () => {
-    const email = `e2e-${ids.next()}@ecommerce.dev`
+    const email = `e2e-${ids.next()}@example.test`
     const password = "e2e-journey-pass-1"
 
     const world = useTestWorld({ apps: ["identity", "order"] })

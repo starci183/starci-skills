@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs"
 import { ConfigError, ConfigErrorCode } from "./errors/config.error"
 
+const FILE_SUFFIX = "_FILE"
+const DURATION_UNITS: Readonly<Record<string, number>> = { ms: 1, s: 1000, m: 60_000, h: 3_600_000 }
+const DURATION_PATTERN = /^(\d+)(ms|s|m|h)?$/
+
 /** A secret value (password, token, connection string with credentials): never logged, serialized as a mask. */
 export class Secret {
     constructor(private readonly value: string) {}
@@ -15,10 +19,6 @@ export class Secret {
         return "[secret]"
     }
 }
-
-const FILE_SUFFIX = "_FILE"
-const DURATION_UNITS: Readonly<Record<string, number>> = { ms: 1, s: 1000, m: 60_000, h: 3_600_000 }
-const DURATION_PATTERN = /^(\d+)(ms|s|m|h)?$/
 
 /**
  * The only reader of the process environment. Typed readers name the missing or malformed key in the error.
@@ -35,14 +35,6 @@ export class EnvSource {
                 values[key.slice(0, -FILE_SUFFIX.length)] = readFileSync(path, "utf8")
         }
         return new EnvSource(values)
-    }
-
-    /** The environment a child process starts with: every declared key, then `overrides` on top (used by the e2e harness to spawn the apps). */
-    toChildEnv(overrides: Readonly<Record<string, string>>): Record<string, string> {
-        const declared = Object.entries(this.values).flatMap(([key, value]) =>
-            value === undefined ? [] : [[key, value] as const],
-        )
-        return { ...Object.fromEntries(declared), ...overrides }
     }
 
     /** True when the key is declared and not empty. */
@@ -91,11 +83,6 @@ export class EnvSource {
         return value
     }
 
-    /** A required secret. */
-    secret(key: string): Secret {
-        return new Secret(this.string(key))
-    }
-
     /** A required value that must be one of `allowed`. */
     enum<T extends string>(key: string, allowed: ReadonlyArray<T>): T {
         const value = this.string(key)
@@ -112,5 +99,10 @@ export class EnvSource {
         if (!match?.[1] || unit === undefined)
             throw new ConfigError({ code: ConfigErrorCode.KeyInvalid, params: { key } })
         return Number(match[1]) * unit
+    }
+
+    /** A required secret. */
+    secret(key: string): Secret {
+        return new Secret(this.string(key))
     }
 }
