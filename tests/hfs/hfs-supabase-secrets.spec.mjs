@@ -80,7 +80,7 @@ test('the catalog-driven checkRepo findings filter drops L17 for a full repo wit
   assert.deepEqual(findings.filter(item => item.code === 'HFS_LITE_SECRET_CUSTODY'), []);
 });
 
-test('L17 is lite-only and forbids root env/custody entries plus sealed files outside the one starcistacks secret home', t => {
+test('HFS_LITE_SECRET_CUSTODY (lite): root env/custody entries and sealed files outside the starcistacks secret home are refused', t => {
   const files = ['.env.example', 'secrets.env', '.secrets/ci.key', 'backup.enc', '.starcistacks/dev/secrets/app.enc'];
   const root = tree(t, Object.fromEntries(files.map(file => [file, 'fixture'])));
   const findings = liteSecretCustodyFindings({ repoRoot: root, files, repo: app('lite') });
@@ -88,7 +88,7 @@ test('L17 is lite-only and forbids root env/custody entries plus sealed files ou
   assert.ok(findings.every(item => item.code === 'HFS_LITE_SECRET_CUSTODY' && item.level === 'error'));
 });
 
-test('L17 recognises Supabase tokens, long eyJ service material and password-bearing connection strings under fe/', t => {
+test('HFS_LITE_SECRET_CUSTODY (lite): Supabase tokens, long eyJ service material and password-bearing connection strings under fe/ are refused', t => {
   const source = [
     `export const publishable = 'sbp_${'A'.repeat(24)}'`,
     `export const secret = 'sb_secret_${'B'.repeat(24)}'`,
@@ -103,7 +103,7 @@ test('L17 recognises Supabase tokens, long eyJ service material and password-bea
   assert.ok(findings.every(item => !item.message.includes('postgresql://') && !item.message.includes('sb_secret_')), 'a finding never prints the captured value');
 });
 
-test('L17 non-matches include comments and strings that merely name token families, passwordless/env-derived URLs and lockfiles', t => {
+test('HFS_LITE_SECRET_CUSTODY (lite): comments, token-family names, passwordless/env-derived URLs and lockfiles pass', t => {
   const harmless = `
 // sbp_ and sb_secret_ are provider prefixes; eyJ is a header prefix.
 export const names=['sbp_example','sb_secret_example','eyJshort'];

@@ -80,6 +80,8 @@ export function resolvedExpression(context, index, node, seen = new Set()) {
     if (property) return resolvedExpression(context, object.index, property.value, seen);
   }
   if (node?.type !== 'Identifier') return { index, node };
+  const local = index.locals?.get(node.name);
+  if (local && local.node !== node) return resolvedExpression(context, local.index, local.node, seen);
   const key = `${index.file}:${node.name}`;
   if (seen.has(key)) return { index, node };
   seen.add(key);
@@ -124,7 +126,7 @@ function reachableChildren(context, current) {
 
 /** Modules reached through an invoked helper or an assertion's result expression. */
 export function expressionReach(context, index, node) {
-  const previous = node && index.reaches.get(node);
+  const previous = index.locals ? null : node && index.reaches.get(node);
   if (previous?.sources.every((source) => context.files.get(source.file) === source.text)) return previous.reached;
   const out = new Map();
   const seen = new Set();
@@ -139,6 +141,6 @@ export function expressionReach(context, index, node) {
     out.set(current.index.file, nodes);
     pending.push(...reachableChildren(context, current));
   }
-  if (node) index.reaches.set(node, { reached: out, sources: [...out.keys()].map((file) => sourceIndex(context, file)) });
+  if (node && !index.locals) index.reaches.set(node, { reached: out, sources: [...out.keys()].map((file) => sourceIndex(context, file)) });
   return out;
 }

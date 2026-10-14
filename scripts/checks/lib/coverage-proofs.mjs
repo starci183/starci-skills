@@ -1,8 +1,10 @@
 // A proves header is a claim; reachable checker results and nonempty test cases substantiate it.
 import { enforcerJudgedInEdition } from '../../hfs/edition-slots.mjs';
 import { evidenceFiles, evidenceInEdition } from './coverage-inventory.mjs';
-import { astChildren, expressionReach, nodeName, propertyOf, resolvedExpression, sourceIndex, staticValues } from './coverage-ast.mjs';
+import { expressionReach, nodeName, resolvedExpression, sourceIndex } from './coverage-ast.mjs';
 import { lintEnforcersForCode, registeredLintRules } from './coverage-routing.mjs';
+import { evaluate, localScope, scopedWalk, UNKNOWN } from './coverage-evaluation.mjs';
+import { resultReach } from './coverage-results.mjs';
 
 const NEGATIVE = /\b(?:invalid|violat\w*|refus\w*|reject\w*|deni\w*|fail\w*|negative|forbid\w*|missing)\b/i;
 const POSITIVE = /\b(?:valid|pass\w*|accept\w*|conform\w*|positive|clean)\b/i;
@@ -26,19 +28,14 @@ function testCall(index, node) {
 
 function testsInEdition(context, index, edition) {
   const out = [];
-  const pending = index.tree ? [{ node: index.tree, editions: [] }] : [];
-  while (pending.length) {
-    const current = pending.pop();
-    let editions = current.editions;
-    if (current.node.type === 'ForOfStatement') editions = staticValues(context, index, current.node.right).filter((value) => ['lite', 'full'].includes(value));
-    if (testCall(index, current.node)) {
-      const title = titleOf(current.node.arguments[0]);
-      const named = title.split(/[^A-Za-z]+/).includes(edition);
-      const callback = current.node.arguments.at(-1);
-      if (named || editions.includes(edition)) out.push({ title, node: callback });
-    }
-    pending.push(...astChildren(current.node).map((node) => ({ node, editions })));
-  }
+  scopedWalk(context, localScope(index), index.tree, (scope, node, enclosingEdition) => {
+    if (!testCall(scope, node)) return;
+    const value = evaluate(context, scope, node.arguments[0]);
+    const title = value === UNKNOWN ? titleOf(node.arguments[0]) : String(value);
+    const named = title.split(/[^A-Za-z]+/).includes(edition);
+    if (enclosingEdition ? enclosingEdition === edition : named) out.push({ title, node: node.arguments.at(-1), index: localScope(scope) });
+    return false;
+  });
   return out;
 }
 
@@ -60,20 +57,13 @@ function testerReceiver(context, index, node) {
   });
 }
 
-function nonemptyCases(context, index, node) {
-  const resolved = resolvedExpression(context, index, node);
-  if (resolved.node?.type !== 'ArrayExpression') return false;
-  return resolved.node.elements.some((entry) => entry && (entry.type !== 'SpreadElement' || nonemptyCases(context, resolved.index, entry.argument)));
-}
-
 function testerRun(context, index, node) {
   if (node.type !== 'CallExpression' || node.callee.type !== 'MemberExpression' || nodeName(node.callee.property) !== 'run') return null;
-  if (typeof node.arguments[0]?.value !== 'string' || !testerReceiver(context, index, node.callee.object)) return null;
-  const cases = node.arguments[2];
-  const valid = propertyOf(context, index, cases, 'valid');
-  const invalid = propertyOf(context, index, cases, 'invalid');
-  return { id: node.arguments[0].value, implementation: expressionReach(context, index, node.arguments[1]),
-    complete: Boolean(valid && invalid && nonemptyCases(context, valid.index, valid.node) && nonemptyCases(context, invalid.index, invalid.node)) };
+  const id = evaluate(context, index, node.arguments[0]);
+  if (typeof id !== 'string' || !testerReceiver(context, index, node.callee.object)) return null;
+  const cases = evaluate(context, index, node.arguments[2]);
+  return { id, implementation: expressionReach(context, index, node.arguments[1]),
+    complete: Boolean(Array.isArray(cases?.valid) && cases.valid.length && Array.isArray(cases?.invalid) && cases.invalid.length) };
 }
 
 function nodeContainsCode(context, file, nodes, code) {
@@ -92,7 +82,7 @@ function reachedExportKeys(context, file, nodes) {
 function assertionTargets(context, index, node, code) {
   const out = new Set();
   const actual = node.arguments[0];
-  for (const [file, reached] of expressionReach(context, index, actual)) {
+  for (const [file, reached] of resultReach(context, index, actual)) {
     if (file === index.file || !nodeContainsCode(context, file, reached, code)) continue;
     out.add(file);
     reachedExportKeys(context, file, reached).forEach((key) => out.add(key));
@@ -100,56 +90,52 @@ function assertionTargets(context, index, node, code) {
   return out;
 }
 
-function expectationRole(node, title) {
+function expectationRole(context, index, node, title, code) {
   const out = new Set();
-  if (POSITIVE.test(title)) out.add('passing');
-  if (NEGATIVE.test(title)) out.add('violating');
-  const expected = node.arguments[1];
-  if (expected?.type === 'ArrayExpression') out.add(expected.elements.length ? 'violating' : 'passing');
-  if (expected?.type === 'Literal' && typeof expected.value === 'number') out.add(expected.value > 0 ? 'violating' : 'passing');
+  const expected = evaluate(context, index, node.arguments[1]);
+  const role = expectedRole(expected, code);
+  if (role) out.add(role);
   if (['throws', 'rejects'].includes(nodeName(node.callee.property))) out.add('violating');
+  if (nodeName(node.callee.property) === 'ok' && node.arguments[0]?.type === 'UnaryExpression' && node.arguments[0].operator === '!') out.add('passing');
+  if (!out.size) {
+    if (POSITIVE.test(title)) out.add('passing');
+    if (NEGATIVE.test(title)) out.add('violating');
+  }
   return out;
 }
 
+function expectedRole(expected, code) {
+  if (Array.isArray(expected)) return expected.length ? 'violating' : 'passing';
+  if (typeof expected === 'number') return expected > 0 ? 'violating' : 'passing';
+  if (typeof expected === 'boolean') return expected ? 'violating' : 'passing';
+  return expected === code ? 'violating' : null;
+}
+
 function assertionClaimsCode(context, index, assertion, code) {
-  const pending = assertion.arguments.map((node) => ({ index, node }));
-  const seen = new Set();
-  while (pending.length) {
-    const current = pending.pop();
-    const key = [current.index.file, current.node.type, current.node.start, current.node.end].join(':');
-    if (seen.has(key)) continue;
-    seen.add(key);
-    if (current.node.type === 'Literal' && current.node.value === code) return true;
-    const resolved = resolvedExpression(context, current.index, current.node);
-    const callable = ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(resolved.node?.type);
-    const helper = resolved.index.file.startsWith('tests/') || resolved.index.file.endsWith('.spec.mjs');
-    if (resolved.node !== current.node && resolved.node && (!callable || helper)) pending.push(resolved);
-    pending.push(...astChildren(current.node).map((node) => ({ index: current.index, node })));
-  }
-  return false;
+  const name = nodeName(assertion.callee.property) ?? assertion.callee.name;
+  const argumentsToCheck = assertion.arguments.slice(0, name === 'ok' ? 1 : 2);
+  return argumentsToCheck.some((argument) => [...resultReach(context, index, argument, { helpersOnly: true }).values()]
+    .some((nodes) => nodes.some((node) => node.type === 'Literal' && node.value === code)));
 }
 
 function testEvidence(context, index, test, code) {
   const roles = new Map();
   const runs = [];
-  const reached = expressionReach(context, index, test.node);
-  for (const [file, nodes] of reached) {
-    const current = sourceIndex(context, file);
-    for (const node of nodes) {
-      const run = testerRun(context, current, node);
-      if (run) runs.push(run);
-      if (!assertionCall(current, node)) continue;
-      const targets = assertionTargets(context, current, node, code);
-      const claimed = assertionClaimsCode(context, current, node, code);
-      for (const target of targets) {
-        const proven = roles.get(target) ?? new Set();
-        expectationRole(node, test.title).forEach((role) => {
-          if (role !== 'violating' || claimed) proven.add(role);
-        });
-        roles.set(target, proven);
-      }
+  const callback = resolvedExpression(context, test.index ?? index, test.node);
+  scopedWalk(context, localScope(callback.index), callback.node?.body, (current, node) => {
+    const run = testerRun(context, current, node);
+    if (run) runs.push(run);
+    if (!assertionCall(current, node)) return;
+    const claimed = assertionClaimsCode(context, current, node, code);
+    for (const target of assertionTargets(context, current, node, code)) {
+      const proven = roles.get(target) ?? new Set();
+      expectationRole(context, current, node, test.title, code).forEach((role) => {
+        if (role !== 'violating' || claimed) proven.add(role);
+      });
+      roles.set(target, proven);
     }
-  }
+    return false;
+  });
   return { roles, runs };
 }
 
