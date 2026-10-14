@@ -2214,6 +2214,23 @@ rules:
       - {kind: hfs, id: db-config-ext, at: scripts/hfs/rules/database-config.mjs}
       - {kind: hfs, id: db-migration-destructive, at: scripts/hfs/rules/database-migrations.mjs}
 
+  - id: R270
+    code: "HFS_DOC_PATH_MISSING"
+    law: "In lite and full products, READMEs, docs and stack READMEs cite existing repository paths, npm scripts, starci app verbs, environment keys declared by typed readers or KEYS.md, and rule ids from the HFS catalog. Documentation changes with the product it describes."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_DOC_PATH_MISSING", "HFS_DOC_COMMAND_UNKNOWN", "HFS_DOC_ENV_UNKNOWN", "HFS_DOC_RULE_UNKNOWN"]
+    enforcers:
+      - {kind: hfs, id: doc-fresh, at: scripts/hfs/rules/doc-fresh.mjs}
+  - id: R271
+    code: "HFS_RELEASE_TAG_MISMATCH"
+    law: "A lite or full product release uses a v-prefixed semantic version tag equal to package.json version; images.yml publishes images under that release tag, and every database deployment refuses a non-tag ref before migration."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_RELEASE_TAG_MISMATCH", "HFS_DB_DEPLOY_UNGUARDED"]
+    enforcers:
+      - {kind: hfs, id: release-provenance, at: scripts/hfs/rules/release-provenance.mjs}
+
   - id: R278
     code: "BE_REST_DOOR_EVIDENCE"
     law: "GraphQL is the default door in lite and full. Each REST route carries its own evidence: a probe, auth handshake, signed webhook, actual byte stream or a public versioned operation served from the app's nonempty defineOperations table. A class-level reference or an unused StreamableFile import proves no route, and a public REST route absent from the operation table is refused."
@@ -2314,19 +2331,3 @@ rules:
     failureCodes: ["HFS_FEATURE_FILE_BUDGET"]
     enforcers:
       - {kind: hfs, id: feature-files, at: scripts/hfs/rules/feature-files.mjs}
-  - id: R270
-    code: "HFS_DOC_PATH_MISSING"
-    law: "In lite and full products, READMEs, docs and stack READMEs cite existing repository paths, npm scripts, starci app verbs, environment keys declared by typed readers or KEYS.md, and rule ids from the HFS catalog. Documentation changes with the product it describes."
-    kinds: [check]
-    gates: [settle, land, ci]
-    failureCodes: ["HFS_DOC_PATH_MISSING", "HFS_DOC_COMMAND_UNKNOWN", "HFS_DOC_ENV_UNKNOWN", "HFS_DOC_RULE_UNKNOWN"]
-    enforcers:
-      - {kind: hfs, id: doc-fresh, at: scripts/hfs/rules/doc-fresh.mjs}
-  - id: R271
-    code: "HFS_RELEASE_TAG_MISMATCH"
-    law: "A lite or full product release uses a v-prefixed semantic version tag equal to package.json version; images.yml publishes images under that release tag, and every database deployment refuses a non-tag ref before migration."
-    kinds: [check]
-    gates: [settle, land, ci]
-    failureCodes: ["HFS_RELEASE_TAG_MISMATCH", "HFS_DB_DEPLOY_UNGUARDED"]
-    enforcers:
-      - {kind: hfs, id: release-provenance, at: scripts/hfs/rules/release-provenance.mjs}

@@ -18550,6 +18550,8 @@ DB_VAULT_WRITE:
   causes_vi:
     - "Vi phạm R259: migration được dùng để tạo hoặc thay đổi giá trị bí mật."
   nextStep_vi: "Bỏ thao tác ghi bí mật khỏi migration và dùng luồng app secret; chỉ giữ khai báo vai trò không chứa mật khẩu."
+  owner: op-retry
+  kind: check-finding
 HFS_DOC_PATH_MISSING:
   title: "Product documentation cites a missing path"
   title_vi: "Tài liệu sản phẩm dẫn đường dẫn không còn tồn tại"
