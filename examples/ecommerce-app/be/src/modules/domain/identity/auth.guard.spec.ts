@@ -6,6 +6,7 @@ import type { OperationRequest } from "@modules/platform/http-security"
 import { AuthGuard } from "./auth.guard"
 import { IdentityErrorCode } from "./errors/identity.error"
 import type { SessionVerifier } from "./identity.contracts"
+import { PublicReason } from "./identity.contracts"
 import { PUBLIC_KEY, ROLES_KEY, SESSION_VERIFIER } from "./identity.decorators"
 
 class Door {}
@@ -38,13 +39,22 @@ const build = async (authorization?: string) => {
 }
 
 describe("AuthGuard", () => {
-    it("opens a door carrying public metadata without authenticating", async () => {
+    it.each(Object.values(PublicReason))("opens a door with the public reason %s without authenticating", async (reason) => {
         const { guard, context, reflector, verifier } = await build()
-        reflector.getAllAndOverride.mockReturnValue({ reason: "health" })
+        reflector.getAllAndOverride.mockReturnValue({ reason })
 
         await expect(guard.canActivate(context)).resolves.toBe(true)
 
         expect(reflector.getAllAndOverride).toHaveBeenCalledWith(PUBLIC_KEY, [handler, Door])
+        expect(verifier.verify).not.toHaveBeenCalled()
+    })
+
+    it("requires authentication when public metadata has an unknown reason", async () => {
+        const { guard, context, reflector, verifier } = await build()
+        reflector.getAllAndOverride.mockReturnValue({ reason: "tool-token" })
+
+        await expect(guard.canActivate(context)).rejects.toMatchObject({ code: IdentityErrorCode.Unauthenticated })
+
         expect(verifier.verify).not.toHaveBeenCalled()
     })
 

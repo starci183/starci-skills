@@ -21,7 +21,7 @@ function trackedCopy(t) {
   return { app, track: () => assert.equal(git('add', '-A', '--', '.').status, 0) };
 }
 
-const codes = (findings) => findings.map((finding) => `${finding.code} ${finding.path}`);
+const codes = (findings) => findings.map((finding) => `${finding.code} ${finding.path}: ${finding.message}`);
 
 test('every example app of the checkout is its render: the fast half of starci app lint finds nothing under the runtime own HFS', async () => {
   assert.deepEqual(codes(await checkExampleRender(repoRoot)), []);

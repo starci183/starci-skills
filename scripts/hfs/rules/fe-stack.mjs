@@ -90,7 +90,7 @@ function stackCatalog() {
 const dependenciesOf = pkg => new Set(DEPENDENCY_SECTIONS.flatMap(section => Object.keys(pkg?.[section] ?? {})));
 
 function extraPackages(declaration) {
-  const entries = declaration?.fe?.extraPackages ?? [];
+  const entries = declaration?.sides?.fe?.extraPackages ?? declaration?.extraPackages ?? declaration?.fe?.extraPackages ?? [];
   return new Set((Array.isArray(entries) ? entries : []).filter(entry => typeof entry?.name === 'string'
     && typeof entry.reason === 'string' && entry.reason.trim()).map(entry => entry.name));
 }
@@ -99,7 +99,7 @@ function unlistedFindings(rel, pkg, allowed, extras, workspaces) {
   const findings = [];
   for (const section of DEPENDENCY_SECTIONS) for (const name of Object.keys(pkg?.[section] ?? {})) {
     if (allowed.has(name) || extras.has(name) || workspaces.has(name) || forbiddenPackages().has(name)) continue;
-    findings.push(found(FE_STACK_UNLISTED, rel, `${rel} ${section} declares ${name}, absent from knowledge/hfs/fe-stack.yaml; add a canonical concern or declare fe.extraPackages with its name and a nonempty reason in hfs.json`, { section, dependency: name }));
+    findings.push(found(FE_STACK_UNLISTED, rel, `${rel} ${section} declares ${name}, absent from knowledge/hfs/fe-stack.yaml; add a canonical concern or declare sides.fe.extraPackages with its name and a nonempty reason in hfs.json`, { section, dependency: name }));
   }
   return findings;
 }

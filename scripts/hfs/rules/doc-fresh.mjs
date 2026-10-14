@@ -2,8 +2,11 @@
 // Paths in links are document-relative; code/prose paths may be repository-relative. Only tracked
 // names are inspected: no environment file, sealed member or secret value is ever read.
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { CATALOG } from '../../../packages/cli/src/catalog.generated.mjs';
 import { checkCommand, extractCommands } from '../../checks/lib/doc-commands.mjs';
+import { globExpression } from '../../lib/glob.mjs';
+import { loadTypescript } from '../../lib/package-at.mjs';
 import { loadRuleCatalog } from '../rule-catalog.mjs';
 import { found, readJson, readText } from './read.mjs';
 
@@ -36,12 +39,17 @@ function cleanPath(raw) {
   return target.replace(/\/$/, '');
 }
 
-function resolvedPath(raw, file, tracked, link) {
+function codePathRoots(file, tracked) {
+  const side = /^(be|fe)\//.exec(file)?.[1] ?? '';
+  return [...new Set(['', side, packageDirectory(file, tracked)])];
+}
+
+function resolvedPath(raw, file, tracked, link, generated, roots) {
   const target = cleanPath(raw);
   if (target === null) return true;
   const relative = path.posix.normalize(path.posix.join(path.posix.dirname(file), target));
-  const candidates = link ? [relative] : [relative, path.posix.normalize(target)];
-  return candidates.some((candidate) => !candidate.startsWith('../') && trackedPath(candidate, tracked));
+  const candidates = link ? [relative] : [relative, ...roots.map((root) => path.posix.join(root, target))];
+  return candidates.some((candidate) => !candidate.startsWith('../') && (trackedPath(candidate, tracked) || generated.has(candidate)));
 }
 
 function pathReferences(line) {
@@ -64,22 +72,38 @@ function pathReferences(line) {
 }
 
 /** A cited host location (the untracked custody file `.claude/secret.env`, `~/...`) or a prose pair (`expand/contract`: no extension and no tracked top-level folder of that name) is no repository path. */
-function hostOrProse(target, tracked) {
+function hostOrProse(target, tracked, link, roots) {
+  if (!link && (target === 'process.env' || target === 'import.meta.env')) return true;
   if (target === '.claude/secret.env' || /^(?:~\/|\/)/.test(target)) return true;
-  if (/\.[A-Za-z0-9]+$/.test(target) || target.endsWith('/') || target.startsWith('.')) return false;
+  if (link || /\.[A-Za-z0-9]+$/.test(target) || target.endsWith('/') || target.startsWith('.')) return false;
   const top = target.split('/')[0];
-  return ![...tracked].some((entry) => entry === top || entry.startsWith(`${top}/`));
+  return !roots.some((root) => trackedPath(path.posix.join(root, top), tracked));
 }
 
-function pathFindings(file, lines, tracked) {
+function pathFindings(file, lines, tracked, generated) {
   const findings = [];
+  const roots = codePathRoots(file, tracked);
   for (const [index, line] of lines.entries()) {
     for (const { target, link } of pathReferences(line)) {
-      if (hostOrProse(target, tracked)) continue;
-      if (!resolvedPath(target, file, tracked, link)) findings.push(found(PATH_MISSING, file, `${file} cites a missing repository path ${target}; update the documentation or restore the path`, { line: index + 1, reference: target }));
+      if (hostOrProse(target, tracked, link, roots)) continue;
+      if (!resolvedPath(target, file, tracked, link, generated, roots)) findings.push(found(PATH_MISSING, file, `${file} cites a missing repository path ${target}; update the documentation or restore the path`, { line: index + 1, reference: target }));
     }
   }
   return findings;
+}
+
+/** Tool reports are generated, never tracked; both their consumer and the slot policy must declare them. */
+function generatedReports(repoRoot, tracked, resolver) {
+  const reports = new Set();
+  if (!tracked.has('sonar-project.properties') || !resolver) return reports;
+  const text = readText(repoRoot, 'sonar-project.properties') ?? '';
+  for (const match of text.matchAll(/^sonar\.javascript\.lcov\.reportPaths\s*=\s*([^\r\n]*)/gm)) {
+    for (const report of match[1].split(',').map((entry) => entry.trim())) {
+      const target = cleanPath(report);
+      if (target && resolver.trackingOf(target) === 'ignored') reports.add(target);
+    }
+  }
+  return reports;
 }
 
 function packageDirectory(file, tracked) {
@@ -89,6 +113,19 @@ function packageDirectory(file, tracked) {
     if (dir === '.') return '';
     dir = path.posix.dirname(dir);
   }
+}
+
+function workspaceManifests(repoRoot, directory, tracked) {
+  const manifest = readJson(repoRoot, path.posix.join(directory, 'package.json'));
+  const workspaces = Array.isArray(manifest?.workspaces) ? manifest.workspaces : manifest?.workspaces?.packages ?? [];
+  const patterns = workspaces.map((entry) => globExpression(path.posix.join(directory, entry)));
+  return [...tracked].filter((entry) => path.posix.basename(entry) === 'package.json' && patterns.some((pattern) => pattern.test(path.posix.dirname(entry))));
+}
+
+function missingScripts(repoRoot, directory, tracked, name, workspaces) {
+  const manifests = workspaces ? workspaceManifests(repoRoot, directory, tracked) : [path.posix.join(directory, 'package.json')];
+  if (!manifests.length) return [path.posix.join(directory, 'package.json')];
+  return manifests.filter((file) => !Object.hasOwn(readJson(repoRoot, file)?.scripts ?? {}, name));
 }
 
 function scriptFindings(repoRoot, file, lines, tracked) {
@@ -101,9 +138,11 @@ function scriptFindings(repoRoot, file, lines, tracked) {
     if (changed) directory = path.posix.normalize(path.posix.join(directory, changed[1]));
     for (const match of line.matchAll(/\bnpm\s+(?:--prefix\s+([\w./-]+)\s+)?run\s+(?:--silent\s+)?([\w:.-]+)/g)) {
       const dir = match[1] ? path.posix.join(directory, match[1]) : directory;
-      const manifest = readJson(repoRoot, path.posix.join(dir, 'package.json'));
       const name = match[2];
-      if (!Object.hasOwn(manifest?.scripts ?? {}, name)) findings.push(found(COMMAND_UNKNOWN, file, `${file} cites npm run ${name}, absent from ${path.posix.join(dir, 'package.json')}; update the command or declare the script`, { line: index + 1, reference: `npm run ${name}` }));
+      const tail = line.slice(match.index + match[0].length).split(/[`;&|]/)[0];
+      const workspaces = /(?:^|\s)--workspaces(?:\s|$)/.test(tail);
+      const missing = missingScripts(repoRoot, dir, tracked, name, workspaces);
+      for (const manifest of missing) findings.push(found(COMMAND_UNKNOWN, file, `${file} cites npm run ${name}, absent from ${manifest}; update the command or declare the script`, { line: index + 1, reference: `npm run ${name}` }));
     }
   }
   return findings;
@@ -169,22 +208,50 @@ function environmentKeys(repoRoot, tracked) {
   return keys;
 }
 
-function unknownEnvironmentName(name, line, keys, codes) {
+function symbolCall(ts, node) {
+  if (!node || !ts.isCallExpression(node)) return false;
+  const callee = node.expression;
+  if (ts.isIdentifier(callee)) return callee.text === 'Symbol';
+  return ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression) && callee.expression.text === 'Symbol' && callee.name.text === 'for';
+}
+
+function declaredTokens(ts, source, tokens) {
+  const visit = (node) => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && KEY.test(node.name.text) && symbolCall(ts, node.initializer)) tokens.add(node.name.text);
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+}
+
+function injectionTokens(repoRoot, tracked) {
+  const tokens = new Set();
+  const ts = loadTypescript(repoRoot, path.dirname(fileURLToPath(import.meta.url)));
+  if (!ts) return tokens;
+  for (const file of tracked) {
+    if (!/\.[cm]?[jt]sx?$/.test(file) || /(?:^|\/)(?:tests?|__tests__)\/|(?:\.(?:spec|test)|-spec)\.[cm]?[jt]sx?$/.test(file)) continue;
+    const text = readText(repoRoot, file) ?? '';
+    declaredTokens(ts, ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true), tokens);
+  }
+  return tokens;
+}
+
+function unknownEnvironmentName(name, line, keys, codes, tokens, explicit) {
   if (!KEY.test(name) || /^R\d+$/.test(name) || codes.has(name)) return false;
+  if (!explicit && tokens.has(name) && !/\benv(?:ironment)?\b|\bvariable\b/i.test(line)) return false;
   if (!name.includes('_') && !keys.has(name) && !/\benv(?:ironment)?\b|\b(?:key|variable)s?\b/i.test(line)) return false;
   return !keys.has(name) && !(name.endsWith('_FILE') && keys.has(name.slice(0, -5)));
 }
 
-function nameFindings(file, lines, keys, rules) {
+function nameFindings(file, lines, keys, rules, tokens) {
   const findings = [];
   const codes = new Set(rules.rules.flatMap((rule) => rule.failureCodes));
   for (const [index, line] of lines.entries()) {
     for (const match of line.matchAll(/\bR\d+\b/g)) {
       if (!rules.rule(match[0])) findings.push(found(RULE_UNKNOWN, file, `${file} cites unknown rule ${match[0]}; use an id from the HFS rule catalog`, { line: index + 1, reference: match[0] }));
     }
-    const names = [...line.matchAll(/`([A-Z][A-Z0-9_]*)`|\b(?:process\.env\.|\$\{?)([A-Z][A-Z0-9_]*)|\b([A-Z][A-Z0-9_]*)\s*=/g)].map((match) => match[1] ?? match[2] ?? match[3]);
-    for (const name of names) {
-      if (!unknownEnvironmentName(name, line, keys, codes)) continue;
+    for (const match of line.matchAll(/`([A-Z][A-Z0-9_]*)`|\b(?:process\.env\.|\$\{?)([A-Z][A-Z0-9_]*)|\b([A-Z][A-Z0-9_]*)\s*=/g)) {
+      const name = match[1] ?? match[2] ?? match[3];
+      if (!unknownEnvironmentName(name, line, keys, codes, tokens, !match[1])) continue;
       findings.push(found(ENV_UNKNOWN, file, `${file} cites unknown environment key ${name}; declare it in a typed environment reader or KEYS.md, or update the documentation`, { line: index + 1, reference: name }));
     }
   }
@@ -192,19 +259,22 @@ function nameFindings(file, lines, keys, rules) {
 }
 
 /** Findings of R270 over product READMEs and docs, in lite and full; runtime docs retain their own checks. */
-export function docFreshFindings({ repoRoot, files = [], all = files, repo, inScope = () => true }) {
-  if (repo?.profile === 'runtime' || !['lite', 'full'].includes(repo?.edition)) return [];
-  const docs = files.filter((file) => DOCUMENT.test(file) && path.posix.basename(file) !== 'KEYS.md' && inScope(file));
+export function docFreshFindings({ repoRoot, files = [], all = files, repo, resolver, appSide = false, inScope = () => true }) {
+  if (appSide || repo?.profile === 'runtime' || !['lite', 'full'].includes(repo?.edition)) return [];
+  const inventory = repo.profile === 'app' ? all : files;
+  const docs = inventory.filter((file) => DOCUMENT.test(file) && path.posix.basename(file) !== 'KEYS.md' && inScope(file));
   if (!docs.length) return [];
   const tracked = new Set(all);
   const { commands, rules } = catalogs();
   const keys = environmentKeys(repoRoot, tracked);
+  const tokens = injectionTokens(repoRoot, tracked);
+  const generated = generatedReports(repoRoot, tracked, resolver);
   const findings = [];
   for (const file of docs) {
     const text = readText(repoRoot, file);
     if (text === null) continue;
     const lines = text.split(/\r?\n/);
-    findings.push(...pathFindings(file, lines, tracked), ...commandFindings(repoRoot, file, text, tracked, commands), ...nameFindings(file, lines, keys, rules));
+    findings.push(...pathFindings(file, lines, tracked, generated), ...commandFindings(repoRoot, file, text, tracked, commands), ...nameFindings(file, lines, keys, rules, tokens));
   }
   const seen = new Set();
   return findings.filter((finding) => {

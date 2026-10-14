@@ -31,7 +31,10 @@
         { "name": "landing", "kind": "next" },
         { "name": "app", "kind": "next" }
       ],
-      "optionalSlots": ["fe.package.api", "fe.package.i18n", "fe.package.ui"]
+      "optionalSlots": ["fe.package.api", "fe.package.i18n", "fe.package.ui"],
+      "extraPackages": [
+        { "name": "@fontsource-variable/inter", "reason": "Self-host the variable Inter font required by both apps' brand records." }
+      ]
     }
   }
 }

@@ -233,7 +233,7 @@ function minimumInstanceFindings(resolver, required, instances) {
   return findings;
 }
 
-function contentRuleFindings({ repoRoot, repo, resolver, files, all, scoped, pins, inScope, isRoot, editionDeclaration, manifest }) {
+function contentRuleFindings({ repoRoot, repo, resolver, files, all, scoped, pins, inScope, isRoot, appSide, editionDeclaration, manifest, phase }) {
   const findings = [
     ...pinFindings({ repoRoot, files, profile: repo.profile, pins, only: scoped }),
     ...supabaseSecretFindings({ repoRoot, files: files.filter((file) => inScope(file)), resolver, repo }),
@@ -241,11 +241,11 @@ function contentRuleFindings({ repoRoot, repo, resolver, files, all, scoped, pin
     ...feStackFindings({ repoRoot, files: files.filter((file) => inScope(file)), repo, manifest }),
     ...repoLocalCheckFindings({ repoRoot, files }),
     ...lintSuppressionFindings({ repoRoot, files }),
-    ...a15Findings({ repoRoot, files, all, repo, resolver, manifest, isRoot, inScope }),
+    ...a15Findings({ repoRoot, files, all, repo, resolver, manifest, isRoot, appSide, inScope }),
   ];
   if (isRoot) {
     findings.push(
-      ...appRootFindings({ repoRoot, files, all, repo, resolver, pins }),
+      ...appRootFindings({ repoRoot, files, all, repo, resolver, pins, phase }),
       ...checkAppRoot({ root: repoRoot, resolver, tree: trackedTreeView(all) }).violations.map((item) => ({ code: item.ruleId, level: 'error', path: item.path, line: item.line, column: item.column, source: 'machine', message: `${item.path}: ${item.message}` })),
     );
   } else if (repo.profile === 'be') {
@@ -274,7 +274,7 @@ function sizeSoftFindings({ repoRoot, resolver, files, inScope }) {
  * relative to it, exactly as the standalone repository root was). `files` are the scope's tracked paths; `all` (root only) every
  * tracked path of the app, for the rules that read across it (dependency skew, proof commands).
  */
-function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, scoped, manifest, editionDeclaration = true }) {
+function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, scoped, manifest, appSide = false, editionDeclaration = true, phase }) {
   const inScope = (file) => !scoped || scoped.has(file);
   // A required directory of the root (be/, fe/) is present through the files below it, which are the sides' own.
   const trackedSet = new Set(all);
@@ -288,7 +288,7 @@ function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, sco
   if (repo.kind === RUNTIME_KIND) return findings;
 
   const pins = readPins(root);
-  findings.push(...contentRuleFindings({ repoRoot, repo, resolver, files, all, scoped, pins, inScope, isRoot, editionDeclaration, manifest }));
+  findings.push(...contentRuleFindings({ repoRoot, repo, resolver, files, all, scoped, pins, inScope, isRoot, appSide, editionDeclaration, manifest, phase }));
   if (!isRoot) findings.push(...sizeSoftFindings({ repoRoot, resolver, files, inScope }));
   return findings;
 }
@@ -303,8 +303,11 @@ function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, sco
  * The root scope and each side run their own rules over their own files (hfs checks per side, the side folder as the old repository
  * root, plus the root checks); every finding path is app-relative. Returns {ok, profile, apps, manifest, tracked, findings, counts};
  * a missing or invalid hfs.json is one HFS_DECLARATION_INVALID / HFS_MANIFEST_MAJOR_MISMATCH error finding, never an exception.
+ * `phase: 'source'` is the runtime's no-install example-render pass: tracked obligations still run, while ignored generated
+ * artifact presence/freshness belongs to the default `workspace` phase after codegen. Ordinary app check/lint always use it.
  */
-export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only, extraFindings = [], tree = files === undefined, manifest = loadSlotManifest({ root }), surface = 'all' }) {
+export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only, extraFindings = [], tree = files === undefined, manifest = loadSlotManifest({ root }), surface = 'all', phase = 'workspace' }) {
+  if (!['source', 'workspace'].includes(phase)) throw new Error(`unknown HFS inspection phase ${phase}`);
   const why = readWhy(root);
   let repo;
   try {
@@ -322,18 +325,18 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
   const keep = (list, scopeRoot) => (surface === 'check' ? list.filter((finding) => !(finding.origin === 'repo' && onLintSurface(scopeRoot, finding))) : list);
   if (repo.profile === APP_SCOPE) {
     const own = tracked.filter((file) => resolver.sideOf(file) === null);
-    findings.push(...keep(scopeFindings({ repoRoot, root, repo, resolver, files: own, all: tracked, scoped, manifest }), repoRoot));
+    findings.push(...keep(scopeFindings({ repoRoot, root, repo, resolver, files: own, all: tracked, scoped, manifest, phase }), repoRoot));
     for (const side of SIDES) {
       const prefix = `${side}/`;
       const sideRoot = path.join(repoRoot, side);
       const sideFiles = tracked.filter((file) => file.startsWith(prefix)).map((file) => file.slice(prefix.length));
       const sideScoped = scoped ? new Set([...scoped].filter((file) => file.startsWith(prefix)).map((file) => file.slice(prefix.length))) : null;
-      const sideFindings = scopeFindings({ repoRoot: sideRoot, root, repo: repo.sides[side], resolver: resolver.sides[side], files: sideFiles, scoped: sideScoped, manifest, editionDeclaration: false });
+      const sideFindings = scopeFindings({ repoRoot: sideRoot, root, repo: repo.sides[side], resolver: resolver.sides[side], files: sideFiles, scoped: sideScoped, manifest, appSide: true, editionDeclaration: false, phase });
       const message = appRelativeMessages(side, sideRoot);
       findings.push(...keep(sideFindings, sideRoot).map((finding) => ({ ...finding, side, path: onSide(side, finding.path), message: message(finding.message) })));
     }
   } else {
-    findings.push(...keep(scopeFindings({ repoRoot, root, repo, resolver, files: tracked, scoped, manifest }), repoRoot));
+    findings.push(...keep(scopeFindings({ repoRoot, root, repo, resolver, files: tracked, scoped, manifest, phase }), repoRoot));
   }
   findings.push(...extraFindings);
   const untrackedSecrets = untrackedSecretFindings({ repoRoot, files: tracked, repo });

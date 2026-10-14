@@ -292,6 +292,8 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
     project: app.project,
     appBinary: APP_BINARY,
     appScripts: appScripts(app, source),
+    // A full upgrade keeps the app's declared Supabase connection and its local database commands.
+    supabaseScripts: providers.includes('supabase') ? render(readBundled('app/package-scripts/supabase.json'), { appBinary: APP_BINARY }) : '',
     // turbo builds every fe app workspace; ^build (turbo.json) builds the packages each app imports first, and caches both.
     buildFe: 'npm run codegen --silent && turbo run build --filter=./fe/apps/*',
     // The be side with its tsc; every fe workspace with its own typecheck script through turbo (the packages are built first: ^build).

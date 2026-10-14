@@ -74,6 +74,14 @@ $defs:
         additionalProperties: false
         required: [common, be]
         properties:
+          db:
+            type: object
+            additionalProperties: false
+            properties:
+              extensions:
+                type: array
+                uniqueItems: true
+                items: {type: string, minLength: 1}
           common:
             type: object
             additionalProperties: false

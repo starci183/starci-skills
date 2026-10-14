@@ -24,6 +24,11 @@ export const SignInForm = () => {
     const t = useTranslations("app.signIn")
     const { failure, pending, signIn, reject } = useSignIn()
     if (session.status !== "signed-out") return null
+    const failureMessages = {
+        refused: t("refused"),
+        invalid: t("invalid"),
+        unavailable: t("unavailable"),
+    } satisfies Record<SignInFailure, string>
     const submit = (input: FormData) => {
         const credentials = credentialsOf(input)
         if (credentials === undefined) reject()
@@ -37,7 +42,7 @@ export const SignInForm = () => {
                 emailLabel: t("email"),
                 passwordLabel: t("password"),
                 submitLabel: pending ? t("working") : t("submit"),
-                failure: failure === undefined ? undefined : t(failure),
+                failure: failure === undefined ? undefined : failureMessages[failure],
             }}
             on={{ submit }}
         />

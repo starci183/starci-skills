@@ -68,6 +68,45 @@ for (const edition of ['lite', 'full']) {
     contents['apps/web/src/features/orders/orders.tsx'] += 'export const retired = t("retired");';
     assert.deepEqual(unusedSymbolFindings({ ...fixture(t, contents), repo: { profile: 'fe', edition } }), []);
   });
+
+  test(`HFS_UNUSED_SYMBOL ${edition}: imported namespace constants and finite parameter values resolve only runtime translation reads`, t => {
+    const context = fixture(t, {
+      'apps/web/src/modules/i18n/messages/en.json': JSON.stringify({ app: { title: 'App', retired: 'Retired' }, cart: { title: 'Cart', retired: 'Retired' }, checkout: { title: 'Checkout' }, unused: { title: 'Unused' } }),
+      'apps/web/src/modules/i18n/namespace.ts': 'export const APP_NAMESPACE = "app"; export const UNUSED_NAMESPACE = "unused";',
+      'apps/web/src/modules/i18n/index.ts': 'export { APP_NAMESPACE as PAGE_NAMESPACE, UNUSED_NAMESPACE } from "./namespace";',
+      'apps/web/src/modules/meta.ts': `export function metadata(namespace: string) { const copy = getTranslations(namespace); return copy('title'); }
+export function section(namespace: 'cart' | 'checkout') { const text = useTranslations(namespace); return text('title'); }`,
+      'apps/web/src/features/page.ts': `import { PAGE_NAMESPACE, UNUSED_NAMESPACE } from '../modules/i18n';
+import { metadata, section } from '../modules/meta';
+const text = getTranslations(PAGE_NAMESPACE); render(text('title')); metadata('cart'); section('checkout');`,
+    });
+    assert.deepEqual(unusedSymbolFindings({ ...context, repo: { profile: 'fe', edition } }).map(finding => finding.name), ['app.retired', 'cart.retired', 'unused.title']);
+  });
+
+  test(`HFS_UNUSED_SYMBOL ${edition}: finite mapped labels consume their keys while an unbounded key gives no evidence`, t => {
+    const context = fixture(t, {
+      'apps/web/src/modules/i18n/messages/en.json': JSON.stringify({ nav: { browse: 'Browse', cart: 'Cart', retired: 'Retired' } }),
+      'apps/web/src/features/nav.tsx': `const links = [{ key: 'browse' }, { key: 'cart' }] as const;
+const text = useTranslations('nav'); export const labels = links.map(link => text(link.key));
+function unknown(key: string) { return text(key); }`,
+    });
+    assert.deepEqual(unusedSymbolFindings({ ...context, repo: { profile: 'fe', edition } }).map(finding => finding.name), ['nav.retired']);
+  });
+
+  test(`HFS_UNUSED_SYMBOL ${edition}: direct JSON runtime member reads follow aliases and barrels without retaining imported dead leaves`, t => {
+    const context = fixture(t, {
+      'tsconfig.json': '{ "compilerOptions": { "baseUrl": ".", "paths": { "@/*": ["apps/web/src/*"] } } }',
+      'apps/web/src/modules/i18n/messages/en.json': JSON.stringify({ errors: { global: { title: 'Error', retry: 'Retry', retired: 'Retired' } }, unused: 'Unused' }),
+      'apps/web/src/modules/config/settings.json': JSON.stringify({ unused: 'Config value' }),
+      'apps/web/src/modules/i18n/catalog.ts': `import messages from './messages/en.json'; export const GLOBAL = messages.errors.global;`,
+      'apps/web/src/modules/i18n/index.ts': `export { GLOBAL as ERROR_COPY } from './catalog';`,
+      'apps/web/src/features/error.tsx': `import { ERROR_COPY } from '../modules/i18n';
+import messages from '@/modules/i18n/messages/en.json'; render(messages.errors.global.title);
+import settings from '../modules/config/settings.json'; render(settings.unused);
+export const error = <div title={ERROR_COPY.title}>{ERROR_COPY['retry']}</div>;`,
+    });
+    assert.deepEqual(unusedSymbolFindings({ ...context, repo: { profile: 'fe', edition } }).map(finding => finding.name), ['errors.global.retired', 'unused']);
+  });
 }
 
 test('HFS_UNUSED_SYMBOL: comments, type references, re-exports and tests alone cannot keep a member alive', t => {

@@ -179,6 +179,9 @@ crossApp: apps never import each other; shared code is a packages/<pkg> slot.
 # Parameters the lint factories and checks read per profile (through ruleParams(profile) in scripts/hfs/slots.mjs, which
 # merges common under the profile: a side restates a common key only to override it).
 ruleParams:
+  db:
+    # R259: btree_gist supplies UUID equality for the booking interval exclusion constraint.
+    extensions: [pgmq, pg_cron, pgcrypto, pg_trgm, vector, uuid-ossp, pg_net, supabase_vault, btree_gist]
   common:
     # HFS_SIZE_GROWTH: a file above soft may not grow against its parent commit; a new file stays within soft. Slot
     # budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
@@ -2058,6 +2061,15 @@ slots:
     entries: ["graphql/queries/query-*.ts", "graphql/queries/types/*.ts", "graphql/mutations/mutation-*.ts", "graphql/mutations/types/*.ts"]
     tests: none
     rules: [FE_TRANSPORT_OWNER, FE_HTTP_STATUS_COLLAPSE, FE_WIRE_GENERATED]
+  - id: fe.transport.generated
+    profiles: [fe]
+    path: "apps/<app>/src/modules/api/graphql/__generated__/"
+    presence: optional
+    tracked: ignored
+    tier: transport
+    tests: none
+    why: the canonical GraphQL client output of codegen is local and never committed; this specific slot overrides the tracked API parent
+    rules: [FE_WIRE_GENERATED]
   - id: fe.transport.client
     profiles: [fe]
     path: "apps/<app>/src/modules/api/graphql/clients/"

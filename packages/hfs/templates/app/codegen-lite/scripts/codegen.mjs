@@ -7,6 +7,11 @@ import { createHash } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 
+const byCodeUnit = (left, right) => {
+    if (left === right) return 0
+    return left < right ? -1 : 1
+}
+
 const MIGRATIONS = path.join("supabase", "migrations")
 const TYPES = path.join("supabase", "types", "database.types.ts")
 const STAMP = /^\/\/ migrations-sha256: ([0-9a-f]{64})$/
@@ -20,7 +25,7 @@ if (!process.argv.includes("--graphql")) {
     const hash = createHash("sha256")
     for (const name of (fs.existsSync(MIGRATIONS) ? fs.readdirSync(MIGRATIONS) : [])
         .filter((file) => file.endsWith(".sql"))
-        .sort()) {
+        .sort(byCodeUnit)) {
         hash.update(`${name}\0${fs.readFileSync(path.join(MIGRATIONS, name), "utf8").replace(/\r\n/g, "\n")}\0`)
     }
     const digest = hash.digest("hex")

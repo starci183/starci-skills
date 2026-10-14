@@ -44,6 +44,21 @@ test('the shipped manifest validates against its JSON schema and the loader', ()
   assert.equal(new Set(manifest.slots.map((s) => s.id)).size, manifest.slots.length);
 });
 
+test('database extension policy agrees between the schema and loader', () => {
+  for (const extensions of [[], ['btree_gist', 'pgmq']]) {
+    const doc = parseYaml(manifestText);
+    doc.ruleParams.db = { extensions };
+    assert.equal(validateManifestSchema(doc), true, JSON.stringify(validateManifestSchema.errors));
+    assert.deepEqual(loadSlotManifest({ text: JSON.stringify(doc) }).ruleParams.db.extensions, extensions);
+  }
+  for (const db of [{ extensions: ['pgmq', 'pgmq'] }, { extensions: [1] }, { extensions: [''] }, { extensions: 'pgmq' }, { unknown: [] }]) {
+    const doc = parseYaml(manifestText);
+    doc.ruleParams.db = db;
+    assert.equal(validateManifestSchema(doc), false, JSON.stringify(db));
+    refusal(() => loadSlotManifest({ text: JSON.stringify(doc) }), 'HFS_MANIFEST_INVALID');
+  }
+});
+
 test('every back-end app kind requires its own env file with the 150-line app budget in both editions', () => {
   const manifest = loadSlotManifest();
   const appSlots = manifest.slots.filter((slot) => slot.id.startsWith('be.app.'));

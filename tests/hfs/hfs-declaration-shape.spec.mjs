@@ -98,6 +98,47 @@ test('the Supabase block refuses every unsupported key and value shape', () => {
   assert.deepEqual(declarationShapeProblems(good, ['be', 'fe']), []);
 });
 
+for (const edition of ['lite', 'full']) {
+  test(`reasoned extra packages belong only to the fe side and schema agrees with the loader (${edition})`, () => {
+    const entries = [{ name: '@fontsource-variable/inter', reason: 'Self-host the product brand font' }];
+    const good = changed(declaration => {
+      declaration.edition = edition;
+      declaration.sides.fe.extraPackages = entries;
+    });
+    assert.deepEqual(declarationShapeProblems(good, ['be', 'fe']), []);
+    assert.equal(validateSchema(good), true, JSON.stringify(validateSchema.errors));
+    const resolved = resolveRepoDeclaration(manifest, good).sides.fe.extraPackages;
+    assert.deepEqual(resolved, entries);
+    assert.ok(Object.isFrozen(resolved) && Object.isFrozen(resolved[0]));
+
+    const invalid = [
+      'fontsource',
+      [null],
+      [{ name: 'fontsource' }],
+      [{ name: 'fontsource', reason: '' }],
+      [{ name: 'fontsource', reason: '  ' }],
+      [{ name: 'fontsource', reason: 1 }],
+      [{ name: '', reason: 'Brand font' }],
+      [{ name: '../fontsource', reason: 'Brand font' }],
+      [{ name: 'fontsource', reason: 'Brand font', ignore: true }],
+    ];
+    for (const value of invalid) {
+      const bad = structuredClone(good);
+      bad.sides.fe.extraPackages = value;
+      assert.equal(validateSchema(bad), false, `schema accepted ${JSON.stringify(value)}`);
+      loaderRefuses(bad);
+    }
+    const wrongSide = structuredClone(good);
+    wrongSide.sides.be.extraPackages = entries;
+    assert.equal(validateSchema(wrongSide), false);
+    loaderRefuses(wrongSide);
+    const unknownSideKey = structuredClone(good);
+    unknownSideKey.sides.fe.ignore = true;
+    assert.equal(validateSchema(unknownSideKey), false);
+    loaderRefuses(unknownSideKey);
+  });
+}
+
 test('connections refuse malformed fields and accept only the absent, postgres and supabase provider values', () => {
   const connection = { name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database' };
   const malformed = [

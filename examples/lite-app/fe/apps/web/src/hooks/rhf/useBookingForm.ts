@@ -12,15 +12,15 @@ import { useGraphQLWithToast } from "@/modules/toast"
 type BookingMessageKey = "resourceInvalid" | "dateInvalid" | "intervalInvalid"
 
 /** The bounded booking: one resource id and a valid, increasing UTC interval, with the reader's-language messages. */
-const bookingSchemaOf = (t: (key: BookingMessageKey) => string) =>
+const bookingSchemaOf = (messages: Readonly<Record<BookingMessageKey, string>>) =>
     z
         .object({
-            resourceId: z.uuid({ error: t("resourceInvalid") }),
-            startsAt: z.iso.datetime({ error: t("dateInvalid") }),
-            endsAt: z.iso.datetime({ error: t("dateInvalid") }),
+            resourceId: z.uuid({ error: messages.resourceInvalid }),
+            startsAt: z.iso.datetime({ error: messages.dateInvalid }),
+            endsAt: z.iso.datetime({ error: messages.dateInvalid }),
         })
         .refine((value) => Date.parse(value.startsAt) < Date.parse(value.endsAt), {
-            error: t("intervalInvalid"),
+            error: messages.intervalInvalid,
             path: ["endsAt"],
         })
 
@@ -45,7 +45,15 @@ const useField = (control: Control<BookingValues>, name: keyof BookingValues) =>
  */
 export const useBookingForm = () => {
     const t = useTranslations("app.booking")
-    const schema = useMemo(() => bookingSchemaOf(t), [t])
+    const schema = useMemo(
+        () =>
+            bookingSchemaOf({
+                resourceInvalid: t("resourceInvalid"),
+                dateInvalid: t("dateInvalid"),
+                intervalInvalid: t("intervalInvalid"),
+            }),
+        [t],
+    )
     const form = useForm<BookingValues>({
         resolver: zodResolver(schema),
         defaultValues: { resourceId: "", startsAt: "", endsAt: "" },

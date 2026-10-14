@@ -1,4 +1,4 @@
-// env-value-shape.mjs - R249 HFS_ENV_VALUE_SHAPE (OPS K6, nivo D2-03: `OPENCLAW_MANAGE_AGENTS=1` for an `env.bool`
+// env-value-shape.mjs - R249 HFS_ENV_VALUE_SHAPE (OPS K6: `OPENCLAW_MANAGE_AGENTS=1` for an `env.bool`
 // read): a stored environment value parses as the type its `EnvSource` reader declares. The reader shapes come from
 // the same static TypeScript walk as the env-key parity (collectEnvReads).
 //   - the finder judges the concrete values of `*.env.example` files: a value that is not a placeholder must parse;

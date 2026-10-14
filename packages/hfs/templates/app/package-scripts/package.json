@@ -10,6 +10,7 @@
     "test:e2e": "npm run typecheck:tests && cd be && jest --selectProjects e2e",
     "test:contract": "npm run typecheck:tests && cd be && jest --selectProjects contract",
     "test:stack": "starci app stack",
+{{supabaseScripts}}
     "contract:emit": "starci app emit"
   }
 }

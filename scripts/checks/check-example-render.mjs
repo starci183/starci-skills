@@ -3,7 +3,9 @@
 // runtime's own HFS, from this checkout and with no app install: its tracked tree against the slot manifest (a file outside the standard shape,
 // such as an extra file in .starcistacks), every managed file against what the renderer of packages/hfs/sync writes for its hfs.json today (the
 // workflows, the ignore files, the quality config, the scripts), the Sonar and gitignore blocks. It is the fast half of `starci app lint`:
-// no eslint, no architecture machine, no emit and no formatter run, so it fits in `npm run check`; the heavy rows (lint, builds, images, suites)
+// no eslint, no architecture machine, no emit and no formatter run, so it fits in `npm run check`. It uses HFS's source phase:
+// tracked inputs, codegen declarations and tracked-output prohibitions are judged here; ignored generated artifacts are
+// judged by the ordinary workspace app check after real codegen in L4. The heavy rows (lint, builds, images, suites)
 // stay in the L4 plan (scripts/supervisor/release-l4.mjs). A renderer, template or canon change that leaves an example behind, or an example
 // edited by hand off its standard, fails here the day it lands instead of at the release cut.
 //
@@ -30,7 +32,7 @@ const presetsOf = (root) => ({ sonarExclusions: createRequire(path.join(root, 'p
 export async function exampleRenderFindings(root, name, repoRoot = path.join(root, 'examples', name)) {
   const tracked = trackedFiles(repoRoot);
   const extraFindings = await managedFindings({ repoRoot, tracked, presets: presetsOf(root), parseYaml });
-  const result = checkRepo({ repoRoot, root, extraFindings, surface: 'check' });
+  const result = checkRepo({ repoRoot, root, extraFindings, surface: 'check', phase: 'source' });
   return result.findings.filter((finding) => finding.level === 'error').map((finding) => ({ example: name, code: finding.code, path: finding.path ?? '', message: finding.message }));
 }
 

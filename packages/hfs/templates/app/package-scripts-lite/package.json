@@ -7,13 +7,7 @@
     "test": "cd be && jest --selectProjects unit --coverage",
     "test:affected": "cd be && jest --selectProjects unit --passWithNoTests",
     "test:integration": "npm run typecheck:tests && cd be && jest --selectProjects integration",
-    "db:start": "supabase start",
-    "db:stop": "supabase stop",
-    "db:reset": "supabase db reset",
-    "db:new": "supabase migration new",
-    "db:push": "supabase db push",
-    "db:types": "npm run contract:emit",
-    "db:lint": "{{appBinary}} check --fast",
+{{> app/package-scripts/supabase.json}}
     "contract:emit": "{{appBinary}} emit"
   }
 }

@@ -32,6 +32,10 @@ const manifests = {
   '.starcistacks/production/infra/swarm/stack.yaml': 'services: {}',
 };
 
+const appDeclaration = (edition) => ({ hfs: 3, kind: 'app', project: 'demo', edition, sides: { be: { apps: [{ name: 'api', kind: 'api' }] }, fe: { apps: [{ name: 'web', kind: 'next' }] } } });
+
+const appDocFindings = (context, edition) => checkRepo({ repoRoot: context.repoRoot, declaration: appDeclaration(edition), files: context.files, tree: false }).findings.filter((finding) => finding.code.startsWith('HFS_DOC_'));
+
 for (const edition of ['lite', 'full']) {
   test(`HFS_DOC_PATH_MISSING@${edition}: broken code, prose, links and stack README paths fail`, (t) => {
     const context = fixture(t, edition, { ...manifests,
@@ -54,6 +58,25 @@ for (const edition of ['lite', 'full']) {
     assert.deepEqual(docFreshFindings(context).filter((finding) => finding.code === 'HFS_DOC_PATH_MISSING'), []);
   });
 
+  test(`HFS_DOC_PATH_MISSING@${edition}: environment API expressions pass while file citations remain checked`, (t) => {
+    const context = fixture(t, edition, { ...manifests,
+      'README.md': 'Read values through `process.env` or `import.meta.env`. Load `missing.env` and [file](process.env).',
+    });
+    const hits = docFreshFindings(context).filter((finding) => finding.code === 'HFS_DOC_PATH_MISSING');
+    assert.deepEqual(hits.map((finding) => finding.reference), ['process.env', 'missing.env']);
+  });
+
+  test(`HFS_DOC_PATH_MISSING@${edition}: only declared reports in ignored slots need no tracked output`, (t) => {
+    const context = fixture(t, edition, { ...manifests,
+      'sonar-project.properties': 'sonar.javascript.lcov.reportPaths=be/coverage/lcov.info,be/src/missing.ts,unknown/lcov.info',
+      'README.md': 'The test writes `be/coverage/lcov.info`. Missing `be/coverage/missing.json`, `be/src/missing.ts` and `unknown/lcov.info` remain errors.',
+    });
+    const hits = appDocFindings(context, edition).filter((finding) => finding.code === 'HFS_DOC_PATH_MISSING');
+    assert.deepEqual(hits.map((finding) => finding.reference), ['be/coverage/missing.json', 'be/src/missing.ts', 'unknown/lcov.info']);
+    const undeclared = appDocFindings({ ...context, files: context.files.filter((file) => file !== 'sonar-project.properties') }, edition);
+    assert.ok(undeclared.some((finding) => finding.reference === 'be/coverage/lcov.info'));
+  });
+
   test(`HFS_DOC_COMMAND_UNKNOWN@${edition}: deleted npm scripts and app verbs fail in prose and fences`, (t) => {
     const context = fixture(t, edition, { ...manifests,
       'README.md': 'Run `npm run env-sync`. Run starci app retired.\n```sh\nstarci app missing-verb\n```',
@@ -72,6 +95,23 @@ for (const edition of ['lite', 'full']) {
     assert.deepEqual(docFreshFindings(context).filter((finding) => finding.code === 'HFS_DOC_COMMAND_UNKNOWN'), []);
   });
 
+  test(`HFS_DOC_COMMAND_UNKNOWN@${edition}: workspace commands resolve the workspace manifests`, (t) => {
+    const context = fixture(t, edition, { ...manifests,
+      'package.json': { workspaces: ['fe/packages/*'], scripts: {} },
+      'fe/packages/ui/package.json': { scripts: { build: 'tsc' } },
+      'fe/packages/core/package.json': { scripts: { build: 'tsc' } },
+      'README.md': 'Run `npm run build --workspaces`.\nRun `npm run removed --workspaces` or `npm run build`.',
+    });
+    const hits = docFreshFindings(context).filter((finding) => finding.code === 'HFS_DOC_COMMAND_UNKNOWN');
+    assert.deepEqual(hits.map((finding) => finding.reference), ['npm run removed', 'npm run build']);
+    assert.ok(hits[0].message.includes('fe/packages/ui/package.json'));
+    assert.ok(hits[1].message.includes('package.json'));
+    fs.writeFileSync(path.join(context.repoRoot, 'fe/packages/core/package.json'), JSON.stringify({ scripts: {} }));
+    const missingWorkspace = docFreshFindings(context).filter((finding) => finding.reference === 'npm run build' && finding.line === 1);
+    assert.equal(missingWorkspace.length, 1);
+    assert.ok(missingWorkspace[0].message.includes('fe/packages/core/package.json'));
+  });
+
   test(`HFS_DOC_ENV_UNKNOWN@${edition}: undeclared key names fail without exposing assigned values`, (t) => {
     const context = fixture(t, edition, { ...manifests,
       'README.md': 'Environment `RETIRED_DB_URL` is required.\nRETIRED_TOKEN=example-placeholder\nprocess.env.RETIRED_PORT',
@@ -86,6 +126,18 @@ for (const edition of ['lite', 'full']) {
       'README.md': 'Environment `PORT`, `PRIMARY_DB_URL`, `PRIMARY_DB_URL_FILE`, `NEXT_PUBLIC_SITE_URL`. SQL uses RLS and CQRS. Finding `HFS_DOC_PATH_MISSING`.',
     });
     assert.deepEqual(docFreshFindings(context).filter((finding) => finding.code === 'HFS_DOC_ENV_UNKNOWN'), []);
+  });
+
+  test(`HFS_DOC_ENV_UNKNOWN@${edition}: declared DI tokens pass while explicit environment references still fail`, (t) => {
+    const context = fixture(t, edition, { ...manifests,
+      'be/src/modules/domain/order/order.decorators.ts': 'export const ORDER_ENTITY_MANAGER: unique symbol = Symbol("order.em"); export const CART_SERVICE = Symbol.for("cart.service");\n// const COMMENT_TOKEN = Symbol("comment");\nconst text = "const STRING_TOKEN = Symbol(42);";',
+      'be/src/tests/fixtures/tokens.ts': 'export const ONLY_TEST_TOKEN = Symbol("test");',
+      'README.md': 'Constructor tokens `ORDER_ENTITY_MANAGER`, `CART_SERVICE`.\nEnvironment `ORDER_ENTITY_MANAGER`.\nprocess.env.CART_SERVICE\nUndeclared `MISSING_SERVICE`, `COMMENT_TOKEN`, `STRING_TOKEN`, `ONLY_TEST_TOKEN`.',
+    });
+    const hits = docFreshFindings(context).filter((finding) => finding.code === 'HFS_DOC_ENV_UNKNOWN');
+    assert.deepEqual(hits.map((finding) => [finding.reference, finding.line]), [
+      ['ORDER_ENTITY_MANAGER', 2], ['CART_SERVICE', 3], ['MISSING_SERVICE', 4], ['COMMENT_TOKEN', 4], ['STRING_TOKEN', 4], ['ONLY_TEST_TOKEN', 4],
+    ]);
   });
 
   test(`HFS_DOC_RULE_UNKNOWN@${edition}: nonexistent rule references fail`, (t) => {
@@ -114,6 +166,28 @@ for (const edition of ['lite', 'full']) {
     const hits = result.findings.filter((finding) => finding.code.startsWith('HFS_DOC_'));
     assert.equal(hits.length, 4);
     assert.ok(hits.every((finding) => finding.titleVi && finding.whyVi && finding.nextStepVi));
+  });
+
+  test(`R270@${edition}: app-root judging resolves side docs once against the whole app`, (t) => {
+    const files = { ...manifests,
+      'be/jest.config.js': 'module.exports = {};',
+      'be/src/tests/world/test-world.config.ts': 'export const world = {};',
+      'be/docs/guides/testing.md': '[manifest](../../../package.json), [stack](../../../.starcistacks/production/infra/swarm/stack.yaml). Source `jest.config.js`, `src/tests/`, `src/tests/world/test-world.config.ts`.\nRun `npm run build`.\nMissing `be/src/retired.ts`, `src/retired` and [invalid relative](jest.config.js).',
+    };
+    delete files['be/package.json'];
+    const context = fixture(t, edition, files);
+    const hits = appDocFindings(context, edition);
+    assert.deepEqual(hits.map((finding) => [finding.code, finding.path, finding.reference]), [
+      ['HFS_DOC_PATH_MISSING', 'be/docs/guides/testing.md', 'jest.config.js'],
+      ['HFS_DOC_PATH_MISSING', 'be/docs/guides/testing.md', 'be/src/retired.ts'],
+      ['HFS_DOC_PATH_MISSING', 'be/docs/guides/testing.md', 'src/retired'],
+    ]);
+    const rootOnly = { ...context, files: ['package.json'], all: context.files };
+    assert.equal(docFreshFindings(rootOnly).length, 3);
+    assert.deepEqual(docFreshFindings({ ...rootOnly, inScope: (file) => file === 'README.md' }), []);
+    const side = { repoRoot: path.join(context.repoRoot, 'be'), files: ['docs/guides/testing.md'], repo: { edition, profile: 'be' } };
+    assert.deepEqual(docFreshFindings({ ...side, appSide: true }), []);
+    assert.ok(docFreshFindings(side).length > 0, 'a standalone side keeps its own documentation checks');
   });
 }
 

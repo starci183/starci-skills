@@ -12,14 +12,14 @@ export const SELECT_WAITING_ROWS = sql`SELECT id, queue, payload FROM public.que
 /** Marks the rows as sent to pgmq ($1 ids, $2 instant). */
 export const MARK_ROWS_SENT = sql`UPDATE public.queue SET sent_at = $2 WHERE id = ANY($1::uuid[])`
 
-/** Sends one message to a pgmq queue on the connection of the caller's transaction ($1 queue, $2 message). */
-export const PGMQ_SEND = sql`SELECT pgmq.send($1, $2::jsonb) AS msg_id`
+/** Sends one message through the app-owned queue door on the caller's transaction ($1 queue, $2 message). */
+export const PGMQ_SEND = sql`SELECT private.queue_send($1, $2::jsonb) AS msg_id`
 
 /** Reads at most $3 messages of the queue $1 and hides them from other readers for $2 seconds (the visibility timeout). */
-export const PGMQ_READ = sql`SELECT msg_id, read_ct, message FROM pgmq.read($1, $2, $3) LIMIT $3`
+export const PGMQ_READ = sql`SELECT msg_id, read_ct, message FROM private.queue_read($1, $2, $3) LIMIT $3`
 
 /** Moves a handled message to the archive of its queue ($1 queue, $2 message id). */
-export const PGMQ_ARCHIVE = sql`SELECT pgmq.archive($1, $2::bigint) AS archived`
+export const PGMQ_ARCHIVE = sql`SELECT private.queue_archive($1, $2::bigint) AS archived`
 
 /** Makes a failed message visible again after $3 seconds: the backoff of its next attempt ($1 queue, $2 message id). */
-export const PGMQ_SET_VT = sql`SELECT msg_id FROM pgmq.set_vt($1, $2::bigint, $3) LIMIT 1`
+export const PGMQ_SET_VT = sql`SELECT msg_id FROM private.queue_set_vt($1, $2::bigint, $3) LIMIT 1`

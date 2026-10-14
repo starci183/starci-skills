@@ -7,6 +7,11 @@ import { createHash } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 
+const byCodeUnit = (left, right) => {
+    if (left === right) return 0
+    return left < right ? -1 : 1
+}
+
 const MIGRATIONS = path.join("supabase", "migrations")
 const TYPES = path.join("supabase", "types", "database.types.ts")
 const STAMP = /^\/\/ migrations-sha256: ([0-9a-f]{64})$/
@@ -20,7 +25,7 @@ if (!process.argv.includes("--graphql")) {
     const hash = createHash("sha256")
     for (const name of (fs.existsSync(MIGRATIONS) ? fs.readdirSync(MIGRATIONS) : [])
         .filter((file) => file.endsWith(".sql"))
-        .sort()) {
+        .sort(byCodeUnit)) {
         hash.update(`${name}\0${fs.readFileSync(path.join(MIGRATIONS, name), "utf8").replace(/\r\n/g, "\n")}\0`)
     }
     const digest = hash.digest("hex")
@@ -44,12 +49,12 @@ const posix = (file) => file.split(path.sep).join("/")
 const schemas = (fs.existsSync(CONTRACTS) ? fs.readdirSync(CONTRACTS) : [])
     .map((app) => path.join(CONTRACTS, app, "schema.graphql"))
     .filter((file) => fs.existsSync(file))
-    .sort()
+    .sort(byCodeUnit)
     .map(posix)
 const operationRoots = (fs.existsSync(FE_APPS) ? fs.readdirSync(FE_APPS) : [])
     .map((app) => path.join(FE_APPS, app, "src", "modules", "api", "graphql"))
     .filter((dir) => fs.existsSync(dir))
-    .sort()
+    .sort(byCodeUnit)
     .map(posix)
 if (schemas.length === 0 || operationRoots.length === 0) {
     process.stdout.write("codegen: no GraphQL contract under be/contracts yet\n")
@@ -67,4 +72,15 @@ if (schemas.length === 0 || operationRoots.length === 0) {
         ]),
     )
     await generate({ schema: schemas, generates, ignoreNoDocuments: true, silent: true }, true)
+    // Stamp only a successful generation, using the same sorted paths and LF-normalized schemas as R52.
+    const hash = createHash("sha256")
+    for (const schema of schemas) {
+        const source = fs.readFileSync(schema, "utf8").replaceAll("\r\n", "\n")
+        hash.update(`${schema}\0${source}\0`)
+    }
+    const digest = hash.digest("hex")
+    for (const root of operationRoots) {
+        const generated = `${root}/__generated__`
+        if (fs.existsSync(generated)) fs.writeFileSync(`${generated}/.schema-sha256`, `${digest}\n`)
+    }
 }

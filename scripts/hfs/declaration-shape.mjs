@@ -60,16 +60,32 @@ function connectionProblems(side, value) {
 /** Whether a declared list is present but not a list of distinct entries that all satisfy `valid`. */
 const isBadUniqueList = (list, valid) => list !== undefined && (!Array.isArray(list) || !list.every((entry) => valid(entry)) || new Set(list).size !== list.length);
 
+const PACKAGE_NAME = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/;
+
+function validExtraPackage(entry) {
+  return isPlainObject(entry) && Object.keys(entry).every(key => key === 'name' || key === 'reason')
+    && typeof entry.name === 'string' && entry.name.length <= 214 && PACKAGE_NAME.test(entry.name)
+    && typeof entry.reason === 'string' && entry.reason.trim().length > 0;
+}
+
+function extraPackageProblems(side, entries) {
+  if (entries === undefined) return [];
+  if (side !== 'fe') return ['extraPackages belong to the fe side'];
+  if (!Array.isArray(entries) || !entries.every(validExtraPackage)) return ['sides.fe.extraPackages must be a list of {name, reason} with a package name and a nonempty reason'];
+  return [];
+}
+
 function declarationSideProblems(side, value, names) {
   const bad = [];
   const at = `sides.${side}`;
   if (!isPlainObject(value)) return [`${at} must be an object`];
-  for (const key of Object.keys(value)) if (!['apps', 'optionalSlots', 'patterns', 'kinds', 'connections', 'reads'].includes(key)) bad.push(`${at} has unknown key ${key}`);
+  for (const key of Object.keys(value)) if (!['apps', 'optionalSlots', 'patterns', 'kinds', 'connections', 'reads', 'extraPackages'].includes(key)) bad.push(`${at} has unknown key ${key}`);
   bad.push(...appShapeProblems(value.apps, at, side, names));
   if (isBadUniqueList(value.optionalSlots, (slot) => SLOT_ID.test(String(slot)))) bad.push(`${at}.optionalSlots must be a unique list of slot ids`);
   bad.push(...patternShapeProblems(value, at, NAME), ...kindShapeProblems(value, at, NAME));
   if (isBadUniqueList(value.reads, (read) => typeof read === 'string' && read.length > 0)) bad.push(`${at}.reads must be a unique list of paths`);
   if (value.connections !== undefined) bad.push(...connectionProblems(side, value));
+  bad.push(...extraPackageProblems(side, value.extraPackages));
   return bad;
 }
 

@@ -1,6 +1,6 @@
--- starci:baseline 20261013064730
--- Squashed baseline of the lite example. The nine retired migrations under
--- supabase/migrations/_archive end at stamp 20261013064730; this file reaches the same
+-- starci:baseline 20261002204543
+-- Squashed baseline of the lite example. The six retired migrations under
+-- supabase/migrations/_archive end at stamp 20261002204543; this file reaches the same
 -- schema in one pass, so a fresh project replays this file instead of the history.
 
 create extension if not exists pgmq;
@@ -284,7 +284,5 @@ grant select, insert, update on table public.calendar_inbox to app_be;
 -- archives its messages and nothing else.
 select pgmq.create('booking_confirmation');
 
-grant usage on schema pgmq to app_be;
 grant select, insert, update, delete on table pgmq.q_booking_confirmation to app_be;
 grant select, insert on table pgmq.a_booking_confirmation to app_be;
-grant usage on sequence pgmq.q_booking_confirmation_msg_id_seq to app_be;

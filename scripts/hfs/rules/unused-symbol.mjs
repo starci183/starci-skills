@@ -3,6 +3,7 @@
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { found, readText } from './read.mjs';
+import { argumentBindings, jsonCatalogBindings, jsonCatalogRead, staticStrings } from './unused-symbol-values.mjs';
 
 export const HFS_UNUSED_SYMBOL = 'HFS_UNUSED_SYMBOL';
 const SOURCE = /\.[cm]?[jt]sx?$/u;
@@ -49,22 +50,24 @@ function projectOptions(ts, repoRoot, files) {
 }
 
 function trackedProgram(ts, repoRoot, files, sources) {
-  const options = { noLib: true, types: [], allowJs: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.Latest, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler };
+  const options = { noLib: true, types: [], allowJs: true, resolveJsonModule: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.Latest, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler };
   const projects = projectOptions(ts, repoRoot, files);
+  const catalogs = new Set(files.filter(file => JSON_CATALOG.test(file)).map(file => slash(path.resolve(repoRoot, file))));
   const host = {
     getSourceFile: file => sources.get(slash(path.resolve(file))),
     getDefaultLibFileName: () => '', writeFile: () => {},
     getCurrentDirectory: () => repoRoot, getDirectories: () => [],
-    fileExists: file => sources.has(slash(path.resolve(file))),
+    fileExists: file => sources.has(slash(path.resolve(file))) || catalogs.has(slash(path.resolve(file))),
     readFile: file => sources.get(slash(path.resolve(file)))?.text,
     getCanonicalFileName: slash, useCaseSensitiveFileNames: () => true,
     getNewLine: () => '\n',
   };
-  host.resolveModuleNames = (names, containing) => names.map(name => {
+  const resolveModule = (name, containing) => {
     const project = projects.find(project => slash(containing).startsWith(project.directory));
     return ts.resolveModuleName(name, containing, { ...options, ...project?.options }, host).resolvedModule;
-  });
-  return ts.createProgram([...sources.keys()], options, host);
+  };
+  host.resolveModuleNames = (names, containing) => names.map(name => resolveModule(name, containing));
+  return { program: ts.createProgram([...sources.keys()], options, host), resolveModule };
 }
 
 const literalName = (ts, node) => node && (ts.isIdentifier(node) || ts.isStringLiteralLike(node) || ts.isNumericLiteral(node)) ? node.text : null;
@@ -200,13 +203,14 @@ function translationFactories(ts, source) {
   return factories;
 }
 
-function translatorNamespace(ts, initializer, factories) {
+function translatorNamespace(state, initializer, factories) {
+  const { ts } = state;
   let init = unwrap(ts, initializer);
   if (ts.isAwaitExpression(init)) init = unwrap(ts, init.expression);
   if (!ts.isCallExpression(init) || !ts.isIdentifier(init.expression) || !factories.has(init.expression.text)) return null;
   let first = init.arguments[0];
   if (first && ts.isObjectLiteralExpression(first)) first = first.properties.find(property => literalName(ts, property.name) === 'namespace')?.initializer;
-  return !first || ts.isStringLiteralLike(first) ? first?.text ?? '' : null;
+  return first ? staticStrings(state, first) : [''];
 }
 
 function translationBindings(state, sources) {
@@ -215,8 +219,8 @@ function translationBindings(state, sources) {
     const factories = translationFactories(ts, source);
     const visit = node => {
       if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
-        const namespace = translatorNamespace(ts, node.initializer, factories);
-        if (namespace !== null) state.translators.set(checker.getSymbolAtLocation(node.name), namespace);
+        const namespaces = translatorNamespace(state, node.initializer, factories);
+        if (namespaces?.length) state.translators.set(checker.getSymbolAtLocation(node.name), namespaces);
       }
       ts.forEachChild(node, visit);
     };
@@ -233,9 +237,9 @@ function catalogNamespace(state, callee) {
   if (ts.isPropertyAccessExpression(callee) && callee.name.text === 'get') {
     const owner = callee.expression;
     const name = literalName(ts, ts.isPropertyAccessExpression(owner) ? owner.name : owner) ?? '';
-    if (/message|catalog/iu.test(name)) return '';
+    if (/message|catalog/iu.test(name)) return [''];
   }
-  if (ts.isIdentifier(callee) && /^(?:t|translate)$/u.test(callee.text)) return '';
+  if (ts.isIdentifier(callee) && /^(?:t|translate)$/u.test(callee.text)) return [''];
   return null;
 }
 
@@ -248,18 +252,16 @@ function catalogArguments(state, node, prefix) {
     catalogArguments(state, argument.whenFalse, prefix);
   } else if (ts.isStringLiteralLike(argument)) state.catalogReads.add(`${prefix}${argument.text}`);
   else if (ts.isTemplateExpression(argument)) state.templates.push([`${prefix}${argument.head.text}`, ...argument.templateSpans.map(span => span.literal.text)]);
-  else if (ts.isIdentifier(argument)) {
-    const declaration = state.checker.getSymbolAtLocation(argument)?.valueDeclaration;
-    if (declaration && ts.isVariableDeclaration(declaration) && declaration.initializer && ts.isStringLiteralLike(unwrap(ts, declaration.initializer))) catalogArguments(state, declaration.initializer, prefix);
-  }
+  else for (const value of staticStrings(state, argument)) state.catalogReads.add(`${prefix}${value}`);
 }
 
 function collectLiteralReads(state, node) {
   const { ts } = state;
   if (ts.isStringLiteralLike(node) && !declarationName(ts, node)) state.reads.add(node.text);
+  jsonCatalogRead(state, node);
   if (!ts.isCallExpression(node)) return;
-  const namespace = catalogNamespace(state, node.expression);
-  if (namespace !== null) catalogArguments(state, node.arguments[0], namespace ? `${namespace}.` : '');
+  const namespaces = catalogNamespace(state, node.expression);
+  for (const namespace of namespaces ?? []) catalogArguments(state, node.arguments[0], namespace ? `${namespace}.` : '');
 }
 
 function sourceReads(state, sources) {
@@ -310,9 +312,11 @@ export function unusedSymbolFindings({ repoRoot, files, repo = {}, isRoot = fals
   const ts = compilerAt(repoRoot, supplied);
   if (!ts) return [];
   const sources = sourceFiles(ts, repoRoot, files);
-  const program = trackedProgram(ts, repoRoot, files, sources);
-  const state = { ts, checker: program.getTypeChecker(), repoRoot, candidates: [], symbols: new Map(), containers: new Map(), reads: new Set(), catalogReads: new Set(), translators: new Map(), templates: [] };
+  const { program, resolveModule } = trackedProgram(ts, repoRoot, files, sources);
+  const state = { ts, checker: program.getTypeChecker(), resolveModule, repoRoot, candidates: [], symbols: new Map(), containers: new Map(), reads: new Set(), catalogReads: new Set(), translators: new Map(), templates: [], arguments: new Map(), catalogObjects: new Map() };
   collectCandidates(state, sources);
+  argumentBindings(state, sources);
+  jsonCatalogBindings(state, sources, files);
   translationBindings(state, sources);
   sourceReads(state, sources);
   jsonCandidates(state, files);

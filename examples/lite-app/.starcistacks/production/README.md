@@ -7,6 +7,9 @@ project age recipient in `../../.sops.yaml`).
 
 The application image references contain illustrative all-zero digests. They identify no published image and must
 be replaced in the declaration and stack source by verified release digests before deployment.
+The public runtime example tracks only `secrets/.gitkeep`, with no secret material or ciphertext. After copying the
+example into a product repository, the owner creates the sealed members there before deploying. The external
+Swarm secret references and `runtime/env/KEYS.md` declare the required keys without storing their values here.
 
 ## Owner actions (declared, never automated)
 
@@ -23,10 +26,12 @@ be replaced in the declaration and stack source by verified release digests befo
 ## Deploy
 
 ```sh
-cd .starcistacks/production
+# From the product repository root, seal each key supplied on stdin without a plaintext file.
+npx starci app secret set production api PRIMARY_DB_URL
+npx starci app secret set production api SUPABASE_SERVICE_ROLE_KEY
+npx starci app secret set production api CALENDAR_WEBHOOK_SECRET
 
-# Seal or reseal the api member (sops reads the recipient from .sops.yaml).
-sops encrypt -i secrets/api.enc
+cd .starcistacks/production
 
 # Create one external secret per key of the member (the deploy decrypts in memory only).
 docker secret create lite-app-PRIMARY_DB_URL-v1 -

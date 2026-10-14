@@ -95,7 +95,6 @@ select pgmq.create('booking_reminder');
 
 grant select, insert, update, delete on table pgmq.q_booking_reminder to app_be;
 grant select, insert on table pgmq.a_booking_reminder to app_be;
-grant usage on sequence pgmq.q_booking_reminder_msg_id_seq to app_be;
 
 -- The recurring job of the example: every fifteen minutes pg_cron asks for one tick on
 -- the booking-reminder queue. By rule a tick only enqueues; the scan for due bookings

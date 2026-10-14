@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { configFindings, databaseConfigFindings } from '../../scripts/hfs/rules/database-config.mjs';
 import { databaseExecutableTokens, databaseSqlTokens, isMigrationName, migrationShapeFindings } from '../../scripts/hfs/rules/database-migrations.mjs';
+import { loadSlotManifest } from '../../scripts/hfs/slots.mjs';
 
 const CONFIG = 'supabase/config.toml';
 const MIGRATION = 'supabase/migrations/20261014120000_expand.sql';
@@ -55,6 +56,14 @@ const has = (list, code) => assert.ok(only(list, code).length > 0, `${code} expe
 const configured = (before, after) => CONFIG_TEXT.replace(before, after);
 
 for (const edition of ['lite', 'full']) {
+  test(`${edition}: the shipped extension policy preserves booking exclusion support and refuses unlisted extensions`, () => {
+    const manifest = loadSlotManifest();
+    assert.ok(manifest.ruleParams.db.extensions.includes('btree_gist'));
+    assert.deepEqual(findings({ [MIGRATION]: 'create extension if not exists btree_gist;' }, edition, { manifest }), []);
+    has(findings({ [MIGRATION]: 'create extension if not exists hstore;' }, edition, { manifest }), 'DB_EXTENSION_ALLOWED');
+    has(findings({ [MIGRATION]: 'create extension if not exists btree_gist;' }, edition, { manifest: { ruleParams: { db: { extensions: [] } } } }), 'DB_EXTENSION_ALLOWED');
+  });
+
   test(`${edition}: a bounded config and additive migration pass every R259 check`, () => {
     assert.deepEqual(findings({ [CONFIG]: CONFIG_TEXT, [MIGRATION]: 'create extension if not exists pgcrypto; create table public.items (id integer);' }, edition), []);
   });

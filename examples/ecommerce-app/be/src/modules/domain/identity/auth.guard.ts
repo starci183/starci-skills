@@ -7,6 +7,7 @@ import { requestOf } from "@modules/platform/http-security"
 import { bearerTokenOf } from "./bearer-token.mapper"
 import { IdentityError, IdentityErrorCode } from "./errors/identity.error"
 import type { PublicMetadata, SessionVerifier } from "./identity.contracts"
+import { PublicReason } from "./identity.contracts"
 import { InjectSessionVerifier, PUBLIC_KEY, ROLES_KEY } from "./identity.decorators"
 
 @Injectable()
@@ -23,7 +24,14 @@ export class AuthGuard implements CanActivate {
     /** Lets public doors through; otherwise authenticates the bearer token, checks the roles and stamps the principal. */
     async canActivate(context: ExecutionContext): Promise<boolean> {
         const targets = [context.getHandler(), context.getClass()]
-        if (this.reflector.getAllAndOverride<PublicMetadata | undefined>(PUBLIC_KEY, targets)) return true
+        const metadata = this.reflector.getAllAndOverride<PublicMetadata | undefined>(PUBLIC_KEY, targets)
+        const publicReasons = [
+            PublicReason.Health,
+            PublicReason.AuthHandshake,
+            PublicReason.SignedWebhook,
+            PublicReason.CatalogRead,
+        ]
+        if (metadata && publicReasons.includes(metadata.reason)) return true
         const request = requestOf(context)
         const token = bearerTokenOf(request.headers.authorization)
         const session = token === null ? null : await this.verifier.verify(token)

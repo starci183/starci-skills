@@ -244,6 +244,14 @@ slots:
     tier: none
     tests: none
     coverage: none
+  - id: runtime.dependabot
+    profiles: [runtime]
+    path: .github/dependabot.yml
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+    coverage: none
   - id: runtime.coverage-config
     profiles: [runtime]
     path: codecov.yml
