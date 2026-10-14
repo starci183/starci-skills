@@ -60,7 +60,7 @@ test('lite removes the slots its editions exclude, keeps the rest, and adds its 
   const manifest = loadSlotManifest();
   for (const slot of manifest.slots) assert.ok(slot.editions === undefined || slot.editions.every((e) => ['full', 'lite'].includes(e)), `${slot.id}: unknown edition`);
   const liteOnly = manifest.slots.filter((s) => s.editions?.includes('lite') && !s.editions.includes('full')).map((s) => s.id);
-  assert.deepEqual(liteOnly.sort(), ['app.starciwork.uat'], 'the lite-only slots');
+  assert.deepEqual(liteOnly.sort(), ['app.scripts.delivery', 'app.starciwork.uat'], 'the lite-only slots');
   const fe = loadSlotManifest().slots.filter((s) => s.id.startsWith('fe.'));
   assert.deepEqual(fe.filter((s) => s.editions || s.litePresence || s.lite).map((s) => s.id), [], 'the front end has no edition overlay: lite = full (owner ruling 2026-10-13)');
   const liteBe = openHfs({ declaration: app({ edition: 'lite' }), side: 'be' });

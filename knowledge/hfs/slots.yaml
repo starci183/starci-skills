@@ -504,6 +504,33 @@ slots:
     tests: none
     managedBy: docker-ignore
     rules: [HFS_MANAGED_FILE_DRIFT]
+  - id: app.deploy
+    profiles: [app]
+    # Production delivery tooling for the app's own processes: compose files, Caddyfile, *.env.example and ops shell scripts.
+    # Lite still keeps its backing services on Supabase and its encrypted custody in app.starcistacks; R06 scans every file here.
+    path: "deploy/"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_PLAINTEXT_SECRET]
+  - id: app.ci-deploy
+    profiles: [app]
+    # Product-owned delivery workflows; the literal app.ci-db path remains the managed database workflow's more specific slot.
+    path: ".github/workflows/<app>-deploy.yml"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_PLAINTEXT_SECRET]
+  - id: app.ci-authorize-deploy-key
+    profiles: [app]
+    path: ".github/workflows/authorize-deploy-key.yml"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_PLAINTEXT_SECRET]
   - id: app.browser
     profiles: [app]
     # The browser journey of the product (Playwright, owner ruling: one minimal journey per example app, run manually): the config, its
@@ -539,6 +566,17 @@ slots:
       path: scripts/codegen.mjs
     liteManagedBy: codegen-lite
     rules: [HFS_SCRIPT_ONE_OFF, BE_SPEC_PLACEMENT, HFS_REPO_LOCAL_CHECK]     # one-off codemods and fix-* scripts are agent output, not tooling
+  - id: app.scripts.delivery
+    profiles: [app]
+    editions: [lite]
+    # Product-owned environment, secret and build tooling, kept apart from lite's managed codegen script.
+    # Full already owns these files through app.scripts; its generic *.mjs pattern must not compete with build-*.mjs.
+    path: "scripts/{env-sync.mjs,with-secrets.mjs,set-secrets.ps1,build-*.mjs}"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_PLAINTEXT_SECRET, HFS_SCRIPT_ONE_OFF, BE_SPEC_PLACEMENT, HFS_REPO_LOCAL_CHECK]
   - id: app.sides
     profiles: [app]
     # The two sides. Everything below be/ and fe/ is judged by the side's own slots (profiles be and fe) with the side folder as its root;
