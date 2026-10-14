@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { normalizedSymbolValue } from './ast-walks.mjs';
 import { relativePath, unwrapExpression } from './typescript.mjs';
+import { BlockRenderAnalysis } from './frontend-block-render.mjs';
 function importDeclarationFor(ts, node) {
   for (let current = node; current; current = current.parent) if (ts.isImportDeclaration(current)) return current;
   return null;
@@ -41,12 +42,14 @@ export class WorldRenderAnalysis {
   constructor(world, helpers) {
     this.world = world;
     this.helpers = helpers;
+    this.blocks = new BlockRenderAnalysis(this);
   }
 
   expressionHasRender(expression, checker, seen = new Set()) {
     expression = unwrapExpression(this.world.ts, expression);
     if (!expression) return false;
     if (this.world.ts.isJsxElement(expression) || this.world.ts.isJsxSelfClosingElement(expression) || this.world.ts.isJsxFragment(expression)) return true;
+    if (this.world.ts.isArrayLiteralExpression(expression)) return expression.elements.some(item => this.expressionHasRender(item, checker, seen));
     if (this.world.ts.isCallExpression(expression) && isReactCreateElement(this.world.ts, checker, expression)) return true;
     if (this.world.ts.isConditionalExpression(expression)) return this.conditionalExpressionHasRender(expression, checker, seen);
     const logicalRender = this.logicalExpressionHasRender(expression, checker, seen);
@@ -148,6 +151,22 @@ export class WorldRenderAnalysis {
       || this.world.expressionFunctions(expression, checker).some(fn => this.functionHasRender(fn, checker));
   }
 
+  isCreateElement(expression, checker) {
+    return isReactCreateElement(this.world.ts, checker, expression);
+  }
+
+  propValueBoundary(input, checker, seen, expectedFile, pureTarget) {
+    const ts = this.world.ts;
+    const value = unwrapExpression(ts, input);
+    if (pureTarget && this.blocks.renderProp(value, checker, expectedFile)) return true;
+    if (pureTarget && this.blocks.featureComposition(value, expectedFile) && ts.isObjectLiteralExpression(value)) {
+      return value.properties.every(property => !ts.isPropertyAssignment(property)
+        || this.propValueBoundary(property.initializer, checker, seen, expectedFile, pureTarget));
+    }
+    return !this.expressionSuppliesRender(value, checker) || this.pureRenderTarget(value, checker, expectedFile)
+      || this.renderBoundary(value, checker, seen, true, expectedFile);
+  }
+
   routedLayoutChild(opening, child, checker) {
     const ts = this.world.ts;
     if (!ts.isJsxExpression(child) || !child.expression) return false;
@@ -216,7 +235,7 @@ export class WorldRenderAnalysis {
     if (!pureTarget && !wrapper) return false;
     const boundary = { hasBoundary: pureTarget };
     const props = expression.arguments[1] ? unwrapExpression(ts, expression.arguments[1]) : null;
-    if (!this.createElementPropsBoundary(props, checker, seen, expectedFile, boundary)) return false;
+    if (!this.createElementPropsBoundary(props, checker, seen, expectedFile, boundary, pureTarget)) return false;
     const children = expression.arguments.slice(2);
     if (children.length) {
       if (!children.every(child => this.renderBoundary(child, checker, seen, false, expectedFile))) return false;
@@ -225,19 +244,19 @@ export class WorldRenderAnalysis {
     return boundary.hasBoundary;
   }
 
-  createElementPropsBoundary(props, checker, seen, expectedFile, boundary) {
+  createElementPropsBoundary(props, checker, seen, expectedFile, boundary, pureTarget) {
     const ts = this.world.ts;
     if (!props || props.kind === ts.SyntaxKind.NullKeyword) return true;
     if (!ts.isObjectLiteralExpression(props) || props.properties.some(property => ts.isSpreadAssignment(property))) return false;
-    return props.properties.every(property => this.propsPropertyBoundary(property, checker, seen, expectedFile, boundary));
+    return props.properties.every(property => this.propsPropertyBoundary(property, checker, seen, expectedFile, boundary, pureTarget));
   }
 
-  propsPropertyBoundary(property, checker, seen, expectedFile, boundary) {
+  propsPropertyBoundary(property, checker, seen, expectedFile, boundary, pureTarget) {
     const ts = this.world.ts;
     if (!ts.isPropertyAssignment(property)) return true;
     const value = unwrapExpression(ts, property.initializer);
+    if (!this.propValueBoundary(value, checker, seen, expectedFile, pureTarget)) return false;
     if (!this.expressionSuppliesRender(value, checker)) return true;
-    if (!this.pureRenderTarget(value, checker, expectedFile) && !this.renderBoundary(value, checker, seen, true, expectedFile)) return false;
     const name = property.name && (ts.isIdentifier(property.name) || ts.isStringLiteralLike(property.name)) ? property.name.text : null;
     if (['children', 'component', 'content', 'render', 'view'].includes(name)) boundary.hasBoundary = true;
     return true;
@@ -270,7 +289,7 @@ export class WorldRenderAnalysis {
     if (!pureTarget && !wrapper) return false;
     const boundary = { hasBoundary: pureTarget };
     if (!this.jsxChildrenBoundary(expression, opening, checker, seen, expectedFile, pureTarget, boundary)) return false;
-    if (!this.jsxAttributesBoundary(opening, checker, seen, expectedFile, boundary)) return false;
+    if (!this.jsxAttributesBoundary(opening, checker, seen, expectedFile, boundary, pureTarget)) return false;
     return boundary.hasBoundary;
   }
 
@@ -286,13 +305,13 @@ export class WorldRenderAnalysis {
     return true;
   }
 
-  jsxAttributesBoundary(opening, checker, seen, expectedFile, boundary) {
+  jsxAttributesBoundary(opening, checker, seen, expectedFile, boundary, pureTarget = false) {
     const ts = this.world.ts;
     return opening.attributes.properties.every(attribute => !ts.isJsxAttribute(attribute) || !attribute.initializer
-      || this.jsxAttributeBoundary(attribute, checker, seen, expectedFile, boundary));
+      || this.jsxAttributeBoundary(attribute, checker, seen, expectedFile, boundary, pureTarget));
   }
 
-  jsxAttributeBoundary(attribute, checker, seen, expectedFile, boundary) {
+  jsxAttributeBoundary(attribute, checker, seen, expectedFile, boundary, pureTarget) {
     const ts = this.world.ts;
     const name = attribute.name.text;
     if (['fallback', 'errorElement'].includes(name)) {
@@ -301,9 +320,9 @@ export class WorldRenderAnalysis {
         && !this.renderBoundary(attribute.initializer.expression, checker, seen, true, expectedFile)) return false;
     }
     if (ts.isJsxExpression(attribute.initializer) && attribute.initializer.expression
+      && !this.propValueBoundary(attribute.initializer.expression, checker, seen, expectedFile, pureTarget)) return false;
+    if (ts.isJsxExpression(attribute.initializer) && attribute.initializer.expression
       && this.expressionSuppliesRender(attribute.initializer.expression, checker)) {
-      if (!this.pureRenderTarget(attribute.initializer.expression, checker, expectedFile)
-        && !this.renderBoundary(attribute.initializer.expression, checker, seen, true, expectedFile)) return false;
       if (['component', 'content', 'render', 'view'].includes(name)) boundary.hasBoundary = true;
     }
     return true;

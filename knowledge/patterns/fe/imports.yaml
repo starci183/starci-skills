@@ -130,8 +130,11 @@ rules:
     hfsRules: [R27, R64, R26]
     requirement: |
       App adapters import internal code only through public entries below features/{pages,layouts,overlays}, including
-      type-only imports and re-exports. Features compose components, hooks and modules. Components never point to app or
-      features; hooks never point to app, features or components; modules never point to app, features, components or hooks.
+      type-only imports and re-exports. Features compose components, hooks and modules. Page owners at
+      features/pages/<Name>/index.tsx may also import overlay public entries and compose blocks, but never another page.
+      Components descend blocks to composites to branches to leaves; no block imports another block.
+      A pure component or branch renders supplied block render props without importing blocks or fetching. Components
+      never point to app or features; hooks never point to app, features or components; modules never point to app, features, components or hooks.
       An app never imports another app. Product visuals may import Grammar. Re-export barrels and aliases obey the same
       resolved direction, and a cycle between owners is a finding.
     rationale: |
@@ -149,6 +152,9 @@ rules:
       - id: case-4
         when: "Pure half to data layer"
         write: "never at runtime; component.tsx may use import type from a generated type only through a feature model"
+      - id: case-5
+        when: "Client list composition"
+        write: 'The page imports @/features/overlays/ItemListOverlay; that overlay imports @/components/blocks/ItemBlock and passes renderItem={id => <ItemBlock id={id} />} to its Base and branch. The branch imports neither the block nor its hook.'
     verification:
       automated:
         - ARCH_OWNER_CYCLE

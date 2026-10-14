@@ -484,6 +484,17 @@ $defs:
           type: array
           uniqueItems: true
           items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+        mayImportKinds:
+          type: object
+          minProperties: 1
+          propertyNames: {pattern: '^[a-z][a-z0-9-]*$'}
+          additionalProperties:
+            type: object
+            additionalProperties: false
+            required: [from, to]
+            properties:
+              from: {$ref: '#/$defs/nameList'}
+              to: {$ref: '#/$defs/nameList'}
         acyclic: {type: boolean}
         lowerLayerOnly: {type: boolean}
   semver: {type: string, pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'}

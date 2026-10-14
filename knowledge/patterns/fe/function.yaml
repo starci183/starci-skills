@@ -170,8 +170,13 @@ rules:
       modules/api, a Server Action or Supabase itself. The connected half holds translations, locale, session and data, folds
       each read into a Slot with `toSlot`, picks the shape from data, resolves every label, and renders the pure XBase from the
       sibling component.tsx. Only that sibling index.tsx imports component.tsx, and index.tsx exports X
-      only, never XBase. Each Block reads its own apis; a page composes Blocks with atoms and reads none; an overlay runs
-      commands only; a layout reads none. A form is a hooks/rhf hook (FE-FORM) the connected half calls; its zod messages are
+      only, never XBase. Each Block reads its own apis; a page owner at features/pages/<Name>/index.tsx composes overlays and
+      Blocks with atoms and reads none; an
+      overlay runs commands and may read list identities for block composition; a layout reads none. Pages and layouts stay
+      server components. For a client list, the overlay's index passes identities and a block render prop to its pure Base
+      and branch. The branch maps identities with stable keys and invokes the supplied renderer without importing blocks
+      or fetching. That renderer composes blocks only, with no intrinsic markup or hook calls; every connected block still
+      renders its exact sibling XBase. A form is a hooks/rhf hook (FE-FORM) the connected half calls; its zod messages are
       resolved with next-intl before they reach XBase as strings. The pure sibling has no runtime world or transport dependency. Pure blocks, composites, branches and leaves
       require no twin. Intrinsic browser interaction such as refs, focus, disclosure, measurement, drag and reduced motion may
       remain in one visual unit; an authored custom helper for it still lives under hooks/ui.
@@ -214,6 +219,13 @@ rules:
           hooks/rhf/useSendHandoffForm.ts builds useForm<SendHandoffFormValues>({ resolver: zodResolver(schema) }) with
           z.string().min(1, t("sales.send.errors.fingerprintRequired")); the overlay's index.tsx calls it and XBase receives
           { value, error } per field
+      - id: case-8
+        when: "A client list of connected blocks"
+        write: >
+          A server page mounts ItemListOverlay. Its client index reads item identities through a hook and returns
+          <ItemListOverlayBase state={state} props={{ ids, renderItem: id => <ItemBlock id={id} /> }} on={{}} />.
+          The Base gives ids and renderItem to a pure branch, which maps ids with stable keys and calls renderItem(id).
+          ItemBlock owns its read and returns ItemBlockBase; neither the Base nor the branch imports ItemBlock.
     verification:
       automated:
         - FE_CLIENT_BOUNDARY

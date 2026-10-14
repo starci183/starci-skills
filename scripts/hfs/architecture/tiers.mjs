@@ -14,8 +14,15 @@ import { byCodeUnit } from '../../lib/list.mjs';
  */
 export const TIER_RULE_IDS = ['BE_TIER_DIRECTION', 'BE_FEATURE_IMPORTS_FEATURE', 'BE_KIND_ISOLATION', 'FE_TIER_DIRECTION', 'FE_APP_ISOLATION', 'ARCH_OWNER_CYCLE'];
 
+function tierDirectionText({ fromTier, toTier, mayImport, kindRestriction, fromKind, toKind }) {
+  if (!kindRestriction) return `a ${fromTier} may import only ${mayImport.join(', ') || 'nothing'}; it imports a ${toTier}`;
+  const source = fromKind ?? 'no folder kind';
+  const target = toKind ?? 'no folder kind';
+  return `a ${fromTier} may import ${toTier} owners only from kinds ${kindRestriction.from.join(', ')} to kinds ${kindRestriction.to.join(', ')}; it imports ${source} -> ${target}`;
+}
+
 const REASON_TEXT = {
-  tierDirection: ({ fromTier, toTier, mayImport }) => `a ${fromTier} may import only ${mayImport.join(', ') || 'nothing'}; it imports a ${toTier}`,
+  tierDirection: tierDirectionText,
   layerOrder: ({ fromLayer, toLayer }) => `a ${fromLayer} component may import only the layers after it; it imports a ${toLayer}`,
   crossApp: ({ from, to }) => `app ${from} imports app ${to}; apps never import each other, shared code is a packages/<pkg> slot`,
 };

@@ -142,6 +142,7 @@ naming:
 # ---------------------------------------------------------------------------------------------------------
 # Tiers and the dependency direction matrix (owner granularity; type-only imports count; no cycles anywhere)
 # mayImport lists the tiers a file of that tier may import. Importing inside the same owner is always allowed.
+# mayImportKinds narrows a permitted tier edge to its named from/to folder kinds; other kind pairs remain forbidden.
 # ---------------------------------------------------------------------------------------------------------
 tiers:
   be:
@@ -158,7 +159,7 @@ tiers:
     package:      {mayImport: [package]}
   fe:
     route:        {mayImport: [feature, foundation, modules, transport, package]} # app/** adapters
-    feature:      {mayImport: [components, hooks, foundation, modules, transport, package]}
+    feature:      {mayImport: [feature, components, hooks, foundation, modules, transport, package], mayImportKinds: {feature: {from: [pages], to: [overlays]}}} # pages compose overlays and blocks; other feature-to-feature edges stay forbidden
     # A component never reaches data: config, routes, i18n and types are foundation; every other module and the api
     # transport are reached through a hook (owner decision 2026-09-29).
     components:   {mayImport: [components, hooks, foundation, package], lowerLayerOnly: true} # blocks, composites, branches, leaves
