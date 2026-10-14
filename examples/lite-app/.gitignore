@@ -69,3 +69,6 @@ next-env.d.ts
 
 # Public package policy is tracked with the example source.
 !.starcistacks/.npmignore
+
+# The application-owned production Swarm model and ingress routes.
+!.starcistacks/*/infra/swarm/**

@@ -1,4 +1,4 @@
-import type { ModuleMetadata } from "@nestjs/common"
+import type { DynamicModule, Type } from "@nestjs/common"
 import { ExpireOrdersQueueModule } from "@features/jobs/expire-orders"
 import { SendReceiptQueueModule } from "@features/jobs/send-receipt"
 import { OrderPaidLoyaltyMessageModule } from "@features/reactors/order-paid-loyalty"
@@ -21,7 +21,7 @@ import type { OrderAppOptions } from "../order.options"
  * the order events, the expiry and receipt jobs). A composition group holds one area's module list and nothing else;
  * `app.module.ts` spreads it.
  */
-export const backgroundModules = (options: OrderAppOptions): NonNullable<ModuleMetadata["imports"]> => [
+export const backgroundModules = (options: OrderAppOptions): Array<DynamicModule | Type<unknown>> => [
     EventBusModule.register({ isGlobal: true, ...options.eventBus, connections: [ORDER_ENTITY_MANAGER] }),
     InboxModule.register({ isGlobal: true, connection: ORDER_ENTITY_MANAGER }),
     SagaModule.register({ isGlobal: true }),

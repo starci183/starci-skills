@@ -10,19 +10,29 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@apollo/client": "4.1.6",
+    "@heroicons/react": "2.2.0",
     "@heroui/react": "3.2.6",
     "@heroui/styles": "3.2.6",
     "@hookform/resolvers": "5.4.0",
+    "@reduxjs/toolkit": "2.11.2",
     "@starci/grammar": "0.9.14",
+    "@starci/heroicons": "0.3.4",
     "@xyflow/react": "12.11.6",
     "axios": "1.15.2",
+    "dayjs": "1.11.21",
+    "graphql": "16.14.2",
     "next": "16.1.6",
     "next-intl": "4.13.6",
+    "next-themes": "0.4.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hook-form": "7.77.0",
+    "react-redux": "9.2.0",
     "server-only": "0.0.1",
+    "superjson": "2.2.6",
     "swr": "2.4.2",
-    "zod": "4.4.3"
+    "zod": "4.4.3",
+    "zustand": "5.0.12"
   }
 }

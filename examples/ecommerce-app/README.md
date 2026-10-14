@@ -18,7 +18,7 @@ The front end serves one deployable Next.js app per `fe/apps/*` site:
 The apps are real, runnable Next.js builds on `@starci/grammar` primitives (the same Common family the todo app
 consumes): grammar's `GrammarRoot` boundary wraps each app's client shell, and every surface maps to a real grammar
 component (`SurfaceCard`, `SurfaceListCard`, `EmptyNotice`, `Button`, `TextAction`, `SectionHeader`, `MediaFrame`, `Badge`)
-or is honestly an app-owned layout. Brand tokens come from each app's `src/modules/brand/brand.css` (teal `#0D9488`, Inter
+or is honestly an app-owned layout. Brand tokens come from each app's `fe/apps/<app>/src/modules/brand/brand.css` (teal `#0D9488`, Inter
 through the `--font-sans` brand-layer token, the on-primary ink chosen because white on teal measures 3.74:1 — under the
 brand record's 4.5:1 floor). The friendly-duck mascot (its direction is a brand record asset at
 `.starciwork/brand/assets/duck.prompt.txt`) appears on welcome and genuine empty surfaces only — never on refusal or error
@@ -33,37 +33,37 @@ the root, whose workspaces are the front end's apps and packages (`fe/apps/*`, `
 
 This example demonstrates local development only. It declares no production/VPS runtime, Swarm stack, sealed secret
 member or rendered deployment model. `.starcistacks/dev/environment.json` records the environment identity;
-`infra/metadata.json` is the port projection, not a rendered Compose model. Render the local deployment with
+`.starcistacks/dev/infra/metadata.json` is the port projection, not a rendered Compose model. Render the local deployment with
 `docker compose -f .starcistacks/dev/infra/compose/compose.yaml --profile app config` when operating it.
 
 ## Repository layout
 
-- `be/apps/<app>/src`: `main.ts` (80 lines, creates `EnvSource` and calls `<app>.env.ts`), `<app>.env.ts` (150, typed, fail-fast parsing
+- `be/apps/<app>/src`: `be/apps/<app>/src/main.ts` (80 lines, creates `EnvSource` and calls `<app>.env.ts`), `<app>.env.ts` (150, typed, fail-fast parsing
   through `EnvSource` and capability parse helpers only), `<app>.options.ts` (200, env-derived values and port bindings with no
-  parsing) and `app.module.ts` (250, `AppModule.register(options)` registers each capability once with `isGlobal: true`).
-  The order app separates its module lists into `compose/<area>.ts` groups, which its `app.module.ts` spreads;
-  identity, billing and cli declare their module lists directly. Only `<app>.env.ts` parses the app's
+  parsing) and `be/apps/<app>/src/app.module.ts` (250, `AppModule.register(options)` registers each capability once with `isGlobal: true`).
+  Each app separates its module lists into `be/apps/<app>/src/compose/<area>.ts` groups, which its app module spreads.
+  Only `<app>.env.ts` parses the app's
   environment, and the env file holds no logic, module composition, business code or feature imports. The e2e world proves it boots.
-- `be/src/features/api/<feature>/`: `application/` (command/query + thin handler + contracts) and `transport/{graphql,http}/`. A handler maps its input and calls one method of one service; a resolver or controller dispatches one bus message.
+- `be/src/features/api/<feature>/`: `be/src/features/api/<feature>/application/` (command/query + thin handler + contracts) and `be/src/features/api/<feature>/transport/{graphql,http}/`. A handler maps its input and calls one method of one service; a resolver or controller dispatches one bus message.
 - `be/src/modules/domain`: account, session, identity (guards), catalog, cart, order (checkout, cancellation and order services), payment, invoice (billing), member; each owns its business logic in its `*.service.ts`, its entities, migrations,
-  `.sql.ts` constants and errors under `persistence/` and `errors/`.
+  `*.sql.ts` constants and errors under `be/src/modules/domain/<capability>/persistence/` and `be/src/modules/domain/<capability>/errors/`.
 - `be/src/modules/platform`: composition (injectors), config (EnvSource), cqrs, database, errors, graphql, http, http-security,
   i18n, logging, clock, primitives (Outcome), probes, inbox (event dedupe), messaging (BullMQ queues over Redis).
 - `be/src/modules/integrations`: cache (Redis), identity-api and order-api (each service calls the other over GraphQL).
-- `be/contracts/<service>/`: the vendored contract of each service: `schema.graphql` for its GraphQL, `events.json` for the messages it publishes. Event publishers and subscribers are composed from the service's typed app options. The order saga: `order.placed` (order) starts the invoice in billing; `billing.invoice-rejected` (compensates `order.placed`) makes the order service cancel the order, release its stock and refund its payment.
-- Unit specs live beside their subjects; every `<name>.service.ts` has its `<name>.service.spec.ts`. `be/src/tests`: `fixtures/builders/<area>.builder.ts` (test data), `e2e/` and `integration/` (the real world), `world/` (test infrastructure).
+- `be/contracts/<service>/`: the vendored contract of each service: `be/contracts/<service>/schema.graphql` for its GraphQL, `be/contracts/<service>/events.json` for the messages it publishes. Event publishers and subscribers are composed from the service's typed app options. The order saga: `order.placed` (order) starts the invoice in billing; `billing.invoice-rejected` (compensates `order.placed`) makes the order service cancel the order, release its stock and refund its payment.
+- Unit specs live beside their subjects; every `<name>.service.ts` has its `<name>.service.spec.ts`. `be/src/tests`: `be/src/tests/fixtures/builders/<area>.builder.ts` (test data), `be/src/tests/e2e/` and `be/src/tests/integration/` (the real world), `be/src/tests/world/` (test infrastructure).
 - `fe/apps/landing/src`: the public marketing app; `fe/apps/app/src`: the authenticated shop app. The front end has no tests.
 - `fe/packages/ecommerce-api`: the repository's one pair of Apollo clients (auth and no-auth) with their link chain, the
   `GraphQLResponse` union and the back-end projection reader. The shop's browser calls the identity and order GraphQL APIs
   directly: one file per operation under `fe/apps/app/src/modules/api/graphql/{queries,mutations}`, typed by the
   `npm run codegen` output generated from `be/contracts/{identity,order}/schema.graphql`, wrapped by the SWR hooks of
-  `src/hooks/swr`; the session (the identity service's opaque bearer) lives in the browser (`src/modules/auth`).
+  `fe/apps/app/src/hooks/swr`; the session (the identity service's opaque bearer) lives in the browser (`fe/apps/app/src/modules/auth`).
 - `fe/packages/ecommerce-i18n`: locales, routing, navigation and the server glue (request config, proxy, locale segment).
 - `fe/packages/ecommerce-ui`: the shared composites and leaves both apps draw (shells, notices, tiles, display controls).
   Each package is built to its own `dist` and consumed by package name; `npm run build --workspaces` builds them.
-- `scripts/`: `codegen.mjs` (the step behind `npm run codegen`), `serve.mjs` and `projection.mjs` (start an app on its
-  projected port), `verify-render.mjs` (the running-page render proof).
-- `.starciwork`: the product records of both sides. `.starcistacks`: the dev stack, env key list (`runtime/env/KEYS.md`) and seeds.
+- `scripts/`: `scripts/codegen.mjs` (the step behind `npm run codegen`), `scripts/serve.mjs` and `scripts/projection.mjs` (start an app on its
+  projected port), `scripts/verify-render.mjs` (the running-page render proof).
+- `.starciwork`: the product records of both sides. `.starcistacks`: the dev stack, env key list (`.starcistacks/dev/runtime/env/KEYS.md`) and seeds.
 
 ## Development
 
@@ -81,9 +81,9 @@ branches, functions or statements. From the parent `.claude` tree, run
 `*.e2e-spec.ts` under `be/src/tests/e2e/`. Narrow an e2e run with jest arguments, for example
 `npm run test:e2e -- checkout/checkout-journey` or `npm run test:e2e -- resilience`. E2E runs manually only: no hook,
 default typecheck/lint or automatic CI job runs it (`npm run typecheck:tests` is its manual type check); in the runtime repository
-it runs through `workflow_dispatch` of `.github/workflows/examples.yml`. On push and pull request that workflow runs this app's
+it runs through `workflow_dispatch` of the runtime repository's [examples workflow](../../.github/workflows/examples.yml). On push and pull request that workflow runs this app's
 typecheck (tsc over be, turbo over the fe workspaces), `starci app lint`, unit tests with coverage, the Codecov upload under the flag `ecommerce-app` (the root `codecov.yml`), the
-be build, the fe build (turbo) and the Sonar gate, and an `images` job that builds the image of every app (identity, order, billing, cli, landing, app) without pushing. The app's own `codecov.yml` and `ci.yml` are the app-repository form `starci app sync` renders; they
+be build, the fe build (turbo) and the Sonar gate, and an `images` job that builds the image of every app (identity, order, billing, cli, landing, app) without pushing. The app's own `codecov.yml` and `.github/workflows/ci.yml` are the app-repository form `starci app sync` renders; they
 run when the app is its own repository. Existing Work
 evidence retains its recorded revisions; the derived index reports stale proof where source or records changed.
 
@@ -94,22 +94,22 @@ Every runtime value of the back end comes from the process environment through `
 **`.starcistacks/dev/infra/metadata.json`** (`ports.landing`, `ports.app`, `ports.identityApi`, `ports.orderApi`), the
 port map the front end reads. No port literal exists in the front end:
 
-- `examples/ecommerce-app/scripts/serve.mjs` resolves the listener port and spawns `next dev`/`next start -p` per app:
-  `node examples/ecommerce-app/scripts/serve.mjs <landing|app> <dev|start>`.
+- `scripts/serve.mjs` resolves the listener port and spawns `next dev`/`next start -p` per app:
+  `node scripts/serve.mjs <landing|app> <dev|start>` from this directory.
 - `fe/packages/ecommerce-api/src/projection.ts` resolves the file for the landing's server-side shop link; the shop's
-  browser reads its service base URLs from the `NEXT_PUBLIC_*` values `serve.mjs` fills from the projection (a deployment
-  passes them as build arguments), and its `src/modules/config` fails a call whose value is missing.
+  browser reads its service base URLs from the `NEXT_PUBLIC_*` values `scripts/serve.mjs` fills from the projection (a deployment
+  passes them as build arguments), and its `fe/apps/app/src/modules/config` fails a call whose value is missing.
 - Resolution order (same shape as the BE's `findMetadataFile`): `ECOMMERCE_APP_METADATA` names the file outright, else the
   walk searches each ancestor for `.starcistacks/dev/infra/metadata.json`.
 - Env overrides keep the BE's precedence — `NEXT_PUBLIC_ORDER_API_URL`, `NEXT_PUBLIC_IDENTITY_API_URL`,
   `NEXT_PUBLIC_SHOP_URL` win outright; the projection is the fallback.
 
-Each env is read once in the app's `src/modules/config` module (the read-once-in-config convention); pages and components import the
+Each env is read once in the app's `fe/apps/<app>/src/modules/config` module (the read-once-in-config convention); pages and components import the
 resolved constant, not `process.env`.
 
 With no back end running, a signed-in shop renders the unreachable states of `/browse`, `/cart`, `/checkout` and
 `/account`, naming the service, rather than showing placeholder data; a signed-out reader sees each page's sign-in gate. That is the intended
-honest behavior — `node examples/ecommerce-app/scripts/verify-render.mjs --record <ui-screen-id> <custody|captures|render>` checks the running-page
+honest behavior — `node scripts/verify-render.mjs --record <ui-screen-id> <custody|captures|render>` from this directory checks the running-page
 pairs (PNG + markup per route and viewport) against the Work tree's ui records.
 
 Every API serves `/health/live` for process liveness and `/health/ready` for its required dependency probes; the

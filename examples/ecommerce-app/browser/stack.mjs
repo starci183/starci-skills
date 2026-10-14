@@ -73,11 +73,13 @@ const compose = (...args) => run("compose", "docker", ["compose", "-f", COMPOSE_
 /** Polls `probe` until it answers true or the deadline passes (message names what was being waited on). */
 const waitFor = async (label, probe, timeoutMs = 180_000) => {
     const deadline = Date.now() + timeoutMs
-    for (;;) {
+    const poll = async () => {
         if (await probe()) return log(`${label} is ready`)
         if (Date.now() > deadline) fail(`timed out waiting for ${label}`)
         await new Promise((resolve) => setTimeout(resolve, 1_000))
+        return poll()
     }
+    return poll()
 }
 
 /** A URL answers 2xx on the host (connection refused, a pre-import 404 or a warming 503 all mean not ready). */
@@ -91,12 +93,15 @@ const serves = async (url) => {
 }
 
 const composeExecOk = (...args) =>
-    spawnSync("docker", ["compose", "-f", COMPOSE_FILE, "exec", "-T", ...args], { cwd: APP_ROOT, stdio: "ignore" })
-        .status === 0
+    spawnSync("docker", ["compose", "-f", COMPOSE_FILE, "exec", "-T", ...args], {
+        cwd: APP_ROOT,
+        env: composeEnv,
+        stdio: "ignore",
+    }).status === 0
 
 /**
  * The secrets of this run: fresh random values every `up`, handed to the compose services through the environment their
- * compose files interpolate (whose tracked defaults are the DEMO-ONLY values). The Keycloak realm import substitutes
+ * compose files interpolate (which require the run to supply credentials). The Keycloak realm import substitutes
  * KEYCLOAK_ADMIN_CLIENT_SECRET into the identity-admin client, so the same generated value is also handed to the
  * identity api below - the pair is self-consistent per run.
  */
@@ -227,23 +232,29 @@ const up = async () => {
     fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true })
     fs.writeFileSync(STATE_FILE, `${JSON.stringify(state, null, 2)}\n`)
 
-    for (const service of services) {
-        const port = service.name === "identity" ? ports.identityApi : ports.orderApi
-        log(`waiting for the ${service.name} api (log: ${service.log})`)
-        const deadline = Date.now() + 120_000
-        while (!(await serves(`http://localhost:${port}/health`))) {
-            if (service.exited()) fail(`the ${service.name} api exited before answering /health - see ${service.log}`)
-            if (Date.now() > deadline) fail(`timed out waiting for the ${service.name} api - see ${service.log}`)
-            await new Promise((resolve) => setTimeout(resolve, 1_000))
-        }
-        log(`${service.name} api is ready`)
-    }
+    await Promise.all(
+        services.map(async (service) => {
+            const port = service.name === "identity" ? ports.identityApi : ports.orderApi
+            log(`waiting for the ${service.name} api (log: ${service.log})`)
+            await waitFor(
+                `the ${service.name} api - see ${service.log}`,
+                () => {
+                    if (service.exited())
+                        fail(`the ${service.name} api exited before answering /health - see ${service.log}`)
+                    return serves(`http://localhost:${port}/health`)
+                },
+                120_000,
+            )
+        }),
+    )
     log(`stack is up: shop ${ORIGIN_APP} once served, apis on ${ports.identityApi}/${ports.orderApi}`)
     log("run \`node browser/stack.mjs down\` when the browser run is done")
 }
 
 /** `down`: stop the host apis of the state file, then the compose project; best-effort, always reports. */
 const down = () => {
+    // Teardown only needs a valid model; fresh values satisfy required interpolation without storing the run's credentials.
+    generateSecrets()
     if (fs.existsSync(STATE_FILE)) {
         const state = JSON.parse(fs.readFileSync(STATE_FILE, "utf8"))
         for (const { name, pid } of state.services ?? []) {

@@ -7,11 +7,13 @@ Each of those files owes 100 percent coverage per file. Feature files (handlers,
 processors) are thin (R203 `BE_FEATURE_THIN`): they map their input and make one delegating call, so nothing is left in them
 to unit-test, and they are never measured. The apps only compose; the e2e world proves they boot.
 
+Run these commands from the ecommerce-app root, the directory that contains its [package manifest](../../../package.json):
+
 | Check      | Command             |
 | ---------- | ------------------- |
 | Types      | `npm run typecheck` |
 | Lint       | `npm run lint`      |
-| Build      | `npm run build`     |
+| Build      | `npm run build:be`  |
 | Unit suite | `npm test`          |
 | E2E suite  | `npm run test:e2e`  |
 
@@ -19,8 +21,8 @@ to unit-test, and they are never measured. The apps only compose; the e2e world 
 
 `npm test` is `jest --selectProjects unit --coverage`. Coverage is measured per file on the logic of `src/modules/**`: every
 file of a `ruleParams.be.logicRoles` role inside a `coverage: required` slot must reach 100 percent lines, branches,
-functions and statements (`be/jest.config.js` is the render `starci app sync` writes from the one derivation,
-`scripts/hfs/coverage-scope.mjs`; R204); jest exits non-zero below that. The run writes `be/coverage/lcov.info`; Sonar and
+functions and statements (`jest.config.js`, relative to the back-end root, is the render `starci app sync` writes from the runtime's
+[coverage-scope derivation](../../../../../scripts/hfs/coverage-scope.mjs); R204); jest exits non-zero below that. The run writes `be/coverage/lcov.info` relative to the app root; Sonar and
 Codecov import it with the same measured scope and hold each file at 100.
 
 A service spec builds its subject from a testing module that provides exactly the constructor dependencies and nothing else:
@@ -66,12 +68,12 @@ insert real rows for the integration and e2e specs, with the database constraint
 
 Everything else lives under `src/tests/`:
 
-- `src/tests/world/` is the only test infrastructure, declared once for `@starci/test-world` in `test-world.config.ts`
-  (`export const { useTestWorld, useSandbox } = defineTestWorld({...})`); `global-setup.ts` and `global-teardown.ts`
-  re-export the library's hooks. The library runs the services `.starcistacks/dev` declares, real and behind toxiproxy:
+- `src/tests/world/` is the only test infrastructure, declared once for `@starci/test-world` in `src/tests/world/test-world.config.ts`
+  (`export const { useTestWorld, useSandbox } = defineTestWorld({...})`); `src/tests/world/global-setup.ts` and `src/tests/world/global-teardown.ts`
+  re-export the library's hooks. The library runs the services the [dev stack](../../../.starcistacks/dev/README.md) declares, real and behind toxiproxy:
   Postgres with one database per connection (identity, order), the Redis of the cache, Keycloak with the stack's
-  `realm-ecommerce.json` and MinIO with the receipts bucket. It runs the real `cli migrate run`
-  bootstrap once and applies the dev seeds; `use-test-world.ts` re-exports `useTestWorld({ apps } | { modules })`, which
+  [ecommerce realm](../../../.starcistacks/dev/infra/compose/realm-ecommerce.json) and MinIO with the receipts bucket. It runs the real `cli migrate run`
+  bootstrap once and applies the dev seeds; `src/tests/world/use-test-world.ts` re-exports `useTestWorld({ apps } | { modules })`, which
   boots the real identity and order apps in the spec process, wired to each other over real GraphQL, and returns
   `world.apps.<name>.api`, `world.db.<connection>` (the shared EntityManager), `world.infra.redis` (the real Redis:
   `size()`, `cut()`, `restore()`), `world.infra.postgresql.connection(name)` (one database down while the other serves)
@@ -87,4 +89,4 @@ Everything else lives under `src/tests/`:
 E2E needs a container runtime and runs by hand or in the manual e2e workflow; husky, `typecheck`, `lint` and the
 automatic CI never run it.
 
-The dev stack and process instructions are in `.starcistacks/dev/README.md`.
+The [dev runbook](../../../.starcistacks/dev/README.md) contains the stack and process instructions.

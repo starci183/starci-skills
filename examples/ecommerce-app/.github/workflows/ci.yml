@@ -30,6 +30,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --ignore-scripts
+      - name: production dependency audit
+        run: npm audit --omit=dev --audit-level=high
       - name: lint
         run: npm run lint -- --sonar reports/lint.sonar.json
       - name: format

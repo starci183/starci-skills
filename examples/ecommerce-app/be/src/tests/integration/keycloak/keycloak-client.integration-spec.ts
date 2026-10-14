@@ -20,7 +20,7 @@ describe("keycloak: identity provider client (integration)", () => {
     const client = (): KeycloakClient => world.resolve<KeycloakClient>(KEYCLOAK)
 
     it("signs a registered person in, reads the subject and the refresh token, and ends the session on sign-out", async () => {
-        const email = `kc-${ids.next()}@ecommerce.dev`
+        const email = `kc-${ids.next()}@example.test`
         const password = `pw-${ids.next()}`
         const personId = await world.keycloak.person(email, password)
 
@@ -40,7 +40,7 @@ describe("keycloak: identity provider client (integration)", () => {
     })
 
     it("a wrong password is the declared invalid-credentials refusal", async () => {
-        const email = `kc-${ids.next()}@ecommerce.dev`
+        const email = `kc-${ids.next()}@example.test`
         await world.keycloak.person(email, `pw-${ids.next()}`)
 
         await expect(client().signIn({ email, password: `wrong-${ids.next()}` })).rejects.toMatchObject({
@@ -49,7 +49,7 @@ describe("keycloak: identity provider client (integration)", () => {
     })
 
     it("an unreachable realm is the declared provider-unavailable refusal, and the client recovers with the realm", async () => {
-        const email = `kc-${ids.next()}@ecommerce.dev`
+        const email = `kc-${ids.next()}@example.test`
         const password = `pw-${ids.next()}`
         const personId = await world.keycloak.person(email, password)
 

@@ -23,9 +23,10 @@ The CLI needs all three database URL keys. Use `npm run build:be` to build the A
 | logs | `docker compose -f .starcistacks/dev/infra/compose/compose.yaml logs -f postgres redis keycloak minio kafka` |
 | down | `docker compose -f .starcistacks/dev/infra/compose/compose.yaml down`; add `-v` only when discarding the local demo databases |
 
-The Compose defaults are demo-only values for local development. To substitute owner values, export
+Compose requires credentials from the runtime environment. Export
 `KC_BOOTSTRAP_ADMIN_PASSWORD`, `KEYCLOAK_ADMIN_CLIENT_SECRET` and `MINIO_ROOT_PASSWORD` before `up` and supply matching
 credentials to the API processes. No credential belongs in this runbook or in a public `NEXT_PUBLIC_*` key.
+The browser stack helper generates fresh credentials in memory for each isolated run.
 A production operator must declare a production runtime and sealed custody separately.
 
 Readiness calls the probes composed by each API, with a bounded deadline for every probe. Liveness remains

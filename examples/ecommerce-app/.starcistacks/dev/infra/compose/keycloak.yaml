@@ -7,11 +7,10 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_HEALTH_ENABLED: "true"
       KC_HOSTNAME_STRICT: "false"
-      # DEMO-ONLY defaults of a local stack on loopback: not secrets, and a run that wants other values exports
-      # these two names (browser/stack.mjs generates fresh ones for its run). The realm import reads
-      # KEYCLOAK_ADMIN_CLIENT_SECRET into the identity-admin client.
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-demo-only-keycloak-admin-password}
-      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-demo-only-identity-admin-client-secret}
+      # Runtime credentials are supplied by the operator; browser/stack.mjs generates fresh values for its run.
+      # The realm import reads the same KEYCLOAK_ADMIN_CLIENT_SECRET the identity API presents.
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?Supply this credential in the runtime environment}
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?Supply this credential in the runtime environment}
     volumes:
       - ./realm-ecommerce.json:/opt/keycloak/data/import/realm-ecommerce.json:ro
     ports:

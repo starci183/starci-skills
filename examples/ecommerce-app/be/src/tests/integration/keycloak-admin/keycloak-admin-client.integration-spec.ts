@@ -19,7 +19,7 @@ describe("keycloak-admin: shopper directory client (integration)", () => {
     const world = useTestWorld({ modules: KEYCLOAK_ADMIN_CAPABILITY_MODULES })
 
     const admin = (): KeycloakAdmin => world.resolve<KeycloakAdmin>(KEYCLOAK_ADMIN)
-    const shopper = () => ({ email: `shopper-${ids.next()}@ecommerce.dev`, password: `pw-${ids.next()}` })
+    const shopper = () => ({ email: `shopper-${ids.next()}@example.test`, password: `pw-${ids.next()}` })
 
     it("creates a shopper that signs in to the realm with its password", async () => {
         const params = shopper()

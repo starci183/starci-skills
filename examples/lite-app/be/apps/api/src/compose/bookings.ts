@@ -2,6 +2,7 @@ import type { ModuleMetadata } from "@nestjs/common"
 import { BookingsGraphqlModule } from "@features/api/bookings"
 import { CalendarsGraphqlModule } from "@features/api/calendars"
 import { ResourcesGraphqlModule } from "@features/api/resources"
+import { CalendarDeliveryQueueModule } from "@features/jobs/calendar-delivery"
 import { ConfirmBookingQueueModule } from "@features/jobs/confirm-booking"
 import { SendReminderQueueModule } from "@features/jobs/send-reminder"
 import { CalendarHttpModule } from "@features/webhooks/calendar"
@@ -24,6 +25,7 @@ export const bookingsModules = (): NonNullable<ModuleMetadata["imports"]> => [
     CalendarsModule.register({ isGlobal: true }),
     BookingsModule.register({ isGlobal: true }),
     ResourcesModule.register({ isGlobal: true }),
+    CalendarDeliveryQueueModule,
     ConfirmBookingQueueModule,
     SendReminderQueueModule,
 ]
