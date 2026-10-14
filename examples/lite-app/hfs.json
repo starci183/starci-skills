@@ -7,7 +7,17 @@
     "enableSignup": false,
     "jwtExpiry": 3600,
     "siteUrl": "http://127.0.0.1:3000",
-    "redirectUrls": ["http://127.0.0.1:3000/"]
+    "redirectUrls": ["http://127.0.0.1:3000/"],
+    "forceRls": [
+      "profiles",
+      "resources",
+      "calendars",
+      "bookings",
+      "queue",
+      "jobs",
+      "calendar_inbox",
+      "announcements_public_read"
+    ]
   },
   "sides": {
     "be": {

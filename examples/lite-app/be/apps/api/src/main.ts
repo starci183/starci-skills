@@ -1,7 +1,7 @@
 import { NestFactory } from "@nestjs/core"
 import { SystemClockService } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
-import { RequestValidationService } from "@modules/platform/http-security"
+import { applyHttpSecurity, RequestValidationService } from "@modules/platform/http-security"
 import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
 import { AppModule } from "./app.module"
 import { readApiEnv } from "./api.env"
@@ -11,7 +11,7 @@ const bootstrap = async (): Promise<void> => {
     const env = EnvSource.fromProcess()
     const options = readApiEnv(env)
     const app = await NestFactory.create(AppModule.register(options), { rawBody: true })
-    app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
+    applyHttpSecurity(app, options.httpSecurity, { trustProxy: 1 })
     app.enableShutdownHooks()
     app.useGlobalPipes(app.get(RequestValidationService))
     await app.listen(options.server.port)

@@ -3,13 +3,13 @@ import type { EntityManager } from "typeorm"
 import { InjectPrimaryEntityManager } from "@modules/platform/database"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import type { QueueHandler, QueueSchedulerDefinition } from "./queue.contracts"
+import type { QueueHandler } from "./queue.contracts"
 import { InjectQueueOptions } from "./queue.decorators"
 import { QueueLogEvent } from "./queue.log-events"
 import type { QueueOptions } from "./queue.options"
-import { backoffSecondsOf, cronScheduleOf, deliveryOf, isExhausted, messageOf, secondsOf } from "./queue.policy"
+import { backoffSecondsOf, deliveryOf, isExhausted, messageOf, secondsOf } from "./queue.policy"
 import type { QueueTransport } from "./queue-transport.port"
-import { CRON_SCHEDULE, PGMQ_ARCHIVE, PGMQ_READ, PGMQ_SEND, PGMQ_SET_VT } from "./persistence/queue.sql"
+import { PGMQ_ARCHIVE, PGMQ_READ, PGMQ_SEND, PGMQ_SET_VT } from "./persistence/queue.sql"
 import type { PgmqMessageRow } from "./persistence/queue.rows"
 
 @Injectable()
@@ -31,16 +31,6 @@ export class PgmqQueueTransportClient implements QueueTransport {
     /** Sends the job inside the transaction `tx`, the outbox row id in the message. */
     async add(tx: EntityManager, queue: string, jobId: string, payload: object): Promise<void> {
         await tx.query(PGMQ_SEND, [queue, JSON.stringify(messageOf(jobId, payload))])
-    }
-
-    /** Creates or replaces the pg_cron job named by the scheduler id; pg_cron keeps one per name however many replicas call this. */
-    async upsertScheduler(scheduler: QueueSchedulerDefinition): Promise<void> {
-        await this.entityManager.query(CRON_SCHEDULE, [
-            scheduler.id,
-            cronScheduleOf(scheduler.everyMs),
-            scheduler.queue,
-            JSON.stringify({ payload: scheduler.payload ?? {} }),
-        ])
     }
 
     /** Starts the read loop of the handler's queue. */

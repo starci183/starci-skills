@@ -20,7 +20,6 @@ const optionsOf = builder<QueueOptions>({
     pollIntervalMs: 100,
     visibilityTimeoutMs: 30_000,
     connections: [],
-    schedulers: [],
 })
 
 const row = (id: string) => ({ id, queue: "mail", payload: { id: `m-${id}` } })

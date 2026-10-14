@@ -9,6 +9,13 @@ max_rows = 1000
 [db]
 major_version = 17
 
+[storage]
+enabled = true
+file_size_limit = "5MiB"
+
+[edge_runtime]
+enabled = false
+
 [auth]
 enabled = true
 site_url = "http://127.0.0.1:3000"

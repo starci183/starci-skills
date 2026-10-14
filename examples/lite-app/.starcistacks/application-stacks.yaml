@@ -1,5 +1,87 @@
-# Local release analysis uses the shared host SonarQube extension and its sealed custody.
+# Lite-app application stack, schema starci/application-stacks@1.
+#
+# dev        the local Supabase stack (supabase CLI) with the api and web run as host processes; the descriptor is
+#            dev/environment.json and there is no sealed secret — `supabase status -o env` prints demo credentials.
+# production docker-swarm on one VPS (single-manager swarm). The Supabase Cloud project is the external datastore;
+#            no Postgres, Redis or Mongo is self-hosted (the lite edition refuses them). The one sidecar, n8n, keeps
+#            its SQLite database on the named volume n8n-data. Runbook: production/README.md.
+#
+# Deployment facts whose structured fields are not yet supported by application-stacks@1:
+#   Ingress/TLS/DNS  ingress is the only public component; Traefik issues certificates for lite-app.example and
+#                    api.lite-app.example, held on lite-app-production-acme. Owner DNS provider receipts and TLS
+#                    issuance/renewal receipts are pending; production/README.md states the required evidence.
+#   Placement/backup acme and n8n-data are external persistent volumes on the production-labelled manager.
+#                    production/README.md declares encrypted off-host backups and the pending restore proof.
+#   Release          /srv/lite-app/releases/<digest>; promote current after verification, preserve previous.
+#   Scheduled work   booking-reminder is the app-owned pg_cron tick -> pgmq queue; no host crontab is installed.
+#   Secret custody   sealed members production/secrets/<slug>.enc (sops, the project age recipient in .sops.yaml).
+#                    The deploy decrypts them in memory and pipes each key into `docker secret create`; the stack
+#                    file keeps {external: true} references and the services read the mounted values by *_FILE.
+#   Owner actions    (1) DNS at the registrar: A records for the declared hosts -> the VPS (nothing scripts DNS).
+#                    (2) `docker swarm init` and node labels on the VPS once. (3) The age identity is held only
+#                    in the owner's untracked .claude/secret.env as SOPS_AGE_KEY; the VPS never holds it.
 schema: starci/application-stacks@1
+sources:
+  - repository: lite-app
+components:
+  supabase:
+    role: stateful
+    purpose: The local Supabase stack (supabase start) with Postgres, Auth, Storage and Studio for development; production uses the Supabase Cloud project. Lite never self-hosts its primary database.
+    required: true
+  api:
+    role: service
+    image: lite-app/api:1.0.0
+    compose: infra/swarm/stack.yaml
+    purpose: The Nest api (GraphQL, the signed calendar webhook, the pgmq relay and workers). Liveness /health/live, readiness /health/ready.
+    required: true
+  web:
+    role: service
+    image: lite-app/web:1.0.0
+    compose: infra/swarm/stack.yaml
+    purpose: The Next.js app (standalone output); no runtime secret, its NEXT_PUBLIC_* values are build arguments. Liveness /health/live.
+    required: true
+  ingress:
+    role: ingress
+    image: traefik:v3.6@sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d
+    compose: infra/swarm/stack.yaml
+    purpose: Traefik, the only service that publishes ports (80/443, host mode). TLS for the declared hosts; routes in infra/swarm/edge/routes.yml.
+    required: true
+  n8n:
+    role: stateful
+    image: docker.n8n.io/n8nio/n8n:1.64.3@sha256:4d9116228d426ce24c442a744e9c11ee7c1187713f93f21dd5a34a12584708c1
+    compose: infra/swarm/stack.yaml
+    purpose: The n8n automation sidecar; private network only, reached by the api as n8n:5678. Its database is SQLite (DB_TYPE=sqlite) on the persisted named volume n8n-data — a database-dependent lite sidecar declares a persistent volume instead of self-hosting Postgres.
+    required: true
+environments:
+  production:
+    status: supported
+    runtime: docker-swarm
+    composeFiles:
+      - infra/swarm/stack.yaml
+    components:
+      api:
+        replicas: 1
+        port: 8787
+      web:
+        replicas: 1
+        port: 3000
+      ingress:
+        replicas: 1
+        port: 443
+        httpPort: 80
+      n8n:
+        replicas: 1
+        port: 5678
+    runbook: README.md
+    secrets:
+      - name: api
+        where: secrets/api
+        recipientPolicy: SOPS/age to the project recipient in .sops.yaml (creation rule for .starcistacks/*/secrets/*.enc); each key becomes one Swarm secret the api reads by its *_FILE environment name.
+        keyCustody: The age identity is held only in the owner's untracked .claude/secret.env as SOPS_AGE_KEY; the VPS never holds it and no private identity is tracked.
+k8s:
+  status: deferred
+  reason: Whole-package Kubernetes deployment is deferred; production is a single-manager Docker Swarm on one VPS and development is the local Supabase CLI stack with host processes.
+# Local release analysis uses the shared host SonarQube extension and its sealed custody.
 services:
   sonar:
     provider: sonarcloud

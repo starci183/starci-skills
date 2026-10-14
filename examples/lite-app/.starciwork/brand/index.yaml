@@ -1,0 +1,32 @@
+schema: work/brand@1
+id: brand
+kind: brand
+state: done
+rev: 1
+brand:
+  identity:
+    name: lite-app
+    character: calm scheduling tool — the surfaces stay out of the way of the bookings they carry
+  color:
+    primary: "#2563EB"
+    surface: "#FFFFFF"
+  typography:
+    sans: Inter
+  logo:
+    mark: the product name in plain text; no drawn logo exists yet
+  iconography:
+    set: none chosen — surfaces use the installed grammar package's icons only
+  voice:
+    tone: short declarative sentences; no exclamation marks, no marketing superlatives
+  motion:
+    rule: no bespoke motion; the published component states of the grammar package stand
+  forbidden:
+    - Never restyle the primary blue outside this record; a surface that wants a different blue needs the brand rev-bumped first, not a local override.
+    - Never ship text on the primary colour below a 4.5 to 1 contrast ratio.
+    - Never invent a mascot, illustration or emoji set for a surface; the brand has none and absence is the decision.
+  limitations:
+    - The palette names two tokens only; the neutral scale and semantic colours are still the grammar package's.
+review:
+  reviewer: brand owner
+  authority: Owner settled rev 1 for the example.
+  reviewedAt: 2026-10-15T00:00:00.000Z

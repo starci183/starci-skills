@@ -23,6 +23,3 @@ export const PGMQ_ARCHIVE = sql`SELECT pgmq.archive($1, $2::bigint) AS archived`
 
 /** Makes a failed message visible again after $3 seconds: the backoff of its next attempt ($1 queue, $2 message id). */
 export const PGMQ_SET_VT = sql`SELECT msg_id FROM pgmq.set_vt($1, $2::bigint, $3) LIMIT 1`
-
-/** Creates or replaces the pg_cron job $1 that sends the message $4 to the queue $3 on the schedule $2. */
-export const CRON_SCHEDULE = sql`SELECT cron.schedule($1, $2, format('SELECT pgmq.send(%L, %L::jsonb)', $3::text, $4::text)) AS job_id`

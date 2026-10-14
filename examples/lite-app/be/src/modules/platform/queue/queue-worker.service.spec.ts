@@ -1,10 +1,7 @@
 import { Test } from "@nestjs/testing"
 import { mock } from "@starci/jest-preset"
-import { LOGGER } from "@modules/platform/logging"
-import type { Logger } from "@modules/platform/logging"
 import type { QueueHandler } from "./queue.contracts"
 import { QUEUE_OPTIONS, QUEUE_TRANSPORT } from "./queue.decorators"
-import { QueueLogEvent } from "./queue.log-events"
 import type { QueueOptions } from "./queue.options"
 import type { QueueTransport } from "./queue-transport.port"
 import { QueueWorkerService } from "./queue-worker.service"
@@ -16,29 +13,25 @@ const options: QueueOptions = {
     pollIntervalMs: 100,
     visibilityTimeoutMs: 30_000,
     connections: [],
-    schedulers: [{ queue: "sweep", id: "sweep-every-minute", everyMs: 60000 }],
 }
 
 const handlerOf = (queue: string): QueueHandler => ({ queue, handle: () => Promise.resolve() })
 
 const build = async () => {
     const transport = mock<QueueTransport>()
-    transport.upsertScheduler.mockResolvedValue(undefined)
-    const logger = mock<Logger>()
     const moduleRef = await Test.createTestingModule({
         providers: [
             QueueWorkerService,
             { provide: QUEUE_OPTIONS, useValue: options },
             { provide: QUEUE_TRANSPORT, useValue: transport },
-            { provide: LOGGER, useValue: logger },
         ],
     }).compile()
-    return { workers: moduleRef.get(QueueWorkerService), transport, logger }
+    return { workers: moduleRef.get(QueueWorkerService), transport }
 }
 
 describe("QueueWorkerService", () => {
     describe("onApplicationBootstrap", () => {
-        it("starts one worker per registered queue with the configured concurrency and registers the schedulers", async () => {
+        it("starts one worker per registered queue with the configured concurrency", async () => {
             const { workers, transport } = await build()
             const mailHandler = handlerOf("mail")
             const sweepHandler = handlerOf("sweep")
@@ -49,7 +42,6 @@ describe("QueueWorkerService", () => {
 
             expect(transport.work).toHaveBeenCalledWith(mailHandler, 3)
             expect(transport.work).toHaveBeenCalledWith(sweepHandler, 3)
-            expect(transport.upsertScheduler).toHaveBeenCalledWith(options.schedulers[0])
         })
 
         it("keeps the last handler registered for a queue", async () => {
@@ -63,18 +55,6 @@ describe("QueueWorkerService", () => {
 
             expect(transport.work).toHaveBeenCalledTimes(1)
             expect(transport.work).toHaveBeenCalledWith(second, 3)
-        })
-
-        it("logs a scheduler that cannot be registered and still starts the app", async () => {
-            const { workers, transport, logger } = await build()
-            const failure = new Error("pg_cron missing")
-            transport.upsertScheduler.mockRejectedValue(failure)
-
-            await expect(workers.onApplicationBootstrap()).resolves.toBeUndefined()
-
-            expect(logger.error).toHaveBeenCalledWith(QueueLogEvent.SchedulerFailed, failure, {
-                scheduler: "sweep-every-minute",
-            })
         })
     })
 

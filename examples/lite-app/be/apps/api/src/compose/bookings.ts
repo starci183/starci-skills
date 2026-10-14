@@ -3,6 +3,7 @@ import { BookingsGraphqlModule } from "@features/api/bookings"
 import { CalendarsGraphqlModule } from "@features/api/calendars"
 import { ResourcesGraphqlModule } from "@features/api/resources"
 import { ConfirmBookingQueueModule } from "@features/jobs/confirm-booking"
+import { SendReminderQueueModule } from "@features/jobs/send-reminder"
 import { CalendarHttpModule } from "@features/webhooks/calendar"
 import { BookingsModule } from "@modules/domain/bookings"
 import { CalendarInboxModule } from "@modules/domain/calendar-inbox"
@@ -24,4 +25,5 @@ export const bookingsModules = (): NonNullable<ModuleMetadata["imports"]> => [
     BookingsModule.register({ isGlobal: true }),
     ResourcesModule.register({ isGlobal: true }),
     ConfirmBookingQueueModule,
+    SendReminderQueueModule,
 ]

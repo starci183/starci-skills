@@ -3,10 +3,11 @@ import type { EntityManager } from "typeorm"
 import { ResourcesService } from "@modules/domain/resources"
 import { InjectPrimaryEntityManager, requireOwnedRow } from "@modules/platform/database"
 import { BookingConfirmationQueue, isConfirmBookingPayload } from "@modules/queues/booking-confirmation"
+import { BookingReminderQueue, isBookingReminderPayload, isBookingReminderTick } from "@modules/queues/booking-reminder"
 import type { BookingResult, BookingStatusResult, CreateBookingParams } from "./bookings.contracts"
 import { BookingsError, BookingsErrorCode } from "./errors/bookings.error"
 import type { BookingsRow } from "./persistence/bookings.rows"
-import { CONFIRM_BOOKING, FIND_BOOKING_STATUS, INSERT_BOOKING } from "./persistence/bookings.sql"
+import { CONFIRM_BOOKING, FIND_BOOKING_STATUS, INSERT_BOOKING, REMIND_BOOKING, REMIND_DUE_BOOKINGS } from "./persistence/bookings.sql"
 
 /** The PostgreSQL code of an exclusion-constraint violation: the interval overlaps another booking of the resource. */
 const EXCLUSION_VIOLATION = "23P01"
@@ -23,6 +24,7 @@ export class BookingsService {
         @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
         private readonly resources: ResourcesService,
         private readonly confirmations: BookingConfirmationQueue,
+        private readonly reminders: BookingReminderQueue,
     ) {}
 
     /**
@@ -49,6 +51,7 @@ export class BookingsService {
                 })
             if (row === undefined) throw new BookingsError({ code: BookingsErrorCode.NotCreated })
             await this.confirmations.enqueueConfirmBooking({ bookingId: row.id }, tx)
+            await this.reminders.enqueueRemindBooking({ bookingId: row.id }, tx)
             return {
                 id: row.id,
                 resourceId: row.resource_id,
@@ -73,5 +76,18 @@ export class BookingsService {
     async confirmBooking(payload: object): Promise<void> {
         if (!isConfirmBookingPayload(payload)) return
         await this.entityManager.query(CONFIRM_BOOKING, [payload.bookingId])
+    }
+
+    /**
+     * The effect of one send-reminder job: the booking it names is marked reminded; for the pg_cron tick every confirmed
+     * booking due a reminder is. Any other payload changes nothing.
+     */
+    async remindBooking(payload: object): Promise<void> {
+        if (isBookingReminderTick(payload)) {
+            await this.entityManager.query(REMIND_DUE_BOOKINGS)
+            return
+        }
+        if (!isBookingReminderPayload(payload)) return
+        await this.entityManager.query(REMIND_BOOKING, [payload.bookingId])
     }
 }

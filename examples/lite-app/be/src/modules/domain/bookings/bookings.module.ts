@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { BookingConfirmationModule } from "@modules/queues/booking-confirmation"
+import { BookingReminderModule } from "@modules/queues/booking-reminder"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./bookings.module-definition"
 import { BookingsService } from "./bookings.service"
 
@@ -12,7 +13,7 @@ export class BookingsModule extends ConfigurableModuleClass {
         const base = super.register(options)
         return {
             ...base,
-            imports: [...(base.imports ?? []), BookingConfirmationModule],
+            imports: [...(base.imports ?? []), BookingConfirmationModule, BookingReminderModule],
             providers: [...(base.providers ?? []), BookingsService],
             exports: [BookingsService],
         }

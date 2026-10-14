@@ -1,7 +1,6 @@
 import type { InjectionToken } from "@nestjs/common"
-import type { QueueSchedulerDefinition } from "./queue.contracts"
 
-/** What the queues of one app need: how the relay and the workers run, which connection holds the outbox and pgmq, and the schedulers it registers. */
+/** What the queues of one app need: how the relay and the workers run, and which connection holds the outbox and pgmq. */
 export interface QueueOptions {
     /** The pause between two relay passes over an empty outbox. */
     readonly relayIntervalMs: number
@@ -15,6 +14,4 @@ export interface QueueOptions {
     readonly visibilityTimeoutMs: number
     /** The tokens of the shared entity managers of the connections that hold a queue outbox of the app: the relay reads each of them. pgmq itself lives in the primary Supabase PostgreSQL. */
     readonly connections: ReadonlyArray<InjectionToken>
-    /** The job schedulers the app registers at boot; pg_cron upserts them by id, so a pool of replicas fires each one once per interval. */
-    readonly schedulers: ReadonlyArray<QueueSchedulerDefinition>
 }

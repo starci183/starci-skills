@@ -26,12 +26,3 @@ export const deliveryOf = (queue: string, row: PgmqMessageRow): QueueDelivery =>
     payload: row.message.payload ?? {},
     attempt: row.read_ct,
 })
-
-/** The pg_cron schedule of an interval: seconds below a minute, whole minutes below an hour, whole hours otherwise (rounded, at least one). */
-export const cronScheduleOf = (everyMs: number): string => {
-    const seconds = Math.max(1, Math.round(everyMs / 1000))
-    if (seconds < 60) return `${seconds} seconds`
-    const minutes = Math.round(seconds / 60)
-    if (minutes < 60) return `*/${minutes} * * * *`
-    return `0 */${Math.min(23, Math.round(minutes / 60))} * * *`
-}

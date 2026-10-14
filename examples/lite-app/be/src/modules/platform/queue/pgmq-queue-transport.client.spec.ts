@@ -9,7 +9,7 @@ import { QUEUE_OPTIONS } from "./queue.decorators"
 import { QueueLogEvent } from "./queue.log-events"
 import type { QueueOptions } from "./queue.options"
 import { PgmqQueueTransportClient } from "./pgmq-queue-transport.client"
-import { CRON_SCHEDULE, PGMQ_ARCHIVE, PGMQ_READ, PGMQ_SEND, PGMQ_SET_VT } from "./persistence/queue.sql"
+import { PGMQ_ARCHIVE, PGMQ_READ, PGMQ_SEND, PGMQ_SET_VT } from "./persistence/queue.sql"
 import type { PgmqMessageRow } from "./persistence/queue.rows"
 
 const optionsOf = builder<QueueOptions>({
@@ -19,7 +19,6 @@ const optionsOf = builder<QueueOptions>({
     pollIntervalMs: 250,
     visibilityTimeoutMs: 30_000,
     connections: [],
-    schedulers: [],
 })
 
 const messageOf = builder<PgmqMessageRow>({
@@ -83,28 +82,6 @@ describe("PgmqQueueTransportClient", () => {
                 JSON.stringify({ jobId: "row-1", payload: { bookingId: "b-1" } }),
             ])
             expect(tx.commits).toBe(1)
-        })
-    })
-
-    describe("upsertScheduler", () => {
-        it("upserts the pg_cron job of the scheduler with its payload, or an empty one", async () => {
-            const { client, manager } = await build(mockEntityManager({ query: [CRON_SCHEDULE, [{ job_id: 1 }]] }))
-
-            await client.upsertScheduler({ queue: "sweep", id: "sweep-often", everyMs: 30_000, payload: { shard: 2 } })
-            await client.upsertScheduler({ queue: "sweep", id: "sweep-hourly", everyMs: 3_600_000 })
-
-            expect(manager.query).toHaveBeenNthCalledWith(1, CRON_SCHEDULE, [
-                "sweep-often",
-                "30 seconds",
-                "sweep",
-                JSON.stringify({ payload: { shard: 2 } }),
-            ])
-            expect(manager.query).toHaveBeenNthCalledWith(2, CRON_SCHEDULE, [
-                "sweep-hourly",
-                "0 */1 * * *",
-                "sweep",
-                JSON.stringify({ payload: {} }),
-            ])
         })
     })
 

@@ -1,19 +1,17 @@
 import { Injectable } from "@nestjs/common"
 import type { OnApplicationBootstrap, OnApplicationShutdown } from "@nestjs/common"
-import { InjectLogger } from "@modules/platform/logging"
-import type { Logger } from "@modules/platform/logging"
 import { eachInOrder } from "@modules/platform/primitives"
 import type { QueueHandler } from "./queue.contracts"
 import { InjectQueueOptions, InjectQueueTransport } from "./queue.decorators"
-import { QueueLogEvent } from "./queue.log-events"
 import type { QueueOptions } from "./queue.options"
 import type { QueueWorkerRegistry } from "./queue.port"
 import type { QueueTransport } from "./queue-transport.port"
 
 @Injectable()
 /**
- * The consuming side of the queues: the registry the processors fill, and the workers and schedulers started when the app has
- * registered every handler. A scheduler that cannot be registered is logged and does not stop the app: the next boot upserts it again.
+ * The consuming side of the queues: the registry the processors fill, and the workers started when the app has registered
+ * every handler. Recurring jobs are owned by the migrations: a pg_cron tick is declared with the queue it feeds, so the
+ * deployment does not depend on which replica booted first.
  */
 export class QueueWorkerService implements QueueWorkerRegistry, OnApplicationBootstrap, OnApplicationShutdown {
     private readonly handlers = new Map<string, QueueHandler>()
@@ -21,7 +19,6 @@ export class QueueWorkerService implements QueueWorkerRegistry, OnApplicationBoo
     constructor(
         @InjectQueueOptions() private readonly options: QueueOptions,
         @InjectQueueTransport() private readonly transport: QueueTransport,
-        @InjectLogger() private readonly logger: Logger,
     ) {}
 
     /** Registers the handler under the queue it names; a second handler for the same queue replaces the first. */
@@ -29,15 +26,10 @@ export class QueueWorkerService implements QueueWorkerRegistry, OnApplicationBoo
         this.handlers.set(handler.queue, handler)
     }
 
-    /** Starts one worker per registered queue, then registers the schedulers of the options. */
+    /** Starts one worker per registered queue. */
     async onApplicationBootstrap(): Promise<void> {
         await eachInOrder([...this.handlers.values()], (handler) =>
             this.transport.work(handler, this.options.concurrency),
-        )
-        await eachInOrder(this.options.schedulers, (scheduler) =>
-            this.transport.upsertScheduler(scheduler).catch((cause: unknown) => {
-                this.logger.error(QueueLogEvent.SchedulerFailed, cause, { scheduler: scheduler.id })
-            }),
         )
     }
 

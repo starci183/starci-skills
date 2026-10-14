@@ -65,7 +65,7 @@ describe("localizeError", () => {
 })
 
 describe("localizeErrorsPlugin", () => {
-    it("localizes a coded error in the language the x-locale header declares", async () => {
+    it("localizes a coded error in the language the Accept-Language header declares", async () => {
         const errors = mock<ErrorsService>()
         const requestLocale = mock<RequestLocale>()
         requestLocale.of.mockReturnValue("vi")
@@ -73,7 +73,7 @@ describe("localizeErrorsPlugin", () => {
         const coded: GraphQLFormattedError = { message: "ITEM_NOT_FOUND", extensions: { code: "ITEM_NOT_FOUND" } }
         const response = singleResponse([coded])
 
-        const context = requestContext(response, { "x-locale": "vi", "accept-language": "en" })
+        const context = requestContext(response, { "accept-language": "vi" })
 
         await sendResponse(errors, requestLocale, context)
 
@@ -83,22 +83,23 @@ describe("localizeErrorsPlugin", () => {
         ])
     })
 
-    it.each([{}, { "x-locale": "" }])(
-        "falls back to Accept-Language when the x-locale header is absent or empty (%p)",
+    it.each([undefined, ""])(
+        "passes an absent or empty Accept-Language header to the locale owner (%p)",
         async (declared) => {
             const errors = mock<ErrorsService>()
             const requestLocale = mock<RequestLocale>()
-            requestLocale.of.mockReturnValue("en")
-            errors.text.mockReturnValue("The item was not found")
+            requestLocale.of.mockReturnValue("vi")
+            errors.text.mockReturnValue("Không tìm thấy")
             const coded: GraphQLFormattedError = { message: "ITEM_NOT_FOUND", extensions: { code: "ITEM_NOT_FOUND" } }
 
             await sendResponse(
                 errors,
                 requestLocale,
-                requestContext(singleResponse([coded]), { ...declared, "accept-language": "en" }),
+                requestContext(singleResponse([coded]), { "accept-language": declared }),
             )
 
-            expect(requestLocale.of).toHaveBeenCalledWith("en")
+            expect(requestLocale.of).toHaveBeenCalledWith(declared)
+            expect(errors.text).toHaveBeenCalledWith("ITEM_NOT_FOUND", {}, "vi")
         },
     )
 

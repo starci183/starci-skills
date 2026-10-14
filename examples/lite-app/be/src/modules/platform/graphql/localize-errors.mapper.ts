@@ -14,11 +14,8 @@ const paramsOf = (value: unknown): ErrorParams => {
     return params
 }
 
-/** The language a request asks for: the `x-locale` header the front end's locale link writes, else Accept-Language. */
-const requestedLocale = (context: GraphqlContext): string | undefined => {
-    const declared = context.req.headers["x-locale"]
-    return typeof declared === "string" && declared !== "" ? declared : context.req.headers["accept-language"]
-}
+/** The language a request asks for through the `Accept-Language` header the front end's locale link writes. */
+const requestedLocale = (context: GraphqlContext): string | undefined => context.req.headers["accept-language"]
 
 /** Replaces the message of an error carrying a code with the catalog text of that code in `locale`; other errors pass unchanged. */
 export const localizeError = (

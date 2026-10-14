@@ -1,0 +1,6 @@
+{
+  "environment": "production",
+  "provider": "supabase",
+  "project": "lite-app",
+  "runtime": "docker-swarm"
+}

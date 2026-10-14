@@ -5,10 +5,11 @@ import { ResourcesService } from "@modules/domain/resources"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
 import { QUEUE_OUTBOX } from "@modules/platform/queue"
 import { BOOKING_CONFIRMATION_QUEUE, BookingConfirmationQueue } from "@modules/queues/booking-confirmation"
+import { BOOKING_REMINDER_QUEUE, BookingReminderQueue } from "@modules/queues/booking-reminder"
 import type { CreateBookingParams } from "./bookings.contracts"
 import { BookingsService } from "./bookings.service"
 import { BookingsErrorCode } from "./errors/bookings.error"
-import { CONFIRM_BOOKING, FIND_BOOKING_STATUS, INSERT_BOOKING } from "./persistence/bookings.sql"
+import { CONFIRM_BOOKING, FIND_BOOKING_STATUS, INSERT_BOOKING, REMIND_BOOKING, REMIND_DUE_BOOKINGS } from "./persistence/bookings.sql"
 
 const paramsOf = builder<CreateBookingParams>({
     resourceId: "resource-1",
@@ -32,6 +33,7 @@ const build = async (entityManager: MockEntityManager) => {
         providers: [
             BookingsService,
             BookingConfirmationQueue,
+            BookingReminderQueue,
             { provide: PRIMARY_ENTITY_MANAGER, useValue: entityManager },
             { provide: ResourcesService, useValue: resources },
             { provide: QUEUE_OUTBOX, useValue: outbox },
@@ -42,7 +44,7 @@ const build = async (entityManager: MockEntityManager) => {
 
 describe("BookingsService", () => {
     describe("createBooking", () => {
-        it("writes the pending booking and enqueues its confirmation in the same transaction", async () => {
+        it("writes the pending booking and enqueues its confirmation and reminder in the same transaction", async () => {
             const tx = fakeTransaction(mockEntityManager({ query: [INSERT_BOOKING, [INSERTED]] }))
             const { bookings, resources, outbox } = await build(tx.em)
 
@@ -63,6 +65,9 @@ describe("BookingsService", () => {
             ])
             expect(outbox.jobsOf(BOOKING_CONFIRMATION_QUEUE)).toEqual([
                 { queue: BOOKING_CONFIRMATION_QUEUE, payload: { bookingId: "booking-1" } },
+            ])
+            expect(outbox.jobsOf(BOOKING_REMINDER_QUEUE)).toEqual([
+                { queue: BOOKING_REMINDER_QUEUE, payload: { bookingId: "booking-1" } },
             ])
             expect(outbox.allInTransaction).toBe(true)
             expect(tx.commits).toBe(1)
@@ -170,6 +175,35 @@ describe("BookingsService", () => {
             const { bookings } = await build(em)
 
             await bookings.confirmBooking({ orderId: "order-1" })
+
+            expect(em.query).not.toHaveBeenCalled()
+        })
+    })
+
+    describe("remindBooking", () => {
+        it("marks the reminder of the booking the job names", async () => {
+            const em = mockEntityManager({ query: [REMIND_BOOKING, []] })
+            const { bookings } = await build(em)
+
+            await bookings.remindBooking({ bookingId: "booking-1" })
+
+            expect(em.query).toHaveBeenCalledWith(REMIND_BOOKING, ["booking-1"])
+        })
+
+        it("runs the due-bookings catch-up of a pg_cron tick", async () => {
+            const em = mockEntityManager({ query: [REMIND_DUE_BOOKINGS, []] })
+            const { bookings } = await build(em)
+
+            await bookings.remindBooking({ tick: true })
+
+            expect(em.query).toHaveBeenCalledWith(REMIND_DUE_BOOKINGS)
+        })
+
+        it("changes nothing for a payload that is neither a booking reminder nor a tick", async () => {
+            const em = mockEntityManager()
+            const { bookings } = await build(em)
+
+            await bookings.remindBooking({ orderId: "order-1" })
 
             expect(em.query).not.toHaveBeenCalled()
         })

@@ -1,3 +1,6 @@
 # Lite secrets have encrypted twins only under .starcistacks/<environment>/secrets.
-# Set a project-owned age recipient before encrypting the first secret.
-creation_rules: []
+# The recipient is the shared master key's PUBLIC half (not a secret). The private half lives outside the repository
+# in the owner's secret custody (docs/host-secrets.md); sops reads it from the environment as SOPS_AGE_KEY.
+creation_rules:
+  - path_regex: \.starcistacks[/\\][^/\\]+[/\\]secrets[/\\][^/\\]+\.enc$
+    age: age1myd77xz5lhsluc4ejzztsck32pfq3vfpzrva8cegzydk2guhxqesgm3z4j

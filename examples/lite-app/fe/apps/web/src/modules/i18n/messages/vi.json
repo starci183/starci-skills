@@ -5,79 +5,79 @@
       "brand": "lite-app"
     },
     "home": {
-      "title": "Home"
+      "title": "Trang chủ"
     },
     "signIn": {
-      "title": "Sign in",
+      "title": "Đăng nhập",
       "email": "Email",
-      "password": "Password",
-      "submit": "Continue",
-      "working": "Signing in",
-      "refused": "The credentials were refused.",
-      "invalid": "Enter a valid email and password.",
-      "unavailable": "Sign-in is unavailable. Try again shortly.",
-      "emailInvalid": "Enter a valid email address.",
-      "passwordShort": "The password has at least 8 characters.",
-      "passwordLong": "The password has at most 256 characters."
+      "password": "Mật khẩu",
+      "submit": "Tiếp tục",
+      "working": "Đang đăng nhập",
+      "refused": "Thông tin đăng nhập không được chấp nhận.",
+      "invalid": "Nhập email và mật khẩu hợp lệ.",
+      "unavailable": "Hiện không thể đăng nhập. Vui lòng thử lại sau ít phút.",
+      "emailInvalid": "Nhập địa chỉ email hợp lệ.",
+      "passwordShort": "Mật khẩu phải có ít nhất 8 ký tự.",
+      "passwordLong": "Mật khẩu chỉ được có tối đa 256 ký tự."
     },
     "signOut": {
-      "signedIn": "Signed in",
-      "submit": "Sign out",
-      "working": "Signing out",
-      "refused": "The session has already ended.",
-      "invalid": "The session could not be ended.",
-      "unavailable": "Sign-out is unavailable. Try again shortly."
+      "signedIn": "Đã đăng nhập",
+      "submit": "Đăng xuất",
+      "working": "Đang đăng xuất",
+      "refused": "Phiên đăng nhập đã kết thúc.",
+      "invalid": "Không thể kết thúc phiên đăng nhập.",
+      "unavailable": "Hiện không thể đăng xuất. Vui lòng thử lại sau ít phút."
     },
     "workspace": {
-      "title": "Booking workspace",
-      "commands": "Create",
-      "addResource": "Add resource",
-      "addCalendar": "Add calendar",
-      "working": "Saving",
-      "resourceCreated": "The resource was created.",
-      "calendarCreated": "The calendar was created.",
-      "lastResource": "New resource: {id}",
-      "lastCalendar": "New calendar: {id}"
+      "title": "Không gian đặt lịch",
+      "commands": "Tạo mới",
+      "addResource": "Thêm tài nguyên",
+      "addCalendar": "Thêm lịch",
+      "working": "Đang lưu",
+      "resourceCreated": "Đã tạo tài nguyên.",
+      "calendarCreated": "Đã tạo lịch.",
+      "lastResource": "Tài nguyên mới: {id}",
+      "lastCalendar": "Lịch mới: {id}"
     },
     "booking": {
-      "title": "Book a resource",
-      "resource": "Resource UUID",
-      "startsAt": "Starts at (UTC ISO timestamp)",
-      "endsAt": "Ends at (UTC ISO timestamp)",
-      "submit": "Book",
-      "working": "Booking",
-      "queued": "The booking waits for its confirmation.",
-      "confirmedTitle": "Confirmed",
-      "confirmed": "The booking is confirmed.",
-      "status": "Booking {id}: {status}",
-      "statusUnknown": "checking",
-      "resourceInvalid": "Enter the UUID of one of your resources.",
-      "dateInvalid": "Enter a UTC ISO timestamp, such as 2026-10-04T09:00:00Z.",
-      "intervalInvalid": "The end comes after the start."
+      "title": "Đặt lịch cho tài nguyên",
+      "resource": "UUID tài nguyên",
+      "startsAt": "Bắt đầu (thời gian UTC theo chuẩn ISO)",
+      "endsAt": "Kết thúc (thời gian UTC theo chuẩn ISO)",
+      "submit": "Đặt lịch",
+      "working": "Đang đặt lịch",
+      "queued": "Lượt đặt lịch đang chờ xác nhận.",
+      "confirmedTitle": "Đã xác nhận",
+      "confirmed": "Lượt đặt lịch đã được xác nhận.",
+      "status": "Lượt đặt lịch {id}: {status}",
+      "statusUnknown": "đang kiểm tra",
+      "resourceInvalid": "Nhập UUID của một tài nguyên thuộc về bạn.",
+      "dateInvalid": "Nhập thời gian UTC theo chuẩn ISO, ví dụ 2026-10-04T09:00:00Z.",
+      "intervalInvalid": "Thời gian kết thúc phải sau thời gian bắt đầu."
     },
     "toast": {
-      "successTitle": "Done",
-      "errorTitle": "Error",
-      "unauthorizedTitle": "Not signed in",
-      "unauthorizedDescription": "Sign in to continue.",
-      "defaultSuccess": "The change was saved.",
-      "defaultError": "Something went wrong."
+      "successTitle": "Hoàn tất",
+      "errorTitle": "Lỗi",
+      "unauthorizedTitle": "Chưa đăng nhập",
+      "unauthorizedDescription": "Đăng nhập để tiếp tục.",
+      "defaultSuccess": "Đã lưu thay đổi.",
+      "defaultError": "Đã xảy ra lỗi."
     },
     "loading": {
-      "message": "Loading"
+      "message": "Đang tải"
     },
     "notFound": {
-      "title": "Page not found",
-      "home": "Return home"
+      "title": "Không tìm thấy trang",
+      "home": "Về trang chủ"
     },
     "errors": {
       "page": {
-        "title": "Something went wrong",
-        "retry": "Try again"
+        "title": "Đã xảy ra lỗi",
+        "retry": "Thử lại"
       },
       "global": {
-        "title": "The application could not continue",
-        "retry": "Try again"
+        "title": "Ứng dụng không thể tiếp tục",
+        "retry": "Thử lại"
       }
     }
   }

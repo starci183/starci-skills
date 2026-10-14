@@ -9,7 +9,7 @@ import { QueueRelayService } from "./queue-relay.service"
 import { QueueWorkerService } from "./queue-worker.service"
 
 @Module({})
-/** The queues of an app over Supabase Queues (pgmq): the outbox writer, its relay, the workers and the schedulers, registered once per app over the connections that hold an outbox. */
+/** The queues of an app over Supabase Queues (pgmq): the outbox writer, its relay and the workers, registered once per app over the connections that hold an outbox. */
 export class QueueModule extends ConfigurableModuleClass {
     /** Registers the capability once per app that enqueues or processes jobs. */
     static register(options: typeof OPTIONS_TYPE): DynamicModule {

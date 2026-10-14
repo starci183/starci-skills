@@ -10,3 +10,10 @@ export const FIND_BOOKING_STATUS = sql`SELECT id, status FROM public.bookings WH
 
 /** Moves one pending booking to confirmed; a confirmed booking is left as it is, so a repeated job changes nothing ($1 id). */
 export const CONFIRM_BOOKING = sql`UPDATE public.bookings SET status = 'confirmed' WHERE id = $1 AND status = 'pending'`
+
+/** Marks the reminder of one booking sent; a reminded booking is left as it is, so a repeated job changes nothing ($1 id). */
+export const REMIND_BOOKING = sql`UPDATE public.bookings SET reminder_sent_at = now() WHERE id = $1 AND reminder_sent_at IS NULL`
+
+/** The catch-up of the pg_cron tick: every confirmed booking that never got its reminder is marked reminded in one pass. */
+export const REMIND_DUE_BOOKINGS = sql`UPDATE public.bookings SET reminder_sent_at = now()
+    WHERE status = 'confirmed' AND reminder_sent_at IS NULL AND starts_at <= now() + interval '24 hours'`

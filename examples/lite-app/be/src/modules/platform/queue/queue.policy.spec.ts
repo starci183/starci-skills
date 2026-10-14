@@ -2,7 +2,6 @@ import {
     ATTEMPTS,
     BACKOFF_MS,
     backoffSecondsOf,
-    cronScheduleOf,
     deliveryOf,
     isExhausted,
     messageOf,
@@ -49,14 +48,11 @@ describe("queue policy", () => {
         })
     })
 
-    it("maps an interval to the pg_cron schedule of seconds, minutes or hours", () => {
-        expect([
-            cronScheduleOf(200),
-            cronScheduleOf(30_000),
-            cronScheduleOf(60_000),
-            cronScheduleOf(900_000),
-            cronScheduleOf(3_600_000),
-            cronScheduleOf(172_800_000),
-        ]).toEqual(["1 seconds", "30 seconds", "*/1 * * * *", "*/15 * * * *", "0 */1 * * *", "0 */23 * * *"])
+    it("preserves the reminder payload that the migration-owned cron tick enqueues", () => {
+        expect(deliveryOf("booking_reminder", {
+            msg_id: "43",
+            read_ct: 1,
+            message: { payload: { tick: true } },
+        })).toEqual({ id: "43", queue: "booking_reminder", payload: { tick: true }, attempt: 1 })
     })
 })
