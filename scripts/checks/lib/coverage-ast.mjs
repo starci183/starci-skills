@@ -15,7 +15,7 @@ export function astNodes(node) {
   while (pending.length) {
     const next = pending.pop();
     out.push(next);
-    pending.push(...astChildren(next));
+    for (const child of astChildren(next)) pending.push(child);
   }
   return out;
 }
@@ -139,7 +139,7 @@ export function expressionReach(context, index, node) {
     const nodes = out.get(current.index.file) ?? [];
     nodes.push(current.node);
     out.set(current.index.file, nodes);
-    pending.push(...reachableChildren(context, current));
+    for (const child of reachableChildren(context, current)) pending.push(child);
   }
   if (node && !index.locals) index.reaches.set(node, { reached: out, sources: [...out.keys()].map((file) => sourceIndex(context, file)) });
   return out;

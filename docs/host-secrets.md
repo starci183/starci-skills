@@ -80,7 +80,7 @@ These requirements apply to both lite and full applications. Their secret source
 - R249 `ENV_VALUE_SHAPE`: secret verification validates decrypted environment value shapes in memory against the application's typed configuration and reports only key names and violated rules; concrete environment-example values obey the same shapes.
 - R252 `HFS_SCRIPT_HYGIENE`: `HFS_SCRIPT_PLAINTEXT_LOAD` refuses plaintext secret loaders and disclosure commands; `HFS_SCRIPT_XTRACE` refuses shell tracing; `HFS_SERVICE_ROLE_SCOPE` confines Supabase service-role references to their back-end integration.
 - R253 `HFS_SECRET_CUSTODY`: `HFS_AGE_KEY_CUSTODY` refuses a tracked or misplaced age identity; `HFS_CANON_COPY_DRIFT` refuses changes to canonical environment-source, webhook-signature and origin-guard copies. Assigned secret literals remain governed by R06, and `SOPS_AGE_KEY` belongs in the owner's untracked `.claude/secret.env`.
-- R277 `HFS_SECRET_CUSTODY_ONLY`: `HFS_SECRET_PLAINTEXT_FILE` refuses tracked plaintext secret files; `HFS_SECRET_OUTSIDE_ENC` refuses sealed members outside `.starcistacks/<env>/secrets/*.enc`.
+- <a id="r277"></a> R277 `HFS_SECRET_CUSTODY_ONLY`: `HFS_SECRET_PLAINTEXT_FILE` refuses tracked plaintext secret files; `HFS_SECRET_OUTSIDE_ENC` refuses sealed members outside `.starcistacks/<env>/secrets/*.enc` in full; lite reports the same custody violation through R220 `HFS_LITE_SECRET_CUSTODY`.
 - R220 `HFS_LITE_SECRET_CUSTODY`: lite additionally refuses secret material outside its sealed stack custody and secret tokens or credential-bearing connection strings in front-end or Supabase files.
 
 ## Selected-action preflight
