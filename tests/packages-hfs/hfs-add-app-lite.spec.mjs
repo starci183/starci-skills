@@ -121,3 +121,15 @@ test("addApp refuses a server callback without a Supabase connection before writ
     assert.equal(fs.existsSync(path.join(root, "fe", "apps", "admin")), false);
   }
 });
+
+test("addApp rejects non-boolean callback switches without changing the app registration or workspaces", () => {
+  for (const edition of ["lite", "full"]) {
+    const root = appRoot(edition);
+    const declaration = read(root, "hfs.json");
+    const workspace = read(root, "package.json");
+    assert.throws(() => addApp({ root, name: "admin", authCallback: "true" }), { code: "HFS_SCAFFOLD_CALLBACK_OPTION" });
+    assert.equal(read(root, "hfs.json"), declaration);
+    assert.equal(read(root, "package.json"), workspace);
+    assert.equal(fs.existsSync(path.join(root, "fe", "apps", "admin")), false);
+  }
+});

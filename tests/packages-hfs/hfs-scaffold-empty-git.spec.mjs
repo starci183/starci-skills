@@ -76,6 +76,17 @@ test('the scaffold callback switch refuses a starter without Supabase before cha
   assertGitPreserved(f);
 });
 
+test('a non-boolean scaffold callback switch preserves the empty Git root of either edition', t => {
+  for (const edition of ['lite', 'full']) {
+    const f = fixture(t);
+    let locked = false;
+    assert.throws(() => scaffold(f, { edition, authCallback: 'true', lock: () => { locked = true; return { ok: true }; } }), { code: 'HFS_SCAFFOLD_CALLBACK_OPTION' });
+    assert.equal(locked, false);
+    assert.deepEqual(fs.readdirSync(f.root), ['.git']);
+    assertGitPreserved(f);
+  }
+});
+
 test('the public app scaffold entry accepts actual empty unborn main and preserves every Git metadata byte', async t => {
   const f = fixture(t);
   let stderr = '';

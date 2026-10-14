@@ -676,6 +676,44 @@ test('ruleParams: the parameters the canon lint lanes read, per side', () => {
   refusal(() => loadSlotManifest({ text: JSON.stringify(twice) }), 'HFS_MANIFEST_INVALID');
 });
 
+test('function and feature budgets are shared across editions, with validated profile and lite overrides', () => {
+  const manifest = loadSlotManifest();
+  for (const profile of ['be', 'fe']) {
+    for (const edition of ['full', 'lite']) {
+      const params = ruleParams(manifest, profile, edition);
+      assert.equal(params.functionLines, 80, `${profile} ${edition}: R291`);
+      assert.equal(params.featureFiles, 250, `${profile} ${edition}: R292`);
+    }
+  }
+  for (const profile of ['be', 'fe']) {
+    const doc = parseYaml(manifestText);
+    doc.ruleParams[profile] = { ...doc.ruleParams[profile], functionLines: 70, featureFiles: 200, lite: { ...doc.ruleParams[profile]?.lite, functionLines: 60, featureFiles: 150 } };
+    assert.equal(validateManifestSchema(doc), true, JSON.stringify(validateManifestSchema.errors));
+    const loaded = loadSlotManifest({ text: JSON.stringify(doc) });
+    assert.equal(ruleParams(loaded, profile).functionLines, 70);
+    assert.equal(ruleParams(loaded, profile).featureFiles, 200);
+    assert.equal(ruleParams(loaded, profile, 'lite').functionLines, 60);
+    assert.equal(ruleParams(loaded, profile, 'lite').featureFiles, 150);
+  }
+});
+
+test('schema and loader reject non-positive, fractional and non-number function or feature budgets', () => {
+  for (const target of ['common', 'be', 'fe', 'be.lite', 'fe.lite']) {
+    for (const key of ['functionLines', 'featureFiles']) {
+      for (const value of [0, -1, 1.5, '80', null]) {
+        const doc = parseYaml(manifestText);
+        const [profile, edition] = target.split('.');
+        doc.ruleParams[profile] ??= {};
+        let params = doc.ruleParams[profile];
+        if (edition) params = params[edition] ??= {};
+        params[key] = value;
+        assert.equal(validateManifestSchema(doc), false, `${target}.${key}: ${JSON.stringify(value)}`);
+        refusal(() => loadSlotManifest({ text: JSON.stringify(doc) }), 'HFS_MANIFEST_INVALID');
+      }
+    }
+  }
+});
+
 test('appRelativeMessages: a side finding message names its paths from the app root, like the finding path', (t) => {
   const side = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-side-'));
   t.after(() => fs.rmSync(side, { recursive: true, force: true }));
