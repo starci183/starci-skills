@@ -33,8 +33,9 @@ const PRESETS = { sonarExclusions: createRequire(import.meta.url)('../../package
 
 /** The one prerequisite that may skip: Docker answering. A busy port never skips; it fails (below). */
 const dockerProbe = spawnSync('docker', ['info'], { encoding: 'utf8', windowsHide: true, timeout: 60_000 });
+const dockerFailure = String(dockerProbe.stderr ?? dockerProbe.stdout ?? '').trim().split(/\r?\n/)[0];
 const skipReason = dockerProbe.status === 0 ? false
-  : `docker is unavailable: ${dockerProbe.error?.message ?? `${dockerProbe.stderr ?? dockerProbe.stdout ?? ''}`.trim().split(/\r?\n/)[0] ?? 'docker info failed'}`;
+  : `docker is unavailable: ${dockerProbe.error?.message ?? dockerFailure ?? 'docker info failed'}`;
 
 const portBusy = (port) => new Promise((resolve) => {
   const socket = net.connect({ host: '127.0.0.1', port });
@@ -49,48 +50,18 @@ const holderOf = (port) => {
   return row ? `the container ${row.split(' ')[0]}` : 'a local process outside Docker';
 };
 
-test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, type drift and full-upgrade view', { skip: skipReason, timeout: 1_800_000 }, async (t) => {
-  // The installed SQL parser extracts one Bun-built native binding at the isolated temp root, and the app's `npm test` leaves jest's
-  // default cache (`<temp>/jest`) there. Both are process infrastructure, not app fixtures, but this spec owns the installed commands
-  // that create them and therefore removes them before the leak guard.
-  t.after(() => {
-    const isolated = process.env.STARCI_TEST_TEMP_DIR;
-    if (!isolated || !fs.existsSync(isolated)) return;
-    for (const entry of fs.readdirSync(isolated).filter(name => /^\.bun-[\w-]+\.node$/u.test(name) || name === 'jest')) {
-      fs.rmSync(path.join(isolated, entry), { recursive: true, force: true });
-    }
-  });
-  // The scaffold writes its own port block into supabase/config.toml (one block per project name), so the stack runs beside any other.
-  // A port of that block already taken is a failure naming the port and its holder, never a skip - except the leftover stack
-  // of this very project (an earlier run killed before its teardown), which is reclaimed first: only containers of the project
-  // `litedemo` whose working directory is gone or whose owner process is dead; a stack held by anything else stays and fails.
-  const ports = Object.values(supabasePortVars(APP_NAME)).map(Number);
-  const busy = await Promise.all(ports.map(portBusy));
-  if (busy.some(Boolean)) reclaimStaleStack(APP_NAME);
-  for (const port of ports) {
-    assert.equal(await portBusy(port), false, `HFS_E2E_PORT_BUSY: the local Supabase port ${port} of the ${APP_NAME} stack is held by ${holderOf(port)}; stop that holder or free the port`);
-  }
-  let stopDatabase = () => {};
-  // Teardown on every path (pass, failure, timeout): the scaffold's own stop, then whatever of this app's stack is still there -
-  // the stack the scaffold-time type generation or a half-failed db:start left behind included.
-  const into = mkdtemp(t, 'hfs-scaffold-lite-e2e-', () => {
-    try { stopDatabase(); } finally { removeProjectStack(APP_NAME, { select: (container) => path.resolve(container.workdir).toLowerCase().startsWith(path.resolve(into).toLowerCase()) }); }
-  });
-  const app = path.join(into, APP_NAME);
-  fs.writeFileSync(path.join(into, OWNER_FILE), String(process.pid));
-  const registry = await startSourceCanonRegistry();
-  t.after(() => registry.close());
-
-  const scaffolded = scaffoldApp({ name: APP_NAME, into, edition: 'lite', presets: PRESETS, lock: registry.lock });
-  assert.equal(scaffolded.root, app, 'the lite scaffold wrote the app');
-  assert.deepEqual(fs.readdirSync(path.join(app, '.starciwork')).sort(), ['.gitignore', 'workspace.yaml'], 'a lite starter carries its workspace declaration without a brand tree');
-
-  // Owner ruling 2026-10-12: lite keeps the back end's unit specs and runs no e2e, contract or browser world; the front end has
-  // no tests in either edition. Check before npm ci, so dependencies' own test files are not mistaken for app files.
+function assertScaffoldTestLanes(app) {
+  // Owner ruling 2026-10-14: lite keeps back-end unit specs and permits integration/contract specs; e2e, stack and browser runs
+  // remain full-only. The front end has no tests in either edition. Check before npm ci, so dependencies' own test files
+  // are not mistaken for app files.
   const files = listFiles(app);
-  const testPath = /(?:^|\/)(?:__tests__|e2e|test-support)(?:\/|$)|(?:^|\/)[^/]*(?:\.spec\.|\.test\.|-spec\.)/i;
-  const outsideUnit = files.find(file => testPath.test(file) && !/^be\/(?:apps|src)\/.*\.spec\.ts$/.test(file));
-  assert.equal(outsideUnit, undefined, `lite emitted a test path outside the back-end unit specs: ${outsideUnit}`);
+  const forbiddenLane = /(?:^|\/)(?:__tests__|e2e|test-support|stack|browser)(?:\/|$)/i;
+  const testPath = /(?:^|\/)[^/]*(?:\.spec\.|\.test\.|-spec\.)/i;
+  const besideSourceUnitSpec = file => /^be\/(?:apps|src)\/.*\.spec\.ts$/.test(file) && !file.startsWith('be/src/tests/');
+  const outsideBackendLanes = files.find(file => forbiddenLane.test(file)
+    || (testPath.test(file) && !besideSourceUnitSpec(file)
+      && !/^be\/src\/tests\/(?:integration|contract)\//.test(file)));
+  assert.equal(outsideBackendLanes, undefined, `lite emitted a test path outside the back-end unit, integration and contract specs: ${outsideBackendLanes}`);
   assert.ok(files.some(file => /^be\/src\/.*\.spec\.ts$/.test(file)), 'lite emits the back-end unit specs');
   for (const file of files.filter(file => path.posix.basename(file) === 'package.json')) {
     const manifest = JSON.parse(fs.readFileSync(path.join(app, ...file.split('/')), 'utf8'));
@@ -111,6 +82,46 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
       assert.equal(dependencies[tool], undefined, `${file} has the test tool ${tool}`);
     }
   }
+}
+
+test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, type drift and full-upgrade view', { skip: skipReason, timeout: 1_800_000 }, async (t) => {
+  // The installed SQL parser extracts one Bun-built native binding at the isolated temp root, and the app's `npm test` leaves jest's
+  // default cache (`<temp>/jest`) there. Both are process infrastructure, not app fixtures, but this spec owns the installed commands
+  // that create them and therefore removes them before the leak guard.
+  t.after(() => {
+    const isolated = process.env.STARCI_TEST_TEMP_DIR;
+    if (!isolated || !fs.existsSync(isolated)) return;
+    for (const entry of fs.readdirSync(isolated).filter(name => /^\.bun-[\w-]+\.node$/u.test(name) || name === 'jest')) {
+      fs.rmSync(path.join(isolated, entry), { recursive: true, force: true });
+    }
+  });
+  // The scaffold writes its own port block into supabase/config.toml (one block per project name), so the stack runs beside any other.
+  // A port of that block already taken is a failure naming the port and its holder, never a skip - except the leftover stack
+  // of this very project (an earlier run killed before its teardown), which is reclaimed first: only containers of the project
+  // `litedemo` whose working directory is gone or whose owner process is dead; a stack held by anything else stays and fails.
+  const ports = Object.values(supabasePortVars(APP_NAME)).map(Number);
+  const busy = await Promise.all(ports.map(portBusy));
+  if (busy.some(Boolean)) reclaimStaleStack(APP_NAME);
+  const currentPortsBusy = await Promise.all(ports.map(portBusy));
+  for (const [index, port] of ports.entries()) {
+    assert.equal(currentPortsBusy[index], false, `HFS_E2E_PORT_BUSY: the local Supabase port ${port} of the ${APP_NAME} stack is held by ${holderOf(port)}; stop that holder or free the port`);
+  }
+  let stopDatabase = () => {};
+  // Teardown on every path (pass, failure, timeout): the scaffold's own stop, then whatever of this app's stack is still there -
+  // the stack the scaffold-time type generation or a half-failed db:start left behind included.
+  const into = mkdtemp(t, 'hfs-scaffold-lite-e2e-', () => {
+    try { stopDatabase(); } finally { removeProjectStack(APP_NAME, { select: (container) => path.resolve(container.workdir).toLowerCase().startsWith(path.resolve(into).toLowerCase()) }); }
+  });
+  const app = path.join(into, APP_NAME);
+  fs.writeFileSync(path.join(into, OWNER_FILE), String(process.pid));
+  const registry = await startSourceCanonRegistry();
+  t.after(() => registry.close());
+
+  const scaffolded = scaffoldApp({ name: APP_NAME, into, edition: 'lite', presets: PRESETS, lock: registry.lock });
+  assert.equal(scaffolded.root, app, 'the lite scaffold wrote the app');
+  assert.deepEqual(fs.readdirSync(path.join(app, '.starciwork')).sort(), ['.gitignore', 'brand', 'workspace.yaml'], 'a lite starter carries its workspace declaration and starter brand record');
+
+  assertScaffoldTestLanes(app);
   const typesFile = path.join(app, 'supabase', 'types', 'database.types.ts');
   assert.ok(fs.existsSync(typesFile), 'scaffold-time Supabase type generation wrote database.types.ts');
   assert.match(fs.readFileSync(typesFile, 'utf8'), /\bprofiles\b/, 'the generated types include the baseline profiles table');
@@ -226,15 +237,16 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
     'HFS_MONO_NEST_PROJECTS',
     'BE_TEST_TOPOLOGY',
   ]);
-  const unexpectedCodes = [...new Set(report.findings.map(finding => finding.code).filter(code => !upgradeGapCodes.has(code)))].sort();
+  const unexpectedCodes = [...new Set(report.findings.map(finding => finding.code).filter(code => !upgradeGapCodes.has(code)))].sort((a, b) => a.localeCompare(b));
   assert.deepEqual(unexpectedCodes, [], `full-edition view reported non-upgrade findings: ${unexpectedCodes.join(', ')}`);
   const productFinding = report.findings.find((finding) =>
     !upgradeGapCodes.has(finding.code)
-    && /^(?:supabase\/|fe\/|be\/src\/)/.test(String(finding.path ?? '').replaceAll('\\', '/')),
+    && /^(?:supabase\/|fe\/|be\/src\/)/.test(String(finding.path ?? '').replaceAll(path.win32.sep, '/')),
   );
+  const productFindingDescription = productFinding ? `${productFinding.code} ${productFinding.path}` : '';
   assert.equal(
     productFinding,
     undefined,
-    `full-edition view rejected existing product code: ${productFinding ? `${productFinding.code} ${productFinding.path}` : ''}`,
+    `full-edition view rejected existing product code: ${productFindingDescription}`,
   );
 });

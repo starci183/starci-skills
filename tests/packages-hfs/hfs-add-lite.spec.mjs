@@ -181,6 +181,8 @@ test("add table --fe writes one policy-complete migration, the GraphQL api featu
     "fe/apps/web/src/modules/api/graphql/mutations/types/create-order.ts",
     "fe/apps/web/src/hooks/swr/api/graphql/queries/useQueryOrderSwr.ts",
     "fe/apps/web/src/hooks/swr/api/graphql/mutations/useMutateCreateOrderSwr.ts",
+    "be/apps/api/src/compose/domain.ts",
+    "be/apps/api/src/compose/api.ts",
   ]);
   // Owner ruling 2026-10-13: the front end reaches data through the back end's GraphQL only.
   assert.equal(result.created.some((file) => file.includes("/modules/db/")), false, "no Supabase reader or Server Action");
@@ -217,24 +219,38 @@ test("add table --fe writes one policy-complete migration, the GraphQL api featu
     read(root, "be/src/modules/domain/orders/persistence/orders.sql.ts"),
     /sql`SELECT id FROM public\.orders WHERE id = \$1 AND owner_id = \$2 LIMIT 1`/,
   );
-  assert.match(read(root, "be/apps/api/src/app.module.ts"), /OrdersModule\.register\(\{ isGlobal: true \}\)/);
-  assert.match(read(root, "be/apps/api/src/app.module.ts"), /ORDERS_ERROR_KINDS/);
+  const domainGroup = read(root, "be/apps/api/src/compose/domain.ts");
+  assert.match(domainGroup, /import \{ OrdersModule \} from "@modules\/domain\/orders"/);
+  assert.match(domainGroup, /OrdersModule\.register\(\{ isGlobal: true \}\)/);
   assert.match(read(root, "be/src/modules/domain/orders/index.ts"), /export \{ OrdersService \}/);
   const app = read(root, "be/apps/api/src/app.module.ts");
-  assert.match(app, /import \{ GraphqlModule \} from "@modules\/platform\/graphql"/);
-  assert.match(app, /GraphqlModule\.register\(\{ isGlobal: true \}\)/);
-  assert.match(app, /import \{ OrdersGraphqlModule \} from "@features\/api\/orders"/);
+  const apiGroup = read(root, "be/apps/api/src/compose/api.ts");
+  assert.match(apiGroup, /import \{ GraphqlModule \} from "@modules\/platform\/graphql"/);
+  assert.match(apiGroup, /GraphqlModule\.register\(\{ isGlobal: true \}\)/);
+  assert.match(apiGroup, /import \{ OrdersGraphqlModule \} from "@features\/api\/orders"/);
+  assert.match(app, /ORDERS_ERROR_KINDS/);
+  assert.match(app, /import \{ domainModules \} from "\.\/compose\/domain"/);
+  assert.match(app, /\.\.\.domainModules\(verifyAccessToken\)/);
+  assert.match(app, /import \{ apiModules \} from "\.\/compose\/api"/);
+  assert.match(app, /\.\.\.apiModules\(\)/);
+  assert.doesNotMatch(app, /OrdersModule|OrdersGraphqlModule|GraphqlModule/);
   assert.match(read(root, "be/src/modules/platform/errors/index.ts"), /export \{ ERRORS_SERVICE \}/);
   assert.match(read(root, "be/src/modules/platform/i18n/index.ts"), /REQUEST_LOCALE/);
   assert.match(read(root, "be/src/modules/platform/database/index.ts"), /export \{ requireOwnedRow, sql \}/);
-  assert.match(read(root, "be/src/modules/platform/database/index.ts"), /export \{ InjectPrimaryEntityManager \}/);
+  assert.match(read(root, "be/src/modules/platform/database/index.ts"), /export \{ InjectPrimaryEntityManager, PRIMARY_ENTITY_MANAGER \}/);
   for (const file of result.created.filter((entry) => entry.endsWith(".ts"))) {
     assert.equal(parses(read(root, file)), true, `${file} parses`);
   }
   // A second GraphQL table reuses the server capability and its wiring.
   const second = addTable({ root, name: "invoices", fe: true, now: () => Date.UTC(2026, 9, 2, 12, 34, 58), emitTypes: false });
   assert.equal(second.created.some((file) => file.startsWith("be/src/modules/platform/graphql/")), false);
-  assert.equal(read(root, "be/apps/api/src/app.module.ts").match(/GraphqlModule\.register/g).length, 1);
+  const secondApiGroup = read(root, "be/apps/api/src/compose/api.ts");
+  assert.equal(secondApiGroup.match(/GraphqlModule\.register/g).length, 1);
+  assert.match(secondApiGroup, /OrdersGraphqlModule,/);
+  assert.match(secondApiGroup, /InvoicesGraphqlModule,/);
+  const secondApp = read(root, "be/apps/api/src/app.module.ts");
+  assert.equal(secondApp.match(/\.\.\.apiModules\(\)/g).length, 1);
+  assert.doesNotMatch(secondApp, /OrdersGraphqlModule|InvoicesGraphqlModule|GraphqlModule/);
   assert.match(read(root, "fe/apps/web/src/hooks/swr/api/graphql/queries/index.ts"), /useQueryInvoiceSwr/);
   const findings = await checkDatabase({
     repoRoot: root,
@@ -471,15 +487,25 @@ test("lite add api emits full's GraphQL door, and api plus webhook transports ar
   for (const spec of ["be/src/features/webhooks/calendar/transport/http/calendar.webhook.spec.ts", "be/src/modules/domain/calendar-inbox/calendar-inbox.service.spec.ts"])
     assert.ok(webhook.created.includes(spec), `${spec} is generated (owner ruling 2026-10-12: lite keeps the unit specs)`);
   const app = read(root, "be/apps/api/src/app.module.ts");
-  assert.match(app, /import \{ BookingsGraphqlModule \} from "@features\/api\/bookings"/);
-  assert.match(app, /import \{ GraphqlModule \} from "@modules\/platform\/graphql"/);
-  assert.match(app, /import \{ CalendarHttpModule \} from "@features\/webhooks\/calendar"/);
-  assert.match(app, /imports: \[\s+CalendarInboxModule\.register\(\{ isGlobal: true \}\),\s+CalendarHttpModule,\s+BookingsGraphqlModule,\s+GraphqlModule\.register\(\{ isGlobal: true \}\),/);
+  const apiGroup = read(root, "be/apps/api/src/compose/api.ts");
+  const webhookGroup = read(root, "be/apps/api/src/compose/webhooks.ts");
+  assert.match(apiGroup, /import \{ BookingsGraphqlModule \} from "@features\/api\/bookings"/);
+  assert.match(apiGroup, /import \{ GraphqlModule \} from "@modules\/platform\/graphql"/);
+  assert.match(apiGroup, /GraphqlModule\.register\(\{ isGlobal: true \}\)/);
+  assert.match(apiGroup, /\n    BookingsGraphqlModule,/);
+  assert.match(webhookGroup, /import \{ CalendarHttpModule \} from "@features\/webhooks\/calendar"/);
+  assert.match(webhookGroup, /CalendarInboxModule\.register\(\{ isGlobal: true \}\)/);
+  assert.match(webhookGroup, /\n    CalendarHttpModule,/);
+  assert.match(app, /import \{ apiModules \} from "\.\/compose\/api"/);
+  assert.match(app, /import \{ webhooksModules \} from "\.\/compose\/webhooks"/);
+  assert.match(app, /\.\.\.apiModules\(\)/);
+  assert.match(app, /\.\.\.webhooksModules\(\)/);
+  assert.doesNotMatch(app, /BookingsGraphqlModule|CalendarHttpModule|CalendarInboxModule|GraphqlModule/);
   assert.match(
     read(root, "be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts"),
     /@Headers\("x-calendar-delivery-id"\) deliveryId/,
   );
-  assert.match(read(root, "be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts"), /recordCalendarDelivery\(deliveryId, delivery\)/);
+  assert.match(read(root, "be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts"), /recordCalendarDelivery\(\{ eventId: deliveryId, delivery \}\)/);
   assert.doesNotMatch(read(root, "be/src/modules/domain/calendar-inbox/calendar-inbox.service.ts"), /CalendarsService|process:|complete:|CommandBus|QueryBus/);
   assert.doesNotMatch(read(root, "be/src/modules/domain/calendars/calendars.service.ts"), /entityManager: EntityManager = this\.entityManager/);
   const main = read(root, "be/apps/api/src/main.ts");

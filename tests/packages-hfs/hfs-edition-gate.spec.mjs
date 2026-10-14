@@ -8,6 +8,7 @@ import { addKind } from '../../packages/hfs/scaffold/add.mjs';
 import { EditionRefusal, LiteAdapterRefusal, refuseInEdition } from '../../packages/hfs/scaffold/edition-gate.mjs';
 import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
 import { cleanup, installTypeScript } from '../helpers/hfs-cli-fixture.mjs';
+import { byCodeUnit } from '../../packages/hfs/report/order.mjs';
 
 // The edition gate of `starci app add` and `starci app new` (design 8.6 R8): in a lite app a noun whose file tree lands in a slot the
 // lite edition does not have (the slot's `editions` exclude it, or its `litePresence` is forbidden) refuses with exit 2
@@ -38,7 +39,7 @@ const cli = async (argv) => {
 const exists = (dir, relative) => fs.existsSync(path.join(dir, ...relative.split('/')));
 const tree = (dir) => {
   const walk = (at) => fs.readdirSync(path.join(dir, ...at.split('/')), { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? walk(`${at}/${entry.name}`) : [`${at}/${entry.name}`]));
-  return walk('.').map((p) => p.slice(2)).sort();
+  return walk('.').map((p) => p.slice(2)).sort(byCodeUnit);
 };
 
 test('the gate reads the slot resolver of the app: a slot the edition lacks or forbids refuses the verb, never the noun name', () => {
@@ -49,14 +50,13 @@ test('the gate reads the slot resolver of the app: a slot the edition lacks or f
     () => refuseInEdition({ resolver, slotIds, command }),
     (error) => error instanceof EditionRefusal && error.message === `${command}: full edition only; run starci app upgrade --edition full`,
     `${command} over ${slotIds}`);
-  // a slot lite forbids (litePresence: the e2e and contract world, the GraphQL subscription door) and an id the manifest never had refuse
+  // a slot lite forbids (litePresence: the e2e world, the GraphQL subscription door) and an id the manifest never had refuse
   refuses(lite, ['be.tests.e2e'], 'add x');
-  refuses(lite, ['be.tests.contract'], 'add x');
   refuses(lite, ['be.feature', 'be.feature.realtime.graphql'], 'add realtime'); // one forbidden slot among legal ones is enough
   refuses(lite, ['be.no.such.slot'], 'add x');
   // a slot that exists under lite - whatever its presence - does not refuse: the patterns and the unit world are lite's too
   for (const slotIds of [['be.feature', 'be.feature.application', 'be.transport.graphql'], ['be.feature.webhooks.http'], ['be.cli'], ['be.app.cli'], ['be.contract.graphql'],
-    ['be.feature.saga'], ['be.tests.world'], ['be.platform.queue', 'be.queues', 'be.feature.jobs'], ['be.feature.realtime.websocket']]) {
+    ['be.feature.saga'], ['be.tests.world'], ['be.tests.contract'], ['be.platform.queue', 'be.queues', 'be.feature.jobs'], ['be.feature.realtime.websocket']]) {
     assert.equal(refuseInEdition({ resolver: lite, slotIds, command: 'add x' }), undefined, slotIds.join(', '));
   }
   // under full the gate never fires over the slots lite forbids, and an id the view does not answer refuses exactly as under lite
@@ -73,14 +73,14 @@ test('a lite app refuses every pattern noun whose topic carries a liteAdapter: t
     ['saga', 'fulfil', '--owner', 'shop', '--from', 'billing', '--failed', 'invoice-rejected', '--done', 'invoice-issued', '--service', 'FulfilService=@modules/domain/fulfil'],
     ['realtime', 'order-status', '--service', 'orderStatusTopic=@modules/domain/order'],
   ];
-  for (const [noun, name, ...opts] of cases) {
+  await Promise.all(cases.map(async ([noun, name, ...opts]) => {
     const dir = repo(LITE);
     const result = await cli(['add', noun, name, ...opts, '--cwd', dir]);
     assert.deepEqual([result.code, result.out], [2, ''], noun);
-    assert.match(result.err, new RegExp(`^add ${noun}: the package carries only the full adapter of [a-z, -]+; in a lite app write it on its Supabase adapter \\(knowledge/patterns/be/[a-z-]+\\.yaml liteAdapter, knowledge/patterns/be/supabase-queues\\.yaml\\)\\n$`), noun);
+    assert.match(result.err, new RegExp(String.raw`^add ${noun}: the package carries only the full adapter of [a-z, -]+; in a lite app write it on its Supabase adapter \(knowledge/patterns/be/[a-z-]+\.yaml liteAdapter, knowledge/patterns/be/supabase-queues\.yaml\)\n$`), noun);
     assert.deepEqual(tree(dir), ['hfs.json'], `${noun}: nothing written, no partial state`);
     assert.throws(() => addKind({ repoRoot: dir, noun, name }), LiteAdapterRefusal, `${noun}: the exported function refuses, not only the CLI`);
-  }
+  }));
   // the refusal precedes the noun's option validation: a saga without its --owner answers the same
   const dir = repo(LITE);
   assert.match((await cli(['add', 'saga', 'fulfil', '--cwd', dir])).err, /^add saga: the package carries only the full adapter of /);

@@ -8,6 +8,7 @@ import { aliasTarget, aliasesOf, apiApps, appModulePath, snapshotPath, snapshotT
 import { createGraphReader } from '../../packages/hfs/emit/static-graph.mjs';
 import { openApiText, readOperations } from '../../packages/hfs/emit/operations.mjs';
 import { contractEmitFindings, CONTRACT_SNAPSHOT_DRIFT } from '../../scripts/hfs/rules/contract.mjs';
+import { byCodeUnit } from '../../packages/hfs/report/order.mjs';
 
 // `starci app emit`: the pure parts (packages/hfs/emit/contracts.mjs), the static module-graph reader that decides what an app
 // serves (static-graph.mjs, run here over virtual files) and the full-pass check that the committed snapshots are current
@@ -45,13 +46,18 @@ test('the snapshot text is the printed schema with exactly one final newline', (
 
 const COMMON = "import { Module, forwardRef } from '@nestjs/common';";
 const GQL = "import { GraphQLModule, Resolver, Query, Scalar } from '@nestjs/graphql';";
+const virtualBase = (from, specifier) => {
+  if (specifier.startsWith('@app/')) return `src/${specifier.slice(5)}`;
+  if (specifier.startsWith('.')) return path.posix.join(path.posix.dirname(from), specifier);
+  return null;
+};
 /** A virtual repository: `files` maps 'src/x.ts' to text; `@app/*` aliases `src/*`; anything else without a dot is external. */
 const composeOf = (files, appFile = 'src/app.module.ts') => {
   const table = new Map(Object.entries(files));
   const host = {
     read: (file) => table.get(file) ?? null,
     resolve(from, specifier) {
-      const base = specifier.startsWith('@app/') ? `src/${specifier.slice(5)}` : specifier.startsWith('.') ? path.posix.join(path.posix.dirname(from), specifier) : null;
+      const base = virtualBase(from, specifier);
       if (base === null) return null;
       const found = [base, `${base}.ts`, `${base}/index.ts`].find((candidate) => table.has(candidate));
       if (!found) throw new Error(`cannot resolve ${specifier} from ${from}`);
@@ -107,7 +113,7 @@ test('static graph: static registration methods that use their options, spreads,
     'src/l1.resolver.ts': resolverClass('L1Resolver'),
     'src/optional.ts': `${COMMON}\n@Module({})\nexport class OptionalFeature {}\n`,
   });
-  assert.deepEqual(names(composition.resolvers).sort(), ['AResolver', 'L1Resolver', 'LateResolver']);
+  assert.deepEqual(names(composition.resolvers).sort(byCodeUnit), ['AResolver', 'L1Resolver', 'LateResolver']);
 });
 
 test('static graph: a dynamic module built on super.register (the configurable-module pattern) and forRootAsync options are followed', () => {
@@ -166,8 +172,8 @@ test('static graph: GraphQLModule include limits the served providers to the lis
     'src/below.resolver.ts': resolverClass('BelowResolver'),
     'src/unlisted.resolver.ts': resolverClass('UnlistedResolver'),
   });
-  assert.deepEqual(names(composeOf(files('include: [Listed]')).resolvers).sort(), ['BelowResolver', 'ListedResolver']);
-  assert.deepEqual(names(composeOf(files('')).resolvers).sort(), ['BelowResolver', 'ListedResolver', 'UnlistedResolver']);
+  assert.deepEqual(names(composeOf(files('include: [Listed]')).resolvers).sort(byCodeUnit), ['BelowResolver', 'ListedResolver']);
+  assert.deepEqual(names(composeOf(files('')).resolvers).sort(byCodeUnit), ['BelowResolver', 'ListedResolver', 'UnlistedResolver']);
 });
 
 // The features one app switches on decide which resolvers a module registers (`if (features.x) providers.push(...)`).
@@ -202,15 +208,15 @@ const featureApp = (bindings, argument) => ({
 
 test('static graph: features passed as literals include or exclude the resolvers they switch (a literal, a const-bound literal, a spread of a const)', () => {
   const on = composeOf(featureApp('', '{ features: { twoFactor: true, reset: true } }'));
-  assert.deepEqual(names(on.resolvers).sort(), ['Base', 'Reset', 'TwoFactor']);
+  assert.deepEqual(names(on.resolvers).sort(byCodeUnit), ['Base', 'Reset', 'TwoFactor']);
   const off = composeOf(featureApp('', '{ features: { twoFactor: false, reset: false } }'));
   assert.deepEqual(names(off.resolvers), ['Base']);
   const mixed = composeOf(featureApp('const features = { twoFactor: true, reset: false };', '{ features }'));
-  assert.deepEqual(names(mixed.resolvers).sort(), ['Base', 'TwoFactor']);
+  assert.deepEqual(names(mixed.resolvers).sort(byCodeUnit), ['Base', 'TwoFactor']);
   const spread = composeOf(featureApp('const ENABLED = { twoFactor: false, reset: true };', '{ features: { ...ENABLED } }'));
-  assert.deepEqual(names(spread.resolvers).sort(), ['Base', 'Reset']);
+  assert.deepEqual(names(spread.resolvers).sort(byCodeUnit), ['Base', 'Reset']);
   const typed = composeOf(featureApp('interface Features { twoFactor: boolean; reset: boolean }\nconst features: Features = { twoFactor: true, reset: true };', '{ features }'));
-  assert.deepEqual(names(typed.resolvers).sort(), ['Base', 'Reset', 'TwoFactor']);
+  assert.deepEqual(names(typed.resolvers).sort(byCodeUnit), ['Base', 'Reset', 'TwoFactor']);
 });
 
 test('static graph: a condition literals do not decide is an error naming the file, line and condition, never a dropped or doubled resolver', () => {
@@ -345,7 +351,7 @@ test('HFS_CONTRACT_SNAPSHOT_DRIFT: an emit that cannot run is a finding with its
   });
 });
 
-test('HFS_CONTRACT_SNAPSHOT_DRIFT: a snapshot left behind by an app that serves no GraphQL is refused; an uncommitted one is the static rule\'s finding', () => {
+test('HFS_CONTRACT_SNAPSHOT_DRIFT: a snapshot left behind by an app that serves no GraphQL and an emitted uncommitted snapshot are refused', () => {
   withRepo(GQL_OLD, (dir) => {
     const stale = contractEmitFindings({ repoRoot: dir, files: [SNAPSHOT], repo: BE_REPO, emit: emitting(null) });
     assert.match(stale.findings[0].message, /serves no GraphQL any more/);
@@ -354,7 +360,11 @@ test('HFS_CONTRACT_SNAPSHOT_DRIFT: a snapshot left behind by an app that serves 
     const none = contractEmitFindings({ repoRoot: dir, files: [], repo: BE_REPO, emit: emitting(null) });
     assert.deepEqual(none.findings, []);
     const uncommitted = contractEmitFindings({ repoRoot: dir, files: [], repo: BE_REPO, emit: emitting(GQL_OLD) });
-    assert.deepEqual(uncommitted.findings, []);
+    assert.equal(uncommitted.findings.length, 1);
+    assert.equal(uncommitted.findings[0].code, CONTRACT_SNAPSHOT_DRIFT);
+    assert.equal(uncommitted.findings[0].path, SNAPSHOT);
+    assert.equal(uncommitted.findings[0].drift, 'not-committed');
+    assert.match(uncommitted.findings[0].message, /not committed or readable/);
     assert.deepEqual(uncommitted.apps, [{ app: 'core', artifact: 'schema.graphql', status: 'not-committed' }]);
   });
 });
@@ -420,8 +430,12 @@ test('operations: the printed text is deterministic (declaration order does not 
   const textA = openApiText({ app: 'core', ...a });
   assert.equal(textA, openApiText({ app: 'core', ...b }));
   assert.ok(textA.endsWith('}\n') && !textA.endsWith('\n\n'));
-  const keys = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? [Object.keys(value), ...Object.values(value).flatMap(keys)] : Array.isArray(value) ? value.flatMap(keys) : []);
-  for (const list of keys(JSON.parse(textA))) assert.deepEqual(list, [...list].sort());
+  const keys = (value) => {
+    if (Array.isArray(value)) return value.flatMap(keys);
+    if (value && typeof value === 'object') return [Object.keys(value), ...Object.values(value).flatMap(keys)];
+    return [];
+  };
+  for (const list of keys(JSON.parse(textA))) assert.deepEqual(list, [...list].sort(byCodeUnit));
 });
 
 test('operations: what the checker cannot express is an error naming the operation, never {}', () => {

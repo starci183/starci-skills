@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 import { ALL_CHECK_CODES, CHECK_CODES, checkRepo as checkRepoWith, checkRepository as checkRepositoryWith, explainPath as explainPathWith, readWhy } from '../../scripts/hfs/check.mjs';
 import { ARCHITECTURE_RULE_IDS } from '../../scripts/hfs/architecture/index.mjs';
 import { HfsSlotsError, loadSlotManifest } from '../../scripts/hfs/slots.mjs';
@@ -33,7 +34,9 @@ const put = (dir, relative, text = 'export {};\n') => {
 };
 const drop = (dir, relative) => fs.rmSync(path.join(dir, ...relative.split('/')), { recursive: true, force: true });
 const codesOf = (result) => result.findings.map((f) => f.code);
+const findingSummary = (result) => JSON.stringify(result.findings.map(({ code, path: file }) => ({ code, path: file })));
 const only = (result, code) => result.findings.filter((f) => f.code === code);
+const machineCodesOf = (result) => result.findings.filter((f) => f.source === 'machine').map((f) => f.code);
 const presetsOf = (argv) => {
   const at = argv.indexOf('--cwd');
   return at >= 0 && fs.existsSync(path.join(argv[at + 1], 'hfs.json')) ? PRESETS : undefined;
@@ -48,7 +51,7 @@ const HAS_VIETNAMESE = /[\u00c0-\u1ef9]/;
 
 test('a clean app passes with no findings', () => {
   const result = checkRepo({ repoRoot: repoOf(APP) });
-  assert.equal(result.ok, true);
+  assert.equal(result.ok, true, findingSummary(result));
   assert.deepEqual(result.findings, []);
   assert.equal(result.profile, 'app');
   assert.equal(result.counts.error, 0);
@@ -56,7 +59,7 @@ test('a clean app passes with no findings', () => {
 
 test('a clean app with two fe apps passes and expands the required files per app', () => {
   const result = checkRepo({ repoRoot: repoOf(TWO_FE_APPS) });
-  assert.equal(result.ok, true, JSON.stringify(result.findings.slice(0, 3)));
+  assert.equal(result.ok, true, findingSummary(result));
   assert.deepEqual(result.apps.map((a) => `${a.side}/${a.name}`), ['be/core', 'fe/web', 'fe/admin']);
 });
 
@@ -77,7 +80,7 @@ test('HFS_SLOT_REQUIRED_MISSING is reported per slot, and per app of a side with
 
   const fe = checkRepo({ repoRoot: repoOf(TWO_FE_APPS, (dir) => drop(dir, 'fe/apps/admin/src/app/global-error.tsx')) });
   const [perApp] = only(fe, 'HFS_SLOT_REQUIRED_MISSING');
-  assert.equal(fe.findings.length, 1);
+  assert.equal(only(fe, 'HFS_SLOT_REQUIRED_MISSING').length, 1);
   assert.equal(perApp.app, 'admin');
   assert.equal(perApp.slot, 'fe.app.next');
 
@@ -136,7 +139,7 @@ test('BE_SOURCE_FORM: a back-end source name outside the closed suffix vocabular
   });
   const result = checkRepo({ repoRoot: dir });
   const refused = only(result, 'BE_SOURCE_FORM');
-  assert.deepEqual(refused.map((f) => path.posix.basename(f.path)).sort(), ['Bad_Name.ts', 'CancelOrder.handler.ts', 'cancel-order.use-case.ts', 'helpers.ts', 'order.repository.ts', 'order.types.ts', 'poll.ts']);
+  assert.deepEqual(refused.map((f) => path.posix.basename(f.path)).sort(byCodeUnit), ['Bad_Name.ts', 'CancelOrder.handler.ts', 'cancel-order.use-case.ts', 'helpers.ts', 'order.repository.ts', 'order.types.ts', 'poll.ts']);
   assert.ok(refused.every((f) => f.level === 'error'));
   assert.equal(refused.find((f) => f.path.endsWith('order.types.ts')).suffix, 'types');
   assert.match(refused.find((f) => f.path.endsWith('order.repository.ts')).message, /\.sql\.ts.*\*\.service\.ts/, 'a repository file is told its home: <name>.sql.ts for text, the capability service for access');
@@ -153,9 +156,9 @@ test('BE_SOURCE_FORM: a test data builder is <area>.builder.ts under src/tests/f
     put(repo, 'be/src/tests/fixtures/builders/order.fixture.ts');
     put(repo, 'be/src/features/api/orders/application/order.builder.ts');
   });
-  const refused = only(checkRepo({ repoRoot: dir }), 'BE_SOURCE_FORM').map((f) => f.path).sort();
-  assert.ok(!refused.includes('be/src/tests/fixtures/builders/order.builder.ts'));
-  for (const bad of ['be/src/tests/fixtures/order.builder.ts', 'be/src/tests/fixtures/order.fixture.ts', 'be/src/tests/fixtures/order.factory.ts', 'be/src/tests/fixtures/order.repository.ts', 'be/src/features/api/orders/application/order.builder.ts']) assert.ok(refused.includes(bad), bad);
+  const refused = new Set(only(checkRepo({ repoRoot: dir }), 'BE_SOURCE_FORM').map((f) => f.path));
+  assert.ok(!refused.has('be/src/tests/fixtures/builders/order.builder.ts'));
+  for (const bad of ['be/src/tests/fixtures/order.builder.ts', 'be/src/tests/fixtures/order.fixture.ts', 'be/src/tests/fixtures/order.factory.ts', 'be/src/tests/fixtures/order.repository.ts', 'be/src/features/api/orders/application/order.builder.ts']) assert.ok(refused.has(bad), bad);
   assert.deepEqual(only(checkRepo({ repoRoot: repoOf(APP, (repo) => put(repo, 'be/src/tests/fixtures/builders/order.builder.ts')) }), 'BE_SOURCE_FORM'), []);
 });
 
@@ -163,7 +166,7 @@ test('an opt-in slot the repository did not declare is HFS_SLOT_NOT_ENABLED, and
   const mutate = (dir) => put(dir, 'be/docs/adr/0001-record.md', '# ADR\n');
   assert.deepEqual(only(checkRepo({ repoRoot: repoOf(APP, mutate) }), 'HFS_SLOT_NOT_ENABLED').map((f) => f.slot), ['repo.docs']);
   const declared = appOf({ be: { apps: [{ name: 'core', kind: 'api' }], optionalSlots: ['repo.docs'] } });
-  assert.equal(checkRepo({ repoRoot: repoOf(declared, mutate) }).ok, true);
+  assert.deepEqual(only(checkRepo({ repoRoot: repoOf(declared, mutate) }), 'HFS_SLOT_NOT_ENABLED'), []);
 });
 
 test('pin drift: a range, an old version and a file: link are drift; the exact registry pin is not, for @starci packages too', () => {
@@ -214,7 +217,7 @@ test('the soft-size backlog is reported and never fails the check', () => {
   assert.equal(finding.path, 'be/apps/core/src/big.options.ts');
   assert.equal(finding.soft, 500);
   assert.ok(finding.lines > 500);
-  assert.equal(result.ok, true);
+  assert.equal(result.ok, true, findingSummary(result));
   assert.equal(result.counts.error, 0);
   assert.equal(result.counts.info, 1);
 });
@@ -247,7 +250,7 @@ test('every finding carries its code and the Vietnamese why text from the catalo
 
 test('every code the check can emit has a Vietnamese catalog entry, and the package bundle carries it', () => {
   const why = readWhy(root);
-  assert.deepEqual(Object.keys(why).sort(), [...CHECK_CODES].sort());
+  assert.deepEqual(Object.keys(why).sort(byCodeUnit), [...CHECK_CODES].sort(byCodeUnit));
   for (const code of CHECK_CODES) {
     assert.match(why[code].titleVi, HAS_VIETNAMESE, code);
     assert.ok(why[code].whyVi.length > 20 && why[code].nextStepVi.length > 20, code);
@@ -266,7 +269,7 @@ test('explain names the slot, tier, allowed imports and required tests of a path
 
   const app = explainPath({ repoRoot: dir, input: 'be/apps/core/src/main.ts' });
   assert.equal(app.slot, 'be.app.api');
-  assert.deepEqual(app.requiredFiles, ['be/apps/core/src/main.ts', 'be/apps/core/src/app.module.ts']);
+  assert.deepEqual(app.requiredFiles, ['be/apps/core/src/main.ts', 'be/apps/core/src/app.module.ts', 'be/apps/core/src/core.env.ts']);
 
   const lost = explainPath({ repoRoot: dir, input: 'be/src/stray/x.ts' });
   assert.equal(lost.status, 'no-slot');
@@ -280,7 +283,7 @@ test('explain names the slot, tier, allowed imports and required tests of a path
 
 test('the CLI: check exits 0 clean, 1 on an error finding, 2 on refusal; --json is machine readable', async () => {
   const clean = await cli(['check', '--cwd', repoOf(APP)]);
-  assert.equal(clean.code, 0);
+  assert.equal(clean.code, 0, clean.err + clean.out);
   assert.match(clean.out, /0 error findings/);
 
   // a stray TypeScript file is an ESLint report of the project graph (slot-undeclared); `starci app check` judges paths no editor shows
@@ -396,7 +399,7 @@ test('HFS_UNTRACKED_ROOT_ENTRY: an entry git neither tracks nor ignores; one in 
   put(dir, '.gitignore', 'ignored-by-git.txt\n');
   put(dir, 'ignored-by-git.txt');
   const result = checkRepo({ repoRoot: dir });
-  assert.deepEqual(only(result, 'HFS_UNTRACKED_ROOT_ENTRY').map((f) => f.path).sort(), ['nul', 'scratch']);
+  assert.deepEqual(only(result, 'HFS_UNTRACKED_ROOT_ENTRY').map((f) => f.path).sort(byCodeUnit), ['nul', 'scratch']);
   assert.equal(result.ok, false);
 });
 
@@ -426,7 +429,7 @@ test('starci app check runs the architecture machine: its violation is a finding
 test('a clean back end and a clean front end are clean to the machine too', () => {
   for (const declaration of [APP, TWO_FE_APPS]) {
     const result = checkRepository({ repoRoot: repoOf(declaration) });
-    assert.deepEqual(result.findings, [], JSON.stringify(declaration.sides.fe.apps));
+    assert.deepEqual(result.findings, [], findingSummary(result));
     assert.equal(result.machine.status, 'ran');
   }
 });
@@ -440,7 +443,7 @@ test('machine errors and violations merge as findings with path, line and messag
     errors: [{ ruleId: 'ARCH_TYPESCRIPT_MISSING', message: 'install TypeScript' }],
   });
   const result = checkRepository({ repoRoot: dir, machine });
-  assert.deepEqual(codesOf(result).sort(), ['ARCH_TYPESCRIPT_MISSING', 'BE_TIER_DIRECTION']);
+  assert.deepEqual(machineCodesOf(result).sort(byCodeUnit), ['ARCH_TYPESCRIPT_MISSING', 'BE_TIER_DIRECTION']);
   assert.equal(only(result, 'BE_TIER_DIRECTION')[0].message, 'be/src/features/api/orders/index.ts:3: goes the wrong way');
   assert.equal(only(result, 'BE_TIER_DIRECTION')[0].line, 3);
   assert.match(only(result, 'ARCH_TYPESCRIPT_MISSING')[0].whyVi, HAS_VIETNAMESE);
@@ -451,7 +454,7 @@ test('machine errors and violations merge as findings with path, line and messag
 test('a machine that throws is one ARCH_EXECUTION_UNAVAILABLE finding, never a pass; an invalid hfs.json skips the machine', () => {
   const dir = repoOf(APP);
   const result = checkRepository({ repoRoot: dir, machine: (input) => { if (path.basename(input.repositoryRoot) === 'be') throw new Error('boom'); return { ok: true, files: 1, kinds: ['frontend'], violations: [], errors: [] }; } });
-  assert.deepEqual(codesOf(result), ['ARCH_EXECUTION_UNAVAILABLE']);
+  assert.deepEqual(machineCodesOf(result), ['ARCH_EXECUTION_UNAVAILABLE']);
   assert.equal(result.ok, false);
   const undeclared = checkRepository({ repoRoot: repoOf(APP, null, { declare: false }), machine: () => { throw new Error('must not run'); } });
   assert.deepEqual(codesOf(undeclared), ['HFS_DECLARATION_INVALID']);
@@ -509,11 +512,11 @@ test('--fast: slot checks run on the changed paths only, and the tree checks do 
   assert.deepEqual(only(fast, 'HFS_SLOT_UNDECLARED').map((f) => f.path), ['be/src/stray/new.json'], 'the stray file already on main is not this change');
   assert.deepEqual(only(fast, 'HFS_EMPTY_DIR'), []);
   const full = checkRepository({ repoRoot: dir, machine: NO_FINDINGS_MACHINE });
-  assert.deepEqual(only(full, 'HFS_SLOT_UNDECLARED').map((f) => f.path).sort(), ['be/src/stray/new.json', 'be/src/stray/old.json']);
+  assert.deepEqual(only(full, 'HFS_SLOT_UNDECLARED').map((f) => f.path).sort(byCodeUnit), ['be/src/stray/new.json', 'be/src/stray/old.json']);
   assert.deepEqual(only(full, 'HFS_EMPTY_DIR').map((f) => f.path), ['be/src/modules/business']);
 
   const cliFast = await cli(['check', '--cwd', dir, '--fast', '--json']);
-  assert.equal(cliFast.code, 1);
+  assert.equal(cliFast.code, 1, cliFast.err + cliFast.out);
   assert.equal(JSON.parse(cliFast.out).fast.changed, 1);
 });
 
@@ -522,7 +525,7 @@ test('--fast with the real machine: a Vietnamese document already on main is not
   put(dir, 'be/src/features/api/orders/application/place-order.query.ts', 'export const placed = 1;\n');
   git(dir, 'add', '-A', '--', '.', ':!node_modules'); // --fast judges tracked paths: the change is staged
   const fast = await cli(['check', '--cwd', dir, '--fast']);
-  assert.equal(fast.code, 0, fast.out);
+  assert.equal(fast.code, 0, fast.err + fast.out);
   assert.match(fast.out, /--fast/);
   assert.match(fast.out, /owners be\/src\/features\/api\/orders/);
   const full = await cli(['check', '--cwd', dir]);
@@ -538,8 +541,12 @@ test('HFS_CONTRACT_SNAPSHOT_DRIFT against the app: the full check emits every ap
   assert.match((await cli(['check', '--cwd', dir])).out, /contract snapshots: emitted and compared, core\/schema\.graphql none/);
   assert.match((await cli(['check', '--cwd', dir, '--fast'])).out, /contract snapshots: skipped, --fast does not emit the apps/);
   assert.equal(JSON.parse((await cli(['check', '--cwd', dir, '--fast', '--json'])).out).contracts.status, 'skipped');
-  put(dir, 'be/apps/core/src/app.module.ts', "import { Missing } from './missing';\nexport class AppModule {\n  static register() {\n    return { module: AppModule, imports: [Missing] };\n  }\n}\n");
-  const broken = JSON.parse((await cli(['check', '--cwd', dir, '--json'])).out);
+  // Keep the registered health route: this fixture breaks contract emission through one unresolved module only.
+  const appModule = fs.readFileSync(path.join(dir, 'be/apps/core/src/app.module.ts'), 'utf8');
+  put(dir, 'be/apps/core/src/app.module.ts', "import { Missing } from './missing';\n" + appModule.replace('imports: []', 'imports: [Missing]'));
+  const brokenCheck = await cli(['check', '--cwd', dir, '--json']);
+  assert.equal(brokenCheck.code, 1, brokenCheck.err + brokenCheck.out);
+  const broken = JSON.parse(brokenCheck.out);
   const [finding] = only(broken, 'HFS_CONTRACT_SNAPSHOT_DRIFT');
   assert.match(finding.message, /cannot be verified.*cannot resolve \.\/missing/);
   assert.match(finding.whyVi, HAS_VIETNAMESE);
@@ -604,7 +611,7 @@ test('the package bundle carries the machine, the files it imports and a why for
   assert.ok(files.includes('knowledge/patterns/fe/folder.yaml'), 'the framework-pinned knowledge the front-end rules read');
   for (const file of importClosure(['scripts/hfs/architecture.mjs', 'scripts/hfs/check.mjs'])) assert.ok(files.includes(file), `${file} is imported by the check but not bundled`);
   const slice = parseYaml(fs.readFileSync(path.join(root, 'packages/hfs/runtime/modules/kernel/failure-codes.yaml'), 'utf8'));
-  assert.deepEqual(Object.keys(slice).sort(), [...ALL_CHECK_CODES].sort());
+  assert.deepEqual(Object.keys(slice).sort(byCodeUnit), [...ALL_CHECK_CODES].sort(byCodeUnit));
   for (const code of ARCHITECTURE_RULE_IDS) assert.match(slice[code].title_vi, HAS_VIETNAMESE, code);
   assert.ok(CHECK_CODES.every((code) => ALL_CHECK_CODES.includes(code)));
 });

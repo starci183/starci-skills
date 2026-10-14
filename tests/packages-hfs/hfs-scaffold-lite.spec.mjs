@@ -19,21 +19,28 @@ const GENERATED_TYPES = 'export type Database = { public: { Tables: Record<strin
 const jestPreset = createRequire(import.meta.url)('../../packages/jest-preset/index.cjs');
 const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 
-// The lite starter's exact file-level output, with <ts> fixed by CREATED_AT. Its brand tree is optional. The web app carries the
+// The lite starter's exact file-level output, with <ts> fixed by CREATED_AT. It includes a starter brand record. The web app carries the
 // shared app core of both editions (owner ruling 2026-10-13): no modules/db, no Server Action and no auth callback route.
 const EXPECTED_LITE_FILES = Object.freeze([
   '.dockerignore', '.editorconfig', '.gitattributes', '.github/dependabot.yml', '.github/workflows/ci.yml', '.github/workflows/db-deploy.yml',
   '.github/workflows/images.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.nvmrc', '.prettierignore',
-  '.prettierrc', '.sops.yaml', '.starcistacks/dev/environment.json', '.starcistacks/dev/secrets/.gitkeep',
-  '.starciwork/.gitignore', '.starciwork/workspace.yaml',
+  '.prettierrc', '.sops.yaml', '.starcistacks/application-stacks.yaml', '.starcistacks/dev/README.md',
+  '.starcistacks/dev/environment.json', '.starcistacks/dev/infra/swarm/stack.yaml',
+  '.starcistacks/dev/runtime/config/Caddyfile', '.starcistacks/dev/runtime/env/KEYS.md', '.starcistacks/dev/secrets/.gitkeep',
+  '.starcistacks/production/README.md', '.starcistacks/production/environment.json', '.starcistacks/production/infra/swarm/stack.yaml',
+  '.starcistacks/production/runtime/config/Caddyfile', '.starcistacks/production/runtime/env/KEYS.md',
+  '.starciwork/.gitignore', '.starciwork/brand/index.yaml', '.starciwork/workspace.yaml',
   'README.md',
-  'be/apps/api/Dockerfile', 'be/apps/api/src/api.env.ts', 'be/apps/api/src/api.options.ts', 'be/apps/api/src/app.module.ts', 'be/apps/api/src/compose/platform.ts', 'be/apps/api/src/main.ts',
+  'be/apps/api/Dockerfile', 'be/apps/api/src/api.env.ts', 'be/apps/api/src/api.options.ts', 'be/apps/api/src/app.module.ts',
+  'be/apps/api/src/compose/api.ts', 'be/apps/api/src/compose/domain.ts', 'be/apps/api/src/compose/integrations.ts',
+  'be/apps/api/src/compose/platform.ts', 'be/apps/api/src/compose/system.ts', 'be/apps/api/src/compose/webhooks.ts', 'be/apps/api/src/main.ts',
   'be/eslint.config.mjs', 'be/jest.config.js', 'be/nest-cli.json',
   'be/src/features/api/system-health/application/check-liveness.contracts.ts',
   'be/src/features/api/system-health/application/check-liveness.handler.ts',
   'be/src/features/api/system-health/application/check-liveness.query.ts',
   'be/src/features/api/system-health/index.ts', 'be/src/features/api/system-health/system-health.module.ts',
   'be/src/features/api/system-health/transport/http/live.controller.ts',
+  'be/src/features/api/system-health/transport/http/ready.controller.ts',
   'be/src/features/api/system-health/transport/http/system-health-http.module.ts', 'be/src/modules/domain/identity/admission.policy.spec.ts',
   'be/src/modules/domain/identity/admission.policy.ts', 'be/src/modules/domain/identity/auth.guard.spec.ts', 'be/src/modules/domain/identity/auth.guard.ts',
   'be/src/modules/domain/identity/errors/identity.error.ts', 'be/src/modules/domain/identity/identity.contracts.ts',
@@ -72,6 +79,7 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'be/src/modules/platform/errors/errors.service.ts', 'be/src/modules/platform/errors/errors/errors.error.ts',
   'be/src/modules/platform/errors/http-status.policy.ts', 'be/src/modules/platform/errors/index.ts',
   'be/src/modules/platform/errors/messages/errors.messages.ts',
+  'be/src/modules/platform/http-security/edge-security.service.spec.ts', 'be/src/modules/platform/http-security/edge-security.service.ts',
   'be/src/modules/platform/http-security/errors/http-security.error.ts', 'be/src/modules/platform/http-security/execution-request.mapper.spec.ts',
   'be/src/modules/platform/http-security/execution-request.mapper.ts',
   'be/src/modules/platform/http-security/http-security.config.ts',
@@ -81,7 +89,9 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'be/src/modules/platform/http-security/http-security.options.ts',
   'be/src/modules/platform/http-security/index.ts',
   'be/src/modules/platform/http-security/messages/http-security.messages.ts', 'be/src/modules/platform/http-security/origin.guard.spec.ts',
-  'be/src/modules/platform/http-security/origin.guard.ts', 'be/src/modules/platform/http-security/rate-limit.guard.spec.ts', 'be/src/modules/platform/http-security/rate-limit.guard.ts', 'be/src/modules/platform/http-security/request-validation.service.spec.ts',
+  'be/src/modules/platform/http-security/origin.guard.ts', 'be/src/modules/platform/http-security/rate-limit.guard.spec.ts', 'be/src/modules/platform/http-security/rate-limit.guard.ts',
+  'be/src/modules/platform/http-security/readiness.decorators.ts', 'be/src/modules/platform/http-security/readiness.service.spec.ts', 'be/src/modules/platform/http-security/readiness.service.ts',
+  'be/src/modules/platform/http-security/request-validation.service.spec.ts',
   'be/src/modules/platform/http-security/request-validation.service.ts', 'be/src/modules/platform/http-security/webhook-signature.service.spec.ts',
   'be/src/modules/platform/http-security/webhook-signature.service.ts', 'be/src/modules/platform/i18n/bundle-message-catalog.service.spec.ts',
   'be/src/modules/platform/i18n/bundle-message-catalog.service.ts',
@@ -94,8 +104,9 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'be/src/modules/platform/logging/logging.module-definition.ts', 'be/src/modules/platform/logging/logging.module.ts',
   'be/src/modules/platform/logging/logging.options.ts', 'be/src/modules/platform/logging/logging.port.ts',
   'be/src/modules/platform/primitives/index.ts', 'be/src/modules/platform/primitives/outcome.contracts.ts', 'be/src/modules/platform/primitives/outcome.mapper.spec.ts',
-  'be/src/modules/platform/primitives/outcome.mapper.ts', 'be/src/tests/tsconfig.json', 'be/tsconfig.build.json', 'be/tsconfig.json', 'codecov.yml',
-  'fe/apps/web/next.config.ts', 'fe/apps/web/package.json', 'fe/apps/web/postcss.config.mjs',
+  'be/src/modules/platform/primitives/outcome.mapper.ts', 'be/src/tests/fixtures/builders/api.builder.ts',
+  'be/src/tests/tsconfig.json', 'be/tsconfig.build.json', 'be/tsconfig.json', 'codecov.yml',
+  'fe/apps/web/Dockerfile', 'fe/apps/web/next.config.ts', 'fe/apps/web/package.json', 'fe/apps/web/postcss.config.mjs',
   'fe/apps/web/src/app/[locale]/error.tsx', 'fe/apps/web/src/app/[locale]/layout.tsx',
   'fe/apps/web/src/app/[locale]/loading.tsx', 'fe/apps/web/src/app/[locale]/not-found.tsx',
   'fe/apps/web/src/app/[locale]/page.tsx', 'fe/apps/web/src/app/[locale]/providers.tsx',
@@ -184,7 +195,7 @@ test('lite scaffold emits its workspace declaration and is structurally clean', 
   assert.ok(env.trimEnd().split('\n').length <= 150, 'the API env reader stays within its 150-line budget');
   assert.doesNotMatch(env, /parseApiEnv|localhost|127\.0\.0\.1|process\.env/);
   assert.doesNotMatch(env, /from "@features\/|\b\w+Module\b|\.(?:register|forRoot)\(/);
-  assert.deepEqual(fs.readdirSync(path.join(root, '.starciwork')).sort(), ['.gitignore', 'workspace.yaml']);
+  assert.deepEqual(fs.readdirSync(path.join(root, '.starciwork')).sort(), ['.gitignore', 'brand', 'workspace.yaml']);
   assert.deepEqual(parseYaml(fs.readFileSync(path.join(root, '.starciwork/workspace.yaml'), 'utf8')), {
     schema: 'work/workspace@1', id: 'demo', project: 'demo',
     description: 'The Work records of demo, one StarCi app with its back end in be/ and its front end in fe/.',
@@ -236,7 +247,10 @@ test('lite scaffold emits its workspace declaration and is structurally clean', 
   assert.match(fs.readFileSync(path.join(root, ...'fe/apps/web/src/modules/auth/client.ts'.split('/')), 'utf8'), /flowType: "pkce"/);
   assert.equal(fs.readFileSync(path.join(root, ...'supabase/types/database.types.ts'.split('/')), 'utf8'), GENERATED_TYPES);
   const baselineSql = fs.readFileSync(path.join(root, ...'supabase/migrations/20261002123456_baseline.sql'.split('/')), 'utf8');
-  assert.match(baselineSql, /drop role if exists app_be;\s*create role app_be login noinherit;/);
+  assert.match(baselineSql, /if not exists \(select 1 from pg_catalog\.pg_roles where rolname = 'app_be'\) then/);
+  assert.match(baselineSql, /create role app_be login noinherit nosuperuser nobypassrls nocreatedb nocreaterole;/);
+  assert.match(baselineSql, /alter role app_be login noinherit nosuperuser nobypassrls nocreatedb nocreaterole;/);
+  assert.doesNotMatch(baselineSql, /drop role/i);
   assert.match(baselineSql, /grant usage on schema public to app_be/);
   assert.match(baselineSql, /create function private\.set_updated_at\(\)[\s\S]*returns trigger[\s\S]*language plpgsql[\s\S]*set search_path = ''/);
   assert.doesNotMatch(baselineSql, /security definer/);
@@ -254,7 +268,8 @@ test('lite scaffold emits its workspace declaration and is structurally clean', 
   const cqrsIndex = fs.readFileSync(path.join(root, ...'be/src/modules/platform/cqrs/index.ts'.split('/')), 'utf8');
   assert.doesNotMatch(cqrsIndex, /\bExecuteParams\b|\bInjectCommandBus\b/);
   const databaseIndex = fs.readFileSync(path.join(root, ...'be/src/modules/platform/database/index.ts'.split('/')), 'utf8');
-  assert.doesNotMatch(databaseIndex, /MigrationRunnerService|SeedRunnerService|requireOwnedRow|\bsql\b|InjectPrimaryEntityManager/);
+  assert.doesNotMatch(databaseIndex, /MigrationRunnerService|SeedRunnerService|requireOwnedRow|\bsql\b/);
+  assert.match(databaseIndex, /export \{ InjectPrimaryEntityManager, PRIMARY_ENTITY_MANAGER \} from "\.\/primary\.decorators"/);
   const securityIndex = fs.readFileSync(path.join(root, ...'be/src/modules/platform/http-security/index.ts'.split('/')), 'utf8');
   assert.doesNotMatch(securityIndex, /parseWebhookProviderConfig|InjectWebhookSignature|\bRateLimit\b|\bRateTier\b|WebhookSignatureService/);
   assert.deepEqual(checkTargets(root, renderTargets(declaration, undefined, { source: appSource(root) })), renderTargets(declaration, undefined, { source: appSource(root) }).map(target => ({

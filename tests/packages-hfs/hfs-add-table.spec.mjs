@@ -11,6 +11,10 @@ const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const made = [];
 const ts = createRequire(import.meta.url)("typescript");
 const at = Date.UTC(2026, 9, 2, 12, 34, 56);
+const runSequentially = (items, action) => items.reduce(
+  (previous, item) => previous.then(() => action(item)),
+  Promise.resolve(),
+);
 
 test.after(() => {
   for (const dir of made) fs.rmSync(dir, { recursive: true, force: true });
@@ -86,14 +90,14 @@ const generatedTypes = (table) =>
   `export type Database = { public: { Tables: { ${table}: { Row: { id: string } } } } }\n`;
 
 test("addTable accepts kebab, snake-case, plural, and reserved names and every accepted migration is database-clean", async () => {
-  for (const [name, feature, table, quoted = false] of [
+  await runSequentially([
     ["orders", "orders", "orders"],
     ["audit-events", "audit-events", "audit_events"],
     ["audit_events", "audit-events", "audit_events"],
     ["select", "select", "select", true],
     ["order", "order", "order", true],
     ["user", "user", "user", true],
-  ]) {
+  ], async ([name, feature, table, quoted = false]) => {
     const root = appRoot();
     const result = addTable({
       root,
@@ -107,7 +111,7 @@ test("addTable accepts kebab, snake-case, plural, and reserved names and every a
     const sql = read(root, migration);
     assert.match(
       sql,
-      new RegExp(`create table public\\.${sqlTable} \\(`),
+      new RegExp(String.raw`create table public\.${sqlTable} \(`),
     );
     assert.match(
       sql,
@@ -115,20 +119,20 @@ test("addTable accepts kebab, snake-case, plural, and reserved names and every a
     );
     assert.match(
       sql,
-      new RegExp(`create index ${table}_owner_id_idx on public\\.${sqlTable} \\(owner_id\\)`),
+      new RegExp(String.raw`create index ${table}_owner_id_idx on public\.${sqlTable} \(owner_id\)`),
     );
     assert.match(
       sql,
-      new RegExp(`create trigger ${table}_set_updated_at[\\s\\S]*before update on public\\.${sqlTable}[\\s\\S]*execute function private\\.set_updated_at\\(\\)`),
+      new RegExp(String.raw`create trigger ${table}_set_updated_at[\s\S]*before update on public\.${sqlTable}[\s\S]*execute function private\.set_updated_at\(\)`),
     );
     assert.match(
       sql,
-      new RegExp(`revoke all on table public\\.${sqlTable} from public, anon`),
+      new RegExp(String.raw`revoke all on table public\.${sqlTable} from public, anon`),
     );
     // the back end is the only reader and writer of a table (owner ruling 2026-10-13); the front end holds no grant
     assert.match(
       sql,
-      new RegExp(`grant select, insert, update, delete on table public\\.${sqlTable} to app_be`),
+      new RegExp(String.raw`grant select, insert, update, delete on table public\.${sqlTable} to app_be`),
     );
     assert.doesNotMatch(sql, /to authenticated/, "the front end holds no table grant");
     const service = read(root, `be/src/modules/domain/${feature}/${feature}.service.ts`);
@@ -143,7 +147,7 @@ test("addTable accepts kebab, snake-case, plural, and reserved names and every a
       /NotFound = "[A-Z0-9_]+_NOT_FOUND"/,
     );
     assert.match(read(root, "be/src/modules/platform/database/index.ts"), /export \{ requireOwnedRow, sql \}/);
-    assert.match(read(root, "be/src/modules/platform/database/index.ts"), /export \{ InjectPrimaryEntityManager \}/);
+    assert.match(read(root, "be/src/modules/platform/database/index.ts"), /export \{ InjectPrimaryEntityManager, PRIMARY_ENTITY_MANAGER \}/);
     assert.deepEqual(
       await checkDatabase({
         repoRoot: root,
@@ -154,7 +158,7 @@ test("addTable accepts kebab, snake-case, plural, and reserved names and every a
       [],
       `${name} migration is valid PostgreSQL and satisfies every database rule`,
     );
-  }
+  });
 });
 
 test("addTable refuses uppercase and a second non-increasing timestamp", () => {
@@ -232,9 +236,13 @@ test("addTable lists the error kinds in the compose/ group that holds them when 
   );
   addTable({ root, name: "ledgers", emitTypes: false, now: () => at });
   const app = read(root, owner);
-  assert.match(app, /import \{ LedgersModule \} from "@modules\/domain\/ledgers"/);
-  assert.match(app, /imports: \[\n\s+LedgersModule\.register\(\{ isGlobal: true \}\),/);
-  assert.doesNotMatch(app, /LEDGERS_ERROR_KINDS/);
+  const domain = read(root, "be/apps/api/src/compose/domain.ts");
+  assert.match(domain, /import \{ LedgersModule \} from "@modules\/domain\/ledgers"/);
+  assert.match(domain, /LedgersModule\.register\(\{ isGlobal: true \}\)/);
+  assert.match(app, /import \{ domainModules \} from "\.\/compose\/domain"/);
+  assert.match(app, /\.\.\.domainModules\(verifyAccessToken\)/);
+  assert.match(app, /\.\.\.platformModules\(\)/);
+  assert.doesNotMatch(app, /LedgersModule|LEDGERS_ERROR_KINDS/);
   const platform = read(root, group);
   assert.match(platform, /import \{ LEDGERS_ERROR_KINDS \} from "@modules\/domain\/ledgers"/);
   assert.match(platform, /kinds: \[\n\s+LEDGERS_ERROR_KINDS,/);

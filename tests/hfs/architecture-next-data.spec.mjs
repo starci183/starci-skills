@@ -93,6 +93,10 @@ function check(root) {
   return checkFrontendDataLifecycle(config, context);
 }
 
+function sequentialSubtests(t, cases, run) {
+  return cases.reduce((previous, [name, ...inputs]) => previous.then(() => t.test(name, () => run(...inputs))), Promise.resolve());
+}
+
 const lifecycleHeader = `import {cache,mutateCache} from '../../shared/cache';
 const QUERY_COURSE='QUERY_COURSE', MUTATE_COURSE='MUTATE_COURSE';
 const useViewerKey=():string|undefined=>'viewer';`;
@@ -156,12 +160,20 @@ const {trigger:add}=mutateCache(params.courseId?['MUTATE',params.courseId]:null)
   assert.ok(dynamic.coverage.details.some(item => /dynamic SWR key/.test(item)), JSON.stringify(dynamic, null, 2));
 });
 
-test('does not certify missing metadata, installed-version drift, or global mutate resource bypasses', t => {
-  const missing = check(fixture(t, { contract: null }));
-  assert.equal(missing.coverage.status, 'unavailable');
-  assert.deepEqual(missing.coverage.ruleIds, [SWR_KEY_RULE_ID, SWR_MUTATION_RULE_ID]);
-  assert.ok(missing.coverage.details.some(item => /dataLifecycle is required/.test(item)));
+test('infers SWR request identities without lifecycle metadata and still refuses a missing key identity', t => {
+  const source = sourceWithQueryKey('()=>params.courseId===undefined?null:[QUERY_COURSE,params.courseId,viewer]')
+    .replace('async()=>null', 'async()=>params.courseId');
+  const inferred = check(fixture(t, { contract: null, source }));
+  assert.equal(inferred.coverage.status, 'checked', JSON.stringify(inferred, null, 2));
+  assert.deepEqual(inferred.coverage.ruleIds, [SWR_KEY_RULE_ID, SWR_MUTATION_RULE_ID]);
+  assert.deepEqual(inferred.violations, [], JSON.stringify(inferred, null, 2));
 
+  const missing = check(fixture(t, { contract: null, source: source.replace('[QUERY_COURSE,params.courseId,viewer]', '[QUERY_COURSE]') }));
+  assert.equal(missing.coverage.status, 'checked', JSON.stringify(missing, null, 2));
+  assert.ok(missing.violations.some(item => item.ruleId === SWR_KEY_RULE_ID && item.identity === 'params.courseId'), JSON.stringify(missing, null, 2));
+});
+
+test('does not certify installed-version drift or global mutate resource bypasses', t => {
   const drift = check(fixture(t, { contract: lifecycleContract({ swr: { package: 'swr', major: 3 } }) }));
   assert.equal(drift.coverage.status, 'unavailable');
   assert.ok(drift.coverage.details.some(item => /does not match declared major/.test(item)));
@@ -179,7 +191,7 @@ test('classifies unsupported SWR bindings as unavailable and a genuine no-SWR pr
     ['aliased CommonJS require', "const load=require; export const loadSWR=()=>load('swr');"],
     ['dynamic import', "export const loadSWR=()=>import('swr');"],
   ];
-  for (const [name, source] of unsupported) await t.test(name, () => {
+  await sequentialSubtests(t, unsupported, source => {
     const root = fixture(t, { contract: null, source, extra: {
       'src/shared/cache.ts': 'export const localCache=()=>undefined;\n',
       'src/features/course/use-disabled.ts': 'export const useDisabled=()=>undefined;\n',
@@ -221,7 +233,7 @@ test('tracks value identity on every active path and rejects mutable or overwrit
     ['disjunction true branch proves nothing', sourceWithQueryKey("()=>params.courseId!==undefined||viewer?[QUERY_COURSE,params.courseId,viewer]:null"), 'finding'],
     ['transparent object alias', sourceWithQueryKey('()=>p.courseId===undefined?null:[QUERY_COURSE,p.courseId,viewer]', 'const p=params;'), 'checked'],
   ];
-  for (const [name, source, expected] of cases) await t.test(name, () => {
+  await sequentialSubtests(t, cases, (source, expected) => {
     const result = check(fixture(t, { source }));
     if (expected === 'checked') {
       assert.equal(result.coverage.status, 'checked', JSON.stringify(result, null, 2));

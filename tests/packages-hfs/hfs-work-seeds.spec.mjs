@@ -33,7 +33,8 @@ test('both editions scaffold a workspace while only full carries the Work catalo
     if (edition === 'full') {
       for (const seed of scaffoldWorkSeeds(`work-${edition}`)) assert.equal(fs.readFileSync(path.join(created.root, seed.path), 'utf8'), seed.content);
     } else {
-      assert.deepEqual(fs.readdirSync(path.join(created.root, '.starciwork')).sort(), ['.gitignore', 'workspace.yaml']);
+      assert.deepEqual(fs.readdirSync(path.join(created.root, '.starciwork')).sort(), ['.gitignore', 'brand', 'workspace.yaml']);
+      assert.ok(created.files.includes('.starciwork/brand/index.yaml'));
       const workspace = scaffoldWorkSeeds('work-lite').find((file) => file.path === '.starciwork/workspace.yaml');
       assert.equal(fs.readFileSync(path.join(created.root, workspace.path), 'utf8'), workspace.content);
     }

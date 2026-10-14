@@ -10,6 +10,7 @@ import { scaffoldApp } from "../../packages/hfs/scaffold/app.mjs";
 import { checkArchitecture } from "../../scripts/hfs/architecture.mjs";
 import { checkDatabase } from "../../scripts/hfs/rules/database.mjs";
 import { parseYaml } from "../../engine/yaml.mjs";
+import { byCodeUnit } from "../../engine/by-code-unit.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const PINS = parseYaml(
@@ -17,6 +18,10 @@ const PINS = parseYaml(
 ).pins;
 const ts = createRequire(import.meta.url)("typescript");
 const made = [];
+const runSequentially = (items, action) => items.reduce(
+  (previous, item) => previous.then(() => action(item)),
+  Promise.resolve(),
+);
 
 const CASES = Object.freeze([
   { input: "resources", feature: "resources", table: "resources" },
@@ -57,7 +62,7 @@ const fakeLock = (root) => {
 
 const databaseTypes = (tables) => {
   const entries = [...tables]
-    .sort()
+    .sort(byCodeUnit)
     .map(
       (name) => `      ${JSON.stringify(name)}: {
         Row: { id: string; owner_id: string; created_at: string; updated_at: string }
@@ -150,17 +155,17 @@ test("add table --fe stays database- and architecture-clean for every accepted t
     assert.equal(result.created.some((file) => file.includes("/modules/db/")), false);
     const sql = fs.readFileSync(path.join(root, ...migration.split("/")), "utf8");
     const sqlTable = RESERVED.has(item.table) ? `"${item.table}"` : item.table;
-    assert.match(sql, new RegExp(`public\\.${sqlTable}`));
+    assert.match(sql, new RegExp(String.raw`public\.${sqlTable}`));
     assert.match(sql, /owner_id uuid not null references auth\.users \(id\) on delete cascade/);
-    assert.match(sql, new RegExp(`create index ${item.table}_owner_id_idx on public\\.${sqlTable} \\(owner_id\\)`));
-    assert.match(sql, new RegExp(`create trigger ${item.table}_set_updated_at[\\s\\S]*before update on public\\.${sqlTable}`));
-    assert.match(sql, new RegExp(`create policy "${item.table}_app_be_select"[\\s\\S]*to app_be[\\s\\S]*using \\(owner_id is not null\\)`));
-    assert.match(sql, new RegExp(`revoke all on table public\\.${sqlTable} from public, anon`));
+    assert.match(sql, new RegExp(String.raw`create index ${item.table}_owner_id_idx on public\.${sqlTable} \(owner_id\)`));
+    assert.match(sql, new RegExp(String.raw`create trigger ${item.table}_set_updated_at[\s\S]*before update on public\.${sqlTable}`));
+    assert.match(sql, new RegExp(String.raw`create policy "${item.table}_app_be_select"[\s\S]*to app_be[\s\S]*using \(owner_id is not null\)`));
+    assert.match(sql, new RegExp(String.raw`revoke all on table public\.${sqlTable} from public, anon`));
     // the back end is the only reader and writer of a table (owner ruling 2026-10-13); the front end holds no grant
-    assert.match(sql, new RegExp(`grant select, insert, update, delete on table public\\.${sqlTable} to app_be`));
+    assert.match(sql, new RegExp(String.raw`grant select, insert, update, delete on table public\.${sqlTable} to app_be`));
     assert.doesNotMatch(sql, /to authenticated/);
     if (RESERVED.has(item.table)) {
-      assert.doesNotMatch(sql, new RegExp(`public\\.${item.table}\\b`));
+      assert.doesNotMatch(sql, new RegExp(String.raw`public\.${item.table}\b`));
     }
     const service = fs.readFileSync(
       path.join(root, "be", "src", "modules", "domain", item.feature, `${item.feature}.service.ts`),
@@ -185,7 +190,7 @@ test("add table --fe stays database- and architecture-clean for every accepted t
   }
   const databaseIndex = fs.readFileSync(path.join(root, "be", "src", "modules", "platform", "database", "index.ts"), "utf8");
   assert.match(databaseIndex, /export \{ requireOwnedRow, sql \}/);
-  assert.match(databaseIndex, /export \{ InjectPrimaryEntityManager \}/);
+  assert.match(databaseIndex, /export \{ InjectPrimaryEntityManager, PRIMARY_ENTITY_MANAGER \}/);
 
   execFileSync("git", ["-c", "core.autocrlf=false", "add", "-A"], {
     cwd: root,
@@ -203,8 +208,8 @@ test("add table --fe stays database- and architecture-clean for every accepted t
   // The app remains uninstalled: expose only the repository's canonical tsconfig package,
   // while the architecture seam below supplies this repository's TypeScript compiler.
   exposeRepoTsconfig(root);
-  for (const side of ["be", "fe"]) {
-    await t.test(`${side} architecture machine accepts the generated tree`, (subtest) => {
+  await runSequentially(["be", "fe"], (side) =>
+    t.test(`${side} architecture machine accepts the generated tree`, () => {
       const paths =
         side === "be"
           ? [
@@ -219,6 +224,6 @@ test("add table --fe stays database- and architecture-clean for every accepted t
         fast: true,
       });
       assert.deepEqual(problemsOf(report), []);
-    });
-  }
+    }),
+  );
 });
