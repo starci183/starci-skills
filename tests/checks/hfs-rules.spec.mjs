@@ -31,7 +31,8 @@ test('the shipped catalog is 3.1.0, validates against its JSON schema and loads 
   for (const rule of catalog.rules) {
     assert.ok(rule.enforcers.length > 0, `${rule.id} has an enforcer`);
     assert.equal(rule.failureCodes[0], rule.code);
-    assert.ok(rule.gates.includes('land') || (rule.scope === 'runtime' && rule.gates.includes('runtime')), `${rule.id} runs at land or its runtime gate`);
+    const releaseGate = rule.gates.includes('land') || rule.gates.includes('ci');
+    assert.ok(releaseGate || (rule.scope === 'runtime' && rule.gates.includes('runtime')), `${rule.id} runs at land, ci or its runtime gate`);
   }
 });
 
@@ -114,7 +115,26 @@ test('the rule-catalog loader also refuses what only semantics can see', () => {
   refusal(() => loadRuleCatalog({ text: '{ not: [valid' }), 'HFS_RULES_INVALID');
 });
 
-test('a runtime-scoped rule may name its runtime gate without claiming land', () => {
+test('a product rule may name only its CI release gate', () => {
+  const d = doc();
+  d.rules[0].gates = ['ci'];
+  assert.equal(validateSchema(d), true, JSON.stringify(validateSchema.errors));
+  const catalog = loadRuleCatalog({ text: JSON.stringify(d) });
+  assert.deepEqual(catalog.rule('R01').gates, ['ci']);
+  assert.ok(catalog.forGate('ci').some((rule) => rule.id === 'R01'));
+  assert.ok(!catalog.forGate('land').some((rule) => rule.id === 'R01'));
+});
+
+test('local and analysis gates alone do not satisfy a product release gate', () => {
+  for (const gates of [['pre-commit'], ['pre-push'], ['settle'], ['sonar'], ['runtime'], ['pre-commit', 'pre-push', 'settle', 'sonar']]) {
+    refusal(load((d) => {
+      d.rules[0].gates = gates;
+      if (gates.includes('sonar')) d.rules[0].enforcers.push({ kind: 'sonar', id: 'size-growth', at: 'scripts/gates/sonar-rules-engine.mjs' });
+    }), 'HFS_RULES_INVALID');
+  }
+});
+
+test('a runtime-scoped rule may name its runtime gate without claiming land or CI', () => {
   const runtimeOnly = (d) => {
     d.rules[0].scope = 'runtime';
     d.rules[0].gates = ['runtime'];

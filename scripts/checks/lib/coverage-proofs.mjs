@@ -10,6 +10,18 @@ const NEGATIVE = /\b(?:invalid|violat\w*|refus\w*|reject\w*|deni\w*|fail\w*|nega
 const POSITIVE = /\b(?:valid|pass\w*|accept\w*|conform\w*|positive|clean)\b/i;
 const assertions = new Set(['ok', 'equal', 'strictEqual', 'deepEqual', 'deepStrictEqual', 'match', 'throws', 'rejects', 'doesNotThrow', 'doesNotReject', 'notEqual', 'notDeepEqual']);
 const sourceFamilies = new Set(['machine', 'hfs', 'runtime', 'work-validate', 'sonar']);
+const evidenceCaches = new WeakMap();
+
+function evidenceCache(context) {
+  let cache = evidenceCaches.get(context.files);
+  const current = cache?.sources.size === context.files.size
+    && [...context.files].every(([file, text]) => cache.sources.get(file) === text);
+  if (!current) {
+    cache = { sources: new Map(context.files), tests: new WeakMap(), evidence: new WeakMap() };
+    evidenceCaches.set(context.files, cache);
+  }
+  return cache;
+}
 
 export function claimsProof(text, code, edition) {
   return text.split(/\r?\n/).some((line) => /^\s*\/\/\s*proves:\s*/.test(line)
@@ -27,6 +39,9 @@ function testCall(index, node) {
 }
 
 function testsInEdition(context, index, edition) {
+  const cache = evidenceCache(context);
+  const previous = cache.tests.get(index) ?? new Map();
+  if (previous.has(edition)) return previous.get(edition);
   const out = [];
   scopedWalk(context, localScope(index), index.tree, (scope, node, enclosingEdition) => {
     if (!testCall(scope, node)) return;
@@ -36,6 +51,8 @@ function testsInEdition(context, index, edition) {
     if (enclosingEdition ? enclosingEdition === edition : named) out.push({ title, node: node.arguments.at(-1), index: localScope(scope) });
     return false;
   });
+  previous.set(edition, out);
+  cache.tests.set(index, previous);
   return out;
 }
 
@@ -82,8 +99,11 @@ function reachedExportKeys(context, file, nodes) {
 function assertionTargets(context, index, node, code) {
   const out = new Set();
   const actual = node.arguments[0];
-  for (const [file, reached] of resultReach(context, index, actual)) {
-    if (file === index.file || !nodeContainsCode(context, file, reached, code)) continue;
+  const results = resultReach(context, index, actual, { code });
+  const emitsCode = [...results].some(([file, reached]) => file !== index.file && nodeContainsCode(context, file, reached, code));
+  if (!emitsCode) return out;
+  for (const [file, reached] of results) {
+    if (file === index.file) continue;
     out.add(file);
     reachedExportKeys(context, file, reached).forEach((key) => out.add(key));
   }
@@ -119,6 +139,9 @@ function assertionClaimsCode(context, index, assertion, code) {
 }
 
 function testEvidence(context, index, test, code) {
+  const cache = evidenceCache(context);
+  const previous = cache.evidence.get(test) ?? new Map();
+  if (previous.has(code)) return previous.get(code);
   const roles = new Map();
   const runs = [];
   const callback = resolvedExpression(context, test.index ?? index, test.node);
@@ -136,7 +159,10 @@ function testEvidence(context, index, test, code) {
     }
     return false;
   });
-  return { roles, runs };
+  const evidence = { roles, runs };
+  previous.set(code, evidence);
+  cache.evidence.set(test, previous);
+  return evidence;
 }
 
 function sourceEvidence(context, rule, code, edition) {
@@ -193,9 +219,10 @@ function sourceProven(context, proofs, entry) {
 
 function lintProven(context, proofs, entry) {
   const implementation = registeredLintRules(context, entry.kind).get(entry.id);
-  const target = implementation?.expression && resolvedExpression(context, implementation.index, implementation.expression).node;
+  const target = implementation?.expression && resolvedExpression(context, implementation.index, implementation.expression);
+  const file = target?.index.file ?? implementation?.file;
   return proofs.some((proof) => proof.tests.some((test) => test.runs.some((run) => run.id === entry.id && run.complete
-    && run.implementation.has(implementation?.file) && (!target || run.implementation.get(implementation.file).includes(target)))));
+    && run.implementation.has(file) && (!target?.node || run.implementation.get(file).includes(target.node)))));
 }
 
 export function coverageProofFindings(context, rule, code, edition) {

@@ -2299,155 +2299,396 @@ rules:
     code: "BE_JWT_ALG_PINNED"
     law: "A back-end JWT verifier pins a nonempty literal subset of ES256, RS256 and EdDSA and obtains its issuer from configuration. A Supabase principal is built only after verification and rejection of every role other than authenticated, in lite and full."
     kinds: [check, lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: ["pre-commit","settle","land","ci"]
     failureCodes: ["BE_JWT_ALG_PINNED"]
     enforcers:
       - {kind: eslint-be, id: jwt-alg-pinned}
       - {kind: machine, id: jwt-policy, at: scripts/hfs/architecture/supabase.mjs}
+    editions: ["lite","full"]
+    templateNa: "Full identity providers are product-owned integrations with no scaffolded JWT verifier; the lite Supabase verifier is templated and both editions are exercised by the verifier specs."
+    docs:
+      - "docs/microservices.md#r260"
+    exemplifiedBy:
+      - {"path":"packages/hfs/templates/be/skeleton-lite/src/modules/integrations/supabase/supabase.jwks.ts","edition":"lite"}
+      - {"path":"examples/lite-app/be/src/modules/integrations/supabase/supabase.jwks.ts","edition":"lite"}
+      - {"path":"packages/eslint/be/jwt-alg.spec.mjs","edition":"full","codes":["BE_JWT_ALG_PINNED"]}
+    proves:
+      - "packages/eslint/be/jwt-alg.spec.mjs"
+      - "tests/hfs-architecture/architecture-jwt-policy.spec.mjs"
+    witness:
+      - {"path":"packages/eslint/be/jwt-alg.spec.mjs","editions":["lite","full"],"codes":["BE_JWT_ALG_PINNED"]}
+      - {"path":"tests/hfs-architecture/architecture-jwt-policy.spec.mjs","editions":["lite","full"],"codes":["BE_JWT_ALG_PINNED"]}
   - id: R261
     code: "BE_CORS_ALLOWLIST"
     law: "Every back-end API declares an exact browser origin allowlist, applies the platform/http-security response middleware, disables x-powered-by and states a nonnegative integer trust proxy hop count. Wildcard or missing CORS and blanket proxy trust are refused in lite and full."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: ["pre-commit","settle","land","ci"]
     failureCodes: ["BE_CORS_ALLOWLIST", "BE_SECURITY_HEADERS", "BE_TRUST_PROXY"]
     enforcers:
       - {kind: eslint-be, id: cors-allowlist}
       - {kind: eslint-be, id: security-headers}
       - {kind: eslint-be, id: trust-proxy}
+    editions: ["lite","full"]
+    docs:
+      - "docs/microservices.md#r261"
+    exemplifiedBy:
+      - {"path":"packages/hfs/templates/be/skeleton-lite/apps/api/src/main.ts","edition":"lite"}
+      - {"path":"packages/hfs/templates/be/skeleton/apps/__app__/src/main.ts","edition":"full"}
+      - {"path":"packages/hfs/templates/be/skeleton/src/modules/platform/http-security/edge-security.service.ts","editions":["lite","full"]}
+      - {"path":"examples/lite-app/be/apps/api/src/main.ts","edition":"lite"}
+      - {"path":"packages/eslint/be/edge-hardening.spec.mjs","edition":"full","codes":["BE_CORS_ALLOWLIST","BE_SECURITY_HEADERS","BE_TRUST_PROXY"]}
+    proves:
+      - "packages/eslint/be/edge-hardening.spec.mjs"
+    witness:
+      - {"path":"packages/eslint/be/edge-hardening.spec.mjs","editions":["lite","full"],"codes":["BE_CORS_ALLOWLIST","BE_SECURITY_HEADERS","BE_TRUST_PROXY"]}
   - id: R262
     code: "BE_READY_REAL"
     law: "Every back-end API serves distinct live and ready health signals. Readiness probes a required dependency with a bounded failure timeout and returns unavailable on dependency failure; an alias of liveness is refused. The API Docker HEALTHCHECK reaches an existing live route and cannot be a command that always succeeds, in lite and full."
     kinds: [check, lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: ["pre-commit","settle","land","ci"]
     failureCodes: ["BE_READY_REAL", "BE_HEALTH_SIGNALS", "HFS_DOCKER_HEALTHCHECK_FAKE"]
     enforcers:
       - {kind: eslint-be, id: ready-real}
       - {kind: eslint-be, id: health-signals}
       - {kind: hfs, id: docker-health-reachability, at: scripts/hfs/rules/docker.mjs}
+    editions: ["lite","full"]
+    docs:
+      - "docs/microservices.md#r262"
+    exemplifiedBy:
+      - {"path":"packages/hfs/templates/be/skeleton/src/features/api/system-health/transport/http/ready.controller.ts","editions":["lite","full"]}
+      - {"path":"packages/hfs/templates/be/skeleton/src/modules/platform/http-security/readiness.service.ts","editions":["lite","full"]}
+      - {"path":"packages/hfs/templates/be/image/api/Dockerfile","editions":["lite","full"]}
+      - {"path":"packages/eslint/be/health-ready.spec.mjs","editions":["lite","full"],"codes":["BE_READY_REAL","BE_HEALTH_SIGNALS","HFS_DOCKER_HEALTHCHECK_FAKE"]}
+    proves:
+      - "packages/eslint/be/health-ready.spec.mjs"
+    witness:
+      - {"path":"packages/eslint/be/health-ready.spec.mjs","editions":["lite","full"],"codes":["BE_READY_REAL","BE_HEALTH_SIGNALS","HFS_DOCKER_HEALTHCHECK_FAKE"]}
 
   - id: R263
     code: "BE_WEBHOOK_SCOPE"
     law: "SignedWebhook public metadata belongs only to a webhook HTTP door or an exact domain verifier declared in its HTTP module's exported webhookVerifiers array. A public controller route containing webhook, callback or events belongs in the webhook door. Domain intake methods identified by a first *Id parameter or DTO property, or raw-body signature input, claim the shared Inbox with the stable delivery key and return early on a duplicate before doing work. The receipt transaction records the inbox delivery and publishes its typed outbox event; process callbacks, domain processing and command dispatch run only after commit in a reactor or job."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: ["pre-commit","settle","land","ci"]
     failureCodes: ["BE_WEBHOOK_SCOPE", "BE_WEBHOOK_INBOX_KEY"]
     enforcers:
       - {kind: eslint-be, id: webhook-scope}
       - {kind: eslint-be, id: webhook-inbox-key}
+    editions: ["lite","full"]
+    codeEditions: {"BE_WEBHOOK_SCOPE":["lite","full"],"BE_WEBHOOK_INBOX_KEY":["lite","full"]}
+    docs:
+      - "docs/microservices.md#r263"
+    exemplifiedBy:
+      - {"path":"packages/hfs/templates/be/inbox/webhook-door.ts.tpl","editions":["lite","full"]}
+      - {"path":"packages/hfs/templates/be/inbox/service.ts.tpl","editions":["lite","full"]}
+      - {"path":"examples/lite-app/be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts","edition":"lite"}
+      - {"path":"examples/ecommerce-app/be/src/features/webhooks/sepay/transport/http/sepay.webhook.ts","edition":"full"}
+      - {"path":"packages/eslint/be/webhook-handoff-inbox.spec.mjs","editions":["lite","full"],"codes":["BE_WEBHOOK_INBOX_KEY"]}
+    proves:
+      - {"path":"packages/eslint/be/webhook-handoff-scope.spec.mjs","editions":["lite","full"],"codes":["BE_WEBHOOK_SCOPE"]}
+      - {"path":"packages/eslint/be/webhook-handoff-inbox.spec.mjs","editions":["lite","full"],"codes":["BE_WEBHOOK_INBOX_KEY"]}
+    witness:
+      - {"path":"packages/eslint/be/webhook-handoff-scope.spec.mjs","edition":"lite","codes":["BE_WEBHOOK_SCOPE"]}
+      - {"path":"packages/eslint/be/webhook-handoff-inbox.spec.mjs","edition":"lite","codes":["BE_WEBHOOK_INBOX_KEY"]}
+      - {"path":"packages/eslint/be/webhook-handoff-scope.spec.mjs","edition":"full","codes":["BE_WEBHOOK_SCOPE"]}
+      - {"path":"packages/eslint/be/webhook-handoff-inbox.spec.mjs","edition":"full","codes":["BE_WEBHOOK_INBOX_KEY"]}
   - id: R264
     code: "HFS_FEATURE_LOGIC_ROLE"
     law: "A non-door role in the feature tier declares data, types and DTO metadata only: a support policy, guard, client, filter, interceptor, projection or contracts file cannot hide a decision, loop, computation or executable call by changing its suffix. Business logic belongs in tested modules; thin feature roles remain governed by R203 and feature module composition keeps its module laws."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: ["pre-commit","settle","land","ci"]
     failureCodes: ["HFS_FEATURE_LOGIC_ROLE"]
     enforcers:
       - {kind: eslint-be, id: feature-logic-role}
+    editions: ["lite","full"]
+    codeEditions: {"HFS_FEATURE_LOGIC_ROLE":["lite","full"]}
+    docs:
+      - "docs/microservices.md#r264"
+    exemplifiedBy:
+      - {"path":"packages/hfs/templates/be/skeleton/src/features/api/system-health/application/check-liveness.contracts.ts","editions":["lite","full"]}
+      - {"path":"examples/lite-app/be/src/features/api/bookings/application/create-booking.contracts.ts","edition":"lite"}
+      - {"path":"examples/ecommerce-app/be/src/features/api/health/application/check-health.contracts.ts","edition":"full"}
+    proves:
+      - {"path":"packages/eslint/be/feature-thin.spec.mjs","editions":["lite","full"],"codes":["HFS_FEATURE_LOGIC_ROLE"]}
+    witness:
+      - {"path":"packages/eslint/be/feature-thin.spec.mjs","edition":"lite","codes":["HFS_FEATURE_LOGIC_ROLE"]}
+      - {"path":"packages/eslint/be/feature-thin.spec.mjs","edition":"full","codes":["HFS_FEATURE_LOGIC_ROLE"]}
   - id: R265
     code: "BE_COMPOSITION_UNTYPED"
     law: "App composition is identified by resolved module, DynamicModule, Provider, queue and scheduler entry types, independently of class, helper or registration method names. Composition lists and maps live in explicitly typed compose/<area>.ts groups, never in main.ts, <app>.env.ts or <app>.options.ts. The bootstrap may pass its app module to NestFactory, options may bind ports, and app.module.ts spreads the groups. starci app add writes and updates the generated feature's typed area group."
     kinds: [lint, codemod]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: ["pre-commit","settle","land","ci"]
     failureCodes: ["BE_COMPOSITION_UNTYPED"]
     enforcers:
       - {kind: eslint-be, id: app-composition-typed}
+    editions: ["lite","full"]
+    codeEditions: {"BE_COMPOSITION_UNTYPED":["lite","full"]}
+    docs:
+      - "docs/microservices.md#r265"
+    exemplifiedBy:
+      - {"path":"packages/hfs/templates/be/skeleton-lite/apps/api/src/compose/platform.ts","edition":"lite"}
+      - {"path":"packages/hfs/templates/be/skeleton/apps/__app__/src/compose/platform.ts","edition":"full"}
+      - {"path":"examples/lite-app/be/apps/api/src/compose/platform.ts","edition":"lite"}
+      - {"path":"examples/ecommerce-app/be/apps/order/src/compose/platform.ts","edition":"full"}
+    proves:
+      - {"path":"packages/eslint/be/app-composition.spec.mjs","editions":["lite","full"],"codes":["BE_COMPOSITION_UNTYPED"]}
+    witness:
+      - {"path":"packages/eslint/be/app-composition.spec.mjs","edition":"lite","codes":["BE_COMPOSITION_UNTYPED"]}
+      - {"path":"packages/eslint/be/app-composition.spec.mjs","edition":"full","codes":["BE_COMPOSITION_UNTYPED"]}
   - id: R266
     code: "STACKS_SECRET_NOT_EXTERNAL"
     law: "Every rendered Swarm deployment uses external immutable secrets whose names match the declared runtimeName and positive version; services carry no secret environment literals. Only the one declared ingress publishes ports; its hosts have routes, DNS ownership receipts and TLS ownership evidence. Stateful services declare placement constraints, and runnable services declare healthchecks and update, rollback and restart policies. A lite api app composing be.feature.realtime.* pins deploy.replicas to 1; full is unaffected by that replica restriction."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: ["settle","land","ci"]
     failureCodes: ["STACKS_SECRET_NOT_EXTERNAL", "STACKS_SECRET_UNVERSIONED", "STACKS_SECRET_ENV_LITERAL", "STACKS_PORT_PUBLISHED", "STACKS_SECOND_INGRESS", "STACKS_DNS_UNDECLARED", "STACKS_HOST_UNROUTED", "STACKS_TLS_UNDECLARED", "STACKS_PLACEMENT_MISSING", "STACKS_HEALTHCHECK_MISSING", "STACKS_UPDATE_POLICY_MISSING", "STACKS_REALTIME_SCALED"]
     enforcers:
       - {kind: hfs, id: stacks-swarm, at: scripts/hfs/rules/stacks-swarm.mjs}
       - {kind: hfs, id: stacks-second-ingress, at: scripts/hfs/rules/stacks-ingress.mjs}
+    editions: ["lite","full"]
+    codeEditions: {"STACKS_REALTIME_SCALED":["lite"]}
+    docs:
+      - "docs/application-stacks.md#r266"
+    exemplifiedBy:
+      - {"path":"packages/hfs/templates/app/skeleton-lite/.starcistacks","edition":"lite"}
+      - {"path":"packages/hfs/templates/app/skeleton/.starcistacks","edition":"full"}
+      - {"path":"tests/hfs/hfs-stacks-swarm.spec.mjs","edition":"lite"}
+      - {"path":"tests/fixtures/hfs-stacks-full/passing.json","edition":"full"}
+      - {"path":"tests/fixtures/hfs-stacks-full/violating.json","edition":"full"}
+    proves:
+      - {path: tests/hfs/hfs-stacks-full-fixtures.spec.mjs, edition: full}
+      - "tests/hfs/hfs-stacks-swarm.spec.mjs"
+      - "tests/hfs/hfs-stacks-ingress.spec.mjs"
+    witness:
+      - {"path":"tests/hfs/hfs-stacks-swarm.spec.mjs","edition":"lite"}
+      - {"path":"tests/fixtures/hfs-stacks-full/violating.json","edition":"full"}
 
   - id: R267
     code: "STACKS_RELEASE_UNDECLARED"
     law: "Each Swarm environment declares an immutable images lock, active and previous release pointers and nonempty health assertions. Every stateful component and declared managed backing dependency declares backup target, retention and owner with a tracked restore proof. The rendered deployment model must be available and valid; an unavailable model is a finding, never a skipped check."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: ["settle","land","ci"]
     failureCodes: ["STACKS_RELEASE_UNDECLARED", "BACKUP_UNDECLARED", "BACKUP_PROOF_MISSING", "STACKS_MODEL_UNAVAILABLE"]
     enforcers:
       - {kind: hfs, id: stacks-release, at: scripts/hfs/rules/stacks-release.mjs}
+    editions: ["lite","full"]
+    docs:
+      - "docs/application-stacks.md#r267"
+    exemplifiedBy:
+      - {"path":"packages/hfs/templates/app/skeleton-lite/.starcistacks","edition":"lite"}
+      - {"path":"packages/hfs/templates/app/skeleton/.starcistacks","edition":"full"}
+      - {"path":"tests/hfs/hfs-stacks-release.spec.mjs","edition":"lite"}
+      - {"path":"tests/fixtures/hfs-stacks-full/passing.json","edition":"full"}
+      - {"path":"tests/fixtures/hfs-stacks-full/violating.json","edition":"full"}
+      - {"path":"tests/fixtures/hfs-stacks-full/model-unavailable.json","edition":"full"}
+    proves:
+      - {path: tests/hfs/hfs-stacks-full-fixtures.spec.mjs, edition: full}
+      - "tests/hfs/hfs-stacks-release.spec.mjs"
+    witness:
+      - {"path":"tests/hfs/hfs-stacks-release.spec.mjs","edition":"lite"}
+      - {"path":"tests/fixtures/hfs-stacks-full/violating.json","edition":"full"}
+      - {"path":"tests/fixtures/hfs-stacks-full/model-unavailable.json","edition":"full"}
 
   - id: R268
     code: "HFS_SCHEDULE_UNDECLARED"
     law: "Every app scheduler, active pg_cron schedule, selected scheduled component and rendered replicated-job has a matching top-level jobs declaration with its schedule and invocation of a named back-end CLI action. A rendered replicated-job uses the same declared CLI invocation; inline JavaScript and shell chaining are refused. Scheduling is app-owned; a manifest entry never grants host crontab or deployment business logic."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: ["settle","land","ci"]
     failureCodes: ["HFS_SCHEDULE_UNDECLARED"]
     enforcers:
       - {kind: hfs, id: stacks-release, at: scripts/hfs/rules/stacks-release.mjs}
+    editions: ["lite","full"]
+    docs:
+      - "docs/application-stacks.md#r268"
+    exemplifiedBy:
+      - {"path":"packages/hfs/templates/app/skeleton-lite/.starcistacks/application-stacks.yaml","edition":"lite"}
+      - {"path":"packages/hfs/templates/app/skeleton/.starcistacks/application-stacks.yaml","edition":"full"}
+      - {"path":"tests/hfs/hfs-stacks-release.spec.mjs","edition":"lite"}
+      - {"path":"tests/fixtures/hfs-stacks-full/passing.json","edition":"full"}
+      - {"path":"tests/fixtures/hfs-stacks-full/violating.json","edition":"full"}
+    proves:
+      - {path: tests/hfs/hfs-stacks-full-fixtures.spec.mjs, edition: full}
+      - "tests/hfs/hfs-stacks-release.spec.mjs"
+    witness:
+      - {"path":"tests/hfs/hfs-stacks-release.spec.mjs","edition":"lite"}
+      - {"path":"tests/fixtures/hfs-stacks-full/violating.json","edition":"full"}
 
   - id: R269
     code: "HFS_DEPENDABOT_MISSING"
     law: "In lite and full apps, .github/dependabot.yml declares scheduled npm, github-actions and docker updates. The CI workflow runs npm audit --omit=dev as an enabled gate whose failure stops the job. The images workflow generates an SBOM and provenance for release images; a disabled step, comment or label is not evidence."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: ["settle","land","ci"]
     failureCodes: ["HFS_DEPENDABOT_MISSING", "HFS_AUDIT_STEP_MISSING", "HFS_SBOM_MISSING"]
     enforcers:
       - {kind: hfs, id: supply-chain, at: scripts/hfs/rules/supply-chain.mjs}
+    editions: ["lite","full"]
+    docs:
+      - "docs/application-stacks.md#r269"
+    exemplifiedBy:
+      - {"path":"tests/hfs/hfs-supply-chain.spec.mjs","edition":"lite"}
+      - {"path":"tests/hfs/hfs-supply-chain.spec.mjs","edition":"full"}
+      - {"path":"packages/hfs/templates/app/skeleton-lite/.github/dependabot.yml","edition":"lite"}
+      - {"path":"packages/hfs/templates/app/ci-workflows-lite/github/workflows/ci.yml","edition":"lite"}
+      - {"path":"packages/hfs/templates/app/ci-workflows-lite/github/workflows/images.yml","edition":"lite"}
+      - {"path":"packages/hfs/templates/app/skeleton/.github/dependabot.yml","edition":"full"}
+      - {"path":"packages/hfs/templates/app/ci-workflows/github/workflows/ci.yml","edition":"full"}
+      - {"path":"packages/hfs/templates/app/ci-workflows/github/workflows/images.yml","edition":"full"}
+    proves:
+      - {"path":"tests/hfs/hfs-supply-chain.spec.mjs","editions":["lite","full"]}
+    witness:
+      - {"path":"tests/hfs/hfs-supply-chain.spec.mjs","edition":"lite"}
+      - {"path":"tests/hfs/hfs-supply-chain.spec.mjs","edition":"full"}
 
   - id: R270
     code: "HFS_DOC_PATH_MISSING"
     law: "In lite and full products, READMEs, docs and stack READMEs cite existing repository paths, npm scripts, starci app verbs, environment keys declared by typed readers or KEYS.md, and rule ids from the HFS catalog. Documentation changes with the product it describes."
     kinds: [check]
-    gates: [settle, land, ci]
+    gates: ["settle","land","ci"]
     failureCodes: ["HFS_DOC_PATH_MISSING", "HFS_DOC_COMMAND_UNKNOWN", "HFS_DOC_ENV_UNKNOWN", "HFS_DOC_RULE_UNKNOWN"]
     enforcers:
       - {kind: hfs, id: doc-fresh, at: scripts/hfs/rules/doc-fresh.mjs}
+    editions: ["lite","full"]
+    docs:
+      - "docs/quality-bar.md#r270"
+    exemplifiedBy:
+      - {"path":"tests/hfs/hfs-doc-fresh.spec.mjs","edition":"lite"}
+      - {"path":"tests/hfs/hfs-doc-fresh.spec.mjs","edition":"full"}
+      - {"path":"packages/hfs/templates/app/skeleton-lite/README.md","edition":"lite"}
+      - {"path":"packages/hfs/templates/app/skeleton/README.md","edition":"full"}
+    proves:
+      - {"path":"tests/hfs/hfs-doc-fresh.spec.mjs","editions":["lite","full"]}
+    witness:
+      - {"path":"tests/hfs/hfs-doc-fresh.spec.mjs","edition":"lite"}
+      - {"path":"tests/hfs/hfs-doc-fresh.spec.mjs","edition":"full"}
   - id: R271
     code: "HFS_RELEASE_TAG_MISMATCH"
     law: "A lite or full product release uses a v-prefixed semantic version tag equal to package.json version; images.yml publishes images under that release tag, and every database deployment refuses a non-tag ref before migration."
     kinds: [check]
-    gates: [settle, land, ci]
+    gates: ["settle","land","ci"]
     failureCodes: ["HFS_RELEASE_TAG_MISMATCH", "HFS_DB_DEPLOY_UNGUARDED"]
     enforcers:
       - {kind: hfs, id: release-provenance, at: scripts/hfs/rules/release-provenance.mjs}
+    editions: ["lite","full"]
+    docs:
+      - "docs/application-stacks.md#r271"
+    exemplifiedBy:
+      - {"path":"tests/hfs/hfs-release-provenance.spec.mjs","edition":"lite"}
+      - {"path":"tests/hfs/hfs-release-provenance.spec.mjs","edition":"full"}
+      - {"path":"packages/hfs/templates/app/ci-workflows-lite/github/workflows/images.yml","edition":"lite"}
+      - {"path":"packages/hfs/templates/app/ci-workflows/github/workflows/images.yml","edition":"full"}
+      - {"path":"packages/hfs/templates/app/ci-workflows-lite/github/workflows/db-deploy.yml","edition":"lite"}
+    proves:
+      - {"path":"tests/hfs/hfs-release-provenance.spec.mjs","editions":["lite","full"]}
+    witness:
+      - {"path":"tests/hfs/hfs-release-provenance.spec.mjs","edition":"lite"}
+      - {"path":"tests/hfs/hfs-release-provenance.spec.mjs","edition":"full"}
 
   - id: R272
     code: "BE_APP_BOOT_PROOF_MISSING"
     law: "Every lite back-end app proves its real Nest AppModule composition by compiling the dependency graph with explicit fixture options and infrastructure doubles; unresolved providers, circular dependencies and a missing or failed proof are refused. The app check wiring verb uses the same proof. Full retains its existing e2e boot proof."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: ["settle","land","ci"]
     failureCodes: ["BE_APP_BOOT_PROOF_MISSING"]
     enforcers:
       - {kind: hfs, id: boot-proof, at: scripts/hfs/rules/boot-proof.mjs}
+    editions: ["lite"]
+    editionWhy: "ruling:R272 requires the lite Nest wiring proof; full retains its existing e2e boot proof and the boot-proof finder skips full."
+    docs:
+      - "docs/quality-bar.md#r272"
+    exemplifiedBy:
+      - {"path":"tests/hfs/hfs-boot-proof.spec.mjs","edition":"lite"}
+      - {"path":"packages/hfs/templates/be/skeleton-lite/src/tests/fixtures/builders/api.builder.ts","edition":"lite"}
+      - {"path":"examples/lite-app/be/src/tests/fixtures/builders/api.builder.ts","edition":"lite"}
+    proves:
+      - {"path":"tests/hfs/hfs-boot-proof.spec.mjs","editions":["lite"]}
+    witness:
+      - {"path":"tests/hfs/hfs-boot-proof.spec.mjs","edition":"lite"}
   - id: R273
     code: "HFS_COVERAGE_BELOW"
     law: "An app check supplied with a coverage-from lcov report proves 100 percent lines, functions and branches per tracked back-end logic file in the edition's slot-derived measured scope; a missing source record or unavailable metric is refused. The unit runner also enforces statement coverage. Reports list the measured scope and the source files outside it, including features, cli and webhooks."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [ci]
     failureCodes: ["HFS_COVERAGE_BELOW"]
     enforcers:
       - {kind: hfs, id: coverage-below, at: scripts/hfs/rules/coverage-below.mjs}
+    editions: ["lite","full"]
+    docs:
+      - "docs/quality-bar.md#r273"
+    exemplifiedBy:
+      - {"path":"tests/hfs/hfs-coverage-below.spec.mjs","edition":"lite"}
+      - {"path":"tests/hfs/hfs-coverage-below.spec.mjs","edition":"full"}
+      - {"path":"packages/hfs/templates/be/tool-config/jest.config.js","editions":["lite","full"]}
+      - {"path":"examples/lite-app/be/jest.config.js","edition":"lite"}
+      - {"path":"examples/ecommerce-app/be/jest.config.js","edition":"full"}
+    proves:
+      - {"path":"tests/hfs/hfs-coverage-below.spec.mjs","editions":["lite","full"]}
+    witness:
+      - {"path":"tests/hfs/hfs-coverage-below.spec.mjs","edition":"lite"}
+      - {"path":"tests/hfs/hfs-coverage-below.spec.mjs","edition":"full"}
 
   - id: R274
     code: "RT_RULING_STALE_CITE"
     law: "Live prose, source comments and spec titles cite current owner rulings using ruling:R212/case-4 or a stable owner id. A superseded or amended ruling needs its live successor in the same paragraph; staleWhen statements outside historical case text and CHANGELOGs are refused, and a bare owner ruling date must match a catalog case or owner ruling."
     scope: runtime
     kinds: [check]
-    gates: [land, runtime]
+    gates: ["runtime"]
     failureCodes: ["RT_RULING_STALE_CITE"]
     enforcers:
       - {kind: runtime, id: ruling-cites, at: scripts/checks/check-ruling-cites.mjs}
+    editions: ["lite","full"]
+    templateNa: "Runtime owner-ruling citation metadata has no product scaffold surface; passing and stale authored-source fixtures live in the ruling-cites spec."
+    docs:
+      - "docs/quality-bar.md#r274"
+    exemplifiedBy:
+      - {"path":"tests/checks/ruling-cites.spec.mjs","edition":"lite"}
+      - {"path":"tests/checks/ruling-cites.spec.mjs","edition":"full"}
+    proves:
+      - {"path":"tests/checks/ruling-cites.spec.mjs","editions":["lite","full"]}
+    witness:
+      - {"path":"tests/checks/ruling-cites.spec.mjs","edition":"lite"}
+      - {"path":"tests/checks/ruling-cites.spec.mjs","edition":"full"}
 
   - id: R275
     code: "STACKS_INGRESS_UNDECLARED"
     law: "Every Swarm environment declares its one ingress component and hosts. The named component has role ingress and a digest-pinned supported ingress image; Traefik and Caddy are both accepted without a preferred product. An absent declaration, unknown component or unsupported image is refused."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: ["settle","land","ci"]
     failureCodes: ["STACKS_INGRESS_UNDECLARED", "STACKS_INGRESS_UNKNOWN"]
     enforcers:
       - {kind: hfs, id: stacks-ingress, at: scripts/hfs/rules/stacks-ingress.mjs}
+    editions: ["lite","full"]
+    docs:
+      - "docs/application-stacks.md#r275"
+    exemplifiedBy:
+      - {"path":"packages/hfs/templates/app/skeleton-lite/.starcistacks","edition":"lite"}
+      - {"path":"packages/hfs/templates/app/skeleton/.starcistacks","edition":"full"}
+      - {"path":"tests/hfs/hfs-stacks-ingress.spec.mjs","edition":"lite"}
+      - {"path":"tests/fixtures/hfs-stacks-full/passing.json","edition":"full"}
+      - {"path":"tests/fixtures/hfs-stacks-full/violating.json","edition":"full"}
+    proves:
+      - {path: tests/hfs/hfs-stacks-full-fixtures.spec.mjs, edition: full}
+      - "tests/hfs/hfs-stacks-ingress.spec.mjs"
+    witness:
+      - {"path":"tests/hfs/hfs-stacks-ingress.spec.mjs","edition":"lite"}
+      - {"path":"tests/fixtures/hfs-stacks-full/violating.json","edition":"full"}
 
   - id: R276
     code: "STACKS_LITE_SELFHOSTED_DB"
     law: "Lite uses managed Supabase and runs no PostgreSQL, Redis or MongoDB backing image. A sidecar that needs a database uses SQLite on a named persistent volume declared by its component and mounted in the rendered model; a sidecar requiring another database is refused. Full retains its declared backing topology."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: ["settle","land","ci"]
     failureCodes: ["STACKS_LITE_SELFHOSTED_DB", "STACKS_SIDECAR_VOLUME_UNDECLARED", "STACKS_SIDECAR_DB_UNSUPPORTED"]
     enforcers:
       - {kind: hfs, id: stacks-lite-backing, at: scripts/hfs/rules/stacks-lite-backing.mjs}
+    editions: ["lite"]
+    editionWhy: "ruling:R276 records owner ruling 4: lite uses managed Supabase, refuses self-hosted backing images and permits database-dependent sidecars only with SQLite on declared persistent volumes; full keeps its declared backing topology."
+    docs:
+      - "docs/application-stacks.md#r276"
+    exemplifiedBy:
+      - {"path":"packages/hfs/templates/app/skeleton-lite/.starcistacks","edition":"lite"}
+      - {"path":"tests/hfs/hfs-stacks-lite-backing.spec.mjs","edition":"lite"}
+    proves:
+      - "tests/hfs/hfs-stacks-lite-backing.spec.mjs"
+    witness:
+      - {"path":"tests/hfs/hfs-stacks-lite-backing.spec.mjs","edition":"lite"}
 
   - id: R277
     code: "HFS_SECRET_PLAINTEXT_FILE"

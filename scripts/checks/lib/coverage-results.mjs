@@ -12,16 +12,23 @@ function returnedExpressions(context, target) {
   return out;
 }
 
-function callDependencies(context, current, helpersOnly) {
-  const target = invocation(context, current.index, current.node);
-  if (!target) return builtinDependencies(current);
+function callDependencies(context, current, { helpersOnly, code }) {
+  const target = resolvedExpression(context, current.index, current.node.callee);
+  if (!['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(target.node?.type)) return builtinDependencies(current);
   if (current.stack.has(target.node)) return [];
   const stack = new Set(current.stack).add(target.node);
-  if (testHelper(target.index)) return [target, ...returnedExpressions(context, target)].map((entry) => ({ ...entry, stack }));
+  if (testHelper(target.index)) return returnedDependencies(context, invocation(context, current.index, current.node), stack);
   if (helpersOnly) return [];
-  return [...expressionReach(context, target.index, target.node)].flatMap(([file, nodes]) => nodes.map((node) => ({
-    index: file === target.index.file ? target.index : sourceIndex(context, file), node, stack, terminal: true,
+  const reached = expressionReach(context, sourceIndex(context, target.index.file), target.node);
+  const emitsCode = reached.get(target.index.file)?.some((node) => node.type === 'Literal' && typeof node.value === 'string' && node.value.includes(code));
+  if (code && !emitsCode) return returnedDependencies(context, invocation(context, current.index, current.node), stack);
+  return [...reached].flatMap(([file, nodes]) => nodes.map((node) => ({
+    index: sourceIndex(context, file), node, stack, terminal: true,
   })));
+}
+
+function returnedDependencies(context, target, stack) {
+  return [target, ...returnedExpressions(context, target)].map((entry) => ({ ...entry, stack }));
 }
 
 function builtinDependencies(current) {
@@ -33,7 +40,20 @@ function builtinDependencies(current) {
   return out;
 }
 
-export function resultReach(context, index, node, { helpersOnly = false } = {}) {
+function appendPending(pending, entries) {
+  for (const entry of entries) pending.push(entry);
+}
+
+function resultDependencies(context, current, options) {
+  if (current.terminal) return [];
+  const resolved = resolvedExpression(context, current.index, current.node);
+  if (resolved.node !== current.node && resolved.node) return [{ ...current, ...resolved }];
+  if (current.node.type === 'CallExpression') return callDependencies(context, current, options);
+  if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(current.node.type)) return [];
+  return astChildren(current.node).map((child) => ({ ...current, node: child }));
+}
+
+export function resultReach(context, index, node, { helpersOnly = false, code } = {}) {
   const out = new Map();
   const pending = node ? [{ index, node, stack: new Set() }] : [];
   const seen = new WeakMap();
@@ -46,12 +66,7 @@ export function resultReach(context, index, node, { helpersOnly = false } = {}) 
     const nodes = out.get(current.index.file) ?? [];
     nodes.push(current.node);
     out.set(current.index.file, nodes);
-    if (current.terminal) continue;
-    const resolved = resolvedExpression(context, current.index, current.node);
-    if (resolved.node !== current.node && resolved.node) { pending.push({ ...current, ...resolved }); continue; }
-    if (current.node.type === 'CallExpression') { pending.push(...callDependencies(context, current, helpersOnly)); continue; }
-    if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(current.node.type)) continue;
-    pending.push(...astChildren(current.node).map((child) => ({ ...current, node: child })));
+    appendPending(pending, resultDependencies(context, current, { helpersOnly, code }));
   }
   return out;
 }

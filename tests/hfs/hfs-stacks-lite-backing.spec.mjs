@@ -184,6 +184,28 @@ function trackedFixture(value, run) {
   }
 }
 
+const finderMutations = [
+  { code: 'STACKS_LITE_SELFHOSTED_DB', violate(value) { value.model.services.cache = { image: pinned('redis:7.4.3') }; } },
+  { code: 'STACKS_SIDECAR_VOLUME_UNDECLARED', violate(value) { delete value.model.volumes; } },
+  { code: 'STACKS_SIDECAR_DB_UNSUPPORTED', violate(value) { value.doc.components.automation.database.provider = 'postgres'; } },
+];
+
+for (const { code, violate } of finderMutations) {
+  test(`${code}@lite: tracked managed backing and SQLite sidecar pass the finder`, () => {
+    trackedFixture(fixture(), context => {
+      assert.deepEqual(stacksLiteBackingFindings(context).filter(finding => finding.code === code), []);
+    });
+  });
+
+  test(`${code}@lite: tracked violating backing evidence fails the finder`, () => {
+    const value = fixture();
+    violate(value);
+    trackedFixture(value, context => {
+      assert.ok(stacksLiteBackingFindings(context).some(finding => finding.code === code));
+    });
+  });
+}
+
 test('R276 HFS finder reads rendered services and reports standard lite findings', () => {
   const value = fixture();
   value.model.services.cache = { image: pinned('redis:7.4.3') };

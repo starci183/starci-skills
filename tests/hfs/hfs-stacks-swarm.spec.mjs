@@ -323,7 +323,7 @@ test('STACKS_REALTIME_SCALED@lite: tracked config cannot read untracked or secre
   }
 });
 
-test('STACKS_REALTIME_SCALED@lite: tracked finder judges the composed API replica pin', t => {
+test('STACKS_REALTIME_SCALED@lite: tracked composed API passes with one replica and fails when scaled', t => {
   const value = fixture(t);
   addRealtime(value);
   value.model.services.api.deploy.replicas = 1;

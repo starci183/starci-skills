@@ -111,6 +111,30 @@ function trackedFixture(value, run) {
   }
 }
 
+const finderMutations = [
+  { code: 'STACKS_INGRESS_UNDECLARED', violate(value) { delete value.spec.ingress; } },
+  { code: 'STACKS_INGRESS_UNKNOWN', violate(value) { value.model.services.edge.image = pinned('nginx:1.28.0'); } },
+  { code: 'STACKS_SECOND_INGRESS', violate(value) { value.model.services.preview = { image: pinned('caddy:2.10.2') }; } },
+];
+
+for (const edition of ['lite', 'full']) {
+  for (const { code, violate } of finderMutations) {
+    test(`${code}@${edition}: tracked declared digest-pinned ingress passes the finder`, () => {
+      trackedFixture(fixture(edition), context => {
+        assert.deepEqual(stacksIngressFindings(context).filter(finding => finding.code === code), []);
+      });
+    });
+
+    test(`${code}@${edition}: tracked violating ingress evidence fails the finder`, () => {
+      const value = fixture(edition);
+      violate(value);
+      trackedFixture(value, context => {
+        assert.ok(stacksIngressFindings(context).some(finding => finding.code === code));
+      });
+    });
+  }
+}
+
 test('R275 HFS finder reads the tracked model and returns standard findings for both editions', () => {
   for (const edition of ['lite', 'full']) {
     const value = fixture(edition);

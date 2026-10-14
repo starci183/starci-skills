@@ -71,7 +71,46 @@ function jobFixture(value) {
   value.doc.jobs = { 'daily-report': { component: 'report', schedule: CRON, command: COMMAND } };
 }
 
+const finderMutations = [
+  { code: 'STACKS_RELEASE_UNDECLARED', violate(value) { delete value.spec.release; } },
+  { code: 'BACKUP_UNDECLARED', violate(value) { value.spec.backup = value.spec.backup.filter(entry => entry.component !== 'supabase'); } },
+  { code: 'BACKUP_PROOF_MISSING', violate(value) { delete value.spec.backup[0].restoreProof; } },
+];
+
 for (const edition of ['lite', 'full']) {
+  for (const { code, violate } of finderMutations) {
+    test(`${code}@${edition}: tracked declared release and backup evidence passes the finder`, () => {
+      withFixture(edition, value => {
+        assert.deepEqual(stacksReleaseFindings(value).filter(finding => finding.code === code), []);
+      });
+    });
+
+    test(`${code}@${edition}: tracked violating release or backup evidence fails the finder`, () => {
+      withFixture(edition, value => {
+        violate(value);
+        saveDeclaration(value);
+        assert.ok(stacksReleaseFindings(value).some(finding => finding.code === code));
+      });
+    });
+  }
+
+  test(`HFS_SCHEDULE_UNDECLARED@${edition}: tracked declared replicated CLI job passes the finder`, () => {
+    withFixture(edition, value => {
+      jobFixture(value);
+      saveDeclaration(value);
+      assert.deepEqual(stacksReleaseFindings(value).filter(finding => finding.code === 'HFS_SCHEDULE_UNDECLARED'), []);
+    });
+  });
+
+  test(`HFS_SCHEDULE_UNDECLARED@${edition}: tracked missing job declaration fails the finder`, () => {
+    withFixture(edition, value => {
+      jobFixture(value);
+      delete value.doc.jobs;
+      saveDeclaration(value);
+      assert.ok(stacksReleaseFindings(value).some(finding => finding.code === 'HFS_SCHEDULE_UNDECLARED'));
+    });
+  });
+
   test('STACKS_RELEASE_UNDECLARED@' + edition + ': tracked immutable records and health assertions pass', () => {
     withFixture(edition, value => assert.deepEqual(releaseCode(value, 'STACKS_RELEASE_UNDECLARED'), []));
   });
@@ -336,7 +375,7 @@ for (const edition of ['lite', 'full']) {
     });
   });
 
-  test('R267/R268@' + edition + ': finder returns standard code, level and declaration/source paths', () => {
+  test('R267/R268@' + edition + ': violating release, backup and schedule evidence fails with standard code, level and declaration/source paths', () => {
     withFixture(edition, value => {
       delete value.spec.release;
       delete value.spec.backup[0].restoreProof;

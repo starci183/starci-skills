@@ -1,6 +1,5 @@
 // proves: BE_SUPABASE_CLIENT_OWNER@lite BE_SUPABASE_CLIENT_OWNER@full
 // proves: FE_SUPABASE_CLIENT_OWNER@lite FE_SUPABASE_CLIENT_OWNER@full
-// proves: BE_JWT_ALG_PINNED@lite BE_JWT_ALG_PINNED@full
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { appDeclaration, archFixture, findings, runArch } from '../helpers/hfs-arch-fixture.mjs';

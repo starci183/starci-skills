@@ -36,7 +36,7 @@ for (const edition of ["lite", "full"]) {
         const hfs = hfsFromDeclaration({ ...appDeclaration("be", { ...BE_DECLARATION, patterns: ["webhooks"] }), edition }, TYPED_ROOT)
         assert.equal(hfs.edition, edition)
         const error = [{ messageId: "key" }]
-        ruleTester({ root: TYPED_ROOT, hfs }).run("webhook-inbox-key", webhookInboxKey, {
+        ruleTester({ root: TYPED_ROOT, hfs }).run("webhook-inbox-key", rules["webhook-inbox-key"], {
             valid: [
                 { filename: SERVICE, code: service(claim) },
                 ...["deliveryId", "messageId", "providerDeliveryId", "orderId", "notificationId"].map((name) => ({ filename: SERVICE, code: service(claim.replaceAll("eventId", name), { parameter: `${name}: string` }) })),

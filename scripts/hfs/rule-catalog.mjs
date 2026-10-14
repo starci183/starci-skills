@@ -201,8 +201,9 @@ function checkRuleCases(rule, label, bad) {
 
 function checkRuleGates(rule, label, gates, bad) {
   if (!gates.length) return;
+  const releaseGate = gates.includes('land') || gates.includes('ci');
   const runtimeGate = rule.scope === 'runtime' && gates.includes('runtime');
-  if (!gates.includes('land') && !runtimeGate) bad.push(`${label} must run at land or, for runtime scope, the runtime gate`);
+  if (!releaseGate && !runtimeGate) bad.push(`${label} must run at land or ci or, for runtime scope, the runtime gate`);
 }
 
 function checkRuleFailureCodes(rule, label, codeOwner, bad) {

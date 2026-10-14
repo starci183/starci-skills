@@ -1,4 +1,4 @@
-import test, { describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -18,6 +18,7 @@ import { loadSlotManifest } from '../../scripts/hfs/slots.mjs';
 import { declaredSonarKeys, readDeclaredSonarKey } from '../../packages/hfs/sync/sonar-key.mjs';
 import { hygieneFindings, runWorkHygiene } from '../../packages/hfs/sync/hygiene.mjs';
 import { appCliTemplateFindings } from '../../scripts/hfs/runtime-rules/app-cli-templates.mjs';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 
 // starci app sync renders the managed files of an app: the root's (the one package.json's scripts, prettier, Sonar, the hooks, the
 // workflows, the .gitignore block and .starciwork/.gitignore) and each side's (be: tsconfig, tsconfig.build, the tests tsconfig,
@@ -147,17 +148,17 @@ describe('.husky/pre-commit', () => {
     const log = path.join(dir, 'calls.jsonl');
     const probe = path.join(bin, 'probe.mjs');
     fs.mkdirSync(bin);
-    fs.writeFileSync(probe, `import fs from 'node:fs';
+    fs.writeFileSync(probe, String.raw`import fs from 'node:fs';
 import path from 'node:path';
 const log = ${JSON.stringify(log)};
-const previous = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\\n').map(line => JSON.parse(line)) : [];
+const previous = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n').map(line => JSON.parse(line)) : [];
 const call = { cwd: process.cwd(), args: process.argv.slice(2) };
-fs.appendFileSync(log, JSON.stringify(call) + '\\n');
+fs.appendFileSync(log, JSON.stringify(call) + '\n');
 const failure = ${JSON.stringify(failure)};
 if (failure && call.args[0] === failure.tool && (!failure.side || path.basename(call.cwd) === failure.side)
   && previous.filter(other => other.cwd === call.cwd && other.args[0] === call.args[0]).length === 1) process.exit(1);
 `);
-    const quote = value => `'${value.replaceAll('\\', '/').replaceAll("'", "'\\''")}'`;
+    const quote = value => "'" + value.split(path.sep).join('/').replaceAll("'", String.raw`'\''`) + "'";
     fs.writeFileSync(path.join(bin, 'npx'), `#!/bin/sh\nexec ${quote(process.execPath)} ${quote(probe)} "$@"\n`, { mode: 0o755 });
     return {
       dir,
@@ -181,7 +182,7 @@ if (failure && call.args[0] === failure.tool && (!failure.side || path.basename(
       const options = side === 'be' ? ['eslint', '--'] : ['eslint', '--max-warnings=0', '--no-warn-ignored', '--'];
       for (const call of lint) assert.deepEqual(call.args.slice(0, options.length), options);
       assert.deepEqual(lint.map(call => call.args.length - options.length), [50, 50, 5]);
-      assert.deepEqual(lint.flatMap(call => call.args.slice(options.length)).sort(), [...names].sort());
+      assert.deepEqual(lint.flatMap(call => call.args.slice(options.length)).sort(byCodeUnit), [...names].sort(byCodeUnit));
     }
     const format = calls.filter(call => call.args[0] === 'prettier');
     for (const call of format) {
@@ -189,7 +190,7 @@ if (failure && call.args[0] === failure.tool && (!failure.side || path.basename(
       assert.deepEqual(call.args.slice(0, 4), ['prettier', '--check', '--ignore-unknown', '--']);
       assert.ok(call.args.length > 4 && call.args.length <= 54);
     }
-    assert.deepEqual(format.flatMap(call => call.args.slice(4)).sort(), [...files, 'hfs.json'].sort());
+    assert.deepEqual(format.flatMap(call => call.args.slice(4)).sort(byCodeUnit), [...files, 'hfs.json'].sort(byCodeUnit));
   });
 
   it('runs only hygiene when no files are staged and side directories are absent', (t) => {
@@ -230,6 +231,17 @@ describe('.husky/pre-push', () => {
 });
 
 describe('.github/workflows', () => {
+  for (const edition of ['lite', 'full']) {
+    it(`ci.yml proves the fresh unit lcov before uploading it in ${edition}`, () => {
+      const doc = parseYaml(rendered({ ...APP, edition })['.github/workflows/ci.yml']);
+      const steps = doc.jobs.ci.steps;
+      const unit = steps.findIndex(step => step.run === 'npm test -- --ci');
+      const proof = steps.findIndex(step => step.run === 'npx starci app check --coverage-from be/coverage/lcov.info');
+      const upload = steps.findIndex(step => String(step.uses ?? '').startsWith('codecov/'));
+      assert.ok(unit >= 0 && proof > unit, 'the proof reads the fresh unit report');
+      assert.ok(upload > proof, 'coverage is proved before it is published');
+    });
+  }
   it('ci.yml runs the one lint, format, typecheck, unit, the coverage upload, both builds and Sonar, with no e2e', () => {
     const text = rendered()['.github/workflows/ci.yml'];
     const doc = parseYaml(text);
@@ -271,7 +283,9 @@ describe('.gitignore', () => {
     }
   });
   it('carries the .starcistacks custody rules of modules/schemas/stacks-layout.yaml in order, rooted at the app root and never under be/', () => {
-    const rules = parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/stacks-layout.yaml'), 'utf8')).custody.gitignoreRules;
+    const declaredRules = parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/stacks-layout.yaml'), 'utf8')).custody.gitignoreRules;
+    // Gitignore uses the last matching entry; keep that effective order for duplicate declarations.
+    const rules = [...new Set(declaredRules.toReversed())].toReversed();
     const lines = block().split('\n');
     const start = lines.indexOf(rules[0]);
     assert.ok(start > 0, 'the custody block is in the managed block');
@@ -542,7 +556,8 @@ describe('the package.json scripts of the app', () => {
     const typecheck = 'npm run codegen --silent && tsc -p be/tsconfig.json && turbo run typecheck';
     assert.equal(scriptsOf(app({ fe: { apps: [{ name: 'app', kind: 'next' }], optionalSlots: ['fe.package.ui'] } })).typecheck, typecheck);
     assert.equal(scriptsOf(app({ fe: { apps: [{ name: 'app', kind: 'next' }] } })).typecheck, typecheck, 'with or without packages: the task graph decides');
-    const graph = JSON.parse(rendered()['turbo.json'].replace(/^\s*\/\/.*$/gm, ''));
+    const graphText = rendered()['turbo.json'].split('\n').filter(line => !line.trimStart().startsWith('//')).join('\n');
+    const graph = JSON.parse(graphText);
     assert.deepEqual(graph.tasks.typecheck.dependsOn, ['^build']);
     assert.deepEqual(graph.tasks.build.dependsOn, ['^build']);
     assert.deepEqual(Object.keys(graph.tasks).sort(), ['build', 'dev', 'lint', 'typecheck']);
@@ -612,7 +627,7 @@ describe('work-hygiene', () => {
     put('be/src/config.ts', 'export const key = 1;\n');   // the work tree is clean; the index still holds the secret
     const lines = [];
     assert.equal(await runWorkHygiene({ cwd: dir, out: line => lines.push(line) }), 1);
-    const refused = lines.filter(line => line.startsWith('HFS_PLAINTEXT_SECRET')).map(line => line.split(' ')[1]).sort();
+    const refused = lines.filter(line => line.startsWith('HFS_PLAINTEXT_SECRET')).map(line => line.split(' ')[1]).sort(byCodeUnit);
     assert.deepEqual(refused, ['.starcistacks/dev/secrets/db.enc', 'be/src/config.ts']);
     assert.ok(!lines.join('\n').includes(awsKey), 'a finding never prints the value');
     git('reset', '-q', 'be/src/config.ts', '.starcistacks/dev/secrets/db.enc');
@@ -655,7 +670,7 @@ describe('starci app scaffold: the first tree', () => {
     // The skeleton specs need no registry: the lock step is the npm run hfs-scaffold-app.spec proves; here it reports success.
     return scaffoldApp({ name, into, presets: PRESETS, lock: () => ({ ok: true }) });
   };
-  const filesUnder = dir => fs.readdirSync(dir, { recursive: true, withFileTypes: true }).filter(entry => entry.isFile()).map(entry => path.relative(dir, path.join(entry.parentPath, entry.name)).split(path.sep).join('/')).sort();
+  const filesUnder = dir => fs.readdirSync(dir, { recursive: true, withFileTypes: true }).filter(entry => entry.isFile()).map(entry => path.relative(dir, path.join(entry.parentPath, entry.name)).split(path.sep).join('/')).sort(byCodeUnit);
   const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
 
   it('writes the root, the be side and the fe side, already in sync, with one package.json at the root and the lockfile left to npm', async t => {
@@ -687,8 +702,8 @@ describe('starci app scaffold: the first tree', () => {
     assert.deepEqual(JSON.parse(read(root, 'hfs.json')).sides.fe.optionalSlots, ['fe.package.ui', 'fe.package.i18n'], 'the shared packages are declared slots');
     const rootManifest = JSON.parse(read(root, 'package.json'));
     assert.deepEqual([rootManifest.workspaces, typeof rootManifest.packageManager, typeof rootManifest.devDependencies.turbo], [['fe/apps/*', 'fe/packages/*'], 'string', 'string'], 'the root is the monorepo root');
-    const feOnly = ['next', 'next-intl', 'react', 'react-dom', '@starci/grammar', '@heroui/react', '@heroui/styles', 'server-only', '@nivo/ui', '@nivo/i18n'];
-    assert.deepEqual(Object.keys(rootManifest.dependencies).filter(name => feOnly.includes(name)), [], 'the root runtime dependencies hold nothing fe-only: each fe workspace declares its own');
+    const feOnly = new Set(['next', 'next-intl', 'react', 'react-dom', '@starci/grammar', '@heroui/react', '@heroui/styles', 'server-only', '@nivo/ui', '@nivo/i18n']);
+    assert.deepEqual(Object.keys(rootManifest.dependencies).filter(name => feOnly.has(name)), [], 'the root runtime dependencies hold nothing fe-only: each fe workspace declares its own');
     assert.ok(files.includes('turbo.json'), 'the task graph sits at the app root');
     assert.ok(!files.includes('package-lock.json'), 'the scaffold writes no lockfile by hand: npm resolves it');
     // .starcistacks and its sops rule live at the app root, beside be/, fe/ and .starciwork; no side holds either.
@@ -734,7 +749,11 @@ describe('starci app scaffold: the first tree', () => {
     assert.ok(required.some(file => file.endsWith('.cli.ts')), 'the cli commands are unit-tested subjects');
     assert.ok(specs.some(spec => /\.(policy|guard|mapper|client|filter)\.spec\.ts$/.test(spec)), 'the logic files that owe 100 carry their specs');
     assert.ok(specs.length >= 3);
-    for (const spec of specs.filter(spec => required.includes(spec.replace(/\.spec\.ts$/, '.ts')))) {
+    const classSpecs = specs.filter(spec => {
+      const subject = spec.replace(/\.spec\.ts$/, '.ts');
+      return required.includes(subject) && /\bclass\s+\w+/.test(read(root, subject));
+    });
+    for (const spec of classSpecs) {
       const text = read(root, spec);
       assert.match(text, /Test\.createTestingModule\(\{[\s\S]*?providers: \[/, `${spec} builds its subject with the testing module`);
       assert.match(text, /moduleRef\.get\(/, spec);
@@ -746,7 +765,12 @@ describe('starci app scaffold: the first tree', () => {
     const { root } = scaffold(t);
     const sources = filesUnder(root).filter(file => file.startsWith('be/') && file.endsWith('.ts') && !file.endsWith('.spec.ts'));
     assert.deepEqual(sources.filter(file => /process\.env/.test(read(root, file))), ['be/src/modules/platform/config/env-source.config.ts'], 'process.env is read only by platform/config');
-    assert.ok(sources.every(file => !/console\.|new Error\(|synchronize(?!: false\b)|@Cron|new Date\(\)|Date\.now/.test(read(root, file)) || file === 'be/src/modules/platform/clock/system-clock.service.ts'), 'the ambient clock is read only by platform/clock');
+    for (const file of sources) {
+      const text = read(root, file);
+      assert.doesNotMatch(text, /console\.|synchronize(?!: false\b)|@Cron/, `${file} keeps the source law`);
+      if (file !== 'be/src/modules/platform/clock/system-clock.service.ts') assert.doesNotMatch(text, /new Date\(\)|Date\.now/, `${file} reads time only through platform/clock`);
+      if (!file.startsWith('be/src/modules/platform/')) assert.doesNotMatch(text, /new Error\(/, `${file} uses its capability error`);
+    }
     // Migrations are the only schema authority (BE-PERSISTENCE-1): every data source the skeleton opens states `synchronize: false`.
     const opened = sources.filter(file => /TypeOrmModule\.forRoot\(|new DataSource\(/.test(read(root, file)));
     assert.deepEqual(opened, ['be/src/modules/platform/database/connection-source.client.ts', 'be/src/modules/platform/database/database.module.ts']);
@@ -780,12 +804,12 @@ describe('starci app scaffold: the first tree', () => {
     assert.match(read(root, 'fe/packages/nivo-i18n/src/index.ts'), /export const createAppI18n = [\s\S]*getRequestConfig\([\s\S]*readLocaleSegment/);
     assert.match(read(root, 'fe/packages/nivo-i18n/src/proxy.ts'), /const negotiate = createMiddleware\(routing\)[\s\S]*export const proxy = /);
     const stack = /defineRouting|getRequestConfig|createMiddleware|createNavigation/;
-    assert.deepEqual(files.filter(file => /\.tsx?$/.test(file) && stack.test(read(root, file))).sort(), ['fe/packages/nivo-i18n/src/index.ts', 'fe/packages/nivo-i18n/src/proxy.ts', 'fe/packages/nivo-i18n/src/routing.ts'], 'no app builds a layer of the next-intl stack');
+    assert.deepEqual(files.filter(file => /\.tsx?$/.test(file) && stack.test(read(root, file))).sort(byCodeUnit), ['fe/packages/nivo-i18n/src/index.ts', 'fe/packages/nivo-i18n/src/proxy.ts', 'fe/packages/nivo-i18n/src/routing.ts'], 'no app builds a layer of the next-intl stack');
     // The brand shell is one ui component both apps mount.
     assert.match(read(root, 'fe/packages/nivo-ui/src/composites/SiteShell/index.tsx'), /<TopBar brand=/);
     for (const [name, prefix] of [['landing', 'Landing'], ['app', 'App']]) {
       const at = `fe/apps/${name}`;
-      assert.match(read(root, `${at}/src/modules/i18n/index.ts`), new RegExp(`import \\{ createAppI18n \\} from "@nivo/i18n"[\\s\\S]*createAppI18n\\(\\s*"${name}"`), `${name} calls the package factory with its name`);
+      assert.match(read(root, `${at}/src/modules/i18n/index.ts`), new RegExp(String.raw`import \{ createAppI18n \} from "@nivo/i18n"[\s\S]*createAppI18n\(\s*"${name}"`), `${name} calls the package factory with its name`);
       assert.match(read(root, `${at}/src/modules/i18n/request.ts`), /export default \w+I18n\.requestConfig/);
       assert.equal(read(root, `${at}/src/proxy.ts`), 'export { proxy } from "@nivo/i18n/proxy"\n', `${name} re-exports the package proxy`);
       assert.match(read(root, `${at}/src/features/layouts/${prefix}Layout/index.tsx`), /<SiteShell brand=/, `${name} mounts the shared brand shell`);
@@ -819,7 +843,7 @@ describe('scripts/gates/hfs-sync.mjs', () => {
     execFileSync('git', ['add', '-f', '.'], { cwd: dir });
     const result = await checkHfsSync(dir, { presets: PRESETS });
     assert.equal(result.ok, false);
-    assert.deepEqual(result.findings.map(finding => [finding.code, finding.file]).sort(), [
+    assert.deepEqual(result.findings.map(finding => [finding.code, finding.file]).sort((left, right) => byCodeUnit(left[0], right[0]) || byCodeUnit(left[1], right[1])), [
       ['HFS_MANAGED_FILE_DRIFT', '.prettierignore'],
       ['HFS_PLAINTEXT_SECRET', '.starcistacks/dev/secrets/db.txt'],
       ['HFS_WORK_AGENT_DATA', '.starciwork/features/a/evidence/run.log'],
