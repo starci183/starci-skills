@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { archFixture, runArch, findings } from '../helpers/hfs-arch-fixture.mjs';
 import { stronglyConnected } from '../../scripts/hfs/architecture/tiers.mjs';
 import { byCodeUnit } from '../../scripts/lib/list.mjs';
-import { overlayHostFiles } from '../helpers/fe-overlay-host-files.mjs';
+import { overlayHostFiles } from '../../packages/eslint/fe/fixtures/overlay-host-files.mjs';
 
 // HFS checks 1 and 2: the tier direction matrix of knowledge/hfs/slots.yaml and owner cycles.
 

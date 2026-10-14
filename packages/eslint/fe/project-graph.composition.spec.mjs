@@ -7,7 +7,7 @@ import { rules as propsRules } from "./props-and-slots.mjs"
 import { rules as splitRules } from "./the-split.mjs"
 import { rules as loadingRules } from "./loading.mjs"
 import { navigationFromIntl, noNullSuspenseFallback } from "./next-conventions.mjs"
-import { overlayHostFiles } from "../../../tests/helpers/fe-overlay-host-files.mjs"
+import { overlayHostFiles } from "./fixtures/overlay-host-files.mjs"
 
 const overlay = "apps/web/src/features/overlays/ItemsOverlay/index.tsx"
 const block = "apps/web/src/components/blocks/ItemBlock/index.tsx"
