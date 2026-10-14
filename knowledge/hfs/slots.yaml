@@ -7,7 +7,7 @@
 # catalog READ this file through scripts/hfs/slots.mjs; none of them hardcodes a path.
 # Shape: modules/schemas/hfs-slots.schema.yaml. The repository side is hfs.json: modules/schemas/hfs-repo.schema.yaml.
 schema: starci/hfs-slots@3
-version: 3.1.0
+version: 3.2.0
 
 versioning:
   # MAJOR.MINOR.PATCH of this manifest. A repository pins only the MAJOR in hfs.json ("hfs": 3).
@@ -410,6 +410,7 @@ slots:
     tests: none
     rules: [HFS_GITIGNORE_BLOCK_DRIFT]     # the marked block of .gitignore is rendered by starci app sync (templates/app/gitignore)
   - id: app.gitattributes
+    since: 3.2.0
     profiles: [app]
     path: .gitattributes
     presence: required
@@ -588,6 +589,7 @@ slots:
     tier: none
     tests: none
   - id: app.dependabot
+    since: 3.2.0
     profiles: [app]
     path: .github/dependabot.yml
     presence: required
@@ -2105,6 +2107,7 @@ slots:
     tests: none
     rules: [FE_TRANSPORT_OWNER, FE_HTTP_STATUS_COLLAPSE, FE_WIRE_GENERATED]
   - id: fe.transport.generated
+    since: 3.2.0
     profiles: [fe]
     path: "apps/<app>/src/modules/api/graphql/__generated__/"
     presence: optional
