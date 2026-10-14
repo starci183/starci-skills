@@ -86,6 +86,9 @@ runbook, environment record and sealed secret custody. The api, web, ingress and
 Kubernetes and Terraform infra trees, runtime and seeds trees remain forbidden. Lite also refuses components whose images
 duplicate Supabase-provided services (postgres, redis, kafka, keycloak, minio, rabbitmq, mysql or mongo).
 
+The ingress is any declared ingress, Traefik or Caddy (the example uses Caddy); the check keys on `role: ingress`. A sidecar such as n8n
+keeps its state in SQLite on a declared persistent volume, never in a self-hosted Postgres (owner ruling 2026-10-14).
+
 Every Swarm service has a digest-pinned image, healthcheck, update policy with rollback on failure, rollback policy and restart
 policy. Only the declared ingress publishes ports. Runtime secrets are external and versioned, materialized from the sealed
 custody for the release. Recurring work is app-owned; workflows, deployment files, scripts and the stack tree must never install

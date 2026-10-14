@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { addScheduledJob, swarmFixture } from '../helpers/swarm-stack-fixture.mjs';
+import { addScheduledJob, swarmFixture, swarmService } from '../helpers/swarm-stack-fixture.mjs';
 
 test('lite accepts the canonical Swarm production tree and managed Supabase backing', t => {
   const f = swarmFixture(t);
@@ -158,4 +158,36 @@ test('empty healthcheck commands, malformed ports and embedded secret content ar
   const messages = f.check().map(item => item.message).join('\n');
   assert.ok(messages.includes('ports must be an array'));
   assert.ok(messages.includes('no embedded value source'));
+});
+
+test('lite accepts any declared ingress: a Traefik ingress passes like Caddy', t => {
+  const f = swarmFixture(t);
+  const image = `traefik:v3.1@sha256:${'e'.repeat(64)}`;
+  f.manifest.components.ingress.image = image;
+  f.model.services.ingress = { ...swarmService(image), ports: ['80:80', '443:443'] };
+  f.write();
+  assert.deepEqual(f.check(), []);
+  f.model.services.api.ports = ['3000:3000'];
+  f.write();
+  assert.ok(f.check().some(item => /only a component with role ingress/.test(item.message)));
+});
+
+test('lite accepts a sidecar on SQLite with a persistent volume and refuses its own Postgres', t => {
+  const f = swarmFixture(t);
+  const image = `docker.n8n.io/n8nio/n8n:1.60.0@sha256:${'f'.repeat(64)}`;
+  f.manifest.components.n8n = { role: 'service', image, compose: 'infra/swarm/stack.yaml' };
+  f.manifest.environments.production.components.n8n = {};
+  f.model.services.n8n = { ...swarmService(image), environment: { DB_TYPE: 'sqlite', N8N_USER_FOLDER: '/data/n8n' },
+    volumes: ['n8n-data:/data/n8n'] };
+  f.model.services.n8n.deploy.replicas = 1;
+  f.model.services.n8n.deploy.placement = { constraints: ['node.role == manager'] };
+  f.model.volumes = { 'n8n-data': {} };
+  f.write();
+  assert.deepEqual(f.check(), []);
+  const postgres = `postgres:16@sha256:${'d'.repeat(64)}`;
+  f.manifest.components['n8n-db'] = { role: 'stateful', image: postgres, compose: 'infra/swarm/stack.yaml' };
+  f.manifest.environments.production.components['n8n-db'] = {};
+  f.model.services['n8n-db'] = swarmService(postgres);
+  f.write();
+  assert.equal(f.check().filter(item => /duplicate/.test(item.message)).length, 2);
 });

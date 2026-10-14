@@ -43,7 +43,9 @@ rules:
       event bus on Supabase Queues (pgmq); realtime on the same socket.io gateway run inside the api process (one instance, no
       Redis adapter); cache and locks on Postgres; app-owned schedules through back-end schedulers, pgmq jobs or pg_cron ticks
       (+ pg_net); storage and auth on Supabase. The api, web, ingress and application sidecars run on Docker Swarm on the VPS;
-      app.starcistacks declares Supabase as managed backing and the environment with `runtime: docker-swarm`.
+      app.starcistacks declares Supabase as managed backing and the environment with `runtime: docker-swarm`. The ingress is
+      any declared `role: ingress` component (Traefik or Caddy); a sidecar such as n8n keeps its state in SQLite on a declared
+      persistent volume, never in a self-hosted Postgres.
       Integration specs are optional and run only on `starci supabase start`. A lite app holds
       none of the infrastructure lite does not run: no e2e or contract spec or script, no e2e workflow or browser journey, no
       UAT record, no test container, toxiproxy, BullMQ, Kafka or Redis dependency. The app.starcistacks lite overlay permits
