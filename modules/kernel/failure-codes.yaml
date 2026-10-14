@@ -18461,5 +18461,92 @@ HFS_APP_LEXICON:
   causes_vi:
     - "Đổi thuật ngữ sản phẩm nhưng chưa cập nhật toàn bộ mã và tài liệu."
   nextStep_vi: "Thay từ đã bỏ bằng thuật ngữ sản phẩm hiện hành tại đường dẫn và dòng được báo."
+DB_BASELINE_SHAPE:
+  title: "An archived migration chain needs exactly one valid replacement baseline"
+  title_vi: "Baseline của chuỗi migration lưu trữ sai hình dạng"
+  meaning_vi: "Archive có migration nhưng thiếu hoặc thừa baseline đang hoạt động, marker không nêu stamp cuối của archive, hoặc stamp baseline không hợp lệ và không có bản đồ restamp rõ ràng."
+  causes_vi:
+    - "Vi phạm R257: chuyển chuỗi migration vào archive mà không tạo baseline đúng marker và stamp."
+  nextStep_vi: "Chạy app db baseline để xem kế hoạch, kiểm tra marker và bản đồ restamp, rồi thi hành với --apply khi kế hoạch đã đúng."
+  owner: op-retry
+  kind: check-finding
+
+DB_ARCHIVE_MUTATED:
+  title: "Archived migrations are immutable and retire only with a new baseline"
+  title_vi: "Archive migration bị thay đổi ngoài lần cắt baseline"
+  meaning_vi: "Migration đã lưu trữ bị sửa hoặc xóa, file mới được đưa thẳng vào archive, hoặc migration đang hoạt động được lưu trữ mà không thêm baseline trong cùng thay đổi."
+  causes_vi:
+    - "Vi phạm R257: archive không giữ nguyên nội dung lịch sử của chuỗi migration."
+  nextStep_vi: "Khôi phục file lưu trữ nguyên vẹn và tạo baseline thay thế trong cùng thay đổi khi cần lưu trữ chuỗi đang hoạt động."
+  owner: op-retry
+  kind: check-finding
+
+DB_PGMQ_DECLARED:
+  title: "Queue constants, migration-created pgmq queues and queue grants must agree"
+  title_vi: "Khai báo hàng đợi pgmq lệch migration"
+  meaning_vi: "Hằng hàng đợi không có pgmq.create trong migration đang hoạt động, hàng đợi đã tạo không có hằng khai báo, hoặc quyền trên đối tượng pgmq vượt vai trò ứng dụng."
+  causes_vi:
+    - "Vi phạm R258: mã nguồn, migration và quyền truy cập không khai báo cùng hàng đợi."
+  nextStep_vi: "Đối chiếu hằng hàng đợi với pgmq.create và chỉ cấp quyền trên q_<queue>, a_<queue> cho vai trò ứng dụng."
+  owner: op-retry
+  kind: check-finding
+
+DB_CRON_OWNED:
+  title: "A uniquely owned migration cron job only enqueues to a declared queue"
+  title_vi: "Lịch pg_cron thiếu chủ sở hữu hoặc thực hiện nghiệp vụ"
+  meaning_vi: "Tên lịch bị trùng, đích hàng đợi hoặc hàm tick không tồn tại, lệnh thực hiện DML nghiệp vụ hay HTTP, hoặc cùng tick còn được lập lịch ở ứng dụng."
+  causes_vi:
+    - "Vi phạm R258: pg_cron chỉ đưa việc vào hàng đợi, mỗi tick có đúng một nơi lập lịch và được hủy lịch khi loại bỏ."
+  nextStep_vi: "Đặt lịch trong migration với tên duy nhất, dùng pgmq.send hoặc một hàm *_tick chỉ enqueue, bỏ lịch trùng và gọi cron.unschedule khi xóa tick."
+  owner: op-retry
+  kind: check-finding
+
+DB_EXTENSION_ALLOWED:
+  title: "Database extensions belong to the declared allowlist"
+  title_vi: "Extension cơ sở dữ liệu nằm ngoài danh sách cho phép"
+  meaning_vi: "Migration tạo extension không thuộc danh sách extension mà chuẩn cơ sở dữ liệu cho phép."
+  causes_vi:
+    - "Vi phạm R259: thêm extension chưa được ruleParams.db.extensions cho phép."
+  nextStep_vi: "Dùng extension trong danh sách chuẩn hoặc khai báo chính sách extension được phê duyệt trước khi thêm migration."
+  owner: op-retry
+  kind: check-finding
+
+DB_API_EXPOSED:
+  title: "The database API never exposes pgmq and lite data access is closed"
+  title_vi: "API cơ sở dữ liệu mở schema bị cấm"
+  meaning_vi: "config.toml mở pgmq hoặc pgmq_public, hoặc ứng dụng lite mở API dữ liệu mà không có policy public_read rõ ràng."
+  causes_vi:
+    - "Vi phạm R259: cửa dữ liệu không khớp quy tắc front end chỉ dùng Supabase Auth."
+  nextStep_vi: "Loại pgmq và pgmq_public khỏi schema API; đóng API dữ liệu lite hoặc khai báo policy public_read giới hạn cần thiết."
+  owner: op-retry
+  kind: check-finding
+
+DB_MIGRATION_DESTRUCTIVE:
+  title: "Destructive DDL requires a contract migration with retired application references"
+  title_vi: "Migration phá hủy chưa thuộc bước contract"
+  meaning_vi: "DDL xóa hoặc thu hẹp schema nằm ngoài migration *_contract_*, hoặc đối tượng bị thay đổi vẫn được SQL hay entity của back end tham chiếu."
+  causes_vi:
+    - "Vi phạm R259: thực hiện bước phá hủy trước khi ứng dụng ngừng dùng đối tượng cũ."
+  nextStep_vi: "Tách thay đổi thành expand và contract, bỏ tham chiếu cũ trong ứng dụng, rồi tạo migration <stamp>_contract_<name>.sql."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SEED_PII:
+  title: "Seed SQL contains no real email or phone literals"
+  title_vi: "Seed SQL chứa dữ liệu định danh thật"
+  meaning_vi: "File seed chứa literal có dạng email hoặc số điện thoại thật thay vì dữ liệu mẫu an toàn. Finding không hiển thị giá trị đó."
+  causes_vi:
+    - "Vi phạm R259: sao chép dữ liệu người dùng vào seed theo dõi trong repository."
+  nextStep_vi: "Thay bằng địa chỉ @example.test và dữ liệu mẫu không định danh; không đưa dữ liệu người dùng thật vào seed."
+  owner: op-retry
+  kind: check-finding
+
+DB_VAULT_WRITE:
+  title: "Migrations contain no vault writes or role passwords"
+  title_vi: "Migration ghi vault hoặc mật khẩu vai trò"
+  meaning_vi: "SQL ghi bí mật vào vault hoặc khai báo PASSWORD khi tạo hay đổi vai trò; bí mật phải nằm trong luồng lưu giữ sops, không trong migration."
+  causes_vi:
+    - "Vi phạm R259: migration được dùng để tạo hoặc thay đổi giá trị bí mật."
+  nextStep_vi: "Bỏ thao tác ghi bí mật khỏi migration và dùng luồng app secret; chỉ giữ khai báo vai trò không chứa mật khẩu."
   owner: op-retry
   kind: check-finding

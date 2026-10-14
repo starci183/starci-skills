@@ -7,6 +7,9 @@ import { featureFileFindings } from './feature-files.mjs';
 import { lexiconFindings } from './lexicon.mjs';
 import { assetsFindings } from './assets.mjs';
 import { unusedSymbolFindings } from './unused-symbol.mjs';
+import { databaseBaselineFindings } from './database-baseline.mjs';
+import { databaseQueuesFindings } from './database-queues.mjs';
+import { databaseConfigFindings } from './database-config.mjs';
 // finders-import-end
 
 /** The failure codes the finders above emit, so `starci app check` ships their labels (check.mjs adds them to CHECK_CODES). Append-only; the coordinator regenerates it at merge time. */
@@ -22,6 +25,9 @@ export const FINDERS = [
   lexiconFindings,
   assetsFindings,
   unusedSymbolFindings,
+  databaseBaselineFindings,
+  databaseQueuesFindings,
+  databaseConfigFindings,
   // finders-end
 ];
 
@@ -29,3 +35,6 @@ export const FINDERS = [
 export function a15Findings(context) {
   return FINDERS.flatMap((finder) => finder(context));
 }
+
+/** Codes emitted by the finders (coordinator-managed). */
+export const A15_CODES = [];
