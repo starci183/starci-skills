@@ -23,6 +23,8 @@ import { deployScanFindings } from './deploy-scan.mjs';
 import { deployWorkflowFindings } from './deploy-workflow.mjs';
 import { scriptHygieneFindings } from './script-hygiene.mjs';
 import { supplyChainFindings } from './supply-chain.mjs';
+import { envParityFindings } from './env-parity.mjs';
+import { envValueShapeFindings } from './env-value-shape.mjs';
 // finders-import-end
 
 /** The failure codes the finders above emit, so `starci app check` ships their labels (check.mjs adds them to CHECK_CODES). Append-only; the coordinator regenerates it at merge time. */
@@ -54,6 +56,8 @@ export const FINDERS = [
   deployWorkflowFindings,
   scriptHygieneFindings,
   supplyChainFindings,
+  envParityFindings,
+  envValueShapeFindings,
   // finders-end
 ];
 
@@ -63,3 +67,5 @@ export function a15Findings(context) {
 }
 
 // A02: include every deployment and supply-chain finding in the bundled app-check catalog.
+/** Codes emitted by the finders (coordinator-managed). */
+export const A15_CODES = [];

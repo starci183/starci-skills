@@ -18969,5 +18969,68 @@ HFS_SBOM_MISSING:
   causes_vi:
     - "Vi phạm R269: bản dựng không tạo cả danh mục thành phần và bằng chứng nguồn gốc."
   nextStep_vi: "Bật sbom và provenance trong bước build image hoặc tạo SBOM cùng chứng thực nguồn gốc bằng công cụ/action đã ghim."
+ENV_REQUIRED_UNSET:
+  title: "A required env key is neither sealed nor declared"
+  title_vi: "Khoá môi trường bắt buộc chưa được niêm phong hay khai báo"
+  meaning_vi: "Mã nguồn đọc một khoá môi trường bắt buộc qua EnvSource nhưng khoá đó không nằm trong member `.enc` nào của `.starcistacks/<env>/secrets` cũng không được stack hay `KEYS.md` khai báo."
+  causes_vi:
+    - "Vi phạm luật R248: khoá mà code đọc, khoá được niêm phong và khoá stack truyền vào phải là cùng một tập; khoá bắt buộc thiếu cả chỗ niêm phong lẫn khai báo sẽ làm app không boot được."
+    - "Khoá được thêm vào `<app>.env.ts` hoặc `*.config.ts` nhưng quên `starci app secret set` và quên khai báo trong `KEYS.md` hoặc stack."
+  nextStep_vi: "Niêm phong khoá bằng `starci app secret set <env> <slug> <KEY>` hoặc khai báo nó trong `.starcistacks/<env>/runtime/env/KEYS.md` / phần `environment:` của stack."
+  owner: op-retry
+  kind: check-finding
+
+ENV_SEALED_UNREAD:
+  title: "A sealed key is read by nobody"
+  title_vi: "Khoá niêm phong không ai đọc"
+  meaning_vi: "Một member `.enc` trong `.starcistacks/<env>/secrets` giữ một khoá mà không có EnvSource reader nào đọc và không có consumer nào được khai báo (stack hay `KEYS.md`)."
+  causes_vi:
+    - "Vi phạm luật R248: khoá niêm phong thừa là custody chết — tên sai (như D2-06 `OPENCLAW_TURN_TIMEOUT_MS`), khoá cũ đã bỏ (D2-07/08) hoặc member sai."
+    - "Code đổi tên khoá nhưng member niêm phong vẫn giữ tên cũ."
+  nextStep_vi: "Gỡ khoá khỏi member, sửa tên cho khớp khoá code đọc, hoặc khai báo consumer của nó trong `KEYS.md` / stack."
+  owner: op-retry
+  kind: check-finding
+
+ENV_DUPLICATE:
+  title: "One env key is sealed in two members"
+  title_vi: "Một khoá env bị niêm phong trong hai member"
+  meaning_vi: "Cùng một khoá môi trường xuất hiện trong hai member `.enc` khác nhau, nên giá trị nào được dùng không còn rõ."
+  causes_vi:
+    - "Vi phạm luật R248: một khoá chỉ sống trong một member; hai bản sao lệch giá trị là lỗi vận hành chờ xảy ra."
+    - "Khoá được di chuyển sang member mới nhưng quên gỡ khỏi member cũ."
+  nextStep_vi: "Giữ khoá ở đúng một member và gỡ nó khỏi member còn lại (`starci app secret set` rồi chỉnh lại member thừa)."
+  owner: op-retry
+  kind: check-finding
+
+ENV_PUBLIC_SEALED:
+  title: "A NEXT_PUBLIC_* key is in sealed custody"
+  title_vi: "Khoá NEXT_PUBLIC_* nằm trong khu vực niêm phong"
+  meaning_vi: "Một member `.enc` giữ khoá `NEXT_PUBLIC_*`: giá trị public của front end là cấu hình công khai, không bao giờ vào custody bí mật."
+  causes_vi:
+    - "Vi phạm luật R248: đưa cấu hình public vào `.enc` làm người đọc tưởng nó là bí mật và kéo theo quy trình custody không cần thiết."
+    - "`web.enc` chứa `NEXT_PUBLIC_*` (D2-11)."
+  nextStep_vi: "Gỡ khoá `NEXT_PUBLIC_*` khỏi member và khai báo nó như public config (stack/`KEYS.md`)."
+  owner: op-retry
+  kind: check-finding
+
+ENV_EXAMPLE_DRIFT:
+  title: "An env example names a key nothing reads"
+  title_vi: "File env mẫu nêu một khoá không ai đọc"
+  meaning_vi: "Một file `*.env.example` liệt kê khoá mà không có EnvSource reader nào dùng: ví dụ đã lệch với các khoá code thật sự đọc."
+  causes_vi:
+    - "Vi phạm luật R248: file example là hợp đồng tài liệu của môi trường; khoá trong đó phải là khoá code đọc."
+    - "Đổi tên hoặc xoá reader mà quên cập nhật file example (D2-23 `QUEUE_RELAY_*`)."
+  nextStep_vi: "Sửa file example cho khớp các khoá `<app>.env.ts`/`*.config.ts` đọc, hoặc thêm reader nếu khoá thật sự cần."
+  owner: op-retry
+  kind: check-finding
+
+ENV_VALUE_SHAPE:
+  title: "A stored env value does not parse as its reader's type"
+  title_vi: "Giá trị env đã lưu không đúng kiểu reader khai báo"
+  meaning_vi: "Một giá trị trong member niêm phong (kiểm bằng `starci app secret verify <env>`) hoặc trong `*.env.example` không parse được theo kiểu reader EnvSource khai báo (int, bool `true`/`false`, url tuyệt đối, duration `250`/`30s`/`5m`/`2h`, hoặc một giá trị enum đã khai báo)."
+  causes_vi:
+    - "Vi phạm luật R249: app boot sẽ fail hoặc đọc sai ngầm khi giá trị không khớp parser — như `OPENCLAW_MANAGE_AGENTS=1` cho `env.bool` (D2-03)."
+    - "Giá trị được set bằng định dạng khác (`1` thay `true`, `1000` thay `1s`, URL thiếu scheme)."
+  nextStep_vi: "Sửa giá trị qua `starci app secret set <env> <slug> <KEY>` cho đúng kiểu reader khai báo, hoặc sửa example; verify in ra tên khoá và kiểu bị vi phạm, không in giá trị."
   owner: op-retry
   kind: check-finding
