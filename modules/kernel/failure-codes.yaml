@@ -18163,3 +18163,25 @@ workflow-purge-ledger-dependency:
   nextStep_vi: "Xử lý tham chiếu theo thẩm quyền sản phẩm hoặc sửa bộ kiểm schema rồi đọc lại kế hoạch; không xóa Work để vượt cổng."
   owner: owner
   kind: verb-refusal
+
+HFS_FUNCTION_BUDGET:
+  title: "A function body exceeds its line budget"
+  title_vi: "Thân hàm vượt hạn mức dòng"
+  meaning_vi: "Thân một hàm, phương thức hoặc hàm mũi tên của back end hoặc front end vượt hạn mức ruleParams.functionLines (80 dòng), kể cả dòng trống và chú thích. Luật áp dụng cho cả lite và full, không cho phép giữ nguyên hàm cũ quá dài."
+  causes_vi:
+    - "Một hàm gộp nhiều trách nhiệm hoặc nhiều bước xử lý vào cùng một thân hàm"
+    - "Thêm mã, chú thích hoặc dòng trống làm thân hàm vượt hạn mức"
+  nextStep_vi: "Tách các trách nhiệm thành hàm nhỏ có tên rõ ràng trong đúng nơi sở hữu, rồi chạy lại lint để mỗi thân hàm nằm trong hạn mức."
+  owner: op-retry
+  kind: check-finding
+
+HFS_FEATURE_FILE_BUDGET:
+  title: "A feature exceeds its file budget"
+  title_vi: "Tính năng vượt hạn mức số tệp"
+  meaning_vi: "Một thư mục sở hữu tính năng có nhiều tệp được theo dõi hơn hạn mức ruleParams.featureFiles (250 tệp), tính cả các thư mục con. Luật áp dụng cho cả lite và full ở back end và front end."
+  causes_vi:
+    - "Một tính năng gộp nhiều khả năng sản phẩm vào cùng một thư mục"
+    - "Các tệp mã nguồn, kiểm thử hoặc tài liệu trong thư mục con làm tổng số tệp vượt hạn mức"
+  nextStep_vi: "Tách tính năng theo khả năng sản phẩm vào các thư mục sở hữu riêng, rồi chạy lại starci app check để mỗi tính năng nằm trong hạn mức."
+  owner: op-retry
+  kind: check-finding

@@ -183,3 +183,12 @@ export const starciBeConfig = ({ hfs }) => buildBeConfig({ hfs, plugin: pluginFo
 
 export { linterOptions } from "./lib/config.mjs"
 export { loadHfs } from "./lib/hfs.mjs"
+
+// A21 append-only registration: keep the already exported plugin and recommendation live.
+import { recommended as functionBudgetRecommended, rules as functionBudgetRules } from "./function-budget.mjs"
+CONTRIBUTIONS.push({ law: "function-budget", rules: functionBudgetRules, recommended: functionBudgetRecommended })
+lawOwners.push("function-budget")
+ruleDeclarations.push(...Object.keys(functionBudgetRules).map((name) => ({ law: "function-budget", name })))
+Object.assign(ruleOwners, Object.fromEntries(Object.keys(functionBudgetRules).map((name) => [name, "function-budget"])))
+Object.assign(rules, functionBudgetRules)
+Object.assign(recommended, functionBudgetRecommended)
