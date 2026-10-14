@@ -30,6 +30,7 @@ import { ERRORS_MESSAGES, ErrorsFilter, ErrorsModule } from "@modules/platform/e
 import {
     EVENT_BUS_ERROR_KINDS,
     EVENT_BUS_MESSAGES,
+    EVENT_TRANSPORT,
     EventBusModule,
     eventBusEntities,
     eventBusMigrations,
@@ -122,7 +123,7 @@ export class AppModule {
                 ProbesModule.register({
                     isGlobal: true,
                     service: "billing",
-                    probes: [DatabaseProbe, IDENTITY_API],
+                    probes: [DatabaseProbe, IDENTITY_API, EVENT_TRANSPORT],
                 }),
                 HealthHttpModule,
                 InvoicingMessageModule,

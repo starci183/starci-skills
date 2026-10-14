@@ -1,10 +1,10 @@
 # shape-slot
 
-The reference app for the shape + slot pattern: one StarCi app whose front end walks every layer of the pattern.
+The reference app for the shape + slot pattern: one StarCi app whose front end demonstrates connected and pure components, independent API slots, and a send form.
 
 ## Overview
 
-An app repo following HFS (`hfs: 3`, `kind: app`, full edition): a scaffolded `be/` side (Nest, `core` + `cli`, `primary` connection) and the hand-written `fe/apps/shape-slot` source, the slot-teaching fixture the grammar and the knowledge read. Each FE layer has a real example; `starci-fe/*` lint and `starci app check` are the two gates proving this sample correct. The back end demonstrates health probes and a notes database; it does not implement the sales REST APIs shown by the front end.
+An app repo following HFS (`hfs: 3`, `kind: app`, full edition): a scaffolded `be/` side (Nest, `core` + `cli`, `primary` connection) and the hand-written `fe/apps/shape-slot` source, the slot-teaching fixture the grammar and the knowledge read. The implemented FE layers are listed below; `starci-fe/*` lint and `starci app check` are the two gates proving this sample correct. The back end demonstrates health probes and a notes database; it does not implement the sales REST APIs shown by the front end.
 
 ## Stack
 
@@ -22,9 +22,9 @@ fe/
     next.config.ts, tsconfig.json, postcss.config.mjs, package.json, Dockerfile
     src/app/                         global-error.tsx, [locale]/{layout,loading,error,not-found}.tsx, [locale]/[workspaceId]/...
     src/proxy.ts                     next-intl: picks the locale
-    src/features/{pages,layouts,overlays}/<Name>/
+    src/features/{pages,layouts}/<Name>/
     src/components/{blocks,composites,branches,leaves}/<Name>/
-    src/hooks/<domain>/
+    src/hooks/{swr,rhf,slot}/
     src/modules/{api,config,i18n,routes,types}/
 ```
 
@@ -56,21 +56,22 @@ The product's Work records live in `.starciwork`.
 - **slot**: the data of one API. Each slot has its own status: `isLoading`, `isForbidden`, `isError` or empty.
   Status renders by formula (`composites/SlotView`) and is never drawn.
 
-## Names (uniform, not chosen freely)
+## Names in the sample
 
 | Layer   | Connected (`index.tsx`, exported outward) | Pure (`component.tsx`, drawn and audited) | Type                                                                       |
 | ------- | ----------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------- |
 | Page    | `OperatePage`                             | `OperatePageBase`                         | `OperatePageProps`, `OperatePageBaseProps`, `OperatePageState`             |
-| Layout  | `WorkspaceLayout`                         | `WorkspaceLayoutBase`                     | `WorkspaceLayoutProps`, `WorkspaceLayoutBaseProps`, `WorkspaceLayoutState` |
-| Overlay | `SendHandoffOverlay`                      | `SendHandoffOverlayBase`                  | `…Props`, `…BaseProps`, `…State`                                           |
-| Block   | `HandoffBlock`                            | `HandoffBlockBase`                        | `…Props`, `…BaseProps`, `…State`, `…Data`, `…Actions`, `…Labels`           |
+| Layout  | `WorkspaceLayout`                         | `WorkspaceLayoutBase`                     | `WorkspaceLayoutProps`, `WorkspaceLayoutBaseProps`, `WorkspaceLayoutData` |
+| Block   | `HandoffBlock`                            | `HandoffBlockBase`                        | `HandoffBlockProps`, `HandoffBlockBaseProps`, `HandoffStatus`, `HandoffBlockData`, `HandoffBlockActions`, `HandoffBlockLabels` |
+
+`WorkspaceLayout` resolves labels and forwards the router's children. It has no state type: `WorkspaceShell` CSS selects wide or compact navigation. `HandoffBlock` owns the send session and composes the pure `SendHandoffForm` composite through `HandoffBlockBase`. The form draws its `form` or `confirm` state in `DrawerBranch`; `useSendHandoffForm` owns react-hook-form + zod validation and the send mutation.
+
+The component export conventions and the sample's REST hook names are:
 
 - Use only `export const X = …`, no `export default`.
 - The only exception is the Next route file: `const Page = …` then `export default Page`.
-- Hook SWR:
-  - read: `useQueryXSwr` + `QUERY_X_SWR_KEY` + `UseQueryXSwrParams`;
-  - write: `useMutateXSwr` + `MUTATE_X_SWR_KEY` + `MutateXSwrArg`.
-- The file name matches the export name.
+- SWR reads use `useGetHandoffSwr`, `useGetOrderSwr` and `useGetSendAttemptsSwr`, each in a matching file under `hooks/swr/api/rest/queries/`. For example, `useGetHandoffSwr` takes `UseGetHandoffSwrParams` and uses `QUERY_HANDOFF_SWR_KEY`.
+- The SWR write is `usePostSendHandoffSwr`, in its matching file under `hooks/swr/api/rest/mutations/`; it uses `MUTATE_SEND_HANDOFF_SWR_KEY` and takes `SendInput` as the mutation trigger's argument.
 
 ## Layers
 
@@ -78,13 +79,12 @@ The product's Work records live in `.starciwork`.
 | --------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------- |
 | Route     | `app/[locale]/`                 | `[workspaceId]/layout.tsx`, `[workspaceId]/operate/[handoffId]/page.tsx`                                                                                                | –                                     | no                                                            |
 | Page      | `features/pages/<Name>/`        | `OperatePage`                                                                                                                                                           | `view` / `edit`                       | no; only composes Blocks from atoms                           |
-| Layout    | `features/layouts/<Name>/`      | `WorkspaceLayout`                                                                                                                                                       | `sidebar` / `mobile`                  | no                                                            |
-| Overlay   | `features/overlays/<Name>/`     | `SendHandoffOverlay`                                                                                                                                                    | `form` / `confirm`                    | commands only (mutation); the form uses react-hook-form + zod |
-| Block     | `components/blocks/<Name>/`     | `HandoffBlock` (2 slots), `SendHistoryBlock` (1 slot), `ModuleNavBlock`, `WorkspaceHeaderBlock`                                                                         | e.g. `prepared` / `sent` / `returned` | **yes**: each Block calls its own API                         |
+| Layout    | `features/layouts/<Name>/`      | `WorkspaceLayout`                                                                                                                                                       | shell CSS selects wide / compact navigation | no                                                      |
+| Block     | `components/blocks/<Name>/`     | `HandoffBlock` (2 slots + send session), `SendHistoryBlock` (1 slot), `ModuleNavBlock`, `WorkspaceHeaderBlock`                                                         | e.g. `prepared` / `sent` / `returned` | `HandoffBlock` and `SendHistoryBlock` use SWR hooks            |
 | Branch    | `components/branches/<Name>/`   | `DrawerBranch`, `OrderDisclosure`                                                                                                                                       | no                                    | no; only internal interaction                                 |
-| Composite | `components/composites/<Name>/` | `OrderSummary`, `SlotView`                                                                                                                                              | no                                    | no                                                            |
+| Composite | `components/composites/<Name>/` | `OrderSummary`, `SlotView`, `SendHandoffForm`                                                                                                                             | `SendHandoffForm`: `form` / `confirm`  | no; the form receives resolved input and actions              |
 | Leaf      | `components/leaves/<Name>/`     | `MoneyText`, `StatusChip`                                                                                                                                               | no                                    | no                                                            |
-| Hook      | `hooks/<domain>/`               | `swr` (`api/rest/{queries,mutations}`: one SWR hook per REST call), `rhf` (the send form), `slot` (`useSlotLabels`), `ui` (only internal hooks such as `useMediaQuery`) | –                                     | goes through `modules/`                                       |
+| Hook      | `hooks/<domain>/`               | `swr` (`api/rest/{queries,mutations}`: one SWR hook per REST call), `rhf` (`useSendHandoffForm`), `slot` (`useSlotLabels`)                                                | –                                     | goes through `modules/`                                       |
 | Module    | `modules/`                      | `api` (`rest/client/axios.ts` is the one axios instance; `rest/sales/*.ts` is one typed call each, validated by its zod schema), `config`, `i18n`, `routes`, `types`    | –                                     | is the transport layer                                        |
 
 ## Rules (`starci-fe/*` lint catches them automatically)
@@ -98,8 +98,8 @@ The product's Work records live in `.starciwork`.
 | 5   | `XBase` takes `XBaseProps`; `X` takes `XProps`.                                                                                                                                               | `public-component-signature`   |
 | 6   | No Vietnamese text in source; display text lives in `modules/i18n/messages/`.                                                                                                                 | `no-second-language-in-source` |
 
-Besides the lint rules above there are 3 conventions:
+Besides the lint rules above, the pattern has these conventions; an Overlay is a possible pattern layer, and this sample implements its send form as a Composite:
 
 - Data status (including 403) is tracked per slot, that is per API, and only Blocks have it. Page, Layout and Overlay have no data status.
 - The 404 route is handled by `notFound()`.
-- Each `component.tsx` has an `xDefaultState`: it is the shape used to draw the skeleton while the slot is still loading.
+- A Block whose shape depends on a loading slot uses an `xDefaultState` for its skeleton; this sample exports `handoffBlockDefaultState` from `HandoffBlock/component.tsx`.
