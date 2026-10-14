@@ -183,3 +183,20 @@ export const starciBeConfig = ({ hfs }) => buildBeConfig({ hfs, plugin: pluginFo
 
 export { linterOptions } from "./lib/config.mjs"
 export { loadHfs } from "./lib/hfs.mjs"
+
+// A06 registrations are appended: the coordinator union-merges this shared registry.
+import { recommended as edgeHardeningRecommended, rules as edgeHardeningRules } from "./edge-hardening.mjs"
+import { recommended as healthReadyRecommended, rules as healthReadyRules } from "./health-ready.mjs"
+import { recommended as jwtAlgRecommended, rules as jwtAlgRules } from "./jwt-alg.mjs"
+
+for (const entry of [
+    { law: "edge-hardening", rules: edgeHardeningRules, recommended: edgeHardeningRecommended },
+    { law: "health-ready", rules: healthReadyRules, recommended: healthReadyRecommended },
+    { law: "jwt-alg", rules: jwtAlgRules, recommended: jwtAlgRecommended },
+]) {
+    lawOwners.push(entry.law)
+    ruleDeclarations.push(...Object.keys(entry.rules).map((name) => ({ law: entry.law, name })))
+    Object.assign(ruleOwners, Object.fromEntries(Object.keys(entry.rules).map((name) => [name, entry.law])))
+    Object.assign(rules, entry.rules)
+    Object.assign(recommended, entry.recommended)
+}

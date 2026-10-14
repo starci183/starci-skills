@@ -2180,3 +2180,32 @@ rules:
     failureCodes: ["BE_APP_COMPOSITION_BUDGET"]
     enforcers:
       - {kind: eslint-be, id: app-file-budget}
+  - id: R260
+    code: "BE_JWT_ALG_PINNED"
+    law: "A back-end JWT verifier pins a nonempty literal subset of ES256, RS256 and EdDSA and obtains its issuer from configuration. A Supabase principal is built only after verification and rejection of every role other than authenticated, in lite and full."
+    kinds: [check, lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_JWT_ALG_PINNED"]
+    enforcers:
+      - {kind: eslint-be, id: jwt-alg-pinned}
+      - {kind: machine, id: jwt-policy, at: scripts/hfs/architecture/supabase.mjs}
+  - id: R261
+    code: "BE_CORS_ALLOWLIST"
+    law: "Every back-end API declares an exact browser origin allowlist, applies the platform/http-security response middleware, disables x-powered-by and states a nonnegative integer trust proxy hop count. Wildcard or missing CORS and blanket proxy trust are refused in lite and full."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_CORS_ALLOWLIST", "BE_SECURITY_HEADERS", "BE_TRUST_PROXY"]
+    enforcers:
+      - {kind: eslint-be, id: cors-allowlist}
+      - {kind: eslint-be, id: security-headers}
+      - {kind: eslint-be, id: trust-proxy}
+  - id: R262
+    code: "BE_READY_REAL"
+    law: "Every back-end API serves distinct live and ready health signals. Readiness probes a required dependency with a bounded failure timeout and returns unavailable on dependency failure; an alias of liveness is refused. The API Docker HEALTHCHECK reaches an existing live route and cannot be a command that always succeeds, in lite and full."
+    kinds: [check, lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_READY_REAL", "BE_HEALTH_SIGNALS", "HFS_DOCKER_HEALTHCHECK_FAKE"]
+    enforcers:
+      - {kind: eslint-be, id: ready-real}
+      - {kind: eslint-be, id: health-signals}
+      - {kind: hfs, id: docker-health-reachability, at: scripts/hfs/rules/docker.mjs}

@@ -18163,3 +18163,74 @@ workflow-purge-ledger-dependency:
   nextStep_vi: "Xử lý tham chiếu theo thẩm quyền sản phẩm hoặc sửa bộ kiểm schema rồi đọc lại kế hoạch; không xóa Work để vượt cổng."
   owner: owner
   kind: verb-refusal
+
+BE_JWT_ALG_PINNED:
+  title: "JWT verification has no pinned asymmetric algorithm policy"
+  title_vi: "Xác minh JWT thiếu chính sách thuật toán bất đối xứng cố định"
+  meaning_vi: "Bộ xác minh chưa cố định thuật toán an toàn, nguồn cấu hình của issuer hoặc vai trò authenticated của principal Supabase."
+  causes_vi:
+    - "Danh sách algorithms rỗng, động hoặc chứa none hay HS256"
+    - "Issuer viết trực tiếp hoặc principal chấp nhận vai trò khác authenticated"
+  nextStep_vi: "Dùng danh sách literal gồm ES256, RS256 hoặc EdDSA, lấy issuer từ cấu hình và từ chối vai trò khác authenticated sau xác minh."
+  owner: op-retry
+  kind: check-finding
+
+BE_CORS_ALLOWLIST:
+  title: "API CORS has no exact origin allowlist"
+  title_vi: "CORS của API thiếu danh sách origin cụ thể"
+  meaning_vi: "API chưa giới hạn các origin của trình duyệt bằng danh sách cấu hình rõ ràng."
+  causes_vi:
+    - "Thiếu enableCors hoặc origin là wildcard, true hay danh sách rỗng"
+  nextStep_vi: "Áp dụng allowedOrigins của http-security hoặc danh sách origin cụ thể; cấu hình phải từ chối wildcard và origin không hợp lệ."
+  owner: op-retry
+  kind: check-finding
+
+BE_SECURITY_HEADERS:
+  title: "API security headers are missing or x-powered-by is enabled"
+  title_vi: "API thiếu header bảo mật hoặc còn bật x-powered-by"
+  meaning_vi: "Entrypoint chưa áp dụng middleware header bảo mật của platform/http-security và tắt thông tin framework."
+  causes_vi:
+    - "Thiếu middleware bảo mật hoặc chưa tắt x-powered-by"
+  nextStep_vi: "Áp dụng middleware của platform/http-security và disable x-powered-by trước khi phục vụ yêu cầu."
+  owner: op-retry
+  kind: check-finding
+
+BE_TRUST_PROXY:
+  title: "API proxy trust has no declared hop count"
+  title_vi: "API chưa khai báo số hop proxy được tin cậy"
+  meaning_vi: "API chưa nêu ranh giới proxy bằng số hop nguyên không âm nên địa chỉ khách có thể sai hoặc bị giả mạo."
+  causes_vi:
+    - "Thiếu trust proxy hoặc dùng true hay giá trị động chưa được giới hạn"
+  nextStep_vi: "Khai báo số hop nguyên không âm phù hợp với ingress trong cấu hình khởi động API."
+  owner: op-retry
+  kind: check-finding
+
+BE_READY_REAL:
+  title: "Readiness does not probe a required dependency"
+  title_vi: "Readiness chưa kiểm tra phụ thuộc bắt buộc"
+  meaning_vi: "Endpoint readiness có thể trả thành công khi phụ thuộc bắt buộc không sẵn sàng."
+  causes_vi:
+    - "Readiness dùng lại liveness hoặc không có probe phụ thuộc với timeout hữu hạn"
+  nextStep_vi: "Gọi probe của phụ thuộc bắt buộc, giới hạn thời gian chờ và trả unavailable khi probe lỗi hoặc hết hạn."
+  owner: op-retry
+  kind: check-finding
+
+BE_HEALTH_SIGNALS:
+  title: "API does not expose both live and ready health signals"
+  title_vi: "API chưa cung cấp đủ tín hiệu live và ready"
+  meaning_vi: "Đồ thị module của API chưa đăng ký cả endpoint liveness và readiness."
+  causes_vi:
+    - "Thiếu route live hoặc ready hoặc controller chưa được đăng ký trong module của API"
+  nextStep_vi: "Đăng ký controller live và ready trong đồ thị module được API compose."
+  owner: op-retry
+  kind: check-finding
+
+HFS_DOCKER_HEALTHCHECK_FAKE:
+  title: "API Docker healthcheck cannot reach its live route"
+  title_vi: "Healthcheck Docker của API không tới được route live"
+  meaning_vi: "Healthcheck không chứng minh API còn phục vụ liveness vì lệnh luôn thành công hoặc gọi route không tồn tại."
+  causes_vi:
+    - "HEALTHCHECK CMD true hoặc lệnh không kiểm tra thành công của route live đã đăng ký"
+  nextStep_vi: "Dùng healthcheck HTTP kiểm tra thành công của route liveness thật của API và giữ lỗi probe thành exit code khác không."
+  owner: op-retry
+  kind: check-finding

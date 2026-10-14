@@ -24,17 +24,18 @@ export class JsonLoggerService implements Logger {
         this.write("warn", this.err, event, fields)
     }
 
-    /** Writes an error line with the cause serialized by name and message. */
+    /** Writes the cause's name, message, optional error code and stack without allowing caller fields to replace them. */
     error(event: string, cause: unknown, fields?: LogFields): void {
+        const code = typeof cause === "object" && cause !== null && "code" in cause ? { errorCode: cause.code } : {}
         const detail =
             cause instanceof Error
-                ? { errorName: cause.name, errorMessage: cause.message }
+                ? { errorName: cause.name, errorMessage: cause.message, stack: cause.stack }
                 : { errorMessage: String(cause) }
-        this.write("error", this.err, event, { ...detail, ...fields })
+        this.write("error", this.err, event, { ...fields, ...detail, ...code })
     }
 
     private write(level: Level, sink: Writable, event: string, fields?: LogFields): void {
-        sink.write(`${JSON.stringify({ level, event, time: this.clock.now().toISOString(), ...fields })}\n`)
+        sink.write(`${JSON.stringify({ ...fields, level, event, time: this.clock.now().toISOString() })}\n`)
     }
 }
 
