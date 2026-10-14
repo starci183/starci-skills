@@ -85,6 +85,7 @@ import { feNoTestsFindings } from './rules/fe-no-tests.mjs';
 import { editionFindings } from './rules/edition.mjs';
 import { feStackFindings } from './rules/fe-stack.mjs';
 import { A15_CODES, a15Findings } from './rules/a15-findings.mjs';
+import { trackedStacksGateFindings } from '../gates/stacks-gate.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { pinFindings } from './pin-findings.mjs';
 import { requiredFileApplies } from './slot-required.mjs';
@@ -243,6 +244,7 @@ function contentRuleFindings({ repoRoot, repo, resolver, files, all, scoped, pin
     ...lintSuppressionFindings({ repoRoot, files }),
     ...a15Findings({ repoRoot, files, all, repo, resolver, manifest, isRoot, appSide, inScope }),
   ];
+  findings.push(...trackedStacksGateFindings({ repoRoot, files, all, repo, resolver, manifest, isRoot, inScope, existingFindings: findings }));
   if (isRoot) {
     findings.push(
       ...appRootFindings({ repoRoot, files, all, repo, resolver, pins, phase }),

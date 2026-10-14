@@ -167,3 +167,56 @@ guidance:
       and reverify. Preserve VPS Swarm as the default; do not silently replace its deployment
       semantics with Compose, reset old data for a passing test or inherit stale acceptance. .starcistacks does
       not own SRS/SDS or workflow state. Runtime maintenance does not grant app deployment.
+  - id: STACK-SWARM-HARDENING
+    requirement: |
+      R266 judges the tracked rendered Swarm model in lite and full. Each environment secret
+      declares runtimeName and a positive version; the immutable runtimeName ends in -v<version>
+      and matches an external engine secret in the model. Grant secrets only to named consumers;
+      use the consumer's file adapter and never put a secret literal in service environment.
+      Only the declared ingress publishes ports. Every declared ingress host has an actual route,
+      a dns entry with host, owner and receipt, and tls ownership with a receipt. Stateful services
+      carry explicit placement constraints. Runnable services carry healthchecks and explicit
+      update, rollback and restart policies. A lite api app composing be.feature.realtime.* pins
+      deploy.replicas to 1; scaling or omitting the replica pin is refused. The replica restriction
+      does not apply to full. Owner-run DNS, provider setup and swarm initialization stay declared
+      prerequisites; static checks do not execute them.
+  - id: STACK-INGRESS-DECLARATION
+    requirement: |
+      R275 accepts one declared ingress, without selecting a preferred product. The environment's
+      ingress block names its component and hosts. The selected component has role ingress and a
+      digest-pinned Traefik or Caddy image in the rendered model. A missing declaration, an unknown
+      component or unsupported ingress image is refused. R266 refuses a second ingress even when
+      it publishes no ports; only the selected ingress may expose application traffic.
+  - id: STACK-RELEASE-BACKUP-DECLARATION
+    requirement: |
+      R267 requires a release block for each Swarm environment: imagesLock names the immutable
+      image inventory, pointer identifies the active release, previous preserves the prior release,
+      and healthAssertions names the nonempty verification list. Move the active pointer only
+      after those checks succeed. Every stateful component and declared managed backing dependency
+      has an environment backup entry with
+      component, target, retention and owner, plus restoreProof referencing a tracked restore
+      evidence file. A backup declaration without its restore evidence is refused. A missing,
+      unreadable or invalid tracked rendered model is STACKS_MODEL_UNAVAILABLE, never a skipped
+      check. renderedModel may name the tracked model relative to .starcistacks/<environment>
+      explicitly, such as infra/swarm/rendered.yaml; otherwise the checker selects the
+      environment's rendered stack from its declared composeFiles.
+  - id: STACK-SCHEDULE-DECLARATION
+    requirement: |
+      R268 requires every selected scheduled component or replicated-job to have a matching entry
+      in the top-level jobs map. The entry declares schedule and a back-end CLI command; component
+      binds it to a component when the job id differs. The command invokes a named action through
+      node be/dist/apps/cli/<entry>.js or the container form node dist/apps/cli/<entry>.js;
+      .mjs and .cjs entries are also accepted. A rendered replicated-job uses that same command.
+      Inline JavaScript and shell chaining are refused. A component schedule or a rendered
+      replicated-job without that declaration is refused. Scheduling remains app-owned; a
+      declaration never authorizes host
+      crontab, inline deployment business logic or remote execution.
+  - id: STACK-LITE-BACKING-DECLARATION
+    requirement: |
+      R276 keeps lite database backing on managed Supabase. PostgreSQL, Redis and MongoDB images
+      are refused in the lite deployment. A sidecar that needs storage declares database.provider
+      sqlite and database.volume, lists that named volume in components.<id>.volumes, and mounts
+      it in the rendered service. Declare the persistent volume in the rendered model as well.
+      A sidecar requiring PostgreSQL, Redis or MongoDB is refused instead of adding another backing
+      service. Mark stateful components explicitly so placement and backup checks cover them.
+      Full retains its declared backing topology; the lite restriction does not apply to it.

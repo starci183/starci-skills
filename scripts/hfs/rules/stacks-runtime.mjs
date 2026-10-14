@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isPlainObject as plain } from '../../../engine/plain-object.mjs';
-import { readDeclaration } from '../../lib/stack-declaration.mjs';
+import { findStackDeclaration, readDeclaration } from '../../lib/stack-declaration.mjs';
 import { isInside } from '../../lib/walk.mjs';
 import { composeIncludePaths, swarmInventoryIssues, swarmModelIssues } from '../../lib/swarm-stack.mjs';
 import { found, readText } from './read.mjs';
@@ -120,9 +120,41 @@ export function stacksRuntimeFindings({ repoRoot, files, doc, edition = 'full' }
     if (spec.runtime !== 'docker-swarm') continue;
     const loaded = loadSwarmModel({ repoRoot, environment, spec, files, findings });
     for (const file of loaded.sources) sources.add(file);
+    const rendered = renderedDeployment({ repoRoot, environment, spec, files, edition });
+    if (spec.renderedModel !== undefined && !rendered.unavailable) sources.add(rendered.file);
     const file = `.starcistacks/${environment}/${spec.composeFiles?.[0] ?? 'infra/swarm/stack.yaml'}`;
     findings.push(...swarmModelIssues({ model: loaded.model, components, bindings: spec.components, lite }).map(issue => issueFinding(file, issue)));
   }
   findings.push(...undeclaredSwarmFindings(deployments, environments, sources));
   return findings;
+}
+
+function renderedDeployment({ repoRoot, environment, spec, files, edition }) {
+  const relative = spec.renderedModel ?? spec.composeFiles?.[0] ?? 'infra/swarm/stack.yaml';
+  const prefix = `.starcistacks/${environment}/`, file = `${prefix}${relative}`;
+  const envDir = path.resolve(repoRoot, prefix);
+  const target = safeStackFile(repoRoot, envDir, relative);
+  const modelDirectory = edition === 'lite' ? 'infra/swarm/' : 'infra/';
+  const allowed = typeof relative === 'string' && relative.startsWith(modelDirectory) && /\.(?:ya?ml|json)$/i.test(relative);
+  const parsed = allowed && target && files.includes(file) ? readDeclaration(target) : {};
+  const model = mapping(parsed.doc);
+  const rendered = plain(model.services) && Object.keys(model.services).length > 0 && model.include === undefined;
+  const complete = spec.renderedModel !== undefined || spec.composeFiles?.length === 1;
+  return { environment, spec, model, file, unavailable: !rendered || !complete };
+}
+
+/** Tracked rendered Swarm models shared by the alpha.15 finders and the app-check gate. */
+export function stacksDeploymentContexts(context = {}) {
+  const files = context.all ?? context.files ?? [];
+  const empty = { doc: {}, deployments: [], files };
+  if (!context.repoRoot || context.isRoot === false) return empty;
+  if (context.repo?.profile && context.repo.profile !== 'app') return empty;
+  if (!files.includes(DECLARATION)) return empty;
+  if (!safeStackFile(context.repoRoot, path.resolve(context.repoRoot, '.starcistacks'), 'application-stacks.yaml')) return empty;
+  const doc = findStackDeclaration(context.repoRoot).doc;
+  if (!doc) return empty;
+  const deployments = Object.entries(mapping(doc.environments))
+    .filter(([, spec]) => spec?.runtime === 'docker-swarm')
+    .map(([environment, spec]) => renderedDeployment({ repoRoot: context.repoRoot, environment, spec, files, edition: context.repo?.edition }));
+  return { doc, deployments, files };
 }

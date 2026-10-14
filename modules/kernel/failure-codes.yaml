@@ -19128,3 +19128,223 @@ BE_LITE_PROOF_LANE_MISSING:
   nextStep_vi: "Thêm spec integration dưới src/tests/integration với test chạy được mang tiêu đề `<pattern>/<kịch bản>: ...` cho từng kịch bản bắt buộc của pattern đã khai báo."
   owner: op-retry
   kind: check-finding
+
+STACKS_SECRET_NOT_EXTERNAL:
+  title: "A Swarm secret is not an external engine secret"
+  title_vi: "Bí mật Swarm chưa dùng secret bên ngoài của engine"
+  meaning_vi: "Mô hình Swarm chứa secret không có external: true, dùng file hoặc giá trị trực tiếp, hoặc không có secret tương ứng với khai báo của môi trường."
+  causes_vi:
+    - "Vi phạm R266: mô hình triển khai giữ bí mật trong tệp mount hoặc nội dung stack thay vì cấp secret của engine cho đúng dịch vụ."
+  nextStep_vi: "Khai báo secret bên ngoài trong mô hình Swarm, tạo nó qua stdin riêng tư và cấp quyền cho đúng dịch vụ; chỉ theo dõi bản mã hóa trong kho mã."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_SECRET_UNVERSIONED:
+  title: "A Swarm secret has no matching immutable version"
+  title_vi: "Bí mật Swarm thiếu phiên bản bất biến khớp khai báo"
+  meaning_vi: "Secret thiếu runtimeName hoặc version dương, tên không kết thúc bằng -v<version>, hoặc tên secret đã render khác với tên được khai báo."
+  causes_vi:
+    - "Vi phạm R266: tên secret có thể bị tái sử dụng khi xoay khóa hoặc khai báo không khớp secret của engine."
+  nextStep_vi: "Khai báo runtimeName và version dương khớp hậu tố -v<version>; dùng đúng tên đó trong mô hình, đổi quyền của consumer rồi mới thu hồi phiên bản cũ."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_SECRET_ENV_LITERAL:
+  title: "A rendered service puts a secret literal in its environment"
+  title_vi: "Dịch vụ đã render đưa bí mật trực tiếp vào biến môi trường"
+  meaning_vi: "Mô hình triển khai truyền giá trị bí mật qua environment thay vì tham chiếu tệp secret được cấp cho dịch vụ."
+  causes_vi:
+    - "Vi phạm R266: giá trị bí mật có thể xuất hiện trong cấu hình đã render, thông tin dịch vụ hoặc bản ghi vận hành."
+  nextStep_vi: "Bỏ giá trị trực tiếp và dùng adapter đọc tệp secret của consumer; cấp secret bên ngoài cho đúng dịch vụ mà không in giá trị."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_PORT_PUBLISHED:
+  title: "A service outside the declared ingress publishes a port"
+  title_vi: "Dịch vụ ngoài ingress được khai báo mở cổng công khai"
+  meaning_vi: "Mô hình Swarm công bố cổng của dịch vụ không phải ingress duy nhất được môi trường chọn."
+  causes_vi:
+    - "Vi phạm R266: API, worker hoặc dịch vụ dữ liệu có cửa truy cập trực tiếp vượt qua ingress đã khai báo."
+  nextStep_vi: "Gỡ ports khỏi dịch vụ nội bộ và định tuyến lưu lượng công khai qua ingress được môi trường khai báo."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_SECOND_INGRESS:
+  title: "A Swarm environment selects more than one ingress"
+  title_vi: "Môi trường Swarm chọn nhiều hơn một ingress"
+  meaning_vi: "Tập component được chọn hoặc mô hình đã render chứa ingress thứ hai bên cạnh ingress của môi trường."
+  causes_vi:
+    - "Vi phạm R266: hai ingress tạo hai chủ sở hữu định tuyến, TLS hoặc cổng công khai trong cùng môi trường."
+  nextStep_vi: "Giữ đúng một ingress trong môi trường và mô hình; chuyển mọi host cùng quyền công bố cổng sang component đó."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_DNS_UNDECLARED:
+  title: "An ingress host has no DNS ownership receipt"
+  title_vi: "Host của ingress thiếu khai báo chủ sở hữu và bằng chứng DNS"
+  meaning_vi: "Một host được ingress sử dụng không có bản ghi dns với host, owner và receipt đầy đủ trong khai báo môi trường."
+  causes_vi:
+    - "Vi phạm R266: điều kiện DNS chỉ tồn tại ngoài kho mã hoặc chưa có người chịu trách nhiệm rõ ràng."
+  nextStep_vi: "Thêm bản ghi dns cho từng host, nêu chủ sở hữu và tham chiếu bằng chứng DNS; việc thay đổi DNS vẫn do chủ sở hữu thực hiện."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_HOST_UNROUTED:
+  title: "A declared ingress host has no rendered route"
+  title_vi: "Host được khai báo chưa có tuyến trong mô hình ingress"
+  meaning_vi: "Danh sách ingress.hosts chứa host mà cấu hình Traefik hoặc Caddy đã render không định tuyến."
+  causes_vi:
+    - "Vi phạm R266: danh sách host và tuyến thực tế không khớp, nên khai báo chưa chứng minh được cửa vào của ứng dụng."
+  nextStep_vi: "Thêm tuyến cho host trong cấu hình ingress được theo dõi hoặc bỏ host không còn dùng, rồi render lại mô hình."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_TLS_UNDECLARED:
+  title: "A Swarm environment has no TLS ownership receipt"
+  title_vi: "Môi trường Swarm thiếu chủ sở hữu và bằng chứng TLS"
+  meaning_vi: "Môi trường có ingress nhưng chưa khai báo tls.owner và tls.receipt cho việc cấp chứng chỉ cùng nơi lưu giữ bền vững."
+  causes_vi:
+    - "Vi phạm R266: quyền cấp hoặc phục hồi chứng chỉ chưa có chủ sở hữu và bằng chứng được khai báo."
+  nextStep_vi: "Khai báo chủ sở hữu TLS và tham chiếu bằng chứng cấp, lưu giữ chứng chỉ; giữ thao tác của chủ sở hữu là điều kiện triển khai rõ ràng."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_PLACEMENT_MISSING:
+  title: "A stateful Swarm service has no placement constraint"
+  title_vi: "Dịch vụ Swarm có trạng thái thiếu ràng buộc vị trí chạy"
+  meaning_vi: "Dịch vụ có trạng thái hoặc volume bền vững không khai báo deploy.placement.constraints trong mô hình đã render."
+  causes_vi:
+    - "Vi phạm R266: task có thể chuyển sang node không giữ volume và mất quyền truy cập dữ liệu của component."
+  nextStep_vi: "Thêm ràng buộc placement phù hợp chủ sở hữu volume và nêu rõ giới hạn phục hồi khi node hoặc đĩa bị mất."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_HEALTHCHECK_MISSING:
+  title: "A runnable Swarm service has no healthcheck"
+  title_vi: "Dịch vụ Swarm đang chạy thiếu healthcheck"
+  meaning_vi: "Mô hình Swarm thiếu healthcheck hoạt động cho dịch vụ chạy liên tục hoặc đã tắt healthcheck của dịch vụ đó."
+  causes_vi:
+    - "Vi phạm R266: trạng thái container chạy chưa chứng minh được tín hiệu sức khỏe cần để cập nhật và phục hồi dịch vụ."
+  nextStep_vi: "Khai báo healthcheck có lệnh thực sự kiểm tra dịch vụ; tách tín hiệu sống và sẵn sàng theo trách nhiệm của ứng dụng."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_UPDATE_POLICY_MISSING:
+  title: "A Swarm service has no explicit rollout and recovery policy"
+  title_vi: "Dịch vụ Swarm thiếu chính sách cập nhật và phục hồi rõ ràng"
+  meaning_vi: "Dịch vụ chạy liên tục thiếu chính sách deploy.update_config, rollback_config hoặc restart_policy cần cho vòng đời triển khai."
+  causes_vi:
+    - "Vi phạm R266: triển khai dựa vào mặc định thay vì nêu cách cập nhật, xử lý lỗi và phục hồi dịch vụ."
+  nextStep_vi: "Khai báo chính sách cập nhật, rollback và restart của từng dịch vụ trong mô hình, rồi kiểm tra cùng các tín hiệu sức khỏe."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_REALTIME_SCALED:
+  title: "A lite realtime API does not pin one replica"
+  title_vi: "API Realtime của lite chưa ghim đúng một replica"
+  meaning_vi: "App API của lite có composition chứa feature be.feature.realtime.* nhưng dịch vụ Swarm chạy nhiều replica hoặc không ghim deploy.replicas: 1."
+  causes_vi:
+    - "Vi phạm R266: Realtime của lite chưa có topology chia sẻ trạng thái để phục vụ nhiều replica an toàn."
+  nextStep_vi: "Ghim deploy.replicas: 1 cho API Realtime của lite trong mô hình Swarm; giới hạn này không áp dụng cho bản full."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_RELEASE_UNDECLARED:
+  title: "A Swarm environment has no complete release declaration"
+  title_vi: "Môi trường Swarm thiếu khai báo release đầy đủ"
+  meaning_vi: "Môi trường chưa khai báo imagesLock, pointer, previous hoặc danh sách healthAssertions không rỗng."
+  causes_vi:
+    - "Vi phạm R267: kho mã chưa gắn image bất biến, release đang chạy, release trước và điều kiện xác nhận triển khai."
+  nextStep_vi: "Bổ sung release với khóa image, con trỏ hiện tại và trước đó cùng healthAssertions; chỉ đổi con trỏ hiện tại sau khi xác minh thành công."
+  owner: op-retry
+  kind: check-finding
+
+BACKUP_UNDECLARED:
+  title: "A stateful component has no complete backup declaration"
+  title_vi: "Component có trạng thái thiếu khai báo sao lưu đầy đủ"
+  meaning_vi: "Component có dữ liệu bền vững hoặc backing được quản lý không có backup tương ứng nêu component, target, retention và owner của môi trường."
+  causes_vi:
+    - "Vi phạm R267: nơi lưu bản sao, thời gian giữ và người chịu trách nhiệm phục hồi chưa được khai báo."
+  nextStep_vi: "Thêm backup cho từng component có trạng thái với nơi lưu, chính sách giữ và chủ sở hữu; nêu rõ miền lỗi của bản sao."
+  owner: op-retry
+  kind: check-finding
+
+BACKUP_PROOF_MISSING:
+  title: "A declared backup has no tracked restore proof"
+  title_vi: "Bản sao lưu được khai báo thiếu bằng chứng phục hồi được theo dõi"
+  meaning_vi: "Backup chưa có restoreProof hoặc tham chiếu của nó không trỏ tới tệp bằng chứng phục hồi hợp lệ được Git theo dõi."
+  causes_vi:
+    - "Vi phạm R267: khai báo sao lưu hoặc tệp không được theo dõi chưa chứng minh được khả năng phục hồi dữ liệu."
+  nextStep_vi: "Thử phục hồi trong môi trường cách ly, ghi bằng chứng vào tệp được theo dõi và khai báo đường dẫn đó tại backup.restoreProof."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_MODEL_UNAVAILABLE:
+  title: "The tracked rendered deployment model cannot be checked"
+  title_vi: "Không kiểm tra được mô hình triển khai đã render được theo dõi"
+  meaning_vi: "Mô hình triển khai được chọn bị thiếu, không được theo dõi, không đọc được hoặc không có cấu trúc dịch vụ hợp lệ."
+  causes_vi:
+    - "Vi phạm R267: checker không có mô hình thực tế để xét topology và không được bỏ qua kiểm tra vì thiếu đầu vào."
+  nextStep_vi: "Theo dõi mô hình đã render dưới cây Swarm của môi trường, khai báo renderedModel hoặc composeFiles đúng và chạy lại kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SCHEDULE_UNDECLARED:
+  title: "A scheduled component has no declared CLI job"
+  title_vi: "Component chạy theo lịch thiếu job CLI được khai báo"
+  meaning_vi: "Component có lịch hoặc replicated-job trong mô hình chưa có entry jobs khớp với schedule và lệnh gọi action có tên của CLI ứng dụng."
+  causes_vi:
+    - "Vi phạm R268: lịch chỉ nằm trong cấu hình triển khai hoặc gọi lệnh ngoài quyền sở hữu CLI của ứng dụng."
+  nextStep_vi: "Khai báo jobs.<id> với schedule, command của back end CLI và component khi cần; giữ lập lịch trong ứng dụng hoặc replicated-job được khai báo."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_INGRESS_UNDECLARED:
+  title: "A Swarm environment has no declared ingress"
+  title_vi: "Môi trường Swarm chưa khai báo ingress"
+  meaning_vi: "Môi trường chưa có ingress.component và danh sách ingress.hosts hợp lệ để xác định cửa vào của ứng dụng."
+  causes_vi:
+    - "Vi phạm R275: mô hình có thể chạy proxy nhưng khai báo không nêu ingress mà môi trường thực sự chọn."
+  nextStep_vi: "Khai báo một ingress component và danh sách host của nó; dùng Traefik hoặc Caddy được ghim bằng digest."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_INGRESS_UNKNOWN:
+  title: "The declared ingress is unknown or unsupported"
+  title_vi: "Ingress được khai báo không tồn tại hoặc chưa được hỗ trợ"
+  meaning_vi: "Component ingress không được chọn, sai role, thiếu trong mô hình hoặc không dùng image Traefik hay Caddy được ghim bằng digest."
+  causes_vi:
+    - "Vi phạm R275: tên component hoặc image của cửa vào không khớp hợp đồng ingress được hỗ trợ."
+  nextStep_vi: "Chọn component có role ingress hiện diện trong mô hình và ghim image Traefik hoặc Caddy bằng digest đầy đủ."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_LITE_SELFHOSTED_DB:
+  title: "A lite deployment runs a self-hosted backing database"
+  title_vi: "Triển khai lite đang chạy cơ sở dữ liệu tự quản"
+  meaning_vi: "Tập component hoặc mô hình triển khai của lite chứa image PostgreSQL, Redis hoặc MongoDB thay vì backing Supabase được quản lý."
+  causes_vi:
+    - "Vi phạm R276: topology lite thêm máy chủ dữ liệu mà chuẩn chỉ dành cho backing được quản lý."
+  nextStep_vi: "Gỡ image backing tự quản khỏi triển khai lite; dùng Supabase cho ứng dụng và SQLite trên volume được khai báo cho sidecar phù hợp."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_SIDECAR_VOLUME_UNDECLARED:
+  title: "A lite SQLite sidecar has no declared persistent volume"
+  title_vi: "Sidecar SQLite của lite thiếu volume bền vững được khai báo"
+  meaning_vi: "Sidecar dùng SQLite nhưng chưa khai báo database.volume, chưa liệt kê volume đó trong component hoặc chưa định nghĩa và mount volume trong mô hình."
+  causes_vi:
+    - "Vi phạm R276: tệp cơ sở dữ liệu sidecar không gắn với volume có chủ sở hữu rõ ràng và có thể mất khi tạo lại container."
+  nextStep_vi: "Khai báo database.provider: sqlite, database.volume và components.<id>.volumes, rồi định nghĩa và mount đúng named volume trong mô hình."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_SIDECAR_DB_UNSUPPORTED:
+  title: "A lite sidecar requires an unsupported database adapter"
+  title_vi: "Sidecar của lite yêu cầu adapter cơ sở dữ liệu không được hỗ trợ"
+  meaning_vi: "Sidecar của lite khai báo hoặc cấu hình database khác SQLite, bao gồm PostgreSQL, Redis và MongoDB."
+  causes_vi:
+    - "Vi phạm R276: sidecar kéo thêm backing bị cấm vào topology lite thay vì dùng SQLite trên volume bền vững."
+  nextStep_vi: "Chọn chế độ SQLite được sidecar hỗ trợ và volume được khai báo; bỏ sidecar nếu nó bắt buộc dùng backing không được lite hỗ trợ."
+  owner: op-retry
+  kind: check-finding

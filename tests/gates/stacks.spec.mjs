@@ -4,8 +4,10 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {spawnSync} from 'node:child_process';
-import {parseYaml,stringifyYaml} from '../../engine/yaml.mjs';
-import {checkApplicationStacks} from '../../scripts/gates/stacks-gate.mjs';
+import {stringifyYaml} from '../../engine/yaml.mjs';
+import {checkApplicationStacks,trackedStacksGateFindings} from '../../scripts/gates/stacks-gate.mjs';
+import {stacksReleaseFindings} from '../../scripts/hfs/rules/stacks-release.mjs';
+import {stacksSwarmFindings} from '../../scripts/hfs/rules/stacks-swarm.mjs';
 import {importClosure} from '../../scripts/hfs/sync-runtime.mjs';
 import {swarmService} from '../helpers/swarm-stack-fixture.mjs';
 
@@ -19,14 +21,29 @@ const RUNBOOK=(extra=[])=>[
 const manifestFor=()=>({schema:'starci/application-stacks@1',
   components:{api:{role:'service',image:'example/api',compose:'infra/compose/api.yaml'},
     db:{role:'stateful',image:'postgres:16',compose:'infra/compose/db.yaml'},
+    edge:{role:'ingress',image:`traefik:3@sha256:${'c'.repeat(64)}`,compose:'infra/stack.yaml'},
     mail:{role:'gateway',required:false}},
   environments:{dev:{status:'supported',runtime:'docker-compose',composeFiles:['infra/compose/compose.yaml'],
     components:{api:{port:3001},db:{port:5432}},runbook:'README.md',
     secrets:[{name:'db-password',where:'secrets/db-password',recipientPolicy:'policy:owner-age',keyCustody:'custody:owner-password-manager'}]},
   vps:{status:'supported',runtime:'docker-swarm',composeFiles:['infra/stack.yaml'],
-    components:{api:{replicas:2},db:{}},runbook:'README.md',
-    secrets:[{name:'app-token',where:'secrets/app-token',recipientPolicy:'policy:owner-age',keyCustody:'custody:owner-password-manager'}]}},
+    components:{api:{replicas:2},db:{},edge:{}},runbook:'README.md',
+    secrets:[{name:'app-token',runtimeName:'app-token-v1',version:1,where:'secrets/app-token',recipientPolicy:'policy:owner-age',keyCustody:'custody:owner-password-manager'}],
+    ingress:{component:'edge',hosts:['api.example.test']},
+    dns:[{host:'api.example.test',owner:'ops',receipt:'dns-confirmed'}],tls:{owner:'ops',receipt:'tls-confirmed'},
+    release:{imagesLock:'.starcistacks/vps/releases/images.lock',pointer:'.starcistacks/vps/releases/current',previous:'.starcistacks/vps/releases/previous',healthAssertions:['api /health/ready']},
+    backup:[{component:'db',target:'offsite-encrypted',retention:'30 days',owner:'ops',restoreProof:'.starcistacks/vps/releases/restore-proof.md'}]}},
   k8s:{status:'deferred',reason:'not in the current delivery target'}});
+
+function vpsModel(){
+  const api=swarmService(),db=swarmService(`postgres:16@sha256:${'b'.repeat(64)}`);
+  api.environment={APP_TOKEN_FILE:'/run/secrets/app-token'};
+  api.secrets=['app-token'];
+  api.deploy.labels={'traefik.http.routers.api.rule':'Host(`api.example.test`)'};
+  db.deploy.placement={constraints:['node.labels.database == true']};
+  const edge={...swarmService(`traefik:3@sha256:${'c'.repeat(64)}`),ports:['80:80','443:443']};
+  return {services:{api,db,edge},secrets:{'app-token':{external:true,name:'app-token-v1'}}};
+}
 
 function fixture(t,environment='dev'){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stacks-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
@@ -39,9 +56,12 @@ function fixture(t,environment='dev'){
   fs.writeFileSync(path.join(root,'.starcistacks','vps','infra','stack.yaml'),'services: {}\n');
   fs.writeFileSync(path.join(root,'.starcistacks','dev','secrets','db-password.enc'),'data: ENC[AES256_GCM,data:cipher,iv:a,tag:b,type:str]\nsops:\n  age: []\n');
   fs.writeFileSync(path.join(root,'.starcistacks','vps','secrets','app-token.enc'),'data: ENC[AES256_GCM,data:cipher,iv:a,tag:b,type:str]\nsops:\n  age: []\n');
+  fs.mkdirSync(path.join(root,'.starcistacks','vps','releases'),{recursive:true});
+  for(const file of ['images.lock','current','previous','restore-proof.md'])
+    fs.writeFileSync(path.join(root,'.starcistacks','vps','releases',file),'fixture release evidence\n');
   const manifest=manifestFor(),modelFile=path.join(root,'rendered.json');
-  const model=environment==='dev'?{services:{api:{},db:{}}}:{services:{api:swarmService(),db:swarmService(`postgres:16@sha256:${'b'.repeat(64)}`)}};
-  const sourceModel=environment==='vps'?model:{services:{api:swarmService(),db:swarmService(`postgres:16@sha256:${'b'.repeat(64)}`)}};
+  const model=environment==='dev'?{services:{api:{},db:{}}}:vpsModel();
+  const sourceModel=environment==='vps'?model:vpsModel();
   const write=()=>{fs.writeFileSync(path.join(root,'.starcistacks','application-stacks.yaml'),stringifyYaml(manifest));fs.writeFileSync(modelFile,JSON.stringify(model));if(fs.existsSync(path.join(root,'.starcistacks','vps','infra')))fs.writeFileSync(path.join(root,'.starcistacks','vps','infra','stack.yaml'),stringifyYaml(sourceModel));};write();
   return {root,manifest,model,modelFile,write,check:()=>checkApplicationStacks({repoRoot:root,environment,deploymentModelFile:modelFile})};
 }
@@ -93,7 +113,7 @@ test('reports plaintext sensitive environment keys without returning their value
 
 test('allows a _FILE pointer for a sensitive key and rejects unresolved Compose placeholders',t=>{
   const f=fixture(t);f.model.services.api.environment={DB_PASSWORD_FILE:'/run/secrets/db-password'};f.model.services.api.image='app:${TAG}';f.write();
-  const codes=f.check().errors.map(x=>x.code);assert.equal(codes.includes('plaintext-sensitive-environment'),false);assert.ok(codes.includes('compose-placeholder-unresolved'));
+  const codes=new Set(f.check().errors.map(x=>x.code));assert.equal(codes.has('plaintext-sensitive-environment'),false);assert.ok(codes.has('compose-placeholder-unresolved'));
 });
 
 test('does not let Kubernetes become an implicit supported environment without a k8s directory',t=>{
@@ -125,7 +145,7 @@ test('rejects an unknown component id bound inside an environment',t=>{
 
 test('does not require every catalog component to be bound in every environment',t=>{
   const f=fixture(t,'vps');delete f.manifest.environments.vps.components.db;
-  f.model.services={api:swarmService()};f.write();
+  delete f.model.services.db;f.write();
   assert.equal(f.check().ok,true,f.check().errors.map(x=>x.code).join(','));
 });
 
@@ -142,7 +162,7 @@ test('requires exact secret custody: a recognizable SOPS envelope and unique nam
   assert.ok(f.check().errors.some(x=>x.code==='encrypted-ref-invalid'));
   fs.writeFileSync(path.join(f.root,'.starcistacks','dev','secrets','db-password.enc'),'plaintext renamed as encrypted');
   f.manifest.environments.dev.secrets.push({...f.manifest.environments.dev.secrets[0]});f.write();
-  const codes=f.check().errors.map(x=>x.code);assert.ok(codes.includes('secret-duplicate'));assert.ok(codes.includes('encrypted-ref-invalid'));
+  const codes=new Set(f.check().errors.map(x=>x.code));assert.ok(codes.has('secret-duplicate'));assert.ok(codes.has('encrypted-ref-invalid'));
 });
 
 test('requires secret recipient and key custody policy text',t=>{
@@ -204,4 +224,71 @@ test('the stacks check reports malformed input and never echoes secret material'
   const before=fs.readFileSync(f.modelFile);
   const result=checkApplicationStacks({repoRoot:f.root,environment:'dev',deploymentModelFile:f.modelFile});
   assert.equal(result.ok,false);assert.equal(JSON.stringify(result).includes(sentinel),false);assert.deepEqual(fs.readFileSync(f.modelFile),before);
+});
+
+function trackedContext(f,edition='full'){
+  if(edition==='lite'){
+    const spec=f.manifest.environments.vps;
+    spec.composeFiles=['infra/swarm/stack.yaml'];
+    const directory=path.join(f.root,'.starcistacks','vps','infra','swarm');
+    fs.mkdirSync(directory,{recursive:true});
+    fs.writeFileSync(path.join(directory,'stack.yaml'),stringifyYaml(f.model));
+    fs.rmSync(path.join(f.root,'.starcistacks','vps','infra','stack.yaml'));
+    fs.writeFileSync(path.join(f.root,'.starcistacks','application-stacks.yaml'),stringifyYaml(f.manifest));
+  }
+  const files=['.starcistacks/application-stacks.yaml'];
+  for(const environment of ['dev','vps']){
+    const prefix=`.starcistacks/${environment}/`;
+    files.push(`${prefix}README.md`,`${prefix}secrets/${environment==='dev'?'db-password':'app-token'}.enc`,
+      `${prefix}${f.manifest.environments[environment].composeFiles[0]}`);
+  }
+  for(const file of ['images.lock','current','previous','restore-proof.md'])files.push(`.starcistacks/vps/releases/${file}`);
+  return {repoRoot:f.root,files,all:files,repo:{profile:'app',edition},isRoot:true};
+}
+
+for(const edition of ['lite','full']){
+  test(`tracked stacks gate surfaces schema, runbook and unresolved model failures in ${edition}`,t=>{
+    const f=fixture(t,'vps');
+    f.model.services.api.environment.WEB_URL='${WEB_URL}';
+    f.manifest.unrecognized=true;
+    fs.writeFileSync(path.join(f.root,'.starcistacks','vps','README.md'),'# Missing runbook commands\n');
+    f.write();
+    const findings=trackedStacksGateFindings(trackedContext(f,edition));
+    for(const expected of ['unresolved interpolation','unknown field','document the prepare command'])
+      assert.ok(findings.some(item=>item.code==='HFS_STACKS_SHAPE'&&item.message.includes(expected)),expected);
+  });
+
+  test(`tracked stacks gate reports unavailable rendered evidence once in ${edition}`,t=>{
+    const f=fixture(t,'vps'),context=trackedContext(f,edition);
+    const rendered=`.starcistacks/vps/${f.manifest.environments.vps.composeFiles[0]}`;
+    context.files=context.all=context.files.filter(file=>file!==rendered);
+    const missing=trackedStacksGateFindings(context).filter(item=>item.code==='STACKS_MODEL_UNAVAILABLE');
+    assert.equal(missing.length,1);
+    const existingFindings=stacksReleaseFindings(context);
+    assert.equal(existingFindings.filter(item=>item.code==='STACKS_MODEL_UNAVAILABLE').length,1);
+    assert.deepEqual(trackedStacksGateFindings({...context,existingFindings}),[]);
+  });
+}
+
+test('tracked stacks gate preserves scope and uses explicitly declared rendered evidence',t=>{
+  const f=fixture(t,'vps'),context=trackedContext(f);
+  f.manifest.environments.vps.renderedModel='infra/rendered.yaml';
+  const rendered='.starcistacks/vps/infra/rendered.yaml';
+  fs.writeFileSync(path.join(f.root,rendered),stringifyYaml(f.model));
+  f.write();context.files.push(rendered);
+  assert.deepEqual(trackedStacksGateFindings(context),[]);
+  f.model.services.api.environment.WEB_URL='${WEB_URL}';
+  fs.writeFileSync(path.join(f.root,rendered),stringifyYaml(f.model));
+  assert.ok(trackedStacksGateFindings(context).some(item=>item.code==='HFS_STACKS_SHAPE'));
+  assert.deepEqual(trackedStacksGateFindings({...context,inScope:()=>false}),[]);
+});
+
+test('tracked stacks gate deduplicates hardening findings already emitted by the finder',t=>{
+  const f=fixture(t,'vps');
+  delete f.model.services.api.healthcheck;f.write();
+  const context=trackedContext(f),existingFindings=stacksSwarmFindings(context);
+  assert.equal(existingFindings.filter(item=>item.code==='STACKS_HEALTHCHECK_MISSING').length,1);
+  const gateFindings=trackedStacksGateFindings({...context,existingFindings});
+  assert.equal(gateFindings.filter(item=>item.code==='STACKS_HEALTHCHECK_MISSING').length,0);
+  assert.ok(gateFindings.some(item=>item.code==='HFS_STACKS_SHAPE'));
 });
