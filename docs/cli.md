@@ -161,24 +161,26 @@ starci app scaffold demo --into projects
 
 ### starci app secret
 
-list, read, seal or generate an encrypted app secret
+initialize, seal and materialize app secrets outside the repository
 
 | flag | type | |
 | --- | --- | --- |
-| `--key` | string |  |
-| `--env` | string |  |
-| `--age` | list |  |
-| `--bytes` | number |  |
+| `--generate` | number |  |
+| `--to-file` | boolean |  |
+| `--reveal` | boolean |  |
 
-Positionals: action, slug?
+Positionals: action, env?, slug?, key?
 
 exit: 0 action completed; 2 refusal or bad usage
 
 json: none
 
 ```sh
-starci app secret list
-starci app secret gen database --key PASSWORD
+starci app secret init
+starci app secret set production app-be-db DB_PASSWORD --generate 32
+starci app secret get production app-be-db DB_PASSWORD --to-file
+starci app secret materialize production
+starci app secret list production
 ```
 
 ### starci app stack

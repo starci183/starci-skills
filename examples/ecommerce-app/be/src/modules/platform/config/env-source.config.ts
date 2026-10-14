@@ -21,18 +21,18 @@ const DURATION_UNITS: Readonly<Record<string, number>> = { ms: 1, s: 1000, m: 60
 const DURATION_PATTERN = /^(\d+)(ms|s|m|h)?$/
 
 /**
- * The only reader of the process environment. Typed readers name the missing or malformed key in the error; a key
- * `<KEY>_FILE` supplies `<KEY>` from a file, so secrets can be mounted instead of exported.
+ * The only reader of the process environment. Typed readers name the missing or malformed key in the error.
+ * A declared `<KEY>_FILE` takes priority over `<KEY>` and supplies its exact file contents, so secrets can be mounted.
  */
 export class EnvSource {
     constructor(private readonly values: Readonly<Record<string, string | undefined>>) {}
 
-    /** Reads the process environment once, resolving every `<KEY>_FILE` into `<KEY>`. */
+    /** Reads the process environment once; a declared `<KEY>_FILE` must be readable and never falls back to `<KEY>`. */
     static fromProcess(): EnvSource {
         const values: Record<string, string | undefined> = { ...process.env }
-        for (const [key, path] of Object.entries(process.env)) {
-            if (key.endsWith(FILE_SUFFIX) && path)
-                values[key.slice(0, -FILE_SUFFIX.length)] = readFileSync(path, "utf8").trim()
+        for (const [key, path] of Object.entries(values)) {
+            if (key.endsWith(FILE_SUFFIX) && path !== undefined)
+                values[key.slice(0, -FILE_SUFFIX.length)] = readFileSync(path, "utf8")
         }
         return new EnvSource(values)
     }

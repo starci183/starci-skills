@@ -26,6 +26,7 @@ test("the process environment is read only by the file that declares EnvSource i
     tester.run("no-direct-env-read", noDirectEnvRead, {
         valid: [
             { filename: ENV_SOURCE, code: "export class EnvSource { static fromProcess() { return { ...process.env } } }" },
+            { filename: ENV_SOURCE, code: 'import { readFileSync } from "node:fs"\nexport class EnvSource { static fromProcess() { const values = { ...process.env }; for (const [key, path] of Object.entries(values)) { if (key.endsWith("_FILE") && path !== undefined) values[key.slice(0, -5)] = readFileSync(path, "utf8") } return values } }' },
             { filename: ENV_SOURCE, code: "export class EnvSource { static a() { return process['env'] } }" },
             { filename: ENV_SOURCE, code: "export class EnvSource { static a() { const { env } = process; return env } }" },
             { filename: SERVICE, code: "const port = options.port" },
@@ -45,6 +46,7 @@ test("the process environment is read only by the file that declares EnvSource i
             { filename: CONFIG, code: "const env = process.env", errors: [{ messageId: "env" }] },
             { filename: SERVICE, code: "const x = process['env']", errors: [{ messageId: "env" }] },
             { filename: MAIN, code: "const x = process.env.PORT", errors: [{ messageId: "env" }] },
+            { filename: at("apps/api/src/api.options.ts"), code: 'import { readFileSync } from "node:fs"\nconst path = process.env.PLAN_API_KEY_FILE\nexport const options = { apiKey: path === undefined ? undefined : readFileSync(path, "utf8") }', errors: [{ messageId: "env" }] },
             { filename: SERVICE, code: "const { env } = process", errors: [{ messageId: "env" }] },
             { filename: SERVICE, code: "const { env: e, argv } = process", errors: [{ messageId: "env" }] },
             { filename: SERVICE, code: "const e = Reflect.get(process, 'env')", errors: [{ messageId: "env" }] },

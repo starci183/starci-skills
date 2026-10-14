@@ -1,194 +1,1002 @@
-// hfs-secret.spec.mjs - `starci app secret list|show|set|gen` (scripts/hfs/secret.mjs) over a fake sops seam: what is read, what is
-// sealed, with which recipients and format, and that a value never reaches a message or an argument list.
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { spawn } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
-import * as secrets from '../../scripts/hfs/secret.mjs';
-const { envelopeOf, formatOf, plaintextOf, secretMain, setSecretValues } = secrets;
+// Names and paths may be printed. Compare private test data only as booleans.
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { spawn } from "node:child_process";
+import { pathToFileURL } from "node:url";
+import { mkdtemp } from "../helpers/tmpdir.mjs";
+import { app, run, privateAbsent } from "../helpers/hfs-secret-fixture.mjs";
+import {
+  envelopeOf,
+  formatOf,
+  plaintextOf,
+  setSecretValues,
+} from "../../scripts/hfs/secret.mjs";
+import { secretRoots } from "../../scripts/hfs/secret-files.mjs";
+import { parseYaml } from "../../engine/yaml.mjs";
+import { configuredRecipients } from "../../scripts/hfs/secret-init.mjs";
 
-const RECIPIENT = 'age1fixturerecipientaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const RECIPIENT = `age1${"q".repeat(58)}`;
+const OTHER_RECIPIENT = `age1${"p".repeat(58)}`;
+const PRIVATE_KEY = `AGE-SECRET-KEY-1${"Q".repeat(58)}`;
+const ENC = "ENC[AES256_GCM,data:AA==,iv:AA==,tag:AA==,type:str]";
+const sealedJson = (keys) =>
+  `${JSON.stringify({ ...Object.fromEntries(keys.map((key) => [key, ENC])), sops: { mac: ENC, age: [{ recipient: RECIPIENT, enc: "x" }] } })}\n`;
+const sealedDotenv = (keys, recipients = [RECIPIENT]) =>
+  `${keys.map((key) => `${key}=${ENC}`).join("\n")}\n${recipients.map((recipient, i) => `sops_age__list_${i}__map_recipient=${recipient}`).join("\n")}\nsops_mac=${ENC}\n`;
+const CONFIG = `creation_rules:\n  - path_regex: '\\.starcistacks[/\\\\][^/\\\\]+[/\\\\]secrets[/\\\\][^/\\\\]+\\.enc$'\n    age: ${RECIPIENT}\n`;
 
-/** A sealed json envelope the way sops writes it: encrypted members, then a `sops` block naming the recipients. */
-const ENC = 'ENC[AES256_GCM,data:AA==,iv:AA==,tag:AA==,type:str]';
-const sealedJson = (keys, recipients = [RECIPIENT]) => `${JSON.stringify({ ...Object.fromEntries(keys.map((key) => [key, ENC])), sops: { mac: ENC, age: recipients.map((recipient) => ({ recipient, enc: 'x' })) } }, null, 1)}\n`;
-const sealedDotenv = (keys) => `${keys.map((key) => `${key}=${ENC}`).join('\n')}\nsops_age__list_0__map_recipient=${RECIPIENT}\nsops_mac=${ENC}\n`;
-
-/** An app with .starcistacks/<env>/secrets holding the given files. */
-function app(t, files, env = 'dev') {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-secret-'));
-  const prior = process.env.STARCI_LOCAL_ROOT;
-  process.env.STARCI_LOCAL_ROOT = path.join(root, 'private-machine');
-  t.after(() => {
-    if (prior === undefined) delete process.env.STARCI_LOCAL_ROOT; else process.env.STARCI_LOCAL_ROOT = prior;
-    fs.rmSync(root, { recursive: true, force: true });
-  });
-  const dir = path.join(root, '.starcistacks', env, 'secrets');
-  fs.mkdirSync(dir, { recursive: true });
-  for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), text);
-  return { root, dir };
-}
-
-/** A sops seam keeping what each file decrypts to, and recording every seal request. */
 function fakeSops(plain = {}) {
   const sealed = [];
+  const decrypted = [];
   return {
     sealed,
-    decrypt: (file) => ({ ...plain[path.basename(file)] }),
-    seal: (request) => { sealed.push(request); return request.inputType === 'dotenv' ? sealedDotenv(request.plaintext.split(String.fromCharCode(10)).filter(Boolean).map((line) => line.split('=')[0])) : sealedJson(Object.keys(JSON.parse(request.plaintext)), request.recipients.length ? request.recipients : [RECIPIENT]); },
+    decrypted,
+    decrypt: (file, format) => {
+      decrypted.push({ file, format });
+      return { ...plain[path.basename(file)] };
+    },
+    seal: (request) => {
+      sealed.push(request);
+      const keys =
+        request.inputType === "dotenv"
+          ? request.plaintext
+              .split("\n")
+              .filter(Boolean)
+              .map((line) => line.split("=")[0])
+          : Object.keys(JSON.parse(request.plaintext));
+      return request.inputType === "dotenv"
+        ? sealedDotenv(
+            keys,
+            request.recipients.length ? request.recipients : [RECIPIENT],
+          )
+        : sealedJson(keys);
+    },
   };
 }
 
-function run(argv, options) {
-  const out = []; const err = [];
-  const code = secretMain(argv, { stdout: (s) => out.push(s), stderr: (s) => err.push(s), ...options });
-  return { code, out: out.join(''), err: err.join('') };
+function fakeTools() {
+  const calls = [];
+  return {
+    calls,
+    resolveSops: () => "fixture-sops",
+    resolveRealTool: () => "fixture-age-keygen",
+    runProgram: (file, args) => {
+      calls.push({ file, args });
+      if (args[0] === "-o") {
+        fs.writeFileSync(
+          args[1],
+          `# public key: ${RECIPIENT}\n${PRIVATE_KEY}\n`,
+          { mode: 0o600 },
+        );
+        return { status: 0, stdout: "", stderr: "" };
+      }
+      if (args[0] === "-y")
+        return { status: 0, stdout: `${RECIPIENT}\n`, stderr: "" };
+      return { status: 1, stdout: "", stderr: "" };
+    },
+  };
 }
 
-test('another live process writing the same sealed secret refuses a write before decrypt or seal', async t => {
-  const { root, dir } = app(t, { 'token.enc': sealedJson(['data']) });
-  const owner = pathToFileURL(path.resolve(import.meta.dirname, '../../scripts/api/fs/claim-file.mjs')).href;
-  const source = `import {claimFile} from ${JSON.stringify(owner)};const held=claimFile(${JSON.stringify(path.resolve(dir, 'token.enc'))});`+
-    `if(!held.ok)process.exit(2);console.log('held');setInterval(()=>{},1000);`;
-  const child = spawn(process.execPath, ['--input-type=module', '-e', source], {
-    env: { ...process.env }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
+test("envelope inspection reads format, key names and public recipients without decrypting", () => {
+  assert.equal(formatOf(sealedJson(["TOKEN"])), "json");
+  assert.equal(formatOf(sealedDotenv(["TOKEN"])), "dotenv");
+  assert.equal(formatOf("A: ENC[x]\nsops:\n  age: []\n"), "yaml");
+  assert.deepEqual(envelopeOf(sealedJson(["TOKEN"])), {
+    format: "json",
+    keys: ["TOKEN"],
+    recipients: [RECIPIENT],
   });
-  const exit = new Promise(resolve => child.once('close', resolve));
-  t.after(async () => { if (child.exitCode === null) child.kill('SIGTERM'); await exit; });
-  try {
-  await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('the other writer did not become ready')), 10_000);
-    let text = '', errors = '';
-    child.stderr.on('data', chunk => { errors += chunk; });
-    child.stdout.on('data', chunk => { text += chunk; if (text.includes('held')) { clearTimeout(timer); resolve(); } });
-    child.once('error', error => { clearTimeout(timer); reject(error); });
-    child.once('close', code => { clearTimeout(timer); reject(new Error(`the other writer exited ${code}: ${errors}`)); });
+  assert.deepEqual(envelopeOf(sealedDotenv(["DATABASE_URL", "REDIS_URL"])), {
+    format: "dotenv",
+    keys: ["DATABASE_URL", "REDIS_URL"],
+    recipients: [RECIPIENT],
   });
-  assert.throws(() => setSecretValues(root, { slug: 'token', values: { data: 'refused-private-value' } }, {
-    sops: { decrypt: () => assert.fail('a held write must refuse before decrypt'), seal: () => assert.fail('a held write must refuse before seal') },
-  }), /being updated/);
-  assert.equal(fs.readFileSync(path.join(dir, 'token.enc'), 'utf8'), sealedJson(['data']));
-  } finally { if (child.exitCode === null) child.kill('SIGTERM'); await exit; }
+  assert.ok(
+    plaintextOf("dotenv", { A: "private-one", B: "private-two" }) ===
+      "A=private-one\nB=private-two\n",
+    "dotenv serialization preserves named values",
+  );
+  assert.ok(
+    plaintextOf("dotenv", { A: "one\ntwo" }) === "A=one\\ntwo\n",
+    "dotenv transports LF as an escaped value on one physical line",
+  );
+  for (const value of ["one\rtwo", "one\\ntwo"])
+    assert.throws(
+      () => plaintextOf("dotenv", { A: value }),
+      /cannot preserve/u,
+    );
 });
 
-test('envelopeOf reads the format, the key names and the recipients of a sealed document without decrypting', () => {
-  assert.equal(formatOf(sealedJson(['data'])), 'json');
-  assert.equal(formatOf(sealedDotenv(['A'])), 'dotenv');
-  assert.equal(formatOf('a: ENC[x]\nsops:\n  age: []\n'), 'yaml');
-  assert.deepEqual(envelopeOf(sealedJson(['data'])), { format: 'json', keys: ['data'], recipients: [RECIPIENT] });
-  assert.deepEqual(envelopeOf(sealedDotenv(['DATABASE_URL', 'REDIS_URL'])), { format: 'dotenv', keys: ['DATABASE_URL', 'REDIS_URL'], recipients: [RECIPIENT] });
-  assert.equal(plaintextOf('dotenv', { A: '1', B: '2' }), 'A=1\nB=2\n');
-  assert.throws(() => plaintextOf('dotenv', { A: 'one\ntwo' }), /line break/);
+test("platform root defaults use roaming config, Linux config/data, and macOS application support", (t) => {
+  const home = mkdtemp(t, "hfs-secret-roots-");
+  const windows = secretRoots({ USERPROFILE: home }, "win32");
+  assert.equal(
+    windows.identity,
+    path.join(home, "AppData", "Roaming", "sops", "age", "keys.txt"),
+  );
+  assert.equal(
+    windows.local,
+    path.join(home, "AppData", "Local", "StarCi", "secrets"),
+  );
+  const linux = secretRoots({ HOME: home }, "linux");
+  assert.equal(
+    linux.identity,
+    path.join(home, ".config", "sops", "age", "keys.txt"),
+  );
+  assert.equal(
+    linux.local,
+    path.join(home, ".local", "share", "StarCi", "secrets"),
+  );
+  const mac = secretRoots({ HOME: home }, "darwin");
+  assert.equal(
+    mac.identity,
+    path.join(
+      home,
+      "Library",
+      "Application Support",
+      "sops",
+      "age",
+      "keys.txt",
+    ),
+  );
+  assert.equal(
+    mac.local,
+    path.join(home, "Library", "Application Support", "StarCi", "secrets"),
+  );
 });
 
-test('list names every secret of the only env with its keys, and decrypts nothing', (t) => {
-  const { root } = app(t, { 'app-env.enc': sealedDotenv(['DATABASE_URL', 'REDIS_URL']), 'sepay-api-key-key.enc': sealedJson(['data']), 'notes.txt': 'not a secret' });
-  const sops = { decrypt: () => assert.fail('list must not decrypt'), seal: () => assert.fail('list must not seal') };
-  const result = run(['list', '--cwd', root], { sops });
+test("init creates an external key and canonical path rule, then reuses both without disclosing the identity", (t) => {
+  const { root, env } = app(t);
+  fs.writeFileSync(
+    path.join(root, ".sops.yaml"),
+    "# Run starci app secret init\ncreation_rules: []\n",
+  );
+  const tools = fakeTools();
+  const result = run(["init"], { cwd: root, env, tools, platform: "win32" });
   assert.equal(result.code, 0);
-  assert.match(result.out, /^app-env {2}DATABASE_URL, REDIS_URL$/mu);
-  assert.match(result.out, /^sepay-api-key-key {2}data$/mu);
-  assert.match(result.out, /2 secrets in \.starcistacks\/dev\/secrets/);
+  const keyFile = path.join(env.APPDATA, "sops", "age", "keys.txt");
+  assert.ok(
+    fs.readFileSync(keyFile, "utf8").includes(PRIVATE_KEY),
+    "identity is installed at the selected external path",
+  );
+  const config = fs.readFileSync(path.join(root, ".sops.yaml"), "utf8");
+  assert.ok(config.includes(RECIPIENT), "config contains the public recipient");
+  assert.ok(
+    config.includes(
+      String.raw`\.starcistacks[/\\][^/\\]+[/\\]secrets[/\\][^/\\]+\.enc$`,
+    ),
+    "config uses the canonical custody path regex",
+  );
+  assert.ok(
+    !config.includes(PRIVATE_KEY),
+    "config contains no private identity",
+  );
+  privateAbsent(result, [PRIVATE_KEY]);
+  const repeated = run(["init"], { cwd: root, env, tools, platform: "win32" });
+  assert.equal(repeated.code, 0);
+  assert.equal(tools.calls.filter((call) => call.args[0] === "-o").length, 1);
+  assert.ok(
+    fs.readFileSync(keyFile, "utf8").includes(PRIVATE_KEY),
+    "rerunning init preserves the identity",
+  );
+  assert.equal(fs.readFileSync(path.join(root, ".sops.yaml"), "utf8"), config);
+  privateAbsent(repeated, [PRIVATE_KEY]);
+});
+
+test("init preserves existing recipients and keys, selects platform roots, and reports missing tools", (t) => {
+  const { root, env } = app(t);
+  const config = `creation_rules:\n  - path_regex: '\\.starcistacks.*\\.enc$'\n    age: ${OTHER_RECIPIENT}\n`;
+  fs.writeFileSync(path.join(root, ".sops.yaml"), config);
+  const keyFile = path.join(env.APPDATA, "sops", "age", "keys.txt");
+  fs.mkdirSync(path.dirname(keyFile), { recursive: true });
+  fs.writeFileSync(keyFile, `${PRIVATE_KEY}\n`);
+  const tools = fakeTools();
+  const result = run(["init"], { cwd: root, env, tools, platform: "win32" });
+  assert.equal(result.code, 0);
+  const updatedConfig = fs.readFileSync(path.join(root, ".sops.yaml"), "utf8");
+  assert.ok(
+    updatedConfig.includes(OTHER_RECIPIENT) &&
+      !updatedConfig.includes(RECIPIENT),
+    "init retains the existing recipient",
+  );
+  assert.ok(
+    fs.readFileSync(keyFile, "utf8") === `${PRIVATE_KEY}\n`,
+    "existing private identity is unchanged",
+  );
+  assert.equal(tools.calls.filter((call) => call.args[0] === "-o").length, 0);
+  privateAbsent(result, [PRIVATE_KEY]);
+  for (const platform of ["linux", "darwin"]) {
+    const fixture = app(t);
+    const initialized = run(["init"], {
+      cwd: fixture.root,
+      env: fixture.env,
+      tools: fakeTools(),
+      platform,
+    });
+    assert.equal(initialized.code, 0);
+    const base =
+      platform === "darwin"
+        ? path.join(fixture.env.HOME, "Library", "Application Support")
+        : fixture.env.XDG_CONFIG_HOME;
+    assert.ok(
+      fs.existsSync(path.join(base, "sops", "age", "keys.txt")),
+      "identity uses the platform config directory",
+    );
+    privateAbsent(initialized, [PRIVATE_KEY]);
+  }
+  const noSops = run(["init"], {
+    cwd: root,
+    env,
+    tools: { ...fakeTools(), resolveSops: () => null },
+  });
+  assert.equal(noSops.code, 2);
+  assert.match(noSops.err, /sops.*(?:installed|missing|available)/iu);
+  const noAge = run(["init"], {
+    cwd: root,
+    env,
+    tools: { ...fakeTools(), resolveRealTool: () => null },
+  });
+  assert.equal(noAge.code, 2);
+  assert.match(noAge.err, /age.*(?:installed|missing|available)/iu);
+});
+
+test("init refuses malformed recipient policy without printing or copying its contents", (t) => {
+  const { root, env } = app(t);
+  const config = `creation_rules:\n  - path_regex: '\\.starcistacks.*\\.enc$'\n    age: ${PRIVATE_KEY}\n`;
+  fs.writeFileSync(path.join(root, ".sops.yaml"), config);
+  const tools = fakeTools();
+  const result = run(["init"], { cwd: root, env, tools });
+  assert.equal(result.code, 2);
+  assert.match(result.err, /valid public age recipients/u);
+  privateAbsent(result, [PRIVATE_KEY]);
+  assert.ok(
+    fs.readFileSync(path.join(root, ".sops.yaml"), "utf8") === config,
+    "invalid policy remains unchanged for deliberate repair",
+  );
+  assert.equal(tools.calls.length, 0);
+  assert.ok(
+    !fs.existsSync(secretRoots(env).identity),
+    "invalid policy creates no identity",
+  );
+});
+
+test("init preserves environment-specific SOPS rule precedence before its general custody rule", (t) => {
+  const { root, env } = app(t);
+  const productionRule = {
+    path_regex: String.raw`\.starcistacks[/\\]production[/\\]secrets[/\\][^/\\]+\.enc$`,
+    age: OTHER_RECIPIENT,
+  };
+  const developmentRule = {
+    path_regex: String.raw`\.starcistacks[/\\]dev[/\\]secrets[/\\][^/\\]+\.enc$`,
+    age: RECIPIENT,
+  };
+  const config = `creation_rules:\n  - path_regex: '${productionRule.path_regex}'\n    age: ${productionRule.age}\n  - path_regex: '${developmentRule.path_regex}'\n    age: ${developmentRule.age}\n`;
+  fs.writeFileSync(path.join(root, ".sops.yaml"), config);
+  const result = run(["init"], { cwd: root, env, tools: fakeTools() });
+  assert.equal(result.code, 0);
+  privateAbsent(result, [PRIVATE_KEY]);
+  const rules = parseYaml(
+    fs.readFileSync(path.join(root, ".sops.yaml"), "utf8"),
+  ).creation_rules;
+  assert.deepEqual(rules.slice(0, 2), [productionRule, developmentRule]);
+  assert.equal(rules.length, 3);
+  assert.equal(
+    rules[2].path_regex,
+    String.raw`\.starcistacks[/\\][^/\\]+[/\\]secrets[/\\][^/\\]+\.enc$`,
+  );
+  const recipientFor = (environment) =>
+    rules.find((rule) =>
+      new RegExp(rule.path_regex).test(
+        `.starcistacks/${environment}/secrets/app.enc`,
+      ),
+    ).age;
+  assert.equal(recipientFor("production"), OTHER_RECIPIENT);
+  assert.equal(recipientFor("dev"), RECIPIENT);
+});
+
+test("init preserves an existing canonical fallback recipient behind a production-specific rule", (t) => {
+  const { root, env } = app(t);
+  const production = {
+    path_regex: String.raw`\.starcistacks[/\\]production[/\\]secrets[/\\][^/\\]+\.enc$`,
+    age: OTHER_RECIPIENT,
+  };
+  const canonical = {
+    path_regex: String.raw`\.starcistacks[/\\][^/\\]+[/\\]secrets[/\\][^/\\]+\.enc$`,
+    age: RECIPIENT,
+  };
+  fs.writeFileSync(
+    path.join(root, ".sops.yaml"),
+    `creation_rules:\n  - path_regex: '${production.path_regex}'\n    age: ${production.age}\n  - path_regex: '${canonical.path_regex}'\n    age: ${canonical.age}\n`,
+  );
+  const result = run(["init"], { cwd: root, env, tools: fakeTools() });
+  assert.equal(result.code, 0);
+  privateAbsent(result, [PRIVATE_KEY]);
+  const rules = parseYaml(
+    fs.readFileSync(path.join(root, ".sops.yaml"), "utf8"),
+  ).creation_rules;
+  assert.deepEqual(rules, [production, canonical]);
+  assert.deepEqual(
+    configuredRecipients(
+      root,
+      path.join(root, ".starcistacks", "production", "secrets", "app.enc"),
+    ),
+    [OTHER_RECIPIENT],
+  );
+  assert.deepEqual(
+    configuredRecipients(
+      root,
+      path.join(root, ".starcistacks", "dev", "secrets", "app.enc"),
+    ),
+    [RECIPIENT],
+  );
+});
+
+test("configured recipients follow the first matching rule and preserve a comma-separated public recipient list", (t) => {
+  const { root } = app(t);
+  const configFile = path.join(root, ".sops.yaml");
+  const production = String.raw`\.starcistacks[/\\]production[/\\]secrets[/\\][^/\\]+\.enc$`;
+  fs.writeFileSync(
+    configFile,
+    `creation_rules:\n  - path_regex: '${production}'\n    age: '${OTHER_RECIPIENT}, ${RECIPIENT}'\n  - path_regex: '\\.starcistacks.*\\.enc$'\n    age: ${RECIPIENT}\n`,
+  );
+  const prodFile = path.join(
+    root,
+    ".starcistacks",
+    "production",
+    "secrets",
+    "app.enc",
+  );
+  const devFile = path.join(root, ".starcistacks", "dev", "secrets", "app.enc");
+  assert.deepEqual(configuredRecipients(root, prodFile), [
+    OTHER_RECIPIENT,
+    RECIPIENT,
+  ]);
+  assert.deepEqual(configuredRecipients(root, devFile), [RECIPIENT]);
+  fs.writeFileSync(
+    configFile,
+    `creation_rules:\n  - age: ${OTHER_RECIPIENT}\n  - path_regex: '\\.starcistacks.*\\.enc$'\n    age: ${RECIPIENT}\n`,
+  );
+  assert.deepEqual(configuredRecipients(root, devFile), [OTHER_RECIPIENT]);
+});
+
+test("configured recipients refuse invalid policy and never leak malformed recipient contents", (t) => {
+  const { root } = app(t);
+  const file = path.join(root, ".starcistacks", "dev", "secrets", "app.enc");
+  const configFile = path.join(root, ".sops.yaml");
+  assert.throws(() => configuredRecipients(root, file), /valid \.sops\.yaml/u);
+  for (const config of [
+    "creation_rules: [",
+    "creation_rules: {}",
+    `creation_rules:\n  - path_regex: '['\n    age: ${RECIPIENT}\n`,
+    `creation_rules:\n  - path_regex: 'does-not-match'\n    age: ${RECIPIENT}\n`,
+    `creation_rules:\n  - path_regex: '\\.starcistacks'\n  - age: ${RECIPIENT}\n`,
+  ]) {
+    fs.writeFileSync(configFile, config);
+    let refused = false;
+    try {
+      configuredRecipients(root, file);
+    } catch {
+      refused = true;
+    }
+    assert.ok(
+      refused,
+      "invalid or missing first-match public age policy is refused",
+    );
+  }
+  fs.writeFileSync(configFile, `creation_rules:\n  - age: ${PRIVATE_KEY}\n`);
+  let refusal;
+  try {
+    configuredRecipients(root, file);
+  } catch (error) {
+    refusal = error;
+  }
+  assert.ok(refusal instanceof Error, "malformed recipient is refused");
+  assert.ok(
+    !refusal.message.includes(PRIVATE_KEY),
+    "policy refusal contains no malformed private contents",
+  );
+});
+
+test("list takes an environment and exposes key names without decrypting any envelope", (t) => {
+  const { root, env } = app(t, {
+    "app-env.enc": sealedDotenv(["DATABASE_URL", "REDIS_URL"]),
+    "token.enc": sealedJson(["TOKEN"]),
+    "notes.txt": "ignored",
+  });
+  const sops = {
+    decrypt: () => assert.fail("list must not decrypt"),
+    seal: () => assert.fail("list must not seal"),
+  };
+  const result = run(["list", "dev"], { cwd: root, env, sops });
+  assert.equal(result.code, 0);
+  assert.deepEqual(result.out.trim().split(/\r?\n/u), [
+    "DATABASE_URL",
+    "REDIS_URL",
+    "TOKEN",
+  ]);
+  assert.ok(
+    !result.out.includes(ENC),
+    "list contains no encrypted member data",
+  );
   assert.doesNotMatch(result.out, /notes/);
+  assert.equal(run(["list"], { cwd: root, env, sops }).code, 2);
 });
 
-test('show prints one value: data of a single-value secret, a named key of a document, and refuses an ambiguous or missing one', (t) => {
-  const { root } = app(t, { 'one-key.enc': sealedJson(['data']), 'app-env.enc': sealedDotenv(['DATABASE_URL', 'REDIS_URL']) });
-  const sops = fakeSops({ 'one-key.enc': { data: 'v1' }, 'app-env.enc': { DATABASE_URL: 'postgres://x', REDIS_URL: 'redis://y' } });
-  assert.equal(run(['show', 'one-key', '--cwd', root], { sops }).out, 'v1\n');
-  assert.equal(run(['show', 'app-env', '--key', 'REDIS_URL', '--cwd', root], { sops }).out, 'redis://y\n');
-  const ambiguous = run(['show', 'app-env', '--cwd', root], { sops });
-  assert.equal(ambiguous.code, 2);
-  assert.match(ambiguous.err, /holds DATABASE_URL, REDIS_URL; name one with --key/);
-  assert.equal(run(['show', 'app-env', '--key', 'NOPE', '--cwd', root], { sops }).code, 2);
-  assert.equal(run(['show', 'absent', '--cwd', root], { sops }).code, 2);
-});
-
-test('set seals the value read from stdin: a new secret takes --age (json), an existing one keeps its keys, format and recipients', (t) => {
-  const { root, dir } = app(t, { 'app-env.enc': sealedDotenv(['DATABASE_URL']) });
-  const sops = fakeSops({ 'app-env.enc': { DATABASE_URL: 'postgres://x' } });
-  const created = run(['set', 'sepay-webhook-secret-key', '--age', RECIPIENT, '--cwd', root], { sops, stdin: () => 'whsec_value\n' });
-  assert.equal(created.code, 0, created.err);
-  assert.deepEqual(sops.sealed[0], { inputType: 'json', plaintext: '{"data":"whsec_value"}\n', recipients: [RECIPIENT], filenameOverride: path.join(dir, 'sepay-webhook-secret-key.enc') });
-  assert.ok(fs.existsSync(path.join(dir, 'sepay-webhook-secret-key.enc')));
-  assert.doesNotMatch(created.out + created.err, /whsec_value/, 'a value is never echoed');
-  const updated = run(['set', 'app-env', '--key', 'REDIS_URL', '--cwd', root], { sops, stdin: () => 'redis://z' });
-  assert.equal(updated.code, 0, updated.err);
-  assert.deepEqual(sops.sealed[1], { inputType: 'dotenv', plaintext: 'DATABASE_URL=postgres://x\nREDIS_URL=redis://z\n', recipients: [RECIPIENT], filenameOverride: path.join(dir, 'app-env.enc') });
-});
-
-test('set of a new secret with no --age leaves the recipients to .sops.yaml through the target file name (the override of every seal); an empty value is refused', (t) => {
-  const { root, dir } = app(t, {});
-  const sops = fakeSops();
-  assert.equal(run(['set', 'upload-signing-secret-key', '--cwd', root], { sops, stdin: () => 'x' }).code, 0);
-  assert.deepEqual(sops.sealed[0].recipients, []);
-  assert.equal(sops.sealed[0].filenameOverride, path.join(dir, 'upload-signing-secret-key.enc'));
-  const empty = run(['set', 'other', '--cwd', root], { sops, stdin: () => '\n' });
+test("set seals stdin as dotenv and updates preserve other keys and existing recipients", (t) => {
+  const { root, dir, env } = app(t, {
+    "app-env.enc": sealedDotenv(["DATABASE_URL"]),
+  });
+  fs.writeFileSync(path.join(root, ".sops.yaml"), CONFIG);
+  const oldValue = "private-existing-database";
+  const newValue = "private-new-token";
+  const sops = fakeSops({ "app-env.enc": { DATABASE_URL: oldValue } });
+  const created = run(["set", "dev", "webhook", "WEBHOOK_SECRET"], {
+    cwd: root,
+    env,
+    sops,
+    stdin: () => `${newValue}\n`,
+  });
+  assert.equal(created.code, 0);
+  assert.equal(sops.sealed[0].inputType, "dotenv");
+  assert.ok(
+    sops.sealed[0].plaintext === `WEBHOOK_SECRET=${newValue}\n`,
+    "stdin is sealed under its named key",
+  );
+  assert.equal(sops.sealed[0].filenameOverride, path.join(dir, "webhook.enc"));
+  assert.ok(fs.existsSync(path.join(dir, "webhook.enc")));
+  privateAbsent(created, [newValue]);
+  const updated = run(["set", "dev", "app-env", "REDIS_URL"], {
+    cwd: root,
+    env,
+    sops,
+    stdin: () => newValue,
+  });
+  assert.equal(updated.code, 0);
+  assert.equal(sops.sealed[1].inputType, "dotenv");
+  assert.deepEqual(sops.sealed[1].recipients, [RECIPIENT]);
+  assert.ok(
+    sops.sealed[1].plaintext ===
+      `DATABASE_URL=${oldValue}\nREDIS_URL=${newValue}\n`,
+    "an update preserves the other key",
+  );
+  privateAbsent(updated, [oldValue, newValue]);
+  const empty = run(["set", "dev", "empty", "TOKEN"], {
+    cwd: root,
+    env,
+    sops,
+    stdin: () => "\n",
+  });
   assert.equal(empty.code, 2);
-  assert.match(empty.err, /empty/);
+  assert.match(empty.err, /empty/u);
 });
 
-test('gen seals a random value of the asked size without printing it', (t) => {
-  const { root } = app(t, {});
+test("set --generate seals the requested random bytes without reading stdin or disclosing them", (t) => {
+  const { root, env } = app(t);
   const sops = fakeSops();
-  const result = run(['gen', 'todo-session-secret-key', '--bytes', '24', '--age', RECIPIENT, '--cwd', root], { sops, random: (n) => Buffer.alloc(n, 0xfb) });
-  assert.equal(result.code, 0, result.err);
-  const sealedValue = JSON.parse(sops.sealed[0].plaintext).data;
-  assert.equal(sealedValue, Buffer.alloc(24, 0xfb).toString('base64url'));
-  assert.doesNotMatch(result.out, new RegExp(sealedValue.replace(/[-_]/gu, '.')), 'the generated value is not printed');
-  assert.equal(run(['gen', 'x', '--bytes', '4', '--cwd', root], { sops }).code, 2);
+  let requested;
+  const value = Buffer.alloc(24, 0xfb).toString("base64url");
+  const result = run(
+    ["set", "dev", "session", "SESSION_SECRET", "--generate", "24"],
+    {
+      cwd: root,
+      env,
+      sops,
+      stdin: () => assert.fail("generation must not read stdin"),
+      random: (n) => {
+        requested = n;
+        return Buffer.alloc(n, 0xfb);
+      },
+    },
+  );
+  assert.equal(result.code, 0);
+  assert.equal(requested, 24);
+  assert.ok(
+    sops.sealed[0].plaintext === `SESSION_SECRET=${value}\n`,
+    "generated bytes are sealed",
+  );
+  privateAbsent(result, [value]);
+  for (const size of ["0", "-1", "1.5", "not-a-number", "1025"])
+    assert.equal(
+      run(["set", "dev", "session", "SESSION_SECRET", "--generate", size], {
+        cwd: root,
+        env,
+        sops,
+      }).code,
+      2,
+    );
 });
 
-test('refusals: an unknown verb or flag, a bad slug, no .starcistacks, several envs without --env', (t) => {
-  const { root } = app(t, { 'a-key.enc': sealedJson(['data']) });
-  const sops = fakeSops();
-  assert.equal(run(['frobnicate'], {}).code, 2);
-  assert.equal(run(['list', '--bogus', '--cwd', root], { sops }).code, 2);
-  assert.match(run(['show', 'Bad_Slug', '--cwd', root], { sops }).err, /not a secret slug/);
-  const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-secret-bare-'));
-  t.after(() => fs.rmSync(bare, { recursive: true, force: true }));
-  assert.match(run(['list', '--cwd', bare], { sops }).err, /no \.starcistacks/);
-  fs.mkdirSync(path.join(root, '.starcistacks', 'vps', 'secrets'), { recursive: true });
-  assert.match(run(['list', '--cwd', root], { sops }).err, /more than one environment/);
-  assert.equal(run(['list', '--env', 'vps', '--cwd', root], { sops }).code, 0);
+test("get --to-file writes local files with empty stdout; --reveal explicitly permits captured value output", (t) => {
+  const values = {
+    DATABASE_URL: "private-database-location",
+    REDIS_URL: "private-cache-location",
+  };
+  const { root, env, localDir } = app(t, {
+    "app-env.enc": sealedDotenv(Object.keys(values)),
+  });
+  const sops = fakeSops({ "app-env.enc": values });
+  const result = run(["get", "dev", "app-env", "REDIS_URL", "--to-file"], {
+    cwd: root,
+    env,
+    sops,
+  });
+  assert.equal(result.code, 0);
+  const file = path.join(localDir, "REDIS_URL");
+  assert.ok(
+    fs.readFileSync(file, "utf8") === values.REDIS_URL,
+    "selected file contains the decrypted value",
+  );
+  assert.ok(
+    !fs.existsSync(path.join(localDir, "DATABASE_URL")),
+    "get of one key does not write another",
+  );
+  assert.equal(result.out, "");
+  assert.deepEqual(result.err.trim().split(/\r?\n/u), [
+    `REDIS_URL_FILE=${file}`,
+  ]);
+  privateAbsent(result, Object.values(values));
+  if (process.platform !== "win32")
+    assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+  const all = run(["get", "dev", "app-env", "--to-file"], {
+    cwd: root,
+    env,
+    sops,
+  });
+  assert.equal(all.code, 0);
+  assert.equal(all.out, "");
+  assert.deepEqual(fs.readdirSync(localDir).sort(), [
+    "DATABASE_URL",
+    "REDIS_URL",
+  ]);
+  privateAbsent(all, Object.values(values));
+  const revealed = run(
+    ["get", "dev", "app-env", "REDIS_URL", "--to-file", "--reveal"],
+    { cwd: root, env, sops },
+  );
+  assert.equal(revealed.code, 0);
+  assert.ok(
+    revealed.out.includes(values.REDIS_URL),
+    "explicit reveal reaches captured stdout",
+  );
+  assert.ok(
+    !revealed.err.includes(values.REDIS_URL),
+    "reveal does not reach stderr",
+  );
+  for (const args of [
+    ["get", "dev", "app-env"],
+    ["get", "dev", "app-env", "MISSING", "--to-file"],
+    ["get", "dev", "absent", "--to-file"],
+  ])
+    assert.equal(run(args, { cwd: root, env, sops }).code, 2);
 });
 
-test('a failed seal or invalid encryption result preserves the previous envelope and publishes no plaintext', t => {
-  const prior = sealedJson(['data']);
-  const { root, dir } = app(t, { 'token.enc': prior });
-  assert.throws(() => run(['set', 'token', '--cwd', root], { stdin: () => 'replacement-negative-fixture',
-    sops: { decrypt: () => ({ data: 'old-negative-fixture' }), seal: () => { throw new Error('fixture SOPS failure'); } } }));
-  assert.equal(fs.readFileSync(path.join(dir, 'token.enc'), 'utf8'), prior);
-  const invalid = run(['set', 'token', '--cwd', root], { stdin: () => 'replacement-negative-fixture',
-    sops: { decrypt: () => ({ data: 'old-negative-fixture' }), seal: () => '{"data":"opaque-negative-fixture"}' } });
-  assert.equal(invalid.code, 2);
-  assert.doesNotMatch(invalid.out + invalid.err, /opaque-negative-fixture/);
-  assert.equal(fs.readFileSync(path.join(dir, 'token.enc'), 'utf8'), prior);
-  assert.deepEqual(fs.readdirSync(dir), ['token.enc']);
+test("materialize decrypts every environment envelope into one local file per KEY and prints paths only", (t) => {
+  const maps = {
+    "database.enc": {
+      DATABASE_URL: "private-database-value",
+      DATABASE_PASSWORD: "private-password-value",
+    },
+    "session.enc": { SESSION_SECRET: "private-session-value" },
+  };
+  const { root, env, localDir } = app(t, {
+    "database.enc": sealedDotenv(Object.keys(maps["database.enc"])),
+    "session.enc": sealedDotenv(["SESSION_SECRET"]),
+    "notes.txt": "ignored",
+  });
+  const other = path.join(root, ".starcistacks", "production", "secrets");
+  fs.mkdirSync(other, { recursive: true });
+  fs.writeFileSync(
+    path.join(other, "other.enc"),
+    sealedDotenv(["PRODUCTION_TOKEN"]),
+  );
+  const sops = fakeSops(maps);
+  const result = run(["materialize", "dev"], { cwd: root, env, sops });
+  assert.equal(result.code, 0);
+  assert.equal(sops.decrypted.length, 2);
+  assert.deepEqual(fs.readdirSync(localDir).sort(), [
+    "DATABASE_PASSWORD",
+    "DATABASE_URL",
+    "SESSION_SECRET",
+  ]);
+  for (const map of Object.values(maps))
+    for (const [key, value] of Object.entries(map))
+      assert.ok(
+        fs.readFileSync(path.join(localDir, key), "utf8") === value,
+        "materialized file contains the named value",
+      );
+  privateAbsent(result, Object.values(maps).flatMap(Object.values));
+  assert.ok(
+    result.out
+      .trim()
+      .split(/\r?\n/u)
+      .every(
+        (line) => path.dirname(line.slice(line.indexOf("=") + 1)) === localDir,
+      ),
+    "materialize emits only KEY_FILE paths",
+  );
+  assert.ok(
+    !fs.existsSync(path.join(root, "secrets.env")),
+    "materialize leaves no root plaintext secret file",
+  );
 });
 
-test('an in-progress update refuses a second writer before decryption, and preserves related keys in one envelope', t => {
-  const { root, dir } = app(t, { 'app-env.enc': sealedJson(['OTHER']) });
-  const sops = fakeSops({ 'app-env.enc': { OTHER: 'old-negative-fixture' } });
+test("invalid verb, flag, env, slug and KEY refuse before decrypt or seal", (t) => {
+  const { root, env } = app(t, { "token.enc": sealedDotenv(["TOKEN"]) });
+  const sops = {
+    decrypt: () => assert.fail("bad usage must not decrypt"),
+    seal: () => assert.fail("bad usage must not seal"),
+  };
+  for (const argv of [
+    ["show", "token"],
+    ["gen", "token"],
+    ["frobnicate"],
+    ["list", "dev", "--bogus"],
+    ["list", "../production"],
+    ["get", "dev", "../token", "--to-file"],
+    ["get", "dev", "Bad_Slug", "--to-file"],
+    ["set", "dev", "token", "../TOKEN"],
+    ["set", "dev", "token"],
+    ["list", "dev", "extra"],
+    ["materialize", "dev", "extra"],
+  ])
+    assert.equal(
+      run(argv, { cwd: root, env, sops, stdin: () => "unused-private" }).code,
+      2,
+    );
+});
+
+test("invalid sealing preserves ciphertext and publishes no plaintext", (t) => {
+  const prior = sealedDotenv(["TOKEN"]);
+  const replacement = "private-replacement-value";
+  const { root, dir, env } = app(t, { "token.enc": prior });
+  const result = run(["set", "dev", "token", "TOKEN"], {
+    cwd: root,
+    env,
+    stdin: () => replacement,
+    sops: {
+      decrypt: () => ({ TOKEN: "private-old-value" }),
+      seal: () => "TOKEN=private-invalid-envelope\n",
+    },
+  });
+  assert.equal(result.code, 2);
+  privateAbsent(result, [
+    replacement,
+    "private-old-value",
+    "private-invalid-envelope",
+  ]);
+  assert.equal(fs.readFileSync(path.join(dir, "token.enc"), "utf8"), prior);
+  assert.deepEqual(fs.readdirSync(dir), ["token.enc"]);
+});
+
+test("a failing seal redacts subprocess diagnostics and preserves ciphertext", (t) => {
+  const prior = sealedDotenv(["TOKEN"]);
+  const value = "private-subprocess-diagnostic";
+  const { root, dir, env } = app(t, { "token.enc": prior });
+  const result = run(["set", "dev", "token", "TOKEN"], {
+    cwd: root,
+    env,
+    stdin: () => value,
+    sops: {
+      decrypt: () => ({ TOKEN: "private-existing-value" }),
+      seal: () => {
+        throw new Error(value);
+      },
+    },
+  });
+  assert.equal(result.code, 2);
+  privateAbsent(result, [value]);
+  assert.equal(fs.readFileSync(path.join(dir, "token.enc"), "utf8"), prior);
+  assert.deepEqual(fs.readdirSync(dir), ["token.enc"]);
+});
+
+test("default SOPS refuses explicit repository identities and external hard-linked identities before decrypting", (t) => {
+  const { root, env, localDir } = app(t, {
+    "token.enc": sealedDotenv(["TOKEN"]),
+  });
+  const tools = fakeTools();
+  const repositoryKey = path.join(root, "age-identity.txt");
+  fs.writeFileSync(repositoryKey, `${PRIVATE_KEY}\n`);
+  const inside = run(["get", "dev", "token", "--to-file"], {
+    cwd: root,
+    env: { ...env, SOPS_AGE_KEY_FILE: repositoryKey },
+    tools,
+  });
+  assert.equal(inside.code, 2);
+  assert.match(inside.err, /outside the repository/u);
+  privateAbsent(inside, [PRIVATE_KEY]);
+  const externalKey = path.join(env.APPDATA, "sops", "age", "keys.txt");
+  fs.mkdirSync(path.dirname(externalKey), { recursive: true });
+  fs.writeFileSync(externalKey, `${PRIVATE_KEY}\n`);
+  fs.linkSync(externalKey, path.join(root, "linked-age-identity.txt"));
+  const linked = run(["get", "dev", "token", "--to-file"], {
+    cwd: root,
+    env: { ...env, SOPS_AGE_KEY_FILE: externalKey },
+    tools,
+  });
+  assert.equal(linked.code, 2);
+  assert.match(linked.err, /without hard links/u);
+  privateAbsent(linked, [PRIVATE_KEY]);
+  assert.equal(tools.calls.length, 0);
+  assert.ok(
+    !fs.existsSync(localDir),
+    "invalid identity custody creates no decrypted files",
+  );
+});
+
+test("duplicate materialized KEY ownership and repository-local plaintext storage are refused", (t) => {
+  const value = "private-refused-materialization";
+  const { root, env, localDir } = app(t, {
+    "first.enc": sealedDotenv(["TOKEN"]),
+    "second.enc": sealedDotenv(["TOKEN"]),
+  });
+  const sops = fakeSops({
+    "first.enc": { TOKEN: value },
+    "second.enc": { TOKEN: value },
+  });
+  const duplicate = run(["materialize", "dev"], { cwd: root, env, sops });
+  assert.equal(duplicate.code, 2);
+  assert.match(duplicate.err, /duplicate KEY/u);
+  assert.ok(
+    !fs.existsSync(localDir),
+    "duplicate ownership is refused before creating plaintext files",
+  );
+  privateAbsent(duplicate, [value]);
+  const local = run(["get", "dev", "first", "--to-file"], {
+    cwd: root,
+    env: {
+      ...env,
+      LOCALAPPDATA: root,
+      XDG_DATA_HOME: root,
+      HOME: root,
+      USERPROFILE: root,
+    },
+    sops,
+  });
+  assert.equal(local.code, 2);
+  assert.match(local.err, /outside.*repository/u);
+  privateAbsent(local, [value]);
+  const tty = run(["set", "dev", "first", "TOKEN"], {
+    cwd: root,
+    env,
+    sops,
+    stdin: { isTTY: true },
+  });
+  assert.equal(tty.code, 2);
+  assert.match(tty.err, /redirected stdin/u);
+});
+
+test("Windows get and materialize refuse case-colliding KEY names before writing any files", (t) => {
+  const value = "private-case-collision-value";
+  const maps = {
+    "both.enc": { TOKEN: value, token: value },
+    "upper.enc": { TOKEN: value },
+    "lower.enc": { token: value },
+  };
+  const getFixture = app(t, { "both.enc": sealedDotenv(["TOKEN", "token"]) });
+  const get = run(["get", "dev", "both", "--to-file"], {
+    cwd: getFixture.root,
+    env: getFixture.env,
+    platform: "win32",
+    sops: fakeSops(maps),
+  });
+  assert.equal(get.code, 2);
+  assert.ok(
+    /case|collid/iu.test(get.err),
+    "get explains the incompatible KEY names",
+  );
+  const getDirectory = path.join(
+    secretRoots(getFixture.env, "win32").local,
+    "custody-spec",
+    "dev",
+  );
+  assert.ok(
+    !fs.existsSync(getDirectory),
+    "get refuses before creating any private files",
+  );
+  privateAbsent(get, [value]);
+  const materializeFixture = app(t, {
+    "upper.enc": sealedDotenv(["TOKEN"]),
+    "lower.enc": sealedDotenv(["token"]),
+  });
+  const materialized = run(["materialize", "dev"], {
+    cwd: materializeFixture.root,
+    env: materializeFixture.env,
+    platform: "win32",
+    sops: fakeSops(maps),
+  });
+  assert.equal(materialized.code, 2);
+  assert.ok(
+    /case|collid/iu.test(materialized.err),
+    "materialize explains the incompatible KEY names",
+  );
+  const materializedDirectory = path.join(
+    secretRoots(materializeFixture.env, "win32").local,
+    "custody-spec",
+    "dev",
+  );
+  assert.ok(
+    !fs.existsSync(materializedDirectory),
+    "materialize refuses before creating any private files",
+  );
+  privateAbsent(materialized, [value]);
+});
+
+test("Linux materialization preserves distinct upper and lower case KEY names", (t) => {
+  const maps = {
+    "both.enc": {
+      TOKEN: "private-uppercase-value",
+      token: "private-lowercase-value",
+    },
+  };
+  const { root, env } = app(t, {
+    "both.enc": sealedDotenv(["TOKEN", "token"]),
+  });
+  const localDir = path.join(
+    secretRoots(env, "linux").local,
+    "custody-spec",
+    "dev",
+  );
+  const result = run(["materialize", "dev"], {
+    cwd: root,
+    env,
+    platform: "linux",
+    sops: fakeSops(maps),
+  });
+  assert.equal(result.code, 0);
+  privateAbsent(result, Object.values(maps["both.enc"]));
+  assert.deepEqual(result.out.trim().split(/\r?\n/u), [
+    `TOKEN_FILE=${path.join(localDir, "TOKEN")}`,
+    `token_FILE=${path.join(localDir, "token")}`,
+  ]);
+  if (process.platform === "linux") {
+    assert.deepEqual(fs.readdirSync(localDir).sort(), ["TOKEN", "token"]);
+    for (const [key, value] of Object.entries(maps["both.enc"]))
+      assert.ok(
+        fs.readFileSync(path.join(localDir, key), "utf8") === value,
+        "Linux keeps the distinct case-sensitive KEY files",
+      );
+  }
+});
+
+test("library compatibility preserves related keys and excludes concurrent writers", (t) => {
+  const { root, dir } = app(t, { "app-env.enc": sealedJson(["OTHER"]) });
+  const sops = fakeSops({ "app-env.enc": { OTHER: "private-existing-value" } });
   const seal = sops.seal;
-  sops.seal = request => {
-    assert.throws(() => setSecretValues(root, { slug: 'app-env', values: { SECOND: 'conflict-negative-fixture' } },
-      { sops: { decrypt: () => assert.fail('held update must refuse before decrypt'), seal } }), /being updated/);
+  sops.seal = (request) => {
+    assert.throws(
+      () =>
+        setSecretValues(
+          root,
+          { slug: "app-env", values: { SECOND: "private-conflict-value" } },
+          {
+            sops: {
+              decrypt: () =>
+                assert.fail("held update must refuse before decrypt"),
+              seal,
+            },
+          },
+        ),
+      /being updated/,
+    );
     return seal(request);
   };
-  setSecretValues(root, { slug: 'app-env', values: { FIRST: 'new-negative-fixture' } }, { sops });
-  assert.deepEqual(JSON.parse(sops.sealed[0].plaintext), { OTHER: 'old-negative-fixture', FIRST: 'new-negative-fixture' });
-  assert.deepEqual(envelopeOf(fs.readFileSync(path.join(dir, 'app-env.enc'), 'utf8')).keys, ['OTHER', 'FIRST']);
+  setSecretValues(
+    root,
+    { slug: "app-env", values: { FIRST: "private-new-value" } },
+    { sops },
+  );
+  assert.equal(sops.sealed[0].inputType, "dotenv");
+  assert.ok(
+    sops.sealed[0].plaintext ===
+      "OTHER=private-existing-value\nFIRST=private-new-value\n",
+    "library update retains all named values when converting to dotenv",
+  );
+  assert.deepEqual(
+    envelopeOf(fs.readFileSync(path.join(dir, "app-env.enc"), "utf8")).keys,
+    ["OTHER", "FIRST"],
+  );
 });
 
-test('a dotenv newline cannot inject another key or overwrite the existing envelope', t => {
-  const prior = sealedDotenv(['OTHER']);
-  const { root, dir } = app(t, { 'app-env.enc': prior });
-  const sops = fakeSops({ 'app-env.enc': { OTHER: 'old-negative-fixture' } });
-  assert.throws(() => setSecretValues(root, { slug: 'app-env', values: { FIRST: 'one\nINJECTED=two' } }, { sops }), /line break/);
-  assert.equal(sops.sealed.length, 0);
-  assert.equal(fs.readFileSync(path.join(dir, 'app-env.enc'), 'utf8'), prior);
+test("dotenv LF is encoded within one member and cannot inject an extra key", (t) => {
+  const prior = sealedDotenv(["OTHER"]);
+  const { root, dir } = app(t, { "app-env.enc": prior });
+  const sops = fakeSops({ "app-env.enc": { OTHER: "private-existing-value" } });
+  setSecretValues(
+    root,
+    { slug: "app-env", values: { FIRST: "one\nINJECTED=two" } },
+    { sops },
+  );
+  assert.equal(sops.sealed.length, 1);
+  assert.ok(
+    sops.sealed[0].plaintext ===
+      "OTHER=private-existing-value\nFIRST=one\\nINJECTED=two\n",
+    "the apparent injected key remains inside the escaped value",
+  );
+  assert.deepEqual(
+    envelopeOf(fs.readFileSync(path.join(dir, "app-env.enc"), "utf8")).keys,
+    ["OTHER", "FIRST"],
+  );
+  const ciphertext = fs.readFileSync(path.join(dir, "app-env.enc"), "utf8");
+  for (const value of ["one\rINJECTED=two", "one\\nINJECTED=two"]) {
+    assert.throws(
+      () =>
+        setSecretValues(
+          root,
+          { slug: "app-env", values: { FIRST: value } },
+          { sops },
+        ),
+      /cannot preserve/u,
+    );
+    assert.equal(
+      fs.readFileSync(path.join(dir, "app-env.enc"), "utf8"),
+      ciphertext,
+    );
+  }
+  assert.equal(sops.sealed.length, 1);
+});
+
+test("another process holding the ciphertext claim refuses before decrypt or seal", async (t) => {
+  const { root, dir } = app(t, { "token.enc": sealedDotenv(["TOKEN"]) });
+  const owner = pathToFileURL(
+    path.resolve(import.meta.dirname, "../../scripts/api/fs/claim-file.mjs"),
+  ).href;
+  const source = `import {claimFile} from ${JSON.stringify(owner)};const held=claimFile(${JSON.stringify(path.resolve(dir, "token.enc"))});if(!held.ok)process.exit(2);console.log('held');setInterval(()=>{},1000);`;
+  const child = spawn(process.execPath, ["--input-type=module", "-e", source], {
+    env: { ...process.env },
+    windowsHide: true,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const exited = new Promise((resolve) => child.once("close", resolve));
+  t.after(async () => {
+    if (child.exitCode === null) child.kill("SIGTERM");
+    await exited;
+  });
+  try {
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("the other writer did not become ready")),
+        10_000,
+      );
+      let output = "";
+      child.stdout.on("data", (chunk) => {
+        output += chunk;
+        if (output.includes("held")) {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+      child.once("error", () => {
+        clearTimeout(timer);
+        reject(new Error("the other writer could not start"));
+      });
+      child.once("close", () => {
+        clearTimeout(timer);
+        reject(new Error("the other writer exited before becoming ready"));
+      });
+    });
+    assert.throws(
+      () =>
+        setSecretValues(
+          root,
+          { slug: "token", values: { TOKEN: "private-refused-value" } },
+          {
+            sops: {
+              decrypt: () =>
+                assert.fail("held write must refuse before decrypt"),
+              seal: () => assert.fail("held write must refuse before seal"),
+            },
+          },
+        ),
+      /being updated/,
+    );
+    assert.equal(
+      fs.readFileSync(path.join(dir, "token.enc"), "utf8"),
+      sealedDotenv(["TOKEN"]),
+    );
+  } finally {
+    if (child.exitCode === null) child.kill("SIGTERM");
+    await exited;
+  }
 });

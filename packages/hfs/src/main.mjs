@@ -36,9 +36,10 @@
 //                                            one placeholder it per public method. Never overwrites a file. Both editions: a lite back end keeps full's unit specs (owner ruling 2026-10-12).
 //   starci app new image [--cwd <dir>]                  the Dockerfile of every declared app that has none, from the image canon (scaffold/image.mjs); never overwrites
 //   starci app new spec <file>.service.ts [--cwd <dir>]  the spec skeleton of an existing service, read from its constructor with the repository's TypeScript
-//   starci app secret list | show <slug> | set <slug> | gen <slug> [--key NAME] [--env NAME] [--age RECIPIENT] [--bytes N] [--cwd DIR]
-//                                            the sealed secrets of `.starcistacks/<env>/secrets/` (runtime scripts/hfs/secret.mjs over the sops api): `set` reads the value from
-//                                            stdin, `gen` seals a random one, `show` decrypts one to stdout; a plain `sops` command in a runbook is retired.
+//   starci app secret init | set <env> <slug> <KEY> [--generate <bytes>] | get <env> <slug> [KEY] --to-file [--reveal]
+//   starci app secret materialize <env> | list <env>
+//                                            dotenv custody in .starcistacks, public age rule initialization, private KEY files outside Git;
+//                                            values reach stdout only when get explicitly receives --reveal.
 //   starci app add <api|webhook|realtime|saga|job|reactor|queue|projection> <name> [--event <event> --from <service> --service <Class>=<module>] [--owner <service> --failed <event> --done <event>] [--connection <name>] [--cwd <dir>]
 //                                            exactly that kind's file tree, generated FROM the files: tree of its pattern topic (knowledge/patterns/be) with the
 //                                            one template body of each entry (templates/be/patterns), plus the platform capabilities it needs when they are missing;
@@ -84,7 +85,11 @@ starci app emit [--cwd <dir>]
 starci app new service <dir> <name> [--inject <binding>...] [--cwd <dir>]
 starci app new spec <file>.service.ts [--cwd <dir>]
 starci app new image [--cwd <dir>]
-starci app secret list|show|set|gen ... [--cwd <dir>]
+starci app secret init [--cwd <dir>]
+starci app secret set <env> <slug> <KEY> [--generate <bytes>] [--cwd <dir>]
+starci app secret get <env> <slug> [KEY] --to-file [--reveal] [--cwd <dir>]
+starci app secret materialize <env> [--cwd <dir>]
+starci app secret list <env> [--cwd <dir>]
 starci app hygiene [--cwd <dir>]
 `;
 const PER_CODE_LIMIT = 25;
@@ -124,7 +129,7 @@ function printCheck(result, out) {
     for (const f of list.slice(0, PER_CODE_LIMIT)) out(`  - ${f.message}\n`);
     if (list.length > PER_CODE_LIMIT) out(`  ... and ${list.length - PER_CODE_LIMIT} more (use --json for all)\n`);
   }
-  out(`\n${counts.error} error finding${counts.error === 1 ? '' : 's'}, ${counts.info} report-only\n`);
+  out(`\n${counts.error} error finding${counts.error === 1 ? '' : 's'}, ${counts.warning} warning${counts.warning === 1 ? '' : 's'}, ${counts.info} report-only\n`);
 }
 
 function printExplain(e, out) {
@@ -245,6 +250,7 @@ async function installedStackMain(cwd) {
 /** `cwd`, `presets`, `prettier`, `lock`, `run` and `stackMain` are test seams (`run` is the Supabase types command runner); stdout and stderr never have to be process globals. */
 export async function main(argv, {
   cwd: baseCwd = process.cwd(), stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier, lock, run, stackMain,
+  env = process.env, stdin, sops, tools, platform,
 } = {}) {
   try {
     const global = globalOptions(argv, path.resolve(baseCwd));
@@ -254,7 +260,7 @@ export async function main(argv, {
     if (!VERBS.includes(verb)) { stderr(USAGE); return 2; }
     if (verb === 'sync' || verb === 'hygiene') return await syncMain([verb, ...rest], { cwd: global.cwd, stdout: out });
     if (verb === 'lint') return await lintMain(rest, { cwd: global.cwd, stdout: out, presets, prettier });
-    if (verb === 'secret') return secretMain(rest, { stdout: out, stderr, cwd: global.cwd });
+    if (verb === 'secret') return secretMain(rest, { stdout: out, stderr, cwd: global.cwd, env, stdin, sops, tools, platform });
     if (verb === 'upgrade') return await upgradeMain(['--repo', global.cwd, ...(global.edition ? ['--edition', global.edition] : []), ...rest], { stdout: out, presets });
     if (verb === 'stack') {
       const run = stackMain ?? await installedStackMain(global.cwd);

@@ -66,10 +66,7 @@ _starci() {
         app:lint:--sonar) return 0;;
         app:new:--inject) return 0;;
         app:scaffold:--into) return 0;;
-        app:secret:--key) return 0;;
-        app:secret:--env) return 0;;
-        app:secret:--age) return 0;;
-        app:secret:--bytes) return 0;;
+        app:secret:--generate) return 0;;
         app:stack:--stack) return 0;;
         app:stack:--services) return 0;;
         check:run:--level) COMPREPLY=( $(compgen -W "L0 L1 L2 L3 L4" -- "$cur") ); return 0;;
@@ -986,7 +983,7 @@ _starci() {
         app:lint) COMPREPLY=( $(compgen -W "--changed --workspace --fix --format --sonar --json --cwd --quiet --help --edition" -- "$cur") );;
         app:new) COMPREPLY=( $(compgen -W "--inject --json --cwd --quiet --help --edition" -- "$cur") );;
         app:scaffold) COMPREPLY=( $(compgen -W "--into --json --cwd --quiet --help --edition" -- "$cur") );;
-        app:secret) COMPREPLY=( $(compgen -W "--key --env --age --bytes --json --cwd --quiet --help --edition" -- "$cur") );;
+        app:secret) COMPREPLY=( $(compgen -W "--generate --to-file --reveal --json --cwd --quiet --help --edition" -- "$cur") );;
         app:stack) COMPREPLY=( $(compgen -W "--stack --services --k3d --force --json --cwd --quiet --help --edition" -- "$cur") );;
         app:sync) COMPREPLY=( $(compgen -W "--check --write --json --cwd --quiet --help --edition" -- "$cur") );;
         app:upgrade) COMPREPLY=( $(compgen -W "--plan --json --cwd --quiet --help --edition" -- "$cur") );;
