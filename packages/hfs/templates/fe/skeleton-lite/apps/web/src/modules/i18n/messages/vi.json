@@ -5,47 +5,53 @@
       "brand": "{{project}}"
     },
     "home": {
-      "title": "Home"
+      "title": "Trang chủ"
     },
     "signIn": {
-      "title": "Sign in",
+      "title": "Đăng nhập",
       "email": "Email",
-      "password": "Password",
-      "submit": "Continue",
-      "working": "Signing in",
-      "refused": "The credentials were refused.",
-      "invalid": "Enter a valid email and password.",
-      "unavailable": "Sign-in is unavailable. Try again shortly."
+      "password": "Mật khẩu",
+      "submit": "Tiếp tục",
+      "working": "Đang đăng nhập",
+      "refused": "Thông tin đăng nhập không đúng.",
+      "invalid": "Hãy nhập email và mật khẩu hợp lệ.",
+      "unavailable": "Chưa thể đăng nhập. Hãy thử lại sau."
     },
     "signOut": {
-      "signedIn": "Signed in",
-      "submit": "Sign out",
-      "working": "Signing out"
+      "signedIn": "Đã đăng nhập",
+      "submit": "Đăng xuất",
+      "working": "Đang đăng xuất"
     },
     "toast": {
-      "successTitle": "Done",
-      "errorTitle": "Error",
-      "unauthorizedTitle": "Not signed in",
-      "unauthorizedDescription": "Sign in to continue.",
-      "defaultSuccess": "The change was saved.",
-      "defaultError": "Something went wrong."
+      "successTitle": "Thành công",
+      "errorTitle": "Lỗi",
+      "unauthorizedTitle": "Chưa đăng nhập",
+      "unauthorizedDescription": "Hãy đăng nhập để tiếp tục.",
+      "defaultSuccess": "Đã hoàn tất.",
+      "defaultError": "Đã xảy ra lỗi."
     },
     "loading": {
-      "message": "Loading"
+      "message": "Đang tải"
     },
     "notFound": {
-      "title": "Page not found",
-      "home": "Return home"
+      "title": "Không tìm thấy trang",
+      "home": "Về trang chủ"
     },
     "errors": {
       "page": {
-        "title": "Something went wrong",
-        "retry": "Try again"
+        "title": "Đã xảy ra lỗi",
+        "retry": "Thử lại"
       },
       "global": {
-        "title": "The application could not continue",
-        "retry": "Try again"
+        "title": "Đã xảy ra lỗi nghiêm trọng",
+        "retry": "Thử lại"
       }
+    },
+    "guide": {
+      "open": "Xem hướng dẫn",
+      "title": "Bắt đầu",
+      "description": "Đăng nhập để sử dụng ứng dụng. Bạn có thể đóng hướng dẫn này và mở lại bất cứ lúc nào.",
+      "close": "Đóng"
     }
   }
 }

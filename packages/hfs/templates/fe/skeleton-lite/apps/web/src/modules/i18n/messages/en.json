@@ -1,0 +1,57 @@
+{
+  "app": {
+    "title": "{{project}}",
+    "shell": {
+      "brand": "{{project}}"
+    },
+    "home": {
+      "title": "Home"
+    },
+    "signIn": {
+      "title": "Sign in",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Continue",
+      "working": "Signing in",
+      "refused": "The credentials were refused.",
+      "invalid": "Enter a valid email and password.",
+      "unavailable": "Sign-in is unavailable. Try again shortly."
+    },
+    "signOut": {
+      "signedIn": "Signed in",
+      "submit": "Sign out",
+      "working": "Signing out"
+    },
+    "toast": {
+      "successTitle": "Done",
+      "errorTitle": "Error",
+      "unauthorizedTitle": "Not signed in",
+      "unauthorizedDescription": "Sign in to continue.",
+      "defaultSuccess": "The change was saved.",
+      "defaultError": "Something went wrong."
+    },
+    "loading": {
+      "message": "Loading"
+    },
+    "notFound": {
+      "title": "Page not found",
+      "home": "Return home"
+    },
+    "errors": {
+      "page": {
+        "title": "Something went wrong",
+        "retry": "Try again"
+      },
+      "global": {
+        "title": "The application could not continue",
+        "retry": "Try again"
+      }
+    },
+    "guide": {
+      "open": "View guide",
+      "title": "Getting started",
+      "description": "Sign in to use the application. You can close this guide and open it again at any time.",
+      "close": "Close"
+    }
+  }
+}

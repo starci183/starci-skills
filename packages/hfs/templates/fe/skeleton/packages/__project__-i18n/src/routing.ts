@@ -1,7 +1,7 @@
 import { defineRouting } from "next-intl/routing"
 
 /** The locales every app of the product serves; every catalog of an app has the same keys in each. */
-const LOCALES = ["vi"] as const
+const LOCALES = ["vi", "en"] as const
 
 /** The locale served at the unprefixed path, and the language of a document no locale reached (the global error boundary). */
 export const DEFAULT_LOCALE = "vi"

@@ -96,12 +96,14 @@ export function jsonText(value) {
     const inner = `${indent}  `;
     if (Array.isArray(item)) {
       if (item.every(entry => entry === null || typeof entry !== 'object')) return `[${item.map(entry => JSON.stringify(entry)).join(', ')}]`;
-      return `[\n${item.map(entry => `${inner}${print(entry, inner)}`).join(',\n')}\n${indent}]`;
+      const entries = item.map(entry => `${inner}${print(entry, inner)}`).join(',\n');
+      return `[\n${entries}\n${indent}]`;
     }
     if (item !== null && typeof item === 'object') {
       const keys = Object.keys(item);
       if (!keys.length) return '{}';
-      return `{\n${keys.map(key => `${inner}${JSON.stringify(key)}: ${print(item[key], inner)}`).join(',\n')}\n${indent}}`;
+      const entries = keys.map(key => `${inner}${JSON.stringify(key)}: ${print(item[key], inner)}`).join(',\n');
+      return `{\n${entries}\n${indent}}`;
     }
     return JSON.stringify(item);
   };
@@ -226,6 +228,47 @@ const starterDeclaration = (name, manifest = loadSlotManifest(), edition = 'full
   sides: structuredClone(edition === 'lite' ? LITE_STARTER_SIDES : STARTER_SIDES),
 });
 
+/** Opting into a server PKCE callback also selects Supabase Auth and declares its route slot. */
+function enableAuthCallback(declaration) {
+  requireAuthCallbackConnection(declaration);
+  declaration.sides.fe.optionalSlots = [...(declaration.sides.fe.optionalSlots ?? []), 'fe.route.callback'];
+  declaration.supabase ??= structuredClone(LITE_STARTER_SUPABASE);
+  declaration.supabase.redirectUrls = ['http://127.0.0.1:3000/auth/callback'];
+}
+
+/** Callback-specific source files are excluded from the browser-only starter. */
+export const CALLBACK_SOURCE_FILES = Object.freeze(new Set([
+  'src/app/auth/callback/route.ts', 'src/modules/auth/server.ts', 'src/modules/auth/pkce-client.ts',
+]));
+export const hasAuthCallback = repo => (repo.sides.fe.optionalSlots ?? []).includes('fe.route.callback');
+
+function requireAuthCallbackConnection(repo) {
+  if (!(repo.sides.be?.connections ?? []).some(entry => entry.provider === 'supabase'))
+    throw new ScaffoldError('HFS_ADD_CONNECTION_REQUIRED', 'the auth callback requires an existing Supabase connection; the full starter has none');
+}
+
+/** Apply the callback's cookie-backed auth owner and its config readers to product apps only. */
+export function callbackSourceFiles(files, repo) {
+  const enabled = hasAuthCallback(repo);
+  if (enabled) requireAuthCallbackConnection(repo);
+  const selected = files.filter(file => {
+    const [, , app, ...parts] = file.path.split('/');
+    const relative = parts.join('/');
+    if (relative === 'src/modules/auth/pkce-client.ts') return false;
+    return MARKETING_FE_APPS.has(app) || enabled || !CALLBACK_SOURCE_FILES.has(relative);
+  });
+  if (!enabled) return selected;
+  const config = fs.readFileSync(path.join(TEMPLATES_DIR, 'fe/skeleton-lite/apps/web/src/modules/config/index.ts'), 'utf8');
+  const client = fs.readFileSync(path.join(TEMPLATES_DIR, 'fe/skeleton/apps/__app__/src/modules/auth/pkce-client.ts'), 'utf8');
+  return selected.map(file => {
+    const [, , app, ...parts] = file.path.split('/');
+    if (MARKETING_FE_APPS.has(app)) return file;
+    const relative = parts.join('/');
+    if (relative === 'src/modules/config/index.ts') return { ...file, content: config };
+    return relative === 'src/modules/auth/client.ts' ? { ...file, content: client } : file;
+  });
+}
+
 /** A dependency section at the canon pins (a null range takes the pin, which must exist; every pinned name is null). */
 function pinnedSection(entries, pins) {
   const pinned = (dependency, range) => {
@@ -278,9 +321,10 @@ const workspaceSection = (entries, project, pins) => pinnedSection(Object.fromEn
  * The package.json of the fe app workspace `app` of the app `project`: @<project>/<app>, private, the workspace scripts, its own
  * dependencies. A product app (`core`, it carries the shared app core) also takes every core runtime package of the fe stack.
  */
-function feAppManifest(project, app, pins, edition, { core = true, stack = coreFeStackPackages() } = {}) {
+function feAppManifest(project, app, pins, edition, { core = true, authCallback = false, stack = coreFeStackPackages() } = {}) {
   const base = edition === 'lite' ? LITE_FE_APP_DEPENDENCIES : FE_APP_DEPENDENCIES;
   const dependencies = { ...base, ...(core ? Object.fromEntries(stack.app.filter(name => !Object.hasOwn(base, name)).map(name => [name, null])) : {}) };
+  if (core && authCallback) Object.assign(dependencies, { '@supabase/ssr': null, '@supabase/supabase-js': null, 'server-only': null });
   return { name: feAppPackageName(project, app), version: '0.0.0', private: true, scripts: { ...FE_APP_SCRIPTS }, dependencies: workspaceSection(dependencies, project, pins) };
 }
 
@@ -337,7 +381,7 @@ const SKELETON_VARIABLES = Object.freeze(['project', 'app', 'appPascal', 'sonarG
  * (a message placeholder of the i18n canon, `{{title}}` in a catalog), and a skeleton name with no value for this file is an error.
  */
 function fill(source, vars, file) {
-  return source.replace(new RegExp(`\\{\\{(${SKELETON_VARIABLES.join('|')})\\}\\}`, 'g'), (_, key) => {
+  return source.replace(new RegExp(String.raw`\{\{(${SKELETON_VARIABLES.join('|')})\}\}`, 'g'), (_, key) => {
     if (!Object.hasOwn(vars, key)) throw new ScaffoldError('HFS_SCAFFOLD_TEMPLATE_VARIABLE', `${file} names {{${key}}}, which has no value outside a __app__ folder`);
     return vars[key];
   });
@@ -387,27 +431,44 @@ const liteBaseFile = (scope, rel) => {
 };
 const liteOverlayFile = (scope, rel) => scope !== 'be' || !LITE_DEFERRED_GENERATOR_FILES.has(rel);
 
+function skeletonOutputPath(relative, { scope, app, vars }) {
+  const prefix = scope === 'app' ? '' : `${scope}/`;
+  const output = relative.split(PROJECT_DIR).join(app.project).split(TIMESTAMP).join(vars.timestamp);
+  return `${prefix}${output}`;
+}
+
+function fixedSkeletonFiles(context, relative, source) {
+  const { scope, directory, app, vars, apps } = context;
+  if (scope === 'be' && relative.startsWith(CLI_APP_DIR) && !declaresCliApp(app)) return [];
+  const fixedApp = apps.find(entry => relative.startsWith(`apps/${entry.name}/`));
+  if (scope === 'fe' && relative.startsWith('apps/') && !fixedApp) return [];
+  const appVars = fixedApp ? { app: fixedApp.name, appPascal: pascal(fixedApp.name) } : {};
+  return [{
+    path: skeletonOutputPath(relative, context),
+    content: fill(source, { project: app.project, ...vars, ...appVars }, `${directory}/${relative}`),
+  }];
+}
+
+function variableSkeletonFiles(context, relative, source) {
+  const { scope, directory, app, vars, apps } = context;
+  const selectedApps = scope === 'fe' ? coreFeApps(apps) : apps;
+  return selectedApps.map(entry => ({
+    path: skeletonOutputPath(relative.split(APP_DIR).join(entry.name), context),
+    content: fill(source, { project: app.project, ...vars, app: entry.name, appPascal: pascal(entry.name) }, `${directory}/${relative}`),
+  }));
+}
+
 /** One skeleton directory rendered to app-relative files; `include` filters source-relative paths before variables are expanded. */
 function skeletonDirectory(scope, directory, app, vars, include = () => true) {
   const dir = path.join(TEMPLATES_DIR, scope, directory);
   if (!fs.existsSync(dir)) throw new ScaffoldError('HFS_SCAFFOLD_SKELETON_MISSING', `no skeleton templates in templates/${scope}/${directory}`);
   const apps = scope === 'app' ? [] : app.sides[scope].apps.filter(entry => scope === 'fe' || entry.kind === 'api');
-  const appsOf = rel => (scope === 'fe' && rel.includes(APP_DIR) ? coreFeApps(apps) : apps);
-  const prefix = scope === 'app' ? '' : `${scope}/`;
+  const context = { scope, directory, app, vars, apps };
   const files = [];
-  for (const rel of listFiles(dir).filter(include)) {
+  for (const rel of listFiles(dir).filter(relative => include(relative))) {
     const source = render(fs.readFileSync(path.join(dir, rel), 'utf8').replace(/\r\n/g, '\n'), PARTIAL_VARIABLES);
-    const once = { project: app.project, ...vars };
-    const output = candidate => candidate.split(PROJECT_DIR).join(app.project).split(TIMESTAMP).join(vars.timestamp);
-    if (!rel.includes(APP_DIR)) {
-      if (scope === 'be' && rel.startsWith(CLI_APP_DIR) && !declaresCliApp(app)) continue;
-      const fixedApp = apps.find(entry => rel.startsWith(`apps/${entry.name}/`));
-      if (scope === 'fe' && rel.startsWith('apps/') && !fixedApp) continue;
-      const appVars = fixedApp ? { app: fixedApp.name, appPascal: pascal(fixedApp.name) } : {};
-      files.push({ path: `${prefix}${output(rel)}`, content: fill(source, { ...once, ...appVars }, `${directory}/${rel}`) });
-      continue;
-    }
-    for (const entry of appsOf(rel)) files.push({ path: `${prefix}${output(rel.split(APP_DIR).join(entry.name))}`, content: fill(source, { ...once, app: entry.name, appPascal: pascal(entry.name) }, `${directory}/${rel}`) });
+    const rendered = rel.includes(APP_DIR) ? variableSkeletonFiles(context, rel, source) : fixedSkeletonFiles(context, rel, source);
+    files.push(...rendered);
   }
   return files;
 }
@@ -432,7 +493,7 @@ function skeletonOf(scope, app, vars) {
   for (const entry of scope === 'fe' ? app.sides.fe.apps : []) {
     if (!unique.some(file => file.path.startsWith(`fe/apps/${entry.name}/`))) throw new ScaffoldError('HFS_SCAFFOLD_SKELETON_MISSING', `no skeleton templates for the fe app ${entry.name}`);
   }
-  return unique;
+  return scope === 'fe' ? [...new Map(callbackSourceFiles(unique, app).map(file => [file.path, file])).values()] : unique;
 }
 
 /** The npm step that resolves the lockfile of a new app, exactly as the error names it. */
@@ -545,17 +606,30 @@ function scaffoldWrites(root, original) {
   };
 }
 
+/** Generate the lite database types and translate generation errors into the scaffold failure contract. */
+function emitScaffoldDatabaseTypes(root, name, writes, emitTypes) {
+  try {
+    const text = emitTypes({ root });
+    if (typeof text !== 'string' || !text.trim()) throw new Error('the Supabase CLI returned no database types');
+    writes.write(dbTypesPath, text);
+  } catch (error) {
+    throw new ScaffoldError('HFS_SCAFFOLD_TYPES_FAILED', `Supabase database types could not be generated for ${root} (${String(error?.message ?? error)}). Start the local Supabase stack and run starci app scaffold ${name} --edition lite again`);
+  }
+}
+
 /**
  * `starci app scaffold <name>`: writes the new app under `into`, resolves its lockfile with npm (`lock`, npmLock), and returns
  * `{ root, files }` (app-relative paths, sorted). `presets` is what sync loads from the installed @starci/jest-preset (the Sonar
  * exclusions); the CLI passes the one it resolves. Failure removes only scaffold-owned entries, retaining an existing .git.
  */
-export function scaffoldApp({ name, into, presets, edition = 'full', manifest = loadSlotManifest(), pins = bundledPins(), lock = npmLock, emitTypes = generateDbTypes, now = () => new Date() }) {
+export function scaffoldApp({ name, into, presets, edition = 'full', authCallback = false, manifest = loadSlotManifest(), pins = bundledPins(), lock = npmLock, emitTypes = generateDbTypes, now = () => new Date() }) {
   if (!NAME.test(String(name))) throw new ScaffoldError('HFS_SCAFFOLD_NAME_INVALID', `the app name ${name} must be kebab-case (a project name: ${NAME})`);
   const root = path.resolve(into, name);
   const original = fs.lstatSync(root, { throwIfNoEntry: false });
   if (original && !emptyUnbornGit(root, original)) throw new ScaffoldError('HFS_SCAFFOLD_EXISTS', `${root} already exists; only a plain directory containing solely .git with unborn main and an empty index can be scaffolded`);
+  if (typeof authCallback !== 'boolean') throw new ScaffoldError('HFS_SCAFFOLD_NAME_INVALID', 'authCallback must be a boolean');
   const declaration = starterDeclaration(name, manifest, edition);
+  if (authCallback) enableAuthCallback(declaration);
   const app = resolveRepoDeclaration(manifest, declaration);
   const pkg = packageManifest(name, pins, app.edition);
   const timestamp = now().toISOString().replace(/\D/g, '').slice(0, 14);
@@ -568,7 +642,7 @@ export function scaffoldApp({ name, into, presets, edition = 'full', manifest = 
       path: `fe/apps/${entry.name}/src/modules/types/ambient/styles.d.ts`,
       content: '/** Declares stylesheets loaded by the Next bundler; non-CSS side-effect imports remain checked. */\ndeclare module "*.css" {}\n',
     })),
-    ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/package.json`, content: packageJsonText(feAppManifest(name, entry.name, pins, app.edition, { core: coreFeApps([entry]).length === 1 })) })),
+    ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/package.json`, content: packageJsonText(feAppManifest(name, entry.name, pins, app.edition, { core: coreFeApps([entry]).length === 1, authCallback })) })),
     ...imageFiles(app),
     ...(app.edition === 'lite' ? [] : Object.keys(FE_PACKAGES).flatMap(pkg => [
       { path: `fe/packages/${name}-${pkg}/package.json`, content: packageJsonText(fePackageManifest(name, pkg, pins)) },
@@ -583,15 +657,7 @@ export function scaffoldApp({ name, into, presets, edition = 'full', manifest = 
     const targets = renderTargets(declaration, presets, { manifest, source: appSource(root) });
     for (const target of targets) writes.claim(target.path);
     writeTargets(root, targets);
-    if (app.edition === 'lite') {
-      try {
-        const text = emitTypes({ root });
-        if (typeof text !== 'string' || !text.trim()) throw new Error('the Supabase CLI returned no database types');
-        writes.write(dbTypesPath, text);
-      } catch (error) {
-        throw new ScaffoldError('HFS_SCAFFOLD_TYPES_FAILED', `Supabase database types could not be generated for ${root} (${String(error?.message ?? error)}). Start the local Supabase stack and run starci app scaffold ${name} --edition lite again`);
-      }
-    }
+    if (app.edition === 'lite') emitScaffoldDatabaseTypes(root, name, writes, emitTypes);
     let locked;
     try { locked = lock(root); } finally { writes.lockfile(); }
     if (!locked.ok) throw new ScaffoldError('HFS_SCAFFOLD_LOCK_FAILED', `\`${LOCK_STEP}\` could not resolve the lockfile of ${root} (${locked.detail}). Check the network and the npm registry, then run starci app scaffold ${name} again`);
