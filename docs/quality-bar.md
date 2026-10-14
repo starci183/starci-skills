@@ -1,4 +1,4 @@
-Task: judge whether a workflow is done
+Owner: knowledge/hfs/rules.yaml
 # QUALITY BAR — what ".claude produces a high-quality project" means
 
 > **Status: DRAFT** — aspiration list. An item is only real once a check, an op
@@ -64,8 +64,8 @@ how it is *proven* — declaration never counts, evidence does.
 - [ ] No dead code, no TODO-debt, no commented-out blocks in landed code
 - [ ] Typed at every boundary (API contracts, events, state); errors are
       taxonomy'd, not stringly
-- [ ] Tests are real journeys: TestingModule / real clients; no stub theater;
-      branch coverage target met (error paths included)
+- [ ] Back-end tests use TestingModule / real clients as their lane requires;
+      measured logic meets the per-file coverage policy (error paths included)
 - [ ] No secrets in code/logs; inputs validated at boundary
 - [ ] Performance: no N+1, no unbounded queries, budgets respected
 
@@ -95,3 +95,51 @@ which refuses a `done` leaf resting on `verificationSource: authored-claim`.
       evidence — never relabeled as debt
 - [ ] `practices/` entry written after each wave — what was practiced,
       observed, derived
+
+## 7. Alpha.15 requirements
+
+These requirements apply to lite and full. They state the standard; their presence
+here does not prove that each checker or CLI option is implemented in this
+checkout. The draft checklist above keeps its existing status.
+
+- **R247 RT_COVERAGE_MATRIX:** Every applicable edition needs linked rule, enforcer, spec, witness, owning doc, template and example evidence for each surface; edition differences need a reason and gate declarations must match their execution.
+- **R270 HFS_DOC_FRESH:** Product README, docs and stack runbooks must cite existing paths, catalogued commands, declared environment keys and known rule IDs.
+- **R272 BE_APP_BOOT_PROOF:** Lite must prove each app's Nest module graph compiles with doubles and rejects missing or circular providers; full keeps its real-app e2e boot proof.
+- **R273 HFS_COVERAGE_BELOW:** Supplied back-end lcov evidence must meet the measured per-file coverage policy below, with unmeasured feature, CLI and webhook paths listed separately.
+- **R274 RT_RULING_SUPERSEDED:** A superseded ruling citation must identify its successor in the same paragraph; stale ruling text must not prescribe the former behavior.
+- **R280 HFS_UNUSED_SYMBOL:** Exported symbols, enum members, queue constants, error codes and catalog keys must have consumers.
+- **R282 HFS_ASSET_BUDGET:** Back-end assets must obey their declared per-file size and allowed-kind budgets; large and user media belong in object storage.
+- **R283 HFS_APP_LEXICON:** Source and docs must exclude product vocabulary declared in `hfs.json lexicon.removed`.
+- **R284 BE_PATTERN_PROOF_LANE:** Lite must prove declared event-bus, queue, webhook, realtime, fenced-job, projection and saga scenarios in its integration-spec lane; full retains its existing proof lanes.
+- **R285 FE_SWR_FAMILY:** SWR calls and data-operation access belong in `hooks/swr`; components and other hook families consume those wrappers.
+- **R286 FE_COPY_AND_GLYPH:** User copy, including toast and validation arguments, comes from i18n; alerts are forbidden and inline SVG is confined to a declared brand-mark leaf.
+- **R287 FE_CALLBACK_SHAPE:** An auth callback exchanges the PKCE code and redirects only, with cookie writes confined to the Supabase helper.
+- **R288 FE_STACK_ALLOWLIST:** Front-end dependencies need a catalog entry or a reasoned `fe.extraPackages` declaration; GraphQL tagged templates must match the schema and SWR keys must carry operation identity by default.
+
+### Measured coverage scope
+
+Product back-end coverage has one derivation: `scripts/hfs/coverage-scope.mjs`
+reads the `coverage: required|none` fields and `ruleParams.be.logicRoles` of
+`knowledge/hfs/slots.yaml`. In both editions, only files with those logic-role
+suffixes inside required slots are measured, currently under
+`be/src/modules/{domain,platform,integrations,projections}/`, subject to declared
+provider slots and excluded subtrees. Each measured file owes 100% lines,
+branches, functions and statements. The managed Jest thresholds, Sonar coverage
+exclusions and Codecov configuration render that same scope; it is not a
+whole-application percentage.
+
+The feature tier, CLI commands, webhook doors, gateways, handlers and saga steps
+outside those measured slots, declaration and composition files, and tests are
+outside this denominator. A logic role such as `webhook` or `saga-step` inside a
+required module slot is measured. Front ends have no tests under R97
+`FE_NO_TESTS` and are excluded from coverage. Static app checking and linting do
+not run the unit project or establish that coverage passed. R273 requires
+supplied lcov evidence; the current app-check command catalog does not yet expose
+the alpha.15 coverage-input option.
+
+Runtime coverage is separate: `scripts/hfs/runtime-coverage-scope.mjs` derives
+measured `.mjs` files from required slots in `knowledge/hfs/runtime-slots.yaml`,
+excluding none slots, specs and declared generated output. Its
+`coverage/lcov.info` report is distinct from a product's `be/coverage/lcov.info`.
+R247's coverage matrix concerns links across the standard, not a code-coverage
+percentage.

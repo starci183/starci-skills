@@ -1,7 +1,8 @@
-Task: configure canonical runtime credentials for a selected action
+Owner: knowledge/application-stacks.yaml
 # Host credentials
 
-The canonical runtime root holds the owner's local `secret.env` and the tracked `secret.env.example`.
+Host credential setup is separate from application secret custody. The canonical runtime root holds the
+owner's local `secret.env` (`.claude/secret.env` in an installed runtime) and the tracked `secret.env.example`.
 Use the example to create a missing local file, then fill the required names locally. The file stores
 plaintext dotenv values; setup requires no encryption or decryption. Keep an existing file and its
 contents. Secret values stay out of `config.yaml`, chat, command arguments, diagnostics, receipts and
@@ -35,12 +36,17 @@ history (without `--rev`, from the parent of the commit that deleted it), decryp
 | `ext/sonar/secrets/sonarqube-admin-token.key.enc` | `SONARQUBE_ADMIN_TOKEN` | `scripts/gates/sonar-local.mjs` |
 | `ext/sonar/secrets/cloudflare-starci-local-services-tunnel-token.key.enc` | `CLOUDFLARE_TUNNEL_TOKEN` | `ext/sonar/cloudflared.yaml`, through `starci gate sonar up --public` |
 | `ext/sonar/secrets/sonarqube-analysis-token.txt.enc` | none (retired) | nothing reads a server-wide analysis token of the extension; a product reads its own custody |
-| the two demo secrets of the ecommerce example | none (retired) | the example carries demo-only defaults in its compose files |
+| the two demo secrets of the ecommerce example | none (retired) | current application secrets follow the sealed application custody contract below |
 
 A ciphertext deleted from the tree stays in the public history, encrypted to the owner's age key: rotate the stack's admin password,
 admin token and tunnel token after the move.
 
 ## Shared age identity
+
+The 2026-10-14 application ruling requires the age private key only in `.claude/secret.env` as
+`SOPS_AGE_KEY`; application commands use that identity and refuse a missing key. Application custody
+does not permit a home-directory identity or `SOPS_AGE_KEY_FILE`. Existing ciphertext never authorizes
+replacement identity generation. Public recipient metadata may be tracked; the private key may not.
 
 `engine/secrets.mjs` owns `sopsIdentityEnv`. The caller hands it the canonical normalized environment.
 `SOPS_AGE_KEY` presence selects inline custody; an explicit blank or invalid value refuses fallback.
@@ -55,7 +61,7 @@ recipient inputs prevent config KeyGroups from adding a provider. Ciphertext is 
 before return. Native tools are required; only researched versions are admitted, update probing is disabled,
 and the unsupported upstream fixed audit-file context refuses before spawn. Image headers and version
 strings do not authenticate binaries: the owning native gate must qualify physical tools and real crypto.
-An explicitly selected original `SOPS_AGE_KEY_FILE` remains a transition input when inline is absent;
+For non-application runtime callers, an explicitly selected original `SOPS_AGE_KEY_FILE` remains a transition input when inline is absent;
 an absent FILE is not replaced with a home default. The original FILE is selected by its absolute path so
 caller and child working directories cannot silently select different files. Neither selection rewrites an existing identity.
 Public-recipient encryption needs no newly generated private identity.
@@ -64,6 +70,17 @@ Initial identity capture and guarded publication belong to the setup owner and r
 The commented template entry represents absence. Actual environment precedence, including intentional blanks,
 continues to apply. Canonical-root handoff and fake fixtures prove routing only; native recipient, cryptographic,
 filesystem-permission and publication-race verification require their own fresh evidence.
+
+## Application secret rules
+
+These requirements apply to both lite and full applications. Their secret source is sealed
+`.starcistacks/<env>/secrets/*.enc` encrypted with SOPS/age; host credential setup does not relax that contract.
+
+- R248 `HFS_ENV_PARITY`: required keys read through `<app>.env.ts`, sealed member names, stack inputs and environment examples agree; reject unread or duplicate sealed keys and public values in custody.
+- R249 `HFS_ENV_VALUE_SHAPE`: alpha.15 secret verification validates decrypted environment value shapes in memory against the application's typed configuration and reports only key names and violated rules.
+- R252 `HFS_SCRIPT_HYGIENE`: scripts refuse plaintext secret loaders and shell tracing; Supabase service-role access stays within its integration, configuration and sealed key names.
+- R253 `HFS_SECRET_CUSTODY`: refuse assigned secret literals and misplaced age keys, keep `SOPS_AGE_KEY` only in `.claude/secret.env`, and preserve canonical environment-source, webhook-signature and origin-guard copies.
+- R277 `HFS_SECRET_CUSTODY_ONLY`: application secrets exist only as `.starcistacks/<env>/secrets/*.enc`; plaintext secret files and secret values in `deploy/` or workflows are refused.
 
 ## Selected-action preflight
 

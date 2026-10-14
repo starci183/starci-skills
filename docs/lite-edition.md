@@ -1,8 +1,8 @@
 Owner: knowledge/hfs/slots.yaml
 # HFS lite edition
 
-Lite is the full HFS code structure deployed without self-hosted infrastructure (owner rulings recorded as R212 in
-`knowledge/hfs/rules.yaml`). It uses the same manifest, rule catalog, lint canons, grammar,
+Lite is the full HFS code structure deployed in production on Docker Swarm with Supabase-backed infrastructure (R212 in
+`knowledge/hfs/rules.yaml`, owner ruling 2026-10-14). It uses the same manifest, rule catalog, lint canons, grammar,
 security model and Docker canon as full, the same monorepo and code slots, the same patterns, the same back-end unit specs and the
 same front end (`knowledge/hfs/fe-stack.yaml`). The `edition` field selects a
 filtered slot and rule view; it does not select a different engine or relax rules locally.
@@ -17,13 +17,14 @@ What lite changes is the adapters behind the platform and integrations seam, all
 - realtime: the same socket.io gateway as full (`be.feature.realtime.websocket`), run inside the api process as one instance
   with no Redis adapter;
 - cache and locks: Postgres (advisory locks or an unlogged table); no Redis;
-- scheduling: `pg_cron` (with `pg_net`) or the platform scheduler; never a self-hosted cron host;
+- scheduling: app-owned work through the back-end scheduler, pgmq or a `pg_cron` tick, or a declared `replicated-job`;
+  no host crontab or host scheduler on the VPS;
 - storage and auth: Supabase Storage and Supabase Auth (the back end verifies the access token against the project JWKS).
 
 `knowledge/patterns/be/supabase-queues.yaml` owns the pgmq adapter, and each pattern topic carries its `liteAdapter`.
 
-The front end is one standard for both editions (R212 case-2): the browser calls the back end through the Apollo clients and one
-file per operation in `fe.modules.api`, wrapped by the SWR hooks of `fe.hooks.swr`; forms are react-hook-form with zod
+The front end is one standard for both editions (R212, owner ruling 2026-10-13): the browser calls the back end through the
+Apollo clients and one file per operation in `fe.modules.api`, wrapped by the SWR hooks of `fe.hooks.swr`; forms are react-hook-form with zod
 (`fe.hooks.rhf`), mutation outcomes go through `fe.modules.toast`, and `fe.modules.auth` is the only front-end importer of
 Supabase, for the session and the access token only. The front end serves no API: no Server Action and no route handler beyond
 health/live and `fe.route.callback` (R243). Heavy work is a mutation that enqueues a pgmq job (fenced job or saga), followed
@@ -31,18 +32,18 @@ through a status query that SWR polls or a socket namespace. Each concern's libr
 forbids is refused (R244).
 
 Tests: back-end unit specs are required exactly as in full (`ruleParams.be.unitRoles`, the logic roles at 100 per file, the
-`@starci/jest-preset` doubles and builders). Integration specs are optional and run only against the local Supabase CLI stack
-(`starci supabase start`), with no toxiproxy and no containers of their own. There is no e2e world, no contract world and no
-e2e workflow (slot `app.ci-e2e`). The front end has no tests in either edition (R97).
+`@starci/jest-preset` doubles and builders). R272 requires a lite wiring and boot proof that compiles the Nest module graph
+with doubles. R284 requires the declared pattern proofs in the integration-spec lane against
+the local Supabase CLI stack (`starci supabase start`), with no toxiproxy and no containers of their own. There is no e2e world,
+no contract world and no e2e workflow (slot `app.ci-e2e`). The front end has no tests in either edition (R97).
 
-Work: lite's `app.starciwork` slot holds only `.gitignore`, `workspace.yaml` and `brand/**` (R212, owner amendment 2026-10-14).
-The tree is optional when the app has no brand records, and `workspace.yaml` is optional when the tree exists. Workspace
-metadata supplies the project id and repo roles that Work tools use to locate the app root and tie brand records to the
-front end. Brand drawing records, references and assets keep their existing layout; brand tooling reads the brand record
-directly. Full keeps its complete Work tree.
+Work: lite's `app.starciwork` slot holds only `.gitignore`, `workspace.yaml` and `brand/**` (ruling:R212/case-4, owner amendment
+2026-10-14). Workspace metadata supplies the project id and repo roles that Work tools use to locate the app root and tie
+brand records to the front end. Brand drawing records, references and assets keep their existing layout; brand tooling reads
+the brand record directly. Full keeps its complete Work tree.
 
-Use lite for a product whose infrastructure is Supabase. Start with full when the product needs its own stack, the e2e world or
-UAT records.
+Use lite for a product whose backing infrastructure is Supabase. Start with full when the product needs self-hosted backing
+services, the e2e world or UAT records.
 
 ## Create a lite app
 
@@ -73,16 +74,26 @@ Regenerating the types (`starci app emit`) is the one step that starts the local
 
 ## Production delivery and secret custody
 
-The optional `app.deploy` slot holds production Compose and Caddy configuration, environment examples and operator shell
-scripts. The `app.ci-deploy` and `app.ci-authorize-deploy-key` slots hold deployment and deploy-key authorization workflows;
-`app.scripts.delivery` holds the lite app's helpers to build, sync environment settings and load or set secrets. The slot
+Lite requires `.starcistacks/application-stacks.yaml` with production declared as `runtime: docker-swarm`; its rendered
+stack is tracked under `.starcistacks/production/infra/swarm/`. Production runs on Docker Swarm on the VPS, with no Compose
+deployment or host crontab. The local Supabase CLI stack remains the development database.
+
+- R275 `STACKS_INGRESS_DECLARED` requires any one declared, digest-pinned ingress component, Traefik or Caddy; the canon names no preferred ingress.
+- R276 `STACKS_LITE_BACKING` forbids self-hosted Postgres, requires SQLite sidecars on declared persistent volumes and refuses sidecars that need Postgres, Redis or Mongo.
+
+The optional `app.deploy` slot holds environment examples and operator shell scripts that invoke the declared stack and app
+commands. The `app.ci-deploy` and `app.ci-authorize-deploy-key` slots hold deployment and deploy-key authorization workflows;
+`app.scripts.delivery` holds the lite app's helpers to build, sync environment settings and call `starci app secret`. The slot
 manifest owns their concrete paths. Delivery files remain legal after an upgrade to full; operational helpers then use
 `app.scripts`.
 
-`app.starcistacks` under lite holds environment and sealed secret custody only; the stack's one backing service is the
-Supabase project (the local CLI stack or the cloud project). Delivery files, including environment examples, remain subject to
-R06 (`HFS_PLAINTEXT_SECRET`): use placeholders and runtime secret references, never plaintext credentials. R220 keeps sealed
-material in the stack's secrets location and enforces the front-end and Supabase secret restrictions.
+`app.starcistacks` under lite holds the declared environments, rendered production Swarm stack and sealed secret custody.
+Supabase is the application database; a database-backed sidecar uses SQLite on a declared persistent volume, and a sidecar
+that requires Postgres, Redis or Mongo is refused. Secrets exist only as sealed `.starcistacks/<env>/secrets/*.enc` material
+encrypted with sops/age. No plaintext secret file is tracked, placed in `deploy/` or embedded in a workflow. The age key lives
+only in `.claude/secret.env` as `SOPS_AGE_KEY` (R253 and R277). Delivery files, including environment examples, remain subject
+to R06 (`HFS_PLAINTEXT_SECRET`): use placeholders and runtime secret references, never plaintext credentials. R220 enforces
+the front-end and Supabase secret restrictions.
 
 ## Database, authentication and storage
 
@@ -148,16 +159,15 @@ not supported.
 
 ## What lite forbids
 
-R212 permits only `.gitignore`, optional `workspace.yaml` metadata and `brand/**` in `app.starciwork`. The feature catalog,
+ruling:R212/case-4 permits only `.gitignore`, `workspace.yaml` metadata and `brand/**` in `app.starciwork`. The feature catalog,
 shell, features, resources, UAT and business-rule records are forbidden there; any other content fails with
 `HFS_STARCIWORK_LITE_FORBIDDEN`: "lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore)". Lite readers read
 workspace metadata normally and skip the full-edition catalog, shell and feature indexes.
 
 R212 also forbids e2e and contract specs, the `test:e2e`, `test:contract`, `test:stack` and
 `test:browser` scripts, the e2e workflow, the browser journey and UAT records, test containers, toxiproxy and browser-runner
-dependencies, BullMQ, Kafka, Redis and graphql-ws dependencies (and their imports, through the lite `infraOwners`), and the
-`.starcistacks` infra, runtime and seeds trees. Lite also forbids Edge Functions and a second front-end
-app.
+dependencies, BullMQ, Kafka, Redis and graphql-ws dependencies (and their imports, through the lite `infraOwners`). Lite also
+forbids Edge Functions, a second front-end app, self-hosted Postgres and sidecars that require Postgres, Redis or Mongo.
 
 R213 to R216 forbid a second schema authority, dynamic database DDL, unsafe policies or definer functions, unchecked database
 configuration and stale generated types. R217, R219 and R220 forbid Supabase access outside its owners (the front end auth only),
