@@ -18693,5 +18693,69 @@ HFS_DOCKER_HEALTHCHECK_FAKE:
   causes_vi:
     - "HEALTHCHECK CMD true hoặc lệnh không kiểm tra thành công của route live đã đăng ký"
   nextStep_vi: "Dùng healthcheck HTTP kiểm tra thành công của route liveness thật của API và giữ lỗi probe thành exit code khác không."
+BE_WEBHOOK_SCOPE:
+  title: "Public webhook traffic bypasses the webhook door"
+  title_vi: "Lưu lượng webhook công khai đi ngoài cửa webhook"
+  meaning_vi: "PublicReason.SignedWebhook được dùng ngoài tệp cửa webhook hoặc phương thức xác thực domain được khai báo chính xác trong webhookVerifiers; một route công khai có đường dẫn webhook, callback hoặc events cũng phải nằm trong cửa webhook."
+  causes_vi:
+    - "Controller API dùng nhãn SignedWebhook để bỏ qua xác thực của cửa webhook"
+    - "Route công khai nhận callback hoặc sự kiện ở một transport khác"
+  nextStep_vi: "Chuyển route vào cửa <provider>.webhook.ts của slot HTTP webhook, xác thực trước rồi chuyển giao cho intake domain và Inbox; chỉ khai báo phương thức xác thực domain bằng symbol chính xác trong webhookVerifiers."
+  owner: op-retry
+  kind: check-finding
+
+BE_WEBHOOK_INBOX_KEY:
+  title: "A webhook intake does not claim its stable delivery key"
+  title_vi: "Intake webhook không claim khóa giao hàng ổn định"
+  meaning_vi: "Phương thức intake nhận tham số đầu hoặc thuộc tính DTO kết thúc bằng Id, hoặc thân thô cùng chữ ký, nhưng không claim Inbox bằng khóa giao hàng ổn định và dừng ngay khi nhận bản trùng; hoặc xử lý giao hàng ngay trong giao dịch ghi nhận."
+  causes_vi:
+    - "Đổi tên tham số hoặc dùng thuộc tính DTO kết thúc bằng Id để tránh kiểm tra Inbox"
+    - "Claim dùng khóa khác, chạy sau xử lý hoặc không dừng khi nhận bản trùng"
+    - "Callback process, lời gọi domain hoặc dispatch command xử lý giao hàng trong giao dịch ghi nhận"
+  nextStep_vi: "Dùng Inbox của platform/inbox, claim khóa giao hàng ổn định và trả về ngay khi claim báo bản trùng; ghi nhận cùng sự kiện outbox có kiểu trong giao dịch, rồi để reactor hoặc job xử lý sau commit."
+  owner: op-retry
+  kind: check-finding
+
+HFS_FEATURE_LOGIC_ROLE:
+  title: "A feature support role hides executable logic"
+  title_vi: "Vai trò hỗ trợ của feature chứa logic thực thi"
+  meaning_vi: "Tệp không phải cửa mỏng trong tầng feature chứa rẽ nhánh, vòng lặp, phép tính hoặc lời gọi thực thi thay vì chỉ khai báo dữ liệu, kiểu và metadata DTO."
+  causes_vi:
+    - "Đặt policy, guard, client hoặc projection có logic trong application/support"
+    - "Đổi hậu tố handler thành vai trò hỗ trợ để tránh luật feature-thin"
+  nextStep_vi: "Chuyển logic vào modules/domain hoặc modules/platform phù hợp và viết unit spec ở đó; giữ tệp feature dưới dạng khai báo dữ liệu hoặc một cửa mỏng ủy quyền."
+  owner: op-retry
+  kind: check-finding
+
+BE_COMPOSITION_UNTYPED:
+  title: "App composition lives outside an explicitly typed area group"
+  title_vi: "Ghép nối ứng dụng nằm ngoài nhóm khu vực có kiểu tường minh"
+  meaning_vi: "Danh sách hoặc map module, provider, queue hay scheduler được đặt trong main, env hoặc options, hoặc nhóm compose không khai báo kiểu mảng hay kiểu trả về tường minh. Kiểm tra dựa trên kiểu đã phân giải, không dựa trên tên lớp hoặc hàm."
+  causes_vi:
+    - "Đổi tên module hoặc helper, dùng configure hay cron-table để giấu danh sách ghép nối"
+    - "Xuất nhóm compose với kiểu suy luận, any hoặc phần tử không phải thành phần ghép nối"
+  nextStep_vi: "Chuyển danh sách sang compose/<area>.ts, khai báo kiểu mảng hoặc kiểu trả về như Array<DynamicModule | Type<unknown>>, rồi spread nhóm trong app.module.ts; chỉ để giá trị môi trường và ràng buộc cổng trong options."
+  owner: op-retry
+  kind: check-finding
+
+BE_APP_ENV_REQUIRED:
+  title: "A back-end app lacks its typed environment boundary"
+  title_vi: "Ứng dụng back end thiếu ranh giới môi trường có kiểu"
+  meaning_vi: "Ứng dụng không có tệp <app>.env.ts được theo dõi với interface và read<App>Env(env: EnvSource), hoặc main.ts tự đọc và phân tích môi trường thay vì gọi hàm đó."
+  causes_vi:
+    - "Ứng dụng thiếu tệp môi trường hoặc dùng hàm đọc không có hợp đồng kiểu"
+    - "main.ts gọi parseConfig hoặc đọc EnvSource trực tiếp"
+  nextStep_vi: "Tạo và theo dõi apps/<app>/src/<app>.env.ts, xuất interface cùng read<App>Env nhận EnvSource; main.ts chỉ tạo EnvSource một lần rồi gọi hàm đọc đó để khởi động."
+  owner: op-retry
+  kind: check-finding
+
+BE_APP_MODULE_LIST_INLINE:
+  title: "An app root holds an inline composition list"
+  title_vi: "Module gốc ứng dụng chứa danh sách ghép nối tại chỗ"
+  meaning_vi: "app.module.ts liệt kê module, queue hoặc scheduler tại chỗ thay vì spread nhóm có kiểu từ compose/<area>.ts."
+  causes_vi:
+    - "Module gốc nhập trực tiếp các module tính năng hoặc đăng ký capability"
+    - "Danh sách ghép nối được đặt trong biến của module gốc để tránh nhóm compose"
+  nextStep_vi: "Chuyển danh sách vào nhóm có kiểu trong compose/<area>.ts rồi spread nhóm trong app.module.ts; chỉ giữ guard và filter toàn ứng dụng tại module gốc."
   owner: op-retry
   kind: check-finding

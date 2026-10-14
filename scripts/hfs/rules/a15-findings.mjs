@@ -13,6 +13,7 @@ import { databaseConfigFindings } from './database-config.mjs';
 import { docFreshFindings } from './doc-fresh.mjs';
 import { releaseProvenanceFindings } from './release-provenance.mjs';
 import { feStackAllowlistFindings } from './fe-stack.mjs';
+import { appEnvRequiredFindings } from './app-env-required.mjs';
 // finders-import-end
 
 /** The failure codes the finders above emit, so `starci app check` ships their labels (check.mjs adds them to CHECK_CODES). Append-only; the coordinator regenerates it at merge time. */
@@ -34,6 +35,7 @@ export const FINDERS = [
   docFreshFindings,
   releaseProvenanceFindings,
   feStackAllowlistFindings,
+  appEnvRequiredFindings,
   // finders-end
 ];
 

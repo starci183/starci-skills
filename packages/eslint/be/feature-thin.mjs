@@ -1,5 +1,6 @@
 /**
- * The rule that holds the thin-feature law (R203 `BE_FEATURE_THIN`).
+ * The rules that hold the thin-feature law (R203 `BE_FEATURE_THIN`) and close the support-role escape
+ * (R264 `HFS_FEATURE_LOGIC_ROLE`).
  *
  * A file of the feature tier whose role is one of `ruleParams.be.thinRoles` of the slot manifest
  * (`<name>.handler.ts`, `<name>.resolver.ts`, `<name>.consumer.ts`, `<name>.processor.ts`, `<name>.step.ts`,
@@ -22,7 +23,7 @@
 import { keyName, walk } from "./lib/ast.mjs"
 import { aliasTarget, callsOf, decoratorsFrom, injectedMembers } from "./lib/doors.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
-import { importOf } from "./lib/import-source.mjs"
+import { importOf, isImportedFrom } from "./lib/import-source.mjs"
 import { baseName, isLoggerType, isOwnedType } from "./lib/ports.mjs"
 import { firstWebhookVerification, isWebhookDomainServiceType } from "./lib/webhook-verifiers.mjs"
 import { isWebhookForbiddenReceiver } from "./lib/webhook-handoff.mjs"
@@ -268,12 +269,76 @@ export const featureThin = {
     },
 }
 
+/** A declaration's signed numeric literal is still data, including an enum member or a constant. */
+const isSignedNumericLiteral = (node) => node.type === "UnaryExpression" && ["+", "-"].includes(node.operator)
+    && node.argument.type === "Literal" && typeof node.argument.value === "number"
+
+/** A DTO's decorator application declares metadata; calls inside its arguments remain ordinary executable calls. */
+const isDecoratorApplication = (node) => node.parent?.type === "Decorator" && node.parent.expression === node
+
+/** A Nest command/query constructor initializes its data base through the required, argument-free super call. */
+const isCqrsDataConstructor = (context, node) => {
+    if (node.callee.type !== "Super" || node.arguments.length !== 0) return false
+    for (let parent = node.parent; parent; parent = parent.parent) {
+        if (parent.type === "MethodDefinition") {
+            const declaration = parent.parent?.parent
+            return parent.kind === "constructor" && isImportedFrom(context, declaration?.superClass, "@nestjs/cqrs", ["Command", "Query"])
+        }
+        if (["FunctionDeclaration", "ArrowFunctionExpression"].includes(parent.type)) return false
+    }
+    return false
+}
+
+/** Non-door feature roles declare data; renaming a policy or a guard must never hide business logic from R203. */
+export const featureLogicRole = {
+    meta: {
+        type: "problem",
+        docs: { description: "Non-door roles in the feature tier may declare data, types and DTO metadata, but cannot hold decisions, computation or executable calls." },
+        schema: [],
+        messages: {
+            logic: "[HFS_FEATURE_LOGIC_ROLE] {{what}} puts executable logic in a feature `<name>.{{role}}.ts` support or data file. Keep its declarations and data here; put business logic in the tested modules and delegate through a declared thin feature role.",
+        },
+    },
+    create(context) {
+        const hfs = hfsOf(context)
+        const name = baseName(context.filename)
+        if (name.endsWith(".spec.ts") || name.endsWith(".d.ts")) return {}
+        const role = roleOf(name)
+        if (role === null || (hfs.ruleParams.thinRoles ?? []).includes(role)) return {}
+        if (hfs.tierOf(context.filename) !== "feature") return {}
+        // The feature's Nest composition is governed by the module laws. A module suffix in support/ is still support.
+        if (["module", "module-definition"].includes(role) && hfs.slotOf(context.filename) !== "be.feature.application.support") return {}
+
+        const report = (node, what) => context.report({ node, messageId: "logic", data: { what, role } })
+        const visitors = {}
+        for (const type of BRANCH_NODES) {
+            visitors[type] = (node) => report(node, type === "LogicalExpression" ? `a \`${node.operator}\`` : BRANCH_WHAT[type])
+        }
+        for (const type of COMPUTE_NODES) {
+            visitors[type] = (node) => {
+                if (!isSignedNumericLiteral(node)) report(node, `an \`${node.operator}\``)
+            }
+        }
+        visitors.TemplateLiteral = (node) => {
+            if (node.expressions.length > 0) report(node, "a template literal with an expression")
+        }
+        visitors.CallExpression = (node) => {
+            if (!isDecoratorApplication(node) && !isCqrsDataConstructor(context, node)) report(node, `the call \`${context.sourceCode.getText(node.callee)}\``)
+        }
+        visitors.TaggedTemplateExpression = (node) => report(node, `the tagged call \`${context.sourceCode.getText(node.tag)}\``)
+        visitors.NewExpression = (node) => report(node, `the construction \`${context.sourceCode.getText(node.callee)}\``)
+        return visitors
+    },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
     "feature-thin": featureThin,
+    "feature-logic-role": featureLogicRole,
 }
 
 /** Every rule of this law at `error`. */
 export const recommended = {
     "starci-be/feature-thin": "error",
+    "starci-be/feature-logic-role": "error",
 }
