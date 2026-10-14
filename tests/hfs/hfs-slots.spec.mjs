@@ -528,6 +528,10 @@ test('ruleParams: the parameters the canon lint lanes read, per side', () => {
   assert.equal('clientModule' in fe, false, 'the transport client is a slot (fe.transport.client, fe.package.api.client), not a parameter');
   assert.equal(manifest.slots.find((s) => s.id === 'be.domain').budget.indexExports, 60);
   assert.equal(manifest.slots.find((s) => s.id === 'be.feature').budget.indexExports, 60);
+  for (const slot of manifest.slots.filter((s) => s.id === 'fe.hooks' || s.id.startsWith('fe.hooks.'))) {
+    assert.equal(slot.budget.file, 200, `${slot.id} keeps the implementation budget`);
+    assert.equal(slot.budget.barrel, 400, `${slot.id} states the pure re-export index.ts budget`);
+  }
   assert.deepEqual(sideOf(APP, 'be').ruleParams(), be);
   assert.deepEqual(sideOf(APP, 'fe').ruleParams(), fe);
   assert.equal(openHfs({ declaration: APP }).ruleParams(), null, 'the app root has no rule parameters of its own');

@@ -606,6 +606,10 @@ fe/packages/<family>-i18n/                                                      
 ```
 <!-- hfs:generated-end fe-tree -->
 
+An instance of `fe.modules`, including its specialized module slots, requires `index.ts` when it contains a `.ts` or `.tsx` file, including nested files and
+declarations (`.d.ts`). A module containing only CSS or assets needs no barrel; neither required-file check reports its
+absent `index.ts`. Required module directories must still exist, and all other required files remain enforced.
+
 The front end's contract input is the back end's committed `be/contracts/<app>/` read in place (`hfs.json`
 `sides.fe.reads`); the root `codegen` script (`scripts/codegen.mjs`) writes the ignored `__generated__/` from it. There is
 no contract copy under `fe/`.
@@ -655,7 +659,8 @@ no contract copy under `fe/`.
 - **Multiple apps (R64).** One independent `fe/apps/<app>` per app; shared code only through `fe/packages/*`. A design draft
   is a branch, not a second app. The `work/ui-screen@2` record declares `app`, a name from `hfs.json` `sides.fe.apps`.
 - **Budgets (R65).** Connected units have at most 6 data hooks and 6 `useState`; component 300 lines; `index.tsx` 200;
-  hook 200; module 400.
+  hook 200; module 400. A pure re-export `index.ts` whose statements are all `export ... from` has a separate 400-line
+  barrel budget. An index containing imports, local declarations or exports without a source keeps its ordinary budget.
 
 ## 7. Tests
 
@@ -726,7 +731,8 @@ no contract copy under `fe/`.
   `noImplicitOverride`, `noFallthroughCasesInSwitch`, `allowJs: false` and never lowers a flag (R22).
 - **Size budgets.** Backend file 500 lines, function 80, `app.module.ts` 250, `<app>.options.ts` 200, `compose/<area>.ts` 120,
   `main.ts` 80 (absolute, R246), `index.ts` 60 exports, feature 250 source
-  files. Frontend component 300, connected `index.tsx` 200, hook 200, module 400. The mechanism is no-growth
+  files. Frontend component 300, connected `index.tsx` 200, hook 200, module 400; a pure re-export `index.ts` barrel has
+  its own 400-line budget. The mechanism is no-growth
   (`HFS_SIZE_GROWTH`): a new file is inside the budget, a file already over its budget gains no lines against its parent
   commit. There is no baseline and no allowlist (R20). A duplicated block at or above the one threshold
   `ruleParams.<side>.duplicateBlock` of `slots.yaml`, and a helper defined twice under the same name, fail (R21).

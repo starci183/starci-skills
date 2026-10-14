@@ -21,7 +21,7 @@
 import { functionOf, isFn } from "./lib/bindings.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { isPromiseValued } from "./lib/types.mjs"
-import { fileOf, roleOfFile, slotOfFile } from "./lib/scope.mjs"
+import { baseName, fileOf, roleOfFile, slotOfFile } from "./lib/scope.mjs"
 
 /**
  * The budget the slot of the linted file states (`budget` in knowledge/hfs/slots.yaml), or an empty one when no slot owns the file
@@ -34,13 +34,17 @@ const budgetOf = (context) => {
 
 /**
  * The line limit of the linted file: the budget keyed by the file name its role has in the slot (`component.tsx` for the drawing,
- * `index.tsx` for the entry), else the slot's `file` budget (hooks 200, modules 400), else null.
+ * `index.tsx` for the entry), else the slot's `file` budget (hooks 200, modules 400), else null. A pure re-export `index.ts`
+ * uses the slot's separate `barrel` budget when stated: every statement must be an `export ... from` declaration.
  */
-const lineBudgetOf = (context) => {
+const lineBudgetOf = (context, node) => {
   const role = roleOfFile(context)
   const id = slotOfFile(context)
   const fileName = role === null || id === null ? undefined : hfsOf(context).slot(id)?.roles?.[role]
   const budget = budgetOf(context)
+  const pureBarrel = baseName(fileOf(context)) === "index.ts" && node.body.length > 0 && node.body.every((statement) =>
+    ["ExportNamedDeclaration", "ExportAllDeclaration"].includes(statement.type) && Boolean(statement.source))
+  if (pureBarrel && typeof budget.barrel === "number") return budget.barrel
   const limit = fileName !== undefined && typeof budget[fileName] === "number" ? budget[fileName] : budget.file
   return typeof limit === "number" ? limit : null
 }
@@ -73,11 +77,11 @@ const isUnitName = (name) => Boolean(name) && (/^[A-Z]/.test(name) || /^use[A-Z0
 
 // -- BUDGET-1 --------------------------------------------------------------------------------------
 
-/** A file is within the line budget its slot states for its role (`component.tsx`, `index.tsx`) or for every file (`file`). */
+/** A file is within the line budget its slot states for its role, pure re-export barrel (`barrel`) or every file (`file`). */
 export const componentLineBudget = {
   meta: {
     type: "suggestion",
-    docs: { description: "A file stays within the line budget its slot states (`component.tsx`, `index.tsx`, `file`)." },
+    docs: { description: "A file stays within the line budget its slot states (`component.tsx`, `index.tsx`, `barrel`, `file`)." },
     schema: [],
     messages: {
       lines:
@@ -85,12 +89,11 @@ export const componentLineBudget = {
     },
   },
   create(context) {
-    // A spec is not held to a budget; a file has one when its role or its slot states it.
-    const max = lineBudgetOf(context)
-    if (max === null) return {}
     const source = context.sourceCode || context.getSourceCode()
     return {
       Program(node) {
+        const max = lineBudgetOf(context, node)
+        if (max === null) return
         // A trailing newline is not a line of code.
         const count = source.lines.length - (source.lines[source.lines.length - 1] === "" ? 1 : 0)
         if (count > max) context.report({ node, messageId: "lines", data: { count, max } })
