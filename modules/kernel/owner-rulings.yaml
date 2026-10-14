@@ -198,6 +198,8 @@ rulings:
     date: '2026-10-14'
     ruling: "R50 (FE_TRANSPORT_OWNER) requires Accept-Language as the locale header in both editions; x-locale is retired. Historical CHANGELOG entries and the rule that rejects the retired header preserve its spelling."
     staleWhen: ['\bx-locale\b']
+    retires: [x-locale]
+    retiredIn: [packages/eslint/fe/served-locale.mjs, knowledge/hfs/requirements.yaml]
     enforcedBy: [packages/eslint/fe/served-locale.mjs]
   # HFS decisions share stable ids and relationship records with knowledge/hfs/rulings.yaml.
   - id: hfs-complete-standard

@@ -77,7 +77,7 @@ const isLinkImplementationFile = (context) => linkFileName(context) !== null
 export const LOCALE_HEADER = "Accept-Language"
 
 /** The retired locale header is refused everywhere, including the locale link. */
-const RETIRED_LOCALE_HEADER = ["x", "locale"].join("-")
+const RETIRED_LOCALE_HEADER = "x-locale"
 
 /** Callee names that construct the terminal link - the one that actually reaches the network. */
 const TERMINAL_LINK_CALLEES = new Set(["createHttpLink", "HttpLink", "createUploadLink", "BatchHttpLink"])
@@ -200,7 +200,7 @@ export const rules = {
         elsewhere:
           "Only the locale link may write `Accept-Language`. Setting it here is a second answer to which language this request is in, and the two diverge the first time one of them is updated - usually leaving a single hook correct and the rest of the surface on the server's default. Let the transport attach it.",
         retired:
-          "The retired custom locale header must not be sent. Declare the reader's language with `Accept-Language` in the locale link, the one place that owns it.",
+          "The `x-locale` header is retired. Declare the reader's language with `Accept-Language` in the locale link, the one place that owns it.",
       },
     },
     create(context) {
