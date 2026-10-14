@@ -5,7 +5,8 @@
 //
 // The catalog is loaded through scripts/hfs/slots.mjs (loadRuleCatalog), which refuses a catalog that breaks its schema
 // (HFS_RULES_INVALID). On top of that this check refuses:
-//   - a rule with no enforcer, or a `lint`/`check` kind with no enforcer of that family        HFS_RULE_NO_ENFORCER
+//   - a rule with no enforcer, or a `lint`/`check` kind with no enforcer of that family in an edition it judges
+//                                                                                              HFS_RULE_NO_ENFORCER
 //   - an existing eslint-be / eslint-fe enforcer whose id is not a rule of the plugin in packages/eslint/{be,fe},
 //     or an existing machine / hfs / work-validate / runtime / sonar enforcer whose file (`at`) is missing or emits none
 //     of the rule's codes                                                                            HFS_RULE_ENFORCER_MISSING
@@ -41,6 +42,8 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { ALL_CHECK_CODES, REFUSAL_CODES } from '../hfs/check.mjs';
 import { INFRASTRUCTURE_CODES } from '../hfs/infrastructure-codes.mjs';
 import { HfsSlotsError, loadRuleCatalog, loadSlotManifest } from '../hfs/slots.mjs';
+import { enforcerJudgedInEdition, judgedInEdition } from '../hfs/edition-slots.mjs';
+import { EDITIONS } from '../hfs/manifest-shape.mjs';
 import { ARCHITECTURE_RULE_IDS, ERROR_RULE_IDS } from '../hfs/architecture/index.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
 import { hasSecondLanguage } from '../lib/language.mjs';
@@ -51,7 +54,7 @@ const EMITTER_ROOTS = Object.freeze({
   machine: ['scripts/hfs/architecture.mjs', 'scripts/hfs/architecture'],
   hfs: ['scripts/hfs/check.mjs', 'scripts/hfs/rules', 'scripts/hfs/slots.mjs', 'packages/hfs/src', 'packages/hfs/sync'],
   'work-validate': ['scripts/work/validate/work-validate.mjs', 'scripts/work/validate/check-example-work.mjs', 'scripts/work/validate/check-work-artifacts.mjs'],
-  runtime: ['scripts/hfs/runtime-check.mjs', 'scripts/hfs/runtime-rules', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-example-coupling.mjs', 'scripts/checks/check-spec-budget.mjs', 'scripts/checks/check-doc-owner.mjs', 'scripts/checks/check-port-once.mjs', 'scripts/checks/check-held-surfacing.mjs', 'scripts/checks/check-event-spill.mjs', 'scripts/checks/check-root-adhoc.mjs', 'scripts/checks/check-storage-convention.mjs', 'scripts/checks/check-default-once.mjs', 'scripts/checks/check-version-pin-once.mjs', 'scripts/checks/check-slot-id-shape.mjs', 'scripts/checks/check-undeclared-identifiers.mjs', 'scripts/checks/check-removed-vocabulary.mjs', 'scripts/checks/check-prose-commands.mjs', 'scripts/checks/check-documented-defaults.mjs', 'scripts/checks/check-roles-contract.mjs', 'scripts/checks/check-edge-case-registry.mjs', 'scripts/checks/check-gate-loosening.mjs', 'scripts/checks/check-revision-scope.mjs', 'scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-cli-only-entry.mjs', 'scripts/cli/gen-catalog.mjs', 'scripts/checks/check-op-judge.mjs'],
+  runtime: ['scripts/hfs/runtime-check.mjs', 'scripts/hfs/runtime-rules', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-example-coupling.mjs', 'scripts/checks/check-spec-budget.mjs', 'scripts/checks/check-doc-owner.mjs', 'scripts/checks/check-port-once.mjs', 'scripts/checks/check-held-surfacing.mjs', 'scripts/checks/check-event-spill.mjs', 'scripts/checks/check-root-adhoc.mjs', 'scripts/checks/check-storage-convention.mjs', 'scripts/checks/check-default-once.mjs', 'scripts/checks/check-version-pin-once.mjs', 'scripts/checks/check-slot-id-shape.mjs', 'scripts/checks/check-undeclared-identifiers.mjs', 'scripts/checks/check-removed-vocabulary.mjs', 'scripts/checks/check-prose-commands.mjs', 'scripts/checks/check-documented-defaults.mjs', 'scripts/checks/check-roles-contract.mjs', 'scripts/checks/check-edge-case-registry.mjs', 'scripts/checks/check-gate-loosening.mjs', 'scripts/checks/check-revision-scope.mjs', 'scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-cli-only-entry.mjs', 'scripts/cli/gen-catalog.mjs', 'scripts/checks/check-op-judge.mjs', 'scripts/checks/check-hfs-coverage.mjs', 'scripts/checks/check-ruling-cites.mjs', 'scripts/checks/lib/coverage-cites.mjs', 'scripts/checks/lib/coverage-gates.mjs', 'scripts/checks/lib/coverage-inventory.mjs', 'scripts/checks/lib/coverage-ledgers.mjs', 'scripts/checks/lib/coverage-rules.mjs', 'scripts/checks/lib/coverage-witness.mjs', 'scripts/checks/lib/ruling-cites.mjs'],
 });
 /** The knowledge files whose rule codes must belong to the one catalog (a directory is read recursively; a missing entry is skipped). */
 export const KNOWLEDGE_CODE_ROOTS = Object.freeze(['knowledge/patterns', 'knowledge/architecture-rules.yaml', 'modules/models/code-patterns.yaml']);
@@ -62,6 +65,7 @@ const STYLELINT_WHY = 'packages/stylelint/lib/why.mjs';
 const LINT_PLUGINS = Object.keys(PLUGIN_ENTRY);
 const LINT_FAMILY = ['eslint-be', 'eslint-fe', 'stylelint'];
 const CHECK_FAMILY = ['machine', 'hfs', 'work-validate', 'runtime'];
+const ENFORCER_COVERAGE = [['lint', LINT_FAMILY, 'an eslint or stylelint rule'], ['check', CHECK_FAMILY, 'a machine, hfs, work-validate or runtime check']];
 // A check spells its code as a string literal ('CODE') or as the `[CODE]` tail of a finding line.
 const quoted = (code) => new RegExp(`['"\`]${code}['"\`]|\\[${code}\\]`);
 
@@ -306,14 +310,30 @@ const failureEntryFindings = (rule, failureCodes, add) => {
   }
 };
 
+/** Edition restrictions must leave an enforcer of each claimed family wherever the rule is judged. */
+const editionEnforcerFindings = (rule, rules, add) => {
+  // Keep the existing catalog-wide absence findings when there are no entries to restrict.
+  if (!rule.enforcers.length) return;
+  for (const edition of EDITIONS) {
+    if (!judgedInEdition(rule, edition)) continue;
+    const enforcers = rule.enforcers.filter((e) => enforcerJudgedInEdition(rules, e.kind, e.id, edition));
+    if (!enforcers.length) add('HFS_RULE_NO_ENFORCER', rule.id, `${rule.id} (${rule.code}) has no enforcer in ${edition}`);
+    for (const [kind, family, what] of ENFORCER_COVERAGE) {
+      if (!rule.kinds.includes(kind) || !rule.enforcers.some((e) => family.includes(e.kind))) continue;
+      if (!enforcers.some((e) => family.includes(e.kind))) add('HFS_RULE_NO_ENFORCER', rule.id, `${rule.id} (${rule.code}) is kind ${kind} but names no ${what} in ${edition}`);
+    }
+  }
+};
+
 /** Every finding of one catalog rule, in the order the passes below produce them. */
-const ruleFindings = (rule, { plugins, files, emitters, tests, failureCodes }, add) => {
+const ruleFindings = (rule, { rules, plugins, files, emitters, tests, failureCodes }, add) => {
   if (!rule.enforcers.length) add('HFS_RULE_NO_ENFORCER', rule.id, `${rule.id} (${rule.code}) has no enforcer`);
   // Owner acceptance 2026-09-30: every rule ships at error on the day the canon ships; an owed enforcer is a gap, not a plan.
   for (const e of rule.enforcers) if (e.planned) add('HFS_RULE_ENFORCER_PLANNED', rule.id, `${rule.id} lists ${e.kind}:${e.id} as planned: build it (with a violating and a passing test) or delete it; the catalog carries no owed enforcer`, `${e.kind}:${e.id}`);
-  for (const [kind, family, what] of [['lint', LINT_FAMILY, 'an eslint or stylelint rule'], ['check', CHECK_FAMILY, 'a machine, hfs, work-validate or runtime check']]) {
+  for (const [kind, family, what] of ENFORCER_COVERAGE) {
     if (rule.kinds.includes(kind) && !rule.enforcers.some((e) => family.includes(e.kind))) add('HFS_RULE_NO_ENFORCER', rule.id, `${rule.id} (${rule.code}) is kind ${kind} but names no ${what}`);
   }
+  editionEnforcerFindings(rule, rules, add);
   enforcerFindings(rule, plugins, files, add);
   emissionFindings(rule, plugins, emitters, add);
   if (tests !== undefined) testedFindings(rule, tests, add);
@@ -379,7 +399,7 @@ const knowledgeFindings = (catalog, failureCodes, knowledge, add) => {
 export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, tests, knowledge, codes, infrastructure }) {
   const findings = [];
   const add = (code, rule, message, enforcer) => findings.push({ code, rule, ...(enforcer ? { enforcer } : {}), message });
-  const context = { plugins, files, emitters, tests, failureCodes };
+  const context = { rules: catalog.rules, plugins, files, emitters, tests, failureCodes };
   for (const rule of catalog.rules) ruleFindings(rule, context, add);
   uncataloguedPluginFindings(catalog, plugins, add);
   unownedCodeFindings(catalog, codes, add);

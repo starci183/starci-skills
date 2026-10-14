@@ -128,6 +128,7 @@ ruleParams:
     selfChecks:
       - {id: ops-registry, run: scripts/route/build-ops-registry.mjs, args: [--check]}
       - {id: providers, run: scripts/checks/check-providers.mjs}
+      - {id: hfs-coverage, run: scripts/checks/check-hfs-coverage.mjs}
       - {id: cli-catalog-drift, run: scripts/cli/gen-catalog.mjs, args: [--check]}
       - {id: cli-parity, run: scripts/checks/check-cli-parity.mjs}
       - {id: cli-only-entry, run: scripts/checks/check-cli-only-entry.mjs}
