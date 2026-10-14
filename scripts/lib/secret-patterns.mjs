@@ -81,7 +81,8 @@ export const SECRET_PATTERNS = [
   // candidate; only this heuristic takes the exemption, never a provider-shaped token above.
   // A spec file's keyword-assigned values are test inputs (a spec's sign-in
   // form password and a mocked accessToken once refused a push): the heuristic skips spec files too.
-  { name: 'assigned-secret', re: ASSIGNED_QUOTED, placeholder: /fixture|stub|fake|dummy|placeholder|example|sample|changeme|redacted|mock/i,
+  // A SCREAMING_SNAKE quoted value in source is a public code (an enum member `AccessTokenInvalid = "SUPABASE_ACCESS_TOKEN_INVALID"`), not a credential.
+  { name: 'assigned-secret', re: ASSIGNED_QUOTED, sourceCode: /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/, placeholder: /fixture|stub|fake|dummy|placeholder|example|sample|changeme|redacted|mock/i,
     skipFile: /\.(?:spec|test|e2e-spec)\.[cm]?[jt]sx?$/ },
   // An unquoted value in TypeScript or JavaScript source is an identifier or a type (`token: InjectionToken`,
   // `MODULE_OPTIONS_TOKEN: DATABASE_OPTIONS_TOKEN`), never a literal; the unquoted form is the dotenv, compose and toml shape.
@@ -96,6 +97,7 @@ export function secretHits(file, text) {
   for (const rule of SECRET_PATTERNS) {
     if (rule.skipFile?.test(file ?? '')) continue;
     const hit = rule.re.exec(text);
+    if (hit && rule.sourceCode?.test(hit[1] ?? '') && /\.[cm]?[jt]sx?$/.test(file ?? '')) continue;
     if (hit && !rule.placeholder?.test(hit[1] ?? '')) names.push(rule.name);
   }
   return names;

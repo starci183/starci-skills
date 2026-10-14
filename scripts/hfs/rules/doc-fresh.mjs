@@ -63,10 +63,19 @@ function pathReferences(line) {
   return refs;
 }
 
+/** A cited host location (the untracked custody file `.claude/secret.env`, `~/...`) or a prose pair (`expand/contract`: no extension and no tracked top-level folder of that name) is no repository path. */
+function hostOrProse(target, tracked) {
+  if (target === '.claude/secret.env' || /^(?:~\/|\/)/.test(target)) return true;
+  if (/\.[A-Za-z0-9]+$/.test(target) || target.endsWith('/') || target.startsWith('.')) return false;
+  const top = target.split('/')[0];
+  return ![...tracked].some((entry) => entry === top || entry.startsWith(`${top}/`));
+}
+
 function pathFindings(file, lines, tracked) {
   const findings = [];
   for (const [index, line] of lines.entries()) {
     for (const { target, link } of pathReferences(line)) {
+      if (hostOrProse(target, tracked)) continue;
       if (!resolvedPath(target, file, tracked, link)) findings.push(found(PATH_MISSING, file, `${file} cites a missing repository path ${target}; update the documentation or restore the path`, { line: index + 1, reference: target }));
     }
   }
