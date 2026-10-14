@@ -21,7 +21,7 @@ export interface CreateAuthApolloClientOptions {
 /**
  * The authenticated Apollo client. The link chain runs outer to inner:
  * retry (transient network failures) -> error (report) -> timeout -> refresh (one token refresh and replay on
- * UNAUTHENTICATED) -> locale (`x-locale`) -> access token (`Authorization: Bearer`, from modules/auth) -> http (terminal).
+ * UNAUTHENTICATED) -> locale (`Accept-Language`) -> access token (`Authorization: Bearer`, from modules/auth) -> http (terminal).
  */
 export const createAuthApolloClient = ({ signal, report }: CreateAuthApolloClientOptions = {}) =>
     new ApolloClient({
