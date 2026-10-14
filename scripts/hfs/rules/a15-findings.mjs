@@ -3,10 +3,19 @@
 // and is wired here by appending ONE import line and ONE entry to FINDERS. Nothing else in this file changes; the file is union-merged.
 // A finder judges its own edition (`repo.edition`): lite and full are both in scope unless the rule says otherwise.
 // finders-import-begin
+import { liteProofLaneFindings } from './lite-proof-lane.mjs';
 // finders-import-end
+
+/** The failure codes the finders above emit, so `starci app check` ships their labels (check.mjs adds them to CHECK_CODES). Append-only; the coordinator regenerates it at merge time. */
+export const A15_CODES = [
+  // codes-begin
+  'BE_LITE_PROOF_LANE_MISSING',
+  // codes-end
+];
 
 export const FINDERS = [
   // finders-begin
+  liteProofLaneFindings,
   // finders-end
 ];
 

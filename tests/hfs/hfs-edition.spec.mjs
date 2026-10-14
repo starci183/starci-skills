@@ -13,9 +13,10 @@ import { HfsSlotsError, loadRuleCatalog, loadSlotManifest, openHfs, resolveRepoD
 // The edition mechanism (L01, manifest 2.1.0, re-ruled in 3.0.0): hfs.json names `edition: full|lite` (absent means full), and lite is
 // the same manifest filtered (a slot's `editions`, `litePresence` and `lite` overlay), never a second engine. Owner ruling 2026-10-12:
 // lite is the full architecture deployed without self-hosted infrastructure - it keeps every pattern, the worker app and the back-end
-// unit specs, and drops only the e2e and contract world, the browser journey, UAT records and the self-hosted stack; a `supabase`
+// unit specs, and drops only the e2e world, the browser journey, UAT records and the self-hosted stack; a `supabase`
 // connection provider enables the Supabase slots (app.supabase*, be.integrations.supabase, fe.route.callback). Owner ruling 2026-10-13:
 // the front end is one standard for both editions (no fe lite overlay) and lite runs the socket.io gateway in the api process.
+// Owner decision 2026-10-14: lite may have optional contract specs and their test:contract lifecycle scripts.
 
 const root = path.resolve(import.meta.dirname, '..', '..');
 const Ajv2020 = (() => { const loaded = createRequire(import.meta.url)('ajv/dist/2020.js'); return loaded.default ?? loaded; })();
@@ -60,14 +61,15 @@ test('lite removes the slots its editions exclude, keeps the rest, and adds its 
   const manifest = loadSlotManifest();
   for (const slot of manifest.slots) assert.ok(slot.editions === undefined || slot.editions.every((e) => ['full', 'lite'].includes(e)), `${slot.id}: unknown edition`);
   const liteOnly = manifest.slots.filter((s) => s.editions?.includes('lite') && !s.editions.includes('full')).map((s) => s.id);
-  assert.deepEqual(liteOnly.sort(), ['app.scripts.delivery'], 'the lite-only slots; Work has no separate UAT slot');
+  assert.deepEqual(liteOnly.sort((a, b) => a.localeCompare(b)), ['app.scripts.delivery'], 'the lite-only slots; Work has no separate UAT slot');
   const fe = loadSlotManifest().slots.filter((s) => s.id.startsWith('fe.'));
   assert.deepEqual(fe.filter((s) => s.editions || s.litePresence || s.lite).map((s) => s.id), [], 'the front end has no edition overlay: lite = full (owner ruling 2026-10-13)');
   const liteBe = openHfs({ declaration: app({ edition: 'lite' }), side: 'be' });
   const fullBe = openHfs({ declaration: app(), side: 'be' });
   assert.equal(liteBe.slot('be.feature.realtime.websocket').presence, 'opt-in', 'the socket.io gateway is legal under lite (in the api process)');
   assert.deepEqual(liteBe.ruleParams().infraOwners['socket.io'], fullBe.ruleParams().infraOwners['socket.io'], 'lite owns socket.io where full does');
-  // owner ruling 2026-10-12: the test world of the optional integration specs and the unit fixtures stay; e2e and contract go
+  // the current manifest keeps the optional integration specs, test world and unit fixtures;
+  // C08 applies the owner's 2026-10-14 decision to make the contract slot optional under lite
   assert.equal(liteBe.slot('be.tests.world').presence, 'optional');
   assert.equal(liteBe.slot('be.tests.fixtures.builders').presence, 'optional');
   assert.equal(liteBe.slot('be.tests.integration').presence, 'optional');
@@ -93,7 +95,7 @@ test('lite removes the slots its editions exclude, keeps the rest, and adds its 
   assert.deepEqual(liteBe.ruleParams().infraOwners.fetch, fullBe.ruleParams().infraOwners.fetch, 'a specifier lite does not restate keeps its owner');
 });
 
-test('lite classification: e2e, contract, the GraphQL subscription door and the browser journey are forbidden paths with a goesTo; the patterns, the socket gateway and the worker are not', () => {
+test('lite classification: current manifest forbids e2e, contract, the GraphQL subscription door and the browser journey; the patterns, the socket gateway and the worker are not', () => {
   const be = openHfs({ declaration: app({ edition: 'lite' }), side: 'be' });
   const fe = openHfs({ declaration: app({ edition: 'lite' }), side: 'fe' });
   const whole = openHfs({ declaration: app({ edition: 'lite' }) });
@@ -103,6 +105,7 @@ test('lite classification: e2e, contract, the GraphQL subscription door and the 
     assert.equal(typeof c.goesTo, 'string', `${p}: a forbidden path says where it goes`);
   };
   forbidden(be, 'src/tests/e2e/orders/place.e2e-spec.ts', 'be.tests.e2e');
+  // C08 owns relaxing this slot; script allowance is independently proved below.
   forbidden(be, 'src/tests/contract/stripe/charge.contract-spec.ts', 'be.tests.contract');
   forbidden(be, 'src/features/realtime/chat/transport/graphql/chat.subscription.ts', 'be.feature.realtime.graphql');
   assert.equal(be.classifyPath('jest.config.e2e.js').slot, 'be.tool-config-local');
@@ -176,8 +179,8 @@ test('a supabase connection provider enables the supabase slots of every profile
     ['fe/apps/web/src/app/auth/callback/route.ts', 'fe.route.callback'],
   ]) assert.deepEqual([whole.classifyPath(p).status, whole.classifyPath(p).slot], ['owned', slot], p);
   // under lite the supabase tree is required: migrations is the schema authority of a lite app
-  const paths = whole.requiredPaths().paths.map((e) => e.path);
-  for (const p of ['supabase/', 'supabase/config.toml', 'supabase/types/database.types.ts']) assert.equal(paths.includes(p), true, `required under lite+supabase: ${p}`);
+  const paths = new Set(whole.requiredPaths().paths.map((e) => e.path));
+  for (const p of ['supabase/', 'supabase/config.toml', 'supabase/types/database.types.ts']) assert.equal(paths.has(p), true, `required under lite+supabase: ${p}`);
   // without the provider the same paths are opt-in slots the app did not enable
   const plain = openHfs({ declaration: app({ edition: 'lite' }) });
   for (const p of ['supabase/config.toml', 'be/src/modules/integrations/supabase/index.ts', 'fe/apps/web/src/app/auth/callback/route.ts']) {
@@ -190,7 +193,7 @@ test('a supabase connection provider enables the supabase slots of every profile
   refusal(() => resolveRepoDeclaration(loadSlotManifest(), app({ be: { ...BE, connections: [{ ...CONNECTION, provider: 'turso' }] } })), 'HFS_DECLARATION_INVALID');
 });
 
-test('L01: under lite an e2e, contract, stack or browser script and a test-infrastructure or self-hosted library dependency are findings; the unit run is not', (t) => {
+test('L01: under lite an e2e, stack or browser script and a test-infrastructure or self-hosted library dependency are findings; unit and contract runs are allowed', (t) => {
   const repoRoot = tree(t, {
     'package.json': {
       name: 'demo',
@@ -204,8 +207,8 @@ test('L01: under lite an e2e, contract, stack or browser script and a test-infra
   const findings = checkRepo({ repoRoot, declaration: liteDecl, files, tree: false }).findings;
   const editionFindings = findings.filter((f) => f.code === 'HFS_EDITION_FORBIDDEN_PRESENT');
   const on = (p) => editionFindings.filter((f) => f.path === p);
-  const named = on('package.json').map((f) => f.name).sort();
-  assert.deepEqual(named, ['bullmq', 'ioredis', 'kafkajs', 'test:contract', 'test:e2e', 'test:stack', 'testcontainers'], JSON.stringify(on('package.json').map((f) => f.message)));
+  const named = on('package.json').map((f) => f.name).sort((a, b) => a.localeCompare(b));
+  assert.deepEqual(named, ['bullmq', 'ioredis', 'kafkajs', 'test:e2e', 'test:stack', 'testcontainers'], JSON.stringify(on('package.json').map((f) => f.message)));
   // the declaration: the worker app, the event patterns and the reactors kind are full architecture, legal under lite
   assert.deepEqual(on('hfs.json'), []);
   // the forbidden e2e path comes from the slot machinery, as HFS_FORBIDDEN_PRESENT, not L01
@@ -216,6 +219,34 @@ test('L01: under lite an e2e, contract, stack or browser script and a test-infra
   const full = checkRepo({ repoRoot, declaration: fullDecl, files, tree: false }).findings;
   assert.equal(full.some((f) => f.code === 'HFS_EDITION_FORBIDDEN_PRESENT'), false);
   assert.equal(full.some((f) => f.code === 'HFS_EDITION_INVALID'), false);
+});
+
+test('L01: lite permits contract lifecycle scripts and refuses every e2e, stack and browser lifecycle script; full permits them all', (t) => {
+  const allowed = new Set(['test:contract', 'pretest:contract', 'posttest:contract']);
+  const forbidden = ['e2e', 'stack', 'browser'].flatMap((layer) => ['', 'pre', 'post'].map((prefix) => `${prefix}test:${layer}`));
+  const files = ['package.json', 'be/package.json'];
+  const manifest = { name: 'demo', scripts: Object.fromEntries([...allowed, ...forbidden].map((name) => [name, 'run-specs'])) };
+  const repoRoot = tree(t, Object.fromEntries(files.map((file) => [file, manifest])));
+  for (const edition of ['lite', 'full']) {
+    const findings = checkRepo({ repoRoot, declaration: app({ edition }), files, tree: false }).findings
+      .filter((finding) => finding.code === 'HFS_EDITION_FORBIDDEN_PRESENT');
+    for (const file of files) {
+      const names = findings.filter((finding) => finding.path === file).map((finding) => finding.name).sort((a, b) => a.localeCompare(b));
+      assert.deepEqual(names, edition === 'lite' ? [...forbidden].sort((a, b) => a.localeCompare(b)) : [], `${edition}: ${file}`);
+    }
+    assert.ok(findings.every((finding) => !allowed.has(finding.name)), `${edition}: contracts are permitted`);
+  }
+});
+
+test('L01: contract lifecycle scripts alone produce no edition finding at the app root or back-end side in either edition', (t) => {
+  const scripts = { 'pretest:contract': 'prepare-contracts', 'test:contract': 'run-contracts', 'posttest:contract': 'clean-contracts' };
+  const files = ['package.json', 'be/package.json'];
+  const repoRoot = tree(t, Object.fromEntries(files.map((file) => [file, { name: 'demo', scripts }])));
+  for (const edition of ['lite', 'full']) {
+    const findings = checkRepo({ repoRoot, declaration: app({ edition }), files, tree: false }).findings
+      .filter((finding) => finding.code.startsWith('HFS_EDITION'));
+    assert.deepEqual(findings, [], `${edition}: contract scripts are allowed`);
+  }
 });
 
 test('L01: a clean lite app produces no edition finding', (t) => {
@@ -245,12 +276,11 @@ test('managedGroupOf: the one template-group answer of sync and the README check
 test('rule catalog: `editions` names the rules lite does not judge; a rule without it is judged by both', () => {
   const catalog = loadRuleCatalog();
   const fullOnly = catalog.rules.filter((r) => r.editions && !r.editions.includes('lite')).map((r) => r.id);
-  // owner rulings 2026-10-12/13: only the proofs that need the e2e or integration world stay full only (the socket.io door, R184,
-  // is judged in lite too: lite runs the same gateway in its api process)
-  assert.deepEqual(fullOnly.sort(), ['R112', 'R155', 'R167', 'R173'].sort());
-  for (const id of ['R46', 'R47', 'R48', 'R98', 'R102', 'R151', 'R160', 'R169', 'R177', 'R10', 'R34', 'R97']) assert.ok(!fullOnly.includes(id), `${id} is judged in lite`);
+  // The full test-world proofs remain full only; R155 also judges lite's integration lane (R284).
+  assert.deepEqual(fullOnly.sort((a, b) => a.localeCompare(b)), ['R112', 'R167', 'R173']);
+  for (const id of ['R46', 'R47', 'R48', 'R98', 'R102', 'R151', 'R155', 'R160', 'R169', 'R177', 'R10', 'R34', 'R97']) assert.ok(!fullOnly.includes(id), `${id} is judged in lite`);
   assert.equal(catalog.judgedIn('BE_TEST_TOPOLOGY', 'lite'), true);
-  assert.equal(catalog.judgedIn('BE_PATTERN_SPEC_MISSING', 'lite'), false);
+  assert.equal(catalog.judgedIn('BE_PATTERN_SPEC_MISSING', 'lite'), true);
   assert.equal(catalog.judgedIn('BE_PATTERN_SPEC_MISSING', 'full'), true);
   assert.equal(catalog.judgedIn('FE_NO_TESTS', 'lite'), true);
   assert.equal(catalog.judgedIn('HFS_REPO_UNREADABLE', 'lite'), true, 'a code outside the catalog is always judged');
@@ -263,7 +293,7 @@ test('checkRepo: the one findings filter drops the codes of rules the edition do
   const files = ['hfs.json', 'be/src/tests/e2e/orders/place.e2e-spec.ts'];
   const lite = checkRepo({ repoRoot: root, declaration: app({ edition: 'lite' }), files, tree: false });
   assert.ok(lite.findings.some((f) => f.code === 'HFS_FORBIDDEN_PRESENT'), 'the forbidden e2e tree is a finding of lite');
-  assert.ok(!lite.findings.some((f) => f.code === 'BE_PATTERN_SPEC_MISSING' || f.code === 'BE_INTEGRATION_SPEC_MISSING'), 'a code of a full-only rule is not reported under lite');
+  assert.ok(!lite.findings.some((f) => f.code === 'BE_INTEGRATION_SPEC_MISSING'), 'the full test-world integration proof is not reported under lite');
 });
 
 test('hfs.json supabase block: the auth posture is declared data (jwtExpiry 3600 at most), unknown keys refused', () => {

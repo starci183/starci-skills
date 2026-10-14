@@ -18163,3 +18163,13 @@ workflow-purge-ledger-dependency:
   nextStep_vi: "Xử lý tham chiếu theo thẩm quyền sản phẩm hoặc sửa bộ kiểm schema rồi đọc lại kế hoạch; không xóa Work để vượt cổng."
   owner: owner
   kind: verb-refusal
+
+BE_LITE_PROOF_LANE_MISSING:
+  title: "A lite back end declares a pattern without an integration proof lane"
+  title_vi: "Back end lite khai báo pattern nhưng thiếu nhánh kiểm thử integration"
+  meaning_vi: "Ứng dụng lite khai báo event-bus, queue, webhooks, realtime, fenced-job, projection hoặc saga nhưng không có spec integration để chứng minh hành vi của pattern."
+  causes_vi:
+    - "Vi phạm luật R284: chỉ có unit spec, spec e2e hoặc contract, hoặc chưa có spec dưới src/tests/integration."
+  nextStep_vi: "Thêm spec integration dưới src/tests/integration với test chạy được mang tiêu đề `<pattern>/<kịch bản>: ...` cho từng kịch bản bắt buộc của pattern đã khai báo."
+  owner: op-retry
+  kind: check-finding

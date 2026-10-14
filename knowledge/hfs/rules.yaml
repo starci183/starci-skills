@@ -1390,7 +1390,6 @@ rules:
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["BE_PATTERN_SPEC_MISSING"]
-    editions: [full]
     enforcers:
       - {kind: hfs, id: pattern-spec-missing, at: scripts/hfs/rules/event-bus.mjs}
   - id: R156
@@ -1846,7 +1845,7 @@ rules:
       - {kind: runtime, id: slot-id-shape, at: scripts/checks/check-slot-id-shape.mjs}
   - id: R212
     code: "HFS_EDITION_INVALID"
-    law: "hfs.json names an edition the manifest knows (full, or lite; absent means full). Lite = full minus self-hosted infrastructure: the same monorepo, code structure, slots, patterns and back-end unit specs, every pattern port implemented on Supabase (Postgres, Auth, Storage, Supabase Queues/pgmq for queue and event bus, Postgres locks, pg_cron), the realtime pattern on the same socket.io gateway run inside the be api process (one instance, no Redis adapter), and one front-end standard for both editions (knowledge/hfs/fe-stack.yaml); a lite app holds none of the infrastructure lite does not run: no e2e or contract spec, no `test:e2e`, `test:contract`, `test:stack` or `test:browser` script, no e2e workflow or browser journey, no Work catalog, shell, features, resources, UAT or br records, no test container, toxiproxy or browser-runner dependency, no BullMQ, Kafka, Redis or graphql-ws dependency (the libraries lite infraOwners own nowhere), no .starcistacks infra/runtime/seeds tree and no supabase/functions. Its .starciwork is optional and admits only .gitignore, workspace.yaml and brand/**; workspace.yaml is optional and carries project identity and repo roles for the Work tools."
+    law: "hfs.json names an edition the manifest knows (full, or lite; absent means full). Lite = full minus self-hosted infrastructure: the same monorepo, code structure, slots, patterns and back-end unit specs, every pattern port implemented on Supabase (Postgres, Auth, Storage, Supabase Queues/pgmq for queue and event bus, Postgres locks, pg_cron), the realtime pattern on the same socket.io gateway run inside the be api process (one instance, no Redis adapter), and one front-end standard for both editions (knowledge/hfs/fe-stack.yaml); a lite app may have contract specs and `test:contract` lifecycle scripts, but holds none of the infrastructure lite does not run: no e2e spec, no `test:e2e`, `test:stack` or `test:browser` script, no e2e workflow or browser journey, no Work catalog, shell, features, resources, UAT or br records, no test container, toxiproxy or browser-runner dependency, no BullMQ, Kafka, Redis or graphql-ws dependency (the libraries lite infraOwners own nowhere), no .starcistacks infra/runtime/seeds tree and no supabase/functions. Its .starciwork is optional and admits only .gitignore, workspace.yaml and brand/**; workspace.yaml is optional and carries project identity and repo roles for the Work tools."
     kinds: [check]
     gates: [pre-push, settle, land, ci]
     failureCodes: ["HFS_EDITION_INVALID", "HFS_EDITION_FORBIDDEN_PRESENT", "HFS_STARCIWORK_LITE_FORBIDDEN"]
@@ -2180,3 +2179,11 @@ rules:
     failureCodes: ["BE_APP_COMPOSITION_BUDGET"]
     enforcers:
       - {kind: eslint-be, id: app-file-budget}
+  - id: R284
+    code: "BE_LITE_PROOF_LANE_MISSING"
+    law: "A lite back end declaring event-bus, queue, webhooks, realtime, fenced-job, projection or saga proves each declared pattern through integration specs under src/tests/integration: runnable tests carry titles `<pattern>/<scenario>: ...` for every required scenario of that pattern. A missing integration lane is refused; missing scenario proofs use R155's BE_PATTERN_SPEC_MISSING. Full-edition pattern proof behavior is unchanged."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["BE_LITE_PROOF_LANE_MISSING"]
+    enforcers:
+      - {kind: hfs, id: lite-proof-lane, at: scripts/hfs/rules/lite-proof-lane.mjs}

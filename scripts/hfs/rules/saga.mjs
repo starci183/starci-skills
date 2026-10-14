@@ -214,7 +214,7 @@ function compensationE2eFindings(compensationPaths, specs) {
 }
 
 /** Findings of R169 to R173 over the tracked paths `files` of the app at `repoRoot`. */
-export function sagaFindings({ repoRoot, files }) {
+export function sagaFindings({ repoRoot, files, repo }) {
   const features = featuresOf(files);
   if (features.length === 0) return [];
   const ts = typescriptFor(repoRoot);
@@ -223,7 +223,6 @@ export function sagaFindings({ repoRoot, files }) {
   for (const contract of files.filter((file) => CONTRACT.test(file))) {
     for (const [name, event] of Object.entries(readJson(repoRoot, contract)?.events ?? {})) events.set(name, { contract, ...event });
   }
-  const specs = files.filter((file) => E2E_SPEC.test(file)).map((file) => ({ file, text: readText(repoRoot, file) ?? '' })).filter(({ text }) => USE_TEST_WORLD.test(text));
   const findings = [];
   const compensationPaths = [];
   for (const feature of features) {
@@ -231,7 +230,10 @@ export function sagaFindings({ repoRoot, files }) {
     findings.push(...result.findings);
     compensationPaths.push(...result.compensationPaths);
   }
-  // R173
-  findings.push(...compensationE2eFindings(compensationPaths, specs));
+  // R173 is the full-edition test-world proof; lite keeps R169-R172 and proves its scenarios through R284.
+  if (repo?.edition !== 'lite') {
+    const specs = files.filter((file) => E2E_SPEC.test(file)).map((file) => ({ file, text: readText(repoRoot, file) ?? '' })).filter(({ text }) => USE_TEST_WORLD.test(text));
+    findings.push(...compensationE2eFindings(compensationPaths, specs));
+  }
   return findings;
 }

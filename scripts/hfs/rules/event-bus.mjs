@@ -2,7 +2,7 @@
 //   BE_EVENT_CLASS_CONTRACT   every typed event class `be/src/modules/events/<service>/<event>.event.ts` equals an entry of the vendored
 //                             contract `be/contracts/<service>/events.json` (the same name and version), every entry of a vendored
 //                             contract has its class, and a class file is named after its event (`order.placed` -> `order-placed.event.ts`);
-//   BE_PATTERN_SPEC_MISSING   a declared pattern has its required scenarios: ruleParams.be.patternScenarios.<pattern> lists scenario ids,
+//   BE_PATTERN_SPEC_MISSING   a full-edition declared pattern has its required scenarios: ruleParams.be.patternScenarios.<pattern> lists scenario ids,
 //                             and an e2e or integration spec of the back end holds a test whose title starts `<pattern>/<scenario>:`.
 // Class members are read with TypeScript's own parser (a `static readonly eventName` and `version` with literal initializers), spec
 // titles are the first argument of `it(` and `test(` calls; no source text is matched by a regular expression.
@@ -181,8 +181,9 @@ let memoScenarios;
 /** ruleParams.be.patternScenarios of the slot manifest this runtime ships. */
 const scenariosTable = () => (memoScenarios ??= ruleParams(loadSlotManifest(), 'be').patternScenarios ?? {});
 
-/** Findings of BE_PATTERN_SPEC_MISSING: each declared pattern's required scenarios have a test. */
+/** Full-edition proof scenarios; lite integration proofs are judged by lite-proof-lane.mjs. */
 export function patternSpecFindings({ repoRoot, files, repo, scenarios = scenariosTable() }) {
+  if (repo.edition === 'lite') return [];
   const patterns = (repo.sides?.be?.patterns ?? []).filter((name) => (scenarios[name] ?? []).length > 0);
   if (patterns.length === 0) return [];
   const ts = typescriptFor(repoRoot);

@@ -1,6 +1,7 @@
 // The declared-pattern tree checks (scripts/hfs/rules/event-bus.mjs): R151 BE_EVENT_CLASS_CONTRACT (a typed event class equals its entry
 // in the vendored contract) and R155 BE_PATTERN_SPEC_MISSING (a declared pattern has its proof scenarios on the test world).
 // Fixtures are built from a temp directory; each violating case changes one fact of the passing base.
+// proves: BE_PATTERN_SPEC_MISSING@full BE_EVENT_CLASS_CONTRACT@lite BE_EVENT_CLASS_CONTRACT@full
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -64,8 +65,11 @@ test('BE_EVENT_CLASS_CONTRACT: a class without both literals, or two classes in 
 });
 
 const SCENARIOS = { 'event-bus': ['atomic-with-transaction', 'redelivery-then-dead-letter'], queue: ['scheduler-fires-once'] };
-const specOf = (...titles) => `describe('flow', () => {\n${titles.map((t) => `  it(${JSON.stringify(t)}, () => {});\n`).join('')}});\n`;
-const specFindings = (files, patterns, scenarios = SCENARIOS) => patternSpecFindings({ ...repoOf(files), repo: { sides: { be: { patterns } } }, scenarios });
+const specOf = (...titles) => {
+  const tests = titles.map((title) => `  it(${JSON.stringify(title)}, () => {});\n`).join('');
+  return `describe('flow', () => {\n${tests}});\n`;
+};
+const specFindings = (files, patterns, scenarios = SCENARIOS, edition = 'full') => patternSpecFindings({ ...repoOf(files), repo: { edition, sides: { be: { patterns } } }, scenarios });
 
 test('BE_PATTERN_SPEC_MISSING: every scenario of a declared pattern has a titled e2e or integration test', () => {
   const files = { 'be/src/tests/e2e/checkout/place-order.e2e-spec.ts': specOf('event-bus/atomic-with-transaction: the row commits with the order', 'event-bus/redelivery-then-dead-letter: three failures bury it') };
@@ -87,4 +91,16 @@ test('BE_PATTERN_SPEC_MISSING: a missing scenario, a title without its prefix an
   assert.equal(misplaced.length, 2, 'a unit spec is not proof on the test world');
   const two = specFindings({}, ['event-bus', 'queue']);
   assert.equal(two.length, 3);
+});
+
+test('lite leaves the full test-world scenario check to its integration lane while event contracts remain checked in both editions', () => {
+  assert.deepEqual(specFindings({}, ['event-bus', 'queue'], SCENARIOS, 'lite'), []);
+  assert.equal(specFindings({}, ['event-bus', 'queue'], SCENARIOS, 'full').length, 3);
+  for (const edition of ['lite', 'full']) {
+    const declaration = { ...DECLARED, edition };
+    assert.deepEqual(eventFindings(BASE, declaration), []);
+    const broken = eventFindings({ ...BASE, 'be/contracts/order/events.json': CONTRACT({}) }, declaration);
+    assert.equal(broken.length, 1);
+    assert.equal(broken[0].code, 'BE_EVENT_CLASS_CONTRACT');
+  }
 });
