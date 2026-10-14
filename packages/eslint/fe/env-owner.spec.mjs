@@ -15,7 +15,7 @@ const CONFIG = at("apps/web/src/modules/config/env.ts")
 const BLOCK = at("apps/web/src/components/blocks/Feed/index.tsx")
 
 test("every rule this law declares is a rule", () => {
-  for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
+  for (const [name, rule] of Object.entries(rules)) assert.ok(rule?.meta && rule.create, `${name} is not a rule`)
 })
 
 test("FE-ENV-1: only modules/config reads the environment", () => {
@@ -94,9 +94,9 @@ for (const edition of ["lite", "full"]) {
       "let p = process; p = p; const url = p.env.API_URL",
       "let key = \"env\"; key = key; const url = import.meta[key].VITE_API_URL",
     ].map((code) => ({ filename: BLOCK, code, errors: [{ messageId: "env" }] }))
-    tester.run(`no-env-outside-config-${edition}`, noEnvOutsideConfig, {
-      valid: valid.map((fixture) => ({ ...fixture, settings })),
-      invalid: invalid.map((fixture) => ({ ...fixture, settings })),
+    tester.run("no-env-outside-config", noEnvOutsideConfig, {
+      valid: [...valid.map((fixture) => ({ ...fixture, settings }))],
+      invalid: [...invalid.map((fixture) => ({ ...fixture, settings }))],
     })
   })
 }

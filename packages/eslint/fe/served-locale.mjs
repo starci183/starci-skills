@@ -221,6 +221,13 @@ export const rules = {
         AssignmentExpression(node) {
           if (node.left.type === "MemberExpression") checkHeader(node, keyOf(node.left))
         },
+        NewExpression(node) {
+          const initial = node.arguments[0]
+          if (!isNativeName(node.callee, "Headers", sourceCode) || initial?.type !== "ArrayExpression") return
+          for (const entry of initial.elements) {
+            if (entry?.type === "ArrayExpression") checkHeader(entry, stringOf(entry.elements[0]))
+          }
+        },
         CallExpression(node) {
           const callee = node.callee
           if (callee.type === "MemberExpression" && ["set", "append"].includes(keyOf(callee)) && isNativeInstance(callee.object, "Headers", sourceCode)) {
