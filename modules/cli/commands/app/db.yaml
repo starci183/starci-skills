@@ -1,0 +1,24 @@
+group: app
+verb: db
+owner: "@starci/hfs"
+summary: preview or apply a migration baseline or restamp and compare database state with the app
+impl: null
+positional:
+  - {name: action, enum: [baseline, restamp, plan], required: true, variadic: false}
+flags:
+  - {name: stamp, type: string, summary: fourteen-digit timestamp of the new baseline migration}
+  - {name: map, type: string, summary: explicit old-to-new migration stamp map for restamp}
+  - {name: apply, type: boolean, summary: apply baseline or restamp mutations after validation}
+  - {name: local, type: boolean, summary: inspect or repair the local Supabase database instead of the linked project}
+conventions:
+  - baseline accepts --stamp; restamp requires --map; both preview without --apply
+  - plan is always read-only and supports --json; it compares migrations, cron, queues and Vault names
+exit: {"0": preview or action completed with no drift, "1": database plan drift, "2": refusal or bad usage}
+json: flag
+examples:
+  - starci app db baseline
+  - starci app db baseline --stamp 20261014000000 --apply
+  - starci app db restamp --map restamp.yaml
+  - starci app db plan --json
+  - starci app db plan --local
+editions: [full, lite]

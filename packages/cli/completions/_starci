@@ -40,7 +40,7 @@ _starci() {
     _describe 'group' groups
   elif (( CURRENT == 3 )); then
     case "$words[2]" in
-      app) _values 'verbs' 'add[add one canonical backend capability and register its patterns]' 'check[judge the app tree, managed output, contracts, formatting and architecture]' 'emit[emit backend GraphQL, operation and event contract snapshots]' 'explain[explain which HFS slot owns one app-relative path]' 'hygiene[judge staged worktree metadata, stack files and plaintext secrets]' 'lint[lint both app sides and report repository, ESLint and stylelint findings together]' 'new[create a canonical service, unit spec or app image definition]' 'scaffold[create a full or lite StarCi app, including an empty unborn main Git repository]' 'secret[initialize, seal and materialize app secrets outside the repository]' 'stack[start, stop or inspect the shared local test-world infrastructure]' 'sync[compare or write every managed app file from its canonical template]' 'upgrade[upgrade a lite app to the full edition (--edition full); a full app is already current]' ;;
+      app) _values 'verbs' 'add[add one canonical backend capability and register its patterns]' 'check[judge the app tree, managed output, contracts, formatting and architecture]' 'db[preview or apply a migration baseline or restamp and compare database state with the app]' 'emit[emit backend GraphQL, operation and event contract snapshots]' 'explain[explain which HFS slot owns one app-relative path]' 'hygiene[judge staged worktree metadata, stack files and plaintext secrets]' 'lint[lint both app sides and report repository, ESLint and stylelint findings together]' 'new[create a canonical service, unit spec or app image definition]' 'scaffold[create a full or lite StarCi app, including an empty unborn main Git repository]' 'secret[initialize, seal, materialize and verify app secrets]' 'stack[start, stop or inspect the shared local test-world infrastructure]' 'sync[compare or write every managed app file from its canonical template]' 'upgrade[upgrade a lite app to the full edition (--edition full); a full app is already current]' ;;
       check) _values 'verbs' 'run[run changed-scope checks or the full structural check set]' ;;
       connect) _values 'verbs' 'ask-gateway[operate the local owner-ask HTTP gateway]' 'telegram[deliver and maintain owner Telegram notifications]' 'telegram-media[deliver settled operation media through Telegram]' 'tunnel[operate the Cloudflare owner-ask tunnel]' ;;
       debug) _values 'verbs' 'digest[print the read-only debug digest with a verdict per role (no error, happy error, BUG)]' 'run[run one allowlisted read-only runtime inspector]' ;;
@@ -87,6 +87,9 @@ _starci() {
     'app:add:--failed') return 0 ;;
     'app:add:--done') return 0 ;;
     'app:check:--base') return 0 ;;
+    'app:check:--coverage-from') return 0 ;;
+    'app:db:--stamp') return 0 ;;
+    'app:db:--map') return 0 ;;
     'app:lint:--changed') return 0 ;;
     'app:lint:--workspace') return 0 ;;
     'app:lint:--format') _values 'values' 'text' 'json'; return 0 ;;
@@ -1003,7 +1006,8 @@ _starci() {
     esac
     case "$words[2]:$words[3]" in
     'app:add') _values 'flags' '--event' '--from' '--service' '--connection' '--owner' '--failed' '--done' '--fe' '--no-types' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'app:check') _values 'flags' '--fast' '--base' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'app:check') _values 'flags' '--fast' '--base' '--wiring' '--coverage-from' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'app:db') _values 'flags' '--stamp' '--map' '--apply' '--local' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:emit') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:explain') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:hygiene') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;

@@ -45,6 +45,8 @@ judge the app tree, managed output, contracts, formatting and architecture
 | --- | --- | --- |
 | `--fast` | boolean |  |
 | `--base` | string |  |
+| `--wiring` | boolean |  |
+| `--coverage-from` | string |  |
 
 exit: 0 clean; 1 findings; 2 refusal or bad usage
 
@@ -54,6 +56,38 @@ json: flag
 starci app check
 starci app check --fast
 starci app check --json
+starci app check --wiring
+starci app check --coverage-from coverage/lcov.info
+```
+
+### starci app db
+
+preview or apply a migration baseline or restamp and compare database state with the app
+
+| flag | type | |
+| --- | --- | --- |
+| `--stamp` | string |  |
+| `--map` | string |  |
+| `--apply` | boolean |  |
+| `--local` | boolean |  |
+
+Positionals: action
+
+Conventions:
+
+- baseline accepts --stamp; restamp requires --map; both preview without --apply
+- plan is always read-only and supports --json; it compares migrations, cron, queues and Vault names
+
+exit: 0 preview or action completed with no drift; 1 database plan drift; 2 refusal or bad usage
+
+json: flag
+
+```sh
+starci app db baseline
+starci app db baseline --stamp 20261014000000 --apply
+starci app db restamp --map restamp.yaml
+starci app db plan --json
+starci app db plan --local
 ```
 
 ### starci app emit
@@ -161,7 +195,7 @@ starci app scaffold demo --into projects
 
 ### starci app secret
 
-initialize, seal and materialize app secrets outside the repository
+initialize, seal, materialize and verify app secrets
 
 | flag | type | |
 | --- | --- | --- |
@@ -171,7 +205,7 @@ initialize, seal and materialize app secrets outside the repository
 
 Positionals: action, env?, slug?, key?
 
-exit: 0 action completed; 2 refusal or bad usage
+exit: 0 action completed; 2 verification findings or refusal or bad usage
 
 json: none
 
@@ -181,6 +215,7 @@ starci app secret set production app-be-db DB_PASSWORD --generate 32
 starci app secret get production app-be-db DB_PASSWORD --to-file
 starci app secret materialize production
 starci app secret list production
+starci app secret verify production
 ```
 
 ### starci app stack
