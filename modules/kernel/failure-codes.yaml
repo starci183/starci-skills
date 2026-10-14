@@ -18604,5 +18604,22 @@ HFS_DB_DEPLOY_UNGUARDED:
   causes_vi:
     - "Workflow db-deploy thiếu chốt kiểm tag hoặc chốt không chặn đường chạy migration theo luật R271."
   nextStep_vi: "Thêm chốt kiểm ref tag trước mỗi bước triển khai migration, rồi chứng minh ref nhánh bị từ chối."
+FE_STACK_UNLISTED:
+  title: "A front-end dependency is absent from the stack catalog"
+  title_vi: "Thư viện front end chưa được khai báo trong danh mục"
+  meaning_vi: "Một package.json của front end khai báo thư viện không có trong knowledge/hfs/fe-stack.yaml và không có ngoại lệ fe.extraPackages kèm lý do trong hfs.json."
+  causes_vi:
+    - "Thêm thư viện ngoài danh mục mà chưa ghi rõ tên và lý do sử dụng."
+  nextStep_vi: "Dùng thư viện chuẩn của concern hoặc khai báo tên và lý do cụ thể trong fe.extraPackages của hfs.json."
+  owner: op-retry
+  kind: check-finding
+
+FE_STACK_CORE_MISSING:
+  title: "A product front end lacks a core stack package"
+  title_vi: "Ứng dụng front end thiếu thư viện cốt lõi"
+  meaning_vi: "Ứng dụng Next phục vụ sản phẩm thiếu một thư viện tier core trong knowledge/hfs/fe-stack.yaml; công cụ dùng chung có thể đặt tại gốc ứng dụng."
+  causes_vi:
+    - "Manifest của workspace sản phẩm chưa khai báo đủ thư viện cốt lõi của cùng chuẩn lite và full."
+  nextStep_vi: "Khai báo thư viện còn thiếu trong workspace sản phẩm; đặt công cụ codegen, lint, TypeScript và Tailwind tại gốc nếu dùng chung."
   owner: op-retry
   kind: check-finding
