@@ -1,6 +1,7 @@
-// secret.mjs - app secret init|set|get|materialize|list: sealed custody and private KEY files.
+// secret.mjs - app secret init|set|get|materialize|list|verify: sealed custody and private KEY files.
 // SOPS plaintext travels on stdin and stays in memory; normal CLI output contains names and local file paths only.
 // Every verb runs at the app root or --cwd. Exit 0 done, 2 refusal; --reveal is the only plaintext stdout path.
+// verify decrypts each member in memory and names only keys and violated shapes, never a value (R249).
 import fs from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
@@ -11,11 +12,12 @@ import { defaultSops } from "./secret-sops.mjs";
 import { fileOf, secretsDirectory, writeSecret } from "./secret-store.mjs";
 import { getSecret, listSecrets, materializeSecrets } from "./secret-output.mjs";
 import { SecretError, publicStorage, secretErrorMessage } from "./secret-errors.mjs";
+import { verifySecrets } from "./rules/env-value-shape.mjs";
 
 export { envelopeOf, formatOf, plaintextOf } from "./secret-document.mjs";
 export { setSecretValues } from "./secret-store.mjs";
 
-const VERBS = new Set(["init", "list", "get", "set", "materialize"]);
+const VERBS = new Set(["init", "list", "get", "set", "materialize", "verify"]);
 
 function valueOption(opts, flag, value) {
   if (value === undefined || value.startsWith("--"))
@@ -74,6 +76,7 @@ function optionsFor(verb, opts) {
     init: [0, 0],
     list: [1, 1],
     materialize: [1, 1],
+    verify: [1, 1],
     set: [3, 3],
     get: [2, 3],
   }[verb];
@@ -130,7 +133,7 @@ export function secretMain(
   try {
     if (!VERBS.has(verb))
       throw new SecretError(
-        "usage: starci app secret init | set <env> <slug> <KEY> | get <env> <slug> [KEY] --to-file | materialize <env> | list <env>",
+        "usage: starci app secret init | set <env> <slug> <KEY> | get <env> <slug> [KEY] --to-file | materialize <env> | list <env> | verify <env>",
       );
     const opts = parse(rest);
     optionsFor(verb, opts);
@@ -143,6 +146,8 @@ export function secretMain(
     const directory = secretsDirectory(repoRoot, environment);
     if (verb === "list") return listSecrets(directory, stdout);
     const seam = sops ?? defaultSops(env, repoRoot, platform, tools);
+    if (verb === "verify")
+      return verifySecrets({ repoRoot, directory, environment, sops: seam, stdout });
     const output = { repoRoot, environment, env, platform, stdout };
     if (verb === "materialize")
       return materializeSecrets(directory, seam, output);
