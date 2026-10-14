@@ -2180,3 +2180,13 @@ rules:
     failureCodes: ["BE_APP_COMPOSITION_BUDGET"]
     enforcers:
       - {kind: eslint-be, id: app-file-budget}
+
+  - id: R274
+    code: "RT_RULING_STALE_CITE"
+    law: "Live prose, source comments and spec titles cite current owner rulings using ruling:R212/case-4 or a stable owner id. A superseded or amended ruling needs its live successor in the same paragraph; staleWhen statements outside historical case text and CHANGELOGs are refused, and a bare owner ruling date must match a catalog case or owner ruling."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_RULING_STALE_CITE"]
+    enforcers:
+      - {kind: runtime, id: ruling-cites, at: scripts/checks/check-ruling-cites.mjs}

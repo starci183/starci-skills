@@ -18163,3 +18163,14 @@ workflow-purge-ledger-dependency:
   nextStep_vi: "Xử lý tham chiếu theo thẩm quyền sản phẩm hoặc sửa bộ kiểm schema rồi đọc lại kế hoạch; không xóa Work để vượt cổng."
   owner: owner
   kind: verb-refusal
+
+RT_RULING_STALE_CITE:
+  title: "A live statement cites a superseded or unknown owner ruling"
+  title_vi: "Nội dung hiện hành dẫn quyết định đã bị thay thế hoặc chưa được ghi nhận"
+  meaning_vi: "Một trích dẫn dẫn quyết định cũ mà không dẫn quyết định thay thế trong cùng đoạn, khớp mẫu staleWhen, hoặc nêu ngày quyết định không có trong danh mục. Nội dung lịch sử của case và CHANGELOG được giữ nguyên."
+  causes_vi:
+    - "Tài liệu hoặc chú thích chưa cập nhật sau khi chủ sở hữu sửa quyết định"
+    - "Trích dẫn thiếu id ổn định hoặc nêu ngày không có case tương ứng"
+  nextStep_vi: "Cập nhật câu theo quyết định hiện hành và dẫn id của quyết định thay thế trong cùng đoạn; kiểm tra ngày và liên kết supersedes trong danh mục."
+  owner: supervisor
+  kind: check-finding
