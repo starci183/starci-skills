@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { at, typedTester } from "./fixtures/typed/tester.mjs"
+import { at, fixtureHfs, typedTester } from "./fixtures/typed/tester.mjs"
 import { httpNeedsTimeout, jsonParseNeedsGuard, noHandRolledRetry, rules } from "./resilience.mjs"
 
 const tester = typedTester()
@@ -13,29 +13,60 @@ const SRC = at("src/modules/integrations/mailer/mail.client.ts")
 const SPEC = at("src/modules/integrations/mailer/mail.client.spec.ts")
 const AXIOS = 'import axios from "axios"\nimport { HttpService } from "@nestjs/axios"\n'
 
+const inBothEditions = (cases) => ["lite", "full"].flatMap((edition) => cases.map((entry) => ({
+  ...entry,
+  settings: { starci: { hfs: { ...fixtureHfs(), edition } } },
+})))
+
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
 })
 
 test("R70: an outbound HTTP call states how long it may take", () => {
   tester.run("http-needs-timeout", httpNeedsTimeout, {
-    valid: [
+    valid: inBothEditions([
       { filename: SRC, code: "await fetch(url, { method: 'POST', signal: AbortSignal.timeout(TIMEOUT_MS) })" },
-      { filename: SRC, code: "await fetch(url, { ...init })" },
+      { filename: SRC, code: "await fetch(url, { ['signal']: AbortSignal.timeout(1000) })" },
+      { filename: SRC, code: "const init = { signal: AbortSignal.timeout(1000) }; await fetch(url, { ...init })" },
+      { filename: SRC, code: "const init = { signal: AbortSignal.timeout(1000) }; await fetch(url, init)" },
+      { filename: SRC, code: "declare const init: Readonly<{ signal: AbortSignal }>; await fetch(url, init)" },
+      { filename: SRC, code: "const init = () => ({ signal: AbortSignal.timeout(1000) }); await fetch(url, init())" },
+      { filename: SRC, code: "function send<T extends { signal: AbortSignal }>(init: T) { return fetch(url, init) }" },
       { filename: SRC, code: `${AXIOS}await axios.get(url, { timeout: TIMEOUT_MS })` },
       { filename: SRC, code: `${AXIOS}await axios.post(url, body, { timeout: TIMEOUT_MS })` },
       { filename: SRC, code: `${AXIOS}class C { constructor(private readonly client: HttpService) {} run() { return this.client.get(url, { signal }) } }` },
       { filename: SRC, code: `${AXIOS}const client = axios.create({ baseURL, timeout: TIMEOUT_MS })` },
-      // a config held in a variable cannot be judged from syntax
-      { filename: SRC, code: `${AXIOS}await axios.get(url, config)` },
+      { filename: SRC, code: `${AXIOS}const config = { timeout: 1000 }; await axios.get(url, config)` },
+      { filename: SRC, code: `${AXIOS}declare const config: { timeout: number } | { signal: AbortSignal }; await axios.get(url, config)` },
+      { filename: SRC, code: `${AXIOS}const config = { signal: AbortSignal.timeout(1000) }; await axios.post(url, body, config)` },
+      { filename: SRC, code: `${AXIOS}const config = { timeout: 1000 }; axios.create(config)` },
+      { filename: SRC, code: `${AXIOS}declare const config: { timeout: number }; class C { constructor(private readonly client: HttpService) {} run() { return this.client.get(url, config) } }` },
+      { filename: SRC, code: `${AXIOS}await axios.get(url, { timeout: TIMEOUT_MS, signal: undefined })` },
       // a receiver that is not an HTTP client is not judged, whatever it is called
       { filename: SRC, code: "const found = items.get(key)" },
       { filename: SRC, code: "const axios = { get: (url: string) => url }\nawait axios.get(url)" },
       { filename: SRC, code: "http.get(url, callback)" },
-    ],
-    invalid: [
+    ]),
+    invalid: inBothEditions([
       { filename: SRC, code: "await fetch(url)", errors: [{ messageId: "fetchNoSignal" }] },
       { filename: SRC, code: "await fetch(url, { method: 'POST', body })", errors: [{ messageId: "fetchNoSignal" }] },
+      { filename: SRC, code: "const init = { method: 'POST' }; await fetch(url, init)", errors: [{ messageId: "fetchNoSignal" }] },
+      { filename: SRC, code: "const init = { timeout: 1000 }; await fetch(url, init)", errors: [{ messageId: "fetchNoSignal" }] },
+      { filename: SRC, code: "declare const init: RequestInit; await fetch(url, init)", errors: [{ messageId: "fetchNoSignal" }] },
+      { filename: SRC, code: "declare const init: { signal?: AbortSignal }; await fetch(url, init)", errors: [{ messageId: "fetchNoSignal" }] },
+      { filename: SRC, code: "declare const init: { signal: AbortSignal | undefined }; await fetch(url, init)", errors: [{ messageId: "fetchNoSignal" }] },
+      { filename: SRC, code: "declare const init: { signal: AbortSignal } | { method: string }; await fetch(url, init)", errors: [{ messageId: "fetchNoSignal" }] },
+      { filename: SRC, code: "declare const init: any; await fetch(url, init)", errors: [{ messageId: "fetchNoSignal" }] },
+      { filename: SRC, code: "declare const init: unknown; await fetch(url, init)", errors: [{ messageId: "fetchNoSignal" }] },
+      { filename: SRC, code: "await fetch(url, { ...init })", errors: [{ messageId: "fetchNoSignal" }] },
+      { filename: SRC, code: "await fetch(url, { signal: undefined })", errors: [{ messageId: "fetchNoSignal" }] },
+      { filename: SRC, code: "await fetch(url, { signal: void 0 })", errors: [{ messageId: "fetchNoSignal" }] },
+      { filename: SRC, code: "await fetch(url, { signal: undefined as any })", errors: [{ messageId: "fetchNoSignal" }] },
+      { filename: SRC, code: "await fetch(url, { signal: undefined! })", errors: [{ messageId: "fetchNoSignal" }] },
+      { filename: SRC, code: "const signal = undefined; await fetch(url, { signal })", errors: [{ messageId: "fetchNoSignal" }] },
+      { filename: SRC, code: "const init = { signal: undefined }; await fetch(url, init)", errors: [{ messageId: "fetchNoSignal" }] },
+      { filename: SRC, code: "await fetch(url, { signal: null })", errors: [{ messageId: "fetchNoSignal" }] },
+      { filename: SRC, code: "declare const signal: string; await fetch(url, { [signal]: AbortSignal.timeout(1000) })", errors: [{ messageId: "fetchNoSignal" }] },
       { filename: SRC, code: `${AXIOS}await axios.get(url)`, errors: [{ messageId: "clientNoTimeout" }] },
       { filename: SRC, code: `${AXIOS}await axios.post(url, body)`, errors: [{ messageId: "clientNoTimeout" }] },
       { filename: SRC, code: `${AXIOS}await axios.post(url, body, { headers })`, errors: [{ messageId: "clientNoTimeout" }] },
@@ -43,9 +74,19 @@ test("R70: an outbound HTTP call states how long it may take", () => {
       // a renamed receiver is still judged by its type
       { filename: SRC, code: `${AXIOS}const wire = axios\nawait wire.get(url)`, errors: [{ messageId: "clientNoTimeout" }] },
       { filename: SRC, code: `${AXIOS}const client = axios.create({ baseURL })`, errors: [{ messageId: "createNoTimeout" }] },
+      { filename: SRC, code: `${AXIOS}const config = { headers: {} }; await axios.get(url, config)`, errors: [{ messageId: "clientNoTimeout" }] },
+      { filename: SRC, code: `${AXIOS}const config = { headers: {} }; await axios.post(url, body, config)`, errors: [{ messageId: "clientNoTimeout" }] },
+      { filename: SRC, code: `${AXIOS}const config = { url }; await axios.request(config)`, errors: [{ messageId: "clientNoTimeout" }] },
+      { filename: SRC, code: `${AXIOS}declare const config: { timeout?: number; signal?: AbortSignal }; await axios.get(url, config)`, errors: [{ messageId: "clientNoTimeout" }] },
+      { filename: SRC, code: `${AXIOS}declare const config: { timeout: number } | { headers: object }; await axios.get(url, config)`, errors: [{ messageId: "clientNoTimeout" }] },
+      { filename: SRC, code: `${AXIOS}await axios.get(url, config)`, errors: [{ messageId: "clientNoTimeout" }] },
+      { filename: SRC, code: `${AXIOS}await axios.get(url, { signal: undefined })`, errors: [{ messageId: "clientNoTimeout" }] },
+      { filename: SRC, code: `${AXIOS}const config = { signal: undefined }; axios.create(config)`, errors: [{ messageId: "createNoTimeout" }] },
+      { filename: SRC, code: `${AXIOS}const config = { baseURL }; axios.create(config)`, errors: [{ messageId: "createNoTimeout" }] },
+      { filename: SRC, code: `${AXIOS}const config = { headers: {} }; class C { constructor(private readonly client: HttpService) {} run() { return this.client.get(url, config) } }`, errors: [{ messageId: "clientNoTimeout" }] },
       // specs are not exempt
       { filename: SPEC, code: "await fetch(url)", errors: [{ messageId: "fetchNoSignal" }] },
-    ],
+    ]),
   })
 })
 

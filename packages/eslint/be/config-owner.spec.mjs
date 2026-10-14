@@ -8,7 +8,9 @@
  */
 import { readFileSync } from "node:fs"
 import test from "node:test"
-import { at, typedTester } from "./fixtures/typed/tester.mjs"
+import { appDeclaration } from "./fixtures/app.mjs"
+import { at, BE_DECLARATION, fixtureHfs, TYPED_ROOT, typedTester } from "./fixtures/typed/tester.mjs"
+import { hfsFromDeclaration } from "./lib/hfs.mjs"
 import { configParsedInMain, noDirectEnvRead, noSecretDefault, secretCompareTimingSafe } from "./config-owner.mjs"
 
 const CONFIG_MODULE = "@modules/platform/config"
@@ -24,6 +26,63 @@ const MAIN = at("apps/api/src/main.ts")
 const ENV = at("apps/api/src/api.env.ts")
 const OPTIONS = at("apps/api/src/api.options.ts")
 const GROUP = at("apps/api/src/compose/platform.ts")
+
+// proves: BE_CONFIG_OWNER@lite BE_CONFIG_OWNER@full
+for (const edition of ["lite", "full"]) {
+    test(`process aliases keep their environment owner in ${edition}`, () => {
+        const hfs = edition === "lite" ? hfsFromDeclaration({
+            ...appDeclaration("be", {
+                ...BE_DECLARATION,
+                connections: [{ name: "primary", envPrefix: "PRIMARY_DB", owner: "api", isolation: "schema", provider: "supabase" }],
+            }),
+            edition,
+        }, TYPED_ROOT) : fixtureHfs()
+        const settings = { starci: { hfs } }
+        tester.run("no-direct-env-read", noDirectEnvRead, {
+            valid: [
+                ...[MAIN, ENV, ENV_SOURCE].map(filename => ({
+                    filename, settings,
+                    code: "export class EnvSource { static read() { const runtime = globalThis.process; const p = runtime; return p['env'].PORT } }",
+                })),
+                { filename: SERVICE, settings, code: "const process = { env: { PORT: 1 } }; const runtime = process; const port = runtime.env.PORT" },
+                { filename: SERVICE, settings, code: "function read(process: { env: { PORT: number } }) { const runtime = process; return runtime.env.PORT }" },
+                { filename: SERVICE, settings, code: "const globalThis = { process: { env: { PORT: 1 } } }; const runtime = globalThis.process; const port = runtime.env.PORT" },
+                { filename: SERVICE, settings, code: "import { env as process } from 'node:os'; const p = process; const port = p.env.PORT" },
+                { filename: SERVICE, settings, code: "const p = process; function read(p: { env: { PORT: number } }) { return p.env.PORT }" },
+                { filename: SERVICE, settings, code: "const p = other; const q = p; const port = q.env.PORT" },
+                { filename: SERVICE, settings, code: "const p = q; const q = p; const port = p.env.PORT" },
+                { filename: SERVICE, settings, code: "const key = 'argv'; const { [key]: args } = process" },
+                { filename: SERVICE, settings, code: "let p = process; p = { env: { PORT: 1 } }; const port = p.env.PORT" },
+                { filename: SERVICE, settings, code: "let p; p = { env: { PORT: 1 } }; const port = p.env.PORT" },
+                { filename: SERVICE, settings, code: "let p = { env: { PORT: 1 } }; function replace() { p = process }; const port = p.env.PORT" },
+            ],
+            invalid: [
+                "const p = process; const port = p.env.PORT",
+                "let p; p = process; const port = p.env.PORT",
+                "let p = process; p = p; const port = p.env.PORT",
+                "function read() { return p.env.PORT }; const p = process",
+                "function read() { return p.env.PORT }; const { process: p } = globalThis",
+                "let p = process; function replace() { p = { env: { PORT: 1 } } }; const port = p.env.PORT",
+                "const runtime = process; const p = runtime; const port = p['env'].PORT",
+                "const runtime = (process as typeof process)!; const port = runtime.env.PORT",
+                "const p = globalThis.process; const port = p.env.PORT",
+                "const p = global['process']; const port = p[`env`].PORT",
+                "const { process: runtime } = globalThis; const port = runtime.env.PORT",
+                "const { ['process']: runtime } = global; const port = runtime.env.PORT",
+                "import proc from 'node:process'; const p = proc; const port = p.env.PORT",
+                "import * as proc from 'process'; const p = proc; const port = p['env'].PORT",
+                "import { default as proc } from 'process'; const p = proc; const port = p.env.PORT",
+                "const runtime = process; const { env: values } = runtime; const port = values.PORT",
+                "const runtime = process; const { ['env']: values } = runtime; const port = values.PORT",
+                "const runtime = process; let values; ({ env: values } = runtime); const port = values.PORT",
+                "const runtime = process; const values = Reflect.get(runtime, 'env')",
+            ].map(code => ({ filename: SERVICE, settings, code, errors: [{ messageId: "env" }] })).concat([
+                { filename: SERVICE, settings, code: "const p = process; const root = path.join(p.cwd(), 'src')", errors: [{ messageId: "cwdPath" }] },
+                { filename: SERVICE, settings, code: "const p = globalThis['process']; const root = path.resolve(p.cwd(), '.starcistacks/dev')", errors: [{ messageId: "cwdPath" }] },
+            ]),
+        })
+    })
+}
 
 test("the process environment is read only by EnvSource, app bootstrap roles and the test world", () => {
     tester.run("no-direct-env-read", noDirectEnvRead, {

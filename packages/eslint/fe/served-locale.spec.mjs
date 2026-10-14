@@ -8,13 +8,15 @@
  * locale to. A rule that fires on every file in a clients folder would be satisfied by scattering
  * the locale link through helpers, which is the opposite of what the law asks for.
  *
- * The second rule's honest case is the locale link ITSELF. A rule refusing `x-locale` everywhere
+ * The second rule's honest case is the locale link ITSELF. A rule refusing `Accept-Language` everywhere
  * would refuse the one file that has to write it, and there would be no correct way to satisfy the
  * pair at once.
  */
+// proves: FE_TRANSPORT_OWNER@lite
+// proves: FE_TRANSPORT_OWNER@full
 import assert from "node:assert/strict"
 import test from "node:test"
-import { at, slotTester } from "./fixtures/typed/tester.mjs"
+import { at, fixtureHfs, LITE_FE_DECLARATION, slotTester } from "./fixtures/typed/tester.mjs"
 import { LOCALE_HEADER, rules } from "./served-locale.mjs"
 
 const tester = slotTester()
@@ -33,7 +35,7 @@ test("every rule this law declares is exported under its published name", () => 
 })
 
 test("the header this law is about is the one the server reads", () => {
-  assert.equal(LOCALE_HEADER, "x-locale")
+  assert.equal(LOCALE_HEADER, "Accept-Language")
 })
 
 tester.run("api-client-attaches-the-locale", rules["api-client-attaches-the-locale"], {
@@ -118,7 +120,7 @@ tester.run("locale-header-belongs-to-the-link", rules["locale-header-belongs-to-
     {
       // The one file allowed to write it. Refusing here would leave the pair unsatisfiable.
       filename: LOCALE_LINK,
-      code: `const headers = { "x-locale": locale }
+      code: `const headers = { "Accept-Language": locale }
 export default headers`,
     },
     {
@@ -130,13 +132,13 @@ export default headers`,
     {
       // The shared api package has its own locale link, the one place there.
       filename: at("packages/nivo-api/src/links/locale.ts"),
-      code: `const headers = { "x-locale": locale }
+      code: `const headers = { "Accept-Language": locale }
 export default headers`,
     },
     {
-      // The locale link of the shared package's clients folder, in the header's canonical spelling.
+      // The locale link of the shared package's clients folder, with case-insensitive spelling.
       filename: at("packages/nivo-api/src/graphql/clients/links/locale.ts"),
-      code: `const headers = { "X-Locale": locale }
+      code: `const headers = { "accept-language": locale }
 export default headers`,
     },
   ],
@@ -144,37 +146,172 @@ export default headers`,
     {
       // A file called like the locale link outside the transport slots is not it.
       filename: at("apps/web/src/hooks/swr/links/locale.ts"),
-      code: `const headers = { "x-locale": "vi" }
+      code: `const headers = { "Accept-Language": "vi" }
 export default headers`,
       errors: [{ messageId: "elsewhere" }],
     },
     {
       // Nor is another link of the same folder, or the client file that assembles them.
       filename: at(`${API}/links/retry.ts`),
-      code: `const headers = { "x-locale": "vi" }
+      code: `const headers = { "Accept-Language": "vi" }
 export default headers`,
       errors: [{ messageId: "elsewhere" }],
     },
     {
       // A hook answering the same question the link already answers.
       filename: HOOK,
-      code: `const headers = { "x-locale": "vi" }
+      code: `const headers = { "Accept-Language": "vi" }
 export default headers`,
       errors: [{ messageId: "elsewhere" }],
     },
     {
       // The computed-key spelling reads identically to the server, so it is refused identically.
       filename: HOOK,
-      code: `const headers = { ["x-locale"]: locale }
+      code: `const headers = { ["Accept-Language"]: locale }
 export default headers`,
       errors: [{ messageId: "elsewhere" }],
     },
     {
-      // A header name is case-insensitive: `X-Locale` is the same header.
+      // A header name is case-insensitive: `ACCEPT-LANGUAGE` is the same header.
       filename: HOOK,
-      code: `const headers = { "X-Locale": "vi" }
+      code: `const headers = { "ACCEPT-LANGUAGE": "vi" }
 export default headers`,
       errors: [{ messageId: "elsewhere" }],
     },
   ],
 })
+
+for (const edition of ["lite", "full"]) {
+  const hfs = edition === "lite" ? fixtureHfs(LITE_FE_DECLARATION, { lite: true }) : fixtureHfs()
+  const inEdition = (fixture) => ({ ...fixture, settings: { starci: { hfs } } })
+  tester.run(`locale-header-belongs-to-the-link (${edition})`, rules["locale-header-belongs-to-the-link"], {
+    valid: [
+      {
+        filename: LOCALE_LINK,
+        code: `const headers = { "Accept-Language": locale }`,
+      },
+      {
+        filename: LOCALE_LINK,
+        code: `const headers = { ["accept-language"]: locale }`,
+      },
+      {
+        filename: HOOK,
+        code: `const headers = { authorization: token }`,
+      },
+      {
+        filename: LOCALE_LINK,
+        code: `const headers = new Headers()
+headers["Accept-Language"] = locale
+headers.set("Accept-Language", locale)
+headers.append(\`accept-language\`, locale)`,
+      },
+      {
+        // Reading either header is not writing it.
+        filename: HOOK,
+        code: `const headers = new Headers()
+const locale = headers["Accept-Language"]
+const oldLocale = headers.get("x-locale")`,
+      },
+      {
+        // A map's setters are not header writers, even if their keys name headers.
+        filename: HOOK,
+        code: `const entries = new Map()
+entries.set("x-locale", locale)
+const list = { append: (key, value) => value }
+list.append("Accept-Language", locale)`,
+      },
+      {
+        // A local constructor named Headers is not the browser's Headers.
+        filename: HOOK,
+        code: `class Headers { set(key, value) { return value } }
+const headers = new Headers()
+headers.set("Accept-Language", locale)`,
+      },
+      {
+        filename: HOOK,
+        code: `const request = { headers: new Map() }
+request.headers.set("x-locale", locale)`,
+      },
+      {
+        // The initializer cannot establish a receiver after its binding has been reassigned.
+        filename: HOOK,
+        code: `let headers: any = new Headers()
+headers = new Map()
+headers.set("x-locale", locale)
+headers.append("Accept-Language", locale)`,
+      },
+    ].map(inEdition),
+    invalid: [
+      {
+        filename: LOCALE_LINK,
+        code: `const headers = { "x-locale": locale }`,
+        errors: [{ messageId: "retired" }],
+      },
+      {
+        filename: LOCALE_LINK,
+        code: `const headers = { ["X-Locale"]: locale, "Accept-Language": locale }`,
+        errors: [{ messageId: "retired" }],
+      },
+      {
+        filename: HOOK,
+        code: `const headers = { "X-LOCALE": locale }`,
+        errors: [{ messageId: "retired" }],
+      },
+      {
+        filename: HOOK,
+        code: `const headers = { ["accept-language"]: locale }`,
+        errors: [{ messageId: "elsewhere" }],
+      },
+      {
+        filename: HOOK,
+        code: `headers["Accept-Language"] = locale`,
+        errors: [{ messageId: "elsewhere" }],
+      },
+      {
+        filename: LOCALE_LINK,
+        code: `headers[\`X-Locale\`] = locale`,
+        errors: [{ messageId: "retired" }],
+      },
+      {
+        filename: LOCALE_LINK,
+        code: `const headers = { [\`x-locale\`]: locale }`,
+        errors: [{ messageId: "retired" }],
+      },
+      {
+        filename: LOCALE_LINK,
+        code: `const headers = new Headers()
+const alias = headers
+alias.set("x-locale", locale)`,
+        errors: [{ messageId: "retired" }],
+      },
+      {
+        filename: HOOK,
+        code: `new Headers().append(\`Accept-Language\`, locale)`,
+        errors: [{ messageId: "elsewhere" }],
+      },
+      {
+        filename: LOCALE_LINK,
+        code: `new globalThis.Headers().append("X-LOCALE", locale)`,
+        errors: [{ messageId: "retired" }],
+      },
+      {
+        filename: HOOK,
+        code: `function attach(headers: Headers) { headers.set("Accept-Language", locale) }`,
+        errors: [{ messageId: "elsewhere" }],
+      },
+      {
+        filename: HOOK,
+        code: `const request = new Request(url)
+request.headers.set("Accept-Language", locale)`,
+        errors: [{ messageId: "elsewhere" }],
+      },
+      {
+        filename: LOCALE_LINK,
+        code: `const response = new Response()
+const headers = response.headers
+headers.set("x-locale", locale)`,
+        errors: [{ messageId: "retired" }],
+      },
+    ].map(inEdition),
+  })
+}
