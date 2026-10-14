@@ -179,7 +179,7 @@ const eslintRuleImports = (text) => {
 const eslintContributionFiles = (text) => {
   const imported = eslintRuleImports(text);
   const block = /const CONTRIBUTIONS = \[([\s\S]*?)\n?\]/.exec(text)?.[1] ?? '';
-  const pushed = [...text.matchAll(/CONTRIBUTIONS\.push\(\{[^}]*?\brules:\s*([A-Za-z_$][\w$]*)/g)].map((m) => m[1]);
+  const pushed = [...text.matchAll(/\blaw:\s*["'][\w-]+["'],\s*rules:\s*([A-Za-z_$][\w$]*)/g)].map((m) => m[1]);
   const named = [...block.matchAll(/\brules:\s*([A-Za-z_$][\w$]*)/g)].map((m) => m[1]);
   return [...new Set([...named, ...pushed].map((name) => imported.get(name)).filter(Boolean))];
 };

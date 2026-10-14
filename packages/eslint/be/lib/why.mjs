@@ -7,4 +7,7 @@
 export const why = {
   "webhook-inbox-key": { code: "BE_WEBHOOK_INBOX_KEY" },
   "rest-route-declared": { code: "BE_REST_ROUTE_UNDECLARED" },
+  "security-headers": { code: "BE_SECURITY_HEADERS" },
+  "trust-proxy": { code: "BE_TRUST_PROXY" },
+  "health-signals": { code: "BE_HEALTH_SIGNALS" },
 }
