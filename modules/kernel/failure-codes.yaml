@@ -18760,4 +18760,42 @@ BE_APP_MODULE_LIST_INLINE:
     - "Danh sách ghép nối được đặt trong biến của module gốc để tránh nhóm compose"
   nextStep_vi: "Chuyển danh sách vào nhóm có kiểu trong compose/<area>.ts rồi spread nhóm trong app.module.ts; chỉ giữ guard và filter toàn ứng dụng tại module gốc."
   owner: op-retry
+HFS_AGE_KEY_CUSTODY:
+  title: "A tracked file holds the sops/age identity"
+  title_vi: "Khoá age/sops bị commit trong kho"
+  meaning_vi: "`<path>` là tệp định danh sops/age được track (`.claude/secret.env`, `keys.txt`, `*.agekey`). Khoá age chỉ nằm trong `.claude/secret.env` nội bộ của host hoặc `keys.txt` của sops, không bao giờ trong kho."
+  causes_vi:
+    - "Vi phạm luật R253: định danh age chỉ là custody trên host; `.claude/secret.env` (SOPS_AGE_KEY) thắng `keys.txt` và cả hai đều không được commit."
+  nextStep_vi: "Không đọc và không in giá trị khoá. Gỡ tệp khỏi index (git rm), đặt khoá vào `.claude/secret.env` hoặc `keys.txt` của sops ngoài kho, rồi xoay identity vì nó đã lộ trong lịch sử."
+  owner: owner
+  kind: check-finding
+
+HFS_CANON_COPY_DRIFT:
+  title: "A hash-sensitive canon file differs from its template"
+  title_vi: "Tệp canon nhạy hash lệch khỏi template"
+  meaning_vi: "`<path>` khác bytes với bản canon trong `packages/hfs/templates/be/skeleton` (sha256 của hai bên được báo trong finding). `env-source.config.ts`, `origin.guard.ts` và `webhook-signature.service.ts` là canon nhạy hash, không phải tệp để sửa."
+  causes_vi:
+    - "Vi phạm luật R253: ba tệp custody bí mật phải bằng đúng bản template scaffold; mọi chỉnh sửa là drift."
+  nextStep_vi: "Khôi phục đúng bytes của template `be/skeleton` cho tệp đó (scaffold lại hoặc checkout lại); thay đổi cần thiết phải đi qua template và canon pins, không sửa bản copy."
+  owner: owner
+  kind: check-finding
+
+HFS_SECRET_PLAINTEXT_FILE:
+  title: "A tracked plaintext secret file is refused"
+  title_vi: "Tệp bí mật dạng rõ bị track trong kho"
+  meaning_vi: "`<path>` là tệp bí mật dạng rõ được track (`secrets.env`, `*.env` không dấu chấm chứa khoá bí mật, hoặc tệp trong thư mục `secrets/`). Trong mọi edition bí mật chỉ được commit dưới dạng sops envelope tại `.starcistacks/<env>/secrets/**.enc`."
+  causes_vi:
+    - "Vi phạm luật R277: custody duy nhất cho secret được track là `.starcistacks/<env>/secrets/**.enc`; mọi file plaintext secret đều bị từ chối."
+  nextStep_vi: "Không đọc và không in giá trị. Niêm phong giá trị bằng `starci app secret set` vào `.starcistacks/<env>/secrets/<slug>.enc` rồi gỡ tệp plaintext khỏi index; xoay secret nếu nó đã lộ."
+  owner: owner
+  kind: check-finding
+
+HFS_SECRET_OUTSIDE_ENC:
+  title: "A sealed secret sits outside the sealed home"
+  title_vi: "File `.enc` nằm ngoài thư mục custody duy nhất"
+  meaning_vi: "`<path>` là file `.enc` ngoài `.starcistacks/<env>/secrets/`. Chỉ đúng một đường custody được chấp nhận cho envelope bí mật trong kho sản phẩm."
+  causes_vi:
+    - "Vi phạm luật R277: chỉ `.starcistacks/<env>/secrets/**.enc` được giữ envelope; `.enc` ở chỗ khác là custody sai (với lite lỗi này đã là HFS_LITE_SECRET_CUSTODY)."
+  nextStep_vi: "Chuyển envelope về `.starcistacks/<env>/secrets/<slug>.enc` (hoặc niêm phong lại bằng `starci app secret set`) rồi gỡ bản `.enc` lạc chỗ khỏi index."
+  owner: owner
   kind: check-finding

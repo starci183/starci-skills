@@ -6,11 +6,12 @@ import { resolveRealTool } from "../api/process/resolve-real-tool.mjs";
 import { decrypt as sopsDecrypt } from "../api/sops/decrypt.mjs";
 import { seal as sopsSeal } from "../api/sops/seal.mjs";
 import { invocationDir } from "../lib/roots.mjs";
-import { configuredRecipients, secretTools } from "./secret-init.mjs";
+import { ageIdentityEnv, configuredRecipients, secretTools } from "./secret-init.mjs";
 import { outsideRepository, secretRoots } from "./secret-files.mjs";
 import { SecretError, publicStorage } from "./secret-errors.mjs";
 
 const sopsInvocation = Object.freeze({ runProgram, resolveRealTool });
+const AGE_IDENTITY_NAME = /^SOPS_AGE_KEY(?:_FILE)?$/i;
 
 /** The default sops seam: the runtime's sops api, which finds the binary on this machine. */
 export function defaultSops(
@@ -20,7 +21,11 @@ export function defaultSops(
   tools,
 ) {
   const { sops: binary } = publicStorage(() => secretTools(env, tools));
-  const selectedEnv = { ...env };
+  const selectedEnv = ageIdentityEnv(repoRoot, env, tools);
+  const invocation = {
+    runProgram: tools?.runProgram ?? sopsInvocation.runProgram,
+    resolveRealTool: tools?.resolveRealTool ?? sopsInvocation.resolveRealTool,
+  };
   const checkIdentity = (file) =>
     publicStorage(() => {
       outsideRepository(repoRoot, file);
@@ -32,7 +37,7 @@ export function defaultSops(
           );
       }
     });
-  for (const [name, value] of Object.entries(env))
+  for (const [name, value] of Object.entries(selectedEnv))
     if (/^SOPS_AGE_KEY_FILE$/i.test(name) && value) {
       if (!path.isAbsolute(value))
         throw new SecretError(
@@ -41,7 +46,7 @@ export function defaultSops(
       checkIdentity(value);
     }
   if (
-    !Object.keys(env).some((name) => /^SOPS_AGE_KEY(?:_FILE)?$/i.test(name))
+    !Object.keys(selectedEnv).some((name) => AGE_IDENTITY_NAME.test(name))
   ) {
     const identity = secretRoots(env, platform).identity;
     checkIdentity(identity);
@@ -63,7 +68,7 @@ export function defaultSops(
       const result = sopsDecrypt(
         binary,
         ["decrypt", "--input-type", format, "--output-type", "dotenv", file],
-        { env: selectedEnv, cwd: repoRoot, invocation: sopsInvocation },
+        { env: selectedEnv, cwd: repoRoot, invocation },
       );
       if (result.status !== 0)
         throw refuse(
@@ -89,7 +94,7 @@ export function defaultSops(
       const result = sopsSeal(
         binary,
         { ...request, recipients },
-        { env: selectedEnv, cwd: repoRoot, invocation: sopsInvocation },
+        { env: selectedEnv, cwd: repoRoot, invocation },
       );
       if (result.status !== 0) throw refuse("seal the secret", result);
       return result.stdout;

@@ -84,7 +84,8 @@ test('the check refuses an unparseable Work YAML and a literal login and passwor
   assert.equal(broken.findings[0].file, `${FLOW}/index.yaml`);
 
   const literal = checkWorkFiles({ repo, files: [put(repo, `${FLOW}/accounts.yaml`, LITERAL_ACCOUNTS)] });
-  assert.deepEqual(codes(literal), [WORK_ACCOUNT_LITERAL, WORK_SECRET_LITERAL]);
+  // `password: Zx9-...` is an unquoted literal: the widened shared scan adds WORK_SECRET_PATTERN beside the pair rules.
+  assert.deepEqual(codes(literal), [WORK_ACCOUNT_LITERAL, WORK_SECRET_LITERAL, WORK_SECRET_PATTERN]);
   assert.ok(literal.findings.every((f) => !JSON.stringify(f).includes('Zx9-qLm2') && !JSON.stringify(f).includes('qa.tester')), 'a finding never carries the value');
 });
 
@@ -259,7 +260,7 @@ test('starci kernel settle refuses an unparseable Work YAML and a literal passwo
   const refusedLiteral = settle(literalRepo, literal);
   assert.equal(refusedLiteral.r.status, 1, refusedLiteral.r.stdout || refusedLiteral.r.stderr);
   assert.equal(refusedLiteral.body.reason, 'work-hygiene-red');
-  assert.deepEqual(refusedLiteral.body.codes.sort(), [WORK_ACCOUNT_LITERAL, WORK_SECRET_LITERAL]);
+  assert.deepEqual(refusedLiteral.body.codes.sort(), [WORK_ACCOUNT_LITERAL, WORK_SECRET_LITERAL, WORK_SECRET_PATTERN]);
   assert.ok(!JSON.stringify(refusedLiteral.body).includes('Zx9-qLm2'), 'the refusal never carries the value');
 
   const oldRepo = checkout(t);

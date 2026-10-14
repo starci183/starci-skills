@@ -2406,3 +2406,20 @@ rules:
     failureCodes: ["HFS_FEATURE_FILE_BUDGET"]
     enforcers:
       - {kind: hfs, id: feature-files, at: scripts/hfs/rules/feature-files.mjs}
+  - id: R253
+    code: "HFS_AGE_KEY_CUSTODY"
+    law: "The age identity that seals and opens an app's `.starcistacks/<env>/secrets/*.enc` is host-local custody only: it lives in the untracked `.claude/secret.env` (as `SOPS_AGE_KEY`, which wins over the legacy `keys.txt` and is handed to sops through the `SOPS_AGE_KEY` child environment, never as an argument and never printed) or in the sops config dir's `keys.txt`; a tracked `.claude/secret.env`, `keys.txt` or `*.agekey` is the identity committed. The three files the secret custody depends on - `src/modules/platform/config/env-source.config.ts`, `src/modules/platform/http-security/origin.guard.ts` and `src/modules/platform/http-security/webhook-signature.service.ts` - are hash-sensitive canon, not files to edit: their bytes equal the `be/skeleton` template they were scaffolded from, judged by sha256."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_AGE_KEY_CUSTODY", "HFS_CANON_COPY_DRIFT"]
+    enforcers:
+      - {kind: hfs, id: secret-age-key-custody, at: scripts/hfs/rules/secrets.mjs}
+      - {kind: hfs, id: canon-copy-drift, at: scripts/hfs/rules/canon-copy-drift.mjs}
+  - id: R277
+    code: "HFS_SECRET_PLAINTEXT_FILE"
+    law: "In every edition the only custody a tracked secret may take is a sops envelope at `.starcistacks/<env>/secrets/**.enc`. A tracked plaintext secret file is refused by being: `secrets.env` or `.secret(s).env` at any depth, a non-dot `*.env` or `*.env.<profile>` holding secret keys (deploy-side dotenv included), and a plaintext member of a `secrets/` directory; a sealed `.enc` outside the one sealed home is refused too (for lite it is already `HFS_LITE_SECRET_CUSTODY`)."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_SECRET_PLAINTEXT_FILE", "HFS_SECRET_OUTSIDE_ENC"]
+    enforcers:
+      - {kind: hfs, id: secret-custody-only, at: scripts/hfs/rules/secret-custody-only.mjs}

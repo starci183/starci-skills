@@ -16,6 +16,7 @@ import {
 import { secretRoots } from "../../scripts/hfs/secret-files.mjs";
 import { parseYaml } from "../../engine/yaml.mjs";
 import { configuredRecipients } from "../../scripts/hfs/secret-init.mjs";
+import { selectedAgeRecipient } from "../../scripts/api/sops/selected-age-recipient.mjs";
 
 const RECIPIENT = `age1${"q".repeat(58)}`;
 const OTHER_RECIPIENT = `age1${"p".repeat(58)}`;
@@ -23,8 +24,11 @@ const PRIVATE_KEY = `AGE-SECRET-KEY-1${"Q".repeat(58)}`;
 const ENC = "ENC[AES256_GCM,data:AA==,iv:AA==,tag:AA==,type:str]";
 const sealedJson = (keys) =>
   `${JSON.stringify({ ...Object.fromEntries(keys.map((key) => [key, ENC])), sops: { mac: ENC, age: [{ recipient: RECIPIENT, enc: "x" }] } })}\n`;
-const sealedDotenv = (keys, recipients = [RECIPIENT]) =>
-  `${keys.map((key) => `${key}=${ENC}`).join("\n")}\n${recipients.map((recipient, i) => `sops_age__list_${i}__map_recipient=${recipient}`).join("\n")}\nsops_mac=${ENC}\n`;
+const sealedDotenv = (keys, recipients = [RECIPIENT]) => {
+  const members = keys.map((key) => `${key}=${ENC}`).join("\n");
+  const metadata = recipients.map((recipient, i) => `sops_age__list_${i}__map_recipient=${recipient}`).join("\n");
+  return `${members}\n${metadata}\nsops_mac=${ENC}\n`;
+};
 const CONFIG = `creation_rules:\n  - path_regex: '\\.starcistacks[/\\\\][^/\\\\]+[/\\\\]secrets[/\\\\][^/\\\\]+\\.enc$'\n    age: ${RECIPIENT}\n`;
 
 function fakeSops(plain = {}) {
@@ -46,12 +50,11 @@ function fakeSops(plain = {}) {
               .filter(Boolean)
               .map((line) => line.split("=")[0])
           : Object.keys(JSON.parse(request.plaintext));
-      return request.inputType === "dotenv"
-        ? sealedDotenv(
-            keys,
-            request.recipients.length ? request.recipients : [RECIPIENT],
-          )
-        : sealedJson(keys);
+      if (request.inputType === "dotenv") {
+        const recipients = request.recipients.length ? request.recipients : [RECIPIENT];
+        return sealedDotenv(keys, recipients);
+      }
+      return sealedJson(keys);
     },
   };
 }
@@ -79,6 +82,65 @@ function fakeTools() {
   };
 }
 
+const selectedEnvelope = (recipient) => {
+  const payload = "-----BEGIN AGE ENCRYPTED FILE-----\nYWdlLWJsb2Nr\n-----END AGE ENCRYPTED FILE-----";
+  const encodedPayload = payload.replaceAll("\n", String.raw`\n`);
+  return sealedDotenv(["TOKEN"], [recipient]) +
+    `sops_age__list_0__map_enc=${encodedPayload}\n` +
+    "sops_version=3.13.2\nsops_lastmodified=2026-01-01T00:00:00Z\n";
+};
+
+function selectedInitTools(calls, {
+  identity = PRIVATE_KEY,
+  recipient = RECIPIENT,
+  failDerivation = false,
+} = {}) {
+  return {
+    resolveSops: () => process.execPath,
+    resolveRealTool: () => process.execPath,
+    runProgram: (file, args, options) => {
+      const result = {
+        status: 0,
+        signal: null,
+        error: null,
+        stdout: Buffer.alloc(0),
+        stderr: Buffer.alloc(0),
+      };
+      const call = {
+        args: [...args],
+        input: options.input,
+        result,
+        hasAgeKey: Object.hasOwn(options.env, "SOPS_AGE_KEY"),
+        hasKeyFile: Object.hasOwn(options.env, "SOPS_AGE_KEY_FILE"),
+        keyMatches: options.env.SOPS_AGE_KEY === identity,
+      };
+      calls.push(call);
+      if (args[0] === "--disable-version-check") result.stdout = Buffer.from("sops 3.13.2\n");
+      else if (args[0] === "--version") result.stdout = Buffer.from("1.3.1\n");
+      else if (args[0] === "-y") {
+        const matches = Buffer.isBuffer(options.input) && options.input.equals(Buffer.from(identity));
+        if (failDerivation || !matches) {
+          result.status = 1;
+          result.stderr = Buffer.from(identity);
+        } else result.stdout = Buffer.from(`${recipient}\n`);
+      } else if (args[0] === "encrypt") result.stdout = Buffer.from(selectedEnvelope(recipient));
+      else if (args[0] === "decrypt") result.stdout = Buffer.from("TOKEN=private-initialized-value\n");
+      else result.status = 1;
+      return result;
+    },
+  };
+}
+
+const selectedCapturesWiped = (calls) => {
+  for (const call of calls) {
+    if (Buffer.isBuffer(call.input))
+      assert.ok(call.input.every((byte) => byte === 0), "identity/document input was wiped");
+    assert.ok(call.result.stdout.every((byte) => byte === 0), "stdout capture was wiped");
+    assert.ok(call.result.stderr.every((byte) => byte === 0), "stderr capture was wiped");
+    assert.ok(call.args.every((arg) => !arg.includes(PRIVATE_KEY)), "identity never rides argv");
+  }
+};
+
 test("envelope inspection reads format, key names and public recipients without decrypting", () => {
   assert.equal(formatOf(sealedJson(["TOKEN"])), "json");
   assert.equal(formatOf(sealedDotenv(["TOKEN"])), "dotenv");
@@ -102,7 +164,7 @@ test("envelope inspection reads format, key names and public recipients without 
     plaintextOf("dotenv", { A: "one\ntwo" }) === "A=one\\ntwo\n",
     "dotenv transports LF as an escaped value on one physical line",
   );
-  for (const value of ["one\rtwo", "one\\ntwo"])
+  for (const value of ["one\rtwo", String.raw`one\ntwo`])
     assert.throws(
       () => plaintextOf("dotenv", { A: value }),
       /cannot preserve/u,
@@ -183,6 +245,130 @@ test("init creates an external key and canonical path rule, then reuses both wit
   );
   assert.equal(fs.readFileSync(path.join(root, ".sops.yaml"), "utf8"), config);
   privateAbsent(repeated, [PRIVATE_KEY]);
+});
+
+test("init and set share the secret.env inline identity ahead of legacy keys.txt", (t) => {
+  for (const legacyExists of [false, true]) {
+    const { root, env, dir } = app(t);
+    const keyFile = secretRoots(env, process.platform).identity;
+    const legacy = `AGE-SECRET-KEY-1${"P".repeat(58)}\n`;
+    if (legacyExists) {
+      fs.mkdirSync(path.dirname(keyFile), { recursive: true });
+      fs.writeFileSync(keyFile, legacy, { mode: 0o600 });
+    }
+    const claude = path.join(root, ".claude");
+    fs.mkdirSync(claude);
+    fs.writeFileSync(path.join(claude, "secret.env"), `SOPS_AGE_KEY=${PRIVATE_KEY}\n`, { mode: 0o600 });
+    const calls = [];
+    const tools = selectedInitTools(calls);
+    const initialized = run(["init"], { cwd: root, env, tools });
+    assert.equal(initialized.code, 0, initialized.err);
+    const file = path.join(dir, "app.enc");
+    assert.deepEqual(configuredRecipients(root, file), [RECIPIENT]);
+    assert.equal(fs.existsSync(keyFile), legacyExists, "inline init creates no legacy identity");
+    if (legacyExists)
+      assert.ok(fs.readFileSync(keyFile, "utf8") === legacy, "legacy identity stays untouched");
+    assert.ok(calls.every((call) => !call.hasAgeKey && !call.hasKeyFile), "age derivation receives no identity environment");
+    assert.ok(calls.every((call) => call.args[0] !== "-o"), "no other identity is generated");
+    selectedCapturesWiped(calls);
+    privateAbsent(initialized, [PRIVATE_KEY, legacy]);
+    const sealed = run(["set", "dev", "app", "TOKEN"], {
+      cwd: root, env, tools, stdin: () => "private-initialized-value",
+    });
+    assert.equal(sealed.code, 0, sealed.err);
+    assert.deepEqual(envelopeOf(fs.readFileSync(file, "utf8")).recipients, [RECIPIENT]);
+    const encrypt = calls.find((call) => call.args[0] === "encrypt");
+    assert.ok(encrypt.keyMatches && !encrypt.hasKeyFile, "set selects the same inline identity");
+    selectedCapturesWiped(calls);
+    privateAbsent(sealed, [PRIVATE_KEY, legacy, "private-initialized-value"]);
+  }
+});
+
+test("init honours an explicit inline selection above secret.env and preserves an existing recipient", (t) => {
+  const { root, env } = app(t);
+  const explicit = `AGE-SECRET-KEY-1${"P".repeat(58)}`;
+  env.SOPS_AGE_KEY = explicit;
+  const claude = path.join(root, ".claude");
+  fs.mkdirSync(claude);
+  fs.writeFileSync(path.join(claude, "secret.env"), `SOPS_AGE_KEY=${PRIVATE_KEY}\n`, { mode: 0o600 });
+  const calls = [];
+  const tools = selectedInitTools(calls, { identity: explicit, recipient: OTHER_RECIPIENT });
+  const initialized = run(["init"], { cwd: root, env, tools });
+  assert.equal(initialized.code, 0, initialized.err);
+  const target = path.join(root, ".starcistacks", "dev", "secrets", "app.enc");
+  assert.deepEqual(configuredRecipients(root, target), [OTHER_RECIPIENT]);
+  fs.writeFileSync(path.join(root, ".sops.yaml"), CONFIG);
+  const repeated = run(["init"], { cwd: root, env, tools });
+  assert.equal(repeated.code, 0, repeated.err);
+  assert.deepEqual(configuredRecipients(root, target), [RECIPIENT], "initialization never rotates existing recipients");
+  selectedCapturesWiped(calls);
+  privateAbsent(initialized, [PRIVATE_KEY, explicit]);
+  privateAbsent(repeated, [PRIVATE_KEY, explicit]);
+});
+
+test("disabled inline init refuses without generating a legacy key or changing recipient policy", (t) => {
+  const { root, env } = app(t);
+  const configFile = path.join(root, ".sops.yaml");
+  fs.writeFileSync(configFile, CONFIG);
+  const claude = path.join(root, ".claude");
+  fs.mkdirSync(claude);
+  fs.writeFileSync(path.join(claude, "secret.env"), "SOPS_AGE_KEY=\n", { mode: 0o600 });
+  const calls = [];
+  const refused = run(["init"], { cwd: root, env, tools: selectedInitTools(calls) });
+  assert.equal(refused.code, 2);
+  assert.match(refused.err, /SOPS_AGE_KEY.*disabled-inline/u);
+  assert.equal(calls.length, 0, "disabled selection launches no key process");
+  assert.equal(fs.readFileSync(configFile, "utf8"), CONFIG);
+  assert.equal(fs.existsSync(secretRoots(env, process.platform).identity), false);
+});
+
+test("failed inline recipient derivation wipes captures and exposes only the refusal", (t) => {
+  const { root, env } = app(t);
+  env.SOPS_AGE_KEY = PRIVATE_KEY;
+  const configFile = path.join(root, ".sops.yaml");
+  fs.writeFileSync(configFile, CONFIG);
+  const calls = [];
+  const refused = run(["init"], {
+    cwd: root, env, tools: selectedInitTools(calls, { failDerivation: true }),
+  });
+  assert.equal(refused.code, 2);
+  assert.match(refused.err, /recipient-unproven/u);
+  assert.equal(fs.readFileSync(configFile, "utf8"), CONFIG);
+  assert.equal(fs.existsSync(secretRoots(env, process.platform).identity), false);
+  selectedCapturesWiped(calls);
+  privateAbsent(refused, [PRIVATE_KEY]);
+});
+
+test("selectedAgeRecipient returns only public data, wipes captures and refuses unqualified tools", (t) => {
+  const { root, env } = app(t);
+  const selected = { ...env, SOPS_AGE_KEY: PRIVATE_KEY };
+  for (const failDerivation of [false, true]) {
+    const calls = [];
+    const tools = selectedInitTools(calls, { failDerivation });
+    const result = selectedAgeRecipient({
+      env: selected,
+      cwd: root,
+      invocation: {
+        runProgram: tools.runProgram,
+        resolveRealTool: tools.resolveRealTool,
+      },
+    });
+    if (failDerivation)
+      assert.deepEqual(result, { ok: false, reason: "recipient-unproven" });
+    else assert.deepEqual(result, { ok: true, publicRecipient: RECIPIENT });
+    selectedCapturesWiped(calls);
+    assert.ok(calls.every((call) => !call.hasAgeKey && !call.hasKeyFile), "public derivation strips identity environment");
+    assert.ok(!JSON.stringify(result).includes(PRIVATE_KEY), "only public data escapes the owner");
+  }
+  const refused = selectedAgeRecipient({
+    env: selected,
+    cwd: root,
+    invocation: {
+      resolveRealTool: () => path.join(root, "unavailable-age-keygen"),
+      runProgram: () => assert.fail("unqualified tools must not launch"),
+    },
+  });
+  assert.deepEqual(refused, { ok: false, reason: "native-tool-unavailable" });
 });
 
 test("init preserves existing recipients and keys, selects platform roots, and reports missing tools", (t) => {
@@ -919,7 +1105,7 @@ test("dotenv LF is encoded within one member and cannot inject an extra key", (t
     ["OTHER", "FIRST"],
   );
   const ciphertext = fs.readFileSync(path.join(dir, "app-env.enc"), "utf8");
-  for (const value of ["one\rINJECTED=two", "one\\nINJECTED=two"]) {
+  for (const value of ["one\rINJECTED=two", String.raw`one\nINJECTED=two`]) {
     assert.throws(
       () =>
         setSecretValues(
