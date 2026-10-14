@@ -27,6 +27,7 @@ import { revParseQuery } from '../runtime/scripts/api/git/rev-parse-query.mjs';
 import { lsFiles } from '../runtime/scripts/api/git/ls-files.mjs';
 import { insidePath, samePath } from '../runtime/scripts/lib/path-key.mjs';
 import { byCodeUnit } from '../report/order.mjs';
+import { addAuthCallbackDependencies, applyFeTemplatePolicy, enableAuthCallback } from './fe-template-policy.mjs';
 
 const NAME = /^[a-z][a-z0-9-]*$/;
 const APP_DIR = '__app__';
@@ -96,12 +97,14 @@ export function jsonText(value) {
     const inner = `${indent}  `;
     if (Array.isArray(item)) {
       if (item.every(entry => entry === null || typeof entry !== 'object')) return `[${item.map(entry => JSON.stringify(entry)).join(', ')}]`;
-      return `[\n${item.map(entry => `${inner}${print(entry, inner)}`).join(',\n')}\n${indent}]`;
+      const entries = item.map(entry => `${inner}${print(entry, inner)}`).join(',\n');
+      return `[\n${entries}\n${indent}]`;
     }
     if (item !== null && typeof item === 'object') {
       const keys = Object.keys(item);
       if (!keys.length) return '{}';
-      return `{\n${keys.map(key => `${inner}${JSON.stringify(key)}: ${print(item[key], inner)}`).join(',\n')}\n${indent}}`;
+      const entries = keys.map(key => `${inner}${JSON.stringify(key)}: ${print(item[key], inner)}`).join(',\n');
+      return `{\n${entries}\n${indent}}`;
     }
     return JSON.stringify(item);
   };
@@ -278,10 +281,12 @@ const workspaceSection = (entries, project, pins) => pinnedSection(Object.fromEn
  * The package.json of the fe app workspace `app` of the app `project`: @<project>/<app>, private, the workspace scripts, its own
  * dependencies. A product app (`core`, it carries the shared app core) also takes every core runtime package of the fe stack.
  */
-function feAppManifest(project, app, pins, edition, { core = true, stack = coreFeStackPackages() } = {}) {
+function feAppManifest(project, app, pins, edition, { core = true, authCallback = false, stack = coreFeStackPackages() } = {}) {
   const base = edition === 'lite' ? LITE_FE_APP_DEPENDENCIES : FE_APP_DEPENDENCIES;
   const dependencies = { ...base, ...(core ? Object.fromEntries(stack.app.filter(name => !Object.hasOwn(base, name)).map(name => [name, null])) : {}) };
-  return { name: feAppPackageName(project, app), version: '0.0.0', private: true, scripts: { ...FE_APP_SCRIPTS }, dependencies: workspaceSection(dependencies, project, pins) };
+  const pkg = { name: feAppPackageName(project, app), version: '0.0.0', private: true, scripts: { ...FE_APP_SCRIPTS }, dependencies: workspaceSection(dependencies, project, pins) };
+  addAuthCallbackDependencies(pkg, pins, core && authCallback);
+  return pkg;
 }
 
 /** The package.json of the fe package workspace `name` (FE_PACKAGES) of the app `project`: @<project>/<name>, private, built to dist. */
@@ -337,7 +342,7 @@ const SKELETON_VARIABLES = Object.freeze(['project', 'app', 'appPascal', 'sonarG
  * (a message placeholder of the i18n canon, `{{title}}` in a catalog), and a skeleton name with no value for this file is an error.
  */
 function fill(source, vars, file) {
-  return source.replace(new RegExp(`\\{\\{(${SKELETON_VARIABLES.join('|')})\\}\\}`, 'g'), (_, key) => {
+  return source.replace(new RegExp(String.raw`\{\{(${SKELETON_VARIABLES.join('|')})\}\}`, 'g'), (_, key) => {
     if (!Object.hasOwn(vars, key)) throw new ScaffoldError('HFS_SCAFFOLD_TEMPLATE_VARIABLE', `${file} names {{${key}}}, which has no value outside a __app__ folder`);
     return vars[key];
   });
@@ -387,29 +392,30 @@ const liteBaseFile = (scope, rel) => {
 };
 const liteOverlayFile = (scope, rel) => scope !== 'be' || !LITE_DEFERRED_GENERATOR_FILES.has(rel);
 
+function skeletonFileRows(scope, directory, app, vars, rel, source, apps) {
+  const prefix = scope === 'app' ? '' : `${scope}/`;
+  const once = { project: app.project, ...vars };
+  const output = candidate => candidate.split(PROJECT_DIR).join(app.project).split(TIMESTAMP).join(vars.timestamp);
+  if (!rel.includes(APP_DIR)) {
+    if (scope === 'be' && rel.startsWith(CLI_APP_DIR) && !declaresCliApp(app)) return [];
+    const fixedApp = apps.find(entry => rel.startsWith(`apps/${entry.name}/`));
+    if (scope === 'fe' && rel.startsWith('apps/') && !fixedApp) return [];
+    const appVars = fixedApp ? { app: fixedApp.name, appPascal: pascal(fixedApp.name) } : {};
+    return [{ path: `${prefix}${output(rel)}`, content: fill(source, { ...once, ...appVars }, `${directory}/${rel}`) }];
+  }
+  const selected = scope === 'fe' ? coreFeApps(apps) : apps;
+  return selected.map(entry => ({ path: `${prefix}${output(rel.split(APP_DIR).join(entry.name))}`, content: fill(source, { ...once, app: entry.name, appPascal: pascal(entry.name) }, `${directory}/${rel}`) }));
+}
+
 /** One skeleton directory rendered to app-relative files; `include` filters source-relative paths before variables are expanded. */
 function skeletonDirectory(scope, directory, app, vars, include = () => true) {
   const dir = path.join(TEMPLATES_DIR, scope, directory);
   if (!fs.existsSync(dir)) throw new ScaffoldError('HFS_SCAFFOLD_SKELETON_MISSING', `no skeleton templates in templates/${scope}/${directory}`);
   const apps = scope === 'app' ? [] : app.sides[scope].apps.filter(entry => scope === 'fe' || entry.kind === 'api');
-  const appsOf = rel => (scope === 'fe' && rel.includes(APP_DIR) ? coreFeApps(apps) : apps);
-  const prefix = scope === 'app' ? '' : `${scope}/`;
-  const files = [];
-  for (const rel of listFiles(dir).filter(include)) {
+  return listFiles(dir).filter(rel => include(rel)).flatMap(rel => {
     const source = render(fs.readFileSync(path.join(dir, rel), 'utf8').replace(/\r\n/g, '\n'), PARTIAL_VARIABLES);
-    const once = { project: app.project, ...vars };
-    const output = candidate => candidate.split(PROJECT_DIR).join(app.project).split(TIMESTAMP).join(vars.timestamp);
-    if (!rel.includes(APP_DIR)) {
-      if (scope === 'be' && rel.startsWith(CLI_APP_DIR) && !declaresCliApp(app)) continue;
-      const fixedApp = apps.find(entry => rel.startsWith(`apps/${entry.name}/`));
-      if (scope === 'fe' && rel.startsWith('apps/') && !fixedApp) continue;
-      const appVars = fixedApp ? { app: fixedApp.name, appPascal: pascal(fixedApp.name) } : {};
-      files.push({ path: `${prefix}${output(rel)}`, content: fill(source, { ...once, ...appVars }, `${directory}/${rel}`) });
-      continue;
-    }
-    for (const entry of appsOf(rel)) files.push({ path: `${prefix}${output(rel.split(APP_DIR).join(entry.name))}`, content: fill(source, { ...once, app: entry.name, appPascal: pascal(entry.name) }, `${directory}/${rel}`) });
-  }
-  return files;
+    return skeletonFileRows(scope, directory, app, vars, rel, source, apps);
+  });
 }
 
 /** The canonical full Work workspace, catalog and feature nodes an edition upgrade may need. */
@@ -423,7 +429,7 @@ export function scaffoldWorkSeeds(project) {
  * be side (once per product app of the fe side, coreFeApps), the be `apps/cli/` folder once when the cli app is declared, an fe `apps/<name>/` folder
  * once for the declared fe app <name> (none other), `__project__` in a path replaced by the project name.
  */
-function skeletonOf(scope, app, vars) {
+function skeletonOf(scope, app, vars, authCallback) {
   const files = app.edition === 'lite'
     ? [...skeletonDirectory(scope, 'skeleton', app, vars, rel => liteBaseFile(scope, rel)), ...skeletonDirectory(scope, 'skeleton-lite', app, vars, rel => liteOverlayFile(scope, rel))]
     : skeletonDirectory(scope, 'skeleton', app, vars);
@@ -432,7 +438,7 @@ function skeletonOf(scope, app, vars) {
   for (const entry of scope === 'fe' ? app.sides.fe.apps : []) {
     if (!unique.some(file => file.path.startsWith(`fe/apps/${entry.name}/`))) throw new ScaffoldError('HFS_SCAFFOLD_SKELETON_MISSING', `no skeleton templates for the fe app ${entry.name}`);
   }
-  return unique;
+  return scope === 'fe' ? applyFeTemplatePolicy(unique, { authCallback }) : unique;
 }
 
 /** The npm step that resolves the lockfile of a new app, exactly as the error names it. */
@@ -545,17 +551,24 @@ function scaffoldWrites(root, original) {
   };
 }
 
+function scaffoldOriginal(root) {
+  const original = fs.lstatSync(root, { throwIfNoEntry: false });
+  if (original && !emptyUnbornGit(root, original)) throw new ScaffoldError('HFS_SCAFFOLD_EXISTS', `${root} already exists; only a plain directory containing solely .git with unborn main and an empty index can be scaffolded`);
+  return original;
+}
+
 /**
  * `starci app scaffold <name>`: writes the new app under `into`, resolves its lockfile with npm (`lock`, npmLock), and returns
  * `{ root, files }` (app-relative paths, sorted). `presets` is what sync loads from the installed @starci/jest-preset (the Sonar
  * exclusions); the CLI passes the one it resolves. Failure removes only scaffold-owned entries, retaining an existing .git.
+ * authCallback explicitly opts into a Supabase server PKCE exchange and its auth owner; the default keeps browser PKCE.
  */
-export function scaffoldApp({ name, into, presets, edition = 'full', manifest = loadSlotManifest(), pins = bundledPins(), lock = npmLock, emitTypes = generateDbTypes, now = () => new Date() }) {
+export function scaffoldApp({ name, into, presets, edition = 'full', authCallback = false, manifest = loadSlotManifest(), pins = bundledPins(), lock = npmLock, emitTypes = generateDbTypes, now = () => new Date() }) {
   if (!NAME.test(String(name))) throw new ScaffoldError('HFS_SCAFFOLD_NAME_INVALID', `the app name ${name} must be kebab-case (a project name: ${NAME})`);
   const root = path.resolve(into, name);
-  const original = fs.lstatSync(root, { throwIfNoEntry: false });
-  if (original && !emptyUnbornGit(root, original)) throw new ScaffoldError('HFS_SCAFFOLD_EXISTS', `${root} already exists; only a plain directory containing solely .git with unborn main and an empty index can be scaffolded`);
+  const original = scaffoldOriginal(root);
   const declaration = starterDeclaration(name, manifest, edition);
+  enableAuthCallback(declaration, authCallback);
   const app = resolveRepoDeclaration(manifest, declaration);
   const pkg = packageManifest(name, pins, app.edition);
   const timestamp = now().toISOString().replace(/\D/g, '').slice(0, 14);
@@ -568,14 +581,14 @@ export function scaffoldApp({ name, into, presets, edition = 'full', manifest = 
       path: `fe/apps/${entry.name}/src/modules/types/ambient/styles.d.ts`,
       content: '/** Declares stylesheets loaded by the Next bundler; non-CSS side-effect imports remain checked. */\ndeclare module "*.css" {}\n',
     })),
-    ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/package.json`, content: packageJsonText(feAppManifest(name, entry.name, pins, app.edition, { core: coreFeApps([entry]).length === 1 })) })),
+    ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/package.json`, content: packageJsonText(feAppManifest(name, entry.name, pins, app.edition, { core: coreFeApps([entry]).length === 1, authCallback })) })),
     ...imageFiles(app),
     ...(app.edition === 'lite' ? [] : Object.keys(FE_PACKAGES).flatMap(pkg => [
       { path: `fe/packages/${name}-${pkg}/package.json`, content: packageJsonText(fePackageManifest(name, pkg, pins)) },
       { path: `fe/packages/${name}-${pkg}/tsconfig.json`, content: jsonText(fePackageTsconfig()) },
       { path: `fe/packages/${name}-${pkg}/tsconfig.build.json`, content: jsonText(fePackageBuildTsconfig()) },
     ])),
-    ...['app', 'be', 'fe'].flatMap(scope => skeletonOf(scope, app, { sonarGate: parseYaml(fs.readFileSync(SONAR_GATE_FILE, 'utf8')).gate.name, timestamp, ...supabasePortVars(name) })),
+    ...['app', 'be', 'fe'].flatMap(scope => skeletonOf(scope, app, { sonarGate: parseYaml(fs.readFileSync(SONAR_GATE_FILE, 'utf8')).gate.name, timestamp, ...supabasePortVars(name) }, authCallback)),
   ];
   const writes = scaffoldWrites(root, original);
   try {

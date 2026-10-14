@@ -86,7 +86,7 @@ export const MANIFEST_KINDS = [APP_KIND, RUNTIME_KIND];
 export const manifestKind = (m) => (isPlainObject(m) && m.kind !== undefined ? m.kind : APP_KIND);
 const strList = (v) => stringList(v);
 
-const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'pattern', 'trigger', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'liteManagedBy', 'rules', 'goesTo', 'why', 'since', 'perConnection', 'parent', 'editions', 'litePresence', 'lite', 'provider', 'coverage', 'entries', 'outcomeHome'];
+const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'pattern', 'trigger', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'liteManagedBy', 'rules', 'goesTo', 'why', 'since', 'perConnection', 'parent', 'editions', 'editionWhy', 'litePresence', 'lite', 'provider', 'coverage', 'entries', 'outcomeHome'];
 /** The fields a slot's `lite` overlay may hold: the same keys it would carry in the slot body, resolved under edition lite. */
 const LITE_OVERLAY_KEYS = ['path', 'requires', 'allows', 'forbids', 'minInstances', 'requiredInstances', 'why'];
 /** A runtime slot has no app kind, side composition, layer or managed template; it may name the generator of a generated copy. */
@@ -184,6 +184,7 @@ function slotListProblems(slot, at) {
 
 function slotAppOptionProblems(slot, at) {
   const bad = [];
+  bad.push(...slotEditionWhyProblems(slot, at));
   if (slot.editions !== undefined && !(Array.isArray(slot.editions) && slot.editions.length && slot.editions.every((e) => EDITIONS.includes(e)) && new Set(slot.editions).size === slot.editions.length)) bad.push(`${at}: editions must be a non-empty subset of ${EDITIONS.join(', ')}`);
   if (slot.litePresence !== undefined && !(PRESENCE.includes(slot.litePresence) || (isPlainObject(slot.litePresence) && Object.keys(slot.litePresence).length && Object.entries(slot.litePresence).every(([side, value]) => ['be', 'fe'].includes(side) && PRESENCE.includes(value))))) bad.push(`${at}: litePresence must be a presence value or map sides to presence values`);
   if (slot.provider !== undefined) {
@@ -191,6 +192,12 @@ function slotAppOptionProblems(slot, at) {
     else if (slot.presence !== 'opt-in' || slot.appKind !== undefined) bad.push(`${at}: provider belongs to an opt-in slot that is not an app kind (a connection with that provider enables it)`);
   }
   return bad;
+}
+
+function slotEditionWhyProblems(slot, at) {
+  if (slot.editionWhy === undefined) return [];
+  return typeof slot.editionWhy === 'string' && slot.editionWhy.trim()
+    ? [] : [`${at}: editionWhy must be non-empty text`];
 }
 
 function slotLiteOverlayProblems(slot, at) {
@@ -209,7 +216,7 @@ function slotEntryProblems(slot, at) {
   if (slot.entries !== undefined) {
     const listed = strList(slot.entries) && slot.entries.length > 0 && new Set(slot.entries).size === slot.entries.length && slot.entries.every(relPath);
     if (!listed) bad.push(`${at}: entries must be a non-empty list of unique relative file paths`);
-    else if (typeof slot.path !== 'string' || !slot.path.endsWith('/') || slot.owner === true) bad.push(`${at}: entries belong to a directory slot that is not an owner (they name extra public entries of the owner that holds it)`);
+    else if (typeof slot.path !== 'string' || !slot.path.endsWith('/')) bad.push(`${at}: entries belong to a directory slot (they name its explicit public API files)`);
     else if (Array.isArray(slot.allows) && slot.entries.some((entry) => !slot.allows.includes(entry))) bad.push(`${at}: every entry must be one of the names the slot allows`);
   }
   if (slot.outcomeHome !== undefined && !(slot.outcomeHome === true && typeof slot.path === 'string' && slot.path && !slot.path.endsWith('/'))) bad.push(`${at}: outcomeHome is true and belongs to a file slot (the one file that declares the repository's Outcome union)`);
@@ -328,6 +335,21 @@ const kindPairValid = pair => isPlainObject(pair) && Object.keys(pair).sort(byCo
   && ['from', 'to'].every(side => folderKindsValid(pair[side]));
 const kindRestrictionValid = kinds => isPlainObject(kinds) && Object.keys(kinds).length > 0
   && Object.entries(kinds).every(([target, pair]) => NAME.test(target) && kindPairValid(pair));
+const slotIdsValid = list => strList(list) && list.length > 0 && new Set(list).size === list.length
+  && list.every(id => SLOT_ID.test(id) || RUNTIME_SLOT_ID.test(id));
+const slotRestrictionPairValid = pair => isPlainObject(pair) && Object.keys(pair).join() === 'from' && slotIdsValid(pair.from);
+const slotRestrictionValid = slots => isPlainObject(slots) && Object.keys(slots).length > 0
+  && Object.entries(slots).every(([target, pair]) => NAME.test(target) && slotRestrictionPairValid(pair));
+
+function tierDefinitionProblems(profile, tier, def) {
+  const bad = [];
+  const at = `tiers.${profile}.${tier}`;
+  if (!isPlainObject(def) || !Array.isArray(def.mayImport) || !def.mayImport.every((t) => NAME.test(String(t)))) bad.push(`${at}.mayImport must be a list of tier names`);
+  if (def?.mayImportKinds !== undefined && !kindRestrictionValid(def.mayImportKinds)) bad.push(`${at}.mayImportKinds must map tier names to {from, to} non-empty lists of unique folder kinds`);
+  if (def?.mayImportSlots !== undefined && !slotRestrictionValid(def.mayImportSlots)) bad.push(`${at}.mayImportSlots must map tier names to {from} non-empty lists of unique slot ids`);
+  for (const key of Object.keys(def ?? {})) if (!['mayImport', 'mayImportKinds', 'mayImportSlots', 'acyclic', 'lowerLayerOnly'].includes(key)) bad.push(`${at}.${key} is not a tier field`);
+  return bad;
+}
 
 /** Shape problems of the tier map of one profile. */
 export function tierMapProblems(profile, tiers) {
@@ -335,9 +357,7 @@ export function tierMapProblems(profile, tiers) {
   if (!isPlainObject(tiers) || !Object.keys(tiers).length) return [`tiers.${profile} must be a non-empty map`];
   for (const [tier, def] of Object.entries(tiers)) {
     if (!NAME.test(tier)) bad.push(`tiers.${profile}.${tier} is not a tier name`);
-    if (!isPlainObject(def) || !Array.isArray(def.mayImport) || !def.mayImport.every((t) => NAME.test(String(t)))) bad.push(`tiers.${profile}.${tier}.mayImport must be a list of tier names`);
-    if (def?.mayImportKinds !== undefined && !kindRestrictionValid(def.mayImportKinds)) bad.push(`tiers.${profile}.${tier}.mayImportKinds must map tier names to {from, to} non-empty lists of unique folder kinds`);
-    for (const key of Object.keys(def ?? {})) if (!['mayImport', 'mayImportKinds', 'acyclic', 'lowerLayerOnly'].includes(key)) bad.push(`tiers.${profile}.${tier}.${key} is not a tier field`);
+    bad.push(...tierDefinitionProblems(profile, tier, def));
   }
   return bad;
 }
@@ -347,10 +367,22 @@ function tierFolderKindProblems(manifest, profile, tier, kinds, at) {
   return kinds.filter(kind => !known.has(kind)).map(kind => `${at} names ${kind}, which is not a folder kind of the ${tier} tier`);
 }
 
-/** Kind restrictions narrow an allowed tier edge and name kinds that its source and target slots actually declare. */
+function tierSlotRestrictionProblems(manifest, profile, tier, def) {
+  const bad = [];
+  const known = new Set(manifest.slots.filter(slot => slot.profiles.includes(profile) && slot.tier === tier).map(slot => slot.id));
+  for (const [target, restriction] of Object.entries(def.mayImportSlots ?? {})) {
+    const at = `tiers.${profile}.${tier}.mayImportSlots.${target}`;
+    if (!def.mayImport.includes(target)) bad.push(`${at} restricts a tier that mayImport does not allow`);
+    for (const id of restriction.from) if (!known.has(id)) bad.push(`${at}.from names ${id}, which is not a slot of the ${profile} ${tier} tier`);
+  }
+  return bad;
+}
+
+/** Kind and slot restrictions narrow allowed tier edges and name declared source and target roles. */
 export function tierKindProblems(manifest, profile) {
   const bad = [];
   for (const [tier, def] of Object.entries(manifest.tiers[profile])) {
+    bad.push(...tierSlotRestrictionProblems(manifest, profile, tier, def));
     for (const [target, kinds] of Object.entries(def.mayImportKinds ?? {})) {
       const at = `tiers.${profile}.${tier}.mayImportKinds.${target}`;
       if (!def.mayImport.includes(target)) bad.push(`${at} restricts a tier that mayImport does not allow`);

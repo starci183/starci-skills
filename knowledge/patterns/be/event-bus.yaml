@@ -283,7 +283,7 @@ files:
     role: "The consumed event's e2e flow; titles event-bus/<scenario>: ... prove the pattern."
     spec: event-bus/atomic-with-transaction, event-bus/relay-only-after-commit, event-bus/redelivery-then-dead-letter, event-bus/duplicate-delivery-is-a-noop
     rules: [BE_PATTERN_SPEC_MISSING]
-# Edition lite (owner ruling 2026-10-12, R212 case-1): the same ports and rules, a Supabase adapter behind them.
+# Edition lite (R212, owner ruling 2026-10-14): the same ports and rules, a Supabase adapter behind them.
 liteAdapter:
   summary: >-
     Under lite the event bus keeps typed events, the vendored contract, publish(event, tx) in the domain transaction, the outbox,
@@ -295,6 +295,6 @@ liteAdapter:
     - {port: EventConsumer (platform/event-bus), adapter: "pgmq.read with a visibility timeout, the inbox claim on the event id, pgmq.delete on success, pgmq.archive as the dead letter"}
   forbids: [kafkajs]
   proof: >-
-    Unit specs as full; the event-bus/* scenarios are optional integration specs on `starci supabase start`, and there is no e2e
-    async spec (R155 and R167 are full's).
+    Unit specs as full; declaring event-bus requires integration specs titled `event-bus/<scenario>: ...` for every declared
+    scenario on `starci supabase start` (R284). Lite has no e2e world.
   see: [knowledge/patterns/be/supabase-queues.yaml]

@@ -170,7 +170,7 @@ rules:
       contracts use named params and result types where that improves clarity; a single primitive may remain positional. Prefer
       a simple function over a provider class when no lifecycle or injection is required. A helper defined twice under one name
       is a finding; the second definition is deleted and imports the first. A file has at most 500 lines and a function at most
-      80; over-budget files do not grow and new files are inside budget. A duplicated block is 8 lines or 60 tokens.
+      80; over-budget files do not grow and new files are inside budget. A duplicated block is 8 lines and 60 tokens.
     rationale: |-
       Reuse and clarity determine helper form, copies drift, and a budget that ratchets keeps units reviewable.
     cases:

@@ -69,6 +69,13 @@ const fakeLock = root => {
 };
 const scaffold = (f, options = {}) => scaffoldApp({ name: f.name, into: f.into, presets: PRESETS, lock: fakeLock, ...options });
 
+test('the scaffold callback switch refuses a starter without Supabase before changing its empty Git root', t => {
+  const f = fixture(t);
+  assert.throws(() => scaffold(f, { authCallback: true }), { code: 'HFS_SCAFFOLD_CALLBACK_PROVIDER' });
+  assert.deepEqual(fs.readdirSync(f.root), ['.git']);
+  assertGitPreserved(f);
+});
+
 test('the public app scaffold entry accepts actual empty unborn main and preserves every Git metadata byte', async t => {
   const f = fixture(t);
   let stderr = '';

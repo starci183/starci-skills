@@ -7,7 +7,8 @@ import {
 } from "../runtime/scripts/hfs/slots.mjs";
 import { imageFiles, render, TEMPLATES_DIR } from "../sync/index.mjs";
 import { ScaffoldError, pascalOf } from "./service.mjs";
-import { PARTIAL_VARIABLES, coreFeApps, jsonText, packageJsonText } from "./app.mjs";
+import { PARTIAL_VARIABLES, bundledPins, coreFeApps, jsonText, packageJsonText } from "./app.mjs";
+import { addAuthCallbackDependencies, applyFeTemplatePolicy, enableAuthCallback } from "./fe-template-policy.mjs";
 
 /** The shared fe app core (modules/api, auth, toast, redux, the providers, the hooks): the base tree, then the edition overlay. */
 const CORE_DIRS = Object.freeze({
@@ -35,12 +36,66 @@ const fill = (text, values, file) =>
     return values[key];
   });
 
+function appSkeleton(repo, name, authCallback) {
+  const source = path.join(TEMPLATES_DIR, "fe", repo.edition === "lite" ? "skeleton-lite/apps/web" : "skeleton/apps/app");
+  if (!fs.existsSync(source)) throw new ScaffoldError("HFS_ADD_TEMPLATE_MISSING", `the ${repo.edition} Next app skeleton is not carried by this package`);
+  const values = { project: repo.project, app: name, appPascal: pascalOf(name) };
+  const readTemplate = (dir, relative) => fill(
+    render(fs.readFileSync(path.join(dir, ...relative.split("/")), "utf8").replace(/\r\n/g, "\n"), PARTIAL_VARIABLES),
+    values,
+    relative,
+  );
+  const byPath = new Map();
+  const coreDirs = CORE_DIRS[repo.edition === "lite" ? "lite" : "full"].map(core => path.join(TEMPLATES_DIR, "fe", ...core.split("/")));
+  // Each later tree replaces the earlier file of the same path.
+  for (const dir of [source, ...coreDirs]) {
+    if (!fs.existsSync(dir)) continue;
+    for (const relative of listFiles(dir)) byPath.set(relative, { path: `fe/apps/${name}/${relative}`, content: readTemplate(dir, relative) });
+  }
+  return applyFeTemplatePolicy([...byPath.values()], { authCallback }).map(file => ({ relative: file.path, body: file.content }));
+}
+
+function workspacePackageFrom(root, repo, name) {
+  const firstApp = coreFeApps(repo.sides.fe.apps)[0] ?? repo.sides.fe.apps.find(app => app.kind === "next");
+  const firstPackage = firstApp ? path.join(root, "fe", "apps", firstApp.name, "package.json") : null;
+  if (!firstPackage || !fs.existsSync(firstPackage)) throw new ScaffoldError("HFS_ADD_APP_PACKAGE_SOURCE", "add app needs the package.json of an existing declared Next app as the edition-matched dependency source");
+  const workspacePackage = JSON.parse(fs.readFileSync(firstPackage, "utf8"));
+  workspacePackage.name = `@${repo.project}/${name}`;
+  return workspacePackage;
+}
+
+function writeAppPlan(root, name, planned, declarationFile, declaration, packageFile) {
+  const rootPackage = JSON.parse(fs.readFileSync(packageFile, "utf8"));
+  const oldDeclaration = fs.readFileSync(declarationFile, "utf8");
+  const oldPackage = fs.readFileSync(packageFile, "utf8");
+  rootPackage.workspaces = [...new Set([...(rootPackage.workspaces ?? []), "fe/apps/*"])];
+  const created = [];
+  try {
+    for (const file of planned) {
+      const target = path.join(root, ...file.relative.split("/"));
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, file.body);
+      created.push(target);
+    }
+    fs.writeFileSync(declarationFile, jsonText(declaration));
+    fs.writeFileSync(packageFile, packageJsonText(rootPackage));
+  } catch (error) {
+    for (const file of [...created].reverse()) if (fs.existsSync(file)) fs.rmSync(file);
+    const appDir = path.resolve(root, "fe", "apps", name);
+    const workspaceRoot = path.resolve(root) + path.sep;
+    if (appDir.startsWith(workspaceRoot) && fs.existsSync(appDir)) fs.rmSync(appDir, { recursive: true, force: true });
+    fs.writeFileSync(declarationFile, oldDeclaration);
+    fs.writeFileSync(packageFile, oldPackage);
+    throw error;
+  }
+}
+
 /**
  * Adds one Next workspace from the edition's canonical app skeleton and the shared app core (both editions, owner ruling
  * 2026-10-13: lite and full have one fe structure), then registers it in hfs.json. The root workspace glob is added only when an
  * older app manifest does not already carry it.
  */
-export function addApp({ root, name }) {
+export function addApp({ root, name, authCallback = false }) {
   if (!NAME.test(String(name)))
     throw new ScaffoldError(
       "HFS_ADD_NAME_INVALID",
@@ -55,6 +110,8 @@ export function addApp({ root, name }) {
     );
   const manifest = loadSlotManifest();
   const repo = readRepoDeclaration(manifest, root);
+  const declaration = JSON.parse(fs.readFileSync(declarationFile, "utf8"));
+  enableAuthCallback(declaration, authCallback);
   if (!repo.sides?.fe)
     throw new ScaffoldError(
       "HFS_ADD_NO_FRONT_END",
@@ -66,48 +123,12 @@ export function addApp({ root, name }) {
       `front-end app ${name} is already declared`,
     );
 
-  const source = path.join(
-    TEMPLATES_DIR,
-    "fe",
-    repo.edition === "lite" ? "skeleton-lite/apps/web" : "skeleton/apps/app",
-  );
-  if (!fs.existsSync(source))
-    throw new ScaffoldError(
-      "HFS_ADD_TEMPLATE_MISSING",
-      `the ${repo.edition} Next app skeleton is not carried by this package`,
-    );
-  const values = {
-    project: repo.project,
-    app: name,
-    appPascal: pascalOf(name),
-  };
   const targetBase = `fe/apps/${name}`;
-  const readTemplate = (dir, relative) =>
-    fill(
-      render(fs.readFileSync(path.join(dir, ...relative.split("/")), "utf8").replace(/\r\n/g, "\n"), PARTIAL_VARIABLES),
-      values,
-      relative,
-    );
-  // The app skeleton, then the shared core, then the edition overlay: a later tree replaces an earlier file of the same path.
-  const byPath = new Map();
-  for (const dir of [source, ...CORE_DIRS[repo.edition === "lite" ? "lite" : "full"].map((core) => path.join(TEMPLATES_DIR, "fe", ...core.split("/")))]) {
-    if (!fs.existsSync(dir)) continue;
-    for (const relative of listFiles(dir)) byPath.set(relative, { relative: `${targetBase}/${relative}`, body: readTemplate(dir, relative) });
-  }
-  const planned = [...byPath.values()];
+  const planned = appSkeleton(repo, name, authCallback);
 
   // The dependency source is a product app (it carries the core's fe-stack packages), else the first Next app.
-  const firstApp = coreFeApps(repo.sides.fe.apps)[0] ?? repo.sides.fe.apps.find((app) => app.kind === "next");
-  const firstPackage = firstApp
-    ? path.join(root, "fe", "apps", firstApp.name, "package.json")
-    : null;
-  if (!firstPackage || !fs.existsSync(firstPackage))
-    throw new ScaffoldError(
-      "HFS_ADD_APP_PACKAGE_SOURCE",
-      "add app needs the package.json of an existing declared Next app as the edition-matched dependency source",
-    );
-  const workspacePackage = JSON.parse(fs.readFileSync(firstPackage, "utf8"));
-  workspacePackage.name = `@${repo.project}/${name}`;
+  const workspacePackage = workspacePackageFrom(root, repo, name);
+  if (authCallback) addAuthCallbackDependencies(workspacePackage, bundledPins(), true);
   const appTemplates = path.join(TEMPLATES_DIR, "fe", "app");
   planned.push(
     {
@@ -122,7 +143,6 @@ export function addApp({ root, name }) {
       body: fs.readFileSync(path.join(appTemplates, "tsconfig.json"), "utf8"),
     },
   );
-  const declaration = JSON.parse(fs.readFileSync(declarationFile, "utf8"));
   declaration.sides.fe.apps.push({ name, kind: "next" });
   if (repo.edition === "full") {
     const image = imageFiles(
@@ -147,32 +167,7 @@ export function addApp({ root, name }) {
       `front-end app ${name} already exists: ${clashes.join(", ")}`,
     );
 
-  const rootPackage = JSON.parse(fs.readFileSync(packageFile, "utf8"));
-  const oldDeclaration = fs.readFileSync(declarationFile, "utf8");
-  const oldPackage = fs.readFileSync(packageFile, "utf8");
-  rootPackage.workspaces = [
-    ...new Set([...(rootPackage.workspaces ?? []), "fe/apps/*"]),
-  ];
-  const created = [];
-  try {
-    for (const file of planned) {
-      const target = path.join(root, ...file.relative.split("/"));
-      fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.writeFileSync(target, file.body);
-      created.push(target);
-    }
-    fs.writeFileSync(declarationFile, jsonText(declaration));
-    fs.writeFileSync(packageFile, packageJsonText(rootPackage));
-  } catch (error) {
-    for (const file of [...created].reverse())
-      if (fs.existsSync(file)) fs.rmSync(file);
-    const appDir = path.join(root, "fe", "apps", name);
-    if (fs.existsSync(appDir))
-      fs.rmSync(appDir, { recursive: true, force: true });
-    fs.writeFileSync(declarationFile, oldDeclaration);
-    fs.writeFileSync(packageFile, oldPackage);
-    throw error;
-  }
+  writeAppPlan(root, name, planned, declarationFile, declaration, packageFile);
   return {
     created: planned.map((file) => file.relative),
     registered: { app: name, workspace: "fe/apps/*" },

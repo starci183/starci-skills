@@ -95,7 +95,8 @@ rules:
     requirement: |
       Both sides are apps/<app>/ monorepos even with one application; each app's name and kind are declared in `hfs.json`
       `sides.<side>.apps` — a back-end app of kind api, worker or cli (slots be.app.api, be.app.worker, be.app.cli; the
-      cli app is named cli) or a front-end app of kind next (slot fe.app.next). A back-end app's composition lives in
+      cli app is named cli) or a front-end app of kind next (slot fe.app.next). Both lite and full may declare multiple
+      front-end apps. A back-end app's composition lives in
       be/apps/<app>/src and nothing else, within its app slot's closed allow-list; shared back-end source lives in
       be/src/features and be/src/modules. A front-end app is slot fe.app.next — an npm workspace of the app root with its
       own package.json — and all of its product source sits under fe/apps/<app>/src; fe/ has no src/. Apps never import
@@ -180,7 +181,7 @@ rules:
     hfsRules: [R07, R10, R01]
     requirement: |
       The app root owns slot `app.starciwork`: required for full's product records, optional for lite when there are no
-      brand records. R212 permits only `.gitignore`, optional `workspace.yaml` metadata and `brand/**` in lite, as described
+      brand records. `ruling:R212/case-4` permits only `.gitignore`, optional `workspace.yaml` metadata and `brand/**` in lite, as described
       in starciwork.yaml.
       `.starcistacks/` and `.sops.yaml` (slots `app.starcistacks`, `app.sops`) are required at the app root.
       Neither side holds any of them (slot `repo.side-root-forbidden`; `.starcistacks` in a side is refused,

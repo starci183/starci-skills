@@ -3,7 +3,8 @@ id: be.supabase-queues
 title: Supabase adapters of the lite edition
 purpose: |-
   Given a lite app (hfs.json `edition: lite`), how do the queue, event-bus, realtime, cache, lock and scheduling ports run without
-  self-hosted infrastructure? Lite is the full code structure deployed on Supabase (owner rulings 2026-10-12 and 2026-10-13, R212 cases 1-3): the
+  self-hosted backing services? Lite keeps the full code structure with Supabase backing services (R212;
+  owner ruling 2026-10-14: app-owned schedules and docker-swarm production): the
   ports, slots, folders, producers, processors, consumers and unit specs are exactly full's, and only the adapter behind each
   port changes. The queue and event-bus transport is Supabase Queues (pgmq, confirmed by the owner the same day): the outbox
   relay of `platform/outbox` sends committed rows to pgmq through the shared EntityManager, a processor or consumer reads with a
@@ -28,7 +29,8 @@ provenance:
   limitations: |-
     Static checks prove that a lite back end imports no BullMQ, Kafka, Redis or graphql-ws library (the lite infraOwners) and that
     the outbox is written in the caller's transaction. They do not prove visibility timeouts, retry budgets or that a pg_cron
-    cadence suits the business; an optional integration spec on `starci supabase start` proves delivery against the real pgmq.
+    cadence suits the business; the declared pattern's integration scenarios on `starci supabase start` prove delivery
+    against the real pgmq (R284).
 rules:
   - id: BE-SUPABASE-QUEUES-1
     title: Lite keeps the ports and swaps only the adapter
@@ -132,7 +134,8 @@ rules:
     hfsRules: [R90, R212]
     requirement: |-
       A schedule is a pg_cron job declared in a supabase migration (`cron.schedule(name, cadence, $$select pgmq.send(...)$$)`),
-      or `pg_net` calling a webhook door, or the platform scheduler of the host; never `@nestjs/schedule` and never a cron
+      `pg_net` calling a webhook door, or a declared replicated-job running the app's cli command. The schedule and overlap
+      policy are declared in `.starcistacks/application-stacks.yaml`; never use a host scheduler, `@nestjs/schedule` or a cron
       process of its own. Cache is Postgres (an unlogged table owned by the cache capability) and a lock or lease is a Postgres
       advisory lock (`pg_try_advisory_xact_lock`) or a row claim. Realtime is the socket.io gateway of be.feature.realtime.websocket
       inside the api process, one instance with no Redis adapter (knowledge/patterns/be/realtime.yaml liteAdapter); a push that
@@ -154,15 +157,15 @@ rules:
         - Confirm each pg_cron job is declared in a migration and enqueues, never runs business SQL itself.
     relatedExamples: []
   - id: BE-SUPABASE-QUEUES-6
-    title: Unit specs as full; integration optional on the local Supabase stack
+    title: Unit specs as full; declared patterns prove integration on the local Supabase stack
     kind: mandatory
-    hfsRules: [R47, R48, R212]
+    hfsRules: [R47, R48, R212, R284]
     requirement: |-
       The adapters are logic files of `coverage: required` slots: each owes 100 per file through unit specs that use the
       @starci/jest-preset doubles (the recording queue outbox, the fake transaction, the mock EntityManager whose `query` answers
-      the pgmq calls). An integration spec of a queue or of the event bus is optional; when present it runs on `starci supabase start`
-      through useTestWorld({ modules }) and titles its scenarios `queue/<scenario>` or `event-bus/<scenario>`. There is no e2e or
-      contract spec, no container and no toxiproxy.
+      the pgmq calls). A declared queue or event-bus pattern requires integration specs on `starci supabase start`
+      through useTestWorld({ modules }), titled with its `queue/<scenario>` or `event-bus/<scenario>` ids (R284).
+      Lite may also hold contract specs; e2e specs, test containers and toxiproxy remain full-only.
     rationale: |-
       The ruling keeps the unit world whole and removes only the infrastructure the e2e world would need.
     cases:

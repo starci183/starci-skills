@@ -111,3 +111,13 @@ test("addApp keeps the full-edition scaffold and registration behavior", () => {
   assert.doesNotMatch(read(root, "fe/apps/admin/src/modules/auth/client.ts"), /@supabase/, "full keeps the IdP stub");
   assert.doesNotMatch(read(root, "fe/apps/admin/src/features/layouts/AppLayout/index.tsx"), /\{\{> /, "partials are rendered");
 });
+
+test("addApp refuses a server callback without a Supabase connection before writing or registering the new front end", () => {
+  for (const edition of ["lite", "full"]) {
+    const root = appRoot(edition);
+    const before = read(root, "hfs.json");
+    assert.throws(() => addApp({ root, name: "admin", authCallback: true }), { code: "HFS_SCAFFOLD_CALLBACK_PROVIDER" });
+    assert.equal(read(root, "hfs.json"), before);
+    assert.equal(fs.existsSync(path.join(root, "fe", "apps", "admin")), false);
+  }
+});

@@ -2,8 +2,13 @@
 // owner units, the layer order and the public entry of an owner. Cycles are a graph property of the architecture check, not of one edge.
 import { RUNTIME_KIND } from './manifest-shape.mjs';
 import { classifyIn, ownerIn, tierIn } from './slot-classify.mjs';
+import { braceVariants, globExpression } from '../lib/glob.mjs';
 
 const isEntryFile = (name) => name === 'index.ts' || name === 'index.tsx';
+
+function declaredEntry(slot, relative) {
+  return (slot.entries ?? []).some(entry => braceVariants(entry).some(pattern => globExpression(pattern).test(relative)));
+}
 
 function unownedPathProblem(from, to) {
   for (const side of [from, to]) {
@@ -39,9 +44,19 @@ function privateEntryProblem({ repo, byId }, to, toOwner) {
   if (toOwner && repo.kind !== RUNTIME_KIND) {
     const relative = to.path === toOwner.root ? '' : to.path.slice(toOwner.root.length + 1);
     const ownerSlot = byId.get(toOwner.slot);
-    const entry = isEntryFile(relative) || (byId.get(to.slot).entries ?? []).includes(to.path.slice(to.root.length + 1)) || (ownerSlot.tier === 'package' && relative === 'src/index.ts') || (ownerSlot.tier === 'app' && relative === 'app.module.ts');
+    const entry = isEntryFile(relative) || declaredEntry(byId.get(to.slot), to.path.slice(to.root.length + 1)) || (ownerSlot.tier === 'package' && relative === 'src/index.ts') || (ownerSlot.tier === 'app' && relative === 'app.module.ts');
     if (!entry) return { allowed: false, reason: 'notPublicEntry', owner: toOwner.root, path: to.path };
   }
+  return null;
+}
+
+function tierImportProblem(scope, from, to, fromTier, toTier) {
+  const { mayImport, mayImportKinds, mayImportSlots } = scope.manifest.tiers[scope.profile][fromTier] ?? {};
+  if (!mayImport?.includes(toTier)) return { allowed: false, reason: 'tierDirection', fromTier, toTier, mayImport: mayImport ?? [] };
+  const kindRestriction = mayImportKinds?.[toTier];
+  if (kindRestriction && (!kindRestriction.from.includes(from.kind) || !kindRestriction.to.includes(to.kind))) return { allowed: false, reason: 'tierDirection', fromTier, toTier, mayImport, kindRestriction, fromKind: from.kind ?? null, toKind: to.kind ?? null };
+  const slotRestriction = mayImportSlots?.[toTier];
+  if (slotRestriction && !slotRestriction.from.includes(from.slot)) return { allowed: false, reason: 'tierDirection', fromTier, toTier, mayImport, slotRestriction, fromSlot: from.slot };
   return null;
 }
 
@@ -65,10 +80,8 @@ export function importAllowedIn(scope, fromPath, toPath) {
   const fromOwner = ownerIn(scope, from.path);
   const toOwner = ownerIn(scope, to.path);
   if (sameOwnerUnit(from, fromOwner) === sameOwnerUnit(to, toOwner)) return { allowed: true, reason: 'sameOwner' };
-  const { mayImport, mayImportKinds } = scope.manifest.tiers[scope.profile][fromTier] ?? {};
-  if (!mayImport?.includes(toTier)) return { allowed: false, reason: 'tierDirection', fromTier, toTier, mayImport: mayImport ?? [] };
-  const kindRestriction = mayImportKinds?.[toTier];
-  if (kindRestriction && (!kindRestriction.from.includes(from.kind) || !kindRestriction.to.includes(to.kind))) return { allowed: false, reason: 'tierDirection', fromTier, toTier, mayImport, kindRestriction, fromKind: from.kind ?? null, toKind: to.kind ?? null };
+  const tierProblem = tierImportProblem(scope, from, to, fromTier, toTier);
+  if (tierProblem) return tierProblem;
   const layerProblem = lowerLayerProblem(scope, from, to, fromTier, toTier, fromOwner, toOwner);
   if (layerProblem) return layerProblem;
   // A runtime owner is imported file by file (crossOwner of knowledge/hfs/runtime-slots.yaml): no public entry.

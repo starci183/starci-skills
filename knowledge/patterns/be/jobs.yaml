@@ -259,7 +259,7 @@ files:
     role: "Titles fenced-job/<scenario>: ... prove the pattern."
     spec: fenced-job/claim-bumps-token, fenced-job/zombie-fenced-out, fenced-job/redispatch-isolated
     rules: [BE_PATTERN_SPEC_MISSING]
-# Edition lite (owner ruling 2026-10-12, R212 case-1): the same ports and rules, a Supabase adapter behind them.
+# Edition lite (R212, owner ruling 2026-10-14): the same ports and rules, a Supabase adapter behind them.
 liteAdapter:
   summary: >-
     Under lite a fenced job is unchanged: the job row with its fencing token, the atomic claim, guarded writes and run keys. The
@@ -267,5 +267,7 @@ liteAdapter:
   ports:
     - {port: job claim (platform/jobs), adapter: "the same claim SQL through the shared EntityManager; the table comes from supabase/migrations"}
     - {port: processor delivery, adapter: "the lite queue worker (pgmq.read, visibility timeout, archive on dead letter)"}
-  proof: Unit specs as full (job-claim.service.spec.ts); the fenced-job/* scenarios are optional integration specs on `starci supabase start`.
+  proof: >-
+    Unit specs as full (job-claim.service.spec.ts); declaring fenced-job requires integration specs titled
+    `fenced-job/<scenario>: ...` for every declared scenario on `starci supabase start` (R284).
   see: [knowledge/patterns/be/supabase-queues.yaml]

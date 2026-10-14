@@ -70,13 +70,16 @@ rules:
       manual:
         - Confirm the schedule and the overlap policy fit the recovery contract.
     relatedExamples: []
-# Edition lite (owner ruling 2026-10-12, R212 case-1): the same ports and rules, a Supabase adapter behind them.
+# Edition lite (R212, owner ruling 2026-10-14): the same ports and rules, a Supabase adapter behind them.
 liteAdapter:
   summary: >-
     Under lite background work keeps its runners: processors and consumers are composed by the api app or by the optional worker
-    app, exactly as full. A schedule is a pg_cron job (or pg_net, or the host's scheduler) that enqueues, never a cron process of
-    the app's own.
+    app, exactly as full. Scheduled work is app-owned: pg_cron/pg_net enqueues a message, or a declared replicated-job schedule
+    runs the cli command. The schedule and overlap policy are declared in `.starcistacks/application-stacks.yaml`.
   ports:
     - {port: schedule, adapter: "pg_cron in a supabase migration calling pgmq.send"}
     - {port: runner, adapter: the api app or the optional worker app polling its pgmq queues}
+  proof: >-
+    `starci app check --wiring` proves the lite app's module graph with doubles (R272); declared patterns also require their
+    scenario-titled integration specs (R284).
   see: [knowledge/patterns/be/supabase-queues.yaml]

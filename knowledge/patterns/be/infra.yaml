@@ -118,14 +118,15 @@ rules:
         - BE_INFRA_OWNER
       manual: []
     relatedExamples: []
-# Edition lite (owner ruling 2026-10-12, R212 case-1): the same ports and rules, a Supabase adapter behind them.
+# Edition lite (R212, owner ruling 2026-10-14): the same ports and rules, a Supabase adapter behind them.
 liteAdapter:
   summary: >-
     Under lite every raw library keeps one owner, and the self-hosted ones are owned nowhere (ruleParams.be.lite.infraOwners):
-    BullMQ, Kafka, Redis and the socket servers. Cache is a Postgres unlogged table of the cache capability; a lock or lease is a
-    Postgres advisory lock or a row claim; the @supabase/* client stays the one import of integrations/supabase.
+    BullMQ, Kafka and Redis. The socket.io server is owned by platform/realtime, with its gateway composed by one api instance.
+    Cache is a Postgres unlogged table of the cache capability; a lock or lease is a Postgres advisory lock or a row claim;
+    the @supabase/* client stays the one import of integrations/supabase.
   ports:
     - {port: cache, adapter: "an unlogged table owned by the cache capability, keys declared in its cache-keys file"}
     - {port: lock, adapter: "pg_try_advisory_xact_lock in the caller's transaction, or a claimed row"}
-  forbids: [bullmq, "@nestjs/bullmq", kafkajs, redis, ioredis, socket.io, "@nestjs/platform-socket.io", graphql-ws, graphql-subscriptions]
-  see: [knowledge/patterns/be/supabase-queues.yaml]
+  forbids: [bullmq, "@nestjs/bullmq", kafkajs, redis, ioredis, graphql-ws, graphql-subscriptions]
+  see: [knowledge/patterns/be/supabase-queues.yaml, knowledge/patterns/be/realtime.yaml]
