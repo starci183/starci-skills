@@ -4,7 +4,7 @@ import { DataSource } from "typeorm"
 import type { EntityManager, QueryRunner } from "typeorm"
 import { EnvSource } from "@modules/platform/config"
 import { sql } from "@modules/platform/database"
-import { readCliEnv } from "../../../../apps/cli/src/cli.env"
+import { readCliEnv } from "../../../apps/cli/src/cli.env"
 
 interface JobSnapshot {
     readonly id: string

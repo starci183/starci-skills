@@ -69,7 +69,7 @@ test('every lite workflow is structurally valid and pins each action by SHA', ()
   }
 });
 
-test('lite workflow semantics: the unit run and its coverage upload, never an e2e, integration or browser run (owner ruling 2026-10-12)', () => {
+test('lite managed workflow runs unit specs and uploads coverage without e2e, integration or browser jobs (ruling:R212/case-1, amended by ruling:R212/case-4)', () => {
   const ci = workflows['.github/workflows/ci.yml'];
   const dbTypes = ci.jobs['db-types'];
   assert.equal(ci.jobs.changes, undefined, 'no path-filter job: the tag run checks the database types unconditionally');
@@ -90,11 +90,25 @@ test('lite workflow semantics: the unit run and its coverage upload, never an e2
   const images = workflows['.github/workflows/images.yml'].jobs.image.strategy.matrix.include;
   assert.deepEqual(
     images.map(entry => [entry.name, entry.file]).sort(byImageName),
-    [
-      ...LITE.sides.be.apps.map(app => [app.name, `be/apps/${app.name}/Dockerfile`]),
-      ...LITE.sides.fe.apps.map(app => [app.name, `fe/apps/${app.name}/Dockerfile`]),
-    ].sort(byImageName),
+    LITE.sides.be.apps.map(app => [app.name, `be/apps/${app.name}/Dockerfile`]).sort(byImageName),
   );
+});
+
+test('lite includes only authored optional frontend images and full includes every frontend image', () => {
+  const hfs = structuredClone(LITE);
+  hfs.sides.fe.apps.push({ name: 'portal', kind: 'next' });
+  const source = { files: [], read: () => '', hasImage: file => file === 'fe/apps/web/Dockerfile' };
+  for (const edition of ['lite', 'full']) {
+    const rendered = renderTargets({ ...hfs, edition }, undefined, { manifest: MANIFEST, source });
+    const images = parseYaml(rendered.find(target => target.path === '.github/workflows/images.yml').content);
+    const expected = hfs.sides.be.apps.map(app => [app.name, `be/apps/${app.name}/Dockerfile`]);
+    expected.push(['web', 'fe/apps/web/Dockerfile']);
+    if (edition === 'full') expected.push(['portal', 'fe/apps/portal/Dockerfile']);
+    assert.deepEqual(images.jobs.image.strategy.matrix.include.map(entry => [entry.name, entry.file]).sort(byImageName), expected.sort(byImageName));
+    const renderedScripts = rendered.find(target => target.path === 'package.json').scripts;
+    assert.equal(renderedScripts['docker:build:web'], 'docker build -f fe/apps/web/Dockerfile -t managed-validity/web:dev .');
+    assert.equal(typeof renderedScripts['docker:build:portal'], edition === 'full' ? 'string' : 'undefined');
+  }
 });
 
 test('every workflow and hook npm run target exists in the lite package scripts', () => {
@@ -119,7 +133,7 @@ test('both lite hooks are valid sh', t => {
   }
 });
 
-test('lite package scripts carry the unit run and the optional integration run, never e2e or contract, and use only the approved database command surface', () => {
+test('lite package scripts carry unit and integration runs without undeclared contract or e2e runs, and use only the approved database command surface', () => {
   assert.deepEqual(Object.keys(scripts).filter(name => /^test(?::|$)/.test(name)).sort(), ['test', 'test:affected', 'test:integration']);
   assert.equal(scripts.test, 'cd be && jest --selectProjects unit --coverage');
   assert.equal(scripts['typecheck:tests'], 'tsc -p be/src/tests/tsconfig.json');

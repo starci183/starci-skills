@@ -186,15 +186,15 @@ rules:
       - id: case-5
         when: The choice switches between different screens of content (upload | write | FAQ) rather than setting one value of a form
         assert: |-
-          Owner ruling 2026-10-12: it is `Tabs`, each tab owning its panel; `SegmentedControl` is reserved for choosing one value inside a form (who may see it, a period, a view density), and is never used to swap whole panels
+          Owner decision STATE-6/case-5 (2026-10-12): it is `Tabs`, each tab owning its panel; `SegmentedControl` is reserved for choosing one value inside a form (who may see it, a period, a view density), and is never used to swap whole panels
       - id: case-6
         when: Tabs are placed
         assert: |-
-          Owner ruling 2026-10-12: `Tabs variant="primary"` (the underline bar) switches the page's main areas, sits under the page header, appears at most once per page and may reflect the URL; `Tabs variant="secondary"` (the compact pill strip) switches panels inside a sub-region - a drawer, card, dialog or rail - and never reflects the URL. A tab set nested in another is the secondary one; two tab sets of the same variant are never nested
+          Owner decision STATE-6/case-6 (2026-10-12): `Tabs variant="primary"` (the underline bar) switches the page's main areas, sits under the page header, appears at most once per page and may reflect the URL; `Tabs variant="secondary"` (the compact pill strip) switches panels inside a sub-region - a drawer, card, dialog or rail - and never reflects the URL. A tab set nested in another is the secondary one; two tab sets of the same variant are never nested
       - id: case-7
         when: The secondary tab strip is painted
         assert: |-
-          Owner ruling 2026-10-12: `Tabs variant="secondary"` is HeroUI's own pill tabs, unpainted by the grammar - a soft `--default` track, the selected tab a white `--segment` pill with the surface shadow and foreground text. It is never re-painted in the accent-soft chip family: next to a ButtonGroup or selectable chips that paint read as a row of buttons, not a view switcher. A tab with no leading icon always shows its label, at every width. The track keeps its padding on every side: the selected pill never sits on the track's edge
+          Owner decision STATE-6/case-7 (2026-10-12): `Tabs variant="secondary"` is HeroUI's own pill tabs, unpainted by the grammar - a soft `--default` track, the selected tab a white `--segment` pill with the surface shadow and foreground text. It is never re-painted in the accent-soft chip family: next to a ButtonGroup or selectable chips that paint read as a row of buttons, not a view switcher. A tab with no leading icon always shows its label, at every width. The track keeps its padding on every side: the selected pill never sits on the track's edge
   - id: STATE-7
     title: Controlled disclosure
     governs: Governs a summary that reveals a region.

@@ -7,7 +7,7 @@ import { PgmqQueueTransportClient } from "@modules/platform/queue/pgmq-queue-tra
 import { QueueOutboxService } from "@modules/platform/queue/queue-outbox.service"
 import { QueueRelayService } from "@modules/platform/queue/queue-relay.service"
 import type { QueueOptions } from "@modules/platform/queue/queue.options"
-import { QueueDatabaseFixture } from "./queue.database.fixture"
+import { QueueDatabaseFixture } from "../../fixtures/queue.database.fixture"
 
 const options: QueueOptions = {
     relayIntervalMs: 1,

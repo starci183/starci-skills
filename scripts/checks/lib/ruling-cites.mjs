@@ -406,6 +406,9 @@ function checkStaleStatements({ rel, text, add }, chunks, patterns) {
   const staleChunks = SOURCE.test(rel) && !SPEC.test(rel) ? [{ start: 0, text }] : chunks;
   for (const chunk of staleChunks) {
     for (const { record, pattern } of patterns) {
+      // A ruling that retires a term declares `retiredIn`: the enforcer that implements the retirement and the ledger entry that records it
+      // may name the retired term. Every other file naming it is still a stale statement.
+      if (list(record.retires).length && list(record.retiredIn).includes(rel)) continue;
       for (const match of chunk.text.matchAll(pattern))
         add(
           rel,

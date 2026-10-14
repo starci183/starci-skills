@@ -6,7 +6,7 @@ purpose: |
   is the full code structure with its backing infrastructure swapped for Supabase (owner ruling 2026-10-13, R212 cases
   1-3), seen through a filtered slot and rule view (`edition: lite` in hfs.json). The same monorepo, slots, patterns and
   back-end unit specs; every pattern port implemented on Supabase (knowledge/patterns/be/supabase-queues.yaml and the lite
-  adapter of each pattern topic); the same front end (knowledge/hfs/fe-stack.yaml); no e2e or contract world. Its api and
+  adapter of each pattern topic); the same front end (knowledge/hfs/fe-stack.yaml); no e2e world, with optional contract specs. Its api and
   sidecars run on the VPS with Docker Swarm through app.starcistacks.
 appliesTo:
   - backend
@@ -19,7 +19,7 @@ provenance:
     - knowledge/hfs/slots.yaml
     - knowledge/hfs/rules.yaml
     - docs/lite-edition.md
-    - owner ruling 2026-10-12 (lite = full minus self-hosted infrastructure; queue transport Supabase Queues/pgmq)
+    - ruling:R212/case-1 (2026-10-12, with the Work boundary amended by ruling:R212/case-4; lite keeps full architecture with Supabase backing services; queue transport Supabase Queues/pgmq)
     - owner rulings 2026-10-13 (one code structure and one front end for both editions; backing infrastructure swapped for Supabase; the HFS standard, migration baseline and assets policies)
     - owner-approved Swarm canon 2026-10-14 (lite api and sidecars on the VPS, app-owned scheduled work)
     - knowledge/hfs/fe-stack.yaml
@@ -46,8 +46,8 @@ rules:
       app.starcistacks declares Supabase as managed backing and the environment with `runtime: docker-swarm`. The ingress is
       any declared `role: ingress` component (Traefik or Caddy); a sidecar such as n8n keeps its state in SQLite on a declared
       persistent volume, never in a self-hosted Postgres.
-      Integration specs are optional and run only on `starci supabase start`. A lite app holds
-      none of the infrastructure lite does not run: no e2e or contract spec or script, no e2e workflow or browser journey, no
+      Integration specs are optional and run only on `starci supabase start`. Contract specs are optional (ruling:lite-contract-specs). A lite app holds
+      none of the infrastructure lite does not run: no e2e spec or script, no e2e workflow or browser journey, no
       UAT record, no test container, toxiproxy, BullMQ, Kafka or Redis dependency. The app.starcistacks lite overlay permits
       Swarm infra and refuses the other infra runtimes, runtime and seeds trees and components duplicating Supabase-provided
       backing services. The app.supabase.functions slot is unavailable. The front end is the one front-end standard of
@@ -59,8 +59,8 @@ rules:
       app-root detection and front-end role mapping. The catalog, shell, features, resources, UAT and br records are
       forbidden (HFS_STARCIWORK_LITE_FORBIDDEN).
     rationale: |
-      One manifest and one catalog keep a lite app upgradable to full by additions only: swap the adapters, add the e2e and
-      contract world and self-hosted backing services.
+      One manifest and one catalog keep a lite app upgradable to full by additions only: swap the adapters, add the full
+      test world and self-hosted backing services; lite may already carry optional contract specs (owner:lite-contract-specs).
     cases:
       - id: case-1
         when: A product outgrows lite

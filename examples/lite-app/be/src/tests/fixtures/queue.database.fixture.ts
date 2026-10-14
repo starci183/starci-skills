@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { DataSource } from "typeorm"
 import type { EntityManager } from "typeorm"
 import { EnvSource } from "@modules/platform/config"
-import { readCliEnv } from "../../../../apps/cli/src/cli.env"
+import { readCliEnv } from "../../../apps/cli/src/cli.env"
 
 /** The disposable local migration-owner connection: cron registration and cleanup need owner privileges. */
 export class QueueDatabaseFixture {

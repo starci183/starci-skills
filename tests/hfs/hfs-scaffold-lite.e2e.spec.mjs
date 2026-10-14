@@ -151,7 +151,7 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
     assert.equal(run.status, 0, `${label} failed (${run.status ?? run.error?.message}); output withheld because it may contain local keys`);
     return run;
   };
-  // The back end's unit run with its per-file coverage thresholds (owner ruling 2026-10-12): every scaffolded logic file is at 100.
+  // The back end's unit run with its per-file coverage thresholds (ruling:R212/case-1, amended by ruling:R212/case-4): every scaffolded logic file is at 100.
   step('npm test', ['test']);
   step('npm run typecheck', ['run', 'typecheck']);
   step('npm run lint', ['run', 'lint']);

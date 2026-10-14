@@ -1,12 +1,12 @@
 // The owner handover: a workflow is done only when the owner approves it.
 //
-// Owner ruling 2026-09-23: at handover one op lets the owner test, give feedback
+// owner:handover-owner-approval: at handover one op lets the owner test, give feedback
 // or ask, and the workflow counts as done only when the reviewer approves.
 // handover.review is that op (modules/ops/ops/handover.review.yaml), the last
 // leg of every chain; scripts/kernel/handover.mjs reads the answer receipt back;
 // starci kernel settle records handover-approved only for the owner's approve, and api
 // finish refuses handover-not-approved without it.
-import test,{describe} from 'node:test';
+import test,{after,before,describe} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -51,6 +51,19 @@ const runSettler=(...args)=>execute(process.execPath,[API,...args],{cwd:ROOT,win
   env:{...process.env,ORCA_TERMINAL_HANDLE:'',STARCI_ROLE:'',STARCI_CALLER:'runtime-settler'}});
 const json=r=>{try{return JSON.parse(r.stdout);}catch{const open=r.stdout.indexOf('{'),close=r.stdout.indexOf('\n}');return open<0||close<0?null:JSON.parse(r.stdout.slice(open,close+2));}};
 const OPTIONS=['Duy\u1ec7t - workflow ho\u00e0n t\u1ea5t','G\u00f3p \u00fd / b\u00e1o l\u1ed7i - m\u00f4 t\u1ea3 trong ghi ch\u00fa','\u0110\u1eb7t c\u00e2u h\u1ecfi - ghi trong ghi ch\u00fa'];
+
+let scratchTempRoot, previousTempRoot;
+before(()=>{
+  previousTempRoot=process.env.STARCI_TEMP_ROOT;
+  scratchTempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-handover-temp-'));
+  // Scratch cleanup belongs to this spec process, including when other files run concurrently.
+  process.env.STARCI_TEMP_ROOT=scratchTempRoot;
+});
+after(()=>{
+  if(previousTempRoot===undefined)delete process.env.STARCI_TEMP_ROOT;
+  else process.env.STARCI_TEMP_ROOT=previousTempRoot;
+  fs.rmSync(scratchTempRoot,{recursive:true,force:true,maxRetries:20,retryDelay:25});
+});
 
 const fixture=t=>{
   const repo=fs.mkdtempSync(path.join(os.tmpdir(),'starci-handover-'));

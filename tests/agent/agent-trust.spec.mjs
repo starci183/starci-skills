@@ -274,7 +274,7 @@ test('launch trust registers the command guard hook in the worktree\'s project s
   assert.equal(assertJsonToolGuard({file:devinFile,command}).ok,false,'a hooks value that is not an object is never rewritten');
 });
 
-// Lead ruling 2026-10-01: launch trust writes Claude's and Devin's guard hook and launch settings only under the launch
+// Launch trust scope (lead decision 2026-10-01; scripts/agent/trust.mjs projectTargets): Claude's and Devin's guard hook and launch settings are written only under the launch
 // worktree (and its repository's own info/exclude), never a user-global settings file: ~/.claude/settings.json and
 // Devin's user config.json keep no guard hook and no launch setting from the runtime. Codex lists no hook of a linked
 // worktree's project layer, so its guard hook is the block in the managed Codex home's config.toml. The home is

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // R247 RT_COVERAGE_MATRIX: every applicable edition has a complete chain of coverage evidence.
 //   starci runtime check --only hfs-coverage -- [--json] [--witness]
-// Metadata-free rules older than R247 report warnings; adopting rules enter the coverage gate.
+// Every rule gates missing enforcers; other metadata-free legacy gaps remain warnings.
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -13,6 +13,7 @@ import { coverageLedgerFindings } from './lib/coverage-ledgers.mjs';
 import { coverageCiteFindings } from './lib/coverage-cites.mjs';
 import { runCoverageWitnesses } from './lib/coverage-witness.mjs';
 import { applyCoverageRatchet } from './lib/coverage-ratchet.mjs';
+import { PLUGIN_ENTRY, pluginRuleIds } from './check-hfs-rules.mjs';
 
 export const CODE = 'RT_COVERAGE_MATRIX';
 export { REPORT_ONLY_CODES };
@@ -23,14 +24,16 @@ export function hfsCoverageFindings(context) {
 }
 
 /** Read only authored, non-secret sources. Missing ledgers remain coverage findings until their batches land. */
-export function loadCoverageContext(root = skillRoot) {
+export async function loadCoverageContext(root = skillRoot) {
   const manifest = loadSlotManifest({ root });
   const catalog = loadRuleCatalog({ root, manifest });
   const files = coverageSources(root);
+  const plugins = Object.fromEntries(await Promise.all(Object.keys(PLUGIN_ENTRY)
+    .map(async (kind) => [kind, await pluginRuleIds(root, kind)])));
   const yaml = (file) => files.has(file) ? parseYaml(files.get(file)) : null;
   const schemas = [...files].filter(([file]) => /^modules\/schemas\/work-[^/]+\.schema\.yaml$/.test(file))
     .map(([file, text]) => ({ path: file, document: parseYaml(text) }));
-  return { root, catalog, manifest, files, schemas, examples: exampleInventory(files),
+  return { root, catalog, manifest, files, plugins, schemas, examples: exampleInventory(files),
     surfaces: yaml('knowledge/hfs/surfaces.yaml'), requirements: yaml('knowledge/hfs/requirements.yaml'),
     rulings: yaml('modules/kernel/owner-rulings.yaml'), hfsRulings: yaml('knowledge/hfs/rulings.yaml') };
 }
@@ -47,7 +50,7 @@ export function coverageReport(findings, inventory = {}) {
 
 export async function checkHfsCoverage(root = skillRoot, { witness = false, judge } = {}) {
   let context;
-  try { context = loadCoverageContext(root); } catch (error) {
+  try { context = await loadCoverageContext(root); } catch (error) {
     return { ok: false, errors: 1, warnings: 0, findings: [], refusal: {
       code: error instanceof HfsSlotsError ? error.code : CODE,
       message: error instanceof HfsSlotsError ? error.message : 'The coverage inventory cannot be parsed; repair its catalog or source declarations.' } };

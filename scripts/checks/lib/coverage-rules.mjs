@@ -17,13 +17,11 @@ const refsIn = (refs, edition) => (Array.isArray(refs) ? refs : []).filter((ref)
 const relatedSlots = (rule, views) => views.filter(({ slot }) => (slot.rules ?? []).some((code) => code === rule.id || rule.failureCodes.includes(code)));
 
 function enforcerExists(context, enforcer, rule) {
+  if (['eslint-be', 'eslint-fe', 'stylelint'].includes(enforcer.kind)) {
+    return context.plugins?.[enforcer.kind]?.ids?.has(enforcer.id) ?? false;
+  }
   if (enforcer.at) return context.files.has(enforcer.at) && rule.failureCodes.some((code) => context.files.get(enforcer.at).includes(code));
-  // Lint enforcers are registered by their exported rule id. Their implementation/spec files are authored sources.
-  const dir = { 'eslint-be': 'packages/eslint/be/', 'eslint-fe': 'packages/eslint/fe/', stylelint: 'packages/stylelint/' }[enforcer.kind];
-  if (!dir) return false;
-  const escaped = escapeRegExp(enforcer.id);
-  const key = new RegExp(String.raw`['"]${escaped}['"]\s*:`);
-  return [...context.files].some(([file, text]) => file.startsWith(dir) && file.endsWith('.mjs') && !file.endsWith('.spec.mjs') && !file.includes('/fixtures/') && key.test(text));
+  return false;
 }
 
 const TEST_TITLE = /(?:^|\W)(?:test|it|describe|t\.test)\s*\(\s*(['"`])([^'"`\n]+)\1/g;
@@ -103,7 +101,8 @@ function ruleEvidence(context, rule, edition, templates) {
   const owned = relatedSlots(rule, slotViews(context.manifest, edition));
   const hasTemplate = refsIn(rule.exemplifiedBy, edition).some((ref) => templateEvidence(context.files, ref).length)
     || owned.some(({ slot }) => templates.templates.get(slot.id)?.length);
-  if (!hasTemplate) add('RT_COVERAGE_NO_TEMPLATE', 'no existing template or managed slot template covers this edition');
+  const templateNa = typeof rule.templateNa === 'string' && rule.templateNa.trim().length > 0;
+  if (!hasTemplate && !templateNa) add('RT_COVERAGE_NO_TEMPLATE', 'no existing template, managed slot template or templateNa reason covers this edition');
   if (!refsIn(rule.exemplifiedBy, edition).some((ref) => exampleEvidence(context, ref, edition).length
     || fixtureEvidence(context, ref, edition, codes))) add('RT_COVERAGE_NO_EXAMPLE', 'no existing example or dedicated fixture is named for this edition');
   out.push(...coverageGateFindings(context, rule, edition));

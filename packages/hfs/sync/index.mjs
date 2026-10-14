@@ -139,7 +139,7 @@ function trailingNewline(text) {
   return text.slice(0, end) + '\n';
 }
 
-/** What the app's sync reads from the jest preset it installs for its be side: the Sonar exclusions ({ sonarExclusions }); both editions install it (a lite back end keeps full's unit run, owner ruling 2026-10-12). */
+/** What the app's sync reads from the jest preset it installs for its be side: the Sonar exclusions ({ sonarExclusions }); both editions install it (a lite back end keeps full's unit run, ruling:R212/case-1, amended by ruling:R212/case-4). */
 export async function loadPresets(root) {
   const name = '@starci/jest-preset';
   const require = createRequire(path.join(root, 'package.json'));
@@ -304,7 +304,7 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
     sonarExclusions: [presets?.sonarExclusions, '**/.next/**', '**/node_modules/**', '**/src/messages/**', ...(lite ? ['supabase/types/**'] : [])].filter(Boolean).join(','),
     sonarSources: ['be/apps', 'be/src', 'fe/apps', ...(packages ? ['fe/packages'] : [])].join(','),
     lcovReport: LCOV_REPORT,
-    // The coverage scope is the same in both editions: lite measures exactly what full measures (owner ruling 2026-10-12).
+    // The coverage scope is the same in both editions: lite measures exactly what full measures (ruling:R212/case-1, amended by ruling:R212/case-4).
     jestCoverage: scope === 'be' ? jestCoverageSource(jestCoverage(manifest, providers)) : '',
     coverageExclusions: scope === APP_SCOPE ? sonarCoverageExclusions(manifest, providers).join(',') : '',
     codecovPaths: scope === APP_SCOPE ? codecovPaths(manifest, providers).map(glob => `          - ${JSON.stringify(glob)}`).join('\n') : '',

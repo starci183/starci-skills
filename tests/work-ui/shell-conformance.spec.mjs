@@ -253,7 +253,7 @@ test('the CLI exits 2 on a bad argument', () => {
   assert.equal(shellConformanceMain([path.join(os.tmpdir(), 'no-such-starci-dir-xyz')]).exitCode, 2);
 });
 
-// Owner ruling 2026-09-24: every drawing set covers desktop AND mobile in the LIGHT theme. Dark is optional -
+// owner:drawing-light-device-matrix: every drawing set covers desktop AND mobile in the LIGHT theme. Dark is optional -
 // never demanded of a layout capture or a draw, kept when present.
 test('draw matrix: desktop and mobile light are required per drawn state; dark is optional everywhere', async (t) => {
   const { layoutSettlement, addCapture } = await import('../../scripts/work/layout-tree.mjs');

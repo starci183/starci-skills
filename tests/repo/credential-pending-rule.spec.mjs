@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-// Owner ruling 2026-09-23: "without creds you still code, put in a dumb string,
+// owner:credential-build-placeholders: "without creds you still code, put in a dumb string,
 // uat just does not run" - asking for a credential does not mean not doing the work.
 const read = (p) => fs.readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
 

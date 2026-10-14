@@ -319,7 +319,7 @@ const writeNew = (repoRoot, relative, text) => {
 
 /** `starci app new spec be/<file>.service.ts` at the app root: writes the spec skeleton of an existing service; returns the created app-relative paths. */
 export function newSpec({ repoRoot: appRoot, file, ts, manifest = loadSlotManifest() }) {
-  // A unit spec belongs to both editions (owner ruling 2026-10-12): a lite back end keeps full's unit specs.
+  // A unit spec belongs to both editions (ruling:R212/case-1, amended by ruling:R212/case-4): a lite back end keeps full's unit specs.
   const { beRoot: repoRoot } = backEndOf(appRoot, manifest);
   const relative = belowBackEnd(file);
   if (!relative.endsWith('.service.ts')) throw new ScaffoldError('HFS_NEW_NOT_A_SERVICE', `${relative} is not a *.service.ts file: only services have a unit spec`);
@@ -333,7 +333,7 @@ export function newSpec({ repoRoot: appRoot, file, ts, manifest = loadSlotManife
 
 /** `starci app new service be/<dir> <name> [--inject ...]` at the app root: writes the service and its spec skeleton; returns the created app-relative paths. */
 export function newService({ repoRoot: appRoot, dir, name, inject = [], ts, manifest = loadSlotManifest() }) {
-  // The service and its unit spec belong to both editions (owner ruling 2026-10-12).
+  // The service and its unit spec belong to both editions (ruling:R212/case-1, amended by ruling:R212/case-4).
   const { beRoot: repoRoot } = backEndOf(appRoot, manifest);
   if (!SERVICE_NAME.test(name)) throw new ScaffoldError('HFS_NEW_NAME_INVALID', `the service name ${name} must be kebab-case (member-profile), without the .service suffix`);
   const relative = path.posix.join(belowBackEnd(dir), `${name}.service.ts`);

@@ -94,6 +94,11 @@ $defs:
         type: string
         minLength: 1
         description: The reason for an edition difference, citing the owner ruling case that authorizes it; the coverage check resolves the citation.
+      templateNa:
+        type: string
+        minLength: 1
+        pattern: '\S'
+        description: Why this rule has no scaffolded surface and therefore needs no rule template; required or managed slot templates remain checked separately.
       docs:
         type: array
         minItems: 1
