@@ -205,18 +205,9 @@ test("add table --fe writes one policy-complete migration, the GraphQL api featu
   assert.match(read(root, "be/src/features/api/orders/transport/graphql/create-order.resolver.ts"), /@Mutation\(\(\) => CreateOrderType, \{ name: "createOrder" \}\)/);
   assert.match(read(root, "be/src/modules/domain/orders/orders.service.ts"), /createOrder\(principalId: string\)/);
   assert.match(read(root, "be/src/modules/domain/orders/orders.service.ts"), /InjectPrimaryEntityManager/);
-  assert.match(
-    read(root, "be/src/modules/domain/orders/orders.service.ts"),
-    /orders\(principalId: string, id: string\)/,
-  );
-  assert.match(
-    read(root, "be/src/modules/domain/orders/orders.service.ts"),
-    /requireOwnedRow<OrdersResult>\(this\.entityManager, FIND_ORDERS, id, principalId, notFound\)/,
-  );
-  assert.match(
-    read(root, "be/src/modules/domain/orders/persistence/orders.sql.ts"),
-    /sql`SELECT id FROM public\.orders WHERE id = \$1 AND owner_id = \$2 LIMIT 1`/,
-  );
+  assert.match(read(root, "be/src/modules/domain/orders/orders.service.ts"), /orders\(principalId: string, id: string\)/);
+  assert.match(read(root, "be/src/modules/domain/orders/orders.service.ts"), /requireOwnedRow<OrdersResult>\(this\.entityManager, FIND_ORDERS, id, principalId, notFound\)/);
+  assert.match(read(root, "be/src/modules/domain/orders/persistence/orders.sql.ts"), /sql`SELECT id FROM public\.orders WHERE id = \$1 AND owner_id = \$2 LIMIT 1`/);
   assert.match(read(root, "be/apps/api/src/app.module.ts"), /OrdersModule\.register\(\{ isGlobal: true \}\)/);
   assert.match(read(root, "be/apps/api/src/app.module.ts"), /ORDERS_ERROR_KINDS/);
   assert.match(read(root, "be/src/modules/domain/orders/index.ts"), /export \{ OrdersService \}/);
@@ -398,18 +389,9 @@ test("add cli bootstraps the optional lite app, Supabase migrate/seed groups, an
   // Owner ruling 2026-10-12: every generated cli command carries its unit spec beside it, as in full.
   for (const command of result.created.filter((file) => file.endsWith(".cli.ts")))
     assert.ok(result.created.includes(command.replace(/\.ts$/, ".spec.ts")), `${command} has its unit spec`);
-  assert.match(
-    read(root, "be/src/features/cli/migrate/subs/run.cli.ts"),
-    /await this\.migrations\.run\(\)/,
-  );
-  assert.match(
-    read(root, "be/src/features/cli/seed/subs/run.cli.ts"),
-    /await this\.seeds\.run\(\)/,
-  );
-  assert.match(
-    read(root, "be/src/features/cli/cli.module.ts"),
-    /RequeueModule/,
-  );
+  assert.match(read(root, "be/src/features/cli/migrate/subs/run.cli.ts"), /await this\.migrations\.run\(\)/);
+  assert.match(read(root, "be/src/features/cli/seed/subs/run.cli.ts"), /await this\.seeds\.run\(\)/);
+  assert.match(read(root, "be/src/features/cli/cli.module.ts"), /RequeueModule/);
   assert.ok(
     JSON.parse(read(root, "hfs.json")).sides.be.apps.some(
       (app) => app.name === "cli" && app.kind === "cli",
@@ -459,10 +441,7 @@ test("lite add api emits full's GraphQL door, and api plus webhook transports ar
   assert.match(read(root, "be/src/modules/domain/identity/index.ts"), /CurrentPrincipal/);
   assert.match(read(root, "be/src/modules/platform/cqrs/index.ts"), /ExecuteParams/);
   assert.match(read(root, "be/src/modules/platform/cqrs/index.ts"), /InjectCommandBus/);
-  assert.match(
-    read(root, "be/src/features/api/bookings/application/bookings.handler.ts"),
-    /bookings\(command\.params\.principal\.id, command\.params\.request\.id\)/,
-  );
+  assert.match(read(root, "be/src/features/api/bookings/application/bookings.handler.ts"), /bookings\(command\.params\.principal\.id, command\.params\.request\.id\)/);
   prepareWebhookDependencies(root);
   const webhook = addKind({ repoRoot: root, noun: "webhook", name: "calendar", options: { service: "CalendarsService=@modules/domain/calendars" } });
   assert.ok(webhook.created.includes("be/src/features/webhooks/calendar/transport/http/calendar-http.module.ts"));
@@ -475,13 +454,16 @@ test("lite add api emits full's GraphQL door, and api plus webhook transports ar
   assert.match(app, /import \{ GraphqlModule \} from "@modules\/platform\/graphql"/);
   assert.match(app, /import \{ CalendarHttpModule \} from "@features\/webhooks\/calendar"/);
   assert.match(app, /imports: \[\s+CalendarInboxModule\.register\(\{ isGlobal: true \}\),\s+CalendarHttpModule,\s+BookingsGraphqlModule,\s+GraphqlModule\.register\(\{ isGlobal: true \}\),/);
-  assert.match(
-    read(root, "be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts"),
-    /@Headers\("x-calendar-delivery-id"\) deliveryId/,
-  );
+  assert.match(read(root, "be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts"), /@Headers\("x-calendar-delivery-id"\) deliveryId/);
   assert.match(read(root, "be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts"), /recordCalendarDelivery\(deliveryId, delivery\)/);
   assert.doesNotMatch(read(root, "be/src/modules/domain/calendar-inbox/calendar-inbox.service.ts"), /CalendarsService|process:|complete:|CommandBus|QueryBus/);
   assert.doesNotMatch(read(root, "be/src/modules/domain/calendars/calendars.service.ts"), /entityManager: EntityManager = this\.entityManager/);
+  assert.match(read(root, "be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts"), /@HttpCode\(HttpStatus\.NO_CONTENT\)/);
+  assert.match(read(root, "be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts"), /@Public\(\{ reason: PublicReason\.SignedWebhook \}\)/);
+  assert.match(read(root, "be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts"), /@RateLimit\(RateTier\.Strict\)/);
+  assert.match(read(root, "be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts"), /this\.signature\.verify\(\{ provider: "calendar"/);
+  assert.match(read(root, "be/src/modules/domain/calendar-inbox/calendar-inbox.service.ts"), /recordWebhookDelivery\(/);
+  assert.match(read(root, "be/src/modules/domain/calendar-inbox/calendar-inbox.service.ts"), /provider: "calendar"/);
   const main = read(root, "be/apps/api/src/main.ts");
   const env = read(root, "be/apps/api/src/api.env.ts");
   assert.match(env, /export interface ApiEnv \{/);
