@@ -18,7 +18,8 @@ const reason = 'ruling:R212/case-4: lite has no e2e world; full may run flow e2e
 function fixture(editionWhy) {
   const doc = structuredClone(raw);
   const slot = doc.slots.find((candidate) => candidate.id === id);
-  if (editionWhy !== undefined) slot.editionWhy = editionWhy;
+  if (editionWhy === undefined) delete slot.editionWhy;
+  else slot.editionWhy = editionWhy;
   return doc;
 }
 

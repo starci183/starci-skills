@@ -122,6 +122,51 @@ function contents(root) {
   return result;
 }
 
+function fixtureContent(file) {
+  if (file.endsWith(".json")) return "{}\n";
+  if (file.endsWith(".yaml") || file.endsWith(".yml")) return "schema: fixture/v1\n";
+  if (file.endsWith(".toml")) return 'project_id = "demo"\n';
+  if (file.endsWith(".md")) return "# Demo\n";
+  return "export {};\n";
+}
+
+function fixtureHealth(root) {
+  put(root, "be/apps/api/src/app.module.ts", `import { Module } from "@nestjs/common"
+import { apiModules } from "./compose/api"
+
+@Module({ imports: [...apiModules()] })
+export class AppModule {}
+`);
+  put(root, "be/apps/api/src/compose/api.ts", `import type { DynamicModule, Type } from "@nestjs/common"
+import { SystemHealthHttpModule } from "@features/api/system-health"
+
+export const apiModules = (): Array<Type<unknown> | DynamicModule> => [SystemHealthHttpModule]
+`);
+  put(root, "be/src/features/api/system-health/index.ts", 'export { SystemHealthHttpModule } from "./transport/http/system-health-http.module"\n');
+  put(root, "be/src/features/api/system-health/system-health.module.ts", `import { Module } from "@nestjs/common"
+
+@Module({})
+export class SystemHealthModule {}
+`);
+  put(root, "be/src/features/api/system-health/application/liveness.contracts.ts", "export interface LivenessReport { readonly alive: true }\n");
+  put(root, "be/src/features/api/system-health/transport/http/system-health-http.module.ts", `import { Module } from "@nestjs/common"
+import { SystemHealthModule } from "../../system-health.module"
+import { LiveController } from "./live.controller"
+
+@Module({ imports: [SystemHealthModule], controllers: [LiveController] })
+export class SystemHealthHttpModule {}
+`);
+  put(root, "be/src/features/api/system-health/transport/http/live.controller.ts", `import { Controller, Get } from "@nestjs/common"
+import type { LivenessReport } from "../../application/liveness.contracts"
+
+@Controller("health")
+export class LiveController {
+    @Get("live")
+    live(): LivenessReport { return { alive: true } }
+}
+`);
+}
+
 function syntheticLite(t, name = "demo") {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "hfs-upgrade-lite-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -163,20 +208,9 @@ function syntheticLite(t, name = "demo") {
       fs.existsSync(path.join(root, ...file.split("/")))
     )
       continue;
-    put(
-      root,
-      file,
-      file.endsWith(".json")
-        ? "{}\n"
-        : file.endsWith(".yaml") || file.endsWith(".yml")
-          ? "schema: fixture/v1\n"
-          : file.endsWith(".toml")
-            ? 'project_id = "demo"\n'
-            : file.endsWith(".md")
-              ? "# Demo\n"
-              : "export {};\n",
-    );
+    put(root, file, fixtureContent(file));
   }
+  fixtureHealth(root);
   put(
     root,
     "be/nest-cli.json",
@@ -221,7 +255,15 @@ function syntheticLite(t, name = "demo") {
   put(
     root,
     "supabase/migrations/20261002000000_baseline.sql",
-    "create table public.notes (id uuid primary key);\nalter table public.notes enable row level security;\ncreate policy notes_read on public.notes for select using (true);\n",
+    `create role app_be login noinherit nosuperuser nobypassrls nocreatedb nocreaterole;
+create table public.notes (id uuid primary key);
+alter table public.notes enable row level security;
+alter table public.notes force row level security;
+create policy notes_app_be_read on public.notes for select to app_be using (current_user = 'app_be');
+grant usage on schema public to app_be;
+revoke all on table public.notes from public, anon, authenticated;
+grant select on table public.notes to app_be;
+`,
   );
   put(
     root,
@@ -335,6 +377,13 @@ test("upgrade plan is ordered, printable and byte-for-byte read-only; apply exec
       "supabase/types/database.types.ts",
       "supabase/migrations/20261002000000_baseline.sql",
       "be/apps/api/src/main.ts",
+      "be/apps/api/src/app.module.ts",
+      "be/apps/api/src/compose/api.ts",
+      "be/src/features/api/system-health/index.ts",
+      "be/src/features/api/system-health/system-health.module.ts",
+      "be/src/features/api/system-health/application/liveness.contracts.ts",
+      "be/src/features/api/system-health/transport/http/system-health-http.module.ts",
+      "be/src/features/api/system-health/transport/http/live.controller.ts",
       "be/src/modules/domain/sample/sample.service.ts",
       "fe/apps/web/src/app/[locale]/page.tsx",
     ].map((file) => [
@@ -552,7 +601,9 @@ test("already-full and invalid targets refuse with exit 2, and a failed lock res
   );
   assert.ok(fs.existsSync(path.join(kept, ".starcistacks/dev/infra/compose/api.yaml")));
 
-  const absent = await upgradeEdition({ root: syntheticLite(t, "absent-stacks-demo"), to: "full", plan: true, presets: PRESETS });
+  const absentRoot = syntheticLite(t, "absent-stacks-demo");
+  fs.rmSync(path.join(absentRoot, ".starcistacks/application-stacks.yaml"));
+  const absent = await upgradeEdition({ root: absentRoot, to: "full", plan: true, presets: PRESETS });
   assert.deepEqual(
     absent.filter((step) => step.path === ".starcistacks/application-stacks.yaml").map((step) => step.op),
     ["add"],

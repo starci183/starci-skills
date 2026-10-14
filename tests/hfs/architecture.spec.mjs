@@ -9,6 +9,7 @@ import { HFS_MACHINE_RULE_IDS as MACHINE_RULE_IDS } from '../../scripts/hfs/arch
 import { loadArchitectureConfig } from '../../scripts/hfs/architecture/config.mjs';
 import { appDeclaration } from '../helpers/hfs-arch-fixture.mjs';
 import { hfsArchitectureFixture } from '../helpers/hfs-architecture-fixture.mjs';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
@@ -42,6 +43,14 @@ function appShaped(side, files) {
   }
   out['../package.json'] = JSON.stringify(manifest);
   return out;
+}
+
+function appEnvironment(app) {
+  const name = app.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('');
+  return `interface EnvSource { str(key: string): string }
+export interface ${name}Env { readonly nodeEnv: string }
+export function read${name}Env(env: EnvSource): ${name}Env { return { nodeEnv: env.str("NODE_ENV") }; }
+`;
 }
 
 function fixture(_t, kind, files = {}, apps = kind === 'backend' ? [{ name: 'core', kind: 'api' }] : [{ name: 'web', kind: 'next' }]) {
@@ -89,6 +98,7 @@ function fixture(_t, kind, files = {}, apps = kind === 'backend' ? [{ name: 'cor
         'src/tests/fixtures/.keep': '',
         [`apps/${app}/src/main.ts`]: 'void 0\n',
         [`apps/${app}/src/app.module.ts`]: 'export const AppModule = 1\n',
+        [`apps/${app}/src/${app}.env.ts`]: appEnvironment(app),
       } : {
         'stylelint.config.mjs': 'export default {};\n',
         [`apps/${app}/next.config.ts`]: 'export default {};\n',
@@ -169,9 +179,10 @@ test('backend accepts inward composition and narrow bootstrap configuration', t 
   });
   const result = check(root);
   assert.equal(result.ok, true, JSON.stringify(result, null, 2));
-  assert.equal(result.files, 5);
+  assert.equal(result.files, 6);
   assert.deepEqual(result.coverage.sourceFiles, [
     'apps/core/src/app.module.ts',
+    'apps/core/src/core.env.ts',
     'apps/core/src/core.options.ts',
     'apps/core/src/main.ts',
     'src/features/api/http/feature.ts',
@@ -363,7 +374,7 @@ test('owner coverage is derived from slot owners; the Grammar contract is unavai
   assert.deepEqual(backendResult.coverage.ownerPublicApi, { status: 'unavailable', reason: 'no slot owner instance with an entry file exists in the repository' });
   assert.deepEqual(backendResult.coverage.grammarContract, { status: 'not-applicable' });
   assert.deepEqual(backendResult.coverage.sourceFiles, [
-    'apps/core/src/main.ts', 'src/features/api/feature.ts', 'src/modules/domain/value.ts',
+    'apps/core/src/core.env.ts', 'apps/core/src/main.ts', 'src/features/api/feature.ts', 'src/modules/domain/value.ts',
   ]);
   assert.equal(backendResult.coverage.checkedRuleIds.includes('ARCH_OWNER_EXPORT_BYPASS'), false);
   const frontend = fixture(t, 'frontend', {
@@ -387,7 +398,7 @@ test('solution tsconfig references merge workspace programs and honor declared p
   });
   const result = check(root);
   assert.equal(result.ok, true, JSON.stringify(result, null, 2));
-  assert.deepEqual(result.compiler.projects.sort(), ['apps/web/tsconfig.json', 'packages/ui/tsconfig.json', 'tsconfig.json']);
+  assert.deepEqual(result.compiler.projects.sort(byCodeUnit), ['apps/web/tsconfig.json', 'packages/ui/tsconfig.json', 'tsconfig.json']);
   assert.equal(result.files, 5);
 });
 
@@ -687,7 +698,7 @@ test('backend source shape accepts adopted application, transport, persistence, 
     'src/features/api/orders/application/create-order.contracts.ts': 'export interface CreateOrderParams { readonly itemId:string } export interface CreateOrderResult { readonly id:string }\n',
     'src/features/api/orders/application/create-order.handler.ts': 'import type { CreateOrderParams,CreateOrderResult } from "./create-order.contracts"; export class CreateOrderHandler { execute(input:CreateOrderParams):CreateOrderResult{return {id:input.itemId}} }\n',
     'src/features/api/orders/transport/graphql/dto/create-order.request.ts': 'import { GqlInput } from "../../../../../../modules/platform/framework"; @GqlInput() export class CreateOrderRequest { itemId!:string }\n',
-    'src/features/api/orders/transport/graphql/create-order.resolver.ts': 'import { GqlArgs,GqlMutation } from "../../../../../modules/platform/framework"; import { CreateOrderRequest } from "./dto/create-order.request"; export class CreateOrderResolver { @GqlMutation(()=>String,{name:"createOrder"}) create(@GqlArgs("input") request:CreateOrderRequest){return request.itemId} }\n',
+    'src/features/api/orders/transport/graphql/create-order.resolver.ts': 'import { GqlArgs,GqlMutation } from "../../../../../modules/platform/framework"; import { CreateOrderRequest } from "./dto/create-order.request"; export class CreateOrderResolver { @GqlMutation(()=>String,{name:"createOrder"}) createOrder(@GqlArgs("input") request:CreateOrderRequest){return request.itemId} }\n',
     'src/modules/platform/database/entities/order.entity.ts': 'import { DatabaseEntity } from "../../framework"; @DatabaseEntity() export class OrderEntity {}\n',
     'src/modules/domain/catalog/enums/order-status.ts': 'import { registerGraphQlEnum } from "../../../platform/framework"; export enum OrderStatus { Pending="pending", Complete="complete" } registerGraphQlEnum(OrderStatus,{name:"OrderStatus"});\n',
     'src/modules/domain/catalog/errors/challenge-not-found.ts': 'export class ChallengeNotFoundException extends Error {}\n',

@@ -16,6 +16,13 @@ test.after(() => {
 });
 
 const read = (root, relative) => fs.readFileSync(path.join(root, relative), 'utf8');
+const compositionText = (root, app) => {
+  const folder = 'be/apps/api/src/compose';
+  const groups = fs.readdirSync(path.join(root, folder), { withFileTypes: true })
+    .filter(entry => entry.isFile() && entry.name.endsWith('.ts'))
+    .map(entry => read(root, `${folder}/${entry.name}`));
+  return [app, ...groups].join('\n');
+};
 const put = (root, relative, body) => {
   const file = path.join(root, relative);
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -130,7 +137,13 @@ for (const edition of ['lite', 'full']) {
     if (edition === 'lite') {
       assert.equal(occurrences(group, '    CalendarInboxModule.register({ isGlobal: true }),'), 1);
       assert.equal(occurrences(group, '    PaymentInboxModule.register({ isGlobal: true }),'), 1);
-      assert.ok(!read(root, 'be/apps/api/src/app.module.ts').includes('InboxModule'));
+      const app = read(root, 'be/apps/api/src/app.module.ts');
+      assert.doesNotMatch(app, /CalendarInboxModule|PaymentInboxModule/);
+      const composition = compositionText(root, app);
+      for (const symbol of ['InboxModule', 'EventBusModule']) {
+        assert.equal([...composition.matchAll(new RegExp(String.raw`\b${symbol}\.register\(`, 'g'))].length, 1, `${symbol} is composed once`);
+        assert.match(composition, new RegExp(String.raw`\b${symbol}\.register\(\{ isGlobal: true \}\)`));
+      }
       assert.match(read(root, 'be/apps/api/src/api.env.ts'), /calendar: parseWebhookProviderConfig/);
       assert.match(read(root, 'be/apps/api/src/api.env.ts'), /payment: parseWebhookProviderConfig/);
       assert.match(read(root, 'be/apps/api/src/main.ts'), /rawBody: true/);

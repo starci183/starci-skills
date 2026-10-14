@@ -14,6 +14,7 @@ import { scaffoldApp } from "../../packages/hfs/scaffold/app.mjs";
 import { checkArchitecture } from "../../scripts/hfs/architecture.mjs";
 import { checkDatabase } from "../../scripts/hfs/rules/database.mjs";
 import { parseYaml } from "../../engine/yaml.mjs";
+import { byCodeUnit } from "../../engine/by-code-unit.mjs";
 import { filesBelow } from "../../packages/hfs/scaffold/lite-exports.mjs";
 import { hfsFromDeclaration } from "../../packages/eslint/be/lib/hfs.mjs";
 import { webhookShape, webhookVerifyFirst } from "../../packages/eslint/be/webhooks.mjs";
@@ -27,6 +28,17 @@ const PINS = parseYaml(
 ).pins;
 const ts = createRequire(import.meta.url)("typescript");
 const made = [];
+const runSequentially = (items, action) => items.reduce(
+  (previous, item) => previous.then(() => action(item)),
+  Promise.resolve(),
+);
+const compositionText = (root, app) => {
+  const folder = path.join(root, "be/apps/api/src/compose");
+  const groups = fs.readdirSync(folder, { withFileTypes: true })
+    .filter(entry => entry.isFile() && entry.name.endsWith(".ts"))
+    .map(entry => fs.readFileSync(path.join(folder, entry.name), "utf8"));
+  return [app, ...groups].join("\n");
+};
 
 test.after(() => {
   for (const dir of made) fs.rmSync(dir, { recursive: true, force: true });
@@ -42,7 +54,7 @@ const fakeLock = (root) => {
 
 const databaseTypes = (tables) => {
   const entries = [...tables]
-    .sort()
+    .sort(byCodeUnit)
     .map(
       (name) => `      ${JSON.stringify(name)}: {
         Row: { id: string; owner_id: string; provider: string; delivery_id: string; received_at: string; payload: unknown; processed_at: string | null; created_at: string; updated_at: string }
@@ -266,14 +278,21 @@ test("lite add webhook records a policy-clean receipt and typed outbox event thr
   assert.equal(new Set(migrationVersions).size, migrationVersions.length, "Supabase migration versions remain unique");
   assert.ok(!payment.created.some((file) => file.startsWith("be/src/modules/platform/event-bus/")), "the publisher is installed once");
   const appModule = fs.readFileSync(path.join(root, "be/apps/api/src/app.module.ts"), "utf8");
-  for (const symbol of ["InboxModule", "EventBusModule", "CalendarInboxModule", "PaymentInboxModule"]) {
-    assert.equal([...appModule.matchAll(new RegExp(`\\b${symbol}\\.register\\(`, "g"))].length, 1, `${symbol} is composed once`);
+  const webhooksGroup = fs.readFileSync(path.join(root, "be/apps/api/src/compose/webhooks.ts"), "utf8");
+  const composition = compositionText(root, appModule);
+  for (const symbol of ["InboxModule", "EventBusModule"]) {
+    assert.equal([...composition.matchAll(new RegExp(String.raw`\b${symbol}\.register\(`, "g"))].length, 1, `${symbol} is composed once`);
   }
+  for (const symbol of ["CalendarInboxModule", "PaymentInboxModule"]) {
+    assert.equal([...webhooksGroup.matchAll(new RegExp(String.raw`\b${symbol}\.register\(`, "g"))].length, 1, `${symbol} is composed once in its area group`);
+    assert.doesNotMatch(appModule, new RegExp(String.raw`\b${symbol}\b`));
+  }
+  assert.match(appModule, /\.\.\.webhooksModules\(\)/);
   const repo = JSON.parse(fs.readFileSync(path.join(root, "hfs.json"), "utf8"));
   assert.ok(repo.sides.be.patterns.includes("event-bus"), "generated event surfaces are enabled in the actual declaration");
   assert.match(fs.readFileSync(path.join(eventFolder, "index.ts"), "utf8"), /CalendarUpdatedEvent/);
   assert.match(fs.readFileSync(path.join(eventFolder, "index.ts"), "utf8"), /CalendarDeliveryRecordedEvent/);
-  assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(root, "be/contracts/calendar/events.json"), "utf8")).events).sort(), ["calendar.delivery-recorded", "calendar.updated"]);
+  assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(root, "be/contracts/calendar/events.json"), "utf8")).events).sort(byCodeUnit), ["calendar.delivery-recorded", "calendar.updated"]);
   const eventFiles = [...calendar.created, ...payment.created, "be/src/modules/events/calendar/calendar-updated.event.ts", "be/contracts/calendar/events.json"];
   assert.deepEqual(eventClassContractFindings({ repoRoot: root, files: eventFiles, repo }), []);
 
@@ -402,13 +421,13 @@ test("the generated intake atomically commits one receipt and typed event, with 
   };
   const intake = new CalendarInboxService(entityManager, new PostgresInbox(), new EventBusService());
   const input = { eventId: " delivery-1 ", delivery: { id: "provider-object-42" } };
-  for (const point of ["receipt", "outbox"]) {
+  await runSequentially(["receipt", "outbox"], async (point) => {
     failAt = point;
     await assert.rejects(intake.recordCalendarDelivery(input), { message: `${point} unavailable` });
     assert.equal(committed.claims.size, 0);
     assert.equal(committed.receipts.size, 0);
     assert.equal(committed.outbox.size, 0, "failed intake rolls back both the claim and all receipt/event writes");
-  }
+  });
   failAt = undefined;
   effects.length = 0;
   await intake.recordCalendarDelivery(input);
@@ -419,11 +438,11 @@ test("the generated intake atomically commits one receipt and typed event, with 
   assert.deepEqual([...committed.outbox.values()], [{ name: "calendar.delivery-recorded", envelope: { eventId: "receipt-1", eventName: "calendar.delivery-recorded", payload: { receiptId: "receipt-1" } } }]);
   assert.equal(commits, 2);
   assert.equal(rollbacks, 2);
-  for (const eventId of [undefined, "   "]) {
+  await runSequentially([undefined, "   "], async (eventId) => {
     const before = effects.length;
     await assert.rejects(intake.recordCalendarDelivery({ ...input, eventId }), { code: "delivery-id-required" });
     assert.equal(effects.length, before, "missing delivery ids are refused before any database write");
-  }
+  });
   const processed = [];
   for (const { envelope } of committed.outbox.values()) {
     const event = events.CalendarDeliveryRecordedEvent.parse(envelope);

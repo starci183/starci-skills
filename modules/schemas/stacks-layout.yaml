@@ -45,7 +45,7 @@ custody:
     - .starcistacks/deployment.json and other rendered, value-free deployment declarations the guard names
     - .starcistacks/**/KEYS.md
     - .starcistacks/**/.gitkeep
-    - .starcistacks/<environment>/infra/compose/**, infra/k8s/** and infra/terraform/** source
+    - .starcistacks/<environment>/infra/compose/**, infra/swarm/**, infra/k8s/** and infra/terraform/** source
     - .starcistacks/<environment>/infra/metadata.json the value-free resolved port projection the front end reads
     - .starcistacks/<environment>/environment.json the rendered value-free environment record
     - .starcistacks/<environment>/seeds/** idempotent seed sources
@@ -53,7 +53,7 @@ custody:
     Deny everything with `.starcistacks/**` (never the directory form `.starcistacks/`, which blocks
     every re-include), re-include directories with `!.starcistacks/**/`, then `!.starcistacks/**/KEYS.md`,
     `!.starcistacks/**/.gitkeep`, `!.starcistacks/application-stacks.yaml`, `!.starcistacks/*/README.md`
-    (the environment runbook, shape.runbook), `!.starcistacks/*/infra/compose/**`
+    (the environment runbook, shape.runbook), `!.starcistacks/*/infra/compose/**`, `!.starcistacks/*/infra/swarm/**`
     and `!.starcistacks/*/infra/terraform/**`; then deny the VALUE files inside infra AGAIN, after those
     re-includes (git applies the last matching rule, so a re-include written after `.env.*` tracked
     every plaintext env under compose - e.g. .starcistacks/dev/infra/compose/.env.generated),
@@ -75,6 +75,7 @@ custody:
     - '!.starcistacks/*/seeds/**'
     - '!.starcistacks/*/infra/metadata.json'
     - '!.starcistacks/*/infra/compose/**'
+    - '!.starcistacks/*/infra/swarm/**'
     - '!.starcistacks/*/infra/k8s/**'
     - '!.starcistacks/*/infra/terraform/**'
     - .starcistacks/*/infra/**/.env

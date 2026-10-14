@@ -11,6 +11,9 @@ import { parseYaml } from '../../engine/yaml.mjs';
 
 const jestPreset = createRequire(import.meta.url)('../../packages/jest-preset/index.cjs');
 const PINS = parseYaml(fs.readFileSync(path.resolve(import.meta.dirname, '..', '..', 'knowledge', 'hfs', 'canon-pins.yaml'), 'utf8')).pins;
+const FE_STACK = parseYaml(fs.readFileSync(path.resolve(import.meta.dirname, '..', '..', 'knowledge', 'hfs', 'fe-stack.yaml'), 'utf8'));
+const FE_CORE_DEPENDENCIES = Object.fromEntries(FE_STACK.concerns.filter((concern) => concern.tier === 'core')
+  .flatMap((concern) => concern.packages).map((name) => [name, PINS[name].version]));
 /** What `starci app sync` would load from the jest preset an app installs for its be side: the Sonar exclusions and the coverage sources. */
 export const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 
@@ -29,6 +32,137 @@ export const STACKS_DECLARATION = ['schema: starci/application-stacks@1', 'servi
 const readmeOf = (name) => [`# ${name}`, '', 'A demo app for the starci app check specs.', '', '## Overview', '', 'Demo.', '', '## Stack', '', 'TypeScript.', '', '## Repository layout', '', 'be/ and fe/.', '',
   '## Development', '', '```sh', 'npm ci', 'npm run typecheck', 'npm run lint', 'npm test', '```', '', '## Work', '', 'Records live in `.starciwork`.', ''].join('\n');
 
+function fixtureWriters(dir) {
+  const write = (relative, text) => {
+    const target = path.join(dir, ...relative.split('/'));
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, text);
+  };
+  const put = (relative, text = '') => {
+    const target = path.join(dir, ...relative.split('/'));
+    if (!fs.existsSync(target)) write(relative, text);
+  };
+  return { put, write };
+}
+
+function writeManifests(dir, declaration, put) {
+  // The one package.json of the app, the monorepo root (R143): the fe workspaces, npm as the package manager, turbo pinned.
+  put('package.json', `${JSON.stringify({ name: path.basename(dir), private: true, packageManager: PACKAGE_MANAGER, workspaces: [...WORKSPACES], devDependencies: { turbo: PINS.turbo.version } })}\n`);
+  // Each product FE workspace declares the core stack from the catalog at the canonical pins (R288).
+  for (const app of declaration.sides.fe.apps) {
+    const pkg = { name: feAppPackageName(declaration.project, app.name), private: true, scripts: FE_APP_SCRIPTS, dependencies: FE_CORE_DEPENDENCIES };
+    put(`fe/apps/${app.name}/package.json`, `${JSON.stringify(pkg, null, 2)}\n`);
+  }
+  // The Nest monorepo of the declared be apps (R145), the default project the first api app.
+  const beApps = declaration.sides.be.apps;
+  const defaultApp = beApps.find((app) => app.kind === 'api') ?? beApps[0];
+  const nest = {
+    $schema: 'https://json.schemastore.org/nest-cli', collection: '@nestjs/schematics', monorepo: true,
+    root: `apps/${defaultApp.name}`, sourceRoot: `apps/${defaultApp.name}/src`,
+    projects: Object.fromEntries(beApps.map((app) => [app.name, { type: 'application', root: `apps/${app.name}`, entryFile: 'main', sourceRoot: `apps/${app.name}/src` }])),
+  };
+  put('be/nest-cli.json', `${JSON.stringify(nest, null, 2)}\n`);
+}
+
+function requiredContent(file) {
+  if (file === 'hfs.json') return '';
+  if (file.endsWith('.json')) return '{}\n';
+  if (/^be\/apps\/[^/]+\/src\/app\.module\.ts$/.test(file)) return 'export class AppModule {}\n';
+  return 'export {};\n';
+}
+
+function importSibling(file) {
+  return `import './${path.posix.basename(file).replace(/\.tsx?$/, '')}';`;
+}
+
+function importFeModule(file) {
+  return `import '../../../modules/${path.posix.basename(path.posix.dirname(file))}';`;
+}
+
+function writeFrontend(declaration, required, { put, write }) {
+  for (const app of declaration.sides.fe.apps) {
+    const base = `fe/apps/${app.name}`;
+    write(`${base}/next.config.ts`, 'export default { output: "standalone" };\n');
+    put(`${base}/src/modules/i18n/messages/en.json`, '{}');
+    put(`${base}/src/modules/i18n/messages/vi.json`, '{}');
+    put(`${base}/src/proxy.ts`);
+    // The machine judges reachability: every module entry imports its siblings and the app's route handler imports every module entry.
+    const entries = required.filter((p) => p.startsWith(`${base}/src/modules/`) && p.endsWith('/index.ts'));
+    for (const entry of entries) {
+      const siblings = required.filter((p) => path.posix.dirname(p) === path.posix.dirname(entry) && p !== entry && /\.tsx?$/.test(p));
+      write(entry, [...siblings.map(importSibling), 'export {};', ''].join('\n'));
+    }
+    put(`${base}/src/app/health/live/route.ts`, [...entries.map(importFeModule), "export const GET = () => new Response('ok');", `export const app_${app.name.replace(/-/g, '_')} = 1;`, ''].join('\n'));
+  }
+}
+
+function writeFeature(put, write) {
+  put('be/src/features/api/orders/orders.module.ts', 'export {};\n');
+  put('be/src/features/api/orders/application/place-order.handler.ts', 'export {};\n');
+  write('be/src/features/api/orders/transport/http/live.controller.ts', [
+    "import { Controller, Get } from '@nestjs/common';", "@Controller('health')", 'export class LiveController {',
+    "  @Get('live') live(): string { return 'ok'; }", '}', ''].join('\n'));
+  write('be/src/features/api/orders/transport/http/orders-http.module.ts', [
+    "import { Module } from '@nestjs/common';", "import { LiveController } from './live.controller';",
+    '@Module({ controllers: [LiveController] })', 'export class OrdersHttpModule {}', ''].join('\n'));
+  write('be/src/features/api/orders/index.ts', [
+    "import './orders.module';", "import './application/place-order.handler';",
+    "export { OrdersHttpModule } from './transport/http/orders-http.module';", ''].join('\n'));
+}
+
+function writePlatform(write) {
+  // An api app is denied by default (throttler, CSRF origin guard, AuthGuard) and masks its errors through the one filter of platform/errors.
+  write('be/src/modules/platform/errors/index.ts', "export { AllExceptionsFilter } from './all-exceptions.filter';\n");
+  write('be/src/modules/platform/errors/all-exceptions.filter.ts', 'export class AllExceptionsFilter { catch(): void {} }\n');
+  write('be/src/modules/platform/http-security/index.ts', "export { CsrfOriginGuard } from './csrf-origin.guard';\n");
+  write('be/src/modules/platform/http-security/csrf-origin.guard.ts', 'interface RequestHeaders { origin?: string }\ninterface HttpRequest { headers: RequestHeaders }\ninterface HttpHost { getRequest(): HttpRequest }\ninterface GuardContext { switchToHttp(): HttpHost }\nexport class CsrfOriginGuard { canActivate(context: GuardContext): boolean { return context.switchToHttp().getRequest().headers.origin !== undefined; } }\n');
+  write('be/src/modules/domain/identity/index.ts', "export { AuthGuard } from './auth.guard';\n");
+  write('be/src/modules/domain/identity/auth.guard.ts', 'export class AuthGuard { canActivate(): boolean { return true; } }\n');
+  write('be/src/modules/platform/config/index.ts', [
+    'export class EnvSource {', '  static fromProcess(): EnvSource { return new EnvSource(); }',
+    '  int(_key: string, fallback: number): number { return fallback; }', '}', ''].join('\n'));
+}
+
+function envName(app) {
+  return app.replace(/(?:^|[-_])([a-z\d])/g, (_, letter) => letter.toUpperCase());
+}
+
+function writeAppEnv(app, owners, write) {
+  const type = `${envName(app.name)}Env`;
+  const reader = `read${type}`;
+  write(`be/apps/${app.name}/src/${app.name}.env.ts`, [
+    "import { EnvSource } from '../../../src/modules/platform/config';", `export interface ${type} { readonly port: number }`,
+    `export const ${reader} = (env: EnvSource): ${type} => ({ port: env.int('PORT', 3000) });`, ''].join('\n'));
+  write(`be/apps/${app.name}/src/main.ts`, [
+    ...owners.map((file) => `import '../../../${file.replace(/\.ts$/, '')}';`),
+    "import { EnvSource } from '../../../src/modules/platform/config';", `import { ${reader} } from './${app.name}.env';`,
+    'const env = EnvSource.fromProcess();', `export const options = ${reader}(env);`, ''].join('\n'));
+}
+
+function writeApiApp(app, write) {
+  write(`be/apps/${app.name}/src/compose/health.ts`, [
+    "import type { Type } from '@nestjs/common';", "import { OrdersHttpModule } from '../../../../src/features/api/orders';",
+    'export const healthModules: Type<unknown>[] = [OrdersHttpModule];', ''].join('\n'));
+  write(`be/apps/${app.name}/src/app.module.ts`, [
+      "import { Module } from '@nestjs/common';", "import { APP_FILTER, APP_GUARD } from '@nestjs/core';", "import { ThrottlerGuard } from '@nestjs/throttler';",
+      "import { AllExceptionsFilter } from '../../../src/modules/platform/errors';", "import { CsrfOriginGuard } from '../../../src/modules/platform/http-security';",
+      "import { AuthGuard } from '../../../src/modules/domain/identity';",
+      "import { healthModules } from './compose/health';",
+      '@Module({ imports: [...healthModules], providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }, { provide: APP_GUARD, useClass: ThrottlerGuard }, { provide: APP_GUARD, useClass: CsrfOriginGuard }, { provide: APP_GUARD, useClass: AuthGuard }] })',
+      'export class AppModule {', '  static register(_options: object) { return { module: AppModule, imports: [], providers: [] }; }', '}', ''].join('\n'));
+}
+
+function writeBackend(declaration, required, { put, write }) {
+  writeFeature(put, write);
+  writePlatform(write);
+  // The machine judges reachability: the app composes the feature and every required module.
+  const owners = ['src/features/api/orders/index.ts', ...required.filter((p) => /^be\/src\/modules\/[^/]+\/[^/]+\/index\.ts$/.test(p)).map((p) => p.slice('be/'.length))];
+  for (const app of declaration.sides.be.apps) {
+    writeAppEnv(app, owners, write);
+    if (app.kind === 'api') writeApiApp(app, write);
+  }
+}
+
 /**
  * A clean app for `declaration`: every managed file of the root and both sides rendered, every other path the manifest requires,
  * one BE feature and the front end's module entries, clean to the whole check (including the README and the back-end app module).
@@ -39,63 +173,19 @@ export function writeCleanRepo(declaration = APP, { declare = true, into, name =
   const dir = into ? path.join(into, name) : fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-cli-'));
   fs.mkdirSync(dir, { recursive: true });
   const manifest = loadSlotManifest();
-  const resolver = createSlotResolver(manifest, resolveRepoDeclaration(manifest, declaration));
-  const put = (relative, text = '') => {
-    const target = path.join(dir, ...relative.split('/'));
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    if (!fs.existsSync(target)) fs.writeFileSync(target, text);
-  };
-  const write = (relative, text) => { const target = path.join(dir, ...relative.split('/')); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, text); };
-  // The one package.json of the app, the monorepo root (R143): the fe workspaces, npm as the package manager, turbo pinned.
-  put('package.json', `${JSON.stringify({ name: path.basename(dir), private: true, packageManager: PACKAGE_MANAGER, workspaces: [...WORKSPACES], devDependencies: { turbo: PINS.turbo.version } })}\n`);
-  // Each fe app is a workspace (R144) that declares its own next-intl stack (R59, R146).
-  for (const app of declaration.sides.fe.apps) put(`fe/apps/${app.name}/package.json`, `${JSON.stringify({ name: feAppPackageName(declaration.project, app.name), private: true, scripts: FE_APP_SCRIPTS, dependencies: { 'next-intl': PINS['next-intl'].version } }, null, 2)}\n`);
-  // The Nest monorepo of the declared be apps (R145), the default project the first api app.
-  const beApps = declaration.sides.be.apps;
-  const defaultApp = beApps.find((app) => app.kind === 'api') ?? beApps[0];
-  put('be/nest-cli.json', `${JSON.stringify({ $schema: 'https://json.schemastore.org/nest-cli', collection: '@nestjs/schematics', monorepo: true, root: `apps/${defaultApp.name}`, sourceRoot: `apps/${defaultApp.name}/src`, projects: Object.fromEntries(beApps.map((app) => [app.name, { type: 'application', root: `apps/${app.name}`, entryFile: 'main', sourceRoot: `apps/${app.name}/src` }])) }, null, 2)}\n`);
+  const resolved = resolveRepoDeclaration(manifest, declaration);
+  const resolver = createSlotResolver(manifest, resolved);
+  const writers = fixtureWriters(dir);
+  const { put, write } = writers;
+  writeManifests(dir, declaration, put);
   writeTargets(dir, renderTargets(declaration, PRESETS));
-  // The file a rule reads the content of that the render does not write: the be side's stack declaration.
   put('.starcistacks/application-stacks.yaml', STACKS_DECLARATION);
-  // One Dockerfile per declared app (R187-R191), the template output, and the standalone output every Next image ships.
-  for (const file of imageFiles(resolveRepoDeclaration(manifest, declaration))) put(file.path, file.content);
-  for (const app of declaration.sides.fe.apps) put(`fe/apps/${app.name}/next.config.ts`, 'export default { output: "standalone" };\n');
+  // Dockerfiles are app-owned scaffold output; managed workflows stay identical to sync output.
+  for (const file of imageFiles(resolved)) put(file.path, file.content);
   const required = resolver.requiredPaths().paths.map((entry) => entry.path);
-  for (const p of required) if (!p.endsWith('/')) put(p, p === 'hfs.json' ? '' : p.endsWith('.json') ? '{}\n' : /^be\/apps\/[^/]+\/src\/app\.module\.ts$/.test(p) ? 'export class AppModule {}\n' : 'export {};\n');
-  for (const app of declaration.sides.fe.apps) {
-    const base = `fe/apps/${app.name}`;
-    put(`${base}/src/modules/i18n/messages/en.json`, '{}');
-    put(`${base}/src/modules/i18n/messages/vi.json`, '{}');
-    put(`${base}/src/proxy.ts`);
-    // The machine judges reachability: every module entry imports its siblings and the app's route handler imports every module entry.
-    const entries = required.filter((p) => p.startsWith(`${base}/src/modules/`) && p.endsWith('/index.ts'));
-    for (const entry of entries) {
-      const siblings = required.filter((p) => path.posix.dirname(p) === path.posix.dirname(entry) && p !== entry && /\.tsx?$/.test(p));
-      write(entry, `${siblings.map((p) => `import './${path.posix.basename(p).replace(/\.tsx?$/, '')}';\n`).join('')}export {};\n`);
-    }
-    put(`${base}/src/app/health/live/route.ts`, `${entries.map((p) => `import '../../../modules/${path.posix.basename(path.posix.dirname(p))}';\n`).join('')}export const GET = () => new Response('ok');\nexport const app_${app.name.replace(/-/g, '_')} = 1;\n`);
-  }
-  put('be/src/features/api/orders/index.ts', `import './orders.module';\nimport './application/place-order.handler';\nexport {};\n`);
-  put('be/src/features/api/orders/orders.module.ts', 'export {};\n');
-  put('be/src/features/api/orders/application/place-order.handler.ts', 'export {};\n');
-  // The machine judges reachability: the app composes the feature and every required module, so a clean app is clean to it too.
-  const owners = ['src/features/api/orders/index.ts', ...required.filter((p) => /^be\/src\/modules\/[^/]+\/[^/]+\/index\.ts$/.test(p)).map((p) => p.slice('be/'.length))];
-  // An api app is denied by default (throttler, CSRF origin guard, AuthGuard) and masks its errors through the one filter of platform/errors.
-  write('be/src/modules/platform/errors/index.ts', "export { AllExceptionsFilter } from './all-exceptions.filter';\n");
-  write('be/src/modules/platform/errors/all-exceptions.filter.ts', 'export class AllExceptionsFilter { catch(): void {} }\n');
-  write('be/src/modules/platform/http-security/index.ts', "export { CsrfOriginGuard } from './csrf-origin.guard';\n");
-  write('be/src/modules/platform/http-security/csrf-origin.guard.ts', 'interface RequestHeaders { origin?: string }\ninterface HttpRequest { headers: RequestHeaders }\ninterface HttpHost { getRequest(): HttpRequest }\ninterface GuardContext { switchToHttp(): HttpHost }\nexport class CsrfOriginGuard { canActivate(context: GuardContext): boolean { return context.switchToHttp().getRequest().headers.origin !== undefined; } }\n');
-  write('be/src/modules/domain/identity/index.ts', "export { AuthGuard } from './auth.guard';\n");
-  write('be/src/modules/domain/identity/auth.guard.ts', 'export class AuthGuard { canActivate(): boolean { return true; } }\n');
-  for (const app of declaration.sides.be.apps.filter((entry) => entry.kind === 'api')) {
-    write(`be/apps/${app.name}/src/app.module.ts`, [
-      "import { Module } from '@nestjs/common';", "import { APP_FILTER, APP_GUARD } from '@nestjs/core';", "import { ThrottlerGuard } from '@nestjs/throttler';",
-      "import { AllExceptionsFilter } from '../../../src/modules/platform/errors';", "import { CsrfOriginGuard } from '../../../src/modules/platform/http-security';",
-      "import { AuthGuard } from '../../../src/modules/domain/identity';",
-      '@Module({ providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }, { provide: APP_GUARD, useClass: ThrottlerGuard }, { provide: APP_GUARD, useClass: CsrfOriginGuard }, { provide: APP_GUARD, useClass: AuthGuard }] })',
-      'export class AppModule {', '  static register(_options: object) { return { module: AppModule, imports: [], providers: [] }; }', '}', ''].join('\n'));
-    write(`be/apps/${app.name}/src/main.ts`, owners.map((file) => `import '../../../${file.replace(/\.ts$/, '')}';`).join('\n') + '\n');
-  }
+  for (const file of required) if (!file.endsWith('/')) put(file, requiredContent(file));
+  writeFrontend(declaration, required, writers);
+  writeBackend(declaration, required, writers);
   // Both sides' tsconfig.json are the managed ones (they extend @starci/tsconfig/be.json or next.json, see installTypeScript).
   write('README.md', readmeOf(path.basename(dir)));
   if (declare) write('hfs.json', `${JSON.stringify(declaration, null, 2)}\n`);
