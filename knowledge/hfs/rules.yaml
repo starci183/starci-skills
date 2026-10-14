@@ -2188,6 +2188,32 @@ rules:
     failureCodes: ["RT_COVERAGE_MATRIX", "RT_COVERAGE_NO_ENFORCER", "RT_COVERAGE_NO_SPEC", "RT_COVERAGE_NO_WITNESS", "RT_COVERAGE_NO_DOC", "RT_COVERAGE_NO_TEMPLATE", "RT_COVERAGE_NO_EXAMPLE", "RT_COVERAGE_EDITION_ASYMMETRY", "RT_COVERAGE_SCHEMA_NO_RECORD", "RT_COVERAGE_GATE_LIE", "RT_COVERAGE_SUPERSEDED_CITE", "RT_COVERAGE_SURFACE_UNMAPPED", "RT_COVERAGE_REQUIREMENT_UNLEDGERED"]
     enforcers:
       - {kind: runtime, id: hfs-coverage, at: scripts/checks/check-hfs-coverage.mjs}
+  - id: R257
+    code: "DB_BASELINE_SHAPE"
+    law: "An archived migration chain has exactly one active baseline marked -- starci:baseline <archived-last-stamp>, with a later valid stamp or an explicit restamp. Archive contents are immutable against repository history; an active migration enters the archive unchanged only in the same diff that adds the replacement baseline. The app db baseline, restamp and plan verbs are read-only unless --apply is explicit."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["DB_BASELINE_SHAPE", "DB_ARCHIVE_MUTATED"]
+    enforcers:
+      - {kind: hfs, id: db-baseline-shape, at: scripts/hfs/rules/database-baseline.mjs}
+  - id: R258
+    code: "DB_PGMQ_DECLARED"
+    law: "DB_QUEUE_CRON: every pgmq queue constant has an active migration creating the queue and every created queue has a constant. Queue objects are granted only to the application role. A uniquely named pg_cron job belongs to a migration and only enqueues to an existing queue directly or through one enqueue-only *_tick function; it executes no business DML or HTTP request and shares no tick with an app scheduler. Removing a tick unschedules its job."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["DB_PGMQ_DECLARED", "DB_CRON_OWNED"]
+    enforcers:
+      - {kind: hfs, id: db-queue-cron, at: scripts/hfs/rules/database-queues.mjs}
+  - id: R259
+    code: "DB_EXTENSION_ALLOWED"
+    law: "DB_CONFIG_EXT: extensions belong to the database allowlist, vault writes and migration role passwords are refused, pgmq schemas are never exposed through the API, and lite API access is closed except for explicit public-read policies. R216 DB_CONFIG_POLICY also checks API schema allowlisting, existing seed paths, anonymous sign-ins, disabled edge runtime, bounded storage uploads and the database major-version pin. Destructive DDL belongs only to *_contract_* migrations whose targets are no longer referenced by back-end SQL or entities. Seeds contain no real email or phone literals."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["DB_EXTENSION_ALLOWED", "DB_API_EXPOSED", "DB_MIGRATION_DESTRUCTIVE", "HFS_SEED_PII", "DB_VAULT_WRITE"]
+    enforcers:
+      - {kind: hfs, id: db-config-ext, at: scripts/hfs/rules/database-config.mjs}
+      - {kind: hfs, id: db-migration-destructive, at: scripts/hfs/rules/database-migrations.mjs}
+
   - id: R278
     code: "BE_REST_DOOR_EVIDENCE"
     law: "GraphQL is the default door in lite and full. Each REST route carries its own evidence: a probe, auth handshake, signed webhook, actual byte stream or a public versioned operation served from the app's nonempty defineOperations table. A class-level reference or an unused StreamableFile import proves no route, and a public REST route absent from the operation table is refused."
@@ -2288,28 +2314,3 @@ rules:
     failureCodes: ["HFS_FEATURE_FILE_BUDGET"]
     enforcers:
       - {kind: hfs, id: feature-files, at: scripts/hfs/rules/feature-files.mjs}
-  - id: R257
-    code: "DB_BASELINE_SHAPE"
-    law: "An archived migration chain has exactly one active baseline marked -- starci:baseline <archived-last-stamp>, with a later valid stamp or an explicit restamp. Archive contents are immutable against repository history; an active migration enters the archive unchanged only in the same diff that adds the replacement baseline. The app db baseline, restamp and plan verbs are read-only unless --apply is explicit."
-    kinds: [check]
-    gates: [settle, land, ci]
-    failureCodes: ["DB_BASELINE_SHAPE", "DB_ARCHIVE_MUTATED"]
-    enforcers:
-      - {kind: hfs, id: db-baseline-shape, at: scripts/hfs/rules/database-baseline.mjs}
-  - id: R258
-    code: "DB_PGMQ_DECLARED"
-    law: "DB_QUEUE_CRON: every pgmq queue constant has an active migration creating the queue and every created queue has a constant. Queue objects are granted only to the application role. A uniquely named pg_cron job belongs to a migration and only enqueues to an existing queue directly or through one enqueue-only *_tick function; it executes no business DML or HTTP request and shares no tick with an app scheduler. Removing a tick unschedules its job."
-    kinds: [check]
-    gates: [settle, land, ci]
-    failureCodes: ["DB_PGMQ_DECLARED", "DB_CRON_OWNED"]
-    enforcers:
-      - {kind: hfs, id: db-queue-cron, at: scripts/hfs/rules/database-queues.mjs}
-  - id: R259
-    code: "DB_EXTENSION_ALLOWED"
-    law: "DB_CONFIG_EXT: extensions belong to the database allowlist, vault writes and migration role passwords are refused, pgmq schemas are never exposed through the API, and lite API access is closed except for explicit public-read policies. R216 DB_CONFIG_POLICY also checks API schema allowlisting, existing seed paths, anonymous sign-ins, disabled edge runtime, bounded storage uploads and the database major-version pin. Destructive DDL belongs only to *_contract_* migrations whose targets are no longer referenced by back-end SQL or entities. Seeds contain no real email or phone literals."
-    kinds: [check]
-    gates: [settle, land, ci]
-    failureCodes: ["DB_EXTENSION_ALLOWED", "DB_API_EXPOSED", "DB_MIGRATION_DESTRUCTIVE", "HFS_SEED_PII", "DB_VAULT_WRITE"]
-    enforcers:
-      - {kind: hfs, id: db-config-ext, at: scripts/hfs/rules/database-config.mjs}
-      - {kind: hfs, id: db-migration-destructive, at: scripts/hfs/rules/database-migrations.mjs}

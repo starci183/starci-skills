@@ -18461,6 +18461,8 @@ HFS_APP_LEXICON:
   causes_vi:
     - "Đổi thuật ngữ sản phẩm nhưng chưa cập nhật toàn bộ mã và tài liệu."
   nextStep_vi: "Thay từ đã bỏ bằng thuật ngữ sản phẩm hiện hành tại đường dẫn và dòng được báo."
+  owner: op-retry
+  kind: check-finding
 DB_BASELINE_SHAPE:
   title: "An archived migration chain needs exactly one valid replacement baseline"
   title_vi: "Baseline của chuỗi migration lưu trữ sai hình dạng"
