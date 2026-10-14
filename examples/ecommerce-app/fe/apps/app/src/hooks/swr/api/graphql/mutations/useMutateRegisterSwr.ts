@@ -1,6 +1,6 @@
 import useSWRMutation from "swr/mutation"
-import { mutateRegister } from "@/modules/api"
-import type { MutationRegisterRequest } from "@/modules/api"
+import { mutateRegister } from "@/modules/api/graphql/mutations/mutation-register"
+import type { MutationRegisterRequest } from "@/modules/api/graphql/mutations/types/register"
 
 /** What one trigger of the mutation carries: its request. */
 type Trigger = { readonly arg: MutationRegisterRequest }

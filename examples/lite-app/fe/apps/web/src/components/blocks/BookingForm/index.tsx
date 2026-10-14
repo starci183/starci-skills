@@ -40,26 +40,23 @@ export const BookingForm = () => {
                         ? undefined
                         : workspace("lastCalendar", { id: calendar.createdId }),
                 bookingTitle: t("title"),
-                resourceLabel: t("resource"),
-                startsAtLabel: t("startsAt"),
-                endsAtLabel: t("endsAt"),
                 submitLabel: isSubmitting ? t("working") : t("submit"),
                 bookingPending: isSubmitting,
                 bookingStatus: statusText,
-                resourceId: { value: fields.resourceId.value, errorMessage: fields.resourceId.errorMessage },
-                startsAt: { value: fields.startsAt.value, errorMessage: fields.startsAt.errorMessage },
-                endsAt: { value: fields.endsAt.value, errorMessage: fields.endsAt.errorMessage },
+                resourceId: { label: t("resource"), ...fields.resourceId.state },
+                startsAt: { label: t("startsAt"), ...fields.startsAt.state },
+                endsAt: { label: t("endsAt"), ...fields.endsAt.state },
             }}
             on={{
                 addResource: () => void resource.create(),
                 addCalendar: () => void calendar.create(),
                 book: () => void submit(),
-                resourceIdChange: fields.resourceId.change,
-                resourceIdBlur: fields.resourceId.blur,
-                startsAtChange: fields.startsAt.change,
-                startsAtBlur: fields.startsAt.blur,
-                endsAtChange: fields.endsAt.change,
-                endsAtBlur: fields.endsAt.blur,
+                resourceIdChange: fields.resourceId.on.change,
+                resourceIdBlur: fields.resourceId.on.blur,
+                startsAtChange: fields.startsAt.on.change,
+                startsAtBlur: fields.startsAt.on.blur,
+                endsAtChange: fields.endsAt.on.change,
+                endsAtBlur: fields.endsAt.on.blur,
             }}
         />
     )

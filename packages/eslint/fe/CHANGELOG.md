@@ -1,10 +1,21 @@
 # Changelog
 
+## 8.3.0 - 2026-10-15
+- Changed: layouts may import overlays beside pages (tier edge `feature -> feature` from pages and layouts to overlays); a layout hosts the route-selected overlay through `components/branches/OverlayHost` while pages stay server components (pattern FE-BOUNDARY-5). Carries the runtime mirror of the manifest and pins, rebased onto alpha.13 (eslint-canon-fe 8.2.18).
+
 ## 8.2.17 - 2026-10-14
 - Changed: `component-line-budget` gives a pure re-export `index.ts` the slot's `barrel` budget (400); `basePropsAtom` admits named `render*` callbacks in `props` of non-block pure halves for feature composition; the bundled machine carries the kind-scoped feature tier edge, canon-shape clone exclusions and in-segment i18n template reads.
 
 
 - Changed: carry the runtime mirror of HFS manifest 3.1.0 (the back-end app composition standard, R245 and R246) and the canon pins of eslint-canon-be 3.3.0, HFS 4.3.0 and CLI 1.2.16. ESLint rule implementations are unchanged.
+
+## 8.2.18 - 2026-10-14
+
+- Changed: carry the canon pins of eslint-canon-be 3.2.19, HFS 4.2.17 and CLI 1.2.17 in the runtime mirror. ESLint rule implementations are unchanged.
+
+## 8.2.17 - 2026-10-14
+
+- Fixed: `dead-exports` (`HFS_UNUSED_EXPORT`) counts an import by another public entry the slot declares in `entries` as a use: a `graphql/{queries,mutations}/types/<x>.ts` export its operation file `query-<x>.ts`/`mutation-<x>.ts` imports is part of that operation's signature and is no longer reported. A barrel or any other non-entry file of the owner still does not count, so an operation reached only through a re-export of `modules/api/index.ts` stays dead.
 
 ## 8.2.16 - 2026-10-13
 

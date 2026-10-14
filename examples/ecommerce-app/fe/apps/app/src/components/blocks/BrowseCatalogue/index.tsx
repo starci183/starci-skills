@@ -19,6 +19,15 @@ export const BrowseCatalogue = () => {
     const read = useCartView()
     const add = useAddToCart()
     const catalog = read.status === "ready" ? read.view.catalog : null
+    const products =
+        catalog === null
+            ? null
+            : catalog.map((product) => ({
+                  id: product.id,
+                  name: product.name,
+                  price: format.number(product.priceMinorUnits / 100, { style: "currency", currency: "USD" }),
+                  stock: product.stock,
+              }))
     return (
         <BrowseCatalogueBase
             state={read.status === "signedOut" ? "signedOut" : "browse"}
@@ -29,22 +38,7 @@ export const BrowseCatalogue = () => {
                     catalog !== null && catalog.length > 0
                         ? t("descriptionCount", { count: catalog.length })
                         : t("description"),
-                productsSlot:
-                    read.status === "loading"
-                        ? { status: "loading" }
-                        : collectionSlot(
-                              catalog === null
-                                  ? null
-                                  : catalog.map((product) => ({
-                                        id: product.id,
-                                        name: product.name,
-                                        price: format.number(product.priceMinorUnits / 100, {
-                                            style: "currency",
-                                            currency: "USD",
-                                        }),
-                                        stock: product.stock,
-                                    })),
-                          ),
+                productsSlot: read.status === "loading" ? { status: "loading" } : collectionSlot(products),
                 stockLabel: t.raw("stockLabel"),
                 addToCart: t("addToCart"),
                 addingToCart: t("addingToCart"),

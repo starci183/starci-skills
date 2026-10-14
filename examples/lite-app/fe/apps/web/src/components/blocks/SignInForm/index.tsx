@@ -23,19 +23,17 @@ export const SignInForm = () => {
             state={stateOf(isSubmitting, failure)}
             props={{
                 title: t("title"),
-                emailLabel: t("email"),
-                passwordLabel: t("password"),
                 submitLabel: isSubmitting ? t("working") : t("submit"),
                 failure: failure === undefined ? undefined : t(failure),
-                email: { value: fields.email.value, errorMessage: fields.email.errorMessage },
-                password: { value: fields.password.value, errorMessage: fields.password.errorMessage },
+                email: { label: t("email"), ...fields.email.state },
+                password: { label: t("password"), ...fields.password.state },
             }}
             on={{
                 submit: () => void submit(),
-                emailChange: fields.email.change,
-                emailBlur: fields.email.blur,
-                passwordChange: fields.password.change,
-                passwordBlur: fields.password.blur,
+                emailChange: fields.email.on.change,
+                emailBlur: fields.email.on.blur,
+                passwordChange: fields.password.on.change,
+                passwordBlur: fields.password.on.blur,
             }}
         />
     )

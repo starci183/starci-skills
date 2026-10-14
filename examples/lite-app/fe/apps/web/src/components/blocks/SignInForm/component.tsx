@@ -1,23 +1,16 @@
-import { Button, Form, Input, SectionHeader, Text } from "@starci/grammar/common"
-import type { InputKind } from "@starci/grammar/common"
-
-/** One controlled field as data: its value and its validation message. */
-interface SignInFieldState {
-    readonly value: string
-    readonly errorMessage?: string
-}
+import { Button, Form, SectionHeader, Text } from "@starci/grammar/common"
+import { FormInput } from "@/components/composites/FormInput"
+import type { FormInputField, FormInputSpec } from "@/components/composites/FormInput"
 
 /** Copy, fields, state and actions supplied by the connected sign-in block. */
 export interface SignInFormBaseProps {
     readonly state: "ready" | "working" | "failed"
     readonly props: {
         readonly title: string
-        readonly emailLabel: string
-        readonly passwordLabel: string
         readonly submitLabel: string
         readonly failure?: string
-        readonly email: SignInFieldState
-        readonly password: SignInFieldState
+        readonly email: FormInputField
+        readonly password: FormInputField
     }
     readonly on: {
         readonly submit: () => void
@@ -28,52 +21,25 @@ export interface SignInFormBaseProps {
     }
 }
 
-/** What one controlled credential input takes. */
-interface SignInInputProps {
-    readonly id: string
-    readonly name: string
-    readonly label: string
-    readonly kind: InputKind
-    readonly field: SignInFieldState
-    readonly onChange: (value: string) => void
-    readonly onBlur: () => void
-}
+/** The email input of the sign-in form. */
+const EMAIL: FormInputSpec = { id: "sign-in-email", name: "email", kind: "email" }
 
-/** One controlled grammar Input of the sign-in form. */
-const SignInInput = (props: SignInInputProps) => (
-    <Input
-        id={props.id}
-        name={props.name}
-        label={props.label}
-        kind={props.kind}
-        isRequired
-        value={props.field.value}
-        onValueChange={props.onChange}
-        onBlur={props.onBlur}
-        errorMessage={props.field.errorMessage}
-        isError={props.field.errorMessage !== undefined}
-    />
-)
+/** The password input of the sign-in form. */
+const PASSWORD: FormInputSpec = { id: "sign-in-password", name: "password", kind: "password" }
 
 /** Draws the sign-in form without reading navigation, copy or session state. */
 export const SignInFormBase = (props: SignInFormBaseProps) => (
     <>
         <SectionHeader title={props.props.title} level={2} />
         <Form label={props.props.title} isPending={props.state === "working"} onSubmit={props.on.submit}>
-            <SignInInput
-                id="sign-in-email"
-                name="email"
-                label={props.props.emailLabel}
-                kind="email"
+            <FormInput
+                input={EMAIL}
                 field={props.props.email}
                 onChange={props.on.emailChange}
                 onBlur={props.on.emailBlur}
             />
-            <SignInInput
-                id="sign-in-password"
-                name="password"
-                label={props.props.passwordLabel}
-                kind="password"
+            <FormInput
+                input={PASSWORD}
                 field={props.props.password}
                 onChange={props.on.passwordChange}
                 onBlur={props.on.passwordBlur}

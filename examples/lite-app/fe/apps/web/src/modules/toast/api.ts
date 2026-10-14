@@ -50,21 +50,3 @@ export const runGraphQLWithToast = async <T>(
     showGraphQLToast(response, messages, options)
     return response
 }
-
-/** Runs one REST call (modules/api/rest) and toasts its outcome; answers the value, or undefined when it failed. */
-export const runRestWithToast = async <T>(
-    action: () => Promise<T>,
-    messages: ToastMessages,
-    options: RunWithToastOptions = {},
-): Promise<T | undefined> => {
-    try {
-        const value = await action()
-        if (options.showSuccessToast !== false)
-            toast.success(messages.successTitle, { description: options.successMessage ?? messages.defaultSuccess })
-        return value
-    } catch (cause) {
-        const description = cause instanceof Error ? cause.message : messages.defaultError
-        toast.danger(messages.errorTitle, { description })
-        return undefined
-    }
-}

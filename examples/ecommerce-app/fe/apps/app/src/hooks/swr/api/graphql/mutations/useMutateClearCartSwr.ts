@@ -1,5 +1,5 @@
 import useSWRMutation from "swr/mutation"
-import { mutateClearCart } from "@/modules/api"
+import { mutateClearCart } from "@/modules/api/graphql/mutations/mutation-clear-cart"
 import { useAppSelector } from "@/redux"
 
 /** The SWR key of the clear-cart mutation; the signed-in person is its identity. */

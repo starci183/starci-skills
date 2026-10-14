@@ -3,9 +3,9 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useTranslations } from "next-intl"
 import { useMemo, useState } from "react"
-import { useController, useForm } from "react-hook-form"
-import type { Control } from "react-hook-form"
+import { useForm } from "react-hook-form"
 import { z } from "zod"
+import { useFormField } from "@/hooks/fields"
 import { useMutateCreateBookingSwr } from "@/hooks/swr"
 import { useGraphQLWithToast } from "@/modules/toast"
 
@@ -27,17 +27,6 @@ const bookingSchemaOf = (t: (key: BookingMessageKey) => string) =>
 /** The values of the booking form. */
 type BookingValues = z.infer<ReturnType<typeof bookingSchemaOf>>
 
-/** One controlled field of the form as a grammar Input takes it. */
-const useField = (control: Control<BookingValues>, name: keyof BookingValues) => {
-    const { field, fieldState } = useController({ control, name })
-    return {
-        value: field.value,
-        errorMessage: fieldState.error?.message,
-        change: field.onChange,
-        blur: field.onBlur,
-    }
-}
-
 /**
  * The booking form: react-hook-form with the zod schema, submitted through the create-booking SWR mutation and reported by
  * modules/toast. The back end answers at once with a pending booking and enqueues its confirmation job; `bookingId` is the
@@ -53,9 +42,9 @@ export const useBookingForm = () => {
     const runGraphQL = useGraphQLWithToast()
     const { trigger, isMutating } = useMutateCreateBookingSwr()
     const [bookingId, setBookingId] = useState<string>()
-    const resourceId = useField(form.control, "resourceId")
-    const startsAt = useField(form.control, "startsAt")
-    const endsAt = useField(form.control, "endsAt")
+    const resourceId = useFormField(form.control, "resourceId")
+    const startsAt = useFormField(form.control, "startsAt")
+    const endsAt = useFormField(form.control, "endsAt")
     const submit = form.handleSubmit(async (values) => {
         const response = await runGraphQL(() => trigger(values), { successMessage: t("queued") })
         if (response.success) setBookingId(response.data.id)

@@ -43,9 +43,9 @@ export const ident = (name: string, allowed: ReadonlyArray<string>): SqlIdent =>
     return name
 }
 
-type NotFoundFactory = () => never
+type NotFoundFactory = (id: string) => never
 
-/** Requires the row selected by an id-and-owner statement and lets the capability own its typed not-found error. */
+/** Requires the row selected by an id-and-owner statement and lets the capability own its typed not-found error of that id. */
 export const requireOwnedRow = async <T>(
     entityManager: EntityManager,
     statement: SqlText,
@@ -54,6 +54,6 @@ export const requireOwnedRow = async <T>(
     notFound: NotFoundFactory,
 ): Promise<T> => {
     const row = (await entityManager.query<Array<T>>(statement, [id, ownerId]))[0]
-    if (row === undefined) return notFound()
+    if (row === undefined) return notFound(id)
     return row
 }

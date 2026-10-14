@@ -1,6 +1,6 @@
 import useSWRMutation from "swr/mutation"
-import { mutateAddCartItem } from "@/modules/api"
-import type { MutationAddCartItemRequest } from "@/modules/api"
+import { mutateAddCartItem } from "@/modules/api/graphql/mutations/mutation-add-cart-item"
+import type { MutationAddCartItemRequest } from "@/modules/api/graphql/mutations/types/add-cart-item"
 import { useAppSelector } from "@/redux"
 
 /** What one trigger of the mutation carries: the product and the quantity to add. */

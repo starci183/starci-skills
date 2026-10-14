@@ -211,7 +211,7 @@ test("add table --fe writes one policy-complete migration, the GraphQL api featu
   );
   assert.match(
     read(root, "be/src/modules/domain/orders/orders.service.ts"),
-    /requireOwnedRow<Pick<OrdersRow, "id">>\(this\.entityManager, FIND_ORDERS, id, principalId,/,
+    /requireOwnedRow<OrdersResult>\(this\.entityManager, FIND_ORDERS, id, principalId, notFound\)/,
   );
   assert.match(
     read(root, "be/src/modules/domain/orders/persistence/orders.sql.ts"),

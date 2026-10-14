@@ -1,5 +1,5 @@
 import useSWR from "swr"
-import { queryVerifySession } from "@/modules/api"
+import { queryVerifySession } from "@/modules/api/graphql/queries/query-verify-session"
 import { authClient } from "@/modules/auth"
 import { useAppSelector } from "@/redux"
 

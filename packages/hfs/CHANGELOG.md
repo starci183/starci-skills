@@ -17,6 +17,16 @@
 - Changed: `add table` lists the table's error kinds where the app keeps its error kinds array: the root `app.module.ts`, or else the `compose/` group that holds it.
 - Changed: the architecture machine reads an app's root and its `compose/` groups as one composition (register-once, module-per-transport, the connection and context maps).
 
+## 4.2.17 - 2026-10-14
+
+- Fixed: the webhook door spec template signs with a per-run key (`randomBytes`) instead of a literal, so a scaffolded spec holds no plaintext secret-shaped value the release secret scan could flag.
+
+## 4.2.16 - 2026-10-14
+
+- Fixed: the `add api`, `add table` and `add webhook` templates render code the published canons (eslint-canon-be 3.2.17, eslint-canon-fe 8.2.16) accept, as examples/lite-app shows. The GraphQL error formatter spec builds its malformed-operation error from a code (`GRAPHQL_VALIDATION_FAILED`), not prose (`user-copy-through-catalog`); `platform/graphql`'s context factory types its parameter with the named `GraphqlContext` (`no-inline-param-type`); both webhook door spec templates register `HttpSecurityModule` with the module's own default and override `WebhookSignatureService` with the real verifier over a fake clock instead of a global `ClockModule` (`is-global-only-in-app`).
+- Fixed: two tables no longer render duplicate code (`HFS_DUPLICATE_CODE`). The table service template answers `Pick<Row, "id">` through a named result type, throws its not-found error from one module-level factory handed to `requireOwnedRow` (whose factory now receives the id) and maps the insert's rows with a module-level `createdRow`.
+- Fixed: `add table --fe` renders no dead or aliased operation types (`HFS_UNUSED_EXPORT`, `HFS_ALIAS_REEXPORT`): the operation files type their request with the generated variables, the types files export only the answer, which the SWR hooks name. `useQuery<X>Swr` answers the operation's GraphQLResponse as its data (as the ecommerce example does) and `useMutateCreate<X>Swr` primes that query with the response.
+
 ## 4.2.15 - 2026-10-13
 
 - Changed: the heroicons family is the one application icon set (owner ruling 2026-10-13): the scaffold installs `@heroicons/react` 2.2.0 and `@starci/heroicons` 0.3.3 (fe-stack `icons`, tier core) in every product fe app in place of `@phosphor-icons/react`, and the `modules/toast` skeleton draws its status indicators with `@heroicons/react/24/outline` (CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, InformationCircleIcon). Carry the canon pins of eslint-canon-be 3.2.17, eslint-canon-fe 8.2.16 and CLI 1.2.15.

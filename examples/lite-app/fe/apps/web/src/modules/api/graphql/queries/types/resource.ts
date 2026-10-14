@@ -1,7 +1,4 @@
-import type { ResourceQuery, ResourceQueryVariables } from "../../__generated__/graphql"
+import type { ResourceQuery } from "../../__generated__/graphql"
 
-/** What queryResource takes: the input of the `resource` query (generated from the back end's contract). */
-export type QueryResourceRequest = ResourceQueryVariables["input"]
-
-/** What queryResource answers: the `resource` field. */
+/** What queryResource answers: the `resource` field (generated from the back end's contract). */
 export type QueryResourceData = ResourceQuery["resource"]
