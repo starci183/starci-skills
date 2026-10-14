@@ -1,13 +1,14 @@
 import path from 'node:path';
 import { isInside } from './config.mjs';
 import { relativePath, unwrapExpression } from './typescript.mjs';
-import { commonJsRequireReasons, decoratorCallee, moduleExportsOf, nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf, returnedExpressions, selectedNode, valueSymbol, violation } from './ast-walks.mjs';
+import { commonJsRequireReasons, constructedDecoratorKind, decoratorCallee, moduleExportsOf, mutableDecoratorKind, nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf, returnedExpressions, selectedNode, valueSymbol, violation } from './ast-walks.mjs';
 import { createBackendSourceShapeChecker } from './source-names-shape.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 const SOURCE_LAYOUT_RULE_ID = 'BE_FEATURE_LAYOUT_INVALID';
 const SOURCE_NAME_RULE_ID = 'BE_SOURCE_FORM';
 const FRAMEWORK_EXPORTS = new Map([
-  ['@nestjs/graphql', new Set(['Args', 'ArgsType', 'InputType', 'Mutation', 'ObjectType', 'Query', 'registerEnumType'])],
+  ['@nestjs/graphql', new Set(['Args', 'ArgsType', 'InputType', 'Mutation', 'ObjectType', 'Query', 'Subscription', 'registerEnumType'])],
   ['typeorm', new Set(['Entity', 'EntitySchema', 'MigrationInterface', 'ViewEntity'])],
 ]);
 const APPLICATION_ROLES = new Set(['command', 'contracts', 'handler', 'query']);
@@ -237,6 +238,11 @@ function graphqlField({ config, context, sourceFile, node, decorator, kind, nami
   }
   const methodName = node.name && (context.ts.isIdentifier(node.name) || context.ts.isStringLiteralLike(node.name)) ? node.name.text : null;
   const name = selected.status === 'literal' ? selected.value : methodName;
+  if (selected.status === 'literal') {
+    if (!methodName) namingReasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot prove the @${kind} method name`);
+    else if (selected.value !== methodName) violations.push(violation(config, sourceFile, selected.node, SOURCE_NAME_RULE_ID,
+      `GraphQL @${kind} field name ${selected.value} must equal its method name ${methodName}.`));
+  }
   if (!name) namingReasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot prove the @${kind} field name`);
   else if (!camelCase(name)) violations.push(violation(config, sourceFile, selected.node ?? node.name ?? node, SOURCE_NAME_RULE_ID,
     `GraphQL field name ${name} must be camelCase.`));
@@ -316,7 +322,46 @@ const checkBackendSourceShapeImpl = createBackendSourceShapeChecker({
   TRACE_NEW,
 });
 
+function inspectSubscriptionSource({ config, context, sourceFile, checker, framework, configuredRoot, namingReasons, violations }) {
+  const visit = node => {
+    for (const decorator of nodeDecorators(context.ts, node)) {
+      const kind = decoratorKind(context.ts, checker, decorator, framework.bySymbol);
+      if (kind === 'Subscription') graphqlField({ config, context, sourceFile, node, decorator, kind, namingReasons, violations });
+      else if (!kind && !configuredRoot) {
+        const dynamic = mutableDecoratorKind(context.ts, checker, decorator, framework.bySymbol)
+          ?? constructedDecoratorKind(context.ts, checker, decorator, framework.bySymbol, TRACE_NEW);
+        if (['Subscription', 'multiple framework', 'unproven framework'].includes(dynamic)) {
+          namingReasons.push(`${relativePath(config.root, sourceFile.fileName)} uses a mutable or constructed ${dynamic} decorator identity`);
+        }
+      }
+    }
+    context.ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+}
+
 export function checkBackendSourceShape(config, context) {
-  return checkBackendSourceShapeImpl(config, context);
+  const result = checkBackendSourceShapeImpl(config, context);
+  const roots = absoluteRoots(config.root, [...config.backend.features, ...config.backend.modules]);
+  const localFiles = new Set(context.files.map(file => canonical(file.fileName)));
+  const frameworkByChecker = new Map();
+  const namingReasons = [];
+  // The shared shape walk dispatches Query and Mutation; subscriptions use the same naming relation here.
+  for (const sourceFile of context.files) {
+    const fileName = canonical(sourceFile.fileName);
+    const configuredRoot = locatedRoot(roots, fileName);
+    const owner = config.hfs?.ownerOf?.(relativePath(config.root, fileName));
+    const slot = owner ? config.hfs.slot(owner.slot) : null;
+    if (!configuredRoot && !(slot?.tier === 'feature' && slot.profiles?.includes('be'))) continue;
+    const checker = context.checkerFor(fileName);
+    if (!frameworkByChecker.has(checker)) frameworkByChecker.set(checker, frameworkTargets(config, context, checker, localFiles));
+    const framework = frameworkByChecker.get(checker);
+    inspectSubscriptionSource({ config, context, sourceFile, checker, framework, configuredRoot, namingReasons, violations: result.violations });
+  }
+  if (namingReasons.length) result.coverage.naming = {
+    status: 'unavailable', reason: 'one or more backend source naming relations are not statically proved',
+    details: [...new Set([...(result.coverage.naming.details ?? []), ...namingReasons])].sort(byCodeUnit),
+  };
+  return result;
 }
 export { SOURCE_LAYOUT_RULE_ID, SOURCE_NAME_RULE_ID };

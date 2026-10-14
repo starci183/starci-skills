@@ -82,7 +82,7 @@ import { testTopologyFindings } from './rules/test-topology.mjs';
 import { feNoTestsFindings } from './rules/fe-no-tests.mjs';
 import { editionFindings } from './rules/edition.mjs';
 import { feStackFindings } from './rules/fe-stack.mjs';
-import { a15Findings } from './rules/a15-findings.mjs';
+import { A15_CODES, a15Findings } from './rules/a15-findings.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { pinFindings } from './pin-findings.mjs';
 import { requiredFileApplies } from './slot-required.mjs';
@@ -110,6 +110,7 @@ export const CHECK_CODES = Object.freeze([
   'DB_MIGRATION_SHAPE', 'DB_RLS_REQUIRED', 'DB_DYNAMIC_DDL', 'DB_POLICY_SHAPE', 'DB_DEFINER_SAFE', 'DB_STORAGE_POLICY', 'DB_CONFIG_POLICY', 'DB_TYPES_DRIFT',
   'HFS_GITIGNORE_BLOCK_DRIFT', 'HFS_SONAR_CONFIG', 'HFS_COVERAGE_SCOPE_DRIFT', 'HFS_FORMAT',
   'HFS_EMPTY_DIR', 'HFS_GHOST_TREE', 'HFS_UNTRACKED_ROOT_ENTRY',
+  ...A15_CODES,
   ...REFUSAL_CODES,
 ]);
 /** Every code `starci app check` can report: its own and every code the architecture machine can emit (derived from the machine's rule id lists). */
