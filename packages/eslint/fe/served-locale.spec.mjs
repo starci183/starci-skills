@@ -195,6 +195,28 @@ for (const edition of ["lite", "full"]) {
         code: `const headers = { ["accept-language"]: locale }`,
       },
       {
+        filename: LOCALE_LINK,
+        code: `const headers = new Headers([["ACCEPT-LANGUAGE", locale]])`,
+      },
+      {
+        filename: HOOK,
+        code: `const headers = new Headers([["authorization", token]])`,
+      },
+      {
+        filename: HOOK,
+        code: `const entries = new Map([["x-locale", locale], ["Accept-Language", locale]])`,
+      },
+      {
+        filename: HOOK,
+        code: `class Headers { constructor(entries) {} }
+const headers = new Headers([["x-locale", locale], ["Accept-Language", locale]])`,
+      },
+      {
+        filename: HOOK,
+        code: `const globalThis = { Headers: class { constructor(entries) {} } }
+const headers = new globalThis.Headers([["x-locale", locale]])`,
+      },
+      {
         filename: HOOK,
         code: `const headers = { authorization: token }`,
       },
@@ -256,6 +278,26 @@ headers.append("Accept-Language", locale)`,
         filename: HOOK,
         code: `const headers = { "X-LOCALE": locale }`,
         errors: [{ messageId: "retired" }],
+      },
+      {
+        filename: LOCALE_LINK,
+        code: `const headers = new Headers([["x-locale", locale], ["Accept-Language", locale]])`,
+        errors: [{ messageId: "retired" }],
+      },
+      {
+        filename: HOOK,
+        code: `const headers = new globalThis.Headers([["X-LOCALE", locale]])`,
+        errors: [{ messageId: "retired" }],
+      },
+      {
+        filename: HOOK,
+        code: `const headers = new window.Headers([[\`accept-language\`, locale]])`,
+        errors: [{ messageId: "elsewhere" }],
+      },
+      {
+        filename: HOOK,
+        code: `const headers = new Headers([["Accept-Language", locale], ["x-locale", locale]])`,
+        errors: [{ messageId: "elsewhere" }, { messageId: "retired" }],
       },
       {
         filename: HOOK,

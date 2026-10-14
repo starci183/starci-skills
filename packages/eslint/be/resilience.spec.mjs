@@ -19,12 +19,12 @@ const inBothEditions = (cases) => ["lite", "full"].flatMap((edition) => cases.ma
 })))
 
 test("every rule this law declares is exported under its published name", () => {
-  for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
+  for (const [name, rule] of Object.entries(rules)) assert.ok(rule?.meta && rule.create, `${name} is not a rule`)
 })
 
 test("R70: an outbound HTTP call states how long it may take", () => {
   tester.run("http-needs-timeout", httpNeedsTimeout, {
-    valid: inBothEditions([
+    valid: [...inBothEditions([
       { filename: SRC, code: "await fetch(url, { method: 'POST', signal: AbortSignal.timeout(TIMEOUT_MS) })" },
       { filename: SRC, code: "await fetch(url, { ['signal']: AbortSignal.timeout(1000) })" },
       { filename: SRC, code: "const init = { signal: AbortSignal.timeout(1000) }; await fetch(url, { ...init })" },
@@ -46,8 +46,8 @@ test("R70: an outbound HTTP call states how long it may take", () => {
       { filename: SRC, code: "const found = items.get(key)" },
       { filename: SRC, code: "const axios = { get: (url: string) => url }\nawait axios.get(url)" },
       { filename: SRC, code: "http.get(url, callback)" },
-    ]),
-    invalid: inBothEditions([
+    ])],
+    invalid: [...inBothEditions([
       { filename: SRC, code: "await fetch(url)", errors: [{ messageId: "fetchNoSignal" }] },
       { filename: SRC, code: "await fetch(url, { method: 'POST', body })", errors: [{ messageId: "fetchNoSignal" }] },
       { filename: SRC, code: "const init = { method: 'POST' }; await fetch(url, init)", errors: [{ messageId: "fetchNoSignal" }] },
@@ -86,7 +86,7 @@ test("R70: an outbound HTTP call states how long it may take", () => {
       { filename: SRC, code: `${AXIOS}const config = { headers: {} }; class C { constructor(private readonly client: HttpService) {} run() { return this.client.get(url, config) } }`, errors: [{ messageId: "clientNoTimeout" }] },
       // specs are not exempt
       { filename: SPEC, code: "await fetch(url)", errors: [{ messageId: "fetchNoSignal" }] },
-    ]),
+    ])],
   })
 })
 
