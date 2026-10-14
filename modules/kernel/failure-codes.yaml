@@ -18163,3 +18163,69 @@ workflow-purge-ledger-dependency:
   nextStep_vi: "Xử lý tham chiếu theo thẩm quyền sản phẩm hoặc sửa bộ kiểm schema rồi đọc lại kế hoạch; không xóa Work để vượt cổng."
   owner: owner
   kind: verb-refusal
+
+FE_SWR_OUTSIDE_FAMILY:
+  title: "An SWR runtime call is outside its hook family"
+  title_vi: "Lời gọi SWR nằm ngoài họ hook được khai báo"
+  meaning_vi: "Tệp <file> gọi SWR trực tiếp ở component, feature hoặc hook miền thay vì dùng hook thuộc họ SWR chịu trách nhiệm lấy dữ liệu."
+  causes_vi:
+    - "Component tự gọi useSWR hoặc useSWRMutation"
+    - "Hook miền tự sở hữu bộ nhớ đệm thay vì dùng hook bọc của họ SWR"
+  nextStep_vi: "Chuyển lời gọi SWR về hook bọc trong hooks/swr rồi để component hoặc hook miền dùng hook đó."
+  owner: op-retry
+  kind: check-finding
+
+FE_OP_OUTSIDE_SWR_HOOK:
+  title: "An API operation is used outside its SWR wrapper hook"
+  title_vi: "Operation API được dùng ngoài hook bọc SWR"
+  meaning_vi: "Tệp <file> import hoặc gọi operation của modules/api trực tiếp ở component, feature hoặc hook miền, bỏ qua hook bọc trong hooks/swr."
+  causes_vi:
+    - "Hook miền import operation API trực tiếp"
+    - "Component hoặc trang máy chủ gọi operation thay vì dùng hook bọc"
+  nextStep_vi: "Đặt import và lời gọi operation trong hook bọc tương ứng ở hooks/swr; các tệp tiêu thụ chỉ dùng hook đó."
+  owner: op-retry
+  kind: check-finding
+
+FE_COPY_IN_CALL:
+  title: "A validation or toast call contains literal display copy"
+  title_vi: "Lời gọi kiểm tra dữ liệu hoặc toast chứa chữ hiển thị gõ trực tiếp"
+  meaning_vi: "Tệp <file> truyền chữ hiển thị trực tiếp vào thông báo Zod hoặc toast; chữ người dùng đọc phải được lấy từ catalog next-intl."
+  causes_vi:
+    - "Lời gọi z.string().email chứa câu báo lỗi gõ trực tiếp"
+    - "Toast chứa tiêu đề hoặc mô tả gõ trực tiếp"
+  nextStep_vi: "Đưa chữ hiển thị vào catalog ngôn ngữ và truyền kết quả t() vào thông báo kiểm tra dữ liệu hoặc toast."
+  owner: op-retry
+  kind: check-finding
+
+FE_NO_ALERT:
+  title: "The front end calls a browser alert"
+  title_vi: "Front end gọi hộp thoại alert của trình duyệt"
+  meaning_vi: "Tệp <file> gọi alert() hoặc biến thể toàn cục của nó, tạo hộp thoại trình duyệt ngoài hệ thống thông báo của sản phẩm."
+  causes_vi:
+    - "Dùng alert() để báo lỗi hoặc báo thao tác hoàn tất"
+    - "Gọi window.alert hoặc globalThis.alert thay cho toast"
+  nextStep_vi: "Dùng mô-đun toast của sản phẩm hoặc overlay được khai báo, với chữ hiển thị lấy từ catalog next-intl."
+  owner: op-retry
+  kind: check-finding
+
+FE_ICON_INLINE_SVG:
+  title: "An inline SVG is outside a declared brand-mark leaf"
+  title_vi: "SVG viết trực tiếp nằm ngoài leaf nhãn hiệu được khai báo"
+  meaning_vi: "Tệp <file> vẽ SVG trực tiếp ngoài leaf nhãn hiệu được khai báo; glyph thông thường phải đến từ họ Heroicons thông qua leaf Icon."
+  causes_vi:
+    - "Leaf Icon tự vẽ path hoặc SVG thay vì dùng Heroicons"
+    - "Component vẽ SVG trực tiếp mà không phải leaf nhãn hiệu được khai báo"
+  nextStep_vi: "Thay glyph bằng Heroicons qua leaf Icon; nếu là nhãn hiệu, đặt nó trong leaf nhãn hiệu và khai báo đúng chủ của leaf."
+  owner: op-retry
+  kind: check-finding
+
+FE_CALLBACK_SHAPE:
+  title: "An auth callback performs more than code exchange and redirect"
+  title_vi: "Callback xác thực làm thêm việc ngoài đổi mã và chuyển hướng"
+  meaning_vi: "Handler của fe.route.callback chứa operation dữ liệu, logic sản phẩm, handler bổ sung hoặc phản hồi JSON thay vì chỉ đổi mã xác thực rồi chuyển hướng."
+  causes_vi:
+    - "Callback gọi operation API hoặc xử lý dữ liệu sản phẩm"
+    - "Callback trả JSON hoặc định nghĩa thêm handler"
+  nextStep_vi: "Giữ callback ở việc đọc mã, tạo client xác thực, đổi mã và chuyển hướng; chuyển logic sản phẩm về back end hoặc hook phù hợp."
+  owner: op-retry
+  kind: check-finding

@@ -27,6 +27,7 @@
 
 import { hfsOf } from "./lib/hfs.mjs"
 import { baseName, classOf, fileOf, inSlot } from "./lib/scope.mjs"
+import { rules as swrFamilyRules } from "./swr-family.mjs"
 
 /** Names that mark a hook. */
 const isHookName = (name) => /^use[A-Z0-9]/.test(name)
@@ -155,6 +156,8 @@ export const hooksFolderHoldsHooksOnly = {
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "hooks-folder-holds-hooks-only": hooksFolderHoldsHooksOnly,
+  // Forward the family enforcers for the catalog's source-only CONTRIBUTIONS discovery.
+  ...swrFamilyRules,
 }
 
 /** Every rule is an error. */

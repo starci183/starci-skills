@@ -237,3 +237,42 @@ export const starciFeConfig = ({ hfs } = {}) => {
     source: { ...recommended, ...reactHooksRules(reactHooks) },
   })
 }
+
+// A14 modules are also forwarded by the existing hooks-folder and transport contributions so
+// source-only catalog discovery can find them. The appended registration gives each module
+// ownership of those same rule instances without declaring either rule twice.
+import { recommended as swrFamilyRecommended, rules as swrFamilyRules } from "./swr-family.mjs"
+import { recommended as callbackShapeRecommended, rules as callbackShapeRules } from "./callback-shape.mjs"
+
+const A14_CONTRIBUTIONS = [
+  { law: "swr-family", rules: swrFamilyRules, recommended: swrFamilyRecommended },
+  { law: "callback-shape", rules: callbackShapeRules, recommended: callbackShapeRecommended },
+]
+
+for (const addition of A14_CONTRIBUTIONS) {
+  const names = new Set(Object.keys(addition.rules))
+  for (const contribution of CONTRIBUTIONS) {
+    for (const name of names) {
+      if (name in contribution.rules && contribution.rules[name] !== addition.rules[name]) {
+        throw new Error("A14 registration: two laws publish different rules named " + name)
+      }
+    }
+    // Replace contribution views only; the law module's exported maps retain their forwarding
+    // entries for the source-only catalog reader.
+    contribution.rules = Object.fromEntries(Object.entries(contribution.rules).filter(([name]) => !names.has(name)))
+    contribution.recommended = Object.fromEntries(
+      Object.entries(contribution.recommended).filter(([name]) => !names.has(name.replace(/^starci-fe\//, ""))),
+    )
+  }
+  CONTRIBUTIONS.push(addition)
+  lawOwners.push(addition.law)
+  for (const name of names) {
+    const declarations = ruleDeclarations.filter((entry) => entry.name === name)
+    if (declarations.length > 1) throw new Error("A14 registration: duplicate declarations for " + name)
+    if (declarations.length === 1) declarations[0].law = addition.law
+    else ruleDeclarations.push({ law: addition.law, name })
+    ruleOwners[name] = addition.law
+  }
+  Object.assign(rules, addition.rules)
+  Object.assign(recommended, addition.recommended)
+}

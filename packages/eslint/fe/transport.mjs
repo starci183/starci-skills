@@ -20,6 +20,7 @@
  */
 
 import ts from "typescript"
+import { rules as callbackShapeRules } from "./callback-shape.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { forbiddingConcern, packageNameOf } from "./lib/fe-stack.mjs"
 import { globalReferences, inSlot, isApiClient, isApiLayer, isApiRest, isOutcomeModule } from "./lib/scope.mjs"
@@ -756,6 +757,8 @@ export const rules = {
   "no-hand-typed-wire": noHandTypedWire,
   "outcome-kinds-exhaustive": outcomeKindsExhaustive,
   "one-outcome-union": oneOutcomeUnion,
+  // Forward the callback enforcer for the catalog's source-only CONTRIBUTIONS discovery.
+  ...callbackShapeRules,
 }
 
 /** Every rule is an error: a second transport or a status collapse is the defect, not a style. */

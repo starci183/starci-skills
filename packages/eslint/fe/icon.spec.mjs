@@ -7,12 +7,15 @@
  * and a check comparing a package name for equality does not see it - so that case is asserted
  * first and must never be deleted to make an import tidier.
  */
+// proves: FE_ICON_INLINE_SVG@lite
+// proves: FE_ICON_INLINE_SVG@full
 import assert from "node:assert/strict"
 import test from "node:test"
-import { at, slotTester } from "./fixtures/typed/tester.mjs"
+import { at, fixtureHfs, slotTester } from "./fixtures/typed/tester.mjs"
 import {
   heroiconsIsTheGlyphVendor,
   noDecorativeIconInMetricCell,
+  noInlineSvgOutsideBrandMarkLeaf,
   noOffScaleGlyphSize,
   noVendorIconOutsideIconLeaf,
   rules,
@@ -177,3 +180,39 @@ test("ICON-10: a repeated metric cell does not invent a decorative feature glyph
     ],
   })
 })
+
+for (const edition of ["lite", "full"]) {
+  test(`R286: FE_ICON_INLINE_SVG requires an exported brand-mark leaf (${edition})`, () => {
+    const settings = { starci: { hfs: fixtureHfs(undefined, { lite: edition === "lite" }) } }
+    const brandLeaf = at(`${R}/leaves/AgentMark/index.tsx`)
+    const svg = "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0z\" /></svg>"
+    const declared = `/** @brand-mark */\nexport const AgentMark = () => ${svg}`
+    const entry = (filename, code) => ({ filename, code, settings })
+    const refused = (filename, code) => ({ ...entry(filename, code), errors: [{ messageId: "inlineSvg" }] })
+    tester.run("no-inline-svg-outside-brand-mark-leaf", noInlineSvgOutsideBrandMarkLeaf, {
+      valid: [
+        entry(brandLeaf, declared),
+        entry(brandLeaf, `/**\n * The product's own wordmark.\n * @brand-mark\n */\nexport function AgentMark() { return ${svg} }`),
+        entry(brandLeaf, `/** @brand-mark */\nexport default () => ${svg}`),
+        entry(OTHER_LEAF, 'export const Link = () => <Icon props={{ name: "next" }} />'),
+        entry(at("scripts/preview.tsx"), `const Preview = () => ${svg}`),
+        ...(edition === "full" ? [entry(at("packages/nivo-ui/src/leaves/AgentMark/index.tsx"), declared)] : []),
+      ],
+      invalid: [
+        refused(brandLeaf, `export const AgentMark = () => ${svg}`),
+        refused(ICON_LEAF, `export const Icon = () => ${svg}`),
+        refused(BLOCK, declared),
+        refused(at(`${R}/composites/AgentMark/index.tsx`), declared),
+        refused(at(`${R}/leaves/AgentMark/component.tsx`), declared),
+        refused(NOT_A_LEAF, declared),
+        refused(brandLeaf, `/** @brand-mark */\nconst unrelated = true\nexport const AgentMark = () => ${svg}`),
+        refused(brandLeaf, `// @brand-mark\nexport const AgentMark = () => ${svg}`),
+        refused(brandLeaf, `/** @brand-mark */\nconst AgentMark = () => ${svg}`),
+        refused(brandLeaf, `export const AgentMark = () => { /** @brand-mark */ return ${svg} }`),
+        refused(brandLeaf, `${declared}\nexport const OtherIcon = () => ${svg}`),
+        refused(brandLeaf, `/** @brand-mark */\nexport const AgentMark = () => { const OtherIcon = () => ${svg}; return <OtherIcon /> }`),
+        ...(edition === "full" ? [refused(at("packages/nivo-ui/src/composites/AgentMark/index.tsx"), declared)] : []),
+      ],
+    })
+  })
+}

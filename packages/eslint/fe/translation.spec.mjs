@@ -9,8 +9,13 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { at, slotTester } from "./fixtures/typed/tester.mjs"
-import { noCopyResolutionBelowBlock, noHardcodedCopy, rules } from "./translation.mjs"
+import { at, fixtureHfs, LITE_FE_DECLARATION, slotTester } from "./fixtures/typed/tester.mjs"
+import { noAlert, noCopyInCall, noCopyResolutionBelowBlock, noHardcodedCopy, rules } from "./translation.mjs"
+
+// proves: FE_COPY_IN_CALL@lite
+// proves: FE_COPY_IN_CALL@full
+// proves: FE_NO_ALERT@lite
+// proves: FE_NO_ALERT@full
 
 const tester = slotTester()
 
@@ -121,3 +126,56 @@ test("COPY-2: no literal copy at any tier, in any language, and no pragma", () =
     ],
   })
 })
+
+for (const edition of ["lite", "full"]) {
+  const settings = { starci: { hfs: edition === "lite" ? fixtureHfs(LITE_FE_DECLARATION, { lite: true }) : fixtureHfs() } }
+  const form = (code) => ({ filename: at("apps/web/src/hooks/rhf/useProfileForm.ts"), settings, code })
+
+  test(`R286 FE_COPY_IN_CALL: ${edition} validation and toast messages use catalogue copy`, () => {
+    tester.run("no-copy-in-call", noCopyInCall, {
+      valid: [
+        form('z.string().email(t("profile.emailInvalid"))'),
+        form('toast.success(t("profile.saved"))'),
+        form('toast.error(props.errorMessage)'),
+        form('z.string().min(2, t("profile.nameShort"))'),
+        form('z.string().regex(/^[a-z]+$/, t("profile.nameInvalid"))'),
+        form('z.literal("admin"); z.enum(["admin", "member"]); z.string().default("guest")'),
+        form('z.string().startsWith("https://"); toast.dismiss("profile-saved")'),
+        form('const contacts = { email: (address) => address }; contacts.email("hello@example.com")'),
+        form('function check(z) { return z.string().email("technical-token") }'),
+        form('toast.success(`${count}`)'),
+      ],
+      invalid: [
+        { ...form('z.string().email("literal")'), errors: [{ messageId: "copy" }] },
+        { ...form('toast.success("literal")'), errors: [{ messageId: "copy" }] },
+        { ...form('toast.error("Save failed")'), errors: [{ messageId: "copy" }] },
+        { ...form('toast("Saved successfully")'), errors: [{ messageId: "copy" }] },
+        { ...form('z.string().min(2, "Too short")'), errors: [{ messageId: "copy" }] },
+        { ...form('z.string().regex(/^[a-z]+$/, "Letters only")'), errors: [{ messageId: "copy" }] },
+        { ...form('toast["success"](`Saved ${count} items`)'), errors: [{ messageId: "copy" }] },
+        { ...form('import { z as schema } from "zod"; schema.string().email("Email is invalid")'), errors: [{ messageId: "copy" }] },
+        { ...form('import { toast as notify } from "@/modules/toast"; notify.success("Profile saved")'), errors: [{ messageId: "copy" }] },
+        { ...form('import * as schema from "zod"; schema.z.string().email(`Email is invalid`)'), errors: [{ messageId: "copy" }] },
+      ],
+    })
+  })
+
+  test(`R286 FE_NO_ALERT: ${edition} feedback uses the toast surface`, () => {
+    tester.run("no-alert", noAlert, {
+      valid: [
+        form('toast.success(t("profile.saved"))'),
+        form('function feedback(alert) { alert(t("profile.saved")) }'),
+        form('import { alert } from "@/modules/monitor"; alert(event)'),
+        form('const window = { alert(message) {} }; window.alert(event)'),
+        form('const dialog = { alert(message) {} }; dialog.alert(event)'),
+      ],
+      invalid: [
+        { ...form('alert()'), errors: [{ messageId: "alert" }] },
+        { ...form('alert(t("profile.saved"))'), errors: [{ messageId: "alert" }] },
+        { ...form('window.alert("Saved")'), errors: [{ messageId: "alert" }] },
+        { ...form('globalThis["alert"]()'), errors: [{ messageId: "alert" }] },
+        { ...form('self.alert?.()'), errors: [{ messageId: "alert" }] },
+      ],
+    })
+  })
+}

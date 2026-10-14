@@ -2180,3 +2180,31 @@ rules:
     failureCodes: ["BE_APP_COMPOSITION_BUDGET"]
     enforcers:
       - {kind: eslint-be, id: app-file-budget}
+
+  - id: R285
+    code: "FE_SWR_OUTSIDE_FAMILY"
+    law: "SWR runtime calls belong to the declared SWR hook family. A component, feature or domain hook consumes its wrapper hook instead of importing an API operation or calling SWR itself; each back-end operation is imported and invoked only by its SWR wrapper under hooks/swr, regardless of whether the tier matrix still permits a direct transport edge."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["FE_SWR_OUTSIDE_FAMILY", "FE_OP_OUTSIDE_SWR_HOOK"]
+    enforcers:
+      - {kind: eslint-fe, id: swr-only-in-family}
+      - {kind: eslint-fe, id: operations-only-in-swr-hooks}
+  - id: R286
+    code: "FE_COPY_IN_CALL"
+    law: "Copy shown by validation and toast calls comes from the next-intl catalog, including Zod message arguments and toast titles or descriptions. Browser alert calls are forbidden. Inline SVG glyphs are forbidden outside a declared brand-mark leaf; ordinary icons use the one Heroicons family through the Icon leaf."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["FE_COPY_IN_CALL", "FE_NO_ALERT", "FE_ICON_INLINE_SVG"]
+    enforcers:
+      - {kind: eslint-fe, id: no-copy-in-call}
+      - {kind: eslint-fe, id: no-alert}
+      - {kind: eslint-fe, id: no-inline-svg-outside-brand-mark-leaf}
+  - id: R287
+    code: "FE_CALLBACK_SHAPE"
+    law: "The fe.route.callback handler performs only the auth code exchange and redirect: read the callback URL, obtain the auth client, exchange the code and redirect to the declared route. It carries no product data operation, business logic, additional request handler or JSON response."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["FE_CALLBACK_SHAPE"]
+    enforcers:
+      - {kind: eslint-fe, id: callback-shape}
