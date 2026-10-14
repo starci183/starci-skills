@@ -1871,7 +1871,7 @@ rules:
 
   - id: R213
     code: "DB_MIGRATION_SHAPE"
-    law: "A migration is `supabase/migrations/<ts14>_<kebab>.sql`; the stamp is a valid UTC instant not in the future, new migrations sort strictly after every migration on the base branch, and a migration already on the base is immutable (a diff or a removal is a finding); a file that does not parse as PostgreSQL is a shape failure."
+    law: "A migration is `supabase/migrations/<ts14>_<kebab>.sql`; the stamp is a valid UTC instant, active stamps are unique, and a new migration sorts strictly after the committed active migrations in HEAD. Repository history includes the archive: moving an active migration to the archive retires it from ordering, so a replacement baseline may predate archived stamps and later migrations append after the baseline. Wall-clock time, commit time and remote-branch stamps do not set the ordering boundary. A migration already on the base is immutable (a diff or an unarchived removal is a finding); a file that does not parse as PostgreSQL is a shape failure."
     kinds: [check]
     gates: [pre-push, settle, land, ci]
     failureCodes: ["DB_MIGRATION_SHAPE"]

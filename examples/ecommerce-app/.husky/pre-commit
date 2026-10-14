@@ -2,19 +2,14 @@
 # Commit gate (L0 only): work hygiene and the secrets guard of the staged files, eslint of the staged files of each side,
 # stylelint over the staged CSS of fe, a prettier check of the staged files. Types and the targeted specs belong to the op gate.
 npx starci app hygiene
-be=$(git diff --cached --name-only --diff-filter=ACMR --relative=be -- '*.ts' '*.mts' '*.cts' '*.js' '*.mjs' '*.cjs' || true)
-if [ -n "$be" ]; then
-  (cd be && npx eslint $be)
-fi
-fe=$(git diff --cached --name-only --diff-filter=ACMR --relative=fe -- '*.ts' '*.tsx' '*.mts' '*.cts' '*.js' '*.jsx' '*.mjs' '*.cjs' || true)
-if [ -n "$fe" ]; then
-  (cd fe && npx eslint --max-warnings=0 --no-warn-ignored $fe)
-fi
+# NUL-delimited paths keep filenames intact; bounded batches fit the Windows command line.
+git diff --cached --name-only --diff-filter=ACMR -z --relative=be -- '*.ts' '*.mts' '*.cts' '*.js' '*.mjs' '*.cjs' |
+  xargs -0 -n 50 sh -c 'if [ "$#" -gt 0 ]; then cd be && npx eslint -- "$@"; fi' sh || exit $?
+git diff --cached --name-only --diff-filter=ACMR -z --relative=fe -- '*.ts' '*.tsx' '*.mts' '*.cts' '*.js' '*.jsx' '*.mjs' '*.cjs' |
+  xargs -0 -n 50 sh -c 'if [ "$#" -gt 0 ]; then cd fe && npx eslint --max-warnings=0 --no-warn-ignored -- "$@"; fi' sh || exit $?
 styles=$(git diff --cached --name-only --diff-filter=ACMR --relative=fe -- '*.css' || true)
 if [ -n "$styles" ]; then
   (cd fe && npx stylelint $styles)
 fi
-formatted=$(git diff --cached --name-only --diff-filter=ACMR || true)
-if [ -n "$formatted" ]; then
-  npx prettier --check --ignore-unknown $formatted
-fi
+git diff --cached --name-only --diff-filter=ACMR -z |
+  xargs -0 -n 50 sh -c 'if [ "$#" -gt 0 ]; then npx prettier --check --ignore-unknown -- "$@"; fi' sh || exit $?

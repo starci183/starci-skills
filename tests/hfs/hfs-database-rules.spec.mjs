@@ -37,7 +37,7 @@ function repo(contents, { supabase = SUPABASE, edition = 'lite' } = {}) {
 }
 
 const gitOk = { ok: false, stdout: '' };
-/** A git runner answering no remote (ordering and immutability are not judged). */
+/** A git runner answering no repository history (ordering and immutability are not judged). */
 const noRemote = () => gitOk;
 
 /** `git -C dir ...args` with the repository-local env of a hosting worktree stripped. */
@@ -100,17 +100,17 @@ test('DB_MIGRATION_SHAPE: a migration name is <ts14>_<kebab>.sql', async () => {
   }
 });
 
-test('DB_MIGRATION_SHAPE: the stamp is a real UTC instant and never in the future', async () => {
+test('DB_MIGRATION_SHAPE: the stamp is a real UTC instant, independent of the wall clock', async () => {
   assert.equal(migrationStamp('20260101120000') !== null, true);
   assert.equal(migrationStamp('20261301120000'), null);
   assert.equal(migrationStamp('20260230000000'), null);
   const bad = repo(migration('20261301120000_x.sql', 'select 1;\n'));
   assert.ok(only(await checkDatabase({ repoRoot: bad, files: [`${MIGRATIONS}/20261301120000_x.sql`], git: noRemote }), 'DB_MIGRATION_SHAPE').some((f) => f.message.includes('no valid UTC time')));
   const future = repo(migration('29990101120000_x.sql', 'select 1;\n'));
-  assert.ok(only(await checkDatabase({ repoRoot: future, files: [`${MIGRATIONS}/29990101120000_x.sql`], git: noRemote }), 'DB_MIGRATION_SHAPE').some((f) => f.message.includes('in the future')));
+  assert.deepEqual(only(await checkDatabase({ repoRoot: future, files: [`${MIGRATIONS}/29990101120000_x.sql`], git: noRemote }), 'DB_MIGRATION_SHAPE'), []);
 });
 
-test('DB_MIGRATION_SHAPE: new migrations sort after every migration on the base, which is a real merge-base', async () => {
+test('DB_MIGRATION_SHAPE: new migrations sort after every committed active migration in HEAD', async () => {
   const dir = committedRepo(migration('20260101120000_old.sql', 'select 1;\n'));
   fs.writeFileSync(path.join(dir, MIGRATIONS, '20250101000000_backdated.sql'), 'select 1;\n');
   fs.writeFileSync(path.join(dir, MIGRATIONS, '20261001120000_new.sql'), 'select 1;\n');
@@ -119,6 +119,52 @@ test('DB_MIGRATION_SHAPE: new migrations sort after every migration on the base,
   assert.equal(findings.length, 1, JSON.stringify(findings));
   assert.equal(findings[0].path, `${MIGRATIONS}/20250101000000_backdated.sql`);
   assert.match(findings[0].message, /not after every migration/);
+});
+
+test('DB_MIGRATION_SHAPE: committed migrations after the merge-base constrain new files, without being judged against themselves', async () => {
+  const old = `${MIGRATIONS}/20260101120000_old.sql`;
+  const latest = `${MIGRATIONS}/29990101120000_latest.sql`;
+  const backdated = `${MIGRATIONS}/20261001120000_backdated.sql`;
+  const next = `${MIGRATIONS}/29990101120001_next.sql`;
+  const dir = committedRepo({ [old]: 'select 1;\n' });
+  git(dir, ['checkout', '-qb', 'feature']);
+  fs.writeFileSync(path.join(dir, latest), 'select 1;\n');
+  git(dir, ['add', '--', latest]);
+  git(dir, ['-c', 'user.email=spec@starci.test', '-c', 'user.name=spec', 'commit', '-qm', 'local migration']);
+  assert.deepEqual(only(await checkDatabase({ repoRoot: dir, files: [old, latest] }), 'DB_MIGRATION_SHAPE'), []);
+  fs.writeFileSync(path.join(dir, backdated), 'select 1;\n');
+  fs.writeFileSync(path.join(dir, next), 'select 1;\n');
+  const findings = only(await checkDatabase({ repoRoot: dir, files: [old, latest, backdated, next] }), 'DB_MIGRATION_SHAPE');
+  assert.deepEqual(findings.map((finding) => finding.path), [backdated]);
+  assert.match(findings[0].message, /repository history/);
+});
+
+test('DB_MIGRATION_SHAPE: future migration stamps on a divergent origin/main do not constrain HEAD', async () => {
+  const old = `${MIGRATIONS}/20260101120000_old.sql`;
+  const remote = `${MIGRATIONS}/29990101120000_remote.sql`;
+  const remoteArchive = `${MIGRATIONS}/_archive/29990101120001_remote-retired.sql`;
+  const next = `${MIGRATIONS}/20261001120000_next.sql`;
+  const dir = committedRepo({ [old]: 'select 1;\n' });
+  git(dir, ['checkout', '-qb', 'upstream']);
+  fs.writeFileSync(path.join(dir, remote), 'select 1;\n');
+  fs.mkdirSync(path.dirname(path.join(dir, remoteArchive)), { recursive: true });
+  fs.writeFileSync(path.join(dir, remoteArchive), 'select 1;\n');
+  git(dir, ['add', '-A', '--', '.']);
+  git(dir, ['-c', 'user.email=spec@starci.test', '-c', 'user.name=spec', 'commit', '-qm', 'remote migrations']);
+  git(dir, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  git(dir, ['checkout', '-q', 'main']);
+  fs.writeFileSync(path.join(dir, next), 'select 1;\n');
+  assert.deepEqual(only(await checkDatabase({ repoRoot: dir, files: [old, next] }), 'DB_MIGRATION_SHAPE'), []);
+});
+
+test('DB_MIGRATION_SHAPE: a new equal stamp and duplicate active stamps are refused', async () => {
+  const old = `${MIGRATIONS}/20260101120000_old.sql`;
+  const equal = `${MIGRATIONS}/20260101120000_equal.sql`;
+  const dir = committedRepo({ [old]: 'select 1;\n' });
+  fs.writeFileSync(path.join(dir, equal), 'select 1;\n');
+  const findings = only(await checkDatabase({ repoRoot: dir, files: [old, equal] }), 'DB_MIGRATION_SHAPE');
+  assert.ok(findings.some((finding) => finding.path === equal && finding.message.includes('not after every migration')));
+  assert.ok(findings.some((finding) => finding.message.includes('shares stamp')));
 });
 
 test('DB_MIGRATION_SHAPE: a migration on the base is immutable - an edit and a removal are both findings', async () => {
@@ -142,10 +188,20 @@ test('DB_MIGRATION_SHAPE: an app nested in a larger repository reads the base co
   assert.ok(only(await checkDatabase({ repoRoot: app, files: [file] }), 'DB_MIGRATION_SHAPE').some((f) => f.message.includes('immutable')));
 });
 
-test('DB_MIGRATION_SHAPE: without a base ref ordering and immutability are simply not judged', async () => {
+test('DB_MIGRATION_SHAPE: without repository history ordering and immutability are simply not judged', async () => {
   const dir = repo(migration('20250101000000_first.sql', 'select 1;\n'));
   const findings = only(await checkDatabase({ repoRoot: dir, files: [`${MIGRATIONS}/20250101000000_first.sql`], git: noRemote }), 'DB_MIGRATION_SHAPE');
   assert.deepEqual(findings, []);
+});
+
+test('DB_MIGRATION_SHAPE: HEAD history orders new files even without a base ref', async () => {
+  const old = `${MIGRATIONS}/20260101120000_old.sql`;
+  const backdated = `${MIGRATIONS}/20250101120000_backdated.sql`;
+  const dir = committedRepo({ [old]: 'select 1;\n' });
+  git(dir, ['branch', '-m', 'feature']);
+  fs.writeFileSync(path.join(dir, backdated), 'select 1;\n');
+  const findings = only(await checkDatabase({ repoRoot: dir, files: [old, backdated] }), 'DB_MIGRATION_SHAPE');
+  assert.deepEqual(findings.map((finding) => finding.path), [backdated]);
 });
 
 test('L02-L08 skip supabase/migrations/_archive/: an archived file is never judged, and a base migration moved there at a baseline cutover is retired, not removed', async () => {
@@ -161,6 +217,55 @@ test('L02-L08 skip supabase/migrations/_archive/: an archived file is never judg
   fs.rmSync(path.join(dir, archived));
   const gone = only(await checkDatabase({ repoRoot: dir, files: [`${MIGRATIONS}/20261001120000_baseline.sql`] }), 'DB_MIGRATION_SHAPE');
   assert.ok(gone.some((f) => f.message.includes('is gone here')), 'a base migration deleted outright is still refused');
+});
+
+test('DB_MIGRATION_SHAPE: a baseline may predate future-stamped archived history, and subsequent files append after it', async () => {
+  const futureName = '29990101120000_future.sql';
+  const old = `${MIGRATIONS}/${futureName}`;
+  const archived = `${MIGRATIONS}/_archive/${futureName}`;
+  const baseline = `${MIGRATIONS}/20261001120000_baseline.sql`;
+  const dir = committedRepo({ [old]: 'select 1;\n' });
+  git(dir, ['checkout', '-qb', 'cutover']);
+  fs.mkdirSync(path.dirname(path.join(dir, archived)), { recursive: true });
+  fs.renameSync(path.join(dir, old), path.join(dir, archived));
+  fs.writeFileSync(path.join(dir, baseline), 'select 1;\n');
+  const files = [archived, baseline];
+  assert.deepEqual(only(await checkDatabase({ repoRoot: dir, files }), 'DB_MIGRATION_SHAPE'), [], 'retiring the previous chain permits the earlier baseline');
+  git(dir, ['add', '-A', '--', '.']);
+  git(dir, ['-c', 'user.email=spec@starci.test', '-c', 'user.name=spec', 'commit', '-qm', 'baseline cutover']);
+  assert.deepEqual(only(await checkDatabase({ repoRoot: dir, files }), 'DB_MIGRATION_SHAPE'), [], 'a committed baseline is not reordered against the base archive');
+  const next = `${MIGRATIONS}/20261001120001_next.sql`;
+  const backdated = `${MIGRATIONS}/20261001115959_backdated.sql`;
+  fs.writeFileSync(path.join(dir, next), 'select 1;\n');
+  fs.writeFileSync(path.join(dir, backdated), 'select 1;\n');
+  const findings = only(await checkDatabase({ repoRoot: dir, files: [...files, next, backdated] }), 'DB_MIGRATION_SHAPE');
+  assert.deepEqual(findings.map((finding) => finding.path), [backdated]);
+});
+
+test('DB_MIGRATION_SHAPE: archive-only committed history permits a new baseline', async () => {
+  const archived = `${MIGRATIONS}/_archive/29990101120000_future.sql`;
+  const invalidArchive = `${MIGRATIONS}/_archive/not a migration.sql`;
+  const baseline = `${MIGRATIONS}/20261001120000_baseline.sql`;
+  const dir = committedRepo({ [archived]: 'create table public.legacy (id int);\n', [invalidArchive]: 'invalid SQL' });
+  fs.writeFileSync(path.join(dir, baseline), 'select 1;\n');
+  assert.deepEqual(await checkDatabase({ repoRoot: dir, files: [archived, invalidArchive, baseline] }), []);
+});
+
+test('DB_MIGRATION_SHAPE: an archive copy does not retire a migration that remains active', async () => {
+  const old = `${MIGRATIONS}/29990101120000_future.sql`;
+  const archived = `${MIGRATIONS}/_archive/29990101120000_future.sql`;
+  const baseline = `${MIGRATIONS}/20261001120000_baseline.sql`;
+  const dir = committedRepo({ [old]: 'select 1;\n' });
+  fs.mkdirSync(path.dirname(path.join(dir, archived)), { recursive: true });
+  fs.copyFileSync(path.join(dir, old), path.join(dir, archived));
+  fs.writeFileSync(path.join(dir, baseline), 'select 1;\n');
+  const files = [old, archived, baseline];
+  const beforeCommit = only(await checkDatabase({ repoRoot: dir, files }), 'DB_MIGRATION_SHAPE');
+  assert.deepEqual(beforeCommit.map((finding) => finding.path), [baseline]);
+  git(dir, ['add', '--', archived]);
+  git(dir, ['-c', 'user.email=spec@starci.test', '-c', 'user.name=spec', 'commit', '-qm', 'archive copy']);
+  const afterCommit = only(await checkDatabase({ repoRoot: dir, files }), 'DB_MIGRATION_SHAPE');
+  assert.deepEqual(afterCommit.map((finding) => finding.path), [baseline]);
 });
 
 // ------------------------------------------------------------------------------------------------ L03 DB_RLS_REQUIRED

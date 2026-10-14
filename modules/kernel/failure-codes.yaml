@@ -16547,11 +16547,11 @@ reserve-override-invalid:
   owner: owner
   kind: input-invalid
 DB_MIGRATION_SHAPE:
-  title: "A migration is named `<ts14>_<kebab>.sql`, stamped in valid past UTC, ordered after the base's migrations, and immutable once on the base"
+  title: "A migration is named `<ts14>_<kebab>.sql`, stamped in valid UTC, appended after HEAD's active migrations, and immutable once on the base"
   title_vi: "Migration sai hình dạng hoặc bị sửa"
-  meaning_vi: "`<path>` vi phạm luật migration: tên phải là `<ts14>_<kebab>.sql`, stamp là thời điểm UTC thật không ở tương lai, migration mới xếp sau mọi migration trên base, và migration đã lên base là bất biến (sửa hay xoá đều là finding)."
+  meaning_vi: "`<path>` vi phạm luật migration: tên phải là `<ts14>_<kebab>.sql`, stamp là thời điểm UTC thật và không trùng giữa các migration đang hoạt động; migration mới xếp sau chuỗi đang hoạt động đã commit trên HEAD. Archive ghi nhận migration đã nghỉ khỏi chuỗi, nên baseline thay thế có thể mang stamp trước archive. Migration đã lên base là bất biến (sửa hay xoá mà không archive đều là finding)."
   causes_vi:
-    - "Vi phạm luật L02: `supabase/migrations/<ts14>_<kebab>.sql`; stamp tăng nghiêm ngặt so với base; file đã lên base không được đổi."
+    - "Vi phạm luật L02: `supabase/migrations/<ts14>_<kebab>.sql`; stamp mới tăng nghiêm ngặt so với chuỗi đang hoạt động đã commit trên HEAD, không so với đồng hồ, thời gian commit hay stamp trên remote; file đã lên base không được đổi."
   nextStep_vi: "Tạo migration mới bằng the Supabase CLI new-migration command, không sửa/đổi tên/xoá migration đã lên base; nếu cần đổi nội dung, viết migration mới."
   owner: op-retry
   kind: check-finding

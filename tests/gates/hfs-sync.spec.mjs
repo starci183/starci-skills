@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { addWorkCommon } from '../../scripts/lib/work-schemas.mjs';
 import { starciworkGitignoreText } from '../../scripts/lib/starciwork-boundary.mjs';
@@ -128,9 +128,91 @@ describe('the generated file set', () => {
 describe('.husky/pre-commit', () => {
   it('is L0 only: work hygiene, the staged eslint of each side from its folder, stylelint over the staged fe css and prettier; no typecheck, no test run', () => {
     const hook = rendered()['.husky/pre-commit'];
-    for (const step of ['npx starci app hygiene', '(cd be && npx eslint $be)', '(cd fe && npx eslint --max-warnings=0 --no-warn-ignored $fe)', '(cd fe && npx stylelint $styles)', 'npx prettier --check --ignore-unknown $formatted']) assert.ok(hook.includes(step), step);
+    for (const step of ['npx starci app hygiene', 'cd be && npx eslint -- "$@"', 'cd fe && npx eslint --max-warnings=0 --no-warn-ignored -- "$@"', '(cd fe && npx stylelint $styles)', 'npx prettier --check --ignore-unknown --']) assert.ok(hook.includes(step), step);
     assert.doesNotMatch(hook.split('\n').filter((line) => !line.startsWith('#')).join('\n'), /typecheck|test:|jest|lint-staged|playwright|vitest|specs/);
   });
+
+  const fixture = (t, files = [], failure = null) => {
+    const shell = spawnSync('sh', ['-c', 'true'], { encoding: 'utf8', windowsHide: true });
+    assert.equal(shell.error?.code, undefined, 'the POSIX shell used by Husky must be installed');
+    assert.equal(shell.status, 0, shell.stderr);
+    const dir = repo(t);
+    execFileSync('git', ['init', '-q'], { cwd: dir, stdio: 'pipe' });
+    for (const file of files) {
+      fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+      fs.writeFileSync(path.join(dir, file), 'fixture\n');
+    }
+    if (files.length) execFileSync('git', ['add', '--', '.'], { cwd: dir, stdio: 'pipe' });
+    const bin = path.join(dir, 'bin');
+    const log = path.join(dir, 'calls.jsonl');
+    const probe = path.join(bin, 'probe.mjs');
+    fs.mkdirSync(bin);
+    fs.writeFileSync(probe, `import fs from 'node:fs';
+import path from 'node:path';
+const log = ${JSON.stringify(log)};
+const previous = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\\n').map(line => JSON.parse(line)) : [];
+const call = { cwd: process.cwd(), args: process.argv.slice(2) };
+fs.appendFileSync(log, JSON.stringify(call) + '\\n');
+const failure = ${JSON.stringify(failure)};
+if (failure && call.args[0] === failure.tool && (!failure.side || path.basename(call.cwd) === failure.side)
+  && previous.filter(other => other.cwd === call.cwd && other.args[0] === call.args[0]).length === 1) process.exit(1);
+`);
+    const quote = value => `'${value.replaceAll('\\', '/').replaceAll("'", "'\\''")}'`;
+    fs.writeFileSync(path.join(bin, 'npx'), `#!/bin/sh\nexec ${quote(process.execPath)} ${quote(probe)} "$@"\n`, { mode: 0o755 });
+    return {
+      dir,
+      run: () => spawnSync('sh', [], { cwd: dir, input: rendered()['.husky/pre-commit'], encoding: 'utf8', windowsHide: true, env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` } }),
+      calls: () => fs.readFileSync(log, 'utf8').trim().split('\n').map(line => JSON.parse(line)),
+    };
+  };
+
+  it('lints and formats more than 100 staged paths per side in batches of at most 50, preserving filenames and side options', (t) => {
+    const names = [...Array.from({ length: 101 }, (_, index) => `src/file-${index}.ts`), '-dash.ts', 'source file.ts', "quote'file.ts", '[literal];file.ts'];
+    const files = [...names.map(name => `be/${name}`), ...names.map(name => `fe/${name}`), 'fe/styles.css', '-notes.md'];
+    const hook = fixture(t, files);
+    if (!hook) return;
+    const result = hook.run();
+    assert.equal(result.status, 0, result.stderr);
+    const calls = hook.calls();
+    assert.deepEqual(calls[0].args, ['starci', 'app', 'hygiene']);
+    assert.deepEqual(calls.filter(call => call.args[0] === 'stylelint'), [{ cwd: path.join(hook.dir, 'fe'), args: ['stylelint', 'styles.css'] }]);
+    for (const side of ['be', 'fe']) {
+      const lint = calls.filter(call => call.args[0] === 'eslint' && call.cwd === path.join(hook.dir, side));
+      const options = side === 'be' ? ['eslint', '--'] : ['eslint', '--max-warnings=0', '--no-warn-ignored', '--'];
+      for (const call of lint) assert.deepEqual(call.args.slice(0, options.length), options);
+      assert.deepEqual(lint.map(call => call.args.length - options.length), [50, 50, 5]);
+      assert.deepEqual(lint.flatMap(call => call.args.slice(options.length)).sort(), [...names].sort());
+    }
+    const format = calls.filter(call => call.args[0] === 'prettier');
+    for (const call of format) {
+      assert.equal(call.cwd, hook.dir);
+      assert.deepEqual(call.args.slice(0, 4), ['prettier', '--check', '--ignore-unknown', '--']);
+      assert.ok(call.args.length > 4 && call.args.length <= 54);
+    }
+    assert.deepEqual(format.flatMap(call => call.args.slice(4)).sort(), [...files, 'hfs.json'].sort());
+  });
+
+  it('runs only hygiene when no files are staged and side directories are absent', (t) => {
+    const hook = fixture(t);
+    if (!hook) return;
+    const result = hook.run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(hook.calls().map(call => call.args), [['starci', 'app', 'hygiene']]);
+  });
+
+  for (const failure of [{ tool: 'eslint', side: 'be' }, { tool: 'eslint', side: 'fe' }, { tool: 'prettier' }]) {
+    it(`refuses a failure in a later ${failure.side ?? 'root'} ${failure.tool} batch`, (t) => {
+      const files = Array.from({ length: 101 }, (_, index) => `${failure.side ?? 'be'}/file-${index}.ts`);
+      const hook = fixture(t, files, failure);
+      if (!hook) return;
+      const result = hook.run();
+      assert.equal(result.error, undefined);
+      assert.notEqual(result.status, 0, 'a passing later batch cannot hide a failing batch');
+      const calls = hook.calls();
+      assert.ok(calls.filter(call => call.args[0] === failure.tool).length >= 2);
+      if (failure.tool === 'eslint') assert.ok(!calls.some(call => call.args[0] === 'prettier'), 'formatting does not mask the lint failure');
+    });
+  }
 });
 
 describe('.husky/pre-push', () => {

@@ -1,7 +1,6 @@
 // database-migrations.mjs - L02 migration name, UTC ordering and base-branch immutability checks. Git reads go
 // through the runtime API call files, and specs may inject the same small runner contract used by database.mjs.
 import { lsTree } from '../../api/git/ls-tree.mjs';
-import { log } from '../../api/git/log.mjs';
 import { mergeBase } from '../../api/git/merge-base.mjs';
 import { show } from '../../api/git/show.mjs';
 import { withoutGitLocalEnv } from '../../lib/git.mjs';
@@ -27,7 +26,6 @@ export function defaultGit(args, { cwd }) {
   if (verb === 'merge-base') { const sha = mergeBase(cwd, rest[0], rest[1]); return { ok: sha !== null, stdout: sha ?? '' }; }
   let call = show;
   if (verb === 'ls-tree') call = lsTree;
-  else if (verb === 'log') call = log;
   const result = call(rest, { cwd, env, maxBuffer: 64 * 1024 * 1024 });
   return { ok: !result.error && result.status === 0, stdout: result.stdout };
 }
@@ -45,11 +43,11 @@ async function baseShaOf(git, repoRoot, base) {
   return found;
 }
 
-async function baseMigrationNames(git, repoRoot, sha) {
+async function migrationFilesAt(git, repoRoot, sha) {
   const result = await runGit(git, repoRoot, ['ls-tree', '-r', '--name-only', '-z', sha, '--', MIGRATIONS_DIR]);
   if (!result.ok) return [];
   const prefix = `${MIGRATIONS_DIR}/`;
-  return result.stdout.split('\0').filter(Boolean).filter(isActiveMigration).map((entry) => entry.slice(prefix.length));
+  return result.stdout.split('\0').filter((entry) => entry.startsWith(prefix));
 }
 
 async function baseFileText(git, repoRoot, sha, file) {
@@ -58,46 +56,48 @@ async function baseFileText(git, repoRoot, sha, file) {
   return result.ok ? result.stdout : null;
 }
 
-async function migrationTimeLimit(git, repoRoot, file, now) {
-  const result = await runGit(git, repoRoot, ['log', '-1', '--format=%ct', '--', file]);
-  const seconds = Number(result.stdout.trim());
-  if (result.ok && Number.isFinite(seconds) && seconds > 0) return { at: seconds * 1000, tracked: true };
-  return { at: now(), tracked: false };
-}
-
-async function localMigrationFindings(local, repoRoot, git, now) {
+function localMigrationFindings(local) {
   const findings = [];
   const stamps = new Map();
-  await eachInOrder(local, async (entry) => {
+  for (const entry of local) {
     if (!entry.match) {
       findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} is not named <ts14>_<kebab>.sql; a migration is created by \`npm run db:new\` (supabase migration new), never renamed by hand`, { expected: '<ts14>_<kebab>.sql' }));
-      return;
+      continue;
     }
     const stamp = migrationStamp(entry.match[1]);
     if (stamp === null) {
-      findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} carries ${entry.match[1]}, which is no valid UTC time; the stamp is the real creation time`, { stamp: entry.match[1] }));
-      return;
-    }
-    const limit = await migrationTimeLimit(git, repoRoot, entry.file, now);
-    if (stamp > limit.at) {
-      const boundary = limit.tracked ? `the file's commit time ${new Date(limit.at).toISOString()}` : `the current time ${new Date(limit.at).toISOString()}`;
-      findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} is stamped ${entry.match[1]}, in the future relative to ${boundary}; a migration stamp is its real creation time, never a hand-picked date`, { stamp: entry.match[1], tracked: limit.tracked }));
+      findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} carries ${entry.match[1]}, which is no valid UTC time; a migration stamp must name a valid UTC instant`, { stamp: entry.match[1] }));
+      continue;
     }
     if (stamps.has(stamp)) findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} shares stamp ${entry.match[1]} with ${stamps.get(stamp)}; stamps are strictly increasing`, { stamp: entry.match[1], other: stamps.get(stamp) }));
     stamps.set(stamp, entry.file);
-  });
+  }
   return findings;
 }
 
-async function baseMigrationEntryFindings(entry, repoRoot, git, baseSha, onBase, baseMax) {
+/** HEAD owns the append boundary. Archived names retire the old chain, so a replacement baseline starts afresh. */
+function migrationHistory(files, retired, localNames) {
+  const prefix = `${MIGRATIONS_DIR}/`;
+  const onHead = new Set(files.filter(isActiveMigration).map((file) => file.slice(prefix.length)));
+  const retiredNames = new Set([...retired, ...files.filter((file) => file.startsWith(`${MIGRATIONS_ARCHIVE_DIR}/`)).map((file) => file.slice(MIGRATIONS_ARCHIVE_DIR.length + 1))].filter((name) => !localNames.has(name)));
+  const stamps = [...onHead].filter((name) => !retiredNames.has(name)).map((name) => MIGRATION_NAME.exec(name)?.[1]).filter(Boolean).map(migrationStamp).filter((stamp) => stamp !== null);
+  return { onHead, latest: stamps.length ? Math.max(...stamps) : null };
+}
+
+function migrationOrderingFindings(local, history) {
+  return local.flatMap((entry) => {
+    const stamp = entry.match ? migrationStamp(entry.match[1]) : null;
+    if (history.onHead.has(entry.name) || stamp === null || history.latest === null || stamp > history.latest) return [];
+    return [found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} is stamped ${entry.match[1]}, not after every migration already in repository history (latest active ${new Date(history.latest).toISOString()}); a new migration sorts after the committed active chain`, { stamp: entry.match[1], latest: new Date(history.latest).toISOString() })];
+  });
+}
+
+async function baseMigrationEntryFindings(entry, repoRoot, git, baseSha, onBase) {
   if (!entry.match) return [];
-  const stamp = migrationStamp(entry.match[1]);
   if (onBase.has(entry.name)) {
     const committed = await baseFileText(git, repoRoot, baseSha.sha, entry.file);
     const current = readText(repoRoot, entry.file);
     if (!sameText(current, committed)) return [found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} differs from its content on ${baseSha.ref}; a migration on the base branch is immutable - write a new migration`, { base: baseSha.ref })];
-  } else if (baseMax !== null && stamp !== null && stamp <= baseMax) {
-    return [found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} is stamped ${entry.match[1]}, not after every migration on ${baseSha.ref} (latest ${String(new Date(baseMax).toISOString())}); a new migration sorts after the base ones`, { stamp: entry.match[1], base: baseSha.ref })];
   }
   return [];
 }
@@ -112,26 +112,27 @@ function removedMigrationFindings(local, retired, baseNames, baseSha) {
 
 /**
  * L02 findings for names, stamps, ordering and immutability of supabase/migrations/*.sql. `archived` are the files of
- * supabase/migrations/_archive/ (app.supabase.migrations.archive): never judged, and a base migration moved there at a baseline
- * cutover is retired, not removed.
+ * supabase/migrations/_archive/ (app.supabase.migrations.archive): never judged, and a migration moved there at a baseline
+ * cutover is retired from the ordering chain, not removed. New files append after HEAD's active migrations; timestamps
+ * on archived migrations, remote branches and the wall clock do not constrain a replacement baseline.
  */
-export async function migrationShapeFindings({ repoRoot, migrations, archived = [], git, base, now }) {
+export async function migrationShapeFindings({ repoRoot, migrations, archived = [], git, base }) {
   const prefix = `${MIGRATIONS_DIR}/`;
   const local = migrations.map((file) => {
     const name = file.startsWith(prefix) ? file.slice(prefix.length) : file;
     return { file, name, match: MIGRATION_NAME.exec(name) };
   });
-  const findings = await localMigrationFindings(local, repoRoot, git, now);
+  const findings = localMigrationFindings(local);
+  const retired = new Set(archived.map((file) => file.slice(MIGRATIONS_ARCHIVE_DIR.length + 1)));
+  const history = migrationHistory(await migrationFilesAt(git, repoRoot, 'HEAD'), retired, new Set(local.map((entry) => entry.name)));
+  findings.push(...migrationOrderingFindings(local, history));
   const baseSha = await baseShaOf(git, repoRoot, base);
   if (!baseSha) return findings;
-  const baseNames = await baseMigrationNames(git, repoRoot, baseSha.sha);
+  const baseNames = (await migrationFilesAt(git, repoRoot, baseSha.sha)).filter(isActiveMigration).map((file) => file.slice(prefix.length));
   const onBase = new Set(baseNames);
-  const baseStamps = baseNames.map((name) => MIGRATION_NAME.exec(name)?.[1]).filter(Boolean).map(migrationStamp).filter((stamp) => stamp !== null);
-  const baseMax = baseStamps.length ? Math.max(...baseStamps) : null;
   await eachInOrder(local, async (entry) => {
-    findings.push(...await baseMigrationEntryFindings(entry, repoRoot, git, baseSha, onBase, baseMax));
+    findings.push(...await baseMigrationEntryFindings(entry, repoRoot, git, baseSha, onBase));
   });
-  const retired = new Set(archived.map((file) => file.slice(MIGRATIONS_ARCHIVE_DIR.length + 1)));
   findings.push(...removedMigrationFindings(local, retired, baseNames, baseSha));
   return findings;
 }
