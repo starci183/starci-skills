@@ -2295,6 +2295,23 @@ rules:
     enforcers:
       - {kind: hfs, id: release-provenance, at: scripts/hfs/rules/release-provenance.mjs}
 
+  - id: R272
+    code: "BE_APP_BOOT_PROOF_MISSING"
+    law: "Every lite back-end app proves its real Nest AppModule composition by compiling the dependency graph with explicit fixture options and infrastructure doubles; unresolved providers, circular dependencies and a missing or failed proof are refused. The app check wiring verb uses the same proof. Full retains its existing e2e boot proof."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_APP_BOOT_PROOF_MISSING"]
+    enforcers:
+      - {kind: hfs, id: boot-proof, at: scripts/hfs/rules/boot-proof.mjs}
+  - id: R273
+    code: "HFS_COVERAGE_BELOW"
+    law: "An app check supplied with a coverage-from lcov report proves 100 percent lines, functions and branches per tracked back-end logic file in the edition's slot-derived measured scope; a missing source record or unavailable metric is refused. The unit runner also enforces statement coverage. Reports list the measured scope and the source files outside it, including features, cli and webhooks."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_COVERAGE_BELOW"]
+    enforcers:
+      - {kind: hfs, id: coverage-below, at: scripts/hfs/rules/coverage-below.mjs}
+
   - id: R274
     code: "RT_RULING_STALE_CITE"
     law: "Live prose, source comments and spec titles cite current owner rulings using ruling:R212/case-4 or a stable owner id. A superseded or amended ruling needs its live successor in the same paragraph; staleWhen statements outside historical case text and CHANGELOGs are refused, and a bare owner ruling date must match a catalog case or owner ruling."
@@ -2434,19 +2451,3 @@ rules:
     failureCodes: ["HFS_FEATURE_FILE_BUDGET"]
     enforcers:
       - {kind: hfs, id: feature-files, at: scripts/hfs/rules/feature-files.mjs}
-  - id: R272
-    code: "BE_APP_BOOT_PROOF_MISSING"
-    law: "Every lite back-end app proves its real Nest AppModule composition by compiling the dependency graph with explicit fixture options and infrastructure doubles; unresolved providers, circular dependencies and a missing or failed proof are refused. The app check wiring verb uses the same proof. Full retains its existing e2e boot proof."
-    kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["BE_APP_BOOT_PROOF_MISSING"]
-    enforcers:
-      - {kind: hfs, id: boot-proof, at: scripts/hfs/rules/boot-proof.mjs}
-  - id: R273
-    code: "HFS_COVERAGE_BELOW"
-    law: "An app check supplied with a coverage-from lcov report proves 100 percent lines, functions and branches per tracked back-end logic file in the edition's slot-derived measured scope; a missing source record or unavailable metric is refused. The unit runner also enforces statement coverage. Reports list the measured scope and the source files outside it, including features, cli and webhooks."
-    kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["HFS_COVERAGE_BELOW"]
-    enforcers:
-      - {kind: hfs, id: coverage-below, at: scripts/hfs/rules/coverage-below.mjs}
