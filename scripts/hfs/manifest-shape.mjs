@@ -185,6 +185,8 @@ function slotListProblems(slot, at) {
 function slotAppOptionProblems(slot, at) {
   const bad = [];
   bad.push(...slotEditionWhyProblems(slot, at), ...slotCoverageEvidenceProblems(slot, at));
+  // Legacy coverage status derives only from an explicit `since`; a slot that omits it is refused, so a new slot can never be taken for an old one.
+  if (slot.since === undefined) bad.push(`${at}: since is required (the manifest version that added the slot)`);
   if (slot.editions !== undefined && !(Array.isArray(slot.editions) && slot.editions.length && slot.editions.every((e) => EDITIONS.includes(e)) && new Set(slot.editions).size === slot.editions.length)) bad.push(`${at}: editions must be a non-empty subset of ${EDITIONS.join(', ')}`);
   if (slot.litePresence !== undefined && !(PRESENCE.includes(slot.litePresence) || (isPlainObject(slot.litePresence) && Object.keys(slot.litePresence).length && Object.entries(slot.litePresence).every(([side, value]) => ['be', 'fe'].includes(side) && PRESENCE.includes(value))))) bad.push(`${at}: litePresence must be a presence value or map sides to presence values`);
   if (slot.provider !== undefined) {

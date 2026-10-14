@@ -14,7 +14,7 @@ export function legacyCoverageRule(rule) {
 
 export function legacyCoverageSlot(slot) {
   if (SLOT_META_FIELDS.some((field) => Object.hasOwn(slot, field))) return false;
-  if (slot.since === undefined) return true;
+  if (slot.since === undefined) return false;
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(slot.since);
   if (!match) return false;
   const version = match.slice(1).map(Number);

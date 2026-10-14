@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyCoverageRatchet, legacyCoverageSlot } from '../../scripts/checks/lib/coverage-ratchet.mjs';
+import { applyCoverageRatchet, legacyCoverageRule, legacyCoverageSlot } from '../../scripts/checks/lib/coverage-ratchet.mjs';
 import { coverageRuleFindings } from '../../scripts/checks/lib/coverage-rules.mjs';
 import { coverageReport, formatCoverageReport } from '../../scripts/checks/check-hfs-coverage.mjs';
 
@@ -13,7 +13,7 @@ function contextFor(slot = {}) {
     catalog: { rules: [] },
     manifest: { editions: EDITIONS, profiles: ['app'], slots: [{
       id: SLOT, profiles: ['app'], path: 'sample.yaml', presence: 'required',
-      tracked: 'tracked', tier: 'none', tests: 'none', ...slot,
+      tracked: 'tracked', tier: 'none', tests: 'none', since: '3.1.0', ...slot,
     }] },
     files: new Map(), examples: [],
   };
@@ -26,8 +26,8 @@ function slotFindings(context, edition) {
 
 for (const edition of EDITIONS) {
   test(`legacy ${edition} slot gaps remain counted backlog warnings`, () => {
-    for (const since of [undefined, '2.1.0', '3.0.0', '3.1.0']) {
-      const context = contextFor(since === undefined ? {} : { since });
+    for (const since of ['2.1.0', '3.0.0', '3.1.0']) {
+      const context = contextFor({ since });
       const findings = slotFindings(context, edition);
       assert.deepEqual(findings.map((finding) => finding.code), CODES);
       assert.ok(findings.every((finding) => finding.level === 'warning' && finding.legacy));
@@ -70,6 +70,7 @@ for (const edition of EDITIONS) {
 
 test('invalid slot versions, unknown chains and missing enforcers stay errors', () => {
   assert.equal(legacyCoverageSlot({ since: 'invalid' }), false);
+  assert.equal(legacyCoverageSlot({}), false, 'a slot without since is never legacy (the manifest loader refuses it)');
   const context = contextFor();
   const findings = [
     { code: 'RT_COVERAGE_NO_ENFORCER', rule: SLOT, legacy: true },
@@ -77,4 +78,15 @@ test('invalid slot versions, unknown chains and missing enforcers stay errors', 
     { code: 'RT_COVERAGE_REQUIREMENT_UNLEDGERED', path: 'docs/sample.md' },
   ];
   assert.ok(applyCoverageRatchet(context, findings).every((finding) => finding.level === 'error' && !finding.legacy));
+});
+
+// Rule legacy status is derived from the id alone: older than R247 (and not yet adopted), never from a missing field.
+test('a rule is legacy only when its id is older than R247 and it carries no coverage field', () => {
+  assert.equal(legacyCoverageRule({ id: 'R246' }), true);
+  assert.equal(legacyCoverageRule({ id: 'R01' }), true);
+  assert.equal(legacyCoverageRule({ id: 'R247' }), false, 'R247 and later are always gated');
+  assert.equal(legacyCoverageRule({ id: 'R300' }), false);
+  assert.equal(legacyCoverageRule({ id: 'X1' }), false, 'an id that is not R<number> is never legacy');
+  assert.equal(legacyCoverageRule({}), false, 'a rule without an id is never legacy');
+  assert.equal(legacyCoverageRule({ id: 'R246', docs: ['docs/x.md'] }), false, 'a legacy rule that adopts a coverage field is gated');
 });

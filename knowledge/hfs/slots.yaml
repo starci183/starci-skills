@@ -353,6 +353,7 @@ slots:
 
   # ----- app root (profile app: the one repository of a product) --------------------------------------------
   - id: app.declaration
+    since: 3.1.0
     profiles: [app]
     path: hfs.json
     presence: required
@@ -361,6 +362,7 @@ slots:
     tests: none
     rules: [HFS_ARCH_CONFIG_UNREAD]
   - id: app.readme
+    since: 3.1.0
     profiles: [app]
     path: README.md
     presence: required
@@ -369,6 +371,7 @@ slots:
     tests: none
     rules: [HFS_README_*]
   - id: app.package-manifest
+    since: 3.1.0
     profiles: [app]
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite manages Supabase and wiring scripts; full also manages e2e and stack test scripts. Both may run optional contracts."
     # The one package.json of the app, at the app root: be's dependencies and every tool, and every script; npm workspaces are
@@ -382,6 +385,7 @@ slots:
     liteManagedBy: package-scripts-lite
     rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW, HFS_CANON_PIN_DRIFT, HFS_MANAGED_FILE_DRIFT, HFS_MONO_WORKSPACES, HFS_MONO_WORKSPACE_DEP]
   - id: app.task-graph
+    since: 3.1.0
     profiles: [app]
     # The turbo task graph of the app (build, dev, lint, typecheck over the fe workspaces; build depends on ^build and caches
     # .next and dist): rendered by starci app sync from templates/app/task-graph/turbo.json, judged for drift by starci app check. turbo needs
@@ -394,6 +398,7 @@ slots:
     managedBy: task-graph
     rules: [HFS_MANAGED_FILE_DRIFT, HFS_MONO_WORKSPACES]
   - id: app.lockfile
+    since: 3.1.0
     profiles: [app]
     path: package-lock.json
     presence: required
@@ -402,6 +407,7 @@ slots:
     tests: none
     rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW]
   - id: app.git-meta
+    since: 3.1.0
     profiles: [app]
     path: .gitignore
     presence: required
@@ -422,6 +428,7 @@ slots:
     editionWhy: "Lite renders the same managed file from skeleton-lite because the editions share one code structure while their adapters differ (ruling:R212/case-2, with Work amended by ruling:R212/case-4 and hosting by owner:lite-production-swarm)."
     rules: [HFS_MANAGED_FILE_DRIFT]
   - id: app.tool-config
+    since: 3.1.0
     profiles: [app]
     path: "{.editorconfig,.nvmrc}"
     presence: required
@@ -433,6 +440,7 @@ slots:
     editionWhy: "Lite renders the same managed files from skeleton-lite because the editions share one code structure while their adapters differ (ruling:R212/case-2, with Work amended by ruling:R212/case-4 and hosting by owner:lite-production-swarm)."
     rules: [HFS_MANAGED_FILE_DRIFT]
   - id: app.format-config
+    since: 3.1.0
     profiles: [app]
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite additionally ignores Supabase-generated row types when formatting; full has its TypeORM schema authority."
     # The one formatter configuration of the app (prettier walks up from every file of both sides to it): .prettierrc names
@@ -446,6 +454,7 @@ slots:
     liteManagedBy: tool-config-lite     # the same files plus the generated supabase/types, which the Supabase CLI writes unformatted
     rules: [HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL]
   - id: app.tool-config-optional
+    since: 3.1.0
     profiles: [app]
     path: "{.npmrc,.npmignore}"     # .npmignore: npm reads the nearest ignore file instead of the root files negations, so an app that ships inside another package keeps its sealed credentials out of the tarball here
     presence: optional
@@ -453,6 +462,7 @@ slots:
     tier: none
     tests: none
   - id: app.tool-config-local
+    since: 3.1.0
     profiles: [app]
     path: "{tsconfig.json,.eslintrc,.eslintrc.*,.eslintignore,eslint.config.*,.stylelintrc,.stylelintrc.*,.stylelintignore,stylelint.config.*,.prettierrc.*,prettier.config.*,jest.config.*,lint-staged.config.*,.lintstagedrc*}"
     presence: forbidden
@@ -462,6 +472,7 @@ slots:
     goesTo: "nowhere at the app root: each side holds exactly its managed tool configuration (be.tool-config, fe.tool-config) and the root only the formatter (app.format-config)"
     rules: [HFS_TOOL_CONFIG_LOCAL]
   - id: app.quality-config
+    since: 3.1.0
     profiles: [app]
     path: "{sonar-project.properties,codecov.yml}"
     presence: required
@@ -471,6 +482,7 @@ slots:
     managedBy: quality-config     # lite renders the same files: the same coverage scope, Sonar import and Codecov flags as full
     rules: [HFS_SONAR_CONFIG, HFS_MANAGED_FILE_DRIFT]
   - id: app.hooks
+    since: 3.1.0
     profiles: [app]
     path: ".husky/{pre-commit,pre-push}"
     presence: required
@@ -480,6 +492,7 @@ slots:
     managedBy: hooks
     rules: [HFS_CI_E2E_AUTOMATIC, HFS_MANAGED_FILE_DRIFT]
   - id: app.ci
+    since: 3.1.0
     profiles: [app]
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite CI proves boot through R272 wiring and checks Supabase artifacts; full also provides its e2e lane."
     path: ".github/workflows/ci.yml"
@@ -491,6 +504,7 @@ slots:
     liteManagedBy: ci-workflows-lite
     rules: [HFS_CI_E2E_AUTOMATIC, HFS_CI_MISSING_CANON, HFS_MANAGED_FILE_DRIFT]
   - id: app.ci-e2e
+    since: 3.1.0
     profiles: [app]
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite has no e2e world; R272 supplies its wiring proof, while optional contracts run separately."
     path: ".github/workflows/e2e.yml"
@@ -503,6 +517,7 @@ slots:
     managedBy: ci-workflows
     rules: [HFS_CI_E2E_AUTOMATIC, HFS_MANAGED_FILE_DRIFT]
   - id: app.ci-images
+    since: 3.1.0
     profiles: [app]
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite renders its Supabase-backed image workflow; full renders images for its separately deployed services."
     # Builds every image of the app (one matrix entry per declared app, path-filtered), never pushes: rendered by starci app sync.
@@ -530,6 +545,7 @@ slots:
     rules: [HFS_MANAGED_FILE_DRIFT]
     since: 2.1.0
   - id: app.dockerignore
+    since: 3.1.0
     profiles: [app]
     # The one build-context filter of every image (the context is the app root): rendered by starci app sync; it keeps secrets and build output out.
     path: .dockerignore
@@ -540,6 +556,7 @@ slots:
     managedBy: docker-ignore
     rules: [HFS_MANAGED_FILE_DRIFT]
   - id: app.deploy
+    since: 3.1.0
     profiles: [app]
     # Production delivery tooling for the app's own processes: compose files, Caddyfile, *.env.example and ops shell scripts.
     # Lite still keeps its backing services on Supabase and its encrypted custody in app.starcistacks; R06 scans every file here.
@@ -550,6 +567,7 @@ slots:
     tests: none
     rules: [HFS_PLAINTEXT_SECRET]
   - id: app.ci-deploy
+    since: 3.1.0
     profiles: [app]
     # Product-owned delivery workflows; the literal app.ci-db path remains the managed database workflow's more specific slot.
     path: ".github/workflows/<app>-deploy.yml"
@@ -559,6 +577,7 @@ slots:
     tests: none
     rules: [HFS_PLAINTEXT_SECRET]
   - id: app.ci-authorize-deploy-key
+    since: 3.1.0
     profiles: [app]
     path: ".github/workflows/authorize-deploy-key.yml"
     presence: optional
@@ -567,6 +586,7 @@ slots:
     tests: none
     rules: [HFS_PLAINTEXT_SECRET]
   - id: app.browser
+    since: 3.1.0
     profiles: [app]
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): browser journeys belong to full; lite proves app boot through R272 wiring."
     # The browser journey of the product (Playwright, owner ruling: one minimal journey per example app, run manually): the config, its
@@ -582,6 +602,7 @@ slots:
     requires: [playwright.config.ts, journeys/]
     allows: [playwright.config.ts, stack.mjs, "journeys/*.ts"]
   - id: app.github-meta
+    since: 3.1.0
     profiles: [app]
     path: ".github/{CODEOWNERS,pull_request_template.md,ISSUE_TEMPLATE/**}"
     presence: optional
@@ -601,6 +622,7 @@ slots:
     editionWhy: "Lite renders the same managed file from skeleton-lite because the editions share one code structure while their adapters differ (ruling:R212/case-2, with Work amended by ruling:R212/case-4 and hosting by owner:lite-production-swarm)."
     rules: [HFS_MANAGED_FILE_DRIFT, HFS_DEPENDABOT_MISSING]
   - id: app.scripts
+    since: 3.1.0
     profiles: [app]
     exemplifiedBy:
       - {path: packages/hfs/templates/app/skeleton/scripts/codegen.mjs, edition: full}
@@ -618,6 +640,7 @@ slots:
     liteManagedBy: codegen-lite
     rules: [HFS_SCRIPT_ONE_OFF, BE_SPEC_PLACEMENT, HFS_REPO_LOCAL_CHECK]     # one-off codemods and fix-* scripts are agent output, not tooling
   - id: app.scripts.delivery
+    since: 3.1.0
     profiles: [app]
     exemplifiedBy:
       - {path: tests/fixtures/hfs-delivery-lite/scripts/build-frontend.mjs, edition: lite}
@@ -632,6 +655,7 @@ slots:
     tests: none
     rules: [HFS_PLAINTEXT_SECRET, HFS_SCRIPT_ONE_OFF, BE_SPEC_PLACEMENT, HFS_REPO_LOCAL_CHECK]
   - id: app.sides
+    since: 3.1.0
     profiles: [app]
     # The two sides. Everything below be/ and fe/ is judged by the side's own slots (profiles be and fe) with the side folder as its root;
     # this slot answers only for the side folders themselves.
@@ -641,6 +665,7 @@ slots:
     tier: none
     tests: none
   - id: app.starciwork
+    since: 3.1.0
     profiles: [app]
     exemplifiedBy:
       - {path: packages/hfs/templates/app/skeleton/.starciwork/, edition: full}
@@ -666,6 +691,7 @@ slots:
       allows: [workspace.yaml, "brand/**"]
     rules: [HFS_AGENT_DATA_TRACKED, HFS_IDENTITY_CUSTODY]
   - id: app.starcistacks
+    since: 3.1.0
     profiles: [app]
     editionWhy: "owner:lite-production-swarm: lite requires declared docker-swarm production with Supabase backing; full also admits Compose development, Kubernetes and Terraform."
     exemplifiedBy:
@@ -690,6 +716,7 @@ slots:
       forbids: ["<env>/runtime/files/**", "**/*.enc outside <env>/secrets/", DESIGN.md, deployment.json, "k8s/ at root"]
     rules: [HFS_STACKS_SHAPE, HFS_STACKS_IN_SIDE, HFS_PLAINTEXT_SECRET, HFS_IDENTITY_CUSTODY]
   - id: app.sops
+    since: 3.1.0
     profiles: [app]
     # The sops custody rule of .starcistacks/<env>/secrets/*.enc, at the app root beside the tree it seals.
     path: .sops.yaml
@@ -698,6 +725,7 @@ slots:
     tier: none
     tests: none
   - id: app.build-output
+    since: 3.1.0
     profiles: [app]
     path: "{**/node_modules/,coverage/,reports/,test-results/,**/*.tsbuildinfo}"
     presence: optional
@@ -705,6 +733,7 @@ slots:
     tier: none
     tests: none
   - id: app.tool-cache
+    since: 3.1.0
     profiles: [app]
     path: "{.eslintcache,.turbo/,.scannerwork/,.sonar/,.jest-cache/,.cache/,.tools/}"
     presence: forbidden
@@ -713,6 +742,7 @@ slots:
     tests: none
     goesTo: "${STARCI_CACHE_HOME:-%LOCALAPPDATA%/StarCi/cache}/<repo>/<tool>/ (the canon presets set eslint --cache-location, jest cacheDirectory, turbo cacheDir, sonar.working.directory)"
   - id: app.agent-output
+    since: 3.1.0
     profiles: [app]
     path: "{report*.json,*.tmp.json,%*%,nul,.artifacts/,.tmp-*,*-lint.json,lf.json,lt.json,*.log,design-plans/,.gitmounts/,.dat,vi-flat.txt}"
     presence: forbidden
@@ -722,6 +752,7 @@ slots:
     goesTo: "agent scratchpad or the StarCi blob store (%LOCALAPPDATA%/StarCi/blobs), cited by {name, sha256}"
     rules: [HFS_UNTRACKED_ROOT_ENTRY, HFS_AGENT_DATA_TRACKED]
   - id: app.worktrees
+    since: 3.1.0
     profiles: [app]
     path: "{.worktrees/,worktrees/,.starciwork/worktrees/}"
     presence: forbidden
@@ -730,6 +761,7 @@ slots:
     tests: none
     goesTo: "<lanes root>/<project>/<lane>/ (outside every repository) for a lane; a Kernel workflow's worktree is created and owned by Orca outside the app checkout, never tracked, and removed by the runtime's host-side controller once the workflow's finish marked it release-pending"
   - id: app.plaintext-env
+    since: 3.1.0
     profiles: [app]
     path: "{.env,.env.*,secrets.env,.secrets/,**/*.pem,**/*.key}"
     presence: forbidden
@@ -852,6 +884,7 @@ slots:
 
   # ----- side root (both sides): what a standalone repository root holds, less the app-root files ----------
   - id: repo.side-root-forbidden
+    since: 3.1.0
     profiles: [be, fe]
     path: "{package.json,package-lock.json,hfs.json,README.md,.gitignore,.gitattributes,.husky/,.github/,.starciwork/,.starcistacks/,supabase/,.sops.yaml,sonar-project.properties,codecov.yml,.prettierrc,.prettierignore,scripts/}"
     presence: forbidden
@@ -860,6 +893,7 @@ slots:
     tests: none
     goesTo: "the app root: one package.json, lockfile, hfs.json, README, git and CI files, hooks, formatter, Sonar and Codecov configuration, scripts/, .starciwork, .starcistacks and .sops.yaml per app"
   - id: be.tool-config
+    since: 3.1.0
     profiles: [be]
     # Managed files (starci app sync renders them, starci app check compares them): the whole tool configuration of a back end. Each is
     # a reference to a canon package, never a configuration: tsconfig.json extends @starci/tsconfig/be.json and adds the
@@ -880,6 +914,7 @@ slots:
     managedBy: tool-config
     rules: [HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL, HFS_TS_STRICT]
   - id: be.nest-cli
+    since: 3.1.0
     profiles: [be]
     # The Nest monorepo of the back end: `monorepo: true` and one project per declared be app (apps/<app>, even for one service).
     path: nest-cli.json
@@ -890,6 +925,7 @@ slots:
     coverage: none
     rules: [HFS_MONO_NEST_PROJECTS]
   - id: be.tool-config-local
+    since: 3.1.0
     profiles: [be]
     path: "{.eslintrc,.eslintrc.*,.eslintignore,eslint.config.js,eslint.config.cjs,eslint.config.ts,eslint.config.mts,eslint.config.cts,.prettierrc.*,prettier.config.*,jest.config.ts,jest.config.mjs,jest.config.cjs,jest.config.json,jest.config.e2e.js}"
     presence: forbidden
@@ -899,6 +935,7 @@ slots:
     goesTo: "nowhere: a back end has exactly the managed tool configuration (be.tool-config); a change to a rule or a flag is proposed in the .claude runtime"
     rules: [HFS_TOOL_CONFIG_LOCAL]
   - id: fe.tool-config
+    since: 3.1.0
     profiles: [fe]
     # Managed files (starci app sync renders them, starci app check compares them): the tool configuration of a front end. Each is a
     # reference to a canon package, never a configuration: tsconfig.json extends @starci/tsconfig/next.json and only
@@ -914,6 +951,7 @@ slots:
     managedBy: tool-config
     rules: [HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL, HFS_RULE_OFF_WITHOUT_REPLACEMENT, HFS_TS_STRICT]
   - id: fe.tool-config-local
+    since: 3.1.0
     profiles: [fe]
     path: "{.eslintrc,.eslintrc.*,.eslintignore,eslint.config.js,eslint.config.cjs,eslint.config.ts,eslint.config.mts,eslint.config.cts,.stylelintrc,.stylelintrc.*,.stylelintignore,stylelint.config.js,stylelint.config.cjs,stylelint.config.ts,stylelint.config.json,prettier.config.*,.prettierrc.*,lint-staged.config.*,.lintstagedrc*,turbo.json}"
     presence: forbidden
@@ -923,6 +961,7 @@ slots:
     goesTo: "nowhere: a front end has exactly the managed tool configuration (fe.tool-config); the task graph is the app root's turbo.json (app.task-graph); a change to a rule or a flag is proposed in the .claude runtime"
     rules: [HFS_TOOL_CONFIG_LOCAL]
   - id: repo.docs
+    since: 3.1.0
     profiles: [be, fe]
     path: "docs/{adr,runbooks,guides}/**/*.md"
     presence: opt-in
@@ -932,6 +971,7 @@ slots:
     coverage: none
     rules: [HFS_ROOT_MARKDOWN_FORBIDDEN]
   - id: repo.docs-media
+    since: 3.1.0
     profiles: [be, fe]
     path: "docs/**/*.{png,svg,webp}"
     presence: opt-in
@@ -941,6 +981,7 @@ slots:
     coverage: none
     budget: {bytes: 512000}
   - id: repo.packages
+    since: 3.1.0
     profiles: [be, fe]
     path: "packages/<pkg>/"
     presence: opt-in
@@ -952,6 +993,7 @@ slots:
     coverage: none
     rules: [FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT]
   - id: repo.app-image
+    since: 3.1.0
     profiles: [be, fe]
     exemplifiedBy:
       - packages/hfs/templates/be/image/api/Dockerfile
@@ -973,6 +1015,7 @@ slots:
 
   # ----- never tracked: build output the tools need in place ---------------------------------------------
   - id: repo.build-output
+    since: 3.1.0
     profiles: [be, fe]
     path: "{**/node_modules/,dist/,apps/*/dist/,packages/*/dist/,.next/,apps/*/.next/,coverage/,reports/,test-results/,**/next-env.d.ts,**/*.tsbuildinfo}"
     presence: optional
@@ -980,6 +1023,7 @@ slots:
     tier: none
     tests: none
   - id: repo.generated
+    since: 3.1.0
     profiles: [be, fe]
     path: "{**/__generated__/,apps/*/src/schema.gql}"
     presence: optional
@@ -990,6 +1034,7 @@ slots:
 
   # ----- never in the working tree: caches, scratch, agent output ----------------------------------------
   - id: repo.tool-cache
+    since: 3.1.0
     profiles: [be, fe]
     path: "{.eslintcache,.turbo/,.scannerwork/,.sonar/,.jest-cache/,.cache/,.tools/}"
     presence: forbidden
@@ -998,6 +1043,7 @@ slots:
     tests: none
     goesTo: "${STARCI_CACHE_HOME:-%LOCALAPPDATA%/StarCi/cache}/<repo>/<tool>/ (the canon presets set eslint --cache-location, jest cacheDirectory, turbo cacheDir, sonar.working.directory)"
   - id: repo.agent-output
+    since: 3.1.0
     profiles: [be, fe]
     path: "{report*.json,*.tmp.json,%*%,nul,.artifacts/,.tmp-*,*-lint.json,lf.json,lt.json,*.log,design-plans/,.gitmounts/,.dat,vi-flat.txt}"
     presence: forbidden
@@ -1007,6 +1053,7 @@ slots:
     goesTo: "agent scratchpad or the StarCi blob store (%LOCALAPPDATA%/StarCi/blobs), cited by {name, sha256}"
     rules: [HFS_UNTRACKED_ROOT_ENTRY, HFS_AGENT_DATA_TRACKED]
   - id: repo.worktrees
+    since: 3.1.0
     profiles: [be, fe]
     path: "{.worktrees/,worktrees/,.starciwork/worktrees/}"
     presence: forbidden
@@ -1015,6 +1062,7 @@ slots:
     tests: none
     goesTo: "<lanes root>/<project>/<lane>/ (outside every repository)"
   - id: repo.plaintext-env
+    since: 3.1.0
     profiles: [be, fe]
     path: "{.env,.env.*,.secrets/,**/*.pem,**/*.key}"
     presence: forbidden
@@ -1024,6 +1072,7 @@ slots:
     goesTo: ".starcistacks/<env>/secrets/<slug>.enc (at the app root); decrypted values only in memory or under %LOCALAPPDATA%/StarCi/secrets/<project>/<env>/ via *_FILE"
     rules: [HFS_PLAINTEXT_SECRET]
   - id: be.root-e2e
+    since: 3.1.0
     profiles: [be]
     path: "e2e/"
     presence: forbidden
@@ -1034,6 +1083,7 @@ slots:
 
   # ----- contract snapshots (the committed machine-emitted files, because they are a cross-repo interface) --
   - id: be.contract.graphql
+    since: 3.1.0
     profiles: [be]
     path: "contracts/<app>/schema.graphql"
     presence: opt-in
@@ -1044,6 +1094,7 @@ slots:
     why: emitted by `npm run contract:emit` (`starci app emit`, never written by hand); CI fails when the emitted file differs (a contract, not a build artefact)
     rules: [HFS_CONTRACT_SNAPSHOT_DRIFT]
   - id: be.contract.openapi
+    since: 3.1.0
     profiles: [be]
     path: "contracts/<app>/openapi.json"
     presence: opt-in
@@ -1054,6 +1105,7 @@ slots:
     why: emitted by `npm run contract:emit` (`starci app emit`, never written by hand) from the app's typed operation table `apps/<app>/src/operations.ts` (canon BE-OPERATIONS-1); CI fails when the emitted file differs
     rules: [HFS_CONTRACT_SNAPSHOT_DRIFT]
   - id: be.contract.events
+    since: 3.1.0
     profiles: [be]
     path: "contracts/<app>/events.json"
     presence: opt-in
@@ -1064,6 +1116,7 @@ slots:
     why: the async contract of a service (`starci/event-contract@1`), emitted by `npm run contract:emit` (`starci app emit`, never written by hand) from the typed event classes of `src/modules/events/<service>/`; the consumers of its events rely on it (R166 HFS_EVENT_CONTRACT)
     rules: [HFS_EVENT_CONTRACT]
   - id: be.contract.events.pin
+    since: 3.1.0
     profiles: [be]
     path: "contracts/<app>/events.pin.json"
     presence: opt-in
@@ -1093,6 +1146,7 @@ slots:
   #                      area's global ports when it has any); composition only, no business logic or process.env/EnvSource read.
   #   app.module.ts      the composition root: imports the groups and spreads them, binds the app-wide guards and filter.
   - id: be.app.api
+    since: 3.1.0
     profiles: [be]
     path: "apps/<app>/src/"
     appKind: api
@@ -1108,6 +1162,7 @@ slots:
     budget: {app.module.ts: 250, main.ts: 80, "<app>.env.ts": 150, "<app>.options.ts": 200, "compose/<area>.ts": 120}
     rules: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE, BE_APP_OPTIONS_COMPOSITION, BE_APP_COMPOSITION_BUDGET, BE_DEFAULT_DENY, BE_ERROR_MASKED, BE_FEATURE_NOT_COMPOSED, BE_CONTEXT_OWNER, BE_APP_ENV_REQUIRED]
   - id: be.app.worker
+    since: 3.1.0
     profiles: [be]
     path: "apps/<app>/src/"
     appKind: worker               # composes transport/message modules and job processors only (an api app may compose them too: a worker app is for separate scaling)
@@ -1122,6 +1177,7 @@ slots:
     budget: {app.module.ts: 250, main.ts: 80, "<app>.env.ts": 150, "<app>.options.ts": 200, "compose/<area>.ts": 120}
     rules: [BE_APP_COMPOSITION_ONLY, BE_APP_OPTIONS_COMPOSITION, BE_APP_COMPOSITION_BUDGET, BE_BACKGROUND_UNOWNED, BE_CONTEXT_OWNER, BE_APP_ENV_REQUIRED]
   - id: be.app.cli
+    since: 3.1.0
     profiles: [be]
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): Supabase CLI owns lite migrations; a lite cli app is optional for declared operator commands."
     # The ONE app of every one-off action (migrate, seed, sync, backup, any operator command): be/apps/cli, on nest-commander.
@@ -1149,6 +1205,7 @@ slots:
   # transport/<protocol>/, composed by the api apps), features/cli/ (a one-off action: the cli feature root, compiled only into
   # apps/cli). Every kind imports only downward into modules/*; no kind imports another.
   - id: be.feature
+    since: 3.1.0
     profiles: [be]
     path: "src/features/api/<feature>/"
     presence: required
@@ -1164,6 +1221,7 @@ slots:
     budget: {files: 250, indexExports: 60}   # a feature above 250 source files must be split by product capability
     rules: [BE_FEATURE_SHAPE, BE_FEATURE_IMPORTS_FEATURE, BE_PUBLIC_SURFACE, BE_FEATURE_NOT_COMPOSED]
   - id: be.feature.application
+    since: 3.1.0
     profiles: [be]
     path: "src/features/{api/,jobs/,reactors/,saga/}<feature>/application/"     # inside a trigger kind (jobs, reactors, saga) the feature folder is one level down
     presence: required
@@ -1175,6 +1233,7 @@ slots:
     coverage: none
     rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_ENTITY_IN_CONTRACT, BE_CQRS_SHAPE]
   - id: be.feature.saga
+    since: 3.1.0
     profiles: [be]
     path: "src/features/saga/<saga>/"
     pattern: saga                 # enabled by `patterns: ["saga"]` in hfs.json sides.be (R169 to R173); an undeclared saga folder is HFS_SLOT_NOT_ENABLED
@@ -1189,6 +1248,7 @@ slots:
     coverage: none
     rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED, BE_SAGA_STEP_COMPENSATION, BE_SAGA_STATE_VERSIONED, BE_SAGA_EVENT_CONTRACT, BE_SAGA_E2E_MISSING]
   - id: be.feature.saga.steps
+    since: 3.1.0
     profiles: [be]
     path: "src/features/saga/<saga>/steps/"
     pattern: saga
@@ -1200,6 +1260,7 @@ slots:
     coverage: none
     rules: [BE_SAGA_STEP_COMPENSATION, BE_SAGA_EVENT_CONTRACT]
   - id: be.feature.saga.compensations
+    since: 3.1.0
     profiles: [be]
     path: "src/features/saga/<saga>/compensations/"
     pattern: saga
@@ -1223,6 +1284,7 @@ slots:
     rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_FEATURE_IMPORTS_FEATURE]
     since: 1.0.0
   - id: be.transport.http
+    since: 3.1.0
     profiles: [be]
     path: "src/features/api/<feature>/transport/http/"
     presence: optional
@@ -1235,6 +1297,7 @@ slots:
     composedBy: [api]
     rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
   - id: be.transport.graphql
+    since: 3.1.0
     profiles: [be]
     path: "src/features/api/<feature>/transport/graphql/"
     presence: optional
@@ -1247,6 +1310,7 @@ slots:
     composedBy: [api]
     rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
   - id: be.transport.message
+    since: 3.1.0
     profiles: [be]
     path: "src/features/{api/,reactors/,saga/}<feature>/transport/message/"
     presence: opt-in              # queue consumer: composed by the service that owns it (an api app) or by a worker app scaled apart
@@ -1376,6 +1440,7 @@ slots:
     rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE, BE_DEFAULT_DENY]
     since: 1.0.0
   - id: be.cli
+    since: 3.1.0
     profiles: [be]
     # The cli feature root: every one-off action of the back end, compiled only into apps/cli. A group is a nest-commander
     # @Command (<group>/<group>.cli.ts) whose sub-commands are @SubCommand classes extending CommandRunner
@@ -1414,6 +1479,7 @@ slots:
 
   # ----- BE: modules (three tiers, closed set) -----------------------------------------------------------
   - id: be.domain
+    since: 3.1.0
     profiles: [be]
     path: "src/modules/domain/<capability>/"
     presence: optional
@@ -1430,6 +1496,7 @@ slots:
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_PUBLIC_SURFACE, BE_ERROR_HOME, BE_CONFIG_OWNER, BE_CONTEXT_COUPLING, BE_CONTEXT_TRANSACTION]
   - id: be.errors
+    since: 3.1.0
     profiles: [be]
     path: "src/modules/{domain,integrations}/<capability>/errors/"
     presence: optional
@@ -1462,6 +1529,7 @@ slots:
     rules: [BE_USER_COPY_LITERAL]
     since: 1.0.0
   - id: be.persistence
+    since: 3.1.0
     profiles: [be]
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): Supabase migrations own lite tables, with SQL and row types here; full keeps TypeORM entities and migrations here."
     path: "src/modules/{domain,platform,projections}/<capability>/persistence/"
@@ -1484,6 +1552,7 @@ slots:
     coverage: none
     rules: [BE_SCHEMA_OWNER, BE_SCHEMA_AUTHORITY, BE_SQL_OUTSIDE_PERSISTENCE, BE_SQL_TABLE_OWNER, BE_SQL_RETURNING_SHAPE, BE_CONTEXT_COUPLING, BE_CONTEXT_PLATFORM_TABLES]
   - id: be.platform
+    since: 3.1.0
     profiles: [be]
     path: "src/modules/platform/<capability>/"
     presence: required
@@ -1506,6 +1575,7 @@ slots:
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE]
   # ----- BE: pattern slots (opt-in; enabled by hfs.json sides.be.patterns). A path under one is HFS_SLOT_NOT_ENABLED unless its pattern is declared.
   - id: be.platform.event-bus
+    since: 3.1.0
     profiles: [be]
     exemplifiedBy:
       - {path: tests/fixtures/hfs-lite-slots/be/src/modules/platform/event-bus/, edition: lite}
@@ -1528,6 +1598,7 @@ slots:
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE, BE_INFRA_OWNER]
   - id: be.platform.queue
+    since: 3.1.0
     profiles: [be]
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite implements queue ports with pgmq and pg_cron; full uses BullMQ and Redis."
     path: "src/modules/platform/queue/"
@@ -1548,6 +1619,7 @@ slots:
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE, BE_INFRA_OWNER]
   - id: be.events
+    since: 3.1.0
     profiles: [be]
     path: "src/modules/events/<service>/"
     presence: opt-in
@@ -1561,6 +1633,7 @@ slots:
     coverage: none
     rules: [BE_EVENT_CLASS_CONTRACT, BE_TIER_DIRECTION]
   - id: be.queues
+    since: 3.1.0
     profiles: [be]
     path: "src/modules/queues/<queue>/"
     presence: opt-in
@@ -1574,6 +1647,7 @@ slots:
     coverage: none
     rules: [BE_OUTBOX_WRITE_TX, BE_TIER_DIRECTION]
   - id: be.feature.reactors
+    since: 3.1.0
     profiles: [be]
     path: "src/features/reactors/<reactor>/"
     presence: opt-in
@@ -1588,6 +1662,7 @@ slots:
     coverage: none
     rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
   - id: be.feature.jobs
+    since: 3.1.0
     profiles: [be]
     path: "src/features/jobs/<job>/"
     presence: opt-in
@@ -1602,6 +1677,7 @@ slots:
     coverage: none
     rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
   - id: be.feature.jobs.queue
+    since: 3.1.0
     profiles: [be]
     path: "src/features/jobs/<job>/transport/queue/"
     presence: opt-in              # the queue transport of the job: its module and the processor the job runner hands the fenced claim to
@@ -1615,6 +1691,7 @@ slots:
     composedBy: [api, worker]
     rules: [BE_BACKGROUND_UNOWNED]
   - id: be.feature.jobs.steps
+    since: 3.1.0
     profiles: [be]
     path: "src/features/jobs/<job>/steps/"
     presence: opt-in
@@ -1626,6 +1703,7 @@ slots:
     coverage: none
     rules: [BE_JOB_SHAPE, BE_JOB_RUN_KEY]
   - id: be.platform.jobs
+    since: 3.1.0
     profiles: [be]
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite persists fenced claims in Supabase migrations and dispatches through pgmq; full uses TypeORM schema authority and its queue adapter."
     path: "src/modules/platform/jobs/"
@@ -1640,6 +1718,7 @@ slots:
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE, BE_JOB_WRITE_OUTSIDE_OWNER, BE_JOB_FENCE_REQUIRED]
   - id: be.projections
+    since: 3.1.0
     profiles: [be]
     exemplifiedBy:
       - {path: tests/fixtures/hfs-lite-slots/be/src/modules/projections/order-summary/, edition: lite}
@@ -1659,6 +1738,7 @@ slots:
     coverage: required
     rules: [BE_PROJECTION_WRITE_OWNER, BE_PROJECTION_SHAPE, BE_TIER_DIRECTION, BE_CONTEXT_COUPLING]
   - id: be.integrations
+    since: 3.1.0
     profiles: [be]
     path: "src/modules/integrations/<provider>/"
     presence: optional
@@ -1671,6 +1751,7 @@ slots:
     budget: {indexExports: 80}   # a provider's port surface includes clients, config, options, tokens and errors
     rules: [BE_TIER_DIRECTION, BE_ERROR_HOME, BE_SECRET_DEFAULT, BE_INTEGRATION_SPEC_MISSING]
   - id: be.integrations.model
+    since: 3.1.0
     profiles: [be]
     path: "src/modules/integrations/<provider>/model/"
     presence: opt-in
@@ -1708,6 +1789,7 @@ slots:
   # lives under src/tests/, one folder per kind, and the folder and the file suffix always agree (a file whose suffix does
   # not match its folder matches no slot: HFS_SLOT_UNDECLARED).
   - id: be.tests.world
+    since: 3.1.0
     profiles: [be]
     exemplifiedBy:
       - {path: tests/fixtures/hfs-lite-slots/be/src/tests/world/, edition: lite}
@@ -1738,6 +1820,7 @@ slots:
     rules: [BE_TEST_TOPOLOGY, BE_TEST_CONSTRAINTS_ON]
 
   - id: be.tests.world.kit
+    since: 3.1.0
     profiles: [be]
     path: "src/tests/world/kit/"
     presence: optional
@@ -1748,6 +1831,7 @@ slots:
     coverage: none
     why: the helpers the test world needs (polling, free ports, transports), inlined so the world imports no other repository; a bare <name>.ts entry in allows is what admits a plain name in BE_SOURCE_FORM
   - id: be.tests.fixtures
+    since: 3.1.0
     profiles: [be]
     path: "src/tests/fixtures/"
     presence: optional
@@ -1758,6 +1842,7 @@ slots:
     coverage: none
     why: payload fixtures with a role suffix (the doubles come from @starci/jest-preset, not from here); the test data builders live in its builders/ slot; importable by unit specs, integration and e2e; never imports a feature
   - id: be.tests.fixtures.builders
+    since: 3.1.0
     profiles: [be]
     path: "src/tests/fixtures/builders/*.builder.ts"
     presence: optional
@@ -1772,6 +1857,7 @@ slots:
       *.fixture.ts or *.factory.ts anywhere, is a BE_SOURCE_FORM finding
     rules: [BE_SOURCE_FORM]
   - id: be.tests.fixtures.i18n
+    since: 3.1.0
     profiles: [be]
     path: "src/tests/fixtures/i18n/"
     presence: optional
@@ -1782,6 +1868,7 @@ slots:
     coverage: none
     why: the ONLY test-fixture location where Vietnamese or another language may appear in source (LANG_NOT_ENGLISH); placement is the marker, there is no comment pragma
   - id: be.tests.integration
+    since: 3.1.0
     profiles: [be]
     editionWhy: "Lite integration specs use the local Supabase CLI stack without containers or toxiproxy (ruling:R212/case-1, amended by ruling:R212/case-2 and ruling:R212/case-4, with contracts allowed by owner:lite-contract-specs); R284 requires declared-pattern proofs there. Full additionally proves infrastructure outages through its world (R112)."
     path: "src/tests/integration/<capability>/*.integration-spec.ts"
@@ -1797,6 +1884,7 @@ slots:
     why: one capability module through useTestWorld({ modules }), no HTTP door of ours (SQL, transactions, concurrency, inbox claims on the real database; and every integration client, `<capability>` being its provider folder, against our real infra, a real peer app or the library fake at the network edge, with its success, its ErrorCode refusal mapping and an outage through the world, R112); run by test:integration
     rules: [BE_TEST_TOPOLOGY, BE_INTEGRATION_SPEC_MISSING]
   - id: be.tests.e2e
+    since: 3.1.0
     profiles: [be]
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): full proves app flows through its e2e world; lite uses the R272 wiring proof and unit/integration specs."
     path: "src/tests/e2e/<area>/*.e2e-spec.ts"
@@ -1810,6 +1898,7 @@ slots:
     why: flow e2e through useTestWorld({ apps }); external services are the world's network fakes; run by test:e2e
     rules: [HFS_CI_E2E_AUTOMATIC, BE_TEST_TOPOLOGY, BE_E2E_FLOW]
   - id: be.tests.contract
+    since: 3.1.0
     profiles: [be]
     path: "src/tests/contract/<provider>/*.contract-spec.ts"
     presence: optional
@@ -1822,6 +1911,7 @@ slots:
     why: provider sandbox contracts, skipped without sandbox config; run only by test:contract, never part of test or test:e2e
     rules: [BE_TEST_TOPOLOGY]
   - id: be.tests.e2e-world-dir
+    since: 3.1.0
     profiles: [be]
     path: "src/tests/e2e/world/"
     presence: forbidden
@@ -1832,6 +1922,7 @@ slots:
 
   # ----- FE: apps ----------------------------------------------------------------------------------------
   - id: fe.app.next
+    since: 3.1.0
     profiles: [fe]
     # Each fe app is an npm workspace: its package.json is @<project>/<app> with its own runtime dependencies and the fixed
     # workspace scripts (HFS_MONO_FE_WORKSPACE); turbo runs them.
@@ -1846,6 +1937,7 @@ slots:
     tests: none
     rules: [FE_APP_ISOLATION, FE_ERROR_BOUNDARY_MISSING, FE_NEXT_CONVENTIONS, HFS_MONO_FE_WORKSPACE, HFS_MONO_WORKSPACE_DEP]
   - id: fe.app-optional
+    since: 3.1.0
     profiles: [fe]
     path: "apps/<app>/public/"
     presence: optional
@@ -1853,6 +1945,7 @@ slots:
     tier: none
     tests: none
   - id: fe.route
+    since: 3.1.0
     profiles: [fe]
     path: "apps/<app>/src/app/"
     presence: required
@@ -1871,6 +1964,7 @@ slots:
     tests: none
     rules: [FE_ROUTE_FILES_THIN, FE_CLIENT_BOUNDARY, FE_OWNER_REACHABLE, FE_ROUTE_HANDLER_FORBIDDEN, FE_SERVER_ACTION_FORBIDDEN]
   - id: fe.source-root-pinned
+    since: 3.1.0
     profiles: [fe]
     path: "apps/<app>/src/{proxy.ts,instrumentation.ts,instrumentation-client.ts,sentry.server.config.ts,sentry.edge.config.ts}"
     presence: optional
@@ -1880,6 +1974,7 @@ slots:
     tests: none
     rules: [FE_NEXT_CONVENTIONS]   # middleware.ts is refused on Next >= 16 (fe.source-root-middleware)
   - id: fe.source-root-middleware
+    since: 3.1.0
     profiles: [fe]
     path: "apps/<app>/src/{middleware.ts,middleware.js}"
     presence: forbidden
@@ -1905,6 +2000,7 @@ slots:
     rules: [FE_ROUTE_HANDLER_FORBIDDEN, FE_CALLBACK_SHAPE, FE_SUPABASE_CLIENT_OWNER, FE_SERVICE_ROLE_FORBIDDEN]
 
   - id: fe.feature
+    since: 3.1.0
     profiles: [fe]
     path: "apps/<app>/src/features/{pages,layouts,overlays}/<name>/"
     presence: required
@@ -1919,6 +2015,7 @@ slots:
     budget: {component.tsx: 300, index.tsx: 200, dataHooks: 6, useState: 6}
     rules: [FE_SIZE_BUDGET, FE_OWNER_REACHABLE, FE_I18N_LITERAL]
   - id: fe.components
+    since: 3.1.0
     profiles: [fe]
     path: "apps/<app>/src/components/{blocks,composites,branches,leaves}/<name>/"
     presence: optional
@@ -1949,6 +2046,7 @@ slots:
     since: 3.0.0
     rules: [FE_CLIENT_BOUNDARY]
   - id: fe.hooks
+    since: 3.1.0
     profiles: [fe]
     path: "apps/<app>/src/hooks/<domain>/"
     presence: optional
@@ -2074,6 +2172,7 @@ slots:
     rules: [FE_SOURCE_FORM, FE_HOOKS_ARE_HOOKS, FE_OWNER_REACHABLE]
 
   - id: fe.modules
+    since: 3.1.0
     profiles: [fe]
     path: "apps/<app>/src/modules/<capability>/"
     presence: required
@@ -2087,6 +2186,7 @@ slots:
     budget: {file: 400}
     rules: [FE_ENV_OWNER, FE_TRANSPORT_OWNER]
   - id: fe.modules.api
+    since: 3.1.0
     profiles: [fe]
     path: "apps/<app>/src/modules/api/"
     presence: optional
@@ -2117,6 +2217,7 @@ slots:
     why: the canonical GraphQL client output of codegen is local and never committed; this specific slot overrides the tracked API parent
     rules: [FE_WIRE_GENERATED]
   - id: fe.transport.client
+    since: 3.1.0
     profiles: [fe]
     path: "apps/<app>/src/modules/api/graphql/clients/"
     presence: optional
@@ -2126,6 +2227,7 @@ slots:
     why: the auth and no-auth Apollo clients and their link chain (retry, error, timeout, token refresh, attach access token, http) of the one app that calls the back end; when several apps do, the shared client is fe.package.api.client
     rules: [FE_TRANSPORT_OWNER]
   - id: fe.transport.outcome
+    since: 3.1.0
     profiles: [fe]
     path: "apps/<app>/src/modules/api/graphql/types.ts"
     presence: optional
@@ -2136,6 +2238,7 @@ slots:
     why: the one GraphQLResponse union ({success, message, error, data}) of the one app that calls the back end; when several apps do, the shared union is fe.package.api.outcome
     rules: [FE_HTTP_STATUS_COLLAPSE]
   - id: fe.modules.config
+    since: 3.1.0
     profiles: [fe]
     path: "apps/<app>/src/modules/config/"
     presence: required
@@ -2146,6 +2249,7 @@ slots:
     rules: [FE_ENV_OWNER]
 
   - id: fe.modules.i18n
+    since: 3.1.0
     profiles: [fe]
     path: "apps/<app>/src/modules/i18n/"
     presence: required
@@ -2158,6 +2262,7 @@ slots:
     tests: none
     rules: [FE_I18N_PLACEMENT, FE_I18N_CATALOG]
   - id: fe.modules.brand
+    since: 3.1.0
     profiles: [fe]
     path: "apps/<app>/src/modules/brand/brand.css"
     presence: optional
@@ -2167,6 +2272,7 @@ slots:
     why: the ONLY app file that may hold colour values; sets grammar brand tokens only, light and dark
     rules: [FE_STYLE_TOKEN_ONLY]
   - id: fe.modules.routes
+    since: 3.1.0
     profiles: [fe]
     path: "apps/<app>/src/modules/routes/"
     presence: required
@@ -2177,6 +2283,7 @@ slots:
     rules: [FE_HREF_RESOLVES, FE_ROUTE_HARDCODED]
 
   - id: fe.modules.types
+    since: 3.1.0
     profiles: [fe]
     path: "apps/<app>/src/modules/types/"
     presence: optional
@@ -2232,6 +2339,7 @@ slots:
     rules: [FE_I18N_LITERAL, FE_HOOKS_ARE_HOOKS, FE_HTTP_STATUS_COLLAPSE]
 
   - id: fe.package.ui
+    since: 3.1.0
     profiles: [fe]
     path: "packages/<family>-ui/"
     presence: opt-in
@@ -2246,6 +2354,7 @@ slots:
     why: built to dist with explicit named exports; only composites, branches and leaves; no unused export; no colour literal
     rules: [FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT, FE_STYLE_TOKEN_ONLY]
   - id: fe.package.api
+    since: 3.1.0
     profiles: [fe]
     path: "packages/<family>-api/"
     presence: opt-in
@@ -2257,6 +2366,7 @@ slots:
     why: the one transport client and the one Outcome union shared by every app of the repository; no app keeps its own
     rules: [FE_TRANSPORT_OWNER, FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT]
   - id: fe.package.api.client
+    since: 3.1.0
     profiles: [fe]
     path: "packages/<family>-api/src/graphql/clients/"
     presence: optional     # enabled with its package (fe.package.api is the opt-in)
@@ -2266,6 +2376,7 @@ slots:
     why: the repository's one pair of Apollo clients and their link chain
     rules: [FE_TRANSPORT_OWNER]
   - id: fe.package.api.outcome
+    since: 3.1.0
     profiles: [fe]
     path: "packages/<family>-api/src/graphql/types.ts"
     presence: optional     # enabled with its package (fe.package.api is the opt-in)
@@ -2276,6 +2387,7 @@ slots:
     why: the repository's one GraphQLResponse union
     rules: [FE_HTTP_STATUS_COLLAPSE]
   - id: fe.package.i18n
+    since: 3.1.0
     profiles: [fe]
     path: "packages/<family>-i18n/"
     presence: opt-in

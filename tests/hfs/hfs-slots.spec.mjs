@@ -779,3 +779,15 @@ test('appRelativeMessages: a side finding message names its paths from the app r
   assert.equal(message('import @/features/x or ../../src/y from fe/apps/a.ts; every apps'), 'import @/features/x or ../../src/y from fe/apps/a.ts; every apps');
   assert.equal(message(undefined), undefined);
 });
+
+// Legacy coverage status comes only from an explicit `since` <= 3.1.0: a slot without one is a manifest error, in the schema and in the loader.
+test('a slot without since is refused by the schema and the loader, so a new slot cannot pass as a legacy one', () => {
+  const doc = parseYaml(manifestText);
+  assert.ok(doc.slots.every((entry) => typeof entry.since === 'string'), 'every shipped slot carries since');
+  const slot = doc.slots.find((entry) => entry.id === 'be.app.api');
+  delete slot.since;
+  assert.equal(validateManifestSchema(doc), false);
+  assert.throws(() => loadSlotManifest({ text: JSON.stringify(doc) }), (error) => /since is required/.test(String(error.message)) || /since/.test(JSON.stringify(error)));
+  slot.since = '3.2.0';
+  assert.equal(validateManifestSchema(doc), true, JSON.stringify(validateManifestSchema.errors));
+});
