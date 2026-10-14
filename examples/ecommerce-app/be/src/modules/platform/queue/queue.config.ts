@@ -2,7 +2,7 @@ import type { EnvSource } from "@modules/platform/config"
 import type { QueueOptions } from "./queue.options"
 
 /** What the app's `main.ts` reads for the queues; the connections and the schedulers are the app root's choice. */
-export type QueueConfig = Omit<QueueOptions, "connections" | "schedulers">
+export type QueueConfig = Omit<QueueOptions, "connections" | "schedulers" | "outboxOnly">
 
 /** Reads the queue options: the Redis address is required, the rest are tunables with literal defaults. */
 export const parseQueueConfig = (env: EnvSource): QueueConfig => ({

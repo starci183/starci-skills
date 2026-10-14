@@ -13,7 +13,7 @@
 //       `.starcistacks/<env>/runtime/env/KEYS.md`, and the `environment:`/`env:` entries, `runtimeSecrets`, `secrets`
 //       and `vars[].name` of every `.starcistacks` yaml. A `<KEY>_FILE` name declares `<KEY>`.
 // Findings: ENV_REQUIRED_UNSET a required read sits in neither S nor D; ENV_SEALED_UNREAD a sealed key sits in
-// neither R nor a declared consumer; ENV_DUPLICATE one key in two members; ENV_PUBLIC_SEALED a NEXT_PUBLIC_* key in
+// neither R nor a declared consumer; ENV_DUPLICATE one key in two members of one environment; ENV_PUBLIC_SEALED a NEXT_PUBLIC_* key in
 // custody; ENV_EXAMPLE_DRIFT a `*.env.example` key nothing reads. The rule judges the app root (`isRoot`): the whole
 // tree `all` is its input, both editions.
 import path from 'node:path';
@@ -329,7 +329,20 @@ function addSealedFindings(sealed, reads, declared, findings) {
       const finding = sealedMemberFinding(key, member, reads, declared);
       if (finding !== null) findings.push(finding);
     }
-    for (const extra of members.slice(1)) findings.push(found(ENV_DUPLICATE, extra, `${key} is sealed in ${members[0]} and again in ${extra}; one key lives in one member`));
+    addDuplicateFindings(key, members, findings);
+  }
+}
+
+function addDuplicateFindings(key, members, findings) {
+  const firstByEnvironment = new Map();
+  for (const member of members) {
+    const environment = member.split('/')[1];
+    const first = firstByEnvironment.get(environment);
+    if (first === undefined) {
+      firstByEnvironment.set(environment, member);
+      continue;
+    }
+    findings.push(found(ENV_DUPLICATE, member, `${key} is sealed in ${first} and again in ${member}; one key lives in one member per environment`));
   }
 }
 

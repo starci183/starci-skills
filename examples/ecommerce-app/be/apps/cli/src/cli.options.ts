@@ -4,6 +4,7 @@ import { catalogEntities, catalogMigrations } from "@modules/domain/catalog"
 import { invoiceEntities, invoiceMigrations } from "@modules/domain/invoice"
 import { loyaltyEntities, loyaltyMigrations } from "@modules/domain/loyalty"
 import { orderEntities, orderMigrations } from "@modules/domain/order"
+import type { OrderExpiryTicksOptions } from "@modules/domain/order-expiry-ticks"
 import { paymentEntities, paymentMigrations } from "@modules/domain/payment"
 import type { DatabaseConnectionConfig, DatabaseConnectionOptions } from "@modules/platform/database"
 import { BILLING_CONNECTION, IDENTITY_CONNECTION, ORDER_CONNECTION } from "@modules/platform/database"
@@ -19,6 +20,8 @@ import type { CliEnv } from "./cli.env"
 export interface CliAppOptions {
     /** The connections the migrate command migrates, in the order it runs them. */
     readonly connections: ReadonlyArray<DatabaseConnectionOptions>
+    /** The manual expiry tick uses the scheduler's payment window. */
+    readonly orderExpiry: OrderExpiryTicksOptions
 }
 
 /** The identity database: the accounts of the identity service. */
@@ -69,6 +72,7 @@ export const billingConnectionOf = (billing: DatabaseConnectionConfig): Database
 
 /** Binds each parsed database configuration to its owners' entities and migrations. */
 export const createCliAppOptions = (databases: CliEnv): CliAppOptions => ({
+    orderExpiry: databases.orderExpiry,
     connections: [
         identityConnectionOf(databases.identity),
         orderConnectionOf(databases.order),

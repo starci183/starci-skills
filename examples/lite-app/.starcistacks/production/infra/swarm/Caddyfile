@@ -1,9 +1,15 @@
-{$SITE_HOST} {
-    @api path /graphql /graphql/* /health/* /api/*
-    handle @api {
-        reverse_proxy api:3000
+lite-app.example {
+    reverse_proxy web:3000 {
+        health_uri /health/live
+        health_interval 10s
+        health_timeout 3s
     }
-    handle {
-        reverse_proxy web:3000
+}
+
+api.lite-app.example {
+    reverse_proxy api:8787 {
+        health_uri /health/ready
+        health_interval 10s
+        health_timeout 3s
     }
 }

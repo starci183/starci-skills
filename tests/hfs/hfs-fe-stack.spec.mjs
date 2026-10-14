@@ -1,3 +1,5 @@
+// proves: FE_STACK_UNLISTED@lite FE_STACK_UNLISTED@full
+// proves: FE_STACK_CORE_MISSING@lite FE_STACK_CORE_MISSING@full
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

@@ -3,12 +3,40 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadSlotManifest, RUNTIME_MANIFEST_FILE, ruleParams } from '../../scripts/hfs/slots.mjs';
+import { loadRuleCatalog, loadSlotManifest, RUNTIME_MANIFEST_FILE, ruleParams } from '../../scripts/hfs/slots.mjs';
 import { BUNDLES, CATALOG, driftOfRuntime, syncRuntime } from '../../scripts/hfs/sync-runtime.mjs';
+import { readWhy } from '../../scripts/hfs/check.mjs';
+import { parseYaml } from '../../engine/yaml.mjs';
 import { catalogFiles } from '../../scripts/lib/i18n.mjs';
 import { releaseSyncRuntime } from '../../scripts/supervisor/release-sync-runtime.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
+
+function runtimeInputs(t, label) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), label));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const inputs = new Set([CATALOG, ...catalogFiles(ROOT), ...Object.values(BUNDLES).flatMap(bundle => bundle.files)]);
+  for (const file of inputs) {
+    const target = path.join(root, file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(path.join(ROOT, file), target);
+  }
+  return root;
+}
+
+test('the generated failure-code slice loads every owned rule code while pruning unrelated runtime codes', (t) => {
+  const root = runtimeInputs(t, 'starci-runtime-sync-catalog-');
+  fs.appendFileSync(path.join(root, CATALOG), '\nUNUSED_RUNTIME_FIXTURE:\n  title: Unrelated runtime code\n');
+  syncRuntime(root);
+  const bundle = path.join(root, 'packages/hfs/runtime');
+  const owned = loadRuleCatalog({ root: bundle }).rules.flatMap(rule => rule.failureCodes);
+  const labels = readWhy(bundle, owned);
+  assert.equal(typeof labels.DB_BE_ONLY_ACCESS.whyVi, 'string', 'async database rules retain their catalog explanations');
+  for (const code of owned) assert.equal(typeof labels[code].whyVi, 'string', code);
+  const slice = parseYaml(fs.readFileSync(path.join(bundle, CATALOG), 'utf8'));
+  assert.equal(slice.UNUSED_RUNTIME_FIXTURE, undefined, 'unowned, unreported codes remain outside the package');
+  assert.deepEqual(driftOfRuntime(root), []);
+});
 
 test('the real generator and public check detect absent/stale UI output without rewriting it', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-runtime-sync-drift-'));

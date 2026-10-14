@@ -1,74 +1,109 @@
 # lite-app production
 
-Single-manager Docker Swarm on one Ubuntu VPS; the Supabase Cloud project is the external datastore. This directory
-is the environment's custody: `environment.json` describes it, `.starcistacks/production/infra/swarm/stack.yaml` is the deployable stack,
-`runtime/env/KEYS.md` is the environment key roster, and `secrets/*.enc` are the sealed secret members (sops, the
-project age recipient in `../../.sops.yaml`).
+Single-manager Docker Swarm on one Ubuntu VPS; the Supabase Cloud project is the external datastore.
+`environment.json` describes it, `infra/swarm/stack.yaml` is the declared stack, `infra/swarm/Caddyfile`
+routes both public hosts, and `runtime/env/KEYS.md` lists the app's environment keys. Caddy is the one
+declared ingress and the only component publishing ports, using Swarm ingress mode on 80 and 443.
 
-The application image references contain illustrative all-zero digests. They identify no published image and must
-be replaced in the declaration and stack source by verified release digests before deployment.
-The public runtime example tracks only `secrets/.gitkeep`, with no secret material or ciphertext. After copying the
-example into a product repository, the owner creates the sealed members there before deploying. The external
-Swarm secret references and `runtime/env/KEYS.md` declare the required keys without storing their values here.
+Application image digests are illustrative all-zero placeholders and identify no published release.
+The tracked `secrets/*.enc` files are explicitly marked structural SOPS envelope examples: their
+ciphertext and MAC stand-ins cannot be decrypted and contain no usable credential. They exercise
+the custody shape only. Replace them with actual owner-sealed members before deployment; keep the
+age identity only in the owner's untracked `.claude/secret.env` as `SOPS_AGE_KEY`.
+
+Public release and recovery records under `infra/swarm/release/` and `infra/swarm/recovery/` explicitly state pending owner evidence.
+Neither those records nor the tracked stack claim a completed deployment, accepted release or restore.
 
 ## Owner actions (declared, never automated)
 
-1. DNS at the registrar: A records for `lite-app.example` and `api.lite-app.example` → the VPS. Receipt: `nslookup`.
-2. `docker swarm init` on the VPS once (the manager constraint in the stack file assumes it).
+1. Replace reserved example hosts and Supabase endpoints with the product's endpoints. At the registrar,
+   point A records for both hosts at the VPS; retain provider receipts and DNS verification.
+2. Run `docker swarm init` on the VPS once and label the stateful manager `lite-app=production`.
 3. Keep the age identity backed up outside the repository; the VPS never holds it.
-4. Create the Supabase Cloud project, run `supabase db push` for the migrations under `supabase/migrations/`, and set
-   the `app_be` role password.
-5. Label the stateful manager `lite-app=production`, create the external `lite-app-production-acme` and
-   `lite-app-production-n8n-data` volumes, and record their off-host encrypted backup destination and retention.
-6. Build and publish the API and web release images by digest; the web build receives the public keys from the
-   environment roster. Replace the reserved example hosts and Supabase URL with owner-provisioned endpoints.
+4. Create the Supabase Cloud project, push the tracked migrations and set the least-privilege `app_be`
+   role password. The CLI and API use the same declared primary connection.
+5. Create external `lite-app-production-caddy-data`, `lite-app-production-caddy-config` and
+   `lite-app-production-n8n-data` volumes on the labelled manager. Caddy persists certificate custody in
+   its data volume; n8n persists its SQLite database in its own volume.
+6. Build and publish the API and web images by digest. Update the declaration, stack and
+   `infra/swarm/release/images.lock.json` with verified digests. Web public configuration is supplied
+   at build time. Preserve Caddy and n8n's declared digest pins.
+7. Record DNS and Caddy TLS issuance/persistence receipts in the declaration. Complete the encrypted
+   off-host backup and isolated restore verification for Supabase, Caddy and n8n before production use.
 
 ## Deploy
 
+From the product repository root, replace every structural sealed example using the secret command.
+Supply each value through stdin; never materialize or track plaintext files.
+First configure `.sops.yaml` with the intended public recipient whose matching identity is held in
+host custody. In the copied product, remove only the three members marked STRUCTURAL EXAMPLE ONLY
+(`.starcistacks/production/secrets/primary-db-url.enc`, `.starcistacks/production/secrets/supabase-service-role-key.enc`,
+`.starcistacks/production/secrets/calendar-webhook-secret.enc`) before the
+first `secret set`: updating an existing member would try to decrypt its unusable stand-in. The
+commands then create genuine sealed members. Retain genuine existing members during later rotation.
+
 ```sh
-# From the product repository root, seal each key supplied on stdin without a plaintext file.
-npx starci app secret set production api PRIMARY_DB_URL
-npx starci app secret set production api SUPABASE_SERVICE_ROLE_KEY
-npx starci app secret set production api CALENDAR_WEBHOOK_SECRET
+npx starci app secret set production primary-db-url PRIMARY_DB_URL
+npx starci app secret set production supabase-service-role-key SUPABASE_SERVICE_ROLE_KEY
+npx starci app secret set production calendar-webhook-secret CALENDAR_WEBHOOK_SECRET
 
 cd .starcistacks/production
 
-# Create one external secret per key of the member (the deploy decrypts in memory only).
-docker secret create lite-app-PRIMARY_DB_URL-v1 -
-docker secret create lite-app-SUPABASE_SERVICE_ROLE_KEY-v1 -
-docker secret create lite-app-CALENDAR_WEBHOOK_SECRET-v1 -
+# Pipe each decrypted value in memory into the matching immutable external secret.
+docker secret create lite-app-primary-db-url-v1 -
+docker secret create lite-app-supabase-service-role-key-v1 -
+docker secret create lite-app-calendar-webhook-secret-v1 -
 
-# Create the immutable routes config and deploy.
-docker config create lite-app-routes-c1 infra/swarm/edge/routes.yml
-# Replace illustrative application digests and export the public operator contact from the deployment roster.
+# Review the model after replacing illustrative application digests and provisioning volumes.
+docker stack config -c infra/swarm/stack.yaml
 docker stack deploy --with-registry-auth -c infra/swarm/stack.yaml lite-app
 ```
 
-Rotation seals a new value, creates a new versioned secret name, updates the grant and removes the old name after
-convergence.
+Rotation seals a new value, creates a new immutable secret version, updates `runtimeName`, `version`
+and the rendered secret name together, and removes the old engine secret after convergence.
 
-## Health gates
+## Health gates and scheduled work
 
-The Swarm healthcheck of every service is liveness only: process-local, dependency-free (`/health/live`), so a
-Supabase outage never restarts the api. Readiness (`/health/ready`: the primary database and the job ledger answer)
-gates traffic at the ingress in `.starcistacks/production/infra/swarm/edge/routes.yml`; a not-ready task leaves the load balancer and is never killed for
-it.
+API and web Swarm healthchecks probe process-local `/health/live`; a Supabase outage does not kill
+the API. Caddy probes API `/health/ready` and removes a not-ready upstream from traffic without
+restarting its task. Its own healthcheck checks the local Caddy configuration endpoint.
+
+The manifest job `booking_reminder_tick` matches the migration-owned pg_cron cadence `*/15 * * * *`.
+Each tick only enqueues the booking-reminder message; the `send-reminder` job owns the catch-up scan.
+The same work can be dispatched once from the product root with its declared app CLI command:
+
+```sh
+npm run cli -- booking-reminder tick
+```
+
+The command uses the existing app-owned queue door and least-privilege primary connection; it starts
+no recurring scheduler. Do not install a host scheduler.
 
 ## Release and recovery
 
-| Command      | Operation                                                                                                                                              |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| prepare      | Complete the owner actions, replace illustrative image digests, provision external secrets and configs, and export the public deployment inputs.       |
-| doctor       | From this directory, run `docker stack config -c infra/swarm/stack.yaml` and confirm the external secrets, config and volumes on the labelled manager. |
-| up           | Run the deploy command above after reviewing the rendered model and release digests.                                                                   |
-| status       | Run `docker stack services lite-app` and retain the convergence result.                                                                                |
-| logs         | Run `docker service logs lite-app_api`; receipts contain no secret values.                                                                             |
-| down         | On the owner's removal decision, run `docker stack rm lite-app`; external volumes remain in custody.                                                   |
-| verification | Confirm TLS, both health probes, a signed-in GraphQL request, and the worker's queued-job completion.                                                  |
+Retain the reviewed model, images lock and health receipts under `/srv/lite-app/releases/<digest>`.
+After successful TLS, API readiness/liveness, web liveness, signed-in GraphQL and queued-job completion,
+record the immutable release in `infra/swarm/release/current.json`. Retain the previous accepted
+release in `.starcistacks/production/infra/swarm/release/previous.json` before promotion so it remains available for rollback. The initial pointers
+truthfully contain no accepted release. Database changes follow an expand/contract sequence.
 
-Store each verified rendered model and image roster under `/srv/lite-app/releases/<digest>`. Promote the current
-pointer after verification and retain the previous release for rollback. Database changes follow an expand/contract
-sequence. Supabase provider backups cover the external database; the owner backs up the ACME and n8n volumes with
-encryption to an off-host target. Record the retention policy and complete a restore into isolated infrastructure
-before first production use. DNS, TLS, backup destination and restore receipts are pending owner evidence; this
-example does not claim a completed deployment or restore.
+The declaration assigns each stateful component and managed backing exactly one backup policy:
+Supabase provider backups plus encrypted exports, both Caddy volumes, and n8n's SQLite volume are
+retained daily for 30 days in operator-owned off-host custody. Before first production use, restore
+each into isolated infrastructure and replace `infra/swarm/recovery/<component>.json` with a
+timestamp, backup hash, isolated destination and verification receipt. The example records are pending
+plans, never receipts for an executed restore.
+
+For convergence run `docker stack services lite-app`; for logs run `docker service logs lite-app_api`
+and retain only public receipts. Remove the stack only on the owner's removal decision with
+`docker stack rm lite-app`; external volumes and recovery custody remain.
+
+| Command | Operation |
+| --- | --- |
+| prepare | Complete the owner actions, replace structural secret members and illustrative image digests, then provision external secrets and volumes. |
+| doctor | Run `docker stack config -c infra/swarm/stack.yaml` and confirm the declared secrets, config and volumes on the labelled manager. |
+| up | Run the deploy command after reviewing the rendered model and verified image roster. |
+| status | Run `docker stack services lite-app` and retain the convergence result. |
+| logs | Run `docker service logs lite-app_api`; retain public receipts without secret values. |
+| down | On the owner's removal decision, run `docker stack rm lite-app`; external volumes remain in custody. |
+| verification | Confirm both health probes, TLS, signed-in GraphQL and queued-job completion before promotion. |

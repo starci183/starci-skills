@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { commandsModules } from "./compose/commands"
 import { databaseModules } from "./compose/database"
+import { domainModules } from "./compose/domain"
 import { platformModules } from "./compose/platform"
 import type { CliAppOptions } from "./cli.options"
 
@@ -18,6 +19,7 @@ export class AppModule {
             imports: [
                 ...platformModules(),
                 ...databaseModules(options),
+                ...domainModules(options),
                 ...commandsModules(),
             ],
         }

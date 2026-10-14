@@ -1,0 +1,6 @@
+schema: starci/release-pointer@1
+environment: dev
+status: no-previous-release
+release: null
+verification: null
+# Before moving current, retain the last accepted release here for rollback.

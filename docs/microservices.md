@@ -6,23 +6,23 @@ policy the `starci app check` rules R163 to R168 enforce and the way the referen
 
 The code requirements apply equally to lite and full. The database requirements below apply when the product declares Supabase.
 
-- R254 `DB_BE_ONLY_ACCESS`: Supabase data goes through the back end; browser grants and policies require declared exceptions, with anonymous reads limited to `_public_read` policies. `DB_REALTIME_UNLISTED` refuses realtime publication membership without a declared direct-access exception.
-- R255 `DB_APP_ROLE`: use one least-privilege application role without superuser, RLS bypass or broad grants. `DB_FORCE_RLS_DEFAULT` requires forced RLS on its tables unless a reasoned exemption is declared.
-- R256 `DB_POLICY_HARDENING`: preserve the existing RLS obligation. `DB_POLICY_TAUTOLOGY` refuses policies without a meaningful principal boundary; `DB_VIEW_UNSAFE` requires exposed views to preserve caller access or revoke browser access; `DB_DEFINER_REVOKE` requires exposed definers to revoke authenticated execution; `DB_STORAGE_PREFIX` scopes private storage policies to a principal's ownership prefix.
-- R257 `DB_BASELINE_SHAPE`: retiring migrations requires exactly one marked active baseline in the same diff. `DB_ARCHIVE_MUTATED` refuses changed archive history or a new archive-only migration.
-- R258 `DB_QUEUE_CRON`: `DB_PGMQ_DECLARED` requires queue constants and migration-created pgmq queues to agree; `DB_CRON_OWNED` requires each uniquely named pg_cron tick to have one owner and only enqueue work.
-- R259 `DB_CONFIG_EXT`: `DB_EXTENSION_ALLOWED` enforces the extension allowlist; `DB_API_EXPOSED` closes undeclared API schema access; `DB_MIGRATION_DESTRUCTIVE` confines destructive DDL to contract migrations without live references; `HFS_SEED_PII` refuses real personal email or phone literals in seeds; `DB_VAULT_WRITE` refuses SQL vault writes and role passwords. R216 continues to validate database and auth configuration and seed paths.
+- <a id="r254"></a>R254 `DB_BE_ONLY_ACCESS`: Supabase data goes through the back end; browser grants and policies require declared exceptions, with anonymous reads limited to `_public_read` policies. `DB_REALTIME_UNLISTED` refuses realtime publication membership without a declared direct-access exception.
+- <a id="r255"></a>R255 `DB_APP_ROLE`: use one least-privilege application role without superuser, RLS bypass or broad grants. `DB_FORCE_RLS_DEFAULT` requires forced RLS on its tables unless a reasoned exemption is declared.
+- <a id="r256"></a>R256 `DB_POLICY_HARDENING`: preserve the existing RLS obligation. `DB_POLICY_TAUTOLOGY` refuses policies without a meaningful principal boundary; `DB_VIEW_UNSAFE` requires exposed views to preserve caller access or revoke browser access; `DB_DEFINER_REVOKE` requires exposed definers to revoke authenticated execution; `DB_STORAGE_PREFIX` scopes private storage policies to a principal's ownership prefix.
+- <a id="r257"></a>R257 `DB_BASELINE_SHAPE`: retiring migrations requires exactly one marked active baseline in the same diff. `DB_ARCHIVE_MUTATED` refuses changed archive history or a new archive-only migration.
+- <a id="r258"></a>R258 `DB_QUEUE_CRON`: `DB_PGMQ_DECLARED` requires queue constants and migration-created pgmq queues to agree; `DB_CRON_OWNED` requires each uniquely named pg_cron tick to have one owner and only enqueue work.
+- <a id="r259"></a>R259 `DB_CONFIG_EXT`: `DB_EXTENSION_ALLOWED` enforces the extension allowlist; `DB_API_EXPOSED` closes undeclared API schema access; `DB_MIGRATION_DESTRUCTIVE` confines destructive DDL to contract migrations without live references; `HFS_SEED_PII` refuses real personal email or phone literals in seeds; `DB_VAULT_WRITE` refuses SQL vault writes and role passwords. R216 continues to validate database and auth configuration and seed paths.
 - <a id="r260"></a>R260 `BE_JWT_ALG_PINNED`: JWT verification pins literal asymmetric algorithms, derives the issuer from configuration and rejects a Supabase principal whose role is not `authenticated`.
 - <a id="r261"></a>R261 `BE_EDGE_HARDENING`: `BE_CORS_ALLOWLIST` requires exact browser origins; `BE_SECURITY_HEADERS` requires platform response hardening and disabled `x-powered-by`; `BE_TRUST_PROXY` requires a declared nonnegative proxy hop count.
 - <a id="r262"></a>R262 `BE_HEALTH_READY`: `BE_HEALTH_SIGNALS` requires distinct live and ready probes; `BE_READY_REAL` requires readiness to check a dependency with a bounded failure timeout; `HFS_DOCKER_HEALTHCHECK_FAKE` refuses an always-successful health command or a nonexistent live route.
 - <a id="r263"></a>R263 `BE_WEBHOOK_SCOPE`: signed-webhook reasons belong to verified webhook doors or declared verifiers. `BE_WEBHOOK_INBOX_KEY` requires intake to deduplicate by the stable delivery identifier, commit its inbox receipt and typed outbox event, and hand processing to a reactor or job after commit.
 - <a id="r264"></a>R264 `HFS_FEATURE_LOGIC_ROLE`: every feature-tier support role stays thin; branching and business logic belong in capability modules.
 - <a id="r265"></a>R265 `BE_COMPOSITION_UNTYPED`: typed module, provider, queue and scheduler collections live in `compose/<area>.ts`, never in `main.ts`, environment or options files; ownership follows resolved types rather than names.
-- R278 `BE_REST_DOOR_EVIDENCE`: each REST route carries evidence for an allowed exception to GraphQL in both editions. `BE_REST_ROUTE_UNDECLARED` refuses a public REST operation absent from the typed operations table.
-- R279 `BE_THIRD_PARTY_OWNER`: vendor SDK ownership derives from package dependencies; SDK calls stay in their owning integration, with declared pure-library exceptions.
-- R281 `BE_SPEC_FORM_ALL_ROLES`: every logic-role unit spec gets its subject from a providers-only TestingModule with doubles and asserts exact outcomes, without constructing the subject or mocking modules.
-- R289 `BE_APP_ENV_REQUIRED`: each back-end app owns a typed `<app>.env.ts` reader and `main.ts` delegates environment reads to it. `BE_APP_MODULE_LIST_INLINE` requires the app module to spread its typed composition groups rather than declare an inline module list.
-- R290 `BE_PUBLIC_REASON_CLOSED`: in lite and full, `PublicReason` has exactly `Health`, `AuthHandshake`, `SignedWebhook` and `CatalogRead`. An API-key or tool-token route authenticates through its own guard; it cannot add a public reason to bypass authentication.
+- <a id="r278"></a> R278 `BE_REST_DOOR_EVIDENCE`: each REST route carries evidence for an allowed exception to GraphQL in both editions. `BE_REST_ROUTE_UNDECLARED` refuses a public REST operation absent from the typed operations table.
+- <a id="r279"></a> R279 `BE_THIRD_PARTY_OWNER`: vendor SDK ownership derives from package dependencies; SDK calls stay in their owning integration, with declared pure-library exceptions.
+- <a id="r281"></a> R281 `BE_SPEC_FORM_ALL_ROLES`: every logic-role unit spec gets its subject from a providers-only TestingModule with doubles and asserts exact outcomes, without constructing the subject or mocking modules.
+- <a id="r289"></a> R289 `BE_APP_ENV_REQUIRED`: each back-end app owns a typed `<app>.env.ts` reader and `main.ts` delegates environment reads to it. `BE_APP_MODULE_LIST_INLINE` requires the app module to spread its typed composition groups rather than declare an inline module list.
+- <a id="r290"></a> R290 `BE_PUBLIC_REASON_CLOSED`: in lite and full, `PublicReason` has exactly `Health`, `AuthHandshake`, `SignedWebhook` and `CatalogRead`. An API-key or tool-token route authenticates through its own guard; it cannot add a public reason to bypass authentication.
 
 ## One place for a service
 
@@ -96,6 +96,8 @@ command reads it.
 
 ## Sagas and compensation
 
+<a id="r173"></a>
+
 A saga is a chain of services reacting to each other's events; the canon has no in-process event (R87). A product declares the
 pattern (`"patterns": ["saga"]` in `hfs.json` `sides.be`), which enables the saga slots; a saga folder in a product that has not
 declared it is `HFS_SLOT_NOT_ENABLED`. The saga is a feature of the saga kind (`knowledge/patterns/be/saga.yaml` lists every path with its slot):
@@ -125,6 +127,8 @@ cancel the order and release its stock, and `billing.invoice-issued` completes t
 `order/invoice-rejected` also cuts the order database while the rejection is delivered and proves the compensation resumes on the retry.
 
 ## Specs
+
+<a id="r167"></a>
 
 In full, every consumed event is named by an e2e spec, a file `be/src/tests/e2e/<area>/*.e2e-spec.ts` that boots the real apps through
 `useTestWorld`, publishes the event, reads the persisted effect back and redelivers it (`BE_ASYNC_SPEC_MISSING`, R167). The spec of a

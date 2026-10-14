@@ -143,7 +143,7 @@ for (const edition of ['lite', 'full']) {
     has(findings({ [CONFIG]: enabled.replace('["./seed.sql"]', '"./seed.sql"') }, edition), 'DB_CONFIG_POLICY');
   });
 
-  test(`${edition}: HFS_SEED_PII reports email and phone literals without revealing them`, () => {
+  test(`${edition}: HFS_SEED_PII rejects personal email and phone literals and accepts synthetic seed identities`, () => {
     for (const value of ['demo@real.invalid', '+1 (202) 555-0199', '2025550199']) {
       const list = findings({ 'supabase/seed.sql': `insert into fixtures values ('${value}');` }, edition);
       has(list, 'HFS_SEED_PII');
@@ -175,7 +175,7 @@ for (const edition of ['lite', 'full']) {
     'truncate table public.items;',
   ];
   for (const sql of destructiveCases) {
-    test(`${edition}: DB_MIGRATION_DESTRUCTIVE requires a contract file for ${sql}`, () => {
+    test(`${edition}: DB_MIGRATION_DESTRUCTIVE rejects ${sql} in expansion migrations and accepts an unreferenced contract migration`, () => {
       has(findings({ [MIGRATION]: sql }, edition), 'DB_MIGRATION_DESTRUCTIVE');
       assert.deepEqual(only(findings({ [CONTRACT]: sql }, edition), 'DB_MIGRATION_DESTRUCTIVE'), []);
     });

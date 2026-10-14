@@ -1,0 +1,7 @@
+{
+  "component": "supabase",
+  "status": "pending-owner-restore-proof",
+  "executedAt": null,
+  "plan": "Restore the encrypted provider backup into an isolated Supabase project and verify migrations, RLS and booking jobs.",
+  "ownerAction": "Replace this example record with the backup hash, isolated destination, timestamp and verification receipt before production."
+}

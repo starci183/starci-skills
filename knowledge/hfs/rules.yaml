@@ -1151,6 +1151,15 @@ rules:
       - {kind: hfs, id: peer-integrations, at: scripts/hfs/rules/peer-integrations.mjs}
   - id: R112
     code: "BE_INTEGRATION_SPEC_MISSING"
+    editionWhy: "ruling:R212/case-3 keeps lite outside the full test world; ruling:lite-production-swarm amends hosting and ruling:lite-contract-specs permits contract specs while preserving that e2e boundary. R284 owns lite's integration proof lane; this rule judges provider module, error-code and outage proofs through the full world."
+    docs: [docs/quality-bar.md#r112]
+    templateNa: "Provider-specific module registration, refusal mapping and outage scenarios must be authored for each integration; the app scaffold has no provider-specific integration proof to generate."
+    proves:
+      - {path: tests/hfs/hfs-repo-scripts-rules.spec.mjs, edition: full}
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-repo-scripts-rules.spec.mjs, edition: full}
+    witness:
+      - {path: tests/hfs/hfs-repo-scripts-rules.spec.mjs, edition: full}
     law: "Every integration of a back end (`src/modules/integrations/<provider>/` holding `<provider>.config.ts`) has at least one `src/tests/integration/<provider>/*.integration-spec.ts` that, read as a syntax tree, calls `useTestWorld({ modules })` with a factory registering the integration's own module (`<Provider>Module.register`, imported from the integration folder; an inline array, a local const or an exported const of another file), references the ErrorCode enum the integration exports, and drives an outage through the world (`world.infra.<service>.cut|latency|during|connection`, `world.fake.<name>.failNext`, `world.apps.<peer>.during`, `world.interruptDatabase`); the finding sits on the integration folder."
     kinds: [check]
     gates: [land, ci]
@@ -1487,6 +1496,15 @@ rules:
       - {kind: hfs, id: services-event-contract, at: scripts/hfs/rules/services.mjs}
   - id: R167
     code: "BE_ASYNC_SPEC_MISSING"
+    editionWhy: "ruling:lite-contract-specs preserves the full-only e2e boundary. R284 owns lite's integration proof lane; this rule requires consumed-event scenarios through the full test world."
+    docs: [docs/microservices.md#r167]
+    templateNa: "Consumed-event and compensation scenarios depend on the product's event contracts and effects; the app scaffold has no product-specific asynchronous e2e scenario to generate."
+    proves:
+      - {path: tests/hfs/hfs-microservice-rules.spec.mjs, edition: full}
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-microservice-rules.spec.mjs, edition: full}
+    witness:
+      - {path: tests/hfs/hfs-microservice-rules.spec.mjs, edition: full}
     law: "Every event an app consumes (an entry of its `consumes.ts`) is named by an e2e spec, a file `be/src/tests/e2e/<area>/*.e2e-spec.ts` that boots the apps through `useTestWorld` (it publishes the event, reads the effect back and redelivers it); when the contract of the event declares `compensates: \"<event>\"` it is a saga step, and a spec naming it also names the compensated event, so the spec drives the whole flow: the step, the failure, then the compensated state."
     kinds: [check]
     gates: [land, ci]
@@ -1536,6 +1554,15 @@ rules:
       - {kind: hfs, id: saga-consumer-dedupe, at: scripts/hfs/rules/saga.mjs}
   - id: R173
     code: "BE_SAGA_E2E_MISSING"
+    editionWhy: "ruling:lite-contract-specs preserves the full-only e2e boundary. R284 owns lite's integration proof lane; this rule requires compensation fault scenarios through the full test world."
+    docs: [docs/microservices.md#r173]
+    templateNa: "Compensation events and injected-fault scenarios depend on the product's saga; the app scaffold has no product-specific compensation e2e scenario to generate."
+    proves:
+      - {path: tests/hfs/hfs-saga-rules.spec.mjs, edition: full}
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-saga-rules.spec.mjs, edition: full}
+    witness:
+      - {path: tests/hfs/hfs-saga-rules.spec.mjs, edition: full}
     law: "Every compensation path of a saga has an e2e spec (`be/src/tests/e2e/<area>/*.e2e-spec.ts` through `useTestWorld`) that names the event of the compensation and injects a failure through the world (an outage of an infra service or an app with `during`, `cut` or `latency`, a fake's `failNext`, `interruptDatabase`): the compensation is proven under a fault, not only on the happy flow."
     kinds: [check]
     gates: [land, ci]
@@ -1932,9 +1959,18 @@ rules:
   - id: R220
     code: "HFS_LITE_SECRET_CUSTODY"
     editions: [lite]
+    editionWhy: "ruling:lite-backing-services assigns Supabase backing to lite; R220 adds lite's reduced custody tree and Supabase/FE literal scan, while R06 governs plaintext secret material in both editions."
+    docs: [docs/host-secrets.md#application-secret-rules]
+    proves:
+      - {path: tests/hfs/hfs-supabase-secrets.spec.mjs, edition: lite}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/skeleton-lite/.sops.yaml, edition: lite}
+      - {path: tests/hfs/hfs-supabase-secrets.spec.mjs, edition: lite}
+    witness:
+      - {path: tests/hfs/hfs-supabase-secrets.spec.mjs, edition: lite}
     law: "A lite app holds no secret material in the tree: root `.env*`, `secrets.env`, `.secrets/` and an `.enc` file outside `.starcistacks/<env>/secrets` are forbidden, and `fe/` and `supabase/` hold no Supabase token, JWT or connection string with a password; the one custody is the sealed `.starcistacks/<env>/secrets/<slug>.enc`."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_LITE_SECRET_CUSTODY"]
     enforcers:
       - {kind: hfs, id: lite-secret-custody, at: scripts/hfs/rules/supabase-secrets.mjs}
@@ -2188,82 +2224,189 @@ rules:
     code: "RT_COVERAGE_MATRIX"
     law: "Every surface and rule has an existing enforcer, edition-specific spec proof, documentation, template, example and mutation witness in each applicable edition; edition differences cite their owner ruling, Work schemas have full example records, gate claims match their commands, superseded rulings are not cited alone and hard documentation requirements are ledgered."
     scope: runtime
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#coverage-matrix]
+    templateNa: "The runtime coverage checker judges authored catalogs and proof metadata; app scaffolds do not contain this runtime surface."
+    proves: [tests/checks/hfs-coverage.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/checks/hfs-coverage.spec.mjs, edition: lite}
+      - {path: tests/checks/hfs-coverage.spec.mjs, edition: full}
+    witness:
+      - {path: tests/checks/hfs-coverage.spec.mjs, edition: lite}
+      - {path: tests/checks/hfs-coverage.spec.mjs, edition: full}
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_COVERAGE_MATRIX", "RT_COVERAGE_NO_ENFORCER", "RT_COVERAGE_NO_SPEC", "RT_COVERAGE_NO_WITNESS", "RT_COVERAGE_NO_DOC", "RT_COVERAGE_NO_TEMPLATE", "RT_COVERAGE_NO_EXAMPLE", "RT_COVERAGE_EDITION_ASYMMETRY", "RT_COVERAGE_SCHEMA_NO_RECORD", "RT_COVERAGE_GATE_LIE", "RT_COVERAGE_SUPERSEDED_CITE", "RT_COVERAGE_SURFACE_UNMAPPED", "RT_COVERAGE_REQUIREMENT_UNLEDGERED", "RT_COVERAGE_PROOF_VACUOUS", "RT_COVERAGE_CODE_UNROUTED"]
     enforcers:
       - {kind: runtime, id: hfs-coverage, at: scripts/checks/check-hfs-coverage.mjs}
   - id: R248
     code: "ENV_REQUIRED_UNSET"
+    editions: [lite, full]
+    docs: [docs/host-secrets.md#r248]
+    proves:
+      - {path: tests/hfs/hfs-env-parity.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton-lite/apps/api/src/api.env.ts, edition: lite}
+      - {path: packages/hfs/templates/be/skeleton/apps/__app__/src/__app__.env.ts, edition: full}
+      - {path: tests/hfs/hfs-env-parity.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-env-parity.spec.mjs, editions: [lite, full]}
     law: "The environment keys a back end reads through its typed `EnvSource` (`<app>.env.ts` and the capability `*.config.ts` parse helpers, resolved by a static TypeScript walk that substitutes the literal arguments of a reader's call sites into a template key such as `${prefix}_WEBHOOK_SECRET`), the key names sealed in `.starcistacks/<env>/secrets/*.enc` and the keys the stack declares or passes (`KEYS.md`, `environment:`/`env:` entries, `runtimeSecrets`, `vars[].name`) are one set, compared by name only in both editions: a required read is sealed or declared (ENV_REQUIRED_UNSET), a sealed key is read or has a declared consumer (ENV_SEALED_UNREAD), one key lives in one member (ENV_DUPLICATE), no `NEXT_PUBLIC_*` key is sealed (ENV_PUBLIC_SEALED) and every `*.env.example` key is read (ENV_EXAMPLE_DRIFT)."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["ENV_REQUIRED_UNSET", "ENV_SEALED_UNREAD", "ENV_DUPLICATE", "ENV_PUBLIC_SEALED", "ENV_EXAMPLE_DRIFT"]
     enforcers:
       - {kind: hfs, id: env-parity, at: scripts/hfs/rules/env-parity.mjs}
   - id: R249
     code: "ENV_VALUE_SHAPE"
+    editions: [lite, full]
+    docs: [docs/host-secrets.md#r249]
+    proves:
+      - {path: tests/hfs/hfs-env-parity.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton-lite/apps/api/src/api.env.ts, edition: lite}
+      - {path: packages/hfs/templates/be/skeleton/apps/__app__/src/__app__.env.ts, edition: full}
+      - {path: tests/hfs/hfs-env-parity.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-env-parity.spec.mjs, editions: [lite, full]}
     law: "A stored environment value parses as the type its `EnvSource` reader declares (an integer, `true`/`false`, an absolute URL, a duration `250`/`30s`/`5m`/`2h`, a member of the declared enum, a nonempty string or secret): `starci app secret verify <env>` decrypts every member in memory and reports each key and its violated shape, never a value, and a concrete (non-placeholder) value of a `*.env.example` parses the same way."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["ENV_VALUE_SHAPE"]
     enforcers:
       - {kind: hfs, id: env-value-shape, at: scripts/hfs/rules/env-value-shape.mjs}
 
   - id: R250
     code: "HFS_HOST_CRON"
+    editions: [lite, full]
+    docs:
+      - {path: docs/application-stacks.md#r250-deploy-scan, editions: [lite, full]}
+    proves:
+      - {path: tests/hfs/hfs-deploy-scan.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/ci-workflows-lite/github/workflows/ci.yml, edition: lite}
+      - {path: packages/hfs/templates/app/ci-workflows/github/workflows/ci.yml, edition: full}
+      - {path: tests/hfs/hfs-deploy-scan.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-deploy-scan.spec.mjs, editions: [lite, full]}
     law: "In lite and full apps, scheduled work belongs to the back-end scheduler, pgmq/pg_cron or a declared replicated-job. Deployment files, scripts, workflows, compose files and Dockerfiles install no host crontab, cron.d entry, systemd timer, @reboot job or at job; a workflow does not schedule app work. Docker compose up, down and pull run only against an explicitly dev environment. Deploy shell scripts delegate to docker, starci or the app CLI, and contain no node -e, psql, inline SQL or downloaded shell logic."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_HOST_CRON", "HFS_DEPLOY_NO_LOGIC", "HFS_DEPLOY_COMPOSE_ON_VPS", "HFS_DEPLOY_SCHEDULER"]
     enforcers:
       - {kind: hfs, id: deploy-scan, at: scripts/hfs/rules/deploy-scan.mjs}
   - id: R251
     code: "HFS_DEPLOY_WORKFLOW"
+    editions: [lite, full]
+    docs:
+      - {path: docs/application-stacks.md#r251-deploy-workflow, editions: [lite, full]}
+    proves:
+      - {path: tests/hfs/hfs-deploy-workflow.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/ci-workflows-lite/github/workflows/db-deploy.yml, edition: lite}
+      - {path: packages/hfs/templates/app/ci-workflows/github/workflows/ci.yml, edition: full}
+      - {path: tests/hfs/hfs-deploy-workflow.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-deploy-workflow.spec.mjs, editions: [lite, full]}
     law: "In lite and full apps, deployment jobs declare a protected environment, explicit permissions and concurrency, materialize sealed secrets through SOPS_AGE_KEY or starci app secret materialize, and reference only the age key and transport SSH key/known_hosts secrets. They never embed a dotenv blob or write a dotenv file. Every remote workflow action uses a 40-hex commit SHA; installed tools are checksum or digest verified, or supplied by a pinned action. App workflows start only on release tags [v*] or workflow_dispatch, never on a branch push."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_DEPLOY_WORKFLOW", "HFS_WORKFLOW_PIN", "HFS_CI_TOOL_INSTALL", "HFS_APP_WORKFLOW_TRIGGER"]
     enforcers:
       - {kind: hfs, id: deploy-workflow, at: scripts/hfs/rules/deploy-workflow.mjs}
   - id: R252
     code: "HFS_SCRIPT_PLAINTEXT_LOAD"
+    editions: [lite, full]
+    docs:
+      - {path: docs/application-stacks.md#r252-script-hygiene, editions: [lite, full]}
+    proves:
+      - {path: tests/hfs/hfs-script-hygiene.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/ci-workflows-lite/github/workflows/db-deploy.yml, edition: lite}
+      - {path: packages/hfs/templates/app/ci-workflows/github/workflows/ci.yml, edition: full}
+      - {path: tests/hfs/hfs-script-hygiene.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-script-hygiene.spec.mjs, editions: [lite, full]}
     law: "In lite and full apps, executable scripts and workflow commands never load plaintext secrets.env, secret.env, .env secret files or a home-directory credential file, enable shell xtrace or request --reveal. Service-role references belong only to the back-end Supabase integration; deployment scripts and source outside that integration never use the service role. Scanners inspect source references and report paths without reading secret files or printing their values."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_SCRIPT_PLAINTEXT_LOAD", "HFS_SCRIPT_XTRACE", "HFS_SERVICE_ROLE_SCOPE"]
     enforcers:
       - {kind: hfs, id: script-hygiene, at: scripts/hfs/rules/script-hygiene.mjs}
   - id: R253
     code: "HFS_AGE_KEY_CUSTODY"
+    editions: [lite, full]
+    docs: [docs/host-secrets.md#application-secret-rules]
+    proves:
+      - {path: tests/hfs/hfs-secret-custody.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton/src/modules/platform/config/env-source.config.ts, editions: [lite, full]}
+      - {path: packages/hfs/templates/be/skeleton/src/modules/platform/http-security/origin.guard.ts, editions: [lite, full]}
+      - {path: packages/hfs/templates/be/skeleton/src/modules/platform/http-security/webhook-signature.service.ts, editions: [lite, full]}
+      - {path: tests/hfs/hfs-secret-custody.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-secret-custody.spec.mjs, editions: [lite, full]}
     law: "The age identity that seals and opens an app's `.starcistacks/<env>/secrets/*.enc` is host-local custody only: it lives in the untracked `.claude/secret.env` (as `SOPS_AGE_KEY`, which wins over the legacy `keys.txt` and is handed to sops through the `SOPS_AGE_KEY` child environment, never as an argument and never printed) or in the sops config dir's `keys.txt`; a tracked `.claude/secret.env`, `keys.txt` or `*.agekey` is the identity committed. The three files the secret custody depends on - `src/modules/platform/config/env-source.config.ts`, `src/modules/platform/http-security/origin.guard.ts` and `src/modules/platform/http-security/webhook-signature.service.ts` - are hash-sensitive canon, not files to edit: their bytes equal the `be/skeleton` template they were scaffolded from, judged by sha256."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_AGE_KEY_CUSTODY", "HFS_CANON_COPY_DRIFT"]
     enforcers:
       - {kind: hfs, id: secret-age-key-custody, at: scripts/hfs/rules/secrets.mjs}
       - {kind: hfs, id: canon-copy-drift, at: scripts/hfs/rules/canon-copy-drift.mjs}
   - id: R254
     code: "DB_BE_ONLY_ACCESS"
+    editions: [lite]
+    editionWhy: "owner:lite-backing-services makes Supabase lite's database backing; these SQL access requirements apply to that backing."
+    docs: [docs/microservices.md#r254]
+    templateNa: "Browser grants, policies and publication membership belong to product-authored Supabase migrations, rather than a scaffolded SQL surface."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-database-access.spec.mjs, edition: lite, codes: [DB_BE_ONLY_ACCESS, DB_REALTIME_UNLISTED]}
+    proves:
+      - {path: tests/hfs/hfs-database-access.spec.mjs, edition: lite, codes: [DB_BE_ONLY_ACCESS, DB_REALTIME_UNLISTED]}
+    witness:
+      - {path: tests/hfs/hfs-database-access.spec.mjs, edition: lite, codes: [DB_BE_ONLY_ACCESS, DB_REALTIME_UNLISTED]}
     law: "In lite and full, browser data access stays closed on exposed schemas: authenticated receives neither table or sequence privileges nor data policies, and anon reads only through a select policy named *_public_read. A table listed in hfs.json supabase.directAccess is an explicit exception. A table joins supabase_realtime only when that direct access is declared. The front end uses Supabase for Auth and reaches product data through the back end."
     kinds: [check]
-    gates: [pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["DB_BE_ONLY_ACCESS", "DB_REALTIME_UNLISTED"]
     enforcers:
       - {kind: hfs, id: db-be-only-access, at: scripts/hfs/rules/database-access.mjs}
   - id: R255
     code: "DB_APP_ROLE"
+    editions: [lite]
+    editionWhy: "owner:lite-backing-services makes Supabase lite's database backing; application-role and forced-RLS requirements apply to that backing."
+    docs: [docs/microservices.md#r255]
+    templateNa: "Application roles and table ownership are product-authored Supabase migration content, rather than a scaffolded SQL surface."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-database-access.spec.mjs, edition: lite, codes: [DB_APP_ROLE, DB_FORCE_RLS_DEFAULT]}
+    proves:
+      - {path: tests/hfs/hfs-database-access.spec.mjs, edition: lite, codes: [DB_APP_ROLE, DB_FORCE_RLS_DEFAULT]}
+    witness:
+      - {path: tests/hfs/hfs-database-access.spec.mjs, edition: lite, codes: [DB_APP_ROLE, DB_FORCE_RLS_DEFAULT]}
     law: "The declared back-end database role (hfs.json supabase.appRole, app_be by default) has only the privileges it needs: role declarations refuse superuser and bypassrls, require noinherit and nobypassrls, and never grant all schema or table privileges. Tables owned by that role enable and force row level security by default; a forceRls exemption identifies the table and carries a nonempty reason. This applies to every edition that declares Supabase."
     kinds: [check]
-    gates: [pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["DB_APP_ROLE", "DB_FORCE_RLS_DEFAULT"]
     enforcers:
       - {kind: hfs, id: db-app-role, at: scripts/hfs/rules/database-access.mjs}
   - id: R256
     code: "DB_POLICY_TAUTOLOGY"
+    editions: [lite]
+    editionWhy: "owner:lite-backing-services makes Supabase lite's database backing; access-policy, view, definer and storage SQL requirements apply to that backing."
+    docs: [docs/microservices.md#r256]
+    templateNa: "Access policies, views, definers and storage policies belong to product-authored Supabase migrations, rather than a scaffolded SQL surface."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-database-access.spec.mjs, edition: lite, codes: [DB_POLICY_TAUTOLOGY, DB_VIEW_UNSAFE, DB_STORAGE_PREFIX]}
+      - {path: tests/hfs/hfs-database-rules.spec.mjs, edition: lite, codes: [DB_DEFINER_REVOKE]}
+    proves:
+      - {path: tests/hfs/hfs-database-access.spec.mjs, edition: lite, codes: [DB_POLICY_TAUTOLOGY, DB_VIEW_UNSAFE, DB_STORAGE_PREFIX]}
+      - {path: tests/hfs/hfs-database-rules.spec.mjs, edition: lite, codes: [DB_DEFINER_REVOKE]}
+    witness:
+      - {path: tests/hfs/hfs-database-access.spec.mjs, edition: lite, codes: [DB_POLICY_TAUTOLOGY, DB_VIEW_UNSAFE, DB_STORAGE_PREFIX]}
+      - {path: tests/hfs/hfs-database-rules.spec.mjs, edition: lite, codes: [DB_DEFINER_REVOKE]}
     law: "Exposed database objects keep their access boundaries in lite and full. Policies refuse tautological true, is-not-null and self-equality predicates; policies for browser roles prove a principal predicate. An exposed view or materialized view uses security_invoker or the migration set ends with access revoked from anon and authenticated. Disabling RLS or moving a table into an exposed schema preserves the R214 RLS obligation. A security definer declaration, including alter function, preserves R215 safety checks and the migration set ends with execute revoked from authenticated when exposed, in addition to R215's public and anon revocation. A storage.objects policy scopes an ownership prefix to the principal unless its bucket id ends _public."
     kinds: [check]
-    gates: [pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["DB_POLICY_TAUTOLOGY", "DB_VIEW_UNSAFE", "DB_DEFINER_REVOKE", "DB_STORAGE_PREFIX"]
     enforcers:
       - {kind: hfs, id: db-policy-hardening, at: scripts/hfs/rules/database-access.mjs}
@@ -2271,6 +2414,16 @@ rules:
 
   - id: R257
     code: "DB_BASELINE_SHAPE"
+    editions: [lite]
+    editionWhy: "owner:lite-backing-services makes Supabase lite's database backing; baseline and archive requirements apply to its migration history."
+    docs: [docs/microservices.md#r257]
+    templateNa: "A baseline is derived from a product's existing Supabase migration history and cannot be supplied by a scaffold template."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-database-baseline.spec.mjs, edition: lite, codes: [DB_BASELINE_SHAPE, DB_ARCHIVE_MUTATED]}
+    proves:
+      - {path: tests/hfs/hfs-database-baseline.spec.mjs, edition: lite, codes: [DB_BASELINE_SHAPE, DB_ARCHIVE_MUTATED]}
+    witness:
+      - {path: tests/hfs/hfs-database-baseline.spec.mjs, edition: lite, codes: [DB_BASELINE_SHAPE, DB_ARCHIVE_MUTATED]}
     law: "An archived migration chain has exactly one active baseline marked -- starci:baseline <archived-last-stamp>, with a later valid stamp or an explicit restamp. Archive contents are immutable against repository history; an active migration enters the archive unchanged only in the same diff that adds the replacement baseline. The app db baseline, restamp and plan verbs are read-only unless --apply is explicit."
     kinds: [check]
     gates: [settle, land, ci]
@@ -2279,6 +2432,16 @@ rules:
       - {kind: hfs, id: db-baseline-shape, at: scripts/hfs/rules/database-baseline.mjs}
   - id: R258
     code: "DB_PGMQ_DECLARED"
+    editions: [lite]
+    editionWhy: "owner:lite-backing-services makes Supabase lite's database backing; pgmq and pg_cron ownership requirements apply to that backing."
+    docs: [docs/microservices.md#r258]
+    templateNa: "Queue declarations and enqueue-only cron commands depend on product-owned work and are authored in its Supabase migrations."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-database-queues.spec.mjs, edition: lite, codes: [DB_PGMQ_DECLARED, DB_CRON_OWNED]}
+    proves:
+      - {path: tests/hfs/hfs-database-queues.spec.mjs, edition: lite, codes: [DB_PGMQ_DECLARED, DB_CRON_OWNED]}
+    witness:
+      - {path: tests/hfs/hfs-database-queues.spec.mjs, edition: lite, codes: [DB_PGMQ_DECLARED, DB_CRON_OWNED]}
     law: "DB_QUEUE_CRON: every pgmq queue constant has an active migration creating the queue and every created queue has a constant. Queue objects are granted only to the application role. A uniquely named pg_cron job belongs to a migration and only enqueues to an existing queue directly or through one enqueue-only *_tick function; it executes no business DML or HTTP request and shares no tick with an app scheduler. Removing a tick unschedules its job."
     kinds: [check]
     gates: [settle, land, ci]
@@ -2287,6 +2450,16 @@ rules:
       - {kind: hfs, id: db-queue-cron, at: scripts/hfs/rules/database-queues.mjs}
   - id: R259
     code: "DB_EXTENSION_ALLOWED"
+    editions: [lite]
+    editionWhy: "owner:lite-backing-services makes Supabase lite's database backing; database configuration, extension, migration and seed requirements apply to that backing."
+    docs: [docs/microservices.md#r259]
+    templateNa: "Extension use, contract migrations, vault operations and seed literals are product-authored Supabase content, rather than a scaffolded SQL surface."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-database-config.spec.mjs, edition: lite, codes: [DB_EXTENSION_ALLOWED, DB_API_EXPOSED, DB_MIGRATION_DESTRUCTIVE, HFS_SEED_PII, DB_VAULT_WRITE]}
+    proves:
+      - {path: tests/hfs/hfs-database-config.spec.mjs, edition: lite, codes: [DB_EXTENSION_ALLOWED, DB_API_EXPOSED, DB_MIGRATION_DESTRUCTIVE, HFS_SEED_PII, DB_VAULT_WRITE]}
+    witness:
+      - {path: tests/hfs/hfs-database-config.spec.mjs, edition: lite, codes: [DB_EXTENSION_ALLOWED, DB_API_EXPOSED, DB_MIGRATION_DESTRUCTIVE, HFS_SEED_PII, DB_VAULT_WRITE]}
     law: "DB_CONFIG_EXT: extensions belong to the database allowlist, vault writes and migration role passwords are refused, pgmq schemas are never exposed through the API, and lite API access is closed except for explicit public-read policies. R216 DB_CONFIG_POLICY also checks API schema allowlisting, existing seed paths, anonymous sign-ins, disabled edge runtime, bounded storage uploads and the database major-version pin. Destructive DDL belongs only to *_contract_* migrations whose targets are no longer referenced by back-end SQL or entities. Seeds contain no real email or phone literals."
     kinds: [check]
     gates: [settle, land, ci]
@@ -2694,41 +2867,88 @@ rules:
     code: "HFS_SECRET_PLAINTEXT_FILE"
     law: "In every edition the only custody a tracked secret may take is a sops envelope at `.starcistacks/<env>/secrets/**.enc`. A tracked plaintext secret file is refused by being: `secrets.env` or `.secret(s).env` at any depth, a non-dot `*.env` or `*.env.<profile>` holding secret keys (deploy-side dotenv included), and a plaintext member of a `secrets/` directory; a sealed `.enc` outside the one sealed home is refused too (for lite it is already `HFS_LITE_SECRET_CUSTODY`)."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_SECRET_PLAINTEXT_FILE", "HFS_SECRET_OUTSIDE_ENC"]
     enforcers:
       - {kind: hfs, id: secret-custody-only, at: scripts/hfs/rules/secret-custody-only.mjs}
+    editions: [lite, full]
+    codeEditions: {HFS_SECRET_OUTSIDE_ENC: [full]}
+    docs: [docs/host-secrets.md#r277]
+    templateNa: "Sealed secret members are owner-created through starci app secret set after custody initialization; the scaffolder does not generate committed secret material."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-secret-custody.spec.mjs, editions: [lite, full], codes: [HFS_SECRET_PLAINTEXT_FILE]}
+      - {path: tests/hfs/hfs-secret-custody.spec.mjs, editions: [full], codes: [HFS_SECRET_OUTSIDE_ENC]}
+    proves:
+      - {path: tests/hfs/hfs-secret-custody.spec.mjs, editions: [lite, full], codes: [HFS_SECRET_PLAINTEXT_FILE]}
+      - {path: tests/hfs/hfs-secret-custody.spec.mjs, editions: [full], codes: [HFS_SECRET_OUTSIDE_ENC]}
+    witness:
+      - {path: tests/hfs/hfs-secret-custody.spec.mjs, editions: [lite, full], codes: [HFS_SECRET_PLAINTEXT_FILE]}
+      - {path: tests/hfs/hfs-secret-custody.spec.mjs, editions: [full], codes: [HFS_SECRET_OUTSIDE_ENC]}
 
   - id: R278
     code: "BE_REST_DOOR_EVIDENCE"
     law: "GraphQL is the default door in lite and full. Each REST route carries its own evidence: a probe, auth handshake, signed webhook, actual byte stream or a public versioned operation served from the app's nonempty defineOperations table. A class-level reference or an unused StreamableFile import proves no route, and a public REST route absent from the operation table is refused."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_REST_DOOR_EVIDENCE", "BE_REST_ROUTE_UNDECLARED"]
     enforcers:
       - {kind: eslint-be, id: rest-door-needs-a-reason}
       - {kind: eslint-be, id: rest-route-declared}
+    editions: [lite, full]
+    docs: [docs/microservices.md#r278]
+    exemplifiedBy:
+      - {path: packages/eslint/be/transport.spec.mjs, editions: [lite, full], codes: [BE_REST_DOOR_EVIDENCE]}
+      - {path: packages/eslint/be/operations.spec.mjs, editions: [lite, full], codes: [BE_REST_ROUTE_UNDECLARED]}
+      - {path: packages/hfs/templates/be/skeleton/src/features/api/system-health/transport/http/live.controller.ts, editions: [lite, full]}
+    proves:
+      - {path: packages/eslint/be/transport.spec.mjs, editions: [lite, full], codes: [BE_REST_DOOR_EVIDENCE]}
+      - {path: packages/eslint/be/operations.spec.mjs, editions: [lite, full], codes: [BE_REST_ROUTE_UNDECLARED]}
+    witness:
+      - {path: packages/eslint/be/transport.spec.mjs, editions: [lite, full], codes: [BE_REST_DOOR_EVIDENCE]}
+      - {path: packages/eslint/be/operations.spec.mjs, editions: [lite, full], codes: [BE_REST_ROUTE_UNDECLARED]}
+
   - id: R279
     code: "BE_THIRD_PARTY_OWNER"
     law: "Third-party SDK ownership is derived from the app's package.json dependencies rather than a finite SDK table. A dependency outside the pure-library and framework allowlists is imported only by one integrations/<provider> capability; domain services call that integration's public API. Existing infrastructure owner restrictions remain in force."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_THIRD_PARTY_OWNER"]
     enforcers:
       - {kind: eslint-be, id: third-party-import-owner}
+    editions: [lite, full]
+    docs: [docs/microservices.md#r279]
+    templateNa: "Vendor SDK dependencies and their provider ownership are selected per application; no generic vendor SDK surface is scaffolded."
+    exemplifiedBy:
+      - {path: packages/eslint/be/third-party-owner.spec.mjs, editions: [lite, full], codes: [BE_THIRD_PARTY_OWNER]}
+    proves:
+      - {path: packages/eslint/be/third-party-owner.spec.mjs, editions: [lite, full], codes: [BE_THIRD_PARTY_OWNER]}
+    witness:
+      - {path: packages/eslint/be/third-party-owner.spec.mjs, editions: [lite, full], codes: [BE_THIRD_PARTY_OWNER]}
+
   - id: R280
     code: "HFS_UNUSED_SYMBOL"
     law: "Every enum member, queue constant, error code and catalog key has a production consumer; an error's kind or message mapping and a test-only reference do not keep a dead symbol alive. Namespace imports consume the members actually read."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_UNUSED_SYMBOL"]
     enforcers:
       - {kind: hfs, id: unused-symbol, at: scripts/hfs/rules/unused-symbol.mjs}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r280]
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-unused-symbol.spec.mjs, editions: [lite, full], codes: [HFS_UNUSED_SYMBOL]}
+      - {path: packages/hfs/templates/be/skeleton/src/modules/domain/identity/errors/identity.error.ts, editions: [lite, full]}
+      - {path: packages/hfs/templates/be/skeleton/src/modules/domain/identity/admission.policy.ts, editions: [lite, full]}
+    proves:
+      - {path: tests/hfs/hfs-unused-symbol.spec.mjs, editions: [lite, full], codes: [HFS_UNUSED_SYMBOL]}
+    witness:
+      - {path: tests/hfs/hfs-unused-symbol.spec.mjs, editions: [lite, full], codes: [HFS_UNUSED_SYMBOL]}
+
   - id: R281
     code: "BE_SPEC_FORM_ALL_ROLES"
     law: "Unit spec form applies to every declared logic role, including policies, mappers, guards and integration clients. A spec obtains its subject from a compiled Nest testing module with explicit providers, never constructs the subject or mocks an own module or third-party library, and asserts behavior or state rather than only toBeDefined existence checks."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_SPEC_FORM_ALL_ROLES"]
     enforcers:
       - {kind: eslint-be, id: spec-builds-with-testing-module}
@@ -2738,22 +2958,51 @@ rules:
       - {kind: eslint-be, id: spec-behavior-assertion}
       - {kind: eslint-be, id: spec-infra-double-from-kit}
       - {kind: eslint-be, id: spec-exact-values}
+    editions: [lite, full]
+    docs: [docs/microservices.md#r281]
+    exemplifiedBy:
+      - {path: packages/eslint/be/unit-spec.spec.mjs, editions: [lite, full], codes: [BE_SPEC_FORM_ALL_ROLES]}
+      - {path: packages/hfs/templates/be/skeleton/src/modules/platform/clock/system-clock.service.spec.ts, editions: [lite, full]}
+    proves:
+      - {path: packages/eslint/be/unit-spec.spec.mjs, editions: [lite, full], codes: [BE_SPEC_FORM_ALL_ROLES]}
+    witness:
+      - {path: packages/eslint/be/unit-spec.spec.mjs, editions: [lite, full], codes: [BE_SPEC_FORM_ALL_ROLES]}
+
   - id: R282
     code: "HFS_ASSET_OVERSIZE"
     law: "Back-end build assets stay within the per-file asset budget (512000 bytes by default) and the build-asset extension allowlist; ordinary media lives in object storage, and model weights and datasets are never tracked in the back end. Declared documentation media remains allowed."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_ASSET_OVERSIZE", "HFS_ASSET_KIND"]
     enforcers:
       - {kind: hfs, id: assets, at: scripts/hfs/rules/assets.mjs}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r282]
+    templateNa: "Build assets are supplied by each application; the scaffolder does not generate binary assets, model weights or datasets."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-assets.spec.mjs, editions: [lite, full], codes: [HFS_ASSET_OVERSIZE, HFS_ASSET_KIND]}
+    proves:
+      - {path: tests/hfs/hfs-assets.spec.mjs, editions: [lite, full], codes: [HFS_ASSET_OVERSIZE, HFS_ASSET_KIND]}
+    witness:
+      - {path: tests/hfs/hfs-assets.spec.mjs, editions: [lite, full], codes: [HFS_ASSET_OVERSIZE, HFS_ASSET_KIND]}
+
   - id: R283
     code: "HFS_APP_LEXICON"
     law: "An app's source and documentation use the current product vocabulary: a word declared in hfs.json lexicon.removed is refused as a whole word or identifier segment, in both editions."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_APP_LEXICON"]
     enforcers:
       - {kind: hfs, id: lexicon, at: scripts/hfs/rules/lexicon.mjs}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r283]
+    templateNa: "Removed product vocabulary is application-specific hfs.json content; there is no canonical product lexicon to scaffold."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-lexicon.spec.mjs, editions: [lite, full], codes: [HFS_APP_LEXICON]}
+    proves:
+      - {path: tests/hfs/hfs-lexicon.spec.mjs, editions: [lite, full], codes: [HFS_APP_LEXICON]}
+    witness:
+      - {path: tests/hfs/hfs-lexicon.spec.mjs, editions: [lite, full], codes: [HFS_APP_LEXICON]}
 
   - id: R284
     code: "BE_LITE_PROOF_LANE_MISSING"
@@ -2763,77 +3012,182 @@ rules:
     failureCodes: ["BE_LITE_PROOF_LANE_MISSING"]
     enforcers:
       - {kind: hfs, id: lite-proof-lane, at: scripts/hfs/rules/lite-proof-lane.mjs}
+    editions: [lite]
+    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite has no e2e world and proves declared patterns in its integration lane; R284 owns only the lite lane code while full retains its existing pattern-proof rules."
+    docs: [docs/quality-bar.md#r284]
+    templateNa: "Integration scenarios depend on the application patterns and providers; no universal runnable scenario lane is scaffolded."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-lite-proof-lane.spec.mjs, editions: [lite], codes: [BE_LITE_PROOF_LANE_MISSING]}
+    proves:
+      - {path: tests/hfs/hfs-lite-proof-lane.spec.mjs, editions: [lite], codes: [BE_LITE_PROOF_LANE_MISSING]}
+    witness:
+      - {path: tests/hfs/hfs-lite-proof-lane.spec.mjs, editions: [lite], codes: [BE_LITE_PROOF_LANE_MISSING]}
 
   - id: R285
     code: "FE_SWR_OUTSIDE_FAMILY"
     law: "SWR runtime calls belong to the declared SWR hook family. A component, feature or domain hook consumes its wrapper hook instead of importing an API operation or calling SWR itself; each back-end operation is imported and invoked only by its SWR wrapper under hooks/swr, regardless of whether the tier matrix still permits a direct transport edge."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["FE_SWR_OUTSIDE_FAMILY", "FE_OP_OUTSIDE_SWR_HOOK"]
     enforcers:
       - {kind: eslint-fe, id: swr-only-in-family}
       - {kind: eslint-fe, id: operations-only-in-swr-hooks}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r285]
+    exemplifiedBy:
+      - {path: packages/eslint/fe/swr-family.spec.mjs, editions: [lite, full], codes: [FE_SWR_OUTSIDE_FAMILY, FE_OP_OUTSIDE_SWR_HOOK]}
+      - {path: packages/hfs/templates/fe/table/graphql/useQuerySwr.ts.tpl, editions: [lite, full]}
+      - {path: packages/hfs/templates/fe/table/graphql/useMutateSwr.ts.tpl, editions: [lite, full]}
+    proves:
+      - {path: packages/eslint/fe/swr-family.spec.mjs, editions: [lite, full], codes: [FE_SWR_OUTSIDE_FAMILY, FE_OP_OUTSIDE_SWR_HOOK]}
+    witness:
+      - {path: packages/eslint/fe/swr-family.spec.mjs, editions: [lite, full], codes: [FE_SWR_OUTSIDE_FAMILY, FE_OP_OUTSIDE_SWR_HOOK]}
+
   - id: R286
     code: "FE_COPY_IN_CALL"
     law: "Copy shown by validation and toast calls comes from the next-intl catalog, including Zod message arguments and toast titles or descriptions. Browser alert calls are forbidden. Inline SVG glyphs are forbidden outside a declared brand-mark leaf; ordinary icons use the one Heroicons family through the Icon leaf."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["FE_COPY_IN_CALL", "FE_NO_ALERT", "FE_ICON_INLINE_SVG"]
     enforcers:
       - {kind: eslint-fe, id: no-copy-in-call}
       - {kind: eslint-fe, id: no-alert}
       - {kind: eslint-fe, id: no-inline-svg-outside-brand-mark-leaf}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r286]
+    exemplifiedBy:
+      - {path: packages/eslint/fe/translation.spec.mjs, editions: [lite, full], codes: [FE_COPY_IN_CALL, FE_NO_ALERT]}
+      - {path: packages/eslint/fe/icon.spec.mjs, editions: [lite, full], codes: [FE_ICON_INLINE_SVG]}
+      - {path: packages/hfs/templates/fe/skeleton/apps/__app__/src/components/leaves/Icon/index.tsx, editions: [lite, full]}
+      - {path: packages/hfs/templates/fe/skeleton/apps/__app__/src/modules/toast, editions: [lite, full]}
+    proves:
+      - {path: packages/eslint/fe/translation.spec.mjs, editions: [lite, full], codes: [FE_COPY_IN_CALL, FE_NO_ALERT]}
+      - {path: packages/eslint/fe/icon.spec.mjs, editions: [lite, full], codes: [FE_ICON_INLINE_SVG]}
+    witness:
+      - {path: packages/eslint/fe/translation.spec.mjs, editions: [lite, full], codes: [FE_COPY_IN_CALL, FE_NO_ALERT]}
+      - {path: packages/eslint/fe/icon.spec.mjs, editions: [lite, full], codes: [FE_ICON_INLINE_SVG]}
+
   - id: R287
     code: "FE_CALLBACK_SHAPE"
     law: "The fe.route.callback handler performs only the auth code exchange and redirect: read the callback URL, obtain the auth client, exchange the code and redirect to the declared route. It carries no product data operation, business logic, additional request handler or JSON response."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["FE_CALLBACK_SHAPE"]
     enforcers:
       - {kind: eslint-fe, id: callback-shape}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r287]
+    exemplifiedBy:
+      - {path: packages/eslint/fe/callback-shape.spec.mjs, editions: [lite, full], codes: [FE_CALLBACK_SHAPE]}
+      - {path: packages/hfs/templates/fe/skeleton/apps/__app__/src/app/auth/callback/route.ts, editions: [lite, full]}
+    proves:
+      - {path: packages/eslint/fe/callback-shape.spec.mjs, editions: [lite, full], codes: [FE_CALLBACK_SHAPE]}
+    witness:
+      - {path: packages/eslint/fe/callback-shape.spec.mjs, editions: [lite, full], codes: [FE_CALLBACK_SHAPE]}
+
   - id: R288
     code: "FE_STACK_UNLISTED"
     law: "Every FE workspace dependency belongs to knowledge/hfs/fe-stack.yaml or is declared in hfs.json fe.extraPackages with its name and a nonempty reason. Every product Next app declares the catalog's core runtime packages; codegen, lint, TypeScript and Tailwind tools may be installed once at the app root. The full marketing landing app is exempt from core presence. GraphQL documents, including gql templates, match the back-end contracts, and SWR keys carry fetcher identities without an opt-in declaration."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["FE_STACK_UNLISTED", "FE_STACK_CORE_MISSING"]
     enforcers:
       - {kind: hfs, id: fe-stack-allowlist, at: scripts/hfs/rules/fe-stack.mjs}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r288]
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-fe-stack.spec.mjs, editions: [lite, full], codes: [FE_STACK_UNLISTED, FE_STACK_CORE_MISSING]}
+      - {path: packages/hfs/templates/fe/app/package.json.tpl, editions: [lite, full]}
+    proves:
+      - {path: tests/hfs/hfs-fe-stack.spec.mjs, editions: [lite, full], codes: [FE_STACK_UNLISTED, FE_STACK_CORE_MISSING]}
+    witness:
+      - {path: tests/hfs/hfs-fe-stack.spec.mjs, editions: [lite, full], codes: [FE_STACK_UNLISTED, FE_STACK_CORE_MISSING]}
 
   - id: R289
     code: "BE_APP_ENV_REQUIRED"
     law: "Every declared back-end app owns a tracked apps/<app>/src/<app>.env.ts exporting its typed environment interface and read<App>Env(env: EnvSource). main.ts constructs EnvSource once and delegates its reads to that reader, with no inline parsing. app.module.ts composes module lists only by spreading compose/<area>.ts groups; its own providers are limited to app-wide guards and filters."
     kinds: [check, lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_APP_ENV_REQUIRED", "BE_APP_MODULE_LIST_INLINE"]
     enforcers:
       - {kind: hfs, id: app-env-required, at: scripts/hfs/rules/app-env-required.mjs}
       - {kind: eslint-be, id: app-env-required}
       - {kind: eslint-be, id: app-module-list-inline}
+    editions: [lite, full]
+    docs: [docs/microservices.md#r289]
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-app-env-required.spec.mjs, editions: [lite, full], codes: [BE_APP_ENV_REQUIRED]}
+      - {path: packages/eslint/be/app-composition.spec.mjs, editions: [lite, full], codes: [BE_APP_ENV_REQUIRED, BE_APP_MODULE_LIST_INLINE]}
+      - {path: packages/hfs/templates/be/skeleton/apps/__app__/src/__app__.env.ts, editions: [full]}
+      - {path: packages/hfs/templates/be/skeleton/apps/__app__/src/app.module.ts, editions: [full]}
+      - {path: packages/hfs/templates/be/skeleton-lite/apps/api/src/api.env.ts, editions: [lite]}
+      - {path: packages/hfs/templates/be/skeleton-lite/apps/api/src/app.module.ts, editions: [lite]}
+    proves:
+      - {path: tests/hfs/hfs-app-env-required.spec.mjs, editions: [lite, full], codes: [BE_APP_ENV_REQUIRED]}
+      - {path: packages/eslint/be/app-composition.spec.mjs, editions: [lite, full], codes: [BE_APP_ENV_REQUIRED, BE_APP_MODULE_LIST_INLINE]}
+    witness:
+      - {path: tests/hfs/hfs-app-env-required.spec.mjs, editions: [lite, full], codes: [BE_APP_ENV_REQUIRED]}
+      - {path: packages/eslint/be/app-composition.spec.mjs, editions: [lite, full], codes: [BE_APP_ENV_REQUIRED, BE_APP_MODULE_LIST_INLINE]}
 
   - id: R290
     code: "BE_PUBLIC_REASON_CLOSED"
     law: "In lite and full PublicReason has exactly Health, AuthHandshake, SignedWebhook and CatalogRead. An app-defined public reason such as ToolToken or ApiKey is refused; API-key and tool-token routes authenticate with their own guard instead of extending the public vocabulary."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_PUBLIC_REASON_CLOSED"]
     enforcers:
       - {kind: eslint-be, id: public-reason-closed}
+    editions: [lite, full]
+    docs: [docs/microservices.md#r290]
+    exemplifiedBy:
+      - {path: packages/eslint/be/default-deny.spec.mjs, editions: [lite, full], codes: [BE_PUBLIC_REASON_CLOSED]}
+      - {path: packages/hfs/templates/be/skeleton/src/modules/domain/identity/identity.contracts.ts, editions: [full]}
+      - {path: packages/hfs/templates/be/skeleton-lite/src/modules/domain/identity/identity.contracts.ts, editions: [lite]}
+    proves:
+      - {path: packages/eslint/be/default-deny.spec.mjs, editions: [lite, full], codes: [BE_PUBLIC_REASON_CLOSED]}
+    witness:
+      - {path: packages/eslint/be/default-deny.spec.mjs, editions: [lite, full], codes: [BE_PUBLIC_REASON_CLOSED]}
 
   - id: R291
     code: "HFS_FUNCTION_BUDGET"
     law: "Every back-end and front-end function, method or arrow body stays within ruleParams.functionLines (80 physical lines), including comments and blank lines, in lite and full; split a larger body by responsibility. This is an absolute budget."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["HFS_FUNCTION_BUDGET"]
     enforcers:
       - {kind: eslint-be, id: function-line-budget}
       - {kind: eslint-fe, id: function-line-budget}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r291]
+    exemplifiedBy:
+      - {path: packages/eslint/be/function-budget.spec.mjs, editions: [lite, full], codes: [HFS_FUNCTION_BUDGET]}
+      - {path: packages/eslint/fe/function-budget.spec.mjs, editions: [lite, full], codes: [HFS_FUNCTION_BUDGET]}
+      - {path: packages/hfs/templates/be/patterns/api/graphql.resolver.ts.tpl, editions: [lite, full]}
+      - {path: examples/lite-app/be/src/features/api/bookings/application/create-booking.handler.ts, editions: [lite]}
+      - {path: examples/ecommerce-app/be/src/features/api/checkout/application/add-cart-item.handler.ts, editions: [full]}
+    proves:
+      - {path: packages/eslint/be/function-budget.spec.mjs, editions: [lite, full], codes: [HFS_FUNCTION_BUDGET]}
+      - {path: packages/eslint/fe/function-budget.spec.mjs, editions: [lite, full], codes: [HFS_FUNCTION_BUDGET]}
+    witness:
+      - {path: packages/eslint/be/function-budget.spec.mjs, editions: [lite, full], codes: [HFS_FUNCTION_BUDGET]}
+      - {path: packages/eslint/fe/function-budget.spec.mjs, editions: [lite, full], codes: [HFS_FUNCTION_BUDGET]}
+
   - id: R292
     code: "HFS_FEATURE_FILE_BUDGET"
     law: "Every feature owner stays within ruleParams.featureFiles (250 tracked files), including nested files, in lite and full; split a larger feature by product capability."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_FEATURE_FILE_BUDGET"]
     enforcers:
       - {kind: hfs, id: feature-files, at: scripts/hfs/rules/feature-files.mjs}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r292]
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-feature-files.spec.mjs, editions: [lite, full], codes: [HFS_FEATURE_FILE_BUDGET]}
+      - {path: packages/hfs/templates/be/patterns/api, editions: [lite, full]}
+      - {path: examples/lite-app/be/src/features/api/bookings, editions: [lite]}
+      - {path: examples/ecommerce-app/be/src/features/api/checkout, editions: [full]}
+    proves:
+      - {path: tests/hfs/hfs-feature-files.spec.mjs, editions: [lite, full], codes: [HFS_FEATURE_FILE_BUDGET]}
+    witness:
+      - {path: tests/hfs/hfs-feature-files.spec.mjs, editions: [lite, full], codes: [HFS_FEATURE_FILE_BUDGET]}

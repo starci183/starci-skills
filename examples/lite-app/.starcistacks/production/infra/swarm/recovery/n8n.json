@@ -1,0 +1,7 @@
+{
+  "component": "n8n",
+  "status": "pending-owner-restore-proof",
+  "executedAt": null,
+  "plan": "Restore the encrypted n8n-data volume backup in isolation and verify the SQLite database, workflows and private health probe.",
+  "ownerAction": "Replace this example record with the backup hash, isolated destination, timestamp and verification receipt before production."
+}

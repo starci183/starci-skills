@@ -127,6 +127,35 @@ for (const edition of ['lite', 'full']) {
     };
     assert.deepEqual(envFindingsOf(tree(t, files), files, edition), []);
   });
+
+  test(`required keys sealed in dev and production are valid (${edition})`, (t) => {
+    const member = sealedDotenv(['ENGINE_SHARED_SECRET', 'PRIMARY_DB_URL', 'OPENCLAW_MANAGE_AGENTS', 'CALENDAR_WEBHOOK_SECRET']);
+    const files = {
+      ...BASE,
+      '.starcistacks/dev/secrets/app.enc': member,
+      '.starcistacks/production/secrets/app.enc': member,
+      '.starcistacks/dev/runtime/env/KEYS.md': '| `API_PORT` | port |\n',
+    };
+    assert.deepEqual(envFindingsOf(tree(t, files), files, edition), []);
+  });
+
+  test(`each environment rejects a key sealed in two of its members (${edition})`, (t) => {
+    const member = sealedDotenv(['ENGINE_SHARED_SECRET', 'PRIMARY_DB_URL', 'OPENCLAW_MANAGE_AGENTS', 'CALENDAR_WEBHOOK_SECRET']);
+    const files = {
+      ...BASE,
+      '.starcistacks/dev/secrets/app.enc': member,
+      '.starcistacks/dev/secrets/engine.enc': sealedDotenv(['ENGINE_SHARED_SECRET']),
+      '.starcistacks/production/secrets/app.enc': member,
+      '.starcistacks/production/secrets/engine.enc': sealedDotenv(['ENGINE_SHARED_SECRET']),
+      '.starcistacks/dev/runtime/env/KEYS.md': '| `API_PORT` | port |\n',
+    };
+    const findings = envFindingsOf(tree(t, files), files, edition);
+    assert.ok(findings.every((finding) => finding.code === ENV_DUPLICATE));
+    assert.deepEqual(findings.map((finding) => finding.path), [
+      '.starcistacks/dev/secrets/engine.enc',
+      '.starcistacks/production/secrets/engine.enc',
+    ]);
+  });
 }
 
 test('env parity flags required reads neither sealed nor declared and sealed keys nobody reads (lite)', (t) => {

@@ -4,7 +4,7 @@
 // scripts/lib/, knowledge/hfs/, modules/kernel/) byte for byte, so the imports need no rewriting.
 //   packages/hfs/runtime         what `hfs` reads (with the one Sonar gate, knowledge/sonar-gate.yaml, whose name starci app check holds a stack declaration to): the slot loader, the check, the architecture machine and every file either
 //                                imports (computed from the import graph, not listed), plus the failure-code catalog slice
-//                                holding exactly the codes `starci app check` can emit (its own and the machine's rule id lists)
+//                                holding the codes `starci app check` can emit and every code its bundled rule catalog owns
 //   packages/eslint/be/runtime   what @starci/eslint-canon-be reads through lib/hfs.mjs (loadHfs: slots, hfs.json, the view), the shared Sonar syntax rules and the project graph
 //                                (scripts/hfs/project-rule.mjs -> project-graph.mjs -> the architecture machine) its project rules share
 //   packages/eslint/fe/runtime   the same files for @starci/eslint-canon-fe (lib/hfs.mjs, lib/params.mjs)
@@ -101,13 +101,19 @@ function catalogSlice(text, codes) {
   }).join('\n\n')}\n`;
 }
 
+/** Every reported code and every code the bundled rule catalog requires, leaving unrelated runtime codes out. */
+function bundledFailureCodes(ruleCatalog) {
+  const owned = parseYaml(ruleCatalog).rules.flatMap(rule => rule.failureCodes);
+  return new Set([...ALL_CHECK_CODES, ...owned]);
+}
+
 /** {relative path: expected text} of one bundle. */
 function expectedBundle(bundle, root) {
   const spec = BUNDLES[bundle];
   if (!spec) throw new Error(`no bundle ${bundle}`);
   const out = new Map();
   for (const file of spec.files) out.set(file, fs.readFileSync(path.join(root, file), 'utf8'));
-  if (spec.catalog) out.set(CATALOG, catalogSlice(fs.readFileSync(path.join(root, CATALOG), 'utf8'), ALL_CHECK_CODES));
+  if (spec.catalog) out.set(CATALOG, catalogSlice(fs.readFileSync(path.join(root, CATALOG), 'utf8'), bundledFailureCodes(out.get(RULE_CATALOG_FILE))));
   return out;
 }
 

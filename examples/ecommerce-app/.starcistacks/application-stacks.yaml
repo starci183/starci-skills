@@ -35,6 +35,11 @@ components:
     image: ecommerce-app/billing:1.0.0
     role: service
     compose: infra/compose/billing.yaml
+jobs:
+  expire-pending-orders:
+    mode: app-scheduler
+    schedule: every:60000
+    command: node be/dist/apps/cli/src/main.js order-expiry tick
 environments:
   dev:
     status: supported
