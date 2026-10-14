@@ -82,6 +82,7 @@ import { testTopologyFindings } from './rules/test-topology.mjs';
 import { feNoTestsFindings } from './rules/fe-no-tests.mjs';
 import { editionFindings } from './rules/edition.mjs';
 import { feStackFindings } from './rules/fe-stack.mjs';
+import { a15Findings } from './rules/a15-findings.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { pinFindings } from './pin-findings.mjs';
 import { requiredFileApplies } from './slot-required.mjs';
@@ -237,6 +238,7 @@ function contentRuleFindings({ repoRoot, repo, resolver, files, all, scoped, pin
     ...feStackFindings({ repoRoot, files: files.filter((file) => inScope(file)), repo, manifest }),
     ...repoLocalCheckFindings({ repoRoot, files }),
     ...lintSuppressionFindings({ repoRoot, files }),
+    ...a15Findings({ repoRoot, files, all, repo, resolver, manifest, isRoot, inScope }),
   ];
   if (isRoot) {
     findings.push(
