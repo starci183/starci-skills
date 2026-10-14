@@ -3,7 +3,6 @@ import type { ApolloDriverConfig } from "@nestjs/apollo"
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { GraphQLModule as NestGraphQLModule } from "@nestjs/graphql"
-import type { Request, Response } from "express"
 import { ERRORS_SERVICE, formatGraphqlError } from "@modules/platform/errors"
 import type { ErrorsService } from "@modules/platform/errors"
 import { REQUEST_LOCALE } from "@modules/platform/i18n"
@@ -37,7 +36,7 @@ export class GraphqlModule extends ConfigurableModuleClass {
                         path: "/graphql",
                         playground: false,
                         introspection: true,
-                        context: ({ req, res }: { req: Request; res: Response }): GraphqlContext => ({ req, res }),
+                        context: ({ req, res }: GraphqlContext): GraphqlContext => ({ req, res }),
                         formatError: (formatted, error) => formatGraphqlError(errors, formatted, error),
                         validationRules: [depthLimitRule(GRAPHQL_DEPTH_MAX)],
                         plugins: [localizeErrorsPlugin(errors, requestLocale)],

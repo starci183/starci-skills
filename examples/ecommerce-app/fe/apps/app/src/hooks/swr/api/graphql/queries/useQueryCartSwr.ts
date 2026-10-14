@@ -1,5 +1,5 @@
 import useSWR from "swr"
-import { queryCart } from "@/modules/api"
+import { queryCart } from "@/modules/api/graphql/queries/query-cart"
 import { useAppSelector } from "@/redux"
 
 /** The SWR key of the cart query; the signed-in person is its identity. */

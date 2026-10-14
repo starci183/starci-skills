@@ -5,8 +5,18 @@ import { ResourcesError, ResourcesErrorCode } from "./errors/resources.error"
 import type { ResourcesRow } from "./persistence/resources.rows"
 import { FIND_RESOURCES, INSERT_RESOURCES } from "./persistence/resources.sql"
 
-interface ResourcesResult {
-    readonly id: string
+/** What the capability answers for one row: its id. */
+type ResourcesResult = Pick<ResourcesRow, "id">
+
+/** Throws the typed not-found error of one id: absent and denied rows share it. */
+const notFound = (id: string): never => {
+    throw new ResourcesError({ code: ResourcesErrorCode.NotFound, params: { id } })
+}
+
+/** The row an insert answered; an insert that answered none throws the typed not-created error. */
+const createdRow = ([row]: ReadonlyArray<ResourcesResult>): ResourcesResult => {
+    if (row === undefined) throw new ResourcesError({ code: ResourcesErrorCode.NotCreated })
+    return row
 }
 
 @Injectable()
@@ -16,15 +26,11 @@ export class ResourcesService {
 
     /** Answers one row owned by the authenticated principal; absent and denied rows share one typed not-found result. */
     resources(principalId: string, id: string): Promise<ResourcesResult> {
-        return requireOwnedRow<Pick<ResourcesRow, "id">>(this.entityManager, FIND_RESOURCES, id, principalId, () => {
-            throw new ResourcesError({ code: ResourcesErrorCode.NotFound, params: { id } })
-        })
+        return requireOwnedRow<ResourcesResult>(this.entityManager, FIND_RESOURCES, id, principalId, notFound)
     }
 
     /** Creates one row owned by the authenticated principal and answers its id. */
-    async createResource(principalId: string): Promise<ResourcesResult> {
-        const [row] = await this.entityManager.query<Array<Pick<ResourcesRow, "id">>>(INSERT_RESOURCES, [principalId])
-        if (row === undefined) throw new ResourcesError({ code: ResourcesErrorCode.NotCreated })
-        return { id: row.id }
+    createResource(principalId: string): Promise<ResourcesResult> {
+        return this.entityManager.query<Array<ResourcesResult>>(INSERT_RESOURCES, [principalId]).then(createdRow)
     }
 }

@@ -1,7 +1,11 @@
 import { useSWRConfig } from "swr"
 import useSWRMutation from "swr/mutation"
 import { mutateCreateBooking } from "@/modules/api/graphql/mutations/mutation-create-booking"
-import type { MutateCreateBookingRequest } from "@/modules/api/graphql/mutations/types/create-booking"
+import type { GraphQLResponse } from "@/modules/api"
+import type {
+    MutateCreateBookingData,
+    MutateCreateBookingRequest,
+} from "@/modules/api/graphql/mutations/types/create-booking"
 import { QUERY_BOOKING_STATUS_SWR_KEY } from "../queries/useQueryBookingStatusSwr"
 
 /** What the trigger of the create-booking mutation hands its fetcher: the booking to create. */
@@ -19,7 +23,7 @@ export const MUTATE_CREATE_BOOKING_SWR_KEY = "MUTATE_CREATE_BOOKING_SWR"
 export const useMutateCreateBookingSwr = () => {
     const { mutate } = useSWRConfig()
     return useSWRMutation(MUTATE_CREATE_BOOKING_SWR_KEY, async (_key: string, { arg }: CreateBookingTrigger) => {
-        const response = await mutateCreateBooking({ request: arg })
+        const response: GraphQLResponse<MutateCreateBookingData> = await mutateCreateBooking({ request: arg })
         if (response.success)
             await mutate(
                 [QUERY_BOOKING_STATUS_SWR_KEY, response.data.id],

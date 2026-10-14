@@ -95,8 +95,8 @@ test('HFS_UNUSED_EXPORT: the unit spec of a webhook, gateway or subscription doo
   assert.deepEqual(dead(report, scenarios.doorSpec.x), ['onlyE2e']);
 });
 
-// No slot of the manifest declares a second public entry (slot field `entries`) since fe.modules.db is removed (owner ruling
-// 2026-10-13): a second file of an owner is never judged as an entry.
+// Only the files a slot declares in `entries` (fe.modules.api: one file per operation and its types) are judged as further
+// public entries; any other second file of an owner is not.
 test('a file the slot does not declare as an entry is not judged as one: modules/config/browser.ts exports are not HFS_UNUSED_EXPORT', t => {
   const report = runArch(archFixture(t, {
     profile: 'fe',
@@ -107,4 +107,26 @@ test('a file the slot does not declare as an entry is not judged as one: modules
     },
   }));
   assert.deepEqual(dead(report, 'apps/web/src/modules/config/browser.ts'), []);
+});
+
+// fe.modules.api declares its operation files and their types files as entries: a hook imports its one operation file
+// directly. A types file export the sibling operation file imports is part of that operation's signature, so it is used; a
+// barrel of the owner re-exporting the operations is no consumer, and an export nobody imports stays dead.
+test('HFS_UNUSED_EXPORT: a declared entry export another declared entry imports is used; a barrel re-export of an operation is not', t => {
+  const report = runArch(archFixture(t, {
+    profile: 'fe',
+    files: {
+      'apps/web/src/modules/api/index.ts': "export { queryBarrel } from './graphql';\n",
+      'apps/web/src/modules/api/graphql/index.ts': "export { queryBarrel } from './queries/query-barrel';\n",
+      'apps/web/src/modules/api/graphql/queries/types/cart.ts': 'export type QueryCartRequest = { id: string };\nexport type QueryCartData = { items: string[] };\nexport type QueryCartUnused = number;\n',
+      'apps/web/src/modules/api/graphql/queries/query-cart.ts': "import type { QueryCartData, QueryCartRequest } from './types/cart';\nexport const queryCart = async (request: QueryCartRequest): Promise<QueryCartData> => ({ items: [request.id] });\n",
+      'apps/web/src/modules/api/graphql/queries/query-barrel.ts': 'export const queryBarrel = async () => 1;\n',
+      'apps/web/src/hooks/swr/api/graphql/queries/useQueryCartSwr.ts': "import { queryCart } from '../../../../../modules/api/graphql/queries/query-cart';\nexport const useQueryCartSwr = () => queryCart({ id: 'a' });\n",
+      'apps/web/src/hooks/swr/api/graphql/queries/useQueryBarrelSwr.ts': "import { queryBarrel } from '../../../../../modules/api';\nexport const useQueryBarrelSwr = () => queryBarrel();\n",
+    },
+  }));
+  assert.deepEqual(dead(report, 'apps/web/src/modules/api/graphql/queries/types/cart.ts'), ['QueryCartUnused']);
+  assert.deepEqual(dead(report, 'apps/web/src/modules/api/graphql/queries/query-cart.ts'), []);
+  assert.deepEqual(dead(report, 'apps/web/src/modules/api/graphql/queries/query-barrel.ts'), ['queryBarrel']);
+  assert.deepEqual(dead(report, 'apps/web/src/modules/api/index.ts'), []);
 });

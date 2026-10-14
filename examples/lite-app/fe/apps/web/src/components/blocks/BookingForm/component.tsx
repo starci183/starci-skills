@@ -1,10 +1,6 @@
-import { Button, ButtonGroup, Form, Input, SectionHeader, Text } from "@starci/grammar/common"
-
-/** One controlled field as data: its value and its validation message. */
-interface BookingFieldState {
-    readonly value: string
-    readonly errorMessage?: string
-}
+import { Button, ButtonGroup, Form, SectionHeader, Text } from "@starci/grammar/common"
+import { FormInput } from "@/components/composites/FormInput"
+import type { FormInputField, FormInputSpec } from "@/components/composites/FormInput"
 
 /** Copy, fields, state and actions for the resource, calendar and booking commands. */
 export interface BookingFormBaseProps {
@@ -18,15 +14,12 @@ export interface BookingFormBaseProps {
         readonly lastResource?: string
         readonly lastCalendar?: string
         readonly bookingTitle: string
-        readonly resourceLabel: string
-        readonly startsAtLabel: string
-        readonly endsAtLabel: string
         readonly submitLabel: string
         readonly bookingPending: boolean
         readonly bookingStatus?: string
-        readonly resourceId: BookingFieldState
-        readonly startsAt: BookingFieldState
-        readonly endsAt: BookingFieldState
+        readonly resourceId: FormInputField
+        readonly startsAt: FormInputField
+        readonly endsAt: FormInputField
     }
     readonly on: {
         readonly addResource: () => void
@@ -41,32 +34,14 @@ export interface BookingFormBaseProps {
     }
 }
 
-/** What one controlled booking input takes. */
-interface BookingInputProps {
-    readonly id: string
-    readonly name: string
-    readonly label: string
-    readonly placeholder?: string
-    readonly field: BookingFieldState
-    readonly onChange: (value: string) => void
-    readonly onBlur: () => void
-}
+/** The resource input of the booking form. */
+const RESOURCE_ID: FormInputSpec = { id: "booking-resource-id", name: "resourceId" }
 
-/** One controlled grammar Input of the booking form. */
-const BookingInput = (props: BookingInputProps) => (
-    <Input
-        id={props.id}
-        name={props.name}
-        label={props.label}
-        placeholder={props.placeholder}
-        isRequired
-        value={props.field.value}
-        onValueChange={props.onChange}
-        onBlur={props.onBlur}
-        errorMessage={props.field.errorMessage}
-        isError={props.field.errorMessage !== undefined}
-    />
-)
+/** The start input of the booking form, with an example UTC timestamp. */
+const STARTS_AT: FormInputSpec = { id: "booking-starts-at", name: "startsAt", placeholder: "2026-10-04T09:00:00Z" }
+
+/** The end input of the booking form, with an example UTC timestamp. */
+const ENDS_AT: FormInputSpec = { id: "booking-ends-at", name: "endsAt", placeholder: "2026-10-04T10:00:00Z" }
 
 /** Draws the signed-in booking workspace without reading copy, session or back-end state. */
 export const BookingFormBase = (props: BookingFormBaseProps) => (
@@ -84,28 +59,20 @@ export const BookingFormBase = (props: BookingFormBaseProps) => (
         {props.props.lastCalendar === undefined ? null : <Text live="polite">{props.props.lastCalendar}</Text>}
         <SectionHeader title={props.props.bookingTitle} level={3} />
         <Form label={props.props.bookingTitle} isPending={props.props.bookingPending} onSubmit={props.on.book}>
-            <BookingInput
-                id="booking-resource-id"
-                name="resourceId"
-                label={props.props.resourceLabel}
+            <FormInput
+                input={RESOURCE_ID}
                 field={props.props.resourceId}
                 onChange={props.on.resourceIdChange}
                 onBlur={props.on.resourceIdBlur}
             />
-            <BookingInput
-                id="booking-starts-at"
-                name="startsAt"
-                label={props.props.startsAtLabel}
-                placeholder="2026-10-04T09:00:00Z"
+            <FormInput
+                input={STARTS_AT}
                 field={props.props.startsAt}
                 onChange={props.on.startsAtChange}
                 onBlur={props.on.startsAtBlur}
             />
-            <BookingInput
-                id="booking-ends-at"
-                name="endsAt"
-                label={props.props.endsAtLabel}
-                placeholder="2026-10-04T10:00:00Z"
+            <FormInput
+                input={ENDS_AT}
                 field={props.props.endsAt}
                 onChange={props.on.endsAtChange}
                 onBlur={props.on.endsAtBlur}

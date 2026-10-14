@@ -42,6 +42,7 @@ export const useCartPage = (namespace: "shop.cart" | "shop.checkout"): CartPageR
             ? summarizeCart(read.view, labels)
             : { rows: [], total: labels.price(0), productNames: {} }
     const accountHref = `/${locale}${SHOP_ROUTES.account}`
+    const rows = read.status === "ready" ? summary.rows : null
     return {
         state: read.status === "signedOut" ? "signedOut" : "ready",
         copy: {
@@ -64,9 +65,7 @@ export const useCartPage = (namespace: "shop.cart" | "shop.checkout"): CartPageR
                 errorDescription: read.status === "error" ? t("unreachable.description", { url: orderApiUrl() }) : "",
             },
             linesSlot:
-                read.status === "loading" || read.status === "signedOut"
-                    ? { status: "loading" }
-                    : collectionSlot(read.status === "ready" ? summary.rows : null),
+                read.status === "loading" || read.status === "signedOut" ? { status: "loading" } : collectionSlot(rows),
         },
         summary,
         hrefs: {

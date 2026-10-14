@@ -1,5 +1,5 @@
 import useSWR from "swr"
-import { queryAccount } from "@/modules/api"
+import { queryAccount } from "@/modules/api/graphql/queries/query-account"
 import { useAppSelector } from "@/redux"
 
 /** The SWR key of the account query; the signed-in person is its identity. */

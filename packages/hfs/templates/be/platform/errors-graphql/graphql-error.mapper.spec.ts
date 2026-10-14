@@ -9,7 +9,7 @@ describe("formatGraphqlError", () => {
     it("keeps the message of a malformed operation and marks it invalid without describing it", () => {
         const errors = mock<ErrorsService>()
 
-        expect(formatGraphqlError(errors, formatted, new GraphQLError("Cannot query field"))).toEqual({
+        expect(formatGraphqlError(errors, formatted, new GraphQLError("GRAPHQL_VALIDATION_FAILED"))).toEqual({
             message: "raw",
             path: ["item"],
             locations: [{ line: 1, column: 3 }],

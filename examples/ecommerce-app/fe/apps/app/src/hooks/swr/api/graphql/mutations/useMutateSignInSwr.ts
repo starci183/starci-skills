@@ -1,6 +1,6 @@
 import useSWRMutation from "swr/mutation"
-import { mutateSignIn } from "@/modules/api"
-import type { MutationSignInRequest } from "@/modules/api"
+import { mutateSignIn } from "@/modules/api/graphql/mutations/mutation-sign-in"
+import type { MutationSignInRequest } from "@/modules/api/graphql/mutations/types/sign-in"
 
 /** What one trigger of the mutation carries: its request. */
 type Trigger = { readonly arg: MutationSignInRequest }

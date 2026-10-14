@@ -1,6 +1,6 @@
 import useSWRMutation from "swr/mutation"
-import { mutateRevokeSession } from "@/modules/api"
-import type { MutationRevokeSessionRequest } from "@/modules/api"
+import { mutateRevokeSession } from "@/modules/api/graphql/mutations/mutation-revoke-session"
+import type { MutationRevokeSessionRequest } from "@/modules/api/graphql/mutations/types/revoke-session"
 
 /** What one trigger of the mutation carries: its request. */
 type Trigger = { readonly arg: MutationRevokeSessionRequest }

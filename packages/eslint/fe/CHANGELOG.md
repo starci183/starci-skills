@@ -1,5 +1,9 @@
 # Changelog
 
+## 8.2.17 - 2026-10-14
+
+- Fixed: `dead-exports` (`HFS_UNUSED_EXPORT`) counts an import by another public entry the slot declares in `entries` as a use: a `graphql/{queries,mutations}/types/<x>.ts` export its operation file `query-<x>.ts`/`mutation-<x>.ts` imports is part of that operation's signature and is no longer reported. A barrel or any other non-entry file of the owner still does not count, so an operation reached only through a re-export of `modules/api/index.ts` stays dead.
+
 ## 8.2.16 - 2026-10-13
 
 - Changed: the heroicons family is the one application icon set again (owner ruling 2026-10-13): `heroicons-is-the-glyph-vendor` admits exactly `@heroicons/react/24/outline`, `@heroicons/react/16/solid` and the matching `@starci/heroicons` subpaths (read from the fe-stack `icons` concern), and refuses Phosphor and every other glyph catalogue, a package the catalog forbids included; `one-icon-set` (8.2.15) is gone. Only the Icon leaf and the toast module import a glyph. The bundled runtime mirror carries the fe-stack catalog and the canon pins with `@heroicons/react` 2.2.0 and `@starci/heroicons` 0.3.3.

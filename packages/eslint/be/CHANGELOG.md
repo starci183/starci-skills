@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.18 - 2026-10-14
+
+- Changed: carry the runtime mirror with the dead-exports fix (an import by a sibling declared entry is a use) and the canon pins of eslint-canon-fe 8.2.17, HFS 4.2.16 and CLI 1.2.16. ESLint rule implementations are unchanged.
+
 ## 3.2.17 - 2026-10-13
 
 - Changed: the bundled canon-pins copy carries `@heroicons/react` 2.2.0 and `@starci/heroicons` 0.3.3 in place of `@phosphor-icons/react` (the heroicons family is the one icon set, owner ruling 2026-10-13) and the pins of eslint-canon-fe 8.2.16, HFS 4.2.15 and CLI 1.2.15. ESLint rule implementations are unchanged.

@@ -12,9 +12,9 @@ type StatusToastOptions = Parameters<typeof heroToast.success>[1]
 
 /** The one indicator of each status, from the app's one icon set. */
 const INDICATOR: Record<"success" | "danger" | "warning" | "info", ReactNode> = {
-    success: <CheckCircleIcon className="size-6 text-success" />,
-    danger: <XCircleIcon className="size-6 text-danger" />,
-    warning: <ExclamationTriangleIcon className="size-6 text-warning" />,
+    success: <CheckCircleIcon className="size-6 text-success-soft-foreground" />,
+    danger: <XCircleIcon className="size-6 text-danger-soft-foreground" />,
+    warning: <ExclamationTriangleIcon className="size-6 text-warning-soft-foreground" />,
     info: <InformationCircleIcon className="size-6 text-accent" />,
 }
 

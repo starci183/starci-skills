@@ -1,6 +1,6 @@
 import useSWRMutation from "swr/mutation"
-import { mutatePlaceOrder } from "@/modules/api"
-import type { MutationPlaceOrderRequest } from "@/modules/api"
+import { mutatePlaceOrder } from "@/modules/api/graphql/mutations/mutation-place-order"
+import type { MutationPlaceOrderRequest } from "@/modules/api/graphql/mutations/types/place-order"
 import { useAppSelector } from "@/redux"
 
 /** What one trigger of the mutation carries: its request. */

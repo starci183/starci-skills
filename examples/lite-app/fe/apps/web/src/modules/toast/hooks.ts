@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl"
 import { useCallback, useMemo } from "react"
 import type { GraphQLResponse } from "@/modules/api"
-import { runGraphQLWithToast, runRestWithToast } from "./api"
+import { runGraphQLWithToast } from "./api"
 import type { RunWithToastOptions, ToastMessages } from "./api"
 
 /** The toast labels of the reader's locale (catalog namespace `app.toast`). */
@@ -28,15 +28,6 @@ export const useGraphQLWithToast = () => {
     return useCallback(
         <T>(action: () => Promise<GraphQLResponse<T>>, options?: RunWithToastOptions) =>
             runGraphQLWithToast(action, messages, options),
-        [messages],
-    )
-}
-
-/** A localized runRestWithToast: every REST write (uploads, presigned URLs) reports its outcome through it. */
-export const useRestWithToast = () => {
-    const messages = useToastMessages()
-    return useCallback(
-        <T>(action: () => Promise<T>, options?: RunWithToastOptions) => runRestWithToast(action, messages, options),
         [messages],
     )
 }

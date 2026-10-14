@@ -1,5 +1,5 @@
 import type { LineItemRow } from "@ecommerce/ui"
-import type { QueryCartResponse } from "@/modules/api"
+import type { QueryCartResponse } from "@/modules/api/graphql/queries/types/cart"
 
 /** The page's own words and number format: one line's quantity label, and a minor-unit amount as display text. */
 export type CartLabels = {

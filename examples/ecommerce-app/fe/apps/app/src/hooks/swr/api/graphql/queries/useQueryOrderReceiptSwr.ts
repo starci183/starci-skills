@@ -1,5 +1,5 @@
 import useSWRMutation from "swr/mutation"
-import { queryOrderReceipt } from "@/modules/api"
+import { queryOrderReceipt } from "@/modules/api/graphql/queries/query-order-receipt"
 
 /** The SWR key of the receipt link query; the order is its identity. */
 const QUERY_ORDER_RECEIPT_SWR_KEY = "QUERY_ORDER_RECEIPT_SWR"

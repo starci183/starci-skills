@@ -1,4 +1,4 @@
-import type { GraphQLResponse } from "@ecommerce/api"
+import type { GraphQLResponse } from "@/modules/api"
 import { toast } from "./toast"
 
 /** The localized labels of the toasts; the use*WithToast hooks resolve them from the catalog. */

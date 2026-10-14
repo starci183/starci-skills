@@ -48,7 +48,11 @@ export function runtimeInstalls({ root = RUNTIME, env = process.env, required = 
     }
     return [dir, { held, unresolved }];
   }));
-  return [...extra.filter((dir) => fs.existsSync(dir)), ...own.sort((a, b) => scores.get(a).unresolved - scores.get(b).unresolved || scores.get(b).held - scores.get(a).held)];
+  // The install that serves the most of the needed packages with their peers resolved leads (held minus unresolved), so one
+  // install supplies the framework and its peers: a near-empty install (few packages, nothing to resolve) never outranks a
+  // complete one and splits `next` or `react` across two installs. Ties go to the more coherent install.
+  const serving = (dir) => scores.get(dir).held - scores.get(dir).unresolved;
+  return [...extra.filter((dir) => fs.existsSync(dir)), ...own.sort((a, b) => serving(b) - serving(a) || scores.get(a).unresolved - scores.get(b).unresolved)];
 }
 
 /** The @starci packages an app installs, from the runtime's own source: package name -> folder under packages/. */

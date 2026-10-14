@@ -4,9 +4,9 @@ import type { RawBodyRequest } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
 import type { Request } from "express"
 import { @@Provider@@InboxService } from "@modules/domain/@@provider@@-inbox"
-import { CLOCK, ClockModule } from "@modules/platform/clock"
 import { Secret } from "@modules/platform/config"
-import { HttpSecurityModule } from "@modules/platform/http-security"
+import { HttpSecurityModule, WebhookSignatureService } from "@modules/platform/http-security"
+import type { HttpSecurityOptions } from "@modules/platform/http-security"
 import { @@Event@@Request } from "./dto/@@event@@.request"
 import { @@Provider@@Webhook } from "./@@provider@@.webhook"
 
@@ -26,26 +26,25 @@ const DELIVERY = deliveryOf()
 const RAW_BODY = Buffer.from(JSON.stringify(DELIVERY))
 const REQUEST = mock<RawBodyRequest<Request>>({ rawBody: RAW_BODY })
 
+const OPTIONS: HttpSecurityOptions = {
+    allowedOrigins: [],
+    rateLimit: { windowMs: 60_000, defaultLimit: 100, strictLimit: 100 },
+    webhooks: { "@@provider@@": { secret: new Secret(SECRET), toleranceMs: 300_000 } },
+}
+
 const sign = (rawBody: Buffer, timestamp: string): string =>
     `sha256=${createHmac("sha256", SECRET).update(`${timestamp}.`).update(rawBody).digest("hex")}`
 
 const build = async (deliveries: @@Provider@@InboxService) => {
     const moduleRef = await Test.createTestingModule({
-        imports: [
-            ClockModule.register({ isGlobal: true }),
-            HttpSecurityModule.register({
-                allowedOrigins: [],
-                rateLimit: { windowMs: 60_000, defaultLimit: 100, strictLimit: 100 },
-                webhooks: { "@@provider@@": { secret: new Secret(SECRET), toleranceMs: 300_000 } },
-            }),
-        ],
+        imports: [HttpSecurityModule.register(OPTIONS)],
         controllers: [@@Provider@@Webhook],
         providers: [
             { provide: @@Provider@@InboxService, useValue: deliveries },
         ],
     })
-        .overrideProvider(CLOCK)
-        .useValue(new FakeClock(AT))
+        .overrideProvider(WebhookSignatureService)
+        .useValue(new WebhookSignatureService(OPTIONS, new FakeClock(AT)))
         .compile()
     return moduleRef.get(@@Provider@@Webhook)
 }
