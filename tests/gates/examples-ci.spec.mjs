@@ -29,7 +29,7 @@ test('the repository: every example app is in the derived matrix and has a flag;
   assert.deepEqual(checkExamplesCi(ROOT).findings, []);
   const flags = parseYaml(fs.readFileSync(path.join(ROOT, CODECOV), 'utf8')).flag_management.individual_flags;
   assert.deepEqual(flags.map((flag) => flag.name), [...coverageExampleApps(ROOT), RUNTIME_FLAG]);
-  // Owner ruling 2026-10-12: a lite app keeps full's unit run and coverage, so the lite example has its flag and its own codecov.yml.
+  // ruling:R212/case-1, amended by ruling:R212/case-4: a lite app keeps full's unit run and coverage, so the lite example has its flag and its own codecov.yml.
   assert.equal(exampleHasTests('lite-app', ROOT), true);
   assert.equal(fs.existsSync(path.join(ROOT, 'examples', 'lite-app', 'codecov.yml')), true);
   const workflow = parseYaml(fs.readFileSync(path.join(ROOT, WORKFLOW), 'utf8'));

@@ -1,0 +1,132 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { claimedSpecProof, coverageProofFindings } from '../../scripts/checks/lib/coverage-proofs.mjs';
+
+const CODE = 'RT_SAMPLE_FAILURE';
+const SPEC = 'tests/checks/sample.spec.mjs';
+const ENFORCER = 'scripts/checks/check-sample.mjs';
+const EDITIONS = ['lite', 'full'];
+const imports = `import test from 'node:test';
+import assert from 'node:assert/strict';
+import { sample } from '../../${ENFORCER}';
+// proves: ${CODE}@lite ${CODE}@full
+`;
+const sourceChecks = `assert.equal(sample(true)[0].code, '${CODE}'); assert.deepEqual(sample(false), []);`;
+
+function fixture(body, lint = false) {
+  const rule = { id: 'R01', code: CODE, failureCodes: [CODE], editions: EDITIONS, proves: [SPEC],
+    enforcers: [{ kind: 'runtime', id: 'sample', at: ENFORCER }] };
+  const files = new Map([[SPEC, imports + body], [ENFORCER,
+    `export function sample(invalid) { return invalid ? [{ code: '${CODE}' }] : []; }`]]);
+  if (lint) {
+    rule.enforcers = [{ kind: 'eslint-be', id: 'sample' }];
+    files.set('packages/eslint/be/index.mjs', `export const rules = {sample: {meta: {}, create() { return {}; }}};`);
+    files.set(SPEC, imports + `import { RuleTester } from 'eslint';
+import { rules } from '../../packages/eslint/be/index.mjs';
+const tester = new RuleTester();
+` + body);
+  }
+  return { catalog: { rules: [rule] }, files, rule };
+}
+
+const recognized = [
+  ['string edition loop', `for (const edition of ['lite', 'full']) test('valid and invalid cases', () => { ${sourceChecks} });`],
+  ['spread edition and code loop', `const editions = ['lite', 'full']; const codes = ['${CODE}'];
+for (const edition of [...editions]) for (const code of [...codes]) test('cases', () => { assert.equal(sample(true)[0].code, code); assert.deepEqual(sample(false), []); });`],
+  ['boolean lite loop', `for (const lite of [false, true]) { const edition = lite ? 'lite' : 'full'; test(edition + ' valid and invalid', () => { ${sourceChecks} }); }`],
+  ['boolean full loop', `for (const full of [false, true]) test(full ? 'full cases' : 'lite cases', () => { ${sourceChecks} });`],
+  ['nested object fixture loop', `const LOGIC_SPECS = [{role: 'policy'}, {role: 'mapper'}];
+for (const edition of ['lite', 'full']) for (const {role} of LOGIC_SPECS) test(role, () => { ${sourceChecks} });`],
+  ['asserted code loop variable', `for (const edition of ['lite', 'full']) for (const code of ['${CODE}']) test('cases', () => {
+assert.equal(sample(true)[0].code, code); assert.deepEqual(sample(false), []); });`],
+  ['destructured code and boolean cases', `const fixtures = [['${CODE}', [true, false]]];
+const codes = findings => findings.map(finding => finding.code);
+function expectCode(code, invalid) { const findings = sample(invalid); assert.equal(codes(findings).includes(code), invalid); }
+for (const edition of ['lite', 'full']) for (const [code, cases] of fixtures) for (const invalid of cases) test('case', () => expectCode(code, invalid));`],
+  ['local returned findings and codes helper', `const codes = findings => findings.map(finding => finding.code);
+const scan = invalid => sample(invalid);
+for (const edition of ['lite', 'full']) test('cases', () => { assert.deepEqual(codes(scan(true)), ['${CODE}']); assert.deepEqual(codes(scan(false)), []); });`],
+  ['assertion helper with filtered findings', `async function expectCode(edition, code, invalid) {
+const findings = await sample(invalid); const matching = findings.filter(finding => finding.code === code);
+assert.equal(matching.length > 0, invalid); }
+for (const edition of ['lite', 'full']) test('cases', () => { expectCode(edition, '${CODE}', true); expectCode(edition, '${CODE}', false); });`],
+];
+
+for (const [shape, body] of recognized) {
+  for (const edition of EDITIONS) {
+    test(`recognizes ${shape} for ${edition}`, () => {
+      const context = fixture(body);
+      assert.deepEqual(coverageProofFindings(context, context.rule, CODE, edition), []);
+      assert.equal(claimedSpecProof(context, SPEC, CODE, edition), true);
+    });
+  }
+}
+
+const lintShapes = [
+  ['nested LOGIC_SPECS RuleTester loop', `const LOGIC_SPECS = [{role: 'policy'}, {role: 'mapper'}];
+for (const edition of ['lite', 'full']) for (const {role} of LOGIC_SPECS) test(role, () => tester.run('sample', rules.sample, {valid: ['ok'], invalid: [{code: 'bad', errors: 1}]}));`],
+  ['boolean RuleTester factory', `const testerFor = lite => new RuleTester();
+for (const lite of [false, true]) test('cases', () => testerFor(lite).run('sample', rules.sample, {valid: ['ok'], invalid: [{code: 'bad', errors: 1}]}));`],
+  ['isolatedCases transformation', `const isolatedCases = cases => Object.fromEntries(Object.entries(cases).map(([kind, fixtures]) => [kind, fixtures.map(fixture => ({...fixture, before: () => {}}))]));
+for (const edition of ['lite', 'full']) test('cases', () => tester.run('sample', rules.sample, isolatedCases({valid: [{code: 'ok'}], invalid: [{code: 'bad', errors: 1}]})));`],
+  ['loop variable rule name and implementation', `const checks = [['sample', rules.sample]];
+for (const edition of ['lite', 'full']) for (const [name, implementation] of checks) test('cases', () => tester.run(name, implementation, {valid: ['ok'], invalid: [{code: 'bad', errors: 1}]}));`],
+];
+
+for (const [shape, body] of lintShapes) {
+  for (const edition of EDITIONS) {
+    test(`recognizes ${shape} for ${edition}`, () => {
+      const context = fixture(body, true);
+      assert.deepEqual(coverageProofFindings(context, context.rule, CODE, edition), []);
+      assert.equal(claimedSpecProof(context, SPEC, CODE, edition), true);
+    });
+  }
+}
+
+const vacuous = [
+  ['uncalled assertion helper', `function unused() { ${sourceChecks} } for (const edition of ['lite', 'full']) test('valid and invalid', () => {});`],
+  ['uncalled checker function', `for (const edition of ['lite', 'full']) test('valid and invalid', () => { const unused = () => sample(true); assert.equal('${CODE}', '${CODE}'); });`],
+  ['ignored code parameter', `function check(unused) { assert.ok(sample(true).length > 0); assert.deepEqual(sample(false), []); }
+for (const edition of ['lite', 'full']) test('valid and invalid', () => check('${CODE}'));`],
+  ['discarded checker result', `const scan = invalid => { sample(invalid); return []; };
+for (const edition of ['lite', 'full']) test('valid and invalid', () => { assert.deepEqual(scan(true), ['${CODE}']); assert.deepEqual(scan(false), []); });`],
+  ['message-only code mention', `for (const edition of ['lite', 'full']) test('valid and invalid', () => { assert.ok(sample(true).length > 0, '${CODE}'); assert.deepEqual(sample(false), []); });`],
+  ['empty nested fixtures', `for (const edition of ['lite', 'full']) for (const code of []) test('valid and invalid', () => { ${sourceChecks} });`],
+];
+
+for (const [shape, body] of vacuous) {
+  for (const edition of EDITIONS) {
+    test(`refuses ${shape} for ${edition}`, () => {
+      const context = fixture(body);
+      assert.equal(coverageProofFindings(context, context.rule, CODE, edition)[0]?.code, 'RT_COVERAGE_PROOF_VACUOUS');
+      assert.equal(claimedSpecProof(context, SPEC, CODE, edition), false);
+    });
+  }
+}
+
+for (const edition of EDITIONS) {
+  test(`refuses an emptied isolatedCases output for ${edition}`, () => {
+    const context = fixture(`const isolatedCases = cases => ({...cases, valid: []});
+for (const edition of ['lite', 'full']) test('cases', () => tester.run('sample', rules.sample, isolatedCases({valid: ['ok'], invalid: [{code: 'bad', errors: 1}]})));`, true);
+    assert.equal(coverageProofFindings(context, context.rule, CODE, edition)[0]?.code, 'RT_COVERAGE_PROOF_VACUOUS');
+    assert.equal(claimedSpecProof(context, SPEC, CODE, edition), false);
+  });
+}
+
+test('boolean loop evidence remains attached to the edition that executes it', () => {
+  const context = fixture(`for (const lite of [false, true]) { if (lite) test('valid and invalid', () => { ${sourceChecks} }); }`);
+  assert.deepEqual(coverageProofFindings(context, context.rule, CODE, 'lite'), []);
+  assert.equal(coverageProofFindings(context, context.rule, CODE, 'full')[0]?.code, 'RT_COVERAGE_PROOF_VACUOUS');
+});
+
+for (const edition of EDITIONS) {
+  test(`different ${edition} RuleTester loop implementations retain their own identities`, () => {
+    const context = fixture(`const checks = [['sample', rules.sample], ['other', rules.other]];
+for (const edition of ['lite', 'full']) for (const [name, implementation] of checks) test('cases', () => tester.run(name, implementation, {valid: ['ok'], invalid: [{code: 'bad', errors: 1}]}));`, true);
+    context.rule.enforcers.push({kind: 'eslint-be', id: 'other'});
+    context.files.set('packages/eslint/be/index.mjs', 'export const rules = {sample: {create() { return {}; }}, other: {create() { return {}; }}};');
+    assert.deepEqual(coverageProofFindings(context, context.rule, CODE, edition), []);
+    context.files.set(SPEC, context.files.get(SPEC).replace("['other', rules.other]", "['other', rules.sample]"));
+    assert.match(coverageProofFindings(context, context.rule, CODE, edition)[0]?.message, /eslint-be:other/);
+  });
+}

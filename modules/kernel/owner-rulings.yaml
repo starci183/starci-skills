@@ -198,7 +198,271 @@ rulings:
     date: '2026-10-14'
     ruling: "R50 (FE_TRANSPORT_OWNER) requires Accept-Language as the locale header in both editions; x-locale is retired. Historical CHANGELOG entries and the rule that rejects the retired header preserve its spelling."
     staleWhen: ['\bx-locale\b']
+    retires: [x-locale]
+    retiredIn: [packages/eslint/fe/served-locale.mjs, knowledge/hfs/requirements.yaml]
     enforcedBy: [packages/eslint/fe/served-locale.mjs]
+  # HFS decisions share stable ids and relationship records with knowledge/hfs/rulings.yaml.
+  - id: hfs-complete-standard
+    date: '2026-10-14'
+    topic: standard.coverage
+    status: live
+    ownerRuling: 1
+    source: A15-STANDARD section 0.1 item 1
+    ruling: >-
+      Alpha.15 is the complete HFS standard for lite and full; every applicable surface in each edition
+      needs its requirement, rule, enforcer, template, example, documentation and proof.
+    supersedes: []
+    enforcedBy: [R247, R274]
+
+  - id: lite-production-swarm
+    date: '2026-10-14'
+    topic: deploy.lite-production
+    status: live
+    ownerRuling: 2
+    source: A15-STANDARD section 0.1 item 2
+    ruling: >-
+      Lite production declares runtime docker-swarm in .starcistacks/application-stacks.yaml and tracks
+      the rendered stack under .starcistacks/production/infra/swarm/. The VPS runs neither Compose nor
+      a host crontab; scheduling is app-owned through the back-end scheduler, pgmq or a pg_cron tick,
+      or through a declared replicated-job.
+    supersedes:
+      - {rule: R212, case: case-1}
+      - {rule: R212, case: case-2}
+      - {rule: R212, case: case-3}
+    amendmentScope: Lite hosting, stack layout and scheduling clauses only.
+    enforcedBy: [R10, R212, R250, R266, R267, R268]
+
+  - id: single-declared-ingress
+    date: '2026-10-14'
+    topic: deploy.ingress
+    status: live
+    ownerRuling: 3
+    source: A15-STANDARD section 0.1 item 3
+    ruling: >-
+      Any single declared ingress component is accepted, including Traefik or Caddy, with its image
+      pinned by digest; the canon selects no particular ingress implementation.
+    supersedes: []
+    enforcedBy: [R266, R275]
+
+  - id: lite-backing-services
+    date: '2026-10-14'
+    topic: deploy.lite-backing-services
+    status: live
+    ownerRuling: 4
+    source: A15-STANDARD section 0.1 item 4
+    ruling: >-
+      Lite uses Supabase and has no self-hosted Postgres. A sidecar that needs a database uses SQLite
+      on a declared persistent volume; a sidecar requiring Postgres, Redis or Mongo is refused.
+    supersedes: []
+    enforcedBy: [R276]
+
+  - id: sealed-secret-custody
+    date: '2026-10-14'
+    topic: security.secret-custody
+    status: live
+    ownerRuling: 5
+    source: A15-STANDARD section 0.1 item 5
+    ruling: >-
+      Product secrets exist only as sops/age sealed .starcistacks/<env>/secrets/*.enc members.
+      Plaintext secret files are never tracked, placed in deploy/ or put in a workflow; the private age
+      identity is held only as SOPS_AGE_KEY in the owner's untracked .claude/secret.env.
+    supersedes: [platform-age-file-custody]
+    enforcedBy: [R06, R253, R277]
+
+  - id: typed-app-environment
+    date: '2026-10-14'
+    topic: code.be-environment
+    status: live
+    ownerRuling: 7
+    source: A15-STANDARD section 0.1 item 7
+    ruling: >-
+      Every back-end app has apps/<app>/src/<app>.env.ts with an interface and read<App>Env(env: EnvSource).
+      The app reads its environment through that boundary; main.ts delegates and holds no parsing of its own,
+      and app.module.ts spreads composition groups instead of holding an inline module list.
+    supersedes: [R245]
+    amendmentScope: The optional inline parsing clause of R245; the other app-role restrictions remain in force.
+    enforcedBy: [R248, R289]
+
+  - id: fe-auth-only
+    date: '2026-10-13'
+    topic: security.fe-data-door
+    status: live
+    ownerRuling: 8
+    source: A15-STANDARD section 0.1 item 8; knowledge/hfs/rules.yaml R212 cases.case-2
+    ruling: >-
+      The front end uses Supabase for Auth only and accesses application data through the back end.
+      The front-end client boundary and the database grants, policies and realtime publication boundary
+      enforce this decision; declared direct-access exceptions are explicit and listed.
+    supersedes: []
+    enforcedBy: [R217, R254]
+
+  - id: graphql-default-door
+    date: '2026-10-13'
+    topic: code.be-transport
+    status: live
+    ownerRuling: 9
+    source: A15-STANDARD section 0.1 item 9
+    ruling: >-
+      GraphQL is the default application door. REST is reserved for probes, auth handshakes, signed
+      webhooks, byte streams and the public v1 table; the reason and route evidence apply in both editions.
+    supersedes: []
+    enforcedBy: [R278, R290]
+
+  - id: owner-run-steps
+    date: '2026-10-14'
+    topic: deploy.owner-steps
+    status: live
+    ownerRuling: 10
+    source: A15-STANDARD section 0.1 item 10
+    ruling: >-
+      DNS changes, provider URIs, docker swarm init and key rotation remain owner-run steps.
+      The standard requires those steps and their evidence to be declared and never automates them.
+    supersedes: []
+    enforcedBy: [R266, R267]
+
+  - id: lite-contract-specs
+    date: '2026-10-14'
+    topic: proof.lite-contract
+    status: live
+    source: A15-STANDARD section 2.2 decision 1
+    ruling: >-
+      Lite may have tests/contract and test:contract. The owner's HFS standard relaxes the older contract
+      refusal in R212, be.tests.contract and edition.mjs; e2e, stack and browser runs remain full-only.
+    supersedes:
+      - {rule: R212, case: case-1}
+    amendmentScope: The lite contract-world prohibition only; the full-only e2e boundary remains.
+    enforcedBy: [R212]
+
+  - id: lite-webhook-after-commit
+    date: '2026-10-14'
+    topic: code.be-webhook-handoff
+    status: live
+    source: A15-STANDARD section 2.2 decision 2
+    ruling: >-
+      Lite webhook intake records its receipt and typed outbox event in the transaction. A reactor or job
+      processes the event after commit; processing never runs inside the intake transaction.
+    supersedes: []
+    enforcedBy: [R263]
+
+  - id: locale-accept-language
+    date: '2026-10-14'
+    topic: code.fe-locale-header
+    status: live
+    source: A15-STANDARD section 2.2 decision 3
+    ruling: >-
+      The single front-end locale writer sends Accept-Language, and back-end localization reads that
+      header; the previous custom locale header is retired in templates, lint and examples.
+    supersedes: []
+    enforcedBy: [R50]
+
+  - id: lite-fe-app-cardinality
+    date: '2026-10-14'
+    topic: code.fe-app-cardinality
+    status: live
+    source: A15-STANDARD section 2.2 decision 4
+    ruling: Lite may have more than one front-end app; the earlier single-app wording is removed.
+    supersedes: []
+    enforcedBy: [R212]
+
+  - id: code-function-feature-budgets
+    date: '2026-10-14'
+    topic: code.size-budgets
+    status: live
+    source: A15-STANDARD section 2.2 decision 5
+    ruling: A function is at most 80 lines in back-end and front-end code, and a feature holds at most 250 files.
+    supersedes: []
+    enforcedBy: [R291, R292]
+
+  - id: observability-required-signals
+    date: '2026-10-14'
+    topic: observability.required
+    status: live
+    source: A15-STANDARD section 0.2 observability decisions
+    ruling: The logger port, live and ready probes, and Docker HEALTHCHECK are mandatory in both editions.
+    supersedes: []
+    enforcedBy: [R40, R71, R189, R262]
+
+  - id: observability-deferred-signals
+    date: '2026-10-14'
+    topic: observability.deferred
+    status: live
+    source: A15-STANDARD section 0.2 observability decisions; section 6
+    ruling: >-
+      Request-id correlation, metrics and tracing are outside alpha.15; their mandatory status remains
+      pending an owner decision and creates no new alpha.15 failure code.
+    supersedes: []
+    enforcedBy: []
+    gap: P2 owner decision pending; no mandatory request-id, metrics or tracing enforcer is scheduled.
+
+  - id: fe-error-reporter-optional
+    date: '2026-10-14'
+    topic: observability.fe-reporter
+    status: live
+    source: A15-STANDARD section 0.2 observability decisions
+    ruling: >-
+      A front-end error reporter is documented optional and declared through hfs.json observe.reporter;
+      FE_OBSERVE_MISSING is not introduced unless the owner makes the reporter mandatory.
+    supersedes: []
+    enforcedBy: []
+    gap: Optional declaration only; no missing-reporter finding is authorized.
+
+  - id: lite-work-brand-only
+    date: '2026-10-14'
+    topic: work.lite-boundary
+    status: superseded
+    source: knowledge/hfs/rules.yaml R212 cases.case-4 quote and amended ruling
+    ruling: The initial restriction to brand records was clarified to permit .gitignore and optional workspace.yaml too.
+    supersedes: []
+    amendedBy: [R212/case-4]
+    enforcedBy: [R212]
+
+  - id: platform-age-file-custody
+    date: '2026-10-14'
+    topic: security.age-key-custody
+    status: superseded
+    source: knowledge/patterns/repo/secrets.yaml provenance.limitations and REPO-SECRETS-4; A15-STANDARD section 3 seeds
+    ruling: >-
+      The dated repository-secrets guidance retained the platform default age identity file outside Git.
+      The standard replaces that custody guidance with SOPS_AGE_KEY in .claude/secret.env.
+    supersedes: []
+    amendedBy: [sealed-secret-custody]
+    enforcedBy: [R253]
+
+  # Earlier kernel and drawing decisions cited by the specs retain stable owner ids.
+  - id: handover-owner-approval
+    date: '2026-09-23'
+    source: tests/kernel/handover.spec.mjs; modules/ops/ops/handover.review.yaml proofs.owner-approval
+    ruling: A workflow finishes only after the owner's approve receipt for its latest handover review; feedback and questions do not approve it.
+    supersedes: []
+    enforcedBy: [scripts/kernel/handover.mjs]
+
+  - id: credential-build-placeholders
+    date: '2026-09-23'
+    source: modules/ops/_common.yaml Bounded finish and blockers; modules/kernel/driver-loop.yaml verdictTable[].provisionAsk
+    ruling: Missing credentials do not stop build work; builds use declared placeholders and report credentialPending, while live proof waits for the required credentials.
+    supersedes: []
+    enforcedBy: [modules/kernel/driver-loop.yaml, scripts/kernel/report-envelope.mjs]
+
+  - id: owner-language-logs
+    date: '2026-09-23'
+    source: tests/repo/owner-language-rule.spec.mjs; modules/kernel/driver-loop.yaml boundary.language
+    ruling: Code and identifiers are English; kernel and op logs and owner-facing narration use the language configured in config.yaml.
+    supersedes: []
+    enforcedBy: [modules/kernel/driver-loop.yaml]
+
+  - id: drawing-owner-parts
+    date: '2026-09-24'
+    source: tests/work/direction-part.spec.mjs; modules/ops/ops/interface.draw.yaml proofs.owner-sees-parts
+    ruling: The owner reviews each drawn part; composites remain implementation and audit evidence, and owner-facing images select the part even when an older record names its composite.
+    supersedes: []
+    enforcedBy: [scripts/work/direction-part.mjs, scripts/kernel/ask-images.mjs, scripts/connectors/telegram-media.mjs]
+
+  - id: drawing-light-device-matrix
+    date: '2026-09-24'
+    source: tests/work-ui/shell-conformance.spec.mjs; modules/ops/ops/interface.draw.yaml proofs.shell-conformance
+    ruling: Every drawing set covers desktop and mobile in the light theme for each drawn state; dark-theme drawings are optional.
+    supersedes: []
+    enforcedBy: [scripts/work/ui/shell-conformance.mjs]
 
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']

@@ -33,7 +33,7 @@
 //                                            a back-end `<name>.service.ts` and its `<name>.service.spec.ts` skeleton (scaffold/service.mjs; <dir> is
 //                                            relative to be/): the spec is built
 //                                            with Test.createTestingModule, one provider per constructor dependency (kit doubles from @starci/jest-preset),
-//                                            one placeholder it per public method. Never overwrites a file. Both editions: a lite back end keeps full's unit specs (owner ruling 2026-10-12).
+//                                            one placeholder it per public method. Never overwrites a file. Both editions: a lite back end keeps full's unit specs (ruling:R212/case-1, amended by ruling:R212/case-4).
 //   starci app new image [--cwd <dir>]                  the Dockerfile of every declared app that has none, from the image canon (scaffold/image.mjs); never overwrites
 //   starci app new spec <file>.service.ts [--cwd <dir>]  the spec skeleton of an existing service, read from its constructor with the repository's TypeScript
 //   starci app secret init | set <env> <slug> <KEY> [--generate <bytes>] | get <env> <slug> [KEY] --to-file [--reveal]

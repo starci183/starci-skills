@@ -127,13 +127,13 @@ test('BE_SAGA_CONSUMER_DEDUPE: a consumer of a saga feature that never reads the
 
 // ------------------------------------------------------------------------------------------------ R173 BE_SAGA_E2E_MISSING
 
-test('BE_SAGA_E2E_MISSING: a compensation path with no e2e spec, one through the world that injects no failure, are refused', () => {
+test('BE_SAGA_E2E_MISSING (full): a compensation path with no e2e spec, one through the world that injects no failure, are refused', () => {
   assert.match(saga('BE_SAGA_E2E_MISSING', { [SPEC]: null })[0].message, /has no e2e spec/);
   const noFault = saga('BE_SAGA_E2E_MISSING', { [SPEC]: SPEC_TS.replace(/it\(.*\n/, "it('compensates billing.invoice-rejected', () => undefined);\n") });
   assert.match(noFault[0].message, /injects no failure/);
 });
 
-test('BE_SAGA_E2E_MISSING: an e2e spec through the world that names the compensation event and injects a failure passes', () => {
+test('BE_SAGA_E2E_MISSING (full): an e2e spec through the world that names the compensation event and injects a failure passes', () => {
   assert.deepEqual(saga('BE_SAGA_E2E_MISSING'), []);
   assert.deepEqual(saga('BE_SAGA_E2E_MISSING', { [SPEC]: SPEC_TS.replace('.during(async () => undefined)', ".cut()") }), []);
 });

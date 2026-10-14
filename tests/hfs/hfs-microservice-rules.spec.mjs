@@ -1,12 +1,14 @@
 // The microservice policy of `starci app check` (scripts/hfs/rules/services.mjs): R163 HFS_SERVICE_PLACEMENT, R164 HFS_IMAGE_UNPINNED,
 // R165 HFS_SERVICE_STACK_DECLARATION, R166 HFS_EVENT_CONTRACT (event classes -> events.json), R167 BE_ASYNC_SPEC_MISSING, plus the event contract emit
 // (packages/hfs/emit). Each rule has a violating and a passing tree; the clean app of tests/helpers/hfs-cli-fixture.mjs is the base.
+// proves: BE_ASYNC_SPEC_MISSING@full
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { checkRepo } from '../../scripts/hfs/check.mjs';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 import { emitContracts } from '../../packages/hfs/emit/contracts.mjs';
 import { APP, STACKS_DECLARATION, appOf, cleanup, gitAdd, installTypeScript, writeCleanRepo } from '../helpers/hfs-cli-fixture.mjs';
 
@@ -26,7 +28,7 @@ const put = (dir, relative, text = 'export {};\n') => {
   fs.writeFileSync(target, text);
 };
 const only = (declaration, mutate, code) => checkRepo({ repoRoot: repoOf(declaration, mutate) }).findings.filter((f) => f.code === code);
-const pathsOf = (findings) => findings.map((f) => f.path).sort();
+const pathsOf = (findings) => findings.map((f) => f.path).sort(byCodeUnit);
 
 const stack = (components) => `${STACKS_DECLARATION}components:\n${components}`;
 const COMPONENTS = [
@@ -65,7 +67,7 @@ test('HFS_IMAGE_UNPINNED: a multi-service stack with a moving image (no tag, lat
     '  core:', '    image: demo/core', '    role: service',
     '  billing:', '    image: demo/billing:1.0.0', '    role: service', '',
   ].join('\n')), 'HFS_IMAGE_UNPINNED');
-  assert.deepEqual(findings.map((f) => f.component).sort(), ['core', 'postgres', 'redis']);
+  assert.deepEqual(findings.map((f) => f.component).sort(byCodeUnit), ['core', 'postgres', 'redis']);
   assert.match(findings.find((f) => f.component === 'core').message, /has no tag/);
   assert.match(findings.find((f) => f.component === 'postgres').message, /not an exact version/);
 });
@@ -80,7 +82,7 @@ test('HFS_IMAGE_UNPINNED: exact versions and digests pass, and a single-service 
 
 test('HFS_SERVICE_STACK_DECLARATION: a service app with no component, or one that is not role service, is refused', () => {
   const findings = only(MULTI, withStack('  core:\n    image: demo/core:1.0.0\n    role: stateful\n'), 'HFS_SERVICE_STACK_DECLARATION');
-  assert.deepEqual(findings.map((f) => f.app).sort(), ['billing', 'core']);
+  assert.deepEqual(findings.map((f) => f.app).sort(byCodeUnit), ['billing', 'core']);
 });
 
 test('HFS_SERVICE_STACK_DECLARATION: every service app declared as a role service component passes', () => {
@@ -188,7 +190,8 @@ const CONSUMER_REJECTED = 'be/src/features/orders/transport/message/invoice-reje
 const CONSUMER_PLACED = 'be/src/features/billing/transport/message/order-placed.consumer.ts';
 const SPEC_PLACED = 'be/src/tests/e2e/orders/order-placed.e2e-spec.ts';
 const SPEC_REJECTED = 'be/src/tests/e2e/orders/invoice-rejected.e2e-spec.ts';
-const SPEC = (...events) => `import { useTestWorld } from '../../world/use-test-world';\nconst world = useTestWorld({ apps: ['core'] });\n${events.map((event) => `it('handles ${event}', () => undefined);`).join('\n')}\n`;
+const eventSpec = (event) => `it('handles ${event}', () => undefined);`;
+const SPEC = (...events) => `import { useTestWorld } from '../../world/use-test-world';\nconst world = useTestWorld({ apps: ['core'] });\n${events.map(eventSpec).join('\n')}\n`;
 /** `billing` consumes `order.placed`; `core` consumes `billing.invoice-rejected`, which compensates `order.placed`. */
 const asyncRepo = (specs = {}) => (dir) => {
   withEvents()(dir);
@@ -198,21 +201,21 @@ const asyncRepo = (specs = {}) => (dir) => {
 };
 const r140 = (specs) => only(MULTI, asyncRepo(specs), 'BE_ASYNC_SPEC_MISSING');
 
-test('BE_ASYNC_SPEC_MISSING: a consumed event no e2e spec names, and a spec that does not boot the world, are refused on the consumer', () => {
-  assert.deepEqual(r140().map((f) => [f.path, f.event]).sort(), [[CONSUMER_PLACED, 'order.placed'], [CONSUMER_REJECTED, 'billing.invoice-rejected']]);
+test('BE_ASYNC_SPEC_MISSING (full): a consumed event no e2e spec names, and a spec that does not boot the world, are refused on the consumer', () => {
+  assert.deepEqual(r140().map((f) => [f.path, f.event]).sort((left, right) => byCodeUnit(left[0], right[0])), [[CONSUMER_PLACED, 'order.placed'], [CONSUMER_REJECTED, 'billing.invoice-rejected']]);
   const notWorld = r140({ [SPEC_PLACED]: "it('order.placed', () => undefined)\n", [SPEC_REJECTED]: "it('billing.invoice-rejected', () => undefined)\n" });
   assert.equal(notWorld.length, 2);
   assert.match(notWorld[0].message, /has no e2e spec/);
 });
 
-test('BE_ASYNC_SPEC_MISSING: the spec of a saga step must also drive the event it compensates', () => {
+test('BE_ASYNC_SPEC_MISSING (full): the spec of a saga step must also drive the event it compensates', () => {
   const stepOnly = r140({ [SPEC_PLACED]: SPEC('order.placed'), [SPEC_REJECTED]: SPEC('billing.invoice-rejected') });
   assert.equal(stepOnly.length, 1);
   assert.equal(stepOnly[0].path, SPEC_REJECTED);
   assert.match(stepOnly[0].message, /undoes "order.placed", but never names it/);
 });
 
-test('BE_ASYNC_SPEC_MISSING: every consumed event named by an e2e spec through the world, a saga step driving the whole flow, passes', () => {
+test('BE_ASYNC_SPEC_MISSING (full): every consumed event named by an e2e spec through the world, a saga step driving the whole flow, passes', () => {
   assert.deepEqual(r140({ [SPEC_PLACED]: SPEC('order.placed'), [SPEC_REJECTED]: SPEC('order.placed', 'billing.invoice-rejected') }), []);
   assert.deepEqual(r140({ 'be/src/tests/e2e/orders/whole-saga.e2e-spec.ts': SPEC('order.placed', 'billing.invoice-rejected') }), []);
 });

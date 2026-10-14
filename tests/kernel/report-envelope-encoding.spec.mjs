@@ -22,7 +22,7 @@ test('real Vietnamese, English questions and query strings are not lossy', () =>
   assert.equal(validateOpReport({ outcome: 'done', summary: 'bad byte � here' }).ok, false, 'a replacement character alone is lossy');
 });
 
-// Owner ruling 2026-09-23: a missing credential never stops building; a build
+// owner:credential-build-placeholders: a missing credential never stops building; a build
 // op codes on a placeholder and names the variables it stood in for.
 test('a report may name the credentials it built on placeholders for', async () => {
   const { validateOpReport } = await import('../../scripts/kernel/report-envelope.mjs');

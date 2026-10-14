@@ -133,6 +133,18 @@ schema; `RT_COVERAGE_GATE_LIE` refuses gate claims unsupported by actual command
 and `RT_COVERAGE_REQUIREMENT_UNLEDGERED` identifies a hard documentation
 requirement without a valid ledger entry or owning rule anchor.
 
+`RT_COVERAGE_PROOF_VACUOUS` refuses proof that only mentions a code, has empty
+valid or invalid fixtures, or lacks both a passing and a violating assertion for
+the applicable edition. Edition loops, table-driven tests and local assertion
+helpers count when their assertions resolve to that code and edition. Each
+enforcer needs proof for the code it emits; one code cannot prove unrelated
+enforcers. `RT_COVERAGE_CODE_UNROUTED` identifies a machine code routed to lint
+when its profile's ESLint plugin has no enforcer that handles it.
+
+A rule with no scaffolded surface may declare `templateNa` with a reason instead
+of citing an unrelated template. Required and managed slot templates still need
+their own evidence.
+
 Rules before R247 without any coverage metadata remain warnings in the legacy
 backlog. Adding any of `editions`, `docs`, `exemplifiedBy`, `proves` or `witness`
 adopts a rule into the coverage gate. R247 onward is always gated, including

@@ -13,7 +13,7 @@ import { byCodeUnit } from '../../packages/hfs/report/order.mjs';
 // The edition gate of `starci app add` and `starci app new` (design 8.6 R8): in a lite app a noun whose file tree lands in a slot the
 // lite edition does not have (the slot's `editions` exclude it, or its `litePresence` is forbidden) refuses with exit 2
 // and "<verb> <noun>: full edition only; run starci app upgrade --edition full" on stderr, nothing written. The slot
-// resolver of the app decides - never a noun list. Owner ruling 2026-10-12: lite has every pattern; a pattern noun whose topic
+// resolver of the app decides - never a noun list. ruling:R212/case-1, amended by ruling:R212/case-4: lite has every pattern; a pattern noun whose topic
 // carries a `liteAdapter` refuses only because the package carries the full adapter's templates (LiteAdapterRefusal).
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -91,7 +91,7 @@ test('a lite app refuses every pattern noun whose topic carries a liteAdapter: t
   assert.match(event.err, /HFS_ADD_NOUN_UNKNOWN/);
 });
 
-test('a lite app writes `new service` with its unit spec - a lite back end keeps full\'s unit specs (owner ruling 2026-10-12)', async () => {
+test('a lite app writes `new service` with its unit spec - a lite back end keeps full\'s unit specs (ruling:R212/case-1, amended by ruling:R212/case-4)', async () => {
   const dir = repo(LITE);
   installTypeScript(dir);
   const result = await cli(['new', 'service', 'be/src/modules/domain/commission', 'commission', '--cwd', dir]);

@@ -300,7 +300,7 @@ test('lite scaffold emits its workspace and required stack declarations and is s
   // The fe stack's root tools (fe-stack.yaml tier core: codegen and lint) at their canon pins, as in full.
   for (const tool of ['@graphql-codegen/cli', '@graphql-codegen/client-preset', 'eslint', 'prettier', 'typescript'])
     assert.equal(pkg.devDependencies[tool], PINS[tool].version, `${tool} is a root devDependency at its pin`);
-  // Owner ruling 2026-10-12: a lite back end keeps the unit run; it runs no test world of its own and has no cli app until add cli.
+  // ruling:R212/case-1, amended by ruling:R212/case-4: the lite starter keeps the unit run without a test-world dependency and has no cli app until add cli.
   for (const unit of ['@nestjs/testing', '@starci/jest-preset', '@types/jest', 'jest', 'ts-jest']) assert.equal(typeof pkg.devDependencies[unit], 'string', `${unit} is a lite devDependency`);
   for (const forbidden of ['@starci/test-world', 'nest-commander']) {
     assert.equal(pkg.dependencies[forbidden] ?? pkg.devDependencies[forbidden], undefined, `${forbidden} is not a lite starter dependency`);

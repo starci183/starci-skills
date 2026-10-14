@@ -693,3 +693,27 @@ test('bad arguments and missing or malformed catalogs are usage errors', () => {
     }
   }
 });
+
+// A ruling that retires a term declares where the term may still be named: the enforcer implementing the retirement and the ledger
+// entry recording it. Every other file naming the term remains a stale statement.
+test('retires/retiredIn exempts only the declared enforcer and ledger files from a staleWhen match', () => {
+  const retiring = {
+    rules,
+    ownerRulings: {
+      rulings: [{
+        id: 'locale-header', date: '2026-10-14', staleWhen: ['x-locale'], retires: ['x-locale'],
+        retiredIn: ['packages/eslint/fe/served-locale.mjs', 'knowledge/hfs/requirements.yaml'],
+      }],
+    },
+  };
+  const text = 'const RETIRED_LOCALE_HEADER = "x-locale"\n';
+  assert.deepEqual(findingsFor(text, 'packages/eslint/fe/served-locale.mjs', retiring), []);
+  assert.deepEqual(findingsFor('statement: x-locale is retired\n', 'knowledge/hfs/requirements.yaml', retiring), []);
+  const other = findingsFor(text, 'packages/eslint/fe/other-rule.mjs', retiring);
+  assert.equal(other.length, 1);
+  assert.equal(other[0].kind, 'staleWhen');
+  assert.equal(findingsFor('Send x-locale to the api.\n', 'docs/guide.md', retiring).length, 1);
+  // retiredIn without retires grants nothing
+  const noRetires = { rules, ownerRulings: { rulings: [{ id: 'locale-header', date: '2026-10-14', staleWhen: ['x-locale'], retiredIn: ['docs/guide.md'] }] } };
+  assert.equal(findingsFor('Send x-locale to the api.\n', 'docs/guide.md', noRetires).length, 1);
+});

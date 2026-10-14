@@ -11,12 +11,12 @@ import { managedGroupOf } from '../../scripts/hfs/edition-slots.mjs';
 import { HfsSlotsError, loadRuleCatalog, loadSlotManifest, openHfs, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
 
 // The edition mechanism (L01, manifest 2.1.0, re-ruled in 3.0.0): hfs.json names `edition: full|lite` (absent means full), and lite is
-// the same manifest filtered (a slot's `editions`, `litePresence` and `lite` overlay), never a second engine. Owner ruling 2026-10-12:
-// lite is the full architecture deployed without self-hosted infrastructure - it keeps every pattern, the worker app and the back-end
-// unit specs, and drops only the e2e world, the browser journey, UAT records and the self-hosted stack; a `supabase`
-// connection provider enables the Supabase slots (app.supabase*, be.integrations.supabase, fe.route.callback). Owner ruling 2026-10-13:
+// the same manifest filtered (a slot's `editions`, `litePresence` and `lite` overlay), never a second engine. The shared architecture and
+// unit specs from ruling:R212/case-1 remain; ruling:R212/case-4 defines the current Work boundary and owner:lite-production-swarm
+// replaces the historical hosting restrictions. A `supabase` connection provider enables the Supabase slots
+// (app.supabase*, be.integrations.supabase, fe.route.callback). ruling:R212/case-2, amended by ruling:R212/case-4:
 // the front end is one standard for both editions (no fe lite overlay) and lite runs the socket.io gateway in the api process.
-// Owner decision 2026-10-14: lite may have optional contract specs and their test:contract lifecycle scripts.
+// owner:lite-contract-specs: lite may have optional contract specs and their test:contract lifecycle scripts; e2e stays full-only.
 
 const root = path.resolve(import.meta.dirname, '..', '..');
 const Ajv2020 = (() => { const loaded = createRequire(import.meta.url)('ajv/dist/2020.js'); return loaded.default ?? loaded; })();

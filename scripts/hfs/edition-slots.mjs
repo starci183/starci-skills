@@ -1,7 +1,7 @@
 // edition.mjs - the one edition filter shared by the HFS slot resolver, declaration validation, rule catalog and
 // edition-specific rule parameters. Full is the default; lite changes data views, never the checks that consume them.
-// Lite is the full architecture deployed without self-hosted infrastructure (owner ruling 2026-10-12): its overlays swap
-// adapters and remove the infra and e2e world, and every slot keeps its own `tests`.
+// Lite uses provider adapters and declares Docker Swarm production infrastructure (owner:lite-production-swarm, ruling:R212/case-4).
+// Its overlays exclude the e2e world, and every slot keeps its own `tests`.
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { EDITIONS } from './manifest-shape.mjs';
 

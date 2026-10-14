@@ -3,37 +3,72 @@ import { parse } from 'acorn';
 import { posix } from 'node:path';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { enforcerJudgedInEdition } from '../../hfs/edition-slots.mjs';
+import { workflowRunCommands } from './coverage-workflows.mjs';
 
 const runtimeCheckCache = new WeakMap();
 const runtimeEmitterCache = new WeakMap();
+const STACKS_GATE_FILES = new Set(['scripts/gates/stacks-gate.mjs', 'scripts/gates/starcistacks-runtime.mjs', 'scripts/gates/starcistacks.mjs']);
+const SHELL_RUNNERS = new Set(['exec', 'execSync']);
+const NODE_RUNNERS = new Set(['runNode', 'runNpm']);
+const FILE_RUNNERS = new Set(['execFile', 'execFileSync', 'spawn', 'spawnSync']);
 const commandsOf = (text) => String(text ?? '').split(/\r?\n/).filter((line) => !/^\s*#/.test(line)).join('\n');
-function executableSource(text) {
-  const comments = [];
-  try {
-    parse(String(text ?? ''), { ecmaVersion: 'latest', sourceType: 'module', onComment: (_block, _text, start, end) => comments.push([start, end]) });
-    let source = String(text ?? '');
-    for (const [start, end] of comments.reverse()) source = source.slice(0, start) + ' '.repeat(end - start) + source.slice(end);
-    return source;
-  } catch { return ''; }
+
+function argumentWords(array) {
+  return array?.elements?.map((entry) => typeof entry?.value === 'string' ? entry.value : '<argument>') ?? [];
 }
 
-// Template variables outside YAML scalars are replaced before parsing; only run steps count.
-function jobRunCommands(text) {
-  let document;
-  try { document = parseYaml(text.replaceAll('{{header}}', '').replace(/\{\{[^{}\n]*\}\}/g, 'template')); } catch { return []; }
+function runnerCommand(entry) {
+  const name = entry.callee.name ?? entry.callee.property?.name;
+  const args = entry.arguments;
+  if (SHELL_RUNNERS.has(name)) return typeof args[0]?.value === 'string' ? commandsOf(args[0].value) : '';
+  if (NODE_RUNNERS.has(name)) {
+    const words = argumentWords(args[0]);
+    if (name === 'runNode' && words[0] === '<argument>' && words[1] === 'app') words[0] = 'starci.mjs';
+    return [name === 'runNode' ? 'node' : 'npm', ...words].join(' ');
+  }
+  if (FILE_RUNNERS.has(name) && typeof args[0]?.value === 'string') return [args[0].value, ...argumentWords(args[1])].join(' ');
+  return '';
+}
+
+function processCommands(node) {
   const commands = [];
-  for (const job of Object.values(document?.jobs ?? {})) {
-    if (job?.if === false || /^(?:false|\$\{\{\s*false\s*\}\})$/.test(String(job?.if))) continue;
-    for (const step of job.steps ?? []) if (step.run && step.if !== false && String(step.if) !== 'false') commands.push(commandsOf(step.run));
+  visitNodes(node, (entry) => {
+    if (entry.type === 'FunctionDeclaration' || (entry.type === 'VariableDeclarator' && callable(entry.init))) return false;
+    if (entry.type !== 'CallExpression') return;
+    const command = runnerCommand(entry);
+    if (command) commands.push(command);
+  });
+  return commands;
+}
+
+function gateArgumentCommands(ast) {
+  const { functions, exports } = moduleFunctions(ast);
+  const pending = [...invokedNames(ast), ...['runGate', 'run', 'gate'].map((name) => exports.get(name)).filter(Boolean)];
+  const reached = new Set();
+  const commands = processCommands(ast);
+  while (pending.length) {
+    const name = pending.pop();
+    if (reached.has(name) || !functions.has(name)) continue;
+    reached.add(name);
+    const body = functions.get(name).body;
+    commands.push(...processCommands(body));
+    pending.push(...invokedNames(body));
   }
   return commands;
+}
+
+function executableSource(text) {
+  try {
+    const ast = parse(String(text ?? ''), { ecmaVersion: 'latest', sourceType: 'module' });
+    return gateArgumentCommands(ast).join('\n');
+  } catch { return ''; }
 }
 
 function workflowCommands(context, edition) {
   const group = edition === 'lite' ? 'ci-workflows-lite' : 'ci-workflows';
   return [...context.files]
     .filter(([file]) => file.startsWith(`packages/hfs/templates/app/${group}/`) && /\.ya?ml$/.test(file))
-    .flatMap(([, text]) => jobRunCommands(text)).join('\n');
+    .flatMap(([, text]) => workflowRunCommands(text).map(commandsOf)).join('\n');
 }
 
 function runtimeChecks(context) {
@@ -206,10 +241,25 @@ function runsEnforcer(context, rule, source, enforcer, emitters) {
   if (runtimeCommandRuns(context, rule, enforcer, source, emitters)) return true;
   if (enforcer.kind === 'eslint-be' || enforcer.kind === 'eslint-fe') return /\beslint\b|\bapp\s+lint\b|npm\s+run\s+lint\b/.test(source);
   if (enforcer.kind === 'stylelint') return /\bstylelint\b|npm\s+run\s+lint\b/.test(source);
-  if (enforcer.kind === 'hfs' || enforcer.kind === 'machine') return /\bapp\s+check\b/.test(source);
+  if (enforcer.kind === 'hfs' || enforcer.kind === 'machine') return appRunsEnforcer(source, enforcer);
   if (enforcer.kind === 'work-validate') return /\bwork\s+validate\b/.test(source);
   if (enforcer.kind === 'sonar') return /\bsonar(?:-scanner)?\b/.test(source);
   return false;
+}
+
+function appRunsEnforcer(source, enforcer) {
+  // app lint runs the fast content checks and the architecture machine; app check adds the stacks gate.
+  const verbs = STACKS_GATE_FILES.has(enforcer.at) ? ['check'] : ['lint', 'check'];
+  return commandWords(source).some((words) => verbs.includes(appCommandVerb(words)));
+}
+
+function appCommandVerb(words) {
+  const [command, first, second, third] = words;
+  if (command === 'npm' && first === 'run') return second;
+  if (command === 'starci' && first === 'app') return second;
+  if (command === 'npx' && first === 'starci' && second === 'app') return third;
+  if (command === 'node' && second === 'app' && /(?:^|\/)starci\.mjs$/.test(first ?? '')) return third;
+  return null;
 }
 
 function gateSource(context, gate, edition) {

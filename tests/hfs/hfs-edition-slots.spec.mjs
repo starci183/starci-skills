@@ -44,7 +44,7 @@ test('litePresenceOf accepts a bare value and a per-side map with presence fallb
   assert.equal(litePresenceOf(slot, 'app'), 'required');
 });
 
-test('effectiveSlot applies every legal lite overlay field and keeps the slot\'s own tests (owner ruling 2026-10-12: lite keeps the unit specs)', () => {
+test('effectiveSlot applies every legal lite overlay field and keeps the slot\'s own tests (ruling:R212/case-1, amended by ruling:R212/case-4: lite keeps the unit specs)', () => {
   const slot = {
     id: 'be.probe',
     path: 'before/',
