@@ -19036,3 +19036,86 @@ ENV_VALUE_SHAPE:
   nextStep_vi: "Sửa giá trị qua `starci app secret set <env> <slug> <KEY>` cho đúng kiểu reader khai báo, hoặc sửa example; verify in ra tên khoá và kiểu bị vi phạm, không in giá trị."
   owner: op-retry
   kind: check-finding
+
+DB_BE_ONLY_ACCESS:
+  title: "Exposed product data is accessed through the back end"
+  title_vi: "Dữ liệu exposed được mở trực tiếp cho trình duyệt"
+  meaning_vi: "Migration tại <path> cấp quyền bảng hoặc sequence cho authenticated, khai báo policy cho authenticated, hoặc mở quyền anon ngoài policy select có tên kết thúc _public_read; đối tượng chưa được khai báo ngoại lệ supabase.directAccess."
+  causes_vi:
+    - "Vi phạm R254: Supabase phía front end chỉ phục vụ Auth; dữ liệu sản phẩm đi qua back end."
+    - "Grant hoặc policy mới mở lại cửa dữ liệu trong schema exposed mà không có ngoại lệ rõ ràng."
+  nextStep_vi: "Gỡ grant và policy truy cập trực tiếp; cho back end truy cập bằng app role. Nếu chủ ý mở đối tượng, khai báo bảng trong hfs.json supabase.directAccess; anon chỉ đọc qua policy select *_public_read."
+  owner: op-retry
+  kind: check-finding
+
+DB_REALTIME_UNLISTED:
+  title: "Realtime publication tables require declared direct access"
+  title_vi: "Bảng Realtime chưa được khai báo truy cập trực tiếp"
+  meaning_vi: "Migration tại <path> thêm bảng vào publication supabase_realtime nhưng bảng không có trong hfs.json supabase.directAccess."
+  causes_vi:
+    - "Vi phạm R254: publication Realtime mở một cửa dữ liệu trực tiếp chưa được khai báo."
+  nextStep_vi: "Gỡ bảng khỏi publication supabase_realtime hoặc khai báo ngoại lệ có chủ ý trong hfs.json supabase.directAccess."
+  owner: op-retry
+  kind: check-finding
+
+DB_APP_ROLE:
+  title: "The back-end database role has explicit least privileges"
+  title_vi: "Role cơ sở dữ liệu của back end có quyền quá rộng"
+  meaning_vi: "Migration tại <path> tạo hoặc sửa role của ứng dụng với superuser, bypassrls hay thuộc tính thiếu an toàn, hoặc cấp all thay cho các quyền cần thiết; role mặc định là app_be và có thể khai báo bằng supabase.appRole."
+  causes_vi:
+    - "Vi phạm R255: app role vượt qua RLS hoặc được cấp quyền rộng hơn công việc của back end."
+    - "Role không khai báo rõ noinherit và nobypassrls, hoặc nhận grant all trên schema hay bảng."
+  nextStep_vi: "Khai báo app role với noinherit, nobypassrls và các thuộc tính không đặc quyền; bỏ superuser, bypassrls và grant all, rồi cấp từng quyền cần thiết."
+  owner: op-retry
+  kind: check-finding
+
+DB_FORCE_RLS_DEFAULT:
+  title: "Tables owned by the app role force row level security"
+  title_vi: "Bảng do app role sở hữu chưa bắt buộc RLS"
+  meaning_vi: "Bảng tại <path> thuộc app role nhưng thiếu force row level security và không có ngoại lệ forceRls kèm lý do không rỗng trong hfs.json."
+  causes_vi:
+    - "Vi phạm R255: chủ sở hữu bảng có thể bỏ qua RLS khi không có force row level security."
+  nextStep_vi: "Thêm alter table <schema>.<table> force row level security trong migration; nếu cần miễn, khai báo đúng bảng và lý do trong hfs.json supabase.forceRls."
+  owner: op-retry
+  kind: check-finding
+
+DB_POLICY_TAUTOLOGY:
+  title: "Access policies use a meaningful principal predicate"
+  title_vi: "Policy dữ liệu có điều kiện luôn đúng"
+  meaning_vi: "Policy tại <path> dùng true, is not null hoặc so sánh một biểu thức với chính nó để mở dữ liệu, hoặc policy cho role trình duyệt không chứng minh điều kiện theo principal."
+  causes_vi:
+    - "Vi phạm R256: điều kiện luôn đúng không tạo ranh giới truy cập dữ liệu."
+    - "Policy không gắn hàng dữ liệu với auth.uid(), auth.jwt() hoặc nguồn principal tương đương."
+  nextStep_vi: "Viết điều kiện quyền sở hữu hoặc tenant dựa trên principal cho using và with check; bỏ các điều kiện true, is not null và x = x dùng thay cho kiểm soát truy cập."
+  owner: op-retry
+  kind: check-finding
+
+DB_VIEW_UNSAFE:
+  title: "Exposed views preserve the caller's access boundary"
+  title_vi: "View exposed chưa bảo vệ quyền của người gọi"
+  meaning_vi: "View hoặc materialized view tại <path> nằm trong schema exposed mà không có security_invoker và tập migration kết thúc khi quyền của anon cùng authenticated chưa được thu hồi."
+  causes_vi:
+    - "Vi phạm R256: view có thể mở dữ liệu qua quyền của chủ sở hữu thay vì quyền của người gọi."
+  nextStep_vi: "Đặt security_invoker = true cho view hỗ trợ tùy chọn này hoặc thêm migration revoke quyền trên view từ anon và authenticated."
+  owner: op-retry
+  kind: check-finding
+
+DB_DEFINER_REVOKE:
+  title: "Exposed security definer functions revoke browser execution"
+  title_vi: "Function security definer chưa thu hồi quyền trình duyệt"
+  meaning_vi: "Function security definer tại <path>, được khai báo bằng create hoặc alter function trong schema exposed, vẫn chưa revoke execute từ authenticated sau toàn bộ tập migration."
+  causes_vi:
+    - "Vi phạm R256: authenticated hoặc role công khai vẫn có thể gọi function chạy bằng quyền của chủ sở hữu."
+  nextStep_vi: "Chuyển function sang schema không exposed hoặc thêm migration revoke execute on function <signature> from authenticated; giữ các yêu cầu search_path, revoke public và anon cùng các kiểm tra an toàn của R215."
+  owner: op-retry
+  kind: check-finding
+
+DB_STORAGE_PREFIX:
+  title: "Private storage policies scope an ownership prefix"
+  title_vi: "Policy storage thiếu prefix theo chủ sở hữu"
+  meaning_vi: "Policy trên storage.objects tại <path> không ràng buộc storage.foldername(name) với principal và bucket không có id kết thúc _public."
+  causes_vi:
+    - "Vi phạm R256: chỉ kiểm tra bucket_id không giới hạn đối tượng theo chủ sở hữu."
+  nextStep_vi: "Thêm điều kiện prefix sở hữu bằng storage.foldername(name) và principal trong using hoặc with check theo thao tác; chỉ dùng ngoại lệ cho bucket id kết thúc _public."
+  owner: op-retry
+  kind: check-finding

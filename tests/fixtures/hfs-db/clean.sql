@@ -56,7 +56,7 @@ create policy objects_member_select on storage.objects
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy objects_member_insert on storage.objects
   for insert to authenticated
-  with check (bucket_id = 'avatars');
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy objects_public_read on storage.objects
   for select to anon, authenticated
   using (bucket_id = 'brand_public');

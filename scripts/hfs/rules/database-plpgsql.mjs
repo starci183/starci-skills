@@ -5,6 +5,7 @@ import { eachInOrder } from '../../lib/in-order.mjs';
 import { parsePlpgsqlBody, parseSql } from '../sql/pg-parse.mjs';
 import { DB_DEFINER_SAFE, DB_DYNAMIC_DDL } from './database-constants.mjs';
 
+const DB_DEFINER_REVOKE = 'DB_DEFINER_REVOKE';
 const sval = (node) => node?.String?.sval;
 const nameOf = (list, defaultSchema) => {
   const parts = (list ?? []).map(sval).filter((part) => part !== undefined);
@@ -183,15 +184,64 @@ async function definerDynamicFindings(file, fn, queries, baseLine) {
   return findings;
 }
 
+const OUTPUT_PARAMETER_MODES = new Set(['OUT', 'TABLE'].map((mode) => ['FUNC', 'PARAM', mode].join('_')));
+const RESET_ALL_KIND = ['VAR', 'RESET', 'ALL'].join('_');
+const inputParameters = (node) => (node.parameters ?? []).map((item) => item.FunctionParameter)
+  .filter((parameter) => !OUTPUT_PARAMETER_MODES.has(parameter?.mode));
+
+function typeIdentity(type) {
+  const node = type?.TypeName ?? type;
+  const parts = (node?.names ?? []).map(sval).filter(Boolean);
+  if (parts[0] === 'pg_catalog') parts.shift();
+  return `${parts.join('.')}${node?.arrayBounds?.length ? '[]' : ''}`;
+}
+
+const functionArguments = (fn) => fn.node.func?.objargs ?? inputParameters(fn.node).map((parameter) => parameter.argType);
+const argumentIdentity = (args) => args.map(typeIdentity).join(',');
+
+function matchesFunction(fn, object, defaultSchema) {
+  if (nameOf(object?.objname, defaultSchema) !== fn.name) return false;
+  return object?.args_unspecified === true || argumentIdentity(object?.objargs ?? []) === argumentIdentity(functionArguments(fn));
+}
+
+const matchesAlter = (fn, alter) => matchesFunction(fn, alter.node.func, alter.schema);
+
+function grantMatchesFunction(fn, grant) {
+  if (grant.objtype !== 'OBJECT_FUNCTION') return false;
+  if (grant.privileges.length && !grant.privileges.includes('execute') && !grant.privileges.includes('all')) return false;
+  if (grant.targtype === 'ACL_TARGET_ALL_IN_SCHEMA') return grant.objects.some((object) => sval(object) === fn.schema);
+  return grant.objects.some((object) => matchesFunction(fn, object?.ObjectWithArgs, grant.defaultSchema));
+}
+
 function revokedRolesFor(fn, grants) {
   const roles = new Set();
   for (const grant of grants) {
-    if (grant.grant || grant.objtype !== 'OBJECT_FUNCTION') continue;
-    if (!grant.privileges.includes('execute') && !grant.privileges.includes('all')) continue;
-    const matches = grant.objects.some((object) => nameOf(object?.ObjectWithArgs?.objname, grant.defaultSchema) === fn.name);
-    if (matches) for (const role of grant.grantees) roles.add(role);
+    if (grant.index <= (fn.originIndex ?? fn.index)) continue;
+    if (!grantMatchesFunction(fn, grant)) continue;
+    for (const role of grant.grantees) {
+      if (grant.grant) roles.delete(role);
+      else roles.add(role);
+    }
   }
   return roles;
+}
+
+function pathSetting(options, pinned, facts) {
+  for (const option of options) {
+    const setting = option?.DefElem?.arg?.VariableSetStmt;
+    if (setting?.name === 'search_path' || setting?.kind === RESET_ALL_KIND) pinned = facts.isSearchPathSet(option.DefElem);
+  }
+  return pinned;
+}
+
+function hasPinnedSearchPath(fn, facts) {
+  let pinned = pathSetting(fn.node.options ?? [], false, facts);
+  const originIndex = fn.originIndex ?? fn.index;
+  for (const alter of facts.alterFunctions) {
+    if (alter.index <= originIndex || !matchesAlter(fn, alter)) continue;
+    pinned = pathSetting(alter.node.actions ?? [], pinned, facts);
+  }
+  return pinned;
 }
 
 async function doBlockFindings(file, block) {
@@ -206,14 +256,12 @@ async function doBlockFindings(file, block) {
 function definerDeclarationFindings(file, fn, facts, exposed, definer) {
   if (!definer) return [];
   const findings = [];
-  const pathSet = functionOption(fn.node, 'set').some((option) => facts.isSearchPathSet(option))
-    || facts.alterFunctions.some((alter) => alter.name === fn.name && alter.setsPath && alter.index > fn.index);
-  if (!pathSet) findings.push(found(DB_DEFINER_SAFE, file, `${file}:${fn.line} security definer function ${fn.name} sets no search_path; add \`set search_path = ''\` (or a pinned schema list) on the create, or an alter function in the same migration`, { line: fn.line, function: fn.name }));
+  if (!hasPinnedSearchPath(fn, facts)) findings.push(found(DB_DEFINER_SAFE, file, `${file}:${fn.line} security definer function ${fn.name} sets no search_path; add \`set search_path = ''\` (or a pinned schema list) on the create, or an alter function in the same migration`, { line: fn.line, function: fn.name }));
   if (exposed.has(fn.schema)) {
     const revoked = revokedRolesFor(fn, facts.grants);
     if (!revoked.has('public') || !revoked.has('anon')) findings.push(found(DB_DEFINER_SAFE, file, `${file}:${fn.line} security definer function ${fn.name} lives in the exposed schema ${fn.schema}; keep it in a non-exposed schema or revoke execute from public and anon in the same migration`, { line: fn.line, function: fn.name }));
   }
-  if (!fn.node.is_procedure && !fn.node.returnType) findings.push(found(DB_DEFINER_SAFE, file, `${file}:${fn.line} security definer function ${fn.name} declares no return type`, { line: fn.line, function: fn.name }));
+  if (!fn.altered && !fn.node.is_procedure && !fn.node.returnType) findings.push(found(DB_DEFINER_SAFE, file, `${file}:${fn.line} security definer function ${fn.name} declares no return type`, { line: fn.line, function: fn.name }));
   return findings;
 }
 
@@ -235,8 +283,17 @@ async function functionBodyFindings(file, fn, definer) {
 async function functionFindings(file, fn, facts, exposed) {
   const definer = securityDefiner(fn.node);
   const findings = definerDeclarationFindings(file, fn, facts, exposed, definer);
-  findings.push(...await functionBodyFindings(file, fn, definer));
+  const becomesDefiner = facts.alterFunctions.some((alter) => alter.securityDefiner && alter.index > fn.index && matchesAlter(fn, alter));
+  findings.push(...await functionBodyFindings(file, fn, definer || becomesDefiner));
   return findings;
+}
+
+function alteredDefinerFindings(file, alter, facts, exposed) {
+  if (!alter.securityDefiner) return [];
+  const created = facts.functions.filter((fn) => fn.index < alter.index && matchesAlter(fn, alter)).at(-1);
+  const node = created?.node ?? { func: alter.node.func };
+  const fn = { ...alter, node, altered: true, originIndex: created?.index ?? -1 };
+  return definerDeclarationFindings(file, fn, facts, exposed, true);
 }
 
 /** All PL/pgSQL-backed L04/L06 findings for one migration's extracted facts. */
@@ -244,5 +301,58 @@ export async function plpgsqlFindings(file, facts, exposed) {
   const findings = [];
   await eachInOrder(facts.doBlocks, async (block) => { findings.push(...await doBlockFindings(file, block)); });
   await eachInOrder(facts.functions, async (fn) => { findings.push(...await functionFindings(file, fn, facts, exposed)); });
+  for (const alter of facts.alterFunctions) findings.push(...alteredDefinerFindings(file, alter, facts, exposed));
   return findings;
+}
+
+const functionKey = (fn) => `${fn.name}/${argumentIdentity(functionArguments(fn))}`;
+
+function applyFunctionAlter(functions, alter) {
+  if (!functionOption({ options: alter.node.actions }, 'security').length) return;
+  const matching = [...functions.values()].filter((fn) => matchesAlter(fn, alter));
+  if (!matching.length) matching.push({ ...alter, node: { func: alter.node.func }, originIndex: -1 });
+  for (const fn of matching) {
+    functions.set(functionKey(fn), { ...fn, file: alter.file, line: alter.line, definer: alter.securityDefiner });
+  }
+}
+
+function applyFunctionDrop(functions, statement) {
+  if (statement.node.removeType !== 'OBJECT_FUNCTION') return;
+  for (const fn of functions.values()) {
+    if (statement.node.objects?.some((object) => matchesFunction(fn, object.ObjectWithArgs, statement.defaultSchema))) {
+      functions.delete(functionKey(fn));
+    }
+  }
+}
+
+function finalFunctionAccess(analyses) {
+  const functions = new Map();
+  const grants = [];
+  let offset = 0;
+  for (const { file, facts } of analyses) {
+    const ordered = (items) => items.map((item) => ({ ...item, file, index: offset + item.index }));
+    const created = new Map(ordered(facts.functions).map((fn) => [fn.index, fn]));
+    const altered = new Map(ordered(facts.alterFunctions).map((fn) => [fn.index, fn]));
+    grants.push(...ordered(facts.grants));
+    for (const statement of ordered(facts.statements)) {
+      const fn = created.get(statement.index);
+      if (fn) {
+        const key = functionKey(fn);
+        const originIndex = functions.get(key)?.originIndex ?? fn.index;
+        functions.set(key, { ...fn, originIndex, definer: securityDefiner(fn.node) });
+      }
+      const alter = altered.get(statement.index);
+      if (alter) applyFunctionAlter(functions, alter);
+      if (statement.type === 'DropStmt') applyFunctionDrop(functions, statement);
+    }
+    offset += facts.statements.length;
+  }
+  return { functions: [...functions.values()], grants };
+}
+
+/** Authenticated execution is judged after all active migrations, including later revokes and grants. */
+export function migrationSetDefinerFindings(analyses, exposed) {
+  const { functions, grants } = finalFunctionAccess(analyses);
+  return functions.filter((fn) => fn.definer && exposed.has(fn.schema) && !revokedRolesFor(fn, grants).has('authenticated'))
+    .map((fn) => found(DB_DEFINER_REVOKE, fn.file, `${fn.file}:${fn.line} security definer function ${fn.name} lives in the exposed schema ${fn.schema}; the migration set ends without revoking execute from authenticated; revoke execute from public, anon and authenticated`, { line: fn.line, function: fn.name }));
 }

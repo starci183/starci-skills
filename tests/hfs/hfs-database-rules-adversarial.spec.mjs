@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { checkDatabase } from '../../scripts/hfs/rules/database.mjs';
 import { withoutGitLocalEnv } from '../../scripts/lib/git.mjs';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 
 const MIGRATIONS = 'supabase/migrations';
 const MIGRATION = `${MIGRATIONS}/20260101120000_adversarial.sql`;
@@ -42,11 +43,11 @@ const git = (dir, args, env = {}) => execFileSync('git', ['-C', dir, ...args], {
   env: { ...withoutGitLocalEnv(process.env), ...env },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
-const uniqueCodes = (findings) => [...new Set(findings.map((finding) => finding.code))].sort();
+const uniqueCodes = (findings) => [...new Set(findings.map((finding) => finding.code))].sort(byCodeUnit);
 const expectCodes = async ({ contents, files = Object.keys(contents), supabase, codes }) => {
   const dir = repo(contents, supabase);
   const findings = await checkDatabase({ repoRoot: dir, files, git: noRemote });
-  assert.deepEqual(uniqueCodes(findings), [...codes].sort(), JSON.stringify(findings, null, 2));
+  assert.deepEqual(uniqueCodes(findings), [...codes].sort(byCodeUnit), JSON.stringify(findings, null, 2));
 };
 
 const cleanTable = (name = 'items') => `
@@ -59,42 +60,42 @@ const sqlCases = [
   ['enums are not tables', "create type public.order_state as enum ('open', 'closed');", []],
   ['composite types are not tables', 'create type public.money_pair as (amount numeric, currency text);', []],
   ['schema creation is not a table', 'create schema if not exists private;', []],
-  ['alter default privileges is not a table grant', 'alter default privileges in schema public grant select on tables to authenticated;', []],
-  ['alter default privileges cannot grant tables to anon', 'alter default privileges in schema public grant select on tables to anon;', ['DB_POLICY_SHAPE']],
-  ['all-tables schema grant to anon is refused', 'grant select on all tables in schema public to anon;', ['DB_POLICY_SHAPE']],
-  ['all-tables schema grant to authenticated is refused', 'grant select on all tables in schema public to authenticated;', ['DB_POLICY_SHAPE']],
-  ['all-tables schema grant to public is refused', 'grant select on all tables in schema public to public;', ['DB_POLICY_SHAPE']],
+  ['authenticated default privileges keep the browser door open', 'alter default privileges in schema public grant select on tables to authenticated;', ['DB_BE_ONLY_ACCESS']],
+  ['alter default privileges cannot grant tables to anon', 'alter default privileges in schema public grant select on tables to anon;', ['DB_BE_ONLY_ACCESS', 'DB_POLICY_SHAPE']],
+  ['all-tables schema grant to anon is refused', 'grant select on all tables in schema public to anon;', ['DB_BE_ONLY_ACCESS', 'DB_POLICY_SHAPE']],
+  ['all-tables schema grant to authenticated is refused', 'grant select on all tables in schema public to authenticated;', ['DB_BE_ONLY_ACCESS', 'DB_POLICY_SHAPE']],
+  ['all-tables schema grant to public is refused', 'grant select on all tables in schema public to public;', ['DB_BE_ONLY_ACCESS', 'DB_POLICY_SHAPE']],
   ['default service-role grant is refused', 'alter default privileges in schema public grant select on tables to service_role;', ['DB_POLICY_SHAPE']],
   ['schema usage grants need no table policy', 'grant usage on schema public to anon;', []],
-  ['sequence usage grants need no table policy', 'grant usage, select on sequence public.items_id_seq to anon;', []],
+  ['anonymous sequence grants need direct access', 'grant usage, select on sequence public.items_id_seq to anon;', ['DB_BE_ONLY_ACCESS']],
   ['safe private security definer function', `
     create function private.lookup(subject uuid) returns boolean language plpgsql security definer
     set search_path = '' as $$ begin return subject is not null; end $$;`, []],
-  ['exposed definer revoked from public and anon', `
+  ['exposed definer revoked from public and anon still needs authenticated revoke', `
     create function public.lookup(value uuid) returns boolean language sql security definer
     set search_path = '' as $$ select value is not null $$;
-    revoke execute on function public.lookup(uuid) from public, anon;`, []],
+    revoke execute on function public.lookup(uuid) from public, anon;`, ['DB_DEFINER_REVOKE']],
   ['unqualified definer name matches qualified revoke', `
     create function lookup(subject uuid) returns boolean language sql security definer
     set search_path = '' as $$ select subject is not null $$;
-    revoke execute on function public.lookup(uuid) from public, anon;`, []],
+    revoke execute on function public.lookup(uuid) from public, anon;`, ['DB_DEFINER_REVOKE']],
   ['exposed definer revoked only from public is incomplete', `
     create function public.lookup(value uuid) returns boolean language sql security definer
     set search_path = '' as $$ select value is not null $$;
-    revoke execute on function public.lookup(uuid) from public;`, ['DB_DEFINER_SAFE']],
+    revoke execute on function public.lookup(uuid) from public;`, ['DB_DEFINER_REVOKE', 'DB_DEFINER_SAFE']],
   ['ordinary trigger declaration is clean', `
     create function private.touch() returns trigger language plpgsql security invoker as $$ begin return new; end $$;
     create trigger items_touch before update on public.items for each row execute function private.touch();`, []],
   ['Supabase auth uid subquery is a real predicate', `${cleanTable()}
     create policy items_member_select on public.items for select to authenticated
-    using ((select auth.uid()) = user_id);`, []],
-  ['authenticated select policy is clean', `${cleanTable()}
-    create policy items_member_select on public.items for select to authenticated using (user_id = auth.uid());`, []],
-  ['for all with real predicates is clean', `${cleanTable()}
+    using ((select auth.uid()) = user_id);`, ['DB_BE_ONLY_ACCESS']],
+  ['authenticated select policy needs direct access', `${cleanTable()}
+    create policy items_member_select on public.items for select to authenticated using (user_id = auth.uid());`, ['DB_BE_ONLY_ACCESS']],
+  ['for all with real predicates still needs direct access', `${cleanTable()}
     create policy items_member_all on public.items for all to authenticated
-    using (user_id = auth.uid()) with check (user_id = auth.uid());`, []],
-  ['insert with a real with-check is clean', `${cleanTable()}
-    create policy items_member_insert on public.items for insert to authenticated with check (user_id = auth.uid());`, []],
+    using (user_id = auth.uid()) with check (user_id = auth.uid());`, ['DB_BE_ONLY_ACCESS']],
+  ['insert with a real with-check still needs direct access', `${cleanTable()}
+    create policy items_member_insert on public.items for insert to authenticated with check (user_id = auth.uid());`, ['DB_BE_ONLY_ACCESS']],
   ['partitioned parent needs one enable and child inherits', `
     create table public.events (id bigint, occurred_at timestamptz) partition by range (occurred_at);
     alter table public.events enable row level security;
@@ -113,12 +114,12 @@ const sqlCases = [
     insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
     values ('avatars', 'avatars', false, 1024, array['image/png']::text[])
     on conflict (id) do update set name = excluded.name;
-    create policy objects_member_select on storage.objects for select to authenticated using (bucket_id = 'avatars');`, []],
-  ['multiple unrelated statements remain clean', `
+    create policy objects_member_select on storage.objects for select to authenticated using (bucket_id = 'avatars');`, ['DB_POLICY_TAUTOLOGY', 'DB_STORAGE_PREFIX']],
+  ['unrelated SQL does not hide authenticated table grants', `
     create schema if not exists private;
     create type public.state as enum ('ready');
     ${cleanTable()}
-    grant select on public.items to authenticated;`, []],
+    grant select on public.items to authenticated;`, ['DB_BE_ONLY_ACCESS']],
   ['dollar body may mention DDL without executing it', `
     create function private.words() returns text language plpgsql security invoker as $body$
     begin return 'create table / execute / security definer'; end $body$;`, []],
@@ -129,7 +130,7 @@ const sqlCases = [
   ['quoted identifiers are matched structurally', `
     create table public."Order" (id bigint);
     alter table only public."Order" enable row level security;
-    create policy "Order_member_select" on public."Order" for select to authenticated using (id > 0);`, []],
+    create policy "Order_member_select" on public."Order" for select to authenticated using (id > 0);`, ['DB_BE_ONLY_ACCESS', 'DB_POLICY_TAUTOLOGY']],
   ['uppercase SQL is parsed normally', `
     CREATE TABLE PUBLIC.ITEMS (ID BIGINT);
     ALTER TABLE ONLY PUBLIC.ITEMS ENABLE ROW LEVEL SECURITY;`, []],
@@ -176,12 +177,12 @@ const sqlCases = [
   ['private bucket may retain a public-suffixed id', `
     insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
     values ('archive_public', 'archive_public', false, 1024, array['application/zip']::text[]);
-    create policy objects_member_select on storage.objects for select to authenticated using (bucket_id = 'archive_public');`, []],
+    create policy objects_member_select on storage.objects for select to authenticated using (bucket_id = 'archive_public');`, ['DB_POLICY_TAUTOLOGY']],
   ['bucket policy must correlate the id with bucket_id', `
     insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
     values ('avatars', 'avatars', false, 1024, array['image/png']::text[]);
     create policy objects_member_select on storage.objects for select to authenticated
-    using (bucket_id = 'other' and name = 'avatars');`, ['DB_STORAGE_POLICY']],
+    using (bucket_id = 'other' and name = 'avatars');`, ['DB_POLICY_TAUTOLOGY', 'DB_STORAGE_POLICY', 'DB_STORAGE_PREFIX']],
   ['public bucket with matching suffix is clean', `
     insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
     values ('brand_public', 'brand_public', true, 1024, array['image/svg+xml']::text[]);
@@ -189,21 +190,21 @@ const sqlCases = [
   ['storage create_bucket call is recognized', `
     select storage.create_bucket('avatars', 'avatars', public := false, file_size_limit := 1024,
       allowed_mime_types := array['image/png']);
-    create policy objects_member_select on storage.objects for select to authenticated using (bucket_id = 'avatars');`, []],
+    create policy objects_member_select on storage.objects for select to authenticated using (bucket_id = 'avatars');`, ['DB_POLICY_TAUTOLOGY', 'DB_STORAGE_PREFIX']],
   ['storage create_bucket call needs bounds', `
     select storage.create_bucket('avatars', 'avatars', public := false);
-    create policy objects_member_select on storage.objects for select to authenticated using (bucket_id = 'avatars');`, ['DB_STORAGE_POLICY']],
+    create policy objects_member_select on storage.objects for select to authenticated using (bucket_id = 'avatars');`, ['DB_POLICY_TAUTOLOGY', 'DB_STORAGE_POLICY', 'DB_STORAGE_PREFIX']],
   ['storage create_bucket public id must declare public name', `
     select storage.create_bucket('avatars', 'avatars', public := true, file_size_limit := 1024,
       allowed_mime_types := array['image/png']);
-    create policy objects_member_select on storage.objects for select to authenticated using (bucket_id = 'avatars');`, ['DB_STORAGE_POLICY']],
+    create policy objects_member_select on storage.objects for select to authenticated using (bucket_id = 'avatars');`, ['DB_POLICY_TAUTOLOGY', 'DB_STORAGE_POLICY', 'DB_STORAGE_PREFIX']],
   ['service-role grants are refused', 'grant usage on schema private to service_role;', ['DB_POLICY_SHAPE']],
-  ['anonymous table grant needs public-read policy', 'grant select on table public.items to anon;', ['DB_POLICY_SHAPE']],
+  ['anonymous table grant needs public-read policy', 'grant select on table public.items to anon;', ['DB_BE_ONLY_ACCESS', 'DB_POLICY_SHAPE']],
   ['anonymous public-read policy and grant are clean', `${cleanTable()}
     create policy items_public_read on public.items for select to anon using (true);
     grant select on public.items to anon;`, []],
   ['authenticated true read must declare public read', `${cleanTable()}
-    create policy items_member_select on public.items for select to authenticated using (true);`, ['DB_POLICY_SHAPE']],
+    create policy items_member_select on public.items for select to authenticated using (true);`, ['DB_BE_ONLY_ACCESS', 'DB_POLICY_SHAPE', 'DB_POLICY_TAUTOLOGY']],
 ];
 
 for (const [name, sql, codes] of sqlCases) {
@@ -239,7 +240,7 @@ test('adversarial policy set: a later drop removes public-read coverage', () => 
     [`${MIGRATIONS}/20260101120000_policy.sql`]: 'create policy items_public_read on public.items for select to anon using (true); grant select on public.items to anon;',
     [`${MIGRATIONS}/20260101120100_drop.sql`]: 'drop policy items_public_read on public.items;',
   };
-  return expectCodes({ contents, codes: ['DB_POLICY_SHAPE'] });
+  return expectCodes({ contents, codes: ['DB_BE_ONLY_ACCESS', 'DB_POLICY_SHAPE'] });
 });
 
 test('adversarial policy set: authenticated-only public-read name does not cover an anon grant', () => {
@@ -247,13 +248,13 @@ test('adversarial policy set: authenticated-only public-read name does not cover
     [`${MIGRATIONS}/20260101120000_policy.sql`]: 'create policy items_public_read on public.items for select to authenticated using (true);',
     [`${MIGRATIONS}/20260101120100_grant.sql`]: 'grant select on public.items to anon;',
   };
-  return expectCodes({ contents, codes: ['DB_POLICY_SHAPE'] });
+  return expectCodes({ contents, codes: ['DB_BE_ONLY_ACCESS', 'DB_POLICY_SHAPE'] });
 });
 
 test('adversarial policy: omitted TO clause is reported as the implicit public default', async () => {
   const dir = repo({ [MIGRATION]: `${cleanTable()} create policy items_member_insert on public.items for insert with check (id is not null);` });
   const findings = await checkDatabase({ repoRoot: dir, files: [MIGRATION], git: noRemote });
-  assert.deepEqual(uniqueCodes(findings), ['DB_POLICY_SHAPE']);
+  assert.deepEqual(uniqueCodes(findings), ['DB_BE_ONLY_ACCESS', 'DB_POLICY_SHAPE', 'DB_POLICY_TAUTOLOGY']);
   assert.ok(findings.some((finding) => finding.message.includes('implicit TO public default')), JSON.stringify(findings));
 });
 

@@ -7,7 +7,7 @@ select 'create table public.words (id int)';   -- a string literal, not a statem
 create table if not exists public."quoted table" (id int);  -- a quoted identifier is a real table
 alter table public."quoted table" enable row level security;
 create policy "quoted table_member_select" on public."quoted table"
-  for select to authenticated using (true = true);
+  for select to authenticated using (id::text = auth.uid()::text);
 
 -- if not exists is still a real create: it needs its enable too.
 create table if not exists public.sessions (id uuid primary key);
