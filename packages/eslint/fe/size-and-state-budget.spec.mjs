@@ -5,6 +5,8 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
+import tsParser from "@typescript-eslint/parser"
+import { Linter } from "eslint"
 import { at, fixtureHfs, slotTester, typedTester } from "./fixtures/typed/tester.mjs"
 import {
   componentLineBudget,
@@ -18,6 +20,7 @@ const tester = slotTester()
 const BLOCK = at("apps/web/src/components/blocks/Feed/index.tsx")
 const DRAWING = at("apps/web/src/components/blocks/Feed/component.tsx")
 const HOOK = at("apps/web/src/hooks/feed/useFeed.ts")
+const BARREL = at("apps/web/src/hooks/feed/index.ts")
 
 // The budgets are the slot manifest's own numbers: the rule keeps no copy.
 const COMPONENTS = fixtureHfs().slot("fe.components").budget
@@ -25,6 +28,15 @@ const FEATURE = fixtureHfs().slot("fe.feature").budget
 
 /** `count` lines of code that do nothing. */
 const lines = (count) => Array.from({ length: count }, (_, index) => `const line${index} = ${index}`).join("\n")
+
+/** A barrel whose named, type-only, star and namespace statements all re-export from another file. */
+const reExports = (count) => Array.from({ length: count }, (_, index) => [
+  `export { value${index} } from "./value${index}"`,
+  `export type { Value${index} } from "./value${index}"`,
+  `export * from "./value${index}"`,
+  `export * as values${index} from "./value${index}"`,
+  `export type * from "./value${index}"`,
+][index % 5]).join("\n")
 
 /** A component with `states` useState calls and `data` data hooks. */
 const unit = (name, states, data) =>
@@ -66,6 +78,49 @@ test("BUDGET-1: a component file stays within the line budget its slot states fo
       { filename: at("apps/web/src/components/leaves/blocks/index.tsx"), code: lines(201), errors: [{ messageId: "lines" }] },
     ],
   })
+})
+
+test("BUDGET-1: only a pure re-export index.ts gets the separate barrel budget", () => {
+  const hfs = fixtureHfs()
+  const slots = ["fe.hooks", "fe.hooks.swr", "fe.hooks.rhf", "fe.hooks.zustand", "fe.hooks.socketio", "fe.hooks.effects", "fe.hooks.reuseables"]
+  for (const id of slots) assert.equal(hfs.slot(id).budget.barrel, 400, id)
+  const max = hfs.slot("fe.hooks").budget.barrel
+  const ordinary = hfs.slot("fe.hooks").budget.file
+  const overOrdinary = { messageId: "lines", data: { count: ordinary + 1, max: ordinary } }
+  tester.run("component-line-budget", componentLineBudget, {
+    valid: [
+      { filename: BARREL, code: reExports(max) },
+      { filename: BARREL, code: `// public surface\n${reExports(max - 1)}\n` },
+      { filename: BARREL, code: `${reExports(max - 4)}\nexport {\n  value as renamed,\n  type Value,\n} from "./other"` },
+      ...["swr", "rhf", "zustand/session", "socketio", "effects", "reuseables"].map((domain) =>
+        ({ filename: at(`apps/web/src/hooks/${domain}/index.ts`), code: reExports(max) })),
+      { filename: at("apps/web/src/hooks/swr/api/graphql/queries/index.ts"), code: reExports(max) },
+      // Slots already allowing 400 lines keep that budget without stating a separate barrel limit.
+      { filename: at("apps/web/src/modules/feed/index.ts"), code: reExports(max) },
+      { filename: BARREL, code: `${reExports(ordinary - 1)}\nexport const local = 1` },
+    ],
+    invalid: [
+      { filename: BARREL, code: reExports(max + 1), errors: [{ messageId: "lines", data: { count: max + 1, max } }] },
+      ...["export const local = 1", "import { value } from './other'", "export { value as local }", "export default 1", "'use client'", ";;"].map((statement) =>
+        ({ filename: BARREL, code: `${reExports(ordinary)}\n${statement}`, errors: [overOrdinary] })),
+      // An empty statement body, another basename or index.tsx keeps the ordinary slot/role limit.
+      { filename: BARREL, code: Array(ordinary + 1).fill("// comment").join("\n"), errors: [overOrdinary] },
+      { filename: HOOK, code: reExports(ordinary + 1), errors: [overOrdinary] },
+      { filename: BLOCK, code: reExports(ordinary + 1), errors: [overOrdinary] },
+    ],
+  })
+})
+
+test("BUDGET-1: malformed export syntax is a parser failure", () => {
+  const messages = new Linter().verify(`${reExports(200)}\nexport { missing } from`, [{
+    files: ["**/*.ts"],
+    languageOptions: { parser: tsParser },
+    settings: { starci: { hfs: fixtureHfs() } },
+    plugins: { budget: { rules: { lines: componentLineBudget } } },
+    rules: { "budget/lines": "error" },
+  }], { filename: BARREL })
+  assert.equal(messages.length, 1)
+  assert.equal(messages[0].fatal, true)
 })
 
 test("BUDGET-2: a unit holds at most six state hooks and six data hooks", () => {

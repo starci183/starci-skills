@@ -83,6 +83,7 @@ import { editionFindings } from './rules/edition.mjs';
 import { feStackFindings } from './rules/fe-stack.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { pinFindings } from './pin-findings.mjs';
+import { requiredFileApplies } from './slot-required.mjs';
 // The database rules (R213-R216) read SQL through a WASM parser, so they are async: `starci app check` calls them beside the other emitters and passes the findings in as `extraFindings`.
 export { checkDatabase } from './rules/database.mjs';
 
@@ -223,7 +224,7 @@ function appendRequiredPathFindings(findings, resolver, files, required, present
   const missing = new Set();
   const missingFile = (slot, p, via) => {
     const key = `${slot}|${p}`;
-    if (missing.has(key) || present(p)) return;
+    if (missing.has(key) || present(p) || !requiredFileApplies(slot, p, files)) return;
     missing.add(key);
     const app = appOf(p);
     const appNote = app ? ` (app ${app})` : '';

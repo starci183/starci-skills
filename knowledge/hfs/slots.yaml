@@ -1802,7 +1802,7 @@ slots:
     allows: [index.ts, "use<name>.ts", "<domain>.shared.ts"]   # React hooks only; <domain>.shared.ts = sanctioned non-hook helpers
     roles: {entry: index.ts, shared: "<domain>.shared.ts"}
     tests: none
-    budget: {file: 200, dataHooks: 6, useState: 6}
+    budget: {file: 200, barrel: 400, dataHooks: 6, useState: 6}   # barrel: index.ts containing only export ... from statements
     rules: [FE_HOOKS_ARE_HOOKS, FE_DATA_FRESHNESS]
   - id: fe.hooks.swr
     profiles: [fe]
@@ -1819,7 +1819,7 @@ slots:
              "api/rest/queries/useGet*Swr.ts", "api/rest/mutations/use{Post,Put,Patch,Delete}*Swr.ts"]
     roles: {entry: index.ts, effects: SwrSideEffects.tsx}
     tests: none
-    budget: {file: 200}
+    budget: {file: 200, barrel: 400}
     since: 3.0.0
     rules: [FE_HOOKS_ARE_HOOKS, FE_DATA_FRESHNESS]
   - id: fe.hooks.rhf
@@ -1835,7 +1835,7 @@ slots:
     allows: [index.ts, "use*Form.ts"]
     roles: {entry: index.ts}
     tests: none
-    budget: {file: 200}
+    budget: {file: 200, barrel: 400}
     since: 3.0.0
     rules: [FE_HOOKS_ARE_HOOKS]
   - id: fe.hooks.zustand
@@ -1850,7 +1850,7 @@ slots:
     allows: [index.ts, store.ts, "use*.ts"]
     roles: {entry: index.ts, store: store.ts}
     tests: none
-    budget: {file: 200}
+    budget: {file: 200, barrel: 400}
     since: 3.0.0
     rules: [FE_HOOKS_ARE_HOOKS]
   - id: fe.hooks.socketio
@@ -1866,7 +1866,7 @@ slots:
     allows: [index.ts, sockets.ts, SocketIoSideEffects.tsx, connectionStore.ts, "enums/*.ts", "types/*.ts", "use*.ts"]
     roles: {entry: index.ts, effects: SocketIoSideEffects.tsx}
     tests: none
-    budget: {file: 200}
+    budget: {file: 200, barrel: 400}
     since: 3.0.0
     rules: [FE_HOOKS_ARE_HOOKS]
   - id: fe.hooks.effects
@@ -1882,7 +1882,7 @@ slots:
     allows: [index.ts, "use*.ts", "*SideEffect.tsx", "*SideEffects.tsx"]
     roles: {entry: index.ts, effects: "*SideEffect.tsx"}
     tests: none
-    budget: {file: 200}
+    budget: {file: 200, barrel: 400}
     since: 3.0.0
     rules: [FE_HOOKS_ARE_HOOKS]
   - id: fe.hooks.reuseables
@@ -1897,7 +1897,7 @@ slots:
     allows: [index.ts, "use*.ts"]
     roles: {entry: index.ts}
     tests: none
-    budget: {file: 200}
+    budget: {file: 200, barrel: 400}
     since: 3.0.0
     rules: [FE_HOOKS_ARE_HOOKS]
   - id: fe.redux
@@ -1922,6 +1922,7 @@ slots:
     tier: modules
     owner: true
     requiredInstances: {capability: [config, i18n, routes]}
+    # A populated fe.modules instance with no .ts or .tsx files (CSS/assets only) needs no index.ts.
     requires: [index.ts]
     tests: none
     budget: {file: 400}

@@ -5,6 +5,19 @@ import { braceVariants } from '../lib/glob.mjs';
 import { classifyIn, slotEnabled } from './slot-classify.mjs';
 import { fillVars, varsOf } from './slot-match.mjs';
 
+/** A populated fe.modules instance needs its index.ts only when it contains TypeScript, including nested files. */
+export function requiredFileApplies(slotId, target, files) {
+  if (!/^fe\.modules(?:\.|$)/u.test(slotId) || path.posix.basename(target) !== 'index.ts') return true;
+  const prefix = `${path.posix.dirname(target)}/`;
+  let populated = false;
+  for (const file of files) {
+    if (!file.startsWith(prefix)) continue;
+    populated = true;
+    if (/\.tsx?$/u.test(file)) return true;
+  }
+  return !populated;
+}
+
 /** One `requires` entry of a slot placed under `root`: a leading / makes it repository-relative, the variables are filled from `bindings`. */
 function requiredEntry(entry, bindings, root) {
   const rooted = entry.startsWith('/');

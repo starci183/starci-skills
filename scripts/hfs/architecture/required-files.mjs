@@ -4,6 +4,7 @@ import { lsFiles } from '../../api/git/ls-files.mjs';
 import { revParseQuery } from '../../api/git/rev-parse-query.mjs';
 import { gitOutputOf } from '../../lib/git.mjs';
 import { trimTrailingSlashes } from '../trailing-slashes.mjs';
+import { requiredFileApplies } from '../slot-required.mjs';
 
 /**
  * HFS check 5: the files and directories the slot manifest requires (knowledge/hfs/slots.yaml `requires`,
@@ -173,7 +174,7 @@ function requirementExists(tree, target) {
 }
 
 function reportMissingRequirement(requirement, tree, report) {
-  if (requirementExists(tree, requirement.target)) return;
+  if (requirementExists(tree, requirement.target) || !requiredFileApplies(requirement.slot, requirement.target, tree.files)) return;
   const rootExists = !requirement.root || tree.directories.has(requirement.root);
   if (!rootExists) {
     report(ruleFor(requirement.slot, requirement.target, false), requirement.root, requirement.slot, requirement.root, { kind: 'directory' },

@@ -2,31 +2,31 @@
 
 Law module: `size-and-state-budget.mjs`. Catalogue: R65 FE_SIZE_AND_STATE_BUDGET.
 
-A component file is at most 300 lines; a connected unit holds at most 6 `useState` and reads at most 6 data hooks; there is no hand-written polling loop. `HFS_SIZE_GROWTH` (no growth against the parent commit) is the architecture machine's; these are the absolute file-local limits.
+A drawing file is at most 300 lines, a connected `index.tsx` at most 200, and a hook implementation at most 200. A pure re-export `index.ts` has a separate 400-line budget. A connected unit holds at most 6 `useState` and reads at most 6 data hooks; there is no hand-written polling loop. `HFS_SIZE_GROWTH` (no growth against the parent commit) is the architecture machine's; these are the absolute file-local limits.
 
 Every rule below is an error in `starciFeConfig`; none can be switched off or suppressed inline.
 
 ## `starci-fe/component-line-budget`
 
-A component file has at most 300 lines.
+A file stays within the budget of its HFS slot: `component.tsx` 300 lines, connected `index.tsx` 200, hook implementation 200, module 400. Where the slot states `budget.barrel`, an `index.ts` containing only `export ... from` statements uses that separate 400-line limit. Named, type-only, star and namespace re-exports qualify, including multiline statements and comments. Imports, declarations, local exports, directives and empty statements keep the ordinary limit, as does an empty statement body. Another basename or `index.tsx` keeps its ordinary limit. The rule reads every limit from `knowledge/hfs/slots.yaml`; a trailing newline does not add a line.
 
 **Invalid** (`src/components/blocks/Feed/index.tsx`)
 
 ```ts
-// a 301-line component file
+// a 201-line connected entry
 ```
 
 **Valid** (`src/components/blocks/Feed/index.tsx`)
 
 ```ts
-// 300 lines or fewer
+// 200 lines or fewer
 ```
 
 **Finding code:** `FE_SIZE_AND_STATE_BUDGET`
 
-**Why:** `<file>` is `<n>` lines long, over the 300-line limit for a component.
+**Why:** `<file>` is `<n>` lines long, over the limit its slot states for the file's role or its pure re-export barrel.
 
-**Fix:** Separate rendering from data and split each region into its own unit.
+**Fix:** Split an oversized implementation by responsibility; narrow a barrel's public surface to the exports its owner needs.
 
 ## `starci-fe/unit-hook-budget`
 
