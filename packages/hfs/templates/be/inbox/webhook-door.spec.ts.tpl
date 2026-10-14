@@ -59,7 +59,7 @@ describe("@@Provider@@Webhook", () => {
             await door.receive(REQUEST, sign(RAW_BODY, SIGNED_AT), SIGNED_AT, DELIVERY_ID, DELIVERY)
 
             expect(deliveries.record@@Provider@@Delivery).toHaveBeenCalledTimes(1)
-            expect(deliveries.record@@Provider@@Delivery).toHaveBeenCalledWith(DELIVERY_ID, DELIVERY)
+            expect(deliveries.record@@Provider@@Delivery).toHaveBeenCalledWith({ eventId: DELIVERY_ID, delivery: DELIVERY })
         })
 
         it("never reaches the inbox when the signature is not the provider's", async () => {

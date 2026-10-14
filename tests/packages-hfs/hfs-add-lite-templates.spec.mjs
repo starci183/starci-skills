@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { peerDependencies } from "../../packages/hfs/scaffold/app.mjs";
+import { addLiteWebhookInbox, selectLiteWebhookEntries } from "../../packages/hfs/scaffold/add-inbox-lite.mjs";
 
 test("add api and the scaffold declare the runtime peer of a driver integration pair the app depends on (R111), at its pin", () => {
   const pairs = [{ id: "apollo-express5", when: [{ package: "@nestjs/apollo" }, { package: "@nestjs/platform-express", major: 11 }], requires: "@as-integrations/express5" }];
@@ -34,4 +35,18 @@ test("the lite API skeleton installs one typed global validation pipe", () => {
   assert.match(validation, /transform: true/);
   assert.match(validation, /HttpSecurityErrorCode\.RequestInvalid/);
   assert.match(errors, /\[HttpSecurityErrorCode\.RequestInvalid\]: "invalid"/);
+});
+
+test("lite webhook selection changes only its door and spec; full and other nouns retain their generators", () => {
+  const entries = [
+    { template: "webhooks/webhook.door.ts.tpl", path: "provider.webhook.ts" },
+    { template: "webhooks/webhook.door.spec.ts.tpl", path: "provider.webhook.spec.ts" },
+    { template: "webhooks/webhook.http.module.ts.tpl", path: "provider-http.module.ts" },
+  ];
+  const selected = selectLiteWebhookEntries(entries);
+  assert.deepEqual(selected.map((entry) => entry.template), ["../inbox/webhook-door.ts.tpl", "../inbox/webhook-door.spec.ts.tpl", "webhooks/webhook.http.module.ts.tpl"]);
+  assert.equal(selected[2], entries[2]);
+  assert.equal(entries[0].template, "webhooks/webhook.door.ts.tpl", "the full-edition template entry remains intact");
+  assert.deepEqual(addLiteWebhookInbox({ repo: { edition: "full" }, noun: "webhook" }), []);
+  assert.deepEqual(addLiteWebhookInbox({ repo: { edition: "lite" }, noun: "api" }), []);
 });
