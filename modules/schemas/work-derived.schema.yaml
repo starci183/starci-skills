@@ -10,6 +10,7 @@ description: "The reverse-edge index, effective state, tally and frontier the Wo
   always wins an argument it should lose. The projection carries no id and no state and is excluded from
   the record walk; scripts/checks/check-example-derived.mjs refuses it the moment it goes stale against the
   tree it claims to describe."
+generated: true
 required:
   - schema
   - records

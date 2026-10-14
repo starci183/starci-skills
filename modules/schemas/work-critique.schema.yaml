@@ -7,6 +7,7 @@ description: "The generated reading of a `.starciwork` tree's own weak points - 
   scripts/example/example-critique.mjs and never authored by hand. It is a projection, so it carries no id
   and no state: every finding is recomputed from the records on disk, and a finding that disappears
   disappeared because the tree changed, not because somebody deleted the line about it."
+generated: true
 required:
   - schema
   - findings
