@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto"
+import { createHmac, randomBytes } from "node:crypto"
 import { FakeClock, mock } from "@starci/jest-preset"
 import type { RawBodyRequest } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
@@ -11,7 +11,7 @@ import { @@Event@@Request } from "./dto/@@event@@.request"
 import { @@Provider@@Webhook } from "./@@provider@@.webhook"
 
 const AT = "2026-01-02T03:04:05.000Z"
-const SECRET = "spec-webhook-secret"
+const SECRET = randomBytes(24).toString("hex")
 const SIGNED_AT = String(new Date(AT).getTime())
 const DELIVERY_ID = "delivery-1"
 

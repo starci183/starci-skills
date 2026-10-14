@@ -1,5 +1,9 @@
 # Changelog
 
+## 8.2.18 - 2026-10-14
+
+- Changed: carry the canon pins of eslint-canon-be 3.2.19, HFS 4.2.17 and CLI 1.2.17 in the runtime mirror. ESLint rule implementations are unchanged.
+
 ## 8.2.17 - 2026-10-14
 
 - Fixed: `dead-exports` (`HFS_UNUSED_EXPORT`) counts an import by another public entry the slot declares in `entries` as a use: a `graphql/{queries,mutations}/types/<x>.ts` export its operation file `query-<x>.ts`/`mutation-<x>.ts` imports is part of that operation's signature and is no longer reported. A barrel or any other non-entry file of the owner still does not count, so an operation reached only through a re-export of `modules/api/index.ts` stays dead.

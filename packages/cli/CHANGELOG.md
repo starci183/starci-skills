@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.17 - 2026-10-14
+
+- Changed: pin HFS 4.2.17 (the webhook door spec template signs with a per-run key). Command dispatcher implementations are unchanged.
+
 ## 1.2.16 - 2026-10-14
 
 - Changed: pin HFS 4.2.16 (templates the published canons accept). Command dispatcher implementations are unchanged.

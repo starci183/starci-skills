@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.19 - 2026-10-14
+
+- Changed: carry the canon pins of eslint-canon-fe 8.2.18, HFS 4.2.17 and CLI 1.2.17 in the runtime mirror. ESLint rule implementations are unchanged.
+
 ## 3.2.18 - 2026-10-14
 
 - Changed: carry the runtime mirror with the dead-exports fix (an import by a sibling declared entry is a use) and the canon pins of eslint-canon-fe 8.2.17, HFS 4.2.16 and CLI 1.2.16. ESLint rule implementations are unchanged.

@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.2.17 - 2026-10-14
+
+- Fixed: the webhook door spec template signs with a per-run key (`randomBytes`) instead of a literal, so a scaffolded spec holds no plaintext secret-shaped value the release secret scan could flag.
+
 ## 4.2.16 - 2026-10-14
 
 - Fixed: the `add api`, `add table` and `add webhook` templates render code the published canons (eslint-canon-be 3.2.17, eslint-canon-fe 8.2.16) accept, as examples/lite-app shows. The GraphQL error formatter spec builds its malformed-operation error from a code (`GRAPHQL_VALIDATION_FAILED`), not prose (`user-copy-through-catalog`); `platform/graphql`'s context factory types its parameter with the named `GraphqlContext` (`no-inline-param-type`); both webhook door spec templates register `HttpSecurityModule` with the module's own default and override `WebhookSignatureService` with the real verifier over a fake clock instead of a global `ClockModule` (`is-global-only-in-app`).
