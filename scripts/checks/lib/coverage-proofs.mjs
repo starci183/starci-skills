@@ -1,10 +1,10 @@
 // A proves header is a claim; reachable checker results and nonempty test cases substantiate it.
 import { enforcerJudgedInEdition } from '../../hfs/edition-slots.mjs';
 import { evidenceFiles, evidenceInEdition } from './coverage-inventory.mjs';
-import { expressionReach, nodeName, resolvedExpression, sourceIndex } from './coverage-ast.mjs';
+import { astChildren, expressionReach, nodeName, resolvedExpression, sourceIndex } from './coverage-ast.mjs';
 import { lintEnforcersForCode, registeredLintRules } from './coverage-routing.mjs';
-import { evaluate, localScope, scopedWalk, UNKNOWN } from './coverage-evaluation.mjs';
-import { resultReach } from './coverage-results.mjs';
+import { bindPattern, evaluate, invocation, localScope, scopedWalk, UNKNOWN } from './coverage-evaluation.mjs';
+import { resultReach, returnedExpressions } from './coverage-results.mjs';
 
 const NEGATIVE = /\b(?:invalid|violat\w*|refus\w*|reject\w*|deni\w*|fail\w*|negative|forbid\w*|missing)\b/i;
 const POSITIVE = /\b(?:valid|pass\w*|accept\w*|conform\w*|positive|clean)\b/i;
@@ -88,14 +88,61 @@ function reachedExportKeys(context, file, nodes) {
     .map(([name]) => `${file}#${name}`);
 }
 
-function assertionTargets(context, assertion, code) {
+function assertionTargets(context, assertion, code, delegatedFiles) {
   const out = new Set();
   for (const [file, reached] of assertion.reached) {
-    if (file === assertion.index.file || !nodeContainsCode(context, file, reached, code, assertion.reached)) continue;
-    out.add(file);
-    reachedExportKeys(context, file, reached).forEach((key) => out.add(key));
+    if (file === assertion.index.file) continue;
+    if (nodeContainsCode(context, file, reached, code, assertion.reached)) {
+      out.add(file);
+      reachedExportKeys(context, file, reached).forEach((key) => out.add(key));
+    } else if (delegatedFiles.has(file)) delegatedTargets(context, file, reached, code).forEach((key) => out.add(key));
   }
   return out;
+}
+
+// A wrapper owns the proof when its returned value consumes a code-bearing checker.
+// Calls whose results are discarded cannot lend their code to the wrapper's return.
+function returnedCode(context, index, node, code, seen = new Set()) {
+  if (!node || seen.has(node)) return false;
+  const next = new Set(seen).add(node);
+  const resolved = resolvedExpression(context, index, node);
+  if (resolved.node !== node) return returnedCode(context, resolved.index, resolved.node, code, next);
+  if (codeLiteral(node, code)) return true;
+  if (node.type === 'CallExpression') {
+    const target = invocation(context, index, node);
+    if (target) return functionReturnsCode(context, target, code, next);
+  }
+  if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type)) return false;
+  return astChildren(node).some((child) => returnedCode(context, index, child, code, next));
+}
+
+function functionReturnsCode(context, target, code, seen = new Set()) {
+  const local = expressionReach(context, target.index, target.node).get(target.index.file) ?? [];
+  if (local.some((node) => codeLiteral(node, code))) return true;
+  return returnedExpressions(context, target).some((entry) => returnedCode(context, entry.index, entry.node, code, seen));
+}
+
+function delegatedTargets(context, file, reached, code) {
+  const index = sourceIndex(context, file);
+  const nodes = new Set(reached);
+  return [...index.exports].flatMap(([name, expression]) => {
+    const target = resolvedExpression(context, index, expression);
+    if (!nodes.has(target.node) || !['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(target.node?.type)) return [];
+    return declarationReturnsCode(context, target, code) ? [file, `${file}#${name}`] : [];
+  });
+}
+
+function declarationReturnsCode(context, target, code) {
+  const declarations = analysisCaches.get(context.files).declarations;
+  let codes = declarations.get(target.node);
+  if (!codes) { codes = new Map(); declarations.set(target.node, codes); }
+  if (codes.has(code)) return codes.get(code);
+  const scope = localScope(target.index);
+  target.node.params.forEach((parameter) => bindPattern(context, scope, parameter,
+    { index: scope, node: { type: 'Literal', value: UNKNOWN } }));
+  const result = functionReturnsCode(context, { index: scope, node: target.node }, code);
+  codes.set(code, result);
+  return result;
 }
 
 function expectationRole(node, title, code, expected) {
@@ -146,10 +193,10 @@ function testAnalysis(context, index, test) {
   return { checked, runs, title: test.title };
 }
 
-function testEvidence(context, analysis, code) {
+function testEvidence(context, analysis, code, delegatedFiles) {
   const roles = new Map();
   for (const assertion of analysis.checked) {
-    for (const target of assertionTargets(context, assertion, code)) {
+    for (const target of assertionTargets(context, assertion, code, delegatedFiles)) {
       const proven = roles.get(target) ?? new Set();
       expectationRole(assertion.node, analysis.title, code, assertion.expected).forEach((role) => {
         if (role !== 'violating' || assertion.claims.has(code)) proven.add(role);
@@ -164,7 +211,7 @@ function cachedTests(context, file, edition) {
   let cache = analysisCaches.get(context.files);
   if (!cache || cache.sources.size !== context.files.size
     || ![...cache.sources].every(([name, text]) => context.files.get(name) === text)) {
-    cache = { sources: new Map(context.files), tests: new Map() };
+    cache = { sources: new Map(context.files), tests: new Map(), declarations: new WeakMap() };
     analysisCaches.set(context.files, cache);
   }
   const key = `${file}@${edition}`;
@@ -177,13 +224,14 @@ function cachedTests(context, file, edition) {
 
 function sourceEvidence(context, rule, code, edition) {
   const proofs = [];
+  const delegatedFiles = new Set(activeSourceEnforcers(context, rule, code, edition).map((entry) => entry.at));
   for (const ref of rule.proves ?? []) {
     if (!evidenceInEdition(ref, edition) || ref.codes && !ref.codes.includes(code)) continue;
     for (const file of evidenceFiles(context.files, ref).filter((name) => name.endsWith('.spec.mjs'))) {
       const index = sourceIndex(context, file);
       if (!claimsProof(index.text, code, edition)) continue;
       const tests = cachedTests(context, file, edition);
-      proofs.push({ file, tests: tests.map((entry) => testEvidence(context, entry, code)) });
+      proofs.push({ file, tests: tests.map((entry) => testEvidence(context, entry, code, delegatedFiles)) });
     }
   }
   return proofs;
@@ -229,9 +277,10 @@ function sourceProven(context, proofs, entry) {
 
 function lintProven(context, proofs, entry) {
   const implementation = registeredLintRules(context, entry.kind).get(entry.id);
-  const target = implementation?.expression && resolvedExpression(context, implementation.index, implementation.expression).node;
+  const target = implementation?.expression && resolvedExpression(context, implementation.index, implementation.expression);
+  const file = target?.index.file ?? implementation?.file;
   return proofs.some((proof) => proof.tests.some((test) => test.runs.some((run) => run.id === entry.id && run.complete
-    && run.implementation.has(implementation?.file) && (!target || run.implementation.get(implementation.file).includes(target)))));
+    && run.implementation.has(file) && (!target?.node || run.implementation.get(file).includes(target.node)))));
 }
 
 export function coverageProofFindings(context, rule, code, edition) {

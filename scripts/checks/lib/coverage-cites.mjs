@@ -1,4 +1,6 @@
 // coverage-cites.mjs - R247's static projection of catalogued ruling amendments.
+import { rulingRetirementExempt } from './ruling-cites.mjs';
+
 const CODE = 'RT_COVERAGE_SUPERSEDED_CITE';
 const list = (value) => {
   if (value === undefined || value === null) return [];
@@ -282,10 +284,12 @@ function paragraphCites(paragraph, index, add) {
   }
 }
 
-function chunkPatterns(chunk, patterns, index, add) {
+function chunkPatterns(path, chunk, patterns, index, add) {
   for (const pattern of patterns) {
+    const record = index.nodes.get(pattern.key);
+    if (rulingRetirementExempt(record, path)) continue;
     pattern.match.lastIndex = 0;
-    const rule = index.nodes.get(pattern.key)?.currentRule;
+    const rule = record.currentRule;
     for (const match of chunk.body.matchAll(pattern.match)) add(chunk.start + match.index, `${pattern.key} records stale wording here; follow its current ruling.`, rule ? [rule] : []);
   }
 }
@@ -294,7 +298,7 @@ function fileCites(path, text, index, patterns, findings, seen) {
   const add = (offset, message, rules) => collectFinding(path, text, findings, seen, offset, message, rules);
   for (const chunk of proseChunks(path, text)) {
     for (const paragraph of paragraphs(chunk)) paragraphCites(paragraph, index, add);
-    chunkPatterns(chunk, patterns, index, add);
+    chunkPatterns(path, chunk, patterns, index, add);
   }
 }
 

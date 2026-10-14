@@ -1,0 +1,7 @@
+export { DatabaseModule } from "./database.module"
+export { parsePrimaryDatabaseConfig } from "./primary.config"
+export { PRIMARY_CONNECTION } from "./primary.connection"
+export { PRIMARY_ENTITY_MANAGER, InjectPrimaryEntityManager } from "./primary.decorators"
+export { sql, ident, requireOwnedRow } from "./database.sql"
+export type { SqlText } from "./database.sql"
+export type { DatabaseConnectionOptions, DatabaseOptions } from "./database.options"

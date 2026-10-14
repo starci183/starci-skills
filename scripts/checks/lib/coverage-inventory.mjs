@@ -10,6 +10,9 @@ import { effectiveSlot, slotInEdition } from '../../hfs/edition-slots.mjs';
 
 const TEMPLATE_ROOT = 'packages/hfs/templates/';
 const TEXT_FILE = /\.(?:md|mjs|cjs|js|ts|tsx|jsx|yaml|yml|json|toml|sql|tpl|sh|css|properties|txt)$/;
+const TEXT_BASENAMES = new Set(['Dockerfile', 'gitignore', 'gitignore-lite', 'starciwork.gitignore',
+  'starciwork.gitignore-lite', 'pre-commit', 'pre-push', 'editorconfig', 'gitattributes', 'nvmrc',
+  'npmignore', 'prettierignore', 'prettierrc']);
 // Custody files are deliberately excluded before opening any file, including sealed members.
 export const coverageSafePath = (rel) => !/(?:^|\/)(?:node_modules|\.git|\.claude|\.aws|\.codex|\.agents|secrets?)(?:\/|$)/i.test(rel)
   && !/(?:^|\/)(?:secret\.env|secrets\.env|\.env(?:\.[^/]*)?|[^/]+\.enc|keys\.txt)$/i.test(rel);
@@ -26,7 +29,8 @@ export function coverageSources(root) {
         || !rel.startsWith('tests/fixtures/') && /(?:^|\/)(?:runtime|dist|coverage|\.runtimes|artifacts)(?:\/|$)/.test(rel);
     } })) {
       const rel = path.relative(root, file).replaceAll('\\', '/');
-      if (!TEXT_FILE.test(rel) && !/(?:^|\/)(?:Dockerfile|gitignore(?:-lite)?|starciwork\.gitignore(?:-lite)?|(?:pre-commit|pre-push)|(?:editorconfig|gitattributes|nvmrc|npmignore|prettierignore))$/.test(rel)) continue;
+      const basename = path.posix.basename(rel).replace(/^\./, '');
+      if (!TEXT_FILE.test(rel) && !TEXT_BASENAMES.has(basename)) continue;
       files.set(rel, fs.readFileSync(file, 'utf8'));
     }
   }

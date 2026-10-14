@@ -2,7 +2,7 @@
 import { astChildren, expressionReach, nodeName, resolvedExpression, sourceIndex } from './coverage-ast.mjs';
 import { invocation, scopedWalk, testHelper } from './coverage-evaluation.mjs';
 
-function returnedExpressions(context, target) {
+export function returnedExpressions(context, target) {
   if (target.node.body.type !== 'BlockStatement') return [{ index: target.index, node: target.node.body }];
   const out = [];
   scopedWalk(context, target.index, target.node.body, (index, node) => {

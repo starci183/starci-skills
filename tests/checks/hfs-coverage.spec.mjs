@@ -57,7 +57,7 @@ function completeCatalog() {
     }] },
     manifest: { editions: [...EDITIONS], profiles: ['app'], slots: [{
       id: 'app.sample', profiles: ['app'], path: 'record.yaml', presence: 'required',
-      tracked: 'tracked', rules: [SAMPLE], managedBy: 'sample',
+      tracked: 'tracked', rules: [SAMPLE], managedBy: 'sample', exemplifiedBy: [TEMPLATE],
     }] },
     files: new Map([
       [DOC, `Owner: Runtime\n\n${SAMPLE} describes the sample.\n`],
@@ -204,7 +204,7 @@ for (const [code, fixtureCatalog] of Object.entries(fixtureCatalogs)) {
       const findings = hfsCoverageFindings(fixtureCatalog(edition, true));
       const failures = findings.filter((finding) => finding.code === code);
       assert.ok(failures.length > 0, JSON.stringify(findings));
-      assert.ok(failures.every((finding) => finding.level === (reportOnly.has(code) ? 'warning' : 'error')), JSON.stringify(failures));
+      assert.ok(failures.every((finding) => finding.level === (reportOnly.has(code) && finding.rule === 'R01' ? 'warning' : 'error')), JSON.stringify(failures));
     });
     test(`${code} accepts the passing ${edition} fixture catalog`, () => {
       const findings = hfsCoverageFindings(fixtureCatalog(edition, false));
@@ -660,12 +660,12 @@ test('check-hfs-rules detects an edition without an enforcer and respects justif
   assert.ok(!hfsRulesFindings(findingContext).some((finding) => finding.code === 'HFS_RULE_NO_ENFORCER'));
 });
 
-test('coverage reports keep only NO_WITNESS and NO_EXAMPLE findings as warnings', () => {
+test('coverage reports keep report-only rule evidence as warnings while adopted slots gate', () => {
   const warnings = [
     ...hfsCoverageFindings(fixtureCatalogs.RT_COVERAGE_NO_WITNESS('lite', true)),
     ...hfsCoverageFindings(fixtureCatalogs.RT_COVERAGE_NO_EXAMPLE('full', true)),
   ];
-  const report = coverageReport(warnings, { rules: 1, slots: 1 });
+  const report = coverageReport(warnings.filter((finding) => finding.rule === 'R01'), { rules: 1, slots: 1 });
   assert.equal(report.ok, true);
   assert.equal(report.errors, 0);
   assert.ok(report.warnings > 0);
@@ -675,6 +675,7 @@ test('coverage reports keep only NO_WITNESS and NO_EXAMPLE findings as warnings'
   assert.ok(failing.errors > 0);
   assert.match(formatCoverageReport(failing), /ERROR RT_COVERAGE_NO_DOC/);
   assert.match(formatCoverageReport(report), /WARNING RT_COVERAGE_NO_WITNESS/);
+  assert.equal(coverageReport(warnings).ok, false);
   assert.equal(formatCoverageReport({ refusal: { code: 'HFS_RULES_INVALID', message: 'Invalid fixture.' } }), 'HFS_RULES_INVALID: Invalid fixture.\n');
 });
 

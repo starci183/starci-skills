@@ -1,0 +1,15 @@
+{
+  "hfs": 3,
+  "kind": "app",
+  "project": "lite-delivery-fixture",
+  "edition": "lite",
+  "sides": {
+    "be": {
+      "apps": [{ "name": "api", "kind": "api" }],
+      "connections": [{ "name": "primary", "envPrefix": "PRIMARY_DB", "owner": "api", "isolation": "schema", "provider": "supabase" }]
+    },
+    "fe": {
+      "apps": [{ "name": "web", "kind": "next" }]
+    }
+  }
+}

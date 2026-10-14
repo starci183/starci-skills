@@ -33,6 +33,10 @@ const list = (value) => {
   return Array.isArray(value) ? value : [value];
 };
 
+/** A retired term may remain only in the ruling's explicitly declared retirement files. */
+export const rulingRetirementExempt = (record, rel) =>
+  list(record.retires).length > 0 && list(record.retiredIn).includes(rel);
+
 /** A link uses a canonical rule/case, an owner id, or a local case id inside a rule. */
 function linkKey(value, rule) {
   if (value && typeof value === 'object') {
@@ -408,7 +412,7 @@ function checkStaleStatements({ rel, text, add }, chunks, patterns) {
     for (const { record, pattern } of patterns) {
       // A ruling that retires a term declares `retiredIn`: the enforcer that implements the retirement and the ledger entry that records it
       // may name the retired term. Every other file naming it is still a stale statement.
-      if (list(record.retires).length && list(record.retiredIn).includes(rel)) continue;
+      if (rulingRetirementExempt(record, rel)) continue;
       for (const match of chunk.text.matchAll(pattern))
         add(
           rel,

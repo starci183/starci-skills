@@ -128,16 +128,46 @@ function slotMatches(slot, profile, example, file) {
   return braceVariants(slot.path).some((variant) => compileVariant(slot, variant).regex.test(file.slice(base.length)));
 }
 
+function slotHasTemplate(context, slot, edition, templates) {
+  const explicit = [slot.template, slot.scaffold, ...refsIn(slot.exemplifiedBy, edition)];
+  const associated = context.catalog.rules.filter((rule) => (slot.rules ?? []).some((code) => code === rule.id || rule.failureCodes.includes(code)));
+  return templates.templates.get(slot.id)?.length || explicit.some((ref) => templateEvidence(context.files, ref).length)
+    || associated.some((rule) => refsIn(rule.exemplifiedBy, edition).some((ref) => templateEvidence(context.files, ref).length));
+}
+
+function slotNeedsTemplate(original, slot) {
+  return slot.presence === 'required' || original.managedBy || original.liteManagedBy || slot.scaffold && slot.scaffold !== 'none';
+}
+
+function slotTemplateWaived(slot) {
+  return typeof slot.templateNa === 'string' && slot.templateNa.trim()
+    || slot.scaffold === 'none' && typeof slot.reason === 'string' && slot.reason.trim();
+}
+
+function slotFixtureMatches(context, slot, profile, file) {
+  if (!file.startsWith('tests/fixtures/') || !String(context.files.get(file) ?? '').trim()) return false;
+  const segments = file.split('/');
+  return segments.slice(2, -1).some((_segment, index) =>
+    slotMatches(slot, profile, { path: segments.slice(0, index + 3).join('/') }, file));
+}
+
+function slotHasExample(context, slot, profile, edition) {
+  if ((context.examples ?? []).some((example) => example.edition === edition
+    && example.files.some((file) => slotMatches(slot, profile, example, file)))) return true;
+  return refsIn(slot.exemplifiedBy, edition).some((ref) => typeof ref === 'object'
+    && (ref.edition === edition || ref.editions?.includes(edition))
+    && evidenceFiles(context.files, ref).some((file) => slotFixtureMatches(context, slot, profile, file)));
+}
+
 function slotEvidence(context, edition, templates) {
   const out = [];
   for (const { original, slot, profile } of slotViews(context.manifest, edition)) {
-    const explicit = [slot.template, slot.scaffold].filter((ref) => typeof ref === 'string' && ref.startsWith('packages/hfs/templates/'));
-    const associated = context.catalog.rules.filter((rule) => (slot.rules ?? []).some((code) => code === rule.id || rule.failureCodes.includes(code)));
-    const hasTemplate = templates.templates.get(slot.id)?.length || explicit.some((ref) => templateEvidence(context.files, ref).length)
-      || associated.some((rule) => refsIn(rule.exemplifiedBy, edition).some((ref) => templateEvidence(context.files, ref).length));
-    const waived = slot.scaffold === 'none' && typeof slot.reason === 'string' && slot.reason.trim();
-    if ((slot.presence === 'required' || original.managedBy || original.liteManagedBy || slot.scaffold && slot.scaffold !== 'none') && !hasTemplate && !waived) out.push(finding('RT_COVERAGE_NO_TEMPLATE', slot.id, edition, `${slot.id} ${edition}: ${profile} slot has no existing template or scaffold path`, 'knowledge/hfs/slots.yaml'));
-    if (!(context.examples ?? []).some((example) => example.edition === edition && example.files.some((file) => slotMatches(slot, profile, example, file)))) out.push(finding('RT_COVERAGE_NO_EXAMPLE', slot.id, edition, `${slot.id} ${edition}: no example file exercises the ${profile} slot`, 'knowledge/hfs/slots.yaml'));
+    if (slotNeedsTemplate(original, slot) && !slotHasTemplate(context, slot, edition, templates) && !slotTemplateWaived(slot)) {
+      out.push(finding('RT_COVERAGE_NO_TEMPLATE', slot.id, edition, `${slot.id} ${edition}: ${profile} slot has no existing template or scaffold path`, 'knowledge/hfs/slots.yaml'));
+    }
+    if (!slotHasExample(context, slot, profile, edition)) {
+      out.push(finding('RT_COVERAGE_NO_EXAMPLE', slot.id, edition, `${slot.id} ${edition}: no example file or dedicated fixture exercises the ${profile} slot`, 'knowledge/hfs/slots.yaml'));
+    }
   }
   return out;
 }

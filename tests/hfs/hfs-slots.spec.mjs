@@ -95,6 +95,44 @@ test('editionWhy is optional non-empty text preserved in both edition views', ()
   }
 });
 
+test('slot coverage metadata agrees between the schema and loader and survives both edition views', () => {
+  const doc = parseYaml(manifestText);
+  const slot = doc.slots.find((entry) => entry.id === 'be.app.api');
+  slot.templateNa = 'Generated application metadata has no independent scaffolded surface.';
+  slot.exemplifiedBy = [
+    'packages/hfs/templates/be/skeleton/apps/__app__/src/main.ts',
+    { path: 'examples/lite-app/be/apps/api/src/main.ts', editions: ['lite', 'full'] },
+    { path: 'tests/fixtures/hfs-callback-full/fe/apps/web/src/app/auth/callback/route.ts', edition: 'full' },
+  ];
+  assert.equal(validateManifestSchema(doc), true, JSON.stringify(validateManifestSchema.errors));
+  const manifest = loadSlotManifest({ text: JSON.stringify(doc) });
+  for (const edition of ['full', 'lite']) {
+    const view = sideOf(app({ edition }), 'be', { manifest }).slot(slot.id);
+    assert.equal(view.templateNa, slot.templateNa);
+    assert.deepEqual(view.exemplifiedBy, slot.exemplifiedBy);
+  }
+});
+
+test('slot coverage metadata refuses blank reasons and malformed or duplicate evidence', () => {
+  const invalid = [
+    { templateNa: '' }, { templateNa: '   ' }, { templateNa: 7 },
+    { exemplifiedBy: [] }, { exemplifiedBy: [7] }, { exemplifiedBy: ['../outside.ts'] },
+    { exemplifiedBy: ['x.ts', 'x.ts'] },
+    { exemplifiedBy: [{ path: 'x.ts', edition: 'other' }] },
+    { exemplifiedBy: [{ path: 'x.ts', edition: 'full', editions: ['full'] }] },
+    { exemplifiedBy: [{ path: 'x.ts', editions: [] }] },
+    { exemplifiedBy: [{ path: 'x.ts', editions: ['lite', 'lite'] }] },
+    { exemplifiedBy: [{ path: 'x.ts', unknown: true }] },
+    { exemplifiedBy: [{ path: 'x.ts', edition: 'full' }, { edition: 'full', path: 'x.ts' }] },
+  ];
+  for (const fields of invalid) {
+    const doc = parseYaml(manifestText);
+    Object.assign(doc.slots.find((entry) => entry.id === 'be.app.api'), fields);
+    assert.equal(validateManifestSchema(doc), false, JSON.stringify(fields));
+    refusal(() => loadSlotManifest({ text: JSON.stringify(doc) }), 'HFS_MANIFEST_INVALID');
+  }
+});
+
 test('every slot with an edition-specific presence, shape or adapter explains the difference', () => {
   const manifest = loadSlotManifest();
   const differing = manifest.slots.filter(slot => slot.lite || slot.editions || slot.liteManagedBy && slot.liteManagedBy !== slot.managedBy || slot.litePresence && slot.litePresence !== slot.presence);

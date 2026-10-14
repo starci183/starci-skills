@@ -1,0 +1,16 @@
+{
+  "hfs": 3,
+  "kind": "app",
+  "project": "full-callback-fixture",
+  "edition": "full",
+  "sides": {
+    "be": {
+      "apps": [{ "name": "core", "kind": "api" }],
+      "connections": [{ "name": "primary", "envPrefix": "PRIMARY_DB", "owner": "core", "isolation": "schema", "provider": "supabase" }]
+    },
+    "fe": {
+      "apps": [{ "name": "web", "kind": "next" }],
+      "optionalSlots": ["fe.route.callback"]
+    }
+  }
+}

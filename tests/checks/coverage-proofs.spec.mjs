@@ -16,6 +16,26 @@ import { sample } from '../../${ENFORCER}';
 const sourceChecks = `assert.equal(sample(true)[0].code, '${CODE}'); assert.deepEqual(sample(false), []);`;
 
 for (const edition of EDITIONS) {
+  test(`recognizes ${edition} wrapper results whose code is emitted by a delegated checker`, () => {
+    const context = fixture(`for (const edition of ['lite', 'full']) test('valid and invalid', () => { ${sourceChecks} });`);
+    context.files.set(ENFORCER, `// ${CODE}\nimport { check } from './findings.mjs';
+export function sample(invalid) { const report = check(invalid); return report.findings.filter(finding => finding); }
+export function unused(invalid) { return check(invalid).findings; }`);
+    const delegate = 'scripts/checks/findings.mjs';
+    const source = `export function check(invalid) {
+const findings = []; if (invalid) findings.push({code: '${CODE}'}); return {findings}; }`;
+    context.files.set(delegate, source);
+    assert.deepEqual(coverageProofFindings(context, context.rule, CODE, edition), []);
+    context.files.set(delegate, source.replace(CODE, 'OTHER_CODE'));
+    assert.equal(coverageProofFindings(context, context.rule, CODE, edition)[0]?.code, 'RT_COVERAGE_PROOF_VACUOUS');
+    context.files.delete(delegate);
+    assert.equal(coverageProofFindings(context, context.rule, CODE, edition)[0]?.code, 'RT_COVERAGE_PROOF_VACUOUS');
+    context.files.set(delegate, source);
+    assert.deepEqual(coverageProofFindings(context, context.rule, CODE, edition), []);
+    context.rule.enforcers[0].id = 'unused';
+    assert.match(coverageProofFindings(context, context.rule, CODE, edition)[0]?.message, /runtime:unused/);
+  });
+
   test(`recognizes consumed delegated checker values for ${edition}`, () => {
     const context = fixture(`for (const edition of ['lite', 'full']) test('valid and invalid', () => { ${sourceChecks} });`);
     context.files.set(ENFORCER, `// ${CODE}\nimport { findings } from './findings.mjs';
@@ -27,6 +47,16 @@ export function unused(invalid) { return findings(invalid); }`);
     assert.match(coverageProofFindings(context, context.rule, CODE, edition)[0]?.message, /runtime:unused/);
   });
 
+  test(`recognizes ${edition} exported aliases that return an aliased delegated result`, () => {
+    const context = fixture(`for (const edition of ['lite', 'full']) test('valid and invalid', () => { ${sourceChecks} });`);
+    context.files.set(ENFORCER, `// ${CODE}\nimport { findings as check } from './findings.mjs';
+const checker = check;
+const scan = invalid => { const report = checker(invalid); const result = report; return result; };
+export { scan as sample };`);
+    context.files.set('scripts/checks/findings.mjs', `export function findings(invalid) { return invalid ? [{ code: '${CODE}' }] : []; }`);
+    assert.deepEqual(coverageProofFindings(context, context.rule, CODE, edition), []);
+  });
+
   test(`refuses discarded delegated checker results and unrelated returned values for ${edition}`, () => {
     const context = fixture(`for (const edition of ['lite', 'full']) test('valid and invalid', () => { ${sourceChecks} });`);
     context.files.set('scripts/checks/findings.mjs', `export function findings(invalid) { return invalid ? [{ code: '${CODE}' }] : []; }`);
@@ -34,6 +64,8 @@ export function unused(invalid) { return findings(invalid); }`);
       'findings(invalid); return [];',
       'const ignored = findings(invalid); return unrelated();',
       'return discarded(invalid);',
+      'const scan = findings; scan(invalid); return unrelated();',
+      'const scan = discarded; return scan(invalid);',
     ]) {
       context.files.set(ENFORCER, `// ${CODE}\nimport { findings } from './findings.mjs';
 function unrelated() { return []; }
@@ -130,6 +162,21 @@ for (const [shape, body] of lintShapes) {
 }
 
 for (const edition of EDITIONS) {
+  test(`${edition} lint registrations resolve through an imported implementation`, () => {
+    const context = fixture(`for (const edition of ['lite', 'full']) test('cases', () => tester.run('sample', rules.sample,
+{valid: ['ok'], invalid: [{code: 'bad', errors: 1}]}));`, true);
+    context.files.set('packages/eslint/be/index.mjs', `import { rules as contributed } from './contribution.mjs';
+const CONTRIBUTIONS = [{ rules: contributed }]; export const rules = contributed;`);
+    context.files.set('packages/eslint/be/contribution.mjs', `import { owned } from './owned.mjs'; export const rules = {sample: owned};`);
+    context.files.set('packages/eslint/be/owned.mjs', `export const owned = {meta: {code: '${CODE}'}, create() { return {}; }};
+export const unrelated = {meta: {code: '${CODE}'}, create() { return {}; }};`);
+    context.files.set(SPEC, context.files.get(SPEC).replace("../../packages/eslint/be/index.mjs", "../../packages/eslint/be/contribution.mjs"));
+    assert.deepEqual(coverageProofFindings(context, context.rule, CODE, edition), []);
+    const wrong = context.files.get(SPEC).replace('rules.sample', 'unrelated');
+    context.files.set(SPEC, `import { unrelated } from '../../packages/eslint/be/owned.mjs';\n${wrong}`);
+    assert.match(coverageProofFindings(context, context.rule, CODE, edition)[0]?.message, /eslint-be:sample/);
+  });
+
   test(`imported ${edition} lint contributions prove only their registered implementation`, () => {
     const context = fixture(`for (const edition of ['lite', 'full']) test('cases', () => tester.run('sample', rules.sample,
 {valid: ['ok'], invalid: [{code: 'bad', errors: 1}]}));`, true);

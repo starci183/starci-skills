@@ -418,7 +418,7 @@ slots:
     tests: none
     managedBy: skeleton
     liteManagedBy: skeleton-lite
-    editionWhy: "lite renders the same managed file from the skeleton-lite template group; the content differs only where the lite skeleton differs (owner 2026-10-13: lite is full code structure with infra swapped for Supabase)"
+    editionWhy: "Lite renders the same managed file from skeleton-lite because the editions share one code structure while their adapters differ (ruling:R212/case-2, with Work amended by ruling:R212/case-4 and hosting by owner:lite-production-swarm)."
     rules: [HFS_MANAGED_FILE_DRIFT]
   - id: app.tool-config
     profiles: [app]
@@ -429,7 +429,7 @@ slots:
     tests: none
     managedBy: skeleton
     liteManagedBy: skeleton-lite
-    editionWhy: "lite renders the same managed file from the skeleton-lite template group; the content differs only where the lite skeleton differs (owner 2026-10-13: lite is full code structure with infra swapped for Supabase)"
+    editionWhy: "Lite renders the same managed files from skeleton-lite because the editions share one code structure while their adapters differ (ruling:R212/case-2, with Work amended by ruling:R212/case-4 and hosting by owner:lite-production-swarm)."
     rules: [HFS_MANAGED_FILE_DRIFT]
   - id: app.format-config
     profiles: [app]
@@ -515,6 +515,9 @@ slots:
     rules: [HFS_MANAGED_FILE_DRIFT]
   - id: app.ci-db
     profiles: [app]
+    exemplifiedBy:
+      - packages/hfs/templates/app/ci-workflows-lite/github/workflows/db-deploy.yml
+      - {path: tests/fixtures/hfs-callback-full/.github/workflows/db-deploy.yml, edition: full}
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite manages its Supabase database deploy workflow; full owns an optional provider-specific workflow."
     # The database deploy workflow: workflow_dispatch only (like app.ci-e2e); starci app sync renders it under the managed ci group.
     path: ".github/workflows/db-deploy.yml"
@@ -593,10 +596,12 @@ slots:
     tests: none
     managedBy: skeleton
     liteManagedBy: skeleton-lite
-    editionWhy: "lite renders the same managed file from the skeleton-lite template group; the content differs only where the lite skeleton differs (owner 2026-10-13: lite is full code structure with infra swapped for Supabase)"
+    editionWhy: "Lite renders the same managed file from skeleton-lite because the editions share one code structure while their adapters differ (ruling:R212/case-2, with Work amended by ruling:R212/case-4 and hosting by owner:lite-production-swarm)."
     rules: [HFS_MANAGED_FILE_DRIFT, HFS_DEPENDABOT_MISSING]
   - id: app.scripts
     profiles: [app]
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/skeleton/scripts/codegen.mjs, edition: full}
     editionWhy: "Lite manages its Supabase codegen script; full owns operational scripts through the generic path (ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4))."
     # The app's operational scripts only (`*.mjs`, `*.cjs`, `*.ps1`, `*.sh`), or nothing: an empty folder is `scripts/.gitkeep`, which
     # `starci app scaffold` writes. A spec or a test (BE_SPEC_PLACEMENT, FE_NO_TESTS), a check or lint source (`check-*`, `eslint-local-rules*`,
@@ -612,6 +617,8 @@ slots:
     rules: [HFS_SCRIPT_ONE_OFF, BE_SPEC_PLACEMENT, HFS_REPO_LOCAL_CHECK]     # one-off codemods and fix-* scripts are agent output, not tooling
   - id: app.scripts.delivery
     profiles: [app]
+    exemplifiedBy:
+      - {path: tests/fixtures/hfs-delivery-lite/scripts/build-frontend.mjs, edition: lite}
     editionWhy: "Lite splits product delivery tooling from managed codegen; full owns the same files through app.scripts (ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4))."
     editions: [lite]
     # Product-owned environment, secret and build tooling, kept apart from lite's managed codegen script.
@@ -633,6 +640,9 @@ slots:
     tests: none
   - id: app.starciwork
     profiles: [app]
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/skeleton/.starciwork/, edition: full}
+      - {path: packages/hfs/templates/app/skeleton-lite/.starciwork/, edition: lite}
     editionWhy: "ruling:R212/case-4: lite optionally keeps .gitignore, workspace.yaml and brand records; full keeps the Work catalog and product summaries."
     path: ".starciwork/"
     presence: required
@@ -655,7 +665,10 @@ slots:
     rules: [HFS_AGENT_DATA_TRACKED, HFS_IDENTITY_CUSTODY]
   - id: app.starcistacks
     profiles: [app]
-    editionWhy: "Owner ruling 2026-10-14: lite requires declared docker-swarm production with Supabase backing; full also admits Compose development, Kubernetes and Terraform."
+    editionWhy: "owner:lite-production-swarm: lite requires declared docker-swarm production with Supabase backing; full also admits Compose development, Kubernetes and Terraform."
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/skeleton/.starcistacks/, edition: full}
+      - {path: packages/hfs/templates/app/skeleton-lite/.starcistacks/, edition: lite}
     # The stack declarations and the sealed custody of the app, at the app root beside be/, fe/ and .starciwork (never under a side).
     path: ".starcistacks/"
     presence: required
@@ -727,6 +740,9 @@ slots:
   # ----- app root: the Supabase project of an app whose connection declares provider: supabase (every lite app) -------
   - id: app.supabase
     profiles: [app]
+    exemplifiedBy:
+      - packages/hfs/templates/app/skeleton-lite/supabase/
+      - {path: tests/fixtures/hfs-callback-full/supabase/, edition: full}
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): Supabase is required in lite; full enables it only through a declared connection."
     # The one Supabase project directory, at the app root beside be/, fe/ and .starcistacks (never under a side).
     path: "supabase/"
@@ -739,6 +755,9 @@ slots:
     since: 2.1.0
   - id: app.supabase.config
     profiles: [app]
+    exemplifiedBy:
+      - packages/hfs/templates/app/skeleton-lite/supabase/config.toml
+      - {path: tests/fixtures/hfs-callback-full/supabase/config.toml, edition: full}
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite requires Supabase configuration; full requires it only when Supabase is declared."
     # The project configuration: auth keys are env(NAME) references, never literals (L08 judges its policy keys).
     path: "supabase/config.toml"
@@ -751,6 +770,9 @@ slots:
     since: 2.1.0
   - id: app.supabase.migrations
     profiles: [app]
+    exemplifiedBy:
+      - packages/hfs/templates/app/skeleton-lite/supabase/migrations/__timestamp___baseline.sql
+      - {path: tests/fixtures/hfs-callback-full/supabase/migrations/20261014100000_baseline.sql, edition: full}
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite uses Supabase schema authority and requires a migration; full opts into that provider."
     # The schema authority of an app on Supabase: forward-only SQL migrations named <timestamp14>_<kebab-name>.sql,
     # one file per change, immutable once on origin/main (L02-L08 judge them).
@@ -786,6 +808,9 @@ slots:
     since: 2.1.0
   - id: app.supabase.types
     profiles: [app]
+    templateNa: "Database row types are generated from the app's Supabase schema by contract:emit; a hand-authored scaffold template would invent the schema contract."
+    exemplifiedBy:
+      - {path: tests/fixtures/hfs-callback-full/supabase/types/database.types.ts, edition: full}
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite requires generated Supabase row types; full enables them with the provider."
     # The generated Database types (database.types.ts) contract:emit writes from the migrations; both sides read it
     # (sides.<side>.reads supabase/types/); drift against regeneration is L09.
@@ -926,6 +951,11 @@ slots:
     rules: [FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT]
   - id: repo.app-image
     profiles: [be, fe]
+    exemplifiedBy:
+      - packages/hfs/templates/be/image/api/Dockerfile
+      - packages/hfs/templates/be/image/cli/Dockerfile
+      - {path: packages/hfs/templates/be/image/worker/Dockerfile, edition: full}
+      - packages/hfs/templates/fe/image/next/Dockerfile
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite may host Next without its own image; back-end images stay required in both editions."
     # One image per app: every declared app has its own Dockerfile (apps/<app>/Dockerfile), built from the APP ROOT (the folder with
     # the one package.json). It is app-owned (starci app scaffold writes it once from templates/<side>/image) and judged by the docker rules.
@@ -1275,6 +1305,8 @@ slots:
     since: 1.0.0
   - id: be.feature.realtime
     profiles: [be]
+    exemplifiedBy:
+      - {path: tests/fixtures/hfs-lite-slots/be/src/features/realtime/order-status/, edition: lite}
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite runs socket.io in the api process, one instance without Redis; full may scale its gateway."
     path: "src/features/realtime/<channel>/"
     presence: opt-in              # a push channel: reads and pushes only (a socket gateway or a GraphQL subscription), no domain write
@@ -1473,6 +1505,8 @@ slots:
   # ----- BE: pattern slots (opt-in; enabled by hfs.json sides.be.patterns). A path under one is HFS_SLOT_NOT_ENABLED unless its pattern is declared.
   - id: be.platform.event-bus
     profiles: [be]
+    exemplifiedBy:
+      - {path: tests/fixtures/hfs-lite-slots/be/src/modules/platform/event-bus/, edition: lite}
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite implements the event ports with outbox and pgmq; full uses its Kafka adapter."
     path: "src/modules/platform/event-bus/"
     presence: opt-in
@@ -1605,6 +1639,8 @@ slots:
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE, BE_JOB_WRITE_OUTSIDE_OWNER, BE_JOB_FENCE_REQUIRED]
   - id: be.projections
     profiles: [be]
+    exemplifiedBy:
+      - {path: tests/fixtures/hfs-lite-slots/be/src/modules/projections/order-summary/, edition: lite}
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite projection tables live in Supabase migrations; full keeps the TypeORM projection entity beside its projection."
     path: "src/modules/projections/<name>/"
     presence: opt-in
@@ -1645,6 +1681,9 @@ slots:
 
   - id: be.integrations.supabase
     profiles: [be]
+    exemplifiedBy:
+      - packages/hfs/templates/be/skeleton-lite/src/modules/integrations/supabase/
+      - {path: tests/fixtures/hfs-callback-full/be/src/modules/integrations/supabase/, edition: full}
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite requires the Supabase Auth and Storage integration; full opts in through a connection."
     # The only be import of @supabase/* (L10): the Auth admin and Storage admin client, plus the JWKS-based verification of
     # the Supabase access token the guard chain reads (L16). The connection itself is ordinary Postgres (the shared
@@ -1668,6 +1707,8 @@ slots:
   # not match its folder matches no slot: HFS_SLOT_UNDECLARED).
   - id: be.tests.world
     profiles: [be]
+    exemplifiedBy:
+      - {path: tests/fixtures/hfs-lite-slots/be/src/tests/world/, edition: lite}
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite integration proofs use the local Supabase stack and network fakes; full also boots apps and self-hosted services."
     path: "src/tests/world/"
     presence: optional
@@ -1740,7 +1781,7 @@ slots:
     why: the ONLY test-fixture location where Vietnamese or another language may appear in source (LANG_NOT_ENGLISH); placement is the marker, there is no comment pragma
   - id: be.tests.integration
     profiles: [be]
-    editionWhy: "R284 requires proofs for declared lite patterns on local Supabase; full additionally proves infrastructure outages through its world (R112)."
+    editionWhy: "Lite integration specs use the local Supabase CLI stack without containers or toxiproxy (ruling:R212/case-1, amended by ruling:R212/case-2 and ruling:R212/case-4, with contracts allowed by owner:lite-contract-specs); R284 requires declared-pattern proofs there. Full additionally proves infrastructure outages through its world (R112)."
     path: "src/tests/integration/<capability>/*.integration-spec.ts"
     presence: optional
     tracked: tracked
@@ -1847,6 +1888,8 @@ slots:
     rules: [FE_NEXT_CONVENTIONS]
   - id: fe.route.callback
     profiles: [fe]
+    exemplifiedBy:
+      - {path: tests/fixtures/hfs-callback-full/fe/apps/web/src/app/auth/callback/route.ts, edition: full}
     # The auth callback of a Supabase session (the PKCE code exchange), kept only when the auth flow truly needs a server exchange
     # (prefer the client-side PKCE exchange in fe.modules.auth): the one non-health route handler of an app with a Supabase
     # connection; an app without one has no route handler in fe/ (L15).

@@ -1,0 +1,63 @@
+# Full provider-owned workflow adapted from examples/lite-app/.github/workflows/db-deploy.yml.
+name: deploy database
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Protected environment with sealed Supabase custody under .starcistacks
+        required: true
+        type: environment
+      backup_receipt:
+        description: Tracked backup receipt path verified by the deployment owner before migration
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      STACK_ENVIRONMENT: ${{ inputs.environment }}
+      BACKUP_RECEIPT: ${{ inputs.backup_receipt }}
+      SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+      XDG_DATA_HOME: ${{ runner.temp }}/starci-data
+    steps:
+      - name: require release tag
+        shell: bash
+        run: '[[ "$GITHUB_REF" == refs/tags/v* ]] || exit 1'
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: release tag matches package version
+        run: node -e "const version=require('./package.json').version;if(process.env.GITHUB_REF_NAME!=='v'+version)process.exit(1)"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: install SOPS
+        uses: mdgreenwald/mozilla-sops-action@bb2d96a13ef438ad122e5827a57ebd75d6ff118d # v2.1.0
+        with:
+          version: v3.13.2
+      - name: materialize sealed custody and push migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$STACK_ENVIRONMENT" =~ ^[a-z][a-z0-9-]*$ ]]
+          git ls-files --error-unmatch -- "$BACKUP_RECEIPT" > /dev/null
+          test -s "$BACKUP_RECEIPT"
+          secret_dir="$XDG_DATA_HOME/StarCi/secrets/full-callback-fixture/$STACK_ENVIRONMENT"
+          trap 'rm -rf -- "$secret_dir"' EXIT
+          npx --no-install starci app secret materialize "$STACK_ENVIRONMENT"
+          export SUPABASE_ACCESS_TOKEN="$(cat "$secret_dir/SUPABASE_ACCESS_TOKEN")"
+          export SUPABASE_DB_PASSWORD="$(cat "$secret_dir/SUPABASE_DB_PASSWORD")"
+          project_id="$(cat "$secret_dir/SUPABASE_PROJECT_ID")"
+          npx --no-install supabase link --project-ref "$project_id"
+          npm run db:push -- --dry-run
+          npm run db:push
