@@ -2314,6 +2314,15 @@ rules:
     failureCodes: ["FE_CALLBACK_SHAPE"]
     enforcers:
       - {kind: eslint-fe, id: callback-shape}
+  - id: R288
+    code: "FE_STACK_UNLISTED"
+    law: "Every FE workspace dependency belongs to knowledge/hfs/fe-stack.yaml or is declared in hfs.json fe.extraPackages with its name and a nonempty reason. Every product Next app declares the catalog's core runtime packages; codegen, lint, TypeScript and Tailwind tools may be installed once at the app root. The full marketing landing app is exempt from core presence. GraphQL documents, including gql templates, match the back-end contracts, and SWR keys carry fetcher identities without an opt-in declaration."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["FE_STACK_UNLISTED", "FE_STACK_CORE_MISSING"]
+    enforcers:
+      - {kind: hfs, id: fe-stack-allowlist, at: scripts/hfs/rules/fe-stack.mjs}
+
   - id: R291
     code: "HFS_FUNCTION_BUDGET"
     law: "Every back-end and front-end function, method or arrow body stays within ruleParams.functionLines (80 physical lines), including comments and blank lines, in lite and full; split a larger body by responsibility. This is an absolute budget."
@@ -2331,12 +2340,3 @@ rules:
     failureCodes: ["HFS_FEATURE_FILE_BUDGET"]
     enforcers:
       - {kind: hfs, id: feature-files, at: scripts/hfs/rules/feature-files.mjs}
-
-  - id: R288
-    code: "FE_STACK_UNLISTED"
-    law: "Every FE workspace dependency belongs to knowledge/hfs/fe-stack.yaml or is declared in hfs.json fe.extraPackages with its name and a nonempty reason. Every product Next app declares the catalog's core runtime packages; codegen, lint, TypeScript and Tailwind tools may be installed once at the app root. The full marketing landing app is exempt from core presence. GraphQL documents, including gql templates, match the back-end contracts, and SWR keys carry fetcher identities without an opt-in declaration."
-    kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["FE_STACK_UNLISTED", "FE_STACK_CORE_MISSING"]
-    enforcers:
-      - {kind: hfs, id: fe-stack-allowlist, at: scripts/hfs/rules/fe-stack.mjs}

@@ -18604,6 +18604,8 @@ HFS_DB_DEPLOY_UNGUARDED:
   causes_vi:
     - "Workflow db-deploy thiếu chốt kiểm tag hoặc chốt không chặn đường chạy migration theo luật R271."
   nextStep_vi: "Thêm chốt kiểm ref tag trước mỗi bước triển khai migration, rồi chứng minh ref nhánh bị từ chối."
+  owner: op-retry
+  kind: check-finding
 FE_STACK_UNLISTED:
   title: "A front-end dependency is absent from the stack catalog"
   title_vi: "Thư viện front end chưa được khai báo trong danh mục"
