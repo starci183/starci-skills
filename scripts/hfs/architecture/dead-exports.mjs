@@ -14,8 +14,9 @@
  * and contributes no name here.
  *
  * A name is used when a production file outside the owner imports it from the entry (type-only imports count). A
- * namespace import, `import x = require`, a dynamic import()/require(), an `export *` or `export * as` of the entry make
- * every name used. A file outside the owner that re-exports the name (`export { n as m } from`) uses it when `m` is itself
+ * namespace import uses its statically accessed members; a computed read or an escape of the namespace uses every name.
+ * `import x = require`, a dynamic import()/require(), an `export *` or `export * as` of the entry make every name used.
+ * A file outside the owner that re-exports the name (`export { n as m } from`) uses it when `m` is itself
  * used by the importers of that file; a re-exporting file nobody imports is a framework entry (a route file) and uses it.
  * Specs and tests are not in the graph, so an export used only by a spec is dead, on purpose, with these exceptions (unit test
  * standard): the unit spec of every unit role (ruleParams.be.unitRoles: `<name>.service.spec.ts`, `<name>.cli.spec.ts`) and of every logic role
@@ -67,13 +68,125 @@ function extraEntries(graph, entry) {
   return names.flatMap(name => (name.includes('*') ? matches(name) : [`${found.root}/${name}`].filter(rel => graph.files.has(rel))));
 }
 
-const importBindings = (ts, declaration) => {
+/** Disk/staged test consumers have no production checker; bind their local names without resolving dependencies. */
+const namespaceChecker = (context, sourceFile, namespace) => {
+  if (context.namespaceCheckers.has(sourceFile)) return context.namespaceCheckers.get(sourceFile);
+  const { ts } = context;
+  let checker = context.checkerFor?.(sourceFile.fileName);
+  if (!checker?.getSymbolAtLocation(namespace.name)) {
+    const options = { noResolve: true, noLib: true, types: [], allowJs: true, target: ts.ScriptTarget.Latest };
+    const host = ts.createCompilerHost(options);
+    const filename = path.resolve(sourceFile.fileName);
+    host.getSourceFile = file => path.resolve(file) === filename ? sourceFile : undefined;
+    host.fileExists = file => path.resolve(file) === filename;
+    host.readFile = file => path.resolve(file) === filename ? sourceFile.text : undefined;
+    checker = ts.createProgram([filename], options, host).getTypeChecker();
+  }
+  context.namespaceCheckers.set(sourceFile, checker);
+  return checker;
+};
+
+const transparentExpression = (ts, node) => node && (ts.isParenthesizedExpression(node) || ts.isAsExpression(node)
+  || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node) || ts.isSatisfiesExpression(node));
+
+const literalMember = (ts, node) => {
+  while (transparentExpression(ts, node)) node = node.expression;
+  return node && (ts.isStringLiteralLike(node) || ts.isNumericLiteral(node)) ? node.text : null;
+};
+
+const destructuredMember = (ts, name) => {
+  if (ts.isIdentifier(name)) return name.text;
+  if (ts.isComputedPropertyName(name)) return literalMember(ts, name.expression);
+  return literalMember(ts, name);
+};
+
+/** A destructuring alias consumes the property's name, while a rest/computed binding may consume every export. */
+const destructuredBindings = (ts, pattern) => {
+  const names = [];
+  const elements = ts.isObjectBindingPattern(pattern) ? pattern.elements : pattern.properties;
+  for (const element of elements) {
+    if (element.dotDotDotToken || ts.isSpreadAssignment(element)) return { all: true, pairs: [] };
+    const name = destructuredMember(ts, element.propertyName ?? element.name);
+    if (name === null) return { all: true, pairs: [] };
+    names.push(name);
+  }
+  return { all: false, pairs: names.map(imported => ({ imported, exported: null })) };
+};
+
+const namespaceReference = (ts, checker, symbol, node) => {
+  if (checker.getSymbolAtLocation(node) === symbol) return true;
+  const parent = node.parent;
+  if (ts.isShorthandPropertyAssignment(parent) && parent.name === node) return checker.getShorthandAssignmentValueSymbol(parent) === symbol;
+  return ts.isExportSpecifier(parent) && node === (parent.propertyName ?? parent.name)
+    && checker.getExportSpecifierLocalTargetSymbol(parent) === symbol;
+};
+
+const unwrappedNamespace = (ts, node) => {
+  while (transparentExpression(ts, node.parent)) node = node.parent;
+  return node;
+};
+
+const indexedNamespaceMember = (ts, node) => {
+  if (!ts.isTypeQueryNode(node.parent) || node.parent.exprName !== node) return null;
+  let query = node.parent;
+  while (ts.isParenthesizedTypeNode(query.parent)) query = query.parent;
+  const indexed = query.parent;
+  return ts.isIndexedAccessTypeNode(indexed) && indexed.objectType === query && ts.isLiteralTypeNode(indexed.indexType)
+    ? literalMember(ts, indexed.indexType.literal) : null;
+};
+
+/** The first member is the entry export even in a chain such as namespace.Enum.Member or namespace.Type.Inner. */
+const namespaceUse = (ts, reference) => {
+  const node = unwrappedNamespace(ts, reference);
+  const parent = node.parent;
+  let name = null;
+  if (ts.isPropertyAccessExpression(parent) && parent.expression === node) name = parent.name.text;
+  else if (ts.isQualifiedName(parent) && parent.left === node) name = parent.right.text;
+  else if (ts.isElementAccessExpression(parent) && parent.expression === node) name = literalMember(ts, parent.argumentExpression);
+  else if (ts.isVariableDeclaration(parent) && parent.initializer === node && ts.isObjectBindingPattern(parent.name)) return destructuredBindings(ts, parent.name);
+  else if (ts.isBinaryExpression(parent) && parent.right === node && parent.operatorToken.kind === ts.SyntaxKind.EqualsToken
+    && ts.isObjectLiteralExpression(parent.left)) return destructuredBindings(ts, parent.left);
+  else name = indexedNamespaceMember(ts, node);
+  return name === null ? { all: true, pairs: [] } : { all: false, pairs: [{ imported: name, exported: null }] };
+};
+
+const namespaceBindings = (context, declaration, namespace) => {
+  if (context.namespaceUses.has(namespace)) return context.namespaceUses.get(namespace);
+  const { ts } = context;
+  const sourceFile = declaration.getSourceFile();
+  const checker = namespaceChecker(context, sourceFile, namespace);
+  const symbol = checker.getSymbolAtLocation(namespace.name);
+  const result = { all: false, pairs: [] };
+  const visit = node => {
+    if (ts.isJSDocSeeTag(node) || ts.isJSDocLink(node) || ts.isJSDocLinkCode(node) || ts.isJSDocLinkPlain(node)) return;
+    if (ts.isIdentifier(node) && node !== namespace.name && namespaceReference(ts, checker, symbol, node)) {
+      const used = namespaceUse(ts, node);
+      result.all ||= used.all;
+      result.pairs.push(...used.pairs);
+    }
+    if (!result.all) {
+      ts.forEachChild(node, visit);
+      for (const doc of node.jsDoc ?? []) visit(doc);
+    }
+  };
+  // An unavailable binding must never turn an unknown consumer into a false unused-export finding.
+  if (symbol) visit(sourceFile);
+  else result.all = true;
+  context.namespaceUses.set(namespace, result);
+  return result;
+};
+
+const importBindings = (context, declaration) => {
+  const { ts } = context;
   const clause = declaration.importClause;
   if (!clause) return { all: false, pairs: [] }; // side-effect import: uses nothing
   const pairs = [];
   if (clause.name) pairs.push({ imported: 'default', exported: null });
   const named = clause.namedBindings;
-  if (named && named.kind === ts.SyntaxKind.NamespaceImport) return { all: true, pairs: [] };
+  if (named && named.kind === ts.SyntaxKind.NamespaceImport) {
+    const namespace = namespaceBindings(context, declaration, named);
+    return { all: namespace.all, pairs: [...pairs, ...namespace.pairs] };
+  }
   if (named) for (const element of named.elements) pairs.push({ imported: (element.propertyName ?? element.name).text, exported: null });
   return { all: false, pairs };
 };
@@ -92,9 +205,10 @@ const importTypeBindings = (ts, declaration) => {
 };
 
 /** Names an import/export declaration takes from its target: {all} or {pairs: [{imported, exported}]}. */
-function bindingsOf(ts, declaration) {
+function bindingsOf(context, declaration) {
+  const { ts } = context;
   if (!declaration) return { all: true, pairs: [] };
-  if (declaration.kind === ts.SyntaxKind.ImportDeclaration) return importBindings(ts, declaration);
+  if (declaration.kind === ts.SyntaxKind.ImportDeclaration) return importBindings(context, declaration);
   if (declaration.kind === ts.SyntaxKind.ExportDeclaration) return exportBindings(ts, declaration);
   if (declaration.kind === ts.SyntaxKind.ImportTypeNode) return importTypeBindings(ts, declaration);
   // ImportEqualsDeclaration, dynamic import(), require(): the whole module is taken.
@@ -309,7 +423,7 @@ const consumedNames = (context, file, ownerKey, depth, visiting) => {
   const result = { all: false, names: new Set() };
   for (const edge of context.edgesTo.get(file) ?? []) {
     if (ownerKey && unitOfFile(context.graph, edge.from) === ownerKey) continue;
-    const bindings = bindingsOf(context.ts, edge.edge.declaration);
+    const bindings = bindingsOf(context, edge.edge.declaration);
     if (bindings.all) { result.all = true; continue; }
     for (const pair of bindings.pairs) consumeReexportedName(context, result, edge, pair, depth, visiting);
   }
@@ -318,10 +432,10 @@ const consumedNames = (context, file, ownerKey, depth, visiting) => {
 
 /** Adds to `used` the entry exports reached by a consumer outside the owner that imports a file the entry re-exports by name. */
 const addReexportedUses = (context, key, publicEntry, used) => {
-  const { ts, graph } = context;
+  const { graph } = context;
   for (const edge of graph.edges) {
     if (edge.from !== publicEntry || !edge.reexport || graph.unit(edge.to) !== key) continue;
-    const reexport = bindingsOf(ts, edge.edge.declaration);
+    const reexport = bindingsOf(context, edge.edge.declaration);
     const inner = consumedNames(context, edge.to, key, 0, new Set([publicEntry, edge.to]));
     if (reexport.all) continue;
     for (const pair of reexport.pairs) if (inner.all || inner.names.has(pair.imported)) used.names.add(pair.exported);
@@ -367,7 +481,7 @@ const ownerExportFindings = (context, config) => {
 
 export function checkDeadExports({ context, graph, config }) {
   const edgesTo = edgeIndex([...graph.edges, ...testConsumerEdges({ context, graph, config })]);
-  const analysis = { ...context, graph, edgesTo };
+  const analysis = { ...context, graph, edgesTo, namespaceCheckers: new WeakMap(), namespaceUses: new WeakMap() };
   const exports = ownerExportFindings(analysis, config);
   const files = deadFiles(graph, config);
   const dead = exports.violations.length;
