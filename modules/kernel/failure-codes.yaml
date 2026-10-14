@@ -19117,6 +19117,8 @@ DB_STORAGE_PREFIX:
   causes_vi:
     - "Vi phạm R256: chỉ kiểm tra bucket_id không giới hạn đối tượng theo chủ sở hữu."
   nextStep_vi: "Thêm điều kiện prefix sở hữu bằng storage.foldername(name) và principal trong using hoặc with check theo thao tác; chỉ dùng ngoại lệ cho bucket id kết thúc _public."
+  owner: op-retry
+  kind: check-finding
 BE_LITE_PROOF_LANE_MISSING:
   title: "A lite back end declares a pattern without an integration proof lane"
   title_vi: "Back end lite khai báo pattern nhưng thiếu nhánh kiểm thử integration"

@@ -2463,6 +2463,15 @@ rules:
     enforcers:
       - {kind: hfs, id: lexicon, at: scripts/hfs/rules/lexicon.mjs}
 
+  - id: R284
+    code: "BE_LITE_PROOF_LANE_MISSING"
+    law: "A lite back end declaring event-bus, queue, webhooks, realtime, fenced-job, projection or saga proves each declared pattern through integration specs under src/tests/integration: runnable tests carry titles `<pattern>/<scenario>: ...` for every required scenario of that pattern. A missing integration lane is refused; missing scenario proofs use R155's BE_PATTERN_SPEC_MISSING. Full-edition pattern proof behavior is unchanged."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["BE_LITE_PROOF_LANE_MISSING"]
+    enforcers:
+      - {kind: hfs, id: lite-proof-lane, at: scripts/hfs/rules/lite-proof-lane.mjs}
+
   - id: R285
     code: "FE_SWR_OUTSIDE_FAMILY"
     law: "SWR runtime calls belong to the declared SWR hook family. A component, feature or domain hook consumes its wrapper hook instead of importing an API operation or calling SWR itself; each back-end operation is imported and invoked only by its SWR wrapper under hooks/swr, regardless of whether the tier matrix still permits a direct transport edge."
@@ -2527,11 +2536,3 @@ rules:
     failureCodes: ["HFS_FEATURE_FILE_BUDGET"]
     enforcers:
       - {kind: hfs, id: feature-files, at: scripts/hfs/rules/feature-files.mjs}
-  - id: R284
-    code: "BE_LITE_PROOF_LANE_MISSING"
-    law: "A lite back end declaring event-bus, queue, webhooks, realtime, fenced-job, projection or saga proves each declared pattern through integration specs under src/tests/integration: runnable tests carry titles `<pattern>/<scenario>: ...` for every required scenario of that pattern. A missing integration lane is refused; missing scenario proofs use R155's BE_PATTERN_SPEC_MISSING. Full-edition pattern proof behavior is unchanged."
-    kinds: [check]
-    gates: [land, ci]
-    failureCodes: ["BE_LITE_PROOF_LANE_MISSING"]
-    enforcers:
-      - {kind: hfs, id: lite-proof-lane, at: scripts/hfs/rules/lite-proof-lane.mjs}
