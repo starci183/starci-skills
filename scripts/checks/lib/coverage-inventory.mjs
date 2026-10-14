@@ -49,7 +49,8 @@ export function evidenceFiles(files, ref) {
 export function exampleInventory(files) {
   const examples = [];
   // The index supplies references; hfs.json supplies the actual edition, never a guessed app name.
-  const index = files.has('examples/index.yaml') ? parseYaml(files.get('examples/index.yaml')) : {};
+  const indexFile = ['examples', 'index.yaml'].join('/');
+  const index = files.has(indexFile) ? parseYaml(files.get(indexFile)) : {};
   for (const [file, text] of files) {
     if (!/^examples\/[^/]+\/hfs\.json$/.test(file)) continue;
     const declaration = JSON.parse(text);

@@ -22,6 +22,7 @@ function boundary(text, at) {
 }
 
 function removedWords(repoRoot, repo) {
+  if (typeof repoRoot !== 'string') return [];
   // Resolved side declarations contain the edition and slots, so read product metadata from the root declaration.
   const root = repo.profile === 'be' || repo.profile === 'fe' ? path.dirname(repoRoot) : repoRoot;
   const lexicon = repo.lexicon ?? readJson(root, 'hfs.json')?.lexicon;

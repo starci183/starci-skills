@@ -247,10 +247,10 @@ test('rule catalog: `editions` names the rules lite does not judge; a rule witho
   const fullOnly = catalog.rules.filter((r) => r.editions && !r.editions.includes('lite')).map((r) => r.id);
   // owner rulings 2026-10-12/13: only the proofs that need the e2e or integration world stay full only (the socket.io door, R184,
   // is judged in lite too: lite runs the same gateway in its api process)
-  assert.deepEqual(fullOnly.sort(), ['R112', 'R155', 'R167', 'R173'].sort());
+  assert.deepEqual(fullOnly.sort(), ['R112', 'R167', 'R173'].sort());
   for (const id of ['R46', 'R47', 'R48', 'R98', 'R102', 'R151', 'R160', 'R169', 'R177', 'R10', 'R34', 'R97']) assert.ok(!fullOnly.includes(id), `${id} is judged in lite`);
   assert.equal(catalog.judgedIn('BE_TEST_TOPOLOGY', 'lite'), true);
-  assert.equal(catalog.judgedIn('BE_PATTERN_SPEC_MISSING', 'lite'), false);
+  assert.equal(catalog.judgedIn('BE_PATTERN_SPEC_MISSING', 'lite'), true, 'owner 2026-10-14: lite proves its patterns on the integration lane (R284)');
   assert.equal(catalog.judgedIn('BE_PATTERN_SPEC_MISSING', 'full'), true);
   assert.equal(catalog.judgedIn('FE_NO_TESTS', 'lite'), true);
   assert.equal(catalog.judgedIn('HFS_REPO_UNREADABLE', 'lite'), true, 'a code outside the catalog is always judged');
