@@ -33,5 +33,16 @@ jobs:
           file: ${{ matrix.file }}
           push: false
           tags: {{imageProject}}/${{ matrix.name }}:ci
+          # OCI keeps the SBOM and provenance attestations without publishing to a registry.
+          outputs: type=oci,dest=${{ runner.temp }}/${{ matrix.name }}.oci.tar
+          sbom: true
+          provenance: mode=max
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,scope=${{ matrix.name }},mode=max
+      - name: retain image with SBOM and provenance
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: image-${{ matrix.name }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/${{ matrix.name }}.oci.tar
+          if-no-files-found: error
+          compression-level: 0

@@ -35,6 +35,8 @@ const LITE = {
 
 const targetMap = (hfs = LITE) => Object.fromEntries(renderTargets(hfs, undefined, { manifest: MANIFEST }).map(target => [target.path, target]));
 const aggregateHash = (targets) => createHash('sha256').update(JSON.stringify(targets.map(({ path: file, content }) => [file, content]))).digest('hex');
+// C04 updates these templates; C02/C03 own their committed example copies.
+const C04_TEMPLATE_TARGETS = new Set(['.editorconfig', '.gitattributes', '.github/dependabot.yml', '.nvmrc', '.github/workflows/ci.yml', '.github/workflows/images.yml']);
 
 test('liteManagedBy is a template id field of app slots', () => {
   const slot = MANIFEST.slots.find(candidate => candidate.id === 'app.ci');
@@ -51,8 +53,8 @@ test('liteManagedBy is a template id field of app slots', () => {
 test('the lite managed set carries the unit run and its coverage world (owner ruling 2026-10-12), the database wrappers and workflows, and no e2e world', () => {
   const targets = targetMap();
   assert.deepEqual(Object.keys(targets).sort(), [
-    '.dockerignore', '.github/workflows/ci.yml', '.github/workflows/db-deploy.yml', '.github/workflows/images.yml', '.gitignore',
-    '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', '.starciwork/.gitignore',
+    '.dockerignore', '.editorconfig', '.gitattributes', '.github/dependabot.yml', '.github/workflows/ci.yml', '.github/workflows/db-deploy.yml', '.github/workflows/images.yml', '.gitignore',
+    '.husky/pre-commit', '.husky/pre-push', '.nvmrc', '.prettierignore', '.prettierrc', '.starciwork/.gitignore',
     'be/eslint.config.mjs', 'be/jest.config.js', 'be/src/tests/tsconfig.json', 'be/tsconfig.build.json', 'be/tsconfig.json',
     'codecov.yml', 'fe/eslint.config.mjs', 'fe/stylelint.config.mjs', 'fe/tsconfig.json',
     'package.json', 'scripts/codegen.mjs', 'sonar-project.properties', 'turbo.json',
@@ -110,7 +112,7 @@ test('lite render reads the Jest preset like full, writeTargets reaches a no-op,
   fs.writeFileSync(path.join(dir, 'hfs.json'), `${JSON.stringify(LITE, null, 2)}\n`);
   await assert.rejects(renderRepo(dir, { manifest: MANIFEST }), /HFS_SYNC_PRESET_MISSING|@starci\/jest-preset/, 'a lite back end installs @starci/jest-preset for its unit run');
   const { targets } = await renderRepo(dir, { manifest: MANIFEST, presets: PRESETS });
-  assert.equal(targets.length, 22);
+  assert.equal(targets.length, 26);
   assert.equal(targets.some(target => target.path.startsWith('.starciwork/')), false);
   assert.equal(writeTargets(dir, targets).length, targets.length);
   assert.deepEqual(checkTargets(dir, targets).map(result => result.status), Array(targets.length).fill('ok'));
@@ -160,17 +162,17 @@ test('sync preserves a lite workspace declaration and does not create forbidden 
   assert.deepEqual(await managedFindings({ repoRoot: dir, tracked: ['hfs.json', '.starciwork/workspace.yaml', ...targets.map(target => target.path)], manifest: MANIFEST, presets: PRESETS }), []);
 });
 
-test('the full managed render of both examples is the committed one (every managed file in sync, edition full explicit or not)', () => {
+test('the full render of both examples keeps the other managed files in sync and all targets equal with full explicit or not', () => {
   for (const folder of ['examples/ecommerce-app', 'examples/shape-slot']) {
     const hfs = JSON.parse(fs.readFileSync(path.join(ROOT, folder, 'hfs.json'), 'utf8'));
     const sonarKey = /^sonar.projectKey=(.+)$/m.exec(fs.readFileSync(path.join(ROOT, folder, 'sonar-project.properties'), 'utf8'))[1];
     const targets = renderTargets(hfs, PRESETS, { manifest: MANIFEST, sonarKey, source: appSource(path.join(ROOT, folder)) });
-    assert.deepEqual(checkTargets(path.join(ROOT, folder), targets).filter(result => result.status !== 'ok'), [], folder);
+    assert.deepEqual(checkTargets(path.join(ROOT, folder), targets.filter(target => !C04_TEMPLATE_TARGETS.has(target.path))).filter(result => result.status !== 'ok'), [], folder);
     assert.equal(aggregateHash(renderTargets({ ...hfs, edition: 'full' }, PRESETS, { manifest: MANIFEST, sonarKey, source: appSource(path.join(ROOT, folder)) })), aggregateHash(targets), `${folder} explicit full`);
   }
 });
 
-test('the committed lite example is the lite managed render with its coverage target (owner ruling 2026-10-12)', () => {
+test('the committed lite example keeps the other managed files in sync with its coverage target (owner ruling 2026-10-12)', () => {
   const folder = 'examples/lite-app';
   const hfs = JSON.parse(fs.readFileSync(path.join(ROOT, folder, 'hfs.json'), 'utf8'));
   assert.equal(hfs.edition, 'lite');
@@ -178,7 +180,7 @@ test('the committed lite example is the lite managed render with its coverage ta
   const targets = renderTargets(hfs, PRESETS, { manifest: MANIFEST, sonarKey, source: appSource(path.join(ROOT, folder)) });
   assert.equal(targets.some(target => target.path === 'codecov.yml'), true);
   assert.equal(targets.some(target => target.path === 'be/jest.config.js'), true);
-  assert.deepEqual(checkTargets(path.join(ROOT, folder), targets).filter(result => result.status !== 'ok'), [], folder);
+  assert.deepEqual(checkTargets(path.join(ROOT, folder), targets.filter(target => !C04_TEMPLATE_TARGETS.has(target.path))).filter(result => result.status !== 'ok'), [], folder);
 });
 
 test('the one Sonar gate document carries a readable lite gate with full\'s coverage conditions (owner ruling 2026-10-12)', () => {

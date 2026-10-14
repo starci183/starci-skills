@@ -396,19 +396,32 @@ slots:
     rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW]
   - id: app.git-meta
     profiles: [app]
-    path: "{.gitignore,.gitattributes}"
+    path: .gitignore
     presence: required
     tracked: tracked
     tier: none
     tests: none
     rules: [HFS_GITIGNORE_BLOCK_DRIFT]     # the marked block of .gitignore is rendered by starci app sync (templates/app/gitignore)
-  - id: app.tool-config
+  - id: app.gitattributes
     profiles: [app]
-    path: "{.editorconfig,.nvmrc}"
-    presence: required     # plain dotfiles, the repository's own
+    path: .gitattributes
+    presence: required
     tracked: tracked
     tier: none
     tests: none
+    managedBy: skeleton
+    liteManagedBy: skeleton-lite
+    rules: [HFS_MANAGED_FILE_DRIFT]
+  - id: app.tool-config
+    profiles: [app]
+    path: "{.editorconfig,.nvmrc}"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: skeleton
+    liteManagedBy: skeleton-lite
+    rules: [HFS_MANAGED_FILE_DRIFT]
   - id: app.format-config
     profiles: [app]
     # The one formatter configuration of the app (prettier walks up from every file of both sides to it): .prettierrc names
@@ -551,11 +564,21 @@ slots:
     allows: [playwright.config.ts, stack.mjs, "journeys/*.ts"]
   - id: app.github-meta
     profiles: [app]
-    path: ".github/{CODEOWNERS,pull_request_template.md,ISSUE_TEMPLATE/**,dependabot.yml}"
+    path: ".github/{CODEOWNERS,pull_request_template.md,ISSUE_TEMPLATE/**}"
     presence: optional
     tracked: tracked
     tier: none
     tests: none
+  - id: app.dependabot
+    profiles: [app]
+    path: .github/dependabot.yml
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: skeleton
+    liteManagedBy: skeleton-lite
+    rules: [HFS_MANAGED_FILE_DRIFT, HFS_DEPENDABOT_MISSING]
   - id: app.scripts
     profiles: [app]
     # The app's operational scripts only (`*.mjs`, `*.cjs`, `*.ps1`, `*.sh`), or nothing: an empty folder is `scripts/.gitkeep`, which
