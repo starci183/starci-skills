@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { archFixture, runArch, findings } from '../helpers/hfs-arch-fixture.mjs';
 import { stronglyConnected } from '../../scripts/hfs/architecture/tiers.mjs';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 
 // HFS checks 1 and 2: the tier direction matrix of knowledge/hfs/slots.yaml and owner cycles.
 
@@ -53,7 +54,7 @@ test('BE: domain, platform and integrations never import a feature or an app; pl
       'src/modules/integrations/mail/index.ts': "import { p } from '../../platform/config';\nimport { x } from '../../domain/x';\nexport const i = [p, x];\n",
     },
   });
-  const paths = beDirection(runArch(root)).map(item => `${item.path} -> ${item.resolvedPath}`).sort();
+  const paths = beDirection(runArch(root)).map(item => `${item.path} -> ${item.resolvedPath}`).sort(byCodeUnit);
   assert.deepEqual(paths, [
     'src/modules/domain/x/index.ts -> src/features/api/a/index.ts',
     'src/modules/integrations/mail/index.ts -> src/modules/domain/x/index.ts',
@@ -116,7 +117,7 @@ test('BE: a three-owner cycle is one finding and an acyclic chain is none', t =>
   assert.deepEqual(findings(runArch(chain), 'ARCH_OWNER_CYCLE'), []);
 });
 
-test('FE: feature to feature is forbidden, route to feature and feature to modules are fine', t => {
+test('FE: page to page is forbidden, route to feature and feature to modules are fine', t => {
   const root = archFixture(t, {
     profile: 'fe',
     files: {
@@ -132,6 +133,79 @@ test('FE: feature to feature is forbidden, route to feature and feature to modul
   assert.equal(hits.length, 1, JSON.stringify(hits));
   assert.equal(hits[0].path, 'apps/web/src/features/pages/A/index.tsx');
   assert.equal(hits[0].resolvedPath, 'apps/web/src/features/pages/B/index.tsx');
+  assert.match(hits[0].message, /feature owners only from kinds pages to kinds overlays; it imports pages -> pages/);
+});
+
+test('FE: pages compose overlay and block owners through their public entries; every feature still imports blocks', t => {
+  const files = {
+    'apps/web/src/features/pages/Home/index.tsx': "import { Confirm } from '../../overlays/Confirm';\nimport type { ConfirmProps } from '../../overlays/Confirm';\nexport { Confirm } from '../../overlays/Confirm';\nimport { Order } from '../../../components/blocks/Order';\nimport { view } from './component';\nexport const Home = [Confirm, Order, view];\nexport type HomeProps = ConfirmProps;\n",
+    'apps/web/src/features/pages/Home/component.tsx': 'export const view = 1;\n',
+    'apps/web/src/features/overlays/Confirm/index.tsx': 'export const Confirm = 1;\nexport type ConfirmProps = string;\n',
+    'apps/web/src/components/blocks/Order/index.tsx': 'export const Order = 1;\n',
+  };
+  for (const kind of ['pages', 'layouts', 'overlays']) {
+    files[`apps/web/src/features/${kind}/Compose/index.tsx`] = "import { Order } from '../../../components/blocks/Order';\nimport { view } from './component';\nexport const Compose = [Order, view];\n";
+    files[`apps/web/src/features/${kind}/Compose/component.tsx`] = 'export const view = 1;\n';
+  }
+  const report = runArch(archFixture(t, { profile: 'fe', files }));
+  assert.deepEqual(findings(report, 'FE_TIER_DIRECTION'), []);
+  assert.deepEqual(findings(report, 'ARCH_OWNER_EXPORT_BYPASS'), []);
+});
+
+test('FE: layouts, overlays and providers still cannot import overlay owners', t => {
+  const root = archFixture(t, {
+    profile: 'fe',
+    files: {
+      'apps/web/src/features/overlays/Confirm/index.tsx': 'export const Confirm = 1;\n',
+      'apps/web/src/features/layouts/Shell/index.tsx': "import { Confirm } from '../../overlays/Confirm';\nexport const Shell = Confirm;\n",
+      'apps/web/src/features/overlays/Other/index.tsx': "import { Confirm } from '../Confirm';\nexport const Other = Confirm;\n",
+      'apps/web/src/components/providers/Theme/index.tsx': "import { Confirm } from '../../../features/overlays/Confirm';\nexport const Theme = Confirm;\n",
+    },
+  });
+  const hits = findings(runArch(root), 'FE_TIER_DIRECTION');
+  assert.deepEqual(hits.map(item => item.path), [
+    'apps/web/src/components/providers/Theme/index.tsx',
+    'apps/web/src/features/layouts/Shell/index.tsx',
+    'apps/web/src/features/overlays/Other/index.tsx',
+  ]);
+  for (const item of hits) assert.match(item.message, /only from kinds pages to kinds overlays/);
+});
+
+test('FE: overlays never import pages or layouts; type-only imports and re-exports keep the target-kind restriction', t => {
+  const root = archFixture(t, {
+    profile: 'fe',
+    files: {
+      'apps/web/src/features/pages/Home/index.tsx': 'export type Home = string;\n',
+      'apps/web/src/features/layouts/Shell/index.tsx': 'export const Shell = 1;\n',
+      'apps/web/src/features/overlays/Confirm/index.tsx': "import type { Home } from '../../pages/Home';\nexport { Shell } from '../../layouts/Shell';\nexport type Confirm = Home;\n",
+    },
+  });
+  const hits = findings(runArch(root), 'FE_TIER_DIRECTION');
+  assert.deepEqual(hits.map(item => [item.resolvedPath, item.typeOnly]), [
+    ['apps/web/src/features/pages/Home/index.tsx', true],
+    ['apps/web/src/features/layouts/Shell/index.tsx', false],
+  ]);
+});
+
+test('FE: newly permitted overlay and block imports preserve public-entry and cross-app restrictions', t => {
+  const root = archFixture(t, {
+    profile: 'fe',
+    apps: [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }],
+    files: {
+      'apps/web/src/features/pages/Home/index.tsx': "import { view } from '../../overlays/Confirm/component';\nimport { Confirm } from '../../../../../admin/src/features/overlays/Confirm';\nimport { Order } from '../../../../../admin/src/components/blocks/Order';\nexport const Home = [view, Confirm, Order];\n",
+      'apps/web/src/features/overlays/Confirm/index.tsx': 'export const Confirm = 1;\n',
+      'apps/web/src/features/overlays/Confirm/component.tsx': 'export const view = 1;\n',
+      'apps/admin/src/features/overlays/Confirm/index.tsx': 'export const Confirm = 1;\n',
+      'apps/admin/src/components/blocks/Order/index.tsx': 'export const Order = 1;\n',
+    },
+  });
+  const report = runArch(root);
+  assert.deepEqual(findings(report, 'FE_TIER_DIRECTION'), []);
+  assert.deepEqual(findings(report, 'ARCH_OWNER_EXPORT_BYPASS').map(item => item.resolvedPath), ['apps/web/src/features/overlays/Confirm/component.tsx']);
+  assert.deepEqual(findings(report, 'FE_APP_ISOLATION').map(item => item.resolvedPath), [
+    'apps/admin/src/features/overlays/Confirm/index.tsx',
+    'apps/admin/src/components/blocks/Order/index.tsx',
+  ]);
 });
 
 test('FE: an app never imports another app', t => {
@@ -160,6 +234,27 @@ test('FE: a component layer imports only the layers after it', t => {
   assert.equal(hits.length, 1, JSON.stringify(hits));
   assert.equal(hits[0].path, 'apps/web/src/components/leaves/Btn/index.tsx');
   assert.match(hits[0].message, /leaves component may import only the layers after it; it imports a blocks/);
+});
+
+test('FE: blocks and lower component layers still cannot import another block or their own layer', t => {
+  const root = archFixture(t, {
+    profile: 'fe',
+    files: {
+      'apps/web/src/components/blocks/Order/index.tsx': "import { Card } from '../Card';\nexport const Order = Card;\n",
+      'apps/web/src/components/blocks/Card/index.tsx': 'export const Card = 1;\n',
+      'apps/web/src/components/composites/List/index.tsx': "import { Card } from '../../blocks/Card';\nexport const List = Card;\n",
+      'apps/web/src/components/branches/Row/index.tsx': "import { Card } from '../../blocks/Card';\nimport { Other } from '../Other';\nexport const Row = [Card, Other];\n",
+      'apps/web/src/components/branches/Other/index.tsx': 'export const Other = 1;\n',
+    },
+  });
+  const hits = findings(runArch(root), 'FE_TIER_DIRECTION');
+  assert.deepEqual(hits.map(item => `${item.path} -> ${item.resolvedPath}`), [
+    'apps/web/src/components/blocks/Order/index.tsx -> apps/web/src/components/blocks/Card/index.tsx',
+    'apps/web/src/components/branches/Row/index.tsx -> apps/web/src/components/blocks/Card/index.tsx',
+    'apps/web/src/components/branches/Row/index.tsx -> apps/web/src/components/branches/Other/index.tsx',
+    'apps/web/src/components/composites/List/index.tsx -> apps/web/src/components/blocks/Card/index.tsx',
+  ]);
+  for (const item of hits) assert.match(item.message, /may import only the layers after it/);
 });
 
 test('FE: a component may import config but not the api transport; a hook reaches the transport and another domain only through its index', t => {
@@ -199,7 +294,7 @@ test('FE: a "use server" module has no tier or owner-entry exemption: a block re
 
 test('stronglyConnected finds only multi-node components', () => {
   const graph = new Map([['a', new Set(['b'])], ['b', new Set(['c'])], ['c', new Set(['a', 'd'])], ['d', new Set()], ['e', new Set(['e'])]]);
-  const components = stronglyConnected(graph).map(component => [...component].sort());
+  const components = stronglyConnected(graph).map(component => [...component].sort(byCodeUnit));
   assert.deepEqual(components, [['a', 'b', 'c']]);
 });
 
@@ -217,5 +312,5 @@ test('ARCH_OWNER_EXPORT_BYPASS: a builder may deep-import a capability entity, a
   const bad = { ...files,
     'src/features/api/a/index.ts': "import { XEntity } from '../../../modules/domain/x/persistence/entities/x.entity';\nexport const a = XEntity;\n",
     'src/tests/fixtures/other.contracts.ts': entity.replace('../../../', '../../') };
-  assert.deepEqual(deep(runArch(archFixture(t, { files: bad }))).sort(), ['src/features/api/a/index.ts', 'src/tests/fixtures/other.contracts.ts']);
+  assert.deepEqual(deep(runArch(archFixture(t, { files: bad }))).sort(byCodeUnit), ['src/features/api/a/index.ts', 'src/tests/fixtures/other.contracts.ts']);
 });

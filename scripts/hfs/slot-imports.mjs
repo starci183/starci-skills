@@ -65,8 +65,10 @@ export function importAllowedIn(scope, fromPath, toPath) {
   const fromOwner = ownerIn(scope, from.path);
   const toOwner = ownerIn(scope, to.path);
   if (sameOwnerUnit(from, fromOwner) === sameOwnerUnit(to, toOwner)) return { allowed: true, reason: 'sameOwner' };
-  const { mayImport } = scope.manifest.tiers[scope.profile][fromTier] ?? {};
+  const { mayImport, mayImportKinds } = scope.manifest.tiers[scope.profile][fromTier] ?? {};
   if (!mayImport?.includes(toTier)) return { allowed: false, reason: 'tierDirection', fromTier, toTier, mayImport: mayImport ?? [] };
+  const kindRestriction = mayImportKinds?.[toTier];
+  if (kindRestriction && (!kindRestriction.from.includes(from.kind) || !kindRestriction.to.includes(to.kind))) return { allowed: false, reason: 'tierDirection', fromTier, toTier, mayImport, kindRestriction, fromKind: from.kind ?? null, toKind: to.kind ?? null };
   const layerProblem = lowerLayerProblem(scope, from, to, fromTier, toTier, fromOwner, toOwner);
   if (layerProblem) return layerProblem;
   // A runtime owner is imported file by file (crossOwner of knowledge/hfs/runtime-slots.yaml): no public entry.

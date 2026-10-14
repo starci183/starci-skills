@@ -8,8 +8,8 @@
  *
  * THE PURE HALF TAKES ATOMS. `component.tsx` receives `{ state, props, on }`: `props` is data
  * (strings, numbers, booleans, arrays, plain objects), `on` is actions whose arguments are data,
- * and the children it renders are written inside it, never handed in. A layout alone also takes
- * `children`, because the router puts the page there.
+ * and feature composition may also take named `render` callbacks inside `props` to render supplied
+ * blocks. A layout alone also takes `children`, because the router puts the page there.
  *
  * ONLY ITS OWN INDEX MAY IMPORT IT. Other tiers use the connected export, so the pure half stays a
  * private drawing surface that audit can render from a fixture.
@@ -37,6 +37,10 @@ const pureHalf = (context) =>
 
 /** Type names that carry a rendered tree rather than data. */
 const NON_ATOM_TYPE = /^(?:ReactNode|ReactElement|ReactPortal|JSX\.Element|Element|ComponentType|FC|FunctionComponent|ElementType|ComponentProps|RenderFunction)$/
+
+/** Feature composition's render callbacks return a rendered value and take only data. */
+const RENDER_RESULT_TYPE = /^(?:ReactNode|ReactElement|JSX\.Element)$/
+const RENDER_PROP_NAME = /^render(?:[A-Z][A-Za-z0-9]*)?$/
 
 /** The printed name of a type reference, qualified names included. */
 const typeNameOf = (node) => {
@@ -79,17 +83,17 @@ const keyOf = (member) => (member.key?.type === "Identifier" ? member.key.name :
 
 // -- DRAWING-1 ----------------------------------------------------------------------------------
 
-/** The pure half takes `{ state, props, on }` of atoms; only a layout also takes `children`. */
+/** The pure half takes atom data and actions; feature composition may receive named render callbacks. */
 export const basePropsAtom = {
   meta: {
     type: "problem",
-    docs: { description: "A pure `XBase` takes `state`, atom `props` and `on` actions; no component or tree crosses in." },
+    docs: { description: "A pure `XBase` takes `state`, atom `props` and `on` actions; feature composition may receive named render callbacks in `props`." },
     schema: [],
     messages: {
       tree:
         "`{{path}}` hands a rendered tree (`{{type}}`) into the pure half. Write the child inside `component.tsx` and pass it atoms (ids, strings, flags); a tree handed in cannot be drawn, audited or reused.",
       action:
-        "`{{path}}` is a function inside `props`. Actions live in `on`, so `props` stays pure data that a fixture can hold.",
+        "`{{path}}` is a function inside `props`. Actions live in `on`; feature composition may receive named `render` callbacks that take atoms and return rendered blocks.",
       onData:
         "`on.{{key}}` is not an action. `on` holds functions only; data belongs in `props`.",
       member:
@@ -101,45 +105,78 @@ export const basePropsAtom = {
     if (!tier) return {}
     let types = new Map()
 
+    /** Resolve render results locally; an optional empty result does not make data a render prop. */
+    const isRenderResult = (node, seen = new Set()) => {
+      if (!node) return false
+      if (node.type === "TSUnionType") {
+        const empty = (part) => ["TSNullKeyword", "TSUndefinedKeyword"].includes(part.type)
+          || part.type === "TSLiteralType" && part.literal.value === null
+        return node.types.some((part) => isRenderResult(part, new Set(seen)))
+          && node.types.every((part) => empty(part) || isRenderResult(part, new Set(seen)))
+      }
+      if (node.type !== "TSTypeReference") return false
+      const name = typeNameOf(node)
+      if (RENDER_RESULT_TYPE.test(name.replace(/^React\./, ""))) return true
+      if (!types.has(name) || seen.has(name)) return false
+      return isRenderResult(types.get(name), new Set(seen).add(name))
+    }
+
+    const checkRenderCallback = (node, path, allowed) => {
+      if (!allowed || !isRenderResult(node.returnType?.typeAnnotation)) return false
+      for (const parameter of node.params ?? node.parameters ?? []) {
+        checkData(parameter.typeAnnotation?.typeAnnotation, `${path}(${parameter.name ?? "arg"})`, new Set(), false, true)
+      }
+      return true
+    }
+
+    const checkDataReference = (node, path, seen, renderProp, renderParameter) => {
+      const name = typeNameOf(node)
+      if (NON_ATOM_TYPE.test(renderParameter ? name.replace(/^React\./, "") : name)) {
+        context.report({ node, messageId: "tree", data: { path, type: name } })
+        return
+      }
+      for (const argument of node.typeArguments?.params ?? node.typeParameters?.params ?? []) checkData(argument, path, seen, false, renderParameter)
+      if (types.has(name) && !seen.has(name)) {
+        const nextSeen = renderProp || renderParameter ? new Set(seen) : seen
+        nextSeen.add(name)
+        checkData(types.get(name), path, nextSeen, renderProp, renderParameter)
+      }
+    }
+
+    const checkDataMember = (member, path, seen, renderParameter) => {
+      const memberPath = `${path}.${keyOf(member)}`
+      const allowsRender = tier !== "blocks" && path === "props" && RENDER_PROP_NAME.test(keyOf(member))
+      if (member.type === "TSMethodSignature") {
+        if (!checkRenderCallback(member, memberPath, allowsRender)) context.report({ node: member, messageId: "action", data: { path: memberPath } })
+      } else if (member.type === "TSPropertySignature") {
+        checkData(member.typeAnnotation?.typeAnnotation, memberPath, seen, allowsRender, renderParameter)
+      }
+    }
+
     /** Walk a data type: report trees and functions anywhere inside it. */
-    const checkData = (node, path, seen) => {
+    const checkData = (node, path, seen, renderProp = false, renderParameter = false) => {
       if (!node) return
       switch (node.type) {
         case "TSFunctionType":
+          if (checkRenderCallback(node, path, renderProp)) return
           context.report({ node, messageId: "action", data: { path } })
           return
-        case "TSTypeReference": {
-          const name = typeNameOf(node)
-          if (NON_ATOM_TYPE.test(name)) {
-            context.report({ node, messageId: "tree", data: { path, type: name } })
-            return
-          }
-          for (const argument of node.typeArguments?.params ?? node.typeParameters?.params ?? []) checkData(argument, path, seen)
-          if (types.has(name) && !seen.has(name)) {
-            seen.add(name)
-            checkData(types.get(name), path, seen)
-          }
+        case "TSTypeReference":
+          checkDataReference(node, path, seen, renderProp, renderParameter)
           return
-        }
         case "TSUnionType":
         case "TSIntersectionType":
-          for (const part of node.types) checkData(part, path, seen)
+          for (const part of node.types) checkData(part, path, seen, renderProp, renderParameter)
           return
         case "TSArrayType":
-          checkData(node.elementType, path, seen)
+          checkData(node.elementType, path, seen, false, renderParameter)
           return
         case "TSTypeOperator":
-          checkData(node.typeAnnotation, path, seen)
+          checkData(node.typeAnnotation, path, seen, false, renderParameter)
           return
         case "TSTypeLiteral":
         case "TSInterfaceBody":
-          for (const member of node.members ?? node.body) {
-            if (member.type === "TSMethodSignature") {
-              context.report({ node: member, messageId: "action", data: { path: `${path}.${keyOf(member)}` } })
-            } else if (member.type === "TSPropertySignature") {
-              checkData(member.typeAnnotation?.typeAnnotation, `${path}.${keyOf(member)}`, seen)
-            }
-          }
+          for (const member of node.members ?? node.body) checkDataMember(member, path, seen, renderParameter)
           return
         default:
       }

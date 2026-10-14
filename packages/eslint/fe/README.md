@@ -45,12 +45,19 @@ class-name ownership. Reusable class names belong in a colocated `classNames.ts`
 be composed with HeroUI `cn` using one utility token per argument.
 
 The `drawing` law holds the split surfaces (blocks, pages, layouts, overlays under `components/`
-or `features/`): the pure `XBase` takes `{ state, props, on }` of atoms (`base-props-atom`), only its
+or `features/`): the pure `XBase` takes `{ state, props, on }` of atoms, with named `render`/`renderX`
+callbacks in feature `props` for block composition (`base-props-atom`), only its
 sibling `index.tsx` imports it and never re-exports it (`base-import-pair`), `XState` names drawn
 shapes and never a data status (`no-data-status-shape`), and a block renders each slot's
 loading/forbidden/error/empty through `SlotView` (`slot-status-through-slotview`). The law's name is
 the `drawing` slot role of `component.tsx`; a split-surface reference tree lives under
 `.claude/examples/`.
+
+Page owners in `features/pages/<Name>/index.tsx` may compose overlay and block public entries; pages never import another
+page, and blocks never import another block. For a client list, a server page mounts an overlay whose connected entry reads list
+identities and supplies a block renderer to its pure Base. A pure component or branch may render that keyed list by
+calling the supplied render prop; it imports no block and fetches no data. The supplied renderer composes blocks only,
+with no intrinsic markup or hook calls, and each connected item block still renders its exact sibling `XBase`.
 
 The one locale pattern everywhere is `next-intl`, a `[locale]` segment, default `vi`,
 `localePrefix: "as-needed"`, and `proxy.ts` instead of `middleware.ts`.

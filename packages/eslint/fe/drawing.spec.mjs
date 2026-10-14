@@ -27,6 +27,7 @@ const PAGE = at("apps/web/src/features/pages/OperatePage/component.tsx")
 const OVERLAY = at("apps/web/src/features/overlays/sales/SendOverlay/component.tsx")
 const FEATURE_PAGE = PAGE
 const COMPOSITE = at("apps/web/src/components/composites/SlotView/index.tsx")
+const BRANCH = at("apps/web/src/components/branches/BlockList/index.tsx")
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -98,6 +99,91 @@ test("a pure half takes state, atom props and on actions", () => {
         filename: BLOCK,
         code: "export const HandoffBlockBase = (props: { state: \"prepared\"; props: {}; on: { readonly render: (node: JSX.Element) => void } }) => <div />",
         errors: [{ messageId: "tree" }],
+      },
+    ],
+  })
+})
+
+test("feature composition receives block render callbacks while ordinary props stay data", () => {
+  tester.run("base-props-atom-render", basePropsAtom, {
+    valid: [
+      {
+        filename: PAGE,
+        code: `
+          type OperatePageData = { readonly ids: readonly string[]; readonly renderItem: (id: string) => ReactNode; readonly renderEmpty: () => JSX.Element | null | undefined }
+          export const OperatePageBase = (props: { state: "view"; props: OperatePageData; on: {} }) => <BlockList ids={props.props.ids} renderItem={props.props.renderItem} />`,
+      },
+      {
+        filename: OVERLAY,
+        code: `
+          type SendOverlayData = { renderItem(id: string): React.ReactElement }
+          export const SendOverlayBase = (props: { state: "form"; props: SendOverlayData; on: {} }) => <BlockList renderItem={props.props.renderItem} />`,
+      },
+      {
+        filename: LAYOUT,
+        code: `
+          type RenderedBlock = React.JSX.Element
+          type RenderBlock = (id: string) => RenderedBlock
+          type WorkspaceLayoutData = { readonly render: RenderBlock }
+          export const WorkspaceLayoutBase = (props: { state: "sidebar"; props: WorkspaceLayoutData; on: {} }) => <BlockList renderItem={props.props.render} />`,
+      },
+      {
+        filename: BRANCH,
+        code: "export const BlockList = (props: { ids: readonly string[]; renderItem: (id: string) => ReactNode }) => <>{props.ids.map(props.renderItem)}</>",
+      },
+    ],
+    invalid: [
+      {
+        filename: PAGE,
+        code: "export const OperatePageBase = (props: { state: \"view\"; props: { renderItem: ReactNode }; on: {} }) => <div />",
+        errors: [{ messageId: "tree" }],
+      },
+      {
+        filename: PAGE,
+        code: "export const OperatePageBase = (props: { state: \"view\"; props: { renderItem: (node: React.ReactNode) => ReactNode }; on: {} }) => <div />",
+        errors: [{ messageId: "tree" }],
+      },
+      {
+        filename: PAGE,
+        code: "export const OperatePageBase = (props: { state: \"view\"; props: { getItem: (id: string) => ReactNode }; on: {} }) => <div />",
+        errors: [{ messageId: "action" }],
+      },
+      {
+        filename: PAGE,
+        code: `
+          type RenderItem = (id: string) => ReactNode
+          export const OperatePageBase = (props: { state: "view"; props: { renderItem: RenderItem; getItem: RenderItem }; on: {} }) => <div />`,
+        errors: [{ messageId: "action" }],
+      },
+      {
+        filename: PAGE,
+        code: "export const OperatePageBase = (props: { state: \"view\"; props: { renderItem: (id: string) => string }; on: {} }) => <div />",
+        errors: [{ messageId: "action" }],
+      },
+      {
+        filename: PAGE,
+        code: "export const OperatePageBase = (props: { state: \"view\"; props: { renderItem: (id: string) => ReactNode | boolean }; on: {} }) => <div />",
+        errors: [{ messageId: "action" }],
+      },
+      {
+        filename: PAGE,
+        code: "export const OperatePageBase = (props: { state: \"view\"; props: { nested: { renderItem: (id: string) => ReactNode } }; on: {} }) => <div />",
+        errors: [{ messageId: "action" }],
+      },
+      {
+        filename: PAGE,
+        code: "export const OperatePageBase = (props: { state: \"view\"; props: {}; renderItem: (id: string) => ReactNode; on: {} }) => <div />",
+        errors: [{ messageId: "member" }],
+      },
+      {
+        filename: PAGE,
+        code: "export const OperatePageBase = (props: { state: \"view\"; props: {}; children: ReactNode; on: {} }) => <div />",
+        errors: [{ messageId: "member" }],
+      },
+      {
+        filename: BLOCK,
+        code: "export const HandoffBlockBase = (props: { state: \"prepared\"; props: { renderItem: (id: string) => ReactNode }; on: {} }) => <div />",
+        errors: [{ messageId: "action" }],
       },
     ],
   })

@@ -323,6 +323,12 @@ function runtimeParamProblems(rp) {
   ];
 }
 
+const folderKindsValid = list => strList(list) && list.length > 0 && new Set(list).size === list.length && list.every(kind => NAME.test(kind));
+const kindPairValid = pair => isPlainObject(pair) && Object.keys(pair).sort(byCodeUnit).join() === 'from,to'
+  && ['from', 'to'].every(side => folderKindsValid(pair[side]));
+const kindRestrictionValid = kinds => isPlainObject(kinds) && Object.keys(kinds).length > 0
+  && Object.entries(kinds).every(([target, pair]) => NAME.test(target) && kindPairValid(pair));
+
 /** Shape problems of the tier map of one profile. */
 export function tierMapProblems(profile, tiers) {
   const bad = [];
@@ -330,14 +336,33 @@ export function tierMapProblems(profile, tiers) {
   for (const [tier, def] of Object.entries(tiers)) {
     if (!NAME.test(tier)) bad.push(`tiers.${profile}.${tier} is not a tier name`);
     if (!isPlainObject(def) || !Array.isArray(def.mayImport) || !def.mayImport.every((t) => NAME.test(String(t)))) bad.push(`tiers.${profile}.${tier}.mayImport must be a list of tier names`);
-    for (const key of Object.keys(def ?? {})) if (!['mayImport', 'acyclic', 'lowerLayerOnly'].includes(key)) bad.push(`tiers.${profile}.${tier}.${key} is not a tier field`);
+    if (def?.mayImportKinds !== undefined && !kindRestrictionValid(def.mayImportKinds)) bad.push(`tiers.${profile}.${tier}.mayImportKinds must map tier names to {from, to} non-empty lists of unique folder kinds`);
+    for (const key of Object.keys(def ?? {})) if (!['mayImport', 'mayImportKinds', 'acyclic', 'lowerLayerOnly'].includes(key)) bad.push(`tiers.${profile}.${tier}.${key} is not a tier field`);
+  }
+  return bad;
+}
+
+function tierFolderKindProblems(manifest, profile, tier, kinds, at) {
+  const known = new Set(manifest.slots.filter((slot) => slot.profiles.includes(profile) && slot.tier === tier).flatMap((slot) => [...(slot.kinds ?? []), ...(slot.layers ?? [])]));
+  return kinds.filter(kind => !known.has(kind)).map(kind => `${at} names ${kind}, which is not a folder kind of the ${tier} tier`);
+}
+
+/** Kind restrictions narrow an allowed tier edge and name kinds that its source and target slots actually declare. */
+export function tierKindProblems(manifest, profile) {
+  const bad = [];
+  for (const [tier, def] of Object.entries(manifest.tiers[profile])) {
+    for (const [target, kinds] of Object.entries(def.mayImportKinds ?? {})) {
+      const at = `tiers.${profile}.${tier}.mayImportKinds.${target}`;
+      if (!def.mayImport.includes(target)) bad.push(`${at} restricts a tier that mayImport does not allow`);
+      bad.push(...tierFolderKindProblems(manifest, profile, tier, kinds.from, `${at}.from`), ...tierFolderKindProblems(manifest, profile, target, kinds.to, `${at}.to`));
+    }
   }
   return bad;
 }
 
 /** The semantic rules of a runtime manifest beyond the slot rules both kinds share: tier names and the schema major. */
 export function runtimeSemanticProblems(m) {
-  const bad = [];
+  const bad = tierKindProblems(m, RUNTIME_KIND);
   const tiers = m.tiers.runtime;
   for (const [tier, def] of Object.entries(tiers)) {
     for (const target of def.mayImport) if (!(target in tiers)) bad.push(`tiers.runtime.${tier}.mayImport names ${target}, which is not a runtime tier`);

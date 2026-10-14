@@ -619,8 +619,17 @@ no contract copy under `fe/`.
 
 ### 6.2 Rules
 
-- **Direction.** route to feature; feature to components, hooks, modules; components descend blocks to composites to
-  branches to leaves; hooks to modules; modules to modules, acyclic; apps never import each other (R27, R64).
+- **Direction.** route to feature; page owners in `features/pages/<Name>/index.tsx` may compose overlays and blocks through
+  their public entries, but never another page; feature to components, hooks, modules; components descend blocks to composites to branches to leaves,
+  with no block-to-block import. A pure component or branch may render a list of blocks received through render props;
+  it never imports the blocks or fetches their data. Hooks to modules; modules to modules, acyclic; apps never import
+  each other (R27, R64).
+- **List composition (R92).** A server page can mount a client overlay that reads the list identities through its hook.
+  The overlay passes those identities and a render prop such as `id => <ItemBlock id={id} />` to its pure sibling, which
+  delegates the keyed list to a branch. The branch calls the supplied renderer; each connected block reads its own data
+  and renders its exact sibling `ItemBlockBase`. The overlay's world-reading render paths still reach a pure boundary,
+  and its supplied renderer contains block composition only, no drawing or hook calls. Pages and layouts stay server
+  components.
 - **`hooks/` are hooks (R56).** `hooks/` holds React hooks only (`use*.ts`, one hook per file): `fe.hooks.swr`, `fe.hooks.rhf`,
   `fe.hooks.zustand`, `fe.hooks.socketio`, `fe.hooks.effects`, `fe.hooks.reuseables` and `fe.hooks` with one `<domain>.shared.ts`
   for shared non-hook helpers. Each concern's library and home is `knowledge/hfs/fe-stack.yaml`, the same in lite and full.
@@ -860,7 +869,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R89 | `BE_SOURCE_FORM` | Files use the closed role-suffix vocabulary of the slot manifest, `ruleParams.be.suffixes`; named exports only; every export has English JSDoc (its public members: R109); no emoji, and no Vietnamese in identifiers, string literals, comments or test titles outside message catalogs and the i18n fixtures slot; a public input or output is a named contract, never an inline object type; no `Mock*`, `Fake*` or `Stub*` class, function or constant in production source. | product |
 | R90 | `BE_INFRA_OWNER` | Each raw infrastructure library (HTTP, cache, queue, scheduler, logger, date, config, events) is imported or referenced only by its one owning platform or integration capability, and the `HttpClient` port of `platform/http` is called only by an `integrations` capability. | product |
 | R91 | `FE_SOURCE_FORM` | Front-end files sit in their tier folder with the fixed names, export arrow functions named after the folder, carry English JSDoc, no emoji, and no Vietnamese in identifiers, string literals, comments or test titles outside the i18n catalogs and the i18n e2e fixtures slot. | product |
-| R92 | `FE_COMPONENT_API` | A component exposes the canon surface: typed named props and slots, a presentational twin for every connected block, status through the slot view, no className or CSS doors, no resting twin or placeholder prop, class names in the colocated file; a pure component reaches no hook, router, locale or API. | product |
+| R92 | `FE_COMPONENT_API` | A component exposes the canon surface: typed named props and slots, an exact sibling XBase presentational twin for every connected block, status through the slot view, no className or CSS doors, no resting twin or placeholder prop, class names in the colocated file; a pure component reaches no hook, router, locale or API, but may render a list of blocks supplied through render props without importing blocks or owning their data. | product |
 | R93 | `FE_VENDOR_BOUNDARY` | Vendor primitives and icons reach components only through their named owner: the one icon set of knowledge/hfs/fe-stack.yaml (the heroicons family) through the icon leaf at the glyph scale, every vendor primitive behind a named owner; the Grammar package is imported only through its selected code and style entry and keeps its declared contract. | product |
 | R94 | `FE_SLOT_FILE_ROLE` | A front-end file is owned by a slot and named by it: a slot that owns a directory (route, feature, components, hooks, api module) holds only the files its `allows` list names, and holds them inside a folder of its own. | product |
 | R95 | `BE_OPERATION_CONTRACT` | A versioned operation is declared once in the app's typed operation table (`OperationContract<Input, Output, RefusalCode>` registered by `defineOperations`): its input and output are closed types (never `any`, `unknown` or `Record<string, unknown>`), its refusal codes a closed union of string literals, and the route that serves the table takes `OperationRequest<Table>` and answers `Promise<OperationReply<Table>>` of that one table. | product |

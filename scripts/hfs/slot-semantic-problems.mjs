@@ -2,7 +2,7 @@
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { triggerProblems } from './declaration-slots.mjs';
 import { litePresenceOf, slotInEdition } from './edition-slots.mjs';
-import { manifestKind, RUNTIME_KIND, runtimeSemanticProblems } from './manifest-shape.mjs';
+import { manifestKind, RUNTIME_KIND, runtimeSemanticProblems, tierKindProblems } from './manifest-shape.mjs';
 import { APP_SCOPE, PROFILES } from './slot-manifest-shape.mjs';
 
 function checkAppRootSlot(slot, bad) {
@@ -113,6 +113,7 @@ function checkSideReads(manifest, bad, braceVariants) {
 }
 
 function checkProfileTierTargets(manifest, profile, bad) {
+  bad.push(...tierKindProblems(manifest, profile));
   for (const [tier, def] of Object.entries(manifest.tiers[profile])) {
     for (const target of def.mayImport) {
       if (!(target in manifest.tiers[profile])) bad.push(`tiers.${profile}.${tier}.mayImport names ${target}, which is not a ${profile} tier`);

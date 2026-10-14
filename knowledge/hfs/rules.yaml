@@ -961,7 +961,7 @@ rules:
       - {kind: eslint-fe, id: frontend-source-layout}
   - id: R92
     code: "FE_COMPONENT_API"
-    law: "A component exposes the canon surface: typed named props and slots, a presentational twin for every connected block, status through the slot view, no className or CSS doors, no resting twin or placeholder prop, class names in the colocated file; a pure component reaches no hook, router, locale or API."
+    law: "A component exposes the canon surface: typed named props and slots, an exact sibling XBase presentational twin for every connected block, status through the slot view, no className or CSS doors, no resting twin or placeholder prop, class names in the colocated file; a pure component reaches no hook, router, locale or API, but may render a list of blocks supplied through render props without importing blocks or owning their data."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["FE_COMPONENT_API", "FE_COMPONENT_WORLD_OWNERSHIP", "FE_WORLD_OWNER_RENDER_BOUNDARY", "FE_CONNECTED_BLOCK_RENDER_PAIR", "FE_PURE_REACHES_DATA", "FE_PURE_WORLD_HOOK", "FE_PURE_WORLD_IMPORT"]
