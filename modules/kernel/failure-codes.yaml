@@ -18810,3 +18810,25 @@ RT_RULING_STALE_CITE:
   nextStep_vi: "Cập nhật câu theo quyết định hiện hành và dẫn id của quyết định thay thế trong cùng đoạn; kiểm tra ngày và liên kết supersedes trong danh mục."
   owner: supervisor
   kind: check-finding
+BE_APP_BOOT_PROOF_MISSING:
+  title: "Lite app has no successful Nest dependency wiring proof"
+  title_vi: "Ứng dụng lite chưa chứng minh ghép nối phụ thuộc Nest thành công"
+  meaning_vi: "AppModule thật của ứng dụng lite không biên dịch được đồ thị phụ thuộc với dữ liệu mẫu và các đối tượng thay thế hạ tầng; bản full tiếp tục dùng bằng chứng e2e hiện có."
+  causes_vi:
+    - "Thiếu provider, thiếu export của module hoặc có phụ thuộc vòng"
+    - "Thiếu AppModule, dữ liệu mẫu cho đăng ký động hoặc đối tượng thay thế hạ tầng"
+    - "Tiến trình chứng minh ghép nối thất bại hoặc hết thời gian"
+  nextStep_vi: "Sửa đăng ký và phạm vi provider trong AppModule thật, cung cấp dữ liệu mẫu cùng đối tượng thay thế hạ tầng rồi chạy lại starci app check --wiring."
+  owner: op-retry
+  kind: check-finding
+
+HFS_COVERAGE_BELOW:
+  title: "Measured back-end logic file is below 100 percent coverage"
+  title_vi: "Tệp logic back-end trong phạm vi đo chưa đạt độ bao phủ 100 phần trăm"
+  meaning_vi: "Báo cáo lcov được cung cấp không chứng minh mỗi tệp logic trong phạm vi đo của edition đạt 100 phần trăm dòng, hàm và nhánh; phạm vi cùng các tệp ngoài phạm vi được liệt kê riêng. Độ bao phủ câu lệnh do trình chạy unit test kiểm tra."
+  causes_vi:
+    - "Có dòng, hàm hoặc nhánh chưa được chạy trong một tệp logic thuộc phạm vi đo"
+    - "Báo cáo thiếu tệp nguồn, thiếu số liệu, sai định dạng hoặc không đọc được"
+  nextStep_vi: "Bổ sung unit test cho tệp được nêu, tạo lại báo cáo lcov đầy đủ rồi chạy starci app check --coverage-from <lcov>; features, cli và webhooks ngoài phạm vi đo vẫn được liệt kê."
+  owner: op-retry
+  kind: check-finding

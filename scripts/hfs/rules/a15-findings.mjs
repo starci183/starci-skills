@@ -17,6 +17,8 @@ import { appEnvRequiredFindings } from './app-env-required.mjs';
 import { ageKeyCustodyFindings } from './secrets.mjs';
 import { canonCopyDriftFindings } from './canon-copy-drift.mjs';
 import { secretCustodyOnlyFindings } from './secret-custody-only.mjs';
+import { bootProofFindings } from './boot-proof.mjs';
+import { coverageBelowFindings } from './coverage-below.mjs';
 // finders-import-end
 
 /** The failure codes the finders above emit, so `starci app check` ships their labels (check.mjs adds them to CHECK_CODES). Append-only; the coordinator regenerates it at merge time. */
@@ -42,6 +44,8 @@ export const FINDERS = [
   ageKeyCustodyFindings,
   canonCopyDriftFindings,
   secretCustodyOnlyFindings,
+  bootProofFindings,
+  coverageBelowFindings,
   // finders-end
 ];
 
@@ -51,3 +55,5 @@ export function a15Findings(context) {
 }
 
 A15_CODES.push('HFS_AGE_KEY_CUSTODY', 'HFS_CANON_COPY_DRIFT', 'HFS_SECRET_PLAINTEXT_FILE', 'HFS_SECRET_OUTSIDE_ENC');
+/** Codes emitted by the finders (coordinator-managed). */
+export const A15_CODES = [];
