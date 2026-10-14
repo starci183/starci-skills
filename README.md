@@ -138,7 +138,11 @@ Run `starci npm ci` once. The local gates:
 - `starci runtime check` runs every self-check, including the Sonar rules enforced locally.
 - `starci check run --level L1 --changed <files>` runs the fast gates on the files you changed.
 - `starci test run --level L1 --spec <files>` runs the specs that cover them.
-- The pre-commit hook runs the Sonar-rules gate on the staged files.
+- The runtime pre-commit hook runs L0 checks: staged whitespace, syntax of staged `.mjs`/`.cjs` files, Sonar rules of staged `.mjs` files, and Work hygiene when `.starciwork/` or `.starcistacks/` files are staged.
+- A generated app's pre-commit hook runs hygiene, staged ESLint, frontend CSS stylelint and staged Prettier checks. Types and targeted specs belong to the op gate.
+- Pre-push checks release eligibility; it runs no lint, type checks or tests. Database rules are judged by app checking at the op gates and in release-tag CI, not by pre-push.
+
+Coverage reports state their measured scope. Runtime coverage includes the `.mjs` sources in `coverage: required` slots of `knowledge/hfs/runtime-slots.yaml`, excluding specs, generated output and `coverage: none` slots. App backend coverage (R204/R273) requires 100% lines, branches, functions and statements per logic file only in the required slots under `modules/{domain,platform,integrations,projections}`. Feature logic, CLI commands, webhook doors, gateways, saga steps, consumers and handlers outside those slots are unmeasured; the percentage makes no claim about them or the frontend. R273 `HFS_COVERAGE_BELOW` judges supplied LCOV evidence; app checking or linting alone does not run unit tests or prove coverage. [The quality bar](docs/quality-bar.md) describes the proof requirements.
 
 Nothing is pushed between releases. A release is cut with `starci release cut`, which pushes `main` and an
 annotated tag together, and CI then runs on the tag. See [CONTRIBUTING.md](CONTRIBUTING.md) and
