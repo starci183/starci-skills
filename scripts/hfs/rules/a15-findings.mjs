@@ -5,6 +5,12 @@
 // finders-import-begin
 // finders-import-end
 
+/** The failure codes the finders above emit, so `starci app check` ships their labels (check.mjs adds them to CHECK_CODES). Append-only; the coordinator regenerates it at merge time. */
+export const A15_CODES = [
+  // codes-begin
+  // codes-end
+];
+
 export const FINDERS = [
   // finders-begin
   // finders-end

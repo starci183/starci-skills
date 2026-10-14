@@ -3,6 +3,7 @@ import path from "node:path";
 import { render, TEMPLATES_DIR } from "../sync/index.mjs";
 import { ScaffoldError, pascalOf } from "./service.mjs";
 import { filesBelow } from "./lite-exports.mjs";
+import { jsonText } from "./app.mjs";
 
 const MIGRATION = /^(\d{14})_[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.sql$/;
 const PLACEHOLDER = /@@([A-Za-z][A-Za-z0-9]*)@@/g;
@@ -71,6 +72,8 @@ const databasePatches = (root) => {
   let index = fs.readFileSync(indexFile, "utf8").replace(/\r\n/g, "\n");
   if (!index.includes('export { recordWebhookDelivery } from "./webhook-inbox.client"'))
     index = `${index.replace(/\n+$/, "")}\nexport { recordWebhookDelivery } from "./webhook-inbox.client"\n`;
+  if (!/^export \{ [^}]*\bDatabaseErrorCode\b[^}]* \} from "\.\/errors\/database\.error"$/m.test(index))
+    index = `${index.replace(/\n+$/, "")}\nexport { DatabaseError, DatabaseErrorCode } from "./errors/database.error"\n`;
   let error = fs.readFileSync(errorFile, "utf8").replace(/\r\n/g, "\n");
   const enumLine =
     '    WebhookDeliveryIdRequired = "DATABASE_WEBHOOK_DELIVERY_ID_REQUIRED",';
@@ -111,20 +114,24 @@ const wiredAppModule = ({ root, repo, provider, Provider }) => {
       "HFS_ADD_WIRE_MISSING",
       `add webhook registers its inbox in ${relative}, which does not exist`,
     );
-  const symbol = `${Provider}InboxModule`;
-  const importLine = `import { ${symbol} } from "@modules/domain/${provider}-inbox"`;
   const lines = fs.readFileSync(file, "utf8").replace(/\r\n/g, "\n").split("\n");
-  const lastImport = lines.reduce(
-    (last, line, index) => (line.startsWith("import ") ? index : last),
-    -1,
-  );
-  const imports = lines.findIndex((line) => /^\s*imports: \[$/.test(line));
-  if (lastImport < 0 || imports < 0)
-    throw new ScaffoldError(
-      "HFS_ADD_WIRE_INVALID",
-      `add webhook could not find the imports array in ${relative}`,
+  for (const [symbol, module] of [
+    ["InboxModule", "@modules/platform/inbox"],
+    ["EventBusModule", "@modules/platform/event-bus"],
+    [`${Provider}InboxModule`, `@modules/domain/${provider}-inbox`],
+  ]) {
+    const importLine = `import { ${symbol} } from "${module}"`;
+    if (lines.includes(importLine)) continue;
+    const lastImport = lines.reduce(
+      (last, line, index) => (line.startsWith("import ") ? index : last),
+      -1,
     );
-  if (!lines.includes(importLine)) {
+    const imports = lines.findIndex((line) => /^\s*imports: \[$/.test(line));
+    if (lastImport < 0 || imports < 0)
+      throw new ScaffoldError(
+        "HFS_ADD_WIRE_INVALID",
+        `add webhook could not find the imports array in ${relative}`,
+      );
     lines.splice(lastImport + 1, 0, importLine);
     const shiftedImports = imports > lastImport ? imports + 1 : imports;
     const indent = /^(\s*)/.exec(lines[shiftedImports])?.[1] ?? "";
@@ -135,6 +142,60 @@ const wiredAppModule = ({ root, repo, provider, Provider }) => {
     );
   }
   return { file, text: `${lines.join("\n").replace(/\n+$/, "")}\n` };
+};
+
+/** The first webhook installs only the lite inbox claim and transactional event publisher, shared by all providers. */
+const handoffPlatformFiles = (root, values) => {
+  const planned = [];
+  for (const capability of ["inbox", "event-bus"]) {
+    const base = `be/src/modules/platform/${capability}`;
+    if (fs.existsSync(path.join(root, base, "index.ts"))) continue;
+    const folder = path.join(TEMPLATES_DIR, "be", "inbox", "platform", capability);
+    for (const file of filesBelow(folder)) {
+      const relative = path.relative(folder, file).replaceAll("\\", "/");
+      planned.push({
+        relative: `${base}/${relative.replace(/\.tpl$/, "")}`,
+        text: template(`platform/${capability}/${relative}`, values),
+      });
+    }
+  }
+  return planned;
+};
+
+/** A provider may already publish other events; retain its barrel and contract when adding the receipt event. */
+const eventFiles = (root, provider, values) => {
+  const entries = [
+    { relative: `be/src/modules/events/${provider}/index.ts`, text: template("event-index.ts.tpl", values) },
+    { relative: `be/contracts/${provider}/events.json`, text: template("events.json.tpl", values) },
+  ];
+  const planned = [];
+  const patches = [];
+  for (const entry of entries) {
+    const file = path.join(root, ...entry.relative.split("/"));
+    if (!fs.existsSync(file)) {
+      planned.push(entry);
+      continue;
+    }
+    const previous = fs.readFileSync(file, "utf8").replace(/\r\n/g, "\n");
+    if (entry.relative.endsWith("index.ts")) {
+      patches.push({ file, text: previous.includes(entry.text.trim()) ? previous : `${previous.trimEnd()}\n${entry.text}` });
+    } else {
+      const contract = JSON.parse(previous);
+      if (contract.schema !== "starci/event-contract@1" || contract.service !== provider || !contract.events || Array.isArray(contract.events) || typeof contract.events !== "object")
+        throw new ScaffoldError("HFS_ADD_EVENT_CONTRACT", `${entry.relative} is not the event contract of ${provider}`);
+      const additions = JSON.parse(entry.text).events;
+      contract.events = { ...contract.events, ...additions };
+      patches.push({ file, text: jsonText(contract) });
+    }
+  }
+  return { planned, patches };
+};
+
+const eventPatternPatch = (root) => {
+  const file = path.join(root, "hfs.json");
+  const declaration = JSON.parse(fs.readFileSync(file, "utf8"));
+  declaration.sides.be.patterns = [...new Set([...(declaration.sides.be.patterns ?? []), "event-bus"])].sort();
+  return { file, text: jsonText(declaration) };
 };
 
 /** Writes the lite provider inbox. Processing belongs to a separately added reactor or job, after the record commits. */
@@ -175,6 +236,7 @@ export function addLiteWebhookInbox({
     table,
   };
   const base = `be/src/modules/domain/${provider}-inbox`;
+  const events = eventFiles(root, provider, renderValues);
   const planned = [
     {
       relative: `supabase/migrations/${stamp}_${suffix}`,
@@ -205,7 +267,18 @@ export function addLiteWebhookInbox({
       relative: `${base}/persistence/${provider}-inbox.sql.ts`,
       text: template("sql.ts.tpl", renderValues),
     },
+    {
+      relative: `be/src/modules/events/${provider}/${provider}-delivery-recorded.event.ts`,
+      text: template("delivery-recorded.event.ts.tpl", renderValues),
+    },
+    ...events.planned,
+    ...handoffPlatformFiles(root, renderValues),
   ];
+  const hasHandoffStorage = migrations.some((file) =>
+    /create\s+table\s+public\.event_bus\b/i.test(fs.readFileSync(path.join(migrationsDir, file), "utf8")),
+  );
+  if (!hasHandoffStorage)
+    planned[0].text = `${template("platform/migration.sql.tpl", renderValues)}\n${planned[0].text}`;
   const databaseSql = "be/src/modules/platform/database/database.sql.ts";
   if (!fs.existsSync(path.join(root, ...databaseSql.split("/")))) {
     planned.push({
@@ -250,6 +323,8 @@ export function addLiteWebhookInbox({
   const patches = [
     ...databasePatches(root),
     wiredAppModule({ root, repo, provider, Provider }),
+    ...events.patches,
+    eventPatternPatch(root),
   ];
   for (const entry of planned) {
     const target = path.join(root, ...entry.relative.split("/"));
