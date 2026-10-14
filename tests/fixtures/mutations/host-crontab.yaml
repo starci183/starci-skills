@@ -1,0 +1,27 @@
+# OPS section 3 item 3 (owner ruling 2): a deploy workflow installs a host crontab line on the VPS
+# (nivo api-deploy.yml:129-131). Scheduled work is app-owned; the host runs no crontab.
+# Witnessed by R250 deploy-scan.
+name: host-crontab
+edition: lite
+base: examples/lite-app
+mutate:
+  - op: add
+    path: deploy/watchdog.sh
+    content: |
+      #!/bin/sh
+      # watchdog: keeps the VPS deploy alive between pushes
+      curl -fsS http://127.0.0.1:3000/health/live || docker compose -f ~/app/compose.yaml up -d
+  - op: add
+    path: .github/workflows/api-deploy.yml
+    content: |
+      name: api-deploy
+      on:
+        workflow_dispatch:
+      jobs:
+        deploy:
+          runs-on: ubuntu-latest
+          steps:
+            - run: ssh vps '{ crontab -l; echo "* * * * * ~/app/deploy/watchdog.sh"; } | crontab -'
+expect:
+  - HFS_HOST_CRON
+pending: R250

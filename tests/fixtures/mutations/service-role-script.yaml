@@ -1,0 +1,15 @@
+# OPS section 3 item 8: a service-role client inside a shell script escapes `machine:supabase-client-owner`,
+# which walks only the be/src import graph (nivo at audit time, D3-06). Witnessed by R252 script-hygiene.
+name: service-role-script
+edition: lite
+base: examples/lite-app
+mutate:
+  - op: add
+    path: deploy/stack/jobs.sh
+    content: |
+      #!/bin/sh
+      # drains the job table with the service role
+      node -e "createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)"
+expect:
+  - HFS_SERVICE_ROLE_SCOPE
+pending: R252

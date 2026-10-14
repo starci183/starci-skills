@@ -1,0 +1,20 @@
+# OPS section 3 item 4 (RUN): a tracked rendered swarm model whose environment carries plaintext secret
+# literals - SERVICE_ROLE_KEY, ENCRYPTION_KEY, PRIMARY_DB_URL - passes the gate: the `sensitive` regex has no
+# service_role/_KEY/_URL and R06 sees no quoted bare keyword. Witnessed by R266 stacks-swarm.
+name: stack-env-literals
+edition: lite
+base: examples/lite-app
+mutate:
+  - op: add
+    path: .starcistacks/production/infra/swarm/api.yaml
+    content: |
+      services:
+        api:
+          image: lite-app/api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          environment:
+            - SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9servicerole
+            - N8N_ENCRYPTION_KEY=9f8e7d6c5b4a3210
+            - PRIMARY_DB_URL=postgres://app_be:S3cretPass@db/lite
+expect:
+  - STACKS_SECRET_ENV_LITERAL
+pending: R266

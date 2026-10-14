@@ -1,0 +1,22 @@
+# OPS section 3 item 2 (owner ruling 2): a deploy workflow that ssh-es to the VPS and runs
+# `docker compose up -d` passes today - the app.ci-deploy slot is scanned only for secret patterns.
+# Witnessed by R250 deploy-scan.
+name: deploy-workflow-compose-up
+edition: lite
+base: examples/lite-app
+mutate:
+  - op: add
+    path: .github/workflows/web-deploy.yml
+    content: |
+      name: web-deploy
+      on:
+        workflow_dispatch:
+      jobs:
+        deploy:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+            - run: ssh vps 'cd ~/app && docker compose up -d'
+expect:
+  - HFS_DEPLOY_COMPOSE_ON_VPS
+pending: R250

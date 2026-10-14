@@ -1,0 +1,16 @@
+# OPS section 3 item 14: a sops envelope's key NAMES are cleartext; a public key (NEXT_PUBLIC_*) sealed into a
+# member passes today - sopsEnvelope is structural and nobody reads the names. Witnessed by R248 env-parity.
+name: sealed-public-key
+edition: lite
+base: examples/lite-app
+mutate:
+  - op: add
+    path: .starcistacks/dev/secrets/web.enc
+    content: |
+      NEXT_PUBLIC_SITE_URL=ENC[AES256_GCM,data:AA==,iv:AA==,tag:AA==,type:str]
+      ANALYTICS_KEY=ENC[AES256_GCM,data:AA==,iv:AA==,tag:AA==,type:str]
+      sops_age__list_0__map_recipient=age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+      sops_mac=ENC[AES256_GCM,data:AA==,iv:AA==,tag:AA==,type:str]
+expect:
+  - ENV_PUBLIC_SEALED
+pending: R248
