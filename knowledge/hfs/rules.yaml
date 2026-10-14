@@ -2219,3 +2219,20 @@ rules:
       - {kind: eslint-be, id: spec-behavior-assertion}
       - {kind: eslint-be, id: spec-infra-double-from-kit}
       - {kind: eslint-be, id: spec-exact-values}
+  - id: R291
+    code: "HFS_FUNCTION_BUDGET"
+    law: "Every back-end and front-end function, method or arrow body stays within ruleParams.functionLines (80 physical lines), including comments and blank lines, in lite and full; split a larger body by responsibility. This is an absolute budget."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_FUNCTION_BUDGET"]
+    enforcers:
+      - {kind: eslint-be, id: function-line-budget}
+      - {kind: eslint-fe, id: function-line-budget}
+  - id: R292
+    code: "HFS_FEATURE_FILE_BUDGET"
+    law: "Every feature owner stays within ruleParams.featureFiles (250 tracked files), including nested files, in lite and full; split a larger feature by product capability."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_FEATURE_FILE_BUDGET"]
+    enforcers:
+      - {kind: hfs, id: feature-files, at: scripts/hfs/rules/feature-files.mjs}
