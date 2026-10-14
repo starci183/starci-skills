@@ -1,0 +1,4341 @@
+# Hard requirements and coverage observations for both HFS editions.
+# statement preserves code identifiers and placeholders; source anchors are the coverage links.
+# enforced claims only named current rule scope; owedRules identify future owners, not landed enforcement.
+# Native/owner-run operations, live evidence and absent examples remain visibly owed.
+# Historical clauses retain structured successor citations and do not override live owner decisions.
+schema: starci/hfs-requirements@1
+requirements:
+  - id: DOC-STACKS-001
+    source: docs/application-stacks.md#application-stacks
+    sourceLine: 4
+    editions:
+      - lite
+      - full
+    statement: "An application stack is the complete deployment description for one application: frontend, APIs,
+      workers, jobs, datastores, ingress, and every required external dependency."
+    status: owed
+    owedRules:
+      - R266
+      - R267
+    gap: R10 checks paths and Sonar ownership, not complete runnable deployment closure.
+  - id: DOC-STACKS-002
+    source: docs/application-stacks.md#application-stacks
+    sourceLine: 6
+    editions:
+      - lite
+      - full
+    statement: "`modules/schemas/stacks-layout.yaml` governs the TREE this manifest lives inside (which
+      directories exist, which files are required, which are refused);
+      `modules/schemas/application-stacks.schema.yaml` is the machine form of the manifest's own CONTENT, and
+      is a strict subset: every field it requires is a field the layout's authored kit actually uses, and
+      nothing the layout does not name is required."
+    status: owed
+    owedRules:
+      - R266
+    gap: The tree/content-schema parity is not proved by R10; the full content gate is not run by app check.
+  - id: DOC-STACKS-003
+    source: docs/application-stacks.md#application-stacks
+    sourceLine: 6
+    editions:
+      - lite
+      - full
+    statement: Whole-package Kubernetes deployment is explicitly `deferred` or `supported` with a reason, and its
+      posture must match whether `.starcistacks/k8s/` actually exists.
+    status: owed
+    owedRules:
+      - R267
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-004
+    source: docs/application-stacks.md#manifest-shape
+    sourceLine: 10
+    editions:
+      - lite
+      - full
+    statement: "`components` is a map from component id to `{role, image?, compose?, purpose?, required?}`."
+    status: owed
+    owedRules:
+      - R266
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-005
+    source: docs/application-stacks.md#manifest-shape
+    sourceLine: 15
+    editions:
+      - lite
+      - full
+    statement: "`composeFiles`, an array of paths relative to that environment's own directory
+      (`.starcistacks/<env>/...`), never prefixed with `.starcistacks` again;"
+    status: owed
+    owedRules:
+      - R266
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-006
+    source: docs/application-stacks.md#manifest-shape
+    sourceLine: 20
+    editions:
+      - lite
+      - full
+    statement: Every catalog component id that appears as a rendered Compose or Swarm service name must be a
+      declared id (`compose-service-unclassified` otherwise); the reverse is not required, because a component
+      such as a profile-gated placeholder image can legitimately run as a host process instead and never
+      appear in the rendered model at all.
+    status: owed
+    owedRules:
+      - R266
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-007
+    source: docs/application-stacks.md#the-runbook-lives-in-a-file-not-the-manifest
+    sourceLine: 24
+    editions:
+      - lite
+      - full
+    statement: That file's Markdown table must document exactly the same seven commands
+      `modules/schemas/stacks-layout.yaml` promises - `prepare`, `doctor`, `up`, `status`, `logs`, `down`,
+      `verification` - as one row each (`runbook-command-missing` names whichever row is absent).
+    status: owed
+    owedRules:
+      - R266
+      - R267
+    gap: The op-time runbook gate checks row names, accepts TODO command cells and is not wired into app check.
+  - id: DOC-STACKS-008
+    source: docs/application-stacks.md#the-runbook-lives-in-a-file-not-the-manifest
+    sourceLine: 24
+    editions:
+      - lite
+      - full
+    statement: "This holds for every environment, VPS included: there is no separate VPS-only command set."
+    status: owed
+    owedRules:
+      - R266
+      - R267
+    gap: The seven-command runbook also applies to VPS, but its op-time gate is not wired into app check.
+  - id: DOC-STACKS-009
+    source: docs/application-stacks.md#secrets-custody
+    sourceLine: 28
+    editions:
+      - lite
+      - full
+    statement: Application custody is only `.starcistacks/<env>/secrets/<slug>.enc`, encrypted with SOPS to the
+      age recipient declared in the root `.sops.yaml`.
+    status: owed
+    owedRules:
+      - R253
+      - R277
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-010
+    source: docs/application-stacks.md#secrets-custody
+    sourceLine: 28
+    editions:
+      - lite
+      - full
+    statement: Root `.env*`, `secrets.env`, `.secrets/`, private keys and decrypted files are forbidden, including
+      ignored files.
+    status: owed
+    owedRules:
+      - R253
+      - R277
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-011
+    source: docs/application-stacks.md#secrets-custody
+    sourceLine: 28
+    editions:
+      - lite
+      - full
+    statement: The frontend receives public configuration only.
+    status: enforced
+    rules:
+      - R217
+    scope: FE auth-client ownership and credential-name restrictions.
+  - id: DOC-STACKS-012
+    source: docs/application-stacks.md#secrets-custody
+    sourceLine: 30
+    editions:
+      - lite
+      - full
+    statement: "`where` names the member relative to its environment directory, such as `secrets/app-be-db`;
+      `<where>.enc` must be a regular, non-symlink SOPS envelope."
+    status: owed
+    owedRules:
+      - R277
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-013
+    source: docs/application-stacks.md#secrets-custody
+    sourceLine: 30
+    editions:
+      - lite
+      - full
+    statement: Both statements are required.
+    status: owed
+    owedRules:
+      - R266
+    gap: Both recipientPolicy and keyCustody statements are required by the stacks gate; R10 itself judges only
+      paths/Sonar.
+  - id: DOC-STACKS-014
+    source: docs/application-stacks.md#secrets-custody
+    sourceLine: 30
+    editions:
+      - lite
+      - full
+    statement: An identity or resource record names its sealed member app-relative through `custody.sealed`;
+      `.starciwork` never holds the value or envelope (`SEALED_CUSTODY_LOCATION`, `SEALED_FILE_IN_WORK`).
+    status: enforced
+    rules:
+      - R09
+    scope: Full Work identity/resource references, not plaintext values or envelopes.
+  - id: DOC-STACKS-015
+    source: docs/application-stacks.md#initialize-and-seal
+    sourceLine: 40
+    editions:
+      - lite
+      - full
+    statement: "`init` creates a local age identity when none exists and records only its public recipient in
+      `.sops.yaml`, using this creation rule:"
+    status: owed
+    owedRules:
+      - R253
+    gap: Historical local identity creation is superseded by inline age-key custody; native setup evidence remains
+      separate.
+    supersededBy:
+      - ruling:sealed-secret-custody
+  - id: DOC-STACKS-016
+    source: docs/application-stacks.md#initialize-and-seal
+    sourceLine: 50
+    editions:
+      - lite
+      - full
+    statement: The command never prints the value.
+    status: owed
+    owedRules:
+      - R249
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-017
+    source: docs/application-stacks.md#initialize-and-seal
+    sourceLine: 50
+    editions:
+      - lite
+      - full
+    statement: "`list <env>` prints key names only."
+    status: owed
+    owedRules:
+      - R248
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-018
+    source: docs/application-stacks.md#materialize-for-a-process
+    sourceLine: 60
+    editions:
+      - lite
+      - full
+    statement: Plaintext lives only in memory or below `%LOCALAPPDATA%/StarCi/secrets/<project>/<env>/`;
+      `<project>` is the name in `hfs.json`.
+    status: owed
+    owedRules:
+      - R277
+    gap: Materialized file placement, native permissions and cleanup require independent command evidence.
+  - id: DOC-STACKS-019
+    source: docs/application-stacks.md#materialize-for-a-process
+    sourceLine: 60
+    editions:
+      - lite
+      - full
+    statement: "`--reveal` explicitly allows stdout disclosure and belongs only to an owner's private terminal;
+      automation uses file output."
+    status: owed
+    owedRules:
+      - R252
+    gap: Private-terminal disclosure authorization and automation output discipline have no complete current HFS
+      enforcer.
+  - id: DOC-STACKS-020
+    source: docs/application-stacks.md#materialize-for-a-process
+    sourceLine: 62
+    editions:
+      - lite
+      - full
+    statement: Only `main.ts` and `<app>.env.ts` may read the app's environment through `EnvSource` and capability
+      parse helpers; `<app>.env.ts` holds typed, fail-fast parsing only, while `<app>.options.ts` holds
+      env-derived values and port bindings with no parsing.
+    status: owed
+    owedRules:
+      - R265
+      - R289
+    gap: Mandatory typed env files and typed compose groups need the new enforcers; the existing name-based
+      detector is incomplete.
+    amendedBy:
+      - ruling:typed-app-environment
+  - id: DOC-STACKS-021
+    source: docs/application-stacks.md#ci
+    sourceLine: 66
+    editions:
+      - lite
+      - full
+    statement: The workflow injects it only into the job that needs custody through `SOPS_AGE_KEY` (or mounts an
+      external protected key file and sets `SOPS_AGE_KEY_FILE`).
+    status: owed
+    owedRules:
+      - R251
+      - R253
+    gap: Workflow scoping and cleanup require product-workflow enforcement; the historical FILE alternative is
+      superseded.
+    supersededBy:
+      - ruling:sealed-secret-custody
+  - id: DOC-STACKS-022
+    source: docs/application-stacks.md#ci
+    sourceLine: 66
+    editions:
+      - lite
+      - full
+    statement: It never runs `init` to generate a replacement CI identity.
+    status: owed
+    owedRules:
+      - R251
+      - R253
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-023
+    source: docs/application-stacks.md#ci
+    sourceLine: 75
+    editions:
+      - lite
+      - full
+    statement: Set the required `*_FILE` pointers for the consuming step, and remove the materialized directory
+      when the job completes.
+    status: owed
+    owedRules:
+      - R248
+      - R251
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-024
+    source: docs/application-stacks.md#ci
+    sourceLine: 75
+    editions:
+      - lite
+      - full
+    statement: A job that only builds or checks source needs no production key.
+    status: owed
+    owedRules:
+      - R251
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-025
+    source: docs/application-stacks.md#production
+    sourceLine: 79
+    editions:
+      - lite
+      - full
+    statement: Materialize the selected environment before starting the service, grant only that service account
+      access, and pass `*_FILE` pointers.
+    status: owed
+    owedRules:
+      - R248
+      - R266
+    gap: Owner-run materialization, actual account grants and startup verification remain owed beyond static key
+      routing.
+  - id: DOC-STACKS-026
+    source: docs/application-stacks.md#production
+    sourceLine: 79
+    editions:
+      - lite
+      - full
+    statement: Containers mount the required files read-only; plaintext is never baked into an image or rendered
+      Compose environment.
+    status: owed
+    owedRules:
+      - R266
+      - R277
+    gap: R191 covers Dockerfile secret inputs; read-only mounts and rendered environments need stack checks and
+      native permission evidence.
+  - id: DOC-STACKS-027
+    source: docs/application-stacks.md#migrate-nivo-lite
+    sourceLine: 83
+    editions:
+      - lite
+      - full
+    statement: Begin with `starci app secret list production`, which reveals names only, and inventory the
+      remaining root `secrets.env` locally without displaying its values.
+    status: owed
+    owedRules:
+      - R248
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-028
+    source: docs/application-stacks.md#migrate-nivo-lite
+    sourceLine: 85
+    editions:
+      - lite
+      - full
+    statement: An owner-run local migration helper must parse `secrets.env` as dotenv in memory, pipe only that
+      key's value into `starci app secret set <env> <slug> <KEY>`, check the command's exit status, and emit
+      only key names and success/failure.
+    status: owed
+    owedRules:
+      - R252
+    gap: The owner performs value-bearing migration locally; stdin, isolation and redaction require execution
+      evidence.
+  - id: DOC-STACKS-029
+    source: docs/application-stacks.md#migrate-nivo-lite
+    sourceLine: 87
+    editions:
+      - lite
+      - full
+    statement: Run `starci app secret materialize production`, wire the backend's required `*_FILE` pointers, and
+      update the app's own with-secrets helper / `env-sync.mjs` plus their package-script callers to stop
+      loading or regenerating the root file.
+    status: owed
+    owedRules:
+      - R248
+      - R252
+      - R277
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-030
+    source: docs/application-stacks.md#directory-shape
+    sourceLine: 91
+    editions:
+      - lite
+      - full
+    statement: "These are read-only structural findings shared with `modules/schemas/stacks-layout.yaml`,
+      independent of manifest content:"
+    status: enforced
+    rules:
+      - R10
+    scope: Read-only stack paths; manifest contents and live acceptance are separate.
+  - id: DOC-STACKS-031
+    source: docs/application-stacks.md#services-sonar-and-every-other-delivery-service
+    sourceLine: 106
+    editions:
+      - lite
+      - full
+    statement: "| `mode` | `local` (a stack runs it: `stack` and `host.local` required), `hosted` (`host.public`
+      or `host.fromCredential`), `disabled` (`reason`; CI must not call it) |"
+    status: owed
+    owedRules:
+      - R247
+    gap: The services contract has a services-gate implementation but no matching current HFS owner; R10 only
+      checks Sonar declaration/ownership.
+  - id: DOC-STACKS-032
+    source: docs/application-stacks.md#services-sonar-and-every-other-delivery-service
+    sourceLine: 110
+    editions:
+      - lite
+      - full
+    statement: "| `projects` | `[{repository, key}]` - the project key per repository (`sonar.projectKey` must match) |"
+    status: owed
+    owedRules:
+      - R247
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-033
+    source: docs/application-stacks.md#services-sonar-and-every-other-delivery-service
+    sourceLine: 111
+    editions:
+      - lite
+      - full
+    statement: "| `qualityGate` | sonar only: `starci-quality`, the one gate whose thresholds live in
+      `knowledge/sonar-gate.yaml` (any other value is `STACKS_QUALITY_GATE_DRIFT`); `sonar-local` makes the
+      server gate of that name carry them and `starci kernel settle` holds `backend.implement`,
+      `interface.implement` and `code.refactor` to it |"
+    status: owed
+    owedRules:
+      - R247
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-034
+    source: docs/application-stacks.md#services-sonar-and-every-other-delivery-service
+    sourceLine: 112
+    editions:
+      - lite
+      - full
+    statement: "| `credentials` | product form: `[{id, env or key, custody: {repository, path}}]` - custody
+      references in the product's own repository, never values; `<path>.enc` must exist |"
+    status: owed
+    owedRules:
+      - R247
+      - R277
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-035
+    source: docs/application-stacks.md#services-sonar-and-every-other-delivery-service
+    sourceLine: 113
+    editions:
+      - lite
+      - full
+    statement: "| `runtimeSecrets` | example form: `[SONAR_TOKEN]` - the one variable of the runtime's untracked
+      `.claude/secret.env` an app inside the runtime repository reads (CI: the repository secret of the same
+      name); the SonarCloud organization is configuration, `config.yaml` `sonar.organization` (env
+      `SONAR_ORGANIZATION` wins; CI: the repository variable), never a secret; no stack, no `host.local`, no
+      custody."
+    status: enforced
+    rules:
+      - R234
+    scope: Runtime/example custody and SonarCloud ownership.
+  - id: DOC-STACKS-036
+    source: docs/application-stacks.md#services-sonar-and-every-other-delivery-service
+    sourceLine: 113
+    editions:
+      - lite
+      - full
+    statement: "Each form is refused for the other kind: `STACKS_EXAMPLE_FORM` (an example declaring a stack,
+      `host.local` or custody, another provider, or no `runtimeSecrets`), `STACKS_PRODUCT_FORM` (a product
+      declaring `runtimeSecrets`) |"
+    status: owed
+    owedRules:
+      - R247
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-037
+    source: docs/application-stacks.md#services-sonar-and-every-other-delivery-service
+    sourceLine: 114
+    editions:
+      - lite
+      - full
+    statement: "| `ci` | `wiring` required / optional-follow-up / not-used, `secrets [{name, credential}]`, `vars
+      [{name, value}]`, `permissions`, `provisioning` |"
+    status: owed
+    owedRules:
+      - R247
+      - R251
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-038
+    source: docs/application-stacks.md#services-sonar-and-every-other-delivery-service
+    sourceLine: 119
+    editions:
+      - lite
+      - full
+    statement: "`.starcistacks` is the only stack root *a repository owns*."
+    status: enforced
+    rules:
+      - R10
+    scope: Repository stack root and allowed tree.
+  - id: DOC-STACKS-039
+    source: docs/application-stacks.md#services-sonar-and-every-other-delivery-service
+    sourceLine: 119
+    editions:
+      - lite
+      - full
+    statement: "A service shared by every routed project instead declares `stack.owner: host` and `stack.root:
+      .claude/ext/<service>` — the extension ships inside the installed runtime tree, so no repository is
+      named and the checker resolves `<root>/<compose>` under the runtime root itself (`environment` stays a
+      required slot label, not a path segment)."
+    status: owed
+    owedRules:
+      - R247
+    gap: R10 covers local Sonar host ownership only; generalized shared-service path resolution remains a
+      services-gate contract.
+  - id: DOC-STACKS-040
+    source: docs/application-stacks.md#services-sonar-and-every-other-delivery-service
+    sourceLine: 119
+    editions:
+      - lite
+      - full
+    statement: The shared local SonarQube is the first such extension (`.claude/ext/sonar`, Compose project
+      `starci`, container `starci-sonarqube`; see `ext/sonar/README.md`); a product never copies its Compose
+      files into its own `.starcistacks`.
+    status: enforced
+    rules:
+      - R10
+    scope: Local Sonar host ownership.
+  - id: DOC-STACKS-041
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    sourceLine: 123
+    editions:
+      - lite
+      - full
+    statement: Additional nodes may improve capacity or availability; manager quorum and data placement must then
+      be designed explicitly, and a multi-manager runbook preserves quorum and records node identities and
+      roles.
+    status: owed
+    owedRules:
+      - R266
+      - R267
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-042
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    sourceLine: 125
+    editions:
+      - lite
+      - full
+    statement: Docker or Ubuntu support never proves application support.
+    status: owed
+    owedRules:
+      - R267
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-043
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    sourceLine: 127
+    editions:
+      - lite
+      - full
+    statement: A release carries the rendered stack bytes, source digest, immutable image digests per
+      architecture, non-secret config digest, versioned secret names, migration and backup plans, health
+      assertions and the previous accepted release; images are built and proved with `starci release images`,
+      then pushed by the owner-approved release flow before the Swarm deployment step, which never builds.
+    status: owed
+    owedRules:
+      - R267
+      - R271
+    gap: Release declaration is not immutable image publication, exact rendered bytes or accepted-release
+      evidence.
+  - id: DOC-STACKS-044
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    sourceLine: 127
+    editions:
+      - lite
+      - full
+    statement: Files land in `/srv/<app>/releases/<release-digest>/` behind a stable pointer that moves only after
+      verification; the prior release stays available for bounded rollback.
+    status: owed
+    owedRules:
+      - R267
+    gap: Live release pointer movement, verification and bounded rollback remain owner-run evidence.
+  - id: DOC-STACKS-045
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    sourceLine: 128
+    editions:
+      - lite
+      - full
+    statement: Only declared ingress publishes public ports.
+    status: owed
+    owedRules:
+      - R266
+      - R275
+    gap: Single-ingress/port declarations need R266/R275; live DNS ownership and certificate issuance are
+      owner-run prerequisites.
+  - id: DOC-STACKS-046
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    sourceLine: 131
+    editions:
+      - lite
+      - full
+    statement: Secrets are versioned and never embedded.
+    status: owed
+    owedRules:
+      - R266
+      - R277
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-047
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    sourceLine: 131
+    editions:
+      - lite
+      - full
+    statement: "Each VPS secret maps a stable logical `name` to an immutable versioned `runtimeName`; the rendered
+      stack keeps `{external: true, name: <runtimeName>}` and never a file or value."
+    status: owed
+    owedRules:
+      - R266
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-STACKS-048
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    sourceLine: 131
+    editions:
+      - lite
+      - full
+    statement: Rotation creates a new versioned name, updates the grant, waits for convergence, then removes the
+      earlier secret — a name is never reused and an earlier version is never deleted before convergence.
+    status: owed
+    owedRules:
+      - R266
+      - R267
+    gap: Secret rotation, grants, convergence and retirement are owner-run live evidence; static versioned names
+      do not prove execution.
+  - id: DOC-STACKS-049
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    sourceLine: 134
+    editions:
+      - lite
+      - full
+    statement: "Acceptance per declared OS/architecture needs disposable cold-host evidence of: signed Docker
+      installation and idempotent preparation; new- or existing-swarm reconciliation without destructive
+      reinitialization; rejection of unsupported platform, image, capacity, placement and quorum; complete
+      image build/publish closure before deploy; rendered Swarm configuration review; convergence plus
+      application health; restart with stable services, secrets and data; secret rotation without disclosure;
+      compatible migration with readiness held closed on failure; update failure and rollback handling;
+      encrypted off-host backup with isolated restore; swarm-state backup and autolock recovery; first TLS
+      issuance and renewal with only declared public ports; interrupted-operation reconciliation; and
+      non-destructive removal with application rollback boundaries."
+    status: owed
+    owedRules:
+      - R267
+    gap: Every declared platform needs fresh cold-host evidence for rotation, restore, recovery, TLS and
+      interrupted-operation reconciliation.
+  - id: DOC-STACKS-050
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    sourceLine: 134
+    editions:
+      - lite
+      - full
+    statement: A single-manager test never certifies manager failover, and an amd64 pass never certifies arm64.
+    status: owed
+    owedRules:
+      - R267
+    gap: An amd64 or single-manager proof cannot establish arm64 or manager failover; no current HFS rule proves
+      this live evidence scope.
+  - id: DOC-STACKS-051
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    sourceLine: 140
+    editions:
+      - lite
+      - full
+    statement: Defaults exist only for values safe in the declared environment; credentials, tenant identity,
+      public origins, datastore authority and remote endpoints get no production-looking placeholders.
+    status: owed
+    owedRules:
+      - R248
+      - R289
+    gap: R44 forbids secret/infrastructure defaults, but tenant identity, public origins and datastore authority
+      need broader typed-boundary coverage.
+  - id: DOC-STACKS-052
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    sourceLine: 142
+    editions:
+      - lite
+      - full
+    statement: Four health signals with different jobs:** startup (initialization in progress or failed), liveness
+      (the process can keep making progress — process-local, so a provider outage never causes restart churn),
+      readiness (this instance may receive its declared work — required dependencies and compatibility),
+      functional verification (a named caller journey works).
+    status: owed
+    owedRules:
+      - R262
+    gap: R189 checks a HEALTHCHECK line; R262 live/ready requirements do not independently prove startup,
+      functional verification or provider-outage behavior.
+  - id: DOC-STACKS-053
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    sourceLine: 142
+    editions:
+      - lite
+      - full
+    statement: Components classify dependencies as required, degraded or optional by behavior, not by vendor;
+      probes are bounded and never mutate business data; readiness never replaces migration evidence,
+      authenticated verification or rollout observation.
+    status: owed
+    owedRules:
+      - R262
+    gap: Bounded non-mutating probes and dependency classification need implementation and live evidence beyond
+      endpoint declarations.
+  - id: DOC-STACKS-054
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    sourceLine: 144
+    editions:
+      - lite
+      - full
+    statement: Conformance binds source revisions, package/config files, images, endpoint names, custody names and
+      verification entry points and reports missing or drifting inputs before effects; it never authenticates
+      history, reads secret values or proves a rollout.
+    status: owed
+    owedRules:
+      - R248
+      - R266
+      - R267
+    gap: Static consistency cannot authenticate history or prove a rollout; complete source/config/image binding
+      remains owed.
+  - id: DOC-STACKS-055
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    sourceLine: 144
+    editions:
+      - lite
+      - full
+    statement: Live evidence records the selected profile, source and image identities, the rendered configuration
+      digest (secrets excluded), migration/bootstrap results, health observations and named functional checks;
+      a source or config change invalidates only the affected component's proof.
+    status: owed
+    owedRules:
+      - R267
+      - R271
+    gap: The operational evidence receipt and its affected-component invalidation require live verification.
+  - id: DOC-STACKS-056
+    source: docs/application-stacks.md#checker-coverage-and-acceptance-evidence
+    sourceLine: 148
+    editions:
+      - lite
+      - full
+    statement: The static checker validates manifest shape against the machine schema, the tree shape above,
+      environment-relative Compose path safety, component-id/service-name correspondence, runbook file
+      existence and command completeness, secret custody (SOPS envelope, plaintext-path safety,
+      tracked-plaintext refusal, required policy prose), unresolved rendered-Compose interpolation, plaintext
+      sensitive environment values in the rendered model, and - for a Swarm environment - a nonempty rendered
+      image with no leftover `build` section on every managed service.
+    status: owed
+    owedRules:
+      - R266
+      - R267
+    gap: These checks exist in the op-time stacks gate; R10 judges only paths/Sonar, and app check does not call
+      the whole gate.
+  - id: DOC-STACKS-057
+    source: docs/application-stacks.md#primary-references
+    sourceLine: 173
+    editions:
+      - lite
+      - full
+    statement: "[Next environment variables](https://nextjs.org/docs/pages/guides/environment-variables) —
+      server-only vs build-inlined `NEXT_PUBLIC_*` values"
+    status: advisory
+    reason: Primary-reference explanation of Next environment behavior, not an additional product rule.
+  - id: DOC-STACKS-058
+    source: docs/application-stacks.md#where-a-secret-may-live
+    sourceLine: 179
+    editions:
+      - lite
+      - full
+    statement: Every secret the host needs lives in the one untracked `.claude/secret.env`, read only through
+      `engine/secrets.mjs` (`secret.env.example` lists the names).
+    status: enforced
+    rules:
+      - R234
+    scope: Runtime host custody; product custody remains independent.
+  - id: DOC-STACKS-059
+    source: docs/application-stacks.md#where-a-secret-may-live
+    sourceLine: 179
+    editions:
+      - lite
+      - full
+    statement: "Two Sonar servers, no overlap: **SonarCloud** serves everything that lives in the runtime
+      repository (the runtime and the three example apps, one `SONAR_TOKEN`, the organization from
+      `config.yaml` `sonar.organization` or the env `SONAR_ORGANIZATION`, project key
+      `<organization>_<declared key>`); the **self-hosted `ext/sonar`** serves product repositories only, and
+      its secrets are `secret.env` variables that `starci gate sonar up` passes to Compose
+      (`docs/host-secrets.md`)."
+    status: enforced
+    rules:
+      - R234
+    scope: Runtime/examples use SonarCloud; products use host Sonar.
+  - id: DOC-LITE-001
+    source: docs/lite-edition.md#hfs-lite-edition
+    sourceLine: 20
+    editions:
+      - lite
+    statement: "scheduling: `pg_cron` (with `pg_net`) or the platform scheduler; never a self-hosted cron host;"
+    status: owed
+    owedRules:
+      - R250
+      - R258
+      - R268
+    gap: R46 covers composed jobs, not host scheduler scripts or SQL/code tick declarations.
+  - id: DOC-LITE-002
+    source: docs/lite-edition.md#hfs-lite-edition
+    sourceLine: 25
+    editions:
+      - lite
+    statement: "The front end is one standard for both editions (R212 case-2): the browser calls the back end
+      through the Apollo clients and one file per operation in `fe.modules.api`, wrapped by the SWR hooks of
+      `fe.hooks.swr`; forms are react-hook-form with zod (`fe.hooks.rhf`), mutation outcomes go through
+      `fe.modules.toast`, and `fe.modules.auth` is the only front-end importer of Supabase, for the session
+      and the access token only."
+    status: owed
+    owedRules:
+      - R254
+      - R285
+      - R288
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-LITE-003
+    source: docs/lite-edition.md#hfs-lite-edition
+    sourceLine: 25
+    editions:
+      - lite
+    statement: Each concern's library is `knowledge/hfs/fe-stack.yaml`; a package it forbids is refused (R244).
+    status: enforced
+    rules:
+      - R244
+    scope: Catalog-listed forbidden FE libraries; complete allowlist is separate.
+  - id: DOC-LITE-004
+    source: docs/lite-edition.md#hfs-lite-edition
+    sourceLine: 33
+    editions:
+      - lite
+    statement: "Tests: back-end unit specs are required exactly as in full (`ruleParams.be.unitRoles`, the logic
+      roles at 100 per file, the `@starci/jest-preset` doubles and builders)."
+    status: enforced
+    rules:
+      - R47
+      - R204
+    scope: Required unit roles and managed 100-per-file measured coverage configuration.
+  - id: DOC-LITE-005
+    source: docs/lite-edition.md#hfs-lite-edition
+    sourceLine: 33
+    editions:
+      - lite
+    statement: Integration specs are optional and run only against the local Supabase CLI stack (`starci supabase
+      start`), with no toxiproxy and no containers of their own.
+    status: owed
+    owedRules:
+      - R284
+    gap: Local Supabase integration proofs differ from full test worlds; required lite pattern lanes still need
+      edition-aware enforcement.
+  - id: DOC-LITE-006
+    source: docs/lite-edition.md#hfs-lite-edition
+    sourceLine: 38
+    editions:
+      - lite
+    statement: "Work: lite's `app.starciwork` slot holds only `.gitignore`, `workspace.yaml` and `brand/**` (R212,
+      owner amendment 2026-10-14)."
+    status: enforced
+    rules:
+      - R212
+    scope: Only the named current rule scope is claimed; additional runtime or proof obligations remain separate.
+  - id: DOC-LITE-007
+    source: docs/lite-edition.md#create-a-lite-app
+    sourceLine: 53
+    editions:
+      - lite
+    statement: Docker must be available.
+    status: owed
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-LITE-008
+    source: docs/lite-edition.md#create-a-lite-app
+    sourceLine: 57
+    editions:
+      - lite
+    statement: It retains `brand/` only when present and creates no feature catalog, shell, feature, resource, UAT
+      or business-rule records there.
+    status: enforced
+    rules:
+      - R212
+    scope: Only the named current rule scope is claimed; additional runtime or proof obligations remain separate.
+  - id: DOC-LITE-009
+    source: docs/lite-edition.md#the-tree-in-words
+    sourceLine: 66
+    editions:
+      - lite
+    statement: Data access belongs to the back end (the shared `EntityManager` and `be.integrations.supabase`);
+      the front end reaches it only through GraphQL, and `fe.modules.auth` holds the Supabase auth client.
+    status: owed
+    owedRules:
+      - R254
+      - R255
+    gap: R217 covers FE client ownership, while SQL least privilege and complete data-chain boundaries still need
+      new checks.
+  - id: DOC-LITE-010
+    source: docs/lite-edition.md#the-tree-in-words
+    sourceLine: 66
+    editions:
+      - lite
+    statement: "The managed codegen step is offline: it only compares that digest with the migrations and refuses
+      missing or stale types, so lint, typecheck, build and CI need no stack."
+    status: enforced
+    rules:
+      - R216
+    scope: Current offline migrations digest; config/body freshness gaps remain separate.
+  - id: DOC-LITE-011
+    source: docs/lite-edition.md#production-delivery-and-secret-custody
+    sourceLine: 82
+    editions:
+      - lite
+    statement: "`app.starcistacks` under lite holds environment and sealed secret custody only; the stack's one
+      backing service is the Supabase project (the local CLI stack or the cloud project)."
+    status: owed
+    owedRules:
+      - R266
+      - R267
+      - R276
+    gap: Historical custody-only stacks are superseded by declared Swarm production and allowed SQLite sidecars.
+    supersededBy:
+      - ruling:lite-production-swarm
+      - ruling:lite-backing-services
+  - id: DOC-LITE-012
+    source: docs/lite-edition.md#production-delivery-and-secret-custody
+    sourceLine: 82
+    editions:
+      - lite
+    statement: "Delivery files, including environment examples, remain subject to R06 (`HFS_PLAINTEXT_SECRET`):
+      use placeholders and runtime secret references, never plaintext credentials."
+    status: owed
+    owedRules:
+      - R253
+      - R277
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-LITE-013
+    source: docs/lite-edition.md#database-authentication-and-storage
+    sourceLine: 89
+    editions:
+      - lite
+    statement: R214 requires each exposed table to enable row-level security and to declare its policies and
+      grants in the same migration; dynamic DDL is forbidden so the checker can see every statement.
+    status: owed
+    owedRules:
+      - R256
+    gap: Current table-create and dynamic-DDL checks miss later RLS changes and hardened policy cases.
+  - id: DOC-LITE-014
+    source: docs/lite-edition.md#database-authentication-and-storage
+    sourceLine: 92
+    editions:
+      - lite
+    statement: "An existing app adopts the standard with one baseline: the live schema is dumped into one
+      migration written to the current standard and marked applied on production without a re-run, the older
+      migrations move to `app.supabase.migrations.archive` (never applied by the Supabase CLI and never judged
+      by the migration rules), and new migrations append after the baseline."
+    status: owed
+    owedRules:
+      - R257
+    gap: Baseline/archive shape can be checked statically; schema dumping, repair and remote marking-applied
+      remain owner-run procedures.
+  - id: DOC-LITE-015
+    source: docs/lite-edition.md#database-authentication-and-storage
+    sourceLine: 96
+    editions:
+      - lite
+    statement: The browser uses only the public URL, the anon key and the user's access token, and only through
+      `fe.modules.auth`.
+    status: enforced
+    rules:
+      - R217
+    scope: Only the named current rule scope is claimed; additional runtime or proof obligations remain separate.
+  - id: DOC-LITE-016
+    source: docs/lite-edition.md#database-authentication-and-storage
+    sourceLine: 96
+    editions:
+      - lite
+    statement: R219 requires the back end to take the principal only from an access token verified against the
+      project JWKS; the back end reaches Postgres through the shared `EntityManager` using a dedicated
+      least-privilege application role.
+    status: owed
+    owedRules:
+      - R255
+      - R260
+    gap: JWT verification exists, but pinned algorithms and application-role least privilege need designated new
+      checks.
+  - id: DOC-LITE-017
+    source: docs/lite-edition.md#database-authentication-and-storage
+    sourceLine: 101
+    editions:
+      - lite
+    statement: Anything that must bypass RLS is a guarded back-end use case or a carefully scoped security-definer
+      database function.
+    status: owed
+    owedRules:
+      - R256
+    gap: Current definer checking misses authenticated revocations and later security-definer changes; authority
+      still needs review.
+  - id: DOC-LITE-018
+    source: docs/lite-edition.md#database-authentication-and-storage
+    sourceLine: 101
+    editions:
+      - lite
+    statement: The service-role credential never enters the front-end process.
+    status: enforced
+    rules:
+      - R217
+    scope: Only the named current rule scope is claimed; additional runtime or proof obligations remain separate.
+  - id: DOC-LITE-019
+    source: docs/lite-edition.md#add-product-capabilities
+    sourceLine: 119
+    editions:
+      - lite
+    statement: The local Supabase stack must be running for type generation.
+    status: owed
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-LITE-020
+    source: docs/lite-edition.md#add-product-capabilities
+    sourceLine: 122
+    editions:
+      - lite
+    statement: "An `add` or `new` command whose target slot is unavailable in lite stops before writing with
+      `<verb> <noun>: full edition only`."
+    status: enforced
+    rules:
+      - R212
+    scope: Edition slot availability; superseding owner allowances must be applied.
+  - id: DOC-LITE-021
+    source: docs/lite-edition.md#upgrade-to-full
+    sourceLine: 134
+    editions:
+      - lite
+    statement: The plan is read-only.
+    status: owed
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-LITE-022
+    source: docs/lite-edition.md#upgrade-to-full
+    sourceLine: 134
+    editions:
+      - lite
+    statement: The check also writes nothing; add `--db-types` when a local Supabase stack is running and a fresh
+      types comparison is required.
+    status: owed
+    owedRules:
+      - R247
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-LITE-023
+    source: docs/lite-edition.md#upgrade-to-full
+    sourceLine: 143
+    editions:
+      - lite
+    statement: The upgrade adds the full-only managed configuration (the e2e workflow and scripts), the
+      self-hosted stack and the required cli support.
+    status: owed
+    owedRules:
+      - R284
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-LITE-024
+    source: docs/lite-edition.md#upgrade-to-full
+    sourceLine: 143
+    editions:
+      - lite
+    statement: The first full check intentionally reports the e2e and integration proofs the product still needs
+      to author; the upgrade never creates placeholder tests.
+    status: owed
+    owedRules:
+      - R272
+      - R284
+    gap: Upgrade must preserve real proof gaps without generating placeholders; CLI procedure correctness has no
+      current HFS owner.
+  - id: DOC-LITE-025
+    source: docs/lite-edition.md#what-lite-forbids
+    sourceLine: 151
+    editions:
+      - lite
+    statement: R212 permits only `.gitignore`, optional `workspace.yaml` metadata and `brand/**` in `app.starciwork`.
+    status: enforced
+    rules:
+      - R212
+    scope: Only the named current rule scope is claimed; additional runtime or proof obligations remain separate.
+  - id: DOC-LITE-026
+    source: docs/lite-edition.md#what-lite-forbids
+    sourceLine: 151
+    editions:
+      - lite
+    statement: 'The feature catalog, shell, features, resources, UAT and business-rule records are forbidden
+      there; any other content fails with `HFS_STARCIWORK_LITE_FORBIDDEN`: "lite .starciwork holds only
+      workspace.yaml and brand/ (plus .gitignore)".'
+    status: enforced
+    rules:
+      - R212
+    scope: Only the named current rule scope is claimed; additional runtime or proof obligations remain separate.
+  - id: DOC-LITE-027
+    source: docs/lite-edition.md#what-lite-forbids
+    sourceLine: 162
+    editions:
+      - lite
+    statement: R217, R219 and R220 forbid Supabase access outside its owners (the front end auth only), unverified
+      principals, front-end service-role use and plaintext credentials.
+    status: owed
+    owedRules:
+      - R253
+      - R260
+      - R277
+    gap: The full sentence has no complete landed HFS owner/proof in this worktree; existing templates and op-time
+      gates alone do not establish app-check enforcement.
+  - id: DOC-LITE-028
+    source: docs/lite-edition.md#what-lite-forbids
+    sourceLine: 162
+    editions:
+      - lite
+    statement: "R243 and R244 hold in both editions: the front end serves no API and uses only the libraries of
+      `knowledge/hfs/fe-stack.yaml`."
+    status: enforced
+    rules:
+      - R243
+      - R244
+    scope: Only the named current rule scope is claimed; additional runtime or proof obligations remain separate.
+  - id: DOC-SERVICES-001
+    source: docs/microservices.md#one-place-for-a-service
+    sourceLine: 9
+    editions:
+      - lite
+      - full
+    statement: Only `main.ts` and `<service>.env.ts` may read the app's environment through `EnvSource` and
+      capability parse helpers; the env file holds no logic, module composition, business code or feature
+      imports, and the options file holds no parsing.
+    status: owed
+    owedRules:
+      - R265
+      - R289
+    gap: Typed env/composition detection is incomplete; mandatory env readers and typed compose groups need new
+      checks.
+    amendedBy:
+      - ruling:typed-app-environment
+  - id: DOC-SERVICES-002
+    source: docs/microservices.md#one-place-for-a-service
+    sourceLine: 17
+    editions:
+      - lite
+      - full
+    statement: "a file of one service app never imports a file of another service app (`BE_SERVICE_ISOLATION`,
+      R168, ESLint `starci-be/service-isolation`): shared code moves to `be/src`, and services meet over the
+      wire;"
+    status: enforced
+    rules:
+      - R168
+    scope: Resolved sibling-service imports; dynamic-import strengthening is separate.
+  - id: DOC-SERVICES-003
+    source: docs/microservices.md#one-place-for-a-service
+    sourceLine: 19
+    editions:
+      - lite
+      - full
+    statement: every one-off action (migrate, seed, sync, backup, operator commands) is a command of the one
+      `be/apps/cli` app, never an argument or script of a service.
+    status: owed
+    owedRules:
+      - R250
+    gap: R147 requires the CLI owner, but unrestricted deploy scripts can still contain one-off logic.
+  - id: DOC-SERVICES-004
+    source: docs/microservices.md#images
+    sourceLine: 24
+    editions:
+      - lite
+      - full
+    statement: "Every `image` of a product with more than one service is pinned (`HFS_IMAGE_UNPINNED`, R164): a
+      digest (`name@sha256:...`) or an exact version (`x.y.z`), never a missing tag, `latest`, a branch word
+      or a major-only tag."
+    status: enforced
+    rules:
+      - R164
+    scope: Products with at least two api/worker apps; all rendered images are a separate obligation.
+  - id: DOC-SERVICES-005
+    source: docs/microservices.md#specs
+    sourceLine: 97
+    editions:
+      - lite
+      - full
+    statement: Sibling services run as real apps in the world, never as fakes; a third-party SaaS stays a fake at
+      the network edge.
+    status: enforced
+    rules:
+      - R47
+    scope: Full test-world apps are real peers; third-party SaaS fakes remain at the network edge.
+  - id: DOC-HOST-001
+    source: docs/host-secrets.md#host-credentials
+    sourceLine: 4
+    editions:
+      - lite
+      - full
+    statement: Use the example to create a missing local file, then fill the required names locally.
+    status: owed
+    gap: Host setup, presence-only preflight or native qualification is an operational contract without a matching
+      current HFS rule; fresh owner/native evidence remains owed.
+  - id: DOC-HOST-002
+    source: docs/host-secrets.md#host-credentials
+    sourceLine: 10
+    editions:
+      - lite
+      - full
+    statement: The owner sets values locally; an agent never reads or prints the file to guide setup.
+    status: owed
+    gap: Host setup, presence-only preflight or native qualification is an operational contract without a matching
+      current HFS rule; fresh owner/native evidence remains owed.
+  - id: DOC-HOST-003
+    source: docs/host-secrets.md#secrets-of-the-self-hosted-sonar-stack
+    sourceLine: 19
+    editions:
+      - lite
+      - full
+    statement: "The names, all in `secret.env.example`: `SONARQUBE_DB_PASSWORD`, `SONARQUBE_ADMIN_PASSWORD`,
+      `SONARQUBE_ADMIN_TOKEN` and `CLOUDFLARE_TUNNEL_TOKEN` (only with `--public`)."
+    status: owed
+    gap: Host setup, presence-only preflight or native qualification is an operational contract without a matching
+      current HFS rule; fresh owner/native evidence remains owed.
+  - id: DOC-HOST-004
+    source: docs/host-secrets.md#secrets-of-the-self-hosted-sonar-stack
+    sourceLine: 25
+    editions:
+      - lite
+      - full
+    statement: "The owner moves each value once with his own age identity: `starci runtime import-held-secret
+      --member <old path> [--rev <rev>]` reads the member from git history (without `--rev`, from the parent
+      of the commit that deleted it), decrypts it through the sops call owner and appends `NAME=value` to
+      `secret.env` without printing it, and it never overwrites a name already there."
+    status: owed
+    gap: Host setup, presence-only preflight or native qualification is an operational contract without a matching
+      current HFS rule; fresh owner/native evidence remains owed.
+  - id: DOC-HOST-005
+    source: docs/host-secrets.md#secrets-of-the-self-hosted-sonar-stack
+    sourceLine: 38
+    editions:
+      - lite
+      - full
+    statement: "| the two demo secrets of the ecommerce example | none (retired) | the example carries demo-only
+      defaults in its compose files |"
+    status: owed
+    gap: Host setup, presence-only preflight or native qualification is an operational contract without a matching
+      current HFS rule; fresh owner/native evidence remains owed.
+  - id: DOC-HOST-006
+    source: docs/host-secrets.md#shared-age-identity
+    sourceLine: 45
+    editions:
+      - lite
+      - full
+    statement: Native tools are required; only researched versions are admitted, update probing is disabled, and
+      the unsupported upstream fixed audit-file context refuses before spawn.
+    status: owed
+    gap: Host setup, presence-only preflight or native qualification is an operational contract without a matching
+      current HFS rule; fresh owner/native evidence remains owed.
+  - id: DOC-HOST-007
+    source: docs/host-secrets.md#shared-age-identity
+    sourceLine: 45
+    editions:
+      - lite
+      - full
+    statement: "Image headers and version strings do not authenticate binaries: the owning native gate must
+      qualify physical tools and real crypto."
+    status: owed
+    gap: Host setup, presence-only preflight or native qualification is an operational contract without a matching
+      current HFS rule; fresh owner/native evidence remains owed.
+  - id: DOC-HOST-008
+    source: docs/host-secrets.md#shared-age-identity
+    sourceLine: 63
+    editions:
+      - lite
+      - full
+    statement: Canonical-root handoff and fake fixtures prove routing only; native recipient, cryptographic,
+      filesystem-permission and publication-race verification require their own fresh evidence.
+    status: owed
+    gap: Host setup, presence-only preflight or native qualification is an operational contract without a matching
+      current HFS rule; fresh owner/native evidence remains owed.
+  - id: DOC-HOST-009
+    source: docs/host-secrets.md#selected-action-preflight
+    sourceLine: 70
+    editions:
+      - lite
+      - full
+    statement: Explicit service selection, normalized connector settings and presence-only declarations from the
+      selected native action owner determine required inputs.
+    status: owed
+    gap: Host setup, presence-only preflight or native qualification is an operational contract without a matching
+      current HFS rule; fresh owner/native evidence remains owed.
+  - id: DOC-HOST-010
+    source: docs/host-secrets.md#selected-action-preflight
+    sourceLine: 70
+    editions:
+      - lite
+      - full
+    statement: The selector returns presence-only requirements plus native account-managed adapter metadata.
+    status: owed
+    gap: Host setup, presence-only preflight or native qualification is an operational contract without a matching
+      current HFS rule; fresh owner/native evidence remains owed.
+  - id: DOC-HOST-011
+    source: docs/host-secrets.md#selected-action-preflight
+    sourceLine: 70
+    editions:
+      - lite
+      - full
+    statement: Help and read-only inspection keep their read-only behavior.
+    status: owed
+    gap: Host setup, presence-only preflight or native qualification is an operational contract without a matching
+      current HFS rule; fresh owner/native evidence remains owed.
+  - id: DOC-HOST-012
+    source: docs/host-secrets.md#selected-action-preflight
+    sourceLine: 77
+    editions:
+      - lite
+      - full
+    statement: If a required input is absent or empty, report the blocked action and exact missing names.
+    status: owed
+    gap: Host setup, presence-only preflight or native qualification is an operational contract without a matching
+      current HFS rule; fresh owner/native evidence remains owed.
+  - id: DOC-HOST-013
+    source: docs/host-secrets.md#selected-action-preflight
+    sourceLine: 88
+    editions:
+      - lite
+      - full
+    statement: Credential presence proves availability only.
+    status: owed
+    gap: Host setup, presence-only preflight or native qualification is an operational contract without a matching
+      current HFS rule; fresh owner/native evidence remains owed.
+  - id: DOC-HOST-014
+    source: docs/host-secrets.md#selected-action-preflight
+    sourceLine: 88
+    editions:
+      - lite
+      - full
+    statement: A presence result, startup receipt or supplied key never proves product completion.
+    status: owed
+    gap: Host setup, presence-only preflight or native qualification is an operational contract without a matching
+      current HFS rule; fresh owner/native evidence remains owed.
+  - id: OPS-S1
+    source: docs/application-stacks.md#manifest-shape
+    editions:
+      - full
+    statement: manifest `application-stacks.yaml` exists. required (docs, layout)
+    status: enforced
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S1
+      line: 33
+      columns: 12
+    rules:
+      - R02
+      - R10
+    scope: Full manifest existence only, not rendered/content closure.
+  - id: OPS-S2
+    source: docs/application-stacks.md#manifest-shape
+    editions:
+      - lite
+    statement: "manifest `application-stacks.yaml` exists. owner 2026-10-14: lite REQUIRES it"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S2
+      line: 34
+      columns: 12
+    owedRules:
+      - R266
+      - R267
+    gap: Historical lite slots conflict with the current production Swarm declaration; new stack rules and example
+      artifacts must land.
+    amendedBy:
+      - ruling:lite-production-swarm
+  - id: OPS-S3
+    source: docs/application-stacks.md#manifest-shape
+    editions:
+      - lite
+      - full
+    statement: 'environment naming. layout: "declaration currently requires dev and vps"; nivo uses `production`'
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S3
+      line: 35
+      columns: 12
+    owedRules:
+      - R266
+    gap: Environment naming and production applicability contradict the source layout; a consistent declaration
+      remains owed.
+  - id: OPS-S4
+    source: docs/application-stacks.md#manifest-shape
+    editions:
+      - full
+    statement: dev = docker-compose. STACK-DEV
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S4
+      line: 36
+      columns: 12
+    owedRules:
+      - R266
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-S5
+    source: docs/application-stacks.md#manifest-shape
+    editions:
+      - lite
+    statement: dev for lite = local Supabase CLI stack. lite-edition.md
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S5
+      line: 37
+      columns: 12
+    owedRules:
+      - R266
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-S6
+    source: docs/application-stacks.md#manifest-shape
+    editions:
+      - lite
+      - full
+    statement: rendered Swarm/Compose model checked on every `app check`. "app check runs the stacks checks" (owner)
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S6
+      line: 38
+      columns: 12
+    owedRules:
+      - R267
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-S7
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    editions:
+      - lite
+      - full
+    statement: VPS runtime = docker-swarm, declared. STACK-VPS, doc "Docker Swarm on a VPS"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S7
+      line: 39
+      columns: 12
+    owedRules:
+      - R250
+      - R266
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-S8
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    editions:
+      - lite
+      - full
+    statement: "Swarm model: image present, no `build`. doc"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S8
+      line: 40
+      columns: 12
+    owedRules:
+      - R266
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-S9
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    editions:
+      - lite
+      - full
+    statement: 'Swarm model: pinned image (digest/exact tag). doc "Releases are immutable"; docker.md'
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S9
+      line: 41
+      columns: 12
+    owedRules:
+      - R266
+    gap: R164 runs only for at least two api/worker apps and checks manifest component images, not every rendered
+      service image.
+  - id: OPS-S10
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    editions:
+      - lite
+      - full
+    statement: 'Swarm secrets: external, versioned `runtimeName`, never file/value. doc "Secrets are versioned and
+      never embedded"'
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S10
+      line: 42
+      columns: 12
+    owedRules:
+      - R266
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-S11
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    editions:
+      - lite
+      - full
+    statement: Plaintext sensitive values in rendered environment. doc
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S11
+      line: 43
+      columns: 12
+    owedRules:
+      - R266
+      - R277
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-S12
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    editions:
+      - lite
+      - full
+    statement: "Ingress: only declared ingress publishes ports. doc"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S12
+      line: 44
+      columns: 12
+    owedRules:
+      - R266
+      - R275
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-S13
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    editions:
+      - lite
+      - full
+    statement: TLS issuance/persistence, DNS ownership with receipt. doc
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S13
+      line: 45
+      columns: 12
+    owedRules:
+      - R266
+    gap: Static DNS/TLS declarations do not prove provider ownership, actual DNS reachability, certificate
+      issuance or renewal; these remain owner-run evidence.
+  - id: OPS-S14
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    editions:
+      - lite
+      - full
+    statement: "Stateful placement/volumes: constraint + custody. doc"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S14
+      line: 46
+      columns: 12
+    owedRules:
+      - R266
+      - R267
+      - R276
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-S15
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    editions:
+      - lite
+      - full
+    statement: "Immutable release: `/srv/<app>/releases/<digest>`, pointer moves after verification, prior release
+      kept. doc"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S15
+      line: 47
+      columns: 12
+    owedRules:
+      - R267
+      - R271
+    gap: Owner-run execution and fresh live evidence remain owed; static declaration checks do not prove the
+      operational result.
+  - id: OPS-S16
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    editions:
+      - lite
+      - full
+    statement: Convergence observed, not declared; rollback; migration completion receipt. doc
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S16
+      line: 48
+      columns: 12
+    owedRules:
+      - R267
+    gap: Owner-run execution and fresh live evidence remain owed; static declaration checks do not prove the
+      operational result.
+  - id: OPS-S17
+    source: docs/application-stacks.md#the-runbook-lives-in-a-file-not-the-manifest
+    editions:
+      - lite
+      - full
+    statement: Runbook has the seven commands. doc
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S17
+      line: 49
+      columns: 12
+    owedRules:
+      - R266
+      - R267
+    gap: The existing gate accepts TODO command cells and is not wired into every app check; meaningful runbook
+      content remains owed.
+  - id: OPS-S18
+    source: docs/application-stacks.md#directory-shape
+    editions:
+      - lite
+      - full
+    statement: Env tree shape (what files may exist). layout
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S18
+      line: 50
+      columns: 12
+    owedRules:
+      - R266
+    gap: Full tree paths have R10; historical lite paths still conflict with Swarm production.
+    amendedBy:
+      - ruling:lite-production-swarm
+  - id: OPS-S19
+    source: docs/application-stacks.md#services-sonar-and-every-other-delivery-service
+    editions:
+      - lite
+      - full
+    statement: "`services` block (sonar etc.). STACK-SERVICES"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S19
+      line: 51
+      columns: 12
+    owedRules:
+      - R247
+    gap: The services gate judges this contract, but R10 covers only Sonar declaration/local host ownership and
+      has no complete content ownership.
+  - id: OPS-S20
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    editions:
+      - lite
+      - full
+    statement: k8s posture. doc
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.1 `.starcistacks`, stacks, VPS runtime
+      row: S20
+      line: 52
+      columns: 12
+    owedRules:
+      - R267
+    gap: The op-time gate checks Kubernetes posture; full app-check and catalog-owned edition proof remain owed.
+  - id: OPS-J1
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - lite
+      - full
+    statement: no host cron / systemd timer / crontab line from CI. owner 2026-10-14
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.2 Scheduled work
+      row: J1
+      line: 58
+      columns: 12
+    owedRules:
+      - R250
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-J2
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - lite
+    statement: app-owned scheduler. pg_cron upsert-by-id from app boot
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.2 Scheduled work
+      row: J2
+      line: 59
+      columns: 12
+    owedRules:
+      - R258
+      - R268
+    gap: R46 covers composed scheduler ownership, not SQL/code parity or enqueue-only pg_cron ticks.
+  - id: OPS-J3
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - full
+    statement: app-owned scheduler. BullMQ job scheduler (queues.yaml `schedulers`)
+    status: enforced
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.2 Scheduled work
+      row: J3
+      line: 60
+      columns: 12
+    rules:
+      - R46
+    scope: Only the named current rule scope is enforced; additional source weaknesses remain separate obligations.
+  - id: OPS-J4
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - lite
+      - full
+    statement: "`replicated-job` (swarm one-shot scheduled service). owner 2026-10-14"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.2 Scheduled work
+      row: J4
+      line: 61
+      columns: 12
+    owedRules:
+      - R268
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-J5
+    source: docs/microservices.md#one-place-for-a-service
+    editions:
+      - lite
+      - full
+    statement: one-off action = `be/apps/cli` command. microservices.md, R147
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.2 Scheduled work
+      row: J5
+      line: 62
+      columns: 12
+    owedRules:
+      - R250
+    gap: R147 covers the CLI code owner; deploy scripts can still contain inline one-off logic.
+  - id: OPS-J6
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - lite
+    statement: docs say `pg_cron ... or the host's scheduler`. background.yaml L77
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.2 Scheduled work
+      row: J6
+      line: 63
+      columns: 12
+    owedRules:
+      - R274
+    gap: Host-scheduler prose cites a superseded ruling; current lite production has app-owned work and no host
+      cron.
+    supersededBy:
+      - ruling:lite-production-swarm
+  - id: OPS-C1
+    source: docs/application-stacks.md#ci
+    editions:
+      - lite
+      - full
+    statement: triggers = release tag + dispatch only. R221
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.3 CI/CD workflows
+      row: C1
+      line: 69
+      columns: 12
+    owedRules:
+      - R251
+    gap: R221 covers the runtime/examples/templates; product deployment workflows are not judged.
+  - id: OPS-C2
+    source: docs/application-stacks.md#ci
+    editions:
+      - lite
+      - full
+    statement: CI lint step present. R13
+    status: enforced
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.3 CI/CD workflows
+      row: C2
+      line: 70
+      columns: 12
+    rules:
+      - R13
+    scope: CI lint-command presence only; unconditional execution remains unproved.
+  - id: OPS-C3
+    source: docs/application-stacks.md#ci
+    editions:
+      - lite
+      - full
+    statement: 'deploy workflow content. doc "CI": `SOPS_AGE_KEY` only, materialize in the job, protected
+      environment, remove materialized dir'
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.3 CI/CD workflows
+      row: C3
+      line: 71
+      columns: 12
+    owedRules:
+      - R251
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-C4
+    source: docs/application-stacks.md#ci
+    editions:
+      - lite
+      - full
+    statement: actions pinned by SHA. ci.yml managed (SHA); D3-08
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.3 CI/CD workflows
+      row: C4
+      line: 72
+      columns: 12
+    owedRules:
+      - R251
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-C5
+    source: docs/application-stacks.md#ci
+    editions:
+      - lite
+      - full
+    statement: tool installs in CI. none
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.3 CI/CD workflows
+      row: C5
+      line: 73
+      columns: 12
+    owedRules:
+      - R251
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-C6
+    source: docs/application-stacks.md#ci
+    editions:
+      - lite
+    statement: db deploy. db-deploy.yml managed
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.3 CI/CD workflows
+      row: C6
+      line: 74
+      columns: 12
+    owedRules:
+      - R251
+      - R271
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-C7
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    editions:
+      - lite
+      - full
+    statement: images workflow builds, never pushes; no digest recorded. doc "immutable image digests"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.3 CI/CD workflows
+      row: C7
+      line: 75
+      columns: 12
+    owedRules:
+      - R267
+      - R271
+    gap: Image builds alone do not produce a proved immutable deployment digest or publication receipt.
+  - id: OPS-C8
+    source: docs/application-stacks.md#ci
+    editions:
+      - lite
+      - full
+    statement: protected environments, required reviewers. doc
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.3 CI/CD workflows
+      row: C8
+      line: 76
+      columns: 12
+    owedRules:
+      - R251
+    gap: Environment presence is static; protected-environment reviewers and provider settings need owner-run
+      configuration evidence.
+  - id: OPS-K1
+    source: docs/application-stacks.md#secrets-custody
+    editions:
+      - lite
+      - full
+    statement: sealed location only `.starcistacks/<env>/secrets/<slug>.enc`; no plaintext literal anywhere. R06
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.4 Secret custody
+      row: K1
+      line: 82
+      columns: 12
+    owedRules:
+      - R253
+      - R277
+    gap: The current assigned-secret pattern misses documented underscore/camelCase credential names; widened
+      custody-only enforcement remains owed.
+  - id: OPS-K2
+    source: docs/application-stacks.md#secrets-custody
+    editions:
+      - lite
+    statement: lite custody paths. R220
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.4 Secret custody
+      row: K2
+      line: 83
+      columns: 12
+    owedRules:
+      - R253
+      - R277
+    gap: Provider-shaped scanning covers fe/ and supabase/ only; be/deploy/scripts/workflows have weaker generic
+      patterns.
+  - id: OPS-K3
+    source: docs/application-stacks.md#initialize-and-seal
+    editions:
+      - lite
+      - full
+    statement: "where the age private key lives. owner 2026-10-14: ONLY `.claude/secret.env` `SOPS_AGE_KEY`; home
+      `keys.txt` removed"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.4 Secret custody
+      row: K3
+      line: 84
+      columns: 12
+    owedRules:
+      - R253
+    gap: Home keys.txt and FILE alternatives are superseded; current custody is SOPS_AGE_KEY in
+      .claude/secret.env.
+    supersededBy:
+      - ruling:sealed-secret-custody
+  - id: OPS-K4
+    source: docs/application-stacks.md#materialize-for-a-process
+    editions:
+      - lite
+      - full
+    statement: "`*_FILE` reading, exact bytes, declared file must exist. application-stacks.md, D2-17"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.4 Secret custody
+      row: K4
+      line: 85
+      columns: 12
+    owedRules:
+      - R253
+    gap: EnvSource behavior exists in the template, but copied-product drift is not currently judged.
+  - id: OPS-K5
+    source: docs/application-stacks.md#secrets-custody
+    editions:
+      - lite
+      - full
+    statement: "env-key parity: keys the code reads = keys sealed = keys the stack passes. D2-01, D2-03, D2-06,
+      D2-07, D2-08"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.4 Secret custody
+      row: K5
+      line: 86
+      columns: 12
+    owedRules:
+      - R248
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-K6
+    source: docs/application-stacks.md#materialize-for-a-process
+    editions:
+      - lite
+      - full
+    statement: env value shape (bool/int/duration/url) matches the parser. D2-03 `OPENCLAW_MANAGE_AGENTS=1` vs
+      `env.bool`
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.4 Secret custody
+      row: K6
+      line: 87
+      columns: 12
+    owedRules:
+      - R249
+    gap: Protected in-memory decryption and the typed reader must verify value shape without printing values.
+  - id: OPS-K7
+    source: docs/application-stacks.md#secrets-custody
+    editions:
+      - lite
+      - full
+    statement: Swarm versioned runtime secrets, rotation. doc
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.4 Secret custody
+      row: K7
+      line: 88
+      columns: 12
+    owedRules:
+      - R266
+    gap: Owner-run execution and fresh live evidence remain owed; static declaration checks do not prove the
+      operational result.
+  - id: OPS-K8
+    source: docs/application-stacks.md#secrets-custody
+    editions:
+      - lite
+      - full
+    statement: rotation record (when sealed, by whom, replaces what). doc "Rotation seals, materializes, changes
+      grant, verifies, retires"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.4 Secret custody
+      row: K8
+      line: 89
+      columns: 12
+    gap: Rotation metadata/max-age policy is P2; actual rotation and convergence remain owner-run live evidence.
+  - id: OPS-K9
+    source: docs/application-stacks.md#secrets-custody
+    editions:
+      - lite
+      - full
+    statement: '`.enc` format dotenv; no duplicate secret in two members; no `_SEALED` twins. doc "New envelopes
+      use dotenv"; D2-10, D2-12'
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.4 Secret custody
+      row: K9
+      line: 90
+      columns: 12
+    owedRules:
+      - R248
+    gap: ENV_DUPLICATE is the designated duplicate-key check; mandatory envelope-format rejection and semantic
+      _SEALED twins remain separately owed.
+  - id: OPS-K10
+    source: docs/application-stacks.md#secrets-custody
+    editions:
+      - lite
+      - full
+    statement: public values never in custody. doc "frontend receives public configuration only"; D2-11
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.4 Secret custody
+      row: K10
+      line: 91
+      columns: 12
+    owedRules:
+      - R248
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-K11
+    source: docs/application-stacks.md#secrets-custody
+    editions:
+      - lite
+      - full
+    statement: obsolete/unread sealed keys, old plaintext folders. D2-07, D2-08, D2-18
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.4 Secret custody
+      row: K11
+      line: 92
+      columns: 12
+    owedRules:
+      - R248
+      - R277
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-K12
+    source: docs/application-stacks.md#secrets-custody
+    editions:
+      - lite
+    statement: local helpers that load plaintext (`with-secrets`, `env-sync`, `set-secrets.ps1`). R06 spirit, doc
+      "Migrate nivo-lite"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.4 Secret custody
+      row: K12
+      line: 93
+      columns: 12
+    owedRules:
+      - R252
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-K13
+    source: docs/application-stacks.md#secrets-custody
+    editions:
+      - lite
+      - full
+    statement: be code writing plaintext secrets to disk (seed CLI). D2-14
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.4 Secret custody
+      row: K13
+      line: 94
+      columns: 12
+    gap: Every secret-bearing filesystem write is not judged by a current HFS rule; P2 write-path enforcement
+      remains owed.
+  - id: OPS-K14
+    source: docs/application-stacks.md#secrets-custody
+    editions:
+      - lite
+      - full
+    statement: no default for a secret. R44
+    status: enforced
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.4 Secret custody
+      row: K14
+      line: 95
+      columns: 12
+    rules:
+      - R44
+    scope: Only the named current rule scope is enforced; additional source weaknesses remain separate obligations.
+  - id: OPS-K15
+    source: docs/application-stacks.md#secrets-custody
+    editions:
+      - lite
+      - full
+    statement: no secret in logs/errors/transcripts. R71, host-secrets.md
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.4 Secret custody
+      row: K15
+      line: 96
+      columns: 12
+    owedRules:
+      - R252
+    gap: BE log/error rules do not judge delivery-shell echo, xtrace or reveal flags.
+  - id: OPS-K16
+    source: docs/application-stacks.md#secrets-custody
+    editions:
+      - lite
+      - full
+    statement: no secret baked into an image. R191
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.4 Secret custody
+      row: K16
+      line: 97
+      columns: 12
+    owedRules:
+      - R266
+    gap: R191 covers Dockerfile image inputs; rendered service environments and grants remain outside its scope.
+  - id: OPS-K17
+    source: docs/application-stacks.md#ci
+    editions:
+      - lite
+      - full
+    statement: CI secret store contains only the age key (+ ssh). doc "CI"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.4 Secret custody
+      row: K17
+      line: 98
+      columns: 12
+    owedRules:
+      - R251
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-K18
+    source: docs/application-stacks.md#secrets-custody
+    editions:
+      - full
+    statement: "`HFS_IDENTITY_CUSTODY` for UAT identities. R09"
+    status: enforced
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.4 Secret custody
+      row: K18
+      line: 99
+      columns: 12
+    rules:
+      - R09
+    scope: Only the named current rule scope is enforced; additional source weaknesses remain separate obligations.
+  - id: OPS-A1
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+    statement: principal only from a verified JWT (JWKS, iss, aud, exp, pinned alg). R219
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.5 Auth, DB, service role
+      row: A1
+      line: 105
+      columns: 12
+    owedRules:
+      - R260
+    gap: The current JWT checker accepts an arbitrary nonempty algorithms list; precise allowed algorithms need
+      R260.
+  - id: OPS-A2
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - full
+    statement: principal verification for FULL (IdP). HFS-STANDARD "IdP (Keycloak)"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.5 Auth, DB, service role
+      row: A2
+      line: 106
+      columns: 12
+    owedRules:
+      - R260
+    gap: Full IdP/JWKS verification requires its own coverage; an algorithms declaration does not establish
+      issuer/audience verification.
+  - id: OPS-A3
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+    statement: RLS enabled + named policies. R214
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.5 Auth, DB, service role
+      row: A3
+      line: 107
+      columns: 12
+    owedRules:
+      - R256
+    gap: Current R214 misses later RLS changes and nonliteral tautological predicates.
+  - id: OPS-A4
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+    statement: '`app_be` least-privilege role. lite-edition.md "dedicated least-privilege application role"'
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.5 Auth, DB, service role
+      row: A4
+      line: 108
+      columns: 12
+    owedRules:
+      - R255
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-A5
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+    statement: PostgREST door closed to the browser (lite). R217 says fe never calls Supabase data; DB side unchecked
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.5 Auth, DB, service role
+      row: A5
+      line: 109
+      columns: 12
+    owedRules:
+      - R254
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-A6
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+      - full
+    statement: "`service_role` never in fe. R217"
+    status: enforced
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.5 Auth, DB, service role
+      row: A6
+      line: 110
+      columns: 12
+    rules:
+      - R217
+    scope: Only the named current rule scope is enforced; additional source weaknesses remain separate obligations.
+  - id: OPS-A7
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+    statement: '`service_role` confined to the back-end integration. PLAN COMMON "no supabaseAdmin anywhere", D3-06'
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.5 Auth, DB, service role
+      row: A7
+      line: 111
+      columns: 12
+    owedRules:
+      - R252
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-A8
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+    statement: RLS `force` for owner-run tables. R214 `forceRls` in hfs.json
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.5 Auth, DB, service role
+      row: A8
+      line: 112
+      columns: 12
+    owedRules:
+      - R255
+    gap: Current R214 covers explicitly declared forceRls tables; default role-owned-table force behavior requires
+      R255.
+  - id: OPS-A9
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+    statement: security definer / storage buckets / config.toml. R215, R216
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.5 Auth, DB, service role
+      row: A9
+      line: 113
+      columns: 12
+    owedRules:
+      - R256
+      - R259
+    gap: Later definer changes, authenticated revocation, storage ownership and extended config checks remain owed
+      despite existing partial checks.
+  - id: OPS-A10
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+    statement: "auth config: `enable_signup`, redirect urls equal hfs.json. R216"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.5 Auth, DB, service role
+      row: A10
+      line: 114
+      columns: 12
+    gap: Local config.toml comparisons do not prove hosted production Auth settings; live provider configuration
+      has no judged declaration.
+  - id: OPS-A11
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - full
+    statement: "RLS for full edition. HFS-STANDARD: full db in `be/`"
+    status: advisory
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.5 Auth, DB, service role
+      row: A11
+      line: 115
+      columns: 12
+    reason: The source n/a describes full without Supabase; full declaring Supabase is conditionally subject to
+      the same database rules.
+  - id: OPS-W1
+    source: docs/lite-edition.md#add-product-capabilities
+    editions:
+      - lite
+      - full
+    statement: "door shape, one POST, `SignedWebhook` reason (slot-scoped: a webhook under `features/api` escapes,
+      counter-example 15). R182"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.6 Webhooks and inbox/outbox
+      row: W1
+      line: 121
+      columns: 12
+    owedRules:
+      - R263
+    gap: The current webhook detector is slot-scoped; SignedWebhook in another HTTP feature can escape.
+  - id: OPS-W2
+    source: docs/lite-edition.md#add-product-capabilities
+    editions:
+      - lite
+      - full
+    statement: verify first. R183
+    status: enforced
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.6 Webhooks and inbox/outbox
+      row: W2
+      line: 122
+      columns: 12
+    rules:
+      - R183
+    scope: Only the named current rule scope is enforced; additional source weaknesses remain separate obligations.
+  - id: OPS-W3
+    source: docs/lite-edition.md#add-product-capabilities
+    editions:
+      - lite
+      - full
+    statement: provider ack constant. R182
+    status: enforced
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.6 Webhooks and inbox/outbox
+      row: W3
+      line: 123
+      columns: 12
+    rules:
+      - R182
+    scope: Only the named current rule scope is enforced; additional source weaknesses remain separate obligations.
+  - id: OPS-W4
+    source: docs/lite-edition.md#add-product-capabilities
+    editions:
+      - lite
+      - full
+    statement: inbox claim first, redelivery safe. R80
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.6 Webhooks and inbox/outbox
+      row: W4
+      line: 124
+      columns: 12
+    owedRules:
+      - R263
+    gap: R80 assumes its recognized first eventId parameter; alternate delivery DTO/id forms can bypass it.
+  - id: OPS-W5
+    source: docs/lite-edition.md#add-product-capabilities
+    editions:
+      - lite
+      - full
+    statement: outbox written in the same tx. R152, R82
+    status: enforced
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.6 Webhooks and inbox/outbox
+      row: W5
+      line: 125
+      columns: 12
+    rules:
+      - R152
+    scope: Only the named current rule scope is enforced; additional source weaknesses remain separate obligations.
+  - id: OPS-W6
+    source: docs/lite-edition.md#add-product-capabilities
+    editions:
+      - lite
+      - full
+    statement: replay window / timestamp. webhooks.yaml L99
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.6 Webhooks and inbox/outbox
+      row: W6
+      line: 126
+      columns: 12
+    owedRules:
+      - R253
+    gap: The replay/timestamp template can be replaced; copy drift checks and behavior evidence remain owed.
+  - id: OPS-W7
+    source: docs/lite-edition.md#add-product-capabilities
+    editions:
+      - lite
+      - full
+    statement: door is rate-limited and strict. `input-bounds`
+    status: enforced
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.6 Webhooks and inbox/outbox
+      row: W7
+      line: 127
+      columns: 12
+    rules:
+      - R42
+    scope: Only the named current rule scope is enforced; additional source weaknesses remain separate obligations.
+  - id: OPS-W8
+    source: docs/lite-edition.md#add-product-capabilities
+    editions:
+      - lite
+      - full
+    statement: webhook secret per provider has a sealed home and a read site. K5
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.6 Webhooks and inbox/outbox
+      row: W8
+      line: 128
+      columns: 12
+    owedRules:
+      - R248
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-E1
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    editions:
+      - lite
+      - full
+    statement: "CORS allowlist. `enableCors({origin: allowedOrigins})`"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: "1.7 Edge: CORS, headers, rate limit, health"
+      row: E1
+      line: 134
+      columns: 12
+    owedRules:
+      - R261
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-E2
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    editions:
+      - lite
+      - full
+    statement: security response headers (HSTS, nosniff, frame, referrer, CSP for the api) and `x-powered-by` off;
+      nivo applies HSTS/nosniff/referrer in the Traefik edge (`routes.yml:9-13`), canon silent on
+      app-vs-ingress. none
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: "1.7 Edge: CORS, headers, rate limit, health"
+      row: E2
+      line: 135
+      columns: 12
+    owedRules:
+      - R261
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-E3
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    editions:
+      - lite
+      - full
+    statement: client IP behind a proxy (rate limit key, audit). `rate-limit.guard.ts:52` keys on `request.ip`
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: "1.7 Edge: CORS, headers, rate limit, health"
+      row: E3
+      line: 136
+      columns: 12
+    owedRules:
+      - R261
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-E4
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    editions:
+      - lite
+      - full
+    statement: "request body limits, `rawBody` global. `rawBody: true` for whole app in template"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: "1.7 Edge: CORS, headers, rate limit, health"
+      row: E4
+      line: 137
+      columns: 12
+    gap: DTO bounds do not establish transport byte limits or webhook-only rawBody scope; P2 transport limits
+      remain owed.
+  - id: OPS-E5
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    editions:
+      - lite
+      - full
+    statement: 'health signals: startup, liveness, readiness, functional (nivo maps `/readyz` to the liveness
+      query). application-stacks.md "Four health signals", STACK-RUNTIME-CONFIG-HEALTH'
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: "1.7 Edge: CORS, headers, rate limit, health"
+      row: E5
+      line: 138
+      columns: 12
+    owedRules:
+      - R262
+      - R266
+    gap: The complete four-signal health model and cold-host behavior exceed R262 live/readiness static
+      requirements.
+  - id: OPS-E6
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    editions:
+      - lite
+      - full
+    statement: graceful shutdown (`enableShutdownHooks`). template
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: "1.7 Edge: CORS, headers, rate limit, health"
+      row: E6
+      line: 139
+      columns: 12
+    gap: Graceful shutdown hooks are P2 and have no current rule owner.
+  - id: OPS-E7
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    editions:
+      - lite
+      - full
+    statement: readiness held closed during migration. doc
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: "1.7 Edge: CORS, headers, rate limit, health"
+      row: E7
+      line: 140
+      columns: 12
+    owedRules:
+      - R262
+    gap: Readiness held closed during migration requires live startup/compatibility proof beyond an endpoint
+      declaration.
+  - id: OPS-P1
+    source: docs/microservices.md#images
+    editions:
+      - lite
+      - full
+    statement: one version per dependency, npm only, canon pins. R14, R15
+    status: enforced
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.8 Supply chain, backups, migrations
+      row: P1
+      line: 146
+      columns: 12
+    rules:
+      - R14
+      - R15
+    scope: Only the named current rule scope is enforced; additional source weaknesses remain separate obligations.
+  - id: OPS-P2
+    source: docs/microservices.md#images
+    editions:
+      - lite
+      - full
+    statement: install scripts off, lockfile frozen in CI. `npm ci --ignore-scripts` in managed ci
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.8 Supply chain, backups, migrations
+      row: P2
+      line: 147
+      columns: 12
+    owedRules:
+      - R251
+    gap: Managed CI/Docker install rules cover part of this obligation; unmanaged deploy installs and lockfile
+      behavior need workflow coverage.
+  - id: OPS-P3
+    source: docs/microservices.md#images
+    editions:
+      - lite
+      - full
+    statement: docker base pin, multi-stage, non-root, no secrets. R188-R191
+    status: enforced
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.8 Supply chain, backups, migrations
+      row: P3
+      line: 148
+      columns: 12
+    rules:
+      - R188
+      - R189
+      - R190
+      - R191
+    scope: Only the named current rule scope is enforced; additional source weaknesses remain separate obligations.
+  - id: OPS-P4
+    source: docs/microservices.md#images
+    editions:
+      - lite
+      - full
+    statement: third-party images pinned in deploy compose. R164
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.8 Supply chain, backups, migrations
+      row: P4
+      line: 149
+      columns: 12
+    owedRules:
+      - R266
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-P5
+    source: docs/microservices.md#images
+    editions:
+      - lite
+      - full
+    statement: vulnerability/audit gate, Dependabot, SBOM, provenance. none
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.8 Supply chain, backups, migrations
+      row: P5
+      line: 150
+      columns: 12
+    owedRules:
+      - R269
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-B1
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    editions:
+      - lite
+      - full
+    statement: 'backups: encrypted, hashed, off-VPS, isolated restore test. doc "Migrations and backups bind
+      evidence first"; STACK-RECOVERY'
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.8 Supply chain, backups, migrations
+      row: B1
+      line: 151
+      columns: 12
+    owedRules:
+      - R267
+    gap: Backup declarations and restore-proof paths do not prove encryption, hashes, off-host custody or
+      successful isolated restore.
+  - id: OPS-B2
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    editions:
+      - lite
+    statement: "backup of Supabase-hosted DB (lite). none: the DB is Supabase cloud, not on the VPS"
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.8 Supply chain, backups, migrations
+      row: B2
+      line: 152
+      columns: 12
+    owedRules:
+      - R267
+    gap: External Supabase and local sidecar-volume backups need declared responsibility and fresh restore
+      evidence.
+  - id: OPS-M1
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+    statement: migration shape, ordering, immutability. R213
+    status: enforced
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.8 Supply chain, backups, migrations
+      row: M1
+      line: 153
+      columns: 12
+    rules:
+      - R213
+    scope: Only the named current rule scope is enforced; additional source weaknesses remain separate obligations.
+  - id: OPS-M2
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - full
+    statement: reversible migration. R74
+    status: enforced
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.8 Supply chain, backups, migrations
+      row: M2
+      line: 154
+      columns: 12
+    rules:
+      - R74
+    scope: Full TypeORM down/up shape; lite migrations remain forward-only.
+  - id: OPS-M3
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+      - full
+    statement: expand/contract (no destructive DDL in the release that stops using it). doc "prefers
+      expand/contract"; design-pattern DP-16
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.8 Supply chain, backups, migrations
+      row: M3
+      line: 155
+      columns: 12
+    owedRules:
+      - R259
+    gap: The source identifies missing/incomplete enforcement; no complete current HFS owner/proof exists for this
+      requirement in this worktree.
+  - id: OPS-M4
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    editions:
+      - lite
+      - full
+    statement: migration deploy binds backup + schema fingerprint under lock. doc
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.8 Supply chain, backups, migrations
+      row: M4
+      line: 156
+      columns: 12
+    owedRules:
+      - R267
+      - R271
+    gap: Migration locking, backup receipts and live schema fingerprint binding require owner-run evidence.
+  - id: OPS-M5
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    editions:
+      - lite
+      - full
+    statement: rollback cannot undo data; release selects previous accepted release and verifies schema
+      compatibility. doc
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.8 Supply chain, backups, migrations
+      row: M5
+      line: 157
+      columns: 12
+    owedRules:
+      - R267
+    gap: Previous-release selection and actual schema-compatible rollback remain live evidence.
+  - id: OPS-X1
+    source: docs/application-stacks.md#checker-coverage-and-acceptance-evidence
+    editions:
+      - lite
+      - full
+    statement: rule has an enforcer. `check-hfs-rules.mjs` HFS_RULE_NO_ENFORCER
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.9 Meta (rules about rules)
+      row: X1
+      line: 163
+      columns: 6
+    owedRules:
+      - R247
+    gap: The catalog checker verifies enforcer presence but has no matching current HFS owner for the complete
+      coverage matrix.
+  - id: OPS-X2
+    source: docs/application-stacks.md#checker-coverage-and-acceptance-evidence
+    editions:
+      - lite
+      - full
+    statement: '`status: planned` allowed. `HFS_RULE_ENFORCER_PLANNED` forbids planned entries ("the catalog
+      carries no owed work", owner 2026-09-30)'
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.9 Meta (rules about rules)
+      row: X2
+      line: 164
+      columns: 6
+    owedRules:
+      - R247
+    gap: Requirements can record owed work separately; release gating and complete coverage remain new
+      meta-enforcer work.
+  - id: OPS-X3
+    source: docs/application-stacks.md#checker-coverage-and-acceptance-evidence
+    editions:
+      - lite
+      - full
+    statement: 'enforcer has a proof. `HFS_RULE_UNTESTED`: "none of whose codes is named by two `test(` blocks of
+      one spec"'
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.9 Meta (rules about rules)
+      row: X3
+      line: 165
+      columns: 6
+    owedRules:
+      - R247
+    gap: Two textual code mentions can be vacuous; per-code per-edition valid/invalid proof and witnesses remain
+      owed.
+  - id: OPS-X4
+    source: docs/application-stacks.md#checker-coverage-and-acceptance-evidence
+    editions:
+      - lite
+      - full
+    statement: rule has a positive instance per edition in a template or example. none
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.9 Meta (rules about rules)
+      row: X4
+      line: 166
+      columns: 6
+    owedRules:
+      - R247
+    gap: Examples/templates need construct-specific per-edition proof, not file-name mentions.
+  - id: OPS-X5
+    source: docs/application-stacks.md#checker-coverage-and-acceptance-evidence
+    editions:
+      - lite
+      - full
+    statement: rule cites a superseded ruling. none
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.9 Meta (rules about rules)
+      row: X5
+      line: 167
+      columns: 6
+    owedRules:
+      - R274
+    gap: Historical cases require successor links and staleWhen enforcement.
+  - id: OPS-X6
+    source: docs/application-stacks.md#checker-coverage-and-acceptance-evidence
+    editions:
+      - lite
+      - full
+    statement: docs claim an example demonstrates X. `RT_FACT_FALSE` evaluates slots only
+    status: owed
+    analysis:
+      file: analysis/ops-security.md
+      section: 1.9 Meta (rules about rules)
+      row: X6
+      line: 168
+      columns: 6
+    owedRules:
+      - R247
+    gap: Slot facts do not prove that an example actually exercises VPS deployment or secret custody.
+  - id: WDD-W1
+    source: docs/lite-edition.md#what-lite-forbids
+    editions:
+      - lite
+    statement: lite tree admits only .gitignore, workspace.yaml, brand/**. docs/lite-edition.md, R212 case-4
+      (2026-10-14)
+    status: enforced
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.1 `.starciwork`
+      row: W1
+      line: 20
+      columns: 12
+    rules:
+      - R212
+    scope: Lite Work allowed-path boundary; brand example/readers remain separate.
+  - id: WDD-W2
+    source: docs/lite-edition.md#what-lite-forbids
+    editions:
+      - lite
+    statement: lite readers skip catalog/shell/features. R212
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.1 `.starciwork`
+      row: W2
+      line: 21
+      columns: 12
+    owedRules:
+      - R247
+    gap: Central readers are guarded, but direct-reader bypasses need safe lite behavior and per-reader fixtures.
+  - id: WDD-W3
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - full
+    statement: "full tree: index.yaml, shell, features, _resources, uat, br. work-*.schema.yaml, R07/R09/R105"
+    status: enforced
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.1 `.starciwork`
+      row: W3
+      line: 22
+      columns: 12
+    rules:
+      - R01
+      - R02
+      - R07
+      - R09
+      - R105
+    scope: Only the named current rule scope is claimed; missing examples, broader proof and command behavior
+      remain separate.
+  - id: WDD-W4
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - full
+    statement: every Work record family exemplified. 27 schemas in modules/schemas/work-*.schema.yaml
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.1 `.starciwork`
+      row: W4
+      line: 23
+      columns: 12
+    owedRules:
+      - R247
+    gap: Acceptance-criterion and graph families have no full example records; schema existence is not example
+      proof.
+  - id: WDD-W5
+    source: docs/lite-edition.md#what-lite-forbids
+    editions:
+      - full
+    statement: "slot app.starciwork `forbids: _derived/`. slots.yaml line 605"
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.1 `.starciwork`
+      row: W5
+      line: 24
+      columns: 12
+    owedRules:
+      - R247
+    gap: Slots forbid _derived/ while layout/examples admit it; correction and a cross-source fixture are owed.
+  - id: WDD-W6
+    source: docs/lite-edition.md#what-lite-forbids
+    editions:
+      - lite
+    statement: lite `workspace.yaml` carries project id and repo roles. R212 case-4
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.1 `.starciwork`
+      row: W6
+      line: 25
+      columns: 12
+    relatedRules:
+      - R212
+    owedRules:
+      - R247
+    gap: The workspace schema validates project identity/repo roles, but R212 owns the lite tree boundary rather
+      than every workspace field; schema-to-rule/example proof remains owed.
+  - id: WDD-W7
+    source: docs/lite-edition.md#what-lite-forbids
+    editions:
+      - lite
+    statement: brand tooling reads lite brand directly. R212
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.1 `.starciwork`
+      row: W7
+      line: 26
+      columns: 12
+    owedRules:
+      - R247
+    gap: Lite brand has a temporary fixture only; no example exercises direct brand readers.
+  - id: WDD-W8
+    source: docs/lite-edition.md#what-lite-forbids
+    editions:
+      - lite
+      - full
+    statement: stale phrase "brand only" cited anywhere. case-4 supersedes k9
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.1 `.starciwork`
+      row: W8
+      line: 27
+      columns: 12
+    owedRules:
+      - R274
+    gap: Stale brand-only prose was absent by luck; a superseded-citation mechanism is owed.
+    supersededBy:
+      - ruling:R212/case-4
+  - id: WDD-D1
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+      - full
+    statement: migration name/stamp/order/immutable. R213
+    status: enforced
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.2 Database and Supabase (lite; full only when it declares a supabase connection)
+      row: D1
+      line: 33
+      columns: 12
+    rules:
+      - R213
+    scope: Only the named current rule scope is claimed; missing examples, broader proof and command behavior
+      remain separate.
+    appliesWhen: Supabase is declared; mandatory for lite and conditional for full.
+  - id: WDD-D2
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+      - full
+    statement: baseline + archive + restamp cutover. ruling 2026-10-13 (HFS-STANDARD sec 5), slot
+      app.supabase.migrations.archive
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.2 Database and Supabase (lite; full only when it declares a supabase connection)
+      row: D2
+      line: 34
+      columns: 12
+    owedRules:
+      - R257
+    gap: R213 ordering does not prove baseline/archive/restamp ceremony; remote repair and marking-applied remain
+      owner-run.
+    appliesWhen: Supabase is declared; mandatory for lite and conditional for full.
+  - id: WDD-D3
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+      - full
+    statement: RLS on every exposed table. R214
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.2 Database and Supabase (lite; full only when it declares a supabase connection)
+      row: D3
+      line: 35
+      columns: 12
+    owedRules:
+      - R256
+    gap: Current R214 misses later disable/no-force and schema moves; views need safe exposure handling.
+    appliesWhen: Supabase is declared; mandatory for lite and conditional for full.
+  - id: WDD-D4
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+      - full
+    statement: policy shape (name, no true, no anon). R214
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.2 Database and Supabase (lite; full only when it declares a supabase connection)
+      row: D4
+      line: 36
+      columns: 12
+    owedRules:
+      - R256
+    gap: Literal true rejection does not reject all tautological principals or bind policy TO roles to names.
+    appliesWhen: Supabase is declared; mandatory for lite and conditional for full.
+  - id: WDD-D5
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+      - full
+    statement: be-only data access (front end never reads data through PostgREST). owner ruling 2026-10-13
+      ("Supabase on the front end is Auth only"); example migration 20261013064730
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.2 Database and Supabase (lite; full only when it declares a supabase connection)
+      row: D5
+      line: 37
+      columns: 12
+    owedRules:
+      - R254
+    gap: The analysis identified missing/incomplete coverage; no complete landed HFS owner/proof exists for this
+      requirement.
+    appliesWhen: Supabase is declared; mandatory for lite and conditional for full.
+  - id: WDD-D6
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+      - full
+    statement: least-privilege app role `app_be`. docs/lite-edition.md l.99, R219 prose
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.2 Database and Supabase (lite; full only when it declares a supabase connection)
+      row: D6
+      line: 38
+      columns: 12
+    owedRules:
+      - R255
+    gap: The analysis identified missing/incomplete coverage; no complete landed HFS owner/proof exists for this
+      requirement.
+    appliesWhen: Supabase is declared; mandatory for lite and conditional for full.
+  - id: WDD-D7
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+      - full
+    statement: definer safety. R215
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.2 Database and Supabase (lite; full only when it declares a supabase connection)
+      row: D7
+      line: 39
+      columns: 12
+    owedRules:
+      - R256
+    gap: R215 misses authenticated revocation and later ALTER FUNCTION security-definer changes.
+    appliesWhen: Supabase is declared; mandatory for lite and conditional for full.
+  - id: WDD-D8
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+      - full
+    statement: storage bucket policy. R215
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.2 Database and Supabase (lite; full only when it declares a supabase connection)
+      row: D8
+      line: 40
+      columns: 12
+    owedRules:
+      - R256
+    gap: R215 judges bucket-id policy presence, not principal ownership-prefix scope.
+    appliesWhen: Supabase is declared; mandatory for lite and conditional for full.
+  - id: WDD-D9
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+      - full
+    statement: pgmq queues vs code. supabase-queues.yaml BE-SUPABASE-QUEUES-2 ("created by a migration"),
+      verification manual
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.2 Database and Supabase (lite; full only when it declares a supabase connection)
+      row: D9
+      line: 41
+      columns: 12
+    owedRules:
+      - R258
+    gap: The analysis identified missing/incomplete coverage; no complete landed HFS owner/proof exists for this
+      requirement.
+    appliesWhen: Supabase is declared; mandatory for lite and conditional for full.
+  - id: WDD-D10
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+      - full
+    statement: pg_cron ownership. BE-SUPABASE-QUEUES-5 (cron.schedule in a migration, enqueue only), background.yaml
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.2 Database and Supabase (lite; full only when it declares a supabase connection)
+      row: D10
+      line: 42
+      columns: 12
+    owedRules:
+      - R258
+    gap: The analysis identified missing/incomplete coverage; no complete landed HFS owner/proof exists for this
+      requirement.
+    appliesWhen: Supabase is declared; mandatory for lite and conditional for full.
+  - id: WDD-D11
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+      - full
+    statement: extensions, vault, pg_net, roles, publications. lite = no self-hosted infra; case-2 "Supabase
+      Realtime door is gone"
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.2 Database and Supabase (lite; full only when it declares a supabase connection)
+      row: D11
+      line: 43
+      columns: 12
+    owedRules:
+      - R254
+      - R255
+      - R258
+      - R259
+    gap: Extensions, vault, pg_net, roles and publications need separate allowlist, enqueue-only and
+      browser-access checks.
+    appliesWhen: Supabase is declared; mandatory for lite and conditional for full.
+  - id: WDD-D12
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+      - full
+    statement: config.toml policy. R216
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.2 Database and Supabase (lite; full only when it declares a supabase connection)
+      row: D12
+      line: 44
+      columns: 12
+    owedRules:
+      - R259
+    gap: Current R216 covers credential/JWT/four declared equalities only; API schemas, seed paths, anon sign-ins,
+      edge runtime, storage limits and major version remain owed.
+    appliesWhen: Supabase is declared; mandatory for lite and conditional for full.
+  - id: WDD-D13
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+      - full
+    statement: generated types freshness. R216 DB_TYPES_DRIFT
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.2 Database and Supabase (lite; full only when it declares a supabase connection)
+      row: D13
+      line: 45
+      columns: 12
+    owedRules:
+      - R259
+    gap: Default app check does not compare emitted types; migration digests omit config/API schemas and
+      generated-body freshness.
+    appliesWhen: Supabase is declared; mandatory for lite and conditional for full.
+  - id: WDD-D14
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+      - full
+    statement: seeds. slot app.supabase.seed, cli seed group
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.2 Database and Supabase (lite; full only when it declares a supabase connection)
+      row: D14
+      line: 46
+      columns: 12
+    owedRules:
+      - R259
+    gap: Secret scanning does not prove seed-path existence, synthetic PII restrictions or seed idempotency.
+  - id: WDD-D15
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - full
+    statement: "full: TypeORM migrations. R34, R35, R74"
+    status: enforced
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.2 Database and Supabase (lite; full only when it declares a supabase connection)
+      row: D15
+      line: 47
+      columns: 12
+    rules:
+      - R34
+      - R35
+      - R74
+    scope: Only the named current rule scope is claimed; missing examples, broader proof and command behavior
+      remain separate.
+  - id: WDD-D16
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+      - full
+    statement: baseline `_archive` is outside every judgement, and R06. slot
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.2 Database and Supabase (lite; full only when it declares a supabase connection)
+      row: D16
+      line: 48
+      columns: 12
+    owedRules:
+      - R257
+    gap: Archive semantics bypass active SQL checks; archive secret scanning requires an explicit assertion rather
+      than an assumption.
+    appliesWhen: Supabase is declared; mandatory for lite and conditional for full.
+  - id: WDD-O1
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    editions:
+      - lite
+      - full
+    statement: be logger port, no console, no secrets in logs. R40, R71
+    status: enforced
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.3 Observability
+      row: O1
+      line: 54
+      columns: 12
+    rules:
+      - R40
+      - R71
+    scope: Only the named current rule scope is claimed; missing examples, broader proof and command behavior
+      remain separate.
+  - id: WDD-O2
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    editions:
+      - lite
+      - full
+    statement: HEALTHCHECK present. R189
+    status: enforced
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.3 Observability
+      row: O2
+      line: 55
+      columns: 12
+    rules:
+      - R189
+    scope: HEALTHCHECK presence only, not route existence or real readiness.
+  - id: WDD-O3
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    editions:
+      - lite
+      - full
+    statement: the endpoint the HEALTHCHECK calls exists and is the right kind. application-stacks.md "four health
+      signals" (startup, liveness, readiness, ...)
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.3 Observability
+      row: O3
+      line: 56
+      columns: 12
+    owedRules:
+      - R262
+    gap: A HEALTHCHECK line does not prove its endpoint exists, readiness checks dependencies or the probe has the
+      right purpose.
+  - id: WDD-O4
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    editions:
+      - lite
+      - full
+    statement: fe error reporting. fe-stack.yaml (`@sentry/nextjs`)
+    status: advisory
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.3 Observability
+      row: O4
+      line: 57
+      columns: 12
+    standardSource: A15-STANDARD section 0.2 observability decision
+    reason: FE error reporting is documented optional through hfs.json observe.reporter; no mandatory
+      FE_OBSERVE_MISSING rule is authorized.
+  - id: WDD-O5
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    editions:
+      - lite
+      - full
+    statement: request correlation (request id in logs), metrics, tracing. none
+    status: advisory
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.3 Observability
+      row: O5
+      line: 58
+      columns: 12
+    standardSource: A15-STANDARD section 0.2 observability decision
+    reason: Request correlation, metrics and tracing remain P2 outside alpha.15; no mandatory observability
+      enforcer is authorized.
+  - id: WDD-X1
+    source: docs/application-stacks.md#checker-coverage-and-acceptance-evidence
+    editions:
+      - lite
+      - full
+    statement: runtime docs owner header, language, prose paths, commands, rule ids, facts, generated blocks.
+      R205, R96, R195, R196, R230, R193, R192, R194
+    status: enforced
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.4 Docs and their sync with the rules
+      row: X1
+      line: 64
+      columns: 8
+    rules:
+      - R96
+      - R192
+      - R193
+      - R194
+      - R195
+      - R196
+      - R205
+      - R230
+    scope: Runtime repository documentation only.
+  - id: WDD-X2
+    source: docs/application-stacks.md#checker-coverage-and-acceptance-evidence
+    editions:
+      - lite
+      - full
+    statement: PRODUCT docs freshness (be/docs, fe/docs, README, .starcistacks/<env>/README). none beyond R96
+      language, R02 README shape, HFS_ROOT_MARKDOWN_FORBIDDEN
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.4 Docs and their sync with the rules
+      row: X2
+      line: 65
+      columns: 7
+    owedRules:
+      - R270
+    gap: Runtime doc freshness does not cover product-owned paths, commands, env names and rule references.
+  - id: WDD-X3
+    source: docs/application-stacks.md#checker-coverage-and-acceptance-evidence
+    editions:
+      - lite
+      - full
+    statement: gate vocabulary in rules.yaml `gates:` header. R225
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.4 Docs and their sync with the rules
+      row: X3
+      line: 66
+      columns: 7
+    owedRules:
+      - R247
+    gap: Claimed gates contradict actual hooks; pre-push runs no lint/typecheck/unit tests. Actual command
+      coverage must be checked.
+  - id: WDD-X4
+    source: docs/application-stacks.md#checker-coverage-and-acceptance-evidence
+    editions:
+      - lite
+      - full
+    statement: 'stale comments that cite superseded rulings. R212 case-2 (2026-10-13): lite realtime is the
+      in-process socket.io gateway, "the Supabase Realtime door is gone"'
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.4 Docs and their sync with the rules
+      row: X4
+      line: 67
+      columns: 7
+    owedRules:
+      - R274
+    gap: Supabase Realtime comments are stale against lite socket.io ownership; historical citations need
+      successors.
+    amendedBy:
+      - ruling:R212/case-2
+  - id: WDD-X5
+    source: docs/application-stacks.md#checker-coverage-and-acceptance-evidence
+    editions:
+      - lite
+    statement: the lite doc says "never a self-hosted cron host". docs/lite-edition.md
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.4 Docs and their sync with the rules
+      row: X5
+      line: 68
+      columns: 7
+    owedRules:
+      - R250
+    gap: The analysis identified missing/incomplete coverage; no complete landed HFS owner/proof exists for this
+      requirement.
+  - id: WDD-G1
+    source: docs/application-stacks.md#ci
+    editions:
+      - lite
+      - full
+    statement: package.json `scripts` block, tsconfig, jest, prettier, eslint/stylelint one-liners, husky, ci,
+      images, db-deploy, sonar, codecov. R05, R11, R16, R17, R22, R204
+    status: enforced
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.5 Managed files, drift, hooks
+      row: G1
+      line: 74
+      columns: 7
+    rules:
+      - R05
+      - R11
+      - R16
+      - R17
+      - R22
+      - R204
+    scope: Only the named current rule scope is claimed; missing examples, broader proof and command behavior
+      remain separate.
+  - id: WDD-G2
+    source: docs/application-stacks.md#ci
+    editions:
+      - lite
+      - full
+    statement: "`.editorconfig`, `.nvmrc`, `.gitattributes`, `.sops.yaml`. slots 399/407 have no `managedBy`"
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.5 Managed files, drift, hooks
+      row: G2
+      line: 75
+      columns: 7
+    owedRules:
+      - R253
+    gap: Managed baseline files and .sops.yaml recipients need distinct drift/native checks; copying a template
+      alone proves nothing.
+  - id: WDD-G3
+    source: docs/application-stacks.md#ci
+    editions:
+      - lite
+      - full
+    statement: pre-commit chunking. pre-commit hook
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.5 Managed files, drift, hooks
+      row: G3
+      line: 76
+      columns: 8
+    owedRules:
+      - R247
+    gap: Stylelint filenames/Windows command-line chunking and BE max-warnings need correction; hook shape alone
+      does not prove execution.
+  - id: WDD-G4
+    source: docs/application-stacks.md#ci
+    editions:
+      - lite
+      - full
+    statement: hooks never run the DB rules. see X3
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.5 Managed files, drift, hooks
+      row: G4
+      line: 77
+      columns: 7
+    owedRules:
+      - R247
+    gap: Hooks do not run the claimed DB checks; correct the gate claim or implement the actual command.
+  - id: WDD-G5
+    source: docs/application-stacks.md#ci
+    editions:
+      - lite
+      - full
+    statement: codecov / sonar. R11, R204
+    status: enforced
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.5 Managed files, drift, hooks
+      row: G5
+      line: 78
+      columns: 6
+    rules:
+      - R11
+      - R204
+    scope: Only the named current rule scope is claimed; missing examples, broader proof and command behavior
+      remain separate.
+  - id: WDD-G6
+    source: docs/application-stacks.md#ci
+    editions:
+      - lite
+    statement: "`db-deploy.yml`. workflow_dispatch(environment) -> `db:push`"
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.5 Managed files, drift, hooks
+      row: G6
+      line: 79
+      columns: 7
+    owedRules:
+      - R251
+      - R271
+    gap: Product db-deploy lacks tag/ref, dry-run, remote comparison and release-CI provenance; live repair stays
+      owner-run.
+  - id: WDD-G7
+    source: docs/application-stacks.md#ci
+    editions:
+      - lite
+      - full
+    statement: "product-owned deploy workflows (`app.ci-deploy` `<app>-deploy.yml`, `authorize-deploy-key.yml`).
+      slot optional, `rules: [HFS_PLAINTEXT_SECRET]`"
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.5 Managed files, drift, hooks
+      row: G7
+      line: 80
+      columns: 7
+    owedRules:
+      - R251
+    gap: Product deploy/authorization workflows lack current trigger/SHA/permission/ref enforcement.
+  - id: WDD-V1
+    source: docs/microservices.md#images
+    editions:
+      - lite
+      - full
+    statement: canon pins. R14, R15, R210
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.6 Release, versioning, pins
+      row: V1
+      line: 86
+      columns: 7
+    owedRules:
+      - R259
+    gap: Canon dependency pins exist, but Postgres/extension version policy needs declared database checks.
+  - id: WDD-V2
+    source: docs/microservices.md#images
+    editions:
+      - lite
+      - full
+    statement: product release contract (tag -> version -> image -> migrations). R221 (runtime scope), R222
+      `RELEASE_NOTES` (runtime scope)
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.6 Release, versioning, pins
+      row: V2
+      line: 87
+      columns: 7
+    owedRules:
+      - R271
+    gap: Tag/version guards are partial; published image digest closure, notes and migration/deployment linkage
+      still need proof.
+  - id: WDD-V3
+    source: docs/microservices.md#images
+    editions:
+      - lite
+      - full
+    statement: release gate for products. pre-push hook
+    status: enforced
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.6 Release, versioning, pins
+      row: V3
+      line: 88
+      columns: 7
+    rules:
+      - R225
+    scope: Only the named current rule scope is claimed; missing examples, broader proof and command behavior
+      remain separate.
+  - id: WDD-E1
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - lite
+    statement: R215 definer, search_path, revoke
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.7 Examples versus rules (does the example exercise the rule?)
+      row: E1
+      line: 94
+      columns: 7
+    owedRules:
+      - R247
+    gap: The analysis identified an absent example construct; no current rule proves complete per-edition
+      exercise.
+  - id: WDD-E2
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - lite
+    statement: R215 storage bucket
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.7 Examples versus rules (does the example exercise the rule?)
+      row: E2
+      line: 95
+      columns: 7
+    owedRules:
+      - R247
+    gap: The analysis identified an absent example construct; no current rule proves complete per-edition
+      exercise.
+  - id: WDD-E3
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - lite
+    statement: R214 `_public_read` policy / anon select
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.7 Examples versus rules (does the example exercise the rule?)
+      row: E3
+      line: 96
+      columns: 7
+    owedRules:
+      - R247
+    gap: The analysis identified an absent example construct; no current rule proves complete per-edition
+      exercise.
+  - id: WDD-E4
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - lite
+    statement: R214 `supabase.forceRls`
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.7 Examples versus rules (does the example exercise the rule?)
+      row: E4
+      line: 97
+      columns: 7
+    owedRules:
+      - R247
+    gap: The analysis identified an absent example construct; no current rule proves complete per-edition
+      exercise.
+  - id: WDD-E5
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - lite
+    statement: pg_cron (`cron.schedule`)
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.7 Examples versus rules (does the example exercise the rule?)
+      row: E5
+      line: 98
+      columns: 7
+    owedRules:
+      - R247
+      - R258
+    gap: The analysis identified an absent example construct; no current rule proves complete per-edition
+      exercise.
+  - id: WDD-E6
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - lite
+    statement: "`_archive` baseline cutover"
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.7 Examples versus rules (does the example exercise the rule?)
+      row: E6
+      line: 99
+      columns: 7
+    owedRules:
+      - R247
+      - R257
+    gap: The analysis identified an absent example construct; no current rule proves complete per-edition
+      exercise.
+  - id: WDD-E7
+    source: docs/lite-edition.md#production-delivery-and-secret-custody
+    editions:
+      - lite
+    statement: production env (`.starcistacks/production`, `deploy/`, `app.ci-deploy`, `app.scripts.delivery`)
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.7 Examples versus rules (does the example exercise the rule?)
+      row: E7
+      line: 100
+      columns: 7
+    owedRules:
+      - R247
+      - R266
+      - R267
+    gap: The analysis identified an absent example construct; no current rule proves complete per-edition
+      exercise.
+  - id: WDD-E8
+    source: docs/lite-edition.md#what-lite-forbids
+    editions:
+      - lite
+    statement: lite `.starciwork/brand/**`
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.7 Examples versus rules (does the example exercise the rule?)
+      row: E8
+      line: 101
+      columns: 7
+    owedRules:
+      - R247
+    gap: The analysis identified an absent example construct; no current rule proves complete per-edition
+      exercise.
+  - id: WDD-E9
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - lite
+      - full
+    statement: "observability: readiness, sentry"
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.7 Examples versus rules (does the example exercise the rule?)
+      row: E9
+      line: 102
+      columns: 7
+    owedRules:
+      - R247
+      - R262
+    gap: Readiness is owed; the FE reporter stays documented optional and this row adds no mandatory Sentry
+      requirement.
+  - id: WDD-E10
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - full
+    statement: Work record families
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.7 Examples versus rules (does the example exercise the rule?)
+      row: E10
+      line: 103
+      columns: 7
+    owedRules:
+      - R247
+    gap: The analysis identified an absent example construct; no current rule proves complete per-edition
+      exercise.
+  - id: WDD-E11
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - lite
+    statement: lite fe Dockerfile
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.7 Examples versus rules (does the example exercise the rule?)
+      row: E11
+      line: 104
+      columns: 7
+    owedRules:
+      - R247
+    gap: Lite FE Dockerfile is absent from examples; existing Docker conventions do not prove example exercise.
+  - id: WDD-E12
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - lite
+      - full
+    statement: "`scripts/` (codegen only in lite-app, 4 files in ecom)"
+    status: owed
+    analysis:
+      file: analysis/work-data-docs.md
+      section: 1.7 Examples versus rules (does the example exercise the rule?)
+      row: E12
+      line: 105
+      columns: 7
+    owedRules:
+      - R247
+    gap: Scripts exist in examples, but complete per-edition example/rule mapping remains a meta-enforcer
+      obligation.
+  - id: DOC-LITE-029
+    source: docs/lite-edition.md#hfs-lite-edition
+    sourceLine: 36
+    editions:
+      - lite
+    statement: There is no e2e world, no contract world and no e2e workflow (slot `app.ci-e2e`).
+    status: owed
+    gap: The no-contract clause is historical; lite contract specs are allowed, while e2e, stack and browser runs
+      stay full-only.
+    owedRules:
+      - R284
+    supersededBy:
+      - ruling:lite-contract-specs
+  - id: DOC-LITE-030
+    source: docs/lite-edition.md#what-lite-forbids
+    sourceLine: 156
+    editions:
+      - lite
+    statement: R212 also forbids e2e and contract specs, the `test:e2e`, `test:contract`, `test:stack` and
+      `test:browser` scripts, the e2e workflow, the browser journey and UAT records, test containers,
+      toxiproxy and browser-runner dependencies, BullMQ, Kafka, Redis and graphql-ws dependencies (and their
+      imports, through the lite `infraOwners`), and the `.starcistacks` infra, runtime and seeds trees. Lite
+      also forbids Edge Functions and a second front-end app.
+    status: owed
+    gap: "Historical mixed prohibition must be amended: lite contracts, production Swarm trees and multiple FE
+      apps are allowed; the remaining full-only runtime/test boundaries remain in force."
+    owedRules:
+      - R284
+      - R266
+    supersededBy:
+      - ruling:lite-contract-specs
+      - ruling:lite-production-swarm
+      - ruling:lite-fe-app-cardinality
+  - id: DOC-LITE-031
+    source: docs/lite-edition.md#add-product-capabilities
+    sourceLine: 117
+    editions:
+      - lite
+    statement: "`starci app add app <name>` refuses in lite because lite has exactly one front-end app. Upgrade
+      before adding another."
+    status: owed
+    gap: The single-app boundary is superseded; edition views and app generators must permit multiple lite FE
+      apps.
+    supersededBy:
+      - ruling:lite-fe-app-cardinality
+  - id: DOC-LITE-032
+    source: docs/lite-edition.md#production-delivery-and-secret-custody
+    sourceLine: 76
+    editions:
+      - lite
+    statement: The optional `app.deploy` slot holds production Compose and Caddy configuration, environment
+      examples and operator shell scripts.
+    status: owed
+    gap: Production Compose wording is superseded; production declares Swarm with any single digest-pinned
+      ingress.
+    owedRules:
+      - R250
+      - R266
+      - R275
+    supersededBy:
+      - ruling:lite-production-swarm
+      - ruling:single-declared-ingress
+  - id: DOC-LITE-033
+    source: docs/lite-edition.md#hfs-lite-edition
+    sourceLine: 36
+    editions:
+      - lite
+    statement: The front end has no tests in either edition (R97).
+    status: enforced
+    rules:
+      - R97
+  - id: DOC-LITE-034
+    source: docs/lite-edition.md#database-authentication-and-storage
+    sourceLine: 104
+    editions:
+      - lite
+    statement: Storage buckets are private by default, bounded by size and MIME type, and protected by policies
+      scoped to an ownership prefix. Public buckets require an explicit public name.
+    status: owed
+    gap: R215 covers declarations and bucket-id policy presence; ownership-prefix scope needs hardened R256.
+    owedRules:
+      - R256
+  - id: DOC-HOST-015
+    source: docs/host-secrets.md#shared-age-identity
+    sourceLine: 58
+    editions:
+      - lite
+      - full
+    statement: An explicitly selected original `SOPS_AGE_KEY_FILE` remains a transition input when inline is
+      absent; an absent FILE is not replaced with a home default. The original FILE is selected by its
+      absolute path so caller and child working directories cannot silently select different files.
+    status: owed
+    gap: The FILE transition is historical and superseded by inline custody-only policy; native selector routing
+      must conform.
+    owedRules:
+      - R253
+    supersededBy:
+      - ruling:sealed-secret-custody
+  - id: DOC-SERVICES-006
+    source: docs/microservices.md#sagas-and-compensation
+    sourceLine: 74
+    editions:
+      - lite
+      - full
+    statement: The displayed saga tree uses `<saga>.saga.service.ts` and `steps/<step>.saga-step.ts`.
+    status: owed
+    gap: "These filenames are stale against current R169 law: `<saga>.saga.ts` and `steps/<step>.step.ts`;
+      documentation correction remains owed."
+    owedRules:
+      - R274
+    relatedRules:
+      - R169
+  - id: DOC-SERVICES-007
+    source: docs/microservices.md#messages-idempotency-retries
+    sourceLine: 58
+    editions:
+      - lite
+      - full
+    statement: Asynchronous messages travel on the Kafka topics of `platform/event-bus`; the topic of an event is
+      the events topic of its service.
+    status: owed
+    gap: This adapter description applies to full; lite uses pgmq-backed topics behind the same ports.
+      Edition-correct documentation and proof remain owed.
+    owedRules:
+      - R284
+    appliesWhen: Kafka statement is full-only; lite adapters remain pgmq.
+  - id: DOC-HOST-016
+    source: docs/host-secrets.md#entry-and-runtime-roles
+    sourceLine: 94
+    editions:
+      - lite
+      - full
+    statement: Resolve an unclear workflow's project, goal, scope and expected outcome, show the native draft and
+      derived operation plan, and obtain the owner's explicit acceptance before queue or launch effects.
+      Credential presence grants no approval. Reuse an existing acceptance while its goal, plan and authority
+      remain unchanged.
+    status: owed
+    gap: Workflow acceptance and credential presence are distinct authorities; no current HFS rule proves the live
+      queue/launch approval boundary.
+  - id: OWNER-001
+    source: docs/application-stacks.md#checker-coverage-and-acceptance-evidence
+    editions:
+      - lite
+      - full
+    statement: Alpha.15 is the complete HFS standard for lite and full; every applicable surface in every edition
+      needs requirements, rules, enforcers, templates, examples, documentation and proof.
+    status: owed
+    ruling: ruling:hfs-complete-standard
+    standardSource: A15-STANDARD section 0.1
+    gap: The current owner decision is authoritative; complete designated enforcement and per-edition proof have
+      not landed in this worktree.
+    owedRules:
+      - R247
+      - R274
+  - id: OWNER-002
+    source: docs/lite-edition.md#production-delivery-and-secret-custody
+    editions:
+      - lite
+    statement: "Lite production declares `runtime: docker-swarm` in `.starcistacks/application-stacks.yaml`,
+      tracks the rendered stack under `.starcistacks/production/infra/swarm/`, and runs neither Compose nor a
+      host crontab on the VPS. Scheduled work is app-owned or a declared replicated-job."
+    status: owed
+    ruling: ruling:lite-production-swarm
+    standardSource: A15-STANDARD section 0.1
+    gap: The current owner decision is authoritative; complete designated enforcement and per-edition proof have
+      not landed in this worktree.
+    owedRules:
+      - R250
+      - R266
+      - R267
+      - R268
+  - id: OWNER-003
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    editions:
+      - lite
+      - full
+    statement: Any single declared ingress component is accepted, including Traefik or Caddy, with its image
+      pinned by digest; the canon names no particular ingress.
+    status: owed
+    ruling: ruling:single-declared-ingress
+    standardSource: A15-STANDARD section 0.1
+    gap: The current owner decision is authoritative; complete designated enforcement and per-edition proof have
+      not landed in this worktree.
+    owedRules:
+      - R266
+      - R275
+  - id: OWNER-004
+    source: docs/lite-edition.md#production-delivery-and-secret-custody
+    editions:
+      - lite
+    statement: Lite has no self-hosted Postgres. A sidecar needing a database uses SQLite on a declared persistent
+      volume; a sidecar needing Postgres, Redis or Mongo is refused.
+    status: owed
+    ruling: ruling:lite-backing-services
+    standardSource: A15-STANDARD section 0.1
+    gap: The current owner decision is authoritative; complete designated enforcement and per-edition proof have
+      not landed in this worktree.
+    owedRules:
+      - R276
+  - id: OWNER-005
+    source: docs/host-secrets.md#shared-age-identity
+    editions:
+      - lite
+      - full
+    statement: Product secrets exist only as sealed `.starcistacks/<env>/secrets/*.enc` members; the private age
+      key lives only as `SOPS_AGE_KEY` in the owner's untracked `.claude/secret.env`.
+    status: owed
+    ruling: ruling:sealed-secret-custody
+    standardSource: A15-STANDARD section 0.1
+    gap: The current owner decision is authoritative; complete designated enforcement and per-edition proof have
+      not landed in this worktree.
+    owedRules:
+      - R253
+      - R277
+  - id: OWNER-006
+    source: docs/lite-edition.md#what-lite-forbids
+    editions:
+      - lite
+    statement: Lite `.starciwork` admits only `.gitignore`, optional `workspace.yaml` and `brand/**`; full retains
+      the full Work tree.
+    status: enforced
+    ruling: ruling:R212/case-4
+    standardSource: A15-STANDARD section 0.1
+    rules:
+      - R212
+  - id: OWNER-007
+    source: docs/microservices.md#one-place-for-a-service
+    editions:
+      - lite
+      - full
+    statement: "Every back-end app has `apps/<app>/src/<app>.env.ts` declaring its typed interface and
+      `read<App>Env(env: EnvSource)` reader. Environment reads pass through that file; `main.ts` delegates
+      parsing and holds no inline module list."
+    status: owed
+    ruling: ruling:typed-app-environment
+    standardSource: A15-STANDARD section 0.1
+    gap: The current owner decision is authoritative; complete designated enforcement and per-edition proof have
+      not landed in this worktree.
+    owedRules:
+      - R248
+      - R289
+  - id: OWNER-008
+    source: docs/lite-edition.md#database-authentication-and-storage
+    editions:
+      - lite
+      - full
+    statement: Supabase on the front end is Auth only; data goes through the back end. The same boundary applies
+      to SQL grants and policies.
+    status: owed
+    ruling: ruling:fe-auth-only
+    standardSource: A15-STANDARD section 0.1
+    gap: The current owner decision is authoritative; complete designated enforcement and per-edition proof have
+      not landed in this worktree.
+    owedRules:
+      - R254
+    relatedRules:
+      - R217
+    appliesWhen: Supabase is declared, in either edition.
+  - id: OWNER-009
+    source: docs/microservices.md#the-contract-between-services
+    editions:
+      - lite
+      - full
+    statement: GraphQL is the default door. REST is allowed only for probes, auth handshake, signed webhooks, byte
+      streams and the public v1 table.
+    status: owed
+    ruling: ruling:graphql-default-door
+    standardSource: A15-STANDARD section 0.1
+    gap: The current owner decision is authoritative; complete designated enforcement and per-edition proof have
+      not landed in this worktree.
+    owedRules:
+      - R278
+      - R290
+  - id: OWNER-010
+    source: docs/application-stacks.md#docker-swarm-on-a-vps
+    editions:
+      - lite
+      - full
+    statement: DNS, provider URIs, `docker swarm init` and key rotation remain owner-run. The standard requires
+      their declarations rather than automating these steps.
+    status: owed
+    ruling: ruling:owner-run-steps
+    standardSource: A15-STANDARD section 0.1
+    gap: Actual owner-run execution and fresh live evidence remain owed; static declarations do not prove
+      operations.
+    owedRules:
+      - R266
+      - R267
+  - id: OWNER-DELTA-001
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - lite
+    statement: Lite may have contract specs in `tests/contract` and the `test:contract` script; e2e, stack and
+      browser runs remain full-only.
+    status: owed
+    ruling: ruling:lite-contract-specs
+    standardSource: A15-STANDARD section 2.2
+    gap: The current owner decision is authoritative; complete designated enforcement and per-edition proof have
+      not landed in this worktree.
+    owedRules:
+      - R284
+  - id: OWNER-DELTA-002
+    source: docs/lite-edition.md#add-product-capabilities
+    editions:
+      - lite
+    statement: Lite webhook intake commits its inbox receipt and typed outbox event before a reactor or job
+      processes the work; nothing is processed inside the intake transaction.
+    status: owed
+    ruling: ruling:lite-webhook-after-commit
+    standardSource: A15-STANDARD section 2.2
+    gap: The current owner decision is authoritative; complete designated enforcement and per-edition proof have
+      not landed in this worktree.
+    owedRules:
+      - R263
+    relatedRules:
+      - R182
+      - R203
+  - id: OWNER-DELTA-003
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - lite
+      - full
+    statement: The locale header is `Accept-Language` everywhere; `x-locale` is retired.
+    status: owed
+    ruling: ruling:locale-accept-language
+    standardSource: A15-STANDARD section 2.2
+    gap: The current owner decision is authoritative; complete designated enforcement and per-edition proof have
+      not landed in this worktree.
+    relatedRules:
+      - R50
+  - id: OWNER-DELTA-004
+    source: docs/lite-edition.md#add-product-capabilities
+    editions:
+      - lite
+    statement: Lite may have more than one front-end app.
+    status: owed
+    ruling: ruling:lite-fe-app-cardinality
+    standardSource: A15-STANDARD section 2.2
+    gap: The current owner decision is authoritative; complete designated enforcement and per-edition proof have
+      not landed in this worktree.
+    relatedRules:
+      - R212
+  - id: OWNER-DELTA-005
+    source: docs/microservices.md#one-place-for-a-service
+    editions:
+      - lite
+      - full
+    statement: A function has at most 80 lines and a feature has at most 250 files, in both back-end and front-end code.
+    status: owed
+    ruling: ruling:code-function-feature-budgets
+    standardSource: A15-STANDARD section 2.2
+    gap: The current owner decision is authoritative; complete designated enforcement and per-edition proof have
+      not landed in this worktree.
+    owedRules:
+      - R291
+      - R292
+  - id: OWNER-OBS-001
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    editions:
+      - lite
+      - full
+    statement: Logger ports, live/ready probes and Docker HEALTHCHECK are mandatory in both editions.
+    status: owed
+    ruling: ruling:observability-required-signals
+    standardSource: A15-STANDARD section 0.2 observability decision
+    gap: The current owner decision is authoritative; complete designated enforcement and per-edition proof have
+      not landed in this worktree.
+    owedRules:
+      - R262
+    relatedRules:
+      - R40
+      - R71
+      - R189
+  - id: OWNER-OBS-002
+    source: docs/application-stacks.md#runtime-configuration-and-health
+    editions:
+      - lite
+      - full
+    statement: Request-id correlation, metrics and tracing remain P2 outside alpha.15; no mandatory enforcement is
+      authorized.
+    status: advisory
+    ruling: ruling:observability-deferred-signals
+    standardSource: A15-STANDARD section 0.2 observability decision
+    reason: Owner decision keeps this capability optional/deferred; it creates no mandatory conformance finding.
+  - id: OWNER-OBS-003
+    source: docs/lite-edition.md#hfs-lite-edition
+    editions:
+      - lite
+      - full
+    statement: A FE error reporter stays documented optional and is declared through `hfs.json observe.reporter`;
+      no FE_OBSERVE_MISSING rule is authorized.
+    status: advisory
+    ruling: ruling:fe-error-reporter-optional
+    standardSource: A15-STANDARD section 0.2 observability decision
+    reason: Owner decision keeps this capability optional/deferred; it creates no mandatory conformance finding.

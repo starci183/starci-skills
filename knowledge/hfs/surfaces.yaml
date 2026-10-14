@@ -1,0 +1,2343 @@
+# Surface coverage: A15-STANDARD/0.2 and OPS/WDD section 1.
+# rules/slots name current evidence; owedRules names decided work absent from this base.
+# Example paths establish source presence, never a passing check or release.
+# gap keeps incomplete, conditional or inapplicable chains explicit.
+schema: starci/hfs-surfaces@1
+version: 1
+editions:
+  - lite
+  - full
+surfaces:
+  - id: code-be
+    title: Back-end structure, doors and composition
+    editions:
+      - lite
+      - full
+    sources:
+      - A15-STANDARD/0.2/code-be
+    owedRules:
+      - R264
+      - R265
+      - R278
+      - R279
+      - R280
+      - R281
+      - R284
+      - R289
+      - R290
+      - R291
+      - R292
+    lite:
+      rules:
+        - R20
+        - R26
+        - R29
+        - R32
+        - R43
+        - R45
+        - R88
+        - R203
+        - R245
+        - R246
+      slots:
+        - be.app.api
+        - be.app.worker
+        - be.app.cli
+        - be.feature
+        - be.feature.application
+        - be.feature.saga
+        - be.feature.saga.steps
+        - be.feature.saga.compensations
+        - be.feature.application.support
+        - be.transport.http
+        - be.transport.graphql
+        - be.transport.message
+        - be.feature.webhooks
+        - be.feature.webhooks.http
+        - be.feature.webhooks.dto
+        - be.feature.realtime
+        - be.feature.realtime.graphql
+        - be.feature.realtime.dto
+        - be.feature.realtime.websocket
+        - be.cli
+        - be.domain
+        - be.errors
+        - be.domain.messages
+        - be.feature.messages
+        - be.platform
+        - be.platform.event-bus
+        - be.platform.queue
+        - be.events
+        - be.queues
+        - be.feature.reactors
+        - be.feature.jobs
+        - be.feature.jobs.queue
+        - be.feature.jobs.steps
+        - be.platform.jobs
+        - be.projections
+        - be.integrations
+        - be.integrations.model
+        - be.integrations.supabase
+      examples:
+        - examples/lite-app/be/apps/api/src/main.ts
+        - examples/lite-app/be/src/features/api/bookings
+        - examples/lite-app/be/src/modules/domain
+      gap:
+        A07/A12/A16/A17/A21 owe new structure/composition/door/budget/proof rules and edition-specific
+        proofs. Current paths map existing rules only.
+    full:
+      rules:
+        - R20
+        - R26
+        - R29
+        - R32
+        - R43
+        - R45
+        - R88
+        - R203
+        - R245
+        - R246
+      slots:
+        - be.app.api
+        - be.app.worker
+        - be.app.cli
+        - be.feature
+        - be.feature.application
+        - be.feature.saga
+        - be.feature.saga.steps
+        - be.feature.saga.compensations
+        - be.feature.application.support
+        - be.transport.http
+        - be.transport.graphql
+        - be.transport.message
+        - be.feature.webhooks
+        - be.feature.webhooks.http
+        - be.feature.webhooks.dto
+        - be.feature.realtime
+        - be.feature.realtime.graphql
+        - be.feature.realtime.dto
+        - be.feature.realtime.websocket
+        - be.cli
+        - be.domain
+        - be.errors
+        - be.domain.messages
+        - be.feature.messages
+        - be.platform
+        - be.platform.event-bus
+        - be.platform.queue
+        - be.events
+        - be.queues
+        - be.feature.reactors
+        - be.feature.jobs
+        - be.feature.jobs.queue
+        - be.feature.jobs.steps
+        - be.platform.jobs
+        - be.projections
+        - be.integrations
+        - be.integrations.model
+        - be.integrations.supabase
+      examples:
+        - examples/ecommerce-app/be/apps/order/src/main.ts
+        - examples/ecommerce-app/be/src/features/api/checkout
+        - examples/ecommerce-app/be/src/modules/domain
+      gap:
+        A07/A12/A16/A17/A21 owe new structure/composition/door/budget/proof rules and edition-specific
+        proofs. Current paths map existing rules only.
+  - id: code-fe
+    title: Front-end structure, data, copy and stack
+    editions:
+      - lite
+      - full
+    sources:
+      - A15-STANDARD/0.2/code-fe
+    owedRules:
+      - R285
+      - R286
+      - R287
+      - R288
+      - R291
+    lite:
+      rules:
+        - R49
+        - R50
+        - R52
+        - R54
+        - R55
+        - R56
+        - R58
+        - R59
+        - R61
+        - R63
+        - R65
+        - R91
+        - R92
+        - R93
+        - R113
+        - R243
+        - R244
+      slots:
+        - fe.app.next
+        - fe.app-optional
+        - fe.route
+        - fe.source-root-pinned
+        - fe.source-root-middleware
+        - fe.route.callback
+        - fe.feature
+        - fe.components
+        - fe.components.providers
+        - fe.hooks
+        - fe.hooks.swr
+        - fe.hooks.rhf
+        - fe.hooks.zustand
+        - fe.hooks.socketio
+        - fe.hooks.effects
+        - fe.hooks.reuseables
+        - fe.redux
+        - fe.modules
+        - fe.modules.api
+        - fe.transport.client
+        - fe.transport.outcome
+        - fe.modules.config
+        - fe.modules.i18n
+        - fe.modules.brand
+        - fe.modules.routes
+        - fe.modules.types
+        - fe.modules.types.ambient
+        - fe.modules.auth
+        - fe.modules.toast
+        - fe.package.ui
+        - fe.package.api
+        - fe.package.api.client
+        - fe.package.api.outcome
+        - fe.package.i18n
+      examples:
+        - examples/lite-app/fe/apps/web/src
+        - examples/lite-app/fe/apps/web/package.json
+      gap:
+        A14/A15/A21 and C08/C10 owe SWR family, copy/glyph, callback, stack and function-budget
+        coverage; existing paths do not prove these new branches.
+    full:
+      rules:
+        - R49
+        - R50
+        - R52
+        - R54
+        - R55
+        - R56
+        - R58
+        - R59
+        - R61
+        - R63
+        - R65
+        - R91
+        - R92
+        - R93
+        - R113
+        - R243
+        - R244
+      slots:
+        - fe.app.next
+        - fe.app-optional
+        - fe.route
+        - fe.source-root-pinned
+        - fe.source-root-middleware
+        - fe.route.callback
+        - fe.feature
+        - fe.components
+        - fe.components.providers
+        - fe.hooks
+        - fe.hooks.swr
+        - fe.hooks.rhf
+        - fe.hooks.zustand
+        - fe.hooks.socketio
+        - fe.hooks.effects
+        - fe.hooks.reuseables
+        - fe.redux
+        - fe.modules
+        - fe.modules.api
+        - fe.transport.client
+        - fe.transport.outcome
+        - fe.modules.config
+        - fe.modules.i18n
+        - fe.modules.brand
+        - fe.modules.routes
+        - fe.modules.types
+        - fe.modules.types.ambient
+        - fe.modules.auth
+        - fe.modules.toast
+        - fe.package.ui
+        - fe.package.api
+        - fe.package.api.client
+        - fe.package.api.outcome
+        - fe.package.i18n
+      examples:
+        - examples/ecommerce-app/fe/apps/app/src
+        - examples/ecommerce-app/fe/apps/landing/src
+        - examples/ecommerce-app/fe/apps/app/package.json
+      gap:
+        A14/A15/A21 and C08/C10 owe SWR family, copy/glyph, callback, stack and function-budget
+        coverage; existing paths do not prove these new branches.
+  - id: deploy-runtime
+    title: Deployment stacks, Swarm, ingress, release and backup
+    editions:
+      - lite
+      - full
+    sources:
+      - A15-STANDARD/0.2/deploy-runtime
+    editionWhy:
+      Lite production is Docker Swarm on a VPS with Supabase backing; full may declare Docker
+      Swarm or Kubernetes. Full development Compose is not lite production evidence.
+    owedRules:
+      - R266
+      - R267
+      - R268
+      - R275
+      - R276
+    lite:
+      rules:
+        - R10
+        - R163
+        - R164
+        - R165
+        - R187
+        - R188
+        - R190
+        - R191
+      slots:
+        - repo.app-image
+      examples:
+        - examples/lite-app/be/apps/api/Dockerfile
+        - examples/lite-app/.starcistacks/application-stacks.yaml
+      gap:
+        A08/C02 owe declared production Swarm, one pinned ingress, external versioned secrets, hosts,
+        placement, release and backup evidence.
+    full:
+      rules:
+        - R10
+        - R163
+        - R164
+        - R165
+        - R187
+        - R188
+        - R190
+        - R191
+      slots:
+        - repo.app-image
+      examples:
+        - examples/ecommerce-app/be/apps/order/Dockerfile
+        - examples/ecommerce-app/.starcistacks/dev/environment.json
+      gap:
+        A08/C03 owe production Swarm or Kubernetes evidence. Current ecommerce development Compose does
+        not demonstrate a production release or restore.
+  - id: deploy-workflows-host
+    title: Deployment workflows, delivery scripts and host boundary
+    editions:
+      - lite
+      - full
+    sources:
+      - A15-STANDARD/0.2/deploy-workflows-host
+    owedRules:
+      - R250
+      - R251
+      - R252
+    lite:
+      rules:
+        - R06
+        - R13
+        - R102
+        - R103
+        - R221
+      slots:
+        - app.ci
+        - app.ci-images
+        - app.ci-db
+        - app.deploy
+        - app.ci-deploy
+        - app.ci-authorize-deploy-key
+        - app.scripts
+        - app.scripts.delivery
+      examples:
+        - examples/lite-app/.github/workflows/ci.yml
+        - examples/lite-app/.github/workflows/db-deploy.yml
+        - examples/lite-app/scripts/codegen.mjs
+      gap:
+        A02/A11 owe product workflow/script content checks, protected deployment jobs and no-host-cron
+        proofs.
+    full:
+      rules:
+        - R06
+        - R13
+        - R102
+        - R103
+        - R221
+      slots:
+        - app.ci
+        - app.ci-images
+        - app.ci-db
+        - app.deploy
+        - app.ci-deploy
+        - app.ci-authorize-deploy-key
+        - app.scripts
+        - app.scripts.delivery
+      examples:
+        - examples/ecommerce-app/.github/workflows/ci.yml
+        - examples/ecommerce-app/.github/workflows/images.yml
+        - examples/ecommerce-app/scripts
+      gap:
+        A02/A11 owe product workflow/script content checks, protected deployment jobs and no-host-cron
+        proofs.
+  - id: security-custody
+    title: Sealed secrets, age custody and typed environment parity
+    editions:
+      - lite
+      - full
+    sources:
+      - A15-STANDARD/0.2/security-custody
+    owedRules:
+      - R248
+      - R249
+      - R253
+      - R277
+    lite:
+      rules:
+        - R06
+        - R09
+        - R43
+        - R44
+        - R191
+      slots:
+        - app.sops
+        - app.plaintext-env
+        - repo.plaintext-env
+      examples:
+        - examples/lite-app/.sops.yaml
+        - examples/lite-app/be/apps/api/src/api.env.ts
+        - examples/lite-app/be/src/modules/platform/config/env-source.config.ts
+      gap:
+        A01/A03 owe key/value parity, sole .enc custody and the .claude/secret.env age-key contract. No
+        secret value is evidence in this ledger.
+    full:
+      rules:
+        - R06
+        - R09
+        - R43
+        - R44
+        - R191
+      slots:
+        - app.sops
+        - app.plaintext-env
+        - repo.plaintext-env
+      examples:
+        - examples/ecommerce-app/.sops.yaml
+        - examples/ecommerce-app/be/apps/order/src/order.env.ts
+        - examples/ecommerce-app/be/src/modules/platform/config/env-source.config.ts
+      gap:
+        A01/A03 owe key/value parity, sole .enc custody and the .claude/secret.env age-key contract. No
+        secret value is evidence in this ledger.
+  - id: security-edge
+    title: JWT, edge policy, health and signed webhook intake
+    editions:
+      - lite
+      - full
+    sources:
+      - A15-STANDARD/0.2/security-edge
+    editionWhy:
+      Lite uses Supabase Auth verification; full uses its declared IdP. JWT, CORS, headers,
+      proxy and webhook obligations apply in both editions.
+    owedRules:
+      - R260
+      - R261
+      - R262
+      - R263
+    lite:
+      rules:
+        - R41
+        - R42
+        - R80
+        - R152
+        - R182
+        - R183
+        - R217
+        - R219
+      slots:
+        - be.app.api
+        - be.integrations.supabase
+        - be.feature.webhooks.http
+        - be.transport.http
+      examples:
+        - examples/lite-app/be/src/modules/integrations/supabase/supabase.jwks.ts
+        - examples/lite-app/be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts
+      gap:
+        A06/A07 owe pinned JWT algorithms, CORS/header/proxy hardening, real readiness and
+        path-independent webhook scope.
+    full:
+      rules:
+        - R41
+        - R42
+        - R80
+        - R152
+        - R182
+        - R183
+        - R217
+        - R219
+      slots:
+        - be.app.api
+        - be.integrations.supabase
+        - be.feature.webhooks.http
+        - be.transport.http
+      examples:
+        - examples/ecommerce-app/be/src/features/webhooks
+        - examples/ecommerce-app/be/src/modules/platform
+      gap:
+        A06/A07 owe pinned JWT algorithms, CORS/header/proxy hardening, real readiness and
+        path-independent webhook scope.
+  - id: starcistacks
+    title: Application stack declarations and environment tree
+    editions:
+      - lite
+      - full
+    sources:
+      - A15-STANDARD/0.2/starcistacks
+    editionWhy:
+      Lite requires development and production Swarm declarations. Full retains development,
+      VPS and Kubernetes options; runtime is declared explicitly.
+    owedRules:
+      - R266
+      - R267
+      - R268
+    lite:
+      rules:
+        - R10
+        - R212
+      slots:
+        - app.starcistacks
+      examples:
+        - examples/lite-app/.starcistacks/application-stacks.yaml
+        - examples/lite-app/.starcistacks/dev/environment.json
+      gap:
+        A08/C02/C03 owe rendered production-model judgment, schedules, owner actions and production
+        fixtures.
+    full:
+      rules:
+        - R10
+        - R212
+      slots:
+        - app.starcistacks
+      examples:
+        - examples/ecommerce-app/.starcistacks/application-stacks.yaml
+        - examples/ecommerce-app/.starcistacks/dev/README.md
+      gap:
+        A08/C02/C03 owe rendered production-model judgment, schedules, owner actions and production
+        fixtures.
+  - id: starciwork
+    title: Edition-specific Work tree and record readers
+    editions:
+      - lite
+      - full
+    sources:
+      - A15-STANDARD/0.2/starciwork
+    editionWhy:
+      Lite admits .gitignore, workspace.yaml and brand/** only, per ruling:R212/case-4. Full
+      holds the Work record tree and derived views.
+    lite:
+      rules:
+        - R07
+        - R09
+        - R105
+        - R212
+      slots:
+        - app.starciwork
+      examples:
+        - examples/lite-app/.starciwork/.gitignore
+        - examples/lite-app/.starciwork/workspace.yaml
+      gap: C02/C09 owe a lite brand record and reader coverage beyond the current workspace fixture.
+    full:
+      rules:
+        - R07
+        - R09
+        - R105
+        - R212
+      slots:
+        - app.starciwork
+      examples:
+        - examples/ecommerce-app/.starciwork/index.yaml
+        - examples/ecommerce-app/.starciwork/brand/index.yaml
+      gap:
+        WDD/W4 records missing acceptance-criterion and graph families; WDD/W5 records the _derived
+        layout conflict for C08. An index is not proof of every family.
+  - id: database-supabase
+    title: Database migrations, Supabase policy, queues and config
+    editions:
+      - lite
+      - full
+    sources:
+      - A15-STANDARD/0.2/database-supabase
+    editionWhy:
+      Lite always uses Supabase; full Supabase obligations apply only to a declared
+      connection. Full TypeORM ownership is separate.
+    owedRules:
+      - R254
+      - R255
+      - R256
+      - R257
+      - R258
+      - R259
+    lite:
+      rules:
+        - R213
+        - R214
+        - R215
+        - R216
+        - R217
+      slots:
+        - app.supabase
+        - app.supabase.config
+        - app.supabase.migrations
+        - app.supabase.migrations.archive
+        - app.supabase.seed
+        - app.supabase.types
+        - app.supabase.templates
+        - app.supabase.local-state
+        - app.supabase.functions
+      examples:
+        - examples/lite-app/supabase/config.toml
+        - examples/lite-app/supabase/migrations
+        - examples/lite-app/supabase/types/database.types.ts
+      gap:
+        A04/A05/C02 owe hardened grants/roles/RLS, baseline/archive ceremony, queue/cron parity,
+        config/extensions and positive definer/storage/force-RLS examples.
+      applicability: Required Supabase database.
+    full:
+      rules:
+        - R213
+        - R214
+        - R215
+        - R216
+        - R217
+      slots:
+        - app.supabase
+        - app.supabase.config
+        - app.supabase.migrations
+        - app.supabase.migrations.archive
+        - app.supabase.seed
+        - app.supabase.types
+        - app.supabase.templates
+        - app.supabase.local-state
+        - app.supabase.functions
+      examples: []
+      gap:
+        No full example currently declares Supabase; the conditional full chain remains owed rather
+        than citing lite paths as full evidence.
+      applicability: "Only when hfs.json declares connections[].provider: supabase."
+  - id: observability
+    title: Logger, liveness, readiness and container health
+    editions:
+      - lite
+      - full
+    sources:
+      - A15-STANDARD/0.2/observability
+    owedRules:
+      - R262
+    lite:
+      rules:
+        - R40
+        - R71
+        - R189
+      slots:
+        - be.platform
+        - be.app.api
+        - repo.app-image
+      examples:
+        - examples/lite-app/be/src/modules/platform/logging/json-logger.service.ts
+        - examples/lite-app/be/src/features/api/system-health/transport/http/live.controller.ts
+      gap:
+        A06/C02/C03 owe backing-service readiness and matching Docker HEALTHCHECK routes.
+        Correlation/metrics/tracing remain P2; FE reporting is documented-optional.
+    full:
+      rules:
+        - R40
+        - R71
+        - R189
+      slots:
+        - be.platform
+        - be.app.api
+        - repo.app-image
+      examples:
+        - examples/ecommerce-app/be/src/modules/platform/logging/json-logger.service.ts
+        - examples/ecommerce-app/be/src/features/api/health/transport/http/health.controller.ts
+      gap:
+        A06/C02/C03 owe backing-service readiness and matching Docker HEALTHCHECK routes.
+        Correlation/metrics/tracing remain P2; FE reporting is documented-optional.
+  - id: docs
+    title: Runtime and product documentation
+    editions:
+      - lite
+      - full
+    sources:
+      - A15-STANDARD/0.2/docs
+    owedRules:
+      - R270
+    lite:
+      rules:
+        - R02
+        - R96
+        - R192
+        - R193
+        - R194
+        - R195
+        - R196
+        - R205
+        - R230
+      slots:
+        - app.readme
+        - repo.docs
+        - repo.docs-media
+      examples:
+        - examples/lite-app/README.md
+      gap: A11/C01 owe product path/command/env/rule freshness and correction of stale deployment claims.
+    full:
+      rules:
+        - R02
+        - R96
+        - R192
+        - R193
+        - R194
+        - R195
+        - R196
+        - R205
+        - R230
+      slots:
+        - app.readme
+        - repo.docs
+        - repo.docs-media
+      examples:
+        - examples/ecommerce-app/README.md
+        - examples/ecommerce-app/.starcistacks/dev/README.md
+      gap: A11/C01 owe product path/command/env/rule freshness and correction of stale deployment claims.
+  - id: managed-supply-chain
+    title: Managed configuration, dependency pins and supply chain
+    editions:
+      - lite
+      - full
+    sources:
+      - A15-STANDARD/0.2/managed-supply-chain
+    owedRules:
+      - R269
+    lite:
+      rules:
+        - R04
+        - R05
+        - R11
+        - R14
+        - R15
+        - R16
+        - R17
+        - R22
+        - R143
+        - R144
+        - R145
+        - R146
+      slots:
+        - app.package-manifest
+        - app.task-graph
+        - app.lockfile
+        - app.git-meta
+        - app.tool-config
+        - app.format-config
+        - app.tool-config-optional
+        - app.tool-config-local
+        - app.quality-config
+        - app.hooks
+        - app.dockerignore
+        - app.github-meta
+        - be.tool-config
+        - be.nest-cli
+        - be.tool-config-local
+        - fe.tool-config
+        - fe.tool-config-local
+        - repo.packages
+      examples:
+        - examples/lite-app/package.json
+        - examples/lite-app/.husky/pre-commit
+        - examples/lite-app/.nvmrc
+      gap:
+        C04/A02/C08 owe managed .editorconfig/.nvmrc/.gitattributes/.sops.yaml plus Dependabot, audit
+        and SBOM.
+    full:
+      rules:
+        - R04
+        - R05
+        - R11
+        - R14
+        - R15
+        - R16
+        - R17
+        - R22
+        - R143
+        - R144
+        - R145
+        - R146
+      slots:
+        - app.package-manifest
+        - app.task-graph
+        - app.lockfile
+        - app.git-meta
+        - app.tool-config
+        - app.format-config
+        - app.tool-config-optional
+        - app.tool-config-local
+        - app.quality-config
+        - app.hooks
+        - app.dockerignore
+        - app.github-meta
+        - be.tool-config
+        - be.nest-cli
+        - be.tool-config-local
+        - fe.tool-config
+        - fe.tool-config-local
+        - repo.packages
+      examples:
+        - examples/ecommerce-app/package.json
+        - examples/ecommerce-app/.husky/pre-commit
+        - examples/ecommerce-app/.nvmrc
+      gap:
+        C04/A02/C08 owe managed .editorconfig/.nvmrc/.gitattributes/.sops.yaml plus Dependabot, audit
+        and SBOM.
+  - id: tests-proof
+    title: Unit specs, boot proof and edition-specific test lanes
+    editions:
+      - lite
+      - full
+    sources:
+      - A15-STANDARD/0.2/tests-proof
+    editionWhy:
+      Both owe unit and meaningful integration proofs. Lite uses boot wiring and may have
+      contract specs; full has e2e/stack/browser lanes. A15-STANDARD/2.2/1 amends the stale lite
+      contract prohibition.
+    owedRules:
+      - R272
+      - R273
+      - R284
+    lite:
+      rules:
+        - R47
+        - R48
+        - R98
+        - R99
+        - R100
+        - R101
+        - R102
+        - R204
+        - R212
+      slots:
+        - app.ci-e2e
+        - app.browser
+        - be.root-e2e
+        - be.contract.graphql
+        - be.contract.openapi
+        - be.contract.events
+        - be.contract.events.pin
+        - be.tests.world
+        - be.tests.world.kit
+        - be.tests.fixtures
+        - be.tests.fixtures.builders
+        - be.tests.fixtures.i18n
+        - be.tests.integration
+        - be.tests.e2e
+        - be.tests.contract
+        - be.tests.e2e-world-dir
+      examples:
+        - examples/lite-app/be/src/modules/platform/queue/queue.policy.spec.ts
+        - examples/lite-app/be/src/features/webhooks/calendar/transport/http/calendar.webhook.spec.ts
+      gap:
+        A13/A17/C08 owe lite boot/pattern lanes, measured coverage scope and correction of the stale
+        contract-slot prohibition.
+    full:
+      rules:
+        - R47
+        - R48
+        - R98
+        - R99
+        - R100
+        - R101
+        - R102
+        - R204
+        - R212
+      slots:
+        - app.ci-e2e
+        - app.browser
+        - be.root-e2e
+        - be.contract.graphql
+        - be.contract.openapi
+        - be.contract.events
+        - be.contract.events.pin
+        - be.tests.world
+        - be.tests.world.kit
+        - be.tests.fixtures
+        - be.tests.fixtures.builders
+        - be.tests.fixtures.i18n
+        - be.tests.integration
+        - be.tests.e2e
+        - be.tests.contract
+        - be.tests.e2e-world-dir
+      examples:
+        - examples/ecommerce-app/be/src/tests/world
+        - examples/ecommerce-app/be/src/tests/integration
+        - examples/ecommerce-app/be/src/tests/e2e
+        - examples/ecommerce-app/browser
+      gap:
+        A13/A17 owe boot/coverage and pattern-proof metadata. Existing lanes are not a measured
+        coverage result.
+  - id: release-provenance
+    title: Release tags, image provenance and guarded database deploy
+    editions:
+      - lite
+      - full
+    sources:
+      - A15-STANDARD/0.2/release-provenance
+    editionWhy:
+      Lite releases include guarded Supabase deployment; full tracks images and its declared
+      database lane. Both require release tags.
+    owedRules:
+      - R271
+    lite:
+      rules:
+        - R221
+        - R222
+        - R225
+      slots:
+        - app.package-manifest
+        - app.hooks
+        - app.ci-images
+        - app.ci-db
+      examples:
+        - examples/lite-app/.github/workflows/images.yml
+        - examples/lite-app/.github/workflows/db-deploy.yml
+      gap:
+        A11 owes product tag/version/image provenance and guarded database deploy; workflows alone do
+        not prove production digests, backups or migration receipts.
+    full:
+      rules:
+        - R221
+        - R222
+        - R225
+      slots:
+        - app.package-manifest
+        - app.hooks
+        - app.ci-images
+        - app.ci-db
+      examples:
+        - examples/ecommerce-app/.github/workflows/images.yml
+        - examples/ecommerce-app/.husky/pre-push
+      gap:
+        A11 owes product tag/version/image provenance and guarded database deploy; workflows alone do
+        not prove production digests, backups or migration receipts.
+  - id: meta-standard
+    title: Catalog integrity, gaps, rulings and coverage of the standard
+    editions:
+      - lite
+      - full
+    sources:
+      - A15-STANDARD/0.2/meta-standard
+    owedRules:
+      - R247
+      - R274
+    lite:
+      rules:
+        - R24
+        - R209
+        - R211
+        - R212
+      slots:
+        - app.declaration
+        - app.sides
+        - repo.side-root-forbidden
+      examples:
+        - examples/lite-app/hfs.json
+      gap:
+        A09/A10/C05-C08/Z01 owe the complete derived enforcer/doc/template/example/spec/witness chain
+        and stale-ruling judgment.
+    full:
+      rules:
+        - R24
+        - R209
+        - R211
+        - R212
+      slots:
+        - app.declaration
+        - app.sides
+        - repo.side-root-forbidden
+      examples:
+        - examples/ecommerce-app/hfs.json
+      gap:
+        A09/A10/C05-C08/Z01 owe the complete derived enforcer/doc/template/example/spec/witness chain
+        and stale-ruling judgment.
+  - id: database-typeorm
+    title: Full TypeORM persistence and reversible migrations
+    editions:
+      - lite
+      - full
+    sources:
+      - WDD/1.2/D15
+      - OPS/1.8/M2
+    editionWhy:
+      Lite schema is forward-only Supabase SQL; full retains TypeORM reversible migration
+      obligations.
+    lite:
+      rules:
+        - R34
+        - R35
+        - R74
+      slots:
+        - be.persistence
+      examples: []
+      gap:
+        "Not applicable as TypeORM migration evidence: lite SQL migration ownership is mapped on
+        database-supabase."
+    full:
+      rules:
+        - R34
+        - R35
+        - R74
+      slots:
+        - be.persistence
+      examples:
+        - examples/ecommerce-app/be/src/modules/domain
+      gap:
+        Full persistence sources exist; a domain directory alone does not establish
+        reversible-migration proof.
+  - id: repository-artifacts
+    title: Generated, ignored, forbidden and agent artifact boundaries
+    editions:
+      - lite
+      - full
+    sources:
+      - WDD/1.5/G1
+      - A15-STANDARD/0.2/managed-files
+    owedRules:
+      - R280
+      - R282
+      - R283
+    lite:
+      rules:
+        - R01
+        - R03
+        - R07
+        - R212
+      slots:
+        - app.build-output
+        - app.tool-cache
+        - app.agent-output
+        - app.worktrees
+        - repo.build-output
+        - repo.generated
+        - repo.tool-cache
+        - repo.agent-output
+        - repo.worktrees
+        - be.assets
+      examples:
+        - examples/lite-app/.gitignore
+        - examples/lite-app/supabase/types/database.types.ts
+      gap:
+        Generated-output freshness and asset/lexicon budgets require their own proofs.
+        Ignored/forbidden absence is enforced by slot boundaries, not positive content evidence.
+    full:
+      rules:
+        - R01
+        - R03
+        - R07
+        - R212
+      slots:
+        - app.build-output
+        - app.tool-cache
+        - app.agent-output
+        - app.worktrees
+        - repo.build-output
+        - repo.generated
+        - repo.tool-cache
+        - repo.agent-output
+        - repo.worktrees
+        - be.assets
+      examples:
+        - examples/ecommerce-app/.gitignore
+      gap:
+        Generated-output freshness and asset/lexicon budgets require their own proofs.
+        Ignored/forbidden absence is enforced by slot boundaries, not positive content evidence.
+  - id: stacks-rendered-model
+    title: Rendered model, environment shape and seven-command runbook
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.1/S1-S9
+      - OPS/1.1/S17-S20
+    editionWhy:
+      Lite production is Swarm, development is local Supabase. Full development Compose and
+      Kubernetes declarations are distinct options, not lite production evidence.
+    owedRules:
+      - R266
+      - R267
+    lite:
+      rules:
+        - R10
+        - R164
+        - R165
+      slots:
+        - app.starcistacks
+        - repo.app-image
+      examples:
+        - examples/lite-app/.starcistacks/application-stacks.yaml
+      gap:
+        A08/C02 owe tracked production Swarm model and actionable runbook. Current lite declarations do
+        not demonstrate the model.
+    full:
+      rules:
+        - R10
+        - R164
+        - R165
+      slots:
+        - app.starcistacks
+        - repo.app-image
+      examples:
+        - examples/ecommerce-app/.starcistacks/dev/README.md
+        - examples/ecommerce-app/.starcistacks/dev/environment.json
+      gap:
+        A08/C03 owe production model judgment. Full development runbook is present; Kubernetes has no
+        current example and production convergence is not proven.
+  - id: stacks-runtime-secrets
+    title: External versioned Swarm secrets and literal-env exclusion
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.1/S10-S11
+      - OPS/1.4/K7
+    owedRules:
+      - R266
+    lite:
+      rules:
+        - R06
+        - R10
+      slots:
+        - app.starcistacks
+        - app.sops
+      examples: []
+      gap:
+        A08/C02/C03 owe external versioned runtime bindings and rendered-model examples. A development
+        .sops.yaml is not evidence of a production Swarm binding.
+    full:
+      rules:
+        - R06
+        - R10
+      slots:
+        - app.starcistacks
+        - app.sops
+      examples: []
+      gap:
+        A08/C02/C03 owe external versioned runtime bindings and rendered-model examples. A development
+        .sops.yaml is not evidence of a production Swarm binding.
+  - id: stacks-ingress-dns
+    title: One pinned ingress, routed ports, DNS ownership and TLS
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.1/S12-S13
+    owedRules:
+      - R266
+      - R275
+    lite:
+      rules:
+        - R10
+      slots:
+        - app.starcistacks
+      examples: []
+      gap:
+        A08/C02/C03 owe one digest-pinned Traefik or Caddy ingress, port/host routing, TLS persistence
+        and declared owner-run DNS receipts. The canon chooses neither product.
+    full:
+      rules:
+        - R10
+      slots:
+        - app.starcistacks
+      examples: []
+      gap:
+        A08/C02/C03 owe one digest-pinned Traefik or Caddy ingress, port/host routing, TLS persistence
+        and declared owner-run DNS receipts. The canon chooses neither product.
+  - id: stacks-stateful-backing
+    title: Persistent volumes, placement and lite sidecar database limits
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.1/S14
+      - A15-STANDARD/0.1/4
+    editionWhy:
+      Lite refuses self-hosted Postgres and sidecars needing Postgres/Redis/Mongo. SQLite
+      sidecars need declared persistent volumes. Full backing follows its declaration.
+    owedRules:
+      - R266
+      - R276
+    lite:
+      rules:
+        - R10
+        - R163
+      slots:
+        - app.starcistacks
+      examples: []
+      gap:
+        A08/C02/C03 owe concrete placement/volume custody. Current lite has no SQLite-sidecar positive
+        fixture or forbidden-backing proof.
+    full:
+      rules:
+        - R10
+        - R163
+      slots:
+        - app.starcistacks
+      examples: []
+      gap:
+        A08/C02/C03 owe concrete placement/volume custody. Current lite has no SQLite-sidecar positive
+        fixture or forbidden-backing proof.
+  - id: stacks-release-convergence
+    title: Immutable release selection, observed convergence and rollback
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.1/S15-S16
+      - OPS/1.8/M5
+    owedRules:
+      - R267
+      - R271
+    lite:
+      rules:
+        - R10
+      slots:
+        - app.starcistacks
+        - app.deploy
+      examples: []
+      gap:
+        A08/A11/C02/C03 owe release/rollback declarations and observed health/convergence receipts. A
+        development runbook does not prove immutable production release or schema compatibility.
+    full:
+      rules:
+        - R10
+      slots:
+        - app.starcistacks
+        - app.deploy
+      examples: []
+      gap:
+        A08/A11/C02/C03 owe release/rollback declarations and observed health/convergence receipts. A
+        development runbook does not prove immutable production release or schema compatibility.
+  - id: scheduling
+    title: App-owned scheduling, replicated jobs and CLI one-off work
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.2/J1-J6
+    editionWhy:
+      Lite scheduling is app-owned pgmq/pg_cron or a declared replicated-job; full uses its
+      declared scheduler. Neither edition uses host crontab for app scheduling.
+    owedRules:
+      - R250
+      - R258
+      - R268
+    lite:
+      rules:
+        - R46
+        - R147
+        - R148
+        - R149
+        - R150
+      slots:
+        - be.platform.queue
+        - be.feature.jobs
+        - be.app.cli
+        - be.cli
+        - app.deploy
+      examples:
+        - examples/lite-app/be/src/modules/platform/queue/queue.contracts.ts
+        - examples/lite-app/be/apps/cli/src
+      gap:
+        A02/A05/A08/C02 owe no-host-cron judgment, migration/code cron parity and replicated-job
+        fixtures. C08 owes the stale host-scheduler text correction.
+    full:
+      rules:
+        - R46
+        - R147
+        - R148
+        - R149
+        - R150
+      slots:
+        - be.platform.queue
+        - be.feature.jobs
+        - be.app.cli
+        - be.cli
+        - app.deploy
+      examples:
+        - examples/ecommerce-app/be/src/features/jobs
+        - examples/ecommerce-app/be/apps/cli/src
+      gap:
+        A02/A05/A08/C02 owe no-host-cron judgment, migration/code cron parity and replicated-job
+        fixtures. C08 owes the stale host-scheduler text correction.
+  - id: ci-product-deploy
+    title: Protected deployment workflows and pinned tools/actions
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.3/C1-C6
+      - OPS/1.3/C8
+      - WDD/1.5/G6-G7
+    owedRules:
+      - R251
+      - R271
+    lite:
+      rules:
+        - R05
+        - R06
+        - R13
+        - R221
+      slots:
+        - app.ci
+        - app.ci-deploy
+        - app.ci-authorize-deploy-key
+        - app.ci-db
+      examples:
+        - examples/lite-app/.github/workflows/ci.yml
+        - examples/lite-app/.github/workflows/db-deploy.yml
+      gap: A02/A11 owe product trigger/permissions/concurrency/protected
+        environment/credential/action/tool checks. Reviewers are owner-run configuration; a declared
+        environment cannot prove provider settings.
+    full:
+      rules:
+        - R05
+        - R06
+        - R13
+        - R221
+      slots:
+        - app.ci
+        - app.ci-deploy
+        - app.ci-authorize-deploy-key
+        - app.ci-db
+      examples:
+        - examples/ecommerce-app/.github/workflows/ci.yml
+      gap: A02/A11 owe product trigger/permissions/concurrency/protected
+        environment/credential/action/tool checks. Reviewers are owner-run configuration; a declared
+        environment cannot prove provider settings.
+  - id: secret-age-custody
+    title: Age identity custody and allowed CI credential stores
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.4/K1-K3
+      - OPS/1.4/K17
+    owedRules:
+      - R253
+      - R277
+    lite:
+      rules:
+        - R06
+        - R09
+      slots:
+        - app.sops
+        - app.ci-deploy
+        - app.plaintext-env
+      examples: []
+      gap:
+        A03 owes sole age-key custody in .claude/secret.env as SOPS_AGE_KEY and sealed-only app
+        custody. No secret/key value is read or recorded as example evidence.
+    full:
+      rules:
+        - R06
+        - R09
+      slots:
+        - app.sops
+        - app.ci-deploy
+        - app.plaintext-env
+      examples: []
+      gap:
+        A03 owes sole age-key custody in .claude/secret.env as SOPS_AGE_KEY and sealed-only app
+        custody. No secret/key value is read or recorded as example evidence.
+  - id: env-parity-value
+    title: Typed env readers, file semantics, key parity and value shape
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.4/K4-K6
+      - OPS/1.4/K10-K11
+      - OPS/1.4/K14
+      - A15-STANDARD/0.1/7
+    owedRules:
+      - R248
+      - R249
+      - R253
+      - R289
+    lite:
+      rules:
+        - R43
+        - R44
+        - R245
+      slots:
+        - be.app.api
+        - be.app.worker
+        - be.app.cli
+        - app.starcistacks
+      examples:
+        - examples/lite-app/be/apps/api/src/api.env.ts
+        - examples/lite-app/be/src/modules/platform/config/env-source.config.ts
+      gap:
+        A01/A03/A07 owe code/sealed/stack/example parity, in-memory value validation and required app
+        env readers. The old R245 inline-parsing allowance is amended by R289; this row does not use
+        it as current permission.
+    full:
+      rules:
+        - R43
+        - R44
+        - R245
+      slots:
+        - be.app.api
+        - be.app.worker
+        - be.app.cli
+        - app.starcistacks
+      examples:
+        - examples/ecommerce-app/be/apps/order/src/order.env.ts
+        - examples/ecommerce-app/be/src/modules/platform/config/env-source.config.ts
+      gap:
+        A01/A03/A07 owe code/sealed/stack/example parity, in-memory value validation and required app
+        env readers. The old R245 inline-parsing allowance is amended by R289; this row does not use
+        it as current permission.
+  - id: secret-rotation-format
+    title: Rotation records and unique dotenv envelope members
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.4/K8-K9
+    lite:
+      rules:
+        - R06
+      slots:
+        - app.starcistacks
+        - app.sops
+      examples: []
+      gap:
+        "P2, not scheduled: rotation records and cross-envelope duplicate-key/format policy have no
+        decided alpha.15 enforcer or positive example. R06 provides only the existing secret
+        boundary."
+    full:
+      rules:
+        - R06
+      slots:
+        - app.starcistacks
+        - app.sops
+      examples: []
+      gap:
+        "P2, not scheduled: rotation records and cross-envelope duplicate-key/format policy have no
+        decided alpha.15 enforcer or positive example. R06 provides only the existing secret
+        boundary."
+  - id: script-secret-hygiene
+    title: Delivery helpers, service-role scope and no secret persistence
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.4/K12-K13
+      - OPS/1.4/K15-K16
+      - OPS/1.4/K18
+      - OPS/1.5/A6-A7
+    owedRules:
+      - R252
+      - R277
+    lite:
+      rules:
+        - R06
+        - R71
+        - R191
+        - R217
+      slots:
+        - app.scripts
+        - app.scripts.delivery
+        - app.deploy
+        - repo.app-image
+        - be.integrations.supabase
+      examples:
+        - examples/lite-app/scripts/codegen.mjs
+        - examples/lite-app/be/src/modules/integrations/supabase/supabase.client.ts
+        - examples/lite-app/be/apps/api/Dockerfile
+      gap:
+        A02/A03 owe plaintext-load/xtrace/deploy-logic/service-role-scope content cases. Existing
+        helpers, clients and images cover older rules only.
+    full:
+      rules:
+        - R06
+        - R71
+        - R191
+        - R217
+      slots:
+        - app.scripts
+        - app.scripts.delivery
+        - app.deploy
+        - repo.app-image
+        - be.integrations.supabase
+      examples:
+        - examples/ecommerce-app/scripts
+        - examples/ecommerce-app/be/apps/order/Dockerfile
+      gap:
+        A02/A03 owe plaintext-load/xtrace/deploy-logic/service-role-scope content cases. Existing
+        helpers, clients and images cover older rules only.
+  - id: auth-jwt
+    title: Verified principals and pinned JWT algorithms
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.5/A1-A2
+      - OPS/1.5/A10
+    editionWhy:
+      Lite Auth uses Supabase; full uses its declared IdP. Full Supabase auth/config parity
+      applies only to a Supabase connection.
+    owedRules:
+      - R260
+    lite:
+      rules:
+        - R41
+        - R217
+        - R219
+      slots:
+        - be.app.api
+        - be.integrations.supabase
+        - fe.modules.auth
+      examples:
+        - examples/lite-app/be/src/modules/integrations/supabase/supabase.jwks.ts
+        - examples/lite-app/fe/apps/web/src/modules/auth/client.ts
+      gap:
+        A06 owes an algorithm-pinned verification proof in each edition; existing principal/auth
+        sources do not prove pinned algorithms.
+    full:
+      rules:
+        - R41
+        - R217
+        - R219
+      slots:
+        - be.app.api
+        - be.integrations.supabase
+        - fe.modules.auth
+      examples:
+        - examples/ecommerce-app/be/src/modules/platform
+      gap:
+        A06 owes an algorithm-pinned verification proof in each edition; existing principal/auth
+        sources do not prove pinned algorithms.
+  - id: webhook-inbox-outbox
+    title: Signed intake, inbox claim and outbox hand-off after commit
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.6/W1-W8
+      - A15-STANDARD/2.2/2
+    owedRules:
+      - R263
+    lite:
+      rules:
+        - R80
+        - R152
+        - R182
+        - R183
+      slots:
+        - be.feature.webhooks
+        - be.feature.webhooks.http
+        - be.feature.webhooks.dto
+        - be.platform.queue
+        - be.events
+      examples:
+        - examples/lite-app/be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts
+        - examples/lite-app/be/src/features/webhooks/calendar/transport/http/calendar.webhook.spec.ts
+      gap:
+        A07/A20 owe path-independent scope and lite receipt plus typed-outbox-event hand-off after
+        commit, replay/inbox-key/sealed-provider-secret cases. Current intake paths are partial
+        evidence only.
+    full:
+      rules:
+        - R80
+        - R152
+        - R182
+        - R183
+      slots:
+        - be.feature.webhooks
+        - be.feature.webhooks.http
+        - be.feature.webhooks.dto
+        - be.platform.queue
+        - be.events
+      examples:
+        - examples/ecommerce-app/be/src/features/webhooks
+        - examples/ecommerce-app/be/src/modules/platform/queue
+      gap:
+        A07/A20 owe path-independent scope and lite receipt plus typed-outbox-event hand-off after
+        commit, replay/inbox-key/sealed-provider-secret cases. Current intake paths are partial
+        evidence only.
+  - id: edge-hardening
+    title: CORS allowlist, response headers and proxy trust
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.7/E1-E3
+    owedRules:
+      - R261
+    lite:
+      rules:
+        - R41
+        - R42
+      slots:
+        - be.app.api
+        - be.transport.http
+        - be.platform
+      examples:
+        - examples/lite-app/be/apps/api/src/main.ts
+      gap:
+        A06/C02/C03 owe explicit CORS/security-header/proxy cases. A bootstrap path alone does not
+        prove edge policy.
+    full:
+      rules:
+        - R41
+        - R42
+      slots:
+        - be.app.api
+        - be.transport.http
+        - be.platform
+      examples:
+        - examples/ecommerce-app/be/apps/order/src/main.ts
+      gap:
+        A06/C02/C03 owe explicit CORS/security-header/proxy cases. A bootstrap path alone does not
+        prove edge policy.
+  - id: edge-lifecycle-p2
+    title: Body limits and graceful shutdown
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.7/E4
+      - OPS/1.7/E6
+    lite:
+      rules:
+        - R42
+      slots:
+        - be.app.api
+        - be.platform
+      examples: []
+      gap:
+        "P2, not scheduled: body-limit and shutdown-hook enforcement has no decided alpha.15
+        rule/example chain. Existing input bounding does not claim either branch."
+    full:
+      rules:
+        - R42
+      slots:
+        - be.app.api
+        - be.platform
+      examples: []
+      gap:
+        "P2, not scheduled: body-limit and shutdown-hook enforcement has no decided alpha.15
+        rule/example chain. Existing input bounding does not claim either branch."
+  - id: health-readiness
+    title: Real startup/liveness/readiness and migration-held readiness
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.7/E5
+      - OPS/1.7/E7
+      - WDD/1.3/O2-O3
+      - WDD/1.7/E9
+      - WDD/1.7/E11
+    owedRules:
+      - R262
+    lite:
+      rules:
+        - R189
+      slots:
+        - repo.app-image
+        - be.app.api
+        - be.transport.http
+      examples:
+        - examples/lite-app/be/apps/api/Dockerfile
+        - examples/lite-app/be/src/features/api/system-health/transport/http/live.controller.ts
+      gap:
+        A06/C02 owe real readiness and matching probes. Current lite FE has no Dockerfile and BE
+        demonstrates liveness only.
+    full:
+      rules:
+        - R189
+      slots:
+        - repo.app-image
+        - be.app.api
+        - be.transport.http
+      examples:
+        - examples/ecommerce-app/be/apps/order/Dockerfile
+        - examples/ecommerce-app/be/src/features/api/health/transport/http/health.controller.ts
+      gap:
+        A06/C03 owe readiness and migration-gating proofs. Current full health and Dockerfile paths
+        establish presence, not behavior.
+  - id: supply-chain-provenance
+    title: Pins, frozen installs, image pins, audit and SBOM
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.8/P1-P5
+      - OPS/1.3/C7
+      - WDD/1.6/V1
+    owedRules:
+      - R251
+      - R269
+      - R271
+    lite:
+      rules:
+        - R14
+        - R15
+        - R164
+        - R187
+        - R188
+        - R190
+        - R191
+      slots:
+        - app.package-manifest
+        - app.lockfile
+        - app.github-meta
+        - app.ci
+        - app.ci-images
+        - repo.app-image
+      examples:
+        - examples/lite-app/package.json
+        - examples/lite-app/.github/workflows/ci.yml
+        - examples/lite-app/be/apps/api/Dockerfile
+      gap:
+        A02/C04/A11 owe audit/Dependabot/SBOM/provenance and product release digest evidence. Existing
+        install/pin examples do not prove the new links.
+    full:
+      rules:
+        - R14
+        - R15
+        - R164
+        - R187
+        - R188
+        - R190
+        - R191
+      slots:
+        - app.package-manifest
+        - app.lockfile
+        - app.github-meta
+        - app.ci
+        - app.ci-images
+        - repo.app-image
+      examples:
+        - examples/ecommerce-app/package.json
+        - examples/ecommerce-app/.github/workflows/images.yml
+        - examples/ecommerce-app/be/apps/order/Dockerfile
+      gap:
+        A02/C04/A11 owe audit/Dependabot/SBOM/provenance and product release digest evidence. Existing
+        install/pin examples do not prove the new links.
+  - id: backup-restore
+    title: Encrypted off-host backup and isolated restore proof
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.8/B1-B2
+      - OPS/1.8/M4
+    editionWhy:
+      Lite backup covers hosted Supabase and declared sidecar volumes; full covers declared
+      backing stores.
+    owedRules:
+      - R267
+    lite:
+      rules:
+        - R10
+      slots:
+        - app.starcistacks
+        - app.ci-db
+      examples: []
+      gap:
+        A08/C02/C03 owe backup declarations and isolated restore receipts. No current example
+        demonstrates the contract; provider backups cannot be assumed.
+    full:
+      rules:
+        - R10
+      slots:
+        - app.starcistacks
+        - app.ci-db
+      examples: []
+      gap:
+        A08/C02/C03 owe backup declarations and isolated restore receipts. No current example
+        demonstrates the contract; provider backups cannot be assumed.
+  - id: work-lite-readers-brand
+    title: Lite workspace identity, restricted readers and brand records
+    editions:
+      - lite
+      - full
+    sources:
+      - WDD/1.1/W1-W2
+      - WDD/1.1/W6-W8
+      - WDD/1.7/E8
+    editionWhy:
+      Lite readers admit workspace and brand data; full traverses the Work catalog. Full brand
+      evidence cannot satisfy a lite-brand example.
+    lite:
+      rules:
+        - R212
+      slots:
+        - app.starciwork
+      examples:
+        - examples/lite-app/.starciwork/workspace.yaml
+        - examples/lite-app/.starciwork/.gitignore
+      gap:
+        C02/C09 owe a lite brand fixture and bypass-reader proofs. The workspace exists, but the
+        current lite app has no brand record.
+    full:
+      rules:
+        - R212
+      slots:
+        - app.starciwork
+      examples:
+        - examples/ecommerce-app/.starciwork/brand/index.yaml
+      gap:
+        Full brand exists; stale lite-brand-only citations need R274 judgment rather than inferring
+        correctness from a grep.
+  - id: work-full-records
+    title: Full Work schema families and derived view layout
+    editions:
+      - lite
+      - full
+    sources:
+      - WDD/1.1/W3-W5
+      - WDD/1.7/E10
+    editionWhy:
+      Full graph/shell/feature/UAT/business-rule record trees are forbidden in lite; lite
+      proves the edition boundary rather than producing these records.
+    lite:
+      rules:
+        - R07
+        - R09
+        - R105
+        - R212
+      slots:
+        - app.starciwork
+      examples: []
+      gap:
+        "Not applicable as positive full Work records: ruling:R212/case-4 admits only .gitignore,
+        workspace.yaml and brand/**. R212 must prove rejection of the full tree."
+    full:
+      rules:
+        - R07
+        - R09
+        - R105
+        - R212
+      slots:
+        - app.starciwork
+      examples:
+        - examples/ecommerce-app/.starciwork/index.yaml
+        - examples/ecommerce-app/.starciwork/features
+      gap:
+        WDD records missing acceptance-criterion and graph examples and conflicting _derived
+        allowances. C08/C09 and final coverage backfill owe these schema/layout branches.
+  - id: db-baseline-archive
+    title: Migration ordering, immutability and baseline/archive cutover
+    editions:
+      - lite
+      - full
+    editionWhy:
+      Supabase is required in lite and connection-conditional in full; ecommerce does not
+      declare Supabase.
+    sources:
+      - WDD/1.2/D1-D2
+      - WDD/1.2/D16
+      - WDD/1.7/E6
+      - OPS/1.8/M1
+    owedRules:
+      - R257
+    lite:
+      rules:
+        - R213
+      slots:
+        - app.supabase.migrations
+        - app.supabase.migrations.archive
+      examples:
+        - examples/lite-app/supabase/migrations/20261002203356_baseline.sql
+      gap:
+        A05/C02 owe a real baseline marker, tracked archive and restamp cutover. A file named baseline
+        is not ceremony proof or archived-history secret-scan evidence.
+      applicability: Required Supabase database.
+    full:
+      rules:
+        - R213
+      slots:
+        - app.supabase.migrations
+        - app.supabase.migrations.archive
+      examples: []
+      gap:
+        No full Supabase example proves baseline/archive/restamp or secret scanning of archived
+        history.
+      applicability: "Only when hfs.json declares connections[].provider: supabase."
+  - id: db-rls-app-role
+    title: RLS, safe policies, least privilege and BE-only access
+    editions:
+      - lite
+      - full
+    editionWhy:
+      Supabase is required in lite and connection-conditional in full; ecommerce does not
+      declare Supabase.
+    sources:
+      - WDD/1.2/D3-D6
+      - WDD/1.7/E3-E4
+      - OPS/1.5/A3-A5
+      - OPS/1.5/A8
+      - OPS/1.5/A11
+    owedRules:
+      - R254
+      - R255
+      - R256
+    lite:
+      rules:
+        - R214
+        - R217
+        - R219
+      slots:
+        - app.supabase.migrations
+        - be.integrations.supabase
+        - fe.modules.auth
+      examples:
+        - examples/lite-app/supabase/migrations/20261013064730_be-only-data-access.sql
+      gap:
+        A04/C02 owe DB-side BE-only grants, least privilege, FORCE RLS, view/set-schema/disable-RLS and
+        policy-tautology proofs. Current BE-only SQL does not demonstrate all new branches.
+      applicability: Required Supabase database.
+    full:
+      rules:
+        - R214
+        - R217
+        - R219
+      slots:
+        - app.supabase.migrations
+        - be.integrations.supabase
+        - fe.modules.auth
+      examples: []
+      gap:
+        No full Supabase example demonstrates conditional grant/RLS/app_be obligations. Full TypeORM
+        persistence does not supply this policy chain.
+      applicability: "Only when hfs.json declares connections[].provider: supabase."
+  - id: db-definer-storage
+    title: Security-definer revokes and owner-prefixed storage policy
+    editions:
+      - lite
+      - full
+    editionWhy:
+      Supabase is required in lite and connection-conditional in full; ecommerce does not
+      declare Supabase.
+    sources:
+      - WDD/1.2/D7-D8
+      - WDD/1.7/E1-E2
+      - OPS/1.5/A9
+    owedRules:
+      - R256
+    lite:
+      rules:
+        - R215
+      slots:
+        - app.supabase.migrations
+      examples: []
+      gap:
+        C02/A04 owe positive definer functions revoked from public/anon/authenticated and buckets with
+        owner prefixes. Neither record exists in the current lite example.
+      applicability: Required Supabase database.
+    full:
+      rules:
+        - R215
+      slots:
+        - app.supabase.migrations
+      examples: []
+      gap: No full Supabase example exercises security-definer or storage-bucket policy branches.
+      applicability: "Only when hfs.json declares connections[].provider: supabase."
+  - id: db-queues-cron
+    title: Queue parity and migration-owned enqueue-only cron
+    editions:
+      - lite
+      - full
+    editionWhy:
+      Supabase is required in lite and connection-conditional in full; ecommerce does not
+      declare Supabase.
+    sources:
+      - WDD/1.2/D9-D10
+      - WDD/1.7/E5
+    owedRules:
+      - R258
+    lite:
+      rules:
+        - R46
+        - R216
+      slots:
+        - app.supabase.migrations
+        - be.queues
+        - be.platform.queue
+      examples:
+        - examples/lite-app/supabase/migrations/20261012110500_booking-confirmation-queue.sql
+        - examples/lite-app/be/src/modules/queues/booking-confirmation/booking-confirmation.queue.ts
+      gap:
+        A05/C02 owe pgmq/code parity and a positive migration-owned pg_cron enqueue-only tick. Current
+        queue files do not prove cron.schedule.
+      applicability: Required Supabase database.
+    full:
+      rules:
+        - R46
+        - R216
+      slots:
+        - app.supabase.migrations
+        - be.queues
+        - be.platform.queue
+      examples: []
+      gap:
+        No full Supabase example proves pgmq/pg_cron parity. Full BullMQ scheduling belongs to the
+        scheduling surface, not this database surface.
+      applicability: "Only when hfs.json declares connections[].provider: supabase."
+  - id: db-config-types-seeds
+    title: Config, API exposure, extensions, vault, seeds and types
+    editions:
+      - lite
+      - full
+    editionWhy:
+      Supabase is required in lite and connection-conditional in full; ecommerce does not
+      declare Supabase.
+    sources:
+      - WDD/1.2/D11-D14
+      - OPS/1.5/A9-A10
+    owedRules:
+      - R259
+    lite:
+      rules:
+        - R06
+        - R216
+      slots:
+        - app.supabase.config
+        - app.supabase.types
+        - app.supabase.seed
+        - app.supabase.templates
+        - app.supabase.functions
+        - app.supabase.local-state
+      examples:
+        - examples/lite-app/supabase/config.toml
+        - examples/lite-app/supabase/types/database.types.ts
+        - examples/lite-app/supabase/seed.sql
+      gap:
+        A05/C02 owe config/extension/vault/API/destructive-DDL/seed-PII checks and stronger type
+        freshness. Empty seed.sql is not proof of meaningful safe seeding or all declared paths.
+      applicability: Required Supabase database.
+    full:
+      rules:
+        - R06
+        - R216
+      slots:
+        - app.supabase.config
+        - app.supabase.types
+        - app.supabase.seed
+        - app.supabase.templates
+        - app.supabase.functions
+        - app.supabase.local-state
+      examples: []
+      gap:
+        No full Supabase config/types/extension/vault/seed example exists. Full development seeds do
+        not prove the Supabase contract.
+      applicability: "Only when hfs.json declares connections[].provider: supabase."
+  - id: db-expand-contract
+    title: Expand/contract, backup and migration compatibility
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.8/M3-M5
+    editionWhy:
+      Lite uses forward-only Supabase SQL; full follows its declared migration owner. Both
+      declare safe release/backup behavior.
+    owedRules:
+      - R259
+      - R267
+      - R271
+    lite:
+      rules:
+        - R213
+      slots:
+        - app.supabase.migrations
+        - app.ci-db
+        - app.starcistacks
+        - be.persistence
+      examples:
+        - examples/lite-app/supabase/migrations
+      gap:
+        A05/A08/A11 owe destructive-DDL judgment, backup/fingerprint/lock declarations and rollback
+        compatibility. A migration path is not a production receipt.
+    full:
+      rules:
+        - R213
+      slots:
+        - app.supabase.migrations
+        - app.ci-db
+        - app.starcistacks
+        - be.persistence
+      examples:
+        - examples/ecommerce-app/be/src/modules/domain
+      gap:
+        A05/A08/A11 owe destructive-DDL judgment, backup/fingerprint/lock declarations and rollback
+        compatibility. A migration path is not a production receipt.
+  - id: observe-logger
+    title: Structured logger port and no secret logging
+    editions:
+      - lite
+      - full
+    sources:
+      - WDD/1.3/O1
+    lite:
+      rules:
+        - R40
+        - R71
+      slots:
+        - be.platform
+        - be.domain
+      examples:
+        - examples/lite-app/be/src/modules/platform/logging/logging.port.ts
+        - examples/lite-app/be/src/modules/platform/logging/json-logger.service.spec.ts
+    full:
+      rules:
+        - R40
+        - R71
+      slots:
+        - be.platform
+        - be.domain
+      examples:
+        - examples/ecommerce-app/be/src/modules/platform/logging/logging.port.ts
+        - examples/ecommerce-app/be/src/modules/platform/logging/json-logger.service.spec.ts
+  - id: observe-optional-p2
+    title: Optional FE reporting and deferred correlation/metrics/tracing
+    editions:
+      - lite
+      - full
+    sources:
+      - WDD/1.3/O4-O5
+      - A15-STANDARD/0.2/observability-decisions
+    lite:
+      rules:
+        - R244
+      slots:
+        - fe.source-root-pinned
+        - fe.modules
+      examples: []
+      gap:
+        FE reporter is documented-optional in hfs.json observe.reporter; no current reporter example is
+        claimed. Request-id/metrics/tracing are unscheduled P2 pending an owner ruling, with no
+        mandatory alpha.15 enforcer.
+    full:
+      rules:
+        - R244
+      slots:
+        - fe.source-root-pinned
+        - fe.modules
+      examples: []
+      gap:
+        FE reporter is documented-optional in hfs.json observe.reporter; no current reporter example is
+        claimed. Request-id/metrics/tracing are unscheduled P2 pending an owner ruling, with no
+        mandatory alpha.15 enforcer.
+  - id: docs-freshness-citations
+    title: Docs freshness, ownership, ruling citations and gate vocabulary
+    editions:
+      - lite
+      - full
+    sources:
+      - WDD/1.4/X1-X5
+    owedRules:
+      - R270
+      - R274
+      - R247
+    lite:
+      rules:
+        - R02
+        - R96
+        - R193
+        - R195
+        - R196
+        - R205
+        - R225
+        - R230
+      slots:
+        - app.readme
+        - repo.docs
+        - app.starcistacks
+        - app.hooks
+      examples:
+        - examples/lite-app/README.md
+      gap:
+        A11/A10/C01/C08 owe product freshness, stale-ruling correction and gate truth. Runtime docs
+        checks do not prove product freshness or that every claimed gate runs.
+    full:
+      rules:
+        - R02
+        - R96
+        - R193
+        - R195
+        - R196
+        - R205
+        - R225
+        - R230
+      slots:
+        - app.readme
+        - repo.docs
+        - app.starcistacks
+        - app.hooks
+      examples:
+        - examples/ecommerce-app/README.md
+        - examples/ecommerce-app/.starcistacks/dev/README.md
+      gap:
+        A11/A10/C01/C08 owe product freshness, stale-ruling correction and gate truth. Runtime docs
+        checks do not prove product freshness or that every claimed gate runs.
+  - id: managed-hook-drift
+    title: Managed config and hook truth versus measured coverage
+    editions:
+      - lite
+      - full
+    sources:
+      - WDD/1.5/G1-G5
+    owedRules:
+      - R247
+    lite:
+      rules:
+        - R05
+        - R11
+        - R16
+        - R17
+        - R22
+        - R204
+        - R225
+      slots:
+        - app.tool-config
+        - app.git-meta
+        - app.sops
+        - app.hooks
+        - app.quality-config
+        - be.tool-config
+        - fe.tool-config
+      examples:
+        - examples/lite-app/.husky/pre-commit
+        - examples/lite-app/.husky/pre-push
+        - examples/lite-app/sonar-project.properties
+      gap:
+        C04/C08/A09 owe unmanaged-file registration and gate truth. Hook chunking is unscheduled P2;
+        current hook paths are not measured per-rule coverage.
+    full:
+      rules:
+        - R05
+        - R11
+        - R16
+        - R17
+        - R22
+        - R204
+        - R225
+      slots:
+        - app.tool-config
+        - app.git-meta
+        - app.sops
+        - app.hooks
+        - app.quality-config
+        - be.tool-config
+        - fe.tool-config
+      examples:
+        - examples/ecommerce-app/.husky/pre-commit
+        - examples/ecommerce-app/.husky/pre-push
+        - examples/ecommerce-app/sonar-project.properties
+      gap:
+        C04/C08/A09 owe unmanaged-file registration and gate truth. Hook chunking is unscheduled P2;
+        current hook paths are not measured per-rule coverage.
+  - id: release-tag-gate
+    title: Product release contract and native release gate
+    editions:
+      - lite
+      - full
+    sources:
+      - WDD/1.6/V2-V3
+    owedRules:
+      - R271
+    lite:
+      rules:
+        - R221
+        - R222
+        - R225
+      slots:
+        - app.package-manifest
+        - app.hooks
+        - app.ci-images
+        - app.ci-db
+      examples:
+        - examples/lite-app/.husky/pre-push
+        - examples/lite-app/package.json
+      gap:
+        A11 owes product tag/version/image/migration provenance. Current hooks are not proof of
+        published images, release notes or a completed production gate.
+    full:
+      rules:
+        - R221
+        - R222
+        - R225
+      slots:
+        - app.package-manifest
+        - app.hooks
+        - app.ci-images
+        - app.ci-db
+      examples:
+        - examples/ecommerce-app/.husky/pre-push
+        - examples/ecommerce-app/package.json
+      gap:
+        A11 owes product tag/version/image/migration provenance. Current hooks are not proof of
+        published images, release notes or a completed production gate.
+  - id: examples-proof-chain
+    title: Truthful example claims, per-enforcer proof and ruling supersession
+    editions:
+      - lite
+      - full
+    sources:
+      - OPS/1.9/X1-X6
+      - WDD/1.7/E1-E12
+    owedRules:
+      - R247
+      - R274
+    lite:
+      rules:
+        - R192
+        - R206
+        - R209
+        - R212
+      slots:
+        - app.declaration
+        - app.starciwork
+        - app.starcistacks
+        - be.tests.integration
+      examples:
+        - examples/lite-app/hfs.json
+      gap:
+        A09/A10/C02/C03/C05/C06/Z01 owe non-vacuous per-edition example/spec/witness chains and
+        truthful example claims. WDD/E1-E11 gaps remain on concrete rows; E12 script examples are
+        mapped on deploy-workflows-host.
+    full:
+      rules:
+        - R192
+        - R206
+        - R209
+        - R212
+      slots:
+        - app.declaration
+        - app.starciwork
+        - app.starcistacks
+        - be.tests.integration
+      examples:
+        - examples/ecommerce-app/hfs.json
+      gap:
+        A09/A10/C02/C03/C05/C06/Z01 owe non-vacuous per-edition example/spec/witness chains and
+        truthful example claims. WDD/E1-E11 gaps remain on concrete rows; E12 script examples are
+        mapped on deploy-workflows-host.
