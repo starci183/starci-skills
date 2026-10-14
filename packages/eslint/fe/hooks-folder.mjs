@@ -26,6 +26,8 @@
  */
 
 import { hfsOf } from "./lib/hfs.mjs"
+import { walk } from "./lib/ast.mjs"
+import { functionOf, isFn, unwrap, variableOf } from "./lib/bindings.mjs"
 import { baseName, classOf, fileOf, inSlot } from "./lib/scope.mjs"
 import { rules as swrFamilyRules } from "./swr-family.mjs"
 
@@ -39,27 +41,133 @@ const isHookName = (name) => /^use[A-Z0-9]/.test(name)
 const isSwrKeyName = (name) => /^[A-Z][A-Z0-9_]*_SWR_KEY$/.test(name)
 
 /** A hook file name: `use<Name>.ts`. */
-const isHookFileName = (name) => /^use[A-Z0-9]\w*\.ts$/.test(name)
+const HOOK_FILE = new RegExp(String.raw`^use[A-Z0-9]\w*\.ts$`)
+const isHookFileName = (name) => HOOK_FILE.test(name)
 
 /** Modules that only run on the server: server code, not a hook. */
-const SERVER_ONLY = /^(?:server-only|next\/headers)$/
+const SERVER_ONLY = new Set(["server-only", "next/headers"])
 
 /** The hooks families of the front-end stack: each slot names its files (`allows`) and its non-hook files (roles). */
 const FAMILY_SLOTS = ["fe.hooks.swr", "fe.hooks.rhf", "fe.hooks.zustand", "fe.hooks.socketio", "fe.hooks.effects", "fe.hooks.reuseables"]
 
-/** The exported names a declaration introduces. */
-const exportedNames = (node) => {
+/** Runtime exports and their local values; type exports do not introduce hooks or helpers. */
+const exportedEntries = (node) => {
   if (node.type === "ExportDefaultDeclaration") {
     const declaration = node.declaration
-    return [declaration && declaration.id ? declaration.id.name : "default"]
+    return [{ node, name: declaration.id?.name ?? "default", local: declaration, default: true }]
   }
+  if (node.exportKind === "type") return []
+  if (node.type === "ExportAllDeclaration") return [{ node, name: "*", local: null }]
   const declaration = node.declaration
-  if (!declaration) return node.specifiers.map((specifier) => specifier.exported.name)
-  if (declaration.type === "FunctionDeclaration" && declaration.id) return [declaration.id.name]
+  if (!declaration) {
+    return node.specifiers.filter((specifier) => specifier.exportKind !== "type").map((specifier) => ({
+      node, name: specifier.exported.name ?? specifier.exported.value, local: node.source ? null : specifier.local,
+      default: (specifier.exported.name ?? specifier.exported.value) === "default",
+    }))
+  }
+  if (declaration.type === "FunctionDeclaration" && declaration.id) return [{ node, name: declaration.id.name, local: declaration }]
   if (declaration.type === "VariableDeclaration") {
-    return declaration.declarations.filter((d) => d.id.type === "Identifier").map((d) => d.id.name)
+    return declaration.declarations.filter((d) => d.id.type === "Identifier").map((d) => ({ node, name: d.id.name, local: d.id }))
   }
   return []
+}
+
+/** Actual React hook APIs and SWR public entry points, rather than an arbitrary `use*` spelling. */
+const REACT_HOOKS = new Set([
+  "use", "useState", "useReducer", "useEffect", "useLayoutEffect", "useInsertionEffect", "useRef", "useImperativeHandle",
+  "useMemo", "useCallback", "useContext", "useDebugValue", "useDeferredValue", "useTransition", "useId",
+  "useSyncExternalStore", "useActionState", "useOptimistic",
+])
+const SWR_HOOKS = new Map([
+  ["swr", new Set(["useSWR", "useSWRConfig"])],
+  ["swr/immutable", new Set(["useSWRImmutable"])],
+  ["swr/infinite", new Set(["useSWRInfinite"])],
+  ["swr/mutation", new Set(["useSWRMutation"])],
+])
+const SWR_DEFAULTS = new Map([["swr", "useSWR"], ["swr/immutable", "useSWRImmutable"], ["swr/infinite", "useSWRInfinite"], ["swr/mutation", "useSWRMutation"]])
+const builtinHook = (origin) => origin?.source === "react" ? REACT_HOOKS.has(origin.name) : Boolean(SWR_HOOKS.get(origin?.source)?.has(origin.name))
+const propertyName = (node) => {
+  if (!node.computed && node.property.type === "Identifier") return node.property.name
+  return node.property.type === "Literal" ? node.property.value : null
+}
+
+/** SWR request hooks are default exports; its root also names useSWRConfig. */
+const namedOrigin = (source, name) => {
+  if (source === "react") return { source, name }
+  if (name === "default" && SWR_DEFAULTS.has(source)) return { source, name: SWR_DEFAULTS.get(source) }
+  return source === "swr" && name === "useSWRConfig" ? { source, name } : null
+}
+
+/** A runtime import records whether its value is a hook or its module namespace. */
+const importOrigin = (definition) => {
+  const specifier = definition.node
+  const source = String(definition.parent.source.value)
+  if (definition.parent.importKind === "type" || specifier.importKind === "type") return null
+  if (source !== "react" && !SWR_HOOKS.has(source)) return null
+  if (specifier.type === "ImportSpecifier") return namedOrigin(source, specifier.imported.name ?? specifier.imported.value)
+  if (specifier.type === "ImportDefaultSpecifier" && SWR_DEFAULTS.has(source)) return { source, name: SWR_DEFAULTS.get(source) }
+  return { source, name: null }
+}
+
+/** Resolve a constant alias, including destructuring a React/SWR namespace. */
+const constantOrigin = (context, definition, variable, seen) => {
+  const declaration = definition.node
+  if (declaration.type !== "VariableDeclarator" || definition.parent.kind !== "const") return null
+  const origin = hookOrigin(context, declaration.init, seen)
+  if (declaration.id.type === "Identifier") return origin
+  if (declaration.id.type !== "ObjectPattern" || !origin || origin.name !== null) return null
+  const property = declaration.id.properties.find((entry) => entry.type === "Property" && entry.value.type === "Identifier" && entry.value.name === variable.name)
+  if (!property) return null
+  const name = property.computed || property.key.type === "Literal" ? property.key.value : property.key.name
+  return namedOrigin(origin.source, name)
+}
+
+/** Follow lexical bindings so shadowed, reassigned and unrelated `use*` values cannot prove a hook. */
+const hookOrigin = (context, input, seen = new Set()) => {
+  const node = unwrap(input)
+  if (node?.type === "MemberExpression") {
+    const origin = hookOrigin(context, node.object, seen)
+    if (origin?.name !== null) return null
+    const name = propertyName(node)
+    return namedOrigin(origin.source, name)
+  }
+  if (node?.type !== "Identifier") return null
+  const variable = variableOf(context, node)
+  if (!variable || seen.has(variable) || variable.defs.length !== 1) return null
+  if (variable.references.some((reference) => reference.isWrite() && !reference.init)) return null
+  const definition = variable.defs[0]
+  if (definition.type === "ImportBinding") return importOrigin(definition)
+  return constantOrigin(context, definition, variable, new Set([...seen, variable]))
+}
+
+/** The exported function itself must call the hook; an unused nested callback is not evidence. */
+const callsBuiltinHook = (context, local) => {
+  const hook = functionOf(context, local)
+  if (!hook) return false
+  let found = false
+  walk(context.sourceCode, hook.body, (node) => {
+    if (found || isFn(node)) return false
+    if (node.type === "CallExpression" && builtinHook(hookOrigin(context, node.callee))) found = true
+    return undefined
+  })
+  return found
+}
+
+/** Exactly one named, locally implemented hook; optional SWR key and type exports remain available. */
+const checkHookExports = (context, program, exported) => {
+  const hooks = exported.filter((item) => !item.default && isHookName(item.name))
+  const defaults = exported.filter((item) => item.default)
+  for (const item of defaults) context.report({ node: item.node, messageId: "defaultExport" })
+  for (const item of exported) {
+    if (!item.default && !isHookName(item.name) && !isSwrKeyName(item.name)) {
+      context.report({ node: item.node, messageId: "export", data: { name: item.name } })
+    }
+  }
+  if (hooks.length === 0 && defaults.length === 0) context.report({ node: program, messageId: "missing" })
+  if (hooks.length > 1) context.report({ node: hooks[1].node, messageId: "many", data: { count: hooks.length } })
+  for (const item of hooks) {
+    if (!callsBuiltinHook(context, item.local)) context.report({ node: item.node, messageId: "fake", data: { name: item.name } })
+  }
 }
 
 /**
@@ -108,6 +216,12 @@ export const hooksFolderHoldsHooksOnly = {
         "`{{name}}` is exported from a hook file but is not a hook. A hook file exports the hook (a function named `use...`) and at most its SWR key (`QUERY_<X>_SWR_KEY`, `MUTATE_<X>_SWR_KEY`); a helper belongs in `<domain>.shared.ts`.",
       many:
         "This file exports {{count}} hooks. One hook per file keeps a hook findable by its name and keeps a change to one from re-running the tests of the others.",
+      missing:
+        "FE_HOOKS_ARE_HOOKS: a hook file exports exactly one named use* function that calls a React or SWR hook. Non-hook helpers belong in the domain's shared helper file.",
+      defaultExport:
+        "FE_HOOKS_ARE_HOOKS: export the hook as a named use* function. A default export does not identify the hook this file owns.",
+      fake:
+        "FE_HOOKS_ARE_HOOKS: `{{name}}` must be a function that calls a real React or SWR hook; a use* name alone does not make a reader or helper a hook.",
       sharedHook:
         "`{{name}}` is a hook exported from the shared helper file. That file holds non-hook helpers; a hook there is a hook nobody will find. Give it its own `use<Name>.ts`.",
       server:
@@ -126,28 +240,22 @@ export const hooksFolderHoldsHooksOnly = {
         else context.report({ node: program, messageId: "notHook", data: { name } })
       },
       ImportDeclaration(node) {
-        if (SERVER_ONLY.test(String(node.source.value))) {
+        if (SERVER_ONLY.has(String(node.source.value))) {
           context.report({ node, messageId: "server", data: { source: node.source.value } })
         }
       },
       "Program:exit"(program) {
         if (judged.directlyInHooks || judged.stray || (!judged.hookFile && !judged.sharedFile)) return
         const exported = program.body
-          .filter((node) => node.type === "ExportNamedDeclaration" || node.type === "ExportDefaultDeclaration")
-          .flatMap((node) => exportedNames(node).map((exportedName) => ({ node, name: exportedName })))
+          .filter((node) => ["ExportNamedDeclaration", "ExportDefaultDeclaration", "ExportAllDeclaration"].includes(node.type))
+          .flatMap(exportedEntries)
         if (judged.sharedFile) {
           for (const item of exported) {
             if (isHookName(item.name)) context.report({ node: item.node, messageId: "sharedHook", data: { name: item.name } })
           }
           return
         }
-        const hooks = exported.filter((item) => isHookName(item.name))
-        for (const item of exported) {
-          if (!isHookName(item.name) && !isSwrKeyName(item.name) && item.name !== "default") {
-            context.report({ node: item.node, messageId: "export", data: { name: item.name } })
-          }
-        }
-        if (hooks.length > 1) context.report({ node: hooks[1].node, messageId: "many", data: { count: hooks.length } })
+        checkHookExports(context, program, exported)
       },
     }
   },

@@ -35,7 +35,7 @@ const E2E = at("src/tests/e2e/checkout/course-enroll.e2e-spec.ts")
 const NEST = 'import { Test } from "@nestjs/testing"\nimport { OrderService } from "./order.service"\n'
 
 test("every rule this law declares is exported under its published name", () => {
-    for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
+    for (const [name, rule] of Object.entries(rules)) assert.ok(rule?.meta && rule.create, `${name} is not a rule`)
 })
 
 test("spec-builds-with-testing-module: the subject comes out of a compiled Nest testing module", () => {
@@ -220,7 +220,7 @@ test("spec-infra-double-from-kit: a provider takes its value from the kit double
 test("the token table is the manifest's, not the rule's", () => {
     const table = fixtureHfs().ruleParams.specDoubles
     assert.equal(table.kit, "@starci/jest-preset")
-    assert.deepEqual(table.doubles.map((entry) => entry.double).sort(), ["FakeClock", "builder", "fakeCache", "fakeIds", "fakeInbox", "fakeLock", "fakeTransaction", "mockEntityManager", "recordingEventBus", "recordingQueueOutbox"])
+    assert.deepEqual(table.doubles.map((entry) => entry.double).sort((left, right) => left < right ? -1 : Number(left > right)), ["FakeClock", "builder", "fakeCache", "fakeIds", "fakeInbox", "fakeLock", "fakeTransaction", "mockEntityManager", "recordingEventBus", "recordingQueueOutbox"])
     assert.equal(table.fallback.double, "mock")
 })
 
@@ -315,7 +315,6 @@ for (const edition of ["lite", "full"]) {
                 { filename: SPEC, settings, code: "await expect(subject.run()).rejects.toThrow('invalid')" },
                 { filename: SPEC, settings, code: "expect(subject.run()).toBeNull()" },
                 { filename: SPEC, settings, code: "expect(subject.run()).toBeFalsy()" },
-                { filename: SPEC, settings, code: "it('x', () => subject.run())" },
                 { filename: SPEC, settings, code: "const expect = (value: object) => ({ toBeDefined: () => value })\nexpect(subject).toBeDefined()" },
                 { filename: HANDLER_SPEC, settings, code: "expect(subject).toBeDefined()" },
                 { filename: E2E, settings, code: "expect(subject).toBeDefined()" },
@@ -329,7 +328,59 @@ for (const edition of ["lite", "full"]) {
                 { filename: SPEC, settings, code: "await expect(subject.run()).resolves.toBeDefined()", errors: [{ messageId: "presenceOnly" }] },
                 { filename: SPEC, settings, code: 'import { expect as check } from "@jest/globals"\ncheck(subject).toBeDefined()', errors: [{ messageId: "presenceOnly" }] },
                 { filename: SPEC, settings, code: 'import * as globals from "@jest/globals"\nglobals.expect(subject).toBeDefined()', errors: [{ messageId: "presenceOnly" }] },
+                { filename: SPEC, settings, code: "it('x', () => subject.run())", errors: [{ messageId: "zeroAssertions" }] },
                 ...LOGIC_SPECS.map(({ path }) => ({ filename: at(path), settings, code: "expect(subject).toBeDefined()", errors: [{ messageId: "presenceOnly" }] })),
+            ],
+        })
+    })
+    test(`R281 ${edition}: every logic role refuses a test with zero assertions even beside an asserted test`, () => {
+        const filenames = [SPEC, at("src/features/cli/migrate/subs/run.cli.spec.ts"), ...hfs.ruleParams.logicRoles.map((role) => at(`src/modules/platform/checks/subject.${role}.spec.ts`))]
+        tester.run("spec-behavior-assertion", specBehaviorAssertion, {
+            valid: filenames.map((filename) => ({ filename, settings, code: 'it("returns a result", () => expect(subject.run()).toEqual({ accepted: true }))\ntest("rejects invalid input", async () => { await expect(subject.run("invalid")).rejects.toThrow("invalid") })' })),
+            invalid: filenames.map((filename) => ({ filename, settings, code: 'it("runs without assertions", () => { subject.run() })\ntest("returns a result", () => expect(subject.run()).toEqual({ accepted: true }))', errors: [{ messageId: "zeroAssertions" }] })),
+        })
+    })
+    test(`R281 ${edition}: each Jest it/test callback must assert, including aliases and parameterized tests`, () => {
+        tester.run("spec-behavior-assertion", specBehaviorAssertion, {
+            valid: [
+                { filename: SPEC, settings, code: 'it("returns a result", function () { expect(subject.run()).toEqual({ accepted: true }) })' },
+                { filename: SPEC, settings, code: 'test.only("returns a result", () => expect(subject.run()).toEqual({ accepted: true }))' },
+                { filename: SPEC, settings, code: 'test.each([1, 2])("doubles %s", value => expect(subject.run(value)).toBe(value * 2))' },
+                { filename: SPEC, settings, code: 'test.concurrent.each([1, 2])("doubles %s", value => expect(subject.run(value)).toBe(value * 2))' },
+                { filename: SPEC, settings, code: 'test.each`value\n${1}`("doubles", ({ value }) => expect(subject.run(value)).toBe(value * 2))' },
+                { filename: SPEC, settings, code: 'import { it as verify, expect as check } from "@jest/globals"\nverify("returns a result", () => check(subject.run()).toEqual({ accepted: true }))' },
+                { filename: SPEC, settings, code: 'import * as globals from "@jest/globals"\nglobals.test("returns a result", () => globals.expect(subject.run()).toEqual({ accepted: true }))' },
+                { filename: SPEC, settings, code: 'const checkResult = () => expect(subject.run()).toEqual({ accepted: true })\nit("returns a result", checkResult)' },
+                { filename: SPEC, settings, code: 'function checkResult() { expect(subject.run()).toEqual({ accepted: true }) }\nit("returns a result", () => checkResult())' },
+                { filename: SPEC, settings, code: 'it("checks each result", () => { [1, 2].forEach(value => expect(subject.run(value)).toBe(value * 2)) })' },
+                { filename: SPEC, settings, code: 'function checkResult() { checkResult(); expect(subject.run()).toEqual({ accepted: true }) }\nit("returns a result", () => checkResult())' },
+                { filename: SPEC, settings, code: 'it.todo("future behavior")\ntest.skip("pending behavior")' },
+                { filename: SPEC, settings, code: 'const it = (name: string, callback: () => void) => callback()\nit("local callback", () => subject.run())' },
+                { filename: SPEC, settings, code: 'import { test } from "./custom-runner"\ntest("local callback", () => subject.run())' },
+                { filename: HANDLER_SPEC, settings, code: 'it("thin handler", () => subject.run())' },
+                { filename: E2E, settings, code: 'it("e2e flow", () => subject.run())' },
+                { filename: at("src/tests/integration/checkout/checkout.integration-spec.ts"), settings, code: 'test("integration flow", () => subject.run())' },
+                { filename: at("src/tests/contract/checkout/checkout.contract-spec.ts"), settings, code: 'test("contract flow", () => subject.run())' },
+                { filename: SERVICE, settings, code: 'test("production callback", () => subject.run())' },
+            ],
+            invalid: [
+                { filename: SPEC, settings, code: 'test("zero assertions", () => subject.run())', errors: [{ messageId: "zeroAssertions" }] },
+                { filename: SPEC, settings, code: 'it.only("zero assertions", function () { subject.run() })', errors: [{ messageId: "zeroAssertions" }] },
+                { filename: SPEC, settings, code: 'it.skip("zero assertions", () => {})', errors: [{ messageId: "zeroAssertions" }] },
+                { filename: SPEC, settings, code: 'test.concurrent("zero assertions", async () => { await subject.run() })', errors: [{ messageId: "zeroAssertions" }] },
+                { filename: SPEC, settings, code: 'test.each([1, 2])("zero assertions %s", value => subject.run(value))', errors: [{ messageId: "zeroAssertions" }] },
+                { filename: SPEC, settings, code: 'test.each`value\n${1}`("zero assertions", ({ value }) => subject.run(value))', errors: [{ messageId: "zeroAssertions" }] },
+                { filename: SPEC, settings, code: 'import { test as verify } from "@jest/globals"\nverify("zero assertions", () => subject.run())', errors: [{ messageId: "zeroAssertions" }] },
+                { filename: SPEC, settings, code: 'import * as globals from "@jest/globals"\nglobals.it.only("zero assertions", () => subject.run())', errors: [{ messageId: "zeroAssertions" }] },
+                { filename: SPEC, settings, code: 'const run = () => subject.run()\nit("zero assertions", run)', errors: [{ messageId: "zeroAssertions" }] },
+                { filename: SPEC, settings, code: 'function run() { subject.run() }\nit("zero assertions", run)', errors: [{ messageId: "zeroAssertions" }] },
+                { filename: SPEC, settings, code: 'it("zero assertions", () => { expect.assertions(1); expect.hasAssertions(); expect(subject.run()) })', errors: [{ messageId: "zeroAssertions" }] },
+                { filename: SPEC, settings, code: 'expect(subject.run()).toEqual({ accepted: true })\nit("zero assertions", () => subject.run())', errors: [{ messageId: "zeroAssertions" }] },
+                { filename: SPEC, settings, code: 'beforeEach(() => expect(subject.run()).toEqual({ accepted: true }))\nit("zero assertions", () => subject.run())', errors: [{ messageId: "zeroAssertions" }] },
+                { filename: SPEC, settings, code: 'const expect = (value: unknown) => ({ toEqual: () => value })\nit("zero assertions", () => expect(subject.run()).toEqual())', errors: [{ messageId: "zeroAssertions" }] },
+                { filename: SPEC, settings, code: 'it("zero assertions", () => { const unused = () => expect(subject.run()).toEqual({ accepted: true }) })', errors: [{ messageId: "zeroAssertions" }] },
+                { filename: SPEC, settings, code: 'it("zero assertions", () => { it("nested assertions", () => expect(subject.run()).toEqual({ accepted: true })) })', errors: [{ messageId: "zeroAssertions" }] },
+                { filename: SPEC, settings, code: 'function run() { run() }\nit("zero assertions", () => run())', errors: [{ messageId: "zeroAssertions" }] },
             ],
         })
     })

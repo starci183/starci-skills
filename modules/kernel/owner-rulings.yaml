@@ -194,6 +194,12 @@ rulings:
     ruling: "The one application icon set is the heroicons family, not Phosphor: @heroicons/react is the base set and is used first, @starci/heroicons holds only the glyphs heroicons lacks (brand or domain glyphs drawn in heroicons style), never duplicates a heroicons glyph, and a missing glyph is added to @starci/heroicons; both are imported on the 24/outline and 16/solid cuts through the icon leaf."
     enforcedBy: [knowledge/hfs/fe-stack.yaml, packages/eslint/fe/icon.mjs, scripts/work/draw/draw-source.mjs, packages/heroicons/src/package-boundary.spec.mjs]
 
+  - id: accept-language-locale-header
+    date: '2026-10-14'
+    ruling: "R50 (FE_TRANSPORT_OWNER) requires Accept-Language as the locale header in both editions; x-locale is retired. Historical CHANGELOG entries and the rule that rejects the retired header preserve its spelling."
+    staleWhen: ['\bx-locale\b']
+    enforcedBy: [packages/eslint/fe/served-locale.mjs]
+
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']
   'ruling:R212/case-4': ['ruling:R212/case-1', 'ruling:R212/case-2']

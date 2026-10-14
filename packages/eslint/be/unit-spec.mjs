@@ -20,12 +20,13 @@
  *   - `spec-exact-values`: no `expect.any(String)`, `expect.any(Number)` or `expect.any(Date)` (`expect` being the jest global
  *     or the `@jest/globals` import): ids and clocks come from the kit's deterministic doubles (`fakeIds()`, `FakeClock`), so a
  *     unit spec asserts the exact value.
- *   - `spec-behavior-assertion`: a spec with only presence/truthiness assertions must assert an exact result or effect.
+ *   - `spec-behavior-assertion`: every `it`/`test` asserts a result or effect; a spec with only presence/truthiness
+ *     assertions must assert an exact result or effect.
  *
  * Paths are asked of the slot manifest (`lib/unit-spec.mjs`), a name is judged by the import that binds it, never by its spelling.
  */
 import { hfsOf } from "./lib/hfs.mjs"
-import { walk } from "./lib/ast.mjs"
+import { keyName, walk } from "./lib/ast.mjs"
 import { importOf, isImportedFrom } from "./lib/import-source.mjs"
 import { isPackageType, typeOrigins } from "./lib/types.mjs"
 import { baseOf, isServiceSpecFile, isUnitSpecFile, unitRoleOfSpec } from "./lib/unit-spec.mjs"
@@ -35,16 +36,20 @@ const TESTING_PACKAGE = "@nestjs/testing"
 /** Existing service specs and every other unit-tested logic role declared by the manifest. */
 const isFormSpecFile = (hfs, filename) => isServiceSpecFile(hfs, filename) || unitRoleOfSpec(hfs, filename) !== null
 
+/** Whether this callee creates a Nest testing module through its actual import. */
+const isTestingFactory = (context, callee) => {
+    if (callee.type !== "MemberExpression" || callee.computed || keyName(callee.property) !== "createTestingModule") return false
+    const found = importOf(context, callee.object)
+    return found?.source === TESTING_PACKAGE && found.imported === "Test"
+}
+
 /** The last call in a chain `Test.createTestingModule(...).<a>().<b>()`: the `createTestingModule` call at its root, or null. */
 const testingModuleRoot = (context, node) => {
     let cursor = node
     while (cursor) {
         if (cursor.type === "CallExpression") {
             const callee = cursor.callee
-            if (callee.type === "MemberExpression" && !callee.computed && callee.property.type === "Identifier" && callee.property.name === "createTestingModule" && callee.object.type === "Identifier") {
-                const found = importOf(context, callee.object)
-                return found && found.source === TESTING_PACKAGE && found.imported === "Test" ? cursor : null
-            }
+            if (isTestingFactory(context, callee)) return cursor
             cursor = callee.type === "MemberExpression" ? callee.object : null
         } else if (cursor.type === "MemberExpression") cursor = cursor.object
         else if (cursor.type === "AwaitExpression") cursor = cursor.argument
@@ -243,6 +248,71 @@ const assignedClassOf = (node) => {
     return target?.type === "NewExpression" && target.callee.type === "Identifier" ? target.callee.name : null
 }
 
+/** The declared name of a function or the property that holds it. */
+const functionNameOf = (fn) => {
+    if (fn.id?.name) return fn.id.name
+    const parent = fn.parent
+    if (parent?.type === "VariableDeclarator" && parent.id.type === "Identifier") return parent.id.name
+    if (parent?.type === "Property" || parent?.type === "MethodDefinition") return parent.key.name ?? parent.key.value
+    return "this function"
+}
+
+/** Names that the parameter types mention. */
+const parameterTypeNames = (fn) => {
+    const names = new Set()
+    for (const param of fn.params) {
+        for (const spelled of typeNamesIn(param.typeAnnotation ?? param.left?.typeAnnotation)) names.add(spelled)
+    }
+    return names
+}
+
+/** Report type parameters chosen only by the caller's expected return type. */
+const reportReturnOnlyParameters = (context, fn, name) => {
+    const declared = fn.typeParameters?.params ?? []
+    const returned = fn.returnType?.typeAnnotation
+    if (declared.length === 0 || !returned) return false
+    const inReturn = typeNamesIn(returned)
+    const inParams = parameterTypeNames(fn)
+    let generic = false
+    for (const param of declared) {
+        const spelled = param.name.name
+        // A parameter mentioned by another parameter's bound is driven by the caller's arguments.
+        const inBounds = declared.some((other) => other !== param && (typeNamesIn(other.constraint).has(spelled) || typeNamesIn(other.default).has(spelled)))
+        if (inReturn.has(spelled) && !inParams.has(spelled) && !inBounds) {
+            generic = true
+            context.report({ node: param, messageId: "returnOnly", data: { name, param: spelled } })
+        }
+    }
+    return generic
+}
+
+/** Untyped parameters handed back by a spec helper. */
+const looseParameters = (fn) => {
+    const loose = new Map()
+    for (const param of fn.params) {
+        const target = param.type === "AssignmentPattern" ? param.left : param
+        const kind = target.type === "Identifier" ? target.typeAnnotation?.typeAnnotation?.type : undefined
+        if (kind === "TSUnknownKeyword" || kind === "TSAnyKeyword") loose.set(target.name, kind === "TSAnyKeyword" ? "any" : "unknown")
+    }
+    return loose
+}
+
+/** Report a helper return that launders an untyped value or a different class. */
+const reportHelperReturn = (context, expression, { name, generic, loose, returned }) => {
+    const value = peel(expression)
+    const returnedType = returned?.type
+    const concrete = returnedType !== undefined && returnedType !== "TSUnknownKeyword" && returnedType !== "TSAnyKeyword"
+    if (!generic && value.type === "Identifier" && loose.has(value.name) && (concrete || value !== expression)) {
+        context.report({ node: expression, messageId: "launder", data: { name, kind: loose.get(value.name) } })
+        return true
+    }
+    const klass = assignedClassOf(value)
+    if (klass !== null && returned?.type === "TSTypeReference" && returned.typeName.type === "Identifier" && returned.typeName.name !== klass) {
+        context.report({ node: expression, messageId: "assign", data: { klass, returned: returned.typeName.name } })
+    }
+    return false
+}
+
 /** A helper of a spec or of the fixtures is not a cast with a name. */
 export const noReturnOnlyGeneric = {
     meta: {
@@ -260,44 +330,14 @@ export const noReturnOnlyGeneric = {
         const hfs = hfsOf(context)
         const filename = context.filename || context.getFilename()
         if (!/\.(?:e2e-|integration-|contract-)?spec\.[cm]?ts$/.test(baseOf(filename)) && hfs.slotOf(filename) !== "be.tests.fixtures") return {}
-        const nameOf = (fn) => fn.id?.name ?? (fn.parent?.type === "VariableDeclarator" && fn.parent.id.type === "Identifier" ? fn.parent.id.name : fn.parent?.type === "Property" || fn.parent?.type === "MethodDefinition" ? (fn.parent.key.name ?? fn.parent.key.value) : "this function")
         const check = (fn) => {
-            const name = nameOf(fn)
-            const declared = fn.typeParameters?.params ?? []
-            let generic = false
+            const name = functionNameOf(fn)
+            const generic = reportReturnOnlyParameters(context, fn, name)
             const returned = fn.returnType?.typeAnnotation
-            if (declared.length > 0 && returned) {
-                const inReturn = typeNamesIn(returned)
-                const inParams = new Set()
-                for (const param of fn.params) for (const spelled of typeNamesIn(param.typeAnnotation ?? param.left?.typeAnnotation)) inParams.add(spelled)
-                for (const param of declared) {
-                    const spelled = param.name.name
-                    // a parameter that another parameter's constraint or default mentions is still driven by the caller's arguments
-                    const inBounds = declared.some((other) => other !== param && (typeNamesIn(other.constraint).has(spelled) || typeNamesIn(other.default).has(spelled)))
-                    if (inReturn.has(spelled) && !inParams.has(spelled) && !inBounds) {
-                        generic = true
-                        context.report({ node: param, messageId: "returnOnly", data: { name, param: spelled } })
-                    }
-                }
-            }
             if (fn.body === null || fn.body === undefined) return
-            const loose = new Map()
-            for (const param of fn.params) {
-                const target = param.type === "AssignmentPattern" ? param.left : param
-                const kind = target.type === "Identifier" ? target.typeAnnotation?.typeAnnotation?.type : undefined
-                if (kind === "TSUnknownKeyword" || kind === "TSAnyKeyword") loose.set(target.name, kind === "TSAnyKeyword" ? "any" : "unknown")
-            }
-            const concrete = returned !== undefined && returned.type !== "TSUnknownKeyword" && returned.type !== "TSAnyKeyword"
+            const loose = looseParameters(fn)
             for (const expression of returnedExpressions(fn)) {
-                const value = peel(expression)
-                if (!generic && value.type === "Identifier" && loose.has(value.name) && (concrete || value !== expression)) {
-                    context.report({ node: expression, messageId: "launder", data: { name, kind: loose.get(value.name) } })
-                    return
-                }
-                const klass = assignedClassOf(value)
-                if (klass !== null && returned?.type === "TSTypeReference" && returned.typeName.type === "Identifier" && returned.typeName.name !== klass) {
-                    context.report({ node: expression, messageId: "assign", data: { klass, returned: returned.typeName.name } })
-                }
+                if (reportHelperReturn(context, expression, { name, generic, loose, returned })) return
             }
         }
         return {
@@ -320,7 +360,7 @@ export const noReturnOnlyGeneric = {
 // -- spec-infra-double-from-kit --------------------------------------------------------------------------------
 
 /** `EntityManager` -> `ENTITY_MANAGER`, `redis-cache` -> `REDIS_CACHE`. */
-const screamingSnake = (name) => String(name).replace(/([a-z0-9])([A-Z])/g, "$1_$2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").toUpperCase().replace(/[^A-Z0-9]+/g, "_")
+const screamingSnake = (name) => String(name).replace(/([a-z0-9])([A-Z])/g, "$1_$2").replace(/([A-Z])([A-Z][a-z])/g, "$1_$2").toUpperCase().replace(/[^A-Z0-9]+/g, "_")
 
 /** The name a provider token spells: an identifier, the last member of `Tokens.CLOCK`, a string, a called token factory's name. */
 const tokenName = (node) => {
@@ -343,6 +383,18 @@ const tableOf = (specDoubles) => {
     return compiled
 }
 
+/** A const identifier's initializer, or null when its value cannot be followed. */
+const constantInitializer = (context, value) => {
+    for (let scope = context.sourceCode.getScope(value); scope; scope = scope.upper) {
+        const variable = scope.set.get(value.name)
+        if (!variable) continue
+        const definition = variable.defs[0]
+        if (definition?.type === "Variable" && definition.node.id.type === "Identifier" && definition.node.init && definition.parent.kind === "const") return definition.node.init
+        return null
+    }
+    return null
+}
+
 /** A value's form and the double it names: `{ form, name }`, or null when it is not a form the table knows. */
 const formOf = (context, node, depth = 0) => {
     const value = peel(node)
@@ -363,14 +415,8 @@ const formOf = (context, node, depth = 0) => {
             return value.expressions.length === 0 ? { form: "primitive" } : null
         case "Identifier": {
             if (depth >= 3) return null
-            for (let scope = context.sourceCode.getScope(value); scope; scope = scope.upper) {
-                const variable = scope.set.get(value.name)
-                if (!variable) continue
-                const definition = variable.defs[0]
-                if (definition?.type === "Variable" && definition.node.id.type === "Identifier" && definition.node.init && definition.parent.kind === "const") return formOf(context, definition.node.init, depth + 1)
-                return null
-            }
-            return null
+            const initializer = constantInitializer(context, value)
+            return initializer === null ? null : formOf(context, initializer, depth + 1)
         }
         default:
             return null
@@ -384,6 +430,21 @@ const KIT_TYPES = Object.freeze({ MockEntityManager: "mockEntityManager", FakeCa
 const kitDoubleOfType = (context, node, kit) => {
     const found = typeOrigins(context, node).find((origin) => Object.hasOwn(KIT_TYPES, origin.name) && origin.module === kit)
     return found ? KIT_TYPES[found.name] : null
+}
+
+/** How an actual double value is written in a diagnostic. */
+const describeDoubleValue = (found) => {
+    if (found.name === undefined) return `a ${found.form} value`
+    const prefix = found.form === "new" ? "new " : ""
+    return `\`${prefix}${found.name}(...)\``
+}
+
+/** Judge a provider that is traced by its declared type instead of its initializer. */
+const checkTypedDouble = (context, node, table, entry, data) => {
+    const typedAs = kitDoubleOfType(context, node.value, table.kit)
+    if (typedAs === null) return context.report({ node: node.value, messageId: "unknown", data })
+    if (typedAs !== entry.double) return context.report({ node: node.value, messageId: "wrong", data: { ...data, got: `a \`${typedAs}\` double` } })
+    return undefined
 }
 
 /** The double a token's provider value must come from. */
@@ -419,18 +480,15 @@ export const specInfraDoubleFromKit = {
                 const data = { token: spelled, want, kit: table.kit }
                 if (found === null) {
                     // not a call, a literal or a traceable const: the declared type of the value decides (a helper parameter, `tx.em`)
-                    const typedAs = kitDoubleOfType(context, node.value, table.kit)
-                    if (typedAs === null) return context.report({ node: node.value, messageId: "unknown", data })
-                    if (typedAs !== entry.double) return context.report({ node: node.value, messageId: "wrong", data: { ...data, got: `a \`${typedAs}\` double` } })
-                    return undefined
+                    return checkTypedDouble(context, node, table, entry, data)
                 }
                 if (!entry.forms.includes(found.form)) {
-                    const got = found.name ? `\`${found.form === "new" ? "new " : ""}${found.name}(...)\`` : `a ${found.form} value`
+                    const got = describeDoubleValue(found)
                     return context.report({ node: node.value, messageId: "wrong", data: { ...data, got } })
                 }
                 if (found.name === undefined) return undefined
                 const imported = importOf(context, found.node)
-                if (found.name !== entry.double) return context.report({ node: node.value, messageId: "wrong", data: { ...data, got: `\`${found.form === "new" ? "new " : ""}${found.name}(...)\`` } })
+                if (found.name !== entry.double) return context.report({ node: node.value, messageId: "wrong", data: { ...data, got: describeDoubleValue(found) } })
                 if (!imported || !(imported.source === table.kit || imported.source.startsWith(`${table.kit}/`)) || imported.imported !== entry.double) return context.report({ node: node.value, messageId: "notKit", data: { ...data, name: found.name } })
                 return undefined
             },
@@ -487,14 +545,72 @@ const matcherOf = (context, node) => {
     return matcher
 }
 
+const TEST_MODIFIERS = new Set(["only", "skip", "concurrent", "failing", "each"])
+
+/** A Jest test registration, including modifiers and both forms of `each`. */
+const isTestFunction = (context, node) => {
+    if (!node) return false
+    if (isImportedFrom(context, node, "@jest/globals", ["it", "test"])) return true
+    if (isAmbientOrImported(context, node, "it", "@jest/globals") || isAmbientOrImported(context, node, "test", "@jest/globals")) return true
+    if (node.type === "MemberExpression" && TEST_MODIFIERS.has(keyName(node.property))) return isTestFunction(context, node.object)
+    if (node.type === "CallExpression" && node.callee.type === "MemberExpression" && keyName(node.callee.property) === "each") return isTestFunction(context, node.callee.object)
+    if (node.type === "TaggedTemplateExpression" && node.tag.type === "MemberExpression" && keyName(node.tag.property) === "each") return isTestFunction(context, node.tag.object)
+    return false
+}
+
+/** The local value an identifier binds, when it can name a callback or assertion helper. */
+const functionBinding = (context, node) => {
+    for (let scope = context.sourceCode.getScope(node); scope; scope = scope.upper) {
+        const variable = scope.set.get(node.name)
+        if (!variable) continue
+        const definition = variable.defs[0]
+        if (definition?.type === "FunctionName") return definition.node
+        if (definition?.type === "Variable") return definition.node.init
+        return null
+    }
+    return null
+}
+
+/** An inline function or a locally bound function, following aliases without cycles. */
+const functionOf = (context, expression) => {
+    let node = peel(expression)
+    const seen = new Set()
+    while (node?.type === "Identifier") {
+        if (seen.has(node)) return null
+        seen.add(node)
+        node = peel(functionBinding(context, node))
+    }
+    if (!node) return null
+    return ["ArrowFunctionExpression", "FunctionExpression", "FunctionDeclaration"].includes(node.type) ? node : null
+}
+
+/** Assertions in the callback's executed syntax, including local helpers and passed callbacks. */
+const hasAssertion = (context, fn, seen = new Set()) => {
+    if (seen.has(fn)) return false
+    seen.add(fn)
+    let found = false
+    walk(fn.body, (node) => {
+        if (found || node.type !== "CallExpression") return
+        if (matcherOf(context, node) !== null) {
+            found = true
+            return
+        }
+        if (isTestFunction(context, node.callee)) return
+        const functions = [node.callee, ...node.arguments].map((expression) => functionOf(context, expression)).filter(Boolean)
+        found = functions.some((helper) => hasAssertion(context, helper, seen))
+    }, { intoFunctions: false })
+    return found
+}
+
 /** Presence alone does not prove the behavior of a logic-role subject. */
 export const specBehaviorAssertion = {
     meta: {
         type: "problem",
-        docs: { description: "A logic-role unit spec has a behavior assertion beyond presence or truthiness (R281 BE_SPEC_FORM_ALL_ROLES)." },
+        docs: { description: "Every logic-role unit test has an assertion, and its spec asserts behavior beyond presence or truthiness (R281 BE_SPEC_FORM_ALL_ROLES)." },
         schema: [],
         messages: {
             presenceOnly: "[BE_SPEC_FORM_ALL_ROLES] Every assertion in this spec checks only presence or truthiness. Assert an exact result, error or observable effect of the subject's behavior.",
+            zeroAssertions: "[BE_SPEC_FORM_ALL_ROLES] This unit test has no assertion. Assert an exact result, error or observable effect of the subject's behavior in every `it`/`test` callback.",
         },
     },
     create(context) {
@@ -503,6 +619,10 @@ export const specBehaviorAssertion = {
         let behavior = false
         return {
             CallExpression(node) {
+                if (isTestFunction(context, node.callee)) {
+                    const callback = functionOf(context, node.arguments[1])
+                    if (callback !== null && !hasAssertion(context, callback)) context.report({ node, messageId: "zeroAssertions" })
+                }
                 const matcher = matcherOf(context, node)
                 if (matcher === null) return
                 if (PRESENCE_MATCHERS.has(matcher)) firstPresence ??= node

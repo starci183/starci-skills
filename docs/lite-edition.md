@@ -33,8 +33,9 @@ forbids is refused (R244).
 Tests: back-end unit specs are required exactly as in full (`ruleParams.be.unitRoles`, the logic roles at 100 per file, the
 `@starci/jest-preset` doubles and builders). R272 requires a lite wiring and boot proof that compiles the Nest module graph
 with doubles. R284 requires the declared pattern proofs in the integration-spec lane against
-the local Supabase CLI stack (`starci supabase start`), with no toxiproxy and no containers of their own. There is no e2e world,
-no contract world and no e2e workflow (slot `app.ci-e2e`). The front end has no tests in either edition (R97).
+the local Supabase CLI stack (`starci supabase start`), with no toxiproxy and no containers of their own. Lite may also have
+contract specs in `tests/contract` and a `test:contract` script. The e2e world and workflow (slot `app.ci-e2e`), stack tests
+and browser runs remain full-only. The front end has no tests in either edition (R97).
 
 Work: lite's `app.starciwork` slot holds only `.gitignore`, `workspace.yaml` and `brand/**` (ruling:R212/case-4, owner amendment
 2026-10-14). Workspace metadata supplies the project id and repo roles that Work tools use to locate the app root and tie
@@ -61,7 +62,8 @@ business-rule records there.
 ## The tree in words
 
 The app is still one monorepo. The `app.sides` slot contains a back-end side and a front-end side. Lite starts with one
-`be.app.api` owner and one `fe.app.next` owner; it creates no shared front-end package until the product upgrades and grows.
+`be.app.api` owner and one `fe.app.next` owner. Lite may have multiple front-end apps and shared front-end packages as the
+product grows.
 
 Supabase is an app-level concern because both sides depend on it. `app.supabase.migrations` is the schema authority and
 `app.supabase.types` is the committed generated contract of the back end. Data access belongs to the back end (the shared
@@ -130,9 +132,13 @@ explicit public name. Supabase Edge Functions are not part of lite.
   front-end GraphQL operations and their SWR hooks. Types regenerate by default; `--no-types` deliberately skips that step.
 - `starci app add cli <group>` creates the optional cli app on first use, including the built-in migration and seed groups, and then
   adds the requested group with the unit spec of each command beside it.
-- `starci app add queue|job|reactor|saga|projection|webhook|realtime ...` adds the same pattern trees as full; under lite the
-  platform adapters are the Supabase ones (pgmq, pg_cron) and realtime is the in-process socket.io gateway.
-- `starci app add app <name>` refuses in lite because lite has exactly one front-end app. Upgrade before adding another.
+- `starci app add queue|job|reactor|saga|projection|realtime ...` refuses in lite with `LiteAdapterRefusal` before writing:
+  the package carries only the full adapters. Write these patterns on the topic's `liteAdapter` in
+  `knowledge/patterns/be/<topic>.yaml`; `knowledge/patterns/be/supabase-queues.yaml` owns pgmq, and realtime uses the
+  in-process socket.io gateway.
+- `starci app add webhook ...` writes the lite inbox intake. The intake transaction records the receipt and a typed outbox
+  event; a reactor or job processes the delivery after commit (R263). Processing never runs inside the intake transaction.
+- `starci app add app <name>` adds another front-end app from the lite skeleton and registers its workspace.
 - `starci app emit` writes the enabled back-end snapshots and the `app.supabase.types` artifact. The local Supabase stack
   must be running for type generation.
 
@@ -170,11 +176,11 @@ shell, features, resources, UAT and business-rule records are forbidden there; a
 `HFS_STARCIWORK_LITE_FORBIDDEN`: "lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore)". Lite readers read
 workspace metadata normally and skip the full-edition catalog, shell and feature indexes.
 
-R212 also forbids e2e and contract specs, the `test:e2e`, `test:contract`, `test:stack` and
+R212 also forbids e2e specs, the `test:e2e`, `test:stack` and
 `test:browser` scripts, the e2e workflow, the browser journey and UAT records, test containers, toxiproxy and browser-runner
 dependencies, BullMQ, Kafka, Redis and graphql-ws dependencies (and their imports, through the lite `infraOwners`), and the
-non-Swarm `.starcistacks` infra trees, runtime and seeds trees, plus components duplicating Supabase backing services. Lite also forbids Edge Functions and a second front-end
-app.
+non-Swarm `.starcistacks` infra trees, runtime and seeds trees, plus components duplicating Supabase backing services. Lite also
+forbids Edge Functions. Contract specs and `test:contract` are allowed, and lite may have multiple front-end apps.
 
 R213 to R216 forbid a second schema authority, dynamic database DDL, unsafe policies or definer functions, unchecked database
 configuration and stale generated types. R217, R219 and R220 forbid Supabase access outside its owners (the front end auth only),
