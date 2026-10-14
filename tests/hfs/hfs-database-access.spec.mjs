@@ -253,3 +253,15 @@ for (const edition of ['lite', 'full']) {
     assert.deepEqual(await findingsFor(edition, cleanSql), []);
   });
 }
+
+// The catalog's proof discovery reads literal test blocks: one violating and one passing block name each R255 code.
+for (const edition of ['lite', 'full']) {
+  test(`DB_APP_ROLE@${edition}: a superuser application role is refused and a least-privilege one passes`, async () => {
+    await expectCode(edition, 'DB_APP_ROLE', 'create role app_be login noinherit nobypassrls superuser;', true);
+    await expectCode(edition, 'DB_APP_ROLE', 'create role app_be login noinherit nobypassrls nosuperuser;', false);
+  });
+  test(`DB_FORCE_RLS_DEFAULT@${edition}: an app-role-owned table without force RLS is refused and with it passes`, async () => {
+    await expectCode(edition, 'DB_FORCE_RLS_DEFAULT', owned, true);
+    await expectCode(edition, 'DB_FORCE_RLS_DEFAULT', `${owned} alter table public.items force row level security;`, false);
+  });
+}
