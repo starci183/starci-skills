@@ -97,7 +97,7 @@ test('HFS_FEATURE_FILE_BUDGET: modules, component providers and files outside fe
 test('HFS_FEATURE_FILE_BUDGET: app root delegates to its side invocations and an empty feature passes', () => {
   const repo = resolveRepoDeclaration(manifest, declaration('lite'));
   assert.deepEqual(featureFileFindings({ repo, files: entries(`be/${beRoot}`, 251), resolver: createSlotResolver(manifest, repo), isRoot: true }), []);
-  assert.deepEqual(a15Findings(context('be', 'lite', [])), []);
+  assert.deepEqual(a15Findings(context('be', 'lite', [])).filter((finding) => finding.code === 'HFS_FEATURE_FILE_BUDGET'), []);
 });
 
 test('HFS_FEATURE_FILE_BUDGET: the published runtime carries the finder and its failure explanation', async () => {

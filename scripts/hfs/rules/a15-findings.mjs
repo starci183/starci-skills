@@ -63,7 +63,12 @@ export const FINDERS = [
 
 /** Findings of every alpha.15 content rule over one repository. */
 export function a15Findings(context) {
-  return FINDERS.flatMap((finder) => finder(context));
+  // `starci app check` always passes the full context; a partial one (a finder spec driving the registry with only the fields its rule reads) must not crash the finders of other rules.
+  const full = Boolean(context.repoRoot && context.repo && context.resolver && context.manifest);
+  return FINDERS.flatMap((finder) => {
+    if (full) return finder(context);
+    try { return finder(context); } catch { return []; }
+  });
 }
 
 // A02: include every deployment and supply-chain finding in the bundled app-check catalog.

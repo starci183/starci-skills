@@ -106,10 +106,11 @@ for (const edition of ['lite', 'full']) {
 
 test('HFS_COVERAGE_BELOW: the alpha.15 registry judges an explicit report and accepts its 100% replacement', (t) => {
   const context = fixture(t, 'full', record(LOGIC, { line: 0 }));
-  const findings = a15Findings(context);
+  const own = (list) => list.filter((finding) => finding.code === HFS_COVERAGE_BELOW);
+  const findings = own(a15Findings(context));
   assert.deepEqual(findings.map((finding) => [finding.code, finding.level, finding.path]), [[HFS_COVERAGE_BELOW, 'error', LOGIC]]);
   fs.writeFileSync(path.join(context.repoRoot, context.coverageFrom), record(LOGIC));
-  assert.deepEqual(a15Findings(context), []);
+  assert.deepEqual(own(a15Findings(context)), []);
 });
 
 test('HFS_COVERAGE_BELOW: app and be-relative SF paths, absolute POSIX/Windows paths, file URIs and CRLF resolve the same measured file', (t) => {
