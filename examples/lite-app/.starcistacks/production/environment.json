@@ -1,8 +1,0 @@
-{
-  "environment": "production",
-  "runtime": "docker-swarm",
-  "provider": "supabase",
-  "project": "lite-app",
-  "declaration": "application-stacks.yaml",
-  "stack": "infra/swarm/stack.yaml"
-}

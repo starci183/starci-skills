@@ -694,7 +694,7 @@ no contract copy under `fe/`.
   `app/[locale]/not-found.tsx`, and a `loading.tsx` for each route group that reads data. `Suspense fallback={null}` is
   forbidden. Route files (page, layout, template, loading, not-found) hold no inline component, no drawing and no hook.
 - **Server first (R55).** Route files, page owners and layout owners are server components. `"use client"` appears at the
-  `index.tsx` of an interactive block or overlay, in a leaf with intrinsic interaction, and in `error.tsx` and `global-error.tsx`;
+  entry of an interactive block or overlay, in a leaf with intrinsic interaction, and in the route error boundaries;
   the client state slots (providers, hooks, redux and toast) also permit it. The i18n catalog is
   split by namespace and a client component receives only the `pick`ed part. `force-dynamic` is forbidden on a client
   page.

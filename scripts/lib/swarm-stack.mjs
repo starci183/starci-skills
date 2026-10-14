@@ -30,7 +30,7 @@ function runnableHealthcheck(value) {
 }
 
 /** Match image repository names, including registry and vendor namespaces, without matching application tags. */
-export function duplicatesManagedBacking(image) {
+function duplicatesManagedBacking(image) {
   if (!present(image)) return false;
   const repository = image.split('@')[0].split('/').at(-1).split(':')[0];
   return BACKING_IMAGE.test(repository);

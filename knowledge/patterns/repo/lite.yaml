@@ -31,7 +31,7 @@ rules:
   - id: REPO-LITE-1
     title: One edition, one engine
     kind: mandatory
-    hfsRules: [R212]
+    hfsRules: [R212, R10]
     requirement: |
       `hfs.json` names its edition (`full`, or `lite`; absent means `full`). The edition selects which slots and rules are in
       view; it never selects another engine or relaxes a rule locally. Lite keeps the full monorepo (the api, cli and optional

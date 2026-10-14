@@ -59,6 +59,9 @@ rules:
         - HFS_MODULE_TIER_INVALID
         - HFS_WORK_IN_FE
         - HFS_STACKS_IN_SIDE
+        - HFS_EDITION_INVALID
+        - HFS_EDITION_FORBIDDEN_PRESENT
+        - HFS_STARCIWORK_LITE_FORBIDDEN
       manual:
         - starci gate starcistacks <app> exits 0 (the app root).
     relatedExamples: []
@@ -93,6 +96,9 @@ rules:
     verification:
       automated:
         - HFS_STACKS_SHAPE
+        - HFS_EDITION_INVALID
+        - HFS_EDITION_FORBIDDEN_PRESENT
+        - HFS_STARCIWORK_LITE_FORBIDDEN
       manual:
         - Confirm completion, retry and overlap handling belongs to the job and that its scheduler has the required runtime access.
     relatedExamples: []

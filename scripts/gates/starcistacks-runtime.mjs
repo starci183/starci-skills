@@ -19,7 +19,7 @@ function safeSourceDirectory(repoRoot, relative) {
   return true;
 }
 
-export function applicationStackFiles(repoRoot) {
+function applicationStackFiles(repoRoot) {
   return ['.starcistacks', '.github/workflows', 'deploy', 'scripts'].flatMap(relative => {
     if (!safeSourceDirectory(repoRoot, relative)) return [];
     return walkFiles(path.join(repoRoot, relative), { ignoreReadErrors: true, exclude: (_name, _file, entry) => entry.isSymbolicLink() })
