@@ -17,7 +17,7 @@ import { PgmqQueueTransportClient } from "@modules/platform/queue/pgmq-queue-tra
 import { QueueOutboxService } from "@modules/platform/queue/queue-outbox.service"
 import type { QueueOptions } from "@modules/platform/queue/queue.options"
 import { CalendarDeliveryQueue, CALENDAR_DELIVERY_QUEUE } from "@modules/queues/calendar-delivery"
-import { QueueDatabaseFixture } from "../queue/queue.database.fixture"
+import { QueueDatabaseFixture } from "../../fixtures/queue.database.fixture"
 
 const clock = new FakeClock("2026-10-14T00:00:00.000Z")
 const signingFixture = "integration-calendar-provider-fixture"

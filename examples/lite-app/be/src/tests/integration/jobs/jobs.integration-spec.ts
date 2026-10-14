@@ -6,7 +6,7 @@ import { JobRunnerService } from "@modules/platform/jobs/job-runner.service"
 import { JobsLogEvent } from "@modules/platform/jobs/jobs.log-events"
 import type { Logger } from "@modules/platform/logging"
 import type { QueueDelivery, QueueWorkerRegistry } from "@modules/platform/queue"
-import { JobsDatabaseFixture } from "./jobs.database.fixture"
+import { JobsDatabaseFixture } from "../../fixtures/jobs.database.fixture"
 
 const LEASE_MS = 100
 const database = new JobsDatabaseFixture()
