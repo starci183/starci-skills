@@ -6,9 +6,13 @@
  * Typed cases over the fixture repository (`fixtures/typed`): the path of a case decides its slot, the stubs of
  * `@nestjs/cqrs`, `typeorm` and the fixture platform capabilities decide what a receiver IS.
  */
+// proves: BE_REST_DOOR_EVIDENCE@lite
+// proves: BE_REST_DOOR_EVIDENCE@full
 import assert from "node:assert/strict"
 import test from "node:test"
-import { BE_DECLARATION, at, typedTester } from "./fixtures/typed/tester.mjs"
+import { appDeclaration } from "./fixtures/app.mjs"
+import { BE_DECLARATION, TYPED_ROOT, at, ruleTester, typedTester } from "./fixtures/typed/tester.mjs"
+import { hfsFromDeclaration } from "./lib/hfs.mjs"
 import {
     doorLivesInFeatures,
     noCapabilityImportsFeatures,
@@ -236,7 +240,7 @@ test("rest-door-needs-a-reason: a controller shows a public reason, a byte strea
             // a renamed import is the same export
             { filename: CONTROLLER, code: `import { Controller, Get, StreamableFile as Bytes } from "@nestjs/common"\n@Controller("files") export class C { @Get() file() { return new Bytes(Buffer.from("")) } }` },
             { filename: CONTROLLER, code: `${head}@Controller("oauth") export class C { @Redirect() @Get() go() { return { url: "/" } } }` },
-            { filename: CONTROLLER, code: `import { Controller, Post } from "@nestjs/common"\nimport { FileInterceptor } from "@nestjs/platform-express"\n@Controller("up") export class C { @Post() up() { return FileInterceptor } }` },
+            { filename: CONTROLLER, code: `import { Controller, Post, UseInterceptors } from "@nestjs/common"\nimport { FileInterceptor } from "@nestjs/platform-express"\n@Controller("up") export class C { @UseInterceptors(FileInterceptor("file")) @Post() up() { return { accepted: true } } }` },
             // a class that is not a controller is not judged
             { filename: CONTROLLER, code: `export class NotADoor { list() { return 1 } }` },
         ],
@@ -251,3 +255,35 @@ test("rest-door-needs-a-reason: a controller shows a public reason, a byte strea
         ],
     })
 })
+
+for (const edition of ["lite", "full"]) {
+    test(`BE_REST_DOOR_EVIDENCE: ${edition} judges each REST method's evidence`, () => {
+        const hfs = hfsFromDeclaration({ ...appDeclaration("be", BE_DECLARATION), edition }, TYPED_ROOT)
+        const editionTester = ruleTester({ root: TYPED_ROOT, hfs })
+        const head = `import { Controller, Get, Post, Body, Redirect, StreamableFile } from "@nestjs/common"\nimport { Public as Open, PublicReason as Reason } from "@modules/domain/identity"\n`
+        const operations = `import { defineOperations as register, query } from "@modules/platform/operations"\nimport type { OperationRequest, OperationReply } from "@modules/platform/operations"\nconst OPERATIONS = register({ "plan.read@1": query<{ readonly id: string }, { readonly ok: boolean }>() })\ntype Table = typeof OPERATIONS\n`
+        editionTester.run("rest-door-needs-a-reason", restDoorNeedsAReason, {
+            valid: [
+                { filename: CONTROLLER, code: `${head}@Controller("health") class C { @Open({ reason: Reason.Health }) @Get() live() { return { ok: true } } }` },
+                { filename: CONTROLLER, code: `${head}@Controller("auth") class C { @Open({ reason: Reason.AuthHandshake }) @Get() auth() { return { ok: true } } }` },
+                { filename: CONTROLLER, code: `${head}@Controller("hooks") class C { @Open({ reason: Reason.SignedWebhook }) @Post() hook() { return { ok: true } } }` },
+                { filename: CONTROLLER, code: `${head}@Controller("files") class C { @Get() file() { const bytes = new StreamableFile(Buffer.from("")); return bytes } }` },
+                { filename: CONTROLLER, code: `${head}import { createReadStream as read } from "node:fs"\n@Controller("files") class C { @Get() file() { return read("file.bin") } }` },
+                { filename: CONTROLLER, code: `${head}@Controller("oauth") class C { @Redirect() @Get() auth() { return { url: "/" } } }` },
+                { filename: CONTROLLER, code: `${head}${operations}@Controller("api/v1") class C { @Post("operations") async invoke(@Body() body: OperationRequest<Table>): Promise<OperationReply<Table>> { return null as never } }` },
+            ],
+            invalid: [
+                { filename: CONTROLLER, code: `${head}@Controller("orders") class C { @Get() list() { return { items: [] } } }`, errors: [{ messageId: "unjustified" }] },
+                // An import, a constructor reference and an unused stream do not turn JSON into bytes.
+                { filename: CONTROLLER, code: `${head}@Controller("orders") class C { @Get() list() { const stream = StreamableFile; return { stream: Boolean(stream) } } }`, errors: [{ messageId: "unjustified" }] },
+                { filename: CONTROLLER, code: `${head}@Controller("orders") class C { @Get() list() { new StreamableFile(Buffer.from("")); return { items: [] } } }`, errors: [{ messageId: "unjustified" }] },
+                { filename: CONTROLLER, code: `${head}@Open({ reason: Reason.Health }) @Controller("orders") class C { @Get() list() { return { items: [] } } }`, errors: [{ messageId: "unjustified" }] },
+                { filename: CONTROLLER, code: `${head}@Controller("orders") class C { @Open({ reason: Reason.Health }) @Get("live") live() { return { ok: true } } @Get() list() { return { items: [] } } }`, errors: [{ messageId: "unjustified" }] },
+                { filename: CONTROLLER, code: `${head}@Controller("orders") class C { @Get("file") file() { return new StreamableFile(Buffer.from("")) } @Get() list() { return { items: [] } } }`, errors: [{ messageId: "unjustified" }] },
+                { filename: CONTROLLER, code: `${head}@Controller("orders") class C { @Get() list() { const reason = Reason.Health; return { reason } } }`, errors: [{ messageId: "unjustified" }] },
+                { filename: CONTROLLER, code: `${head}const Other = (_options: unknown): MethodDecorator => () => undefined\n@Controller("orders") class C { @Other({ reason: Reason.Health }) @Get() list() { return { items: [] } } }`, errors: [{ messageId: "unjustified" }] },
+                { filename: CONTROLLER, code: `${head}${operations}@Controller("api/v1") class C { @Post() list(@Body() body: { id: string }) { return body } }`, errors: [{ messageId: "unjustified" }] },
+            ],
+        })
+    })
+}

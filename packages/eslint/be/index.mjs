@@ -183,3 +183,16 @@ export const starciBeConfig = ({ hfs }) => buildBeConfig({ hfs, plugin: pluginFo
 
 export { linterOptions } from "./lib/config.mjs"
 export { loadHfs } from "./lib/hfs.mjs"
+
+// A12 registration is appended so the shared registry can be union-merged.
+import { recommended as thirdPartyOwnerRecommended, rules as thirdPartyOwnerRules } from "./third-party-owner.mjs"
+Object.assign(rules, thirdPartyOwnerRules)
+Object.assign(recommended, thirdPartyOwnerRecommended)
+lawOwners.push("third-party-owner")
+for (const name of Object.keys(thirdPartyOwnerRules)) {
+    ruleOwners[name] = "third-party-owner"
+    // infra-owner also exposes these rules so the catalog's static contribution reader sees them.
+    const declaration = ruleDeclarations.find((entry) => entry.name === name)
+    if (declaration) declaration.law = "third-party-owner"
+    else ruleDeclarations.push({ law: "third-party-owner", name })
+}

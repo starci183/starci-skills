@@ -26,6 +26,7 @@
 import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { moduleReferences } from "./lib/import-source.mjs"
 import { isOwnedType } from "./lib/ports.mjs"
+import { recommended as thirdPartyRecommended, rules as thirdPartyRules } from "./third-party-owner.mjs"
 
 /** The owner id of a file: the last two segments of its owner root (`platform/http`), or null when no owner holds it. */
 const ownerIdOf = (hfs, filename) => {
@@ -126,10 +127,12 @@ export const httpClientOnlyInIntegrations = {
 export const rules = {
     "infra-import-owner": infraImportOwner,
     "http-client-only-in-integrations": httpClientOnlyInIntegrations,
+    ...thirdPartyRules,
 }
 
 /** Every rule of this law at `error`. */
 export const recommended = {
     "starci-be/infra-import-owner": "error",
     "starci-be/http-client-only-in-integrations": "error",
+    ...thirdPartyRecommended,
 }

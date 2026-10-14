@@ -11,8 +11,9 @@
  * a path pattern.
  */
 import ts from "typescript"
+import { keyName, walk } from "./lib/ast.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
-import { decoratorCallee, isImportedFrom } from "./lib/import-source.mjs"
+import { decoratorArguments, decoratorCallee, isImportedFrom } from "./lib/import-source.mjs"
 import { isTransportSlot } from "./lib/transport-slots.mjs"
 import { typed } from "./lib/types.mjs"
 
@@ -155,6 +156,123 @@ const unwrapPromise = (annotation) => {
     return node ?? null
 }
 
+/** The canon request and reply annotations of one HTTP method. */
+const operationReferences = (context, method) => {
+    const hfs = hfsOf(context)
+    const { checker, toTs } = typed(context)
+    const params = method.value.params.filter((param) => (param.decorators ?? []).some((decorator) => isImportedFrom(context, decoratorCallee(decorator), "@nestjs/common", "Body")))
+    return {
+        request: params.map((param) => canonReference(hfs, checker, toTs, param.typeAnnotation ?? param.parameter?.typeAnnotation)).find((reference) => reference?.name === "OperationRequest") ?? null,
+        reply: canonReference(hfs, checker, toTs, unwrapPromise(method.value.returnType)),
+    }
+}
+
+/** A route's table must be the nonempty result of the canon defineOperations, including an imported app table. */
+export const operationRouteEvidence = (context) => {
+    const hfs = hfsOf(context)
+    const { program, checker } = typed(context)
+    let tables
+    const declaredTables = () => {
+        if (tables) return tables
+        tables = new Set()
+        const visit = (node) => {
+            if (ts.isCallExpression(node) && isCanonType(hfs, checker, checker.getSymbolAtLocation(node.expression), "defineOperations")) {
+                const table = checker.getTypeAtLocation(node)
+                if (checker.getPropertiesOfType(table).length > 0) tables.add(table)
+            }
+            ts.forEachChild(node, visit)
+        }
+        for (const source of program.getSourceFiles()) {
+            if (!source.isDeclarationFile && hfs.slotOf(source.fileName)) visit(source)
+        }
+        return tables
+    }
+    return (method) => {
+        const { request, reply } = operationReferences(context, method)
+        return request?.table != null && reply?.name === "OperationReply" && request.table === reply.table && declaredTables().has(request.table)
+    }
+}
+
+/** A symbol declared by the app's domain identity capability, rather than a same-named local decorator or enum. */
+const identityExport = (context, node, name) => {
+    if (!node) return false
+    const hfs = hfsOf(context)
+    const { checker, toTs } = typed(context)
+    const target = toTs(node)
+    if (!target) return false
+    return declarationsOfSymbol(checker, checker.getSymbolAtLocation(target)).some((declaration) => {
+        const file = declaration.getSourceFile().fileName
+        return declaration.name?.text === name && hfs.tierOf(file) === "domain" && hfs.ownerOf(file)?.split("/").pop() === "identity"
+    })
+}
+
+const REST_REASONS = new Set(["Health", "AuthHandshake", "SignedWebhook"])
+const FILE_INTERCEPTORS = ["FileInterceptor", "FilesInterceptor", "AnyFilesInterceptor", "FileFieldsInterceptor"]
+
+/** A stream actually returned by this method; importing or mentioning a stream constructor proves nothing. */
+const returnsBytes = (context, method) => {
+    const seen = new Set()
+    const isBytes = (expression) => {
+        if (!expression || seen.has(expression)) return false
+        seen.add(expression)
+        if (["AwaitExpression", "TSAsExpression", "TSTypeAssertion", "TSNonNullExpression"].includes(expression.type)) return isBytes(expression.argument ?? expression.expression)
+        if (expression.type === "NewExpression" && isImportedFrom(context, expression.callee, "@nestjs/common", "StreamableFile")) return true
+        if (expression.type === "CallExpression" && isImportedFrom(context, expression.callee, ["node:fs", "fs"], "createReadStream")) return true
+        if (expression.type !== "Identifier") return false
+        for (let scope = context.sourceCode.getScope(expression); scope; scope = scope.upper) {
+            const variable = scope.set.get(expression.name)
+            if (variable) return variable.defs.some((definition) => definition.type === "Variable" && isBytes(definition.node.init))
+        }
+        return false
+    }
+    let found = false
+    walk(method.value.body, (node) => {
+        if (node.type === "ReturnStatement" && isBytes(node.argument)) found = true
+    }, { intoFunctions: false })
+    return found
+}
+
+/** Route-level evidence for probes, auth handshakes, signed webhooks, redirects and byte transfers. */
+export const restExceptionEvidence = (context, method) => {
+    for (const decorator of method.decorators ?? []) {
+        const callee = decoratorCallee(decorator)
+        if (isImportedFrom(context, callee, "@nestjs/common", "Redirect")) return true
+        if (identityExport(context, callee, "Public")) {
+            const options = decoratorArguments(decorator)[0]
+            const reason = options?.type === "ObjectExpression" ? options.properties.find((property) => property.type === "Property" && keyName(property.key) === "reason")?.value : null
+            if (reason?.type === "MemberExpression" && !reason.computed && REST_REASONS.has(keyName(reason.property)) && identityExport(context, reason.object, "PublicReason")) return true
+        }
+        if (isImportedFrom(context, callee, "@nestjs/common", "UseInterceptors") && decoratorArguments(decorator).some((argument) => argument.type === "CallExpression" && isImportedFrom(context, argument.callee, "@nestjs/platform-express", FILE_INTERCEPTORS))) return true
+    }
+    return returnsBytes(context, method)
+}
+
+/** Public REST JSON is exposed through the app's declared operation table. */
+export const restRouteDeclared = {
+    meta: {
+        type: "problem",
+        docs: { description: "Every REST route outside probes, auth handshakes, signed webhooks and byte transfers uses a declared operation table." },
+        schema: [],
+        messages: {
+            undeclared: "[BE_REST_ROUTE_UNDECLARED] This REST route is absent from the app's defineOperations table. Serve public v1 JSON through @Body() request: OperationRequest<Table> and Promise<OperationReply<Table>> of the same declared table; otherwise expose it through GraphQL.",
+        },
+    },
+    create(context) {
+        const hfs = hfsOf(context)
+        if (!isTransportSlot(hfs.slotOf(context.filename))) return {}
+        const declared = operationRouteEvidence(context)
+        return {
+            MethodDefinition(node) {
+                if (node.kind !== "method" || node.static) return
+                if (!(node.decorators ?? []).some((decorator) => isImportedFrom(context, decoratorCallee(decorator), "@nestjs/common", HTTP_ROUTES))) return
+                const controller = node.parent?.parent
+                if (!(controller?.decorators ?? []).some((decorator) => isImportedFrom(context, decoratorCallee(decorator), "@nestjs/common", "Controller"))) return
+                if (!restExceptionEvidence(context, node) && !declared(node)) context.report({ node: node.key, messageId: "undeclared" })
+            },
+        }
+    },
+}
+
 /** An operation route takes the table's `OperationRequest` and answers its `OperationReply`, of one table. */
 export const operationRouteDrivenByTable = {
     meta: {
@@ -192,10 +310,12 @@ export const operationRouteDrivenByTable = {
 export const rules = {
     "operation-contract-decidable": operationContractDecidable,
     "operation-route-driven-by-table": operationRouteDrivenByTable,
+    "rest-route-declared": restRouteDeclared,
 }
 
 /** Every rule of this law at `error`. */
 export const recommended = {
     "starci-be/operation-contract-decidable": "error",
     "starci-be/operation-route-driven-by-table": "error",
+    "starci-be/rest-route-declared": "error",
 }

@@ -12,6 +12,7 @@ import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import { at, fixtureHfs, typedTester } from "./fixtures/typed/tester.mjs"
 import { httpClientOnlyInIntegrations, infraImportOwner, rules } from "./infra-owner.mjs"
+import { thirdPartyImportOwner } from "./third-party-owner.mjs"
 
 const tester = new RuleTester({
     languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
@@ -35,6 +36,7 @@ const E2E = at("src/tests/world/use-test-world.ts")
 
 test("every rule this law declares is exported under its published name", () => {
     for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
+    assert.equal(rules["third-party-import-owner"], thirdPartyImportOwner)
 })
 
 test("the table comes from the slot manifest and nothing else", () => {

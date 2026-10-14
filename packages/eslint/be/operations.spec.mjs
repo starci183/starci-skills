@@ -6,10 +6,14 @@
  * Typed cases over the fixture repository (`fixtures/typed`): the platform capability `operations` declares the canon types
  * (`OperationContract`, `query`, `mutation`, `defineOperations`, `OperationRequest`, `OperationReply`).
  */
+// proves: BE_REST_ROUTE_UNDECLARED@lite
+// proves: BE_REST_ROUTE_UNDECLARED@full
 import assert from "node:assert/strict"
 import test from "node:test"
-import { at, typedTester } from "./fixtures/typed/tester.mjs"
-import { operationContractDecidable, operationRouteDrivenByTable, recommended, rules } from "./operations.mjs"
+import { appDeclaration } from "./fixtures/app.mjs"
+import { BE_DECLARATION, TYPED_ROOT, at, ruleTester, typedTester } from "./fixtures/typed/tester.mjs"
+import { hfsFromDeclaration } from "./lib/hfs.mjs"
+import { operationContractDecidable, operationRouteDrivenByTable, restRouteDeclared, recommended, rules } from "./operations.mjs"
 
 const tester = typedTester()
 const TABLE = at("src/features/api/plan/plan.operations.ts")
@@ -18,9 +22,9 @@ const CANON = at("src/modules/platform/operations/operation-bounds.ts")
 const OPS = `import { defineOperations, mutation, query } from "@modules/platform/operations"\n`
 const TYPES = `export interface PlanAsk { readonly planId: string }\nexport interface PlanView { readonly revision: number; readonly items: ReadonlyArray<{ readonly name: string }> }\n`
 
-test("the law ships two rules, both at error", () => {
-    assert.deepEqual(Object.keys(rules), ["operation-contract-decidable", "operation-route-driven-by-table"])
-    assert.deepEqual(Object.values(recommended), ["error", "error"])
+test("the law ships three rules, all at error", () => {
+    assert.deepEqual(Object.keys(rules), ["operation-contract-decidable", "operation-route-driven-by-table", "rest-route-declared"])
+    assert.deepEqual(Object.values(recommended), ["error", "error", "error"])
 })
 
 test("operation-contract-decidable: an operation names closed input, output and refusal types", () => {
@@ -68,3 +72,37 @@ test("operation-route-driven-by-table: a route takes OperationRequest<Table> and
 test("the message of a half-typed route names the missing side", () => {
     assert.match(operationRouteDrivenByTable.meta.messages.half, /OperationRequest<Table>/)
 })
+
+for (const edition of ["lite", "full"]) {
+    test(`BE_REST_ROUTE_UNDECLARED: ${edition} requires actual defineOperations provenance`, () => {
+        const hfs = hfsFromDeclaration({ ...appDeclaration("be", { ...BE_DECLARATION, patterns: ["webhooks"] }), edition }, TYPED_ROOT)
+        const editionTester = ruleTester({ root: TYPED_ROOT, hfs })
+        const head = `import { Body, Controller, Get, Post, Redirect, StreamableFile } from "@nestjs/common"\nimport { Public, PublicReason } from "@modules/domain/identity"\n`
+        const contracts = `import { query } from "@modules/platform/operations"\nimport type { OperationRequest, OperationReply } from "@modules/platform/operations"\n`
+        editionTester.run("rest-route-declared", restRouteDeclared, {
+            valid: [
+                { filename: CONTROLLER, code: `${ROUTE_HEAD}@Controller("api/v1") class C { @Post("operations") async handle(@Body() request: OperationRequest<Table>): Promise<OperationReply<Table>> { return null as never } }` },
+                { filename: CONTROLLER, code: `${head}${contracts}import { defineOperations as register } from "@modules/platform/operations"\nconst entries = { "plan.read@1": query<{ readonly id: string }, { readonly ok: boolean }>() }; const OPS = register(entries)\n@Controller("api/v1") class C { @Post("operations") async handle(@Body() request: OperationRequest<typeof OPS>): Promise<OperationReply<typeof OPS>> { return null as never } }` },
+                { filename: CONTROLLER, code: `${head}@Controller("health") class C { @Public({ reason: PublicReason.Health }) @Get() live() { return { ok: true } } }` },
+                { filename: CONTROLLER, code: `${head}@Controller("auth") class C { @Public({ reason: PublicReason.AuthHandshake }) @Post() auth() { return { ok: true } } }` },
+                { filename: at("src/features/webhooks/payment/transport/http/payment.webhook.ts"), code: `${head}@Controller("hooks") class C { @Public({ reason: PublicReason.SignedWebhook }) @Post() hook() { return { ok: true } } }` },
+                { filename: CONTROLLER, code: `${head}@Controller("files") class C { @Get() file() { return new StreamableFile(Buffer.from("")) } }` },
+                { filename: CONTROLLER, code: `${head}import { createReadStream } from "node:fs"\n@Controller("files") class C { @Get() file() { return createReadStream("file.bin") } }` },
+                { filename: CONTROLLER, code: `${head}@Controller("oauth") class C { @Redirect() @Get() auth() { return { url: "/" } } }` },
+                { filename: CONTROLLER, code: `${head}import { UseInterceptors } from "@nestjs/common"\nimport { FileInterceptor } from "@nestjs/platform-express"\n@Controller("files") class C { @UseInterceptors(FileInterceptor("file")) @Post() upload() { return { accepted: true } } }` },
+                { filename: TABLE, code: `${head}@Controller("api/v1") class C { @Get() list() { return { ok: true } } }` },
+                { filename: CONTROLLER, code: `${head}class C { @Get() helper() { return { ok: true } } }` },
+            ],
+            invalid: [
+                { filename: CONTROLLER, code: `${head}@Controller("api/v1") class C { @Get("orders") list() { return { items: [] } } }`, errors: [{ messageId: "undeclared" }] },
+                { filename: CONTROLLER, code: `${ROUTE_HEAD}@Controller("api/v1") class C { @Post() list(@Body() body: { id: string }) { return body } }`, errors: [{ messageId: "undeclared" }] },
+                { filename: CONTROLLER, code: `${ROUTE_HEAD}@Controller("api/v1") class C { @Post() async handle(@Body() request: OperationRequest<Table>): Promise<OperationReply<typeof OTHER>> { return null as never } }`, errors: [{ messageId: "undeclared" }] },
+                { filename: CONTROLLER, code: `${head}${contracts}const OPS = { "plan.read@1": query<{ readonly id: string }, { readonly ok: boolean }>() }\n@Controller("api/v1") class C { @Post() async handle(@Body() request: OperationRequest<typeof OPS>): Promise<OperationReply<typeof OPS>> { return null as never } }`, errors: [{ messageId: "undeclared" }] },
+                { filename: CONTROLLER, code: `${head}${contracts}const defineOperations = <T,>(entries: T): T => entries; const OPS = defineOperations({ "plan.read@1": query<{ readonly id: string }, { readonly ok: boolean }>() })\n@Controller("api/v1") class C { @Post() async handle(@Body() request: OperationRequest<typeof OPS>): Promise<OperationReply<typeof OPS>> { return null as never } }`, errors: [{ messageId: "undeclared" }] },
+                { filename: CONTROLLER, code: `${head}${contracts}import { defineOperations } from "@modules/platform/operations"\nconst OPS = defineOperations({})\n@Controller("api/v1") class C { @Post() async handle(@Body() request: OperationRequest<typeof OPS>): Promise<OperationReply<typeof OPS>> { return null as never } }`, errors: [{ messageId: "undeclared" }] },
+                { filename: CONTROLLER, code: `${head}@Public({ reason: PublicReason.Health }) @Controller("api/v1") class C { @Get() list() { return { items: [] } } }`, errors: [{ messageId: "undeclared" }] },
+                { filename: CONTROLLER, code: `${head}@Controller("api/v1") class C { @Get("file") file() { return new StreamableFile(Buffer.from("")) } @Get() list() { return { items: [] } } }`, errors: [{ messageId: "undeclared" }] },
+            ],
+        })
+    })
+}
