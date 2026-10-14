@@ -1,9 +1,10 @@
 // edition.mjs - L01, the edition rule. An hfs.json edition is `full` or `lite` (absent means full); under lite the standard is a
 // filter plus a few additions over the same manifest, never a second engine. Lite is the full architecture deployed without
 // self-hosted infrastructure (owner ruling 2026-10-12): the same slots, patterns and unit specs, Supabase adapters behind the same
-// ports, and no e2e or contract world. The slot layer already answers the paths lite removed (slots lite excludes, or whose
-// litePresence is forbidden, come back HFS_FORBIDDEN_PRESENT with their goesTo); this rule reports what no path can state:
-//   - inside a package.json: an e2e, contract, stack or browser script (`test:e2e`, `test:contract`, `test:stack`, `test:browser`,
+// ports, optional contract specs, and no e2e world (owner decision 2026-10-14). The slot layer already answers the paths lite
+// removed (slots lite excludes, or whose litePresence is forbidden, come back HFS_FORBIDDEN_PRESENT with their goesTo);
+// this rule reports what no path can state:
+//   - inside a package.json: an e2e, stack or browser script (`test:e2e`, `test:stack`, `test:browser`,
 //     with a pre/post prefix too) or a dependency of the infrastructure lite does not run - a test-world container or proxy
 //     (testcontainers, toxiproxy) or a browser runner (playwright, cypress), and every library the lite infraOwners own nowhere
 //     while full owns them (BullMQ, Kafka, Redis: lite runs pgmq and Postgres locks instead);
@@ -18,8 +19,8 @@ import { editionRuleParams } from '../edition-slots.mjs';
 export const HFS_EDITION_FORBIDDEN_PRESENT = 'HFS_EDITION_FORBIDDEN_PRESENT';
 
 const PACKAGE_JSON = /(?:^|\/)package\.json$/;
-/** The scripts of a world lite does not have: the e2e and contract layers, the self-hosted stack and the browser journey. */
-const LITE_FORBIDDEN_SCRIPT = /^(?:pre|post)?test:(?:e2e|contract|stack|browser)$/;
+/** The scripts of a world lite does not have: the e2e layer, the self-hosted stack and the browser journey. */
+const LITE_FORBIDDEN_SCRIPT = /^(?:pre|post)?test:(?:e2e|stack|browser)$/;
 /** The dependencies of a test infrastructure lite does not run: containers, fault proxies and browser runners. */
 const LITE_FORBIDDEN_TEST_INFRA = /^(?:testcontainers|@testcontainers\/.+|toxiproxy-node-client|playwright|playwright-core|@playwright\/.+|cypress)$/;
 
@@ -68,7 +69,7 @@ function scriptFindings(rel, pkg) {
   const scripts = isPlainObject(pkg.scripts) ? pkg.scripts : {};
   return Object.keys(scripts)
     .filter((name) => LITE_FORBIDDEN_SCRIPT.test(name))
-    .map((name) => found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} has script ${JSON.stringify(name)}: a lite app has unit specs and optional integration specs on the local Supabase stack, never an e2e, contract, stack or browser run`, { name }));
+    .map((name) => found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} has script ${JSON.stringify(name)}: a lite app has unit specs, optional integration specs on the local Supabase stack and optional contract specs, never an e2e, stack or browser run`, { name }));
 }
 
 function dependencyFindings(rel, pkg, removed) {

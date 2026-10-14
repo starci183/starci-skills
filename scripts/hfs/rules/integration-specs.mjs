@@ -225,8 +225,9 @@ const MISSING_PARTS = Object.freeze({
   outage: 'drive an outage through the world: world.infra.<service>, world.fake.<name>.failNext(...), world.apps.<peer>.during(...) or world.interruptDatabase(...)',
 });
 
-/** The findings of R112 over the tracked paths `files` of the app at `repoRoot`. */
-export function integrationSpecFindings({ repoRoot, files }) {
+/** The full-edition test-world proofs of R112; lite owns its integration lane through R284. */
+export function integrationSpecFindings({ repoRoot, files, repo }) {
+  if (repo?.edition === 'lite') return [];
   const integrations = files.map((file) => CONFIG_FILE.exec(file)).filter(Boolean).map(([, side, provider]) => ({ side, provider, folder: `${side}src/modules/integrations/${provider}` }));
   if (integrations.length === 0) return [];
   const ts = typescriptFor(repoRoot);

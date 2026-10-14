@@ -1,12 +1,14 @@
 // The saga pattern of `starci app check` (scripts/hfs/rules/saga.mjs): R169 BE_SAGA_STEP_COMPENSATION, R170 BE_SAGA_STATE_VERSIONED,
 // R171 BE_SAGA_EVENT_CONTRACT, R172 BE_SAGA_CONSUMER_DEDUPE, R173 BE_SAGA_E2E_MISSING, and the declared-pattern mechanism that enables
 // the saga slots (`patterns: ["saga"]` in hfs.json sides.be). Each rule has a violating and a passing tree.
+// proves: BE_SAGA_E2E_MISSING@full BE_SAGA_STEP_COMPENSATION@lite BE_SAGA_STATE_VERSIONED@lite BE_SAGA_EVENT_CONTRACT@lite BE_SAGA_CONSUMER_DEDUPE@lite
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { checkRepo } from '../../scripts/hfs/check.mjs';
 import { loadSlotManifest, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
+import { sagaFindings } from '../../scripts/hfs/rules/saga.mjs';
 import { appOf, cleanup, gitAdd, writeCleanRepo } from '../helpers/hfs-cli-fixture.mjs';
 
 const OPTIONAL = ['be.contract.events', 'be.transport.message'];
@@ -57,8 +59,9 @@ const saga = (code, override) => only(run(WITH_SAGA, sagaRepo(override)), code);
 // ------------------------------------------------------------------------------------------------ the declared pattern
 
 test('the saga slots are enabled only by the declared pattern: an undeclared saga folder is HFS_SLOT_NOT_ENABLED', () => {
-  const undeclared = only(run(WITHOUT_PATTERN, sagaRepo()), 'HFS_SLOT_NOT_ENABLED').map((f) => f.path).filter((file) => file.includes('/saga/')).sort();
-  assert.deepEqual(undeclared, [COMPENSATION, ORCHESTRATOR, STATE, STEP].sort());
+  const comparePaths = (left, right) => left.localeCompare(right);
+  const undeclared = only(run(WITHOUT_PATTERN, sagaRepo()), 'HFS_SLOT_NOT_ENABLED').map((f) => f.path).filter((file) => file.includes('/saga/')).sort(comparePaths);
+  assert.deepEqual(undeclared, [COMPENSATION, ORCHESTRATOR, STATE, STEP].sort(comparePaths));
   assert.deepEqual(only(run(WITH_SAGA, sagaRepo()), 'HFS_SLOT_NOT_ENABLED'), []);
 });
 
@@ -133,4 +136,28 @@ test('BE_SAGA_E2E_MISSING: a compensation path with no e2e spec, one through the
 test('BE_SAGA_E2E_MISSING: an e2e spec through the world that names the compensation event and injects a failure passes', () => {
   assert.deepEqual(saga('BE_SAGA_E2E_MISSING'), []);
   assert.deepEqual(saga('BE_SAGA_E2E_MISSING', { [SPEC]: SPEC_TS.replace('.during(async () => undefined)', ".cut()") }), []);
+});
+
+test('lite uses its integration proof lane while saga structure, state, contracts and consumer dedupe stay enforced', () => {
+  const declaration = { ...WITH_SAGA, edition: 'lite' };
+  const findings = run(declaration, sagaRepo({ [SPEC]: null }));
+  assert.deepEqual(only(findings, 'BE_SAGA_E2E_MISSING'), []);
+  for (const code of ['BE_SAGA_STEP_COMPENSATION', 'BE_SAGA_STATE_VERSIONED', 'BE_SAGA_EVENT_CONTRACT', 'BE_SAGA_CONSUMER_DEDUPE']) assert.deepEqual(only(findings, code), [], code);
+
+  const broken = run(declaration, sagaRepo({
+    [SPEC]: null,
+    [COMPENSATION]: null,
+    [STATE]: 'export interface PlaceSagaState { status: string; version: string }\n',
+    [STEP]: 'export class ReserveStep {}\n',
+    [CONSUMER]: 'export class InvoiceRejectedConsumer { handle(): string { return "x" } }\n',
+  }));
+  for (const code of ['BE_SAGA_STEP_COMPENSATION', 'BE_SAGA_STATE_VERSIONED', 'BE_SAGA_EVENT_CONTRACT', 'BE_SAGA_CONSUMER_DEDUPE']) assert.ok(only(broken, code).length > 0, code);
+  assert.deepEqual(only(broken, 'BE_SAGA_E2E_MISSING'), []);
+});
+
+test('the saga finder gates only its full-edition compensation proof when called directly', () => {
+  const repoRoot = repoOf(WITH_SAGA, sagaRepo({ [SPEC]: null }));
+  const files = [STEP, COMPENSATION, ORCHESTRATOR, STATE, CONSUMER, ...Object.keys(CONTRACTS)];
+  assert.deepEqual(sagaFindings({ repoRoot, files, repo: { edition: 'lite' } }), []);
+  assert.equal(only(sagaFindings({ repoRoot, files, repo: { edition: 'full' } }), 'BE_SAGA_E2E_MISSING').length, 1);
 });
