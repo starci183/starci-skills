@@ -6,13 +6,13 @@ import { FINDERS, a15Findings } from '../../scripts/hfs/rules/a15-findings.mjs';
 test('a15Findings flattens every finder and passes the context through', () => {
   const context = { repoRoot: '/repo', files: [], isRoot: true };
   const seen = [];
-  const finders = [(c) => { seen.push(c); return [{ code: 'A' }]; }, () => [], (c) => { seen.push(c); return [{ code: 'B' }, { code: 'C' }]; }];
-  FINDERS.push(...finders);
+  const original = FINDERS.splice(0, FINDERS.length);
+  FINDERS.push((c) => { seen.push(c); return [{ code: 'A' }]; }, () => [], (c) => { seen.push(c); return [{ code: 'B' }, { code: 'C' }]; });
   try {
-    assert.deepEqual(a15Findings(context).map((f) => f.code).slice(-3), ['A', 'B', 'C']);
+    assert.deepEqual(a15Findings(context).map((f) => f.code), ['A', 'B', 'C']);
     assert.equal(seen.every((c) => c === context), true);
   } finally {
-    FINDERS.length -= finders.length;
+    FINDERS.splice(0, FINDERS.length, ...original);
   }
 });
 

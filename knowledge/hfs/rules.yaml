@@ -2205,6 +2205,14 @@ rules:
     failureCodes: ["BE_THIRD_PARTY_OWNER"]
     enforcers:
       - {kind: eslint-be, id: third-party-import-owner}
+  - id: R280
+    code: "HFS_UNUSED_SYMBOL"
+    law: "Every enum member, queue constant, error code and catalog key has a production consumer; an error's kind or message mapping and a test-only reference do not keep a dead symbol alive. Namespace imports consume the members actually read."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_UNUSED_SYMBOL"]
+    enforcers:
+      - {kind: hfs, id: unused-symbol, at: scripts/hfs/rules/unused-symbol.mjs}
   - id: R281
     code: "BE_SPEC_FORM_ALL_ROLES"
     law: "Unit spec form applies to every declared logic role, including policies, mappers, guards and integration clients. A spec obtains its subject from a compiled Nest testing module with explicit providers, never constructs the subject or mocks an own module or third-party library, and asserts behavior or state rather than only toBeDefined existence checks."
@@ -2219,23 +2227,22 @@ rules:
       - {kind: eslint-be, id: spec-behavior-assertion}
       - {kind: eslint-be, id: spec-infra-double-from-kit}
       - {kind: eslint-be, id: spec-exact-values}
-  - id: R291
-    code: "HFS_FUNCTION_BUDGET"
-    law: "Every back-end and front-end function, method or arrow body stays within ruleParams.functionLines (80 physical lines), including comments and blank lines, in lite and full; split a larger body by responsibility. This is an absolute budget."
-    kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["HFS_FUNCTION_BUDGET"]
-    enforcers:
-      - {kind: eslint-be, id: function-line-budget}
-      - {kind: eslint-fe, id: function-line-budget}
-  - id: R292
-    code: "HFS_FEATURE_FILE_BUDGET"
-    law: "Every feature owner stays within ruleParams.featureFiles (250 tracked files), including nested files, in lite and full; split a larger feature by product capability."
+  - id: R282
+    code: "HFS_ASSET_OVERSIZE"
+    law: "Back-end build assets stay within the per-file asset budget (512000 bytes by default) and the build-asset extension allowlist; ordinary media lives in object storage, and model weights and datasets are never tracked in the back end. Declared documentation media remains allowed."
     kinds: [check]
     gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["HFS_FEATURE_FILE_BUDGET"]
+    failureCodes: ["HFS_ASSET_OVERSIZE", "HFS_ASSET_KIND"]
     enforcers:
-      - {kind: hfs, id: feature-files, at: scripts/hfs/rules/feature-files.mjs}
+      - {kind: hfs, id: assets, at: scripts/hfs/rules/assets.mjs}
+  - id: R283
+    code: "HFS_APP_LEXICON"
+    law: "An app's source and documentation use the current product vocabulary: a word declared in hfs.json lexicon.removed is refused as a whole word or identifier segment, in both editions."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_APP_LEXICON"]
+    enforcers:
+      - {kind: hfs, id: lexicon, at: scripts/hfs/rules/lexicon.mjs}
 
   - id: R285
     code: "FE_SWR_OUTSIDE_FAMILY"
@@ -2264,27 +2271,20 @@ rules:
     failureCodes: ["FE_CALLBACK_SHAPE"]
     enforcers:
       - {kind: eslint-fe, id: callback-shape}
-  - id: R280
-    code: "HFS_UNUSED_SYMBOL"
-    law: "Every enum member, queue constant, error code and catalog key has a production consumer; an error's kind or message mapping and a test-only reference do not keep a dead symbol alive. Namespace imports consume the members actually read."
+  - id: R291
+    code: "HFS_FUNCTION_BUDGET"
+    law: "Every back-end and front-end function, method or arrow body stays within ruleParams.functionLines (80 physical lines), including comments and blank lines, in lite and full; split a larger body by responsibility. This is an absolute budget."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_FUNCTION_BUDGET"]
+    enforcers:
+      - {kind: eslint-be, id: function-line-budget}
+      - {kind: eslint-fe, id: function-line-budget}
+  - id: R292
+    code: "HFS_FEATURE_FILE_BUDGET"
+    law: "Every feature owner stays within ruleParams.featureFiles (250 tracked files), including nested files, in lite and full; split a larger feature by product capability."
     kinds: [check]
     gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["HFS_UNUSED_SYMBOL"]
+    failureCodes: ["HFS_FEATURE_FILE_BUDGET"]
     enforcers:
-      - {kind: hfs, id: unused-symbol, at: scripts/hfs/rules/unused-symbol.mjs}
-  - id: R282
-    code: "HFS_ASSET_OVERSIZE"
-    law: "Back-end build assets stay within the per-file asset budget (512000 bytes by default) and the build-asset extension allowlist; ordinary media lives in object storage, and model weights and datasets are never tracked in the back end. Declared documentation media remains allowed."
-    kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["HFS_ASSET_OVERSIZE", "HFS_ASSET_KIND"]
-    enforcers:
-      - {kind: hfs, id: assets, at: scripts/hfs/rules/assets.mjs}
-  - id: R283
-    code: "HFS_APP_LEXICON"
-    law: "An app's source and documentation use the current product vocabulary: a word declared in hfs.json lexicon.removed is refused as a whole word or identifier segment, in both editions."
-    kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["HFS_APP_LEXICON"]
-    enforcers:
-      - {kind: hfs, id: lexicon, at: scripts/hfs/rules/lexicon.mjs}
+      - {kind: hfs, id: feature-files, at: scripts/hfs/rules/feature-files.mjs}

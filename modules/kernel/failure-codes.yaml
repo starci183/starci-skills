@@ -18355,6 +18355,8 @@ HFS_FEATURE_FILE_BUDGET:
     - "Một tính năng gộp nhiều khả năng sản phẩm vào cùng một thư mục"
     - "Các tệp mã nguồn, kiểm thử hoặc tài liệu trong thư mục con làm tổng số tệp vượt hạn mức"
   nextStep_vi: "Tách tính năng theo khả năng sản phẩm vào các thư mục sở hữu riêng, rồi chạy lại starci app check để mỗi tính năng nằm trong hạn mức."
+  owner: op-retry
+  kind: check-finding
 FE_SWR_OUTSIDE_FAMILY:
   title: "An SWR runtime call is outside its hook family"
   title_vi: "Lời gọi SWR nằm ngoài họ hook được khai báo"
@@ -18418,6 +18420,8 @@ FE_CALLBACK_SHAPE:
     - "Callback gọi operation API hoặc xử lý dữ liệu sản phẩm"
     - "Callback trả JSON hoặc định nghĩa thêm handler"
   nextStep_vi: "Giữ callback ở việc đọc mã, tạo client xác thực, đổi mã và chuyển hướng; chuyển logic sản phẩm về back end hoặc hook phù hợp."
+  owner: op-retry
+  kind: check-finding
 HFS_UNUSED_SYMBOL:
   title: "An enum member, queue constant, error code or catalog key has no production consumer"
   title_vi: "Ký hiệu không có nơi dùng trong mã chạy thực tế"

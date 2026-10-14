@@ -12,7 +12,7 @@ import { unusedSymbolFindings } from './unused-symbol.mjs';
 /** The failure codes the finders above emit, so `starci app check` ships their labels (check.mjs adds them to CHECK_CODES). Append-only; the coordinator regenerates it at merge time. */
 export const A15_CODES = [
   // codes-begin
-  'HFS_FEATURE_FILE_BUDGET',
+  'HFS_FEATURE_FILE_BUDGET', 'HFS_UNUSED_SYMBOL', 'HFS_ASSET_OVERSIZE', 'HFS_ASSET_KIND', 'HFS_APP_LEXICON',
   // codes-end
 ];
 
@@ -29,6 +29,3 @@ export const FINDERS = [
 export function a15Findings(context) {
   return FINDERS.flatMap((finder) => finder(context));
 }
-
-/** Codes emitted by the finders (coordinator-managed). */
-export const A15_CODES = [];
