@@ -17,13 +17,11 @@ const refsIn = (refs, edition) => (Array.isArray(refs) ? refs : []).filter((ref)
 const relatedSlots = (rule, views) => views.filter(({ slot }) => (slot.rules ?? []).some((code) => code === rule.id || rule.failureCodes.includes(code)));
 
 function enforcerExists(context, enforcer, rule) {
+  if (['eslint-be', 'eslint-fe', 'stylelint'].includes(enforcer.kind)) {
+    return context.plugins?.[enforcer.kind]?.ids?.has(enforcer.id) ?? false;
+  }
   if (enforcer.at) return context.files.has(enforcer.at) && rule.failureCodes.some((code) => context.files.get(enforcer.at).includes(code));
-  // Lint enforcers are registered by their exported rule id. Their implementation/spec files are authored sources.
-  const dir = { 'eslint-be': 'packages/eslint/be/', 'eslint-fe': 'packages/eslint/fe/', stylelint: 'packages/stylelint/' }[enforcer.kind];
-  if (!dir) return false;
-  const escaped = escapeRegExp(enforcer.id);
-  const key = new RegExp(String.raw`['"]${escaped}['"]\s*:`);
-  return [...context.files].some(([file, text]) => file.startsWith(dir) && file.endsWith('.mjs') && !file.endsWith('.spec.mjs') && !file.includes('/fixtures/') && key.test(text));
+  return false;
 }
 
 const TEST_TITLE = /(?:^|\W)(?:test|it|describe|t\.test)\s*\(\s*(['"`])([^'"`\n]+)\1/g;

@@ -6,7 +6,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { loadRuleCatalog } from '../../scripts/hfs/rule-catalog.mjs';
-import { hfsRulesFindings } from '../../scripts/checks/check-hfs-rules.mjs';
+import { hfsRulesFindings, pluginRuleIds } from '../../scripts/checks/check-hfs-rules.mjs';
 import { coverageReport, formatCoverageReport, hfsCoverageFindings, loadCoverageContext } from '../../scripts/checks/check-hfs-coverage.mjs';
 import { runCoverageWitnesses } from '../../scripts/checks/lib/coverage-witness.mjs';
 
@@ -32,6 +32,8 @@ const SPEC = 'tests/checks/sample.spec.mjs';
 const ENFORCER = 'scripts/checks/check-sample.mjs';
 const TEMPLATE = 'packages/hfs/templates/app/sample/record.yaml';
 const RUNTIME_SLOTS = 'knowledge/hfs/runtime-slots.yaml';
+const LINT_KINDS = ['eslint-be', 'eslint-fe', 'stylelint'];
+const TARGET_RULE_IDS = ['R25', 'R26', 'R28', 'R31', 'R32', 'R33', 'R35', 'R39', 'R46', 'R64', 'R86', 'R106', 'R174', 'R175', 'R176', 'R178', 'R181', 'R235'];
 const ruleOf = (context) => context.catalog.rules[0];
 const otherEdition = (edition) => edition === 'lite' ? 'full' : 'lite';
 const examplePath = (edition) => `examples/${edition}-app`;
@@ -72,7 +74,7 @@ function completeCatalog() {
     })),
     schemas: [],
     surfaces: [{ id: 'sample', editions: [...EDITIONS], rules: ['R01'], slots: ['app.sample'] }],
-    requirements: [], rulings: null,
+    requirements: [], rulings: null, plugins: {},
   };
 }
 
@@ -132,6 +134,7 @@ const fixtureCatalogs = {
     context.files.set(machine, `export function sample() { return [{ ruleId: '${SAMPLE}' }]; }`);
     context.files.set('scripts/hfs/architecture/surface.mjs', `const BE = ['be'];\nconst enforcer = (id, plugins, codes) => ({id, plugins, codes});\nexport const LINT_ENFORCERS = [enforcer('sample', BE, ['${SAMPLE}'])];`);
     context.files.set('packages/eslint/be/index.mjs', invalid ? 'export const rules = {};' : `export const rules = {'sample': {create() { return {}; }}};`);
+    context.plugins['eslint-be'] = {ids: new Set(invalid ? [] : ['sample'])};
     context.files.set('packages/eslint/be/lib/why.mjs', `export const why = {'sample': {code: '${SAMPLE}'}};`);
     if (!invalid) {
       ruleOf(context).enforcers.push({kind: 'eslint-be', id: 'sample'});
@@ -433,6 +436,69 @@ test('RT_COVERAGE_NO_ENFORCER refuses a planned, absent or silent enforcer file'
   }
 });
 
+function lintCatalog(kind, id = 'sample') {
+  const context = completeCatalog();
+  ruleOf(context).kinds = ['lint'];
+  ruleOf(context).enforcers = [{kind, id}];
+  context.plugins[kind] = {ids: new Set([id])};
+  return context;
+}
+
+const missingEnforcers = (context) => hfsCoverageFindings(context).filter((item) => item.code === 'RT_COVERAGE_NO_ENFORCER');
+
+for (const kind of LINT_KINDS) {
+  for (const edition of EDITIONS) {
+    test(`registered ${kind} ids provide a passing ${edition} enforcer without a quoted source key`, () => {
+      const context = lintCatalog(kind);
+      assert.deepEqual(missingEnforcers(context), []);
+    });
+
+    test(`${kind} refuses absent, failed and wrong-id ${edition} inventories despite orphan source keys`, () => {
+      const context = lintCatalog(kind);
+      const source = kind === 'stylelint' ? 'packages/stylelint/orphan.mjs' : `packages/eslint/${kind.slice(7)}/orphan.mjs`;
+      context.files.set(source, `export const rules = {'sample': {create() { return {}; }}}; // ${SAMPLE}`);
+      ruleOf(context).enforcers[0].at = source;
+      for (const plugin of [undefined, {error: 'The plugin cannot be loaded.'}, {ids: new Set(['other-rule'])}]) {
+        context.plugins[kind] = plugin;
+        assert.ok(missingEnforcers(context).some((item) => item.edition === edition && item.level === 'error'));
+      }
+    });
+
+    test(`${kind} refuses planned and edition-restricted ${edition} enforcers`, () => {
+      const context = lintCatalog(kind);
+      const enforcer = ruleOf(context).enforcers[0];
+      enforcer.status = 'planned';
+      assert.ok(missingEnforcers(context).some((item) => item.edition === edition));
+      delete enforcer.status;
+      enforcer.planned = true;
+      assert.ok(missingEnforcers(context).some((item) => item.edition === edition));
+      delete enforcer.planned;
+      enforcer.editions = [otherEdition(edition)];
+      enforcer.editionWhy = 'The scope follows ruling:R01/case-1.';
+      assert.deepEqual(missingEnforcers(context).map((item) => item.edition), [edition]);
+    });
+  }
+}
+
+for (const edition of EDITIONS) {
+  test(`RT_COVERAGE_NO_ENFORCER gates a metadata-free legacy ${edition} rule while other gaps remain backlog`, () => {
+    const context = completeCatalog();
+    for (const key of ['editions', 'docs', 'exemplifiedBy', 'proves', 'witness']) delete ruleOf(context)[key];
+    ruleOf(context).enforcers = [];
+    const findings = hfsCoverageFindings(context);
+    const missing = findings.find((item) => item.code === 'RT_COVERAGE_NO_ENFORCER' && item.edition === edition);
+    assert.equal(missing?.level, 'error');
+    assert.ok(!missing.legacy);
+    const backlog = findings.filter((item) => item.code !== 'RT_COVERAGE_NO_ENFORCER');
+    assert.ok(backlog.length > 0);
+    assert.ok(backlog.every((item) => item.level === 'warning' && item.legacy));
+    const report = coverageReport(findings);
+    assert.equal(report.ok, false);
+    assert.equal(report.errors, 2);
+    assert.equal(report.legacyBacklog.total, backlog.length);
+  });
+}
+
 test('RT_COVERAGE_NO_DOC requires the declared anchor and code in the owning document', () => {
   const context = completeCatalog();
   ruleOf(context).docs = [`${DOC}#sample`];
@@ -626,10 +692,37 @@ function tempFixture(t) {
   return { fixtureRoot, scratch, write };
 }
 
-test('the coverage context loader inventories authored sources and excludes custody and generated copies', (t) => {
-  const { fixtureRoot, write } = tempFixture(t);
+function writeCoverageCatalog(write, catalog = metadataCatalog()) {
   write('knowledge/hfs/slots.yaml', fs.readFileSync(path.join(root, 'knowledge/hfs/slots.yaml'), 'utf8'));
-  write('knowledge/hfs/rules.yaml', JSON.stringify(metadataCatalog()));
+  write('knowledge/hfs/rules.yaml', JSON.stringify(catalog));
+}
+
+function writeComputedLintPlugin(write, kind) {
+  const profile = kind.slice(7);
+  const directory = `packages/eslint/${profile}`;
+  write(`${directory}/index.mjs`, [
+    "import { rules as authoredRules } from './authored.mjs';",
+    "import { rules as machineRules } from './machine.mjs';",
+    "import { rules as orphanRules } from './orphan.mjs';",
+    'const CONTRIBUTIONS = [',
+    "  {law: 'authored', rules: authoredRules},",
+    "  {law: 'machine', rules: machineRules},",
+    '];',
+    'export const rules = Object.assign({}, ...CONTRIBUTIONS.map((entry) => entry.rules));',
+  ].join('\n'));
+  write(`${directory}/authored.mjs`, "const names = [['authored', 'sample'].join('-')];\nexport const rules = Object.fromEntries(names.map((id) => [id, {create() { return {}; }}]));\n");
+  write(`${directory}/machine.mjs`, [
+    "import { LINT_ENFORCERS } from '../../../scripts/hfs/architecture/surface.mjs';",
+    `const entries = LINT_ENFORCERS.filter((entry) => entry.plugins.includes('${profile}'));`,
+    'export const rules = Object.fromEntries(entries.map((entry) => [entry.id, {create() { return {}; }}]));',
+  ].join('\n'));
+  write('scripts/hfs/architecture/surface.mjs', "export const LINT_ENFORCERS = [{id: ['generated', 'sample'].join('-'), plugins: ['be', 'fe']}];\n");
+  write(`${directory}/orphan.mjs`, "export const rules = {'orphan-sample': {create() { return {}; }}};\n");
+}
+
+test('the coverage context loader inventories authored sources and excludes custody and generated copies', async (t) => {
+  const { fixtureRoot, write } = tempFixture(t);
+  writeCoverageCatalog(write);
   write(DOC, `${SAMPLE}.\n`);
   write(SPEC, `// proves: ${SAMPLE}@lite ${SAMPLE}@full\n`);
   write('examples/lite-app/hfs.json', JSON.stringify({ hfs: 3, kind: 'app', edition: 'lite' }));
@@ -640,12 +733,52 @@ test('the coverage context loader inventories authored sources and excludes cust
     'packages/hfs/runtime/copied.mjs', 'packages/example/dist/generated.mjs',
   ];
   for (const file of excluded) write(file, 'fixture-marker\n');
-  const context = loadCoverageContext(fixtureRoot);
+  const context = await loadCoverageContext(fixtureRoot);
   assert.equal(context.catalog.rules.length, 1);
   assert.ok(context.files.has(DOC));
   assert.ok(context.files.has(SPEC), 'authored tests are part of the proof inventory');
   assert.deepEqual(context.examples.map((example) => [example.path, example.edition]), [['examples/lite-app', 'lite']]);
   for (const file of excluded) assert.ok(!context.files.has(file), file);
+  assert.ok(LINT_KINDS.every((kind) => context.plugins[kind].error), 'absent plugin entries are retained as failed inventories');
+});
+
+for (const kind of ['eslint-be', 'eslint-fe']) {
+  test(`the ${kind} loader resolves contributed and generated rule ids and refuses quoted orphan keys in both editions`, async (t) => {
+    const {fixtureRoot, write} = tempFixture(t);
+    writeCoverageCatalog(write);
+    writeComputedLintPlugin(write, kind);
+    const context = await loadCoverageContext(fixtureRoot);
+    context.catalog = {rules: context.catalog.rules.map((rule) => ({...rule}))};
+    const shared = await pluginRuleIds(fixtureRoot, kind);
+    assert.deepEqual(context.plugins[kind].ids, new Set(['authored-sample', 'generated-sample']));
+    assert.deepEqual(context.plugins[kind].ids, shared.ids);
+    for (const id of ['authored-sample', 'generated-sample']) {
+      ruleOf(context).enforcers = [{kind, id}];
+      assert.deepEqual(missingEnforcers(context), [], id);
+    }
+    ruleOf(context).enforcers = [{kind, id: 'orphan-sample'}];
+    assert.deepEqual(new Set(missingEnforcers(context).map((item) => item.edition)), new Set(EDITIONS));
+  });
+}
+
+test('all 18 formerly missing real lint rule owners have an enforcer in both editions and fail when the inventory loses them', async () => {
+  const context = completeCatalog();
+  context.catalog.rules = loadRuleCatalog({root}).rules.filter((rule) => TARGET_RULE_IDS.includes(rule.id));
+  context.manifest.slots = [];
+  context.surfaces = [];
+  context.plugins = Object.fromEntries(await Promise.all(LINT_KINDS.map(async (kind) => [kind, await pluginRuleIds(root, kind)])));
+  assert.equal(context.catalog.rules.length, 18);
+  for (const rule of context.catalog.rules) {
+    for (const enforcer of rule.enforcers) {
+      assert.ok(context.plugins[enforcer.kind]?.ids?.has(enforcer.id), `${rule.id} ${enforcer.kind}:${enforcer.id}`);
+    }
+  }
+  assert.deepEqual(missingEnforcers(context), []);
+  for (const plugin of Object.values(context.plugins)) plugin.ids = new Set();
+  const failures = missingEnforcers(context);
+  assert.equal(failures.length, 36);
+  assert.deepEqual(new Set(failures.map((item) => `${item.rule}@${item.edition}`)), new Set(TARGET_RULE_IDS.flatMap((id) => EDITIONS.map((edition) => `${id}@${edition}`))));
+  assert.ok(failures.every((item) => item.level === 'error'));
 });
 
 function witnessFixture(t, edition, mutation) {
