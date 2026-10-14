@@ -1,12 +1,12 @@
 /**
- * The rules that hold the FORM of a unit spec (catalog R48 `BE_SPEC_QUALITY`, the unit-test standard of 2026-09-30).
+ * The rules that hold the FORM of a unit spec (R48 `BE_SPEC_QUALITY`, extended by R281 `BE_SPEC_FORM_ALL_ROLES`).
  *
- * A unit spec is `<name>.service.spec.ts` beside `<name>.service.ts` (R47). It builds the service the way Nest builds it
+ * A unit spec is `<name>.<role>.spec.ts` beside its logic-role subject (R47). It builds the subject the way Nest builds it
  * and takes every double from the one shared kit, `@starci/jest-preset`:
  *
  *   - `spec-builds-with-testing-module`: the spec calls `Test.createTestingModule(...)` from `@nestjs/testing`, awaits
  *     `.compile()` and reads the subject with `.get(...)` on the resulting `TestingModule`.
- *   - `spec-no-new-subject`: the service under test (the class of the sibling `<name>.service.ts`) is never built with `new`.
+ *   - `spec-no-new-subject`: the subject (the class of the sibling `<name>.<role>.ts`) is never built with `new`.
  *   - `spec-module-definition-only-providers`: the module definition has a `providers` list and nothing else: no `imports` key
  *     and no `override*` call (`overrideProvider`, `overrideGuard`, `overrideModule`, `overrideFilter`, `overridePipe`,
  *     `overrideInterceptor`).
@@ -20,16 +20,20 @@
  *   - `spec-exact-values`: no `expect.any(String)`, `expect.any(Number)` or `expect.any(Date)` (`expect` being the jest global
  *     or the `@jest/globals` import): ids and clocks come from the kit's deterministic doubles (`fakeIds()`, `FakeClock`), so a
  *     unit spec asserts the exact value.
+ *   - `spec-behavior-assertion`: a spec with only presence/truthiness assertions must assert an exact result or effect.
  *
  * Paths are asked of the slot manifest (`lib/unit-spec.mjs`), a name is judged by the import that binds it, never by its spelling.
  */
 import { hfsOf } from "./lib/hfs.mjs"
 import { walk } from "./lib/ast.mjs"
-import { importOf } from "./lib/import-source.mjs"
+import { importOf, isImportedFrom } from "./lib/import-source.mjs"
 import { isPackageType, typeOrigins } from "./lib/types.mjs"
-import { baseOf, isServiceSpecFile, isUnitSpecFile, serviceNameOfSpec } from "./lib/unit-spec.mjs"
+import { baseOf, isServiceSpecFile, isUnitSpecFile, unitRoleOfSpec } from "./lib/unit-spec.mjs"
 
 const TESTING_PACKAGE = "@nestjs/testing"
+
+/** Existing service specs and every other unit-tested logic role declared by the manifest. */
+const isFormSpecFile = (hfs, filename) => isServiceSpecFile(hfs, filename) || unitRoleOfSpec(hfs, filename) !== null
 
 /** The last call in a chain `Test.createTestingModule(...).<a>().<b>()`: the `createTestingModule` call at its root, or null. */
 const testingModuleRoot = (context, node) => {
@@ -54,20 +58,20 @@ const isCreateTestingModule = (context, node) => node.type === "CallExpression" 
 
 // -- spec-builds-with-testing-module ---------------------------------------------------------------------------
 
-/** A service spec builds its subject through the Nest testing module. */
+/** A logic-role spec builds its subject through the Nest testing module. */
 export const specBuildsWithTestingModule = {
     meta: {
         type: "problem",
-        docs: { description: "A `<name>.service.spec.ts` calls `Test.createTestingModule(...)` from `@nestjs/testing`, awaits `.compile()` and reads the subject with `.get(...)`." },
+        docs: { description: "A logic-role unit spec calls `Test.createTestingModule(...)` from `@nestjs/testing`, awaits `.compile()` and reads the subject with `.get(...)`." },
         schema: [],
         messages: {
-            noModule: "This service spec never calls `Test.createTestingModule(...)` from `@nestjs/testing`. Build the subject the way Nest does, so its constructor injectors are exercised: `const moduleRef = await Test.createTestingModule({ providers: [Subject, { provide: TOKEN, useValue: double }] }).compile()`.",
-            noCompile: "`Test.createTestingModule(...)` is never followed by `.compile()`, so no module exists to read the subject from.",
-            noGet: "The subject is never read with `moduleRef.get(Subject)` from the compiled `TestingModule`. Read it from the module, do not hold a second construction path.",
+            noModule: "[BE_SPEC_FORM_ALL_ROLES] This logic-role spec never calls `Test.createTestingModule(...)` from `@nestjs/testing`. Build the subject the way Nest does, so its constructor injectors are exercised: `const moduleRef = await Test.createTestingModule({ providers: [Subject, { provide: TOKEN, useValue: double }] }).compile()`.",
+            noCompile: "[BE_SPEC_FORM_ALL_ROLES] `Test.createTestingModule(...)` is never followed by `.compile()`, so no module exists to read the subject from.",
+            noGet: "[BE_SPEC_FORM_ALL_ROLES] The subject is never read with `moduleRef.get(Subject)` from the compiled `TestingModule`. Read it from the module, do not hold a second construction path.",
         },
     },
     create(context) {
-        if (!isServiceSpecFile(hfsOf(context), context.filename || context.getFilename())) return {}
+        if (!isFormSpecFile(hfsOf(context), context.filename || context.getFilename())) return {}
         let created = null
         let compiled = false
         let read = false
@@ -93,20 +97,20 @@ export const specBuildsWithTestingModule = {
 /** The last path segment of a module specifier, without an extension. */
 const moduleStem = (specifier) => String(specifier).replace(/\\/g, "/").split("/").pop().replace(/\.[cm]?[jt]s$/, "")
 
-/** The service under test is never constructed by hand. */
+/** The logic-role subject is never constructed by hand. */
 export const specNoNewSubject = {
     meta: {
         type: "problem",
-        docs: { description: "A service spec never builds the service under test with `new`." },
+        docs: { description: "A logic-role unit spec never builds its subject with `new`." },
         schema: [],
         messages: {
-            construct: "`new {{name}}(...)` builds the service under test by hand, so its injectors are never exercised and a constructor change goes unnoticed. Provide it in `Test.createTestingModule({ providers: [{{name}}, ...] })` and read it with `moduleRef.get({{name}})`.",
+            construct: "[BE_SPEC_FORM_ALL_ROLES] `new {{name}}(...)` builds the subject by hand, so its injectors are never exercised and a constructor change goes unnoticed. Provide it in `Test.createTestingModule({ providers: [{{name}}, ...] })` and read it with `moduleRef.get({{name}})`.",
         },
     },
     create(context) {
         const filename = context.filename || context.getFilename()
-        if (!isServiceSpecFile(hfsOf(context), filename)) return {}
-        const stem = `${serviceNameOfSpec(filename)}.service`
+        if (!isFormSpecFile(hfsOf(context), filename)) return {}
+        const stem = baseOf(filename).replace(/\.spec\.ts$/, "")
         const locals = new Set()
         const namespaces = new Set()
         return {
@@ -133,15 +137,15 @@ const OVERRIDES = new Set(["overrideProvider", "overrideGuard", "overrideModule"
 export const specModuleDefinitionOnlyProviders = {
     meta: {
         type: "problem",
-        docs: { description: "A service spec's testing module has no `imports` key and no `override*` call." },
+        docs: { description: "A logic-role unit spec's testing module has no `imports` key and no `override*` call." },
         schema: [],
         messages: {
-            imports: "`imports` pulls a real module into a unit spec, so the test runs the module's providers instead of the doubles you list. Provide exactly the service's constructor dependencies in `providers`.",
-            override: "`{{method}}` swaps a provider after the module was declared. A unit spec provides its double up front: `providers: [Subject, { provide: TOKEN, useValue: double }]`.",
+            imports: "[BE_SPEC_FORM_ALL_ROLES] `imports` pulls a real module into a unit spec, so the test runs the module's providers instead of the doubles you list. Provide exactly the subject's constructor dependencies in `providers`.",
+            override: "[BE_SPEC_FORM_ALL_ROLES] `{{method}}` swaps a provider after the module was declared. A unit spec provides its double up front: `providers: [Subject, { provide: TOKEN, useValue: double }]`.",
         },
     },
     create(context) {
-        if (!isServiceSpecFile(hfsOf(context), context.filename || context.getFilename())) return {}
+        if (!isFormSpecFile(hfsOf(context), context.filename || context.getFilename())) return {}
         return {
             CallExpression(node) {
                 if (isCreateTestingModule(context, node)) {
@@ -186,7 +190,7 @@ export const specNoModuleMock = {
         docs: { description: "A unit spec never calls `jest.mock`, `jest.doMock`, `jest.unstable_mockModule` or `jest.requireMock`." },
         schema: [],
         messages: {
-            moduleMock: "`jest.{{method}}(...)` replaces a whole module, so the subject runs against a stand-in the production wiring never has. Provide a collaborator through its injection token (`{ provide: TOKEN, useValue: mock<Port>() }`); a third-party library is reached through the wrapper that owns it, and the wrapper is the double.",
+            moduleMock: "[BE_SPEC_FORM_ALL_ROLES] `jest.{{method}}(...)` replaces a whole module, so the subject runs against a stand-in the production wiring never has. Provide a collaborator through its injection token (`{ provide: TOKEN, useValue: mock<Port>() }`); a third-party library is reached through the wrapper that owns it, and the wrapper is the double.",
         },
     },
     create(context) {
@@ -386,17 +390,17 @@ const kitDoubleOfType = (context, node, kit) => {
 export const specInfraDoubleFromKit = {
     meta: {
         type: "problem",
-        docs: { description: "In a service spec a provider `{ provide: TOKEN, useValue: X }` takes X from the `@starci/jest-preset` double the token calls for (`ruleParams.be.specDoubles`)." },
+        docs: { description: "In a logic-role unit spec a provider `{ provide: TOKEN, useValue: X }` takes X from the `@starci/jest-preset` double the token calls for (`ruleParams.be.specDoubles`)." },
         schema: [],
         messages: {
-            wrong: "`{{token}}` is provided with {{got}}, but a token of this kind takes {{want}} from `{{kit}}`. The kit double is behavioural (or, for `mock`, typed against the port), a hand-built value drifts from the thing it stands for.",
-            notKit: "`{{name}}` is not imported from `{{kit}}`. A double for `{{token}}` is {{want}} of the kit, never a local helper or a lookalike of the same name.",
-            unknown: "The value provided for `{{token}}` cannot be traced to a kit double. Bind it to a `const` initialised with {{want}} from `{{kit}}` (or write the call in place).",
+            wrong: "[BE_SPEC_FORM_ALL_ROLES] `{{token}}` is provided with {{got}}, but a token of this kind takes {{want}} from `{{kit}}`. The kit double is behavioural (or, for `mock`, typed against the port), a hand-built value drifts from the thing it stands for.",
+            notKit: "[BE_SPEC_FORM_ALL_ROLES] `{{name}}` is not imported from `{{kit}}`. A double for `{{token}}` is {{want}} of the kit, never a local helper or a lookalike of the same name.",
+            unknown: "[BE_SPEC_FORM_ALL_ROLES] The value provided for `{{token}}` cannot be traced to a kit double. Bind it to a `const` initialised with {{want}} from `{{kit}}` (or write the call in place).",
         },
     },
     create(context) {
         const hfs = hfsOf(context)
-        if (!isServiceSpecFile(hfs, context.filename || context.getFilename())) return {}
+        if (!isFormSpecFile(hfs, context.filename || context.getFilename())) return {}
         const table = tableOf(hfs.ruleParams.specDoubles)
         const describe = (entry) => {
             const forms = entry.forms.map((form) => ({ call: `\`${entry.double}(...)\``, new: `\`new ${entry.double}(...)\``, curried: `\`${entry.double}(...)(...)\``, object: "a plain object literal of real values", primitive: "a real value", array: "an array" })[form])
@@ -443,14 +447,14 @@ const LOOSE_KINDS = new Set(["String", "Number", "Date"])
 export const specExactValues = {
     meta: {
         type: "problem",
-        docs: { description: "A service spec never asserts `expect.any(String)`, `expect.any(Number)` or `expect.any(Date)`: ids and clocks come from `fakeIds()` and `FakeClock`, so the exact value is asserted." },
+        docs: { description: "A logic-role unit spec never asserts `expect.any(String)`, `expect.any(Number)` or `expect.any(Date)`: ids and clocks come from `fakeIds()` and `FakeClock`, so the exact value is asserted." },
         schema: [],
         messages: {
-            loose: "`expect.any({{kind}})` accepts every {{what}}, so the assertion proves nothing about the value the service generated. The service takes its ids and its clock from tokens and the spec provides the kit's deterministic doubles: `{ provide: ID_GENERATOR, useValue: fakeIds() }` and `{ provide: CLOCK, useValue: new FakeClock(...) }` from `@starci/jest-preset`. Assert the exact value ({{exact}}).",
+            loose: "[BE_SPEC_FORM_ALL_ROLES] `expect.any({{kind}})` accepts every {{what}}, so the assertion proves nothing about the value the subject generated. The subject takes its ids and its clock from tokens and the spec provides the kit's deterministic doubles: `{ provide: ID_GENERATOR, useValue: fakeIds() }` and `{ provide: CLOCK, useValue: new FakeClock(...) }` from `@starci/jest-preset`. Assert the exact value ({{exact}}).",
         },
     },
     create(context) {
-        if (!isServiceSpecFile(hfsOf(context), context.filename || context.getFilename())) return {}
+        if (!isFormSpecFile(hfsOf(context), context.filename || context.getFilename())) return {}
         return {
             CallExpression(node) {
                 const callee = node.callee
@@ -466,6 +470,51 @@ export const specExactValues = {
     },
 }
 
+// -- spec-behavior-assertion -----------------------------------------------------------------------------------
+
+const PRESENCE_MATCHERS = new Set(["toBeDefined", "toBeTruthy"])
+
+/** The matcher in `expect(value).not.resolves.toEqual(...)`, or null for another receiver. */
+const matcherOf = (context, node) => {
+    const callee = node.callee
+    if (callee.type !== "MemberExpression") return null
+    const matcher = callee.computed ? callee.property.value : callee.property.name
+    if (typeof matcher !== "string" || !matcher.startsWith("to")) return null
+    let receiver = callee.object
+    while (receiver.type === "MemberExpression") receiver = receiver.object
+    if (receiver.type !== "CallExpression") return null
+    if (!isImportedFrom(context, receiver.callee, "@jest/globals", "expect") && !isAmbientOrImported(context, receiver.callee, "expect", "@jest/globals")) return null
+    return matcher
+}
+
+/** Presence alone does not prove the behavior of a logic-role subject. */
+export const specBehaviorAssertion = {
+    meta: {
+        type: "problem",
+        docs: { description: "A logic-role unit spec has a behavior assertion beyond presence or truthiness (R281 BE_SPEC_FORM_ALL_ROLES)." },
+        schema: [],
+        messages: {
+            presenceOnly: "[BE_SPEC_FORM_ALL_ROLES] Every assertion in this spec checks only presence or truthiness. Assert an exact result, error or observable effect of the subject's behavior.",
+        },
+    },
+    create(context) {
+        if (!isFormSpecFile(hfsOf(context), context.filename || context.getFilename())) return {}
+        let firstPresence = null
+        let behavior = false
+        return {
+            CallExpression(node) {
+                const matcher = matcherOf(context, node)
+                if (matcher === null) return
+                if (PRESENCE_MATCHERS.has(matcher)) firstPresence ??= node
+                else behavior = true
+            },
+            "Program:exit"() {
+                if (firstPresence !== null && !behavior) context.report({ node: firstPresence, messageId: "presenceOnly" })
+            },
+        }
+    },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
     "spec-builds-with-testing-module": specBuildsWithTestingModule,
@@ -475,6 +524,7 @@ export const rules = {
     "no-return-only-generic": noReturnOnlyGeneric,
     "spec-infra-double-from-kit": specInfraDoubleFromKit,
     "spec-exact-values": specExactValues,
+    "spec-behavior-assertion": specBehaviorAssertion,
 }
 
 /** Every rule of this law ships at `error`. */
@@ -486,4 +536,5 @@ export const recommended = {
     "starci-be/no-return-only-generic": "error",
     "starci-be/spec-infra-double-from-kit": "error",
     "starci-be/spec-exact-values": "error",
+    "starci-be/spec-behavior-assertion": "error",
 }

@@ -18163,3 +18163,47 @@ workflow-purge-ledger-dependency:
   nextStep_vi: "Xử lý tham chiếu theo thẩm quyền sản phẩm hoặc sửa bộ kiểm schema rồi đọc lại kế hoạch; không xóa Work để vượt cổng."
   owner: owner
   kind: verb-refusal
+
+BE_REST_DOOR_EVIDENCE:
+  title: "A REST route has no route-level reason"
+  title_vi: "Route REST thiếu lý do ngay tại phương thức"
+  meaning_vi: "Mỗi route REST trong cả lite và full phải chứng minh mục đích được phép của chính phương thức: probe, bắt tay xác thực, webhook đã ký, luồng byte thật hoặc bảng thao tác công khai có phiên bản. Import StreamableFile hoặc lý do ở cấp lớp không chứng minh route trả JSON."
+  causes_vi:
+    - "Controller trả JSON nhưng không có bằng chứng tại route"
+    - "Một route khác hoặc import không dùng được lấy làm lý do cho cả controller"
+  nextStep_vi: "Chuyển thao tác dữ liệu sang GraphQL hoặc khai báo bằng chứng hợp lệ ngay tại route; với API công khai có phiên bản, phục vụ bảng defineOperations có kiểu."
+  owner: op-retry
+  kind: check-finding
+
+BE_REST_ROUTE_UNDECLARED:
+  title: "A public REST route is absent from the operation table"
+  title_vi: "Route REST công khai chưa thuộc bảng thao tác"
+  meaning_vi: "Route REST công khai phải nhận OperationRequest và trả OperationReply của cùng một bảng defineOperations có thao tác đã khai báo. Một bảng rỗng, bảng không liên quan hoặc chỉ một nửa kiểu hợp đồng không đăng ký route."
+  causes_vi:
+    - "Route API công khai được viết riêng ngoài defineOperations"
+    - "Đầu vào và đầu ra không dùng cùng một bảng thao tác"
+  nextStep_vi: "Khai báo thao tác có kiểu trong bảng của ứng dụng và cho route nhận OperationRequest<typeof TABLE>, trả Promise<OperationReply<typeof TABLE>> của chính bảng đó."
+  owner: op-retry
+  kind: check-finding
+
+BE_THIRD_PARTY_OWNER:
+  title: "A third-party SDK is imported outside its single integration owner"
+  title_vi: "SDK bên thứ ba dùng ngoài chủ sở hữu tích hợp duy nhất"
+  meaning_vi: "Các dependency của package.json ngoài danh sách thư viện thuần và framework phải có đúng một năng lực integrations/<provider> nhập chúng. Service miền và tính năng gọi API công khai của năng lực đó thay vì nhập SDK mạng hoặc IO trực tiếp."
+  causes_vi:
+    - "Service miền nhập nodemailer, openai, googleapis hoặc SDK mới"
+    - "Hai năng lực tích hợp cùng nhập một SDK"
+  nextStep_vi: "Chuyển import và giao thức nhà cung cấp vào một integrations/<provider> client, rồi tiêm cổng công khai của tích hợp vào service."
+  owner: op-retry
+  kind: check-finding
+
+BE_SPEC_FORM_ALL_ROLES:
+  title: "A logic-role unit spec does not prove behavior through its declared subject"
+  title_vi: "Spec của vai trò logic không chứng minh hành vi qua đối tượng đã khai báo"
+  meaning_vi: "Spec của policy, mapper, guard, client và các vai trò logic phải lấy đối tượng từ Nest testing module đã compile với provider rõ ràng, không new đối tượng hay mock module. Chỉ expect(x).toBeDefined() không chứng minh kết quả hay trạng thái."
+  causes_vi:
+    - "Spec new đối tượng kiểm thử hoặc mock module của ứng dụng"
+    - "Spec chỉ kiểm tra đối tượng tồn tại"
+  nextStep_vi: "Dựng đối tượng bằng Test.createTestingModule với provider và double phù hợp, lấy bằng moduleRef.get, gọi hành vi rồi so sánh kết quả hoặc trạng thái cụ thể."
+  owner: op-retry
+  kind: check-finding

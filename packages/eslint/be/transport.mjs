@@ -15,6 +15,7 @@ import { hfsOf } from "./lib/hfs.mjs"
 import { decoratorArguments, decoratorCallee, importOf, isImportedFrom, moduleReferences } from "./lib/import-source.mjs"
 import { isTransportSlot, KIND_DOOR_SLOTS } from "./lib/transport-slots.mjs"
 import { isPackageType, typeOrigins, typed } from "./lib/types.mjs"
+import { operationRouteEvidence, restExceptionEvidence } from "./operations.mjs"
 
 /** The HTTP route decorators of `@nestjs/common`. */
 const HTTP_ROUTES = ["Get", "Post", "Put", "Patch", "Delete", "All", "Options", "Head"]
@@ -395,47 +396,28 @@ export const noCapabilityImportsFeatures = {
 
 // -- rest-door-needs-a-reason ------------------------------------------------------------------------------------
 
-/** The `PublicReason` members that justify a REST door: a probe, a handshake and a signed webhook. */
-const REST_REASONS = new Set(["Health", "AuthHandshake", "SignedWebhook"])
-
-/** Nest and Express exports whose presence shows a byte stream or a redirect. */
-const BYTE_EVIDENCE = [
-    { source: "@nestjs/common", names: ["StreamableFile", "Redirect"] },
-    { source: "@nestjs/platform-express", names: ["FileInterceptor", "FilesInterceptor", "AnyFilesInterceptor", "FileFieldsInterceptor"] },
-    { source: "node:fs", names: ["createReadStream"] },
-    { source: "fs", names: ["createReadStream"] },
-]
-
-/** True when the class shows one of the four reasons a door is REST: a public reason, a byte stream, or an OAuth redirect. */
-const showsReason = (context, controller) => {
-    let shown = false
-    walk(controller, (node) => {
-        if (shown) return
-        if (node.type === "MemberExpression" && !node.computed && node.property.type === "Identifier" && REST_REASONS.has(node.property.name) && node.object.type === "Identifier" && importOf(context, node.object)?.imported === "PublicReason") shown = true
-        if (node.type === "Identifier" && !(node.parent?.type === "MemberExpression" && node.parent.property === node && !node.parent.computed)) {
-            const found = importOf(context, node)
-            if (found && BYTE_EVIDENCE.some((evidence) => evidence.source === found.source && evidence.names.includes(found.imported))) shown = true
-        }
-    })
-    return shown
-}
-
-/** A REST door exists only where GraphQL cannot go, and the class has to show which case it is. */
+/** A REST door exists only where GraphQL cannot go, and each route has to show which case it is. */
 export const restDoorNeedsAReason = {
     meta: {
         type: "problem",
-        docs: { description: "A `@Controller` shows a public reason (Health, AuthHandshake, SignedWebhook) or a byte stream or redirect." },
+        docs: { description: "Every REST route shows its own public reason (Health, AuthHandshake, SignedWebhook), byte transfer, redirect or declared operation table." },
         schema: [],
         messages: {
-            unjustified: "This REST door shows none of the reasons a door may not be GraphQL: a probe, an auth handshake (OAuth redirect) or a signed webhook (`@Public({ reason: PublicReason.X })`), or a byte stream. A plain JSON read belongs in the GraphQL schema, where the client already is.",
+            unjustified: "[BE_REST_DOOR_EVIDENCE] This REST route shows none of the reasons a door may not be GraphQL: a route-level probe, auth handshake or signed webhook (`@Public({ reason: PublicReason.X })`), a byte transfer, an OAuth redirect or a declared public v1 operation table. A plain JSON read belongs in the GraphQL schema, where the client already is.",
         },
     },
     create(context) {
         hfsOf(context)
+        const declared = operationRouteEvidence(context)
         return {
             ClassDeclaration(node) {
                 const controller = (node.decorators ?? []).find((decorator) => isController(context, decorator))
-                if (controller && !showsReason(context, node)) context.report({ node: controller, messageId: "unjustified" })
+                if (!controller) return
+                for (const method of node.body.body) {
+                    if (method.type !== "MethodDefinition" || method.kind !== "method" || method.static) continue
+                    const route = (method.decorators ?? []).find((decorator) => isImportedFrom(context, decoratorCallee(decorator), "@nestjs/common", HTTP_ROUTES))
+                    if (route && !restExceptionEvidence(context, method) && !declared(method)) context.report({ node: route, messageId: "unjustified" })
+                }
             },
         }
     },

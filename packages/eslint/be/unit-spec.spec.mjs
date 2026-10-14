@@ -1,5 +1,7 @@
+// proves: BE_SPEC_FORM_ALL_ROLES@lite
+// proves: BE_SPEC_FORM_ALL_ROLES@full
 /**
- * Twin tests for the unit-spec form rules (R48 `BE_SPEC_QUALITY`).
+ * Twin tests for the unit-spec form rules (R48 `BE_SPEC_QUALITY`, R281 `BE_SPEC_FORM_ALL_ROLES`).
  *
  *   node --test unit-spec.spec.mjs
  *
@@ -8,10 +10,13 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { at, fixtureHfs, typedTester } from "./fixtures/typed/tester.mjs"
+import { BE_DECLARATION, TYPED_ROOT, at, fixtureHfs, typedTester } from "./fixtures/typed/tester.mjs"
+import { appDeclaration } from "./fixtures/app.mjs"
+import { hfsFromDeclaration } from "./lib/hfs.mjs"
 import {
     noReturnOnlyGeneric,
     rules,
+    specBehaviorAssertion,
     specBuildsWithTestingModule,
     specExactValues,
     specInfraDoubleFromKit,
@@ -39,7 +44,7 @@ test("spec-builds-with-testing-module: the subject comes out of a compiled Nest 
             { filename: SPEC, code: `${NEST}it("x", async () => {\n  const moduleRef = await Test.createTestingModule({ providers: [OrderService] }).compile()\n  const service = moduleRef.get(OrderService)\n  expect(service).toBeDefined()\n})` },
             // a builder held in a variable is still the testing module
             { filename: SPEC, code: `${NEST}it("x", async () => {\n  const builder = Test.createTestingModule({ providers: [OrderService] })\n  const moduleRef = await builder.compile()\n  moduleRef.get(OrderService)\n})` },
-            // only a service spec is judged
+            // feature handlers and other spec kinds are not unit-tested logic-role specs
             { filename: HANDLER_SPEC, code: "export const a = 1" },
             { filename: E2E, code: "export const a = 1" },
             { filename: SERVICE, code: "export const a = 1" },
@@ -63,7 +68,7 @@ test("spec-no-new-subject: the service under test is never built with new", () =
             // a class of another module may be built: a value object, an error, a plain fixture
             { filename: SPEC, code: 'import { OrderService } from "./order.service"\nclass Row {}\nexport const row = new Row()\nexport { OrderService }' },
             { filename: SPEC, code: 'import { OtherService } from "./other.service"\nexport const other = new OtherService()' },
-            // not a service spec
+            // a feature handler is not a unit-tested logic-role spec
             { filename: HANDLER_SPEC, code: 'import { OrderService } from "./order.service"\nexport const s = new OrderService()' },
         ],
         invalid: [
@@ -78,7 +83,7 @@ test("spec-module-definition-only-providers: no imports key and no override in t
     tester.run("spec-module-definition-only-providers", specModuleDefinitionOnlyProviders, {
         valid: [
             { filename: SPEC, code: `${NEST}Test.createTestingModule({ providers: [OrderService, { provide: "X", useValue: 1 }] })` },
-            // a `get` of the module and an `overrideProvider` outside a service spec are other rules' business
+            // feature handler specs and e2e modules are other rules' business
             { filename: HANDLER_SPEC, code: `${NEST}Test.createTestingModule({ imports: [OrderService] }).overrideProvider(1)` },
             { filename: E2E, code: `${NEST}Test.createTestingModule({ imports: [OrderService] })` },
         ],
@@ -180,7 +185,7 @@ test("spec-infra-double-from-kit: a provider takes its value from the kit double
             { filename: SPEC, code: provide("TRANSACTION_RUNNER", "fakeTransaction()") },
             // a provider without useValue, and a value with no token, are not judged
             { filename: SPEC, code: 'export const p = { provide: "CLOCK", useFactory: () => 1 }' },
-            // not a service spec
+            // a feature handler is not a unit-tested logic-role spec
             { filename: HANDLER_SPEC, code: provide("CLOCK", "{}") },
             { filename: SERVICE, code: provide("CLOCK", "{}") },
         ],
@@ -230,7 +235,7 @@ test("spec-exact-values: a unit spec asserts the exact id and the exact date, ne
             // a locally declared `expect` or `Date` is not the jest global or the global constructor
             { filename: SPEC, code: "const expect = { any: (kind: unknown) => kind }\nexpect.any(String)" },
             { filename: SPEC, code: "class Date {}\nexpect({}).toEqual({ at: expect.any(Date) })" },
-            // only a service spec is judged
+            // feature handlers and e2e specs retain their separate rules
             { filename: HANDLER_SPEC, code: "expect({}).toEqual({ id: expect.any(String) })" },
             { filename: E2E, code: "expect({}).toEqual({ id: expect.any(String) })" },
         ],
@@ -245,3 +250,87 @@ test("spec-exact-values: a unit spec asserts the exact id and the exact date, ne
         ],
     })
 })
+
+const LOGIC_SPECS = [
+    { role: "policy", path: "src/modules/domain/order/order.policy.spec.ts", stem: "order.policy" },
+    { role: "mapper", path: "src/modules/domain/order/order.mapper.spec.ts", stem: "order.mapper" },
+    { role: "guard", path: "src/modules/platform/auth/session.guard.spec.ts", stem: "session.guard" },
+    { role: "client", path: "src/modules/integrations/mail/mail.client.spec.ts", stem: "mail.client" },
+]
+
+for (const edition of ["lite", "full"]) {
+    const hfs = hfsFromDeclaration({ ...appDeclaration("be", BE_DECLARATION), edition }, TYPED_ROOT)
+    const settings = { starci: { hfs } }
+    for (const { role, path, stem } of LOGIC_SPECS) {
+        test(`R281 ${edition}: ${role} specs use the same Nest construction, provider and double rules`, () => {
+            const filename = at(path)
+            const head = `import { Test } from "@nestjs/testing"\nimport { Subject } from "./${stem}"\n`
+            const built = `${head}it("returns the exact result", async () => {\nconst moduleRef = await Test.createTestingModule({ providers: [Subject] }).compile()\nconst subject = moduleRef.get(Subject)\nexpect(subject.run()).toEqual({ accepted: true })\n})`
+            tester.run("spec-builds-with-testing-module", specBuildsWithTestingModule, {
+                valid: [{ filename, settings, code: built }],
+                invalid: [
+                    { filename, settings, code: `${head}const subject = new Subject()`, errors: [{ messageId: "noModule" }] },
+                    { filename, settings, code: `${head}Test.createTestingModule({ providers: [Subject] })`, errors: [{ messageId: "noCompile" }] },
+                    { filename, settings, code: `${head}await Test.createTestingModule({ providers: [Subject] }).compile()`, errors: [{ messageId: "noGet" }] },
+                ],
+            })
+            tester.run("spec-no-new-subject", specNoNewSubject, {
+                valid: [
+                    { filename, settings, code: built },
+                    { filename, settings, code: `${head}class Row {}\nexport const row = new Row()` },
+                ],
+                invalid: [
+                    { filename, settings, code: `${head}export const subject = new Subject()`, errors: [{ messageId: "construct" }] },
+                    { filename, settings, code: `import * as subject from "./${stem}.js"\nnew subject.Subject()`, errors: [{ messageId: "construct" }] },
+                ],
+            })
+            tester.run("spec-module-definition-only-providers", specModuleDefinitionOnlyProviders, {
+                valid: [{ filename, settings, code: built }],
+                invalid: [
+                    { filename, settings, code: `${head}Test.createTestingModule({ imports: [Subject], providers: [] })`, errors: [{ messageId: "imports" }] },
+                    { filename, settings, code: `${head}Test.createTestingModule({ providers: [Subject] }).overrideProvider("PORT")`, errors: [{ messageId: "override" }] },
+                ],
+            })
+            tester.run("spec-no-module-mock", specNoModuleMock, {
+                valid: [{ filename, settings, code: 'import { jest } from "@jest/globals"\njest.fn()' }],
+                invalid: [
+                    { filename, settings, code: `import { jest } from "@jest/globals"\njest.mock("./${stem}")`, errors: [{ messageId: "moduleMock" }] },
+                    { filename, settings, code: 'import { jest } from "@jest/globals"\njest.doMock("openai")', errors: [{ messageId: "moduleMock" }] },
+                ],
+            })
+            tester.run("spec-infra-double-from-kit", specInfraDoubleFromKit, {
+                valid: [{ filename, settings, code: provide("CLOCK", "new FakeClock(0)") }],
+                invalid: [{ filename, settings, code: provide("CLOCK", "{ now: () => new Date(0) }"), errors: [{ messageId: "wrong" }] }],
+            })
+            tester.run("spec-exact-values", specExactValues, {
+                valid: [{ filename, settings, code: 'expect(saved).toEqual({ id: "order-1" })' }],
+                invalid: [{ filename, settings, code: "expect(saved).toEqual({ id: expect.any(String) })", errors: [{ messageId: "loose" }] }],
+            })
+        })
+    }
+    test(`R281 ${edition}: presence-only assertions are refused and a behavior assertion passes`, () => {
+        tester.run("spec-behavior-assertion", specBehaviorAssertion, {
+            valid: [
+                { filename: SPEC, settings, code: 'expect(subject).toBeDefined()\nexpect(subject.run()).toEqual({ accepted: true })' },
+                { filename: SPEC, settings, code: "await expect(subject.run()).rejects.toThrow('invalid')" },
+                { filename: SPEC, settings, code: "expect(subject.run()).toBeNull()" },
+                { filename: SPEC, settings, code: "expect(subject.run()).toBeFalsy()" },
+                { filename: SPEC, settings, code: "it('x', () => subject.run())" },
+                { filename: SPEC, settings, code: "const expect = (value: object) => ({ toBeDefined: () => value })\nexpect(subject).toBeDefined()" },
+                { filename: HANDLER_SPEC, settings, code: "expect(subject).toBeDefined()" },
+                { filename: E2E, settings, code: "expect(subject).toBeDefined()" },
+                { filename: SERVICE, settings, code: "expect(subject).toBeDefined()" },
+                ...LOGIC_SPECS.map(({ path }) => ({ filename: at(path), settings, code: 'expect(subject.run()).toEqual({ accepted: true })' })),
+            ],
+            invalid: [
+                { filename: SPEC, settings, code: "expect(subject).toBeDefined()", errors: [{ messageId: "presenceOnly" }] },
+                { filename: SPEC, settings, code: "expect(subject).toBeDefined()\nexpect(subject).toBeTruthy()", errors: [{ messageId: "presenceOnly" }] },
+                { filename: SPEC, settings, code: "expect(subject).not.toBeDefined()", errors: [{ messageId: "presenceOnly" }] },
+                { filename: SPEC, settings, code: "await expect(subject.run()).resolves.toBeDefined()", errors: [{ messageId: "presenceOnly" }] },
+                { filename: SPEC, settings, code: 'import { expect as check } from "@jest/globals"\ncheck(subject).toBeDefined()', errors: [{ messageId: "presenceOnly" }] },
+                { filename: SPEC, settings, code: 'import * as globals from "@jest/globals"\nglobals.expect(subject).toBeDefined()', errors: [{ messageId: "presenceOnly" }] },
+                ...LOGIC_SPECS.map(({ path }) => ({ filename: at(path), settings, code: "expect(subject).toBeDefined()", errors: [{ messageId: "presenceOnly" }] })),
+            ],
+        })
+    })
+}

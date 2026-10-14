@@ -898,7 +898,7 @@ rules:
     enforcers:
       - {kind: eslint-be, id: door-lives-in-features}
       - {kind: eslint-be, id: no-capability-imports-features}
-      - {kind: eslint-be, id: rest-door-needs-a-reason, editions: [full]}
+      - {kind: eslint-be, id: rest-door-needs-a-reason}
       - {kind: eslint-be, id: transport-is-thin}
       - {kind: eslint-be, id: no-response-envelope}
       - {kind: eslint-be, id: no-graphql-json}
@@ -2180,3 +2180,34 @@ rules:
     failureCodes: ["BE_APP_COMPOSITION_BUDGET"]
     enforcers:
       - {kind: eslint-be, id: app-file-budget}
+  - id: R278
+    code: "BE_REST_DOOR_EVIDENCE"
+    law: "GraphQL is the default door in lite and full. Each REST route carries its own evidence: a probe, auth handshake, signed webhook, actual byte stream or a public versioned operation served from the app's nonempty defineOperations table. A class-level reference or an unused StreamableFile import proves no route, and a public REST route absent from the operation table is refused."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_REST_DOOR_EVIDENCE", "BE_REST_ROUTE_UNDECLARED"]
+    enforcers:
+      - {kind: eslint-be, id: rest-door-needs-a-reason}
+      - {kind: eslint-be, id: rest-route-declared}
+  - id: R279
+    code: "BE_THIRD_PARTY_OWNER"
+    law: "Third-party SDK ownership is derived from the app's package.json dependencies rather than a finite SDK table. A dependency outside the pure-library and framework allowlists is imported only by one integrations/<provider> capability; domain services call that integration's public API. Existing infrastructure owner restrictions remain in force."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_THIRD_PARTY_OWNER"]
+    enforcers:
+      - {kind: eslint-be, id: third-party-import-owner}
+  - id: R281
+    code: "BE_SPEC_FORM_ALL_ROLES"
+    law: "Unit spec form applies to every declared logic role, including policies, mappers, guards and integration clients. A spec obtains its subject from a compiled Nest testing module with explicit providers, never constructs the subject or mocks an own module or third-party library, and asserts behavior or state rather than only toBeDefined existence checks."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_SPEC_FORM_ALL_ROLES"]
+    enforcers:
+      - {kind: eslint-be, id: spec-builds-with-testing-module}
+      - {kind: eslint-be, id: spec-no-new-subject}
+      - {kind: eslint-be, id: spec-module-definition-only-providers}
+      - {kind: eslint-be, id: spec-no-module-mock}
+      - {kind: eslint-be, id: spec-behavior-assertion}
+      - {kind: eslint-be, id: spec-infra-double-from-kit}
+      - {kind: eslint-be, id: spec-exact-values}
