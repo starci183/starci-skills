@@ -19356,6 +19356,8 @@ BE_PUBLIC_REASON_CLOSED:
   causes_vi:
     - "Vi phạm R290: ứng dụng thêm lý do riêng như ToolToken hoặc ApiKey, hoặc bỏ một lý do chuẩn khỏi enum PublicReason."
   nextStep_vi: "Giữ đúng bốn thành viên chuẩn của PublicReason; xác thực route dùng API key hoặc tool token bằng guard riêng thay vì thêm lý do công khai."
+  owner: op-retry
+  kind: check-finding
 RT_COVERAGE_PROOF_VACUOUS:
   title: "A claimed coverage proof does not exercise its enforcer"
   title_vi: "Bằng chứng kiểm thử không thực thi bộ kiểm tra"
