@@ -27,20 +27,21 @@ rules:
     kind: mandatory
     hfsRules: [R10, R01]
     requirement: |
-      `.starcistacks/` is `application-stacks.yaml` plus one folder per environment (`dev/`, `vps/`, ...), each holding only
-      `README.md`, `environment.json` where the schema asks for it, `infra/{compose,k8s,terraform}/`, `runtime/{config,env}/`,
+      `.starcistacks/` is `application-stacks.yaml` plus one folder per environment (`dev/`, `production/`, ...), each holding only
+      `README.md`, `environment.json` where the schema asks for it, `infra/{compose,swarm,k8s,terraform}/`, `runtime/{config,env}/`,
       `secrets/<slug>.enc` and `seeds/` (the environment's seed data, loaded only by a cli seed command). `runtime/env/KEYS.md` lists slug names and never values. There is no `runtime/files/`.
       A `DESIGN.md`, `deployment.json` or `k8s/` at its root does not exist; design notes go to `be/docs/` and Kubernetes
-      manifests to `<env>/infra/k8s/`.
+      manifests to `<env>/infra/k8s/`. Lite production uses `runtime: docker-swarm` and its tracked rendered stack under
+      `production/infra/swarm/`; production never uses Compose or host crontab.
     rationale: |
       One shape lets the stack check and the deploy tooling find everything without a per-project map.
     cases:
       - id: case-1
         when: A new environment
-        write: .starcistacks/vps/{README.md,environment.json,infra/,runtime/,secrets/,seeds/}
+        write: .starcistacks/production/{README.md,environment.json,infra/,runtime/,secrets/,seeds/}
       - id: case-2
         when: A Kubernetes manifest
-        write: .starcistacks/vps/infra/k8s/orders-deployment.yaml
+        write: .starcistacks/production/infra/k8s/orders-deployment.yaml
     verification:
       automated:
         - HFS_STACKS_SHAPE

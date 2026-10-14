@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { braceVariants } from '../../scripts/lib/glob.mjs';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 import { allowsFile } from '../../scripts/hfs/allows.mjs';
 import { HfsSlotsError, appRelativeMessages, loadSlotManifest, ruleParams, openHfs, readRepoDeclaration, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
 
@@ -43,13 +44,13 @@ test('the shipped manifest validates against its JSON schema and the loader', ()
   assert.equal(new Set(manifest.slots.map((s) => s.id)).size, manifest.slots.length);
 });
 
-test('every back-end app kind allows its own env file with the 150-line app budget in both editions', () => {
+test('every back-end app kind requires its own env file with the 150-line app budget in both editions', () => {
   const manifest = loadSlotManifest();
   const appSlots = manifest.slots.filter((slot) => slot.id.startsWith('be.app.'));
-  assert.deepEqual(appSlots.map((slot) => slot.appKind).sort(), [...manifest.appKinds.be].sort());
+  assert.deepEqual(appSlots.map((slot) => slot.appKind).sort(byCodeUnit), [...manifest.appKinds.be].sort(byCodeUnit));
   for (const slot of appSlots) {
     assert.ok(slot.allows.includes('<app>.env.ts'), `${slot.id} allows an env file`);
-    assert.equal(slot.requires.includes('<app>.env.ts'), false, `${slot.id}: the env file is optional`);
+    assert.equal(slot.requires.includes('<app>.env.ts'), true, `${slot.id}: the typed env file is required by R289`);
     assert.deepEqual(slot.budget, { 'app.module.ts': 250, 'main.ts': 80, '<app>.env.ts': 150, '<app>.options.ts': 200, 'compose/<area>.ts': 120 });
     const appName = BE_SIDE.apps.find((entry) => entry.kind === slot.appKind).name;
     for (const edition of ['full', 'lite']) {
@@ -57,9 +58,98 @@ test('every back-end app kind allows its own env file with the 150-line app budg
       const file = `apps/${appName}/src/${appName}.env.ts`;
       assert.equal(resolver.classifyPath(file).slot, slot.id, `${edition}: ${file}`);
       assert.equal(allowsFile(resolver, file).allowed, true, `${edition}: ${file} is allowed`);
+      assert.ok(resolver.requiredFiles(`apps/${appName}/src/`).includes(file), `${edition}: ${file} is required`);
       assert.equal(allowsFile(resolver, `apps/${appName}/src/another.env.ts`).allowed, false, `${edition}: an env file uses its app name`);
     }
   }
+});
+
+test('editionWhy is optional non-empty text preserved in both edition views', () => {
+  const doc = parseYaml(manifestText);
+  const slot = doc.slots.find((entry) => entry.id === 'be.app.api');
+  delete slot.editionWhy;
+  assert.equal(validateManifestSchema(doc), true, JSON.stringify(validateManifestSchema.errors));
+  assert.equal(loadSlotManifest({ text: JSON.stringify(doc) }).slots.find((entry) => entry.id === slot.id).editionWhy, undefined);
+
+  const reason = 'Lite composes the worker into the api process (ruling:R212/case-2).';
+  slot.editionWhy = reason;
+  assert.equal(validateManifestSchema(doc), true, JSON.stringify(validateManifestSchema.errors));
+  const manifest = loadSlotManifest({ text: JSON.stringify(doc) });
+  for (const edition of ['full', 'lite']) {
+    assert.equal(sideOf(app({ edition }), 'be', { manifest }).slot(slot.id).editionWhy, reason, `${edition}: the ruling remains available to consumers`);
+  }
+});
+
+test('every slot with an edition-specific presence, shape or adapter explains the difference', () => {
+  const manifest = loadSlotManifest();
+  const differing = manifest.slots.filter(slot => slot.lite || slot.editions || slot.liteManagedBy && slot.liteManagedBy !== slot.managedBy || slot.litePresence && slot.litePresence !== slot.presence);
+  for (const slot of differing) assert.ok(slot.editionWhy?.trim(), `${slot.id} explains its edition difference`);
+});
+
+test('SWR hooks own transport imports in lite and full; other hooks and features go through their public API', () => {
+  const transport = 'apps/web/src/modules/api/graphql/queries/query-orders.ts';
+  const swr = 'apps/web/src/hooks/swr/api/graphql/queries/useQueryOrdersSwr.ts';
+  const forbidden = [
+    'apps/web/src/hooks/orders/useOrders.ts',
+    'apps/web/src/hooks/rhf/useOrderForm.ts',
+    'apps/web/src/hooks/socketio/SocketIoSideEffects.tsx',
+    'apps/web/src/features/pages/Home/index.tsx',
+    'apps/web/src/features/overlays/Cart/index.tsx',
+  ];
+  for (const edition of ['full', 'lite']) {
+    const fe = sideOf(app({ edition }), 'fe');
+    assert.equal(fe.importAllowed(swr, transport).allowed, true, edition);
+    assert.equal(fe.importAllowed(swr, 'apps/web/src/modules/api/graphql/queries/helper.ts').reason, 'notPublicEntry', edition);
+    for (const source of forbidden) assert.equal(fe.importAllowed(source, transport).reason, 'tierDirection', `${edition}: ${source}`);
+    assert.equal(fe.importAllowed(forbidden[0], 'apps/web/src/hooks/swr/index.ts').allowed, true, edition);
+    assert.equal(fe.importAllowed(swr, 'apps/admin/src/modules/api/index.ts').reason, 'crossApp', edition);
+  }
+});
+
+test('schema and loader reject malformed transport slot restrictions', () => {
+  const invalid = [{}, { transport: {} }, { transport: { from: [] } }, { transport: { from: ['fe.hooks.swr', 'fe.hooks.swr'] } }, { transport: { from: ['swr'] } }, { transport: { from: ['fe.hooks.swr'], to: ['fe.modules.api'] } }];
+  for (const restriction of invalid) {
+    const doc = parseYaml(manifestText);
+    doc.tiers.fe.hooks.mayImportSlots = restriction;
+    assert.equal(validateManifestSchema(doc), false, JSON.stringify(restriction));
+    refusal(() => loadSlotManifest({ text: JSON.stringify(doc) }), 'HFS_MANIFEST_INVALID');
+  }
+});
+
+test('transport restrictions name a source slot in the correct profile and tier and an allowed target tier', () => {
+  for (const id of ['fe.hooks.missing', 'be.domain', 'fe.feature']) {
+    const doc = parseYaml(manifestText);
+    doc.tiers.fe.hooks.mayImportSlots.transport.from = [id];
+    refusal(() => loadSlotManifest({ text: JSON.stringify(doc) }), 'HFS_MANIFEST_INVALID');
+  }
+  const doc = parseYaml(manifestText);
+  doc.tiers.fe.hooks.mayImportSlots = { components: { from: ['fe.hooks.swr'] } };
+  refusal(() => loadSlotManifest({ text: JSON.stringify(doc) }), 'HFS_MANIFEST_INVALID');
+});
+
+test('lite contracts are optional while e2e stays full-only', () => {
+  const contract = 'src/tests/contract/provider/provider.contract-spec.ts';
+  const e2e = 'src/tests/e2e/orders/orders.e2e-spec.ts';
+  for (const edition of ['full', 'lite']) {
+    const be = sideOf(app({ edition }), 'be');
+    assert.equal(be.classifyPath(contract).status, 'owned', edition);
+    assert.equal(be.requiredPaths().paths.some(entry => entry.slot === 'be.tests.contract'), false, edition);
+    assert.equal(be.classifyPath(e2e).status, edition === 'lite' ? 'forbidden' : 'owned', edition);
+  }
+});
+
+test('full Work admits only the generated product summaries named by its layout; lite keeps the brand boundary', () => {
+  const layout = readSchema('work-layout.yaml');
+  const declaration = layout.shape.productPaths.find(entry => entry.startsWith('_derived/'));
+  const files = braceVariants(declaration).map(file => `.starciwork/${file}`);
+  const full = openHfs({ declaration: APP });
+  const lite = openHfs({ declaration: app({ edition: 'lite' }) });
+  for (const file of files) {
+    assert.equal(allowsFile(full, file).allowed, true, file);
+    assert.equal(allowsFile(lite, file).allowed, false, file);
+  }
+  assert.equal(allowsFile(full, '.starciwork/_derived/runtime.sqlite').allowed, false);
+  assert.equal(allowsFile(full, '.starciwork/_derived/capture.png').allowed, false);
 });
 
 test('schema and loader agree on a broken manifest', () => {
@@ -69,6 +159,9 @@ test('schema and loader agree on a broken manifest', () => {
     'unknown presence': (d) => { d.slots[0].presence = 'sometimes'; },
     'external slot that is not forbidden': (d) => { d.slots.find((s) => s.tracked === 'external').presence = 'optional'; },
     'unknown slot field': (d) => { d.slots[0].colour = 'red'; },
+    'empty edition reason': (d) => { d.slots[0].editionWhy = ''; },
+    'whitespace edition reason': (d) => { d.slots[0].editionWhy = ' \t\n'; },
+    'edition reason is a map': (d) => { d.slots[0].editionWhy = { lite: 'a reason' }; },
     'version not semver': (d) => { d.version = '2.0'; },
   };
   for (const [name, mutate] of Object.entries(cases)) {
@@ -221,9 +314,9 @@ test('the app root: its own slots, a side path through the side, and the files o
     assert.equal(owner(`fe/${file}`), 'forbidden:repo.side-root-forbidden', `fe/${file}`);
   }
   // required paths: the root's own, then each side's under its folder
-  const paths = whole.requiredPaths().paths.map((e) => e.path);
+  const paths = new Set(whole.requiredPaths().paths.map((e) => e.path));
   for (const p of ['README.md', 'hfs.json', 'package.json', 'package-lock.json', '.husky/pre-push', '.github/workflows/ci.yml', '.starciwork/', '.sops.yaml', '.starcistacks/application-stacks.yaml', 'be/', 'fe/', 'be/tsconfig.json', 'be/apps/core/src/', 'fe/tsconfig.json', 'fe/apps/admin/src/modules/i18n/'])
-    assert.equal(paths.includes(p), true, `required path missing: ${p}`);
+    assert.equal(paths.has(p), true, `required path missing: ${p}`);
   // nothing crosses sides except the declared reads
   const ok = (a, b) => whole.importAllowed(a, b);
   assert.deepEqual([ok('fe/apps/web/src/modules/api/index.ts', 'be/src/features/api/orders/index.ts').allowed, ok('fe/apps/web/src/modules/api/index.ts', 'be/src/features/api/orders/index.ts').reason], [false, 'crossSide']);
@@ -266,7 +359,7 @@ test('BE side: which slot owns a path', () => {
   assert.equal(owner('node_modules/x/index.js'), 'owned:repo.build-output');
   assert.equal(owner('apps/core/src/.next/x'), 'owned:be.app.api');   // the deeper slot: app source owns its subtree
   // a Windows spelling and a directory spelling reach the same slot
-  assert.equal(owner('src\\features\\api\\orders\\index.ts'), 'owned:be.feature');
+  assert.equal(owner(String.raw`src\features\api\orders\index.ts`), 'owned:be.feature');
   assert.equal(owner('src/features/api/orders/'), 'owned:be.feature');
   assert.equal(be.ownerOf('src/features/api/orders/application/place.handler.ts').root, 'src/features/api/orders');
   assert.equal(be.classifyPath('e2e/probe.spec.ts').goesTo.startsWith('src/tests/e2e/'), true);
@@ -287,7 +380,7 @@ test('BE side: tracked, tier, required files', () => {
   assert.equal(be.tierOf('tsconfig.json'), 'none');
   assert.deepEqual(be.requiredFiles('src/features/api/orders/index.ts'), ['src/features/api/orders/index.ts', 'src/features/api/orders/orders.module.ts', 'src/features/api/orders/application/']);
   assert.deepEqual(be.requiredFiles('src/features/api/orders/transport/http/a.controller.ts'), ['src/features/api/orders/transport/http/orders-http.module.ts']);
-  assert.deepEqual(be.requiredFiles('apps/core/src/main.ts'), ['apps/core/src/main.ts', 'apps/core/src/app.module.ts']);
+  assert.deepEqual(be.requiredFiles('apps/core/src/main.ts'), ['apps/core/src/main.ts', 'apps/core/src/app.module.ts', 'apps/core/src/core.env.ts']);
   assert.deepEqual(be.requiredFiles('src/modules/domain/orders/persistence/x.ts'), ['src/modules/domain/orders/persistence/connection.ts']);
   const { paths, minimums } = be.requiredPaths();
   const has = (p) => paths.some((e) => e.path === p);
@@ -297,7 +390,7 @@ test('BE side: tracked, tier, required files', () => {
   for (const p of ['README.md', 'hfs.json', 'package-lock.json', '.husky/pre-push', '.github/workflows/ci.yml', '.starciwork/', '.sops.yaml', '.starcistacks/application-stacks.yaml']) assert.equal(has(p), false, `${p} is the app root's, not the side's`);
   assert.equal(has('apps/worker/src/'), false, 'an opt-in app is not required');
   assert.equal(has('jest.config.e2e.js'), false);
-  assert.deepEqual(minimums.map((m) => m.slot).sort(), ['be.app.api', 'be.feature']);
+  assert.deepEqual(minimums.map((m) => m.slot).sort(byCodeUnit), ['be.app.api', 'be.feature']);
   // the cli app is required by BE_CLI_REQUIRED (starci app check), not by the slot: with or without a connection, no cli path is a slot requirement of an app that declares none
   const noDb = sideOf(app({ be: { ...BE_SIDE, apps: [{ name: 'core', kind: 'api' }], connections: [] } }), 'be');
   assert.equal(noDb.requiredPaths().paths.some((e) => e.slot === 'be.app.cli'), false);
@@ -351,14 +444,14 @@ test('FE side with two apps', () => {
   assert.equal(fe.ownerOf('apps/admin/src/modules/cart/index.ts').root, 'apps/admin/src/modules/cart');
   assert.equal(fe.classifyPath('apps/admin/src/modules/cart/index.ts').bindings.app, 'admin');
   // required paths are expanded per declared app
-  const paths = fe.requiredPaths().paths.map((e) => e.path);
+  const paths = new Set(fe.requiredPaths().paths.map((e) => e.path));
   for (const name of ['web', 'admin']) for (const p of [`apps/${name}/package.json`, `apps/${name}/next.config.ts`, `apps/${name}/tsconfig.json`, `apps/${name}/src/app/[locale]/layout.tsx`, `apps/${name}/src/modules/i18n/`, `apps/${name}/src/modules/routes/`, `apps/${name}/src/modules/config/`])
-    assert.equal(paths.includes(p), true, `missing ${p}`);
-  assert.equal(paths.includes('apps/web/src/modules/api/'), false, 'the transport may live in the shared api package; FE_TRANSPORT_OWNER counts the clients');
+    assert.equal(paths.has(p), true, `missing ${p}`);
+  assert.equal(paths.has('apps/web/src/modules/api/'), false, 'the transport may live in the shared api package; FE_TRANSPORT_OWNER counts the clients');
   assert.equal(fe.classifyPath('tsconfig.e2e.json').status, 'no-slot', 'the front-end e2e tsconfig is no managed file');
   // the tool configuration of the fe side: managed files and the forbidden ones (a turbo.json is the app root's task graph, app.task-graph)
   for (const file of ['tsconfig.json', 'eslint.config.mjs', 'stylelint.config.mjs']) assert.equal(owner(file), 'fe.tool-config', file);
-  for (const file of ['tsconfig.json', 'eslint.config.mjs', 'stylelint.config.mjs']) assert.equal(paths.includes(file), true, `${file} is required`);
+  for (const file of ['tsconfig.json', 'eslint.config.mjs', 'stylelint.config.mjs']) assert.equal(paths.has(file), true, `${file} is required`);
   for (const file of ['vitest.config.ts', 'vitest.setup.ts', 'playwright.config.ts']) assert.equal(fe.classifyPath(file).status, 'no-slot', file);
   for (const file of ['turbo.json', '.eslintrc.json', '.eslintignore', 'eslint.config.js', '.stylelintrc.json', 'stylelint.config.cjs', '.prettierrc.json', '.lintstagedrc.json']) assert.equal(owner(file), 'fe.tool-config-local', file);
   for (const file of ['package.json', 'package-lock.json', '.prettierrc', '.prettierignore']) assert.equal(owner(file), 'repo.side-root-forbidden', `${file} is the app root's`);
@@ -373,7 +466,7 @@ test('FE side with two apps', () => {
   assert.equal(ok('apps/web/src/components/blocks/Header/component.tsx', 'apps/web/src/components/leaves/Button/index.tsx').allowed, true);
   assert.equal(ok('apps/web/src/components/leaves/Button/component.tsx', 'apps/web/src/components/blocks/Header/index.tsx').reason, 'layerOrder');
   assert.equal(ok('apps/web/src/components/blocks/Header/component.tsx', 'apps/web/src/components/leaves/Button/component.tsx').reason, 'notPublicEntry');
-  assert.equal(ok('apps/web/src/hooks/orders/useOrders.ts', 'apps/web/src/modules/api/index.ts').allowed, true);
+  assert.equal(ok('apps/web/src/hooks/swr/api/graphql/queries/useQueryOrdersSwr.ts', 'apps/web/src/modules/api/index.ts').allowed, true);
   assert.equal(ok('apps/web/src/modules/api/graphql/clients/index.ts', 'apps/web/src/hooks/orders/useOrders.ts').reason, 'tierDirection');
   // components reach foundation modules (config, routes, i18n, types) but never the api transport or a data module
   for (const capability of ['config', 'routes', 'i18n', 'types']) assert.equal(ok('apps/web/src/components/leaves/Button/index.tsx', `apps/web/src/modules/${capability}/index.ts`).allowed, true, capability);
@@ -482,6 +575,23 @@ test('be.cli is the cli feature root: a feature-tier owner at src/features/cli/,
   assert.equal(cli.classifyPath('src/features/api/orders/transport/rest/import.cli.ts').slot === 'be.cli', false);
 });
 
+function assertProfileSlotSamples(manifest, bare, profile) {
+  const resolver = profile === 'app' ? openHfs({ declaration: bare }) : sideOf(bare, profile);
+  const apps = profile === 'app' ? [] : bare.sides[profile].apps;
+  const kindOf = (slot) => apps.find((a) => a.kind === slot.appKind)?.name;
+  // app.sides answers only for the side folders themselves; what lies below them is the sides' (sampled under be and fe).
+  // bare declares no edition, so it is full: a slot lite-only (editions) does not exist for it and is not sampled here.
+  for (const slot of manifest.slots.filter((s) => s.profiles.includes(profile) && s.id !== 'app.sides' && (s.editions ?? ['full', 'lite']).includes('full'))) {
+    for (const variant of braceVariants(slot.path)) {
+      const sample = variant.replace(/<app>/g, kindOf(slot) ?? 'core').replace(/<[a-z][a-z0-9-]{0,63}>/g, 'sample').replace(/\*\*\//g, '').replace(/\*\*/g, 'a/b').replace(/\*/g, 'x') + (variant.endsWith('/') ? 'file.ts' : '');
+      const c = resolver.classifyPath(sample);
+      assert.notEqual(c.status, 'ambiguous', `${profile}: ${sample} (${slot.id}) is ambiguous between ${c.candidates}`);
+      assert.notEqual(c.status, 'no-slot', `${profile}: ${sample} (${slot.id}) matches no slot`);
+      if (slot.appKind === undefined) assert.equal(c.slot, slot.id, `${profile}: ${sample} owned by ${c.slot}, expected ${slot.id}`);
+    }
+  }
+}
+
 test('growth is a minor: adding a slot changes no existing answer; every slot pattern owns its own sample', () => {
   const current = loadSlotManifest();
   const nextVersion = `${current.major}.${current.minor + 1}.0`;
@@ -509,22 +619,7 @@ test('growth is a minor: adding a slot changes no existing answer; every slot pa
   // every variant of every slot, filled with sample names, is owned by that slot and never ambiguous: the root's and each side's
   const manifest = loadSlotManifest();
   const bare = app({ be: { ...BE_SIDE, optionalSlots: [] }, fe: { ...FE_SIDE, optionalSlots: [] } });
-  for (const profile of ['app', 'be', 'fe']) {
-    const resolver = profile === 'app' ? openHfs({ declaration: bare }) : sideOf(bare, profile);
-    const apps = profile === 'app' ? [] : bare.sides[profile].apps;
-    const kindOf = (slot) => apps.find((a) => a.kind === slot.appKind)?.name;
-    // app.sides answers only for the side folders themselves; what lies below them is the sides' (sampled under be and fe).
-    // bare declares no edition, so it is full: a slot lite-only (editions) does not exist for it and is not sampled here.
-    for (const slot of manifest.slots.filter((s) => s.profiles.includes(profile) && s.id !== 'app.sides' && (s.editions ?? ['full', 'lite']).includes('full'))) {
-      for (const variant of braceVariants(slot.path)) {
-        const sample = variant.replace(/<app>/g, kindOf(slot) ?? 'core').replace(/<[^>]+>/g, 'sample').replace(/\*\*\//g, '').replace(/\*\*/g, 'a/b').replace(/\*/g, 'x') + (variant.endsWith('/') ? 'file.ts' : '');
-        const c = resolver.classifyPath(sample);
-        assert.notEqual(c.status, 'ambiguous', `${profile}: ${sample} (${slot.id}) is ambiguous between ${c.candidates}`);
-        assert.notEqual(c.status, 'no-slot', `${profile}: ${sample} (${slot.id}) matches no slot`);
-        if (slot.appKind === undefined) assert.equal(c.slot, slot.id, `${profile}: ${sample} owned by ${c.slot}, expected ${slot.id}`);
-      }
-    }
-  }
+  for (const profile of ['app', 'be', 'fe']) assertProfileSlotSamples(manifest, bare, profile);
 });
 
 test('the failure catalog explains the new codes in Vietnamese', () => {

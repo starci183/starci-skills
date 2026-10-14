@@ -306,6 +306,7 @@ rules:
       envelope, the generated wire types (from be/contracts/, through the root codegen) and the axios calls live in
       modules/api; the session lives in modules/auth; mutation feedback in modules/toast; environment reading in
       modules/config; every href builder in modules/routes; locale routing in modules/i18n; colour values in modules/brand.
+      Only hooks/swr imports the API transport operations; feature owners and other hooks consume those SWR hooks.
       A helper name defined twice across hook files is a finding.
     rationale: |
       A rule that says what a hooks folder is also says where everything else goes, so nobody copies a helper sixteen

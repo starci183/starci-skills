@@ -83,7 +83,9 @@ rules:
     hfsRules: [R56, R50, R26, R92]
     requirement: |
       Every authored hook lives under hooks/ (FE-NAMING-4). Feature owners and connected blocks import those hooks through a resolved
-      hooks public entry; hooks reach transport and domain capabilities through module public entries (`@/modules/api`).
+      hooks public entry. Only hooks/swr imports API transport operations through the module public entry (`@/modules/api`);
+      other hooks compose those SWR hooks or reach non-transport domain capabilities through their public entries.
+      Feature owners never import transport directly.
       Leaves, branches and composites may call a hooks/ui intrinsic hook
       whose resolved implementation stays free of product, session and API lifecycle. They do not call product hooks.
     rationale: |

@@ -78,7 +78,7 @@ rules:
     kind: mandatory
     hfsRules: [R21]
     requirement: |
-      A block of 8 or more lines (60 or more tokens) duplicated across files, and a helper defined twice under the same name
+      A block of 8 or more lines and 60 or more tokens duplicated across files, and a helper defined twice under the same name
       (`isRecord`, a token reader), fail at the land gate and in Sonar. The copy is deleted and imports the owner: a platform
       primitive, a `<domain>.shared.ts`, or a package.
     rationale: |

@@ -438,7 +438,7 @@ rules:
   - id: BE-TEST-12
     title: Integration and e2e boot the real world
     kind: mandatory
-    hfsRules: [R32, R47, R48]
+    hfsRules: [R32, R47, R48, R272]
     requirement: |-
       Integration and e2e specs boot through `useTestWorld`; the unit kind has no module of its own beyond BE-TEST-2. An e2e boots
       the real apps through `useTestWorld({ apps })` against the app's own stack running real (Postgres, Redis, Keycloak
@@ -448,13 +448,14 @@ rules:
       team does not operate at the network edge (`world.fake.<provider>`), fails a real service on purpose through
       `world.infra.<service>.latency(ms)`, `.cut()` and `.restore()` (toxiproxy), overrides no provider or DI token and never a
       guard, authenticates through an identity fixture that issues real tokens, asserts persisted state and waits with `waitFor`
-      deadlines. That e2e boot is also the one proof that an app composes: it fails when a module or provider is missing, and an app
-      has no spec of its own. Database doubles establish local behavior only; transaction, lock and crash claims need the real store
+      deadlines. Full proves app composition with that e2e boot; lite uses `starci app check --wiring` to compile the Nest module
+      graph with doubles (R272). Both fail when a module or provider is missing, and an app has no spec of its own.
+      Database doubles establish local behavior only; transaction, lock and crash claims need the real store
       (an integration spec). Configuration is substituted at the owned config boundary by passing options, never by patching
       `process.env`.
     rationale: |-
-      A hand-assembled module can pass while the real app cannot start, so composition and cross-service behavior are proved on the
-      real apps in the world, not in a unit spec.
+      A hand-assembled module can pass while the real app cannot start. The edition's boot proof checks the actual app
+      composition; integration and full's e2e world prove behavior against real backing services.
     cases:
       - id: case-1
         when: An e2e boots the app
@@ -479,7 +480,7 @@ rules:
         - BE_CONTRACT_UNGUARDED
         - BE_SPEC_QUALITY
       manual:
-        - Confirm an e2e fails when a module or provider of the app is missing.
+        - Confirm the edition's boot proof fails when a module or provider of the app is missing.
     relatedExamples: []
   - id: BE-TEST-13
     title: Coverage is per-file 100 on the logic roles of the measured slots, from one derivation

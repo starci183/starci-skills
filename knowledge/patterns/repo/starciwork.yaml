@@ -32,10 +32,12 @@ rules:
       `workspace.yaml`, `index.yaml`, `brand/`, `shell/index.yaml`, `features/<feature>/index.yaml`, flat records
       `features/<feature>/<family>/<name>/index.yaml`, `features/<feature>/br/<rule>/ac/<name>/`,
       `features/<feature>/ui/<name>/assets/<approved-file>`, `features/<feature>/uat/<name>/{index,accounts,fixtures}.yaml` with
-      `seed.sql` and `cleanup.sql`, and `_resources/{identities,environments,fixtures}/<slug>/resource.yaml`.
+      `seed.sql` and `cleanup.sql`, `_resources/{identities,environments,fixtures}/<slug>/resource.yaml`, and the generated
+      `_derived/{index.yaml,frontier.md,critique.yaml,critique.md}` files declared by modules/schemas/work-layout.yaml.
+      The derived files are never authored records; the derivation and critique tools regenerate them and check freshness.
       Its ignore file uses the edition's managed template. The tracked image of a ui-screen is the accepted design
       direction only. Under lite, slot `app.starciwork` is optional when the app has no brand records and permits only
-      `.gitignore`, optional `workspace.yaml` metadata and `brand/**` (R212). Workspace metadata supplies the project id and
+      `.gitignore`, optional `workspace.yaml` metadata and `brand/**` (`ruling:R212/case-4`). Workspace metadata supplies the project id and
       repo roles that Work tools use to locate the app root and tie brand records to the front end. Brand drawing records,
       references and assets keep the brand tooling's layout; catalog, shell, features, resources, UAT and business-rule
       records are forbidden.
@@ -76,7 +78,7 @@ rules:
     hfsRules: [R07]
     requirement: |
       Evidence, logs, reports, checks, captures, draw rounds (initial and intermediate images, prompt files), UAT runs, kernel
-      evidence, runtime.sqlite files, operation folders and `_derived/` are not app content. They live in the runtime
+      evidence, runtime.sqlite files and operation folders are not app content. They live in the runtime
       ledger and the blob store, and a record cites them by `{name, sha256}`. A worktree is never tracked under
       `.starciwork`: a Kernel workflow's worktree is created and owned by Orca outside the app checkout, one per workflow,
       and removed by the runtime after the workflow finishes.

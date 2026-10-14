@@ -207,7 +207,7 @@ files:
     spec: realtime/subscriber-receives-push, realtime/foreign-topic-is-isolated, realtime/disconnect-releases-subscription
     rules: [BE_PATTERN_SPEC_MISSING]
     optional: true
-# Edition lite (owner rulings 2026-10-12 and 2026-10-13, R212 cases 1-2): the same ports, door and rules; one instance behind them.
+# Edition lite (R212, owner ruling 2026-10-14): the same ports, door and rules; one instance behind them.
 liteAdapter:
   summary: >-
     Under lite the realtime pattern is the full one: the socket.io gateway of be.feature.realtime.websocket
@@ -221,6 +221,7 @@ liteAdapter:
     - {port: topic scope, adapter: "the room name built from @CurrentPrincipal (BE_REALTIME_TOPIC_SCOPE), as full"}
   forbids: [redis, ioredis, "@socket.io/redis-adapter", graphql-ws, graphql-subscriptions]
   proof: >-
-    The gateway's own unit spec (<channel>.gateway.spec.ts) and the hub adapter's spec, as full; the realtime/* scenarios are
-    optional integration specs on `starci supabase start` (lite has no e2e).
+    The gateway's own unit spec (<channel>.gateway.spec.ts) and the hub adapter's spec, as full; declaring realtime requires
+    integration specs titled `realtime/<scenario>: ...` for every declared scenario on `starci supabase start` (R284), using a
+    real socket.io client. Lite has no e2e world.
   see: [knowledge/patterns/be/supabase-queues.yaml, knowledge/patterns/fe/realtime.yaml]

@@ -5,7 +5,8 @@ purpose: |-
   Given a frontend read or write, which code calls the back end, what does it return and where do the wire types come
   from? The browser calls the back end directly through the Apollo clients of modules/api/graphql (one file per operation)
   and, for uploads, presigned URLs and auth endpoints only, the one axios instance of modules/api/rest; the wire types are
-  generated from be/contracts. The same in lite and full (R212 case-2, knowledge/hfs/fe-stack.yaml graphql and codegen).
+  generated from be/contracts. The same in lite and full (R212; owner ruling 2026-10-14;
+  knowledge/hfs/fe-stack.yaml graphql and codegen).
 appliesTo:
   - frontend
 family: fe

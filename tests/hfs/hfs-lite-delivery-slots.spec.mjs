@@ -1,4 +1,4 @@
-// Delivery slots add optional product tooling without changing managed codegen, side placement or lite's infrastructure boundary.
+// Delivery slots keep product tooling separate from managed codegen and admit the declared lite Swarm production tree.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -61,6 +61,9 @@ test('lite delivery does not admit unrelated scripts, workflows or tooling insid
   assert.deepEqual([resolver.classifyPath('.github/workflows/e2e.yml').status, resolver.classifyPath('.github/workflows/e2e.yml').slot], ['forbidden', 'app.ci-e2e']);
   const infrastructure = '.starcistacks/prod/infra/compose/compose.yaml';
   assert.deepEqual(stacksFindings({ repoRoot: temporaryRoot(t), files: [infrastructure], resolver }).map(item => [item.path, item.code]), [[infrastructure, 'HFS_STACKS_SHAPE']]);
+  const swarm = '.starcistacks/production/infra/swarm/stack.yaml';
+  assert.deepEqual(stacksFindings({ repoRoot: temporaryRoot(t), files: [swarm], resolver }), []);
+  assert.ok(resolver.requiredPaths().paths.some(item => item.path === '.starcistacks/application-stacks.yaml'));
 });
 
 test('deploy is an allowed optional app-root entry, while unrelated roots remain forbidden', t => {
