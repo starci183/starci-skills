@@ -1,6 +1,14 @@
 /** The state of one probed dependency. */
 export type ProbeState = "ok" | "unreachable"
 
+/** A process-local liveness report: answering it never touches a dependency. */
+export interface LivenessReport {
+    /** The event loop answered the request. */
+    readonly status: "ok"
+    /** The name of the reporting service. */
+    readonly service: string
+}
+
 /** What the checker found: the service name, the state of each dependency and whether all are up. */
 export interface ProbeReport {
     /** The name of the reporting service. */

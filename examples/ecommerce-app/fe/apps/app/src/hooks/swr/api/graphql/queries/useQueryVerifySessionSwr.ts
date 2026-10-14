@@ -1,5 +1,10 @@
 import useSWR from "swr"
-import { queryVerifySession } from "@/modules/api"
+import type { GraphQLResponse } from "@ecommerce/api"
+import { queryVerifySession } from "@/modules/api/graphql/queries/query-verify-session"
+import type {
+    QueryVerifySessionRequest,
+    QueryVerifySessionResponse,
+} from "@/modules/api/graphql/queries/types/verify-session"
 import { authClient } from "@/modules/auth"
 import { useAppSelector } from "@/redux"
 
@@ -12,11 +17,15 @@ const QUERY_VERIFY_SESSION_SWR_KEY = "QUERY_VERIFY_SESSION_SWR"
  */
 export const useQueryVerifySessionSwr = () => {
     const personId = useAppSelector((state) => state.session.session?.personId)
-    return useSWR(personId === undefined ? null : [QUERY_VERIFY_SESSION_SWR_KEY, personId], async () => {
-        const sessionToken = await authClient.accessToken()
-        if (sessionToken === undefined) return undefined
-        const response = await queryVerifySession({ request: { sessionToken } })
-        if (!response.success && response.kind === "unauthenticated") authClient.end()
-        return response
-    })
+    return useSWR(
+        personId === undefined ? null : [QUERY_VERIFY_SESSION_SWR_KEY, personId],
+        async (): Promise<GraphQLResponse<QueryVerifySessionResponse> | undefined> => {
+            const sessionToken = await authClient.accessToken()
+            if (sessionToken === undefined) return undefined
+            const request: QueryVerifySessionRequest = { sessionToken }
+            const response = await queryVerifySession({ request })
+            if (!response.success && response.kind === "unauthenticated") authClient.end()
+            return response
+        },
+    )
 }

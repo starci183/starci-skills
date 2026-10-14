@@ -12,6 +12,8 @@ export interface RateLimitOptions {
 export interface HttpSecurityOptions {
     /** The origins allowed to send state-changing requests from a browser. */
     readonly allowedOrigins: ReadonlyArray<string>
+    /** Number of trusted reverse-proxy hops; zero means a direct host listener. */
+    readonly trustProxy?: number
     /** The rate limit tiers. */
     readonly rateLimit: RateLimitOptions
 }

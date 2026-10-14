@@ -21,7 +21,7 @@ import { ORDER_API_ERROR_KINDS, ORDER_API_MESSAGES, OrderApiModule } from "@modu
 import { ClockModule } from "@modules/platform/clock"
 import { CONFIG_ERROR_KINDS } from "@modules/platform/config"
 import { CqrsModule } from "@modules/platform/cqrs"
-import { DATABASE_ERROR_KINDS, DatabaseModule, DatabaseProbe } from "@modules/platform/database"
+import { DATABASE_ERROR_KINDS, IDENTITY_CONNECTION, DatabaseModule, DatabaseProbe } from "@modules/platform/database"
 import { ERRORS_MESSAGES, ErrorsFilter, ErrorsModule } from "@modules/platform/errors"
 import { GraphqlModule } from "@modules/platform/graphql"
 import { HTTP_ERROR_KINDS, HTTP_MESSAGES, HttpModule } from "@modules/platform/http"
@@ -88,7 +88,14 @@ export class AppModule {
                 HttpSecurityModule.register({ isGlobal: true, ...options.httpSecurity }),
                 DatabaseModule.register({
                     isGlobal: true,
-                    connections: [{ ...options.database, entities: accountEntities, migrations: accountMigrations }],
+                    connections: [
+                        {
+                            ...options.database,
+                            name: IDENTITY_CONNECTION,
+                            entities: accountEntities,
+                            migrations: accountMigrations,
+                        },
+                    ],
                 }),
                 CacheModule.register({ isGlobal: true, ...options.cache }),
                 HttpModule.register({ isGlobal: true }),

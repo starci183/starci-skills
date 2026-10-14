@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common"
 import { CheckLivenessHandler } from "./application/check-liveness.handler"
+import { CheckReadinessHandler } from "./application/check-readiness.handler"
 
-@Module({ providers: [CheckLivenessHandler] })
-/** Application module of the health feature: the handler of the liveness probe; readiness comes with the design that declares dependencies. */
+@Module({ providers: [CheckLivenessHandler, CheckReadinessHandler] })
+/** The health feature separates process-local liveness from readiness of its required primary database. */
 export class SystemHealthModule {}

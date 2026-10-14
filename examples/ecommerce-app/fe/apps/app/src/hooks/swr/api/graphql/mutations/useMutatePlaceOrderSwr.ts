@@ -1,6 +1,10 @@
 import useSWRMutation from "swr/mutation"
-import { mutatePlaceOrder } from "@/modules/api"
-import type { MutationPlaceOrderRequest } from "@/modules/api"
+import type { GraphQLResponse } from "@ecommerce/api"
+import { mutatePlaceOrder } from "@/modules/api/graphql/mutations/mutation-place-order"
+import type {
+    MutationPlaceOrderRequest,
+    MutationPlaceOrderResponse,
+} from "@/modules/api/graphql/mutations/types/place-order"
 import { useAppSelector } from "@/redux"
 
 /** What one trigger of the mutation carries: its request. */
@@ -14,6 +18,9 @@ export const useMutatePlaceOrderSwr = () => {
     const personId = useAppSelector((state) => state.session.session?.personId)
     return useSWRMutation(
         [MUTATE_PLACE_ORDER_SWR_KEY, personId],
-        (_key: ReadonlyArray<string | undefined>, { arg }: Trigger) => mutatePlaceOrder({ request: arg }),
+        (
+            _key: ReadonlyArray<string | undefined>,
+            { arg }: Trigger,
+        ): Promise<GraphQLResponse<MutationPlaceOrderResponse>> => mutatePlaceOrder({ request: arg }),
     )
 }

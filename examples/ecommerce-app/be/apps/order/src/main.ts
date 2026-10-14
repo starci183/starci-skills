@@ -2,6 +2,7 @@ import "reflect-metadata"
 import { NestFactory } from "@nestjs/core"
 import { SystemClock } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
+import { applySecurityHeaders } from "@modules/platform/http-security"
 import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
 import { AppModule } from "./app.module"
 import { readOrderEnv } from "./order.env"
@@ -12,6 +13,7 @@ async function bootstrap(): Promise<void> {
     const options = readOrderEnv(env)
     const app = await NestFactory.create(AppModule.register(options))
     app.enableShutdownHooks()
+    applySecurityHeaders(app)
     // The shop's browser calls this GraphQL API directly (owner ruling 2026-10-13): the allowlisted origins may.
     app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
     await app.listen(options.port)
