@@ -107,16 +107,16 @@ checkout. The draft checklist above keeps its existing status.
 - **R272 BE_APP_BOOT_PROOF_MISSING:** Lite must prove each app's Nest module graph compiles with doubles and rejects missing or circular providers; a missing or failed proof is refused. Full keeps its real-app e2e boot proof.
 - **R273 HFS_COVERAGE_BELOW:** Supplied back-end lcov evidence must meet the measured per-file coverage policy below, with unmeasured feature, CLI and webhook paths listed separately.
 - **R274 RT_RULING_STALE_CITE:** A superseded ruling citation must identify its successor in the same paragraph; stale ruling text must not prescribe the former behavior.
-- **R280 HFS_UNUSED_SYMBOL:** Exported symbols, enum members, queue constants, error codes and catalog keys must have consumers.
-- **R282 HFS_ASSET_BUDGET:** `HFS_ASSET_OVERSIZE` refuses a back-end asset above its per-file size budget; `HFS_ASSET_KIND` refuses an unsupported tracked asset kind. Large and user media belong in object storage.
-- **R283 HFS_APP_LEXICON:** Source and docs must exclude product vocabulary declared in `hfs.json lexicon.removed`.
-- **R284 BE_LITE_PROOF_LANE_MISSING:** Lite must keep its declared event-bus, queue, webhook, realtime, fenced-job, projection and saga proofs in a runnable integration-spec lane; the existing `BE_PATTERN_SPEC_MISSING` code names a missing scenario. Full retains its existing proof lanes.
-- **R285 FE_SWR_FAMILY:** `FE_SWR_OUTSIDE_FAMILY` confines SWR calls to `hooks/swr`; `FE_OP_OUTSIDE_SWR_HOOK` confines API operation imports and calls to those wrappers. Components and other hook families consume the wrapper hooks.
-- **R286 FE_COPY_AND_GLYPH:** `FE_COPY_IN_CALL` requires toast and validation arguments to come from i18n; `FE_NO_ALERT` refuses browser alerts; `FE_ICON_INLINE_SVG` confines inline SVG to a declared brand-mark leaf.
-- **R287 FE_CALLBACK_SHAPE:** An auth callback exchanges the PKCE code and redirects only, with cookie writes confined to the Supabase helper.
-- **R288 FE_STACK_ALLOWLIST:** `FE_STACK_UNLISTED` requires each front-end dependency to have a catalog entry or a reasoned `fe.extraPackages` declaration; `FE_STACK_CORE_MISSING` requires product apps to declare the core runtime packages, with the full marketing app exempt. GraphQL tagged templates must match the schema and SWR keys must carry operation identity by default.
-- **R291 HFS_FUNCTION_BUDGET:** A back-end or front-end function, method or arrow body has at most 80 physical lines, including comments and blank lines, in both editions.
-- **R292 HFS_FEATURE_FILE_BUDGET:** A feature owner has at most 250 tracked files, including nested files, in both editions.
+- <a id="r280"></a> **R280 HFS_UNUSED_SYMBOL:** Exported symbols, enum members, queue constants, error codes and catalog keys must have consumers.
+- <a id="r282"></a> **R282 HFS_ASSET_BUDGET:** `HFS_ASSET_OVERSIZE` refuses a back-end asset above its per-file size budget; `HFS_ASSET_KIND` refuses an unsupported tracked asset kind. Large and user media belong in object storage.
+- <a id="r283"></a> **R283 HFS_APP_LEXICON:** Source and docs must exclude product vocabulary declared in `hfs.json lexicon.removed`.
+- <a id="r284"></a> **R284 BE_LITE_PROOF_LANE_MISSING:** Lite must keep its declared event-bus, queue, webhook, realtime, fenced-job, projection and saga proofs in a runnable integration-spec lane; the existing `BE_PATTERN_SPEC_MISSING` code names a missing scenario. Full retains its existing proof lanes.
+- <a id="r285"></a> **R285 FE_SWR_FAMILY:** `FE_SWR_OUTSIDE_FAMILY` confines SWR calls to `hooks/swr`; `FE_OP_OUTSIDE_SWR_HOOK` confines API operation imports and calls to those wrappers. Components and other hook families consume the wrapper hooks.
+- <a id="r286"></a> **R286 FE_COPY_AND_GLYPH:** `FE_COPY_IN_CALL` requires toast and validation arguments to come from i18n; `FE_NO_ALERT` refuses browser alerts; `FE_ICON_INLINE_SVG` confines inline SVG to a declared brand-mark leaf.
+- <a id="r287"></a> **R287 FE_CALLBACK_SHAPE:** An auth callback exchanges the PKCE code and redirects only, with cookie writes confined to the Supabase helper.
+- <a id="r288"></a> **R288 FE_STACK_ALLOWLIST:** `FE_STACK_UNLISTED` requires each front-end dependency to have a catalog entry or a reasoned `fe.extraPackages` declaration; `FE_STACK_CORE_MISSING` requires product apps to declare the core runtime packages, with the full marketing app exempt. GraphQL tagged templates must match the schema and SWR keys must carry operation identity by default.
+- <a id="r291"></a> **R291 HFS_FUNCTION_BUDGET:** A back-end or front-end function, method or arrow body has at most 80 physical lines, including comments and blank lines, in both editions.
+- <a id="r292"></a> **R292 HFS_FEATURE_FILE_BUDGET:** A feature owner has at most 250 tracked files, including nested files, in both editions.
 
 R247 reports `RT_COVERAGE_MATRIX` when its inventory cannot be parsed. For an
 applicable rule and edition, `RT_COVERAGE_NO_ENFORCER` identifies an absent
