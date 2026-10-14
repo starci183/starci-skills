@@ -19,6 +19,10 @@ import { canonCopyDriftFindings } from './canon-copy-drift.mjs';
 import { secretCustodyOnlyFindings } from './secret-custody-only.mjs';
 import { bootProofFindings } from './boot-proof.mjs';
 import { coverageBelowFindings } from './coverage-below.mjs';
+import { deployScanFindings } from './deploy-scan.mjs';
+import { deployWorkflowFindings } from './deploy-workflow.mjs';
+import { scriptHygieneFindings } from './script-hygiene.mjs';
+import { supplyChainFindings } from './supply-chain.mjs';
 // finders-import-end
 
 /** The failure codes the finders above emit, so `starci app check` ships their labels (check.mjs adds them to CHECK_CODES). Append-only; the coordinator regenerates it at merge time. */
@@ -46,6 +50,10 @@ export const FINDERS = [
   secretCustodyOnlyFindings,
   bootProofFindings,
   coverageBelowFindings,
+  deployScanFindings,
+  deployWorkflowFindings,
+  scriptHygieneFindings,
+  supplyChainFindings,
   // finders-end
 ];
 
@@ -55,3 +63,13 @@ export function a15Findings(context) {
 }
 
 A15_CODES.push('HFS_AGE_KEY_CUSTODY', 'HFS_CANON_COPY_DRIFT', 'HFS_SECRET_PLAINTEXT_FILE', 'HFS_SECRET_OUTSIDE_ENC');
+/** Codes emitted by the finders (coordinator-managed). */
+export const A15_CODES = [];
+
+// A02: include every deployment and supply-chain finding in the bundled app-check catalog.
+A15_CODES.push(
+  'HFS_HOST_CRON', 'HFS_DEPLOY_NO_LOGIC', 'HFS_DEPLOY_COMPOSE_ON_VPS', 'HFS_DEPLOY_SCHEDULER',
+  'HFS_DEPLOY_WORKFLOW', 'HFS_WORKFLOW_PIN', 'HFS_CI_TOOL_INSTALL', 'HFS_APP_WORKFLOW_TRIGGER',
+  'HFS_SCRIPT_PLAINTEXT_LOAD', 'HFS_SCRIPT_XTRACE', 'HFS_SERVICE_ROLE_SCOPE',
+  'HFS_DEPENDABOT_MISSING', 'HFS_AUDIT_STEP_MISSING', 'HFS_SBOM_MISSING',
+);

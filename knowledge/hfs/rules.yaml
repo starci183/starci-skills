@@ -2451,3 +2451,35 @@ rules:
     failureCodes: ["HFS_FEATURE_FILE_BUDGET"]
     enforcers:
       - {kind: hfs, id: feature-files, at: scripts/hfs/rules/feature-files.mjs}
+  - id: R250
+    code: "HFS_HOST_CRON"
+    law: "In lite and full apps, scheduled work belongs to the back-end scheduler, pgmq/pg_cron or a declared replicated-job. Deployment files, scripts, workflows, compose files and Dockerfiles install no host crontab, cron.d entry, systemd timer, @reboot job or at job; a workflow does not schedule app work. Docker compose up, down and pull run only against an explicitly dev environment. Deploy shell scripts delegate to docker, starci or the app CLI, and contain no node -e, psql, inline SQL or downloaded shell logic."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_HOST_CRON", "HFS_DEPLOY_NO_LOGIC", "HFS_DEPLOY_COMPOSE_ON_VPS", "HFS_DEPLOY_SCHEDULER"]
+    enforcers:
+      - {kind: hfs, id: deploy-scan, at: scripts/hfs/rules/deploy-scan.mjs}
+  - id: R251
+    code: "HFS_DEPLOY_WORKFLOW"
+    law: "In lite and full apps, deployment jobs declare a protected environment, explicit permissions and concurrency, materialize sealed secrets through SOPS_AGE_KEY or starci app secret materialize, and reference only the age key and transport SSH key/known_hosts secrets. They never embed a dotenv blob or write a dotenv file. Every remote workflow action uses a 40-hex commit SHA; installed tools are checksum or digest verified, or supplied by a pinned action. App workflows start only on release tags [v*] or workflow_dispatch, never on a branch push."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_DEPLOY_WORKFLOW", "HFS_WORKFLOW_PIN", "HFS_CI_TOOL_INSTALL", "HFS_APP_WORKFLOW_TRIGGER"]
+    enforcers:
+      - {kind: hfs, id: deploy-workflow, at: scripts/hfs/rules/deploy-workflow.mjs}
+  - id: R252
+    code: "HFS_SCRIPT_PLAINTEXT_LOAD"
+    law: "In lite and full apps, executable scripts and workflow commands never load plaintext secrets.env, secret.env, .env secret files or a home-directory credential file, enable shell xtrace or request --reveal. Service-role references belong only to the back-end Supabase integration; deployment scripts and source outside that integration never use the service role. Scanners inspect source references and report paths without reading secret files or printing their values."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_SCRIPT_PLAINTEXT_LOAD", "HFS_SCRIPT_XTRACE", "HFS_SERVICE_ROLE_SCOPE"]
+    enforcers:
+      - {kind: hfs, id: script-hygiene, at: scripts/hfs/rules/script-hygiene.mjs}
+  - id: R269
+    code: "HFS_DEPENDABOT_MISSING"
+    law: "In lite and full apps, .github/dependabot.yml declares scheduled npm, github-actions and docker updates. The CI workflow runs npm audit --omit=dev as an enabled gate whose failure stops the job. The images workflow generates an SBOM and provenance for release images; a disabled step, comment or label is not evidence."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_DEPENDABOT_MISSING", "HFS_AUDIT_STEP_MISSING", "HFS_SBOM_MISSING"]
+    enforcers:
+      - {kind: hfs, id: supply-chain, at: scripts/hfs/rules/supply-chain.mjs}
