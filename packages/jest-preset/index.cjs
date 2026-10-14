@@ -60,7 +60,7 @@ function transform(tsconfig) {
  * The runtime dependencies of a back end that ship ECMAScript modules only: jest's CommonJS runtime cannot load them, so their
  * files are compiled to CommonJS like the repository's own (ts-jest with `allowJs`) instead of being skipped as node_modules.
  * `jose` is the Supabase access-token verifier of every lite back end (be.integrations.supabase); a lite app keeps full's unit
- * run (owner ruling 2026-10-12), so a spec that imports its guard must load it.
+ * run (ruling:R212/case-1, amended by ruling:R212/case-4), so a spec that imports its guard must load it.
  */
 const ESM_ONLY_DEPENDENCIES = Object.freeze(["jose"])
 const ESM_DEPENDENCY_TRANSFORM = String.raw`^.+[\\/]node_modules[\\/](?:${ESM_ONLY_DEPENDENCIES.join("|")})[\\/].+\.js$`

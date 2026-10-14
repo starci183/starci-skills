@@ -64,11 +64,11 @@ rules:
       - id: case-8
         when: A drawer or dialog carries options that apply to the whole batch but are rarely changed (topic, tags, audience, module)
         assert: |-
-          Owner ruling 2026-10-12, corrected the same day: they live in one `SurfaceAccordionCard` (depth nested) below the main task, closed by default; its summary names the title and, in words, WHO may read the result ("Who may use: Internal · For: All agents"), never bare tokens. The fields open INSIDE that card, never loose on the panel. They never take half of the panel before the task itself
+          Owner decision LAYOUT-1/case-8 (2026-10-12, corrected the same day): they live in one `SurfaceAccordionCard` (depth nested) below the main task, closed by default; its summary names the title and, in words, WHO may read the result ("Who may use: Internal · For: All agents"), never bare tokens. The fields open INSIDE that card, never loose on the panel. They never take half of the panel before the task itself
       - id: case-9
         when: A panel offers several ways to bring content in (files, a cloud picker, links)
         assert: |-
-          Owner ruling 2026-10-12: each source sits with its own kind - a cloud file picker (Google Drive) is a secondary button directly under the file drop zone, with its one-line promise below it; links are a list of Inputs with a ghost "+ add link" under the last row. There is no separate "add to list" staging step when the panel's primary action already takes what was typed, and a picker never shares a ButtonGroup with a staging command
+          Owner decision LAYOUT-1/case-9 (2026-10-12): each source sits with its own kind - a cloud file picker (Google Drive) is a secondary button directly under the file drop zone, with its one-line promise below it; links are a list of Inputs with a ghost "+ add link" under the last row. There is no separate "add to list" staging step when the panel's primary action already takes what was typed, and a picker never shares a ButtonGroup with a staging command
     notThisRule: |-
       which of several regions carries the strongest anchor is HIERARCHY-2.
   - id: LAYOUT-2

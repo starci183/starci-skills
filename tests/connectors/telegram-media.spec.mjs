@@ -314,7 +314,7 @@ test('settle never fails because Telegram failed: the hook is synchronous, never
   });
 });
 
-// Owner ruling 2026-09-24: a drawing notice shows the drawn PART (page content, overlay panel, layout
+// owner:drawing-owner-parts: a drawing notice shows the drawn PART (page content, overlay panel, layout
 // drawing), never the composite placed into the layout capture.
 test('a drawing notice sends each draw\'s part, never its composite; desktop and mobile both go',t=>{
   withLedger(t,({repoRoot})=>{

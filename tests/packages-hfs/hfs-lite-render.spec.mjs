@@ -63,7 +63,7 @@ test('liteManagedBy is a template id field of app slots', () => {
   assert.equal(validateSlotsSchema(invalidManifest), false);
 });
 
-test('the lite managed set carries the unit run and its coverage world (owner ruling 2026-10-12), the database wrappers and workflows, and no e2e world', () => {
+test('the lite managed set carries the unit run and its coverage world (ruling:R212/case-1, amended by ruling:R212/case-4), the database wrappers and workflows, and no e2e world', () => {
   const targets = targetMap();
   assert.deepEqual(Object.keys(targets).sort(), [
     '.dockerignore', '.editorconfig', '.gitattributes', '.github/dependabot.yml', '.github/workflows/ci.yml', '.github/workflows/db-deploy.yml', '.github/workflows/images.yml', '.gitignore',
@@ -103,7 +103,9 @@ test('the lite managed set carries the unit run and its coverage world (owner ru
   assert.ok(ci.jobs.ci.steps.some(step => /codecov\/codecov-action@/.test(step.uses ?? '')), 'the unit coverage is uploaded on the tag');
 
   const images = parseYaml(targets['.github/workflows/images.yml'].content).jobs.image.strategy.matrix.include;
-  assert.deepEqual(images.map(entry => [entry.name, entry.file]), [['api', 'be/apps/api/Dockerfile'], ['web', 'fe/apps/web/Dockerfile']]);
+  assert.deepEqual(images.map(entry => [entry.name, entry.file]), [['api', 'be/apps/api/Dockerfile']]);
+  assert.equal(scripts['docker:build'], 'npm run docker:build:api');
+  assert.equal(scripts['docker:build:web'], undefined, 'the host-built frontend has no authored optional Dockerfile');
   const deploy = parseYaml(targets['.github/workflows/db-deploy.yml'].content);
   assert.deepEqual(Object.keys(deploy.on), ['workflow_dispatch']);
   assert.equal(deploy.jobs.deploy.environment, '${{ inputs.environment }}');
@@ -186,7 +188,7 @@ test('the full render of both examples keeps the other managed files in sync and
   }
 });
 
-test('the committed lite example keeps the other managed files in sync with its coverage target (owner ruling 2026-10-12)', () => {
+test('the committed lite example keeps the other managed files in sync with its coverage target (ruling:R212/case-1, amended by ruling:R212/case-4)', () => {
   const folder = 'examples/lite-app';
   const hfs = JSON.parse(fs.readFileSync(path.join(ROOT, folder, 'hfs.json'), 'utf8'));
   assert.equal(hfs.edition, 'lite');
@@ -197,7 +199,7 @@ test('the committed lite example keeps the other managed files in sync with its 
   assert.deepEqual(checkTargets(path.join(ROOT, folder), targets.filter(target => !C04_TEMPLATE_TARGETS.has(target.path))).filter(result => result.status !== 'ok'), [], folder);
 });
 
-test('the one Sonar gate document carries a readable lite gate with full\'s coverage conditions (owner ruling 2026-10-12)', () => {
+test('the one Sonar gate document carries a readable lite gate with full\'s coverage conditions (ruling:R212/case-1, amended by ruling:R212/case-4)', () => {
   const document = parseYaml(fs.readFileSync(path.join(ROOT, 'knowledge/sonar-gate.yaml'), 'utf8'));
   assert.equal(sonarGateName(document), 'starci-quality');
   assert.equal(sonarGateName(document, 'lite'), 'starci-quality-lite');
