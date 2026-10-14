@@ -43,16 +43,12 @@ export function runtimeInstalls({ root = RUNTIME, env = process.env, required = 
       const manifest = JSON.parse(fs.readFileSync(file, 'utf8'));
       const require = createRequire(file);
       for (const peer of Object.keys(manifest.peerDependencies ?? {}).filter((peer) => needed.has(peer))) {
-        try { require.resolve(peer); } catch { unresolved += 1; }
+        if (!resolvable(require, peer)) unresolved += 1;
       }
     }
     return [dir, { held, unresolved }];
   }));
-  // The install that serves the most of the needed packages with their peers resolved leads (held minus unresolved), so one
-  // install supplies the framework and its peers: a near-empty install (few packages, nothing to resolve) never outranks a
-  // complete one and splits `next` or `react` across two installs. Ties go to the more coherent install.
-  const serving = (dir) => scores.get(dir).held - scores.get(dir).unresolved;
-  return [...extra.filter((dir) => fs.existsSync(dir)), ...own.sort((a, b) => serving(b) - serving(a) || scores.get(a).unresolved - scores.get(b).unresolved)];
+  return [...extra.filter((dir) => fs.existsSync(dir)), ...own.sort((a, b) => scores.get(a).unresolved - scores.get(b).unresolved || scores.get(b).held - scores.get(a).held)];
 }
 
 /** The @starci packages an app installs, from the runtime's own source: package name -> folder under packages/. */
@@ -75,6 +71,17 @@ export const LINT_DEPENDENCIES = Object.freeze([...new Set([
   // the core front-end stack every scaffold installs (knowledge/hfs/fe-stack.yaml), read from the catalog, never listed here
   ...coreFeStackPackages().app,
 ])]);
+
+/**
+ * Whether `peer` resolves from a package's physical directory: its runtime entry, or, for a types-only package (`@types/react`
+ * has no `main`), its package.json. A types-only peer that is installed is resolved, not missing.
+ */
+const resolvable = (require, peer) => {
+  for (const request of [peer, `${peer}/package.json`]) {
+    try { require.resolve(request); return true; } catch { /* the next form of the request */ }
+  }
+  return false;
+};
 
 const has = (dir, name) => fs.existsSync(path.join(dir, ...name.split('/'), 'package.json'));
 
