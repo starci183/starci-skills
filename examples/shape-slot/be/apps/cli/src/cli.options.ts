@@ -10,6 +10,7 @@ export interface CliAppOptions {
 /** The primary database: the notes. */
 export const primaryConnectionOf = (primary: DatabaseConnectionConfig): DatabaseConnectionOptions => ({
     ...primary,
+    name: "primary",
     entities: noteEntities,
     migrations: noteMigrations,
 })

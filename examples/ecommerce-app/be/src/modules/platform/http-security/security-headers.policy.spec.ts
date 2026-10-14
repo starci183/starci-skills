@@ -1,0 +1,45 @@
+import type { INestApplication } from "@nestjs/common"
+import { mock } from "@starci/jest-preset"
+import type { Application, NextFunction, Request, Response } from "express"
+import { applySecurityHeaders } from "./security-headers.policy"
+
+describe("applySecurityHeaders", () => {
+    it("removes the Express fingerprint and applies protective headers before continuing the request", () => {
+        const server = mock<Application>()
+        const disabled = new Set<string>()
+        server.disable.mockImplementation((name: string) => {
+            disabled.add(name)
+            return server
+        })
+        const adapter = mock<ReturnType<INestApplication["getHttpAdapter"]>>()
+        adapter.getInstance.mockReturnValue(server)
+        const app = mock<INestApplication>()
+        app.getHttpAdapter.mockReturnValue(adapter)
+        const response = mock<Response>()
+        const headers = new Map<string, number | string | ReadonlyArray<string>>()
+        response.setHeader.mockImplementation((name, value) => {
+            headers.set(name, value)
+            return response
+        })
+        let nextCalls = 0
+        const next = (): void => {
+            nextCalls += 1
+        }
+        app.use.mockImplementation((middleware: (request: Request, response: Response, next: NextFunction) => void) => {
+            middleware(mock<Request>(), response, next)
+            return app
+        })
+
+        applySecurityHeaders(app)
+
+        expect(disabled.has("x-powered-by")).toBe(true)
+        expect(headers.get("Strict-Transport-Security")).toBe("max-age=31536000; includeSubDomains")
+        expect(headers.get("X-Content-Type-Options")).toBe("nosniff")
+        expect(headers.get("X-Frame-Options")).toBe("DENY")
+        expect(headers.get("Referrer-Policy")).toBe("no-referrer")
+        expect(headers.get("Content-Security-Policy")).toBe(
+            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+        )
+        expect(nextCalls).toBe(1)
+    })
+})

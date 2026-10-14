@@ -1,4 +1,4 @@
-# Environment keys of ecommerce-app (be side)
+# Environment keys of ecommerce-app
 
 Values live in the process environment of each service (never in code and never tracked); this file lists the keys
 only. Every key without a default is required: a missing or malformed key stops the boot and names the key.
@@ -18,7 +18,7 @@ only. Every key without a default is required: a missing or malformed key stops 
 | `KEYCLOAK_ADMIN_URL` | Base URL of the Keycloak server shoppers are created on | none |
 | `KEYCLOAK_ADMIN_REALM` | Realm the shoppers live in | none |
 | `KEYCLOAK_ADMIN_CLIENT_ID` | Confidential client whose service account creates the realm's users (`identity-admin`) | none |
-| `KEYCLOAK_ADMIN_CLIENT_SECRET` | Secret of that client (secret, sealed in `secrets/keycloak-env.enc`) | none |
+| `KEYCLOAK_ADMIN_CLIENT_SECRET` | Credential of that client; supply at runtime, or use the local Compose demo credential | none |
 | `KEYCLOAK_ADMIN_TIMEOUT` | Deadline of a call to Keycloak (`250`, `3s`) | `3s` |
 | `ORDER_API_URL` | Base URL of the order service | none |
 | `ORDER_API_TIMEOUT` | Deadline of a call to the order service (`250`, `3s`) | `3s` |
@@ -41,11 +41,11 @@ The order service verifies every bearer token through identity `verifySession`, 
 | `RECEIPTS_S3_ENDPOINT` | MinIO (S3) endpoint the receipts are archived in; buyers' download links point at it | none |
 | `RECEIPTS_S3_BUCKET` | Private bucket of the receipts | none |
 | `RECEIPTS_S3_ACCESS_KEY_ID` | Access key id (the MinIO root user `ecommerce` in dev) | none |
-| `RECEIPTS_S3_SECRET_ACCESS_KEY` | Secret access key (secret, sealed in `secrets/minio-env.enc`) | none |
+| `RECEIPTS_S3_SECRET_ACCESS_KEY` | Credential of the object-storage client; supply at runtime, or use the local Compose demo credential | none |
 | `RECEIPTS_S3_REGION` | Region the requests are signed for | `us-east-1` |
 | `RECEIPTS_LINK_TTL` | Lifetime of a receipt download link (`5m`) | `5m` |
 | `RECEIPTS_S3_TIMEOUT` | Deadline of a call to MinIO | `15s` |
-| `HTTP_SECURITY_ALLOWED_ORIGINS`, `HTTP_SECURITY_RATE_*` | As above | as above |
+| `HTTP_SECURITY_ALLOWED_ORIGINS`, `HTTP_SECURITY_RATE_WINDOW`, `HTTP_SECURITY_RATE_DEFAULT_LIMIT`, `HTTP_SECURITY_RATE_STRICT_LIMIT` | As above | as above |
 | `EVENT_BUS_BROKERS` | Kafka bootstrap addresses, comma separated (`host:port`) | none |
 | `EVENT_BUS_GROUP_ID` | Consumer group of the app (the order api consumes `billing.invoice-issued` and `billing.invoice-rejected`) | none |
 | `EVENT_BUS_TOPIC_PREFIX` | What every topic name starts with (empty in a deployment) | empty |
@@ -56,6 +56,7 @@ The order service verifies every bearer token through identity `verifySession`, 
 | `ORDER_PAYMENT_WINDOW` | How long an order stays pending for its payment before it expires | `1h` |
 | `QUEUE_REDIS_HOST` | Redis host BullMQ talks to | none |
 | `QUEUE_REDIS_PORT` | Redis port | `6379` |
+| `QUEUE_REDIS_DB` | Redis database used by BullMQ | `0` |
 | `QUEUE_PREFIX` | What every BullMQ key starts with | `queue` |
 | `QUEUE_RELAY_INTERVAL` | Pause between two relay passes over an empty queue outbox | `200ms` |
 | `QUEUE_RELAY_BATCH` | The most queue outbox rows one relay pass hands to BullMQ | `50` |
@@ -74,7 +75,7 @@ It listens for the signed webhook of the bank transfer notifier (`POST /webhooks
 | `IDENTITY_API_URL`, `IDENTITY_API_TIMEOUT` | As on the order api | as above |
 | `SEPAY_WEBHOOK_SECRET` | Secret the bank transfer notifier signs its deliveries with: HMAC-SHA256 over `<timestamp>.<raw body>` in `x-sepay-signature`, the timestamp in `x-sepay-timestamp` (secret) | none |
 | `SEPAY_WEBHOOK_TOLERANCE` | How far a delivery's signed timestamp may be from now before it is refused as a replay | `5m` |
-| `HTTP_SECURITY_ALLOWED_ORIGINS`, `HTTP_SECURITY_RATE_*` | As above | as above |
+| `HTTP_SECURITY_ALLOWED_ORIGINS`, `HTTP_SECURITY_RATE_WINDOW`, `HTTP_SECURITY_RATE_DEFAULT_LIMIT`, `HTTP_SECURITY_RATE_STRICT_LIMIT` | As above | as above |
 
 | `EVENT_BUS_BROKERS`, `EVENT_BUS_GROUP_ID`, `EVENT_BUS_TOPIC_PREFIX`, `EVENT_BUS_RELAY_INTERVAL`, `EVENT_BUS_RELAY_BATCH`, `EVENT_BUS_TIMEOUT` | As on the order api | as above |
 | `INVOICE_MAX_TOTAL_MINOR_UNITS` | The largest total one invoice may bill; a larger order is rejected and announced | `50000000` |
@@ -100,3 +101,18 @@ clone needs no owner secret. Export `KC_BOOTSTRAP_ADMIN_PASSWORD`, `KEYCLOAK_ADM
 ## cli (`apps/cli`)
 
 `IDENTITY_DB_URL`, `ORDER_DB_URL` and `BILLING_DB_URL`, the same keys the apis and the billing worker read; `cli migrate run` migrates every connection.
+
+## Front-end apps and projection
+
+These are public configuration keys. Next.js includes `NEXT_PUBLIC_*` values in the browser bundle at build time;
+never put a credential in them. `scripts/serve.mjs` derives defaults from the dev port projection.
+
+| Key | Consumer | Default |
+| --- | --- | --- |
+| `NEXT_PUBLIC_IDENTITY_API_URL` | Shop identity GraphQL transport | projection when started through `scripts/serve.mjs`; otherwise required |
+| `NEXT_PUBLIC_ORDER_API_URL` | Shop order GraphQL transport | projection when started through `scripts/serve.mjs`; otherwise required |
+| `NEXT_PUBLIC_SHOP_URL` | Landing link to the shop | dev projection |
+| `ECOMMERCE_APP_METADATA` | Server-side projection reader and serve script | ancestor `.starcistacks/dev/infra/metadata.json` |
+
+This example declares no sealed members. A production operator must declare a production runtime and sealed custody
+before supplying real credentials; the local demo defaults do not demonstrate production secret custody.

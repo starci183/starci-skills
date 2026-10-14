@@ -1,20 +1,2 @@
-export {
-    mutateAddCartItem,
-    mutateClearCart,
-    mutatePlaceOrder,
-    mutateRegister,
-    mutateRevokeSession,
-    mutateSignIn,
-    queryAccount,
-    queryCart,
-    queryOrderReceipt,
-    queryVerifySession,
-} from "./graphql"
-export type {
-    MutationAddCartItemRequest,
-    MutationPlaceOrderRequest,
-    MutationRegisterRequest,
-    MutationRevokeSessionRequest,
-    MutationSignInRequest,
-    QueryCartResponse,
-} from "./graphql"
+/** The cart view used by presentation hooks; SWR hooks import each operation from its own file. */
+export type { QueryCartResponse } from "./graphql/queries/types/cart"

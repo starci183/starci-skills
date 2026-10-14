@@ -1,6 +1,6 @@
 # ecommerce-app
 
-A small real shop: one StarCi app, two NestJS services in `be/` and two Next.js apps in `fe/`, one install at the root.
+A small real shop: one StarCi app, three NestJS services in `be/` and two Next.js apps in `fe/`, one install at the root.
 
 ## Overview
 
@@ -27,16 +27,21 @@ pointers.
 
 ## Stack
 
-TypeScript everywhere; NestJS 11, PostgreSQL (one database per connection: `identity`, `order`), Redis (sessions) and
+TypeScript everywhere; NestJS 11, PostgreSQL (one database per connection: `identity`, `order`, `billing`), Redis (sessions) and
 GraphQL in `be/`; Next.js, React, next-intl and `@starci/grammar` in `fe/`; npm with one `package.json` and one lockfile at
-the root, whose workspaces are the front end's packages (`fe/packages/*`). The dev stack is declared in `.starcistacks/dev`.
+the root, whose workspaces are the front end's apps and packages (`fe/apps/*`, `fe/packages/*`). The dev stack is declared in `.starcistacks/application-stacks.yaml`, with its Compose sources and runbook in `.starcistacks/dev`.
+
+This example demonstrates local development only. It declares no production/VPS runtime, Swarm stack, sealed secret
+member or rendered deployment model. `.starcistacks/dev/environment.json` records the environment identity;
+`infra/metadata.json` is the port projection, not a rendered Compose model. Render the local deployment with
+`docker compose -f .starcistacks/dev/infra/compose/compose.yaml --profile app config` when operating it.
 
 ## Repository layout
 
-- `be/apps/<app>/src`: `main.ts` (80 lines, parses inline or calls `<app>.env.ts`), `<app>.env.ts` (150, typed, fail-fast parsing
+- `be/apps/<app>/src`: `main.ts` (80 lines, creates `EnvSource` and calls `<app>.env.ts`), `<app>.env.ts` (150, typed, fail-fast parsing
   through `EnvSource` and capability parse helpers only), `<app>.options.ts` (200, env-derived values and port bindings with no
   parsing), `compose/<area>.ts` (120, one area's module list) and `app.module.ts` (250, `AppModule.register(options)` spreads the
-  groups; every capability registered once with `isGlobal: true`). Only `main.ts` and `<app>.env.ts` may read the app's
+  groups; every capability registered once with `isGlobal: true`). Only `<app>.env.ts` parses the app's
   environment, and the env file holds no logic, module composition, business code or feature imports. The e2e world proves it boots.
 - `be/src/features/api/<feature>/`: `application/` (command/query + thin handler + contracts) and `transport/{graphql,http}/`. A handler maps its input and calls one method of one service; a resolver or controller dispatches one bus message.
 - `be/src/modules/domain`: account, session, identity (guards), catalog, cart, order (checkout, cancellation and order services), payment, invoice (billing), member; each owns its business logic in its `*.service.ts`, its entities, migrations,
@@ -44,8 +49,8 @@ the root, whose workspaces are the front end's packages (`fe/packages/*`). The d
 - `be/src/modules/platform`: composition (injectors), config (EnvSource), cqrs, database, errors, graphql, http, http-security,
   i18n, logging, clock, primitives (Outcome), probes, inbox (event dedupe), messaging (BullMQ queues over Redis).
 - `be/src/modules/integrations`: cache (Redis), identity-api and order-api (each service calls the other over GraphQL).
-- `be/contracts/<service>/`: the vendored contract of each service: `schema.graphql` for its GraphQL, `events.json` for the messages it publishes (`apps/<service>/src/events.ts`); a worker lists what it reads in `apps/<app>/src/consumes.ts`. The order saga: `order.placed` (order) starts the invoice in billing; `billing.invoice-rejected` (compensates `order.placed`) makes the order service cancel the order, release its stock and refund its payment.
-- Unit specs exist only as `<name>.service.spec.ts` beside each `<name>.service.ts`. `be/src/tests`: `fixtures/builders/<area>.builder.ts` (test data), `e2e/` and `integration/` (the real world), `world/` (test infrastructure).
+- `be/contracts/<service>/`: the vendored contract of each service: `schema.graphql` for its GraphQL, `events.json` for the messages it publishes. Event publishers and subscribers are composed from the service's typed app options. The order saga: `order.placed` (order) starts the invoice in billing; `billing.invoice-rejected` (compensates `order.placed`) makes the order service cancel the order, release its stock and refund its payment.
+- Unit specs live beside their subjects; every `<name>.service.ts` has its `<name>.service.spec.ts`. `be/src/tests`: `fixtures/builders/<area>.builder.ts` (test data), `e2e/` and `integration/` (the real world), `world/` (test infrastructure).
 - `fe/apps/landing/src`: the public marketing app; `fe/apps/app/src`: the authenticated shop app. The front end has no tests.
 - `fe/packages/ecommerce-api`: the repository's one pair of Apollo clients (auth and no-auth) with their link chain, the
   `GraphQLResponse` union and the back-end projection reader. The shop's browser calls the identity and order GraphQL APIs
@@ -105,6 +110,10 @@ With no back end running, a signed-in shop renders the unreachable states of `/b
 `/account`, naming the service, rather than showing placeholder data; a signed-out reader sees each page's sign-in gate. That is the intended
 honest behavior — `node examples/ecommerce-app/scripts/verify-render.mjs --record <ui-screen-id> <custody|captures|render>` checks the running-page
 pairs (PNG + markup per route and viewport) against the Work tree's ui records.
+
+Every API serves `/health/live` for process liveness and `/health/ready` for its required dependency probes; the
+existing `/health` endpoint is a readiness alias. A failed or timed-out probe returns 503. Docker HEALTHCHECK uses
+liveness. API bootstrap and both Next apps set security headers and disable `X-Powered-By`.
 
 ## Work
 

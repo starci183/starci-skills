@@ -18,6 +18,23 @@ const nextConfig: NextConfig = {
     turbopack: { root: WORKSPACE_ROOT },
     // The product app is the authenticated one: it does not advertise the framework that serves it.
     poweredByHeader: false,
+    async headers() {
+        return [
+            {
+                source: "/:path*",
+                headers: [
+                    { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+                    { key: "X-Content-Type-Options", value: "nosniff" },
+                    { key: "X-Frame-Options", value: "DENY" },
+                    { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+                    {
+                        key: "Content-Security-Policy",
+                        value: "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+                    },
+                ],
+            },
+        ]
+    },
 }
 
 export default withNextIntl(nextConfig)

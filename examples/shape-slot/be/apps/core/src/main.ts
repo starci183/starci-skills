@@ -1,6 +1,7 @@
 import { NestFactory } from "@nestjs/core"
 import { SystemClockService } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
+import { securityHeaders } from "@modules/platform/http-security"
 import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
 import { AppModule } from "./app.module"
 import { readCoreEnv } from "./core.env"
@@ -10,6 +11,10 @@ const bootstrap = async (): Promise<void> => {
     const env = EnvSource.fromProcess()
     const options = readCoreEnv(env)
     const app = await NestFactory.create(AppModule.register(options))
+    const server = app.getHttpAdapter().getInstance()
+    server.disable("x-powered-by")
+    server.set("trust proxy", options.httpSecurity.trustProxy ?? 0)
+    app.use(securityHeaders)
     app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
     app.enableShutdownHooks()
     await app.listen(options.server.port)

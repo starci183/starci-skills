@@ -2,6 +2,7 @@ export { HTTP_SECURITY_ERROR_KINDS, HttpSecurityErrorCode } from "./errors/http-
 export { requestOf } from "./execution-request.mapper"
 export type { OperationRequest } from "./http-security.contracts"
 export { parseHttpSecurityConfig, parseWebhookProviderConfig } from "./http-security.config"
+export { applySecurityHeaders } from "./security-headers.policy"
 export { HttpSecurityModule } from "./http-security.module"
 export type { HttpSecurityOptions } from "./http-security.options"
 export { HTTP_SECURITY_MESSAGES } from "./messages/http-security.messages"

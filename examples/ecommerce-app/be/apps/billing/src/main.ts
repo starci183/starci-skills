@@ -2,6 +2,7 @@ import "reflect-metadata"
 import { NestFactory } from "@nestjs/core"
 import { SystemClock } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
+import { applySecurityHeaders } from "@modules/platform/http-security"
 import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
 import { AppModule } from "./app.module"
 import { readBillingEnv } from "./billing.env"
@@ -12,6 +13,7 @@ async function bootstrap(): Promise<void> {
     const options = readBillingEnv(env)
     const app = await NestFactory.create(AppModule.register(options), { rawBody: true })
     app.enableShutdownHooks()
+    applySecurityHeaders(app)
     await app.listen(options.port)
     createJsonLogger(new SystemClock()).info(LoggingLogEvent.ServerStarted, {
         service: "billing",

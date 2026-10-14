@@ -24,6 +24,15 @@ const build = async () => {
 }
 
 describe("ProbeCheckerService", () => {
+    it("answers liveness without calling an unavailable dependency", async () => {
+        const { checker, database, cache, logger } = await build()
+
+        expect(await checker.live()).toEqual({ status: "ok", service: "order" })
+        expect(database.check).not.toHaveBeenCalled()
+        expect(cache.check).not.toHaveBeenCalled()
+        expect(logger.error).not.toHaveBeenCalled()
+    })
+
     it("succeeds with the report when every dependency answers", async () => {
         const { checker, database, cache, logger } = await build()
         database.check.mockResolvedValue(undefined)
@@ -49,5 +58,44 @@ describe("ProbeCheckerService", () => {
         })
         expect(logger.error).toHaveBeenCalledTimes(1)
         expect(logger.error).toHaveBeenCalledWith(ProbesLogEvent.ProbeFailed, failure, { dependency: "cache" })
+    })
+
+    it("refuses readiness within two seconds when a required dependency never settles", async () => {
+        jest.useFakeTimers()
+        try {
+            const { checker, database, cache, logger } = await build()
+            database.check.mockResolvedValue(undefined)
+            cache.check.mockReturnValue(new Promise<void>(() => {}))
+            const result = checker.check()
+
+            await jest.advanceTimersByTimeAsync(2_000)
+
+            expect(await result).toBeRefused({
+                code: ProbesErrorCode.DependencyUnavailable,
+                params: { database: "ok", cache: "unreachable" },
+            })
+            expect(logger.error).toHaveBeenCalledWith(ProbesLogEvent.ProbeFailed, expect.any(Error), {
+                dependency: "cache",
+            })
+            expect(await checker.live()).toEqual({ status: "ok", service: "order" })
+            expect(jest.getTimerCount()).toBe(0)
+        } finally {
+            jest.useRealTimers()
+        }
+    })
+
+    it("clears probe deadlines after successful readiness", async () => {
+        jest.useFakeTimers()
+        try {
+            const { checker, database, cache } = await build()
+            database.check.mockResolvedValue(undefined)
+            cache.check.mockResolvedValue(undefined)
+
+            await checker.check()
+
+            expect(jest.getTimerCount()).toBe(0)
+        } finally {
+            jest.useRealTimers()
+        }
     })
 })

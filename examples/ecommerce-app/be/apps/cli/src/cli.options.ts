@@ -6,6 +6,7 @@ import { loyaltyEntities, loyaltyMigrations } from "@modules/domain/loyalty"
 import { orderEntities, orderMigrations } from "@modules/domain/order"
 import { paymentEntities, paymentMigrations } from "@modules/domain/payment"
 import type { DatabaseConnectionConfig, DatabaseConnectionOptions } from "@modules/platform/database"
+import { BILLING_CONNECTION, IDENTITY_CONNECTION, ORDER_CONNECTION } from "@modules/platform/database"
 import { eventBusEntities, eventBusMigrations } from "@modules/platform/event-bus"
 import { inboxEntities, inboxMigrations } from "@modules/platform/inbox"
 import { jobsEntities, jobsMigrations } from "@modules/platform/jobs"
@@ -23,6 +24,7 @@ export interface CliAppOptions {
 /** The identity database: the accounts of the identity service. */
 export const identityConnectionOf = (identity: DatabaseConnectionConfig): DatabaseConnectionOptions => ({
     ...identity,
+    name: IDENTITY_CONNECTION,
     entities: accountEntities,
     migrations: accountMigrations,
 })
@@ -30,6 +32,7 @@ export const identityConnectionOf = (identity: DatabaseConnectionConfig): Databa
 /** The order database: the catalog, the carts, the orders, loyalty, the order-summary projection and its inbox, the place-order saga, the order outbox, the queue outbox and the job table. */
 export const orderConnectionOf = (order: DatabaseConnectionConfig): DatabaseConnectionOptions => ({
     ...order,
+    name: ORDER_CONNECTION,
     entities: [
         ...catalogEntities,
         ...cartEntities,
@@ -59,11 +62,16 @@ export const orderConnectionOf = (order: DatabaseConnectionConfig): DatabaseConn
 /** The billing database: the invoices, the payments, the billing inbox and the billing outbox. */
 export const billingConnectionOf = (billing: DatabaseConnectionConfig): DatabaseConnectionOptions => ({
     ...billing,
+    name: BILLING_CONNECTION,
     entities: [...invoiceEntities, ...paymentEntities, ...inboxEntities, ...eventBusEntities],
     migrations: [...invoiceMigrations, ...paymentMigrations, ...inboxMigrations, ...eventBusMigrations],
 })
 
 /** Binds each parsed database configuration to its owners' entities and migrations. */
 export const createCliAppOptions = (databases: CliEnv): CliAppOptions => ({
-    connections: [identityConnectionOf(databases.identity), orderConnectionOf(databases.order), billingConnectionOf(databases.billing)],
+    connections: [
+        identityConnectionOf(databases.identity),
+        orderConnectionOf(databases.order),
+        billingConnectionOf(databases.billing),
+    ],
 })

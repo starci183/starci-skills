@@ -8,7 +8,7 @@ import { OrderModule, orderEntities, orderMigrations } from "@modules/domain/ord
 import { LoyaltyModule, loyaltyEntities, loyaltyMigrations } from "@modules/domain/loyalty"
 import { IDENTITY_API, IdentityApiModule } from "@modules/integrations/identity-api"
 import { ReceiptStorageModule } from "@modules/integrations/receipt-storage"
-import { DatabaseModule } from "@modules/platform/database"
+import { ORDER_CONNECTION, DatabaseModule } from "@modules/platform/database"
 import { ErrorsFilter } from "@modules/platform/errors"
 import { OriginGuard, RateLimitGuard } from "@modules/platform/http-security"
 import { inboxEntities, inboxMigrations } from "@modules/platform/inbox"
@@ -39,6 +39,7 @@ export class AppModule {
                     connections: [
                         {
                             ...options.database,
+                            name: ORDER_CONNECTION,
                             entities: [
                                 ...catalogEntities,
                                 ...cartEntities,

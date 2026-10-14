@@ -1,31 +1,32 @@
-# ecommerce-app dev stack
+﻿# ecommerce-app dev stack
 
-The dev environment for the second example product: the three shared stateful components
-(Postgres on 5501, Redis on 6448, Keycloak on 8149 with the `ecommerce` realm, MinIO on 9069 for the receipts, Kafka on 9161 as the event bus) run under Compose; the services run on the host against
-them (the billing service and the order service consume each other's events from Kafka topics `events.<service>`). Postgres carries one database per connection (`ecommerce_identity`, `ecommerce_order`, `ecommerce_billing`, created by
-`../infra/compose/initdb`). Every runtime value reaches the services through their environment; the keys are
-listed in `runtime/env/KEYS.md`, and `../infra/metadata.json` stays the resolved port map the frontend reads.
+The local development environment declares five shared components (Postgres, Redis, Keycloak, MinIO and Kafka)
+and three API services (identity, order and billing). Compose starts the infrastructure by default; the `app`
+profile also starts API images. Each service owns a Postgres database. The front-end port projection lives in
+`infra/metadata.json`; it is configuration metadata, not a rendered deployment model.
 
-Declared in `.starcistacks/application-stacks.yaml`; this file is its runbook. Only `dev` is
-declared - this example has no vps deployment, and an environment nobody operates is not
-authored "for shape" (the machine schema requires at least one environment; the layout prose
-that mentions dev+vps is reported as a finding, not answered with a fake).
+Only `dev` is declared in `.starcistacks/application-stacks.yaml`. This example has no production/VPS deployment
+or sealed secret member. The example README describes this development scope.
+
+Run these commands from the example root. Before starting the host services, supply the required keys for each
+API from `runtime/env/KEYS.md`, including the broker/group settings, order queue host and billing webhook key.
+The CLI needs all three database URL keys. Use `npm run build:be` to build the APIs and CLI.
 
 | command | what it does |
 | --- | --- |
-| prepare | `docker compose -f .starcistacks/dev/infra/compose/compose.yaml --profile app config --quiet` - the compose tree parses and every include resolves |
-| doctor | `docker compose -f .starcistacks/dev/infra/compose/compose.yaml ps` - the infra pair is listed as running; the services answer `curl http://localhost:5070/health` and `curl http://localhost:6070/health` once started |
-| up | `docker compose -f .starcistacks/dev/infra/compose/compose.yaml up -d postgres redis keycloak minio kafka` - the infra only (5501/6448/8149/9069/9161); then export the keys below, `npm run build && npm run migrate`, apply the seeds, and `npm run start:identity` and `npm run start:order` on the host |
-| env | `IDENTITY_API_PORT=5070 IDENTITY_DB_URL=postgres://postgres@localhost:5501/ecommerce_identity CACHE_REDIS_URL=redis://localhost:6448/0 ORDER_API_URL=http://localhost:6070 KEYCLOAK_TOKEN_URL=http://localhost:8149/realms/ecommerce/protocol/openid-connect/token KEYCLOAK_CLIENT_ID=identity-api KEYCLOAK_ADMIN_URL=http://localhost:8149 KEYCLOAK_ADMIN_REALM=ecommerce KEYCLOAK_ADMIN_CLIENT_ID=identity-admin HTTP_SECURITY_ALLOWED_ORIGINS=http://localhost:4069` plus `KEYCLOAK_ADMIN_CLIENT_SECRET` (the demo default `demo-only-identity-admin-client-secret`, or the value you exported for compose) for identity; `ORDER_API_PORT=6070 ORDER_DB_URL=postgres://postgres@localhost:5501/ecommerce_order IDENTITY_API_URL=http://localhost:5070 RECEIPTS_S3_ENDPOINT=http://localhost:9069 RECEIPTS_S3_BUCKET=receipts RECEIPTS_S3_ACCESS_KEY_ID=ecommerce HTTP_SECURITY_ALLOWED_ORIGINS=http://localhost:4069` plus `RECEIPTS_S3_SECRET_ACCESS_KEY` (the demo default `demo-only-minio-root-password`, or the value you exported for compose) for order; `npm run migrate` reads both `*_DB_URL` keys |
-| seeds | `psql postgres://postgres@localhost:5501/ecommerce_order -f .starcistacks/dev/seeds/order-catalog.sql` (the demo catalog) and `psql postgres://postgres@localhost:5501/ecommerce_identity -f .starcistacks/dev/seeds/identity-demo.sql` (the demo person) |
-| verification | after `up`: `curl http://localhost:5070/health` and `curl http://localhost:6070/health` answer 200, and `npm run test:e2e` runs the flows on the test world's own stack |
+| prepare | `docker compose -f .starcistacks/dev/infra/compose/compose.yaml --profile app config --quiet` validates every include; use `config --format json` to obtain a rendered local model |
+| doctor | `docker compose -f .starcistacks/dev/infra/compose/compose.yaml ps` checks all five infrastructure containers; after service startup, check each `/health/ready` endpoint |
+| up | `docker compose -f .starcistacks/dev/infra/compose/compose.yaml up -d postgres redis keycloak minio kafka`; supply each API's required environment, then `npm run build:be`, `npm run migrate`, seed, and run `npm run start:identity`, `npm run start:order` and `npm run start:billing` in separate terminals |
+| seeds | `psql "$ORDER_DB_URL" -f .starcistacks/dev/seeds/order-catalog.sql` and `psql "$IDENTITY_DB_URL" -f .starcistacks/dev/seeds/identity-demo.sql` apply the local demo data |
+| verification | `curl --fail http://localhost:5070/health/live`, `curl --fail http://localhost:6070/health/live` and `curl --fail http://localhost:7070/health/live` check liveness; call the same ports at `/health/ready` to verify required dependencies; `/health` remains a readiness alias |
 | status | `docker compose -f .starcistacks/dev/infra/compose/compose.yaml ps` |
 | logs | `docker compose -f .starcistacks/dev/infra/compose/compose.yaml logs -f postgres redis keycloak minio kafka` |
-| down | `docker compose -f .starcistacks/dev/infra/compose/compose.yaml down` (add `-v` to drop the Postgres volume, then migrate and seed again) |
+| down | `docker compose -f .starcistacks/dev/infra/compose/compose.yaml down`; add `-v` only when discarding the local demo databases |
 
-The dev Postgres runs with trust authentication (DEMO-ONLY: a local container whose published
-ports bind loopback, holding the demo seeds - nothing worth a password). Keycloak's two credentials (its bootstrap admin
-password and the `identity-admin` client secret) and MinIO's root password are not secrets of this example: the compose files carry
-obviously fake DEMO-ONLY defaults (`demo-only-...`), so a clean clone runs with no owner secret, and a run that wants other values
-exports `KC_BOOTSTRAP_ADMIN_PASSWORD`, `KEYCLOAK_ADMIN_CLIENT_SECRET` and `MINIO_ROOT_PASSWORD` before `up` (`browser/stack.mjs`
-generates fresh ones for its run). The declaration lists no sealed secret; `runtime/env/KEYS.md` lists the keys.
+The Compose defaults are demo-only values for local development. To substitute owner values, export
+`KC_BOOTSTRAP_ADMIN_PASSWORD`, `KEYCLOAK_ADMIN_CLIENT_SECRET` and `MINIO_ROOT_PASSWORD` before `up` and supply matching
+credentials to the API processes. No credential belongs in this runbook or in a public `NEXT_PUBLIC_*` key.
+A production operator must declare a production runtime and sealed custody separately.
+
+Readiness calls the probes composed by each API, with a bounded deadline for every probe. Liveness remains
+independent of database and broker availability, so an infrastructure outage does not masquerade as a dead process.

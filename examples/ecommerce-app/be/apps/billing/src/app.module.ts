@@ -19,7 +19,13 @@ import {
 import { ClockModule } from "@modules/platform/clock"
 import { CONFIG_ERROR_KINDS } from "@modules/platform/config"
 import { CqrsModule } from "@modules/platform/cqrs"
-import { BILLING_ENTITY_MANAGER, DATABASE_ERROR_KINDS, DatabaseModule, DatabaseProbe } from "@modules/platform/database"
+import {
+    BILLING_CONNECTION,
+    BILLING_ENTITY_MANAGER,
+    DATABASE_ERROR_KINDS,
+    DatabaseModule,
+    DatabaseProbe,
+} from "@modules/platform/database"
 import { ERRORS_MESSAGES, ErrorsFilter, ErrorsModule } from "@modules/platform/errors"
 import {
     EVENT_BUS_ERROR_KINDS,
@@ -95,6 +101,7 @@ export class AppModule {
                     connections: [
                         {
                             ...options.database,
+                            name: BILLING_CONNECTION,
                             entities: [...invoiceEntities, ...paymentEntities, ...inboxEntities, ...eventBusEntities],
                             migrations: [
                                 ...invoiceMigrations,

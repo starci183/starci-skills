@@ -3,13 +3,14 @@ import type { DynamicModule } from "@nestjs/common"
 import { TypeOrmModule, getDataSourceToken } from "@nestjs/typeorm"
 import type { DataSource } from "typeorm"
 import { openConnectionSource } from "./connection-source.client"
+import { DatabaseReadinessService } from "./database-readiness.service"
 import { CONNECTION_SOURCE, DATABASE_OPTIONS, READ_SEED_FILES } from "./database.port"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./database.module-definition"
 import { MigrationRunnerService } from "./migration-runner.service"
 import { readSeedFiles } from "./seed-connections.client"
 import { SeedRunnerService } from "./seed-runner.service"
 import { PRIMARY_CONNECTION } from "./primary.connection"
-import { PRIMARY_ENTITY_MANAGER } from "./primary.decorators"
+import { DATABASE_READINESS, PRIMARY_ENTITY_MANAGER } from "./primary.decorators"
 
 /** The token each declared connection provides its shared EntityManager under. */
 type EntityManagerToken = typeof PRIMARY_ENTITY_MANAGER
@@ -57,6 +58,8 @@ export class DatabaseModule extends ConfigurableModuleClass {
             providers: [
                 ...(base.providers ?? []),
                 ...managers,
+                DatabaseReadinessService,
+                { provide: DATABASE_READINESS, useExisting: DatabaseReadinessService },
                 MigrationRunnerService,
                 SeedRunnerService,
                 {
@@ -71,6 +74,7 @@ export class DatabaseModule extends ConfigurableModuleClass {
                 MigrationRunnerService,
                 SeedRunnerService,
                 ...managers.map((manager) => manager.provide),
+                DATABASE_READINESS,
             ],
         }
     }
