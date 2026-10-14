@@ -598,7 +598,7 @@ test("module-registration: a handler registered by one module, a provider by its
 })
 
 // background-unowned --------------------------------------------------------------------------------------------------------
-const PROCESSOR = "export class SweepProcessor {\n  async process(): Promise<void> { return Promise.resolve(); }\n}\n"
+const PROCESSOR = "import { PurgeHandler } from './application/purge.handler';\nexport class SweepProcessor {\n  constructor(private readonly purge: PurgeHandler) {}\n  async process(): Promise<number> { return this.purge.purge(); }\n}\n"
 const JOB_MODULE = "import { Module } from '@nestjs/common';\nimport { SweepProcessor } from './sweep.processor';\n@Module({ providers: [SweepProcessor] })\nexport class SweepModule {}\n"
 const WORKER_APP = "import { Module } from '@nestjs/common';\nimport { SweepModule } from '../../../src/features/jobs/sweep';\n@Module({ imports: [SweepModule] })\nexport class AppModule {}\n"
 const BILLING_SERVICE = {
@@ -615,16 +615,14 @@ const BACKGROUND_APPS = [{ name: "core", kind: "api" }, { name: "jobs", kind: "w
 const backgroundRepo = (t, files, apps = BACKGROUND_APPS) => repo(t, { apps, declaration: { patterns: ["fenced-job"] }, files: { ...BILLING_SERVICE, ...JOB_FEATURE, "apps/jobs/src/main.ts": "void 0;\n", "apps/jobs/src/app.module.ts": WORKER_APP, ...files } })
 const JOB_CLEAN = ["src/features/jobs/sweep/sweep.processor.ts", "src/features/jobs/sweep/sweep.module.ts", "src/modules/domain/billing/billing.service.ts", "apps/jobs/src/app.module.ts"]
 
-test("background-unowned: a processor a worker app composes, and a background method it reaches, are owned; an unreached method is not", (t) => {
+test("background-unowned: composed background calls are owned and ordinary retry/replay methods are not background", (t) => {
     const f = backgroundRepo(t, {
         "src/modules/domain/payments/index.ts": "export { PaymentsService } from './payments.service';\n",
-        "src/modules/domain/payments/payments.service.ts": "export class PaymentsService {\n  async deliverReceipts(): Promise<void> {}\n  async reconcile(): Promise<void> {}\n  async retryFailed(): Promise<void> {}\n  async delivery(): Promise<void> {}\n}\n",
+        "src/modules/domain/payments/payments.service.ts": "export class PaymentsService {\n  async deliverReceipts(): Promise<void> {}\n  async reconcile(): Promise<void> {}\n  async retryFailed(): Promise<void> {}\n  async replay(): Promise<void> {}\n  async delivery(): Promise<void> {}\n}\n",
     })
     f.tester.run("background-unowned", rules["background-unowned"], {
-        valid: ok(f, JOB_CLEAN),
-        invalid: [...bad(f, [
-            ["src/modules/domain/payments/payments.service.ts", [2, /deliverReceipts is background work/], [3, /reconcile is background work/], [4, /retryFailed is background work/]],
-        ])],
+        valid: ok(f, [...JOB_CLEAN, "src/modules/domain/payments/payments.service.ts"]),
+        invalid: [],
     })
 })
 
@@ -637,7 +635,7 @@ test("background-unowned: a processor and a consumer no worker or api app compos
     f.tester.run("background-unowned", rules["background-unowned"], {
         valid: ok(f, ["src/modules/domain/billing/index.ts", "src/features/jobs/sweep/sweep.module.ts", "src/features/api/b/index.ts"]),
         invalid: [...bad(f, [
-            ["src/features/jobs/sweep/sweep.processor.ts", [1, /is a processor that no service app composes/]],
+            ["src/features/jobs/sweep/sweep.processor.ts", [1, /is a processor that no service app composes/], [4, /process is background work/]],
             ["src/features/api/b/transport/message/paid.consumer.ts", [1, /is a consumer that no service app composes/]],
             ["src/modules/domain/billing/billing.service.ts", [2, /sweepExpired is background work/]],
         ])],
@@ -648,7 +646,74 @@ test("background-unowned: a processor with no worker app declared is refused", (
     const f = backgroundRepo(t, { "apps/jobs/src/app.module.ts": null, "apps/jobs/src/main.ts": null }, [{ name: "core", kind: "api" }])
     f.tester.run("background-unowned", rules["background-unowned"], {
         valid: ok(f, ["src/modules/domain/billing/index.ts", "src/features/jobs/sweep/sweep.module.ts"]),
-        invalid: [...bad(f, [["src/features/jobs/sweep/sweep.processor.ts", [1, /declares no worker app/]]])],
+        invalid: [...bad(f, [["src/features/jobs/sweep/sweep.processor.ts", [1, /declares no worker app/], [4, /process is background work/]]])],
+    })
+})
+
+test("background-unowned: GraphQL mutations and HTTP controllers stay user-triggered even when reached by a processor", (t) => {
+    const resolver = "src/features/api/payments/transport/graphql/payments.resolver.ts"
+    const controller = "src/features/api/payments/transport/http/payments.controller.ts"
+    const decorated = "src/modules/domain/payments/payments.service.ts"
+    const untouched = "src/modules/domain/payments/user.service.ts"
+    const f = backgroundRepo(t, {
+        "apps/jobs/src/app.module.ts": "export class AppModule {}\n",
+        "src/features/jobs/sweep/sweep.processor.ts": "import { PaymentsResolver } from '../../api/payments/transport/graphql/payments.resolver';\nimport { PaymentsController } from '../../api/payments/transport/http/payments.controller';\nimport { PaymentsService } from '../../../modules/domain/payments/payments.service';\nexport class SweepProcessor {\n  constructor(private readonly resolver: PaymentsResolver, private readonly controller: PaymentsController, private readonly service: PaymentsService) {}\n  process(): void { this.resolver.retryPayment(); this.controller.replayPayment(); this.service.retry(); }\n}\n",
+        [resolver]: "import { Resolver, Mutation } from '@nestjs/graphql';\nimport { UserService } from '../../../../../modules/domain/payments/user.service';\n@Resolver()\nexport class PaymentsResolver {\n  constructor(private readonly service: UserService) {}\n  @Mutation() retryPayment(): void { this.service.save(); }\n  @Mutation() replayPayment(): void {}\n}\n",
+        [controller]: "import { Controller, Post } from '@nestjs/common';\nimport { UserService } from '../../../../../modules/domain/payments/user.service';\n@Controller()\nexport class PaymentsController {\n  constructor(private readonly service: UserService) {}\n  @Post() replayPayment(): void { this.service.save(); }\n  @Post() retryPayment(): void {}\n}\n",
+        [decorated]: "import { Resolver as GraphQL } from '@nestjs/graphql';\nimport { Cron } from '@nestjs/schedule';\n@GraphQL()\nexport class PaymentsService {\n  @Cron('* * * * *') retry(): void {}\n  replay(): void {}\n}\n",
+        [untouched]: "export class UserService {\n  save(): void {}\n  retry(): void {}\n  replay(): void {}\n}\n",
+    })
+    f.tester.run("background-unowned", rules["background-unowned"], {
+        valid: ok(f, [resolver, controller, decorated, untouched]),
+        invalid: bad(f, [["src/features/jobs/sweep/sweep.processor.ts", [1, /is a processor/], [6, /process is background work/]]]),
+    })
+})
+
+test("background-unowned: neutral methods inherit orphan processor context through actual calls only", (t) => {
+    const service = "src/modules/domain/work/work.service.ts"
+    const helper = "src/modules/domain/work/work.helper.ts"
+    const f = backgroundRepo(t, {
+        "apps/jobs/src/app.module.ts": "export class AppModule {}\n",
+        "src/features/jobs/sweep/sweep.processor.ts": "import { WorkService } from '../../../modules/domain/work/work.service';\nimport { forward } from '../../../modules/domain/work/work.helper';\nexport class SweepProcessor {\n  constructor(private readonly work: WorkService) {}\n  process(): void { forward(this.work); }\n}\n",
+        [helper]: "import { WorkService } from './work.service';\nexport function forward(work: WorkService): void { work.apply(); }\n",
+        [service]: "export class WorkService {\n  apply(): void { this.persist(); }\n  persist(): void { this.apply(); }\n  retry(): void {}\n  replay(): void {}\n}\nexport class OtherService { apply(): void {} }\n",
+    })
+    f.tester.run("background-unowned", rules["background-unowned"], {
+        valid: ok(f, [helper, "src/modules/domain/billing/billing.service.ts"]),
+        invalid: bad(f, [
+            ["src/features/jobs/sweep/sweep.processor.ts", [1, /is a processor/], [5, /process is background work/]],
+            [service, [2, /apply is background work/], [3, /persist is background work/]],
+        ]),
+    })
+})
+
+test("background-unowned: schedulers, sagas and event handlers use context and framework import origins", (t) => {
+    const scheduler = "src/modules/domain/orders/orders.scheduler.ts"
+    const saga = "src/features/saga/orders/orders.saga.ts"
+    const handler = "src/features/api/orders/application/paid.handler.ts"
+    const scheduled = "src/modules/domain/orders/scheduled.service.ts"
+    const sagaService = "src/modules/domain/orders/saga.service.ts"
+    const events = "src/modules/domain/orders/events.service.ts"
+    const lookalike = "src/modules/domain/orders/lookalike.service.ts"
+    const f = backgroundRepo(t, {
+        [scheduler]: "export class OrdersScheduler {\n  run(): void {}\n}\n",
+        [saga]: "export class OrdersSaga {\n  advance(): void {}\n}\n",
+        [handler]: "import { EventsHandler as OnPaid } from '@nestjs/cqrs';\n@OnPaid()\nexport class PaidHandler {\n  handle(): void {}\n}\n",
+        [scheduled]: "import { Cron as Every } from '@nestjs/schedule';\nexport class ScheduledService {\n  @Every('* * * * *') tick(): void {}\n  retry(): void {}\n}\n",
+        [sagaService]: "import * as cqrs from '@nestjs/cqrs';\nexport class SagaService {\n  @cqrs.Saga() react(): void {}\n  replay(): void {}\n}\n",
+        [events]: "import { OnEvent } from '@nestjs/event-emitter';\nexport class EventsService {\n  @OnEvent('paid') receive(): void {}\n  retry(): void {}\n}\n",
+        [lookalike]: "declare function Cron(value: string): MethodDecorator;\nexport class Lookalike {\n  @Cron('* * * * *') retry(): void {}\n}\n",
+    })
+    f.tester.run("background-unowned", rules["background-unowned"], {
+        valid: ok(f, [...JOB_CLEAN, lookalike]),
+        invalid: bad(f, [
+            [scheduler, [1, /is a scheduler/], [2, /run is background work/]],
+            [saga, [1, /is a saga/], [2, /advance is background work/]],
+            [handler, [1, /is a event-handler/], [4, /handle is background work/]],
+            [scheduled, [1, /is a scheduler/], [3, /tick is background work/]],
+            [sagaService, [1, /is a saga/], [3, /react is background work/]],
+            [events, [1, /is a event-handler/], [3, /receive is background work/]],
+        ]),
     })
 })
 
