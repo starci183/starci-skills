@@ -252,7 +252,7 @@ rulings:
     enforcedBy: []
     gap: Optional declaration only; no missing-reporter finding is authorized.
 
-  - id: R212/case-1
+  - id: R212/case-1 # Historical decision; Work boundary amended by ruling:R212/case-4.
     date: '2026-10-12'
     topic: edition.shared-architecture
     status: amended
@@ -266,7 +266,7 @@ rulings:
     amendmentScope: Realtime adapter, lite Work boundary, production stack and scheduling, and contract specs.
     enforcedBy: [R212]
 
-  - id: R212/case-2
+  - id: R212/case-2 # Historical decision; Work boundary amended by ruling:R212/case-4.
     date: '2026-10-13'
     topic: edition.shared-frontend-and-realtime
     status: amended
@@ -281,7 +281,7 @@ rulings:
     amendmentScope: The lite Work and production hosting clauses only.
     enforcedBy: [R212, R217]
 
-  - id: R212/case-3
+  - id: R212/case-3 # Historical hosting clause amended by owner:lite-production-swarm.
     date: '2026-10-13'
     topic: edition.adapters-baseline-and-assets
     status: amended

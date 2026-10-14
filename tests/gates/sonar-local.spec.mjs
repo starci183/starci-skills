@@ -1560,7 +1560,7 @@ test('dashboard --branch reads the measures of that branch, and without it the m
   assert.ok(main.branches.every(branch=>branch===undefined),JSON.stringify(main.branches));
 });
 
-test('lite Sonar selects its own gate name with full\'s conditions, coverage included (owner ruling 2026-10-12), and requires an actual processed project gate',async t=>{
+test('lite Sonar selects its own gate name with full\'s conditions, coverage included (ruling:R212/case-1, amended by ruling:R212/case-4), and requires an actual processed project gate',async t=>{
   const root=temporary(t,'lite-policy'),custody=fakeCustody(root),repo=fakeRepo(root);
   write(repo,'hfs.json',JSON.stringify({hfs:3,kind:'app',edition:'lite'}));
   const full=loadSonarGate(),lite=loadSonarGate({cwd:repo});
@@ -1580,7 +1580,7 @@ test('lite Sonar selects its own gate name with full\'s conditions, coverage inc
   assertNoSecret(report,'lite scan');
 });
 
-test('lite slice coverage is judged exactly as full: the unit run measures the touched services, one below 100 fails and all at 100 pass (owner ruling 2026-10-12)',async t=>{
+test('lite slice coverage is judged exactly as full: the unit run measures the touched services, one below 100 fails and all at 100 pass (ruling:R212/case-1, amended by ruling:R212/case-4)',async t=>{
   const custody=fakeCustody(temporary(t,'lite-slice-custody'));
   const liteRepo=(label)=>{const repo=fakeRepo(temporary(t,label),{services:true});write(repo,'hfs.json',JSON.stringify({hfs:3,kind:'app',edition:'lite'}));return repo;};
   const red=await fakeSonar(t,{sources:serviceSources(),coverage:{'src/orders/order.service.js':100,'src/orders/payment.service.js':87.5}});

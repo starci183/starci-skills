@@ -829,7 +829,7 @@ requirements:
     sourceLine: 25
     editions:
       - lite
-    statement: "The front end is one standard for both editions (R212 case-2): the browser calls the back end
+    statement: "The front end is one standard for both editions (R212 case-2, with the Work boundary amended by ruling:R212/case-4): the browser calls the back end
       through the Apollo clients and one file per operation in `fe.modules.api`, wrapped by the SWR hooks of
       `fe.hooks.swr`; forms are react-hook-form with zod (`fe.hooks.rhf`), mutation outcomes go through
       `fe.modules.toast`, and `fe.modules.auth` is the only front-end importer of Supabase, for the session
@@ -3539,7 +3539,7 @@ requirements:
     editions:
       - lite
       - full
-    statement: 'stale comments that cite superseded rulings. R212 case-2 (2026-10-13): lite realtime is the
+    statement: 'stale comments that cite superseded rulings. R212 case-2 (2026-10-13, with the Work boundary amended by ruling:R212/case-4): lite realtime is the
       in-process socket.io gateway, "the Supabase Realtime door is gone"'
     status: owed
     analysis:
@@ -3554,6 +3554,7 @@ requirements:
       successors.
     amendedBy:
       - ruling:R212/case-2
+      - ruling:R212/case-4
   - id: WDD-X5
     source: docs/application-stacks.md#checker-coverage-and-acceptance-evidence
     editions:
@@ -4266,7 +4267,7 @@ requirements:
     editions:
       - lite
       - full
-    statement: The locale header is `Accept-Language` everywhere; `x-locale` is retired.
+    statement: The locale header is `Accept-Language` everywhere; the earlier custom locale header is retired.
     status: owed
     ruling: ruling:locale-accept-language
     standardSource: A15-STANDARD section 2.2

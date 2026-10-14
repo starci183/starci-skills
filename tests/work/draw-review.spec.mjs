@@ -368,8 +368,8 @@ test('apply: a receipt outside the repository is refused; a reviewed part withou
   assert.deepEqual(fs.readdirSync(dir).filter((f) => f.endsWith('.tmp')), []);
 });
 
-// Owner ruling 2026-09-26 ("approve the interfaces nobody asked to review"): a drawing the owner did not ask to review is
-// accepted without the owner through the one auto-accept path; a drawing the owner asked for stays the owner's.
+// owner:one-version-owner-review: every drawing requires the owner's review. The historical auto-accept policy below
+// proves that configuration cannot accept either requested or unrequested drawings.
 const ON = { autoAcceptRecommended: true, excludes: ['credential', 'irreversible-confirmation', 'handover'], source: 'asks' };
 const quiet = () => {
   const woken = [], notified = [];

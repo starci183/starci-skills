@@ -22,7 +22,7 @@ provenance:
   sources:
     - knowledge/hfs/slots.yaml
     - knowledge/hfs/rules.yaml
-    - owner ruling 2026-10-12 (lite = full architecture minus self-hosted infrastructure; queue transport Supabase Queues/pgmq)
+    - ruling:R212/case-1 (2026-10-12, with the Work boundary amended by ruling:R212/case-4; lite keeps full architecture with Supabase backing services; queue transport Supabase Queues/pgmq)
     - https://supabase.com/docs/guides/queues
     - https://github.com/pgmq/pgmq
     - https://supabase.com/docs/guides/cron

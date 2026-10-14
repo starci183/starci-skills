@@ -163,7 +163,7 @@ const STARTER_DEPENDENCIES = Object.freeze({
 });
 
 /**
- * Lite keeps the production stack, the canon tools and the back end's unit run (owner ruling 2026-10-12); it runs no test world of
+ * Lite keeps the production stack, the canon tools and the back end's unit run (ruling:R212/case-1, amended by ruling:R212/case-4); it runs no test world of
  * its own (no @starci/test-world). Both editions serve GraphQL from the api app (@nestjs/graphql over Apollo, owner ruling
  * 2026-10-13); the fe stack's root tools are added from fe-stack.yaml by packageManifest.
  */
@@ -419,7 +419,7 @@ const liteOverlaid = (() => {
 })();
 /**
  * A base be file lite reuses: a source file of the shared shape, and the unit spec beside a reused source file that the lite overlay
- * does not replace (owner ruling 2026-10-12: a lite back end keeps full's unit specs).
+ * does not replace (ruling:R212/case-1, amended by ruling:R212/case-4: a lite back end keeps full's unit specs).
  */
 const liteBaseFile = (scope, rel) => {
   if (scope === 'app') return LITE_APP_REUSED.has(rel);

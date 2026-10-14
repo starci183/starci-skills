@@ -41,7 +41,7 @@ test('a question that lists options gets no pick groups derived from image names
   assert.equal(pickGroupsOf({}, images).length, 1, 'without options the naming convention still derives a group');
 });
 
-// Owner ruling 2026-09-24: the owner reviews the drawn PART, never the
+// owner:drawing-owner-parts: the owner reviews the drawn PART, never the
 // composite. A draw that binds the composite in `part` is served as its part.
 test('an ask serves each draw\'s part, not its composite; a declared pick on the composite path still binds', () => {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'serve-ask-parts-'));

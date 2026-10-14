@@ -411,7 +411,7 @@ test("add cli bootstraps the optional lite app, Supabase migrate/seed groups, an
   assert.ok(
     result.created.includes("be/src/features/cli/requeue/subs/run.cli.ts"),
   );
-  // Owner ruling 2026-10-12: every generated cli command carries its unit spec beside it, as in full.
+  // ruling:R212/case-1, amended by ruling:R212/case-4: every generated cli command carries its unit spec beside it, as in full.
   for (const command of result.created.filter((file) => file.endsWith(".cli.ts")))
     assert.ok(result.created.includes(command.replace(/\.ts$/, ".spec.ts")), `${command} has its unit spec`);
   assert.match(

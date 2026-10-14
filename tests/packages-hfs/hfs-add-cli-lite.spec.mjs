@@ -98,7 +98,7 @@ const parses = (text) =>
     compilerOptions: { experimentalDecorators: true },
   }).diagnostics.length === 0;
 
-test("ensureLiteCli writes the unit spec of every built-in command, each parseable and naming its command (owner ruling 2026-10-12)", () => {
+test("ensureLiteCli writes the unit spec of every built-in command, each parseable and naming its command (ruling:R212/case-1, amended by ruling:R212/case-4)", () => {
   const root = appRoot();
   const created = ensureLiteCli({ root, manifest, repo: repoAt(root) });
   const specs = created.filter((relative) => relative.endsWith(".cli.spec.ts")).sort();
@@ -132,7 +132,7 @@ test("ensureLiteCli bootstraps the canonical app and groups once, registers conf
   ]) {
     assert.ok(created.includes(relative), relative);
   }
-  // Owner ruling 2026-10-12: each built-in cli command carries its unit spec, as in full.
+  // ruling:R212/case-1, amended by ruling:R212/case-4: each built-in cli command carries its unit spec, as in full.
   for (const command of created.filter((relative) => relative.endsWith(".cli.ts")))
     assert.ok(created.includes(command.replace(/\.ts$/, ".spec.ts")), `${command} has its unit spec`);
   for (const relative of created.filter((entry) => entry.endsWith(".ts"))) {

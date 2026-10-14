@@ -14,9 +14,9 @@ export class EditionRefusal extends Error {
 }
 
 /**
- * The refusal of a pattern noun in a lite app whose topic carries a `liteAdapter` (owner ruling 2026-10-12): lite HAS the pattern,
- * but the package's templates are the full adapter (BullMQ, Kafka, sockets, TypeORM entities, e2e proofs), so generating them would
- * write what lite forbids. The pattern is written by hand on its Supabase adapter until the package carries a lite template.
+ * The refusal of a pattern noun in a lite app whose topic carries a `liteAdapter` (ruling:R212/case-1, amended by ruling:R212/case-4):
+ * lite has the pattern, but the package carries only its full-adapter templates, so generating them would write adapter paths
+ * unavailable in lite. The pattern is written by hand using the topic's declared lite adapter until the package carries a lite template.
  */
 export class LiteAdapterRefusal extends EditionRefusal {
   constructor(command, topics) {

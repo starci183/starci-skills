@@ -68,7 +68,7 @@ rules:
       - id: case-8
         when: The user enters several values of the same kind (links, emails, phone numbers, tags with structure)
         assert: |-
-          Owner ruling 2026-10-12: they are a list of single-value fields - one `Input` per value with its own remove action, an "add another" command below, and a paste of several values split into one row each - never one free `Textarea` "one per line"; each row validates and reports its own error
+          Owner decision COLLECTION-1/case-8 (2026-10-12): they are a list of single-value fields - one `Input` per value with its own remove action, an "add another" command below, and a paste of several values split into one row each - never one free `Textarea` "one per line"; each row validates and reports its own error
     notThisRule: |-
       which of several regions carries the strongest anchor is HIERARCHY-2, and which face a bounded object
       presents once it is composed is SURFACE-2.

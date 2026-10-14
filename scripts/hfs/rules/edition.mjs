@@ -1,7 +1,7 @@
 // edition.mjs - L01, the edition rule. An hfs.json edition is `full` or `lite` (absent means full); under lite the standard is a
-// filter plus a few additions over the same manifest, never a second engine. Lite is the full architecture deployed without
-// self-hosted infrastructure (owner ruling 2026-10-12): the same slots, patterns and unit specs, Supabase adapters behind the same
-// ports, optional contract specs, and no e2e world (owner decision 2026-10-14). The slot layer already answers the paths lite
+// filter plus a few additions over the same manifest, never a second engine. Lite declares Docker Swarm production infrastructure
+// (owner:lite-production-swarm, ruling:R212/case-4): the same slots, patterns and unit specs, provider adapters behind the same
+// ports, optional contract specs, and no e2e world (owner:lite-contract-specs). The slot layer already answers the paths lite
 // removed (slots lite excludes, or whose litePresence is forbidden, come back HFS_FORBIDDEN_PRESENT with their goesTo);
 // this rule reports what no path can state:
 //   - inside a package.json: an e2e, stack or browser script (`test:e2e`, `test:stack`, `test:browser`,
