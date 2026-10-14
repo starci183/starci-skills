@@ -83,7 +83,7 @@ test('installed current examples reach the real current reference catalog and RE
     assert.deepEqual(actual, fs.readFileSync(path.join(source, relative)), relative);
     assert.equal(installed.files[relative], digest(actual), relative);
   }
-  assert.equal(selectedExampleFiles.length, 18, 'only BASIC13, three own Work catalog indexes and two declared system-health seeds');
+  assert.equal(selectedExampleFiles.length, 16, 'only BASIC13, two own Work catalog indexes and one declared system-health seed (lite-app carries no Work catalog)');
   for (const relative of selectedExampleFiles) {
     const actual = fs.readFileSync(path.join(target, relative));
     assert.deepEqual(actual, fs.readFileSync(path.join(source, relative)), relative);
