@@ -22,6 +22,8 @@ const slots = slotTester()
 
 const DIRECTIVE = "\"use client\"\nexport const X = () => null"
 const PLAIN = "export const X = () => null"
+const OVERLAY = '"use client"\nexport const Confirm = () => null'
+const OVERLAY_HOST = 'import { Confirm } from "../../overlays/Confirm"\nexport const Home = () => <Confirm />'
 
 test("every rule this law declares is a rule", () => {
   for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
@@ -62,6 +64,10 @@ test("FE-CLIENT-1: the directive sits only at an interaction boundary", () => {
       { filename: at("apps/web/src/app/[locale]/layout.tsx"), code: PLAIN },
       { filename: at("apps/web/src/app/[locale]/page.tsx"), code: PLAIN },
       { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: PLAIN },
+      // server composition of a client entry does not move the directive onto the server host
+      { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: OVERLAY_HOST },
+      { filename: at("apps/web/src/features/layouts/Shell/index.tsx"), code: OVERLAY_HOST.replace("Home", "Shell") },
+      { filename: at("apps/web/src/features/overlays/Confirm/index.tsx"), code: OVERLAY },
       // a string that merely reads like the directive is not one
       { filename: at("apps/web/src/app/[locale]/page.tsx"), code: "const s = \"use client\"" },
     ],
@@ -103,6 +109,9 @@ test("FE-CLIENT-2: a client component imports nothing that exists only on the se
       // a server component may import all of it
       { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: 'import { headers } from "next/headers"\nimport { getTranslations } from "next-intl/server"' },
       { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: 'import "server-only"' },
+      { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: `${OVERLAY_HOST}\nimport { getTranslations } from "next-intl/server"` },
+      { filename: at("apps/web/src/features/layouts/Shell/index.tsx"), code: OVERLAY_HOST.replace("Home", "Shell") },
+      { filename: at("apps/web/src/features/overlays/Confirm/index.tsx"), code: OVERLAY },
       // a file named like a reader is not server code by its name
       { filename: CLIENT, code: '"use client"\nimport { readLocal } from "@/modules/storage/read-local"' },
     ],
@@ -113,6 +122,7 @@ test("FE-CLIENT-2: a client component imports nothing that exists only on the se
       { filename: CLIENT, code: '"use client"\nimport { getTranslations } from "next-intl/server"', errors: [{ messageId: "server" }] },
       { filename: CLIENT, code: '"use client"\nimport { NextResponse } from "next/server"', errors: [{ messageId: "server" }] },
       { filename: CLIENT, code: '"use client"\nimport { join } from "path"', errors: [{ messageId: "server" }] },
+      { filename: at("apps/web/src/features/overlays/Confirm/index.tsx"), code: `${OVERLAY}\nimport { cookies } from "next/headers"`, errors: [{ messageId: "server" }] },
     ],
   })
 })
@@ -269,4 +279,3 @@ test("FE-CLIENT-5: a written cookie states httpOnly and is secure and same-site"
     ],
   })
 })
-

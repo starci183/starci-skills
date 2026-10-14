@@ -130,8 +130,10 @@ rules:
     hfsRules: [R27, R64, R26]
     requirement: |
       App adapters import internal code only through public entries below features/{pages,layouts,overlays}, including
-      type-only imports and re-exports. Features compose components, hooks and modules. Page owners at
-      features/pages/<Name>/index.tsx may also import overlay public entries and compose blocks, but never another page.
+      type-only imports and re-exports. Features compose components, hooks and modules. Page and layout owners at
+      features/{pages,layouts}/<Name>/index.tsx may also import overlay public entries and compose blocks. The only
+      feature-to-feature edge is pages or layouts to overlays: a layout never imports a page, and an overlay never imports
+      another overlay. A server page may import and render a client overlay entry without becoming a client component.
       Components descend blocks to composites to branches to leaves; no block imports another block.
       A pure component or branch renders supplied block render props without importing blocks or fetching. Components
       never point to app or features; hooks never point to app, features or components; modules never point to app, features, components or hooks.
@@ -155,6 +157,12 @@ rules:
       - id: case-5
         when: "Client list composition"
         write: 'The page imports @/features/overlays/ItemListOverlay; that overlay imports @/components/blocks/ItemBlock and passes renderItem={id => <ItemBlock id={id} />} to its Base and branch. The branch imports neither the block nor its hook.'
+      - id: case-6
+        when: "A layout hosts overlays selected by the URL"
+        write: >
+          The server layout imports OverlayRouteHost and candidate overlay entries, and supplies rendered candidate nodes
+          to that client host. Its route-state hook supplies scalar selection to the pure OverlayHost branch; the host
+          and branch import no candidate overlay (FE-BOUNDARY-5).
     verification:
       automated:
         - ARCH_OWNER_CYCLE

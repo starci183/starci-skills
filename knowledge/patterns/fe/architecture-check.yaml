@@ -75,8 +75,9 @@ rules:
     hfsRules: [R27, R64, R26, R30, R91]
     requirement: |-
       Dependencies follow the tiers of slots.yaml: route to feature, modules and packages; feature to components
-      (including blocks), hooks, modules and packages. Page owners at features/pages/<Name>/index.tsx may also import overlay
-      public entries, never another page. Components descend blocks to composites to
+      (including blocks), hooks, modules and packages. Page and layout owners at features/{pages,layouts}/<Name>/index.tsx
+      may also import overlay public entries. This is the only feature-to-feature edge: layouts never import pages,
+      overlays never import overlays, and components never import overlays. Components descend blocks to composites to
       branches to leaves (a layer imports only the layers after it, never block to block) and may import hooks and
       packages, never app or features; hooks import modules and packages only; modules
       import modules and packages only, acyclic. A framework-pinned source-root file (proxy, instrumentation,
@@ -100,6 +101,9 @@ rules:
       - id: case-4
         when: A page composes a client list of connected blocks
         write: The page entry imports the overlay public entry; the overlay entry imports block public entries and passes block renderers to pure presentation. A branch or block never imports another block.
+      - id: case-5
+        when: A layout hosts URL-selected overlays while pages remain server components
+        write: The layout imports an OverlayRouteHost overlay and its candidate overlay entries, passing rendered nodes to the host. That client host owns route state and renders the pure OverlayHost branch, which receives nodes and never imports features (FE-BOUNDARY-5).
     verification:
       automated:
         - ARCH_OWNER_CYCLE

@@ -53,11 +53,22 @@ loading/forbidden/error/empty through `SlotView` (`slot-status-through-slotview`
 the `drawing` slot role of `component.tsx`; a split-surface reference tree lives under
 `.claude/examples/`.
 
-Page owners in `features/pages/<Name>/index.tsx` may compose overlay and block public entries; pages never import another
-page, and blocks never import another block. For a client list, a server page mounts an overlay whose connected entry reads list
+Page and layout owners in `features/{pages,layouts}/<Name>/index.tsx` may compose overlay and block public entries. A server
+page may import and render a client overlay entry while remaining a server component: `FE_CLIENT_BOUNDARY` accepts the
+overlay entry, and `FE_CLIENT_SERVER_IMPORT` / `FE_CLIENT_REACHES_SERVER` reject server-only imports from its client closure.
+The only feature-to-feature edge is pages or layouts to overlays; layouts never import pages, overlays never import other
+overlays, components never import overlays, and blocks never import another block. For a client list, a server page mounts an overlay whose connected entry reads list
 identities and supplies a block renderer to its pure Base. A pure component or branch may render that keyed list by
 calling the supplied render prop; it imports no block and fetches no data. The supplied renderer composes blocks only,
 with no intrinsic markup or hook calls, and each connected item block still renders its exact sibling `XBase`.
+
+A layout-level overlay host passes rendered overlay candidates into a client `features/overlays/OverlayRouteHost` entry.
+Its hook under `hooks/overlays` reads `usePathname()` and `useSearchParams()` and supplies scalar selection to the pure
+`components/branches/OverlayHost` branch. The layout imports the candidate overlay entries; the host and branch only
+receive rendered nodes. No callback crosses the server-to-client boundary, and pages stay server components. This
+composition-only host renders an existing public pure branch without a forwarding private Base; connected blocks still
+require their exact sibling Base. The worked tree is in
+[`knowledge/patterns/fe/boundaries.yaml`](../../../knowledge/patterns/fe/boundaries.yaml), `FE-BOUNDARY-5`.
 
 The one locale pattern everywhere is `next-intl`, a `[locale]` segment, default `vi`,
 `localePrefix: "as-needed"`, and `proxy.ts` instead of `middleware.ts`.

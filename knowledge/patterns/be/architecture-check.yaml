@@ -134,7 +134,7 @@ rules:
   - id: BE-ARCHITECTURE-3
     title: One module shape; one representative module per capability, registered once per app
     kind: mandatory
-    hfsRules: [R30, R45]
+    hfsRules: [R30, R45, R25]
     requirement: |-
       Every capability module (the `<c>.module.ts` of a `be.domain`, `be.platform` or `be.integrations` owner) is
       `@Module({...}) export class XModule extends ConfigurableModuleClass {}` with a `<c>.module-definition.ts` built by
@@ -150,7 +150,9 @@ rules:
       app roots and `@Global()` appears nowhere (tests included). The one legal cross-module import is a transport module
       importing its own feature's application module. No `new` of an `@Injectable`, no module-level `let`, no two modules in
       one file, no `PortBinding`-style composition helper, no `ModuleRef`. Each owner exposes one `index.ts` with named exports
-      only, no `export *`, at most 60 names.
+      only and no `export *`, within the owning slot's `budget.indexExports`: 60 names for domain, platform and feature
+      owners, 80 for be.integrations provider entries. A specialized slot without its own budget inherits the tier's
+      owner-slot budget. HFS_UNUSED_EXPORT still prunes names with no supported external consumer.
     rationale: |-
       A stateful module imported from two consumers is two instances: two pools, two clients. Registering the representative
       once at the app root removes that failure class and makes globality a composition decision; splitting a capability into
@@ -178,6 +180,8 @@ rules:
         - BE_MODULE_SHAPE
         - BE_MODULE_HANDLER_REGISTRATION
         - BE_MODULE_PROVIDER_REREGISTRATION
+        - HFS_UNUSED_EXPORT
+        - HFS_UNUSED_FILE
       manual:
         - Review provider token, scope and lifetime through the e2e run of the app.
     relatedExamples: []

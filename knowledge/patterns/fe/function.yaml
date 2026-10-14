@@ -170,8 +170,8 @@ rules:
       modules/api, a Server Action or Supabase itself. The connected half holds translations, locale, session and data, folds
       each read into a Slot with `toSlot`, picks the shape from data, resolves every label, and renders the pure XBase from the
       sibling component.tsx. Only that sibling index.tsx imports component.tsx, and index.tsx exports X
-      only, never XBase. Each Block reads its own apis; a page owner at features/pages/<Name>/index.tsx composes overlays and
-      Blocks with atoms and reads none; an
+      only, never XBase. Each Block reads its own apis; page and layout owners at
+      features/{pages,layouts}/<Name>/index.tsx compose overlays and Blocks with atoms and read none; an
       overlay runs commands and may read list identities for block composition; a layout reads none. Pages and layouts stay
       server components. For a client list, the overlay's index passes identities and a block render prop to its pure Base
       and branch. The branch maps identities with stable keys and invokes the supplied renderer without importing blocks
@@ -180,6 +180,9 @@ rules:
       resolved with next-intl before they reach XBase as strings. The pure sibling has no runtime world or transport dependency. Pure blocks, composites, branches and leaves
       require no twin. Intrinsic browser interaction such as refs, focus, disclosure, measurement, drag and reduced motion may
       remain in one visual unit; an authored custom helper for it still lives under hooks/ui.
+      A composition-only overlay host may render an existing public pure branch directly (FE-BOUNDARY-5); its route-state
+      hook stays in the client overlay entry, and the branch only receives scalar selection and supplied rendered nodes.
+      It needs no forwarding private Base. This does not relax the exact sibling Base rule for connected blocks.
     rationale: |
       Separating real world access keeps presentation pure and prevents hidden requests, while avoiding
       boilerplate where there is no independent render contract.
@@ -226,6 +229,12 @@ rules:
           <ItemListOverlayBase state={state} props={{ ids, renderItem: id => <ItemBlock id={id} /> }} on={{}} />.
           The Base gives ids and renderItem to a pure branch, which maps ids with stable keys and calls renderItem(id).
           ItemBlock owns its read and returns ItemBlockBase; neither the Base nor the branch imports ItemBlock.
+      - id: case-9
+        when: "Layout-level overlays selected from client route state"
+        write: >
+          The server layout passes rendered overlay nodes to the OverlayRouteHost overlay; its client entry calls
+          useOverlayRouteState and renders the pure OverlayHost branch (FE-BOUNDARY-5). The branch imports neither the
+          hook nor the overlays.
     verification:
       automated:
         - FE_CLIENT_BOUNDARY

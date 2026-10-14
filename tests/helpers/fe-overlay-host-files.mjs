@@ -1,0 +1,40 @@
+// The same server-host/client-selector tree is judged by the architecture machine and its ESLint facade.
+export const overlayHostFiles = {
+  'apps/web/src/app/page.tsx': "import { Home } from '../features/pages/Home';\nexport default function Route() { return <Home />; }\n",
+  'apps/web/src/app/layout.tsx': "import type { ReactNode } from 'react';\nimport { Shell } from '../features/layouts/Shell';\ntype RootProps = { readonly children: ReactNode };\nexport default function Root(props: RootProps) { return <Shell children={props.children} />; }\n",
+  'apps/web/src/features/pages/Home/index.tsx': "import { getTranslations } from 'next-intl/server';\nimport { Confirm } from '../../overlays/Confirm';\nexport const Home = async () => { const t = await getTranslations(); return <><h1>{t('title')}</h1><Confirm /></>; };\n",
+  'apps/web/src/features/layouts/Shell/index.tsx': [
+    "import { Suspense } from 'react';",
+    "import type { ReactNode } from 'react';",
+    "import { Confirm } from '../../overlays/Confirm';",
+    "import { OverlayRouteHost } from '../../overlays/OverlayRouteHost';",
+    'type ShellProps = { readonly children: ReactNode };',
+    "export const Shell = (props: ShellProps) => <><main>{props.children}</main><Suspense fallback={'Preparing overlay'}><OverlayRouteHost confirm={<Confirm />} /></Suspense></>;",
+    '',
+  ].join('\n'),
+  'apps/web/src/features/overlays/Confirm/index.tsx': "'use client';\nimport { ConfirmBase } from './component';\nexport const Confirm = () => <ConfirmBase />;\n",
+  'apps/web/src/features/overlays/Confirm/component.tsx': 'export const ConfirmBase = () => <section>Confirm</section>;\n',
+  'apps/web/src/features/overlays/OverlayRouteHost/index.tsx': [
+    "'use client';",
+    "import type { ReactNode } from 'react';",
+    "import { useOverlayRouteState } from '../../../hooks/overlays';",
+    "import { OverlayHost } from '../../../components/branches/OverlayHost';",
+    'type OverlayRouteHostProps = { readonly confirm: ReactNode };',
+    'export const OverlayRouteHost = (props: OverlayRouteHostProps) => { const selected = useOverlayRouteState(); return <OverlayHost selected={selected} confirm={props.confirm} />; };',
+    '',
+  ].join('\n'),
+  'apps/web/src/components/branches/OverlayHost/index.tsx': [
+    "import type { ReactNode } from 'react';",
+    "type OverlayHostProps = { readonly selected: 'confirm' | null; readonly confirm: ReactNode };",
+    "export const OverlayHost = (props: OverlayHostProps) => <>{props.selected === 'confirm' && props.confirm}</>;",
+    '',
+  ].join('\n'),
+  'apps/web/src/hooks/overlays/index.ts': "export { useOverlayRouteState } from './use-overlay-route-state';\n",
+  'apps/web/src/hooks/overlays/use-overlay-route-state.ts': [
+    "import { usePathname } from '../../modules/i18n/navigation';",
+    "import { useSearchParams } from 'next/navigation';",
+    "export const useOverlayRouteState = () => { const pathname = usePathname(); const search = useSearchParams(); return pathname.startsWith('/items') && search.get('overlay') === 'confirm' ? 'confirm' : null; };",
+    '',
+  ].join('\n'),
+  'apps/web/src/modules/i18n/navigation.ts': "export { usePathname } from 'next/navigation';\n",
+};

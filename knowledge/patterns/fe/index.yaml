@@ -99,8 +99,8 @@ topics:
     rules: "FE-AUTH"
   - path: boundaries.yaml
     title: Boundaries
-    decides: "Mandatory error, not-found and loading boundaries, Outcome rendering in boundaries, server-first components"
-    rules: "FE-BOUNDARY-1 … FE-BOUNDARY-3"
+    decides: "Mandatory error, not-found and loading boundaries, Outcome rendering, server-first components, layout-level overlay hosts"
+    rules: "FE-BOUNDARY-1 … FE-BOUNDARY-5"
   - path: i18n.yaml
     title: Internationalization
     decides: "next-intl, [locale], default locale vi, as-needed prefix, proxy.ts, no display text outside catalogs, catalog parity"

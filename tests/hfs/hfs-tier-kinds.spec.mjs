@@ -23,7 +23,24 @@ test('tier source/target-kind restrictions validate in the schema and loader', (
   // The loader adds version components; the source manifest is the schema document.
   const doc = parseYaml(fs.readFileSync(path.join(root, 'knowledge/hfs/slots.yaml'), 'utf8'));
   assert.equal(validate(doc), true, JSON.stringify(validate.errors));
-  assert.deepEqual(manifest.tiers.fe.feature.mayImportKinds, { feature: { from: ['pages'], to: ['overlays'] } });
+  assert.deepEqual(manifest.tiers.fe.feature.mayImportKinds, { feature: { from: ['pages', 'layouts'], to: ['overlays'] } });
+});
+
+test('pages and layouts may host overlays while the other feature edges and component imports remain forbidden', () => {
+  const hfs = openHfs({ declaration, side: 'fe', manifest });
+  const entry = (kind, name) => `apps/web/src/features/${kind}/${name}/index.tsx`;
+  const cases = [
+    [entry('pages', 'Home'), entry('overlays', 'Confirm'), true],
+    [entry('layouts', 'Shell'), entry('overlays', 'Confirm'), true],
+    [entry('layouts', 'Shell'), entry('pages', 'Home'), false],
+    [entry('overlays', 'Confirm'), entry('overlays', 'Other'), false],
+    ['apps/web/src/components/branches/OverlayHost/index.tsx', entry('overlays', 'Confirm'), false],
+  ];
+  for (const [from, to, allowed] of cases) {
+    const result = hfs.importAllowed(from, to);
+    assert.equal(result.allowed, allowed, `${from} -> ${to}`);
+    if (!allowed) assert.equal(result.reason, 'tierDirection');
+  }
 });
 
 test('schema and loader refuse malformed source/target-kind restrictions', () => {

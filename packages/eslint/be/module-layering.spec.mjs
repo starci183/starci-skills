@@ -9,7 +9,7 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { at, typedTester } from "./fixtures/typed/tester.mjs"
+import { at, BE_DECLARATION, fixtureHfs, typedTester } from "./fixtures/typed/tester.mjs"
 import {
   importOwnerEntry,
   noFolderReexport,
@@ -23,6 +23,7 @@ const tester = typedTester()
 const IN_PLAN = at("src/modules/domain/plan/plan.service.ts")
 const IN_PLAN_NESTED = at("src/modules/domain/plan/balancer/use-api.service.ts")
 const IN_PLAN_INDEX = at("src/modules/domain/plan/index.ts")
+const IN_DATA_SOURCES_INDEX = at("src/modules/integrations/data-sources/index.ts")
 const IN_LOGGING = at("src/modules/platform/logging/json-logger.service.ts")
 const IN_FEATURE = at("src/features/api/checkout/application/place.handler.ts")
 const IN_APP_ROOT = at("apps/api/src/app.module.ts")
@@ -96,6 +97,38 @@ test("R30: an owner does not reach itself through its own alias", () => {
 
 /** An index that names `count` symbols from one file. */
 const namesFrom = (count) => `export { ${Array.from({ length: count }, (_, index) => `N${index}`).join(", ")} } from './names'`
+
+test("R30: the data-sources integration entry uses its resolved slot budget of 80; domain entries retain 60", () => {
+  const hfs = fixtureHfs()
+  assert.equal(hfs.slotOf(IN_DATA_SOURCES_INDEX), "be.integrations")
+  assert.equal(hfs.ownerOf(IN_DATA_SOURCES_INDEX), "src/modules/integrations/data-sources")
+  assert.equal(hfs.slot(hfs.slotOf(IN_DATA_SOURCES_INDEX)).budget.indexExports, 80)
+  assert.equal(hfs.slotOf(IN_PLAN_INDEX), "be.domain")
+  assert.equal(hfs.slot(hfs.slotOf(IN_PLAN_INDEX)).budget.indexExports, 60)
+
+  tester.run("no-folder-reexport integration budget", noFolderReexport, {
+    valid: Array.from({ length: 20 }, (_, index) => ({ filename: IN_DATA_SOURCES_INDEX, code: namesFrom(61 + index) })),
+    invalid: [
+      { filename: IN_DATA_SOURCES_INDEX, code: namesFrom(81), errors: [{ messageId: "tooWide", data: { count: 81, max: 80 } }] },
+      { filename: IN_PLAN_INDEX, code: namesFrom(61), errors: [{ messageId: "tooWide", data: { count: 61, max: 60 } }] },
+    ],
+  })
+})
+
+test("R30: a provider-specific integration slot inherits the integrations tier budget", () => {
+  const declaration = { ...BE_DECLARATION, connections: BE_DECLARATION.connections.map(connection => ({ ...connection, provider: "supabase" })) }
+  const hfs = fixtureHfs(declaration)
+  const filename = at("src/modules/integrations/supabase/index.ts")
+  assert.equal(hfs.classify(filename).status, "owned")
+  assert.equal(hfs.slotOf(filename), "be.integrations.supabase")
+  assert.equal(hfs.tierOf(filename), "integrations")
+  assert.equal(hfs.slot(hfs.slotOf(filename)).budget, undefined)
+
+  typedTester({ declaration }).run("no-folder-reexport provider budget", noFolderReexport, {
+    valid: [{ filename, code: namesFrom(80) }],
+    invalid: [{ filename, code: namesFrom(81), errors: [{ messageId: "tooWide", data: { count: 81, max: 80 } }] }],
+  })
+})
 
 test("R30: no folder re-export, no nested index, and an owner's index holds only named export lines", () => {
   tester.run("no-folder-reexport", noFolderReexport, {

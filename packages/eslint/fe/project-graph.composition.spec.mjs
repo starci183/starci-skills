@@ -1,6 +1,13 @@
 import test from "node:test"
 import { projectFixture } from "../be/fixtures/project/tester.mjs"
 import { rules } from "./project-graph.mjs"
+import { rules as boundaryRules } from "./client-boundary.mjs"
+import { rules as drawingRules } from "./drawing.mjs"
+import { rules as propsRules } from "./props-and-slots.mjs"
+import { rules as splitRules } from "./the-split.mjs"
+import { rules as loadingRules } from "./loading.mjs"
+import { navigationFromIntl, noNullSuspenseFallback } from "./next-conventions.mjs"
+import { overlayHostFiles } from "../../../tests/helpers/fe-overlay-host-files.mjs"
 
 const overlay = "apps/web/src/features/overlays/ItemsOverlay/index.tsx"
 const block = "apps/web/src/components/blocks/ItemBlock/index.tsx"
@@ -82,4 +89,31 @@ test("composition: receiving block render props never permits a branch to import
     const entry = { filename: f.at(branch), code: badBranch }
     f.tester.run("tier-direction", rules["tier-direction"], { valid: [], invalid: [{ ...entry, errors: [{ messageId: "finding", line: 1 }] }] })
     f.tester.run("component-purity", rules["component-purity"], { valid: [], invalid: [{ ...entry, errors: [{ messageId: "finding", line: 3 }, { messageId: "finding", line: 3 }] }] })
+})
+
+test("composition: a server layout passes rendered overlays to a client host owner and its pure branch", (t) => {
+    const f = projectFixture({ profile: "fe", files: overlayHostFiles })
+    t.after(f.cleanup)
+    const valid = Object.entries(overlayHostFiles).map(([rel, code]) => ({ filename: f.at(rel), code }))
+    const graphIds = ["tier-direction", "owner-export-bypass", "component-purity", "route-adapter", "client-reaches-server", "hook-location"]
+    for (const id of graphIds) f.tester.run(id, rules[id], { valid, invalid: [] })
+    for (const family of [boundaryRules, drawingRules, propsRules, splitRules, loadingRules]) {
+        // These rules read syntax/slots; the same scene supplies actual imports for the graph checks above.
+        for (const [id, rule] of Object.entries(family)) {
+            if (id === "server-module-marks-server-only" || id === "response-cookie-attributes") continue
+            f.tester.run(id, rule, { valid, invalid: [] })
+        }
+    }
+    f.tester.run("navigation-from-intl", navigationFromIntl, { valid, invalid: [] })
+    f.tester.run("no-null-suspense-fallback", noNullSuspenseFallback, { valid, invalid: [] })
+})
+
+test("composition: layout overlay hosting does not let its pure branch import or select product-world owners", (t) => {
+    const branch = "apps/web/src/components/branches/OverlayHost/index.tsx"
+    const code = 'import { Confirm } from "../../../features/overlays/Confirm"\nimport { useOverlayRouteState } from "../../../hooks/overlays"\nexport const OverlayHost = () => { const selected = useOverlayRouteState(); return selected && <Confirm />; }\n'
+    const f = projectFixture({ profile: "fe", files: { ...overlayHostFiles, [branch]: code } })
+    t.after(f.cleanup)
+    const entry = { filename: f.at(branch), code }
+    f.tester.run("tier-direction", rules["tier-direction"], { valid: [], invalid: [{ ...entry, errors: [{ messageId: "finding", line: 1 }] }] })
+    f.tester.run("component-purity", rules["component-purity"], { valid: [], invalid: [{ ...entry, errors: [{ messageId: "finding", line: 3 }] }] })
 })

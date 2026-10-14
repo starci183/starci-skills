@@ -162,7 +162,7 @@ tiers:
     package:      {mayImport: [package]}
   fe:
     route:        {mayImport: [feature, foundation, modules, transport, package]} # app/** adapters
-    feature:      {mayImport: [feature, components, hooks, foundation, modules, transport, package], mayImportKinds: {feature: {from: [pages], to: [overlays]}}} # pages compose overlays and blocks; other feature-to-feature edges stay forbidden
+    feature:      {mayImport: [feature, components, hooks, foundation, modules, transport, package], mayImportKinds: {feature: {from: [pages, layouts], to: [overlays]}}} # pages and layouts compose overlays and blocks; other feature-to-feature edges stay forbidden
     # A component never reaches data: config, routes, i18n and types are foundation; every other module and the api
     # transport are reached through a hook (owner decision 2026-09-29).
     components:   {mayImport: [components, hooks, foundation, package], lowerLayerOnly: true} # blocks, composites, branches, leaves
@@ -1570,7 +1570,7 @@ slots:
     requires: [index.ts, "<provider>.config.ts"]
     tests: unit-beside            # <name>.service.spec.ts beside each <name>.service.ts; plus src/tests/integration/<provider>/ (R112)
     coverage: required
-    budget: {indexExports: 60}
+    budget: {indexExports: 80}   # a provider's port surface includes clients, config, options, tokens and errors
     rules: [BE_TIER_DIRECTION, BE_ERROR_HOME, BE_SECRET_DEFAULT, BE_INTEGRATION_SPEC_MISSING]
   - id: be.integrations.model
     profiles: [be]

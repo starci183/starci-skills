@@ -24,7 +24,9 @@ rules:
     hfsRules: [R20, R30, R65]
     requirement: |
       Backend: source file 500 lines, function 80 lines, the app bootstrap and root module budgets of the `be.app.*` slots
-      (80 and 250 lines), an owner's public index 60 exports, feature 250 source files. Frontend: component 300 lines, connected `index.tsx` 200 lines, hook 200 lines, module file 400
+      (80 and 250 lines), an owner's public index follows `budget.indexExports` (60 names for domain, platform and feature
+      owners, 80 for be.integrations provider entries), feature 250 source files. A specialized slot without an explicit
+      export budget inherits its tier's owner-slot budget. Frontend: component 300 lines, connected `index.tsx` 200 lines, hook 200 lines, module file 400
       lines, at most 6 data hooks and 6 `useState` per connected unit. Packages: images under docs 500 KB. Budgets are the slot
       `budget` fields and are read by the checks.
     rationale: |

@@ -29,8 +29,10 @@ rules:
       package export, and always resolve to the target owner's `index.ts`. Inside one owner use relative imports and never
       import the owner's own public `index.ts` back into its implementation. Deep imports into another owner's files are
       forbidden, a barrel that re-exports a folder wholesale (`export *`) is forbidden, and a nested `index.ts` does not exist.
-      An `index.ts` holds only named `export { }` and `export type { }` lines, at most 60 names, and no symbol that nothing
-      outside the owner uses.
+      An `index.ts` holds only named `export { }` and `export type { }` lines, within its slot's `budget.indexExports`:
+      60 names for domain, platform and feature owners, 80 for be.integrations provider entries. A specialized slot with
+      no explicit export budget inherits its tier's owner-slot budget. No exported symbol lacks a supported external
+      consumer (HFS_UNUSED_EXPORT); the single-file export count cannot exempt spec-only consumers.
     rationale: |-
       One public entry per owner is the only way to change internals without a cross-repository search.
     cases:

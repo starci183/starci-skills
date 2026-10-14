@@ -67,9 +67,9 @@ const onSpecifiers = (check) => ({
   },
 })
 
-/** The public-surface width: the `budget.indexExports` of the slot that owns the file, else of the first back-end owner slot that states one. */
+/** The public-surface width: the file's slot budget, else its tier's owner-slot budget, else a back-end owner default. */
 const indexExportBudget = (hfs, filename) =>
-  [hfs.slotOf(filename), "be.domain", "be.feature"].map((id) => (id ? hfs.slot(id)?.budget?.indexExports : undefined)).find(Number.isInteger)
+  [hfs.slotOf(filename), `be.${hfs.tierOf(filename)}`, "be.domain", "be.feature"].map((id) => (id ? hfs.slot(id)?.budget?.indexExports : undefined)).find(Number.isInteger)
 
 // -- R30: import-owner-entry -----------------------------------------------------------------------
 

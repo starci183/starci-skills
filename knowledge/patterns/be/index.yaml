@@ -8,6 +8,14 @@ purpose: |-
   per-capability configuration and background work as a transport, then the concrete Nest and TypeScript code forms
   below. It is the owner-locked BE convention of 2026-09-30. Each rule cites the HFS rule ids it implements
   (hfsRules) and the finding codes that judge it (verification.automated); the one rule catalog is knowledge/hfs/rules.yaml.
+  An owner has one explicit public index.ts. Its named-export budget comes from the owning slot: be.integrations permits
+  80 names, while be.domain remains at 60. An integration such as modules/integrations/data-sources exposes a provider's
+  whole port surface (client, configuration, options, tokens and errors), which is wider than a domain contract. The
+  no-folder-reexport rule sees one file and cannot distinguish a spec-only consumer from a production consumer, so the
+  budget counts every exported name without a test-token exemption. HFS_UNUSED_EXPORT still prunes public names with no
+  supported external consumer; raising the integration budget does not make unused exports valid. Besides production
+  consumers, the dead-export check recognizes the supported unit and logic role specs, door specs, fixture builders,
+  test-world files and the integration spec of the same provider; an arbitrary spec or e2e-only consumer does not qualify.
 appliesTo:
   - backend
 family: be

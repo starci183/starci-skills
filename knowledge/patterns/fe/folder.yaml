@@ -174,6 +174,9 @@ rules:
       component.tsx. Pure blocks, composites, branches and leaves use index.tsx only and never gain an
       empty twin. classNames.ts is present only when the unit owns class strings. Budgets: component.tsx 300 lines,
       connected index.tsx 200 lines, at most 6 data hooks and 6 useState per connected unit.
+      A composition-only feature may render an existing public pure component owner directly instead of creating a
+      forwarding component.tsx. The route-state overlay host of FE-BOUNDARY-5 renders components/branches/OverlayHost;
+      a connected block still requires its exact private Base twin.
     rationale: |
       Stable basenames make class names and the connected and presentational split discoverable without forwarding
       twins, and budgets keep a unit reviewable.

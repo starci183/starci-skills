@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { archFixture, runArch, findings } from '../helpers/hfs-arch-fixture.mjs';
 import { stronglyConnected } from '../../scripts/hfs/architecture/tiers.mjs';
 import { byCodeUnit } from '../../scripts/lib/list.mjs';
+import { overlayHostFiles } from '../helpers/fe-overlay-host-files.mjs';
 
 // HFS checks 1 and 2: the tier direction matrix of knowledge/hfs/slots.yaml and owner cycles.
 
@@ -133,7 +134,7 @@ test('FE: page to page is forbidden, route to feature and feature to modules are
   assert.equal(hits.length, 1, JSON.stringify(hits));
   assert.equal(hits[0].path, 'apps/web/src/features/pages/A/index.tsx');
   assert.equal(hits[0].resolvedPath, 'apps/web/src/features/pages/B/index.tsx');
-  assert.match(hits[0].message, /feature owners only from kinds pages to kinds overlays; it imports pages -> pages/);
+  assert.match(hits[0].message, /feature owners only from kinds pages, layouts to kinds overlays; it imports pages -> pages/);
 });
 
 test('FE: pages compose overlay and block owners through their public entries; every feature still imports blocks', t => {
@@ -152,12 +153,13 @@ test('FE: pages compose overlay and block owners through their public entries; e
   assert.deepEqual(findings(report, 'ARCH_OWNER_EXPORT_BYPASS'), []);
 });
 
-test('FE: layouts, overlays and providers still cannot import overlay owners', t => {
+test('FE: a layout hosts an overlay but cannot import a page; overlays and components never import overlays', t => {
   const root = archFixture(t, {
     profile: 'fe',
     files: {
       'apps/web/src/features/overlays/Confirm/index.tsx': 'export const Confirm = 1;\n',
-      'apps/web/src/features/layouts/Shell/index.tsx': "import { Confirm } from '../../overlays/Confirm';\nexport const Shell = Confirm;\n",
+      'apps/web/src/features/pages/Home/index.tsx': 'export const Home = () => null;\n',
+      'apps/web/src/features/layouts/Shell/index.tsx': "import { Confirm } from '../../overlays/Confirm';\nimport { Home } from '../../pages/Home';\nexport const Shell = [Confirm, Home];\n",
       'apps/web/src/features/overlays/Other/index.tsx': "import { Confirm } from '../Confirm';\nexport const Other = Confirm;\n",
       'apps/web/src/components/providers/Theme/index.tsx': "import { Confirm } from '../../../features/overlays/Confirm';\nexport const Theme = Confirm;\n",
     },
@@ -168,7 +170,40 @@ test('FE: layouts, overlays and providers still cannot import overlay owners', t
     'apps/web/src/features/layouts/Shell/index.tsx',
     'apps/web/src/features/overlays/Other/index.tsx',
   ]);
-  for (const item of hits) assert.match(item.message, /only from kinds pages to kinds overlays/);
+  assert.equal(hits[1].resolvedPath, 'apps/web/src/features/pages/Home/index.tsx');
+  for (const item of hits) assert.match(item.message, /only from kinds pages, layouts to kinds overlays/);
+});
+
+test('FE: a server page composes a client overlay without drawing server APIs into its client graph', t => {
+  const root = archFixture(t, { profile: 'fe', files: overlayHostFiles });
+  const report = runArch(root);
+  const forbidden = ['FE_TIER_DIRECTION', 'ARCH_OWNER_EXPORT_BYPASS', 'FE_CLIENT_REACHES_SERVER', 'FE_ROUTE_CLIENT_BOUNDARY',
+    'FE_COMPONENT_WORLD_OWNERSHIP', 'FE_WORLD_OWNER_RENDER_BOUNDARY', 'FE_PURE_REACHES_DATA', 'FE_COMPONENT_DEEP_HOOK_IMPORT'];
+  for (const code of forbidden) {
+    assert.deepEqual(findings(report, code), [], code);
+  }
+  assert.equal(report.coverage.hfsMachine.clientReachesServer.clientEntries, 2);
+});
+
+test('FE: a server host never masks server imports inside an overlay client dependency graph', t => {
+  const overlay = 'apps/web/src/features/overlays/Confirm/index.tsx';
+  const view = 'apps/web/src/features/overlays/Confirm/component.tsx';
+  const root = archFixture(t, {
+    profile: 'fe',
+    files: {
+      'apps/web/src/features/pages/Home/index.tsx': "import { Confirm } from '../../overlays/Confirm';\nexport const Home = () => <Confirm />;\n",
+      [overlay]: "'use client';\nimport { ConfirmBase } from './component';\nexport const Confirm = () => <ConfirmBase />;\n",
+      [view]: "import { headers } from 'next/headers';\nexport const ConfirmBase = () => <section>{headers()}</section>;\n",
+    },
+  });
+  const report = runArch(root);
+  assert.deepEqual(findings(report, 'FE_TIER_DIRECTION'), []);
+  const hits = findings(report, 'FE_CLIENT_REACHES_SERVER');
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].clientEntry, overlay);
+  assert.equal(hits[0].importer, view);
+  assert.equal(hits[0].specifier, 'next/headers');
+  assert.deepEqual(hits[0].dependencyChain, [overlay, view]);
 });
 
 test('FE: overlays never import pages or layouts; type-only imports and re-exports keep the target-kind restriction', t => {

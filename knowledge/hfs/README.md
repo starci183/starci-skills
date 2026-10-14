@@ -651,8 +651,10 @@ no contract copy under `fe/`.
 
 ### 6.2 Rules
 
-- **Direction.** route to feature; page owners in `features/pages/<Name>/index.tsx` may compose overlays and blocks through
-  their public entries, but never another page; feature to components, hooks, modules; components descend blocks to composites to branches to leaves,
+- **Direction.** route to feature; page and layout owners in `features/{pages,layouts}/<Name>/index.tsx` may compose overlays
+  and blocks through their public entries. The kind-scoped feature edge is only pages/layouts to overlays: layout-to-page,
+  page-to-page and overlay-to-overlay imports are forbidden, and components never import overlays. Feature to components,
+  hooks, modules; components descend blocks to composites to branches to leaves,
   with no block-to-block import. A pure component or branch may render a list of blocks received through render props;
   it never imports the blocks or fetches their data. Hooks to modules; modules to modules, acyclic; apps never import
   each other (R27, R64).
@@ -662,6 +664,18 @@ no contract copy under `fe/`.
   and renders its exact sibling `ItemBlockBase`. The overlay's world-reading render paths still reach a pure boundary,
   and its supplied renderer contains block composition only, no drawing or hook calls. Pages and layouts stay server
   components.
+- **Overlay hosts (R26, R55, R92).** A server page may import and render an overlay's client `index.tsx` directly.
+  `FE_CLIENT_BOUNDARY` allows the directive at the overlay entry and does not require one on its importing page;
+  `FE_CLIENT_SERVER_IMPORT` checks imports from client files and `FE_CLIENT_REACHES_SERVER` follows the client subtree
+  toward server-only code, so a safe client overlay imported by a server page passes all three. The same applies to a server
+  layout. For overlays selected by the URL, the layout imports the overlay entries and passes rendered `ReactNode` candidates
+  to `features/overlays/OverlayRouteHost/index.tsx`, the client boundary. Its hook reads route state using `usePathname()`
+  from the app's i18n navigation facade and `useSearchParams()`, then passes the selected key and candidate nodes to
+  `components/branches/OverlayHost`. The branch mounts the supplied nodes without importing overlays or reading route state;
+  the client host imports only its hook and branch, never another overlay.
+  Keep function render props inside the client subtree; only serializable props and rendered nodes cross from the server
+  layout. Enclose a search-parameter host on a static route in `Suspense` with a visible text fallback. The worked tree
+  and implementation are in `knowledge/patterns/fe/boundaries.yaml`.
 - **`hooks/` are hooks (R56).** `hooks/` holds React hooks only (`use*.ts`, one hook per file): `fe.hooks.swr`, `fe.hooks.rhf`,
   `fe.hooks.zustand`, `fe.hooks.socketio`, `fe.hooks.effects`, `fe.hooks.reuseables` and `fe.hooks` with one `<domain>.shared.ts`
   for shared non-hook helpers. Each concern's library and home is `knowledge/hfs/fe-stack.yaml`, the same in lite and full.
@@ -679,8 +693,9 @@ no contract copy under `fe/`.
 - **Boundaries (R53, R54).** Every app has `app/global-error.tsx`, `app/[locale]/error.tsx`,
   `app/[locale]/not-found.tsx`, and a `loading.tsx` for each route group that reads data. `Suspense fallback={null}` is
   forbidden. Route files (page, layout, template, loading, not-found) hold no inline component, no drawing and no hook.
-- **Server first (R55).** Route files are server components. `"use client"` appears only in the `index.tsx` of a block
-  with interaction or data hooks, in a leaf with intrinsic interaction, and in `error.tsx` and `global-error.tsx`. The i18n catalog is
+- **Server first (R55).** Route files, page owners and layout owners are server components. `"use client"` appears at the
+  `index.tsx` of an interactive block or overlay, in a leaf with intrinsic interaction, and in `error.tsx` and `global-error.tsx`;
+  the client state slots (providers, hooks, redux and toast) also permit it. The i18n catalog is
   split by namespace and a client component receives only the `pick`ed part. `force-dynamic` is forbidden on a client
   page.
 - **i18n (R58 to R60).** Every app uses `next-intl` with the `[locale]` segment, default locale `vi`, `localePrefix`
@@ -777,12 +792,18 @@ no contract copy under `fe/`.
   moves to the new pin in its own upgrade lane. `tsconfig` extends `@starci/tsconfig` with `strict`, `noUncheckedIndexedAccess`,
   `noImplicitOverride`, `noFallthroughCasesInSwitch`, `allowJs: false` and never lowers a flag (R22).
 - **Size budgets.** Backend file 500 lines, function 80, `app.module.ts` 250, `<app>.options.ts` 200, `compose/<area>.ts` 120,
-  `main.ts` 80 (absolute, R246), `index.ts` 60 exports, feature 250 source
+  `main.ts` 80 (absolute, R246), owner `index.ts` 60 exports (integration provider entries 80), feature 250 source
   files. Frontend component 300, connected `index.tsx` 200, hook 200, module 400; a pure re-export `index.ts` barrel has
   its own 400-line budget. The mechanism is no-growth
   (`HFS_SIZE_GROWTH`): a new file is inside the budget, a file already over its budget gains no lines against its parent
   commit. There is no baseline and no allowlist (R20). A duplicated block at or above the one threshold
   `ruleParams.<side>.duplicateBlock` of `slots.yaml`, and a helper defined twice under the same name, fail (R21).
+- **Integration entry budget (R30).** `be.integrations` allows 80 named exports because a provider exposes its whole port
+  surface: clients, configuration, options, injection tokens and errors, wider than a domain owner. This includes
+  `src/modules/integrations/data-sources/index.ts`; domain entries retain 60. The single-file `no-folder-reexport` rule cannot
+  distinguish a name used only by specs from one used in production, so the budget remains a count of every exported name,
+  with no spec exemption. `HFS_UNUSED_EXPORT` still checks external consumers across files and prunes unused names, including
+  its supported unit and matching-provider integration spec consumers.
 - **Contracts.** The back end commits `be/contracts/<app>/schema.graphql` (and `openapi.json` of a typed operation table),
   written by `starci app emit`; the front end reads them in place and keeps no copy (R23).
 
@@ -840,11 +861,11 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R23 | `HFS_CONTRACT_SNAPSHOT_DRIFT` | The be side commits its contract snapshot and it equals the emit; the fe side reads it in place (be/contracts/). | product |
 | R24 | `HFS_ARCH_CONFIG_UNREAD` | The machine reads `hfs.json`; zero files analysed is red. | product |
 | R25 | `HFS_UNUSED_EXPORT` | No public export without a consumer; no source file nothing reaches. | product |
-| R26 | `BE_TIER_DIRECTION` | The tier direction matrix; a shared package never imports an app. | product |
+| R26 | `BE_TIER_DIRECTION` | The tier direction matrix; a shared package never imports an app. Front-end page and layout owners may import overlay entries; every other cross-owner feature-to-feature edge is forbidden, including layout-to-page and overlay-to-overlay. Components never import overlays. | product |
 | R27 | `ARCH_OWNER_CYCLE` | No owner cycles, type-only included. | product |
 | R28 | `BE_FEATURE_IMPORTS_FEATURE` | A feature never imports a feature. | product |
 | R29 | `BE_FEATURE_SHAPE` | Feature root is `index.ts`, module, `application/`, `transport/<protocol>/`; `application/` never imports `transport/` or a protocol framework. | product |
-| R30 | `BE_PUBLIC_SURFACE` | Every owner has one `index.ts`; cross-owner imports use it, same-owner imports are relative and never go through it; it holds only named `export { }` lines, no `export *`, no alias re-export (`export { X as Y }`, `export const Y = X`, `export type Y = X`, `export interface Y extends X {}`: one declaration has one name), at most 60 exports; cross-package imports use the package name and a declared export. | product |
+| R30 | `BE_PUBLIC_SURFACE` | Every owner has one `index.ts`; cross-owner imports use it, same-owner imports are relative and never go through it; it holds only named `export { }` lines, no `export *`, no alias re-export (`export { X as Y }`, `export const Y = X`, `export type Y = X`, `export interface Y extends X {}`: one declaration has one name), within the owner slot's `indexExports` budget (60 for domain and feature owners, 80 for `be.integrations` provider entries); cross-package imports use the package name and a declared export. | product |
 | R31 | `BE_FEATURE_NOT_COMPOSED` | Every feature, transport module and capability module is composed by an app. | product |
 | R32 | `BE_APP_COMPOSITION_ONLY` | Apps compose only; an app is proven by the e2e world (`useTestWorld({ apps })`), never by a unit spec. | product |
 | R33 | `BE_ENTRYPOINT_ONLY_IN_APPS` | Entrypoints only in `be/apps/*/src`. | product |

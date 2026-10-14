@@ -11,12 +11,13 @@ family: fe
 # into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
 slots: [fe.app, fe.route, fe.feature, fe.components, fe.hooks, fe.modules]
 provenance:
-  reviewedAt: 2026-09-29
+  reviewedAt: 2026-10-14
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
     - https://nextjs.org/docs/app/getting-started/error-handling
     - https://nextjs.org/docs/app/getting-started/server-and-client-components
+    - https://nextjs.org/docs/app/api-reference/functions/use-search-params
     - https://nextjs.org/docs/app/api-reference/file-conventions/loading
   limitations: |-
     Static checks prove that the boundary files exist, that route files are server components and that "use client" sits
@@ -89,10 +90,16 @@ rules:
     hfsRules: [R55, R54]
     requirement: |-
       Route files (page, layout, template, loading, not-found) are server components. `"use client"` appears only in the
-      `index.tsx` of a block that has interaction or client data hooks, in a leaf with intrinsic interaction, and in
+      `index.tsx` of a block or overlay that has interaction or client data hooks, in a leaf with intrinsic interaction, and in
       `error.tsx` and `global-error.tsx`. A layout is never a client component. The i18n catalog is split by namespace
       and a client component receives only the picked part through `NextIntlClientProvider messages`. `force-dynamic` is
       forbidden on a client page.
+      A server page can host an overlay: it imports the public `features/overlays/<Name>/index.tsx` entry and renders it;
+      the overlay declares `"use client"` and receives serializable props. This does not make the page a client component.
+      FE_CLIENT_BOUNDARY accepts the overlay entry and keeps the page server; FE_CLIENT_SERVER_IMPORT judges server-only
+      imports made by the client file; FE_CLIENT_REACHES_SERVER follows the overlay's runtime dependencies toward the
+      server. None refuses the server-to-client composition itself. The overlay must still keep server-only APIs and
+      marked server modules outside its client dependency closure.
     rationale: |-
       A client layout ships the whole subtree and the whole catalog to every page, and a server-first tree keeps the client
       bundle to the interactive parts.
@@ -103,6 +110,9 @@ rules:
       - id: case-2
         when: A client block needs messages
         write: 'The server layout passes `pick(messages, ["sales"])` to the provider; the block reads only the sales namespace.'
+      - id: case-3
+        when: A server page renders an interactive overlay
+        write: 'The page imports SendHandoffOverlay from its public entry and returns <SendHandoffOverlay handoffId={handoffId} />; only the overlay entry has "use client".'
     verification:
       automated:
         - FE_CLIENT_BOUNDARY
@@ -150,4 +160,80 @@ rules:
         - FE_COOKIE_ATTRIBUTES
       manual:
         - Confirm that no page script reads the session and that a preference cookie with httpOnly false holds nothing the server trusts.
+    relatedExamples: []
+  - id: FE-BOUNDARY-5
+    title: Layout-level overlay host
+    kind: mandatory
+    hfsRules: [R26, R27, R53, R55, R56, R65, R92]
+    requirement: |-
+      A server feature layout imports its overlay public entries and a client OverlayRouteHost overlay entry, then
+      supplies rendered ReactNode candidates to the host. The host owns `"use client"` and calls a route-state hook under
+      hooks/overlays. That hook reads usePathname() through modules/i18n/navigation and useSearchParams() from
+      next/navigation, and returns the scalar selection the host needs. The host renders the public pure
+      components/branches/OverlayHost entry, which chooses the supplied node to mount. No server-created callback crosses
+      the client boundary. Pages and the layout stay server components, and neither the host overlay nor the branch
+      imports a candidate overlay. The manifest's kind edge permits only features/pages or features/layouts to
+      features/overlays; layout-to-page, overlay-to-overlay and component-to-overlay remain refused.
+      Route lifecycle belongs to the overlay host and its hook, never to the branch or a hooks/ui helper. This host
+      composes an existing public pure boundary and needs no forwarding component.tsx twin; a connected block still
+      requires its exact private Base twin. Enclose the search-parameter reader in Suspense with a meaningful fallback
+      when the route is statically rendered.
+    rationale: |-
+      A persistent layout can mount overlays selected by navigation without turning every page into a client component.
+      The client hook receives current URL state even though a shared server layout does not rerender on navigation.
+      Supplying rendered nodes keeps the overlay imports in the layout and preserves the downward component graph.
+    cases:
+      - id: case-1
+        when: The shell hosts a URL-selected Confirm overlay on any server page
+        write: |-
+          Worked files under fe/apps/<app>/src/:
+            features/layouts/WorkspaceShell/index.tsx
+            features/overlays/OverlayRouteHost/index.tsx
+            features/overlays/Confirm/index.tsx
+            components/branches/OverlayHost/index.tsx
+            hooks/overlays/index.ts
+            hooks/overlays/useOverlayRouteState.ts
+          Render tree: layouts/WorkspaceShell/index.tsx -> overlays/OverlayRouteHost
+          -> components/branches/OverlayHost -> overlays/Confirm.
+          This realizes layouts/<Shell>/index.tsx -> components/branches/OverlayHost -> overlays/<Name>
+          with a client route-state host between the server layout and the pure branch.
+          The layout imports OverlayRouteHost and Confirm through their public entries and resolves overlayLoadingLabel
+          as a localized text string:
+          <Suspense fallback={overlayLoadingLabel}><OverlayRouteHost candidate={<Confirm />} /></Suspense>.
+          These are rendered nodes, never server-created render callbacks; the visible text fallback is not null.
+          OverlayRouteHost calls useOverlayRouteState and returns <OverlayHost active={active} candidate={candidate} />.
+          OverlayHost receives the scalar selection and candidate node; it imports no feature and calls no hook.
+          The arrows describe rendered composition, not imports: only the layout imports Confirm.
+    verification:
+      automated:
+        - BE_TIER_DIRECTION
+        - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
+        - ARCH_OWNER_CYCLE
+        - FE_ERROR_BOUNDARY_MISSING
+        - FE_SUSPENSE_NULL_FALLBACK
+        - FE_CLIENT_BOUNDARY
+        - FE_CLIENT_SERVER_IMPORT
+        - FE_CLIENT_REACHES_SERVER
+        - FE_SERVER_ONLY_MARK
+        - FE_STORAGE_OUTSIDE_MODULES
+        - FE_DANGEROUS_HTML
+        - FE_HOOKS_ARE_HOOKS
+        - FE_CUSTOM_HOOK_LOCATION
+        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
+        - FE_COMPONENT_DEEP_HOOK_IMPORT
+        - FE_SIZE_AND_STATE_BUDGET
+        - FE_LIST_KEY
+        - FE_EFFECT_CLEANUP
+        - FE_SWALLOWED_ERROR
+        - FE_CONSOLE_CALL
+        - FE_COMPONENT_API
+        - FE_COMPONENT_WORLD_OWNERSHIP
+        - FE_WORLD_OWNER_RENDER_BOUNDARY
+        - FE_CONNECTED_BLOCK_RENDER_PAIR
+        - FE_PURE_REACHES_DATA
+        - FE_PURE_WORLD_HOOK
+        - FE_PURE_WORLD_IMPORT
+      manual:
+        - Navigate between pathname and query states and confirm the intended overlay mounts while the page stays server.
     relatedExamples: []
