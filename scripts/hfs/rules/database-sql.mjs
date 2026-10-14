@@ -62,16 +62,67 @@ function searchPathSchema(node, current) {
 function addTableFacts(statement, node, facts, defaultSchema) {
   const relation = statement.type === 'CreateStmt' ? node.relation : node.into?.rel;
   if (!relation || node.partbound || relation.relpersistence === 't') return;
+  if (node.objtype === ['OBJECT', 'MATVIEW'].join('_')) {
+    facts.views.push({ ...relationFact(statement, relation, defaultSchema), kind: 'materialized', securityInvoker: false, node });
+    return;
+  }
   facts.tables.push({ schema: schemaOf(relation, defaultSchema), name: relation.relname, index: statement.index, line: statement.line });
 }
 
+const relationFact = (statement, relation, defaultSchema) => ({
+  schema: schemaOf(relation, defaultSchema), name: relation?.relname, index: statement.index, line: statement.line,
+});
+
+const rlsCommands = new Map([
+  ['AT_EnableRowSecurity', { enabled: true }], ['AT_DisableRowSecurity', { enabled: false }],
+  ['AT_ForceRowSecurity', { forced: true }], ['AT_NoForceRowSecurity', { forced: false }],
+]);
+
 function addAlterTableFacts(statement, node, facts, defaultSchema) {
   for (const command of node.cmds ?? []) {
-    const subtype = command?.AlterTableCmd?.subtype;
-    const item = { schema: schemaOf(node.relation, defaultSchema), name: node.relation?.relname, index: statement.index };
+    const alteration = command?.AlterTableCmd;
+    const subtype = alteration?.subtype;
+    const item = relationFact(statement, node.relation, defaultSchema);
     if (subtype === 'AT_EnableRowSecurity') facts.enables.push(item);
     else if (subtype === 'AT_ForceRowSecurity') facts.forces.push(item);
+    const event = rlsCommands.get(subtype);
+    if (event) facts.rlsEvents.push({ ...item, ...event });
+    if (subtype === 'AT_ChangeOwner') facts.owners.push({ ...item, role: alteration.newowner?.rolename });
   }
+}
+
+function addViewFacts(statement, node, facts, defaultSchema) {
+  const security = (node.options ?? []).find((option) => option?.DefElem?.defname === 'security_invoker')?.DefElem?.arg;
+  const securityInvoker = security?.Boolean?.boolval === true || security?.String?.sval === 'true';
+  facts.views.push({ ...relationFact(statement, node.view, defaultSchema), kind: 'view', securityInvoker, node });
+}
+
+function addSchemaMoveFacts(statement, node, facts, defaultSchema) {
+  if (!node.relation) return;
+  const item = relationFact(statement, node.relation, defaultSchema);
+  facts.schemaMoves.push({ ...item, fromSchema: item.schema, schema: node.newschema, objtype: node.objectType });
+}
+
+function addRoleFacts(statement, node, facts) {
+  const kind = statement.type === 'CreateRoleStmt' ? 'create' : 'alter';
+  const name = typeof node.role === 'string' ? node.role : node.role?.rolename;
+  facts.roles.push({ kind, name, options: node.options ?? [], node, index: statement.index, line: statement.line });
+}
+
+function addDropRoleFacts(statement, node, facts) {
+  for (const role of node.roles ?? []) facts.roles.push({ kind: 'drop', name: roleOf(role), options: [], node, index: statement.index, line: statement.line });
+}
+
+function addRoleGrantFacts(statement, node, facts) {
+  facts.roleGrants.push({ node, index: statement.index, line: statement.line });
+}
+
+function addPublicationFacts(statement, node, facts, defaultSchema) {
+  const tables = (node.pubobjects ?? []).flatMap((object) => {
+    const relation = object?.PublicationObjSpec?.pubtable?.relation;
+    return relation ? [{ schema: schemaOf(relation, defaultSchema), name: relation.relname }] : [];
+  });
+  facts.publications.push({ name: node.pubname, action: node.action, allTables: node.for_all_tables === true, tables, node, index: statement.index, line: statement.line });
 }
 
 function addCreatePolicyFacts(statement, node, facts, defaultSchema) {
@@ -104,6 +155,7 @@ function addAlterPolicyFacts(statement, node, facts, defaultSchema) {
     ...(node.qual !== undefined ? { qual: node.qual } : {}),
     ...(node.with_check !== undefined ? { withCheck: node.with_check } : {}),
     index: statement.index,
+    line: statement.line,
   });
 }
 
@@ -123,6 +175,7 @@ function addGrantFacts(statement, node, facts, defaultSchema) {
     objtype: node.objtype,
     objects: node.objects ?? [],
     privileges: (node.privileges ?? []).map((privilege) => String(privilege?.AccessPriv?.priv_name ?? '').toLowerCase()),
+    all: (node.privileges ?? []).length === 0,
     grantees: (node.grantees ?? []).map(roleOf),
     defaultSchema,
     index: statement.index,
@@ -130,13 +183,17 @@ function addGrantFacts(statement, node, facts, defaultSchema) {
   });
 }
 
-function addDefaultPrivilegeFacts(statement, node, facts) {
+function addDefaultPrivilegeFacts(statement, node, facts, defaultSchema) {
   const action = node.action ?? {};
+  const schemas = (node.options ?? []).find((option) => option?.DefElem?.defname === 'schemas')?.DefElem?.arg?.List?.items;
   facts.defaultPrivileges.push({
     grant: action.is_grant === true,
     objtype: action.objtype,
     privileges: (action.privileges ?? []).map((privilege) => String(privilege?.AccessPriv?.priv_name ?? '').toLowerCase()),
+    all: (action.privileges ?? []).length === 0,
     grantees: (action.grantees ?? []).map(roleOf),
+    schemas: (schemas ?? []).map(sval).filter(Boolean),
+    defaultSchema,
     index: statement.index,
     line: statement.line,
   });
@@ -151,7 +208,8 @@ function addCreateFunctionFacts(statement, node, facts, defaultSchema) {
 function addAlterFunctionFacts(statement, node, facts, defaultSchema) {
   const rawName = nameOf(node.func?.objname);
   const name = rawName.includes('.') ? rawName : `${defaultSchema}.${rawName}`;
-  facts.alterFunctions.push({ name, setsPath: (node.actions ?? []).some((action) => isSearchPathSet(action?.DefElem)), index: statement.index, line: statement.line });
+  const securityDefiner = (node.actions ?? []).some((action) => action?.DefElem?.defname === 'security' && action?.DefElem?.arg?.Boolean?.boolval === true);
+  facts.alterFunctions.push({ name, schema: name.split('.')[0], node, securityDefiner, setsPath: (node.actions ?? []).some((action) => isSearchPathSet(action?.DefElem)), index: statement.index, line: statement.line });
 }
 
 function addDoBlockFacts(statement, node, facts) {
@@ -173,6 +231,9 @@ function addBucketCallFacts(statement, node, facts) {
 const statementFactHandlers = new Map([
   ['VariableSetStmt', (statement, node, facts, defaultSchema) => searchPathSchema(node, defaultSchema)],
   ['CreateStmt', addTableFacts], ['CreateTableAsStmt', addTableFacts], ['AlterTableStmt', addAlterTableFacts],
+  ['ViewStmt', addViewFacts], ['AlterObjectSchemaStmt', addSchemaMoveFacts],
+  ['CreateRoleStmt', addRoleFacts], ['AlterRoleStmt', addRoleFacts], ['DropRoleStmt', addDropRoleFacts],
+  ['GrantRoleStmt', addRoleGrantFacts], ['CreatePublicationStmt', addPublicationFacts], ['AlterPublicationStmt', addPublicationFacts],
   ['CreatePolicyStmt', addCreatePolicyFacts], ['AlterPolicyStmt', addAlterPolicyFacts], ['DropStmt', addDropPolicyFacts],
   ['GrantStmt', addGrantFacts], ['AlterDefaultPrivilegesStmt', addDefaultPrivilegeFacts], ['CreateFunctionStmt', addCreateFunctionFacts],
   ['AlterFunctionStmt', addAlterFunctionFacts], ['DoStmt', addDoBlockFacts], ['InsertStmt', addBucketInsertFacts], ['SelectStmt', addBucketCallFacts],
@@ -183,9 +244,11 @@ function factsOf(statements) {
   const facts = {
     tables: [], enables: [], forces: [], policies: [], policyEvents: [], grants: [], defaultPrivileges: [],
     functions: [], alterFunctions: [], doBlocks: [], buckets: [], bucketCalls: [], isSearchPathSet,
+    statements: [], views: [], rlsEvents: [], owners: [], schemaMoves: [], roles: [], roleGrants: [], publications: [],
   };
   let defaultSchema = 'public';
   for (const statement of statements) {
+    facts.statements.push({ ...statement, defaultSchema });
     const { node } = statement;
     const handler = statementFactHandlers.get(statement.type);
     if (handler) defaultSchema = handler(statement, node, facts, defaultSchema) ?? defaultSchema;
@@ -193,18 +256,37 @@ function factsOf(statements) {
   return facts;
 }
 
-function rlsFindings(file, facts, exposed, forceRls) {
+function relationHasLaterEvent(events, table) {
+  return events.some((event) => event.schema === table.schema && event.name === table.name && event.index > table.index);
+}
+
+function rlsWeakeningFindings(file, events, exposed) {
   const findings = [];
-  for (const table of facts.tables) {
+  for (const event of events) {
+    if (!exposed.has(event.schema) || (event.enabled !== false && event.forced !== false)) continue;
+    const qualified = `${event.schema}.${event.name}`;
+    const operation = event.enabled === false ? 'disables row level security' : 'removes forced row level security';
+    findings.push(found(DB_RLS_REQUIRED, file, `${file}:${event.line} ${operation} on ${qualified} in the exposed schema ${event.schema}`, { line: event.line, table: qualified }));
+  }
+  return findings;
+}
+
+function rlsFindings(file, facts, exposed, forceRls) {
+  const movedTables = facts.schemaMoves.filter((move) => move.objtype === 'OBJECT_TABLE').map((move) => ({ ...move, moved: true }));
+  const targets = [...facts.tables, ...movedTables];
+  const findings = [];
+  for (const table of targets) {
     if (!exposed.has(table.schema)) continue;
     const qualified = `${table.schema}.${table.name}`;
-    if (!facts.enables.some((enable) => enable.schema === table.schema && enable.name === table.name && enable.index > table.index)) {
-      findings.push(found(DB_RLS_REQUIRED, file, `${file}:${table.line} creates ${qualified} in the exposed schema ${table.schema} without a later \`alter table ${qualified} enable row level security\` in the same migration`, { line: table.line, table: qualified }));
+    const operation = table.moved ? 'moves' : 'creates';
+    if (!relationHasLaterEvent(facts.enables, table)) {
+      findings.push(found(DB_RLS_REQUIRED, file, `${file}:${table.line} ${operation} ${qualified} into the exposed schema ${table.schema} without a later \`alter table ${qualified} enable row level security\` in the same migration`, { line: table.line, table: qualified }));
     }
-    if (forceRls.has(qualified) && !facts.forces.some((force) => force.schema === table.schema && force.name === table.name && force.index > table.index)) {
-      findings.push(found(DB_RLS_REQUIRED, file, `${file}:${table.line} creates ${qualified}, which hfs.json supabase.forceRls declares definer-owned, without \`alter table ${qualified} force row level security\` in the same migration`, { line: table.line, table: qualified }));
+    if (forceRls.has(qualified) && !relationHasLaterEvent(facts.forces, table)) {
+      findings.push(found(DB_RLS_REQUIRED, file, `${file}:${table.line} ${operation} ${qualified}, which hfs.json supabase.forceRls declares definer-owned, without \`alter table ${qualified} force row level security\` in the same migration`, { line: table.line, table: qualified }));
     }
   }
+  findings.push(...rlsWeakeningFindings(file, facts.rlsEvents, exposed));
   return findings;
 }
 

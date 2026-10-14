@@ -14,6 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkDatabase, migrationStamp } from '../../scripts/hfs/rules/database.mjs';
 import { withoutGitLocalEnv } from '../../scripts/lib/git.mjs';
+import { eachInOrder } from '../../scripts/lib/in-order.mjs';
 
 const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'hfs-db');
 const fixture = (name) => fs.readFileSync(path.join(FIXTURES, name), 'utf8');
@@ -63,14 +64,14 @@ test('an app without a supabase tree and without a supabase block is not judged 
 
 test('the clean fixture is clean to every rule', async () => {
   const file = `${MIGRATIONS}/20260101120000_baseline.sql`;
-  const dir = repo({ [file]: fixture('clean.sql'), 'supabase/config.toml': fixture('config-clean.toml'), 'supabase/types/database.types.ts': 'export type Database = {};\n' });
+  const dir = repo({ [file]: fixture('clean.sql'), 'supabase/config.toml': fixture('config-clean.toml'), 'supabase/types/database.types.ts': 'export type Database = {};\n' }, { supabase: { ...SUPABASE, directAccess: ['public.profiles', 'public.countries', 'storage.objects'] } });
   const findings = await checkDatabase({ repoRoot: dir, files: [file, 'supabase/config.toml', 'supabase/types/database.types.ts'], git: noRemote, emitTypes: async () => 'export type Database = {};\n' });
   assert.deepEqual(findings, [], JSON.stringify(findings, null, 1));
 });
 
 test('the tricky fixture is clean: literals, comments, quoted names, partitions, invoker, later alter function', async () => {
   const file = `${MIGRATIONS}/20260102120000_tricky.sql`;
-  const dir = repo({ [file]: fixture('tricky.sql') });
+  const dir = repo({ [file]: fixture('tricky.sql') }, { supabase: { ...SUPABASE, directAccess: ['public.quoted table', 'public.sessions'] } });
   const findings = await checkDatabase({ repoRoot: dir, files: [file], git: noRemote });
   assert.deepEqual(findings, [], JSON.stringify(findings, null, 1));
 });
@@ -89,15 +90,15 @@ test('the violations fixture reports one finding for every rule it breaks', asyn
 // ------------------------------------------------------------------------------------------------ L02 DB_MIGRATION_SHAPE
 
 test('DB_MIGRATION_SHAPE: a migration name is <ts14>_<kebab>.sql', async () => {
-  for (const name of ['x.sql', '20260101120000.sql', '20260101120000_Mixed_Case.sql', '2026-01-01_broken.sql', '2026010112000_short.sql']) {
+  await eachInOrder(['x.sql', '20260101120000.sql', '20260101120000_Mixed_Case.sql', '2026-01-01_broken.sql', '2026010112000_short.sql'], async (name) => {
     const dir = repo(migration(name, 'select 1;\n'));
     const findings = only(await checkDatabase({ repoRoot: dir, files: [`${MIGRATIONS}/${name}`], git: noRemote }), 'DB_MIGRATION_SHAPE');
     assert.ok(findings.some((f) => f.message.includes('named <ts14>_<kebab>.sql')), name);
-  }
-  for (const name of ['20260101120000_baseline.sql', '20260101120000_multi-part-name.sql', '20260228235959_edge.sql']) {
+  });
+  await eachInOrder(['20260101120000_baseline.sql', '20260101120000_multi-part-name.sql', '20260228235959_edge.sql'], async (name) => {
     const dir = repo(migration(name, 'select 1;\n'));
     assert.deepEqual(await checkDatabase({ repoRoot: dir, files: [`${MIGRATIONS}/${name}`], git: noRemote }), [], name);
-  }
+  });
 });
 
 test('DB_MIGRATION_SHAPE: the stamp is a real UTC instant, independent of the wall clock', async () => {
@@ -358,15 +359,15 @@ const policyOf = async (sql) => {
 };
 
 test('DB_POLICY_SHAPE: a write or FOR ALL policy never uses (true)', async () => {
-  for (const sql of [
+  await eachInOrder([
     'create policy t_member_all on public.t for all to authenticated using (true) with check (true);',
     'create policy t_member_insert on public.t for insert to authenticated with check (true);',
     'create policy t_member_update on public.t for update to authenticated using (true);',
     'create policy t_member_delete on public.t for delete to authenticated using (1 = 1) with check (true);',
-  ]) {
+  ], async (sql) => {
     const findings = only(await policyOf(sql), POLICY);
     assert.ok(findings.length > 0, sql);
-  }
+  });
   assert.deepEqual(only(await policyOf('create policy t_member_update on public.t for update to authenticated using (1 = 1);'), POLICY).filter((f) => /true/.test(f.message)), []);
 });
 
@@ -386,14 +387,14 @@ test('DB_POLICY_SHAPE: to anon (or public) is legal only on FOR SELECT named *_p
 });
 
 test('DB_POLICY_SHAPE: every policy is named <table>_<role>_<action>', async () => {
-  for (const name of ['loose', 't_read', 't_member', 't_member_upsert']) {
+  await eachInOrder(['loose', 't_read', 't_member', 't_member_upsert'], async (name) => {
     const findings = only(await policyOf(`create policy ${name} on public.t for select to authenticated using (id > 0);`), POLICY);
     assert.ok(findings.some((f) => f.message.includes('<table>_<role>_<action>')), name);
-  }
-  for (const name of ['t_member_select', 't_member_insert', 't_member_delete', 't_manager_all', 't_public_read']) {
+  });
+  await eachInOrder(['t_member_select', 't_member_insert', 't_member_delete', 't_manager_all', 't_public_read'], async (name) => {
     const findings = only(await policyOf(`create policy ${name} on public.t for select to authenticated using (id > 0);`), POLICY);
     assert.deepEqual(findings.filter((f) => f.message.includes('<table>_<role>_<action>')), [], name);
-  }
+  });
 });
 
 test('DB_POLICY_SHAPE: service_role is never granted; anon needs its _public_read policy', async () => {
@@ -408,9 +409,9 @@ test('DB_POLICY_SHAPE: service_role is never granted; anon needs its _public_rea
 // ------------------------------------------------------------------------------------------------ L06 DB_DEFINER_SAFE
 
 const DEFINER = 'DB_DEFINER_SAFE';
-const definerOf = async (sql) => {
+const definerOf = async (sql, edition = 'lite') => {
   const file = `${MIGRATIONS}/20260101120000_t.sql`;
-  const dir = repo({ [file]: sql });
+  const dir = repo({ [file]: sql }, { edition });
   return checkDatabase({ repoRoot: dir, files: [file], git: noRemote });
 };
 
@@ -427,13 +428,67 @@ test('DB_DEFINER_SAFE: a definer pins its search_path, on the create or a later 
   assert.deepEqual(only(list, DEFINER), []);
 });
 
-test('DB_DEFINER_SAFE: a definer in an exposed schema needs revoke execute from public; private is clean', async () => {
+test('DB_DEFINER_SAFE: a definer in an exposed schema needs revoke execute from public, anon and authenticated; private is clean', async () => {
   const exposed = await definerOf('create or replace function public.f() returns int language sql security definer set search_path = \'\' as $$ select 1 $$;\n');
   assert.ok(only(exposed, DEFINER).some((f) => f.message.includes('exposed schema')));
-  const revoked = await definerOf('create or replace function public.f() returns int language sql security definer set search_path = \'\' as $$ select 1 $$;\nrevoke execute on function public.f() from public, anon;\n');
+  const revoked = await definerOf('create or replace function public.f() returns int language sql security definer set search_path = \'\' as $$ select 1 $$;\nrevoke execute on function public.f() from public, anon, authenticated;\n');
   assert.deepEqual(only(revoked, DEFINER), []);
   const invoker = await definerOf('create or replace function public.f() returns int language sql security invoker as $$ select 1 $$;\n');
   assert.deepEqual(only(invoker, DEFINER), [], 'security invoker is exempt');
+});
+
+// proves: DB_DEFINER_REVOKE@lite DB_DEFINER_REVOKE@full DB_DEFINER_SAFE@lite DB_DEFINER_SAFE@full
+for (const edition of ['lite', 'full']) {
+  test(`DB_DEFINER_REVOKE ${edition}: exposed definers close authenticated access and accept explicit ALL revocation`, async () => {
+    const create = "create function public.f(value int) returns int language sql security definer set search_path = '' as $$ select value $$;";
+    const missing = await definerOf(`${create}\nrevoke execute on function public.f(int) from public, anon;`, edition);
+    assert.equal(only(missing, 'DB_DEFINER_REVOKE').length, 1);
+    assert.deepEqual(only(missing, DEFINER), []);
+    const complete = await definerOf(`${create}\nrevoke all on function public.f(integer) from public, anon, authenticated;`, edition);
+    assert.deepEqual(only(complete, 'DB_DEFINER_REVOKE'), []);
+    assert.deepEqual(only(complete, DEFINER), []);
+    const privateFunction = await definerOf(SAFE_FN(), edition);
+    assert.deepEqual(only(privateFunction, 'DB_DEFINER_REVOKE'), []);
+  });
+
+  test(`DB_DEFINER_SAFE ${edition}: ALTER FUNCTION SECURITY DEFINER is a declaration and checks a known body`, async () => {
+    const unsafe = await definerOf('alter function private.f() security definer;', edition);
+    assert.ok(only(unsafe, DEFINER).some((finding) => finding.message.includes('search_path')));
+    const safe = await definerOf("alter function private.f() set search_path = '';\nalter function private.f() security definer;", edition);
+    assert.deepEqual(only(safe, DEFINER), []);
+    const promoted = await definerOf("create function private.f(value text) returns void language plpgsql security invoker set search_path = '' as $$ begin execute 'delete from ' || value; end $$;\nalter function private.f(text) security definer;", edition);
+    assert.ok(only(promoted, DEFINER).some((finding) => finding.message.includes('format')));
+    const invoker = await definerOf('alter function private.f() security invoker;', edition);
+    assert.deepEqual(only(invoker, DEFINER), []);
+  });
+}
+
+test('DB_DEFINER_REVOKE: ALTER FUNCTION in an exposed schema also requires authenticated revocation', async () => {
+  const sql = "alter function public.f() security definer;\nalter function public.f() set search_path = '';\nrevoke execute on function public.f() from public, anon;";
+  assert.equal(only(await definerOf(sql), 'DB_DEFINER_REVOKE').length, 1);
+  const complete = await definerOf(`${sql}\nrevoke execute on function public.f() from authenticated;`);
+  assert.deepEqual(only(complete, 'DB_DEFINER_REVOKE'), []);
+  assert.deepEqual(only(complete, DEFINER), []);
+});
+
+test('DB_DEFINER_SAFE: search_path and execute revocation match the function overload', async () => {
+  const create = 'create function public.f(value int) returns int language sql security definer as $$ select value $$;';
+  const wrong = await definerOf(`${create}\nalter function public.f(text) set search_path = '';\nrevoke execute on function public.f(text) from public, anon, authenticated;`);
+  assert.ok(only(wrong, DEFINER).some((finding) => finding.message.includes('search_path')));
+  assert.ok(only(wrong, DEFINER).some((finding) => finding.message.includes('exposed schema')));
+  assert.equal(only(wrong, 'DB_DEFINER_REVOKE').length, 1);
+  const matching = await definerOf(`${create}\nalter function public.f(integer) set search_path = '';\nrevoke execute on function public.f(integer) from public, anon, authenticated;`);
+  assert.deepEqual(only(matching, DEFINER), []);
+  assert.deepEqual(only(matching, 'DB_DEFINER_REVOKE'), []);
+});
+
+test('DB_DEFINER_REVOKE: a later grant reopens access, while a schema-wide revoke closes it', async () => {
+  const create = "create function public.f() returns int language sql security definer set search_path = '' as $$ select 1 $$;";
+  const reopened = await definerOf(`${create}\nrevoke execute on function public.f() from public, anon, authenticated;\ngrant execute on function public.f() to authenticated;`);
+  assert.equal(only(reopened, 'DB_DEFINER_REVOKE').length, 1);
+  const closed = await definerOf(`${create}\nrevoke all on all functions in schema public from public, anon, authenticated;`);
+  assert.deepEqual(only(closed, DEFINER), []);
+  assert.deepEqual(only(closed, 'DB_DEFINER_REVOKE'), []);
 });
 
 test('DB_DEFINER_SAFE: dynamic SQL inside a definer interpolates only through format %I/%L', async () => {
@@ -488,7 +543,7 @@ test('DB_CONFIG_POLICY: the clean config fixture is clean', async () => {
 test('DB_CONFIG_POLICY: literal credentials are refused anywhere in the file; env(NAME) is the form', async () => {
   const findings = only(await configOf(fixture('config-bad.toml')), CONFIG);
   const keys = findings.filter((f) => f.message.includes('literal credential')).map((f) => f.key);
-  assert.deepEqual(keys.sort(), ['auth.external.github.client_id', 'auth.external.github.secret']);
+  assert.deepEqual(keys.sort((left, right) => left.localeCompare(right, 'en')), ['auth.external.github.client_id', 'auth.external.github.secret']);
   assert.ok(findings.some((f) => f.message.includes('jwt_expiry')), 'jwt_expiry over 3600');
   assert.ok(findings.some((f) => f.message.includes('enable_signup')), 'signup not declared');
   assert.ok(findings.some((f) => f.message.includes('site_url')), 'site_url not declared');

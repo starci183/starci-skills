@@ -4,11 +4,18 @@ import { found, readJson, readText } from './read.mjs';
 import { configFindings, parseToml, typesFindings } from './database-config.mjs';
 import { defaultGit, migrationShapeFindings } from './database-migrations.mjs';
 import { migrationSetPolicyFindings, sqlAnalysis } from './database-sql.mjs';
+import { migrationSetDefinerFindings } from './database-plpgsql.mjs';
+import { databaseAccessFindings } from './database-access.mjs';
 import { CONFIG_FILE, DB_CONFIG_POLICY, DB_MIGRATION_SHAPE, isActiveMigration, MIGRATIONS_ARCHIVE_DIR, TYPES_FILE } from './database-constants.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 import { eachInOrder } from '../../lib/in-order.mjs';
 
 export { migrationStamp } from './database-migrations.mjs';
+export {
+  DB_BE_ONLY_ACCESS, DB_REALTIME_UNLISTED, DB_APP_ROLE, DB_FORCE_RLS_DEFAULT,
+  DB_POLICY_TAUTOLOGY, DB_VIEW_UNSAFE, DB_STORAGE_PREFIX,
+} from './database-access.mjs';
+export const DB_DEFINER_REVOKE = 'DB_DEFINER_REVOKE';
 export {
   CONFIG_FILE,
   DB_CONFIG_POLICY,
@@ -76,6 +83,8 @@ export async function checkDatabase({ repoRoot, files, base, git, edition, supab
   const analyses = await migrationAnalyses({ repoRoot, migrations, exposed, forceRls, findings });
   findings.push(
     ...migrationSetPolicyFindings(analyses),
+    ...migrationSetDefinerFindings(analyses, exposed),
+    ...await databaseAccessFindings({ analyses, exposed, supabase: declared }),
     ...await typesFindings({ repoRoot, files, emitTypes, declaration: declared }),
   );
   return findings;

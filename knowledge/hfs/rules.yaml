@@ -2501,3 +2501,29 @@ rules:
     failureCodes: ["HFS_FEATURE_FILE_BUDGET"]
     enforcers:
       - {kind: hfs, id: feature-files, at: scripts/hfs/rules/feature-files.mjs}
+
+  - id: R254
+    code: "DB_BE_ONLY_ACCESS"
+    law: "In lite and full, browser data access stays closed on exposed schemas: authenticated receives neither table or sequence privileges nor data policies, and anon reads only through a select policy named *_public_read. A table listed in hfs.json supabase.directAccess is an explicit exception. A table joins supabase_realtime only when that direct access is declared. The front end uses Supabase for Auth and reaches product data through the back end."
+    kinds: [check]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["DB_BE_ONLY_ACCESS", "DB_REALTIME_UNLISTED"]
+    enforcers:
+      - {kind: hfs, id: db-be-only-access, at: scripts/hfs/rules/database-access.mjs}
+  - id: R255
+    code: "DB_APP_ROLE"
+    law: "The declared back-end database role (hfs.json supabase.appRole, app_be by default) has only the privileges it needs: role declarations refuse superuser and bypassrls, require noinherit and nobypassrls, and never grant all schema or table privileges. Tables owned by that role enable and force row level security by default; a forceRls exemption identifies the table and carries a nonempty reason. This applies to every edition that declares Supabase."
+    kinds: [check]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["DB_APP_ROLE", "DB_FORCE_RLS_DEFAULT"]
+    enforcers:
+      - {kind: hfs, id: db-app-role, at: scripts/hfs/rules/database-access.mjs}
+  - id: R256
+    code: "DB_POLICY_TAUTOLOGY"
+    law: "Exposed database objects keep their access boundaries in lite and full. Policies refuse tautological true, is-not-null and self-equality predicates; policies for browser roles prove a principal predicate. An exposed view or materialized view uses security_invoker or the migration set ends with access revoked from anon and authenticated. Disabling RLS or moving a table into an exposed schema preserves the R214 RLS obligation. A security definer declaration, including alter function, preserves R215 safety checks and the migration set ends with execute revoked from authenticated when exposed, in addition to R215's public and anon revocation. A storage.objects policy scopes an ownership prefix to the principal unless its bucket id ends _public."
+    kinds: [check]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["DB_POLICY_TAUTOLOGY", "DB_VIEW_UNSAFE", "DB_DEFINER_REVOKE", "DB_STORAGE_PREFIX"]
+    enforcers:
+      - {kind: hfs, id: db-policy-hardening, at: scripts/hfs/rules/database-access.mjs}
+      - {kind: hfs, id: db-definer-revoke, at: scripts/hfs/rules/database-plpgsql.mjs}
