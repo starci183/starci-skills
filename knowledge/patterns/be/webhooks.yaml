@@ -5,24 +5,31 @@ purpose: |-
   Given a delivery a payment, identity or shipping provider POSTs to us, how is it received? A webhook is a feature KIND:
   `be/src/features/webhooks/<provider>/` holds one signed door whose first call proves the delivery came from the provider
   (signature and replay window), either separately or inside its ONE domain method that combines verification and intake. The
-  intake records the delivery (deduplicated through the
-  inbox) and publishes the domain event with `eventBus.publish(event, tx)` inside its own transaction, because publishing is
-  allowed only from `modules/domain`. The door writes nothing and decides nothing; everything after the proof is an event.
+  intake records the delivery (deduplicated through the inbox) and publishes a typed receipt event with
+  `eventBus.publish(event, tx)` inside its own transaction, because publishing is allowed only from `modules/domain`.
+  A reactor or job consumes the durable receipt and dispatches the processing command. Neither the door, its HTTP module,
+  nor its called domain intake dispatches on a command/query bus or feature handler. A provider may receive a declared fixed `PROVIDER_ACK` body;
+  a subscription provider may also use one GET verifier that echoes its challenge result.
 appliesTo:
   - backend
 family: be
 provenance:
-  reviewedAt: 2026-10-02
+  reviewedAt: 2026-10-14
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
     - knowledge/hfs/rules.yaml
     - knowledge/patterns/be/api-auth.yaml
     - knowledge/patterns/be/idempotency.yaml
+    - knowledge/patterns/be/event-bus.yaml
+    - knowledge/patterns/be/reactors.yaml
+    - knowledge/patterns/be/jobs.yaml
     - owner decision 2026-10-02 (feature kinds: webhooks, realtime, reactors, saga, jobs, cli; no kind imports another)
+    - owner decision 2026-10-14 (literal provider ACK, one optional GET challenge, durable inbox handoff before reactor/job command dispatch)
   limitations: |-
     Static checks prove the door's shape, that an unconditional verification call is its first statement and that it makes
-    one intake call, either after a separate proof or combined with it. They do not prove that a domain verifier completes proof
+    one intake call, either after a separate proof or combined with it. They resolve direct command/query-bus and feature-handler receivers in the called
+    domain intake; helper calls, dynamic receivers and unavailable method bodies need semantic review. They do not prove that a domain verifier completes proof
     before intake, that the signature scheme matches the provider's documentation, that the replay window
     is the right length or that the intake is idempotent; the provider fake of the test world and the three
     `webhooks/*` scenarios prove those against the real stack.
@@ -35,7 +42,8 @@ rules:
       A provider webhook lives in `be/src/features/webhooks/<provider>/` (slot `be.feature.webhooks`), enabled by declaring the pattern
       `webhooks` in `hfs.json` `sides.be.patterns`. The folder holds `index.ts` (the module class an app composes), `transport/http/<provider>-http.module.ts`, `transport/http/<provider>.webhook.ts` (the
       door), `<provider>.webhook.spec.ts` (its spec — the kind's door has no service of its own, so the door carries it) and an optional `transport/http/dto/` of typed
-      payload classes (`<event>.request.ts`). Nothing else exists there: no application layer, no handler, no consumer. The kind
+      payload classes (`<event>.request.ts`). `PROVIDER_ACK`, when needed, is an exported typed literal constant in the door or
+      its own HTTP module. Nothing else exists there: no application layer, no handler, no consumer. The kind
       imports only `modules/*`, never another kind, and only an api-kind app composes `<provider>-http.module.ts`.
     rationale: |-
       A webhook is an external caller we do not control, so its door is kept apart from the api features a client uses. One place
@@ -82,7 +90,8 @@ rules:
     kind: mandatory
     hfsRules: [R182, R183, R41, R42, R203]
     requirement: |-
-      `<provider>.webhook.ts` is one `@Controller` with one `@Post` handler declared
+      `<provider>.webhook.ts` is one `@Controller` with exactly one `@Post` handler and optionally one `@Get` subscription
+      challenge handler. Each handler is declared
       `@Public({ reason: PublicReason.SignedWebhook })`, thin (R203 `BE_FEATURE_THIN`). The handler's FIRST statement is an unconditional
       direct verification call, awaited when async: either `this.<signature>.verify({ provider, rawBody, signature, timestamp })`
       of the `WebhookSignatureService` of `platform/http-security` or a domain verifier. No data access, nested call or other work
@@ -97,8 +106,16 @@ rules:
       A separate verification call is followed by exactly one domain intake call. A domain method that verifies and then performs
       intake may be the first and only call; a separate domain verification call does not count as intake. The door injects only
       domain services and, when used, the signature service (injected with `@InjectWebhookSignature()`), holds no branch, loop or
-      `try`, calls nothing else (no parsing, mapping or publishing) and returns nothing: the provider gets its status code and an
-      empty body. `@RateLimit(RateTier.Strict)` is required by the signed-webhook reason.
+      `try`, and calls nothing else (no parsing, mapping or publishing). Neither the door nor its HTTP module imports or injects
+      `CommandBus`, `QueryBus` from `@nestjs/cqrs`, or a feature command handler. The called domain intake must not dispatch on
+      a command or query bus or feature handler either; it records the inbox receipt and outbox event so a reactor or job can dispatch after commit.
+      The POST handler returns nothing (an empty body) or exactly `return PROVIDER_ACK`. That exported constant belongs to the
+      same webhook feature, is declared with `as const` or a readonly literal type, and contains only literal object values or
+      a literal string. Calls, interpolated templates, spreads, input-derived values, inline returned objects and constants of
+      another feature are refused. A provider acknowledgement does not weaken the first-statement proof requirement.
+      The optional GET starts with a declared domain verifier's challenge call, awaited when async, and returns exactly that
+      call's result: `const challenge = this.verifier.challenge(query); return challenge`, or directly returns that call.
+      It makes no intake call and computes no other response. `@RateLimit(RateTier.Strict)` is required on both signed-webhook handlers.
     rationale: |-
       The signature is the authentication of a public door. Making verification the first statement removes every door path that
       skips it; a combined domain method must finish that proof before intake. Keeping one intake and no decision leaves the door
@@ -110,6 +127,87 @@ rules:
       - id: case-2
         when: A payment provider uses a different secret for each billing connection
         write: 'declare BillingService.prototype.receiveCassoWebhook in the adjacent HTTP module webhookVerifiers array; the first and only handler statement awaits that method, which resolves the connection secret, verifies the provider proof and delegates to the intake. The door never reads the connection or payment data itself.'
+      - id: case-3
+        when: 'A provider requires exactly {"success": true} instead of an empty acknowledgement'
+        write: |-
+          In the webhook door's own file declare `export const PROVIDER_ACK = { success: true } as const`.
+          After the first verification call and the one domain intake call, return `PROVIDER_ACK` with the provider's required
+          status code. `return { success: true }`, `return { success: delivery.accepted }`, a spread, a computed constant,
+          and an ACK imported from another feature remain findings.
+      - id: case-4
+        when: A Meta-style provider uses GET subscription verification and POST deliveries
+        write: |-
+          Worked tree (the webhook and reactor are separate kinds; the app composes their modules):
+          be/src/features/webhooks/meta/index.ts
+          be/src/features/webhooks/meta/transport/http/meta-http.module.ts
+          be/src/features/webhooks/meta/transport/http/meta.webhook.ts
+          be/src/features/webhooks/meta/transport/http/meta.webhook.spec.ts
+          be/src/features/webhooks/meta/transport/http/dto/meta-challenge.request.ts
+          be/src/features/webhooks/meta/transport/http/dto/meta-event.request.ts
+          be/src/modules/domain/meta/index.ts
+          be/src/modules/domain/meta/meta-verifier.service.ts
+          be/src/modules/domain/meta/meta.service.ts
+          be/src/modules/events/core/meta-delivery-recorded.event.ts
+          be/src/features/reactors/meta-intake/index.ts
+          be/src/features/reactors/meta-intake/meta-intake.module.ts
+          be/src/features/reactors/meta-intake/application/process-meta-delivery.command.ts
+          be/src/features/reactors/meta-intake/application/process-meta-delivery.handler.ts
+          be/src/features/reactors/meta-intake/application/process-meta-delivery.contracts.ts
+          be/src/features/reactors/meta-intake/transport/message/meta-delivery-recorded.consumer.ts
+          be/src/features/reactors/meta-intake/transport/message/meta-intake-message.module.ts
+
+          meta.webhook.ts:
+          import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Post, Query, Req } from "@nestjs/common"
+          import type { RawBodyRequest } from "@nestjs/common"
+          import type { Request } from "express"
+          import { Public, PublicReason } from "@modules/domain/identity"
+          import { MetaService, MetaVerifier } from "@modules/domain/meta"
+          import { RateLimit, RateTier } from "@modules/platform/http-security"
+          import { MetaChallengeRequest } from "./dto/meta-challenge.request"
+          import { MetaEventRequest } from "./dto/meta-event.request"
+
+          export const PROVIDER_ACK = "EVENT_RECEIVED" as const
+
+          @Controller("webhooks/meta")
+          export class MetaWebhook {
+              constructor(private readonly verifier: MetaVerifier, private readonly deliveries: MetaService) {}
+
+              @Get()
+              @Public({ reason: PublicReason.SignedWebhook })
+              @RateLimit(RateTier.Strict)
+              challenge(@Query() query: MetaChallengeRequest): string {
+                  const challenge = this.verifier.challenge(query)
+                  return challenge
+              }
+
+              @Post()
+              @HttpCode(HttpStatus.OK)
+              @Public({ reason: PublicReason.SignedWebhook })
+              @RateLimit(RateTier.Strict)
+              async receive(
+                  @Req() request: RawBodyRequest<Request>,
+                  @Headers("x-hub-signature-256") signature: string | undefined,
+                  @Body() delivery: MetaEventRequest,
+              ): Promise<typeof PROVIDER_ACK> {
+                  await this.verifier.verify({ rawBody: request.rawBody, signature })
+                  await this.deliveries.recordMetaDelivery(delivery)
+                  return PROVIDER_ACK
+              }
+          }
+
+          meta-http.module.ts:
+          import { Module } from "@nestjs/common"
+          import { MetaWebhook } from "./meta.webhook"
+
+          @Module({ controllers: [MetaWebhook] })
+          export class MetaHttpModule {}
+
+          MetaVerifier is declared in meta-verifier.service.ts. Its challenge method proves the subscription mode and verify
+          token before returning the challenge field unchanged; its verify method owns Meta's signature proof and delivery
+          freshness policy. MetaService.recordMetaDelivery only records the delivery and its outbox receipt in one transaction
+          (case-1 of BE-WEBHOOK-3). The reactor consumes that receipt and dispatches ProcessMetaDeliveryCommand after commit.
+          The provider's real GET and POST proof schemes belong in the verifier, rather than being assumed to match the shared
+          timestamp/HMAC convention. The api app composes MetaHttpModule; an api or worker app composes MetaIntakeMessageModule.
     verification:
       automated:
         - BE_WEBHOOK_SHAPE
@@ -119,32 +217,57 @@ rules:
         - BE_FEATURE_THIN
       manual:
         - Review that the raw body, not a re-serialized one, is verified, that the replay window matches the provider's tolerance, and that a domain verifier refuses the delivery before intake or business data access.
+        - Trace intake helpers and dynamic dispatch that static resolution cannot inspect; none may dispatch a command before the receipt is durable.
     relatedExamples: [webhooks]
   - id: BE-WEBHOOK-3
-    title: The intake publishes the event inside its own transaction
+    title: The intake records the inbox receipt; a reactor or job dispatches after commit
     kind: mandatory
     hfsRules: [R80, R152, R151]
     requirement: |-
-      The domain intake method (`PaymentService.acceptNotification`) is the delivery method of R80: its first awaited expression
+      The sanctioned path is `verify -> inbox.record -> reactor/job dispatches the command`. `inbox.record` describes the
+      domain intake's durable recording responsibility, not a new method on the shared `Inbox` port: the real port has `claim`.
+      The domain intake method (`PaymentService.recordPaymentDelivery`) is the delivery method of R80: its first awaited expression
       claims `(source, eventId)` in the `Inbox` and it returns when the claim answers false, so a redelivery is a no-op. It then
-      records the delivery and calls `this.eventBus.publish(PaymentConfirmedEvent.create({...}), manager)` inside the same
+      records the provider payload or a durable receipt reference and calls
+      `this.eventBus.publish(PaymentDeliveryRecordedEvent.create({...}), manager)` inside the same
       transaction (`entityManager.transaction`). The events are typed classes in `modules/events/<service>/<event>.event.ts` that
-      equal their `be/contracts/<service>/events.json` entry (`payment.confirmed`, `payment.failed`). The webhook door never
-      imports `modules/events` or the event bus.
+      equal their `be/contracts/<service>/events.json` entry (`payment.delivery-recorded`). The webhook door never imports
+      `modules/events` or the event bus. The door, HTTP module and called intake do not reach a command or query bus or feature
+      handler. A reactor consumes the receipt event and dispatches its own command, forwarding the delivered `eventId` and
+      receipt reference; its domain service claims that separate consumer delivery before processing the receipt. A job may
+      instead consume a transactionally enqueued receipt reference under the queue and fenced-job patterns.
     rationale: |-
       Recording the delivery and writing the outbox row in one transaction means a crash cannot lose or duplicate the event, and
       keeping the publish in `modules/domain` keeps one place that owns the transaction boundary.
     cases:
       - id: case-1
-        when: A confirmed payment arrives
-        write: 'acceptNotification claims the inbox row, updates the payment row and publishes PaymentConfirmedEvent in one transaction; a second delivery of the same eventId changes nothing.'
+        when: A payment provider retries a delivery whose processing belongs in a reactor
+        write: |-
+          The POST handler verifies first, then calls PaymentService.recordPaymentDelivery(delivery) once. That domain method
+          runs entityManager.transaction(async (manager) => { ... }): its first awaited statement claims
+          this.inbox.claim(PAYMENT_SOURCE, delivery.eventId, manager), and a false answer returns. With the same manager it
+          saves the durable receipt and publishes PaymentDeliveryRecordedEvent carrying that receipt's id. Its method never
+          dispatches CommandBus.execute. The outbox relay delivers the committed event to
+          features/reactors/payment-intake/transport/message/payment-delivery-recorded.consumer.ts:
+
+          async handle(delivery: EventDelivery<PaymentDeliveryRecordedEvent>): Promise<void> {
+              await this.commandBus.execute(new ProcessPaymentDeliveryCommand({
+                  request: { eventId: delivery.eventId, receiptId: delivery.event.payload.receiptId },
+              }))
+          }
+
+          The command's handler delegates to its domain service; that service claims the reactor delivery id and processes the
+          saved receipt in its transaction. A duplicate provider POST records nothing more, and a duplicate relay delivery
+          processes nothing twice. The command, handler and consumer live in the reactor's own kind; no feature imports the
+          webhook kind. The equivalent job path enqueues a receipt reference in the recording transaction and processes it
+          through the job's platform claim and fencing, never synchronously in the POST handler.
     verification:
       automated:
         - BE_INBOX_DEDUPE_MISSING
         - BE_OUTBOX_WRITE_TX
         - BE_EVENT_CLASS_CONTRACT
       manual:
-        - Confirm each provider event kind maps to exactly one published event and that an unknown kind is acknowledged and ignored, not published.
+        - Confirm each accepted provider delivery records at most one receipt and outbox event, and the reactor or job alone dispatches processing commands.
     relatedExamples: [webhooks]
   - id: BE-WEBHOOK-4
     title: Three behaviours are proven on the test world
@@ -184,7 +307,7 @@ files:
   - path: src/features/webhooks/<provider>/transport/http/<provider>.webhook.ts
     slot: be.feature.webhooks.http
     template: webhooks/webhook.door.ts.tpl
-    role: The signed door, one controller with one POST handler.
+    role: The signed door, one controller with one POST handler and optionally one GET challenge verifier; an own-feature PROVIDER_ACK is a fixed literal.
     rules: [BE_WEBHOOK_SHAPE, BE_WEBHOOK_UNVERIFIED, BE_DEFAULT_DENY, BE_INPUT_BOUNDED]
     spec: src/features/webhooks/<provider>/transport/http/<provider>.webhook.spec.ts
   - path: src/features/webhooks/<provider>/transport/http/<provider>.webhook.spec.ts
@@ -203,7 +326,7 @@ files:
     optional: true
   - path: src/modules/domain/<capability>/<capability>.service.ts
     slot: be.domain
-    role: The domain verifier or intake method, which may combine per-connection proof with inbox claim and event publishing in its transaction.
+    role: The domain verifier or intake method, which may combine per-connection proof with inbox claim, durable receipt recording and outbox publishing in its transaction; no command/query-bus or feature-handler dispatch.
     rules: [BE_INBOX_DEDUPE_MISSING, BE_OUTBOX_WRITE_TX]
     optional: true
   - path: src/modules/events/<service>/<event>.event.ts
@@ -211,9 +334,24 @@ files:
     role: The typed event the intake publishes.
     rules: [BE_EVENT_CLASS_CONTRACT]
     optional: true
+  - path: src/features/reactors/<reactor>/transport/message/<event>.consumer.ts
+    slot: be.transport.message
+    role: Optional reactor consumer of the durable receipt event; forwards its eventId and receipt reference in one command after commit.
+    rules: [BE_EVENT_CONSUMER_SHAPE, BE_FEATURE_THIN]
+    optional: true
   - path: src/tests/e2e/<area>/<provider>-webhook.e2e-spec.ts
     slot: be.tests.e2e
     role: "Titles webhooks/<scenario>: ... prove the pattern against the provider fake."
     spec: webhooks/bad-signature-is-refused, webhooks/replay-is-refused, webhooks/accepted-delivery-publishes-once
     rules: [BE_PATTERN_SPEC_MISSING]
     optional: true
+sourceMaintenance: >-
+  The add webhook verb keeps the default empty acknowledgement and does not add a consumer. In full, the generated POST
+  verifies first and calls the supplied domain service's record<Provider>Delivery once. Implement that method as the
+  transactional inbox receipt/outbox recording intake above, then add its reactor or job separately.
+  In lite, the generated POST verifies first and calls <Provider>InboxService.record<Provider>Delivery. This record-only
+  domain intake uses recordWebhookDelivery to insert a pending provider inbox row atomically in Supabase Postgres, unique on
+  (provider, delivery_id), without processing it or marking it complete. Add a reactor or job separately to consume the
+  committed pending row and dispatch the processing command (reactors.yaml, jobs.yaml). The --service option validates the
+  future domain processing owner; the webhook writer does not import or call that owner synchronously and does not
+  synthesize a consumer.

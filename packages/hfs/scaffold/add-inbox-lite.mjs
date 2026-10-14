@@ -25,13 +25,13 @@ const template = (relative, values) => {
   });
 };
 
-/** The lite templates of the webhook door and its unit spec: the door hands the delivery id to the provider inbox. */
+/** The lite templates of the webhook door and its unit spec: the door records the delivery in the provider inbox. */
 const LITE_WEBHOOK_TEMPLATES = Object.freeze({
   "webhooks/webhook.door.ts.tpl": "../inbox/webhook-door.ts.tpl",
   "webhooks/webhook.door.spec.ts.tpl": "../inbox/webhook-door.spec.ts.tpl",
 });
 
-/** Lite replaces only the webhook door and its spec; the full-edition pattern remains byte-identical. */
+/** Lite replaces only the webhook door and its spec with the durable provider inbox intake. */
 export const selectLiteWebhookEntries = (entries) =>
   entries.map((entry) =>
     LITE_WEBHOOK_TEMPLATES[entry.template] === undefined
@@ -39,86 +39,24 @@ export const selectLiteWebhookEntries = (entries) =>
       : { ...entry, template: LITE_WEBHOOK_TEMPLATES[entry.template] },
   );
 
-const matchingBrace = (text, open) => {
-  let depth = 0;
-  for (let index = open; index < text.length; index += 1) {
-    if (text[index] === "{") depth += 1;
-    else if (text[index] === "}") {
-      depth -= 1;
-      if (depth === 0) return index;
-    }
-  }
-  return -1;
-};
-
-const addEntityManagerImport = (text) => {
-  if (/import type \{[^}]*\bEntityManager\b[^}]*\} from "typeorm"/.test(text))
-    return text;
-  return `import type { EntityManager } from "typeorm"\n${text}`;
-};
-
-/** Gives the selected domain intake the transaction manager while preserving its existing processing body. */
-function adaptedDomainService({ root, service, serviceModule, provider, Provider }) {
+/** Validates the selected processing owner for a later reactor/job without invoking or changing that service in the door. */
+function validateProcessingOwner({ root, service, serviceModule, provider }) {
   const prefix = "@modules/domain/";
-  if (!serviceModule.startsWith(prefix))
+  const capability = serviceModule.slice(prefix.length);
+  if (!serviceModule.startsWith(prefix) || !/^[a-z][a-z0-9-]*(?:\/[a-z][a-z0-9-]*)*$/.test(capability))
     throw new ScaffoldError(
       "HFS_ADD_INBOX_SERVICE",
-      `lite add webhook needs a domain service module below ${prefix}`,
+      `lite add webhook needs a processing service module below ${prefix}`,
     );
-  const owner = path.join(
-    root,
-    "be",
-    "src",
-    "modules",
-    "domain",
-    ...serviceModule.slice(prefix.length).split("/"),
-  );
-  const candidates = filesBelow(owner).filter(
-    (file) =>
-      file.endsWith(".service.ts") &&
-      new RegExp(`\\bexport\\s+class\\s+${service}\\b`).test(
-        fs.readFileSync(file, "utf8"),
-      ),
+  const owner = path.join(root, "be", "src", "modules", "domain", ...capability.split("/"));
+  const candidates = filesBelow(owner).filter((file) =>
+    file.endsWith(".service.ts") && new RegExp(`\\bexport\\s+class\\s+${service}\\b`).test(fs.readFileSync(file, "utf8")),
   );
   if (candidates.length !== 1)
     throw new ScaffoldError(
-      "HFS_ADD_INBOX_SERVICE",
-      `${serviceModule} must export exactly one ${service} class from a .service.ts file before adding the ${provider} webhook`,
-    );
-  const file = candidates[0];
-  let text = fs.readFileSync(file, "utf8").replace(/\r\n/g, "\n");
-  const method = `accept${Provider}Delivery`;
-  const methodAt = text.search(new RegExp(`\\b${method}\\s*\\(`));
-  if (methodAt < 0)
-    throw new ScaffoldError(
       "HFS_ADD_INBOX_INTAKE",
-      `${service} must declare ${method}(delivery) before adding the ${provider} webhook`,
+      `${serviceModule} must export exactly one ${service} from a .service.ts file as the processing owner of the ${provider} inbox`,
     );
-  const paramsOpen = text.indexOf("(", methodAt);
-  const paramsClose = text.indexOf(")", paramsOpen);
-  const bodyOpen = text.indexOf("{", paramsClose);
-  const bodyClose = matchingBrace(text, bodyOpen);
-  if (paramsClose < 0 || bodyOpen < 0 || bodyClose < 0)
-    throw new ScaffoldError(
-      "HFS_ADD_INBOX_INTAKE",
-      `${service}.${method} is not a readable method declaration`,
-    );
-  const parameters = text.slice(paramsOpen + 1, paramsClose).trim();
-  if (/(?:^|,)\s*(?:manager|entityManager)\s*:/.test(parameters)) return { file, text };
-  const manager =
-    /private\s+readonly\s+([A-Za-z][A-Za-z0-9]*)\s*:\s*EntityManager/.exec(
-      text,
-    )?.[1];
-  if (!manager)
-    throw new ScaffoldError(
-      "HFS_ADD_INBOX_INTAKE",
-      `${service}.${method} needs an injected EntityManager so the inbox can keep its processing in one transaction`,
-    );
-  const body = text
-    .slice(bodyOpen + 1, bodyClose)
-    .replaceAll(`this.${manager}`, "entityManager");
-  text = `${text.slice(0, paramsOpen + 1)}${parameters}, entityManager: EntityManager = this.${manager}${text.slice(paramsClose, bodyOpen + 1)}${body}${text.slice(bodyClose)}`;
-  return { file, text: addEntityManagerImport(text) };
 }
 
 const databasePatches = (root) => {
@@ -131,8 +69,8 @@ const databasePatches = (root) => {
       "lite add webhook needs the scaffolded platform/database capability",
     );
   let index = fs.readFileSync(indexFile, "utf8").replace(/\r\n/g, "\n");
-  if (!index.includes('export { acceptWebhookDelivery } from "./webhook-inbox.client"'))
-    index = `${index.replace(/\n+$/, "")}\nexport { acceptWebhookDelivery } from "./webhook-inbox.client"\n`;
+  if (!index.includes('export { recordWebhookDelivery } from "./webhook-inbox.client"'))
+    index = `${index.replace(/\n+$/, "")}\nexport { recordWebhookDelivery } from "./webhook-inbox.client"\n`;
   let error = fs.readFileSync(errorFile, "utf8").replace(/\r\n/g, "\n");
   const enumLine =
     '    WebhookDeliveryIdRequired = "DATABASE_WEBHOOK_DELIVERY_ID_REQUIRED",';
@@ -199,7 +137,7 @@ const wiredAppModule = ({ root, repo, provider, Provider }) => {
   return { file, text: `${lines.join("\n").replace(/\n+$/, "")}\n` };
 };
 
-/** Writes the lite provider inbox and adapts the selected domain intake to share its transaction. */
+/** Writes the lite provider inbox. Processing belongs to a separately added reactor or job, after the record commits. */
 export function addLiteWebhookInbox({
   root,
   repo,
@@ -209,6 +147,7 @@ export function addLiteWebhookInbox({
   now = Date.now,
 }) {
   if (repo.edition !== "lite" || noun !== "webhook") return [];
+  validateProcessingOwner({ root, ...values, provider });
   const Provider = pascalOf(provider);
   const table = `${snakeOf(provider)}_inbox`;
   const migrationsDir = path.join(root, "supabase", "migrations");
@@ -308,15 +247,7 @@ export function addLiteWebhookInbox({
       "HFS_ADD_EXISTS",
       `webhook ${provider} inbox already exists: ${clashes.join(", ")}`,
     );
-  const servicePatch = adaptedDomainService({
-    root,
-    service: values.service,
-    serviceModule: values.serviceModule,
-    provider,
-    Provider,
-  });
   const patches = [
-    servicePatch,
     ...databasePatches(root),
     wiredAppModule({ root, repo, provider, Provider }),
   ];

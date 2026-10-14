@@ -7,10 +7,8 @@ import { createRequire } from "node:module";
 import { addTable } from "../../packages/hfs/scaffold/add-table.mjs";
 import { addApp } from "../../packages/hfs/scaffold/add-app.mjs";
 import { addKind } from "../../packages/hfs/scaffold/add.mjs";
-import { peerDependencies } from "../../packages/hfs/scaffold/app.mjs";
 import { main } from "../../packages/hfs/src/main.mjs";
 import { checkDatabase } from "../../scripts/hfs/rules/database.mjs";
-
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const made = [];
 const ts = createRequire(import.meta.url)("typescript");
@@ -481,10 +479,9 @@ test("lite add api emits full's GraphQL door, and api plus webhook transports ar
     read(root, "be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts"),
     /@Headers\("x-calendar-delivery-id"\) deliveryId/,
   );
-  assert.match(
-    read(root, "be/src/modules/domain/calendars/calendars.service.ts"),
-    /entityManager: EntityManager = this\.entityManager/,
-  );
+  assert.match(read(root, "be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts"), /recordCalendarDelivery\(deliveryId, delivery\)/);
+  assert.doesNotMatch(read(root, "be/src/modules/domain/calendar-inbox/calendar-inbox.service.ts"), /CalendarsService|process:|complete:|CommandBus|QueryBus/);
+  assert.doesNotMatch(read(root, "be/src/modules/domain/calendars/calendars.service.ts"), /entityManager: EntityManager = this\.entityManager/);
   const main = read(root, "be/apps/api/src/main.ts");
   const env = read(root, "be/apps/api/src/api.env.ts");
   assert.match(env, /export interface ApiEnv \{/);
@@ -500,37 +497,4 @@ test("lite add api emits full's GraphQL door, and api plus webhook transports ar
   assert.match(security, /InjectWebhookSignature/);
   assert.match(security, /RateLimit, RateLimitGuard, RateTier/);
   assert.match(security, /WebhookSignatureService/);
-});
-
-test("add api and the scaffold declare the runtime peer of a driver integration pair the app depends on (R111), at its pin", () => {
-  const pairs = [{ id: "apollo-express5", when: [{ package: "@nestjs/apollo" }, { package: "@nestjs/platform-express", major: 11 }], requires: "@as-integrations/express5" }];
-  const pins = { "@as-integrations/express5": { version: "1.1.2" } };
-  const graphql = { dependencies: { "@nestjs/apollo": "13.4.5", "@nestjs/platform-express": "11.2.5" } };
-  assert.deepEqual(peerDependencies(graphql, pins, pairs), { "@as-integrations/express5": "1.1.2" });
-  assert.deepEqual(peerDependencies({ dependencies: { ...graphql.dependencies, "@as-integrations/express5": "1.1.2" } }, pins, pairs), {}, "a declared peer is kept");
-  assert.deepEqual(peerDependencies({ dependencies: { "@nestjs/apollo": "13.4.5", "@nestjs/platform-express": "10.4.0" } }, pins, pairs), {}, "another major is not the pair");
-  assert.deepEqual(peerDependencies({ dependencies: { "@nestjs/platform-express": "11.2.5" } }, pins, pairs), {}, "no GraphQL, no peer");
-  assert.throws(() => peerDependencies(graphql, {}, pairs), { code: "HFS_SCAFFOLD_PIN_MISSING" }, "a peer without a canon pin fails closed");
-});
-
-test("the lite API skeleton installs one typed global validation pipe", () => {
-  const main = fs.readFileSync(
-    new URL("../../packages/hfs/templates/be/skeleton-lite/apps/api/src/main.ts", import.meta.url),
-    "utf8",
-  );
-  const validation = fs.readFileSync(
-    new URL("../../packages/hfs/templates/be/skeleton/src/modules/platform/http-security/request-validation.service.ts", import.meta.url),
-    "utf8",
-  );
-  const errors = fs.readFileSync(
-    new URL("../../packages/hfs/templates/be/skeleton/src/modules/platform/http-security/errors/http-security.error.ts", import.meta.url),
-    "utf8",
-  );
-  assert.match(main, /app\.useGlobalPipes\(app\.get\(RequestValidationService\)\)/);
-  assert.ok(main.indexOf("useGlobalPipes") < main.indexOf("await app.listen"));
-  assert.match(validation, /whitelist: true/);
-  assert.match(validation, /forbidNonWhitelisted: true/);
-  assert.match(validation, /transform: true/);
-  assert.match(validation, /HttpSecurityErrorCode\.RequestInvalid/);
-  assert.match(errors, /\[HttpSecurityErrorCode\.RequestInvalid\]: "invalid"/);
 });

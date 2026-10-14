@@ -13,7 +13,7 @@ const DOOR = at("src/features/webhooks/payment/transport/http/payment.webhook.ts
 const OTHER_SLOT = at("src/features/plan/transport/http/payment.webhook.ts")
 const SPEC = at("src/features/webhooks/payment/transport/http/payment.webhook.spec.ts")
 
-const HEAD = `import { Body, Controller, Headers, Post } from "@nestjs/common"
+const HEAD = `import { Body, Controller, Get, Headers, Post, Query } from "@nestjs/common"
 import { InjectCommandBus } from "@modules/platform/cqrs"
 import { Public, PublicReason } from "@modules/domain/identity"
 import { PaymentService } from "@modules/domain/payment"
@@ -35,13 +35,13 @@ export class W {
 const PROVEN = "this.signature.verify({ rawBody: body, signature })"
 
 /** A webhook class with the given constructor and handler body, a signed webhook by default. */
-const door = ({ ctor = "private readonly signature: WebhookSignatureService, private readonly payments: PaymentService", body, decorators = "@Post()\n    @Public({ reason: PublicReason.SignedWebhook })", extra = "", imports = "" } = {}) => `${HEAD}${imports}
+const door = ({ ctor = "private readonly signature: WebhookSignatureService, private readonly payments: PaymentService", body, decorators = "@Post()\n    @Public({ reason: PublicReason.SignedWebhook })", extra = "", imports = "", returned = "void" } = {}) => `${HEAD}${imports}
 @Controller("webhooks/payment")
 export class PaymentWebhook {
     constructor(${ctor}) {}
 
     ${decorators}
-    async receive(@Headers("x-signature") signature: string, @Body() body: object): Promise<void> {
+    async receive(@Headers("x-signature") signature: string, @Body() body: object): Promise<${returned}> {
         ${body ?? `${PROVEN}\n        await this.payments.acceptNotification(body)`}
     }
     ${extra}
@@ -90,6 +90,41 @@ const DOMAIN_DOORS = [
     ...PROVIDER_DOORS,
 ]
 
+const INTAKE = `${PROVEN}\n        await this.payments.acceptNotification(body)`
+const ACK = "export const PROVIDER_ACK = { success: true } as const\n"
+
+/** Meta uses the same provider endpoint for a subscription proof and signed delivery intake. */
+const metaDoor = ({ challenge = "const echo = this.proof.challenge(query)\n        return echo", imports = "", post = "this.proof.verifyDelivery(body)\n        await this.payments.acceptNotification(body)\n        return PROVIDER_ACK" } = {}) => door({
+    imports: `import { MetaWebhookVerifier } from "@modules/domain/payment/meta-verifier.service"\n${ACK}${imports}`,
+    ctor: "private readonly proof: MetaWebhookVerifier, private readonly payments: PaymentService",
+    returned: "typeof PROVIDER_ACK",
+    body: post,
+    extra: `@Get()\n    @Public({ reason: PublicReason.SignedWebhook })\n    async challenge(@Query() query: object): Promise<string> {\n        ${challenge}\n    }`,
+})
+
+const ACK_DOORS = [
+    { filename: DOOR, code: door({ imports: ACK, body: `${INTAKE}\n        return PROVIDER_ACK`, returned: "typeof PROVIDER_ACK" }) },
+    { filename: DOOR, code: door({ imports: 'export const PROVIDER_ACK = "accepted" as const\n', body: `${INTAKE}\n        return PROVIDER_ACK`, returned: "typeof PROVIDER_ACK" }) },
+    { filename: DOOR, code: door({ imports: "export const PROVIDER_ACK: { readonly success: true } = { success: true }\n", body: `${INTAKE}\n        return PROVIDER_ACK`, returned: "typeof PROVIDER_ACK" }) },
+    { filename: DOOR, code: door({ imports: "export const PROVIDER_ACK: Readonly<{ success: true }> = { success: true }\n", body: `${INTAKE}\n        return PROVIDER_ACK`, returned: "typeof PROVIDER_ACK" }) },
+    { filename: DOOR, code: door({ imports: 'export const PROVIDER_ACK: "accepted" = "accepted"\n', body: `${INTAKE}\n        return PROVIDER_ACK`, returned: "typeof PROVIDER_ACK" }) },
+    { filename: DOOR, code: door({ imports: "const PROVIDER_ACK = { success: true } as const\nexport { PROVIDER_ACK }\n", body: `${INTAKE}\n        return PROVIDER_ACK`, returned: "typeof PROVIDER_ACK" }) },
+    { filename: DOOR, code: door({ imports: 'import { PROVIDER_ACK as ACK_BODY } from "./payment.webhook.ack"\n', body: `${INTAKE}\n        return ACK_BODY`, returned: "typeof ACK_BODY" }) },
+    { filename: DOOR, code: door({ imports: "export const PROVIDER_ACK = { success: true, details: { received: null, values: [1, 'fixed', false] } } as const\n", body: `${INTAKE}\n        return PROVIDER_ACK`, returned: "typeof PROVIDER_ACK" }) },
+]
+
+const CHALLENGE_DOORS = [
+    { filename: DOOR, code: metaDoor() },
+    { filename: DOOR, code: metaDoor({ challenge: "const echo = await this.proof.asyncChallenge(query)\n        return echo" }) },
+    { filename: DOOR, code: metaDoor({ challenge: "const echo = await this.proof.syncOrAsyncChallenge(query)\n        return echo" }) },
+    { filename: DOOR, code: metaDoor({ challenge: "return this.proof.challenge(query)" }) },
+    { filename: DOOR, code: metaDoor({ challenge: "return await this.proof.asyncChallenge(query)" }) },
+    { filename: at("src/features/webhooks/meta/transport/http/meta.webhook.ts"), code: metaDoor({
+        imports: 'import "./meta-http.module"\nimport { MetaSubscriptionService } from "@modules/domain/payment/meta-verifier.service"\n',
+        post: `${INTAKE}\n        return PROVIDER_ACK`,
+    }).replace("private readonly proof: MetaWebhookVerifier", "private readonly signature: WebhookSignatureService, private readonly proof: MetaSubscriptionService") },
+]
+
 test("every rule this law declares is exported under its published name", () => {
     for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
 })
@@ -101,6 +136,11 @@ test("webhook-shape: a signed door with a shared or domain proof and one intake 
             // the proof may be awaited when it is async, and the intake takes any argument
             { filename: DOOR, code: door({ body: `await ${PROVEN}\n        await this.payments.acceptNotification({ body })` }) },
             ...DOMAIN_DOORS,
+            ...ACK_DOORS,
+            ...CHALLENGE_DOORS,
+            // HTTP decorator identity survives both named and namespace aliases.
+            { filename: DOOR, code: metaDoor().replace("Get,", "Get as Subscribe,").replace("@Get()", "@Subscribe()") },
+            { filename: DOOR, code: metaDoor({ imports: 'import * as Nest from "@nestjs/common"\n' }).replace("@Get()", "@Nest.Get()").replace("@Post()", "@Nest.Post()") },
             // a file outside the webhook slot is not judged by this rule (its own door laws apply)
             { filename: OTHER_SLOT, code: door({ ctor: "private readonly payments: PaymentService", body: "await this.payments.acceptNotification(body)\n        await this.payments.refund('x')" }) },
             // a spec is not a door
@@ -133,11 +173,40 @@ test("webhook-shape: a signed door with a shared or domain proof and one intake 
             { filename: DOOR, code: door({ body: `${PROVEN}\n        await this.payments.acceptNotification(JSON.parse(String(body)))` }), errors: [{ messageId: "call" }, { messageId: "call" }] },
             // the door returns domain data
             { filename: DOOR, code: door({ body: `${PROVEN}\n        return await this.payments.acceptNotification(body)` }), errors: [{ messageId: "returns" }] },
+            // A literal return is fixed only when declared as this feature's typed, exported provider contract.
+            { filename: DOOR, code: door({ body: `${INTAKE}\n        return { success: true }` }), errors: [{ messageId: "returns" }] },
+            { filename: DOOR, code: door({ imports: ACK, body: `${INTAKE}\n        return 'accepted-' + signature` }), errors: [{ messageId: "returns" }] },
+            { filename: DOOR, code: door({ imports: ACK, body: `${INTAKE}\n        return String(signature)` }), errors: [{ messageId: "returns" }, { messageId: "call" }] },
+            { filename: DOOR, code: door({ imports: ACK, body: `${INTAKE}\n        return \`accepted-\${signature}\`` }), errors: [{ messageId: "returns" }] },
+            { filename: DOOR, code: door({ imports: 'import { PROVIDER_ACK } from "../../../other/transport/http/other.webhook.ack"\n', body: `${INTAKE}\n        return PROVIDER_ACK` }), errors: [{ messageId: "returns" }] },
+            { filename: DOOR, code: door({ imports: "const input = true\nexport const PROVIDER_ACK = { success: input } as const\n", body: `${INTAKE}\n        return PROVIDER_ACK` }), errors: [{ messageId: "returns" }] },
+            { filename: DOOR, code: door({ imports: "const input = { success: true }\nexport const PROVIDER_ACK = { ...input } as const\n", body: `${INTAKE}\n        return PROVIDER_ACK` }), errors: [{ messageId: "returns" }] },
+            { filename: DOOR, code: door({ imports: "export const PROVIDER_ACK = { success: true }\n", body: `${INTAKE}\n        return PROVIDER_ACK` }), errors: [{ messageId: "returns" }] },
+            { filename: DOOR, code: door({ imports: "const PROVIDER_ACK = { success: true } as const\n", body: `${INTAKE}\n        return PROVIDER_ACK` }), errors: [{ messageId: "returns" }] },
+            { filename: DOOR, code: door({ imports: "export const PROVIDER_ACK: {} = { success: true }\n", body: `${INTAKE}\n        return PROVIDER_ACK` }), errors: [{ messageId: "returns" }] },
+            { filename: DOOR, code: door({ imports: "type Readonly<T> = T\nexport const PROVIDER_ACK: Readonly<{ success: true }> = { success: true }\n", body: `${INTAKE}\n        return PROVIDER_ACK` }), errors: [{ messageId: "returns" }] },
+            { filename: DOOR, code: door({ imports: ACK, body: `${INTAKE}\n        const PROVIDER_ACK = body\n        return PROVIDER_ACK` }), errors: [{ messageId: "returns" }] },
+            // GET returns only the verifier result; copied, replaced, missing or re-evaluated echoes fail.
+            { filename: DOOR, code: metaDoor({ challenge: "const echo = this.proof.challenge(query)\n        return 'other'" }), errors: [{ messageId: "returns" }] },
+            { filename: DOOR, code: metaDoor({ challenge: "const echo = this.proof.challenge(query)\n        return PROVIDER_ACK" }), errors: [{ messageId: "returns" }] },
+            { filename: DOOR, code: metaDoor({ challenge: "const echo = this.proof.challenge(query)\n        return" }), errors: [{ messageId: "returns" }] },
+            { filename: DOOR, code: metaDoor({ challenge: "const echo = this.proof.challenge(query)" }), errors: [{ messageId: "returns" }] },
+            { filename: DOOR, code: metaDoor({ challenge: "const echo = this.proof.challenge(query)\n        const copy = echo\n        return copy" }), errors: [{ messageId: "returns" }] },
+            { filename: DOOR, code: metaDoor({ challenge: "const echo = this.proof.challenge(query)\n        return this.proof.challenge(query)" }), errors: [{ messageId: "returns" }, { messageId: "call" }] },
+            { filename: DOOR, code: metaDoor({ challenge: "return 'unverified'" }), errors: [{ messageId: "returns" }] },
+            // Importing a bus into the door/module is forbidden, and a resolvable domain intake cannot dispatch either.
+            { filename: DOOR, code: door({ imports: 'import { CommandBus } from "@nestjs/cqrs"\n' }), errors: [{ messageId: "handoff" }] },
+            { filename: at("src/features/webhooks/unsafe/transport/http/unsafe-http.module.ts"), code: 'import { QueryBus } from "@nestjs/cqrs"\nexport const bus = QueryBus', errors: [{ messageId: "handoff" }] },
+            { filename: DOOR, code: door({ imports: 'import { PaymentDispatchService } from "@modules/domain/payment/payment-dispatch.service"\n', ctor: "private readonly signature: WebhookSignatureService, private readonly payments: PaymentDispatchService", body: `${PROVEN}\n        await this.payments.dispatchNotification(body)` }), errors: [{ messageId: "handoff" }] },
+            // Separate delivery and subscription proofs cannot conceal business command dispatch.
+            { filename: DOOR, code: metaDoor({ post: "this.proof.dispatchingProof(body)\n        await this.payments.acceptNotification(body)\n        return PROVIDER_ACK" }), errors: [{ messageId: "handoff" }] },
+            { filename: DOOR, code: metaDoor({ challenge: "return this.proof.dispatchingChallenge(query)" }), errors: [{ messageId: "handoff" }] },
             // not a signed webhook: another public reason, or none
             { filename: DOOR, code: door({ decorators: "@Post()\n    @Public({ reason: PublicReason.Health })" }), errors: [{ messageId: "notPublic" }] },
             { filename: DOOR, code: door({ decorators: "@Post()" }), errors: [{ messageId: "notPublic" }] },
             // route shape: a second route, and a door with no @Post
             { filename: DOOR, code: door({ extra: `@Post("b")\n    @Public({ reason: PublicReason.SignedWebhook })\n    async other(@Body() body: object): Promise<void> {\n        ${PROVEN}\n        await this.payments.acceptNotification(body)\n    }` }), errors: [{ messageId: "route" }] },
+            { filename: DOOR, code: door({ extra: "@Get() firstChallenge(): string { return 'one' }\n@Get() secondChallenge(): string { return 'two' }" }), errors: [{ messageId: "route" }] },
             { filename: DOOR, code: `${HEAD}import { Get } from "@nestjs/common"
 @Controller("w")
 export class W {
@@ -159,10 +228,23 @@ test("webhook-verify-first: the first statement is an unconditional, completed s
             { filename: DOOR, code: door() },
             { filename: DOOR, code: door({ body: `await ${PROVEN}\n        await this.payments.acceptNotification(body)` }) },
             ...DOMAIN_DOORS,
+            ...ACK_DOORS,
+            ...CHALLENGE_DOORS,
             // outside the webhook slot nothing is judged
             { filename: OTHER_SLOT, code: door({ body: "await this.payments.acceptNotification(body)" }) },
         ],
         invalid: [
+            // A fixed provider ACK cannot excuse work before the proof.
+            { filename: DOOR, code: door({ imports: ACK, body: `await this.payments.acceptNotification(body)\n        ${PROVEN}\n        return PROVIDER_ACK` }), errors: [{ messageId: "first" }] },
+            // Subscription verification must be the first completed domain proof and must produce an echo value.
+            { filename: DOOR, code: metaDoor({ challenge: "return 'unverified'" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: metaDoor({ challenge: "const echo = this.proof.asyncChallenge(query)\n        return echo" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: metaDoor({ challenge: "const echo = this.proof.syncOrAsyncChallenge(query)\n        return echo" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: metaDoor({ challenge: "const input = query\n        return this.proof.challenge(input)" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: metaDoor({ challenge: "const echo = this.proof.challenge(JSON.parse('query'))\n        return echo" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: metaDoor({ challenge: "return this.proof.voidChallenge(query)" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: metaDoor({ challenge: "let echo = this.proof.challenge(query)\n        return echo" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: metaDoor({ challenge: "return this.payments.acceptNotification(query)" }), errors: [{ messageId: "first" }] },
             { filename: DOOR, code: door({ body: `await this.payments.acceptNotification(body)\n        ${PROVEN}` }), errors: [{ messageId: "first" }] },
             { filename: DOOR, code: door({ body: `const received = body\n        ${PROVEN}\n        await this.payments.acceptNotification(received)` }), errors: [{ messageId: "first" }] },
             // No domain intake, data call or even a declaration may precede the domain proof.

@@ -177,7 +177,10 @@ test('starci app add webhook writes the transport/http door tree with its signat
   assert.match(door, /export class PaymentGatewayWebhook/);
   assert.ok(door.includes('@Public({ reason: PublicReason.SignedWebhook })'));
   assert.ok(door.includes('this.signature.verify({ provider: "payment-gateway"'));
-  assert.ok(door.includes('this.deliveries.acceptPaymentGatewayDelivery(delivery)'));
+  assert.ok(door.includes('this.deliveries.recordPaymentGatewayDelivery(delivery)'));
+  assert.match(door, /this\.signature\.verify\([^\n]+\)\s+await this\.deliveries\.recordPaymentGatewayDelivery\(delivery\)/);
+  assert.doesNotMatch(door, /CommandBus|QueryBus|\.execute\(/);
+  assert.equal(exists(dir, `${base}/transport/message`), false, 'a webhook does not scaffold a consumer beside its door');
   assert.ok(read(dir, `${base}/index.ts`).includes('export { PaymentGatewayHttpModule }'));
   assert.deepEqual(hfsJson(dir).sides.be.patterns, ['webhooks']);
   assert.deepEqual(hfsJson(dir).sides.be.kinds, ['api', 'webhooks']);

@@ -5,6 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { Script } from "node:vm";
 import { addKind } from "../../packages/hfs/scaffold/add.mjs";
 import { addTable } from "../../packages/hfs/scaffold/add-table.mjs";
 import { scaffoldApp } from "../../packages/hfs/scaffold/app.mjs";
@@ -82,32 +83,7 @@ const problemsOf = (report) => [
   ...report.violations.map((problem) => ({ kind: "violation", ...problem })),
 ];
 
-const addDeliveryIntake = (root, capability) => {
-  const service = path.join(
-    root,
-    "be",
-    "src",
-    "modules",
-    "domain",
-    capability,
-    `${capability}.service.ts`,
-  );
-  const text = fs.readFileSync(service, "utf8").replace(/\r\n/g, "\n");
-  const Capability = capability[0].toUpperCase() + capability.slice(1);
-  const method = `\ninterface ${Capability.slice(0, -1)}Delivery { readonly id: string }\n`;
-  const classAt = text.indexOf("@Injectable()");
-  const withContract = `${text.slice(0, classAt)}${method}\n${text.slice(classAt)}`;
-  const classClose = withContract.lastIndexOf("}");
-  const intake = `
-    /** Provider-specific processing; add webhook supplies the transaction manager that also owns the inbox claim. */
-    async accept${Capability.slice(0, -1)}Delivery(delivery: ${Capability.slice(0, -1)}Delivery): Promise<void> {
-        await this.entityManager.query(FIND_${capability.toUpperCase()}, [delivery.id, delivery.id])
-    }
-`;
-  fs.writeFileSync(service, `${withContract.slice(0, classClose)}${intake}${withContract.slice(classClose)}`);
-};
-
-test("lite add webhook writes a policy-clean inbox and an atomic, architecture-clean intake", async () => {
+test("lite add webhook writes a policy-clean pending inbox and an architecture-clean record-only intake", async () => {
   const into = fs.mkdtempSync(path.join(os.tmpdir(), "hfs-add-webhook-lite-"));
   made.push(into);
   const tables = new Set(["profiles"]);
@@ -140,8 +116,8 @@ test("lite add webhook writes a policy-clean inbox and an atomic, architecture-c
     emitTypes: () => databaseTypes(tables),
     now: () => Date.UTC(2026, 9, 2, 12, 36, 0),
   });
-  addDeliveryIntake(root, "calendars");
-  addDeliveryIntake(root, "payments");
+  const calendarService = path.join(root, "be/src/modules/domain/calendars/calendars.service.ts");
+  const calendarBefore = fs.readFileSync(calendarService, "utf8");
 
   tables.add("calendar_inbox");
   const calendar = addKind({
@@ -196,7 +172,8 @@ test("lite add webhook writes a policy-clean inbox and an atomic, architecture-c
     "utf8",
   );
   assert.match(client, /entityManager\.transaction/);
-  assert.match(client, /if \(identity === undefined\) return/);
+  assert.match(client, /export const recordWebhookDelivery/);
+  assert.doesNotMatch(client, /await process|manager\.query\(complete|readonly process:/);
   assert.match(client, /DatabaseErrorCode\.WebhookDeliveryIdRequired/);
   const door = fs.readFileSync(
     path.join(
@@ -206,21 +183,16 @@ test("lite add webhook writes a policy-clean inbox and an atomic, architecture-c
     "utf8",
   );
   assert.match(door, /@Headers\("x-calendar-delivery-id"\) deliveryId/);
-  assert.match(door, /acceptCalendarDelivery\(deliveryId, delivery\)/);
+  assert.match(door, /recordCalendarDelivery\(deliveryId, delivery\)/);
+  assert.match(door, /this\.signature\.verify\([^\n]+\)\s+await this\.deliveries\.recordCalendarDelivery/);
+  const inbox = fs.readFileSync(path.join(root, "be/src/modules/domain/calendar-inbox/calendar-inbox.service.ts"), "utf8");
+  assert.match(inbox, /return recordWebhookDelivery/);
+  assert.doesNotMatch(inbox, /CalendarsService|process:|complete:|CommandBus|QueryBus/);
   const service = fs.readFileSync(
     path.join(root, "be/src/modules/domain/calendars/calendars.service.ts"),
     "utf8",
   );
-  assert.match(service, /entityManager: EntityManager = this\.entityManager/);
-  assert.match(service, /entityManager\.query/);
-  assert.match(
-    fs.readFileSync(path.join(root, "be/src/modules/domain/calendars/index.ts"), "utf8"),
-    /CalendarsService/,
-  );
-  assert.match(
-    fs.readFileSync(path.join(root, "be/src/modules/domain/payments/index.ts"), "utf8"),
-    /PaymentsService/,
-  );
+  assert.equal(service, calendarBefore, 'recording does not adapt a business processing method into the request transaction');
   const securityIndex = fs.readFileSync(
     path.join(root, "be/src/modules/platform/http-security/index.ts"),
     "utf8",
@@ -271,4 +243,47 @@ test("lite add webhook writes a policy-clean inbox and an atomic, architecture-c
     fast: true,
   });
   assert.deepEqual(problemsOf(report), []);
+});
+
+test("the generated inbox helper commits pending records, ignores duplicates and never invokes business processing", async () => {
+  const source = fs.readFileSync(path.join(ROOT, "packages/hfs/templates/be/inbox/database-client.ts.tpl"), "utf8");
+  const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const runtime = {};
+  class DatabaseError extends Error {
+    constructor({ code }) { super(code); this.code = code; }
+  }
+  new Script(compiled).runInNewContext({ exports: runtime, require: () => ({ DatabaseError, DatabaseErrorCode: { WebhookDeliveryIdRequired: "delivery-id-required" } }) });
+  const pending = new Map();
+  let transactions = 0;
+  let commits = 0;
+  let queryCalls = 0;
+  let processingCalls = 0;
+  const entityManager = {
+    transaction: async (callback) => {
+      transactions += 1;
+      await callback({
+        query: async (_insert, [provider, deliveryId, payload]) => {
+          queryCalls += 1;
+          const key = `${provider}:${deliveryId}`;
+          if (pending.has(key)) return [];
+          pending.set(key, { payload: JSON.parse(payload), processedAt: null });
+          return [{ id: key }];
+        },
+      });
+      commits += 1;
+    },
+  };
+  const input = { entityManager, insert: "pending-insert", provider: "calendar", deliveryId: " delivery-1 ", payload: { id: "delivery-1" }, process: async () => { processingCalls += 1; } };
+
+  await runtime.recordWebhookDelivery(input);
+  await runtime.recordWebhookDelivery(input);
+
+  assert.deepEqual([...pending.values()], [{ payload: { id: "delivery-1" }, processedAt: null }]);
+  assert.equal(queryCalls, 2, 'each delivery performs only the conflict-safe record attempt');
+  assert.equal(commits, 2);
+  assert.equal(processingCalls, 0, 'business processing happens only in a later consumer');
+  for (const deliveryId of [undefined, "   "]) {
+    await assert.rejects(runtime.recordWebhookDelivery({ ...input, deliveryId }), { code: "delivery-id-required" });
+  }
+  assert.equal(transactions, 2, 'missing ids are refused before a transaction opens');
 });

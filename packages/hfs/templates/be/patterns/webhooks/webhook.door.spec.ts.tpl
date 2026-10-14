@@ -57,8 +57,8 @@ describe("@@Provider@@Webhook", () => {
 
             await door.receive(REQUEST, sign(RAW_BODY, SIGNED_AT), SIGNED_AT, DELIVERY)
 
-            expect(deliveries.accept@@Provider@@Delivery).toHaveBeenCalledTimes(1)
-            expect(deliveries.accept@@Provider@@Delivery).toHaveBeenCalledWith(DELIVERY)
+            expect(deliveries.record@@Provider@@Delivery).toHaveBeenCalledTimes(1)
+            expect(deliveries.record@@Provider@@Delivery).toHaveBeenCalledWith(DELIVERY)
         })
 
         it("never reaches the intake when the signature is not the provider's", async () => {
@@ -69,7 +69,7 @@ describe("@@Provider@@Webhook", () => {
                 door.receive(REQUEST, sign(Buffer.from("other body"), SIGNED_AT), SIGNED_AT, DELIVERY),
             ).rejects.toMatchObject({ code: "HTTP_SECURITY_WEBHOOK_SIGNATURE_INVALID" })
 
-            expect(deliveries.accept@@Provider@@Delivery).not.toHaveBeenCalled()
+            expect(deliveries.record@@Provider@@Delivery).not.toHaveBeenCalled()
         })
     })
 })

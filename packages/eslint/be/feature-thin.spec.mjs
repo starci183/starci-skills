@@ -91,6 +91,9 @@ test("feature-thin: a feature file of a thin role maps parameters and makes one 
             },
             // a consumer hands the event payload to one domain service call
             { filename: CONSUMER, code: door("await this.orders.open(input.orderId)") },
+            // Later reactors and jobs may dispatch commands; this exemption never reaches the webhook HTTP slot.
+            { filename: CONSUMER, code: door("return this.bus.execute(new PlaceOrderCommand(input.orderId))", { imports: BUS, ctor: "private readonly bus: CommandBus" }) },
+            { filename: PROCESSOR, code: door("return this.bus.execute(new PlaceOrderCommand(input.orderId))", { imports: BUS, ctor: "private readonly bus: CommandBus" }) },
             // a processor delegates to the injected runner
             { filename: PROCESSOR, code: door("await this.orders.open(input.orderId)") },
             // a step makes one service call
@@ -158,6 +161,8 @@ export const toOrder = (input: { id: string }) => ({ id: input.id, total: toMone
             // a webhook proves the signature (verify is free) and hands the delivery to one intake method
             { filename: WEBHOOK, code: WEBHOOK_DOOR(`this.signature.verify({ rawBody: body, signature })
         await this.payments.acceptNotification(body)`) },
+            { filename: WEBHOOK, code: `export const PROVIDER_ACK = { code: -1 } as const\n${WEBHOOK_DOOR("this.signature.verify({ rawBody: body, signature })\n        await this.payments.acceptNotification(body)\n        return PROVIDER_ACK")}` },
+            { filename: WEBHOOK, code: 'export const PROVIDER_ACK: { readonly code: -1 } = { code: -1 }' },
             // an unconditional domain proof is free beside the one intake, including an explicit module declaration
             { filename: WEBHOOK, code: DOMAIN_WEBHOOK_DOOR("await this.verifier.verifyDelivery(body)\n        await this.payments.acceptNotification(body)") },
             { filename: WEBHOOK, code: DOMAIN_WEBHOOK_DOOR("this.verifier.assertDelivery(body)\n        await this.payments.acceptNotification(body)") },
@@ -332,6 +337,11 @@ export const toOrder = (orders: OrderService, input: { id: string }) => orders.o
                 errors: [{ messageId: "call" }],
             },
             // a webhook calls `verify` and one delegate - anything else is a call
+            { filename: WEBHOOK, code: 'declare const input: number; export const PROVIDER_ACK = { code: -input } as const', errors: [{ messageId: "compute" }] },
+            { filename: WEBHOOK, code: door("return this.bus.execute(new PlaceOrderCommand(input.orderId))", { imports: BUS, ctor: "private readonly bus: CommandBus" }), errors: [{ messageId: "call" }] },
+            { filename: WEBHOOK, code: door("return this.bus.execute(input.orderId)", { imports: 'import { QueryBus as LookupBus } from "@nestjs/cqrs"', ctor: "private readonly bus: LookupBus" }), errors: [{ messageId: "call" }] },
+            { filename: WEBHOOK, code: door("return this.handler.handle()", { imports: 'import { StartCheckoutHandler } from "@features/api/checkout/application/start-checkout.handler"', ctor: "private readonly handler: StartCheckoutHandler" }), errors: [{ messageId: "call" }] },
+            { filename: WEBHOOK, code: door("return this.bus.execute(input.orderId)", { imports: 'import { ProviderDispatchBus } from "@modules/domain/payment/payment-dispatch.service"', ctor: "private readonly bus: ProviderDispatchBus" }), errors: [{ messageId: "call" }] },
             { filename: WEBHOOK, code: WEBHOOK_DOOR(`this.signature.verify({ rawBody: body, signature })
         const parsed = JSON.parse(JSON.stringify(body))
         await this.payments.acceptNotification(parsed)`), errors: [{ messageId: "call" }, { messageId: "call" }] },

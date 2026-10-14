@@ -14679,27 +14679,28 @@ BE_TRANSPORT_SHAPE:
   kind: check-finding
 
 BE_WEBHOOK_SHAPE:
-  title: "A webhook door does more than prove and hand over"
+  title: "A webhook door breaks the verified inbox handoff or provider response contract"
   title_vi: "Cửa webhook làm nhiều hơn xác thực và chuyển giao"
-  meaning_vi: "Webhook của nhà cung cấp là một cửa ký số: một `@Controller` có đúng một handler `@Post` khai báo `@Public({ reason: PublicReason.SignedWebhook })`, chỉ tiêm `WebhookSignatureService` của platform/http-security và service của modules/domain, không rẽ nhánh, không vòng lặp, không try, chỉ gọi `verify` rồi đúng một phương thức nhận của service miền, và không trả dữ liệu miền về cho nhà cung cấp."
+  meaning_vi: "Webhook của nhà cung cấp là một cửa ký số: A provider webhook door (`src/features/webhooks/<provider>/transport/http/<provider>.webhook.ts`) is one `@Controller` with exactly one `@Post` handler and optionally one `@Get` subscription challenge handler, each declared `@Public({ reason: PublicReason.SignedWebhook })`. It injects only the `WebhookSignatureService` of `platform/http-security` and services of `modules/domain`, holds no branch, loop or `try`, and its POST calls proof then exactly one domain intake that durably records the inbox receipt and outbox event in its transaction. A combined domain proof and intake call is allowed. POST returns nothing or exactly the own-feature exported `PROVIDER_ACK`, a literal object or string declared with `as const` or a readonly literal type; computed values, inline return objects and cross-feature constants are refused. GET starts with a declared domain verifier call and returns exactly that result, with no intake. The door and its HTTP module import or inject no CommandBus, QueryBus of @nestjs/cqrs or feature command handler; the resolved called intake dispatches no command/query bus or feature handler. A reactor or job consumes the durable receipt and dispatches after commit; unresolved helpers and dynamic receivers require semantic review."
   causes_vi:
-    - "Webhook tiêm EntityManager, CommandBus hoặc hàng đợi và tự ghi dữ liệu hay tự phát sự kiện"
-    - "Handler có if hoặc try để tự quyết định xử lý hay bỏ qua giao hàng"
-    - "Handler gọi hai phương thức nhận, hoặc phân tích và ánh xạ payload ngay trong cửa"
-    - "Cửa webhook không khai báo lý do SignedWebhook nên mở công khai mà không được tính vào bậc giới hạn nghiêm ngặt"
-  nextStep_vi: "Đưa mọi quyết định và mọi lần ghi vào một phương thức nhận của service trong modules/domain (service tự ghi bản nhận và gọi eventBus.publish(event, tx) trong giao dịch của nó, dùng inbox để chống giao lại); để handler chỉ gọi verify rồi gọi đúng phương thức nhận đó, khai báo @Public({ reason: PublicReason.SignedWebhook }) và không trả gì. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và knowledge/patterns/be/webhooks.yaml; không thêm ngoại lệ, không tắt luật."
+    - "The webhook door or its HTTP module imports or injects CommandBus, QueryBus or a feature command handler, or the resolved called domain intake dispatches on a command/query bus or feature handler"
+    - "The handler branches, loops, parses, maps or publishes instead of proving first and recording one durable receipt"
+    - "The POST returns an inline object, computed value, input-derived constant or another feature's PROVIDER_ACK"
+    - "The door declares two POST routes, more than one GET, or a GET that echoes anything except its declared domain verifier result"
+  nextStep_vi: "Đưa mọi quyết định và mọi lần ghi vào một phương thức nhận của service trong modules/domain: verify first, then call one domain recordProviderDelivery-style method that claims the shared Inbox and records the receipt with its outbox event in one transaction. Let a reactor or job consume the durable receipt and dispatch the command. POST may return nothing or the own-feature exported literal PROVIDER_ACK; one optional GET echoes only its first declared domain verifier result. Keep the signed-webhook public reason and strict rate tier; follow knowledge/patterns/be/webhooks.yaml."
   owner: op-retry
   kind: check-finding
 
 BE_WEBHOOK_UNVERIFIED:
-  title: "A webhook handler runs code before proving the delivery"
+  title: "A webhook handler runs code before its declared delivery or challenge proof"
   title_vi: "Handler webhook chạy mã trước khi xác thực giao hàng"
-  meaning_vi: "Câu lệnh đầu tiên của handler webhook phải là lời gọi `verify` không điều kiện của `WebhookSignatureService` (chữ ký và cửa sổ chống phát lại). Giao hàng sai chữ ký hoặc quá hạn phải bị ném lỗi trước khi bất kỳ mã nào khác chạy, nhờ đó không có đường nào tới phương thức nhận khi chưa được chứng minh."
+  meaning_vi: "Câu lệnh đầu tiên của handler webhook: The first statement of a webhook POST is an unconditional verification call to `WebhookSignatureService.verify` or a domain verifier, awaited when async, with no data access or other call before proof. A domain verifier is a method on a domain service whose declared class name ends in `Verifier` or `verify`, or a domain service method declared by symbol in the adjacent HTTP module's exported `webhookVerifiers` array. A domain method may verify with per-connection secrets before intake in the same call; invalid proof throws before intake. A fixed PROVIDER_ACK never replaces proof. The optional GET challenge handler starts with a declared domain verifier call (directly returned or bound to a const and then returned), awaited when async, and echoes only its exact result."
   causes_vi:
-    - "Handler đọc hoặc gán biến trước khi gọi verify"
-    - "verify nằm trong if nên có đường đi bỏ qua nó"
-    - "Handler gọi verify của một lớp cùng tên nhưng không phải WebhookSignatureService của platform/http-security"
-  nextStep_vi: "Đặt `this.<signature>.verify({ rawBody, signature, timestamp })` làm câu lệnh đầu tiên của handler, không điều kiện, dùng WebhookSignatureService của platform/http-security và thân yêu cầu thô (không phải bản đã serialize lại). Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và BE-WEBHOOK trong knowledge/patterns/be/webhooks.yaml; không thêm ngoại lệ, không tắt luật."
+    - "The handler reads or assigns data before its first unconditional proof call"
+    - "Proof is conditional, unawaited when async, or a call nested around other work"
+    - "The verifier is a local lookalike or lacks a resolved domain service or declared verification method symbol"
+    - "The GET returns the unverified challenge field or transforms its verifier result"
+  nextStep_vi: "Đặt `this.<signature>.verify({ rawBody, signature, timestamp })` làm câu lệnh đầu tiên của handler, không điều kiện, dùng WebhookSignatureService của platform/http-security và thân yêu cầu thô (không phải bản đã serialize lại). POST must start with WebhookSignatureService.verify or the declared domain verifier, awaited when async; a combined proof and intake must refuse invalid proof before recording. GET must start with its declared domain challenge verifier and echo exactly that call result. Returning PROVIDER_ACK after POST intake never removes this first-statement requirement; follow knowledge/patterns/be/webhooks.yaml."
   owner: op-retry
   kind: check-finding
 
@@ -14743,7 +14744,7 @@ BE_REALTIME_TOPIC_SCOPE:
 BE_FEATURE_THIN:
   title: "A feature file holds logic"
   title_vi: "Tệp feature chứa logic thay vì chỉ ủy quyền"
-  meaning_vi: "Mọi tệp thuộc tầng feature có vai trò trong ruleParams.be.thinRoles (handler, resolver, controller, consumer, processor, step, saga, saga-step, compensation, webhook, gateway, subscription, cli, mapper, service của saga) chỉ ánh xạ tham số rồi thực hiện MỘT lệnh gọi ủy quyền vào modules/ (service, command bus, query bus, event bus hoặc queue producer): không if/switch/vòng lặp/toán tử ba ngôi/&&/||/??, không try/catch hay throw, không tính toán (so sánh, phép toán, chuỗi mẫu có biểu thức), không gọi hàm nào khác ngoài lệnh ủy quyền duy nhất, hàm ánh xạ thuần (*.mapper.ts) và logger. Logic nghiệp vụ nằm ở modules/** nơi được đo độ phủ 100% từng tệp; điều phối (thứ tự bước, bù trừ, claim, fencing, retry) nằm ở platform/*; tầng feature được kiểm chứng bằng integration và e2e, không bằng unit spec."
+  meaning_vi: "Mọi tệp thuộc tầng feature có vai trò trong ruleParams.be.thinRoles (handler, resolver, controller, consumer, processor, step, saga, saga-step, compensation, webhook, gateway, subscription, cli, mapper, service của saga) chỉ ánh xạ tham số rồi thực hiện MỘT lệnh gọi ủy quyền vào modules/ (service, command bus, query bus, event bus hoặc queue producer): không if/switch/vòng lặp/toán tử ba ngôi/&&/||/??, không try/catch hay throw, không tính toán (so sánh, phép toán, chuỗi mẫu có biểu thức), không gọi hàm nào khác ngoài lệnh ủy quyền duy nhất, hàm ánh xạ thuần (*.mapper.ts) và logger. Logic nghiệp vụ nằm ở modules/** nơi được đo độ phủ 100% từng tệp; điều phối (thứ tự bước, bù trừ, claim, fencing, retry) nằm ở platform/*; tầng feature được kiểm chứng bằng integration và e2e, không bằng unit spec. A webhook POST delegates only to its durable inbox recording intake and may return the declared literal PROVIDER_ACK; its optional GET challenge delegates once to the domain verifier and echoes only that result. Webhook doors and HTTP modules import or inject no CommandBus, QueryBus or feature command handler; the reactor or job alone dispatches the processing command after commit."
   causes_vi:
     - "Handler, consumer hoặc processor có if/switch/vòng lặp/try để quyết định nghiệp vụ thay vì để service quyết định"
     - "Step hoặc saga service gọi hai service liên tiếp (điều phối nằm sai chỗ, phải thuộc platform/*)"

@@ -10,7 +10,8 @@ import { @@Event@@Request } from "./dto/@@event@@.request"
 @Controller("webhooks/@@provider@@")
 /**
  * POST /webhooks/@@provider@@, the signed intake door of the @@provider@@ notifier. The signature and replay window are proven
- * first; the verified delivery goes to one domain intake that claims its inbox row and processes it in one transaction.
+ * first; the verified delivery goes to one domain intake that records a pending inbox row in its transaction. A separate
+ * reactor or job consumes the committed row and dispatches the command.
  */
 export class @@Provider@@Webhook {
     constructor(
@@ -18,7 +19,7 @@ export class @@Provider@@Webhook {
         private readonly deliveries: @@Provider@@InboxService,
     ) {}
 
-    /** Acknowledges with 204 and no body: a duplicate receives the same acknowledgement without being processed again. */
+    /** Acknowledges with 204 and no body: a duplicate receives the same acknowledgement without another inbox row. */
     @Post()
     @HttpCode(HttpStatus.NO_CONTENT)
     @Public({ reason: PublicReason.SignedWebhook })
@@ -31,6 +32,6 @@ export class @@Provider@@Webhook {
         @Body() delivery: @@Event@@Request,
     ): Promise<void> {
         this.signature.verify({ provider: "@@provider@@", rawBody: request.rawBody, signature, timestamp })
-        await this.deliveries.accept@@Provider@@Delivery(deliveryId, delivery)
+        await this.deliveries.record@@Provider@@Delivery(deliveryId, delivery)
     }
 }

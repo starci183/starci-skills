@@ -10,8 +10,8 @@ import { @@Event@@Request } from "./dto/@@event@@.request"
 @Controller("webhooks/@@provider@@")
 /**
  * POST /webhooks/@@provider@@, the signed intake door of the @@provider@@ notifier. The signature and the replay window are proven
- * first; the verified delivery goes to exactly one intake method of @@service@@ (`accept@@Provider@@Delivery`), which records it
- * once and publishes the event in its own transaction.
+ * first; the verified delivery goes to exactly one intake method of @@service@@ (`record@@Provider@@Delivery`), which records it
+ * once in the inbox and writes its outbox event in one transaction. A reactor or job dispatches the command after commit.
  */
 export class @@Provider@@Webhook {
     constructor(
@@ -31,6 +31,6 @@ export class @@Provider@@Webhook {
         @Body() delivery: @@Event@@Request,
     ): Promise<void> {
         this.signature.verify({ provider: "@@provider@@", rawBody: request.rawBody, signature, timestamp })
-        await this.deliveries.accept@@Provider@@Delivery(delivery)
+        await this.deliveries.record@@Provider@@Delivery(delivery)
     }
 }

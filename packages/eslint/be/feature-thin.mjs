@@ -25,6 +25,8 @@ import { hfsOf } from "./lib/hfs.mjs"
 import { importOf } from "./lib/import-source.mjs"
 import { baseName, isLoggerType, isOwnedType } from "./lib/ports.mjs"
 import { firstWebhookVerification, isWebhookDomainServiceType } from "./lib/webhook-verifiers.mjs"
+import { isWebhookForbiddenReceiver } from "./lib/webhook-handoff.mjs"
+import { isProviderAcknowledgement } from "./lib/webhook-ack.mjs"
 
 /** The statements and expressions that are a decision, a repetition or an exit: none lives in a thin file. */
 const BRANCH_NODES = new Set(["IfStatement", "SwitchStatement", "ConditionalExpression", "ForStatement", "ForInStatement", "ForOfStatement", "WhileStatement", "DoWhileStatement", "TryStatement", "ThrowStatement", "LogicalExpression"])
@@ -67,6 +69,27 @@ const isClaimsReceiver = (context, node) => isOwnedType(context, node, { name: "
 /** The `Logger` port of `platform/logging` - the one call that is always free. */
 const isLoggerReceiver = isLoggerType
 
+/** A direct, non-computed member call; other callee shapes keep their ordinary call classification. */
+const memberOf = (callee) => callee.type === "MemberExpression" && !callee.computed && callee.property.type === "Identifier" ? callee : null
+
+/** Nest-commander's group help is transport bookkeeping in a CLI door. */
+const isCliHelp = (role, member) => role === "cli" && member?.property.name === "help" && member.object.type === "MemberExpression"
+    && member.object.object.type === "ThisExpression" && member.object.property.type === "Identifier" && member.object.property.name === "command"
+
+/** A signed number inside the validated immutable provider literal is data, rather than door computation. */
+const isLiteralAcknowledgementInitializer = (context, hfs, node) => {
+    let child = node
+    for (let parent = node.parent; parent; parent = parent.parent) {
+        if (parent.type === "VariableDeclarator") return parent.init === child && isProviderAcknowledgement(context, hfs, parent.id)
+        child = parent
+    }
+    return false
+}
+
+/** A signed numeric literal in a TypeScript type annotation executes no expression. */
+const isSignedNumericLiteralType = (node) => node.type === "UnaryExpression" && node.parent?.type === "TSLiteralType"
+    && ["+", "-"].includes(node.operator) && node.argument.type === "Literal" && typeof node.argument.value === "number"
+
 /** The name of a thin file's law is `feature-thin` (R203). */
 export const featureThin = {
     meta: {
@@ -76,7 +99,7 @@ export const featureThin = {
         messages: {
             branch: "{{what}} is a decision or a repetition in a thin file. A feature `<name>.{{role}}.ts` maps its parameters and makes one delegating call into the modules; a branch, a loop, a `try` or a `throw` is business logic that belongs in a service of the modules (where a unit spec covers it) - and orchestration (step order, compensation, claim, fencing, retry) belongs to the platform.",
             compute: "{{what}} computes a value in a thin file. A feature `<name>.{{role}}.ts` maps its parameters and hands them over; an expression that computes is logic that belongs in the modules. Map the value there and read it back.",
-            call: "`{{what}}` is a call a thin file does not make. It calls exactly one injected member (a service, a bus `execute`, an event bus, a queue producer) or one function of the modules, and pure `*.mapper.ts` functions and the `Logger` port are free{{webhook}}; everything else - parsing, mapping by hand, a helper, a second dependency - is logic that belongs in the modules.",
+            call: "`{{what}}` is a call a thin file does not make. It calls exactly one injected member (a service, a bus `execute`, an event bus, a queue producer) or one function of the modules, and pure `*.mapper.ts` functions and the `Logger` port are free{{webhook}}; a webhook hands off through domain intake and the inbox/outbox, never a command/query bus or a feature handler. Everything else - parsing, mapping by hand, a helper, a second dependency - is logic that belongs in the modules.",
             many: "`{{name}}` makes a second delegating call here. A thin file makes exactly one; a second is orchestration - step order, compensation, claim, fencing, retry - and belongs to a capability of the platform or inside the service the file calls.",
         },
     },
@@ -89,6 +112,7 @@ export const featureThin = {
         if (hfs.tierOf(context.filename) !== "feature") return {}
         const sourceCode = context.sourceCode
         const mapperFile = role === "mapper"
+        const webhookDoor = role === "webhook" && hfs.slotOf(context.filename) === "be.feature.webhooks.http"
 
         /** The injected member names of a class: constructor parameter properties and properties carrying an injector decorator. */
         const memberNames = new Map()
@@ -156,20 +180,28 @@ export const featureThin = {
          * `free` (a mapper, a logger method, a webhook `verify`, a job step's `JobClaims` fence call, a modules function in a mapping position)
          * or `call` (a call a thin file does not make). A `mapper` file holds only mapper calls and `new`.
          */
+        const classifyMapperOrCli = (member, call) => {
+            if (mapperFile && member !== null && MAPPER_SHAPE_METHODS.has(member.property.name) && injectedMemberOf(member.object, call) === null) return "free"
+            if (isCliHelp(role, member)) return "free"
+            return mapperFile ? "call" : null
+        }
+
+        /** The free bookkeeping calls beside an injected member's one delegate. */
+        const classifyInjected = (member) => {
+            if (webhookDoor && isWebhookForbiddenReceiver(context, hfs, member.object)) return "call"
+            if (isLoggerReceiver(context, member.object)) return "free"
+            if (role === "webhook" && member.property.name === "verify" && isSignatureReceiver(context, member.object)) return "free"
+            if (role === "step" && isClaimsReceiver(context, member.object)) return "free"
+            return "delegating"
+        }
+
         const classify = (call) => {
             const callee = call.callee
             if (callee.type === "Identifier" && isMapperCall(callee)) return "free"
-            const member = callee.type === "MemberExpression" && !callee.computed && callee.property.type === "Identifier" ? callee : null
-            if (mapperFile && member !== null && MAPPER_SHAPE_METHODS.has(member.property.name) && injectedMemberOf(member.object, call) === null) return "free"
-            // a cli group command shows its help without a sub-command: the `help` of the command nest-commander gives it
-            if (role === "cli" && member !== null && member.property.name === "help" && member.object.type === "MemberExpression" && member.object.object.type === "ThisExpression" && member.object.property.type === "Identifier" && member.object.property.name === "command") return "free"
-            if (mapperFile) return "call"
-            if (callee.type === "MemberExpression" && !callee.computed && callee.property.type === "Identifier" && injectedMemberOf(callee.object, call) !== null) {
-                if (isLoggerReceiver(context, callee.object)) return "free"
-                if (role === "webhook" && callee.property.name === "verify" && isSignatureReceiver(context, callee.object)) return "free"
-                if (role === "step" && isClaimsReceiver(context, callee.object)) return "free"
-                return "delegating"
-            }
+            const member = memberOf(callee)
+            const special = classifyMapperOrCli(member, call)
+            if (special !== null) return special
+            if (member !== null && injectedMemberOf(member.object, call) !== null) return classifyInjected(member)
             if (callee.type === "Identifier" && isModulesCall(callee)) return isStatementCall(call) ? "delegating" : "free"
             return "call"
         }
@@ -203,7 +235,11 @@ export const featureThin = {
             visitors[type] = (node) => context.report({ node, messageId: "branch", data: { what: type === "LogicalExpression" ? `a \`${node.operator}\`` : BRANCH_WHAT[type], role } })
         }
         for (const type of COMPUTE_NODES) {
-            visitors[type] = (node) => context.report({ node, messageId: "compute", data: { what: `an \`${node.operator}\``, role } })
+            visitors[type] = (node) => {
+                if (isSignedNumericLiteralType(node)) return
+                if (webhookDoor && isLiteralAcknowledgementInitializer(context, hfs, node)) return
+                context.report({ node, messageId: "compute", data: { what: `an \`${node.operator}\``, role } })
+            }
         }
         visitors.TemplateLiteral = (node) => {
             if (node.expressions.length > 0) context.report({ node, messageId: "compute", data: { what: "a template literal with an expression", role } })

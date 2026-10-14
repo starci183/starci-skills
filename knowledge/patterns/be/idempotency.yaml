@@ -31,8 +31,10 @@ rules:
     kind: mandatory
     hfsRules: [R80, R85]
     requirement: |-
-      A consumer (`transport/message/<event>.consumer.ts`) or `@Public({ reason: PublicReason.SignedWebhook })` controller is
-      a thin door: it forwards the delivery's `eventId` through one command to the domain service. A public delivery method
+      A consumer (`transport/message/<event>.consumer.ts`) is a thin door that forwards the delivery's `eventId` through one
+      command to the domain service. A signed webhook verifies first and calls one domain method that durably records the
+      inbox receipt and outbox event; only a reactor or job dispatches its processing command after commit (webhooks.yaml).
+      A public delivery method
       of that service (its first parameter carries `eventId`) takes `@InjectInbox() private readonly inbox: Inbox`, claims
       `(source, eventId)` first and returns when the claim answers `false`. When the service owns an EntityManager transaction,
       the first awaited work in the transaction callback is `this.inbox.claim(source, eventId, manager)`, with that callback's
@@ -47,7 +49,7 @@ rules:
     cases:
       - id: case-1
         when: A signed webhook controller
-        write: 'the webhook door (webhooks.yaml) verifies the signature and calls one domain intake method; that method of the domain service claims (PAYOS_SOURCE, eventId) as its first awaited expression, returns when the claim answers false, and publishes the event in its transaction.'
+        write: 'the webhook door (webhooks.yaml) verifies the signature and calls one domain recording intake; that method claims (PAYOS_SOURCE, eventId) first in its transaction, returns when the claim answers false, and saves the durable receipt with its outbox event. A reactor or job consumes the committed receipt and dispatches the processing command; the webhook door, HTTP module and called intake never dispatch on a command bus.'
       - id: case-2
         when: A consumer
         write: 'be/src/features/api/billing/transport/message/payment-captured.consumer.ts forwards delivery.eventId in one command; its domain service claims first inside its own transaction with the callback manager, then writes and publishes through that manager.'
