@@ -18163,3 +18163,143 @@ workflow-purge-ledger-dependency:
   nextStep_vi: "Xử lý tham chiếu theo thẩm quyền sản phẩm hoặc sửa bộ kiểm schema rồi đọc lại kế hoạch; không xóa Work để vượt cổng."
   owner: owner
   kind: verb-refusal
+
+HFS_HOST_CRON:
+  title: "Apps do not install host cron or timer jobs"
+  title_vi: "Ứng dụng cài lịch chạy trên máy chủ"
+  meaning_vi: "Tệp triển khai hoặc script tại <path> khai báo crontab, cron.d, systemd timer, @reboot hoặc at; lịch chạy phải do ứng dụng sở hữu."
+  causes_vi:
+    - "Vi phạm R250: cài lịch chạy ngoài scheduler của ứng dụng hoặc replicated-job đã khai báo."
+  nextStep_vi: "Chuyển tác vụ sang scheduler của back end, pgmq/pg_cron hoặc replicated-job đã khai báo và gọi lệnh CLI của ứng dụng."
+  owner: op-retry
+  kind: check-finding
+
+HFS_DEPLOY_NO_LOGIC:
+  title: "Deploy shell scripts delegate to the app CLI"
+  title_vi: "Script triển khai chứa logic của ứng dụng"
+  meaning_vi: "Script triển khai tại <path> chạy node -e, psql, SQL nội tuyến hoặc tải và thực thi shell; logic phải nằm trong ứng dụng và có spec."
+  causes_vi:
+    - "Vi phạm R250: đặt logic hoặc truy cập cơ sở dữ liệu trực tiếp trong deploy/*.sh."
+  nextStep_vi: "Đưa logic vào lệnh be/apps/cli có spec rồi để script triển khai gọi docker, starci hoặc CLI đã biên dịch."
+  owner: op-retry
+  kind: check-finding
+
+HFS_DEPLOY_COMPOSE_ON_VPS:
+  title: "Docker compose lifecycle commands are dev-only"
+  title_vi: "Docker Compose được dùng ngoài môi trường dev"
+  meaning_vi: "Tệp tại <path> chạy docker compose up, down hoặc pull cho môi trường không phải dev; triển khai VPS dùng Docker Swarm."
+  causes_vi:
+    - "Vi phạm R250: dùng vòng đời Compose trong production, staging hoặc trên VPS."
+  nextStep_vi: "Dùng stack Swarm đã khai báo để triển khai VPS; chỉ giữ Compose cho môi trường dev được xác định rõ."
+  owner: op-retry
+  kind: check-finding
+
+HFS_DEPLOY_SCHEDULER:
+  title: "Workflow scheduling does not own app work"
+  title_vi: "Workflow tự lập lịch cho tác vụ ứng dụng"
+  meaning_vi: "Workflow tại <path> có lịch chạy thay cho scheduler của ứng dụng; tác vụ định kỳ phải thuộc back end hoặc job đã khai báo."
+  causes_vi:
+    - "Vi phạm R250: dùng sự kiện schedule hoặc lịch trong workflow để chạy tác vụ ứng dụng."
+  nextStep_vi: "Bỏ lịch khỏi workflow và đưa tác vụ sang scheduler của ứng dụng hoặc replicated-job đã khai báo."
+  owner: op-retry
+  kind: check-finding
+
+HFS_DEPLOY_WORKFLOW:
+  title: "Deployment workflows declare protected jobs and sealed custody"
+  title_vi: "Workflow triển khai thiếu kiểm soát hoặc sai nơi giữ bí mật"
+  meaning_vi: "Workflow triển khai tại <path> thiếu environment, permissions, concurrency hoặc bước materialize; hoặc dùng dotenv hay bí mật ngoài danh sách cho phép."
+  causes_vi:
+    - "Vi phạm R251: workflow bỏ qua môi trường bảo vệ hoặc lấy bí mật ứng dụng từ GitHub thay cho kho mã hoá."
+  nextStep_vi: "Khai báo environment, permissions và concurrency; materialize bí mật đã mã hoá với SOPS_AGE_KEY; chỉ cho phép khoá SSH và known_hosts phục vụ vận chuyển."
+  owner: op-retry
+  kind: check-finding
+
+HFS_WORKFLOW_PIN:
+  title: "Remote workflow actions use immutable commit SHAs"
+  title_vi: "Action của workflow chưa được ghim SHA"
+  meaning_vi: "Workflow tại <path> dùng action từ xa với tag hoặc nhánh thay cho commit SHA gồm 40 ký tự hex."
+  causes_vi:
+    - "Vi phạm R251: action có thể đổi nội dung khi tag hoặc nhánh thay đổi."
+  nextStep_vi: "Ghim uses của action từ xa bằng commit SHA gồm 40 ký tự hex; action cục bộ vẫn dùng đường dẫn trong kho."
+  owner: op-retry
+  kind: check-finding
+
+HFS_CI_TOOL_INSTALL:
+  title: "CI tool installation verifies immutable artifacts"
+  title_vi: "Công cụ CI được cài mà chưa xác minh checksum"
+  meaning_vi: "Workflow tại <path> tải hoặc cài công cụ bằng curl|sh, go install, npm global hoặc pip mà không xác minh checksum hay digest."
+  causes_vi:
+    - "Vi phạm R251: phiên bản hoặc URL riêng lẻ không chứng minh nội dung công cụ đã được xác minh."
+  nextStep_vi: "Dùng action đã ghim SHA hoặc tải artifact được ghim và xác minh checksum/digest trước khi thực thi; không pipe bản tải vào shell."
+  owner: op-retry
+  kind: check-finding
+
+HFS_APP_WORKFLOW_TRIGGER:
+  title: "App workflows start on release tags or manual dispatch"
+  title_vi: "Workflow ứng dụng có sự kiện khởi chạy không hợp lệ"
+  meaning_vi: "Workflow tại <path> chạy theo push nhánh hoặc sự kiện khác; ứng dụng chỉ chạy CI theo release tag v* hoặc workflow_dispatch."
+  causes_vi:
+    - "Vi phạm R251: áp dụng ngoại lệ push main của runtime cho workflow ứng dụng."
+  nextStep_vi: "Đặt on.push.tags thành [v*] và dùng workflow_dispatch khi cần chạy thủ công; bỏ nhánh và sự kiện khác."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SCRIPT_PLAINTEXT_LOAD:
+  title: "Executable scripts do not load plaintext credential files"
+  title_vi: "Script đọc tệp bí mật dạng rõ"
+  meaning_vi: "Script tại <path> đọc secrets.env, secret.env, .env bí mật hoặc tệp thông tin xác thực trong thư mục nhà; bộ kiểm chỉ báo đường dẫn và không đọc giá trị."
+  causes_vi:
+    - "Vi phạm R252: nạp bí mật từ tệp dạng rõ thay cho bí mật đã mã hoá và cơ chế materialize."
+  nextStep_vi: "Bỏ cách nạp tệp rõ; dùng starci app secret materialize và cơ chế bí mật của stack, không in giá trị."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SCRIPT_XTRACE:
+  title: "Scripts do not enable xtrace or reveal secrets"
+  title_vi: "Script bật truy vết hoặc hiện bí mật"
+  meaning_vi: "Script tại <path> bật set -x, xtrace hoặc yêu cầu --reveal, có thể đưa giá trị bí mật vào log."
+  causes_vi:
+    - "Vi phạm R252: bật truy vết shell hoặc yêu cầu hiển thị bí mật trong lệnh tự động."
+  nextStep_vi: "Tắt xtrace và bỏ --reveal; chỉ ghi thông tin thao tác không chứa giá trị bí mật."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SERVICE_ROLE_SCOPE:
+  title: "Service-role access belongs to the Supabase integration"
+  title_vi: "Service role được dùng ngoài integration Supabase"
+  meaning_vi: "Mã tại <path> tham chiếu service_role ngoài integration Supabase của back end, kể cả trong script triển khai."
+  causes_vi:
+    - "Vi phạm R252: sử dụng quyền service role ngoài thành phần sở hữu kết nối Supabase."
+  nextStep_vi: "Đưa quyền service role vào be/src/modules/integrations/supabase và truy cập qua port của integration; script gọi CLI của ứng dụng."
+  owner: op-retry
+  kind: check-finding
+
+HFS_DEPENDABOT_MISSING:
+  title: "Apps declare scheduled dependency updates"
+  title_vi: "Ứng dụng thiếu cấu hình cập nhật phụ thuộc"
+  meaning_vi: "Kho thiếu .github/dependabot.yml hợp lệ với lịch cập nhật npm, github-actions và docker."
+  causes_vi:
+    - "Vi phạm R269: một hệ sinh thái phụ thuộc chưa được theo dõi cập nhật định kỳ."
+  nextStep_vi: "Khai báo Dependabot version 2 với directory và schedule cho npm, github-actions và docker."
+  owner: op-retry
+  kind: check-finding
+
+HFS_AUDIT_STEP_MISSING:
+  title: "CI gates releases on a production dependency audit"
+  title_vi: "CI thiếu bước kiểm tra lỗ hổng phụ thuộc production"
+  meaning_vi: "Workflow CI thiếu bước npm audit --omit=dev hoạt động và dừng job khi kiểm tra thất bại."
+  causes_vi:
+    - "Vi phạm R269: audit không có, bị vô hiệu hoá, chỉ nằm trong chú thích hoặc bỏ qua kết quả."
+  nextStep_vi: "Thêm npm audit --omit=dev --audit-level=high vào job CI hoạt động; không dùng continue-on-error hoặc bỏ qua mã lỗi."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SBOM_MISSING:
+  title: "Release images carry SBOM and provenance evidence"
+  title_vi: "Image phát hành thiếu SBOM hoặc provenance"
+  meaning_vi: "Workflow images thiếu bước hoạt động tạo SBOM và chứng thực nguồn gốc cho image phát hành."
+  causes_vi:
+    - "Vi phạm R269: bản dựng không tạo cả danh mục thành phần và bằng chứng nguồn gốc."
+  nextStep_vi: "Bật sbom và provenance trong bước build image hoặc tạo SBOM cùng chứng thực nguồn gốc bằng công cụ/action đã ghim."
+  owner: op-retry
+  kind: check-finding
