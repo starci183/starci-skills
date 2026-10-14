@@ -9,8 +9,9 @@ import { generatedRootsOf } from '../../lib/check-scan.mjs';
 import { eachInOrder } from '../../lib/in-order.mjs';
 import { judgedInEdition } from '../../hfs/edition-slots.mjs';
 import { checkRepository } from '../../hfs/check.mjs';
-import { coverageSafePath } from './coverage-inventory.mjs';
+import { codesInEdition, coverageSafePath, coverageSources } from './coverage-inventory.mjs';
 import { coverageRuleFindingLevel } from './coverage-ratchet.mjs';
+import { fixtureEvidence } from './coverage-rules.mjs';
 
 const CODE = 'RT_COVERAGE_NO_WITNESS';
 const PREFIX = 'hfs-coverage-witness-';
@@ -181,8 +182,8 @@ async function runWitness(context, rule, witness, index, deps, generated) {
 }
 
 /** The opt-in L4 layer; call under the external weight-2 wrapper. Inject judge/tempRoot for isolated specs. */
-export async function runCoverageWitnesses({ root, catalog, manifest }, deps = {}) {
-  const context = { root: fs.realpathSync.native(path.resolve(root)), manifest };
+export async function runCoverageWitnesses({ root, catalog, manifest, files }, deps = {}) {
+  const context = { root: fs.realpathSync.native(path.resolve(root)), manifest, files };
   const generated = generatedRootsOf(context.root);
   const findings = [];
   await eachInOrder(catalog.rules ?? [], async (rule) => {
@@ -193,7 +194,19 @@ export async function runCoverageWitnesses({ root, catalog, manifest }, deps = {
       findings.push(finding(rule, undefined, 0, 'witness must contain mutations or a dated unreachable reason'));
       return;
     }
-    await eachInOrder(rule.witness, async (witness, index) => findings.push(...await runWitness(context, rule, witness, index, deps, generated)));
+    await eachInOrder(rule.witness, async (witness, index) => {
+      if (witness?.path) {
+        context.files ??= coverageSources(context.root);
+        findings.push(...referenceWitnessFindings(context, rule, witness, index));
+      } else findings.push(...await runWitness(context, rule, witness, index, deps, generated));
+    });
   });
   return findings;
+}
+
+function referenceWitnessFindings(context, rule, witness, index) {
+  const editions = witness.edition ? [witness.edition] : witness.editions ?? rule.editions ?? ['lite', 'full'];
+  return editions.filter((edition) => !judgedInEdition(rule, edition)
+    || !fixtureEvidence(context, witness, edition, codesInEdition(rule, edition)))
+    .map((edition) => finding(rule, edition, index, 'dedicated fixture or spec helper evidence is missing for this edition'));
 }

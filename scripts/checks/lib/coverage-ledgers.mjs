@@ -3,6 +3,7 @@
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { isPlainObject } from '../../../engine/plain-object.mjs';
 import { judgedInEdition, slotInEdition, effectiveSlot } from '../../hfs/edition-slots.mjs';
+import { codesInEdition } from './coverage-inventory.mjs';
 
 const SURFACES_PATH = 'knowledge/hfs/surfaces.yaml';
 const REQUIREMENT_DOCS = ['docs/application-stacks.md', 'docs/lite-edition.md', 'docs/microservices.md', 'docs/host-secrets.md'];
@@ -87,7 +88,10 @@ function surfaceCellFindings(row, edition, { manifest, slots, rules, covered }) 
   const applicableSlots = slotIds.map((slot) => slots.get(slot)).filter((slot) => slot && slotInEdition(manifest, slot, edition));
   const declaredRules = strings(cell.rules ?? cell.rule);
   const references = declaredRules.length ? declaredRules : applicableSlots.flatMap((slot) => slotRuleReferences(slot, manifest, edition));
-  const applicableRules = references.map((rule) => rules.get(rule)).filter((rule) => rule && judgedInEdition(rule, edition));
+  const applicableRules = references.filter((reference) => {
+    const rule = rules.get(reference);
+    return rule && judgedInEdition(rule, edition) && (reference === rule.id || codesInEdition(rule, edition).includes(reference));
+  });
   const mapped = applicableSlots.length > 0 && applicableRules.length > 0;
   if (!mapped && !gapReason(cell.gap)) return [finding('RT_COVERAGE_SURFACE_UNMAPPED', SURFACES_PATH, `Surface ${id} has no applicable rule and slot for edition ${edition}; declare their mapping or gap: reason.`, { edition, rules: references })];
   for (const slot of applicableSlots) covered.add(`${slot.id}@${edition}`);

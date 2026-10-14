@@ -22,6 +22,8 @@ import { runCoverageWitnesses } from '../../scripts/checks/lib/coverage-witness.
 // proves: RT_COVERAGE_SUPERSEDED_CITE@lite RT_COVERAGE_SUPERSEDED_CITE@full
 // proves: RT_COVERAGE_SURFACE_UNMAPPED@lite RT_COVERAGE_SURFACE_UNMAPPED@full
 // proves: RT_COVERAGE_REQUIREMENT_UNLEDGERED@lite RT_COVERAGE_REQUIREMENT_UNLEDGERED@full
+// proves: RT_COVERAGE_PROOF_VACUOUS@lite RT_COVERAGE_PROOF_VACUOUS@full
+// proves: RT_COVERAGE_CODE_UNROUTED@lite RT_COVERAGE_CODE_UNROUTED@full
 
 const EDITIONS = ['lite', 'full'];
 const SAMPLE = 'RT_SAMPLE_FAILURE';
@@ -56,8 +58,8 @@ function completeCatalog() {
     }] },
     files: new Map([
       [DOC, `Owner: Runtime\n\n${SAMPLE} describes the sample.\n`],
-      [SPEC, `// proves: ${SAMPLE}@lite ${SAMPLE}@full\ntest('invalid lite', () => {});\ntest('valid lite', () => {});\ntest('invalid full', () => {});\ntest('valid full', () => {});\n`],
-      [ENFORCER, `export const finding = '${SAMPLE}';\n`],
+      [SPEC, sampleProof()],
+      [ENFORCER, `export function sample(invalid) { return invalid ? [{ code: '${SAMPLE}' }] : []; }\n`],
       [TEMPLATE, 'sample: valid\n'],
       [RUNTIME_SLOTS, `ruleParams:\n  runtime:\n    selfChecks:\n      - {id: sample, run: ${ENFORCER}}\n`],
       ...EDITIONS.flatMap((edition) => [
@@ -72,6 +74,11 @@ function completeCatalog() {
     surfaces: [{ id: 'sample', editions: [...EDITIONS], rules: ['R01'], slots: ['app.sample'] }],
     requirements: [], rulings: null,
   };
+}
+
+function sampleProof() {
+  const tests = EDITIONS.map((edition) => `test('invalid ${edition}', () => { assert.equal(sample(true)[0].code, '${SAMPLE}'); });\ntest('valid ${edition}', () => { assert.deepEqual(sample(false), []); });`).join('\n');
+  return `import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { sample } from '../../${ENFORCER}';\n// proves: ${SAMPLE}@lite ${SAMPLE}@full\n${tests}\n`;
 }
 
 /** One fixture catalog per R247 code; each has an invalid and a conforming form for both editions. */
@@ -110,6 +117,26 @@ const fixtureCatalogs = {
     if (invalid) {
       context.files.delete(recordPath(edition));
       context.examples.find((entry) => entry.edition === edition).files = [`${examplePath(edition)}/hfs.json`];
+    }
+    return context;
+  },
+  RT_COVERAGE_PROOF_VACUOUS(edition, invalid) {
+    const context = completeCatalog();
+    const violating = `test('invalid ${edition}', () => { assert.equal(sample(true)[0].code, '${SAMPLE}'); });`;
+    if (invalid) context.files.set(SPEC, context.files.get(SPEC).replace(violating, `test('invalid ${edition}', () => { const code = '${SAMPLE}'; });`));
+    return context;
+  },
+  RT_COVERAGE_CODE_UNROUTED(_edition, invalid) {
+    const context = completeCatalog();
+    const machine = 'scripts/hfs/architecture/sample.mjs';
+    context.files.set(machine, `export function sample() { return [{ ruleId: '${SAMPLE}' }]; }`);
+    context.files.set('scripts/hfs/architecture/surface.mjs', `const BE = ['be'];\nconst enforcer = (id, plugins, codes) => ({id, plugins, codes});\nexport const LINT_ENFORCERS = [enforcer('sample', BE, ['${SAMPLE}'])];`);
+    context.files.set('packages/eslint/be/index.mjs', invalid ? 'export const rules = {};' : `export const rules = {'sample': {create() { return {}; }}};`);
+    context.files.set('packages/eslint/be/lib/why.mjs', `export const why = {'sample': {code: '${SAMPLE}'}};`);
+    if (!invalid) {
+      ruleOf(context).enforcers.push({kind: 'eslint-be', id: 'sample'});
+      const run = "test(`valid and invalid ${edition}`, () => tester.run('sample', rules.sample, {valid: ['ok'], invalid: [{code: 'bad', errors: 1}]}));";
+      context.files.set(SPEC, context.files.get(SPEC) + `import { RuleTester } from 'eslint';\nimport { rules } from '../../packages/eslint/be/index.mjs';\nconst tester = new RuleTester();\nfor (const edition of ['lite', 'full']) ${run}\n`);
     }
     return context;
   },
@@ -180,6 +207,198 @@ for (const [code, fixtureCatalog] of Object.entries(fixtureCatalogs)) {
       assert.deepEqual(findings, [], JSON.stringify(findings));
     });
   }
+}
+
+for (const edition of EDITIONS) {
+  test(`the legacy ${edition} ratchet reports metadata-free rules as backlog warnings`, () => {
+    const context = completeCatalog();
+    for (const key of ['editions', 'docs', 'exemplifiedBy', 'proves', 'witness']) delete ruleOf(context)[key];
+    const findings = hfsCoverageFindings(context);
+    assert.ok(findings.length > 0);
+    assert.ok(findings.every((item) => item.level === 'warning' && item.legacy));
+    const report = coverageReport(findings);
+    assert.equal(report.ok, true);
+    assert.equal(report.legacyBacklog.total, findings.length);
+    assert.match(formatCoverageReport(report), /Legacy backlog:/);
+    ruleOf(context).docs = [{path: DOC, edition}];
+    assert.ok(hfsCoverageFindings(context).some((item) => item.level === 'error' && !item.legacy));
+  });
+
+  test(`new ${edition} rules gate missing fixture and witness evidence`, () => {
+    const context = completeCatalog();
+    ruleOf(context).id = 'R247';
+    delete ruleOf(context).witness;
+    ruleOf(context).exemplifiedBy = [TEMPLATE];
+    const findings = hfsCoverageFindings(context).filter((item) => item.rule === 'R247' && item.edition === edition);
+    for (const code of reportOnly) assert.ok(findings.some((item) => item.code === code && item.level === 'error'), code);
+  });
+
+  test(`dedicated ${edition} fixtures provide passing example and witness evidence`, () => {
+    const context = completeCatalog();
+    const fixture = `tests/fixtures/coverage/${edition}/record.yaml`;
+    context.files.set(fixture, 'sample: valid\n');
+    const evidence = {path: fixture, edition, codes: [SAMPLE]};
+    ruleOf(context).exemplifiedBy = [TEMPLATE, evidence];
+    ruleOf(context).witness = [evidence];
+    const missing = () => hfsCoverageFindings(context).filter((item) => item.rule === 'R01' && reportOnly.has(item.code));
+    assert.ok(!missing().some((item) => item.edition === edition));
+    assert.ok(missing().some((item) => item.edition === otherEdition(edition)));
+    context.files.delete(fixture);
+    assert.ok(missing().some((item) => item.edition === edition));
+  });
+
+  test(`a ${edition} spec helper provides passing example and witness evidence`, () => {
+    const context = completeCatalog();
+    const evidence = {path: SPEC, edition, codes: [SAMPLE]};
+    ruleOf(context).exemplifiedBy = [TEMPLATE, evidence];
+    ruleOf(context).witness = [evidence];
+    const relevant = () => hfsCoverageFindings(context).filter((item) => item.rule === 'R01' && item.edition === edition && reportOnly.has(item.code));
+    assert.deepEqual(relevant(), []);
+    context.files.set(SPEC, `// proves: ${SAMPLE}@${otherEdition(edition)}\n`);
+    assert.equal(relevant().length, 2);
+  });
+
+  test(`an imported ${edition} helper supplies evidence only through a spec that uses it`, () => {
+    const context = completeCatalog();
+    const helper = 'tests/helpers/sample.mjs';
+    context.files.set(helper, `import { sample } from '../../${ENFORCER}';\nexport function runSample(invalid) { return sample(invalid); }`);
+    const direct = `import { sample } from '../../${ENFORCER}';`;
+    const throughHelper = "import { runSample as sample } from '../helpers/sample.mjs';";
+    context.files.set(SPEC, context.files.get(SPEC).replace(direct, throughHelper));
+    const evidence = {path: helper, edition, codes: [SAMPLE]};
+    ruleOf(context).exemplifiedBy = [TEMPLATE, evidence];
+    ruleOf(context).witness = [evidence];
+    const failures = () => hfsCoverageFindings(context).filter((item) => item.rule === 'R01' && item.edition === edition && reportOnly.has(item.code));
+    assert.deepEqual(failures(), []);
+    context.files.set(SPEC, context.files.get(SPEC).replace(throughHelper, direct));
+    assert.equal(failures().length, 2, 'an unused helper import cannot stand in for fixture evidence');
+  });
+
+  test(`codeEditions checks only applicable ${edition} proof and documentation codes`, () => {
+    const context = completeCatalog();
+    ruleOf(context).failureCodes.push('RT_SAMPLE_DETAIL');
+    ruleOf(context).codeEditions = {RT_SAMPLE_DETAIL: [otherEdition(edition)]};
+    const findings = hfsCoverageFindings(context).filter((item) => /RT_SAMPLE_DETAIL/.test(item.message));
+    assert.ok(findings.length > 0);
+    assert.ok(findings.every((item) => item.edition === otherEdition(edition)));
+  });
+
+  test(`surface mappings cannot cite a code outside its ${edition} applicability`, () => {
+    const context = completeCatalog();
+    context.surfaces[0].rules = [SAMPLE];
+    ruleOf(context).codeEditions = {[SAMPLE]: [otherEdition(edition)]};
+    const failures = hfsCoverageFindings(context).filter((item) => item.code === 'RT_COVERAGE_SURFACE_UNMAPPED');
+    assert.ok(failures.some((item) => item.edition === edition));
+    assert.ok(!failures.some((item) => item.edition === otherEdition(edition)));
+  });
+
+  test(`runtime selfChecks truthfully gate runtime-scope ${edition} check enforcers`, () => {
+    const context = completeCatalog();
+    ruleOf(context).enforcers[0].kind = 'hfs';
+    const gateFailures = () => hfsCoverageFindings(context).filter((item) => item.code === 'RT_COVERAGE_GATE_LIE' && item.edition === edition);
+    assert.deepEqual(gateFailures(), []);
+    delete ruleOf(context).scope;
+    assert.equal(gateFailures().length, 1);
+    ruleOf(context).scope = 'runtime';
+    context.files.set(RUNTIME_SLOTS, 'ruleParams:\n  runtime:\n    selfChecks:\n      - {id: sample, run: scripts/checks/check-unrelated.mjs}\n');
+    assert.equal(gateFailures().length, 1);
+  });
+
+  test(`runtime gate tracing refuses unused ${edition} imports and command mentions`, () => {
+    const context = completeCatalog();
+    const driver = 'scripts/hfs/runtime-check.mjs';
+    context.files.set(RUNTIME_SLOTS, 'ruleParams:\n  runtime:\n    selfChecks: []\n');
+    context.files.set('scripts/checks/check-runtime.mjs', "import { check } from '../hfs/runtime-check.mjs';\nexport function run() { return check(); }\n");
+    context.files.set(driver, `import { sample } from '../checks/check-sample.mjs';\nexport function check() { return sample(true); }\n`);
+    const failures = () => hfsCoverageFindings(context).filter((item) => item.code === 'RT_COVERAGE_GATE_LIE' && item.edition === edition);
+    assert.deepEqual(failures(), []);
+    context.files.set(driver, `import { sample } from '../checks/check-sample.mjs';\nexport function check() { return []; }\n`);
+    assert.equal(failures().length, 1);
+    context.files.set(driver, `import { sample } from '../checks/check-sample.mjs';\nfunction neverCalled() { return sample(true); }\nexport function check() { return []; }\n`);
+    assert.equal(failures().length, 1, 'an uncalled helper cannot establish runtime gate coverage');
+    context.files.set(RUNTIME_SLOTS, `ruleParams:\n  runtime:\n    selfChecks:\n      - {id: sample, run: ${ENFORCER}}\n`);
+    ruleOf(context).gates = ['pre-push'];
+    const hook = 'packages/hfs/templates/app/hooks/husky/pre-push';
+    for (const command of [`echo node ${ENFORCER}`, `node --check ${ENFORCER}`, 'starci runtime check --only unrelated']) {
+      context.files.set(hook, command);
+      assert.equal(failures().length, 1, command);
+    }
+    context.files.set(hook, 'starci runtime check --only sample');
+    assert.deepEqual(failures(), []);
+  });
+
+  test(`RT_COVERAGE_PROOF_VACUOUS refuses empty ${edition} RuleTester cases`, () => {
+    for (const empty of ["valid: []", "invalid: []"]) {
+      const context = fixtureCatalogs.RT_COVERAGE_CODE_UNROUTED(edition, false);
+      const text = context.files.get(SPEC);
+      const source = empty.startsWith('valid') ? "valid: ['ok']" : "invalid: [{code: 'bad', errors: 1}]";
+      context.files.set(SPEC, text.replace(source, empty));
+      assert.ok(hfsCoverageFindings(context).some((item) => item.code === 'RT_COVERAGE_PROOF_VACUOUS' && item.edition === edition), empty);
+    }
+  });
+
+  test(`RT_COVERAGE_PROOF_VACUOUS requires each ${edition} enforcer sharing a code to be exercised`, () => {
+    const context = completeCatalog();
+    const second = 'scripts/checks/check-sample-detail.mjs';
+    context.files.set(second, `export function detail(invalid) { return invalid ? [{ code: '${SAMPLE}' }] : []; }`);
+    ruleOf(context).enforcers.push({kind: 'runtime', id: 'sample-detail', at: second});
+    const failures = () => hfsCoverageFindings(context).filter((item) => item.code === 'RT_COVERAGE_PROOF_VACUOUS' && item.edition === edition);
+    assert.equal(failures().length, 1);
+    const passing = `test('valid ${edition} detail', () => { assert.deepEqual(detail(false), []); });`;
+    const violating = `test('invalid ${edition} detail', () => { assert.equal(detail(true)[0].code, '${SAMPLE}'); });`;
+    context.files.set(SPEC, context.files.get(SPEC) + `import { detail } from '../../${second}';\n${passing}\n${violating}\n`);
+    assert.deepEqual(failures(), []);
+  });
+
+  test(`RT_COVERAGE_PROOF_VACUOUS distinguishes ${edition} enforcers in the same source file`, () => {
+    const context = completeCatalog();
+    context.files.set(ENFORCER, context.files.get(ENFORCER) + `export function sampleDetail(invalid) { return invalid ? [{code: '${SAMPLE}'}] : []; }`);
+    ruleOf(context).enforcers.push({kind: 'runtime', id: 'sample-detail', at: ENFORCER});
+    const failures = () => hfsCoverageFindings(context).filter((item) => item.code === 'RT_COVERAGE_PROOF_VACUOUS' && item.edition === edition);
+    assert.equal(failures().length, 1);
+    const passing = `test('valid ${edition} detail', () => { assert.deepEqual(sampleDetail(false), []); });`;
+    const violating = `test('invalid ${edition} detail', () => { assert.equal(sampleDetail(true)[0].code, '${SAMPLE}'); });`;
+    context.files.set(SPEC, context.files.get(SPEC) + `import { sampleDetail } from '../../${ENFORCER}';\n${passing}\n${violating}\n`);
+    assert.deepEqual(failures(), []);
+  });
+
+  test(`RT_COVERAGE_PROOF_VACUOUS requires the ${edition} violation assertion to name its claimed code`, () => {
+    const context = completeCatalog();
+    const detail = 'RT_SAMPLE_DETAIL';
+    ruleOf(context).failureCodes.push(detail);
+    context.files.set(ENFORCER, `export function sample(mode) { if (mode === 'detail') return [{code: '${detail}'}]; return mode ? [{code: '${SAMPLE}'}] : []; }`);
+    context.files.set(SPEC, context.files.get(SPEC) + `// proves: ${detail}@${edition}\n`);
+    const failures = () => hfsCoverageFindings(context).filter((item) => item.code === 'RT_COVERAGE_PROOF_VACUOUS' && item.edition === edition && item.message.includes(detail));
+    assert.equal(failures().length, 1);
+    const violating = `test('invalid ${edition}', () => { assert.equal(sample(true)[0].code, '${SAMPLE}'); });`;
+    const detailTest = `test('invalid ${edition} detail', () => { assert.equal(sample('detail')[0].code, '${detail}'); });`;
+    context.files.set(SPEC, context.files.get(SPEC).replace(violating, violating + '\n' + detailTest));
+    assert.deepEqual(failures(), []);
+  });
+
+  test(`RT_COVERAGE_CODE_UNROUTED respects the ${edition} plugin and code edition`, () => {
+    const context = fixtureCatalogs.RT_COVERAGE_CODE_UNROUTED(edition, false);
+    const lint = ruleOf(context).enforcers.find((entry) => entry.kind === 'eslint-be');
+    lint.editions = [otherEdition(edition)];
+    lint.editionWhy = 'This fixture follows ruling:R01/case-1.';
+    const failures = () => hfsCoverageFindings(context).filter((item) => item.code === 'RT_COVERAGE_CODE_UNROUTED');
+    assert.ok(failures().some((item) => item.edition === edition));
+    assert.ok(!failures().some((item) => item.edition === otherEdition(edition)));
+    ruleOf(context).codeEditions = {[SAMPLE]: [otherEdition(edition)]};
+    assert.deepEqual(failures(), []);
+  });
+
+  test(`RT_COVERAGE_CODE_UNROUTED traces ${edition} profile exports in a shared machine file`, () => {
+    const context = fixtureCatalogs.RT_COVERAGE_CODE_UNROUTED(edition, false);
+    const machine = 'scripts/hfs/architecture/sample.mjs';
+    context.files.set(machine, `export function checkBackend() { return [{ruleId: '${SAMPLE}'}]; }\nexport function checkFrontend() { return []; }`);
+    context.files.set('scripts/hfs/architecture/index.mjs', "import { checkBackend, checkFrontend } from './sample.mjs';\nconst BACKEND_MACHINE = {sample: checkBackend};\nconst FRONTEND_MACHINE = {sample: checkFrontend};");
+    ruleOf(context).enforcers.push({kind: 'machine', id: 'sample-machine', at: machine});
+    const failures = () => hfsCoverageFindings(context).filter((item) => item.code === 'RT_COVERAGE_CODE_UNROUTED' && item.edition === edition);
+    assert.deepEqual(failures(), []);
+    context.files.set(machine, `export function checkBackend() { return []; }\nexport function checkFrontend() { return [{ruleId: '${SAMPLE}'}]; }`);
+    assert.ok(failures().some((item) => item.message.includes('fe lint plugin')));
+  });
 }
 
 test('RT_COVERAGE_NO_SPEC checks every failure code in each edition, rather than only the primary code', () => {
@@ -443,6 +662,22 @@ function sampleWitnessJudge({ repoRoot }) {
   const invalid = !fs.existsSync(record) || fs.readFileSync(record, 'utf8') !== 'sample: valid\n'
     || fs.existsSync(path.join(repoRoot, 'invalid.yaml'));
   return { findings: invalid ? [{ code: SAMPLE }] : [] };
+}
+
+for (const edition of EDITIONS) {
+  test(`the ${edition} witness runner accepts dedicated fixture evidence without allocating a mutation`, async (t) => {
+    const {fixtureRoot, scratch, write} = tempFixture(t);
+    const fixture = `tests/fixtures/coverage/${edition}/record.yaml`;
+    write(fixture, 'sample: valid\n');
+    const rule = ruleOf(completeCatalog());
+    rule.witness = [{path: fixture, edition, codes: [SAMPLE]}];
+    const context = {root: fixtureRoot, catalog: {rules: [rule]}};
+    const deps = {tempRoot: scratch, judge: () => { throw new Error('Fixture references must not run a mutation judge.'); }};
+    assert.deepEqual(await runCoverageWitnesses(context, deps), []);
+    assert.deepEqual(fs.readdirSync(scratch), []);
+    rule.witness[0].path = 'tests/fixtures/coverage/missing.yaml';
+    assert.ok((await runCoverageWitnesses(context, deps)).some((item) => item.code === 'RT_COVERAGE_NO_WITNESS'));
+  });
 }
 
 for (const edition of EDITIONS) {

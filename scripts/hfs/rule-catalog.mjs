@@ -16,7 +16,7 @@ const RULE_KINDS = Object.freeze(['codemod', 'lint', 'check', 'design']);
 const FINDING_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/;
 const ENFORCER_ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 const FILE_ENFORCERS = new Set(['machine', 'hfs', 'work-validate', 'sonar', 'runtime']);
-const RULE_KEYS = new Set(['id', 'code', 'law', 'scope', 'kinds', 'gates', 'failureCodes', 'editions', 'enforcers', 'cases', 'docs', 'exemplifiedBy', 'proves', 'witness', 'editionWhy', 'amendedBy']);
+const RULE_KEYS = new Set(['id', 'code', 'law', 'scope', 'kinds', 'gates', 'failureCodes', 'editions', 'codeEditions', 'enforcers', 'cases', 'docs', 'exemplifiedBy', 'proves', 'witness', 'editionWhy', 'amendedBy']);
 const CASE_KEYS = new Set(['id', 'date', 'source', 'ruling', 'quote', 'supersedes', 'status', 'staleWhen', 'amendedBy']);
 const CASE_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ENFORCER_KEYS = new Set(['kind', 'id', 'status', 'at', 'editions', 'editionWhy']);
@@ -71,17 +71,21 @@ function codeListProblems(codes, label, bad) {
   for (const code of codes) if (typeof code !== 'string' || !FINDING_CODE.test(code)) bad.push(`${label} must contain UPPER_SNAKE finding codes`);
 }
 
+function evidenceMapProblems(item, key, label, bad) {
+  unknownKeys(item, key === 'docs' ? EVIDENCE_KEYS : PROOF_KEYS, label, bad);
+  relativePathProblem(item.path, `${label}.path`, bad, key === 'docs');
+  evidenceEditionProblems(item, label, bad);
+  if (item.codes !== undefined) codeListProblems(item.codes, `${label}.codes`, bad);
+  if (item.fixtures !== undefined && nonEmptyList(item.fixtures, `${label}.fixtures`, bad)) item.fixtures.forEach((value) => textProblem(value, `${label}.fixtures`, bad));
+}
+
 function evidenceProblems(rule, key, label, bad) {
   if (rule[key] === undefined || !nonEmptyList(rule[key], `${label}.${key}`, bad)) return;
   rule[key].forEach((item, index) => {
     const at = `${label}.${key}[${index}]`;
     if (typeof item === 'string') { relativePathProblem(item, at, bad, key === 'docs'); return; }
     if (!isPlainObject(item)) { bad.push(`${at} must be a path or a map`); return; }
-    unknownKeys(item, key === 'proves' ? PROOF_KEYS : EVIDENCE_KEYS, at, bad);
-    relativePathProblem(item.path, `${at}.path`, bad, key === 'docs');
-    evidenceEditionProblems(item, at, bad);
-    if (item.codes !== undefined) codeListProblems(item.codes, `${at}.codes`, bad);
-    if (item.fixtures !== undefined && nonEmptyList(item.fixtures, `${at}.fixtures`, bad)) item.fixtures.forEach((value) => textProblem(value, `${at}.fixtures`, bad));
+    evidenceMapProblems(item, key, at, bad);
   });
 }
 
@@ -92,6 +96,16 @@ function mutationProblems(item, label, bad) {
   relativePathProblem(item.path, `${label}.path`, bad);
   if (['add', 'edit'].includes(item.op) && typeof item.content !== 'string') bad.push(`${label}.content must be text for add or edit`);
   if (item.op === 'delete' && item.content !== undefined) bad.push(`${label}.content is absent for delete`);
+}
+
+function witnessEntryProblems(item, label, bad) {
+  if (!isPlainObject(item)) { bad.push(`${label} must be a map`); return; }
+  if (Object.hasOwn(item, 'path')) { evidenceMapProblems(item, 'proves', label, bad); return; }
+  unknownKeys(item, WITNESS_KEYS, label, bad);
+  if (!['full', 'lite'].includes(item.edition)) bad.push(`${label}.edition must be full or lite`);
+  relativePathProblem(item.base, `${label}.base`, bad);
+  codeListProblems(item.expect, `${label}.expect`, bad);
+  if (nonEmptyList(item.mutate, `${label}.mutate`, bad)) item.mutate.forEach((mutation, index) => mutationProblems(mutation, `${label}.mutate[${index}]`, bad));
 }
 
 function witnessProblems(rule, label, bad) {
@@ -106,15 +120,7 @@ function witnessProblems(rule, label, bad) {
     return;
   }
   if (!nonEmptyList(value, at, bad)) return;
-  value.forEach((item, index) => {
-    const location = `${at}[${index}]`;
-    if (!isPlainObject(item)) { bad.push(`${location} must be a map`); return; }
-    unknownKeys(item, WITNESS_KEYS, location, bad);
-    if (!['full', 'lite'].includes(item.edition)) bad.push(`${location}.edition must be full or lite`);
-    relativePathProblem(item.base, `${location}.base`, bad);
-    codeListProblems(item.expect, `${location}.expect`, bad);
-    if (nonEmptyList(item.mutate, `${location}.mutate`, bad)) item.mutate.forEach((mutation, mutationIndex) => mutationProblems(mutation, `${location}.mutate[${mutationIndex}]`, bad));
-  });
+  value.forEach((item, index) => witnessEntryProblems(item, `${at}[${index}]`, bad));
 }
 
 function caseReferenceProblems(value, label, bad) {
@@ -212,6 +218,19 @@ function checkRuleFailureCodes(rule, label, codeOwner, bad) {
   }
 }
 
+function checkCodeEditions(rule, label, bad) {
+  const value = rule.codeEditions;
+  if (value === undefined) return;
+  if (!isPlainObject(value) || !Object.keys(value).length) { bad.push(`${label}.codeEditions must be a non-empty map`); return; }
+  const editions = Array.isArray(rule.editions) ? rule.editions : ['full', 'lite'];
+  for (const [code, selected] of Object.entries(value)) {
+    const at = `${label}.codeEditions.${code}`;
+    if (!Array.isArray(rule.failureCodes) || !rule.failureCodes.includes(code)) bad.push(`${at} must name a code owned by this rule`);
+    enumListProblems({ editions: selected }, at, 'editions', ['full', 'lite'], bad);
+    if (Array.isArray(selected) && selected.some((edition) => !editions.includes(edition))) bad.push(`${at} must be a subset of the rule's editions`);
+  }
+}
+
 function checkEnforcerIdentity(enforcer, label, seen, bad) {
   if (!ENFORCER_FAMILIES.includes(enforcer.kind)) bad.push(`${label}.kind must be one of ${ENFORCER_FAMILIES.join(', ')}`);
   if (!ENFORCER_ID.test(String(enforcer.id))) bad.push(`${label}.id must be kebab-case`);
@@ -265,6 +284,7 @@ function checkRule(rule, index, catalog, codeOwner, bad) {
   const gates = enumListProblems(rule, label, 'gates', RULE_GATES, bad);
   checkRuleGates(rule, label, gates, bad);
   checkRuleFailureCodes(rule, label, codeOwner, bad);
+  checkCodeEditions(rule, label, bad);
   checkRuleEnforcers(rule, label, bad);
   if (Array.isArray(rule.gates)) {
     const hasSonar = rule.enforcers.some((enforcer) => isPlainObject(enforcer) && enforcer.kind === 'sonar');
@@ -310,8 +330,11 @@ export function loadRuleCatalog({ root = skillRoot, file = path.join(root, HFS_R
     rule: (id) => byId.get(id) ?? null,
     /** The rule that owns this failure code (its own or a sub-check code), or null. */
     byCode: (code) => byCode.get(code) ?? null,
-    /** Whether a finding code is judged under `edition`: a code of a rule that names `editions` without it is not (a code outside the catalog always is). */
-    judgedIn: (code, edition = 'full') => judgedInEdition(byCode.get(code), edition),
+    /** Whether a finding code is judged under `edition`: codeEditions narrows its owner's editions; uncatalogued codes remain judged. */
+    judgedIn: (code, edition = 'full') => {
+      const owner = byCode.get(code);
+      return judgedInEdition(owner, edition) && (!owner?.codeEditions?.[code] || owner.codeEditions[code].includes(edition));
+    },
     enforcerJudgedIn: (kind, id, edition = 'full') => enforcerJudgedInEdition(list, kind, id, edition),
     /** The rules that run at a gate. */
     forGate: (gate) => list.filter((rule) => rule.gates.includes(gate)),

@@ -3,10 +3,12 @@ import { braceVariants } from '../../lib/glob.mjs';
 import { compileVariant } from '../../hfs/slot-match.mjs';
 import { EDITIONS } from '../../hfs/manifest-shape.mjs';
 import { enforcerJudgedInEdition, judgedInEdition } from '../../hfs/edition-slots.mjs';
-import { evidenceFiles, evidenceInEdition, evidencePath, exampleEvidence, managedTemplates, slotViews, templateEvidence } from './coverage-inventory.mjs';
+import { codesInEdition, evidenceFiles, evidenceInEdition, evidencePath, exampleEvidence, managedTemplates, slotViews, templateEvidence } from './coverage-inventory.mjs';
 import { coverageGateFindings } from './coverage-gates.mjs';
 import { hasRulingReference } from './coverage-cites.mjs';
 import { REPORT_ONLY_CODES } from './coverage-ratchet.mjs';
+import { claimedSpecProof, coverageProofFindings } from './coverage-proofs.mjs';
+import { coverageRoutingFindings } from './coverage-routing.mjs';
 
 export { REPORT_ONLY_CODES };
 const finding = (code, rule, edition, message, path = 'knowledge/hfs/rules.yaml') =>
@@ -44,8 +46,8 @@ function specProves(text, code, edition, fixtures) {
 
 function proofExists(context, rule, code, edition) {
   return refsIn(rule.proves, edition).some((ref) => (!ref.codes || ref.codes.includes(code))
-    && evidenceFiles(context.files, ref).some((file) => file.endsWith('.spec.mjs')
-      && specProves(String(context.files.get(file)), code, edition, typeof ref === 'string' ? undefined : ref.fixtures)));
+    && (claimedSpecProof(context, ref, code, edition) || evidenceFiles(context.files, ref).some((file) => file.endsWith('.spec.mjs')
+      && specProves(String(context.files.get(file)), code, edition, typeof ref === 'string' ? undefined : ref.fixtures))));
 }
 
 function docExists(context, ref, code) {
@@ -61,9 +63,27 @@ function docExists(context, ref, code) {
 function validWitness(context, rule, edition) {
   if (rule.witness?.status === 'unreachable') return typeof rule.witness.reason === 'string' && rule.witness.reason.trim()
     && /^\d{4}-\d{2}-\d{2}$/.test(rule.witness.date ?? '');
-  return (Array.isArray(rule.witness) ? rule.witness : []).some((witness) => witness.edition === edition
-    && (context.examples ?? []).some((example) => example.path === witness.base && example.edition === edition)
-    && witness.mutate?.length > 0 && witness.expect?.some((code) => rule.failureCodes.includes(code)));
+  return (Array.isArray(rule.witness) ? rule.witness : []).some((witness) => {
+    if (witness.path) return fixtureEvidence(context, witness, edition, codesInEdition(rule, edition));
+    return witness.edition === edition
+      && (context.examples ?? []).some((example) => example.path === witness.base && example.edition === edition)
+      && witness.mutate?.length > 0 && witness.expect?.some((code) => codesInEdition(rule, edition).includes(code));
+  });
+}
+
+/** Dedicated fixture records need an explicit edition; spec helpers also prove a relevant finding code. */
+export function fixtureEvidence(context, ref, edition, codes) {
+  if (!evidenceInEdition(ref, edition)) return false;
+  const scoped = typeof ref === 'object' && (ref.edition === edition || ref.editions?.includes(edition));
+  const relevant = codes.filter((code) => !ref.codes || ref.codes.includes(code));
+  if (!relevant.length) return false;
+  return evidenceFiles(context.files, ref).some((file) => {
+    const text = String(context.files.get(file) ?? '');
+    if (!text.trim()) return false;
+    if (file.startsWith('tests/fixtures/')) return scoped;
+    if (!file.endsWith('.spec.mjs') && !file.startsWith('tests/helpers/')) return false;
+    return relevant.some((code) => claimedSpecProof(context, ref, code, edition));
+  });
 }
 
 function ruleEvidence(context, rule, edition, templates) {
@@ -72,16 +92,20 @@ function ruleEvidence(context, rule, edition, templates) {
   const enforcers = (rule.enforcers ?? []).filter((enforcer) => enforcer.status !== 'planned' && !enforcer.planned
     && enforcerJudgedInEdition(context.catalog.rules, enforcer.kind, enforcer.id, edition) && enforcerExists(context, enforcer, rule));
   if (!enforcers.length) add('RT_COVERAGE_NO_ENFORCER', 'no existing enforcer runs in this edition');
-  for (const code of rule.failureCodes ?? []) {
+  const codes = codesInEdition(rule, edition);
+  for (const code of codes) {
     if (!proofExists(context, rule, code, edition)) add('RT_COVERAGE_NO_SPEC', `${code} has no named spec with a // proves: ${code}@${edition} header`);
     if (!refsIn(rule.docs, edition).some((ref) => docExists(context, ref, code))) add('RT_COVERAGE_NO_DOC', `${code} has no existing documentation reference that explains it`);
+    out.push(...coverageProofFindings(context, rule, code, edition).map((item) => ({...item, code: 'RT_COVERAGE_PROOF_VACUOUS'})),
+      ...coverageRoutingFindings(context, rule, code, edition).map((item) => ({...item, code: 'RT_COVERAGE_CODE_UNROUTED'})));
   }
   if (!validWitness(context, rule, edition)) add('RT_COVERAGE_NO_WITNESS', 'no mutation witness or dated unreachable reason is declared');
   const owned = relatedSlots(rule, slotViews(context.manifest, edition));
   const hasTemplate = refsIn(rule.exemplifiedBy, edition).some((ref) => templateEvidence(context.files, ref).length)
     || owned.some(({ slot }) => templates.templates.get(slot.id)?.length);
   if (!hasTemplate) add('RT_COVERAGE_NO_TEMPLATE', 'no existing template or managed slot template covers this edition');
-  if (!refsIn(rule.exemplifiedBy, edition).some((ref) => exampleEvidence(context, ref, edition).length)) add('RT_COVERAGE_NO_EXAMPLE', 'no existing example construct is named for this edition');
+  if (!refsIn(rule.exemplifiedBy, edition).some((ref) => exampleEvidence(context, ref, edition).length
+    || fixtureEvidence(context, ref, edition, codes))) add('RT_COVERAGE_NO_EXAMPLE', 'no existing example or dedicated fixture is named for this edition');
   out.push(...coverageGateFindings(context, rule, edition));
   return out;
 }

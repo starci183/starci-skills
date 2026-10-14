@@ -115,8 +115,17 @@ test('the rule-catalog loader also refuses what only semantics can see', () => {
 });
 
 test('a runtime-scoped rule may name its runtime gate without claiming land', () => {
-  const runtimeOnly = (d) => { d.rules[0].scope = 'runtime'; d.rules[0].gates = ['runtime']; };
-  assert.doesNotThrow(load(runtimeOnly));
+  const runtimeOnly = (d) => {
+    d.rules[0].scope = 'runtime';
+    d.rules[0].gates = ['runtime'];
+    d.rules[0].enforcers = [{ kind: 'runtime', id: 'hfs-rules', at: 'scripts/checks/check-hfs-rules.mjs' }];
+  };
+  const d = doc();
+  runtimeOnly(d);
+  assert.equal(validateSchema(d), true, JSON.stringify(validateSchema.errors));
+  const catalog = loadRuleCatalog({ text: JSON.stringify(d) });
+  assert.ok(catalog.forGate('runtime').some((rule) => rule.id === 'R01'));
+  assert.equal(catalog.rule('R01').enforcers[0].id, 'hfs-rules', 'runtime selfChecks can provide the gate');
   refusal(load((d) => { runtimeOnly(d); delete d.rules[0].scope; }), 'HFS_RULES_INVALID');
   refusal(load((d) => { runtimeOnly(d); d.rules[0].gates = ['pre-commit']; }), 'HFS_RULES_INVALID');
 });
@@ -124,11 +133,77 @@ test('a runtime-scoped rule may name its runtime gate without claiming land', ()
 test('rule-level amendedBy names a valid ruling reference and survives the frozen loader', () => {
   const d = doc();
   d.rules.find((rule) => rule.id === 'R245').amendedBy = 'R289';
+  assert.equal(validateSchema(d), true, JSON.stringify(validateSchema.errors));
   const catalog = loadRuleCatalog({ text: JSON.stringify(d) });
   assert.equal(catalog.rule('R245').amendedBy, 'R289');
   assert.ok(Object.isFrozen(catalog.rule('R245')));
   refusal(load((broken) => { broken.rules[0].amendedBy = 'missing successor'; }), 'HFS_RULES_INVALID');
   refusal(load((broken) => { broken.rules[0].amendedBy = []; }), 'HFS_RULES_INVALID');
+});
+
+for (const edition of ['lite', 'full']) {
+  test(`codeEditions narrows an owned code and preserves inherited codes in ${edition}`, () => {
+    const d = doc();
+    const rule = d.rules[0];
+    const otherEdition = edition === 'lite' ? 'full' : 'lite';
+    rule.editions = ['lite', 'full'];
+    rule.failureCodes.push('HFS_CODE_EDITION_FIXTURE');
+    rule.codeEditions = { [rule.code]: [edition] };
+    assert.equal(validateSchema(d), true, JSON.stringify(validateSchema.errors));
+    const catalog = loadRuleCatalog({ text: JSON.stringify(d) });
+    assert.deepEqual(catalog.rule(rule.id).codeEditions, { [rule.code]: [edition] });
+    assert.ok(Object.isFrozen(catalog.rule(rule.id).codeEditions[rule.code]));
+    assert.equal(catalog.judgedIn(rule.code, edition), true);
+    assert.equal(catalog.judgedIn(rule.code, otherEdition), false);
+    assert.equal(catalog.judgedIn('HFS_CODE_EDITION_FIXTURE', otherEdition), true);
+    assert.equal(catalog.judgedIn('UNKNOWN_FINDING_CODE', otherEdition), true);
+    rule.editions = [otherEdition];
+    refusal(() => loadRuleCatalog({ text: JSON.stringify(d) }), 'HFS_RULES_INVALID');
+    rule.editions = ['lite', 'full'];
+    rule.codeEditions = { [d.rules[1].code]: [edition] };
+    refusal(() => loadRuleCatalog({ text: JSON.stringify(d) }), 'HFS_RULES_INVALID');
+  });
+
+  test(`fixture and spec-helper evidence load for examples and witnesses in ${edition}`, () => {
+    const d = doc();
+    const rule = d.rules[0];
+    const references = [
+      { path: 'tests/fixtures/coverage/rules.yaml', edition, codes: [rule.code], fixtures: ['passing', 'violating'] },
+      { path: 'tests/checks/hfs-coverage.spec.mjs', editions: [edition], codes: [rule.code], fixtures: ['coverageFixture'] },
+    ];
+    rule.exemplifiedBy = references;
+    rule.witness = references;
+    assert.equal(validateSchema(d), true, JSON.stringify(validateSchema.errors));
+    const catalog = loadRuleCatalog({ text: JSON.stringify(d) });
+    assert.deepEqual(catalog.rule(rule.id).witness, references);
+    assert.deepEqual(catalog.rule(rule.id).exemplifiedBy, references);
+    assert.ok(Object.isFrozen(catalog.rule(rule.id).witness[0].fixtures));
+    references[0].edition = 'unknown';
+    assert.equal(validateSchema(d), false);
+    refusal(() => loadRuleCatalog({ text: JSON.stringify(d) }), 'HFS_RULES_INVALID');
+  });
+}
+
+test('schema and loader reject malformed codeEditions and mixed witness reference shapes', () => {
+  const cases = [
+    (rule) => { rule.codeEditions = []; },
+    (rule) => { rule.codeEditions = {}; },
+    (rule) => { rule.codeEditions = { [rule.code]: [] }; },
+    (rule) => { rule.codeEditions = { [rule.code]: ['lite', 'lite'] }; },
+    (rule) => { rule.codeEditions = { [rule.code]: ['unknown'] }; },
+    (rule) => { rule.codeEditions = { [rule.code]: 'lite' }; },
+    (rule) => { rule.witness = [{ path: '../outside.spec.mjs', edition: 'lite' }]; },
+    (rule) => { rule.witness = [{ path: 'tests/checks/hfs-coverage.spec.mjs', edition: 'lite', editions: ['lite'] }]; },
+    (rule) => { rule.witness = [{ path: 'tests/checks/hfs-coverage.spec.mjs', edition: 'lite', fixtures: [] }]; },
+    (rule) => { rule.witness = [{ path: 'tests/checks/hfs-coverage.spec.mjs', edition: 'lite', codes: ['lower-case'] }]; },
+    (rule) => { rule.witness = [{ path: 'tests/checks/hfs-coverage.spec.mjs', edition: 'lite', base: 'examples/lite-app' }]; },
+  ];
+  for (const mutate of cases) {
+    const d = doc();
+    mutate(d.rules[0]);
+    assert.equal(validateSchema(d), false, JSON.stringify(d.rules[0]));
+    refusal(() => loadRuleCatalog({ text: JSON.stringify(d) }), 'HFS_RULES_INVALID');
+  }
 });
 
 test('a catalog whose major differs from the slot manifest is refused', () => {
