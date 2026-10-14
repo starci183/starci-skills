@@ -1,0 +1,12 @@
+schema: work/brand@1
+id: brand
+kind: brand
+state: todo
+rev: 1
+brand:
+  identity:
+    name: "{{project}}"
+review:
+  reviewer: the {{project}} owner
+  authority: "The lite scaffold seeds this record so the brand tree exists; the owner settles rev 1 of the brand before the first drawn surface."
+  reviewedAt: "2026-10-14T00:00:00Z"

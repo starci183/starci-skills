@@ -6,6 +6,7 @@ description: One version of a workflow's work graph - the domains, slices and no
   edges between them. scope.define draws v0; every later version is a revision an op with graph-write
   permission proposes through scripts/work/work-graph.mjs propose, which validates it and records it in the
   ledger table work_graph_versions with its diff and colours. The leg skeleton stays in the goal plan.
+generated: true
 required: [schema, workflow, domains, nodes, edges]
 properties:
   schema:
