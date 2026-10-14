@@ -1390,7 +1390,6 @@ rules:
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["BE_PATTERN_SPEC_MISSING"]
-    editions: [full]
     enforcers:
       - {kind: hfs, id: pattern-spec-missing, at: scripts/hfs/rules/event-bus.mjs}
   - id: R156
