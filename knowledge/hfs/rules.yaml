@@ -1606,7 +1606,7 @@ rules:
       - {kind: eslint-be, id: sql-returning}
   - id: R182
     code: "BE_WEBHOOK_SHAPE"
-    law: "A provider webhook door (`src/features/webhooks/<provider>/transport/http/<provider>.webhook.ts`) is one `@Controller` with one `@Post` handler declared `@Public({ reason: PublicReason.SignedWebhook })`; it injects only the `WebhookSignatureService` of `platform/http-security` and services of `modules/domain`, and its handler holds no branch, loop or `try`, calls only `verify` on the signature service and exactly one method of a domain service (the intake that records the delivery and publishes the event in its own transaction), and returns nothing."
+    law: "A provider webhook door (`src/features/webhooks/<provider>/transport/http/<provider>.webhook.ts`) is one `@Controller` with one `@Post` handler declared `@Public({ reason: PublicReason.SignedWebhook })`; it injects only the `WebhookSignatureService` of `platform/http-security` and services of `modules/domain`, and its handler holds no branch, loop or `try`, calls one verification method and exactly one domain intake method (which records the delivery and publishes the event in its own transaction), and returns nothing. The first domain call may combine verification and intake; a separate domain proof call does not count as the intake."
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_WEBHOOK_SHAPE"]
@@ -1614,7 +1614,7 @@ rules:
       - {kind: eslint-be, id: webhook-shape}
   - id: R183
     code: "BE_WEBHOOK_UNVERIFIED"
-    law: "The first statement of a webhook handler is the unconditional `verify` call of the `WebhookSignatureService` (signature and replay window): a delivery that fails the proof throws before any other code runs, so no path reaches the domain intake unproven."
+    law: "The first statement of a webhook handler is an unconditional verification call to `WebhookSignatureService.verify` or a domain verifier, awaited when async, with no data access or other call before the proof. A domain verifier is a method on a domain service whose declared class name ends in `Verifier` or `verify`, or a domain service method declared by symbol in the adjacent webhook module's exported `webhookVerifiers` array. A domain method may verify with per-connection secrets before performing intake in the same call; a delivery that fails the proof throws before intake, so no path processes an unproven delivery."
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_WEBHOOK_UNVERIFIED"]
@@ -1776,7 +1776,7 @@ rules:
       - {kind: runtime, id: ci-upload, at: scripts/hfs/runtime-rules/ci-upload.mjs}
   - id: R203
     code: "BE_FEATURE_THIN"
-    law: "A feature file (a role of ruleParams.be.thinRoles inside a slot of tier feature: handler, resolver, controller, consumer, processor, step, saga, saga-step, compensation, webhook, gateway, subscription, cli, mapper, the saga orchestrator service) maps its parameters and makes ONE delegating call into modules/ (a service, the command or query bus, the event bus, a queue producer): no branch, loop, ternary, try or throw and no computation. Business logic lives in modules/**, where every logic file owes 100 per file; orchestration (step order, compensation, claim, fencing, retry) lives in platform/*; the feature layer is proven by integration and e2e. The gate calls a kind requires are not delegation: a webhook's `verify` and a job step's `JobClaims` fence (`advance`, `runKey`); a logger call, a pure mapper function and a modules function in argument position are free too; a mapper may map a collection item by item (`map`) and write a date as text (`toISOString`), and a cli group command shows its help."
+    law: "A feature file (a role of ruleParams.be.thinRoles inside a slot of tier feature: handler, resolver, controller, consumer, processor, step, saga, saga-step, compensation, webhook, gateway, subscription, cli, mapper, the saga orchestrator service) maps its parameters and makes ONE delegating call into modules/ (a service, the command or query bus, the event bus, a queue producer): no branch, loop, ternary, try or throw and no computation. Business logic lives in modules/**, where every logic file owes 100 per file; orchestration (step order, compensation, claim, fencing, retry) lives in platform/*; the feature layer is proven by integration and e2e. The gate calls a kind requires are not delegation: a webhook's first verification call of R183 when followed by one separate intake, and a job step's `JobClaims` fence (`advance`, `runKey`); a combined domain verification and intake call counts as the delegation. A logger call, a pure mapper function and a modules function in argument position are free too; a mapper may map a collection item by item (`map`) and write a date as text (`toISOString`), and a cli group command shows its help."
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_FEATURE_THIN"]

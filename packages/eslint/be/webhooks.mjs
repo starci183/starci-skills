@@ -8,9 +8,9 @@
  *
  *   - `webhook-shape` (R182): the door is one `@Controller` with one `@Post` handler, `@Public({ reason: PublicReason.SignedWebhook })`;
  *     it injects only the `WebhookSignatureService` of `platform/http-security` and services of `modules/domain`; its handler has no
- *     branch, loop or `try`, makes exactly one call on a domain service, calls on the signature service only `verify`, and returns
- *     nothing.
- *   - `webhook-verify-first` (R183): the first statement of the handler is the unconditional `verify` call, so no path reaches the
+ *     branch, loop or `try`, makes one domain intake call, optionally preceded by a declared domain verifier, and returns nothing.
+ *     A single declared domain method may verify and intake internally, using per-connection secrets.
+ *   - `webhook-verify-first` (R183): the first statement is the unconditional shared or declared domain proof call, so no path reaches the
  *     intake with an unproven delivery.
  *
  * What a receiver is comes from its TYPE (where the class is declared); what a decorator is comes from the import that binds it.
@@ -20,8 +20,8 @@ import { walk } from "./lib/ast.mjs"
 import { callsOf, decoratorsFrom, hasClassDecorator, injectedMembers, methodsDecoratedBy } from "./lib/doors.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { decoratorArguments, decoratorCallee, importOf } from "./lib/import-source.mjs"
-import { baseName, enumMemberOf, isOwnedType } from "./lib/ports.mjs"
-import { typeOrigins } from "./lib/types.mjs"
+import { baseName, enumMemberOf } from "./lib/ports.mjs"
+import { firstWebhookVerification, isWebhookDomainServiceType as isDomainServiceType, isWebhookSignatureType as isSignatureType } from "./lib/webhook-verifiers.mjs"
 
 /** The slot of provider webhook doors. */
 const SLOT = "be.feature.webhooks.http"
@@ -31,13 +31,6 @@ const HTTP_VERBS = ["Get", "Post", "Put", "Patch", "Delete", "All", "Options", "
 
 /** Statements and expressions that are a decision or a repetition: none of them belongs in a door. */
 const DECISION_NODES = new Set(["IfStatement", "SwitchStatement", "ConditionalExpression", "LogicalExpression", "ForStatement", "ForInStatement", "ForOfStatement", "WhileStatement", "DoWhileStatement", "TryStatement", "ThrowStatement"])
-
-/** The `WebhookSignatureService` of `platform/http-security`. */
-const isSignatureType = (context, node) => isOwnedType(context, node, { name: "WebhookSignatureService", capability: "http-security", tier: "platform" })
-
-/** A service of `modules/domain`: a class declared in a `<name>.service.ts` of the domain tier. */
-const isDomainServiceType = (context, hfs, node) =>
-    typeOrigins(context, node).some((origin) => origin.module === null && hfs.tierOf(origin.file) === "domain" && baseName(origin.file).endsWith(".service.ts"))
 
 /** The `@Controller` classes of a webhook file, with their handler methods. */
 const doorsOf = (context, program) => {
@@ -71,7 +64,7 @@ const isSignedWebhookDoor = (context, method) =>
 export const webhookShape = {
     meta: {
         type: "problem",
-        docs: { description: "A webhook door is one `@Controller` with one `@Public({ reason: PublicReason.SignedWebhook })` `@Post` handler that injects only the `WebhookSignatureService` and domain services, verifies, makes exactly one domain call and returns nothing." },
+        docs: { description: "A webhook door is one signed `@Post` handler that injects only the shared signature and domain services, verifies first, makes one domain intake call (with an optional declared domain proof call) and returns nothing." },
         schema: [],
         messages: {
             noDoor: "A webhook file declares one `@Controller` class: the door of the provider. Nothing else lives in `<provider>.webhook.ts`.",
@@ -79,8 +72,8 @@ export const webhookShape = {
             route: "A webhook door has exactly one `@Post` handler (this class has {{count}} route methods{{verbs}}). One provider endpoint is one door; another route belongs in its own provider folder or in an api feature.",
             notPublic: "`{{name}}` is not `@Public({ reason: PublicReason.SignedWebhook })`. The signature is the authentication of a webhook: it is public by that declaration and no other, so the open doors stay readable and the strict rate tier applies.",
             branch: "`{{what}}` is a decision or a loop in a webhook door. The door proves the delivery and hands it over: a refusal is the thrown error of `verify`, and every other decision belongs in the domain intake method.",
-            call: "`{{what}}` is a call a webhook door does not make. The handler calls `verify` of the `WebhookSignatureService` once and one method of a domain service once; parsing, mapping and publishing belong in the domain service.",
-            intakeCalls: "`{{name}}` calls domain services {{count}} times. A webhook hands the verified delivery to exactly one domain intake method (it records the delivery and publishes the event in one transaction); a second call is orchestration that belongs in that method.",
+            call: "`{{what}}` is a call a webhook door does not make. The handler starts with the shared signature proof or a declared domain verifier and hands the delivery to one domain intake; a declared domain method may do both internally. Parsing, mapping and publishing belong in the domain service.",
+            intakeCalls: "`{{name}}` makes {{count}} domain intake calls. A webhook hands the verified delivery to exactly one domain intake method (it records the delivery and publishes the event in one transaction); a separate first domain proof is allowed, and a second intake is orchestration that belongs in that method.",
             returns: "`{{name}}` returns a value. A webhook acknowledges with its status and an empty body; it returns nothing of the domain to the provider.",
         },
     },
@@ -111,10 +104,16 @@ export const webhookShape = {
                     if (DECISION_NODES.has(child.type)) context.report({ node: child, messageId: "branch", data: { what: child.type === "LogicalExpression" ? child.operator : child.type.replace(/(Statement|Expression)$/, "").toLowerCase() } })
                     else if (child.type === "ReturnStatement" && child.argument) context.report({ node: child, messageId: "returns", data: { name } })
                 })
+                const proof = firstWebhookVerification(context, hfs, handler)
+                const calls = callsOf(handler)
+                const domainCalls = calls.filter(({ receiver }) => receiver !== null && isDomainServiceType(context, hfs, receiver))
+                // One domain call can prove and intake internally; a separate domain proof is not a second intake.
+                const separateProof = domainCalls.length > 1 && domainCalls.some(({ call }) => call === proof)
                 let intake = 0
-                for (const { call, receiver, method } of callsOf(handler)) {
+                for (const { call, receiver, method } of calls) {
                     if (receiver !== null && isSignatureType(context, receiver) && method === "verify") continue
                     if (receiver !== null && isDomainServiceType(context, hfs, receiver)) {
+                        if (separateProof && call === proof) continue
                         intake += 1
                         continue
                     }
@@ -130,10 +129,10 @@ export const webhookShape = {
 export const webhookVerifyFirst = {
     meta: {
         type: "problem",
-        docs: { description: "The first statement of a webhook handler is the unconditional `verify` call of the `WebhookSignatureService` (signature and replay window), before anything else runs." },
+        docs: { description: "The first statement of a webhook handler is an unconditional shared signature or declared domain verifier call, awaited when async, before any other work runs." },
         schema: [],
         messages: {
-            first: "`{{name}}` does not start with `verify` of the `WebhookSignatureService`. The first statement of a webhook handler is `this.<signature>.verify({ rawBody, signature, timestamp })` (awaited when it is async): a delivery that fails the signature or the replay window throws before any other code runs, so no path reaches the intake unproven.",
+            first: "`{{name}}` does not start with an unconditional webhook proof. Call `WebhookSignatureService.verify` or a declared domain verifier as the first statement, awaiting an async proof. Domain verifier service names end in `Verifier` or `verify`, or their methods appear in the adjacent HTTP module's exported `webhookVerifiers` array. No data call or other work may run before verification, including inside its arguments.",
         },
     },
     create(context) {
@@ -144,15 +143,7 @@ export const webhookVerifyFirst = {
                 for (const door of doorsOf(context, program)) {
                     const handler = handlerOf(context, door)
                     if (handler === null) continue
-                    const first = handler.value.body?.body[0]
-                    let expression = first?.type === "ExpressionStatement" ? first.expression : null
-                    if (expression?.type === "AwaitExpression") expression = expression.argument
-                    const proven = expression?.type === "CallExpression"
-                        && expression.callee.type === "MemberExpression"
-                        && !expression.callee.computed
-                        && expression.callee.property.type === "Identifier"
-                        && expression.callee.property.name === "verify"
-                        && isSignatureType(context, expression.callee.object)
+                    const proven = firstWebhookVerification(context, hfs, handler)
                     if (!proven) context.report({ node: handler.key, messageId: "first", data: { name: handler.key.type === "Identifier" ? handler.key.name : "the handler" } })
                 }
             },

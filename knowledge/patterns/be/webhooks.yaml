@@ -3,8 +3,9 @@ id: be.feature.webhooks
 title: Provider webhooks
 purpose: |-
   Given a delivery a payment, identity or shipping provider POSTs to us, how is it received? A webhook is a feature KIND:
-  `be/src/features/webhooks/<provider>/` holds one signed door that proves the delivery came from the provider (signature and
-  replay window), then hands it to exactly ONE domain intake method. That method records the delivery (deduplicated through the
+  `be/src/features/webhooks/<provider>/` holds one signed door whose first call proves the delivery came from the provider
+  (signature and replay window), either separately or inside its ONE domain method that combines verification and intake. The
+  intake records the delivery (deduplicated through the
   inbox) and publishes the domain event with `eventBus.publish(event, tx)` inside its own transaction, because publishing is
   allowed only from `modules/domain`. The door writes nothing and decides nothing; everything after the proof is an event.
 appliesTo:
@@ -20,8 +21,9 @@ provenance:
     - knowledge/patterns/be/idempotency.yaml
     - owner decision 2026-10-02 (feature kinds: webhooks, realtime, reactors, saga, jobs, cli; no kind imports another)
   limitations: |-
-    Static checks prove the door's shape, that the proof is its first statement and that the only thing it can call after it is
-    one domain service method. They do not prove the HMAC scheme matches the provider's documentation, that the replay window
+    Static checks prove the door's shape, that an unconditional verification call is its first statement and that it makes
+    one intake call, either after a separate proof or combined with it. They do not prove that a domain verifier completes proof
+    before intake, that the signature scheme matches the provider's documentation, that the replay window
     is the right length or that the intake is idempotent; the provider fake of the test world and the three
     `webhooks/*` scenarios prove those against the real stack.
 rules:
@@ -76,24 +78,38 @@ rules:
         - Confirm the provider endpoint is one door and that a second endpoint of the same provider is a second door only when it has a different proof.
     relatedExamples: [webhooks]
   - id: BE-WEBHOOK-2
-    title: The door verifies first, then makes one domain call
+    title: The door verifies first and hands the delivery to one domain intake
     kind: mandatory
     hfsRules: [R182, R183, R41, R42, R203]
     requirement: |-
       `<provider>.webhook.ts` is one `@Controller` with one `@Post` handler declared
-      `@Public({ reason: PublicReason.SignedWebhook })`, thin (R203 `BE_FEATURE_THIN`). The handler's FIRST statement is the unconditional
-      `this.<signature>.verify({ provider, rawBody, signature, timestamp })` of the `WebhookSignatureService` of `platform/http-security`
-      (HMAC-SHA256 over `<timestamp>.<raw body>` with the provider's secret, a constant-time comparison and a replay window on the signed timestamp; it throws before anything else runs). The provider key and its secret and tolerance are options of `platform/http-security` (`options.webhooks[provider]`). The
-      second and last call is one method of a domain service, the intake. The door injects only that service and the signature
-      service (injected with `@InjectWebhookSignature()`), holds no branch, loop or `try`, calls nothing else (no parsing, mapping or publishing) and returns nothing: the
-      provider gets its status code and an empty body. `@RateLimit(RateTier.Strict)` is required by the signed-webhook reason.
+      `@Public({ reason: PublicReason.SignedWebhook })`, thin (R203 `BE_FEATURE_THIN`). The handler's FIRST statement is an unconditional
+      direct verification call, awaited when async: either `this.<signature>.verify({ provider, rawBody, signature, timestamp })`
+      of the `WebhookSignatureService` of `platform/http-security` or a domain verifier. No data access, nested call or other work
+      may run in the door before that proof call. The shared service uses HMAC-SHA256 over `<timestamp>.<raw body>`, a constant-time
+      comparison and a replay window on the signed timestamp; its provider key, secret and tolerance are `platform/http-security`
+      options (`options.webhooks[provider]`). A domain verifier owns the provider's proof when secrets belong to individual
+      connections, as for the billing payment webhooks; it refuses an invalid delivery before intake.
+      A domain verifier is a method on a service declared in a domain `<name>.service.ts` whose declared class name ends in
+      `Verifier` or `verify`, or an exact domain service method declared by the adjacent `<provider>-http.module.ts` as
+      `export const webhookVerifiers = [BillingService.prototype.receiveCassoWebhook] as const`. The array names TypeScript
+      method symbols, never strings; a local alias or a class from the platform, integrations or a package grants no domain proof.
+      A separate verification call is followed by exactly one domain intake call. A domain method that verifies and then performs
+      intake may be the first and only call; a separate domain verification call does not count as intake. The door injects only
+      domain services and, when used, the signature service (injected with `@InjectWebhookSignature()`), holds no branch, loop or
+      `try`, calls nothing else (no parsing, mapping or publishing) and returns nothing: the provider gets its status code and an
+      empty body. `@RateLimit(RateTier.Strict)` is required by the signed-webhook reason.
     rationale: |-
-      The signature is the authentication of a public door. Making the proof the first statement removes every path to the intake
-      that skips it, and a door with one call and no decision has nothing left to test except the proof and the hand-over.
+      The signature is the authentication of a public door. Making verification the first statement removes every door path that
+      skips it; a combined domain method must finish that proof before intake. Keeping one intake and no decision leaves the door
+      with only the proof and the hand-over to test.
     cases:
       - id: case-1
         when: A delivery whose raw body must be hashed
         write: 'enable the raw body for the app (`NestFactory.create(..., { rawBody: true })` in the api app) and read `request.rawBody`; never hash a re-serialized `body`.'
+      - id: case-2
+        when: A payment provider uses a different secret for each billing connection
+        write: 'declare BillingService.prototype.receiveCassoWebhook in the adjacent HTTP module webhookVerifiers array; the first and only handler statement awaits that method, which resolves the connection secret, verifies the provider proof and delegates to the intake. The door never reads the connection or payment data itself.'
     verification:
       automated:
         - BE_WEBHOOK_SHAPE
@@ -102,7 +118,7 @@ rules:
         - BE_INPUT_BOUNDED
         - BE_FEATURE_THIN
       manual:
-        - Review that the raw body, not a re-serialized one, is verified, and that the replay window matches the provider's tolerance.
+        - Review that the raw body, not a re-serialized one, is verified, that the replay window matches the provider's tolerance, and that a domain verifier refuses the delivery before intake or business data access.
     relatedExamples: [webhooks]
   - id: BE-WEBHOOK-3
     title: The intake publishes the event inside its own transaction
@@ -140,8 +156,9 @@ rules:
       refused and nothing is published) and `accepted-delivery-publishes-once` (a valid delivery publishes the event once and a
       redelivery publishes nothing more). The provider is the network-edge fake of the test world (`world.fake.<provider>`), which
       signs with the test secret; a real provider is never called. The unit spec `<provider>.webhook.spec.ts` covers the door
-      itself with the Nest testing module, a real `WebhookSignatureService` configured with a test secret and a double of the
-      domain service.
+      itself with the Nest testing module and the verifier it uses: a real `WebhookSignatureService` configured with a test secret
+      or a real domain verifier configured with the connection's test secret, plus a double of a separate intake service. A method
+      that combines verification and intake has its domain service spec proving refusal before intake and the door spec proving delegation.
     rationale: |-
       The door has no logic of its own, so the risk is in the wiring: the raw body, the headers, the real signature scheme and the
       transaction behind the intake. Only a signed request through the real app proves it.
@@ -181,12 +198,12 @@ files:
     template: webhooks/webhook.request.ts.tpl
   - path: src/modules/platform/http-security/webhook-signature.service.ts
     slot: be.platform
-    role: WebhookSignatureService, the one owner of the signature and replay proof.
+    role: WebhookSignatureService, the shared signature and replay proof when provider secrets are platform options.
     spec: src/modules/platform/http-security/webhook-signature.service.spec.ts
     optional: true
   - path: src/modules/domain/<capability>/<capability>.service.ts
     slot: be.domain
-    role: The intake method, which claims the inbox and publishes the event in its transaction.
+    role: The domain verifier or intake method, which may combine per-connection proof with inbox claim and event publishing in its transaction.
     rules: [BE_INBOX_DEDUPE_MISSING, BE_OUTBOX_WRITE_TX]
     optional: true
   - path: src/modules/events/<service>/<event>.event.ts

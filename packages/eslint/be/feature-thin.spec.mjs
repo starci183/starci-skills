@@ -54,6 +54,21 @@ export class Door {
     }
 }`
 
+/** A signed provider door with a typed domain verifier and a separate intake. */
+const DOMAIN_WEBHOOK_DOOR = (body, { post = true, declaration = false } = {}) => `import { Controller, Post } from "@nestjs/common"
+import { PaymentService } from "@modules/domain/payment"
+import { PaymentWebhookVerifier } from "@modules/domain/payment/payment-verifier.service"
+${declaration ? 'import { webhookVerifiers } from "./payment-http.module"' : ""}
+@Controller("webhooks/payment")
+export class Door {
+    constructor(private readonly verifier: PaymentWebhookVerifier, private readonly payments: PaymentService) {}
+
+    ${post ? "@Post()" : ""}
+    async receive(body: object): Promise<void> {
+        ${body}
+    }
+}`
+
 test("every rule this law declares is exported under its published name", () => {
     for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
 })
@@ -143,6 +158,11 @@ export const toOrder = (input: { id: string }) => ({ id: input.id, total: toMone
             // a webhook proves the signature (verify is free) and hands the delivery to one intake method
             { filename: WEBHOOK, code: WEBHOOK_DOOR(`this.signature.verify({ rawBody: body, signature })
         await this.payments.acceptNotification(body)`) },
+            // an unconditional domain proof is free beside the one intake, including an explicit module declaration
+            { filename: WEBHOOK, code: DOMAIN_WEBHOOK_DOOR("await this.verifier.verifyDelivery(body)\n        await this.payments.acceptNotification(body)") },
+            { filename: WEBHOOK, code: DOMAIN_WEBHOOK_DOOR("this.verifier.assertDelivery(body)\n        await this.payments.acceptNotification(body)") },
+            { filename: WEBHOOK, code: DOMAIN_WEBHOOK_DOOR("await this.verifier.acceptCasso(body)") },
+            { filename: at("src/features/webhooks/payment/transport/http/payment.webhook.ts"), code: DOMAIN_WEBHOOK_DOOR("await this.payments.acceptVerifiedNotification(body)\n        await this.payments.acceptNotification(body)", { declaration: true }) },
             // a subscription: one hub call; the modules function sits in its arguments (parameter mapping)
             {
                 filename: SUBSCRIPTION,
@@ -315,6 +335,15 @@ export const toOrder = (orders: OrderService, input: { id: string }) => orders.o
             { filename: WEBHOOK, code: WEBHOOK_DOOR(`this.signature.verify({ rawBody: body, signature })
         const parsed = JSON.parse(JSON.stringify(body))
         await this.payments.acceptNotification(parsed)`), errors: [{ messageId: "call" }, { messageId: "call" }] },
+            // the exemption cannot hide late, unawaited or extra delegation
+            { filename: WEBHOOK, code: DOMAIN_WEBHOOK_DOOR("await this.payments.acceptNotification(body)\n        await this.verifier.verifyDelivery(body)"), errors: [{ messageId: "many" }] },
+            { filename: WEBHOOK, code: DOMAIN_WEBHOOK_DOOR("this.verifier.verifyDelivery(body)\n        await this.payments.acceptNotification(body)"), errors: [{ messageId: "many" }] },
+            { filename: WEBHOOK, code: DOMAIN_WEBHOOK_DOOR("await this.verifier.verifyDelivery(body)\n        await this.payments.acceptNotification(body)\n        await this.payments.refund('x')"), errors: [{ messageId: "many" }] },
+            // a verifier declaration does not permit calls on dependencies the controller did not inject
+            { filename: WEBHOOK, code: DOMAIN_WEBHOOK_DOOR("PaymentWebhookVerifier.prototype.assertDelivery(body)\n        await this.payments.acceptNotification(body)"), errors: [{ messageId: "call" }] },
+            // only a webhook slot's actual @Post handler gets the domain proof exemption
+            { filename: WEBHOOK, code: DOMAIN_WEBHOOK_DOOR("await this.verifier.verifyDelivery(body)\n        await this.payments.acceptNotification(body)", { post: false }), errors: [{ messageId: "many" }] },
+            { filename: at("src/features/api/checkout/transport/http/payment.webhook.ts"), code: DOMAIN_WEBHOOK_DOOR("await this.verifier.verifyDelivery(body)\n        await this.payments.acceptNotification(body)"), errors: [{ messageId: "many" }] },
         ],
     })
 })

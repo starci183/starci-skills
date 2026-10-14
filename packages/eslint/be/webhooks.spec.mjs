@@ -35,7 +35,7 @@ export class W {
 const PROVEN = "this.signature.verify({ rawBody: body, signature })"
 
 /** A webhook class with the given constructor and handler body, a signed webhook by default. */
-const door = ({ ctor = "private readonly signature: WebhookSignatureService, private readonly payments: PaymentService", body, decorators = "@Post()\n    @Public({ reason: PublicReason.SignedWebhook })", extra = "" } = {}) => `${HEAD}
+const door = ({ ctor = "private readonly signature: WebhookSignatureService, private readonly payments: PaymentService", body, decorators = "@Post()\n    @Public({ reason: PublicReason.SignedWebhook })", extra = "", imports = "" } = {}) => `${HEAD}${imports}
 @Controller("webhooks/payment")
 export class PaymentWebhook {
     constructor(${ctor}) {}
@@ -47,16 +47,60 @@ export class PaymentWebhook {
     ${extra}
 }`
 
+const DOMAIN_IMPORTS = `import { PaymentWebhookVerifier as DeliveryProof, PaymentWebhookverify as LowercaseProof } from "@modules/domain/payment/payment-verifier.service"
+`
+const MODULE_IMPORT = `import "./payment-http.module"
+`
+const DOMAIN_PROVEN = "this.proof.assertDelivery({ body, signature })"
+const ASYNC_DOMAIN_PROVEN = "await this.proof.verifyDelivery({ body, signature })"
+
+/** An aliased domain verifier and an intake: recognition comes from its declared type and method symbol. */
+const domainDoor = (options = {}) => door({
+    imports: DOMAIN_IMPORTS,
+    ctor: "private readonly proof: DeliveryProof, private readonly payments: PaymentService",
+    body: `${DOMAIN_PROVEN}\n        await this.payments.acceptNotification(body)`,
+    ...options,
+})
+
+/** Every payment provider has its own combined verifying intake; each resolves the class behind its local alias. */
+const PROVIDER_DOORS = [
+    ["casso", "acceptCasso"],
+    ["payos", "acceptPayos"],
+    ["sepay", "acceptSepay"],
+    ["sepay-feed", "acceptSepayFeed"],
+    ["vietcombank", "acceptVietcombank"],
+].map(([provider, method]) => ({
+    filename: at(`src/features/webhooks/${provider}/transport/http/${provider}.webhook.ts`),
+    code: domainDoor({
+        ctor: "private readonly proof: DeliveryProof",
+        body: `await this.proof.${method}({ connectionId: "primary", body, signature })`,
+    }),
+}))
+
+const DOMAIN_DOORS = [
+    // The proof's method name is unconstrained; the imported alias and receiver do not end in Verifier.
+    { filename: DOOR, code: domainDoor() },
+    { filename: DOOR, code: domainDoor({ body: `${ASYNC_DOMAIN_PROVEN}\n        await this.payments.acceptNotification(body)` }) },
+    { filename: DOOR, code: domainDoor({ body: "await this.proof.syncOrAsync({ body, signature })\n        await this.payments.acceptNotification(body)" }) },
+    { filename: DOOR, code: domainDoor({ ctor: "private readonly proof: LowercaseProof, private readonly payments: PaymentService", body: "this.proof.confirm({ body, signature })\n        await this.payments.acceptNotification(body)" }) },
+    // A module declaration names the resolved method, even when the injected service import is aliased.
+    { filename: DOOR, code: door({ imports: `${MODULE_IMPORT}import { PaymentService as BillingIntake } from "@modules/domain/payment"\n`, ctor: "private readonly billing: BillingIntake", body: "await this.billing.acceptVerifiedNotification({ connectionId: 'primary', body, signature })" }) },
+    // An explicitly declared verifier may also precede a separate ordinary intake.
+    { filename: DOOR, code: door({ imports: MODULE_IMPORT, ctor: "private readonly payments: PaymentService", body: "await this.payments.acceptVerifiedNotification({ body, signature })\n        await this.payments.acceptNotification(body)" }) },
+    ...PROVIDER_DOORS,
+]
+
 test("every rule this law declares is exported under its published name", () => {
     for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
 })
 
-test("webhook-shape: a signed door with one verify and one domain intake call passes, everything else is refused", () => {
+test("webhook-shape: a signed door with a shared or domain proof and one intake passes, everything else is refused", () => {
     tester.run("webhook-shape", webhookShape, {
         valid: [
             { filename: DOOR, code: door() },
             // the proof may be awaited when it is async, and the intake takes any argument
             { filename: DOOR, code: door({ body: `await ${PROVEN}\n        await this.payments.acceptNotification({ body })` }) },
+            ...DOMAIN_DOORS,
             // a file outside the webhook slot is not judged by this rule (its own door laws apply)
             { filename: OTHER_SLOT, code: door({ ctor: "private readonly payments: PaymentService", body: "await this.payments.acceptNotification(body)\n        await this.payments.refund('x')" }) },
             // a spec is not a door
@@ -69,6 +113,19 @@ test("webhook-shape: a signed door with one verify and one domain intake call pa
             // the handler makes no domain call, or two
             { filename: DOOR, code: door({ body: PROVEN }), errors: [{ messageId: "intakeCalls" }] },
             { filename: DOOR, code: door({ body: `${PROVEN}\n        await this.payments.acceptNotification(body)\n        await this.payments.refund('x')` }), errors: [{ messageId: "intakeCalls" }] },
+            // A declared domain proof is free only as the first unconditional, completed call.
+            { filename: DOOR, code: domainDoor({ body: `await this.payments.acceptNotification(body)\n        ${DOMAIN_PROVEN}` }), errors: [{ messageId: "intakeCalls" }] },
+            { filename: DOOR, code: domainDoor({ body: `const received = body\n        ${DOMAIN_PROVEN}\n        await this.payments.acceptNotification(received)` }), errors: [{ messageId: "intakeCalls" }] },
+            { filename: DOOR, code: domainDoor({ body: "this.proof.verifyDelivery({ body, signature })\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "intakeCalls" }] },
+            { filename: DOOR, code: domainDoor({ body: "this.proof.syncOrAsync({ body, signature })\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "intakeCalls" }] },
+            { filename: DOOR, code: domainDoor({ body: "await this.proof.verifyDelivery({ notification: await this.payments.acceptNotification(body), signature })\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "intakeCalls" }] },
+            { filename: DOOR, code: domainDoor({ body: "this.proof.assertDelivery(new Map())\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "intakeCalls" }] },
+            { filename: DOOR, code: domainDoor({ body: "this.proof?.assertDelivery({ body, signature })\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "intakeCalls" }] },
+            { filename: DOOR, code: domainDoor({ body: "this.proof['assertDelivery']({ body, signature })\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "call" }] },
+            // The optional proof does not permit two ordinary intakes after it.
+            { filename: DOOR, code: domainDoor({ body: `${DOMAIN_PROVEN}\n        await this.payments.acceptNotification(body)\n        await this.payments.refund('x')` }), errors: [{ messageId: "intakeCalls" }] },
+            // The module declaration is method-specific: a different PaymentService method is still ordinary intake.
+            { filename: DOOR, code: door({ imports: MODULE_IMPORT, ctor: "private readonly payments: PaymentService", body: "await this.payments.refund('x')\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "intakeCalls" }] },
             // a decision and a try in the door
             { filename: DOOR, code: door({ body: `${PROVEN}\n        if (signature) await this.payments.acceptNotification(body)` }), errors: [{ messageId: "branch" }] },
             { filename: DOOR, code: door({ body: `${PROVEN}\n        try { await this.payments.acceptNotification(body) } catch { return }` }), errors: [{ messageId: "branch" }] },
@@ -96,21 +153,55 @@ export class W {
     })
 })
 
-test("webhook-verify-first: the first statement of the handler is the verify call", () => {
+test("webhook-verify-first: the first statement is an unconditional, completed shared or declared domain proof", () => {
     tester.run("webhook-verify-first", webhookVerifyFirst, {
         valid: [
             { filename: DOOR, code: door() },
             { filename: DOOR, code: door({ body: `await ${PROVEN}\n        await this.payments.acceptNotification(body)` }) },
+            ...DOMAIN_DOORS,
             // outside the webhook slot nothing is judged
             { filename: OTHER_SLOT, code: door({ body: "await this.payments.acceptNotification(body)" }) },
         ],
         invalid: [
             { filename: DOOR, code: door({ body: `await this.payments.acceptNotification(body)\n        ${PROVEN}` }), errors: [{ messageId: "first" }] },
             { filename: DOOR, code: door({ body: `const received = body\n        ${PROVEN}\n        await this.payments.acceptNotification(received)` }), errors: [{ messageId: "first" }] },
+            // No domain intake, data call or even a declaration may precede the domain proof.
+            { filename: DOOR, code: domainDoor({ body: `await this.payments.acceptNotification(body)\n        ${DOMAIN_PROVEN}` }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: domainDoor({ body: `const received = body\n        ${DOMAIN_PROVEN}\n        await this.payments.acceptNotification(received)` }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: domainDoor({ body: `await this.payments.refund('x')\n        ${DOMAIN_PROVEN}\n        await this.payments.acceptNotification(body)` }), errors: [{ messageId: "first" }] },
+            // Argument evaluation cannot touch data or execute work before the verifier itself runs.
+            { filename: DOOR, code: domainDoor({ body: "await this.proof.verifyDelivery({ notification: await this.payments.acceptNotification(body), signature })" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: domainDoor({ body: "this.proof.assertDelivery(new Map())\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: domainDoor({ body: "this.proof.assertDelivery({ sequence: (body as { sequence: number }).sequence++ })\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: domainDoor({ body: "this.proof.assertDelivery({ cleared: delete (body as { signature?: string }).signature })\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: door({ body: "this.signature.verify({ rawBody: JSON.parse(String(body)), signature })\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
             // a verify guarded by a condition is not unconditional
             { filename: DOOR, code: door({ body: `if (signature) ${PROVEN}\n        await this.payments.acceptNotification(body)` }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: domainDoor({ body: `if (signature) ${DOMAIN_PROVEN}\n        await this.payments.acceptNotification(body)` }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: domainDoor({ body: `signature && ${DOMAIN_PROVEN}\n        await this.payments.acceptNotification(body)` }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: domainDoor({ body: "this.proof?.assertDelivery({ body, signature })\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: domainDoor({ body: "this.proof.assertDelivery?.({ body, signature })\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: domainDoor({ body: "this.proof['assertDelivery']({ body, signature })\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: door({ body: "this.signature?.verify({ rawBody: body, signature })\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: door({ body: "this.signature['verify']({ rawBody: body, signature })\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
+            // A thenable proof must be awaited, including a return type that is only sometimes a promise.
+            { filename: DOOR, code: domainDoor({ body: "this.proof.verifyDelivery({ body, signature })\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: domainDoor({ body: "this.proof.syncOrAsync({ body, signature })\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: domainDoor({ ctor: "private readonly proof: DeliveryProof", body: "this.proof.acceptCasso({ connectionId: 'primary', body, signature })" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: door({ imports: MODULE_IMPORT, ctor: "private readonly payments: PaymentService", body: "this.payments.acceptVerifiedNotification({ body, signature })" }), errors: [{ messageId: "first" }] },
             // a lookalike signature service of a domain owner proves nothing
             { filename: DOOR, code: LOOKALIKE, errors: [{ messageId: "first" }] },
+            // Aliases, local receiver names and local classes do not declare a domain verifier.
+            { filename: DOOR, code: door({ imports: `import { PaymentService as PaymentVerifier } from "@modules/domain/payment"\n`, ctor: "private readonly verifier: PaymentVerifier", body: "await this.verifier.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: door({ imports: "type PaymentVerifier = PaymentService\n", ctor: "private readonly verifier: PaymentVerifier", body: "await this.verifier.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: door({ imports: `import type { PaymentVerifier } from "@modules/domain/payment/payment-verifier.service"\n`, ctor: "private readonly verifier: PaymentVerifier, private readonly payments: PaymentService", body: "await this.verifier.refund('x')\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: door({ imports: `import { CacheService as PaymentVerifier } from "@modules/platform/cache/cache.service"\n`, ctor: "private readonly verifier: PaymentVerifier, private readonly payments: PaymentService", body: "this.verifier.get(signature)\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: door({ imports: "class PaymentVerifier { assertDelivery(_delivery: object): void {} }\n", ctor: "private readonly verifier: PaymentVerifier, private readonly payments: PaymentService", body: "this.verifier.assertDelivery({ body, signature })\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
+            // Only the adjacent module's exact exported method reference declares a general service verifier.
+            { filename: DOOR, code: door({ imports: MODULE_IMPORT, ctor: "private readonly payments: PaymentService", body: "await this.payments.refund('x')\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: door({ imports: `import "./other-http.module"\n`, ctor: "private readonly payments: PaymentService", body: "await this.payments.refund('x')\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
+            { filename: DOOR, code: door({ imports: "export const webhookVerifiers = [PaymentService.prototype.refund] as const\n", ctor: "private readonly payments: PaymentService", body: "await this.payments.refund('x')\n        await this.payments.acceptNotification(body)" }), errors: [{ messageId: "first" }] },
+            { filename: at("src/features/webhooks/other/transport/http/other.webhook.ts"), code: door({ imports: `import "../../../payment/transport/http/payment-http.module"\n`, ctor: "private readonly payments: PaymentService", body: "await this.payments.acceptVerifiedNotification(body)" }), errors: [{ messageId: "first" }] },
             { filename: DOOR, code: door({ body: "" }), errors: [{ messageId: "first" }] },
         ],
     })
