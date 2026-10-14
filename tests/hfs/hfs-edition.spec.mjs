@@ -71,7 +71,9 @@ test('lite removes the slots its editions exclude, keeps the rest, and adds its 
   assert.equal(liteBe.slot('be.tests.world').presence, 'optional');
   assert.equal(liteBe.slot('be.tests.fixtures.builders').presence, 'optional');
   assert.equal(liteBe.slot('be.tests.integration').presence, 'optional');
-  for (const id of ['be.tests.e2e', 'be.tests.contract']) {
+  // owner ruling 2026-10-14: lite MAY have contract specs; only the e2e world stays full-only
+  assert.equal(liteBe.slot('be.tests.contract').presence, 'optional');
+  for (const id of ['be.tests.e2e']) {
     assert.equal(liteBe.slot(id).presence, 'forbidden', `${id}: litePresence replaces presence under lite`);
     assert.equal(liteBe.slot(id).tracked, 'external', `${id}: a forbidden slot holds no tracked path: it points out (goesTo)`);
     assert.equal(typeof liteBe.slot(id).goesTo, 'string', `${id}: every lite-forbidden slot says where the content goes`);
@@ -103,7 +105,7 @@ test('lite classification: e2e, contract, the GraphQL subscription door and the 
     assert.equal(typeof c.goesTo, 'string', `${p}: a forbidden path says where it goes`);
   };
   forbidden(be, 'src/tests/e2e/orders/place.e2e-spec.ts', 'be.tests.e2e');
-  forbidden(be, 'src/tests/contract/stripe/charge.contract-spec.ts', 'be.tests.contract');
+  assert.equal(be.classifyPath('src/tests/contract/stripe/charge.contract-spec.ts').slot, 'be.tests.contract');
   forbidden(be, 'src/features/realtime/chat/transport/graphql/chat.subscription.ts', 'be.feature.realtime.graphql');
   assert.equal(be.classifyPath('jest.config.e2e.js').slot, 'be.tool-config-local');
   assert.equal(be.classifyPath('e2e/probe.ts').slot, 'be.root-e2e');
