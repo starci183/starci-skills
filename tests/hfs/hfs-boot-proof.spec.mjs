@@ -1,4 +1,4 @@
-// proves: BE_APP_BOOT_PROOF_MISSING@lite BE_APP_BOOT_PROOF_MISSING@full
+// proves: BE_APP_BOOT_PROOF_MISSING@lite
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

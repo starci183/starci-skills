@@ -103,10 +103,10 @@ here does not prove that each checker or CLI option is implemented in this
 checkout. The draft checklist above keeps its existing status.
 
 - **R247 RT_COVERAGE_MATRIX:** Every applicable edition needs linked rule, enforcer, spec, witness, owning doc, template and example evidence for each surface; edition differences need a reason and gate declarations must match their execution.
-- **R270 HFS_DOC_FRESH:** Product README, docs and stack runbooks must cite current product facts. `HFS_DOC_PATH_MISSING` names an absent repository path, `HFS_DOC_COMMAND_UNKNOWN` an unknown command, `HFS_DOC_ENV_UNKNOWN` an undeclared environment key, and `HFS_DOC_RULE_UNKNOWN` an unknown rule ID.
-- **R272 BE_APP_BOOT_PROOF_MISSING:** Lite must prove each app's Nest module graph compiles with doubles and rejects missing or circular providers; a missing or failed proof is refused. Full keeps its real-app e2e boot proof.
-- **R273 HFS_COVERAGE_BELOW:** Supplied back-end lcov evidence must meet the measured per-file coverage policy below, with unmeasured feature, CLI and webhook paths listed separately.
-- **R274 RT_RULING_STALE_CITE:** A superseded ruling citation must identify its successor in the same paragraph; stale ruling text must not prescribe the former behavior.
+- <a id="r270"></a>**R270 HFS_DOC_FRESH:** Product README, docs and stack runbooks must cite current product facts. `HFS_DOC_PATH_MISSING` names an absent repository path, `HFS_DOC_COMMAND_UNKNOWN` an unknown command, `HFS_DOC_ENV_UNKNOWN` an undeclared environment key, and `HFS_DOC_RULE_UNKNOWN` an unknown rule ID.
+- <a id="r272"></a>**R272 BE_APP_BOOT_PROOF_MISSING:** Lite must prove each app's Nest module graph compiles with doubles and rejects missing or circular providers; a missing or failed proof is refused. Full keeps its real-app e2e boot proof.
+- <a id="r273"></a>**R273 HFS_COVERAGE_BELOW:** Supplied back-end lcov evidence must meet the measured per-file coverage policy below, with unmeasured feature, CLI and webhook paths listed separately.
+- <a id="r274"></a>**R274 RT_RULING_STALE_CITE:** A superseded ruling citation must identify its successor in the same paragraph; stale ruling text must not prescribe the former behavior.
 - **R280 HFS_UNUSED_SYMBOL:** Exported symbols, enum members, queue constants, error codes and catalog keys must have consumers.
 - **R282 HFS_ASSET_BUDGET:** `HFS_ASSET_OVERSIZE` refuses a back-end asset above its per-file size budget; `HFS_ASSET_KIND` refuses an unsupported tracked asset kind. Large and user media belong in object storage.
 - **R283 HFS_APP_LEXICON:** Source and docs must exclude product vocabulary declared in `hfs.json lexicon.removed`.
