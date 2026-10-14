@@ -4,6 +4,8 @@ import { render, TEMPLATES_DIR } from "../sync/index.mjs";
 import { ScaffoldError, pascalOf } from "./service.mjs";
 import { filesBelow } from "./lite-exports.mjs";
 import { jsonText } from "./app.mjs";
+import { byCodeUnit } from "../report/order.mjs";
+import { withSqlIdentifierError } from "./add-database-lite.mjs";
 
 const MIGRATION = /^(\d{14})_[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.sql$/;
 const PLACEHOLDER = /@@([A-Za-z][A-Za-z0-9]*)@@/g;
@@ -51,7 +53,7 @@ function validateProcessingOwner({ root, service, serviceModule, provider }) {
     );
   const owner = path.join(root, "be", "src", "modules", "domain", ...capability.split("/"));
   const candidates = filesBelow(owner).filter((file) =>
-    file.endsWith(".service.ts") && new RegExp(`\\bexport\\s+class\\s+${service}\\b`).test(fs.readFileSync(file, "utf8")),
+    file.endsWith(".service.ts") && new RegExp(String.raw`\bexport\s+class\s+${service}\b`).test(fs.readFileSync(file, "utf8")),
   );
   if (candidates.length !== 1)
     throw new ScaffoldError(
@@ -71,10 +73,10 @@ const databasePatches = (root) => {
     );
   let index = fs.readFileSync(indexFile, "utf8").replace(/\r\n/g, "\n");
   if (!index.includes('export { recordWebhookDelivery } from "./webhook-inbox.client"'))
-    index = `${index.replace(/\n+$/, "")}\nexport { recordWebhookDelivery } from "./webhook-inbox.client"\n`;
-  if (!/^export \{ [^}]*\bDatabaseErrorCode\b[^}]* \} from "\.\/errors\/database\.error"$/m.test(index))
-    index = `${index.replace(/\n+$/, "")}\nexport { DatabaseError, DatabaseErrorCode } from "./errors/database.error"\n`;
-  let error = fs.readFileSync(errorFile, "utf8").replace(/\r\n/g, "\n");
+    index = `${index.trimEnd()}\nexport { recordWebhookDelivery } from "./webhook-inbox.client"\n`;
+  if (!index.split("\n").some((line) => line.startsWith("export { ") && line.includes("DatabaseErrorCode") && line.endsWith(' } from "./errors/database.error"')))
+    index = `${index.trimEnd()}\nexport { DatabaseError, DatabaseErrorCode } from "./errors/database.error"\n`;
+  let error = withSqlIdentifierError(fs.readFileSync(errorFile, "utf8").replace(/\r\n/g, "\n"));
   const enumLine =
     '    WebhookDeliveryIdRequired = "DATABASE_WEBHOOK_DELIVERY_ID_REQUIRED",';
   if (!error.includes(enumLine)) {
@@ -98,50 +100,6 @@ const databasePatches = (root) => {
     { file: indexFile, text: index },
     { file: errorFile, text: error },
   ];
-};
-
-const wiredAppModule = ({ root, repo, provider, Provider }) => {
-  const app = repo.sides.be.apps.find((entry) => entry.kind === "api");
-  if (!app)
-    throw new ScaffoldError(
-      "HFS_ADD_NO_API_OWNER",
-      "add webhook needs a declared lite api app",
-    );
-  const file = path.join(root, "be", "apps", app.name, "src", "app.module.ts");
-  const relative = `be/apps/${app.name}/src/app.module.ts`;
-  if (!fs.existsSync(file))
-    throw new ScaffoldError(
-      "HFS_ADD_WIRE_MISSING",
-      `add webhook registers its inbox in ${relative}, which does not exist`,
-    );
-  const lines = fs.readFileSync(file, "utf8").replace(/\r\n/g, "\n").split("\n");
-  for (const [symbol, module] of [
-    ["InboxModule", "@modules/platform/inbox"],
-    ["EventBusModule", "@modules/platform/event-bus"],
-    [`${Provider}InboxModule`, `@modules/domain/${provider}-inbox`],
-  ]) {
-    const importLine = `import { ${symbol} } from "${module}"`;
-    if (lines.includes(importLine)) continue;
-    const lastImport = lines.reduce(
-      (last, line, index) => (line.startsWith("import ") ? index : last),
-      -1,
-    );
-    const imports = lines.findIndex((line) => /^\s*imports: \[$/.test(line));
-    if (lastImport < 0 || imports < 0)
-      throw new ScaffoldError(
-        "HFS_ADD_WIRE_INVALID",
-        `add webhook could not find the imports array in ${relative}`,
-      );
-    lines.splice(lastImport + 1, 0, importLine);
-    const shiftedImports = imports > lastImport ? imports + 1 : imports;
-    const indent = /^(\s*)/.exec(lines[shiftedImports])?.[1] ?? "";
-    lines.splice(
-      shiftedImports + 1,
-      0,
-      `${indent}    ${symbol}.register({ isGlobal: true }),`,
-    );
-  }
-  return { file, text: `${lines.join("\n").replace(/\n+$/, "")}\n` };
 };
 
 /** The first webhook installs only the lite inbox claim and transactional event publisher, shared by all providers. */
@@ -194,7 +152,7 @@ const eventFiles = (root, provider, values) => {
 const eventPatternPatch = (root) => {
   const file = path.join(root, "hfs.json");
   const declaration = JSON.parse(fs.readFileSync(file, "utf8"));
-  declaration.sides.be.patterns = [...new Set([...(declaration.sides.be.patterns ?? []), "event-bus"])].sort();
+  declaration.sides.be.patterns = [...new Set([...(declaration.sides.be.patterns ?? []), "event-bus"])].sort(byCodeUnit);
   return { file, text: jsonText(declaration) };
 };
 
@@ -213,7 +171,7 @@ export function addLiteWebhookInbox({
   const table = `${snakeOf(provider)}_inbox`;
   const migrationsDir = path.join(root, "supabase", "migrations");
   const migrations = fs.existsSync(migrationsDir)
-    ? fs.readdirSync(migrationsDir).filter((file) => MIGRATION.test(file)).sort()
+    ? fs.readdirSync(migrationsDir).filter((file) => MIGRATION.test(file)).sort(byCodeUnit)
     : [];
   const suffix = `${provider}-inbox.sql`;
   if (migrations.some((file) => file.endsWith(`_${suffix}`)))
@@ -322,7 +280,6 @@ export function addLiteWebhookInbox({
     );
   const patches = [
     ...databasePatches(root),
-    wiredAppModule({ root, repo, provider, Provider }),
     ...events.patches,
     eventPatternPatch(root),
   ];

@@ -4,7 +4,7 @@ One StarCi lite app: a Nest API in `be/`, one Next web app in `fe/`, and Supabas
 
 ## Overview
 
-The starter keeps one deployable API and one web app, with the same code structure as a full app: the web app calls the API over GraphQL (`src/modules/api`, SWR hooks under `src/hooks/swr`) and uses Supabase only for Auth in the browser (`src/modules/auth`); every data read and write goes through the API, which verifies the access token.
+The starter keeps one deployable API and one web app, with the same code structure as a full app: the web app calls the API over GraphQL (`fe/apps/web/src/modules/api`, SWR hooks under `fe/apps/web/src/hooks/swr`) and uses Supabase only for Auth in the browser (`fe/apps/web/src/modules/auth`); every data read and write goes through the API, which verifies the access token.
 
 ## Stack
 
@@ -14,9 +14,9 @@ TypeScript everywhere, NestJS in `be/`, Next.js with next-intl in `fe/`, Supabas
 
 - `supabase/`: local configuration, forward-only SQL migrations, seed data, and generated database types.
 - `be/`: the API, shared platform capabilities, verified identity admission, and privileged Supabase integrations.
-- `fe/`: the web app; the only Supabase client is the Auth client of `src/modules/auth`, data goes through `src/modules/api`.
+- `fe/`: the web app; the only Supabase client is the Auth client of `fe/apps/web/src/modules/auth`, data goes through `fe/apps/web/src/modules/api`.
 - `.starcistacks/`: value-free environment metadata and encrypted-secret custody.
-- `.starciwork/`: `.gitignore`, `workspace.yaml` project metadata and repo roles, and optional `brand/` drawing records, references, and assets.
+- `.starciwork/`: `.gitignore`, `.starciwork/workspace.yaml` project metadata and repo roles, and optional brand drawing records, references, and assets.
 
 ## Development
 

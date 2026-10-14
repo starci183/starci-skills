@@ -9,6 +9,7 @@ create table public.@@table@@ (
 );
 
 alter table public.@@table@@ enable row level security;
+alter table public.@@table@@ force row level security;
 
 -- The dedicated app_be PostgreSQL role is the only application path. With no anon or authenticated policy,
 -- RLS denies those PostgREST roles by default; the service-role JWT is deliberately not granted here.

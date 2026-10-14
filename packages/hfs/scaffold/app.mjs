@@ -439,6 +439,7 @@ function skeletonOutputPath(relative, { scope, app, vars }) {
 
 function fixedSkeletonFiles(context, relative, source) {
   const { scope, directory, app, vars, apps } = context;
+  if (scope === 'be' && relative === 'src/tests/fixtures/builders/cli.builder.ts' && !declaresCliApp(app)) return [];
   if (scope === 'be' && relative.startsWith(CLI_APP_DIR) && !declaresCliApp(app)) return [];
   const fixedApp = apps.find(entry => relative.startsWith(`apps/${entry.name}/`));
   if (scope === 'fe' && relative.startsWith('apps/') && !fixedApp) return [];

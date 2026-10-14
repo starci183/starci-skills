@@ -1,0 +1,5 @@
+{
+  "environment": "dev",
+  "provider": "docker-compose",
+  "project": "{{project}}"
+}

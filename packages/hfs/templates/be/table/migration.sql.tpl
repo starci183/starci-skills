@@ -8,6 +8,7 @@ create table public.{{tableSql}} (
 create index {{table}}_owner_id_idx on public.{{tableSql}} (owner_id);
 
 alter table public.{{tableSql}} enable row level security;
+alter table public.{{tableSql}} force row level security;
 
 create trigger {{table}}_set_updated_at
 before update on public.{{tableSql}}

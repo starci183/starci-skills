@@ -1,18 +1,16 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { APP_FILTER, APP_GUARD } from "@nestjs/core"
-import { SystemHealthHttpModule } from "@features/api/system-health"
-import { AuthGuard, IdentityModule } from "@modules/domain/identity"
-import {
-    SUPABASE_ACCESS_TOKEN_VERIFIER,
-    SUPABASE_ADMIN_CLIENT,
-    createSupabaseAccessTokenVerifier,
-    createSupabaseAdminClient,
-} from "@modules/integrations/supabase"
-import { LivenessModule } from "@modules/domain/liveness"
+import { AuthGuard } from "@modules/domain/identity"
+import { createSupabaseAccessTokenVerifier } from "@modules/integrations/supabase"
 import { ErrorsFilter } from "@modules/platform/errors"
 import { OriginGuard, RateLimitGuard } from "@modules/platform/http-security"
 import { platformModules } from "./compose/platform"
+import { domainModules } from "./compose/domain"
+import { systemModules } from "./compose/system"
+import { apiModules } from "./compose/api"
+import { webhooksModules } from "./compose/webhooks"
+import { integrationProviders } from "./compose/integrations"
 import type { ApiOptions } from "./api.options"
 
 @Module({})
@@ -25,16 +23,13 @@ export class AppModule {
             module: AppModule,
             imports: [
                 ...platformModules(options),
-                IdentityModule.register({ isGlobal: true, verifyAccessToken }),
-                LivenessModule.register({ isGlobal: true }),
-                SystemHealthHttpModule,
+                ...domainModules(verifyAccessToken),
+                ...systemModules(),
+                ...apiModules(),
+                ...webhooksModules(),
             ],
             providers: [
-                {
-                    provide: SUPABASE_ADMIN_CLIENT,
-                    useValue: createSupabaseAdminClient(options.supabase),
-                },
-                { provide: SUPABASE_ACCESS_TOKEN_VERIFIER, useValue: verifyAccessToken },
+                ...integrationProviders(options.supabase, verifyAccessToken),
                 { provide: APP_FILTER, useClass: ErrorsFilter },
                 { provide: APP_GUARD, useClass: RateLimitGuard },
                 { provide: APP_GUARD, useClass: OriginGuard },

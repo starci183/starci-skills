@@ -180,6 +180,9 @@ export function ensureLiteCli({ root, manifest, repo }) {
       "be/apps/cli/src/app.module.ts",
       read("be/skeleton/apps/cli/src/app.module.ts"),
     ],
+    ["be/apps/cli/src/compose/platform.ts", read("be/skeleton/apps/cli/src/compose/platform.ts")],
+    ["be/apps/cli/src/compose/cli.ts", read("be/skeleton/apps/cli/src/compose/cli.ts")],
+    ["be/src/tests/fixtures/builders/cli.builder.ts", read("be/skeleton-lite/src/tests/fixtures/builders/cli.builder.ts")],
     ["be/apps/cli/src/cli.env.ts", read("be/skeleton-lite/apps/cli/src/cli.env.ts")],
     ["be/apps/cli/src/cli.options.ts", CLI_OPTIONS],
     [
@@ -255,7 +258,7 @@ export function ensureLiteCli({ root, manifest, repo }) {
     );
   const nest = JSON.parse(fs.readFileSync(nestFile, "utf8"));
   nest.projects = {
-    ...(nest.projects ?? {}),
+    ...nest.projects,
     cli: {
       type: "application",
       root: "apps/cli",
@@ -269,9 +272,9 @@ export function ensureLiteCli({ root, manifest, repo }) {
   const pin = parseYaml(fs.readFileSync(PINS_FILE, "utf8")).pins?.["nest-commander"]?.version;
   if (typeof pin !== "string" || pin === "")
     throw new ScaffoldError("HFS_ADD_CANON_PIN_MISSING", "add cli needs the nest-commander canon pin");
-  packageManifest.dependencies = { ...(packageManifest.dependencies ?? {}), "nest-commander": pin };
+  packageManifest.dependencies = { ...packageManifest.dependencies, "nest-commander": pin };
   packageManifest.scripts = {
-    ...(packageManifest.scripts ?? {}),
+    ...packageManifest.scripts,
     ...managedScripts(resolved),
   };
   for (const [relative, body] of files) {
