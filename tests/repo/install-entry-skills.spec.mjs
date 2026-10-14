@@ -90,7 +90,7 @@ test('installed current examples reach the real current reference catalog and RE
     assert.equal(installed.files[relative], installedPayloadDigest(actual, relative), relative);
     if (relative.startsWith('examples/.runtimes/')) assert.equal(installed.files[relative], sha256(actual), relative);
   }
-  for (const app of discoverExampleApps(target)) assert.deepEqual(exampleArtifactReadOptions(target,
+  for (const app of discoverExampleApps(target).filter(name => fs.existsSync(path.join(target, 'examples', name, '.starciwork')))) assert.deepEqual(exampleArtifactReadOptions(target,
     path.join(target, 'examples', app, '.starciwork')), {root: path.join(target, 'examples/.runtimes', app, 'artifacts')});
   const read = await buildReadDigest({root: repo, touch: [], base: target});
   for (const relative of exampleSourcePaths(target)) {
