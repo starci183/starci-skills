@@ -9,7 +9,7 @@
 // proves: STACKS_PLACEMENT_MISSING@lite STACKS_PLACEMENT_MISSING@full
 // proves: STACKS_HEALTHCHECK_MISSING@lite STACKS_HEALTHCHECK_MISSING@full
 // proves: STACKS_UPDATE_POLICY_MISSING@lite STACKS_UPDATE_POLICY_MISSING@full
-// proves: STACKS_REALTIME_SCALED@lite STACKS_REALTIME_SCALED@full
+// proves: STACKS_REALTIME_SCALED@lite
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

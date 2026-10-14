@@ -31,7 +31,7 @@ test('the shipped catalog is 3.1.0, validates against its JSON schema and loads 
   for (const rule of catalog.rules) {
     assert.ok(rule.enforcers.length > 0, `${rule.id} has an enforcer`);
     assert.equal(rule.failureCodes[0], rule.code);
-    assert.ok(rule.gates.includes('land'), `${rule.id} runs at land`);
+    assert.ok(rule.gates.includes('land') || (rule.scope === 'runtime' && rule.gates.includes('runtime')), `${rule.id} runs at land or its runtime gate`);
   }
 });
 
@@ -54,9 +54,9 @@ test('the loader answers by id, code, gate, enforcer and what is still owed', ()
   const owed = loadRuleCatalog({ text: JSON.stringify(withPlanned(doc())) });
   assert.deepEqual(owed.unbuilt().map((r) => r.id).slice(0, 1), ['R01'], 'a rule whose only enforcer is planned is unbuilt');
   assert.ok(owed.planned().some((p) => p.rule === 'R01' && p.kind === 'hfs' && p.id === 'slot-undeclared'));
-  const unbuilt = catalog.unbuilt().map((r) => r.id);
-  assert.ok(!unbuilt.includes('R12'), 'R12 is enforced by the architecture machine today');
-  assert.ok(!unbuilt.includes('R58'), 'R58 is enforced by eslint-fe');
+  const unbuilt = new Set(catalog.unbuilt().map((r) => r.id));
+  assert.ok(!unbuilt.has('R12'), 'R12 is enforced by the architecture machine today');
+  assert.ok(!unbuilt.has('R58'), 'R58 is enforced by eslint-fe');
   assert.ok(catalog.planned().every((p) => p.rule && p.kind && p.id));
   assert.deepEqual(Object.keys(catalog.gates), ['pre-commit', 'pre-push', 'settle', 'land', 'ci', 'sonar', 'runtime']);
 });
@@ -102,7 +102,7 @@ test('the rule-catalog loader also refuses what only semantics can see', () => {
   refusal(load((d) => { d.rules[1].failureCodes = [d.rules[1].code, d.rules[0].code]; }), 'HFS_RULES_INVALID');
   refusal(load((d) => { d.rules[0].failureCodes = ['HFS_SOMETHING_ELSE']; }), 'HFS_RULES_INVALID');
   refusal(load((d) => { d.rules[0].gates = ['pre-push', 'settle']; }), 'HFS_RULES_INVALID');
-  refusal(load((d) => { d.rules[5].gates = ['pre-commit', 'land', 'ci']; }), 'HFS_RULES_INVALID');
+  assert.doesNotThrow(load((d) => { d.rules[5].gates = ['pre-commit', 'land', 'ci']; }));
   refusal(load((d) => { d.rules[0].gates.push('sonar'); }), 'HFS_RULES_INVALID');
   const owing = (mutate) => load((d) => { withPlanned(d); mutate(d); });
   refusal(owing((d) => { d.rules[0].enforcers[0].at = 'scripts/x.mjs'; }), 'HFS_RULES_INVALID');
@@ -112,6 +112,23 @@ test('the rule-catalog loader also refuses what only semantics can see', () => {
   refusal(load((d) => { d.schema = 'starci/hfs-rules@4'; }), 'HFS_RULES_INVALID');
   refusal(load((d) => { d.gates = { land: 'x' }; }), 'HFS_RULES_INVALID');
   refusal(() => loadRuleCatalog({ text: '{ not: [valid' }), 'HFS_RULES_INVALID');
+});
+
+test('a runtime-scoped rule may name its runtime gate without claiming land', () => {
+  const runtimeOnly = (d) => { d.rules[0].scope = 'runtime'; d.rules[0].gates = ['runtime']; };
+  assert.doesNotThrow(load(runtimeOnly));
+  refusal(load((d) => { runtimeOnly(d); delete d.rules[0].scope; }), 'HFS_RULES_INVALID');
+  refusal(load((d) => { runtimeOnly(d); d.rules[0].gates = ['pre-commit']; }), 'HFS_RULES_INVALID');
+});
+
+test('rule-level amendedBy names a valid ruling reference and survives the frozen loader', () => {
+  const d = doc();
+  d.rules.find((rule) => rule.id === 'R245').amendedBy = 'R289';
+  const catalog = loadRuleCatalog({ text: JSON.stringify(d) });
+  assert.equal(catalog.rule('R245').amendedBy, 'R289');
+  assert.ok(Object.isFrozen(catalog.rule('R245')));
+  refusal(load((broken) => { broken.rules[0].amendedBy = 'missing successor'; }), 'HFS_RULES_INVALID');
+  refusal(load((broken) => { broken.rules[0].amendedBy = []; }), 'HFS_RULES_INVALID');
 });
 
 test('a catalog whose major differs from the slot manifest is refused', () => {
@@ -167,7 +184,11 @@ test('an existing machine enforcer needs its file to exist and to emit the rule 
 
 test('a rule with no enforcer, or a lint kind with no lint enforcer, is a finding', () => {
   const catalog = loadRuleCatalog();
-  const bare = { ...catalog, rules: catalog.rules.map((r) => (r.id === 'R01' ? { ...r, enforcers: [] } : r.id === 'R06' ? { ...r, kinds: ['lint'] } : r)) };
+  const bare = { ...catalog, rules: catalog.rules.map((r) => {
+    if (r.id === 'R01') return { ...r, enforcers: [] };
+    if (r.id === 'R06') return { ...r, kinds: ['lint'] };
+    return r;
+  }) };
   const findings = run(bare);
   assert.deepEqual(findings.map((f) => [f.code, f.rule]), [['HFS_RULE_NO_ENFORCER', 'R01'], ['HFS_RULE_NO_ENFORCER', 'R01'], ['HFS_RULE_NO_ENFORCER', 'R01'], ['HFS_RULE_NO_ENFORCER', 'R06']]);
 });
@@ -245,7 +266,7 @@ test('a knowledge file names a rule code only if the catalog or the failure cata
   // only the RED20 findings: the fixture file stubs above answer for the machine enforcers, which is another test's subject
   const red20 = (over) => run(catalog, over).filter((f) => f.code === 'HFS_RULE_CODE_UNCATALOGUED' && f.rule === '-');
   assert.deepEqual(red20({ knowledge: [file('BE_TIER_DIRECTION and HFS_SLOT_UNDECLARED judge it; NEST_ANYTHING and R26 are not codes of these families')] }), []);
-  const stray = red20({ knowledge: [file(['- BE_SQL_OUTSIDE_REPOSITORY', '- BE_SQL_OUTSIDE_REPOSITORY', '- FE_GONE_CODE'].join(String.fromCharCode(10)))] });
+  const stray = red20({ knowledge: [file(['- BE_SQL_OUTSIDE_REPOSITORY', '- BE_SQL_OUTSIDE_REPOSITORY', '- FE_GONE_CODE'].join(String.fromCodePoint(10)))] });
   assert.deepEqual(stray.map((f) => [f.code, f.rule]), [['HFS_RULE_CODE_UNCATALOGUED', '-'], ['HFS_RULE_CODE_UNCATALOGUED', '-']]);
   assert.ok(stray.every((f) => f.message.startsWith('knowledge/patterns/be/example.yaml names ')));
   assert.deepEqual(stray.map((f) => / names ([A-Z0-9_]+),/.exec(f.message)?.[1]), ['BE_SQL_OUTSIDE_REPOSITORY', 'FE_GONE_CODE']);

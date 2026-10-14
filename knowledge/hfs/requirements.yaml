@@ -4339,3 +4339,69 @@ requirements:
     ruling: ruling:fe-error-reporter-optional
     standardSource: A15-STANDARD section 0.2 observability decision
     reason: Owner decision keeps this capability optional/deferred; it creates no mandatory conformance finding.
+  - id: A15-STACKS-INGRESS-PORTS
+    source: docs/application-stacks.md#lite-production
+    editions: [lite]
+    text: 'Only a component with `role: ingress` publishes ports.'
+    status: enforced
+    rules: [R266]
+  - id: A15-STACKS-INGRESS-ROLE
+    source: docs/application-stacks.md#lite-production
+    editions: [lite]
+    text: 'The component with `role: ingress` may run Traefik or Caddy (or another reverse proxy); the checker keys on the role and the published ports, never on the image name.'
+    status: enforced
+    rules: [R266, R275]
+  - id: A15-STACKS-SIDECAR-POSTGRES
+    source: docs/application-stacks.md#lite-production
+    editions: [lite]
+    text: 'A sidecar such as n8n does not run its own Postgres in lite: that image would duplicate a Supabase-provided service and is refused.'
+    status: enforced
+    rules: [R276]
+  - id: A15-STACKS-SIDECAR-IMAGES
+    source: docs/application-stacks.md#lite-production
+    editions: [lite]
+    text: 'The checker does not refuse a named volume; it refuses only the Postgres, Redis, Kafka, Keycloak, MinIO, RabbitMQ, MySQL and Mongo images.'
+    status: enforced
+    rules: [R212, R276]
+  - id: A15-DB-ARCHIVE-IMMUTABLE
+    source: docs/microservices.md#services-of-one-product
+    editions: [lite]
+    text: '`DB_ARCHIVE_MUTATED` refuses changed archive history or a new archive-only migration.'
+    status: enforced
+    rules: [R257]
+  - id: A15-DB-QUEUE-CRON
+    source: docs/microservices.md#services-of-one-product
+    editions: [lite]
+    text: 'R258 `DB_QUEUE_CRON`: `DB_PGMQ_DECLARED` requires queue constants and migration-created pgmq queues to agree; `DB_CRON_OWNED` requires each uniquely named pg_cron tick to have one owner and only enqueue work.'
+    status: enforced
+    rules: [R258]
+  - id: A15-BE-COMPOSITION-TYPES
+    source: docs/microservices.md#services-of-one-product
+    editions: [lite, full]
+    text: 'R265 `BE_COMPOSITION_UNTYPED`: typed module, provider, queue and scheduler collections live in `compose/<area>.ts`, never in `main.ts`, environment or options files; ownership follows resolved types rather than names.'
+    status: enforced
+    rules: [R265]
+  - id: A15-BE-SPEC-FORM
+    source: docs/microservices.md#services-of-one-product
+    editions: [lite, full]
+    text: 'R281 `BE_SPEC_FORM_ALL_ROLES`: every logic-role unit spec gets its subject from a providers-only TestingModule with doubles and asserts exact outcomes, without constructing the subject or mocking modules.'
+    status: enforced
+    rules: [R281]
+  - id: A15-ENV-KEY-PARITY
+    source: docs/host-secrets.md#application-secret-rules
+    editions: [lite, full]
+    text: 'R248 `HFS_ENV_PARITY`: required keys read through `<app>.env.ts`, sealed member names, stack inputs and environment examples agree.'
+    status: enforced
+    rules: [R248]
+  - id: A15-ENV-KEY-FINDINGS
+    source: docs/host-secrets.md#application-secret-rules
+    editions: [lite, full]
+    text: '`ENV_REQUIRED_UNSET` names an undeclared required read; `ENV_SEALED_UNREAD` names a sealed key without a reader or consumer; `ENV_DUPLICATE` names a key in more than one sealed member; `ENV_PUBLIC_SEALED` refuses sealed public configuration; `ENV_EXAMPLE_DRIFT` names an example key without a reader.'
+    status: enforced
+    rules: [R248]
+  - id: A15-ENV-VALUE-SHAPE
+    source: docs/host-secrets.md#application-secret-rules
+    editions: [lite, full]
+    text: "R249 `ENV_VALUE_SHAPE`: secret verification validates decrypted environment value shapes in memory against the application's typed configuration and reports only key names and violated rules; concrete environment-example values obey the same shapes."
+    status: enforced
+    rules: [R249]

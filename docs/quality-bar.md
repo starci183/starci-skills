@@ -103,18 +103,45 @@ here does not prove that each checker or CLI option is implemented in this
 checkout. The draft checklist above keeps its existing status.
 
 - **R247 RT_COVERAGE_MATRIX:** Every applicable edition needs linked rule, enforcer, spec, witness, owning doc, template and example evidence for each surface; edition differences need a reason and gate declarations must match their execution.
-- **R270 HFS_DOC_FRESH:** Product README, docs and stack runbooks must cite existing paths, catalogued commands, declared environment keys and known rule IDs.
-- **R272 BE_APP_BOOT_PROOF:** Lite must prove each app's Nest module graph compiles with doubles and rejects missing or circular providers; full keeps its real-app e2e boot proof.
+- **R270 HFS_DOC_FRESH:** Product README, docs and stack runbooks must cite current product facts. `HFS_DOC_PATH_MISSING` names an absent repository path, `HFS_DOC_COMMAND_UNKNOWN` an unknown command, `HFS_DOC_ENV_UNKNOWN` an undeclared environment key, and `HFS_DOC_RULE_UNKNOWN` an unknown rule ID.
+- **R272 BE_APP_BOOT_PROOF_MISSING:** Lite must prove each app's Nest module graph compiles with doubles and rejects missing or circular providers; a missing or failed proof is refused. Full keeps its real-app e2e boot proof.
 - **R273 HFS_COVERAGE_BELOW:** Supplied back-end lcov evidence must meet the measured per-file coverage policy below, with unmeasured feature, CLI and webhook paths listed separately.
-- **R274 RT_RULING_SUPERSEDED:** A superseded ruling citation must identify its successor in the same paragraph; stale ruling text must not prescribe the former behavior.
+- **R274 RT_RULING_STALE_CITE:** A superseded ruling citation must identify its successor in the same paragraph; stale ruling text must not prescribe the former behavior.
 - **R280 HFS_UNUSED_SYMBOL:** Exported symbols, enum members, queue constants, error codes and catalog keys must have consumers.
-- **R282 HFS_ASSET_BUDGET:** Back-end assets must obey their declared per-file size and allowed-kind budgets; large and user media belong in object storage.
+- **R282 HFS_ASSET_BUDGET:** `HFS_ASSET_OVERSIZE` refuses a back-end asset above its per-file size budget; `HFS_ASSET_KIND` refuses an unsupported tracked asset kind. Large and user media belong in object storage.
 - **R283 HFS_APP_LEXICON:** Source and docs must exclude product vocabulary declared in `hfs.json lexicon.removed`.
-- **R284 BE_PATTERN_PROOF_LANE:** Lite must prove declared event-bus, queue, webhook, realtime, fenced-job, projection and saga scenarios in its integration-spec lane; full retains its existing proof lanes.
-- **R285 FE_SWR_FAMILY:** SWR calls and data-operation access belong in `hooks/swr`; components and other hook families consume those wrappers.
-- **R286 FE_COPY_AND_GLYPH:** User copy, including toast and validation arguments, comes from i18n; alerts are forbidden and inline SVG is confined to a declared brand-mark leaf.
+- **R284 BE_LITE_PROOF_LANE_MISSING:** Lite must keep its declared event-bus, queue, webhook, realtime, fenced-job, projection and saga proofs in a runnable integration-spec lane; the existing `BE_PATTERN_SPEC_MISSING` code names a missing scenario. Full retains its existing proof lanes.
+- **R285 FE_SWR_FAMILY:** `FE_SWR_OUTSIDE_FAMILY` confines SWR calls to `hooks/swr`; `FE_OP_OUTSIDE_SWR_HOOK` confines API operation imports and calls to those wrappers. Components and other hook families consume the wrapper hooks.
+- **R286 FE_COPY_AND_GLYPH:** `FE_COPY_IN_CALL` requires toast and validation arguments to come from i18n; `FE_NO_ALERT` refuses browser alerts; `FE_ICON_INLINE_SVG` confines inline SVG to a declared brand-mark leaf.
 - **R287 FE_CALLBACK_SHAPE:** An auth callback exchanges the PKCE code and redirects only, with cookie writes confined to the Supabase helper.
-- **R288 FE_STACK_ALLOWLIST:** Front-end dependencies need a catalog entry or a reasoned `fe.extraPackages` declaration; GraphQL tagged templates must match the schema and SWR keys must carry operation identity by default.
+- **R288 FE_STACK_ALLOWLIST:** `FE_STACK_UNLISTED` requires each front-end dependency to have a catalog entry or a reasoned `fe.extraPackages` declaration; `FE_STACK_CORE_MISSING` requires product apps to declare the core runtime packages, with the full marketing app exempt. GraphQL tagged templates must match the schema and SWR keys must carry operation identity by default.
+- **R291 HFS_FUNCTION_BUDGET:** A back-end or front-end function, method or arrow body has at most 80 physical lines, including comments and blank lines, in both editions.
+- **R292 HFS_FEATURE_FILE_BUDGET:** A feature owner has at most 250 tracked files, including nested files, in both editions.
+
+R247 reports `RT_COVERAGE_MATRIX` when its inventory cannot be parsed. For an
+applicable rule and edition, `RT_COVERAGE_NO_ENFORCER` identifies an absent
+running enforcer, `RT_COVERAGE_NO_SPEC` a missing named proof header,
+`RT_COVERAGE_NO_WITNESS` a missing mutation or dated unreachable explanation,
+and `RT_COVERAGE_NO_DOC` a missing owning document that explains the code.
+`RT_COVERAGE_NO_TEMPLATE` identifies missing template coverage and
+`RT_COVERAGE_NO_EXAMPLE` a missing example construct.
+`RT_COVERAGE_EDITION_ASYMMETRY` requires an existing ruling for edition differences;
+`RT_COVERAGE_SCHEMA_NO_RECORD` requires a full example record for an authored Work
+schema; `RT_COVERAGE_GATE_LIE` refuses gate claims unsupported by actual commands.
+`RT_COVERAGE_SUPERSEDED_CITE` identifies stale ruling references,
+`RT_COVERAGE_SURFACE_UNMAPPED` identifies missing slot and rule surface mappings,
+and `RT_COVERAGE_REQUIREMENT_UNLEDGERED` identifies a hard documentation
+requirement without a valid ledger entry or owning rule anchor.
+
+Rules before R247 without any coverage metadata remain warnings in the legacy
+backlog. Adding any of `editions`, `docs`, `exemplifiedBy`, `proves` or `witness`
+adopts a rule into the coverage gate. R247 onward is always gated, including
+witness and example evidence. The older rules that already declare editions
+also owe their complete chains: full-only R112 `BE_INTEGRATION_SPEC_MISSING`
+requires a provider integration world spec with the integration's error codes
+and an outage; R167 `BE_ASYNC_SPEC_MISSING` requires consumed-event e2e proofs
+that publish, read effects and redeliver, including compensation events; R173
+`BE_SAGA_E2E_MISSING` requires a compensation e2e proof under an injected fault.
 
 ### Measured coverage scope
 

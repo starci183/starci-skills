@@ -6,8 +6,9 @@ import { enforcerJudgedInEdition, judgedInEdition } from '../../hfs/edition-slot
 import { evidenceFiles, evidenceInEdition, evidencePath, exampleEvidence, managedTemplates, slotViews, templateEvidence } from './coverage-inventory.mjs';
 import { coverageGateFindings } from './coverage-gates.mjs';
 import { hasRulingReference } from './coverage-cites.mjs';
+import { REPORT_ONLY_CODES } from './coverage-ratchet.mjs';
 
-export const REPORT_ONLY_CODES = Object.freeze(['RT_COVERAGE_NO_WITNESS', 'RT_COVERAGE_NO_EXAMPLE']);
+export { REPORT_ONLY_CODES };
 const finding = (code, rule, edition, message, path = 'knowledge/hfs/rules.yaml') =>
   ({ code, level: REPORT_ONLY_CODES.includes(code) ? 'warning' : 'error', rule, edition, path, message });
 const refsIn = (refs, edition) => (Array.isArray(refs) ? refs : []).filter((ref) => evidenceInEdition(ref, edition));

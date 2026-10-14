@@ -1,3 +1,4 @@
+// proves: HFS_LITE_SECRET_CUSTODY@lite
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -83,7 +84,7 @@ test('L17 is lite-only and forbids root env/custody entries plus sealed files ou
   const files = ['.env.example', 'secrets.env', '.secrets/ci.key', 'backup.enc', '.starcistacks/dev/secrets/app.enc'];
   const root = tree(t, Object.fromEntries(files.map(file => [file, 'fixture'])));
   const findings = liteSecretCustodyFindings({ repoRoot: root, files, repo: app('lite') });
-  assert.deepEqual(findings.map(item => item.path).sort(), ['.env.example', '.secrets/ci.key', 'backup.enc', 'secrets.env']);
+  assert.deepEqual(findings.map(item => item.path).sort((left, right) => left.localeCompare(right)), ['.env.example', '.secrets/ci.key', 'backup.enc', 'secrets.env']);
   assert.ok(findings.every(item => item.code === 'HFS_LITE_SECRET_CUSTODY' && item.level === 'error'));
 });
 
@@ -96,7 +97,7 @@ test('L17 recognises Supabase tokens, long eyJ service material and password-bea
   ].join('\n');
   const root = tree(t, { 'apps/web/src/modules/config/generated.ts': source });
   const findings = liteSecretCustodyFindings({ repoRoot: root, files: ['apps/web/src/modules/config/generated.ts'], repo: fe('lite') });
-  assert.deepEqual(findings.map(item => item.pattern).sort(), [
+  assert.deepEqual(findings.map(item => item.pattern).sort((left, right) => left.localeCompare(right)), [
     'password-connection-string', 'supabase-eyj-service-token', 'supabase-personal-access-token', 'supabase-secret-token',
   ]);
   assert.ok(findings.every(item => !item.message.includes('postgresql://') && !item.message.includes('sb_secret_')), 'a finding never prints the captured value');

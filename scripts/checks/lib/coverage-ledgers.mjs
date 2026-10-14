@@ -89,7 +89,7 @@ function surfaceCellFindings(row, edition, { manifest, slots, rules, covered }) 
   const references = declaredRules.length ? declaredRules : applicableSlots.flatMap((slot) => slotRuleReferences(slot, manifest, edition));
   const applicableRules = references.map((rule) => rules.get(rule)).filter((rule) => rule && judgedInEdition(rule, edition));
   const mapped = applicableSlots.length > 0 && applicableRules.length > 0;
-  if (!mapped && !gapReason(cell.gap)) return [finding('RT_COVERAGE_SURFACE_UNMAPPED', SURFACES_PATH, `Surface ${id} has no applicable rule and slot for edition ${edition}; declare their mapping or gap: reason.`, { edition })];
+  if (!mapped && !gapReason(cell.gap)) return [finding('RT_COVERAGE_SURFACE_UNMAPPED', SURFACES_PATH, `Surface ${id} has no applicable rule and slot for edition ${edition}; declare their mapping or gap: reason.`, { edition, rules: references })];
   for (const slot of applicableSlots) covered.add(`${slot.id}@${edition}`);
   return [];
 }
@@ -99,7 +99,7 @@ function missingSurfaceCells({ slots, manifest, editions, covered, surfaces }) {
   // inventory, including slots whose lite view forbids a construct.
   const missingLedger = surfaces === null || surfaces === undefined ? '; the surfaces ledger is missing' : '';
   return [...slots.values()].flatMap((slot) => editions.filter((edition) => slotInEdition(manifest, slot, edition) && !covered.has(`${slot.id}@${edition}`))
-    .map((edition) => finding('RT_COVERAGE_SURFACE_UNMAPPED', SURFACES_PATH, `Slot ${slot.id} has no surface mapping for edition ${edition}${missingLedger}.`, { edition })));
+    .map((edition) => finding('RT_COVERAGE_SURFACE_UNMAPPED', SURFACES_PATH, `Slot ${slot.id} has no surface mapping for edition ${edition}${missingLedger}.`, { edition, slot: slot.id })));
 }
 
 function surfaceFindings({ catalog, manifest = {}, surfaces }) {

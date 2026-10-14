@@ -263,12 +263,12 @@ function allowedSuccessors(key, index) {
 
 /** Synchronous static R247 findings. The caller supplies already-read safe repository texts. */
 function collectFinding(path, text, findings, seen) {
-  return (offset, message) => {
+  return (offset, message, rules = []) => {
     const line = text.slice(0, offset).split('\n').length;
     const key = `${path}:${line}:${message}`;
     if (seen.has(key)) return;
     seen.add(key);
-    findings.push({ code: CODE, level: 'error', path, line, message });
+    findings.push({ code: CODE, level: 'error', path, line, message, rules });
   };
 }
 
@@ -279,14 +279,16 @@ function paragraphCites(paragraph, index, add) {
     if (!index.successors.has(cite.key)) continue;
     const successors = allowedSuccessors(cite.key, index);
     if ([...successors].some((successor) => present.has(successor))) continue;
-    add(paragraph.start + cite.offset, `${cite.key} is superseded; cite ${[...successors].join(' or ') || 'its recorded successor'} in the same paragraph.`);
+    const rules = [cite.key, ...successors].map((key) => index.nodes.get(key)?.currentRule).filter(Boolean);
+    add(paragraph.start + cite.offset, `${cite.key} is superseded; cite ${[...successors].join(' or ') || 'its recorded successor'} in the same paragraph.`, rules);
   }
 }
 
-function chunkPatterns(chunk, patterns, add) {
+function chunkPatterns(chunk, patterns, index, add) {
   for (const pattern of patterns) {
     pattern.match.lastIndex = 0;
-    for (const match of chunk.body.matchAll(pattern.match)) add(chunk.start + match.index, `${pattern.key} records stale wording here; follow its current ruling.`);
+    const rule = index.nodes.get(pattern.key)?.currentRule;
+    for (const match of chunk.body.matchAll(pattern.match)) add(chunk.start + match.index, `${pattern.key} records stale wording here; follow its current ruling.`, rule ? [rule] : []);
   }
 }
 
@@ -294,7 +296,7 @@ function fileCites(path, text, index, patterns, findings, seen) {
   const add = collectFinding(path, text, findings, seen);
   for (const chunk of proseChunks(path, text)) {
     for (const paragraph of paragraphs(chunk)) paragraphCites(paragraph, index, add);
-    chunkPatterns(chunk, patterns, add);
+    chunkPatterns(chunk, patterns, index, add);
   }
 }
 
