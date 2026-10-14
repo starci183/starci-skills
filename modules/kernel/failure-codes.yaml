@@ -19356,5 +19356,22 @@ BE_PUBLIC_REASON_CLOSED:
   causes_vi:
     - "Vi phạm R290: ứng dụng thêm lý do riêng như ToolToken hoặc ApiKey, hoặc bỏ một lý do chuẩn khỏi enum PublicReason."
   nextStep_vi: "Giữ đúng bốn thành viên chuẩn của PublicReason; xác thực route dùng API key hoặc tool token bằng guard riêng thay vì thêm lý do công khai."
+RT_COVERAGE_PROOF_VACUOUS:
+  title: "A claimed coverage proof does not exercise its enforcer"
+  title_vi: "Bằng chứng kiểm thử không thực thi bộ kiểm tra"
+  meaning_vi: "Spec khai báo proves nhưng không có ca hợp lệ và vi phạm thực chất, hoặc dùng bằng chứng của một bộ kiểm tra cho bộ khác."
+  causes_vi:
+    - "Vi phạm R247: danh sách valid hoặc invalid rỗng, mã lỗi chỉ được nhắc tên, hoặc bộ kiểm tra chưa được gọi trong bằng chứng."
+  nextStep_vi: "Thêm ca hợp lệ và vi phạm cho từng edition, gọi đúng bộ kiểm tra và xác nhận kết quả bằng assertion."
+  owner: op-retry
+  kind: check-finding
+
+RT_COVERAGE_CODE_UNROUTED:
+  title: "A machine finding routed to lint has no applicable plugin enforcer"
+  title_vi: "Mã lỗi chuyển sang lint thiếu bộ kiểm tra phù hợp"
+  meaning_vi: "Mã lỗi máy chuyển sang bề mặt lint nhưng plugin của profile và edition đó không đăng ký bộ kiểm tra phát mã này."
+  causes_vi:
+    - "Vi phạm R247: mã lỗi chỉ được xử lý bởi plugin của profile khác hoặc bộ kiểm tra chưa được đăng ký."
+  nextStep_vi: "Đăng ký bộ kiểm tra phát đúng mã trong plugin của profile và edition được định tuyến, rồi thêm spec chứng minh đường đi."
   owner: op-retry
   kind: check-finding

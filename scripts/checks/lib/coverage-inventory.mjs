@@ -23,7 +23,7 @@ export function coverageSources(root) {
     for (const file of walkFiles(absolute, { sorted: true, exclude: (_name, full, entry) => {
       const rel = path.relative(root, full).replaceAll('\\', '/');
       return entry.isSymbolicLink() || !coverageSafePath(rel) || generated.some((prefix) => `${rel}/`.startsWith(prefix))
-        || /(?:^|\/)(?:runtime|dist|coverage|\.runtimes|artifacts)(?:\/|$)/.test(rel);
+        || !rel.startsWith('tests/fixtures/') && /(?:^|\/)(?:runtime|dist|coverage|\.runtimes|artifacts)(?:\/|$)/.test(rel);
     } })) {
       const rel = path.relative(root, file).replaceAll('\\', '/');
       if (!TEXT_FILE.test(rel) && !/(?:^|\/)(?:Dockerfile|gitignore(?:-lite)?|starciwork\.gitignore(?:-lite)?|(?:pre-commit|pre-push)|(?:editorconfig|gitattributes|nvmrc|npmignore|prettierignore))$/.test(rel)) continue;
@@ -36,6 +36,9 @@ export function coverageSources(root) {
 export const evidencePath = (ref) => typeof ref === 'string' ? ref : ref?.path;
 export const evidenceInEdition = (ref, edition) => typeof ref === 'string'
   || (ref?.edition ? ref.edition === edition : !ref?.editions || ref.editions.includes(edition));
+
+export const codesInEdition = (rule, edition) => (rule.failureCodes ?? [])
+  .filter((code) => (rule.codeEditions?.[code] ?? rule.editions ?? ['lite', 'full']).includes(edition));
 
 /** Resolve files, directories and globs; a missing path never counts as evidence. */
 export function evidenceFiles(files, ref) {

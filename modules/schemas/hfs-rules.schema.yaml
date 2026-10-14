@@ -84,6 +84,12 @@ $defs:
         uniqueItems: true
         items: {enum: [full, lite]}
         description: The editions that judge this rule (default both). A rule that names editions without lite is not judged in a lite app, and its finding codes are dropped by the one findings filter (checkRepo and checkRepository); an app cannot opt out of a rule, it can only pick an edition (R16, R17).
+      codeEditions:
+        type: object
+        minProperties: 1
+        propertyNames: {type: string, pattern: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$'}
+        additionalProperties: {$ref: '#/$defs/editions'}
+        description: Per-code edition subsets for codes owned by this rule; omitted codes inherit the rule's editions. The loader verifies ownership and that each list is a subset of the rule's editions.
       editionWhy:
         type: string
         minLength: 1
@@ -104,8 +110,8 @@ $defs:
         items:
           oneOf:
             - {$ref: '#/$defs/repoPath'}
-            - {$ref: '#/$defs/evidence'}
-        description: Repository-relative example paths or globs containing a conforming instance, optionally scoped to editions.
+            - {$ref: '#/$defs/proof'}
+        description: Repository-relative example, dedicated fixture or spec-helper paths containing a conforming instance, optionally scoped to editions, finding codes and fixture ids.
       proves:
         type: array
         minItems: 1
@@ -120,9 +126,12 @@ $defs:
           - type: array
             minItems: 1
             uniqueItems: true
-            items: {$ref: '#/$defs/witness'}
+            items:
+              oneOf:
+                - {$ref: '#/$defs/witness'}
+                - {$ref: '#/$defs/proof'}
           - {$ref: '#/$defs/unreachableWitness'}
-        description: Mutations that make a conforming example emit the expected codes, or a dated explanation of why a mutation cannot reach this rule.
+        description: Mutations that make a conforming example emit the expected codes, dedicated fixture or spec-helper references with violating and passing evidence, or a dated explanation of why a mutation cannot reach this rule.
       enforcers:
         type: array
         minItems: 1
