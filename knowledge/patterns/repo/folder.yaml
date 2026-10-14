@@ -179,8 +179,9 @@ rules:
     kind: mandatory
     hfsRules: [R07, R10, R01]
     requirement: |
-      `.starciwork/` (slot `app.starciwork`) is required at the app root: one product record tree per app, for both
-      sides. `.starcistacks/` and `.sops.yaml` (slots `app.starcistacks`, `app.sops`) are required at the app root too.
+      The app root owns slot `app.starciwork`: required for full's product records, optional for lite when there are no
+      brand records. R212 restricts lite to the brand boundary described in starciwork.yaml.
+      `.starcistacks/` and `.sops.yaml` (slots `app.starcistacks`, `app.sops`) are required at the app root.
       Neither side holds any of them (slot `repo.side-root-forbidden`; `.starcistacks` in a side is refused,
       HFS_STACKS_IN_SIDE, and `fe/` holds no `.starciwork`, HFS_WORK_IN_FE). See
       starciwork.yaml and starcistacks.yaml for their contents.
@@ -253,7 +254,7 @@ rules:
     requirement: |
       The root README.md starts with the app name as its level-one heading and one concise description line. Its standard
       sections, in order, are Overview, Stack, Repository layout (the HFS map: the root, be/ and fe/), and Development
-      (install, typecheck, lint, build and test commands, all run at the app root). Because .starciwork is present, a Work
+      (install, typecheck, lint, build and test commands, all run at the app root). When .starciwork is present, a Work
       section points readers at that product record tree. Other sections may follow. Badges represent live external services
       only. Do not publish a badge for a local or private SonarQube instance or any README URL pointing at localhost,
       loopback, RFC1918 or private hosts. Local development endpoints may be documented as inline code, never as remote links

@@ -9,6 +9,8 @@ import { bindOpPath } from '../lib/op-shared.mjs';
 import { insidePath } from '../lib/path-key.mjs';
 import { lines } from '../lib/verb-call.mjs';
 import { READ_SEPARATOR } from '../lib/filed-reads.mjs';
+import { isLiteWorkRoot, workPathAllowed } from '../lib/work-edition.mjs';
+import { WORK_DIR_NAME } from '../lib/roots.mjs';
 
 const SKIP = new Set(['node_modules', '.git', '.next', 'dist']);
 const INSPECTION_LIMIT = 10000;
@@ -34,6 +36,7 @@ const safeReadPath = (root, file) => {
 };
 
 const addHit = (state, file) => {
+  if (!state.allowed(file)) return;
   safeReadPath(state.root, file);
   if (!fs.lstatSync(file).isFile()) return;
   if (state.hits.size >= MATCH_LIMIT && !state.hits.has(file)) { state.truncated = true; return; }
@@ -42,6 +45,7 @@ const addHit = (state, file) => {
 
 const visitDir = (state, dir, regex) => {
   if (state.truncated) return;
+  if (!state.allowed(dir, { dir: true })) return;
   safeReadPath(state.root, dir);
   const entries = fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
   for (const entry of entries) {
@@ -53,20 +57,31 @@ const visitDir = (state, dir, regex) => {
   }
 };
 
+const patternPrefix = (pattern) => /[*?]/.test(pattern) ? pattern.slice(0, pattern.search(/[*?]/)).replace(/\/[^/]*$/, '') : pattern;
+const patternInfoOf = (pattern) => {
+  const glob = /[*?]/.test(pattern);
+  const prefix = patternPrefix(pattern);
+  const match = glob ? pattern : `${pattern.replace(/\/$/, '')}/**`;
+  return { glob, prefix, regex: globExpression(match) };
+};
+const allowedTarget = (allowed, file) => allowed(file) || allowed(file, { dir: true });
+const expandLiteral = (file, state, regex) => {
+  if (!fs.existsSync(file)) return;
+  if (fs.lstatSync(file).isDirectory()) visitDir(state, file, regex);
+  else addHit(state, file);
+};
+
 /** Expand one pattern under `state.root`; returns true on an escaping pattern. */
 const expandPattern = (pattern, state, missing) => {
   const { root } = state;
   if (!insidePath(root, path.resolve(root, pattern), { includeSelf: true })) return true;
-  if (/[*?]/.test(pattern)) {
-    const prefix = pattern.slice(0, pattern.search(/[*?]/)).replace(/\/[^/]*$/, '');
+  const { glob, prefix, regex } = patternInfoOf(pattern);
+  if (!allowedTarget(state.allowed, path.resolve(root, prefix))) return false;
+  if (glob) {
     const base = path.resolve(root, prefix);
-    if (fs.existsSync(base)) visitDir(state, base, globExpression(pattern));
-  } else {
-    const file = path.resolve(root, pattern);
-    if (fs.existsSync(file)) { if (fs.lstatSync(file).isDirectory()) visitDir(state, file, globExpression(`${pattern.replace(/\/$/, '')}/**`)); else addHit(state, file); }
-  }
-  const matches = /[*?]/.test(pattern) ? globExpression(pattern) : globExpression(`${pattern.replace(/\/$/, '')}/**`);
-  if (![...state.hits].some((file) => file === path.resolve(root, pattern) || matches.test(path.relative(root, file).replaceAll('\\', '/')))) missing.push(pattern);
+    if (fs.existsSync(base)) visitDir(state, base, regex);
+  } else expandLiteral(path.resolve(root, pattern), state, regex);
+  if (![...state.hits].some((file) => file === path.resolve(root, pattern) || regex.test(path.relative(root, file).replaceAll('\\', '/')))) missing.push(pattern);
   return false;
 };
 
@@ -91,6 +106,20 @@ const referenceLocationOf = (token, { sourceRoot, stateDir, appRoot, params }) =
   return { original, rel: bindOpPath(rel, params), rootKind, root };
 };
 
+const workRootOf = (rootKind, root) => {
+  if (rootKind === 'work') return root;
+  if (rootKind === 'app' && root) return path.join(root, WORK_DIR_NAME);
+  return null;
+};
+const forbiddenRead = (root, rel, allowed) => braceVariants(rel)
+  .every(pattern => !allowedTarget(allowed, path.resolve(root, patternPrefix(pattern))));
+const unboundReference = (original, rel, rootKind) => {
+  const unbound = [...rel.matchAll(/<([A-Za-z0-9_-]+)>/g)].map(match => `unbound <${match[1]}> binding`);
+  const unresolved = unbound.length ? unbound : [original];
+  const missing = rootKind === 'source' ? unresolved : [];
+  return { token: original, kind: 'template', rootKind, resolved: [], missing, truncated: false };
+};
+
 /** Resolve one READ reference with an explicit Source, Work or app root. Values
  * of params.* are instance inputs, not runtime filenames. New record templates
  * may remain unresolved; they are never reported as missing Source law files. */
@@ -99,18 +128,18 @@ export function resolveReadReference(token, { sourceRoot, stateDir = null, appRo
   if (location.result) return location.result;
   const { original, rootKind } = location;
   let { rel, root } = location;
+  const workRoot = workRootOf(rootKind, root);
+  const allowed = (file, options) => !workRoot || workPathAllowed(workRoot, file, options);
+  if (root && isLiteWorkRoot(workRoot) && forbiddenRead(root, rel, allowed)) {
+    return { token: original, kind: 'skipped', rootKind, resolved: [], missing: [], truncated: false };
+  }
   // An unresolvable placeholder in a required (Source-law) read is a missing
   // binding, never a file literally named '<x>': the refusal names the binding.
-  if (rel.includes('<') || !root) {
-    const unbound = [...rel.matchAll(/<([A-Za-z0-9_-]+)>/g)].map((match) => `unbound <${match[1]}> binding`);
-    const unresolved = unbound.length ? unbound : [original];
-    const missing = rootKind === 'source' ? unresolved : [];
-    return { token: original, kind: 'template', rootKind, resolved: [], missing, truncated: false };
-  }
+  if (rel.includes('<') || !root) return unboundReference(original, rel, rootKind);
   root = path.resolve(root);
   if (!insidePath(root, path.resolve(root, rel), { includeSelf: true })) return { token: original, kind: 'invalid', rootKind, resolved: [], missing: [original], truncated: false };
   const patterns = braceVariants(rel), missing = [];
-  const expansion = { root, hits: new Set(), visited: 0, truncated: false };
+  const expansion = { root, allowed, hits: new Set(), visited: 0, truncated: false };
   try {
     if (expandPatterns(patterns, expansion, missing)) return { token: original, kind: 'invalid', rootKind, resolved: [], missing: [original], truncated: false };
     const resolved = [...expansion.hits].sort(byCodeUnit).map((absolute) => ({

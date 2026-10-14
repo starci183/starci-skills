@@ -229,9 +229,9 @@ function additions(root, full, hadCli, manifest) {
   const variables = { project: full.project, app: "cli", appPascal: "Cli" };
   const files = [
     ...templateFiles("app/upgrade-full", "", variables),
-    ...(fs.existsSync(path.join(root, ".starciwork", "index.yaml"))
-      ? []
-      : scaffoldWorkSeeds(full.project).filter((file) => !fs.existsSync(path.join(root, file.path)))),
+    ...scaffoldWorkSeeds(full.project).filter((file) =>
+      !fs.existsSync(path.join(root, file.path))
+      && (file.path === ".starciwork/workspace.yaml" || !fs.existsSync(path.join(root, ".starciwork", "index.yaml")))),
     ...(!hadCli
       ? [
           ...STANDARD_CLI_FILES.map((file) => ({

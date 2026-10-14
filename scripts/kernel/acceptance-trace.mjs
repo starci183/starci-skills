@@ -20,6 +20,7 @@ import { indexInlineCriteria, splitRef } from '../work/record-ownership.mjs';
 import { GATE_SCHEMA } from '../gates/gate.mjs';
 import { UNIT_RUN_SCHEMA } from '../gates/unit-run.mjs';
 import { TEST_WORLD_RUN_SCHEMA } from '../gates/test-world-run.mjs';
+import { workPathAllowed } from '../lib/work-edition.mjs';
 
 const TRACE_CHECK = 'acceptance-trace';
 const AC_ID = /\bac(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){3,}\b/g;
@@ -80,8 +81,9 @@ function boundRecord(owned, roots) {
   const at = text.indexOf(`${WORK_DIR_NAME}/`);
   if (at < 0 || text.includes(':')) return null;
   for (const root of roots) {
-    const file = path.resolve(root, text);
-    if (insidePath(root, file) && fs.existsSync(file)) return { workRoot: path.join(root, text.slice(0, at + WORK_DIR_NAME.length)), file };
+    const file = path.resolve(root, text), workRoot = path.join(root, text.slice(0, at + WORK_DIR_NAME.length));
+    if (!workPathAllowed(workRoot, file) && !workPathAllowed(workRoot, file, { dir: true })) continue;
+    if (insidePath(root, file) && fs.existsSync(file)) return { workRoot, file };
   }
   return null;
 }

@@ -10,6 +10,7 @@ import {readWorkspace, resolveOwnedDirs, hashOwnedDirs, indexInlineCriteria, spl
 import {isProductPath} from '../lib/starciwork-boundary.mjs';
 import { canonicalJSON } from '../../engine/canonical-json.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { isLiteWorkRoot } from '../lib/work-edition.mjs';
 
 /**
  * The layout promises a reader can answer every work question from the tree without opening source
@@ -411,6 +412,7 @@ const DERIVED_FRONTIER_REL = `${DERIVED_DIR_NAME}/frontier.md`;
  * still match (YAML structurally by canonicalJSON, the text byte for byte). One owner; derive and critique each wrap it.
  */
 export function runGenerated(workRoot, {write} = {}, {boundaryError, yamlRel, textRel, yamlHeader, compute, buildDoc, buildText}) {
+  if (isLiteWorkRoot(workRoot)) return {ok: true, wrote: false, skipped: true};
   if (write && [yamlRel, textRel].some(rel => !isProductPath(rel))) throw new Error(boundaryError);
   const computed = compute(workRoot);
   const doc = buildDoc(computed);
@@ -438,6 +440,7 @@ export function runDerive(workRoot, {write} = {}) {
     yamlRel: DERIVED_INDEX_REL, textRel: DERIVED_FRONTIER_REL, yamlHeader: HEADER,
     compute: computeDerived, buildDoc: buildYamlDocument, buildText: buildFrontierMarkdown,
   });
+  if (run.skipped) return run;
   if (run.wrote) return {wrote: true, derived: run.computed, doc: run.doc};
   return {ok: run.ok, derived: run.computed, doc: run.doc, onDisk: run.onDiskDoc};
 }

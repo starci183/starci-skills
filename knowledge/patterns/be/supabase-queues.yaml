@@ -52,6 +52,7 @@ rules:
       automated:
         - HFS_EDITION_INVALID
         - HFS_EDITION_FORBIDDEN_PRESENT
+        - HFS_STARCIWORK_LITE_FORBIDDEN
         - BE_INFRA_OWNER
       manual:
         - Confirm no domain or feature file names pgmq, Supabase or a channel; only the platform adapter does.
@@ -148,6 +149,7 @@ rules:
         - BE_INFRA_OWNER
         - HFS_EDITION_INVALID
         - HFS_EDITION_FORBIDDEN_PRESENT
+        - HFS_STARCIWORK_LITE_FORBIDDEN
       manual:
         - Confirm each pg_cron job is declared in a migration and enqueues, never runs business SQL itself.
     relatedExamples: []
@@ -174,5 +176,6 @@ rules:
         - BE_SPEC_QUALITY
         - HFS_EDITION_INVALID
         - HFS_EDITION_FORBIDDEN_PRESENT
+        - HFS_STARCIWORK_LITE_FORBIDDEN
       manual: []
     relatedExamples: []

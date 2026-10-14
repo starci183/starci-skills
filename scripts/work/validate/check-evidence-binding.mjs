@@ -14,6 +14,7 @@ import { catFile } from '../../api/git/cat-file.mjs';
 import {isDir} from '../../lib/fs-kind.mjs';
 import {list, byCodeUnit} from '../../lib/list.mjs';
 import {sha256File} from '../../../engine/digest.mjs';
+import {isLiteWorkRoot} from '../../lib/work-edition.mjs';
 
 /**
  * QUALITY-BAR §5 asks for proof rather than assertion. This script is the executable form of two of its
@@ -92,7 +93,9 @@ export function parseArgs(argv) {
 
 function assertWorkRoot(workRoot) {
   if (workRoot === null) throw new EvidenceBindingInputError('--work is required');
+  if (isLiteWorkRoot(workRoot) && !fs.existsSync(workRoot)) return;
   if (!isDir(workRoot)) throw new EvidenceBindingInputError(`--work ${slash(workRoot)} is not a readable directory`);
+  if (isLiteWorkRoot(workRoot)) return;
   if (!fs.existsSync(path.join(workRoot, 'index.yaml')) && !fs.existsSync(path.join(workRoot, 'workspace.yaml'))) {
     throw new EvidenceBindingInputError(`--work ${slash(workRoot)} is not a .starciwork root (no index.yaml or workspace.yaml)`);
   }

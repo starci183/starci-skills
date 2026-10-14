@@ -1,0 +1,5 @@
+# StarCi lite .starciwork holds only brand/ records, references and assets.
+# Runtime output lives in runtime.sqlite rows and blobs outside the repository.
+/*
+!/.gitignore
+!/brand/

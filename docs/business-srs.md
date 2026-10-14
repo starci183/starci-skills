@@ -24,7 +24,7 @@ keys, stable IDs and refs, enum literals, protocol identifiers, API fields, vari
 operation names and source symbols. Conversation or presentation locale never translates canonical
 records.
 
-One project has one backend-owned `.starciwork`. The root `index.yaml` is the product catalog and every actual capability owns `features/<feature>/`. Shared rules, data, NFRs, decisions and cross-feature journeys have one accountable feature owner; other features reference their stable IDs.
+In full edition, one project has one app-owned `.starciwork`. The root `index.yaml` is the product catalog and every actual capability owns `features/<feature>/`. Shared rules, data, NFRs, decisions and cross-feature journeys have one accountable feature owner; other features reference their stable IDs. Lite's `app.starciwork` permits only brand records (R212; see [lite edition](lite-edition.md)).
 
 ## Layout
 

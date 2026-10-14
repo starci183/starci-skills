@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {sameDriveTmp} from '../helpers/ledger-fixture.mjs';
 import {checkWorkChange,classifyChange,normativeDigest,normative,readWorkTree,CHANGE_KINDS,WorkChangeInputError} from '../../scripts/work/validate/work-change.mjs';
 
 /**
@@ -11,7 +11,7 @@ import {checkWorkChange,classifyChange,normativeDigest,normative,readWorkTree,CH
  * revision that was and the revision that is. The findings are the interesting half - a check that
  * only ever proves the clean case proves that it cannot see anything.
  *
- * Fixtures live in `sameDriveTmp()`, never in the runtime tree, and every one of them is removed by a
+ * Fixtures live in `os.tmpdir()`, never in the runtime tree, and every one of them is removed by a
  * `t.after` registered the moment the directory exists - cleanup that runs only when the code under
  * test succeeded is not cleanup.
  */
@@ -23,7 +23,7 @@ const LATER='2026-02-01T00:00:00.000Z';
 const REV1='d'.repeat(64),REV2='e'.repeat(64);
 
 function world(t){
-  const base=sameDriveTmp();fs.mkdirSync(base,{recursive:true});
+  const base=os.tmpdir();fs.mkdirSync(base,{recursive:true});
   const dir=fs.mkdtempSync(path.join(base,'starci-work-change-'));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   return dir;
@@ -310,6 +310,37 @@ test('a withdrawal is recorded as breaking and keeps the clauses it removed',t=>
 test('the check refuses a missing or unreadable root instead of reporting about nothing',t=>{
   assert.throws(()=>checkWorkChange({}),WorkChangeInputError);
   assert.throws(()=>checkWorkChange({workRoot:path.join(world(t),'absent')}),WorkChangeInputError);
+});
+
+test('lite change checks read only brand records and never open retired Work indices', t => {
+  const app = world(t), root = path.join(app, '.starciwork');
+  write(path.join(app, 'hfs.json'), JSON.stringify({kind: 'app', edition: 'lite'}));
+  plant(root);
+  write(path.join(root, 'brand/index.yaml'), 'schema: work/brand@1\nid: brand\nstate: todo\n');
+  write(path.join(root, 'index.yaml'), 'retired: [unreadable\n');
+  write(path.join(root, 'shell/index.yaml'), 'retired: [unreadable\n');
+  const read = fs.readFileSync, opened = [];
+  fs.readFileSync = (file, ...options) => {
+    const rel = path.relative(root, path.resolve(file));
+    if (rel && rel !== '..' && !rel.startsWith(`..${path.sep}`)) opened.push(rel.replaceAll('\\', '/'));
+    return read(file, ...options);
+  };
+  try {
+    const report = checkWorkChange({workRoot: root});
+    assert.equal(report.clean, true);
+    assert.deepEqual(report.records.map(record => record.id), ['brand']);
+    assert.deepEqual(opened, ['brand/index.yaml']);
+  } finally { fs.readFileSync = read; }
+});
+
+test('lite change checks accept the optional absent Work tree without creating it', t => {
+  const app = world(t), root = path.join(app, '.starciwork');
+  write(path.join(app, 'hfs.json'), JSON.stringify({kind: 'app', edition: 'lite'}));
+  const report = checkWorkChange({workRoot: root});
+  assert.equal(report.clean, true);
+  assert.equal(report.coverage.records, 0);
+  assert.deepEqual(report.findings, []);
+  assert.equal(fs.existsSync(root), false);
 });
 
 // `starci work-change` is not one of the runtime's verbs, so the report contract is asserted where a

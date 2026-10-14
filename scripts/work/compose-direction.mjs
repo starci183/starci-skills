@@ -30,8 +30,8 @@ import {
   allNodesOf, appOfUi, captureFileOf, captureRelOf, destinationsOf, nodeById, readShellRecord, surfaceAt,
 } from './layout-tree.mjs';
 import { DRAW_TOOL } from './ui/ui-shapes.mjs';
-import { parseYaml } from '../../engine/yaml.mjs';
 import { SLOT_FILL_MIN, assetsOf, flag, list, parseUiRef, readYamlOrNull, sha256Of, slash, workRootOf } from './work-io.mjs';
+import { isLiteWorkRoot } from '../lib/work-edition.mjs';
 
 const COMPOSITOR = 'scripts/work/compose-direction.mjs';
 const DEFAULT_SCRIM = 0.5;
@@ -89,8 +89,8 @@ function resolveImageRef(workRoot, ref, uiRecords = null) {
   // shell/<name>: a layout capture or lockup the layout tree cites - a blob, or a file a tree kept.
   const shellRef = /^shell\/(.+)$/.exec(String(ref));
   if (shellRef) {
-    let tree = null;
-    try { tree = parseYaml(fs.readFileSync(path.join(workRoot, 'shell', 'index.yaml'), 'utf8')); } catch { tree = null; }
+    if (isLiteWorkRoot(workRoot)) return null;
+    const tree = readShellRecord(workRoot)?.record ?? null;
     const cited = [...allNodesOf(tree ?? {}).flatMap((n) => [...list(n.layout?.captures), ...destinationsOf(tree, n).flatMap((d) => d.captures)]), ...list(tree?.brand?.lockups)]
       .find((c) => captureRelOf(c) === `shell/${shellRef[1]}`);
     if (cited) return captureFileOf(cited);
@@ -120,7 +120,10 @@ function hostCompositeOf(host, bp, theme, state = null) {
  * Nothing is written when `write` is false.
  */
 export function composeDirection(options) {
-  try { return composeOne(options); } catch (error) { return { ok: false, error: String(error?.message ?? error) }; }
+  try {
+    if (isLiteWorkRoot(workRootOf(options.uiDir))) return { ok: true, skipped: true, reason: 'lite .starciwork holds only brand/' };
+    return composeOne(options);
+  } catch (error) { return { ok: false, error: String(error?.message ?? error) }; }
 }
 
 function resolveComposeContext({ uiDir, content, breakpoint, theme, state, presentation }) {
@@ -278,6 +281,7 @@ export function composeDirectionMain(argv = []) {
     tool: flag(argv, '--tool') ?? DRAW_TOOL, prompt: flag(argv, '--prompt'), out: flag(argv, '--out'),
   });
   if (!result.ok) return { exitCode: 1, text: `compose-direction: ${result.error}\n` };
+  if (result.skipped) return { exitCode: 0, text: argv.includes('--json') ? `${JSON.stringify(result, null, 2)}\n` : `SKIP: ${result.reason}\n` };
   const payload = { ok: true, wrote: slash(result.outFile), promptExists: result.promptExists, assets: [result.contentAsset, result.asset] };
   if (argv.includes('--json')) return { exitCode: 0, text: `${JSON.stringify(payload, null, 2)}\n` };
   const warning = result.promptExists ? '' : 'WARNING: the content prompt file does not exist yet - keep the exact prompt beside the content image.\n';

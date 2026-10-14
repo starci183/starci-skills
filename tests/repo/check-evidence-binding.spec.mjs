@@ -247,3 +247,21 @@ test('an unowned digest path resolves at the app root and returns a typed missin
   assert.match(r.stdout,/shared\/missing\.ts/);
   assert.doesNotMatch(r.stderr,/ReferenceError/);
 });
+
+
+test('lite evidence checks accept optional and brand-only Work without catalog or workspace', t => {
+  const repo = mkdtemp(t, 'evidence-binding-lite-');
+  fs.writeFileSync(path.join(repo, 'hfs.json'), JSON.stringify({kind: 'app', edition: 'lite'}));
+  const workRoot = path.join(repo, '.starciwork');
+  const absent = run('--work', workRoot, '--json');
+  assert.equal(absent.status, 0, absent.stderr);
+  assert.deepEqual(JSON.parse(absent.stdout), {findings: []});
+  fs.mkdirSync(path.join(workRoot, 'brand'), {recursive: true});
+  fs.writeFileSync(path.join(workRoot, 'brand', 'index.yaml'), JSON.stringify({schema: 'work/brand@1',
+    id: 'brand', state: 'done', verificationSource: 'authored-claim'}));
+  fs.mkdirSync(path.join(workRoot, 'features', 'stale'), {recursive: true});
+  fs.writeFileSync(path.join(workRoot, 'features', 'stale', 'index.yaml'), 'bad: [\n');
+  const result = run('--work', workRoot, '--json');
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), {findings: []});
+});

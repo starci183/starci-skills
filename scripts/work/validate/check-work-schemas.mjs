@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { addWorkCommon } from '../../lib/work-schemas.mjs';
 import { isWorkRecordSchema, readWorkspace } from '../record-ownership.mjs';
+import { workPathAllowed } from '../../lib/work-edition.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SKIPPED_ROOTS = new Set(['kernel-evidence', 'kernel-strays', 'kernel-approvals', '_derived']);
@@ -59,9 +60,10 @@ const describe = (error) => {
   return `${at} ${error.message}${detail}`;
 };
 
-const listYaml = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+const listYaml = (dir, workRoot) => !fs.existsSync(dir) || !workPathAllowed(workRoot, dir, { dir: true }) ? [] : fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
   const full = path.join(dir, entry.name);
-  if (entry.isDirectory()) return entry.name === 'node_modules' ? [] : listYaml(full);
+  if (!workPathAllowed(workRoot, full, { dir: entry.isDirectory() })) return [];
+  if (entry.isDirectory()) return entry.name === 'node_modules' ? [] : listYaml(full, workRoot);
   return entry.isFile() && entry.name.endsWith('.yaml') ? [full] : [];
 });
 
@@ -97,7 +99,7 @@ export function checkWorkSchemas(root, refused, info = [], { workRoot = root } =
     return counts;
   }
   const workspaceDoc = readWorkspace(workRoot);
-  for (const file of listYaml(root)) {
+  for (const file of listYaml(root, workRoot)) {
     const rel = path.relative(root, file).split(path.sep).join('/');
     const segments = rel.split('/');
     if (SKIPPED_ROOTS.has(segments[0])) continue;

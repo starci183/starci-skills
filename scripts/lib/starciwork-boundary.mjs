@@ -10,6 +10,7 @@ import path from 'node:path';
 
 // The one source of the .starciwork/.gitignore text: the app root template `starci app sync` renders (packages/hfs/templates).
 const TEMPLATE = path.join(import.meta.dirname, '..', '..', 'packages', 'hfs', 'templates', 'app', 'starciwork.gitignore');
+const LITE_TEMPLATE = path.join(path.dirname(TEMPLATE), 'starciwork.gitignore-lite');
 
 // The record families that hold nothing but index.yaml and evidence.yaml (ui, impl, uat and ac have their own rows).
 const PLAIN_FAMILIES = Object.freeze(['br', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'contract', 'integration', 'gap', 'event']);
@@ -83,6 +84,13 @@ export function isProductPath(rel) {
   return PRODUCT_PATTERNS.some((p) => matchFile(p, parts));
 }
 
+/** The lite app boundary: its optional Work tree holds .gitignore and brand/** only. */
+export function isLiteProductPath(rel, { dir = false } = {}) {
+  const parts = segs(rel);
+  return (!dir && parts.length === 1 && parts[0] === '.gitignore')
+    || (parts[0] === 'brand' && (parts.length > 1 || dir));
+}
+
 const ROOT_CACHE_DIRS = new Set(['settle-parity', 'settle-tail', 'runtime', 'canon-seams']);
 const ROOT_CACHE_FILE = /^(.*\.tmp\.json|tmp-.*\.json|scan-i18n.*\.json|runtime-budget\.json|ledger-anchor\.json|supervisor-precheck\.mjs)$/;
 
@@ -154,4 +162,5 @@ export const STARCIWORK_GITIGNORE = new Proxy([], {
   defineProperty: frozenWrite,
   setPrototypeOf: frozenWrite,
 });
-export const starciworkGitignoreText = () => `${gitignoreLines().join('\n')}\n`;
+export const starciworkGitignoreText = ({ edition = 'full' } = {}) => edition === 'lite'
+  ? `${fs.readFileSync(LITE_TEMPLATE, 'utf8').trimEnd()}\n` : `${gitignoreLines().join('\n')}\n`;

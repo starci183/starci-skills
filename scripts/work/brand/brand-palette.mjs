@@ -61,6 +61,7 @@ import { sha256File } from '../../../engine/digest.mjs';
 import { isPartName } from '../direction-part.mjs';
 import { appNamesOf, captureFileOf, capturesAt, matrixOf, nodesOf, treeOf } from '../layout-tree.mjs';
 import { assetsOf, indexFilesUnder, list, readYamlOrNull, slash } from '../work-io.mjs';
+import { isLiteWorkRoot } from '../../lib/work-edition.mjs';
 
 const PALETTE_CODES = { offBrand: 'PALETTE_OFF_BRAND', primaryAbsent: 'PRIMARY_ABSENT', unavailable: 'BRAND_PALETTE_UNAVAILABLE', unreadable: 'PALETTE_IMAGE_UNREADABLE' };
 export const TOKEN_TOLERANCE = 6;
@@ -395,6 +396,7 @@ const walkFiles = (dir, keep, skip = new Set(['node_modules', 'kernel-evidence',
 /** Every image the gate judges under `workRoot`, with what it is and the record that owns it. */
 export async function scanTargets(workRoot) {
   const targets = [];
+  if (isLiteWorkRoot(workRoot)) return targets;
   for (const index of indexFilesUnder(path.join(workRoot, 'features'))) appendRecordTargets(index, targets);
   appendShellTargets(workRoot, targets);
   return targets;

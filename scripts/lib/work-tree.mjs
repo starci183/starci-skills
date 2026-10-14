@@ -6,6 +6,7 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { walkFiles } from './walk.mjs';
+import { isLiteWorkRoot, workPathAllowed } from './work-edition.mjs';
 
 const DERIVED = '_derived';
 const yamlObjectOf = (file) => {
@@ -14,6 +15,15 @@ const yamlObjectOf = (file) => {
     return isPlainObject(data) ? data : null;
   } catch { return null; }
 };
+
+const authoredWorkFiles = workRoot => walkFiles(workRoot, {
+  ignoreReadErrors: isLiteWorkRoot(workRoot) && !fs.existsSync(workRoot),
+  exclude: (_name, file, entry) => {
+    const rel = path.relative(workRoot, file).replaceAll('\\', '/');
+    return rel === DERIVED || rel.startsWith(`${DERIVED}/`)
+      || !workPathAllowed(workRoot, file, { dir: entry.isDirectory() });
+  },
+});
 
 /**
  * Every record and evidence file under `workRoot`:
@@ -24,9 +34,8 @@ const yamlObjectOf = (file) => {
 export function readWorkTree(workRoot) {
   const records = new Map();
   const evidenceByDir = new Map();
-  for (const file of walkFiles(workRoot).filter((f) => f.endsWith('.yaml'))) {
+  for (const file of authoredWorkFiles(workRoot).filter((f) => f.endsWith('.yaml'))) {
     const relPath = path.relative(workRoot, file).replaceAll('\\', '/');
-    if (relPath === DERIVED || relPath.startsWith(`${DERIVED}/`)) continue;
     const data = yamlObjectOf(file);
     if (!data) continue;
     const dir = path.dirname(relPath).replaceAll('\\', '/');
@@ -44,7 +53,7 @@ export function readWorkTree(workRoot) {
 
 /** The record's own index.yaml under `workRoot` (matched on its authored `id`), or null. */
 export function findRecordFile(workRoot, recordId) {
-  for (const file of walkFiles(workRoot)) {
+  for (const file of authoredWorkFiles(workRoot)) {
     if (!file.endsWith('index.yaml')) continue;
     let parsed;
     try { parsed = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; }

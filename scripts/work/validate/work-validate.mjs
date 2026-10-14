@@ -14,6 +14,7 @@
 // A finding whose file cannot be read off stays in scope.
 import fs from 'node:fs';
 import path from 'node:path';
+import { WORK_DIR_NAME } from '../../lib/roots.mjs';
 import { fileURLToPath } from 'node:url';
 import { checkFamiliesDrift, checkStarciworkBoundary, checkWorkTree, walk } from './check-example-work.mjs';
 import { checkWorkConsistencyTree } from './check-work-consistency.mjs';
@@ -24,6 +25,7 @@ import { checkStarciStacks } from '../../gates/starcistacks.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
+import { isLiteWorkRoot } from '../../lib/work-edition.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
@@ -39,23 +41,26 @@ function rootSchemaOf(root) {
 
 /** The work root a record directory belongs to: the nearest ancestor that is .starciwork or holds workspace.yaml, else `root`. */
 function enclosingWorkRootOf(root) {
-  let dir = root;
+  let dir = root, workspaceRoot = null;
   while (true) {
-    if (path.basename(dir) === '.starciwork' || fs.existsSync(path.join(dir, 'workspace.yaml'))) return dir;
+    if (path.basename(dir) === WORK_DIR_NAME) return isLiteWorkRoot(dir) ? dir : workspaceRoot ?? dir;
+    if (!workspaceRoot && fs.existsSync(path.join(dir, 'workspace.yaml'))) workspaceRoot = dir;
     const parent = path.dirname(dir);
-    if (parent === dir) return root;
+    if (parent === dir) return workspaceRoot ?? root;
     dir = parent;
   }
 }
 
 function workContextFor(requested) {
   const root = fs.statSync(requested).isDirectory() ? requested : path.dirname(requested);
+  const enclosing = enclosingWorkRootOf(root);
+  const lite = isLiteWorkRoot(enclosing);
   const yamlFiles = walk(root).filter((file) => /\.ya?ml$/i.test(file));
-  const rootSchema = rootSchemaOf(root);
-  const mode = fs.existsSync(path.join(root, 'workspace.yaml')) || rootSchema === 'work/catalog@1'
+  const rootSchema = lite ? null : rootSchemaOf(root);
+  const mode = (lite && root === enclosing) || (!lite && (fs.existsSync(path.join(root, 'workspace.yaml')) || rootSchema === 'work/catalog@1'))
     ? 'tree' : 'record';
-  const enclosingWorkRoot = mode === 'tree' ? root : enclosingWorkRootOf(root);
-  return {root, yamlFiles, mode, enclosingWorkRoot};
+  const enclosingWorkRoot = mode === 'tree' ? root : enclosing;
+  return {root, yamlFiles, mode, enclosingWorkRoot, lite};
 }
 
 function checkStructure(root, enclosingWorkRoot, refused, suspect, info) {
@@ -68,9 +73,9 @@ function checkStructure(root, enclosingWorkRoot, refused, suspect, info) {
   }
 }
 
-function checkProductBoundary(root, refused, suspect) {
+function checkProductBoundary(root, refused, suspect, enclosingWorkRoot = root) {
   try {
-    checkStarciworkBoundary(root, refused, suspect);
+    checkStarciworkBoundary(root, refused, suspect, enclosingWorkRoot);
   } catch (error) {
     refused.push(`${root}: product boundary validation crashed closed (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
   }
@@ -131,20 +136,30 @@ function checkStrictSchemas(root, enclosingWorkRoot, refused, info) {
   }
 }
 
-export function validateWork(target, { strict = false } = {}) {
-  const requested = path.resolve(target ?? '.');
-  if (!fs.existsSync(requested)) {
+/** Missing Work is valid only for the optional lite root; preserve the target-missing report otherwise. */
+function missingWorkReport(requested, strict) {
+  if (path.basename(requested) === WORK_DIR_NAME && isLiteWorkRoot(requested)) {
     return {
-      schema: 'starci/work-validate-report@1', ok: false, target: requested,
-      refused: [`${requested}: target does not exist [TARGET_MISSING]`], suspect: [], info: [],
-      counts: { records: 0, refs: 0, evidence: 0, payloads: 0, yamlFiles: 0 },
+      schema: 'starci/work-validate-report@1', ok: true, target: requested, mode: 'tree', strict,
+      refused: [], suspect: [], info: [],
+      counts: { records: 0, refs: 0, evidence: 0, payloads: 0, yamlFiles: 0, ...(strict ? {schemaChecked: 0, schemaRejected: 0} : {}) },
     };
   }
-  const {root, yamlFiles, mode, enclosingWorkRoot} = workContextFor(requested);
+  return {
+    schema: 'starci/work-validate-report@1', ok: false, target: requested,
+    refused: [`${requested}: target does not exist [TARGET_MISSING]`], suspect: [], info: [],
+    counts: { records: 0, refs: 0, evidence: 0, payloads: 0, yamlFiles: 0 },
+  };
+}
+
+export function validateWork(target, { strict = false } = {}) {
+  const requested = path.resolve(target ?? '.');
+  if (!fs.existsSync(requested)) return missingWorkReport(requested, strict);
+  const {root, yamlFiles, mode, enclosingWorkRoot, lite} = workContextFor(requested);
   const refused = [];
   const suspect = [];
   const info = [];
-  if (!yamlFiles.length) refused.push(`${root}: no YAML Work record found [WORK_RECORD_MISSING]`);
+  if (!lite && !yamlFiles.length) refused.push(`${root}: no YAML Work record found [WORK_RECORD_MISSING]`);
 
   // Record-scoped validation still resolves refs against the enclosing work
   // tree: a uat-flow's `environment:` names a _resources record above the
@@ -153,8 +168,8 @@ export function validateWork(target, { strict = false } = {}) {
 
   // A repository's .starciwork holds product records only (R07): known agent data - evidence, runs, captures, kernel
   // custody, ledgers - is refused [HFS_AGENT_DATA_TRACKED] and a path off the product list is a suspect [STARCIWORK_DRIFT].
-  if (mode === 'tree' && path.basename(root) === '.starciwork') {
-    checkProductBoundary(root, refused, suspect);
+  if (lite || (mode === 'tree' && path.basename(root) === WORK_DIR_NAME)) {
+    checkProductBoundary(root, refused, suspect, enclosingWorkRoot);
   }
 
   if (mode === 'tree') {
@@ -170,13 +185,13 @@ export function validateWork(target, { strict = false } = {}) {
   // A ui record's shell binding (scripts/work/ui/shell-conformance.mjs): one drawn before the shell record
   // existed, or bound to an older shell rev, stays valid and is listed as a suspect for a redraw; a binding
   // that resolves to nothing is refused. Prompts and captures are the op proof's, not the validator's.
-  checkShellBindings(root, enclosingWorkRoot, refused, suspect, info);
+  if (!lite) checkShellBindings(root, enclosingWorkRoot, refused, suspect, info);
 
   // The owning repository's stack declaration services block (scripts/gates/starcistacks.mjs, contract
   // change starcistacks-services): the validator reports what it finds as suspects so no running leg is held
   // by it - refusals belong to the dedicated starci-starcistacks-check an op proof runs - except a tracked
   // plaintext custody member, which is a leak already.
-  if (mode === 'tree' && path.basename(root) === '.starciwork') {
+  if (!lite && mode === 'tree' && path.basename(root) === WORK_DIR_NAME) {
     checkStackServices(root, suspect, refused);
   }
 

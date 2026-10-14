@@ -35,7 +35,8 @@ import { workCommonDef } from '../lib/work-schemas.mjs';
 import { validateAgainstSchema } from '../lib/json-schema.mjs';
 import { admittedContractOf } from '../machine/contract-version.mjs';
 import { workflowWorktreeOf } from '../machine/workflow-tree.mjs';
-import { treesInOrder } from '../lib/roots.mjs';
+import { treesInOrder, workDirsInOrder } from '../lib/roots.mjs';
+import { workPathAllowed } from '../lib/work-edition.mjs';
 // The events whose payload chains artifact {id, sha256} (read lazily: job-artifacts.mjs imports this module).
 const chainedArtifactEvents = () => [ARTIFACTS_INDEXED, 'report-filed'];
 
@@ -107,12 +108,20 @@ export function claimsProblems(claims) {
 }
 
 const readYaml = (file) => { try { return parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; } };
-const recordAt = (repo, rel) => readYaml(path.join(repo, slashed(rel).replace(/\/index\.yaml$/, ''), 'index.yaml'));
+const recordAt = (repo, rel) => {
+  const file = path.join(repo, slashed(rel).replace(/\/index\.yaml$/, ''), 'index.yaml');
+  return workPathAllowed(workDirsInOrder({ repo })[0], file) ? readYaml(file) : null;
+};
+const workInputAllowed = (repo, rel) => {
+  const workRoot = workDirsInOrder({ repo })[0], file = path.resolve(repo, rel);
+  return workPathAllowed(workRoot, file) || workPathAllowed(workRoot, file, { dir: true });
+};
 
 /** Every FR record of the product: [{id, dir, required[], commands[]}], read once per call. */
 function frRecordsOf(repo) {
-  const root = path.join(repo, '.starciwork', 'features');
+  const root = path.join(workDirsInOrder({ repo })[0], 'features');
   const out = [];
+  if (!workPathAllowed(workDirsInOrder({ repo })[0], root, { dir: true })) return out;
   let features = [];
   try { features = fs.readdirSync(root, { withFileTypes: true }).filter((d) => d.isDirectory()); } catch { return out; }
   const visit = (dir) => {
@@ -183,7 +192,8 @@ function claimsOfJob({ repo, job, payload = {}, envelope = null, rows = [], frRe
   };
   // A drawing labelled <state>[--<part>]@<viewport> under a ui record (or of the one ui record the job bound) shows
   // the shape of that record's ui.shapes whose state it names, when exactly one base has that state.
-  const boundUi = uniq(list(payload.records).map((r) => UI_DIR.exec(`${slashed(r)}/`)?.[1]));
+  const boundUi = uniq(list(payload.records).filter(r => typeof r === 'string' && workPathAllowed(workDirsInOrder({ repo })[0], path.resolve(repo, r)))
+    .map((r) => UI_DIR.exec(`${slashed(r)}/`)?.[1]));
   const shapesOf = new Map();
   const uiShape = (row, label) => {
     const dir = boundUi.length === 1 ? boundUi[0] : null;
@@ -217,13 +227,14 @@ const gitHead = (repo) => { try { return gitOutputOf(revParseQuery(['HEAD'], { d
 const codeDigester = (repo) => createDigester(repo, { skip: CODE_SKIP_DIRS });
 
 /** The paths a job's proofs depend on: {code[], work[]}, relative to the ledger repository. */
-function dependencyPathsOf({ db, job, payload = {}, claims = emptyClaims() }) {
+function dependencyPathsOf({ db, repo, job, payload = {}, claims = emptyClaims() }) {
   const owned = list(payload.owned_paths).map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string').map(slashed);
   const graph = db ? latestVersion(db, job.workflow_id)?.graph : null;
   const nodes = list(graph?.nodes).filter((n) => list(n.frs).some((id) => claims.frs.includes(id)) || list(n.shapes).some((id) => claims.shapes.includes(id)));
   const all = [...owned, ...nodes.flatMap((n) => list(n.ownedPaths)).map(slashed), ...claims.specs];
   const code = uniq(all.filter((p) => !p.startsWith(WORK_PREFIX) && !p.startsWith('.starciwork') && !p.includes('..') && !/[*{<]/.test(p)));
-  const work = uniq([...list(payload.records).filter((r) => typeof r === 'string').map(slashed), ...all].filter((p) => isWorkInput(p)));
+  const work = uniq([...list(payload.records).filter((r) => typeof r === 'string').map(slashed), ...all]
+    .filter((p) => isWorkInput(p) && workInputAllowed(repo, p)));
   return { code, work };
 }
 
@@ -239,7 +250,7 @@ export function recordArtifactProofs(db, { repo, job, payload = {}, envelope = n
   const rows = artifacts.filter((a) => !known.has(a.artifactId));
   if (!rows.length) return 0;
   const { job: jobClaims, byArtifact } = claimsOfJob({ repo, job, payload, envelope, rows });
-  const { code, work } = dependencyPathsOf({ db, job, payload, claims: mergeClaims(jobClaims, ...byArtifact.values()) });
+  const { code, work } = dependencyPathsOf({ db, repo, job, payload, claims: mergeClaims(jobClaims, ...byArtifact.values()) });
   const cd = codeDigester(repo), wd = createWorkDigester(repo);
   const deps = [...code.map((p) => ({ path: p, kind: 'code', digest: cd(p) })), ...work.map((p) => ({ path: p, kind: 'work', digest: wd(p) }))];
   const codeSha = headSha ?? envelope?.head ?? gitHead(repo);
@@ -263,7 +274,8 @@ function proofArtifactsOf(db, workflowId, { repo }) {
   const digestOf = (dep) => { const key = `${dep.kind}\0${dep.path}`; if (!now.has(key)) { now.set(key, dep.kind === 'work' ? wd(dep.path) : cd(dep.path)); } return now.get(key); };
   return rows.map((r) => {
     const claims = r.claims_json ? mergeClaims(parseJson(r.claims_json, {})) : emptyClaims();
-    const deps = r.deps_json ? list(parseJson(r.deps_json, [])) : null;
+    const deps = r.deps_json ? list(parseJson(r.deps_json, [])).filter(d => d?.kind !== 'work'
+      || workInputAllowed(repo, String(d?.path ?? ''))) : null;
     const changed = deps ? deps.filter((d) => typeof d?.path === 'string' && digestOf(d) !== d.digest).map((d) => d.path) : [];
     let state = 'fresh';
     if (!deps) state = 'unbaselined';
@@ -327,8 +339,11 @@ export function staleProofsOf(db, workflowId, { repo, artifacts = proofArtifacts
 }
 
 /** The workflow's scope: FR ids, XBase#state shapes and ui record dirs, from its work graph and the records its jobs bound. */
-function scopeOf(db, workflowId) {
+function scopeOf(db, workflowId, repo) {
   const graph = latestVersion(db, workflowId)?.graph ?? null;
+  const graphVersion = graph ? latestVersion(db, workflowId).version : null;
+  if (!workPathAllowed(workDirsInOrder({ repo })[0], path.join(workDirsInOrder({ repo })[0], 'features'), { dir: true }))
+    return { graphVersion, frs: [], shapes: [], uiDirs: [] };
   const records = db.prepare("SELECT payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel'").all(workflowId)
     .flatMap((r) => { const p = parseJson(r.payload_json, {}) ?? {}; return [...list(p.records), ...list(p.owned_paths).map((o) => (typeof o === 'string' ? o : o?.path))]; })
     .filter((r) => typeof r === 'string').map(slashed);
@@ -336,7 +351,7 @@ function scopeOf(db, workflowId) {
   const frs = uniq([...list(graph?.nodes).flatMap((n) => list(n.frs)).filter((id) => FR_ID.test(id)),
     ...records.map((r) => frDir.exec(r)).filter((m) => m && !/\/(evidence|assets)(\/|$)/.test(m[2])).map((m) => `fr.${m[1]}.${m[2].replaceAll('/', '.')}`)]);
   const uiDirs = uniq(records.map((r) => UI_DIR.exec(`${r}/`)?.[1]));
-  return { graphVersion: graph ? latestVersion(db, workflowId).version : null, frs, shapes: uniq(list(graph?.nodes).flatMap((n) => list(n.shapes)).filter((s) => SHAPE_ID.test(s))), uiDirs };
+  return { graphVersion, frs, shapes: uniq(list(graph?.nodes).flatMap((n) => list(n.shapes)).filter((s) => SHAPE_ID.test(s))), uiDirs };
 }
 
 // A caller's claim names an item; only a green independent run of that item's declared command proves a kind.
@@ -408,7 +423,7 @@ function recordsRootOf(workflowId, repo) {
 export function coverageOf(db, workflowId, { repo: ledgerRepo, briefCases = null, artifacts = null, notCounted = [], qualified = false } = {}) {
   const repo = recordsRootOf(workflowId, ledgerRepo);
   artifacts ??= proofArtifactsOf(db, workflowId, { repo });
-  const scope = scopeOf(db, workflowId);
+  const scope = scopeOf(db, workflowId, repo);
   const index = evidenceIndex(artifacts, { qualified });
   const frRecords = new Map(qualified ? scope.frs.map(id => [id, requiredFrOf(repo, id)]) : frRecordsOf(repo).map(fr => [fr.id, fr]));
   const items = [];

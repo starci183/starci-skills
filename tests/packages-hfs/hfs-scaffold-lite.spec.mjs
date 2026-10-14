@@ -19,14 +19,13 @@ const GENERATED_TYPES = 'export type Database = { public: { Tables: Record<strin
 const jestPreset = createRequire(import.meta.url)('../../packages/jest-preset/index.cjs');
 const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 
-// Design 8.5's exact file-level output, with <ts> fixed by CREATED_AT. Empty brand/ is a directory, not a file. The web app carries the
+// The lite starter's exact file-level output, with <ts> fixed by CREATED_AT. Its brand tree is optional. The web app carries the
 // shared app core of both editions (owner ruling 2026-10-13): no modules/db, no Server Action and no auth callback route.
 const EXPECTED_LITE_FILES = Object.freeze([
   '.dockerignore', '.editorconfig', '.gitattributes', '.github/workflows/ci.yml', '.github/workflows/db-deploy.yml',
   '.github/workflows/images.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.nvmrc', '.prettierignore',
   '.prettierrc', '.sops.yaml', '.starcistacks/dev/environment.json', '.starcistacks/dev/secrets/.gitkeep',
-  '.starciwork/.gitignore', '.starciwork/features/system-health/index.yaml', '.starciwork/index.yaml',
-  '.starciwork/shell/index.yaml', '.starciwork/workspace.yaml', 'README.md',
+  'README.md',
   'be/apps/api/Dockerfile', 'be/apps/api/src/api.options.ts', 'be/apps/api/src/app.module.ts', 'be/apps/api/src/compose/platform.ts', 'be/apps/api/src/main.ts',
   'be/eslint.config.mjs', 'be/jest.config.js', 'be/nest-cli.json',
   'be/src/features/api/system-health/application/check-liveness.contracts.ts',
@@ -161,11 +160,12 @@ const scaffoldLite = into => scaffoldApp({
   now: () => CREATED_AT,
 });
 
-test('lite scaffold emits the design 8.5 tree and is structurally clean', async (t) => {
+test('lite scaffold emits the brand-only Work tree and is structurally clean', async (t) => {
   const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-lite-'));
   t.after(() => fs.rmSync(into, { recursive: true, force: true }));
   const { root, files } = scaffoldLite(into);
   assert.deepEqual(files, EXPECTED_LITE_FILES);
+  assert.equal(fs.existsSync(path.join(root, '.starciwork')), false, 'the starter has no brand records, so no Work tree is required');
   const declaration = JSON.parse(fs.readFileSync(path.join(root, 'hfs.json'), 'utf8'));
   assert.deepEqual(declaration.supabase, {
     enableSignup: false,

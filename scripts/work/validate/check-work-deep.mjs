@@ -10,6 +10,8 @@ import { isMain } from '../../lib/is-main.mjs';
 import { fromRoot } from './work-consistency-shared.mjs';
 import { recordRules } from './work-deep-records.mjs';
 import { checkSurfaces } from './work-deep-surfaces.mjs';
+import { isLiteWorkRoot, workPathAllowed } from '../../lib/work-edition.mjs';
+import { exampleWorkRoots } from '../../lib/example-refs.mjs';
 export { runTimeOf } from './work-deep-records.mjs';
 
 /**
@@ -73,7 +75,7 @@ function depsOf(data) {
 /** The evidence.yaml files of the tree indexed by the record they belong to. */
 function evidenceIndex(workRoot) {
   const evidenceByRecord = new Map();
-  for (const file of walk(workRoot).filter(f => f.endsWith('evidence.yaml'))) {
+  for (const file of walk(workRoot).filter(f => workPathAllowed(workRoot, f) && f.endsWith('evidence.yaml'))) {
     let ev;
     try { ev = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; } // the gate refuses the malformed file itself
     if (ev?.record) evidenceByRecord.set(ev.record, {ev, file, dir: path.dirname(file)});
@@ -106,6 +108,7 @@ function checkDepStale({ records, refuse }, id, rec, was, { normNow, inline }) {
 
 // ---- baseline-backed checks ----
 function checkAgainstBaseline(ctx, out, baseline, { normNow, inline }) {
+  if (isLiteWorkRoot(ctx.workRoot)) return;
   if (!baseline) {
     out.info.push(`${fromRoot(ctx.workRoot)}: no _derived/deep-baseline.json - DEP_STALE and NORM_UNRECORDED skipped; run --write-baseline after a verified-clean pass [NO_BASELINE]`);
     return;
@@ -130,13 +133,14 @@ function reportUnstampedEvidence({ workRoot, evidenceByRecord, info }) {
 
 // ---- PAYLOAD_AS_RECORD: asset payloads the base gate walks as records ----
 function reportPayloadsAsRecords({ workRoot, info }) {
-  const payloads = walk(workRoot).filter(f => f.replaceAll('\\', '/').includes('/assets/') && f.endsWith('.yaml'))
+  const payloads = walk(workRoot).filter(f => workPathAllowed(workRoot, f) && f.replaceAll('\\', '/').includes('/assets/') && f.endsWith('.yaml'))
     .map(f => parseYaml(fs.readFileSync(f, 'utf8'))).filter(d => d?.schema && !String(d.schema).startsWith('work/'));
   if (payloads.length) info(workRoot, 'PAYLOAD_AS_RECORD', `${payloads.length} asset payload(s) carry non-work schemas - they are artifacts of their parent record, not records; the base gate should not walk them as such`);
 }
 
 // ---- CATALOG_DRIFT ----
 function checkCatalogDrift({ workRoot, refuse }) {
+  if (isLiteWorkRoot(workRoot)) return;
   const catalogFile = path.join(workRoot, 'index.yaml');
   const catalog = fs.existsSync(catalogFile) ? parseYaml(fs.readFileSync(catalogFile, 'utf8')) : null;
   const featureDirs = fs.existsSync(path.join(workRoot, 'features'))
@@ -177,11 +181,12 @@ function checkTree(workRoot, out, baseline) {
   reportUnstampedEvidence(ctx);
   reportPayloadsAsRecords(ctx);
   checkCatalogDrift(ctx);
-  return {records: records.size, surfaces: checkSurfaces(ctx)};
+  return {records: records.size, surfaces: isLiteWorkRoot(workRoot) ? 0 : checkSurfaces(ctx)};
 }
 
 // ---------- baseline ----------
 function writeBaseline(workRoot) {
+  if (isLiteWorkRoot(workRoot)) return null;
   const records = loadRecords(workRoot, walk);
   const entry = {};
   for (const [id, rec] of records) {
@@ -205,16 +210,24 @@ if (isMain(import.meta.url)) {
   const doBaseline = args.includes('--write-baseline');
   const treeArg = args.includes('--tree') ? args[args.indexOf('--tree') + 1] : null;
   const trees = treeArg ? [path.resolve(treeArg)]
-    : walk(path.join(root, 'examples')).filter(f => f.endsWith(`.starciwork${path.sep}index.yaml`)).map(dir => path.dirname(dir));
+    : exampleWorkRoots(root);
 
   if (doBaseline) {
-    for (const workRoot of trees) console.log(`baseline written: ${writeBaseline(workRoot)}`);
-    process.exitCode = 0;
+    let refused = false;
+    for (const workRoot of trees) {
+      const written = writeBaseline(workRoot);
+      if (written) console.log(`baseline written: ${written}`);
+      else {
+        console.log(`REFUSE  ${fromRoot(path.join(workRoot, '_derived', 'deep-baseline.json'))}: lite .starciwork holds only brand/ [HFS_STARCIWORK_LITE_FORBIDDEN]`);
+        refused = true;
+      }
+    }
+    process.exitCode = refused ? 1 : 0;
   } else {
     const out = {refuse: [], suspect: [], info: []};
     for (const workRoot of trees) {
       const baselineFile = path.join(workRoot, '_derived', 'deep-baseline.json');
-      const baseline = fs.existsSync(baselineFile) ? JSON.parse(fs.readFileSync(baselineFile, 'utf8')) : null;
+      const baseline = !isLiteWorkRoot(workRoot) && fs.existsSync(baselineFile) ? JSON.parse(fs.readFileSync(baselineFile, 'utf8')) : null;
       checkTree(workRoot, out, baseline);
     }
     for (const l of out.refuse) console.log(`REFUSE  ${l}`);

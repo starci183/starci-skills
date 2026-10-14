@@ -6,6 +6,7 @@ import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {sendSettleMedia,queueSettleMedia,collectDrawings,mediaKindOf,mediaSent,fitCaption} from '../../scripts/connectors/telegram-media.mjs';
 import {readMachine} from '../../engine/db/machine.mjs';
+import { planSettleMedia } from '../../scripts/connectors/telegram-media-plan.mjs';
 // The media dedupe rows (machine.sqlite notifications, kind media) of a machine home.
 const mediaRows=machineHome=>readMachine(m=>m.db.prepare("SELECT * FROM notifications WHERE kind='media' ORDER BY dedupe_key").all(),[],{env:{STARCI_LOCAL_ROOT:machineHome}});
 
@@ -82,6 +83,23 @@ test('media kinds: draw and asset ops send drawings, UAT and e2e ops send videos
   assert.deepEqual(['interface.draw','interface.asset','uat.verify','uat.assisted.prepare','uat.assisted.verify','e2e.verify','backend.implement',null].map(mediaKindOf),
     ['draw','draw','uat','uat','uat','uat',null,null]);
   assert.equal(fitCaption(['head'],['a'.repeat(50),'b'.repeat(50)],['tail'],70),`head\n${'a'.repeat(50)}\ntail`,'body lines drop from the end; head and tail stay');
+});
+
+test('lite media planning ignores stale UI/UAT records and preserves brand drawings', async t => {
+  await withLedger(t, async ({ repoRoot }) => {
+    const files = seedDraw(repoRoot), uat = seedUat(repoRoot);
+    put(repoRoot, 'hfs.json', JSON.stringify({ kind: 'app', edition: 'lite' }));
+    assert.deepEqual(collectDrawings({ files: files.map(file => path.join(repoRoot, file)), repo: repoRoot }), { picks: [], nodes: [] });
+    const base = { verdict: 'pass', workflow: { id: 'wf-lite', title: 'Lite' }, repo: repoRoot, language: 'en' };
+    assert.deepEqual(planSettleMedia({ ...base, op: 'uat.verify', report: { files: uat } }), { skip: 'no UAT media found' });
+    const brand = put(repoRoot, '.starciwork/brand/assets/refs/logo.webp', 'brand-image');
+    assert.equal(collectDrawings({ files: [brand], repo: repoRoot }).picks[0].file, brand);
+    put(repoRoot, 'proof/checkout.webm', 'video');
+    put(repoRoot, 'proof/request.yaml', 'flows:\n  - id: uat.shop.checkout\n    title: Current request\n    steps:\n      - Current step\n');
+    const current = planSettleMedia({ ...base, op: 'uat.verify', report: { files: ['proof/checkout.webm'] } });
+    assert.match(current.sends[0].caption, /Current request/);
+    assert.doesNotMatch(current.sends[0].caption, /Buy one item|Pay with the test card/);
+  });
 });
 
 test('a settled interface.draw sends its drawings as one album with a Vietnamese caption',async t=>{

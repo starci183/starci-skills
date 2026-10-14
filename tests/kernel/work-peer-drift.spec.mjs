@@ -9,7 +9,7 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {inspectLedger,ledgerFileFor,openLedger,PROJECTS_ROOT_ENV,writeContract} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {claimFoundation,writeFoundation} from '../../scripts/kernel/foundation-registry.mjs';
-import {baselineWorkInputs,inputDrift,peerDriftSummaryOf,recordInputs,staleOperationsOf} from '../../scripts/kernel/input-digests.mjs';
+import {ABSENT,baselineWorkInputs,createWorkDigester,inputDrift,peerDriftSummaryOf,recordInputs,staleOperationsOf} from '../../scripts/kernel/input-digests.mjs';
 import {changeNoteOf,committedMatches,committedReader,createOwnership,ownerDeclarationFor} from '../../scripts/kernel/work-ownership.mjs';
 
 // Three workflows on one ledger - foundation, learn-content, subscription - share Work records
@@ -156,6 +156,19 @@ test('pieces: change notes, committed matching across line ends, owner declarati
   assert.deepEqual(ownerDeclarationFor(changes,`${CH}/index.yaml`,{owner:L,after:1}),{by:L,reach:'follow-up',at:7,record:'.starciwork/features/challenges'},'the newest declaration of the owner covering the file');
   assert.equal(ownerDeclarationFor(changes,`${CH}/index.yaml`,{owner:L,after:7}),null,'only one made after the job read it');
   assert.equal(ownerDeclarationFor(changes,'.starciwork/index.yaml',{owner:L,after:0}),null,'a record file never covers its parent directory');
+});
+
+test('lite digests and historical input drift skip stale full Work records and retain brand', t => {
+  const w = world(t);
+  w.work('hfs.json', JSON.stringify({ kind: 'app', edition: 'lite' }));
+  w.work('.starciwork/brand/index.yaml', 'schema: work/brand@1\nid: brand.example\n');
+  const digest = createWorkDigester(w.repo);
+  for (const rel of ['.starciwork/workspace.yaml', '.starciwork/index.yaml', '.starciwork/shell/index.yaml', '.starciwork/features', SUB]) {
+    assert.equal(digest(rel), ABSENT, rel); assert.deepEqual(digest.files(rel), {});
+  }
+  assert.notEqual(digest('.starciwork/brand'), ABSENT);
+  assert.deepEqual(Object.keys(digest.files('.starciwork/brand')), ['.starciwork/brand/index.yaml']);
+  assert.deepEqual(w.drift(F), { stale: [], sourceDrift: [], peerDrift: [] }, 'old full-record baselines do not create lite follow-up work');
 });
 
 test('3-workflow ping-pong: peers rewriting shared records re-stale nothing; each change is advisory peerDrift, an in-flight rewrite not even that',t=>{

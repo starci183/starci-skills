@@ -1,9 +1,9 @@
 Owner: knowledge/hfs/slots.yaml
 # HFS lite edition
 
-Lite is the full HFS code structure deployed without self-hosted infrastructure (owner rulings 2026-10-12 and 2026-10-13,
-recorded as R212 cases 1-3 in `knowledge/hfs/rules.yaml`). It uses the same manifest, rule catalog, lint canons, grammar,
-security model and Docker canon as full, the same monorepo and slots, the same patterns, the same back-end unit specs and the
+Lite is the full HFS code structure deployed without self-hosted infrastructure (owner rulings recorded as R212 in
+`knowledge/hfs/rules.yaml`). It uses the same manifest, rule catalog, lint canons, grammar,
+security model and Docker canon as full, the same monorepo and code slots, the same patterns, the same back-end unit specs and the
 same front end (`knowledge/hfs/fe-stack.yaml`). The `edition` field selects a
 filtered slot and rule view; it does not select a different engine or relax rules locally.
 
@@ -35,6 +35,10 @@ Tests: back-end unit specs are required exactly as in full (`ruleParams.be.unitR
 (`starci supabase start`), with no toxiproxy and no containers of their own. There is no e2e world, no contract world and no
 e2e workflow (slot `app.ci-e2e`). The front end has no tests in either edition (R97).
 
+Work: lite's `app.starciwork` slot holds only `.gitignore` and `brand/**` (R212, owner ruling 2026-10-14). The tree is optional
+when the app has no brand records. Brand drawing records, references and assets keep their existing layout: the brand tooling
+reads the brand record directly, without workspace metadata or a feature catalog. Full keeps its complete Work tree.
+
 Use lite for a product whose infrastructure is Supabase. Start with full when the product needs its own stack, the e2e world or
 UAT records.
 
@@ -47,6 +51,9 @@ npx starci app scaffold <name> --edition lite
 The scaffold creates the minimum live product and generates the `app.supabase.types` artifact from the app's local Supabase
 stack. Docker must be available. If type generation fails, the command removes the app it began rather than leaving a partial
 scaffold.
+
+The lite scaffold creates at most the brand area and its ignore file under `app.starciwork`; it creates no workspace metadata,
+feature catalog, shell, feature, resource, UAT or business-rule records there.
 
 ## The tree in words
 
@@ -138,7 +145,12 @@ not supported.
 
 ## What lite forbids
 
-Lite forbids only infrastructure. R212 forbids e2e and contract specs, the `test:e2e`, `test:contract`, `test:stack` and
+R212 restricts `app.starciwork` to its brand boundary. Workspace metadata, the feature catalog, shell, features, resources,
+UAT and business-rule records are forbidden there; any content outside `.gitignore` and `brand/**` fails with
+`HFS_STARCIWORK_LITE_FORBIDDEN`: "lite .starciwork holds only brand/". Lite readers skip the full-edition workspace, catalog,
+shell and feature indexes.
+
+R212 also forbids e2e and contract specs, the `test:e2e`, `test:contract`, `test:stack` and
 `test:browser` scripts, the e2e workflow, the browser journey and UAT records, test containers, toxiproxy and browser-runner
 dependencies, BullMQ, Kafka, Redis and graphql-ws dependencies (and their imports, through the lite `infraOwners`), and the
 `.starcistacks` infra, runtime and seeds trees. Lite also forbids Edge Functions and a second front-end

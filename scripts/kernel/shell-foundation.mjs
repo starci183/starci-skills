@@ -24,6 +24,7 @@ import { getWorkflow, workflowRunning } from './verbs/shared/rows.mjs';
 import { claimFoundation, declareDependent, landFoundation, readDeclaration, readFoundation, writeDeclaration, writeFoundation } from './foundation-registry.mjs';
 import { boundRecordPaths, segments, WORK_ROOT } from './bound-records.mjs';
 import { normRel } from '../lib/path-key.mjs';
+import { isLiteWorkRoot } from '../lib/work-edition.mjs';
 
 export const SHELL_FOUNDATION = 'shell';
 export const FOUNDATION_WAIT = 'foundation-wait';
@@ -93,6 +94,7 @@ const wholeTreeReasonsOf = (shell, workRoot) => {
  * layout not settled. Returns null when the op does not carry the mark, else {needed, reasons}.
  */
 export function shellFoundationNeed({ brief, payload, repo }) {
+  if (isLiteWorkRoot(path.join(repo, WORK_ROOT))) return null;
   const read = (Array.isArray(brief?.reads) ? brief.reads : []).find((item) => item?.layoutFoundation === true);
   if (!read) return null;
   const records = (Array.isArray(payload?.records) ? payload.records : []).map((p) => normRel(p)).filter(Boolean);

@@ -46,6 +46,7 @@ import { normWork } from '../lib/path-key.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { recordRecordChange } from '../../engine/db/ledger.mjs';
 import { workflowWorktreeOf } from '../machine/workflow-tree.mjs';
+import { isLiteWorkRoot, workPathAllowed } from '../lib/work-edition.mjs';
 
 export const TRANSFER_SCHEMA = 'starci/ownership-transfer@1';
 /** Every ownership transfer the Supervisor recorded ({path, to, from, reason, at, by, provisional, bridgeId}): path_transfers rows. */
@@ -94,6 +95,7 @@ export function createOwnership(db, { repo = null, workDir = '.starciwork', foun
     scopes = [];
     if (!repo) return scopes;
     const abs = path.join(repo, workDir);
+    if (isLiteWorkRoot(abs)) return scopes;
     for (const dir of [...scopeDirs(abs)].sort(byCodeUnit)) {
       if (dir.includes('..')) continue;
       scopes.push(scopeOf(abs, dir));
@@ -216,7 +218,8 @@ export const committedMatches = (buffer, digest) => (buffer ? committedDigestsOf
 export function committedReader(repo, { workDir = '.starciwork' } = {}) {
   const dir = normWork(workDir) || '.starciwork';
   return (rels) => {
-    const wanted = [...new Set(rels.map(normWork))].filter((rel) => rel.startsWith(WORK_PREFIX) && !rel.includes('\n'));
+    const wanted = [...new Set(rels.map(normWork))].filter((rel) => rel.startsWith(WORK_PREFIX) && !rel.includes('\n')
+      && (!repo || workPathAllowed(path.join(repo, dir), path.join(repo, dir, rel.slice(WORK_PREFIX.length)))));
     if (!repo) return null;
     const out = new Map();
     if (!wanted.length) return out;

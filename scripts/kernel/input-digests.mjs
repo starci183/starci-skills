@@ -43,6 +43,7 @@ import { normWork } from '../lib/path-key.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { opReadTexts, bindOpPath } from '../lib/op-shared.mjs';
 import { underWorktrees } from '../lib/worktree-exclude.mjs';
+import { workPathAllowed } from '../lib/work-edition.mjs';
 
 export const ABSENT = 'absent';
 const WORK_RECORD_FILES = new Set(['index.yaml', 'resource.yaml']);
@@ -92,15 +93,16 @@ export function workInputPaths(payload) {
   return out;
 }
 
-const listFiles = (abs, skip = SKIP_DIRS, strict = false) => {
+const listFiles = (abs, skip = SKIP_DIRS, strict = false, allowed = () => true) => {
   const out = [];
   const visit = (dir) => {
+    if (!allowed(dir, { dir: true })) return;
     let entries;
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (error) { if (strict) { throw error; } return; }
     for (const entry of entries) {
       const p = path.join(dir, entry.name);
       if (entry.isDirectory()) { if (!skip.has(entry.name) && !underWorktrees(abs, p)) visit(p); }
-      else if (entry.isFile()) out.push(p);
+      else if (entry.isFile() && allowed(p)) out.push(p);
     }
   };
   if (fs.existsSync(abs)) visit(abs);
@@ -171,10 +173,13 @@ export function createDigester(root, { skip = SKIP_DIRS, strict = false } = {}) 
  */
 export function createWorkDigester(repo, { workDir = '.starciwork', strict = false } = {}) {
   const fileCache = new Map(), pathCache = new Map();
+  const workRoot = path.join(repo, workDir);
+  const allowed = (file, options) => workPathAllowed(workRoot, file, options);
   const absOf = (rel) => path.join(repo, workDir, rel.slice(WORK_PREFIX.length));
   const relOf = (abs) => `${WORK_PREFIX}${path.relative(path.join(repo, workDir), abs).replaceAll('\\', '/')}`;
   const resolve = (rel) => {
     const abs = absOf(rel);
+    if (!allowed(abs) && !allowed(abs, { dir: true })) return { digest: ABSENT, files: {} };
     let stat = null;
     try { stat = fs.statSync(abs); } catch (error) { if (strict && !['ENOENT', 'ENOTDIR'].includes(error.code)) { throw error; } return { digest: ABSENT, files: {} }; }
     if (stat.isFile()) {
@@ -182,7 +187,7 @@ export function createWorkDigester(repo, { workDir = '.starciwork', strict = fal
       return digest ? { digest, files: { [rel]: digest } } : { digest: ABSENT, files: {} };
     }
     if (!stat.isDirectory()) return { digest: ABSENT, files: {} };
-    const lines = sortLines(listFiles(abs, new Set([...SKIP_DIRS, ...WORK_SKIP_DIRS]), strict)
+    const lines = sortLines(listFiles(abs, new Set([...SKIP_DIRS, ...WORK_SKIP_DIRS]), strict, allowed)
       .filter((file) => WORK_RECORD_FILES.has(path.basename(file)))
       .map((file) => [relOf(file), fileSha(fileCache, file, strict)])
       .filter(([, digest]) => digest));

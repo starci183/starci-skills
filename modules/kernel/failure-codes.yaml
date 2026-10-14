@@ -2706,6 +2706,17 @@ HFS_EDITION_FORBIDDEN_PRESENT:
   owner: op-retry
   kind: check-finding
 
+HFS_STARCIWORK_LITE_FORBIDDEN:
+  title: "lite .starciwork holds only brand/"
+  title_vi: "Work của lite chỉ giữ thương hiệu"
+  meaning_vi: "Trong ứng dụng edition lite, .starciwork chỉ được giữ .gitignore và brand/** (bản ghi bản vẽ, tham chiếu và tài sản thương hiệu). Cây này không bắt buộc khi ứng dụng chưa có bản ghi thương hiệu."
+  causes_vi:
+    - "Ứng dụng lite còn workspace.yaml, index.yaml, shell/, features/, _resources/, uat hoặc br trong .starciwork"
+    - "Có tệp khác nằm ngoài brand/ và .gitignore trong Work của lite"
+  nextStep_vi: "Giữ nguyên brand/** và .gitignore, chuyển nội dung khác ra khỏi .starciwork hoặc nâng ứng dụng lên edition full nếu cần các bản ghi đó, rồi chạy lại kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
 HFS_FORBIDDEN_PRESENT:
   title: "Tracked path in a forbidden slot"
   title_vi: "Có tệp bị cấm trong cây mã nguồn"

@@ -40,6 +40,8 @@ import { RETRYABLE_JOB_STATUSES, retiredBeforeDispatch } from '../../engine/admi
 import { resolveIncident } from '../../engine/db/ledger.mjs';
 import { jobResultSql } from '../machine/job-row.mjs';
 import { GATE_CONDITION_EVALUATORS, GATE_CONDITION_PARSERS, GATE_CONDITION_TYPES, gateConditionLabel, gateConditionProblem } from './gate-runtime-conditions.mjs';
+import { workPathAllowed } from '../lib/work-edition.mjs';
+import { WORK_DIR_NAME } from '../lib/roots.mjs';
 
 const UNTIL_TYPES = Object.freeze(['record', 'job', 'message', 'commit', 'incident', 'foundation', 'landed', ...GATE_CONDITION_TYPES]);
 const repoMatches = (repoRoot, want) => {
@@ -255,17 +257,29 @@ export function recordRevision(doc) {
   return { rev: null, source: null };
 }
 
-const readRecord = (abs) => {
-  let file = abs;
-  try { if (fs.statSync(abs).isDirectory()) file = path.join(abs, 'index.yaml'); } catch { return null; }
+const readRecord = (file) => {
   try { return parseYaml(fs.readFileSync(file, 'utf8')) ?? {}; } catch { return null; }
+};
+
+const forbiddenRecordCondition = (workRoot, file, label, { directory = false, index = false } = {}) => {
+  if (workPathAllowed(workRoot, file)) return null;
+  if (directory && workPathAllowed(workRoot, file, { dir: true })) return null;
+  const requirement = index ? 'cannot require an index' : 'cannot be required';
+  const evidence = `${label} ${requirement}: lite .starciwork holds only brand/`;
+  return { met: false, evidence, unmeetable: evidence };
 };
 
 const recordCondition = (cond, repo) => {
   const abs = path.isAbsolute(cond.path) ? cond.path : path.join(repo, cond.path);
+  const workRoot = path.join(repo, WORK_DIR_NAME);
+  const pathRefusal = forbiddenRecordCondition(workRoot, abs, cond.path, { directory: true });
+  if (pathRefusal) return pathRefusal;
   if (!fs.existsSync(abs)) return { met: false, evidence: `${cond.path} absent` };
   if (cond.state == null && cond.minRev == null) return { met: true, evidence: `${cond.path} exists` };
-  const doc = readRecord(abs);
+  const recordFile = fs.statSync(abs).isDirectory() ? path.join(abs, 'index.yaml') : abs;
+  const indexRefusal = forbiddenRecordCondition(workRoot, recordFile, cond.path, { index: true });
+  if (indexRefusal) return indexRefusal;
+  const doc = readRecord(recordFile);
   if (!doc || typeof doc !== 'object') return { met: false, evidence: `${cond.path} unreadable as a record` };
   const state = doc.state ?? doc.status ?? null, { rev, source, changeRev } = recordRevision(doc);
   const stateOk = cond.state == null || String(state) === cond.state;
