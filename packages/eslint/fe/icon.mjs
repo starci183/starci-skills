@@ -16,6 +16,7 @@ import { isClassAttribute, staticText } from "./lib/ast.mjs"
 import { canonicalPackages } from "./lib/fe-stack.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { fileOf, inSlot, isComponentFile, isProductSource, kindOfFile, roleOfFile } from "./lib/scope.mjs"
+import { why } from "./lib/why.mjs"
 
 /** The one module allowed to name a glyph from a library: the entry of the leaf owner named `Icon`. */
 const ICON_LEAF = { kind: "leaves", owner: "Icon" }
@@ -195,12 +196,78 @@ export const noDecorativeIconInMetricCell = {
   },
 }
 
+/** The immediately preceding JSDoc declares this exported component as a brand mark. */
+const declaresBrandMark = (sourceCode, node) => {
+  const comment = sourceCode.getCommentsBefore(node).at(-1)
+  return comment?.type === "Block" && comment.value.startsWith("*") &&
+    /(?:^|\n)\s*\*?\s*@brand-mark(?:\s|$)/.test(comment.value) &&
+    sourceCode.text.slice(comment.range[1], node.range[0]).trim() === ""
+}
+
+/** A marker belongs to the exported component itself, never to a sibling or an enclosing file. */
+const isDeclaredBrandMarkFunction = (sourceCode, node) => {
+  let declaration = node
+  if (node.parent?.type === "VariableDeclarator") {
+    if (node.parent.init !== node || node.parent.id.type !== "Identifier") return false
+    declaration = node.parent.parent
+    if (declaration.type !== "VariableDeclaration" || declaration.declarations.length !== 1) return false
+  }
+  const exported = declaration.parent
+  if (!["ExportNamedDeclaration", "ExportDefaultDeclaration"].includes(exported?.type)) return false
+  return declaresBrandMark(sourceCode, exported) || declaresBrandMark(sourceCode, declaration)
+}
+
+/** An SVG belongs to its nearest function; marking another component cannot license it. */
+const inDeclaredBrandMark = (sourceCode, node) => {
+  for (let ancestor = node.parent; ancestor; ancestor = ancestor.parent) {
+    if (["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"].includes(ancestor.type)) {
+      return isDeclaredBrandMarkFunction(sourceCode, ancestor)
+    }
+  }
+  return false
+}
+
+/** Inline SVG belongs only to an explicitly declared brand mark in a leaf entry. */
+export const noInlineSvgOutsideBrandMarkLeaf = {
+  meta: {
+    type: "problem",
+    docs: { description: "FE_ICON_INLINE_SVG: inline SVG is drawn only by an exported leaf entry component with a @brand-mark JSDoc declaration." },
+    schema: [],
+    messages: {
+      inlineSvg:
+        "FE_ICON_INLINE_SVG: inline `<svg>` draws a second glyph vocabulary. Use the Icon leaf for product glyphs. A brand mark may draw its own SVG only in a leaf entry whose exported component is immediately documented with `@brand-mark` in JSDoc.",
+    },
+  },
+  create(context) {
+    if (!isProductSource(context)) return {}
+    const sourceCode = context.sourceCode ?? context.getSourceCode()
+    const isLeafEntry = isComponentFile(context) && kindOfFile(context) === "leaves" && roleOfFile(context) === "entry"
+    return {
+      JSXOpeningElement(node) {
+        if (node.name?.type !== "JSXIdentifier" || node.name.name !== "svg") return
+        if (isLeafEntry && inDeclaredBrandMark(sourceCode, node)) return
+        context.report({ node, messageId: "inlineSvg" })
+      },
+    }
+  },
+}
+
+/** The finding code for the copy-and-glyph law's inline SVG enforcer. */
+Object.assign(why, {
+  "no-inline-svg-outside-brand-mark-leaf": {
+    code: "FE_ICON_INLINE_SVG",
+    en: "`<file>` draws an inline SVG outside an exported leaf entry component declared as a brand mark.",
+    fix: "Use the Icon leaf for product glyphs; declare an original brand mark with @brand-mark JSDoc on its exported leaf entry component.",
+  },
+})
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-vendor-icon-outside-icon-leaf": noVendorIconOutsideIconLeaf,
   "heroicons-is-the-glyph-vendor": heroiconsIsTheGlyphVendor,
   "no-off-scale-glyph-size": noOffScaleGlyphSize,
   "no-decorative-icon-in-metric-cell": noDecorativeIconInMetricCell,
+  "no-inline-svg-outside-brand-mark-leaf": noInlineSvgOutsideBrandMarkLeaf,
 }
 
 /**

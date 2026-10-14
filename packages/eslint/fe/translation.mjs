@@ -1,8 +1,8 @@
 /**
- * The rules that hold `translation.md` (HFS R58, `FE_I18N_LITERAL`).
+ * The rules that hold `translation.md` (HFS R58, `FE_I18N_LITERAL`, and R286 feedback copy).
  *
- * TWO RULES. The first forbids a translation call below a block - easy and mostly redundant, since
- * the split rule already stops the drawing half reaching for the runtime. The second is the law:
+ * The original pair forbids a translation call below a block - easy and mostly redundant, since
+ * the split rule already stops the drawing half reaching for the runtime - and holds the law:
  * NO LITERAL COPY AT ANY TIER, IN ANY LANGUAGE, AND NO PRAGMA.
  *
  * One escape is enough to turn a rule into a comment convention, so there is no tier
@@ -26,7 +26,8 @@
  */
 
 import { isContentFile } from "./comments.mjs"
-import { isComponentFile, kindOfFile } from "./lib/scope.mjs"
+import { globalReferences, isComponentFile, kindOfFile } from "./lib/scope.mjs"
+import { why } from "./lib/why.mjs"
 
 /** True when a file sits in a component layer that must not resolve copy: every layer but `blocks` receives every word it renders, so it can know no domain and no sentence. */
 const isVocabularyFile = (context) => isComponentFile(context) && kindOfFile(context) !== "blocks"
@@ -247,10 +248,131 @@ export const noHardcodedCopy = {
   },
 }
 
+/** The static name of a member, including a bracketed string name. */
+const memberName = (node) => {
+  if (node?.type !== "MemberExpression") return null
+  return node.computed ? staticString(node.property) : node.property.name ?? null
+}
+
+/** The identifier at the root of a fluent call or property chain. */
+const callRoot = (node) => {
+  if (!node) return null
+  if (node.type === "Identifier") return node
+  if (node.type === "CallExpression") return callRoot(node.callee)
+  if (node.type === "MemberExpression") return callRoot(node.object)
+  if (["ChainExpression", "TSAsExpression", "TSNonNullExpression"].includes(node.type)) return callRoot(node.expression)
+  return null
+}
+
+/** The first definition of a value name in its enclosing scopes, or null for a global. */
+const bindingOf = (context, node) => {
+  let scope = (context.sourceCode ?? context.getSourceCode()).getScope(node)
+  while (scope) {
+    const variable = scope.set.get(node.name)
+    if (variable) return variable.defs[0] ?? null
+    scope = scope.upper
+  }
+  return null
+}
+
+/** Methods whose first argument is a Zod validation message rather than a value constraint. */
+const ZOD_MESSAGE_FIRST = new Set([
+  "email", "url", "uuid", "cuid", "cuid2", "ulid", "emoji", "base64", "base64url", "ip", "ipv4", "ipv6",
+  "datetime", "date", "time", "duration", "jwt", "nanoid", "nonempty", "finite", "int", "safe",
+  "positive", "negative", "nonnegative", "nonpositive",
+])
+
+/** Methods whose constraint or predicate precedes the validation message. */
+const ZOD_MESSAGE_SECOND = new Set([
+  "min", "max", "length", "regex", "includes", "startsWith", "endsWith", "gt", "gte", "lt", "lte", "multipleOf", "refine",
+])
+
+/** Toast methods that receive visible feedback as their first argument; dismiss receives an id. */
+const TOAST_MESSAGE_METHODS = new Set(["success", "error", "info", "warning", "warn", "loading", "message"])
+
+/** Literal feedback and validation messages are catalogue copy in both editions. */
+export const noCopyInCall = {
+  meta: {
+    type: "problem",
+    docs: { description: "FE_COPY_IN_CALL: toast and Zod validation messages come from next-intl." },
+    schema: [],
+    messages: {
+      copy: "FE_COPY_IN_CALL: `{{text}}` is literal feedback or validation copy. Resolve the message from the catalogue with t().",
+    },
+  },
+  create(context) {
+    const source = context.sourceCode ?? context.getSourceCode()
+    return {
+      CallExpression(node) {
+        const root = callRoot(node.callee)
+        if (!root) return
+        const binding = bindingOf(context, root)
+        const imported = binding?.type === "ImportBinding" ? binding.parent.source.value : null
+        const method = memberName(node.callee)
+        const zod = imported === "zod" || imported?.startsWith("zod/") || (!binding && root.name === "z")
+        const toast = root.name === "toast" || (imported && /(?:^|\/)toast(?:\/|$)/.test(imported) &&
+          (binding.node.type === "ImportDefaultSpecifier" || binding.node.imported?.name === "toast"))
+        let message
+        if (toast && (node.callee.type === "Identifier" || TOAST_MESSAGE_METHODS.has(method))) message = node.arguments[0]
+        else if (zod && ZOD_MESSAGE_FIRST.has(method)) message = node.arguments[0]
+        else if (zod && ZOD_MESSAGE_SECOND.has(method)) message = node.arguments[1]
+        if (!message) return
+        const text = staticString(message)
+        if (text !== null ? hasLetter(text) : templateHasWord(message)) {
+          context.report({ node: message, messageId: "copy", data: { text: text ?? source.getText(message) } })
+        }
+      },
+    }
+  },
+}
+
+/** Browser alerts bypass the application's translated toast feedback. */
+export const noAlert = {
+  meta: {
+    type: "problem",
+    docs: { description: "FE_NO_ALERT: feedback uses the toast module rather than browser alert()." },
+    schema: [],
+    messages: {
+      alert: "FE_NO_ALERT: browser alert() bypasses the application feedback surface. Use the toast module with a translated message.",
+    },
+  },
+  create(context) {
+    const calls = []
+    return {
+      CallExpression(node) { calls.push(node) },
+      "Program:exit"() {
+        const globals = new Set(globalReferences(context, new Set(["alert", "window", "globalThis", "self"])))
+        for (const node of calls) {
+          const callee = node.callee
+          const direct = callee.type === "Identifier" && callee.name === "alert" && globals.has(callee)
+          const member = memberName(callee) === "alert" && callee.object.type === "Identifier" && globals.has(callee.object)
+          if (direct || member) context.report({ node, messageId: "alert" })
+        }
+      },
+    }
+  },
+}
+
+// Subcodes remain available to catalog validation when this module is imported independently.
+Object.assign(why, {
+  "no-copy-in-call": {
+    code: "FE_COPY_IN_CALL",
+    en: "`<file>` passes literal copy to a toast or a Zod validation message.",
+    fix: "Resolve feedback and validation messages from the next-intl catalogue with t().",
+  },
+  "no-alert": {
+    code: "FE_NO_ALERT",
+    en: "`<file>` calls browser alert(), bypassing the application's feedback surface.",
+    fix: "Use the toast module with a translated message.",
+  },
+})
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-copy-resolution-below-block": noCopyResolutionBelowBlock,
   "no-hardcoded-copy": noHardcodedCopy,
+  "no-copy-in-call": noCopyInCall,
+  "no-alert": noAlert,
 }
 
 /**
