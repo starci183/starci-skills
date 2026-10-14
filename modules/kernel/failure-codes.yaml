@@ -18623,6 +18623,8 @@ FE_STACK_CORE_MISSING:
   causes_vi:
     - "Manifest của workspace sản phẩm chưa khai báo đủ thư viện cốt lõi của cùng chuẩn lite và full."
   nextStep_vi: "Khai báo thư viện còn thiếu trong workspace sản phẩm; đặt công cụ codegen, lint, TypeScript và Tailwind tại gốc nếu dùng chung."
+  owner: op-retry
+  kind: check-finding
 BE_JWT_ALG_PINNED:
   title: "JWT verification has no pinned asymmetric algorithm policy"
   title_vi: "Xác minh JWT thiếu chính sách thuật toán bất đối xứng cố định"
