@@ -59,6 +59,7 @@ function registerFeatureExports({ repoRoot, repo, noun, values }) {
 }
 
 function writeKind({ repoRoot, noun, name, now, manifest, repo, spec, declarationFile, values, forms, beRoot, patterns, planned }) {
+  if (noun === 'api' || noun === 'webhook') preflightFeatureComposition({ repoRoot, repo, noun, name });
   const bootstrapCreated = noun === 'cli' && repo.edition === 'lite' ? ensureLiteCli({ root: repoRoot, manifest, repo }) : [];
   for (const file of planned) {
     fs.mkdirSync(path.dirname(file.absolute), { recursive: true });
@@ -66,8 +67,8 @@ function writeKind({ repoRoot, noun, name, now, manifest, repo, spec, declaratio
   }
   registerFeatureExports({ repoRoot, repo, noun, values });
   if (spec.wire) wire({ beRoot, wire: spec.wire, forms, noun, name });
-  const platformCreated = repo.edition === 'lite' && (noun === 'api' || noun === 'webhook') ? wireLiteFeature({ repoRoot, repo, noun, name }) : [];
   const inboxCreated = addLiteWebhookInbox({ root: repoRoot, repo, noun, provider: name, values, now });
+  const platformCreated = noun === 'api' || noun === 'webhook' ? wireFeature({ repoRoot, repo, noun, name }) : [];
   const graphqlDoor = noun === 'api' ? ensureGraphqlPeers(repoRoot) : [];
   const registered = register({ declarationFile, spec: { patterns, trigger: spec.trigger, optionalSlots: noun === 'api' ? [GRAPHQL_CONTRACT_SLOT] : [] } });
   return { created: [...bootstrapCreated, ...planned.map((file) => `be/${file.target}`), ...platformCreated, ...inboxCreated, ...graphqlDoor], registered };
@@ -93,13 +94,75 @@ function ensureGraphqlPeers(repoRoot) {
 
 /** Adds `importLine` and one `symbol` entry of the `imports` array of a module file's lines, once. */
 function addModuleImport(lines, { importLine, entry, relative, noun }) {
-  if (lines.includes(importLine)) return;
-  const lastImport = lines.reduce((last, line, index) => line.startsWith('import ') ? index : last, -1);
-  if (lastImport < 0 || lines.findIndex(line => /^\s*imports: \[$/.test(line)) < 0) throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add ${noun} could not find the imports array in ${relative}`);
-  lines.splice(lastImport + 1, 0, importLine);
-  const imports = lines.findIndex(line => /^\s*imports: \[$/.test(line));
+  const active = compositionCode(lines.join('\n')).split('\n');
+  const imported = active.some(line => line.replace(/;\s*$/, '') === importLine);
+  const registered = active.some(line => line.trim() === `${entry},` ||
+    (/\bimports:\s*\[/.test(line) && !line.trim().startsWith('//') && line.replace(/\s+/g, '').includes(entry.replace(/\s+/g, ''))));
+  if (imported && registered) return;
+  const lastImport = active.reduce((last, line, index) => line.startsWith('import ') ? index : last, -1);
+  const importsLine = line => /\bimports:\s*\[/.test(line) && !line.trim().startsWith('//');
+  if (lastImport < 0 || active.findIndex(importsLine) < 0) throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add ${noun} could not find the imports array in ${relative}`);
+  if (!imported) lines.splice(lastImport + 1, 0, importLine);
+  if (registered) return;
+  const imports = compositionCode(lines.join('\n')).split('\n').findIndex(importsLine);
   const indent = /^(\s*)/.exec(lines[imports])?.[1] ?? '';
-  lines.splice(imports + 1, 0, `${indent}    ${entry},`);
+  if (/^\s*imports: \[$/.test(lines[imports])) lines.splice(imports + 1, 0, `${indent}    ${entry},`);
+  else lines[imports] = lines[imports].replace(/(\bimports:\s*\[)\s*/, `$1${entry}, `);
+}
+
+/** Masks comments without changing offsets or treating quoted module specifiers as comments. */
+function compositionCode(text) {
+  return text.replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,
+    value => value.startsWith('/') ? value.replace(/[^\r\n]/g, ' ') : value);
+}
+
+/** The skeleton registrations that move into area groups when the first transport is added. */
+function skeletonComposition(lines, edition) {
+  const active = compositionCode(lines.join('\n')).split('\n');
+  const candidates = [
+    { area: 'domain', symbol: 'IdentityModule', source: '@modules/domain/identity', entry: edition === 'lite' ? 'IdentityModule.register({ isGlobal: true, verifyAccessToken })' : 'IdentityModule.register({ isGlobal: true })' },
+    { area: 'domain', symbol: 'LivenessModule', source: '@modules/domain/liveness', entry: 'LivenessModule.register({ isGlobal: true })' },
+    { area: 'api', symbol: 'SystemHealthHttpModule', source: '@features/api/system-health', entry: 'SystemHealthHttpModule' },
+    { area: 'api', symbol: 'GraphqlModule', source: '@modules/platform/graphql', entry: 'GraphqlModule.register({ isGlobal: true })' },
+  ];
+  if (edition === 'full') candidates.push({ area: 'domain', symbol: 'NoteModule', source: '@modules/domain/note', entry: 'NoteModule.register({ isGlobal: true })' });
+  return candidates.filter(({ entry }) => active.some(line => line.trim() === `${entry},`));
+}
+
+function featureCompositionRoot({ repoRoot, repo, noun }) {
+  const app = repo.sides.be.apps.find(entry => entry.kind === 'api');
+  if (!app) throw new ScaffoldError('HFS_ADD_NO_API_OWNER', `add ${noun} needs a declared api app`);
+  const relative = `be/apps/${app.name}/src/app.module.ts`;
+  const file = path.join(repoRoot, ...relative.split('/'));
+  if (!fs.existsSync(file)) throw new ScaffoldError('HFS_ADD_WIRE_MISSING', `add ${noun} registers its transport in ${relative}, which does not exist`);
+  return { app, relative, file, lines: fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n').split('\n') };
+}
+
+/** Refuse an incompatible root or area group before generating the feature or changing its capability exports. */
+function preflightFeatureComposition({ repoRoot, repo, noun, name }) {
+  const { app, relative, lines } = featureCompositionRoot({ repoRoot, repo, noun });
+  if (noun === 'webhook' && repo.edition === 'lite') {
+    if (!compositionCode(lines.join('\n')).split('\n').some(line => /^\s*imports: \[$/.test(line)))
+      throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add webhook needs a multiline imports array in ${relative}`);
+    planLiteWebhookConfig({ repoRoot, app: app.name, provider: name });
+  }
+  const areas = new Set([noun === 'api' ? 'api' : 'webhooks', ...skeletonComposition(lines, repo.edition).map(entry => entry.area)]);
+  for (const area of areas) {
+    readComposeGroup({ repoRoot, repo, app: app.name, area, noun });
+    const argument = area === 'domain' && repo.edition === 'lite' ? 'verifyAccessToken' : '';
+    addModuleImport(lines, { importLine: `import { ${area}Modules } from "./compose/${area}"`, entry: `...${area}Modules(${argument})`, relative, noun });
+  }
+}
+
+/** Remove only a moved skeleton registration and its named import, keeping guards imported from the same barrel. */
+function removeSkeletonRegistration(lines, { symbol, source, entry }) {
+  const entryAt = compositionCode(lines.join('\n')).split('\n').findIndex(line => line.trim() === `${entry},`);
+  lines.splice(entryAt, 1);
+  const importAt = lines.findIndex(line => line.startsWith('import { ') && line.replace(/;\s*$/, '').endsWith(` } from "${source}"`));
+  if (importAt < 0) return;
+  const symbols = lines[importAt].slice('import { '.length, lines[importAt].indexOf(' } from ')).split(',').map(value => value.trim()).filter(value => value !== symbol);
+  if (symbols.length) lines[importAt] = `import { ${symbols.join(', ')} } from "${source}"`;
+  else lines.splice(importAt, 1);
 }
 
 /** The GraphQL server capability (be/src/modules/platform/graphql), written whole by the first GraphQL feature of an app that has none. */
@@ -118,40 +181,105 @@ function ensureGraphqlPlatform(repoRoot) {
 }
 
 /**
- * Lite has one API app; compose each generated transport into that app immediately: an api feature's GraphQL module (with the
- * GraphQL server on first use), a webhook's HTTP door.
+ * Compose each generated transport in its declared API owner through an explicitly typed area group. The root only spreads
+ * the group; it never acquires a second feature list. Lite's inbox capability belongs to its webhook group as well.
  */
-function wireLiteFeature({ repoRoot, repo, noun, name }) {
-  const app = repo.sides.be.apps.find(entry => entry.kind === 'api');
-  if (!app) throw new ScaffoldError('HFS_ADD_NO_API_OWNER', `add ${noun} needs a declared lite api app`);
-  const relative = `be/apps/${app.name}/src/app.module.ts`;
-  const file = path.join(repoRoot, ...relative.split('/'));
-  if (!fs.existsSync(file)) throw new ScaffoldError('HFS_ADD_WIRE_MISSING', `add ${noun} registers its transport in ${relative}, which does not exist`);
-  const lines = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n').split('\n');
+function wireFeature({ repoRoot, repo, noun, name }) {
+  const { app, relative, file, lines } = featureCompositionRoot({ repoRoot, repo, noun });
   const created = [];
+  const area = noun === 'api' ? 'api' : 'webhooks';
+  const groups = new Map([[area, []]]);
+  for (const migration of skeletonComposition(lines, repo.edition)) {
+    const entries = groups.get(migration.area) ?? [];
+    entries.push({ importLine: `import { ${migration.symbol} } from "${migration.source}"`, entry: migration.entry });
+    groups.set(migration.area, entries);
+    removeSkeletonRegistration(lines, migration);
+  }
+  const entries = groups.get(area);
   if (noun === 'api') {
     created.push(...ensureGraphqlPlatform(repoRoot));
-    addModuleImport(lines, { importLine: 'import { GraphqlModule } from "@modules/platform/graphql"', entry: 'GraphqlModule.register({ isGlobal: true })', relative, noun });
+    entries.push({ importLine: 'import { GraphqlModule } from "@modules/platform/graphql"', entry: 'GraphqlModule.register({ isGlobal: true })' });
     const symbol = `${pascalOf(name)}GraphqlModule`;
-    addModuleImport(lines, { importLine: `import { ${symbol} } from "@features/api/${name}"`, entry: symbol, relative, noun });
+    entries.push({ importLine: `import { ${symbol} } from "@features/api/${name}"`, entry: symbol });
   } else {
     const symbol = `${pascalOf(name)}HttpModule`;
-    addModuleImport(lines, { importLine: `import { ${symbol} } from "@features/webhooks/${name}"`, entry: symbol, relative, noun });
+    entries.push({ importLine: `import { ${symbol} } from "@features/webhooks/${name}"`, entry: symbol });
+    if (repo.edition === 'lite') {
+      const inbox = `${pascalOf(name)}InboxModule`;
+      const importLine = `import { ${inbox} } from "@modules/domain/${name}-inbox"`;
+      const entry = `${inbox}.register({ isGlobal: true })`;
+      entries.push({ importLine, entry });
+      // The existing inbox generator registers in the root. Move exactly that generated registration into the area group.
+      const importAt = lines.indexOf(importLine);
+      if (importAt >= 0) lines.splice(importAt, 1);
+      const entryAt = lines.findIndex(line => line.trim() === `${entry},`);
+      if (entryAt >= 0) lines.splice(entryAt, 1);
+    }
+  }
+  for (const [group, members] of groups) {
+    const symbol = `${group}Modules`;
+    const argument = group === 'domain' && repo.edition === 'lite' ? 'verifyAccessToken' : '';
+    addModuleImport(lines, { importLine: `import { ${symbol} } from "./compose/${group}"`, entry: `...${symbol}(${argument})`, relative, noun });
+    created.push(...writeComposeGroup({ repoRoot, repo, app: app.name, area: group, entries: members, noun }));
   }
   fs.writeFileSync(file, `${lines.join('\n').replace(/\n+$/, '')}\n`);
-  if (noun === 'webhook') wireLiteWebhookConfig({ repoRoot, app: app.name, provider: name });
+  if (noun === 'webhook' && repo.edition === 'lite') wireLiteWebhookConfig({ repoRoot, app: app.name, provider: name });
   return created;
 }
 
+/** Reads the explicitly typed expression body of a group without treating comments as active declarations. */
+function readComposeGroup({ repoRoot, repo, app, area, noun }) {
+  const relative = `be/apps/${app}/src/compose/${area}.ts`;
+  const file = path.join(repoRoot, ...relative.split('/'));
+  const exists = fs.existsSync(file);
+  const skeleton = repo.edition === 'lite' ? 'skeleton-lite/apps/api' : 'skeleton/apps/__app__';
+  const template = path.join(TEMPLATES_DIR, 'be', ...skeleton.split('/'), 'src', 'compose', `${area}.ts`);
+  const text = fs.readFileSync(exists ? file : template, 'utf8').replace(/\r\n/g, '\n');
+  const argument = area === 'domain' && repo.edition === 'lite' ? 'verifyAccessToken: VerifySupabaseAccessToken' : '';
+  const marker = `export const ${area}Modules = (${argument}): Array<Type<unknown> | DynamicModule> => [`;
+  const declarationAt = compositionCode(text).indexOf(`\n${marker}`);
+  const active = declarationAt >= 0;
+  const body = active ? text.slice(declarationAt + 1 + marker.length).match(/^([\s\S]*)\]\s*;?\s*$/)?.[1] : undefined;
+  if (body === undefined) throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add ${noun} needs the typed ${area}Modules group in ${relative}`);
+  return { relative, file, exists, text, marker, body };
+}
+
+/** Creates a typed group from the edition's template, or adds members without duplicating inline registrations or semicolon imports. */
+function writeComposeGroup(input) {
+  const { relative, file, exists, marker, body, text: original } = readComposeGroup(input);
+  let text = original;
+  let compactBody = compositionCode(body).replace(/\s+/g, '');
+  for (const { importLine, entry } of input.entries) {
+    const lines = text.split('\n');
+    if (!lines.some(line => line.replace(/;\s*$/, '') === importLine)) {
+      const lastImport = lines.reduce((last, line, index) => line.startsWith('import ') ? index : last, -1);
+      lines.splice(lastImport + 1, 0, importLine);
+      text = lines.join('\n');
+    }
+    const compactEntry = entry.replace(/\s+/g, '');
+    const escapedEntry = compactEntry.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!new RegExp(`(?:^|,)${escapedEntry}(?=,|$)`).test(compactBody)) {
+      const afterMarker = compositionCode(text).indexOf(marker) + marker.length;
+      const empty = text.slice(afterMarker).startsWith(']');
+      text = `${text.slice(0, afterMarker)}\n    ${entry},${empty ? '\n' : ''}${text.slice(afterMarker)}`;
+      compactBody = `${compactEntry},${compactBody}`;
+    }
+  }
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, text);
+  return exists ? [] : [relative];
+}
+
 /** Adds one generated webhook provider to the lite API's typed env reader (or an existing inline bootstrap) and enables exact raw-body verification. */
-function wireLiteWebhookConfig({ repoRoot, app, provider }) {
+function planLiteWebhookConfig({ repoRoot, app, provider }) {
   const envRelative = `be/apps/${app}/src/${app}.env.ts`;
   const relative = fs.existsSync(path.join(repoRoot, ...envRelative.split('/')))
     ? envRelative
     : `be/apps/${app}/src/main.ts`;
   const file = path.join(repoRoot, ...relative.split('/'));
+  if (!fs.existsSync(file)) throw new ScaffoldError('HFS_ADD_WIRE_MISSING', `add webhook needs ${relative}`);
   let text = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
-  const httpSecurityImport = /^import \{ ([^}]+) \} from "@modules\/platform\/http-security"$/m;
+  const httpSecurityImport = /^import \{ ([^}]+) \} from "@modules\/platform\/http-security";?$/m;
   const importMatch = httpSecurityImport.exec(text);
   if (!importMatch) throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add webhook could not find the HTTP security import in ${relative}`);
   const imported = importMatch[1].split(',').map(symbol => symbol.trim()).filter(Boolean);
@@ -175,12 +303,19 @@ function wireLiteWebhookConfig({ repoRoot, app, provider }) {
     }
   }
   text = text.replace('NestFactory.create(AppModule.register(options))', 'NestFactory.create(AppModule.register(options), { rawBody: true })');
-  fs.writeFileSync(file, text);
+  const planned = [{ file, text }];
   if (relative === envRelative) {
     const main = path.join(repoRoot, 'be', 'apps', app, 'src', 'main.ts');
+    if (!fs.existsSync(main)) throw new ScaffoldError('HFS_ADD_WIRE_MISSING', `add webhook needs be/apps/${app}/src/main.ts`);
     const entry = fs.readFileSync(main, 'utf8').replace('NestFactory.create(AppModule.register(options))', 'NestFactory.create(AppModule.register(options), { rawBody: true })');
-    fs.writeFileSync(main, entry);
+    planned.push({ file: main, text: entry });
   }
+  return planned;
+}
+
+/** Applies the preflighted provider configuration and exact raw-body bootstrap option. */
+function wireLiteWebhookConfig(input) {
+  for (const { file, text } of planLiteWebhookConfig(input)) fs.writeFileSync(file, text);
 }
 
 /**

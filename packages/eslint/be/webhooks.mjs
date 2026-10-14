@@ -17,14 +17,18 @@
  * What a receiver is comes from its TYPE (where the class is declared); what a decorator is comes from the import that binds it.
  * No rule here tests a directory spelled in a path pattern or a variable name.
  */
+import ts from "typescript"
 import { walk } from "./lib/ast.mjs"
 import { callsOf, decoratorsFrom, hasClassDecorator, injectedMembers, methodsDecoratedBy } from "./lib/doors.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { decoratorArguments, decoratorCallee, importOf, isImportedFrom } from "./lib/import-source.mjs"
 import { baseName, enumMemberOf } from "./lib/ports.mjs"
+import { typed } from "./lib/types.mjs"
 import { isProviderAcknowledgement } from "./lib/webhook-ack.mjs"
 import { webhookForbiddenReferences, webhookIntakeDispatchesCommand } from "./lib/webhook-handoff.mjs"
 import { firstWebhookChallenge, firstWebhookVerification, isWebhookChallengeReturn, isWebhookDomainServiceType as isDomainServiceType, isWebhookSignatureType as isSignatureType } from "./lib/webhook-verifiers.mjs"
+import { webhookInboxKey } from "./webhook-handoff-inbox.mjs"
+import { webhookIntakeProcessesDelivery } from "./webhook-handoff-intake.mjs"
 
 /** The slot of provider webhook doors. */
 const SLOT = "be.feature.webhooks.http"
@@ -173,6 +177,154 @@ const reportDoor = (context, hfs, program) => {
     for (const challenge of methodsDecoratedBy(context, door, "@nestjs/common", "Get")) reportRoute(context, hfs, challenge, true)
 }
 
+/** Resolve a decorator or method through its imported alias to its declaration. */
+const targetSymbol = (checker, node) => {
+    const symbol = checker.getSymbolAtLocation(node)
+    return symbol?.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol
+}
+
+/** Public metadata belongs to the identity owner, including aliases and namespace imports. */
+const isPublicDecorator = (context, hfs, decorator) => {
+    const { checker, toTs } = typed(context)
+    const node = toTs(decoratorCallee(decorator))
+    const symbol = node && targetSymbol(checker, ts.isPropertyAccessExpression(node) ? node.name : node)
+    return symbol?.getName() === "Public" && symbol.getDeclarations()?.some((declaration) => {
+        const file = declaration.getSourceFile().fileName.replace(/\\/g, "/")
+        return hfs.tierOf(file) === "domain" && hfs.ownerOf(file)?.split("/").at(-1) === "identity"
+    })
+}
+
+/** Unwrap const/satisfies annotations without granting a computed declaration a proof. */
+const unwrapTs = (node) => {
+    while (node && (ts.isAsExpression(node) || ts.isSatisfiesExpression(node) || ts.isParenthesizedExpression(node))) node = node.expression
+    return node
+}
+
+/** Static object properties keep aliases, spreads and computed literal keys readable. Last writes win. */
+const propertyValue = (checker, expression, name, seen = new Set()) => {
+    const node = unwrapTs(expression)
+    if (!node || seen.has(node)) return null
+    seen.add(node)
+    if (ts.isObjectLiteralExpression(node)) {
+        for (const property of [...node.properties].reverse()) {
+            if (ts.isSpreadAssignment(property)) {
+                const value = propertyValue(checker, property.expression, name, seen)
+                if (value) return value
+            } else if (ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property)) {
+                const key = ts.isComputedPropertyName(property.name) ? unwrapTs(property.name.expression) : property.name
+                if ((ts.isIdentifier(key) || ts.isStringLiteralLike(key)) && key.text === name) return property.initializer ?? property.name
+            }
+        }
+        return null
+    }
+    const symbol = targetSymbol(checker, ts.isPropertyAccessExpression(node) ? node.name : node)
+    for (const declaration of symbol?.getDeclarations() ?? []) {
+        const value = propertyValue(checker, declaration.initializer, name, seen)
+        if (value) return value
+    }
+    return null
+}
+
+/** A SignedWebhook reason is the actual identity enum member, even behind a const options alias. */
+const signedReason = (context, decorator) => {
+    const { checker, toTs } = typed(context)
+    const options = decoratorArguments(decorator)[0]
+    const reason = options && propertyValue(checker, toTs(options), "reason")
+    if (!reason) return false
+    const type = checker.getTypeAtLocation(unwrapTs(reason))
+    const declaration = type.getSymbol()?.getDeclarations()?.[0]
+    const owner = declaration?.parent
+    if (!declaration || !ts.isEnumMember(declaration) || !owner || !ts.isEnumDeclaration(owner)
+        || owner.name.text !== "PublicReason" || declaration.name.getText().replace(/["']/g, "") !== "SignedWebhook") return false
+    const hfs = hfsOf(context)
+    const file = declaration.getSourceFile().fileName.replace(/\\/g, "/")
+    return hfs.tierOf(file) === "domain" && hfs.ownerOf(file)?.split("/").at(-1) === "identity"
+}
+
+/** An explicit verifier exemption names the exact domain method in a webhook HTTP module's exported const array. */
+const declaredVerifier = (context, hfs, method) => {
+    if (method?.type !== "MethodDefinition" || hfs.tierOf(context.filename) !== "domain" || !baseName(context.filename).endsWith(".service.ts")) return false
+    const { checker, program, toTs } = typed(context)
+    const declaration = toTs(method)
+    const symbol = declaration?.name && targetSymbol(checker, declaration.name)
+    if (!symbol) return false
+    return program.getSourceFiles().some((source) => hfs.slotOf(source.fileName) === SLOT && baseName(source.fileName).endsWith(".module.ts")
+        && source.statements.some((statement) => ts.isVariableStatement(statement)
+            && statement.declarationList.flags & ts.NodeFlags.Const
+            && statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+            && statement.declarationList.declarations.some((entry) => {
+                const array = unwrapTs(entry.initializer)
+                return ts.isIdentifier(entry.name) && entry.name.text === "webhookVerifiers" && array && ts.isArrayLiteralExpression(array)
+                    && array.elements.some((item) => {
+                        const reference = unwrapTs(item)
+                        return reference && ts.isPropertyAccessExpression(reference) && targetSymbol(checker, reference.name) === symbol
+                    })
+            })))
+}
+
+/** Read literal paths and const aliases through the checker; Nest accepts path lists and Controller options too. */
+const routePaths = (context, decorator) => {
+    const { checker, toTs } = typed(context)
+    const seen = new Set()
+    const read = (original) => {
+        const node = unwrapTs(original)
+        if (!node || seen.has(node)) return []
+        seen.add(node)
+        if (ts.isStringLiteralLike(node)) return [node.text]
+        if (ts.isArrayLiteralExpression(node)) return node.elements.flatMap(read)
+        if (ts.isObjectLiteralExpression(node)) return read(propertyValue(checker, node, "path"))
+        if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+            return read(node.left).flatMap((left) => read(node.right).map((right) => left + right))
+        }
+        if (ts.isTemplateExpression(node)) {
+            return node.templateSpans.reduce((values, span) => values.flatMap((value) => read(span.expression).map((part) => value + part + span.literal.text)), [node.head.text])
+        }
+        const reference = ts.isPropertyAccessExpression(node) ? node.name : node
+        const symbol = targetSymbol(checker, reference)
+        return symbol?.getDeclarations()?.flatMap((declaration) => read(declaration.initializer)) ?? []
+    }
+    return decoratorArguments(decorator).flatMap((argument) => read(toTs(argument)))
+}
+
+/** R263: public webhook traffic always enters the signed, verified webhook kind. */
+export const webhookScope = {
+    meta: {
+        type: "problem",
+        docs: { description: "SignedWebhook metadata belongs only to webhook doors or explicitly declared domain verifiers; public webhook/callback/events routes belong to the webhook kind." },
+        schema: [],
+        messages: {
+            scope: "[BE_WEBHOOK_SCOPE] SignedWebhook metadata is allowed only on a `<provider>.webhook.ts` door in the webhook HTTP slot or an exact domain method declared in its HTTP module's exported `webhookVerifiers`. Move public webhook, callback and events routes into that door so signature verification and inbox handoff are enforced.",
+        },
+    },
+    create(context) {
+        const hfs = hfsOf(context)
+        const slot = hfs.slotOf(context.filename)
+        if (slot?.startsWith("be.tests.") || /(?:\.spec|\.d)\.ts$/.test(context.filename)) return {}
+        const inDoor = slot === SLOT && baseName(context.filename).endsWith(".webhook.ts")
+        return {
+            CallExpression(call) {
+                if (inDoor && call.callee.type === "MemberExpression" && isDomainServiceType(context, hfs, call.callee.object)
+                    && webhookIntakeProcessesDelivery(context, hfs, call)) context.report({ node: call, messageId: "scope" })
+            },
+            Decorator(decorator) {
+                if (!inDoor && isPublicDecorator(context, hfs, decorator) && signedReason(context, decorator)
+                    && !declaredVerifier(context, hfs, decorator.parent)) context.report({ node: decorator, messageId: "scope" })
+            },
+            ClassDeclaration(controller) {
+                if (inDoor || !hasClassDecorator(context, controller, "@nestjs/common", "Controller")) return
+                const classPublic = (controller.decorators ?? []).filter((decorator) => isPublicDecorator(context, hfs, decorator))
+                const prefix = decoratorsFrom(context, controller, "@nestjs/common", "Controller").flatMap((decorator) => routePaths(context, decorator))
+                for (const method of routeMethods(context, controller)) {
+                    const publicMetadata = [...classPublic, ...(method.decorators ?? []).filter((decorator) => isPublicDecorator(context, hfs, decorator))]
+                    if (publicMetadata.length === 0 || publicMetadata.some((decorator) => signedReason(context, decorator))) continue
+                    const paths = [...prefix, ...decoratorsFrom(context, method, "@nestjs/common", HTTP_VERBS).flatMap((decorator) => routePaths(context, decorator))]
+                    if (paths.some((path) => /webhook|callback|events/i.test(path))) context.report({ node: method.key, messageId: "scope" })
+                }
+            },
+        }
+    },
+}
+
 /** A provider webhook door: one signed `@Post`, the signature proof, one domain intake call, nothing else. */
 export const webhookShape = {
     meta: {
@@ -236,10 +388,14 @@ export const webhookVerifyFirst = {
 export const rules = {
     "webhook-shape": webhookShape,
     "webhook-verify-first": webhookVerifyFirst,
+    "webhook-scope": webhookScope,
+    "webhook-inbox-key": webhookInboxKey,
 }
 
 /** Every rule of this law at `error`. */
 export const recommended = {
     "starci-be/webhook-shape": "error",
     "starci-be/webhook-verify-first": "error",
+    "starci-be/webhook-scope": "error",
+    "starci-be/webhook-inbox-key": "error",
 }

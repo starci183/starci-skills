@@ -3,10 +3,13 @@
  *
  *   node --test feature-thin.spec.mjs
  */
+// proves: HFS_FEATURE_LOGIC_ROLE@lite HFS_FEATURE_LOGIC_ROLE@full
 import assert from "node:assert/strict"
 import test from "node:test"
-import { BE_DECLARATION, at, typedTester } from "./fixtures/typed/tester.mjs"
-import { featureThin, rules } from "./feature-thin.mjs"
+import { BE_DECLARATION, TYPED_ROOT, at, ruleTester, typedTester } from "./fixtures/typed/tester.mjs"
+import { appDeclaration } from "./fixtures/app.mjs"
+import { hfsFromDeclaration } from "./lib/hfs.mjs"
+import { featureLogicRole, featureThin, rules } from "./feature-thin.mjs"
 
 const tester = typedTester({ declaration: { ...BE_DECLARATION, patterns: ["webhooks", "realtime", "fenced-job", "event-bus", "saga"] } })
 
@@ -71,7 +74,85 @@ export class Door {
 
 test("every rule this law declares is exported under its published name", () => {
     for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
+    assert.match(featureLogicRole.meta.messages.logic, /^\[HFS_FEATURE_LOGIC_ROLE\] /)
 })
+
+for (const edition of ["lite", "full"]) {
+    test(`feature-logic-role: non-door feature roles cannot hide logic in ${edition}`, () => {
+        const hfs = hfsFromDeclaration({ ...appDeclaration("be", BE_DECLARATION), edition }, TYPED_ROOT)
+        assert.equal(hfs.edition, edition)
+        const support = (role) => at(`src/features/api/checkout/application/support/price.${role}.ts`)
+        const data = `export interface PriceInput { readonly id: string }
+export type PriceResult = Readonly<{ id: string }>
+export const PRICE_LABELS = { accepted: "accepted", rejected: "rejected", offset: -1 } as const
+export class PriceInputData { constructor(readonly id: string) {} }`
+        const logic = { messageId: "logic" }
+        ruleTester({ root: TYPED_ROOT, hfs }).run("feature-logic-role", featureLogicRole, {
+            valid: [
+                // The suffix alone does not reject a support file: data and contracts are valid.
+                ...["policy", "guard", "client", "filter", "interceptor", "projection", "contracts"].map((role) => ({ filename: support(role), code: data })),
+                { filename: COMMAND, code: "export class PlaceOrderCommand { constructor(readonly orderId: string) {} }" },
+                ...["Command", "Query"].map((base) => ({
+                    filename: at(`src/features/api/checkout/application/place-order.${base.toLowerCase()}.ts`),
+                    code: `import { ${base} as DataBase } from "@nestjs/cqrs"; export class PlaceOrder extends DataBase<string> { constructor(readonly orderId: string) { super() } }`,
+                })),
+                {
+                    filename: COMMAND,
+                    code: 'import * as Cqrs from "@nestjs/cqrs"; export class PlaceOrder extends Cqrs.Command<string> { constructor(readonly orderId: string) { super() } }',
+                },
+                // DTO metadata and a signed literal type execute no business logic.
+                {
+                    filename: support("input"),
+                    code: `import { Inject } from "@nestjs/common"
+export class PriceInput {
+    @Inject("PRICE") readonly price!: number
+    readonly delta: -1 = -1
+}`,
+                },
+                // Nest feature composition keeps its own laws.
+                {
+                    filename: at("src/features/api/checkout/checkout.module.ts"),
+                    code: 'import { Module } from "@nestjs/common"; @Module({ providers: [] }) export class CheckoutModule {}',
+                },
+                // R203 remains the sole thin-role judge; no duplicate findings from R264.
+                { filename: HANDLER, code: "export const choose = (ok: boolean) => ok ? 1 : 0" },
+                { filename: DOMAIN_SERVICE, code: "export const choose = (ok: boolean) => ok ? 1 : 0" },
+                { filename: support("policy").replace(".ts", ".spec.ts"), code: "if (true) throw new Error('proof')" },
+                { filename: support("policy").replace(".ts", ".d.ts"), code: "export declare const x: number" },
+            ],
+            invalid: [
+                // V-01: changing a handler suffix to a support role cannot hide the decision.
+                ...["policy", "guard", "client", "filter", "interceptor", "projection", "contracts"].map((role) => ({
+                    filename: support(role),
+                    code: "export class PricePolicy { choose(ok: boolean): number { if (ok) return 1; return 0 } }",
+                    errors: [logic],
+                })),
+                { filename: support("policy"), code: "export const choose = (ok: boolean) => ok ? 1 : 0", errors: [logic] },
+                { filename: support("guard"), code: "export const choose = (ok: boolean) => ok && 'accepted'", errors: [logic] },
+                { filename: support("projection"), code: "export function choose(ids: string[]): void { for (const id of ids) { const same = id } }", errors: [logic] },
+                { filename: support("filter"), code: "export function choose(): number { try { return 1 } catch { return 0 } }", errors: [logic] },
+                { filename: support("policy"), code: "export const add = (x: number, y: number) => x + y", errors: [logic] },
+                { filename: support("policy"), code: "export const negate = (ok: boolean) => !ok", errors: [logic] },
+                { filename: support("policy"), code: 'export const label = (id: string) => `price:${id}`', errors: [logic] },
+                { filename: support("client"), code: 'export const parse = (text: string) => JSON.parse(text)', errors: [logic] },
+                { filename: support("policy"), code: 'declare const mutate: (parts: TemplateStringsArray) => void; export const execute = () => mutate`delivery`', errors: [logic] },
+                { filename: support("contracts"), code: "export const now = new Date()", errors: [logic] },
+                // A module suffix under support/ cannot buy the composition exception.
+                { filename: support("module"), code: 'export const parsed = JSON.parse("{}")', errors: [logic] },
+                // Only the decorator application is metadata; an inner executable call is judged.
+                {
+                    filename: support("input"),
+                    code: 'import { Inject } from "@nestjs/common"; @Inject(JSON.parse("{}")) export class PriceInput {}',
+                    errors: [logic],
+                },
+                { filename: COMMAND, code: "export class PlaceOrderCommand { choose(ok: boolean): number { if (ok) return 1; return 0 } }", errors: [logic] },
+                // A local lookalike or a base initializer with input is executable work, not Nest data initialization.
+                { filename: COMMAND, code: "class Command {}; export class PlaceOrder extends Command { constructor() { super() } }", errors: [logic] },
+                { filename: COMMAND, code: 'import { Command } from "@nestjs/cqrs"; export class PlaceOrder extends Command<string> { constructor(readonly id: string) { super(id) } }', errors: [logic] },
+            ],
+        })
+    })
+}
 
 test("feature-thin: a feature file of a thin role maps parameters and makes one delegating call; every other shape is refused", () => {
     tester.run("feature-thin", featureThin, {
