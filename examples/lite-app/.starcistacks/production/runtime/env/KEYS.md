@@ -4,18 +4,18 @@ Every environment key the app's typed environment readers (`be/apps/api/src/api.
 
 ## api (be)
 
-Required — declared in `infra/swarm/stack.yaml` or sealed in `secrets/api.enc` and mounted by `*_FILE`:
+Required — declared in `infra/swarm/stack.yaml` or sealed in the per-key members under `secrets/` and mounted by `*_FILE`:
 
 | Key                             | Kind              | Where                                                | Semantics                                                                                           |
 | ------------------------------- | ----------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | `PORT`                          | int               | stack env `8787`                                     | The HTTP listener port.                                                                             |
 | `NODE_ENV`                      | string (optional) | stack env `production`                               | `development`/`test` permits plain-HTTP origins in the CORS allowlist; `production` requires HTTPS. |
 | `HTTP_SECURITY_ALLOWED_ORIGINS` | string            | stack env                                            | Comma-separated exact origins; validated at boot (no wildcards, HTTPS outside development/test).    |
-| `PRIMARY_DB_URL`                | secret            | `secrets/api.enc` → `PRIMARY_DB_URL_FILE`            | The least-privilege `app_be` connection to the Supabase project.                                    |
+| `PRIMARY_DB_URL`                | secret            | `secrets/primary-db-url.enc` → `PRIMARY_DB_URL_FILE`            | The least-privilege `app_be` connection to the Supabase project.                                    |
 | `PRIMARY_DB_SCHEMA`             | string            | stack env `public`                                   | The schema the primary connection is bound to.                                                      |
 | `SUPABASE_URL`                  | url               | stack env                                            | The Supabase project origin (Auth, Storage, JWKS).                                                  |
-| `SUPABASE_SERVICE_ROLE_KEY`     | secret            | `secrets/api.enc` → `SUPABASE_SERVICE_ROLE_KEY_FILE` | Service-role key for Supabase server calls; the back end never forwards it.                         |
-| `CALENDAR_WEBHOOK_SECRET`       | secret            | `secrets/api.enc` → `CALENDAR_WEBHOOK_SECRET_FILE`   | The signing secret of the calendar provider's webhook deliveries.                                   |
+| `SUPABASE_SERVICE_ROLE_KEY`     | secret            | `secrets/supabase-service-role-key.enc` → `SUPABASE_SERVICE_ROLE_KEY_FILE` | Service-role key for Supabase server calls; the back end never forwards it.                         |
+| `CALENDAR_WEBHOOK_SECRET`       | secret            | `secrets/calendar-webhook-secret.enc` → `CALENDAR_WEBHOOK_SECRET_FILE`   | The signing secret of the calendar provider's webhook deliveries.                                   |
 
 Optional tunables (literal defaults in the parsers; override in the stack env only when needed):
 
@@ -45,14 +45,15 @@ Required public build values (`NEXT_PUBLIC_*` are published by design and are ne
 | `NEXT_PUBLIC_SUPABASE_URL`      | The public Supabase project origin; the browser reaches Auth only.   |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | The public anonymous key of Supabase Auth.                           |
 
-## Deployment inputs
+## Deployment custody
 
-These public names configure the stack renderer and ingress, rather than the API's typed reader.
-The external secret names and routes config name are versioned references declared in the model.
+The declared immutable external secret names map to one per-key sealed member. The tracked envelopes
+are structural examples with no decryptable credentials; replace them with actual owner-sealed members
+before use. Caddy reads the tracked Caddyfile and persists certificates in its declared external volumes.
+There is no additional ingress environment key.
+- `SOPS_AGE_KEY` is the owner's sealing identity in untracked host custody, never an application runtime key
+or a value supplied to the Swarm stack.
 
-| Key                  | Semantics                                                                                      |
-| -------------------- | ---------------------------------------------------------------------------------------------- |
-| `ACME_EMAIL`         | Public operator contact for certificate renewal notices.                                       |
-
-The illustrative all-zero application image digests in the declaration and stack source must be replaced by
-verified published release digests before deployment. They are authored image references, not environment keys.
+The CLI reminder tick uses the same `PRIMARY_DB_URL` and `PRIMARY_DB_SCHEMA` reads as migrate and seed.
+The illustrative application image digests must be replaced consistently in the declaration, stack and
+public images lock before deployment; they are image references rather than environment keys.

@@ -23,6 +23,8 @@ components:
     required: true
   ingress:
     role: ingress
+    stateful: true
+    volumes: [ingress-data, ingress-config-data]
     image: caddy:2.10.2@sha256:c3d7ee5d2b11f9dc54f947f68a734c84e9c9666c92c88a7f30b9cba5da182adb
     compose: infra/swarm/stack.yaml
     purpose: The single declared ingress; certificates and persistent volumes are owner-provisioned.
@@ -35,9 +37,48 @@ environments:
     components:
       api: {replicas: 1, port: 3001}
       web: {replicas: 1, port: 3000}
-      ingress: {replicas: 1, port: 8080}
+      ingress: {replicas: 1, port: 80}
     runbook: README.md
-    secrets: []
+    ingress:
+      component: ingress
+      hosts: ["dev.{{project}}.example.invalid"]
+    dns:
+      - host: "dev.{{project}}.example.invalid"
+        owner: Development operator
+        receipt: .starcistacks/dev/infra/swarm/owner-actions.md#dns
+    tls:
+      owner: Development operator
+      receipt: .starcistacks/dev/infra/swarm/owner-actions.md#tls
+    release:
+      imagesLock: .starcistacks/dev/infra/swarm/releases/images.lock.yaml
+      pointer: .starcistacks/dev/infra/swarm/releases/current.yaml
+      previous: .starcistacks/dev/infra/swarm/releases/previous.yaml
+      healthAssertions: [API /health/live, API /health/ready, Web /health/live]
+    backup:
+      - component: ingress
+        target: Owner-provisioned encrypted off-host storage for both ingress volumes
+        retention: Seven daily snapshots
+        owner: Development operator
+        restoreProof: .starcistacks/dev/infra/swarm/recovery/restore-proof.md
+      - component: supabase
+        target: Owner-provisioned encrypted off-host storage for development database exports
+        retention: Seven daily exports
+        owner: Development operator
+        restoreProof: .starcistacks/dev/infra/swarm/recovery/restore-proof.md
+    # The .enc twins are structural examples only; replace them with real sealed members before use.
+    secrets:
+      - name: primary-db-url
+        runtimeName: "{{project}}-dev-primary-db-url-v1"
+        version: 1
+        where: secrets/primary-db-url
+        recipientPolicy: The shared master age recipient configured before sealing
+        keyCustody: SOPS_AGE_KEY in the host's untracked .claude/secret.env
+      - name: supabase-service-role-key
+        runtimeName: "{{project}}-dev-supabase-service-role-key-v1"
+        version: 1
+        where: secrets/supabase-service-role-key
+        recipientPolicy: The shared master age recipient configured before sealing
+        keyCustody: SOPS_AGE_KEY in the host's untracked .claude/secret.env
   production:
     status: supported
     runtime: docker-swarm
@@ -47,7 +88,49 @@ environments:
       web: {replicas: 1, port: 3000}
       ingress: {replicas: 1, port: 443, httpPort: 80}
     runbook: README.md
-    secrets: []
+    ingress:
+      component: ingress
+      hosts: ["{{project}}.example.invalid", "api.{{project}}.example.invalid"]
+    dns:
+      - host: "{{project}}.example.invalid"
+        owner: Production operator
+        receipt: .starcistacks/production/infra/swarm/owner-actions.md#dns
+      - host: "api.{{project}}.example.invalid"
+        owner: Production operator
+        receipt: .starcistacks/production/infra/swarm/owner-actions.md#dns
+    tls:
+      owner: Production operator
+      receipt: .starcistacks/production/infra/swarm/owner-actions.md#tls
+    release:
+      imagesLock: .starcistacks/production/infra/swarm/releases/images.lock.yaml
+      pointer: .starcistacks/production/infra/swarm/releases/current.yaml
+      previous: .starcistacks/production/infra/swarm/releases/previous.yaml
+      healthAssertions: [API /health/live, API /health/ready, Web /health/live, Signed-in GraphQL request over TLS]
+    backup:
+      - component: ingress
+        target: Owner-provisioned encrypted off-host storage for both ingress volumes
+        retention: Thirty daily snapshots
+        owner: Production operator
+        restoreProof: .starcistacks/production/infra/swarm/recovery/restore-proof.md
+      - component: supabase
+        target: Provider PITR plus owner-provisioned encrypted off-host database exports
+        retention: Seven days PITR and thirty daily exports
+        owner: Production operator
+        restoreProof: .starcistacks/production/infra/swarm/recovery/restore-proof.md
+    # The .enc twins are structural examples only; replace them with real sealed members before use.
+    secrets:
+      - name: primary-db-url
+        runtimeName: "{{project}}-production-primary-db-url-v1"
+        version: 1
+        where: secrets/primary-db-url
+        recipientPolicy: The shared master age recipient configured before sealing
+        keyCustody: SOPS_AGE_KEY in the host's untracked .claude/secret.env
+      - name: supabase-service-role-key
+        runtimeName: "{{project}}-production-supabase-service-role-key-v1"
+        version: 1
+        where: secrets/supabase-service-role-key
+        recipientPolicy: The shared master age recipient configured before sealing
+        keyCustody: SOPS_AGE_KEY in the host's untracked .claude/secret.env
 k8s:
   status: deferred
   reason: Lite production uses Docker Swarm with managed Supabase backing; Kubernetes belongs to a future full-edition deployment.
@@ -56,7 +139,14 @@ services:
     provider: sonarqube
     mode: local
     qualityGate: {{sonarGate}}
+    host: {local: http://127.0.0.1:9000}
     stack:
       owner: host
       root: .claude/ext/sonar
       environment: dev
+      compose: compose.yaml
+    auth: token
+    ci: {wiring: optional-follow-up}
+    ownerAction:
+      needed: Provision the shared host Sonar project and its analysis credential through sealed custody.
+      reason: A fresh app declares its quality service without fabricating credentials or a successful analysis.

@@ -62,6 +62,7 @@ component_management:
     - component_id: platform
       name: platform
       paths:
+        - "be/src/modules/domain/order-expiry-ticks/**"
         - "be/src/modules/integrations/identity-api/**"
         - "be/src/modules/platform/*/**"
 ignore:

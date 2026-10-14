@@ -6,7 +6,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: "3001"
-      HTTP_SECURITY_ALLOWED_ORIGINS: http://127.0.0.1:8080
+      HTTP_SECURITY_ALLOWED_ORIGINS: http://dev.{{project}}.example.invalid
       PRIMARY_DB_URL_FILE: /run/secrets/primary-db-url
       PRIMARY_DB_SCHEMA: public
       SUPABASE_URL: https://{{project}}.supabase.co
@@ -44,7 +44,7 @@ services:
       NODE_ENV: development
       PORT: "3000"
       HOSTNAME: 0.0.0.0
-      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:8080
+      NEXT_PUBLIC_SITE_URL: http://dev.{{project}}.example.invalid
     networks: [app]
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
@@ -73,7 +73,7 @@ services:
       - source: ingress-config
         target: /etc/caddy/Caddyfile
     ports:
-      - { target: 80, published: 8080, protocol: tcp, mode: ingress }
+      - { target: 80, published: 80, protocol: tcp, mode: ingress }
     volumes:
       - ingress-data:/data
       - ingress-config-data:/config
@@ -110,7 +110,7 @@ secrets:
     name: "{{project}}-dev-supabase-service-role-key-v1"
 configs:
   ingress-config:
-    file: ../../runtime/config/Caddyfile
+    file: ./Caddyfile
 volumes:
   ingress-data:
     external: true

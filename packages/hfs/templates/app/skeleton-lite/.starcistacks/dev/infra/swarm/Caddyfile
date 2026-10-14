@@ -3,7 +3,7 @@
     auto_https off
 }
 
-:80 {
+http://dev.{{project}}.example.invalid {
     handle /graphql* {
         reverse_proxy api:3001
     }

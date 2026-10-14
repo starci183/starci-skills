@@ -1,5 +1,4 @@
 # Application digests are illustrative all-zero placeholders; replace them with verified published release digests.
-# The public certificate contact remains an owner-provisioned renderer input.
 version: "3.8"
 services:
   api:
@@ -61,27 +60,18 @@ services:
       rollback_config: { parallelism: 1, order: stop-first }
       restart_policy: { condition: on-failure, delay: 5s }
   ingress:
-    image: traefik:v3.6@sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d
-    command:
-      - --providers.file.filename=/etc/traefik/routes.yml
-      - --entrypoints.web.address=:80
-      - --entrypoints.websecure.address=:443
-      - --entrypoints.web.http.redirections.entrypoint.to=websecure
-      - --entrypoints.web.http.redirections.entrypoint.scheme=https
-      - --certificatesresolvers.production.acme.email=${ACME_EMAIL:?set the public operator contact}
-      - --certificatesresolvers.production.acme.storage=/acme/acme.json
-      - --certificatesresolvers.production.acme.httpchallenge.entrypoint=web
-      - --ping=true
+    image: caddy:2.10.2@sha256:c3d7ee5d2b11f9dc54f947f68a734c84e9c9666c92c88a7f30b9cba5da182adb
     configs:
-      - { source: routes, target: /etc/traefik/routes.yml }
+      - { source: ingress-config, target: /etc/caddy/Caddyfile }
     ports:
-      - { target: 80, published: 80, protocol: tcp, mode: host }
-      - { target: 443, published: 443, protocol: tcp, mode: host }
+      - { target: 80, published: 80, protocol: tcp, mode: ingress }
+      - { target: 443, published: 443, protocol: tcp, mode: ingress }
     volumes:
-      - acme:/acme
+      - caddy-data:/data
+      - caddy-config:/config
     networks: [app]
     healthcheck:
-      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -126,21 +116,23 @@ networks:
 secrets:
   primary-db-url:
     external: true
-    name: lite-app-PRIMARY_DB_URL-v1
+    name: lite-app-primary-db-url-v1
   supabase-service-role-key:
     external: true
-    name: lite-app-SUPABASE_SERVICE_ROLE_KEY-v1
+    name: lite-app-supabase-service-role-key-v1
   calendar-webhook-secret:
     external: true
-    name: lite-app-CALENDAR_WEBHOOK_SECRET-v1
+    name: lite-app-calendar-webhook-secret-v1
 configs:
-  routes:
-    external: true
-    name: lite-app-routes-c1
+  ingress-config:
+    file: ./Caddyfile
 volumes:
-  acme:
+  caddy-data:
     external: true
-    name: lite-app-production-acme
+    name: lite-app-production-caddy-data
+  caddy-config:
+    external: true
+    name: lite-app-production-caddy-config
   n8n-data:
     external: true
     name: lite-app-production-n8n-data

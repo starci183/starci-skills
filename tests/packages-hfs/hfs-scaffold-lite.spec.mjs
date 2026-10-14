@@ -25,10 +25,19 @@ const EXPECTED_LITE_FILES = Object.freeze([
   '.dockerignore', '.editorconfig', '.gitattributes', '.github/dependabot.yml', '.github/workflows/ci.yml', '.github/workflows/db-deploy.yml',
   '.github/workflows/images.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.nvmrc', '.prettierignore',
   '.prettierrc', '.sops.yaml', '.starcistacks/application-stacks.yaml', '.starcistacks/dev/README.md',
-  '.starcistacks/dev/environment.json', '.starcistacks/dev/infra/swarm/stack.yaml', '.starcistacks/dev/runtime/config/Caddyfile',
-  '.starcistacks/dev/runtime/env/KEYS.md', '.starcistacks/dev/secrets/.gitkeep', '.starcistacks/production/README.md',
-  '.starcistacks/production/environment.json', '.starcistacks/production/infra/swarm/stack.yaml',
-  '.starcistacks/production/runtime/config/Caddyfile', '.starcistacks/production/runtime/env/KEYS.md',
+  '.starcistacks/dev/environment.json', '.starcistacks/dev/infra/swarm/Caddyfile', '.starcistacks/dev/infra/swarm/owner-actions.md',
+  '.starcistacks/dev/infra/swarm/recovery/restore-proof.md', '.starcistacks/dev/infra/swarm/releases/current.yaml',
+  '.starcistacks/dev/infra/swarm/releases/images.lock.yaml', '.starcistacks/dev/infra/swarm/releases/previous.yaml',
+  '.starcistacks/dev/infra/swarm/stack.yaml',
+  '.starcistacks/dev/runtime/env/KEYS.md', '.starcistacks/dev/secrets/.gitkeep',
+  '.starcistacks/dev/secrets/primary-db-url.enc', '.starcistacks/dev/secrets/supabase-service-role-key.enc',
+  '.starcistacks/production/README.md',
+  '.starcistacks/production/environment.json', '.starcistacks/production/infra/swarm/Caddyfile',
+  '.starcistacks/production/infra/swarm/owner-actions.md', '.starcistacks/production/infra/swarm/recovery/restore-proof.md',
+  '.starcistacks/production/infra/swarm/releases/current.yaml', '.starcistacks/production/infra/swarm/releases/images.lock.yaml',
+  '.starcistacks/production/infra/swarm/releases/previous.yaml', '.starcistacks/production/infra/swarm/stack.yaml',
+  '.starcistacks/production/runtime/env/KEYS.md', '.starcistacks/production/secrets/primary-db-url.enc',
+  '.starcistacks/production/secrets/supabase-service-role-key.enc',
   '.starciwork/.gitignore', '.starciwork/brand/index.yaml', '.starciwork/workspace.yaml',
   'README.md',
   'be/apps/api/Dockerfile', 'be/apps/api/src/api.env.ts', 'be/apps/api/src/api.options.ts', 'be/apps/api/src/app.module.ts',
@@ -176,16 +185,48 @@ const scaffoldLite = into => scaffoldApp({
   now: () => CREATED_AT,
 });
 
-test('lite scaffold emits its workspace and required stack declarations and is structurally clean', async (t) => {
-  const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-lite-'));
-  t.after(() => fs.rmSync(into, { recursive: true, force: true }));
-  const { root, files } = scaffoldLite(into);
-  assert.deepEqual(files, EXPECTED_LITE_FILES);
-  const stacks = parseYaml(fs.readFileSync(path.join(root, '.starcistacks/application-stacks.yaml'), 'utf8'));
+function assertPublicRelease(root, environment, spec) {
+  const directory = `.starcistacks/${environment}/infra/swarm/releases`;
+  assert.equal(spec.release.imagesLock, `${directory}/images.lock.yaml`);
+  assert.equal(spec.release.pointer, `${directory}/current.yaml`);
+  assert.equal(spec.release.previous, `${directory}/previous.yaml`);
+  assert.ok(spec.release.healthAssertions.length > 0);
+  for (const file of [spec.release.imagesLock, spec.release.pointer, spec.release.previous]) {
+    assert.ok(fs.statSync(path.join(root, file)).size > 0, `${file} is a populated public release record`);
+  }
+}
+
+function assertStackRecovery(root, environment, spec) {
+  assert.deepEqual(spec.backup.map(record => record.component).sort((a, b) => a.localeCompare(b)), ['ingress', 'supabase']);
+  for (const record of spec.backup) {
+    for (const key of ['target', 'retention', 'owner']) assert.ok(record[key]?.trim(), `${record.component} declares ${key}`);
+    assert.equal(record.restoreProof, `.starcistacks/${environment}/infra/swarm/recovery/restore-proof.md`);
+    assert.ok(fs.statSync(path.join(root, record.restoreProof)).size > 0);
+  }
+}
+
+function assertSwarmBindings(root, environment, spec) {
+  const file = path.join(root, '.starcistacks', environment, 'infra/swarm/stack.yaml');
+  const model = parseYaml(fs.readFileSync(file, 'utf8'));
+  assert.equal(spec.ingress.component, 'ingress');
+  assert.deepEqual(Object.entries(model.services).filter(([, service]) => service.ports?.length).map(([id]) => id), ['ingress']);
+  for (const port of model.services.ingress.ports) {
+    assert.equal(port.mode, 'ingress');
+    assert.ok([80, 443].includes(port.published));
+  }
+  assert.deepEqual(spec.secrets.map(secret => secret.name).sort((a, b) => a.localeCompare(b)), ['primary-db-url', 'supabase-service-role-key']);
+  for (const secret of spec.secrets) {
+    assert.equal(secret.runtimeName, `demo-${environment}-${secret.name}-v1`);
+    assert.equal(secret.version, 1);
+    assert.deepEqual(model.secrets[secret.name], { external: true, name: secret.runtimeName });
+  }
+}
+
+function assertLiteStacks(root, stacks) {
   assert.deepEqual(stacks.backing, { supabase: { provider: 'supabase', managed: true } });
   assert.equal(stacks.services.sonar.provider, 'sonarqube');
   assert.equal(stacks.services.sonar.mode, 'local');
-  assert.deepEqual(stacks.services.sonar.stack, { owner: 'host', root: '.claude/ext/sonar', environment: 'dev' });
+  assert.deepEqual(stacks.services.sonar.stack, { owner: 'host', root: '.claude/ext/sonar', environment: 'dev', compose: 'compose.yaml' });
   assert.deepEqual(Object.keys(stacks.components), ['api', 'web', 'ingress']);
   assert.equal(stacks.components.ingress.role, 'ingress');
   for (const environment of ['dev', 'production']) {
@@ -195,9 +236,21 @@ test('lite scaffold emits its workspace and required stack declarations and is s
     assert.equal(spec.runbook, 'README.md');
     assert.deepEqual(Object.keys(spec.components), ['api', 'web', 'ingress']);
     const directory = path.join(root, '.starcistacks', environment);
-    assert.ok(fs.existsSync(path.join(directory, 'runtime/config/Caddyfile')));
+    assert.ok(fs.existsSync(path.join(directory, 'infra/swarm/Caddyfile')));
     assert.ok(fs.existsSync(path.join(directory, 'runtime/env/KEYS.md')));
+    assertPublicRelease(root, environment, spec);
+    assertStackRecovery(root, environment, spec);
+    assertSwarmBindings(root, environment, spec);
   }
+}
+
+test('lite scaffold emits its workspace and required stack declarations and is structurally clean', async (t) => {
+  const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-lite-'));
+  t.after(() => fs.rmSync(into, { recursive: true, force: true }));
+  const { root, files } = scaffoldLite(into);
+  assert.deepEqual(files, EXPECTED_LITE_FILES);
+  const stacks = parseYaml(fs.readFileSync(path.join(root, '.starcistacks/application-stacks.yaml'), 'utf8'));
+  assertLiteStacks(root, stacks);
   const entry = fs.readFileSync(path.join(root, 'be/apps/api/src/main.ts'), 'utf8');
   const env = fs.readFileSync(path.join(root, 'be/apps/api/src/api.env.ts'), 'utf8');
   assert.match(entry, /readApiEnv\(env\)/);
