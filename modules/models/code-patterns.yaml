@@ -654,7 +654,7 @@ profiles:
         sourceRuleIds: [BE-WEBHOOK-2]
         applicability: { include: ['src/**/*.ts', 'apps/**/*.ts'], exclude: ['**/*.d.ts'] }
         mechanical:
-          requirement: A provider webhook door is one signed controller that proves the delivery with the WebhookSignatureService as its first statement, injects only that service and domain services, and makes exactly one domain intake call.
+          requirement: A provider webhook door is one signed controller whose first statement is an unconditional verification call to WebhookSignatureService.verify or a domain verifier, awaited when async; it injects only the signature service and domain services, accesses no data before proof, and makes exactly one domain intake call, which may be combined with domain verification.
           check:
             kind: eslint
             sourceOnly: true
@@ -662,7 +662,7 @@ profiles:
             expected: { severity: error }
         semantic:
           guidance: knowledge/patterns/be/webhooks.yaml
-          review: Review that the raw body, not a re-serialized one, is verified and that the replay window matches the provider's tolerance.
+          review: Review that the raw body, not a re-serialized one, is verified, that the replay window matches the provider's tolerance, and that a domain verifier completes proof with the correct connection secret before intake or business data access.
         status: implemented
       - id: NEST-WEBHOOK-OBSERVATION
         sourceRuleIds: [BE-WEBHOOK-1, BE-WEBHOOK-3, BE-WEBHOOK-4]

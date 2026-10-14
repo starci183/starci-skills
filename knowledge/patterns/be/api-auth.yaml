@@ -102,7 +102,9 @@ rules:
     requirement: |-
       `platform/http-security` owns the origin and referer allowlist guard that every state-changing request passes; only
       `SignedWebhook` is exempt. A webhook (webhooks.yaml) is `@Public({ reason: PublicReason.SignedWebhook })` and verifies its signature and
-      replay window with `verify` of the `WebhookSignatureService` of `platform/http-security`, as its first statement. Every comparison of a secret, signature or
+      replay window as its first unconditional call, awaited when async, through `WebhookSignatureService.verify` of
+      `platform/http-security` or a domain verifier that owns per-connection secrets. The door accesses no data before proof;
+      a domain method may verify and then perform intake in the same call. Every comparison of a secret, signature or
       token uses `timingSafeEqual` on equal-length buffers; a secret is never compared with `===`.
     rationale: |-
       A public door is only safe when the request proves its origin, and a variable-time comparison leaks the secret.

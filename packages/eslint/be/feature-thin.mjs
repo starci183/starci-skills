@@ -14,15 +14,17 @@
  * the file-name suffix the closed role vocabulary defines - never a path regex. What a receiver is comes
  * from its TYPE (`Logger` of `platform/logging`, `WebhookSignatureService` of `platform/http-security`) and
  * from whether the member is injected (`injectedMembers`); what a free function is comes from the file its
- * import resolves to. A job `step` records its fence through `JobClaims` (`advance`, `runKey`) and a webhook proves its signature through `verify`: those gate calls
- * are free, the one effect each makes is the delegating call. `.spec.ts` and `.d.ts` are never judged, and neither is a file whose tier is not
+ * import resolves to. A job `step` records its fence through `JobClaims` (`advance`, `runKey`), and a webhook proves its signature through the shared `verify`
+ * or a declared domain verifier as its first call: a separate gate call is free beside the one intake delegation.
+ * A combined domain proof and intake counts as the delegation. `.spec.ts` and `.d.ts` are never judged, and neither is a file whose tier is not
  * `feature` or whose role is not a thin role. A clean thin file is never flagged: that is the bar.
  */
 import { keyName, walk } from "./lib/ast.mjs"
-import { aliasTarget, injectedMembers } from "./lib/doors.mjs"
+import { aliasTarget, callsOf, decoratorsFrom, injectedMembers } from "./lib/doors.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { importOf } from "./lib/import-source.mjs"
 import { baseName, isLoggerType, isOwnedType } from "./lib/ports.mjs"
+import { firstWebhookVerification, isWebhookDomainServiceType } from "./lib/webhook-verifiers.mjs"
 
 /** The statements and expressions that are a decision, a repetition or an exit: none lives in a thin file. */
 const BRANCH_NODES = new Set(["IfStatement", "SwitchStatement", "ConditionalExpression", "ForStatement", "ForInStatement", "ForOfStatement", "WhileStatement", "DoWhileStatement", "TryStatement", "ThrowStatement", "LogicalExpression"])
@@ -210,10 +212,14 @@ export const featureThin = {
             for (const root of rootFunctionsOf(program)) {
                 const body = root.type === "MethodDefinition" ? root.value?.body : root.body
                 if (!body) continue
+                const proof = role === "webhook" && hfs.slotOf(context.filename) === "be.feature.webhooks.http" && root.type === "MethodDefinition" && decoratorsFrom(context, root, "@nestjs/common", "Post").length > 0
+                    ? firstWebhookVerification(context, hfs, root) : null
+                const separateDomainProof = proof !== null && callsOf(root).filter(({ receiver }) => receiver !== null && isWebhookDomainServiceType(context, hfs, receiver)).length > 1
                 let delegating = 0
                 walk(body, (node) => {
                     if (node.type !== "CallExpression") return
-                    const kind = classify(node)
+                    const classified = classify(node)
+                    const kind = separateDomainProof && node === proof && classified === "delegating" ? "free" : classified
                     if (kind === "call") context.report({ node, messageId: "call", data: { what: sourceCode.getText(node.callee), webhook: role === "webhook" ? ", plus `verify` of the signature service" : "" } })
                     else if (kind === "delegating") {
                         delegating += 1
