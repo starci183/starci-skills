@@ -1,35 +1,15 @@
 import { NestFactory } from "@nestjs/core"
 import { SystemClockService } from "@modules/platform/clock"
-import { EnvSource, parseServerConfig } from "@modules/platform/config"
-import { parsePrimaryDatabaseConfig } from "@modules/platform/database"
-import {
-    parseHttpSecurityConfig,
-    parseWebhookProviderConfig,
-    RequestValidationService,
-} from "@modules/platform/http-security"
+import { EnvSource } from "@modules/platform/config"
+import { RequestValidationService } from "@modules/platform/http-security"
 import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
-import { parseJobsConfig } from "@modules/platform/jobs"
-import { parseQueueConfig } from "@modules/platform/queue"
-import { parseSupabaseConfig } from "@modules/integrations/supabase"
 import { AppModule } from "./app.module"
-import type { ApiOptions } from "./api.options"
+import { readApiEnv } from "./api.env"
 
 /** Reads the environment once, composes the API from parsed options and serves until a shutdown signal. */
 const bootstrap = async (): Promise<void> => {
     const env = EnvSource.fromProcess()
-    const options: ApiOptions = {
-        server: parseServerConfig(env),
-        httpSecurity: {
-            ...parseHttpSecurityConfig(env),
-            webhooks: {
-                calendar: parseWebhookProviderConfig(env, "CALENDAR"),
-            },
-        },
-        database: parsePrimaryDatabaseConfig(env),
-        supabase: parseSupabaseConfig(env),
-        queue: parseQueueConfig(env),
-        jobs: parseJobsConfig(env),
-    }
+    const options = readApiEnv(env)
     const app = await NestFactory.create(AppModule.register(options), { rawBody: true })
     app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
     app.enableShutdownHooks()

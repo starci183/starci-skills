@@ -149,8 +149,10 @@ rules:
     kind: mandatory
     hfsRules: [R40, R43, R89, R90]
     requirement: |-
-      Source exports are named; the only default export is a Jest `*.global-setup.ts` entry. Raw environment access belongs to
-      `platform/config`; all other source receives typed options. A raw infrastructure library is imported only by its owner
+      Source exports are named; the only default export is a Jest `*.global-setup.ts` entry. `platform/config` owns `EnvSource`;
+      only `apps/<app>/src/main.ts` and its matching `<app>.env.ts` may read the app's `process.env` or `EnvSource`. They use
+      the typed `read<App>Env` reader; compose groups and `<app>.options.ts` receive values and never read the environment.
+      All other source receives typed options. A raw infrastructure library is imported only by its owner
       (infra.yaml). No `console.*` and no Nest `Logger` in source; use the `Logger` port of `platform/logging`.
     rationale: |-
       One reader of the environment and one logger port keep configuration and diagnostics in one place.
@@ -160,7 +162,7 @@ rules:
         write: Named exports everywhere; only be/src/tests/world/global-setup.ts and global-teardown.ts default-export the Jest API.
       - id: case-2
         when: process.env
-        write: Only platform/config reads it; a capability config parses the values that EnvSource passes.
+        write: 'Allowed in the EnvSource owner and the app bootstrap roles main.ts and <app>.env.ts; use EnvSource.fromProcess() and read<App>Env so secrets use env.secret with <NAME>_FILE first. Compose groups and <app>.options.ts never read it.'
       - id: case-3
         when: console.* or the Nest Logger
         write: Use `this.logger.info(PurchaseLogEvent.CheckoutOpened, { purchaseId })` on the injected Logger port.

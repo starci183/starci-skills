@@ -167,9 +167,14 @@ test('lite scaffold emits the brand-only Work tree and is structurally clean', a
   assert.deepEqual(files, EXPECTED_LITE_FILES);
   const entry = fs.readFileSync(path.join(root, 'be/apps/api/src/main.ts'), 'utf8');
   const env = fs.readFileSync(path.join(root, 'be/apps/api/src/api.env.ts'), 'utf8');
-  assert.match(entry, /parseApiEnv\(env\)/);
+  assert.match(entry, /readApiEnv\(env\)/);
+  assert.equal((entry.match(/EnvSource\.fromProcess\(\)/g) ?? []).length, 1);
+  assert.ok(entry.trimEnd().split('\n').length <= 80, 'the API bootstrap stays within its 80-line budget');
   assert.doesNotMatch(entry, /parse(?:Server|HttpSecurity|PrimaryDatabase|Supabase)Config/);
-  assert.match(env, /parseApiEnv = \(env: EnvSource\): ApiOptions/);
+  assert.match(env, /export interface ApiEnv extends ApiOptions/);
+  assert.match(env, /export const readApiEnv = \(env: EnvSource\): ApiEnv/);
+  assert.ok(env.trimEnd().split('\n').length <= 150, 'the API env reader stays within its 150-line budget');
+  assert.doesNotMatch(env, /parseApiEnv|localhost|127\.0\.0\.1|process\.env/);
   assert.doesNotMatch(env, /from "@features\/|\b\w+Module\b|\.(?:register|forRoot)\(/);
   assert.equal(fs.existsSync(path.join(root, '.starciwork')), false, 'the starter has no brand records, so no Work tree is required');
   const declaration = JSON.parse(fs.readFileSync(path.join(root, 'hfs.json'), 'utf8'));

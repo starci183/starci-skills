@@ -29,7 +29,7 @@ test("every rule this law declares is exported as a rule", () => {
 test("<app>.env.ts parses env and <app>.options.ts binds ports, never a module, queue or scheduler list", () => {
     tester.run("app-options-composition-free", appOptionsCompositionFree, {
         valid: [
-            { filename: ENV, code: "export const parse = (env: { int(key: string): number }) => ({ port: env.int(\"PORT\"), origins: [\"https://a.example\"] })" },
+            { filename: ENV, code: "export interface ApiEnv { readonly port: number }\nexport const readApiEnv = (env: { int(key: string): number }): ApiEnv => ({ port: env.int(\"PORT\") })" },
             { filename: OPTIONS, code: "export interface ApiOptions { readonly port: number }" },
             // a port binding is a provider map: the port names its adapter
             { filename: OPTIONS, code: "class ApprovalGateAdapter {}\nexport const PORTS = { approvalGate: ApprovalGateAdapter }" },

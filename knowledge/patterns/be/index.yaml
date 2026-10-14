@@ -117,7 +117,7 @@ topics:
   - id: be.config
     title: Configuration and secrets
     path: config.yaml
-    decides: One environment reader, typed readers, config per capability with Inject<Cap>Options, no default secrets or addresses, all-or-nothing optional integrations, sealed secrets
+    decides: EnvSource, app-level typed <App>Env and read<App>Env in <app>.env.ts, unchanged config per capability with Inject<Cap>Options, no default secrets or addresses, all-or-nothing optional integrations, _FILE-first sealed secrets
     rules: BE-CONFIG-1 … BE-CONFIG-4
   - id: be.logging
     title: Logging

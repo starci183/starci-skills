@@ -33,8 +33,10 @@ versioning:
 # providers, be.assets and the migration archive.
 # 3.1.0 is a minor (owner ruling 2026-10-14, R245 and R246): every be.app.* slot allows `<app>.env.ts` and the composition groups
 # `compose/<area>.ts` and budgets its app files (`app.module.ts` 250, `<app>.options.ts` 200, `<app>.env.ts` 150,
-# `compose/<area>.ts` 120, `main.ts` 80); `<app>.env.ts` holds typed, fail-fast env parsing only, and `<app>.options.ts` holds
-# env-derived options and port bindings only, with no parsing (BE_APP_OPTIONS_COMPOSITION).
+# `compose/<area>.ts` 120, `main.ts` 80); `<app>.env.ts` exports interface <App>Env and read<App>Env(env: EnvSource): <App>Env
+# for fail-fast env parsing only, and `<app>.options.ts` holds env-derived options and port bindings only, with no parsing
+# or environment reads (BE_APP_OPTIONS_COMPOSITION). Secrets use EnvSource.secret(): <NAME>_FILE first, plain <NAME> only
+# when the file key is absent; .starcistacks owns custody. Capability <capability>.config.ts roles stay unchanged.
 
 # Field meaning, per slot.
 #   id          stable name, never changes meaning inside a major.
@@ -993,14 +995,19 @@ slots:
   # ----- BE: apps (one slot per app kind; a new kind = a new slot, minor bump) ---------------------------
   # The files of every app (owner ruling 2026-10-14, R245 and R246, since 3.1.0), each with a line budget that
   # BE_APP_COMPOSITION_BUDGET holds absolutely (not a ratchet):
-  #   main.ts            the entry: builds EnvSource once, parses inline or imports <app>.env.ts, builds the options and boots.
-  #   <app>.env.ts       typed, fail-fast environment parsing only, via EnvSource and capability parse helpers; no logic,
-  #                      module composition, business code or feature imports. Only main.ts and this app file may read env.
+  #   main.ts            the entry: builds EnvSource once, imports and calls read<App>Env from <app>.env.ts, builds options and boots.
+  #   <app>.env.ts       exports interface <App>Env and read<App>Env(env: EnvSource): <App>Env (for example ApiEnv/readApiEnv);
+  #                      fail-fast environment parsing only, via EnvSource and unchanged capability parse helpers; no localhost
+  #                      or default host fallback, logic, module composition, business code or feature imports. Only main.ts
+  #                      and this app file may read process.env or EnvSource. The interface may extend the options type;
+  #                      the role name stays <app>.env.ts, never env.ts. Secrets use EnvSource.secret(): <NAME>_FILE first
+  #                      for .starcistacks custody, plain <NAME> only when the file key is absent. A declared file supplies
+  #                      exact contents; an empty or unreadable path stops boot without fallback.
   #   <app>.options.ts   the options: env-derived options plus port bindings (provider maps such as { approvalGate: X }) only;
-  #                      no environment parsing; module, queue or scheduler composition here or in <app>.env.ts is
+  #                      no environment parsing or process.env/EnvSource reads; module, queue or scheduler composition here or in <app>.env.ts is
   #                      BE_APP_OPTIONS_COMPOSITION.
   #   compose/<area>.ts  a composition group: exports the module list of one area (an imports array, and the providers of the
-  #                      area's global ports when it has any); composition only, no business logic and no environment read.
+  #                      area's global ports when it has any); composition only, no business logic or process.env/EnvSource read.
   #   app.module.ts      the composition root: imports the groups and spreads them, binds the app-wide guards and filter.
   - id: be.app.api
     profiles: [be]
@@ -1035,7 +1042,7 @@ slots:
     profiles: [be]
     # The ONE app of every one-off action (migrate, seed, sync, backup, any operator command): be/apps/cli, on nest-commander.
     # main.ts boots with CommandFactory.run (BE_CLI_BOOTSTRAP); app.module.ts composes the platform and the cli feature root
-    # (src/features/cli/cli.module.ts); cli.env.ts can parse its environment, and cli.options.ts carries the env-derived values,
+    # (src/features/cli/cli.module.ts); cli.env.ts exports CliEnv and readCliEnv(env: EnvSource): CliEnv, and cli.options.ts carries the env-derived values,
     # the connections it migrates among them (the test world migrates through the same list). It is required as soon as the
     # back end declares a connection or tracks a command, with its image apps/cli/Dockerfile (BE_CLI_REQUIRED): one image,
     # run as `cli <group> <command>`.

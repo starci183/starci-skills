@@ -140,7 +140,7 @@ function enableLiteCliDatabase(root) {
 }
 
 /**
- * Creates the optional lite cli app and its Supabase migrate/seed groups on first `add cli`.
+ * Creates the optional lite cli app, its typed CliEnv/readCliEnv boundary and Supabase migrate/seed groups on first `add cli`.
  * Existing cli trees are never repaired or overwritten: drift remains a check finding.
  */
 export function ensureLiteCli({ root, manifest, repo }) {

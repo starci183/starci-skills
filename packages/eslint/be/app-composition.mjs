@@ -9,6 +9,8 @@
  *     (a `*SchedulerOf(...)`, `*Scheduler(...)` or `*Queue(...)` call), a spread of such a list, and an `imports`, `modules`,
  *     `schedulers` or `processors` array are refused. Those lists are composition: they live in `compose/<area>.ts`, one
  *     group per area, which `app.module.ts` spreads. The env role also refuses registration and scheduler calls outside arrays.
+ *     `config-owner.mjs` keeps process environment access and owned `EnvSource` reads in `main.ts` or the matching env role;
+ *     options files and composition groups receive the typed result of `read<App>Env(env: EnvSource)`.
  *   - `app-file-budget` (`BE_APP_COMPOSITION_BUDGET`) holds each composition file to the line budget its app slot names
  *     (`budget` of the slot, keyed by the same entry: `app.module.ts` 250, `<app>.env.ts` 150, `<app>.options.ts` 200, `compose/<area>.ts` 120,
  *     `main.ts` 80). The budget is absolute, not a ratchet: an app root that outgrows it moves an area into a new group.

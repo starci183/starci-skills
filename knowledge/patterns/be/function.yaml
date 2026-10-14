@@ -195,7 +195,8 @@ rules:
     hfsRules: [R43, R45, R85]
     requirement: |-
       A capability module is a `ConfigurableModuleBuilder<Options>` module whose only registration method is
-      `register(options)` and registered once per app root as its capability's representative; a feature module is static. Options come from `parse<C>Config` in `main.ts` or `<app>.env.ts` and are read with
+      `register(options)` and registered once per app root as its capability's representative; a feature module is static.
+      Options come from unchanged `parse<C>Config` helpers called by `read<App>Env` in `<app>.env.ts` and are read with
       `Inject<C>Options()`; a factory never calls an environment reader. Secret custody stays outside source literals. A dynamic
       option never substitutes for provider identity or lifetime design.
     rationale: |-
@@ -204,7 +205,7 @@ rules:
     cases:
       - id: case-1
         when: A configured capability
-        write: 'PurchaseModule.register({ isGlobal: true, ...options.purchase }) from app.module.ts or its compose/<area>.ts group, where options.purchase is the output of parsePurchaseConfig(env) computed once in main.ts or <app>.env.ts.'
+        write: 'PurchaseModule.register({ isGlobal: true, ...options.purchase }) from app.module.ts or its compose/<area>.ts group, where options.purchase is the output of parsePurchaseConfig(env) computed once by read<App>Env in <app>.env.ts; main.ts builds EnvSource and calls that reader.'
     verification:
       automated:
         - BE_CONFIG_OWNER

@@ -423,7 +423,7 @@ rules:
       - {kind: eslint-be, id: auth-door-strict-rate-tier}
   - id: R43
     code: "BE_CONFIG_OWNER"
-    law: "Only `platform/config` reads `process.env`; config per capability."
+    law: "Only the `EnvSource` declaration of `platform/config`, app `main.ts`, the matching `<app>.env.ts` and the test world read `process.env`; app environment reads through `EnvSource` and capability config helpers live in `main.ts` or the matching `<app>.env.ts`; options files and composition groups receive typed options."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_CONFIG_OWNER"]

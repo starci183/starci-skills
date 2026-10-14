@@ -5,19 +5,14 @@ import { invoiceEntities, invoiceMigrations } from "@modules/domain/invoice"
 import { loyaltyEntities, loyaltyMigrations } from "@modules/domain/loyalty"
 import { orderEntities, orderMigrations } from "@modules/domain/order"
 import { paymentEntities, paymentMigrations } from "@modules/domain/payment"
-import type { EnvSource } from "@modules/platform/config"
-import {
-    parseBillingDatabaseConfig,
-    parseIdentityDatabaseConfig,
-    parseOrderDatabaseConfig,
-} from "@modules/platform/database"
-import type { DatabaseConnectionOptions } from "@modules/platform/database"
+import type { DatabaseConnectionConfig, DatabaseConnectionOptions } from "@modules/platform/database"
 import { eventBusEntities, eventBusMigrations } from "@modules/platform/event-bus"
 import { inboxEntities, inboxMigrations } from "@modules/platform/inbox"
 import { jobsEntities, jobsMigrations } from "@modules/platform/jobs"
 import { queueEntities, queueMigrations } from "@modules/platform/queue"
 import { sagaEntities, sagaMigrations } from "@modules/platform/saga"
 import { orderSummaryEntities, orderSummaryMigrations } from "@modules/projections/order-summary"
+import type { CliEnv } from "./cli.env"
 
 /** Everything the cli app needs from its environment: every connection with the entities and migrations of its owners. */
 export interface CliAppOptions {
@@ -26,15 +21,15 @@ export interface CliAppOptions {
 }
 
 /** The identity database: the accounts of the identity service. */
-export const identityConnectionOf = (env: EnvSource): DatabaseConnectionOptions => ({
-    ...parseIdentityDatabaseConfig(env),
+export const identityConnectionOf = (identity: DatabaseConnectionConfig): DatabaseConnectionOptions => ({
+    ...identity,
     entities: accountEntities,
     migrations: accountMigrations,
 })
 
 /** The order database: the catalog, the carts, the orders, loyalty, the order-summary projection and its inbox, the place-order saga, the order outbox, the queue outbox and the job table. */
-export const orderConnectionOf = (env: EnvSource): DatabaseConnectionOptions => ({
-    ...parseOrderDatabaseConfig(env),
+export const orderConnectionOf = (order: DatabaseConnectionConfig): DatabaseConnectionOptions => ({
+    ...order,
     entities: [
         ...catalogEntities,
         ...cartEntities,
@@ -62,13 +57,13 @@ export const orderConnectionOf = (env: EnvSource): DatabaseConnectionOptions => 
 })
 
 /** The billing database: the invoices, the payments, the billing inbox and the billing outbox. */
-export const billingConnectionOf = (env: EnvSource): DatabaseConnectionOptions => ({
-    ...parseBillingDatabaseConfig(env),
+export const billingConnectionOf = (billing: DatabaseConnectionConfig): DatabaseConnectionOptions => ({
+    ...billing,
     entities: [...invoiceEntities, ...paymentEntities, ...inboxEntities, ...eventBusEntities],
     migrations: [...invoiceMigrations, ...paymentMigrations, ...inboxMigrations, ...eventBusMigrations],
 })
 
-/** Parses the cli options from the environment: one entry per connection, each built by its own function above. */
-export const parseCliAppOptions = (env: EnvSource): CliAppOptions => ({
-    connections: [identityConnectionOf(env), orderConnectionOf(env), billingConnectionOf(env)],
+/** Binds each parsed database configuration to its owners' entities and migrations. */
+export const createCliAppOptions = (databases: CliEnv): CliAppOptions => ({
+    connections: [identityConnectionOf(databases.identity), orderConnectionOf(databases.order), billingConnectionOf(databases.billing)],
 })

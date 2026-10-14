@@ -3,8 +3,8 @@ id: be.config
 title: Backend configuration and secrets
 purpose: |-
   Given a value a backend needs from its environment, who reads it, who parses it and how does it reach the code that
-  uses it? One reader, one typed parse per capability in `main.ts` or `<app>.env.ts`, options through the `Inject<Cap>Options()` injector, and
-  no default for a secret, a credential or an address.
+  uses it? One `EnvSource`, a typed `<App>Env` interface and `read<App>Env` reader in `<app>.env.ts`, one typed parse per
+  capability, options through the `Inject<Cap>Options()` injector, and no default for a secret, a credential or an address.
 appliesTo:
   - backend
 family: be
@@ -30,14 +30,20 @@ rules:
     kind: mandatory
     hfsRules: [R43, R26, R90]
     requirement: |-
-      `platform/config` owns `EnvSource`, the only code that touches `process.env`. When `<KEY>_FILE` is declared, its exact
-      file contents take priority over `<KEY>`; an empty or unreadable path stops boot, without falling back or trimming
-      the contents. Otherwise it reads `<KEY>`. It offers the typed readers `env.string`, `env.int`, `env.bool`, `env.url`, `env.secret`, `env.enum`, `env.duration`,
-      `optional(...)` and `anyDeclared(keys)`. `be/apps/<app>/src/main.ts` builds `EnvSource` once and calls the capability
-      parsers inline or through `<app>.env.ts` (at most 150 lines), which holds typed, fail-fast parsing only: no logic, module
-      composition, business code or feature imports. These are the only app files that may read the environment.
+      `platform/config` owns `EnvSource`, the standard reader of `process.env`. Secrets use `env.secret("<NAME>")`:
+      `EnvSource.fromProcess()` resolves `<NAME>_FILE` first for the `.starcistacks` custody; its exact file contents take
+      priority over `<NAME>`, and an empty or unreadable path stops boot without falling back or trimming the contents.
+      When `<NAME>_FILE` is absent, it reads plain `<NAME>`. It offers the typed readers `env.string`, `env.int`, `env.bool`,
+      `env.url`, `env.secret`, `env.enum`, `env.duration`, `optional(...)` and `anyDeclared(keys)`.
+      `be/apps/<app>/src/<app>.env.ts` exports an explicit typed `<App>Env` interface and
+      `read<App>Env(env: EnvSource): <App>Env` (for example `ApiEnv` and `readApiEnv`); the interface may extend the app's
+      options type. The file stays at most 150 lines and holds fail-fast environment parsing only, through the typed
+      readers and capability parse helpers, with no localhost or default host fallback, logic, module composition,
+      business code or feature imports. The role name stays `<app>.env.ts`, never `env.ts`.
+      `main.ts` (at most 80 lines) builds `EnvSource` once, imports and calls the reader, then builds `AppOptions` and boots.
+      These are the only app files that may read `process.env` or `EnvSource`; scaffolds and examples use the reader above.
       `<app>.options.ts` holds env-derived values and port bindings, with no parsing; `main.ts` builds `AppOptions` from them.
-      A module factory and `compose/<area>.ts` never read the environment. `envConfig()`, `ConfigService`,
+      A module factory, `compose/<area>.ts` and `<app>.options.ts` never read `process.env` or `EnvSource`. `envConfig()`, `ConfigService`,
       `@nestjs/config`, dotenv or preload files and module-level config reads do not exist, and `platform/config` imports no
       domain or integration type.
     rationale: |-
@@ -45,10 +51,10 @@ rules:
     cases:
       - id: case-1
         when: Bootstrap
-        write: 'const env = EnvSource.fromProcess(); const options: AppOptions = { purchase: parsePurchaseConfig(env), identity: parseIdentityConfig(env) }; const app = await NestFactory.create(AppModule.register(options))'
+        write: 'const env = EnvSource.fromProcess(); const options = createApiAppOptions(readApiEnv(env)); const app = await NestFactory.create(AppModule.register(options))'
       - id: case-2
-        when: Capability parsing makes main.ts exceed its 80-line budget
-        write: 'api.env.ts exports parseApiEnv(env: EnvSource) with a typed result built only from capability parse helpers; main.ts calls it once, builds AppOptions from the parsed values and port bindings, and boots.'
+        when: An api app needs environment values
+        write: 'api.env.ts exports interface ApiEnv and readApiEnv(env: EnvSource): ApiEnv built only from typed readers and capability parse helpers; main.ts calls it once, builds AppOptions from the parsed values and port bindings, and boots within 80 lines.'
     verification:
       automated:
         - BE_CONFIG_OWNER
@@ -65,7 +71,8 @@ rules:
     requirement: |-
       Each capability or provider that needs configuration has `<c>.config.ts` exporting
       `parse<C>Config(env: EnvSource): <C>Options` (or `<C>Options | null` for an optional integration) built from the typed
-      readers, and `<c>.options.ts` exporting the options type. The module receives its options through `register()` and
+      readers, and `<c>.options.ts` exporting the options type. These capability roles and parser names stay unchanged;
+      the app's `read<App>Env` calls their parsers. The module receives its options through `register()` and
       the classes read them with `Inject<C>Options()` from `<c>.decorators.ts`. There is no central config file that knows
       every provider, and no second config path. There is no schema library: the typed readers are the one parser and they
       already name the missing key.
@@ -94,7 +101,8 @@ rules:
     hfsRules: [R44, R43]
     requirement: |-
       A secret, credential, token, key, host, URL, port of a remote, bucket or database name has no default of any kind (no
-      `""`, no `"localhost"`, no `"127.0.0.1"`, no `?? "http://..."`). Secrets are typed `Secret` by `env.secret`. Tunables
+      `""`, no `"localhost"`, no `"127.0.0.1"`, no `?? "http://..."`). Secrets are typed `Secret` by `env.secret`, using
+      `<NAME>_FILE` first and plain `<NAME>` only when the file key is absent. Tunables
       (timeouts, concurrency, TTLs, page sizes) may have literal defaults inside `<c>.config.ts` only. An optional integration
       is all-or-nothing: none of its keys set gives `null` and the app composes the capability's disabled variant (or does
       not compose it); some set stops boot with an error that names the missing keys, never the values. Local values live in

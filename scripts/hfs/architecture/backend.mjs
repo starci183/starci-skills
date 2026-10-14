@@ -2,6 +2,7 @@ import path from 'node:path';
 import { isInside } from './config.mjs';
 import { allowsFile, slotAdmitsFile } from '../allows.mjs';
 import { reachableViolation, relativePath } from './typescript.mjs';
+import { checkApplicationEnvironment } from './backend-app-files.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 
@@ -424,6 +425,7 @@ function checkBackendSource(config, context, sourceFiles, roots, sourceFile, vio
   if (app) {
     checkApplicationComposition(config, context.ts, sourceFile, fileName, app, violations);
     checkApplicationEnvEdges(config, context, fileName, violations);
+    checkApplicationEnvironment(config, context, sourceFile, fileName, violations);
   }
   if (!fromModules && !fromFeatures) return;
   if (fromApplication) checkApplicationTransport(config, context, sourceFile, fileName, violations);

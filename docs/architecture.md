@@ -273,11 +273,18 @@ machinery that owns nothing (a presentational twin, a forwarding service, a comm
 sake).
 
 The **back end** instantiates it in Nest/TypeScript: apps compose processes (the `be.app.*` slots:
-`main.ts` (80 lines), typed, fail-fast parsing in `<app>.env.ts` (150), env-derived values and port bindings in
+`main.ts` (80 lines), a typed `<App>Env` interface and `read<App>Env(env: EnvSource): <App>Env` reader in `<app>.env.ts` (150),
+env-derived values and port bindings in
 `<app>.options.ts` (200), one `compose/<area>.ts` group per area (120) and the `app.module.ts` root that spreads them (250),
-R245 and R246). Only `main.ts` and `<app>.env.ts` may read the app's environment, through `EnvSource` and capability parse
-helpers; the env file holds parsing only, with no logic, module composition, business code or feature imports, and the
-options file holds no parsing. An api feature exposes operations as typed commands and queries with one handler each
+R245 and R246). `main.ts` builds `EnvSource` once, imports and calls the reader, builds the options and boots. Only
+`main.ts` and its matching `<app>.env.ts` may read the app's `process.env` or `EnvSource`; compose groups and
+`<app>.options.ts` never read either. The env file holds fail-fast parsing only, through typed readers and unchanged
+capability `parse<C>Config` helpers, with no localhost or default host fallback, logic, module composition, business code
+or feature imports. Its interface may extend the options type; the role name stays `<app>.env.ts` (`api.env.ts`,
+`worker.env.ts`, `cli.env.ts`). Secrets use `EnvSource.secret()`: `EnvSource.fromProcess()` resolves `<NAME>_FILE` first
+for `.starcistacks` custody and reads plain `<NAME>` only when the file key is absent. A declared file supplies its exact
+contents; an empty or unreadable path fails startup without falling back. The options file holds no parsing.
+An api feature exposes operations as typed commands and queries with one handler each
 (`transport -> command -> handler -> domain`, one transaction inside a bounded context, an event
 only to cross contexts or carry async work), and each capability module registers exactly once per
 app with typed options (`register`, `ConfigurableModuleBuilder`, `isGlobal: true` only in app

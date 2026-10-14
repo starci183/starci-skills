@@ -3,7 +3,7 @@
  * and the secret-comparison half of R41 `BE_DEFAULT_DENY`).
  *
  *   - `no-direct-env-read` keeps the process environment inside the one file that declares the `EnvSource` class of
- *     `platform/config`. Everything else receives typed options from `<capability>.config.ts`. `process.env` in any form
+ *     `platform/config`, `main.ts` or the matching `<app>.env.ts`. Everything else receives typed options. `process.env` in any form
  *     (member access, destructuring, `Reflect.get(process, "env")`, an `env` import of `node:process`), an import of
  *     `@nestjs/config` or `dotenv`, and a `process.cwd()` path joined into `src` or
  *     `.starcistacks` are refused everywhere else. The test world (slot `be.tests.world`) may read and write `process.env`:
@@ -51,14 +51,14 @@ const isGlobalProcess = (node) =>
 /** True when the property of a member expression spells `env`. */
 const spellsEnv = (node) => (node.computed ? staticText(node.property) === "env" : keyName(node.property) === "env")
 
-/** Only the file that declares `EnvSource` (and the test world) reads the process environment. */
+/** Only EnvSource, the app bootstrap roles and the test world read the process environment. */
 export const noDirectEnvRead = {
     meta: {
         type: "problem",
-        docs: { description: "The process environment is read only by the `EnvSource` class of `platform/config`." },
+        docs: { description: "The process environment is read only by `EnvSource` of `platform/config`, app `main.ts`, the matching `<app>.env.ts` and the test world." },
         schema: [],
         messages: {
-            env: "The process environment is read outside the `EnvSource` of `platform/config`. Add the key to the capability's `<capability>.config.ts` (`parse<C>Config(env: EnvSource)`) and receive the value through its `<capability>.options.ts`.",
+            env: "The process environment is read outside `EnvSource` of `platform/config`, app `main.ts`, the matching `<app>.env.ts` or the test world. Read app keys through `read<App>Env(env: EnvSource)` and capability keys through `<capability>.config.ts`, then receive typed options here.",
             package: "`{{source}}` is a second config path. Configuration is parsed once in `main.ts` or `<app>.env.ts` by `platform/config` typed readers and reaches a module through `register(options)`.",
             cwdPath: "A path built from `process.cwd()` and `{{segment}}` depends on where the process was started. Resolve it from a configured root.",
         },
@@ -80,8 +80,10 @@ export const noDirectEnvRead = {
         const isProcess = (node) => (node.type === "Identifier" && processNames.has(node.name) && !isLocal(node)) || isGlobalProcess(node)
         const isEnvSourceFile = () => inConfigOwner && declaresEnvSource
         const inWorld = isTestWorld(hfs, filename)
+        const appRole = appRoleOf(hfs, filename)?.entry
+        const inAppEntry = appRole === "main.ts" || appRole === APP_ENV_ROLE
         const reportEnv = (node) => {
-            if (!isEnvSourceFile() && !inWorld) context.report({ node, messageId: "env" })
+            if (!isEnvSourceFile() && !inWorld && !inAppEntry) context.report({ node, messageId: "env" })
         }
         const reportSource = (node, source) => {
             if (isConfigPackage(source)) context.report({ node, messageId: "package", data: { source } })
@@ -99,7 +101,7 @@ export const noDirectEnvRead = {
                 if (!PROCESS_MODULES.has(source)) return
                 for (const specifier of node.specifiers) {
                     if (specifier.type === "ImportSpecifier" && (specifier.imported.name ?? specifier.imported.value) === "env") reportEnv(specifier)
-                    else if (specifier.type !== "ImportSpecifier") processNames.add(specifier.local.name)
+                    else if (specifier.type !== "ImportSpecifier" || (specifier.imported.name ?? specifier.imported.value) === "default") processNames.add(specifier.local.name)
                 }
             },
             ImportExpression(node) {

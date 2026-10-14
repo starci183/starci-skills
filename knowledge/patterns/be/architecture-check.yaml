@@ -76,11 +76,16 @@ rules:
     requirement: |-
       An app directory `be/apps/<app>/src` holds `main.ts` (at most 80 lines), `<app>.env.ts` (150), `<app>.options.ts` (200),
       `compose/<area>.ts` (120) and `app.module.ts` (250, with `static register(options: AppOptions)`); an app has no spec of its
-      own (BE-TEST-1). `main.ts` builds `EnvSource` once, parses inline or imports the typed, fail-fast parsing from `<app>.env.ts`,
-      builds `AppOptions`, calls `AppModule.register(options)` and handles startup failure (the cli app boots with
+      own (BE-TEST-1). `<app>.env.ts` exports an explicit typed `<App>Env` interface and
+      `read<App>Env(env: EnvSource): <App>Env`, with no localhost or default host fallback. Secrets use `env.secret`:
+      `EnvSource` resolves `<NAME>_FILE` first for `.starcistacks` custody and plain `<NAME>` only when the file key is absent.
+      The role name stays `<app>.env.ts`, never `env.ts`; capability `<capability>.config.ts` parsers remain unchanged.
+      `main.ts` builds `EnvSource` once, imports and calls the reader from `<app>.env.ts`, builds `AppOptions`, calls
+      `AppModule.register(options)` and handles startup failure (the cli app boots with
       `CommandFactory.run` instead and never serves, cli.yaml BE-CLI-1). Only `main.ts` and `<app>.env.ts` may read the app's
       environment. The env file holds parsing only, with no logic, module composition, business code or feature imports;
-      the options file holds env-derived values and port bindings only, with no parsing. Both refuse module, queue and
+      the options file holds env-derived values and port bindings only, with no parsing. Neither it nor a compose group
+      reads `process.env` or `EnvSource`. The env and options files both refuse module, queue and
       scheduler composition (`BE_APP_OPTIONS_COMPOSITION`).
       `app.module.ts` imports and spreads the area groups, which register the capability modules and the modules of the app's
       kind (api: `-graphql`, `-http`, `-websocket` and the `-schedule` and `-message` modules of the background it owns; worker:
@@ -93,7 +98,7 @@ rules:
     cases:
       - id: case-1
         when: Process entry
-        write: main.ts builds EnvSource, parses inline or calls its <app>.env.ts helper, builds options, creates the Nest app from AppModule.register(options), starts, and reports a startup failure with the failing key or module name.
+        write: main.ts builds EnvSource, calls read<App>Env from <app>.env.ts, builds options, creates the Nest app from AppModule.register(options), starts, and reports a startup failure with the failing key or module name.
       - id: case-2
         when: Root dependency composition
         write: 'app.module.ts lists ClockModule.register({ isGlobal: true }), PurchaseModule.register({ isGlobal: true, ...options.purchase }), CheckoutGraphqlModule and the APP_GUARD and APP_FILTER providers.'

@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { ensureLiteCli } from "../../packages/hfs/scaffold/add-cli-lite.mjs";
+import { render } from "../../packages/hfs/sync/index.mjs";
 import {
   loadSlotManifest,
   readRepoDeclaration,
@@ -189,9 +190,13 @@ test("ensureLiteCli separates fail-fast environment parsing from its connection 
   const env = read(root, "be/apps/cli/src/cli.env.ts");
   const options = read(root, "be/apps/cli/src/cli.options.ts");
   assert.match(main, /from "\.\/cli\.env"/);
-  assert.match(main, /createCliAppOptions\(parseCliEnv\(EnvSource\.fromProcess\(\)\)\)/);
+  assert.match(main, /createCliAppOptions\(readCliEnv\(EnvSource\.fromProcess\(\)\)\)/);
   assert.equal((main.match(/EnvSource\.fromProcess\(\)/g) ?? []).length, 1);
-  assert.match(env, /parseCliEnv = \(env: EnvSource\): ReturnType<typeof parsePrimaryDatabaseConfig> => parsePrimaryDatabaseConfig\(env\)/);
+  assert.match(env, /export interface CliEnv extends ReturnType<typeof parsePrimaryDatabaseConfig>/);
+  assert.match(env, /export const readCliEnv = \(env: EnvSource\): CliEnv => parsePrimaryDatabaseConfig\(env\)/);
+  assert.ok(main.trimEnd().split("\n").length <= 80, "the CLI bootstrap stays within its 80-line budget");
+  assert.ok(env.trimEnd().split("\n").length <= 150, "the CLI env reader stays within its 150-line budget");
+  assert.doesNotMatch(env, /parseCliEnv|localhost|127\.0\.0\.1|process\.env/);
   assert.doesNotMatch(env, /import type \{ DatabaseConnectionConfig/);
   assert.doesNotMatch(env, /@features\/|@modules\/domain\/|\b(?:register|forRoot)\s*\(|\b[A-Za-z]*Module\b/);
   assert.match(options, /createCliAppOptions = \(primary: DatabaseConnectionOptions\): CliAppOptions/);
@@ -205,12 +210,33 @@ test("the full cli template binds domain entities and migrations after environme
   const options = read(ROOT, `${cli}/cli.options.ts`);
   assert.equal(parses(env), true);
   assert.equal(parses(options), true);
+  assert.match(env, /export interface CliEnv extends ReturnType<typeof parsePrimaryDatabaseConfig>/);
+  assert.match(env, /export const readCliEnv = \(env: EnvSource\): CliEnv/);
   assert.match(env, /parsePrimaryDatabaseConfig\(env\)/);
   assert.doesNotMatch(env, /noteEntities|noteMigrations/);
   assert.match(options, /primaryConnectionOf = \(primary: DatabaseConnectionConfig\): DatabaseConnectionOptions/);
   assert.match(options, /\.\.\.primary,[\s\S]*entities: noteEntities,[\s\S]*migrations: noteMigrations/);
   assert.match(options, /connections: \[primaryConnectionOf\(primary\)\]/);
   assert.doesNotMatch(options, /EnvSource|parsePrimaryDatabaseConfig/);
+});
+
+test("the full HTTP template gives a named app a typed, bounded environment reader", () => {
+  const app = "packages/hfs/templates/be/skeleton/apps/__app__/src";
+  const variables = { app: "catalog-api", appPascal: "CatalogApi" };
+  const env = render(read(ROOT, `${app}/__app__.env.ts`).replace(/\r\n/g, "\n"), variables);
+  const main = render(read(ROOT, `${app}/main.ts`).replace(/\r\n/g, "\n"), variables);
+
+  assert.equal(parses(env), true);
+  assert.equal(parses(main), true);
+  assert.match(env, /export interface CatalogApiEnv extends CatalogApiOptions/);
+  assert.match(env, /export const readCatalogApiEnv = \(env: EnvSource\): CatalogApiEnv/);
+  assert.match(main, /import \{ readCatalogApiEnv \} from "\.\/catalog-api\.env"/);
+  assert.match(main, /readCatalogApiEnv\(env\)/);
+  assert.equal((main.match(/EnvSource\.fromProcess\(\)/g) ?? []).length, 1);
+  assert.ok(main.trimEnd().split("\n").length <= 80, "the HTTP bootstrap stays within its 80-line budget");
+  assert.ok(env.trimEnd().split("\n").length <= 150, "the HTTP env reader stays within its 150-line budget");
+  assert.doesNotMatch(main, /parse(?:Server|HttpSecurity|PrimaryDatabase)Config/);
+  assert.doesNotMatch(env, /localhost|127\.0\.0\.1|process\.env|@features\/|@modules\/domain\/|\b[A-Za-z]*Module\b/);
 });
 
 test("ensureLiteCli refuses undeclared or foreign cli trees instead of adopting them", () => {

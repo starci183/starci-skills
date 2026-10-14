@@ -3,6 +3,7 @@
 import path from 'node:path';
 import { machineKit } from './machine-ast.mjs';
 import { importedFrom, reportAt, unwrap } from './supabase-ast.mjs';
+import { accessName } from './backend-app-files.mjs';
 
 const BE_SUPABASE_SLOT = 'be.integrations.supabase';
 const BE_JWT_VERIFIED = 'BE_SUPABASE_JWT_VERIFIED';
@@ -45,12 +46,6 @@ const importedCall = (kit, checker, call) => {
   if (!kit.ts.isPropertyAccessExpression(call.expression) || !kit.ts.isIdentifier(call.expression.expression)) return null;
   const owner = kit.importBinding(checker, call.expression.expression);
   return owner?.name === 'default' ? { module: owner.module, name: call.expression.name.text } : null;
-};
-
-const accessName = (ts, node) => {
-  if (ts.isPropertyAccessExpression(node)) return node.name.text;
-  if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) return node.argumentExpression.text;
-  return null;
 };
 
 const requestLike = (ts, node) => {

@@ -3,13 +3,13 @@ import { SystemClockService } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
 import { RequestValidationService } from "@modules/platform/http-security"
 import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
-import { parseApiEnv } from "./api.env"
+import { readApiEnv } from "./api.env"
 import { AppModule } from "./app.module"
 
 /** Reads the environment once, composes the API from parsed options and serves until a shutdown signal. */
 const bootstrap = async (): Promise<void> => {
     const env = EnvSource.fromProcess()
-    const options = parseApiEnv(env)
+    const options = readApiEnv(env)
     const app = await NestFactory.create(AppModule.register(options), { rawBody: true })
     app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
     app.enableShutdownHooks()

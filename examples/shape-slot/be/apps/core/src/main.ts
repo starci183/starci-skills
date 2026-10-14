@@ -1,20 +1,14 @@
 import { NestFactory } from "@nestjs/core"
 import { SystemClockService } from "@modules/platform/clock"
-import { EnvSource, parseServerConfig } from "@modules/platform/config"
-import { parsePrimaryDatabaseConfig } from "@modules/platform/database"
-import { parseHttpSecurityConfig } from "@modules/platform/http-security"
+import { EnvSource } from "@modules/platform/config"
 import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
 import { AppModule } from "./app.module"
-import type { CoreOptions } from "./core.options"
+import { readCoreEnv } from "./core.env"
 
 /** Reads the environment once, composes the app from the parsed options and serves until a shutdown signal. */
 const bootstrap = async (): Promise<void> => {
     const env = EnvSource.fromProcess()
-    const options: CoreOptions = {
-        server: parseServerConfig(env),
-        httpSecurity: parseHttpSecurityConfig(env),
-        database: parsePrimaryDatabaseConfig(env),
-    }
+    const options = readCoreEnv(env)
     const app = await NestFactory.create(AppModule.register(options))
     app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
     app.enableShutdownHooks()

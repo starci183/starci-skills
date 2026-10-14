@@ -41,10 +41,14 @@ rules:
       nest-commander and never serves: no `NestFactory.create*`, no `.listen()`, no microservice connection, no
       `@nestjs/platform-*` adapter and no `@nestjs/microservices`. `apps/cli/src/app.module.ts` composes the platform modules
       the commands need (the database capability over every connection with its entities and migrations, like an api app) and
-      the static cli feature root module `CliModule`; `main.ts` can delegate typed, fail-fast parsing through `EnvSource` and
-      capability parse helpers to `apps/cli/src/cli.env.ts` (at most 150 lines), with no logic, module composition, business
-      code or feature imports. Only these two app files may read the environment. `apps/cli/src/cli.options.ts` carries the
-      env-derived values and port bindings, the connections it migrates among them, with no parsing.
+      the static cli feature root module `CliModule`. `apps/cli/src/cli.env.ts` (at most 150 lines) exports an explicit typed
+      `CliEnv` interface and `readCliEnv(env: EnvSource): CliEnv` using `EnvSource` and unchanged capability parse helpers.
+      It holds fail-fast parsing only, with no localhost or default host fallback, logic, module composition, business code
+      or feature imports. Secrets use `env.secret`, with `<NAME>_FILE` first for `.starcistacks` custody, then plain `<NAME>`
+      when the file key is absent. `main.ts` (at most 80 lines) builds `EnvSource` once and imports and calls `readCliEnv`.
+      Only these two app files may read the environment; the role name stays `cli.env.ts`, never `env.ts`.
+      `apps/cli/src/cli.options.ts` carries the env-derived values and port bindings, the connections it migrates among them,
+      with no parsing or reads of `process.env` or `EnvSource`; compose groups never read the environment either.
     rationale: |-
       One image for every operator action gives one place to find, deploy and audit them, and a process that never listens
       cannot become a second, unguarded door into the application.
@@ -55,7 +59,7 @@ rules:
           // be/apps/cli/src/main.ts
           async function bootstrap(): Promise<void> {
               const env = EnvSource.fromProcess()
-              const options = createCliAppOptions(parseCliEnv(env))
+              const options = createCliAppOptions(readCliEnv(env))
               await CommandFactory.run(AppModule.register(options), new JsonLinesLogger())
           }
           void bootstrap()
@@ -64,7 +68,7 @@ rules:
         write: 'Refused (BE_CLI_BOOTSTRAP): the cli app boots only through CommandFactory.run.'
       - id: case-3
         when: A back end declares a connection and has no apps/cli
-        write: 'Refused (BE_CLI_REQUIRED): add be/apps/cli with main.ts, app.module.ts, cli.options.ts and its Dockerfile, declared as { "name": "cli", "kind": "cli" } in hfs.json sides.be.apps.'
+        write: 'Refused (BE_CLI_REQUIRED): add be/apps/cli with main.ts, app.module.ts, cli.env.ts, cli.options.ts and its Dockerfile, declared as { "name": "cli", "kind": "cli" } in hfs.json sides.be.apps.'
     verification:
       automated:
         - BE_CLI_REQUIRED
@@ -207,7 +211,7 @@ files:
   - path: apps/cli/src/cli.env.ts
     slot: be.app.cli
     optional: true
-    role: typed, fail-fast parsing through EnvSource and capability parse helpers only; no logic, composition, business code or feature imports
+    role: 'exports interface CliEnv and readCliEnv(env: EnvSource): CliEnv; fail-fast parsing only, no localhost fallback, logic, composition, business code or feature imports; secrets use env.secret with _FILE first'
     rules:
       - BE_CONFIG_OWNER
       - BE_APP_OPTIONS_COMPOSITION

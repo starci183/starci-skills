@@ -275,7 +275,7 @@ function wireLiteFeature({ repoRoot, repo, noun, name }) {
   return created;
 }
 
-/** Adds one generated webhook provider to the lite API's parsed options and enables exact raw-body verification. */
+/** Adds one generated webhook provider to the lite API's typed env reader (or an existing inline bootstrap) and enables exact raw-body verification. */
 function wireLiteWebhookConfig({ repoRoot, app, provider }) {
   const envRelative = `be/apps/${app}/src/${app}.env.ts`;
   const relative = fs.existsSync(path.join(repoRoot, ...envRelative.split('/')))

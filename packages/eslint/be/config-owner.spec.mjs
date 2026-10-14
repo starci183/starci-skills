@@ -25,13 +25,20 @@ const ENV = at("apps/api/src/api.env.ts")
 const OPTIONS = at("apps/api/src/api.options.ts")
 const GROUP = at("apps/api/src/compose/platform.ts")
 
-test("the process environment is read only by the file that declares EnvSource in platform/config", () => {
+test("the process environment is read only by EnvSource, app bootstrap roles and the test world", () => {
     tester.run("no-direct-env-read", noDirectEnvRead, {
         valid: [
             { filename: ENV_SOURCE, code: "export class EnvSource { static fromProcess() { return { ...process.env } } }" },
             { filename: ENV_SOURCE, code: 'import { readFileSync } from "node:fs"\nexport class EnvSource { static fromProcess() { const values = { ...process.env }; for (const [key, path] of Object.entries(values)) { if (key.endsWith("_FILE") && path !== undefined) values[key.slice(0, -5)] = readFileSync(path, "utf8") } return values } }' },
             { filename: ENV_SOURCE, code: "export class EnvSource { static a() { return process['env'] } }" },
             { filename: ENV_SOURCE, code: "export class EnvSource { static a() { const { env } = process; return env } }" },
+            ...[MAIN, ENV].flatMap(filename => [
+                { filename, code: "const x = process.env.PORT" },
+                { filename, code: "const x = process['env'].PORT" },
+                { filename, code: "const { env: values } = process\nconst x = values.PORT" },
+                { filename, code: "import { env as values } from 'node:process'\nconst x = values.PORT" },
+                { filename, code: "import proc from 'node:process'\nconst x = proc.env.PORT" },
+            ]),
             { filename: SERVICE, code: "const port = options.port" },
             { filename: SERVICE, code: "const env = { region: 1 }; const x = env.region" },
             { filename: SERVICE, code: "const p = path.join(root, 'src')" },
@@ -48,8 +55,16 @@ test("the process environment is read only by the file that declares EnvSource i
             { filename: SERVICE, code: "const url = process.env.PLAN_URL", errors: [{ messageId: "env" }] },
             { filename: CONFIG, code: "const env = process.env", errors: [{ messageId: "env" }] },
             { filename: SERVICE, code: "const x = process['env']", errors: [{ messageId: "env" }] },
-            { filename: MAIN, code: "const x = process.env.PORT", errors: [{ messageId: "env" }] },
-            { filename: ENV, code: "const x = process.env.PORT", errors: [{ messageId: "env" }] },
+            ...[OPTIONS, GROUP].flatMap(filename => [
+                { filename, code: "export const port = process.env.PORT", errors: [{ messageId: "env" }] },
+                { filename, code: "export const read = () => process['env'].PORT", errors: [{ messageId: "env" }] },
+                { filename, code: "const { env: values } = process\nexport const port = values.PORT", errors: [{ messageId: "env" }] },
+                { filename, code: "import { env as values } from 'node:process'\nexport const port = values.PORT", errors: [{ messageId: "env" }] },
+                { filename, code: "import { default as proc } from 'node:process'\nexport const port = proc.env.PORT", errors: [{ messageId: "env" }] },
+                { filename, code: "import * as proc from 'process'\nexport const port = proc['env'].PORT", errors: [{ messageId: "env" }] },
+                { filename, code: "export const values = Reflect.get(process, 'env')", errors: [{ messageId: "env" }] },
+            ]),
+            { filename: at("apps/api/src/other.env.ts"), code: "const x = process.env.PORT", errors: [{ messageId: "env" }] },
             { filename: at("apps/api/src/api.options.ts"), code: 'import { readFileSync } from "node:fs"\nconst path = process.env.PLAN_API_KEY_FILE\nexport const options = { apiKey: path === undefined ? undefined : readFileSync(path, "utf8") }', errors: [{ messageId: "env" }] },
             { filename: SERVICE, code: "const { env } = process", errors: [{ messageId: "env" }] },
             { filename: SERVICE, code: "const { env: e, argv } = process", errors: [{ messageId: "env" }] },
@@ -162,7 +177,7 @@ const HELPER = importLine("buildPlatformOptions", `${CONFIG_MODULE}/platform.hel
 const PLATFORM_CONFIG_FILE = at("src/modules/platform/config/platform.config.ts")
 const CONFIG_SPEC = at("src/modules/platform/config/platform.config.spec.ts")
 const WORLD = at("src/tests/world/use-test-world.ts")
-const APP_ENV = importLine("parseApiEnv", "./api.env") + importLine("EnvSource", CONFIG_MODULE) + "declare const env: EnvSource\n"
+const APP_ENV = importLine("readApiEnv", "./api.env") + importLine("EnvSource", CONFIG_MODULE) + "declare const env: EnvSource\n"
 
 test("a config parser is called only by main.ts, the matching app env file, its config file or spec and composing tests", () => {
     tester.run("config-parsed-in-main", configParsedInMain, {
@@ -174,11 +189,12 @@ test("a config parser is called only by main.ts, the matching app env file, its 
             { filename: PLATFORM_CONFIG_FILE, code: readFileSync(PLATFORM_CONFIG_FILE, "utf8") },
             { filename: CONFIG_SPEC, code: `${PLATFORM_CONFIG}const options = parsePlatformConfig(env)` },
             { filename: WORLD, code: `${PLATFORM_CONFIG}export const options = parsePlatformConfig(env)` },
+            ...[MAIN, ENV].map(filename => ({ filename, code: `${PLATFORM_CONFIG}const key = env.secret('API_KEY')` })),
             // Keep the real env fixture's exported parser visible to the project service for indirect-call cases below.
             // It covers capability parsers, owned EnvSource readers and source acquisition in the matching env file.
             { filename: ENV, code: readFileSync(ENV, "utf8") },
             { filename: at("apps/cli/src/cli.env.ts"), code: `${PLATFORM_CONFIG}const options = parsePlatformConfig(env)` },
-            { filename: MAIN, code: `${APP_ENV}const options = parseApiEnv(env)` },
+            { filename: MAIN, code: `${APP_ENV}const options = readApiEnv(env)` },
             { filename: MAIN, code: `${PLATFORM_CONFIG}const port = env.int('PORT')` },
             { filename: MAIN, code: `${PLATFORM_CONFIG}const source = EnvSource.fromProcess()` },
             // a provider contract spec registers a module with options parsed from the sandbox keys
@@ -199,9 +215,15 @@ test("a config parser is called only by main.ts, the matching app env file, its 
             { filename: OPTIONS, code: `${PLATFORM_CONFIG}const port = env.int('PORT')`, errors: [{ messageId: "parsed" }] },
             { filename: GROUP, code: `${PLATFORM_CONFIG}const port = env.string('PORT')`, errors: [{ messageId: "parsed" }] },
             { filename: OPTIONS, code: `${PLATFORM_CONFIG}const source = EnvSource.fromProcess()`, errors: [{ messageId: "parsed" }] },
+            ...[OPTIONS, GROUP].flatMap(filename => [
+                { filename, code: `${PLATFORM_CONFIG}export const read = () => env.secret('API_KEY')`, errors: [{ messageId: "parsed" }] },
+                { filename, code: `${PLATFORM_CONFIG}const key = env['secret']('API_KEY')`, errors: [{ messageId: "parsed" }] },
+                { filename, code: `${PLATFORM_CONFIG}const { string: read } = env\nconst port = read('PORT')`, errors: [{ messageId: "parsed" }] },
+                { filename, code: `${PLATFORM_CONFIG}const source = EnvSource['fromProcess']()`, errors: [{ messageId: "parsed" }] },
+            ]),
             // calling the app env helper would read env indirectly in an options file or group
-            { filename: OPTIONS, code: `${APP_ENV}const options = parseApiEnv(env)`, errors: [{ messageId: "parsed" }] },
-            { filename: GROUP, code: `${importLine("parseApiEnv as parse", "../api.env")}${importLine("EnvSource", CONFIG_MODULE)}declare const env: EnvSource\nconst options = parse(env)`, errors: [{ messageId: "parsed" }] },
+            { filename: OPTIONS, code: `${APP_ENV}const options = readApiEnv(env)`, errors: [{ messageId: "parsed" }] },
+            { filename: GROUP, code: `${importLine("readApiEnv as read", "../api.env")}${importLine("EnvSource", CONFIG_MODULE)}declare const env: EnvSource\nconst options = read(env)`, errors: [{ messageId: "parsed" }] },
             // module scope
             { filename: SERVICE, code: `${PLATFORM_CONFIG}const x = platformConfig().isProduction`, errors: [{ messageId: "parsed" }] },
             // lazily inside a service method

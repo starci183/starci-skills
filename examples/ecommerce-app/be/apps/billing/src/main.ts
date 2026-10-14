@@ -4,11 +4,12 @@ import { SystemClock } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
 import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
 import { AppModule } from "./app.module"
-import { parseBillingAppOptions } from "./billing.options"
+import { readBillingEnv } from "./billing.env"
 
 /** Reads the environment once, builds the billing api from it and listens; the raw body is kept so a webhook signature is checked on the exact bytes. */
 async function bootstrap(): Promise<void> {
-    const options = parseBillingAppOptions(EnvSource.fromProcess())
+    const env = EnvSource.fromProcess()
+    const options = readBillingEnv(env)
     const app = await NestFactory.create(AppModule.register(options), { rawBody: true })
     app.enableShutdownHooks()
     await app.listen(options.port)
