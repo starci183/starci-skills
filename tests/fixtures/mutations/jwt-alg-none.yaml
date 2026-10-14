@@ -1,0 +1,22 @@
+# OPS section 3 item 5: jwtVerify with algorithms ['none'] (or ['HS256']) passes - the a14 check requires only
+# a non-empty algorithms list, never its content. Witnessed by R260 jwt-alg (eslint-be; the witness runner of
+# the release cut runs the lint canon over the mutated copy, not only `starci app check`).
+name: jwt-alg-none
+edition: lite
+base: examples/lite-app
+mutate:
+  - op: add
+    path: be/src/modules/integrations/supabase/jwt-verifier.service.ts
+    content: |
+      import { createRemoteJWKSet, jwtVerify } from "jose"
+
+      /** Verifies a Supabase-issued token against the project JWKS. */
+      export const verifySupabaseToken = async (token: string, jwksUrl: string) =>
+          jwtVerify(token, createRemoteJWKSet(new URL(jwksUrl)), {
+              issuer: "https://supabase.example",
+              audience: "authenticated",
+              algorithms: ["none"],
+          })
+expect:
+  - BE_JWT_ALG_PINNED
+pending: R260
