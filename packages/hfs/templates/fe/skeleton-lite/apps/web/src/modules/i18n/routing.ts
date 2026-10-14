@@ -1,4 +1,4 @@
-const LOCALES = ["vi"] as const
+const LOCALES = ["vi", "en"] as const
 
 /** The locale served at the unprefixed path. */
 export const DEFAULT_LOCALE = "vi" as const

@@ -46,6 +46,12 @@
         "title": "Đã xảy ra lỗi nghiêm trọng",
         "retry": "Thử lại"
       }
+    },
+    "guide": {
+      "open": "Xem hướng dẫn",
+      "title": "Bắt đầu",
+      "description": "Đăng nhập để sử dụng ứng dụng. Bạn có thể đóng hướng dẫn này và mở lại bất cứ lúc nào.",
+      "close": "Đóng"
     }
   }
 }

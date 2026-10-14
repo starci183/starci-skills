@@ -525,6 +525,10 @@ $defs:
         uniqueItems: true
         items: {enum: [full, lite]}
         description: 'the editions the slot exists in (default: the manifest editions); a slot outside the declared edition owns no path'
+      editionWhy:
+        type: string
+        minLength: 1
+        description: 'the ruling case that explains a difference between lite and full; retained in each edition view'
       litePresence:
         description: 'the presence under edition lite (default: presence); a bare value or a per-side map (an app-root slot takes the bare value); forbidden demands goesTo'
         anyOf:

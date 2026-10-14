@@ -1,0 +1,31 @@
+{
+  "landing": {
+    "title": "{{project}}",
+    "description": "The introduction to {{project}}.",
+    "shell": {
+      "brand": "{{project}}"
+    },
+    "home": {
+      "title": "Welcome to {{project}}",
+      "lede": "Everything you need is in the application.",
+      "openApp": "Open the application"
+    },
+    "loading": {
+      "message": "Loading"
+    },
+    "notFound": {
+      "title": "Page not found",
+      "home": "Return home"
+    },
+    "errors": {
+      "page": {
+        "title": "Something went wrong",
+        "retry": "Try again"
+      },
+      "global": {
+        "title": "The application could not continue",
+        "retry": "Try again"
+      }
+    }
+  }
+}
