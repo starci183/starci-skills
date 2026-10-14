@@ -68,6 +68,14 @@ rules:
           The back-end feature exposes GraphQL (be.transport.graphql); the front end calls it through modules/api/graphql and
           hooks/swr exactly as in full, reports writes through modules/toast, keeps Supabase for auth only in modules/auth, and
           follows heavy work (a mutation that enqueues a pgmq job) through a status query polled by SWR or a socket namespace.
+      - id: case-4
+        when: A lite app needs production delivery tooling
+        write: >-
+          Use app.deploy for production Compose and Caddy configuration, environment examples and operator shell scripts;
+          app.ci-deploy and app.ci-authorize-deploy-key for deployment and deploy-key authorization workflows; and
+          app.scripts.delivery for helpers to build, sync environment settings and load or set secrets. Lite's backing services
+          stay on Supabase and app.starcistacks holds environment and sealed secret custody. Delivery files remain legal after
+          an upgrade to full; operational helpers then use app.scripts.
     verification:
       automated:
         - HFS_EDITION_INVALID
@@ -155,15 +163,18 @@ rules:
   - id: REPO-LITE-5
     title: No secret material in a lite tree
     kind: mandatory
-    hfsRules: [R220]
+    hfsRules: [R06, R220]
     requirement: |
       A lite app holds no root `.env*`, `.secrets/` or sealed file outside the `.starcistacks` secrets location, and `fe/` and
       `supabase/` hold no token, JWT or connection string with a password. Configuration names a secret as `env(NAME)`.
+      Delivery slots remain subject to the plaintext-secret checks, including environment examples, workflows and operational
+      helpers: use placeholders and runtime secret references rather than credential values.
     rationale: |
       Supabase keys are bearer credentials; a tree that holds none cannot leak one.
     cases: []
     verification:
       automated:
+        - HFS_PLAINTEXT_SECRET
         - HFS_LITE_SECRET_CUSTODY
       manual: []
     relatedExamples: []

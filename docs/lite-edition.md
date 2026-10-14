@@ -35,9 +35,6 @@ Tests: back-end unit specs are required exactly as in full (`ruleParams.be.unitR
 (`starci supabase start`), with no toxiproxy and no containers of their own. There is no e2e world, no contract world and no
 e2e workflow (slot `app.ci-e2e`). The front end has no tests in either edition (R97).
 
-Infrastructure: `.starcistacks` under lite holds environment and secret custody only; the stack's one backing service is the
-Supabase project (the local CLI stack or the cloud project).
-
 Use lite for a product whose infrastructure is Supabase. Start with full when the product needs its own stack, the e2e world or
 UAT records.
 
@@ -64,6 +61,19 @@ The types file starts with the digest of the migrations it was generated from. T
 only compares that digest with the migrations and refuses missing or stale types, so lint, typecheck, build and CI need no stack.
 Regenerating the types (`starci app emit`) is the one step that starts the local stack.
 
+## Production delivery and secret custody
+
+The optional `app.deploy` slot holds production Compose and Caddy configuration, environment examples and operator shell
+scripts. The `app.ci-deploy` and `app.ci-authorize-deploy-key` slots hold deployment and deploy-key authorization workflows;
+`app.scripts.delivery` holds the lite app's helpers to build, sync environment settings and load or set secrets. The slot
+manifest owns their concrete paths. Delivery files remain legal after an upgrade to full; operational helpers then use
+`app.scripts`.
+
+`app.starcistacks` under lite holds environment and sealed secret custody only; the stack's one backing service is the
+Supabase project (the local CLI stack or the cloud project). Delivery files, including environment examples, remain subject to
+R06 (`HFS_PLAINTEXT_SECRET`): use placeholders and runtime secret references, never plaintext credentials. R220 keeps sealed
+material in the stack's secrets location and enforces the front-end and Supabase secret restrictions.
+
 ## Database, authentication and storage
 
 R213 requires ordered, immutable, parseable migrations. R214 requires each exposed table to enable row-level security and to
@@ -79,8 +89,7 @@ types. R219 requires the back end to take the principal only from an access toke
 end reaches Postgres through the shared `EntityManager` using a dedicated least-privilege application role.
 
 Anything that must bypass RLS is a guarded back-end use case or a carefully scoped security-definer database function. The
-service-role credential never enters the front-end process. R220 keeps all secret material in sealed custody and forbids it
-from product source.
+service-role credential never enters the front-end process.
 
 Storage buckets are private by default, bounded by size and MIME type, and protected by policies scoped to an ownership prefix.
 Browser uploads use a signed upload URL the back end issues (an axios PUT from `fe.modules.api`); private downloads use signed
