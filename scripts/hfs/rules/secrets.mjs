@@ -5,6 +5,8 @@
 //   - a tracked `.enc` that is not a sops envelope (an encrypted-looking file that holds plaintext);
 //   - a line of any other tracked text file that matches a secret pattern.
 // A finding names the file, the line and the pattern, never the value.
+import fs from 'node:fs';
+import path from 'node:path';
 import { FORBIDDEN_FILES, secretHits } from '../../lib/secret-patterns.mjs';
 import { isSopsEnvelope } from '../../lib/sops-envelope.mjs';
 import { found, readText } from './read.mjs';
@@ -15,6 +17,17 @@ const NOT_SCANNED = /(^|\/)package-lock\.json$/;
 
 /** True when the slot `id` of the manifest reports HFS_PLAINTEXT_SECRET for the paths it forbids. */
 export const slotOwnsSecrets = (slot) => slot?.rules?.includes(PLAINTEXT_SECRET) === true;
+
+/** A legacy lite root secrets.env is reported even when ignored; its presence is enough, so no value is read. */
+export function untrackedSecretFindings({ repoRoot, files, repo }) {
+  if (repo.profile !== 'app' || repo.edition !== 'lite' || files.includes('secrets.env')) return [];
+  try {
+    if (!fs.statSync(path.join(repoRoot, 'secrets.env')).isFile()) return [];
+  } catch {
+    return [];
+  }
+  return [found(PLAINTEXT_SECRET, 'secrets.env', 'secrets.env is an untracked plaintext secret at the lite app root; seal it with starci app secret set into .starcistacks/<env>/secrets/<slug>.enc and remove the plaintext file; read materialized values by *_FILE', { level: 'warning', pattern: 'untracked-secrets-env' })];
+}
 
 /**
  * The findings of R06 for one tracked file that no forbidden slot claims: a secret by being (an env file, a key file), an `.enc` that is

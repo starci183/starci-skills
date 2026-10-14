@@ -449,7 +449,9 @@ doors are strictly rate limited.
 ### 5.6 Configuration and secrets (R43, R44)
 
 Only the file of `platform/config` that declares `EnvSource` (which also resolves `<KEY>_FILE`, and its typed readers)
-touches `process.env`. Each capability and provider has `<name>.config.ts` (`parse<C>Config(env: EnvSource): <C>Options`, or
+touches `process.env`. A declared `<KEY>_FILE` takes priority over `<KEY>` and reads the file contents without trimming;
+an empty or unreadable file path stops boot instead of falling back to `<KEY>`. Without `<KEY>_FILE`, the reader uses `<KEY>`.
+Each capability and provider has `<name>.config.ts` (`parse<C>Config(env: EnvSource): <C>Options`, or
 `<C>Options | null` for an optional integration) and `<name>.options.ts`. `main.ts` builds `EnvSource` once and passes options
 to `AppModule.register(options)`; classes read them with `Inject<C>Options()`. `envConfig()`, `ConfigService`,
 `@nestjs/config` and dotenv preloaders do not exist. A value typed `Secret` or `Url` by `platform/config` has no default of
@@ -701,8 +703,10 @@ no contract copy under `fe/`.
 - Secrets exist only as sops `*.enc` at `.starcistacks/<env>/secrets/<slug>.enc`, sealed per `.sops.yaml`; the front end
   holds no secret. A decrypted value is never written into the app tree, ignored or not; it lives in memory or under `%LOCALAPPDATA%/StarCi/secrets/<project>/<env>/`
   and is passed by `*_FILE` (R06). Agents never read, print or commit a secret value and never generate or rotate keys.
-  Owner ruling 2026-09-29: ONE shared master age identity (`~/.starci/master.identity`) decrypts every project's SOPS
-  custody; every project's envelopes are encrypted to that one master recipient, and the stack text says so.
+  Owner ruling 2026-10-14: the owner runs `starci app secret init` to create or reuse an external age identity and record
+  its public recipient in the root `.sops.yaml`. The private key stays in the platform SOPS age key file (Windows:
+  `%APPDATA%/sops/age/keys.txt`); an existing recipient is retained and requires its matching identity. The stack text
+  describes those actual recipients and their outside-repository key custody. See [the secrets custody runbook](../../docs/application-stacks.md#secrets-custody).
 
 ## 9. Shared tooling, formatter, pins, budgets
 

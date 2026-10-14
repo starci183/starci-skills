@@ -1,2 +1,2 @@
-# Set a project-owned age recipient before encrypting the first secret.
+# Run `starci app secret init` to set a project-owned age recipient before encrypting the first secret.
 creation_rules: []

@@ -40,7 +40,7 @@ _starci() {
     _describe 'group' groups
   elif (( CURRENT == 3 )); then
     case "$words[2]" in
-      app) _values 'verbs' 'add[add one canonical backend capability and register its patterns]' 'check[judge the app tree, managed output, contracts, formatting and architecture]' 'emit[emit backend GraphQL, operation and event contract snapshots]' 'explain[explain which HFS slot owns one app-relative path]' 'hygiene[judge staged worktree metadata, stack files and plaintext secrets]' 'lint[lint both app sides and report repository, ESLint and stylelint findings together]' 'new[create a canonical service, unit spec or app image definition]' 'scaffold[create a full or lite StarCi app, including an empty unborn main Git repository]' 'secret[list, read, seal or generate an encrypted app secret]' 'stack[start, stop or inspect the shared local test-world infrastructure]' 'sync[compare or write every managed app file from its canonical template]' 'upgrade[upgrade a lite app to the full edition (--edition full); a full app is already current]' ;;
+      app) _values 'verbs' 'add[add one canonical backend capability and register its patterns]' 'check[judge the app tree, managed output, contracts, formatting and architecture]' 'emit[emit backend GraphQL, operation and event contract snapshots]' 'explain[explain which HFS slot owns one app-relative path]' 'hygiene[judge staged worktree metadata, stack files and plaintext secrets]' 'lint[lint both app sides and report repository, ESLint and stylelint findings together]' 'new[create a canonical service, unit spec or app image definition]' 'scaffold[create a full or lite StarCi app, including an empty unborn main Git repository]' 'secret[initialize, seal and materialize app secrets outside the repository]' 'stack[start, stop or inspect the shared local test-world infrastructure]' 'sync[compare or write every managed app file from its canonical template]' 'upgrade[upgrade a lite app to the full edition (--edition full); a full app is already current]' ;;
       check) _values 'verbs' 'run[run changed-scope checks or the full structural check set]' ;;
       connect) _values 'verbs' 'ask-gateway[operate the local owner-ask HTTP gateway]' 'telegram[deliver and maintain owner Telegram notifications]' 'telegram-media[deliver settled operation media through Telegram]' 'tunnel[operate the Cloudflare owner-ask tunnel]' ;;
       debug) _values 'verbs' 'digest[print the read-only debug digest with a verdict per role (no error, happy error, BUG)]' 'run[run one allowlisted read-only runtime inspector]' ;;
@@ -93,10 +93,7 @@ _starci() {
     'app:lint:--sonar') return 0 ;;
     'app:new:--inject') return 0 ;;
     'app:scaffold:--into') return 0 ;;
-    'app:secret:--key') return 0 ;;
-    'app:secret:--env') return 0 ;;
-    'app:secret:--age') return 0 ;;
-    'app:secret:--bytes') return 0 ;;
+    'app:secret:--generate') return 0 ;;
     'app:stack:--stack') return 0 ;;
     'app:stack:--services') return 0 ;;
     'check:run:--level') _values 'values' 'L0' 'L1' 'L2' 'L3' 'L4'; return 0 ;;
@@ -1013,7 +1010,7 @@ _starci() {
     'app:lint') _values 'flags' '--changed' '--workspace' '--fix' '--format' '--sonar' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:new') _values 'flags' '--inject' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:scaffold') _values 'flags' '--into' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'app:secret') _values 'flags' '--key' '--env' '--age' '--bytes' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'app:secret') _values 'flags' '--generate' '--to-file' '--reveal' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:stack') _values 'flags' '--stack' '--services' '--k3d' '--force' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:sync') _values 'flags' '--check' '--write' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:upgrade') _values 'flags' '--plan' '--json' '--cwd' '--quiet' '--help' '--edition' ;;

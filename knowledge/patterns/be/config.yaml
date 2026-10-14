@@ -30,8 +30,9 @@ rules:
     kind: mandatory
     hfsRules: [R43, R26, R90]
     requirement: |-
-      `platform/config` owns `EnvSource`, the only code that touches `process.env`; it also resolves `<KEY>_FILE` indirection
-      and offers the typed readers `env.string`, `env.int`, `env.bool`, `env.url`, `env.secret`, `env.enum`, `env.duration`,
+      `platform/config` owns `EnvSource`, the only code that touches `process.env`. When `<KEY>_FILE` is declared, its exact
+      file contents take priority over `<KEY>`; an empty or unreadable path stops boot, without falling back or trimming
+      the contents. Otherwise it reads `<KEY>`. It offers the typed readers `env.string`, `env.int`, `env.bool`, `env.url`, `env.secret`, `env.enum`, `env.duration`,
       `optional(...)` and `anyDeclared(keys)`. `be/apps/<app>/src/main.ts` builds `EnvSource` once and calls the capability
       parsers into `AppOptions`. A module factory never reads the environment. `envConfig()`, `ConfigService`,
       `@nestjs/config`, dotenv or preload files and module-level config reads do not exist, and `platform/config` imports no
@@ -131,5 +132,5 @@ rules:
         - SEALED_FILE_IN_WORK
         - HFS_STACKS_SHAPE
       manual:
-        - Owner performs any key operation; verify the recipient in .sops.yaml is the shared master recipient the stack declaration names.
+        - Owner authorizes key operations; run starci app secret init before the first secret and verify the project-owned recipient in .sops.yaml.
     relatedExamples: []

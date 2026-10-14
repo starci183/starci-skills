@@ -74,6 +74,7 @@ import { frontendFindings } from './rules/frontend-tree.mjs';
 import { lintSuppressionFindings } from './rules/lint-suppression.mjs';
 import { repoLocalCheckFindings } from './rules/repo-local-checks.mjs';
 import { supabaseSecretFindings } from './rules/supabase-secrets.mjs';
+import { untrackedSecretFindings } from './rules/secrets.mjs';
 import { pathFindings } from './path-findings.mjs';
 import { onLintSurface } from './architecture/surface.mjs';
 import { checkAppRoot, trackedTreeView } from './architecture/hfs.mjs';
@@ -182,6 +183,7 @@ function summarize(findings) {
   }
   return {
     error: findings.filter((f) => f.level === 'error').length,
+    warning: findings.filter((f) => f.level === 'warning').length,
     info: findings.filter((f) => f.level === 'info').length,
     byCode,
   };
@@ -198,7 +200,7 @@ function judgedFindings(findings, edition, root) {
 }
 
 /** The tree findings of R03: empty directories, ghost siblings, untracked entries outside an ignored slot. */
-function treeFindings({ repoRoot, resolver }) {
+function treeFindings({ repoRoot, resolver, reportedUntracked = new Set() }) {
   const inIgnoredSlot = (rel) => resolver.classifyPath(`${rel}/.probe`).tracking === 'ignored';
   const findings = [];
   const facts = treeFacts(readTree(repoRoot, { isIgnored: inIgnoredSlot }));
@@ -210,6 +212,7 @@ function treeFindings({ repoRoot, resolver }) {
   }
   for (const entry of untrackedEntries(repoRoot)) {
     const bare = entry.replace(/\/$/, '');
+    if (reportedUntracked.has(bare)) continue;
     const ignored = entry.endsWith('/') ? inIgnoredSlot(bare) : resolver.classifyPath(bare).tracking === 'ignored';
     if (!ignored) findings.push({ code: 'HFS_UNTRACKED_ROOT_ENTRY', level: 'error', path: bare, message: `${entry} is neither tracked nor git-ignored, and no ignored slot owns it` });
   }
@@ -347,7 +350,9 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
     findings.push(...keep(scopeFindings({ repoRoot, root, repo, resolver, files: tracked, scoped, manifest }), repoRoot));
   }
   findings.push(...extraFindings);
-  if (tree) findings.push(...treeFindings({ repoRoot, resolver }));
+  const untrackedSecrets = untrackedSecretFindings({ repoRoot, files: tracked, repo });
+  findings.push(...untrackedSecrets);
+  if (tree) findings.push(...treeFindings({ repoRoot, resolver, reportedUntracked: new Set(untrackedSecrets.map((finding) => finding.path)) }));
 
   // The app-root tree check reports machine codes: their why is read with the check's own.
   const judged = judgedFindings(findings, repo.edition ?? 'full', root);

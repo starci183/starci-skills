@@ -23,13 +23,68 @@ Every catalog component id that appears as a rendered Compose or Swarm service n
 
 `runbook` names a file; the checker resolves and reads it. That file's Markdown table must document exactly the same seven commands `modules/schemas/stacks-layout.yaml` promises - `prepare`, `doctor`, `up`, `status`, `logs`, `down`, `verification` - as one row each (`runbook-command-missing` names whichever row is absent). This holds for every environment, VPS included: there is no separate VPS-only command set. The commands are declared and legible; the checker does not execute them.
 
-## Secret custody
+## secrets custody
 
-A secret is `{name, where, recipientPolicy, keyCustody}`. `where` is one relative path inside the environment directory; the checker requires `<where>.enc` to exist as a regular, non-symlink, recognizable SOPS envelope (either the YAML/JSON `sops:` object or the flattened dotenv envelope SOPS emits for a `.env` member), and requires the plaintext member `<where>` - if it exists at all - to sit below the environment directory with no symlink ancestor. The shared age recipient is declared by `recipientPolicy`; host identity custody and its execution prerequisites follow [host credentials](host-secrets.md), so `keyCustody` cites that host custody rather than a per-project identity. `recipientPolicy` and `keyCustody` are required prose, not machine-checked custody, but their absence is still refused.
+Run these commands at the application root. Install `sops` and `age` (`age-keygen` on `PATH`) before setup; a missing tool stops the command with an actionable error. Application custody is only `.starcistacks/<env>/secrets/<slug>.enc`, encrypted with SOPS to the age recipient declared in the root `.sops.yaml`. Root `.env*`, `secrets.env`, `.secrets/`, private keys and decrypted files are forbidden, including ignored files. An untracked root `secrets.env` is a warning under lite so an existing app can migrate; tracking it is a failure. The frontend receives public configuration only.
 
-`.starcistacks/**/*.key`, `*.pem`, `*.p12`, `*.pfx`, and `id_rsa` are refused as tracked files (`STACKS_PLAINTEXT_SECRET`); only `<name>.enc` may be committed. The checker asks `git ls-files` to tell tracked apart from merely-present-on-this-machine; when it cannot reach a repository (a disposable fixture, a relocated payload with no `.git`) it skips this one check rather than assuming either answer.
+A manifest secret is `{name, where, recipientPolicy, keyCustody}`. `where` names the member relative to its environment directory, such as `secrets/app-be-db`; `<where>.enc` must be a regular, non-symlink SOPS envelope. `recipientPolicy` describes the actual `.sops.yaml` recipients, and `keyCustody` describes the owner's external private-key storage and backup. Both statements are required. An identity or resource record names its sealed member app-relative through `custody.sealed`; `.starciwork` never holds the value or envelope (`SEALED_CUSTODY_LOCATION`, `SEALED_FILE_IN_WORK`). The checker also refuses tracked private-key material (`STACKS_PLAINTEXT_SECRET`) and obtains tracked status through `git ls-files`.
 
-A sealed identity or resource secret is one file, `.starcistacks/<env>/secrets/<identity-or-resource-slug>.enc` (sops age); the Work tree keeps only the identity/resource record whose `custody.sealed` names that path app-relative, never a sealed file or a plaintext value (`SEALED_CUSTODY_LOCATION`, `SEALED_FILE_IN_WORK`). Other custody members are named `<name>.<fmt>.enc` (fmt inside, `.enc` last), for example `app.env.enc`, `admin.key.enc`; a name such as `secrets.enc.yaml` is refused (`STACKS_PLAINTEXT_TRACKED`, with a rename hint). sops takes the format of a `.enc` name to be binary, so every read states the input type (`sops decrypt --input-type yaml|json|dotenv`), and `sops exec-env` cannot read such a file because it has no `--input-type` flag. Use the runtime helper `node <Source>/.claude/scripts/gates/custody-exec.mjs <file>.<fmt>.enc '<command>'` (or `--get NAME`, `--keys` for names only): it decrypts in memory with the stated format, runs the command with the keys in its environment and writes no plaintext. A `<slug>.enc` states its format: `--input-type yaml`.
+### Initialize and seal
+
+```sh
+starci app secret init
+starci app secret set production app-be API_SECRET --generate 32
+starci app secret list production
+```
+
+`init` creates a local age identity when none exists and records only its public recipient in `.sops.yaml`, using this creation rule:
+
+```yaml
+creation_rules:
+  - path_regex: '\.starcistacks[/\\][^/\\]+[/\\]secrets[/\\][^/\\]+\.enc$'
+    age: <public-age-recipient>
+```
+
+The private key stays in `%APPDATA%/sops/age/keys.txt` on Windows, `~/Library/Application Support/sops/age/keys.txt` on macOS, or `$XDG_CONFIG_HOME/sops/age/keys.txt` on Linux (default `~/.config/sops/age/keys.txt`). Back it up in the owner's protected key store. Re-running `init` preserves an existing matching recipient rule; it does not rotate recipients or re-encrypt existing envelopes. A retained recipient still requires its matching private identity for decryption. Sharing a local identity across projects does not provide key isolation between them.
+
+`set <env> <slug> <KEY>` reads the value from stdin or creates it with `--generate <bytes>`. Feed stdin directly from an owner-controlled local secret source; do not put a value in argv, shell history, chat or an `echo` command. The command never prints the value. One trailing stdin line ending is removed; other supported value bytes are preserved. Multiline LF values are supported; carriage returns and a literal backslash followed by `n` are rejected without printing the value because SOPS dotenv cannot represent them losslessly. Each member is a SOPS dotenv document, and updating one key retains the other keys. `list <env>` prints key names only. New envelopes use dotenv; existing JSON/YAML envelopes can be read during migration.
+
+### Materialize for a process
+
+```sh
+starci app secret materialize production
+starci app secret get production app-be API_SECRET --to-file
+starci app secret get production app-be --to-file
+```
+
+`materialize <env>` decrypts all custody members into one file per KEY. `get <env> <slug> [KEY] --to-file` does the same for one member, or one key when KEY is given. Both report paths rather than values: `get --to-file` writes `KEY_FILE=...` metadata to stderr and leaves stdout empty unless `--reveal` is given; `materialize` writes its path metadata to stdout. Plaintext lives only in memory or below `%LOCALAPPDATA%/StarCi/secrets/<project>/<env>/`; `<project>` is the name in `hfs.json`. The macOS base is `~/Library/Application Support`; the Linux base is `$XDG_DATA_HOME` (default `~/.local/share`). `--reveal` explicitly allows stdout disclosure and belongs only to an owner's private terminal; automation uses file output.
+
+Export `<NAME>_FILE` with the returned absolute path and start the backend in that same execution context. Its canonical configuration boundary reads the file when `<NAME>_FILE` is set, otherwise it reads `<NAME>`; a bad file pointer fails rather than falling back silently. Keep file pointers and public configuration in the launcher, and keep all environment reads inside the canonical backend config/options boundary. Do not copy the decrypted files into the repository, build context or frontend, and remove obsolete materialized files after the process no longer needs them.
+
+### CI
+
+The owner provisions the matching private age key in the CI secret store. The workflow injects it only into the job that needs custody through `SOPS_AGE_KEY` (or mounts an external protected key file and sets `SOPS_AGE_KEY_FILE`). It never runs `init` to generate a replacement CI identity. For example, on a runner with the app CLI and SOPS tools already available:
+
+```yaml
+- name: Materialize production custody
+  env:
+    SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+  run: starci app secret materialize production
+```
+
+Use protected CI environments for production access. Set the required `*_FILE` pointers for the consuming step, and remove the materialized directory when the job completes. Secret keys and decrypted files are excluded from logs, caches, artifacts and images; do not enable shell tracing or run `--reveal`. A job that only builds or checks source needs no production key.
+
+### Production
+
+Provision the matching age identity through the deployment secret store to the service account outside the checkout. Materialize the selected environment before starting the service, grant only that service account access, and pass `*_FILE` pointers. Containers mount the required files read-only; plaintext is never baked into an image or rendered Compose environment. For Swarm, provision immutable versioned runtime secrets from the materialized files and use the external runtime names described below. Rotation seals the replacement, materializes it, changes the runtime grant, verifies convergence, then retires the old runtime secret and obsolete local files. Keep the private identity recoverable in the protected backup store.
+
+### Migrate nivo-lite
+
+Keep nivo-lite's existing `.sops.yaml` recipient and `.starcistacks/production/secrets/app-be-db.enc`. Use the identity that already decrypts that envelope; `init` is not a recipient-rotation command. Begin with `starci app secret list production`, which reveals names only, and inventory the remaining root `secrets.env` locally without displaying its values.
+
+For each remaining secret, choose its environment, resource slug and KEY. An owner-run local migration helper must parse `secrets.env` as dotenv in memory, pipe only that key's value into `starci app secret set <env> <slug> <KEY>`, check the command's exit status, and emit only key names and success/failure. Do not use shell substitution or interpolate values into a command string. Keep the source file until every selected key is sealed and its file-backed consumer has been verified; do not overwrite an existing sealed key just because the root file contains the same name. Public values belong in canonical public configuration, not encrypted custody.
+
+Run `starci app secret materialize production`, wire the backend's required `*_FILE` pointers, and update `scripts/with-secrets.mjs` / `env-sync.mjs` plus their package-script callers to stop loading or regenerating the root file. Verify backend startup and the affected database/auth behavior without value-bearing logs. After verification, remove root `secrets.env`, any root `.env*` / `.secrets/` copies and stale loaders, then run `starci app check` and `starci app hygiene`. If plaintext was ever tracked or otherwise exposed, rotate those credentials; deleting the working-tree file does not remove earlier disclosures. Agents may work with key names, paths and receipts, while the owner performs value-bearing migration locally.
 
 ## Directory shape
 

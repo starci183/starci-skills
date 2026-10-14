@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { checkRepo } from '../../scripts/hfs/check.mjs';
 import { liteSecretCustodyFindings, supabaseSecretFindings } from '../../scripts/hfs/rules/supabase-secrets.mjs';
-import { secretFindings } from '../../scripts/hfs/rules/secrets.mjs';
+import { secretFindings, untrackedSecretFindings } from '../../scripts/hfs/rules/secrets.mjs';
 
 const tree = (t, files) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-supabase-secrets-'));
@@ -23,6 +24,54 @@ const fe = edition => ({ profile: 'fe', edition });
 const resolver = { classifyPath: () => ({ status: 'owned' }), slot: () => null };
 const jwtFixture = `${Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url')}.${Buffer.from(JSON.stringify({ role: 'service_role', exp: 4102444800 })).toString('base64url')}.${'C'.repeat(43)}`;
 const fullApp = { hfs: 3, kind: 'app', project: 'fixture', sides: { be: { apps: [{ name: 'core', kind: 'api' }] }, fe: { apps: [{ name: 'web', kind: 'next' }] } } };
+const liteApp = { ...fullApp, edition: 'lite' };
+
+for (const ignored of [false, true]) {
+  test(`R06 warns about an ${ignored ? 'ignored' : 'unignored'} untracked secrets.env at the lite app root without making it an error`, t => {
+    const root = tree(t, { '.gitignore': ignored ? 'secrets.env\n' : '' });
+    execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'ignore' });
+    execFileSync('git', ['add', '.gitignore'], { cwd: root, stdio: 'ignore' });
+    const baseline = checkRepo({ repoRoot: root, declaration: liteApp });
+    fs.writeFileSync(path.join(root, 'secrets.env'), '');
+    const result = checkRepo({ repoRoot: root, declaration: liteApp });
+    const findings = result.findings.filter(item => item.path === 'secrets.env');
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].code, 'HFS_PLAINTEXT_SECRET');
+    assert.equal(findings[0].level, 'warning');
+    assert.match(findings[0].message, /starci app secret set/);
+    assert.equal(result.counts.warning, 1);
+    assert.equal(result.counts.error, baseline.counts.error, 'the generic untracked-entry gate must not turn the custody warning into an error');
+    const fast = checkRepo({ repoRoot: root, declaration: liteApp, tree: false, only: [] });
+    assert.equal(fast.findings.filter(item => item.code === 'HFS_PLAINTEXT_SECRET' && item.level === 'warning').length, 1, 'a fast check also reports local secret custody');
+  });
+}
+
+test('R06 keeps a tracked secrets.env an error by path even when its content is empty, and never downgrades it in a fast check', t => {
+  const root = tree(t, { 'secrets.env': '' });
+  execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'ignore' });
+  execFileSync('git', ['add', 'secrets.env'], { cwd: root, stdio: 'ignore' });
+  for (const declaration of [fullApp, liteApp]) {
+    const result = checkRepo({ repoRoot: root, declaration });
+    const [finding] = result.findings.filter(item => item.code === 'HFS_PLAINTEXT_SECRET');
+    assert.equal(finding?.path, 'secrets.env');
+    assert.equal(finding?.level, 'error');
+    assert.equal(finding?.slot, 'app.plaintext-env');
+    assert.equal(result.counts.warning, 0);
+    const fast = checkRepo({ repoRoot: root, declaration, tree: false, only: [] });
+    assert.deepEqual(fast.findings.filter(item => item.level === 'warning'), []);
+  }
+});
+
+test('the untracked custody warning applies only to the lite app root, with no warning for an absent file or nested secrets.env', t => {
+  const root = tree(t, { 'be/secrets.env': '' });
+  const input = { repoRoot: root, files: [] };
+  assert.deepEqual(untrackedSecretFindings({ ...input, repo: app('lite') }), []);
+  fs.writeFileSync(path.join(root, 'secrets.env'), '');
+  assert.deepEqual(untrackedSecretFindings({ ...input, repo: app('full') }), []);
+  assert.deepEqual(untrackedSecretFindings({ ...input, repo: fe('lite') }), []);
+  assert.deepEqual(untrackedSecretFindings({ ...input, repo: { profile: 'be', edition: 'lite' } }), []);
+  assert.deepEqual(untrackedSecretFindings({ ...input, files: ['secrets.env'], repo: app('lite') }), []);
+});
 
 test('the catalog-driven checkRepo findings filter drops L17 for a full repo with a root .env', t => {
   const root = tree(t, { '.env': 'PUBLIC_VALUE=fixture\n' });
