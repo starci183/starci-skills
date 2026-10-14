@@ -209,6 +209,18 @@ test("ensureLiteCli separates fail-fast environment parsing from its connection 
   assert.doesNotMatch(options, /EnvSource|parsePrimaryDatabaseConfig|noteEntities|noteMigrations/);
 });
 
+test("ensureLiteCli keeps an authored lite front-end image in the managed build command", () => {
+  const root = appRoot();
+  const dockerfile = path.join(root, "fe", "apps", "web", "Dockerfile");
+  fs.mkdirSync(path.dirname(dockerfile), { recursive: true });
+  fs.writeFileSync(dockerfile, "# app-owned Next image\n");
+  ensureLiteCli({ root, manifest, repo: repoAt(root) });
+  const scripts = JSON.parse(read(root, "package.json")).scripts;
+  assert.equal(scripts["docker:build:web"], "docker build -f fe/apps/web/Dockerfile -t demo/web:dev .");
+  assert.match(scripts["docker:build"], /npm run docker:build:api && npm run docker:build:cli && npm run docker:build:web/);
+  assert.equal(read(root, "fe/apps/web/Dockerfile"), "# app-owned Next image\n");
+});
+
 test("the full cli template binds domain entities and migrations after environment parsing", () => {
   const cli = "packages/hfs/templates/be/skeleton/apps/cli/src";
   const env = read(ROOT, `${cli}/cli.env.ts`);

@@ -101,6 +101,17 @@ test('a connection reached through a spread of an options property or a config c
   assert.equal(viaCall[0].connection, 'agentos');
 });
 
+test('a connection read by the <app>.env.ts reader through its own interface is the options connection', t => {
+  const options = ['export interface Options { readonly database: { name: string } }', ''].join('\n');
+  const env = ['export interface Env { readonly database: { name: string } }', 'export const readEnv = (): Env => ({ database: { name: "primary" } });', ''].join('\n');
+  const through = hits(run(t, {
+    'apps/core/src/core.options.ts': options,
+    'apps/core/src/core.env.ts': env,
+    [APP]: REGISTER('{ ...options.database, entities: billingEntities, migrations: billingMigrations }', ["import type { Options } from './core.options';", 'declare const options: Options;'].join('\n')),
+  }));
+  assert.deepEqual(through, [], JSON.stringify(through));
+});
+
 test('an entity manager injector of another connection inside the capability is BE_SCHEMA_OWNER; its own connection is fine', t => {
   const own = hits(run(t, { [`${BILLING}/invoice.reader.ts`]: "import { InjectPrimaryEntityManager } from '../../platform/database/primary.decorators';\nexport const read = () => InjectPrimaryEntityManager();\n" }));
   assert.deepEqual(own, [], JSON.stringify(own));

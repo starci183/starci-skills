@@ -42,6 +42,7 @@ import { escapeRegExp } from '../lib/regex.mjs';
 import { isInfrastructureValueFile } from './starcistacks-value-file.mjs';
 import { STACK_DECLARATION_TEMPLATE } from '../lib/example-refs.mjs';
 import { checkSecretForm, kindOf } from './starcistacks-form.mjs';
+import { applicationStackFindings } from './starcistacks-runtime.mjs';
 export { DECLARATION, STACK_ROOT, findStackDeclaration };
 const RESULT_SCHEMA = 'starci/starcistacks-check@1';
 const DECLARATION_SCHEMA = 'starci/application-stacks@1';
@@ -65,7 +66,7 @@ export const CODES = [
   'STACKS_SERVICE_UNDECLARED', 'STACKS_CI_CONTRADICTION', 'STACKS_CI_UNUSED', 'STACKS_CI_NAME_UNREFERENCED',
   'STACKS_PLAINTEXT_TRACKED', 'STACKS_ENC_TWIN_MISSING', 'STACKS_GITIGNORE_OPEN', 'STACKS_DECLARATION_IGNORED',
   'STACKS_GITIGNORE_VALUE_OPEN', 'STACKS_RUNBOOK_IGNORED', 'STACKS_QUALITY_GATE_DRIFT',
-  'STACKS_EXAMPLE_FORM', 'STACKS_PRODUCT_FORM',
+  'STACKS_EXAMPLE_FORM', 'STACKS_PRODUCT_FORM', 'HFS_STACKS_SHAPE',
 ];
 /** A plaintext value file inside infra/** (compose, terraform): env files, keys, certificates, tfvars. */
 /** Paths (under <root>/<environment>/) the ignore rules must deny; they need not exist. */
@@ -303,7 +304,7 @@ const checkUndeclared = ({ repo, ciUses, normalized, services, declFile, add }) 
       `${files.join(', ')} call ${id}, which the declaration does not state${followUp}`);
   }
 };
-const checkQualityGate = (sonar, normalized, declFile, add) => { if (!sonar || sonar.mode === 'disabled') { return; } const gateName = loadSonarGate().gate.name; if (sonar.qualityGate !== gateName) { add(normalized.sonar ? 'refuse' : 'suspect', 'STACKS_QUALITY_GATE_DRIFT', `${declFile}#services.sonar.qualityGate`, `services.sonar.qualityGate is ${sonar.qualityGate ?? 'absent'}; every product names the one gate ${gateName} (knowledge/sonar-gate.yaml owns its thresholds)`); } };
+const checkQualityGate = (sonar, normalized, declFile, add, repo) => { if (!sonar || sonar.mode === 'disabled') { return; } const gateName = loadSonarGate({ cwd: repo }).gate.name; if (sonar.qualityGate !== gateName) { add(normalized.sonar ? 'refuse' : 'suspect', 'STACKS_QUALITY_GATE_DRIFT', `${declFile}#services.sonar.qualityGate`, `services.sonar.qualityGate is ${sonar.qualityGate ?? 'absent'}; every product names the one gate ${gateName} (knowledge/sonar-gate.yaml owns its thresholds)`); } };
 // Sonar settings the repository carries must agree with the declaration, and every repository names the one quality gate.
 const checkSonarDrift = ({ repo, name, normalized, services, declFile, add }) => {
   const sonar = normalized.sonar ?? (services ? null : resolveStackService(repo, 'sonar'));
@@ -316,7 +317,7 @@ const checkSonarDrift = ({ repo, name, normalized, services, declFile, add }) =>
       add('suspect', 'STACKS_HOST_DRIFT', 'sonar-project.properties', `sonar.host.url ${props['sonar.host.url']} but the declaration's public host is ${sonar.host.public}`);
   }
   // The one quality gate (knowledge/sonar-gate.yaml): a repository names it, never its own thresholds.
-  checkQualityGate(sonar, normalized, declFile, add);
+  checkQualityGate(sonar, normalized, declFile, add, repo);
 };
 const checkTrackedCustody = ({ repo, root, add }) => {
   const tracked = git(lsFiles, repo, ['--', root]);
@@ -430,6 +431,7 @@ export function checkStarciStacks(repoRoot, { newRepo = false, examplesRoot = pa
   checkSonarDrift({ repo, name, normalized, services, declFile, add });
   checkCustodyLayout({ repo, own, add });
   checkDeclarationIgnore(own, repo, shown, add);
+  for (const item of applicationStackFindings(repo)) add('refuse', item.code, item.path, item.message);
   return buildResult({ repo, name, newRepo, declaration, governing, normalized, findings });
 }
 /** A report-safe view: custody as presence, never a value. */

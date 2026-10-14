@@ -118,17 +118,21 @@ test('.starcistacks lives at the app root: a be/.starcistacks or be/.sops.yaml i
 test('HFS_STACKS_SHAPE: the slot allows list and the custody .gitignore rules (stacks-layout.yaml gitignoreRules) agree: every tracked member the shape allows is un-ignored', () => {
   const slots = parseYaml(fs.readFileSync(path.join(root, 'knowledge/hfs/slots.yaml'), 'utf8')).slots;
   const layout = parseYaml(fs.readFileSync(path.join(root, 'modules/schemas/stacks-layout.yaml'), 'utf8'));
-  const allows = slots.find((slot) => slot.id === 'app.starcistacks').allows;
+  const slot = slots.find((entry) => entry.id === 'app.starcistacks');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-stacks-ignore-'));
   made.push(dir);
   execFileSync('git', ['init', '-q'], { cwd: dir });
   fs.writeFileSync(path.join(dir, '.gitignore'), `${layout.custody.gitignoreRules.join('\n')}\n`);
   // A custody member (runtime/{config,env}, secrets) is ignored by design; every other allowed entry is a tracked source file.
-  const tracked = allows.filter((entry) => !/^<env>\/(?:runtime|secrets)\//.test(entry)).flatMap((entry) => braceVariants(entry))
-    .map((entry) => `.starcistacks/${entry.replace('<env>', 'dev').replace('**', 'sub/file.yaml')}`);
-  assert.ok(tracked.includes('.starcistacks/dev/infra/metadata.json') && tracked.length > 5, tracked.join(', '));
-  for (const file of tracked) assert.equal(spawnSync('git', ['check-ignore', '-q', '--no-index', '--', file], { cwd: dir }).status, 1, `${file} is allowed by the app.starcistacks slot but the custody rules ignore it`);
+  for (const allows of [slot.allows, slot.lite.allows]) {
+    const tracked = allows.filter((entry) => !/^<env>\/(?:runtime|secrets)\//.test(entry)).flatMap((entry) => braceVariants(entry))
+      .map((entry) => `.starcistacks/${entry.replace('<env>', 'dev').replace('**', 'sub/file.yaml')}`);
+    assert.ok(tracked.includes('.starcistacks/dev/infra/swarm/sub/file.yaml'), tracked.join(', '));
+    for (const file of tracked) assert.equal(spawnSync('git', ['check-ignore', '-q', '--no-index', '--', file], { cwd: dir }).status, 1, `${file} is allowed by the app.starcistacks slot but the custody rules ignore it`);
+  }
   assert.equal(spawnSync('git', ['check-ignore', '-q', '--no-index', '--', '.starcistacks/dev/infra/compose/.env'], { cwd: dir }).status, 0, 'a value file stays ignored');
+  assert.equal(spawnSync('git', ['check-ignore', '-q', '--no-index', '--', '.starcistacks/dev/infra/swarm/.env.production'], { cwd: dir }).status, 0, 'Swarm plaintext values stay ignored after the re-include');
+  assert.equal(spawnSync('git', ['check-ignore', '-q', '--no-index', '--', '.starcistacks/dev/secrets/database-url.enc'], { cwd: dir }).status, 1, 'sealed custody stays tracked');
 });
 
 // ------------------------------------------------------------------------------------------------ R13 HFS_CI_MISSING_CANON

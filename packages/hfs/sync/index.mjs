@@ -25,6 +25,7 @@ import { APP_SCOPE, SIDES, litePresenceOf, loadSlotManifest, resolveRepoDeclarat
 import { managedGroupOf } from '../runtime/scripts/hfs/edition-slots.mjs';
 import { feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
 import { DEFAULT_PORT, NODE_IMAGE, dockerfilePath } from '../runtime/scripts/hfs/rules/docker.mjs';
+import { isFile } from '../runtime/scripts/lib/fs-kind.mjs';
 import { readDeclaredSonarKey } from './sonar-key.mjs';
 import { byCodeUnit } from '../report/order.mjs';
 
@@ -160,7 +161,8 @@ const SOURCE_SKIPPED = new Set(['node_modules', 'dist', 'coverage']);
 /**
  * The be source of the app at `root` the coverage components read: { files, read }, `files` be-relative posix paths of every `*.ts` file under
  * be/apps and be/src (build output and dependencies skipped) and `read` their text. `workPresent` records whether the optional
- * lite brand tree exists, so sync can preserve its absence. An app with no be folder has no files.
+ * lite brand tree exists, so sync can preserve its absence. `hasImage` identifies authored optional Dockerfiles without reading
+ * their content. An app with no be folder has no source files.
  */
 export function appSource(root) {
   const files = [];
@@ -173,7 +175,8 @@ export function appSource(root) {
     }
   };
   for (const dir of ['apps', 'src']) walk(dir);
-  return { files: files.sort(byCodeUnit), read: file => fs.readFileSync(path.join(root, 'be', file), 'utf8'), workPresent: fs.existsSync(path.join(root, '.starciwork')) };
+  return { files: files.sort(byCodeUnit), read: file => fs.readFileSync(path.join(root, 'be', file), 'utf8'),
+    workPresent: fs.existsSync(path.join(root, '.starciwork')), hasImage: file => isFile(path.join(root, file), { followLinks: false }) };
 }
 
 /**
@@ -204,7 +207,7 @@ export function jestCoverageSource(coverage) {
  * `docker:build:<app>` builds the image of one app (the exact command its Dockerfile header states, tag `<project>/<app>:dev`) and
  * `docker:build` builds every image, one after the other, never pushing.
  */
-export function appScripts(app) {
+export function appScripts(app, source) {
   const line = (name, command) => `${JSON.stringify(name)}: ${JSON.stringify(command)},`;
   const be = app.sides.be.apps;
   const fe = app.sides.fe.apps;
@@ -215,7 +218,7 @@ export function appScripts(app) {
   const workspace = entry => feAppPackageName(app.project, entry.name);
   // Both editions generate before they run (owner ruling 2026-10-13): the fe's GraphQL wire types, and under lite the Supabase types check.
   const dev = entry => `npm run codegen --silent && turbo run dev --filter=${workspace(entry)}`;
-  const images = imageEntries(app);
+  const images = imageEntries(app, source);
   const imageCommand = ({ side, entry }) => `docker build -f ${dockerfilePath(side, entry.name)} -t ${app.project}/${entry.name}:dev .`;
   return [
     ...(apis.length === 1 ? [line('dev:be', watch(apis[0]))] : apis.map(entry => line(`dev:be:${entry.name}`, watch(entry)))),
@@ -240,9 +243,10 @@ const opensPackages = side => (side.optionalSlots ?? []).some(id => id === 'repo
 /** The stylesheets of the fe side the CSS canon judges, relative to fe/: every app and every workspace package (slot fe.route, fe.package.*). */
 export const STYLE_GLOB = '{apps,packages}/*/src/**/*.css';
 
-/** The images a declaration renders commands and CI entries for: every app of either edition. */
-function imageEntries(app) {
-  return [...app.sides.be.apps.map(entry => ({ side: 'be', entry })), ...app.sides.fe.apps.map(entry => ({ side: 'fe', entry }))];
+/** Required app images plus lite front ends whose optional Dockerfile the source holds. */
+function imageEntries(app, source) {
+  const frontend = app.sides.fe.apps.filter(entry => app.edition !== 'lite' || source?.hasImage?.(dockerfilePath('fe', entry.name)));
+  return [...app.sides.be.apps.map(entry => ({ side: 'be', entry })), ...frontend.map(entry => ({ side: 'fe', entry }))];
 }
 
 /**
@@ -250,9 +254,9 @@ function imageEntries(app) {
  * runs on the release tag, so every image is built there; no path filter narrows it. A YAML block mapping per entry, indented for
  * `strategy.matrix.include`.
  */
-export function imageMatrix(app) {
+export function imageMatrix(app, source) {
   const entry = (side, item) => `          - name: ${item.name}\n            file: ${dockerfilePath(side, item.name)}`;
-  return imageEntries(app).map(image => entry(image.side, image.entry)).join('\n');
+  return imageEntries(app, source).map(image => entry(image.side, image.entry)).join('\n');
 }
 
 const IMAGE_TEMPLATE = Object.freeze({ api: 'be/image/api', worker: 'be/image/worker', cli: 'be/image/cli', next: 'fe/image/next' });
@@ -262,14 +266,14 @@ const IMAGE_TEMPLATE = Object.freeze({ api: 'be/image/api', worker: 'be/image/wo
  * and then the app's own, judged by the docker rules (R187-R191). A Next image copies the fe packages only when the fe side opts into
  * them and the be contracts only when the fe side reads them, so each COPY names a folder the app has.
  */
-export function imageFiles(app) {
+export function imageFiles(app, source) {
   const side = app.sides.fe;
   const inputs = [...(opensPackages(side) ? ['fe/packages'] : []), ...((side.reads ?? []).includes('be/contracts/') ? ['be/contracts'] : [])];
   const copyInputs = inputs.map(folder => `COPY ${folder} ${folder}\n`).join('');
   // The folders outside be/ that the back end declares it reads (the generated Supabase types of a lite back end, which an upgraded app keeps reading) are in every one of its images.
   const beFolders = (app.sides.be.reads ?? []).map(folder => folder.replace(/\/$/, ''));
   const copyBeInputs = beFolders.map(folder => `COPY ${folder} ${folder}\n`).join('');
-  const entries = imageEntries(app).map(({ side: which, entry: item }) => ({ side: which, item }));
+  const entries = imageEntries(app, source).map(({ side: which, entry: item }) => ({ side: which, item }));
   return entries.map(({ side: which, item }) => {
     const template = IMAGE_TEMPLATE[item.kind];
     const vars = { project: app.project, app: item.name, nodeImage: NODE_IMAGE, port: DEFAULT_PORT, copyInputs, copyBeInputs };
@@ -287,7 +291,7 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
     header: HEADER(scope),
     project: app.project,
     appBinary: APP_BINARY,
-    appScripts: appScripts(app),
+    appScripts: appScripts(app, source),
     // turbo builds every fe app workspace; ^build (turbo.json) builds the packages each app imports first, and caches both.
     buildFe: 'npm run codegen --silent && turbo run build --filter=./fe/apps/*',
     // The be side with its tsc; every fe workspace with its own typecheck script through turbo (the packages are built first: ^build).
@@ -305,7 +309,7 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
     codecovComponents: scope === APP_SCOPE ? componentsYaml(coverageComponents(manifest, { ...source, apps: app.sides.be.apps, providers })) : '',
     tsconfigPaths: ['be/tsconfig.json', ...fe.apps.map(entry => `fe/apps/${entry.name}/tsconfig.json`), ...(packages ? ['fe/packages/*/tsconfig.json'] : [])].join(','),
     styleGlob: STYLE_GLOB,
-    imageMatrix: imageMatrix(app),
+    imageMatrix: imageMatrix(app, source),
     imageProject: app.project,
   };
 }

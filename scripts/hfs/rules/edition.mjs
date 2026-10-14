@@ -10,7 +10,7 @@
 //     while full owns them (BullMQ, Kafka, Redis: lite runs pgmq and Postgres locks instead);
 //   - a declaration of what lite does not have: an app kind, pattern or trigger kind every slot of which is forbidden under
 //     lite. The forbidden names are DERIVED from the manifest, so adding or restoring a kind is a manifest edit, not an edit here
-//     (under the 2026-10-12 ruling no pattern, trigger or app kind is gone).
+//     (under the 2026-10-13 ruling no pattern, trigger or app kind is gone).
 // A full app answers []: the rule tests the edition once and a full view forbids none of these names.
 import { found, readJson } from './read.mjs';
 import { DEPENDENCY_SECTIONS } from './fe-no-tests.mjs';
@@ -79,7 +79,7 @@ function dependencyFindings(rel, pkg, removed) {
     if (!isPlainObject(deps)) continue;
     for (const name of Object.keys(deps)) {
       if (LITE_FORBIDDEN_TEST_INFRA.test(name)) findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} ${section} has ${name}: a lite app runs no test containers, fault proxy or browser journey - its integration specs run against \`supabase start\``, { section, name }));
-      else if (removed.has(name)) findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} ${section} has ${name}: lite runs no self-hosted infrastructure - the pattern's port is implemented on Supabase (pgmq, Postgres locks)`, { section, name }));
+      else if (removed.has(name)) findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} ${section} has ${name}: lite replaces backing infrastructure with Supabase - the pattern's port is implemented on Supabase (pgmq, Postgres locks)`, { section, name }));
     }
   }
   return findings;

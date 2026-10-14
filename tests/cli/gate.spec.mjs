@@ -4,6 +4,8 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { CATALOG as catalog } from '../../packages/cli/src/catalog.generated.mjs';
+import { main as cliMain } from '../../packages/cli/src/main.mjs';
+import { main as runtimeMain } from '../../scripts/cli/main.mjs';
 
 import { flagsOfUsage } from '../../scripts/checks/check-cli-parity.mjs';
 
@@ -59,4 +61,33 @@ test('gate catalog resolves every implementation and exactly declares its parsed
     assert.deepEqual(flagsOfUsage(spec.usage(source)).sort(), [...spec.flags].sort(), `${verb} usage reflects its parser`);
     assert.deepEqual(command.flags.map((flag) => flag.name).sort(), [...spec.flags].sort(), `${verb} catalog flags`);
   }
+});
+
+test('the actual starcistacks dispatch accepts lite and consumes the global edition before invoking the gate', async () => {
+  assert.deepEqual(group.verbs.starcistacks.editions, ['full', 'lite']);
+  const appRoot = path.join(repoRoot, 'examples', 'lite-app');
+  let runtimeArgs, gateCall, stderr = '';
+  const io = { cwd: appRoot, env: {}, stdout: () => {}, stderr: text => { stderr += text; } };
+  const code = await cliMain(['gate', 'starcistacks', appRoot, '--edition', 'lite', '--json'], {
+    ...io,
+    locateRuntime: () => ({ root: repoRoot, source: 'fixture' }),
+    ownRuntimeRoot: () => repoRoot,
+    spawn: (command, args, options) => {
+      assert.equal(command, process.execPath);
+      assert.equal(args[0], path.join(repoRoot, 'scripts', 'cli', 'main.mjs'));
+      assert.equal(options.cwd, appRoot);
+      runtimeArgs = args.slice(1);
+      return { status: 0 };
+    },
+  });
+  assert.equal(code, 0, stderr);
+  assert.ok(runtimeArgs.includes('--edition'));
+  assert.equal(await runtimeMain(runtimeArgs, {
+    ...io, runtimeRoot: repoRoot,
+    runScript: (script, args, options) => { gateCall = { script, args, options }; return 0; },
+  }), 0, stderr);
+  assert.equal(gateCall.script, path.join(repoRoot, 'scripts', 'gates', 'starcistacks.mjs'));
+  assert.deepEqual(gateCall.args, [appRoot, '--json']);
+  assert.equal(gateCall.options.cwd, appRoot);
+  assert.equal(stderr, '');
 });

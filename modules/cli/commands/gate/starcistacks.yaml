@@ -15,4 +15,4 @@ json: flag
 examples:
   - starci gate starcistacks <repo-root>
   - starci gate starcistacks <repo-root> --new --json
-editions: [full]
+editions: [full, lite]

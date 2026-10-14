@@ -11,13 +11,15 @@ family: repo
 # into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
 slots: [app.starcistacks]
 provenance:
-  reviewedAt: 2026-09-29
+  reviewedAt: 2026-10-14
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
     - knowledge/application-stacks.yaml
     - docs/application-stacks.md
     - scripts/gates/starcistacks.mjs
+    - owner-approved Swarm canon 2026-10-14 (lite production runtime and app-owned scheduled work)
   limitations: |
     The shape check proves where declarations live. It proves neither startup nor recovery; readiness and recovery evidence
     do. Package profiles and lifecycle are owned by knowledge/application-stacks.yaml.
@@ -25,23 +27,23 @@ rules:
   - id: REPO-STACKS-1
     title: One shape per environment
     kind: mandatory
-    hfsRules: [R10, R01]
+    hfsRules: [R10, R01, R212]
     requirement: |
-      `.starcistacks/` is `application-stacks.yaml` plus one folder per environment (`dev/`, `production/`, ...), each holding only
-      `README.md`, `environment.json` where the schema asks for it, `infra/{compose,swarm,k8s,terraform}/`, `runtime/{config,env}/`,
-      `secrets/<slug>.enc` and `seeds/` (the environment's seed data, loaded only by a cli seed command). `runtime/env/KEYS.md` lists slug names and never values. There is no `runtime/files/`.
-      A `DESIGN.md`, `deployment.json` or `k8s/` at its root does not exist; design notes go to `be/docs/` and Kubernetes
-      manifests to `<env>/infra/k8s/`. Lite production uses `runtime: docker-swarm` and its tracked rendered stack under
-      `production/infra/swarm/`; production never uses Compose or host crontab.
+      app.starcistacks owns the application-root declaration and the permitted shape of each environment; neither side owns
+      a stack tree. Read that slot's requires, allows, forbidden and edition overlay instead of copying its file list.
+      Full permits its declared infra runtimes, runtime configuration, sealed custody and cli-owned seeds. Lite requires the
+      declaration and permits Swarm infra, the environment's runbook and record, and sealed custody; the other infra runtimes,
+      runtime and seeds trees remain forbidden. Lite components never duplicate a Supabase-provided backing service.
+      Deployment design belongs to be.docs; the stack tree holds the declared topology and operational record.
     rationale: |
       One shape lets the stack check and the deploy tooling find everything without a per-project map.
     cases:
       - id: case-1
         when: A new environment
-        write: .starcistacks/production/{README.md,environment.json,infra/,runtime/,secrets/,seeds/}
+        write: Use the app.starcistacks shape for the selected edition and declare the environment and its runtime.
       - id: case-2
         when: A Kubernetes manifest
-        write: .starcistacks/production/infra/k8s/orders-deployment.yaml
+        write: Use the Kubernetes infra location of app.starcistacks under full; lite refuses that runtime.
     verification:
       automated:
         - HFS_STACKS_SHAPE
@@ -57,8 +59,48 @@ rules:
         - HFS_MODULE_TIER_INVALID
         - HFS_WORK_IN_FE
         - HFS_STACKS_IN_SIDE
+        - HFS_EDITION_INVALID
+        - HFS_EDITION_FORBIDDEN_PRESENT
+        - HFS_STARCIWORK_LITE_FORBIDDEN
       manual:
         - starci gate starcistacks <app> exits 0 (the app root).
+    relatedExamples: []
+  - id: REPO-STACKS-4
+    title: Scheduled work on Swarm is application-owned
+    kind: mandatory
+    hfsRules: [R10, R212]
+    requirement: |
+      Recurring work is owned by the application: a back-end scheduler dispatches a command, a pgmq job has an api or worker
+      runner, or a lite pg_cron tick enqueues work. Deployment never installs a host crontab from app.ci-deploy, app.deploy,
+      app.scripts, app.scripts.delivery or app.starcistacks. The checker reports the offending file and line.
+      A scheduled CLI batch is converted to an app scheduler or declared as a component with `role: job`,
+      `mode: replicated-job`, a cron `schedule` and a `scheduler` naming a declared `role: scheduler` component running
+      swarm-cronjob. Both components belong to the target environment. The stack job has deploy mode replicated-job,
+      zero replicas, restart condition
+      none and matching swarm.cronjob.enable and swarm.cronjob.schedule service labels.
+      Every Swarm service has a digest-pinned image, healthcheck, update_config with order, failure_action rollback and
+      monitor, rollback_config and restart_policy. Only ingress publishes ports; secrets are external with versioned names.
+    rationale: |
+      A schedule declared with its runner remains reviewable and moves with the application release. A host crontab adds a
+      second runtime authority that the stack cannot reconcile.
+    cases:
+      - id: case-1
+        when: A report CLI command must run every day
+        write: >-
+          Declare report as role job with mode replicated-job, scheduler cron and schedule "0 3 * * *"; declare cron as role
+          scheduler with the swarm-cronjob image. Wire report with deploy mode replicated-job, zero replicas, restart condition none and the matching
+          service labels. docs/application-stacks.md "Scheduled work on Swarm" owns the manifest and stack example.
+      - id: case-2
+        when: A lite recurring queue task
+        write: Use a pg_cron tick to enqueue through pgmq and compose its consumer in the api or worker app; no host crontab.
+    verification:
+      automated:
+        - HFS_STACKS_SHAPE
+        - HFS_EDITION_INVALID
+        - HFS_EDITION_FORBIDDEN_PRESENT
+        - HFS_STARCIWORK_LITE_FORBIDDEN
+      manual:
+        - Confirm completion, retry and overlap handling belongs to the job and that its scheduler has the required runtime access.
     relatedExamples: []
   - id: REPO-STACKS-2
     title: Shared host services are declared, not copied

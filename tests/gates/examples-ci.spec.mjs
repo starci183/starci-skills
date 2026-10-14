@@ -176,11 +176,11 @@ test('a hand-written matrix, a per-example workflow, an automatic e2e step and a
   assert.deepEqual(codes(root), ['EXAMPLES_CI_STRAY_WORKFLOW']);
 });
 
-test('every deployable image is derived from hfs.json (full be+fe, lite be only) and the images job builds it without pushing', (t) => {
+test('every deployable image is derived from hfs.json and optional lite Dockerfiles, and the images job builds it without pushing', (t) => {
   assert.deepEqual(exampleImages(ROOT).map((image) => `${image.app}:${image.file}`), [
     'ecommerce-app:be/apps/identity/Dockerfile', 'ecommerce-app:be/apps/order/Dockerfile', 'ecommerce-app:be/apps/billing/Dockerfile', 'ecommerce-app:be/apps/cli/Dockerfile',
     'ecommerce-app:fe/apps/landing/Dockerfile', 'ecommerce-app:fe/apps/app/Dockerfile',
-    'lite-app:be/apps/api/Dockerfile', 'lite-app:be/apps/cli/Dockerfile',
+    'lite-app:be/apps/api/Dockerfile', 'lite-app:be/apps/cli/Dockerfile', 'lite-app:fe/apps/web/Dockerfile',
     'shape-slot:be/apps/core/Dockerfile', 'shape-slot:be/apps/cli/Dockerfile', 'shape-slot:fe/apps/shape-slot/Dockerfile',
   ]);
   const root = fixture(t, ['alpha']);
@@ -196,6 +196,29 @@ test('every deployable image is derived from hfs.json (full be+fe, lite be only)
   assert.deepEqual(codes(root), ['EXAMPLES_CI_IMAGES_NOT_DERIVED']);
   fs.writeFileSync(file, original.slice(0, original.indexOf('\n  images:')) + '\n');
   assert.deepEqual(codes(root), ['EXAMPLES_CI_IMAGES_NOT_DERIVED']);
+});
+
+test('lite examples build authored Next images and keep hosted front ends outside the image matrix', (t) => {
+  const root = fixture(t, ['alpha']);
+  const appRoot = path.join(root, 'examples', 'alpha');
+  const declaration = JSON.parse(declarationOf('alpha'));
+  declaration.edition = 'lite';
+  fs.writeFileSync(path.join(appRoot, 'hfs.json'), JSON.stringify(declaration));
+  const expected = [
+    { app: 'alpha', name: 'core', file: 'be/apps/core/Dockerfile' },
+    { app: 'alpha', name: 'cli', file: 'be/apps/cli/Dockerfile' },
+  ];
+  assert.deepEqual(exampleImages(root), expected, 'a hosted Next app has no local image');
+  const dockerfile = path.join(appRoot, 'fe', 'apps', 'web', 'Dockerfile');
+  fs.mkdirSync(dockerfile, { recursive: true });
+  assert.deepEqual(exampleImages(root), expected, 'a directory cannot supply an image build');
+  fs.rmdirSync(dockerfile);
+  fs.writeFileSync(dockerfile, 'FROM node:22.14.0-alpine3.21\n');
+  assert.deepEqual(exampleImages(root), [...expected, { app: 'alpha', name: 'web', file: 'fe/apps/web/Dockerfile' }]);
+  const undeclared = path.join(appRoot, 'fe', 'apps', 'undeclared', 'Dockerfile');
+  fs.mkdirSync(path.dirname(undeclared), { recursive: true });
+  fs.writeFileSync(undeclared, 'FROM node:22.14.0-alpine3.21\n');
+  assert.equal(exampleImages(root).some((image) => image.name === 'undeclared'), false, 'hfs.json owns the inventory');
 });
 
 test('the quality files of each example are rendered from the source slot manifest: the app codecov.yml scope equals the root flag, and a hand edit is refused', (t) => {

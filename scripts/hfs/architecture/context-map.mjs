@@ -74,10 +74,16 @@ const nameFromIdentifier = (ctx, checker, node, depth) => {
     ? nameOfExpression(ctx, kit.checkerOf(declaration.getSourceFile()), declaration.initializer, depth + 1) : null;
 };
 
+/** True when `declaration` is a property of the `<app>.env.ts` reader's own interface that sits beside the options file declaring `target`: the reader feeds the options value, so its property is the same slot. */
+const feedsOptions = (declaration, target) => {
+  const home = declaration?.getSourceFile().fileName ?? '';
+  return home.endsWith('.env.ts') && path.posix.dirname(home) === path.posix.dirname(target.getSourceFile().fileName);
+};
+
 const nameFromProperty = (ctx, checker, node, depth) => {
   const target = ctx.kit.declarationsOf(checker, node.name)[0];
   if (!target) return null;
-  const names = new Set(assignmentsOf(ctx, node.name.text).filter(item => item.declaration === target)
+  const names = new Set(assignmentsOf(ctx, node.name.text).filter(item => item.declaration === target || feedsOptions(item.declaration, target))
     .map(item => nameOfExpression(ctx, item.checker, item.initializer, depth + 1)).filter(Boolean));
   return names.size === 1 ? [...names][0] : null;
 };

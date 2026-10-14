@@ -7,7 +7,9 @@ The canonical manifest is `.starcistacks/application-stacks.yaml`, schema `starc
 
 ## Manifest shape
 
-`components` is a map from component id to `{role, image?, compose?, purpose?, required?}`. `role` is a free-text classification (`stateful`, `service`, `observability`, and so on are all in use); `image` and `compose` are descriptive cross-references to the environment's own Compose fragments, not a rendering instruction. `sources` is an optional list of `{repository}` entries naming the application repositories this stack deploys, with no further binding - the manifest is a static declaration, not a build pipeline.
+`components` is a map from component id to `{role, image?, compose?, purpose?, required?, mode?, scheduler?, schedule?}`. `role` is a free-text classification, including `stateful`, `service`, `observability`, `ingress`, `scheduler` and `job`; existing classifications remain valid. `mode` is `service` by default or `replicated-job`. A scheduled replicated job names its declared scheduler component id in `scheduler` and its cron expression in `schedule`. `image` and `compose` are descriptive cross-references to the environment's own stack fragments, not a rendering instruction. `sources` is an optional list of `{repository}` entries naming the application repositories this stack deploys, with no further binding - the manifest is a static declaration, not a build pipeline.
+
+`backing` is an optional map of managed dependencies that the stack does not run, such as `supabase: {provider: supabase, managed: true}`. It is separate from the runnable `components` and the delivery/quality `services` catalog. The new component fields and `backing` are optional so older declarations remain loadable. The existing required `k8s: {status: deferred | supported, reason: ...}` posture remains required, including for lite.
 
 `environments` is a map from environment name to:
 
@@ -135,6 +137,69 @@ A single VPS is a one-manager swarm: it provides orchestration but no manager fa
 
 Acceptance per declared OS/architecture needs disposable cold-host evidence of: signed Docker installation and idempotent preparation; new- or existing-swarm reconciliation without destructive reinitialization; rejection of unsupported platform, image, capacity, placement and quorum; complete image build/publish closure before deploy; rendered Swarm configuration review; convergence plus application health; restart with stable services, secrets and data; secret rotation without disclosure; compatible migration with readiness held closed on failure; update failure and rollback handling; encrypted off-host backup with isolated restore; swarm-state backup and autolock recovery; first TLS issuance and renewal with only declared public ports; interrupted-operation reconciliation; and non-destructive removal with application rollback boundaries. A single-manager test never certifies manager failover, and an amd64 pass never certifies arm64.
 
+### Lite production
+
+Lite retains the full application code structure and swaps backing infrastructure for Supabase (owner ruling 2026-10-13). Its api, web, ingress and application sidecars run on the VPS as a `runtime: docker-swarm` environment. `backing.supabase` declares `{provider: supabase, managed: true}`; that managed dependency is not a Swarm service. The `app.starcistacks` lite slot requires the manifest and permits the environment's tracked, value-free `infra/swarm/**` stack, runbook, environment record and sealed secret custody. It refuses Compose, Kubernetes and Terraform infra trees, runtime and seeds trees, and components whose images duplicate a Supabase-provided backing service: postgres, redis, kafka, keycloak, minio, rabbitmq, mysql or mongo.
+
+For every service in a Swarm stack, declare an image pinned by `@sha256:<digest>`, a `healthcheck`, `deploy.update_config` with `order`, `failure_action: rollback` and `monitor`, `deploy.rollback_config`, and `deploy.restart_policy`. Only a component with `role: ingress` publishes ports. Every stack secret is `external: true` with a versioned `name` ending in `-v<N>`; materialize its value from the environment's SOPS custody for each release.
+
+**Ingress is any declared ingress (owner ruling 2026-10-14).** The component with `role: ingress` may run Traefik or Caddy (or another reverse proxy); the checker keys on the role and the published ports, never on the image name. The lite example uses Caddy, and a live app that already holds persisted Traefik certificates keeps Traefik. Declare it as the `ingress` component in `application-stacks.yaml` and in `infra/swarm/stack.yaml`; the ingress alone publishes ports and carries the same digest, healthcheck and update/rollback policy as every other service.
+
+**Sidecar state is SQLite on a declared persistent volume (owner ruling 2026-10-14).** A sidecar such as n8n does not run its own Postgres in lite: that image would duplicate a Supabase-provided service and is refused. The approved pattern is the sidecar's built-in SQLite database on a named volume declared in `infra/swarm/stack.yaml` (for n8n, `DB_TYPE=sqlite` and `N8N_USER_FOLDER` on the volume), with a placement constraint that pins the single replica to the node holding the volume and a backup of that volume in the runbook. The checker does not refuse a named volume; it refuses only the Postgres, Redis, Kafka, Keycloak, MinIO, RabbitMQ, MySQL and Mongo images.
+
+## Scheduled work on Swarm
+
+Swarm has no native CronJob. Recurring work is application-owned: a back-end scheduler dispatches a command, a pgmq job is consumed by its api or worker, or a lite pg_cron tick enqueues work. Do not install a host crontab from a workflow, deployment file, script or stack tree. The checker reports the file and line of crontab installation, including `crontab -`, `crontab -l`, `/etc/cron.d`, `cron.d` and `@reboot`.
+
+A CLI batch on a schedule is either converted to an application scheduler or declared as a `mode: replicated-job` component with a cron `schedule` and a `scheduler` pointing to a declared `role: scheduler` component running swarm-cronjob. Include both components in the target environment. For example, these manifest entries schedule an app-owned report command:
+
+```yaml
+components:
+  cron:
+    role: scheduler
+    image: crazymax/swarm-cronjob@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    compose: infra/swarm/stack.yaml
+  report:
+    role: job
+    mode: replicated-job
+    scheduler: cron
+    schedule: "0 3 * * *"
+    image: ghcr.io/example/app-cli@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    compose: infra/swarm/stack.yaml
+```
+
+The corresponding stack service declares `deploy.mode: replicated-job`, starts at zero replicas, has `restart_policy.condition: none`, and repeats the declared schedule in service labels. Both services still carry the common health and rollout policies; this fragment shows the scheduler and job wiring:
+
+```yaml
+x-rollout: &rollout
+  update_config: {order: stop-first, failure_action: rollback, monitor: 30s}
+  rollback_config: {order: stop-first, monitor: 30s}
+  restart_policy: {condition: on-failure}
+services:
+  cron:
+    image: crazymax/swarm-cronjob@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    healthcheck: {test: [CMD-SHELL, "kill -0 1"], interval: 30s, timeout: 5s, retries: 3}
+    volumes: [/var/run/docker.sock:/var/run/docker.sock]
+    deploy:
+      <<: *rollout
+      replicas: 1
+      placement: {constraints: [node.role == manager]}
+  report:
+    image: ghcr.io/example/app-cli@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    command: [cli, report, run]
+    healthcheck: {test: [CMD-SHELL, "kill -0 1"], interval: 30s, timeout: 5s, retries: 3}
+    deploy:
+      <<: *rollout
+      mode: replicated-job
+      replicas: 0
+      restart_policy: {condition: none}
+      labels:
+        swarm.cronjob.enable: "true"
+        swarm.cronjob.schedule: "0 3 * * *"
+```
+
+The image digests above illustrate the declaration; a release binds the actual registry digests. The CLI command owns completion, retry and overlap handling. A process healthcheck does not prove that its report completed; record application completion evidence and an idempotency or exclusion policy.
+
 ## Runtime configuration and health
 
 Configuration and health belong to the component that consumes them. Each runnable component identifies its repository role, immutable revision, package root, entry command or image, and the files that define its configuration and startup — a monorepo path and a split-repository root share the model.
@@ -147,7 +212,7 @@ Configuration and health belong to the component that consumes them. Each runnab
 
 ## Checker coverage and acceptance evidence
 
-The static checker validates manifest shape against the machine schema, the tree shape above, environment-relative Compose path safety, component-id/service-name correspondence, runbook file existence and command completeness, secret custody (SOPS envelope, plaintext-path safety, tracked-plaintext refusal, required policy prose), unresolved rendered-Compose interpolation, plaintext sensitive environment values in the rendered model, and - for a Swarm environment - a nonempty rendered image with no leftover `build` section on every managed service. For a Swarm environment the caller supplies the rendered Swarm configuration: `checkApplicationStacks({repoRoot, environment: 'production', deploymentModelFile})` in `scripts/gates/stacks-gate.mjs`. Alpha.15 requires a declared model to be available for application checking; model absence must not silently bypass the deployment requirements.
+The static checker validates manifest shape against the machine schema, the tree shape above, environment-relative Compose path safety, component-id/service-name correspondence, runbook file existence and command completeness, secret custody (SOPS envelope, plaintext-path safety, tracked-plaintext refusal, required policy prose), unresolved rendered-Compose interpolation and plaintext sensitive environment values in the rendered model. Swarm checks require digest-pinned images with no leftover `build`, healthchecks, update and rollback configuration, restart policies, versioned external secrets, ingress-only published ports and the replicated-job scheduler wiring above. Both `starci app check` and `starci gate starcistacks` validate lite stack shape, Swarm policies, host crontab installation and duplicate backing-service components. The gate can also check an explicitly rendered Swarm configuration: `checkApplicationStacks({repoRoot, environment: 'vps', deploymentModelFile})` in `scripts/gates/stacks-gate.mjs`.
 
 It does not invoke Docker or host processes, execute a runbook, authenticate the rendered model's provenance, decrypt SOPS, inspect registry manifests, or independently discover component-to-service placement. A rendered Compose or Swarm model is checked for consistency with the declaration, not proven live — convergence, migration, backup, restore, autolock recovery, TLS and rollback behavior are the application's own evidence. Tracked-plaintext detection is a best-effort `git ls-files` query, not a cryptographic or content-based leak scan.
 
@@ -165,7 +230,7 @@ These requirements apply to lite and full; the rule catalog and its enforcers pr
 
 ## Reference pattern
 
-The `examples/ecommerce-app/.starcistacks` kit declares only `dev` with `runtime: docker-compose` and `secrets: []`. It demonstrates the development manifest, component declarations, runbook and static checker input; it provides no VPS deployment or sealed-secret custody example. Application-specific production audit evidence belongs in that application's reports.
+The `examples/ecommerce-app/.starcistacks` kit demonstrates the full manifest, distinct dev and VPS runtimes, secret custody, and static checker input. `examples/lite-app` demonstrates a lite production Swarm environment with Supabase as managed backing. Application-specific readiness and audit evidence belongs in that application's reports.
 
 ## Primary references
 

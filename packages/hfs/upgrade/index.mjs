@@ -6,6 +6,7 @@
 // restored before the refusal is returned.
 import fs from "node:fs";
 import path from "node:path";
+import { authoredAdditionReasons, remember, ensureParent, writeFile, restore } from "./file-state.mjs";
 import { parseYaml } from "../runtime/engine/yaml.mjs";
 import {
   loadSlotManifest,
@@ -270,8 +271,6 @@ function sourceWithAdditions(root, additions) {
   };
 }
 
-// Files the app authors itself: the upgrade never overwrites them and keeps an existing one (CONTEXT: declarations are preserved).
-const APP_OWNED = new Set([".starcistacks/application-stacks.yaml"]);
 const publicStep = ({ op, path: file, why }) => ({ op, path: file, why });
 
 async function model({ root, to, presets, manifest }) {
@@ -286,6 +285,7 @@ async function model({ root, to, presets, manifest }) {
   );
   const full = fullEditionDeclaration(declaration, manifest);
   const desired = additions(root, full, hadCli, manifest);
+  const authored = authoredAdditionReasons(declaration, appSource(root));
   const pins = parseYaml(fs.readFileSync(PINS_FILE, "utf8")).pins;
   const upgradedPackage = pinnedPackage(root, pins);
   const resolvedPresets = presets ?? UPGRADE_PRESETS;
@@ -357,8 +357,8 @@ async function model({ root, to, presets, manifest }) {
   for (const file of desired) {
     const target = path.join(root, ...file.path.split("/"));
     if (fs.existsSync(target)) {
-      if (APP_OWNED.has(file.path)) {
-        steps.push({ op: "keep", path: file.path, why: "The app already declares its stacks; the declaration stays as the app wrote it.", kind: "keep" });
+      if (authored.has(file.path)) {
+        steps.push({ op: "keep", path: file.path, why: authored.get(file.path), kind: "keep" });
         continue;
       }
       if (!sameText(root, file.path, file.content))
@@ -400,55 +400,6 @@ async function model({ root, to, presets, manifest }) {
   return { full, managed: managedWithoutPackage, steps, dependenciesChanged };
 }
 
-function remember(snapshot, target) {
-  if (snapshot.has(target)) return;
-  snapshot.set(
-    target,
-    fs.existsSync(target) && fs.statSync(target).isFile()
-      ? fs.readFileSync(target)
-      : null,
-  );
-}
-
-function ensureParent(root, target, directories) {
-  const missing = [];
-  for (
-    let at = path.dirname(target);
-    at.startsWith(root) && at !== root && !fs.existsSync(at);
-    at = path.dirname(at)
-  )
-    missing.push(at);
-  for (const directory of missing.reverse()) {
-    fs.mkdirSync(directory);
-    directories.push(directory);
-  }
-}
-
-function writeFile(root, file, content, snapshot, directories) {
-  const target = path.join(root, ...file.split("/"));
-  remember(snapshot, target);
-  ensureParent(root, target, directories);
-  fs.writeFileSync(target, content);
-}
-
-function restore(snapshot, directories) {
-  for (const [target, content] of [...snapshot.entries()].reverse()) {
-    if (content === null) {
-      if (fs.existsSync(target) && fs.statSync(target).isFile())
-        fs.unlinkSync(target);
-    } else {
-      fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.writeFileSync(target, content);
-    }
-  }
-  for (const directory of [...directories].reverse()) {
-    try {
-      fs.rmdirSync(directory);
-    } catch {
-      /* It is non-empty or already absent: preserve it. */
-    }
-  }
-}
 
 /**
  * Plans or applies the lite -> full migration. Returns the ordered public plan (`{op,path,why}[]`) in both modes.

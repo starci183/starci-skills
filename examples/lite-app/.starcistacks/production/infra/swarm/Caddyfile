@@ -1,0 +1,9 @@
+{$SITE_HOST} {
+    @api path /graphql /graphql/* /health/* /api/*
+    handle @api {
+        reverse_proxy api:3000
+    }
+    handle {
+        reverse_proxy web:3000
+    }
+}

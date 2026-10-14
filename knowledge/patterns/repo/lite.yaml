@@ -3,25 +3,25 @@ id: repo.lite
 title: Lite edition
 purpose: |
   Given a small product on Supabase, which part of the one HFS standard still applies and how is it kept? All of it: a lite app
-  keeps the full code structure with Supabase backing services and declared docker-swarm production (R212;
-  owner ruling 2026-10-14), seen through a filtered slot and rule view (`edition: lite` in hfs.json).
-  The same monorepo, slots, patterns and back-end unit specs; the lite adapters implement the same pattern ports
-  (knowledge/patterns/be/supabase-queues.yaml and the lite
-  adapter of each pattern topic); the same front end (knowledge/hfs/fe-stack.yaml); integration scenario proofs for declared
-  patterns, optional contract specs and no e2e world.
+  is the full code structure with its backing infrastructure swapped for Supabase (owner ruling 2026-10-13, R212 cases
+  1-3), seen through a filtered slot and rule view (`edition: lite` in hfs.json). The same monorepo, slots, patterns and
+  back-end unit specs; every pattern port implemented on Supabase (knowledge/patterns/be/supabase-queues.yaml and the lite
+  adapter of each pattern topic); the same front end (knowledge/hfs/fe-stack.yaml); no e2e or contract world. Its api and
+  sidecars run on the VPS with Docker Swarm through app.starcistacks.
 appliesTo:
   - backend
   - frontend
 family: repo
 provenance:
-  reviewedAt: 2026-10-13
+  reviewedAt: 2026-10-14
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
     - knowledge/hfs/rules.yaml
     - docs/lite-edition.md
-    - owner ruling 2026-10-14 (Supabase backing services, declared docker-swarm production, app-owned schedules, sealed custody)
-    - owner rulings 2026-10-13 (one code structure and one front end for both editions; the HFS standard, migration baseline and assets policies)
+    - owner ruling 2026-10-12 (lite = full minus self-hosted infrastructure; queue transport Supabase Queues/pgmq)
+    - owner rulings 2026-10-13 (one code structure and one front end for both editions; backing infrastructure swapped for Supabase; the HFS standard, migration baseline and assets policies)
+    - owner-approved Swarm canon 2026-10-14 (lite api and sidecars on the VPS, app-owned scheduled work)
     - knowledge/hfs/fe-stack.yaml
     - https://supabase.com/docs/guides/database/postgres/row-level-security
   limitations: |
@@ -31,7 +31,7 @@ rules:
   - id: REPO-LITE-1
     title: One edition, one engine
     kind: mandatory
-    hfsRules: [R212, R272, R284]
+    hfsRules: [R212, R10]
     requirement: |
       `hfs.json` names its edition (`full`, or `lite`; absent means `full`). The edition selects which slots and rules are in
       view; it never selects another engine or relaxes a rule locally. Lite keeps the full monorepo (the api, cli and optional
@@ -39,16 +39,19 @@ rules:
       declaration), the CQRS
       shape, every pattern (queue, event bus, saga, reactors, projection, realtime, webhooks, fenced job) declared the same way,
       and the back-end unit specs exactly as full (ruleParams.be.unitRoles, logicRoles at 100 per file, @starci/jest-preset
-      doubles, builders). Adapters and delivery differ: schema authority in `supabase/migrations`; queue and
+      doubles, builders). Backing adapters run on Supabase: schema authority in app.supabase.migrations; queue and
       event bus on Supabase Queues (pgmq); realtime on the same socket.io gateway run inside the api process (one instance, no
-      Redis adapter); cache and locks on Postgres; schedules on pg_cron (+ pg_net) or a declared replicated-job, never host
-      crontab. Lite proves app boot and dependency injection with the wiring proof (R272), and declared patterns require
-      integration scenario proofs on `starci supabase start` (R284). Contract specs are optional. A lite app holds
-      none of the infrastructure lite does not run: no e2e spec or script, no e2e workflow or browser journey, no
-      UAT record, no test container, toxiproxy, BullMQ, Kafka or Redis dependency, no self-hosted Postgres and no
-      `supabase/functions`. Production is declared in `.starcistacks/application-stacks.yaml` with `runtime: docker-swarm`
-      and its rendered stack tracked under `.starcistacks/production/infra/swarm/`.
-      The front end is the one front-end standard of knowledge/hfs/fe-stack.yaml, identical to full and
+      Redis adapter); cache and locks on Postgres; app-owned schedules through back-end schedulers, pgmq jobs or pg_cron ticks
+      (+ pg_net); storage and auth on Supabase. The api, web, ingress and application sidecars run on Docker Swarm on the VPS;
+      app.starcistacks declares Supabase as managed backing and the environment with `runtime: docker-swarm`. The ingress is
+      any declared `role: ingress` component (Traefik or Caddy); a sidecar such as n8n keeps its state in SQLite on a declared
+      persistent volume, never in a self-hosted Postgres.
+      Integration specs are optional and run only on `starci supabase start`. A lite app holds
+      none of the infrastructure lite does not run: no e2e or contract spec or script, no e2e workflow or browser journey, no
+      UAT record, no test container, toxiproxy, BullMQ, Kafka or Redis dependency. The app.starcistacks lite overlay permits
+      Swarm infra and refuses the other infra runtimes, runtime and seeds trees and components duplicating Supabase-provided
+      backing services. The app.supabase.functions slot is unavailable. The front end is the one front-end standard of
+      knowledge/hfs/fe-stack.yaml, identical to full and
       with no tests (R97): Apollo GraphQL and SWR to the back end, modules/auth as the only Supabase importer (auth only), no
       Server Action and no route handler beyond health/live and the auth callback (R243).
       Lite's Work tree (slot app.starciwork) is required only when brand records exist and permits only `.gitignore`, the workspace
@@ -56,8 +59,8 @@ rules:
       app-root detection and front-end role mapping. The catalog, shell, features, resources, UAT and br records are
       forbidden (HFS_STARCIWORK_LITE_FORBIDDEN).
     rationale: |
-      One manifest and one catalog keep a lite app upgradable to full by additions only: swap the adapters and add the full
-      e2e world and backing services.
+      One manifest and one catalog keep a lite app upgradable to full by additions only: swap the adapters, add the e2e and
+      contract world and self-hosted backing services.
     cases:
       - id: case-1
         when: A product outgrows lite
@@ -81,17 +84,19 @@ rules:
       - id: case-4
         when: A lite app needs production delivery tooling
         write: >-
-          Declare docker-swarm production in app.starcistacks and track its rendered stack under
-          `.starcistacks/production/infra/swarm/`, with one declared digest-pinned ingress component. Use app.deploy for thin operator shell scripts;
+          Use app.deploy for delivery helpers, Caddy configuration, environment examples and operator shell scripts;
           app.ci-deploy and app.ci-authorize-deploy-key for deployment and deploy-key authorization workflows; and
-          app.scripts.delivery for helpers to build and sync declared environment settings. Lite's backing services
-          stay on Supabase and secrets live only in `.starcistacks/<env>/secrets/*.enc`. Delivery files remain legal after
+          app.scripts.delivery for helpers to build, sync environment settings and load or set secrets. Lite's backing services
+          stay on Supabase; app.starcistacks requires the declaration and holds Swarm topology, the environment runbook and
+          record, and sealed secret custody. Scheduled CLI batches use the replicated-job and scheduler contract of
+          repo.starcistacks; delivery never installs a host crontab. Delivery files remain legal after
           an upgrade to full; operational helpers then use app.scripts.
     verification:
       automated:
         - HFS_EDITION_INVALID
         - HFS_EDITION_FORBIDDEN_PRESENT
         - HFS_STARCIWORK_LITE_FORBIDDEN
+        - HFS_STACKS_SHAPE
       manual: []
     relatedExamples: []
   - id: REPO-LITE-2

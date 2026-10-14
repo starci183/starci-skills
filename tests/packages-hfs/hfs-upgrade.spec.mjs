@@ -1,8 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { main } from "../../packages/hfs/src/main.mjs";
 import {
@@ -10,291 +8,15 @@ import {
   fullEditionDeclaration,
   upgradeEdition,
 } from "../../packages/hfs/upgrade/index.mjs";
-import {
-  imageFiles,
-  renderTargets,
-  writeTargets,
-} from "../../packages/hfs/sync/index.mjs";
+import { renderTargets } from "../../packages/hfs/sync/index.mjs";
 import { checkRepo, trackedFiles } from "../../scripts/hfs/check.mjs";
-import {
-  createSlotResolver,
-  loadSlotManifest,
-  resolveRepoDeclaration,
-} from "../../scripts/hfs/slots.mjs";
-import {
-  FE_APP_SCRIPTS,
-  PACKAGE_MANAGER,
-  WORKSPACES,
-  feAppPackageName,
-} from "../../scripts/hfs/rules/monorepo.mjs";
 import {
   FORMATTED,
   gitAdd,
   installTypeScript,
 } from "../helpers/hfs-cli-fixture.mjs";
 
-const MANIFEST = loadSlotManifest();
-const ROOT = path.resolve(import.meta.dirname, "..", "..");
-const PRESETS = {
-  sonarExclusions: ["**/node_modules/**", "fe/**"],
-  coverageSources: ["src/**/*.service.ts", "src/features/cli/**/*.cli.ts"],
-};
-const LITE = {
-  hfs: MANIFEST.major,
-  kind: "app",
-  edition: "lite",
-  project: "demo",
-  sides: {
-    be: {
-      apps: [{ name: "api", kind: "api" }],
-      kinds: ["api"],
-      connections: [
-        {
-          name: "primary",
-          envPrefix: "PRIMARY_DB",
-          owner: "api",
-          isolation: "schema",
-          provider: "supabase",
-        },
-      ],
-    },
-    fe: {
-      apps: [{ name: "web", kind: "next" }],
-      reads: ["be/contracts/", "supabase/types/"],
-    },
-  },
-};
-const TYPE_TEXT =
-  "export type Json = string | number | boolean | null | Json[] | { [key: string]: Json | undefined };\nexport interface Database { public: { Tables: Record<string, never> } }\n";
-
-const posix = (value) => value.split(path.sep).join("/");
-const put = (root, file, text = "export {};\n") => {
-  const target = path.join(root, ...file.split("/"));
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, text);
-};
-const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
-
-function fakeLock(root) {
-  const pkg = JSON.parse(
-    fs.readFileSync(path.join(root, "package.json"), "utf8"),
-  );
-  put(
-    root,
-    "package-lock.json",
-    json({
-      name: pkg.name,
-      version: pkg.version,
-      lockfileVersion: 3,
-      requires: true,
-      packages: {
-        "": {
-          name: pkg.name,
-          version: pkg.version,
-          dependencies: pkg.dependencies,
-          devDependencies: pkg.devDependencies,
-        },
-      },
-    }),
-  );
-  return { ok: true };
-}
-
-function contents(root) {
-  const result = {};
-  const walk = (dir) => {
-    for (const entry of fs
-      .readdirSync(dir, { withFileTypes: true })
-      .sort((a, b) => a.name.localeCompare(b.name))) {
-      if (entry.name === ".git" || entry.name === "node_modules") continue;
-      const target = path.join(dir, entry.name);
-      const rel = posix(path.relative(root, target));
-      if (entry.isDirectory()) {
-        result[`${rel}/`] = "directory";
-        walk(target);
-      } else
-        result[rel] = createHash("sha256")
-          .update(fs.readFileSync(target))
-          .digest("hex");
-    }
-  };
-  walk(root);
-  return result;
-}
-
-function fixtureContent(file) {
-  if (file.endsWith(".json")) return "{}\n";
-  if (file.endsWith(".yaml") || file.endsWith(".yml")) return "schema: fixture/v1\n";
-  if (file.endsWith(".toml")) return 'project_id = "demo"\n';
-  if (file.endsWith(".md")) return "# Demo\n";
-  return "export {};\n";
-}
-
-function fixtureHealth(root) {
-  put(root, "be/apps/api/src/app.module.ts", `import { Module } from "@nestjs/common"
-import { apiModules } from "./compose/api"
-
-@Module({ imports: [...apiModules()] })
-export class AppModule {}
-`);
-  put(root, "be/apps/api/src/compose/api.ts", `import type { DynamicModule, Type } from "@nestjs/common"
-import { SystemHealthHttpModule } from "@features/api/system-health"
-
-export const apiModules = (): Array<Type<unknown> | DynamicModule> => [SystemHealthHttpModule]
-`);
-  put(root, "be/src/features/api/system-health/index.ts", 'export { SystemHealthHttpModule } from "./transport/http/system-health-http.module"\n');
-  put(root, "be/src/features/api/system-health/system-health.module.ts", `import { Module } from "@nestjs/common"
-
-@Module({})
-export class SystemHealthModule {}
-`);
-  put(root, "be/src/features/api/system-health/application/liveness.contracts.ts", "export interface LivenessReport { readonly alive: true }\n");
-  put(root, "be/src/features/api/system-health/transport/http/system-health-http.module.ts", `import { Module } from "@nestjs/common"
-import { SystemHealthModule } from "../../system-health.module"
-import { LiveController } from "./live.controller"
-
-@Module({ imports: [SystemHealthModule], controllers: [LiveController] })
-export class SystemHealthHttpModule {}
-`);
-  put(root, "be/src/features/api/system-health/transport/http/live.controller.ts", `import { Controller, Get } from "@nestjs/common"
-import type { LivenessReport } from "../../application/liveness.contracts"
-
-@Controller("health")
-export class LiveController {
-    @Get("live")
-    live(): LivenessReport { return { alive: true } }
-}
-`);
-}
-
-function syntheticLite(t, name = "demo") {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "hfs-upgrade-lite-"));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const declaration = { ...structuredClone(LITE), project: name };
-  const pkg = {
-    name,
-    version: "0.0.0",
-    private: true,
-    packageManager: PACKAGE_MANAGER,
-    workspaces: [...WORKSPACES],
-    dependencies: {
-      "@nestjs/common": "11.1.6",
-      "@nestjs/core": "11.1.6",
-      "@supabase/supabase-js": "2.117.2",
-    },
-    devDependencies: {
-      "@starci/hfs": "4.0.9",
-      supabase: "2.119.0",
-      turbo: "2.8.20",
-      typescript: "5.9.3",
-    },
-  };
-  put(root, "hfs.json", json(declaration));
-  put(root, "package.json", json(pkg));
-  writeTargets(
-    root,
-    renderTargets(declaration, PRESETS, { manifest: MANIFEST }),
-  );
-
-  const resolver = createSlotResolver(
-    MANIFEST,
-    resolveRepoDeclaration(MANIFEST, declaration),
-  );
-  for (const entry of resolver.requiredPaths().paths) {
-    const file = entry.path;
-    if (
-      file.endsWith("/") ||
-      file === ".starciwork/index.yaml" ||
-      fs.existsSync(path.join(root, ...file.split("/")))
-    )
-      continue;
-    put(root, file, fixtureContent(file));
-  }
-  fixtureHealth(root);
-  put(
-    root,
-    "be/nest-cli.json",
-    json({
-      $schema: "https://json.schemastore.org/nest-cli",
-      collection: "@nestjs/schematics",
-      monorepo: true,
-      root: "apps/api",
-      sourceRoot: "apps/api/src",
-      projects: {
-        api: {
-          type: "application",
-          root: "apps/api",
-          entryFile: "main",
-          sourceRoot: "apps/api/src",
-        },
-      },
-    }),
-  );
-  put(
-    root,
-    "fe/apps/web/package.json",
-    json({
-      name: feAppPackageName(name, "web"),
-      version: "0.0.0",
-      private: true,
-      scripts: FE_APP_SCRIPTS,
-      dependencies: { "next-intl": "4.3.9" },
-    }),
-  );
-  put(
-    root,
-    "fe/apps/web/tsconfig.json",
-    json({
-      extends: "../../tsconfig.json",
-      compilerOptions: { paths: { "@/*": ["./src/*"] } },
-    }),
-  );
-  for (const image of imageFiles(resolveRepoDeclaration(MANIFEST, declaration)))
-    put(root, image.path, image.content);
-  put(root, "supabase/types/database.types.ts", TYPE_TEXT);
-  put(
-    root,
-    "supabase/migrations/20261002000000_baseline.sql",
-    `create role app_be login noinherit nosuperuser nobypassrls nocreatedb nocreaterole;
-create table public.notes (id uuid primary key);
-alter table public.notes enable row level security;
-alter table public.notes force row level security;
-create policy notes_app_be_read on public.notes for select to app_be using (current_user = 'app_be');
-grant usage on schema public to app_be;
-revoke all on table public.notes from public, anon, authenticated;
-grant select on table public.notes to app_be;
-`,
-  );
-  put(
-    root,
-    ".starcistacks/dev/environment.json",
-    json({ environment: "dev", provider: "supabase" }),
-  );
-  put(root, ".starcistacks/dev/secrets/.gitkeep", "");
-  put(root, ".starciwork/shell/index.yaml", "schema: work/shell@1\n");
-  put(
-    root,
-    "be/apps/api/src/main.ts",
-    'export const apiProductMarker = "preserve-api";\n',
-  );
-  put(
-    root,
-    "be/src/modules/domain/sample/index.ts",
-    'export { SampleService } from "./sample.service";\n',
-  );
-  put(
-    root,
-    "be/src/modules/domain/sample/sample.service.ts",
-    'export class SampleService { value(): string { return "preserve-service"; } }\n',
-  );
-  put(
-    root,
-    "fe/apps/web/src/app/[locale]/page.tsx",
-    'export default function Page() { return "preserve-fe"; }\n',
-  );
-  fakeLock(root);
-  return root;
-}
+import { MANIFEST, ROOT, PRESETS, put, fakeLock, contents, syntheticLite } from "../helpers/hfs-upgrade-fixture.mjs";
 
 const outputOf = async (argv) => {
   let out = "";
@@ -314,6 +36,7 @@ const outputOf = async (argv) => {
 
 test("upgrade plan is ordered, printable and byte-for-byte read-only; apply executes that exact plan", async (t) => {
   const root = syntheticLite(t);
+  put(root, "fe/apps/web/Dockerfile", "# authored optional lite image\nFROM node:22.14.0-alpine3.21\n");
   const before = contents(root);
   const plan = await upgradeEdition({
     root,
@@ -336,6 +59,7 @@ test("upgrade plan is ordered, printable and byte-for-byte read-only; apply exec
     plan.length,
     "each path has one operation",
   );
+  assert.equal(plan.find(step => step.path === "fe/apps/web/Dockerfile")?.op, "keep", "an authored optional front-end image is preserved");
   for (const file of [
     ".github/workflows/ci.yml",
     "codecov.yml",
@@ -386,6 +110,7 @@ test("upgrade plan is ordered, printable and byte-for-byte read-only; apply exec
       "be/src/features/api/system-health/transport/http/live.controller.ts",
       "be/src/modules/domain/sample/sample.service.ts",
       "fe/apps/web/src/app/[locale]/page.tsx",
+      "fe/apps/web/Dockerfile",
     ].map((file) => [
       file,
       fs.readFileSync(path.join(root, ...file.split("/"))),
@@ -602,7 +327,7 @@ test("already-full and invalid targets refuse with exit 2, and a failed lock res
   assert.ok(fs.existsSync(path.join(kept, ".starcistacks/dev/infra/compose/api.yaml")));
 
   const absentRoot = syntheticLite(t, "absent-stacks-demo");
-  fs.rmSync(path.join(absentRoot, ".starcistacks/application-stacks.yaml"));
+  fs.unlinkSync(path.join(absentRoot, ".starcistacks", "application-stacks.yaml"));
   const absent = await upgradeEdition({ root: absentRoot, to: "full", plan: true, presets: PRESETS });
   assert.deepEqual(
     absent.filter((step) => step.path === ".starcistacks/application-stacks.yaml").map((step) => step.op),

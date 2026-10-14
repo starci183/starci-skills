@@ -12,12 +12,13 @@ family: be
 # into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
 slots: [be.app.worker, be.transport.message, be.feature.jobs]
 provenance:
-  reviewedAt: 2026-09-30
+  reviewedAt: 2026-10-14
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
     - knowledge/hfs/rules.yaml
     - owner-locked BE convention 2026-09-30
+    - owner-approved Swarm canon 2026-10-14 (application-owned schedules, no host crontab)
     - docs/architecture.md
     - https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html
   limitations: |-
@@ -82,4 +83,4 @@ liteAdapter:
   proof: >-
     `starci app check --wiring` proves the lite app's module graph with doubles (R272); declared patterns also require their
     scenario-titled integration specs (R284).
-  see: [knowledge/patterns/be/supabase-queues.yaml]
+  see: [knowledge/patterns/be/supabase-queues.yaml, knowledge/patterns/repo/starcistacks.yaml]

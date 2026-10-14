@@ -1,57 +1,16 @@
-# The app declares its topology before any owner provisions a deployment.
+# The stack declaration of the lite app, at the app root beside be/, fe/ and .starciwork.
+# Production compute is authored for an operated environment; the starter invents no deployment.
 schema: starci/application-stacks@1
-sources:
-  - repository: "{{project}}"
-components:
-  api:
-    role: service
-    image: "{{project}}/api:v0.0.0"
-  web:
-    role: service
-    image: "{{project}}/web:v0.0.0"
-  ingress:
-    role: ingress
-    image: caddy:2.10.2@sha256:c3d7ee5d2b11f9dc54f947f68a734c84e9c9666c92c88a7f30b9cba5da182adb
-    purpose: The single public entry point; TLS state stays on its declared persistent volume.
-environments:
-  dev:
-    status: supported
-    runtime: docker-swarm
-    composeFiles: [infra/swarm/stack.yaml]
-    components:
-      api: { port: 3001 }
-      web: { port: 3000 }
-      ingress: { httpPort: 8080 }
-    runbook: README.md
-    # Custody starts empty; add real sealed members after owner provisioning.
-    secrets: []
-  production:
-    status: supported
-    runtime: docker-swarm
-    composeFiles: [infra/swarm/stack.yaml]
-    components:
-      api: { port: 3001 }
-      web: { port: 3000 }
-      ingress: { httpPort: 80, httpsPort: 443 }
-    runbook: README.md
-    # External Swarm secret names are declared in the model. Real sealed members are owner-provisioned.
-    secrets: []
-k8s:
-  status: deferred
-  reason: This starter declares Docker Swarm production; no Kubernetes environment is provisioned.
+backing:
+  supabase:
+    provider: supabase
+    managed: true
 services:
   sonar:
     provider: sonarqube
     mode: local
     qualityGate: {{sonarGate}}
-    host: { local: http://127.0.0.1:9000 }
     stack:
       owner: host
       root: .claude/ext/sonar
       environment: dev
-      compose: compose.yaml
-    auth: token
-    ci: { wiring: optional-follow-up }
-    ownerAction:
-      needed: Provision the shared host Sonar project and its analysis credential through sealed custody.
-      reason: A fresh app declares its quality service without fabricating credentials or a successful analysis.
