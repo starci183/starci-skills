@@ -22,7 +22,7 @@
  * (ruleParams.be.logicRoles: `<name>.policy.spec.ts`, `<name>.client.spec.ts`, ...), a
  * unit spec of a webhook, gateway or subscription door (`.webhook.spec.ts`, `.gateway.spec.ts`, `.subscription.spec.ts`: a door has no service of its own), a
  * `*.builder.ts` under src/tests/fixtures/builders, and a file of the test world (slots be.tests.world and be.tests.world.kit, which
- * open and migrate the real databases of the e2e run) read from disk count as consumers, because a spec can only provide an
+ * open and migrate the real databases of the e2e run) read from disk or staged in the git index count as consumers, because a spec can only provide an
  * Inject*() token or a param type the entry exports, and the world wires the same capabilities the apps do. An integration
  * spec (slot be.tests.integration, `src/tests/integration/<capability>/*.integration-spec.ts`) counts as a consumer of exactly one
  * owner: the integration (slot be.integrations, `src/modules/integrations/<provider>/`) whose provider folder is its capability
@@ -35,6 +35,7 @@ import { canonical } from './config.mjs';
 import path from 'node:path';
 import { treeOf } from './required-files.mjs';
 import { globExpression } from '../../lib/glob.mjs';
+import { stagedConsumerSources } from './staged-consumers.mjs';
 
 export const DEAD_EXPORT_RULE_IDS = ['HFS_UNUSED_EXPORT', 'HFS_UNUSED_FILE'];
 
@@ -238,10 +239,12 @@ function inIntegrationOf(graph, to, provider) {
 }
 
 /** The pseudo edges of one test consumer file: its import/export declarations that resolve to graph files it may reach. */
-function consumerFileEdges({ ts, options, graph, config }, rel, provider) {
+function consumerFileEdges({ ts, options, graph, config }, rel, provider, indexedText) {
   const abs = path.join(config.root, ...rel.split('/'));
-  let text;
-  try { text = fs.readFileSync(abs, 'utf8'); } catch { return []; }
+  let text = indexedText;
+  if (text === undefined) {
+    try { text = fs.readFileSync(abs, 'utf8'); } catch { return []; }
+  }
   const sourceFile = ts.createSourceFile(abs, text, ts.ScriptTarget.Latest, true);
   const edges = [];
   for (const statement of sourceFile.statements) {
@@ -254,17 +257,19 @@ function consumerFileEdges({ ts, options, graph, config }, rel, provider) {
 }
 
 /**
- * Pseudo edges (read from disk, outside the production program) to graph files: from the unit role specs, the fixture builders and
+ * Pseudo edges (read from disk and staged index sources, outside the production program) to graph files: from the unit role specs, the fixture builders and
  * the test world files to anything, and from an integration spec only to the integration of its own provider folder.
  */
 function testConsumerEdges({ context, graph, config }) {
   const resolution = { ts: context.ts, options: context.projects?.[0]?.options ?? {}, graph, config };
-  const consumers = [...treeOf(config.root).files]
-    .map(file => ({ file, any: testConsumer(graph, file) }))
-    .map(({ file, any }) => ({ file, provider: any ? null : integrationSpecProvider(graph, file), any }))
+  // Live lint keeps tracked disk consumers; staged snapshots add the consumers present in the same commit.
+  const staged = stagedConsumerSources(config.root, file => testConsumer(graph, file) || integrationSpecProvider(graph, file) !== null);
+  const consumers = [...[...treeOf(config.root).files].map(file => ({ file })), ...staged]
+    .map(source => ({ ...source, any: testConsumer(graph, source.file) }))
+    .map(({ file, text, any }) => ({ file, text, provider: any ? null : integrationSpecProvider(graph, file), any }))
     .filter(({ any, provider }) => any || provider !== null)
     .sort((a, b) => a.file.localeCompare(b.file));
-  return consumers.flatMap(({ file: rel, provider }) => consumerFileEdges(resolution, rel, provider));
+  return consumers.flatMap(({ file: rel, text, provider }) => consumerFileEdges(resolution, rel, provider, text));
 }
 
 const edgeIndex = edges => {

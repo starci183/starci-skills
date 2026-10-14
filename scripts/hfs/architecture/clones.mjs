@@ -21,8 +21,12 @@
  * helper because NestFactory is allowed only in main.ts (BE_ENTRYPOINT_ONLY_IN_APPS), so what repeats there is the
  * canonical shape of section 5 of BE-CONVENTION. A door or main.ts that grows logic is refused by those enforcers, not
  * excused here; every other file of the same slots (mappers, dto, app.module.ts) stays compared.
+ * Canon scaffold subtrees (job fences, read/mapping methods, queue producers/definitions, CQRS wiring and data
+ * props of imported JSX frames) are also dropped through their imported shape markers. Each exclusion ends a
+ * token segment, so a window cannot join unrelated code across omitted scaffold lines. Custom bodies stay compared.
  */
 import { byCodeUnit } from '../../lib/list.mjs';
+import { canonCloneNodes } from './canon-clones.mjs';
 
 export const CLONE_RULE_IDS = ['HFS_DUPLICATE_CODE'];
 
@@ -61,11 +65,13 @@ function visitToken(walk, node, inType) {
   const { ts, sourceFile, kinds, lines, types, lineStarts, literalKinds } = walk;
   const { SyntaxKind } = ts;
   if (isTriviaNode(SyntaxKind, node)) return;
+  if (walk.excluded?.has(node)) { walk.segment += 1; return; }
   const kind = node.kind;
   const typeScope = inType || kind === SyntaxKind.InterfaceDeclaration || kind === SyntaxKind.TypeAliasDeclaration;
   kinds.push(normalizedKindOf(SyntaxKind, literalKinds, kind));
   lines.push(lineOfPosition(lineStarts, node.getStart(sourceFile)));
   types.push(typeScope ? 1 : 0);
+  walk.segments.push(walk.segment);
   ts.forEachChild(node, (child) => { visitToken(walk, child, typeScope); });
 }
 
@@ -73,13 +79,14 @@ function visitToken(walk, node, inType) {
 const isDroppedStatement = (SyntaxKind, statement) => statement.kind === SyntaxKind.ImportDeclaration || statement.kind === SyntaxKind.ImportEqualsDeclaration
   || (statement.kind === SyntaxKind.ExportDeclaration && statement.moduleSpecifier);
 
-export function tokenize(ts, sourceFile) {
+export function tokenize(ts, sourceFile, { excluded = null } = {}) {
   const { SyntaxKind } = ts;
-  const walk = { ts, sourceFile, kinds: [], lines: [], types: [], lineStarts: sourceFile.getLineStarts(), literalKinds: literalKindSet(SyntaxKind) };
+  const walk = { ts, sourceFile, kinds: [], lines: [], types: [], segments: [], segment: 0, excluded,
+    lineStarts: sourceFile.getLineStarts(), literalKinds: literalKindSet(SyntaxKind) };
   for (const statement of sourceFile.statements) {
     if (!isDroppedStatement(SyntaxKind, statement)) visitToken(walk, statement, false);
   }
-  return { kinds: Int32Array.from(walk.kinds), lines: Int32Array.from(walk.lines), types: Uint8Array.from(walk.types) };
+  return { kinds: Int32Array.from(walk.kinds), lines: Int32Array.from(walk.lines), types: Uint8Array.from(walk.types), segments: Int32Array.from(walk.segments) };
 }
 
 /** The app a file belongs to, by the slot binding of the manifest; null for a file of no app. */
@@ -142,15 +149,15 @@ const addToBucket = (buckets, key, item) => {
 
 const addFileWindows = (buckets, file, fileIndex, N, T, hashing) => {
   const { pow1, pow2, B1, B2 } = hashing;
-  const { kinds, lines } = file;
+  const { kinds, lines, segments } = file;
   const count = kinds.length;
   const { pre1, pre2 } = prefixHashes(kinds, B1, B2);
   let end = 0;
   for (let start = 0; start < count; start += 1) {
-    if (start > 0 && lines[start] === lines[start - 1]) continue;
+    if (start > 0 && lines[start] === lines[start - 1] && segments[start] === segments[start - 1]) continue;
     const limit = lines[start] + N;
     if (end < start) end = start;
-    while (end < count && lines[end] < limit) end += 1;
+    while (end < count && lines[end] < limit && segments[end] === segments[start]) end += 1;
     if (end === start || lines[end - 1] - lines[start] + 1 < N) continue;
     const length = end - start;
     if (length < T) continue;
@@ -224,7 +231,8 @@ const cloneBlocks = (entries, hits, N) => {
     group.sort((x, y) => x[0] - y[0]);
     let [start, end] = group[0];
     for (const [nextStart, nextEnd] of group.slice(1)) {
-      if (nextStart <= end) { end = Math.max(end, nextEnd); continue; }
+      if (nextStart <= end && fileA.segments[nextStart] === fileA.segments[start]
+        && fileB.segments[nextStart + diag] === fileB.segments[start + diag]) { end = Math.max(end, nextEnd); continue; }
       appendCloneBlock(blocks, fileA, fileB, start, end, diag, N);
       start = nextStart; end = nextEnd;
     }
@@ -263,7 +271,8 @@ export function checkClones({ config, context, graph } = {}) {
     if (/\.d\.[cm]?tsx?$/.test(rel) || uniformByDesign(graph.resolver, rel)) continue;
     const unit = graph.unit(rel);
     if (!unit) continue;
-    entries.push({ rel, unit, ...tokenize(ts, graph.files.get(rel).sourceFile) });
+    const sourceFile = graph.files.get(rel).sourceFile;
+    entries.push({ rel, unit, ...tokenize(ts, sourceFile, { excluded: canonCloneNodes(ts, sourceFile, graph.profile) }) });
   }
   const buckets = cloneBuckets(entries, N, T);
   const blocks = cloneBlocks(entries, cloneHits(entries, buckets), N);
