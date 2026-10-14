@@ -212,6 +212,47 @@ const toolProfileSupported = (version, ageVersion) => captured(version) && captu
 
 const invalidCaptureBudget = (deadline, maxBuffer) => !Number.isInteger(deadline) || deadline < 1 || deadline > 2_147_483_647 || !Number.isInteger(maxBuffer) || maxBuffer < 1;
 
+const publicAgeFailure = reason => ({ ok: false, reason });
+const publicAgeRequestValid = ({ env, cwd, invocation }) => env && typeof env === 'object' && !Array.isArray(env)
+  && path.isAbsolute(cwd ?? '') && typeof invocation?.runProgram === 'function'
+  && typeof invocation?.resolveRealTool === 'function';
+const publicAgeCapture = result => captured(result) && result.stdout.length <= CREDENTIAL_FILE_MAX_BYTES
+  && result.stderr.length <= CREDENTIAL_FILE_MAX_BYTES;
+
+const deriveSelectedAgeRecipient = (state, { env, cwd, invocation }, selection) => {
+  const key = env[selection.inlineName];
+  if (typeof key !== 'string' || !/^AGE-SECRET-KEY-1[0-9A-Z]+$/.test(key.trim())) return publicAgeFailure('invalid-inline');
+  const age = invocation.resolveRealTool('age-keygen', { env });
+  if (!nativeFile(age)) return publicAgeFailure('native-tool-unavailable');
+  const publicEnv = isolatedSopsEnv(env, null);
+  const options = { cwd, shell: false, encoding: 'buffer', windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
+    timeout: IDENTITY_TIMEOUT_MS, maxBuffer: CREDENTIAL_FILE_MAX_BYTES };
+  const run = selectedRunner(invocation, options, state.captures, publicEnv);
+  const version = run(age, ['--version']);
+  if (!publicAgeCapture(version) || !SELECTED_AGE_VERSIONS.has(/^v?(\d+\.\d+\.\d+)/.exec(decoded(version.stdout))?.[1])) return publicAgeFailure('unsupported-tool-profile');
+  state.identity = Buffer.from(key.trim(), 'utf8');
+  const derived = run(age, ['-y'], state.identity);
+  if (!publicAgeCapture(derived)) return publicAgeFailure('recipient-unproven');
+  const recipient = recipientOf(derived.stdout);
+  if (recipient === null) return publicAgeFailure('recipient-unproven');
+  return { ok: true, publicRecipient: recipient };
+};
+
+/** Derive only the public recipient of an explicitly selected inline identity; no private capture escapes. */
+export function selectedAgeRecipient(options = {}) {
+  if (!publicAgeRequestValid(options)) return publicAgeFailure('invalid-request');
+  const selection = sopsIdentityEnv(options.env, { required: true });
+  if (selection.error?.identityRefusal !== 'inline-context-unqualified') return publicAgeFailure(selection.error?.identityRefusal ?? 'selected-inline-required');
+  const state = { identity: undefined, captures: [] };
+  try {
+    return deriveSelectedAgeRecipient(state, options, selection);
+  } catch { return publicAgeFailure('selected-native-refused'); }
+  finally {
+    state.identity?.fill(0);
+    wipeCaptures(state.captures);
+  }
+}
+
 // The document bytes into `state.input`; the refusal when they are unavailable or over budget, else null.
 const readSelectedInput = (state, request, spec, file) => {
   try { state.input = request.operation === 'seal' ? Buffer.from(spec.plaintext) : readSecretBytes(file); } catch { return held('actual-document-unavailable'); }

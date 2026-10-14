@@ -66,3 +66,16 @@ export function secretFindings({ repoRoot, files, resolver }) {
   }
   return findings;
 }
+
+// The age identity stays on the host: `.claude/secret.env` (SOPS_AGE_KEY) or the sops config dir's `keys.txt`,
+// both host-local files. A tracked `secret.env`, `keys.txt` or `*.agekey` is the identity committed.
+const AGE_KEY_FILE = /^\.claude\/secret\.env$|(?:^|\/)keys\.txt$|\.agekey$/i;
+export function ageKeyCustodyFindings({ files, inScope }) {
+  const findings = [];
+  for (const file of files.filter((f) => !inScope || inScope(f))) {
+    if (!AGE_KEY_FILE.test(file)) continue;
+    findings.push(found('HFS_AGE_KEY_CUSTODY', file,
+      `${file} is a tracked sops/age identity file; the age key lives only in the host-local .claude/secret.env or the sops keys.txt - never commit the identity`));
+  }
+  return findings;
+}

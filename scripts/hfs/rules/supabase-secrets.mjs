@@ -94,5 +94,5 @@ export function supabaseSecretFindings(input) {
   const ordinary = secretFindings(input);
   const lite = liteSecretCustodyFindings(input);
   const liteJwtAuthority = (input.repo.edition ?? 'full') === 'lite';
-  return [...ordinary.filter(item => !(liteJwtAuthority && item.pattern === 'jwt' && inSecretFreeTree(input.repo, item.path))), ...lite];
+  return [...ordinary.filter(item => !(liteJwtAuthority && (item.pattern === 'jwt' || item.pattern === 'password-connection-string') && inSecretFreeTree(input.repo, item.path))), ...lite];
 }

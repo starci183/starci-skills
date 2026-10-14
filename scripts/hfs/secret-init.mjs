@@ -2,7 +2,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseYaml, stringifyYaml } from "../../engine/yaml.mjs";
+import { secretEnv } from "../../engine/secrets.mjs";
 import { resolveSops } from "../api/sops/resolve-sops.mjs";
+import { selectedAgeRecipient } from "../api/sops/selected-age-recipient.mjs";
 import { resolveRealTool } from "../api/process/resolve-real-tool.mjs";
 import { runProgram } from "../api/process/run-program.mjs";
 import { claimFile } from "../api/fs/claim-file.mjs";
@@ -13,6 +15,25 @@ import {
 } from "./secret-files.mjs";
 
 const PATH_RULE = String.raw`\.starcistacks[/\\][^/\\]+[/\\]secrets[/\\][^/\\]+\.enc$`;
+const AGE_IDENTITY_NAME = /^SOPS_AGE_KEY(?:_FILE)?$/i;
+
+/** Load host-local age selections below the explicit environment, without copying any other credentials. */
+export function ageIdentityEnv(repoRoot, env, tools) {
+  const load = tools?.secretEnv ?? secretEnv;
+  let resolved = {};
+  try {
+    resolved = load(path.join(repoRoot, ".claude"), env) ?? {};
+  } catch {
+    return { ...env };
+  }
+  const own = new Set(Object.keys(env).map((name) => name.toUpperCase()));
+  const local = Object.fromEntries(
+    Object.entries(resolved).filter(
+      ([name]) => AGE_IDENTITY_NAME.test(name) && !own.has(name.toUpperCase()),
+    ),
+  );
+  return { ...env, ...local };
+}
 
 /** Select the first matching public age rule, including for SOPS's isolated CI identity path. */
 export function configuredRecipients(repoRoot, file) {
@@ -93,19 +114,14 @@ function readInitializationConfig(configFile) {
   return config;
 }
 
-/** Reuse an existing matching age rule; initialization must not rotate an app's recipient. */
-export function initializeSecrets(repoRoot, { env, platform, tools, stdout }) {
-  const tool = secretTools(env, tools);
-  const configFile = path.join(repoRoot, ".sops.yaml");
-  const config = readInitializationConfig(configFile);
-  const rules = config.creation_rules ?? [];
+function existingInitializationRule(rules) {
   const canonical = rules.find(
     (rule) =>
       rule?.path_regex === PATH_RULE &&
       typeof rule.age === "string" &&
       rule.age.trim(),
   );
-  const existing =
+  return (
     canonical ??
     rules.find((rule) => {
       if (typeof rule?.age !== "string" || !rule.age.trim()) return false;
@@ -119,15 +135,11 @@ export function initializeSecrets(repoRoot, { env, platform, tools, stdout }) {
       } catch {
         return false;
       }
-    });
-  if (
-    existing?.age
-      .split(",")
-      .some((value) => !/^age1[a-z0-9]+$/.test(value.trim()))
-  )
-    throw new Error(
-      ".sops.yaml must name valid public age recipients; initialization never prints private key material",
-    );
+    })
+  );
+}
+
+function legacyInitializationRecipient(repoRoot, env, platform, tool) {
   const identity = secretRoots(env, platform).identity;
   outsideRepository(repoRoot, identity);
   privateDirectory(repoRoot, path.dirname(identity));
@@ -136,7 +148,6 @@ export function initializeSecrets(repoRoot, { env, platform, tools, stdout }) {
     throw new Error(
       "the age identity is being initialized; retry after that operation settles",
     );
-  let recipient;
   try {
     if (!fs.existsSync(identity)) {
       const generated = tool.run(tool.keygen, ["-o", identity], {
@@ -170,10 +181,46 @@ export function initializeSecrets(repoRoot, { env, platform, tools, stdout }) {
       recipients.some((value) => !/^age1[a-z0-9]+$/.test(value))
     )
       throw new Error("age-keygen returned an invalid public recipient");
-    recipient = existing?.age ?? recipients.join(",");
+    return recipients.join(",");
   } finally {
     held.release();
   }
+}
+
+function initializationRecipient(repoRoot, env, platform, tool, tools) {
+  const selectedEnv = ageIdentityEnv(repoRoot, env, tools);
+  if (!Object.keys(selectedEnv).some((name) => /^SOPS_AGE_KEY$/i.test(name)))
+    return legacyInitializationRecipient(repoRoot, env, platform, tool);
+  const result = selectedAgeRecipient({
+    env: selectedEnv,
+    cwd: repoRoot,
+    invocation: {
+      runProgram: tool.run,
+      resolveRealTool: tools?.resolveRealTool ?? resolveRealTool,
+    },
+  });
+  if (!result.ok)
+    throw new Error(`SOPS_AGE_KEY public recipient could not be derived (${result.reason})`);
+  return result.publicRecipient;
+}
+
+/** Reuse an existing matching age rule; initialization must not rotate an app's recipient. */
+export function initializeSecrets(repoRoot, { env, platform, tools, stdout }) {
+  const tool = secretTools(env, tools);
+  const configFile = path.join(repoRoot, ".sops.yaml");
+  const config = readInitializationConfig(configFile);
+  const rules = config.creation_rules ?? [];
+  const existing = existingInitializationRule(rules);
+  if (
+    existing?.age
+      .split(",")
+      .some((value) => !/^age1[a-z0-9]+$/.test(value.trim()))
+  )
+    throw new Error(
+      ".sops.yaml must name valid public age recipients; initialization never prints private key material",
+    );
+  const derived = initializationRecipient(repoRoot, env, platform, tool, tools);
+  const recipient = existing?.age ?? derived;
   const exact = rules.findIndex((rule) => rule?.path_regex === PATH_RULE);
   if (exact >= 0) rules[exact] = { ...rules[exact], age: recipient };
   // SOPS uses the first matching rule: keep any existing environment-specific recipients in force.
