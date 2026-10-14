@@ -15,7 +15,7 @@ import { databaseConfigFindings } from './database-config.mjs';
 /** The failure codes the finders above emit, so `starci app check` ships their labels (check.mjs adds them to CHECK_CODES). Append-only; the coordinator regenerates it at merge time. */
 export const A15_CODES = [
   // codes-begin
-  'HFS_FEATURE_FILE_BUDGET', 'HFS_UNUSED_SYMBOL', 'HFS_ASSET_OVERSIZE', 'HFS_ASSET_KIND', 'HFS_APP_LEXICON',
+  'DB_API_EXPOSED', 'DB_ARCHIVE_MUTATED', 'DB_BASELINE_SHAPE', 'DB_CRON_OWNED', 'DB_EXTENSION_ALLOWED', 'DB_MIGRATION_DESTRUCTIVE', 'DB_PGMQ_DECLARED', 'DB_VAULT_WRITE', 'HFS_APP_LEXICON', 'HFS_ASSET_KIND', 'HFS_ASSET_OVERSIZE', 'HFS_FEATURE_FILE_BUDGET', 'HFS_SEED_PII', 'HFS_UNUSED_SYMBOL',
   // codes-end
 ];
 
@@ -35,6 +35,3 @@ export const FINDERS = [
 export function a15Findings(context) {
   return FINDERS.flatMap((finder) => finder(context));
 }
-
-/** Codes emitted by the finders (coordinator-managed). */
-export const A15_CODES = [];
