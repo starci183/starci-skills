@@ -30,6 +30,7 @@ shape:
   seeds: .starcistacks/<environment>/seeds/**
   infra: .starcistacks/<environment>/infra/**
   compose: .starcistacks/<environment>/infra/compose/*.yaml (one fragment per backing service, composed by include)
+  swarm: .starcistacks/<environment>/infra/swarm/stack.yaml (value-free Docker Swarm stack; optional fragments under infra/swarm/**)
   metadata: .starcistacks/<environment>/infra/metadata.json (the resolved port projection, value-free, tracked, read by the front end)
   keyRoster: .starcistacks/<environment>/runtime/env/KEYS.md and .starcistacks/<environment>/infra/KEYS.md (names and custody paths, never values)
   services: the declaration's `services` block (application-stacks.schema.yaml $defs.service) - sonar and every other delivery/quality service, with custody references into runtime/files
@@ -45,7 +46,7 @@ custody:
     - .starcistacks/deployment.json and other rendered, value-free deployment declarations the guard names
     - .starcistacks/**/KEYS.md
     - .starcistacks/**/.gitkeep
-    - .starcistacks/<environment>/infra/compose/**, infra/k8s/** and infra/terraform/** source
+    - .starcistacks/<environment>/infra/compose/**, infra/k8s/**, infra/terraform/** and infra/swarm/** source
     - .starcistacks/<environment>/infra/metadata.json the value-free resolved port projection the front end reads
     - .starcistacks/<environment>/environment.json the rendered value-free environment record
     - .starcistacks/<environment>/seeds/** idempotent seed sources
@@ -53,7 +54,7 @@ custody:
     Deny everything with `.starcistacks/**` (never the directory form `.starcistacks/`, which blocks
     every re-include), re-include directories with `!.starcistacks/**/`, then `!.starcistacks/**/KEYS.md`,
     `!.starcistacks/**/.gitkeep`, `!.starcistacks/application-stacks.yaml`, `!.starcistacks/*/README.md`
-    (the environment runbook, shape.runbook), `!.starcistacks/*/infra/compose/**`
+    (the environment runbook, shape.runbook), `!.starcistacks/*/infra/compose/**`, `!.starcistacks/*/infra/swarm/**`
     and `!.starcistacks/*/infra/terraform/**`; then deny the VALUE files inside infra AGAIN, after those
     re-includes (git applies the last matching rule, so a re-include written after `.env.*` tracked
     every plaintext env under compose - e.g. .starcistacks/dev/infra/compose/.env.generated),
@@ -77,6 +78,7 @@ custody:
     - '!.starcistacks/*/infra/compose/**'
     - '!.starcistacks/*/infra/k8s/**'
     - '!.starcistacks/*/infra/terraform/**'
+    - '!.starcistacks/*/infra/swarm/**'
     - .starcistacks/*/infra/**/.env
     - .starcistacks/*/infra/**/.env.*
     - .starcistacks/*/infra/**/*.env
@@ -138,6 +140,15 @@ roles:
           While k8s.status is deferred the directory is refused, not optional: a deferred posture with
           manifests on disk is a claim the declaration contradicts. Change the declaration first.
 
+editions:
+  lite: >-
+    The app.starcistacks lite overlay in knowledge/hfs/slots.yaml is the tree authority (owner ruling 2026-10-13).
+    The declaration is required; production api and sidecars use docker-swarm with the tracked, value-free stack at
+    shape.swarm. Supabase supplies the managed backing services. The checker refuses components whose images duplicate
+    postgres, redis, kafka, keycloak, minio, rabbitmq, mysql or mongo, and the overlay refuses compose, k8s and terraform
+    infrastructure, runtime custody and seeds. The shared custody.gitignoreRules keep swarm sources tracked while
+    denying plaintext values inside them.
+
 rules:
   - One repository owns one .starcistacks. A service, a frontend or a submodule does not open a second one;
     the environment directory is the unit of variation, not the repository.
@@ -179,3 +190,4 @@ example:
     - vps/README.md
     - vps/stack.yaml
     - vps/secrets/uat.enc
+    - production/infra/swarm/stack.yaml

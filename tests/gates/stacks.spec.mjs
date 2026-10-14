@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {parseYaml,stringifyYaml} from '../../engine/yaml.mjs';
 import {checkApplicationStacks} from '../../scripts/gates/stacks-gate.mjs';
 import {importClosure} from '../../scripts/hfs/sync-runtime.mjs';
+import {swarmService} from '../helpers/swarm-stack-fixture.mjs';
 
 const RUNBOOK=(extra=[])=>[
   '# runbook','','| command | what it does |','|---|---|',
@@ -39,8 +40,9 @@ function fixture(t,environment='dev'){
   fs.writeFileSync(path.join(root,'.starcistacks','dev','secrets','db-password.enc'),'data: ENC[AES256_GCM,data:cipher,iv:a,tag:b,type:str]\nsops:\n  age: []\n');
   fs.writeFileSync(path.join(root,'.starcistacks','vps','secrets','app-token.enc'),'data: ENC[AES256_GCM,data:cipher,iv:a,tag:b,type:str]\nsops:\n  age: []\n');
   const manifest=manifestFor(),modelFile=path.join(root,'rendered.json');
-  const model=environment==='dev'?{services:{api:{},db:{}}}:{services:{api:{image:'example/api@sha256:fixture',deploy:{replicas:2}},db:{image:'postgres:16'}}};
-  const write=()=>{fs.writeFileSync(path.join(root,'.starcistacks','application-stacks.yaml'),stringifyYaml(manifest));fs.writeFileSync(modelFile,JSON.stringify(model));};write();
+  const model=environment==='dev'?{services:{api:{},db:{}}}:{services:{api:swarmService(),db:swarmService(`postgres:16@sha256:${'b'.repeat(64)}`)}};
+  const sourceModel=environment==='vps'?model:{services:{api:swarmService(),db:swarmService(`postgres:16@sha256:${'b'.repeat(64)}`)}};
+  const write=()=>{fs.writeFileSync(path.join(root,'.starcistacks','application-stacks.yaml'),stringifyYaml(manifest));fs.writeFileSync(modelFile,JSON.stringify(model));if(fs.existsSync(path.join(root,'.starcistacks','vps','infra')))fs.writeFileSync(path.join(root,'.starcistacks','vps','infra','stack.yaml'),stringifyYaml(sourceModel));};write();
   return {root,manifest,model,modelFile,write,check:()=>checkApplicationStacks({repoRoot:root,environment,deploymentModelFile:modelFile})};
 }
 
@@ -123,7 +125,7 @@ test('rejects an unknown component id bound inside an environment',t=>{
 
 test('does not require every catalog component to be bound in every environment',t=>{
   const f=fixture(t,'vps');delete f.manifest.environments.vps.components.db;
-  f.model.services={api:{image:'example/api@sha256:fixture',deploy:{replicas:2}}};f.write();
+  f.model.services={api:swarmService()};f.write();
   assert.equal(f.check().ok,true,f.check().errors.map(x=>x.code).join(','));
 });
 
@@ -172,7 +174,7 @@ test('rejects a rendered service name that no component declares',t=>{
 
 test('requires a nonempty image and no build section for a managed Swarm service',t=>{
   const f=fixture(t,'vps');f.model.services.api.image='';f.model.services.api.build={context:'.'};f.write();
-  const codes=f.check().errors.map(x=>x.code);assert.ok(codes.includes('swarm-image-missing'));assert.ok(codes.includes('swarm-build-unrendered'));
+  const errors=f.check().errors;assert.ok(errors.some(x=>x.code==='HFS_STACKS_SHAPE'&&x.path==='services.api.image'));assert.ok(errors.some(x=>x.code==='HFS_STACKS_SHAPE'&&x.path==='services.api.build'));
 });
 
 test('malformed null component catalog fails checking without crashing',t=>{
@@ -203,4 +205,3 @@ test('the stacks check reports malformed input and never echoes secret material'
   const result=checkApplicationStacks({repoRoot:f.root,environment:'dev',deploymentModelFile:f.modelFile});
   assert.equal(result.ok,false);assert.equal(JSON.stringify(result).includes(sentinel),false);assert.deepEqual(fs.readFileSync(f.modelFile),before);
 });
-

@@ -100,6 +100,27 @@ test('effectiveSlot makes a lite-forbidden slot external and keeps its destinati
   );
 });
 
+test('app.starcistacks requires the declaration in both editions and lite owns its Swarm tree', () => {
+  const manifest = loadSlotManifest();
+  const slot = manifest.slots.find(entry => entry.id === 'app.starcistacks');
+  const lite = effectiveSlot(slot, 'app', 'lite');
+  assert.deepEqual(lite.requires, ['application-stacks.yaml']);
+  assert.deepEqual(lite.allows, [
+    'application-stacks.yaml', '<env>/README.md', '<env>/environment.json', '<env>/infra/swarm/**',
+    '<env>/secrets/<slug>.enc', '<env>/secrets/.gitkeep',
+  ]);
+  for (const forbidden of ['<env>/infra/{compose,k8s,terraform}/**', '<env>/runtime/**', '<env>/seeds/**']) {
+    assert.ok(lite.forbids.includes(forbidden), forbidden);
+  }
+  assert.deepEqual(effectiveSlot(slot, 'app', 'full').requires, ['application-stacks.yaml']);
+  for (const edition of ['full', 'lite']) {
+    const repo = resolveRepoDeclaration(manifest, declaration(edition));
+    const resolver = createSlotResolver(manifest, repo);
+    assert.ok(resolver.requiredPaths().paths.some(entry => entry.path === '.starcistacks/application-stacks.yaml'), edition);
+    assert.equal(resolver.classifyPath('.starcistacks/production/infra/swarm/stack.yaml').slot, 'app.starcistacks', edition);
+  }
+});
+
 test('editionRuleParams merges the lite override, removes its source key and deeply freezes a copy', () => {
   const params = {
     fileLines: { soft: 500, hardGrowth: true },

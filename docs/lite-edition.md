@@ -1,13 +1,13 @@
 Owner: knowledge/hfs/slots.yaml
 # HFS lite edition
 
-Lite is the full HFS code structure deployed without self-hosted infrastructure (owner rulings recorded as R212 in
+Lite is the full HFS code structure with its backing infrastructure supplied by Supabase (owner ruling 2026-10-13, recorded as R212 in
 `knowledge/hfs/rules.yaml`). It uses the same manifest, rule catalog, lint canons, grammar,
 security model and Docker canon as full, the same monorepo and code slots, the same patterns, the same back-end unit specs and the
 same front end (`knowledge/hfs/fe-stack.yaml`). The `edition` field selects a
 filtered slot and rule view; it does not select a different engine or relax rules locally.
 
-What lite changes is the adapters behind the platform and integrations seam, all on Supabase:
+Lite supplies its backing services through Supabase and keeps the same platform and integrations ports:
 
 - persistence: the schema authority is `supabase/migrations`;
 - queue: Supabase Queues (pgmq) behind the same `platform/queue` ports (outbox to queue, processors, retry and backoff by
@@ -17,7 +17,7 @@ What lite changes is the adapters behind the platform and integrations seam, all
 - realtime: the same socket.io gateway as full (`be.feature.realtime.websocket`), run inside the api process as one instance
   with no Redis adapter;
 - cache and locks: Postgres (advisory locks or an unlogged table); no Redis;
-- scheduling: `pg_cron` (with `pg_net`) or the platform scheduler; never a self-hosted cron host;
+- scheduling: an application-owned back-end scheduler, pgmq jobs or `pg_cron` ticks (with `pg_net`); a scheduled CLI batch may use a declared Swarm scheduler and replicated job;
 - storage and auth: Supabase Storage and Supabase Auth (the back end verifies the access token against the project JWKS).
 
 `knowledge/patterns/be/supabase-queues.yaml` owns the pgmq adapter, and each pattern topic carries its `liteAdapter`.
@@ -41,7 +41,7 @@ metadata supplies the project id and repo roles that Work tools use to locate th
 front end. Brand drawing records, references and assets keep their existing layout; brand tooling reads the brand record
 directly. Full keeps its complete Work tree.
 
-Use lite for a product whose infrastructure is Supabase. Start with full when the product needs its own stack, the e2e world or
+Use lite for a product whose backing infrastructure is Supabase; its api and sidecars still run on Docker Swarm on a VPS. Start with full when the product needs self-hosted backing services, the e2e world or
 UAT records.
 
 ## Create a lite app
@@ -73,14 +73,28 @@ Regenerating the types (`starci app emit`) is the one step that starts the local
 
 ## Production delivery and secret custody
 
-The optional `app.deploy` slot holds production Compose and Caddy configuration, environment examples and operator shell
+The optional `app.deploy` slot holds production delivery helpers, Caddy configuration, environment examples and operator shell
 scripts. The `app.ci-deploy` and `app.ci-authorize-deploy-key` slots hold deployment and deploy-key authorization workflows;
 `app.scripts.delivery` holds the lite app's helpers to build, sync environment settings and load or set secrets. The slot
 manifest owns their concrete paths. Delivery files remain legal after an upgrade to full; operational helpers then use
 `app.scripts`.
 
-`app.starcistacks` under lite holds environment and sealed secret custody only; the stack's one backing service is the
-Supabase project (the local CLI stack or the cloud project). Delivery files, including environment examples, remain subject to
+`app.starcistacks` under lite requires the application stack declaration and allows the production environment's Swarm stack,
+runbook, environment record and sealed secret custody. The api, web, ingress and application sidecars run with
+`runtime: docker-swarm` on the VPS; the manifest declares the Supabase project under
+`backing: {supabase: {provider: supabase, managed: true}}`. The slot permits tracked, value-free `infra/swarm/**`; Compose,
+Kubernetes and Terraform infra trees, runtime and seeds trees remain forbidden. Lite also refuses components whose images
+duplicate Supabase-provided services (postgres, redis, kafka, keycloak, minio, rabbitmq, mysql or mongo).
+
+Every Swarm service has a digest-pinned image, healthcheck, update policy with rollback on failure, rollback policy and restart
+policy. Only the declared ingress publishes ports. Runtime secrets are external and versioned, materialized from the sealed
+custody for the release. Recurring work is app-owned; workflows, deployment files, scripts and the stack tree must never install
+a host crontab. A scheduled CLI command declares `mode: replicated-job`, its cron `schedule` and a `scheduler` component;
+the stack declares `deploy.mode: replicated-job`, zero replicas, no restart and the matching swarm-cronjob labels. The scheduler runs as a
+declared component. See [Scheduled work on Swarm](application-stacks.md#scheduled-work-on-swarm) for the manifest and stack
+example. `starci app check` and `starci gate starcistacks` check these declarations and runtime policies.
+
+Delivery files, including environment examples, remain subject to
 R06 (`HFS_PLAINTEXT_SECRET`): use placeholders and runtime secret references, never plaintext credentials. R220 keeps sealed
 material in the stack's secrets location and enforces the front-end and Supabase secret restrictions.
 
@@ -140,7 +154,7 @@ Apply the plan with:
 starci app upgrade --edition full
 ```
 
-The upgrade adds the full-only managed configuration (the e2e workflow and scripts), the self-hosted stack and the required cli
+The upgrade adds the full-only managed configuration (the e2e workflow and scripts), self-hosted backing-service declarations and the required cli
 support. It does not rewrite product source or move the Supabase schema authority: swapping an adapter (pgmq to BullMQ, the
 in-process socket.io gateway to one scaled with a Redis adapter) is a product change behind the same port. The first full check intentionally reports the e2e and
 integration proofs the product still needs to author; the upgrade never creates placeholder tests. Downgrade from full to lite is
@@ -156,7 +170,7 @@ workspace metadata normally and skip the full-edition catalog, shell and feature
 R212 also forbids e2e and contract specs, the `test:e2e`, `test:contract`, `test:stack` and
 `test:browser` scripts, the e2e workflow, the browser journey and UAT records, test containers, toxiproxy and browser-runner
 dependencies, BullMQ, Kafka, Redis and graphql-ws dependencies (and their imports, through the lite `infraOwners`), and the
-`.starcistacks` infra, runtime and seeds trees. Lite also forbids Edge Functions and a second front-end
+non-Swarm `.starcistacks` infra trees, runtime and seeds trees, plus components duplicating Supabase backing services. Lite also forbids Edge Functions and a second front-end
 app.
 
 R213 to R216 forbid a second schema authority, dynamic database DDL, unsafe policies or definer functions, unchecked database

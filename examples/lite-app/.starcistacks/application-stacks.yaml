@@ -1,5 +1,40 @@
-# Local release analysis uses the shared host SonarQube extension and its sealed custody.
+# Production compute runs on Swarm; managed backing services stay in Supabase.
 schema: starci/application-stacks@1
+sources:
+  - repository: lite-app
+components:
+  api:
+    image: ghcr.io/starci183/lite-app-api@sha256:b51a608233c882567a3aabdc8e314d17c528524a45445919b875f7072e1eed44
+    role: service
+    compose: infra/swarm/stack.yaml
+  web:
+    image: ghcr.io/starci183/lite-app-web@sha256:67e4aee26e8f897b1c89a323e31cb2c313e1adad575ae01d43965964c674cacc
+    role: service
+    compose: infra/swarm/stack.yaml
+  ingress:
+    image: caddy:2-alpine@sha256:301aeb914f3ac159f0b5c610fba096136702862905c7e557c98f17f663752d41
+    role: ingress
+    compose: infra/swarm/stack.yaml
+backing:
+  supabase:
+    provider: supabase
+    managed: true
+environments:
+  production:
+    status: supported
+    runtime: docker-swarm
+    composeFiles: [infra/swarm/stack.yaml]
+    components:
+      api: {replicas: 2}
+      web: {replicas: 2}
+      ingress: {replicas: 1}
+    runbook: README.md
+    # This value-free fixture owns no credentials. Before a real release, seal the values
+    # under production/secrets and declare their custody as described in the runbook.
+    secrets: []
+k8s:
+  status: deferred
+  reason: Production compute uses Docker Swarm on a VPS; the managed backing services are supplied by Supabase.
 services:
   sonar:
     provider: sonarcloud

@@ -20,7 +20,7 @@
 //   starci runtime check --only examples-ci              check: the workflow derives its matrix from --matrix, no other root
 //                                                  workflow runs an example on its own, codecov.yml is its render (exit 1)
 //   starci runtime check --only examples-ci -- --matrix   the matrix as JSON (["<app>"]) for $GITHUB_OUTPUT
-//   starci runtime check --only examples-ci -- --images   every image of every example as JSON ([{app, name, file}], one per be and fe app of hfs.json); lite owns back-end images only
+//   starci runtime check --only examples-ci -- --images   every image of every example as JSON ([{app, name, file}], one per be and fe app of hfs.json); lite includes authored front-end Dockerfiles
 //   starci runtime check --only examples-ci -- --write    rewrite codecov.yml and each example's own edition-matched quality files (codecov.yml, sonar-project.properties, be/jest.config.js) from the render
 //
 // The quality files of each example (codecov.yml, sonar-project.properties, be/jest.config.js) are rendered here from the SOURCE slot manifest of this
@@ -41,6 +41,7 @@ import { dockerfilePath } from '../hfs/rules/docker.mjs';
 import { discoverExampleApps } from '../lib/example-refs.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { readTextFile } from '../lib/read-text.mjs';
+import { isFile } from '../lib/fs-kind.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const WORKFLOW = '.github/workflows/examples.yml';
@@ -100,13 +101,15 @@ export function appQualityTargets(app, root = ROOT) {
 }
 export const APP_QUALITY_FILES = Object.freeze(['codecov.yml', 'sonar-project.properties', 'be/jest.config.js']);
 
-/** Every deployable image of every example app, from its hfs.json: full owns be+fe; lite owns be only. */
+/** Every declared app image: be and full fe are required; lite fe joins when its optional Dockerfile exists. */
 export function exampleImages(root = ROOT) {
   return exampleApps(root).flatMap((app) => {
-    const declaration = JSON.parse(fs.readFileSync(path.join(root, 'examples', app, 'hfs.json'), 'utf8'));
+    const appRoot = path.join(root, 'examples', app);
+    const declaration = JSON.parse(fs.readFileSync(path.join(appRoot, 'hfs.json'), 'utf8'));
     const sides = declaration.sides ?? {};
-    const deployableSides = declaration.edition === 'lite' ? ['be'] : ['be', 'fe'];
-    return deployableSides.flatMap((side) => (sides[side]?.apps ?? []).map((entry) => ({ app, name: entry.name, file: dockerfilePath(side, entry.name) })));
+    return ['be', 'fe'].flatMap((side) => (sides[side]?.apps ?? [])
+      .map((entry) => ({ app, name: entry.name, file: dockerfilePath(side, entry.name) }))
+      .filter((image) => side === 'be' || declaration.edition !== 'lite' || isFile(path.join(appRoot, image.file), { followLinks: false })));
   });
 }
 const IMAGES_COMMAND = 'starci runtime check --only examples-ci -- --images';

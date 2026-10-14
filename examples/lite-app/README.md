@@ -4,7 +4,7 @@ One StarCi lite app: a Nest API in `be/`, one Next web app in `fe/`, and Supabas
 
 ## Overview
 
-Lite is the full architecture minus infra. The back end has the same slots, ports and patterns as the full example (`examples/ecommerce-app`); only the adapters are simpler, because everything runs on one managed Supabase project: PostgreSQL through the `primary` connection, Auth and Storage through the Supabase integration, and jobs on Supabase Queues (pgmq) in the same database. There is no compose, k8s or terraform tree, no test world and no e2e run; unit specs are the same as full.
+Lite keeps the full code structure and swaps the backing infrastructure for Supabase. The back end has the same slots, ports and patterns as the full example (`examples/ecommerce-app`): PostgreSQL through the `primary` connection, Auth and Storage through the Supabase integration, and jobs on Supabase Queues (pgmq) in the same database. Production runs the API, web app and ingress on Docker Swarm on a VPS, with Supabase declared as managed backing. The infrastructure tree holds only Swarm configuration; there is no test world or e2e run, and unit specs are the same as full.
 
 The web app calls the API over GraphQL (`src/modules/api`, SWR hooks under `src/hooks/swr`, forms under `src/hooks/rhf`) and uses Supabase only for Auth in the browser (`src/modules/auth`, PKCE exchanged client-side); every data read and write goes through the API, which verifies the access token. The browser roles hold no table grant or policy: only the `app_be` role reaches the tables.
 
@@ -18,7 +18,7 @@ TypeScript everywhere, NestJS in `be/`, Next.js with next-intl in `fe/`, Supabas
 - `be/`: the API, shared platform capabilities, verified identity admission, privileged Supabase integrations, and the queues.
 - `fe/`: the web app; the only Supabase client is the Auth client of `src/modules/auth`, data goes through `src/modules/api`.
 - `be/contracts/api/schema.graphql`: the emitted GraphQL contract the web app's codegen reads (`npm run contract:emit`).
-- `.starcistacks/`: value-free environment metadata and encrypted-secret custody only (no infra).
+- `.starcistacks/`: application-stack declarations, value-free environment metadata, encrypted-secret custody and the production Swarm stack. The production runbook describes deployment and rollback.
 - `.starciwork/`: `.gitignore`, `workspace.yaml` project metadata and repo roles, and optional `brand/` drawing records, references, and assets.
 
 ## Development

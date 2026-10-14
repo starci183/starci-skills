@@ -1,0 +1,16 @@
+# The stack declaration of the lite app, at the app root beside be/, fe/ and .starciwork.
+# Production compute is authored for an operated environment; the starter invents no deployment.
+schema: starci/application-stacks@1
+backing:
+  supabase:
+    provider: supabase
+    managed: true
+services:
+  sonar:
+    provider: sonarqube
+    mode: local
+    qualityGate: {{sonarGate}}
+    stack:
+      owner: host
+      root: .claude/ext/sonar
+      environment: dev

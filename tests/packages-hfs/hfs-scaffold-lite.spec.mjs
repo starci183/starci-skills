@@ -24,7 +24,7 @@ const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 const EXPECTED_LITE_FILES = Object.freeze([
   '.dockerignore', '.editorconfig', '.gitattributes', '.github/workflows/ci.yml', '.github/workflows/db-deploy.yml',
   '.github/workflows/images.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.nvmrc', '.prettierignore',
-  '.prettierrc', '.sops.yaml', '.starcistacks/dev/environment.json', '.starcistacks/dev/secrets/.gitkeep',
+  '.prettierrc', '.sops.yaml', '.starcistacks/application-stacks.yaml', '.starcistacks/dev/environment.json', '.starcistacks/dev/secrets/.gitkeep',
   '.starciwork/.gitignore', '.starciwork/workspace.yaml',
   'README.md',
   'be/apps/api/Dockerfile', 'be/apps/api/src/api.env.ts', 'be/apps/api/src/api.options.ts', 'be/apps/api/src/app.module.ts', 'be/apps/api/src/compose/platform.ts', 'be/apps/api/src/main.ts',
@@ -161,11 +161,19 @@ const scaffoldLite = into => scaffoldApp({
   now: () => CREATED_AT,
 });
 
-test('lite scaffold emits its workspace declaration and is structurally clean', async (t) => {
+test('lite scaffold emits its workspace and required stack declarations and is structurally clean', async (t) => {
   const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-lite-'));
   t.after(() => fs.rmSync(into, { recursive: true, force: true }));
   const { root, files } = scaffoldLite(into);
   assert.deepEqual(files, EXPECTED_LITE_FILES);
+  const stacks = parseYaml(fs.readFileSync(path.join(root, '.starcistacks/application-stacks.yaml'), 'utf8'));
+  assert.deepEqual(stacks.backing, { supabase: { provider: 'supabase', managed: true } });
+  assert.equal(stacks.services.sonar.provider, 'sonarqube');
+  assert.equal(stacks.services.sonar.mode, 'local');
+  assert.deepEqual(stacks.services.sonar.stack, { owner: 'host', root: '.claude/ext/sonar', environment: 'dev' });
+  assert.equal(stacks.components, undefined, 'the starter declares no unoperated compute');
+  assert.equal(stacks.environments, undefined, 'production delivery is authored when operated');
+  assert.equal(fs.existsSync(path.join(root, '.starcistacks/production')), false);
   const entry = fs.readFileSync(path.join(root, 'be/apps/api/src/main.ts'), 'utf8');
   const env = fs.readFileSync(path.join(root, 'be/apps/api/src/api.env.ts'), 'utf8');
   assert.match(entry, /readApiEnv\(env\)/);
