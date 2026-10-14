@@ -22,7 +22,7 @@ Run these commands from the ecommerce-app root, the directory that contains its 
 `npm test` is `jest --selectProjects unit --coverage`. Coverage is measured per file on the logic of `src/modules/**`: every
 file of a `ruleParams.be.logicRoles` role inside a `coverage: required` slot must reach 100 percent lines, branches,
 functions and statements (`jest.config.js`, relative to the back-end root, is the render `starci app sync` writes from the runtime's
-[coverage-scope derivation](../../../../../scripts/hfs/coverage-scope.mjs); R204); jest exits non-zero below that. The run writes `be/coverage/lcov.info` relative to the app root; Sonar and
+coverage-scope derivation; R204); jest exits non-zero below that. The derivation belongs to the StarCi runtime rather than this app repository. The run writes `be/coverage/lcov.info` relative to the app root; Sonar and
 Codecov import it with the same measured scope and hold each file at 100.
 
 A service spec builds its subject from a testing module that provides exactly the constructor dependencies and nothing else:

@@ -1,4 +1,4 @@
-// env-parity.mjs - R248 HFS_ENV_PARITY (OPS K5/K11, nivo D2-01/06/07/08): the environment keys a back end reads, the
+// env-parity.mjs - R248 HFS_ENV_PARITY (OPS K5/K11): the environment keys a back end reads, the
 // keys sealed under `.starcistacks/<env>/secrets/*.enc` and the keys the stack declares or passes are one set,
 // compared by name only (owner ruling 0.1.7: every back-end app reads its environment only through the typed
 // `EnvSource` of `<app>.env.ts` and the capability `*.config.ts` parse helpers).

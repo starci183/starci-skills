@@ -119,6 +119,7 @@ function sideDeclaration(manifest, declaration, name, edition, providers) {
     connections: Object.freeze((s.connections ?? []).map(connectionView)),
     providers,
     reads: Object.freeze([...(s.reads ?? [])]),
+    ...(s.extraPackages === undefined ? {} : { extraPackages: Object.freeze(s.extraPackages.map(entry => Object.freeze({ ...entry }))) }),
     manifestVersion: manifest.version,
   });
 }

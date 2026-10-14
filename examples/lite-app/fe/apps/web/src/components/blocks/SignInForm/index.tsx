@@ -18,6 +18,11 @@ export const SignInForm = () => {
     const t = useTranslations("app.signIn")
     const { fields, submit, isSubmitting, failure } = useSignInForm()
     if (session.status !== "signed-out") return null
+    const failureMessages = {
+        refused: t("refused"),
+        invalid: t("invalid"),
+        unavailable: t("unavailable"),
+    } satisfies Record<SignInFailure, string>
     return (
         <SignInFormBase
             state={stateOf(isSubmitting, failure)}
@@ -26,7 +31,7 @@ export const SignInForm = () => {
                 emailLabel: t("email"),
                 passwordLabel: t("password"),
                 submitLabel: isSubmitting ? t("working") : t("submit"),
-                failure: failure === undefined ? undefined : t(failure),
+                failure: failure === undefined ? undefined : failureMessages[failure],
                 email: { value: fields.email.value, errorMessage: fields.email.errorMessage },
                 password: { value: fields.password.value, errorMessage: fields.password.errorMessage },
             }}

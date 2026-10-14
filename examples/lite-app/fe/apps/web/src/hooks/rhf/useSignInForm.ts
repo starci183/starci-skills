@@ -12,13 +12,13 @@ import { authClient } from "@/modules/auth"
 export type SignInFailure = "refused" | "invalid" | "unavailable"
 
 /** The bounded credentials, with the reader's-language messages of each bound. */
-const signInSchemaOf = (t: (key: "emailInvalid" | "passwordShort" | "passwordLong") => string) =>
+const signInSchemaOf = (messages: Readonly<Record<"emailInvalid" | "passwordShort" | "passwordLong", string>>) =>
     z.object({
-        email: z.email({ error: t("emailInvalid") }).max(254, { error: t("emailInvalid") }),
+        email: z.email({ error: messages.emailInvalid }).max(254, { error: messages.emailInvalid }),
         password: z
             .string()
-            .min(8, { error: t("passwordShort") })
-            .max(256, { error: t("passwordLong") }),
+            .min(8, { error: messages.passwordShort })
+            .max(256, { error: messages.passwordLong }),
     })
 
 /** The values of the sign-in form. */
@@ -41,7 +41,15 @@ const useField = (control: Control<SignInValues>, name: keyof SignInValues) => {
  */
 export const useSignInForm = () => {
     const t = useTranslations("app.signIn")
-    const schema = useMemo(() => signInSchemaOf(t), [t])
+    const schema = useMemo(
+        () =>
+            signInSchemaOf({
+                emailInvalid: t("emailInvalid"),
+                passwordShort: t("passwordShort"),
+                passwordLong: t("passwordLong"),
+            }),
+        [t],
+    )
     const form = useForm<SignInValues>({ resolver: zodResolver(schema), defaultValues: { email: "", password: "" } })
     const [failure, setFailure] = useState<SignInFailure>()
     const email = useField(form.control, "email")

@@ -71,11 +71,12 @@ test("addApp adds a second lite front end with the lite app skeleton and the sha
     "fe/apps/admin/src/hooks/swr/SwrSideEffects.tsx",
     "fe/apps/admin/package.json",
     "fe/apps/admin/tsconfig.json",
+    "fe/apps/admin/Dockerfile",
   ]) {
     assert.ok(result.created.includes(relative), relative);
   }
   assert.equal(result.created.some((relative) => relative.includes("/modules/db/") || relative.includes("/auth/callback/")), false);
-  assert.equal(result.created.includes("fe/apps/admin/Dockerfile"), false, "a lite app deploys no front-end image");
+  assert.match(read(root, "fe/apps/admin/Dockerfile"), /fe\/apps\/admin\/.next\/standalone/, "the lite Swarm deployment carries the new front-end image");
   assert.match(read(root, "fe/apps/admin/src/modules/auth/client.ts"), /@supabase\/supabase-js/);
   assert.doesNotMatch(read(root, "fe/apps/admin/src/components/composites/SiteShell/index.tsx"), /\{\{> /, "partials are rendered");
   assert.deepEqual(JSON.parse(read(root, "hfs.json")).sides.fe.apps, [

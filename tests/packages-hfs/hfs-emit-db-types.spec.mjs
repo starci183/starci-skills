@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+import { parse as parseToml } from 'smol-toml';
 import { main } from '../../packages/hfs/src/main.mjs';
 import { TYPES_STAMP, appHasDbTypes, dbTypesEmitter, dbTypesPath, emitDbTypes, generateDbTypes, migrationsDigest, writeDbTypes } from '../../packages/hfs/emit/db-types.mjs';
 import { emitContracts } from '../../packages/hfs/emit/contracts.mjs';
@@ -157,11 +158,13 @@ test('emit-contracts CLI regenerates database types for a scaffolded lite app th
   const stdout = [];
   const run = fakeRun(calls);
 
+  const config = parseToml(fs.readFileSync(path.join(root, 'supabase/config.toml'), 'utf8'));
+  assert.deepEqual(config.api.schemas, [], 'the lite scaffold keeps the Supabase data API schemas closed');
   assert.equal(await main(['emit', '--cwd', root], { run, stdout: text => stdout.push(text) }), 0);
   assert.equal(fs.readFileSync(path.join(root, dbTypesPath), 'utf8'), stamped(root));
   assert.deepEqual(calls, [{
     file: 'supabase',
-    args: ['gen', 'types', 'typescript', '--local', '--schema', 'public,graphql_public'],
+    args: ['gen', 'types', 'typescript', '--local'],
     cwd: root,
   }]);
   assert.match(stdout.join(''), /starci app emit: 0 written/);

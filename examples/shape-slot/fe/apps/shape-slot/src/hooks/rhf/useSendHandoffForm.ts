@@ -21,6 +21,28 @@ const sendHandoffSchema = z.object({
 /** Values of the send form, inferred from the schema so the two never drift. */
 type SendHandoffFormValues = z.infer<typeof sendHandoffSchema>
 
+type SendHandoffErrorKey =
+    | "sales.send.errors.fingerprintRequired"
+    | "sales.send.errors.revisionMin"
+    | "sales.send.errors.noteTooLong"
+    | "errors.page.title"
+
+/** Resolve only the error keys owned by this form; unknown resolver messages are not UI copy. */
+const sendHandoffErrorMessage = (translate: (key: SendHandoffErrorKey) => string, key?: string) => {
+    switch (key) {
+        case "sales.send.errors.fingerprintRequired":
+            return translate("sales.send.errors.fingerprintRequired")
+        case "sales.send.errors.revisionMin":
+            return translate("sales.send.errors.revisionMin")
+        case "sales.send.errors.noteTooLong":
+            return translate("sales.send.errors.noteTooLong")
+        case "errors.page.title":
+            return translate("errors.page.title")
+        default:
+            return undefined
+    }
+}
+
 type UseSendHandoffFormParams = {
     readonly handoffId: string
     readonly input?: SendInput
@@ -58,7 +80,7 @@ export const useSendHandoffForm = (params: UseSendHandoffFormParams) => {
 
     const values = useWatch({ control: form.control })
     const errors = form.formState.errors
-    const errorOf = (key?: string) => (key === undefined ? undefined : tRoot(key))
+    const errorOf = (key?: string) => sendHandoffErrorMessage(tRoot, key)
     const isBusy = () => inFlight.current || send.isMutating
     const submit = (action: "review" | "confirm") => {
         if (isBusy() || params.input === undefined) return

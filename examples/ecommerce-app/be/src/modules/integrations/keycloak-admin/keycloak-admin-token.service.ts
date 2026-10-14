@@ -64,7 +64,7 @@ export class KeycloakAdminTokenService {
                 typeof body.access_token !== "string" ||
                 typeof body.expires_in !== "number"
             ) {
-                this.logger.warn(KeycloakAdminLogEvent.TokenRefused, { status: answer.status })
+                this.logger.warn(KeycloakAdminLogEvent.GrantRefused, { status: answer.status })
                 return null
             }
             return {
@@ -72,7 +72,7 @@ export class KeycloakAdminTokenService {
                 renewAt: now + body.expires_in * MILLISECONDS_PER_SECOND - RENEW_BEFORE_MS,
             }
         } catch (cause) {
-            this.logger.error(KeycloakAdminLogEvent.TokenRefused, cause)
+            this.logger.error(KeycloakAdminLogEvent.GrantRefused, cause)
             return null
         }
     }

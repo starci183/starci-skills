@@ -87,6 +87,23 @@ const badCommands = [
 ];
 
 for (const edition of ['lite', 'full']) {
+  test(`${edition}: app-root parity owns migrations while a side scope is not judged twice`, (t) => {
+    const context = fixture(t, edition, { [QUEUE]: CONSTANT, [MIGRATION]: CREATE });
+    assert.deepEqual(databaseQueuesFindings({ ...context, isRoot: true }), []);
+    const side = { ...context, files: [QUEUE], all: [QUEUE] };
+    assert.deepEqual(databaseQueuesFindings({ ...side, isRoot: false, appSide: true }), []);
+    assert.ok(databaseQueuesFindings({ ...side, isRoot: true }).some((finding) => finding.code === 'DB_PGMQ_DECLARED'));
+  });
+
+  test(`${edition}: a standalone back-end scope still checks queue migration parity`, (t) => {
+    const queue = QUEUE.slice(3);
+    const context = fixture(t, edition, { [queue]: CONSTANT, [MIGRATION]: CREATE });
+    const standalone = { ...context, repo: { ...context.repo, profile: 'be' }, isRoot: false, appSide: false };
+    assert.deepEqual(databaseQueuesFindings(standalone), []);
+    const findings = databaseQueuesFindings({ ...standalone, files: [queue], all: [queue] });
+    assert.ok(findings.some((finding) => finding.code === 'DB_PGMQ_DECLARED' && finding.path === queue));
+  });
+
   test(`${edition}: DB_PGMQ_DECLARED passing parity, quoted SQL and per-queue app grants`, (t) => {
     assert.deepEqual(judge(t, edition, {
       [QUEUE]: CONSTANT,

@@ -1,0 +1,8 @@
+import fs from "node:fs"
+import path from "node:path"
+import { createHash } from "node:crypto"
+
+const byCodeUnit = (left, right) => {
+    if (left === right) return 0
+    return left < right ? -1 : 1
+}

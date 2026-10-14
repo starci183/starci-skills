@@ -73,11 +73,14 @@ function appWireFindings({ repoRoot, files, app, snapshots, digest }) {
   return [found(WIRE_GENERATED, generated, `${generated} ${problem}; run \`npm run codegen\` so its wire types and ${WIRE_SCHEMA_STAMP} match the schema`, { app, snapshots })];
 }
 
-/** R52 over the app: root codegen, required operation output, and its recorded schema digest. */
-function wireFindings({ repoRoot, files, apps, reads }) {
+/** R52's tracked-source obligations, plus generated local artifacts in the workspace phase. */
+function wireFindings({ repoRoot, files, apps, reads, phase }) {
   const snapshots = files.filter((file) => file.endsWith('/schema.graphql') && reads.some((read) => file.startsWith(read)));
   const findings = [];
   if (snapshots.length && typeof scriptsOf(repoRoot, 'package.json').codegen !== 'string') findings.push(found(WIRE_GENERATED, 'package.json', `the app keeps contract snapshots (${reads.join(', ')}) but its package.json declares no \`codegen\` script; wire types are generated from the snapshots, never typed by hand`));
+  // A clean checkout has no ignored build artifacts. The runtime's source-render check judges their tracked inputs;
+  // the ordinary app check/lint judges the generated output after the app's codegen step (also required by L4).
+  if (phase === 'source') return findings;
   const digest = snapshots.length ? wireSchemaDigest(repoRoot, snapshots) : null;
   findings.push(...apps.flatMap((app) => appWireFindings({ repoRoot, files, app, snapshots, digest })));
   return findings;
@@ -134,9 +137,9 @@ export function frontendFindings({ repoRoot, files, repo }) {
   return repo.apps.filter((a) => a.kind === 'next').flatMap((a) => [placementFindings, catalogFindings].flatMap((check) => check({ repoRoot, app: a.name, tracked: files })));
 }
 
-/** The app's front-end findings that read the root (R52, R59's dependency); `repoRoot` is the app root, `files` app-relative. */
-export function appFrontendFindings({ repoRoot, files, repo }) {
+/** The app's front-end findings that read the root; workspace checks include R52's ignored local artifacts. */
+export function appFrontendFindings({ repoRoot, files, repo, phase = 'workspace' }) {
   const apps = repo.sides.fe.apps.filter((a) => a.kind === 'next').map((a) => a.name);
   // The snapshots are the paths the fe side declares it reads of the be side (hfs.json sides.fe.reads: be/contracts/).
-  return [...wireFindings({ repoRoot, files, apps, reads: repo.sides.fe.reads }), ...intlDependencyFindings({ repoRoot, files })];
+  return [...wireFindings({ repoRoot, files, apps, reads: repo.sides.fe.reads, phase }), ...intlDependencyFindings({ repoRoot, files })];
 }

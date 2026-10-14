@@ -36,6 +36,8 @@ test('RT_SECRET_TRACKED: the dated allowance is empty on the real tree, every ol
   assert.deepEqual(heldSecretsOf(manifest), [], 'ruleParams.runtime.heldSecrets is empty');
   for (const member of HELD_MEMBERS) assert.equal(fs.existsSync(path.join(ROOT, member.path)), false, `${member.path} is deleted from the tree`);
   assert.equal(fs.existsSync(path.join(ROOT, 'ext', 'sonar', 'secrets')), false, 'the Sonar extension holds no custody directory');
+  const exampleSecrets = path.join(ROOT, 'examples', 'lite-app', '.starcistacks', 'production', 'secrets');
+  assert.deepEqual(fs.readdirSync(exampleSecrets), ['.gitkeep'], 'the public example declares custody without holding secret material');
   const real = runtimeCheck({ repoRoot: ROOT, root: ROOT });
   assert.deepEqual(real.findings.filter((f) => f.code === RT_SECRET_TRACKED), [], 'the real tree trips no RT_SECRET_TRACKED with the empty allowance');
 });

@@ -27,7 +27,7 @@ import { testTopologyFindings } from './test-topology.mjs';
  * The findings of the app-root rules: `files` are the root's own tracked paths, `all` every tracked path of the app, `repo` the
  * resolved app declaration, `resolver` its slot resolver and `pins` the canon pins.
  */
-export function appRootFindings({ repoRoot, files, all, repo, resolver, pins }) {
+export function appRootFindings({ repoRoot, files, all, repo, resolver, pins, phase }) {
   return [
     ...depFindings({ repoRoot, files: all }),
     ...peerIntegrationFindings({ repoRoot, files: all }),
@@ -45,7 +45,7 @@ export function appRootFindings({ repoRoot, files, all, repo, resolver, pins }) 
     ...pipelineFindings({ repoRoot, files, pins }),
     ...testTopologyFindings({ repoRoot, files }),
     ...proofCommandFindings({ repoRoot, files: all, resolver, sides: Object.keys(repo.sides ?? {}) }),
-    ...appFrontendFindings({ repoRoot, files: all, repo }),
+    ...appFrontendFindings({ repoRoot, files: all, repo, phase }),
     ...stacksFindings({ repoRoot, files, resolver }),
   ];
 }

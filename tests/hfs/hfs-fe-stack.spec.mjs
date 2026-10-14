@@ -6,6 +6,7 @@ import path from 'node:path';
 import { checkRepo } from '../../scripts/hfs/check.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { feStackAllowlistFindings } from '../../scripts/hfs/rules/fe-stack.mjs';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 
 // FE_STACK_FORBIDDEN (rules/fe-stack.mjs): a front-end manifest never declares a package knowledge/hfs/fe-stack.yaml lists under a
 // concern's `forbids` (owner ruling 2026-10-13, lite = full). The fe side judges every package.json it holds; the app root's one
@@ -43,7 +44,7 @@ test('FE_STACK_FORBIDDEN: a forbidden alternative in an app or a package manifes
   };
   const repoRoot = tree(t, files);
   const found = stack(repoRoot, Object.keys(files));
-  assert.deepEqual(found.map((f) => `${f.path}|${f.section}|${f.dependency}|${f.concern}`).sort(), [
+  assert.deepEqual(found.map((f) => `${f.path}|${f.section}|${f.dependency}|${f.concern}`).sort(byCodeUnit), [
     'fe/apps/web/package.json|dependencies|@tanstack/react-query|data',
     'fe/apps/web/package.json|dependencies|urql|graphql',
     'fe/apps/web/package.json|devDependencies|moment|dates',
@@ -57,7 +58,7 @@ test('FE_STACK_FORBIDDEN: a forbidden alternative in an app or a package manifes
 test('FE_STACK_FORBIDDEN: the app root manifest is judged too, except a library the back end owns', (t) => {
   const files = { 'package.json': { name: 'demo', dependencies: { 'graphql-ws': '6.0.0', moment: '2.30.0', formik: '2.4.0' }, devDependencies: { 'react-toastify': '11.0.0' } } };
   const repoRoot = tree(t, files);
-  assert.deepEqual(stack(repoRoot, Object.keys(files)).map((f) => f.dependency).sort(), ['formik', 'react-toastify']);
+  assert.deepEqual(stack(repoRoot, Object.keys(files)).map((f) => f.dependency).sort(byCodeUnit), ['formik', 'react-toastify']);
 });
 
 test('FE_STACK_FORBIDDEN judges a lite app exactly as a full one, and a back-end manifest never', (t) => {
@@ -103,12 +104,38 @@ for (const edition of ['lite', 'full']) {
     }
   });
 
+  test(`FE_STACK_UNLISTED reads reasoned extras from the declared fe side (${edition})`, t => {
+    const name = '@fontsource-variable/inter';
+    const declaration = app(edition);
+    declaration.sides.fe = { ...FE, extraPackages: [
+      { name, reason: 'Self-host the product brand font' }, { name: 'urql', reason: 'Another GraphQL client' },
+    ] };
+    const files = {
+      'hfs.json': declaration,
+      'fe/apps/web/package.json': product({ dependencies: { ...dependencies(core), [name]: '1.0.0', 'undeclared-reader': '1.0.0', urql: '1.0.0' } }),
+    };
+    const root = tree(t, files);
+    const findings = checkRepo({ repoRoot: root, declaration, files: Object.keys(files), tree: false }).findings;
+    assert.ok(!findings.some(finding => finding.code === 'HFS_DECLARATION_INVALID'));
+    assert.deepEqual(findings.filter(finding => finding.code === 'FE_STACK_UNLISTED').map(finding => finding.dependency), ['undeclared-reader']);
+    assert.deepEqual(findings.filter(finding => finding.code === 'FE_STACK_FORBIDDEN').map(finding => finding.dependency), ['urql']);
+  });
+
+  test(`FE_STACK_UNLISTED uses the resolved side when hfs.json is supplied in memory (${edition})`, t => {
+    const declaration = app(edition);
+    declaration.sides.fe = { ...FE, extraPackages: [{ name: 'product-reader', reason: 'Read the product data format' }] };
+    const files = { 'fe/apps/web/package.json': product({ dependencies: { ...dependencies(core), 'product-reader': '1.0.0' } }) };
+    const root = tree(t, files);
+    const findings = checkRepo({ repoRoot: root, declaration, files: Object.keys(files), tree: false }).findings;
+    assert.deepEqual(findings.filter(finding => ['HFS_DECLARATION_INVALID', 'FE_STACK_UNLISTED'].includes(finding.code)), []);
+  });
+
   test(`FE_STACK_CORE_MISSING rejects missing core packages in product apps (${edition})`, t => {
     const missing = ['axios', 'dayjs', 'next-themes', 'superjson', 'zustand'];
     const files = { 'fe/apps/web/package.json': product({ dependencies: dependencies(core.filter(name => !missing.includes(name))) }) };
     const root = tree(t, files);
     const findings = allowlist(root, files, edition);
-    assert.deepEqual(findings.map(finding => finding.dependency).sort(), missing);
+    assert.deepEqual(findings.map(finding => finding.dependency).sort(byCodeUnit), missing);
     assert.ok(findings.every(finding => finding.code === 'FE_STACK_CORE_MISSING' && finding.path === 'apps/web/package.json'));
   });
 

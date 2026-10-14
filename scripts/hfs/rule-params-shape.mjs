@@ -29,6 +29,8 @@ const roleList = (v) => Array.isArray(v) && v.length > 0 && v.every((x) => /^[a-
 const formsOk = (v) => Array.isArray(v) && v.length > 0 && v.every((x) => FORM_NAMES.has(x)) && new Set(v).size === v.length;
 const doubleOk = (v) => isPlainObject(v) && /^[A-Za-z][A-Za-z0-9]*$/.test(String(v.double)) && formsOk(v.forms);
 const regexOk = (v) => { try { return typeof v === 'string' && v.length > 0 && Boolean(new RegExp(v)); } catch { return false; } };
+const dbExtensionsOk = (value) => Array.isArray(value) && value.every((name) => typeof name === 'string' && name.length > 0) && new Set(value).size === value.length;
+const dbParamsOk = (db) => db === undefined || (isPlainObject(db) && Object.entries(db).every(([key, value]) => key === 'extensions' && dbExtensionsOk(value)));
 
 function beSpecificProblems(be, manifest) {
   const bad = [];
@@ -52,7 +54,7 @@ function beSpecificProblems(be, manifest) {
 export function ruleParamsProblems(m) {
   const bad = [];
   const rp = m.ruleParams;
-  if (!isPlainObject(rp) || Object.keys(rp).some((k) => ![...PROFILES, 'common'].includes(k)) || !isPlainObject(rp.common) || !isPlainObject(rp.be) || (rp.fe !== undefined && !isPlainObject(rp.fe))) return ['ruleParams must be a map with common, be and optionally fe'];
+  if (!isPlainObject(rp) || Object.keys(rp).some((k) => ![...PROFILES, 'common', 'db'].includes(k)) || !isPlainObject(rp.common) || !isPlainObject(rp.be) || (rp.fe !== undefined && !isPlainObject(rp.fe))) return ['ruleParams must be a map with common, be and optionally fe and db'];
   else {
     // common holds the parameters both sides share; a side may restate one of them (a valid value) as an override, nothing else.
     // Edition lite: a side's optional `lite` map overrides keys of the same side (never `lite` itself) when the app declares edition lite.
@@ -60,6 +62,7 @@ export function ruleParamsProblems(m) {
     if (!sideOk(rp.be, BE_OWN, ['schemaAuthority', 'lite']) || (rp.be.schemaAuthority !== undefined && !SCHEMA_AUTHORITIES.includes(rp.be.schemaAuthority)) || !liteOk(rp.be.lite, [...BE_OWN, ...SHARED_KEYS, 'schemaAuthority'])) bad.push('ruleParams.be needs infraOwners, eventBus, specDoubles, paramNames, suffixes, bannedSuffixes, contractShape {helper}, unitRoles, logicRoles, thinRoles, patternScenarios, kindPatterns and addKinds (shared parameters live in ruleParams.common, a side may override them); optional: schemaAuthority (' + SCHEMA_AUTHORITIES.join(' | ') + ') and lite (overrides of the same keys)'); else bad.push(...unitRolesProblems(rp.be), ...roleListProblems(rp.be));
     bad.push(...beSpecificProblems(rp.be, m));
     if (rp.fe !== undefined && (!sideOk(rp.fe, [], ['lite']) || !liteOk(rp.fe.lite, SHARED_KEYS))) bad.push('ruleParams.fe may only restate the shared parameters of ruleParams.common, and carry a lite override of them');
+    if (!dbParamsOk(rp.db)) bad.push('ruleParams.db may contain only extensions: a list of unique non-empty extension names');
   }
   return bad;
 }

@@ -519,6 +519,8 @@ function validateQueues(state, inScope) {
 
 /** Cross-file R258 findings. A full app participates when it declares or contains Supabase files. */
 export function databaseQueuesFindings(context) {
+  // The app-root pass owns the cross-file inventory; a side pass cannot see its migrations.
+  if (context.appSide === true) return [];
   const state = queueState(context);
   return state ? validateQueues(state, context.inScope ?? (() => true)) : [];
 }

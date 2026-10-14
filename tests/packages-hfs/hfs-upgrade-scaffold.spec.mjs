@@ -152,6 +152,8 @@ test("a real lite scaffold plans and applies the additive full upgrade", async (
   const statusBeforePlan = gitStatus(root);
   const productBefore = fileHashes(root, PRODUCT_ROOTS);
   const readmeBefore = fs.readFileSync(path.join(root, "README.md"), "utf8");
+  const stacksBefore = fs.readFileSync(path.join(root, ".starcistacks/application-stacks.yaml"), "utf8");
+  const scriptsBefore = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).scripts;
 
   const firstPlan = await upgradeEdition({
     root,
@@ -163,12 +165,19 @@ test("a real lite scaffold plans and applies the additive full upgrade", async (
   assert.ok(firstPlan.length > 0, "the lite scaffold has full-only additions");
   assert.ok(
     firstPlan.every((step) =>
-      ["add", "remove-field", "rewrite-managed", "rewrite-readme"].includes(
+      ["add", "keep", "remove-field", "rewrite-managed", "rewrite-readme"].includes(
         step.op,
       ),
     ),
     JSON.stringify(firstPlan, null, 2),
   );
+  assert.deepEqual(firstPlan.filter((step) => step.op === "keep"), [
+    {
+      op: "keep",
+      path: ".starcistacks/application-stacks.yaml",
+      why: "The app already declares its stacks; the declaration stays as the app wrote it.",
+    },
+  ]);
   assert.deepEqual(
     firstPlan.filter((step) => step.op === "remove-field"),
     [
@@ -208,6 +217,14 @@ test("a real lite scaffold plans and applies the additive full upgrade", async (
     readmeBefore,
     "the lite README already lists every managed command full has, so the upgrade leaves it byte-for-byte",
   );
+  assert.equal(
+    fs.readFileSync(path.join(root, ".starcistacks/application-stacks.yaml"), "utf8"),
+    stacksBefore,
+    "the upgrade preserves the app-owned Swarm declaration byte-for-byte",
+  );
+  const upgradedScripts = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).scripts;
+  for (const name of ["db:start", "db:stop", "db:reset", "db:new", "db:push", "db:types", "db:lint"])
+    assert.equal(upgradedScripts[name], scriptsBefore[name], `${name} stays available for the declared Supabase connection`);
   for (const [file, hash] of productBefore)
     assert.equal(
       fileHashes(root, [file]).get(file),
@@ -291,6 +308,8 @@ test("a real lite scaffold plans and applies the additive full upgrade", async (
 
 test("upgrade refuses a real full scaffold with exit 2 and the documented message", async (t) => {
   const root = scaffold(t, "full");
+  const scripts = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).scripts;
+  assert.deepEqual(Object.keys(scripts).filter((name) => name.startsWith("db:")), [], "a full scaffold without a Supabase connection adds no Supabase commands");
   const before = fileHashes(root);
   const result = await cliOutput([
     "upgrade",

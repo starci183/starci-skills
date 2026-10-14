@@ -90,7 +90,7 @@ describe("KeycloakAdminTokenService", () => {
 
             await expect(service.accessToken()).resolves.toBeNull()
 
-            expect(logger.warn).toHaveBeenCalledWith(KeycloakAdminLogEvent.TokenRefused, { status: answer.status })
+            expect(logger.warn).toHaveBeenCalledWith(KeycloakAdminLogEvent.GrantRefused, { status: answer.status })
         })
 
         it("answers null and logs the cause when the token endpoint cannot be reached, then tries again on the next call", async () => {
@@ -99,7 +99,7 @@ describe("KeycloakAdminTokenService", () => {
             http.request.mockRejectedValueOnce(failure).mockResolvedValueOnce(granted("token-1"))
 
             await expect(service.accessToken()).resolves.toBeNull()
-            expect(logger.error).toHaveBeenCalledWith(KeycloakAdminLogEvent.TokenRefused, failure)
+            expect(logger.error).toHaveBeenCalledWith(KeycloakAdminLogEvent.GrantRefused, failure)
 
             await expect(service.accessToken()).resolves.toBe("token-1")
         })
