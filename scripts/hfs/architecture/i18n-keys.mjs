@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { byCodeUnit } from '../../lib/list.mjs';
+import { escapeRegExp } from '../../lib/regex.mjs';
 
 /**
  * R106 `i18n-keys` (FE_I18N_KEYS). The catalogs of an app (`apps/<app>/src/modules/i18n/messages/<locale>.json`, slot fe.modules.i18n) and
@@ -12,7 +13,7 @@ import { byCodeUnit } from '../../lib/list.mjs';
  *     own source (both branches of a conditional key are read). A key no locale's catalog holds is FE_I18N_KEYS, once per call. A computed
  *     key (a template with an interpolation, a variable) is not judged here; it counts as a read.
  *   - a key nobody reads is dead: a leaf of the app's catalogs that no string in the app's or the shared packages' source can be reading.
- *     A leaf counts as read when a string literal or a template pattern (each interpolation a wildcard segment) of that source equals a
+ *     A leaf counts as read when a string literal or a template pattern (each interpolation a wildcard within its dotted segment) equals a
  *     tail of its dotted path (`"title"`, `"card.title"`, `"orders.card.title"` all read `orders.card.title`); the test is deliberately loose
  *     so a key handed through props or a table of keys is never reported, and only a key that appears nowhere is.
  *
@@ -39,7 +40,10 @@ const held = (leaves, full) => leaves.has(full) || [...leaves].some(leaf => leaf
 
 // A pattern that is only wildcards (`${a}`, `${a}.${b}`) names nothing: it would read every key, so it reads none.
 const tailMatches = (pattern, leafSegments) => pattern.some(segment => segment !== '*' && segment !== '') && pattern.length <= leafSegments.length
-  && pattern.every((segment, index) => segment === '*' || segment === leafSegments[leafSegments.length - pattern.length + index]);
+  && pattern.every((segment, index) => {
+    const leaf = leafSegments[leafSegments.length - pattern.length + index];
+    return segment instanceof RegExp ? segment.test(leaf) : segment === '*' || segment === leaf;
+  });
 
 function catalogsPerApp(config, graph) {
   const catalogs = new Map();
@@ -56,12 +60,21 @@ function catalogsPerApp(config, graph) {
   return catalogs;
 }
 
+/** Each interpolation can fill part or all of a segment; the template's static fragments keep their literal spelling. */
+function templatePatternOf(node) {
+  return [node.head.text, ...node.templateSpans.map(span => span.literal.text)].join('\u0000').split('.').map(segment => {
+    if (!segment.includes('\u0000')) return segment;
+    const parts = segment.split('\u0000');
+    return parts.every(part => part === '') ? '*' : new RegExp(`^${parts.map(escapeRegExp).join('.*')}$`, 'su');
+  });
+}
+
 function patternsOf(ts, files) {
   const patterns = [];
   for (const file of files) {
     const visit = node => {
       if (ts.isStringLiteralLike(node)) patterns.push(node.text.split('.'));
-      else if (ts.isTemplateExpression(node)) patterns.push([node.head.text, ...node.templateSpans.map(span => span.literal.text)].join('\u0000').replaceAll('\u0000', '*').split('.'));
+      else if (ts.isTemplateExpression(node)) patterns.push(templatePatternOf(node));
       ts.forEachChild(node, visit);
     };
     visit(file.sourceFile);

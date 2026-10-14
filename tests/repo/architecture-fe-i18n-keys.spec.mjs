@@ -53,3 +53,78 @@ test('a translator that is not next-intl, a computed namespace and a computed ke
   });
   assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
 });
+
+test('in-segment template reads through t, tw and server translators keep matching catalog keys alive', t => {
+  const extra = {
+    hiring: { stage_new: 'New', stage_review: 'Review', stage_: 'Empty', stages_new: 'Unused' },
+    workbench: { level_low_label: 'Low', level_high_label: 'High', level_low_caption: 'Unused' },
+    orders: { ready_paid: { label_short: 'Short', label_long: 'Long', caption: 'Unused' } },
+    server: { result_ok: 'OK', result_failed: 'Failed' },
+  };
+  const report = run(t, {
+    [`${CATALOG_DIR}/vi.json`]: catalog(extra),
+    [`${CATALOG_DIR}/en.json`]: catalog(extra),
+    'apps/web/src/modules/i18n/use-dynamic.ts': [
+      "import { useTranslations as useCopy } from 'next-intl';",
+      "import { getTranslations } from 'next-intl/server';",
+      'export const useDynamic = (stage: string, level: string, kind: string, state: string, style: string) => {',
+      "  const t = useCopy('hiring');",
+      "  const tw = useCopy('workbench');",
+      "  const orders = useCopy('orders');",
+      '  return [t(`stage_${stage}`), tw.rich(`level_${level}_label`), orders.raw(`${kind}_${state}.label_${style}`)];',
+      '};',
+      "export const readResult = async (state: string) => { const tw = await getTranslations({ namespace: 'server' }); return tw.markup(`result_${state}`); };",
+      '',
+    ].join('\n'),
+  });
+  assert.deepEqual(hits(report).map(item => item.key), ['hiring.stages_new', 'orders.ready_paid.caption', 'workbench.level_low_caption']);
+});
+
+test('template static fragments and string literals keep their metacharacters literal', t => {
+  const extra = {
+    badges: { 'badge[ok]?+': 'OK', badgeok: 'Unused', 'tag*_ready': 'Ready', tag_ready: 'Unused' },
+    exact: { 'literal_*': 'Literal', literal_one: 'Unused', 'template_*': 'Template', template_one: 'Unused' },
+  };
+  const report = run(t, {
+    [`${CATALOG_DIR}/vi.json`]: catalog(extra),
+    [`${CATALOG_DIR}/en.json`]: catalog(extra),
+    'apps/web/src/modules/i18n/use-symbols.ts': [
+      "import { useTranslations } from 'next-intl';",
+      'export const useSymbols = (state: string) => {',
+      "  const t = useTranslations('badges');",
+      "  const exact = useTranslations('exact');",
+      "  return [t(`badge[${state}]?+`), t(`tag*_${state}`), exact('literal_*'), exact(`template_*`)];",
+      '};',
+      '',
+    ].join('\n'),
+  });
+  assert.deepEqual(hits(report).map(item => item.key), ['badges.badgeok', 'badges.tag_ready', 'exact.literal_one', 'exact.template_one']);
+});
+
+test('whole-segment and shared-package template reads keep matching tails alive without crossing dotted segments', t => {
+  const extra = {
+    orders: { status: { paid: 'Paid', due: 'Due' }, nested: { status: { pending: 'Pending' } } },
+    shared: { copy_ready_label: 'Ready', copy_pending_label: 'Pending', copy_ready_caption: 'Unused', copy_ready: { child_label: 'Unused' } },
+  };
+  const report = run(t, {
+    'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', skipLibCheck: true, noEmit: true }, include: ['apps/**/*', 'packages/**/*'] }),
+    [`${CATALOG_DIR}/vi.json`]: catalog(extra),
+    [`${CATALOG_DIR}/en.json`]: catalog(extra),
+    'apps/web/src/modules/i18n/use-status.ts': 'export const statusKey = (state: string) => `status.${state}`;\n',
+    'packages/ui/src/copy.ts': 'export const sharedKey = (state: string) => `copy_${state}_label`;\n',
+  });
+  assert.deepEqual(hits(report).map(item => item.key), ['shared.copy_ready.child_label', 'shared.copy_ready_caption']);
+});
+
+test('templates containing only interpolations do not make every catalog key live', t => {
+  const report = run(t, {
+    [`${CATALOG_DIR}/vi.json`]: catalog({ unused: { alpha: 'A', beta: 'B', child: { gamma: 'C' } } }),
+    [`${CATALOG_DIR}/en.json`]: catalog({ unused: { alpha: 'A', beta: 'B', child: { gamma: 'C' } } }),
+    'apps/web/src/modules/i18n/use-unknown.ts': [
+      "import { useTranslations } from 'next-intl';",
+      "export const useUnknown = (left: string, right: string) => { const tw = useTranslations('unused'); return [tw(`${left}`), tw(`${left}${right}`), tw(`${left}.${right}`)]; };",
+      '',
+    ].join('\n'),
+  });
+  assert.deepEqual(hits(report).map(item => item.key), ['unused.alpha', 'unused.beta', 'unused.child.gamma']);
+});
