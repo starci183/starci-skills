@@ -160,6 +160,7 @@ component_management:
     - component_id: ecommerce-app-platform
       name: ecommerce-app-platform
       paths:
+        - "examples/ecommerce-app/be/src/modules/domain/order-expiry-ticks/**"
         - "examples/ecommerce-app/be/src/modules/integrations/identity-api/**"
         - "examples/ecommerce-app/be/src/modules/platform/*/**"
     - component_id: lite-app-api
@@ -175,6 +176,7 @@ component_management:
     - component_id: lite-app-platform
       name: lite-app-platform
       paths:
+        - "examples/lite-app/be/src/modules/domain/booking-reminders/**"
         - "examples/lite-app/be/src/modules/platform/*/**"
         - "examples/lite-app/be/src/modules/projections/*/**"
     - component_id: shape-slot-core

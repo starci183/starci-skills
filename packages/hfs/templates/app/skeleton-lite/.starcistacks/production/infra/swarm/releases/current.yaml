@@ -1,0 +1,6 @@
+schema: starci/release-pointer@1
+environment: production
+status: pending-owner-release
+release: null
+verification: null
+# Write a real /srv/{{project}}/releases/<digest> reference and dated health receipt only after verification.

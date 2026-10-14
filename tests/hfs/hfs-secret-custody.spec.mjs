@@ -249,7 +249,7 @@ for (const edition of ["lite", "full"]) {
   });
 }
 
-test("HFS_SECRET_OUTSIDE_ENC (full): a sealed file outside .starcistacks/<env>/secrets/ is refused", (t) => {
+test("HFS_SECRET_OUTSIDE_ENC (full): a sealed file outside its home is refused; direct members pass", (t) => {
   const { root } = app(t);
   write(root, "x/app.enc", sealedDotenv(["TOKEN"]));
   write(root, ".starcistacks/dev/secrets/app.enc", sealedDotenv(["TOKEN"]));
@@ -258,6 +258,10 @@ test("HFS_SECRET_OUTSIDE_ENC (full): a sealed file outside .starcistacks/<env>/s
   );
   assert.deepEqual(codes(findings), ["HFS_SECRET_OUTSIDE_ENC"]);
   assert.equal(findings[0].path, "x/app.enc");
+  assert.deepEqual(
+    secretCustodyOnlyFindings(ctx(root, [".starcistacks/dev/secrets/app.enc"], "full")),
+    [],
+  );
 });
 
 test("HFS_SECRET_OUTSIDE_ENC (lite): an off-home .enc is already HFS_LITE_SECRET_CUSTODY, so R277 stays silent", (t) => {

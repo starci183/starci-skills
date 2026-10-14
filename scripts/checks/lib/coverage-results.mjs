@@ -33,8 +33,13 @@ function builtinDependencies(current) {
   return out;
 }
 
-function appendDependencies(pending, dependencies) {
-  for (const dependency of dependencies) pending.push(dependency);
+function resultDependencies(context, current, helpersOnly) {
+  if (current.terminal) return [];
+  const resolved = resolvedExpression(context, current.index, current.node);
+  if (resolved.node !== current.node && resolved.node) return [{ ...current, ...resolved }];
+  if (current.node.type === 'CallExpression') return callDependencies(context, current, helpersOnly);
+  if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(current.node.type)) return [];
+  return astChildren(current.node).map((child) => ({ ...current, node: child }));
 }
 
 export function resultReach(context, index, node, { helpersOnly = false } = {}) {
@@ -50,15 +55,7 @@ export function resultReach(context, index, node, { helpersOnly = false } = {}) 
     const nodes = out.get(current.index.file) ?? [];
     nodes.push(current.node);
     out.set(current.index.file, nodes);
-    if (current.terminal) continue;
-    const resolved = resolvedExpression(context, current.index, current.node);
-    if (resolved.node !== current.node && resolved.node) { pending.push({ ...current, ...resolved }); continue; }
-    if (current.node.type === 'CallExpression') {
-      appendDependencies(pending, callDependencies(context, current, helpersOnly));
-      continue;
-    }
-    if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(current.node.type)) continue;
-    for (const child of astChildren(current.node)) pending.push({ ...current, node: child });
+    for (const dependency of resultDependencies(context, current, helpersOnly)) pending.push(dependency);
   }
   return out;
 }

@@ -2626,41 +2626,88 @@ rules:
     code: "HFS_SECRET_PLAINTEXT_FILE"
     law: "In every edition the only custody a tracked secret may take is a sops envelope at `.starcistacks/<env>/secrets/**.enc`. A tracked plaintext secret file is refused by being: `secrets.env` or `.secret(s).env` at any depth, a non-dot `*.env` or `*.env.<profile>` holding secret keys (deploy-side dotenv included), and a plaintext member of a `secrets/` directory; a sealed `.enc` outside the one sealed home is refused too (for lite it is already `HFS_LITE_SECRET_CUSTODY`)."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_SECRET_PLAINTEXT_FILE", "HFS_SECRET_OUTSIDE_ENC"]
     enforcers:
       - {kind: hfs, id: secret-custody-only, at: scripts/hfs/rules/secret-custody-only.mjs}
+    editions: [lite, full]
+    codeEditions: {HFS_SECRET_OUTSIDE_ENC: [full]}
+    docs: [docs/host-secrets.md#r277]
+    templateNa: "Sealed secret members are owner-created through starci app secret set after custody initialization; the scaffolder does not generate committed secret material."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-secret-custody.spec.mjs, editions: [lite, full], codes: [HFS_SECRET_PLAINTEXT_FILE]}
+      - {path: tests/hfs/hfs-secret-custody.spec.mjs, editions: [full], codes: [HFS_SECRET_OUTSIDE_ENC]}
+    proves:
+      - {path: tests/hfs/hfs-secret-custody.spec.mjs, editions: [lite, full], codes: [HFS_SECRET_PLAINTEXT_FILE]}
+      - {path: tests/hfs/hfs-secret-custody.spec.mjs, editions: [full], codes: [HFS_SECRET_OUTSIDE_ENC]}
+    witness:
+      - {path: tests/hfs/hfs-secret-custody.spec.mjs, editions: [lite, full], codes: [HFS_SECRET_PLAINTEXT_FILE]}
+      - {path: tests/hfs/hfs-secret-custody.spec.mjs, editions: [full], codes: [HFS_SECRET_OUTSIDE_ENC]}
 
   - id: R278
     code: "BE_REST_DOOR_EVIDENCE"
     law: "GraphQL is the default door in lite and full. Each REST route carries its own evidence: a probe, auth handshake, signed webhook, actual byte stream or a public versioned operation served from the app's nonempty defineOperations table. A class-level reference or an unused StreamableFile import proves no route, and a public REST route absent from the operation table is refused."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_REST_DOOR_EVIDENCE", "BE_REST_ROUTE_UNDECLARED"]
     enforcers:
       - {kind: eslint-be, id: rest-door-needs-a-reason}
       - {kind: eslint-be, id: rest-route-declared}
+    editions: [lite, full]
+    docs: [docs/microservices.md#r278]
+    exemplifiedBy:
+      - {path: packages/eslint/be/transport.spec.mjs, editions: [lite, full], codes: [BE_REST_DOOR_EVIDENCE]}
+      - {path: packages/eslint/be/operations.spec.mjs, editions: [lite, full], codes: [BE_REST_ROUTE_UNDECLARED]}
+      - {path: packages/hfs/templates/be/skeleton/src/features/api/system-health/transport/http/live.controller.ts, editions: [lite, full]}
+    proves:
+      - {path: packages/eslint/be/transport.spec.mjs, editions: [lite, full], codes: [BE_REST_DOOR_EVIDENCE]}
+      - {path: packages/eslint/be/operations.spec.mjs, editions: [lite, full], codes: [BE_REST_ROUTE_UNDECLARED]}
+    witness:
+      - {path: packages/eslint/be/transport.spec.mjs, editions: [lite, full], codes: [BE_REST_DOOR_EVIDENCE]}
+      - {path: packages/eslint/be/operations.spec.mjs, editions: [lite, full], codes: [BE_REST_ROUTE_UNDECLARED]}
+
   - id: R279
     code: "BE_THIRD_PARTY_OWNER"
     law: "Third-party SDK ownership is derived from the app's package.json dependencies rather than a finite SDK table. A dependency outside the pure-library and framework allowlists is imported only by one integrations/<provider> capability; domain services call that integration's public API. Existing infrastructure owner restrictions remain in force."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_THIRD_PARTY_OWNER"]
     enforcers:
       - {kind: eslint-be, id: third-party-import-owner}
+    editions: [lite, full]
+    docs: [docs/microservices.md#r279]
+    templateNa: "Vendor SDK dependencies and their provider ownership are selected per application; no generic vendor SDK surface is scaffolded."
+    exemplifiedBy:
+      - {path: packages/eslint/be/third-party-owner.spec.mjs, editions: [lite, full], codes: [BE_THIRD_PARTY_OWNER]}
+    proves:
+      - {path: packages/eslint/be/third-party-owner.spec.mjs, editions: [lite, full], codes: [BE_THIRD_PARTY_OWNER]}
+    witness:
+      - {path: packages/eslint/be/third-party-owner.spec.mjs, editions: [lite, full], codes: [BE_THIRD_PARTY_OWNER]}
+
   - id: R280
     code: "HFS_UNUSED_SYMBOL"
     law: "Every enum member, queue constant, error code and catalog key has a production consumer; an error's kind or message mapping and a test-only reference do not keep a dead symbol alive. Namespace imports consume the members actually read."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_UNUSED_SYMBOL"]
     enforcers:
       - {kind: hfs, id: unused-symbol, at: scripts/hfs/rules/unused-symbol.mjs}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r280]
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-unused-symbol.spec.mjs, editions: [lite, full], codes: [HFS_UNUSED_SYMBOL]}
+      - {path: packages/hfs/templates/be/skeleton/src/modules/domain/identity/errors/identity.error.ts, editions: [lite, full]}
+      - {path: packages/hfs/templates/be/skeleton/src/modules/domain/identity/admission.policy.ts, editions: [lite, full]}
+    proves:
+      - {path: tests/hfs/hfs-unused-symbol.spec.mjs, editions: [lite, full], codes: [HFS_UNUSED_SYMBOL]}
+    witness:
+      - {path: tests/hfs/hfs-unused-symbol.spec.mjs, editions: [lite, full], codes: [HFS_UNUSED_SYMBOL]}
+
   - id: R281
     code: "BE_SPEC_FORM_ALL_ROLES"
     law: "Unit spec form applies to every declared logic role, including policies, mappers, guards and integration clients. A spec obtains its subject from a compiled Nest testing module with explicit providers, never constructs the subject or mocks an own module or third-party library, and asserts behavior or state rather than only toBeDefined existence checks."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_SPEC_FORM_ALL_ROLES"]
     enforcers:
       - {kind: eslint-be, id: spec-builds-with-testing-module}
@@ -2670,22 +2717,51 @@ rules:
       - {kind: eslint-be, id: spec-behavior-assertion}
       - {kind: eslint-be, id: spec-infra-double-from-kit}
       - {kind: eslint-be, id: spec-exact-values}
+    editions: [lite, full]
+    docs: [docs/microservices.md#r281]
+    exemplifiedBy:
+      - {path: packages/eslint/be/unit-spec.spec.mjs, editions: [lite, full], codes: [BE_SPEC_FORM_ALL_ROLES]}
+      - {path: packages/hfs/templates/be/skeleton/src/modules/platform/clock/system-clock.service.spec.ts, editions: [lite, full]}
+    proves:
+      - {path: packages/eslint/be/unit-spec.spec.mjs, editions: [lite, full], codes: [BE_SPEC_FORM_ALL_ROLES]}
+    witness:
+      - {path: packages/eslint/be/unit-spec.spec.mjs, editions: [lite, full], codes: [BE_SPEC_FORM_ALL_ROLES]}
+
   - id: R282
     code: "HFS_ASSET_OVERSIZE"
     law: "Back-end build assets stay within the per-file asset budget (512000 bytes by default) and the build-asset extension allowlist; ordinary media lives in object storage, and model weights and datasets are never tracked in the back end. Declared documentation media remains allowed."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_ASSET_OVERSIZE", "HFS_ASSET_KIND"]
     enforcers:
       - {kind: hfs, id: assets, at: scripts/hfs/rules/assets.mjs}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r282]
+    templateNa: "Build assets are supplied by each application; the scaffolder does not generate binary assets, model weights or datasets."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-assets.spec.mjs, editions: [lite, full], codes: [HFS_ASSET_OVERSIZE, HFS_ASSET_KIND]}
+    proves:
+      - {path: tests/hfs/hfs-assets.spec.mjs, editions: [lite, full], codes: [HFS_ASSET_OVERSIZE, HFS_ASSET_KIND]}
+    witness:
+      - {path: tests/hfs/hfs-assets.spec.mjs, editions: [lite, full], codes: [HFS_ASSET_OVERSIZE, HFS_ASSET_KIND]}
+
   - id: R283
     code: "HFS_APP_LEXICON"
     law: "An app's source and documentation use the current product vocabulary: a word declared in hfs.json lexicon.removed is refused as a whole word or identifier segment, in both editions."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_APP_LEXICON"]
     enforcers:
       - {kind: hfs, id: lexicon, at: scripts/hfs/rules/lexicon.mjs}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r283]
+    templateNa: "Removed product vocabulary is application-specific hfs.json content; there is no canonical product lexicon to scaffold."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-lexicon.spec.mjs, editions: [lite, full], codes: [HFS_APP_LEXICON]}
+    proves:
+      - {path: tests/hfs/hfs-lexicon.spec.mjs, editions: [lite, full], codes: [HFS_APP_LEXICON]}
+    witness:
+      - {path: tests/hfs/hfs-lexicon.spec.mjs, editions: [lite, full], codes: [HFS_APP_LEXICON]}
 
   - id: R284
     code: "BE_LITE_PROOF_LANE_MISSING"
@@ -2695,77 +2771,182 @@ rules:
     failureCodes: ["BE_LITE_PROOF_LANE_MISSING"]
     enforcers:
       - {kind: hfs, id: lite-proof-lane, at: scripts/hfs/rules/lite-proof-lane.mjs}
+    editions: [lite]
+    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite has no e2e world and proves declared patterns in its integration lane; R284 owns only the lite lane code while full retains its existing pattern-proof rules."
+    docs: [docs/quality-bar.md#r284]
+    templateNa: "Integration scenarios depend on the application patterns and providers; no universal runnable scenario lane is scaffolded."
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-lite-proof-lane.spec.mjs, editions: [lite], codes: [BE_LITE_PROOF_LANE_MISSING]}
+    proves:
+      - {path: tests/hfs/hfs-lite-proof-lane.spec.mjs, editions: [lite], codes: [BE_LITE_PROOF_LANE_MISSING]}
+    witness:
+      - {path: tests/hfs/hfs-lite-proof-lane.spec.mjs, editions: [lite], codes: [BE_LITE_PROOF_LANE_MISSING]}
 
   - id: R285
     code: "FE_SWR_OUTSIDE_FAMILY"
     law: "SWR runtime calls belong to the declared SWR hook family. A component, feature or domain hook consumes its wrapper hook instead of importing an API operation or calling SWR itself; each back-end operation is imported and invoked only by its SWR wrapper under hooks/swr, regardless of whether the tier matrix still permits a direct transport edge."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["FE_SWR_OUTSIDE_FAMILY", "FE_OP_OUTSIDE_SWR_HOOK"]
     enforcers:
       - {kind: eslint-fe, id: swr-only-in-family}
       - {kind: eslint-fe, id: operations-only-in-swr-hooks}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r285]
+    exemplifiedBy:
+      - {path: packages/eslint/fe/swr-family.spec.mjs, editions: [lite, full], codes: [FE_SWR_OUTSIDE_FAMILY, FE_OP_OUTSIDE_SWR_HOOK]}
+      - {path: packages/hfs/templates/fe/table/graphql/useQuerySwr.ts.tpl, editions: [lite, full]}
+      - {path: packages/hfs/templates/fe/table/graphql/useMutateSwr.ts.tpl, editions: [lite, full]}
+    proves:
+      - {path: packages/eslint/fe/swr-family.spec.mjs, editions: [lite, full], codes: [FE_SWR_OUTSIDE_FAMILY, FE_OP_OUTSIDE_SWR_HOOK]}
+    witness:
+      - {path: packages/eslint/fe/swr-family.spec.mjs, editions: [lite, full], codes: [FE_SWR_OUTSIDE_FAMILY, FE_OP_OUTSIDE_SWR_HOOK]}
+
   - id: R286
     code: "FE_COPY_IN_CALL"
     law: "Copy shown by validation and toast calls comes from the next-intl catalog, including Zod message arguments and toast titles or descriptions. Browser alert calls are forbidden. Inline SVG glyphs are forbidden outside a declared brand-mark leaf; ordinary icons use the one Heroicons family through the Icon leaf."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["FE_COPY_IN_CALL", "FE_NO_ALERT", "FE_ICON_INLINE_SVG"]
     enforcers:
       - {kind: eslint-fe, id: no-copy-in-call}
       - {kind: eslint-fe, id: no-alert}
       - {kind: eslint-fe, id: no-inline-svg-outside-brand-mark-leaf}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r286]
+    exemplifiedBy:
+      - {path: packages/eslint/fe/translation.spec.mjs, editions: [lite, full], codes: [FE_COPY_IN_CALL, FE_NO_ALERT]}
+      - {path: packages/eslint/fe/icon.spec.mjs, editions: [lite, full], codes: [FE_ICON_INLINE_SVG]}
+      - {path: packages/hfs/templates/fe/skeleton/apps/__app__/src/components/leaves/Icon/index.tsx, editions: [lite, full]}
+      - {path: packages/hfs/templates/fe/skeleton/apps/__app__/src/modules/toast, editions: [lite, full]}
+    proves:
+      - {path: packages/eslint/fe/translation.spec.mjs, editions: [lite, full], codes: [FE_COPY_IN_CALL, FE_NO_ALERT]}
+      - {path: packages/eslint/fe/icon.spec.mjs, editions: [lite, full], codes: [FE_ICON_INLINE_SVG]}
+    witness:
+      - {path: packages/eslint/fe/translation.spec.mjs, editions: [lite, full], codes: [FE_COPY_IN_CALL, FE_NO_ALERT]}
+      - {path: packages/eslint/fe/icon.spec.mjs, editions: [lite, full], codes: [FE_ICON_INLINE_SVG]}
+
   - id: R287
     code: "FE_CALLBACK_SHAPE"
     law: "The fe.route.callback handler performs only the auth code exchange and redirect: read the callback URL, obtain the auth client, exchange the code and redirect to the declared route. It carries no product data operation, business logic, additional request handler or JSON response."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["FE_CALLBACK_SHAPE"]
     enforcers:
       - {kind: eslint-fe, id: callback-shape}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r287]
+    exemplifiedBy:
+      - {path: packages/eslint/fe/callback-shape.spec.mjs, editions: [lite, full], codes: [FE_CALLBACK_SHAPE]}
+      - {path: packages/hfs/templates/fe/skeleton/apps/__app__/src/app/auth/callback/route.ts, editions: [lite, full]}
+    proves:
+      - {path: packages/eslint/fe/callback-shape.spec.mjs, editions: [lite, full], codes: [FE_CALLBACK_SHAPE]}
+    witness:
+      - {path: packages/eslint/fe/callback-shape.spec.mjs, editions: [lite, full], codes: [FE_CALLBACK_SHAPE]}
+
   - id: R288
     code: "FE_STACK_UNLISTED"
     law: "Every FE workspace dependency belongs to knowledge/hfs/fe-stack.yaml or is declared in hfs.json fe.extraPackages with its name and a nonempty reason. Every product Next app declares the catalog's core runtime packages; codegen, lint, TypeScript and Tailwind tools may be installed once at the app root. The full marketing landing app is exempt from core presence. GraphQL documents, including gql templates, match the back-end contracts, and SWR keys carry fetcher identities without an opt-in declaration."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["FE_STACK_UNLISTED", "FE_STACK_CORE_MISSING"]
     enforcers:
       - {kind: hfs, id: fe-stack-allowlist, at: scripts/hfs/rules/fe-stack.mjs}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r288]
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-fe-stack.spec.mjs, editions: [lite, full], codes: [FE_STACK_UNLISTED, FE_STACK_CORE_MISSING]}
+      - {path: packages/hfs/templates/fe/app/package.json.tpl, editions: [lite, full]}
+    proves:
+      - {path: tests/hfs/hfs-fe-stack.spec.mjs, editions: [lite, full], codes: [FE_STACK_UNLISTED, FE_STACK_CORE_MISSING]}
+    witness:
+      - {path: tests/hfs/hfs-fe-stack.spec.mjs, editions: [lite, full], codes: [FE_STACK_UNLISTED, FE_STACK_CORE_MISSING]}
 
   - id: R289
     code: "BE_APP_ENV_REQUIRED"
     law: "Every declared back-end app owns a tracked apps/<app>/src/<app>.env.ts exporting its typed environment interface and read<App>Env(env: EnvSource). main.ts constructs EnvSource once and delegates its reads to that reader, with no inline parsing. app.module.ts composes module lists only by spreading compose/<area>.ts groups; its own providers are limited to app-wide guards and filters."
     kinds: [check, lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_APP_ENV_REQUIRED", "BE_APP_MODULE_LIST_INLINE"]
     enforcers:
       - {kind: hfs, id: app-env-required, at: scripts/hfs/rules/app-env-required.mjs}
       - {kind: eslint-be, id: app-env-required}
       - {kind: eslint-be, id: app-module-list-inline}
+    editions: [lite, full]
+    docs: [docs/microservices.md#r289]
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-app-env-required.spec.mjs, editions: [lite, full], codes: [BE_APP_ENV_REQUIRED]}
+      - {path: packages/eslint/be/app-composition.spec.mjs, editions: [lite, full], codes: [BE_APP_ENV_REQUIRED, BE_APP_MODULE_LIST_INLINE]}
+      - {path: packages/hfs/templates/be/skeleton/apps/__app__/src/__app__.env.ts, editions: [full]}
+      - {path: packages/hfs/templates/be/skeleton/apps/__app__/src/app.module.ts, editions: [full]}
+      - {path: packages/hfs/templates/be/skeleton-lite/apps/api/src/api.env.ts, editions: [lite]}
+      - {path: packages/hfs/templates/be/skeleton-lite/apps/api/src/app.module.ts, editions: [lite]}
+    proves:
+      - {path: tests/hfs/hfs-app-env-required.spec.mjs, editions: [lite, full], codes: [BE_APP_ENV_REQUIRED]}
+      - {path: packages/eslint/be/app-composition.spec.mjs, editions: [lite, full], codes: [BE_APP_ENV_REQUIRED, BE_APP_MODULE_LIST_INLINE]}
+    witness:
+      - {path: tests/hfs/hfs-app-env-required.spec.mjs, editions: [lite, full], codes: [BE_APP_ENV_REQUIRED]}
+      - {path: packages/eslint/be/app-composition.spec.mjs, editions: [lite, full], codes: [BE_APP_ENV_REQUIRED, BE_APP_MODULE_LIST_INLINE]}
 
   - id: R290
     code: "BE_PUBLIC_REASON_CLOSED"
     law: "In lite and full PublicReason has exactly Health, AuthHandshake, SignedWebhook and CatalogRead. An app-defined public reason such as ToolToken or ApiKey is refused; API-key and tool-token routes authenticate with their own guard instead of extending the public vocabulary."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_PUBLIC_REASON_CLOSED"]
     enforcers:
       - {kind: eslint-be, id: public-reason-closed}
+    editions: [lite, full]
+    docs: [docs/microservices.md#r290]
+    exemplifiedBy:
+      - {path: packages/eslint/be/default-deny.spec.mjs, editions: [lite, full], codes: [BE_PUBLIC_REASON_CLOSED]}
+      - {path: packages/hfs/templates/be/skeleton/src/modules/domain/identity/identity.contracts.ts, editions: [full]}
+      - {path: packages/hfs/templates/be/skeleton-lite/src/modules/domain/identity/identity.contracts.ts, editions: [lite]}
+    proves:
+      - {path: packages/eslint/be/default-deny.spec.mjs, editions: [lite, full], codes: [BE_PUBLIC_REASON_CLOSED]}
+    witness:
+      - {path: packages/eslint/be/default-deny.spec.mjs, editions: [lite, full], codes: [BE_PUBLIC_REASON_CLOSED]}
 
   - id: R291
     code: "HFS_FUNCTION_BUDGET"
     law: "Every back-end and front-end function, method or arrow body stays within ruleParams.functionLines (80 physical lines), including comments and blank lines, in lite and full; split a larger body by responsibility. This is an absolute budget."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["HFS_FUNCTION_BUDGET"]
     enforcers:
       - {kind: eslint-be, id: function-line-budget}
       - {kind: eslint-fe, id: function-line-budget}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r291]
+    exemplifiedBy:
+      - {path: packages/eslint/be/function-budget.spec.mjs, editions: [lite, full], codes: [HFS_FUNCTION_BUDGET]}
+      - {path: packages/eslint/fe/function-budget.spec.mjs, editions: [lite, full], codes: [HFS_FUNCTION_BUDGET]}
+      - {path: packages/hfs/templates/be/patterns/api/graphql.resolver.ts.tpl, editions: [lite, full]}
+      - {path: examples/lite-app/be/src/features/api/bookings/application/create-booking.handler.ts, editions: [lite]}
+      - {path: examples/ecommerce-app/be/src/features/api/checkout/application/add-cart-item.handler.ts, editions: [full]}
+    proves:
+      - {path: packages/eslint/be/function-budget.spec.mjs, editions: [lite, full], codes: [HFS_FUNCTION_BUDGET]}
+      - {path: packages/eslint/fe/function-budget.spec.mjs, editions: [lite, full], codes: [HFS_FUNCTION_BUDGET]}
+    witness:
+      - {path: packages/eslint/be/function-budget.spec.mjs, editions: [lite, full], codes: [HFS_FUNCTION_BUDGET]}
+      - {path: packages/eslint/fe/function-budget.spec.mjs, editions: [lite, full], codes: [HFS_FUNCTION_BUDGET]}
+
   - id: R292
     code: "HFS_FEATURE_FILE_BUDGET"
     law: "Every feature owner stays within ruleParams.featureFiles (250 tracked files), including nested files, in lite and full; split a larger feature by product capability."
     kinds: [check]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_FEATURE_FILE_BUDGET"]
     enforcers:
       - {kind: hfs, id: feature-files, at: scripts/hfs/rules/feature-files.mjs}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r292]
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-feature-files.spec.mjs, editions: [lite, full], codes: [HFS_FEATURE_FILE_BUDGET]}
+      - {path: packages/hfs/templates/be/patterns/api, editions: [lite, full]}
+      - {path: examples/lite-app/be/src/features/api/bookings, editions: [lite]}
+      - {path: examples/ecommerce-app/be/src/features/api/checkout, editions: [full]}
+    proves:
+      - {path: tests/hfs/hfs-feature-files.spec.mjs, editions: [lite, full], codes: [HFS_FEATURE_FILE_BUDGET]}
+    witness:
+      - {path: tests/hfs/hfs-feature-files.spec.mjs, editions: [lite, full], codes: [HFS_FEATURE_FILE_BUDGET]}

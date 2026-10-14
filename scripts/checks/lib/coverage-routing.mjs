@@ -39,6 +39,31 @@ function generatedGraphRules(context, index, routes, profile) {
   return routes.filter((route) => route.plugins.includes(profile)).map((route) => ({ id: route.id, file: index.file, codes: route.codes }));
 }
 
+function whyAssignments(context, index, why) {
+  const target = resolvedExpression(context, why, why.exports.get('why'));
+  const entries = [];
+  for (const statement of index.tree?.body ?? []) {
+    const call = statement.type === 'ExpressionStatement' ? statement.expression : null;
+    if (call?.type !== 'CallExpression' || call.callee.type !== 'MemberExpression'
+      || call.callee.object.name !== 'Object' || nodeName(call.callee.property) !== 'assign') continue;
+    if (resolvedExpression(context, index, call.callee.object).node !== call.callee.object) continue;
+    const assigned = resolvedExpression(context, index, call.arguments[0]);
+    if (assigned.index.file !== target.index.file || assigned.node !== target.node) continue;
+    for (const source of call.arguments.slice(1)) entries.push(...objectProperties(context, index, source));
+  }
+  return entries;
+}
+
+function applyWhyCodes(context, registered, why) {
+  const entries = objectProperties(context, why, why.exports.get('why'));
+  const sources = new Set([why.file, ...[...registered.values()].map(entry => entry.file)]);
+  for (const file of sources) entries.push(...whyAssignments(context, sourceIndex(context, file), why));
+  for (const entry of entries) {
+    const value = objectProperties(context, entry.index, entry.node).find(property => property.name === 'code')?.node.value;
+    if (registered.has(entry.name) && typeof value === 'string') registered.get(entry.name).code = value;
+  }
+}
+
 /** Only contributions gathered by index.mjs count as shipped plugin rules. */
 export function registeredLintRules(context, kind) {
   const profile = kind.slice(7);
@@ -54,10 +79,7 @@ export function registeredLintRules(context, kind) {
     for (const rule of generatedGraphRules(context, entry.index, routes, profile)) out.set(rule.id, rule);
   }
   const why = sourceIndex(context, `packages/eslint/${profile}/lib/why.mjs`);
-  for (const entry of objectProperties(context, why, why.exports.get('why'))) {
-    const value = objectProperties(context, entry.index, entry.node).find((property) => property.name === 'code')?.node.value;
-    if (out.has(entry.name) && typeof value === 'string') out.get(entry.name).code = value;
-  }
+  applyWhyCodes(context, out, why);
   return out;
 }
 

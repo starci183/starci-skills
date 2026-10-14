@@ -6,20 +6,8 @@
 #            no Postgres, Redis or Mongo is self-hosted (the lite edition refuses them). The one sidecar, n8n, keeps
 #            its SQLite database on the named volume n8n-data. Runbook: production/README.md.
 #
-# Deployment facts whose structured fields are not yet supported by application-stacks@1:
-#   Ingress/TLS/DNS  ingress is the only public component; Traefik issues certificates for lite-app.example and
-#                    api.lite-app.example, held on lite-app-production-acme. Owner DNS provider receipts and TLS
-#                    issuance/renewal receipts are pending; production/README.md states the required evidence.
-#   Placement/backup acme and n8n-data are external persistent volumes on the production-labelled manager.
-#                    production/README.md declares encrypted off-host backups and the pending restore proof.
-#   Release          /srv/lite-app/releases/<digest>; promote current after verification, preserve previous.
-#   Scheduled work   booking-reminder is the app-owned pg_cron tick -> pgmq queue; no host crontab is installed.
-#   Secret custody   sealed members production/secrets/<slug>.enc (sops, the project age recipient in .sops.yaml).
-#                    The deploy decrypts them in memory and pipes each key into `docker secret create`; the stack
-#                    file keeps {external: true} references and the services read the mounted values by *_FILE.
-#   Owner actions    (1) DNS at the registrar: A records for the declared hosts -> the VPS (nothing scripts DNS).
-#                    (2) `docker swarm init` and node labels on the VPS once. (3) The age identity is held only
-#                    in the owner's untracked .claude/secret.env as SOPS_AGE_KEY; the VPS never holds it.
+# Owner-run DNS, TLS, releases and recovery are declared below; the public records state pending evidence.
+# Sealed members are structural examples without usable ciphertext. Replace them with owner-sealed members.
 schema: starci/application-stacks@1
 sources:
   - repository: lite-app
@@ -27,6 +15,10 @@ backing:
   supabase:
     provider: supabase
     managed: true
+jobs:
+  booking_reminder_tick:
+    schedule: '*/15 * * * *'
+    command: node be/dist/apps/cli/src/main.js booking-reminder tick
 # Application image digests are illustrative all-zero placeholders, never a completed release.
 # The owner replaces them with verified published digests before deployment.
 components:
@@ -48,14 +40,16 @@ components:
     required: true
   ingress:
     role: ingress
-    image: traefik:v3.6@sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d
+    image: caddy:2.10.2@sha256:c3d7ee5d2b11f9dc54f947f68a734c84e9c9666c92c88a7f30b9cba5da182adb
     compose: infra/swarm/stack.yaml
-    purpose: Traefik, the only service that publishes ports (80/443, host mode). TLS for the declared hosts; routes in infra/swarm/edge/routes.yml.
+    purpose: Caddy, the only service that publishes ports (80/443, ingress mode). TLS and health-checked routes for the declared hosts live in infra/swarm/Caddyfile.
     required: true
   n8n:
     role: stateful
     image: docker.n8n.io/n8nio/n8n:1.64.3@sha256:4d9116228d426ce24c442a744e9c11ee7c1187713f93f21dd5a34a12584708c1
     compose: infra/swarm/stack.yaml
+    database: {provider: sqlite, volume: n8n-data}
+    volumes: [n8n-data]
     purpose: The n8n automation sidecar; private network only, reached by the api as n8n:5678. Its database is SQLite (DB_TYPE=sqlite) on the persisted named volume n8n-data — a database-dependent lite sidecar declares a persistent volume instead of self-hosting Postgres.
     required: true
 environments:
@@ -79,9 +73,55 @@ environments:
         replicas: 1
         port: 5678
     runbook: README.md
+    ingress:
+      component: ingress
+      hosts: [lite-app.example, api.lite-app.example]
+    dns:
+      - {host: lite-app.example, owner: Product operator, receipt: 'README.md#owner-actions-declared-never-automated (pending DNS receipt)'}
+      - {host: api.lite-app.example, owner: Product operator, receipt: 'README.md#owner-actions-declared-never-automated (pending DNS receipt)'}
+    tls:
+      owner: Product operator
+      receipt: README.md#owner-actions-declared-never-automated (pending Caddy issuance and persistent certificate receipt)
+    release:
+      imagesLock: .starcistacks/production/infra/swarm/release/images.lock.json
+      pointer: .starcistacks/production/infra/swarm/release/current.json
+      previous: .starcistacks/production/infra/swarm/release/previous.json
+      healthAssertions:
+        - API /health/live and /health/ready succeed before promotion.
+        - Web /health/live, TLS, signed-in GraphQL and queued-job completion succeed before promotion.
+    backup:
+      - component: supabase
+        target: Supabase provider backup with an encrypted export to the operator's off-host archive
+        retention: Daily backups retained 30 days
+        owner: Product operator
+        restoreProof: .starcistacks/production/infra/swarm/recovery/supabase.json
+      - component: ingress
+        target: Encrypted off-host operator archive of lite-app-production-caddy-data and lite-app-production-caddy-config
+        retention: Daily backups retained 30 days
+        owner: Product operator
+        restoreProof: .starcistacks/production/infra/swarm/recovery/ingress.json
+      - component: n8n
+        target: Encrypted off-host operator archive of lite-app-production-n8n-data
+        retention: Daily backups retained 30 days
+        owner: Product operator
+        restoreProof: .starcistacks/production/infra/swarm/recovery/n8n.json
     secrets:
-      - name: api
-        where: secrets/api
+      - name: primary-db-url
+        runtimeName: lite-app-primary-db-url-v1
+        version: 1
+        where: secrets/primary-db-url
+        recipientPolicy: SOPS/age to the project recipient in .sops.yaml; the member holds PRIMARY_DB_URL.
+        keyCustody: The age identity is held only in the owner's untracked .claude/secret.env as SOPS_AGE_KEY; the VPS never holds it and no private identity is tracked.
+      - name: supabase-service-role-key
+        runtimeName: lite-app-supabase-service-role-key-v1
+        version: 1
+        where: secrets/supabase-service-role-key
+        recipientPolicy: SOPS/age to the project recipient in .sops.yaml; the member holds SUPABASE_SERVICE_ROLE_KEY.
+        keyCustody: The age identity is held only in the owner's untracked .claude/secret.env as SOPS_AGE_KEY; the VPS never holds it and no private identity is tracked.
+      - name: calendar-webhook-secret
+        runtimeName: lite-app-calendar-webhook-secret-v1
+        version: 1
+        where: secrets/calendar-webhook-secret
         recipientPolicy: SOPS/age to the project recipient in .sops.yaml (creation rule for .starcistacks/*/secrets/*.enc); each key becomes one Swarm secret the api reads by its *_FILE environment name.
         keyCustody: The age identity is held only in the owner's untracked .claude/secret.env as SOPS_AGE_KEY; the VPS never holds it and no private identity is tracked.
 k8s:

@@ -7,7 +7,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { byCodeUnit } from '../../scripts/lib/list.mjs';
 import { ALL_CHECK_CODES, CHECK_CODES, checkRepo as checkRepoWith, checkRepository as checkRepositoryWith, explainPath as explainPathWith, readWhy } from '../../scripts/hfs/check.mjs';
 import { ARCHITECTURE_RULE_IDS } from '../../scripts/hfs/architecture/index.mjs';
-import { HfsSlotsError, loadSlotManifest } from '../../scripts/hfs/slots.mjs';
+import { HfsSlotsError, loadRuleCatalog, loadSlotManifest } from '../../scripts/hfs/slots.mjs';
 import { main } from '../../packages/hfs/src/main.mjs';
 import { BUNDLES, driftOfRuntime, importClosure } from '../../scripts/hfs/sync-runtime.mjs';
 import { APP, TWO_FE_APPS, FORMATTED, PRESETS, appOf, cleanup, gitAdd, installPresets, installTypeScript, writeCleanRepo } from '../helpers/hfs-cli-fixture.mjs';
@@ -611,7 +611,8 @@ test('the package bundle carries the machine, the files it imports and a why for
   assert.ok(files.includes('knowledge/patterns/fe/folder.yaml'), 'the framework-pinned knowledge the front-end rules read');
   for (const file of importClosure(['scripts/hfs/architecture.mjs', 'scripts/hfs/check.mjs'])) assert.ok(files.includes(file), `${file} is imported by the check but not bundled`);
   const slice = parseYaml(fs.readFileSync(path.join(root, 'packages/hfs/runtime/modules/kernel/failure-codes.yaml'), 'utf8'));
-  assert.deepEqual(Object.keys(slice).sort(byCodeUnit), [...ALL_CHECK_CODES].sort(byCodeUnit));
+  const owned = loadRuleCatalog({ root }).rules.flatMap(rule => rule.failureCodes);
+  assert.deepEqual(Object.keys(slice).sort(byCodeUnit), [...new Set([...ALL_CHECK_CODES, ...owned])].sort(byCodeUnit));
   for (const code of ARCHITECTURE_RULE_IDS) assert.match(slice[code].title_vi, HAS_VIETNAMESE, code);
   assert.ok(CHECK_CODES.every((code) => ALL_CHECK_CODES.includes(code)));
 });

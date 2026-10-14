@@ -1,0 +1,6 @@
+schema: starci/release-pointer@1
+environment: dev
+status: pending-owner-release
+release: null
+verification: null
+# Write a real release digest and dated health receipt only after convergence and verification.
