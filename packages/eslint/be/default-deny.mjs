@@ -9,17 +9,61 @@
  *   - `public-needs-reason` refuses `@Public()` without `{ reason: PublicReason.X }`, where `PublicReason` is the enum
  *     `domain/identity` exports (judged by the enum's declaring owner, type-aware). An open door states why it is open
  *     from a closed list, so the open doors can be read and reviewed; a string or another enum is refused.
+ *   - `public-reason-closed` holds `PublicReason` to Health, AuthHandshake, SignedWebhook and CatalogRead.
+ *     API-key and tool-token doors authenticate through their own guard instead of extending this enum.
  *
  * The `APP_GUARD` registration and the app-level guard live in the composition check, not here: a rule reading
  * one file cannot see which module the app registered.
  */
 import { isTransportSlot } from "./lib/transport-slots.mjs"
 import { decoratorName, keyName } from "./lib/ast.mjs"
-import { isOwnedEnumMember } from "./lib/declared.mjs"
+import { isOwnedBy, isOwnedEnumMember, isOwnedType, partsOf, typeOf } from "./lib/declared.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { isDeclarationFile, normalizePath } from "./lib/path.mjs"
+import { typed } from "./lib/types.mjs"
 
 const BODY_DECORATORS = new Set(["Body", "Args"])
+const PUBLIC_REASONS = new Set(["Health", "AuthHandshake", "SignedWebhook", "CatalogRead"])
+const REASON_WRAPPERS = new Set(["TSAsExpression", "TSTypeAssertion", "TSNonNullExpression", "TSSatisfiesExpression"])
+
+/** The reason expression supplied to a public decorator, or null when it supplies none. */
+const publicReasonOf = (node) => {
+    const expression = node.expression
+    const argument = expression.type === "CallExpression" ? expression.arguments[0] : undefined
+    if (argument?.type !== "ObjectExpression") return null
+    const property = argument.properties.find((item) => item.type === "Property" && !item.computed && keyName(item.key) === "reason")
+    return property ? property.value : null
+}
+
+/** A static member name; a computed identifier is an expression rather than the member's name. */
+const staticMemberName = (node) => {
+    if (node.computed && node.property.type !== "Literal") return null
+    return keyName(node.property)
+}
+
+/** All declared names of the enum, including TypeScript's merged declarations. */
+const publicReasonNames = (context, node) => {
+    const { checker, toTs } = typed(context)
+    const declaration = toTs(node)
+    const symbol = checker.getSymbolAtLocation(declaration.name)
+    const members = (symbol?.declarations ?? []).flatMap((part) => part.members ?? [])
+    return new Set(members.map((member) => member.name.text))
+}
+
+/** Reject added enum members even when the expression is an alias or a union of reasons. */
+const hasAddedPublicReason = (context, reason) => {
+    let value = reason
+    while (REASON_WRAPPERS.has(value.type)) value = value.expression
+    // A stale or not-yet-declared member has an error type, but its enum receiver still has an owner.
+    if (value.type === "MemberExpression" && isOwnedType(context, value.object, "PublicReason", "domain", "identity")) {
+        const name = staticMemberName(value)
+        if (name !== null && !PUBLIC_REASONS.has(name)) return true
+    }
+    if (isOwnedEnumMember(context, reason, "PublicReason", "domain", "identity")) {
+        return partsOf(typeOf(context, reason)).some((part) => !PUBLIC_REASONS.has(part.getSymbol()?.name))
+    }
+    return false
+}
 
 const isUntyped = (annotation) => {
     if (!annotation) return true
@@ -95,14 +139,39 @@ export const publicNeedsReason = {
         return {
             Decorator(node) {
                 if (decoratorName(node) !== "Public") return
-                const expression = node.expression
-                const argument = expression.type === "CallExpression" ? expression.arguments[0] : undefined
-                let reason = null
-                if (argument?.type === "ObjectExpression") {
-                    const property = argument.properties.find((item) => item.type === "Property" && !item.computed && keyName(item.key) === "reason")
-                    reason = property ? property.value : null
-                }
+                const reason = publicReasonOf(node)
                 if (reason === null || !isOwnedEnumMember(context, reason, "PublicReason", "domain", "identity")) context.report({ node, messageId: "reason" })
+            },
+        }
+    },
+}
+
+/** The identity enum and each public door use exactly the canon's four reasons. */
+export const publicReasonClosed = {
+    meta: {
+        type: "problem",
+        docs: { description: "`PublicReason` is closed to Health, AuthHandshake, SignedWebhook and CatalogRead in both editions." },
+        schema: [],
+        messages: {
+            closed: "BE_PUBLIC_REASON_CLOSED: `PublicReason` has exactly Health, AuthHandshake, SignedWebhook and CatalogRead. An API-key or tool-token route authenticates with its own guard; do not add a public reason.",
+        },
+    },
+    create(context) {
+        const filename = normalizePath(context.filename || context.getFilename())
+        if (isDeclarationFile(filename)) return {}
+        const inIdentity = isOwnedBy(hfsOf(context), filename, "domain", "identity")
+        return {
+            TSEnumDeclaration(node) {
+                if (!inIdentity || node.id.name !== "PublicReason") return
+                const names = publicReasonNames(context, node)
+                if (names.size !== PUBLIC_REASONS.size || [...PUBLIC_REASONS].some((name) => !names.has(name))) {
+                    context.report({ node, messageId: "closed" })
+                }
+            },
+            Decorator(node) {
+                if (decoratorName(node) !== "Public") return
+                const reason = publicReasonOf(node)
+                if (reason !== null && hasAddedPublicReason(context, reason)) context.report({ node, messageId: "closed" })
             },
         }
     },
@@ -112,10 +181,12 @@ export const publicNeedsReason = {
 export const rules = {
     "no-untyped-body": noUntypedBody,
     "public-needs-reason": publicNeedsReason,
+    "public-reason-closed": publicReasonClosed,
 }
 
-/** Both start at error: an untyped door and an unexplained open door are the failures this law exists for. */
+/** Every rule starts at error: public doors and typed inputs hold the default-deny boundary. */
 export const recommended = {
     "starci-be/no-untyped-body": "error",
     "starci-be/public-needs-reason": "error",
+    "starci-be/public-reason-closed": "error",
 }

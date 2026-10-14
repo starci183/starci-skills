@@ -1,6 +1,10 @@
+// proves: BE_PUBLIC_REASON_CLOSED@lite BE_PUBLIC_REASON_CLOSED@full
+import assert from "node:assert/strict"
 import test from "node:test"
+import { appDeclaration } from "./fixtures/app.mjs"
 import { at, typedTester } from "./fixtures/typed/tester.mjs"
-import { noUntypedBody, publicNeedsReason } from "./default-deny.mjs"
+import { hfsFromDeclaration } from "./lib/hfs.mjs"
+import { noUntypedBody, publicNeedsReason, publicReasonClosed, recommended, rules } from "./default-deny.mjs"
 
 const tester = typedTester()
 const CONTROLLER = at("src/features/api/plan/transport/http/create-plan.controller.ts")
@@ -57,3 +61,51 @@ test("an open door states why it is open, with a PublicReason member of domain/i
         ],
     })
 })
+
+const IDENTITY = at("src/modules/domain/identity/public-reason.ts")
+const CLOSED_ENUM = "export enum PublicReason { Health = 'health', AuthHandshake = 'auth-handshake', SignedWebhook = 'signed-webhook', CatalogRead = 'catalog-read' }\n"
+const EXTENDED_ENUM = "export enum PublicReason { Health = 'health', AuthHandshake = 'auth-handshake', SignedWebhook = 'signed-webhook', CatalogRead = 'catalog-read', ToolToken = 'tool-token' }\n"
+const closedError = { messageId: "closed" }
+
+test("R290 BE_PUBLIC_REASON_CLOSED publishes its own rule at error", () => {
+    assert.equal(rules["public-reason-closed"], publicReasonClosed)
+    assert.equal(recommended["starci-be/public-reason-closed"], "error")
+})
+
+for (const edition of ["lite", "full"]) {
+    test(`R290 BE_PUBLIC_REASON_CLOSED keeps the public vocabulary closed in ${edition}`, () => {
+        const declaration = { ...appDeclaration("be", { apps: [{ name: "api", kind: "api" }] }), edition }
+        const settings = { starci: { hfs: hfsFromDeclaration(declaration, at("")) } }
+        typedTester().run("public-reason-closed", publicReasonClosed, {
+            valid: [
+                { filename: IDENTITY, settings, code: CLOSED_ENUM },
+                { filename: IDENTITY, settings, code: "enum PublicReason { Health = 'health', AuthHandshake = 'auth-handshake' }; enum PublicReason { SignedWebhook = 'signed-webhook', CatalogRead = 'catalog-read' }" },
+                ...["Health", "AuthHandshake", "SignedWebhook", "CatalogRead"].map((name) => ({
+                    filename: IDENTITY, settings, code: `${CLOSED_ENUM}class C { @Public({ reason: PublicReason.${name} }) route() {} }`,
+                })),
+                { filename: CONTROLLER, settings, code: `${REASON}class C { @Public({ reason: PublicReason['Health'] }) route() {} }` },
+                { filename: CONTROLLER, settings, code: 'import { PublicReason as Reason } from "@modules/domain/identity"\nconst reason = Reason.Health; class C { @Public({ reason }) route() {} }' },
+                { filename: CONTROLLER, settings, code: `${REASON}declare const reason: PublicReason.Health | PublicReason.SignedWebhook; class C { @Public({ reason }) route() {} }` },
+                { filename: CONTROLLER, settings, code: "class C { @UseGuards(ToolTokenGuard) route() {} }" },
+                { filename: CONTROLLER, settings, code: "class C { @UseGuards(ApiKeyGuard) route() {} }" },
+                // The existing rule owns absent reasons, strings and enums from other owners.
+                { filename: CONTROLLER, settings, code: "class C { @Public() route() {} }" },
+                { filename: CONTROLLER, settings, code: "class C { @Public({ reason: 'ToolToken' }) route() {} }" },
+                { filename: CONTROLLER, settings, code: "enum PublicReason { ToolToken = 'tool-token' }; class C { @Public({ reason: PublicReason.ToolToken }) route() {} }" },
+            ],
+            invalid: [
+                { filename: IDENTITY, settings, code: EXTENDED_ENUM, errors: [closedError] },
+                { filename: IDENTITY, settings, code: "enum PublicReason { Health = 'health', AuthHandshake = 'auth-handshake', SignedWebhook = 'signed-webhook' }", errors: [closedError] },
+                { filename: IDENTITY, settings, code: `${EXTENDED_ENUM}class C { @Public({ reason: PublicReason.ToolToken }) route() {} }`, errors: [closedError, closedError] },
+                { filename: IDENTITY, settings, code: `${EXTENDED_ENUM}const reason = PublicReason.ToolToken; class C { @Public({ reason }) route() {} }`, errors: [closedError, closedError] },
+                { filename: IDENTITY, settings, code: `${EXTENDED_ENUM}declare const reason: PublicReason.Health | PublicReason.ToolToken; class C { @Public({ reason }) route() {} }`, errors: [closedError, closedError] },
+                { filename: IDENTITY, settings, code: `${CLOSED_ENUM}export enum PublicReason { ToolToken = 'health' }; class C { @Public({ reason: PublicReason.ToolToken }) route() {} }`, errors: [closedError, closedError, closedError] },
+                { filename: CONTROLLER, settings, code: `${REASON}class C { @Public({ reason: PublicReason.ToolToken }) route() {} }`, errors: [closedError] },
+                { filename: CONTROLLER, settings, code: 'import { PublicReason as Reason } from "@modules/domain/identity"\nclass C { @Public({ reason: Reason.ToolToken }) route() {} }', errors: [closedError] },
+                { filename: CONTROLLER, settings, code: `${REASON}class C { @Public({ reason: PublicReason['ToolToken'] }) route() {} }`, errors: [closedError] },
+                { filename: CONTROLLER, settings, code: `${REASON}class C { @Public({ reason: PublicReason.ApiKey }) route() {} }`, errors: [closedError] },
+                { filename: CONTROLLER, settings, code: `${REASON}class C { @Public({ reason: PublicReason.ToolToken as PublicReason.Health }) route() {} }`, errors: [closedError] },
+            ],
+        })
+    })
+}

@@ -19348,3 +19348,13 @@ STACKS_SIDECAR_DB_UNSUPPORTED:
   nextStep_vi: "Chọn chế độ SQLite được sidecar hỗ trợ và volume được khai báo; bỏ sidecar nếu nó bắt buộc dùng backing không được lite hỗ trợ."
   owner: op-retry
   kind: check-finding
+
+BE_PUBLIC_REASON_CLOSED:
+  title: "PublicReason differs from the closed public vocabulary"
+  title_vi: "PublicReason khác danh sách lý do công khai cố định"
+  meaning_vi: "Enum PublicReason của domain/identity hoặc lý do trên cửa công khai không thuộc đúng bốn tên Health, AuthHandshake, SignedWebhook và CatalogRead."
+  causes_vi:
+    - "Vi phạm R290: ứng dụng thêm lý do riêng như ToolToken hoặc ApiKey, hoặc bỏ một lý do chuẩn khỏi enum PublicReason."
+  nextStep_vi: "Giữ đúng bốn thành viên chuẩn của PublicReason; xác thực route dùng API key hoặc tool token bằng guard riêng thay vì thêm lý do công khai."
+  owner: op-retry
+  kind: check-finding
