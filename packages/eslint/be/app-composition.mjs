@@ -239,10 +239,11 @@ export const appCompositionTyped = {
             let expression = node
             while (WRAPPERS.has(expression.parent?.type)) expression = expression.parent
             const parent = expression.parent
-            return parent?.type === "CallExpression" && parent.arguments.includes(expression)
-                && parent.callee.type === "MemberExpression"
-                && ["create", "createApplicationContext", "createMicroservice"].includes(memberName(parent.callee))
-                && (packageOfExport(context, parent.callee) === "@nestjs/core" || packageOfExport(context, parent.callee.object) === "@nestjs/core")
+            if (parent?.type !== "CallExpression" || !parent.arguments.includes(expression) || parent.callee.type !== "MemberExpression") return false
+            const owner = (callee) => packageOfExport(context, callee) ?? packageOfExport(context, callee.object)
+            // An api boots through NestFactory; a cli app boots its root module through nest-commander's CommandFactory.run (R148).
+            return (["create", "createApplicationContext", "createMicroservice"].includes(memberName(parent.callee)) && owner(parent.callee) === "@nestjs/core")
+                || (memberName(parent.callee) === "run" && parent.arguments[0] === expression && owner(parent.callee) === "nest-commander")
         }
         const checkValue = (node) => {
             if (role === "compose/<area>.ts" || hasReport(node) || bootstrapArgument(node)) return
