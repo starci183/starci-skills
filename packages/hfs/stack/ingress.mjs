@@ -18,6 +18,7 @@ import { parseYaml } from '../runtime/engine/yaml.mjs';
 import { firstLine } from './context.mjs';
 import { refusal } from './errors.mjs';
 import { remoteDocker, shellQuote, withRunner } from './remote.mjs';
+import { createIngress } from './ingress-create.mjs';
 
 const MATCHER = /(Host|HostRegexp)\(([^)]*)\)/gu;
 const QUOTED = /`([^`]*)`/gu;
@@ -661,10 +662,10 @@ async function rehearseAction(ctx, run, config, ingress, execute) {
 
 // ---- entry --------------------------------------------------------------------------------------------------------------------------
 
-const ACTIONS = ['plan', 'attach', 'takeover', 'rehearse'];
+const ACTIONS = ['plan', 'attach', 'create', 'takeover', 'rehearse'];
 
 /**
- * `starci app stack ingress <plan|attach|takeover|rehearse>`; effects need execute === true.
+ * `starci app stack ingress <plan|attach|create|takeover|rehearse>`; effects need execute === true.
  *   deps.ssh  an injected ssh runner (specs).
  */
 export async function runIngress(ctx, config, { action, execute = false, args = [], sshCmd = null }, deps = {}) {
@@ -676,6 +677,7 @@ export async function runIngress(ctx, config, { action, execute = false, args = 
     const outcome = await {
       plan: () => planAction(run, config, ingress),
       attach: () => attachAction(run, ingress, execute),
+      create: () => createIngress(run, ingress, execute),
       takeover: () => takeoverAction(ctx, run, config, ingress, execute),
       rehearse: () => rehearseAction(ctx, run, config, ingress, execute),
     }[action]();

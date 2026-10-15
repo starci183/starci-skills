@@ -11,13 +11,15 @@ const DOCKER_NAME = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/u;
 const REMOTE_PATH = /^\/[A-Za-z0-9._/-]+$/u;
 const DNS_LABEL = '[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?';
 const DNS_HOST = new RegExp(String.raw`^${DNS_LABEL}(?:\.${DNS_LABEL})+$`, 'u');
+const PINNED_IMAGE = /^[a-z0-9./_-]+(?::[A-Za-z0-9._-]+)?@sha256:(?!0{64}$)[0-9a-f]{64}$/u;
+const TRAEFIK_ARG = /^--[A-Za-z0-9][A-Za-z0-9.-]*(?:=[^\s]*)?$/u;
 const OCTET = String.raw`(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)`;
 const IPV4 = new RegExp(String.raw`^${OCTET}(?:\.${OCTET}){3}$`, 'u');
 const URL_PATH = /^\/[A-Za-z0-9._~%/-]*$/u;
 const REDIRECT_STATUS = [301, 302, 303, 307, 308];
 
 const FIELDS = {
-  ingress: ['name', 'network', 'acmeVolume', 'service', 'legacy', 'upstreams', 'routes', 'middlewares', 'verify', 'drop', 'redirects', 'backup', 'takeover'],
+  ingress: ['name', 'image', 'args', 'network', 'acmeVolume', 'service', 'legacy', 'upstreams', 'routes', 'middlewares', 'verify', 'drop', 'redirects', 'backup', 'takeover'],
   legacy: ['dir', 'dynamicDir', 'container'],
   upstream: ['name', 'hosts', 'container', 'hostAddress', 'port', 'aliases', 'middlewares'],
   verify: ['host', 'path', 'status'],
@@ -188,6 +190,8 @@ export function normalizeIngress(block, { probe }) {
   if (block === undefined) return { ingress: null, problems: [] };
   if (!closed(c, 'deploy.ingress', block, FIELDS.ingress)) return { ingress: null, problems: c.problems };
   for (const key of ['name', 'service']) if (block[key] !== undefined) matching(c, `deploy.ingress.${key}`, block[key], NAME);
+  if (block.image !== undefined) matching(c, 'deploy.ingress.image', block.image, PINNED_IMAGE);
+  const args = block.args === undefined ? null : list(c, 'deploy.ingress.args', block.args, names(c, TRAEFIK_ARG));
   matching(c, 'deploy.ingress.network', block.network, DOCKER_NAME);
   matching(c, 'deploy.ingress.acmeVolume', block.acmeVolume, DOCKER_NAME);
   if (block.routes !== undefined) treeFile(c, 'deploy.ingress.routes', block.routes, probe);
@@ -197,6 +201,8 @@ export function normalizeIngress(block, { probe }) {
   referencedMiddlewares(c, ups, declared, routes);
   const ingress = {
     name: block.name ?? 'ingress',
+    image: block.image ?? null,
+    args,
     service: block.service ?? 'ingress',
     network: block.network,
     acmeVolume: block.acmeVolume,

@@ -52,4 +52,5 @@ examples:
   - starci app stack backup --env production --swarm-state --execute
   - starci app stack jobs stats --env production
   - starci app stack ingress plan --env production
+  - starci app stack ingress create --env production --execute
 editions: [full, lite]
