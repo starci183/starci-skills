@@ -1,7 +1,7 @@
 Owner: knowledge/hfs/rules.yaml
 # LEGACY-BACKLOG: the alpha.16 plan for rules older than R247
 
-Generated 2026-10-15 from `node scripts/checks/check-hfs-coverage.mjs` on integ/a15. Legacy rules (R01-R246) are RATCHETED, not yet fully gated: their coverage findings are warnings and counted here; a legacy rule is gated the day it gains any meta field (editions, docs, exemplifiedBy, proves, witness). Rules R247 and later are fully gated. Findings count one per (rule, edition, code).
+Generated 2026-10-15 from the `hfs-coverage` self-check of `starci runtime check` on integ/a15. Legacy rules (R01-R246) are RATCHETED, not yet fully gated: their coverage findings are warnings and counted here; a legacy rule is gated the day it gains any meta field (editions, docs, exemplifiedBy, proves, witness). Rules R247 and later are fully gated. Findings count one per (rule, edition, code).
 
 ## Totals (all rules)
 
