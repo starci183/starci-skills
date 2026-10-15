@@ -3255,6 +3255,8 @@ rules:
       - {path: packages/hfs/templates/be/skeleton/src/features/api/system-health/system-health.module-definition.ts, edition: full}
       - {path: packages/hfs/templates/be/skeleton/src/features/api/system-health/transport/http/system-health-http.module-definition.ts, edition: full}
       - {path: examples/lite-app/be/src/features/api/bookings/bookings.module-definition.ts, edition: lite}
+      - {path: packages/hfs/templates/be/patterns/api/feature.module-definition.ts.tpl, edition: lite}
+      - {path: packages/hfs/templates/be/patterns/api/graphql.module-definition.ts.tpl, edition: lite}
       - {path: examples/lite-app/be/src/features/api/bookings/transport/graphql/bookings-graphql.module-definition.ts, edition: lite}
       - {path: examples/ecommerce-app/be/src/features/api/checkout/checkout.module-definition.ts, edition: full}
       - {path: packages/eslint/be/module-shape.spec.mjs, editions: [lite, full]}
