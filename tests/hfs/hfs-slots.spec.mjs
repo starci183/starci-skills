@@ -618,7 +618,9 @@ test('be.cli is the cli feature root: a feature-tier owner at src/features/cli/,
   assert.equal(slot.owner, true);
   assert.equal(slot.tests, 'unit-beside');
   assert.deepEqual(slot.requires, ['index.ts', 'cli.module.ts']);
-  for (const gone of ['cli.module-definition.ts', '<group>/<group>.module-definition.ts', '<group>/<group>.options.ts', '<group>/<group>.decorators.ts']) assert.equal(slot.allows.includes(gone), false, `${gone}: the cli feature root is static`);
+  // owner:module-definition-everywhere: every module of the cli root has its definition and options beside it; the group decorators stay gone.
+  for (const present of ['cli.module-definition.ts', 'cli.options.ts', '<group>/<group>.module-definition.ts', '<group>/<group>.options.ts']) assert.equal(slot.allows.includes(present), true, `${present}: the cli feature root allows the definition and options of each module`);
+  assert.equal(slot.allows.includes('<group>/<group>.decorators.ts'), false, 'a cli group has no decorators file');
   assert.ok(manifest.appKinds.be.includes('cli'), 'the cli app kind exists');
   assert.equal(manifest.appKinds.be.includes('migrate'), false, 'the migrate kind is gone: the cli migrate command migrates');
   assert.equal(manifest.slots.some((s) => s.id === 'be.feature.transport.cli'), false, 'no feature transport is a command line');
