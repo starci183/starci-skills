@@ -404,6 +404,7 @@ $defs:
       verify: {$ref: '#/$defs/deployVerify'}
       jobs: {$ref: '#/$defs/deployJobs'}
       backup: {$ref: '#/$defs/deployBackup'}
+      registry: {$ref: '#/$defs/deployRegistry'}
       ingress:
         description: The shared host ingress (stack-ingress-config.mjs is the authority for the fields; starci app check R294 judges them).
         type: object
@@ -605,6 +606,16 @@ $defs:
         type: array
         minItems: 1
         items: {$ref: '#/$defs/deployBackupVolume'}
+  deployRegistry:
+    description: >-
+      The image registry and the visibility the app's packages are meant to have. The canon scaffold writes `public`; the value then belongs to the app.
+      While the effective value is `public`, `stack build --push` scans every image for secret material before the push and checks the real
+      visibility afterwards. Omitted: ghcr.io and public.
+    type: object
+    additionalProperties: false
+    properties:
+      host: {type: string, pattern: '^[a-z0-9][a-z0-9.-]*(?::[0-9]{1,5})?$', default: ghcr.io}
+      visibility: {enum: [public, private], default: public}
   deployBackupVolume:
     type: object
     additionalProperties: false

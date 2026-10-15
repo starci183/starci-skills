@@ -324,6 +324,8 @@ starci app stack jobs stats --env production
 starci app stack ingress plan --env production
 starci app stack retire --env production --project old-web --project old-engine --execute
 starci app stack build --env production --push --execute
+starci app stack deploy --env production --skip-public --image api=ghcr.io/org/app-api@sha256:<digest> --source-sha <sha> --execute
+starci app stack accept --env production --release <16 hex> --execute
 starci app stack ingress create --env production --execute
 starci app stack ingress publish --env production --execute
 ```

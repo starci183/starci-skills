@@ -60,7 +60,8 @@ test('every action reaches its module with the options built from the flags', as
     connect: ['connectCi', ['--execute'], { execute: true }],
     disconnect: ['disconnectCi', [], { execute: false }],
     'build-args': ['buildArgs', ['--app', 'web'], { app: 'web' }],
-    deploy: ['deployRelease', ['--image', IMAGE, '--source-sha', 'abc1234', '--out', 'rel', '--timeout', '30', '--retry', '5', '--execute'], { execute: true, sourceSha: 'abc1234', timeoutSeconds: 30, retrySeconds: 5 }],
+    deploy: ['deployRelease', ['--image', IMAGE, '--source-sha', 'abc1234', '--out', 'rel', '--timeout', '30', '--retry', '5', '--skip-public', '--execute'], { execute: true, sourceSha: 'abc1234', timeoutSeconds: 30, retrySeconds: 5, skipPublic: true }],
+    accept: ['acceptRelease', ['--release', '0123456789abcdef', '--retry', '20', '--execute'], { release: '0123456789abcdef', execute: true, retrySeconds: 20 }],
     converge: ['convergeStack', ['--since', '2026-10-15T00:00:00Z', '--timeout', '90'], { since: '2026-10-15T00:00:00Z', timeoutSeconds: 90 }],
     verify: ['verifyStack', ['--retry', '10', '--skip-public', '--skip-internal'], { retrySeconds: 10, skipPublic: true, skipInternal: true }],
     rollback: ['rollbackRelease', ['--release', '0123456789abcdef', '--execute', '--timeout', '60'], { release: '0123456789abcdef', execute: true, timeoutSeconds: 60 }],
@@ -143,5 +144,6 @@ test('rollback without --release targets the previous pointer and prune without 
   assert.equal((await run(['rollback'])).seen[0].options.release, null);
   assert.deepEqual((await run(['prune'])).seen[0].options.keepFiles, []);
   assert.deepEqual((await run(['retire'])).seen[0].options.projects, []);
+  assert.equal((await run(['accept'])).seen[0].options.release, null);
   assert.deepEqual([(await run(['build'])).seen[0].options.push, (await run(['build'])).seen[0].options.execute], [false, false]);
 });

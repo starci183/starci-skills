@@ -391,7 +391,7 @@ complete -c starci -n '__starci_using_command app stack' -l fix-live-restore -d 
 complete -c starci -n '__starci_using_command app stack' -l project -r -d 'retire: an old docker compose project whose containers are stopped (restart policy off, nothing removed), repeatable'
 complete -c starci -n '__starci_using_command app stack' -l push -d 'build: push the images to the registry with the operator'\''s own docker login and print their digests (needs --execute)'
 complete -c starci -n '__starci_using_command app stack' -l swarm-state -d 'backup: also archive /var/lib/docker/swarm, encrypted'
-complete -c starci -n '__starci_using_command app stack' -l skip-public -d 'verify: skip the public HTTP checks'
+complete -c starci -n '__starci_using_command app stack' -l skip-public -d 'deploy, verify: skip the public HTTP checks (deploy then leaves the release pending until accept)'
 complete -c starci -n '__starci_using_command app stack' -l skip-internal -d 'verify: skip the checks run inside a service task'
 complete -c starci -n '__starci_using_command app sync' -l check -d 'compare managed output without writing'
 complete -c starci -n '__starci_using_command app sync' -l write -d 'rewrite managed output that drifted'

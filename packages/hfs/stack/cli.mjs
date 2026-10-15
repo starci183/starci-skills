@@ -9,9 +9,9 @@ import { withDockerTransport } from './docker-transport.mjs';
 import { StackError, EXIT, refusal } from './errors.mjs';
 
 /** The actions that drive the docker CLI of the operator machine (pointed at the manager by docker-transport.mjs when the key is sealed). */
-const DOCKER_ACTIONS = new Set(['deploy', 'converge', 'verify', 'rollback', 'prune']);
+const DOCKER_ACTIONS = new Set(['deploy', 'accept', 'converge', 'verify', 'rollback', 'prune']);
 
-export const ACTIONS = Object.freeze(['prepare', 'doctor', 'connect', 'disconnect', 'build-args', 'render', 'deploy', 'converge', 'verify', 'rollback', 'prune', 'backup', 'jobs', 'ingress', 'retire', 'build']);
+export const ACTIONS = Object.freeze(['prepare', 'doctor', 'connect', 'disconnect', 'build-args', 'render', 'deploy', 'converge', 'verify', 'rollback', 'prune', 'backup', 'jobs', 'ingress', 'retire', 'build', 'accept']);
 
 const BOOLEAN = new Set(['--execute', '--json', '--swarm-state', '--init-swarm', '--owner-approved', '--fix-live-restore', '--skip-public', '--skip-internal', '--allow-unpinned', '--push']);
 const VALUE = new Set(['--env', '--image', '--source-sha', '--previous', '--out', '--release', '--since', '--timeout', '--retry', '--keep', '--app', '--ssh-cmd', '--extra-compose', '--project']);
@@ -69,7 +69,7 @@ const OPTIONS = {
   }),
   deploy: ({ flags, cwd }) => ({
     images: parseImages(flags.image), sourceSha: flags['source-sha'], execute: flags.execute === true,
-    out: flags.out ? path.resolve(cwd, flags.out) : null, timeoutSeconds: number(flags, 'timeout'), retrySeconds: number(flags, 'retry'),
+    out: flags.out ? path.resolve(cwd, flags.out) : null, timeoutSeconds: number(flags, 'timeout'), retrySeconds: number(flags, 'retry'), skipPublic: flags['skip-public'] === true,
   }),
   converge: ({ flags }) => ({ since: flags.since, timeoutSeconds: number(flags, 'timeout') }),
   verify: ({ flags }) => ({ retrySeconds: number(flags, 'retry'), skipPublic: flags['skip-public'] === true, skipInternal: flags['skip-internal'] === true }),
@@ -78,6 +78,7 @@ const OPTIONS = {
   backup: ({ flags }) => ({ swarmState: flags['swarm-state'] === true, execute: flags.execute === true }),
   ingress: ({ flags, positional }) => ({ action: positional[0], execute: flags.execute === true, args: positional.slice(1) }),
   build: ({ flags }) => ({ push: flags.push === true, execute: flags.execute === true }),
+  accept: ({ flags }) => ({ release: flags.release ?? null, execute: flags.execute === true, retrySeconds: number(flags, 'retry') }),
   retire: ({ flags }) => ({ projects: flags.project ?? [], execute: flags.execute === true }),
   jobs: ({ flags, positional }) => ({ action: positional[0], args: positional.slice(1), execute: flags.execute === true }),
 };
@@ -92,6 +93,7 @@ const MODULES = {
   ingress: ['./ingress.mjs', 'runIngress'],
   retire: ['./retire.mjs', 'retireCompose'],
   build: ['./build.mjs', 'buildImages'],
+  accept: ['./deploy.mjs', 'acceptRelease'],
 };
 
 async function handlerOf(action, importer) {

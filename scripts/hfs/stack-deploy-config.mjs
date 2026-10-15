@@ -19,7 +19,7 @@ const ARGUMENT = /^[A-Za-z0-9_@%+=:,./-]+$/u;
 const UPPER_ENV = KEY;
 
 const FIELDS = {
-  deploy: ['stack', 'remote', 'images', 'volumes', 'secrets', 'environment', 'configs', 'passEnv', 'verify', 'jobs', 'backup', 'ingress'],
+  deploy: ['stack', 'remote', 'images', 'volumes', 'secrets', 'environment', 'configs', 'passEnv', 'verify', 'jobs', 'backup', 'ingress', 'registry'],
   remote: ['host', 'releasesBase', 'sealed'],
   sealed: ['ops', 'sshKey', 'knownHosts'],
   image: ['app', 'buildArgs'],
@@ -37,6 +37,7 @@ const FIELDS = {
   jobs: ['service', 'command'],
   backup: ['image', 'keepDays', 'dir', 'volumes'],
   backupVolume: ['name', 'volume'],
+  registry: ['host', 'visibility'],
 };
 
 const text = (value) => typeof value === 'string' && value.length > 0;
@@ -222,6 +223,19 @@ function jobs(c, block, services) {
   return { service: block.service, command: command(c, 'deploy.jobs.command', block.command) };
 }
 
+const REGISTRY_HOST = /^[a-z0-9][a-z0-9.-]*(?::[0-9]{1,5})?$/u;
+const VISIBILITY = ['public', 'private'];
+
+/** The image registry: host (default ghcr.io) and the visibility the app's packages are meant to have (default public, the canon scaffold writes it and the app owns it afterwards). */
+function registry(c, block) {
+  const fallback = { host: 'ghcr.io', visibility: 'public' };
+  if (block === undefined) return fallback;
+  if (!closedFields(c, 'deploy.registry', block, FIELDS.registry)) return fallback;
+  if (block.host !== undefined) patternField(c, 'deploy.registry.host', block.host, REGISTRY_HOST);
+  if (block.visibility !== undefined && !VISIBILITY.includes(block.visibility)) c.problem('deploy.registry.visibility', `must be one of ${VISIBILITY.join(', ')}`);
+  return { host: block.host ?? fallback.host, visibility: block.visibility ?? fallback.visibility };
+}
+
 function backup(c, block) {
   if (block === undefined) return null;
   if (!closedFields(c, 'deploy.backup', block, FIELDS.backup)) return null;
@@ -272,6 +286,7 @@ export function normalizeDeploy(block, { project, probe }) {
     jobs: jobs(c, block.jobs, services),
     backup: backup(c, block.backup),
     ingress: ingress(c, block.ingress, probe),
+    registry: registry(c, block.registry),
   };
   if (block.stack === undefined && !NAME.test(String(project))) c.problem('deploy.stack', `the stack name ${project} must match ${NAME}`);
   return { config: c.problems.length === 0 ? config : null, problems: c.problems };

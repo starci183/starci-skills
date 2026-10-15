@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { convergeStack } from '../../packages/hfs/stack/converge.mjs';
-import { DEFAULT_DEPS, deployRelease, importModule, lazy, rollbackRelease } from '../../packages/hfs/stack/deploy.mjs';
+import { DEFAULT_DEPS, acceptRelease, deployRelease, importModule, lazy, rollbackRelease } from '../../packages/hfs/stack/deploy.mjs';
 import { StackError } from '../../packages/hfs/stack/errors.mjs';
 import { createReleaseStore } from '../../packages/hfs/stack/release-store.mjs';
 import { fakeHost } from '../helpers/stack-fakes.mjs';
@@ -175,7 +175,7 @@ test('a successful deploy runs every step in order and moves the pointers last',
   assert.equal(w.calls.render[1].previous, OLD_ID);
   assert.deepEqual(w.calls.provision[0], { execute: true, out: w.out, releaseFile: path.join(w.out, 'release.json') });
   assert.deepEqual(w.calls.converge[0], { since: new Date(deploy.at - 60_000).toISOString(), timeoutSeconds: 900 });
-  assert.deepEqual(w.calls.verify[0], { retrySeconds: 240 });
+  assert.deepEqual(w.calls.verify[0], { retrySeconds: 240, skipPublic: false });
   assert.deepEqual(w.calls.prune[0], { keepFiles: [path.join(w.out, 'release.json'), path.join(w.out, 'previous', 'release.json')], execute: true });
   assert.deepEqual(w.host.state.removed, [{ kind: 'secret', name: 'app-t-v0' }]);
   assert.equal(await currentPointer(), NEW_ID);
@@ -466,4 +466,69 @@ test('a rollback to a release that was never stored fails at the fetch', async (
   assert.equal(result.ok, false);
   assert.equal(result.lines.at(-1), `rollback to ${NEW_ID} failed at fetch`);
   assert.equal(w.host.calls.some((call) => call.args[0] === 'stack'), false);
+});
+
+test('a first deploy into a shared ingress (--skip-public) verifies inside the stack only and leaves the release pending', async () => {
+  const w = await world();
+  const result = await deployRelease(w.ctx, config, base(w, { skipPublic: true, retrySeconds: 60 }), w.deps);
+  assert.equal(result.ok, true, result.lines.join('\n'));
+  assert.deepEqual(w.calls.verify[0], { retrySeconds: 60, skipPublic: true });
+  assert.equal(w.trace.includes('ssh:accept'), false, 'the pointer does not move');
+  assert.equal(w.trace.includes('prune'), false, 'nothing is pruned before the accept');
+  assert.equal(await currentPointer(), OLD_ID);
+  assert.equal(result.data.pendingAccept, true);
+  assert.deepEqual(result.data.steps.map((entry) => entry.step), ['render', 'provision', 'store', 'pre-pull', 'deploy', 'converge', 'verify']);
+  assert.match(result.lines.at(-2), /the public hosts were NOT checked and the release is NOT accepted yet/u);
+  assert.equal(result.lines.at(-1), `next: starci app stack ingress publish, then starci app stack accept --release ${NEW_ID} --execute`);
+});
+
+test('a failing inside verification of a pending deploy still rolls back to the previous accepted release', async () => {
+  const w = await world({ spies: { verify: async () => ({ ok: false, lines: ['FAIL internal'] }) } });
+  const result = await deployRelease(w.ctx, config, base(w, { skipPublic: true }), w.deps);
+  assert.equal(result.ok, false);
+  assert.equal(result.data.rolledBack, true);
+  assert.equal(await currentPointer(), OLD_ID);
+});
+
+test('the dry run of a --skip-public deploy says the release stays pending', async () => {
+  const w = await world();
+  const result = await deployRelease(w.ctx, config, base(w, { skipPublic: true, execute: false }), w.deps);
+  assert.match(result.lines.at(-1), /public hosts skipped\); it would stay pending until ingress publish and stack accept/u);
+});
+
+test('accept needs a release id, a stored record and the FULL verification before the pointer moves', async () => {
+  const w = await world();
+  await deployRelease(w.ctx, config, base(w, { skipPublic: true }), w.deps);
+  await assert.rejects(acceptRelease(w.ctx, config, { release: null }, w.deps), (error) => error.code === 'STACK_RELEASE_ID');
+  await assert.rejects(acceptRelease(w.ctx, config, { release: '0000000000000001', execute: true }, w.deps), (error) => error.code === 'STACK_ACCEPT_UNKNOWN');
+  const dry = await acceptRelease(w.ctx, config, { release: NEW_ID }, w.deps);
+  assert.match(dry.lines[0], /^dry run: would run the full verification/u);
+  assert.equal(await currentPointer(), OLD_ID);
+  const calls = w.calls.verify.length;
+  const done = await acceptRelease(w.ctx, config, { release: NEW_ID, execute: true, retrySeconds: 30 }, w.deps);
+  assert.equal(done.ok, true, done.lines.join('\n'));
+  assert.deepEqual(w.calls.verify[calls], { retrySeconds: 30 });
+  assert.equal(await currentPointer(), NEW_ID);
+  assert.equal(await createReleaseStore(config, remote.ssh).previous(), OLD_ID);
+  assert.ok(done.lines.includes(`accepted release ${NEW_ID}`));
+  assert.equal(w.calls.prune.length, 1);
+  const again = await acceptRelease(w.ctx, config, { release: NEW_ID, execute: true }, w.deps);
+  assert.match(again.lines[0], /is already the accepted release/u);
+});
+
+test('accept does not move the pointer when the full verification fails', async () => {
+  const w = await world({ spies: { verify: async (ctx, cfg, options) => (options.skipPublic ? { ok: true, lines: [] } : { ok: false, lines: ['FAIL public'] }) } });
+  await deployRelease(w.ctx, config, base(w, { skipPublic: true }), w.deps);
+  const result = await acceptRelease(w.ctx, config, { release: NEW_ID, execute: true }, w.deps);
+  assert.equal(result.ok, false);
+  assert.ok(result.lines.includes(`release ${NEW_ID} is NOT accepted: the full verification failed`));
+  assert.equal(await currentPointer(), OLD_ID);
+});
+
+test('accept without a verification result lines and without a previous release still accepts', async () => {
+  const w = await world({ previous: false, spies: { verify: async (ctx, cfg, options) => (options.skipPublic ? { ok: true, lines: [] } : { ok: true }) } });
+  await deployRelease(w.ctx, config, base(w, { skipPublic: true }), w.deps);
+  const result = await acceptRelease(w.ctx, config, { release: NEW_ID, execute: true }, w.deps);
+  assert.equal(result.ok, true);
+  assert.equal(await currentPointer(), NEW_ID);
 });

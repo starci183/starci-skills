@@ -148,12 +148,17 @@ async function deployExecute(ctx, config, options, d, out) {
   const data = { releaseId, previous: previous || null, steps, rolledBack: false };
   if (!prepared.ok) return { ok: false, lines: [...lines, 'deploy not started; the services are untouched'], data };
   const since = isoBefore(ctx, 60);
+  const { skipPublic } = options;
   const failed = await runSteps([
     ['deploy', () => stackDeploy(ctx, config, path.join(out, 'stack.yaml'))],
     ['converge', () => d.convergeStack(ctx, config, { since, timeoutSeconds: options.timeoutSeconds })],
-    ['verify', () => d.verifyStack(ctx, config, { retrySeconds: options.retrySeconds })],
-    ['accept', async () => { await store.accept(releaseId); return { ok: true, lines: [`accepted release ${releaseId}`] }; }],
+    ['verify', () => d.verifyStack(ctx, config, { retrySeconds: options.retrySeconds, skipPublic: skipPublic === true })],
+    ...(skipPublic ? [] : [['accept', async () => { await store.accept(releaseId); return { ok: true, lines: [`accepted release ${releaseId}`] }; }]]),
   ], lines, steps);
+  if (!failed && skipPublic) {
+    data.pendingAccept = true;
+    return { ok: true, lines: [...lines, `deployed release ${releaseId}: converged and verified inside the stack; the public hosts were NOT checked and the release is NOT accepted yet`, `next: starci app stack ingress publish, then starci app stack accept --release ${releaseId} --execute`], data };
+  }
   if (!failed) {
     await housekeeping(ctx, config, d, store, { previous, out }, lines);
     return { ok: true, lines: [...lines, `deployed release ${releaseId}`], data };
@@ -166,7 +171,9 @@ async function deployExecute(ctx, config, options, d, out) {
 }
 
 /**
- * Deploys a release: `options` = { images, sourceSha, execute, out, timeoutSeconds, retrySeconds, sshCmd }.
+ * Deploys a release: `options` = { images, sourceSha, execute, out, timeoutSeconds, retrySeconds, skipPublic, sshCmd }.
+ * skipPublic (the first deploy into a shared ingress, whose public routes exist only after `ingress publish`): the verification checks only what runs
+ * inside the stack, and the release stays PENDING (stored and deployed, pointer not moved) until `acceptRelease` has verified it in full.
  * Returns { ok, lines, data: { releaseId, previous, steps: [{ step, ok }], rolledBack } }.
  */
 export async function deployRelease(ctx, config, options = {}, deps = {}) {
@@ -178,7 +185,9 @@ export async function deployRelease(ctx, config, options = {}, deps = {}) {
     const rendered = await d.renderRelease(ctx, config, renderOptions(options, out, null));
     const { releaseId } = inspectRendered(out);
     if (options.execute !== true) {
-      const plan = `dry run: release ${releaseId} would be provisioned, stored, pre-pulled, deployed, converged, verified, accepted`;
+      const plan = options.skipPublic
+        ? `dry run: release ${releaseId} would be provisioned, stored, pre-pulled, deployed, converged and verified inside the stack (public hosts skipped); it would stay pending until ingress publish and stack accept`
+        : `dry run: release ${releaseId} would be provisioned, stored, pre-pulled, deployed, converged, verified, accepted`;
       return { ok: true, lines: [...(rendered.lines ?? []), plan], data: { releaseId, steps: [{ step: 'render', ok: true }], executed: false } };
     }
     return await deployExecute(ctx, config, options, d, out);
@@ -215,5 +224,32 @@ export async function rollbackRelease(ctx, config, options = {}, deps = {}) {
     return { ok: !failed, lines, data: { release: target, executed: true, steps } };
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Accepts a release that a `skipPublic` deploy left pending: the FULL verification (public hosts and checks inside the stack) must pass first, then the
+ * pointer moves and the superseded secrets and configs are pruned. `options` = { release, execute, retrySeconds, sshCmd }.
+ */
+export async function acceptRelease(ctx, config, options = {}, deps = {}) {
+  const d = { ...DEFAULT_DEPS, ...deps };
+  const release = options.release ?? null;
+  if (!isReleaseId(release)) throw refusal('STACK_RELEASE_ID', 'accept needs --release <16 lowercase hex characters> (the id the deploy printed)');
+  const store = await openStore(ctx, config, options, d);
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-accept-'));
+  try {
+    try { await store.fetch(release, out); } catch { throw refusal('STACK_ACCEPT_UNKNOWN', `release ${release} has no stored record on the manager`); }
+    const previous = await store.current();
+    if (previous === release) return { ok: true, lines: [`release ${release} is already the accepted release`], data: { release, accepted: true, executed: options.execute === true } };
+    if (options.execute !== true) return { ok: true, lines: [`dry run: would run the full verification (public hosts and checks inside the stack) and then accept release ${release}`], data: { release, accepted: false, executed: false } };
+    const verified = await d.verifyStack(ctx, config, { retrySeconds: options.retrySeconds });
+    const lines = [...(verified.lines ?? [])];
+    if (!verified.ok) return { ok: false, lines: [...lines, `release ${release} is NOT accepted: the full verification failed`], data: { release, accepted: false, executed: true } };
+    await store.accept(release);
+    lines.push(`accepted release ${release}`);
+    await housekeeping(ctx, config, d, store, { previous: previous || null, out }, lines);
+    return { ok: true, lines, data: { release, accepted: true, executed: true } };
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
   }
 }

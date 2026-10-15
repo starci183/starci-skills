@@ -86,7 +86,7 @@ test('deploy config: an empty block takes its defaults from the project', () => 
   assert.deepEqual(problems, []);
   assert.deepEqual(config, {
     stack: 'shop', remote: { host: 'vps', releasesBase: null, sealed: null }, images: {}, volumes: [], secrets: { grants: [], settings: null },
-    environment: {}, configs: [], passEnv: [], verify: { http: [], exec: [] }, jobs: null, backup: null, ingress: null,
+    environment: {}, configs: [], passEnv: [], verify: { http: [], exec: [] }, jobs: null, backup: null, ingress: null, registry: { host: 'ghcr.io', visibility: 'public' },
   });
 });
 
@@ -283,4 +283,15 @@ test('deploy.ingress is normalised by the ingress normaliser and its problems su
   assert.equal(bad.config, null);
   assert.ok(bad.problems.some((item) => item.at.includes('ingress')));
   assert.equal(normalizeDeploy(validBlock(), { project: 'shop', probe: probe() }).config.ingress, null);
+});
+
+test('deploy.registry: public is the default, private is the owner choice, any other value or field is refused', () => {
+  const run = (registry) => normalizeDeploy({ ...validBlock(), ...(registry === undefined ? {} : { registry }) }, { project: 'shop', probe: probe() });
+  assert.deepEqual(run(undefined).config.registry, { host: 'ghcr.io', visibility: 'public' });
+  assert.deepEqual(run({}).config.registry, { host: 'ghcr.io', visibility: 'public' });
+  assert.deepEqual(run({ host: 'registry.example:5000', visibility: 'private' }).config.registry, { host: 'registry.example:5000', visibility: 'private' });
+  for (const visibility of ['internal', 'Public', true, '']) assert.match(run({ visibility }).problems[0].message, /must be one of public, private/u);
+  assert.match(run({ host: 'Not A Host' }).problems[0].message, /must match/u);
+  assert.match(run({ extra: 1 }).problems[0].message, /is not a field of the deploy block/u);
+  assert.match(run('public').problems[0].message, /must be a mapping/u);
 });
