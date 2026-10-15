@@ -310,7 +310,7 @@ const unusedExportViolation = (publicEntry, name, line, owner) => ({
 const addSiblingEntryUses = (context, publicEntry, declared, used) => {
   for (const edge of context.edgesTo.get(publicEntry) ?? []) {
     if (edge.reexport || edge.from === publicEntry || !declared.has(edge.from)) continue;
-    const bindings = bindingsOf(context.ts, edge.edge.declaration);
+    const bindings = bindingsOf(context, edge.edge.declaration);
     if (bindings.all) used.all = true;
     for (const pair of bindings.pairs) used.names.add(pair.imported);
   }

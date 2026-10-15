@@ -6,6 +6,7 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {addWorkCommon} from '../../scripts/lib/work-schemas.mjs';
 import {isWorkRecordSchema} from '../../scripts/work/record-ownership.mjs';
+import {byCodeUnit} from '../../scripts/lib/list.mjs';
 
 /**
  * One schema per Work record family, checked against the tree that is the readable statement of the shape.
@@ -60,6 +61,15 @@ const validatorFor = family => compiled.get(family);
 
 const errorText = validate => (validate.errors ?? []).map(error => `${error.instancePath || '/'} ${error.message}`).join('; ');
 
+test('generated is a boolean schema annotation and other unknown keywords still fail strict validation', () => {
+  const strict = addWorkCommon(new Ajv2020({strict: true}));
+  const validate = strict.compile({type: 'string', generated: true, minLength: 1});
+  assert.equal(validate('projection'), true);
+  assert.equal(validate(''), false, 'the annotation preserves shape validation');
+  assert.throws(() => strict.compile({generated: 'yes'}), /generated value must be/);
+  assert.throws(() => strict.compile({unregisteredAnnotation: true}), /unknown keyword/);
+});
+
 function recordFiles() {
   const found = [];
   const walk = directory => {
@@ -70,7 +80,7 @@ function recordFiles() {
     }
   };
   walk(workRoot);
-  return found.sort();
+  return found.sort(byCodeUnit);
 }
 
 test('every record family named in the example has a schema, and every schema is named by the example', () => {

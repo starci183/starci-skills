@@ -35,7 +35,7 @@ const KEEP_PLACEHOLDERS = new Proxy(Object.create(null), {
   getOwnPropertyDescriptor: (_target, key) => ({ configurable: true, value: `{{${String(key)}}}` }),
 });
 const MANAGED = JSON.parse(render(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'packages', 'hfs', 'templates', 'app', 'package-scripts', 'package.json'), 'utf8'), KEEP_PLACEHOLDERS)
-  .replace(/^\s*\{\{appScripts\}\}\s*$/m, '').replace(/\{\{\w+\}\}/g, 'x')).scripts;
+  .replaceAll('{{appScripts}}', '').replaceAll('{{supabaseScripts}}', '').replace(/\{\{\w+\}\}/g, 'x')).scripts;
 
 test('planFor: runtime = npm test + npm run test:packages + npm run check; an app = its managed typecheck, lint, test, build:be, build:fe, canon-scan; never e2e', () => {
   const rt = planFor(RUNTIME, { runtimeRoot: RUNTIME });
@@ -119,8 +119,10 @@ test('pushGitRepo: a red suite prints the grouped failures, runs every step, ski
 test('pushGitRepo: green pushes in the promised order (dry run, hooks only, push); --check stops before the push; main moving is red', () => {
   const calls = [];
   const push = (o) => {
-    calls.push(o.dryRun ? 'dry-run' : o.hooksOnly ? 'hooks-only' : 'push');
-    return [o.dryRun ? { wouldPush: true } : o.hooksOnly ? { hooks: 'green' } : { pushed: true, head: 'abc1234', repo: PRODUCT }];
+    if (o.dryRun) { calls.push('dry-run'); return [{ wouldPush: true }]; }
+    if (o.hooksOnly) { calls.push('hooks-only'); return [{ hooks: 'green' }]; }
+    calls.push('push');
+    return [{ pushed: true, head: 'abc1234', repo: PRODUCT }];
   };
   const base = { plan: () => planFor(RUNTIME, { runtimeRoot: RUNTIME }), step: greenStep, push };
   const green = pushGitRepo(RUNTIME, { deps: { ...base, git: fakeGit({ ahead: 4 }) } });
