@@ -17,6 +17,7 @@ import { firstLine, tool } from './context.mjs';
 import { hasPlaceholderDigest, isReleaseId } from './digest.mjs';
 import { failure, refusal } from './errors.mjs';
 import { pruneStack } from './prune.mjs';
+import { parseYaml } from '../runtime/engine/yaml.mjs';
 import { createReleaseStore } from './release-store.mjs';
 import { verifyStack } from './verify.mjs';
 
@@ -40,9 +41,26 @@ const IMAGE_LINE = /^[ \t]+image:[ \t]*(\S+)[ \t]*$/gmu;
 const QUOTE = /^["']|["']$/gu;
 const IMAGE_REF = /^[A-Za-z0-9][A-Za-z0-9./_:@-]*$/u;
 
+/** Every network alias the services of a rendered stack claim: [{ service, alias }]. */
+function stackAliases(bytes) {
+  const services = parseYaml(bytes)?.services ?? {};
+  return Object.entries(services).flatMap(([service, entry]) => Object.values(entry?.networks ?? {}).flatMap((network) => (network?.aliases ?? []).map((alias) => ({ service, alias }))));
+}
+
+/**
+ * A swarm service must never claim an alias that a live (compose) upstream of the declared ingress still answers to: on the shared overlay both would
+ * share the name and the old route would round-robin into the new service BEFORE the routes are published. Refused before anything is changed.
+ */
+function refuseSharedAliases(config, bytes) {
+  const live = new Map((config.ingress?.upstreams ?? []).filter((upstream) => upstream.container !== null).flatMap((upstream) => upstream.aliases.map((alias) => [alias, upstream.name])));
+  const clash = stackAliases(bytes).find(({ alias }) => live.has(alias));
+  if (clash) throw refusal('STACK_DEPLOY_ALIAS_SHARED', `service ${clash.service} claims the network alias ${clash.alias}, which the live upstream ${live.get(clash.alias)} of deploy.ingress.upstreams still answers to: give the swarm service its own alias (for example ${clash.alias}-swarm) and point the published routes at it; nothing was changed`);
+}
+
 /** The release id (first 16 hex of the sha256 of the rendered stack bytes) and the distinct images of a rendered release. */
-function inspectRendered(out) {
+function inspectRendered(out, config) {
   const bytes = fs.readFileSync(path.join(out, 'stack.yaml'), 'utf8');
+  refuseSharedAliases(config, bytes);
   if (hasPlaceholderDigest(bytes)) throw refusal('STACK_DEPLOY_PLACEHOLDER', 'the rendered stack still carries a placeholder digest; nothing was changed');
   const images = [...new Set([...bytes.matchAll(IMAGE_LINE)].map((match) => match[1].replaceAll(QUOTE, '')))];
   const unsafe = images.find((image) => !IMAGE_REF.test(image));
@@ -133,7 +151,7 @@ async function prepareRelease(ctx, config, options, d, out, cleanups) {
   const store = await openStore(ctx, config, options, d, cleanups);
   const previous = await store.current();
   const rendered = await d.renderRelease(ctx, config, renderOptions(options, out, previous || null));
-  const { releaseId, images } = inspectRendered(out);
+  const { releaseId, images } = inspectRendered(out, config);
   const lines = [...(rendered.lines ?? [])];
   const provisioned = await d.provisionRelease(ctx, config, { execute: true, out, releaseFile: path.join(out, 'release.json') });
   lines.push(...(provisioned.lines ?? []));
@@ -187,7 +205,7 @@ export async function deployRelease(ctx, config, options = {}, deps = {}) {
   const cleanups = [];
   try {
     const rendered = await d.renderRelease(ctx, config, renderOptions(options, out, null));
-    const { releaseId } = inspectRendered(out);
+    const { releaseId } = inspectRendered(out, config);
     if (options.execute !== true) {
       const plan = options.skipPublic
         ? `dry run: release ${releaseId} would be provisioned, stored, pre-pulled, deployed, converged and verified inside the stack (public hosts skipped); it would stay pending until ingress publish and stack accept`

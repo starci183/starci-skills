@@ -121,3 +121,18 @@ test('a docker that cannot run, and a failing config create or listing, are fail
   const noDocker = app({ overrides: { docker: { 'config ls': () => ({ status: null, stdout: '', stderr: '', error: new Error('no docker') }) } } });
   await assert.rejects(provisionRelease(noDocker.ctx(), noDocker.config, { release: releaseOf(noDocker), execute: true }), (error) => error.message.includes('no docker'));
 });
+
+test('a config whose file has CRLF line endings is created with LF; a binary config is created byte for byte', async () => {
+  const crlf = String.fromCharCode(13, 10);
+  const made = app();
+  fs.writeFileSync(path.join(made.config.envDir, 'infra/swarm/routes.yml'), `routes: []${crlf}more: 1${crlf}`);
+  const release = releaseOf(made);
+  await provisionRelease(made.ctx(), made.config, { release, execute: true });
+  assert.equal(Buffer.from(made.host.state.configs.get(release.configs[0].name).value).toString('utf8'), 'routes: []\nmore: 1\n');
+  const binary = Buffer.from([0, 13, 10, 7]);
+  const other = app();
+  fs.writeFileSync(path.join(other.config.envDir, 'infra/swarm/routes.yml'), binary);
+  const again = releaseOf(other);
+  await provisionRelease(other.ctx(), other.config, { release: again, execute: true });
+  assert.deepEqual(Buffer.from(other.host.state.configs.get(again.configs[0].name).value), binary);
+});

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import { firstLine, lines as splitLines, tool } from './context.mjs';
 import { failure, refusal } from './errors.mjs';
 import { isReleaseId } from './digest.mjs';
-import { configObjects, loadSealed } from './sealed.mjs';
+import { configBytes, configObjects, loadSealed } from './sealed.mjs';
 
 const STALE = 'render the release again';
 
@@ -70,7 +70,7 @@ function createAll(ctx, config, id, todo) {
     if (run.error || run.status !== 0) throw createFailure(run, `secret create for ${item.key}`, item.value);
   }
   for (const item of todo.configs) {
-    const run = create(ctx, 'config', [managed, tagged], item.name, fs.readFileSync(item.file));
+    const run = create(ctx, 'config', [managed, tagged], item.name, configBytes(item.file));
     if (run.error || run.status !== 0) throw createFailure(run, `config create for ${item.logical}`);
   }
 }

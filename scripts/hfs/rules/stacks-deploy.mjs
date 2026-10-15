@@ -31,14 +31,34 @@ function probeOf(envDir, spec) {
   return { exists: (relative) => fs.existsSync(path.join(envDir, relative)), services: stackServices(envDir, spec), members: sealedMembers(envDir) };
 }
 
+/** The shell scripts below the environment directory (node_modules aside), as absolute paths. */
+function shellScripts(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const file = path.join(directory, entry.name);
+    if (entry.isDirectory()) return entry.name === 'node_modules' ? [] : shellScripts(file);
+    return entry.name.endsWith('.sh') ? [file] : [];
+  });
+}
+
+/** A shell script with CRLF line endings fails inside the container (`set: Illegal option -`): one finding per such file. */
+function lineEndingFindings({ repoRoot, envDir, environment }) {
+  if (!fs.existsSync(envDir)) return [];
+  const crlf = String.fromCodePoint(13, 10);
+  return shellScripts(envDir).filter((file) => fs.readFileSync(file, 'utf8').includes(crlf)).map((file) => found(
+    'STACKS_DEPLOY_CONFIG_INVALID',
+    path.relative(repoRoot, file).split(path.sep).join('/'),
+    `environments.${environment}: this shell script has CRLF line endings and fails in the container; commit it with LF (.gitattributes: *.sh text eol=lf) and save it again`,
+  ));
+}
+
 function environmentFindings({ repoRoot, project, environment, spec }) {
   const envDir = path.join(repoRoot, STACK_ROOT, environment);
   const { problems } = normalizeDeploy(spec.deploy, { project, probe: probeOf(envDir, spec) });
-  return problems.map((problem) => found(
+  return [...problems.map((problem) => found(
     'STACKS_DEPLOY_CONFIG_INVALID',
     DECLARATION,
     `environments.${environment}.${problem.at}: ${problem.message}`,
-  ));
+  )), ...lineEndingFindings({ repoRoot, envDir, environment })];
 }
 
 /** Only docker-swarm environments that declare a deploy block are judged. */

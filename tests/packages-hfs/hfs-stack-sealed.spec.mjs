@@ -2,7 +2,8 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { configObjects, loadSealed, openMember, secretRuntimeName, sha, versionKeyOf } from '../../packages/hfs/stack/sealed.mjs';
+import path from 'node:path';
+import { configBytes, configObjects, isBinary, lfBytes, lfText, loadSealed, openMember, secretRuntimeName, sha, versionKeyOf } from '../../packages/hfs/stack/sealed.mjs';
 import { makeApp, MEMBERS } from '../helpers/stack-release-fakes.mjs';
 
 const apps = [];
@@ -126,4 +127,38 @@ test('config objects are named by the digest of their file bytes', () => {
   assert.equal(routes.name, `app-routes-c${crypto.createHash('sha256').update('routes: []\n').digest('hex').slice(0, 10)}`);
   assert.ok(routes.file.endsWith('routes.yml'));
   assert.equal(sha('x'), crypto.createHash('sha256').update('x').digest('hex'));
+});
+
+const CRLF = String.fromCharCode(13, 10);
+
+test('line endings: CRLF text becomes LF, binary content and lone CR are left alone', () => {
+  assert.equal(lfBytes(Buffer.from(`set -e${CRLF}echo ok${CRLF}`)).toString(), 'set -e\necho ok\n');
+  const binary = Buffer.from([0, 13, 10, 255, 13, 10]);
+  assert.equal(lfBytes(binary), binary);
+  const plain = Buffer.from('already lf\n');
+  assert.equal(lfBytes(plain), plain);
+  assert.equal(lfBytes(Buffer.from('a\rb')).toString(), 'a\rb');
+  assert.equal(lfText(`x${CRLF}y`), 'x\ny');
+  assert.equal(isBinary(Buffer.from('text')), false);
+});
+
+test('a config rendered from a CRLF checkout has the same name and bytes as its LF twin', () => {
+  const lf = app({ files: { 'infra/swarm/entry.sh': 'set -eu\necho go\n' } });
+  const crlf = app({ files: { 'infra/swarm/entry.sh': `set -eu${CRLF}echo go${CRLF}` } });
+  const only = (made) => made.config.configs.length;
+  assert.equal(only(lf), only(crlf));
+  const file = (made) => path.join(made.config.envDir, 'infra/swarm/entry.sh');
+  assert.equal(configBytes(file(crlf)).toString(), 'set -eu\necho go\n');
+  assert.equal(sha(configBytes(file(crlf))), sha(configBytes(file(lf))));
+  const [routes] = configObjects(crlf.config);
+  assert.equal(routes.name, configObjects(lf.config)[0].name, 'CRLF does not change the object name either');
+});
+
+test('a sealed secret value with CRLF is delivered with LF, a value with NUL is untouched', () => {
+  const members = { ...MEMBERS, auth: { SESSION_KEY: `line1${CRLF}line2${CRLF}` } };
+  const made = app({ members });
+  const sealed = loadSealed(made.ctx(), made.config);
+  assert.equal(sealed.secrets.SESSION_KEY.value, 'line1\nline2\n');
+  const nul = app({ members: { ...MEMBERS, auth: { SESSION_KEY: `a\0${CRLF}b` } } });
+  assert.equal(loadSealed(nul.ctx(), nul.config).secrets.SESSION_KEY.value, `a\0${CRLF}b`);
 });

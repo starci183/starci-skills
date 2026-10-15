@@ -14,6 +14,27 @@ const MAX_NAME = 64;
 /** sha256 of the bytes, as lowercase hex. */
 export const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
+const CR = String.fromCodePoint(13);
+const LF = String.fromCodePoint(10);
+
+/** True for content that is not text: a NUL byte in the first 8 KiB. Binary files are never rewritten. */
+export const isBinary = (bytes) => bytes.subarray(0, 8192).includes(0);
+
+/** Every CRLF of a string becomes LF. */
+export const lfText = (text) => text.replaceAll(CR + LF, LF);
+
+/**
+ * Line endings of a text file as the services need them: every CRLF becomes LF (a script rendered from a Windows checkout failed with
+ * `set: Illegal option -`). Binary content is returned untouched. Takes and returns a Buffer.
+ */
+export function lfBytes(bytes) {
+  if (isBinary(bytes) || !bytes.includes(13)) return bytes;
+  return Buffer.from(lfText(bytes.toString('latin1')), 'latin1');
+}
+
+/** The bytes of a config file as they are hashed and created: LF-normalised text, untouched binary. */
+export const configBytes = (file) => lfBytes(fs.readFileSync(file));
+
 /** The key that makes the version suffix of a secret name unguessable from the name alone: a local fixture key or the age identity. */
 export function versionKeyOf(ctx) {
   const key = ctx.env.STARCI_SECRET_VERSION_KEY || ctx.env.SOPS_AGE_KEY;
@@ -32,7 +53,8 @@ export function secretRuntimeName(stack, key, value, versionKey) {
 /** Opens one sealed member (`<secretsDir>/<member>.enc`) into a { KEY: value } map. Names the member only on failure. */
 export function openMember(ctx, config, member) {
   try {
-    return readMap(path.join(config.secretsDir, `${member}.enc`), ctx.sops);
+    const map = readMap(path.join(config.secretsDir, `${member}.enc`), ctx.sops);
+    return Object.fromEntries(Object.entries(map).map(([key, value]) => [key, typeof value === 'string' && !value.includes(String.fromCodePoint(0)) ? lfText(value) : value]));
   } catch {
     throw refusal('STACK_SECRET_MEMBER_UNREADABLE', `the sealed member ${member} cannot be opened (is SOPS_AGE_KEY set to a recipient key?)`);
   }
@@ -108,5 +130,5 @@ export function loadSealed(ctx, config) {
 /** The config objects: non-secret files mounted into services, named by the digest of their content. */
 export const configObjects = (config) => config.configs.map((entry) => {
   const file = path.join(config.envDir, entry.file);
-  return { logical: entry.name, env: entry.env, file, name: `${config.stack}-${entry.name}-c${sha(fs.readFileSync(file)).slice(0, 10)}` };
+  return { logical: entry.name, env: entry.env, file, name: `${config.stack}-${entry.name}-c${sha(configBytes(file)).slice(0, 10)}` };
 });

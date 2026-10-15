@@ -1,3 +1,8 @@
 {{header}}
 * text=auto eol=lf
 *.enc binary
+# Scripts and the deploy data are mounted into Linux containers: CRLF there fails (set: Illegal option -).
+*.sh text eol=lf
+*.mjs text eol=lf
+.starcistacks/** text eol=lf
+.starcistacks/**/*.enc binary

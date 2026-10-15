@@ -532,3 +532,33 @@ test('accept without a verification result lines and without a previous release 
   assert.equal(result.ok, true);
   assert.equal(await currentPointer(), NEW_ID);
 });
+
+const aliasStack = (alias) => `services:
+  web:
+    image: ghcr.io/o/app-web@sha256:${WEB}
+    networks:
+      edge:
+        aliases: [${alias}]
+  worker:
+    image: ghcr.io/o/app-api@sha256:${NEW}
+`;
+const withUpstreams = (upstreams) => ({ ...config, ingress: { upstreams } });
+const live = { name: 'shop-web', container: 'shop-web-web-1', hostAddress: null, aliases: ['shop-web'] };
+
+test('a swarm service that claims the alias of a live upstream is refused before anything changes (the new web must not join the old route)', async () => {
+  const w = await world();
+  const refused = (error) => error.code === 'STACK_DEPLOY_ALIAS_SHARED' && /service web claims the network alias shop-web, which the live upstream shop-web .* shop-web-swarm/u.test(error.message);
+  await assert.rejects(deployRelease(w.ctx, withUpstreams([live]), base(w, { out: w.out, execute: true }), { ...w.deps, renderRelease: async (ctx, cfg, options) => { fs.mkdirSync(options.out, { recursive: true }); fs.writeFileSync(path.join(options.out, 'stack.yaml'), aliasStack('shop-web')); fs.writeFileSync(path.join(options.out, 'release.json'), '{}'); return { ok: true, lines: [] }; } }), refused);
+  assert.equal(w.trace.includes('provision'), false);
+  assert.equal(w.trace.some((entry) => entry.startsWith('ssh:')), false, 'no remote call');
+});
+
+test('its own alias, a host-address upstream and a stack without networks are accepted', async () => {
+  const render = (text) => async (ctx, cfg, options) => { fs.mkdirSync(options.out, { recursive: true }); fs.writeFileSync(path.join(options.out, 'stack.yaml'), text); fs.writeFileSync(path.join(options.out, 'release.json'), '{"secrets":[],"configs":[]}'); return { ok: true, lines: [] }; };
+  const hostOnly = { name: 'shop-web', container: null, hostAddress: '10.0.0.1', aliases: ['shop-web'] };
+  for (const [cfg, text] of [[withUpstreams([live]), aliasStack('shop-web-swarm')], [withUpstreams([hostOnly]), aliasStack('shop-web')], [config, aliasStack('shop-web')], [withUpstreams([live]), stackText(NEW)], [withUpstreams([live]), 'services:\n  a:\n    networks:\n      edge:\n  b:\n'], [withUpstreams([live]), '# no services\n']]) {
+    const w = await world();
+    const result = await deployRelease(w.ctx, cfg, base(w, { execute: false }), { ...w.deps, renderRelease: render(text) });
+    assert.equal(result.ok, true);
+  }
+});
