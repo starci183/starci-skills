@@ -166,6 +166,19 @@ rules:
       - {kind: hfs, id: canon-pin-drift, at: scripts/hfs/check.mjs}
   - id: R16
     code: "HFS_TOOL_CONFIG_LOCAL"
+    editions: ["lite", "full"]
+    docs: ["docs/managed-tooling-coverage.md#local-tool-configuration"]
+    proves:
+      - {path: "tests/hfs-proofs/hfs-tool-config-local.spec.mjs", editions: ["lite", "full"]}
+      - {path: "tests/hfs-proofs/hfs-tool-config-forbidden.spec.mjs", editions: ["lite", "full"]}
+    exemplifiedBy:
+      - {path: "packages/hfs/templates/be/tool-config/eslint.config.mjs", editions: ["lite", "full"]}
+      - {path: "packages/hfs/templates/fe/tool-config/eslint.config.mjs", editions: ["lite", "full"]}
+      - {path: "tests/hfs-proofs/hfs-tool-config-local.spec.mjs", editions: ["lite", "full"]}
+      - {path: "tests/hfs-proofs/hfs-tool-config-forbidden.spec.mjs", editions: ["lite", "full"]}
+    witness:
+      - {path: "tests/hfs-proofs/hfs-tool-config-local.spec.mjs", editions: ["lite", "full"], codes: ["HFS_TOOL_CONFIG_LOCAL"]}
+      - {path: "tests/hfs-proofs/hfs-tool-config-forbidden.spec.mjs", editions: ["lite", "full"], codes: ["HFS_TOOL_CONFIG_LOCAL"]}
     law: "Configs only call the factories; no local rules."
     kinds: [check, codemod]
     gates: [land, ci]
@@ -175,6 +188,17 @@ rules:
       - {kind: hfs, id: tool-config-forbidden, at: scripts/hfs/check.mjs}
   - id: R17
     code: "HFS_RULE_OFF_WITHOUT_REPLACEMENT"
+    editions: ["lite", "full"]
+    docs: ["docs/managed-tooling-coverage.md#rendered-lint-configurations"]
+    proves:
+      - {path: "tests/hfs-proofs/hfs-rule-off-without-replacement.spec.mjs", editions: ["lite", "full"]}
+    exemplifiedBy:
+      - {path: "packages/hfs/templates/be/tool-config/eslint.config.mjs", editions: ["lite", "full"]}
+      - {path: "packages/hfs/templates/fe/tool-config/eslint.config.mjs", editions: ["lite", "full"]}
+      - {path: "packages/hfs/templates/fe/tool-config/stylelint.config.mjs", editions: ["lite", "full"]}
+      - {path: "tests/hfs-proofs/hfs-rule-off-without-replacement.spec.mjs", editions: ["lite", "full"]}
+    witness:
+      - {path: "tests/hfs-proofs/hfs-rule-off-without-replacement.spec.mjs", editions: ["lite", "full"], codes: ["HFS_RULE_OFF_WITHOUT_REPLACEMENT"]}
     law: "The ESLint configuration (and a front end's stylelint configuration) is the rendered one-liner, so no rule is off, warned or redefined in a repository."
     kinds: [check]
     gates: [land, ci]
@@ -193,9 +217,19 @@ rules:
       - {kind: stylelint, id: no-inline-lint-config}
   - id: R19
     code: "HFS_FORMAT"
+    editions: ["lite", "full"]
+    docs: ["docs/managed-tooling-coverage.md#canonical-formatting"]
+    proves:
+      - {path: "tests/hfs-proofs/hfs-format.spec.mjs", editions: ["lite", "full"]}
+    exemplifiedBy:
+      - {path: "packages/hfs/templates/app/tool-config-lite/prettierrc", edition: "lite"}
+      - {path: "packages/hfs/templates/app/tool-config/prettierrc", edition: "full"}
+      - {path: "tests/hfs-proofs/hfs-format.spec.mjs", editions: ["lite", "full"]}
+    witness:
+      - {path: "tests/hfs-proofs/hfs-format.spec.mjs", editions: ["lite", "full"], codes: ["HFS_FORMAT"]}
     law: "Prettier is the only formatter."
     kinds: [codemod]
-    gates: [pre-commit, pre-push, land, ci]
+    gates: [land, ci]
     failureCodes: ["HFS_FORMAT"]
     enforcers:
       - {kind: hfs, id: format, at: packages/hfs/sync/format.mjs}
@@ -225,9 +259,22 @@ rules:
       - {kind: sonar, id: duplicated-lines-density, at: knowledge/sonar-gate.yaml}
   - id: R22
     code: "HFS_TS_STRICT"
+    editions: ["lite", "full"]
+    docs: ["docs/hfs-typescript-strict.md#r22-typescript"]
+    exemplifiedBy:
+      - {path: "packages/hfs/templates/be/tool-config/tsconfig.json", editions: ["lite", "full"]}
+      - {path: "packages/hfs/templates/fe/tool-config/tsconfig.json", editions: ["lite", "full"]}
+      - {path: "tests/hfs-proofs/hfs-ts-strict.spec.mjs", editions: ["lite", "full"], codes: ["HFS_TS_STRICT"]}
+      - {path: "tests/hfs-proofs/hfs-ts-strict-rule-tester.spec.mjs", editions: ["lite", "full"], codes: ["FE_TYPE_ESCAPE"]}
+    proves:
+      - {path: "tests/hfs-proofs/hfs-ts-strict.spec.mjs", editions: ["lite", "full"], codes: ["HFS_TS_STRICT"]}
+      - {path: "tests/hfs-proofs/hfs-ts-strict-rule-tester.spec.mjs", editions: ["lite", "full"], codes: ["FE_TYPE_ESCAPE"]}
+    witness:
+      - {path: "tests/hfs-proofs/hfs-ts-strict.spec.mjs", editions: ["lite", "full"], codes: ["HFS_TS_STRICT"]}
+      - {path: "tests/hfs-proofs/hfs-ts-strict-rule-tester.spec.mjs", editions: ["lite", "full"], codes: ["FE_TYPE_ESCAPE"]}
     law: "tsconfig extends `@starci/tsconfig` and lowers no flag; no assertion, `!` or `any` in product source."
     kinds: [codemod, design, lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["HFS_TS_STRICT", "FE_TYPE_ESCAPE"]
     enforcers:
       - {kind: eslint-fe, id: no-type-assertion}
@@ -237,6 +284,16 @@ rules:
       - {kind: eslint-fe, id: no-double-cast}
   - id: R23
     code: "HFS_CONTRACT_SNAPSHOT_DRIFT"
+    editions: ["lite", "full"]
+    docs: ["docs/hfs-contract-snapshots.md#committed-contract-snapshots"]
+    templateNa: "Contract snapshots are generated from each app's composed schema and operation table, not from a scaffolded contract artifact."
+    proves:
+      - {path: "tests/hfs-proofs/hfs-contract-snapshot-drift-direct.spec.mjs", editions: ["lite", "full"], codes: ["HFS_CONTRACT_SNAPSHOT_DRIFT"]}
+    exemplifiedBy:
+      - {path: "tests/hfs-proofs/hfs-contract-snapshot-drift-direct.spec.mjs", editions: ["lite", "full"], codes: ["HFS_CONTRACT_SNAPSHOT_DRIFT"]}
+    witness:
+      - {path: "tests/hfs-proofs/hfs-contract-snapshot-drift-direct.spec.mjs", edition: "lite", codes: ["HFS_CONTRACT_SNAPSHOT_DRIFT"]}
+      - {path: "tests/hfs-proofs/hfs-contract-snapshot-drift-direct.spec.mjs", edition: "full", codes: ["HFS_CONTRACT_SNAPSHOT_DRIFT"]}
     law: "The be side commits its contract snapshot and it equals the emit; the fe side reads it in place (be/contracts/)."
     kinds: [check]
     gates: [land, ci]
@@ -245,6 +302,17 @@ rules:
       - {kind: hfs, id: contract-snapshot-drift, at: scripts/hfs/rules/contract.mjs}
   - id: R24
     code: "HFS_ARCH_CONFIG_UNREAD"
+    editions: ["lite", "full"]
+    docs: ["docs/hfs-analysis-coverage.md#analysed-production-source"]
+    proves:
+      - {path: "tests/hfs-proofs/hfs-arch-config-unread.spec.mjs", editions: ["lite", "full"], codes: ["HFS_ARCH_CONFIG_UNREAD"]}
+    exemplifiedBy:
+      - {path: "packages/hfs/templates/be/skeleton-lite/apps/api/src/main.ts", edition: "lite"}
+      - {path: "packages/hfs/templates/be/skeleton/apps/__app__/src/main.ts", edition: "full"}
+      - {path: "tests/hfs-proofs/hfs-arch-config-unread.spec.mjs", editions: ["lite", "full"], codes: ["HFS_ARCH_CONFIG_UNREAD"]}
+    witness:
+      - {path: "tests/hfs-proofs/hfs-arch-config-unread.spec.mjs", edition: "lite", codes: ["HFS_ARCH_CONFIG_UNREAD"]}
+      - {path: "tests/hfs-proofs/hfs-arch-config-unread.spec.mjs", edition: "full", codes: ["HFS_ARCH_CONFIG_UNREAD"]}
     law: "The machine reads `hfs.json`; zero files analysed is red."
     kinds: [check]
     gates: [land, ci]
@@ -253,9 +321,22 @@ rules:
       - {kind: machine, id: arch-config-unread, at: scripts/hfs/architecture/config-unread.mjs}
   - id: R25
     code: "HFS_UNUSED_EXPORT"
+    editions: ["lite", "full"]
+    docs: ["docs/hfs-export-liveness.md#export-and-file-liveness"]
+    proves:
+      - {path: "tests/hfs-proofs/hfs-unused-export.spec.mjs", editions: ["lite", "full"], codes: ["HFS_UNUSED_EXPORT", "HFS_UNUSED_FILE"]}
+    exemplifiedBy:
+      - {path: "packages/hfs/templates/be/skeleton-lite/apps/api/src/main.ts", edition: "lite"}
+      - {path: "packages/hfs/templates/be/skeleton/apps/__app__/src/main.ts", edition: "full"}
+      - {path: "packages/hfs/templates/fe/skeleton-lite/apps/web/src/app/[locale]/page.tsx", edition: "lite"}
+      - {path: "packages/hfs/templates/fe/skeleton/apps/app/src/app/[locale]/page.tsx", edition: "full"}
+      - {path: "tests/hfs-proofs/hfs-unused-export.spec.mjs", editions: ["lite", "full"], codes: ["HFS_UNUSED_EXPORT", "HFS_UNUSED_FILE"]}
+    witness:
+      - {path: "tests/hfs-proofs/hfs-unused-export.spec.mjs", edition: "lite", codes: ["HFS_UNUSED_EXPORT", "HFS_UNUSED_FILE"]}
+      - {path: "tests/hfs-proofs/hfs-unused-export.spec.mjs", edition: "full", codes: ["HFS_UNUSED_EXPORT", "HFS_UNUSED_FILE"]}
     law: "No public export without a consumer; no source file nothing reaches."
     kinds: [lint, codemod]
-    gates: [pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_UNUSED_EXPORT", "HFS_UNUSED_FILE"]
     enforcers:
       - {kind: eslint-be, id: dead-exports}
