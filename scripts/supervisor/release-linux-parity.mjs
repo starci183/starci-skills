@@ -132,6 +132,7 @@ export function parityScript(plan) {
     '#!/usr/bin/env bash',
     'set -eu',
     'export CI=1 NEXT_TELEMETRY_DISABLED=1 npm_config_update_notifier=false npm_config_fund=false npm_config_audit=false',
+    `export GITHUB_WORKSPACE=${WORK_DIR}`,
     // The runner's scratch directory, step-output file and step-summary file, which workflow steps name.
     'export RUNNER_TEMP=/tmp/runner-temp GITHUB_OUTPUT=/tmp/runner-temp/github-output GITHUB_STEP_SUMMARY=/tmp/runner-temp/step-summary && mkdir -p "$RUNNER_TEMP" && : > "$GITHUB_OUTPUT" && : > "$GITHUB_STEP_SUMMARY"',
     `mkdir -p ${WORK_DIR} && tar -xf /in/src.tar -C ${WORK_DIR}`,

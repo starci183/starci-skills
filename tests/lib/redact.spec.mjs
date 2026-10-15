@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
-import { redactBytes, redactText } from '../../scripts/lib/redact.mjs';
+import { redactBytes, redactText, survivingSecrets } from '../../scripts/lib/redact.mjs';
 import { secretEnv, connectorSecret } from '../../engine/secrets.mjs';
 import { redactTextStream } from '../../ui/api/redact-read.mjs';
 
@@ -13,6 +13,23 @@ const utf16 = (text, be) => {
   if (be) body.swap16();
   return Buffer.concat([Buffer.from(be ? [0xfe, 0xff] : [0xff, 0xfe]), body]);
 };
+
+test('context rules keep their classifications while widened assignment names still redact', () => {
+  const examples = [
+    ['url-secret', 'GET /callback?access_token=abc123def456ghi'],
+    ['env-secret', 'MY_SERVICE_API_KEY=planted-env-value-42'],
+    ['keyed-secret', 'password = planted-keyed-value-42'],
+    ['assigned-secret', 'dbPassword = "planted-camel-value-42"'],
+    ['assigned-secret', 'mySecretKey=planted-camel-value-42'],
+  ];
+  for (const [rule, text] of examples) {
+    assert.deepEqual(survivingSecrets(text), [{ rule, count: 1 }]);
+    const clean = redactText(text);
+    assert.deepEqual(survivingSecrets(clean), [], `${rule}: redaction is idempotent`);
+    assert.doesNotMatch(clean, /planted-|abc123def456ghi/);
+  }
+  assert.equal(redactText('token password=hunter2hunter2 line1'), 'token [redacted] line1');
+});
 
 test('write-time redaction normalizes every supported BOM and refuses malformed text', () => {
   const text = 'ACCESS_TOKEN=opaque-fixture-credential\n';

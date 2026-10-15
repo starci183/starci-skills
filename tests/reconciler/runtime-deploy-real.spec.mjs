@@ -1,7 +1,7 @@
 // `starci runtime deploy` against a REAL throwaway runtime root, no fake engine: a clone of this runtime becomes the host (own config.yaml with every controller off,
 // own .runtime state), a real engine process leads on it, and the verb fast-forwards the host, runs the new tree's `runtime artefacts --migrate` and
-// `reconciler restart` as real child processes, and verifies the new leader from the machine store. Only the check run and the affected-spec run are replaced (they take minutes
-// and have their own specs). Nothing here touches the live host: the root, the store and the engine are all inside a temporary directory.
+// `reconciler restart` as real child processes, and verifies the new leader from the machine store. The check run and affected-spec run are replaced (they take minutes
+// and have their own specs); the deploy actor is fixture metadata. Nothing here touches the live host: the root, store and engine are inside a temporary directory.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -14,12 +14,32 @@ import { pidAlive, readMachine } from '../../engine/db/machine.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { makeTempDir } from '../../scripts/api/fs/make-temp-dir.mjs';
 import { sleep } from '../../scripts/lib/sleep.mjs';
+import { repeatInOrder } from '../../scripts/lib/in-order.mjs';
 
 const git = (cwd, ...args) => {
   const r = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, encoding: 'utf8', windowsHide: true });
   assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);
   return r.stdout.trim();
 };
+
+/** A cloned host tests the working source, including fixes awaiting a coordinator commit.
+ * Commit the overlay only in the throwaway host, so its reported revision names its exact bytes. */
+function snapshotSource(host) {
+  const changed = git(skillRoot, 'diff', '--name-only', '-z', 'HEAD');
+  const added = git(skillRoot, 'ls-files', '--others', '--exclude-standard', '-z');
+  const files = new Set([...changed.split('\0'), ...added.split('\0')].filter(Boolean));
+  for (const file of files) {
+    const source = path.join(skillRoot, file), destination = path.join(host, file);
+    if (fs.existsSync(source)) {
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      fs.copyFileSync(source, destination);
+    } else fs.rmSync(destination, { force: true });
+  }
+  if (git(host, 'status', '--porcelain')) {
+    git(host, 'add', '-A');
+    git(host, 'commit', '-q', '-m', 'fixture: snapshot the runtime source under test');
+  }
+}
 
 /** The environment of the throwaway host: its own state directory, no test registry, no inherited spec preloads that would point the store elsewhere. */
 function hostEnv(host) {
@@ -31,7 +51,12 @@ function hostEnv(host) {
 async function until(read, { timeoutMs, stepMs = 500 }) {
   const end = Date.now() + timeoutMs;
   let value = read();
-  while (!value && Date.now() < end) { await sleep(stepMs); value = read(); }
+  await repeatInOrder(async () => {
+    if (value || Date.now() >= end) return true;
+    await sleep(stepMs);
+    value = read();
+    return undefined;
+  });
   return value;
 }
 
@@ -40,12 +65,19 @@ test('a real engine on a throwaway host is carried to a new revision by the verb
   const host = path.join(root, 'host'), clone = path.join(root, 'clone');
   const env = hostEnv(host);
   t.after(async () => {
+    const pid = leaderState({ env }).pid;
     try { stopEngine({ env }); } catch { /* not running */ }
-    await sleep(500);
+    // The fixture owns this controller-free process; restricted Windows accounts may refuse taskkill /T.
+    if (Number.isInteger(pid) && pidAlive(pid)) {
+      try { process.kill(pid); } catch (error) { if (error.code !== 'ESRCH') throw error; }
+      assert.ok(await until(() => !pidAlive(pid), { timeoutMs: 5000, stepMs: 50 }), 'the fixture engine exits before removing its host');
+    }
     fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
   });
   git(root, 'clone', '-q', skillRoot, host);
   git(host, 'checkout', '-q', '-B', 'main');
+  snapshotSource(host);
+  assert.equal(fs.existsSync(path.join(host, 'node_modules')), false, 'the runtime engine starts without a development install');
   const example = fs.readFileSync(path.join(host, 'config.example.yaml'), 'utf8');
   fs.writeFileSync(path.join(host, 'config.yaml'), example.replace(/reconciler:\n {2}enabled: true\n {2}profile: operational\n {2}controllers: \{\}\n/, 'reconciler:\n  enabled: true\n  controllers: {}\n'));
   assert.match(fs.readFileSync(path.join(host, 'config.yaml'), 'utf8'), /reconciler:\n {2}enabled: true\n {2}controllers: \{\}/, 'every controller is off on the throwaway host');
@@ -64,7 +96,7 @@ test('a real engine on a throwaway host is carried to a new revision by the verb
   const tip = git(clone, 'rev-parse', 'HEAD');
 
   const out = await runtimeDeploy({ args: { from: clone }, positionals: [], env, role: 'owner' },
-    { root: host, numbers: { waitMs: 30_000, pollMs: 500, verifyMs: 180_000 }, seams: { runCheck: () => ({ ok: true, pass: 1, total: 1 }),
+    { root: host, numbers: { waitMs: 30_000, pollMs: 500, verifyMs: 180_000 }, seams: { who: () => ({ actor: 'owner', user: 'deploy-spec', pid: process.pid }), runCheck: () => ({ ok: true, pass: 1, total: 1 }),
       runAffected: (dir, base) => ({ exit: { exited: true, code: 0, signal: null, timedOut: false }, tail: [], red: [], unfinished: [], answer: {}, receipt: { schema: 'starci/affected-receipt@1', base, tip, clean: true, files: 1, passed: 1, total: 1, ok: true, ms: 1, budgetMs: 1, concurrency: 1 } }), provenAffected: () => null } });
   assert.equal(out.code, 0, out.text);
   assert.equal(git(host, 'rev-parse', 'HEAD'), tip);
