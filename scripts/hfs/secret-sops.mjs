@@ -85,6 +85,20 @@ export function defaultSops(
       }
       return map;
     },
+    /** A sops BINARY envelope (the ssh key and known_hosts of the deploy custody): the plaintext is the file itself. */
+    decryptBinary(file) {
+      const result = sopsDecrypt(
+        binary,
+        ["decrypt", "--input-type", "binary", "--output-type", "binary", file],
+        { env: selectedEnv, cwd: repoRoot, invocation },
+      );
+      if (result.status !== 0)
+        throw refuse(
+          `decrypt ${path.basename(file)}; is the age identity installed?`,
+          result,
+        );
+      return String(result.stdout);
+    },
     seal(request) {
       const recipients = request.recipients.length
         ? request.recipients
