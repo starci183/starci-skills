@@ -132,7 +132,7 @@ async function prepareRelease(ctx, config, options, d, out) {
   const rendered = await d.renderRelease(ctx, config, renderOptions(options, out, previous || null));
   const { releaseId, images } = inspectRendered(out);
   const lines = [...(rendered.lines ?? [])];
-  const provisioned = await d.provisionRelease(ctx, config, { execute: true, out, release: path.join(out, 'release.json') });
+  const provisioned = await d.provisionRelease(ctx, config, { execute: true, out, releaseFile: path.join(out, 'release.json') });
   lines.push(...(provisioned.lines ?? []));
   if (provisioned.ok === false) return { ok: false, lines, releaseId, previous, store, stepsDone: [{ step: 'render', ok: true }, { step: 'provision', ok: false }] };
   await store.store(out, releaseId);

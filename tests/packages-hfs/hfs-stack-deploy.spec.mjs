@@ -173,7 +173,7 @@ test('a successful deploy runs every step in order and moves the pointers last',
   assert.deepEqual(deploy.args, ['stack', 'deploy', '--prune', '--with-registry-auth', '--resolve-image', 'always', '--detach=true', '-c', path.join(w.out, 'stack.yaml'), 'app']);
   assert.equal(w.calls.render[0].previous, null);
   assert.equal(w.calls.render[1].previous, OLD_ID);
-  assert.deepEqual(w.calls.provision[0], { execute: true, out: w.out, release: path.join(w.out, 'release.json') });
+  assert.deepEqual(w.calls.provision[0], { execute: true, out: w.out, releaseFile: path.join(w.out, 'release.json') });
   assert.deepEqual(w.calls.converge[0], { since: new Date(deploy.at - 60_000).toISOString(), timeoutSeconds: 900 });
   assert.deepEqual(w.calls.verify[0], { retrySeconds: 240 });
   assert.deepEqual(w.calls.prune[0], { keepFiles: [path.join(w.out, 'release.json'), path.join(w.out, 'previous', 'release.json')], execute: true });

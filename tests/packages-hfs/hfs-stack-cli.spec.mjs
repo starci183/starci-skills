@@ -136,3 +136,8 @@ test('the default importer loads the action modules next to the dispatcher', asy
   assert.equal(code, EXIT.refused);
   assert.match(err.join(''), /STACK_JOBS_UNDECLARED/u);
 });
+
+test('rollback without --release targets the previous pointer and prune without --keep passes none', async () => {
+  assert.equal((await run(['rollback'])).seen[0].options.release, null);
+  assert.deepEqual((await run(['prune'])).seen[0].options.keepFiles, []);
+});
