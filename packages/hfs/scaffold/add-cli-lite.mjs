@@ -109,9 +109,14 @@ function enableLiteCliDatabase(root) {
     text = text.replace(anchor, `${anchor}\nimport { MigrationRunnerService } from "./migration-runner.service"`);
   }
   if (!text.includes('import { SeedRunnerService } from "./seed-runner.service"')) {
-    const anchor = 'import { PRIMARY_ENTITY_MANAGER } from "./primary.decorators"';
-    if (!text.includes(anchor)) throw new ScaffoldError("HFS_ADD_CLI_DATABASE", `${relative} has an unknown import shape`);
+    // The import of the entity-manager token, with or without the probe token beside it.
+    const anchor = /^import \{[^}]*\bPRIMARY_ENTITY_MANAGER\b[^}]*\} from "\.\/primary\.decorators"$/m.exec(text)?.[0];
+    if (!anchor) throw new ScaffoldError("HFS_ADD_CLI_DATABASE", `${relative} has an unknown import shape`);
     text = text.replace(anchor, `${anchor}\nimport { SeedRunnerService } from "./seed-runner.service"`);
+  }
+  const probeProviders = "providers: [...(base.providers ?? []), ...managers, ...probes]";
+  if (text.includes(probeProviders)) {
+    text = text.replace(probeProviders, "providers: [...(base.providers ?? []), ...managers, ...probes, MigrationRunnerService, SeedRunnerService]");
   }
   const providers = "providers: [...(base.providers ?? []), ...managers]";
   if (text.includes(providers)) {

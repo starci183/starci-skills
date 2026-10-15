@@ -147,7 +147,7 @@ test("addTable accepts kebab, snake-case, plural, and reserved names and every a
       /NotFound = "[A-Z0-9_]+_NOT_FOUND"/,
     );
     assert.match(read(root, "be/src/modules/platform/database/index.ts"), /export \{ requireOwnedRow, sql \}/);
-    assert.match(read(root, "be/src/modules/platform/database/index.ts"), /export \{ InjectPrimaryEntityManager, PRIMARY_ENTITY_MANAGER \}/);
+    assert.match(read(root, "be/src/modules/platform/database/index.ts"), /export \{[^}]*\bInjectPrimaryEntityManager, PRIMARY_ENTITY_MANAGER\b[^}]*\} from "\.\/primary\.decorators"/);
     assert.deepEqual(
       await checkDatabase({
         repoRoot: root,

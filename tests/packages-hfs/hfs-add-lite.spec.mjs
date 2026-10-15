@@ -237,7 +237,7 @@ test("add table --fe writes one policy-complete migration, the GraphQL api featu
   assert.match(read(root, "be/src/modules/platform/errors/index.ts"), /export \{ ERRORS_SERVICE \}/);
   assert.match(read(root, "be/src/modules/platform/i18n/index.ts"), /REQUEST_LOCALE/);
   assert.match(read(root, "be/src/modules/platform/database/index.ts"), /export \{ requireOwnedRow, sql \}/);
-  assert.match(read(root, "be/src/modules/platform/database/index.ts"), /export \{ InjectPrimaryEntityManager, PRIMARY_ENTITY_MANAGER \}/);
+  assert.match(read(root, "be/src/modules/platform/database/index.ts"), /export \{[^}]*\bInjectPrimaryEntityManager, PRIMARY_ENTITY_MANAGER\b[^}]*\} from "\.\/primary\.decorators"/);
   for (const file of result.created.filter((entry) => entry.endsWith(".ts"))) {
     assert.equal(parses(read(root, file)), true, `${file} parses`);
   }

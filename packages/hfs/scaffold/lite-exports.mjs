@@ -32,7 +32,8 @@ const REGISTRATIONS = Object.freeze({
     {
       file: "be/src/modules/platform/database/index.ts",
       source: "./primary.decorators",
-      names: ["InjectPrimaryEntityManager"],
+      // PRIMARY_ENTITY_MANAGER: the token a generated table service's unit spec provides its EntityManager double under.
+      names: ["InjectPrimaryEntityManager", "PRIMARY_ENTITY_MANAGER"],
     },
   ],
   webhook: [
