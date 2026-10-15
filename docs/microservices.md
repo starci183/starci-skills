@@ -96,6 +96,24 @@ export const CONSUMES = { order: { "order.placed": 1 } } as const
 snapshot does not declare, a version mismatch and an event that `compensates` an event no contract declares. A breaking change bumps the `version`; every consumer that has not
 followed fails the check.
 
+## Pinned event compatibility
+
+<a id="r177"></a>R177 `BE_CONTRACT_BREAKING` compares each service's `be/contracts/<service>/events.json`
+with its published `events.pin.json` in lite and full. Keep every pinned event, stream, version, payload field,
+type and optionality. Add optional fields or a new `<event>.v2` key beside the old event; removing a field or
+adding a required one breaks consumers already using the published contract. Pins are service-owned release snapshots.
+
+## Declared feature kinds
+
+<a id="r179"></a>R179 `BE_KIND_DECLARATION` requires `hfs.json` `sides.be.kinds` to equal the kinds
+present under `be/src/features/` in lite and full. Each used kind also declares its required patterns and tracks
+their platform capabilities. `starci app add` creates the first member and registers those dependencies; unused
+kind declarations, undeclared used kinds, missing patterns and missing capabilities fail the check.
+
+<a id="r180"></a>R180 `BE_KIND_EMPTY` requires a kind folder to contain instance folders with TypeScript
+source. A file directly under `be/src/features/<kind>/`, including `.gitkeep`, or a member containing only a
+README fails in either edition. Keep populated members such as `jobs/send/transport/queue/send.processor.ts`.
+
 ## Messages, idempotency, retries
 
 Asynchronous messages travel on the Kafka topics of `platform/event-bus`; the topic of an event is the events topic of its service. A
@@ -107,6 +125,12 @@ after an exponential backoff; a message that runs out of attempts stays in the d
 command reads it.
 
 ## Sagas and compensation
+
+<a id="r169"></a>R169 `BE_SAGA_STEP_COMPENSATION` requires matching steps and compensations and an orchestrator importing every pair in both editions.
+
+<a id="r170"></a>R170 `BE_SAGA_STATE_VERSIONED` requires an exported state type with `status` and a numeric `version`, and an orchestrator using the fenced `platform/saga` store in both editions.
+
+<a id="r171"></a>R171 `BE_SAGA_EVENT_CONTRACT` requires literal step and compensation events in vendored contracts, with the compensation declaring the forward event it undoes in both editions.
 
 <a id="r173"></a>
 
@@ -137,6 +161,38 @@ lane (R284). In the example, `order.placed` starts the billing service's
 invoice; when the invoice is above the limit `billing.invoice-rejected` (which compensates `order.placed`) makes the order service
 cancel the order and release its stock, and `billing.invoice-issued` completes the run. The e2e spec
 `order/invoice-rejected` also cuts the order database while the rejection is delivered and proves the compensation resumes on the retry.
+
+## Webhook and realtime doors
+
+<a id="r182"></a>
+
+`BE_WEBHOOK_SHAPE` (R182) keeps a provider's webhook HTTP file to one signed POST intake and an optional signed GET
+challenge. The POST performs proof and one domain intake without branching or returning domain data; it returns empty or
+the feature's declared literal `PROVIDER_ACK`. The GET echoes only its declared verifier result. Command dispatch belongs
+after the durable receipt commits, in a reactor or job.
+
+<a id="r183"></a>
+
+`BE_WEBHOOK_UNVERIFIED` (R183) requires the first handler statement to complete the shared signature proof or declared domain
+verifier, awaiting an async proof. An intake, a data read or argument evaluation that performs work before proof is refused.
+The same ordering applies to a GET subscription challenge.
+
+<a id="r184"></a>
+
+`BE_REALTIME_SHAPE` (R184) requires one socket gateway or one GraphQL subscription resolver in the matching file role, with
+only that protocol's subscription operations or authenticated server push streams. API queries, mutations and REST routes
+belong in API features. Lite serves the socket.io gateway in its API process; GraphQL subscriptions belong to full.
+
+<a id="r185"></a>
+
+`BE_REALTIME_WRITES` (R185) permits a realtime door to inject only the platform `RealtimeHub`. Domain services, buses,
+repositories and queues stay outside the door; reactors feed the hub after their own work commits.
+
+<a id="r186"></a>
+
+`BE_REALTIME_TOPIC_SCOPE` (R186) requires every hub subscription topic to use the handler's authenticated
+`@CurrentPrincipal()` parameter, or the platform `Principal` supplied to a server push stream. A constant or client-only topic
+does not establish the subscriber's ownership. These webhook and realtime boundaries apply in both editions.
 
 ## Specs
 
@@ -214,3 +270,26 @@ These backend rules apply to both lite and full.
 ### Owned background work
 
 `BE_BACKGROUND_UNOWNED` requires every sweep, retry or outbox to have a job or consumer composed by an app. Keep the work in its owning service or compose a worker app when it needs independent scaling.
+
+## Bounded contexts
+
+<a id="bounded-context-coverage"></a>
+
+Both lite and full identify a bounded context by its declared database connection.
+`BE_CONTEXT_OWNER` (R174) refuses app composition or imports of another app's context;
+CLI and migration apps compose every declared connection.
+`BE_CONTEXT_COUPLING` (R175) refuses cross-context capability imports, entity relations
+and migration foreign keys; connect contexts through events and store foreign IDs as plain columns.
+`BE_CONTEXT_TRANSACTION` (R176) keeps each transaction on one connection and refuses
+manager use or capability calls into another context; a saga coordinates their separate transactions.
+`BE_CONTEXT_PLATFORM_TABLES` (R178) requires a per-connection platform capability's
+entities and migrations on every connection whose manager its calls receive.
+
+## SQL returning rows
+
+<a id="r181"></a>
+
+In lite and full, `BE_SQL_RETURNING_SHAPE` refuses a bare `UPDATE ... RETURNING` or `DELETE ... RETURNING` in a capability's
+persistence SQL constant: `EntityManager.query` returns `[rows, affectedCount]` for those statements. Wrap the write in
+`WITH changed AS (UPDATE ... RETURNING ...) SELECT ... FROM changed` to return rows instead. The same wrapper applies to a
+deleting CTE; `INSERT ... RETURNING` and writes without `RETURNING` remain valid.
