@@ -457,3 +457,23 @@ the cited-path scan over live prose; then every retained self-check of
 `modules/kernel/allowlist.yaml` (`starci/allowlist@1`): every exception a check keeps is a named,
 shrink-only section of it, and `scripts/checks/check-one-allowlist.mjs` refuses a second one
 (`RT_ALLOWLIST_SPRAWL`).
+
+<a id="r36"></a>
+## SQL statements and query builders (R36)
+
+`BE_SQL_OUTSIDE_PERSISTENCE` keeps raw SQL in the owning capability's
+`persistence/<name>.sql.ts`. Export a statement built with the platform database
+`sql` tag and pass its branded `SqlText` to database `.query()` calls. Building SQL
+in a handler, passing an ordinary string to `.query()`, and using
+`createQueryBuilder()` violate this boundary in lite and full. Migration files
+may pass their schema-changing SQL directly to the migration runner.
+
+<a id="r37"></a>
+## Plain contracts across boundaries (R37)
+
+`BE_ENTITY_IN_CONTRACT` rejects ORM entities in contracts, messages, transport
+signatures, and handler `execute` signatures in lite and full. Return plain
+projections and pass identifiers across these boundaries. An entity remains a
+persistence declaration; GraphQL decorators and validation imports belong to
+transport DTOs. A plain interface whose name ends in `Entity` is still judged by
+its declaration rather than its name.

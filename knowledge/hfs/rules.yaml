@@ -262,9 +262,18 @@ rules:
       - {kind: eslint-fe, id: dead-exports}
   - id: R26
     code: "BE_TIER_DIRECTION"
+    editions: [lite, full]
+    docs: [docs/a16-r26-r28.md#r26]
+    proves:
+      - {path: packages/eslint/be/legacy-owner-graph.a16.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/eslint/be/legacy-owner-graph.a16.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: packages/eslint/be/legacy-owner-graph.a16.spec.mjs, editions: [lite, full]}
+    templateNa: "Tier and package direction are constraints on cross-owner import graphs; no dedicated cross-owner graph scaffold is generated."
     law: "The tier direction matrix; a shared package never imports an app. Front-end page and layout owners may import overlay entries; every other cross-owner feature-to-feature edge is forbidden, including layout-to-page and overlay-to-overlay. Components never import overlays."
     kinds: [lint, design]
-    gates: [pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["BE_TIER_DIRECTION", "FE_TIER_DIRECTION", "ARCH_PACKAGE_IMPORTS_APP"]
     enforcers:
       - {kind: eslint-be, id: tier-direction}
@@ -273,9 +282,19 @@ rules:
       - {kind: eslint-fe, id: package-imports-app}
   - id: R27
     code: "ARCH_OWNER_CYCLE"
+    editions: [lite, full]
+    docs: [docs/a16-r26-r28.md#r27]
+    proves:
+      - {path: packages/eslint/be/legacy-owner-graph.a16.spec.mjs, editions: [lite, full]}
+      - {path: tests/hfs-runtime-rules/legacy-owner-cycle.a16.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/eslint/be/legacy-owner-graph.a16.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: packages/eslint/be/legacy-owner-graph.a16.spec.mjs, editions: [lite, full]}
+    templateNa: "Owner cycles concern relations between separately generated owners, including the runtime; no cyclic or acyclic graph scaffold is generated."
     law: "No owner cycles, type-only included."
     kinds: [lint, design]
-    gates: [pre-push, settle, land, ci, runtime]
+    gates: [settle, land, ci, runtime]
     failureCodes: ["ARCH_OWNER_CYCLE"]
     enforcers:
       - {kind: eslint-be, id: owner-cycle}
@@ -283,6 +302,15 @@ rules:
       - {kind: runtime, id: runtime-cycles, at: scripts/hfs/runtime-rules/tier-direction.mjs}
   - id: R28
     code: "BE_FEATURE_IMPORTS_FEATURE"
+    editions: [lite, full]
+    docs: [docs/a16-r26-r28.md#r28]
+    proves:
+      - {path: packages/eslint/be/legacy-owner-graph.a16.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/eslint/be/legacy-owner-graph.a16.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: packages/eslint/be/legacy-owner-graph.a16.spec.mjs, editions: [lite, full]}
+    templateNa: "Feature isolation constrains imports between separately scaffolded features; no cross-feature dependency graph is generated."
     law: "A feature never imports a feature."
     kinds: [lint, design]
     gates: [settle, land, ci]
@@ -292,6 +320,16 @@ rules:
   - id: R29
     code: "BE_FEATURE_SHAPE"
     law: "Feature root is `index.ts`, module, `application/`, `transport/<protocol>/`; `application/` never imports `transport/` or a protocol framework."
+    editions: [lite, full]
+    docs: [docs/a16-r29-r31.md#r29-feature-shape]
+    proves:
+      - {path: tests/hfs-proofs/a16-r29-r31.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/patterns/api/feature.module.ts.tpl, editions: [lite, full]}
+      - {path: tests/hfs-proofs/a16-r29-r31.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-proofs/a16-r29-r31.spec.mjs, edition: lite}
+      - {path: tests/hfs-proofs/a16-r29-r31.spec.mjs, edition: full}
     kinds: [check, codemod, design, lint]
     gates: [settle, land, ci]
     failureCodes: ["BE_FEATURE_SHAPE", "BE_FEATURE_LAYOUT_INVALID", "BE_APPLICATION_IMPORTS_TRANSPORT", "BE_APPLICATION_TRANSPORT_FRAMEWORK"]
@@ -303,7 +341,7 @@ rules:
     code: "BE_PUBLIC_SURFACE"
     law: "Every owner has one `index.ts`; cross-owner imports use it, same-owner imports are relative and never go through it; it holds only named `export { }` lines, no `export *`, no alias re-export (`export { X as Y }`, `export const Y = X`, `export type Y = X`, `export interface Y extends X {}`: one declaration has one name), within the owner slot's `indexExports` budget (60 for domain and feature owners, 80 for `be.integrations` provider entries); cross-package imports use the package name and a declared export."
     kinds: [lint, codemod]
-    gates: [pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["BE_PUBLIC_SURFACE", "ARCH_OWNER_EXPORT_BYPASS", "ARCH_OWNER_EXPORT_STAR", "HFS_ALIAS_REEXPORT", "ARCH_PACKAGE_EXPORT_BYPASS"]
     enforcers:
       - {kind: eslint-be, id: import-owner-entry}
@@ -316,6 +354,16 @@ rules:
       - {kind: eslint-be, id: no-self-module-alias}
       - {kind: eslint-be, id: package-export-bypass}
       - {kind: eslint-fe, id: package-export-bypass}
+    editions: [lite, full]
+    docs: [docs/a16-r30.md#r30-public-owner-surface]
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton-lite/src/modules/domain/identity/index.ts, edition: lite}
+      - {path: packages/hfs/templates/be/skeleton/src/modules/domain/identity/index.ts, edition: full}
+      - {path: packages/eslint/be/a16-r30-public-surface.spec.mjs, editions: [lite, full]}
+    proves:
+      - {path: packages/eslint/be/a16-r30-public-surface.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: packages/eslint/be/a16-r30-public-surface.spec.mjs, editions: [lite, full], codes: [BE_PUBLIC_SURFACE, ARCH_OWNER_EXPORT_BYPASS, ARCH_OWNER_EXPORT_STAR, HFS_ALIAS_REEXPORT, ARCH_PACKAGE_EXPORT_BYPASS]}
   - id: R31
     code: "BE_FEATURE_NOT_COMPOSED"
     law: "Every feature, transport module and capability module is composed by an app."
@@ -332,6 +380,16 @@ rules:
     failureCodes: ["BE_APP_COMPOSITION_ONLY", "BE_APP_BUSINESS_ROLE"]
     enforcers:
       - {kind: eslint-be, id: app-composition-only}
+    editions: [lite, full]
+    docs: [docs/a16-r32-r35.md#r32-app-composition-only]
+    proves:
+      - {path: packages/eslint/be/a16-r32-r33-r35-project-graph.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton-lite/apps/api/src/app.module.ts, edition: lite}
+      - {path: packages/hfs/templates/be/skeleton/apps/__app__/src/app.module.ts, edition: full}
+      - {path: packages/eslint/be/a16-r32-r33-r35-project-graph.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: packages/eslint/be/a16-r32-r33-r35-project-graph.spec.mjs, editions: [lite, full], codes: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE]}
   - id: R33
     code: "BE_ENTRYPOINT_ONLY_IN_APPS"
     law: "Entrypoints only in `be/apps/*/src`."
@@ -340,14 +398,34 @@ rules:
     failureCodes: ["BE_ENTRYPOINT_ONLY_IN_APPS"]
     enforcers:
       - {kind: eslint-be, id: entrypoint-only-in-apps}
+    editions: [lite, full]
+    docs: [docs/a16-r32-r35.md#r33-entrypoint-ownership]
+    proves:
+      - {path: packages/eslint/be/a16-r32-r33-r35-project-graph.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton-lite/apps/api/src/main.ts, edition: lite}
+      - {path: packages/hfs/templates/be/skeleton/apps/__app__/src/main.ts, edition: full}
+      - {path: packages/eslint/be/a16-r32-r33-r35-project-graph.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: packages/eslint/be/a16-r32-r33-r35-project-graph.spec.mjs, editions: [lite, full], codes: [BE_ENTRYPOINT_ONLY_IN_APPS]}
   - id: R34
     code: "BE_SCHEMA_AUTHORITY"
     law: "Migrations own the application schema and run only through cli migrate or TestWorld; `synchronize` is `false`. TestWorld infrastructure may provision generated write-fault triggers and functions only in its verified private connection, preserving production constraints and existing triggers, holding its operation lock through catalog-confirmed cleanup."
     kinds: [lint, codemod, design]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_SCHEMA_AUTHORITY"]
     enforcers:
       - {kind: eslint-be, id: no-runtime-schema}
+    editions: [lite, full]
+    docs: [docs/a16-r32-r35.md#r34-schema-authority]
+    proves:
+      - {path: packages/eslint/be/a16-r34-schema-authority.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton-lite/src/modules/platform/database/database.module.ts, edition: lite}
+      - {path: packages/hfs/templates/be/skeleton/src/modules/platform/database/database.module.ts, edition: full}
+      - {path: packages/eslint/be/a16-r34-schema-authority.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: packages/eslint/be/a16-r34-schema-authority.spec.mjs, editions: [lite, full], codes: [BE_SCHEMA_AUTHORITY]}
   - id: R35
     code: "BE_SCHEMA_OWNER"
     law: "Entities and migrations live in the owning capability's `persistence/`; its `<c>Entities` and `<c>Migrations` are registered under exactly one declared connection, which every `Inject<Conn>EntityManager` of the capability names (no `CONNECTION` alias); only a platform capability the manifest lists as `perConnection` (the event-bus outbox, the job table) registers on several."
@@ -356,6 +434,16 @@ rules:
     failureCodes: ["BE_SCHEMA_OWNER"]
     enforcers:
       - {kind: eslint-be, id: schema-owner}
+    editions: [lite, full]
+    docs: [docs/a16-r32-r35.md#r35-schema-ownership]
+    proves:
+      - {path: packages/eslint/be/a16-r32-r33-r35-project-graph.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton/src/modules/domain/note/persistence/connection.ts, edition: full}
+      - {path: packages/eslint/be/a16-r32-r33-r35-project-graph.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: packages/eslint/be/a16-r32-r33-r35-project-graph.spec.mjs, editions: [lite, full], codes: [BE_SCHEMA_OWNER]}
+    templateNa: "The lite database scaffold contains no TypeORM entities or migrations; its optional capability persistence surface is supplied by application owners rather than scaffolded."
   - id: R36
     code: "BE_SQL_OUTSIDE_PERSISTENCE"
     law: "Raw SQL is `sql`-tagged `SqlText` in `persistence/<name>.sql.ts` of the owning capability; `.query()` takes only `SqlText`; no QueryBuilder."
@@ -365,6 +453,26 @@ rules:
     enforcers:
       - {kind: eslint-be, id: sql-text-only}
       - {kind: eslint-be, id: no-query-builder}
+    editions: [lite, full]
+    docs: ["docs/architecture.md#r36"]
+    proves:
+      - path: packages/eslint/be/r36-sql-boundary.spec.mjs
+        editions: [lite, full]
+        codes: ["BE_SQL_OUTSIDE_PERSISTENCE"]
+    exemplifiedBy:
+      - path: packages/hfs/templates/be/table/sql.ts.tpl
+        editions: [lite, full]
+      - path: packages/eslint/be/r36-sql-boundary.spec.mjs
+        editions: [lite, full]
+        codes: ["BE_SQL_OUTSIDE_PERSISTENCE"]
+    witness:
+      - path: packages/eslint/be/r36-sql-boundary.spec.mjs
+        edition: lite
+        codes: ["BE_SQL_OUTSIDE_PERSISTENCE"]
+      - path: packages/eslint/be/r36-sql-boundary.spec.mjs
+        edition: full
+        codes: ["BE_SQL_OUTSIDE_PERSISTENCE"]
+
   - id: R37
     code: "BE_ENTITY_IN_CONTRACT"
     law: "No ORM entity in a contract or transport type."
@@ -373,8 +481,41 @@ rules:
     failureCodes: ["BE_ENTITY_IN_CONTRACT"]
     enforcers:
       - {kind: eslint-be, id: no-entity-in-contract}
+    editions: [lite, full]
+    docs: ["docs/architecture.md#r37"]
+    proves:
+      - path: packages/eslint/be/r37-contract-entities.spec.mjs
+        editions: [lite, full]
+        codes: ["BE_ENTITY_IN_CONTRACT"]
+    exemplifiedBy:
+      - path: packages/hfs/templates/be/skeleton-lite/src/modules/domain/identity/identity.contracts.ts
+        editions: [lite]
+      - path: packages/hfs/templates/be/skeleton/src/modules/domain/identity/identity.contracts.ts
+        editions: [full]
+      - path: packages/eslint/be/r37-contract-entities.spec.mjs
+        editions: [lite, full]
+        codes: ["BE_ENTITY_IN_CONTRACT"]
+    witness:
+      - path: packages/eslint/be/r37-contract-entities.spec.mjs
+        edition: lite
+        codes: ["BE_ENTITY_IN_CONTRACT"]
+      - path: packages/eslint/be/r37-contract-entities.spec.mjs
+        edition: full
+        codes: ["BE_ENTITY_IN_CONTRACT"]
+
   - id: R38
     code: "BE_ERROR_HOME"
+    editions: [lite, full]
+    docs: [docs/a16-r38-r39.md#r38-error-ownership]
+    proves:
+      - {path: packages/eslint/be/a16-error-home.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton-lite/src/modules/integrations/supabase/errors/supabase.error.ts, edition: lite}
+      - {path: packages/hfs/templates/be/skeleton/src/modules/domain/identity/errors/identity.error.ts, edition: full}
+      - {path: packages/eslint/be/a16-error-home.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: packages/eslint/be/a16-error-home.spec.mjs, edition: lite, codes: [BE_ERROR_HOME]}
+      - {path: packages/eslint/be/a16-error-home.spec.mjs, edition: full, codes: [BE_ERROR_HOME]}
     law: "Errors live in the owning capability's `errors/` and extend `DomainError`."
     kinds: [lint, codemod]
     gates: [settle, land, ci]
@@ -386,6 +527,17 @@ rules:
       - {kind: eslint-be, id: error-code-unique}
   - id: R39
     code: "BE_ERROR_MASKED"
+    editions: [lite, full]
+    docs: [docs/a16-r38-r39.md#r39-error-masking]
+    proves:
+      - {path: packages/eslint/be/a16-error-masked.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton-lite/apps/api/src/app.module.ts, edition: lite}
+      - {path: packages/hfs/templates/be/skeleton/apps/__app__/src/app.module.ts, edition: full}
+      - {path: packages/eslint/be/a16-error-masked.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: packages/eslint/be/a16-error-masked.spec.mjs, edition: lite, codes: [BE_ERROR_MASKED]}
+      - {path: packages/eslint/be/a16-error-masked.spec.mjs, edition: full, codes: [BE_ERROR_MASKED]}
     law: "One filter per app; undeclared errors are masked."
     kinds: [lint, codemod]
     gates: [land, ci]
