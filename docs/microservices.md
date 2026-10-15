@@ -143,3 +143,24 @@ Supabase CLI stack; it has no e2e world.
 `order.placed`, records an invoice, announces a rejection) and `migrate`; the order service also consumes `billing.invoice-rejected`, the compensating
 step of its saga. Its e2e specs `billing/order-placed` and `order/invoice-rejected` prove the asynchronous path, the redelivery and
 the compensation on the real stack; `integration/messaging` proves the queue adapter against Redis.
+
+## Backend implementation safety
+
+These backend rules apply to both lite and full.
+
+- <a id="r68"></a>R68 `BE_SQL_INTERPOLATED`: SQL values use numbered parameters. SQL text is never built from runtime values by interpolation or concatenation; the `sql` tag permits only checked `SqlIdent` substitutions for identifiers.
+- <a id="r69"></a>R69 `BE_QUERY_UNBOUNDED`: reads that can return many rows state a visible bound or use cursor pagination. EntityManager list reads supply `take`; replace unbounded `findBy` and `findAndCountBy` calls with bounded options.
+- <a id="r70"></a>R70 `BE_HTTP_TIMEOUT`: outbound fetch calls supply an abort signal, and axios or HttpService request configuration states a timeout or signal. An axios client created with `axios.create` also declares its deadline.
+- <a id="r71"></a>R71 `BE_LOG_SECRET`: Logger arguments exclude `Secret` and `Pii` values and raw credential or personal identifier fields. Log an id, count or masked value. Constructed errors also exclude secret values and credential text.
+- <a id="r72"></a>R72 `BE_TYPE_ESCAPE`: use typed call signatures and ordinary callbacks instead of the global `Function` type, `eval` or the `Function` constructor. The managed TypeScript rules also reject explicit `any`, non-null assertions and type assertions other than `as const`, including in specs.
+- <a id="r73"></a>R73 `BE_ASYNC_NO_AWAIT`: an async implementation awaits work; otherwise remove `async`. The enforcer retains the declared Promise contract exemptions for framework lifecycle and interface methods.
+- <a id="r74"></a>R74 `BE_MIGRATION_REVERSIBLE`: a TypeORM migration with `up()` declares a meaningful `down()` that reverses the change. An absent or empty body, or a body that only throws, does not provide a reversal.
+- <a id="r75"></a>R75 `BE_RETURN_TYPE`: handlers and public methods of Injectable, Resolver and Controller classes declare their return type. Keep the result contract visible at the method boundary.
+- <a id="r76"></a>R76 `BE_JSON_PARSE_UNGUARDED`: put `JSON.parse` inside a try block in the same function and return a typed failure outcome when parsing fails. A surrounding function, catch block or finally block does not guard a parse in its own right.
+- <a id="r77"></a>R77 `BE_QUERY_IN_LOOP`: batch shared EntityManager reads before iterating, using the collected keys. Do not repeat a database read for each element of a loop or collection callback.
+- <a id="r78"></a>R78 `BE_USER_COPY_LITERAL`: exception messages, notification text and response copy come from the capability messages catalog through the typed `MessageCatalog` port. Select a catalog entry instead of embedding user-facing text in source.
+- <a id="r79"></a>R79 `BE_AMBIENT_CLOCK`: read time through the injected `Clock` port and use `FakeClock` in specs. Ambient `Date.now`, bare `new Date()`, `performance.now`, `process.hrtime` and `Temporal.Now` belong only in the platform clock implementation.
+- <a id="r80"></a>R80 `BE_INBOX_DEDUPE_MISSING`: a delivery service claims the stable event id through the shared Inbox before other awaited work and returns early on a false claim. A receipt transaction claims first, records the receipt and writes its typed outbox event; processing and command dispatch follow commit.
+- <a id="r81"></a>R81 `BE_HAND_ROLLED_RETRY`: use the shared platform retry helper for an operation that catches a failure, waits and tries again. Keep application loops free of handwritten retry scheduling.
+- <a id="r82"></a>R82 `BE_TRANSACTION_EXTERNAL_CALL`: a transaction contains database work and same-transaction outbox publication. Commit before making external HTTP or other network calls, or record an outbox message for later delivery.
+- <a id="r83"></a>R83 `BE_UNNAMED_DATA_ACCESS`: inject a declared connection through its named EntityManager injector and call that manager directly. Repository injection or wrapper classes, eager relations, unnamed entity tables and use of the outer manager inside a transaction are rejected. Keep DataSource and QueryRunner ownership within the permitted platform database, CLI and test-world surfaces.
