@@ -237,10 +237,11 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
     'HFS_MONO_NEST_PROJECTS',
     'BE_TEST_TOPOLOGY',
   ]);
-  // The cli app is added by the upgrade, so its typed environment (R289 BE_APP_ENV_REQUIRED) is one more addition, but only under be/apps/cli.
-  const cliUpgradeGaps = new Set(['BE_APP_ENV_REQUIRED']);
+  // The upgrade writes the typed environment of the cli app it adds (R289 BE_APP_ENV_REQUIRED): that finding is an upgrade gap only for a file
+  // the dry plan above adds, so an upgrade that stopped writing cli.env.ts would leave it unexpected and fail here.
+  const plannedAdds = new Set([...String(plan.stdout).matchAll(/^add (\S+?):/gm)].map(match => match[1]));
   const isUpgradeGap = finding => upgradeGapCodes.has(finding.code)
-    || (cliUpgradeGaps.has(finding.code) && /^be\/apps\/cli\//.test(String(finding.path ?? '').replaceAll(path.win32.sep, '/')));
+    || (finding.code === 'BE_APP_ENV_REQUIRED' && plannedAdds.has(String(finding.path ?? '').replaceAll(path.win32.sep, '/')));
   const unexpectedCodes = [...new Set(report.findings.filter(finding => !isUpgradeGap(finding)).map(finding => finding.code))].sort((a, b) => a.localeCompare(b));
   assert.deepEqual(unexpectedCodes, [], `full-edition view reported non-upgrade findings: ${unexpectedCodes.join(', ')}`);
   const productFinding = report.findings.find((finding) =>
