@@ -339,6 +339,7 @@ rules:
         - BE_UNNAMED_DATA_ACCESS
         - BE_TRANSACTION_EXTERNAL_CALL
         - BE_CQRS_SHAPE
+        - BE_READONLY_BOUNDARY
       manual:
         - Run a refusal-after-write case against a real database and assert the rollback.
     relatedExamples: []
@@ -480,4 +481,164 @@ rules:
         - BE_CONTRACT_BREAKING
       manual:
         - Copy events.json over events.pin.json only when the new contract is published.
+    relatedExamples: []
+  - id: BE-PERSISTENCE-17
+    title: Supabase product data is reached through the back end
+    kind: mandatory
+    hfsRules: [R217, R254]
+    requirement: |-
+      In every edition that uses Supabase, the front end uses Supabase for Auth and reaches product data through the back
+      end. On exposed schemas, authenticated receives no table or sequence privileges and no data policies. Anonymous
+      access is limited to SELECT on a table with a matching policy named `*_public_read`. An intentional direct-access
+      table is listed explicitly in `hfs.json` `supabase.directAccess`; only a listed table may join `supabase_realtime`.
+      Default privileges never reopen browser data access. The back end reads and writes through the shared EntityManager,
+      using its application role, rather than a Supabase data client.
+    rationale: |-
+      A browser can call the data API with its public key and user token even when application code never imports that API.
+      Closing database grants and policies preserves the same back-end authorization boundary.
+    cases:
+      - id: case-1
+        when: A new product table is created
+        write: 'Grant its required operations only to app_be, keep browser grants and policies closed, and serve the data through a back-end operation.'
+      - id: case-2
+        when: A table deliberately supports a public read
+        write: 'Use an anonymous SELECT grant beside a policy named <table>_public_read; document any broader intentional access in supabase.directAccess.'
+    verification:
+      automated:
+        - FE_SUPABASE_CLIENT_OWNER
+        - BE_SUPABASE_CLIENT_OWNER
+        - FE_SERVICE_ROLE_FORBIDDEN
+        - DB_BE_ONLY_ACCESS
+        - DB_REALTIME_UNLISTED
+      manual:
+        - Review the final grants, policies and publication membership after all active migrations have run.
+    relatedExamples: []
+  - id: BE-PERSISTENCE-18
+    title: The application database role has explicit privileges and forced RLS
+    kind: mandatory
+    hfsRules: [R214, R255]
+    requirement: |-
+      The back-end connection uses the role declared by `hfs.json` `supabase.appRole`, `app_be` by default. Its declaration
+      uses LOGIN, NOINHERIT and NOBYPASSRLS and grants no SUPERUSER, CREATEDB, CREATEROLE, REPLICATION or other administrative
+      privilege. Grant only the named operations and objects it needs, never ALL privileges on schemas or tables. Tables
+      owned by the application role enable and force row level security by default. An exception to forced RLS names its
+      table and a nonempty reason in `supabase.forceRlsExemptions`; it does not remove the table's ordinary RLS obligation.
+    rationale: |-
+      A privileged connection or a table owner's RLS bypass makes declared policies ineffective. Explicit role attributes
+      and grants make the connection's authority reviewable.
+    cases:
+      - id: case-1
+        when: Declaring the default application role
+        write: 'CREATE ROLE app_be LOGIN NOINHERIT NOBYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION; provision its password through sealed secret custody, outside migration SQL.'
+      - id: case-2
+        when: The application role owns a table
+        write: 'Enable and FORCE ROW LEVEL SECURITY on the table, then grant the individual operations that its owning service uses.'
+    verification:
+      automated:
+        - DB_RLS_REQUIRED
+        - DB_DYNAMIC_DDL
+        - DB_POLICY_SHAPE
+        - DB_APP_ROLE
+        - DB_FORCE_RLS_DEFAULT
+      manual:
+        - Confirm each deployed connection authenticates as its declared application role.
+    relatedExamples: []
+  - id: BE-PERSISTENCE-19
+    title: Policies, views, definers and storage preserve the principal boundary
+    kind: mandatory
+    hfsRules: [R214, R215, R256]
+    requirement: |-
+      A policy for a browser role proves a principal predicate through `auth.uid()`, `auth.jwt()`, request JWT claims or a
+      helper that reads them; constants, IS NOT NULL and self-equality do not prove ownership. The declared application
+      role's trusted policies and intentional `*_public_read` policies retain their separate access posture. An exposed
+      ordinary view uses `security_invoker = true`, or access ends revoked from anon and authenticated; an exposed
+      materialized view requires those revokes. Disabling RLS or moving a table into an exposed schema preserves R214's
+      RLS obligation. A SECURITY DEFINER declaration, including ALTER FUNCTION, keeps R215's pinned search_path and safe
+      SQL requirements; exposed functions end with EXECUTE revoked from public, anon and authenticated. A storage.objects
+      policy constrains `(storage.foldername(name))[1]` to the principal unless it explicitly selects a bucket ending `_public`.
+    rationale: |-
+      A view, definer function, schema move or broad storage policy can expose rows while the base table appears protected.
+      Each database door must preserve the same principal boundary.
+    cases:
+      - id: case-1
+        when: An explicitly listed direct-access table has a user policy
+        write: 'Use owner_id = auth.uid() as the ownership predicate, rather than owner_id IS NOT NULL or owner_id = owner_id.'
+      - id: case-2
+        when: Adding an exposed definer function
+        write: 'Pin its search_path, review its SQL under R215, and revoke EXECUTE from public, anon and authenticated after the declaration.'
+    verification:
+      automated:
+        - DB_RLS_REQUIRED
+        - DB_DYNAMIC_DDL
+        - DB_POLICY_SHAPE
+        - DB_DEFINER_SAFE
+        - DB_STORAGE_POLICY
+        - DB_POLICY_TAUTOLOGY
+        - DB_VIEW_UNSAFE
+        - DB_DEFINER_REVOKE
+        - DB_STORAGE_PREFIX
+      manual:
+        - Review every exposed view, function and storage policy together with its final grants.
+    relatedExamples: []
+  - id: BE-PERSISTENCE-20
+    title: A migration archive is immutable history with one explicit baseline
+    kind: mandatory
+    hfsRules: [R213, R257]
+    requirement: |-
+      An archived Supabase migration chain has exactly one active baseline whose header contains
+      `-- starci:baseline <archived-last-stamp>`. The baseline has a later valid stamp or an explicit restamp. Archived
+      migrations never change against repository history; an active migration moves into the archive byte-for-byte only
+      in the same diff that adds its replacement baseline. Do not add a new migration directly to the archive.
+      `starci app db baseline`, `starci app db restamp` and `starci app db plan` default to read-only operation; applying a
+      cutover requires explicit `--apply`. Review the plan and migration repair commands before an owner applies them.
+    rationale: |-
+      An archive without a replacement baseline lets a fresh database and the deployed migration ledger describe different
+      schemas. Immutable history and an explicit boundary make that cutover inspectable.
+    cases:
+      - id: case-1
+        when: Replacing an applied migration chain with a baseline
+        write: 'Prepare the baseline and unchanged archived chain together, inspect the database plan, and apply the reviewed cutover explicitly.'
+    verification:
+      automated:
+        - DB_MIGRATION_SHAPE
+        - DB_BASELINE_SHAPE
+        - DB_ARCHIVE_MUTATED
+      manual:
+        - Compare the baseline plan with the deployed migration ledger, queues and cron jobs before the owner applies it.
+    relatedExamples: []
+  - id: BE-PERSISTENCE-21
+    title: Supabase configuration and migrations keep data and secrets bounded
+    kind: mandatory
+    hfsRules: [R216, R259]
+    requirement: |-
+      Enable only extensions allowed by `ruleParams.db.extensions`. Migration SQL never writes vault secrets or sets role
+      passwords; provision credentials through sealed secret custody. API schemas come from `ruleParams.db.apiSchemas`,
+      never pgmq or pgmq_public. In lite, disable the data API or expose no schemas unless an exposed schema has an explicit
+      `*_public_read` SELECT policy. Enabled seed paths resolve to tracked SQL files. Anonymous sign-ins stay disabled
+      unless `hfs.json` `supabase.enableAnonymousSignIns` declares them, `edge_runtime.enabled` is false, enabled storage
+      declares a positive upload-size limit, and `db.major_version` equals the `ruleParams.db.majorVersion` pin. Other auth
+      settings match their Supabase declaration and credentials in config use environment references.
+      Destructive DDL belongs only to `*_contract_*` migrations, after back-end SQL and entities no longer reference its
+      targets. Seeds contain synthetic identities using the example.test email domain and no real email or phone literals.
+    rationale: |-
+      Configuration can reopen the data API or introduce execution and secret stores outside the declared application.
+      A separate contract migration and synthetic seeds keep schema removal and fixture data reviewable.
+    cases:
+      - id: case-1
+        when: Removing an obsolete column
+        write: 'Deploy code that stops using the column first; remove it in a later contract migration after SQL and entity references are gone.'
+      - id: case-2
+        when: Enabling local seed data
+        write: 'List existing tracked SQL seed files and use synthetic example.test identities; keep role passwords and vault writes outside those files and migrations.'
+    verification:
+      automated:
+        - DB_CONFIG_POLICY
+        - DB_TYPES_DRIFT
+        - DB_EXTENSION_ALLOWED
+        - DB_API_EXPOSED
+        - DB_MIGRATION_DESTRUCTIVE
+        - HFS_SEED_PII
+        - DB_VAULT_WRITE
+      manual:
+        - Confirm the deployed code no longer uses every destructive migration target and review configured API exposure.
     relatedExamples: []

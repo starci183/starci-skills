@@ -163,8 +163,8 @@ that publish, read effects and redeliver, including compensation events; R173
 Product back-end coverage has one derivation: `scripts/hfs/coverage-scope.mjs`
 reads the `coverage: required|none` fields and `ruleParams.be.logicRoles` of
 `knowledge/hfs/slots.yaml`. In both editions, only files with those logic-role
-suffixes inside required slots are measured, currently under
-`be/src/modules/{domain,platform,integrations,projections}/`, subject to declared
+suffixes inside required slots are measured: `be.domain`, `be.platform`,
+`be.integrations` and `be.projections`, subject to declared
 provider slots and excluded subtrees. Each measured file owes 100% lines,
 branches, functions and statements. The managed Jest thresholds, Sonar coverage
 exclusions and Codecov configuration render that same scope; it is not a

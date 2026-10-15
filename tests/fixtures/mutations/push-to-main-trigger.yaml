@@ -5,8 +5,8 @@ name: push-to-main-trigger
 edition: lite
 base: examples/lite-app
 mutate:
-  - op: add
-    path: .github/workflows/api-deploy.yml
+  - op: edit
+    path: .github/workflows/ci.yml
     content: |
       name: api-deploy
       on:
@@ -21,4 +21,3 @@ mutate:
             - run: echo deploying
 expect:
   - HFS_APP_WORKFLOW_TRIGGER
-pending: R251

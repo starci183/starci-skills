@@ -403,3 +403,22 @@ rules:
         - SCAN_SMELL
       manual: []
     relatedExamples: []
+  - id: FE-FUNCTION-9
+    title: Every function body stays within the absolute line budget
+    kind: mandatory
+    hfsRules: [R291]
+    requirement: |-
+      Every function, method and arrow body stays within ruleParams.functionLines, currently 80 physical lines,
+      including comments and blank lines, in lite and full. Split a larger body by responsibility; staying below a
+      former size does not waive this absolute budget.
+    rationale: |-
+      A bounded body keeps one responsibility readable and makes its inputs, effects and result reviewable together.
+    cases:
+      - id: case-1
+        when: A connected component or hook exceeds 80 lines
+        write: Extract responsibilities into the appropriate local helpers or owned hooks and keep each body within the budget.
+    verification:
+      automated:
+        - HFS_FUNCTION_BUDGET
+      manual: []
+    relatedExamples: []

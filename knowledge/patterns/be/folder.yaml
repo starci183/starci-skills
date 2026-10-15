@@ -23,7 +23,7 @@ rules:
   - id: BE-FOLDER-1
     title: Responsibility roots
     kind: mandatory
-    hfsRules: [R01, R02, R29, R89, R26, R145]
+    hfsRules: [R01, R02, R29, R89, R26, R145, R292]
     requirement: |-
       The back end of every app (`be/`) is a `be/apps/<app>/` monorepo even with one app (slots `be.app.api`,
       `be.app.worker`, `be.app.cli`; the cli app is named cli). Apps own process composition only.
@@ -35,7 +35,8 @@ rules:
       Nothing else exists at `be/src/` level, and no teaching, mock or sandbox code lives under `be/src/`. No folder named `types`,
       `constants`, `utils`, `helpers`, `shared`, `common`, `testing` or `exceptions` exists under `be/src/modules` or
       `be/src/features`: types live in `<name>.contracts.ts`, constants in the file that owns them, and a helper with no owner goes
-      to the platform capability that uses it. A feature above 250 source files is split by product capability. A module may
+      to the platform capability that uses it. A feature owner holds at most 250 tracked files, including nested files;
+      split a larger feature by product capability. A module may
       have one consumer.
     rationale: |-
       Ownership decides placement; repository topology and consumer count do not. A closed tier set keeps every capability
@@ -88,13 +89,14 @@ rules:
         - FE_TIER_DIRECTION
         - ARCH_PACKAGE_IMPORTS_APP
         - HFS_MONO_NEST_PROJECTS
+        - HFS_FEATURE_FILE_BUDGET
       manual:
         - Verify the actual owner and public API, not only folder names.
     relatedExamples: []
   - id: BE-FOLDER-2
     title: Features are grouped by trigger kind
     kind: mandatory
-    hfsRules: [R29, R87, R147, R149, R28, R179, R180]
+    hfsRules: [R29, R87, R147, R149, R28, R179, R180, R264]
     requirement: |-
       `be/src/features/` holds one folder per trigger kind and nothing else: `features/api/<feature>/` for a feature a
       request triggers (api.yaml, slot `be.feature`), `features/cli/` for the one-off actions an operator runs (cli.yaml,
@@ -108,6 +110,9 @@ rules:
       `<feature>-<protocol>.module.ts`, its resolvers, controllers or consumers, and `dto/` where the slot has one (the
       `be.transport.*` slots and each kind's own transport slots). A socket gateway or a subscription is the realtime
       kind and a provider webhook the webhooks kind.
+      A feature support policy, guard, client, filter, interceptor, projection or contracts role declares only data, types
+      and DTO metadata. It holds no decision, loop, computation or executable call; changing a suffix never grants a place
+      for business logic. That behavior belongs in a tested module capability.
     rationale: |-
       The trigger decides which app composes the code, so grouping by trigger keeps each app's composition one folder and
       makes a cross-kind import visible from the path alone.
@@ -134,6 +139,7 @@ rules:
         - BE_FEATURE_IMPORTS_FEATURE
         - BE_KIND_DECLARATION
         - BE_KIND_EMPTY
+        - HFS_FEATURE_LOGIC_ROLE
       manual: []
     relatedExamples: []
   - id: BE-FOLDER-3
@@ -163,6 +169,7 @@ rules:
         - BE_MODULE_SHAPE
         - BE_MODULE_HANDLER_REGISTRATION
         - BE_MODULE_PROVIDER_REREGISTRATION
+        - BE_APP_BOOT_PROOF_MISSING
       manual:
         - Boot the applicable app container and resolve real provider tokens.
     relatedExamples: []

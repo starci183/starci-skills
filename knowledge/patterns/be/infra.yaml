@@ -73,13 +73,16 @@ rules:
   - id: BE-INFRA-3
     title: An integration is one folder that only it may call
     kind: mandatory
-    hfsRules: [R26, R38, R85, R90]
+    hfsRules: [R26, R38, R85, R90, R279]
     requirement: |-
       An integration is `be/src/modules/integrations/<provider>/` with `index.ts`, `<provider>.config.ts`,
       `<provider>.decorators.ts` (the SDK client token and `Inject<Provider>`), `<provider>.client.ts` (the only file that
       calls the SDK or the `HttpClient` for that provider), `errors/` and optional `messages/`. An integration imports
       `platform` only and never the domain; the domain calls the integration's public API. Results are typed and a failure is
       the integration's `DomainError` or an `Outcome`.
+      The app's `package.json` dependencies determine third-party SDK ownership, rather than a finite list of vendor names.
+      A dependency outside the pure-library and framework allowlists is imported only by its one provider integration;
+      domain services consume that integration's public API. Existing raw-infrastructure owner restrictions still apply.
     rationale: |-
       A provider is replaceable only when one file speaks its protocol and nothing above it knows the SDK's types.
     cases:
@@ -94,6 +97,7 @@ rules:
         - BE_ERROR_HOME
         - BE_RAW_INJECT
         - BE_INFRA_OWNER
+        - BE_THIRD_PARTY_OWNER
       manual: []
     relatedExamples: []
   - id: BE-INFRA-4

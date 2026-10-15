@@ -22,14 +22,15 @@ rules:
   - id: FE-TOAST
     title: "Mutation outcomes go through modules/toast"
     kind: mandatory
-    hfsRules: [R58, R244]
+    hfsRules: [R58, R244, R286]
     requirement: |-
       modules/toast holds toast.tsx (the HeroUI toast wrapper), api.ts (pure helpers: showGraphQLToast(response,
       messages) on the success flag of a GraphQLResponse, showUnauthorizedToast, runGraphQLWithToast, runRestWithToast)
       and hooks.ts (useGraphQLWithToast, useRestWithToast, which inject the labels of the next-intl toast namespace).
       Every write a user starts runs through one of the hooks; the description is the response message or a catalog
       default, never an English literal in code. The HeroUI toast region is mounted once in components/providers.
-      sonner, react-toastify, react-hot-toast, notistack and alert() are refused.
+      Toast call titles and descriptions resolve their authored copy through next-intl. sonner, react-toastify,
+      react-hot-toast, notistack and browser alert calls are refused.
     rationale: |-
       One feedback path makes every success and failure visible in the same way and keeps copy in the catalog.
     cases:
@@ -48,6 +49,9 @@ rules:
       automated:
         - FE_I18N_LITERAL
         - FE_STACK_FORBIDDEN
+        - FE_COPY_IN_CALL
+        - FE_NO_ALERT
+        - FE_ICON_INLINE_SVG
       manual:
         - "Confirm a silent success (no toast) is intended for that write."
     relatedExamples: []

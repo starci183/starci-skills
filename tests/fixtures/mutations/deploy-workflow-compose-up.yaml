@@ -5,8 +5,8 @@ name: deploy-workflow-compose-up
 edition: lite
 base: examples/lite-app
 mutate:
-  - op: add
-    path: .github/workflows/web-deploy.yml
+  - op: edit
+    path: .github/workflows/ci.yml
     content: |
       name: web-deploy
       on:
@@ -19,4 +19,3 @@ mutate:
             - run: ssh vps 'cd ~/app && docker compose up -d'
 expect:
   - HFS_DEPLOY_COMPOSE_ON_VPS
-pending: R250

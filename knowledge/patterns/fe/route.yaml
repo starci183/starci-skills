@@ -24,14 +24,16 @@ rules:
   - id: FE-ROUTE
     title: "App Router, thin routes, and the front end serves no API"
     kind: mandatory
-    hfsRules: [R54, R243, R244]
+    hfsRules: [R54, R243, R244, R287]
     requirement: |-
       The front end is a Next App Router app (fe-stack framework). Route files mount one owner (FE-FOLDER-3). The front
       end serves no API: no file under fe/ carries a "use server" directive, and the only route handlers are
       app/health/live/route.ts and, when the auth flow truly needs a server code exchange, the fe.route.callback slot
       (prefer the client-side PKCE exchange in modules/auth). Reads and writes go through modules/api and the SWR hooks;
       a webhook, cron, public API or third-party callback is a back-end feature (REST under be/src/features/webhooks or
-      the public api). The pages router is not used.
+      the public api). The callback handler only reads the callback URL, obtains the auth client, exchanges the auth
+      code and redirects to the declared route. It holds no product data operation, business logic, additional request
+      handler or JSON response. The pages router is not used.
     rationale: |-
       A Server Action or a route handler is a second back end hidden inside the front end: it bypasses the GraphQL
       contract, the back-end authorization and the job pipeline, and it would differ between editions.
@@ -60,6 +62,7 @@ rules:
         - FE_SERVER_ACTION_FORBIDDEN
         - FE_ROUTE_HANDLER_FORBIDDEN
         - FE_STACK_FORBIDDEN
+        - FE_CALLBACK_SHAPE
       manual:
         - "Confirm a remaining fe.route.callback is needed because the provider requires a server code exchange."
     relatedExamples: []

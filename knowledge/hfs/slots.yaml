@@ -2216,6 +2216,8 @@ slots:
     tests: none
     why: the canonical GraphQL client output of codegen is local and never committed; this specific slot overrides the tracked API parent
     rules: [FE_WIRE_GENERATED]
+    exemplifiedBy:
+      - {path: tests/fixtures/hfs-generated-wire/fe/apps/web/src/modules/api/graphql/__generated__/graphql.ts, editions: [lite, full]}
   - id: fe.transport.client
     since: 3.1.0
     profiles: [fe]

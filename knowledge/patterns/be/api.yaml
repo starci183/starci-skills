@@ -249,7 +249,7 @@ rules:
   - id: BE-API-4
     title: An api app parses env separately and composes in area groups; its options hold values and port bindings only
     kind: mandatory
-    hfsRules: [R245, R246, R32, R45, R43]
+    hfsRules: [R245, R246, R32, R45, R43, R265, R289]
     requirement: |-
       An app's `src/` (slot `be.app.api`, and alike `be.app.worker` and `be.app.cli`) holds five app roles, each within the
       line budget its slot names (owner ruling 2026-10-14):
@@ -269,13 +269,17 @@ rules:
         listing `*Module` classes, module or queue registrations (`register`, `forRoot`, `registerQueue`) or scheduler entries,
         or an `imports`, `modules`, `schedulers` or `processors` list. The env file also refuses standalone module or queue
         registration calls (`BE_APP_OPTIONS_COMPOSITION`).
-      - `compose/<area>.ts` (120) is a composition group: it exports the module list of one area of the app (the platform, the
+      - `compose/<area>.ts` (120) is a composition group: it exports explicitly typed module, DynamicModule, Provider, queue or
+        scheduler lists and maps for one area of the app (the platform, the
         background mechanisms with their message and queue doors, a product area), as a function of the options when it needs
         them, and the providers of the area's global ports when it has any. It is composition only: no business logic, no
         environment read (no `parse<C>Config`, `process.env` or `EnvSource` reads), and its `X.register({ isGlobal: true, ...options.x })` calls
         count as the app root's registrations (R45).
-      - `app.module.ts` (250) imports the groups and spreads them into its `imports` (`...platformModules(options)`), registers
-        what is left, and binds the app-wide guards and filter.
+      - `app.module.ts` (250) imports the groups and spreads them into its `imports` (`...platformModules(options)`); its own
+        providers bind only the app-wide guards and filter. Module-list literals belong in the compose groups.
+      Resolved composition types establish these roles even when imports are aliased, a registration is saved to a constant,
+      or scheduler definitions use a typed constant array. `starci app add` writes and updates the generated feature's typed
+      area group. A compose group holds no business arrow, branch or other decision that belongs in a tested module.
       A file over its budget is `BE_APP_COMPOSITION_BUDGET`; the budget is absolute, so an app root that outgrows 250 lines
       moves an area into a new group, never into the env or options file. An entrypoint over 80 moves its parsing into the env file.
     rationale: |-
@@ -305,13 +309,16 @@ rules:
         - BE_MODULE_HANDLER_REGISTRATION
         - BE_MODULE_PROVIDER_REREGISTRATION
         - BE_CONFIG_OWNER
+        - BE_COMPOSITION_UNTYPED
+        - BE_APP_ENV_REQUIRED
+        - BE_APP_MODULE_LIST_INLINE
       manual:
         - Confirm each group is one area of the app and holds no decision a capability should own.
     relatedExamples: [api]
   - id: BE-OPERATIONS-1
     title: A versioned operation is declared once in the app's typed operation table
     kind: mandatory
-    hfsRules: [R95, R88, R23]
+    hfsRules: [R95, R88, R23, R278]
     requirement: |-
       A versioned operation `<name>@<version>` (for example `sales.policy@1`) that an app serves over one operation route is
       declared once, in the app's operation table `be/apps/<app>/src/operations.ts`, which exports `OPERATIONS`. The table is made by
@@ -324,6 +331,8 @@ rules:
       outcome }` out, `outcome` being the canon Outcome `{ kind: "ok", value }` or `{ kind: "refused", code }`. `starci app emit`
       derives `be/contracts/<app>/openapi.json` (OpenAPI 3.1, `x-operation: "<name>@<version>"`, a oneOf over the operations) from the
       table with the type checker, and the full `starci app check` fails when the committed file is stale.
+      A public REST operation in either edition belongs to this nonempty table, and its route decorator supplies its own
+      versioned-operation evidence; a class-level reference does not justify a route absent from the table.
     rationale: |-
       The operation set of an app is a contract the front end (`fe/`, through the root codegen) and other consumers generate a client from. A name-to-string registry with `unknown`
       bodies and results forces every client to hand-type the wire; one typed table gives the client generator, the route and the
@@ -345,6 +354,8 @@ rules:
         - BE_OPERATION_CONTRACT
         - BE_TRANSPORT_SHAPE
         - HFS_CONTRACT_SNAPSHOT_DRIFT
+        - BE_REST_DOOR_EVIDENCE
+        - BE_REST_ROUTE_UNDECLARED
       manual:
         - Confirm each refusal code is one the operation's owner can actually answer.
     relatedExamples: [api]

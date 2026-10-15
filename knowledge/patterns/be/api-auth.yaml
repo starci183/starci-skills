@@ -29,11 +29,12 @@ rules:
   - id: BE-AUTH-1
     title: Default deny with APP_GUARD and @Public
     kind: mandatory
-    hfsRules: [R41, R02]
+    hfsRules: [R41, R02, R290]
     requirement: |-
       `domain/identity` exports `AuthGuard`, `@Public({ reason: PublicReason.X })`, `@Roles(...)` and `@CurrentPrincipal()`.
       Every api app registers, in this order, the `APP_GUARD` throttler, the CSRF origin guard and `AuthGuard`. `PublicReason`
-      is an enum closed at `Health | AuthHandshake | SignedWebhook | CatalogRead`; a new reason is a `.claude` change. An
+      is an enum closed at `Health | AuthHandshake | SignedWebhook | CatalogRead`. API-key and tool-token routes use their
+      own authentication guard rather than adding a public reason. An
       operation is open only when it carries `@Public({ reason })`; any other operation requires the authenticated principal.
       `@UseGuards` is not used for authentication or authorization. A worker or cli app exposes no route.
     rationale: |-
@@ -66,17 +67,20 @@ rules:
         - HFS_README_WORK_POINTER_MISSING
         - HFS_README_PRIVATE_URL
         - HFS_README_BADGE_NOT_LIVE
+        - BE_PUBLIC_REASON_CLOSED
       manual:
         - Review each `@Public` reason and confirm that the operation may be reached without a session.
     relatedExamples: []
   - id: BE-AUTH-2
     title: Identity owns verification
     kind: mandatory
-    hfsRules: [R26, R41]
+    hfsRules: [R26, R41, R260]
     requirement: |-
       Verifying a token or session belongs to `domain/identity`, which uses `integrations/<provider>` for the identity
-      provider. Platform never verifies a caller and a GraphQL context factory never authenticates. For a JWT, verify the
-      allowed algorithms, issuer and intended audience; decoding is not verification. A workspace or tenant header is a
+      provider. Platform never verifies a caller and a GraphQL context factory never authenticates. A JWT verifier pins a
+      nonempty literal subset of `ES256`, `RS256` and `EdDSA`, reads the issuer from configuration and verifies the intended
+      audience; decoding is not verification. A Supabase principal is built only after verification and rejection of any
+      role other than `authenticated`. A workspace or tenant header is a
       selector, never proof of access, and resource authorization stays in the handler or the domain service so jobs and other
       entry points cannot bypass a guard.
     rationale: |-
@@ -92,6 +96,7 @@ rules:
         - FE_TIER_DIRECTION
         - ARCH_PACKAGE_IMPORTS_APP
         - BE_DEFAULT_DENY
+        - BE_JWT_ALG_PINNED
       manual:
         - Confirm the audience, issuer and algorithm allow list against the provider contract.
     relatedExamples: []
@@ -186,4 +191,50 @@ rules:
         - BE_INPUT_BOUNDED
         - BE_QUERY_UNBOUNDED
       manual: []
+    relatedExamples: []
+  - id: BE-AUTH-7
+    title: API edge configuration states its trust boundaries
+    kind: mandatory
+    hfsRules: [R261]
+    requirement: |-
+      Every API in lite and full supplies an exact browser-origin CORS allowlist, applies the response middleware owned by
+      `platform/http-security`, disables `x-powered-by` and declares a nonnegative integer proxy-hop count. A missing or
+      wildcard CORS policy and blanket proxy trust are refused. Keep these values in the typed app configuration and pass
+      them to the bootstrap rather than inferring trust from the incoming request.
+    rationale: |-
+      The app must state which browser origins and proxy hops it trusts before a request reaches an authenticated door.
+    cases:
+      - id: case-1
+        when: An API runs behind one ingress
+        write: Declare the exact browser origins and one trusted proxy hop, and apply the platform response middleware at boot.
+    verification:
+      automated:
+        - BE_CORS_ALLOWLIST
+        - BE_SECURITY_HEADERS
+        - BE_TRUST_PROXY
+      manual:
+        - Compare the origin list and proxy-hop count with the deployed ingress topology.
+    relatedExamples: []
+  - id: BE-AUTH-8
+    title: Liveness and readiness prove different health signals
+    kind: mandatory
+    hfsRules: [R262]
+    requirement: |-
+      Every API in lite and full exposes distinct live and ready signals. Readiness probes a required dependency with a
+      bounded failure timeout and returns unavailable when that dependency fails; it never aliases the live response.
+      The API Docker HEALTHCHECK calls an existing live route, and never uses an always-successful command as its proof.
+    rationale: |-
+      A live process may be unable to serve work. Separate signals let the runtime distinguish restarting a process from
+      withholding traffic while a dependency recovers.
+    cases:
+      - id: case-1
+        when: The database becomes unavailable
+        write: Keep the live process signal independent, fail readiness within its timeout, and verify that the live route is the Docker probe target.
+    verification:
+      automated:
+        - BE_READY_REAL
+        - BE_HEALTH_SIGNALS
+        - HFS_DOCKER_HEALTHCHECK_FAKE
+      manual:
+        - Fail the required dependency and confirm readiness returns unavailable within the declared bound.
     relatedExamples: []

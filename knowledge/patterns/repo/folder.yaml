@@ -252,7 +252,7 @@ rules:
   - id: REPO-FOLDER-6
     title: App README and GitHub presentation
     kind: mandatory
-    hfsRules: [R02, R05]
+    hfsRules: [R02, R05, R270]
     requirement: |
       The root README.md starts with the app name as its level-one heading and one concise description line. Its standard
       sections, in order, are Overview, Stack, Repository layout (the HFS map: the root, be/ and fe/), and Development
@@ -263,6 +263,8 @@ rules:
       or badges. The git and GitHub entries are the slots `app.git-meta`, `app.ci`, `app.ci-images`, the optional
       `app.ci-e2e` and `app.github-meta`. The GitHub repository description and topics are set with gh repo edit.
       docs/repo-presentation.md is the maintenance checklist.
+      Product READMEs, docs and stack READMEs change with the product: cited repository paths, npm scripts, app CLI verbs,
+      typed-reader or key-inventory environment names and HFS rule ids must resolve to the current repository and catalogs.
     rationale: |
       A consistent entry page makes the HFS tree and real checks discoverable without advertising local-only services as
       public project health.
@@ -287,9 +289,28 @@ rules:
         - HFS_README_PRIVATE_URL
         - HFS_README_BADGE_NOT_LIVE
         - HFS_MANAGED_FILE_DRIFT
+        - HFS_DOC_PATH_MISSING
+        - HFS_DOC_COMMAND_UNKNOWN
+        - HFS_DOC_ENV_UNKNOWN
+        - HFS_DOC_RULE_UNKNOWN
       manual:
         - Confirm every badge's target currently reports a live external service.
         - Review GitHub description and topics against the app's current purpose.
     relatedExamples:
       - examples/ecommerce-app/README.md
       - packages/hfs/templates/app/skeleton/README.md
+  - id: REPO-FOLDER-7
+    title: Source and documentation use the current product vocabulary
+    kind: mandatory
+    hfsRules: [R283]
+    requirement: |
+      Declare retired product words in hfs.json lexicon.removed and replace them throughout application source and
+      documentation. A removed word is refused as a whole word or identifier segment in both lite and full editions.
+    rationale: |
+      One current vocabulary keeps code, documentation and product discussions referring to the same concepts.
+    cases: []
+    verification:
+      automated:
+        - HFS_APP_LEXICON
+      manual: []
+    relatedExamples: []

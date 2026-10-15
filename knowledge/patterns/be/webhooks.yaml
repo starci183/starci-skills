@@ -88,7 +88,7 @@ rules:
   - id: BE-WEBHOOK-2
     title: The door verifies first and hands the delivery to one domain intake
     kind: mandatory
-    hfsRules: [R182, R183, R41, R42, R203]
+    hfsRules: [R182, R183, R41, R42, R203, R263]
     requirement: |-
       `<provider>.webhook.ts` is one `@Controller` with exactly one `@Post` handler and optionally one `@Get` subscription
       challenge handler. Each handler is declared
@@ -116,6 +116,8 @@ rules:
       The optional GET starts with a declared domain verifier's challenge call, awaited when async, and returns exactly that
       call's result: `const challenge = this.verifier.challenge(query); return challenge`, or directly returns that call.
       It makes no intake call and computes no other response. `@RateLimit(RateTier.Strict)` is required on both signed-webhook handlers.
+      `SignedWebhook` metadata belongs only to this HTTP door or the exact domain verifier named in its module's exported
+      `webhookVerifiers`. A public route whose path contains webhook, callback or events belongs in the webhook door too.
     rationale: |-
       The signature is the authentication of a public door. Making verification the first statement removes every door path that
       skips it; a combined domain method must finish that proof before intake. Keeping one intake and no decision leaves the door
@@ -215,6 +217,8 @@ rules:
         - BE_DEFAULT_DENY
         - BE_INPUT_BOUNDED
         - BE_FEATURE_THIN
+        - BE_WEBHOOK_SCOPE
+        - BE_WEBHOOK_INBOX_KEY
       manual:
         - Review that the raw body, not a re-serialized one, is verified, that the replay window matches the provider's tolerance, and that a domain verifier refuses the delivery before intake or business data access.
         - Trace intake helpers and dynamic dispatch that static resolution cannot inspect; none may dispatch a command before the receipt is durable.
@@ -222,7 +226,7 @@ rules:
   - id: BE-WEBHOOK-3
     title: The intake records the inbox receipt; a reactor or job dispatches after commit
     kind: mandatory
-    hfsRules: [R80, R152, R151]
+    hfsRules: [R80, R152, R151, R263]
     requirement: |-
       The sanctioned path is `verify -> inbox.record -> reactor/job dispatches the command`. `inbox.record` describes the
       domain intake's durable recording responsibility, not a new method on the shared `Inbox` port: the real port has `claim`.
@@ -236,6 +240,9 @@ rules:
       handler. A reactor consumes the receipt event and dispatches its own command, forwarding the delivered `eventId` and
       receipt reference; its domain service claims that separate consumer delivery before processing the receipt. A job may
       instead consume a transactionally enqueued receipt reference under the queue and fenced-job patterns.
+      This responsibility follows every intake identified by its first `*Id` parameter, a DTO delivery-id property or raw-body
+      signature input. The inbox key is the stable provider delivery id, and a duplicate returns before work. No `process`
+      callback, domain processing or command dispatch runs inside the receipt transaction; those run only after commit.
     rationale: |-
       Recording the delivery and writing the outbox row in one transaction means a crash cannot lose or duplicate the event, and
       keeping the publish in `modules/domain` keeps one place that owns the transaction boundary.
@@ -266,6 +273,8 @@ rules:
         - BE_INBOX_DEDUPE_MISSING
         - BE_OUTBOX_WRITE_TX
         - BE_EVENT_CLASS_CONTRACT
+        - BE_WEBHOOK_SCOPE
+        - BE_WEBHOOK_INBOX_KEY
       manual:
         - Confirm each accepted provider delivery records at most one receipt and outbox event, and the reactor or job alone dispatches processing commands.
     relatedExamples: [webhooks]
@@ -293,6 +302,7 @@ rules:
     verification:
       automated:
         - BE_PATTERN_SPEC_MISSING
+        - BE_LITE_PROOF_LANE_MISSING
       manual:
         - Confirm the fake signs exactly as the provider documents and that a contract spec guards its payload fixtures.
     relatedExamples: [webhooks]

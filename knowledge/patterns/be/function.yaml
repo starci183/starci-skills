@@ -164,13 +164,15 @@ rules:
   - id: BE-FUNCTION-7
     title: Helpers have cohesive ownership, files stay inside budget
     kind: mandatory
-    hfsRules: [R20, R21, R25]
+    hfsRules: [R20, R21, R25, R291]
     requirement: |-
       Keep pure helpers with their owning capability or handler. A helper with no owner goes to `platform/primitives`. Public
       contracts use named params and result types where that improves clarity; a single primitive may remain positional. Prefer
       a simple function over a provider class when no lifecycle or injection is required. A helper defined twice under one name
-      is a finding; the second definition is deleted and imports the first. A file has at most 500 lines and a function at most
-      80; over-budget files do not grow and new files are inside budget. A duplicated block is 8 lines and 60 tokens.
+      is a finding; the second definition is deleted and imports the first. A file has at most 500 lines; over-budget files do
+      not grow and new files are inside budget. Every function, method and arrow body stays within the absolute 80 physical
+      line budget, including comments and blank lines; split a larger body by responsibility. A duplicated block is 8 lines
+      and 60 tokens.
     rationale: |-
       Reuse and clarity determine helper form, copies drift, and a budget that ratchets keeps units reviewable.
     cases:
@@ -186,6 +188,7 @@ rules:
         - FE_CROSS_APP_DUPLICATE
         - HFS_UNUSED_EXPORT
         - HFS_UNUSED_FILE
+        - HFS_FUNCTION_BUDGET
       manual:
         - Confirm purity and absence of hidden config, I/O or authority decisions.
     relatedExamples: []
