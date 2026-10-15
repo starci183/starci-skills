@@ -19,12 +19,13 @@ const URL_PATH = /^\/[A-Za-z0-9._~%/-]*$/u;
 const REDIRECT_STATUS = [301, 302, 303, 307, 308];
 
 const FIELDS = {
-  ingress: ['name', 'image', 'args', 'network', 'acmeVolume', 'service', 'legacy', 'upstreams', 'routes', 'middlewares', 'verify', 'drop', 'redirects', 'backup', 'takeover'],
+  ingress: ['name', 'image', 'args', 'network', 'acmeVolume', 'service', 'legacy', 'upstreams', 'routes', 'middlewares', 'verify', 'drop', 'redirects', 'backup', 'publish', 'takeover'],
   legacy: ['dir', 'dynamicDir', 'container'],
   upstream: ['name', 'hosts', 'container', 'hostAddress', 'port', 'aliases', 'middlewares'],
   verify: ['host', 'path', 'status'],
   redirect: ['host', 'to', 'status'],
   backup: ['dir'],
+  publish: ['file', 'supersedes'],
   takeover: ['gateSeconds', 'rehearsalPorts'],
   ports: ['http', 'https'],
 };
@@ -157,6 +158,21 @@ function backup(c, block) {
   return { dir: block.dir };
 }
 
+const ROUTE_FILE = /^[a-z][a-z0-9-]*.ya?ml$/u;
+
+/** Where the app's own routes file lands in the shared directory, and the generic old file names it replaces (both required when declared). */
+function publish(c, block) {
+  if (block === undefined) return null;
+  const at = 'deploy.ingress.publish';
+  if (!closed(c, at, block, FIELDS.publish)) return null;
+  matching(c, `${at}.file`, block.file, ROUTE_FILE);
+  const supersedes = list(c, `${at}.supersedes`, block.supersedes, (where, name) => {
+    if (matching(c, where, name, ROUTE_FILE) && name === block.file) c.problem(where, 'must differ from publish.file');
+  });
+  duplicates(c, 'superseded file', supersedes, `${at}.supersedes`);
+  return { file: block.file, supersedes };
+}
+
 const DEFAULT_REHEARSAL_PORTS = { http: 18080, https: 18443 };
 
 /** Alternate host ports of the rehearsal: valid ports, never the production 80 and 443, and different from each other. */
@@ -214,6 +230,7 @@ export function normalizeIngress(block, { probe }) {
     drop: dropList(c, block.drop),
     redirects: redirects(c, block.redirects),
     backup: backup(c, block.backup),
+    publish: publish(c, block.publish),
     takeover: takeover(c, block.takeover),
   };
   return { ingress: c.problems.length === 0 ? ingress : null, problems: c.problems };
