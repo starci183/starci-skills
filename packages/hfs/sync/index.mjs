@@ -27,6 +27,7 @@ import { feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
 import { DEFAULT_PORT, NODE_IMAGE, dockerfilePath } from '../runtime/scripts/hfs/rules/docker.mjs';
 import { isFile } from '../runtime/scripts/lib/fs-kind.mjs';
 import { readDeclaredSonarKey } from './sonar-key.mjs';
+import { readDeclaredStack, stackWorkflowVariables } from './stack-images.mjs';
 import { byCodeUnit } from '../report/order.mjs';
 import { isRuntimeExampleApp } from '../runtime/scripts/lib/runtime-example.mjs';
 import { ciWorkflowCommands } from './ci-commands.mjs';
@@ -178,7 +179,8 @@ export function appSource(root) {
   };
   for (const dir of ['apps', 'src']) walk(dir);
   return { runtimeExample: isRuntimeExampleApp(root), files: files.sort(byCodeUnit), read: file => fs.readFileSync(path.join(root, 'be', file), 'utf8'),
-    workPresent: fs.existsSync(path.join(root, '.starciwork')), hasImage: file => isFile(path.join(root, file), { followLinks: false }) };
+    workPresent: fs.existsSync(path.join(root, '.starciwork')), hasImage: file => isFile(path.join(root, file), { followLinks: false }),
+    stack: readDeclaredStack(root) };
 }
 
 /**
@@ -261,6 +263,13 @@ export function imageMatrix(app, source) {
   return imageEntries(app, source).map(image => entry(image.side, image.entry)).join('\n');
 }
 
+/** The Dockerfile of the app a deploy image names (be first, then fe); an app hfs.json does not declare cannot be built by the managed workflow. */
+function stackDockerfile(app, name) {
+  const side = ['be', 'fe'].find(which => app.sides[which].apps.some(entry => entry.name === name));
+  if (!side) throw new SyncError('HFS_SYNC_STACK_IMAGE', `deploy.images names the app ${name}, which hfs.json does not declare under be or fe`);
+  return dockerfilePath(side, name);
+}
+
 const IMAGE_TEMPLATE = Object.freeze({ api: 'be/image/api', worker: 'be/image/worker', cli: 'be/image/cli', next: 'fe/image/next' });
 
 /**
@@ -285,6 +294,7 @@ export function imageFiles(app, source) {
 
 /** Every value a template of `scope` can name, derived from hfs.json and the presets. */
 export function variables(app, scope, presets, sonarKey, manifest = loadSlotManifest(), source = { files: [], read: () => '' }) {
+  const stack = source.stack ?? { images: [], passEnv: [] };
   const fe = app.sides.fe;
   const packages = opensPackages(fe);
   const lite = app.edition === 'lite';
@@ -316,6 +326,7 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
     styleGlob: STYLE_GLOB,
     imageMatrix: imageMatrix(app, source),
     imageProject: app.project,
+    ...stackWorkflowVariables(stack, app.project, name => stackDockerfile(app, name)),
   };
 }
 
@@ -443,7 +454,7 @@ export function loadHfs(root, manifest = loadSlotManifest()) {
 export async function renderRepo(root, { presets, parseYaml, manifest = loadSlotManifest() } = {}) {
   const hfs = loadHfs(root, manifest);
   const sonarKey = await readDeclaredSonarKey(root, { parseYaml, fail: message => { throw new SyncError('HFS_SYNC_SONAR_KEY', message); } });
-  return { hfs, targets: renderTargets(hfs, presets ?? await loadPresets(root), { sonarKey, manifest, source: appSource(root) }) };
+  return { hfs, targets: renderTargets(hfs, presets ?? await loadPresets(root), { sonarKey, manifest, source: { ...appSource(root), stack: readDeclaredStack(root, { parseYaml }) } }) };
 }
 
 /** `starci app sync --check | --write [--cwd <dir>]` at the app root; returns 0 clean, 1 drift, 2 usage. */

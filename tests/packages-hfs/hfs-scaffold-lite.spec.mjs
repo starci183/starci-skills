@@ -30,7 +30,7 @@ const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 // shared app core of both editions (owner ruling 2026-10-13): no modules/db, no Server Action and no auth callback route.
 const EXPECTED_LITE_FILES = Object.freeze([
   '.claude/.gitignore', '.claude/secret.env', '.dockerignore', '.editorconfig', '.gitattributes', '.github/dependabot.yml', '.github/workflows/ci.yml', '.github/workflows/db-deploy.yml',
-  '.github/workflows/images.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.nvmrc', '.prettierignore',
+  '.github/workflows/images.yml', '.github/workflows/stack-deploy.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.nvmrc', '.prettierignore',
   '.prettierrc', '.sops.yaml', '.starcistacks/application-stacks.yaml', '.starcistacks/dev/README.md',
   '.starcistacks/dev/environment.json', '.starcistacks/dev/infra/swarm/Caddyfile', '.starcistacks/dev/infra/swarm/owner-actions.md',
   '.starcistacks/dev/infra/swarm/recovery/restore-proof.md', '.starcistacks/dev/infra/swarm/releases/current.yaml',

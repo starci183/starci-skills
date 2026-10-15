@@ -45,6 +45,34 @@ environments:
     runbook: README.md
     # External Swarm secret names are declared in the model. Real sealed members are owner-provisioned.
     secrets: []
+    # What `starci app stack` deploys (verbs: prepare, doctor, deploy, verify, rollback); names and shapes only, never a value.
+    # Add secrets.grants once the real sealed members exist under .starcistacks/production/secrets, and a backup block for stateful volumes.
+    deploy:
+      stack: {{project}}-production
+      images:
+        core:
+          app: core
+        app:
+          app: app
+        landing:
+          app: landing
+      volumes:
+        - {{project}}-production-ingress-data
+        - {{project}}-production-ingress-config-data
+      verify:
+        http:
+          - name: core liveness
+            url: "https://api.{{project}}.example.invalid/health/live"
+            status: 200
+            retry: true
+          - name: app liveness
+            url: "https://{{project}}.example.invalid/health/live"
+            status: 200
+            retry: true
+          - name: landing liveness
+            url: "https://www.{{project}}.example.invalid/health/live"
+            status: 200
+            retry: true
 k8s:
   status: deferred
   reason: This starter declares Docker Swarm production; no Kubernetes environment is provisioned.

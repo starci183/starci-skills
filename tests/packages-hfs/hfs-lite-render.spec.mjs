@@ -66,7 +66,7 @@ test('liteManagedBy is a template id field of app slots', () => {
 test('the lite managed set carries the unit run and its coverage world (ruling:R212/case-1, amended by ruling:R212/case-4), the database wrappers and workflows, and no e2e world', () => {
   const targets = targetMap();
   assert.deepEqual(Object.keys(targets).sort(), [
-    '.dockerignore', '.editorconfig', '.gitattributes', '.github/dependabot.yml', '.github/workflows/ci.yml', '.github/workflows/db-deploy.yml', '.github/workflows/images.yml', '.gitignore',
+    '.dockerignore', '.editorconfig', '.gitattributes', '.github/dependabot.yml', '.github/workflows/ci.yml', '.github/workflows/db-deploy.yml', '.github/workflows/images.yml', '.github/workflows/stack-deploy.yml', '.gitignore',
     '.husky/pre-commit', '.husky/pre-push', '.nvmrc', '.prettierignore', '.prettierrc', '.starciwork/.gitignore',
     'be/eslint.config.mjs', 'be/jest.config.js', 'be/src/tests/tsconfig.json', 'be/tsconfig.build.json', 'be/tsconfig.json',
     'codecov.yml', 'fe/eslint.config.mjs', 'fe/stylelint.config.mjs', 'fe/tsconfig.json',
@@ -127,7 +127,7 @@ test('lite render reads the Jest preset like full, writeTargets reaches a no-op,
   fs.writeFileSync(path.join(dir, 'hfs.json'), `${JSON.stringify(LITE, null, 2)}\n`);
   await assert.rejects(renderRepo(dir, { manifest: MANIFEST }), /HFS_SYNC_PRESET_MISSING|@starci\/jest-preset/, 'a lite back end installs @starci/jest-preset for its unit run');
   const { targets } = await renderRepo(dir, { manifest: MANIFEST, presets: PRESETS });
-  assert.equal(targets.length, 26);
+  assert.equal(targets.length, 27);
   assert.equal(targets.some(target => target.path.startsWith('.starciwork/')), false);
   assert.equal(writeTargets(dir, targets).length, targets.length);
   assert.deepEqual(checkTargets(dir, targets).map(result => result.status), Array(targets.length).fill('ok'));

@@ -131,6 +131,42 @@ environments:
         where: secrets/supabase-service-role-key
         recipientPolicy: This app's own age recipient configured in .sops.yaml
         keyCustody: SOPS_AGE_KEY in the host's untracked .claude/secret.env
+    # What `starci app stack` deploys (verbs: prepare, doctor, deploy, verify, rollback); names and shapes only, never a value.
+    # Add a backup block (digest-pinned tar helper image) once the stateful volumes are provisioned.
+    deploy:
+      stack: {{project}}-production
+      images:
+        api:
+          app: api
+        web:
+          app: web
+          buildArgs:
+            values:
+              NEXT_PUBLIC_SITE_URL: "https://{{project}}.example.invalid"
+      volumes:
+        - {{project}}-production-ingress-data
+        - {{project}}-production-ingress-config-data
+      secrets:
+        grants:
+          - service: api
+            filePointers: true
+            from:
+              - member: primary-db-url
+              - member: supabase-service-role-key
+      verify:
+        http:
+          - name: api liveness
+            url: "https://api.{{project}}.example.invalid/health/live"
+            status: 200
+            retry: true
+          - name: api readiness
+            url: "https://api.{{project}}.example.invalid/health/ready"
+            status: 200
+            retry: true
+          - name: web liveness
+            url: "https://{{project}}.example.invalid/health/live"
+            status: 200
+            retry: true
 k8s:
   status: deferred
   reason: Lite production uses Docker Swarm with managed Supabase backing; Kubernetes belongs to a future full-edition deployment.

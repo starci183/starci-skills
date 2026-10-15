@@ -7,7 +7,7 @@
 # catalog READ this file through scripts/hfs/slots.mjs; none of them hardcodes a path.
 # Shape: modules/schemas/hfs-slots.schema.yaml. The repository side is hfs.json: modules/schemas/hfs-repo.schema.yaml.
 schema: starci/hfs-slots@3
-version: 3.2.0
+version: 3.3.0
 
 versioning:
   # MAJOR.MINOR.PATCH of this manifest. A repository pins only the MAJOR in hfs.json ("hfs": 3).
@@ -37,6 +37,7 @@ versioning:
 # for fail-fast env parsing only, and `<app>.options.ts` holds env-derived options and port bindings only, with no parsing
 # or environment reads (BE_APP_OPTIONS_COMPOSITION). Secrets use EnvSource.secret(): <NAME>_FILE first, plain <NAME> only
 # when the file key is absent; .starcistacks owns custody. Capability <capability>.config.ts roles stay unchanged.
+# 3.3.0 is a minor (alpha.16): it ADDS the optional app.ci-stack-deploy slot, the managed workflow of the starci app stack verbs.
 
 # Field meaning, per slot.
 #   id          stable name, never changes meaning inside a major.
@@ -544,6 +545,19 @@ slots:
     liteManagedBy: ci-workflows-lite
     rules: [HFS_MANAGED_FILE_DRIFT]
     since: 2.1.0
+  - id: app.ci-stack-deploy
+    since: 3.3.0
+    profiles: [app]
+    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): both editions deploy their images to a Docker Swarm stack through the same starci stack verbs; the workflow lists the images the app declares."
+    # The Swarm stack deploy workflow: workflow_dispatch only (like app.ci-db); a thin file that calls `starci app stack`, rendered by starci app sync.
+    path: ".github/workflows/stack-deploy.yml"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: ci-workflows
+    liteManagedBy: ci-workflows-lite
+    rules: [HFS_MANAGED_FILE_DRIFT]
   - id: app.dockerignore
     since: 3.1.0
     profiles: [app]
