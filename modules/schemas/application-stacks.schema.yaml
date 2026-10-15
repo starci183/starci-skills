@@ -304,6 +304,7 @@ $defs:
           additionalProperties: {type: number}
       runbook: {type: string, minLength: 1}
       secrets: {type: array, items: {$ref: '#/$defs/secret'}}
+      deploy: {$ref: '#/$defs/deploy'}
       ingress:
         description: The one selected ingress component and the hosts it routes.
         type: object
@@ -361,6 +362,247 @@ $defs:
             retention: {type: string, minLength: 1}
             owner: {type: string, minLength: 1}
             restoreProof: {type: string, minLength: 1}
+  deploy:
+    description: >-
+      The Swarm deploy configuration `starci app stack` verbs read (optional; rule R294 judges it). It holds names, paths and shapes
+      only, never a value: sealed members and keys are references into .starcistacks/<environment>/secrets. The authority is
+      scripts/hfs/stack-deploy-config.mjs, which normalises exactly this shape (service, volume and member names, paths
+      inside the environment directory and the existence of the files they name are checked there, not here).
+    type: object
+    additionalProperties: false
+    properties:
+      stack: {$ref: '#/$defs/deployName'}
+      remote: {$ref: '#/$defs/deployRemote'}
+      images:
+        description: Service -> the image the deploy injects; the managed workflow builds one per entry.
+        type: object
+        propertyNames: {$ref: '#/$defs/deployName'}
+        additionalProperties: {$ref: '#/$defs/deployImage'}
+      volumes:
+        description: External volumes prepare creates and doctor checks.
+        type: array
+        items: {$ref: '#/$defs/deployVolumeName'}
+      secrets: {$ref: '#/$defs/deploySecrets'}
+      environment:
+        description: Service -> plain environment merged into the generated override.
+        type: object
+        additionalProperties: {$ref: '#/$defs/deployServiceEnvironment'}
+      configs:
+        description: Non-secret files mounted into services, versioned by content digest; config names are unique (checked by the normaliser).
+        type: array
+        items: {$ref: '#/$defs/deployConfig'}
+      passEnv:
+        description: Host variable names interpolated by `docker stack config` (names only).
+        type: array
+        items: {$ref: '#/$defs/deployKey'}
+      verify: {$ref: '#/$defs/deployVerify'}
+      jobs: {$ref: '#/$defs/deployJobs'}
+      backup: {$ref: '#/$defs/deployBackup'}
+  deployName:
+    type: string
+    pattern: '^[a-z][a-z0-9-]*$'
+  deployKey:
+    type: string
+    pattern: '^[A-Z][A-Z0-9_]*$'
+  deployVolumeName:
+    type: string
+    pattern: '^[A-Za-z0-9][A-Za-z0-9_.-]*$'
+  deployTreePath:
+    description: A relative path inside .starcistacks/<environment>/ (forward slashes, no .. segment).
+    type: string
+    pattern: '^(?!/)(?!.*\\)(?!(?:.*/)?\.\.(?:/|$)).+$'
+  deployAbsolutePath:
+    description: An absolute path on the host without .. segments.
+    type: string
+    pattern: '^/(?!.*\.\.)[A-Za-z0-9._/-]+$'
+  deployKeyList:
+    type: array
+    minItems: 1
+    items: {$ref: '#/$defs/deployKey'}
+  deployMemberKeys:
+    description: A sealed member and the keys taken from it.
+    type: object
+    additionalProperties: false
+    required: [member, keys]
+    properties:
+      member: {$ref: '#/$defs/deployName'}
+      keys: {$ref: '#/$defs/deployKeyList'}
+  deployRemote:
+    type: object
+    additionalProperties: false
+    properties:
+      host:
+        description: ssh alias used for DOCKER_HOST=ssh://<host> and the release records (default vps).
+        type: string
+        pattern: '^[A-Za-z0-9][A-Za-z0-9._-]*$'
+      releasesBase: {$ref: '#/$defs/deployAbsolutePath'}
+      sealed:
+        description: 'Owner-machine session for prepare and doctor: members of .starcistacks/<environment>/secrets.'
+        type: object
+        additionalProperties: false
+        required: [ops, sshKey, knownHosts]
+        properties:
+          ops: {$ref: '#/$defs/deployName'}
+          sshKey: {$ref: '#/$defs/deployName'}
+          knownHosts: {$ref: '#/$defs/deployName'}
+  deployImage:
+    type: object
+    additionalProperties: false
+    required: [app]
+    properties:
+      app: {$ref: '#/$defs/deployName'}
+      buildArgs:
+        description: Public build values (they reach the browser by design), literals and the public keys of a sealed member.
+        type: object
+        additionalProperties: false
+        properties:
+          values:
+            type: object
+            propertyNames: {$ref: '#/$defs/deployKey'}
+            additionalProperties: {type: string}
+          sealed: {$ref: '#/$defs/deployMemberKeys'}
+  deploySecrets:
+    type: object
+    additionalProperties: false
+    properties:
+      grants:
+        description: Which sealed keys become which Swarm secrets, granted to which services.
+        type: array
+        items: {$ref: '#/$defs/deployGrant'}
+      settings: {$ref: '#/$defs/deployMemberKeys'}
+  deployGrant:
+    type: object
+    additionalProperties: false
+    required: [service, from]
+    properties:
+      service: {$ref: '#/$defs/deployName'}
+      filePointers:
+        description: Also set <KEY>_FILE=/run/secrets/<KEY> in the service environment.
+        type: boolean
+      from:
+        type: array
+        minItems: 1
+        items: {$ref: '#/$defs/deployGrantSource'}
+  deployGrantSource:
+    type: object
+    additionalProperties: false
+    required: [member]
+    properties:
+      member: {$ref: '#/$defs/deployName'}
+      keys: {$ref: '#/$defs/deployKeyList'}
+      required: {type: boolean}
+      fill:
+        description: Never override a key an earlier source of the same service gave.
+        type: boolean
+    if:
+      required: [required]
+      properties:
+        required: {const: true}
+    then:
+      required: [keys]
+  deployServiceEnvironment:
+    type: object
+    additionalProperties: false
+    properties:
+      files:
+        description: KEY=VALUE files, relative to .starcistacks/<environment>/.
+        type: array
+        items: {$ref: '#/$defs/deployTreePath'}
+      values:
+        type: object
+        propertyNames: {$ref: '#/$defs/deployKey'}
+        additionalProperties: {type: string}
+      settings:
+        type: object
+        propertyNames: {$ref: '#/$defs/deployKey'}
+        additionalProperties: {$ref: '#/$defs/deploySetting'}
+  deploySetting:
+    type: object
+    additionalProperties: false
+    required: [key]
+    properties:
+      key: {$ref: '#/$defs/deployKey'}
+      default: {description: 'A literal default: a string, number or boolean.'}
+  deployConfig:
+    type: object
+    additionalProperties: false
+    required: [name, file, env]
+    properties:
+      name: {$ref: '#/$defs/deployName'}
+      file: {$ref: '#/$defs/deployTreePath'}
+      env: {$ref: '#/$defs/deployKey'}
+  deployVerify:
+    type: object
+    additionalProperties: false
+    properties:
+      http:
+        type: array
+        items: {$ref: '#/$defs/deployHttpCheck'}
+      exec:
+        type: array
+        items: {$ref: '#/$defs/deployExecCheck'}
+  deployHttpCheck:
+    type: object
+    additionalProperties: false
+    required: [name, url]
+    properties:
+      name: {type: string, minLength: 1}
+      url: {type: string, pattern: '^https?://[^\s]+$'}
+      method: {enum: [GET, POST]}
+      body: {type: string}
+      status: {type: integer, minimum: 100, maximum: 599}
+      json:
+        description: Expected fields of the JSON response.
+        type: object
+      contains: {type: string}
+      retry: {type: boolean}
+  deployExecCheck:
+    type: object
+    additionalProperties: false
+    required: [name, service, command]
+    properties:
+      name: {type: string, minLength: 1}
+      service: {$ref: '#/$defs/deployName'}
+      command: {$ref: '#/$defs/deployCommand'}
+      stdout:
+        description: Regular expression the standard output must match.
+        type: string
+  deployCommand:
+    description: An argument vector run inside a task; every argument is a plain word (no shell syntax).
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: '^[A-Za-z0-9_@%+=:,./-]+$'
+  deployJobs:
+    type: object
+    additionalProperties: false
+    required: [service, command]
+    properties:
+      service: {$ref: '#/$defs/deployName'}
+      command: {$ref: '#/$defs/deployCommand'}
+  deployBackup:
+    type: object
+    additionalProperties: false
+    required: [image, volumes]
+    properties:
+      image:
+        description: The tar helper image, pinned by a non-placeholder digest.
+        type: string
+        pattern: '^[a-z0-9./_-]+(?::[A-Za-z0-9._-]+)?@sha256:(?!0{64}$)[0-9a-f]{64}$'
+      keepDays: {type: integer, minimum: 1, maximum: 3650}
+      dir: {$ref: '#/$defs/deployAbsolutePath'}
+      volumes:
+        type: array
+        minItems: 1
+        items: {$ref: '#/$defs/deployBackupVolume'}
+  deployBackupVolume:
+    type: object
+    additionalProperties: false
+    required: [name, volume]
+    properties:
+      name: {$ref: '#/$defs/deployName'}
+      volume: {$ref: '#/$defs/deployVolumeName'}
   secret:
     type: object
     additionalProperties: false

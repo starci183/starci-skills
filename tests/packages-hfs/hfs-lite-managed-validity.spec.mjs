@@ -52,6 +52,7 @@ test('every lite workflow is structurally valid and pins each action by SHA', ()
     '.github/workflows/ci.yml',
     '.github/workflows/db-deploy.yml',
     '.github/workflows/images.yml',
+    '.github/workflows/stack-deploy.yml',
   ]);
 
   for (const [file, workflow] of Object.entries(workflows)) {

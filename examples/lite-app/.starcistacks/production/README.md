@@ -34,6 +34,8 @@ Neither those records nor the tracked stack claim a completed deployment, accept
 
 ## Deploy
 
+The `deploy` block of `environments.production` in `.starcistacks/application-stacks.yaml` configures the `starci app stack` verbs (images, grants, volumes, verification). The managed `.github/workflows/stack-deploy.yml` calls them; the manual commands below show the owner-run equivalent of the same steps.
+
 From the product repository root, create the declared sealed members using the secret command.
 Supply each value through stdin; never materialize or track plaintext files.
 First run `npx starci app secret init` to configure `.sops.yaml` with that product's public recipient
@@ -98,10 +100,10 @@ and retain only public receipts. Remove the stack only on the owner's removal de
 
 | Command | Operation |
 | --- | --- |
-| prepare | Complete the owner actions, seal the declared secret members and replace illustrative image digests, then provision external secrets and volumes. |
-| doctor | Run `docker stack config -c infra/swarm/stack.yaml` and confirm the declared secrets, config and volumes on the labelled manager. |
-| up | Run the deploy command after reviewing the rendered model and verified image roster. |
-| status | Run `docker stack services lite-app` and retain the convergence result. |
+| prepare | Complete the owner actions and seal the declared secret members, then run `starci app stack prepare --env production --execute` to create the missing external volumes (the one-time swarm initialization needs `--init-swarm` and the owner's explicit approval). |
+| doctor | Run `starci app stack doctor --env production` (read-only) and confirm the declared volumes, services, secrets and release pointers on the labelled manager. |
+| up | Run the manual `.github/workflows/stack-deploy.yml` workflow on a release tag, or `starci app stack deploy --env production --image <service>=<repository>@sha256:<digest> --source-sha <sha> --execute` after reviewing the rendered model (`starci app stack render` is the dry run). |
+| status | Run `starci app stack doctor --env production`, or `starci app stack converge --env production --since <ISO time>`, and retain the convergence result. |
 | logs | Run `docker service logs lite-app_api`; retain public receipts without secret values. |
 | down | On the owner's removal decision, run `docker stack rm lite-app`; external volumes remain in custody. |
-| verification | Confirm both health probes, TLS, signed-in GraphQL and queued-job completion before promotion. |
+| verification | Run `starci app stack verify --env production` (the journeys declared in `deploy.verify`) and confirm TLS, signed-in GraphQL and queued-job completion before promotion. |

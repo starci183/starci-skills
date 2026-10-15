@@ -125,6 +125,43 @@ environments:
         where: secrets/calendar-webhook-secret
         recipientPolicy: SOPS/age to the project recipient in .sops.yaml (creation rule for .starcistacks/*/secrets/*.enc); each key becomes one Swarm secret the api reads by its *_FILE environment name.
         keyCustody: The age identity is held only in the owner's untracked .claude/secret.env as SOPS_AGE_KEY; the VPS never holds it and no private identity is tracked.
+    # What `starci app stack` deploys (the stack name is the project, lite-app); names and shapes only, never a value.
+    # The ingress configuration and the sidecar volume are part of the committed stack source (infra/swarm/stack.yaml).
+    deploy:
+      images:
+        api:
+          app: api
+        web:
+          app: web
+          buildArgs:
+            values:
+              NEXT_PUBLIC_SITE_URL: "https://lite-app.example"
+      volumes:
+        - lite-app-production-caddy-data
+        - lite-app-production-caddy-config
+        - lite-app-production-n8n-data
+      secrets:
+        grants:
+          - service: api
+            filePointers: true
+            from:
+              - member: primary-db-url
+              - member: supabase-service-role-key
+              - member: calendar-webhook-secret
+      verify:
+        http:
+          - name: api liveness
+            url: "https://api.lite-app.example/health/live"
+            status: 200
+            retry: true
+          - name: api readiness
+            url: "https://api.lite-app.example/health/ready"
+            status: 200
+            retry: true
+          - name: web liveness
+            url: "https://lite-app.example/health/live"
+            status: 200
+            retry: true
 k8s:
   status: deferred
   reason: Whole-package Kubernetes deployment is deferred; production is a single-manager Docker Swarm on one VPS and development is the local Supabase CLI stack with host processes.
