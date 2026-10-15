@@ -11,7 +11,7 @@ appliesTo:
 family: repo
 # The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
 # into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
-slots: [be.tool-config, be.tool-config-local, be.nest-cli, fe.tool-config, fe.tool-config-local, repo.side-root-forbidden, app.declaration, app.package-manifest, app.tool-config, app.format-config, app.tool-config-local, app.quality-config, app.hooks, app.ci, app.scripts]
+slots: [be.tool-config, be.tool-config-local, be.nest-cli, fe.tool-config, fe.tool-config-local, repo.side-root-forbidden, app.declaration, app.package-manifest, app.tool-config, app.format-config, app.tool-config-local, app.quality-config, app.hooks, app.ci, app.ci-images, app.ci-deploy, app.scripts]
 provenance:
   reviewedAt: 2026-10-01
   sources:
@@ -57,6 +57,49 @@ rules:
         - FE_TYPE_ESCAPE
         - HFS_MANAGED_FILE_DRIFT
         - HFS_REPO_LOCAL_CHECK
+      manual: []
+    relatedExamples: []
+  - id: REPO-TOOLING-7
+    title: Workflows deploy a protected release with pinned tools
+    kind: mandatory
+    hfsRules: [R251, R271]
+    requirement: |
+      App workflows start only from v-prefixed release tags or workflow_dispatch. The semantic version in a release tag
+      equals the root package version, the images workflow publishes that release tag, and database deployment refuses
+      a non-tag ref before running migrations. Deployment jobs declare a protected environment, explicit permissions
+      and concurrency. They materialize sealed secrets through SOPS_AGE_KEY or the secret materialize command, reference
+      only that age key and transport SSH key/known_hosts secrets, and never embed a dotenv blob or write a dotenv file.
+      Every remote action is pinned to a 40-hex commit SHA. Installed tools are checksum or digest verified or supplied
+      by a pinned action.
+    rationale: |
+      The checked release tag, protected job and immutable tool inputs make each deployment traceable to its reviewed source.
+    cases: []
+    verification:
+      automated:
+        - HFS_DEPLOY_WORKFLOW
+        - HFS_WORKFLOW_PIN
+        - HFS_CI_TOOL_INSTALL
+        - HFS_APP_WORKFLOW_TRIGGER
+        - HFS_RELEASE_TAG_MISMATCH
+        - HFS_DB_DEPLOY_UNGUARDED
+      manual: []
+    relatedExamples: []
+  - id: REPO-TOOLING-8
+    title: Dependency updates and release supply-chain evidence are enabled
+    kind: mandatory
+    hfsRules: [R269]
+    requirement: |
+      Dependabot declares scheduled npm, github-actions and docker updates. CI runs npm audit --omit=dev as an enabled
+      gate whose failure stops the job. The images workflow generates an SBOM and provenance for release images.
+      A disabled step, comment or label does not prove that these gates or evidence producers run.
+    rationale: |
+      Scheduled updates, an enforced dependency audit and release attestations keep dependency and image inputs reviewable.
+    cases: []
+    verification:
+      automated:
+        - HFS_DEPENDABOT_MISSING
+        - HFS_AUDIT_STEP_MISSING
+        - HFS_SBOM_MISSING
       manual: []
     relatedExamples: []
   - id: REPO-TOOLING-2

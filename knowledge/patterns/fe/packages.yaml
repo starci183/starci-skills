@@ -103,3 +103,27 @@ rules:
         - HFS_CANON_PIN_DRIFT
       manual: []
     relatedExamples: []
+  - id: FE-PACKAGES-4
+    title: Dependencies follow the declared front-end stack
+    kind: mandatory
+    hfsRules: [R288]
+    requirement: |-
+      Every FE workspace dependency appears in knowledge/hfs/fe-stack.yaml or in hfs.json fe.extraPackages with its
+      name and a nonempty reason. Every product Next app declares the catalog's core runtime packages. Codegen, lint,
+      TypeScript and Tailwind tools may be installed once at the app root; the full marketing landing app is exempt
+      from core package presence. These requirements apply in lite and full.
+    rationale: |-
+      A declared stack keeps each concern on one library and makes an additional dependency an explicit product decision.
+    cases:
+      - id: case-1
+        when: A package is outside the stack catalog
+        write: Declare its name and reason in hfs.json fe.extraPackages before adding the FE dependency.
+      - id: case-2
+        when: A product app is missing a core runtime library
+        write: Add the catalog's core package to that app's manifest, even when build tools are shared at the root.
+    verification:
+      automated:
+        - FE_STACK_UNLISTED
+        - FE_STACK_CORE_MISSING
+      manual: []
+    relatedExamples: []

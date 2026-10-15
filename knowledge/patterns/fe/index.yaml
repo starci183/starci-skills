@@ -39,8 +39,8 @@ topics:
     rules: "FE-NAMING-1 … FE-NAMING-7"
   - path: function.yaml
     title: Function
-    decides: "Component shape, the { state, props, on } pure half of atoms (drawing law), server and client connected halves, data lifecycle, route files"
-    rules: "FE-FUNCTION-1 … FE-FUNCTION-7"
+    decides: "Component shape, the { state, props, on } pure half of atoms (drawing law), server and client connected halves, data lifecycle, route files, function line budget"
+    rules: "FE-FUNCTION-1 … FE-FUNCTION-9"
   - path: imports.yaml
     title: Imports
     decides: "Source and package paths, Grammar entry, responsibility direction, public entries; layout is Prettier's"
@@ -111,8 +111,8 @@ topics:
     rules: "FE-CSS-1 … FE-CSS-4"
   - path: packages.yaml
     title: Packages
-    decides: "Built packages with explicit exports, no dead unit, one version of every dependency"
-    rules: "FE-PACKAGES-1 … FE-PACKAGES-3"
+    decides: "Built packages with explicit exports, no dead unit, one version of every dependency, declared stack dependencies and core packages"
+    rules: "FE-PACKAGES-1 … FE-PACKAGES-4"
   - path: multi-app.yaml
     title: Multiple apps
     decides: "Independent apps under fe/apps/<app>, drafts as branches, ui-screen records that name their app"

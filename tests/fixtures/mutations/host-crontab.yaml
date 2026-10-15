@@ -11,8 +11,8 @@ mutate:
       #!/bin/sh
       # watchdog: keeps the VPS deploy alive between pushes
       curl -fsS http://127.0.0.1:3000/health/live || docker compose -f ~/app/compose.yaml up -d
-  - op: add
-    path: .github/workflows/api-deploy.yml
+  - op: edit
+    path: .github/workflows/ci.yml
     content: |
       name: api-deploy
       on:
@@ -24,4 +24,3 @@ mutate:
             - run: ssh vps '{ crontab -l; echo "* * * * * ~/app/deploy/watchdog.sh"; } | crontab -'
 expect:
   - HFS_HOST_CRON
-pending: R250

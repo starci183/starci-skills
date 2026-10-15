@@ -98,9 +98,10 @@ rules:
   - id: BE-TEST-2
     title: Build the subject through the Nest testing module, providers only
     kind: mandatory
-    hfsRules: [R48, R85]
+    hfsRules: [R48, R85, R281]
     requirement: |-
-      A unit spec builds its service with `Test.createTestingModule({ providers: [Service, { provide: TOKEN, useValue: double },
+      A unit spec of every declared logic role, including a policy, mapper, guard or integration client, builds its subject
+      with `Test.createTestingModule({ providers: [Service, { provide: TOKEN, useValue: double },
       ...] }).compile()` and takes the subject with `moduleRef.get(Service)`. There is no `new` of the service, no `imports: [...]`
       of a real module, no `overrideProvider` and no `overrideModule`: the module holds the subject and its doubles and nothing
       else, so dependency injection resolves the same constructor parameters that production resolves. The spec calls the
@@ -121,6 +122,7 @@ rules:
       automated:
         - BE_SPEC_QUALITY
         - BE_RAW_INJECT
+        - BE_SPEC_FORM_ALL_ROLES
       manual:
         - Review that a double matches the real dependency contract.
     relatedExamples: [service-spec]
@@ -359,11 +361,13 @@ rules:
   - id: BE-TEST-9
     title: What is asserted
     kind: mandatory
-    hfsRules: [R48, R47]
+    hfsRules: [R48, R47, R281]
     requirement: |-
       Assert the refusal code or error code, ordering of side effects, returned rows, persisted state and the `where` that holds
       ownership, as relevant. Test titles are English sentences that state the behavior (BE-CONVENTION 1.16); whether title
       and assertions describe the required behavior is agent review.
+      Every unit test contains a behavior or state assertion. A test with zero assertions, or only `toBeDefined()` existence
+      checks, does not prove the subject's behavior.
     rationale: |-
       Assertions on type, code and state prove behavior. Message strings and call counts alone do not.
     cases:
@@ -384,6 +388,7 @@ rules:
         - BE_SPEC_QUALITY
         - BE_TEST_TOPOLOGY
         - BE_CONTRACT_UNGUARDED
+        - BE_SPEC_FORM_ALL_ROLES
       manual:
         - Review that titles and assertions describe the required behavior.
     relatedExamples: []
@@ -479,13 +484,14 @@ rules:
         - BE_TEST_TOPOLOGY
         - BE_CONTRACT_UNGUARDED
         - BE_SPEC_QUALITY
+        - BE_APP_BOOT_PROOF_MISSING
       manual:
         - Confirm the edition's boot proof fails when a module or provider of the app is missing.
     relatedExamples: []
   - id: BE-TEST-13
     title: Coverage is per-file 100 on the logic roles of the measured slots, from one derivation
     kind: mandatory
-    hfsRules: [R11, R47, R204]
+    hfsRules: [R11, R47, R204, R273]
     requirement: |-
       ts-jest runs with `diagnostics: false` in every project (`isolatedModules: true` comes from `@starci/tsconfig`); types are checked once, by `typecheck`
       and `typecheck:tests`. What the unit project measures is derived once from the slot manifest (scripts/hfs/coverage-scope.mjs): every
@@ -497,6 +503,10 @@ rules:
       on `be/tsconfig.json` and the app root `package.json` lists `tslib` in its devDependencies, so neither the `design:paramtypes`
       guards TypeScript emits under isolated modules nor inlined decorator helpers add branches: counts measure only source. The managed jest config and preset render all of this; an app
       never edits the coverage settings — a hand edit of the rendered file is drift (R204 `HFS_COVERAGE_SCOPE_DRIFT`) — and no file carries an inline coverage ignore.
+      `starci app check --coverage-from be/coverage/lcov.info` checks 100 percent lines, functions and branches for every
+      tracked logic file in that same edition-derived scope. A missing source record or unavailable metric is a failure.
+      The report lists the measured files and those outside the scope, including features, cli and webhooks; a passing
+      coverage report proves only the measured scope.
     rationale: |-
       The modules' logic is the only place decisions live (BE-TEST-7: the feature tier is thin and never measured, and
       declaration or composition files carry nothing a branch could hide in), so a per-file 100 on exactly the measured files is
@@ -517,6 +527,7 @@ rules:
         - BE_TEST_TOPOLOGY
         - BE_CONTRACT_UNGUARDED
         - HFS_COVERAGE_SCOPE_DRIFT
+        - HFS_COVERAGE_BELOW
       manual:
         - Confirm a new service or cli command ships its spec in the same change and the unit project stays at 100.
     relatedExamples: []

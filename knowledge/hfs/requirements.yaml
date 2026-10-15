@@ -1976,8 +1976,8 @@ requirements:
     owedRules:
       - R253
       - R277
-    gap: Provider-shaped scanning covers fe/ and supabase/ only; be/deploy/scripts/workflows have weaker generic
-      patterns.
+    gap: Provider-shaped scanning covers front-end and Supabase slots only; app.sides (back-end), app.deploy,
+      app.scripts and app.ci-deploy have weaker generic patterns.
   - id: OPS-K3
     source: docs/application-stacks.md#initialize-and-seal
     editions:
@@ -3599,7 +3599,7 @@ requirements:
     editions:
       - lite
       - full
-    statement: "`.editorconfig`, `.nvmrc`, `.gitattributes`, `.sops.yaml`. slots 399/407 have no `managedBy`"
+    statement: "Slots `app.tool-config`, `app.gitattributes` and `app.sops`. slots 399/407 have no `managedBy`"
     status: owed
     analysis:
       file: analysis/work-data-docs.md
@@ -4163,7 +4163,7 @@ requirements:
     source: docs/lite-edition.md#what-lite-forbids
     editions:
       - lite
-    statement: Lite `.starciwork` admits only `.gitignore`, optional `workspace.yaml` and `brand/**`; full retains
+    statement: Lite slot `app.starciwork` admits only its `lite.requires` and `lite.allows` members; full retains
       the full Work tree.
     status: enforced
     ruling: ruling:R212/case-4

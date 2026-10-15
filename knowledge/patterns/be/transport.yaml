@@ -26,13 +26,16 @@ rules:
   - id: BE-TRANSPORT-1
     title: GraphQL is the default door and its files are flat
     kind: mandatory
-    hfsRules: [R88, R89]
+    hfsRules: [R88, R89, R278]
     requirement: |-
       GraphQL (code-first, Apollo) is the default door. Resolver files are `transport/graphql/<action>.resolver.ts`, inputs
       `transport/graphql/dto/<action>.input.ts` (`<Action>Input`), outputs `dto/<action>.type.ts` (`<Action>Type`),
       `dto/<action>.args.ts` when needed, and mappers `<action>.mapper.ts` (`to<Action>Type`, `to<Action>Request`). The method
       name is the operation name and `name:` equals the method. There is one Nest module per transport
       (`<feature>-graphql.module.ts`), never one per operation.
+      REST in lite and full carries evidence on each route decorator: a probe, auth handshake, signed webhook, actual byte
+      stream or public versioned operation served from the app's nonempty `defineOperations` table. A class-level reason or
+      an unused `StreamableFile` import proves no route; the implementation must actually stream bytes when that is its reason.
     rationale: |-
       One flat shape per operation makes the operation, its input, its output and its mapper findable from the name alone.
     verification:
@@ -40,6 +43,8 @@ rules:
         - BE_TRANSPORT_SHAPE
         - BE_SOURCE_FORM
         - BE_PUBLIC_CONTRACT_FORM
+        - BE_REST_DOOR_EVIDENCE
+        - BE_REST_ROUTE_UNDECLARED
       manual: []
     relatedExamples: [api]
   - id: BE-TRANSPORT-2

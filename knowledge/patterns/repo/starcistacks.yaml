@@ -27,7 +27,7 @@ rules:
   - id: REPO-STACKS-1
     title: One shape per environment
     kind: mandatory
-    hfsRules: [R10, R01, R212]
+    hfsRules: [R10, R01, R212, R276]
     requirement: |
       app.starcistacks owns the application-root declaration and the permitted shape of each environment; neither side owns
       a stack tree. Read that slot's requires, allows, forbidden and edition overlay instead of copying its file list.
@@ -35,6 +35,9 @@ rules:
       declaration and permits Swarm infra, the environment's runbook and record, and sealed custody; the other infra runtimes,
       runtime and seeds trees remain forbidden. Lite components never duplicate a Supabase-provided backing service.
       Deployment design belongs to be.docs; the stack tree holds the declared topology and operational record.
+      Lite runs no PostgreSQL, Redis or MongoDB backing image. A database-dependent sidecar uses SQLite on a named
+      persistent volume declared by its component and mounted in the rendered model; a sidecar requiring another
+      database is refused. Full retains its declared backing topology.
     rationale: |
       One shape lets the stack check and the deploy tooling find everything without a per-project map.
     cases:
@@ -62,24 +65,30 @@ rules:
         - HFS_EDITION_INVALID
         - HFS_EDITION_FORBIDDEN_PRESENT
         - HFS_STARCIWORK_LITE_FORBIDDEN
+        - STACKS_LITE_SELFHOSTED_DB
+        - STACKS_SIDECAR_VOLUME_UNDECLARED
+        - STACKS_SIDECAR_DB_UNSUPPORTED
       manual:
         - starci gate starcistacks <app> exits 0 (the app root).
     relatedExamples: []
   - id: REPO-STACKS-4
     title: Scheduled work on Swarm is application-owned
     kind: mandatory
-    hfsRules: [R10, R212]
+    hfsRules: [R10, R212, R250, R268]
     requirement: |
       Recurring work is owned by the application: a back-end scheduler dispatches a command, a pgmq job has an api or worker
       runner, or a lite pg_cron tick enqueues work. Deployment never installs a host crontab from app.ci-deploy, app.deploy,
       app.scripts, app.scripts.delivery or app.starcistacks. The checker reports the offending file and line.
+      Deployment scripts delegate to docker, starci or the named back-end CLI action; they contain no inline JavaScript,
+      SQL, psql or downloaded shell logic. Compose up, down and pull target only an explicitly dev environment.
+      Every app scheduler, active pg_cron schedule, selected scheduled component and rendered replicated-job also has a
+      matching top-level jobs declaration with its schedule and named CLI invocation; a rendered job uses that same
+      invocation without shell chaining. A workflow never schedules application work.
       A scheduled CLI batch is converted to an app scheduler or declared as a component with `role: job`,
       `mode: replicated-job`, a cron `schedule` and a `scheduler` naming a declared `role: scheduler` component running
       swarm-cronjob. Both components belong to the target environment. The stack job has deploy mode replicated-job,
       zero replicas, restart condition
       none and matching swarm.cronjob.enable and swarm.cronjob.schedule service labels.
-      Every Swarm service has a digest-pinned image, healthcheck, update_config with order, failure_action rollback and
-      monitor, rollback_config and restart_policy. Only ingress publishes ports; secrets are external with versioned names.
     rationale: |
       A schedule declared with its runner remains reviewable and moves with the application release. A host crontab adds a
       second runtime authority that the stack cannot reconcile.
@@ -99,8 +108,67 @@ rules:
         - HFS_EDITION_INVALID
         - HFS_EDITION_FORBIDDEN_PRESENT
         - HFS_STARCIWORK_LITE_FORBIDDEN
+        - HFS_HOST_CRON
+        - HFS_DEPLOY_NO_LOGIC
+        - HFS_DEPLOY_COMPOSE_ON_VPS
+        - HFS_DEPLOY_SCHEDULER
+        - HFS_SCHEDULE_UNDECLARED
       manual:
         - Confirm completion, retry and overlap handling belongs to the job and that its scheduler has the required runtime access.
+    relatedExamples: []
+  - id: REPO-STACKS-5
+    title: Rendered Swarm services preserve declared custody and ingress
+    kind: mandatory
+    hfsRules: [R266, R275]
+    requirement: |
+      Each Swarm environment declares one ingress component and its hosts. Its component has role ingress and a
+      digest-pinned supported image; Traefik and Caddy are both accepted. Only that ingress publishes ports. Every host
+      has a route, DNS ownership receipt and TLS ownership evidence. DNS and TLS provider actions remain owner-run.
+      Swarm secrets are external and immutable, matching their declared runtimeName and positive version; services pass
+      no secret environment literals. Stateful services declare placement constraints. Every Swarm service has a
+      digest-pinned image, healthcheck, update_config with order, failure_action rollback and monitor, rollback_config
+      and restart_policy. A lite api composing realtime features pins replicas to 1;
+      full retains its declared replica topology.
+    rationale: |
+      Judging the rendered model connects the deployment's actual ports, secrets and service policies to its declaration.
+    cases: []
+    verification:
+      automated:
+        - STACKS_SECRET_NOT_EXTERNAL
+        - STACKS_SECRET_UNVERSIONED
+        - STACKS_SECRET_ENV_LITERAL
+        - STACKS_PORT_PUBLISHED
+        - STACKS_SECOND_INGRESS
+        - STACKS_DNS_UNDECLARED
+        - STACKS_HOST_UNROUTED
+        - STACKS_TLS_UNDECLARED
+        - STACKS_PLACEMENT_MISSING
+        - STACKS_HEALTHCHECK_MISSING
+        - STACKS_UPDATE_POLICY_MISSING
+        - STACKS_REALTIME_SCALED
+        - STACKS_INGRESS_UNDECLARED
+        - STACKS_INGRESS_UNKNOWN
+      manual: []
+    relatedExamples: []
+  - id: REPO-STACKS-6
+    title: Releases and backups have reviewable recovery evidence
+    kind: mandatory
+    hfsRules: [R267]
+    requirement: |
+      Each Swarm environment declares an immutable images lock, active and previous release pointers and nonempty
+      health assertions. Every stateful component and declared managed backing dependency has a backup target,
+      retention, owner and tracked restore proof. The rendered deployment model is available and valid; an unavailable
+      model fails the check. Owner-run setup and recovery actions are declared with their evidence.
+    rationale: |
+      Release and backup declarations make the previous release and the proof of data recovery assessable before deployment.
+    cases: []
+    verification:
+      automated:
+        - STACKS_RELEASE_UNDECLARED
+        - BACKUP_UNDECLARED
+        - BACKUP_PROOF_MISSING
+        - STACKS_MODEL_UNAVAILABLE
+      manual: []
     relatedExamples: []
   - id: REPO-STACKS-2
     title: Shared host services are declared, not copied

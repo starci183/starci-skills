@@ -120,8 +120,8 @@ topics:
   - id: be.api-auth
     title: API authentication and input bounds
     path: api-auth.yaml
-    decides: Default deny with APP_GUARD and public reasons, CSRF origin guard, identity-owned verification, signed webhooks, typed operations, bounded validated input, cursor pagination
-    rules: BE-AUTH-1 … BE-AUTH-6
+    decides: Default deny with APP_GUARD and public reasons, CSRF origin guard, identity-owned verification, signed webhooks, typed operations, bounded validated input, cursor pagination, exact API edge trust and distinct live/ready probes
+    rules: BE-AUTH-1 … BE-AUTH-8
   - id: be.config
     title: Configuration and secrets
     path: config.yaml
@@ -135,8 +135,8 @@ topics:
   - id: be.persistence
     title: Persistence and migrations
     path: persistence.yaml
-    decides: Migrations as the only schema authority, the cli migrate command as the only runner, persistence per capability, SqlText constants, the outbox, no transaction spanning an external call, the named shared EntityManager, one connection per database, table ownership and bounds, transactions
-    rules: BE-PERSISTENCE-1 … BE-PERSISTENCE-10
+    decides: Migrations as the only schema authority, the cli migrate command as the only runner, persistence per capability, SqlText constants, the outbox, no transaction spanning an external call, the named shared EntityManager, one connection per database, table ownership and bounds, transactions, Supabase browser access, least-privilege app roles, hardened RLS, immutable baselines and database configuration
+    rules: BE-PERSISTENCE-1 … BE-PERSISTENCE-21
   - id: be.background
     title: Background work
     path: background.yaml

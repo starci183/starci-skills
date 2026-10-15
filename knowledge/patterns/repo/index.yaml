@@ -24,7 +24,7 @@ topics:
     title: Repository folder
     path: folder.yaml
     decides: Every tracked path has a slot, be/apps/<app> and fe/apps/<app> only, one npm manifest at the root, .starciwork at the root and .starcistacks in be/, ignored and external storage, README
-    rules: REPO-FOLDER-1 … REPO-FOLDER-6
+    rules: REPO-FOLDER-1 … REPO-FOLDER-7
   - id: repo.starciwork
     title: .starciwork
     path: starciwork.yaml
@@ -33,18 +33,18 @@ topics:
   - id: repo.starcistacks
     title: .starcistacks
     path: starcistacks.yaml
-    decides: One shape per environment, host services declared not copied, declarations versus effects
-    rules: REPO-STACKS-1 … REPO-STACKS-3
+    decides: Environment shape, app-owned schedules, Swarm custody and ingress, release and backup recovery evidence, declarations versus effects
+    rules: REPO-STACKS-1 … REPO-STACKS-6
   - id: repo.secrets
     title: Secrets
     path: secrets.yaml
-    decides: One sealed location, plaintext never in the tree, agents never touch values or keys, the recipient truth
-    rules: REPO-SECRETS-1 … REPO-SECRETS-4
+    decides: Sealed custody, typed environment key parity and value shapes, private identity custody, script hygiene, agents never touch values or keys
+    rules: REPO-SECRETS-1 … REPO-SECRETS-6
   - id: repo.tooling
     title: Tooling
     path: tooling.yaml
     decides: Thin configs into canon packages per side, generated files from starci app sync at the app root, one machine at every gate, no inline configuration, e2e outside automatic gates
-    rules: REPO-TOOLING-1 … REPO-TOOLING-6
+    rules: REPO-TOOLING-1 … REPO-TOOLING-8
   - id: repo.formatter
     title: Formatter
     path: formatter.yaml
@@ -64,4 +64,4 @@ topics:
     title: Size budgets
     path: size-budgets.yaml
     decides: The budgets, no-growth over budget, duplicated code
-    rules: REPO-BUDGET-1 … REPO-BUDGET-3
+    rules: REPO-BUDGET-1 … REPO-BUDGET-4

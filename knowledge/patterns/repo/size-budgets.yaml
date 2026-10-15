@@ -51,6 +51,23 @@ rules:
         - FE_CONSOLE_CALL
       manual: []
     relatedExamples: []
+  - id: REPO-BUDGET-4
+    title: Build assets have a per-file budget and allowed kinds
+    kind: mandatory
+    hfsRules: [R282]
+    requirement: |
+      Each back-end build asset fits the configured per-file asset budget, 512000 bytes by default, and its extension
+      belongs to the build-asset allowlist. Ordinary media lives in object storage. Model weights and datasets are never
+      tracked in the back end; declared documentation media remains allowed.
+    rationale: |
+      Build assets should be bounded inputs to the application, while media and model data have their own storage lifecycle.
+    cases: []
+    verification:
+      automated:
+        - HFS_ASSET_OVERSIZE
+        - HFS_ASSET_KIND
+      manual: []
+    relatedExamples: []
   - id: REPO-BUDGET-2
     title: No growth over budget, new files inside budget
     kind: mandatory

@@ -78,13 +78,14 @@ rules:
   - id: FE-WIRE-GENERATED
     title: Wire types are generated from be/contracts
     kind: mandatory
-    hfsRules: [R52, R23]
+    hfsRules: [R52, R23, R113, R288]
     requirement: |-
       The back end commits `be/contracts/<app>/schema.graphql`, written by `starci app emit`. The front end reads it in
       place (`hfs.json` `sides.fe.reads: [be/contracts/]`) and keeps no copy. graphql-codegen (the root `codegen` script)
       writes the ignored `modules/api/graphql/__generated__/` from it; `lint`, `typecheck`, `build:fe` and the op gate run
       `codegen` first. The request and response types under `queries/types/` and `mutations/types/` re-export or narrow the
       generated types; a hand-written wire type, a cast of a response and an enum typed as `string` are forbidden.
+      Every GraphQL document, including a gql template embedded in TypeScript, validates against that back-end contract.
     rationale: |-
       Types written by hand drift from the back end without a signal; the committed snapshot makes the interface between the
       sides a reviewable artifact in the same commit as the change that moved it.
@@ -104,6 +105,9 @@ rules:
       automated:
         - FE_WIRE_GENERATED
         - HFS_CONTRACT_SNAPSHOT_DRIFT
+        - FE_GRAPHQL_CONTRACT
+        - FE_STACK_UNLISTED
+        - FE_STACK_CORE_MISSING
       manual:
         - Review contract diffs for breaking changes before regenerating.
     relatedExamples: []

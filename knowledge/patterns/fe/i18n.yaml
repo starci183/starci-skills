@@ -121,13 +121,14 @@ rules:
   - id: FE-I18N-2
     title: No display text outside the catalog
     kind: mandatory
-    hfsRules: [R58, R18]
+    hfsRules: [R58, R18, R286]
     requirement: |-
       No display text is written in source at any tier: blocks, pages, layouts, composites, branches, leaves, overlays and
       route files, including JSX text, `aria-label`, `title`, `placeholder`, `alt` and copy objects, in any language. Text
       comes from `useTranslations` or `getTranslations` (or resolved labels handed down from the connected half). There is
-      no escape annotation and no inline switch. Form validation messages are message keys resolved by the
-      connected half.
+      no escape annotation and no inline switch. Validation call arguments, including Zod messages, and toast titles
+      and descriptions use next-intl translations; neither display literals nor untranslated message keys are passed
+      as their copy.
     rationale: |-
       A single escape hatch turns the rule into a comment convention. With none, every string is translatable and
       checkable, and the lint has one job.
@@ -143,11 +144,14 @@ rules:
         write: 'const t = await getTranslations("sales.summary")'
       - id: case-4
         when: A schema message
-        write: 'z.string().min(1, "sales.send.errors.fingerprintRequired") and the connected half calls t(key).'
+        write: 'z.string().min(1, t("sales.send.errors.fingerprintRequired")) in the connected form hook.'
     verification:
       automated:
         - FE_I18N_LITERAL
         - HFS_INLINE_SUPPRESSION
+        - FE_COPY_IN_CALL
+        - FE_NO_ALERT
+        - FE_ICON_INLINE_SVG
       manual:
         - Review that keys name the meaning, not the current wording.
     relatedExamples: []

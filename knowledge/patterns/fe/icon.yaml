@@ -21,13 +21,14 @@ rules:
   - id: FE-ICON
     title: "One icon set: the heroicons family (@heroicons/react first, @starci/heroicons for what it lacks)"
     kind: mandatory
-    hfsRules: [R244, R93]
+    hfsRules: [R244, R93, R286]
     requirement: |-
       Application icons come from the heroicons family through the components/leaves icon owner (or the grammar), on the two
       cuts 24/outline and 16/solid. @heroicons/react is the base set and is used first; @starci/heroicons supplies only a
       glyph absent from @heroicons/react (a brand or domain glyph drawn in heroicons style), never a copy of a heroicons
       glyph; a glyph missing from both is added to @starci/heroicons. Phosphor, react-icons, lucide-react, iconify, gravity,
-      tabler and fontawesome are refused.
+      tabler and fontawesome are refused. Inline SVG glyphs, including paths drawn inside the Icon leaf, are refused;
+      only a leaf explicitly declared as a brand mark in hfs.json may draw its brand SVG.
     rationale: |-
       One icon set keeps stroke, size and metaphor consistent; a custom cut that only fills the gaps of the base set never
       competes with it for the same meaning.
@@ -66,5 +67,8 @@ rules:
         - FE_VENDOR_BOUNDARY
         - ARCH_GRAMMAR_CONTRACT_INVALID
         - ARCH_GRAMMAR_EXPORT_BYPASS
+        - FE_COPY_IN_CALL
+        - FE_NO_ALERT
+        - FE_ICON_INLINE_SVG
       manual: []
     relatedExamples: []

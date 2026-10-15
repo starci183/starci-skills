@@ -104,12 +104,12 @@ The browser stack helper generates fresh values per run and hands them to Compos
 ## Front-end apps and projection
 
 These are public configuration keys. Next.js includes `NEXT_PUBLIC_*` values in the browser bundle at build time;
-never put a credential in them. `scripts/serve.mjs` derives defaults from the dev port projection.
+never put a credential in them. `examples/ecommerce-app/scripts/serve.mjs` derives defaults from the dev port projection.
 
 | Key | Consumer | Default |
 | --- | --- | --- |
-| `NEXT_PUBLIC_IDENTITY_API_URL` | Shop identity GraphQL transport | projection when started through `scripts/serve.mjs`; otherwise required |
-| `NEXT_PUBLIC_ORDER_API_URL` | Shop order GraphQL transport | projection when started through `scripts/serve.mjs`; otherwise required |
+| `NEXT_PUBLIC_IDENTITY_API_URL` | Shop identity GraphQL transport | projection when started through the serve helper; otherwise required |
+| `NEXT_PUBLIC_ORDER_API_URL` | Shop order GraphQL transport | projection when started through the serve helper; otherwise required |
 | `NEXT_PUBLIC_SHOP_URL` | Landing link to the shop | dev projection |
 | `ECOMMERCE_APP_METADATA` | Server-side projection reader and serve script | ancestor `.starcistacks/dev/infra/metadata.json` |
 

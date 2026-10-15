@@ -23,7 +23,7 @@ rules:
   - id: BE-IMPORTS-1
     title: Paths
     kind: mandatory
-    hfsRules: [R30, R25]
+    hfsRules: [R30, R25, R280]
     requirement: |-
       Across owners use the back end's aliases (the managed `be/tsconfig.json` `paths`: `@modules/*`, `@features/*`, `@tests/*`) or a workspace
       package export, and always resolve to the target owner's `index.ts`. Inside one owner use relative imports and never
@@ -33,6 +33,8 @@ rules:
       60 names for domain, platform and feature owners, 80 for be.integrations provider entries. A specialized slot with
       no explicit export budget inherits its tier's owner-slot budget. No exported symbol lacks a supported external
       consumer (HFS_UNUSED_EXPORT); the single-file export count cannot exempt spec-only consumers.
+      Every enum member, queue constant, error code and catalog key has a production consumer. A test reference or an error's
+      kind or message mapping does not keep that symbol alive. A namespace import consumes only the members it actually reads.
     rationale: |-
       One public entry per owner is the only way to change internals without a cross-repository search.
     cases:
@@ -54,6 +56,7 @@ rules:
         - ARCH_PACKAGE_EXPORT_BYPASS
         - HFS_UNUSED_EXPORT
         - HFS_UNUSED_FILE
+        - HFS_UNUSED_SYMBOL
       manual: []
     relatedExamples: []
   - id: BE-IMPORTS-2

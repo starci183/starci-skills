@@ -1872,7 +1872,7 @@ surfaces:
         - app.supabase.migrations
         - app.supabase.migrations.archive
       examples:
-        - examples/lite-app/supabase/migrations/20261002203356_baseline.sql
+        - examples/lite-app/supabase/migrations/20261014100000_baseline.sql
       gap:
         A05/C02 owe a real baseline marker, tracked archive and restamp cutover. A file named baseline
         is not ceremony proof or archived-history secret-scan evidence.
@@ -1916,7 +1916,7 @@ surfaces:
         - be.integrations.supabase
         - fe.modules.auth
       examples:
-        - examples/lite-app/supabase/migrations/20261013064730_be-only-data-access.sql
+        - examples/lite-app/supabase/migrations/20261014100000_baseline.sql
       gap:
         A04/C02 owe DB-side BE-only grants, least privilege, FORCE RLS, view/set-schema/disable-RLS and
         policy-tautology proofs. Current BE-only SQL does not demonstrate all new branches.
@@ -1989,7 +1989,7 @@ surfaces:
         - be.queues
         - be.platform.queue
       examples:
-        - examples/lite-app/supabase/migrations/20261012110500_booking-confirmation-queue.sql
+        - examples/lite-app/supabase/migrations/20261014100000_baseline.sql
         - examples/lite-app/be/src/modules/queues/booking-confirmation/booking-confirmation.queue.ts
       gap:
         A05/C02 owe pgmq/code parity and a positive migration-owned pg_cron enqueue-only tick. Current

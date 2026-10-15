@@ -62,10 +62,11 @@ rules:
   - id: BE-SUPABASE-QUEUES-2
     title: The queue transport is pgmq behind the outbox relay
     kind: mandatory
-    hfsRules: [R152, R154]
+    hfsRules: [R152, R154, R258]
     requirement: |-
-      Every queue is a pgmq queue created by a supabase migration (`select pgmq.create('<queue>')`, plus its RLS posture: the
-      `pgmq` schema is never exposed to the client). A producer still writes the outbox in the caller's transaction; the relay
+      Every queue constant under `modules/queues` has a matching pgmq queue created by an active Supabase migration
+      (`select pgmq.create('<queue>')`), and every created queue has a constant. Queue objects grant privileges only to the
+      application role (`app_be` by default); neither `pgmq` nor `pgmq_public` is exposed to the client. A producer still writes the outbox in the caller's transaction; the relay
       reads committed outbox rows and calls `pgmq.send(queue, message, delay)` through the shared EntityManager with the outbox id
       inside the message, then marks the row sent in the same transaction. A processor reads with
       `pgmq.read(queue, vt, qty)`, runs the job, and on success calls `pgmq.delete(queue, msg_id)`; the handler's inbox claim on the
@@ -81,6 +82,8 @@ rules:
       automated:
         - BE_OUTBOX_WRITE_TX
         - BE_QUEUE_PRODUCER_SHAPE
+        - DB_PGMQ_DECLARED
+        - DB_CRON_OWNED
       manual:
         - Confirm the migration creates every declared queue and exposes no pgmq function to anon or authenticated.
     relatedExamples: []
@@ -131,11 +134,13 @@ rules:
   - id: BE-SUPABASE-QUEUES-5
     title: Schedules, cache and locks run on Supabase; realtime runs in the api process
     kind: mandatory
-    hfsRules: [R90, R212]
+    hfsRules: [R90, R212, R258]
     requirement: |-
-      A schedule is a pg_cron job declared in a supabase migration (`cron.schedule(name, cadence, $$select pgmq.send(...)$$)`),
-      `pg_net` calling a webhook door, or a declared replicated-job running the app's cli command. The schedule and overlap
-      policy are declared in `.starcistacks/application-stacks.yaml`; never use a host scheduler, `@nestjs/schedule` or a cron
+      A schedule is an app-owned queue scheduler, a pg_cron job declared in a Supabase migration, or a declared replicated-job
+      running the app's cli command. Each pg_cron job has a unique name and only enqueues to an existing queue, directly with
+      `pgmq.send` or through one enqueue-only `*_tick` function. It runs no business DML or HTTP request, and its tick is never
+      also owned by an app scheduler. A migration that removes a tick unschedules its job. The schedule and overlap policy
+      are declared in `.starcistacks/application-stacks.yaml`; never use a host scheduler, `@nestjs/schedule` or a cron
       process of its own. Cache is Postgres (an unlogged table owned by the cache capability) and a lock or lease is a Postgres
       advisory lock (`pg_try_advisory_xact_lock`) or a row claim. Realtime is the socket.io gateway of be.feature.realtime.websocket
       inside the api process, one instance with no Redis adapter (knowledge/patterns/be/realtime.yaml liteAdapter); a push that
@@ -153,6 +158,8 @@ rules:
         - HFS_EDITION_INVALID
         - HFS_EDITION_FORBIDDEN_PRESENT
         - HFS_STARCIWORK_LITE_FORBIDDEN
+        - DB_PGMQ_DECLARED
+        - DB_CRON_OWNED
       manual:
         - Confirm each pg_cron job is declared in a migration and enqueues, never runs business SQL itself.
     relatedExamples: []
@@ -180,5 +187,6 @@ rules:
         - HFS_EDITION_INVALID
         - HFS_EDITION_FORBIDDEN_PRESENT
         - HFS_STARCIWORK_LITE_FORBIDDEN
+        - BE_LITE_PROOF_LANE_MISSING
       manual: []
     relatedExamples: []

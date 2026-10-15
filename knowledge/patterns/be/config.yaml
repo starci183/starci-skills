@@ -28,7 +28,7 @@ rules:
   - id: BE-CONFIG-1
     title: One reader of the environment
     kind: mandatory
-    hfsRules: [R43, R26, R90]
+    hfsRules: [R43, R26, R90, R289]
     requirement: |-
       `platform/config` owns `EnvSource`, the standard reader of `process.env`. Secrets use `env.secret("<NAME>")`:
       `EnvSource.fromProcess()` resolves `<NAME>_FILE` first for the `.starcistacks` custody; its exact file contents take
@@ -82,6 +82,8 @@ rules:
         - FE_TIER_DIRECTION
         - ARCH_PACKAGE_IMPORTS_APP
         - BE_INFRA_OWNER
+        - BE_APP_ENV_REQUIRED
+        - BE_APP_MODULE_LIST_INLINE
       manual: []
     relatedExamples: []
   - id: BE-CONFIG-2
