@@ -469,6 +469,13 @@ rulings:
     supersedes: []
     enforcedBy: [scripts/checks/check-json-exceptions.mjs]
 
+  - id: module-definition-everywhere
+    date: '2026-10-15'
+    source: knowledge/hfs/rulings.yaml module-definition-everywhere; knowledge/patterns/be/folder.yaml BE-FOLDER-3
+    ruling: Every NestJS module has a module definition (capability, sub-module, feature, transport module, cli group, integration), built with ConfigurableModuleBuilder and registered with XModule.register(...); the clause that forbade a module-definition in an api feature is superseded.
+    supersedes: []
+    enforcedBy: [packages/eslint/be/module-shape.mjs, scripts/hfs/architecture/module-per-transport.mjs]
+
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']
   'ruling:R212/case-4': ['ruling:R212/case-1', 'ruling:R212/case-2']

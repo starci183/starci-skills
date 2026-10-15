@@ -9,13 +9,13 @@ import { byCodeUnit } from '../../lib/list.mjs';
  * reference's `CodingModule imports DeviceModule` shape). Each capability has one representative module: the only module
  * of the capability an app registers, once, in `apps/<app>/src/app.module.ts` as `X.register({ isGlobal: true, ... })`, or in a
  * composition group `apps/<app>/src/compose/<area>.ts` the root spreads (an app root here means the root and its groups).
- * It may split itself into sub-modules imported as plain `imports: [Sub]`; a sub-module is never in an app and has one
+ * It may split itself into sub-modules imported as `imports: [Sub.register({})]`; a sub-module is never in an app and has one
  * importer, its parent. Over every `@Module` class of the program:
  *
  *   - a module in an app root's imports (a `X.register(...)` call or a listed class, helpers of the root included) is
  *     listed once there, is imported by no other module, and, when it is a capability module of src/modules, is registered
  *     with the literal `isGlobal: true` (a bare capability class is not a registration);
- *   - a module imported by a non-app module has exactly one importer and appears in no app root; the one exception is
+ *   - a module imported by a non-app module (as `Sub.register({})`) has exactly one importer and appears in no app root; the one exception is
  *     the feature case: a feature's application module is imported by each protocol module of the same feature;
  *   - `isGlobal: true` appears only in an app root.
  */

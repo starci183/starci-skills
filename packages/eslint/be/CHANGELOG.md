@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.4.0 - 2026-10-15
+- Added: `module-definition-required` (R295 `BE_MODULE_DEFINITION_MISSING`, owner ruling 2026-10-15 `owner:module-definition-everywhere`): every `<x>.module.ts` of a feature, capability or projection has a sibling `<x>.module-definition.ts` and `<x>.options.ts`, its class extends the `ConfigurableModuleClass` of that definition, and a module of the product is listed in an `imports` array only as `X.register(...)`.
+- Changed: `capability-module-shape` judges the definition of every module: the representative module of a capability keeps `.setExtras({ isGlobal: false }, ...)` and the one `register` override; a sub-module, feature, transport module or cli group builds `.setClassMethodName("register").build()` and overrides nothing. A module definition in a feature is no longer refused.
+
 ## 3.3.1 - 2026-10-15
 - Changed: version-only republish. 3.3.0 was published first and the bundled canon-pins copy then moved with the rest of the alpha.14 package set (hfs 4.3.0, canon-fe 8.3.0, cli 1.3.0); 3.3.0 is superseded and no longer pinned anywhere.
 

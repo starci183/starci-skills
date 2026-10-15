@@ -262,7 +262,7 @@ profiles:
           check:
             kind: eslint
             sourceOnly: true
-            ruleIds: [starci-be/no-global-decorator, starci-be/is-global-only-in-app, starci-be/no-cross-owner-module-import, starci-be/capability-module-shape, starci-be/typed-module-definition, starci-be/static-module-register, starci-be/no-new-injectable, starci-be/no-module-let, starci-be/one-module-per-file]
+            ruleIds: [starci-be/no-global-decorator, starci-be/is-global-only-in-app, starci-be/no-cross-owner-module-import, starci-be/capability-module-shape, starci-be/module-definition-required, starci-be/typed-module-definition, starci-be/static-module-register, starci-be/no-new-injectable, starci-be/no-module-let, starci-be/one-module-per-file]
             expected: { severity: error }
         semantic:
           guidance: docs/architecture.md

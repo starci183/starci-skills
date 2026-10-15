@@ -689,11 +689,23 @@ BE_MODULE_SHAPE:
     - "new ConfigurableModuleBuilder() không có kiểu options"
     - "register không static, hoặc có forRoot, forFeature, registerAsync"
     - "new XService() hoặc let ở cấp module tạo trạng thái toàn cục"
-    - "Feature có hai module trong một thư mục transport (một module cho mỗi thao tác), có module-definition, hoặc @Module ngoài `<f>.module.ts` và `<f>-<protocol>.module.ts`; app import module ứng dụng của feature hoặc module transport không thuộc loại app cho phép (api: graphql/http/websocket; worker: schedule/message; cli: cli)"
+    - "Feature có hai module trong một thư mục transport (một module cho mỗi thao tác), module-definition không nằm cạnh module của nó, hoặc @Module ngoài `<f>.module.ts` và `<f>-<protocol>.module.ts`; app import module ứng dụng của feature hoặc module transport không thuộc loại app cho phép (api: graphql/http/websocket; worker: schedule/message; cli: cli)"
     - "Bộ máy đồ thị module: module đại diện của capability được đăng ký hai lần trong một app, thiếu isGlobal: true ở gốc app, hoặc bị module khác import"
     - "Module con có hơn một nơi import, hoặc vừa nằm ở gốc app vừa được module khác import"
     - "isGlobal: true xuất hiện ngoài gốc app apps/<app>/src/app.module.ts"
   nextStep_vi: "Bỏ @Global, để app đăng ký capability đúng một lần với isGlobal: true, dùng capability khác qua Inject<Thing>(), khai kiểu options, chỉ dùng static register, tách module, để container dựng provider; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_MODULE_DEFINITION_MISSING:
+  title: "A Nest module has no module definition or is registered without register"
+  title_vi: "Module Nest thiếu module-definition hoặc được đăng ký không qua register"
+  meaning_vi: "Mọi module Nest của sản phẩm (capability, module con, feature, module transport, nhóm cli) phải có tệp <x>.module-definition.ts và <x>.options.ts cạnh <x>.module.ts, lớp module kế thừa ConfigurableModuleClass của chính tệp đó, và khi được import thì chỉ được viết dạng XModule.register({...}), không import trần tên lớp."
+  causes_vi:
+    - "Có <x>.module.ts nhưng thiếu <x>.module-definition.ts hoặc <x>.options.ts bên cạnh"
+    - "Lớp module không kế thừa ConfigurableModuleClass lấy từ ./<x>.module-definition"
+    - "Module sản phẩm nằm trong mảng imports (hoặc nhóm compose của app) như một tên lớp trần thay vì XModule.register({...})"
+  nextStep_vi: "Tạo <x>.module-definition.ts (new ConfigurableModuleBuilder<XOptions>().setClassMethodName(\"register\").build()) và <x>.options.ts (export type XOptions = Record<string, never> nếu chưa có tùy chọn), cho lớp kế thừa ConfigurableModuleClass, và đăng ký bằng XModule.register({}); op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 

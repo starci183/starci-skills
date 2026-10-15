@@ -7,11 +7,13 @@ import { trimTrailingSlashes } from '../trailing-slashes.mjs';
 /**
  * R45 `module-per-transport` (BE_MODULE_SHAPE, BE-CONVENTION 1.2 and 1.6). A feature has one Nest module for its
  * application (`<f>.module.ts` at the feature root) and exactly one module per transport folder
- * (`transport/<protocol>/<f>-<protocol>.module.ts`). Never one module per operation, never a module-definition in a feature:
+ * (`transport/<protocol>/<f>-<protocol>.module.ts`). Never one module per operation. Every one of these modules has its own
+ * module-definition beside it (owner ruling module-definition-everywhere, R295):
  *
- *   - a `*.module.ts` file below a transport folder other than `<f>-<protocol>.module.ts`, a `*.module-definition.ts`
- *     anywhere in a feature, and an `@Module` class (or a `ConfigurableModuleBuilder`/`ConfigurableModuleClass` use) in a
- *     feature file that is neither the application module nor the transport module of its own folder are refused;
+ *   - a `*.module.ts` file below a transport folder other than `<f>-<protocol>.module.ts`, a `*.module-definition.ts` that is
+ *     not the sibling of the application module or of the transport module of its own folder, and an `@Module` class (or a
+ *     `ConfigurableModuleBuilder`/`ConfigurableModuleClass` use) in a feature file that is neither the application module, the
+ *     transport module of its own folder nor that module's definition are refused;
  *   - apps import only transport modules, of the kinds their app kind allows: the `composedBy` list of each transport slot
  *     in knowledge/hfs/slots.yaml (api: graphql, http, websocket; worker: schedule, message). An app root (app.module.ts
  *     or a composition group of its compose/ folder) that lists a feature's application module, or the transport module
@@ -53,13 +55,24 @@ function composedByProtocol(resolver) {
   return composedBy;
 }
 
-function reportTransportFileShapes(tree, placeOf, plain) {
+/** The module a feature file may declare: the application module, the transport module of its folder, or a cli folder's module. */
+function ownModuleOf(place, rel, composedModuleOf) {
+  if (place.composed) return composedModuleOf(rel);
+  return place.protocol === null
+    ? `${place.root}/${place.feature}.module.ts`
+    : `${place.root}/transport/${place.protocol}/${place.feature}-${place.protocol}.module.ts`;
+}
+
+const DEFINITION_FILE = /\.module-definition\.[cm]?tsx?$/u;
+const definitionOf = modulePath => modulePath.replace(/\.module\.([cm]?tsx?)$/u, '.module-definition.$1');
+
+function reportTransportFileShapes(tree, placeOf, plain, composedModuleOf) {
   let transportModules = 0;
   for (const rel of [...tree.files].sort(byCodeUnit)) {
     const place = placeOf(rel);
     if (!place) continue;
     const base = path.posix.basename(rel);
-    if (/\.module-definition\.[cm]?tsx?$/u.test(base)) plain(rel, `${rel} is a module-definition inside feature ${place.feature}; a feature module is a static \`@Module\`, and only capabilities under src/modules build their module from a definition. Delete it and list the providers in the module.`, { feature: place.feature });
+    if (DEFINITION_FILE.test(base) && rel !== definitionOf(ownModuleOf(place, rel, composedModuleOf))) plain(rel, `${rel} is a module-definition that is not beside a module of feature ${place.feature}; the definition of a module is its sibling ${path.posix.basename(definitionOf(ownModuleOf(place, rel, composedModuleOf)))}, one per application module, transport module or cli folder.`, { feature: place.feature });
     if (place.protocol && /\.module\.[cm]?tsx?$/u.test(base)) {
       const expected = `${place.feature}-${place.protocol}.module.ts`;
       if (place.below.length !== 3 || base !== expected) plain(rel, `${rel} is a second module of the ${place.protocol} transport of ${place.feature}; a transport folder has exactly one module, transport/${place.protocol}/${expected}, never one module per operation. List the operation's providers in that module and delete this file.`, { feature: place.feature, protocol: place.protocol });
@@ -88,13 +101,15 @@ function reportModuleClassLocation(file, statement, place, composedModuleOf, rep
   if (file.rel !== own) report(file, statement.name, `${statement.name.text} is a Nest module declared in ${file.rel}; a feature declares exactly its application module (${place.feature}.module.ts) and one module per transport folder (${place.feature}-<protocol>.module.ts), never a module per operation.`, { feature: place.feature });
 }
 
-function reportConfigurableModuleUses(file, checker, kit, ts, place, report) {
+function reportConfigurableModuleUses(file, checker, kit, ts, place, env) {
+  const own = ownModuleOf(place, file.rel, env.composedModuleOf);
+  const isDefinition = file.rel === definitionOf(own);
   kit.walk(file.sourceFile, node => {
-    if (ts.isNewExpression(node) && kit.isImportOf(checker, node.expression, 'ConfigurableModuleBuilder', '@nestjs/common')) {
-      report(file, node, `ConfigurableModuleBuilder builds a capability's module definition; feature ${place.feature} has static modules only, so declare the providers in its @Module.`, { feature: place.feature });
-    } else if (ts.isHeritageClause(node)) {
+    if (ts.isNewExpression(node) && kit.isImportOf(checker, node.expression, 'ConfigurableModuleBuilder', '@nestjs/common') && !isDefinition) {
+      env.report(file, node, `ConfigurableModuleBuilder builds the module definition of one module; in feature ${place.feature} it is written only in ${path.posix.basename(definitionOf(own))}, beside ${path.posix.basename(own)}.`, { feature: place.feature });
+    } else if (ts.isHeritageClause(node) && file.rel !== own) {
       for (const type of node.types) if (kit.isImportOf(checker, type.expression, 'ConfigurableModuleClass', '@nestjs/common')) {
-        report(file, type, `A feature module never extends ConfigurableModuleClass; feature ${place.feature} has static modules only.`, { feature: place.feature });
+        env.report(file, type, `ConfigurableModuleClass is extended by the module of its own definition only (${path.posix.basename(own)}); feature ${place.feature} declares no other configurable module.`, { feature: place.feature });
       }
     }
     return true;
@@ -118,7 +133,7 @@ function collectFeatureModules(graph, kit, ts, placeOf, composedModuleOf, report
     const checker = kit.checkerOf(file.sourceFile);
     const place = placeOf(file.rel);
     moduleClassesInFile(file, checker, place, modules, env);
-    if (place) reportConfigurableModuleUses(file, checker, kit, ts, place, report);
+    if (place) reportConfigurableModuleUses(file, checker, kit, ts, place, env);
   }
   return modules;
 }
@@ -203,7 +218,7 @@ export function checkModulePerTransport(input) {
   const composedBy = composedByProtocol(resolver);
 
   const tree = treeOf(config.root);
-  const transportModules = reportTransportFileShapes(tree, placeOf, plain);
+  const transportModules = reportTransportFileShapes(tree, placeOf, plain, composedModuleOf);
 
   const modules = collectFeatureModules(graph, kit, ts, placeOf, composedModuleOf, report);
 

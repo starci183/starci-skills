@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.4.0 - 2026-10-15
+- Added: R295 `BE_MODULE_DEFINITION_MISSING`: every Nest module has a module definition (owner ruling 2026-10-15 `owner:module-definition-everywhere`). The slot manifest allows `<x>.module-definition.ts` and `<x>.options.ts` beside every feature, transport, cli group, queue, reactor and job module; the generators of `starci app add` and `starci app new` write the three files and register the module as `X.register({})`.
+- Changed: `module-per-transport` accepts a module-definition beside the application module, the transport module of its folder and a cli group, and refuses one anywhere else.
+
 ## 4.3.0 - 2026-10-14
 - Added: the app file role `<app>.env.ts` (`apps/<app>/src/`, every `be.app.*` slot, budget 150): a typed `<App>Env` interface and fail-fast `read<App>Env` reader (secrets `_FILE` first), imported by `main.ts` so the entry stays within its 80 lines. Only `main.ts` and the app's own env file read the environment; the env file lists no module and imports no feature. The api, lite api and cli scaffolds write it.
 - Added: `starci app secret` custody verbs `init`, `set <env> <slug> <KEY>` (stdin or `--generate <bytes>`), `get <env> <slug> [KEY] --to-file [--reveal]`, `materialize <env>` and `list <env>` over sops dotenv files under `.starcistacks/<env>/secrets/`; the age identity lives outside the repository, materialized values go under the local StarCi secrets directory for `*_FILE` reading, and no value reaches stdout unless `--reveal`. The scaffolded `.sops.yaml` carries the `init` instruction and the be config template reads `<NAME>_FILE` before `<NAME>`. An untracked root `secrets.env` of a lite app is an `HFS_PLAINTEXT_SECRET` warning.

@@ -12,11 +12,15 @@
  *     capability's representative module is reached through its `Inject*()` decorators, never by import. One owner may
  *     import its own modules (a transport module its feature's application module, a representative its sub-modules);
  *     the app composes every owner.
- *   - `capability-module-shape` holds the files of a capability: its representative `<c>.module.ts` extends the
- *     `ConfigurableModuleClass` of its own `<c>.module-definition.ts` (and may override only
- *     `static register(options: typeof OPTIONS_TYPE): DynamicModule`); that definition is a typed
- *     `ConfigurableModuleBuilder` with `.setExtras({ isGlobal: false }, ...)` and `.build()`; every sub-module and every
- *     feature module is a plain `@Module` class, and a feature has no module definition.
+ *   - `capability-module-shape` holds the definition of every module (owner ruling module-definition-everywhere): the representative
+ *     `<c>.module-definition.ts` of a capability is a typed `ConfigurableModuleBuilder` with `.setExtras({ isGlobal: false }, ...)`
+ *     and `.build()`; every other module's definition (a sub-module, a feature, a transport, a cli group) is
+ *     `.setClassMethodName("register").build()` with no extras; only a representative may override
+ *     `static register(options: typeof OPTIONS_TYPE): DynamicModule`.
+ *   - `module-definition-required` holds that every module has one: a `<x>.module.ts` of a feature, capability or projection has a
+ *     sibling `<x>.module-definition.ts` and `<x>.options.ts`, its class extends the `ConfigurableModuleClass` of that definition,
+ *     and a module of the product appears in an `imports` array only as `X.register(...)`, never as a bare class
+ *     (BE_MODULE_DEFINITION_MISSING).
  *   - `typed-module-definition` requires `ConfigurableModuleBuilder<Options>` to state its options type.
  *   - `static-module-register` allows one factory name, `register`, and requires it `static`: no `forRoot`, `forFeature`
  *     or `registerAsync`, because options are parsed once in `main.ts`.
@@ -25,6 +29,8 @@
  *   - `no-module-let` refuses mutable module-level state (`let` and `var` at the top of a file).
  *   - `one-module-per-file` allows one `@Module` class in a file, so one transport or application module has one home.
  */
+import { existsSync } from "node:fs"
+import { dirname, join } from "node:path"
 import ts from "typescript"
 import { decoratorName, keyName, walk } from "./lib/ast.mjs"
 import { importsFrom } from "./lib/declared.mjs"
@@ -295,6 +301,8 @@ export const oneModulePerFile = {
 }
 
 const CAPABILITY_TIERS = new Set(["domain", "platform", "integrations"])
+/** The tiers whose `<x>.module.ts` files are modules of the product: every one of them has a module definition. */
+const MODULE_TIERS = new Set(["feature", "domain", "platform", "integrations", "projections", "queues", "events"])
 
 /** `{ inside, name }`: the owner-relative path of a file and the owner's directory name, or null outside an owner. */
 const insideOwner = (hfs, filename) => {
@@ -330,82 +338,168 @@ const builderChain = (newExpression) => {
     return calls
 }
 
+/** True when the argument is the string literal `register`. */
+const isRegisterName = (node) => node?.type === "Literal" && node.value === "register"
+
+/** The reasons a builder chain is not the module definition of its kind (an empty list when it is). */
+const chainFaults = (calls, representative) => {
+    const missing = []
+    const extras = calls.find((entry) => entry.name === "setExtras")
+    const named = calls.find((entry) => entry.name === "setClassMethodName")
+    if (representative) {
+        const defaults = extras?.call.arguments[0]
+        const localByDefault =
+            defaults?.type === "ObjectExpression" &&
+            defaults.properties.some((item) => item.type === "Property" && keyName(item.key) === "isGlobal" && item.value.type === "Literal" && item.value.value === false)
+        if (!localByDefault) missing.push("`.setExtras({ isGlobal: false }, ...)` is missing or does not default `isGlobal` to a literal `false`")
+        if (named && !isRegisterName(named.call.arguments[0])) missing.push('`.setClassMethodName(...)` names a factory other than "register"')
+    } else {
+        if (extras) missing.push("a sub-module, feature or transport module is never global, so it has no `.setExtras(...)`")
+        if (!named || !isRegisterName(named.call.arguments[0])) missing.push('`.setClassMethodName("register")` is missing')
+    }
+    if (calls.at(-1)?.name !== "build") missing.push("the chain does not end in `.build()`")
+    return missing
+}
+
+/** The module scope of a file: its kind, tier and name when it is a `<x>.module.ts` or `<x>.module-definition.ts` of a product tier, else null. */
+const moduleFileOf = (hfs, filename) => {
+    const base = filename.split("/").at(-1)
+    const suffix = base.endsWith(".module-definition.ts") ? ".module-definition.ts" : base.endsWith(".module.ts") ? ".module.ts" : null
+    if (!suffix) return null
+    const tier = hfs.tierOf(filename)
+    if (!MODULE_TIERS.has(tier)) return null
+    const name = base.slice(0, base.length - suffix.length)
+    const where = insideOwner(hfs, filename)
+    const representative = CAPABILITY_TIERS.has(tier) && where !== null && where.inside === `${where.name}${suffix}`
+    return { kind: suffix === ".module.ts" ? "module" : "definition", tier, name, representative }
+}
+
 /**
- * The shape of a capability's module files (BE-CONVENTION 1.2): the representative `<c>.module.ts` extends the
- * `ConfigurableModuleClass` of its own `<c>.module-definition.ts`; that definition builds a typed
- * `ConfigurableModuleBuilder` with `.setExtras({ isGlobal: false }, ...)` and `.build()`; every other module of the
- * capability, and every feature module, is a plain static `@Module` class with no definition and no `register`.
+ * The shape of a module's definition (BE-CONVENTION 1.2, owner ruling module-definition-everywhere): the representative
+ * module of a capability builds `new ConfigurableModuleBuilder<XOptions>().setExtras({ isGlobal: false }, ...).build()` and
+ * may override only `static register(options: typeof OPTIONS_TYPE): DynamicModule`; every other module (a sub-module, a feature,
+ * a transport, a cli group) builds `new ConfigurableModuleBuilder<XOptions>().setClassMethodName("register").build()` and
+ * declares nothing but its `@Module` metadata.
  */
 export const capabilityModuleShape = {
     meta: {
         type: "problem",
-        docs: { description: "A capability's representative module extends its module definition's `ConfigurableModuleClass`; sub-modules and feature modules are plain." },
+        docs: { description: "A module definition is a typed `ConfigurableModuleBuilder` chain of its kind; only a capability's representative module overrides `register`." },
         schema: [],
         messages: {
-            extendsBase: "The representative module of `{{name}}` must be `@Module({...}) export class X extends ConfigurableModuleClass {}` with `ConfigurableModuleClass` imported from `./{{name}}.module-definition`.",
             registerSignature: "The only `register` a capability module may declare is the override `static register(options: typeof OPTIONS_TYPE): DynamicModule`, with `OPTIONS_TYPE` from `./{{name}}.module-definition`.",
-            plain: "`{{class}}` is a sub-module or a feature module: a plain static `@Module` class with no base class, no `register` and no module definition. Only the capability's representative module `{{name}}.module.ts` is configurable.",
-            chain: "The module definition must be `new ConfigurableModuleBuilder<XOptions>().setExtras({ isGlobal: false }, (d, e) => ({ ...d, global: e.isGlobal })).build()`: {{missing}}.",
-            featureDefinition: "A feature has no module definition: feature modules are static. Delete this file and register the feature's providers in its `@Module`.",
+            plain: "`{{class}}` is a sub-module, feature module, transport module or cli group: it declares its providers in `@Module({...})` and has no `register` of its own. Only the representative module of a capability may override `register`.",
+            chain: "The module definition of this kind must be {{shape}}: {{missing}}.",
         },
     },
     create(context) {
         const filename = normalizePath(context.filename || context.getFilename())
-        if (isDeclarationFile(filename)) return {}
-        const hfs = hfsOf(context)
-        const where = insideOwner(hfs, filename)
-        if (!where) return {}
-        const base = filename.split("/").at(-1)
-        const isDefinition = base.endsWith(".module-definition.ts")
-        const isModuleFile = base.endsWith(".module.ts")
-        if (where.tier === "feature" && isDefinition) return { Program: (program) => context.report({ node: program, loc: { line: 1, column: 0 }, messageId: "featureDefinition" }) }
-        if (CAPABILITY_TIERS.has(where.tier) && isDefinition) {
+        if (isDeclarationFile(filename) || isSpecFile(filename)) return {}
+        const scope = moduleFileOf(hfsOf(context), filename)
+        if (!scope) return {}
+        if (scope.kind === "definition") {
+            const shape = scope.representative
+                ? "`new ConfigurableModuleBuilder<XOptions>().setExtras({ isGlobal: false }, (d, e) => ({ ...d, global: e.isGlobal })).build()`"
+                : '`new ConfigurableModuleBuilder<XOptions>().setClassMethodName("register").build()`'
             return {
                 Program(program) {
                     let found = false
                     walk(program, (node) => {
                         if (node.type !== "NewExpression" || node.callee.type !== "Identifier" || node.callee.name !== "ConfigurableModuleBuilder") return
                         found = true
-                        const calls = builderChain(node)
-                        const extras = calls.find((entry) => entry.name === "setExtras")
-                        const defaults = extras?.call.arguments[0]
-                        const localByDefault =
-                            defaults?.type === "ObjectExpression" &&
-                            defaults.properties.some((item) => item.type === "Property" && keyName(item.key) === "isGlobal" && item.value.type === "Literal" && item.value.value === false)
-                        const missing = []
-                        if (!localByDefault) missing.push("`.setExtras({ isGlobal: false }, ...)` is missing or does not default `isGlobal` to a literal `false`")
-                        if (calls.at(-1)?.name !== "build") missing.push("the chain does not end in `.build()`")
-                        if (missing.length > 0) context.report({ node, messageId: "chain", data: { missing: missing.join("; ") } })
+                        const missing = chainFaults(builderChain(node), scope.representative)
+                        if (missing.length > 0) context.report({ node, messageId: "chain", data: { shape, missing: missing.join("; ") } })
                     })
-                    if (!found) context.report({ node: program, loc: { line: 1, column: 0 }, messageId: "chain", data: { missing: "no `new ConfigurableModuleBuilder<XOptions>()` is built here" } })
+                    if (!found) context.report({ node: program, loc: { line: 1, column: 0 }, messageId: "chain", data: { shape, missing: "no `new ConfigurableModuleBuilder<XOptions>()` is built here" } })
                 },
             }
         }
-        if (!isModuleFile || (where.tier !== "feature" && !CAPABILITY_TIERS.has(where.tier))) return {}
-        const importedFrom = new Map()
-        const representative = CAPABILITY_TIERS.has(where.tier) && where.inside === `${where.name}.module.ts`
         return {
             ClassDeclaration(node) {
                 if (!isModuleClass(node)) return
-                if (!representative) {
-                    const hasRegister = node.body.body.some((member) => member.type === "MethodDefinition" && member.key.type === "Identifier" && member.key.name === "register")
-                    if (node.superClass || hasRegister) context.report({ node: node.id ?? node, messageId: "plain", data: { class: node.id?.name ?? "This class", name: where.name } })
-                    return
-                }
-                const base = node.superClass
-                const imported = base?.type === "Identifier" ? importedFrom.get(base.name) : null
-                if (!imported || imported.name !== "ConfigurableModuleClass" || imported.source !== `./${where.name}.module-definition`) {
-                    context.report({ node: node.id ?? node, messageId: "extendsBase", data: { name: where.name } })
-                }
                 for (const member of node.body.body) {
-                    if (member.type === "MethodDefinition" && member.key.type === "Identifier" && member.key.name === "register" && !isRegisterOverride(member)) {
-                        context.report({ node: member, messageId: "registerSignature", data: { name: where.name } })
-                    }
+                    if (member.type !== "MethodDefinition" || member.key.type !== "Identifier" || member.key.name !== "register") continue
+                    if (!scope.representative) context.report({ node: member, messageId: "plain", data: { class: node.id?.name ?? "This class" } })
+                    else if (!isRegisterOverride(member)) context.report({ node: member, messageId: "registerSignature", data: { name: scope.name } })
                 }
             },
+        }
+    },
+}
+
+/** True when a class declaration carries the Nest `Module` decorator. */
+const isModuleDeclaration = (declaration) => {
+    if (!ts.isClassDeclaration(declaration)) return false
+    return (ts.getDecorators(declaration) ?? []).some((decorator) => {
+        const expression = ts.isCallExpression(decorator.expression) ? decorator.expression.expression : decorator.expression
+        return ts.isIdentifier(expression) && expression.text === "Module"
+    })
+}
+
+/** The array of an `imports` property (the `@Module({ imports })` metadata or a dynamic module literal), else null. */
+const importsArrayOf = (property) => (!property.computed && keyName(property.key) === "imports" && property.value.type === "ArrayExpression" ? property.value : null)
+
+/** The PascalCase options type name a module file name implies: `sepay-feed-http` gives `SepayFeedHttpOptions`. */
+const optionsTypeOf = (name) => `${name.replace(/(?:^|-)(\w)/g, (_, letter) => letter.toUpperCase())}Options`
+
+/**
+ * Every Nest module has a module definition and is registered through it (owner ruling module-definition-everywhere): its
+ * `<x>.module.ts` has a sibling `<x>.module-definition.ts` and `<x>.options.ts`, its class extends the `ConfigurableModuleClass`
+ * of that definition, and a module of the product is listed in an `imports` array only as `X.register(...)`, never as a bare
+ * class. The `AppModule` of an app root and the test world are composition roots and are not judged here.
+ */
+export const moduleDefinitionRequired = {
+    meta: {
+        type: "problem",
+        docs: { description: "A module has a sibling module definition and options file, extends its `ConfigurableModuleClass`, and is imported only as `X.register(...)`." },
+        schema: [],
+        messages: {
+            missingDefinition: '`{{name}}.module.ts` has no sibling `{{name}}.module-definition.ts`. Every module builds its base class: `export const { ConfigurableModuleClass, MODULE_OPTIONS_TOKEN, OPTIONS_TYPE } = new ConfigurableModuleBuilder<{{type}}>().setClassMethodName("register").build()`.',
+            missingOptions: "`{{name}}.module.ts` has no sibling `{{name}}.options.ts`. Declare `export type {{type}} = Record<string, never>` there (with a one-line doc saying the module takes no options yet), or its real options.",
+            extendsBase: "`{{class}}` must be `@Module({...}) export class {{class}} extends ConfigurableModuleClass {}` with `ConfigurableModuleClass` imported from `./{{name}}.module-definition`.",
+            unregistered: "`{{name}}` is imported as a bare class. Every module is registered through its definition: write `{{name}}.register({...})` (`{}` when it takes no options).",
+        },
+    },
+    create(context) {
+        const filename = normalizePath(context.filename || context.getFilename())
+        if (isDeclarationFile(filename) || isSpecFile(filename)) return {}
+        const hfs = hfsOf(context)
+        if (inTestWorld(hfs, filename)) return {}
+        const scope = moduleFileOf(hfs, filename)
+        const importedFrom = new Map()
+        const { checker, toTs } = typed(context)
+        const isModuleClassIdentifier = (identifier) => {
+            const tsNode = toTs(identifier)
+            let symbol = tsNode ? checker.getSymbolAtLocation(tsNode) : undefined
+            if (symbol && symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol)
+            return (symbol?.declarations ?? []).some((declaration) => !/[\\/]node_modules[\\/]/.test(declaration.getSourceFile().fileName) && isModuleDeclaration(declaration))
+        }
+        return {
             ImportDeclaration(node) {
                 for (const specifier of node.specifiers) {
                     if (specifier.type === "ImportSpecifier") importedFrom.set(specifier.local.name, { name: specifier.imported.name ?? specifier.imported.value, source: String(node.source.value) })
+                }
+            },
+            Program(program) {
+                if (scope?.kind !== "module") return
+                const siblings = dirname(filename)
+                const type = optionsTypeOf(scope.name)
+                if (!existsSync(join(siblings, `${scope.name}.module-definition.ts`))) context.report({ node: program, loc: { line: 1, column: 0 }, messageId: "missingDefinition", data: { name: scope.name, type } })
+                if (!existsSync(join(siblings, `${scope.name}.options.ts`))) context.report({ node: program, loc: { line: 1, column: 0 }, messageId: "missingOptions", data: { name: scope.name, type } })
+            },
+            ClassDeclaration(node) {
+                if (scope?.kind !== "module" || !isModuleClass(node)) return
+                const base = node.superClass
+                const imported = base?.type === "Identifier" ? importedFrom.get(base.name) : null
+                if (!imported || imported.name !== "ConfigurableModuleClass" || imported.source !== `./${scope.name}.module-definition`) {
+                    context.report({ node: node.id ?? node, messageId: "extendsBase", data: { class: node.id?.name ?? "This class", name: scope.name } })
+                }
+            },
+            Property(node) {
+                const array = importsArrayOf(node)
+                if (!array) return
+                for (const entry of array.elements) {
+                    if (entry?.type === "Identifier" && isModuleClassIdentifier(entry)) context.report({ node: entry, messageId: "unregistered", data: { name: entry.name } })
                 }
             },
         }
@@ -418,6 +512,7 @@ export const rules = {
     "is-global-only-in-app": isGlobalOnlyInApp,
     "no-cross-owner-module-import": noCrossOwnerModuleImport,
     "capability-module-shape": capabilityModuleShape,
+    "module-definition-required": moduleDefinitionRequired,
     "typed-module-definition": typedModuleDefinition,
     "static-module-register": staticModuleRegister,
     "no-new-injectable": noNewInjectable,
@@ -431,6 +526,7 @@ export const recommended = {
     "starci-be/is-global-only-in-app": "error",
     "starci-be/no-cross-owner-module-import": "error",
     "starci-be/capability-module-shape": "error",
+    "starci-be/module-definition-required": "error",
     "starci-be/typed-module-definition": "error",
     "starci-be/static-module-register": "error",
     "starci-be/no-new-injectable": "error",

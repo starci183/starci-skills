@@ -444,7 +444,8 @@ rules:
       - {kind: eslint-be, id: no-secret-default}
   - id: R45
     code: "BE_MODULE_SHAPE"
-    law: "`@Global` nowhere and `isGlobal: true` only at app roots; no cross-owner module imports; typed options; one module per transport; every handler and provider registered exactly once."
+    amendedBy: [R295, owner:module-definition-everywhere]
+    law: "`@Global` nowhere and `isGlobal: true` only at app roots; no cross-owner module imports; typed options; one module per transport, each module with its own module definition beside it (R295); every handler and provider registered exactly once."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_MODULE_SHAPE", "BE_MODULE_HANDLER_REGISTRATION", "BE_MODULE_PROVIDER_REREGISTRATION"]
@@ -3236,3 +3237,28 @@ rules:
       - {path: tests/hfs/hfs-stacks-deploy.spec.mjs, editions: [lite, full]}
     witness:
       - {path: tests/hfs/hfs-stacks-deploy.spec.mjs, editions: [lite, full]}
+
+  - id: R295
+    code: "BE_MODULE_DEFINITION_MISSING"
+    law: "Every NestJS module of the product has a module definition (owner ruling 2026-10-15, owner:module-definition-everywhere): capability modules, sub-modules, features, transport modules and cli groups alike. For a module `<x>` the folder holds `<x>.module-definition.ts` (`export const { ConfigurableModuleClass, MODULE_OPTIONS_TOKEN, OPTIONS_TYPE } = new ConfigurableModuleBuilder<XOptions>().setClassMethodName(\"register\").build()`; the representative module of a capability keeps `.setExtras({ isGlobal: false }, ...)`), `<x>.options.ts` (`export type XOptions`, `Record<string, never>` with a one-line doc when it takes nothing yet) and `<x>.module.ts` (`@Module({...}) export class XModule extends ConfigurableModuleClass {}`, no `register` override except the capability representative's). A module appears in an `imports` array or in an app composition group only as `XModule.register({...})`, never as a bare class. The `AppModule` of an app root and the test world are composition roots and are not judged."
+    kinds: [lint, codemod]
+    gates: [pre-commit, settle, land, ci]
+    failureCodes: ["BE_MODULE_DEFINITION_MISSING"]
+    enforcers:
+      - {kind: eslint-be, id: module-definition-required}
+      - {kind: eslint-be, id: capability-module-shape}
+      - {kind: machine, id: module-per-transport, at: scripts/hfs/architecture/module-per-transport.mjs}
+    editions: [lite, full]
+    docs:
+      - {path: docs/microservices.md#r295, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton/src/features/api/system-health/system-health.module-definition.ts, edition: full}
+      - {path: packages/hfs/templates/be/skeleton/src/features/api/system-health/transport/http/system-health-http.module-definition.ts, edition: full}
+      - {path: examples/lite-app/be/src/features/api/bookings/bookings.module-definition.ts, edition: lite}
+      - {path: examples/lite-app/be/src/features/api/bookings/transport/graphql/bookings-graphql.module-definition.ts, edition: lite}
+      - {path: examples/ecommerce-app/be/src/features/api/checkout/checkout.module-definition.ts, edition: full}
+      - {path: packages/eslint/be/module-shape.spec.mjs, editions: [lite, full]}
+    proves:
+      - {path: packages/eslint/be/module-shape.spec.mjs, editions: [lite, full], codes: [BE_MODULE_DEFINITION_MISSING]}
+    witness:
+      - {path: packages/eslint/be/module-shape.spec.mjs, editions: [lite, full], codes: [BE_MODULE_DEFINITION_MISSING]}

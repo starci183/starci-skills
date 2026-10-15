@@ -145,12 +145,14 @@ rules:
   - id: BE-FOLDER-3
     title: Registration is executable composition
     kind: mandatory
-    hfsRules: [R31, R32, R45, R272]
+    hfsRules: [R31, R32, R45, R272, R295]
     requirement: |-
       An app registers the capability modules once and the transport modules it serves (architecture-check.yaml
       BE-ARCHITECTURE-3). Api feature modules are static: `<feature>.module.ts` (the handlers) and one
-      `<feature>-<protocol>.module.ts` per transport folder; there is no module per operation and no module-definition in an
-      api feature (the cli feature root uses the module-definition pattern, cli.yaml). Full proves boot by running the real
+      `<feature>-<protocol>.module.ts` per transport folder; there is no module per operation. Every one of those modules has
+      its module definition beside it (owner:module-definition-everywhere, R295): `<x>.module-definition.ts`, `<x>.options.ts`
+      and `<x>.module.ts` extending `ConfigurableModuleClass`, and the app and the transport modules list them as
+      `XModule.register({...})`. Full proves boot by running the real
       `AppModule.register(options)` through `useTestWorld({ apps })` in e2e. Lite proves boot with
       `starci app check --wiring`, which compiles the Nest module graph with doubles (R272). Missing modules or providers fail
       the applicable boot proof.
@@ -160,13 +162,14 @@ rules:
     cases:
       - id: case-1
         when: A feature is added
-        write: The app registers `<Feature>GraphqlModule` or `<Feature>HttpModule`; full proves it through e2e, and lite through `starci app check --wiring`.
+        write: The app registers `<Feature>GraphqlModule.register({})` or `<Feature>HttpModule.register({})`; full proves it through e2e, and lite through `starci app check --wiring`.
     verification:
       automated:
         - BE_FEATURE_NOT_COMPOSED
         - BE_APP_COMPOSITION_ONLY
         - BE_APP_BUSINESS_ROLE
         - BE_MODULE_SHAPE
+        - BE_MODULE_DEFINITION_MISSING
         - BE_MODULE_HANDLER_REGISTRATION
         - BE_MODULE_PROVIDER_REREGISTRATION
         - BE_APP_BOOT_PROOF_MISSING

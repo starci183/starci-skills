@@ -332,6 +332,23 @@ rulings:
     amendedBy: [sealed-secret-custody]
     enforcedBy: [R253]
 
+  - id: module-definition-everywhere
+    date: '2026-10-15'
+    topic: code.be-module-shape
+    status: live
+    ownerRuling: 11
+    source: owner ruling 2026-10-15 (alpha.16 module-definition job); knowledge/patterns/be/folder.yaml BE-FOLDER-3
+    statement: >-
+      Every NestJS module has a module definition: capability modules, sub-modules, features, transport
+      modules, cli groups and integrations. The earlier clause "no module-definition in an api feature" is
+      superseded. A module <x> has <x>.module-definition.ts (ConfigurableModuleBuilder<XOptions>, method
+      name register), <x>.options.ts (export type XOptions, Record<string, never> when it takes nothing
+      yet) and <x>.module.ts (a class extending ConfigurableModuleClass); app compose groups and modules
+      register it with XModule.register({...}).
+    supersedes: []
+    amendmentScope: The BE-FOLDER-3 clause that forbade a module-definition in an api feature, and the plain-static-module clause of R45 for sub-modules, features and transports.
+    enforcedBy: [R45, R295]
+
   - id: heroicons-family-icon-set
     date: '2026-10-13'
     topic: code.fe-glyph-source

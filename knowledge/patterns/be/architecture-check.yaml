@@ -134,9 +134,14 @@ rules:
   - id: BE-ARCHITECTURE-3
     title: One module shape; one representative module per capability, registered once per app
     kind: mandatory
-    hfsRules: [R30, R45, R25]
+    hfsRules: [R30, R45, R25, R295]
     requirement: |-
-      Every capability module (the `<c>.module.ts` of a `be.domain`, `be.platform` or `be.integrations` owner) is
+      Every NestJS module has a module definition (owner:module-definition-everywhere, R295): a capability's sub-modules, every feature
+      application module, every transport module and every cli group are built the same way as a capability, with
+      `<x>.module-definition.ts` (`new ConfigurableModuleBuilder<XOptions>().setClassMethodName("register").build()`), `<x>.options.ts`
+      and a `<x>.module.ts` that extends `ConfigurableModuleClass` and declares only its `@Module` metadata. Such a module is listed
+      only as `XModule.register({...})` (`{}` when it takes no options); a sub-module is imported by its parent as
+      `PetModule.register({})`. The rest of this requirement is the capability case. Every capability module (the `<c>.module.ts` of a `be.domain`, `be.platform` or `be.integrations` owner) is
       `@Module({...}) export class XModule extends ConfigurableModuleClass {}` with a `<c>.module-definition.ts` built by
       `new ConfigurableModuleBuilder<XOptions>().setExtras({ isGlobal: false }, (definition, extras) => ({ ...definition, global: extras.isGlobal })).build()`.
       The generic `XOptions` is required; a capability without options declares `export type XOptions = Record<string, never>` in
@@ -144,7 +149,8 @@ rules:
       providers overrides `static register(options: typeof OPTIONS_TYPE): DynamicModule`. Each capability has one representative
       module (`AnimalModule`), the only module of the capability registered in an app, exactly once per app, in
       `be/apps/<app>/src/app.module.ts`, as `X.register({ isGlobal: true, ...options.x })`. A representative may split its
-      complexity into sub-modules (`PetModule`, `HumanModule`) and import them as plain `imports: [PetModule]`; a sub-module is
+      complexity into sub-modules (`PetModule`, `HumanModule`, each with its own module definition) and import them as
+      `imports: [PetModule.register({})]`; a sub-module is
       never registered in an app, never global and has exactly one importer, its parent. Other capabilities reach a capability
       only through its `Inject<Thing>()` decorators and never import its representative module. `isGlobal: true` appears only in
       app roots and `@Global()` appears nowhere (tests included). The one legal cross-module import is a transport module
@@ -166,13 +172,14 @@ rules:
         write: Inject it through the capability's injector or by class from its public entry; the app registered the capability once, and the feature module does not import it.
       - id: case-3
         when: A capability grows too large for one module
-        write: 'PurchaseModule imports PetModule-style sub-modules as plain imports; only PurchaseModule appears in an app''s imports.'
+        write: 'PurchaseModule imports PetModule-style sub-modules as PetModule.register({}) (each with its own module definition); only PurchaseModule appears in an app''s imports.'
       - id: case-4
         when: Providers differ by connection
         write: 'Keep one connection per database with its own injector and one DatabaseModule.register({ isGlobal: true, connections: [...] }) at the app root.'
     verification:
       automated:
         - BE_PUBLIC_SURFACE
+        - BE_MODULE_DEFINITION_MISSING
         - ARCH_OWNER_EXPORT_BYPASS
         - ARCH_OWNER_EXPORT_STAR
         - HFS_ALIAS_REEXPORT

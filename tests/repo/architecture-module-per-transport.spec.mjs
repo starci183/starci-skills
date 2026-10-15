@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { archFixture, runArch, findings } from '../helpers/hfs-arch-be-fixture.mjs';
 
-// R45 module-per-transport (BE_MODULE_SHAPE): one <f>-<protocol>.module.ts per transport folder, no module per operation, no
-// module-definition in a feature, and apps import only the transport modules their app kind composes (api: graphql, http,
+// R45 module-per-transport (BE_MODULE_SHAPE): one <f>-<protocol>.module.ts per transport folder, no module per operation, a
+// module-definition only beside the module it defines (owner:module-definition-everywhere, R295), and apps import only the transport modules their app kind composes (api: graphql, http,
 // websocket, message; worker: message; cli: cli).
 const MODULE = (name, imports = '', importLine = '') => `import { Module } from '@nestjs/common';\n${importLine}@Module({ imports: [${imports}] })\nexport class ${name} {}\n`;
 const FEATURE = {
@@ -37,15 +37,46 @@ test('a second module in a transport folder (a module per operation) is BE_MODUL
   assert.ok(found.some(item => /declared in/.test(item.message)));
 });
 
-test('a @Module declared in application/, and a module-definition or ConfigurableModuleBuilder in a feature, are BE_MODULE_SHAPE', t => {
+test('a @Module declared in application/, a module-definition not beside a module, and a ConfigurableModuleBuilder outside a definition are BE_MODULE_SHAPE', t => {
+  const builder = `import { ConfigurableModuleBuilder } from '@nestjs/common';
+export const { ConfigurableModuleClass } = new ConfigurableModuleBuilder<{ x: number }>().setClassMethodName('register').build();
+`;
   const report = run(t, {
     'src/features/api/a/application/run.handler.ts': MODULE('RunHandlerModule'),
-    'src/features/api/a/a.module-definition.ts': "import { ConfigurableModuleBuilder } from '@nestjs/common';\nexport const { ConfigurableModuleClass } = new ConfigurableModuleBuilder<{ x: number }>().build();\n",
+    'src/features/api/a/application/run.module-definition.ts': builder,
+    'src/features/api/a/a.config.ts': builder,
   });
   const found = hits(report);
   assert.ok(found.some(item => item.path === 'src/features/api/a/application/run.handler.ts' && /RunHandlerModule/.test(item.message)), JSON.stringify(found));
-  assert.ok(found.some(item => item.path === 'src/features/api/a/a.module-definition.ts' && /module-definition inside feature a/.test(item.message)));
-  assert.ok(found.some(item => item.path === 'src/features/api/a/a.module-definition.ts' && /ConfigurableModuleBuilder/.test(item.message)));
+  assert.ok(found.some(item => item.path === 'src/features/api/a/application/run.module-definition.ts' && /module-definition that is not beside a module of feature a/.test(item.message)), JSON.stringify(found));
+  assert.ok(found.some(item => item.path === 'src/features/api/a/a.config.ts' && /ConfigurableModuleBuilder builds the module definition of one module/.test(item.message)), JSON.stringify(found));
+});
+
+test('a module-definition beside the application module and beside each transport module raises no module-per-transport finding', t => {
+  const builder = name => `import { ConfigurableModuleBuilder } from '@nestjs/common';
+import type { ${name}Options } from './${name === 'A' ? 'a' : 'a-graphql'}.options';
+export const { ConfigurableModuleClass, MODULE_OPTIONS_TOKEN, OPTIONS_TYPE } = new ConfigurableModuleBuilder<${name}Options>().setClassMethodName('register').build();
+`;
+  const report = run(t, {
+    'src/features/api/a/a.module-definition.ts': builder('A'),
+    'src/features/api/a/a.options.ts': 'export type AOptions = Record<string, never>;\n',
+    'src/features/api/a/transport/graphql/a-graphql.module-definition.ts': builder('AGraphql'),
+    'src/features/api/a/transport/graphql/a-graphql.options.ts': 'export type AGraphqlOptions = Record<string, never>;\n',
+  });
+  assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
+});
+
+test('a module-definition beside the wrong module, or in the transport folder of another protocol, is BE_MODULE_SHAPE', t => {
+  const builder = `import { ConfigurableModuleBuilder } from '@nestjs/common';
+export const { ConfigurableModuleClass } = new ConfigurableModuleBuilder<{ x: number }>().setClassMethodName('register').build();
+`;
+  const report = run(t, {
+    'src/features/api/a/transport/graphql/a-http.module-definition.ts': builder,
+    'src/features/api/a/transport/message/run.module-definition.ts': builder,
+  });
+  const found = hits(report);
+  assert.ok(found.some(item => item.path === 'src/features/api/a/transport/graphql/a-http.module-definition.ts' && /its sibling a-graphql.module-definition.ts/.test(item.message)), JSON.stringify(found));
+  assert.ok(found.some(item => item.path === 'src/features/api/a/transport/message/run.module-definition.ts' && /its sibling a-message.module-definition.ts/.test(item.message)), JSON.stringify(found));
 });
 
 test('a worker app listing a graphql module is BE_MODULE_SHAPE, while an api app may compose the message transport of its own service', t => {

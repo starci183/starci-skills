@@ -289,9 +289,10 @@ for `.starcistacks` custody and reads plain `<NAME>` only when the file key is a
 contents; an empty or unreadable path fails startup without falling back. The options file holds no parsing.
 An api feature exposes operations as typed commands and queries with one handler each
 (`transport -> command -> handler -> domain`, one transaction inside a bounded context, an event
-only to cross contexts or carry async work), and each capability module registers exactly once per
-app with typed options (`register`, `ConfigurableModuleBuilder`, `isGlobal: true` only in app
-roots). Every infrastructure dependency is injected through a zero-argument `Inject<Thing>()`
+only to cross contexts or carry async work), and every module (capability, sub-module, feature,
+transport module, cli group) has a module definition built by `ConfigurableModuleBuilder` and is
+listed only as `X.register(...)`; each capability's representative module registers exactly once
+per app with typed options (`isGlobal: true` only in app roots). Every infrastructure dependency is injected through a zero-argument `Inject<Thing>()`
 exported from its owner's `<owner>.decorators.ts`. The **front end** instantiates it in Next.js:
 `app/` route adapters mount feature owners and hold no product logic; a connected block splits
 world ownership (`index.tsx`) from rendering (sibling `component.tsx`); every authored custom hook

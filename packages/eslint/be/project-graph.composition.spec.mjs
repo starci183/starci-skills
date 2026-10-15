@@ -527,18 +527,19 @@ const transportRepo = (t, files) => repo(t, {
 })
 const TRANSPORT_CLEAN = ["src/features/api/a/transport/graphql/a-graphql.module.ts", "src/features/api/a/transport/message/a-message.module.ts", "apps/core/src/app.module.ts", "apps/jobs/src/app.module.ts"]
 
-test("module-per-transport: one module per transport folder, none per operation, no module-definition in a feature", (t) => {
+test("module-per-transport: one module per transport folder, none per operation, a module-definition only beside its module", (t) => {
     const f = transportRepo(t, {
         "src/features/api/a/transport/graphql/run.module.ts": TRANSPORT_MODULE("RunModule"),
         "src/features/api/a/application/run.handler.ts": TRANSPORT_MODULE("RunHandlerModule"),
-        "src/features/api/a/a.module-definition.ts": "import { ConfigurableModuleBuilder } from '@nestjs/common';\nexport const { ConfigurableModuleClass } = new ConfigurableModuleBuilder<{ x: number }>().build();\n",
+        "src/features/api/a/application/run.module-definition.ts": "import { ConfigurableModuleBuilder } from '@nestjs/common';\nexport const { ConfigurableModuleClass } = new ConfigurableModuleBuilder<{ x: number }>().setClassMethodName('register').build();\n",
+        "src/features/api/a/a.module-definition.ts": "import { ConfigurableModuleBuilder } from '@nestjs/common';\nexport const { ConfigurableModuleClass } = new ConfigurableModuleBuilder<{ x: number }>().setClassMethodName('register').build();\n",
     })
     f.tester.run("module-per-transport", rules["module-per-transport"], {
-        valid: ok(f, TRANSPORT_CLEAN),
+        valid: ok(f, [...TRANSPORT_CLEAN, "src/features/api/a/a.module-definition.ts"]),
         invalid: [...bad(f, [
             ["src/features/api/a/transport/graphql/run.module.ts", [1, /second module of the graphql transport/], [3, /RunModule is a Nest module declared in/]],
             ["src/features/api/a/application/run.handler.ts", [3, /RunHandlerModule is a Nest module declared in/]],
-            ["src/features/api/a/a.module-definition.ts", [1, /module-definition inside feature a/], [2, /ConfigurableModuleBuilder/]],
+            ["src/features/api/a/application/run.module-definition.ts", [1, /module-definition that is not beside a module of feature a/], [2, /ConfigurableModuleBuilder builds the module definition/]],
         ])],
     })
 })

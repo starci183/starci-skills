@@ -6,6 +6,11 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+## [1.0.0-alpha.16]
+
+### Added
+- R295 `BE_MODULE_DEFINITION_MISSING` (owner ruling 2026-10-15, `owner:module-definition-everywhere`): every NestJS module of a product has a module definition (`<x>.module-definition.ts`, `<x>.options.ts`, a `<x>.module.ts` extending `ConfigurableModuleClass`) and is listed only as `XModule.register({...})`, including features, transport modules and cli groups. It supersedes the clause of BE-FOLDER-3 that forbade a module-definition in an api feature. The `module-definition-required` lint rule enforces it; the skeletons, the `starci app add` generators and both examples carry the new shape.
+
 ## [1.0.0-alpha.14] — 2026-10-15
 
 ### Added
