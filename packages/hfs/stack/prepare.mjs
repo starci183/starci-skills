@@ -4,6 +4,7 @@
 import { firstLine, lines as splitLines } from './context.mjs';
 import { RELEASE_ID } from './digest.mjs';
 import { approvalMissing, refusal } from './errors.mjs';
+import { checkLiveRestore, fixLiveRestore } from './live-restore.mjs';
 import { remoteDocker, shellQuote, withRunner } from './remote.mjs';
 
 const MIN_FREE_GB = 10;
@@ -100,6 +101,7 @@ function checkReleasesDirectory(run, report, config) {
 /** The checks both verbs share; false when the daemon cannot be reached (nothing else can be judged). */
 function baseChecks(run, report, config) {
   if (!checkDaemon(run, report)) return false;
+  checkLiveRestore(run, report);
   checkPlatform(run, report);
   checkSwarm(run, report);
   checkNodes(run, report);
@@ -113,7 +115,10 @@ function advertiseArguments(ctx) {
   const address = ctx.env.STARCI_ADVERTISE_ADDR;
   if (!address) return [];
   if (!ADDRESS.test(address)) throw refusal('STACK_SWARM_ADVERTISE_ADDR', `STARCI_ADVERTISE_ADDR must match ${ADDRESS}`);
-  return ['--advertise-addr', address];
+  const listen = ctx.env.STARCI_SWARM_LISTEN_ADDR ?? '127.0.0.1:2377';
+  if (!ADDRESS.test(listen)) throw refusal('STACK_SWARM_LISTEN_ADDR', `STARCI_SWARM_LISTEN_ADDR must match ${ADDRESS}`);
+  // the control port stays on loopback unless the owner widens it: a single manager needs no inbound swarm port
+  return ['--advertise-addr', address, '--listen-addr', listen];
 }
 
 function initSwarm(run, report, { execute, advertise }) {
@@ -166,16 +171,17 @@ function ensureTools(run, report, config) {
 }
 
 /** prepare: read-only checks; with execute also the missing volumes and (initSwarm, approved) the one-time swarm init. */
-export async function prepareHost(ctx, config, { execute = false, initSwarm: wantInit = false, ownerApproved = false, sshCmd = null } = {}, deps = {}) {
+export async function prepareHost(ctx, config, { execute = false, initSwarm: wantInit = false, fixLiveRestore: wantFix = false, ownerApproved = false, sshCmd = null } = {}, deps = {}) {
   if (wantInit && execute && !ownerApproved && ctx.env.STARCI_SWARM_INIT_APPROVED !== '1') {
     throw approvalMissing('STACK_SWARM_INIT_UNAPPROVED', 'docker swarm init is an owner-approved effect; pass --owner-approved (or set STARCI_SWARM_INIT_APPROVED=1) after the owner said yes');
   }
   const advertise = wantInit ? advertiseArguments(ctx) : [];
-  return withRunner(ctx, config, { sshCmd }, deps, (run, notes) => {
+  return withRunner(ctx, config, { sshCmd }, deps, async (run, notes) => {
     const report = newReport();
     notes.forEach(report.note);
     const data = { created: [], swarmInitialized: false };
     if (swarmInfo(run).reachable) {
+      if (wantFix) data.liveRestore = await fixLiveRestore(ctx, run, report, { execute, ownerApproved });
       if (wantInit) data.swarmInitialized = initSwarm(run, report, { execute, advertise });
       data.created = createVolumes(run, report, config, execute);
       if (execute) ensureTools(run, report, config);

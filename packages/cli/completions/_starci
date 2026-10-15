@@ -1029,7 +1029,7 @@ _starci() {
     'app:new') _values 'flags' '--inject' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:scaffold') _values 'flags' '--into' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:secret') _values 'flags' '--generate' '--to-file' '--reveal' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'app:stack') _values 'flags' '--stack' '--services' '--k3d' '--force' '--env' '--execute' '--image' '--source-sha' '--previous' '--out' '--release' '--since' '--timeout' '--retry' '--keep' '--app' '--ssh-cmd' '--extra-compose' '--allow-unpinned' '--init-swarm' '--owner-approved' '--swarm-state' '--skip-public' '--skip-internal' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'app:stack') _values 'flags' '--stack' '--services' '--k3d' '--force' '--env' '--execute' '--image' '--source-sha' '--previous' '--out' '--release' '--since' '--timeout' '--retry' '--keep' '--app' '--ssh-cmd' '--extra-compose' '--allow-unpinned' '--init-swarm' '--owner-approved' '--fix-live-restore' '--swarm-state' '--skip-public' '--skip-internal' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:sync') _values 'flags' '--check' '--write' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:upgrade') _values 'flags' '--plan' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'check:run') _values 'flags' '--level' '--changed' '--json' '--cwd' '--quiet' '--help' '--edition' ;;

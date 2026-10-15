@@ -28,6 +28,7 @@ flags:
   - {name: allow-unpinned, type: boolean, summary: "render: accept stand-in images without a digest (a local throwaway swarm; never the placeholder digest)"}
   - {name: init-swarm, type: boolean, summary: "prepare: run the one-time docker swarm init (needs --execute and --owner-approved)"}
   - {name: owner-approved, type: boolean, summary: "prepare: the owner approved the one-time docker swarm init (with --init-swarm --execute)"}
+  - {name: fix-live-restore, type: boolean, summary: "prepare: disable docker live-restore (incompatible with swarm), restart dockerd and report the containers that came back; needs --owner-approved --execute"}
   - {name: swarm-state, type: boolean, summary: "backup: also archive /var/lib/docker/swarm, encrypted"}
   - {name: skip-public, type: boolean, summary: "verify: skip the public HTTP checks"}
   - {name: skip-internal, type: boolean, summary: "verify: skip the checks run inside a service task"}

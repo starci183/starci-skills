@@ -245,6 +245,7 @@ Swarm deploy tooling of an app (prepare to rollback) and the full edition test-w
 | `--allow-unpinned` | boolean |  |
 | `--init-swarm` | boolean |  |
 | `--owner-approved` | boolean |  |
+| `--fix-live-restore` | boolean |  |
 | `--swarm-state` | boolean |  |
 | `--skip-public` | boolean |  |
 | `--skip-internal` | boolean |  |

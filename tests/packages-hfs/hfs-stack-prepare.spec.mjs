@@ -144,7 +144,7 @@ test('swarm init passes a valid advertise address and refuses a malformed one', 
   const { ctx, deps, host } = setup({ env });
   host.state.swarm = { state: 'inactive', manager: false };
   await prepareHost(ctx, config, { execute: true, initSwarm: true }, deps);
-  assert.deepEqual(host.state.inits, [['--advertise-addr', '10.0.0.5:2377']]);
+  assert.deepEqual(host.state.inits, [['--advertise-addr', '10.0.0.5:2377', '--listen-addr', '127.0.0.1:2377']]);
   const hostile = setup({ env: { ...env, STARCI_ADVERTISE_ADDR: '10.0.0.5; rm -rf /' } });
   await assert.rejects(prepareHost(hostile.ctx, config, { execute: true, initSwarm: true }, hostile.deps), (error) => error.code === 'STACK_SWARM_ADVERTISE_ADDR' && error.exit === 2);
   assert.equal(hostile.run.commands.length, 0);
@@ -278,3 +278,13 @@ function withoutAgeAndDirectory() {
   delete base['elif [ ! -w'];
   return base;
 }
+
+test('the swarm control port listens where STARCI_SWARM_LISTEN_ADDR says, and a hostile value is refused', async () => {
+  const env = { STARCI_SWARM_INIT_APPROVED: '1', STARCI_ADVERTISE_ADDR: '10.0.0.5', STARCI_SWARM_LISTEN_ADDR: '0.0.0.0:2377' };
+  const { ctx, deps, host } = setup({ env });
+  host.state.swarm = { state: 'inactive', manager: false };
+  await prepareHost(ctx, config, { execute: true, initSwarm: true }, deps);
+  assert.deepEqual(host.state.inits, [['--advertise-addr', '10.0.0.5', '--listen-addr', '0.0.0.0:2377']]);
+  const hostile = setup({ env: { ...env, STARCI_SWARM_LISTEN_ADDR: '0.0.0.0; id' } });
+  await assert.rejects(prepareHost(hostile.ctx, config, { execute: true, initSwarm: true }, hostile.deps), (error) => error.code === 'STACK_SWARM_LISTEN_ADDR');
+});

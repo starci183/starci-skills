@@ -109,6 +109,10 @@ function dockerInfo(args, state) {
   const format = args[args.indexOf('--format') + 1];
   if (format === '{{.Swarm.LocalNodeState}} {{.Swarm.ControlAvailable}}') return ok(`${state.swarm.state} ${state.swarm.manager}\n`);
   if (format === '{{.OSType}}/{{.Architecture}}') return ok(`${state.platform}\n`);
+  if (format === '{{.LiveRestoreEnabled}}') return ok(`${state.liveRestore}
+`);
+  if (format === '{{.ServerVersion}}') return ok(`${state.version}
+`);
   return bad(`unknown docker info format ${format}`);
 }
 
@@ -175,6 +179,7 @@ export function fakeHost({ overrides = {}, fileReader, clock = 1_800_000_000_000
     platform: 'linux/x86_64',
     version: '29.8.2',
     nodes: 1,
+    liveRestore: false,
     volumes: new Set(),
     secrets: new Map(),
     configs: new Map(),
