@@ -264,21 +264,21 @@ function targetsOf(ingress, declared) {
 
 const bashScript = (script) => `bash -c ${shellQuote(script)}`;
 
-function statusCommand(target) {
-  const args = ['-sS', '--max-time', '10', '--resolve', `${target.host}:443:127.0.0.1`, '-o', '/dev/null', '-w', '%{http_code}', `https://${target.host}${target.path}`];
+function statusCommand(target, port) {
+  const args = ['-sS', '--max-time', '10', '--resolve', `${target.host}:${port}:127.0.0.1`, '-o', '/dev/null', '-w', '%{http_code}', `https://${target.host}:${port}${target.path}`];
   return `curl ${args.map(shellQuote).join(' ')}`;
 }
 
-function certificateCommand(target) {
-  const connect = ['openssl', 's_client', '-connect', '127.0.0.1:443', '-servername', target.host].map(shellQuote).join(' ');
+function certificateCommand(target, port) {
+  const connect = ['openssl', 's_client', '-connect', `127.0.0.1:${port}`, '-servername', target.host].map(shellQuote).join(' ');
   return bashScript(`printf '' | ${connect} 2>/dev/null | openssl x509 -noout -serial -subject`);
 }
 
-/** What 127.0.0.1:443 serves for one host: the HTTP status (0 = connection or TLS error) and the certificate serial and subject (public data). */
-function observe(run, target) {
-  const status = run(statusCommand(target));
+/** What 127.0.0.1:<port> serves for one host: the HTTP status (0 = connection or TLS error) and the certificate serial and subject (public data). */
+function observe(run, target, port = 443) {
+  const status = run(statusCommand(target, port));
   const code = String(status.stdout).trim();
-  const certificate = run(certificateCommand(target));
+  const certificate = run(certificateCommand(target, port));
   const text = String(certificate.stdout).trim();
   return {
     code: status.status === 0 && /^\d{3}$/u.test(code) ? Number(code) : 0,
@@ -363,12 +363,13 @@ function backupStores(ctx, run, ingress, recipient) {
 
 const serviceName = (ingress) => `${ingress.name}_${ingress.service}`;
 
-/** { exists, desired } of a swarm service from `docker service ls` (desired = the replica count the service is set to). */
+/** { exists, desired, running } of a swarm service from the service listing (desired = the replica count the service is set to). */
 function serviceState(run, name) {
   const listed = remoteDocker(run, ['service', 'ls', '--filter', `name=${name}`, '--format', '{{.Name}} {{.Replicas}}']);
   const row = String(listed.stdout).split('\n').map((line) => line.trim().split(' ')).find(([found]) => found === name);
-  if (listed.status !== 0 || !row) return { exists: false, desired: -1 };
-  return { exists: true, desired: Number(String(row[1]).split('/')[1]) };
+  if (listed.status !== 0 || !row) return { exists: false, desired: -1, running: -1 };
+  const [running, desired] = String(row[1]).split('/').map(Number);
+  return { exists: true, desired, running };
 }
 
 function preconditions(run, ingress, found) {
@@ -465,12 +466,205 @@ async function takeoverAction(ctx, run, config, ingress, execute) {
   return cutover(ctx, run, ingress, { base, lines, steps, files: saved.files });
 }
 
+// ---- rehearse -----------------------------------------------------------------------------------------------------------------------
+// A throwaway copy of the ingress on alternate host ports, proving that the persisted certificates and the dynamic routes serve every host
+// exactly as the live edge does. The live edge, its container, the production certificates volume and ports 80/443 are never touched: the
+// store is only READ (read-only mount of a helper container) into a NEW volume, the service reads the legacy dynamic directory read-only,
+// the ACME http challenge is moved to an unused internal entrypoint so no certificate can be requested, and everything created is torn
+// down in a finally path.
+
+const UNUSED_ENTRYPOINT = 'rehearsal-unused';
+const CHALLENGE_ARG = /^(--certificatesresolvers\.[^.]+\.acme\.httpchallenge\.entrypoint)=.*$/iu;
+const ACME_ACTIVITY = /\b(?:obtain|obtaining|registering|new account|authorization)\b/iu;
+const READY_ATTEMPTS = 12;
+
+const rehearsalName = (ingress) => `${ingress.name}-rehearsal`;
+const rehearsalVolume = (ingress) => `${ingress.acmeVolume}-rehearsal`;
+const classOf = (code) => Math.floor(code / 100);
+
+/** The static arguments of the ingress service with the ACME http challenge moved to an unused internal entrypoint. */
+export function rehearsalArgs(args) {
+  const quiet = args.map((arg) => arg.replace(CHALLENGE_ARG, `$1=${UNUSED_ENTRYPOINT}`));
+  return [...quiet, `--entrypoints.${UNUSED_ENTRYPOINT}.address=127.0.0.1:1`];
+}
+
+/** Image, static arguments and the container paths of the two mounts the rehearsal copies; null when the service cannot be rehearsed. */
+function ingressSpec(run, ingress) {
+  const inspect = remoteDocker(run, ['service', 'inspect', '--format', '{{json .Spec.TaskTemplate.ContainerSpec}}', serviceName(ingress)]);
+  let spec = null;
+  try { spec = JSON.parse(inspect.stdout); } catch { spec = null; }
+  const mounts = Array.isArray(spec?.Mounts) ? spec.Mounts : [];
+  const targetOf = (source) => mounts.find((mount) => asMap(mount).Source === source)?.Target;
+  const out = {
+    image: spec?.Image,
+    args: (Array.isArray(spec?.Args) ? spec.Args : []).filter((arg) => typeof arg === 'string'),
+    dynamicTarget: targetOf(ingress.legacy.dynamicDir),
+    acmeTarget: targetOf(ingress.acmeVolume),
+  };
+  const complete = typeof out.image === 'string' && out.args.length > 0 && typeof out.dynamicTarget === 'string' && typeof out.acmeTarget === 'string';
+  return inspect.status === 0 && complete ? out : null;
+}
+
+function rehearseChecks(run, config, ingress, found, spec) {
+  const leftoverService = remoteDocker(run, ['service', 'inspect', rehearsalName(ingress)]).status === 0;
+  const leftoverVolume = volumePresent(run, rehearsalVolume(ingress));
+  const checks = [
+    ['plan green', planOk(found), `${found.missing.length} live host(s) not covered`],
+    [`network ${ingress.network} is an attachable overlay`, found.network === 'ok', `network state: ${found.network}`],
+    [`certificates volume ${ingress.acmeVolume} present`, found.certificates, 'the persisted certificates volume is missing'],
+    ['helper image declared (deploy.backup.image)', typeof config.backup?.image === 'string', 'the copy of the store needs a digest-pinned helper image'],
+    [`swarm service ${serviceName(ingress)} readable (image, arguments, dynamic and certificates mounts)`, spec !== null, 'create the ingress service first'],
+    [`no leftover ${rehearsalName(ingress)} service or ${rehearsalVolume(ingress)} volume`, !leftoverService && !leftoverVolume, 'remove the leftover of an earlier rehearsal first'],
+  ];
+  return checks.map(([name, ok, detail]) => ({ name, ok, detail }));
+}
+
+function serviceCreateArgs(ingress, spec) {
+  const ports = ingress.takeover.rehearsalPorts;
+  const mounts = [
+    `type=bind,source=${ingress.legacy.dynamicDir},target=${spec.dynamicTarget},readonly`,
+    `type=volume,source=${rehearsalVolume(ingress)},target=${spec.acmeTarget}`,
+  ];
+  return [
+    'service', 'create', '--detach', '--name', rehearsalName(ingress), '--replicas', '1', '--restart-condition', 'none', '--network', ingress.network,
+    '--publish', `mode=host,target=80,published=${ports.http}`, '--publish', `mode=host,target=443,published=${ports.https}`,
+    ...mounts.flatMap((mount) => ['--mount', mount]), spec.image, ...rehearsalArgs(spec.args),
+  ];
+}
+
+/** Volume, read-only copy of the store, service: stops at the first failed step. Returns a failure message or null. */
+async function rehearsalUp(ctx, run, config, ingress, context) {
+  const { spec, steps, created } = context;
+  const volume = rehearsalVolume(ingress);
+  const made = remoteDocker(run, ['volume', 'create', volume]);
+  if (made.status !== 0) return `creating ${volume} FAILED: ${firstLine(made.stderr)}`;
+  created.volume = true;
+  steps.push('volume-create');
+  const copy = remoteDocker(run, ['run', '--rm', '--network', 'none', '-v', `${ingress.acmeVolume}:/from:ro`, '-v', `${volume}:/to`, config.backup.image, 'cp', '-a', '/from/.', '/to/']);
+  if (copy.status !== 0) return `copying the certificates store FAILED: ${firstLine(copy.stderr)}`;
+  steps.push('volume-copy');
+  const service = remoteDocker(run, serviceCreateArgs(ingress, spec));
+  if (service.status !== 0) return `creating ${rehearsalName(ingress)} FAILED: ${firstLine(service.stderr)}`;
+  created.service = true;
+  steps.push('service-create');
+  const ready = await settle(ctx, READY_ATTEMPTS, SETTLE_MS, () => {
+    const state = serviceState(run, rehearsalName(ingress));
+    return { ok: state.desired > 0 && state.running === state.desired };
+  });
+  steps.push('service-ready');
+  return ready.ok ? null : `${rehearsalName(ingress)} did not start`;
+}
+
+/** Status class and certificate of every host on the rehearsal ports against the live edge baseline; hosts without a live certificate are skipped. */
+function compareRehearsal(run, ingress, base) {
+  const port = ingress.takeover.rehearsalPorts.https;
+  return base.map((entry) => {
+    if (entry.certificate === null) return { target: entry.target, live: entry.code, skipped: true, ok: true };
+    const seen = observe(run, entry.target, port);
+    const sameStatus = classOf(seen.code) === classOf(entry.code);
+    const sameCertificate = seen.certificate === entry.certificate;
+    return { target: entry.target, live: entry.code, code: seen.code, sameCertificate, skipped: false, ok: sameStatus && sameCertificate };
+  });
+}
+
+function certificateVerdict(row) {
+  if (row.skipped) return 'skipped';
+  return row.sameCertificate ? 'equal' : 'different';
+}
+
+function rowLine(row) {
+  if (row.skipped) return `skipped: needs fresh issuance ${label(row.target)} (the live edge presents no certificate for it)`;
+  return `${row.ok ? 'ok' : 'MISMATCH'} ${label(row.target)}: status ${row.code} (live ${row.live}), certificate serial and subject ${certificateVerdict(row)}`;
+}
+
+/** The rehearsal log must show no certificate request (obtain, register, authorization). Returns a failure message or null. */
+function acmeLogProblem(run, ingress) {
+  const logs = remoteDocker(run, ['service', 'logs', '--raw', '--no-task-ids', rehearsalName(ingress)]);
+  if (logs.status !== 0) return 'cannot read the rehearsal log: no proof that no certificate was requested';
+  return String(logs.stdout).split('\n').some((line) => ACME_ACTIVITY.test(line)) ? 'the rehearsal log shows certificate activity (a certificate was requested)' : null;
+}
+
+/** Brings the rehearsal up, probes every host and checks the log. Returns { failure, rows }. */
+async function rehearsalBody(ctx, run, config, ingress, context) {
+  const failure = await rehearsalUp(ctx, run, config, ingress, context);
+  if (failure !== null) return { failure, rows: [] };
+  const compared = await settle(ctx, SETTLE_ATTEMPTS, SETTLE_MS, () => {
+    const rows = compareRehearsal(run, ingress, context.base);
+    return { ok: rows.every((row) => row.ok), rows };
+  });
+  context.steps.push('probe');
+  const problem = acmeLogProblem(run, ingress);
+  context.steps.push('acme-log');
+  const mismatched = compared.rows.filter((row) => !row.ok).map((row) => label(row.target));
+  const failures = [mismatched.length > 0 ? `mismatch on ${mismatched.join(', ')}` : null, problem].filter(Boolean);
+  return { failure: failures.length > 0 ? failures.join('; ') : null, rows: compared.rows };
+}
+
+/** Removes what was created: the service, then its tasks, then the volume. Always reports each step. */
+async function rehearsalTeardown(ctx, run, ingress, created, steps) {
+  const lines = [];
+  let clean = true;
+  const record = (name, done, text) => {
+    steps.push(`teardown:${name}`);
+    lines.push(done ? `teardown: ${text}` : `TEARDOWN FAILED: ${text} not done`);
+    clean = clean && done;
+  };
+  if (created.service) {
+    record('service-rm', remoteDocker(run, ['service', 'rm', rehearsalName(ingress)]).status === 0, 'service removed');
+    const gone = await settle(ctx, READY_ATTEMPTS, SETTLE_MS, () => ({ ok: String(remoteDocker(run, ['ps', '-q', '--filter', `label=com.docker.swarm.service.name=${rehearsalName(ingress)}`]).stdout).trim() === '' }));
+    record('tasks-gone', gone.ok, 'tasks gone');
+  }
+  if (created.volume) {
+    const removed = await settle(ctx, SETTLE_ATTEMPTS, SETTLE_MS, () => ({ ok: remoteDocker(run, ['volume', 'rm', rehearsalVolume(ingress)]).status === 0 }));
+    record('volume-rm', removed.ok, 'volume removed');
+  }
+  if (!clean) lines.push(`manual: remove the service ${rehearsalName(ingress)} and the volume ${rehearsalVolume(ingress)}`);
+  return { clean, lines };
+}
+
+async function rehearsalRun(ctx, run, config, ingress, context) {
+  const created = { volume: false, service: false };
+  let body = { failure: 'rehearsal did not run', rows: [] };
+  let down = { clean: true, lines: [] };
+  try {
+    body = await rehearsalBody(ctx, run, config, ingress, { ...context, created });
+  } finally {
+    down = await rehearsalTeardown(ctx, run, ingress, created, context.steps);
+  }
+  const lines = [...context.lines, ...body.rows.map(rowLine), ...down.lines];
+  if (body.failure !== null) lines.push(`rehearsal FAILED: ${body.failure}`);
+  const ok = body.failure === null && down.clean;
+  if (ok) lines.push('rehearsal passed: every host matches the live edge and nothing of the rehearsal is left');
+  const hosts = body.rows.map((row) => ({ host: row.target.host, path: row.target.path, status: row.code ?? null, certificate: certificateVerdict(row) }));
+  return result(ok, lines, context.steps, { hosts, teardown: down.clean ? 'clean' : 'failed' });
+}
+
+async function rehearseAction(ctx, run, config, ingress, execute) {
+  const steps = ['plan'];
+  const found = gather(run, config, ingress);
+  if (found.error) return result(false, [found.error], steps);
+  const spec = ingressSpec(run, ingress);
+  const checks = rehearseChecks(run, config, ingress, found, spec);
+  const lines = checks.map((check) => (check.ok ? `precondition ok: ${check.name}` : `precondition FAILED: ${check.name} (${check.detail})`));
+  steps.push('preconditions');
+  if (checks.some((check) => !check.ok)) return result(false, [...lines, 'rehearsal refused: nothing was changed'], steps);
+  const base = baselines(run, targetsOf(ingress, found.declared));
+  steps.push('baseline');
+  for (const row of base) lines.push(`live edge ${label(row.target)}: status ${row.code}`);
+  if (!execute) {
+    const ports = ingress.takeover.rehearsalPorts;
+    lines.push(`dry run: would copy ${ingress.acmeVolume} read-only into ${rehearsalVolume(ingress)}, start ${rehearsalName(ingress)} on host ports ${ports.http}/${ports.https} with no certificate requests, compare ${base.length} host(s) with the live edge and tear everything down`);
+    return result(true, lines, steps);
+  }
+  return rehearsalRun(ctx, run, config, ingress, { spec, base, lines, steps });
+}
+
 // ---- entry --------------------------------------------------------------------------------------------------------------------------
 
-const ACTIONS = ['plan', 'attach', 'takeover'];
+const ACTIONS = ['plan', 'attach', 'takeover', 'rehearse'];
 
 /**
- * `starci app stack ingress <plan|attach|takeover>`; effects need execute === true.
+ * `starci app stack ingress <plan|attach|takeover|rehearse>`; effects need execute === true.
  *   deps.ssh  an injected ssh runner (specs).
  */
 export async function runIngress(ctx, config, { action, execute = false, args = [], sshCmd = null }, deps = {}) {
@@ -483,6 +677,7 @@ export async function runIngress(ctx, config, { action, execute = false, args = 
       plan: () => planAction(run, config, ingress),
       attach: () => attachAction(run, ingress, execute),
       takeover: () => takeoverAction(ctx, run, config, ingress, execute),
+      rehearse: () => rehearseAction(ctx, run, config, ingress, execute),
     }[action]();
     return { ...outcome, lines: [...notes, ...outcome.lines], data: { action, ...outcome.data } };
   });

@@ -8,6 +8,8 @@ import { normalizeIngress } from '../../scripts/hfs/stack-ingress-config.mjs';
 
 export const RECIPIENT = `age1${'q'.repeat(58)}`;
 export const DYNAMIC = '/srv/deploy/app-edge/dynamic';
+export const HELPER_IMAGE = `registry.example/helper@sha256:${'a'.repeat(64)}`;
+export const REHEARSAL_HTTPS = 18443;
 export const SECRET_TOKENS = ['SECRETTOKEN-1', 'userinfo-secret'];
 
 const json = (value) => JSON.stringify(value);
@@ -60,7 +62,7 @@ export function ingressBlock(extra = {}) {
 }
 
 /** A temp app tree (.sops.yaml, edge/routes.yml) and the config object the module receives. Call cleanup() in after(). */
-export function makeTree(blockExtra = {}, { recipient = true, ownRoutes = OWN_ROUTES } = {}) {
+export function makeTree(blockExtra = {}, { recipient = true, ownRoutes = OWN_ROUTES, helper = true } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-ingress-'));
   const envDir = path.join(root, '.starcistacks', 'production');
   fs.mkdirSync(path.join(envDir, 'edge'), { recursive: true });
@@ -69,7 +71,7 @@ export function makeTree(blockExtra = {}, { recipient = true, ownRoutes = OWN_RO
   const probe = { exists: (rel) => fs.existsSync(path.join(envDir, rel)) };
   const normalised = normalizeIngress(ingressBlock(blockExtra), { probe });
   if (!normalised.ingress) throw new Error(`fixture invalid: ${json(normalised.problems)}`);
-  const config = { stack: 'app', repoRoot: root, envDir, ingress: normalised.ingress, remote: { host: 'vps' } };
+  const config = { stack: 'app', repoRoot: root, envDir, ingress: normalised.ingress, remote: { host: 'vps' }, backup: helper ? { image: HELPER_IMAGE } : null };
   return { root, config, cleanup: () => fs.rmSync(root, { recursive: true, force: true }) };
 }
 
@@ -97,12 +99,26 @@ export function makeVps(overrides = {}) {
     tcpMs: 4000,
     fail: new Set(),
     afterStop: null,
+    ingressSpec: {
+      Image: 'proxy:1@sha256:abc',
+      Args: ['--providers.file.directory=/etc/traefik/dynamic', '--certificatesResolvers.le.acme.httpChallenge.entryPoint=web', '--certificatesResolvers.le.acme.storage=/acme/acme.json', 7],
+      Mounts: [{ Type: 'bind', Source: DYNAMIC, Target: '/etc/traefik/dynamic' }, { Type: 'volume', Source: 'edge_acme', Target: '/acme' }],
+    },
+    specRaw: null,
+    rehearsal: { volume: false, service: false },
+    rehearsalBoot: 0,
+    rehearsalTable: table(LIVE_HOSTS),
+    rehearsalLog: 'level=info msg="Configuration loaded"\n',
+    taskLinger: 0,
+    volumeRmFailures: 0,
     ...overrides,
   };
   const calls = [];
   const sleeps = [];
   const clock = { t: 1_700_000_000_000 };
-  const serving = () => {
+  const rehearsalReady = () => state.rehearsal.service && sleeps.length >= state.rehearsalBoot;
+  const serving = (port) => {
+    if (Number(port) === REHEARSAL_HTTPS) return rehearsalReady() ? state.rehearsalTable : null;
     if (state.legacyRunning) return state.legacyTable;
     return state.services.edge_ingress >= 1 && sleeps.length >= state.bootSleeps ? state.newTable : null;
   };
@@ -125,6 +141,7 @@ export function makeVps(overrides = {}) {
     },
   };
   const volumeInspect = (args) => {
+    if (args.at(-1) === 'edge_acme-rehearsal') return state.rehearsal.volume ? ok('[]') : bad('no such volume');
     if (!state.volume || (args.includes('--format') && state.fail.has('volume mountpoint'))) return bad('no such volume');
     return ok(args.includes('--format') ? `${state.mountpoint}
 ` : '[]');
@@ -132,6 +149,7 @@ export function makeVps(overrides = {}) {
   const serviceLs = (args) => {
     const name = args.at(-3).replace('name=', '');
     if (state.fail.has('service ls')) return bad('swarm error');
+    if (name === 'edge-rehearsal') return ok(state.rehearsal.service ? `edge-rehearsal ${Number(rehearsalReady())}/1\n` : '');
     return ok(Object.hasOwn(state.services, name) ? `${name} ${state.services[name]}/${state.services[name]}
 ` : '');
   };
@@ -146,7 +164,46 @@ export function makeVps(overrides = {}) {
     state.legacyRunning = true;
     return ok();
   };
+  const serviceInspect = (args) => {
+    const name = args.at(-1);
+    if (name === 'edge-rehearsal') return state.rehearsal.service ? ok('{}') : bad('no such service');
+    if (name !== 'edge_ingress' || state.fail.has('spec')) return bad('no such service');
+    return ok(state.specRaw ?? json(state.ingressSpec));
+  };
+  const volumeCreate = () => {
+    if (state.fail.has('volume create')) return bad('create refused');
+    state.rehearsal.volume = true;
+    return ok();
+  };
+  const volumeRm = () => {
+    if (state.volumeRmFailures > 0 || state.fail.has('volume rm')) { state.volumeRmFailures -= 1; return bad('volume is in use'); }
+    state.rehearsal.volume = false;
+    return ok();
+  };
+  const serviceCreate = () => {
+    if (state.fail.has('service create')) return bad('create refused');
+    state.rehearsal.service = true;
+    return ok();
+  };
+  const serviceRm = () => {
+    if (state.fail.has('service rm')) return bad('rm refused');
+    state.rehearsal.service = false;
+    return ok();
+  };
+  const tasks = () => {
+    if (state.fail.has('tasks stuck')) return ok('abc\n');
+    if (state.taskLinger > 0) { state.taskLinger -= 1; return ok('abc\n'); }
+    return ok('');
+  };
   const dockerCommands = {
+    'service inspect': serviceInspect,
+    'volume create': volumeCreate,
+    'volume rm': volumeRm,
+    run: () => (state.fail.has('copy') ? bad('copy failed') : ok()),
+    'service create': serviceCreate,
+    'service rm': serviceRm,
+    ps: tasks,
+    'service logs': () => (state.fail.has('logs') ? bad('no logs') : ok(state.rehearsalLog)),
     inspect: (args) => inspectContainer(args.at(-1)),
     network: (args) => networkCommands[args[1]](args),
     'volume inspect': volumeInspect,
@@ -162,13 +219,14 @@ export function makeVps(overrides = {}) {
     return handler(args);
   };
   const curl = (command) => {
-    const host = parseArgs(command)[4].split(':')[0];
-    const entry = serving()?.[host];
+    const [host, port] = parseArgs(command)[4].split(':');
+    const entry = serving(port)?.[host];
     return entry ? ok(String(entry.code)) : { status: 7, stdout: '000', stderr: 'connection refused' };
   };
   const openssl = (command) => {
     const host = /-servername[^a-z0-9]+([a-z0-9.-]+)/u.exec(command)[1];
-    const entry = serving()?.[host];
+    const port = /127\.0\.0\.1:(\d+)/u.exec(command)[1];
+    const entry = serving(port)?.[host];
     return entry ? ok(`${entry.cert}\n`) : bad('no certificate');
   };
   const combined = (command) => {
