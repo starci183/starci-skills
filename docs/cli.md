@@ -3420,7 +3420,7 @@ exit: 0 the command succeeded in the disposable copy; 1 the command failed or th
 json: none
 
 ```sh
-starci runtime example-secrets --run examples/lite-app -- npm run lint
+starci runtime example-secrets --run <example-dir> -- npm run lint
 ```
 
 ### starci runtime gen-catalog

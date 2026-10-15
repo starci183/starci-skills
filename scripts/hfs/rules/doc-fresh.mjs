@@ -4,7 +4,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CATALOG } from '../../../packages/cli/src/catalog.generated.mjs';
-import { checkCommand, extractCommands } from '../../lib/doc-commands.mjs';
+import { checkCommand, extractCommands } from '../doc-commands.mjs';
 import { globExpression } from '../../lib/glob.mjs';
 import { loadTypescript } from '../../lib/package-at.mjs';
 import { loadRuleCatalog } from '../rule-catalog.mjs';

@@ -1,1 +1,1 @@
-export { extractCommands, checkCommand, commandCatalogOf } from '../../lib/doc-commands.mjs';
+export { extractCommands, checkCommand, commandCatalogOf } from '../../hfs/doc-commands.mjs';

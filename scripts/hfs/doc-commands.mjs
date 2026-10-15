@@ -1,5 +1,5 @@
-import { validateArgs } from './validate-cli-args.mjs';
-import { isAlternation, isPlaceholder, tokenise } from './command-tokens.mjs';
+import { validateArgs } from '../../packages/cli/src/validate-args.mjs';
+import { isAlternation, isPlaceholder, tokenise } from '../lib/command-tokens.mjs';
 
 // The one owner of "a documented command exists": it finds every `starci <group> <verb> ...` a text shows to an agent or owner
 // (extractCommands) and judges it the way the dispatcher would (checkCommand): group and verb exist, every flag is declared, enum

@@ -1065,7 +1065,7 @@ cases:
     family: smooth-operation
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a flag is either a CLI option or refused with a pointer) start-supervisor.mjs takes --replace, --rotate and --restart for the watchdog, the verb supervisor start declares none of them, and the CLI refused them with the bare text unknown option, so a person or an agent who read the script or the registry found a half-flag: it exists in the script, is not in the catalog and the refusal does not say why or what to run instead", remedy: {state: in-tree, change: "rotation stays the watchdog's call (the owner's chat is the Supervisor seat, so a launched rotation has nothing to rotate there, and the watchdog rotates an idle seat by itself); the verb declares the three flags as internalFlags with a pointer, the CLI refuses each with it (unknown option --rotate: it is a call of the runtime itself ... run starci supervisor stop, then starci supervisor start), and a spec fails when the script takes a flag the verb neither declares public nor internal"}}
     met: {date: "2026-10-09", where: "alpha.8 audit of scripts/supervisor/start-supervisor.mjs against modules/cli/commands/supervisor/start.yaml", evidence: "main() takes has('rotate'); start.yaml declared plan and reason only; tests/cli/supervisor.spec.mjs asserted exit 2 and nothing about the message"}
-    rule: {file: scripts/lib/validate-cli-args.mjs, anchor: "internal"}
+    rule: {file: packages/cli/src/validate-args.mjs, anchor: "internal"}
     spec: tests/cli/supervisor.spec.mjs
     status: covered
   - id: shape-guard-refuses-the-retry-the-failure-route-queued
@@ -1532,7 +1532,7 @@ cases:
   - id: contract-teaches-list-flag-values-the-cli-refuses
     family: correctness
     met: {date: "2026-10-09", where: "premortem walk of the authentication workflows, scope.define first work step", evidence: "every deciding op's READ step teaches `starci gate read --knowledge a b c`; the CLI answered `too many positional arguments for read`"}
-    rule: {file: scripts/lib/validate-cli-args.mjs, anchor: "listTail"}
+    rule: {file: packages/cli/src/validate-args.mjs, anchor: "listTail"}
     spec: tests/cli/list-flag-values.spec.mjs
     status: covered
   - id: leg-proposal-omits-the-resource-slots-the-contract-declares
