@@ -30,6 +30,20 @@ test('a list item removed from a gate file loosens it, and one moved inside the 
   assert.deepEqual(kinds(fileDiff('docs/readme.md', ['- an item'], [])), [], 'a file that is no gate is not judged');
 });
 
+test('an enforcer row that widens its editions is no loosening; one that narrows, or loses its row, is', () => {
+  const rules = 'knowledge/hfs/rules.yaml';
+  const row = (extra) => `      - {kind: eslint-be, id: rest-door-needs-a-reason${extra}}`;
+  assert.deepEqual(kinds(fileDiff(rules, [row(', editions: [full]')], [row('')])), [], 'a lost restriction runs everywhere');
+  assert.deepEqual(kinds(fileDiff(rules, [row(', editions: [full]')], [row(', editions: [full, lite]')])), [], 'a superset of editions');
+  assert.deepEqual(kinds(fileDiff(rules, [row(', editions: [full]')], [row(', editions: [full]')])), [], 'the same row');
+  assert.deepEqual(kinds(fileDiff(rules, [row('')], [row(', editions: [full]')])), ['check-narrowed'], 'a restriction gained narrows');
+  assert.deepEqual(kinds(fileDiff(rules, [row(', editions: [full, lite]')], [row(', editions: [lite]')])), ['check-narrowed'], 'a subset of editions narrows');
+  assert.deepEqual(kinds(fileDiff(rules, [row(', editions: [full]')], [row(', editions: [lite]')])), ['check-narrowed'], 'a disjoint edition narrows');
+  assert.deepEqual(kinds(fileDiff(rules, [row(', editions: [full]')], [])), ['check-removed'], 'the enforcer removed');
+  assert.deepEqual(kinds(fileDiff(rules, [row('')], ['      - {kind: eslint-be, id: another-rule}'])), ['check-removed'], 'another enforcer is no replacement');
+  assert.deepEqual(kinds(fileDiff(rules, [row(', editions: [full]')], [row(''), row('')])), [], 'the row repeated in a new rule still widens');
+});
+
 test('a floor lowered or a ceiling raised in a gate file loosens it; the other directions do not', () => {
   assert.deepEqual(kinds(fileDiff('modules/kernel/verdict-contract.yaml', ['  minScore: 8'], ['  minScore: 5'])), ['threshold-lowered']);
   assert.deepEqual(kinds(fileDiff('modules/kernel/verdict-contract.yaml', ['  maxAttempts: 3'], ['  maxAttempts: 9'])), ['threshold-lowered']);

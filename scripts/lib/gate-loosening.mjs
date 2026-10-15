@@ -2,6 +2,8 @@
 // A loosening is one of:
 //   check-removed      a list item removed from a gate file and not added back in the same file (an item that carries an id is the
 //                      same item while an added item carries that id: a row whose fields change stays a check)
+//   check-narrowed     an enforcer row `{kind, id, editions}` that keeps its kind and id but now runs in fewer editions (a lost restriction or
+//                      a superset of editions is a widening, never a loosening)
 //   threshold-lowered  a number of a gate file moved the loose way: a floor lowered, a ceiling raised
 //   allowlist-added    a list item added to an allowlist file
 //   spec-deleted       a spec file deleted in a change that also changes product code
@@ -44,15 +46,59 @@ function identityOf(line) {
   return id ? `id:${id}` : trimmed(line);
 }
 
-/** The removed list items of a gate file that no added line restores. */
+/** Splits `a: 1, b: [x, y]` at the commas outside square brackets. */
+function splitTopLevel(text) {
+  const parts = [];
+  let depth = 0;
+  let from = 0;
+  for (let at = 0; at < text.length; at += 1) {
+    if (text[at] === '[') depth += 1;
+    else if (text[at] === ']') depth -= 1;
+    else if (text[at] === ',' && depth === 0) { parts.push(text.slice(from, at)); from = at + 1; }
+  }
+  parts.push(text.slice(from));
+  return parts;
+}
+
+/** The flow-mapping enforcer row `- {kind: k, id: i, editions: [a, b]}`: {kind, id, editions} (editions null = every edition), or null. */
+function flowRow(line) {
+  const text = line.trim();
+  if (!text.startsWith('-')) return null;
+  const open = text.indexOf('{');
+  const close = text.lastIndexOf('}');
+  if (open < 1 || close < open || text.slice(1, open).trim() !== '') return null;
+  const fields = new Map();
+  for (const part of splitTopLevel(text.slice(open + 1, close))) {
+    const at = part.indexOf(':');
+    if (at > 0) fields.set(part.slice(0, at).trim(), part.slice(at + 1).trim());
+  }
+  if (!fields.has('kind') || !fields.has('id')) return null;
+  const editions = fields.get('editions');
+  const list = editions === undefined ? null : editions.replace('[', '').replace(']', '').split(',').map((value) => value.trim()).filter(Boolean);
+  return { kind: fields.get('kind'), id: fields.get('id'), editions: list };
+}
+
+/** Whether row `after` still runs everywhere row `before` ran: a lost restriction or a superset of editions widens, a subset narrows. */
+const coversEditions = (before, after) => after.editions === null || (before.editions !== null && before.editions.every((edition) => after.editions.includes(edition)));
+
+/** The removed list items of a gate file that no added line restores; an enforcer row that keeps its kind and id may only widen its editions. */
 function checksRemoved(entry) {
   const back = new Map();
   for (const line of entry.added.filter((value) => LIST_ITEM.test(value))) back.set(identityOf(line), (back.get(identityOf(line)) ?? 0) + 1);
-  return entry.removed.filter((value) => LIST_ITEM.test(value)).filter((value) => {
+  const addedRows = entry.added.map(flowRow).filter(Boolean);
+  return entry.removed.filter((value) => LIST_ITEM.test(value)).flatMap((value) => {
+    const row = flowRow(value);
+    if (row) {
+      const same = addedRows.filter((candidate) => candidate.kind === row.kind && candidate.id === row.id);
+      if (same.length) {
+        if (same.some((candidate) => coversEditions(row, candidate))) return [];
+        return [{ kind: 'check-narrowed', file: entry.file, detail: clip(trimmed(value)) }];
+      }
+    }
     const left = back.get(identityOf(value)) ?? 0;
-    if (left > 0) { back.set(identityOf(value), left - 1); return false; }
-    return true;
-  }).map((value) => ({ kind: 'check-removed', file: entry.file, detail: clip(trimmed(value)) }));
+    if (left > 0) { back.set(identityOf(value), left - 1); return []; }
+    return [{ kind: 'check-removed', file: entry.file, detail: clip(trimmed(value)) }];
+  });
 }
 
 const numbersOf = (lines) => lines.map((line) => NUMBER_LINE.exec(line)).filter(Boolean).map((match) => ({ key: match[1], value: Number(match[2]) }));
