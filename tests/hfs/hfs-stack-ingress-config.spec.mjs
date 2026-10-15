@@ -40,7 +40,7 @@ test('a valid block is normalised with defaults', () => {
   assert.deepEqual(ingress.upstreams[1], { name: 'tool', hosts: ['tool.example'], container: null, hostAddress: '172.29.0.1', port: 5678, aliases: [], middlewares: [] });
   assert.deepEqual(ingress.verify[1], { host: 'tool.example', path: '/', status: null });
   assert.deepEqual(ingress.redirects.map((item) => item.status), [301, 308]);
-  assert.deepEqual(ingress.takeover, { gateSeconds: 20 });
+  assert.deepEqual(ingress.takeover, { gateSeconds: 20, rehearsalPorts: { http: 18080, https: 18443 } });
 });
 
 test('minimal block: no optional fields', () => {
@@ -49,7 +49,7 @@ test('minimal block: no optional fields', () => {
   assert.equal(ingress.routes, 'edge/routes.yml');
   assert.deepEqual(ingress.upstreams, []);
   assert.equal(ingress.backup, null);
-  assert.deepEqual(ingress.takeover, { gateSeconds: 30 });
+  assert.deepEqual(ingress.takeover, { gateSeconds: 30, rehearsalPorts: { http: 18080, https: 18443 } });
 });
 
 test('a block that is not a mapping, and unknown fields', () => {
@@ -146,11 +146,20 @@ test('backup and takeover', () => {
   assert.match(problemsOf((b) => { b.takeover.gateSeconds = 0; }), /gateSeconds: must be a whole number/u);
   assert.match(problemsOf((b) => { b.takeover.gateSeconds = 301; }), /gateSeconds: must be a whole number/u);
   const { ingress } = normalizeIngress({ ...valid(), takeover: {} }, { probe });
-  assert.deepEqual(ingress.takeover, { gateSeconds: 30 });
+  assert.deepEqual(ingress.takeover, { gateSeconds: 30, rehearsalPorts: { http: 18080, https: 18443 } });
 });
 
 test('a block with problems yields no ingress', () => {
   const out = normalizeIngress({ ...valid(), network: '!' }, { probe });
   assert.equal(out.ingress, null);
   assert.equal(out.problems.length, 1);
+});
+
+test('rehearsal ports: defaults, custom values and refusals', () => {
+  assert.deepEqual(normalizeIngress({ ...valid(), takeover: { rehearsalPorts: { http: 1080, https: 1443 } } }, { probe }).ingress.takeover.rehearsalPorts, { http: 1080, https: 1443 });
+  assert.match(problemsOf((b) => { b.takeover.rehearsalPorts = 'x'; }), /rehearsalPorts: must be a mapping/u);
+  assert.match(problemsOf((b) => { b.takeover.rehearsalPorts = { http: 80, https: 18443 }; }), /rehearsalPorts.http: must not be the production port/u);
+  assert.match(problemsOf((b) => { b.takeover.rehearsalPorts = { http: 18080, https: 443 }; }), /rehearsalPorts.https: must not be the production port/u);
+  assert.match(problemsOf((b) => { b.takeover.rehearsalPorts = { http: 0, https: 18443 }; }), /rehearsalPorts.http: must be a port/u);
+  assert.match(problemsOf((b) => { b.takeover.rehearsalPorts = { http: 9000, https: 9000 }; }), /http and https must differ/u);
 });

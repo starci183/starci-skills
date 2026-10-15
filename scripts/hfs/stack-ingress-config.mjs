@@ -23,7 +23,8 @@ const FIELDS = {
   verify: ['host', 'path', 'status'],
   redirect: ['host', 'to', 'status'],
   backup: ['dir'],
-  takeover: ['gateSeconds'],
+  takeover: ['gateSeconds', 'rehearsalPorts'],
+  ports: ['http', 'https'],
 };
 
 const closed = (c, at, value, allowed) => closedFields(c, at, value, allowed, 'ingress');
@@ -153,12 +154,27 @@ function backup(c, block) {
   return { dir: block.dir };
 }
 
+const DEFAULT_REHEARSAL_PORTS = { http: 18080, https: 18443 };
+
+/** Alternate host ports of the rehearsal: valid ports, never the production 80 and 443, and different from each other. */
+function rehearsalPorts(c, block) {
+  const at = 'deploy.ingress.takeover.rehearsalPorts';
+  if (block === undefined) return { ...DEFAULT_REHEARSAL_PORTS };
+  if (!closed(c, at, block, FIELDS.ports)) return { ...DEFAULT_REHEARSAL_PORTS };
+  for (const key of FIELDS.ports) {
+    port(c, `${at}.${key}`, block[key]);
+    if ([80, 443].includes(block[key])) c.problem(`${at}.${key}`, 'must not be the production port 80 or 443');
+  }
+  if (block.http === block.https) c.problem(at, 'http and https must differ');
+  return { http: block.http, https: block.https };
+}
+
 function takeover(c, block) {
-  if (block === undefined) return { gateSeconds: 30 };
+  if (block === undefined) return { gateSeconds: 30, rehearsalPorts: { ...DEFAULT_REHEARSAL_PORTS } };
   if (!closed(c, 'deploy.ingress.takeover', block, FIELDS.takeover)) return null;
   const gate = block.gateSeconds ?? 30;
   if (!(Number.isInteger(gate) && gate >= 1 && gate <= 300)) c.problem('deploy.ingress.takeover.gateSeconds', 'must be a whole number of seconds from 1 to 300');
-  return { gateSeconds: gate };
+  return { gateSeconds: gate, rehearsalPorts: rehearsalPorts(c, block.rehearsalPorts) };
 }
 
 /**
