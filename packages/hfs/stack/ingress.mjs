@@ -19,6 +19,7 @@ import { firstLine } from './context.mjs';
 import { refusal } from './errors.mjs';
 import { remoteDocker, shellQuote, withRunner } from './remote.mjs';
 import { createIngress } from './ingress-create.mjs';
+import { publishIngress } from './ingress-publish.mjs';
 
 const MATCHER = /(Host|HostRegexp)\(([^)]*)\)/gu;
 const QUOTED = /`([^`]*)`/gu;
@@ -662,10 +663,22 @@ async function rehearseAction(ctx, run, config, ingress, execute) {
 
 // ---- entry --------------------------------------------------------------------------------------------------------------------------
 
-const ACTIONS = ['plan', 'attach', 'create', 'takeover', 'rehearse'];
+/** The probe helpers the publish action shares with the takeover (injected so the two modules never import each other). */
+const PUBLISH_KIT = {
+  readRecipient,
+  stampOf,
+  observe,
+  baselines,
+  settle,
+  serviceState,
+  liveCommand,
+  targets: (config, ingress) => targetsOf(ingress, declaredHosts(ingress, readOwnRoutes(config, ingress))),
+};
+
+const ACTIONS = ['plan', 'attach', 'create', 'takeover', 'rehearse', 'publish'];
 
 /**
- * `starci app stack ingress <plan|attach|create|takeover|rehearse>`; effects need execute === true.
+ * `starci app stack ingress <plan|attach|create|takeover|rehearse|publish>`; effects need execute === true.
  *   deps.ssh  an injected ssh runner (specs).
  */
 export async function runIngress(ctx, config, { action, execute = false, args = [], sshCmd = null }, deps = {}) {
@@ -680,6 +693,7 @@ export async function runIngress(ctx, config, { action, execute = false, args = 
       create: () => createIngress(run, ingress, execute),
       takeover: () => takeoverAction(ctx, run, config, ingress, execute),
       rehearse: () => rehearseAction(ctx, run, config, ingress, execute),
+      publish: () => publishIngress(ctx, run, config, ingress, execute, PUBLISH_KIT),
     }[action]();
     return { ...outcome, lines: [...notes, ...outcome.lines], data: { action, ...outcome.data } };
   });

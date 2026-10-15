@@ -171,3 +171,16 @@ test('rehearsal ports: defaults, custom values and refusals', () => {
   assert.match(problemsOf((b) => { b.takeover.rehearsalPorts = { http: 0, https: 18443 }; }), /rehearsalPorts.http: must be a port/u);
   assert.match(problemsOf((b) => { b.takeover.rehearsalPorts = { http: 9000, https: 9000 }; }), /http and https must differ/u);
 });
+
+test('publish block: file names, supersedes and duplicates', () => {
+  const withPublish = (publish) => normalizeIngress({ ...valid(), publish }, { probe });
+  assert.deepEqual(withPublish({ file: 'app.yml', supersedes: ['routes.yml'] }).ingress.publish, { file: 'app.yml', supersedes: ['routes.yml'] });
+  assert.equal(normalizeIngress(valid(), { probe }).ingress.publish, null);
+  assert.match(problemsOf((b) => { b.publish = 'x'; }), /publish: must be a mapping/u);
+  assert.match(problemsOf((b) => { b.publish = { file: 'App.yml', supersedes: ['routes.yml'] }; }), /publish\.file: must match/u);
+  assert.match(problemsOf((b) => { b.publish = { file: 'app.yml' }; }), /supersedes: must be a non-empty list/u);
+  assert.match(problemsOf((b) => { b.publish = { file: 'app.yml', supersedes: ['sub/routes.yml'] }; }), /supersedes\[0\]: must match/u);
+  assert.match(problemsOf((b) => { b.publish = { file: 'app.yml', supersedes: ['app.yml'] }; }), /supersedes\[0\]: must differ from publish\.file/u);
+  assert.match(problemsOf((b) => { b.publish = { file: 'app.yml', supersedes: ['a.yml', 'a.yml'] }; }), /superseded file a\.yml is declared more than once/u);
+  assert.match(problemsOf((b) => { b.publish = { file: 'app.yml', supersedes: ['a.yml'], extra: 1 }; }), /publish\.extra: is not a field/u);
+});
