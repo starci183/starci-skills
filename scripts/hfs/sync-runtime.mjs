@@ -167,6 +167,12 @@ function writeUiCatalog(root) {
   fs.writeFileSync(target, text);
 }
 
+/** Removes the directories a cleared file left empty, deepest first: git tracks no empty directory and the HFS tree check refuses one. */
+function pruneEmptyDirs(directory, keep) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) if (entry.isDirectory()) pruneEmptyDirs(path.join(directory, entry.name), false);
+  if (!keep && fs.readdirSync(directory).length === 0) fs.rmdirSync(directory);
+}
+
 function clearUnlisted(bundle, bundleRoot, expected) {
   if (!fs.existsSync(bundleRoot)) return;
   for (const file of listed(bundleRoot)) {
@@ -175,6 +181,7 @@ function clearUnlisted(bundle, bundleRoot, expected) {
     const removed = safeRemove(path.join(bundleRoot, file), { hold: () => null });
     if (!removed.ok) throw new Error(`cannot clear ${bundle}/${file}: ${removed.errors.map((e) => e.message).join("; ")}`);
   }
+  pruneEmptyDirs(bundleRoot, true);
 }
 
 /** Writes each expected file whose bytes differ; returns how many files the bundle holds. */

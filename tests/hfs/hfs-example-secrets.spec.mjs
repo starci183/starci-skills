@@ -174,3 +174,25 @@ test('the CLI runs executable argv in the disposable copy and preserves its exit
   assert.equal(fs.existsSync(copied), false);
   assert.equal(fs.existsSync(path.join(root, '.starcistacks/production/secrets/connection.enc')), false);
 });
+
+const nativeSops = process.env.STARCI_TEST_SOPS_BIN || 'sops';
+const hasNativeSops = spawnSync(nativeSops, ['--version'], { windowsHide: true }).status === 0;
+const requireNative = process.env.STARCI_REQUIRE_NATIVE_CRYPTO === '1' || process.env.CI === 'true';
+
+test('native SOPS decrypts every materialized sealed member with the ephemeral key, and another key cannot', { skip: !hasNativeSops && !requireNative && 'native sops is missing; install sops (or set STARCI_TEST_SOPS_BIN) - CI sets STARCI_REQUIRE_NATIVE_CRYPTO=1 and fails instead' }, async (t) => {
+  assert.ok(hasNativeSops, `native sops is required (set STARCI_TEST_SOPS_BIN or put it on PATH): ${nativeSops}`);
+  const { root } = fixture(t);
+  let kept;
+  const other = generateAppIdentity();
+  t.after(() => other.identity.fill(0));
+  await materializeExample(root, { createIdentity: () => { const created = generateAppIdentity(); kept = Buffer.from(created.identity); return created; } });
+  t.after(() => kept?.fill(0));
+  const member = path.join(root, '.starcistacks/production/secrets/connection.enc');
+  const decrypt = (identity) => spawnSync(nativeSops, ['--decrypt', '--input-type', 'dotenv', '--output-type', 'dotenv', member], {
+    env: { ...process.env, SOPS_AGE_KEY: identity.toString(), SOPS_AGE_KEY_FILE: path.join(root, 'no-other-identity') }, windowsHide: true,
+  });
+  const own = decrypt(kept);
+  assert.equal(own.status, 0, 'the ephemeral identity decrypts the generated member');
+  assert.ok(own.stdout.length > 0);
+  assert.notEqual(decrypt(other.identity).status, 0, 'another identity cannot decrypt it');
+});

@@ -1,4 +1,4 @@
-Owner: scripts/hfs/example-secrets.mjs
+Owner: knowledge/application-stacks.yaml
 # Runtime example sealed members
 
 The public runtime repository stores member names and environment-key inventories. It stores no ciphertext. Application repositories still keep their genuine SOPS/age members under `.starcistacks/<environment>/secrets/`; R253 and R277 continue to judge that custody.

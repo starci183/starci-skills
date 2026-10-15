@@ -7,6 +7,7 @@ import { init as initGit } from '../api/git/init.mjs';
 import { add as addGit } from '../api/git/add.mjs';
 import { stringifyYaml } from '../../engine/yaml.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { readEnv } from '../lib/env.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs';
 import { resolveRealTool } from '../api/process/resolve-real-tool.mjs';
 import { generateAppIdentity } from './secret-bootstrap-crypto.mjs';
@@ -116,8 +117,9 @@ function commandLaunch(command, args) {
   if (process.platform !== 'win32' || !npm) return { file: command, args };
   const entry = npm[1].toLowerCase() + '-cli.js';
   const resolved = resolveRealTool(npm[1]);
+  const npmExecPath = readEnv('npm_execpath');
   const candidates = [
-    process.env.npm_execpath && path.join(path.dirname(process.env.npm_execpath), entry),
+    npmExecPath && path.join(path.dirname(npmExecPath), entry),
     resolved && path.join(path.dirname(resolved), 'node_modules', 'npm', 'bin', entry),
     path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', entry),
   ];

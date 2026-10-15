@@ -11,6 +11,8 @@ const sops = process.env.STARCI_TEST_SOPS_BIN || 'sops';
 const ageKeygen = process.env.STARCI_TEST_AGE_KEYGEN_BIN || 'age-keygen';
 const hasSops = spawnSync(sops, ['--version'], { windowsHide: true }).status === 0;
 const hasAgeKeygen = spawnSync(ageKeygen, ['--version'], { windowsHide: true }).status === 0;
+// CI sets CI=true and STARCI_REQUIRE_NATIVE_CRYPTO=1: missing sops or age-keygen is then a failure, never a skip.
+const requireNative = process.env.STARCI_REQUIRE_NATIVE_CRYPTO === '1' || process.env.CI === 'true';
 const fixtureValues = () => ({ BOOTSTRAP_TOKEN: 'test-scaffold-placeholder', BOOTSTRAP_NOTES: 'bootstrap\nsecond line=not-real' });
 
 test('bootstrap identities are fresh native X25519 age key pairs', () => {
@@ -57,7 +59,8 @@ test('bootstrap refuses invalid recipients and unsafe dotenv input', () => {
   }
 });
 
-test('native age-keygen derives the generated app recipient', { skip: !hasAgeKeygen }, () => {
+test('native age-keygen derives the generated app recipient', { skip: !hasAgeKeygen && !requireNative && 'native age-keygen is missing; install age (or set STARCI_TEST_AGE_KEYGEN_BIN) - CI sets STARCI_REQUIRE_NATIVE_CRYPTO=1 and fails instead' }, () => {
+  assert.ok(hasAgeKeygen, `native age-keygen is required (set STARCI_TEST_AGE_KEYGEN_BIN or put it on PATH): ${ageKeygen}`);
   const app = generateAppIdentity();
   try {
     const result = spawnSync(ageKeygen, ['-y'], { input: app.identity, windowsHide: true });
@@ -69,13 +72,14 @@ test('native age-keygen derives the generated app recipient', { skip: !hasAgeKey
 });
 
 function nativeDecrypt(file, identity, directory) {
+  // An empty SOPS_AGE_KEY_CMD panics sops 3.13 (empty command slice): the variable is removed, never blanked.
+  const { SOPS_AGE_KEY_CMD: _command, SOPS_AGE_KEY_FILE: _file, ...inherited } = process.env;
   return spawnSync(sops, ['--decrypt', '--input-type', 'dotenv', '--output-type', 'dotenv', file], {
     cwd: directory,
     env: {
-      ...process.env,
+      ...inherited,
       SOPS_AGE_KEY: identity.toString(),
       SOPS_AGE_KEY_FILE: path.join(directory, 'no-other-identity'),
-      SOPS_AGE_KEY_CMD: '',
       XDG_CONFIG_HOME: directory,
     },
     windowsHide: true,
@@ -86,7 +90,8 @@ function expectedDotenv(values) {
   return Buffer.from(Object.entries(values).map(([key, value]) => key + '=' + value.replaceAll('\n', String.raw`\n`)).join('\n') + '\n');
 }
 
-test('native SOPS verifies bootstrap encryption, app ownership and authenticated paths', { skip: !hasSops }, () => {
+test('native SOPS verifies bootstrap encryption, app ownership and authenticated paths', { skip: !hasSops && !requireNative && 'native sops is missing; install sops (or set STARCI_TEST_SOPS_BIN) - CI sets STARCI_REQUIRE_NATIVE_CRYPTO=1 and fails instead' }, () => {
+  assert.ok(hasSops, `native sops is required (set STARCI_TEST_SOPS_BIN or put it on PATH): ${sops}`);
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-bootstrap-crypto-'));
   const app = generateAppIdentity();
   const other = generateAppIdentity();

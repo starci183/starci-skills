@@ -73,6 +73,17 @@ jobs:
           npm ci --ignore-scripts
           npm run build
 
+      - name: Native secret tools (age, sops)
+        # The secret specs run real encrypt and decrypt round-trips and fail when these are missing (STARCI_REQUIRE_NATIVE_CRYPTO).
+        run: |
+          sudo apt-get install -y --no-install-recommends age
+          curl -fsSL -o sops https://github.com/getsops/sops/releases/download/v3.13.2/sops-v3.13.2.linux.amd64
+          echo "154dfe4cd70554bdd82b98e4cd4acf191d43d01ead6f00a73477aa44c4ac42ef  sops" | sha256sum --check
+          sudo install -m 0755 sops /usr/local/bin/sops
+          sops --version && age --version && age-keygen --version
+        env:
+          STARCI_REQUIRE_NATIVE_CRYPTO: '1'
+
       - name: Static checks
         run: npm run check
 

@@ -15,6 +15,9 @@ test("real throwaway age identity runs init, set, generated set, get, list and m
   if (!resolveRealTool("age", { env: process.env })) missing.push("age");
   if (!resolveRealTool("age-keygen", { env: process.env }))
     missing.push("age-keygen");
+  if (missing.length && (process.env.STARCI_REQUIRE_NATIVE_CRYPTO === "1" || process.env.CI === "true")) {
+    assert.fail(`real secret custody lifecycle requires sops and age; missing: ${missing.join(", ")}`);
+  }
   if (missing.length) {
     t.skip(
       `real secret custody lifecycle requires sops and age; missing: ${missing.join(", ")}`,
