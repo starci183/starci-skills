@@ -66,6 +66,12 @@ properties:
           description: Cron expression consumed by the declared scheduler.
           type: string
           minLength: 1
+  release:
+    description: Release gates of the app (starci app release gate and push); packages/hfs/release/gate.mjs is the authority for the fields.
+    type: object
+  database:
+    description: Database cutover data (starci app db migrate and post-cutover); packages/hfs/db/migrate.mjs is the authority for the fields.
+    type: object
   jobs:
     description: Application-owned schedules, bound to their back-end CLI commands.
     type: object
