@@ -52,7 +52,7 @@ function checkPlatform(run, report) {
 function checkSwarm(run, report) {
   const info = swarmInfo(run);
   if (info.active) report.ok('swarm active, this node is a manager');
-  else report.bad(`swarm is '${info.state}' (manager: ${info.manager}): the owner approves "starci app stack prepare --init-swarm --execute" once`);
+  else report.bad(`swarm is '${info.state}' (manager: ${info.manager}): the owner approves "starci app stack prepare --init-swarm --owner-approved --execute" once`);
 }
 
 function checkNodes(run, report) {
