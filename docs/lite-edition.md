@@ -186,3 +186,11 @@ R213 to R216 forbid a second schema authority, dynamic database DDL, unsafe poli
 configuration and stale generated types. R217, R219 and R220 forbid Supabase access outside its owners (the front end auth only),
 unverified principals, front-end service-role use and plaintext credentials. R243 and R244 hold in both editions: the front end
 serves no API and uses only the libraries of `knowledge/hfs/fe-stack.yaml`.
+
+## R217
+
+Both editions give Supabase one owner per side. `FE_SUPABASE_CLIENT_OWNER` refuses imports outside `fe.modules.auth` and front-end data, storage or realtime calls; the auth owner exports the session and access token. `BE_SUPABASE_CLIENT_OWNER` keeps imports and typed `SupabaseClient<Database>` clients in `be.integrations.supabase`, where the SDK serves Auth and Storage rather than database queries. `FE_SERVICE_ROLE_FORBIDDEN` refuses service-role names and credential-shaped environment reads in the front end; public product configuration belongs to `fe.modules.config`.
+
+## R219
+
+`BE_SUPABASE_JWT_VERIFIED` applies in both editions. The Supabase integration verifies access tokens with the project's remote JWKS, issuer, authenticated audience and pinned algorithms before accepting a principal. Unverified decoding, authorization claims from the request body and verification outside the integration are refused.

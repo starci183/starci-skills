@@ -457,3 +457,14 @@ the cited-path scan over live prose; then every retained self-check of
 `modules/kernel/allowlist.yaml` (`starci/allowlist@1`): every exception a check keeps is a named,
 shrink-only section of it, and `scripts/checks/check-one-allowlist.mjs` refuses a second one
 (`RT_ALLOWLIST_SPRAWL`).
+
+<a id="r213"></a>
+## R213: Supabase migration history
+
+In lite and in full apps that use Supabase, `DB_MIGRATION_SHAPE` refuses an invalid
+`supabase/migrations/<ts14>_<kebab>.sql` name, impossible UTC timestamp, duplicate
+active stamp, invalid PostgreSQL, or migration that does not append after the active
+committed chain. Keep base migrations immutable and retire earlier history through
+the archive when introducing a baseline; neither wall-clock time nor archived stamps
+set the append boundary. The paired edition proof refuses February 30 and accepts a
+real UTC timestamp.
