@@ -238,7 +238,7 @@ function enableAuthCallback(declaration) {
 }
 
 /** Callback-specific source files are excluded from the browser-only starter. */
-export const CALLBACK_SOURCE_FILES = Object.freeze(new Set([
+const CALLBACK_SOURCE_FILES = Object.freeze(new Set([
   'src/app/auth/callback/route.ts', 'src/modules/auth/server.ts', 'src/modules/auth/pkce-client.ts',
 ]));
 export const hasAuthCallback = repo => (repo.sides.fe.optionalSlots ?? []).includes('fe.route.callback');
@@ -260,7 +260,7 @@ export function callbackSourceFiles(files, repo) {
   });
   if (!enabled) return selected;
   const config = fs.readFileSync(path.join(TEMPLATES_DIR, 'fe/skeleton-lite/apps/web/src/modules/config/index.ts'), 'utf8');
-  const client = fs.readFileSync(path.join(TEMPLATES_DIR, 'fe/skeleton/apps/__app__/src/modules/auth/pkce-client.ts'), 'utf8');
+  const client = render(fs.readFileSync(path.join(TEMPLATES_DIR, 'fe/skeleton/apps/__app__/src/modules/auth/pkce-client.ts'), 'utf8').replace(/\r\n/g, '\n'), PARTIAL_VARIABLES);
   return selected.map(file => {
     const [, , app, ...parts] = file.path.split('/');
     if (MARKETING_FE_APPS.has(app)) return file;

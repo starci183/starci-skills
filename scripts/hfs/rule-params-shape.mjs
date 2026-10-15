@@ -4,8 +4,8 @@
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { paramNamesOk } from './param-names.mjs';
 import { kindParamProblems, scenarioProblem } from './declaration-slots.mjs';
-import { roleListProblems, SCHEMA_AUTHORITIES, unitRolesProblems } from './manifest-shape.mjs';
-import { byCodeUnit } from '../lib/list.mjs';
+import { NAME, roleListProblems, SCHEMA_AUTHORITIES, unitRolesProblems } from './manifest-shape.mjs';
+import { byCodeUnit, nonemptyUniqueList } from '../lib/list.mjs';
 
 const PROFILES = ['be', 'fe'];
 const BE_OWN = ['infraOwners', 'eventBus', 'specDoubles', 'paramNames', 'suffixes', 'bannedSuffixes', 'contractShape', 'unitRoles', 'logicRoles', 'thinRoles', 'patternScenarios', 'kindPatterns', 'addKinds'];
@@ -25,7 +25,7 @@ const liteKeyOk = (lite, key, keys) => key !== 'lite' && keys.includes(key)
   && (!['functionLines', 'featureFiles'].includes(key) || sharedParam(key, lite[key]));
 const liteOk = (lite, keys) => lite === undefined || (isPlainObject(lite) && Object.keys(lite).length > 0 && Object.keys(lite).every((k) => liteKeyOk(lite, k, keys)));
 const memberMap = (v, allowEmpty) => isPlainObject(v) && Object.keys(v).length > 0 && Object.values(v).every((list) => Array.isArray(list) && (allowEmpty || list.length > 0) && list.every((x) => /^[A-Z][A-Za-z0-9]*$/.test(String(x))) && new Set(list).size === list.length);
-const roleList = (v) => Array.isArray(v) && v.length > 0 && v.every((x) => /^[a-z][a-z0-9-]*$/.test(String(x))) && new Set(v).size === v.length;
+const roleList = (v) => nonemptyUniqueList(v, (role) => NAME.test(String(role)));
 const formsOk = (v) => Array.isArray(v) && v.length > 0 && v.every((x) => FORM_NAMES.has(x)) && new Set(v).size === v.length;
 const doubleOk = (v) => isPlainObject(v) && /^[A-Za-z][A-Za-z0-9]*$/.test(String(v.double)) && formsOk(v.forms);
 const regexOk = (v) => { try { return typeof v === 'string' && v.length > 0 && Boolean(new RegExp(v)); } catch { return false; } };

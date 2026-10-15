@@ -17,7 +17,7 @@ export function feName(value, label = "name") {
 }
 
 /** An app-relative target whose existing ancestors are real directories, never symlinks. */
-export function feTarget(root, relative) {
+function feTarget(root, relative) {
   const target = path.resolve(root, relative);
   const inside = path.relative(root, target);
   if (!inside || inside.startsWith("..") || path.isAbsolute(inside)) {

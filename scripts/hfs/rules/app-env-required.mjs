@@ -2,7 +2,7 @@
 // ESLint's app-env-required rule checks its interface, reader and bootstrap delegation.
 import { found, readText } from './read.mjs';
 
-export const REQUIRED_CODE = 'BE_APP_ENV_REQUIRED';
+const REQUIRED_CODE = 'BE_APP_ENV_REQUIRED';
 
 /** Missing files cannot be visited by ESLint, so the content check owns their presence. */
 export function appEnvRequiredFindings({ repoRoot, files, all = files, repo, inScope = () => true }) {

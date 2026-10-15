@@ -3,7 +3,7 @@
 import path from 'node:path';
 import { machineKit } from './machine-ast.mjs';
 import { importedFrom, reportAt, unwrap } from './supabase-ast.mjs';
-import { accessName } from './backend-app-files.mjs';
+import { accessName } from '../../lib/ts-ast.mjs';
 
 const BE_SUPABASE_SLOT = 'be.integrations.supabase';
 const BE_JWT_VERIFIED = 'BE_SUPABASE_JWT_VERIFIED';

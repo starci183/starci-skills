@@ -3,7 +3,7 @@ import { isInside } from './config.mjs';
 import { allowsFile, slotAdmitsFile } from '../allows.mjs';
 import { reachableViolation, relativePath } from './typescript.mjs';
 import { checkApplicationEnvironment } from './backend-app-files.mjs';
-import { sourceLocation } from '../../lib/ts-ast.mjs';
+import { accessName, sourceLocation } from '../../lib/ts-ast.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 
 const FORBIDDEN_APP_ROLE = /(?:^|\.)(?:service|provider|providers|resolver|controller|handler|repository|entity|use-case|command|query|listener|consumer|processor)\.[cm]?[jt]sx?$/i;
@@ -177,15 +177,10 @@ function requiredSpecifier(ts, call) {
     : null;
 }
 
-const requiredMemberSelection = (ts, node) => {
-  if (ts.isPropertyAccessExpression(node)) return node.name.text;
-  return ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
-};
-
 function requiredMemberEvidence(ts, node, found) {
   if (!(ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) || !ts.isCallExpression(node.expression)) return;
   const specifier = requiredSpecifier(ts, node.expression);
-  const selected = requiredMemberSelection(ts, node);
+  const selected = accessName(ts, node);
   const member = ts.isPropertyAccessExpression(node) ? node.name : node.argumentExpression;
   if (specifier && TRANSPORT_PACKAGES.test(specifier)) {
     found.push({ node: member, specifier, detail: `${selected ?? 'computed member'} from ${specifier}` });

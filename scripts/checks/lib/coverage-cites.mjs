@@ -1,5 +1,6 @@
 // coverage-cites.mjs - R247's static projection of catalogued ruling amendments.
 import { rulingRetirementExempt } from './ruling-cites.mjs';
+import { maskSourceRange as maskSource } from '../../lib/text-mask.mjs';
 
 const CODE = 'RT_COVERAGE_SUPERSEDED_CITE';
 const list = (value) => {
@@ -12,7 +13,7 @@ const specPath = /(?:^|\/)[^/]*\.(?:spec|test)\.[cm]?[jt]sx?$/i;
 const textExtension = /\.(?:md|mdx|txt|rst|ya?ml|json|toml|[cm]?[jt]sx?|sh|ps1|html|css|scss|hbs|ejs|njk|tmpl)$/i;
 
 /** Scope predicate also usable before reading files: generated copies and secret material never enter this scan. */
-export function coverageCitePath(candidate) {
+function coverageCitePath(candidate) {
   const path = String(candidate).replaceAll('\\', '/');
   if (/(?:^|\/)(?:node_modules|\.git|\.claude|\.codex|\.tmp-docs|\.runtimes|dist|build|coverage|_derived|secrets|\.secrets)(?:\/|$)/i.test(path)) return false;
   if (/^packages\/(?:hfs\/runtime|eslint\/(?:be|fe)\/runtime)\//.test(path)) return false;
@@ -123,10 +124,6 @@ const quotedEnd = (text, start, quote) => {
   }
   return cursor;
 };
-
-function maskSource(code, start, end) {
-  for (let at = start; at < end; at++) if (code[at] !== '\n' && code[at] !== '\r') code[at] = ' ';
-}
 
 function commentEnd(text, start) {
   const block = text[start + 1] === '*';

@@ -32,16 +32,16 @@ const SHAPES = Object.freeze({
 });
 
 /** What a shape violation is called in output; the enum shape names its allowed values. */
-export const shapeText = (shape) => (shape.kind === 'enum' ? `one of ${shape.allowed.join(', ')}` : SHAPES[shape.kind].text);
+const shapeText = (shape) => (shape.kind === 'enum' ? `one of ${shape.allowed.join(', ')}` : SHAPES[shape.kind].text);
 
 /** Whether `value` parses as `shape` declares. */
-export const shapeOk = (shape, value) => (shape.kind === 'enum' ? shape.allowed.includes(value) : SHAPES[shape.kind]?.ok(value) ?? true);
+const shapeOk = (shape, value) => (shape.kind === 'enum' ? shape.allowed.includes(value) : SHAPES[shape.kind]?.ok(value) ?? true);
 
 /** An example line holds a documented stand-in, not a value to parse: empty, an `<...>` name or a `${...}` reference. */
 const isPlaceholder = (value) => value === '' || value.includes('${') || (value.startsWith('<') && value.endsWith('>'));
 
 /** The repository-relative env source files on disk: the be side of an app, else the src tree of a back-end repository. */
-export function listEnvSourceFiles(repoRoot) {
+function listEnvSourceFiles(repoRoot) {
   const out = [];
   const walk = (dir, rel) => {
     let entries;
@@ -58,7 +58,7 @@ export function listEnvSourceFiles(repoRoot) {
 }
 
 /** The ENV_VALUE_SHAPE violations of one decrypted map against the walked reader shapes; keys and shapes only. */
-export function shapeViolations(reads, map) {
+function shapeViolations(reads, map) {
   const violations = [];
   for (const [key, value] of Object.entries(map)) {
     if (FILE_SUFFIX.test(key)) continue;

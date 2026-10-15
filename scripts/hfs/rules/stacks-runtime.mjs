@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isPlainObject as plain } from '../../../engine/plain-object.mjs';
+import { deploymentFindings } from '../../lib/deployment-findings.mjs';
 import { findStackDeclaration, readDeclaration } from '../../lib/stack-declaration.mjs';
 import { isInside } from '../../lib/walk.mjs';
 import { composeIncludePaths, swarmInventoryIssues, swarmModelIssues } from '../../lib/swarm-stack.mjs';
@@ -157,4 +158,11 @@ export function stacksDeploymentContexts(context = {}) {
     .filter(([, spec]) => spec?.runtime === 'docker-swarm')
     .map(([environment, spec]) => renderedDeployment({ repoRoot: context.repoRoot, environment, spec, files, edition: context.repo?.edition }));
   return { doc, deployments, files };
+}
+
+/** Apply a static Swarm contract to tracked rendered models and project standard HFS findings. */
+export function stacksDeploymentFindings(context, issuesFor) {
+  const { doc, deployments, files } = stacksDeploymentContexts(context);
+  return deploymentFindings(deployments,
+    entry => issuesFor({ doc, ...entry, files, repoRoot: context.repoRoot, repo: context.repo }), found, DECLARATION);
 }

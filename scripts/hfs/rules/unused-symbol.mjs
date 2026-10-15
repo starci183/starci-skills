@@ -3,6 +3,8 @@
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { found, readText } from './read.mjs';
+import { nameText } from '../../lib/ts-ast.mjs';
+import { unwrapCatalogExpression as unwrap } from '../../lib/ts-analysis.mjs';
 import { argumentBindings, jsonCatalogBindings, jsonCatalogRead, staticStrings } from './unused-symbol-values.mjs';
 
 export const HFS_UNUSED_SYMBOL = 'HFS_UNUSED_SYMBOL';
@@ -70,8 +72,6 @@ function trackedProgram(ts, repoRoot, files, sources) {
   return { program: ts.createProgram([...sources.keys()], options, host), resolveModule };
 }
 
-const literalName = (ts, node) => node && (ts.isIdentifier(node) || ts.isStringLiteralLike(node) || ts.isNumericLiteral(node)) ? node.text : null;
-const unwrap = (ts, node) => node && (ts.isAsExpression(node) || ts.isSatisfiesExpression(node) || ts.isParenthesizedExpression(node)) ? unwrap(ts, node.expression) : node;
 const symbolOf = (ts, checker, node) => {
   const shorthand = ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node;
   const symbol = shorthand ? checker.getShorthandAssignmentValueSymbol(node.parent) : checker.getSymbolAtLocation(node);
@@ -89,7 +89,7 @@ function addCandidate(state, source, node, kind, name, value, symbol) {
 function enumCandidates(state, source, declaration) {
   const members = [];
   for (const member of declaration.members) {
-    const name = literalName(state.ts, member.name);
+    const name = nameText(state.ts, member.name, { numbers: true });
     if (name === null) continue;
     const kind = declaration.name.text.endsWith('ErrorCode') ? 'error code' : 'enum member';
     const value = state.checker.getConstantValue(member) ?? null;
@@ -101,10 +101,10 @@ function enumCandidates(state, source, declaration) {
 function catalogProperties(state, source, object, prefix = '') {
   for (const property of object.properties) {
     if (!state.ts.isPropertyAssignment(property)) continue;
-    const name = literalName(state.ts, property.name);
+    const name = nameText(state.ts, property.name, { numbers: true });
     if (name === null) continue;
     const child = unwrap(state.ts, property.initializer);
-    if (state.ts.isObjectLiteralExpression(child) && !child.properties.some(item => ['vi', 'en'].includes(literalName(state.ts, item.name)))) {
+    if (state.ts.isObjectLiteralExpression(child) && !child.properties.some(item => ['vi', 'en'].includes(nameText(state.ts, item.name, { numbers: true })))) {
       catalogProperties(state, source, child, ['vi', 'en'].includes(name) ? prefix : `${prefix}${name}.`);
     } else {
       const key = `${prefix}${name}`;
@@ -126,7 +126,7 @@ function variableCandidates(state, source, declaration) {
     addCandidate(state, source, declaration, QUEUE_NAME.test(name) ? 'queue constant' : 'error code', name, value.text, checker.getSymbolAtLocation(declaration.name));
   } else if (/(?:ErrorCodes|ERROR_CODES)$/u.test(name) && ts.isObjectLiteralExpression(value)) {
     const members = value.properties.filter(property => ts.isPropertyAssignment(property) && ts.isStringLiteralLike(unwrap(ts, property.initializer))).map(property =>
-      addCandidate(state, source, property, 'error code', `${name}.${literalName(ts, property.name)}`, unwrap(ts, property.initializer).text, checker.getSymbolAtLocation(property.name)));
+      addCandidate(state, source, property, 'error code', `${name}.${nameText(ts, property.name, { numbers: true })}`, unwrap(ts, property.initializer).text, checker.getSymbolAtLocation(property.name)));
     state.containers.set(checker.getSymbolAtLocation(declaration.name), members);
   }
 }
@@ -145,7 +145,7 @@ function collectCandidates(state, sources) {
 function metadataDeclaration(ts, node, source) {
   if (!ts.isVariableDeclaration(node)) return false;
   if (CATALOG.test(source.fileName)) return true;
-  const name = literalName(ts, node.name) ?? '';
+  const name = nameText(ts, node.name, { numbers: true }) ?? '';
   return /(?:ERROR_KINDS|ERROR_MESSAGES|ERROR_CODES|errorKinds|errorMessages)$/u.test(name) && ts.isObjectLiteralExpression(unwrap(ts, node.initializer) ?? node);
 }
 
@@ -155,7 +155,6 @@ function declarationName(ts, node) {
     || ts.isPropertyDeclaration(parent) || ts.isMethodDeclaration(parent) || ts.isFunctionDeclaration(parent) || ts.isClassDeclaration(parent));
 }
 
-const literalIndex = (ts, argument) => argument && (ts.isStringLiteralLike(argument) || ts.isNumericLiteral(argument)) ? argument.text : null;
 const matchesMember = (member, key) => key === null || member.name.endsWith(`.${key}`) || typeof member.value === 'number' && String(member.value) === key;
 const markMembers = (members, key) => { for (const member of members) if (matchesMember(member, key)) member.used = true; };
 
@@ -167,7 +166,7 @@ function markContainerRead(ts, members, node) {
     return;
   }
   if (ts.isElementAccessExpression(parent) && parent.expression === receiver) {
-    const key = literalIndex(ts, parent.argumentExpression);
+    const key = nameText(ts, parent.argumentExpression, { identifiers: false, numbers: true });
     markMembers(members, key);
     return;
   }
@@ -209,7 +208,7 @@ function translatorNamespace(state, initializer, factories) {
   if (ts.isAwaitExpression(init)) init = unwrap(ts, init.expression);
   if (!ts.isCallExpression(init) || !ts.isIdentifier(init.expression) || !factories.has(init.expression.text)) return null;
   let first = init.arguments[0];
-  if (first && ts.isObjectLiteralExpression(first)) first = first.properties.find(property => literalName(ts, property.name) === 'namespace')?.initializer;
+  if (first && ts.isObjectLiteralExpression(first)) first = first.properties.find(property => nameText(ts, property.name, { numbers: true }) === 'namespace')?.initializer;
   return first ? staticStrings(state, first) : [''];
 }
 
@@ -236,7 +235,7 @@ function catalogNamespace(state, callee) {
   if (translator !== undefined) return translator;
   if (ts.isPropertyAccessExpression(callee) && callee.name.text === 'get') {
     const owner = callee.expression;
-    const name = literalName(ts, ts.isPropertyAccessExpression(owner) ? owner.name : owner) ?? '';
+    const name = nameText(ts, ts.isPropertyAccessExpression(owner) ? owner.name : owner, { numbers: true }) ?? '';
     if (/message|catalog/iu.test(name)) return [''];
   }
   if (ts.isIdentifier(callee) && /^(?:t|translate)$/u.test(callee.text)) return [''];

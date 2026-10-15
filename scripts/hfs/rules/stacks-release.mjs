@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadTypescript } from '../../lib/package-at.mjs';
+import { walkSqlAst, sqlParser, sqlCallArgument } from '../../lib/sql-ast.mjs';
 import { isPlainObject as plain } from '../../../engine/plain-object.mjs';
 import { found, readText } from './read.mjs';
 import { stacksDeploymentContexts } from './stacks-runtime.mjs';
@@ -215,16 +216,11 @@ function sourceObservationIssues(doc, file, source, facts) {
   return issues;
 }
 
-function walkSql(value, visit) {
-  if (!value || typeof value !== 'object' || value.CreateFunctionStmt) return;
-  visit(value);
-  for (const child of Object.values(value)) walkSql(child, visit);
-}
+const walkSql = (tree, visit) => walkSqlAst(tree, visit, true);
+const parseSql = sqlParser(pg);
 
 function sqlArgument(call, position, names) {
-  const args = call.args ?? [];
-  const value = args.find(arg => names.includes(arg.NamedArgExpr?.name))?.NamedArgExpr?.arg
-    ?? args.filter(arg => !arg.NamedArgExpr)[position];
+  const value = sqlCallArgument(call, position, names);
   return value?.A_Const?.sval?.sval ?? value?.TypeCast?.arg?.A_Const?.sval?.sval ?? null;
 }
 
@@ -253,8 +249,7 @@ function doSqlObservations(statement, file) {
 }
 
 function sqlObservations(text, file) {
-  let tree;
-  try { tree = pg?.parseSync(text); } catch { tree = null; }
+  const tree = parseSql(text);
   if (!tree) return [{ id: null, cadence: null, at: file }];
   const observations = [];
   walkSql(tree, value => {

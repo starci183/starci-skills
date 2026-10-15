@@ -80,9 +80,6 @@ export const unitRoleOfSubject = (hfs, filename) => {
     return unitRoles(hfs).find((role) => name.endsWith(`.${role.role}.ts`) && !name.endsWith(`.${role.spec}.ts`) && inRoleSlot(hfs, role, filename)) ?? null
 }
 
-/** The `<name>` of a `<name>.service.spec.ts`. */
-export const serviceNameOfSpec = (filename) => baseOf(filename).replace(/\.service\.spec\.ts$/, "")
-
 /** The slots of the feature kinds whose door carries its own unit spec beside it. */
 const DOOR_SPEC_SLOTS = new Set(["be.feature.webhooks.http", "be.feature.realtime.graphql", "be.feature.realtime.websocket"])
 

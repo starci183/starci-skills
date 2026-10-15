@@ -62,7 +62,8 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { ARCHITECTURE_RULE_IDS, checkArchitecture } from './architecture/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readCatalogOnce } from './catalog-once.mjs';
-import { APP_SCOPE, HFS_DECLARATION_FILE, appRelativeMessages, HfsSlotsError, SIDES, createSlotResolver, loadRuleCatalog, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './slots.mjs';
+import { APP_SCOPE, HFS_DECLARATION_FILE, appRelativeMessages, HfsSlotsError, SIDES, createSlotResolver, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './slots.mjs';
+import { judgedFindings, summarize, withWhy } from './check-results.mjs';
 import { RUNTIME_KIND } from './manifest-shape.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { diff as gitDiff } from '../api/git/diff.mjs';
@@ -85,7 +86,7 @@ import { feNoTestsFindings } from './rules/fe-no-tests.mjs';
 import { editionFindings } from './rules/edition.mjs';
 import { feStackFindings } from './rules/fe-stack.mjs';
 import { A15_CODES, a15Findings } from './rules/a15-findings.mjs';
-import { trackedStacksGateFindings } from '../gates/stacks-gate.mjs';
+import { trackedStacksGateFindings } from './stacks-gate.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { pinFindings } from './pin-findings.mjs';
 import { requiredFileApplies } from './slot-required.mjs';
@@ -111,6 +112,8 @@ export const CHECK_CODES = Object.freeze([
   'BE_TEST_TOPOLOGY', 'BE_SPEC_PLACEMENT', 'HFS_REPO_LOCAL_CHECK', 'HFS_LINT_SUPPRESSION_FILE', 'HFS_PROOF_COMMAND_FILE_MISSING', 'HFS_PEER_INTEGRATION_MISSING', 'BE_INTEGRATION_SPEC_MISSING', 'FE_GRAPHQL_CONTRACT', 'FE_NO_TESTS', 'HFS_MONO_WORKSPACES', 'HFS_MONO_FE_WORKSPACE', 'HFS_MONO_NEST_PROJECTS', 'HFS_MONO_WORKSPACE_DEP', 'BE_CLI_REQUIRED', 'FE_WIRE_GENERATED', 'FE_I18N_PLACEMENT', 'FE_I18N_CATALOG', 'HFS_SERVICE_PLACEMENT', 'HFS_IMAGE_UNPINNED', 'HFS_SERVICE_STACK_DECLARATION', 'HFS_EVENT_CONTRACT', 'BE_ASYNC_SPEC_MISSING', 'BE_SAGA_STEP_COMPENSATION', 'BE_SAGA_STATE_VERSIONED', 'BE_SAGA_EVENT_CONTRACT', 'BE_SAGA_CONSUMER_DEDUPE', 'BE_EVENT_CLASS_CONTRACT', 'BE_PATTERN_SPEC_MISSING', 'BE_CONTRACT_BREAKING', 'BE_KIND_DECLARATION', 'BE_KIND_EMPTY', 'HFS_DOCKER_BUILD_CONTEXT', 'HFS_DOCKER_STAGES', 'HFS_DOCKER_ENTRY', 'HFS_DOCKER_BASE_PIN', 'HFS_DOCKER_SECRETS', 'BE_SAGA_E2E_MISSING',
   'FE_STACK_FORBIDDEN', 'HFS_EDITION_FORBIDDEN_PRESENT', 'HFS_LITE_SECRET_CUSTODY', 'HFS_STARCIWORK_LITE_FORBIDDEN',
   'DB_MIGRATION_SHAPE', 'DB_RLS_REQUIRED', 'DB_DYNAMIC_DDL', 'DB_POLICY_SHAPE', 'DB_DEFINER_SAFE', 'DB_STORAGE_POLICY', 'DB_CONFIG_POLICY', 'DB_TYPES_DRIFT',
+  'HFS_DOCKER_HEALTHCHECK_FAKE', 'DB_BE_ONLY_ACCESS', 'DB_REALTIME_UNLISTED', 'DB_APP_ROLE', 'DB_FORCE_RLS_DEFAULT',
+  'DB_POLICY_TAUTOLOGY', 'DB_VIEW_UNSAFE', 'DB_STORAGE_PREFIX', 'DB_DEFINER_REVOKE',
   'HFS_GITIGNORE_BLOCK_DRIFT', 'HFS_SONAR_CONFIG', 'HFS_COVERAGE_SCOPE_DRIFT', 'HFS_FORMAT',
   'HFS_EMPTY_DIR', 'HFS_GHOST_TREE', 'HFS_UNTRACKED_ROOT_ENTRY',
   ...A15_CODES,
@@ -176,34 +179,6 @@ const requiredOf = (slot, instance) => (slot.requires ?? []).map((entry) => {
 });
 
 const appOf = (p) => /^apps\/([^/]+)\//.exec(p)?.[1];
-
-function withWhy(findings, why) {
-  return findings.map((f) => ({ ...f, title: why[f.code].title, titleVi: why[f.code].titleVi, whyVi: why[f.code].whyVi, nextStepVi: why[f.code].nextStepVi }));
-}
-
-function summarize(findings) {
-  const byCode = {};
-  for (const f of findings) {
-    byCode[f.code] ??= { level: f.level, count: 0 };
-    byCode[f.code].count += 1;
-  }
-  return {
-    error: findings.filter((f) => f.level === 'error').length,
-    warning: findings.filter((f) => f.level === 'warning').length,
-    info: findings.filter((f) => f.level === 'info').length,
-    byCode,
-  };
-}
-
-/**
- * THE edition filter of findings: a finding whose code belongs, through the rule catalog, to a rule the app's edition does not
- * judge (rules.yaml `editions`) is dropped. Codes outside the catalog (refusals, machine codes without a rule) stay. This is the
- * only place the edition touches a finding; no check below it knows the edition.
- */
-function judgedFindings(findings, edition, root) {
-  const catalog = loadRuleCatalog({ root });
-  return findings.filter((finding) => catalog.judgedIn(finding.code, edition));
-}
 
 /** A side-relative path (or null) as an app-relative one. */
 const onSide = (side, p) => (p ? path.posix.normalize(`${side}/${p}`) : p);

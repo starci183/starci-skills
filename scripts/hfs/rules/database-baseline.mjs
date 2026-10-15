@@ -36,7 +36,7 @@ function explicitRestamp(text, archiveBoundary, newStamp) {
 }
 
 /** Synchronous git seam: (args, {cwd}) -> {ok, stdout}; no diff or blob containing SQL is printed. */
-export function baselineGit(args, { cwd }) {
+function baselineGit(args, { cwd }) {
   const [verb, ...rest] = args;
   if (verb === 'merge-base') {
     const sha = mergeBase(cwd, rest[0], rest[1]);

@@ -1,14 +1,13 @@
 // R275 and R266: each Swarm environment has one declared, digest-pinned ingress.
 import { isPlainObject as plain } from '../../../engine/plain-object.mjs';
-import { found } from './read.mjs';
-import { stacksDeploymentContexts } from './stacks-runtime.mjs';
+import { repositoryOf } from '../../lib/stack-services.mjs';
+import { stacksDeploymentFindings } from './stacks-runtime.mjs';
 
-const DECLARATION = '.starcistacks/application-stacks.yaml';
 const PINNED = /@sha256:[a-f0-9]{64}$/i;
 const SUPPORTED = new Set(['traefik', 'caddy', 'caddy-docker-proxy']);
 const mapping = value => plain(value) ? value : {};
 const present = value => typeof value === 'string' && Boolean(value.trim());
-const imageName = image => present(image) ? image.split('@')[0].split('/').at(-1).split(':')[0].toLowerCase() : '';
+const imageName = image => present(image) ? repositoryOf(image).toLowerCase() : '';
 const ingressImage = image => SUPPORTED.has(imageName(image));
 
 function ingressIds(components, bindings, services, chosen) {
@@ -68,10 +67,5 @@ export function ingressIssues({ doc, environment, spec = doc?.environments?.[env
 
 /** HFS finder over the tracked rendered Swarm environments of either edition. */
 export function stacksIngressFindings(context) {
-  const { doc, deployments } = stacksDeploymentContexts(context);
-  if (!doc) return [];
-  return deployments.filter(entry => !entry.unavailable).flatMap(entry => {
-    const file = entry.file ?? DECLARATION;
-    return ingressIssues({ doc, ...entry }).map(issue => found(issue.code, file, `${file}: ${issue.at}: ${issue.message}`));
-  });
+  return stacksDeploymentFindings(context, ingressIssues);
 }

@@ -1,5 +1,7 @@
 // Shared static Swarm contract for app checks and rendered deployment evidence.
 import { isPlainObject as plain } from '../../engine/plain-object.mjs';
+import { composeEntries } from './compose-values.mjs';
+import { repositoryOf } from './stack-services.mjs';
 
 const PINNED_IMAGE = /@sha256:[a-f0-9]{64}$/i;
 const VERSIONED_SECRET = /-v[1-9][0-9]*$/;
@@ -29,13 +31,6 @@ function runnableHealthcheck(value) {
   return value.slice(1).some(present);
 }
 
-/** Match image repository names, including registry and vendor namespaces, without matching application tags. */
-function duplicatesManagedBacking(image) {
-  if (!present(image)) return false;
-  const repository = image.split('@')[0].split('/').at(-1).split(':')[0];
-  return BACKING_IMAGE.test(repository);
-}
-
 function jobDeclarationIssues(id, component, components, add) {
   if (component.mode !== 'replicated-job') return;
   const scheduler = components[component.scheduler];
@@ -51,7 +46,7 @@ export function swarmInventoryIssues({ components, lite = false }) {
   const add = (at, message) => errors.push({ at, message });
   for (const [id, entry] of Object.entries(catalog)) {
     const component = mapping(entry);
-    if (lite && duplicatesManagedBacking(component.image))
+    if (lite && present(component.image) && BACKING_IMAGE.test(repositoryOf(component.image)))
       add(`components.${id}.image`, 'lite must use managed Supabase backing services; this image duplicates a Supabase-provided service');
     jobDeclarationIssues(id, component, catalog, add);
   }
@@ -73,14 +68,6 @@ function serviceSafetyIssues(id, service, add) {
     add(`${at}.deploy.restart_policy`, 'every Swarm service needs deploy.restart_policy with a condition');
 }
 
-function labelsOf(value) {
-  if (!Array.isArray(value)) return mapping(value);
-  return Object.fromEntries(value.map(label => {
-    const text = String(label), separator = text.indexOf('=');
-    return separator < 0 ? [text, ''] : [text.slice(0, separator), text.slice(separator + 1)];
-  }));
-}
-
 function jobServiceIssues(id, service, component, services, bindings, add) {
   const deploy = mapping(service.deploy), at = `services.${id}.deploy`;
   if (component.mode !== 'replicated-job') {
@@ -90,7 +77,7 @@ function jobServiceIssues(id, service, component, services, bindings, add) {
   if (deploy.mode !== 'replicated-job') add(`${at}.mode`, 'replicated-job component must use deploy.mode: replicated-job');
   if (deploy.replicas !== 0) add(`${at}.replicas`, 'scheduled replicated-job must keep deploy.replicas: 0 until its scheduler triggers it');
   if (deploy.restart_policy?.condition !== 'none') add(`${at}.restart_policy.condition`, 'scheduled replicated-job must use restart_policy.condition: none');
-  const labels = labelsOf(deploy.labels);
+  const labels = Object.fromEntries(composeEntries(deploy.labels));
   if (String(labels['swarm.cronjob.enable']) !== 'true') add(`${at}.labels`, 'scheduled replicated-job needs swarm.cronjob.enable: "true"');
   if (!present(component.schedule) || labels['swarm.cronjob.schedule'] !== component.schedule)
     add(`${at}.labels`, 'swarm.cronjob.schedule must match the component cron schedule');
@@ -127,7 +114,7 @@ export function swarmModelIssues({ model, components, bindings, lite = false }) 
       add(`services.${id}.ports`, 'Swarm ports must be an array of published port definitions');
     else if (service.ports?.length && component.role !== 'ingress')
       add(`services.${id}.ports`, 'only a component with role ingress may publish Swarm ports');
-    if (lite && duplicatesManagedBacking(service.image))
+    if (lite && present(service.image) && BACKING_IMAGE.test(repositoryOf(service.image)))
       add(`services.${id}.image`, 'lite stack must not run an image that duplicates a Supabase-provided backing service');
     jobServiceIssues(id, service, component, services, bound, add);
   }

@@ -12,7 +12,7 @@ const assertions = new Set(['ok', 'equal', 'strictEqual', 'deepEqual', 'deepStri
 const sourceFamilies = new Set(['machine', 'hfs', 'runtime', 'work-validate', 'sonar']);
 const analysisCaches = new WeakMap();
 
-export function claimsProof(text, code, edition) {
+function claimsProof(text, code, edition) {
   return text.split(/\r?\n/).some((line) => /^\s*\/\/\s*proves:\s*/.test(line)
     && line.replace(/^\s*\/\/\s*proves:\s*/, '').split(/[\s,]+/).includes(`${code}@${edition}`));
 }

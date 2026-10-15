@@ -1,6 +1,8 @@
 // R251: product workflow custody, immutable dependencies and release-only triggers, in both editions.
 import { parseWorkflow, workflowFindings } from '../runtime-rules/workflow-source.mjs';
 import { found, readText } from './read.mjs';
+import { isPlainObject as record } from '../../../engine/plain-object.mjs';
+import { workflowEventOptions } from '../../lib/workflow-events.mjs';
 
 const DEPLOY = 'HFS_DEPLOY_WORKFLOW';
 const PIN = 'HFS_WORKFLOW_PIN';
@@ -8,7 +10,6 @@ const TOOL = 'HFS_CI_TOOL_INSTALL';
 const TRIGGER = 'HFS_APP_WORKFLOW_TRIGGER';
 // Only the age identity and SSH transport credentials belong in the CI secret store.
 const CI_SECRET_ENV_NAMES = new Set(['SOPS_AGE_KEY', 'SSH_KEY', 'SSH_PRIVATE_KEY', 'SSH_KNOWN_HOSTS', 'VPS_SSH_KEY', 'VPS_SSH_PRIVATE_KEY', 'VPS_KNOWN_HOSTS', 'VPS_SSH_KNOWN_HOSTS', 'DEPLOY_SSH_KEY', 'DEPLOY_SSH_PRIVATE_KEY', 'DEPLOY_KNOWN_HOSTS', 'DEPLOY_SSH_KNOWN_HOSTS']);
-const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const nonempty = (value) => typeof value === 'string' && value.trim().length > 0;
 function executable(script) {
   let result = '';
@@ -67,14 +68,8 @@ function hasAgeIdentity(job, doc) {
   return steps.some((step) => strings(step.with).some((value) => reference.test(value)) || (typeof step.run === 'string' && reference.test(executable(step.run))));
 }
 
-function triggerOptions(on) {
-  if (typeof on === 'string') return { [on]: null };
-  if (Array.isArray(on)) return Object.fromEntries(on.map((event) => [event, null]));
-  return on;
-}
-
 function triggerFindings(doc, refuse) {
-  const on = triggerOptions(doc.on);
+  const on = workflowEventOptions(doc.on);
   if (!record(on) || !Object.keys(on).length) return [refuse(TRIGGER, 'declare release tags [v*] and/or workflow_dispatch')];
   const findings = [];
   for (const [event, options] of Object.entries(on)) {

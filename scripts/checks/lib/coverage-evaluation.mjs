@@ -175,7 +175,7 @@ function iterableExpressions(context, index, node) {
     ? iterableExpressions(context, resolved.index, entry.argument) : [{ index: resolved.index, node: entry }]);
 }
 
-export function loopIterations(context, index, node) {
+function loopIterations(context, index, node) {
   const values = evaluate(context, index, node.right);
   if (!Array.isArray(values)) return [];
   const pattern = node.left.declarations?.[0]?.id ?? node.left;

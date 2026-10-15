@@ -1,15 +1,14 @@
 // Static values used at runtime by catalog consumers. A declaration alone is never a read.
 import path from 'node:path';
+import { nameText as nameOf } from '../../lib/ts-ast.mjs';
+import { unwrapCatalogExpression as unwrap } from '../../lib/ts-analysis.mjs';
 
 const JSON_CATALOG = /(?:^|\/)(?:messages|locales)\/[^/]+\.json$|\.catalog\.json$/u;
 
-const unwrap = (ts, node) => node && (ts.isAsExpression(node) || ts.isSatisfiesExpression(node) || ts.isParenthesizedExpression(node)) ? unwrap(ts, node.expression) : node;
 const symbolAt = (state, node) => {
   const symbol = state.checker.getSymbolAtLocation(node);
   return symbol?.flags === state.ts.SymbolFlags.Alias ? state.checker.getAliasedSymbol(symbol) : symbol;
 };
-const nameOf = (ts, node) => node && (ts.isIdentifier(node) || ts.isStringLiteralLike(node)) ? node.text : null;
-
 function callable(state, node) {
   const declaration = symbolAt(state, node)?.valueDeclaration;
   if (declaration && state.ts.isVariableDeclaration(declaration)) return unwrap(state.ts, declaration.initializer);
