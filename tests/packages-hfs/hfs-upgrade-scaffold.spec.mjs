@@ -153,6 +153,7 @@ test("a real lite scaffold plans and applies the additive full upgrade", async (
   const productBefore = fileHashes(root, PRODUCT_ROOTS);
   const readmeBefore = fs.readFileSync(path.join(root, "README.md"), "utf8");
   const stacksBefore = fs.readFileSync(path.join(root, ".starcistacks/application-stacks.yaml"), "utf8");
+  const runbookBefore = fs.readFileSync(path.join(root, ".starcistacks/dev/README.md"), "utf8");
   const scriptsBefore = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).scripts;
 
   const firstPlan = await upgradeEdition({
@@ -163,6 +164,7 @@ test("a real lite scaffold plans and applies the additive full upgrade", async (
   });
   assert.equal(gitStatus(root), statusBeforePlan, "--plan writes nothing");
   assert.ok(firstPlan.length > 0, "the lite scaffold has full-only additions");
+  assert.ok(firstPlan.every((step) => !step.path.includes("/infra/compose/")), "the preserved Swarm topology receives no undeclared Compose files");
   assert.ok(
     firstPlan.every((step) =>
       ["add", "keep", "remove-field", "rewrite-managed", "rewrite-readme"].includes(
@@ -226,6 +228,11 @@ test("a real lite scaffold plans and applies the additive full upgrade", async (
     fs.readFileSync(path.join(root, ".starcistacks/application-stacks.yaml"), "utf8"),
     stacksBefore,
     "the upgrade preserves the app-owned Swarm declaration byte-for-byte",
+  );
+  assert.equal(
+    fs.readFileSync(path.join(root, ".starcistacks/dev/README.md"), "utf8"),
+    runbookBefore,
+    "the current lite runbook stays with its preserved Swarm declaration",
   );
   const upgradedScripts = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).scripts;
   for (const name of ["db:start", "db:stop", "db:reset", "db:new", "db:push", "db:types", "db:lint"])
@@ -309,6 +316,14 @@ test("a real lite scaffold plans and applies the additive full upgrade", async (
     afterApply,
     "a repeated apply refuses without changing the upgraded tree",
   );
+});
+
+test("upgrade preserves an authored runbook alongside the lite stack declaration", async (t) => {
+  const root = scaffold(t, "lite");
+  fs.appendFileSync(path.join(root, ".starcistacks/dev/README.md"), "\nOwner-authored development steps.\n");
+  const before = fileHashes(root, [".starcistacks"]);
+  await upgradeEdition({ root, to: "full", presets: PRESETS, lock: fakeLock });
+  assert.deepEqual(fileHashes(root, [".starcistacks"]), before, "the whole declared topology keeps its original bytes");
 });
 
 test("upgrade refuses a real full scaffold with exit 2 and the documented message", async (t) => {

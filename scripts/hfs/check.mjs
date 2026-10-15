@@ -90,19 +90,13 @@ import { trackedStacksGateFindings } from './stacks-gate.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { pinFindings } from './pin-findings.mjs';
 import { requiredFileApplies } from './slot-required.mjs';
+import { REFUSAL_CODES } from './refusal-codes.mjs';
+export { REFUSAL_CODES } from './refusal-codes.mjs';
 // The database rules (R213-R216) read SQL through a WASM parser, so they are async: `starci app check` calls them beside the other emitters and passes the findings in as `extraFindings`.
 export { checkDatabase } from './rules/database.mjs';
 
 const CANON_PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
 export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
-/**
- * The codes `starci app check` reports when it cannot judge (an unreadable repository, a refused declaration or manifest, a missing
- * formatter): infrastructure refusals, never obligations, so no rule of knowledge/hfs/rules.yaml owns them.
- */
-export const REFUSAL_CODES = Object.freeze([
-  'HFS_REPO_UNREADABLE',
-  'HFS_DECLARATION_INVALID', 'HFS_MANIFEST_MAJOR_MISMATCH', 'HFS_MANIFEST_INVALID', 'HFS_FORMAT_TOOL_MISSING', 'HFS_EDITION_INVALID',
-]);
 /** The codes this module emits that are not the slot loader's own: the why bundle of packages/hfs ships exactly these plus the loader's. */
 export const CHECK_CODES = Object.freeze([
   'HFS_SLOT_UNDECLARED', 'HFS_SLOT_NOT_ENABLED', 'HFS_SLOT_AMBIGUOUS', 'HFS_TRACKED_MUST_BE_IGNORED', 'HFS_FORBIDDEN_PRESENT',

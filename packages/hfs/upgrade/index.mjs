@@ -79,6 +79,11 @@ const sameText = (root, file, content) =>
 const readmeCommand = (name) =>
   name === "test" ? "npm test" : `npm run ${name}`;
 
+function listsCommand(section, command) {
+  const escaped = command.replace(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
+  return new RegExp(String.raw`^\s*${escaped}\s*$`, "mu").test(section);
+}
+
 /** Add only the top-level commands that the full managed scripts introduce, preserving every existing README byte around them. */
 function upgradedReadme(root) {
   const file = path.join(root, "README.md");
@@ -99,13 +104,7 @@ function upgradedReadme(root) {
   const section = lines.slice(start + 1, stop).join("\n");
   const commands = addedNames
     .map(readmeCommand)
-    .filter(
-      (command) =>
-        !new RegExp(
-          `^\\s*${command.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}\\s*$`,
-          "mu",
-        ).test(section),
-    );
+    .filter((command) => !listsCommand(section, command));
   if (commands.length === 0) return null;
   let insert = -1;
   for (let index = start + 1; index < stop; index += 1)
@@ -168,7 +167,7 @@ export function fullEditionDeclaration(
 function pinnedPackage(root, pins) {
   const current = readJson(root, "package.json");
   const section = (name, dependencies) => {
-    const next = { ...(current[name] ?? {}) };
+    const next = { ...current[name] };
     for (const dependency of dependencies) {
       const pin = pins[dependency]?.version;
       if (!pin)
@@ -226,10 +225,18 @@ function templateFiles(group, prefix, variables) {
   }));
 }
 
+/** Keep an existing topology and its runbooks together; the fallback stack is only for apps without a declaration. */
+function stackAdditions(root, variables) {
+  const declaration = ".starcistacks/application-stacks.yaml";
+  const hasStacks = fs.existsSync(path.join(root, declaration));
+  return templateFiles("app/upgrade-full", "", variables).filter((file) =>
+    !hasStacks || file.path === declaration || !file.path.startsWith(".starcistacks/"));
+}
+
 function additions(root, full, hadCli, manifest) {
   const variables = { project: full.project, app: "cli", appPascal: "Cli" };
   const files = [
-    ...templateFiles("app/upgrade-full", "", variables),
+    ...stackAdditions(root, variables),
     ...scaffoldWorkSeeds(full.project).filter((file) =>
       !fs.existsSync(path.join(root, file.path))
       && (file.path === ".starciwork/workspace.yaml" || !fs.existsSync(path.join(root, ".starciwork", "index.yaml")))),
@@ -272,6 +279,28 @@ function sourceWithAdditions(root, additions) {
 }
 
 const publicStep = ({ op, path: file, why }) => ({ op, path: file, why });
+
+function additionReason(file) {
+  if (file.startsWith(".starcistacks/")) return "Add the pinned Supabase/Postgres and api full-stack skeleton.";
+  if (file.startsWith(".starciwork/")) return "Add the canonical product catalog and existing liveness feature overview.";
+  if (file.includes("/tests/")) return "Open the full test layer without inventing a spec.";
+  return "Add the full-only cli or image scaffold.";
+}
+
+function additionStep(root, file, authored) {
+  const target = path.join(root, ...file.path.split("/"));
+  if (!fs.existsSync(target)) return {
+    op: "add", path: file.path, why: additionReason(file.path), content: file.content, kind: "file",
+  };
+  if (authored.has(file.path)) return {
+    op: "keep", path: file.path, why: authored.get(file.path), kind: "keep",
+  };
+  if (!sameText(root, file.path, file.content)) throw new UpgradeError(
+    "HFS_UPGRADE_FILE_CONFLICT",
+    `${file.path} already exists and is not the upgrade scaffold; no file was overwritten`,
+  );
+  return null;
+}
 
 async function model({ root, to, presets, manifest }) {
   if (to !== "full")
@@ -355,32 +384,8 @@ async function model({ root, to, presets, manifest }) {
       kind: "file",
     });
   for (const file of desired) {
-    const target = path.join(root, ...file.path.split("/"));
-    if (fs.existsSync(target)) {
-      if (authored.has(file.path)) {
-        steps.push({ op: "keep", path: file.path, why: authored.get(file.path), kind: "keep" });
-        continue;
-      }
-      if (!sameText(root, file.path, file.content))
-        throw new UpgradeError(
-          "HFS_UPGRADE_FILE_CONFLICT",
-          `${file.path} already exists and is not the upgrade scaffold; no file was overwritten`,
-        );
-      continue;
-    }
-    steps.push({
-      op: "add",
-      path: file.path,
-      why: file.path.startsWith(".starcistacks/")
-        ? "Add the pinned Supabase/Postgres and api full-stack skeleton."
-        : file.path.startsWith(".starciwork/")
-          ? "Add the canonical product catalog and existing liveness feature overview."
-          : file.path.includes("/tests/")
-          ? "Open the full test layer without inventing a spec."
-          : "Add the full-only cli or image scaffold.",
-      content: file.content,
-      kind: "file",
-    });
+    const step = additionStep(root, file, authored);
+    if (step) steps.push(step);
   }
   if (!sameText(root, "be/nest-cli.json", nestCliText(full)))
     steps.push({
@@ -450,11 +455,7 @@ export async function upgradeEdition({
   return result;
 }
 
-/** CLI adapter kept outside the CLI entry so that verb wiring remains one line. */
-export async function upgradeMain(
-  argv,
-  { stdout = (value) => process.stdout.write(value), presets } = {},
-) {
+function upgradeArguments(argv) {
   let to;
   let plan = false;
   let root = process.cwd();
@@ -474,6 +475,15 @@ export async function upgradeMain(
       "HFS_UPGRADE_USAGE",
       "starci app upgrade needs --edition full",
     );
+  return { root, to, plan };
+}
+
+/** CLI adapter kept outside the CLI entry so that verb wiring remains one line. */
+export async function upgradeMain(
+  argv,
+  { stdout = (value) => process.stdout.write(value), presets } = {},
+) {
+  const { root, to, plan } = upgradeArguments(argv);
   const steps = await upgradeEdition({ root, to, plan, presets });
   for (const step of steps) stdout(`${step.op} ${step.path}: ${step.why}\n`);
   stdout(

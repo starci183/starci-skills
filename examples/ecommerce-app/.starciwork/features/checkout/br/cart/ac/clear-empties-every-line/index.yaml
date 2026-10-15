@@ -1,7 +1,0 @@
-schema: work/acceptance-criterion@1
-id: ac.checkout.cart.clear-empties-every-line
-rule: br.checkout.cart
-given: A person whose cart holds lines
-when: They clear the cart
-then:
-  - A later read answers no lines, and the lines of nobody else were touched.

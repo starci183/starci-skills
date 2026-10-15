@@ -4,7 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { findPackage } from '../../scripts/lib/package-at.mjs';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { chromiumGap } from '../helpers/chromium-gap.mjs';
 import {
@@ -79,7 +81,7 @@ test('font stacks: a named family that neither loaded nor is installed is missin
   assert.deepEqual(r.used.map((u) => [u.family, u.source]), [
     ['Drawn Sans', 'webfont'], ['Segoe UI', 'local'], ['Segoe UI', 'local'], ['ui-sans-serif', 'generic'], [null, 'browser-default'],
   ]);
-  assert.deepEqual(r.missing.sort(), ['Ghost', 'NoSuch']);
+  assert.deepEqual(r.missing.sort(byCodeUnit), ['Ghost', 'NoSuch']);
   assert.deepEqual(splitFontStack(`'A B', "C", d`), ['A B', 'C', 'd']);
 });
 
@@ -116,7 +118,8 @@ test('CLI: usage errors and a host with no usable browser exit 2, never 0', asyn
 test('loadPlaywright: no project install and no runtime install is RENDER_TOOL_UNAVAILABLE; the runtime own install serves a project that has none', async () => {
   await withTmp(async (dir) => {
     assert.throws(() => loadPlaywright([dir], { runtime: null }), /RENDER_TOOL_UNAVAILABLE: no playwright install resolvable/);
-    if (PW_DIR) assert.equal(loadPlaywright([dir], { runtime: PW_DIR }).root.startsWith(PW_DIR), true, 'the runtime root is the last candidate');
+    if (PW_DIR) assert.equal(loadPlaywright([dir], { runtime: PW_DIR }).root,
+      findPackage([PW_DIR], ['playwright', '@playwright/test', 'playwright-core']).root, 'the runtime install is the last candidate, including a junction to shared dependencies');
   });
 });
 
@@ -136,11 +139,11 @@ test('HTML capture: one png and one record per viewport, green', { skip: NO_BROW
     assert.equal(r.status, 0, r.stderr + r.stdout);
     const { ok, records } = JSON.parse(r.stdout);
     assert.equal(ok, true);
-    assert.deepEqual(fs.readdirSync(out).sort(), [
+    assert.deepEqual(fs.readdirSync(out).sort(byCodeUnit), [
       'sign-in--1440x900--dark.json', 'sign-in--1440x900--dark.png', 'sign-in--390x844--dark.json', 'sign-in--390x844--dark.png']);
     for (const rec of records) {
       const png = fs.readFileSync(rec.image.path);
-      assert.equal(rec.image.sha256, (await import('node:crypto')).createHash('sha256').update(png).digest('hex'));
+      assert.equal(rec.image.sha256, createHash('sha256').update(png).digest('hex'));
       assert.equal(rec.tool.settleMs, SETTLE_MS, 'the settle wait the capture applied, recorded on the render record');
       assert.equal(png.readUInt32BE(16), rec.viewport.width * 2, 'deviceScaleFactor 2');
       assert.equal(rec.layout.pageWidth, rec.viewport.width);

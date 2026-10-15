@@ -1,6 +1,7 @@
 // Optional release-cut witnesses mutate isolated authored example copies; no source custody files are opened.
 import fs from 'node:fs';
 import path from 'node:path';
+import { safeRemove } from '../../api/fs/safe-remove.mjs';
 import { tempRoot } from '../../../engine/temp-root.mjs';
 import { isPlainObject } from '../../../engine/plain-object.mjs';
 import { init } from '../../api/git/init.mjs';
@@ -130,7 +131,8 @@ function removeAllocated(allocated, parent) {
   if (!stat) return;
   if (!within(parent, allocated) || path.dirname(allocated) !== parent || !path.basename(allocated).startsWith(PREFIX)
     || stat.isSymbolicLink() || !stat.isDirectory() || fs.realpathSync.native(allocated) !== allocated) refuse('temporary witness cleanup path could not be verified');
-  fs.rmSync(allocated, { recursive: true, force: true, maxRetries: 3, retryDelay: 25 });
+  const removed = safeRemove(allocated, { hold: () => null });
+  if (!removed.ok) refuse('temporary witness cleanup failed');
 }
 
 function witnessSource(context, rule, witness, generated) {

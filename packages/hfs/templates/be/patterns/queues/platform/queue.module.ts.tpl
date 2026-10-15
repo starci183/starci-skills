@@ -28,6 +28,17 @@ export class QueueModule extends ConfigurableModuleClass {
     /** Registers the capability once per app that enqueues or processes jobs. */
     static register(options: typeof OPTIONS_TYPE): DynamicModule {
         const base = super.register(options)
+        if (options.outboxOnly === true) {
+            return {
+                ...base,
+                providers: [
+                    ...(base.providers ?? []),
+                    QueueOutboxService,
+                    { provide: QUEUE_OUTBOX, useExisting: QueueOutboxService },
+                ],
+                exports: [QUEUE_OUTBOX],
+            }
+        }
         return {
             ...base,
             providers: [
