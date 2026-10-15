@@ -3355,37 +3355,69 @@ rules:
     law: "Every port literal of the runtime is spelled once, by its owner, and every other file references the owner: the harness UI ports live in modules/models/runtimes.yaml statusApp.port/devPort read through ui/ports.mjs, the local SonarQube host in scripts/gates/sonar-local.mjs DEFAULT_HOST. No in-scope file that is not the owner spells an owned literal in a port position (a scheme://host:NNNN or host:NNNN authority, a *port*/PORT assignment, a listen(NNNN) call), and an unowned literal in a port position of two or more runtime source files gets one owning exported constant the rest reference. Specs, tests, node_modules, the generated runtime copies, changelogs, .starciwork and the product stack declarations (.starcistacks, starcistacks-services - a product owns the ports of the services it runs) are out of scope."
     scope: runtime
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_PORT_RESTATED"]
     enforcers:
       - {kind: runtime, id: port-once, at: scripts/checks/check-port-once.mjs}
+    editions: [lite, full]
+    docs: [docs/source-process.md#r208]
+    templateNa: "Runtime port ownership is repository infrastructure; app scaffolds do not contain its owner files or readers."
+    proves: [tests/hfs-proofs/runtime-source-checks.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/hfs-proofs/runtime-source-checks.spec.mjs, editions: [lite, full], codes: [RT_PORT_RESTATED]}
+    witness:
+      - {path: tests/hfs-proofs/runtime-source-checks.spec.mjs, editions: [lite, full], codes: [RT_PORT_RESTATED]}
   - id: R209
     code: "RT_CONFIG_DEFAULT_TWICE"
     law: "Every documented configuration default is stated once, by its owner, and read through it: a camelCase leaf or lowercase key of config.example.yaml, or a value an owner declares - scripts/machine/home.mjs DEFAULTS (supervisor workers, the land gate, frozenMinutes, pollIntervalMs), engine/config.mjs (connector, ask, UAT, spec and allocation defaults, and DEFAULT_OWNER_LANGUAGE which scripts/machine/home.mjs re-exports), engine/orca-config.mjs (worker depth), scripts/reconciler/state.mjs (the controller mode) - is never restated as a literal fallback (?? or ||, a parameter default, or a language ternary) in any other runtime source file; the reader calls the owner accessor (supervisorSettings(), configuredMode(), ownerLanguage(), ...). Specs, tests, the generated runtime copies, stories and the HFS templates are out of scope, and a bare identifier or a computed value is a read, not a restatement."
     scope: runtime
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_CONFIG_DEFAULT_TWICE"]
     enforcers:
       - {kind: runtime, id: default-once, at: scripts/checks/check-default-once.mjs}
+    editions: [lite, full]
+    docs: [docs/source-process.md#r209]
+    templateNa: "Runtime configuration defaults belong to harness owners and readers; HFS product templates are outside this check's scope."
+    proves: [tests/hfs-proofs/runtime-source-checks.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/hfs-proofs/runtime-source-checks.spec.mjs, editions: [lite, full], codes: [RT_CONFIG_DEFAULT_TWICE]}
+    witness:
+      - {path: tests/hfs-proofs/runtime-source-checks.spec.mjs, editions: [lite, full], codes: [RT_CONFIG_DEFAULT_TWICE]}
   - id: R210
     code: "RT_VERSION_RESTATED"
     law: "knowledge/hfs/canon-pins.yaml spells the version of every @starci package and every canon-pinned dependency once; a package.json is the declared install site and a lockfile its resolution. Anywhere else a semver literal equal to a pin - or a name@x.y.z specifier naming one - restates it, except on the declared binding keys a refresher owns and rewrites in place (canon.version of the code-pattern bindings held by check-canon-pins.mjs, provenance.version and identity.version of the grammar snapshots rewritten by scripts/work/ui/grammar-knowledge.mjs). Package manifests, lockfiles, changelogs, specs, tests, the generated runtime copies and .starciwork are out of scope; a restatement is fixed by naming the pin, never the literal."
     scope: runtime
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_VERSION_RESTATED"]
     enforcers:
       - {kind: runtime, id: version-pin-once, at: scripts/checks/check-version-pin-once.mjs}
+    editions: [lite, full]
+    docs: [docs/source-process.md#r210]
+    templateNa: "This runtime check scans tracked references to the canon pin catalog; product package install declarations are excluded and no app scaffold owns this runtime surface."
+    proves: [tests/hfs-proofs/rt-version-restated.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/hfs-proofs/rt-version-restated.spec.mjs, editions: [lite, full], codes: [RT_VERSION_RESTATED]}
+    witness:
+      - {path: tests/hfs-proofs/rt-version-restated.spec.mjs, editions: [lite, full], codes: [RT_VERSION_RESTATED]}
   - id: R211
     code: "RT_SLOT_ID_SHAPE"
     law: "A slot id follows the grammar its manifest declares, read from the manifest not from a list: dot-separated lowercase kebab segments, a first segment of naming.prefixes in knowledge/hfs/slots.yaml (profiles in knowledge/hfs/runtime-slots.yaml), <side>.app.<kind> naming a kind of appKinds.<side>, and every deeper id extending a declared id - an explicit parent field, or a family at least two slots share; a lone deep orphan invents a family. The role-suffix vocabulary holds no synonym pairs: a profile's suffixes never share a word with bannedSuffixes, no naming.refusedPairs pair is live in suffixes on both sides, and naming.sameConceptPairs is the one declared exception (step + saga-step), live on both sides or dropped; naming.glossary binds the five incoming-thing names (consumer, subscription, webhook, processor, handler) to their distinct kinds."
     scope: runtime
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_SLOT_ID_SHAPE"]
     enforcers:
       - {kind: runtime, id: slot-id-shape, at: scripts/checks/check-slot-id-shape.mjs}
+    editions: [lite, full]
+    docs: [docs/source-process.md#r211]
+    templateNa: "The authored app and runtime slot manifests are canon catalogs, not files scaffolded into apps."
+    proves: [tests/hfs-proofs/runtime-source-checks.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/hfs-proofs/runtime-source-checks.spec.mjs, editions: [lite, full], codes: [RT_SLOT_ID_SHAPE]}
+    witness:
+      - {path: tests/hfs-proofs/runtime-source-checks.spec.mjs, editions: [lite, full], codes: [RT_SLOT_ID_SHAPE]}
   - id: R212
     code: "HFS_EDITION_INVALID"
     law: "hfs.json names an edition the manifest knows (full, or lite; absent means full). Lite follows the 2026-10-13 ruling: the same monorepo, code structure, slots, patterns and back-end unit specs, with only backing infrastructure swapped for managed Supabase (Postgres, Auth, Storage, Supabase Queues/pgmq for queue and event bus, Postgres locks, pg_cron); the api and sidecars run on docker-swarm on a VPS. The realtime pattern uses the same socket.io gateway inside the be api process (one instance, no Redis adapter), and both editions share knowledge/hfs/fe-stack.yaml. Lite requires application-stacks.yaml and permits environment metadata, runbooks, infra/swarm and encrypted-secret custody, while refusing infra/compose, infra/k8s, infra/terraform and components duplicating Supabase backing services (runtime/{config,env}, seeds and the sealed secrets of its environments are allowed). Contract specs and `test:contract` are allowed (owner 2026-10-14); it has no e2e spec, `test:e2e`, `test:stack` or `test:browser` script, e2e workflow, browser journey, Work catalog, shell, features, resources, UAT or br records, test container, toxiproxy, browser-runner, BullMQ, Kafka, Redis or graphql-ws dependency, or supabase/functions. Its .starciwork is optional and admits only .gitignore, workspace.yaml and brand/**; workspace.yaml is optional and carries project identity and repo roles for the Work tools."
@@ -3421,9 +3453,19 @@ rules:
 
   - id: R213
     code: "DB_MIGRATION_SHAPE"
+    editions: [lite, full]
+    docs: [docs/architecture.md#r213]
+    templateNa: "Full apps opt into Supabase without a managed Supabase migration scaffold; their migration sequence and Git history are product-authored."
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/skeleton-lite/supabase/migrations/__timestamp___baseline.sql, edition: lite}
+      - {path: tests/hfs-proofs/db-migration-shape.spec.mjs, editions: [lite, full]}
+    proves:
+      - {path: tests/hfs-proofs/db-migration-shape.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-proofs/db-migration-shape.spec.mjs, editions: [lite, full], codes: [DB_MIGRATION_SHAPE]}
     law: "A migration is `supabase/migrations/<ts14>_<kebab>.sql`; the stamp is a valid UTC instant, active stamps are unique, and a new migration sorts strictly after the committed active migrations in HEAD. Repository history includes the archive: moving an active migration to the archive retires it from ordering, so a replacement baseline may predate archived stamps and later migrations append after the baseline. Wall-clock time, commit time and remote-branch stamps do not set the ordering boundary. A migration already on the base is immutable (a diff or an unarchived removal is a finding); a file that does not parse as PostgreSQL is a shape failure."
     kinds: [check]
-    gates: [pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["DB_MIGRATION_SHAPE"]
     enforcers:
       - {kind: hfs, id: db-migration-shape, at: scripts/hfs/rules/database.mjs}
@@ -3453,18 +3495,48 @@ rules:
       - {kind: hfs, id: db-config-types, at: scripts/hfs/rules/database.mjs}
   - id: R217
     code: "FE_SUPABASE_CLIENT_OWNER"
+    editions: [lite, full]
+    docs: [docs/lite-edition.md#r217]
+    proves:
+      - {path: tests/hfs-proofs/fe-supabase-client-owner.spec.mjs, editions: [lite, full], codes: [FE_SUPABASE_CLIENT_OWNER]}
+      - {path: tests/hfs-proofs/r217-backend-client-owner.spec.mjs, editions: [lite, full], codes: [BE_SUPABASE_CLIENT_OWNER]}
+      - {path: tests/hfs-proofs/fe-service-role-forbidden.spec.mjs, editions: [lite, full], codes: [FE_SERVICE_ROLE_FORBIDDEN]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/fe/auth/supabase-client.ts.tpl, editions: [lite, full]}
+      - {path: packages/hfs/templates/be/skeleton-lite/src/modules/integrations/supabase/supabase.client.ts, edition: lite}
+      - {path: tests/hfs-proofs/fe-supabase-client-owner.spec.mjs, editions: [lite, full]}
+      - {path: tests/hfs-proofs/r217-backend-client-owner.spec.mjs, editions: [lite, full]}
+      - {path: tests/hfs-proofs/fe-service-role-forbidden.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-proofs/fe-supabase-client-owner.spec.mjs, edition: lite, codes: [FE_SUPABASE_CLIENT_OWNER]}
+      - {path: tests/hfs-proofs/r217-backend-client-owner.spec.mjs, edition: lite, codes: [BE_SUPABASE_CLIENT_OWNER]}
+      - {path: tests/hfs-proofs/fe-service-role-forbidden.spec.mjs, edition: lite, codes: [FE_SERVICE_ROLE_FORBIDDEN]}
+      - {path: tests/hfs-proofs/fe-supabase-client-owner.spec.mjs, edition: full, codes: [FE_SUPABASE_CLIENT_OWNER]}
+      - {path: tests/hfs-proofs/r217-backend-client-owner.spec.mjs, edition: full, codes: [BE_SUPABASE_CLIENT_OWNER]}
+      - {path: tests/hfs-proofs/fe-service-role-forbidden.spec.mjs, edition: full, codes: [FE_SERVICE_ROLE_FORBIDDEN]}
     law: "Supabase has one door per side: on the front end `@supabase/supabase-js` and `@supabase/ssr` are imported only by `fe.modules.auth` and only their auth API is called (sign-in, sign-out, session, access token; never `.from`, `.rpc`, `.storage` or `.channel`, so the front end reads and writes no data through Supabase), and on the back end only `be.integrations.supabase` imports them, every back-end client carrying the committed `Database` type; the front end holds no credential: `fe/` names no service-role or `*_SECRET`, `*_PRIVATE`, `*_TOKEN`, `*_PASSWORD` value (public configuration is read once by `modules/config`)."
     kinds: [check, design]
-    gates: [pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["FE_SUPABASE_CLIENT_OWNER", "BE_SUPABASE_CLIENT_OWNER", "FE_SERVICE_ROLE_FORBIDDEN"]
     enforcers:
       - {kind: machine, id: supabase-client-owner, at: scripts/hfs/architecture/supabase.mjs}
       - {kind: machine, id: supabase-service-role, at: scripts/hfs/architecture/supabase.mjs}
   - id: R219
     code: "BE_SUPABASE_JWT_VERIFIED"
+    editions: [lite, full]
+    docs: [docs/lite-edition.md#r219]
+    templateNa: "Full-edition Supabase verification is an optional integration with no managed verifier scaffold; lite has the referenced integration template."
+    proves:
+      - {path: tests/hfs-proofs/be-supabase-jwt-verified.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton-lite/src/modules/integrations/supabase/supabase.jwks.ts, edition: lite}
+      - {path: tests/hfs-proofs/be-supabase-jwt-verified.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-proofs/be-supabase-jwt-verified.spec.mjs, edition: lite, codes: [BE_SUPABASE_JWT_VERIFIED]}
+      - {path: tests/hfs-proofs/be-supabase-jwt-verified.spec.mjs, edition: full, codes: [BE_SUPABASE_JWT_VERIFIED]}
     law: "The principal is verified, never trusted: a back-end principal comes only from a Supabase access token verified against the project JWKS (signature, issuer, audience, expiry, pinned algorithm), never decoded unverified and never from the request body."
     kinds: [check, design]
-    gates: [pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["BE_SUPABASE_JWT_VERIFIED"]
     enforcers:
       - {kind: machine, id: supabase-principal, at: scripts/hfs/architecture/supabase.mjs}
@@ -3490,8 +3562,18 @@ rules:
     code: "CI_TRIGGERS_RELEASE_ONLY"
     law: "The only workflow triggers are a push of release tags, a person dispatching it and, in the runtime's own workflows (`.github/workflows/` at the root), a push to `main`: every tracked workflow declares an `on` that holds only `push` filtered to `tags: ['v*']` (and, in the runtime's own workflows, `branches: [main]`; no paths or ignore filter beside them) and `workflow_dispatch`. The examples and the hfs app templates (so every scaffolded app inherits it) take the tag and the dispatch only: an app's CI runs once per release, on its tag. A push to any other branch, a pull_request, a schedule, a workflow_call or any other event refuses the workflow."
     scope: runtime
+    editions: [lite, full]
+    docs: [docs/git-governance.md#r221]
+    proves: [tests/hfs-proofs/ci-triggers-release-only.spec.mjs]
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/ci-workflows-lite/github/workflows/ci.yml, edition: lite}
+      - {path: packages/hfs/templates/app/ci-workflows/github/workflows/ci.yml, edition: full}
+      - {path: tests/hfs-proofs/ci-triggers-release-only.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-proofs/ci-triggers-release-only.spec.mjs, edition: lite, codes: [CI_TRIGGERS_RELEASE_ONLY]}
+      - {path: tests/hfs-proofs/ci-triggers-release-only.spec.mjs, edition: full, codes: [CI_TRIGGERS_RELEASE_ONLY]}
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["CI_TRIGGERS_RELEASE_ONLY"]
     enforcers:
       - {kind: runtime, id: git-triggers, at: scripts/hfs/runtime-rules/git-triggers.mjs}
@@ -3499,8 +3581,17 @@ rules:
     code: "RELEASE_NOTES"
     law: "A release tag `v<version>` on HEAD has its CHANGELOG.md section `## [<version>]` with no TODO, PENDING or TBD left in it and no `in preparation` mark: the tag message and the GitHub Release are that section, so a tag is never cut over an unfinished or missing section."
     scope: runtime
+    editions: [lite, full]
+    docs: [docs/git-governance.md#r222]
+    templateNa: "Release tags at HEAD and their finished changelog sections are authored release evidence, not app scaffold output."
+    proves: [tests/hfs-proofs/release-notes.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/hfs-proofs/release-notes.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-proofs/release-notes.spec.mjs, edition: lite, codes: [RELEASE_NOTES]}
+      - {path: tests/hfs-proofs/release-notes.spec.mjs, edition: full, codes: [RELEASE_NOTES]}
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RELEASE_NOTES"]
     enforcers:
       - {kind: runtime, id: release-notes, at: scripts/hfs/runtime-rules/release-notes.mjs}
@@ -3536,16 +3627,34 @@ rules:
     law: "Every recorded spec duration should stay within the shared per-file land budget in modules/kernel/spec-durations.yaml: an over-budget spec is an advisory info finding ranked by its excess (it does not fail the check stage), and every recorded spec path must still exist. An over-budget spec is repaired without removing tests or assertions: share a per-process fixture, remove per-test install or boot, inject the clock and never lengthen a timeout; stale rows are refreshed from the current land record."
     scope: runtime
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_SPEC_OVER_BUDGET", "RT_SPEC_BUDGET_STALE"]
     enforcers:
       - {kind: runtime, id: spec-budget, at: scripts/checks/check-spec-budget.mjs}
+    editions: [lite, full]
+    docs: [docs/source-process.md#r226]
+    templateNa: "The runtime land-duration record is measured repository data, not an app scaffold surface."
+    proves: [tests/hfs-proofs/runtime-source-checks.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/hfs-proofs/runtime-source-checks.spec.mjs, editions: [lite, full], codes: [RT_SPEC_OVER_BUDGET, RT_SPEC_BUDGET_STALE]}
+    witness:
+      - {path: tests/hfs-proofs/runtime-source-checks.spec.mjs, editions: [lite, full], codes: [RT_SPEC_OVER_BUDGET, RT_SPEC_BUDGET_STALE]}
   - id: R227
     code: "RT_SYNTAX_INVALID"
+    editions: [lite, full]
+    docs: [docs/source-process.md#r227]
+    templateNa: "The runtime syntax check judges tracked authored JavaScript, not a scaffolded application surface."
+    proves:
+      - {path: tests/hfs-runtime-rules/runtime-syntax.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: tests/hfs-runtime-rules/runtime-syntax.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-runtime-rules/runtime-syntax.spec.mjs, edition: lite, codes: [RT_SYNTAX_INVALID]}
+      - {path: tests/hfs-runtime-rules/runtime-syntax.spec.mjs, edition: full, codes: [RT_SYNTAX_INVALID]}
     law: "Every git-tracked .mjs, .cjs and .js file parses as JavaScript, including tests and package sources; node_modules, generated roots of ruleParams.runtime.generated and vendored build output are outside the authored-source scope. The runtime folder's Node-exact syntax pass remains in place, while this batched in-process pass extends coverage to the whole tracked repository and reports every parser diagnostic at its file and line."
     scope: runtime
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_SYNTAX_INVALID"]
     enforcers:
       - {kind: runtime, id: syntax, at: scripts/hfs/runtime-rules/syntax.mjs}
@@ -3554,19 +3663,35 @@ rules:
     law: "Every identifier a runtime ES module (scripts/, engine/ without the vendored yaml bundle, ui/api/, packages/cli/bin and src) reads or writes resolves, by scope analysis over its TypeScript syntax tree, to a declaration, import, parameter or Node global of an enclosing scope. A re-export (export {x} from './y.mjs') binds x in no local scope; require, module, exports and __dirname are not globals of a module; browser globals resolve only inside a function that a module hands to page.evaluate, here or through an import. A name a refactor left behind is refused before the line that reads it runs."
     scope: runtime
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_IDENTIFIER_UNDECLARED"]
     enforcers:
       - {kind: runtime, id: undeclared-identifiers, at: scripts/checks/check-undeclared-identifiers.mjs}
+    editions: [lite, full]
+    docs: [docs/source-process.md#r228]
+    templateNa: "This check scans authored runtime ES modules; app scaffolds do not contain these harness modules."
+    proves: [tests/hfs-proofs/runtime-source-checks.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/hfs-proofs/runtime-source-checks.spec.mjs, editions: [lite, full], codes: [RT_IDENTIFIER_UNDECLARED]}
+    witness:
+      - {path: tests/hfs-proofs/runtime-source-checks.spec.mjs, editions: [lite, full], codes: [RT_IDENTIFIER_UNDECLARED]}
   - id: R229
     code: "RT_REMOVED_VOCABULARY"
     law: "No text an agent or the owner reads teaches a spelling the runtime refuses. The refused names - config keys, routing-bias fields, verbs, flags, codes and vocabulary - are the one list modules/kernel/removed-vocabulary.yaml, each with its replacement and the release that removed it; the config and routing-bias refusals read the same list. Every tracked file of skills/, docs/, README.md, CONTEXT.md, CONTRIBUTING.md, modules/ and knowledge/ (Markdown and yaml) is scanned line by line, and a line that spells a listed name is a finding naming file:line, the name and its replacement, (and every tests/**/*.spec.mjs, where a name is allowed only on a line or under a test title that says refuse, reject, removed, throws or unknown) unless the file is the list, CHANGELOG.md, or the line or block carries the [removed-list] marker (a marker alone on a comment line covers the lines up to the next blank one). Removing or renaming a key, flag, verb, field or code adds its entry to the list in the same commit."
     scope: runtime
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_REMOVED_VOCABULARY"]
     enforcers:
       - {kind: runtime, id: removed-vocabulary, at: scripts/checks/check-removed-vocabulary.mjs}
+    editions: [lite, full]
+    docs: [docs/source-process.md#r229]
+    templateNa: "The removed-name catalog and authored runtime instructions are maintained repository surfaces, not app scaffold output."
+    proves: [tests/hfs-proofs/runtime-source-checks.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/hfs-proofs/runtime-source-checks.spec.mjs, editions: [lite, full], codes: [RT_REMOVED_VOCABULARY]}
+    witness:
+      - {path: tests/hfs-proofs/runtime-source-checks.spec.mjs, editions: [lite, full], codes: [RT_REMOVED_VOCABULARY]}
   - id: R230
     code: "RT_PROSE_COMMAND_UNKNOWN"
     law: "A command an instruction shows exists as written. Every `starci <group> <verb>` in a backticked span, fenced code line or yaml example item of skills/, docs/, README.md, CONTEXT.md, CONTRIBUTING.md and modules/ names a verb of the CLI catalog (modules/cli/commands) in a catalogued group, and every --flag on it is a flag of that verb or a global flag; the text after a lone -- belongs to another program and a [removed-list] marked line is exempt. The catalog is generated into the valid set, never typed twice."

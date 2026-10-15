@@ -607,3 +607,14 @@ Use relative paths, the runtime root, temporary directories or configuration val
 Declare an actual runtime read of an example once in `scripts/lib/example-refs.mjs`
 and import its constant wherever it is consumed. Specs, tests and generated runtime
 copies are outside this source scan; managed templates remain in scope.
+
+<a id="r213"></a>
+## R213: Supabase migration history
+
+In lite and in full apps that use Supabase, `DB_MIGRATION_SHAPE` refuses an invalid
+`supabase/migrations/<ts14>_<kebab>.sql` name, impossible UTC timestamp, duplicate
+active stamp, invalid PostgreSQL, or migration that does not append after the active
+committed chain. Keep base migrations immutable and retire earlier history through
+the archive when introducing a baseline; neither wall-clock time nor archived stamps
+set the append boundary. The paired edition proof refuses February 30 and accepts a
+real UTC timestamp.
