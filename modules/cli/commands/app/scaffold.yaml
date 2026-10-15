@@ -7,6 +7,7 @@ positional:
   - {name: name, required: true, variadic: false}
 flags:
   - {name: into, type: string, summary: parent directory in which the named app is created}
+  - {name: registry-visibility, type: enum, enum: [public, private], summary: "visibility of the app's container images written once into deploy.registry (default public; the app owns it afterwards)"}
 exit: {"0": app created, "2": refusal or bad usage}
 json: none
 conventions:

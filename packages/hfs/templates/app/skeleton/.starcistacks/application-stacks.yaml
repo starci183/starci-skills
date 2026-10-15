@@ -49,6 +49,11 @@ environments:
     # Add secrets.grants once the real sealed members exist under .starcistacks/production/secrets, and a backup block for stateful volumes.
     deploy:
       stack: {{project}}-production
+      # The image registry. The canon scaffold writes `public` (the owner's default: images cost nothing there); the value belongs to the app from now on
+      # and `starci app sync` never rewrites it. While it is public, `starci app stack build --push` scans every image for secret material first.
+      registry:
+        host: ghcr.io
+        visibility: {{registryVisibility}}
       images:
         core:
           app: core

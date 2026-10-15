@@ -74,6 +74,7 @@ _starci() {
         app:release:--tag-prefix) return 0;;
         app:release:--remote) return 0;;
         app:scaffold:--into) return 0;;
+        app:scaffold:--registry-visibility) COMPREPLY=( $(compgen -W "public private" -- "$cur") ); return 0;;
         app:secret:--generate) return 0;;
         app:stack:--stack) return 0;;
         app:stack:--services) return 0;;
@@ -1007,7 +1008,7 @@ _starci() {
         app:lint) COMPREPLY=( $(compgen -W "--changed --workspace --fix --format --sonar --json --cwd --quiet --help --edition" -- "$cur") );;
         app:new) COMPREPLY=( $(compgen -W "--inject --json --cwd --quiet --help --edition" -- "$cur") );;
         app:release) COMPREPLY=( $(compgen -W "--execute --source --tag-prefix --remote --json --json --cwd --quiet --help --edition" -- "$cur") );;
-        app:scaffold) COMPREPLY=( $(compgen -W "--into --json --cwd --quiet --help --edition" -- "$cur") );;
+        app:scaffold) COMPREPLY=( $(compgen -W "--into --registry-visibility --json --cwd --quiet --help --edition" -- "$cur") );;
         app:secret) COMPREPLY=( $(compgen -W "--generate --to-file --reveal --json --cwd --quiet --help --edition" -- "$cur") );;
         app:stack) COMPREPLY=( $(compgen -W "--stack --services --k3d --force --env --execute --image --source-sha --previous --out --release --since --timeout --retry --keep --app --ssh-cmd --extra-compose --allow-unpinned --init-swarm --owner-approved --fix-live-restore --project --push --swarm-state --skip-public --skip-internal --json --cwd --quiet --help --edition" -- "$cur") );;
         app:sync) COMPREPLY=( $(compgen -W "--check --write --json --cwd --quiet --help --edition" -- "$cur") );;

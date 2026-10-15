@@ -101,6 +101,7 @@ _starci() {
     'app:release:--tag-prefix') return 0 ;;
     'app:release:--remote') return 0 ;;
     'app:scaffold:--into') return 0 ;;
+    'app:scaffold:--registry-visibility') _values 'values' 'public' 'private'; return 0 ;;
     'app:secret:--generate') return 0 ;;
     'app:stack:--stack') return 0 ;;
     'app:stack:--services') return 0 ;;
@@ -1034,7 +1035,7 @@ _starci() {
     'app:lint') _values 'flags' '--changed' '--workspace' '--fix' '--format' '--sonar' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:new') _values 'flags' '--inject' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:release') _values 'flags' '--execute' '--source' '--tag-prefix' '--remote' '--json' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'app:scaffold') _values 'flags' '--into' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'app:scaffold') _values 'flags' '--into' '--registry-visibility' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:secret') _values 'flags' '--generate' '--to-file' '--reveal' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:stack') _values 'flags' '--stack' '--services' '--k3d' '--force' '--env' '--execute' '--image' '--source-sha' '--previous' '--out' '--release' '--since' '--timeout' '--retry' '--keep' '--app' '--ssh-cmd' '--extra-compose' '--allow-unpinned' '--init-swarm' '--owner-approved' '--fix-live-restore' '--project' '--push' '--swarm-state' '--skip-public' '--skip-internal' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:sync') _values 'flags' '--check' '--write' '--json' '--cwd' '--quiet' '--help' '--edition' ;;

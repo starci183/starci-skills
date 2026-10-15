@@ -376,8 +376,8 @@ function nextAppTsconfig() {
   };
 }
 
-/** The names a skeleton file may fill: {{project}}, {{app}}, {{appPascal}} (the side's app), {{sonarGate}} and the lite Supabase port block ({{supabasePort<Section>}}, supabase-ports.mjs). */
-const SKELETON_VARIABLES = Object.freeze(['project', 'app', 'appPascal', 'sonarGate', ...SUPABASE_PORT_VARIABLES]);
+/** The names a skeleton file may fill: {{project}}, {{app}}, {{appPascal}} (the side's app), {{sonarGate}}, {{registryVisibility}} (the image visibility written once into deploy.registry) and the lite Supabase port block ({{supabasePort<Section>}}, supabase-ports.mjs). */
+const SKELETON_VARIABLES = Object.freeze(['project', 'app', 'appPascal', 'sonarGate', 'registryVisibility', ...SUPABASE_PORT_VARIABLES]);
 
 /**
  * A skeleton file with its variables filled. Only the skeleton names are variables: every other `{{name}}` is source the app keeps
@@ -635,11 +635,12 @@ function initializeScaffoldSecrets(root, writes) {
   return [...initialized.files, ...materialized.members];
 }
 
-export function scaffoldApp({ name, into, presets, edition = 'full', authCallback = false, manifest = loadSlotManifest(), pins = bundledPins(), lock = npmLock, emitTypes = generateDbTypes, now = () => new Date() }) {
+export function scaffoldApp({ name, into, presets, edition = 'full', authCallback = false, registryVisibility = 'public', manifest = loadSlotManifest(), pins = bundledPins(), lock = npmLock, emitTypes = generateDbTypes, now = () => new Date() }) {
   if (!NAME.test(String(name))) throw new ScaffoldError('HFS_SCAFFOLD_NAME_INVALID', `the app name ${name} must be kebab-case (a project name: ${NAME})`);
   const root = path.resolve(into, name);
   const original = fs.lstatSync(root, { throwIfNoEntry: false });
   if (original && !emptyUnbornGit(root, original)) throw new ScaffoldError('HFS_SCAFFOLD_EXISTS', `${root} already exists; only a plain directory containing solely .git with unborn main and an empty index can be scaffolded`);
+  if (!['public', 'private'].includes(registryVisibility)) throw new ScaffoldError('HFS_SCAFFOLD_REGISTRY_VISIBILITY', `--registry-visibility accepts public or private (got ${registryVisibility})`);
   if (typeof authCallback !== 'boolean') throw new ScaffoldError('HFS_SCAFFOLD_NAME_INVALID', 'authCallback must be a boolean');
   const declaration = starterDeclaration(name, manifest, edition);
   if (authCallback) enableAuthCallback(declaration);
@@ -662,7 +663,7 @@ export function scaffoldApp({ name, into, presets, edition = 'full', authCallbac
       { path: `fe/packages/${name}-${pkg}/tsconfig.json`, content: jsonText(fePackageTsconfig()) },
       { path: `fe/packages/${name}-${pkg}/tsconfig.build.json`, content: jsonText(fePackageBuildTsconfig()) },
     ])),
-    ...['app', 'be', 'fe'].flatMap(scope => skeletonOf(scope, app, { sonarGate: sonarGateName(parseYaml(fs.readFileSync(SONAR_GATE_FILE, 'utf8')), app.edition), timestamp, ...supabasePortVars(name) })),
+    ...['app', 'be', 'fe'].flatMap(scope => skeletonOf(scope, app, { sonarGate: sonarGateName(parseYaml(fs.readFileSync(SONAR_GATE_FILE, 'utf8')), app.edition), timestamp, registryVisibility, ...supabasePortVars(name) })),
   ];
   const writes = scaffoldWrites(root, original);
   try {
