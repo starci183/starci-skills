@@ -19,7 +19,7 @@ const ARGUMENT = /^[A-Za-z0-9_@%+=:,./-]+$/u;
 const UPPER_ENV = KEY;
 
 const FIELDS = {
-  deploy: ['stack', 'remote', 'images', 'volumes', 'secrets', 'environment', 'configs', 'passEnv', 'verify', 'jobs', 'backup', 'ingress', 'registry'],
+  deploy: ['stack', 'remote', 'images', 'volumes', 'secrets', 'environment', 'configs', 'passEnv', 'verify', 'jobs', 'tasks', 'backup', 'ingress', 'registry'],
   remote: ['host', 'releasesBase', 'sealed'],
   sealed: ['ops', 'sshKey', 'knownHosts'],
   image: ['app', 'buildArgs'],
@@ -35,6 +35,7 @@ const FIELDS = {
   http: ['name', 'url', 'method', 'body', 'status', 'json', 'contains', 'retry'],
   exec: ['name', 'service', 'command', 'stdout'],
   jobs: ['service', 'command'],
+  task: ['service', 'command'],
   backup: ['image', 'keepDays', 'dir', 'volumes'],
   backupVolume: ['name', 'volume'],
   registry: ['host', 'visibility'],
@@ -223,6 +224,24 @@ function jobs(c, block, services) {
   return { service: block.service, command: command(c, 'deploy.jobs.command', block.command) };
 }
 
+const TASK_NAME = /^[a-z][a-z0-9-]{0,40}$/u;
+
+/** The one-off commands (`starci app stack task <name>`): name -> { service, command }, each run inside a running task of the service. */
+function tasks(c, block, services) {
+  if (block === undefined) return {};
+  if (!plain(block)) { c.problem('deploy.tasks', 'must be a mapping'); return {}; }
+  const out = {};
+  for (const [name, entry] of Object.entries(block)) {
+    const at = `deploy.tasks.${name}`;
+    if (!TASK_NAME.test(name)) c.problem(at, `the task name must match ${TASK_NAME}`);
+    if (!closedFields(c, at, entry, FIELDS.task)) continue;
+    nameField(c, `${at}.service`, entry.service);
+    if (services.size > 0 && !services.has(entry.service)) c.problem(`${at}.service`, `${entry.service} is not a service of the stack source`);
+    out[name] = { service: entry.service, command: command(c, `${at}.command`, entry.command) };
+  }
+  return out;
+}
+
 const REGISTRY_HOST = /^[a-z0-9][a-z0-9.-]*(?::[0-9]{1,5})?$/u;
 const VISIBILITY = ['public', 'private'];
 
@@ -284,6 +303,7 @@ export function normalizeDeploy(block, { project, probe }) {
     passEnv: block.passEnv === undefined ? [] : stringList(c, 'deploy.passEnv', block.passEnv, KEY),
     verify: verify(c, block.verify, services),
     jobs: jobs(c, block.jobs, services),
+    tasks: tasks(c, block.tasks, services),
     backup: backup(c, block.backup),
     ingress: ingress(c, block.ingress, probe),
     registry: registry(c, block.registry),

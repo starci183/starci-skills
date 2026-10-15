@@ -35,6 +35,7 @@ const validBlock = () => ({
     exec: [{ name: 'jobs watchdog', service: 'api', command: ['node', 'dist/cli.js', 'jobs', 'watchdog'], stdout: String.raw`^\d+$` }, { name: 'ping', service: 'web', command: ['true'] }],
   },
   jobs: { service: 'api', command: ['node', 'dist/cli.js', 'jobs'] },
+  tasks: { 'seed-media': { service: 'api', command: ['node', 'dist/main.js', 'seed-media', 'upload'] } },
   backup: { image: `alpine:3.21@sha256:${'a'.repeat(64)}`, keepDays: 7, dir: '/var/backups/shop', volumes: [{ name: 'data', volume: 'shop-data' }] },
 });
 
@@ -78,6 +79,7 @@ test('deploy config: a valid block normalises to the config the verbs consume', 
   assert.deepEqual(config.verify.http[1], { name: 'graphql', url: 'http://api.example.com/graphql', method: 'POST', body: '{}', status: 200, json: null, contains: 'data', retry: false });
   assert.equal(config.verify.exec[1].stdout, null);
   assert.deepEqual(config.jobs, { service: 'api', command: ['node', 'dist/cli.js', 'jobs'] });
+  assert.deepEqual(config.tasks, { 'seed-media': { service: 'api', command: ['node', 'dist/main.js', 'seed-media', 'upload'] } });
   assert.deepEqual(config.backup, { image: `alpine:3.21@sha256:${'a'.repeat(64)}`, keepDays: 7, dir: '/var/backups/shop', volumes: [{ name: 'data', volume: 'shop-data' }] });
 });
 
@@ -86,7 +88,7 @@ test('deploy config: an empty block takes its defaults from the project', () => 
   assert.deepEqual(problems, []);
   assert.deepEqual(config, {
     stack: 'shop', remote: { host: 'vps', releasesBase: null, sealed: null }, images: {}, volumes: [], secrets: { grants: [], settings: null },
-    environment: {}, configs: [], passEnv: [], verify: { http: [], exec: [] }, jobs: null, backup: null, ingress: null, registry: { host: 'ghcr.io', visibility: 'public' },
+    environment: {}, configs: [], passEnv: [], verify: { http: [], exec: [] }, jobs: null, tasks: {}, backup: null, ingress: null, registry: { host: 'ghcr.io', visibility: 'public' },
   });
 });
 
@@ -141,6 +143,7 @@ test('deploy config: refuses a block that is not a mapping and unknown fields at
   expectProblem((b) => { b.verify.http[0].extra = 1; }, 'deploy.verify.http[0].extra', 'is not a field');
   expectProblem((b) => { b.verify.exec[0].extra = 1; }, 'deploy.verify.exec[0].extra', 'is not a field');
   expectProblem((b) => { b.jobs.extra = 1; }, 'deploy.jobs.extra', 'is not a field');
+  expectProblem((b) => { b.tasks['seed-media'].extra = 1; }, 'deploy.tasks.seed-media.extra', 'is not a field');
   expectProblem((b) => { b.backup.extra = 1; }, 'deploy.backup.extra', 'is not a field');
   expectProblem((b) => { b.backup.volumes[0].extra = 1; }, 'deploy.backup.volumes[0].extra', 'is not a field');
 });
@@ -165,6 +168,8 @@ test('deploy config: refuses a nested block that is not a mapping', () => {
   expectProblem((b) => { b.verify.http[0] = 'home'; }, 'deploy.verify.http[0]', 'must be a mapping');
   expectProblem((b) => { b.verify.exec[0] = 'ping'; }, 'deploy.verify.exec[0]', 'must be a mapping');
   expectProblem((b) => { b.jobs = 'api'; }, 'deploy.jobs', 'must be a mapping');
+  expectProblem((b) => { b.tasks = 'seed'; }, 'deploy.tasks', 'must be a mapping');
+  expectProblem((b) => { b.tasks['seed-media'] = 'x'; }, 'deploy.tasks.seed-media', 'must be a mapping');
   expectProblem((b) => { b.backup = 'daily'; }, 'deploy.backup', 'must be a mapping');
   expectProblem((b) => { b.backup.volumes[0] = 'data'; }, 'deploy.backup.volumes[0]', 'must be a mapping');
 });
@@ -195,6 +200,12 @@ test('deploy config: refuses names, keys and paths that break their patterns', (
   expectProblem((b) => { b.configs[0].name = 'Routes'; }, 'deploy.configs[0].name', 'must match');
   expectProblem((b) => { b.configs[0].env = 'lower'; }, 'deploy.configs[0].env', 'must match');
   expectProblem((b) => { b.jobs.service = 'Api'; }, 'deploy.jobs.service', 'must match');
+  expectProblem((b) => { b.tasks.Seed_Media = b.tasks['seed-media']; }, 'deploy.tasks.Seed_Media', 'the task name must match');
+  expectProblem((b) => { b.tasks['a'.repeat(42)] = b.tasks['seed-media']; }, `deploy.tasks.${'a'.repeat(42)}`, 'the task name must match');
+  expectProblem((b) => { b.tasks['seed-media'].service = 'Api'; }, 'deploy.tasks.seed-media.service', 'must match');
+  expectProblem((b) => { delete b.tasks['seed-media'].service; }, 'deploy.tasks.seed-media.service', 'must match');
+  expectProblem((b) => { b.tasks['seed-media'].command = []; }, 'deploy.tasks.seed-media.command', 'must be a list');
+  expectProblem((b) => { b.tasks['seed-media'].command = ['node', 'a b']; }, 'deploy.tasks.seed-media.command[1]', 'must match');
   expectProblem((b) => { b.jobs.command = []; }, 'deploy.jobs.command', 'must be a list');
   expectProblem((b) => { b.jobs.command = ['node', 'a b']; }, 'deploy.jobs.command[1]', 'must match');
   expectProblem((b) => { b.backup.volumes[0].name = 'Data'; }, 'deploy.backup.volumes[0].name', 'must match');
@@ -219,6 +230,7 @@ test('deploy config: refuses services and sealed members the tree does not have'
   expectProblem((b) => { b.environment.ghost = {}; }, 'deploy.environment.ghost', 'is not a service');
   expectProblem((b) => { b.verify.exec[0].service = 'ghost'; }, 'deploy.verify.exec[0].service', 'is not a service');
   expectProblem((b) => { b.jobs.service = 'ghost'; }, 'deploy.jobs.service', 'is not a service');
+  expectProblem((b) => { b.tasks['seed-media'].service = 'ghost'; }, 'deploy.tasks.seed-media.service', 'is not a service');
   expectProblem((b) => { b.secrets.grants[0].from[0].member = 'ghost'; }, 'deploy.secrets.grants[0].from[0].member', 'has no .starcistacks/<env>/secrets/ghost.enc');
   expectProblem((b) => { b.secrets.settings.member = 'ghost'; }, 'deploy.secrets.settings.member', 'has no .starcistacks');
   expectProblem((b) => { b.images.web.buildArgs.sealed.member = 'ghost'; }, 'deploy.images.web.buildArgs.sealed.member', 'has no .starcistacks');
