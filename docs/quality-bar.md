@@ -212,3 +212,13 @@ calls. Front-end components must read every member of their declared props type.
 The dedicated RuleTester specs exercise each published enforcer with passing
 and violating source in both editions; unit and end-to-end source specs retain
 the scan exclusion declared by the rule.
+
+<a id="r155"></a>
+### Declared pattern scenario proofs
+
+R155 reports `BE_PATTERN_SPEC_MISSING` when a back end declares a pattern in
+`hfs.json sides.be.patterns` but lacks a test titled `<pattern>/<scenario>: ...`
+for one of that pattern's required scenario ids in `ruleParams.be.patternScenarios`.
+Full accepts tracked e2e or integration specs under `be/src/tests`; lite requires
+runnable tests in tracked `be/src/tests/integration/*.integration-spec.ts` files,
+including nested folders. Adding the missing scenario proof clears the finding.

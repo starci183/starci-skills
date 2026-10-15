@@ -190,8 +190,22 @@ rules:
   - id: R14
     code: "HFS_DEP_VERSION_SKEW"
     law: "One version per dependency in the workspace, a root `overrides` pin included, and npm is the only package manager."
+    editions: [lite, full]
+    docs: [docs/hfs-legacy-tooling.md#dependency-consistency]
+    templateNa: "Dependency versions, root overrides and the npm packageManager field are generated programmatically by pinnedSection and packageManifest in packages/hfs/scaffold/app.mjs rather than rendered from a managed dependency template."
+    proves:
+      - {path: tests/hfs-proofs/hfs-dep-version-skew-coverage.spec.mjs, editions: [lite, full], codes: [HFS_DEP_VERSION_SKEW]}
+      - {path: tests/hfs-proofs/hfs-package-manager-mixed.spec.mjs, editions: [lite, full], codes: [HFS_PACKAGE_MANAGER_MIXED]}
+    exemplifiedBy:
+      - {path: tests/hfs-proofs/hfs-dep-version-skew-coverage.spec.mjs, editions: [lite, full], codes: [HFS_DEP_VERSION_SKEW]}
+      - {path: tests/hfs-proofs/hfs-package-manager-mixed.spec.mjs, editions: [lite, full], codes: [HFS_PACKAGE_MANAGER_MIXED]}
+    witness:
+      - {path: tests/hfs-proofs/hfs-dep-version-skew-coverage.spec.mjs, edition: lite, codes: [HFS_DEP_VERSION_SKEW]}
+      - {path: tests/hfs-proofs/hfs-package-manager-mixed.spec.mjs, edition: lite, codes: [HFS_PACKAGE_MANAGER_MIXED]}
+      - {path: tests/hfs-proofs/hfs-dep-version-skew-coverage.spec.mjs, edition: full, codes: [HFS_DEP_VERSION_SKEW]}
+      - {path: tests/hfs-proofs/hfs-package-manager-mixed.spec.mjs, edition: full, codes: [HFS_PACKAGE_MANAGER_MIXED]}
     kinds: [check, codemod]
-    gates: [pre-push, land, ci]
+    gates: [land, ci]
     failureCodes: ["HFS_DEP_VERSION_SKEW", "HFS_PACKAGE_MANAGER_MIXED"]
     enforcers:
       - {kind: hfs, id: dep-version-skew, at: scripts/hfs/rules/deps.mjs}
@@ -199,8 +213,20 @@ rules:
   - id: R15
     code: "HFS_CANON_PIN_DRIFT"
     law: "Canon packages and frameworks match `canon-pins.yaml`."
+    editions: [lite, full]
+    docs: [docs/hfs-legacy-tooling.md#canon-package-pins]
+    templateNa: "Dependency versions are generated programmatically by pinnedSection and packageManifest in packages/hfs/scaffold/app.mjs rather than rendered from a managed dependency template."
+    proves:
+      - {path: tests/hfs-proofs/hfs-canon-pin-drift-checker.spec.mjs, editions: [lite, full]}
+      - {path: tests/hfs-proofs/hfs-canon-pin-drift.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: tests/hfs-proofs/hfs-canon-pin-drift-checker.spec.mjs, edition: lite, codes: [HFS_CANON_PIN_DRIFT]}
+      - {path: tests/hfs-proofs/hfs-canon-pin-drift-checker.spec.mjs, edition: full, codes: [HFS_CANON_PIN_DRIFT]}
+    witness:
+      - {path: tests/hfs-proofs/hfs-canon-pin-drift-checker.spec.mjs, edition: lite, codes: [HFS_CANON_PIN_DRIFT]}
+      - {path: tests/hfs-proofs/hfs-canon-pin-drift-checker.spec.mjs, edition: full, codes: [HFS_CANON_PIN_DRIFT]}
     kinds: [check, codemod]
-    gates: [pre-push, land, ci]
+    gates: [land, ci]
     failureCodes: ["HFS_CANON_PIN_DRIFT"]
     enforcers:
       - {kind: hfs, id: canon-pin-drift, at: scripts/hfs/check.mjs}
@@ -2364,6 +2390,16 @@ rules:
       - {path: tests/hfs/legacy-monorepo-coverage.spec.mjs, edition: full, codes: ["HFS_MONO_FE_WORKSPACE"]}
   - id: R145
     code: "HFS_MONO_NEST_PROJECTS"
+    editions: [lite, full]
+    docs: [docs/legacy-monorepo-rules.md#r145-nest-monorepo-projects]
+    templateNa: "be/nest-cli.json is generated programmatically by nestCli(app) in packages/hfs/scaffold/app.mjs, rather than from a managed template file."
+    proves:
+      - {path: tests/hfs/hfs-mono-nest-projects-coverage.spec.mjs, editions: [lite, full], codes: [HFS_MONO_NEST_PROJECTS]}
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-mono-nest-projects-coverage.spec.mjs, editions: [lite, full], codes: [HFS_MONO_NEST_PROJECTS]}
+    witness:
+      - {path: tests/hfs/hfs-mono-nest-projects-coverage.spec.mjs, edition: lite, codes: [HFS_MONO_NEST_PROJECTS]}
+      - {path: tests/hfs/hfs-mono-nest-projects-coverage.spec.mjs, edition: full, codes: [HFS_MONO_NEST_PROJECTS]}
     law: "The back end is a Nest monorepo of `be/apps/<app>`, even with one service: `be/nest-cli.json` is `\"monorepo\": true`, its default project (`root`, `sourceRoot`) is an api app, and its `projects` are exactly the be apps hfs.json declares, each `{\"type\": \"application\", \"root\": \"apps/<app>\", \"sourceRoot\": \"apps/<app>/src\"}`."
     kinds: [check]
     gates: [settle, land, ci]
