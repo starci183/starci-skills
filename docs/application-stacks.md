@@ -262,7 +262,7 @@ The runtime repository is public and tracks no secret, not even ciphertext (`RT_
 
 ## App image entry and health {#r189}
 
-`HFS_DOCKER_ENTRY` requires the app's own built entry in exec form: `node be/dist/apps/<app>/src/main.js` for a back end, or `node fe/apps/<app>/server.js` for a Next app. In either edition an API or Next image sets `ENV PORT`, exposes that same port and declares a healthcheck. A worker declares a process healthcheck and exposes no port; a CLI declares `HEALTHCHECK NONE` and exposes no port. A Next build uses `turbo run build --filter=@<project>/<app>` and `next.config.ts` sets `output: "standalone"`.
+`HFS_DOCKER_ENTRY` requires the app's own built entry in exec form: `node be/dist/apps/<app>/src/main.js` for a back end, or `node server.js` from the standalone output for a Next app. In either edition an API or Next image sets `ENV PORT`, exposes that same port and declares a healthcheck. A worker declares a process healthcheck and exposes no port; a CLI declares `HEALTHCHECK NONE` and exposes no port. A Next build uses `turbo run build --filter=@<project>/<app>` and `next.config.ts` sets `output: "standalone"`.
 
 ## App image base pins {#r190}
 

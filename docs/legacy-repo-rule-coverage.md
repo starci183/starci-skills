@@ -4,11 +4,11 @@ Owner: knowledge/hfs/rules.yaml
 
 ## R102
 
-`BE_SPEC_PLACEMENT` keeps back-end tests in their owning layers in both lite and full. Unit tests sit beside a unit-tested role as `<name>.service.spec.ts` or `<name>.cli.spec.ts`; integration, e2e and contract tests belong below `be/src/tests/{integration,e2e,contract}`. A spec or test under an app, `scripts/`, `tools/` or another directory produces this finding. Move the test into its layer; operational scripts carry no specs. Lite permits contract tests while its separate edition rules still restrict e2e execution.
+`BE_SPEC_PLACEMENT` keeps back-end tests in their owning layers in both lite and full. Unit tests sit beside a unit-tested role as `<name>.service.spec.ts` or `<name>.cli.spec.ts`; integration, e2e and contract tests belong below `be/src/tests/{integration,e2e,contract}`. A spec or test placed under an application folder or any other directory outside those layers produces this finding. Move the test into its layer; operational scripts carry no specs. Lite permits contract tests while its separate edition rules still restrict e2e execution.
 
 ## R103
 
-`HFS_REPO_LOCAL_CHECK` rejects repository-owned check scripts and lint plugins in either edition. This includes `scripts/check-*`, `tools/check-*`, local ESLint rule/plugin names, `eslint-rules/` and `lint-rules/`, and package scripts that invoke those check files. Submit a reusable check to the runtime or canon package and call `starci app check`; an operational script such as `scripts/rotate-logs.mjs` may remain in the application.
+`HFS_REPO_LOCAL_CHECK` rejects repository-owned check scripts and lint plugins in either edition. This includes `scripts/check-*`, `tools/check-*`, local ESLint rule/plugin names, `eslint-rules/` and `lint-rules/`, and package scripts that invoke those check files. Submit a reusable check to the runtime or canon package and call `starci app check`; an operational script that is not a check may remain in the application.
 
 ## R104
 

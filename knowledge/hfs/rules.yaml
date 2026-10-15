@@ -781,7 +781,7 @@ rules:
   - id: R44
     code: "BE_SECRET_DEFAULT"
     editions: [lite, full]
-    docs: [docs/microservices.md#r44]
+    docs: [docs/microservices.md#required-secrets]
     proves: [{path: packages/eslint/be/secret-default-coverage.spec.mjs, editions: [lite, full], codes: ["BE_SECRET_DEFAULT"]}]
     exemplifiedBy:
       - {path: packages/hfs/templates/be/skeleton-lite/src/modules/platform/database/primary.config.ts, edition: lite}
@@ -1620,7 +1620,7 @@ rules:
     gates: ["settle","land","ci"]
     editions: ["lite","full"]
     docs: ["docs/backend-boundary-proofs.md#r86"]
-    exemplifiedBy: [{"path":"packages/hfs/templates/be/inbox/platform/inbox/persistence/inbox.sql.ts.tpl","editions":["lite","full"]},{"path":"packages/eslint/be/r86-sql-owner-coverage.spec.mjs","editions":["lite","full"],"codes":["BE_SQL_TABLE_OWNER"]}]
+    exemplifiedBy: [{"path":"packages/hfs/templates/be/inbox/platform/inbox/inbox.service.ts.tpl","editions":["lite","full"]},{"path":"packages/eslint/be/r86-sql-owner-coverage.spec.mjs","editions":["lite","full"],"codes":["BE_SQL_TABLE_OWNER"]}]
     proves: [{"path":"packages/eslint/be/r86-sql-owner-coverage.spec.mjs","editions":["lite","full"],"codes":["BE_SQL_TABLE_OWNER"]}]
     witness: [{"path":"packages/eslint/be/r86-sql-owner-coverage.spec.mjs","edition":"lite","codes":["BE_SQL_TABLE_OWNER"]},{"path":"packages/eslint/be/r86-sql-owner-coverage.spec.mjs","edition":"full","codes":["BE_SQL_TABLE_OWNER"]}]
   - id: R87
@@ -3000,7 +3000,7 @@ rules:
     proves:
       - {path: packages/eslint/be/sql-returning.spec.mjs, editions: [lite, full], codes: [BE_SQL_RETURNING_SHAPE]}
     exemplifiedBy:
-      - {path: packages/hfs/templates/be/patterns/jobs/platform/persistence.jobs.sql.ts.tpl, editions: [lite, full]}
+      - {path: packages/hfs/templates/be/patterns/jobs/platform/job-claim.service.ts.tpl, editions: [lite, full]}
       - {path: packages/eslint/be/sql-returning.spec.mjs, editions: [lite, full], codes: [BE_SQL_RETURNING_SHAPE]}
     witness:
       - {path: packages/eslint/be/sql-returning.spec.mjs, edition: lite, codes: [BE_SQL_RETURNING_SHAPE]}
