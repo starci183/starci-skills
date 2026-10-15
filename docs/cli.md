@@ -321,6 +321,7 @@ starci app stack backup --env production --swarm-state --execute
 starci app stack jobs stats --env production
 starci app stack ingress plan --env production
 starci app stack ingress create --env production --execute
+starci app stack ingress publish --env production --execute
 ```
 
 ### starci app sync
