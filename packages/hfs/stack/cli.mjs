@@ -9,7 +9,7 @@ import { StackError, EXIT, refusal } from './errors.mjs';
 
 export const ACTIONS = Object.freeze(['prepare', 'doctor', 'connect', 'disconnect', 'build-args', 'render', 'deploy', 'converge', 'verify', 'rollback', 'prune', 'backup', 'jobs', 'ingress']);
 
-const BOOLEAN = new Set(['--execute', '--json', '--swarm-state', '--init-swarm', '--skip-public', '--skip-internal', '--allow-unpinned']);
+const BOOLEAN = new Set(['--execute', '--json', '--swarm-state', '--init-swarm', '--owner-approved', '--skip-public', '--skip-internal', '--allow-unpinned']);
 const VALUE = new Set(['--env', '--image', '--source-sha', '--previous', '--out', '--release', '--since', '--timeout', '--retry', '--keep', '--app', '--ssh-cmd', '--extra-compose']);
 const REPEAT = new Set(['--image', '--keep', '--extra-compose']);
 
@@ -53,7 +53,7 @@ const number = (flags, name) => {
 
 /** The options object each action module receives, from the parsed flags. */
 const OPTIONS = {
-  prepare: ({ flags }) => ({ execute: flags.execute === true, initSwarm: flags['init-swarm'] === true }),
+  prepare: ({ flags }) => ({ execute: flags.execute === true, initSwarm: flags['init-swarm'] === true, ownerApproved: flags['owner-approved'] === true }),
   doctor: () => ({}),
   connect: ({ flags }) => ({ execute: flags.execute === true }),
   disconnect: ({ flags }) => ({ execute: flags.execute === true }),

@@ -84,10 +84,14 @@ function checkDisk(run, report) {
 
 const releasesBase = (config) => config.remote.releasesBase ?? `/srv/${config.stack}`;
 
+function directoryState(run, config) {
+  const quoted = shellQuote(releasesBase(config));
+  return run(`if [ ! -d ${quoted} ]; then echo missing; elif [ ! -w ${quoted} ]; then echo readonly; else echo writable; fi`).stdout.trim();
+}
+
 function checkReleasesDirectory(run, report, config) {
   const base = releasesBase(config);
-  const quoted = shellQuote(base);
-  const state = run(`if [ ! -d ${quoted} ]; then echo missing; elif [ ! -w ${quoted} ]; then echo readonly; else echo writable; fi`).stdout.trim();
+  const state = directoryState(run, config);
   if (state === 'writable') report.ok(`releases directory ${base} is writable`);
   else if (state === 'readonly') report.bad(`releases directory ${base} is not writable by the deploy user`);
   else report.bad(`releases directory ${base} is missing (create it once, owned by the deploy user)`);
@@ -118,7 +122,7 @@ function initSwarm(run, report, { execute, advertise }) {
     return false;
   }
   if (!execute) {
-    report.note('dry run: would run docker swarm init (needs --execute and STARCI_SWARM_INIT_APPROVED=1)');
+    report.note('dry run: would run docker swarm init (needs --execute and --owner-approved)');
     return false;
   }
   const result = remoteDocker(run, ['swarm', 'init', ...advertise]);
@@ -146,10 +150,25 @@ function createVolumes(run, report, config, execute) {
   return created;
 }
 
+/** Creates the releases directory and installs age (the backup encryptor) once, with passwordless sudo when the host allows it. */
+function ensureTools(run, report, config) {
+  const base = releasesBase(config);
+  const quoted = shellQuote(base);
+  if (directoryState(run, config) === 'missing') {
+    const made = run(`sudo -n mkdir -p ${quoted} && sudo -n chown "$(id -un)" ${quoted}`);
+    if (made.status === 0) report.note(`created ${base} owned by the deploy user`);
+    else report.bad(`cannot create ${base}: ${firstLine(made.stderr)} (needs passwordless sudo once, or create it by hand)`);
+  }
+  if (run('command -v age').status === 0) return;
+  const installed = run('sudo -n apt-get install -y age');
+  if (installed.status === 0) report.note('installed age on the manager');
+  else report.bad(`cannot install age: ${firstLine(installed.stderr)} (needs passwordless sudo once, or run apt-get install age by hand)`);
+}
+
 /** prepare: read-only checks; with execute also the missing volumes and (initSwarm, approved) the one-time swarm init. */
-export async function prepareHost(ctx, config, { execute = false, initSwarm: wantInit = false, sshCmd = null } = {}, deps = {}) {
-  if (wantInit && execute && ctx.env.STARCI_SWARM_INIT_APPROVED !== '1') {
-    throw approvalMissing('STACK_SWARM_INIT_UNAPPROVED', 'docker swarm init is an owner-approved effect; set STARCI_SWARM_INIT_APPROVED=1 after the owner said yes');
+export async function prepareHost(ctx, config, { execute = false, initSwarm: wantInit = false, ownerApproved = false, sshCmd = null } = {}, deps = {}) {
+  if (wantInit && execute && !ownerApproved && ctx.env.STARCI_SWARM_INIT_APPROVED !== '1') {
+    throw approvalMissing('STACK_SWARM_INIT_UNAPPROVED', 'docker swarm init is an owner-approved effect; pass --owner-approved (or set STARCI_SWARM_INIT_APPROVED=1) after the owner said yes');
   }
   const advertise = wantInit ? advertiseArguments(ctx) : [];
   return withRunner(ctx, config, { sshCmd }, deps, (run, notes) => {
@@ -159,6 +178,7 @@ export async function prepareHost(ctx, config, { execute = false, initSwarm: wan
     if (swarmInfo(run).reachable) {
       if (wantInit) data.swarmInitialized = initSwarm(run, report, { execute, advertise });
       data.created = createVolumes(run, report, config, execute);
+      if (execute) ensureTools(run, report, config);
     }
     baseChecks(run, report, config);
     return { ok: !report.failed(), lines: report.lines(), data: { ...data, checks: report.checks() } };

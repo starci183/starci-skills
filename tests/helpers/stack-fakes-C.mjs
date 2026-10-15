@@ -83,6 +83,7 @@ export function fakeRunner(host, table = {}) {
 /** Answers for the non-docker commands of prepare/doctor. */
 export function healthyTable({ freeKb = 50 * 1_048_576, directory = 'writable', current = '0123456789abcdef', previous = 'fedcba9876543210' } = {}) {
   return {
+    'command -v age': () => ({ status: 0, stdout: '/usr/bin/age\n', stderr: '' }),
     'df -Pk': () => ({ status: 0, stdout: `/var/lib/docker\nFilesystem 1024-blocks Used Available Capacity Mounted\n/dev/sda1 100000000 1000 ${freeKb} 10% /\n`, stderr: '' }),
     'elif [ ! -w': () => ({ status: 0, stdout: `${directory}\n`, stderr: '' }),
     'readlink current': () => ({ status: 0, stdout: current === null ? '' : `${current}\n`, stderr: '' }),

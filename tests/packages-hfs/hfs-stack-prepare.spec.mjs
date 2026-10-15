@@ -163,7 +163,7 @@ test('swarm init in a dry run needs no approval and runs nothing', async () => {
   const { ctx, deps, host, run } = setup();
   host.state.swarm = { state: 'inactive', manager: false };
   const result = await prepareHost(ctx, config, { execute: false, initSwarm: true }, deps);
-  assert.ok(result.lines.includes('dry run: would run docker swarm init (needs --execute and STARCI_SWARM_INIT_APPROVED=1)'));
+  assert.ok(result.lines.includes('dry run: would run docker swarm init (needs --execute and --owner-approved)'));
   assert.equal(host.state.inits.length, 0);
   assert.equal(dockerCalls(run, 'init').length, 0);
   assert.equal(result.ok, false);
@@ -244,3 +244,37 @@ test('doctor reports a service listing that fails and stops after an unreachable
   assert.equal(down.ok, false);
   assert.deepEqual(down.data.releases, { current: null, previous: null });
 });
+
+test('--owner-approved replaces the approval variable for the one-time swarm init', async () => {
+  const { ctx, deps, host } = setup();
+  host.state.swarm = { state: 'inactive', manager: false };
+  const result = await prepareHost(ctx, config, { execute: true, initSwarm: true, ownerApproved: true }, deps);
+  assert.equal(host.state.inits.length, 1);
+  assert.equal(result.data.swarmInitialized, true);
+});
+
+test('prepare --execute creates the releases directory and installs age with passwordless sudo, once', async () => {
+  const table = { 'elif [ ! -w': () => ({ status: 0, stdout: 'missing\n', stderr: '' }), 'command -v age': () => bad('', 1), 'sudo -n mkdir': () => ({ status: 0, stdout: '', stderr: '' }), 'sudo -n apt-get': () => ({ status: 0, stdout: '', stderr: '' }), ...withoutAgeAndDirectory() };
+  const { ctx, deps, run } = setup({ table });
+  const result = await prepareHost(ctx, config, { execute: true }, deps);
+  assert.ok(result.lines.includes('created /srv/shop owned by the deploy user'));
+  assert.ok(result.lines.includes('installed age on the manager'));
+  assert.ok(run.commands.some((entry) => entry.command.startsWith('sudo -n mkdir -p') && entry.command.includes('chown "$(id -un)"')));
+});
+
+test('prepare --execute reports sudo refusals instead of hiding them', async () => {
+  const refused = () => bad('sudo: a password is required');
+  const table = { 'elif [ ! -w': () => ({ status: 0, stdout: 'missing\n', stderr: '' }), 'command -v age': () => bad('', 1), 'sudo -n mkdir': refused, 'sudo -n apt-get': refused, ...withoutAgeAndDirectory() };
+  const { ctx, deps } = setup({ table });
+  const result = await prepareHost(ctx, config, { execute: true }, deps);
+  assert.equal(result.ok, false);
+  assert.ok(result.lines.some((line) => line.startsWith('FAIL  cannot create /srv/shop: sudo: a password is required')));
+  assert.ok(result.lines.some((line) => line.startsWith('FAIL  cannot install age: sudo: a password is required')));
+});
+
+function withoutAgeAndDirectory() {
+  const base = healthyTable();
+  delete base['command -v age'];
+  delete base['elif [ ! -w'];
+  return base;
+}
