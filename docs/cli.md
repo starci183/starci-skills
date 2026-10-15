@@ -62,7 +62,7 @@ starci app check --coverage-from coverage/lcov.info
 
 ### starci app db
 
-preview or apply a migration baseline or restamp and compare database state with the app
+preview or apply a migration baseline, restamp, history migration or post-cutover step
 
 | flag | type | |
 | --- | --- | --- |
@@ -70,6 +70,12 @@ preview or apply a migration baseline or restamp and compare database state with
 | `--map` | string |  |
 | `--apply` | boolean |  |
 | `--local` | boolean |  |
+| `--execute` | boolean |  |
+| `--linked` | boolean |  |
+| `--url-env` | string |  |
+| `--green-at` | string |  |
+| `--owner-confirms-old-app-gone` | boolean |  |
+| `--json` | boolean |  |
 
 Positionals: action
 
@@ -77,6 +83,9 @@ Conventions:
 
 - baseline accepts --stamp; restamp requires --map; both preview without --apply
 - plan is always read-only and supports --json; it compares migrations, cron, queues and Vault names
+- migrate and post-cutover read the optional database block of application-stacks.yaml; both are dry runs without --execute
+- migrate is idempotent: baseline plus forward on the remote prints nothing to do; held-back migrations are never applied by it
+- post-cutover applies held-back migrations after the read-only pg_proc preflight, an open time gate and STARCI_DB_ARMED=1
 
 exit: 0 preview or action completed with no drift; 1 database plan drift; 2 refusal or bad usage
 
@@ -88,6 +97,9 @@ starci app db baseline --stamp 20261014000000 --apply
 starci app db restamp --map restamp.yaml
 starci app db plan --json
 starci app db plan --local
+starci app db migrate --linked
+starci app db migrate --execute
+starci app db post-cutover --green-at 2026-10-10T00:00:00Z
 ```
 
 ### starci app emit
@@ -167,6 +179,38 @@ json: none
 ```sh
 starci app new service be/src/modules/domain/order order
 starci app new image
+```
+
+### starci app release
+
+run the release gates and write the L4 record and tag, or push branch and tag atomically
+
+| flag | type | |
+| --- | --- | --- |
+| `--execute` | boolean |  |
+| `--source` | string |  |
+| `--tag-prefix` | string |  |
+| `--remote` | string |  |
+| `--json` | boolean |  |
+
+Positionals: action
+
+Conventions:
+
+- the gate list is release.gates of application-stacks.yaml (argument arrays), else the app check plus the managed package scripts
+- gate refuses a dirty tree, HEAD other than --source, a moved HEAD and a tree dirtied by the gates; record and tag only when all gates are green
+- a gate with summary jest is red on failed tests and on a coverage threshold miss even when the process exits 0
+- push needs the annotated tag and L4 record of HEAD, runs git push --dry-run --atomic first and never uses --no-verify
+
+exit: 0 gate green or push done or nothing to do; 1 a gate is red or the push was refused by the hook; 2 refusal or bad usage
+
+json: flag
+
+```sh
+starci app release gate
+starci app release gate --execute
+starci app release push --remote origin
+starci app release push --execute
 ```
 
 ### starci app scaffold

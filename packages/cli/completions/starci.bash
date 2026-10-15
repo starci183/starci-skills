@@ -13,7 +13,7 @@ _starci() {
     fi
     if [ "$COMP_CWORD" -eq 2 ]; then
         case "$group" in
-        app) COMPREPLY=( $(compgen -W "add check db emit explain hygiene lint new scaffold secret stack sync upgrade" -- "$cur") );;
+        app) COMPREPLY=( $(compgen -W "add check db emit explain hygiene lint new release scaffold secret stack sync upgrade" -- "$cur") );;
         check) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
         connect) COMPREPLY=( $(compgen -W "ask-gateway telegram telegram-media tunnel" -- "$cur") );;
         debug) COMPREPLY=( $(compgen -W "digest run" -- "$cur") );;
@@ -63,11 +63,16 @@ _starci() {
         app:check:--coverage-from) return 0;;
         app:db:--stamp) return 0;;
         app:db:--map) return 0;;
+        app:db:--url-env) return 0;;
+        app:db:--green-at) return 0;;
         app:lint:--changed) return 0;;
         app:lint:--workspace) return 0;;
         app:lint:--format) COMPREPLY=( $(compgen -W "text json" -- "$cur") ); return 0;;
         app:lint:--sonar) return 0;;
         app:new:--inject) return 0;;
+        app:release:--source) return 0;;
+        app:release:--tag-prefix) return 0;;
+        app:release:--remote) return 0;;
         app:scaffold:--into) return 0;;
         app:secret:--generate) return 0;;
         app:stack:--stack) return 0;;
@@ -994,12 +999,13 @@ _starci() {
     case "$group:$verb" in
         app:add) COMPREPLY=( $(compgen -W "--event --from --service --connection --owner --failed --done --fe --no-types --json --cwd --quiet --help --edition" -- "$cur") );;
         app:check) COMPREPLY=( $(compgen -W "--fast --base --wiring --coverage-from --json --cwd --quiet --help --edition" -- "$cur") );;
-        app:db) COMPREPLY=( $(compgen -W "--stamp --map --apply --local --json --cwd --quiet --help --edition" -- "$cur") );;
+        app:db) COMPREPLY=( $(compgen -W "--stamp --map --apply --local --execute --linked --url-env --green-at --owner-confirms-old-app-gone --json --json --cwd --quiet --help --edition" -- "$cur") );;
         app:emit) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         app:explain) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         app:hygiene) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         app:lint) COMPREPLY=( $(compgen -W "--changed --workspace --fix --format --sonar --json --cwd --quiet --help --edition" -- "$cur") );;
         app:new) COMPREPLY=( $(compgen -W "--inject --json --cwd --quiet --help --edition" -- "$cur") );;
+        app:release) COMPREPLY=( $(compgen -W "--execute --source --tag-prefix --remote --json --json --cwd --quiet --help --edition" -- "$cur") );;
         app:scaffold) COMPREPLY=( $(compgen -W "--into --json --cwd --quiet --help --edition" -- "$cur") );;
         app:secret) COMPREPLY=( $(compgen -W "--generate --to-file --reveal --json --cwd --quiet --help --edition" -- "$cur") );;
         app:stack) COMPREPLY=( $(compgen -W "--stack --services --k3d --force --env --execute --image --source-sha --previous --out --release --since --timeout --retry --keep --app --ssh-cmd --extra-compose --allow-unpinned --init-swarm --swarm-state --skip-public --skip-internal --json --cwd --quiet --help --edition" -- "$cur") );;

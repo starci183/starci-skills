@@ -79,9 +79,12 @@ import { writeReport } from '../report/sonar.mjs';
 import { checkEdition } from '../upgrade/check.mjs';
 import { UpgradeError, upgradeMain } from '../upgrade/index.mjs';
 import { ACTIONS as STACK_ACTIONS, stackMain as deployStackMain } from '../stack/cli.mjs';
+import { releaseMain } from '../release/index.mjs';
+import { dbMigrateMain } from '../db/migrate.mjs';
+import { dbPostCutoverMain } from '../db/post-cutover.mjs';
 
-export const VERBS = Object.freeze(['scaffold', 'add', 'lint', 'sync', 'check', 'upgrade', 'stack', 'explain', 'emit', 'new', 'secret', 'db', 'hygiene']);
-const DATABASE_VERBS = new Map([['baseline', dbBaselineMain], ['restamp', dbRestampMain], ['plan', dbPlanMain]]);
+export const VERBS = Object.freeze(['scaffold', 'add', 'lint', 'sync', 'check', 'upgrade', 'stack', 'release', 'explain', 'emit', 'new', 'secret', 'db', 'hygiene']);
+const DATABASE_VERBS = new Map([['baseline', dbBaselineMain], ['restamp', dbRestampMain], ['plan', dbPlanMain], ['migrate', dbMigrateMain], ['post-cutover', dbPostCutoverMain]]);
 
 const USAGE = `starci app scaffold <name> [--into <dir>] [--cwd <dir>]
 starci app add <api|webhook|realtime|saga|job|reactor|queue|projection|cli|table|app> <name> [options] [--cwd <dir>]
@@ -91,6 +94,10 @@ starci app check [--cwd <dir>] [--json] [--fast] [--base <ref>] [--edition full]
 starci app db baseline [--stamp <version>] [--local] [--apply] [--cwd <dir>]
 starci app db restamp --map <restamp.yaml> [--local] [--apply] [--cwd <dir>]
 starci app db plan [--local] [--json] [--cwd <dir>]
+starci app db migrate [--execute] [--linked | --url-env <NAME>] [--json] [--cwd <dir>]
+starci app db post-cutover [--execute] [--green-at <ISO> | --owner-confirms-old-app-gone] [--linked | --url-env <NAME>] [--json] [--cwd <dir>]
+starci app release gate [--execute] [--source <ref>] [--tag-prefix <prefix>] [--json] [--cwd <dir>]
+starci app release push [--execute] [--remote <name>] [--json] [--cwd <dir>]
 starci app upgrade --edition full [--plan] [--cwd <dir>]
 starci app stack <up|down|status> [--stack <dir>] [--services <list>] [--k3d] [--force] [--json] [--cwd <dir>]
 starci app stack <prepare|doctor|connect|disconnect|build-args|render|deploy|converge|verify|rollback|prune|backup|jobs> --env <env> [--execute] [--json] [--cwd <dir>]
@@ -307,7 +314,7 @@ async function installedStackMain(cwd) {
 function databaseMain(argv, io) {
   const [verb, ...rest] = argv;
   const dispatch = DATABASE_VERBS.get(verb);
-  if (!dispatch) throw new Error('starci app db takes baseline, restamp or plan');
+  if (!dispatch) throw new Error('starci app db takes baseline, restamp, plan, migrate or post-cutover');
   return dispatch(rest, io);
 }
 
@@ -397,7 +404,7 @@ async function stackAppMain(argv, { cwd, edition, stackMain, stdout: out, stderr
   return run(argv, { cwd, out, err });
 }
 
-const DIRECT_VERBS = new Map([['lint', lintMain], ['secret', secretMain], ['db', databaseMain], ['upgrade', upgradeAppMain], ['stack', stackAppMain]]);
+const DIRECT_VERBS = new Map([['lint', lintMain], ['secret', secretMain], ['db', databaseMain], ['upgrade', upgradeAppMain], ['stack', stackAppMain], ['release', releaseMain]]);
 const PARSED_VERBS = new Map([['check', checkMain], ['emit', emitMain], ['new', newMain], ['add', addMain], ['scaffold', scaffoldMain], ['explain', explainMain]]);
 
 function dispatchMain(verb, argv, io) {

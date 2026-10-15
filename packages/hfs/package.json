@@ -19,6 +19,8 @@
     "src/main.mjs",
     "emit/**",
     "stack/**",
+    "release/**",
+    "db/**",
     "lint/**",
     "scaffold/**",
     "report/**",
