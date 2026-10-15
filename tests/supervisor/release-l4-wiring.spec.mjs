@@ -12,6 +12,7 @@ import { stepEnv } from '../../scripts/supervisor/release-l4-layers.mjs';
 import { exampleApps, passesOf, planL4, runL4, runtimeSpecStep, scriptsOf, sectionOf, skipReport, specEnv, specFilesFor } from '../../scripts/supervisor/release-l4.mjs';
 import { testWorldDistProblem } from '../helpers/test-world-dist.mjs';
 import { cutRelease } from '../../scripts/supervisor/release-cut.mjs';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const NODE_TEST = 'node --import ./tests/setup/low-priority.mjs --import ./tests/setup/isolated-temp.mjs --import ./tests/setup/isolated-registry.mjs --import ./tests/setup/runtime-copies.mjs --test "tests/**/*.spec.mjs"';
@@ -77,7 +78,9 @@ test('the repository\'s own workflows give a plan that holds the full check set,
   for (const app of exampleApps(ROOT).map((a) => a.name)) {
     for (const cmd of ['npm ci --ignore-scripts', 'npm run typecheck', 'npm run build:be', 'npm run build:fe']) assert.ok(runs.includes(`examples/${app}: ${cmd}`), `${app}: ${cmd}`);
   }
-  assert.ok(runs.some((r) => r.startsWith('.: npm run starci --silent -- app lint')), 'starci app lint');
+  const lint = plan.steps.filter((s) => s.name.endsWith(': starci app lint'));
+  assert.deepEqual(lint.map((s) => s.env.APP_DIR).sort(byCodeUnit), exampleApps(ROOT).map((a) => `examples/${a.name}`).sort(byCodeUnit));
+  assert.ok(lint.every((s) => s.dir === '.' && s.run === 'node packages/cli/bin/starci.mjs runtime example-secrets --run "$APP_DIR" -- node "$GITHUB_WORKSPACE/packages/cli/bin/starci.mjs" app lint --cwd . --sonar reports/lint.sonar.json'), 'starci app lint checks each temporary copy with fresh sealed members');
   assert.ok(!runs.some((r) => /: npm (?:run )?test(?::\w+)?(?: -- .*)?$/.test(r) && !r.startsWith('packages/grammar')), 'no spec suite');
   assert.ok(!runs.some((r) => /docker|playwright/.test(r)), 'no docker or browser step');
 });
@@ -85,6 +88,7 @@ test('the repository\'s own workflows give a plan that holds the full check set,
 test('the parity script extracts HEAD from the read-only tar, snapshots it as a git repository, runs each step with its env and marks each step', () => {
   const script = parityScript(parityPlan({ workflows: WORKFLOWS, apps: ['shop'] }));
   assert.match(script, /tar -xf \/in\/src\.tar -C \/opt\/starci-parity\/checkout/);
+  assert.ok(script.includes('export GITHUB_WORKSPACE=/opt/starci-parity/checkout\n'), 'workflow commands resolve the CLI inside the container checkout');
   assert.match(script, /cd "\/opt\/starci-parity\/checkout\/\$dir"/);
   assert.match(script, /git init -q && git add -A && git -c user\.name=starci/);
   assert.match(script, /run_step 'examples\.yml:app\[shop\]: starci app lint' '\.' <<'__STEP_\d+__'\nexport NODE_VERSION='22'\nexport APP_DIR='examples\/shop'\nnpm run starci/);
@@ -173,7 +177,7 @@ test('L4: the installs run first as a real npm ci (a node_modules link is remove
   assert.deepEqual(unlinked, ['shop'], 'the link guard runs before the install, only for a runnable install');
   assert.ok(order.includes('parity') && order.indexOf('parity') < order.indexOf('npm test'), 'the Linux container starts beside the installs, before the suite ends');
   assert.ok(order.indexOf('npm run check') < order.indexOf('sonar blog'), 'a proof follows the root rows (the apps wait for the suite)');
-  assert.deepEqual(order.slice(-2).sort(), ['sonar blog', 'sonar shop']);
+  assert.deepEqual(order.slice(-2).sort(byCodeUnit), ['sonar blog', 'sonar shop']);
   assert.equal(out.at(-1).name, 'linux-parity');
   assert.equal(closed, 1);
   assert.deepEqual(out.find((s) => s.name === 'blog: npm ci').absent, true);
@@ -395,10 +399,10 @@ test('L4 evidence: the Linux leg is handed the spec files of the host run\'s ski
   const out = await run(leg('✔ zsh completion has valid syntax (30ms)\n﹣ PowerShell parse (0.1ms) # powershell.exe is unavailable'));
   assert.deepEqual(seen.specs, ['tests/cli/completions.spec.mjs'], 'the files that hold the skipped titles, once');
   const linux = out.at(-1);
-  assert.deepEqual([linux.passes, linux.skips.map((k) => k.name), linux.unmatched.sort()], [['zsh completion has valid syntax'], ['PowerShell parse'], ['a template title 1']]);
+  assert.deepEqual([linux.passes, linux.skips.map((k) => k.name), linux.unmatched.sort(byCodeUnit)], [['zsh completion has valid syntax'], ['PowerShell parse'], ['a template title 1']]);
   const report = skipReport(out);
   assert.deepEqual(report.covered.map((c) => c.name), ['zsh completion has valid syntax']);
-  assert.deepEqual(report.failures.map((k) => k.name).sort(), ['PowerShell parse', 'a template title 1', 'a title only the host skipped'], 'executed in no leg: the title the Linux run did not pass, the one nothing found, and the Linux-only skip no host pass covers');
+  assert.deepEqual(report.failures.map((k) => k.name).sort(byCodeUnit), ['PowerShell parse', 'a template title 1', 'a title only the host skipped'], 'executed in no leg: the title the Linux run did not pass, the one nothing found, and the Linux-only skip no host pass covers');
   const quiet = await runL4(base, { plan, supplier: { proofs: {}, close: () => {} }, unlink: () => true, parity: () => ({ name: 'linux-parity', ok: true, log: null, ms: 1, skips: [] }), step: () => ({ ok: true, log: 'x', ms: 1, text: '✔ all fine (1ms)\n' }) });
   assert.deepEqual(quiet.at(-1).specs, [], 'no host skip, no spec step');
   assert.deepEqual(skipReport(quiet).failures, []);

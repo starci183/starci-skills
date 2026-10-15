@@ -12,6 +12,8 @@ const WORK_COMMON_ID = 'urn:work:common:1';
 /** Register the shared work-schema vocabulary on an Ajv instance (once per instance). `root` is the
  *  runtime root the rest of the caller reads schemas from; it defaults to this checkout. */
 export function addWorkCommon(ajv, root = skillRoot) {
+  // Generated Work projections carry this annotation for the coverage inventory; it does not change their shape.
+  if (!ajv.getKeyword('generated')) ajv.addKeyword({ keyword: 'generated', schemaType: 'boolean', valid: true });
   if (ajv.getSchema?.(WORK_COMMON_ID)) return ajv;
   const file = path.join(root, 'modules', 'schemas', 'work-common.schema.yaml');
   ajv.addSchema(parseYaml(fs.readFileSync(file, 'utf8')));

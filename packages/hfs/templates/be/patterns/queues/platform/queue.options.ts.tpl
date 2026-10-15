@@ -3,6 +3,8 @@ import type { QueueSchedulerDefinition } from "./queue.contracts"
 
 /** What the queues of one app need: where Redis is, how the relay and the workers run, which connections hold an outbox, and the schedulers it registers. */
 export interface QueueOptions {
+    /** The runtime registration owns the relay, workers and schedulers. */
+    readonly outboxOnly?: false
     /** The Redis host BullMQ talks to. */
     readonly redisHost: string
     /** The Redis port. */
@@ -22,3 +24,11 @@ export interface QueueOptions {
     /** The job schedulers the app registers at boot; BullMQ upserts them by id, so a pool of replicas fires each one once per interval. */
     readonly schedulers: ReadonlyArray<QueueSchedulerDefinition>
 }
+
+/** A one-off producer writes an outbox row and exits; the running app owns delivery. */
+export interface QueueOutboxOnlyOptions {
+    readonly outboxOnly: true
+}
+
+/** Registers either the running queue capability or only its transactional writer. */
+export type QueueRegistrationOptions = QueueOptions | QueueOutboxOnlyOptions

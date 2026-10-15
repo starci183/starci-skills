@@ -1,5 +1,6 @@
 // Runtime examples keep names only; checks receive disposable copies with fresh sealed members.
 import fs from 'node:fs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { runProgram } from '../api/process/run-program.mjs';
@@ -45,7 +46,7 @@ export async function materializeExample(repoRoot, { createIdentity = generateAp
     writePublicRecipient(repoRoot, selected.recipient);
     return materializeDeclaredPlaceholders(repoRoot, { recipient: selected.recipient, sops });
   } finally {
-    fs.rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+    safeRemove(directory, { hold: () => null });
   }
 }
 
@@ -94,7 +95,7 @@ export async function withMaterializedExample(repoRoot, exampleRelativePath, cal
     trackExample(app);
     return await callback(app);
   } finally {
-    fs.rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+    safeRemove(directory, { hold: () => null });
   }
 }
 

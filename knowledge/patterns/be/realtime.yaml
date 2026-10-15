@@ -179,16 +179,19 @@ files:
     optional: true
   - path: src/features/realtime/<channel>/transport/websocket/<channel>-websocket.module.ts
     slot: be.feature.realtime.websocket
+    template: realtime/channel.websocket.module.ts.tpl
     role: Nest module of the gateway door, composed only by an api-kind app.
     optional: true
   - path: src/features/realtime/<channel>/transport/websocket/<channel>.gateway.ts
     slot: be.feature.realtime.websocket
+    template: realtime/channel.gateway.ts.tpl
     role: A socket door (one WebSocketGateway class); exactly one of gateway or subscription per channel file name.
     rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE]
     spec: src/features/realtime/<channel>/transport/websocket/<channel>.gateway.spec.ts
     optional: true
   - path: src/features/realtime/<channel>/transport/websocket/<channel>.gateway.spec.ts
     slot: be.feature.realtime.websocket
+    template: realtime/channel.gateway.spec.ts.tpl
     role: Unit spec of the gateway beside it.
     optional: true
   - path: src/features/realtime/<channel>/transport/graphql/<channel>.subscription.ts

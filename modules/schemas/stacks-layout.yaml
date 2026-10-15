@@ -76,7 +76,6 @@ custody:
     - '!.starcistacks/*/seeds/**'
     - '!.starcistacks/*/infra/metadata.json'
     - '!.starcistacks/*/infra/compose/**'
-    - '!.starcistacks/*/infra/swarm/**'
     - '!.starcistacks/*/infra/k8s/**'
     - '!.starcistacks/*/infra/terraform/**'
     - '!.starcistacks/*/infra/swarm/**'

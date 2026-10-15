@@ -15,7 +15,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ALL_CHECK_CODES } from './check.mjs';
+import { ARCHITECTURE_RULE_IDS } from './architecture/index.mjs';
+import { REFUSAL_CODES } from './refusal-codes.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { isMain } from '../lib/is-main.mjs';
@@ -104,7 +105,7 @@ function catalogSlice(text, codes) {
 /** Every reported code and every code the bundled rule catalog requires, leaving unrelated runtime codes out. */
 function bundledFailureCodes(ruleCatalog) {
   const owned = parseYaml(ruleCatalog).rules.flatMap(rule => rule.failureCodes);
-  return new Set([...ALL_CHECK_CODES, ...owned]);
+  return new Set([...REFUSAL_CODES, ...ARCHITECTURE_RULE_IDS, ...owned]);
 }
 
 /** {relative path: expected text} of one bundle. */

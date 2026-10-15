@@ -11,6 +11,22 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 ### Added
 - R295 `BE_MODULE_DEFINITION_MISSING` (owner ruling 2026-10-15, `owner:module-definition-everywhere`): every NestJS module of a product has a module definition (`<x>.module-definition.ts`, `<x>.options.ts`, a `<x>.module.ts` extending `ConfigurableModuleClass`) and is listed only as `XModule.register({...})`, including features, transport modules and cli groups. It supersedes the clause of BE-FOLDER-3 that forbade a module-definition in an api feature. The `module-definition-required` lint rule enforces it; the skeletons, the `starci app add` generators and both examples carry the new shape.
 
+## [1.0.0-alpha.15] — 2026-10-15
+
+### Added
+- The complete HFS standard for lite and full apps (owner ruling 2026-10-14): rules R247 to R292, the meta-enforcer `starci runtime` coverage gate (`check-hfs-coverage`, R247) that requires every rule and slot to name its enforcer, template, example, documentation and spec per edition, and the surface map in `knowledge/hfs/surfaces.yaml`. Added areas: environment parity and value shape (R248, R249, R289), deploy workflows, scripts and host scheduling (R250 to R252, R268), secret custody (R253, R277), database access, baseline, queues, extensions and migrations (R254 to R259), edge hardening, JWT, readiness (R260 to R262), webhook, door and spec form (R263 to R265, R278 to R281, R290), docker-swarm stacks with any single declared ingress (R266, R267, R275, R276), supply chain and release provenance (R269 to R273), ruling citations (R274), front-end data, copy and stack (R285 to R288), function and feature budgets (R291, R292).
+- `starci runtime example-secrets`: runs a command in a disposable copy of a runtime example whose declared sealed members are freshly generated with an ephemeral age key.
+
+### Changed
+- The public runtime repository tracks no secret material, not even ciphertext: a scaffolded lite app generates its sealed placeholder members at scaffold time, encrypted to that app's own age recipient; the examples and their specs generate them on the fly in a temporary directory.
+- Gate-loosening judgement: an enforcer row that widens its editions (or loses its restriction) is a widening, not a loosening; narrowing it is the new `check-narrowed` finding.
+- The lite example's swarm recovery and release records are authored YAML; nine authored JSON files are declared as exceptions with a reason each (owner-rulings `gate-loosening-05bab95ace66`, to be ratified by the owner).
+- Native `sops` and `age` are required by the secret round-trip specs under `CI=true` or `STARCI_REQUIRE_NATIVE_CRYPTO=1`; the CI workflow installs them.
+
+### Release
+- Packages to publish, and the canon pins, code-pattern bindings and example pins to rebind at publish: `@starci/hfs` 4.4.0, `@starci/eslint-canon-be` 3.4.0, `@starci/eslint-canon-fe` 8.4.0 and `@starci/cli` 1.4.0 (pins HFS 4.4.0, carries runtime 1.0.0-alpha.15).
+- **Legacy rules are ratcheted, not yet fully gated.** The meta-enforcer fully gates R247 to R292 and every slot added in this release (slot `since` is required). The 221 older rules (R01 to R246) that carry no coverage metadata are reported as warnings and counted, not gated: a legacy rule becomes gated the day it gains any meta field (editions, docs, exemplifiedBy, proves, witness). The per-rule backlog is `docs/legacy-backlog.md` (LEGACY-BACKLOG, generated from the coverage gate) and is the alpha.16 plan.
+
 ## [1.0.0-alpha.14] — 2026-10-15
 
 ### Added

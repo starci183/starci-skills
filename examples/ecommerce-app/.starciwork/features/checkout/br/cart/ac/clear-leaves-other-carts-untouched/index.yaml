@@ -1,0 +1,7 @@
+schema: work/acceptance-criterion@1
+id: ac.checkout.cart.clear-leaves-other-carts-untouched
+rule: br.checkout.cart
+given: Two signed-in people who each hold cart lines
+when: One of them clears their cart
+then:
+  - The other person's next cart read still answers every line it held.

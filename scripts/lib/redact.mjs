@@ -117,6 +117,14 @@ const patternTo = (rule) => (match, value) => {
   return `[redacted:${rule.name}]`;
 };
 
+function redactPatterns(text, hits, assignments) {
+  for (const rule of PATTERNS) {
+    if ((rule.name === 'assigned-secret') !== assignments) continue;
+    text = replaceCounting(text, rule.g, rule.name, patternTo(rule), hits);
+  }
+  return text;
+}
+
 /**
  * `text` with every secret value blanked, and what blanked it: {text, hits: Map(rule name -> replacements that changed the text)}. A rule
  * that meets only a placeholder ([redacted...]) counts nothing, so a text redacted before reports no hit. `repoRoots` (optional) are product
@@ -130,10 +138,12 @@ export function redactTracked(text, { repoRoots = [] } = {}) {
   if (resolved !== text) hits.set('resolved-secret', 1);
   let out = replaceCounting(resolved, PEM_BLOCK, PEM_RULE, (m, kind) => `[redacted:pem ${kind}]`, hits);
   for (const value of secretValues) if (out.includes(value)) { hits.set('stack-secret', (hits.get('stack-secret') ?? 0) + 1); out = out.split(value).join('[redacted:stack-secret]'); }
-  for (const rule of PATTERNS) out = replaceCounting(out, rule.g, rule.name, patternTo(rule), hits);
+  out = redactPatterns(out, hits, false);
   const declared = declaredNameRule();
   if (declared) out = replaceCounting(out, declared, 'declared-secret-name', (m, a, b) => `${a}${b}${MARK}`, hits);
   for (const rule of RULES) out = replaceCounting(out, rule.re, rule.name, rule.to, hits);
+  // Specific contexts keep their classifications; the widened assignment heuristic handles the remaining values.
+  out = redactPatterns(out, hits, true);
   return { text: out, hits };
 }
 
