@@ -1,4 +1,6 @@
 // modules/kernel/revision-scope.yaml: one spec per row of the table - what a change of the runtime tree asks of each role.
+// proves: RT_REVISION_SCOPE@lite
+// proves: RT_REVISION_SCOPE@full
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -19,6 +21,15 @@ const scopeOf = (repo, changes, message = 'change') => {
   return changeScope(repo.root, from, to, { roles: ALL, engineLoaded: engineLoadedPredicate(repo.root, loadScope(repo.root)) });
 };
 const textOf = (repo, file) => fs.readFileSync(path.join(repo.root, file), 'utf8');
+
+for (const edition of ['lite', 'full']) {
+  test(`${edition} accepts declared runtime paths and rejects a missing revision-scope row`, (t) => {
+    const repo = revisionRepo(t);
+    assert.deepEqual(checkRevisionScope(repo.root), []);
+    repo.commit('track an undeclared path', { 'strange/unmatched.zzz': 'synthetic revision-scope fixture\n' });
+    assert.deepEqual(checkRevisionScope(repo.root).map((finding) => finding.code), ['RT_REVISION_SCOPE']);
+  });
+}
 
 test('docs, tests, changelog and tooling concern no role and cost no seat anything', (t) => {
   const repo = revisionRepo(t);

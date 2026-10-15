@@ -24,6 +24,18 @@ The code requirements apply equally to lite and full. The database requirements 
 - <a id="r289"></a> R289 `BE_APP_ENV_REQUIRED`: each back-end app owns a typed `<app>.env.ts` reader and `main.ts` delegates environment reads to it. `BE_APP_MODULE_LIST_INLINE` requires the app module to spread its typed composition groups rather than declare an inline module list.
 - <a id="r290"></a> R290 `BE_PUBLIC_REASON_CLOSED`: in lite and full, `PublicReason` has exactly `Health`, `AuthHandshake`, `SignedWebhook` and `CatalogRead`. An API-key or tool-token route authenticates through its own guard; it cannot add a public reason to bypass authentication.
 
+## App composition roles and budgets
+
+<a id="r245"></a>R245 `BE_APP_OPTIONS_COMPOSITION` keeps environment and options files free of module lists,
+queue registrations and scheduler composition in lite and full. Environment files parse typed configuration;
+options files declare values and port bindings. Move composition into `compose/<area>.ts` and spread its groups
+from `app.module.ts`. R289 requires `main.ts` to delegate parsing to the app's typed environment reader.
+
+<a id="r246"></a>R246 `BE_APP_COMPOSITION_BUDGET` applies the same absolute line limits in both editions:
+`main.ts` 80, `<app>.env.ts` 150, `<app>.options.ts` 200, `compose/<area>.ts` 120 and `app.module.ts` 250.
+A file exactly at its limit passes; one extra line fails. Move parsing into its environment reader or split
+an area's composition into another group when a file outgrows its role.
+
 ## One place for a service
 
 <a id="r163"></a>

@@ -271,3 +271,66 @@ Every failed, blocked, refused, requeued or waiting attempt has a plain-language
   - survived-restart: one of those workflows ran across a host restart and resumed without lost or repeated work
 - Principles: P1 P5 P6 P7 (modules/kernel/roles.yaml, principles).
 <!-- roles:end debug -->
+
+## R230: instruction commands
+
+`RT_PROSE_COMMAND_UNKNOWN` identifies the document and line containing a command with an
+unknown CLI group, verb or option. Compare the instruction with `modules/cli/commands/` and
+correct the command or its flag. A lone `--` passes the remaining arguments to the child
+program. This runtime self-check applies to instructions used by both lite and full.
+
+## R231: documented defaults
+
+`RT_DOCUMENTED_DEFAULT_DRIFT` means a stated default differs from the value of its cited
+configuration key, or that the key resolves to nothing. Read the key's owner and update the
+claim; for settings blocks, the effective value includes the settings reader's code defaults.
+The same check judges documentation for lite and full.
+
+## R232: generated role contracts
+
+`RT_ROLES_CONTRACT_DRIFT` reports missing or stale generated role blocks, citations, role
+tables, contradictions or incomplete role declarations. The source is
+`modules/kernel/roles.yaml`; update that contract deliberately, then regenerate its surfaces
+with `starci runtime check --only roles-contract -- --write`. Both editions share this
+runtime role contract.
+
+## R233: edge-case evidence
+
+`RT_EDGE_CASE_REGISTRY` names an invalid entry in `modules/reconciler/edge-cases.yaml`.
+Record its listed family and real occurrence. A covered case names an existing handling rule
+and reproducing spec; an open case explains why it remains open. A covered defect found on a
+live host also names a replay spec using the replay harness. Repair the missing evidence
+before marking a case covered, in either edition.
+
+<a id="r236"></a>
+
+### Runtime gate changes
+
+`RT_GATE_LOOSENING` refuses an unapproved weakening of a released gate: removing
+a check, lowering a required floor, raising a limit, adding an allowance, or
+deleting, weakening or skipping a spec together with product code. Restore the
+protection or obtain the owner's ruling for the exact loosening fingerprint.
+The runtime self-check judges release history in both editions; changes to
+checks that were added and removed before a release do not weaken that release.
+
+<a id="r237"></a>
+
+### Runtime revision scope
+
+`RT_REVISION_SCOPE` reports drift in the runtime revision-scope contract in both
+editions. Every tracked runtime path must match a table row, the engine restart
+set must come from its import graph, and seat boot files must match the launch
+generators. A wording-only declaration must preserve file structure. Update the
+owning revision-scope table or restore the declared relationship, then rerun the
+runtime self-check.
+
+## Surfacing held runtime faults (R241)
+
+<a id="r241"></a>
+
+`RT_HELD_UNSURFACED` means a runtime fault assigned to the Supervisor or owner has
+no declared, working route to that role. Its failure-code entry must name the
+Decision Item, SLA clock, incident, digest, notifier or caller mechanism and its
+producer. A known gap instead names an open edge-case registry entry through
+`surfacedBy: open` and `openCase`. The runtime check verifies those references and
+the mechanism's wiring for both lite and full work.

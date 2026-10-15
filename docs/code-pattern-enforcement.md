@@ -272,3 +272,22 @@ compiler programs even when Git's dirty status has not changed. A valid report
 hash proves retained bytes, while a changed input still owes fresh applicable
 judgment. Independent operation verification, supervisor land, release and final
 delivery reconciliation each retain their separate authorities and receipts.
+
+## Front-end server boundary {#r243}
+
+R243 applies to every front-end app and package in both editions.
+`FE_SERVER_ACTION_FORBIDDEN` rejects a `"use server"` directive in a module or
+function prologue. `FE_ROUTE_HANDLER_FORBIDDEN` rejects handlers under an app's
+route tree except `health/live/route.ts` and the `fe.route.callback` auth callback
+slot. Move API, webhook and scheduled work to a back-end feature; the front end
+calls its operations through `modules/api` and the SWR hooks.
+
+## Canonical front-end dependencies {#r244}
+
+R244 uses `knowledge/hfs/fe-stack.yaml` in both editions.
+`FE_STACK_FORBIDDEN` rejects a forbidden alternative in a front-end manifest or
+source import, including package subpaths and type-only imports. Replace it with
+the concern's canonical library and remove the dependency. The mixed app-root
+manifest excludes libraries owned by the back end; front-end workspace manifests
+remain subject to the full forbidden list. The lint rule also confines Supabase
+imports to the `modules/auth` boundary.

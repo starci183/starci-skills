@@ -618,3 +618,13 @@ committed chain. Keep base migrations immutable and retire earlier history throu
 the archive when introducing a baseline; neither wall-clock time nor archived stamps
 set the append boundary. The paired edition proof refuses February 30 and accepts a
 real UTC timestamp.
+
+## Runtime root ownership (R240)
+
+<a id="r240"></a>
+
+`RT_ROOT_ADHOC` refuses runtime source files that add raw `process.cwd()` calls or
+Work-directory literals beyond their count when the check landed. Resolve the
+invocation directory, runtime state, temporary paths and Work records through
+`scripts/lib/roots.mjs`; new files start with no raw inputs. This runtime ownership
+check applies equally when working on lite and full apps.
