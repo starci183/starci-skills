@@ -17,7 +17,9 @@ const options: HttpSecurityOptions = {
     webhooks: {},
 }
 
-const build = async (reflector: Reflector, clock: FakeClock) => {
+const build = async (clock: FakeClock, tier?: RateTier) => {
+    const reflector = mock<Reflector>()
+    reflector.getAllAndOverride.mockReturnValue(tier)
     const moduleRef = await Test.createTestingModule({
         providers: [
             RateLimitGuard,
@@ -26,7 +28,7 @@ const build = async (reflector: Reflector, clock: FakeClock) => {
             { provide: HTTP_SECURITY_OPTIONS, useValue: options },
         ],
     }).compile()
-    return moduleRef.get(RateLimitGuard)
+    return { guard: moduleRef.get(RateLimitGuard), reflector }
 }
 
 /** An execution context of one POST from `ip` on the door; the handler and the class carry the tier metadata. */
@@ -47,17 +49,20 @@ describe("RateLimit", () => {
     it("marks a door with the tier it declares, and the guard counts it under that tier's limit", async () => {
         class Door {}
         RateLimit(RateTier.Strict)(Door)
-        const guard = await build(new Reflector(), new FakeClock(AT))
-        const { context } = contextOf("127.0.0.1", () => undefined, Door)
+        const { guard, reflector } = await build(new FakeClock(AT), RateTier.Strict)
+        const handler = () => undefined
+        const { context } = contextOf("127.0.0.1", handler, Door)
 
+        expect(Reflect.getMetadata("platform.http-security.rate-tier", Door)).toBe(RateTier.Strict)
         expect(guard.canActivate(context)).toBe(true)
         expect(() => guard.canActivate(context)).toThrow(RATE_LIMITED)
+        expect(reflector.getAllAndOverride).toHaveBeenCalledWith("platform.http-security.rate-tier", [handler, Door])
     })
 })
 
 describe("RateLimitGuard", () => {
     it("counts an unmarked door under the default limit", async () => {
-        const guard = await build(mock<Reflector>(), new FakeClock(AT))
+        const { guard } = await build(new FakeClock(AT))
         const { context } = contextOf("127.0.0.1")
 
         expect(guard.canActivate(context)).toBe(true)
@@ -67,7 +72,7 @@ describe("RateLimitGuard", () => {
 
     it("opens a fresh window for a caller whose bucket expired", async () => {
         const clock = new FakeClock(AT)
-        const guard = await build(mock<Reflector>(), clock)
+        const { guard } = await build(clock)
         const { context } = contextOf("127.0.0.1")
 
         guard.canActivate(context)
@@ -80,7 +85,7 @@ describe("RateLimitGuard", () => {
     })
 
     it("counts a request without an address under the unknown bucket", async () => {
-        const guard = await build(mock<Reflector>(), new FakeClock(AT))
+        const { guard } = await build(new FakeClock(AT))
         const { context } = contextOf(undefined)
 
         guard.canActivate(context)
@@ -90,7 +95,7 @@ describe("RateLimitGuard", () => {
 
     it("prunes the expired buckets when the map outgrows the bucket cap", async () => {
         const clock = new FakeClock(AT)
-        const guard = await build(mock<Reflector>(), clock)
+        const { guard } = await build(clock)
         const { context, setIp } = contextOf("0.0.0.0")
 
         for (let index = 0; index <= 10_000; index += 1) {

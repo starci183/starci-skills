@@ -25,7 +25,7 @@ const stack = (services) => ({
         "    composeFiles: [infra/compose/compose.yaml]",
         "",
     ].join("\n"),
-    ".starcistacks/dev/infra/compose/compose.yaml": `services:\n${Object.entries(services).map(([name, image]) => `  ${name}:\n    image: ${image}\n`).join("")}`,
+    ".starcistacks/dev/infra/compose/compose.yaml": ["services:", ...Object.entries(services).map(([name, image]) => `  ${name}:\n    image: ${image}`), ""].join("\n"),
 })
 const fake = (name) => ({ [`src/tests/world/fakes/${name}/server.ts`]: EXPORT })
 
@@ -169,6 +169,67 @@ test("unit-spec-providers: the providers of a unit spec equal the constructor de
             "src/modules/domain/noarray/cart.service.spec.ts": [2],
             "src/modules/domain/unresolved/cart.service.spec.ts": [6, 6],
         })],
+    })
+})
+
+const functionSpec = ({ provider = "{ provide: SUBJECT, useValue: { total, doubled } }", read = "const subject = moduleRef.get(SUBJECT); expect(subject.total(2, 3)).toBe(5);", compilation = "await Test.createTestingModule", compile = ".compile()" } = {}) => [
+    "import { Test } from '@nestjs/testing';",
+    "import { total, doubled } from './numbers.service';",
+    "const SUBJECT = Symbol('subject');",
+    "it('uses the real function subject from Nest', async () => {",
+    `  const moduleRef = ${compilation}({ providers: [${provider}] })${compile};`,
+    `  ${read}`,
+    "});",
+].join("\n")
+
+const functionCapability = (name, options) => ({
+    [`src/modules/domain/${name}/numbers.service.ts`]: "export const total = (left: number, right: number) => left + right;\nexport function doubled(value: number) { return value * 2; }\n",
+    [`src/modules/domain/${name}/numbers.service.spec.ts`]: functionSpec(options),
+})
+
+const helperFunctionSpec = [
+    "import { Test } from '@nestjs/testing';",
+    "import { total, doubled } from './numbers.service';",
+    "const SUBJECT = Symbol('subject');",
+    "const build = async () => {",
+    "  const moduleRef = await Test.createTestingModule({ providers: [{ provide: SUBJECT, useValue: { total, doubled } }] }).compile();",
+    "  return moduleRef.get(SUBJECT);",
+    "};",
+    "it('uses the helper result', async () => { const subject = await build(); expect(subject.total(2, 3)).toBe(5); });",
+].join("\n")
+
+for (const edition of ["lite", "full"]) test(`unit-spec-providers: ${edition} pure functions are real Nest subject values and the retrieved subject is used`, (t) => {
+    const files = {
+        ...functionCapability("functions-good"),
+        ...functionCapability("functions-fake", { provider: "{ provide: SUBJECT, useValue: { total: () => 5, doubled } }" }),
+        ...functionCapability("functions-missing", { provider: "{ provide: SUBJECT, useValue: { total } }" }),
+        ...functionCapability("functions-extra", { provider: "{ provide: SUBJECT, useValue: { total, doubled } }, { provide: OTHER, useValue: {} }" }),
+        ...functionCapability("functions-no-get", { read: "expect(total(2, 3)).toBe(5);" }),
+        ...functionCapability("functions-unused", { read: "moduleRef.get(SUBJECT); expect(total(2, 3)).toBe(5);" }),
+        ...functionCapability("functions-unused-result", { read: "const subject = moduleRef.get(SUBJECT); expect(total(2, 3)).toBe(5);" }),
+        ...functionCapability("functions-wrong-module", { read: "const subject = otherModule.get(SUBJECT); expect(subject.total(2, 3)).toBe(5);" }),
+        ...functionCapability("functions-wrong-token", { read: "const subject = moduleRef.get(OTHER); expect(subject.total(2, 3)).toBe(5);" }),
+        ...functionCapability("functions-uncompiled", { compile: "" }),
+        ...functionCapability("functions-unawaited", { compilation: "Test.createTestingModule" }),
+        ...functionCapability("functions-helper"),
+        "src/modules/domain/functions-helper/numbers.service.spec.ts": helperFunctionSpec,
+    }
+    const f = projectFixture({ files, edition })
+    t.after(f.cleanup)
+    f.tester.run("unit-spec-providers", rules["unit-spec-providers"], {
+        valid: valid(f, files, ["src/modules/domain/functions-good/numbers.service.spec.ts", "src/modules/domain/functions-helper/numbers.service.spec.ts"]),
+        invalid: invalid(f, files, {
+            "src/modules/domain/functions-fake/numbers.service.spec.ts": [5],
+            "src/modules/domain/functions-missing/numbers.service.spec.ts": [5],
+            "src/modules/domain/functions-extra/numbers.service.spec.ts": [5],
+            "src/modules/domain/functions-no-get/numbers.service.spec.ts": [5],
+            "src/modules/domain/functions-unused/numbers.service.spec.ts": [5],
+            "src/modules/domain/functions-unused-result/numbers.service.spec.ts": [5],
+            "src/modules/domain/functions-wrong-module/numbers.service.spec.ts": [5],
+            "src/modules/domain/functions-wrong-token/numbers.service.spec.ts": [5],
+            "src/modules/domain/functions-uncompiled/numbers.service.spec.ts": [5],
+            "src/modules/domain/functions-unawaited/numbers.service.spec.ts": [5],
+        }),
     })
 })
 
@@ -480,7 +541,7 @@ const NAME_FILES = {
     [`${C}/enums/order-status.ts`]: "export enum OrderStatus { Pending='pending', Complete='complete' }\n",
     [`${C}/errors/challenge-not-found.ts`]: "export class ChallengeNotFoundException extends Error {}\n",
     [`${C}/transport/graphql/dto/create-order.request.ts`]: "import { InputType } from '@nestjs/graphql'; @InputType() export class CreateOrderRequest { itemId!:string }\n",
-    [`${C}/transport/graphql/place-order.resolver.ts`]: "import { Args,Mutation } from '@nestjs/graphql'; export class PlaceOrderResolver { @Mutation(()=>String,{name:'placeOrder'}) place(@Args('input') input:string){return input} }\n",
+    [`${C}/transport/graphql/place-order.resolver.ts`]: "import { Args,Mutation } from '@nestjs/graphql'; export class PlaceOrderResolver { @Mutation(()=>String,{name:'placeOrder'}) placeOrder(@Args('input') input:string){return input} }\n",
     // the forms that do not
     [`${C}/bad_Name.service.ts`]: "export class WrongName {}\n",
     [`${C}/export-list.service.ts`]: "class ExportListWrong {} export {ExportListWrong};\n",
@@ -520,7 +581,7 @@ test("source-names: the names and forms inside a source file follow its role", (
             [`${C}/order.rows.ts`]: [1],
             [`${C}/add.input.ts`]: [1],
             [`${C}/enums/bad-status.ts`]: [1, 1],
-            [`${C}/transport/graphql/create-order.resolver.ts`]: [1, 1],
+            [`${C}/transport/graphql/create-order.resolver.ts`]: [1, 1, 1],
         })],
     })
 })

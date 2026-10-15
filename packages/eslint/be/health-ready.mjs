@@ -37,9 +37,10 @@ function expandedNodes(node, bindings, seen = new Set()) {
 }
 
 function sourcePath(source, filename, root) {
-    const base = source.startsWith(".") ? path.resolve(path.dirname(filename), source)
-        : source.startsWith("@modules/") ? path.join(root, "src/modules", source.slice(9))
-        : source.startsWith("@features/") ? path.join(root, "src/features", source.slice(10)) : null
+    let base = null
+    if (source.startsWith(".")) base = path.resolve(path.dirname(filename), source)
+    if (source.startsWith("@modules/")) base = path.join(root, "src/modules", source.slice(9))
+    if (source.startsWith("@features/")) base = path.join(root, "src/features", source.slice(10))
     if (!base || path.relative(root, base).startsWith("..")) return null
     return [base, `${base}.ts`, path.join(base, "index.ts")].find((candidate) => fs.existsSync(candidate) && fs.statSync(candidate).isFile()) ?? null
 }
@@ -84,9 +85,102 @@ function positiveDuration(node, bindings, seen = new Set()) {
     return node?.type === "Literal" && typeof node.value === "number" && Number.isFinite(node.value) && node.value > 0 && node.value <= 60000
 }
 
-function rejectingTimeout(nodes, bindings) {
-    return nodes.some((node) => node.type === "CallExpression" && node.callee.type === "Identifier" && node.callee.name === "setTimeout"
-        && positiveDuration(node.arguments[1], bindings) && expandedNodes(node.arguments[0], bindings).some((entry) => entry.type === "CallExpression" && entry.callee.type === "Identifier" && entry.callee.name === "reject"))
+function resolvedType(node, source, seen = new Set()) {
+    if (node?.type !== "TSTypeReference") return node
+    const target = delegatedClass(node.typeName?.name, source.program, source.filename, source.root)
+    if (target?.controller.type !== "TSTypeAliasDeclaration") return null
+    const identity = `${target.filename}:${target.controller.id.name}`
+    if (seen.has(identity)) return null
+    return resolvedType(target.controller.typeAnnotation, { ...target, root: source.root }, new Set(seen).add(identity))
+}
+
+function timerMethod(call, injected, source) {
+    const dependency = injectedCall(call, injected)
+    if (!dependency) return false
+    const target = delegatedClass(dependency.type, source.program, source.filename, source.root)
+    const members = target?.controller.body?.body ?? []
+    const method = members.find((entry) => keyName(entry.key) === dependency.method)
+    const params = method?.params ?? method?.value?.params ?? []
+    const location = { ...target, root: source.root }
+    const callback = resolvedType(params[0]?.typeAnnotation?.typeAnnotation, location)
+    const returns = resolvedType(method?.returnType?.typeAnnotation ?? method?.value?.returnType?.typeAnnotation, location)
+    const delay = resolvedType(params[1]?.typeAnnotation?.typeAnnotation, location)
+    return callback?.type === "TSFunctionType" && callback.params.length === 0
+        && callback.returnType?.typeAnnotation?.type === "TSVoidKeyword"
+        && delay?.type === "TSNumberKeyword"
+        && returns?.type === "TSFunctionType" && returns.params.length === 0
+        && returns.returnType?.typeAnnotation?.type === "TSVoidKeyword"
+        && timerBinding(dependency, target, source)
+}
+
+function timerToken(name, source) {
+    const constructor = methodsOf(source.controller).find((entry) => entry.kind === "constructor")
+    const parameter = constructor?.value.params.map(paramParts).find((entry) => entry.target.name === name)
+    for (const decorator of parameter?.decorators ?? []) {
+        const target = delegatedClass(decoratorName(decorator), source.program, source.filename, source.root)
+        const body = target?.controller.init?.body ?? target?.controller.body
+        const token = body?.type === "CallExpression" && body.arguments[0]?.name
+        const resolved = token && delegatedClass(token, target.program, target.filename, source.root)
+        if (resolved) return resolved
+    }
+    return null
+}
+
+function timerImplementation(target, methodName, contract, root) {
+    const matches = target.controller.implements?.some((entry) => {
+        const implemented = delegatedClass(entry.expression?.name, target.program, target.filename, root)
+        return implemented && sameClass(implemented, contract)
+    })
+    if (!matches) return false
+    const method = methodsOf(target.controller).find((entry) => keyName(entry.key) === methodName)
+    if (!method?.value.body) return false
+    const [callback, delay] = method.value.params.map((entry) => paramParts(entry).target.name)
+    const statements = method.value.body.body
+    const declarations = statements.filter((entry) => entry.type === "VariableDeclaration").flatMap((entry) => entry.declarations)
+    const scheduled = declarations.find((entry) => entry.init?.type === "CallExpression" && entry.init.callee.name === "setTimeout"
+        && entry.init.arguments[0]?.name === callback && entry.init.arguments[1]?.name === delay)
+    if (!scheduled) return false
+    return statements.some((entry) => entry.type === "ReturnStatement" && entry.argument?.type === "ArrowFunctionExpression"
+        && entry.argument.body?.type === "CallExpression" && entry.argument.body.callee.name === "clearTimeout"
+        && entry.argument.body.arguments[0]?.name === scheduled.id.name)
+}
+
+function providedTimer(module, token, dependency, contract, source) {
+    for (const object of moduleObjects(module)) {
+        const providers = object.properties.find((entry) => keyName(entry.key) === "providers")?.value
+        for (const node of expandedNodes(providers, bindingsOf(source.program)).filter((entry) => entry.type === "ObjectExpression")) {
+            const name = node.properties.find((entry) => keyName(entry.key) === "provide")?.value?.name
+            const provided = name && delegatedClass(name, source.program, source.filename, source.root)
+            if (!provided || !sameClass(provided, token)) continue
+            const implementation = node.properties.find((entry) => keyName(entry.key) === "useClass")?.value?.name
+            const target = implementation && delegatedClass(implementation, source.program, source.filename, source.root)
+            if (target?.controller.type === "ClassDeclaration" && timerImplementation(target, dependency.method, contract, source.root)) return true
+        }
+    }
+    return false
+}
+
+function timerBinding(dependency, contract, source) {
+    const token = timerToken(dependency.name, source)
+    if (!token) return false
+    const directory = path.dirname(contract.filename)
+    for (const entry of fs.readdirSync(directory).filter((name) => name.endsWith(".module.ts"))) {
+        const filename = path.join(directory, entry)
+        const program = readProgram(filename)
+        if (!program) continue
+        const location = { program, filename, root: source.root }
+        if ([...classesOf(program).values()].some((module) => providedTimer(module, token, dependency, contract, location))) return true
+    }
+    return false
+}
+
+function rejectingTimeout(nodes, bindings, injected, source) {
+    return nodes.some((node) => {
+        if (node.type !== "CallExpression" || !positiveDuration(node.arguments[1], bindings)) return false
+        const native = node.callee.type === "Identifier" && node.callee.name === "setTimeout"
+        if (!native && !timerMethod(node, injected, source)) return false
+        return expandedNodes(node.arguments[0], bindings).some((entry) => entry.type === "CallExpression" && entry.callee.type === "Identifier" && entry.callee.name === "reject")
+    })
 }
 
 function parentsOf(body) {
@@ -94,7 +188,7 @@ function parentsOf(body) {
     walk(body, (node) => {
         for (const [key, value] of Object.entries(node)) {
             if (["parent", "loc", "range", "tokens", "comments"].includes(key)) continue
-            for (const child of Array.isArray(value) ? value : [value]) if (child && typeof child.type === "string") parents.set(child, node)
+            for (const child of Array.isArray(value) ? value : [value]) if (typeof child?.type === "string") parents.set(child, node)
         }
     })
     return parents
@@ -124,18 +218,18 @@ function propagatesFailures(body) {
         && promiseCatches.every((callback) => callback && (rejected(callback.body) || fails(callback.body)))
 }
 
-function boundedDependency(method, injected, bindings) {
+function boundedDependency(method, injected, bindings, source) {
     if (!propagatesFailures(method.value.body)) return false
     const nodes = expandedNodes(method.value.body, bindings)
     return nodes.some((node) => {
         if (node.type !== "CallExpression" || !consumedCall(node, method.value.body, bindings)) return false
         const callee = unwrap(node.callee)
         if (callee?.type !== "MemberExpression") return false
-        if (injectedCall(node, injected)) return expandedNodes(node, bindings).some((entry) => entry.type === "CallExpression"
+        if (injectedCall(node, injected)) return requiredCall(node, injected, source) && expandedNodes(node, bindings).some((entry) => entry.type === "CallExpression"
             && entry.callee.type === "MemberExpression" && entry.callee.object.name === "AbortSignal" && memberName(entry.callee) === "timeout" && positiveDuration(entry.arguments[0], bindings))
         if (callee.object.name !== "Promise" || memberName(callee) !== "race") return false
         const racers = expandedNodes(node.arguments[0], bindings)
-        return racers.some((entry) => injectedCall(entry, injected)) && rejectingTimeout(racers, bindings)
+        return racers.some((entry) => requiredCall(entry, injected, source)) && rejectingTimeout(racers, bindings, injected, source)
     })
 }
 
@@ -143,7 +237,8 @@ function classInSource(name, program, filename, root, seen = new Set()) {
     const identity = `${filename}:${name}`
     if (seen.has(identity)) return null
     const next = new Set(seen).add(identity)
-    const local = classesOf(program).get(name)
+    let local = classesOf(program).get(name)
+    walk(program, (node) => { if (["TSInterfaceDeclaration", "TSTypeAliasDeclaration", "VariableDeclarator", "FunctionDeclaration"].includes(node.type) && node.id?.name === name) local = node })
     if (local) return { controller: local, program, filename }
     for (const entry of program.body.filter((node) => ["ExportNamedDeclaration", "ExportAllDeclaration"].includes(node.type) && node.source)) {
         const specifier = entry.specifiers?.find((node) => keyName(node.exported) === name)
@@ -170,17 +265,156 @@ function delegatedClass(name, program, filename, root) {
     return null
 }
 
+function consumedDependencies(method, injected, source) {
+    const bindings = bindingsOf(source.program)
+    return expandedNodes(method.value.body, bindings).filter((node) => consumedCall(node, method.value.body, bindings))
+        .map((node) => ({ node, call: injectedCall(node, injected) })).filter((entry) => entry.call)
+}
+
+function requiredCall(node, injected, source, visited = new Set()) {
+    const call = injectedCall(node, injected)
+    if (!call || timerMethod(node, injected, source)) return false
+    const target = delegatedClass(call.type, source.program, source.filename, source.root)
+    if (!target) return true
+    if (target.controller.type !== "ClassDeclaration") return false
+    const method = methodsOf(target.controller).find((entry) => keyName(entry.key) === call.method)
+    const identity = `${target.filename}:${call.type}:${call.method}`
+    if (!method || visited.has(identity) || !propagatesFailures(method.value.body)) return false
+    const next = new Set(visited).add(identity)
+    const location = { ...target, root: source.root }
+    const dependencies = injectedOf(target.controller)
+    return consumedDependencies(method, dependencies, location).some((entry) => requiredCall(entry.node, dependencies, location, next))
+}
+
+function importedAs(program, name, imported, module) {
+    return program.body.some((entry) => entry.type === "ImportDeclaration" && entry.source.value === module
+        && entry.specifiers.some((specifier) => specifier.local.name === name && keyName(specifier.imported) === imported))
+}
+
+function moduleObjects(controller) {
+    const objects = []
+    const decorator = controller.decorators?.find((entry) => decoratorName(entry) === "Module")
+    const declared = decorator?.expression.arguments?.[0]
+    if (declared?.type === "ObjectExpression") objects.push(declared)
+    for (const method of methodsOf(controller).filter((entry) => entry.static)) walk(method.value.body, (node) => {
+        if (node.type === "ReturnStatement" && node.argument?.type === "ObjectExpression") objects.push(node.argument)
+    })
+    return objects
+}
+
+function moduleReferences(controller, field, source) {
+    const names = new Set()
+    for (const object of moduleObjects(controller)) {
+        const value = object.properties.find((entry) => keyName(entry.key) === field)?.value
+        for (const node of expandedNodes(value, bindingsOf(source.program))) if (node.type === "Identifier") names.add(node.name)
+    }
+    return [...names].map((name) => delegatedClass(name, source.program, source.filename, source.root))
+        .filter((entry) => entry?.controller.type === "ClassDeclaration")
+}
+
+const sameClass = (left, right) => left.filename === right.filename && left.controller.id.name === right.controller.id.name
+
+function routeModules(controller, source) {
+    const roots = []
+    let directory = path.dirname(source.filename)
+    while (!path.relative(source.root, directory).startsWith("..")) {
+        for (const entry of fs.readdirSync(directory).filter((name) => name.endsWith(".module.ts"))) {
+            const filename = path.join(directory, entry)
+            const program = readProgram(filename)
+            if (!program) continue
+            const location = { program, filename, root: source.root }
+            for (const module of classesOf(program).values()) {
+                const target = { controller, filename: source.filename }
+                if (moduleReferences(module, "controllers", location).some((candidate) => sameClass(candidate, target))) roots.push({ ...location, controller: module })
+            }
+        }
+        if (directory === source.root) break
+        directory = path.dirname(directory)
+    }
+    return roots
+}
+
+function registeredProviders(controller, source) {
+    const pending = routeModules(controller, source)
+    const visited = new Set()
+    const providers = []
+    while (pending.length) {
+        const module = pending.pop()
+        const identity = `${module.filename}:${module.controller.id.name}`
+        if (visited.has(identity)) continue
+        visited.add(identity)
+        providers.push(...moduleReferences(module.controller, "providers", { ...module, root: source.root }))
+        pending.push(...moduleReferences(module.controller, "imports", { ...module, root: source.root }))
+    }
+    return providers
+}
+
+function thisCall(node, name) {
+    return node.type === "CallExpression" && node.callee.type === "MemberExpression"
+        && node.callee.object.type === "ThisExpression" && memberName(node.callee) === name
+}
+
+function handlerEntry(target, root) {
+    const own = methodsOf(target.controller)
+    const execute = own.find((entry) => keyName(entry.key) === "execute")
+    if (execute) return execute
+    const base = target.controller.superClass
+    const parent = base?.type === "Identifier" && delegatedClass(base.name, target.program, target.filename, root)
+    const inherited = parent?.controller.type === "ClassDeclaration" && methodsOf(parent.controller).find((entry) => keyName(entry.key) === "execute")
+    if (!inherited || !propagatesFailures(inherited.value.body)) return null
+    const bindings = bindingsOf(parent.program)
+    const consumesProcess = expandedNodes(inherited.value.body, bindings).some((node) => thisCall(node, "process") && consumedCall(node, inherited.value.body, bindings))
+    return consumesProcess && own.find((entry) => keyName(entry.key) === "process")
+}
+
+function handlerOf(target, query, root) {
+    return target.controller.decorators?.some((entry) => {
+        const expression = entry.expression
+        if (!importedAs(target.program, expression.callee?.name, "QueryHandler", "@nestjs/cqrs")) return false
+        const name = expression.arguments?.[0]?.name
+        const handled = name && delegatedClass(name, target.program, target.filename, root)
+        return handled && sameClass(handled, query)
+    })
+}
+
+function dispatchedQueries(controller, method, source) {
+    const injected = injectedOf(controller)
+    const bindings = bindingsOf(source.program)
+    return expandedNodes(method.value.body, bindings).flatMap((node) => {
+        const callee = unwrap(node.callee)
+        if (node.type !== "CallExpression" || callee?.type !== "MemberExpression" || memberName(callee) !== "execute") return []
+        const owner = callee.object
+        if (owner.type !== "MemberExpression" || owner.object.type !== "ThisExpression") return []
+        if (!importedAs(source.program, injected.get(memberName(owner)), "QueryBus", "@nestjs/cqrs")) return []
+        if (!consumedCall(node, method.value.body, bindings)) return []
+        const message = unwrap(node.arguments[0])
+        const target = message?.type === "NewExpression" && delegatedClass(message.callee.name, source.program, source.filename, source.root)
+        return target ? [target] : []
+    })
+}
+
+function busReadiness(controller, method, source, visited) {
+    const queries = dispatchedQueries(controller, method, source)
+    if (!queries.length) return false
+    return registeredProviders(controller, source).some((target) => {
+        if (!queries.some((query) => handlerOf(target, query, source.root))) return false
+        const entry = handlerEntry(target, source.root)
+        return entry && realReadiness(target.controller, entry, target.program, target.filename, source.root, visited)
+    })
+}
+
 function realReadiness(controller, method, program, filename, root, visited = new Set()) {
     const identity = `${filename}:${controller.id.name}:${keyName(method.key)}`
     if (visited.has(identity)) return false
     const next = new Set(visited).add(identity)
     const injected = injectedOf(controller)
-    if (boundedDependency(method, injected, bindingsOf(program))) return true
+    const source = { program, filename, root, controller }
+    if (boundedDependency(method, injected, bindingsOf(program), source)) return true
     if (!propagatesFailures(method.value.body)) return false
-    const calls = expandedNodes(method.value.body, bindingsOf(program)).filter((node) => consumedCall(node, method.value.body, bindingsOf(program))).map((node) => injectedCall(node, injected)).filter(Boolean)
-    return calls.some((call) => {
+    if (busReadiness(controller, method, source, next)) return true
+    return consumedDependencies(method, injected, source).some(({ call }) => {
         const target = call.type && delegatedClass(call.type, program, filename, root)
-        const delegated = target && methodsOf(target.controller).find((entry) => keyName(entry.key) === call.method)
+        const delegated = target?.controller.type === "ClassDeclaration" && methodsOf(target.controller).find((entry) => keyName(entry.key) === call.method)
         return delegated && realReadiness(target.controller, delegated, target.program, target.filename, root, next)
     })
 }
@@ -218,7 +452,7 @@ function wiringNames(program, wanted) {
         for (const property of node.properties) if (["imports", "controllers"].includes(keyName(property.key))) collect(property.value)
     }
     for (const controller of classesOf(program).values()) {
-        if (wanted && !wanted.includes(controller.id.name)) continue
+        if (wanted?.includes(controller.id.name) === false) continue
         const module = controller.decorators?.find((entry) => decoratorName(entry) === "Module")
         moduleObject(module?.expression.arguments?.[0])
         for (const method of methodsOf(controller).filter((entry) => entry.static)) walk(method.value.body, (node) => {
@@ -233,6 +467,32 @@ function wiringNames(program, wanted) {
     return used
 }
 
+function importedTargets(program, filename, root, used) {
+    const targets = []
+    for (const entry of program.body.filter((node) => node.type === "ImportDeclaration")) {
+        if (entry.importKind === "type" || !entry.specifiers.some((specifier) => used.has(specifier.local.name))) continue
+        const target = sourcePath(entry.source.value, filename, root)
+        const imported = entry.specifiers.filter((specifier) => used.has(specifier.local.name)).map((specifier) => keyName(specifier.imported) ?? specifier.local.name)
+        if (target) targets.push({ filename: target, wanted: imported })
+    }
+    return targets
+}
+
+function exportedTargets(program, filename, root, wanted) {
+    const targets = []
+    for (const entry of program.body.filter((node) => ["ExportNamedDeclaration", "ExportAllDeclaration"].includes(node.type) && node.source && node.exportKind !== "type")) {
+        const target = sourcePath(entry.source.value, filename, root)
+        const exported = entry.type === "ExportAllDeclaration" ? wanted : entry.specifiers.filter((specifier) => !wanted || wanted.includes(keyName(specifier.exported))).map((specifier) => keyName(specifier.local))
+        if (target && (!exported || exported.length)) targets.push({ filename: target, wanted: exported })
+    }
+    return targets
+}
+
+function usedRoutes(program, wanted, used) {
+    return [...classesOf(program).values()].filter((controller) => !wanted || wanted.includes(controller.id.name) || used.has(controller.id.name))
+        .flatMap((controller) => routesOf(controller).map((entry) => entry.route))
+}
+
 function appRoutes(filename, root) {
     const routes = new Set()
     const pending = [{ filename, wanted: ["AppModule"] }]
@@ -245,18 +505,8 @@ function appRoutes(filename, root) {
         const program = readProgram(current)
         if (!program) continue
         const used = wiringNames(program, wanted)
-        for (const controller of classesOf(program).values()) if (!wanted || wanted.includes(controller.id.name) || used.has(controller.id.name)) for (const { route } of routesOf(controller)) routes.add(route)
-        for (const entry of program.body.filter((node) => node.type === "ImportDeclaration")) {
-            if (entry.importKind === "type" || !entry.specifiers.some((specifier) => used.has(specifier.local.name))) continue
-            const target = sourcePath(entry.source.value, current, root)
-            const imported = entry.specifiers.filter((specifier) => used.has(specifier.local.name)).map((specifier) => keyName(specifier.imported) ?? specifier.local.name)
-            if (target) pending.push({ filename: target, wanted: imported })
-        }
-        for (const entry of program.body.filter((node) => ["ExportNamedDeclaration", "ExportAllDeclaration"].includes(node.type) && node.source && node.exportKind !== "type")) {
-            const target = sourcePath(entry.source.value, current, root)
-            const exported = entry.type === "ExportAllDeclaration" ? wanted : entry.specifiers.filter((specifier) => !wanted || wanted.includes(keyName(specifier.exported))).map((specifier) => keyName(specifier.local))
-            if (target && (!exported || exported.length)) pending.push({ filename: target, wanted: exported })
-        }
+        for (const route of usedRoutes(program, wanted, used)) routes.add(route)
+        pending.push(...importedTargets(program, current, root, used), ...exportedTargets(program, current, root, wanted))
     }
     return routes
 }

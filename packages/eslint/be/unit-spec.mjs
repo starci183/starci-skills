@@ -30,6 +30,7 @@ import { keyName, walk } from "./lib/ast.mjs"
 import { importOf, isImportedFrom } from "./lib/import-source.mjs"
 import { isPackageType, typeOrigins } from "./lib/types.mjs"
 import { baseOf, isServiceSpecFile, isUnitSpecFile, unitRoleOfSpec } from "./lib/unit-spec.mjs"
+import { isRealSubjectValue } from "./lib/subject-values.mjs"
 
 const TESTING_PACKAGE = "@nestjs/testing"
 
@@ -470,6 +471,7 @@ export const specInfraDoubleFromKit = {
         return {
             Property(node) {
                 if (node.parent.type !== "ObjectExpression" || (node.key.name ?? node.key.value) !== "useValue") return
+                if (isRealSubjectValue(context, node.value)) return
                 const provide = node.parent.properties.find((property) => property.type === "Property" && (property.key.name ?? property.key.value) === "provide")
                 const spelled = tokenName(provide?.value)
                 if (spelled === null) return
