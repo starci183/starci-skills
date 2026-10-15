@@ -263,7 +263,7 @@ test('starci app add cli writes a command group with its first sub-command and r
   assert.ok(read(dir, `${base}/subs/run.cli.ts`).includes('await this.deadLetterService.run()'));
   const module = read(dir, 'be/src/features/cli/cli.module.ts');
   assert.ok(module.includes('import { RequeueModule } from "./requeue/requeue.module"'));
-  assert.ok(module.includes('imports: [MigrateModule, RequeueModule]'));
+  assert.ok(module.includes('imports: [MigrateModule, RequeueModule.register({})]'));
   assert.deepEqual(hfsJson(dir).sides.be.kinds, ['api', 'cli']);
   assert.equal((await cli(['add', 'cli', 'requeue', '--service', 'DeadLetterService=@modules/domain/order', '--cwd', dir])).code, 2, 'an existing group is refused');
   assert.equal(read(dir, 'be/src/features/cli/cli.module.ts'), module, 'a refused add registers nothing');
