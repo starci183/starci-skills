@@ -457,3 +457,93 @@ the cited-path scan over live prose; then every retained self-check of
 `modules/kernel/allowlist.yaml` (`starci/allowlist@1`): every exception a check keeps is a named,
 shrink-only section of it, and `scripts/checks/check-one-allowlist.mjs` refuses a second one
 (`RT_ALLOWLIST_SPRAWL`).
+
+<a id="r54"></a>
+
+## R54 Thin route adapters
+
+Route files mount one feature owner and leave rendering decisions, hooks, and client interaction
+inside that owner. `FE_ROUTE_FILES_THIN` rejects business logic in route adapters.
+`FE_NEXT_CONVENTIONS` requires `proxy.ts` instead of `middleware.ts`, and
+`FE_PAGE_METADATA_MISSING` requires page metadata. `FE_ROUTE_ONE_PAGE` rejects multiple page
+owners, while `FE_ROUTE_DRAWING_DECISION` rejects route-side drawing decisions.
+`FE_ROUTE_CLIENT_BOUNDARY` and `FE_ROUTE_CLIENT_HOOK` keep client boundaries and hooks below the
+route. `FE_ROUTE_DEFAULT_EXPORT` requires the route's default component export. These boundaries
+apply in both lite and full editions.
+
+<a id="r55"></a>
+
+## R55 Server and client boundaries
+
+Pages and layouts stay server components; an interactive block entry or leaf may declare a client
+boundary. `FE_CLIENT_BOUNDARY` rejects misplaced `use client` directives.
+`FE_CLIENT_SERVER_IMPORT` rejects direct server imports from client code, and
+`FE_CLIENT_REACHES_SERVER` rejects server surfaces reached through the import graph.
+`FE_SERVER_ONLY_MARK` requires server modules to open with `import 'server-only'`.
+`FE_STORAGE_OUTSIDE_MODULES` keeps browser storage behind modules, and `FE_DANGEROUS_HTML` rejects
+raw HTML on visible elements. These boundaries apply in both lite and full editions.
+
+<a id="r57"></a>
+
+## R57 Mounted pages and route destinations
+
+`FE_OWNER_REACHABLE` requires each page owner to be mounted by an app route. `FE_HREF_RESOLVES`
+rejects internal hrefs for which no route exists; route groups, locale prefixes, and dynamic
+segments retain their routing meaning. `FE_ROUTE_HARDCODED` requires href builders in
+`modules/routes` instead of copied route strings.
+
+<a id="r58"></a>
+
+## R58 Translation ownership
+
+`FE_I18N_LITERAL` rejects visible or spoken display text written directly in source, including a
+literal document language. Blocks resolve messages through `next-intl`; leaves and composites
+receive words as props. Set the HTML `lang` from the locale parameter and keep translated values
+in catalogs.
+
+<a id="r59"></a>
+
+## R59 Internationalization stack
+
+`FE_I18N_PLACEMENT` requires `next-intl`, a `[locale]` segment, `src/proxy.ts`, and the default `vi`
+catalog. Build the stack once in a shared i18n package, or in `modules/i18n` for a single app.
+`FE_I18N_NAVIGATION` requires locale-aware navigation and `Link` for internal destinations.
+`FE_I18N_FORMATTER` requires the `next-intl` formatter for displayed dates, numbers, and money.
+
+<a id="r64"></a>
+
+## R64 FE app isolation
+
+`FE_APP_ISOLATION` rejects imports from one application into another. Keep application code in
+its app and put reusable code in shared packages.
+
+## R60
+
+`FE_I18N_CATALOG` requires every locale catalog under an app's `modules/i18n/messages`
+to contain the same nested keys. Translate values freely while keeping key sets aligned.
+
+## R62
+
+`FE_NATIVE_FORM_CONTROL` refuses native form controls and raw structural tags in product
+tiers; compose grammar controls and structural components instead. `FE_NATIVE_IMAGE`
+refuses native `img` tags and `next/image` instances without width plus height, or fill
+with sizes. The grammar tier may render the underlying elements. These constraints
+apply in lite and full.
+
+## R63
+
+`FE_PACKAGE_SHAPE` requires each shared package to declare a build command and explicit
+exports into `./dist/`. Export subpaths cannot use wildcards or folder mappings; `main`,
+`module`, `types` and `typings` must also point into `./dist/` when present. Both editions
+judge the package manifest, so consumers use built output rather than source files.
+
+<a id="r65"></a>
+
+## R65 FE size and state budget
+
+`FE_SIZE_AND_STATE_BUDGET` keeps components and hooks within their line and state budgets
+and refuses hand-written polling. `FE_LIST_KEY` requires stable keys for rendered lists
+and avoids fresh object or array props on their components. `FE_EFFECT_CLEANUP` requires
+an effect or subscription to release every timer, listener and other resource it starts.
+`FE_SWALLOWED_ERROR` refuses empty catches and empty promise rejection handlers; handle
+or propagate the error. `FE_CONSOLE_CALL` keeps console calls out of product source.
