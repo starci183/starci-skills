@@ -437,6 +437,18 @@ contract, concurrency and recovery proof. [code-pattern enforcement](code-patter
 describes the executable inventory, and [nest contract check](nest-contract-check.md) and
 [next data lifecycle check](next-data-lifecycle-check.md) the specialized contract checkers.
 
+## R156: isolate feature trigger kinds
+
+`BE_KIND_ISOLATION` rejects an import between backend feature owners whose slots
+declare different trigger kinds. Static imports, dynamic imports, re-exports and
+type-only imports all count, including imports made by a file below the owner's
+root. Both lite and full use the slot's `trigger` value to identify the kind.
+
+A feature may import files within its own owner and allowed modules. Different
+kinds coordinate through the event bus: a domain service publishes with
+`eventBus.publish(event, tx)` and the receiving kind consumes that event. Replacing
+a cross-kind import with a type-only import does not remove the boundary.
+
 ## This repository's own layout
 
 The runtime repository is judged by the same engine with its own manifest,
