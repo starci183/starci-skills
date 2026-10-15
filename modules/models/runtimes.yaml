@@ -356,7 +356,7 @@ allocation:
       codex-, deps-, direction-part-, draw-layer-, footprint-, grammar-pin-, guard-, literal-argv-, module-yaml-,
       doc-language-, guidance-, hk-, hfs-, install-link-, kernel-check-, kguard-, sup-orca, land-, op-manifest-, path-key-, pathspec-, push-scan-spec-, rename-over-, sbl-, serve-ask-, sup-chat, sup-repo, sup-src, sup-wd,
       work-acceptance-, work-brand-test-, work-core-test-, work-custody-test-, work-external-,
-      work-index-md-, work-module-spec-, example-critique-, example-derive-, example-evidence-, example-lite-, example-verify-,
+      work-index-md-, work-module-spec-, example-critique-, example-derive-, example-evidence-, work-validate-lite-, example-refs-lite-, example-lite-, example-verify-,
       example-work-gate-, work-artifacts-, work-consistency-, work-surfaces-,
       grammar-land-, kernel-replace-close-, nm-link-, rc-job-, rc-health-, release-gate-, seat-titles-, slice-typecheck-, unit-roles-, spec-budget-,
       model-hotload-, price-hotload-, owner-trust-, fs-kind-contract-, private-publication-, private-create-, private-lease-, private-partial-,
