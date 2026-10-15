@@ -56,6 +56,7 @@ function makeVps(overrides = {}) {
     whenPublished: {},
     blackout: false,
     afterSwap: null,
+    defaultCert: null,
     ...overrides,
   };
   const calls = [];
@@ -67,7 +68,7 @@ function makeVps(overrides = {}) {
   });
   const serving = (host) => {
     if (state.blackout || !hostsNow().includes(host) || !state.table[host]) return null;
-    return { ...state.table[host], ...(Object.hasOwn(state.files, 'app.yml') ? state.whenPublished[host] : {}) };
+    return { ...state.table[host], ...(Object.hasOwn(state.files, 'app.yml') && (!state.onlyNew || state.files['app.yml'].includes(NEW_TOKEN)) ? state.whenPublished[host] : {}) };
   };
   const guard = (target) => {
     const name = target.slice(DYNAMIC.length + 1);
@@ -92,7 +93,8 @@ function makeVps(overrides = {}) {
   };
   const shell = (command, input) => {
     const script = command.slice("sh -c '".length, -1).replaceAll(String.raw`'\''`, "'");
-    const forward = script.includes("rm -f '/srv/deploy/app-edge/dynamic/routes.yml'");
+    const forward = script.startsWith('mv') && !state.swapped;
+    if (script.startsWith('mv')) state.swapped = true;
     if (script.startsWith('umask 022') && state.fail.has('upload') && !script.includes('routes.yml.tmp')) return bad('disk full');
     if (script.startsWith('umask 022') && state.fail.has('upload-restore') && script.includes('routes.yml.tmp')) return bad('disk full');
     if (script.startsWith('mv') && forward && state.fail.has('swap')) return bad('mv failed');
@@ -105,10 +107,12 @@ function makeVps(overrides = {}) {
     if (command.includes('openssl')) {
       const host = /-servername[^a-z0-9]+([a-z0-9.-]+)/u.exec(command)[1];
       const entry = serving(host);
-      return entry ? ok(`${entry.cert}\n`) : bad('no certificate');
+      if (entry) return ok(`${entry.cert}\n`);
+      return state.defaultCert ? ok(`${state.defaultCert}\n`) : bad('no certificate');
     }
     if (command.includes(' age ')) {
       if (state.fail.has('backup')) return bad('age: failed');
+      if (state.fail.has('backup-previous') && command.includes('app.yml-')) return bad('age: failed');
       backups.push({ file: /-o '\\''([^']+)'\\''/u.exec(command)[1], input });
       return ok();
     }
@@ -371,4 +375,75 @@ test('empty and scalar tenant files cannot clash', async () => {
   const vps = makeVps({ files: { 'routes.yml': OLD_ROUTES, ...TENANTS, 'empty.yml': '', 'scalar.yml': '5' } });
   const result = await call(vps, config);
   assert.equal(result.ok, true, text(result));
+});
+
+// The 2026-10-16 production outage: a re-publish of an existing routes file that only ADDS a host. The edge answers an unrouted host with its default
+// certificate (status 0 for curl, a certificate present), so the new host has a baseline certificate that must not be compared after the swap.
+const OLD_OWN = json(routesFile(['api.tenant.example', 'tool.example', 'www.tenant.example'], OLD_TOKEN));
+const republish = (overrides = {}) => makeVps({ files: { 'app.yml': OLD_OWN, ...TENANTS }, defaultCert: 'serial=DEFAULT\nsubject=CN=default', ...overrides });
+
+test('re-publishing the existing file with only a new host passes: the new host is expected-new, its default certificate is not compared', async () => {
+  const { config } = tree();
+  const vps = republish();
+  const result = await call(vps, config, { execute: true });
+  assert.equal(result.ok, true, text(result));
+  assert.match(text(result), /ok api\.app\.example\/: status 200 \(baseline 0\), certificate serial new/u);
+  assert.match(text(result), /ok api\.tenant\.example\/: status 200 \(baseline 200\), certificate serial equal/u);
+  assert.equal(vps.state.files['app.yml'], json(OWN));
+  assert.equal(result.data.restored, null);
+});
+
+test('the file about to be overwritten is backed up with age first, even when no superseded file exists', async () => {
+  const { config } = tree();
+  const vps = republish();
+  const result = await call(vps, config, { execute: true });
+  assert.equal(vps.backups.length, 1);
+  assert.match(vps.backups[0].file, /^\/srv\/deploy\/backups\/app\.yml-20231114-221320\.age$/u);
+  assert.equal(vps.backups[0].input, OLD_OWN);
+  assert.doesNotMatch(text(result), /none needed/u);
+  assert.ok(result.data.backups.some((file) => file.includes('app.yml-')));
+  assert.deepEqual(result.data.steps.slice(0, 4), ['preconditions', 'baseline', 'backup', 'upload']);
+});
+
+test('a failed verification restores the previous published file, it never deletes it', async () => {
+  const { config } = tree();
+  const vps = republish({ onlyNew: true, whenPublished: { 'tool.example': { cert: 'serial=ZZ' } } });
+  const result = await call(vps, config, { execute: true });
+  assert.equal(result.ok, false);
+  assert.match(text(result), /MISMATCH tool\.example\/: status 200 \(baseline 200\), certificate serial different/u);
+  assert.match(text(result), /RESTORED ok/u);
+  assert.equal(result.data.restored, 'ok');
+  assert.equal(vps.state.files['app.yml'], OLD_OWN, 'the previous file is back, byte for byte');
+  assert.ok(!Object.hasOwn(vps.state.files, 'app.yml.tmp'));
+  assert.deepEqual(result.data.steps.slice(-3), ['verify', 'restore', 'restore-verify']);
+});
+
+test('a failed swap with a previous file restores it together with the superseded one', async () => {
+  const { config } = tree();
+  const vps = republish({ files: { 'app.yml': OLD_OWN, 'routes.yml': OLD_ROUTES, ...TENANTS }, fail: new Set(['swap']) });
+  const result = await call(vps, config, { execute: true });
+  assert.equal(result.ok, false);
+  assert.equal(vps.state.files['app.yml'], OLD_OWN);
+  assert.equal(vps.state.files['routes.yml'], OLD_ROUTES);
+  assert.equal(vps.backups.length, 2);
+});
+
+test('the new host is judged by its declared status and by answering over a valid certificate', async () => {
+  const exact = tree({ verify: [{ host: 'api.app.example', path: '/', status: 200 }] });
+  assert.equal((await call(republish(), exact.config, { execute: true })).ok, true);
+  const wrong = tree({ verify: [{ host: 'api.app.example', path: '/', status: 204 }] });
+  const failing = await call(republish(), wrong.config, { execute: true });
+  assert.equal(failing.ok, false);
+  assert.match(text(failing), /MISMATCH api\.app\.example\/: status 200/u);
+  const noCertificate = await call(republish({ whenPublished: { 'api.app.example': { code: 0 } } }), tree().config, { execute: true });
+  assert.equal(noCertificate.ok, false, 'a new host that does not answer is a failure');
+});
+
+test('a backup of the file about to be overwritten that fails stops before any change', async () => {
+  const vps = republish({ fail: new Set(['backup-previous']) });
+  const result = await call(vps, tree().config, { execute: true });
+  assert.equal(result.ok, false);
+  assert.match(text(result), /backup of app.yml FAILED: age: failed/u);
+  assert.deepEqual(vps.writes, []);
+  assert.equal(vps.state.files['app.yml'], OLD_OWN);
 });
