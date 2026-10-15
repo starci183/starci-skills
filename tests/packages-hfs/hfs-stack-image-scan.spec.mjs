@@ -8,7 +8,7 @@ import { tarOf } from '../helpers/tar-fixture.mjs';
 
 const temps = [];
 const tempFile = (buffer) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-tar-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-tar-'));
   temps.push(dir);
   const file = path.join(dir, 'x.tar');
   fs.writeFileSync(file, buffer);

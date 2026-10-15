@@ -25,6 +25,7 @@ import {
   renderTargets,
   writeTargets,
 } from "../sync/index.mjs";
+import { readDeclaredStack } from "../sync/stack-images.mjs";
 
 const PACKAGE_ROOT = path.join(import.meta.dirname, "..");
 const PINS_FILE = path.join(
@@ -275,6 +276,8 @@ function sourceWithAdditions(root, additions) {
   return {
     files: [...new Set([...current.files, ...added.keys()])].sort(byCodeUnit),
     read: (file) => added.get(file) ?? current.read(file),
+    // The declared images and pass-through variables render the managed stack-deploy.yml exactly as `app sync` will.
+    stack: readDeclaredStack(root, { parseYaml }),
   };
 }
 

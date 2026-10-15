@@ -21,7 +21,7 @@ const temps = [];
 after(() => { for (const dir of temps) fs.rmSync(dir, { recursive: true, force: true }); });
 
 function scaffold(extra = {}) {
-  const into = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-registry-'));
+  const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-registry-'));
   temps.push(into);
   const { root } = scaffoldApp({ name: 'demo', into, pins: PINS, presets: PRESETS, lock: fakeLock, emitTypes: () => GENERATED_TYPES, now: () => new Date('2026-10-02T12:34:56.000Z'), ...extra });
   return root;

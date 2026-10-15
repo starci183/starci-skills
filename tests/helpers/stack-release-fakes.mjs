@@ -54,7 +54,7 @@ const deployBlock = () => ({
 
 /** A temp app tree plus fakes. `mutate(deploy, stackSource)` edits the declarations before they are written. */
 export function makeApp({ members = MEMBERS, mutate = () => {}, overrides, files = {} } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-'));
   const deploy = deployBlock();
   const source = structuredClone(STACK_SOURCE);
   mutate(deploy, source);

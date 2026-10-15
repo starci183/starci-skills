@@ -12,7 +12,7 @@ import { IMAGE_API, IMAGE_WEB, SOURCE_SHA, ZERO, makeApp, secretValues } from '.
 const apps = [];
 const outs = [];
 const app = (options) => { const made = makeApp(options); apps.push(made); return made; };
-const outDir = () => { const dir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'stack-out-')), 'nested', 'release'); outs.push(path.dirname(path.dirname(dir))); return dir; };
+const outDir = () => { const dir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-out-')), 'nested', 'release'); outs.push(path.dirname(path.dirname(dir))); return dir; };
 after(() => { apps.forEach((made) => made.dispose()); outs.forEach((dir) => fs.rmSync(dir, { recursive: true, force: true })); });
 
 const images = { api: IMAGE_API, web: IMAGE_WEB };

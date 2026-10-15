@@ -9,7 +9,7 @@ const roots = [];
 export const STACK_SOURCE = `services:\n  api:\n    image: registry.example/team/app-api@sha256:${'a'.repeat(64)}\n  web:\n    image: registry.example/team/app-web@sha256:${'b'.repeat(64)}\n`;
 
 export function buildApp({ deploy, runtime = 'docker-swarm', declaration, stack = STACK_SOURCE, withSecrets = true } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-app-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-app-'));
   roots.push(root);
   const env = path.join(root, '.starcistacks', 'production');
   fs.mkdirSync(path.join(env, 'infra', 'swarm'), { recursive: true });

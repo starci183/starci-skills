@@ -36,7 +36,7 @@ const rollbackUpdate = (host) => ({ State: 'rollback_started', StartedAt: new Da
 let work;
 let remote;
 const remotes = [];
-before(() => { work = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-deploy-')); });
+before(() => { work = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-deploy-')); });
 after(() => fs.rmSync(work, { recursive: true, force: true }));
 afterEach(() => { for (const each of remotes.splice(0)) each.dispose(); });
 

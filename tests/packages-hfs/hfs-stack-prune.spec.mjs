@@ -14,7 +14,7 @@ let previous;
 let bare;
 
 before(() => {
-  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-prune-'));
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-prune-'));
   const write = (name, release) => {
     const file = path.join(dir, name);
     fs.writeFileSync(file, JSON.stringify(release));

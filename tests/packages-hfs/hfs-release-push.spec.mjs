@@ -37,7 +37,7 @@ async function greenRepo(options = {}) {
 
 /** Another clone of the bare remote, to move the remote behind the repository's back. */
 function otherClone(repo) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'release-clone-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-release-clone-'));
   dirs.push(dir);
   gitIn(dir, ['clone', '--quiet', repo.remote, '.']);
   for (const [key, value] of [['user.name', 'Other'], ['user.email', 'other@example.com'], ['commit.gpgsign', 'false'], ['tag.gpgsign', 'false']]) gitIn(dir, ['config', key, value]);

@@ -23,7 +23,7 @@ const baseDeploy = () => ({
 
 /** `deploy` entries override the defaults; a `null` entry removes the default. `sealedFiles` creates empty ops / key / known_hosts members. */
 export function makeApp({ deploy = {}, sealedFiles = false, sops = RECIPIENT } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-'));
   const merged = { ...baseDeploy(), ...deploy };
   for (const [key, value] of Object.entries(merged)) if (value === null) delete merged[key];
   fs.writeFileSync(path.join(root, 'hfs.json'), JSON.stringify({ project: 'shop' }));

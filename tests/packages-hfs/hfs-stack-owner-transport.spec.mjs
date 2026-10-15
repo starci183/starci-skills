@@ -12,7 +12,7 @@ const PEM = '-----BEGIN OPENSSH PRIVATE KEY-----\nBODY\n-----END OPENSSH PRIVATE
 const ID = 'ab'.repeat(8);
 const temps = [];
 const tempDir = () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-owner-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-owner-'));
   temps.push(dir);
   return dir;
 };

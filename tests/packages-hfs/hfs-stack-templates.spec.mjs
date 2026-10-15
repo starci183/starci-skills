@@ -33,7 +33,7 @@ function walk(dir) {
 /** The skeleton's .starcistacks tree rendered into a temp app root (the template variables filled), with placeholder sealed members. */
 function renderedApp(t, edition) {
   const { directory, members } = TEMPLATES[edition];
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-templates-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-templates-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.writeFileSync(path.join(root, 'hfs.json'), JSON.stringify({ project: 'demo' }));
   const source = path.join(TEMPLATES_DIR, 'app', directory, '.starcistacks');

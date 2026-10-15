@@ -24,7 +24,7 @@ const IMAGES = { api: `ghcr.io/owner/lite-app-api@${digest('1')}`, web: `ghcr.io
 
 /** A disposable copy of the example's stack tree and hfs.json; the public example tracks no sealed member, so placeholders stand in. */
 function exampleCopy(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-example-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-example-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.cpSync(path.join(EXAMPLE, '.starcistacks'), path.join(root, '.starcistacks'), { recursive: true });
   fs.copyFileSync(path.join(EXAMPLE, 'hfs.json'), path.join(root, 'hfs.json'));
