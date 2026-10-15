@@ -19377,3 +19377,25 @@ RT_COVERAGE_CODE_UNROUTED:
   nextStep_vi: "Đăng ký bộ kiểm tra phát đúng mã trong plugin của profile và edition được định tuyến, rồi thêm spec chứng minh đường đi."
   owner: op-retry
   kind: check-finding
+
+STACK_TOOLING_REIMPLEMENTED:
+  title: "An app re-implements deploy tooling the canon ships"
+  title_vi: "Ứng dụng tự cài lại công cụ triển khai mà canon đã cung cấp"
+  meaning_vi: "Một tệp triển khai gọi lệnh docker mà một động từ starci app stack đã đảm nhiệm, hoặc thư mục deploy chứa tệp mang tên một động từ như render, converge hay prepare."
+  causes_vi:
+    - "Vi phạm R293: kho mã giữ bản sao công cụ Swarm riêng (docker stack deploy, docker secret create, docker swarm init...) thay vì gọi động từ của canon."
+    - "Một workflow hoặc script trong deploy/, scripts/ hay package.json gọi trực tiếp docker cho việc canon đã làm."
+  nextStep_vi: "Xóa tệp hoặc lệnh đó và gọi động từ được nêu trong thông báo (starci app stack render, deploy, converge, verify, prune, rollback, prepare, doctor), đặt hằng số của ứng dụng vào khối deploy của application-stacks.yaml."
+  owner: op-retry
+  kind: check-finding
+
+STACKS_DEPLOY_CONFIG_INVALID:
+  title: "A deploy block of application-stacks.yaml is not coherent"
+  title_vi: "Khối deploy trong application-stacks.yaml không nhất quán"
+  meaning_vi: "environments.<env>.deploy có trường lạ, tên hoặc mẫu sai, tệp cấu hình không tồn tại, dịch vụ không có trong stack, thành viên sealed không có tệp .enc, mục verify sai dạng, tên config trùng hoặc ảnh backup chưa ghim digest thật."
+  causes_vi:
+    - "Vi phạm R294: khối deploy được kiểm bằng đúng normalizeDeploy mà các động từ starci app stack dùng, nên động từ sẽ từ chối cùng lỗi đó."
+    - "Tệp, dịch vụ hoặc thành viên sealed được đổi tên hay xóa mà khối deploy chưa cập nhật."
+  nextStep_vi: "Sửa đúng trường nêu trong thông báo (environments.<env>.<đường dẫn>), rồi chạy lại starci app check; mỗi vấn đề là một phát hiện riêng."
+  owner: op-retry
+  kind: check-finding
