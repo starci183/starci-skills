@@ -237,10 +237,14 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
     'HFS_MONO_NEST_PROJECTS',
     'BE_TEST_TOPOLOGY',
   ]);
-  const unexpectedCodes = [...new Set(report.findings.map(finding => finding.code).filter(code => !upgradeGapCodes.has(code)))].sort((a, b) => a.localeCompare(b));
+  // The cli app is added by the upgrade, so its typed environment (R289 BE_APP_ENV_REQUIRED) is one more addition, but only under be/apps/cli.
+  const cliUpgradeGaps = new Set(['BE_APP_ENV_REQUIRED']);
+  const isUpgradeGap = finding => upgradeGapCodes.has(finding.code)
+    || (cliUpgradeGaps.has(finding.code) && /^be\/apps\/cli\//.test(String(finding.path ?? '').replaceAll(path.win32.sep, '/')));
+  const unexpectedCodes = [...new Set(report.findings.filter(finding => !isUpgradeGap(finding)).map(finding => finding.code))].sort((a, b) => a.localeCompare(b));
   assert.deepEqual(unexpectedCodes, [], `full-edition view reported non-upgrade findings: ${unexpectedCodes.join(', ')}`);
   const productFinding = report.findings.find((finding) =>
-    !upgradeGapCodes.has(finding.code)
+    !isUpgradeGap(finding)
     && /^(?:supabase\/|fe\/|be\/src\/)/.test(String(finding.path ?? '').replaceAll(path.win32.sep, '/')),
   );
   const productFindingDescription = productFinding ? `${productFinding.code} ${productFinding.path}` : '';
