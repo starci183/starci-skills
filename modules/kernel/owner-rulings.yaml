@@ -463,6 +463,11 @@ rulings:
     ruling: Every drawing set covers desktop and mobile in the light theme for each drawn state; dark-theme drawings are optional.
     supersedes: []
     enforcedBy: [scripts/work/ui/shell-conformance.mjs]
+  - id: gate-loosening-05bab95ace66
+    date: '2026-10-15'
+    ruling: "Declared by main under the owner's delegation of 2026-10-14; owner to ratify. Nine authored JSON files are declared in modules/kernel/allowlist.yaml json-exceptions, each by its exact path with a reason: four English i18n message catalogs (examples/lite-app and three FE skeleton templates), the npm scripts fragment packages/hfs/templates/app/package-scripts/supabase.json that renders into package.json (a tool-mandated format), and four environment.json files (the lite example production descriptor and the skeleton and skeleton-lite templates), the canon-named value-free rendered descriptor of knowledge/hfs/slots.yaml:707. The six lite swarm recovery and release records were converted to YAML instead."
+    supersedes: []
+    enforcedBy: [scripts/checks/check-json-exceptions.mjs]
 
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']
