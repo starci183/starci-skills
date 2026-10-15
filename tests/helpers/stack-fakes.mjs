@@ -74,7 +74,7 @@ function removeObject(kind, args, state) {
 function serviceInspect(name, state) {
   const service = state.services.get(name);
   if (!service) return bad(`Error: no such service: ${name}`);
-  const spec = { Name: name, Spec: { Mode: { Replicated: { Replicas: service.replicas } } }, UpdateStatus: service.update };
+  const spec = { Name: name, Spec: { Mode: { Replicated: { Replicas: service.replicas } }, ...(service.template ? { TaskTemplate: service.template } : {}) }, UpdateStatus: service.update };
   return ok(`${JSON.stringify(spec)}\n`);
 }
 
@@ -84,9 +84,14 @@ function servicePs(name, state) {
 }
 
 function taskInspect(args, state) {
-  const ids = args.slice(args.indexOf('{{.DesiredState}}|{{.Status.State}}|{{.Status.Timestamp}}|{{.Status.Err}}') + 1);
+  const ids = args.slice(args.indexOf('--format') + 2);
   const rows = ids.map((id) => state.tasks.find((task) => task.id === id)).filter(Boolean);
-  return ok(rows.map((task) => `${task.desired}|${task.state}|${task.timestamp}|${task.error ?? ''}\n`).join(''));
+  // A task may carry its spec (an object, or `rawSpec` for a broken text); the spec follows the error after a tab, as in the real format.
+  const specOf = (task) => {
+    if (task.rawSpec !== undefined) return `\t${task.rawSpec}`;
+    return task.spec === undefined ? '' : `\t${JSON.stringify(task.spec)}`;
+  };
+  return ok(rows.map((task) => `${task.desired}|${task.state}|${task.timestamp}|${task.error ?? ''}${specOf(task)}\n`).join(''));
 }
 
 function stackDeploy(args, call, state, fileReader) {

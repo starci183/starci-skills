@@ -88,3 +88,18 @@ test('extra arguments are refused: the command is the declaration', async () => 
   await assert.rejects(runTask(m.ctx, config, { name: 'seed-media', args: ['--all'], execute: true }, m.deps), (error) => error.code === 'STACK_USAGE');
   assert.equal(m.run.commands.length, 0);
 });
+
+test('an environment that declares no tasks says so, and a config without a tasks key is the same', async () => {
+  const m = manager();
+  for (const bare of [{ ...config, tasks: {} }, { ...config, tasks: undefined }]) {
+    await assert.rejects(runTask(m.ctx, bare, { name: 'seed-media' }, m.deps), (error) => undeclared(error) && error.message.includes('the environment declares no deploy.tasks'));
+  }
+});
+
+test('no running task, and a docker ps that fails, are failures naming the reason', async () => {
+  const none = manager();
+  none.host.state.tasks.length = 0;
+  await assert.rejects(runTask(none.ctx, config, { name: 'seed-media', execute: true }, none.deps), (error) => error.code === 'STACK_TASK_NO_TASK' && error.message.includes('none is running'));
+  const host = fakeHost({ overrides: { docker: { 'ps -q': () => ({ status: 1, stdout: '', stderr: 'daemon down\nmore' }) } } });
+  await assert.rejects(runTask(host.ctx(), config, { name: 'seed-media', execute: true }, { ssh: fakeRunner(host) }), (error) => error.code === 'STACK_TASK_NO_TASK' && error.message.includes('daemon down'));
+});

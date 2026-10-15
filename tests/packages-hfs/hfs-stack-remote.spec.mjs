@@ -368,3 +368,10 @@ test('disconnectCi without execute changes nothing and refuses outside CI', asyn
   assert.equal(fs.existsSync(path.join(home, '.ssh', 'deploy_key')), true);
   await assert.rejects(disconnectCi(host.ctx({ env: { HOME: home } }), aliasConfig(), { execute: true }), refusalCode('STACK_CONNECT_CI_ONLY'));
 });
+
+test('restrictToUser defaults to the real platform when the context names none', async () => {
+  const { restrictToUser } = await import('../../packages/hfs/stack/private-file.mjs');
+  const seen = [];
+  restrictToUser({ spawn: (command, args) => { seen.push(command); return answer(); } }, 'x');
+  assert.deepEqual(seen, process.platform === 'win32' ? ['icacls'] : []);
+});

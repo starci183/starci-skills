@@ -15,8 +15,8 @@ export function restrictToUser(ctx, file, rights = 'R') {
 }
 
 /** Writes `text` to `file` with owner-only access (mode on POSIX, icacls on win32). */
-export function writePrivate(ctx, file, text, mode = 0o600) {
-  fs.writeFileSync(file, text, { mode });
-  fs.chmodSync(file, mode);
+export function writePrivate(ctx, file, text) {
+  fs.writeFileSync(file, text, { mode: 0o600 });
+  fs.chmodSync(file, 0o600);
   restrictToUser(ctx, file);
 }

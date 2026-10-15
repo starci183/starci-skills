@@ -19,7 +19,7 @@ const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const require = createRequire(import.meta.url);
 const Ajv2020 = (() => { const loaded = require('ajv/dist/2020.js'); return loaded?.default ?? loaded; })();
 const SCHEMA = parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/application-stacks.schema.yaml'), 'utf8'));
-const VARIABLES = { project: 'demo', sonarGate: 'starci-quality' };
+const VARIABLES = { project: 'demo', sonarGate: 'starci-quality', registryVisibility: 'public' };
 const SEALED_PLACEHOLDER = 'KEY=ENC[placeholder]\nsops_mac=ENC[placeholder]\n';
 const TEMPLATES = {
   lite: { directory: 'skeleton-lite', members: ['primary-db-url', 'supabase-service-role-key'], services: ['api', 'web'], hosts: ['demo.example.invalid', 'api.demo.example.invalid'] },

@@ -22,7 +22,7 @@ after(() => apps.forEach((made) => made.dispose()));
 const ok = (stdout = '') => ({ status: 0, stdout, stderr: '' });
 
 /** A git and docker shim: answers by command, writes the buildx metadata file, records every call. */
-function shim({ dirty = '', tags = 'v0.1.0\nnot-a-release\n', remote = 'https://github.com/Starci183/nivo-lite.git', buildFails = null, noDigest = false, head = SHA, gitFails = null, emptyMetadata = false, silentFailure = false, imageLeak = false, pushFails = false, pushNoDigest = false, scanBroken = false } = {}) {
+function shim({ dirty = '', tags = 'v0.1.0\nnot-a-release\n', remote = 'https://github.com/Starci183/nivo-lite.git', buildFails = null, noDigest = false, head = SHA, gitFails = null, emptyMetadata = false, silentFailure = false, imageLeak = false, pushFails = false, pushSilent = false, pushNoDigest = false, scanBroken = false } = {}) {
   const calls = [];
   const spawn = (command, args, options = {}) => {
     calls.push({ command, args, cwd: options.cwd });
@@ -45,6 +45,7 @@ function shim({ dirty = '', tags = 'v0.1.0\nnot-a-release\n', remote = 'https://
       return ok();
     }
     if (command === 'docker' && args[0] === 'push') {
+      if (pushSilent) return { status: 1, stdout: '', stderr: '' };
       if (pushFails) return { status: 1, stdout: '', stderr: 'denied: push refused\nsecond' };
       return ok(pushNoDigest ? 'pushed\n' : `latest: digest: ${DIGEST(args[1].includes('-web:') ? 'web' : 'api')} size: 1\n`);
     }
@@ -57,7 +58,7 @@ function shim({ dirty = '', tags = 'v0.1.0\nnot-a-release\n', remote = 'https://
 /** The docker answers of the image scan: a clean image, or one whose build history carries a private key block. */
 function scanAnswer(args, { imageLeak, scanBroken }) {
   if (scanBroken && args[0] === 'inspect') return { status: 1, stdout: '', stderr: 'inspect broke' };
-  if (args[0] === 'history') return ok(imageLeak ? ['RUN echo -----BEGIN OPENSSH', 'PRIVATE KEY-----'].join(' ') : 'COPY dir:abc in /app');
+  if (args[0] === 'history') return ok(imageLeak ? Array.from({ length: imageLeak === true ? 1 : imageLeak }, () => ['RUN echo -----BEGIN OPENSSH', 'PRIVATE KEY-----'].join(' ')).join(String.fromCharCode(10)) : 'COPY dir:abc in /app');
   if (args[0] === 'inspect') return ok('["PATH=/usr/bin"]');
   if (args[0] === 'create') return ok('cid1\n');
   if (args[0] === 'export') { fs.writeFileSync(args[2], Buffer.alloc(1024)); return ok(); }
@@ -247,4 +248,12 @@ test('a build that opens the sealed build values refuses up front, naming the ag
   } finally {
     fs.rmSync(home, { recursive: true, force: true });
   }
+});
+
+test('public: a silent docker push failure gets a default message, and a long hit list is cut with a count', async () => {
+  const made = app();
+  const silent = await run(made, { push: true, execute: true }, shim({ pushSilent: true }));
+  assert.ok(silent.lines.includes('push of api FAILED: docker push failed'));
+  const leaky = await run(made, { push: true, execute: true }, shim({ imageLeak: 25 }));
+  assert.ok(leaky.lines.some((line) => line === '  ... and 5 more'));
 });

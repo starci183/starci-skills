@@ -112,7 +112,7 @@ function processImage(ctx, config, item, args, { push }) {
 const ownerStep = (name) => `owner step: GitHub -> Packages -> ${name} -> Package settings -> Change visibility -> Public (GitHub has no API for this)`;
 
 /** 'public' when an ANONYMOUS client can fetch the manifest of the pushed digest, 'private' when the registry refuses it, 'unknown' on a network error. */
-export async function visibilityOf(ctx, host, repository, digest) {
+async function visibilityOf(ctx, host, repository, digest) {
   try {
     const token = await ctx.fetch(`https://${host}/token?scope=repository:${repository}:pull&service=${host}`, { signal: AbortSignal.timeout(15000) });
     const bearer = token.ok ? (await token.json()).token : null;

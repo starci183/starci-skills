@@ -87,7 +87,7 @@ test('an update that is still running is pending, an older or undated one is ign
   const { host, since, ctx } = setup();
   seedService(host, 'app_api', { update: { State: 'updating', StartedAt: new Date(host.state.time).toISOString() } });
   const running = await convergeStack(ctx, config, { since, timeoutSeconds: 6 });
-  assert.deepEqual(running.data.pending, ['app_api: update in progress']);
+  assert.deepEqual(running.data.pending, ['app_api: update in progress (updating)']);
   seedService(host, 'app_api', { update: { State: 'rollback_completed', StartedAt: new Date(host.state.time - 3_600_000).toISOString() } });
   assert.equal((await convergeStack(ctx, config, { since })).ok, true);
   seedService(host, 'app_api', { update: { State: 'rollback_completed' } });
@@ -142,4 +142,49 @@ test('a zero timeout never observes', async () => {
   const { since, ctx } = setup();
   const result = await convergeStack(ctx, config, { since, timeoutSeconds: 0 });
   assert.deepEqual(result.lines, ['converge: TIMEOUT', '  not observed']);
+});
+
+const OLD = { ContainerSpec: { Image: 'app/api:1', Env: ['A=1'] }, Resources: { Limits: { MemoryBytes: 1 } } };
+const NEW = { Resources: { Limits: { MemoryBytes: 1 } }, ContainerSpec: { Env: ['A=1'], Image: 'app/api:2' } };
+
+test('the old spec tasks still failing during the rolling update are not the deploy failures; the new spec tasks are', async () => {
+  const { host, since, ctx } = setup();
+  const now = new Date(host.state.time).toISOString();
+  const update = { State: 'completed', StartedAt: now };
+  seedService(host, 'app_api', { template: NEW, update, tasks: [{ state: 'failed', timestamp: now, error: 'old task restarting', spec: OLD }] });
+  const old = await convergeStack(ctx, config, { since });
+  assert.equal(old.ok, true, 'a failure of the previous spec is history');
+  assert.deepEqual(old.data.failed, []);
+  seedService(host, 'app_api', { template: NEW, update, tasks: [{ state: 'failed', timestamp: now, error: 'new task crashed', spec: { ...NEW } }, { state: 'rejected', timestamp: now, error: 'old', spec: OLD }] });
+  const fresh = await convergeStack(ctx, config, { since });
+  assert.equal(fresh.ok, false);
+  assert.deepEqual(fresh.data.failed, ['app_api: task failed: new task crashed'], 'key order does not matter, only the new spec counts');
+});
+
+test('the spec is read from the same inspect call as the task state: the format asks for it after the error text', async () => {
+  const { host, since, ctx } = setup();
+  seedService(host, 'app_api', { template: NEW });
+  await convergeStack(ctx, config, { since });
+  const inspect = host.calls.find((call) => call.args[0] === 'inspect' && call.args.includes('task'));
+  assert.equal(inspect.args[inspect.args.indexOf('--format') + 1], '{{.DesiredState}}|{{.Status.State}}|{{.Status.Timestamp}}|{{.Status.Err}}\t{{json .Spec}}');
+});
+
+test('a task without a readable spec, or a service without a task template, still counts: nothing is hidden', async () => {
+  const { host, since, ctx } = setup();
+  const now = new Date(host.state.time).toISOString();
+  seedService(host, 'app_api', { template: NEW, tasks: [{ state: 'failed', timestamp: now, error: 'broken spec text', rawSpec: '{not json' }] });
+  assert.deepEqual((await convergeStack(ctx, config, { since })).data.failed, ['app_api: task failed: broken spec text']);
+  seedService(host, 'app_api', { tasks: [{ state: 'failed', timestamp: now, error: 'no template', spec: OLD }] });
+  assert.deepEqual((await convergeStack(ctx, config, { since })).data.failed, ['app_api: task failed: no template']);
+});
+
+test('a recent update that has not reached completed keeps the stack pending, whatever its state', async () => {
+  const { host, since, ctx } = setup();
+  const started = new Date(host.state.time).toISOString();
+  seedService(host, 'app_api', { update: { State: 'updating', StartedAt: started } });
+  assert.deepEqual((await convergeStack(ctx, config, { since, timeoutSeconds: 6 })).data.pending, ['app_api: update in progress (updating)']);
+  seedService(host, 'app_api', { update: { State: 'completed', StartedAt: started } });
+  assert.equal((await convergeStack(ctx, config, { since })).ok, true);
+  seedService(host, 'app_api', { update: { State: 'unknown_state', StartedAt: started } });
+  assert.deepEqual((await convergeStack(ctx, config, { since, timeoutSeconds: 6 })).data.pending, ['app_api: update in progress (unknown_state)']);
 });
