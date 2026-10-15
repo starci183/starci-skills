@@ -3,6 +3,7 @@ import { CancelOrderHandler } from "./application/cancel-order.handler"
 import { CompensatePlaceOrderHandler } from "./application/compensate-place-order.handler"
 import { CompletePlaceOrderHandler } from "./application/complete-place-order.handler"
 import { ReserveOrderCompensation } from "./compensations/reserve-order.compensation"
+import { ConfigurableModuleClass } from "./place-order.module-definition"
 import { PlaceOrderSagaService } from "./place-order.saga.service"
 import { ReserveOrderStep } from "./steps/reserve-order.saga-step"
 
@@ -17,4 +18,4 @@ import { ReserveOrderStep } from "./steps/reserve-order.saga-step"
     ],
 })
 /** The place-order saga: its orchestrator, its step and compensation, and the handlers of the commands the consumers dispatch. */
-export class PlaceOrderModule {}
+export class PlaceOrderModule extends ConfigurableModuleClass {}

@@ -14,7 +14,7 @@ export const doorsModules = (): Array<DynamicModule | Type<unknown>> => [
         service: "billing",
         probes: [DatabaseProbe, IDENTITY_API, EVENT_TRANSPORT],
     }),
-    HealthHttpModule,
-    InvoicingMessageModule,
-    SepayHttpModule,
+    HealthHttpModule.register({}),
+    InvoicingMessageModule.register({}),
+    SepayHttpModule.register({}),
 ]

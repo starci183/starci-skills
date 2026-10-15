@@ -201,7 +201,7 @@ function tableComposition({ root, repo, owner, feature, fe, ownerRelative }) {
   const groups = [['domain', [domain]]];
   if (fe) groups.push(['api', [
     { importLine: 'import { GraphqlModule } from "@modules/platform/graphql"', entry: 'GraphqlModule.register({ isGlobal: true })' },
-    { importLine: `import { ${pascalOf(feature)}GraphqlModule } from "@features/api/${feature}"`, entry: `${pascalOf(feature)}GraphqlModule` },
+    { importLine: `import { ${pascalOf(feature)}GraphqlModule } from "@features/api/${feature}"`, entry: `${pascalOf(feature)}GraphqlModule.register({})` },
   ]]);
   const lines = fs.readFileSync(at(root, ownerRelative), 'utf8').replace(/\r\n/g, '\n').split('\n');
   const patches = groups.map(([area, entries]) => {
@@ -263,6 +263,8 @@ const apiFeatureFiles = (values) => {
   const create = `create-${values.singular}`;
   return [
     [`${base}/index.ts`, "feature.index.ts.tpl"],
+    [`${base}/${values.name}.options.ts`, "feature.options.ts.tpl"],
+    [`${base}/${values.name}.module-definition.ts`, "feature.module-definition.ts.tpl"],
     [`${base}/${values.name}.module.ts`, "feature.module.ts.tpl"],
     [`${base}/application/${get}.query.ts`, "get.query.ts.tpl"],
     [`${base}/application/${get}.handler.ts`, "get.handler.ts.tpl"],
@@ -277,6 +279,8 @@ const apiFeatureFiles = (values) => {
     [`${base}/transport/graphql/${create}.resolver.ts`, "create.resolver.ts.tpl"],
     [`${base}/transport/graphql/${create}.mapper.ts`, "create.mapper.ts.tpl"],
     [`${base}/transport/graphql/dto/${create}.type.ts`, "create.type.ts.tpl"],
+    [`${base}/transport/graphql/${values.name}-graphql.options.ts`, "graphql.options.ts.tpl"],
+    [`${base}/transport/graphql/${values.name}-graphql.module-definition.ts`, "graphql.module-definition.ts.tpl"],
     [`${base}/transport/graphql/${values.name}-graphql.module.ts`, "graphql.module.ts.tpl"],
   ].map(([relative, file]) => ({ relative, body: template(`be/table/api/${file}`, values) }));
 };

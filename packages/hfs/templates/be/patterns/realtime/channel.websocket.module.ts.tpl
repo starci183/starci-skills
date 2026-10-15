@@ -1,9 +1,11 @@
 import { Module } from "@nestjs/common"
-import type { DynamicModule, OnModuleDestroy, OnModuleInit } from "@nestjs/common"
+import type { OnModuleDestroy, OnModuleInit } from "@nestjs/common"
 import type { @@Channel@@Frame } from "@@serviceModule@@"
 import type { VerifySupabaseAccessToken } from "@modules/integrations/supabase"
 import { injector } from "@modules/platform/composition"
 import type { Principal } from "@modules/platform/cqrs"
+import { ConfigurableModuleClass, MODULE_OPTIONS_TOKEN } from "./@@channel@@-websocket.module-definition"
+import type { @@Channel@@WebsocketOptions } from "./@@channel@@-websocket.options"
 import { @@Channel@@Gateway } from "./@@channel@@.gateway"
 
 const ACCESS_TOKEN_VERIFIER: unique symbol = Symbol("@@channel@@.access-token-verifier")
@@ -34,23 +36,22 @@ export interface @@Channel@@Namespace {
     on(event: "connection", listener: (client: @@Channel@@Socket) => void): void
 }
 
-@Module({ providers: [@@Channel@@Gateway] })
+@Module({
+    providers: [
+        @@Channel@@Gateway,
+        { provide: ACCESS_TOKEN_VERIFIER, useFactory: (options: @@Channel@@WebsocketOptions) => options.verifyAccessToken, inject: [MODULE_OPTIONS_TOKEN] },
+    ],
+})
 /** The socket transport: verifies each connection, forwards hub frames and releases every disconnected subscription. */
-export class @@Channel@@WebsocketModule implements OnModuleInit, OnModuleDestroy {
+export class @@Channel@@WebsocketModule extends ConfigurableModuleClass implements OnModuleInit, OnModuleDestroy {
     private readonly streams = new Map<string, AsyncIterator<@@Channel@@Frame>>()
 
     constructor(
         private readonly gateway: @@Channel@@Gateway,
         @injector<VerifySupabaseAccessToken>(ACCESS_TOKEN_VERIFIER)
         private readonly verifyAccessToken: VerifySupabaseAccessToken,
-    ) {}
-
-    /** Compose with the same cryptographic verifier as identity; lite uses one API instance and the in-memory hub. */
-    static register(verifyAccessToken: VerifySupabaseAccessToken): DynamicModule {
-        return {
-            module: @@Channel@@WebsocketModule,
-            providers: [{ provide: ACCESS_TOKEN_VERIFIER, useValue: verifyAccessToken }],
-        }
+    ) {
+        super()
     }
 
     /** Nest creates gateway namespaces before module initialization and starts listening afterwards. */

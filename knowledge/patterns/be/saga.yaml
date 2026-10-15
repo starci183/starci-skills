@@ -31,6 +31,14 @@ files:
     slot: be.feature.saga
     template: saga/saga.index.ts.tpl
     role: "The public surface of the kind folder: the message module an app composes."
+  - path: src/features/saga/<saga>/<saga>.options.ts
+    slot: be.feature.saga
+    template: saga/saga.options.ts.tpl
+    role: The options of the module (the configurable module base needs a type); empty until the module takes some.
+  - path: src/features/saga/<saga>/<saga>.module-definition.ts
+    slot: be.feature.saga
+    template: saga/saga.module-definition.ts.tpl
+    role: The configurable-module base of the module, registered as register.
   - path: src/features/saga/<saga>/<saga>.module.ts
     slot: be.feature.saga
     template: saga/saga.module.ts.tpl
@@ -120,6 +128,14 @@ files:
     role: "A thin door that hands the delivery of the last event, with its `eventId`, to the complete command; the saga takes it through the inbox."
     suffix: consumer
     rules: [R80, R88, R172]
+  - path: src/features/saga/<saga>/transport/message/<saga>-message.options.ts
+    slot: be.transport.message
+    template: saga/saga.message.options.ts.tpl
+    role: The options of the module (the configurable module base needs a type); empty until the module takes some.
+  - path: src/features/saga/<saga>/transport/message/<saga>-message.module-definition.ts
+    slot: be.transport.message
+    template: saga/saga.message.module-definition.ts.tpl
+    role: The configurable-module base of the module, registered as register.
   - path: src/features/saga/<saga>/transport/message/<saga>-message.module.ts
     slot: be.transport.message
     template: saga/saga.message.module.ts.tpl

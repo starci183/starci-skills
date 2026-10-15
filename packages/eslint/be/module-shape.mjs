@@ -300,7 +300,7 @@ export const oneModulePerFile = {
     },
 }
 
-const CAPABILITY_TIERS = new Set(["domain", "platform", "integrations"])
+const CAPABILITY_TIERS = new Set(["domain", "platform", "integrations", "projections"])
 /** The tiers whose `<x>.module.ts` files are modules of the product: every one of them has a module definition. */
 const MODULE_TIERS = new Set(["feature", "domain", "platform", "integrations", "projections", "queues", "events"])
 

@@ -12,7 +12,7 @@ export class CalendarInboxModule extends ConfigurableModuleClass {
         const base = super.register(options)
         return {
             ...base,
-            imports: [...(base.imports ?? []), CalendarDeliveryModule],
+            imports: [...(base.imports ?? []), CalendarDeliveryModule.register({})],
             providers: [...(base.providers ?? []), CalendarInboxService],
             exports: [CalendarInboxService],
         }

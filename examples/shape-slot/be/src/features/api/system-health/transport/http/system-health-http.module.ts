@@ -2,7 +2,8 @@ import { Module } from "@nestjs/common"
 import { SystemHealthModule } from "../../system-health.module"
 import { LiveController } from "./live.controller"
 import { ReadyController } from "./ready.controller"
+import { ConfigurableModuleClass } from "./system-health-http.module-definition"
 
-@Module({ imports: [SystemHealthModule], controllers: [LiveController, ReadyController] })
+@Module({ imports: [SystemHealthModule.register({})], controllers: [LiveController, ReadyController] })
 /** The HTTP transport of the health feature: independent live and ready doors. */
-export class SystemHealthHttpModule {}
+export class SystemHealthHttpModule extends ConfigurableModuleClass {}

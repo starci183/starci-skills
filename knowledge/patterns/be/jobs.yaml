@@ -228,9 +228,25 @@ files:
   - path: src/features/jobs/<job>/index.ts
     slot: be.feature.jobs
     template: jobs/job.index.ts.tpl
+  - path: src/features/jobs/<job>/<job>.options.ts
+    slot: be.feature.jobs
+    template: jobs/job.options.ts.tpl
+    role: The options of the module (the configurable module base needs a type); empty until the module takes some.
+  - path: src/features/jobs/<job>/<job>.module-definition.ts
+    slot: be.feature.jobs
+    template: jobs/job.module-definition.ts.tpl
+    role: The configurable-module base of the module, registered as register.
   - path: src/features/jobs/<job>/<job>.module.ts
     slot: be.feature.jobs
     template: jobs/job.module.ts.tpl
+  - path: src/features/jobs/<job>/transport/queue/<job>-queue.options.ts
+    slot: be.feature.jobs.queue
+    template: jobs/job.queue.options.ts.tpl
+    role: The options of the module (the configurable module base needs a type); empty until the module takes some.
+  - path: src/features/jobs/<job>/transport/queue/<job>-queue.module-definition.ts
+    slot: be.feature.jobs.queue
+    template: jobs/job.queue.module-definition.ts.tpl
+    role: The configurable-module base of the module, registered as register.
   - path: src/features/jobs/<job>/transport/queue/<job>-queue.module.ts
     slot: be.feature.jobs.queue
     template: jobs/job.queue.module.ts.tpl

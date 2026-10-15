@@ -16,7 +16,7 @@ export class OrderModule extends ConfigurableModuleClass {
         const base = super.register(options)
         return {
             ...base,
-            imports: [...(base.imports ?? []), ReceiptModule],
+            imports: [...(base.imports ?? []), ReceiptModule.register({})],
             providers: [
                 ...(base.providers ?? []),
                 OrderService,

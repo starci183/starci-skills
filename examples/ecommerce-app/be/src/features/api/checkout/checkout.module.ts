@@ -5,6 +5,7 @@ import { GetBuyerStatusHandler } from "./application/get-buyer-status.handler"
 import { GetCartHandler } from "./application/get-cart.handler"
 import { GetOrderReceiptHandler } from "./application/get-order-receipt.handler"
 import { PlaceOrderHandler } from "./application/place-order.handler"
+import { ConfigurableModuleClass } from "./checkout.module-definition"
 
 @Module({
     providers: [
@@ -17,4 +18,4 @@ import { PlaceOrderHandler } from "./application/place-order.handler"
     ],
 })
 /** The checkout feature: the handlers of the cart, the placement of an order, the receipt link and the buyer status. */
-export class CheckoutModule {}
+export class CheckoutModule extends ConfigurableModuleClass {}

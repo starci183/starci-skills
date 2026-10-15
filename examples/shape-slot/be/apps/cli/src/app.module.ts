@@ -23,7 +23,7 @@ export class AppModule {
                     isGlobal: true,
                     connections: options.connections,
                 }),
-                CliModule,
+                CliModule.register({}),
             ],
         }
     }

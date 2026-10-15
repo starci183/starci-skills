@@ -114,6 +114,14 @@ files:
   - path: src/features/reactors/<reactor>/index.ts
     slot: be.feature.reactors
     template: reactors/reactor.index.ts.tpl
+  - path: src/features/reactors/<reactor>/<reactor>.options.ts
+    slot: be.feature.reactors
+    template: reactors/reactor.options.ts.tpl
+    role: The options of the module (the configurable module base needs a type); empty until the module takes some.
+  - path: src/features/reactors/<reactor>/<reactor>.module-definition.ts
+    slot: be.feature.reactors
+    template: reactors/reactor.module-definition.ts.tpl
+    role: The configurable-module base of the module, registered as register.
   - path: src/features/reactors/<reactor>/<reactor>.module.ts
     slot: be.feature.reactors
     template: reactors/reactor.module.ts.tpl
@@ -131,6 +139,14 @@ files:
     template: reactors/consumer.ts.tpl
     role: The consumer door of one event.
     rules: [BE_EVENT_CONSUMER_SHAPE]
+  - path: src/features/reactors/<reactor>/transport/message/<reactor>-message.options.ts
+    slot: be.transport.message
+    template: reactors/message.options.ts.tpl
+    role: The options of the module (the configurable module base needs a type); empty until the module takes some.
+  - path: src/features/reactors/<reactor>/transport/message/<reactor>-message.module-definition.ts
+    slot: be.transport.message
+    template: reactors/message.module-definition.ts.tpl
+    role: The configurable-module base of the module, registered as register.
   - path: src/features/reactors/<reactor>/transport/message/<reactor>-message.module.ts
     slot: be.transport.message
     template: reactors/message.module.ts.tpl

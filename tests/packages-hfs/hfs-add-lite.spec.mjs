@@ -135,6 +135,8 @@ test("add table --fe writes one policy-complete migration, the GraphQL api featu
     "be/src/modules/domain/orders/persistence/orders.rows.ts",
     "be/src/modules/domain/orders/persistence/orders.sql.ts",
     "be/src/features/api/orders/index.ts",
+    "be/src/features/api/orders/orders.options.ts",
+    "be/src/features/api/orders/orders.module-definition.ts",
     "be/src/features/api/orders/orders.module.ts",
     "be/src/features/api/orders/application/get-order.query.ts",
     "be/src/features/api/orders/application/get-order.handler.ts",
@@ -149,6 +151,8 @@ test("add table --fe writes one policy-complete migration, the GraphQL api featu
     "be/src/features/api/orders/transport/graphql/create-order.resolver.ts",
     "be/src/features/api/orders/transport/graphql/create-order.mapper.ts",
     "be/src/features/api/orders/transport/graphql/dto/create-order.type.ts",
+    "be/src/features/api/orders/transport/graphql/orders-graphql.options.ts",
+    "be/src/features/api/orders/transport/graphql/orders-graphql.module-definition.ts",
     "be/src/features/api/orders/transport/graphql/orders-graphql.module.ts",
     "be/src/modules/platform/graphql/graphql-depth.policy.spec.ts",
     "be/src/modules/platform/graphql/graphql-depth.policy.ts",
@@ -245,9 +249,9 @@ test("add table --fe writes one policy-complete migration, the GraphQL api featu
   const second = addTable({ root, name: "invoices", fe: true, now: () => Date.UTC(2026, 9, 2, 12, 34, 58), emitTypes: false });
   assert.equal(second.created.some((file) => file.startsWith("be/src/modules/platform/graphql/")), false);
   const secondApiGroup = read(root, "be/apps/api/src/compose/api.ts");
-  assert.equal(secondApiGroup.match(/GraphqlModule\.register/g).length, 1);
-  assert.match(secondApiGroup, /OrdersGraphqlModule,/);
-  assert.match(secondApiGroup, /InvoicesGraphqlModule,/);
+  assert.equal(secondApiGroup.match(/GraphqlModule\.register\(\{ isGlobal/g).length, 1);
+  assert.match(secondApiGroup, /OrdersGraphqlModule\.register\(\{\}\),/);
+  assert.match(secondApiGroup, /InvoicesGraphqlModule\.register\(\{\}\),/);
   const secondApp = read(root, "be/apps/api/src/app.module.ts");
   assert.equal(secondApp.match(/\.\.\.apiModules\(\)/g).length, 1);
   assert.doesNotMatch(secondApp, /OrdersGraphqlModule|InvoicesGraphqlModule|GraphqlModule/);
@@ -461,7 +465,7 @@ test("lite add api emits full's GraphQL door, and api plus webhook transports ar
   );
   assert.equal(api.created.some(file => file.includes("/transport/http/")), false);
   assert.match(read(root, "be/src/features/api/bookings/index.ts"), /BookingsGraphqlModule/);
-  assert.match(read(root, "be/src/features/api/bookings/transport/graphql/bookings-graphql.module.ts"), /imports: \[BookingsApiModule\]/);
+  assert.match(read(root, "be/src/features/api/bookings/transport/graphql/bookings-graphql.module.ts"), /imports: \[BookingsApiModule\.register\(\{\}\)\]/);
   assert.match(read(root, "be/src/modules/domain/bookings/index.ts"), /BookingsService/);
   assert.match(read(root, "be/src/modules/domain/identity/index.ts"), /CurrentPrincipal/);
   assert.match(read(root, "be/src/modules/platform/cqrs/index.ts"), /ExecuteParams/);

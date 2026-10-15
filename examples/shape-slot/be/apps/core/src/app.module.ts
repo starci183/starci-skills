@@ -22,7 +22,7 @@ export class AppModule {
                 IdentityModule.register({ isGlobal: true }),
                 LivenessModule.register({ isGlobal: true }),
                 NoteModule.register({ isGlobal: true }),
-                SystemHealthHttpModule,
+                SystemHealthHttpModule.register({}),
             ],
             providers: [
                 { provide: APP_FILTER, useClass: ErrorsFilter },

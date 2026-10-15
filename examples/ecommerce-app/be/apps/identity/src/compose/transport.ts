@@ -11,7 +11,7 @@ export function transportModules(): Array<DynamicModule | Type<unknown>> {
     return [
         ProbesModule.register({ isGlobal: true, service: "identity", probes: [DatabaseProbe, CACHE] }),
         GraphqlModule.register({ isGlobal: true }),
-        HealthHttpModule,
-        IdentityGraphqlModule,
+        HealthHttpModule.register({}),
+        IdentityGraphqlModule.register({}),
     ]
 }

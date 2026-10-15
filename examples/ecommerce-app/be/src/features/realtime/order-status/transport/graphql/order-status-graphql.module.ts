@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common"
+import { ConfigurableModuleClass } from "./order-status-graphql.module-definition"
 import { OrderStatusSubscription } from "./order-status.subscription"
 
 @Module({ providers: [OrderStatusSubscription] })
 /** The GraphQL transport of the order status channel: its subscription door; the hub comes from the app's realtime capability. */
-export class OrderStatusGraphqlModule {}
+export class OrderStatusGraphqlModule extends ConfigurableModuleClass {}

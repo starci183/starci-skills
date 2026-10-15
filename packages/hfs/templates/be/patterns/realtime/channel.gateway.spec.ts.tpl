@@ -81,7 +81,7 @@ const socketOf = (id: string, auth: Readonly<Record<string, unknown>> = { access
 
 const build = async (hub: RealtimeHub, verify: VerifySupabaseAccessToken) => {
     const moduleRef = await Test.createTestingModule({
-        imports: [@@Channel@@WebsocketModule.register(verify)],
+        imports: [@@Channel@@WebsocketModule.register({ verifyAccessToken: verify })],
     })
         .useMocker((token) => token === REALTIME_HUB ? hub : undefined)
         .compile()

@@ -29,7 +29,7 @@ export class AppModule {
                 ...bookingsModules(),
                 IdentityModule.register({ isGlobal: true, verifyAccessToken }),
                 LivenessModule.register({ isGlobal: true }),
-                SystemHealthHttpModule,
+                SystemHealthHttpModule.register({}),
             ],
             providers: [
                 {

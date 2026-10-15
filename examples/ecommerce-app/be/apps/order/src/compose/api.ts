@@ -5,7 +5,7 @@ import { OrderStatusGraphqlModule } from "@features/realtime/order-status"
 
 /** The order request doors expose health, checkout and live order status. */
 export const apiModules = (): Array<Type<unknown>> => [
-    HealthHttpModule,
-    CheckoutGraphqlModule,
-    OrderStatusGraphqlModule,
+    HealthHttpModule.register({}),
+    CheckoutGraphqlModule.register({}),
+    OrderStatusGraphqlModule.register({}),
 ]

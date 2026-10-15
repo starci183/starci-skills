@@ -1,14 +1,15 @@
 import { Module } from "@nestjs/common"
 import { IdentityFeatureModule } from "../../identity.module"
 import { AccountResolver } from "./account.resolver"
+import { ConfigurableModuleClass } from "./identity-graphql.module-definition"
 import { RegisterResolver } from "./register.resolver"
 import { RevokeSessionResolver } from "./revoke-session.resolver"
 import { SignInResolver } from "./sign-in.resolver"
 import { VerifySessionResolver } from "./verify-session.resolver"
 
 @Module({
-    imports: [IdentityFeatureModule],
+    imports: [IdentityFeatureModule.register({})],
     providers: [RegisterResolver, SignInResolver, VerifySessionResolver, RevokeSessionResolver, AccountResolver],
 })
 /** The GraphQL transport of the identity feature. */
-export class IdentityGraphqlModule {}
+export class IdentityGraphqlModule extends ConfigurableModuleClass {}

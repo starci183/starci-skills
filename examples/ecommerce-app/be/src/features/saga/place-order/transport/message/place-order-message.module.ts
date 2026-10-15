@@ -5,15 +5,18 @@ import type { EventConsumerRegistry } from "@modules/platform/event-bus"
 import { PlaceOrderModule } from "../../place-order.module"
 import { InvoiceIssuedConsumer } from "./billing-invoice-issued.consumer"
 import { InvoiceRejectedConsumer } from "./billing-invoice-rejected.consumer"
+import { ConfigurableModuleClass } from "./place-order-message.module-definition"
 
-@Module({ imports: [PlaceOrderModule], providers: [InvoiceIssuedConsumer, InvoiceRejectedConsumer] })
+@Module({ imports: [PlaceOrderModule.register({})], providers: [InvoiceIssuedConsumer, InvoiceRejectedConsumer] })
 /** The message transport of the place-order saga: registers its consumers with the messaging capability. */
-export class PlaceOrderMessageModule implements OnModuleInit {
+export class PlaceOrderMessageModule extends ConfigurableModuleClass implements OnModuleInit {
     constructor(
         @InjectEventConsumerRegistry() private readonly registry: EventConsumerRegistry,
         private readonly invoiceIssuedConsumer: InvoiceIssuedConsumer,
         private readonly invoiceRejectedConsumer: InvoiceRejectedConsumer,
-    ) {}
+    ) {
+        super()
+    }
 
     /** Hands every consumer to the registry. */
     onModuleInit(): void {

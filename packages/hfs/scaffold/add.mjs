@@ -98,7 +98,7 @@ function skeletonComposition(lines, edition) {
   const candidates = [
     { area: 'domain', symbol: 'IdentityModule', source: '@modules/domain/identity', entry: edition === 'lite' ? 'IdentityModule.register({ isGlobal: true, verifyAccessToken })' : 'IdentityModule.register({ isGlobal: true })' },
     { area: 'domain', symbol: 'LivenessModule', source: '@modules/domain/liveness', entry: 'LivenessModule.register({ isGlobal: true })' },
-    { area: 'api', symbol: 'SystemHealthHttpModule', source: '@features/api/system-health', entry: 'SystemHealthHttpModule' },
+    { area: 'api', symbol: 'SystemHealthHttpModule', source: '@features/api/system-health', entry: 'SystemHealthHttpModule.register({})' },
     { area: 'api', symbol: 'GraphqlModule', source: '@modules/platform/graphql', entry: 'GraphqlModule.register({ isGlobal: true })' },
   ];
   if (edition === 'full') candidates.push({ area: 'domain', symbol: 'NoteModule', source: '@modules/domain/note', entry: 'NoteModule.register({ isGlobal: true })' });
@@ -300,7 +300,7 @@ function wireLiteWebhookConfig(input) {
 
 /**
  * Registers the generated member in the static module that lists its siblings (the cli feature root lists each group module): one import
- * line after the last import and one more entry of the `imports` array of its `@Module`. Nothing happens when the member is already listed.
+ * line after the last import and one more entry of the `imports` array of its `@Module`, written `Symbol.register({})` (every module has a module definition). Nothing happens when the member is already listed.
  */
 function wire({ beRoot, wire: target, forms, noun, name }) {
   const file = path.join(beRoot, ...target.file.split('/'));
@@ -314,7 +314,7 @@ function wire({ beRoot, wire: target, forms, noun, name }) {
   const lastImport = lines.map((line) => line.startsWith('import ')).lastIndexOf(true);
   if (!array || lastImport < 0) throw new ScaffoldError('HFS_ADD_WIRE_FAILED', `${target.file} has no \`@Module({ imports: [...] })\` to register ${symbol} in`);
   lines.splice(lastImport + 1, 0, `import { ${symbol} } from "${fill(target.import)}"`);
-  text = lines.join('\n').replace(array[0], `@Module({ imports: [${[array[1].trim(), symbol].filter(Boolean).join(', ')}] })`);
+  text = lines.join('\n').replace(array[0], `@Module({ imports: [${[array[1].trim(), `${symbol}.register({})`].filter(Boolean).join(', ')}] })`);
   fs.writeFileSync(file, text);
 }
 

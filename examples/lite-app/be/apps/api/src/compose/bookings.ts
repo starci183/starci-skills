@@ -17,15 +17,15 @@ import { ResourcesModule } from "@modules/domain/resources"
  * list and nothing else; `app.module.ts` spreads it into its imports.
  */
 export const bookingsModules = (): NonNullable<ModuleMetadata["imports"]> => [
-    ResourcesGraphqlModule,
-    CalendarsGraphqlModule,
-    BookingsGraphqlModule,
+    ResourcesGraphqlModule.register({}),
+    CalendarsGraphqlModule.register({}),
+    BookingsGraphqlModule.register({}),
     CalendarInboxModule.register({ isGlobal: true }),
-    CalendarHttpModule,
+    CalendarHttpModule.register({}),
     CalendarsModule.register({ isGlobal: true }),
     BookingsModule.register({ isGlobal: true }),
     ResourcesModule.register({ isGlobal: true }),
-    CalendarDeliveryQueueModule,
-    ConfirmBookingQueueModule,
-    SendReminderQueueModule,
+    CalendarDeliveryQueueModule.register({}),
+    ConfirmBookingQueueModule.register({}),
+    SendReminderQueueModule.register({}),
 ]

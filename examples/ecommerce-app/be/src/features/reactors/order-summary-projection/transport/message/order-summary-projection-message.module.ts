@@ -6,19 +6,22 @@ import { OrderSummaryProjectionModule } from "../../order-summary-projection.mod
 import { OrderPlacedConsumer } from "./order-placed.consumer"
 import { OrderPaidConsumer } from "./order-paid.consumer"
 import { OrderExpiredConsumer } from "./order-expired.consumer"
+import { ConfigurableModuleClass } from "./order-summary-projection-message.module-definition"
 
 @Module({
-    imports: [OrderSummaryProjectionModule],
+    imports: [OrderSummaryProjectionModule.register({})],
     providers: [OrderPlacedConsumer, OrderPaidConsumer, OrderExpiredConsumer],
 })
 /** The message transport of the order-summary-projection reactor: registers its consumers with the event bus; an api or worker app composes it. */
-export class OrderSummaryProjectionMessageModule implements OnModuleInit {
+export class OrderSummaryProjectionMessageModule extends ConfigurableModuleClass implements OnModuleInit {
     constructor(
         @InjectEventConsumerRegistry() private readonly registry: EventConsumerRegistry,
         private readonly orderPlacedConsumer: OrderPlacedConsumer,
         private readonly orderPaidConsumer: OrderPaidConsumer,
         private readonly orderExpiredConsumer: OrderExpiredConsumer,
-    ) {}
+    ) {
+        super()
+    }
 
     /** Hands every consumer to the registry. */
     onModuleInit(): void {
