@@ -293,11 +293,15 @@ function observe(run, target, port = 443) {
 const label = (target) => `${target.host}${target.path}`;
 const answers = (code) => code >= 200 && code < 500;
 
-/** The old edge is the baseline: it must answer every host (the declared status when there is one) and present a certificate. */
+/**
+ * The old edge is the baseline: it must answer every host and present a certificate, and whatever it answers IS the expectation of the takeover (the new
+ * ingress serves the same dynamic directory, so every host must answer exactly the same). The declared `verify.status` values describe the state AFTER
+ * `ingress publish` (for example a 308 redirect that only the app's own routes file creates) and are judged by publish and by `stack verify`.
+ */
 function baselines(run, targets) {
   return targets.map((target) => {
     const seen = observe(run, target);
-    return { target, ...seen, ok: answers(seen.code) && seen.certificate !== null && (target.status === null || seen.code === target.status) };
+    return { target, ...seen, ok: answers(seen.code) && seen.certificate !== null };
   });
 }
 

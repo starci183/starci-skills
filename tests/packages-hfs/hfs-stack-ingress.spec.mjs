@@ -277,13 +277,16 @@ for (const [title, mutate] of BASELINES) {
   });
 }
 
-test('takeover refuses when the declared status is not what the old edge answers', async () => {
+test('takeover expects exactly what the old edge answers; a declared status of the post-publish phase does not block it', async () => {
+  // 204 is what the app's own routes will answer AFTER publish; the takeover phase serves the same directory as the old edge (200)
   const { config } = tree({ verify: [{ host: 'api.tenant.example', path: '/health', status: 204 }] });
+  const dry = await call(readyVps(), config, 'takeover');
+  assert.equal(dry.ok, true, text(dry));
+  assert.match(text(dry), /baseline ok api\.tenant\.example\/health: old edge answers 200/u);
   const vps = readyVps();
   const result = await call(vps, config, 'takeover', { execute: true });
-  assert.equal(result.ok, false);
-  assert.match(text(result), /baseline FAILED api\.tenant\.example\/health: old edge answers 200/u);
-  assert.deepEqual(vps.mutating(), []);
+  assert.equal(result.ok, true, text(result));
+  assert.match(text(result), /api\.tenant\.example\/health/u);
 });
 
 test('takeover dry run proves the preconditions and the baseline but changes nothing', async () => {
