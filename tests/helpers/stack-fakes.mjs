@@ -210,10 +210,11 @@ export function fakeHost({ overrides = {}, fileReader, clock = 1_800_000_000_000
       return handler ? handler(args, call, host) : bad(`fake docker: unknown command ${key}`, 127);
     }
     if (command === 'ssh' && overrides.ssh) return overrides.ssh(args, call, host);
+    if (command === 'icacls' && overrides.icacls) return overrides.icacls(args, call, host);
     return bad(`fake host: unknown tool ${command}`, 127);
   };
   host.ctx = (extra = {}) => ({
-    cwd: process.cwd(), env: {}, spawn: host.spawn, sleep: host.sleep, now: host.now,
+    cwd: process.cwd(), env: {}, platform: 'linux', username: 'operator', spawn: host.spawn, sleep: host.sleep, now: host.now,
     stdout: () => {}, stderr: () => {}, sops: undefined, ...extra,
   });
   return host;

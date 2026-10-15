@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { tool } from './context.mjs';
+import { restrictToUser, writePrivate } from './private-file.mjs';
 import { refusal } from './errors.mjs';
 
 const ACCOUNT = /^[A-Za-z0-9._@-]+$/u;
@@ -80,7 +81,8 @@ function binaryMember(ctx, config, slug, names) {
 
 const withNewline = (text) => `${text.trim()}\n`;
 
-function writePrivate(file, text, mode) {
+/** CI (a Linux runner): the file with exactly this mode. */
+function writeWithMode(file, text, mode) {
   fs.writeFileSync(file, text, { mode });
   fs.chmodSync(file, mode);
 }
@@ -95,13 +97,21 @@ export function openSealedSession(ctx, config) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-ssh-'));
   const keyFile = path.join(dir, 'id');
   const knownFile = path.join(dir, 'known_hosts');
-  writePrivate(keyFile, withNewline(key), 0o600);
-  writePrivate(knownFile, known ? withNewline(known) : '', 0o600);
-  const notes = known ? [] : ['owner-machine session without known_hosts: the host key is accepted on first contact (accept-new); verify it, CI never does this'];
   const cleanup = () => {
-    if (fs.existsSync(keyFile)) fs.writeFileSync(keyFile, '0'.repeat(key.length));
+    if (fs.existsSync(keyFile)) {
+      restrictToUser(ctx, keyFile, 'F');
+      fs.writeFileSync(keyFile, '0'.repeat(key.length));
+    }
     fs.rmSync(dir, { recursive: true, force: true });
   };
+  try {
+    writePrivate(ctx, keyFile, withNewline(key));
+    writePrivate(ctx, knownFile, known ? withNewline(known) : '');
+  } catch (error) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    throw error;
+  }
+  const notes = known ? [] : ['owner-machine session without known_hosts: the host key is accepted on first contact (accept-new); verify it, CI never does this'];
   return { account, dir, keyFile, knownFile, strict: known ? 'yes' : 'accept-new', notes, cleanup };
 }
 
@@ -176,8 +186,8 @@ export async function connectCi(ctx, config, { execute = false } = {}) {
   const data = { host: alias, files: ['deploy_key', 'known_hosts', 'config'] };
   if (!execute) return { ok: true, lines: plan.map((item) => `dry run: would write ${item}`), data };
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  writePrivate(path.join(dir, 'deploy_key'), inputs.key, 0o600);
-  writePrivate(path.join(dir, 'known_hosts'), inputs.known, 0o644);
+  writeWithMode(path.join(dir, 'deploy_key'), inputs.key, 0o600);
+  writeWithMode(path.join(dir, 'known_hosts'), inputs.known, 0o644);
   fs.appendFileSync(path.join(dir, 'config'), sshBlock(alias, inputs), { mode: 0o600 });
   fs.appendFileSync(ctx.env.GITHUB_ENV, `DOCKER_HOST=ssh://${alias}\n`);
   return { ok: true, lines: plan.map((item) => `wrote ${item}`), data };

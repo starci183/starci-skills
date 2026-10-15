@@ -133,6 +133,42 @@ test('the owner-machine session writes a private key and known_hosts, pins the h
   assert.ok(!JSON.stringify(host.calls).includes(KEY_BODY));
 });
 
+test('on win32 the sealed key and known_hosts lose their inherited ACL and are granted to the current user only, so Windows OpenSSH accepts the key', () => {
+  const icacls = [];
+  const host = fakeHost({ overrides: { ssh: () => answer(), icacls: (args) => { icacls.push({ args, key: fs.existsSync(args[0]) }); return answer(); } } });
+  const ctx = ownerCtx(host, ownerSops(), {});
+  const run = sshRunner({ ...ctx, platform: 'win32', username: 'Op Erator' }, sealedConfig());
+  run('uptime');
+  const keyFile = host.calls.find((call) => call.command === 'ssh').args.find((arg, index, all) => all[index - 1] === '-i');
+  const knownFile = host.calls.find((call) => call.command === 'ssh').args.find((arg) => arg.startsWith('UserKnownHostsFile=')).slice(19);
+  assert.deepEqual(icacls.map((entry) => entry.args), [[keyFile, '/inheritance:r', '/grant:r', 'Op Erator:R'], [knownFile, '/inheritance:r', '/grant:r', 'Op Erator:R']]);
+  assert.ok(icacls.every((entry) => entry.key), 'the file exists when its ACL is set');
+  run.cleanup();
+  assert.deepEqual(icacls.at(-1).args, [keyFile, '/inheritance:r', '/grant:r', 'Op Erator:F'], 'cleanup re-grants write so the key can be overwritten');
+  assert.equal(JSON.stringify(host.calls).includes(KEY_BODY), false);
+});
+
+test('on win32 the username comes from os.userInfo() when the context names none; other platforms never call icacls', () => {
+  const icacls = [];
+  const host = fakeHost({ overrides: { ssh: () => answer(), icacls: (args) => { icacls.push(args); return answer(); } } });
+  const win = { ...ownerCtx(host, ownerSops(), {}), platform: 'win32', username: undefined };
+  sshRunner(win, sealedConfig())('true');
+  assert.equal(icacls[0].at(-1), `${os.userInfo().username}:R`);
+  icacls.length = 0;
+  for (const platform of ['linux', 'darwin']) sshRunner({ ...ownerCtx(host, ownerSops(), {}), platform }, sealedConfig())('true');
+  assert.deepEqual(icacls, []);
+});
+
+test('a failing icacls refuses the session and leaves no key behind', () => {
+  const host = fakeHost({ overrides: { ssh: () => answer(), icacls: () => ({ status: 5, stdout: '', stderr: 'Access is denied.' + String.fromCharCode(10) + 'more' }) } });
+  const before = fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('stack-ssh-'));
+  assert.throws(() => sshRunner({ ...ownerCtx(host, ownerSops(), {}), platform: 'win32', username: 'op' }, sealedConfig())('true'), (error) => error.code === 'STACK_REMOTE_ACL' && error.message.includes('Access is denied.') && !error.message.includes(KEY_BODY));
+  assert.equal(host.calls.some((call) => call.command === 'ssh'), false);
+  const leaked = fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('stack-ssh-') && !before.includes(name));
+  for (const name of leaked) fs.rmSync(path.join(os.tmpdir(), name), { recursive: true, force: true });
+  assert.deepEqual(leaked, [], 'the temp directory with the key was removed');
+});
+
 test('without known_hosts content the owner session says accept-new is used', () => {
   const host = fakeHost({ overrides: { ssh: () => answer() } });
   const run = sshRunner(ownerCtx(host, ownerSops({ binary: { 'vps-ssh-key': PEM, 'vps-known-hosts': '\n' } })), sealedConfig());
