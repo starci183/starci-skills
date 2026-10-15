@@ -185,3 +185,18 @@ excluding none slots, specs and declared generated output. Its
 `coverage/lcov.info` report is distinct from a product's `be/coverage/lcov.info`.
 R247's coverage matrix concerns links across the standard, not a code-coverage
 percentage.
+
+<a id="r235"></a>
+
+### Syntax smells
+
+`SCAN_SMELL` applies the same syntax policy in lite and full. The back-end and
+front-end lint canons reject sequential awaits inside bounded loops, UTF-16-only
+character helpers, avoidable backslash escaping, nested conditional expressions,
+unused imports, and imports used only for re-export. Use `Promise.all` for
+independent calls, code-point helpers, `String.raw`, named intermediate values,
+and direct `export ... from` declarations. `void` is reserved for discarded
+calls. Front-end components must read every member of their declared props type.
+The dedicated RuleTester specs exercise each published enforcer with passing
+and violating source in both editions; unit and end-to-end source specs retain
+the scan exclusion declared by the rule.

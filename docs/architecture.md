@@ -457,3 +457,13 @@ the cited-path scan over live prose; then every retained self-check of
 `modules/kernel/allowlist.yaml` (`starci/allowlist@1`): every exception a check keeps is a named,
 shrink-only section of it, and `scripts/checks/check-one-allowlist.mjs` refuses a second one
 (`RT_ALLOWLIST_SPRAWL`).
+
+## Runtime root ownership (R240)
+
+<a id="r240"></a>
+
+`RT_ROOT_ADHOC` refuses runtime source files that add raw `process.cwd()` calls or
+Work-directory literals beyond their count when the check landed. Resolve the
+invocation directory, runtime state, temporary paths and Work records through
+`scripts/lib/roots.mjs`; new files start with no raw inputs. This runtime ownership
+check applies equally when working on lite and full apps.

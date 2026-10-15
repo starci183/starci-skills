@@ -2059,8 +2059,16 @@ rules:
     code: "RT_PROSE_COMMAND_UNKNOWN"
     law: "A command an instruction shows exists as written. Every `starci <group> <verb>` in a backticked span, fenced code line or yaml example item of skills/, docs/, README.md, CONTEXT.md, CONTRIBUTING.md and modules/ names a verb of the CLI catalog (modules/cli/commands) in a catalogued group, and every --flag on it is a flag of that verb or a global flag; the text after a lone -- belongs to another program and a [removed-list] marked line is exempt. The catalog is generated into the valid set, never typed twice."
     scope: runtime
+    editions: [lite, full]
+    docs: [docs/debugging.md#r230-instruction-commands]
+    templateNa: "Runtime instruction and contract self-checks judge authored runtime surfaces; application scaffolds do not contain this surface."
+    proves: [tests/checks/runtime-contracts-l14.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/checks/runtime-contracts-l14.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/checks/runtime-contracts-l14.spec.mjs, editions: [lite, full]}
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_PROSE_COMMAND_UNKNOWN"]
     enforcers:
       - {kind: runtime, id: prose-commands, at: scripts/checks/check-prose-commands.mjs}
@@ -2068,8 +2076,16 @@ rules:
     code: "RT_DOCUMENTED_DEFAULT_DRIFT"
     law: "A default a document states equals the value the code reads. A document states a default by citing its key - default <value> = `<key>` - where the key is a config.yaml path (resolved through the validator's settings reader, so an absent block yields its code default) or <yaml file under modules/>:<dotted path>; the check resolves the key and compares, and a key that resolves to nothing is a finding. docs/, README.md, CONTEXT.md, config.example.yaml and modules/ prose and yaml are scanned; a bare number stated as a default without its key is not judged, so the owner of a default is cited, never retyped."
     scope: runtime
+    editions: [lite, full]
+    docs: [docs/debugging.md#r231-documented-defaults]
+    templateNa: "Runtime instruction and contract self-checks judge authored runtime surfaces; application scaffolds do not contain this surface."
+    proves: [tests/checks/runtime-contracts-l14.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/checks/runtime-contracts-l14.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/checks/runtime-contracts-l14.spec.mjs, editions: [lite, full]}
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_DOCUMENTED_DEFAULT_DRIFT"]
     enforcers:
       - {kind: runtime, id: documented-defaults, at: scripts/checks/check-documented-defaults.mjs}
@@ -2077,8 +2093,16 @@ rules:
     code: "RT_ROLES_CONTRACT_DRIFT"
     law: "A role is described once. modules/kernel/roles.yaml holds, per role, its scope, what it does, what it must clean up, what it never does, whom it reports to and who oversees it; a Markdown surface of the role carries the block generated from it, a yaml or script surface cites modules/kernel/roles.yaml#<role>, and no surface teaches a spelling the role's contradicts list names."
     scope: runtime
+    editions: [lite, full]
+    docs: [docs/debugging.md#r232-generated-role-contracts]
+    templateNa: "Runtime instruction and contract self-checks judge authored runtime surfaces; application scaffolds do not contain this surface."
+    proves: [tests/checks/runtime-contracts-l14.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/checks/runtime-contracts-l14.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/checks/runtime-contracts-l14.spec.mjs, editions: [lite, full]}
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_ROLES_CONTRACT_DRIFT"]
     enforcers:
       - {kind: runtime, id: roles-contract, at: scripts/checks/check-roles-contract.mjs}
@@ -2086,25 +2110,57 @@ rules:
     code: "RT_EDGE_CASE_REGISTRY"
     law: "Every edge case met is a declared entry of modules/reconciler/edge-cases.yaml with its family, its real occurrence and a status of covered or open; a covered entry names the rule that handles it and the spec that reproduces it, and both exist, and an open entry says why."
     scope: runtime
+    editions: [lite, full]
+    docs: [docs/debugging.md#r233-edge-case-evidence]
+    templateNa: "Runtime instruction and contract self-checks judge authored runtime surfaces; application scaffolds do not contain this surface."
+    proves: [tests/checks/runtime-contracts-l14.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/checks/runtime-contracts-l14.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/checks/runtime-contracts-l14.spec.mjs, editions: [lite, full]}
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_EDGE_CASE_REGISTRY"]
     enforcers:
       - {kind: runtime, id: edge-case-registry, at: scripts/checks/check-edge-case-registry.mjs}
   - id: R234
     code: "RT_SECRET_TRACKED"
+    editions: [lite, full]
+    docs: [docs/application-stacks.md#where-a-secret-may-live]
+    templateNa: "The public runtime repository secret policy judges Git-tracked custody paths; application scaffolds do not contain runtime host secrets."
+    proves:
+      - {path: tests/checks/secret-tracked.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: tests/checks/secret-tracked.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/checks/secret-tracked.spec.mjs, edition: lite}
+      - {path: tests/checks/secret-tracked.spec.mjs, edition: full}
     law: "The runtime repository is public and tracks no secret material, not even ciphertext: no tracked *.enc member and no tracked secret.env or .env file, except the paths ruleParams.runtime.heldSecrets names with their reason (a list that only shrinks). Every secret the host needs lives in the one untracked .claude/secret.env, read only through engine/secrets.mjs, its names listed in the tracked secret.env.example; a product repository keeps its own custody in its own repository. Two Sonar servers, no overlap: SonarCloud serves everything that lives in the runtime repository (the runtime and the example apps, token SONAR_TOKEN), the self-hosted ext/sonar serves product repositories only."
     scope: runtime
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_SECRET_TRACKED"]
     enforcers:
       - {kind: runtime, id: secret-tracked, at: scripts/hfs/runtime-rules/secret-tracked.mjs}
   - id: R235
     code: "SCAN_SMELL"
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r235]
+    templateNa: "These syntax restrictions apply across authored expressions and imports rather than a dedicated scaffolded HFS surface; RuleTester source fixtures demonstrate the passing and violating forms."
+    proves:
+      - {path: packages/eslint/be/sonar-parity-editions.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/fe/sonar-parity-editions.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/eslint/be/sonar-parity-editions.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/fe/sonar-parity-editions.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: packages/eslint/be/sonar-parity-editions.spec.mjs, edition: lite}
+      - {path: packages/eslint/be/sonar-parity-editions.spec.mjs, edition: full}
+      - {path: packages/eslint/fe/sonar-parity-editions.spec.mjs, edition: lite}
+      - {path: packages/eslint/fe/sonar-parity-editions.spec.mjs, edition: full}
     law: "Code carries none of the smells SonarCloud measures that a lint rule can decide: no `await` inside a loop (S9382; an endless loop is spared), no `charCodeAt`/`fromCharCode` (S7758), no string that only escapes backslashes (S7780; a Next `matcher` is spared, it is read statically), no nested conditional expression (S3358), no `void` on anything but a call (S3735), no unused import (S1128), no import that is only handed on instead of `export ... from` (S7763), no prop of a component's props type the component never reads (S6767, front end), and, through typescript-eslint with type information, no deprecated API (S1874), no object turned into text (S6551) and no `async` function that never awaits and returns no promise (S7503). The files a unit or an end-to-end spec names are outside the scan, so outside these rules."
     kinds: [lint, codemod]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["SCAN_SMELL"]
     enforcers:
       - {kind: eslint-be, id: no-await-in-loop}
@@ -2124,19 +2180,39 @@ rules:
       - {kind: eslint-fe, id: no-unused-prop-types}
   - id: R236
     code: "RT_GATE_LOOSENING"
+    editions: [lite, full]
+    docs: [docs/debugging.md#r236]
+    templateNa: "Runtime release-history approval is checked against committed gates and owner rulings; product scaffolding has no runtime release history to generate."
+    proves:
+      - {path: tests/supervisor/gate-loosening.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: tests/supervisor/gate-loosening.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/supervisor/gate-loosening.spec.mjs, edition: lite}
+      - {path: tests/supervisor/gate-loosening.spec.mjs, edition: full}
     law: "A change that loosens a gate or check is owner-class: a check removed from a gate file's list, a floor lowered or a ceiling raised there, an allowlist entry added, a spec deleted or weakened or skipped together with product code (modules/kernel/gate-loosening.yaml). It lands, and passes the check, only when the tree it is judged against already holds the owner's approval of exactly that loosening, an owner-rulings entry gate-loosening-<fingerprint>."
     scope: runtime
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_GATE_LOOSENING"]
     enforcers:
       - {kind: runtime, id: gate-loosening, at: scripts/checks/check-gate-loosening.mjs}
   - id: R237
     code: "RT_REVISION_SCOPE"
+    editions: [lite, full]
+    docs: [docs/debugging.md#r237]
+    templateNa: "The runtime revision-scope table and derived engine import graph are runtime authoring surfaces, not generated application files."
+    proves:
+      - {path: tests/reconciler/revision-scope.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: tests/reconciler/revision-scope.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/reconciler/revision-scope.spec.mjs, edition: lite}
+      - {path: tests/reconciler/revision-scope.spec.mjs, edition: full}
     law: "What a change of the runtime tree asks of each role is declared once, in modules/kernel/revision-scope.yaml: every tracked path matches a row, the engine-loaded files are derived from the import graph of the engine's entries and never hand-listed, the files each seat's launch prompt is built from are the files its generator reads, and a wording-only declaration holds only for an edit that keeps the file's structure."
     scope: runtime
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_REVISION_SCOPE"]
     enforcers:
       - {kind: runtime, id: revision-scope, at: scripts/checks/check-revision-scope.mjs}
@@ -2144,8 +2220,16 @@ rules:
     code: "RT_EVENT_SPILL_BYPASS"
     law: "A ledger event payload that grows with its input (a file list, a manifest, a digest, a report, a critique, a menu) goes to the blob store through the one path of appendEvent: engine/db/event-compact.mjs eventPayloadRecord keeps a bounded inline view of at most 16 KiB and the whole payload behind events.payload_sha, and readers resolve it through engine/db/event-payload.mjs. No runtime source file other than engine/db/ledger.mjs and engine/db/event-compact.mjs passes a payloadSha to a write, catches the payload-too-large refusal to spill by hand, or inserts into the events table directly. Specs, tests, node_modules, the generated runtime copies and packages are out of scope."
     scope: runtime
+    editions: [lite, full]
+    docs: [docs/ledger-db.md#the-storage-convention-owner-ruling-2026-10-09]
+    templateNa: "These runtime checker inputs are maintained in the runtime repository, not scaffolded in a product app."
+    proves: [tests/checks/runtime-integrity-coverage.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/checks/runtime-integrity-coverage.spec.mjs, editions: [lite, full], codes: [RT_EVENT_SPILL_BYPASS]}
+    witness:
+      - {path: tests/checks/runtime-integrity-coverage.spec.mjs, editions: [lite, full], codes: [RT_EVENT_SPILL_BYPASS]}
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_EVENT_SPILL_BYPASS"]
     enforcers:
       - {kind: runtime, id: event-spill, at: scripts/checks/check-event-spill.mjs}
@@ -2153,8 +2237,16 @@ rules:
     code: "RT_STORAGE_UNDECLARED"
     law: "Content lives as a file in the content-addressed blob store under the runtime state dir (<runtime root>/.runtime/artifacts, engine/db/blob.mjs) and a database row holds only the reference (the sha) plus the small scalars it is queried by (owner ruling 2026-10-09). Always content, whatever its size: a report, a critique or verdict, a prompt or dispatch contract, a read manifest, a list of files, a log or command output, a menu or digest snapshot, an image or render, a diff. What may stay inline: ids, states, timestamps, counts, short codes and one-line reasons up to 256 bytes; any other free text up to 1024 bytes; a payload of any size is class spill (appendEvent and supEvent keep the whole payload behind the sha and a small inline form). Every text column of the product ledger and of machine.sqlite is declared in modules/schemas/storage-convention.yaml with its class (scalar, bounded, reference, spill, migrate), so a new table or column cannot appear without one; a column that holds content inline today is class migrate with its measured size, and the migration to a reference is a proposed runtime step, idempotent and journalled, never a hand rewrite of a live store."
     scope: runtime
+    editions: [lite, full]
+    docs: [docs/ledger-db.md#the-storage-convention-owner-ruling-2026-10-09]
+    templateNa: "These runtime checker inputs are maintained in the runtime repository, not scaffolded in a product app."
+    proves: [tests/checks/runtime-integrity-coverage.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/checks/runtime-integrity-coverage.spec.mjs, editions: [lite, full], codes: [RT_STORAGE_UNDECLARED]}
+    witness:
+      - {path: tests/checks/runtime-integrity-coverage.spec.mjs, editions: [lite, full], codes: [RT_STORAGE_UNDECLARED]}
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_STORAGE_UNDECLARED"]
     enforcers:
       - {kind: runtime, id: storage-convention, at: scripts/checks/check-storage-convention.mjs}
@@ -2162,8 +2254,16 @@ rules:
     code: "RT_ROOT_ADHOC"
     law: "Which directory a component reads or writes is decided in one module, scripts/lib/roots.mjs: the runtime tree, its state directory, the temp root, the invocation directory, the Work directory name, the order in which two trees that can hold the same record are tried (the tree the work happens in first, then the product's main checkout: workDirHolding, workRecordPath) and the order a tool is looked up (the tree the work happens in, then the project, the runtime's own install last: toolSearchDirs). A runtime source file does not resolve a root by itself: it neither spells process.cwd() nor the Work directory name as a literal outside that module more often than the tree the check landed on held it: a file keeps the count it had and only loses it as it is converted, and a new file starts at none. Four times in two days a component read or wrote the wrong tree because it resolved the directory itself."
     scope: runtime
+    editions: [lite, full]
+    docs: [docs/architecture.md#r240]
+    templateNa: "These runtime checker inputs are maintained in the runtime repository, not scaffolded in a product app."
+    proves: [tests/checks/runtime-integrity-coverage.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/checks/runtime-integrity-coverage.spec.mjs, editions: [lite, full], codes: [RT_ROOT_ADHOC]}
+    witness:
+      - {path: tests/checks/runtime-integrity-coverage.spec.mjs, editions: [lite, full], codes: [RT_ROOT_ADHOC]}
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_ROOT_ADHOC"]
     enforcers:
       - {kind: runtime, id: root-adhoc, at: scripts/checks/check-root-adhoc.mjs}
@@ -2171,8 +2271,16 @@ rules:
     code: "RT_HELD_UNSURFACED"
     law: "A failure code the catalogue gives to the Supervisor or the owner as a runtime fault is a state that role must be able to learn of; a stop that nobody is told of stands for hours until someone reads source. Each such entry of modules/kernel/failure-codes.yaml names the house mechanism that reaches its owner (surfacedBy: decision-item, sla-clock, incident, digest, notifier, caller or open) with surfacedAs (the item kind, clock code, incident kind, digest problem line or urgent class) and surfacedAt (the file that does it), and the check proves the mechanism exists and is wired in that file: the kind is a Decision Item kind and the file opens items naming it, the code is an SLA code with an owner and the file sets its clock, the problem line is a departure of the operating standard, a caller is a verb the owning role ran itself and never a reconciler file (a loop is no owner). An entry nothing reaches is surfacedBy open and names an open edge-case registry entry with the exact reason; it is never exempted silently."
     scope: runtime
+    editions: [lite, full]
+    docs: [docs/debugging.md#r241]
+    templateNa: "These runtime checker inputs are maintained in the runtime repository, not scaffolded in a product app."
+    proves: [tests/checks/runtime-integrity-coverage.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/checks/runtime-integrity-coverage.spec.mjs, editions: [lite, full], codes: [RT_HELD_UNSURFACED]}
+    witness:
+      - {path: tests/checks/runtime-integrity-coverage.spec.mjs, editions: [lite, full], codes: [RT_HELD_UNSURFACED]}
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_HELD_UNSURFACED"]
     enforcers:
       - {kind: runtime, id: held-surfacing, at: scripts/checks/check-held-surfacing.mjs}
@@ -2180,25 +2288,55 @@ rules:
     code: "RT_OP_JUDGE_UNDECLARED"
     law: "Every op declares who judges its product (principle P2: the maker never judges its own work). The contract of each op (modules/ops/ops/<op>.yaml) carries the required field `judge`, a list of at least one entry, each with a one-line why: machine (independent measures the runtime owns or re-runs at settle, named from modules/kernel/op-judges.yaml, and the contract proofs they rely on; a test file the same attempt wrote is never one by itself), critic (the independent Critic and its rubric, declared exactly for the op kinds that modules/kernel/critic.yaml coverage marks covered), owner (only where modules/kernel/op-judges.yaml ownerGates holds an owner gate) and next-leg (a registered reviewing leg whose contract is to review this product). Nobody cannot be declared. The registry and the contracts are checked against the runtime's own tables (op-gate and sonar-gate enforcedOps, opProofs, proof media, the Critic coverage), so the declarations and what the runtime does cannot drift apart. Surfaced in the full status text of a leg and in the op prompt."
     scope: runtime
+    editions: [lite, full]
+    docs: [docs/ops.md#r242]
+    templateNa: "These runtime checker inputs are maintained in the runtime repository, not scaffolded in a product app."
+    proves: [tests/checks/runtime-integrity-coverage.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/checks/runtime-integrity-coverage.spec.mjs, editions: [lite, full], codes: [RT_OP_JUDGE_UNDECLARED]}
+    witness:
+      - {path: tests/checks/runtime-integrity-coverage.spec.mjs, editions: [lite, full], codes: [RT_OP_JUDGE_UNDECLARED]}
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_OP_JUDGE_UNDECLARED"]
     enforcers:
       - {kind: runtime, id: op-judge, at: scripts/checks/check-op-judge.mjs}
   - id: R243
     code: "FE_SERVER_ACTION_FORBIDDEN"
+    editions: [lite, full]
+    docs: [docs/code-pattern-enforcement.md#r243]
+    proves:
+      - {path: tests/hfs/frontend-boundary-coverage.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/fe/frontend-boundary-coverage.spec.mjs, editions: [lite, full], codes: [FE_SERVER_ACTION_FORBIDDEN]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/fe/skeleton-lite/apps/web/src/app/health/live/route.ts, edition: lite}
+      - {path: packages/hfs/templates/fe/skeleton/apps/app/src/app/health/live/route.ts, edition: full}
+      - {path: tests/hfs/frontend-boundary-coverage.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/frontend-boundary-coverage.spec.mjs, editions: [lite, full], codes: [FE_SERVER_ACTION_FORBIDDEN, FE_ROUTE_HANDLER_FORBIDDEN]}
     law: "The front end serves no API, in every app and edition (R212 case-2, with the Work boundary amended by ruling:R212/case-4): no file under `fe/` carries a `\"use server\"` directive (module or function level), and the only route handlers are `app/health/live/route.ts` and the auth callback of the `fe.route.callback` slot; reads and writes reach the back end through `modules/api` and the SWR hooks, and a webhook, cron, public API or third-party callback is a back-end feature."
     kinds: [check, lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["FE_SERVER_ACTION_FORBIDDEN", "FE_ROUTE_HANDLER_FORBIDDEN"]
     enforcers:
       - {kind: machine, id: server-action-forbidden, at: scripts/hfs/architecture/server-action.mjs}
       - {kind: eslint-fe, id: no-server-action}
   - id: R244
     code: "FE_STACK_FORBIDDEN"
+    editions: [lite, full]
+    docs: [docs/code-pattern-enforcement.md#r244]
+    proves:
+      - {path: tests/hfs/frontend-boundary-coverage.spec.mjs, editions: [lite, full], codes: [FE_STACK_FORBIDDEN]}
+      - {path: packages/eslint/fe/frontend-boundary-coverage.spec.mjs, editions: [lite, full], codes: [FE_STACK_FORBIDDEN]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/fe/skeleton-lite/apps/web/src/proxy.ts, edition: lite}
+      - {path: packages/hfs/templates/fe/skeleton/apps/app/src/proxy.ts, edition: full}
+      - {path: tests/hfs/frontend-boundary-coverage.spec.mjs, editions: [lite, full], codes: [FE_STACK_FORBIDDEN]}
+    witness:
+      - {path: tests/hfs/frontend-boundary-coverage.spec.mjs, editions: [lite, full], codes: [FE_STACK_FORBIDDEN]}
     law: "A front end uses the one canonical library of each concern of knowledge/hfs/fe-stack.yaml: no front-end package.json (an app or a `fe/packages/*` package) depends on, and no source file under `fe/` imports, a package that the catalog lists under a concern's `forbids`; a missing concern is added to the catalog (with its pin in canon-pins.yaml), never installed beside it."
     kinds: [check, lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["FE_STACK_FORBIDDEN"]
     enforcers:
       - {kind: hfs, id: fe-stack, at: scripts/hfs/rules/fe-stack.mjs}
@@ -2206,17 +2344,37 @@ rules:
   - id: R245
     code: "BE_APP_OPTIONS_COMPOSITION"
     amendedBy: R289
+    editions: [lite, full]
+    docs: [docs/microservices.md#r245]
+    proves: [packages/eslint/be/app-composition-coverage.spec.mjs]
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton-lite/apps/api/src/api.options.ts, edition: lite}
+      - {path: packages/hfs/templates/be/skeleton/apps/__app__/src/__app__.options.ts, edition: full}
+      - {path: packages/eslint/be/app-composition-coverage.spec.mjs, editions: [lite, full], codes: [BE_APP_OPTIONS_COMPOSITION]}
+    witness:
+      - {path: packages/eslint/be/app-composition-coverage.spec.mjs, edition: lite, codes: [BE_APP_OPTIONS_COMPOSITION]}
+      - {path: packages/eslint/be/app-composition-coverage.spec.mjs, edition: full, codes: [BE_APP_OPTIONS_COMPOSITION]}
     law: "An app's `src/` holds five app roles (owner ruling 2026-10-14): `main.ts` builds `EnvSource` once, parses inline or imports `<app>.env.ts`, builds options and boots; `<app>.env.ts` holds typed, fail-fast environment parsing only, via `EnvSource` and capability parse helpers, with no logic, module composition, business code or feature imports; only `main.ts` and `<app>.env.ts` may read the app's environment; `<app>.options.ts` holds env-derived options plus port bindings (provider maps such as `{ approvalGate: X }`) only, with no parsing; neither the env nor options file holds an array listing `*Module` classes, module or queue registrations (`register`, `forRoot`, `registerQueue`) or scheduler entries, or an `imports`, `modules`, `schedulers` or `processors` list; the env file also refuses standalone module or queue registration calls; `compose/<area>.ts` exports the module list of one area (and the providers of its global ports when it has any), composition only, with no business logic and no environment read; `app.module.ts` imports the groups and spreads them and binds the app-wide guards and filter."
     kinds: [lint, codemod]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_APP_OPTIONS_COMPOSITION"]
     enforcers:
       - {kind: eslint-be, id: app-options-composition-free}
   - id: R246
     code: "BE_APP_COMPOSITION_BUDGET"
+    editions: [lite, full]
+    docs: [docs/microservices.md#r246]
+    proves: [packages/eslint/be/app-composition-coverage.spec.mjs]
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton-lite/apps/api/src/main.ts, edition: lite}
+      - {path: packages/hfs/templates/be/skeleton/apps/__app__/src/main.ts, edition: full}
+      - {path: packages/eslint/be/app-composition-coverage.spec.mjs, editions: [lite, full], codes: [BE_APP_COMPOSITION_BUDGET]}
+    witness:
+      - {path: packages/eslint/be/app-composition-coverage.spec.mjs, edition: lite, codes: [BE_APP_COMPOSITION_BUDGET]}
+      - {path: packages/eslint/be/app-composition-coverage.spec.mjs, edition: full, codes: [BE_APP_COMPOSITION_BUDGET]}
     law: "Each app file stays within the line budget its `be.app.*` slot names (`budget`, keyed by the slot entry the file matches): `main.ts` 80, `<app>.env.ts` 150, `<app>.options.ts` 200, `compose/<area>.ts` 120, `app.module.ts` 250. The budget is absolute, not a ratchet: an entrypoint that outgrows it moves typed, fail-fast parsing into `<app>.env.ts`; an app root that outgrows it moves an area into a new `compose/<area>.ts` group, never into the env or options file."
     kinds: [lint, codemod]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_APP_COMPOSITION_BUDGET"]
     enforcers:
       - {kind: eslint-be, id: app-file-budget}
