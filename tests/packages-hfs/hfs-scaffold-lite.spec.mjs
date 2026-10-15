@@ -326,7 +326,8 @@ test('lite scaffold emits its workspace and required stack declarations and is s
   const baselineSql = fs.readFileSync(path.join(root, ...'supabase/migrations/20261002123456_baseline.sql'.split('/')), 'utf8');
   assert.match(baselineSql, /if not exists \(select 1 from pg_catalog\.pg_roles where rolname = 'app_be'\) then/);
   assert.match(baselineSql, /create role app_be login noinherit nosuperuser nobypassrls nocreatedb nocreaterole;/);
-  assert.match(baselineSql, /alter role app_be login noinherit nosuperuser nobypassrls nocreatedb nocreaterole;/);
+  assert.match(baselineSql, /alter role app_be login noinherit nocreatedb nocreaterole;/);
+  assert.doesNotMatch(baselineSql, /alter role app_be[^;]*(?:nosuperuser|bypassrls)/i, 'a Supabase migration role cannot name SUPERUSER or BYPASSRLS in ALTER ROLE');
   assert.doesNotMatch(baselineSql, /drop role/i);
   assert.match(baselineSql, /grant usage on schema public to app_be/);
   assert.match(baselineSql, /create function private\.set_updated_at\(\)[\s\S]*returns trigger[\s\S]*language plpgsql[\s\S]*set search_path = ''/);
