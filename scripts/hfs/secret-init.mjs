@@ -8,6 +8,9 @@ import { selectedAgeRecipient } from "../api/sops/selected-age-recipient.mjs";
 import { resolveRealTool } from "../api/process/resolve-real-tool.mjs";
 import { runProgram } from "../api/process/run-program.mjs";
 import { claimFile } from "../api/fs/claim-file.mjs";
+import { generateAppIdentity } from "./secret-bootstrap-crypto.mjs";
+import { materializeDeclaredPlaceholders } from "./sealed-members.mjs";
+import { defaultSops } from "./secret-sops.mjs";
 import {
   outsideRepository,
   privateDirectory,
@@ -16,6 +19,49 @@ import {
 
 const PATH_RULE = String.raw`\.starcistacks[/\\][^/\\]+[/\\]secrets[/\\][^/\\]+\.enc$`;
 const AGE_IDENTITY_NAME = /^SOPS_AGE_KEY(?:_FILE)?$/i;
+
+/** Bootstrap a new app with its own age identity; only its public recipient leaves this owner. */
+
+
+/** Bootstrap a new app with its own age identity; only the public recipient leaves this owner. */
+export function initializeAppIdentity(repoRoot, { write, tools } = {}) {
+  const privateDirectory = path.join(repoRoot, ".claude");
+  const privateFile = path.join(privateDirectory, "secret.env");
+  const directoryStat = fs.lstatSync(privateDirectory, { throwIfNoEntry: false });
+  if (directoryStat && (!directoryStat.isDirectory() || directoryStat.isSymbolicLink()))
+    throw new Error("the app private identity directory must be an ordinary directory");
+  const privateStat = fs.lstatSync(privateFile, { throwIfNoEntry: false });
+  if (privateStat && (!privateStat.isFile() || privateStat.isSymbolicLink() || privateStat.nlink !== 1))
+    throw new Error("the app private identity must be an ordinary unlinked file");
+  let local;
+  try { local = privateStat ? (tools?.secretEnv ?? secretEnv)(privateDirectory, {}) : {}; }
+  catch { throw new Error("the app private environment could not be loaded safely"); }
+  if (Object.keys(local ?? {}).some((name) => AGE_IDENTITY_NAME.test(name)))
+    throw new Error("the app already has a private age identity; initialization must not rotate it");
+  const config = readInitializationConfig(path.join(repoRoot, ".sops.yaml"));
+  if ((config.creation_rules ?? []).some((rule) => rule?.age))
+    throw new Error("the app already has an age recipient; initialization must not rotate it");
+  const publish = write ?? ((file, content) => {
+    fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+    const append = file === privateFile || file === path.join(privateDirectory, ".gitignore");
+    fs.writeFileSync(file, content, { mode: 0o600, flag: append ? "a" : "w" });
+  });
+  const generated = generateAppIdentity();
+  let privateContent;
+  try {
+    const prefix = privateStat ? "\nSOPS_AGE_KEY=" : "SOPS_AGE_KEY=";
+    privateContent = Buffer.concat([Buffer.from(prefix), generated.identity, Buffer.from("\n")]);
+    publish(path.join(privateDirectory, ".gitignore"), "\nsecret.env\n");
+    publish(privateFile, privateContent);
+    if (process.platform !== "win32") fs.chmodSync(privateFile, 0o600);
+    config.creation_rules = [{ path_regex: PATH_RULE, age: generated.recipient }];
+    publish(path.join(repoRoot, ".sops.yaml"), stringifyYaml(config));
+    return { recipient: generated.recipient, files: [".claude/.gitignore", ".claude/secret.env", ".sops.yaml"] };
+  } finally {
+    privateContent?.fill(0);
+    generated.identity.fill(0);
+  }
+}
 
 /** Load host-local age selections below the explicit environment, without copying any other credentials. */
 export function ageIdentityEnv(repoRoot, env, tools) {
@@ -206,7 +252,6 @@ function initializationRecipient(repoRoot, env, platform, tool, tools) {
 
 /** Reuse an existing matching age rule; initialization must not rotate an app's recipient. */
 export function initializeSecrets(repoRoot, { env, platform, tools, stdout }) {
-  const tool = secretTools(env, tools);
   const configFile = path.join(repoRoot, ".sops.yaml");
   const config = readInitializationConfig(configFile);
   const rules = config.creation_rules ?? [];
@@ -219,7 +264,17 @@ export function initializeSecrets(repoRoot, { env, platform, tools, stdout }) {
     throw new Error(
       ".sops.yaml must name valid public age recipients; initialization never prints private key material",
     );
-  const derived = initializationRecipient(repoRoot, env, platform, tool, tools);
+  const localEnv = ageIdentityEnv(repoRoot, {}, tools);
+  const selectedEnv = ageIdentityEnv(repoRoot, existing ? env : { ...env, ...localEnv }, tools);
+  if (!existing && !Object.keys(localEnv).some((name) => /^SOPS_AGE_KEY$/i.test(name))) {
+    const initialized = initializeAppIdentity(repoRoot, { tools });
+    materializeDeclaredPlaceholders(repoRoot, { recipient: initialized.recipient, processEnv: selectedEnv });
+    stdout('secrets initialized; public recipient: ' + initialized.recipient + '\n');
+    return 0;
+  }
+  const tool = secretTools(env, tools);
+  const inline = Object.keys(selectedEnv).some((name) => /^SOPS_AGE_KEY$/i.test(name));
+  const derived = existing && !inline ? existing.age : initializationRecipient(repoRoot, selectedEnv, platform, tool, tools);
   const recipient = existing?.age ?? derived;
   const exact = rules.findIndex((rule) => rule?.path_regex === PATH_RULE);
   if (exact >= 0) rules[exact] = { ...rules[exact], age: recipient };
@@ -228,8 +283,14 @@ export function initializeSecrets(repoRoot, { env, platform, tools, stdout }) {
   config.creation_rules = rules;
   fs.writeFileSync(
     configFile,
-    `# Initialized by starci app secret init; private age identities stay outside the repo.\n${stringifyYaml(config)}`,
+    `# Initialized by starci app secret init; private age identities stay outside Git.\n${stringifyYaml(config)}`,
   );
+  materializeDeclaredPlaceholders(repoRoot, {
+    recipient,
+    recipientsForFile: (file) => configuredRecipients(repoRoot, file),
+    processEnv: selectedEnv,
+    sops: { seal: (request) => defaultSops(selectedEnv, repoRoot, platform, tools).seal(request) },
+  });
   stdout(`secrets initialized; public recipient: ${recipient}\n`);
   if (existing)
     stdout(

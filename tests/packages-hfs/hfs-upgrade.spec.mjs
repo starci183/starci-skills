@@ -10,6 +10,7 @@ import {
 } from "../../packages/hfs/upgrade/index.mjs";
 import { renderTargets } from "../../packages/hfs/sync/index.mjs";
 import { checkRepo, trackedFiles } from "../../scripts/hfs/check.mjs";
+import { withMaterializedExample } from "../../scripts/hfs/example-secrets.mjs";
 import {
   FORMATTED,
   gitAdd,
@@ -168,39 +169,40 @@ test("upgrade plan is ordered, printable and byte-for-byte read-only; apply exec
 });
 
 test("the committed lite example has a read-only, additions-only full upgrade plan", async () => {
-  const root = path.join(ROOT, "examples", "lite-app");
-  assert.ok(fs.existsSync(path.join(root, "hfs.json")), "examples/lite-app is present");
-  const before = contents(root);
-  const plan = await upgradeEdition({ root, to: "full", plan: true, presets: PRESETS });
-  assert.deepEqual(contents(root), before, "planning the example changes no byte");
-  assert.ok(plan.length > 0, "the full edition has additions to make");
-  const lite = JSON.parse(fs.readFileSync(path.join(root, "hfs.json"), "utf8"));
-  const full = fullEditionDeclaration(lite, MANIFEST);
-  const managed = new Set([
-    "hfs.json",
-    "package-lock.json",
-    "be/nest-cli.json",
-    ...renderTargets(full, PRESETS, { manifest: MANIFEST }).map(
-      (target) => target.path,
-    ),
-  ]);
-  for (const step of plan) {
-    if (step.op === "add") {
-      assert.equal(before[step.path], undefined, `${step.path} is a new full-edition path`);
-      continue;
+  await withMaterializedExample(ROOT, "examples/lite-app", async (root) => {
+    assert.ok(fs.existsSync(path.join(root, "hfs.json")), "examples/lite-app is present");
+    const before = contents(root);
+    const plan = await upgradeEdition({ root, to: "full", plan: true, presets: PRESETS });
+    assert.deepEqual(contents(root), before, "planning the example changes no byte");
+    assert.ok(plan.length > 0, "the full edition has additions to make");
+    const lite = JSON.parse(fs.readFileSync(path.join(root, "hfs.json"), "utf8"));
+    const full = fullEditionDeclaration(lite, MANIFEST);
+    const managed = new Set([
+      "hfs.json",
+      "package-lock.json",
+      "be/nest-cli.json",
+      ...renderTargets(full, PRESETS, { manifest: MANIFEST }).map(
+        (target) => target.path,
+      ),
+    ]);
+    for (const step of plan) {
+      if (step.op === "add") {
+        assert.equal(before[step.path], undefined, `${step.path} is a new full-edition path`);
+        continue;
+      }
+      if (step.op === "keep") {
+        assert.notEqual(before[step.path], undefined, `${step.path} is an app-owned file the upgrade leaves as it is`);
+        continue;
+      }
+      if (step.op === "rewrite-readme") {
+        assert.equal(step.path, "README.md");
+        continue;
+      }
+      assert.ok(managed.has(step.path), `${step.op} touches only a managed declaration: ${step.path}`);
     }
-    if (step.op === "keep") {
-      assert.notEqual(before[step.path], undefined, `${step.path} is an app-owned file the upgrade leaves as it is`);
-      continue;
-    }
-    if (step.op === "rewrite-readme") {
-      assert.equal(step.path, "README.md");
-      continue;
-    }
-    assert.ok(managed.has(step.path), `${step.op} touches only a managed declaration: ${step.path}`);
-  }
-  const product = /^(?:supabase\/(?:migrations|types)\/|be\/src\/(?:features|modules)\/|fe\/apps\/[^/]+\/src\/)/;
-  assert.deepEqual(plan.filter(step => product.test(step.path)), [], "the plan never replaces lite product source");
+    const product = /^(?:supabase\/(?:migrations|types)\/|be\/src\/(?:features|modules)\/|fe\/apps\/[^/]+\/src\/)/;
+    assert.deepEqual(plan.filter(step => product.test(step.path)), [], "the plan never replaces lite product source");
+  });
 });
 
 test("the full-edition override judges a lite tree without writing it, and the applied structure has no slot, forbidden or monorepo finding", async (t) => {

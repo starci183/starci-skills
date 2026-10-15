@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { withMaterializedExample } from '../../scripts/hfs/example-secrets.mjs';
 import { checkStarciStacks, checkStarciStacksMain, ownerAskConflict, resolveStackService, schemaErrors, CODES } from '../../scripts/gates/starcistacks.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -33,7 +34,8 @@ function workspace(t, { services, sourceServices, ci = CI, props = null } = {}) 
   const host = path.join(dir, 'src-host'), product = path.join(dir, 'product');
   write(path.join(host, '.starcistacks', 'dev', 'infra', 'compose', 'sonarqube.yaml'), 'services: {sonarqube: {image: sonarqube}}\n');
   write(path.join(host, '.starcistacks', 'dev', 'runtime', 'files', 'sonarqube-analysis-token.txt.enc'), 'sops: {}\n');
-  write(path.join(host, '.starcistacks', DECL), yamlOf({ ...baseDoc, ...(sourceServices === undefined ? { services: { sonar: sonarEntry('product') } } : sourceServices ? { services: sourceServices } : {}) }));
+  const hostServices = sourceServices === undefined ? { sonar: sonarEntry('product') } : sourceServices;
+  write(path.join(host, '.starcistacks', DECL), yamlOf({ ...baseDoc, ...(hostServices ? { services: hostServices } : {}) }));
   write(path.join(product, '.starcistacks', DECL), yamlOf({ ...baseDoc, ...(services ? { services } : {}) }));
   fs.mkdirSync(path.join(product, 'docs'), { recursive: true });
   write(path.join(product, '.gitignore'), '.starcistacks/**\n!.starcistacks/**/\n!.starcistacks/**/*.enc\n');
@@ -118,7 +120,9 @@ test('services.sonar.qualityGate must name the one gate knowledge/sonar-gate.yam
   const refused = checkStarciStacks(own.product);
   assert.ok(codes(refused, 'refuse').includes('STACKS_QUALITY_GATE_DRIFT'));
   assert.match(refused.findings.find((finding) => finding.code === 'STACKS_QUALITY_GATE_DRIFT').message, /starci-quality/);
-  const absent = workspace(t, { services: { sonar: (({ qualityGate, ...rest }) => rest)(sonarEntry('product')), 'error-tracking': sentryEntry('product') } });
+  const absentEntry = sonarEntry('product');
+  delete absentEntry.qualityGate;
+  const absent = workspace(t, { services: { sonar: absentEntry, 'error-tracking': sentryEntry('product') } });
   assert.ok(codes(checkStarciStacks(absent.product), 'refuse').includes('STACKS_QUALITY_GATE_DRIFT'), 'a declaration with no qualityGate is refused');
 });
 
@@ -275,7 +279,9 @@ test('an example that declares a stack, host.local or a custody credential, anot
   const withOrganization = workspace(t, { services: { sonar: exampleEntry('product', { runtimeSecrets: ['SONAR_TOKEN', 'SONAR_ORGANIZATION'] }), 'error-tracking': sentryEntry('product') } });
   const organization = checkStarciStacks(withOrganization.product, { examplesRoot: withOrganization.dir }).findings.filter((finding) => finding.code === 'STACKS_EXAMPLE_FORM');
   assert.ok(organization.some((finding) => /organization is configuration \(config\.yaml sonar\.organization\)/.test(finding.message)), JSON.stringify(organization));
-  const bare = workspace(t, { services: { sonar: (({ runtimeSecrets, ...rest }) => rest)(exampleEntry('product')), 'error-tracking': sentryEntry('product') } });
+  const bareEntry = exampleEntry('product');
+  delete bareEntry.runtimeSecrets;
+  const bare = workspace(t, { services: { sonar: bareEntry, 'error-tracking': sentryEntry('product') } });
   assert.ok(codes(checkStarciStacks(bare.product, { examplesRoot: bare.dir }), 'refuse').includes('STACKS_EXAMPLE_FORM'));
 });
 
@@ -288,9 +294,10 @@ test('a product that declares runtimeSecrets is refused with STACKS_PRODUCT_FORM
   assert.ok(!codes(checkStarciStacks(own.product, { examplesRoot: path.join(own.dir, 'examples') })).some((code) => code === 'STACKS_PRODUCT_FORM' || code === 'STACKS_EXAMPLE_FORM'));
 });
 
-test('the three example apps of this repository declare the example form and satisfy the stacks check', () => {
-  for (const app of ['ecommerce-app', 'lite-app', 'shape-slot']) {
-    const result = checkStarciStacks(path.join(root, 'examples', app));
-    assert.deepEqual(codes(result, 'refuse').filter((code) => code.startsWith('STACKS_EXAMPLE') || code === 'STACKS_PRODUCT_FORM' || code === 'STACKS_SCHEMA_INVALID' || code === 'STACKS_PROJECT_DRIFT' || code === 'STACKS_SERVICE_AMBIGUOUS'), [], app);
-  }
+test('the three example apps of this repository declare the example form and satisfy the stacks check', async () => {
+  await Promise.all(['ecommerce-app', 'lite-app', 'shape-slot'].map((app) =>
+    withMaterializedExample(root, `examples/${app}`, (exampleRoot) => {
+      const result = checkStarciStacks(exampleRoot, { examplesRoot: path.dirname(exampleRoot) });
+      assert.deepEqual(codes(result, 'refuse').filter((code) => code.startsWith('STACKS_EXAMPLE') || code === 'STACKS_PRODUCT_FORM' || code === 'STACKS_SCHEMA_INVALID' || code === 'STACKS_PROJECT_DRIFT' || code === 'STACKS_SERVICE_AMBIGUOUS'), [], app);
+    })));
 });

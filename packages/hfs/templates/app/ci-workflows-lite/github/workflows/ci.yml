@@ -34,10 +34,10 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - name: lint
         if: env.SONAR_TOKEN == ''
-        run: npm run lint
+        run: {{ciLint}}
       - name: lint with Sonar import
         if: env.SONAR_TOKEN != ''
-        run: npm run lint -- --sonar reports/lint.sonar.json
+        run: {{ciLintSonar}}
       - name: format
         run: npm run format:check
       - name: typecheck
@@ -45,7 +45,7 @@ jobs:
       - name: unit
         run: npm test -- --ci
       - name: coverage proof
-        run: npx starci app check --coverage-from {{lcovReport}}
+        run: {{ciCoverageProof}}
       - name: coverage upload
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
@@ -59,7 +59,7 @@ jobs:
       - name: build fe
         run: npm run build:fe
       - name: database migration checks
-        run: npm run db:lint
+        run: {{ciDatabaseLint}}
 {{> app/ci-workflows/sonar-steps.yml}}
 
   db-types:

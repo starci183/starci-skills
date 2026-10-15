@@ -28,6 +28,8 @@ import { DEFAULT_PORT, NODE_IMAGE, dockerfilePath } from '../runtime/scripts/hfs
 import { isFile } from '../runtime/scripts/lib/fs-kind.mjs';
 import { readDeclaredSonarKey } from './sonar-key.mjs';
 import { byCodeUnit } from '../report/order.mjs';
+import { isRuntimeExampleApp } from '../runtime/scripts/lib/runtime-example.mjs';
+import { ciWorkflowCommands } from './ci-commands.mjs';
 
 export const TEMPLATES_DIR = path.join(import.meta.dirname, '..', 'templates');
 const NODE_MAJOR = 22;
@@ -175,7 +177,7 @@ export function appSource(root) {
     }
   };
   for (const dir of ['apps', 'src']) walk(dir);
-  return { files: files.sort(byCodeUnit), read: file => fs.readFileSync(path.join(root, 'be', file), 'utf8'),
+  return { runtimeExample: isRuntimeExampleApp(root), files: files.sort(byCodeUnit), read: file => fs.readFileSync(path.join(root, 'be', file), 'utf8'),
     workPresent: fs.existsSync(path.join(root, '.starciwork')), hasImage: file => isFile(path.join(root, file), { followLinks: false }) };
 }
 
@@ -304,6 +306,7 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
     sonarExclusions: [presets?.sonarExclusions, '**/.next/**', '**/node_modules/**', '**/src/messages/**', ...(lite ? ['supabase/types/**'] : [])].filter(Boolean).join(','),
     sonarSources: ['be/apps', 'be/src', 'fe/apps', ...(packages ? ['fe/packages'] : [])].join(','),
     lcovReport: LCOV_REPORT,
+    ...ciWorkflowCommands(source, LCOV_REPORT),
     // The coverage scope is the same in both editions: lite measures exactly what full measures (ruling:R212/case-1, amended by ruling:R212/case-4).
     jestCoverage: scope === 'be' ? jestCoverageSource(jestCoverage(manifest, providers)) : '',
     coverageExclusions: scope === APP_SCOPE ? sonarCoverageExclusions(manifest, providers).join(',') : '',

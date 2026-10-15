@@ -1,3 +1,4 @@
-# Lite secrets have encrypted twins only under .starcistacks/<environment>/secrets.
-# Run `starci app secret init` to configure the shared master age recipient before sealing real members.
+# The runtime template tracks no sealed members or shared recipient.
+# Scaffolding configures this app's own age recipient and generates sealed placeholders.
+# The private identity lives only in untracked .claude/secret.env as SOPS_AGE_KEY.
 creation_rules: []

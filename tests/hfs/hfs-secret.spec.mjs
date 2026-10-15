@@ -15,7 +15,8 @@ import {
 } from "../../scripts/hfs/secret.mjs";
 import { secretRoots } from "../../scripts/hfs/secret-files.mjs";
 import { parseYaml } from "../../engine/yaml.mjs";
-import { configuredRecipients } from "../../scripts/hfs/secret-init.mjs";
+import { ageIdentityEnv, configuredRecipients } from "../../scripts/hfs/secret-init.mjs";
+import { isSopsEnvelope, selectedAgeEnvelope } from "../../scripts/lib/sops-envelope.mjs";
 import { selectedAgeRecipient } from "../../scripts/api/sops/selected-age-recipient.mjs";
 
 const RECIPIENT = `age1${"q".repeat(58)}`;
@@ -209,44 +210,90 @@ test("platform root defaults use roaming config, Linux config/data, and macOS ap
   );
 });
 
-test("init creates an external key and canonical path rule, then reuses both without disclosing the identity", (t) => {
+test("init creates an ignored app-owned key and canonical path rule, then reuses both without disclosing the identity", (t) => {
   const { root, env } = app(t);
   fs.writeFileSync(
     path.join(root, ".sops.yaml"),
     "# Run starci app secret init\ncreation_rules: []\n",
   );
-  const tools = fakeTools();
-  const result = run(["init"], { cwd: root, env, tools, platform: "win32" });
-  assert.equal(result.code, 0);
-  const keyFile = path.join(env.APPDATA, "sops", "age", "keys.txt");
+  const unavailable = {
+    resolveSops: () => assert.fail("fresh init needs no native SOPS tool"),
+    resolveRealTool: () => assert.fail("fresh init needs no native age tool"),
+  };
+  const result = run(["init"], { cwd: root, env, tools: unavailable, platform: "win32" });
+  assert.equal(result.code, 0, result.err);
+  const keyFile = path.join(root, ".claude", "secret.env");
+  const identity = ageIdentityEnv(root, {}).SOPS_AGE_KEY;
+  assert.ok(/^AGE-SECRET-KEY-1[A-Z0-9]+$/u.test(identity), "init installs an app-owned age identity");
   assert.ok(
-    fs.readFileSync(keyFile, "utf8").includes(PRIVATE_KEY),
-    "identity is installed at the selected external path",
+    fs.readFileSync(path.join(root, ".claude", ".gitignore"), "utf8").split(/\r?\n/u).includes("secret.env"),
+    "the private identity is ignored by git",
   );
+  assert.ok(!fs.existsSync(secretRoots(env, "win32").identity), "fresh init creates no machine-level identity");
   const config = fs.readFileSync(path.join(root, ".sops.yaml"), "utf8");
-  assert.ok(config.includes(RECIPIENT), "config contains the public recipient");
+  const [recipient] = configuredRecipients(root, path.join(root, ".starcistacks", "dev", "secrets", "app.enc"));
+  assert.match(recipient, /^age1[a-z0-9]{58}$/u);
   assert.ok(
     config.includes(
       String.raw`\.starcistacks[/\\][^/\\]+[/\\]secrets[/\\][^/\\]+\.enc$`,
     ),
     "config uses the canonical custody path regex",
   );
-  assert.ok(
-    !config.includes(PRIVATE_KEY),
-    "config contains no private identity",
-  );
-  privateAbsent(result, [PRIVATE_KEY]);
-  const repeated = run(["init"], { cwd: root, env, tools, platform: "win32" });
-  assert.equal(repeated.code, 0);
-  assert.equal(tools.calls.filter((call) => call.args[0] === "-o").length, 1);
-  assert.ok(
-    fs.readFileSync(keyFile, "utf8").includes(PRIVATE_KEY),
-    "rerunning init preserves the identity",
-  );
-  assert.equal(fs.readFileSync(path.join(root, ".sops.yaml"), "utf8"), config);
-  privateAbsent(repeated, [PRIVATE_KEY]);
+  assert.ok(!config.includes(identity), "config contains no private identity");
+  privateAbsent(result, [identity]);
+  const before = fs.readFileSync(keyFile, "utf8");
+  const calls = [];
+  const repeated = run(["init"], {
+    cwd: root, env, platform: "win32", tools: selectedInitTools(calls, { identity, recipient }),
+  });
+  assert.equal(repeated.code, 0, repeated.err);
+  assert.ok(calls.every((call) => call.args[0] !== "-o"), "repeated init generates no new identity");
+  assert.ok(fs.readFileSync(keyFile, "utf8") === before, "rerunning init preserves the app identity");
+  assert.deepEqual(parseYaml(fs.readFileSync(path.join(root, ".sops.yaml"), "utf8")), parseYaml(config));
+  selectedCapturesWiped(calls);
+  privateAbsent(repeated, [identity]);
 });
 
+test("new apps get distinct recipients and sealed members despite sharing host identity selections", (t) => {
+  const first = app(t);
+  const second = app(t);
+  const sharedIdentityFile = secretRoots(first.env, process.platform).identity;
+  fs.mkdirSync(path.dirname(sharedIdentityFile), { recursive: true });
+  fs.writeFileSync(sharedIdentityFile, `${PRIVATE_KEY}\n`, { mode: 0o600 });
+  const results = [];
+  const recipients = [];
+  const identities = [];
+  for (const fixture of [first, second]) {
+    fs.writeFileSync(path.join(fixture.root, ".starcistacks", "dev", "environment.json"), JSON.stringify({
+      secrets: [{ where: "secrets/token", keys: ["TOKEN"] }],
+    }));
+    const env = { ...first.env, SOPS_AGE_KEY: PRIVATE_KEY, SOPS_AGE_KEY_FILE: sharedIdentityFile };
+    const result = run(["init"], {
+      cwd: fixture.root,
+      env,
+      tools: {
+        resolveSops: () => assert.fail("app bootstrap must not reuse host tools or keys"),
+        resolveRealTool: () => assert.fail("app bootstrap must not reuse host tools or keys"),
+      },
+    });
+    assert.equal(result.code, 0, result.err);
+    const file = path.join(fixture.dir, "token.enc");
+    const [recipient] = configuredRecipients(fixture.root, file);
+    const sealed = fs.readFileSync(file, "utf8");
+    assert.ok(isSopsEnvelope(sealed), "the generated member contains only encrypted values");
+    assert.deepEqual(envelopeOf(sealed), { format: "dotenv", keys: ["TOKEN"], recipients: [recipient] });
+    assert.deepEqual(selectedAgeEnvelope(sealed, "dotenv", recipient), { ok: true });
+    assert.notEqual(recipient, RECIPIENT, "host public recipient is not selected for a new app");
+    results.push(result);
+    recipients.push(recipient);
+    identities.push(ageIdentityEnv(fixture.root, {}).SOPS_AGE_KEY);
+  }
+  assert.notEqual(recipients[0], recipients[1], "each new app has its own public recipient");
+  assert.ok(identities[0] !== identities[1], "each new app has its own private identity");
+  assert.ok(identities.every((identity) => identity !== PRIVATE_KEY), "host private identity is not copied");
+  assert.ok(fs.readFileSync(sharedIdentityFile, "utf8") === `${PRIVATE_KEY}\n`, "shared host identity remains unchanged");
+  for (const result of results) privateAbsent(result, [PRIVATE_KEY, ...identities]);
+});
 test("init and set share the secret.env inline identity ahead of legacy keys.txt", (t) => {
   for (const legacyExists of [false, true]) {
     const { root, env, dir } = app(t);
@@ -284,8 +331,24 @@ test("init and set share the secret.env inline identity ahead of legacy keys.txt
   }
 });
 
-test("init honours an explicit inline selection above secret.env and preserves an existing recipient", (t) => {
+test("an app-owned inline identity stays selected over ambient host identity during first init", (t) => {
   const { root, env } = app(t);
+  const hostIdentity = `AGE-SECRET-KEY-1${"P".repeat(58)}`;
+  fs.mkdirSync(path.join(root, ".claude"));
+  fs.writeFileSync(path.join(root, ".claude", "secret.env"), `SOPS_AGE_KEY=${PRIVATE_KEY}\n`, { mode: 0o600 });
+  const calls = [];
+  const initialized = run(["init"], {
+    cwd: root, env: { ...env, SOPS_AGE_KEY: hostIdentity }, tools: selectedInitTools(calls),
+  });
+  assert.equal(initialized.code, 0, initialized.err);
+  assert.deepEqual(configuredRecipients(root, path.join(root, ".starcistacks", "dev", "secrets", "app.enc")), [RECIPIENT]);
+  assert.ok(ageIdentityEnv(root, {}).SOPS_AGE_KEY === PRIVATE_KEY, "the existing app-owned identity stays unchanged");
+  selectedCapturesWiped(calls);
+  privateAbsent(initialized, [PRIVATE_KEY, hostIdentity]);
+});
+test("init honours an explicit inline selection for an existing app and preserves its configured recipient", (t) => {
+  const { root, env } = app(t);
+  fs.writeFileSync(path.join(root, ".sops.yaml"), CONFIG.replace(RECIPIENT, OTHER_RECIPIENT));
   const explicit = `AGE-SECRET-KEY-1${"P".repeat(58)}`;
   env.SOPS_AGE_KEY = explicit;
   const claude = path.join(root, ".claude");
@@ -402,15 +465,10 @@ test("init preserves existing recipients and keys, selects platform roots, and r
       platform,
     });
     assert.equal(initialized.code, 0);
-    const base =
-      platform === "darwin"
-        ? path.join(fixture.env.HOME, "Library", "Application Support")
-        : fixture.env.XDG_CONFIG_HOME;
-    assert.ok(
-      fs.existsSync(path.join(base, "sops", "age", "keys.txt")),
-      "identity uses the platform config directory",
-    );
-    privateAbsent(initialized, [PRIVATE_KEY]);
+    const identity = ageIdentityEnv(fixture.root, {}).SOPS_AGE_KEY;
+    assert.ok(typeof identity === "string" && identity.startsWith("AGE-SECRET-KEY-"), "fresh identity stays in the app on every platform");
+    assert.ok(!fs.existsSync(secretRoots(fixture.env, platform).identity), "fresh init leaves platform key storage unused");
+    privateAbsent(initialized, [identity]);
   }
   const noSops = run(["init"], {
     cwd: root,

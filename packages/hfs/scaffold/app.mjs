@@ -23,6 +23,8 @@ import { SUPABASE_PORT_VARIABLES, supabasePortVars } from './supabase-ports.mjs'
 import { FE_APP_SCRIPTS, PACKAGE_MANAGER, WORKSPACES, WORKSPACE_LINT, feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
 import { isLinkLike } from '../runtime/scripts/api/fs/is-link-like.mjs';
 import { unlinkOnly } from '../runtime/scripts/api/fs/lib.mjs';
+import { initializeAppIdentity } from '../runtime/scripts/hfs/secret-init.mjs';
+import { declaredSealedMembers, materializeDeclaredPlaceholders } from '../runtime/scripts/hfs/sealed-members.mjs';
 import { revParseQuery } from '../runtime/scripts/api/git/rev-parse-query.mjs';
 import { lsFiles } from '../runtime/scripts/api/git/ls-files.mjs';
 import { insidePath, samePath } from '../runtime/scripts/lib/path-key.mjs';
@@ -624,6 +626,15 @@ function emitScaffoldDatabaseTypes(root, name, writes, emitTypes) {
  * `{ root, files }` (app-relative paths, sorted). `presets` is what sync loads from the installed @starci/jest-preset (the Sonar
  * exclusions); the CLI passes the one it resolves. Failure removes only scaffold-owned entries, retaining an existing .git.
  */
+/** Seal declared starter members to a fresh app recipient through the scaffold rollback owner. */
+function initializeScaffoldSecrets(root, writes) {
+  if (!declaredSealedMembers(root).length) return [];
+  const write = (file, content) => writes.write(path.relative(root, file), content);
+  const initialized = initializeAppIdentity(root, { write });
+  const materialized = materializeDeclaredPlaceholders(root, { recipient: initialized.recipient, write });
+  return [...initialized.files, ...materialized.members];
+}
+
 export function scaffoldApp({ name, into, presets, edition = 'full', authCallback = false, manifest = loadSlotManifest(), pins = bundledPins(), lock = npmLock, emitTypes = generateDbTypes, now = () => new Date() }) {
   if (!NAME.test(String(name))) throw new ScaffoldError('HFS_SCAFFOLD_NAME_INVALID', `the app name ${name} must be kebab-case (a project name: ${NAME})`);
   const root = path.resolve(into, name);
@@ -660,10 +671,11 @@ export function scaffoldApp({ name, into, presets, edition = 'full', authCallbac
     for (const target of targets) writes.claim(target.path);
     writeTargets(root, targets);
     if (app.edition === 'lite') emitScaffoldDatabaseTypes(root, name, writes, emitTypes);
+    const secretFiles = initializeScaffoldSecrets(root, writes);
     let locked;
     try { locked = lock(root); } finally { writes.lockfile(); }
     if (!locked.ok) throw new ScaffoldError('HFS_SCAFFOLD_LOCK_FAILED', `\`${LOCK_STEP}\` could not resolve the lockfile of ${root} (${locked.detail}). Check the network and the npm registry, then run starci app scaffold ${name} again`);
-    return { root, files: [...new Set([...files.map(file => file.path), ...targets.map(target => target.path), ...(app.edition === 'lite' ? [dbTypesPath] : []), 'package-lock.json'])].sort(byCodeUnit) };
+    return { root, files: [...new Set([...files.map(file => file.path), ...targets.map(target => target.path), ...secretFiles, ...(app.edition === 'lite' ? [dbTypesPath] : []), 'package-lock.json'])].sort(byCodeUnit) };
   } catch (error) {
     const held = writes.rollback();
     if (held.length) error.message += `; cleanup retained replaced or occupied entries: ${held.join(', ')}`;

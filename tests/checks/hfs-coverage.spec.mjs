@@ -829,6 +829,32 @@ function sampleWitnessJudge({ repoRoot }) {
 }
 
 for (const edition of EDITIONS) {
+  test(`the ${edition} witness materializes sealed members in its isolated copy before baseline judgement`, async (t) => {
+    const mutation = { op: 'edit', path: 'record.yaml', content: 'sample: invalid\n' };
+    const { context, scratch } = witnessFixture(t, edition, mutation);
+    let materialized;
+    let judged = 0;
+    // The injected fixture source models generated custody without native age/SOPS tooling.
+    const materialize = (repoRoot) => {
+      assert.notEqual(repoRoot, path.join(context.root, examplePath(edition)));
+      materialized = path.join(repoRoot, '.starcistacks/dev/secrets/app.enc');
+      fs.mkdirSync(path.dirname(materialized), { recursive: true });
+      fs.writeFileSync(materialized, 'injected sealed-member fixture\n');
+    };
+    const judge = (input) => {
+      assert.equal(fs.existsSync(materialized), true, 'sealed members exist for both judgements');
+      judged += 1;
+      return sampleWitnessJudge(input);
+    };
+    assert.deepEqual(await runCoverageWitnesses(context, { tempRoot: scratch, materialize, judge }), []);
+    assert.equal(judged, 2);
+    assert.equal(fs.existsSync(materialized), false, 'temporary custody is removed');
+    assert.deepEqual(fs.readdirSync(scratch), []);
+    assert.equal(fs.existsSync(path.join(context.root, examplePath(edition), '.starcistacks')), false);
+  });
+}
+
+for (const edition of EDITIONS) {
   test(`the ${edition} witness runner accepts dedicated fixture evidence without allocating a mutation`, async (t) => {
     const {fixtureRoot, scratch, write} = tempFixture(t);
     const fixture = `tests/fixtures/coverage/${edition}/record.yaml`;

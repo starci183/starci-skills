@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { coverageGateFindings } from '../../scripts/checks/lib/coverage-gates.mjs';
 import { workflowRunCommands } from '../../scripts/checks/lib/coverage-workflows.mjs';
 import { loadRuleCatalog } from '../../scripts/hfs/rule-catalog.mjs';
+import { ciWorkflowCommands } from '../../packages/hfs/sync/ci-commands.mjs';
 
 // proves: RT_COVERAGE_GATE_LIE@lite RT_COVERAGE_GATE_LIE@full
 const EDITIONS = ['lite', 'full'];
@@ -161,4 +162,36 @@ test('the catalog loader accepts hfs and machine claims for lint-driven land and
     }) });
     assert.deepEqual(catalog.rule('R01').gates, ['land', 'settle', 'ci']);
   }
+});
+
+for (const edition of EDITIONS) {
+  test(`managed command bindings prove only their real app gates in ${edition}`, () => {
+    const content = contextFor('hfs', ['ci']);
+    for (const binding of ['ciLint', 'ciLintSonar', 'ciCoverageProof']) {
+      content.files.set(CI(edition), workflow('{{' + binding + '}}'));
+      assert.deepEqual(findings(content, edition), []);
+    }
+    const stacks = contextFor('hfs', ['ci'], STACKS);
+    for (const binding of ['ciLint', 'ciLintSonar', 'ciDatabaseLint', 'unknownCiCommand']) {
+      stacks.files.set(CI(edition), workflow('{{' + binding + '}}'));
+      assert.equal(findings(stacks, edition)[0].code, 'RT_COVERAGE_GATE_LIE');
+    }
+    stacks.files.set(CI(edition), workflow('{{ciCoverageProof}}'));
+    assert.deepEqual(findings(stacks, edition), []);
+    stacks.files.set(CI(edition), workflow('{{ciCoverageProof}}', 'false'));
+    assert.equal(findings(stacks, edition)[0].code, 'RT_COVERAGE_GATE_LIE');
+  });
+}
+
+test('workflow command binding resolution uses the renderer values and preserves explicit variants', () => {
+  for (const runtimeExample of [false, true]) {
+    const bindings = ciWorkflowCommands({ runtimeExample });
+    for (const [binding, command] of Object.entries(bindings)) {
+      assert.deepEqual(workflowRunCommands(workflow('{{' + binding + '}}'), bindings), [command, 'npm run typecheck']);
+    }
+  }
+  assert.deepEqual(workflowRunCommands(workflow('{{ciLint}}'), { ciLint: 'npm run typecheck' }),
+    ['npm run typecheck', 'npm run typecheck']);
+  assert.deepEqual(workflowRunCommands(workflow('{{unknownCiCommand}}')), ['template', 'npm run typecheck']);
+  assert.deepEqual(workflowRunCommands(workflow('{{ciLint}}', '${{ false }}')), ['npm run typecheck']);
 });

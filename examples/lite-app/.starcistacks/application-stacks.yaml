@@ -7,7 +7,8 @@
 #            its SQLite database on the named volume n8n-data. Runbook: production/README.md.
 #
 # Owner-run DNS, TLS, releases and recovery are declared below; the public records state pending evidence.
-# Sealed members are structural examples without usable ciphertext. Replace them with owner-sealed members.
+# Only member names are tracked. Runtime checks seal ephemeral values in a disposable example copy;
+# a product initializes its own recipient and seals real members before deployment.
 schema: starci/application-stacks@1
 sources:
   - repository: lite-app

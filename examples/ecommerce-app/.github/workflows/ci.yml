@@ -33,13 +33,15 @@ jobs:
       - name: production dependency audit
         run: npm audit --omit=dev --audit-level=high
       - name: lint
-        run: npm run lint -- --sonar reports/lint.sonar.json
+        run: node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npm run lint -- --sonar reports/lint.sonar.json
       - name: format
         run: npm run format:check
       - name: typecheck
         run: npm run typecheck
       - name: unit
         run: npm test -- --ci
+      - name: coverage proof
+        run: node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npx starci app check --coverage-from be/coverage/lcov.info
       - name: coverage upload
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}

@@ -19,6 +19,7 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { starciBin } from '../lib/package-at.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { withMaterializedExample } from '../hfs/example-secrets.mjs';
 
 const USAGE = 'usage: starci runtime check --only example-architecture -- [--examples <dir>] [--only <name>]';
 
@@ -38,7 +39,8 @@ const LINT_SHAPE = (report) => report.schema === 'starci/lint@1' && typeof repor
 
 /** The app-relative path of a finding safe to print, or null (absolute, overlong, control-char or private-segment path). */
 const publicPathOf = (file) => file && file.length <= 512 && !path.posix.isAbsolute(file) && !path.win32.isAbsolute(file)
-  && !/[\u0000-\u001f\u007f<>:"|?*]/.test(file)
+  && !/[<>:"|?*]/.test(file)
+  && !Array.from(file).some((character) => character.codePointAt(0) < 32 || character.codePointAt(0) === 127)
   && (file === '.' || file.split('/').every((part) => part && part !== '.' && part !== '..'
     && !/^(?:\.git|\.starciwork|node_modules|\.env(?:\..*)?|credentials(?:\..*)?)$/i.test(part)));
 
@@ -75,8 +77,7 @@ const lintFindings = (report) => {
  * {name, status, errors, byCode, findings} of one example: status is `clean`, `findings` or `unrunnable` (the CLI refused, printed no
  * report, or a tool of the lint could not run - a lint that did not run is never clean).
  */
-function checkExample(examplesDir, name, { bin, runner = runNode } = {}) {
-  const root = path.join(examplesDir, name);
+function checkExample(root, name, { bin, runner = runNode } = {}) {
   const run = runner([bin ?? starciBin(root), 'app', 'lint', '--format', 'json'], { cwd: root, maxBuffer: 256 * 1024 * 1024 });
   const refused = (detail) => ({ name, status: 'unrunnable', errors: 1, byCode: {}, detail });
   let report;
@@ -95,8 +96,20 @@ function checkExample(examplesDir, name, { bin, runner = runNode } = {}) {
   return { name, status: report.counts.error === 0 ? 'clean' : 'findings', errors: report.counts.error, byCode, findings };
 }
 
-export function checkExamples({ examplesDir, only, bin, runner } = {}) {
-  return exampleDirs(examplesDir, only).map((name) => checkExample(examplesDir, name, { bin, runner }));
+async function checkMaterializedExample(examplesDir, name, { bin, runner, withExample }) {
+  const installedBin = bin ?? starciBin(path.join(examplesDir, name));
+  try {
+    return await withExample(examplesDir, name,
+      (root) => checkExample(root, name, { bin: installedBin, runner }), { linkDependencies: true });
+  } catch {
+    return { name, status: 'unrunnable', errors: 1, byCode: {}, detail: 'could not materialize sealed example members' };
+  }
+}
+
+/** Lint disposable apps with freshly sealed members and their installed dependency links. */
+export function checkExamples({ examplesDir, only, bin, runner, withExample = withMaterializedExample } = {}) {
+  return Promise.all(exampleDirs(examplesDir, only).map((name) =>
+    checkMaterializedExample(examplesDir, name, { bin, runner, withExample })));
 }
 
 const statusText = (r) => {
@@ -133,7 +146,7 @@ export function formatResults(results) {
 }
 
 /** The check: `bin` is the starci CLI the examples are linted with (by default each example's own, else the runtime's). */
-export function main(argv, { out = (s) => process.stdout.write(s), err = (s) => process.stderr.write(s), bin, runner } = {}) {
+export async function main(argv, { out = (s) => process.stdout.write(s), err = (s) => process.stderr.write(s), bin, runner, withExample } = {}) {
   let examplesDir = path.join(skillRoot, 'examples');
   let only;
   for (let i = 0; i < argv.length; i += 1) {
@@ -141,9 +154,9 @@ export function main(argv, { out = (s) => process.stdout.write(s), err = (s) => 
     else if (argv[i] === '--only' && argv[i + 1]) { only = argv[i + 1]; i += 1; }
     else { err(`unexpected argument ${argv[i]}; ${USAGE}\n`); return 2; }
   }
-  const results = checkExamples({ examplesDir, only, bin, runner });
+  const results = await checkExamples({ examplesDir, only, bin, runner, withExample });
   out(formatResults(results));
   return results.length && results.every((r) => r.status === 'clean') ? 0 : 1;
 }
 
-if (isMain(import.meta.url)) process.exitCode = main(process.argv.slice(2));
+if (isMain(import.meta.url)) process.exitCode = await main(process.argv.slice(2));

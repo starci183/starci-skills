@@ -34,3 +34,6 @@ next-env.d.ts
 .starcistacks/*/infra/terraform/files/
 .starcistacks/*/infra/terraform/*.tar.gz
 !.starcistacks/**/*.enc
+
+# Host-local agent credentials and app age identity never enter Git.
+.claude/

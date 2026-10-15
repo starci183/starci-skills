@@ -3,7 +3,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 import { RT_SECRET_TRACKED, secretTrackedFindings } from '../../scripts/hfs/runtime-rules/secret-tracked.mjs';
 import { runtimeCheck } from '../../scripts/hfs/runtime-check.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -23,6 +26,36 @@ test('RT_SECRET_TRACKED: a path ruleParams.runtime.heldSecrets names is allowed,
   const held = [{ path: 'ext/sonar/secrets/db.txt.enc', reason: 'the stack' }];
   assert.deepEqual(secretTrackedFindings(ctx(['ext/sonar/secrets/db.txt.enc'], held)), []);
   assert.deepEqual(secretTrackedFindings(ctx(['ext/sonar/secrets/other.txt.enc'], held)).map((f) => f.path), ['ext/sonar/secrets/other.txt.enc']);
+});
+
+test('RT_SECRET_TRACKED: git-tracked ciphertext and placeholder members fail in examples, templates and arbitrary directories', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-tracked-secret-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const sealed = [
+    'examples/lite-app/.starcistacks/production/secrets/app.enc',
+    'examples/full-app/.starcistacks/dev/secrets/app.enc',
+    'packages/hfs/templates/app/skeleton-lite/.starcistacks/dev/secrets/app.enc',
+    'arbitrary/nested/placeholder.enc',
+  ];
+  const names = ['members.json', 'secret.env.example'];
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+  for (const file of [...sealed, ...names]) {
+    const target = path.join(root, file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, 'synthetic non-secret fixture\n');
+  }
+  const git = (args) => {
+    const result = spawnSync('git', args, { cwd: root, env, encoding: 'utf8', windowsHide: true });
+    assert.equal(result.status, 0, 'fixture git command succeeds');
+    return result.stdout;
+  };
+  git(['init', '--quiet']);
+  git(['add', '--', ...sealed, ...names]);
+  const files = git(['ls-files', '-z']).split('\0').filter(Boolean);
+  const found = secretTrackedFindings(ctx(files));
+  assert.deepEqual(found.map((finding) => finding.path).sort(byCodeUnit), [...sealed].sort(byCodeUnit));
+  assert.ok(found.every((finding) => finding.code === RT_SECRET_TRACKED && finding.level === 'error'));
+  assert.deepEqual(secretTrackedFindings(ctx(names)), []);
 });
 
 const heldSecretsOf = (node) => {

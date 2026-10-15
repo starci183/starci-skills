@@ -1,6 +1,6 @@
 # Production environment key roster
 
-This inventory declares names, consumers and mounted file paths. The two tracked .enc members are nondeployable structural SOPS examples with invalid ciphertext stand-ins. Replace their entire envelopes with real sealed members after owner provisioning and before materializing anything. Scaffolding supplies no credential or successful deployment.
+This inventory declares names, consumers and mounted file paths. Scaffolding generates the two declared encrypted members with placeholder values encrypted to this app's own age recipient. Replace their values through `starci app secret set production` after owner provisioning and before creating external secrets. The runtime template tracks no ciphertext; its specs generate members with ephemeral identities in disposable copies. Scaffolding supplies no deployment credential or successful deployment.
 
 | Key | Consumer |
 | --- | --- |
@@ -18,4 +18,4 @@ This inventory declares names, consumers and mounted file paths. The two tracked
 | `SUPABASE_DB_PASSWORD` | Production database deployment |
 | `SUPABASE_PROJECT_ID` | Production database deployment |
 
-Public front-end configuration is supplied at build time and stays outside sealed custody. Replace `.starcistacks/production/secrets/primary-db-url.enc` and `.starcistacks/production/secrets/supabase-service-role-key.enc` with real sealed members at the declared paths. Versioned external application secrets are `{{project}}-production-primary-db-url-v1` and `{{project}}-production-supabase-service-role-key-v1`. Seal deployment-only credentials separately under `.starcistacks/production/secrets/*.enc`; they never enter an API container.
+Public front-end configuration is supplied at build time and stays outside sealed custody. Set real values in `.starcistacks/production/secrets/primary-db-url.enc` and `.starcistacks/production/secrets/supabase-service-role-key.enc` at the declared paths. Versioned external application secrets are `{{project}}-production-primary-db-url-v1` and `{{project}}-production-supabase-service-role-key-v1`. Seal deployment-only credentials separately under `.starcistacks/production/secrets/*.enc`; they never enter an API container.

@@ -53,69 +53,55 @@ export const fileOf = (directory, slug) => {
   return path.join(directory, `${slug}.enc`);
 };
 
-/** Seal `key = value` into the secret `slug`: an existing document keeps its other keys and its recipients. */
-export function writeSecret({ file, values, age, sops }) {
-  for (const key of Object.keys(values)) validateKey(key);
-  const held = claimFile(path.resolve(file));
-  if (!held.ok)
-    throw new SecretError(
-      "the sealed secret is being updated; retry after that write settles",
-    );
-  try {
-    const format = "dotenv";
-    let map = Object.create(null);
-    let recipients = age;
-    if (fs.existsSync(file)) {
-      const text = fs.readFileSync(file, "utf8");
-      const envelope = envelopeOf(text);
-      map = sops.decrypt(file, envelope.format);
-      if (!age.length) recipients = envelope.recipients;
-    }
-    validateMap(map);
-    map = { ...map, ...values };
-    const sealed = sops.seal({
-      inputType: format,
-      plaintext: plaintextOf(format, map),
-      recipients,
-      filenameOverride: file,
-    });
-    let parsed;
-    try {
-      parsed = envelopeOf(sealed);
-    } catch {
-      throw new SecretError("sops returned an invalid sealed document");
-    }
-    if (
-      !isSopsEnvelope(sealed) ||
-      parsed.keys.length !== Object.keys(map).length ||
-      !parsed.keys.every((key) => Object.hasOwn(map, key))
-    )
-      throw new SecretError("sops returned an invalid sealed document");
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    const temporary = path.join(
-      path.dirname(file),
-      `.${path.basename(file)}-${randomUUID()}.tmp`,
-    );
-    try {
-      fs.writeFileSync(temporary, sealed, {
-        flag: "wx",
-        mode: 0o600,
-        flush: true,
-      });
-      fs.renameSync(temporary, file);
-    } finally {
-      if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
-    }
-  } finally {
-    held.release();
+/** Build and validate a replacement envelope without publishing it. */
+function sealSecretMap({ file, values, age, sops }) {
+  let map = Object.create(null);
+  let recipients = age;
+  if (fs.existsSync(file)) {
+    const envelope = envelopeOf(fs.readFileSync(file, "utf8"));
+    map = sops.decrypt(file, envelope.format);
+    if (!age.length) recipients = envelope.recipients;
   }
+  validateMap(map);
+  map = { ...map, ...values };
+  const sealed = sops.seal({ inputType: "dotenv", plaintext: plaintextOf("dotenv", map), recipients, filenameOverride: file });
+  let parsed;
+  try { parsed = envelopeOf(sealed); }
+  catch { throw new SecretError("sops returned an invalid sealed document"); }
+  if (!isSopsEnvelope(sealed) || parsed.keys.length !== Object.keys(map).length || !parsed.keys.every((key) => Object.hasOwn(map, key)))
+    throw new SecretError("sops returned an invalid sealed document");
+  return sealed;
+}
+
+/** Publish through an explicit file owner, or the canonical atomic replace. */
+function publishSealed(file, sealed, write) {
+  if (write) { write(file, sealed); return; }
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const temporary = path.join(path.dirname(file), "." + path.basename(file) + "-" + randomUUID() + ".tmp");
+  try {
+    fs.writeFileSync(temporary, sealed, { flag: "wx", mode: 0o600, flush: true });
+    fs.renameSync(temporary, file);
+  } finally {
+    if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
+  }
+}
+
+/** Seal named values; a supplied writer owns its own claim and rollback (the fresh-app scaffold). */
+export function writeSecret({ file, values, age, sops, write }) {
+  for (const key of Object.keys(values)) validateKey(key);
+  const held = write ? { ok: true, release() {} } : claimFile(path.resolve(file));
+  if (!held.ok)
+    throw new SecretError("the sealed secret is being updated; retry after that write settles");
+  try {
+    publishSealed(file, sealSecretMap({ file, values, age, sops }), write);
+  } finally { held.release(); }
 }
 
 /** Update named keys through the same canonical sealed-secret owner used by the CLI. */
 export function setSecretValues(
   repoRoot,
   { slug, values, env = null },
-  { sops = null, age = [], processEnv = process.env } = {},
+  { sops = null, age = [], processEnv = process.env, write } = {},
 ) {
   const directory = secretsDirectory(repoRoot, env);
   const file = fileOf(directory, slug);
@@ -134,6 +120,7 @@ export function setSecretValues(
     values,
     age,
     sops: sops ?? defaultSops(processEnv, repoRoot),
+    write,
   });
   return { file, via: "sealed-secret" };
 }

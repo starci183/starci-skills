@@ -22,6 +22,7 @@ import { discoverExampleApps } from '../lib/example-refs.mjs';
 import { mapInOrder } from '../lib/in-order.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { managedFindings } from '../../packages/hfs/sync/managed.mjs';
+import { withMaterializedExample } from '../hfs/example-secrets.mjs';
 
 const USAGE = 'usage: starci runtime check --only example-render [-- --root <runtime tree>]';
 
@@ -29,11 +30,16 @@ const USAGE = 'usage: starci runtime check --only example-render [-- --root <run
 const presetsOf = (root) => ({ sonarExclusions: createRequire(path.join(root, 'package.json'))('./packages/jest-preset/index.cjs').sonarExclusions() });
 
 /** The findings of the app at `repoRoot` judged by the runtime tree `root`: [{example, code, path, message}] (example is `name`), error-level only. */
-export async function exampleRenderFindings(root, name, repoRoot = path.join(root, 'examples', name)) {
+async function materializedRenderFindings(root, name, repoRoot) {
   const tracked = trackedFiles(repoRoot);
   const extraFindings = await managedFindings({ repoRoot, tracked, presets: presetsOf(root), parseYaml });
   const result = checkRepo({ repoRoot, root, extraFindings, surface: 'check', phase: 'source' });
   return result.findings.filter((finding) => finding.level === 'error').map((finding) => ({ example: name, code: finding.code, path: finding.path ?? '', message: finding.message }));
+}
+
+/** Source examples contain names only; judge a temporary app whose declared members are freshly sealed. */
+export async function exampleRenderFindings(root, name, repoRoot = path.join(root, 'examples', name)) {
+  return withMaterializedExample(root, repoRoot, (app) => materializedRenderFindings(root, name, app));
 }
 
 /** Every example's findings: [{example, code, path, message}], by example then as reported. */

@@ -9,6 +9,7 @@ import { generatedRootsOf } from '../../lib/check-scan.mjs';
 import { eachInOrder } from '../../lib/in-order.mjs';
 import { judgedInEdition } from '../../hfs/edition-slots.mjs';
 import { checkRepository } from '../../hfs/check.mjs';
+import { materializeExample } from '../../hfs/example-secrets.mjs';
 import { codesInEdition, coverageSafePath, coverageSources } from './coverage-inventory.mjs';
 import { coverageRuleFindingLevel } from './coverage-ratchet.mjs';
 import { fixtureEvidence } from './coverage-rules.mjs';
@@ -17,7 +18,9 @@ const CODE = 'RT_COVERAGE_NO_WITNESS';
 const PREFIX = 'hfs-coverage-witness-';
 const FINDING_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/;
 const GENERATED = /(?:^|\/)(?:runtime|dist|coverage|\.runtimes|artifacts|generated)(?:\/|$)/;
-const UNSAFE_COMPONENT = /[\u0000-\u001f<>:"|?*]|[. ]$|^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
+const UNSAFE_COMPONENT = /[<>:"|?*]|[. ]$|^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
+const hasControl = (value) => [...value].some((character) => character.codePointAt(0) < 32);
+const unsafeComponent = (part) => !part || part === '.' || part === '..' || hasControl(part) || UNSAFE_COMPONENT.test(part);
 class WitnessRefusal extends Error {}
 const refuse = (message) => { throw new WitnessRefusal(message); };
 const finding = (rule, edition, index, message) => ({ code: CODE, level: coverageRuleFindingLevel(rule, CODE), rule: rule.id, edition,
@@ -27,7 +30,7 @@ function relativePath(value, label) {
   if (typeof value !== 'string' || !value.trim() || value.includes('\0') || path.isAbsolute(value)
     || path.win32.isAbsolute(value) || value.includes(':')) refuse(`${label} must be a repository-relative path`);
   const rel = value.replaceAll('\\', '/');
-  if (rel.split('/').some((part) => !part || part === '.' || part === '..' || UNSAFE_COMPONENT.test(part))) refuse(`${label} has an unsafe path component`);
+  if (rel.split('/').some(unsafeComponent)) refuse(`${label} has an unsafe path component`);
   return rel;
 }
 
@@ -138,18 +141,20 @@ function witnessSource(context, rule, witness, generated) {
   return { source, mutations };
 }
 
-function allocateWitness(deps) {
+function allocateWitness(deps, source) {
   let parent = path.resolve(typeof deps.tempRoot === 'function' ? deps.tempRoot() : deps.tempRoot ?? tempRoot());
   fs.mkdirSync(parent, { recursive: true });
   parent = fs.realpathSync.native(parent);
   const allocated = fs.realpathSync.native(fs.mkdtempSync(path.join(parent, PREFIX)));
-  return { allocated, parent, repoRoot: path.join(allocated, 'repo') };
+  fs.writeFileSync(path.join(allocated, 'hfs.json'), JSON.stringify({ kind: 'runtime' }));
+  return { allocated, parent, repoRoot: path.join(allocated, 'examples', path.basename(source)) };
 }
 
 async function proveWitness(context, rule, witness, mutations, sandbox, deps) {
   const { repoRoot, allocated } = sandbox;
   const declaration = JSON.parse(fs.readFileSync(childPath(repoRoot, 'hfs.json'), 'utf8'));
   if ((declaration.edition ?? 'full') !== witness.edition) refuse('base example edition differs from witness edition');
+  await (deps.materialize ?? materializeExample)(repoRoot);
   const stage = deps.judge ? () => {} : gitSandbox(repoRoot, allocated);
   const judge = deps.judge ?? checkRepository;
   const input = { ...context, repoRoot, rule, edition: witness.edition, witness };
@@ -172,7 +177,7 @@ async function runWitness(context, rule, witness, index, deps, generated) {
   let sandbox;
   try {
     const { source, mutations } = witnessSource(context, rule, witness, generated);
-    sandbox = allocateWitness(deps);
+    sandbox = allocateWitness(deps, source);
     copyAuthored(source, sandbox.repoRoot, context.root, generated);
     await proveWitness(context, rule, witness, mutations, sandbox, deps);
   } catch (error) {

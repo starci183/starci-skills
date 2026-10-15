@@ -9,6 +9,7 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { APP_QUALITY_FILES, RUNTIME_SONAR, CODECOV, WORKFLOW, appCoverageScope, appQualityTargets, checkExamplesCi, coverageExampleApps, examplesCiMain, exampleApps, exampleHasTests, exampleImages, renderCodecov } from '../../scripts/checks/check-examples-ci.mjs';
 import { readProperties } from '../../scripts/lib/properties.mjs';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 import { coverageScopeOf, coverageTargetOf } from '../../scripts/gates/sonar-gate.mjs';
 import { braceVariants, globExpression } from '../../scripts/lib/glob.mjs';
 import { isMeasured } from '../../scripts/hfs/coverage-scope.mjs';
@@ -19,7 +20,7 @@ import { RUNTIME_FLAG, RUNTIME_LCOV, renderRuntimeSonar, runtimeCodecovPaths, ru
 import { coverageArgs } from '../../scripts/gates/runtime-coverage.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const codes = (root) => checkExamplesCi(root).findings.map((finding) => finding.code).sort();
+const codes = (root) => checkExamplesCi(root).findings.map((finding) => finding.code).sort(byCodeUnit);
 
 test('the repository: every example app is in the derived matrix and has a flag; the check is clean', () => {
   const apps = exampleApps(ROOT);
@@ -100,7 +101,7 @@ test('the root codecov.yml holds one component per service app of each example p
 
 test('integration and e2e run on workflow_dispatch only; the automatic steps hold coverage, the upload and Sonar', () => {
   const workflow = parseYaml(fs.readFileSync(path.join(ROOT, WORKFLOW), 'utf8'));
-  assert.deepEqual(Object.keys(workflow.on).sort(), ['push', 'workflow_dispatch'], 'CI runs once per release (CI_TRIGGERS_RELEASE_ONLY): a release tag or a person, never a branch push or a pull request');
+  assert.deepEqual(Object.keys(workflow.on).sort(byCodeUnit), ['push', 'workflow_dispatch'], 'CI runs once per release (CI_TRIGGERS_RELEASE_ONLY): a release tag or a person, never a branch push or a pull request');
   assert.deepEqual(workflow.on.push, { tags: ['v*'] });
   const steps = workflow.jobs.app.steps;
   for (const layer of ['test:integration', 'test:e2e']) {
@@ -224,7 +225,7 @@ test('lite examples build authored Next images and keep hosted front ends outsid
 test('the quality files of each example are rendered from the source slot manifest: the app codecov.yml scope equals the root flag, and a hand edit is refused', (t) => {
   const root = fixture(t, ['alpha']);
   const targets = appQualityTargets('alpha', root);
-  assert.deepEqual(targets.map((target) => target.path).sort(), [...APP_QUALITY_FILES].sort());
+  assert.deepEqual(targets.map((target) => target.path).sort(byCodeUnit), [...APP_QUALITY_FILES].sort(byCodeUnit));
   for (const target of targets) assert.equal(fs.readFileSync(path.join(root, 'examples', 'alpha', target.path), 'utf8'), target.content);
   assert.deepEqual(codes(root), []);
   const sonar = path.join(root, 'examples', 'alpha', 'sonar-project.properties');
@@ -399,4 +400,16 @@ test('the lister job refuses a missing sync-runtime step and a listing swallowed
   assert.notEqual(swallowed, original);
   fs.writeFileSync(file, swallowed);
   assert.deepEqual(codes(root), ['EXAMPLES_CI_LISTER_UNSAFE']);
+});
+
+
+test('example CI runs app lint through the disposable sealed-example helper before tests', () => {
+  const workflow = parseYaml(fs.readFileSync(path.join(ROOT, WORKFLOW), 'utf8'));
+  const steps = workflow.jobs.app.steps;
+  const materializedLint = steps.find((step) => String(step.run ?? '').includes('scripts/hfs/example-secrets.mjs'));
+  assert.ok(materializedLint, 'example app checks generate sealed members in a disposable copy');
+  assert.equal(materializedLint['working-directory'], '.');
+  assert.equal(materializedLint.run, 'node scripts/hfs/example-secrets.mjs --run "$APP_DIR" -- node "$GITHUB_WORKSPACE/packages/cli/bin/starci.mjs" app lint --cwd . --sonar reports/lint.sonar.json', 'the temporary copy is checked by this checkout?s CLI');
+  const tests = steps.findIndex((step) => step.run === 'npm test -- --ci');
+  assert.ok(steps.indexOf(materializedLint) < tests, 'the sealed copy is checked before the unit run');
 });
