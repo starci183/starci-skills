@@ -6,9 +6,9 @@ The model is a deployment declaration. It contains no owner credentials, real DN
 
 | Command | Operation |
 | --- | --- |
-| prepare | Owner provisions the Swarm, node label, database, DNS and real sealed secret members, then runs `starci app stack prepare --env production --execute` to create the missing external volumes (the one-time swarm initialization stays an owner-approved step: `--init-swarm` with `--execute`, after the owner's explicit approval). Release images are built and pushed by the managed `.github/workflows/stack-deploy.yml` workflow. |
+| prepare | Owner provisions the Swarm, node label, database, DNS and real sealed secret members, then runs `starci app stack prepare --env production --execute` to create the missing external volumes (the one-time swarm initialization stays an owner-approved step: `--init-swarm` with `--execute`, after the owner's explicit approval). Release images are built and pushed by the managed the managed stack-deploy workflow. |
 | doctor | Run `starci app stack doctor --env production` (read-only): docker, swarm, volumes, services, secrets, configs and the release pointers on the intended manager. |
-| up | After preparation and review, run the manual `.github/workflows/stack-deploy.yml` workflow (Actions, deploy stack) on a release tag; it builds the images and runs `starci app stack deploy --env production --image <service>=<repository>@sha256:<digest> --source-sha <sha> --execute`. A dry run is `starci app stack render` or `deploy` without `--execute`. |
+| up | After preparation and review, run the manual stack-deploy workflow (Actions, deploy stack) on a release tag; it builds the images and runs `starci app stack deploy --env production --image <service>=<repository>@sha256:<digest> --source-sha <sha> --execute`. A dry run is `starci app stack render` or `deploy` without `--execute`. |
 | status | Run `starci app stack doctor --env production`, or `starci app stack converge --env production --since <ISO time>` to inspect desired and running replicas plus update state. |
 | logs | Run `docker service logs {{project}}-production_core` on the manager; never include secret values in a receipt. |
 | down | After the owner's removal decision, run `docker stack rm {{project}}-production`; persistent external volumes remain in owner custody. |

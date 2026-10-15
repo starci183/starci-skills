@@ -275,7 +275,7 @@ test('deploy config: a project name that breaks the stack pattern is refused whe
 });
 
 test('deploy.ingress is normalised by the ingress normaliser and its problems surface under the deploy block', () => {
-  const ingress = { network: 'edge-shared', acmeVolume: 'edge_acme', legacy: { dir: '/home/deploy/edge', dynamicDir: '/home/deploy/edge/dynamic', container: 'edge-proxy' }, upstreams: [{ name: 'tool', hosts: ['tool.example'], hostAddress: '172.29.0.1', port: 5678 }] };
+  const ingress = { network: 'edge-shared', acmeVolume: 'edge_acme', legacy: { dir: '/srv/deploy/edge', dynamicDir: '/srv/deploy/edge/dynamic', container: 'edge-proxy' }, upstreams: [{ name: 'tool', hosts: ['tool.example'], hostAddress: '172.29.0.1', port: 5678 }] };
   const good = normalizeDeploy({ ...validBlock(), ingress }, { project: 'shop', probe: probe() });
   assert.deepEqual(good.problems, []);
   assert.equal(good.config.ingress.network, 'edge-shared');

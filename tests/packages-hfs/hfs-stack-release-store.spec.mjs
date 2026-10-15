@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createReleaseStore, lfOnly } from '../../packages/hfs/stack/release-store.mjs';
-import { releaseSsh, testConfig } from '../helpers/stack-fakes-B.mjs';
+import { releaseSsh, testConfig } from '../helpers/stack-swarm-fakes.mjs';
 
 const ONE = '0123456789abcdef';
 const TWO = 'fedcba9876543210';

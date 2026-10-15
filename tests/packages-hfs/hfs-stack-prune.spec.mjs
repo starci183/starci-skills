@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pruneStack } from '../../packages/hfs/stack/prune.mjs';
 import { fakeHost } from '../helpers/stack-fakes.mjs';
-import { testConfig } from '../helpers/stack-fakes-B.mjs';
+import { testConfig } from '../helpers/stack-swarm-fakes.mjs';
 
 const config = testConfig();
 let dir;

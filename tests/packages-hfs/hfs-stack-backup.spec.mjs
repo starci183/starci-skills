@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { backupVolumes } from '../../packages/hfs/stack/backup.mjs';
 import { fakeHost } from '../helpers/stack-fakes.mjs';
-import { IMAGE, RECIPIENT, fakeRunner, makeApp, shellWords } from '../helpers/stack-fakes-C.mjs';
+import { IMAGE, RECIPIENT, fakeRunner, makeApp, shellWords } from '../helpers/stack-remote-fakes.mjs';
 
 const apps = [];
 const appWith = (options) => {

@@ -7,7 +7,7 @@ const probe = { exists: (rel) => rel === 'edge/routes.yml' };
 const valid = () => ({
   network: 'edge-shared',
   acmeVolume: 'edge_acme',
-  legacy: { dir: '/home/deploy/app-edge', dynamicDir: '/home/deploy/app-edge/dynamic', container: 'app-edge-proxy' },
+  legacy: { dir: '/srv/deploy/app-edge', dynamicDir: '/srv/deploy/app-edge/dynamic', container: 'app-edge-proxy' },
   upstreams: [
     { name: 'tenant-api', hosts: ['api.tenant.example'], container: 'tenant-api', port: 3000, middlewares: ['secure'] },
     { name: 'tool', hosts: ['tool.example'], hostAddress: '172.29.0.1', port: 5678 },
@@ -16,7 +16,7 @@ const valid = () => ({
   verify: [{ host: 'api.tenant.example', path: '/health', status: 200 }, { host: 'tool.example' }],
   drop: ['old.example'],
   redirects: [{ host: 'www.example.org', to: 'example.org' }, { host: 'a.example.org', to: 'b.example.org', status: 308 }],
-  backup: { dir: '/home/deploy/backups' },
+  backup: { dir: '/srv/deploy/backups' },
   takeover: { gateSeconds: 20 },
 });
 

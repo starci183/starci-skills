@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseYaml } from '../../packages/hfs/runtime/engine/yaml.mjs';
 import { renderRelease } from '../../packages/hfs/stack/render.mjs';
-import { IMAGE_API, IMAGE_WEB, SOURCE_SHA, ZERO, makeApp, secretValues } from '../helpers/stack-fakes-A.mjs';
+import { IMAGE_API, IMAGE_WEB, SOURCE_SHA, ZERO, makeApp, secretValues } from '../helpers/stack-release-fakes.mjs';
 
 const apps = [];
 const outs = [];
@@ -22,7 +22,7 @@ const dockerRenders = (made) => made.host.calls.filter((call) => call.command ==
 
 const HOST_ENV = {
   STARCI_SECRET_VERSION_KEY: 'fixture-version-key', SOPS_AGE_KEY: 'AGE-SECRET-KEY-FAKE', DOCKER_HOST: 'ssh://vps',
-  PATH: '/usr/bin', HOME: '/home/u', USERPROFILE: 'C:/Users/u', SystemRoot: 'C:/Windows', TEMP: '/tmp', TMP: '/tmp', DOCKER_CONFIG: '/dc', CONTACT_EMAIL: 'ops@example.test', UNRELATED: 'x',
+  PATH: '/usr/bin', HOME: '/srv/u', USERPROFILE: 'profile-fixture', SystemRoot: 'sysroot-fixture', TEMP: '/tmp', TMP: '/tmp', DOCKER_CONFIG: '/dc', CONTACT_EMAIL: 'ops@example.test', UNRELATED: 'x',
 };
 
 test('a render writes the override, the rendered stack and the release record, and reports names and counts', async () => {

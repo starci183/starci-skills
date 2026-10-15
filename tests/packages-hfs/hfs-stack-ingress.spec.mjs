@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { runIngress, hostsOfRule, routesOfDocument } from '../../packages/hfs/stack/ingress.mjs';
 import { StackError } from '../../packages/hfs/stack/errors.mjs';
-import { makeTree, makeVps, table, liveFiles, LIVE_HOSTS, SECRET_TOKENS } from '../helpers/stack-fakes-F.mjs';
+import { makeTree, makeVps, table, liveFiles, LIVE_HOSTS, SECRET_TOKENS } from '../helpers/stack-ingress-fakes.mjs';
 
 const trees = [];
 const tree = (...args) => {
@@ -295,7 +295,7 @@ test('takeover dry run proves the preconditions and the baseline but changes not
   assert.match(text(result), /baseline ok api\.tenant\.example\/: old edge answers 200/u);
   assert.match(text(result), /baseline ok www\.tenant\.example\/: old edge answers 301/u);
   assert.doesNotMatch(text(result), /old\.example\//u);
-  assert.match(text(result), /dry run: would back up .* to \/home\/deploy\/backups, stop app-edge-proxy and scale edge_ingress to 1, verify 3 host\(s\)/u);
+  assert.match(text(result), /dry run: would back up .* to \/srv\/deploy\/backups, stop app-edge-proxy and scale edge_ingress to 1, verify 3 host\(s\)/u);
   assert.deepEqual(result.data.steps, ['plan', 'preconditions', 'baseline']);
   assert.deepEqual(vps.mutating(), []);
 });

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { connectCi, disconnectCi, lfOnly, remoteDocker, shellQuote, sshRunner, withOwnerTransport, withRunner } from '../../packages/hfs/stack/remote.mjs';
 import { fakeHost, fakeSops } from '../helpers/stack-fakes.mjs';
-import { shellWords } from '../helpers/stack-fakes-C.mjs';
+import { shellWords } from '../helpers/stack-remote-fakes.mjs';
 
 const KEY_BODY = 'SECRETKEYBODY';
 const PEM = `-----BEGIN OPENSSH PRIVATE KEY-----\n${KEY_BODY}\n-----END OPENSSH PRIVATE KEY-----\n`;

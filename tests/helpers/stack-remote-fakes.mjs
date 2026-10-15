@@ -1,4 +1,4 @@
-// stack-fakes-C.mjs - helpers of the remote / prepare / backup / jobs specs (worker C only).
+// stack-remote-fakes.mjs - helpers of the remote / prepare / backup / jobs specs (worker C only).
 //   makeApp(options)          a real temp app tree (hfs.json, application-stacks.yaml with a deploy block, stack.yaml, .sops.yaml) + its loaded config
 //   shellWords(command)       splits a command composed with shellQuote back into words (single quotes only)
 //   fakeRunner(host, table)   an ssh runner (command) -> { status, stdout, stderr } that answers `docker ...` through the fake docker of

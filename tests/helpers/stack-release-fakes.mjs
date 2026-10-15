@@ -1,4 +1,4 @@
-// stack-fakes-A.mjs - the app tree and sealed members the render/provision/build-args/sealed specs share (worker A).
+// stack-release-fakes.mjs - the app tree and sealed members the render/provision/build-args/sealed specs share (worker A).
 // makeApp({ members, mutate }) writes a tiny app into a temp directory (hfs.json, application-stacks.yaml with a deploy block, the stack
 // source, config files, empty `.enc` stand-ins) and returns { root, config, host, sops, ctx(extra), dispose }. Neutral names only.
 import fs from 'node:fs';

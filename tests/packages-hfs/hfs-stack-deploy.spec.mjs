@@ -9,7 +9,7 @@ import { DEFAULT_DEPS, deployRelease, importModule, lazy, rollbackRelease } from
 import { StackError } from '../../packages/hfs/stack/errors.mjs';
 import { createReleaseStore } from '../../packages/hfs/stack/release-store.mjs';
 import { fakeHost } from '../helpers/stack-fakes.mjs';
-import { psRunning, releaseSsh, testConfig } from '../helpers/stack-fakes-B.mjs';
+import { psRunning, releaseSsh, testConfig } from '../helpers/stack-swarm-fakes.mjs';
 
 const OLD = 'a'.repeat(64);
 const NEW = 'b'.repeat(64);

@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { provisionRelease } from '../../packages/hfs/stack/provision.mjs';
 import { configObjects, loadSealed } from '../../packages/hfs/stack/sealed.mjs';
-import { makeApp, secretValues } from '../helpers/stack-fakes-A.mjs';
+import { makeApp, secretValues } from '../helpers/stack-release-fakes.mjs';
 
 const apps = [];
 const app = (options) => { const made = makeApp(options); apps.push(made); return made; };

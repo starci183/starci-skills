@@ -1,4 +1,4 @@
-// stack-fakes-B.mjs - helpers of worker B's specs (converge, verify, prune, release-store, deploy), on top of tests/helpers/stack-fakes.mjs.
+// stack-swarm-fakes.mjs - helpers of worker B's specs (converge, verify, prune, release-store, deploy), on top of tests/helpers/stack-fakes.mjs.
 //   testConfig(extra)        a normalised deploy config as stack-deploy-config.mjs returns it (neutral names)
 //   seedService(host, ...)   a service with running / failed tasks in the docker shim
 //   psRunning                a corrected `ps -q` override (see its comment)

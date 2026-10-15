@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { verifyStack } from '../../packages/hfs/stack/verify.mjs';
 import { fakeHost } from '../helpers/stack-fakes.mjs';
-import { fakeFetch, psRunning, seedService, testConfig } from '../helpers/stack-fakes-B.mjs';
+import { fakeFetch, psRunning, seedService, testConfig } from '../helpers/stack-swarm-fakes.mjs';
 
 const http = (extra) => ({ name: 'live', url: 'https://api.example.test/healthz', method: 'GET', body: null, status: 200, json: null, contains: null, retry: false, ...extra });
 const exec = (extra) => ({ name: 'watchdog', service: 'api', command: ['app', 'jobs', 'watchdog'], stdout: null, ...extra });

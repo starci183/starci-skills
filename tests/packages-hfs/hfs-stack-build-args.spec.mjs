@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { buildArgs } from '../../packages/hfs/stack/build-args.mjs';
-import { makeApp, MEMBERS } from '../helpers/stack-fakes-A.mjs';
+import { makeApp, MEMBERS } from '../helpers/stack-release-fakes.mjs';
 
 const apps = [];
 const app = (options) => { const made = makeApp(options); apps.push(made); return made; };

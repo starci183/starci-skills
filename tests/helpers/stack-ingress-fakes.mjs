@@ -1,4 +1,4 @@
-// stack-fakes-F.mjs - a strict in-memory VPS for the ingress specs: ONE ssh function that answers by command content (docker, curl,
+// stack-ingress-fakes.mjs - a strict in-memory VPS for the ingress specs: ONE ssh function that answers by command content (docker, curl,
 // openssl, bash scripts) and throws on any command it does not know, so a spec can never pass by accident.
 //   const vps = makeVps(overrides);   vps.run (the ssh runner), vps.state, vps.calls (every command), vps.ctx (now/sleep seams)
 import fs from 'node:fs';
@@ -7,7 +7,7 @@ import path from 'node:path';
 import { normalizeIngress } from '../../scripts/hfs/stack-ingress-config.mjs';
 
 export const RECIPIENT = `age1${'q'.repeat(58)}`;
-export const DYNAMIC = '/home/deploy/app-edge/dynamic';
+export const DYNAMIC = '/srv/deploy/app-edge/dynamic';
 export const SECRET_TOKENS = ['SECRETTOKEN-1', 'userinfo-secret'];
 
 const json = (value) => JSON.stringify(value);
@@ -46,7 +46,7 @@ export function ingressBlock(extra = {}) {
     name: 'edge',
     network: 'edge-shared',
     acmeVolume: 'edge_acme',
-    legacy: { dir: '/home/deploy/app-edge', dynamicDir: DYNAMIC, container: 'app-edge-proxy' },
+    legacy: { dir: '/srv/deploy/app-edge', dynamicDir: DYNAMIC, container: 'app-edge-proxy' },
     upstreams: [
       { name: 'tenant-api', hosts: ['api.tenant.example'], container: 'tenant-api', port: 3000, aliases: ['tenant-api', 'tenant-api-b'], middlewares: ['secure'] },
       { name: 'tool', hosts: ['tool.example'], hostAddress: '172.29.0.1', port: 5678 },
@@ -54,7 +54,7 @@ export function ingressBlock(extra = {}) {
     routes: 'edge/routes.yml',
     drop: ['old.example'],
     redirects: [{ host: 'www.tenant.example', to: 'tenant.example' }],
-    backup: { dir: '/home/deploy/backups' },
+    backup: { dir: '/srv/deploy/backups' },
     ...extra,
   };
 }

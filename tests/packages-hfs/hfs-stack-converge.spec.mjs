@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { convergeStack } from '../../packages/hfs/stack/converge.mjs';
 import { fakeHost } from '../helpers/stack-fakes.mjs';
-import { globalInspect, seedService, testConfig } from '../helpers/stack-fakes-B.mjs';
+import { globalInspect, seedService, testConfig } from '../helpers/stack-swarm-fakes.mjs';
 
 const config = testConfig();
 const bad = (stderr) => ({ status: 1, stdout: '', stderr });

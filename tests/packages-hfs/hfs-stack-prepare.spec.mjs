@@ -2,7 +2,7 @@ import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { doctorHost, prepareHost } from '../../packages/hfs/stack/prepare.mjs';
 import { fakeHost } from '../helpers/stack-fakes.mjs';
-import { fakeRunner, healthyTable, makeApp } from '../helpers/stack-fakes-C.mjs';
+import { fakeRunner, healthyTable, makeApp } from '../helpers/stack-remote-fakes.mjs';
 
 const app = makeApp();
 after(() => app.cleanup());

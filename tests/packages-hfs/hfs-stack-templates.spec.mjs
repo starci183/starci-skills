@@ -88,7 +88,7 @@ for (const edition of Object.keys(TEMPLATES)) {
     assert.deepEqual(Object.keys(rows), ['prepare', 'doctor', 'up', 'status', 'logs', 'down', 'verification']);
     assert.match(rows.prepare, /starci app stack prepare --env production --execute/);
     assert.match(rows.doctor, /starci app stack doctor --env production/);
-    assert.match(rows.up, /stack-deploy\.yml[\s\S]*starci app stack deploy --env production/);
+    assert.match(rows.up, /stack-deploy workflow[\s\S]*starci app stack deploy --env production/);
     assert.match(rows.status, /starci app stack doctor[\s\S]*starci app stack converge/);
     assert.match(rows.verification, /starci app stack verify --env production/);
     assert.match(rows.logs, /docker service logs/);
