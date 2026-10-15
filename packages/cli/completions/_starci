@@ -40,7 +40,7 @@ _starci() {
     _describe 'group' groups
   elif (( CURRENT == 3 )); then
     case "$words[2]" in
-      app) _values 'verbs' 'add[add one canonical backend capability and register its patterns]' 'check[judge the app tree, managed output, contracts, formatting and architecture]' 'db[preview or apply a migration baseline or restamp and compare database state with the app]' 'emit[emit backend GraphQL, operation and event contract snapshots]' 'explain[explain which HFS slot owns one app-relative path]' 'hygiene[judge staged worktree metadata, stack files and plaintext secrets]' 'lint[lint both app sides and report repository, ESLint and stylelint findings together]' 'new[create a canonical service, unit spec or app image definition]' 'scaffold[create a full or lite StarCi app, including an empty unborn main Git repository]' 'secret[initialize, seal, materialize and verify app secrets]' 'stack[Swarm deploy tooling of an app (prepare to rollback) and the full edition test-world infrastructure]' 'sync[compare or write every managed app file from its canonical template]' 'upgrade[upgrade a lite app to the full edition (--edition full); a full app is already current]' ;;
+      app) _values 'verbs' 'add[add one canonical backend capability and register its patterns]' 'check[judge the app tree, managed output, contracts, formatting and architecture]' 'db[preview or apply a migration baseline, restamp, history migration or post-cutover step]' 'emit[emit backend GraphQL, operation and event contract snapshots]' 'explain[explain which HFS slot owns one app-relative path]' 'hygiene[judge staged worktree metadata, stack files and plaintext secrets]' 'lint[lint both app sides and report repository, ESLint and stylelint findings together]' 'new[create a canonical service, unit spec or app image definition]' 'release[run the release gates and write the L4 record and tag, or push branch and tag atomically]' 'scaffold[create a full or lite StarCi app, including an empty unborn main Git repository]' 'secret[initialize, seal, materialize and verify app secrets]' 'stack[Swarm deploy tooling of an app (prepare to rollback) and the full edition test-world infrastructure]' 'sync[compare or write every managed app file from its canonical template]' 'upgrade[upgrade a lite app to the full edition (--edition full); a full app is already current]' ;;
       check) _values 'verbs' 'run[run changed-scope checks or the full structural check set]' ;;
       connect) _values 'verbs' 'ask-gateway[operate the local owner-ask HTTP gateway]' 'telegram[deliver and maintain owner Telegram notifications]' 'telegram-media[deliver settled operation media through Telegram]' 'tunnel[operate the Cloudflare owner-ask tunnel]' ;;
       debug) _values 'verbs' 'digest[print the read-only debug digest with a verdict per role (no error, happy error, BUG)]' 'run[run one allowlisted read-only runtime inspector]' ;;
@@ -90,11 +90,16 @@ _starci() {
     'app:check:--coverage-from') return 0 ;;
     'app:db:--stamp') return 0 ;;
     'app:db:--map') return 0 ;;
+    'app:db:--url-env') return 0 ;;
+    'app:db:--green-at') return 0 ;;
     'app:lint:--changed') return 0 ;;
     'app:lint:--workspace') return 0 ;;
     'app:lint:--format') _values 'values' 'text' 'json'; return 0 ;;
     'app:lint:--sonar') return 0 ;;
     'app:new:--inject') return 0 ;;
+    'app:release:--source') return 0 ;;
+    'app:release:--tag-prefix') return 0 ;;
+    'app:release:--remote') return 0 ;;
     'app:scaffold:--into') return 0 ;;
     'app:secret:--generate') return 0 ;;
     'app:stack:--stack') return 0 ;;
@@ -1021,12 +1026,13 @@ _starci() {
     case "$words[2]:$words[3]" in
     'app:add') _values 'flags' '--event' '--from' '--service' '--connection' '--owner' '--failed' '--done' '--fe' '--no-types' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:check') _values 'flags' '--fast' '--base' '--wiring' '--coverage-from' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'app:db') _values 'flags' '--stamp' '--map' '--apply' '--local' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'app:db') _values 'flags' '--stamp' '--map' '--apply' '--local' '--execute' '--linked' '--url-env' '--green-at' '--owner-confirms-old-app-gone' '--json' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:emit') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:explain') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:hygiene') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:lint') _values 'flags' '--changed' '--workspace' '--fix' '--format' '--sonar' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:new') _values 'flags' '--inject' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'app:release') _values 'flags' '--execute' '--source' '--tag-prefix' '--remote' '--json' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:scaffold') _values 'flags' '--into' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:secret') _values 'flags' '--generate' '--to-file' '--reveal' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:stack') _values 'flags' '--stack' '--services' '--k3d' '--force' '--env' '--execute' '--image' '--source-sha' '--previous' '--out' '--release' '--since' '--timeout' '--retry' '--keep' '--app' '--ssh-cmd' '--extra-compose' '--allow-unpinned' '--init-swarm' '--owner-approved' '--fix-live-restore' '--swarm-state' '--skip-public' '--skip-internal' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
