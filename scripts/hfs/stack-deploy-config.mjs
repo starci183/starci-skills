@@ -3,6 +3,7 @@
 // judges the same block through it, so the verbs and the rule can never disagree. Pure given the block and a probe of the app tree.
 import path from 'node:path';
 import { isPlainObject as plain } from '../../engine/plain-object.mjs';
+import { list } from '../lib/list.mjs';
 import { normalizeIngress } from './stack-ingress-config.mjs';
 
 export const DEPLOY_CONFIG_CODE = 'STACKS_DEPLOY_CONFIG_INVALID';
@@ -45,7 +46,6 @@ function collector() {
 }
 
 const text = (value) => typeof value === 'string' && value.length > 0;
-const list = (value) => (Array.isArray(value) ? value : []);
 
 function closedFields(c, at, value, allowed) {
   if (!plain(value)) { c.problem(at, 'must be a mapping'); return false; }
@@ -168,7 +168,8 @@ function serviceEnvironment(c, at, entry, probe) {
     else out.values[key] = value;
   }
   for (const [key, setting] of Object.entries(entry.settings ?? {})) {
-    if (!UPPER_ENV.test(key) || !closedFields(c, `${at}.settings.${key}`, setting, FIELDS.setting) || !nameField(c, `${at}.settings.${key}.key`, setting.key, KEY)) continue;
+    if (!UPPER_ENV.test(key)) { c.problem(`${at}.settings.${key}`, `the environment name must match ${UPPER_ENV}`); continue; }
+    if (!closedFields(c, `${at}.settings.${key}`, setting, FIELDS.setting) || !nameField(c, `${at}.settings.${key}.key`, setting.key, KEY)) continue;
     out.settings[key] = { key: setting.key, default: setting.default === undefined ? null : String(setting.default) };
   }
   return out;

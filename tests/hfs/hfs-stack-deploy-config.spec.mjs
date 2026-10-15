@@ -201,9 +201,8 @@ test('deploy config: refuses names, keys and paths that break their patterns', (
   expectProblem((b) => { b.backup.volumes[0].volume = '-bad'; }, 'deploy.backup.volumes[0].volume', 'must match');
 });
 
-test('deploy config: a setting under a lowercase variable name is left out of the config', () => {
-  const { config } = run((b) => { b.environment.api.settings.bad = { key: 'JOBS' }; });
-  assert.equal(Object.hasOwn(config.environment.api.settings, 'bad'), false);
+test('deploy config: a setting under a lowercase variable name is refused', () => {
+  expectProblem((b) => { b.environment.api.settings.bad = { key: 'JOBS' }; }, 'deploy.environment.api.settings.bad', 'the environment name must match');
 });
 
 test('deploy config: refuses files that are missing or leave the environment directory', () => {
