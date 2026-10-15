@@ -170,6 +170,29 @@ rules:
         - STACKS_MODEL_UNAVAILABLE
       manual: []
     relatedExamples: []
+  - id: REPO-STACKS-7
+    title: Swarm deploys call the canon verbs and declare their configuration
+    kind: mandatory
+    hfsRules: [R293, R294]
+    requirement: |
+      An app does not re-implement the Swarm deploy tooling the canon ships. Deploy sources (tracked files under deploy/
+      and scripts/, the scripts of package.json and every workflow except the managed stack-deploy.yml) never call a
+      docker command that a `starci app stack` verb owns, and deploy/ holds no script named after a verb; the app calls
+      `starci app stack <verb>` instead. The app's constants (stack name, images, volumes, secret grants, configs, verify
+      checks, jobs and backup volumes) live in `environments.<env>.deploy` of application-stacks.yaml, which is judged by
+      the same normaliser the verbs use: names match their patterns, files and services exist, sealed members have a
+      secrets file and the backup image is pinned by a real digest. docs/application-stacks.md "Swarm deploy tooling"
+      lists the verbs and the block.
+    rationale: |
+      One tested implementation of the deploy procedure keeps every app on the same guards, and a coherent declaration
+      lets the verbs refuse before any effect instead of failing halfway.
+    cases: []
+    verification:
+      automated:
+        - STACK_TOOLING_REIMPLEMENTED
+        - STACKS_DEPLOY_CONFIG_INVALID
+      manual: []
+    relatedExamples: []
   - id: REPO-STACKS-2
     title: Shared host services are declared, not copied
     kind: mandatory

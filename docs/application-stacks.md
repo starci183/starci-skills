@@ -231,6 +231,62 @@ These requirements apply to lite and full; the rule catalog and its enforcers pr
 - <a id="r275"></a>R275 `STACKS_INGRESS_DECLARED`: `STACKS_INGRESS_UNDECLARED` requires one declared ingress and its hosts; `STACKS_INGRESS_UNKNOWN` refuses an unknown component, wrong role or unsupported image. Both digest-pinned Traefik and Caddy are accepted.
 - <a id="r276"></a>R276 `STACKS_LITE_BACKING`: `STACKS_LITE_SELFHOSTED_DB` refuses self-hosted backing databases in lite; `STACKS_SIDECAR_VOLUME_UNDECLARED` requires a declared and mounted persistent volume for a SQLite sidecar; `STACKS_SIDECAR_DB_UNSUPPORTED` refuses a sidecar's non-SQLite database requirement. Full keeps its declared backing topology.
 
+## Swarm deploy tooling
+
+The generic Swarm deploy procedure ships in the canon as `starci app stack <verb>`; an app keeps its configuration in `.starcistacks/` and carries no render, provision or converge scripts of its own. Every verb runs at the app root, takes `--env <env>` (default `production`) and `--json`. Effectful verbs are a dry run by default; `--execute` performs the effects. Exit codes: `0` ok, `1` a check or step failed, `2` refusal or bad usage, `3` owner approval missing (swarm init).
+
+| Verb | What it does |
+| --- | --- |
+| `prepare` | Host checks without effect, creation of the missing external volumes and, with `--init-swarm`, `--execute` and the owner's `STARCI_SWARM_INIT_APPROVED=1` together, the one-time `docker swarm init`. |
+| `doctor` | The same checks plus services, secrets, configs and the release pointers. Changes nothing. |
+| `connect`, `disconnect` | CI transport: the pinned ssh key, known hosts and `DOCKER_HOST` for a GitHub Actions job. |
+| `build-args` | Prints the public build values of one image, with no private key. |
+| `render` | Opens the sealed members in memory, derives the versioned secret and config names and renders the stack plus a generated override and `release.json` into `--out`. Refuses unpinned images and the all-zero placeholder digest. |
+| `deploy` | The whole release: render, provision, store the release record, pre-pull, `docker stack deploy`, converge, verify, accept and prune. A failure after the deploy started redeploys the previous accepted release. |
+| `converge` | Observes desired against running replicas, update state and failed tasks; two agreeing observations. Changes nothing. |
+| `verify` | The declared HTTP journeys and the declared checks inside a running task. Changes nothing. |
+| `rollback` | Redeploys a stored release (default: the `previous` pointer) from its stored bytes, then verifies and moves the pointer. |
+| `prune` | Removes managed secrets and configs that no kept release names; objects still in use are reported and left in place. |
+| `backup` | age-encrypted tarballs of the declared volumes, piped through `age` with no plaintext file; `--swarm-state` also archives the swarm state. |
+| `jobs` | Runs the app's declared job CLI inside the running api task; `retry` actions need `--execute`. |
+
+`starci app stack up|down|status` (the local test-world infrastructure of a full app) is unchanged; a lite app refuses them.
+
+The shape of an environment's `deploy` block (all optional unless noted, unknown fields are refused, nothing in it holds a value):
+
+```yaml
+environments:
+  production:
+    runtime: docker-swarm
+    composeFiles: [infra/swarm/stack.yaml]
+    deploy:
+      stack: shop                       # default: the hfs.json project
+      remote: {host: vps, releasesBase: /srv/shop, sealed: {ops: ops, sshKey: vps-ssh-key, knownHosts: vps-known-hosts}}
+      images:                           # service -> the app whose Dockerfile builds it
+        api: {app: api}
+      volumes: [shop-data]              # external volumes prepare creates
+      secrets:
+        grants:                         # sealed keys -> swarm secrets granted to services
+          - {service: api, filePointers: true, from: [{member: api}]}
+        settings: {member: api, keys: [JOBS_STALE_SECONDS]}
+      environment:
+        api: {files: [infra/swarm/api-public.env], values: {PORT: "8787"}}
+      configs:                          # non-secret files mounted into services, versioned by digest
+        - {name: routes, file: infra/swarm/routes.yml, env: SHOP_CFG_ROUTES}
+      passEnv: [ACME_EMAIL]
+      verify:
+        http: [{name: api liveness, url: "https://api.example.com/healthz", status: 200, retry: true}]
+        exec: [{name: jobs watchdog, service: api, command: [node, dist/cli.js, jobs, watchdog]}]
+      jobs: {service: api, command: [node, dist/cli.js, jobs]}
+      backup:
+        image: alpine:3.21@sha256:<64 hex digest>
+        keepDays: 14
+        volumes: [{name: data, volume: shop-data}]
+```
+
+- <a id="r293"></a>R293 `STACK_TOOLING_REIMPLEMENTED`: in lite and full apps, deploy sources (tracked files under `deploy/` and `scripts/`, the scripts of `package.json` and every workflow except the managed `stack-deploy.yml`) must not call a docker command a verb owns, and `deploy/` must not hold a file named after a verb. The finding names the file and the replacing verb: `docker stack deploy` and the `docker secret|config create` calls map to `deploy`, `docker stack config` to `render`, `docker secret|config rm` to `prune`, `docker service ls|ps` to `converge`, `docker service inspect` to `verify`, `docker service update` to `rollback`, `docker swarm init` and `docker volume create` to `prepare`, `docker node ls` to `doctor`; a `render`, `provision`, `converge`, `verify`, `prune`, `rollback`, `release`, `backup`, `prepare`, `doctor`, `jobs` or `public` script under `deploy/` maps to the verb of the same name. `docker stack rm|ls|ps|services`, `docker compose` (R250), `docker run|exec|ps|logs`, comments, documents and `starci app stack ...` command lines are not judged.
+- <a id="r294"></a>R294 `STACKS_DEPLOY_CONFIG_INVALID`: every `docker-swarm` environment that declares `environments.<env>.deploy` is judged by the same `normalizeDeploy` the verbs use, against the real tree: unknown fields, names and patterns, missing config or public env files, services absent from the first `composeFiles` entry, sealed members without a `secrets/<member>.enc` file, duplicate config names, malformed verify entries and a backup image that is not pinned by a real `sha256` digest are each one finding at `environments.<env>.<field>`. An environment without a `deploy` block is not a finding.
+
 ## Reference pattern
 
 The `examples/ecommerce-app/.starcistacks` kit demonstrates the full manifest, distinct dev and VPS runtimes, secret custody, and static checker input. `examples/lite-app` demonstrates a lite production Swarm environment with Supabase as managed backing. Application-specific readiness and audit evidence belongs in that application's reports.

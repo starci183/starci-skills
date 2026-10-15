@@ -3191,3 +3191,48 @@ rules:
       - {path: tests/hfs/hfs-feature-files.spec.mjs, editions: [lite, full], codes: [HFS_FEATURE_FILE_BUDGET]}
     witness:
       - {path: tests/hfs/hfs-feature-files.spec.mjs, editions: [lite, full], codes: [HFS_FEATURE_FILE_BUDGET]}
+
+  - id: R293
+    code: "STACK_TOOLING_REIMPLEMENTED"
+    law: "In lite and full apps, an app does not re-implement the Swarm deploy tooling the canon ships as `starci app stack <verb>`. Tracked deploy sources (files under deploy/ and scripts/, the scripts of package.json and every workflow except the managed stack-deploy.yml) never call a docker command a verb owns (docker stack deploy and config, docker secret and config create and rm, docker service ls, ps, inspect and update, docker swarm init, docker volume create, docker node ls), and deploy/ holds no render, provision, converge, verify, prune, rollback, release, backup, prepare, doctor, jobs or public script. A finding names the file and the replacing verb, never a snippet; docker stack rm, ls, ps and services, docker compose, docker run, exec, ps and logs, comments, documents and `starci app stack ...` command lines are not judged."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["STACK_TOOLING_REIMPLEMENTED"]
+    enforcers:
+      - {kind: hfs, id: stack-tooling, at: scripts/hfs/rules/stack-tooling.mjs}
+    editions: [lite, full]
+    docs:
+      - {path: docs/application-stacks.md#r293, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/ci-workflows-lite/github/workflows/stack-deploy.yml, edition: lite}
+      - {path: packages/hfs/templates/app/ci-workflows/github/workflows/stack-deploy.yml, edition: full}
+      - {path: packages/hfs/templates/app/ci-workflows-lite/github/workflows/ci.yml, edition: lite}
+      - {path: packages/hfs/templates/app/ci-workflows/github/workflows/ci.yml, edition: full}
+      - {path: examples/lite-app/.github/workflows/stack-deploy.yml, edition: lite}
+      - {path: tests/fixtures/hfs-stack-tooling/passing.json, edition: lite}
+      - {path: tests/fixtures/hfs-stack-tooling/passing.json, edition: full}
+    proves:
+      - {path: tests/hfs/hfs-stack-tooling.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/fixtures/hfs-stack-tooling/violating.json, edition: lite}
+      - {path: tests/fixtures/hfs-stack-tooling/violating.json, edition: full}
+
+  - id: R294
+    code: "STACKS_DEPLOY_CONFIG_INVALID"
+    law: "In lite and full apps, every docker-swarm environment of .starcistacks/application-stacks.yaml that declares environments.<env>.deploy declares a coherent block: it is judged by the same normalizeDeploy the `starci app stack` verbs use, against the real tree. Unknown fields are refused, names, keys, volumes, hosts, URLs and commands match their patterns, the config and public environment files exist below .starcistacks/<env>/, every service names a service of the first stack source, every sealed member has a secrets/<member>.enc file, verify entries and configs are well formed with unique config names, and the backup helper image is pinned by a real sha256 digest (no placeholder). Each problem is one finding at environments.<env>.<field>; an environment without a deploy block is not a finding."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["STACKS_DEPLOY_CONFIG_INVALID"]
+    enforcers:
+      - {kind: hfs, id: stacks-deploy, at: scripts/hfs/rules/stacks-deploy.mjs}
+    editions: [lite, full]
+    docs:
+      - {path: docs/application-stacks.md#r294, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/skeleton-lite/.starcistacks, edition: lite}
+      - {path: packages/hfs/templates/app/skeleton/.starcistacks, edition: full}
+      - {path: tests/hfs/hfs-stacks-deploy.spec.mjs, editions: [lite, full]}
+    proves:
+      - {path: tests/hfs/hfs-stacks-deploy.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-stacks-deploy.spec.mjs, editions: [lite, full]}
