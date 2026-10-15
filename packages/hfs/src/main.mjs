@@ -36,6 +36,8 @@
 //                                            one placeholder it per public method. Never overwrites a file. Both editions: a lite back end keeps full's unit specs (ruling:R212/case-1, amended by ruling:R212/case-4).
 //   starci app new image [--cwd <dir>]                  the Dockerfile of every declared app that has none, from the image canon (scaffold/image.mjs); never overwrites
 //   starci app new spec <file>.service.ts [--cwd <dir>]  the spec skeleton of an existing service, read from its constructor with the repository's TypeScript
+//   starci app stack prepare|doctor|connect|disconnect|build-args|render|deploy|converge|verify|rollback|prune|backup|jobs --env <env> [--execute]
+//                                            the Swarm deploy tooling of stack/ (dry run unless --execute; never prints a secret value; see docs/application-stacks.md).
 //   starci app secret init | set <env> <slug> <KEY> [--generate <bytes>] | get <env> <slug> [KEY] --to-file [--reveal]
 //   starci app secret materialize <env> | list <env> | verify <env>
 //                                            dotenv custody in .starcistacks, public age rule initialization, private KEY files outside Git;
@@ -76,6 +78,7 @@ import { lintRepository, parseLintArgs, printLintText } from '../lint/run.mjs';
 import { writeReport } from '../report/sonar.mjs';
 import { checkEdition } from '../upgrade/check.mjs';
 import { UpgradeError, upgradeMain } from '../upgrade/index.mjs';
+import { ACTIONS as STACK_ACTIONS, stackMain as deployStackMain } from '../stack/cli.mjs';
 
 export const VERBS = Object.freeze(['scaffold', 'add', 'lint', 'sync', 'check', 'upgrade', 'stack', 'explain', 'emit', 'new', 'secret', 'db', 'hygiene']);
 const DATABASE_VERBS = new Map([['baseline', dbBaselineMain], ['restamp', dbRestampMain], ['plan', dbPlanMain]]);
@@ -90,6 +93,7 @@ starci app db restamp --map <restamp.yaml> [--local] [--apply] [--cwd <dir>]
 starci app db plan [--local] [--json] [--cwd <dir>]
 starci app upgrade --edition full [--plan] [--cwd <dir>]
 starci app stack <up|down|status> [--stack <dir>] [--services <list>] [--k3d] [--force] [--json] [--cwd <dir>]
+starci app stack <prepare|doctor|connect|disconnect|build-args|render|deploy|converge|verify|rollback|prune|backup|jobs> --env <env> [--execute] [--json] [--cwd <dir>]
 starci app explain <path> [--cwd <dir>] [--json]
 starci app emit [--cwd <dir>]
 starci app new service <dir> <name> [--inject <binding>...] [--cwd <dir>]
@@ -377,7 +381,18 @@ function upgradeAppMain(argv, { cwd, edition, stdout, presets }) {
   return upgradeMain(['--repo', cwd, ...(edition ? ['--edition', edition] : []), ...argv], { stdout, presets });
 }
 
-async function stackAppMain(argv, { cwd, stackMain, stdout: out, stderr: err }) {
+/** The edition `hfs.json` declares, or undefined when it cannot be read (the test-world verbs then decide on their own). */
+function declaredEdition(cwd) {
+  try { return JSON.parse(fs.readFileSync(path.join(cwd, HFS_DECLARATION_FILE), 'utf8')).edition; } catch { return undefined; }
+}
+
+/**
+ * `starci app stack`: the deploy actions (prepare, doctor, render, deploy, converge, verify, rollback, prune, backup, jobs, ...) are the Swarm
+ * tooling of stack/cli.mjs; up, down and status are the full edition's test-world infrastructure.
+ */
+async function stackAppMain(argv, { cwd, edition, stackMain, stdout: out, stderr: err, env, sops, stackIo }) {
+  if (STACK_ACTIONS.includes(argv[0])) return deployStackMain(argv, { ...stackIo, cwd, stdout: out, stderr: err, env, ...(sops ? { sops } : {}) });
+  if ((edition ?? declaredEdition(cwd)) === 'lite') throw new Error('starci app stack up|down|status manage the local test world of the full edition; a lite app starts its local infrastructure with the Supabase CLI');
   const run = stackMain ?? await installedStackMain(cwd);
   return run(argv, { cwd, out, err });
 }
@@ -398,10 +413,10 @@ function errorMessage(error) {
   return `starci app: ${error.message}\n${USAGE}`;
 }
 
-/** `run` injects the Supabase command runner; IO and tool seams keep every verb independently testable. */
+/** `run` injects the Supabase command runner and `stackIo` the spawn, fetch, sleep and clock seams of the Swarm tooling; IO and tool seams keep every verb independently testable. */
 export async function main(argv, {
   cwd: baseCwd = process.cwd(), stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier, lock, run, stackMain,
-  env = process.env, stdin, sops, tools, platform,
+  env = process.env, stdin, sops, tools, platform, stackIo,
 } = {}) {
   try {
     const global = globalOptions(argv, path.resolve(baseCwd));
@@ -409,7 +424,7 @@ export async function main(argv, {
     const out = global.quiet ? () => {} : stdout;
     if (global.help) { out(USAGE); return 0; }
     if (!VERBS.includes(verb)) { stderr(USAGE); return 2; }
-    return await dispatchMain(verb, rest, { cwd: global.cwd, edition: global.edition, stdout: out, stderr, presets, prettier, lock, run, stackMain, env, stdin, sops, tools, platform });
+    return await dispatchMain(verb, rest, { cwd: global.cwd, edition: global.edition, stdout: out, stderr, presets, prettier, lock, run, stackMain, env, stdin, sops, tools, platform, stackIo });
   } catch (error) {
     stderr(errorMessage(error));
     return 2;

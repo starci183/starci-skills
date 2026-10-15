@@ -220,7 +220,7 @@ starci app secret verify production
 
 ### starci app stack
 
-start, stop or inspect the shared local test-world infrastructure
+Swarm deploy tooling of an app (prepare to rollback) and the full edition test-world infrastructure
 
 | flag | type | |
 | --- | --- | --- |
@@ -228,10 +228,37 @@ start, stop or inspect the shared local test-world infrastructure
 | `--services` | list |  |
 | `--k3d` | boolean |  |
 | `--force` | boolean |  |
+| `--env` | string (default production) |  |
+| `--execute` | boolean |  |
+| `--image` | list |  |
+| `--source-sha` | string |  |
+| `--previous` | string |  |
+| `--out` | string |  |
+| `--release` | string |  |
+| `--since` | string |  |
+| `--timeout` | number |  |
+| `--retry` | number |  |
+| `--keep` | list |  |
+| `--app` | string |  |
+| `--ssh-cmd` | string |  |
+| `--extra-compose` | list |  |
+| `--allow-unpinned` | boolean |  |
+| `--init-swarm` | boolean |  |
+| `--swarm-state` | boolean |  |
+| `--skip-public` | boolean |  |
+| `--skip-internal` | boolean |  |
 
-Positionals: action
+Positionals: action, args?
 
-exit: 0 action completed; 1 infrastructure failure; 2 refusal or bad usage
+Conventions:
+
+- the deploy actions read environments.<env>.deploy of .starcistacks/application-stacks.yaml and nothing app-specific is kept anywhere else
+- effectful actions are a dry run unless --execute is given; a placeholder (all-zero) image digest is always refused
+- secret values are decrypted in memory, piped to docker on stdin and never printed or written
+- docker swarm init runs once, only with --init-swarm, --execute and the owner's STARCI_SWARM_INIT_APPROVED=1, and never on a swarm that is already active
+- up, down and status are the full edition's local test-world verbs
+
+exit: 0 action completed; 1 a check or step failed; 2 refusal or bad usage; 3 owner approval missing
 
 json: flag
 
@@ -239,6 +266,13 @@ json: flag
 starci app stack up
 starci app stack status --json
 starci app stack down --force
+starci app stack doctor --env production
+starci app stack prepare --env production --init-swarm --execute
+starci app stack render --env production --image api=ghcr.io/org/app-api@sha256:<digest> --source-sha <sha>
+starci app stack deploy --env production --image api=ghcr.io/org/app-api@sha256:<digest> --source-sha <sha> --execute
+starci app stack rollback --env production --release <16 hex> --execute
+starci app stack backup --env production --swarm-state --execute
+starci app stack jobs stats --env production
 ```
 
 ### starci app sync

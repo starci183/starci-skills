@@ -72,6 +72,19 @@ _starci() {
         app:secret:--generate) return 0;;
         app:stack:--stack) return 0;;
         app:stack:--services) return 0;;
+        app:stack:--env) return 0;;
+        app:stack:--image) return 0;;
+        app:stack:--source-sha) return 0;;
+        app:stack:--previous) return 0;;
+        app:stack:--out) return 0;;
+        app:stack:--release) return 0;;
+        app:stack:--since) return 0;;
+        app:stack:--timeout) return 0;;
+        app:stack:--retry) return 0;;
+        app:stack:--keep) return 0;;
+        app:stack:--app) return 0;;
+        app:stack:--ssh-cmd) return 0;;
+        app:stack:--extra-compose) return 0;;
         check:run:--level) COMPREPLY=( $(compgen -W "L0 L1 L2 L3 L4" -- "$cur") ); return 0;;
         check:run:--changed) return 0;;
         connect:ask-gateway:--port) return 0;;
@@ -989,7 +1002,7 @@ _starci() {
         app:new) COMPREPLY=( $(compgen -W "--inject --json --cwd --quiet --help --edition" -- "$cur") );;
         app:scaffold) COMPREPLY=( $(compgen -W "--into --json --cwd --quiet --help --edition" -- "$cur") );;
         app:secret) COMPREPLY=( $(compgen -W "--generate --to-file --reveal --json --cwd --quiet --help --edition" -- "$cur") );;
-        app:stack) COMPREPLY=( $(compgen -W "--stack --services --k3d --force --json --cwd --quiet --help --edition" -- "$cur") );;
+        app:stack) COMPREPLY=( $(compgen -W "--stack --services --k3d --force --env --execute --image --source-sha --previous --out --release --since --timeout --retry --keep --app --ssh-cmd --extra-compose --allow-unpinned --init-swarm --swarm-state --skip-public --skip-internal --json --cwd --quiet --help --edition" -- "$cur") );;
         app:sync) COMPREPLY=( $(compgen -W "--check --write --json --cwd --quiet --help --edition" -- "$cur") );;
         app:upgrade) COMPREPLY=( $(compgen -W "--plan --json --cwd --quiet --help --edition" -- "$cur") );;
         check:run) COMPREPLY=( $(compgen -W "--level --changed --json --cwd --quiet --help --edition" -- "$cur") );;

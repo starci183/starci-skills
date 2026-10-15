@@ -18,6 +18,7 @@
     "LICENSE",
     "src/main.mjs",
     "emit/**",
+    "stack/**",
     "lint/**",
     "scaffold/**",
     "report/**",
