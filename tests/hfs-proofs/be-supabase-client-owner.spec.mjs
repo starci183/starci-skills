@@ -37,7 +37,7 @@ for (const edition of ['lite', 'full']) {
     assert.ok(report.coverage.checkedRuleIds.includes(code));
     assert.ok(violations.some(item => item.path.endsWith('leak.service.ts') && /imported by/.test(item.message)));
     assert.ok(violations.some(item => /untyped Supabase client/.test(item.message)));
-    assert.ok(violations.some(item => item.method === 'rpc'));
+    assert.ok(violations.some(item => item.path.endsWith('leak.service.ts') && item.member === 'rpc' && /Auth\/Storage only/.test(item.message)));
   });
 
   test(`${code} ${edition}: accepts a Database-typed client owned by the integration`, t => {

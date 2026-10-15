@@ -37,6 +37,7 @@ const outputOf = async (argv) => {
 
 test("upgrade plan is ordered, printable and byte-for-byte read-only; apply executes that exact plan", async (t) => {
   const root = syntheticLite(t);
+  fs.unlinkSync(path.join(root, ".starcistacks", "application-stacks.yaml"));
   put(root, "fe/apps/web/Dockerfile", "# authored optional lite image\nFROM node:22.14.0-alpine3.21\n");
   const before = contents(root);
   const plan = await upgradeEdition({
@@ -286,6 +287,7 @@ test("already-full and invalid targets refuse with exit 2, and a failed lock res
   assert.match(mismatch.err, /^HFS_EDITION_INVALID:/);
 
   const conflicted = syntheticLite(t, "conflict-demo");
+  fs.unlinkSync(path.join(conflicted, ".starcistacks", "application-stacks.yaml"));
   put(
     conflicted,
     ".starcistacks/dev/infra/compose/api.yaml",
@@ -312,21 +314,24 @@ test("already-full and invalid targets refuse with exit 2, and a failed lock res
 
   const kept = syntheticLite(t, "kept-stacks-demo");
   const declared = "schema: starci/application-stacks@1\nservices: [{ name: app-owned }]\n";
+  const runbook = "# Development\n\nOwner-authored deployment and recovery steps.\n";
   put(kept, ".starcistacks/application-stacks.yaml", declared);
+  put(kept, ".starcistacks/dev/README.md", runbook);
   const keptPlan = await upgradeEdition({ root: kept, to: "full", plan: true, presets: PRESETS });
   assert.deepEqual(
     keptPlan.filter((step) => step.path === ".starcistacks/application-stacks.yaml").map((step) => step.op),
     ["keep"],
     "an app that declares its stacks keeps the declaration; the plan reports it kept",
   );
-  assert.ok(keptPlan.some((step) => step.op === "add" && step.path === ".starcistacks/dev/infra/compose/api.yaml"), "the rest of the scaffold is still added");
+  assert.deepEqual(keptPlan.filter((step) => step.path.startsWith(".starcistacks/") && step.op !== "keep"), [], "the preserved declaration owns its stack tree; no fallback topology is added");
   await upgradeEdition({ root: kept, to: "full", presets: PRESETS, lock: fakeLock });
   assert.equal(
     fs.readFileSync(path.join(kept, ".starcistacks/application-stacks.yaml"), "utf8"),
     declared,
     "the app-owned stacks declaration is byte-identical after the upgrade",
   );
-  assert.ok(fs.existsSync(path.join(kept, ".starcistacks/dev/infra/compose/api.yaml")));
+  assert.equal(fs.existsSync(path.join(kept, ".starcistacks/dev/infra/compose/api.yaml")), false, "no undeclared Compose service is added");
+  assert.equal(fs.readFileSync(path.join(kept, ".starcistacks/dev/README.md"), "utf8"), runbook, "the app-owned runbook stays with its declaration");
 
   const absentRoot = syntheticLite(t, "absent-stacks-demo");
   fs.unlinkSync(path.join(absentRoot, ".starcistacks", "application-stacks.yaml"));

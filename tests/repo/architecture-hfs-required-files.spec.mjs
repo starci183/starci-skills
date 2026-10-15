@@ -10,7 +10,7 @@ import { reusableArchFixture } from '../helpers/repo-architecture-hfs-required-f
 const PLATFORM = ['config', 'logging', 'errors', 'primitives', 'clock', 'i18n'];
 const platformFiles = (skip = []) => Object.fromEntries(PLATFORM.filter(name => !skip.includes(name))
   .map(name => [`src/modules/platform/${name}/index.ts`, 'export const value = 1;\n']));
-const paths = (report, ruleId) => findings(report, ruleId).map(item => item.path).sort();
+const paths = (report, ruleId) => findings(report, ruleId).map(item => item.path).sort((left, right) => left.localeCompare(right));
 const FEATURE = {
   'src/features/api/a/index.ts': 'export const a = 1;\n',
   'src/features/api/a/a.module.ts': 'export const AModule = 1;\n',
@@ -23,6 +23,7 @@ const PACKAGE = {
   'packages/kit/src/util.ts': 'export const u = 1;\n',
 };
 const VARIANT_FILES = {
+  'apps/core/src/core.env.ts': 'export interface CoreEnv {}\nexport const readCoreEnv = (): CoreEnv => ({});\n',
   'src/modules/platform/logging/logger.ts': 'export const l = 1;\n',
   'src/modules/domain/x/index.ts': 'export * from \'./x.service\';\n',
   'src/modules/domain/x/x.service.ts': 'export const s = 1;\n',
@@ -48,7 +49,7 @@ test('BE: a missing required platform instance is flagged once', () => {
 });
 
 test('BE: with no platform module at all all six are missing; one lacking index.ts names the file', () => {
-  assert.deepEqual(paths(runBe({ 'src/modules/platform': null }), 'HFS_REQUIRED_FILE_MISSING'), PLATFORM.map(name => `src/modules/platform/${name}`).sort());
+  assert.deepEqual(paths(runBe({ 'src/modules/platform': null }), 'HFS_REQUIRED_FILE_MISSING'), PLATFORM.map(name => `src/modules/platform/${name}`).sort((left, right) => left.localeCompare(right)));
   assert.deepEqual(paths(runBe({ 'src/modules/platform/logging/index.ts': null }), 'HFS_REQUIRED_FILE_MISSING'), ['src/modules/platform/logging/index.ts']);
 });
 
