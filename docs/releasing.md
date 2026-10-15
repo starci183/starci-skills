@@ -121,3 +121,11 @@ Also verify an update preserving custom host instructions and a seeded `config.y
 The intended package is `starci`. A registry lookup returning not-found is not proof of namespace ownership. Before any publish, the maintainer must confirm authenticated npm account rights, name/version availability, archive contents, license ownership and intended prerelease dist-tag. Require explicit publication authority, then publish the exact reviewed archive. Do not expose tokens in logs or source. Update README release status only after registry verification succeeds.
 
 Never publish unrelated dirty changes, silently retag a stable release as a pre-release, or assume the previous `@starci/skills` package redirects users. Announce the naming transition and upgrade limits in the release notes.
+
+## Coverage uploads must report failure {#r202}
+
+In lite and full, `CI_UPLOAD_NOT_SILENT` refuses a Codecov upload without
+`use_oidc: true`, job or workflow `permissions: id-token: write`, and
+`fail_ci_if_error: true`. Remove `continue-on-error: true` and any upload condition
+that reads a secret or `CODECOV_TOKEN`. These requirements apply to root, example
+and managed template workflows so missing credentials cannot silently skip an upload.

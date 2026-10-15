@@ -259,3 +259,11 @@ Read 2026-09-15:
 ### Where a secret may live
 
 The runtime repository is public and tracks no secret, not even ciphertext (`RT_SECRET_TRACKED`). Every secret the host needs lives in the one untracked `.claude/secret.env`, read only through `engine/secrets.mjs` (`secret.env.example` lists the names). A product repository keeps its own custody in its own repository. Two Sonar servers, no overlap: **SonarCloud** serves everything that lives in the runtime repository (the runtime and the three example apps, one `SONAR_TOKEN`, the organization from `config.yaml` `sonar.organization` or the env `SONAR_ORGANIZATION`, project key `<organization>_<declared key>`); the **self-hosted `ext/sonar`** serves product repositories only, and its secrets are `secret.env` variables that `starci gate sonar up` passes to Compose (`docs/host-secrets.md`). An example declares `provider: sonarcloud`, `mode: hosted`, `host.public: https://sonarcloud.io`, `auth: token` and `runtimeSecrets`; a product declares the host stack and its custody as above.
+
+## App image entry and health {#r189}
+
+`HFS_DOCKER_ENTRY` requires the app's own built entry in exec form: `node be/dist/apps/<app>/src/main.js` for a back end, or `node fe/apps/<app>/server.js` for a Next app. In either edition an API or Next image sets `ENV PORT`, exposes that same port and declares a healthcheck. A worker declares a process healthcheck and exposes no port; a CLI declares `HEALTHCHECK NONE` and exposes no port. A Next build uses `turbo run build --filter=@<project>/<app>` and `next.config.ts` sets `output: "standalone"`.
+
+## App image base pins {#r190}
+
+In both editions, `HFS_DOCKER_BASE_PIN` refuses moving base tags and unresolved build arguments. Every `FROM` resolves to a prior stage, the exact Node and Alpine image named by `NODE_IMAGE` in `scripts/hfs/rules/docker.mjs`, or an image pinned by a complete `@sha256` digest.

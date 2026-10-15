@@ -21,6 +21,14 @@ can preserve the deduplication key. `BE_QUEUE_PRODUCER_SHAPE` requires every
 queue producer that writes `QueueOutbox` to declare an `EntityManager` parameter
 and pass that same parameter to the outbox write.
 
+## R203 thin features
+
+`BE_FEATURE_THIN` reports business decisions, computation or extra delegation in a thin
+feature role in both lite and full. A handler maps input and delegates once to its
+module service; move branches, loops and calculations into the covered modules.
+The edition-specific RuleTester witnesses accept a direct service delegation and
+reject a handler that branches and makes a second delegation.
+
 `modules/models/code-patterns.yaml` is the executable inventory for the fixed StarCi NestJS and Next.js code profiles. The authored manifest, not every rule exported by an installed lint package, decides which code obligations apply. The runtime reads this authored manifest directly.
 
 ## Command and operation
