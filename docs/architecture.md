@@ -457,3 +457,11 @@ the cited-path scan over live prose; then every retained self-check of
 `modules/kernel/allowlist.yaml` (`starci/allowlist@1`): every exception a check keeps is a named,
 shrink-only section of it, and `scripts/checks/check-one-allowlist.mjs` refuses a second one
 (`RT_ALLOWLIST_SPRAWL`).
+
+<a id="r03-filesystem-residue"></a>
+
+## R03 filesystem residue
+
+HFS_UNTRACKED_ROOT_ENTRY rejects a Git-visible untracked entry outside an ignored slot. Track an intended path that satisfies the slot law, or remove the leftover. HFS_EMPTY_DIR rejects a directory tree with no files, which Git cannot retain. HFS_GHOST_TREE additionally identifies an empty directory whose name resembles an existing sibling; remove the stale spelling or populate the intended structure.
+
+Lite and full use the same tree law. App proofs select the real edition in hfs.json. Runtime repositories have no product-edition field: their shared tree checker enforces the same filesystem law for installations of either edition. Scaffolds do not create the accidental untracked files or empty and ghost directories that these checks reject.
