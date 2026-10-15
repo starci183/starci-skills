@@ -15,17 +15,18 @@ import { ACCESS_TOKEN_VERIFIER } from "./identity.decorators"
 
 const principal: Principal = { id: "user-1", role: "authenticated" }
 
-const build = async (metadata: PublicMetadata | undefined, verify: VerifySupabaseAccessToken) => {
+const build = async (metadata: PublicMetadata | undefined) => {
+    const verifier = mock<{ verify: VerifySupabaseAccessToken }>()
     const reflector = mock<Reflector>()
     reflector.getAllAndOverride.mockReturnValue(metadata)
     const moduleRef = await Test.createTestingModule({
         providers: [
             AuthGuard,
             { provide: Reflector, useValue: reflector },
-            { provide: ACCESS_TOKEN_VERIFIER, useValue: verify },
+            { provide: ACCESS_TOKEN_VERIFIER, useFactory: () => verifier.verify },
         ],
     }).compile()
-    return moduleRef.get(AuthGuard)
+    return { guard: moduleRef.get(AuthGuard), verify: verifier.verify }
 }
 
 const contextOf = (authorization: string | undefined) => {
@@ -45,8 +46,7 @@ const unauthenticated = expect.objectContaining({ code: IdentityErrorCode.Unauth
 
 describe("AuthGuard", () => {
     it("lets a public door through without reading a token", async () => {
-        const verify = jest.fn<ReturnType<VerifySupabaseAccessToken>, Parameters<VerifySupabaseAccessToken>>()
-        const guard = await build({ reason: PublicReason.Health }, verify)
+        const { guard, verify } = await build({ reason: PublicReason.Health })
         const { context } = contextOf("Bearer token")
 
         await expect(guard.canActivate(context)).resolves.toBe(true)
@@ -55,9 +55,8 @@ describe("AuthGuard", () => {
     })
 
     it("admits a door that is not public for a verified bearer token and records the principal on the request", async () => {
-        const verify = jest.fn<ReturnType<VerifySupabaseAccessToken>, Parameters<VerifySupabaseAccessToken>>()
+        const { guard, verify } = await build(undefined)
         verify.mockResolvedValue(ok(principal))
-        const guard = await build(undefined, verify)
         const { context, request } = contextOf("Bearer signed-token")
 
         await expect(guard.canActivate(context)).resolves.toBe(true)
@@ -67,9 +66,8 @@ describe("AuthGuard", () => {
     })
 
     it("refuses a door that is not public when the token fails verification", async () => {
-        const verify = jest.fn<ReturnType<VerifySupabaseAccessToken>, Parameters<VerifySupabaseAccessToken>>()
+        const { guard, verify } = await build(undefined)
         verify.mockResolvedValue(refused(SupabaseErrorCode.AccessTokenInvalid))
-        const guard = await build(undefined, verify)
         const { context, request } = contextOf("bearer forged-token")
 
         await expect(guard.canActivate(context)).rejects.toThrow(unauthenticated)
@@ -83,8 +81,7 @@ describe("AuthGuard", () => {
         ["a scheme without a token", "Bearer"],
         ["a token followed by more text", "Bearer one two"],
     ])("refuses a door that is not public with %s, without calling the verifier", async (_label, authorization) => {
-        const verify = jest.fn<ReturnType<VerifySupabaseAccessToken>, Parameters<VerifySupabaseAccessToken>>()
-        const guard = await build(undefined, verify)
+        const { guard, verify } = await build(undefined)
         const { context } = contextOf(authorization)
 
         await expect(guard.canActivate(context)).rejects.toThrow(unauthenticated)

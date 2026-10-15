@@ -15,6 +15,7 @@ export const admit = (metadata: PublicMetadata | undefined): Outcome<PublicReaso
         case PublicReason.SignedWebhook:
         case PublicReason.CatalogRead:
             return ok(metadata.reason)
+        case undefined:
         default:
             return refused(IdentityErrorCode.Unauthenticated)
     }

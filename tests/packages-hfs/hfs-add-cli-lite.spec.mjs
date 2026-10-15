@@ -101,7 +101,7 @@ const parses = (text) =>
 test("ensureLiteCli writes the unit spec of every built-in command, each parseable and naming its command (ruling:R212/case-1, amended by ruling:R212/case-4)", () => {
   const root = appRoot();
   const created = ensureLiteCli({ root, manifest, repo: repoAt(root) });
-  const specs = created.filter((relative) => relative.endsWith(".cli.spec.ts")).sort();
+  const specs = created.filter((relative) => relative.endsWith(".cli.spec.ts")).sort((left, right) => left.localeCompare(right));
   assert.deepEqual(specs, [
     "be/src/features/cli/migrate/migrate.cli.spec.ts",
     "be/src/features/cli/migrate/subs/run.cli.spec.ts",
@@ -225,6 +225,8 @@ test("the full cli template binds domain entities and migrations after environme
   const cli = "packages/hfs/templates/be/skeleton/apps/cli/src";
   const env = read(ROOT, `${cli}/cli.env.ts`);
   const options = read(ROOT, `${cli}/cli.options.ts`);
+  const platform = read(ROOT, `${cli}/compose/platform.ts`);
+  const main = read(ROOT, `${cli}/main.ts`);
   assert.equal(parses(env), true);
   assert.equal(parses(options), true);
   assert.match(env, /export interface CliEnv \{/);
@@ -234,10 +236,15 @@ test("the full cli template binds domain entities and migrations after environme
   assert.match(env, /export const readCliEnv = \(env: EnvSource\): CliEnv/);
   assert.match(env, /parsePrimaryDatabaseConfig\(env\)/);
   assert.doesNotMatch(env, /noteEntities|noteMigrations/);
-  assert.match(options, /primaryConnectionOf = \(primary: DatabaseConnectionConfig\): DatabaseConnectionOptions/);
-  assert.match(options, /\.\.\.primary,[\s\S]*entities: noteEntities,[\s\S]*migrations: noteMigrations/);
-  assert.match(options, /connections: \[primaryConnectionOf\(primary\)\]/);
-  assert.doesNotMatch(options, /EnvSource|parsePrimaryDatabaseConfig/);
+  assert.match(options, /readonly database: DatabaseConnectionConfig/);
+  assert.match(options, /database: primary/);
+  assert.doesNotMatch(options, /EnvSource|parsePrimaryDatabaseConfig|noteEntities|noteMigrations|DatabaseConnectionOptions/);
+  assert.match(platform, /platformModules = \(options: CliAppOptions\): Array<DynamicModule>/);
+  assert.match(platform, /primaryConnectionOf = \(primary: DatabaseConnectionConfig\): DatabaseConnectionOptions/);
+  assert.match(platform, /entities: noteEntities/);
+  assert.match(platform, /migrations: noteMigrations/);
+  assert.match(platform, /connections: \[primaryConnectionOf\(options.database\)\]/);
+  assert.match(main, /await CommandFactory\.run\(AppModule\.register\(/);
 });
 
 test("the full HTTP template gives a named app a typed, bounded environment reader", () => {

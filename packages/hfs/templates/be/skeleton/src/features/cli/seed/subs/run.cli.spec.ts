@@ -3,17 +3,17 @@ import { Test } from "@nestjs/testing"
 import { SeedRunnerService } from "@modules/platform/database"
 import { RunSeedsCli } from "./run.cli"
 
-const build = async (seeds: SeedRunnerService) => {
+const build = async () => {
+    const seeds = mock<SeedRunnerService>()
     const moduleRef = await Test.createTestingModule({
         providers: [RunSeedsCli, { provide: SeedRunnerService, useValue: seeds }],
     }).compile()
-    return moduleRef.get(RunSeedsCli)
+    return { command: moduleRef.get(RunSeedsCli), seeds }
 }
 
 describe("RunSeedsCli", () => {
     it("delegates the seed run of the named environment to the seed runner once", async () => {
-        const seeds = mock<SeedRunnerService>()
-        const command = await build(seeds)
+        const { command, seeds } = await build()
 
         await command.run([], { env: "staging" })
 
@@ -22,8 +22,7 @@ describe("RunSeedsCli", () => {
     })
 
     it("delegates with no environment when none is named, and takes --env as given", async () => {
-        const seeds = mock<SeedRunnerService>()
-        const command = await build(seeds)
+        const { command, seeds } = await build()
 
         await command.run([])
 
