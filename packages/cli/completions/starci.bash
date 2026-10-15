@@ -90,6 +90,7 @@ _starci() {
         app:stack:--app) return 0;;
         app:stack:--ssh-cmd) return 0;;
         app:stack:--extra-compose) return 0;;
+        app:stack:--project) return 0;;
         check:run:--level) COMPREPLY=( $(compgen -W "L0 L1 L2 L3 L4" -- "$cur") ); return 0;;
         check:run:--changed) return 0;;
         connect:ask-gateway:--port) return 0;;
@@ -1008,7 +1009,7 @@ _starci() {
         app:release) COMPREPLY=( $(compgen -W "--execute --source --tag-prefix --remote --json --json --cwd --quiet --help --edition" -- "$cur") );;
         app:scaffold) COMPREPLY=( $(compgen -W "--into --json --cwd --quiet --help --edition" -- "$cur") );;
         app:secret) COMPREPLY=( $(compgen -W "--generate --to-file --reveal --json --cwd --quiet --help --edition" -- "$cur") );;
-        app:stack) COMPREPLY=( $(compgen -W "--stack --services --k3d --force --env --execute --image --source-sha --previous --out --release --since --timeout --retry --keep --app --ssh-cmd --extra-compose --allow-unpinned --init-swarm --owner-approved --fix-live-restore --swarm-state --skip-public --skip-internal --json --cwd --quiet --help --edition" -- "$cur") );;
+        app:stack) COMPREPLY=( $(compgen -W "--stack --services --k3d --force --env --execute --image --source-sha --previous --out --release --since --timeout --retry --keep --app --ssh-cmd --extra-compose --allow-unpinned --init-swarm --owner-approved --fix-live-restore --project --swarm-state --skip-public --skip-internal --json --cwd --quiet --help --edition" -- "$cur") );;
         app:sync) COMPREPLY=( $(compgen -W "--check --write --json --cwd --quiet --help --edition" -- "$cur") );;
         app:upgrade) COMPREPLY=( $(compgen -W "--plan --json --cwd --quiet --help --edition" -- "$cur") );;
         check:run) COMPREPLY=( $(compgen -W "--level --changed --json --cwd --quiet --help --edition" -- "$cur") );;

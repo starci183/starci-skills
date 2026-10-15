@@ -290,6 +290,7 @@ Swarm deploy tooling of an app (prepare to rollback) and the full edition test-w
 | `--init-swarm` | boolean |  |
 | `--owner-approved` | boolean |  |
 | `--fix-live-restore` | boolean |  |
+| `--project` | list |  |
 | `--swarm-state` | boolean |  |
 | `--skip-public` | boolean |  |
 | `--skip-internal` | boolean |  |
@@ -320,6 +321,7 @@ starci app stack rollback --env production --release <16 hex> --execute
 starci app stack backup --env production --swarm-state --execute
 starci app stack jobs stats --env production
 starci app stack ingress plan --env production
+starci app stack retire --env production --project old-web --project old-engine --execute
 starci app stack ingress create --env production --execute
 starci app stack ingress publish --env production --execute
 ```

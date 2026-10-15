@@ -85,8 +85,8 @@ function writePrivate(file, text, mode) {
   fs.chmodSync(file, mode);
 }
 
-/** The owner-machine session: key and known_hosts in a private temp directory, removed (key overwritten) by cleanup(). */
-function sealedRunner(ctx, config) {
+/** The owner-machine session files: key and known_hosts in a private temp directory, removed (key overwritten) by cleanup(). */
+export function openSealedSession(ctx, config) {
   const { sealed } = config.remote;
   const account = opsAccount(ctx, config);
   const key = binaryMember(ctx, config, sealed.sshKey, ['privateKey', 'key']);
@@ -97,14 +97,19 @@ function sealedRunner(ctx, config) {
   const knownFile = path.join(dir, 'known_hosts');
   writePrivate(keyFile, withNewline(key), 0o600);
   writePrivate(knownFile, known ? withNewline(known) : '', 0o600);
-  const strict = known ? 'yes' : 'accept-new';
   const notes = known ? [] : ['owner-machine session without known_hosts: the host key is accepted on first contact (accept-new); verify it, CI never does this'];
   const cleanup = () => {
     if (fs.existsSync(keyFile)) fs.writeFileSync(keyFile, '0'.repeat(key.length));
     fs.rmSync(dir, { recursive: true, force: true });
   };
-  const argv = ['ssh', '-T', '-i', keyFile, '-o', 'IdentitiesOnly=yes', '-o', `UserKnownHostsFile=${knownFile}`, '-o', `StrictHostKeyChecking=${strict}`, '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=20', account];
-  return makeRunner(ctx, argv, { cleanup, notes });
+  return { account, dir, keyFile, knownFile, strict: known ? 'yes' : 'accept-new', notes, cleanup };
+}
+
+/** The owner-machine runner over that session. */
+function sealedRunner(ctx, config) {
+  const session = openSealedSession(ctx, config);
+  const argv = ['ssh', '-T', '-i', session.keyFile, '-o', 'IdentitiesOnly=yes', '-o', `UserKnownHostsFile=${session.knownFile}`, '-o', `StrictHostKeyChecking=${session.strict}`, '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=20', session.account];
+  return makeRunner(ctx, argv, { cleanup: session.cleanup, notes: session.notes });
 }
 
 /** The ssh runner of one invocation (see the top of the file). */

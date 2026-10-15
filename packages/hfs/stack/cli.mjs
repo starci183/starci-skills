@@ -5,13 +5,17 @@
 import path from 'node:path';
 import { stackContext } from './context.mjs';
 import { loadDeployConfig } from './config.mjs';
+import { withDockerTransport } from './docker-transport.mjs';
 import { StackError, EXIT, refusal } from './errors.mjs';
 
-export const ACTIONS = Object.freeze(['prepare', 'doctor', 'connect', 'disconnect', 'build-args', 'render', 'deploy', 'converge', 'verify', 'rollback', 'prune', 'backup', 'jobs', 'ingress']);
+/** The actions that drive the docker CLI of the operator machine (pointed at the manager by docker-transport.mjs when the key is sealed). */
+const DOCKER_ACTIONS = new Set(['deploy', 'converge', 'verify', 'rollback', 'prune']);
+
+export const ACTIONS = Object.freeze(['prepare', 'doctor', 'connect', 'disconnect', 'build-args', 'render', 'deploy', 'converge', 'verify', 'rollback', 'prune', 'backup', 'jobs', 'ingress', 'retire']);
 
 const BOOLEAN = new Set(['--execute', '--json', '--swarm-state', '--init-swarm', '--owner-approved', '--fix-live-restore', '--skip-public', '--skip-internal', '--allow-unpinned']);
-const VALUE = new Set(['--env', '--image', '--source-sha', '--previous', '--out', '--release', '--since', '--timeout', '--retry', '--keep', '--app', '--ssh-cmd', '--extra-compose']);
-const REPEAT = new Set(['--image', '--keep', '--extra-compose']);
+const VALUE = new Set(['--env', '--image', '--source-sha', '--previous', '--out', '--release', '--since', '--timeout', '--retry', '--keep', '--app', '--ssh-cmd', '--extra-compose', '--project']);
+const REPEAT = new Set(['--image', '--keep', '--extra-compose', '--project']);
 
 /** Splits argv into { flags, positional }; an unknown flag or a flag without its value is a refusal. */
 export function parseFlags(argv) {
@@ -73,6 +77,7 @@ const OPTIONS = {
   prune: ({ flags, cwd }) => ({ keepFiles: (flags.keep ?? []).map((file) => path.resolve(cwd, file)), execute: flags.execute === true }),
   backup: ({ flags }) => ({ swarmState: flags['swarm-state'] === true, execute: flags.execute === true }),
   ingress: ({ flags, positional }) => ({ action: positional[0], execute: flags.execute === true, args: positional.slice(1) }),
+  retire: ({ flags }) => ({ projects: flags.project ?? [], execute: flags.execute === true }),
   jobs: ({ flags, positional }) => ({ action: positional[0], args: positional.slice(1), execute: flags.execute === true }),
 };
 
@@ -84,6 +89,7 @@ const MODULES = {
   verify: ['./verify.mjs', 'verifyStack'], rollback: ['./deploy.mjs', 'rollbackRelease'],
   prune: ['./prune.mjs', 'pruneStack'], backup: ['./backup.mjs', 'backupVolumes'], jobs: ['./jobs.mjs', 'runJobs'],
   ingress: ['./ingress.mjs', 'runIngress'],
+  retire: ['./retire.mjs', 'retireCompose'],
 };
 
 async function handlerOf(action, importer) {
@@ -106,7 +112,9 @@ export async function stackMain(argv, io = {}) {
     const config = loadDeployConfig({ repoRoot: ctx.cwd, env: flags.env ?? 'production' });
     const options = OPTIONS[action]({ flags, positional, cwd: ctx.cwd });
     const handler = await handlerOf(action, io.importer ?? ((file) => import(file)));
-    const result = await handler(ctx, config, { ...options, sshCmd: flags['ssh-cmd'] ?? null });
+    const sshCmd = flags['ssh-cmd'] ?? null;
+    const call = (context) => handler(context, config, { ...options, sshCmd });
+    const result = DOCKER_ACTIONS.has(action) ? await withDockerTransport(ctx, config, { sshCmd }, call) : await call(ctx);
     print(ctx, action, flags, result);
     return result.ok ? EXIT.ok : EXIT.failed;
   } catch (error) {

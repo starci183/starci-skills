@@ -388,6 +388,7 @@ complete -c starci -n '__starci_using_command app stack' -l allow-unpinned -d 'r
 complete -c starci -n '__starci_using_command app stack' -l init-swarm -d 'prepare: run the one-time docker swarm init (needs --execute and --owner-approved)'
 complete -c starci -n '__starci_using_command app stack' -l owner-approved -d 'prepare: the owner approved the one-time docker swarm init (with --init-swarm --execute)'
 complete -c starci -n '__starci_using_command app stack' -l fix-live-restore -d 'prepare: disable docker live-restore (incompatible with swarm), restart dockerd and report the containers that came back; needs --owner-approved --execute'
+complete -c starci -n '__starci_using_command app stack' -l project -r -d 'retire: an old docker compose project whose containers are stopped (restart policy off, nothing removed), repeatable'
 complete -c starci -n '__starci_using_command app stack' -l swarm-state -d 'backup: also archive /var/lib/docker/swarm, encrypted'
 complete -c starci -n '__starci_using_command app stack' -l skip-public -d 'verify: skip the public HTTP checks'
 complete -c starci -n '__starci_using_command app stack' -l skip-internal -d 'verify: skip the checks run inside a service task'

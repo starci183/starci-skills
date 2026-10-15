@@ -67,6 +67,7 @@ test('every action reaches its module with the options built from the flags', as
     prune: ['pruneStack', ['--keep', 'a.json', '--keep', 'b.json', '--execute'], { execute: true }],
     backup: ['backupVolumes', ['--swarm-state', '--execute'], { swarmState: true, execute: true }],
     ingress: ['runIngress', ['takeover', '--execute'], { action: 'takeover', execute: true, args: [] }],
+    retire: ['retireCompose', ['--project', 'a', '--project', 'b', '--execute'], { projects: ['a', 'b'], execute: true }],
     jobs: ['runJobs', ['retry', '42', '--execute'], { action: 'retry', args: ['42'], execute: true }],
   };
   for (const [action, [name, flags, expected]] of Object.entries(expectations)) {
@@ -140,4 +141,5 @@ test('the default importer loads the action modules next to the dispatcher', asy
 test('rollback without --release targets the previous pointer and prune without --keep passes none', async () => {
   assert.equal((await run(['rollback'])).seen[0].options.release, null);
   assert.deepEqual((await run(['prune'])).seen[0].options.keepFiles, []);
+  assert.deepEqual((await run(['retire'])).seen[0].options.projects, []);
 });
