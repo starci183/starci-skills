@@ -190,3 +190,13 @@ percentage.
 ### Behavioral spec quality
 
 `BE_SPEC_QUALITY` requires specs to assert results or persisted state with exact values. Build a unit subject through a providers-only `TestingModule`, obtain it from the module reference, and supply infrastructure doubles from the test kit. Avoid source-reading assertions, module mocks, constructing the subject directly, sleeps and model calls in end-to-end flows. Enter end-to-end scenarios through production transport and read the persisted effect back. Specs must run without skip, focus, todo or conditional runner selection; the test-world library alone may skip a contract sandbox when its configuration is absent.
+
+<a id="r155"></a>
+### Declared pattern scenario proofs
+
+R155 reports `BE_PATTERN_SPEC_MISSING` when a back end declares a pattern in
+`hfs.json sides.be.patterns` but lacks a test titled `<pattern>/<scenario>: ...`
+for one of that pattern's required scenario ids in `ruleParams.be.patternScenarios`.
+Full accepts tracked e2e or integration specs under `be/src/tests`; lite requires
+runnable tests in tracked `be/src/tests/integration/*.integration-spec.ts` files,
+including nested folders. Adding the missing scenario proof clears the finding.

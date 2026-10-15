@@ -26,3 +26,16 @@ scripts are `build: next build`, `dev: next dev`,
 `typecheck: tsc --noEmit`. A workspace under `fe/packages/` chooses its own
 nonempty build and type-check commands and uses the same workspace lint command.
 Each workspace declares the runtime dependencies its sources consume.
+
+## R145 Nest monorepo projects
+
+`HFS_MONO_NEST_PROJECTS` reports an unreadable `be/nest-cli.json`, a missing or
+false `monorepo` flag, or a project list that differs from the back-end apps in
+`hfs.json`. Each project has `type: application`, `root: apps/<app>` and
+`sourceRoot: apps/<app>/src`. The default `root` and `sourceRoot` select a
+declared API app, including when a worker is also present. This shape applies
+to a single service and to multiple services in both lite and full editions.
+The scaffold writes this configuration through `nestCli(app)` in
+`packages/hfs/scaffold/app.mjs`; there is no managed Nest CLI template file.
+The dedicated `tests/hfs/hfs-mono-nest-projects-coverage.spec.mjs` fixtures
+exercise accepted configurations and independent violations in each edition.
