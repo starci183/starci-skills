@@ -465,3 +465,23 @@ shrink-only section of it, and `scripts/checks/check-one-allowlist.mjs` refuses 
 HFS_UNTRACKED_ROOT_ENTRY rejects a Git-visible untracked entry outside an ignored slot. Track an intended path that satisfies the slot law, or remove the leftover. HFS_EMPTY_DIR rejects a directory tree with no files, which Git cannot retain. HFS_GHOST_TREE additionally identifies an empty directory whose name resembles an existing sibling; remove the stale spelling or populate the intended structure.
 
 Lite and full use the same tree law. App proofs select the real edition in hfs.json. Runtime repositories have no product-edition field: their shared tree checker enforces the same filesystem law for installations of either edition. Scaffolds do not create the accidental untracked files or empty and ghost directories that these checks reject.
+
+<a id="r36"></a>
+## SQL statements and query builders (R36)
+
+`BE_SQL_OUTSIDE_PERSISTENCE` keeps raw SQL in the owning capability's
+`persistence/<name>.sql.ts`. Export a statement built with the platform database
+`sql` tag and pass its branded `SqlText` to database `.query()` calls. Building SQL
+in a handler, passing an ordinary string to `.query()`, and using
+`createQueryBuilder()` violate this boundary in lite and full. Migration files
+may pass their schema-changing SQL directly to the migration runner.
+
+<a id="r37"></a>
+## Plain contracts across boundaries (R37)
+
+`BE_ENTITY_IN_CONTRACT` rejects ORM entities in contracts, messages, transport
+signatures, and handler `execute` signatures in lite and full. Return plain
+projections and pass identifiers across these boundaries. An entity remains a
+persistence declaration; GraphQL decorators and validation imports belong to
+transport DTOs. A plain interface whose name ends in `Entity` is still judged by
+its declaration rather than its name.
