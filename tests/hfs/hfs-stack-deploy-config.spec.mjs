@@ -86,7 +86,7 @@ test('deploy config: an empty block takes its defaults from the project', () => 
   assert.deepEqual(problems, []);
   assert.deepEqual(config, {
     stack: 'shop', remote: { host: 'vps', releasesBase: null, sealed: null }, images: {}, volumes: [], secrets: { grants: [], settings: null },
-    environment: {}, configs: [], passEnv: [], verify: { http: [], exec: [] }, jobs: null, backup: null,
+    environment: {}, configs: [], passEnv: [], verify: { http: [], exec: [] }, jobs: null, backup: null, ingress: null,
   });
 });
 
@@ -273,4 +273,15 @@ test('deploy config: a project name that breaks the stack pattern is refused whe
   const { config, problems } = normalizeDeploy({}, { project: 'Bad_Project', probe: probe() });
   assert.equal(config, null);
   assert.deepEqual(problems.map((problem) => problem.at), ['deploy.stack']);
+});
+
+test('deploy.ingress is normalised by the ingress normaliser and its problems surface under the deploy block', () => {
+  const ingress = { network: 'edge-shared', acmeVolume: 'edge_acme', legacy: { dir: '/home/deploy/edge', dynamicDir: '/home/deploy/edge/dynamic', container: 'edge-proxy' }, upstreams: [{ name: 'tool', hosts: ['tool.example'], hostAddress: '172.29.0.1', port: 5678 }] };
+  const good = normalizeDeploy({ ...validBlock(), ingress }, { project: 'shop', probe: probe() });
+  assert.deepEqual(good.problems, []);
+  assert.equal(good.config.ingress.network, 'edge-shared');
+  const bad = normalizeDeploy({ ...validBlock(), ingress: { ...ingress, network: 'Bad Network' } }, { project: 'shop', probe: probe() });
+  assert.equal(bad.config, null);
+  assert.ok(bad.problems.some((item) => item.at.includes('ingress')));
+  assert.equal(normalizeDeploy(validBlock(), { project: 'shop', probe: probe() }).config.ingress, null);
 });
