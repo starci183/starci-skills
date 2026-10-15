@@ -119,8 +119,8 @@ rules:
     enforcers:
       - {kind: hfs, id: stacks-shape, at: scripts/hfs/rules/stacks.mjs}
       - {kind: hfs, id: stacks-runtime, at: scripts/hfs/rules/stacks-runtime.mjs}
-      - {kind: hfs, id: stacks-evidence-runtime, at: scripts/gates/stacks-gate.mjs}
-      - {kind: hfs, id: starcistacks-runtime, at: scripts/gates/starcistacks-runtime.mjs}
+      - {kind: hfs, id: stacks-evidence-runtime, at: scripts/hfs/stacks-gate.mjs}
+      - {kind: hfs, id: starcistacks-runtime, at: scripts/hfs/starcistacks-runtime.mjs}
       - {kind: hfs, id: starcistacks-runtime-gate, at: scripts/gates/starcistacks.mjs}
   - id: R11
     code: "HFS_SONAR_CONFIG"
