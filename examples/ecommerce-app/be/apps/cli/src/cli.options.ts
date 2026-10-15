@@ -65,5 +65,9 @@ export const billingConnectionOf = (billing: DatabaseConnectionConfig): Database
 
 /** Binds each parsed database configuration to its owners' entities and migrations. */
 export const createCliAppOptions = (databases: CliEnv): CliAppOptions => ({
-    connections: [identityConnectionOf(databases.identity), orderConnectionOf(databases.order), billingConnectionOf(databases.billing)],
+    connections: [
+        identityConnectionOf(databases.identity),
+        orderConnectionOf(databases.order),
+        billingConnectionOf(databases.billing),
+    ],
 })
