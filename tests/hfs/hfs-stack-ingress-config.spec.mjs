@@ -154,3 +154,11 @@ test('a block with problems yields no ingress', () => {
   assert.equal(out.ingress, null);
   assert.equal(out.problems.length, 1);
 });
+
+test('an upstream without hosts is an attach-only container', () => {
+  const block = valid();
+  delete block.upstreams[0].hosts;
+  const { ingress, problems } = normalizeIngress(block, { probe });
+  assert.deepEqual(problems, []);
+  assert.deepEqual(ingress.upstreams[0].hosts, []);
+});

@@ -72,7 +72,8 @@ function upstream(c, at, entry) {
   matching(c, `${at}.name`, entry.name, NAME);
   port(c, `${at}.port`, entry.port);
   const aliases = target(c, at, entry);
-  const hosts = list(c, `${at}.hosts`, entry.hosts, names(c, DNS_HOST));
+  // an attach-only upstream (a container the tenants' own route files reach, with no host of its own) declares no hosts
+  const hosts = entry.hosts === undefined ? [] : list(c, `${at}.hosts`, entry.hosts, names(c, DNS_HOST));
   const middlewareNames = entry.middlewares === undefined ? [] : list(c, `${at}.middlewares`, entry.middlewares, names(c, NAME));
   return {
     name: entry.name, hosts, container: entry.container ?? null, hostAddress: entry.hostAddress ?? null, port: entry.port, aliases, middlewares: middlewareNames,
