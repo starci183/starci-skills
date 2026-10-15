@@ -4,6 +4,7 @@ import { TypeOrmModule, getDataSourceToken } from "@nestjs/typeorm"
 import type { DataSource } from "typeorm"
 import { DATABASE_OPTIONS } from "./database.port"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./database.module-definition"
+import { DatabaseError, DatabaseErrorCode } from "./errors/database.error"
 import { PRIMARY_CONNECTION } from "./primary.connection"
 import { PRIMARY_ENTITY_MANAGER } from "./primary.decorators"
 
@@ -20,17 +21,19 @@ export class DatabaseModule extends ConfigurableModuleClass {
     /** Registers the capability once per app with the connections it opens. */
     static register(options: typeof OPTIONS_TYPE): DynamicModule {
         const base = super.register(options)
-        const managers = options.connections.flatMap((connection) => {
+        const managers = options.connections.map((connection) => {
             const token = ENTITY_MANAGER_TOKENS.get(connection.name)
-            return token === undefined
-                ? []
-                : [
-                      {
-                          provide: token,
-                          inject: [getDataSourceToken(connection.name)],
-                          useFactory: (source: DataSource) => source.manager,
-                      },
-                  ]
+            if (token === undefined) {
+                throw new DatabaseError({
+                    code: DatabaseErrorCode.ConnectionUndeclared,
+                    params: { name: connection.name },
+                })
+            }
+            return {
+                provide: token,
+                inject: [getDataSourceToken(connection.name)],
+                useFactory: (source: DataSource) => source.manager,
+            }
         })
         return {
             ...base,

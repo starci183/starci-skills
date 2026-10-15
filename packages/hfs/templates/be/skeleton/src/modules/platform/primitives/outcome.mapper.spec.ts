@@ -1,3 +1,4 @@
+import { Test } from "@nestjs/testing"
 import { DomainError } from "@modules/platform/errors"
 import { ok, refused, unwrapOutcome } from "./outcome.mapper"
 
@@ -5,18 +6,31 @@ type CapabilityErrorCode = "CAPABILITY_REFUSED"
 
 class CapabilityError extends DomainError<CapabilityErrorCode> {}
 
+const OUTCOME_MAPPERS: unique symbol = Symbol("primitives.outcome")
+
+type OutcomeMappers = { ok: typeof ok; refused: typeof refused; unwrapOutcome: typeof unwrapOutcome }
+
 describe("outcome mappers", () => {
+    let subject: OutcomeMappers
+
+    beforeEach(async () => {
+        const moduleRef = await Test.createTestingModule({
+            providers: [{ provide: OUTCOME_MAPPERS, useFactory: () => ({ ok, refused, unwrapOutcome }) }],
+        }).compile()
+        subject = moduleRef.get<OutcomeMappers>(OUTCOME_MAPPERS)
+    })
+
     describe("ok", () => {
         it("wraps the produced value as a success", () => {
             const value = { id: "value-1" }
 
-            expect(ok(value)).toEqual({ kind: "ok", value })
+            expect(subject.ok(value)).toEqual({ kind: "ok", value })
         })
     })
 
     describe("refused", () => {
         it("wraps the capability code and display parameters as a refusal", () => {
-            expect(refused("CAPABILITY_REFUSED", { resource: "value-1" })).toEqual({
+            expect(subject.refused("CAPABILITY_REFUSED", { resource: "value-1" })).toEqual({
                 kind: "refused",
                 code: "CAPABILITY_REFUSED",
                 params: { resource: "value-1" },
@@ -24,7 +38,7 @@ describe("outcome mappers", () => {
         })
 
         it("keeps display parameters optional", () => {
-            expect(refused("CAPABILITY_REFUSED")).toEqual({
+            expect(subject.refused("CAPABILITY_REFUSED")).toEqual({
                 kind: "refused",
                 code: "CAPABILITY_REFUSED",
                 params: undefined,
@@ -34,13 +48,13 @@ describe("outcome mappers", () => {
 
     describe("unwrapOutcome", () => {
         it("returns the value of a successful outcome", () => {
-            expect(unwrapOutcome(ok("value-1"), CapabilityError)).toBe("value-1")
+            expect(subject.unwrapOutcome(subject.ok("value-1"), CapabilityError)).toBe("value-1")
         })
 
         it("turns a refusal into the capability error with its parameters", () => {
-            const outcome = refused<CapabilityErrorCode>("CAPABILITY_REFUSED", { resource: "value-1" })
+            const outcome = subject.refused<CapabilityErrorCode>("CAPABILITY_REFUSED", { resource: "value-1" })
 
-            expect(() => unwrapOutcome(outcome, CapabilityError)).toThrow(
+            expect(() => subject.unwrapOutcome(outcome, CapabilityError)).toThrow(
                 expect.objectContaining({
                     name: "CapabilityError",
                     code: "CAPABILITY_REFUSED",

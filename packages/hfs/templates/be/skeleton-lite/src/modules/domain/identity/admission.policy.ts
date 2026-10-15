@@ -16,6 +16,7 @@ export const admit = (
         case PublicReason.SignedWebhook:
         case PublicReason.CatalogRead:
             return ok(metadata.reason)
+        case undefined:
         default:
             break
     }
