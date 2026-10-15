@@ -47,7 +47,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
         'app release' = @('--execute','--source','--tag-prefix','--remote','--json','--json','--cwd','--quiet','--help','--edition')
         'app scaffold' = @('--into','--json','--cwd','--quiet','--help','--edition')
         'app secret' = @('--generate','--to-file','--reveal','--json','--cwd','--quiet','--help','--edition')
-        'app stack' = @('--stack','--services','--k3d','--force','--env','--execute','--image','--source-sha','--previous','--out','--release','--since','--timeout','--retry','--keep','--app','--ssh-cmd','--extra-compose','--allow-unpinned','--init-swarm','--owner-approved','--fix-live-restore','--project','--swarm-state','--skip-public','--skip-internal','--json','--cwd','--quiet','--help','--edition')
+        'app stack' = @('--stack','--services','--k3d','--force','--env','--execute','--image','--source-sha','--previous','--out','--release','--since','--timeout','--retry','--keep','--app','--ssh-cmd','--extra-compose','--allow-unpinned','--init-swarm','--owner-approved','--fix-live-restore','--project','--push','--swarm-state','--skip-public','--skip-internal','--json','--cwd','--quiet','--help','--edition')
         'app sync' = @('--check','--write','--json','--cwd','--quiet','--help','--edition')
         'app upgrade' = @('--plan','--json','--cwd','--quiet','--help','--edition')
         'check run' = @('--level','--changed','--json','--cwd','--quiet','--help','--edition')

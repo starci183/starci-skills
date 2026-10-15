@@ -310,3 +310,13 @@ test('prepare --execute reports a backup directory it cannot create', async () =
   assert.equal(result.ok, false);
   assert.ok(result.lines.some((line) => line.startsWith('FAIL  cannot create /var/backups/shop: install: cannot create directory: Permission denied')));
 });
+
+test('prepare --execute also ensures the releases directory under the releases root', async () => {
+  const made = [];
+  const table = { ...healthyTable(), 'test -d': (command) => (command.includes('/srv/shop/releases') ? { status: 1, stdout: '', stderr: '' } : { status: 0, stdout: '', stderr: '' }), 'install -d': (command) => { made.push(command); return { status: 0, stdout: '', stderr: '' }; } };
+  const { ctx, deps } = setup({ table });
+  const result = await prepareHost(ctx, config, { execute: true }, deps);
+  assert.equal(made.length, 1);
+  assert.ok(made[0].startsWith("install -d -m 750 '/srv/shop/releases' || sudo -n install -d -o "));
+  assert.ok(result.lines.includes('created /srv/shop/releases (mode 750, owned by the deploy user)'));
+});

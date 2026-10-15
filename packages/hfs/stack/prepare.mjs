@@ -177,7 +177,7 @@ function ensureTools(run, report, config) {
     if (made.status === 0) report.note(`created ${base} owned by the deploy user`);
     else report.bad(`cannot create ${base}: ${firstLine(made.stderr)} (needs passwordless sudo once, or create it by hand)`);
   }
-  for (const dir of backupDirectories(config)) ensureDirectory(run, report, dir);
+  for (const dir of [`${base}/releases`, ...backupDirectories(config)]) ensureDirectory(run, report, dir);
   installAge(run, report);
 }
 

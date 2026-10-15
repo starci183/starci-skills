@@ -11,9 +11,9 @@ import { StackError, EXIT, refusal } from './errors.mjs';
 /** The actions that drive the docker CLI of the operator machine (pointed at the manager by docker-transport.mjs when the key is sealed). */
 const DOCKER_ACTIONS = new Set(['deploy', 'converge', 'verify', 'rollback', 'prune']);
 
-export const ACTIONS = Object.freeze(['prepare', 'doctor', 'connect', 'disconnect', 'build-args', 'render', 'deploy', 'converge', 'verify', 'rollback', 'prune', 'backup', 'jobs', 'ingress', 'retire']);
+export const ACTIONS = Object.freeze(['prepare', 'doctor', 'connect', 'disconnect', 'build-args', 'render', 'deploy', 'converge', 'verify', 'rollback', 'prune', 'backup', 'jobs', 'ingress', 'retire', 'build']);
 
-const BOOLEAN = new Set(['--execute', '--json', '--swarm-state', '--init-swarm', '--owner-approved', '--fix-live-restore', '--skip-public', '--skip-internal', '--allow-unpinned']);
+const BOOLEAN = new Set(['--execute', '--json', '--swarm-state', '--init-swarm', '--owner-approved', '--fix-live-restore', '--skip-public', '--skip-internal', '--allow-unpinned', '--push']);
 const VALUE = new Set(['--env', '--image', '--source-sha', '--previous', '--out', '--release', '--since', '--timeout', '--retry', '--keep', '--app', '--ssh-cmd', '--extra-compose', '--project']);
 const REPEAT = new Set(['--image', '--keep', '--extra-compose', '--project']);
 
@@ -77,6 +77,7 @@ const OPTIONS = {
   prune: ({ flags, cwd }) => ({ keepFiles: (flags.keep ?? []).map((file) => path.resolve(cwd, file)), execute: flags.execute === true }),
   backup: ({ flags }) => ({ swarmState: flags['swarm-state'] === true, execute: flags.execute === true }),
   ingress: ({ flags, positional }) => ({ action: positional[0], execute: flags.execute === true, args: positional.slice(1) }),
+  build: ({ flags }) => ({ push: flags.push === true, execute: flags.execute === true }),
   retire: ({ flags }) => ({ projects: flags.project ?? [], execute: flags.execute === true }),
   jobs: ({ flags, positional }) => ({ action: positional[0], args: positional.slice(1), execute: flags.execute === true }),
 };
@@ -90,6 +91,7 @@ const MODULES = {
   prune: ['./prune.mjs', 'pruneStack'], backup: ['./backup.mjs', 'backupVolumes'], jobs: ['./jobs.mjs', 'runJobs'],
   ingress: ['./ingress.mjs', 'runIngress'],
   retire: ['./retire.mjs', 'retireCompose'],
+  build: ['./build.mjs', 'buildImages'],
 };
 
 async function handlerOf(action, importer) {

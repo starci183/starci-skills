@@ -4,7 +4,7 @@ owner: "@starci/hfs"
 summary: Swarm deploy tooling of an app (prepare to rollback) and the full edition test-world infrastructure
 impl: null
 positional:
-  - {name: action, enum: [up, down, status, prepare, doctor, connect, disconnect, build-args, render, deploy, converge, verify, rollback, prune, backup, jobs, ingress, retire], required: true, variadic: false}
+  - {name: action, enum: [up, down, status, prepare, doctor, connect, disconnect, build-args, render, deploy, converge, verify, rollback, prune, backup, jobs, ingress, retire, build], required: true, variadic: false}
   - {name: args, required: false, variadic: true}
 flags:
   - {name: stack, type: string, summary: "up, down, status: stack definition directory"}
@@ -30,6 +30,7 @@ flags:
   - {name: owner-approved, type: boolean, summary: "prepare: the owner approved the one-time docker swarm init (with --init-swarm --execute)"}
   - {name: fix-live-restore, type: boolean, summary: "prepare: disable docker live-restore (incompatible with swarm), restart dockerd and report the containers that came back; needs --owner-approved --execute"}
   - {name: project, type: list, summary: "retire: an old docker compose project whose containers are stopped (restart policy off, nothing removed), repeatable"}
+  - {name: push, type: boolean, summary: "build: push the images to the registry with the operator's own docker login and print their digests (needs --execute)"}
   - {name: swarm-state, type: boolean, summary: "backup: also archive /var/lib/docker/swarm, encrypted"}
   - {name: skip-public, type: boolean, summary: "verify: skip the public HTTP checks"}
   - {name: skip-internal, type: boolean, summary: "verify: skip the checks run inside a service task"}
@@ -54,6 +55,7 @@ examples:
   - starci app stack jobs stats --env production
   - starci app stack ingress plan --env production
   - starci app stack retire --env production --project old-web --project old-engine --execute
+  - starci app stack build --env production --push --execute
   - starci app stack ingress create --env production --execute
   - starci app stack ingress publish --env production --execute
 editions: [full, lite]
