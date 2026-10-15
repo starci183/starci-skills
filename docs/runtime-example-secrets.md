@@ -6,7 +6,7 @@ The public runtime repository stores member names and environment-key inventorie
 Run a check against an example after installing its declared dependencies:
 
 ```sh
-node scripts/hfs/example-secrets.mjs --run examples/lite-app -- npm run lint
+starci runtime example-secrets --run examples/lite-app -- npm run lint
 ```
 
 The runner copies the example into an `os.tmpdir()` directory, creates a fresh age identity and seals the declared members with random, nondeployable values. The private identity is written only to a separate private temporary directory, zeroed in memory, and removed before the check starts. The copy's public SOPS recipient matches its envelopes. The runner links the example's installed dependencies, makes existing coverage input available, returns generated `reports/` artifacts to the source example and removes the temporary copy even when the check fails. Its exit status is the check's exit status.

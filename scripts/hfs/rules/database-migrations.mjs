@@ -8,7 +8,11 @@ import { eachInOrder, findInOrder } from '../../lib/in-order.mjs';
 import { sameText } from '../../lib/same-text.mjs';
 import { found, readText } from './read.mjs';
 import { DB_MIGRATION_DESTRUCTIVE, DB_MIGRATION_SHAPE, isActiveMigration, MIGRATIONS_ARCHIVE_DIR, MIGRATIONS_DIR } from './database-constants.mjs';
-import ts from 'typescript';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { loadTypescript } from '../../lib/package-at.mjs';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
 const MIGRATION_NAME = /^(\d{14})_([a-z0-9]+(?:-[a-z0-9]+)*|contract_[a-z0-9]+(?:[-_][a-z0-9]+)*|[a-z0-9]+(?:-[a-z0-9]+)*_contract_[a-z0-9]+(?:[-_][a-z0-9]+)*)\.sql$/;
 export const isMigrationName = (name) => MIGRATION_NAME.test(name);
 const RESTAMP_HEADER = /^-- starci:restamp (\d{14}) (\d{14})(?:\r?\n|$)/;
@@ -364,7 +368,7 @@ function destructiveObjects(statement) {
   return objects;
 }
 
-function sourceNames(text, file) {
+function sourceNames(ts, text, file) {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
   const names = new Set();
   const addSql = (sql) => { for (const token of databaseSqlTokens(sql)) if (sqlName(token) !== null) names.add(token.v); };
@@ -402,8 +406,10 @@ function destructiveFileFindings(file, text, references) {
 
 /** Destructive changes require a contract migration and no remaining SQL/entity reference in be/src. */
 export function destructiveMigrationFindings({ repoRoot, migrations, files }) {
-  const references = files.filter((file) => /^be\/src\/.+\.(?:sql|entity)\.[cm]?tsx?$/.test(file))
-    .map((file) => ({ file, names: sourceNames(readText(repoRoot, file) ?? '', file) }));
+  const sources = files.filter((file) => /^be\/src\/.+\.(?:sql|entity)\.[cm]?tsx?$/.test(file));
+  const ts = sources.length ? loadTypescript(repoRoot, HERE) : null;
+  if (sources.length && !ts) return [found(DB_MIGRATION_DESTRUCTIVE, 'hfs.json', 'destructive migration checks require the TypeScript parser to read be/src references')];
+  const references = sources.map((file) => ({ file, names: sourceNames(ts, readText(repoRoot, file) ?? '', file) }));
   return migrations.flatMap((file) => {
     const text = readText(repoRoot, file);
     return text === null ? [] : destructiveFileFindings(file, text, references);

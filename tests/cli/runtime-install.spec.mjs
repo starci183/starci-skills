@@ -148,6 +148,19 @@ test('offline runtime installation binds the real shim to the installed host and
   assert.equal(hfsManifest.name, '@starci/hfs');
   assert.equal(hfsManifest.version, cliManifest.dependencies[hfsManifest.name]);
   const sourceHfs = createRequire(path.join(root, 'packages', 'hfs', 'package.json'));
+  // A package that has dependencies of its own (libpg-query needs @pgsql/types) is installed with them, nested in its own node_modules.
+  const copyTransitive = (source, destination) => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(source, 'package.json'), 'utf8'));
+    const from = createRequire(path.join(source, 'package.json'));
+    for (const child of Object.keys(manifest.dependencies ?? {})) {
+      const file = (from.resolve.paths(child) ?? []).map((modules) => path.join(modules, ...child.split('/'), 'package.json')).find((candidate) => fs.existsSync(candidate));
+      assert.ok(file, `offline fixture requires an actual installed ${child} for ${manifest.name}`);
+      const childSource = fs.realpathSync.native(path.dirname(file));
+      const childDestination = path.join(destination, 'node_modules', ...child.split('/'));
+      fs.cpSync(childSource, childDestination, { recursive: true, filter: (item) => !path.relative(childSource, item).split(path.sep).includes('node_modules') });
+      copyTransitive(childSource, childDestination);
+    }
+  };
   const privateHfs = createRequire(path.join(hfs, 'package.json'));
   for (const [name, version] of Object.entries(hfsManifest.dependencies ?? {})) {
     const manifestFile = (sourceHfs.resolve.paths(name) ?? [])
@@ -162,6 +175,7 @@ test('offline runtime installation binds the real shim to the installed host and
       recursive: true,
       filter: (file) => !path.relative(source, file).split(path.sep).includes('node_modules'),
     });
+    copyTransitive(source, destination);
     assert.equal(fs.lstatSync(destination).isSymbolicLink(), false);
     const entry = fs.realpathSync.native(privateHfs.resolve(name));
     const relative = path.relative(fs.realpathSync.native(destination), entry);

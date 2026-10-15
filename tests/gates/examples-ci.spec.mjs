@@ -406,10 +406,10 @@ test('the lister job refuses a missing sync-runtime step and a listing swallowed
 test('example CI runs app lint through the disposable sealed-example helper before tests', () => {
   const workflow = parseYaml(fs.readFileSync(path.join(ROOT, WORKFLOW), 'utf8'));
   const steps = workflow.jobs.app.steps;
-  const materializedLint = steps.find((step) => String(step.run ?? '').includes('scripts/hfs/example-secrets.mjs'));
+  const materializedLint = steps.find((step) => String(step.run ?? '').includes('runtime example-secrets'));
   assert.ok(materializedLint, 'example app checks generate sealed members in a disposable copy');
   assert.equal(materializedLint['working-directory'], '.');
-  assert.equal(materializedLint.run, 'node scripts/hfs/example-secrets.mjs --run "$APP_DIR" -- node "$GITHUB_WORKSPACE/packages/cli/bin/starci.mjs" app lint --cwd . --sonar reports/lint.sonar.json', 'the temporary copy is checked by this checkout?s CLI');
+  assert.equal(materializedLint.run, 'node packages/cli/bin/starci.mjs runtime example-secrets --run "$APP_DIR" -- node "$GITHUB_WORKSPACE/packages/cli/bin/starci.mjs" app lint --cwd . --sonar reports/lint.sonar.json', 'the temporary copy is checked by this checkout?s CLI');
   const tests = steps.findIndex((step) => step.run === 'npm test -- --ci');
   assert.ok(steps.indexOf(materializedLint) < tests, 'the sealed copy is checked before the unit run');
 });

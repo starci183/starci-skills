@@ -131,4 +131,3 @@ internal:
   - {path: scripts/checks/check-ruling-cites.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/hfs/app-wiring.mjs, why: "Lite backend boot proof behind app check --wiring", usedBy: [scripts/hfs/check.mjs]}
   - {path: scripts/hfs/coverage-from.mjs, why: "Logic-file LCOV evidence behind app check --coverage-from", usedBy: [packages/hfs/src/main.mjs]}
-  - {path: scripts/hfs/example-secrets.mjs, why: "Runtime example runner: materializes sealed placeholders in a disposable example copy and runs a command there; the example workflows call it", usedBy: [scripts/checks/check-example-render.mjs]}

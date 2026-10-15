@@ -150,7 +150,7 @@ jobs:
       # The app lint runs in a temporary copy with fresh sealed members; only its Sonar report returns to the source tree.
       - name: starci app lint
         working-directory: .
-        run: node scripts/hfs/example-secrets.mjs --run "$APP_DIR" -- node "$GITHUB_WORKSPACE/packages/cli/bin/starci.mjs" app lint --cwd . --sonar reports/lint.sonar.json
+        run: node packages/cli/bin/starci.mjs runtime example-secrets --run "$APP_DIR" -- node "$GITHUB_WORKSPACE/packages/cli/bin/starci.mjs" app lint --cwd . --sonar reports/lint.sonar.json
       - name: Unit tests with coverage (per-file 100 on the logic of be/src/modules/**; writes be/coverage/lcov.info)
         if: ${{ !cancelled() && steps.policy.outputs.tests == 'true' }}
         run: npm test -- --ci

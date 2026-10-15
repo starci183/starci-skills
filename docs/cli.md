@@ -3405,6 +3405,24 @@ json: none
 starci runtime doctor --cwd <repo> --quick
 ```
 
+### starci runtime example-secrets
+
+run a command in a disposable copy of an example with freshly generated sealed members
+
+| flag | type | |
+| --- | --- | --- |
+| `--run` | string |  |
+
+Positionals: command-arguments?
+
+exit: 0 the command succeeded in the disposable copy; 1 the command failed or the copy could not be prepared; 2 bad usage
+
+json: none
+
+```sh
+starci runtime example-secrets --run examples/lite-app -- npm run lint
+```
+
 ### starci runtime gen-catalog
 
 write or check the generated CLI catalog outputs, docs and shell completions

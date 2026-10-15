@@ -12,7 +12,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@starci/hfs": "4.3.0"
+    "@starci/hfs": "4.4.0"
   },
   "scripts": {
     "test": "node --test src/*.spec.mjs"

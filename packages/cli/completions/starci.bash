@@ -30,7 +30,7 @@ _starci() {
         reconciler) COMPREPLY=( $(compgen -W "once reopen restart start status stop up" -- "$cur") );;
         release) COMPREPLY=( $(compgen -W "app-installs check ci-status clean-test cut env-test images launch-smoke notes proof publish sync-runtime" -- "$cur") );;
         route) COMPREPLY=( $(compgen -W "op" -- "$cur") );;
-        runtime) COMPREPLY=( $(compgen -W "architecture artefacts benchmark-snapshot check deploy derived-fields doctor gen-catalog gen-ops housekeeping import-held-secret install ledger-hygiene link machine-db owner-claims-audit readme-blocks revision-scope status update validate verify version" -- "$cur") );;
+        runtime) COMPREPLY=( $(compgen -W "architecture artefacts benchmark-snapshot check deploy derived-fields doctor example-secrets gen-catalog gen-ops housekeeping import-held-secret install ledger-hygiene link machine-db owner-claims-audit readme-blocks revision-scope status update validate verify version" -- "$cur") );;
         smoke) COMPREPLY=( $(compgen -W "scaffold" -- "$cur") );;
         supabase) COMPREPLY=( $(compgen -W "start status stop" -- "$cur") );;
         supervisor) COMPREPLY=( $(compgen -W "actions bridge channel decide direct-commits gate-stability gc land lesson-actions notify owed poll push push-mains ram-cap report revision-ack start status stop telegram-bridge tell watchdog workers" -- "$cur") );;
@@ -610,6 +610,7 @@ _starci() {
         runtime:benchmark-snapshot:--dir) return 0;;
         runtime:check:--only) return 0;;
         runtime:deploy:--from) return 0;;
+        runtime:example-secrets:--run) return 0;;
         runtime:gen-catalog:--root) return 0;;
         runtime:gen-ops:--ops-dir) return 0;;
         runtime:gen-ops:--out) return 0;;
@@ -1124,6 +1125,7 @@ _starci() {
         runtime:deploy) COMPREPLY=( $(compgen -W "--from --plan --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:derived-fields) COMPREPLY=( $(compgen -W "--write --check --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:doctor) COMPREPLY=( $(compgen -W "--quick --json --cwd --quiet --help --edition" -- "$cur") );;
+        runtime:example-secrets) COMPREPLY=( $(compgen -W "--run --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:gen-catalog) COMPREPLY=( $(compgen -W "--write --check --root --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:gen-ops) COMPREPLY=( $(compgen -W "--check --ops-dir --out --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:housekeeping) COMPREPLY=( $(compgen -W "--dry-run --apply --only --json --cwd --quiet --help --edition" -- "$cur") );;
