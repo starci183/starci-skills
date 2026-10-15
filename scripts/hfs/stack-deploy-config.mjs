@@ -3,6 +3,7 @@
 // judges the same block through it, so the verbs and the rule can never disagree. Pure given the block and a probe of the app tree.
 import path from 'node:path';
 import { isPlainObject as plain } from '../../engine/plain-object.mjs';
+import { normalizeIngress } from './stack-ingress-config.mjs';
 
 export const DEPLOY_CONFIG_CODE = 'STACKS_DEPLOY_CONFIG_INVALID';
 
@@ -17,7 +18,7 @@ const ARGUMENT = /^[A-Za-z0-9_@%+=:,./-]+$/u;
 const UPPER_ENV = KEY;
 
 const FIELDS = {
-  deploy: ['stack', 'remote', 'images', 'volumes', 'secrets', 'environment', 'configs', 'passEnv', 'verify', 'jobs', 'backup'],
+  deploy: ['stack', 'remote', 'images', 'volumes', 'secrets', 'environment', 'configs', 'passEnv', 'verify', 'jobs', 'backup', 'ingress'],
   remote: ['host', 'releasesBase', 'sealed'],
   sealed: ['ops', 'sshKey', 'knownHosts'],
   image: ['app', 'buildArgs'],
@@ -260,6 +261,13 @@ function backup(c, block) {
   return { image: block.image, keepDays: block.keepDays ?? 14, dir: block.dir ?? null, volumes };
 }
 
+function ingress(c, block, probe) {
+  if (block === undefined) return null;
+  const result = normalizeIngress(block, { probe });
+  for (const item of result.problems) c.problem(item.at, item.message);
+  return result.ingress;
+}
+
 /**
  * Validates and normalises one `deploy` block.
  *   probe.exists(rel)  does a file exist below .starcistacks/<env>/ ?
@@ -285,6 +293,7 @@ export function normalizeDeploy(block, { project, probe }) {
     verify: verify(c, block.verify, services),
     jobs: jobs(c, block.jobs, services),
     backup: backup(c, block.backup),
+    ingress: ingress(c, block.ingress, probe),
   };
   if (block.stack === undefined && !NAME.test(String(project))) c.problem('deploy.stack', `the project name ${project} is not a valid stack name (${NAME}); declare deploy.stack`);
   return { config: c.problems.length === 0 ? config : null, problems: c.problems };

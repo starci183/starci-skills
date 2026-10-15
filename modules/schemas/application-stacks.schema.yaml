@@ -398,6 +398,9 @@ $defs:
       verify: {$ref: '#/$defs/deployVerify'}
       jobs: {$ref: '#/$defs/deployJobs'}
       backup: {$ref: '#/$defs/deployBackup'}
+      ingress:
+        description: The shared host ingress (stack-ingress-config.mjs is the authority for the fields; starci app check R294 judges them).
+        type: object
   deployName:
     type: string
     pattern: '^[a-z][a-z0-9-]*$'
