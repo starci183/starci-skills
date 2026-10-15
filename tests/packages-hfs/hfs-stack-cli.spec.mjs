@@ -71,6 +71,7 @@ test('every action reaches its module with the options built from the flags', as
     retire: ['retireCompose', ['--project', 'a', '--project', 'b', '--execute'], { projects: ['a', 'b'], execute: true }],
     build: ['buildImages', ['--push', '--execute'], { push: true, execute: true }],
     jobs: ['runJobs', ['retry', '42', '--execute'], { action: 'retry', args: ['42'], execute: true }],
+    task: ['runTask', ['seed-media', '--execute'], { name: 'seed-media', args: [], execute: true }],
   };
   for (const [action, [name, flags, expected]] of Object.entries(expectations)) {
     const { code, seen, out } = await run([action, ...flags]);
@@ -138,6 +139,14 @@ test('the default importer loads the action modules next to the dispatcher', asy
   const code = await stackMain(['jobs', 'stats'], { cwd: root, stdout: () => {}, stderr: (text) => err.push(text) });
   assert.equal(code, EXIT.refused);
   assert.match(err.join(''), /STACK_JOBS_UNDECLARED/u);
+});
+
+test('the default importer loads the task module and refuses a missing name with STACK_TASK_UNDECLARED', async () => {
+  const root = buildApp({ deploy: DEPLOY });
+  const err = [];
+  const code = await stackMain(['task'], { cwd: root, stdout: () => {}, stderr: (text) => err.push(text) });
+  assert.equal(code, EXIT.refused);
+  assert.match(err.join(''), /STACK_TASK_UNDECLARED/u);
 });
 
 test('rollback without --release targets the previous pointer and prune without --keep passes none', async () => {

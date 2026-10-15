@@ -403,6 +403,7 @@ $defs:
         items: {$ref: '#/$defs/deployKey'}
       verify: {$ref: '#/$defs/deployVerify'}
       jobs: {$ref: '#/$defs/deployJobs'}
+      tasks: {$ref: '#/$defs/deployTasks'}
       backup: {$ref: '#/$defs/deployBackup'}
       registry: {$ref: '#/$defs/deployRegistry'}
       ingress:
@@ -591,6 +592,18 @@ $defs:
     properties:
       service: {$ref: '#/$defs/deployName'}
       command: {$ref: '#/$defs/deployCommand'}
+  deployTasks:
+    description: One-off commands `starci app stack task <name>` runs inside a running task of the declared service.
+    type: object
+    propertyNames:
+      pattern: '^[a-z][a-z0-9-]{0,40}$'
+    additionalProperties:
+      type: object
+      additionalProperties: false
+      required: [service, command]
+      properties:
+        service: {$ref: '#/$defs/deployName'}
+        command: {$ref: '#/$defs/deployCommand'}
   deployBackup:
     type: object
     additionalProperties: false

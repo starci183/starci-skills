@@ -382,7 +382,7 @@ complete -c starci -n '__starci_using_command app stack' -l timeout -r -d 'deplo
 complete -c starci -n '__starci_using_command app stack' -l retry -r -d 'deploy, verify: seconds public checks keep retrying'
 complete -c starci -n '__starci_using_command app stack' -l keep -r -d 'prune: release.json of a release whose secrets and configs stay'
 complete -c starci -n '__starci_using_command app stack' -l app -r -d 'build-args: the app whose image receives the public build values'
-complete -c starci -n '__starci_using_command app stack' -l ssh-cmd -r -d 'prepare, doctor, backup, jobs, deploy, rollback: ssh command to reach the manager instead of the configured alias'
+complete -c starci -n '__starci_using_command app stack' -l ssh-cmd -r -d 'prepare, doctor, backup, jobs, task, deploy, rollback: ssh command to reach the manager instead of the configured alias'
 complete -c starci -n '__starci_using_command app stack' -l extra-compose -r -d 'render: additional compose files for a local throwaway swarm'
 complete -c starci -n '__starci_using_command app stack' -l allow-unpinned -d 'render: accept stand-in images without a digest (a local throwaway swarm; never the placeholder digest)'
 complete -c starci -n '__starci_using_command app stack' -l init-swarm -d 'prepare: run the one-time docker swarm init (needs --execute and --owner-approved)'

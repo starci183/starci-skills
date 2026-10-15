@@ -249,6 +249,7 @@ The generic Swarm deploy procedure ships in the canon as `starci app stack <verb
 | `prune` | Removes managed secrets and configs that no kept release names; objects still in use are reported and left in place. |
 | `backup` | age-encrypted tarballs of the declared volumes, piped through `age` with no plaintext file; `--swarm-state` also archives the swarm state. |
 | `jobs` | Runs the app's declared job CLI inside the running api task; `retry` actions need `--execute`. |
+| `task` | `task <name>` runs one one-off command the app declares under `deploy.tasks.<name>` inside the running task of the declared service and relays its stdout; without `--execute` it prints a dry-run line naming what would run. A missing or unknown name lists the declared names and is refused with `STACK_TASK_UNDECLARED` (exit 2); a non-zero exit of the command fails with its first stderr line. |
 
 `starci app stack up|down|status` (the local test-world infrastructure of a full app) is unchanged; a lite app refuses them.
 
@@ -278,6 +279,8 @@ environments:
         http: [{name: api liveness, url: "https://api.example.com/healthz", status: 200, retry: true}]
         exec: [{name: jobs watchdog, service: api, command: [node, dist/cli.js, jobs, watchdog]}]
       jobs: {service: api, command: [node, dist/cli.js, jobs]}
+      tasks:                            # one-off commands for `starci app stack task <name>` (name: lowercase, digits, dashes)
+        seed-media: {service: api, command: [node, dist/cli.js, seed-media, upload]}
       backup:
         image: alpine:3.21@sha256:<64 hex digest>
         keepDays: 14
