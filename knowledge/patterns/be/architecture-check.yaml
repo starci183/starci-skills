@@ -179,7 +179,6 @@ rules:
     verification:
       automated:
         - BE_PUBLIC_SURFACE
-        - BE_MODULE_DEFINITION_MISSING
         - ARCH_OWNER_EXPORT_BYPASS
         - ARCH_OWNER_EXPORT_STAR
         - HFS_ALIAS_REEXPORT
@@ -189,6 +188,7 @@ rules:
         - BE_MODULE_PROVIDER_REREGISTRATION
         - HFS_UNUSED_EXPORT
         - HFS_UNUSED_FILE
+        - BE_MODULE_DEFINITION_MISSING
       manual:
         - Review provider token, scope and lifetime through the e2e run of the app.
     relatedExamples: []

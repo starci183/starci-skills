@@ -169,10 +169,10 @@ rules:
         - BE_APP_COMPOSITION_ONLY
         - BE_APP_BUSINESS_ROLE
         - BE_MODULE_SHAPE
-        - BE_MODULE_DEFINITION_MISSING
         - BE_MODULE_HANDLER_REGISTRATION
         - BE_MODULE_PROVIDER_REREGISTRATION
         - BE_APP_BOOT_PROOF_MISSING
+        - BE_MODULE_DEFINITION_MISSING
       manual:
         - Boot the applicable app container and resolve real provider tokens.
     relatedExamples: []

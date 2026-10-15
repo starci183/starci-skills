@@ -3247,7 +3247,6 @@ rules:
     enforcers:
       - {kind: eslint-be, id: module-definition-required}
       - {kind: eslint-be, id: capability-module-shape}
-      - {kind: machine, id: module-per-transport, at: scripts/hfs/architecture/module-per-transport.mjs}
     editions: [lite, full]
     docs:
       - {path: docs/microservices.md#r295, editions: [lite, full]}

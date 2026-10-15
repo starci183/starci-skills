@@ -103,6 +103,7 @@ rules:
     verification:
       automated:
         - BE_CLI_COMMAND_SHAPE
+        - BE_MODULE_DEFINITION_MISSING
       manual: []
     relatedExamples: [cli]
   - id: BE-CLI-3
