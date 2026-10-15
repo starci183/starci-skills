@@ -848,16 +848,20 @@ rules:
     code: "BE_CONNECTION_DUPLICATE"
     law: "One physical database is one connection and one `Inject<Conn>EntityManager()` injector declared once in `platform/database`; `hfs.json` connections, connection files, injectors and module registrations correspond one to one."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_CONNECTION_DUPLICATE"]
     enforcers:
       - {kind: eslint-be, id: one-connection-per-database}
       - {kind: eslint-be, id: connection-map}
+    gates: ["pre-commit","settle","land","ci"]
+    editions: ["lite","full"]
+    docs: ["docs/backend-boundary-proofs.md#r84"]
+    exemplifiedBy: [{"path":"packages/hfs/templates/be/skeleton/src/modules/platform/database/primary.connection.ts","editions":["lite","full"]},{"path":"packages/hfs/templates/be/skeleton/src/modules/platform/database/primary.decorators.ts","editions":["lite","full"]},{"path":"packages/eslint/be/r84-connection-coverage.spec.mjs","editions":["lite","full"],"codes":["BE_CONNECTION_DUPLICATE"]}]
+    proves: [{"path":"packages/eslint/be/r84-connection-coverage.spec.mjs","editions":["lite","full"],"codes":["BE_CONNECTION_DUPLICATE"]}]
+    witness: [{"path":"packages/eslint/be/r84-connection-coverage.spec.mjs","edition":"lite","codes":["BE_CONNECTION_DUPLICATE"]},{"path":"packages/eslint/be/r84-connection-coverage.spec.mjs","edition":"full","codes":["BE_CONNECTION_DUPLICATE"]}]
   - id: R85
     code: "BE_RAW_INJECT"
     law: "Every injected infrastructure dependency arrives through a zero-argument `Inject<Thing>()` from its owner's `<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(` exists only there, and every such token is exported so a spec can provide it; a constructor parameter of a provider is typed by a class or carries an `Inject<Thing>()`, never a bare primitive, `Map`, union or interface; the parameter that injects a port of the table `ruleParams.be.paramNames` of `slots.yaml` (`Clock`, `Logger`, `Cache`, `CommandBus`, `QueryBus`, `EntityManager`, an `*Options`) carries the name that table gives it."
     kinds: [lint, codemod]
-    gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_RAW_INJECT"]
     enforcers:
       - {kind: eslint-be, id: injector-only}
@@ -870,19 +874,29 @@ rules:
       - {kind: eslint-be, id: no-forward-ref}
       - {kind: eslint-be, id: no-string-token}
       - {kind: eslint-be, id: injection-token-exported}
+    gates: ["pre-commit","settle","land","ci"]
+    editions: ["lite","full"]
+    docs: ["docs/backend-boundary-proofs.md#r85"]
+    exemplifiedBy: [{"path":"packages/hfs/templates/be/skeleton/src/modules/platform/clock/clock.decorators.ts","editions":["lite","full"]},{"path":"packages/eslint/be/r85-injection-coverage.spec.mjs","editions":["lite","full"],"codes":["BE_RAW_INJECT"]}]
+    proves: [{"path":"packages/eslint/be/r85-injection-coverage.spec.mjs","editions":["lite","full"],"codes":["BE_RAW_INJECT"]}]
+    witness: [{"path":"packages/eslint/be/r85-injection-coverage.spec.mjs","edition":"lite","codes":["BE_RAW_INJECT"]},{"path":"packages/eslint/be/r85-injection-coverage.spec.mjs","edition":"full","codes":["BE_RAW_INJECT"]}]
   - id: R86
     code: "BE_SQL_TABLE_OWNER"
     law: "SQL writes only the tables of its own capability's entities, reads only tables of its own context (its own capability's, or a same-context capability it may import; a cross-context JOIN is refused), and every multi-row SELECT is bounded."
     kinds: [lint, design]
-    gates: [settle, land, ci]
     failureCodes: ["BE_SQL_TABLE_OWNER"]
     enforcers:
       - {kind: eslint-be, id: sql-owner}
+    gates: ["settle","land","ci"]
+    editions: ["lite","full"]
+    docs: ["docs/backend-boundary-proofs.md#r86"]
+    exemplifiedBy: [{"path":"packages/hfs/templates/be/inbox/platform/inbox/persistence/inbox.sql.ts.tpl","editions":["lite","full"]},{"path":"packages/eslint/be/r86-sql-owner-coverage.spec.mjs","editions":["lite","full"],"codes":["BE_SQL_TABLE_OWNER"]}]
+    proves: [{"path":"packages/eslint/be/r86-sql-owner-coverage.spec.mjs","editions":["lite","full"],"codes":["BE_SQL_TABLE_OWNER"]}]
+    witness: [{"path":"packages/eslint/be/r86-sql-owner-coverage.spec.mjs","edition":"lite","codes":["BE_SQL_TABLE_OWNER"]},{"path":"packages/eslint/be/r86-sql-owner-coverage.spec.mjs","edition":"full","codes":["BE_SQL_TABLE_OWNER"]}]
   - id: R87
     code: "BE_CQRS_SHAPE"
     law: "The application layer is CQRS: typed `Command<R>`/`Query<R>` messages carrying one `params`, handlers extending `ICQRSHandler` that override `process`, where `process` is one `return this.<service>.<method>(...)` and the handler injects only `*Service` classes and the Logger (no EntityManager, no branch, no loop, no second call); no use-case classes, forwarder services or in-process events (`EventBus`, `EventEmitter`, an RxJS `Subject`, a stored listener list); a message and an injected dependency are `readonly`."
     kinds: [lint, codemod]
-    gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_CQRS_SHAPE", "BE_READONLY_BOUNDARY"]
     enforcers:
       - {kind: eslint-be, id: handler-overrides-process}
@@ -893,11 +907,16 @@ rules:
       - {kind: eslint-be, id: no-event-bus}
       - {kind: eslint-be, id: execute-params-shape}
       - {kind: eslint-be, id: readonly-boundary}
+    gates: ["pre-commit","settle","land","ci"]
+    editions: ["lite","full"]
+    docs: ["docs/backend-boundary-proofs.md#r87"]
+    exemplifiedBy: [{"path":"packages/hfs/templates/be/patterns/api/application.command.ts.tpl","editions":["lite","full"]},{"path":"packages/hfs/templates/be/patterns/api/application.handler.ts.tpl","editions":["lite","full"]},{"path":"packages/eslint/be/r87-cqrs-coverage.spec.mjs","editions":["lite","full"],"codes":["BE_CQRS_SHAPE","BE_READONLY_BOUNDARY"]}]
+    proves: [{"path":"packages/eslint/be/r87-cqrs-coverage.spec.mjs","editions":["lite","full"],"codes":["BE_CQRS_SHAPE","BE_READONLY_BOUNDARY"]}]
+    witness: [{"path":"packages/eslint/be/r87-cqrs-coverage.spec.mjs","edition":"lite","codes":["BE_CQRS_SHAPE","BE_READONLY_BOUNDARY"]},{"path":"packages/eslint/be/r87-cqrs-coverage.spec.mjs","edition":"full","codes":["BE_CQRS_SHAPE","BE_READONLY_BOUNDARY"]}]
   - id: R88
     code: "BE_TRANSPORT_SHAPE"
     law: "A transport handler (a controller, resolver, gateway, consumer or job; a cli command is an action runner, R149) maps its input, dispatches exactly one command or query through the injected bus and maps the result; it injects nothing else (no EntityManager, no Inbox), holds no branch, loop or other call besides pure mapper functions and `unwrapOutcome` of `platform/primitives`, returns no envelope and takes no `GraphQLJSON`."
     kinds: [lint, codemod]
-    gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_TRANSPORT_SHAPE"]
     enforcers:
       - {kind: eslint-be, id: door-lives-in-features}
@@ -907,11 +926,16 @@ rules:
       - {kind: eslint-be, id: no-response-envelope}
       - {kind: eslint-be, id: no-graphql-json}
       - {kind: eslint-be, id: em-injection-slots}
+    editions: ["lite","full"]
+    docs: ["docs/be-shape-coverage.md#r88"]
+    proves: [{"path":"packages/eslint/be/r88-transport-coverage.spec.mjs","editions":["lite","full"]}]
+    exemplifiedBy: [{"path":"packages/hfs/templates/be/patterns/api/graphql.resolver.ts.tpl","editions":["lite","full"]},{"path":"packages/eslint/be/r88-transport-coverage.spec.mjs","editions":["lite","full"]}]
+    witness: [{"path":"packages/eslint/be/r88-transport-coverage.spec.mjs","edition":"lite","codes":["BE_TRANSPORT_SHAPE"]},{"path":"packages/eslint/be/r88-transport-coverage.spec.mjs","edition":"full","codes":["BE_TRANSPORT_SHAPE"]}]
+    gates: ["pre-commit","settle","land","ci"]
   - id: R89
     code: "BE_SOURCE_FORM"
     law: "Files use the closed role-suffix vocabulary of the slot manifest, `ruleParams.be.suffixes`; named exports only; every export has English JSDoc (its public members: R109); no emoji, and no Vietnamese in identifiers, string literals, comments or test titles outside message catalogs and the i18n fixtures slot; a public input or output is a named contract, never an inline object type; no `Mock*`, `Fake*` or `Stub*` class, function or constant in production source."
     kinds: [lint, check, codemod]
-    gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_SOURCE_FORM", "BE_PUBLIC_CONTRACT_FORM"]
     enforcers:
       - {kind: eslint-be, id: require-export-jsdoc}
@@ -930,20 +954,31 @@ rules:
       - {kind: eslint-be, id: source-suffix}
       - {kind: eslint-be, id: source-names}
       - {kind: eslint-be, id: public-contract-form}
+    editions: ["lite","full"]
+    docs: ["docs/be-shape-coverage.md#r89"]
+    proves: [{"path":"packages/eslint/be/r89-source-form-coverage.spec.mjs","editions":["lite","full"]}]
+    exemplifiedBy: [{"path":"packages/hfs/templates/be/patterns/api/graphql.input.ts.tpl","editions":["lite","full"]},{"path":"packages/eslint/be/r89-source-form-coverage.spec.mjs","editions":["lite","full"]}]
+    witness: [{"path":"packages/eslint/be/r89-source-form-coverage.spec.mjs","edition":"lite","codes":["BE_SOURCE_FORM","BE_PUBLIC_CONTRACT_FORM"]},{"path":"packages/eslint/be/r89-source-form-coverage.spec.mjs","edition":"full","codes":["BE_SOURCE_FORM","BE_PUBLIC_CONTRACT_FORM"]}]
+    gates: ["pre-commit","settle","land","ci"]
   - id: R90
     code: "BE_INFRA_OWNER"
     law: "Each raw infrastructure library (HTTP, cache, queue, scheduler, logger, date, config, events) is imported or referenced only by its one owning platform or integration capability, and the `HttpClient` port of `platform/http` is called only by an `integrations` capability."
     kinds: [lint, codemod]
-    gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_INFRA_OWNER"]
     enforcers:
       - {kind: eslint-be, id: infra-import-owner}
       - {kind: eslint-be, id: http-client-only-in-integrations}
+    editions: ["lite","full"]
+    docs: ["docs/be-shape-coverage.md#r90"]
+    templateNa: "Lite scaffolds no raw infrastructure implementation or provider HttpClient integration; those application-specific implementations are supplied by their capability owners."
+    proves: [{"path":"packages/eslint/be/r90-infra-owner-coverage.spec.mjs","editions":["lite","full"]}]
+    exemplifiedBy: [{"path":"packages/hfs/templates/be/patterns/queues/platform/queue.module.ts.tpl","edition":"full"},{"path":"packages/eslint/be/r90-infra-owner-coverage.spec.mjs","editions":["lite","full"]}]
+    witness: [{"path":"packages/eslint/be/r90-infra-owner-coverage.spec.mjs","edition":"lite","codes":["BE_INFRA_OWNER"]},{"path":"packages/eslint/be/r90-infra-owner-coverage.spec.mjs","edition":"full","codes":["BE_INFRA_OWNER"]}]
+    gates: ["pre-commit","settle","land","ci"]
   - id: R91
     code: "FE_SOURCE_FORM"
     law: "Front-end files sit in their tier folder with the fixed names, export arrow functions named after the folder, carry English JSDoc, no emoji, and no Vietnamese in identifiers, string literals, comments or test titles outside the i18n catalogs and the i18n e2e fixtures slot."
     kinds: [lint, codemod]
-    gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["FE_SOURCE_FORM", "FE_SOURCE_LAYOUT_INVALID"]
     enforcers:
       - {kind: eslint-fe, id: require-export-jsdoc}
@@ -963,6 +998,12 @@ rules:
       - {kind: eslint-fe, id: no-second-language-in-path}
       - {kind: eslint-fe, id: no-direct-const-alias}
       - {kind: eslint-fe, id: frontend-source-layout}
+    editions: ["lite","full"]
+    docs: ["docs/frontend-source-authoring.md#r91-source-form"]
+    proves: [{"path":"packages/eslint/fe/r91-source-form.spec.mjs","editions":["lite","full"]}]
+    exemplifiedBy: [{"path":"packages/hfs/templates/fe/skeleton-lite/apps/web/src/components/composites/SiteShell/index.tsx","edition":"lite"},{"path":"packages/hfs/templates/fe/skeleton/apps/app/src/features/pages/AppHomePage/index.tsx","edition":"full"},{"path":"packages/eslint/fe/r91-source-form.spec.mjs","editions":["lite","full"]}]
+    witness: [{"path":"packages/eslint/fe/r91-source-form.spec.mjs","edition":"lite","codes":["FE_SOURCE_FORM","FE_SOURCE_LAYOUT_INVALID"]},{"path":"packages/eslint/fe/r91-source-form.spec.mjs","edition":"full","codes":["FE_SOURCE_FORM","FE_SOURCE_LAYOUT_INVALID"]}]
+    gates: ["pre-commit","settle","land","ci"]
   - id: R92
     code: "FE_COMPONENT_API"
     law: "A component exposes the canon surface: typed named props and slots, an exact sibling XBase presentational twin for every connected block, status through the slot view, no className or CSS doors, no resting twin or placeholder prop, class names in the colocated file; a pure component reaches no hook, router, locale or API, but may render a list of blocks supplied through render props without importing blocks or owning their data."
@@ -1010,15 +1051,26 @@ rules:
     failureCodes: ["FE_SLOT_FILE_ROLE"]
     enforcers:
       - {kind: machine, id: fe-slot-allows, at: scripts/hfs/architecture/fe-slot-allows.mjs}
+    editions: ["lite","full"]
+    docs: ["docs/hfs-authored-file-boundaries.md#r94-slot-file-roles"]
+    proves: ["tests/hfs-architecture/r94-r96-r97-coverage.spec.mjs"]
+    exemplifiedBy: [{"path":"packages/hfs/templates/fe/skeleton-lite/apps/web/src/app/[locale]/page.tsx","edition":"lite"},{"path":"packages/hfs/templates/fe/skeleton/apps/app/src/app/[locale]/page.tsx","edition":"full"},{"path":"tests/hfs-architecture/r94-r96-r97-coverage.spec.mjs","editions":["lite","full"],"codes":["FE_SLOT_FILE_ROLE"]}]
+    witness: [{"path":"tests/hfs-architecture/r94-r96-r97-coverage.spec.mjs","editions":["lite","full"],"codes":["FE_SLOT_FILE_ROLE"]}]
   - id: R95
     code: "BE_OPERATION_CONTRACT"
     law: "A versioned operation is declared once in the app's typed operation table (`OperationContract<Input, Output, RefusalCode>` registered by `defineOperations`): its input and output are closed types (never `any`, `unknown` or `Record<string, unknown>`), its refusal codes a closed union of string literals, and the route that serves the table takes `OperationRequest<Table>` and answers `Promise<OperationReply<Table>>` of that one table."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_OPERATION_CONTRACT"]
     enforcers:
       - {kind: eslint-be, id: operation-contract-decidable}
       - {kind: eslint-be, id: operation-route-driven-by-table}
+    gates: ["pre-commit","settle","land","ci"]
+    editions: ["lite","full"]
+    docs: ["docs/operation-contracts.md#r95-closed-operations-and-matching-routes"]
+    templateNa: "Operation tables and their table-driven HTTP routes are application-authored feature contracts; managed templates scaffold neither defineOperations tables nor OperationRequest/OperationReply routes."
+    exemplifiedBy: [{"path":"packages/eslint/be/operation-contract-coverage.spec.mjs","editions":["lite","full"],"codes":["BE_OPERATION_CONTRACT"]}]
+    proves: [{"path":"packages/eslint/be/operation-contract-coverage.spec.mjs","editions":["lite","full"],"codes":["BE_OPERATION_CONTRACT"]}]
+    witness: [{"path":"packages/eslint/be/operation-contract-coverage.spec.mjs","edition":"lite","codes":["BE_OPERATION_CONTRACT"]},{"path":"packages/eslint/be/operation-contract-coverage.spec.mjs","edition":"full","codes":["BE_OPERATION_CONTRACT"]}]
   - id: R96
     code: "HFS_DOC_NOT_ENGLISH"
     law: "Every Markdown and YAML document under a side's docs/, src/ and apps/ (be/, fe/) and under the runtime's knowledge/ and docs/ is English, code fences included; only YAML data in a message-catalog or i18n-fixtures slot may hold another language."
@@ -1027,31 +1079,55 @@ rules:
     failureCodes: ["HFS_DOC_NOT_ENGLISH"]
     enforcers:
       - {kind: machine, id: doc-language, at: scripts/hfs/architecture/doc-language.mjs}
+    editions: ["lite","full"]
+    docs: ["docs/hfs-authored-file-boundaries.md#r96-document-language"]
+    templateNa: "Language validation judges authored document content rather than a scaffolded file role; edition-specific spec fixtures exercise English documents and localized data."
+    proves: ["tests/hfs-architecture/r94-r96-r97-coverage.spec.mjs"]
+    exemplifiedBy: [{"path":"tests/hfs-architecture/r94-r96-r97-coverage.spec.mjs","editions":["lite","full"],"codes":["HFS_DOC_NOT_ENGLISH"]}]
+    witness: [{"path":"tests/hfs-architecture/r94-r96-r97-coverage.spec.mjs","editions":["lite","full"],"codes":["HFS_DOC_NOT_ENGLISH"]}]
   - id: R97
     code: "FE_NO_TESTS"
     law: "The front end (`fe/`) has no tests by standard: no `*.spec.*`, `*.test.*` or `*-spec.*` file, no `e2e/`, `__tests__/`, `__mocks__/` or `test-support/` directory, no vitest, Playwright, jest or Cypress configuration or setup file, no test script, and no test-runner, test-environment, testing-library or axe dependency in any `package.json`; there is no exception, `scripts/` included."
     kinds: [check]
-    gates: [pre-push, settle, land, ci]
     failureCodes: ["FE_NO_TESTS"]
     enforcers:
       - {kind: hfs, id: fe-no-tests, at: scripts/hfs/rules/fe-no-tests.mjs}
+    editions: ["lite","full"]
+    docs: ["docs/hfs-authored-file-boundaries.md#r97-front-end-test-exclusion"]
+    templateNa: "Front-end test files and test tooling are forbidden and are therefore not scaffolded; spec fixtures show permitted production files and manifests without test tooling."
+    proves: ["tests/hfs-architecture/r94-r96-r97-coverage.spec.mjs"]
+    exemplifiedBy: [{"path":"tests/hfs-architecture/r94-r96-r97-coverage.spec.mjs","editions":["lite","full"],"codes":["FE_NO_TESTS"]}]
+    witness: [{"path":"tests/hfs-architecture/r94-r96-r97-coverage.spec.mjs","editions":["lite","full"],"codes":["FE_NO_TESTS"]}]
+    gates: ["settle","land","ci"]
   - id: R98
     code: "BE_TEST_BUILDER_HOME"
     law: "A test data builder lives only in `be/src/tests/fixtures/builders/<area>.builder.ts` (slot `be.tests.fixtures.builders`, its SQL text in `<area>.sql.ts` beside it): a `*.repository.ts`, `*.factory.ts` or `*.fixture.ts` under `be/src/tests` and a `*.builder.ts` elsewhere are BE_SOURCE_FORM findings, and any other module of the test tree that exports a function creating persisted rows through an EntityManager, DataSource or QueryRunner is a builder in the wrong place."
     kinds: [lint]
-    gates: [pre-push, settle, land, ci]
     failureCodes: ["BE_TEST_BUILDER_HOME"]
     enforcers:
       - {kind: eslint-be, id: persisting-builder-in-builders-slot}
+    editions: ["lite","full"]
+    docs: ["docs/test-builder-coverage.md#r98-builder-home"]
+    proves: [{"path":"packages/eslint/be/persisting-builder-home-coverage.spec.mjs","editions":["lite","full"],"codes":["BE_TEST_BUILDER_HOME"]}]
+    exemplifiedBy: [{"path":"packages/eslint/be/persisting-builder-home-coverage.spec.mjs","editions":["lite","full"],"codes":["BE_TEST_BUILDER_HOME"]}]
+    templateNa: "Persisted rows and their parent chains depend on each application's entities; the scaffold's wiring-proof builders supply configuration and doubles rather than persistent row builders."
+    witness: [{"path":"packages/eslint/be/persisting-builder-home-coverage.spec.mjs","edition":"lite","codes":["BE_TEST_BUILDER_HOME"]},{"path":"packages/eslint/be/persisting-builder-home-coverage.spec.mjs","edition":"full","codes":["BE_TEST_BUILDER_HOME"]}]
+    gates: ["settle","land","ci"]
   - id: R99
     code: "BE_TEST_ROW_BY_BUILDER"
     law: "A unit, integration or e2e spec never hand-builds rows: no raw INSERT/UPDATE/DELETE text, no `save`, `insert`, `upsert`, `update`, `delete` or `remove` on an EntityManager, DataSource or QueryRunner, and no persistence entity built as an object literal more than once in the spec; rows come from the area's builder."
     kinds: [lint]
-    gates: [pre-push, settle, land, ci]
     failureCodes: ["BE_TEST_ROW_BY_BUILDER"]
     enforcers:
       - {kind: eslint-be, id: spec-no-raw-insert}
       - {kind: eslint-be, id: spec-no-repeated-row-literal}
+    editions: ["lite","full"]
+    docs: ["docs/test-builder-coverage.md#r99-row-arrangement"]
+    proves: [{"path":"packages/eslint/be/spec-row-by-builder-coverage.spec.mjs","editions":["lite","full"],"codes":["BE_TEST_ROW_BY_BUILDER"]}]
+    exemplifiedBy: [{"path":"packages/eslint/be/spec-row-by-builder-coverage.spec.mjs","editions":["lite","full"],"codes":["BE_TEST_ROW_BY_BUILDER"]}]
+    templateNa: "Persistent row arrangements are authored for each application's entities and parent chains; scaffolded wiring proofs do not generate those arrangements."
+    witness: [{"path":"packages/eslint/be/spec-row-by-builder-coverage.spec.mjs","edition":"lite","codes":["BE_TEST_ROW_BY_BUILDER"]},{"path":"packages/eslint/be/spec-row-by-builder-coverage.spec.mjs","edition":"full","codes":["BE_TEST_ROW_BY_BUILDER"]}]
+    gates: ["settle","land","ci"]
   - id: R100
     code: "BE_TEST_CONSTRAINTS_ON"
     law: "Nothing under `be/src/tests` disables or drops a database constraint: no `session_replication_role`, `SET CONSTRAINTS ... DEFERRED`, `DEFERRABLE INITIALLY DEFERRED`, `ALTER TABLE ... DISABLE`, `DISABLE TRIGGER`, `DROP CONSTRAINT`, and no `dropForeignKey(s)`, `dropCheckConstraint(s)` or `dropUniqueConstraint(s)` on a QueryRunner; a builder creates the parent chain instead."
