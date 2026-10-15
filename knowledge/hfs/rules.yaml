@@ -70,17 +70,38 @@ rules:
       - {kind: runtime, id: runtime-untracked, at: scripts/hfs/runtime-check.mjs}
   - id: R04
     code: "HFS_GITIGNORE_BLOCK_DRIFT"
+    editions: [lite, full]
+    docs: [docs/legacy-managed-rule-coverage.md#r04]
+    proves:
+      - {path: tests/hfs-proofs/hfs-gitignore-block-drift.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/gitignore-lite, edition: lite}
+      - {path: packages/hfs/templates/app/gitignore, edition: full}
+      - {path: tests/hfs-proofs/hfs-gitignore-block-drift.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-proofs/hfs-gitignore-block-drift.spec.mjs, edition: lite, codes: [HFS_GITIGNORE_BLOCK_DRIFT]}
+      - {path: tests/hfs-proofs/hfs-gitignore-block-drift.spec.mjs, edition: full, codes: [HFS_GITIGNORE_BLOCK_DRIFT]}
     law: "The managed `.gitignore` block equals its render."
     kinds: [check, codemod]
-    gates: [pre-push, land, ci]
+    gates: [land, ci]
     failureCodes: ["HFS_GITIGNORE_BLOCK_DRIFT"]
     enforcers:
       - {kind: hfs, id: gitignore-block-drift, at: packages/hfs/sync/managed.mjs}
   - id: R05
     code: "HFS_MANAGED_FILE_DRIFT"
+    editions: [lite, full]
+    docs: [docs/legacy-managed-rule-coverage.md#r05]
+    proves:
+      - {path: tests/hfs-proofs/hfs-managed-file-drift.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/hooks/husky/pre-push, editions: [lite, full]}
+      - {path: tests/hfs-proofs/hfs-managed-file-drift.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-proofs/hfs-managed-file-drift.spec.mjs, edition: lite, codes: [HFS_MANAGED_FILE_DRIFT]}
+      - {path: tests/hfs-proofs/hfs-managed-file-drift.spec.mjs, edition: full, codes: [HFS_MANAGED_FILE_DRIFT]}
     law: "A managed file equals its template render."
     kinds: [check, codemod]
-    gates: [pre-push, land, ci]
+    gates: [land, ci]
     failureCodes: ["HFS_MANAGED_FILE_DRIFT"]
     enforcers:
       - {kind: hfs, id: managed-file-drift, at: packages/hfs/sync/managed.mjs}
@@ -124,6 +145,16 @@ rules:
       - {kind: hfs, id: starcistacks-runtime-gate, at: scripts/gates/starcistacks.mjs}
   - id: R11
     code: "HFS_SONAR_CONFIG"
+    editions: [lite, full]
+    docs: [docs/legacy-managed-rule-coverage.md#r11]
+    proves:
+      - {path: tests/hfs-proofs/hfs-sonar-config.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/quality-config/sonar-project.properties, editions: [lite, full]}
+      - {path: tests/hfs-proofs/hfs-sonar-config.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-proofs/hfs-sonar-config.spec.mjs, edition: lite, codes: [HFS_SONAR_CONFIG]}
+      - {path: tests/hfs-proofs/hfs-sonar-config.spec.mjs, edition: full, codes: [HFS_SONAR_CONFIG]}
     law: "Sonar config is generated, with no host URL, importing the be lcov with the logic of be/src/modules (the coverage scope derived from the slot manifest) as the only coverage scope."
     kinds: [check, codemod]
     gates: [land, ci]
@@ -132,9 +163,18 @@ rules:
       - {kind: hfs, id: sonar-config, at: packages/hfs/sync/managed.mjs}
   - id: R12
     code: "HFS_E2E_IN_AUTOMATIC_GATE"
+    editions: [lite, full]
+    docs: [docs/legacy-custody-e2e-coverage.md#r12-automatic-test-execution]
+    proves:
+      - {path: tests/hfs-proofs/hfs-e2e-automatic-gate.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/hooks/husky/pre-push, editions: [lite, full]}
+      - {path: tests/hfs-proofs/hfs-e2e-automatic-gate.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-proofs/hfs-e2e-automatic-gate.spec.mjs, editions: [lite, full]}
     law: "e2e never joins husky, coverage or automatic CI."
     kinds: [check]
-    gates: [pre-push, land, ci]
+    gates: [land, ci]
     failureCodes: ["HFS_E2E_IN_AUTOMATIC_GATE"]
     enforcers:
       - {kind: machine, id: e2e-in-automatic-gate, at: scripts/hfs/architecture/hfs.mjs}
