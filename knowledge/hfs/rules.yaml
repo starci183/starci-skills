@@ -1522,6 +1522,18 @@ rules:
       - {kind: eslint-be, id: service-isolation}
   - id: R169
     code: "BE_SAGA_STEP_COMPENSATION"
+    editions: [lite, full]
+    docs: [docs/microservices.md#r169]
+    proves:
+      - {path: tests/hfs/hfs-saga-coverage.spec.mjs, editions: [lite, full], codes: [BE_SAGA_STEP_COMPENSATION]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/patterns/saga/saga.service.ts.tpl, editions: [lite, full]}
+      - {path: packages/hfs/templates/be/patterns/saga/saga.step.ts.tpl, editions: [lite, full]}
+      - {path: packages/hfs/templates/be/patterns/saga/saga.compensation.ts.tpl, editions: [lite, full]}
+      - {path: tests/hfs/hfs-saga-coverage.spec.mjs, editions: [lite, full], codes: [BE_SAGA_STEP_COMPENSATION]}
+    witness:
+      - {path: tests/hfs/hfs-saga-coverage.spec.mjs, edition: lite, codes: [BE_SAGA_STEP_COMPENSATION]}
+      - {path: tests/hfs/hfs-saga-coverage.spec.mjs, edition: full, codes: [BE_SAGA_STEP_COMPENSATION]}
     law: "In a product that declares the `saga` pattern (`patterns: [\"saga\"]` in hfs.json sides.be) a saga is the folder `be/src/features/saga/<saga>/` (`<saga>.saga.ts` the orchestrator, `steps/<step>.step.ts`, `compensations/<step>.compensation.ts`): every step has a compensation of the same name and every compensation a step, the orchestrator imports every step and every compensation of its folder, and a folder of steps or compensations has an orchestrator; the folders themselves are slots enabled only by the declared pattern, so an undeclared saga is `HFS_SLOT_NOT_ENABLED`."
     kinds: [check]
     gates: [land, ci]
@@ -1530,6 +1542,17 @@ rules:
       - {kind: hfs, id: saga-step-compensation, at: scripts/hfs/rules/saga.mjs}
   - id: R170
     code: "BE_SAGA_STATE_VERSIONED"
+    editions: [lite, full]
+    docs: [docs/microservices.md#r170]
+    proves:
+      - {path: tests/hfs/hfs-saga-coverage.spec.mjs, editions: [lite, full], codes: [BE_SAGA_STATE_VERSIONED]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/patterns/saga/saga.service.ts.tpl, editions: [lite, full]}
+      - {path: packages/hfs/templates/be/patterns/saga/saga.state.ts.tpl, editions: [lite, full]}
+      - {path: tests/hfs/hfs-saga-coverage.spec.mjs, editions: [lite, full], codes: [BE_SAGA_STATE_VERSIONED]}
+    witness:
+      - {path: tests/hfs/hfs-saga-coverage.spec.mjs, edition: lite, codes: [BE_SAGA_STATE_VERSIONED]}
+      - {path: tests/hfs/hfs-saga-coverage.spec.mjs, edition: full, codes: [BE_SAGA_STATE_VERSIONED]}
     law: "Every saga orchestrator has `<saga>.saga-state.ts` beside it, whose exported state type declares `status` and `version: number`, and imports the fenced store of `platform/saga`: the persisted state of a run moves only through the store, every transition naming the version it read, so a zombie delivery cannot move a run twice."
     kinds: [check]
     gates: [land, ci]
@@ -1538,6 +1561,17 @@ rules:
       - {kind: hfs, id: saga-state-versioned, at: scripts/hfs/rules/saga.mjs}
   - id: R171
     code: "BE_SAGA_EVENT_CONTRACT"
+    editions: [lite, full]
+    docs: [docs/microservices.md#r171]
+    proves:
+      - {path: tests/hfs/hfs-saga-coverage.spec.mjs, editions: [lite, full], codes: [BE_SAGA_EVENT_CONTRACT]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/patterns/saga/saga.step.ts.tpl, editions: [lite, full]}
+      - {path: packages/hfs/templates/be/patterns/saga/saga.compensation.ts.tpl, editions: [lite, full]}
+      - {path: tests/hfs/hfs-saga-coverage.spec.mjs, editions: [lite, full], codes: [BE_SAGA_EVENT_CONTRACT]}
+    witness:
+      - {path: tests/hfs/hfs-saga-coverage.spec.mjs, edition: lite, codes: [BE_SAGA_EVENT_CONTRACT]}
+      - {path: tests/hfs/hfs-saga-coverage.spec.mjs, edition: full, codes: [BE_SAGA_EVENT_CONTRACT]}
     law: "A saga step and a saga compensation each name their event (`readonly event = \"<name>\"`), both events are declared in a vendored contract (`be/contracts/<service>/events.json`), and the contract of the compensation's event declares `compensates: \"<event of the step of the same name>\"`."
     kinds: [check]
     gates: [land, ci]
@@ -1572,6 +1606,18 @@ rules:
       - {kind: hfs, id: saga-e2e, at: scripts/hfs/rules/saga.mjs}
   - id: R174
     code: "BE_CONTEXT_OWNER"
+    editions: [lite, full]
+    docs: [docs/microservices.md#bounded-context-coverage]
+    proves:
+      - {path: packages/eslint/be/project-graph.context-coverage.spec.mjs, editions: [lite, full], codes: [BE_CONTEXT_OWNER]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton-lite/apps/api/src/compose/platform.ts, edition: lite}
+      - {path: packages/hfs/templates/be/skeleton/apps/__app__/src/compose/platform.ts, edition: full}
+      - {path: packages/hfs/templates/be/skeleton/apps/cli/src/compose/platform.ts, edition: full}
+      - {path: packages/eslint/be/project-graph.context-coverage.spec.mjs, editions: [lite, full], codes: [BE_CONTEXT_OWNER]}
+    witness:
+      - {path: packages/eslint/be/project-graph.context-coverage.spec.mjs, edition: lite, codes: [BE_CONTEXT_OWNER]}
+      - {path: packages/eslint/be/project-graph.context-coverage.spec.mjs, edition: full, codes: [BE_CONTEXT_OWNER]}
     law: "A connection of hfs.json is a bounded context owned by one api or worker app (`owner`, `isolation` database or schema): an app composes only the connections and capabilities of the contexts it owns, and the migrate and cli apps compose every declared connection (migrations run only through them, once per connection)."
     kinds: [lint, design]
     gates: [settle, land, ci]
@@ -1580,6 +1626,16 @@ rules:
       - {kind: eslint-be, id: context-owner}
   - id: R175
     code: "BE_CONTEXT_COUPLING"
+    editions: [lite, full]
+    docs: [docs/microservices.md#bounded-context-coverage]
+    proves:
+      - {path: packages/eslint/be/project-graph.context-coverage.spec.mjs, editions: [lite, full], codes: [BE_CONTEXT_COUPLING]}
+    exemplifiedBy:
+      - {path: packages/eslint/be/project-graph.context-coverage.spec.mjs, editions: [lite, full], codes: [BE_CONTEXT_COUPLING]}
+    witness:
+      - {path: packages/eslint/be/project-graph.context-coverage.spec.mjs, edition: lite, codes: [BE_CONTEXT_COUPLING]}
+      - {path: packages/eslint/be/project-graph.context-coverage.spec.mjs, edition: full, codes: [BE_CONTEXT_COUPLING]}
+    templateNa: "Cross-context capability ownership is determined from product-specific connection registrations and imports; the scaffold does not declare a multi-context capability graph."
     law: "Contexts are coupled only by events: no entity relation, no migration foreign key and no import (entities, services or SQL) of a domain or projection capability reaches a capability of another context."
     kinds: [lint, design]
     gates: [settle, land, ci]
@@ -1588,6 +1644,16 @@ rules:
       - {kind: eslint-be, id: context-coupling}
   - id: R176
     code: "BE_CONTEXT_TRANSACTION"
+    editions: [lite, full]
+    docs: [docs/microservices.md#bounded-context-coverage]
+    proves:
+      - {path: packages/eslint/be/project-graph.context-coverage.spec.mjs, editions: [lite, full], codes: [BE_CONTEXT_TRANSACTION]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/inbox/service.ts.tpl, editions: [lite, full]}
+      - {path: packages/eslint/be/project-graph.context-coverage.spec.mjs, editions: [lite, full], codes: [BE_CONTEXT_TRANSACTION]}
+    witness:
+      - {path: packages/eslint/be/project-graph.context-coverage.spec.mjs, edition: lite, codes: [BE_CONTEXT_TRANSACTION]}
+      - {path: packages/eslint/be/project-graph.context-coverage.spec.mjs, edition: full, codes: [BE_CONTEXT_TRANSACTION]}
     law: "One transaction touches one context's connection: inside `transaction(async (manager) => ...)` of a connection's entity manager no entity manager of another connection is used and no capability of another context is called; work across contexts is a saga."
     kinds: [lint, design]
     gates: [settle, land, ci]
@@ -1596,6 +1662,16 @@ rules:
       - {kind: eslint-be, id: context-transaction}
   - id: R177
     code: "BE_CONTRACT_BREAKING"
+    editions: [lite, full]
+    docs: [docs/microservices.md#r177]
+    proves:
+      - {path: tests/hfs/hfs-contract-compat-coverage.spec.mjs, editions: [lite, full], codes: [BE_CONTRACT_BREAKING]}
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-contract-compat-coverage.spec.mjs, editions: [lite, full], codes: [BE_CONTRACT_BREAKING]}
+    witness:
+      - {path: tests/hfs/hfs-contract-compat-coverage.spec.mjs, edition: lite, codes: [BE_CONTRACT_BREAKING]}
+      - {path: tests/hfs/hfs-contract-compat-coverage.spec.mjs, edition: full, codes: [BE_CONTRACT_BREAKING]}
+    templateNa: "Published event-contract pins are service-owned release snapshots, not scaffolded files."
     law: "An event contract evolves only additively: `be/contracts/<service>/events.json` against its pinned previous copy `events.pin.json` keeps every event, stream, version, payload field and type, adds only optional fields, and a breaking change is a new `<event>.v2` key."
     kinds: [check]
     gates: [settle, land, ci]
@@ -1604,6 +1680,16 @@ rules:
       - {kind: hfs, id: contract-compat, at: scripts/hfs/rules/contract-compat.mjs}
   - id: R178
     code: "BE_CONTEXT_PLATFORM_TABLES"
+    editions: [lite, full]
+    docs: [docs/microservices.md#bounded-context-coverage]
+    proves:
+      - {path: packages/eslint/be/project-graph.context-coverage.spec.mjs, editions: [lite, full], codes: [BE_CONTEXT_PLATFORM_TABLES]}
+    exemplifiedBy:
+      - {path: packages/eslint/be/project-graph.context-coverage.spec.mjs, editions: [lite, full], codes: [BE_CONTEXT_PLATFORM_TABLES]}
+    witness:
+      - {path: packages/eslint/be/project-graph.context-coverage.spec.mjs, edition: lite, codes: [BE_CONTEXT_PLATFORM_TABLES]}
+      - {path: packages/eslint/be/project-graph.context-coverage.spec.mjs, edition: full, codes: [BE_CONTEXT_PLATFORM_TABLES]}
+    templateNa: "Per-connection platform tables depend on the application connections used by capability callers; the scaffold does not generate that product-specific caller and registration matrix."
     law: "A platform capability the manifest lists as `perConnection` (the event-bus outbox, the job table) has its entities and migrations registered on every connection whose entity manager is passed to it."
     kinds: [lint, design]
     gates: [settle, land, ci]
@@ -1612,6 +1698,16 @@ rules:
       - {kind: eslint-be, id: context-platform-tables}
   - id: R179
     code: "BE_KIND_DECLARATION"
+    editions: [lite, full]
+    docs: [docs/microservices.md#r179]
+    proves:
+      - {path: tests/hfs/hfs-kind-coverage.spec.mjs, editions: [lite, full], codes: [BE_KIND_DECLARATION]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/patterns/jobs/job.processor.ts.tpl, editions: [lite, full]}
+      - {path: tests/hfs/hfs-kind-coverage.spec.mjs, editions: [lite, full], codes: [BE_KIND_DECLARATION]}
+    witness:
+      - {path: tests/hfs/hfs-kind-coverage.spec.mjs, edition: lite, codes: [BE_KIND_DECLARATION]}
+      - {path: tests/hfs/hfs-kind-coverage.spec.mjs, edition: full, codes: [BE_KIND_DECLARATION]}
     law: "`hfs.json` `sides.be.kinds` lists exactly the trigger kinds (api, webhooks, realtime, saga, reactors, jobs, cli) the back end uses: a kind in use that is not declared, a declared kind with no feature, a declared kind whose patterns (`ruleParams.be.kindPatterns`, e.g. jobs needs fenced-job and queue) are missing from `sides.be.patterns`, and a declared kind whose platform capabilities (the tier-platform slots naming those patterns) are not tracked are each a finding. A kind is declared only when it is used; `starci app add <noun> <name>` creates the first member, the platform capabilities it needs and the registration."
     kinds: [check]
     gates: [settle, land, ci]
@@ -1620,6 +1716,16 @@ rules:
       - {kind: hfs, id: kind-declaration, at: scripts/hfs/rules/kinds.mjs}
   - id: R180
     code: "BE_KIND_EMPTY"
+    editions: [lite, full]
+    docs: [docs/microservices.md#r180]
+    proves:
+      - {path: tests/hfs/hfs-kind-coverage.spec.mjs, editions: [lite, full], codes: [BE_KIND_EMPTY]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/patterns/jobs/job.processor.ts.tpl, editions: [lite, full]}
+      - {path: tests/hfs/hfs-kind-coverage.spec.mjs, editions: [lite, full], codes: [BE_KIND_EMPTY]}
+    witness:
+      - {path: tests/hfs/hfs-kind-coverage.spec.mjs, edition: lite, codes: [BE_KIND_EMPTY]}
+      - {path: tests/hfs/hfs-kind-coverage.spec.mjs, edition: full, codes: [BE_KIND_EMPTY]}
     law: "A kind folder `be/src/features/<kind>/` holds only instance folders `<kind>/<name>/`, and each instance holds TypeScript source: a file directly in the kind folder (a feature named like a kind, a `.gitkeep`) and an instance with no TypeScript file are findings; an empty kind folder is never kept."
     kinds: [check]
     gates: [settle, land, ci]
@@ -1628,6 +1734,16 @@ rules:
       - {kind: hfs, id: kind-empty, at: scripts/hfs/rules/kinds.mjs}
   - id: R181
     code: "BE_SQL_RETURNING_SHAPE"
+    editions: [lite, full]
+    docs: [docs/microservices.md#r181]
+    proves:
+      - {path: packages/eslint/be/sql-returning.spec.mjs, editions: [lite, full], codes: [BE_SQL_RETURNING_SHAPE]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/patterns/jobs/platform/persistence.jobs.sql.ts.tpl, editions: [lite, full]}
+      - {path: packages/eslint/be/sql-returning.spec.mjs, editions: [lite, full], codes: [BE_SQL_RETURNING_SHAPE]}
+    witness:
+      - {path: packages/eslint/be/sql-returning.spec.mjs, edition: lite, codes: [BE_SQL_RETURNING_SHAPE]}
+      - {path: packages/eslint/be/sql-returning.spec.mjs, edition: full, codes: [BE_SQL_RETURNING_SHAPE]}
     law: "A `sql` constant that UPDATEs or DELETEs with RETURNING is wrapped as `WITH changed AS (UPDATE ... RETURNING ...) SELECT ... FROM changed`, because EntityManager.query returns a bare UPDATE or DELETE with RETURNING as `[rows, affectedCount]`, not as rows."
     kinds: [lint, design]
     gates: [settle, land, ci]
@@ -1636,41 +1752,91 @@ rules:
       - {kind: eslint-be, id: sql-returning}
   - id: R182
     code: "BE_WEBHOOK_SHAPE"
+    editions: [lite, full]
+    docs: [docs/microservices.md#r182]
+    proves:
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, editions: [lite, full], codes: [BE_WEBHOOK_SHAPE]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/inbox/webhook-door.ts.tpl, editions: [lite, full]}
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, editions: [lite, full], codes: [BE_WEBHOOK_SHAPE]}
+    witness:
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, edition: lite, codes: [BE_WEBHOOK_SHAPE]}
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, edition: full, codes: [BE_WEBHOOK_SHAPE]}
     law: "A provider webhook door (`src/features/webhooks/<provider>/transport/http/<provider>.webhook.ts`) is one `@Controller` with exactly one `@Post` handler and optionally one `@Get` subscription challenge handler, each declared `@Public({ reason: PublicReason.SignedWebhook })`. It injects only the `WebhookSignatureService` of `platform/http-security` and services of `modules/domain`, holds no branch, loop or `try`, and its POST calls proof then exactly one domain intake that durably records the inbox receipt and outbox event in its transaction. A combined domain proof and intake call is allowed. POST returns nothing or exactly the own-feature exported PROVIDER_ACK, a literal object or string declared with `as const` or a readonly literal type; computed values, inline return objects and cross-feature constants are refused. GET starts with a declared domain verifier call and returns exactly that result, with no intake. The door and its HTTP module import or inject no CommandBus, QueryBus of @nestjs/cqrs or feature command handler; the resolved called intake dispatches no command/query bus or feature handler. A reactor or job consumes the durable receipt and dispatches after commit; unresolved helpers and dynamic receivers require semantic review."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_WEBHOOK_SHAPE"]
     enforcers:
       - {kind: eslint-be, id: webhook-shape}
   - id: R183
     code: "BE_WEBHOOK_UNVERIFIED"
+    editions: [lite, full]
+    docs: [docs/microservices.md#r183]
+    proves:
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, editions: [lite, full], codes: [BE_WEBHOOK_UNVERIFIED]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/inbox/webhook-door.ts.tpl, editions: [lite, full]}
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, editions: [lite, full], codes: [BE_WEBHOOK_UNVERIFIED]}
+    witness:
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, edition: lite, codes: [BE_WEBHOOK_UNVERIFIED]}
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, edition: full, codes: [BE_WEBHOOK_UNVERIFIED]}
     law: "The first statement of a webhook POST is an unconditional verification call to `WebhookSignatureService.verify` or a domain verifier, awaited when async, with no data access or other call before proof. A domain verifier is a method on a domain service whose declared class name ends in `Verifier` or `verify`, or a domain service method declared by symbol in the adjacent HTTP module's exported `webhookVerifiers` array. A domain method may verify with per-connection secrets before intake in the same call; invalid proof throws before intake. A fixed PROVIDER_ACK never replaces proof. The optional GET challenge handler starts with a declared domain verifier call (directly returned or bound to a const and then returned), awaited when async, and echoes only its exact result."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_WEBHOOK_UNVERIFIED"]
     enforcers:
       - {kind: eslint-be, id: webhook-verify-first}
   - id: R184
     code: "BE_REALTIME_SHAPE"
+    editions: [lite, full]
+    docs: [docs/microservices.md#r184]
+    proves:
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, editions: [lite, full], codes: [BE_REALTIME_SHAPE]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/patterns/realtime/channel.gateway.ts.tpl, editions: [lite, full]}
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, editions: [lite, full], codes: [BE_REALTIME_SHAPE]}
+    witness:
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, edition: lite, codes: [BE_REALTIME_SHAPE]}
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, edition: full, codes: [BE_REALTIME_SHAPE]}
     law: "A realtime file is the one door its role names: `<channel>.gateway.ts` holds one `@WebSocketGateway` class with `@SubscribeMessage` handlers and `<x>.subscription.ts` holds one `@Resolver` class with `@Subscription` operations, and neither carries a query, a mutation, a field resolver, a REST route or the other protocol. A lite app serves the same socket.io gateway from its api process and no graphql-ws subscription (R212 case-2, with the Work boundary amended by ruling:R212/case-4)."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_REALTIME_SHAPE"]
     enforcers:
       - {kind: eslint-be, id: realtime-shape}
   - id: R185
     code: "BE_REALTIME_WRITES"
+    editions: [lite, full]
+    docs: [docs/microservices.md#r185]
+    proves:
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, editions: [lite, full], codes: [BE_REALTIME_WRITES]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/patterns/realtime/channel.gateway.ts.tpl, editions: [lite, full]}
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, editions: [lite, full], codes: [BE_REALTIME_WRITES]}
+    witness:
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, edition: lite, codes: [BE_REALTIME_WRITES]}
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, edition: full, codes: [BE_REALTIME_WRITES]}
     law: "A realtime door reads and pushes only: the one value injected into it is the `RealtimeHub` of `platform/realtime`; no `EntityManager`, bus, queue, event bus or domain service reaches it."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_REALTIME_WRITES"]
     enforcers:
       - {kind: eslint-be, id: realtime-read-only}
   - id: R186
     code: "BE_REALTIME_TOPIC_SCOPE"
+    editions: [lite, full]
+    docs: [docs/microservices.md#r186]
+    proves:
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, editions: [lite, full], codes: [BE_REALTIME_TOPIC_SCOPE]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/patterns/realtime/channel.gateway.ts.tpl, editions: [lite, full]}
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, editions: [lite, full], codes: [BE_REALTIME_TOPIC_SCOPE]}
+    witness:
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, edition: lite, codes: [BE_REALTIME_TOPIC_SCOPE]}
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, edition: full, codes: [BE_REALTIME_TOPIC_SCOPE]}
     law: "The topic a realtime handler passes to `RealtimeHub.subscribe` is built from the handler's `@CurrentPrincipal()` parameter of `domain/identity`, so a client can only listen to channels its principal owns."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_REALTIME_TOPIC_SCOPE"]
     enforcers:
       - {kind: eslint-be, id: realtime-topic-scope}
