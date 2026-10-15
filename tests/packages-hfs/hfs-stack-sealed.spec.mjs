@@ -2,8 +2,10 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { configBytes, configObjects, isBinary, lfBytes, lfText, loadSealed, openMember, secretRuntimeName, sha, versionKeyOf } from '../../packages/hfs/stack/sealed.mjs';
+import { configBytes, configObjects, hasAgeIdentity, isBinary, lfBytes, lfText, loadSealed, openMember, requireAgeIdentity, secretRuntimeName, sha, versionKeyOf } from '../../packages/hfs/stack/sealed.mjs';
 import { makeApp, MEMBERS } from '../helpers/stack-release-fakes.mjs';
 
 const apps = [];
@@ -95,6 +97,44 @@ test('a member that cannot be opened is refused naming the member', () => {
   const { config, ctx } = app();
   const broken = ctx({ sops: { decrypt() { throw new Error('boom with db-secret-value'); } } });
   assert.throws(() => openMember(broken, config, 'api'), (error) => error.code === 'STACK_SECRET_MEMBER_UNREADABLE' && error.message.includes('api') && !error.message.includes('db-secret-value'));
+});
+
+/** An environment whose per-user locations are an empty temp home, so no age identity exists on disk. */
+function emptyHome() {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-home-'));
+  apps.push({ dispose: () => fs.rmSync(home, { recursive: true, force: true }) });
+  return { USERPROFILE: home, HOME: home, APPDATA: path.join(home, 'AppData'), XDG_CONFIG_HOME: path.join(home, 'cfg') };
+}
+
+test('the age identity is found in SOPS_AGE_KEY, SOPS_AGE_KEY_FILE, the repository secret.env or the per-user keys.txt, and its absence is refused up front', () => {
+  const { config, ctx } = app();
+  const home = emptyHome();
+  assert.equal(hasAgeIdentity(ctx({ env: home }), config), false);
+  refused(() => requireAgeIdentity(ctx({ env: home }), config, 'build'), 'STACK_AGE_IDENTITY_MISSING');
+  assert.throws(() => requireAgeIdentity(ctx({ env: home }), config, 'build'), (error) => error.message.includes('load the age identity into SOPS_AGE_KEY') && error.message.includes('build needs the sealed members'));
+  assert.equal(hasAgeIdentity(ctx({ env: { ...home, SOPS_AGE_KEY: 'AGE-SECRET-KEY-FAKE' } }), config), true);
+  assert.equal(hasAgeIdentity(ctx({ env: { ...home, sops_age_key_file: '/keys/age.txt' } }), config), true);
+  assert.equal(hasAgeIdentity(ctx({ env: { ...home, SOPS_AGE_KEY: '' } }), config), false, 'an empty value is no identity');
+  assert.doesNotThrow(() => requireAgeIdentity(ctx({ env: { ...home, SOPS_AGE_KEY: 'AGE-SECRET-KEY-FAKE' } }), config, 'build'));
+  fs.mkdirSync(path.join(config.repoRoot, '.claude'), { recursive: true });
+  fs.writeFileSync(path.join(config.repoRoot, '.claude', 'secret.env'), 'SOPS_AGE_KEY=x');
+  assert.equal(hasAgeIdentity(ctx({ env: home }), config), true);
+  fs.rmSync(path.join(config.repoRoot, '.claude'), { recursive: true });
+  fs.mkdirSync(path.join(home.XDG_CONFIG_HOME, 'sops', 'age'), { recursive: true });
+  fs.mkdirSync(path.join(home.APPDATA, 'sops', 'age'), { recursive: true });
+  fs.writeFileSync(path.join(home.XDG_CONFIG_HOME, 'sops', 'age', 'keys.txt'), 'k');
+  fs.writeFileSync(path.join(home.APPDATA, 'sops', 'age', 'keys.txt'), 'k');
+  fs.mkdirSync(path.join(home.HOME, 'Library', 'Application Support', 'sops', 'age'), { recursive: true });
+  fs.writeFileSync(path.join(home.HOME, 'Library', 'Application Support', 'sops', 'age', 'keys.txt'), 'k');
+  assert.equal(hasAgeIdentity(ctx({ env: home }), config), true);
+});
+
+test('an unreadable member says to load the age identity when none is available, and to check the recipients when one is', () => {
+  const { config, ctx } = app();
+  const home = emptyHome();
+  const decrypt = () => { throw new Error('boom'); };
+  assert.throws(() => openMember(ctx({ env: home, sops: { decrypt } }), config, 'web'), (error) => error.code === 'STACK_SECRET_MEMBER_UNREADABLE' && error.message.includes('load the age identity into SOPS_AGE_KEY'));
+  assert.throws(() => openMember(ctx({ env: { ...home, SOPS_AGE_KEY: 'AGE-SECRET-KEY-FAKE' }, sops: { decrypt } }), config, 'web'), (error) => error.message.includes('recipient') && !error.message.includes('load the age identity'));
 });
 
 test('each member is opened once however many sources name it', () => {

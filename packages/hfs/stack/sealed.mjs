@@ -4,6 +4,7 @@
 import { createHash, createHmac } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { secretRoots } from '../runtime/scripts/hfs/secret-files.mjs';
 import { readMap } from '../runtime/scripts/hfs/secret-store.mjs';
 import { refusal } from './errors.mjs';
 
@@ -50,13 +51,27 @@ export function secretRuntimeName(stack, key, value, versionKey) {
   return name;
 }
 
+const AGE_IDENTITY_ENV = /^SOPS_AGE_KEY(?:_FILE)?$/iu;
+const AGE_HINT = 'load the age identity into SOPS_AGE_KEY (the secret.env of the owner machine, or the CI secret) and retry';
+
+/** True when an age identity is reachable: SOPS_AGE_KEY or SOPS_AGE_KEY_FILE in the environment, the repository's .claude/secret.env or the per-user keys.txt. */
+export function hasAgeIdentity(ctx, config) {
+  const named = Object.entries(ctx.env).some(([name, value]) => AGE_IDENTITY_ENV.test(name) && value);
+  return named || fs.existsSync(path.join(config.repoRoot, '.claude', 'secret.env')) || fs.existsSync(secretRoots(ctx.env).identity);
+}
+
+/** Refuses up front, before any work, when sealed custody must be opened and no age identity is reachable. */
+export function requireAgeIdentity(ctx, config, purpose) {
+  if (!hasAgeIdentity(ctx, config)) throw refusal('STACK_AGE_IDENTITY_MISSING', `${purpose} needs the sealed members, and no age identity is available: ${AGE_HINT}`);
+}
+
 /** Opens one sealed member (`<secretsDir>/<member>.enc`) into a { KEY: value } map. Names the member only on failure. */
 export function openMember(ctx, config, member) {
   try {
     const map = readMap(path.join(config.secretsDir, `${member}.enc`), ctx.sops);
     return Object.fromEntries(Object.entries(map).map(([key, value]) => [key, typeof value === 'string' && !value.includes(String.fromCodePoint(0)) ? lfText(value) : value]));
   } catch {
-    throw refusal('STACK_SECRET_MEMBER_UNREADABLE', `the sealed member ${member} cannot be opened (is SOPS_AGE_KEY set to a recipient key?)`);
+    throw refusal('STACK_SECRET_MEMBER_UNREADABLE', `the sealed member ${member} cannot be opened${hasAgeIdentity(ctx, config) ? ' (is the age identity a recipient of this member?)' : `: no age identity is available, ${AGE_HINT}`}`);
   }
 }
 

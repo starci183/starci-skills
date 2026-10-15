@@ -1,6 +1,7 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { buildImages } from '../../packages/hfs/stack/build.mjs';
 import { makeApp, MEMBERS } from '../helpers/stack-release-fakes.mjs';
@@ -70,7 +71,7 @@ const anonymousRegistry = (state) => async (url) => {
   return { status: state === 'private' ? 401 : 200 };
 };
 const registryOf = (made, visibility) => ({ ...made.config, registry: { ...made.config.registry, visibility } });
-const run = (made, options, extra) => buildImages(made.ctx({ spawn: extra.spawn, fetch: extra.fetch ?? anonymousRegistry('public') }), extra.config ?? made.config, options);
+const run = (made, options, extra) => buildImages(made.ctx({ env: { STARCI_SECRET_VERSION_KEY: 'fixture-version-key', SOPS_AGE_KEY: 'AGE-SECRET-KEY-FAKE' }, spawn: extra.spawn, fetch: extra.fetch ?? anonymousRegistry('public') }), extra.config ?? made.config, options);
 
 test('a dry run prints the release, the Dockerfiles and the tags, and builds nothing', async () => {
   const made = app();
@@ -232,4 +233,18 @@ test('visibility: a package that is still private fails a public declaration wit
 test('build supports ghcr.io only', async () => {
   const made = app();
   await assert.rejects(run(made, {}, { ...shim(), config: { ...made.config, registry: { host: 'registry.example', visibility: 'public' } } }), (error) => error.code === 'STACK_BUILD_REGISTRY');
+});
+
+test('a build that opens the sealed build values refuses up front, naming the age identity, when none is available', async () => {
+  const made = app();
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-home-'));
+  const env = { USERPROFILE: home, HOME: home, APPDATA: path.join(home, 'AppData'), XDG_CONFIG_HOME: path.join(home, 'cfg') };
+  const s = shim();
+  try {
+    await assert.rejects(buildImages(made.ctx({ env, spawn: s.spawn }), made.config, { push: true, execute: true }), (error) => error.code === 'STACK_AGE_IDENTITY_MISSING' && error.message.includes('load the age identity into SOPS_AGE_KEY'));
+    assert.equal(s.builds().length, 0, 'nothing was built');
+    assert.equal((await buildImages(made.ctx({ env, spawn: s.spawn }), made.config, {})).ok, true, 'a dry run opens nothing');
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
 });
