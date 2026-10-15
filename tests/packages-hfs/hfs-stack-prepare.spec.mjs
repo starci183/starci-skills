@@ -289,3 +289,24 @@ test('the swarm control port listens where STARCI_SWARM_LISTEN_ADDR says, and a 
   const hostile = setup({ env: { ...env, STARCI_SWARM_LISTEN_ADDR: '0.0.0.0; id' } });
   await assert.rejects(prepareHost(hostile.ctx, config, { execute: true, initSwarm: true }, hostile.deps), (error) => error.code === 'STACK_SWARM_LISTEN_ADDR');
 });
+
+test('prepare --execute creates the declared backup directories (mode 750, deploy user) and skips the ones that exist', async () => {
+  const made = [];
+  const table = { ...healthyTable(), 'test -d': (command) => (command.includes('/srv/shop/backups') ? { status: 1, stdout: '', stderr: '' } : { status: 0, stdout: '', stderr: '' }), 'install -d': (command) => { made.push(command); return { status: 0, stdout: '', stderr: '' }; } };
+  const { ctx, deps } = setup({ table });
+  const withDirs = { ...config, backup: { ...config.backup, dir: '/srv/shop/backups' }, ingress: { backup: { dir: '/srv/shop/backups' } } };
+  const result = await prepareHost(ctx, withDirs, { execute: true }, deps);
+  assert.equal(made.length, 1, 'one directory, declared twice');
+  assert.ok(made[0].startsWith("install -d -m 750 '/srv/shop/backups' || sudo -n install -d -o ") && made[0].endsWith(" -m 750 '/srv/shop/backups'") && made[0].includes('$(id -un)'));
+  assert.ok(result.lines.includes('created /srv/shop/backups (mode 750, owned by the deploy user)'));
+  const existing = await prepareHost(setup().ctx, withDirs, { execute: true }, setup().deps);
+  assert.ok(!existing.lines.some((line) => line.startsWith('created /srv/shop/backups')));
+});
+
+test('prepare --execute reports a backup directory it cannot create', async () => {
+  const table = { ...healthyTable(), 'test -d': () => ({ status: 1, stdout: '', stderr: '' }), 'install -d': () => bad('install: cannot create directory: Permission denied') };
+  const { ctx, deps } = setup({ table });
+  const result = await prepareHost(ctx, { ...config, ingress: { backup: { dir: '/var/backups/shop' } } }, { execute: true }, deps);
+  assert.equal(result.ok, false);
+  assert.ok(result.lines.some((line) => line.startsWith('FAIL  cannot create /var/backups/shop: install: cannot create directory: Permission denied')));
+});

@@ -156,6 +156,18 @@ function createVolumes(run, report, config, execute) {
   return created;
 }
 
+/** The backup directories the deploy block declares (volume backups and the ingress store backups), without duplicates. */
+const backupDirectories = (config) => [...new Set([config.backup?.dir, config.ingress?.backup?.dir].filter((dir) => typeof dir === 'string'))];
+
+/** Creates one declared backup directory (mode 750, owned by the deploy user): as the user first, with passwordless sudo when the parent is not theirs. */
+function ensureDirectory(run, report, dir) {
+  const quoted = shellQuote(dir);
+  if (run(`test -d ${quoted}`).status === 0) return;
+  const made = run(`install -d -m 750 ${quoted} || sudo -n install -d -o "$(id -un)" -m 750 ${quoted}`);
+  if (made.status === 0) report.note(`created ${dir} (mode 750, owned by the deploy user)`);
+  else report.bad(`cannot create ${dir}: ${firstLine(made.stderr)} (declare a backup dir under the releases root, or create it once with sudo)`);
+}
+
 /** Creates the releases directory and installs age (the backup encryptor) once, with passwordless sudo when the host allows it. */
 function ensureTools(run, report, config) {
   const base = releasesBase(config);
@@ -165,6 +177,7 @@ function ensureTools(run, report, config) {
     if (made.status === 0) report.note(`created ${base} owned by the deploy user`);
     else report.bad(`cannot create ${base}: ${firstLine(made.stderr)} (needs passwordless sudo once, or create it by hand)`);
   }
+  for (const dir of backupDirectories(config)) ensureDirectory(run, report, dir);
   installAge(run, report);
 }
 
