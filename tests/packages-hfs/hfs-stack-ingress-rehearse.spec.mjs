@@ -221,3 +221,22 @@ test('the other ingress spec still sees a plain ingress service', async () => {
   const result = await runIngress(vps.ctx, config, { action: 'plan' }, { ssh: vps.run });
   assert.equal(result.ok, true);
 });
+
+test('a redirect rule that depends on the URL text is probed exactly as in production: --connect-to, no port in the URL', async () => {
+  const { config } = tree();
+  // the host redirects (301) only while the URL carries no explicit port; with a port in the URL it would answer 200
+  const rehearsalTable = table(LIVE_HOSTS);
+  rehearsalTable['www.tenant.example'] = { ...rehearsalTable['www.tenant.example'], portSensitive: 200 };
+  const vps = vpsWith({ rehearsalBoot: 1, rehearsalTable });
+  const result = await call(vps, config, { execute: true });
+  assert.equal(result.ok, true, text(result));
+  assert.match(text(result), /ok www\.tenant\.example\/: status 301 \(live 301\), certificate serial and subject equal/u);
+  const probes = vps.calls.filter((command) => command.startsWith('curl ') && command.includes('18443'));
+  assert.ok(probes.length >= 3);
+  for (const command of probes) {
+    assert.match(command, /'--connect-to' '[a-z.]+:443:127\.0\.0\.1:18443'/u);
+    assert.doesNotMatch(command, /'--resolve'/u);
+    assert.doesNotMatch(command, /https:\/\/[a-z.]+:\d+/u, 'the URL carries no port');
+  }
+  assertLiveEdgeUntouched(vps);
+});

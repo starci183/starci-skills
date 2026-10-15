@@ -219,9 +219,15 @@ export function makeVps(overrides = {}) {
     return handler(args);
   };
   const curl = (command) => {
-    const [host, port] = parseArgs(command)[4].split(':');
+    const args = parseArgs(command);
+    const url = args.at(-1);
+    const flag = args.findIndex((arg) => arg === '--resolve' || arg === '--connect-to');
+    const hop = args[flag + 1].split(':');
+    const [host, port] = [hop[0], args[flag] === '--connect-to' ? hop[3] : hop[1]];
     const entry = serving(port)?.[host];
-    return entry ? ok(String(entry.code)) : { status: 7, stdout: '000', stderr: 'connection refused' };
+    if (!entry) return { status: 7, stdout: '000', stderr: 'connection refused' };
+    // a rule that matches the URL text (a redirect on https://host/...) does not match when the URL carries an explicit port
+    return ok(String(entry.portSensitive && new URL(url).port !== '' ? entry.portSensitive : entry.code));
   };
   const openssl = (command) => {
     const host = /-servername[^a-z0-9]+([a-z0-9.-]+)/u.exec(command)[1];

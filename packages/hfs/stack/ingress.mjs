@@ -265,8 +265,10 @@ function targetsOf(ingress, declared) {
 
 const bashScript = (script) => `bash -c ${shellQuote(script)}`;
 
+/** The URL and the Host stay exactly as in production (a redirect rule that matches on the URL must see the same text): an alternate port is reached with --connect-to, never by putting the port in the URL. */
 function statusCommand(target, port) {
-  const args = ['-sS', '--max-time', '10', '--resolve', `${target.host}:${port}:127.0.0.1`, '-o', '/dev/null', '-w', '%{http_code}', `https://${target.host}:${port}${target.path}`];
+  const route = port === 443 ? ['--resolve', `${target.host}:443:127.0.0.1`] : ['--connect-to', `${target.host}:443:127.0.0.1:${port}`];
+  const args = ['-sS', '--max-time', '10', ...route, '-o', '/dev/null', '-w', '%{http_code}', `https://${target.host}${target.path}`];
   return `curl ${args.map(shellQuote).join(' ')}`;
 }
 
