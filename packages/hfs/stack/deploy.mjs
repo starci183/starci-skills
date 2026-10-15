@@ -33,7 +33,7 @@ export const DEFAULT_DEPS = Object.freeze({
   verifyStack,
   pruneStack,
   releaseStore: createReleaseStore,
-  ssh: lazy('./remote.mjs', 'sshRunner'),
+  ssh: lazy('./remote.mjs', 'ownerSshRunner'),
 });
 
 const IMAGE_LINE = /^[ \t]+image:[ \t]*(\S+)[ \t]*$/gmu;
@@ -83,8 +83,11 @@ async function runSteps(plan, lines, steps) {
 
 const isoBefore = (ctx, seconds) => new Date(ctx.now() - seconds * 1000).toISOString();
 
-async function openStore(ctx, config, options, d) {
-  return d.releaseStore(config, await d.ssh(ctx, config, { sshCmd: options.sshCmd ?? null }));
+/** Opens the release store over the ssh runner of this invocation; the runner's cleanup is queued on `cleanups` (sealed session files). */
+async function openStore(ctx, config, options, d, cleanups) {
+  const run = await d.ssh(ctx, config, { sshCmd: options.sshCmd ?? null });
+  cleanups.push(() => run.cleanup?.());
+  return d.releaseStore(config, run);
 }
 
 /** Redeploys a stored release after a failed deploy: fetch, stack deploy, converge. Returns the lines to print. */
@@ -126,8 +129,8 @@ function prePull(ctx, images) {
 }
 
 /** Everything before the stack deploy: any failure here leaves the services untouched. Returns { ok, lines, releaseId, images, previous }. */
-async function prepareRelease(ctx, config, options, d, out) {
-  const store = await openStore(ctx, config, options, d);
+async function prepareRelease(ctx, config, options, d, out, cleanups) {
+  const store = await openStore(ctx, config, options, d, cleanups);
   const previous = await store.current();
   const rendered = await d.renderRelease(ctx, config, renderOptions(options, out, previous || null));
   const { releaseId, images } = inspectRendered(out);
@@ -140,8 +143,8 @@ async function prepareRelease(ctx, config, options, d, out) {
   return { ok: true, lines, releaseId, previous, store, stepsDone: [{ step: 'render', ok: true }, { step: 'provision', ok: true }, { step: 'store', ok: true }, { step: 'pre-pull', ok: true }] };
 }
 
-async function deployExecute(ctx, config, options, d, out) {
-  const prepared = await prepareRelease(ctx, config, options, d, out);
+async function deployExecute(ctx, config, options, d, out, cleanups) {
+  const prepared = await prepareRelease(ctx, config, options, d, out, cleanups);
   const { releaseId, previous, store } = prepared;
   const lines = [...prepared.lines];
   const steps = [...prepared.stepsDone];
@@ -181,6 +184,7 @@ export async function deployRelease(ctx, config, options = {}, deps = {}) {
   if (!options.sourceSha) throw refusal('STACK_DEPLOY_SOURCE_SHA', '--source-sha is required (the git commit being deployed)');
   const made = options.out ? null : fs.mkdtempSync(path.join(os.tmpdir(), 'stack-release-'));
   const out = options.out ?? made;
+  const cleanups = [];
   try {
     const rendered = await d.renderRelease(ctx, config, renderOptions(options, out, null));
     const { releaseId } = inspectRendered(out);
@@ -190,8 +194,9 @@ export async function deployRelease(ctx, config, options = {}, deps = {}) {
         : `dry run: release ${releaseId} would be provisioned, stored, pre-pulled, deployed, converged, verified, accepted`;
       return { ok: true, lines: [...(rendered.lines ?? []), plan], data: { releaseId, steps: [{ step: 'render', ok: true }], executed: false } };
     }
-    return await deployExecute(ctx, config, options, d, out);
+    return await deployExecute(ctx, config, options, d, out, cleanups);
   } finally {
+    cleanups.forEach((close) => close());
     if (made) fs.rmSync(made, { recursive: true, force: true });
   }
 }
@@ -204,12 +209,14 @@ export async function rollbackRelease(ctx, config, options = {}, deps = {}) {
   const d = { ...DEFAULT_DEPS, ...deps };
   const release = options.release ?? null;
   if (release !== null && !isReleaseId(release)) throw refusal('STACK_RELEASE_ID', 'the release must be 16 lowercase hex characters');
-  const store = await openStore(ctx, config, options, d);
-  const target = release ?? await store.previous();
-  if (!target) throw refusal('STACK_ROLLBACK_NO_TARGET', 'no previous accepted release is recorded; name one with --release');
-  if (options.execute !== true) return { ok: true, lines: [`dry run: would redeploy release ${target}`], data: { release: target, executed: false } };
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-rollback-'));
+  const cleanups = [];
+  const store = await openStore(ctx, config, options, d, cleanups);
+  let dir = null;
   try {
+    const target = release ?? await store.previous();
+    if (!target) throw refusal('STACK_ROLLBACK_NO_TARGET', 'no previous accepted release is recorded; name one with --release');
+    if (options.execute !== true) return { ok: true, lines: [`dry run: would redeploy release ${target}`], data: { release: target, executed: false } };
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-rollback-'));
     const lines = [];
     const steps = [];
     const since = isoBefore(ctx, 30);
@@ -223,7 +230,8 @@ export async function rollbackRelease(ctx, config, options = {}, deps = {}) {
     lines.push(failed ? `rollback to ${target} failed at ${failed}` : `rolled back to release ${target}; a rollback cannot undo data effects`);
     return { ok: !failed, lines, data: { release: target, executed: true, steps } };
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    if (dir) fs.rmSync(dir, { recursive: true, force: true });
+    cleanups.forEach((close) => close());
   }
 }
 
@@ -235,7 +243,8 @@ export async function acceptRelease(ctx, config, options = {}, deps = {}) {
   const d = { ...DEFAULT_DEPS, ...deps };
   const release = options.release ?? null;
   if (!isReleaseId(release)) throw refusal('STACK_RELEASE_ID', 'accept needs --release <16 lowercase hex characters> (the id the deploy printed)');
-  const store = await openStore(ctx, config, options, d);
+  const cleanups = [];
+  const store = await openStore(ctx, config, options, d, cleanups);
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-accept-'));
   try {
     try { await store.fetch(release, out); } catch { throw refusal('STACK_ACCEPT_UNKNOWN', `release ${release} has no stored record on the manager`); }
@@ -251,5 +260,6 @@ export async function acceptRelease(ctx, config, options = {}, deps = {}) {
     return { ok: true, lines, data: { release, accepted: true, executed: true } };
   } finally {
     fs.rmSync(out, { recursive: true, force: true });
+    cleanups.forEach((close) => close());
   }
 }

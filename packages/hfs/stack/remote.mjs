@@ -131,6 +131,9 @@ export function withOwnerTransport(ctx, config, { sshCmd = null } = {}) {
   return Object.create(ctx, { env: { value: { ...ctx.env, STARCI_STACK_SEALED_SSH: '1' }, enumerable: true } });
 }
 
+/** The runner of a verb that opens it itself (deploy, rollback, accept): the owner-machine session is selected exactly as `withRunner` does. */
+export const ownerSshRunner = (ctx, config, options = {}) => sshRunner(withOwnerTransport(ctx, config, options), config, options);
+
 /** Opens the runner (`deps.ssh` wins in specs), calls `body(run, notes)` and always cleans the session up. */
 export async function withRunner(ctx, config, options, deps, body) {
   const run = deps.ssh ?? sshRunner(withOwnerTransport(ctx, config, options), config, options);
