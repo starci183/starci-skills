@@ -1,17 +1,19 @@
 import { Controller, Get } from "@nestjs/common"
+import type { QueryBus } from "@nestjs/cqrs"
 import { Public, PublicReason } from "@modules/domain/identity"
-import { InjectReadiness } from "@modules/platform/http-security"
-import type { ReadinessService } from "@modules/platform/http-security"
+import { InjectQueryBus } from "@modules/platform/cqrs"
+import type { ReadinessReport } from "@modules/platform/http-security"
+import { CheckReadinessQuery } from "../../application/check-readiness.query"
 
 @Controller("health")
 /** Readiness door: reports the bounded required-dependency probe, independently of process liveness. */
 export class ReadyController {
-    constructor(@InjectReadiness() private readonly readiness: ReadinessService) {}
+    constructor(@InjectQueryBus() private readonly queryBus: QueryBus) {}
 
     /** Answers 503 while the required primary database cannot serve the app. */
     @Get("ready")
     @Public({ reason: PublicReason.Health })
-    ready(): Promise<{ readonly ok: true }> {
-        return this.readiness.probeRequired()
+    ready(): Promise<ReadinessReport> {
+        return this.queryBus.execute(new CheckReadinessQuery({ request: {} }))
     }
 }

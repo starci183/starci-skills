@@ -1,5 +1,5 @@
 // proves: BE_APP_BOOT_PROOF_MISSING@lite
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,6 +9,14 @@ import { bootProofFindings } from '../../scripts/hfs/rules/boot-proof.mjs';
 import { a15Findings } from '../../scripts/hfs/rules/a15-findings.mjs';
 
 const FIXTURES = fileURLToPath(new URL('../../.tmp-docs/', import.meta.url));
+// The wiring proof resolves @nestjs/common through the repository's node_modules, so the fixtures live under the repository root, not in
+// os.tmpdir(). Each test removes its own directory; the parent is removed too when this file created it, so no empty directory is left
+// behind for the tree check (HFS_EMPTY_DIR).
+const FIXTURES_EXISTED = fs.existsSync(FIXTURES);
+after(() => {
+  if (FIXTURES_EXISTED) return;
+  try { fs.rmdirSync(FIXTURES); } catch { /* another test run owns files in it */ }
+});
 const APP_MODULE = 'apps/api/src/app.module.ts';
 const CODE = 'BE_APP_BOOT_PROOF_MISSING';
 const config = { compilerOptions: { target: 'ES2022', module: 'CommonJS', experimentalDecorators: true,

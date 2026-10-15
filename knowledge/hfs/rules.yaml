@@ -2588,7 +2588,7 @@ rules:
       - {"path":"packages/eslint/be/feature-thin.spec.mjs","edition":"full","codes":["HFS_FEATURE_LOGIC_ROLE"]}
   - id: R265
     code: "BE_COMPOSITION_UNTYPED"
-    law: "App composition is identified by resolved module, DynamicModule, Provider, queue and scheduler entry types, independently of class, helper or registration method names. Composition lists and maps live in explicitly typed compose/<area>.ts groups, never in main.ts, <app>.env.ts or <app>.options.ts. The bootstrap may pass its app module to NestFactory, options may bind ports, and app.module.ts spreads the groups. starci app add writes and updates the generated feature's typed area group."
+    law: "App composition is identified by resolved module, DynamicModule, Provider, queue and scheduler entry types, independently of class, helper or registration method names. Composition lists and maps live in explicitly typed compose/<area>.ts groups, never in main.ts, <app>.env.ts or <app>.options.ts. The bootstrap may pass its app module to NestFactory (a cli app, to the CommandFactory.run of nest-commander, R148), options may bind ports, and app.module.ts spreads the groups. starci app add writes and updates the generated feature's typed area group."
     kinds: [lint, codemod]
     gates: ["pre-commit","settle","land","ci"]
     failureCodes: ["BE_COMPOSITION_UNTYPED"]

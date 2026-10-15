@@ -1,12 +1,15 @@
 import { DomainError } from "@modules/platform/errors"
 import type { ErrorKind } from "@modules/platform/errors"
 
-/** Database refusal codes are added with the SQL helpers that can raise them. */
+/** Codes of the database capability. */
 export enum DatabaseErrorCode {
+    /** A configured connection has no declared EntityManager injection token. */
+    ConnectionUndeclared = "DATABASE_CONNECTION_UNDECLARED",
 }
 
-/** How each installed database refusal travels. */
+/** How each database code travels. */
 export const DATABASE_ERROR_KINDS: Record<DatabaseErrorCode, ErrorKind> = {
+    [DatabaseErrorCode.ConnectionUndeclared]: "internal",
 }
 
 /** The one error class of the database capability. */

@@ -147,7 +147,10 @@ export const reportAt = (violations, kit, ruleId, file, node, message, extra = {
 
 const declarationsOf = (ts, checker, node) => {
   const target = ts.isPropertyAccessExpression(node) ? node.name : node;
-  let symbol = checker.getSymbolAtLocation(target);
+  // A shorthand property (`issuer,`) names the variable it reads, not the property it creates.
+  let symbol = ts.isShorthandPropertyAssignment(target.parent ?? {}) && target.parent.name === target
+    ? checker.getShorthandAssignmentValueSymbol(target.parent)
+    : checker.getSymbolAtLocation(target);
   if (symbol && hasAnyFlag(symbol.flags, ts.SymbolFlags.Alias)) symbol = checker.getAliasedSymbol(symbol);
   return symbol?.declarations ?? [];
 };

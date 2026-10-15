@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { TypeOrmModule, getDataSourceToken } from "@nestjs/typeorm"
 import type { DataSource } from "typeorm"
+import { DatabaseProbeService } from "./database-probe.service"
 import { openConnectionSource } from "./connection-source.client"
 import { CONNECTION_SOURCE, DATABASE_OPTIONS, READ_SEED_FILES } from "./database.port"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./database.module-definition"
@@ -9,7 +10,7 @@ import { MigrationRunnerService } from "./migration-runner.service"
 import { readSeedFiles } from "./seed-connections.client"
 import { SeedRunnerService } from "./seed-runner.service"
 import { PRIMARY_CONNECTION } from "./primary.connection"
-import { PRIMARY_ENTITY_MANAGER } from "./primary.decorators"
+import { DATABASE_PROBE, PRIMARY_ENTITY_MANAGER } from "./primary.decorators"
 
 /** The token each declared connection provides its shared EntityManager under. */
 type EntityManagerToken = typeof PRIMARY_ENTITY_MANAGER
@@ -39,6 +40,9 @@ export class DatabaseModule extends ConfigurableModuleClass {
                       },
                   ]
         })
+        const probes = options.connections.some((connection) => connection.name === PRIMARY_CONNECTION)
+            ? [{ provide: DATABASE_PROBE, useClass: DatabaseProbeService }]
+            : []
         return {
             ...base,
             imports: [
@@ -59,6 +63,7 @@ export class DatabaseModule extends ConfigurableModuleClass {
                 ...managers,
                 MigrationRunnerService,
                 SeedRunnerService,
+                ...probes,
                 {
                     provide: CONNECTION_SOURCE,
                     useValue: { open: openConnectionSource },
@@ -70,6 +75,7 @@ export class DatabaseModule extends ConfigurableModuleClass {
                 CONNECTION_SOURCE,
                 MigrationRunnerService,
                 SeedRunnerService,
+                ...probes.map((probe) => probe.provide),
                 ...managers.map((manager) => manager.provide),
             ],
         }

@@ -9,6 +9,7 @@ import { ERRORS_MESSAGES, ErrorsModule } from "@modules/platform/errors"
 import { HTTP_SECURITY_ERROR_KINDS, HTTP_SECURITY_MESSAGES, HttpSecurityModule } from "@modules/platform/http-security"
 import { I18nModule } from "@modules/platform/i18n"
 import { LoggingModule } from "@modules/platform/logging"
+import { RetryModule } from "@modules/platform/retry"
 import type { ApiOptions } from "../api.options"
 
 /**
@@ -18,6 +19,7 @@ import type { ApiOptions } from "../api.options"
  */
 export const platformModules = (options: ApiOptions): Array<DynamicModule> => [
     ClockModule.register({ isGlobal: true }),
+    RetryModule.register({ isGlobal: true }),
     LoggingModule.register({ isGlobal: true }),
     I18nModule.register({
         isGlobal: true,

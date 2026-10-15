@@ -5,6 +5,7 @@ import { constructorDependencies } from './constructor-deps.mjs';
 import { treeOf } from './required-files.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 import { importsOf } from '../../lib/ts-analysis.mjs';
+import { checkFunctionSubject, functionSubjectExports, keyOf as literalKey } from './function-spec-providers.mjs';
 
 /**
  * R48 `unit-spec-providers` (BE_SPEC_QUALITY), the unit test standard's rule 3: the unit spec of a service builds its
@@ -15,7 +16,8 @@ import { importsOf } from '../../lib/ts-analysis.mjs';
  * outside the production program, so it is read from disk). A parameter decorated with a custom `Inject<Thing>()` provides
  * the token that decorator's `injector<T>(TOKEN)` names; an undecorated parameter of a class type provides that class (see
  * constructor-deps.mjs). Providers are matched by the exported name of the imported binding (`import { CACHE as C }` is
- * CACHE), never by text. A provider is a class, or `{ provide: TOKEN, useValue: double }` and nothing else.
+ * CACHE), never by text. A provider is a class, or `{ provide: TOKEN, useValue: double }` and nothing else. A sibling
+ * containing only exported functions instead provides its complete real function object and exercises it through module.get.
  *
  * Findings: an extra provider, a missing provider, a service that is not the first provider, a dependency whose token cannot
  * be resolved, a spec with no createTestingModule providers array, and a provider that is neither a class nor
@@ -37,7 +39,6 @@ function testingModules(ts, sourceFile) {
   return calls;
 }
 
-const literalKey = (ts, property) => (ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property)) && (ts.isIdentifier(property.name) || ts.isStringLiteralLike(property.name)) ? property.name.text : null;
 
 function providerList(ts, call, rel, report) {
   const options = call.arguments[0];
@@ -97,6 +98,8 @@ function checkDependencies(kit, rel, service, serviceFile, list, provided, repor
 function checkTestingModule({ ts, kit, rel, serviceRel, serviceFile, imports, call, report }) {
   const list = providerList(ts, call, rel, report);
   if (!list) return;
+  const names = functionSubjectExports(ts, serviceFile.sourceFile);
+  if (names) return checkFunctionSubject({ ts, rel, serviceRel, imports, call, list, names, report });
   const nameOf = identifier => imports.get(identifier.text)?.name ?? identifier.text;
   const { provided, readable } = readProviders(ts, list, rel, nameOf, report);
   if (!readable) return;

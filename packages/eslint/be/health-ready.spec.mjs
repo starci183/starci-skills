@@ -34,11 +34,70 @@ const bounded = "return Promise.race([this.required.check(), new Promise((resolv
 const liveController = '@Controller("health") export class LiveController { @Get("live") live() { return { ok: true } } }'
 const readyController = ready(bounded).replace("class ReadyController", "export class ReadyController")
 
+const queryReadinessFixture = (change = {}) => {
+    const root = fixture()
+    const files = {
+        "src/features/api/system-health/application/required.query.ts": "export class RequiredQuery {}",
+        "src/modules/platform/cqrs/handler.ts": "export abstract class HandlerBase { execute() { return this.process() } protected abstract process(): Promise<unknown> }",
+        "src/modules/platform/database/probe.ts": 'import type { EntityManager } from "typeorm"; export class DatabaseProbe { constructor(private readonly database: EntityManager) {} async probe() { await this.database.transaction(() => Promise.resolve()) } }',
+        "src/modules/platform/retry/timer.ts": "export interface Timer { schedule(callback: () => void, delayMs: number): () => void }",
+        "src/modules/platform/retry/callbacks.ts": "export type Run = () => void; export type Stop = Run",
+        "src/modules/platform/retry/inject.ts": 'export const TIMER = Symbol("timer"); export const InjectTimer = () => injector(TIMER)',
+        "src/modules/platform/retry/host-timer.ts": 'import type { Timer } from "./timer"; export class HostTimer implements Timer { schedule(callback: () => void, delayMs: number): () => void { const handle = setTimeout(callback, delayMs); return () => clearTimeout(handle) } }',
+        "src/modules/platform/retry/retry.module.ts": 'import { TIMER } from "./inject"; import { HostTimer } from "./host-timer"; @Module({providers:[{provide:TIMER,useClass:HostTimer}]}) export class RetryModule {}',
+        "src/modules/platform/http-security/readiness.ts": 'import { DatabaseProbe } from "@modules/platform/database/probe"; import type { Timer } from "@modules/platform/retry/timer"; import { InjectTimer } from "@modules/platform/retry/inject"; export class ReadinessService { constructor(private readonly database: DatabaseProbe, @InjectTimer() private readonly timer: Timer) {} async probeRequired() { const TIMEOUT = 1000; const failure = new Promise((resolve, reject) => this.timer.schedule(() => reject(new Error("timeout")), TIMEOUT)); await Promise.race([this.database.probe(), failure]); return {ok:true} } }',
+        "src/features/api/system-health/application/required.handler.ts": 'import { QueryHandler } from "@nestjs/cqrs"; import { HandlerBase } from "@modules/platform/cqrs/handler"; import { ReadinessService } from "@modules/platform/http-security/readiness"; import { RequiredQuery } from "./required.query"; @QueryHandler(RequiredQuery) export class RequiredHandler extends HandlerBase { constructor(private readonly readiness: ReadinessService) {super()} protected process() { return this.readiness.probeRequired() } }',
+        "src/features/api/system-health/system-health.module.ts": 'import { RequiredHandler } from "./application/required.handler"; @Module({providers:[RequiredHandler]}) export class HealthModule {}',
+        "src/features/api/system-health/transport/http/health-http.module.ts": 'import { HealthModule } from "../../system-health.module"; import { ReadyController } from "./ready.controller"; @Module({imports:[HealthModule], controllers:[ReadyController]}) export class HealthHttpModule {}',
+        "src/features/api/system-health/transport/http/ready.controller.ts": 'import { QueryBus } from "@nestjs/cqrs"; import { RequiredQuery } from "../../application/required.query"; @Controller("health") export class ReadyController { constructor(private readonly bus: QueryBus) {} @Get("ready") ready() { return this.bus.execute(new RequiredQuery()) } }',
+    }
+    for (const [filename, original] of Object.entries(files)) put(root, filename, change[filename]?.(original) ?? original)
+    const filename = path.join(root, "src/features/api/system-health/transport/http/ready.controller.ts")
+    return { root, filename, code: fs.readFileSync(filename, "utf8") }
+}
+
 test("R262 exports the two rules", () => {
     assert.deepEqual(Object.keys(rules), ["ready-real", "health-signals"])
 })
 
 for (const edition of ["lite", "full"]) {
+    test(`BE_READY_REAL@${edition}: a registered query handler consumes the typed timer and actual required probe`, () => {
+        const passing = queryReadinessFixture()
+        testerOf(passing.root, edition).run("ready-real", readyReal, { valid: [{ filename: passing.filename, code: passing.code }], invalid: [] })
+        for (const timer of [
+            "type ScheduledWork = () => void; type CancelWork = () => void; export interface Timer { schedule(callback: ScheduledWork, delayMs: number): CancelWork }",
+            'import type { Run, Stop } from "./callbacks"; export interface Timer { schedule(callback: Run, delayMs: number): Stop }',
+        ]) {
+            const aliased = queryReadinessFixture({ "src/modules/platform/retry/timer.ts": () => timer })
+            testerOf(aliased.root, edition).run("ready-real", readyReal, { valid: [{ filename: aliased.filename, code: aliased.code }], invalid: [] })
+        }
+        const mutations = [
+            ["src/features/api/system-health/system-health.module.ts", (code) => code.replace("providers:[RequiredHandler]", "providers:[]")],
+            ["src/features/api/system-health/transport/http/health-http.module.ts", (code) => code.replace("imports:[HealthModule]", "imports:[]")],
+            ["src/features/api/system-health/application/required.handler.ts", (code) => code.replace("@QueryHandler(RequiredQuery)", "")],
+            ["src/features/api/system-health/application/required.handler.ts", (code) => code.replace("@QueryHandler(RequiredQuery)", "class OtherQuery {} @QueryHandler(OtherQuery)")],
+            ["src/features/api/system-health/application/required.handler.ts", (code) => code.replace("return this.readiness.probeRequired()", "return Promise.resolve({ok:true})")],
+            ["src/modules/platform/cqrs/handler.ts", (code) => code.replace("return this.process()", "this.process(); return Promise.resolve({ok:true})")],
+            ["src/modules/platform/database/probe.ts", (code) => code.replace("await this.database.transaction(() => Promise.resolve())", "return Promise.resolve()")],
+            ["src/modules/platform/http-security/readiness.ts", (code) => code.replace("this.database.probe(), failure", "Promise.resolve({ok:true}), failure")],
+            ["src/modules/platform/http-security/readiness.ts", (code) => code.replace("TIMEOUT));", "0));")],
+            ["src/modules/platform/http-security/readiness.ts", (code) => code.replace('reject(new Error("timeout"))', "resolve({ok:true})")],
+            ["src/modules/platform/retry/timer.ts", (code) => code.replace("delayMs: number", "delayMs: string")],
+            ["src/modules/platform/retry/timer.ts", () => "type Run = string; type Stop = () => void; export interface Timer { schedule(callback: Run, delayMs: number): Stop }"],
+            ["src/modules/platform/retry/timer.ts", () => "type Run = () => void; type Stop = string; export interface Timer { schedule(callback: Run, delayMs: number): Stop }"],
+            ["src/modules/platform/retry/timer.ts", () => "type Run = Stop; type Stop = Run; export interface Timer { schedule(callback: Run, delayMs: number): Stop }"],
+            ["src/modules/platform/retry/host-timer.ts", (code) => code.replace("setTimeout(callback, delayMs)", "setTimeout(() => undefined, delayMs)")],
+            ["src/modules/platform/retry/host-timer.ts", (code) => code.replace("setTimeout(callback, delayMs)", "setTimeout(callback, 1000)")],
+            ["src/modules/platform/retry/retry.module.ts", (code) => code.replace("provide:TIMER", "provide:OTHER")],
+            ["src/modules/platform/retry/retry.module.ts", (code) => code.replace("useClass:HostTimer", "useClass:MissingTimer")],
+            ["src/features/api/system-health/transport/http/ready.controller.ts", (code) => code.replace("return this.bus.execute(new RequiredQuery())", "this.bus.execute(new RequiredQuery()); return {ok:true}")],
+        ]
+        for (const [filename, mutate] of mutations) {
+            const failing = queryReadinessFixture({ [filename]: mutate })
+            testerOf(failing.root, edition).run("ready-real", readyReal, { valid: [], invalid: [{ filename: failing.filename, code: failing.code, errors: [{ messageId: "real" }] }] })
+        }
+    })
+
     test(`BE_READY_REAL@${edition}: dependency probes are bounded and liveness aliases fail`, () => {
         const root = fixture()
         const filename = path.join(root, "src/features/api/system-health/transport/http/ready.controller.ts")

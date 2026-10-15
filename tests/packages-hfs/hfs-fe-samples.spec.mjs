@@ -63,20 +63,22 @@ function localState() {
   return { create, updates, read: () => state };
 }
 
-function sampleModules(root, source) {
+function sampleModules(root, source, edition) {
   const circle = Symbol('CircleIcon');
-  const icon = load(root, `${source}/components/leaves/Icon/index.tsx`, { '@starci/heroicons/24/outline': { CircleIcon: circle } });
+  const iconPath = edition === 'lite' ? `${source}/components/leaves/Icon/index.tsx` : 'fe/packages/sample-ui/src/leaves/Icon/index.tsx';
+  const iconModule = edition === 'lite' ? '@/components/leaves/Icon' : '@sample/ui';
+  const icon = load(root, iconPath, { '@starci/heroicons/24/outline': { CircleIcon: circle } });
   const local = localState();
   const store = load(root, `${source}/hooks/zustand/appGuide/store.ts`, { zustand: { create: local.create } });
   const hook = load(root, `${source}/hooks/zustand/appGuide/index.ts`, { './store': store });
   const drawing = load(root, `${source}/features/overlays/AppGuideOverlay/component.tsx`, {
-    '@starci/grammar/common': grammar, '@/components/leaves/Icon': icon,
+    '@starci/grammar/common': grammar, [iconModule]: icon,
   });
   const connected = load(root, `${source}/features/overlays/AppGuideOverlay/index.tsx`, {
     'next-intl': { useTranslations: namespace => key => `${namespace}.${key}` },
     '@/hooks/zustand/appGuide': hook, './component': drawing,
   });
-  return { circle, icon, local, drawing, connected };
+  return { circle, icon, iconPath, local, drawing, connected };
 }
 
 function assertGuideState(sample) {
@@ -139,12 +141,18 @@ for (const edition of ['lite', 'full']) {
   test(`C10 ${edition}: the mounted grammar overlay opens and dismisses its local zustand state and delegates the glyph`, async t => {
     const { root, app } = fixture(t, edition);
     const source = `fe/apps/${app}/src`;
-    const sample = sampleModules(root, source);
+    const sample = sampleModules(root, source, edition);
     assertGuideState(sample);
     await assertMounted(root, source, sample.connected);
     const glyph = sample.icon.Icon();
     assert.equal(glyph.type, sample.circle, 'the Icon leaf delegates drawing to @starci/heroicons');
     assert.deepEqual({ ...glyph.props }, { width: 24, height: 24, 'aria-hidden': 'true' });
-    assert.doesNotMatch(read(root, `${source}/components/leaves/Icon/index.tsx`), /<(?:svg|path|circle)\b/);
+    assert.doesNotMatch(read(root, sample.iconPath), /<(?:svg|path|circle)\b/);
+    if (edition === 'full') {
+      assert.equal(fs.existsSync(path.join(root, source, 'components/leaves/Icon/index.tsx')), false, 'all full apps use one shared leaf');
+      const ui = JSON.parse(read(root, 'fe/packages/sample-ui/package.json'));
+      assert.equal(typeof ui.dependencies['@starci/heroicons'], 'string', 'the glyph owner declares its own dependency');
+      assert.match(read(root, 'fe/packages/sample-ui/src/index.ts'), /export \{ Icon \} from/, 'the package entry exports the shared leaf');
+    }
   });
 }

@@ -224,6 +224,28 @@ test("the token table is the manifest's, not the rule's", () => {
     assert.equal(table.fallback.double, "mock")
 })
 
+for (const edition of ["lite", "full"]) test(`spec-infra-double-from-kit: ${edition} real sibling function subjects are values and collaborators still require kit doubles`, () => {
+    const hfs = hfsFromDeclaration({ ...appDeclaration("be", BE_DECLARATION), edition }, TYPED_ROOT)
+    const settings = { starci: { hfs } }
+    const filename = at("src/modules/domain/order/function-subject.mapper.spec.ts")
+    const functions = 'import { doubled, total as sum } from "./function-subject.mapper"\n'
+    const subject = (value) => `${functions}const SUBJECT = Symbol("subject")\nconst provider = { provide: SUBJECT, useValue: ${value} }`
+    tester.run("spec-infra-double-from-kit", specInfraDoubleFromKit, {
+        valid: [
+            { filename, settings, code: subject("doubled") },
+            { filename, settings, code: subject("{ doubled, total: sum }") },
+        ],
+        invalid: [
+            { filename, settings, code: subject("{ doubled: () => 1, total: sum }"), errors: [{ messageId: "wrong" }] },
+            { filename, settings, code: subject("{ doubled, total: () => 1 }"), errors: [{ messageId: "wrong" }] },
+            { filename, settings, code: 'const doubled = (value: number) => value * 2\nconst provider = { provide: SUBJECT, useValue: doubled }', errors: [{ messageId: "unknown" }] },
+            { filename: SPEC, settings, code: subject("doubled"), errors: [{ messageId: "unknown" }] },
+            { filename: SPEC, settings, code: subject("{ doubled, total: sum }"), errors: [{ messageId: "wrong" }] },
+            { filename: SPEC, settings, code: 'import { OrderService } from "./order.service"\nconst provider = { provide: SUBJECT, useValue: OrderService }', errors: [{ messageId: "unknown" }] },
+        ],
+    })
+})
+
 test("spec-exact-values: a unit spec asserts the exact id and the exact date, never expect.any(String|Number|Date)", () => {
     const kit = 'import { FakeClock, fakeIds } from "@starci/jest-preset"\n'
     tester.run("spec-exact-values", specExactValues, {

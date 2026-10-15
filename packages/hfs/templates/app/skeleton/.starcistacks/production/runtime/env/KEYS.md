@@ -1,6 +1,6 @@
 # Production environment key roster
 
-This inventory declares names, consumers and mounted file paths. Credential values are sealed only after owner provisioning; no sealed member or successful deployment is fabricated by scaffolding.
+This inventory declares names, consumers and mounted file paths. Scaffolding seals a generated database placeholder to this app's own recipient. Replace it with the real credential before use; no successful deployment is claimed by scaffolding.
 
 | Key | Consumer |
 | --- | --- |
@@ -11,4 +11,4 @@ This inventory declares names, consumers and mounted file paths. Credential valu
 | `NEXT_PUBLIC_GRAPHQL_URL` | Product front-end GraphQL transport |
 | `NEXT_PUBLIC_APP_URL` | Landing front-end product link |
 
-Public front-end configuration is supplied at build time and stays outside sealed custody. Seal real private members under `.starcistacks/production/secrets/*.enc`, then add their member paths to the manifest. The versioned external database secret is `{{project}}-production-primary-db-url-v1`.
+Public front-end configuration is supplied at build time and stays outside sealed custody. Replace the generated private placeholder only in `.starcistacks/production/secrets/primary-db-url.enc`, already declared by the manifest. The versioned external database secret is `{{project}}-production-primary-db-url-v1`.

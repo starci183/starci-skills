@@ -11,7 +11,13 @@ export const AppGuideOverlay = () => {
     const setOpen = useAppGuideStore((state) => state.setOpen)
     return (
         <AppGuideOverlayBase
-            props={{ isOpen, triggerLabel: t("open"), title: t("title"), description: t("description"), closeLabel: t("close") }}
+            props={{
+                isOpen,
+                triggerLabel: t("open"),
+                title: t("title"),
+                description: t("description"),
+                closeLabel: t("close"),
+            }}
             on={{ openChange: setOpen }}
         />
     )

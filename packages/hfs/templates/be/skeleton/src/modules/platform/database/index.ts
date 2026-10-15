@@ -1,4 +1,6 @@
 export { DatabaseModule } from "./database.module"
+export { DATABASE_PROBE, InjectDatabaseProbe } from "./primary.decorators"
+export { DatabaseProbeService } from "./database-probe.service"
 export { MigrationRunnerService } from "./migration-runner.service"
 export { DEFAULT_SEED_ENV } from "./seed-connections.client"
 export { SeedRunnerService } from "./seed-runner.service"
@@ -6,5 +8,4 @@ export type { DatabaseConnectionConfig, DatabaseConnectionOptions } from "./data
 export { LIST_ROWS_MAX, sql } from "./database.sql"
 export { DATABASE_ERROR_KINDS } from "./errors/database.error"
 export { parsePrimaryDatabaseConfig } from "./primary.config"
-export { PRIMARY_CONNECTION } from "./primary.connection"
 export { InjectPrimaryEntityManager, PRIMARY_ENTITY_MANAGER } from "./primary.decorators"

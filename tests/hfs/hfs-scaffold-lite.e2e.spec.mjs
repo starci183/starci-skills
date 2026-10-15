@@ -237,10 +237,15 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
     'HFS_MONO_NEST_PROJECTS',
     'BE_TEST_TOPOLOGY',
   ]);
-  const unexpectedCodes = [...new Set(report.findings.map(finding => finding.code).filter(code => !upgradeGapCodes.has(code)))].sort((a, b) => a.localeCompare(b));
+  // The upgrade writes the typed environment of the cli app it adds (R289 BE_APP_ENV_REQUIRED): that finding is an upgrade gap only for a file
+  // the dry plan above adds, so an upgrade that stopped writing cli.env.ts would leave it unexpected and fail here.
+  const plannedAdds = new Set([...String(plan.stdout).matchAll(/^add (\S+?):/gm)].map(match => match[1]));
+  const isUpgradeGap = finding => upgradeGapCodes.has(finding.code)
+    || (finding.code === 'BE_APP_ENV_REQUIRED' && plannedAdds.has(String(finding.path ?? '').replaceAll(path.win32.sep, '/')));
+  const unexpectedCodes = [...new Set(report.findings.filter(finding => !isUpgradeGap(finding)).map(finding => finding.code))].sort((a, b) => a.localeCompare(b));
   assert.deepEqual(unexpectedCodes, [], `full-edition view reported non-upgrade findings: ${unexpectedCodes.join(', ')}`);
   const productFinding = report.findings.find((finding) =>
-    !upgradeGapCodes.has(finding.code)
+    !isUpgradeGap(finding)
     && /^(?:supabase\/|fe\/|be\/src\/)/.test(String(finding.path ?? '').replaceAll(path.win32.sep, '/')),
   );
   const productFindingDescription = productFinding ? `${productFinding.code} ${productFinding.path}` : '';

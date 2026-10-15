@@ -158,6 +158,12 @@ const bootstrap = async (): Promise<void> => {
     await app.listen(3000)
 }
 bootstrap()`),
+                example(MAIN, `import { CommandFactory } from "nest-commander"
+declare const Root: { register(): DynamicModule }
+const bootstrap = async (): Promise<void> => {
+    await CommandFactory.run(Root.register(), { logger: false })
+}
+bootstrap()`),
                 example(ROOT, '@Module({}) class Core {}\nexport const metadata = { imports: [Core] }'),
                 example(MODULE, '@Module({}) class Core {}\nexport const metadata = { imports: [Core] }'),
                 example(GROUP, `@Module({}) class Core {}
@@ -212,6 +218,9 @@ export const ports: Provider[] = [{ provide: "APPROVAL", useClass: Adapter }]`),
 declare module "@nestjs/core" { const NestFactory: { create(module: unknown): Promise<void> } }
 @Module({}) class Core {}
 NestFactory.create([Core])`, "outside"),
+                example(MAIN, `declare const Local: { run(module: unknown): Promise<void> }
+@Module({}) class Core {}
+Local.run([Core])`, "outside"),
                 example(OPTIONS, 'class Adapter {}\nexport const providers = [{ provide: "APPROVAL", useClass: Adapter }]', "outside"),
                 example(GROUP, '@Module({}) class Core {}\nexport const area = () => [Core]', "group"),
                 example(GROUP, '@Module({}) class Core {}\nexport const area = [Core]', "group"),

@@ -1,58 +1,86 @@
-import { ServiceUnavailableException } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
-import { fakeTransaction, mockEntityManager } from "@starci/jest-preset"
-import type { MockEntityManager } from "@starci/jest-preset"
-import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { mock } from "@starci/jest-preset"
+import { DATABASE_PROBE } from "@modules/platform/database"
+import type { DatabaseProbeService } from "@modules/platform/database"
+import { TIMER } from "@modules/platform/retry"
+import type { Timer } from "@modules/platform/retry"
+import { HTTP_SECURITY_ERROR_KINDS, HttpSecurityError, HttpSecurityErrorCode } from "./errors/http-security.error"
 import { ReadinessService } from "./readiness.service"
 
-const build = async (entityManager: MockEntityManager) => {
+const build = async () => {
+    const database = mock<DatabaseProbeService>()
+    const timer = mock<Timer>()
+    const cancel = jest.fn()
+    timer.schedule.mockReturnValue(cancel)
     const moduleRef = await Test.createTestingModule({
-        providers: [ReadinessService, { provide: PRIMARY_ENTITY_MANAGER, useValue: entityManager }],
+        providers: [
+            ReadinessService,
+            { provide: DATABASE_PROBE, useValue: database },
+            { provide: TIMER, useValue: timer },
+        ],
     }).compile()
-    return moduleRef.get(ReadinessService)
+    return { service: moduleRef.get(ReadinessService), database, timer, cancel }
 }
 
 describe("ReadinessService", () => {
-    afterEach(() => jest.useRealTimers())
+    it("probes the required database before reporting ready", async () => {
+        const { service, database, timer } = await build()
+        database.probe.mockResolvedValue(undefined)
 
-    it("opens and commits a transaction against the required database before reporting ready", async () => {
-        const transaction = fakeTransaction(mockEntityManager())
-        const service = await build(transaction.em)
         await expect(service.probeRequired()).resolves.toEqual({ ok: true })
-        expect(transaction.em.transaction).toHaveBeenCalledTimes(1)
-        expect(transaction.commits).toBe(1)
+
+        expect(database.probe).toHaveBeenCalledTimes(1)
+        expect(timer.schedule).toHaveBeenCalledWith(expect.any(Function), 1000)
     })
 
-    it("reports 503 when the required database rejects the probe", async () => {
-        const entityManager = mockEntityManager()
-        entityManager.transaction.mockRejectedValue(new Error("connection unavailable"))
-        const service = await build(entityManager)
-        await expect(service.probeRequired()).rejects.toBeInstanceOf(
-            ServiceUnavailableException,
-        )
+    it("preserves the database failure under the unavailable error kind that answers 503", async () => {
+        const { service, database, cancel } = await build()
+        const cause = new Error("connection unavailable")
+        database.probe.mockRejectedValue(cause)
+        const probe = service.probeRequired()
+
+        await expect(probe).rejects.toBeInstanceOf(HttpSecurityError)
+        await expect(probe).rejects.toMatchObject({ code: HttpSecurityErrorCode.RequiredDependencyUnavailable, cause })
+        expect(HTTP_SECURITY_ERROR_KINDS[HttpSecurityErrorCode.RequiredDependencyUnavailable]).toBe("unavailable")
+        expect(cancel).toHaveBeenCalledTimes(1)
     })
 
-    it("reports 503 within the bounded timeout when the required database never answers", async () => {
-        jest.useFakeTimers()
-        const entityManager = mockEntityManager()
-        entityManager.transaction.mockReturnValue(new Promise(() => undefined))
-        const service = await build(entityManager)
-        const expected = expect(service.probeRequired()).rejects.toBeInstanceOf(
-            ServiceUnavailableException,
-        )
-        await jest.advanceTimersByTimeAsync(1000)
+    it("fails within the bounded timeout when the required database never answers", async () => {
+        const { service, database, timer, cancel } = await build()
+        database.probe.mockReturnValue(new Promise(() => undefined))
+        const probe = service.probeRequired()
+        const expected = expect(probe).rejects.toMatchObject({
+            code: HttpSecurityErrorCode.RequiredDependencyUnavailable,
+            cause: new Error("Required database readiness timed out"),
+        })
+
+        expect(timer.schedule).toHaveBeenCalledWith(expect.any(Function), 1000)
+        timer.schedule.mock.calls.at(0)?.[0]()
         await expected
-        expect(jest.getTimerCount()).toBe(0)
+        expect(cancel).toHaveBeenCalledTimes(1)
     })
 
-    it("clears the timeout when the database answers early", async () => {
-        jest.useFakeTimers()
-        const entityManager = mockEntityManager()
-        entityManager.transaction.mockResolvedValue(undefined)
-        const service = await build(entityManager)
+    it("cancels the deadline when the database answers early", async () => {
+        const { service, database, cancel } = await build()
+        database.probe.mockResolvedValue(undefined)
+
         await expect(service.probeRequired()).resolves.toEqual({ ok: true })
-        expect(jest.getTimerCount()).toBe(0)
-        await jest.advanceTimersByTimeAsync(1000)
-        expect(jest.getTimerCount()).toBe(0)
+
+        expect(cancel).toHaveBeenCalledTimes(1)
+    })
+
+    it("preserves a synchronous database failure before a deadline can be scheduled", async () => {
+        const { service, database, timer, cancel } = await build()
+        const cause = new HttpSecurityError({ code: HttpSecurityErrorCode.RequiredDependencyUnavailable })
+        database.probe.mockImplementation(() => {
+            throw cause
+        })
+
+        await expect(service.probeRequired()).rejects.toMatchObject({
+            code: HttpSecurityErrorCode.RequiredDependencyUnavailable,
+            cause,
+        })
+        expect(timer.schedule).not.toHaveBeenCalled()
+        expect(cancel).not.toHaveBeenCalled()
     })
 })

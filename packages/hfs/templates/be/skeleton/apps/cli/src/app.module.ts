@@ -14,10 +14,7 @@ export class AppModule {
     static register(options: CliAppOptions): DynamicModule {
         return {
             module: AppModule,
-            imports: [
-                ...platformModules(options),
-                ...cliModules(),
-            ],
+            imports: [...platformModules(options), ...cliModules()],
         }
     }
 }

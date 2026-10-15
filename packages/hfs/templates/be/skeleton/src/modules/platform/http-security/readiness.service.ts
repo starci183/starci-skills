@@ -1,33 +1,39 @@
-import { Injectable, ServiceUnavailableException } from "@nestjs/common"
-import type { EntityManager } from "typeorm"
-import { InjectPrimaryEntityManager } from "@modules/platform/database"
+import { Injectable } from "@nestjs/common"
+import { InjectDatabaseProbe } from "@modules/platform/database"
+import type { DatabaseProbeService } from "@modules/platform/database"
+import { InjectTimer } from "@modules/platform/retry"
+import type { Timer } from "@modules/platform/retry"
+import { HttpSecurityError, HttpSecurityErrorCode } from "./errors/http-security.error"
+import type { ReadinessReport } from "./readiness.contracts"
 
 const READINESS_TIMEOUT_MS = 1000
 
-/** Required-dependency readiness; liveness never calls this database probe. */
 @Injectable()
+/** Required-dependency readiness; liveness never calls this database probe. */
 export class ReadinessService {
-    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {}
+    constructor(
+        @InjectDatabaseProbe() private readonly database: DatabaseProbeService,
+        @InjectTimer() private readonly timer: Timer,
+    ) {}
 
     /** Returns ready only when the required primary database answers within one second. */
-    async probeRequired(): Promise<{ readonly ok: true }> {
-        let timer: ReturnType<typeof setTimeout> | undefined
+    async probeRequired(): Promise<ReadinessReport> {
+        let cancel: () => void = () => undefined
         try {
             await Promise.race([
-                // BEGIN and COMMIT reach the required database without reading or changing business data.
-                this.entityManager.transaction(async () => undefined),
+                this.database.probe(),
                 new Promise<never>((_resolve, reject) => {
-                    timer = setTimeout(
+                    cancel = this.timer.schedule(
                         () => reject(new Error("Required database readiness timed out")),
                         READINESS_TIMEOUT_MS,
                     )
                 }),
             ])
-            return { ok: true }
-        } catch {
-            throw new ServiceUnavailableException("Required database is unavailable")
+        } catch (cause) {
+            throw new HttpSecurityError({ code: HttpSecurityErrorCode.RequiredDependencyUnavailable, cause })
         } finally {
-            clearTimeout(timer)
+            cancel()
         }
+        return { ok: true }
     }
 }
