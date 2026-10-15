@@ -158,7 +158,7 @@ for (const edition of Object.keys(EDITIONS)) {
 
   test(`${edition}: the deploy workflow scanners (R250, R251) accept the rendering with and without images`, t => {
     for (const stack of [undefined, { images: imagesOf(hfsOf(edition)), passEnv: [] }]) {
-      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-workflow-'));
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-workflow-'));
       t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
       fs.mkdirSync(path.join(dir, '.github', 'workflows'), { recursive: true });
       fs.writeFileSync(path.join(dir, FILE), render(edition, stack).content);

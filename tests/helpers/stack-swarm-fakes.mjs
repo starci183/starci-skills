@@ -66,7 +66,7 @@ const NO = (stderr, status = 1) => ({ status, stdout: '', stderr });
  *   const remote = releaseSsh({ base: '/srv/app' });  remote.ssh(command, { input })  remote.calls  remote.dispose()
  */
 export function releaseSsh({ base = '/srv/app' } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-remote-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-remote-'));
   const links = new Map();
   const modes = new Map();
   const order = [];

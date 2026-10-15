@@ -11,7 +11,7 @@ const TWO = 'fedcba9876543210';
 let work;
 let remote;
 
-before(() => { work = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-store-')); });
+before(() => { work = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-store-')); });
 after(() => fs.rmSync(work, { recursive: true, force: true }));
 afterEach(() => remote?.dispose());
 

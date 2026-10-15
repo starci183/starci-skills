@@ -13,7 +13,7 @@ const PRESETS = { sonarExclusions: [] };
 const dockerfileOf = app => `side/${app}/Dockerfile`;
 
 function appTree(t, declaration, hfs = fs.readFileSync(path.join(ROOT, 'examples', 'lite-app', 'hfs.json'), 'utf8')) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-images-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-images-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   fs.writeFileSync(path.join(dir, 'hfs.json'), hfs);
   if (declaration !== undefined) {

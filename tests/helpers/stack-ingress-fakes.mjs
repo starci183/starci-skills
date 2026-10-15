@@ -63,7 +63,7 @@ export function ingressBlock(extra = {}) {
 
 /** A temp app tree (.sops.yaml, edge/routes.yml) and the config object the module receives. Call cleanup() in after(). */
 export function makeTree(blockExtra = {}, { recipient = true, ownRoutes = OWN_ROUTES, helper = true } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-ingress-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-ingress-'));
   const envDir = path.join(root, '.starcistacks', 'production');
   fs.mkdirSync(path.join(envDir, 'edge'), { recursive: true });
   if (ownRoutes !== null) fs.writeFileSync(path.join(envDir, 'edge', 'routes.yml'), json(ownRoutes));

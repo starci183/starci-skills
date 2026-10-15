@@ -11,10 +11,12 @@ import {
 import { loadSlotManifest, openHfs } from "../runtime/scripts/hfs/slots.mjs";
 import { formatFindings } from "../sync/format.mjs";
 import {
+  appSource,
   checkTargets,
   loadHfs,
   renderTargets,
 } from "../sync/index.mjs";
+import { readDeclaredStack } from "../sync/stack-images.mjs";
 import {
   UPGRADE_PRESETS,
   UpgradeError,
@@ -91,7 +93,7 @@ export async function checkEdition({
   // A lite app scaffolded before the 2026-10-12 ruling has no Jest preset installed. The upgrade model carries the preset's public sync inputs
   // specifically so both the dry full-edition view and the upgrade plan render the same targets before dependencies are added.
   const resolvedPresets = presets ?? UPGRADE_PRESETS;
-  const managed = renderTargets(full, resolvedPresets, { manifest });
+  const managed = renderTargets(full, resolvedPresets, { manifest, source: { ...appSource(repoRoot), stack: readDeclaredStack(repoRoot) } });
   const extra = [
     ...fullManagedFindings(repoRoot, managed),
     ...(await checkDatabase({ repoRoot, files: tracked })),

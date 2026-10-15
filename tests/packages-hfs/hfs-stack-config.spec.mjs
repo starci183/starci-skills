@@ -48,7 +48,7 @@ test('an environment name that is not a name is refused before any file is read'
 });
 
 test('a missing or unparsable declaration is refused with its own code', () => {
-  const empty = trackDirectory(fs.mkdtempSync(path.join(os.tmpdir(), 'stack-empty-')));
+  const empty = trackDirectory(fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-empty-')));
   assert.equal(refusalOf(() => loadDeployConfig({ repoRoot: empty, env: 'production' })).code, 'STACKS_DEPLOY_FILE_MISSING');
   const invalid = buildApp({ declaration: 'a: [unclosed' });
   assert.equal(refusalOf(() => loadDeployConfig({ repoRoot: invalid, env: 'production' })).code, 'STACKS_DEPLOY_FILE_INVALID');

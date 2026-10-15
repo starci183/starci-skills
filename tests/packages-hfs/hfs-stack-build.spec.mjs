@@ -238,7 +238,7 @@ test('build supports ghcr.io only', async () => {
 
 test('a build that opens the sealed build values refuses up front, naming the age identity, when none is available', async () => {
   const made = app();
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-home-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-home-'));
   const env = { USERPROFILE: home, HOME: home, APPDATA: path.join(home, 'AppData'), XDG_CONFIG_HOME: path.join(home, 'cfg') };
   const s = shim();
   try {

@@ -101,7 +101,7 @@ test('a member that cannot be opened is refused naming the member', () => {
 
 /** An environment whose per-user locations are an empty temp home, so no age identity exists on disk. */
 function emptyHome() {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-home-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-home-'));
   apps.push({ dispose: () => fs.rmSync(home, { recursive: true, force: true }) });
   return { USERPROFILE: home, HOME: home, APPDATA: path.join(home, 'AppData'), XDG_CONFIG_HOME: path.join(home, 'cfg') };
 }

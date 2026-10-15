@@ -12,7 +12,7 @@ const PEM = `-----BEGIN OPENSSH PRIVATE KEY-----\n${KEY_BODY}\n-----END OPENSSH 
 const KNOWN = 'vps.example ssh-ed25519 AAAAC3NzaC1lZDI1NTE5';
 const temps = [];
 const tempDir = () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-'));
   temps.push(dir);
   return dir;
 };
@@ -152,21 +152,32 @@ test('on win32 the username comes from os.userInfo() when the context names none
   const icacls = [];
   const host = fakeHost({ overrides: { ssh: () => answer(), icacls: (args) => { icacls.push(args); return answer(); } } });
   const win = { ...ownerCtx(host, ownerSops(), {}), platform: 'win32', username: undefined };
-  sshRunner(win, sealedConfig())('true');
+  const winRun = sshRunner(win, sealedConfig());
+  winRun('true');
+  winRun.cleanup();
   assert.equal(icacls[0].at(-1), `${os.userInfo().username}:R`);
   icacls.length = 0;
-  for (const platform of ['linux', 'darwin']) sshRunner({ ...ownerCtx(host, ownerSops(), {}), platform }, sealedConfig())('true');
+  for (const platform of ['linux', 'darwin']) {
+    const other = sshRunner({ ...ownerCtx(host, ownerSops(), {}), platform }, sealedConfig());
+    other('true');
+    other.cleanup();
+  }
   assert.deepEqual(icacls, []);
 });
 
 test('a failing icacls refuses the session and leaves no key behind', () => {
   const host = fakeHost({ overrides: { ssh: () => answer(), icacls: () => ({ status: 5, stdout: '', stderr: 'Access is denied.' + String.fromCharCode(10) + 'more' }) } });
-  const before = fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('stack-ssh-'));
-  assert.throws(() => sshRunner({ ...ownerCtx(host, ownerSops(), {}), platform: 'win32', username: 'op' }, sealedConfig())('true'), (error) => error.code === 'STACK_REMOTE_ACL' && error.message.includes('Access is denied.') && !error.message.includes(KEY_BODY));
+  const created = [];
+  const real = fs.mkdtempSync;
+  fs.mkdtempSync = (prefix, ...rest) => { const dir = real(prefix, ...rest); created.push(dir); return dir; };
+  try {
+    assert.throws(() => sshRunner({ ...ownerCtx(host, ownerSops(), {}), platform: 'win32', username: 'op' }, sealedConfig())('true'), (error) => error.code === 'STACK_REMOTE_ACL' && error.message.includes('Access is denied.') && !error.message.includes(KEY_BODY));
+  } finally {
+    fs.mkdtempSync = real;
+  }
   assert.equal(host.calls.some((call) => call.command === 'ssh'), false);
-  const leaked = fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('stack-ssh-') && !before.includes(name));
-  for (const name of leaked) fs.rmSync(path.join(os.tmpdir(), name), { recursive: true, force: true });
-  assert.deepEqual(leaked, [], 'the temp directory with the key was removed');
+  assert.equal(created.length, 1);
+  assert.equal(fs.existsSync(created[0]), false, 'the temp directory with the key was removed');
 });
 
 test('without known_hosts content the owner session says accept-new is used', () => {
