@@ -1490,9 +1490,19 @@ rules:
       - {kind: eslint-be, id: spec-no-repeated-row-literal}
   - id: R100
     code: "BE_TEST_CONSTRAINTS_ON"
+    editions: [lite, full]
+    docs: [docs/legacy-be-rule-coverage.md#r100]
+    templateNa: "Application-specific constraint-changing test SQL and QueryRunner calls are handwritten; no managed template generates those operations."
+    proves:
+      - {path: packages/eslint/be/legacy-safety-coverage.spec.mjs, editions: [lite, full], codes: [BE_TEST_CONSTRAINTS_ON]}
+    exemplifiedBy:
+      - {path: packages/eslint/be/legacy-safety-coverage.spec.mjs, editions: [lite, full], codes: [BE_TEST_CONSTRAINTS_ON]}
+    witness:
+      - {path: packages/eslint/be/legacy-safety-coverage.spec.mjs, edition: lite, codes: [BE_TEST_CONSTRAINTS_ON]}
+      - {path: packages/eslint/be/legacy-safety-coverage.spec.mjs, edition: full, codes: [BE_TEST_CONSTRAINTS_ON]}
     law: "Nothing under `be/src/tests` disables or drops a database constraint: no `session_replication_role`, `SET CONSTRAINTS ... DEFERRED`, `DEFERRABLE INITIALLY DEFERRED`, `ALTER TABLE ... DISABLE`, `DISABLE TRIGGER`, `DROP CONSTRAINT`, and no `dropForeignKey(s)`, `dropCheckConstraint(s)` or `dropUniqueConstraint(s)` on a QueryRunner; a builder creates the parent chain instead."
     kinds: [lint]
-    gates: [pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["BE_TEST_CONSTRAINTS_ON"]
     enforcers:
       - {kind: eslint-be, id: tests-keep-constraints}
@@ -1506,6 +1516,20 @@ rules:
       - {kind: eslint-be, id: builder-arranges-only}
   - id: R102
     code: "BE_SPEC_PLACEMENT"
+    editions: [lite, full]
+    docs: [docs/legacy-repo-rule-coverage.md#r102]
+    proves:
+      - {path: tests/hfs/hfs-spec-placement-coverage.spec.mjs, editions: [lite, full], codes: [BE_SPEC_PLACEMENT]}
+      - {path: packages/eslint/be/spec-placement-coverage.spec.mjs, editions: [lite, full], codes: [BE_SPEC_PLACEMENT]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/patterns/cli/group.cli.spec.ts.tpl, editions: [lite, full]}
+      - {path: tests/hfs/hfs-spec-placement-coverage.spec.mjs, editions: [lite, full], codes: [BE_SPEC_PLACEMENT]}
+      - {path: packages/eslint/be/spec-placement-coverage.spec.mjs, editions: [lite, full], codes: [BE_SPEC_PLACEMENT]}
+    witness:
+      - {path: tests/hfs/hfs-spec-placement-coverage.spec.mjs, edition: lite, codes: [BE_SPEC_PLACEMENT]}
+      - {path: tests/hfs/hfs-spec-placement-coverage.spec.mjs, edition: full, codes: [BE_SPEC_PLACEMENT]}
+      - {path: packages/eslint/be/spec-placement-coverage.spec.mjs, edition: lite, codes: [BE_SPEC_PLACEMENT]}
+      - {path: packages/eslint/be/spec-placement-coverage.spec.mjs, edition: full, codes: [BE_SPEC_PLACEMENT]}
     law: "A back-end spec or test file lives in one of the four test layers and nowhere else: a unit spec of a unit-tested role (`ruleParams.be.unitRoles`: `<name>.service.spec.ts` beside its service, `<name>.cli.spec.ts` beside its cli command), or an integration, e2e or contract spec under `be/src/tests/{integration,e2e,contract}`; a `*.spec.*`, `*.test.*` or `*-spec.*` file anywhere else, `scripts/` and `tools/` included, is a finding."
     kinds: [check, lint]
     gates: [land, ci]
@@ -1515,6 +1539,16 @@ rules:
       - {kind: eslint-be, id: spec-placement}
   - id: R103
     code: "HFS_REPO_LOCAL_CHECK"
+    editions: [lite, full]
+    docs: [docs/legacy-repo-rule-coverage.md#r103]
+    proves:
+      - {path: tests/hfs/hfs-repository-hygiene-coverage.spec.mjs, editions: [lite, full], codes: [HFS_REPO_LOCAL_CHECK]}
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-repository-hygiene-coverage.spec.mjs, editions: [lite, full], codes: [HFS_REPO_LOCAL_CHECK]}
+    witness:
+      - {path: tests/hfs/hfs-repository-hygiene-coverage.spec.mjs, edition: lite, codes: [HFS_REPO_LOCAL_CHECK]}
+      - {path: tests/hfs/hfs-repository-hygiene-coverage.spec.mjs, edition: full, codes: [HFS_REPO_LOCAL_CHECK]}
+    templateNa: "Repository-local checks and lint plugins are forbidden artifacts and have no managed scaffold."
     law: "A repository keeps no check, lint rule or lint plugin of its own: no `check-*` file in `scripts/` or `tools/`, no `eslint-local-rules*` or local eslint plugin, no script that runs one; every check lives in the `.claude` runtime and the canons."
     kinds: [check]
     gates: [land, ci]
@@ -1523,6 +1557,16 @@ rules:
       - {kind: hfs, id: repo-local-check, at: scripts/hfs/rules/repo-local-checks.mjs}
   - id: R104
     code: "HFS_LINT_SUPPRESSION_FILE"
+    editions: [lite, full]
+    docs: [docs/legacy-repo-rule-coverage.md#r104]
+    proves:
+      - {path: tests/hfs/hfs-repository-hygiene-coverage.spec.mjs, editions: [lite, full], codes: [HFS_LINT_SUPPRESSION_FILE]}
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-repository-hygiene-coverage.spec.mjs, editions: [lite, full], codes: [HFS_LINT_SUPPRESSION_FILE]}
+    witness:
+      - {path: tests/hfs/hfs-repository-hygiene-coverage.spec.mjs, edition: lite, codes: [HFS_LINT_SUPPRESSION_FILE]}
+      - {path: tests/hfs/hfs-repository-hygiene-coverage.spec.mjs, edition: full, codes: [HFS_LINT_SUPPRESSION_FILE]}
+    templateNa: "Lint-suppression files and options are prohibited, so no suppression artifact is scaffolded."
     law: "A repository keeps no lint-suppression file, script or option: no `eslint.suppressions*`, no `lint:suppressions` script, no eslint `--suppress-all` or `--suppressions-location` flag and no suppressions configuration passed to eslint; a finding is fixed in the code."
     kinds: [check]
     gates: [land, ci]
@@ -1531,6 +1575,16 @@ rules:
       - {kind: hfs, id: lint-suppression, at: scripts/hfs/rules/lint-suppression.mjs}
   - id: R105
     code: "HFS_PROOF_COMMAND_FILE_MISSING"
+    editions: [lite, full]
+    docs: [docs/legacy-repo-rule-coverage.md#r105]
+    templateNa: "Proof plans name project-specific files in authored Work records; managed app scaffolds do not supply those commands or their target scripts."
+    proves:
+      - {path: tests/hfs-proofs/hfs-proof-command-file-missing.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: tests/hfs-proofs/hfs-proof-command-file-missing.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-proofs/hfs-proof-command-file-missing.spec.mjs, edition: lite, codes: [HFS_PROOF_COMMAND_FILE_MISSING]}
+      - {path: tests/hfs-proofs/hfs-proof-command-file-missing.spec.mjs, edition: full, codes: [HFS_PROOF_COMMAND_FILE_MISSING]}
     law: "A proof command of a `.starciwork` record (`requiresProof.<kind>.command`) is runnable as written: every repository file it names exists."
     kinds: [check]
     gates: [land, ci]
@@ -1545,27 +1599,70 @@ rules:
     failureCodes: ["FE_I18N_KEYS"]
     enforcers:
       - {kind: eslint-fe, id: i18n-keys}
+    editions: [lite, full]
+    docs: [docs/legacy-fe-rule-coverage.md#r106]
+    proves:
+      - {path: packages/eslint/fe/legacy-i18n-keys-coverage.spec.mjs, editions: [lite, full], codes: [FE_I18N_KEYS]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/fe/skeleton-lite/apps/web/src/features/pages/AppErrorPage/index.tsx, edition: lite}
+      - {path: packages/hfs/templates/fe/skeleton/apps/app/src/features/pages/AppErrorPage/index.tsx, edition: full}
+      - {path: packages/eslint/fe/legacy-i18n-keys-coverage.spec.mjs, editions: [lite, full], codes: [FE_I18N_KEYS]}
+    witness:
+      - {path: packages/eslint/fe/legacy-i18n-keys-coverage.spec.mjs, edition: lite, codes: [FE_I18N_KEYS]}
+      - {path: packages/eslint/fe/legacy-i18n-keys-coverage.spec.mjs, edition: full, codes: [FE_I18N_KEYS]}
   - id: R107
     code: "FE_COOKIE_ATTRIBUTES"
     law: "A cookie the front end writes through Next's response cookies (`response.cookies.set`, `cookies().set`) states `httpOnly` as a literal (`true` for a session, `false` only for a preference page script reads), carries `secure` and has `sameSite` `lax` or `strict`."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["FE_COOKIE_ATTRIBUTES"]
     enforcers:
       - {kind: eslint-fe, id: response-cookie-attributes}
+    editions: [lite, full]
+    docs: [docs/legacy-fe-rule-coverage.md#r107]
+    templateNa: "Next response-cookie writes are application-authored behavior; no managed skeleton or slot scaffolds a response-cookie writer."
+    proves:
+      - {path: packages/eslint/fe/legacy-cookie-attributes-coverage.spec.mjs, editions: [lite, full], codes: [FE_COOKIE_ATTRIBUTES]}
+    exemplifiedBy:
+      - {path: packages/eslint/fe/legacy-cookie-attributes-coverage.spec.mjs, editions: [lite, full], codes: [FE_COOKIE_ATTRIBUTES]}
+    witness:
+      - {path: packages/eslint/fe/legacy-cookie-attributes-coverage.spec.mjs, edition: lite, codes: [FE_COOKIE_ATTRIBUTES]}
+      - {path: packages/eslint/fe/legacy-cookie-attributes-coverage.spec.mjs, edition: full, codes: [FE_COOKIE_ATTRIBUTES]}
   - id: R108
     code: "BE_ERROR_CAUSE_DROPPED"
+    editions: [lite, full]
+    docs: [docs/legacy-be-rule-coverage.md#r108]
+    proves:
+      - {path: packages/eslint/be/legacy-safety-coverage.spec.mjs, editions: [lite, full], codes: [BE_ERROR_CAUSE_DROPPED]}
+    exemplifiedBy:
+      - {path: packages/eslint/be/legacy-safety-coverage.spec.mjs, editions: [lite, full], codes: [BE_ERROR_CAUSE_DROPPED]}
+      - {path: packages/hfs/templates/be/skeleton-lite/apps/api/src/main.ts, edition: lite}
+      - {path: packages/hfs/templates/be/skeleton/src/modules/platform/cqrs/cqrs.handler.ts, edition: full}
+    witness:
+      - {path: packages/eslint/be/legacy-safety-coverage.spec.mjs, edition: lite, codes: [BE_ERROR_CAUSE_DROPPED]}
+      - {path: packages/eslint/be/legacy-safety-coverage.spec.mjs, edition: full, codes: [BE_ERROR_CAUSE_DROPPED]}
     law: "A `throw` that escapes a `catch` (or a promise `.catch` handler) rethrows the caught value or carries it: the replacement capability error takes the exact caught value as `cause`; a `catch` with no binding throws nothing new."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_ERROR_CAUSE_DROPPED"]
     enforcers:
       - {kind: eslint-be, id: replacement-throw-carries-cause}
   - id: R109
     code: "BE_MEMBER_DOC_MISSING"
+    editions: [lite, full]
+    docs: [docs/legacy-be-rule-coverage.md#r109]
+    proves:
+      - {path: packages/eslint/be/legacy-safety-coverage.spec.mjs, editions: [lite, full], codes: [BE_MEMBER_DOC_MISSING]}
+    exemplifiedBy:
+      - {path: packages/eslint/be/legacy-safety-coverage.spec.mjs, editions: [lite, full], codes: [BE_MEMBER_DOC_MISSING]}
+      - {path: packages/hfs/templates/be/skeleton-lite/src/modules/domain/identity/auth.guard.ts, edition: lite}
+      - {path: packages/hfs/templates/be/skeleton/src/modules/domain/identity/auth.guard.ts, edition: full}
+    witness:
+      - {path: packages/eslint/be/legacy-safety-coverage.spec.mjs, edition: lite, codes: [BE_MEMBER_DOC_MISSING]}
+      - {path: packages/eslint/be/legacy-safety-coverage.spec.mjs, edition: full, codes: [BE_MEMBER_DOC_MISSING]}
     law: "Every public member of an exported class, interface or object type alias in product source opens with English JSDoc: methods, accessors, fields and signatures; a private, protected or `#` member, the constructor, an index signature and a property set to a literal or a named constant are not judged, and overloads of one name share one doc."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_MEMBER_DOC_MISSING"]
     enforcers:
       - {kind: eslint-be, id: require-public-member-jsdoc}
@@ -1573,12 +1670,32 @@ rules:
     code: "FE_PROPS_MUTABLE"
     law: "The props type of an exported rendering function in front-end product source is readonly all the way down: every field and index signature is `readonly`, and every collection it holds, directly or in a nested object, is `readonly T[]`, `readonly [A, B]` or `ReadonlyArray<T>`."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["FE_PROPS_MUTABLE"]
     enforcers:
       - {kind: eslint-fe, id: props-fields-readonly}
+    editions: [lite, full]
+    docs: [docs/legacy-fe-rule-coverage.md#r110]
+    proves:
+      - {path: packages/eslint/fe/legacy-props-readonly-coverage.spec.mjs, editions: [lite, full], codes: [FE_PROPS_MUTABLE]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/fe/skeleton-lite/apps/web/src/features/pages/AppErrorPage/index.tsx, edition: lite}
+      - {path: packages/hfs/templates/fe/skeleton/apps/app/src/features/pages/AppErrorPage/index.tsx, edition: full}
+      - {path: packages/eslint/fe/legacy-props-readonly-coverage.spec.mjs, editions: [lite, full], codes: [FE_PROPS_MUTABLE]}
+    witness:
+      - {path: packages/eslint/fe/legacy-props-readonly-coverage.spec.mjs, edition: lite, codes: [FE_PROPS_MUTABLE]}
+      - {path: packages/eslint/fe/legacy-props-readonly-coverage.spec.mjs, edition: full, codes: [FE_PROPS_MUTABLE]}
   - id: R111
     code: "HFS_PEER_INTEGRATION_MISSING"
+    editions: [lite, full]
+    docs: [docs/legacy-contract-rule-coverage.md#r111]
+    proves:
+      - {path: tests/hfs/hfs-peer-integrations-coverage.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-peer-integrations-coverage.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-peer-integrations-coverage.spec.mjs, editions: [lite, full], codes: [HFS_PEER_INTEGRATION_MISSING]}
+    templateNa: "Optional integration dependency pairs and their runtime peers are application-specific package.json dependencies, not a managed scaffold surface."
     law: "An app declares the runtime peer every driver integration it uses needs: when the app root package.json depends on every package of a pair of knowledge/hfs/peer-integrations.yaml (at the named major), it declares the pair's `requires` in its dependencies (`@nestjs/apollo` on `@nestjs/platform-express` 11, Express 5, needs `@as-integrations/express5`)."
     kinds: [check]
     gates: [land, ci]
@@ -1605,6 +1722,15 @@ rules:
       - {kind: hfs, id: integration-specs, at: scripts/hfs/rules/integration-specs.mjs}
   - id: R113
     code: "FE_GRAPHQL_CONTRACT"
+    editions: [lite, full]
+    docs: [docs/legacy-contract-rule-coverage.md#r113]
+    proves:
+      - {path: tests/hfs/hfs-fe-contract-documents-coverage.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/fe/table/graphql/query.ts.tpl, editions: [lite, full]}
+      - {path: tests/hfs/hfs-fe-contract-documents-coverage.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-fe-contract-documents-coverage.spec.mjs, editions: [lite, full], codes: [FE_GRAPHQL_CONTRACT]}
     law: "Every GraphQL operation a front end keeps in a `.graphql` file under `fe/` is one its back end serves: it is judged against the contract snapshot (`be/contracts/<service>/schema.graphql`) whose root type declares its first root field, and every selected field, argument and input field must be declared there, every required argument and required input field given, every variable passed with the argument's named type, every leaf selected without and every object with a selection, and every declared variable used; a root field no contract declares is a finding too."
     kinds: [check]
     gates: [land, ci]
