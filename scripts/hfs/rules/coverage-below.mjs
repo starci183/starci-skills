@@ -62,7 +62,7 @@ function recordData(record, tag, value, line, problems) {
 }
 
 /** Parse conventional lcov records without executing or reading any referenced source path. */
-export function parseLcov(text) {
+function parseLcov(text) {
   const records = [];
   const problems = [];
   let current = null;

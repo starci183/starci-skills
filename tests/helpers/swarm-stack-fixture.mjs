@@ -30,12 +30,24 @@ export function swarmFixture(t, edition = 'lite') {
       ingress: { role: 'ingress', image: `caddy:2@sha256:${'b'.repeat(64)}`, compose: 'infra/swarm/stack.yaml' } },
     backing: { supabase: { provider: 'supabase', managed: true } },
     environments: { production: { status: 'supported', runtime: 'docker-swarm', composeFiles: ['infra/swarm/stack.yaml'],
-      components: { api: { replicas: 2 }, ingress: {} }, runbook: 'README.md', secrets: [] } },
+      components: { api: { replicas: 2 }, ingress: {} }, runbook: 'README.md',
+      secrets: [{ name: 'database-url', runtimeName: 'swarm-app-database-url-v1', version: 1,
+        where: 'secrets/database-url', recipientPolicy: 'policy:owner-age', keyCustody: 'custody:owner-password-manager' }],
+      ingress: { component: 'ingress', hosts: ['app.example.test'] },
+      dns: [{ host: 'app.example.test', owner: 'application operator', receipt: 'evidence/dns.md' }],
+      tls: { owner: 'application operator', receipt: 'evidence/tls.md' },
+      release: { imagesLock: 'evidence/images.lock', pointer: 'evidence/current.json',
+        previous: 'evidence/previous.json', healthAssertions: ['api-ready'] },
+      backup: [{ component: 'supabase', target: 'encrypted-offsite', retention: '30d', owner: 'application operator',
+        restoreProof: 'evidence/supabase-restore.md' }] } },
     k8s: { status: 'deferred', reason: 'Swarm is the delivery runtime' },
     services: { sonar: { provider: 'sonarcloud', mode: 'disabled', reason: 'isolated checker fixture', ci: { wiring: 'not-used' }, ownerAction: 'none' } } };
-  const model = { services: { api: swarmService(), ingress: { ...swarmService(manifest.components.ingress.image), ports: ['443:443'] } },
-    secrets: { 'database-url': { external: true, name: 'swarm-app-database-url-v1' } } };
+  const model = { services: { api: swarmService(), ingress: { ...swarmService(manifest.components.ingress.image), ports: ['443:443'],
+    configs: [{ source: 'ingress-config', target: '/etc/caddy/Caddyfile' }] } },
+    secrets: { 'database-url': { external: true, name: 'swarm-app-database-url-v1' } },
+    configs: { 'ingress-config': { file: './Caddyfile' } } };
   model.services.api.secrets = ['database-url'];
+  model.services.api.environment = { DATABASE_URL_FILE: '/run/secrets/database-url' };
   const put = (relative, content) => {
     const target = path.join(root, relative);
     fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -52,6 +64,11 @@ export function swarmFixture(t, edition = 'lite') {
   put('.starcistacks/production/README.md', RUNBOOK);
   put('.starcistacks/production/environment.json', '{}\n');
   put('.starcistacks/production/secrets/.gitkeep', '');
+  const encrypted = 'ENC[AES256_GCM,data:YWJj,iv:ZGVm,tag:Z2hp,type:str]';
+  put('.starcistacks/production/secrets/database-url.enc', JSON.stringify({ data: encrypted, sops: { mac: encrypted, age: [] } }));
+  put('.starcistacks/production/infra/swarm/Caddyfile', 'app.example.test {\n  reverse_proxy api:3000\n}\n');
+  for (const record of ['images.lock', 'current.json', 'previous.json', 'supabase-restore.md', 'dns.md', 'tls.md'])
+    put(`evidence/${record}`, 'Public fixture evidence for the declared release and recovery contract.\n');
   write();
   const check = () => stacksFindings({ repoRoot: root, files: [...files], resolver: openHfs({ declaration }) });
   return { root, files, stackFile, declaration, manifest, model, put, write, check, modelFile: path.join(root, 'rendered.json') };
@@ -64,8 +81,10 @@ export function addScheduledJob(fixture) {
     image: swarmService().image, compose: 'infra/swarm/stack.yaml' };
   manifest.environments.production.components.cron = {};
   manifest.environments.production.components.report = {};
+  manifest.jobs = { report: { component: 'report', schedule: '0 3 * * *', command: 'node dist/apps/cli/main.js report' } };
   model.services.cron = swarmService(manifest.components.cron.image);
   model.services.report = swarmService();
+  model.services.report.command = ['node', 'dist/apps/cli/main.js', 'report'];
   Object.assign(model.services.report.deploy, { mode: 'replicated-job', replicas: 0, restart_policy: { condition: 'none' },
     labels: { 'swarm.cronjob.enable': 'true', 'swarm.cronjob.schedule': '0 3 * * *' } });
   fixture.write();

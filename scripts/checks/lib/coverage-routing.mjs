@@ -15,7 +15,7 @@ function surfaceEntry(context, index, node) {
   return { id: id.value, plugins: staticValues(context, index, pluginNames), codes: staticValues(context, index, codes) };
 }
 
-export function lintRoutes(context) {
+function lintRoutes(context) {
   const index = sourceIndex(context, SURFACE);
   return astNodes(index.tree).map((node) => surfaceEntry(context, index, node)).filter(Boolean);
 }

@@ -77,7 +77,7 @@ export function formatCoverageReport(report) {
 if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   if (argv.includes('--help') || argv.includes('-h')) {
-    console.log('usage: node scripts/checks/check-hfs-coverage.mjs [--json] [--witness] [--root <directory>]');
+    console.log('usage: starci runtime check --only hfs-coverage -- [--json] [--witness] [--root <directory>]');
   } else {
     let root = skillRoot;
     let invalid = false;

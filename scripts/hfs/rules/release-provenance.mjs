@@ -4,9 +4,11 @@
 // opaque helper scripts and computed image metadata cannot prove provenance in this static check.
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { parseYaml } from '../../../engine/yaml.mjs';
-import { withoutGitLocalEnv } from '../../lib/git.mjs';
+import { isPlainObject } from '../../../engine/plain-object.mjs';
+import { revParseQuery } from '../../api/git/rev-parse-query.mjs';
+import { tag } from '../../api/git/tag.mjs';
+import { gitOutputOf, withoutGitLocalEnv } from '../../lib/git.mjs';
 import { found, readJson, readText } from './read.mjs';
 
 export const HFS_RELEASE_TAG_MISMATCH = 'HFS_RELEASE_TAG_MISMATCH';
@@ -17,20 +19,20 @@ const TAG = 1;
 const VERSION_PREFIX = 2;
 const RELEASE_REF = TAG | VERSION_PREFIX;
 
-function gitTags(repoRoot) {
-  const options = { cwd: repoRoot, env: withoutGitLocalEnv(process.env), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000, maxBuffer: 64 * 1024, windowsHide: true };
+function gitTags(repoRoot, env) {
+  const options = { cwd: repoRoot, env: withoutGitLocalEnv(env), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000, maxBuffer: 64 * 1024, windowsHide: true };
   try {
     // A nested example belongs to its own product, never to an ancestor runtime's tags.
-    const top = execFileSync('git', ['rev-parse', '--show-toplevel'], options).trim();
+    const top = gitOutputOf(revParseQuery(['--show-toplevel'], options)).trim();
     if (path.relative(fs.realpathSync(top), fs.realpathSync(repoRoot)) !== '') return [];
-    const tags = execFileSync('git', ['tag', '--points-at', 'HEAD'], options).trim().split(/\r?\n/).filter((tag) => tag.startsWith('v'));
-    if (process.env.GITHUB_ACTIONS === 'true' && process.env.GITHUB_REF?.startsWith('refs/tags/v')) tags.push(process.env.GITHUB_REF.slice('refs/tags/'.length));
+    const tags = gitOutputOf(tag(['--points-at', 'HEAD'], options)).trim().split(/\r?\n/).filter((value) => value.startsWith('v'));
+    if (env.GITHUB_ACTIONS === 'true' && env.GITHUB_REF?.startsWith('refs/tags/v')) tags.push(env.GITHUB_REF.slice('refs/tags/'.length));
     return [...new Set(tags)];
   } catch { return []; }
 }
 
-function tagFindings(repoRoot, version) {
-  return gitTags(repoRoot).filter((tag) => !SEMVER.test(tag.slice(1)) || tag.slice(1) !== version)
+function tagFindings(repoRoot, version, env) {
+  return gitTags(repoRoot, env).filter((tag) => !SEMVER.test(tag.slice(1)) || tag.slice(1) !== version)
     .map((tag) => found(HFS_RELEASE_TAG_MISMATCH, 'package.json', 'the release tag at HEAD must be v<semver> and equal the root package.json version; align the version before cutting the release', { tag, version: typeof version === 'string' ? version : null }));
 }
 
@@ -149,16 +151,12 @@ function dbFindings(file, workflow) {
   return findings;
 }
 
-function isRecord(value) {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 function validJob(job) {
-  return isRecord(job) && (job.steps === undefined || (Array.isArray(job.steps) && job.steps.every(isRecord)));
+  return isPlainObject(job) && (job.steps === undefined || (Array.isArray(job.steps) && job.steps.every(isPlainObject)));
 }
 
 function validWorkflow(workflow) {
-  return isRecord(workflow) && isRecord(workflow.jobs) && Object.values(workflow.jobs).every(validJob);
+  return isPlainObject(workflow) && isPlainObject(workflow.jobs) && Object.values(workflow.jobs).every(validJob);
 }
 
 function imageTagIsRelease(value, version) {
@@ -192,11 +190,11 @@ function productRoot(repo, isRoot) {
 }
 
 /** Synchronous product-root provenance findings; root and workflows are judged in lite and full, never a side or runtime. */
-export function releaseProvenanceFindings({ repoRoot, files = [], repo = {}, isRoot, inScope = () => true } = {}) {
+export function releaseProvenanceFindings({ repoRoot, files = [], repo = {}, isRoot, inScope = () => true, env = process.env } = {}) {
   if (!productRoot(repo, isRoot)) return [];
   const version = readJson(repoRoot, 'package.json')?.version;
   const packageInScope = files.includes('package.json') && inScope('package.json');
-  const findings = packageInScope ? tagFindings(repoRoot, version) : [];
+  const findings = packageInScope ? tagFindings(repoRoot, version, env) : [];
   for (const file of files) {
     const match = WORKFLOW.exec(file);
     if (!match || (!inScope(file) && !packageInScope)) continue;

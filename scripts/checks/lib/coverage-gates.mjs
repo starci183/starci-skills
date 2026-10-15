@@ -4,14 +4,14 @@ import { posix } from 'node:path';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { enforcerJudgedInEdition } from '../../hfs/edition-slots.mjs';
 import { workflowRunCommands } from './coverage-workflows.mjs';
+import { shellCommandSource as commandsOf } from '../../lib/shell-source.mjs';
 
 const runtimeCheckCache = new WeakMap();
 const runtimeEmitterCache = new WeakMap();
-const STACKS_GATE_FILES = new Set(['scripts/gates/stacks-gate.mjs', 'scripts/gates/starcistacks-runtime.mjs', 'scripts/gates/starcistacks.mjs']);
+const STACKS_GATE_FILES = new Set(['scripts/hfs/stacks-gate.mjs', 'scripts/hfs/starcistacks-runtime.mjs', 'scripts/gates/stacks-gate.mjs', 'scripts/gates/starcistacks-runtime.mjs', 'scripts/gates/starcistacks.mjs']);
 const SHELL_RUNNERS = new Set(['exec', 'execSync']);
 const NODE_RUNNERS = new Set(['runNode', 'runNpm']);
 const FILE_RUNNERS = new Set(['execFile', 'execFileSync', 'spawn', 'spawnSync']);
-const commandsOf = (text) => String(text ?? '').split(/\r?\n/).filter((line) => !/^\s*#/.test(line)).join('\n');
 
 function argumentWords(array) {
   return array?.elements?.map((entry) => typeof entry?.value === 'string' ? entry.value : '<argument>') ?? [];

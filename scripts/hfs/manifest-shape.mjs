@@ -4,7 +4,7 @@
 // (sides, app kinds) and refuses a manifest whole on any problem (HFS_MANIFEST_INVALID). Pure: every function takes a
 // parsed manifest or slot and returns a list of problems in the words of modules/schemas/hfs-slots.schema.yaml.
 import { isPlainObject } from '../../engine/plain-object.mjs';
-import { stringList, byCodeUnit } from '../lib/list.mjs';
+import { stringList, byCodeUnit, nonemptyUniqueList } from '../lib/list.mjs';
 
 export const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
 export const NAME = /^[a-z][a-z0-9-]*$/;
@@ -203,15 +203,13 @@ function slotEditionWhyProblems(slot, at) {
 }
 
 const slotEvidencePathValid = (value) => relPath(value) && /^[^\s]+$/.test(value);
-const evidenceEditionsValid = (values) => Array.isArray(values) && values.length > 0
-  && values.every((edition) => EDITIONS.includes(edition)) && new Set(values).size === values.length;
 
 function slotEvidenceRefValid(ref) {
   if (typeof ref === 'string') return slotEvidencePathValid(ref);
   if (!isPlainObject(ref) || !slotEvidencePathValid(ref.path)) return false;
   if (!Object.keys(ref).every((key) => ['path', 'edition', 'editions'].includes(key))) return false;
   if (ref.edition !== undefined && !EDITIONS.includes(ref.edition)) return false;
-  if (ref.editions !== undefined && !evidenceEditionsValid(ref.editions)) return false;
+  if (ref.editions !== undefined && !nonemptyUniqueList(ref.editions, (edition) => EDITIONS.includes(edition))) return false;
   return ref.edition === undefined || ref.editions === undefined;
 }
 

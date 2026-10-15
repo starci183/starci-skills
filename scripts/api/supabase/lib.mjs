@@ -38,3 +38,7 @@ export const supabaseSpawn = (appRoot, args, {
   timeout,
   windowsHide: true,
 });
+
+/** Invoke one Supabase command prefix with caller arguments and runner options. */
+export const supabaseCall = (prefix, appRoot, args = [], options = {}) =>
+  supabaseSpawn(appRoot, [...prefix, ...args], options);

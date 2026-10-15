@@ -104,6 +104,8 @@ for (const edition of ['lite', 'full']) {
     const browser = fs.readFileSync(path.join(root, prefix, 'modules/auth/client.ts'), 'utf8');
     assert.match(browser, /createBrowserClient/);
     assert.match(browser, /detectSessionInUrl: false/);
+    assert.match(browser, /export const authClient/);
+    assert.doesNotMatch(browser, /\{\{>/);
     assert.equal(fs.existsSync(path.join(root, prefix, 'modules/auth/pkce-client.ts')), false);
     const recorded = authDouble();
     const owner = loadTypeScript(root, `${prefix}/modules/auth/server.ts`, recorded.modules);

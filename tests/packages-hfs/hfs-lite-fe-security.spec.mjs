@@ -4,6 +4,7 @@ import fs from "node:fs"
 import path from "node:path"
 import vm from "node:vm"
 import { createRequire } from "node:module"
+import { render } from "../../packages/hfs/sync/index.mjs"
 
 // Owner ruling 2026-10-13: Supabase on the front end is auth only. The lite skeleton's identity-provider client
 // (modules/auth/client.ts, slot fe.modules.auth) is run against a recording Supabase double: every authClient call touches the
@@ -29,7 +30,7 @@ function loadAuthClient() {
         "@supabase/supabase-js": { createClient: (url, key, settings) => { options.push(settings); return client } },
         "@/modules/config": { supabaseUrl: () => "https://fixture.invalid", supabaseAnonKey: () => "public-anon" },
     }
-    const compiled = ts.transpileModule(fs.readFileSync(AUTH_CLIENT, "utf8"), {
+    const compiled = ts.transpileModule(render(fs.readFileSync(AUTH_CLIENT, "utf8").replace(/\r\n/g, "\n"), {}), {
         fileName: "client.ts",
         reportDiagnostics: true,
         compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },

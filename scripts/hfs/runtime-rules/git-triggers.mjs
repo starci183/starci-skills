@@ -7,6 +7,7 @@
 // A push to another branch, a pull_request, a schedule, a workflow_call or any other event refuses the workflow, and so does a push to main in an
 // example or a template: an app's CI runs once per release, on its tag (docs/git-governance.md). Pure apart from ctx.read.
 import { parseWorkflow, workflowFindings } from './workflow-source.mjs';
+import { workflowEventOptions } from '../../lib/workflow-events.mjs';
 
 export const CODE = 'CI_TRIGGERS_RELEASE_ONLY';
 const RELEASE_TAGS = 'v*';
@@ -40,12 +41,6 @@ function eventFindings({ event, config, ownBranch, refuse }) {
   return pushFindings({ ownBranch, config, refuse });
 }
 
-function normalizeEvents(on) {
-  if (typeof on === 'string') return { [on]: null };
-  if (Array.isArray(on)) return Object.fromEntries(on.map((event) => [String(event), null]));
-  return on;
-}
-
 /** The CI_TRIGGERS_RELEASE_ONLY findings of one workflow text; a text that is not YAML yields none (the other checks name it). A workflow at the root `.github/workflows/` is the runtime's own and may also push on main. */
 export function workflowTriggerFindings({ path: file, text }) {
   const doc = parseWorkflow(text);
@@ -54,7 +49,7 @@ export function workflowTriggerFindings({ path: file, text }) {
   const refuse = (why) => ({ code: CODE, level: 'error', path: file, message: `${CODE} ${file}: ${why}` });
   const on = doc.on;
   if (on === undefined || on === null) return [refuse('the workflow has no `on` trigger block: it must declare push of tags [v*] and/or workflow_dispatch')];
-  return Object.entries(normalizeEvents(on)).flatMap(([event, config]) => eventFindings({ event, config, ownBranch, refuse }));
+  return Object.entries(workflowEventOptions(on, String)).flatMap(([event, config]) => eventFindings({ event, config, ownBranch, refuse }));
 }
 
 /** CI_TRIGGERS_RELEASE_ONLY over every tracked workflow (ctx of scripts/hfs/runtime-check.mjs). */

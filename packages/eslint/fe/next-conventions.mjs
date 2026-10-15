@@ -12,12 +12,13 @@
  */
 
 import { attribute, attributeValue, calleeName, leadingTextOf, stringOf } from "./lib/ast.mjs"
+import { variableOf } from "./lib/bindings.mjs"
 import { forbiddingConcern } from "./lib/fe-stack.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
-import { baseName, classOf, fileOf, inSlot, roleOfFile, slotOfFile, stem } from "./lib/scope.mjs"
+import { baseName, classOf, fileOf, inSlot, roleOfFile, slotOfFile } from "./lib/scope.mjs"
 
 /** Another i18n stack: a second place that decides which language a reader sees (one the fe-stack catalog forbids by name is fe-stack-import's finding). */
-const OTHER_I18N = /^(?:react-i18next|i18next|next-i18next|react-intl|next-translate|@lingui\/.+|typesafe-i18n|rosetta)(?:\/.*)?$/
+const OTHER_I18N = /^(?:react-i18next|i18next|next-i18next|react-intl|next-translate|typesafe-i18n|rosetta)(?:\/.*)?$|^@lingui\/.+$/
 
 // -- FE-NEXT-1 -------------------------------------------------------------------------------------
 
@@ -137,20 +138,22 @@ export const htmlLangFromLocale = {
 
 // -- FE-NEXT-5 -------------------------------------------------------------------------------------
 
-/** The names a module exports, from declarations and specifiers. */
-const exportedNames = (program) => {
-  const names = new Set()
-  for (const statement of program.body) {
-    if (statement.type !== "ExportNamedDeclaration") continue
-    const declaration = statement.declaration
-    if (declaration && declaration.id) names.add(declaration.id.name)
-    if (declaration && declaration.type === "VariableDeclaration") {
-      for (const entry of declaration.declarations) if (entry.id.type === "Identifier") names.add(entry.id.name)
+/** The names one named-export statement introduces. */
+const statementExportNames = (statement) => {
+  if (statement.type !== "ExportNamedDeclaration") return []
+  const declaration = statement.declaration
+  const names = (statement.specifiers ?? []).map((specifier) => specifier.exported.name)
+  if (declaration?.id) names.push(declaration.id.name)
+  if (declaration?.type === "VariableDeclaration") {
+    for (const entry of declaration.declarations) {
+      if (entry.id.type === "Identifier") names.push(entry.id.name)
     }
-    for (const specifier of statement.specifiers ?? []) names.add(specifier.exported.name)
   }
   return names
 }
+
+/** The names a module exports, from declarations and specifiers. */
+const exportedNames = (program) => new Set(program.body.flatMap(statementExportNames))
 
 /** Every page names itself: `metadata` or `generateMetadata`. */
 export const pageExportsMetadata = {
@@ -338,34 +341,34 @@ const STACK_FACTORIES = new Map([
   ["next-intl/middleware", new Set(["default"])],
 ])
 
-/** The variable a name binds to, walking up from the scope of a node. */
-const bindingOf = (context, identifier) => {
-  let scope = (context.sourceCode ?? context.getSourceCode()).getScope(identifier)
-  while (scope) {
-    const variable = scope.set.get(identifier.name)
-    if (variable) return variable.defs[0] ?? null
-    scope = scope.upper
-  }
+/** The public name selected by a named or default import. */
+const importedName = (specifier) => {
+  if (specifier.type === "ImportSpecifier") return specifier.imported.name ?? specifier.imported.value
+  if (specifier.type === "ImportDefaultSpecifier") return "default"
   return null
+}
+
+/** The known next-intl factory selected from an import. */
+const stackFactory = (definition, exported) => {
+  const source = String(definition.parent.source.value)
+  if (!STACK_FACTORIES.get(source)?.has(exported)) return null
+  return { source, name: exported === "default" ? "createMiddleware" : exported }
+}
+
+/** A factory called through a namespace import, else null. */
+const namespaceFactory = (context, callee) => {
+  if (callee.type !== "MemberExpression" || callee.computed || callee.object.type !== "Identifier" || callee.property.type !== "Identifier") return null
+  const definition = variableOf(context, callee.object)?.defs[0] ?? null
+  if (definition?.type !== "ImportBinding" || definition.node.type !== "ImportNamespaceSpecifier") return null
+  return stackFactory(definition, callee.property.name)
 }
 
 /** The name a stack factory has where the call reads it: "defineRouting" (next-intl/routing), else null. */
 const stackFactoryOf = (context, callee) => {
-  if (callee.type === "Identifier") {
-    const definition = bindingOf(context, callee)
-    if (definition?.type !== "ImportBinding") return null
-    const source = String(definition.parent.source.value)
-    const specifier = definition.node
-    const exported = specifier.type === "ImportSpecifier" ? specifier.imported.name ?? specifier.imported.value : specifier.type === "ImportDefaultSpecifier" ? "default" : null
-    return exported !== null && STACK_FACTORIES.get(source)?.has(exported) ? { source, name: exported === "default" ? "createMiddleware" : exported } : null
-  }
-  if (callee.type === "MemberExpression" && !callee.computed && callee.object.type === "Identifier" && callee.property.type === "Identifier") {
-    const definition = bindingOf(context, callee.object)
-    if (definition?.type !== "ImportBinding" || definition.node.type !== "ImportNamespaceSpecifier") return null
-    const source = String(definition.parent.source.value)
-    return STACK_FACTORIES.get(source)?.has(callee.property.name) ? { source, name: callee.property.name } : null
-  }
-  return null
+  if (callee.type !== "Identifier") return namespaceFactory(context, callee)
+  const definition = variableOf(context, callee)?.defs[0] ?? null
+  if (definition?.type !== "ImportBinding") return null
+  return stackFactory(definition, importedName(definition.node))
 }
 
 /**

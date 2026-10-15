@@ -58,7 +58,7 @@ const KNOWN_IMAGES = Object.freeze({
 export const STATEFUL_KINDS = Object.freeze(new Set(['database', 'cache', 'identity', 'storage', 'mail', 'queue', 'search']));
 
 /** The repository name of an image reference: `quay.io/keycloak/keycloak:26.0` -> `keycloak`. */
-const repositoryOf = image => {
+export const repositoryOf = image => {
   const withoutDigest = image.split('@')[0];
   const lastSegment = withoutDigest.split('/').at(-1) ?? withoutDigest;
   return lastSegment.split(':')[0];

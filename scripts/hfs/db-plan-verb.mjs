@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import pg from 'libpg-query';
 import { parse as parseToml } from 'smol-toml';
 import { invocationDir } from '../lib/roots.mjs';
+import { sqlStringParts, walkSqlAst as walk, sqlParser, sqlCallArgument as argument, sqlStringLiteral as literal } from '../lib/sql-ast.mjs';
 import { DbVerbError, dbOptions, dbAppRoot, dbSqlFiles, runDbSupabase, dbFailure } from './db-baseline-verb.mjs';
 
 await pg.loadModule();
@@ -22,29 +23,11 @@ const INVENTORIES = {
   queues: 'select queue_name as name from pgmq.meta order by queue_name;',
   vault: 'select name from vault.secrets order by name;',
 };
-const names = (nodes) => (nodes ?? []).map((node) => node?.String?.sval).filter((name) => name !== undefined).join('.');
+const names = (nodes) => sqlStringParts(nodes).join('.');
 const hash = (command) => createHash('md5').update(command).digest('hex');
 const OWNERSHIP_CALLS = new Set(['pgmq.create', 'pgmq.drop_queue', 'cron.schedule', 'cron.unschedule', 'cron.schedule_in_database', 'cron.alter_job']);
 
-function walk(node, visit) {
-  if (!node || typeof node !== 'object') return;
-  visit(node);
-  for (const child of Object.values(node)) walk(child, visit);
-}
-
-function parseSql(text) {
-  try { return pg.parseSync(text); } catch { throw new DbVerbError('migration SQL could not be inventoried safely'); }
-}
-
-function argument(call, index, aliases) {
-  return (call.args ?? []).find((node) => aliases.includes(node.NamedArgExpr?.name))?.NamedArgExpr?.arg
-    ?? (call.args ?? []).filter((node) => !node.NamedArgExpr)[index];
-}
-
-function literal(node) {
-  if (node?.TypeCast) return literal(node.TypeCast.arg);
-  return node?.A_Const?.sval?.sval ?? null;
-}
+const parseSql = sqlParser(pg, () => { throw new DbVerbError('migration SQL could not be inventoried safely'); });
 
 function requiredLiteral(call, index, aliases) {
   const value = literal(argument(call, index, aliases));

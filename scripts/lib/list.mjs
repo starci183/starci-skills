@@ -17,6 +17,10 @@ export const objectList = (v) => (Array.isArray(v) ? v : []).filter((item) => it
 export const stringList = (v, { blank = true } = {}) =>
   Array.isArray(v) && v.every((s) => typeof s === 'string' && s.length > 0 && (blank || s.trim().length > 0));
 
+/** A non-empty list of distinct values, all accepted by the supplied predicate. */
+export const nonemptyUniqueList = (values, accepts) => Array.isArray(values) && values.length > 0
+  && values.every((entry) => accepts(entry)) && new Set(values).size === values.length;
+
 /** The items of a `sep`-separated list: trimmed, empties dropped; `dedupe` keeps first occurrences only. */
 export const splitList = (v, { sep = ',', dedupe = false } = {}) => {
   const items = String(v ?? '').split(sep).map((s) => s.trim()).filter(Boolean);

@@ -1,7 +1,7 @@
 /** The expression under the wrappers selected by an AST check's contract. */
-export function unwrapExpression(ts, expression, { awaitExpressions = false, typeAssertions = true, satisfiesExpressions = true } = {}) {
+export function unwrapExpression(ts, expression, { awaitExpressions = false, typeAssertions = true, nonNullExpressions = true, satisfiesExpressions = true } = {}) {
   while (expression && (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression)
-    || (typeAssertions && ts.isTypeAssertionExpression(expression)) || ts.isNonNullExpression(expression)
+    || (typeAssertions && ts.isTypeAssertionExpression(expression)) || (nonNullExpressions && ts.isNonNullExpression(expression))
     || (satisfiesExpressions && (ts.isSatisfiesExpression?.(expression) ?? false))
     || (awaitExpressions && ts.isAwaitExpression(expression)))) expression = expression.expression;
   return expression;
@@ -18,3 +18,6 @@ export function importsOf(ts, sourceFile, { moduleKey = 'module', stringLiterals
   }
   return imports;
 }
+
+/** Catalog values unwrap parentheses, `as`, and `satisfies`, preserving assertions and non-null nodes. */
+export const unwrapCatalogExpression = (ts, node) => unwrapExpression(ts, node, { typeAssertions: false, nonNullExpressions: false });

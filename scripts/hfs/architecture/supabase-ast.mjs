@@ -1,7 +1,8 @@
 // supabase-ast.mjs - shared TypeScript-symbol and expression helpers for the front-end and back-end Supabase
 // architecture checks. Recognition follows imported declarations and inferred types, never local spelling alone.
 import { unwrapExpression } from '../../lib/ts-analysis.mjs';
-import { hasAnyFlag } from '../../lib/ts-ast.mjs';
+import { accessName as memberName, hasAnyFlag } from '../../lib/ts-ast.mjs';
+export { accessName as memberName } from '../../lib/ts-ast.mjs';
 
 export const SUPABASE_MODULES = Object.freeze({ has: name => typeof name === 'string' && name.startsWith('@supabase/') });
 
@@ -49,11 +50,6 @@ const isSupabaseValue = (kit, checker, node) => {
   if (importedFrom(kit, checker, current, SUPABASE_MODULES)) return true;
   if (kit.ts.isCallExpression(current) && signatureFromSupabase(checker, current)) return true;
   return typeFromSupabase(checker, current);
-};
-
-export const memberName = (ts, node) => {
-  if (ts.isPropertyAccessExpression(node)) return node.name.text;
-  return ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
 };
 
 export const callName = (ts, call) => ts.isCallExpression(call) ? memberName(ts, call.expression) : null;

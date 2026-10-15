@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { maskSourceRange as blank } from '../../lib/text-mask.mjs';
 
 /**
  * Source and stylesheet readers of the grammar knowledge census (grammar-knowledge.mjs): a small TS/TSX lexer,
@@ -12,8 +13,6 @@ const lineAt=(text,offset)=>{let line=1;for(let i=0;i<offset&&i<text.length;i++)
 // ---------------------------------------------------------------------------
 // Source lexing: comments blanked (offsets kept), string literals collected.
 // ---------------------------------------------------------------------------
-
-const blank=(out,from,to)=>{for(let k=from;k<to;k++)if(out[k]!=='\n'&&out[k]!=='\r')out[k]=' ';};
 
 /** A template chunk from `start`: pushed as a string; `open` says the chunk ended on `${`. */
 function scanTemplate(lexer,start){

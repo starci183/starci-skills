@@ -12,6 +12,7 @@
 //                 /J or /D, New-Item -ItemType Junction or SymbolicLink, ln -s - and can name node_modules
 // Pure.
 import { nameOfFn, paramOf, spawnCalls } from '../../lib/spawn-calls.mjs';
+import { variableInitializerGroups as constsOf } from '../../lib/ts-ast.mjs';
 import { fsBindings, fsMemberAccess, lineOf, ts } from './source-ast.mjs';
 
 export const CODE = 'RT_NODE_MODULES_LINK';
@@ -20,17 +21,6 @@ const NODE_MODULES = /node_modules/;
 const LINK_COMMAND = [/\bmklink\b[\s\S]*\/[jd]\b/i, /\bnew-item\b[\s\S]*\b(?:junction|symboliclink)\b/i, /(?:^|\s)ln\s+-[a-z]*s/i];
 
 const isStringPart = (t, node) => t.isStringLiteral(node) || t.isTemplateLiteralToken(node);
-
-/** Every initializer of each named const of the source, by name. */
-function constsOf(t, source) {
-  const consts = new Map();
-  const collect = (node) => {
-    if (t.isVariableDeclaration(node) && t.isIdentifier(node.name) && node.initializer) consts.set(node.name.text, [...(consts.get(node.name.text) ?? []), node.initializer]);
-    t.forEachChild(node, collect);
-  };
-  collect(source);
-  return consts;
-}
 
 /** True when `node` can name node_modules: a string in its subtree, or a const it reads that does (one level of names deep each). */
 function namesNodeModules(scope, node, seen = new Set()) {

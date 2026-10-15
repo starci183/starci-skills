@@ -63,6 +63,17 @@ for (const edition of ['lite', 'full']) {
     assert.deepEqual(check(fixture, edition), []);
   });
 
+  test(`HFS_RELEASE_TAG_MISMATCH@${edition}: injected GitHub Actions refs are checked and deduplicated`, (t) => {
+    const fixture = tagged(t, `v${VERSION}`);
+    const env = { ...process.env, GITHUB_ACTIONS: 'true', GITHUB_REF: 'refs/tags/v9.9.9' };
+    assert.deepEqual(check(fixture, edition, { env }).map((finding) => finding.tag), ['v9.9.9']);
+    env.GITHUB_REF = `refs/tags/v${VERSION}`;
+    assert.deepEqual(check(fixture, edition, { env }), []);
+    env.GITHUB_ACTIONS = 'false';
+    env.GITHUB_REF = 'refs/tags/v9.9.9';
+    assert.deepEqual(check(fixture, edition, { env }), []);
+  });
+
   test(`HFS_RELEASE_TAG_MISMATCH@${edition}: every release tag at HEAD must equal package version`, (t) => {
     const fixture = tagged(t, 'v1.2.2');
     git(fixture.repoRoot, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'tag', '-a', `v${VERSION}`, '-m', 'release');

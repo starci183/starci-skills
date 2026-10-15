@@ -2,15 +2,17 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { isPlainObject as plain } from '../../../engine/plain-object.mjs';
+import { composeEntries } from '../../lib/compose-values.mjs';
+import { list } from '../../lib/list.mjs';
+import { repositoryOf } from '../../lib/stack-services.mjs';
 import { isInside } from '../../lib/walk.mjs';
 import { readTypeScriptProject, resolveTypeScriptModule } from '../typescript-programs.mjs';
 import { parseSource, ts } from '../runtime-rules/source-ast.mjs';
-import { found, readText } from './read.mjs';
-import { stacksDeploymentContexts } from './stacks-runtime.mjs';
+import { readText } from './read.mjs';
+import { stacksDeploymentFindings } from './stacks-runtime.mjs';
 
 const mapping = value => plain(value) ? value : {};
 const present = value => typeof value === 'string' && Boolean(value.trim());
-const list = value => Array.isArray(value) ? value : [];
 const VERSION = /^[1-9][0-9]*$/;
 const VERSIONED_SECRET = /-v[1-9][0-9]*$/;
 const SENSITIVE_KEY = /password|passwd|secret|token|credential|private[_-]?key|api[_-]?key|service[_-]?role|(?:^|_)key$/i;
@@ -18,14 +20,6 @@ const SOURCE = /^be\/(?:apps|src)\/.*\.[cm]?[jt]sx?$/;
 const TEST_SOURCE = /(?:\.(?:spec|test)|-spec)\.[cm]?[jt]sx?$|\/tests\//;
 const REALTIME_SOURCE = /^be\/src\/features\/realtime\/[^/]+\//;
 const HOST = /^(?:[a-z0-9-]+\.)+[a-z0-9-]+$/i;
-
-function entriesOf(value) {
-  if (!Array.isArray(value)) return Object.entries(mapping(value));
-  return value.map(entry => {
-    const text = String(entry), separator = text.indexOf('=');
-    return separator < 0 ? [text, null] : [text.slice(0, separator), text.slice(separator + 1)];
-  });
-}
 
 function secretVersionMatches(declaration, secret) {
   const version = String(declaration.version ?? '');
@@ -73,7 +67,7 @@ function credentialUri(value) {
 
 function environmentSecretIssues(id, service, spec, model, add) {
   const targets = grantedSecretTargets(service, mapping(model.secrets));
-  for (const [key, value] of entriesOf(service.environment)) {
+  for (const [key, value] of composeEntries(service.environment, { missingValue: null })) {
     if (key.endsWith('_FILE')) {
       const secretFile = sensitiveEnvironmentKey(key.slice(0, -5), list(spec.secrets)) || String(value).startsWith('/run/secrets/') || credentialUri(value);
       if (secretFile && !targets.has(value)) add('STACKS_SECRET_ENV_LITERAL', `services.${id}.environment.${key}`, 'A secret file binding must name the exact /run/secrets target granted to this service');
@@ -140,7 +134,7 @@ function positiveHostCall(prefix) {
 
 function labelHosts(service, family) {
   const hosts = [];
-  const labels = [...entriesOf(service.labels), ...entriesOf(service.deploy?.labels)];
+  const labels = [...composeEntries(service.labels, { missingValue: null }), ...composeEntries(service.deploy?.labels, { missingValue: null })];
   if (family === 'traefik' && labels.some(([key, value]) => key === 'traefik.enable' && String(value) === 'false')) return hosts;
   for (const [key, value] of labels) {
     if (family === 'traefik' && key.startsWith('traefik.http.routers.') && key.endsWith('.rule')) hosts.push(...traefikHosts(value));
@@ -211,7 +205,7 @@ function caddyfileHosts(text) {
 function routedHosts(input) {
   const hosts = new Set();
   const ingress = mapping(input.model.services)[input.spec.ingress?.component];
-  const family = String(ingress?.image ?? '').split('@')[0].split('/').at(-1).split(':')[0].toLowerCase();
+  const family = repositoryOf(String(ingress?.image ?? '')).toLowerCase();
   for (const service of Object.values(mapping(input.model.services))) {
     for (const host of labelHosts(service, family)) hosts.add(host);
   }
@@ -417,8 +411,5 @@ export function swarmHardeningIssues(input) {
 
 /** R266 findings at the app root, over each available tracked rendered Swarm model. */
 export function stacksSwarmFindings(context) {
-  const { doc, deployments, files } = stacksDeploymentContexts(context);
-  return deployments.filter(deployment => !deployment.unavailable).flatMap(deployment =>
-    swarmHardeningIssues({ ...deployment, doc, files, repoRoot: context.repoRoot, repo: context.repo })
-      .map(issue => found(issue.code, deployment.file, `${deployment.file}: ${issue.at}: ${issue.message}`)));
+  return stacksDeploymentFindings(context, swarmHardeningIssues);
 }

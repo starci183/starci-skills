@@ -2688,7 +2688,7 @@ requirements:
     editions:
       - lite
       - full
-    statement: install scripts off, lockfile frozen in CI. `npm ci --ignore-scripts` in managed ci
+    statement: install scripts off, lockfile frozen in CI. `NPM_CONFIG_IGNORE_SCRIPTS=true starci npm ci` in managed ci
     status: owed
     analysis:
       file: analysis/ops-security.md
@@ -4223,7 +4223,7 @@ requirements:
     editions:
       - lite
       - full
-    statement: DNS, provider URIs, `docker swarm init` and key rotation remain owner-run. The standard requires
+    statement: DNS, provider URIs, Swarm setup before `starci docker up` and key rotation remain owner-run. The standard requires
       their declarations rather than automating these steps.
     status: owed
     ruling: ruling:owner-run-steps

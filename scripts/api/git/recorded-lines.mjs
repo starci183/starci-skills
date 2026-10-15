@@ -6,31 +6,33 @@ import { runGit } from './lib.mjs';
 import { mergeBase } from './merge-base.mjs';
 import { withoutGitLocalEnv } from '../../lib/git.mjs';
 import { lineCount } from '../../lib/line-count.mjs';
+import { readEnv } from '../../lib/env.mjs';
+import { folded } from '../../lib/event-contract.mjs';
 
 const ok = (result) => !result.error && result.status === 0;
-const normalized = (text) => text.replaceAll('\r\n', '\n');
 const pathKey = (value) => process.platform === 'win32' ? value.toLowerCase() : value;
 
 /** A commit hook exports an index; HEAD applies only to a staged file whose lint text is that index's text. */
 function lintingIndex(dir, name, source) {
-  if (!process.env.GIT_INDEX_FILE || typeof source !== 'string') return false;
+  const indexFile = readEnv('GIT_INDEX_FILE');
+  if (!indexFile || typeof source !== 'string') return false;
   const options = { dir, env: withoutGitLocalEnv(process.env), maxBuffer: 64 * 1024 * 1024 };
   const index = runGit(['rev-parse', '--path-format=absolute', '--git-path', 'index'], options);
   const root = runGit(['rev-parse', '--show-toplevel'], options);
   if (!ok(index) || !ok(root)) return false;
   // The hook's relative index path is relative to the repository root even after xargs changes to be/ or fe/.
-  const hookIndex = path.resolve(root.stdout.trim(), process.env.GIT_INDEX_FILE);
+  const hookIndex = path.resolve(root.stdout.trim(), indexFile);
   if (pathKey(path.dirname(hookIndex)) !== pathKey(path.dirname(path.resolve(index.stdout.trim())))) return false;
   const stagedOptions = { ...options, env: { ...options.env, GIT_INDEX_FILE: hookIndex } };
   const changed = runGit(['diff', '--cached', '--relative', '--name-only', '-z', '--', `./${name}`], stagedOptions);
   if (!ok(changed) || !changed.stdout.split('\0').includes(name)) return false;
   const staged = runGit(['show', `:./${name}`], stagedOptions);
-  return ok(staged) && normalized(staged.stdout) === normalized(source);
+  return ok(staged) && folded(staged.stdout) === folded(source);
 }
 
 function recordedRef(dir, name, source) {
   if (lintingIndex(dir, name, source)) return 'HEAD';
-  const base = process.env.STARCI_BASE_REF;
+  const base = readEnv('STARCI_BASE_REF');
   for (const ref of base ? [base] : ['origin/main', 'main']) {
     const sha = mergeBase(dir, 'HEAD', ref);
     if (sha) return sha;

@@ -1,19 +1,12 @@
 import path from 'node:path';
 import { allowsFile } from '../allows.mjs';
 import { relativePath, unwrapExpression } from './typescript.mjs';
-import { sourceLocation } from '../../lib/ts-ast.mjs';
+import { accessName, sourceLocation } from '../../lib/ts-ast.mjs';
 
 const PROCESS_MODULES = new Set(['process', 'node:process']);
 const PROCESS_GLOBAL = new Set(['process']);
 const GLOBAL_HOLDERS = new Set(['globalThis', 'global']);
 const REFLECT_GLOBAL = new Set(['Reflect']);
-
-/** A static property name, including `object['env']` and `object[`env`]`. */
-export function accessName(ts, node) {
-  if (ts.isPropertyAccessExpression(node)) return node.name.text;
-  if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) return node.argumentExpression.text;
-  return null;
-}
 
 function bindingName(ts, element) {
   const name = element.propertyName ?? element.name;

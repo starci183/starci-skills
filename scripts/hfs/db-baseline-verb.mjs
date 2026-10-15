@@ -3,7 +3,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import pg from 'libpg-query';
 import { invocationDir } from '../lib/roots.mjs';
-import { supabaseSpawn } from '../api/supabase/lib.mjs';
+import { sqlStringParts as names, walkSqlAst as walk, sqlParser } from '../lib/sql-ast.mjs';
+import { databaseDump } from '../api/supabase/database-dump.mjs';
+import { databaseQuery } from '../api/supabase/database-query.mjs';
+import { migrationRepair } from '../api/supabase/migration-repair.mjs';
 import { migrationStamp, isMigrationName, databaseSqlTokens, databaseExecutableTokens } from './rules/database-migrations.mjs';
 import { baselineMarkers, baselineSourceFindings } from './rules/database-baseline.mjs';
 import { databaseQueueDeclarations } from './rules/database-queues.mjs';
@@ -57,13 +60,21 @@ export function dbSqlFiles(root, directory = MIGRATIONS_DIR) {
 }
 
 /** Supabase adapter uses supabaseSpawn's (repoRoot, args, options) contract; raw failures are private. */
+const DB_CALLS = { 'db dump': databaseDump, 'db query': databaseQuery, 'migration repair': migrationRepair };
+
+function runDatabaseCommand(root, args, options) {
+  const call = DB_CALLS[args.slice(0, 2).join(' ')];
+  if (!call) throw new DbVerbError('unsupported database command');
+  return call(root, args.slice(2), options);
+}
+
 export function runDbSupabase(root, args, ports = {}) {
   const env = ports.env ?? process.env;
   // The linked CLI can mint a temporary remote login when no existing password is supplied.
   // Check custody presence only; the value stays within the CLI environment.
   if (args.includes('--linked') && !ports.runSupabase && !ports.run && (typeof env[LINKED_PASSWORD_ENV] !== 'string' || env[LINKED_PASSWORD_ENV].length === 0)) throw new DbVerbError('linked database operations require an existing SUPABASE_DB_PASSWORD in the CLI environment');
   const cliEnv = { ...env, [TELEMETRY_DISABLED_ENV]: '1', [TELEMETRY_DEBUG_ENV]: '0', [CLI_DEBUG_ENV]: '0' };
-  const result = (ports.runSupabase ?? supabaseSpawn)(root, args, { env: cliEnv, ...(ports.run ? { run: ports.run } : {}) });
+  const result = (ports.runSupabase ?? runDatabaseCommand)(root, args, { env: cliEnv, ...(ports.run ? { run: ports.run } : {}) });
   if (result?.error || !(result?.ok === true || result?.status === 0)) throw new DbVerbError('Supabase command failed; inspect the CLI privately');
   return String(result.stdout ?? '');
 }
@@ -86,16 +97,9 @@ function baselinePlan(root, opts, now) {
 
 const EXCLUDED_SCHEMAS = new Set(['information_schema', '_analytics', '_realtime', '_supavisor', 'auth', 'etl', 'extensions', 'pgbouncer', 'realtime', 'storage', 'supabase_functions', 'supabase_migrations', 'cron', 'dbdev', 'graphql', 'graphql_public', 'net', 'pgmq', 'pgmq_public', 'pgsodium', 'pgsodium_masks', 'pgtle', 'repack', 'tiger', 'tiger_data', 'topology', 'vault']);
 const ROLE_OPTIONS = new Set(['canlogin', 'inherit', 'superuser', 'createdb', 'createrole', 'isreplication', 'bypassrls', 'connectionlimit']);
-const names = (nodes) => (nodes ?? []).map((node) => node.String?.sval).filter((name) => name !== undefined);
 const identifier = (name) => `"${name.replaceAll('"', '""')}"`;
 const literal = (value) => `'${value.replaceAll("'", "''")}'`;
 const excludedSchema = (name) => EXCLUDED_SCHEMAS.has(name) || /^(?:pg_|timescaledb_|_timescaledb_)/.test(name ?? '');
-
-function walk(value, visit) {
-  if (!value || typeof value !== 'object') return;
-  visit(value);
-  for (const child of Object.values(value)) walk(child, visit);
-}
 
 /** Inventory source paths only; no credential, generated or vendor tree is traversed. */
 function baselineFiles(root) {
@@ -114,9 +118,7 @@ function baselineFiles(root) {
   return files;
 }
 
-function parsed(text) {
-  try { return pg.parseSync(text); } catch { throw new DbVerbError('migration SQL could not be prepared safely for a baseline'); }
-}
+const parsed = sqlParser(pg, () => { throw new DbVerbError('migration SQL could not be prepared safely for a baseline'); });
 
 function statementSql(text, entry) {
   const bytes = Buffer.from(text);

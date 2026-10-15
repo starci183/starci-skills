@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { invocationDir } from '../lib/roots.mjs';
 import { isMain } from '../lib/is-main.mjs';
@@ -59,7 +59,7 @@ async function compileGraph(builder, Nest, request) {
 }
 
 /** Compile a real root, with overrides of existing tokens only; never auto-mock an unresolved dependency. */
-export async function compileAppModule({ AppModule, options, overrides = [], request = {}, Test, Nest, timeout = DEFAULT_TIMEOUT }) {
+async function compileAppModule({ AppModule, options, overrides = [], request = {}, Test, Nest, timeout = DEFAULT_TIMEOUT }) {
   if (typeof AppModule !== 'function') throw new Error('the actual AppModule is missing');
   if (typeof AppModule.register === 'function' && options === undefined) throw new Error('dynamic AppModule needs fixture options');
   const root = typeof AppModule.register === 'function' ? await AppModule.register(options) : AppModule;
@@ -152,8 +152,9 @@ function appWiringFinding({ repoRoot, beRoot, prefix, app, files, fixtures, time
   }
   const fixture = fixtures[app] ?? wiringFixturePath(app);
   const fixtureExists = fs.existsSync(path.join(beRoot, fixture)) && (!files || files.includes(`${prefix}${fixture}`));
-  const result = run(process.execPath, [WORKER, '--worker', JSON.stringify({ repoRoot: beRoot, app, fixture: fixtureExists ? fixture : null, timeout })],
-    { cwd: beRoot, encoding: 'utf8', env: {}, windowsHide: true, timeout: timeout + 2000, maxBuffer: 1024 * 1024 });
+  const args = [WORKER, '--worker', JSON.stringify({ repoRoot: beRoot, app, fixture: fixtureExists ? fixture : null, timeout })];
+  const options = { cwd: beRoot, encoding: 'utf8', env: {}, windowsHide: true, timeout: timeout + 2000, maxBuffer: 1024 * 1024 };
+  const result = run ? run(process.execPath, args, options) : runNode(args, options);
   let proof;
   try { proof = JSON.parse(result.stdout ?? ''); } catch { /* Output from app source cannot serve as a proof. */ }
   if (result.status !== 0 || proof?.ok !== true) return refusal(file, SAFE_REASONS.has(proof?.reason) ? proof.reason : WORKER_FAILURE);
@@ -161,7 +162,7 @@ function appWiringFinding({ repoRoot, beRoot, prefix, app, files, fixtures, time
 }
 
 /** Synchronous check seam for the dispatcher and content finder. Paths in findings are relative to repoRoot. */
-export function appWiring({ repoRoot, repo = readJson(repoRoot, 'hfs.json'), files, fixtures = {}, timeout = DEFAULT_TIMEOUT, run = spawnSync } = {}) {
+export function appWiring({ repoRoot, repo = readJson(repoRoot, 'hfs.json'), files, fixtures = {}, timeout = DEFAULT_TIMEOUT, run } = {}) {
   if (repo?.edition !== 'lite' || repo?.profile === 'fe' || repo?.kind === 'fe') return { ok: true, status: 'skipped', findings: [], apps: [] };
   const appRoot = Boolean(repo.sides);
   const beRoot = appRoot ? path.join(repoRoot, 'be') : repoRoot;

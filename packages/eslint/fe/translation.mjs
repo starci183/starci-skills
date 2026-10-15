@@ -26,6 +26,7 @@
  */
 
 import { isContentFile } from "./comments.mjs"
+import { variableOf } from "./lib/bindings.mjs"
 import { globalReferences, isComponentFile, kindOfFile } from "./lib/scope.mjs"
 import { why } from "./lib/why.mjs"
 
@@ -126,6 +127,24 @@ const templateHasWord = (node) => {
   return text !== null && hasLetter(text.replaceAll("#", " "))
 }
 
+/** Punctuation at either edge of a word, outside its letters and hyphens. */
+const WORD_START = new Set(['"', "'", "("])
+const WORD_END = new Set([".", ",", "!", "?", ":", ";", '"', ")"])
+
+/** Remove the edge punctuation in a single pass, preserving an apostrophe used as the core. */
+const wordCore = (token) => {
+  let end = token.length
+  while (end > 0 && WORD_END.has(token[end - 1])) end -= 1
+  let start = 0
+  while (start < end && WORD_START.has(token[start])) start += 1
+  if (start > 0 && token[start - 1] === "'") start -= 1
+  return token.slice(start, end)
+}
+
+/** A sentence word allows hyphens between letters; an all-capitals chain (YYYY-MM-DD) is a format. */
+const isSentenceWord = (token) =>
+  /^[\p{L}\p{N}#'\u2019]+(?:-[\p{L}\p{N}#]+)*$/u.test(wordCore(token)) && !/^\p{Lu}{2,}(?:-\p{Lu}{2,})+$/u.test(token)
+
 /**
  * A sentence rather than a token, for a property whose key does not say it is copy: two or more words made of
  * letters and sentence punctuation only (so a class list, a URL, a media type or an id never qualifies), and it starts
@@ -134,9 +153,7 @@ const templateHasWord = (node) => {
 const looksLikeSentence = (text) => {
   const tokens = text.trim().split(/\s+/)
   if (tokens.length < 2) return false
-  // a word has punctuation only at its edges or as a hyphen between letters; an all-capitals hyphen chain (YYYY-MM-DD) is a format
-  const isWord = (token) => /^["'(]*[\p{L}\p{N}#'’]+(?:-[\p{L}\p{N}#]+)*[.,!?:;")]*$/u.test(token) && !/^\p{Lu}{2,}(?:-\p{Lu}{2,})+$/u.test(token)
-  if (!tokens.every(isWord)) return false
+  if (!tokens.every(isSentenceWord)) return false
   if (tokens.filter((token) => /\p{L}{2,}/u.test(token)).length < 2) return false
   return /^\p{Lu}/u.test(text.trim()) || /[^\x00-\x7F]/.test(text) || /[.!?]$/.test(text.trim())
 }
@@ -264,17 +281,6 @@ const callRoot = (node) => {
   return null
 }
 
-/** The first definition of a value name in its enclosing scopes, or null for a global. */
-const bindingOf = (context, node) => {
-  let scope = (context.sourceCode ?? context.getSourceCode()).getScope(node)
-  while (scope) {
-    const variable = scope.set.get(node.name)
-    if (variable) return variable.defs[0] ?? null
-    scope = scope.upper
-  }
-  return null
-}
-
 /** Methods whose first argument is a Zod validation message rather than a value constraint. */
 const ZOD_MESSAGE_FIRST = new Set([
   "email", "url", "uuid", "cuid", "cuid2", "ulid", "emoji", "base64", "base64url", "ip", "ipv4", "ipv6",
@@ -306,7 +312,7 @@ export const noCopyInCall = {
       CallExpression(node) {
         const root = callRoot(node.callee)
         if (!root) return
-        const binding = bindingOf(context, root)
+        const binding = variableOf(context, root)?.defs[0] ?? null
         const imported = binding?.type === "ImportBinding" ? binding.parent.source.value : null
         const method = memberName(node.callee)
         const zod = imported === "zod" || imported?.startsWith("zod/") || (!binding && root.name === "z")

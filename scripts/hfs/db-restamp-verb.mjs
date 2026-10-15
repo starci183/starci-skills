@@ -8,7 +8,7 @@ import { MIGRATIONS_DIR, MIGRATIONS_ARCHIVE_DIR } from './rules/database-constan
 import { DbVerbError, dbOptions, dbAppRoot, dbSqlFiles, runDbSupabase, repairArgs, dbFailure } from './db-baseline-verb.mjs';
 
 /** YAML maps use quoted UTC stamps as keys and values (or a versions: mapping). */
-export function restampPlan(root, mapFile) {
+function restampPlan(root, mapFile) {
   if (!mapFile) throw new DbVerbError('restamp requires --map <restamp.yaml>');
   let document;
   try { document = parseYaml(fs.readFileSync(path.resolve(root, mapFile), 'utf8')); }
