@@ -1,4 +1,6 @@
 export { DatabaseModule } from "./database.module"
+export { DATABASE_PROBE, InjectDatabaseProbe } from "./primary.decorators"
+export { DatabaseProbeService } from "./database-probe.service"
 export { MigrationRunnerService } from "./migration-runner.service"
 export { DEFAULT_SEED_ENV } from "./seed-connections.client"
 export { SeedRunnerService } from "./seed-runner.service"

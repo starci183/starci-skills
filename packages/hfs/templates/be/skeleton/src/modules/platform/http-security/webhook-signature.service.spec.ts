@@ -36,137 +36,145 @@ const build = async () => {
 
 const refusal = (code: HttpSecurityErrorCode) => expect.objectContaining({ code })
 
-describe("WebhookSignatureService", () => {
-    describe("verify", () => {
-        it("accepts a current delivery signed with the configured secret", async () => {
-            const { service } = await build()
-            const timestamp = String(SIGNED_AT)
+const signedPartCases = () => {
+    it("accepts a current delivery signed with the configured secret", async () => {
+        const { service } = await build()
+        const timestamp = String(SIGNED_AT)
 
-            expect(() =>
-                service.verify({
-                    provider: "payments",
-                    rawBody: BODY,
-                    signature: `sha256=${sign(timestamp)}`,
-                    timestamp,
-                }),
-            ).not.toThrow()
-        })
-
-        it("refuses a provider that is not configured", async () => {
-            const { service } = await build()
-
-            expect(() =>
-                service.verify({
-                    provider: "unknown",
-                    rawBody: BODY,
-                    signature: "sha256=x",
-                    timestamp: "1",
-                }),
-            ).toThrow(refusal(HttpSecurityErrorCode.WebhookProviderUnknown))
-        })
-
-        it.each([
-            {
-                rawBody: undefined,
-                signature: "sha256=x",
-                timestamp: String(SIGNED_AT),
-            },
-            { rawBody: BODY, signature: undefined, timestamp: String(SIGNED_AT) },
-            { rawBody: BODY, signature: "sha256=x", timestamp: undefined },
-            { rawBody: BODY, signature: "sha256=x", timestamp: "yesterday" },
-        ])("refuses a delivery missing a signed part (%#)", async (part) => {
-            const { service } = await build()
-
-            expect(() => service.verify({ provider: "payments", ...part })).toThrow(
-                refusal(HttpSecurityErrorCode.WebhookSignatureInvalid),
-            )
-        })
-
-        it("refuses a signature without the sha256 scheme", async () => {
-            const { service } = await build()
-            const timestamp = String(SIGNED_AT)
-
-            expect(() =>
-                service.verify({
-                    provider: "payments",
-                    rawBody: BODY,
-                    signature: sign(timestamp),
-                    timestamp,
-                }),
-            ).toThrow(refusal(HttpSecurityErrorCode.WebhookSignatureInvalid))
-        })
-
-        it("refuses a signature of another length and one made with another secret", async () => {
-            const { service } = await build()
-            const timestamp = String(SIGNED_AT)
-
-            expect(() =>
-                service.verify({
-                    provider: "payments",
-                    rawBody: BODY,
-                    signature: "sha256=abc",
-                    timestamp,
-                }),
-            ).toThrow(refusal(HttpSecurityErrorCode.WebhookSignatureInvalid))
-            expect(() =>
-                service.verify({
-                    provider: "payments",
-                    rawBody: BODY,
-                    signature: `sha256=${sign(timestamp, BODY, "other")}`,
-                    timestamp,
-                }),
-            ).toThrow(refusal(HttpSecurityErrorCode.WebhookSignatureInvalid))
-        })
-
-        it("refuses a delivery whose body was changed after signing", async () => {
-            const { service } = await build()
-            const timestamp = String(SIGNED_AT)
-
-            expect(() =>
-                service.verify({
-                    provider: "payments",
-                    rawBody: Buffer.from("{}"),
-                    signature: `sha256=${sign(timestamp)}`,
-                    timestamp,
-                }),
-            ).toThrow(refusal(HttpSecurityErrorCode.WebhookSignatureInvalid))
-        })
-
-        it("refuses a correctly signed delivery outside the replay window, in either direction", async () => {
-            const { service } = await build()
-            const stale = String(SIGNED_AT - 300_001)
-            const future = String(SIGNED_AT + 300_001)
-
-            expect(() =>
-                service.verify({
-                    provider: "payments",
-                    rawBody: BODY,
-                    signature: `sha256=${sign(stale)}`,
-                    timestamp: stale,
-                }),
-            ).toThrow(refusal(HttpSecurityErrorCode.WebhookReplayed))
-            expect(() =>
-                service.verify({
-                    provider: "payments",
-                    rawBody: BODY,
-                    signature: `sha256=${sign(future)}`,
-                    timestamp: future,
-                }),
-            ).toThrow(refusal(HttpSecurityErrorCode.WebhookReplayed))
-        })
-
-        it("accepts a delivery exactly at the edge of the replay window", async () => {
-            const { service } = await build()
-            const edge = String(SIGNED_AT - 300_000)
-
-            expect(() =>
-                service.verify({
-                    provider: "payments",
-                    rawBody: BODY,
-                    signature: `sha256=${sign(edge)}`,
-                    timestamp: edge,
-                }),
-            ).not.toThrow()
-        })
+        expect(() =>
+            service.verify({
+                provider: "payments",
+                rawBody: BODY,
+                signature: `sha256=${sign(timestamp)}`,
+                timestamp,
+            }),
+        ).not.toThrow()
     })
+
+    it("refuses a provider that is not configured", async () => {
+        const { service } = await build()
+
+        expect(() =>
+            service.verify({
+                provider: "unknown",
+                rawBody: BODY,
+                signature: "sha256=x",
+                timestamp: "1",
+            }),
+        ).toThrow(refusal(HttpSecurityErrorCode.WebhookProviderUnknown))
+    })
+
+    it.each([
+        {
+            rawBody: undefined,
+            signature: "sha256=x",
+            timestamp: String(SIGNED_AT),
+        },
+        { rawBody: BODY, signature: undefined, timestamp: String(SIGNED_AT) },
+        { rawBody: BODY, signature: "sha256=x", timestamp: undefined },
+        { rawBody: BODY, signature: "sha256=x", timestamp: "yesterday" },
+    ])("refuses a delivery missing a signed part (%#)", async (part) => {
+        const { service } = await build()
+
+        expect(() => service.verify({ provider: "payments", ...part })).toThrow(
+            refusal(HttpSecurityErrorCode.WebhookSignatureInvalid),
+        )
+    })
+}
+
+const digestCases = () => {
+    it("refuses a signature without the sha256 scheme", async () => {
+        const { service } = await build()
+        const timestamp = String(SIGNED_AT)
+
+        expect(() =>
+            service.verify({
+                provider: "payments",
+                rawBody: BODY,
+                signature: sign(timestamp),
+                timestamp,
+            }),
+        ).toThrow(refusal(HttpSecurityErrorCode.WebhookSignatureInvalid))
+    })
+
+    it("refuses a signature of another length and one made with another secret", async () => {
+        const { service } = await build()
+        const timestamp = String(SIGNED_AT)
+
+        expect(() =>
+            service.verify({
+                provider: "payments",
+                rawBody: BODY,
+                signature: "sha256=abc",
+                timestamp,
+            }),
+        ).toThrow(refusal(HttpSecurityErrorCode.WebhookSignatureInvalid))
+        expect(() =>
+            service.verify({
+                provider: "payments",
+                rawBody: BODY,
+                signature: `sha256=${sign(timestamp, BODY, "other")}`,
+                timestamp,
+            }),
+        ).toThrow(refusal(HttpSecurityErrorCode.WebhookSignatureInvalid))
+    })
+
+    it("refuses a delivery whose body was changed after signing", async () => {
+        const { service } = await build()
+        const timestamp = String(SIGNED_AT)
+
+        expect(() =>
+            service.verify({
+                provider: "payments",
+                rawBody: Buffer.from("{}"),
+                signature: `sha256=${sign(timestamp)}`,
+                timestamp,
+            }),
+        ).toThrow(refusal(HttpSecurityErrorCode.WebhookSignatureInvalid))
+    })
+}
+
+const replayWindowCases = () => {
+    it("refuses a correctly signed delivery outside the replay window, in either direction", async () => {
+        const { service } = await build()
+        const stale = String(SIGNED_AT - 300_001)
+        const future = String(SIGNED_AT + 300_001)
+
+        expect(() =>
+            service.verify({
+                provider: "payments",
+                rawBody: BODY,
+                signature: `sha256=${sign(stale)}`,
+                timestamp: stale,
+            }),
+        ).toThrow(refusal(HttpSecurityErrorCode.WebhookReplayed))
+        expect(() =>
+            service.verify({
+                provider: "payments",
+                rawBody: BODY,
+                signature: `sha256=${sign(future)}`,
+                timestamp: future,
+            }),
+        ).toThrow(refusal(HttpSecurityErrorCode.WebhookReplayed))
+    })
+
+    it("accepts a delivery exactly at the edge of the replay window", async () => {
+        const { service } = await build()
+        const edge = String(SIGNED_AT - 300_000)
+
+        expect(() =>
+            service.verify({
+                provider: "payments",
+                rawBody: BODY,
+                signature: `sha256=${sign(edge)}`,
+                timestamp: edge,
+            }),
+        ).not.toThrow()
+    })
+}
+
+describe("WebhookSignatureService", () => {
+    describe("verify signed parts", signedPartCases)
+    describe("verify digest", digestCases)
+    describe("verify replay window", replayWindowCases)
 })

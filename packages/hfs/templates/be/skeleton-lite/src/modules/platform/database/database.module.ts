@@ -2,11 +2,12 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { TypeOrmModule, getDataSourceToken } from "@nestjs/typeorm"
 import type { DataSource } from "typeorm"
+import { DatabaseProbeService } from "./database-probe.service"
 import { DATABASE_OPTIONS } from "./database.port"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./database.module-definition"
 import { DatabaseError, DatabaseErrorCode } from "./errors/database.error"
 import { PRIMARY_CONNECTION } from "./primary.connection"
-import { PRIMARY_ENTITY_MANAGER } from "./primary.decorators"
+import { DATABASE_PROBE, PRIMARY_ENTITY_MANAGER } from "./primary.decorators"
 
 /** The token each declared connection provides its shared EntityManager under. */
 type EntityManagerToken = typeof PRIMARY_ENTITY_MANAGER
@@ -35,6 +36,9 @@ export class DatabaseModule extends ConfigurableModuleClass {
                 useFactory: (source: DataSource) => source.manager,
             }
         })
+        const probes = options.connections.some((connection) => connection.name === PRIMARY_CONNECTION)
+            ? [{ provide: DATABASE_PROBE, useClass: DatabaseProbeService }]
+            : []
         return {
             ...base,
             imports: [
@@ -50,8 +54,12 @@ export class DatabaseModule extends ConfigurableModuleClass {
                     }),
                 ),
             ],
-            providers: [...(base.providers ?? []), ...managers],
-            exports: [DATABASE_OPTIONS, ...managers.map((manager) => manager.provide)],
+            providers: [...(base.providers ?? []), ...managers, ...probes],
+            exports: [
+                DATABASE_OPTIONS,
+                ...probes.map((probe) => probe.provide),
+                ...managers.map((manager) => manager.provide),
+            ],
         }
     }
 }

@@ -3,6 +3,8 @@ import type { ErrorKind } from "@modules/platform/errors"
 
 /** Codes of the http-security capability. */
 export enum HttpSecurityErrorCode {
+    /** The required primary database failed or did not answer before the readiness deadline. */
+    RequiredDependencyUnavailable = "HTTP_SECURITY_REQUIRED_DEPENDENCY_UNAVAILABLE",
     /** A state-changing request came from an origin that is not on the allowlist. */
     OriginRejected = "HTTP_SECURITY_ORIGIN_REJECTED",
     /** The caller sent more requests than its tier allows in the current window. */
@@ -19,6 +21,7 @@ export enum HttpSecurityErrorCode {
 
 /** How each http-security code travels. */
 export const HTTP_SECURITY_ERROR_KINDS: Record<HttpSecurityErrorCode, ErrorKind> = {
+    [HttpSecurityErrorCode.RequiredDependencyUnavailable]: "unavailable",
     [HttpSecurityErrorCode.OriginRejected]: "forbidden",
     [HttpSecurityErrorCode.RateLimited]: "rate-limited",
     [HttpSecurityErrorCode.RequestInvalid]: "invalid",
