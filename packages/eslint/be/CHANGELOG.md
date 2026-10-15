@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.3.1 - 2026-10-15
+- Changed: version-only republish. 3.3.0 was published first and the bundled canon-pins copy then moved with the rest of the alpha.14 package set (hfs 4.3.0, canon-fe 8.3.0, cli 1.3.0); 3.3.0 is superseded and no longer pinned anywhere.
+
 ## 3.3.0 - 2026-10-14
 - Added: the app file role `<app>.env.ts` (150-line budget, `app-file-budget`): `config-owner` lets `main.ts` and the app's env file parse the environment; `app-options-composition-free` also refuses a module list or `register`/`forRoot` call in it, and it imports no feature.
 - Changed: `background-unowned` decides by context (processor, scheduler, saga, event handler and what they call; a resolver or controller is never background) instead of by method name.

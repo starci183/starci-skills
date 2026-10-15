@@ -6,8 +6,10 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+## [1.0.0-alpha.14] — 2026-10-15
+
 ### Added
-- The back-end app composition standard (owner ruling 2026-10-14, R245 and R246, slot manifest and rule catalog 3.1.0): an app's `src/` holds `main.ts`, `<app>.options.ts` (env-derived options plus port bindings only), the composition groups `compose/<area>.ts` (one area's module list each, composition only) and `app.module.ts` (imports the groups and spreads them), with line budgets of 80, 200, 120 and 250. `@starci/eslint-canon-be` 3.3.0 adds `app-options-composition-free` (`BE_APP_OPTIONS_COMPOSITION`: no module, queue or scheduler list in the options) and `app-file-budget` (`BE_APP_COMPOSITION_BUDGET`); the architecture machine reads a root and its groups as one composition. `@starci/hfs` 4.3.0 scaffolds `compose/platform.ts`; the lite-app api, the ecommerce order api and the shape-slot core app compose in groups. `@starci/eslint-canon-fe` 8.2.17 and `@starci/cli` 1.2.16 carry the new mirror and pins. Knowledge: BE-API-4, the HFS README section 5.8.
+- The back-end app composition standard (owner ruling 2026-10-14, R245 and R246, slot manifest and rule catalog 3.1.0): an app's `src/` holds `main.ts`, `<app>.options.ts` (env-derived options plus port bindings only), the composition groups `compose/<area>.ts` (one area's module list each, composition only) and `app.module.ts` (imports the groups and spreads them), with line budgets of 80, 200, 120 and 250. `@starci/eslint-canon-be` 3.3.1 (3.3.0 was published first and is superseded by the set-wide bundling rule) adds `app-options-composition-free` (`BE_APP_OPTIONS_COMPOSITION`: no module, queue or scheduler list in the options) and `app-file-budget` (`BE_APP_COMPOSITION_BUDGET`); the architecture machine reads a root and its groups as one composition. `@starci/hfs` 4.3.0 scaffolds `compose/platform.ts`; the lite-app api, the ecommerce order api and the shape-slot core app compose in groups. `@starci/eslint-canon-fe` 8.2.17 and `@starci/cli` 1.2.16 carry the new mirror and pins. Knowledge: BE-API-4, the HFS README section 5.8.
 - The app file role `<app>.env.ts` (every `be.app.*` slot, budget 150): the typed, fail-fast environment parse beside `main.ts`, which stays within 80 lines (owner request 2026-10-14).
 - `starci app secret init|set|get|materialize|list`: sops dotenv custody under `.starcistacks/<env>/secrets/` with the age identity outside the repository and `*_FILE` reading; an untracked lite `secrets.env` is a warning.
 - Lite delivery slots (`deploy/`, `<app>-deploy.yml`, `authorize-deploy-key.yml`, `scripts/{env-sync,with-secrets,set-secrets,build-*}`), with R06 on all of them.
@@ -17,6 +19,10 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - A lite app's `.starciwork/` holds only `.gitignore`, `workspace.yaml` and `brand/**` and is optional; the work readers skip the removed records under lite.
 - Lint precision: `BE_BACKGROUND_UNOWNED` by context instead of method name, webhook doors may start with a declared domain verifier, `HFS_DUPLICATE_CODE` ignores canon scaffold shapes, `HFS_UNUSED_EXPORT` counts staged consumers, `FE_I18N_KEYS` reads in-segment template keys.
 - The scaffolded pre-commit hook lints and formats staged files in chunks of 50; `DB_MIGRATION_SHAPE` orders new migrations against HEAD.
+
+### Release
+- Packages to publish, and the canon pins, code-pattern bindings and example pins to rebind at publish: `@starci/hfs` 4.3.0, `@starci/eslint-canon-be` 3.3.0, `@starci/eslint-canon-fe` 8.3.0 and `@starci/cli` 1.3.0 (pins HFS 4.3.0, carries runtime 1.0.0-alpha.14). alpha.13 published hfs 4.2.17, canon-be 3.2.19, canon-fe 8.2.18 and cli 1.2.17 natively; its root package was deliberately not published, so alpha.14 is the root release after alpha.13.
+- The lite example (`examples/lite-app`) ships no Work catalog; its `.starciwork/` holds only `workspace.yaml` and `brand/**`.
 
 ## [1.0.0-alpha.13] — 2026-10-13
 
