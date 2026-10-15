@@ -108,7 +108,7 @@ export function addFeOverlay({ root, app, name, page, messages, ts }) {
   const catalogs = planFeCatalogs(context, {
     group: "overlays", name, messages,
     defaults: {
-      vi: { title: "Thông tin", open: "Mở thông tin", close: "Đóng", description: "Xem thông tin của trang này." },
+      vi: { title: "Th\u00f4ng tin", open: "M\u1edf th\u00f4ng tin", close: "\u0110\u00f3ng", description: "Xem th\u00f4ng tin c\u1ee7a trang n\u00e0y." },
       en: { title: "Information", open: "Open information", close: "Close", description: "View information about this page." },
     },
   });

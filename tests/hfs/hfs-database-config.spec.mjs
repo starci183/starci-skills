@@ -135,7 +135,8 @@ for (const edition of ['lite', 'full']) {
     const enabled = configured('[db.seed]\nenabled = false', '[db.seed]\nenabled = true');
     has(findings({ [CONFIG]: enabled }, edition), 'DB_CONFIG_POLICY');
     assert.deepEqual(findings({ [CONFIG]: enabled, 'supabase/seed.sql': "insert into items values ('demo@example.test') on conflict do nothing;" }, edition), []);
-    for (const sqlPath of ['../outside.sql', '/outside.sql', 'C:/outside.sql', './missing.sql', './seed.txt']) {
+    const windowsOutside = path.win32.resolve('C:', os.tmpdir(), 'outside.sql').replaceAll(path.win32.sep, '/');
+    for (const sqlPath of ['../outside.sql', '/outside.sql', windowsOutside, './missing.sql', './seed.txt']) {
       has(findings({ [CONFIG]: enabled.replace('./seed.sql', sqlPath), 'outside.sql': 'select 1;', 'supabase/seed.txt': 'select 1;' }, edition), 'DB_CONFIG_POLICY');
     }
     assert.deepEqual(findings({ [CONFIG]: enabled.replace('./seed.sql', './seeds/*.sql'), 'supabase/seeds/demo.sql': 'select 1;' }, edition), []);

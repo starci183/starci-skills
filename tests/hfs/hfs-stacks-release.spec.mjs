@@ -172,7 +172,8 @@ for (const edition of ['lite', 'full']) {
   });
 
   test('BACKUP_PROOF_MISSING@' + edition + ': absent, untracked and unsafe proof references fail', () => {
-    const references = [undefined, '', 'missing.md', '../restore.md', '/restore.md', 'C:/restore.md',
+    const windowsRestore = path.win32.resolve('C:', os.tmpdir(), 'restore.md').replaceAll(path.win32.sep, '/');
+    const references = [undefined, '', 'missing.md', '../restore.md', '/restore.md', windowsRestore,
       'evidence/../restore.md', 'evidence//restore.md', 'evidence/./restore.md',
       '.starcistacks/production/secrets/proof.enc', '.claude/proof.md', '.env', 'evidence/private.key',
       ['evidence', 'restore.md'].join(String.fromCodePoint(92))];

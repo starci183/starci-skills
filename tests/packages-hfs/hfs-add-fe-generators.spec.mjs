@@ -73,7 +73,7 @@ for (const edition of ["lite", "full"]) {
     assert.match(entry, /canonical: SALES_SUMMARY_PAGE_ROUTE/);
     assert.doesNotMatch(entry, /use client/);
     assert.match(read(root, `${source}/modules/routes/index.ts`), /SALES_SUMMARY_PAGE_ROUTE = "\/reports\/sales"/);
-    for (const [locale, title] of [["vi", "Trang mới"], ["en", "New page"]]) {
+    for (const [locale, title] of [["vi", "Trang m\u1edbi"], ["en", "New page"]]) {
       const catalog = JSON.parse(read(root, `${source}/modules/i18n/messages/${locale}.json`));
       assert.deepEqual(catalog.app.pages["sales-summary"], { title });
       assert.deepEqual(catalog.app.home, { title: "Demo" });
@@ -105,7 +105,7 @@ for (const edition of ["lite", "full"]) {
     const root = appRoot(edition, [{ name: "web", kind: "next" }, { name: "admin", kind: "next" }]);
     refuses(() => addFePage({ root, name: "sales" }), "HFS_ADD_OPTION_MISSING");
     refuses(() => addFePage({ root, app: "missing", name: "sales" }), "HFS_ADD_APP_UNKNOWN");
-    const result = addFePage({ root, app: "admin", name: "sales", messages: { vi: { title: "Doanh số" }, en: { title: "Sales" } } });
+    const result = addFePage({ root, app: "admin", name: "sales", messages: { vi: { title: "Doanh s\u1ed1" }, en: { title: "Sales" } } });
     assert.ok(result.created.every((file) => file.startsWith("fe/apps/admin/")));
     assert.equal(JSON.parse(read(root, "fe/apps/admin/src/modules/i18n/messages/en.json")).app.pages.sales.title, "Sales");
     fs.rmSync(path.join(root, ...source.split("/"), "modules/i18n/messages/en.json"));
@@ -135,7 +135,7 @@ for (const edition of ["lite", "full"]) {
     const vi = JSON.parse(read(root, `${source}/modules/i18n/messages/vi.json`)).app.overlays.details;
     const en = JSON.parse(read(root, `${source}/modules/i18n/messages/en.json`)).app.overlays.details;
     assert.deepEqual(Object.keys(vi), Object.keys(en));
-    assert.equal(vi.close, "Đóng");
+    assert.equal(vi.close, "\u0110\u00f3ng");
     assert.equal(en.close, "Close");
     parses(root, [...result.created, ...result.updated]);
     const before = snapshot(root);
@@ -221,7 +221,7 @@ for (const edition of ["lite", "full"]) {
   test(`generators ${edition} keep an additional locale in lockstep when supplied its messages`, () => {
     const root = appRoot(edition, [{ name: "web", kind: "next" }, { name: "admin", kind: "next" }]);
     const selected = "fe/apps/admin/src";
-    write(root, `${selected}/modules/i18n/messages/fr.json`, jsonText({ app: { home: { title: "Démo" } } }));
+    write(root, `${selected}/modules/i18n/messages/fr.json`, jsonText({ app: { home: { title: "D\u00e9mo" } } }));
     const unselected = snapshot(path.join(root, "fe/apps/web"));
     const page = addFePage({ root, app: "admin", name: "sales", messages: { fr: { title: "Ventes" } } });
     const overlay = addFeOverlay({
@@ -286,7 +286,7 @@ test("catalog collision, extra locales and missing routes all refuse atomically"
   refuses(() => addFePage({ root, name: "sales" }), "HFS_ADD_EXISTS");
   assert.deepEqual(snapshot(root), before);
   write(root, en, jsonText({ app: { home: { title: "Demo" } } }));
-  write(root, `${source}/modules/i18n/messages/fr.json`, jsonText({ app: { home: { title: "Démo" } } }));
+  write(root, `${source}/modules/i18n/messages/fr.json`, jsonText({ app: { home: { title: "D\u00e9mo" } } }));
   refuses(() => addFePage({ root, name: "sales" }), "HFS_ADD_I18N_INVALID");
   fs.rmSync(path.join(root, ...source.split("/"), "modules/routes/index.ts"));
   const missing = snapshot(root);

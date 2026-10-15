@@ -10,6 +10,7 @@ import { liteBackingIssues, stacksLiteBackingFindings } from '../../scripts/hfs/
 
 const DECLARATION = '.starcistacks/application-stacks.yaml';
 const STACK_FILE = '.starcistacks/production/infra/swarm/stack.yaml';
+const SQLITE_DATA_DIR = path.posix.join(path.posix.sep, 'home', 'node', '.n8n');
 const pinned = image => `${image}@sha256:${'b'.repeat(64)}`;
 const CODES = ['STACKS_LITE_SELFHOSTED_DB', 'STACKS_SIDECAR_VOLUME_UNDECLARED', 'STACKS_SIDECAR_DB_UNSUPPORTED'];
 
@@ -23,7 +24,7 @@ function fixture(edition = 'lite') {
     environments: { production: spec }, backing: { supabase: { provider: 'supabase', managed: true } },
   };
   const model = {
-    services: { api: { image: pinned('app/api:1.0.0') }, automation: { image: pinned('n8nio/n8n:1.64.3'), volumes: ['automation-data:/home/node/.n8n'] } },
+    services: { api: { image: pinned('app/api:1.0.0') }, automation: { image: pinned('n8nio/n8n:1.64.3'), volumes: [`automation-data:${SQLITE_DATA_DIR}`] } },
     volumes: { 'automation-data': {} },
   };
   return { doc, spec, model, environment: 'production', repo: { edition } };
@@ -93,7 +94,7 @@ test('STACKS_SIDECAR_DB_UNSUPPORTED@lite: SQLite adapter configuration and app m
 test('STACKS_SIDECAR_VOLUME_UNDECLARED@lite: declared named volume with short or long writable mount passes', () => {
   const value = fixture();
   assert.deepEqual(issuesFor(value, 'STACKS_SIDECAR_VOLUME_UNDECLARED'), []);
-  value.model.services.automation.volumes = [{ type: 'volume', source: 'automation-data', target: '/home/node/.n8n' }];
+  value.model.services.automation.volumes = [{ type: 'volume', source: 'automation-data', target: SQLITE_DATA_DIR }];
   assert.deepEqual(issuesFor(value, 'STACKS_SIDECAR_VOLUME_UNDECLARED'), []);
   value.model.volumes['automation-data'] = null;
   assert.deepEqual(issuesFor(value, 'STACKS_SIDECAR_VOLUME_UNDECLARED'), []);
@@ -107,7 +108,7 @@ test('STACKS_SIDECAR_VOLUME_UNDECLARED@lite: absent volume metadata, component v
     value => { delete value.model.volumes; },
     value => { value.model.volumes = { unrelated: {} }; },
     value => { delete value.model.services.automation.volumes; },
-    value => { value.model.services.automation.volumes = ['other-data:/home/node/.n8n']; },
+    value => { value.model.services.automation.volumes = [`other-data:${SQLITE_DATA_DIR}`]; },
   ];
   for (const mutate of mutations) {
     const value = fixture();
@@ -131,16 +132,16 @@ test('STACKS_SIDECAR_VOLUME_UNDECLARED@lite: path-like volume names cannot turn 
     value.doc.components.automation.database.volume = source;
     value.doc.components.automation.volumes = [source];
     value.model.volumes = { [source]: {} };
-    value.model.services.automation.volumes = [`${source}:/home/node/.n8n`];
+    value.model.services.automation.volumes = [`${source}:${SQLITE_DATA_DIR}`];
     assert.equal(issuesFor(value, 'STACKS_SIDECAR_VOLUME_UNDECLARED').length, 1);
   }
 });
 
 test('STACKS_SIDECAR_VOLUME_UNDECLARED@lite: bind mounts, anonymous volumes and read-only mounts do not persist writable SQLite', () => {
   for (const mount of [
-    './automation-data:/home/node/.n8n', '/home/node/.n8n', 'automation-data:/home/node/.n8n:ro',
-    { type: 'bind', source: 'automation-data', target: '/home/node/.n8n' },
-    { type: 'volume', source: 'automation-data', target: '/home/node/.n8n', read_only: true },
+    `./automation-data:${SQLITE_DATA_DIR}`, SQLITE_DATA_DIR, `automation-data:${SQLITE_DATA_DIR}:ro`,
+    { type: 'bind', source: 'automation-data', target: SQLITE_DATA_DIR },
+    { type: 'volume', source: 'automation-data', target: SQLITE_DATA_DIR, read_only: true },
   ]) {
     const value = fixture();
     value.model.services.automation.volumes = [mount];
