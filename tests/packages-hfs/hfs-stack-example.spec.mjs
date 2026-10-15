@@ -1,6 +1,7 @@
 // examples/lite-app end to end: its deploy block is read by the real loadDeployConfig against its own stack source, and a release of it renders
 // with the fake docker and sops seams (names, counts and digests only; no value leaves memory).
 import test from 'node:test';
+import { renderRelease } from '../../packages/hfs/stack/render.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -12,7 +13,6 @@ import { fakeHost, fakeSops } from '../helpers/stack-fakes.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const EXAMPLE = path.join(ROOT, 'examples', 'lite-app');
-const RENDER = path.join(ROOT, 'packages', 'hfs', 'stack', 'render.mjs');
 const MEMBERS = {
   'primary-db-url': { PRIMARY_DB_URL: 'value-primary-3f9a1c' },
   'supabase-service-role-key': { SUPABASE_SERVICE_ROLE_KEY: 'value-service-77b2d0' },
@@ -57,11 +57,6 @@ test('the example deploy block names the volumes, hosts and secret pointers its 
 });
 
 test('a release of the example renders with the fake docker and sops and leaks no value', async t => {
-  if (!fs.existsSync(RENDER)) {
-    t.skip('packages/hfs/stack/render.mjs is not merged yet (task A); the lead removes this guard with the merge');
-    return;
-  }
-  const { renderRelease } = await import(RENDER);
   const root = exampleCopy(t);
   const config = loadDeployConfig({ repoRoot: root, env: 'production' });
   const host = fakeHost({ fileReader: file => fs.readFileSync(file, 'utf8') });
