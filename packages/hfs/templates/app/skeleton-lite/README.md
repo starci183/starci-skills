@@ -34,6 +34,8 @@ The API reads `PORT`, `HTTP_SECURITY_ALLOWED_ORIGINS`, `PRIMARY_DB_URL`, `PRIMAR
 
 `npm test` runs the back end's unit specs with per-file coverage. Optional integration specs run with `npm run test:integration` against the local Supabase stack (`npm run db:start`); a lite app has no e2e world.
 
+The public runtime template tracks only sealed member names. Scaffolding creates this app's own age recipient and encrypts generated placeholder values into the declared `.starcistacks/<environment>/secrets/*.enc` members. Keep the matching host age identity in untracked local custody, then use `starci app secret set` to replace each placeholder with an actual value before deployment. Product apps retain sealed member custody. Runtime specs use disposable copies with ephemeral identities and remove them afterwards.
+
 ## Database changes
 
 Create a forward-only migration under `supabase/migrations`, keep each table's RLS policies and grants beside the table, and run `npm run contract:emit` to refresh `supabase/types/database.types.ts`. `starci app add table <name> --fe` adds the table with its GraphQL feature on the API and its operations and SWR hooks in the web app; `npm run codegen:graphql` regenerates the web app's wire types from `be/contracts/<app>/schema.graphql`.

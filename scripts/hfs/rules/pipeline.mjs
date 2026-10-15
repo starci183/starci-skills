@@ -7,6 +7,7 @@
 // A missing file is the slot manifest's finding (HFS_SLOT_REQUIRED_MISSING); a file that is present and lacks the step is this rule's.
 // The redirect of `core.hooksPath` away from husky is the architecture machine's (HFS_HOOKS_PATH_REDIRECTED).
 import { found, readJson, readText } from './read.mjs';
+import { isRuntimeExampleApp } from '../../lib/runtime-example.mjs';
 
 const CI_MISSING_CANON = 'HFS_CI_MISSING_CANON';
 const CI_FILE = '.github/workflows/ci.yml';
@@ -15,6 +16,7 @@ const RUN_PREFIX = /^\s*(?:-\s+)?run:/;
 const NPX_PREFIX = /^npx\s+(?:(?:--no-install|-y)\s+)?/;
 const LINT_COMMAND = /^(?:@starci\/cli(?:@(\S+))?|starci)\s+app\s+lint/;
 const NPM_RUN_PREFIX = 'npm run ';
+const EXAMPLE_RUN_PREFIX = 'node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- ';
 const SCRIPT_NAME = /^[\w:.-]+/;
 const ARGS_SEPARATOR = /^\s+--\s+/;
 const LINE_TERMINATOR = /[\n\r\u2028\u2029]/;
@@ -72,6 +74,9 @@ function expanded(command, scripts) {
   return run.args ? `${scripts[run.script]} ${run.args}` : scripts[run.script];
 }
 
+/** Only the bundled example runner with its fixed current-app arguments delegates to the following argv. */
+const exampleCommandOf = (command) => command.startsWith(EXAMPLE_RUN_PREFIX) ? command.slice(EXAMPLE_RUN_PREFIX.length) : command;
+
 /** The findings of R13 over the repository at `repoRoot`; `pins` is the parsed canon-pins.yaml pin map. */
 export function pipelineFindings({ repoRoot, files, pins }) {
   const findings = [];
@@ -79,7 +84,9 @@ export function pipelineFindings({ repoRoot, files, pins }) {
   const ci = files.includes(CI_FILE) ? readText(repoRoot, CI_FILE) : null;
   if (ci !== null) {
     const scripts = readJson(repoRoot, 'package.json')?.scripts ?? {};
-    const lints = commandsOf(ci).flatMap((command) => chainedCommands(expanded(command, scripts))).map(lintCommandOf).filter(Boolean);
+    const commands = commandsOf(ci);
+    const selected = isRuntimeExampleApp(repoRoot) ? commands.map(exampleCommandOf) : commands;
+    const lints = selected.flatMap((command) => chainedCommands(expanded(command, scripts))).map(lintCommandOf).filter(Boolean);
     if (!lints.length) findings.push(found(CI_MISSING_CANON, CI_FILE, `${CI_FILE} has no step that runs \`starci app lint\` (directly or through \`npm run lint\`); CI runs the one lint entry, which includes the repository check`, { step: 'starci app lint' }));
     else if (pinned && !lints.some((match) => match.version === undefined || match.version === pinned)) {
       findings.push(found(CI_MISSING_CANON, CI_FILE, `${CI_FILE} runs starci app lint at ${lints[0].version}, but ${hfsPackage} is pinned at ${pinned}; run the pinned version`, { step: 'starci app lint', pinned }));

@@ -1,6 +1,6 @@
 # Environment key roster
 
-This roster declares names only. The two tracked .enc members are nondeployable structural SOPS examples with invalid ciphertext stand-ins. Replace their entire envelopes with real sealed members before materializing anything. Store credential values in sealed custody and materialize private KEY files outside the repository.
+This roster declares names only. Scaffolding generates the two declared encrypted members with placeholder values encrypted to this app's own age recipient. Replace their values through `starci app secret set dev` before creating external secrets. The runtime template tracks no ciphertext; its specs generate members with ephemeral identities in disposable copies. Store product credential values in sealed custody and materialize private KEY files outside the repository.
 
 | Key | Consumer |
 | --- | --- |

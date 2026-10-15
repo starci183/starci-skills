@@ -6,6 +6,9 @@ import path from 'node:path';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { checkRepo } from '../../scripts/hfs/check.mjs';
+import { materializeExample } from '../../scripts/hfs/example-secrets.mjs';
+import { checkApplicationStacks } from '../../scripts/gates/stacks-gate.mjs';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 
 // The witness-mutation fixtures (alpha.15, batch C05): the counter-examples of analysis/ops-security.md
 // section 3 and the 2026-10-14 owner rulings as `mutate` lists over a temp copy of examples/lite-app, each
@@ -16,17 +19,18 @@ import { checkRepo } from '../../scripts/hfs/check.mjs';
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const FIXTURES = path.join(ROOT, 'tests', 'fixtures', 'mutations');
 const OPS = new Set(['add', 'edit', 'delete']);
-const SAFE_PATH = /^(?!\/)[a-zA-Z0-9._\-\/[\]]+$/;
+const SAFE_PATH = /^(?!\/)[a-zA-Z0-9._\-/[\]]+$/;
 
 const fixtures = fs.readdirSync(FIXTURES)
   .filter((file) => file.endsWith('.yaml'))
-  .sort()
+  .sort(byCodeUnit)
   .map((file) => ({ file, ...parseYaml(fs.readFileSync(path.join(FIXTURES, file), 'utf8')) }));
 
 /** A private copy of the fixture's base with its mutate list applied. */
-const mutatedCopy = (t, fixture, { apply = true } = {}) => {
+const mutatedCopy = async (t, fixture, { apply = true } = {}) => {
   const dir = mkdtemp(t, 'hfs-mutation-');
   fs.cpSync(path.join(ROOT, fixture.base), dir, { recursive: true });
+  await materializeExample(dir);
   if (!apply) return dir;
   for (const step of fixture.mutate) {
     const target = path.join(dir, step.path);
@@ -53,14 +57,14 @@ const trackedFilesOf = (dir) => {
     }
   };
   descend('');
-  return out.sort();
+  return out.sort(byCodeUnit);
 };
 
 const codesOf = (repoRoot, files) => new Set(checkRepo({ repoRoot, files, tree: false }).findings.map((finding) => finding.code));
 
-test('every mutation fixture is well formed and its mutate list applies to a copy of its base', (t) => {
+test('every mutation fixture is well formed and its mutate list applies to a copy of its base', async (t) => {
   assert.ok(fixtures.length > 0, 'tests/fixtures/mutations holds no fixture');
-  for (const fixture of fixtures) {
+  await Promise.all(fixtures.map((fixture) => {
     const label = `${fixture.file} (${fixture.name ?? 'unnamed'})`;
     assert.match(fixture.name ?? '', /^[a-z0-9][a-z0-9-]*$/, `${label}: name`);
     assert.ok(fixture.name === fixture.file.replace(/\.yaml$/, ''), `${label}: the name is the file name`);
@@ -74,21 +78,43 @@ test('every mutation fixture is well formed and its mutate list applies to a cop
       assert.ok(SAFE_PATH.test(step.path) && !step.path.split('/').includes('..'), `${label}: unsafe path ${step.path}`);
       if (step.op !== 'delete') assert.equal(typeof step.content, 'string', `${label}: ${step.path} needs content`);
     }
-    mutatedCopy(t, fixture);
-  }
+    return mutatedCopy(t, fixture);
+  }));
 });
 
 for (const fixture of fixtures) {
-  test(`${fixture.name} -> ${fixture.expect.join(', ')}`, { skip: fixture.pending ? `pending: ${fixture.pending}` : false }, (t) => {
-    const dir = mutatedCopy(t, fixture);
+  test(`${fixture.name} -> ${fixture.expect.join(', ')}`, { skip: fixture.pending ? `pending: ${fixture.pending}` : false }, async (t) => {
+    const dir = await mutatedCopy(t, fixture);
     const mutated = codesOf(dir, trackedFilesOf(dir));
     for (const code of fixture.expect) {
-      assert.ok(mutated.has(code), `${fixture.name}: the mutated ${fixture.base} did not produce ${code} (saw ${[...mutated].sort().join(', ') || 'no findings'})`);
+      assert.ok(mutated.has(code), `${fixture.name}: the mutated ${fixture.base} did not produce ${code} (saw ${[...mutated].sort(byCodeUnit).join(', ') || 'no findings'})`);
     }
-    const plainDir = mutatedCopy(t, fixture, { apply: false });
+    const plainDir = await mutatedCopy(t, fixture, { apply: false });
     const plain = codesOf(plainDir, trackedFilesOf(plainDir));
     for (const code of fixture.expect) {
       assert.ok(!plain.has(code), `${fixture.name}: ${code} already fires on the unmutated ${fixture.base}; it is no witness of this mutation`);
     }
   });
 }
+
+// The runtime tracks declarations only. Rule evidence is generated in this private copy before either
+// baseline or mutation is judged, so an absent sealed member remains an app-side violation.
+test('the materialized lite example satisfies stacks, environment parity and secret custody rules', async t => {
+  const repoRoot = await mutatedCopy(t, { base: 'examples/lite-app' }, { apply: false });
+  const files = trackedFilesOf(repoRoot);
+  const doc = parseYaml(fs.readFileSync(path.join(repoRoot, '.starcistacks/application-stacks.yaml'), 'utf8'));
+  const members = doc.environments.production.secrets.map(member => member.where + '.enc');
+  assert.ok(members.length > 0);
+  for (const member of members) assert.ok(files.includes('.starcistacks/production/' + member));
+  const report = checkRepo({ repoRoot, files, tree: false });
+  const custodyCodes = new Set(['HFS_STACKS_SHAPE', 'HFS_PLAINTEXT_SECRET', 'HFS_LITE_SECRET_CUSTODY',
+    'HFS_AGE_KEY_CUSTODY', 'HFS_SECRET_OUTSIDE_ENC', 'HFS_SECRET_PLAINTEXT_FILE']);
+  const relevant = report.findings.filter(finding => custodyCodes.has(finding.code)
+    || finding.code.startsWith('STACKS_') || finding.code.startsWith('ENV_'));
+  assert.deepEqual(relevant, []);
+  const gate = () => checkApplicationStacks({ repoRoot, environment: 'production',
+    deploymentModelFile: path.join(repoRoot, '.starcistacks/production/infra/swarm/stack.yaml') });
+  assert.equal(gate().ok, true);
+  fs.unlinkSync(path.join(repoRoot, '.starcistacks/production', members[0]));
+  assert.ok(gate().errors.some(error => error.code === 'encrypted-ref-invalid'));
+});

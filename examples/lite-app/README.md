@@ -18,7 +18,7 @@ TypeScript everywhere, NestJS in `be/`, Next.js with next-intl in `fe/`, Supabas
 - `be/`: the API, shared platform capabilities, verified identity admission, privileged Supabase integrations, and the queues.
 - `fe/`: the web app; the only Supabase client is the Auth client of `src/modules/auth`, data goes through `src/modules/api`.
 - `be/contracts/api/schema.graphql`: the emitted GraphQL contract the web app's codegen reads (`npm run contract:emit`).
-- `.starcistacks/`: environment metadata, the production Swarm model, runbook, key roster, and sealed secret custody.
+- `.starcistacks/`: environment metadata, the production Swarm model, runbook, and declared sealed member names and key roster.
 - `.starciwork/`: `.gitignore`, `.starciwork/workspace.yaml` project metadata and repo roles, and optional `.starciwork/brand/` drawing records, references, and assets.
 
 ## Development
@@ -34,6 +34,8 @@ npm run build:fe
 ```
 
 The API reads `PORT`, `HTTP_SECURITY_ALLOWED_ORIGINS`, `CALENDAR_WEBHOOK_SECRET`, `PRIMARY_DB_URL`, `PRIMARY_DB_SCHEMA`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`. The queue tunables `QUEUE_RELAY_INTERVAL`, `QUEUE_RELAY_BATCH`, `QUEUE_CONCURRENCY`, `QUEUE_POLL_INTERVAL` and `QUEUE_VISIBILITY_TIMEOUT` are optional and have literal defaults. The web app reads `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_GRAPHQL_URL`, `NEXT_PUBLIC_SUPABASE_URL`, and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Missing configuration stops the relevant process with a named error; no template supplies credential defaults.
+
+The public runtime tracks no encrypted members, including encrypted placeholders. Runtime CI, example render checks and specs use the runtime example materializer and sealed-member writer to prepare a disposable copy under `os.tmpdir()`, generate an ephemeral age identity and seal the declared members there. The copy and identity are removed afterwards. The CLI accepts only a disposable copy. A product copied from this example must initialize its own recipient and seal its real values before deployment; see `.starcistacks/production/README.md`.
 
 ## Tests
 

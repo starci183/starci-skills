@@ -47,8 +47,9 @@ Required public build values (`NEXT_PUBLIC_*` are published by design and are ne
 
 ## Deployment custody
 
-The declared immutable external secret names map to one per-key sealed member. The tracked envelopes
-are structural examples with no decryptable credentials; replace them with actual owner-sealed members
+The declared immutable external secret names map to one per-key sealed member. The runtime tracks
+only their names. CI and specs generate sealed placeholders in a disposable copy with an ephemeral
+age identity and remove the copy afterwards. A product seals actual values to its own recipient
 before use. Caddy reads the tracked Caddyfile and persists certificates in its declared external volumes.
 There is no additional ingress environment key.
 - `SOPS_AGE_KEY` is the owner's sealing identity in untracked host custody, never an application runtime key

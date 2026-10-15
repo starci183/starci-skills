@@ -12,6 +12,13 @@ import { checkRepository } from '../../scripts/hfs/check.mjs';
 import { checkDatabase } from '../../scripts/hfs/rules/database.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
+import { isSopsEnvelope } from '../../scripts/lib/sops-envelope.mjs';
+import { envelopeOf } from '../../scripts/hfs/secret-document.mjs';
+import { ageIdentityEnv, initializeAppIdentity } from '../../scripts/hfs/secret-init.mjs';
+import { defaultSops } from '../../scripts/hfs/secret-sops.mjs';
+import { resolveSops } from '../../scripts/api/sops/resolve-sops.mjs';
+import { resolveRealTool } from '../../scripts/api/process/resolve-real-tool.mjs';
+
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const PINS = parseYaml(fs.readFileSync(path.join(ROOT, 'knowledge', 'hfs', 'canon-pins.yaml'), 'utf8')).pins;
 const CREATED_AT = new Date('2026-10-02T12:34:56.000Z');
@@ -22,7 +29,7 @@ const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 // The lite starter's exact file-level output, with <ts> fixed by CREATED_AT. It includes a starter brand record. The web app carries the
 // shared app core of both editions (owner ruling 2026-10-13): no modules/db, no Server Action and no auth callback route.
 const EXPECTED_LITE_FILES = Object.freeze([
-  '.dockerignore', '.editorconfig', '.gitattributes', '.github/dependabot.yml', '.github/workflows/ci.yml', '.github/workflows/db-deploy.yml',
+  '.claude/.gitignore', '.claude/secret.env', '.dockerignore', '.editorconfig', '.gitattributes', '.github/dependabot.yml', '.github/workflows/ci.yml', '.github/workflows/db-deploy.yml',
   '.github/workflows/images.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.nvmrc', '.prettierignore',
   '.prettierrc', '.sops.yaml', '.starcistacks/application-stacks.yaml', '.starcistacks/dev/README.md',
   '.starcistacks/dev/environment.json', '.starcistacks/dev/infra/swarm/Caddyfile', '.starcistacks/dev/infra/swarm/owner-actions.md',
@@ -396,4 +403,53 @@ test('lite scaffold removes its partial app when database type generation fails'
     error => error.code === 'HFS_SCAFFOLD_TYPES_FAILED' && error.message.includes('local stack unavailable'),
   );
   assert.equal(fs.existsSync(path.join(into, 'demo')), false);
+});
+
+
+function scaffoldIdentityEnv(root) {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.toUpperCase().startsWith('SOPS_')));
+  return ageIdentityEnv(root, env);
+}
+
+function assertAppSealedMembers(root, recipient) {
+  const members = [];
+  for (const environment of ['dev', 'production']) {
+    for (const slug of ['primary-db-url', 'supabase-service-role-key']) {
+      const file = path.join(root, '.starcistacks', environment, 'secrets', slug + '.enc');
+      const envelope = fs.readFileSync(file, 'utf8');
+      assert.ok(isSopsEnvelope(envelope), 'the generated member is a sealed SOPS envelope');
+      assert.deepEqual(envelopeOf(envelope).recipients, [recipient]);
+      members.push(file);
+    }
+  }
+  return members;
+}
+
+test('lite scaffold seals fresh placeholders only to its own app recipient and ignores its private key', (t) => {
+  const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-lite-recipient-'));
+  t.after(() => fs.rmSync(into, { recursive: true, force: true }));
+  const first = scaffoldLite(path.join(into, 'first'));
+  const second = scaffoldLite(path.join(into, 'second'));
+  const config = root => parseYaml(fs.readFileSync(path.join(root, '.sops.yaml'), 'utf8'));
+  const recipient = config(first.root).creation_rules[0].age;
+  const otherRecipient = config(second.root).creation_rules[0].age;
+  assert.notEqual(recipient, otherRecipient, 'each app receives a fresh public recipient');
+  const members = assertAppSealedMembers(first.root, recipient);
+  assertAppSealedMembers(second.root, otherRecipient);
+  assert.throws(() => initializeAppIdentity(first.root), /already has a private age identity/);
+  execFileSync('git', ['init', '-q'], { cwd: first.root, stdio: 'ignore' });
+  execFileSync('git', ['check-ignore', '.claude/secret.env'], { cwd: first.root, stdio: 'ignore' });
+  execFileSync('git', ['-c', 'core.autocrlf=false', 'add', '-A'], { cwd: first.root, stdio: 'ignore' });
+  const tracked = execFileSync('git', ['ls-files'], { cwd: first.root, encoding: 'utf8' });
+  assert.equal(tracked.includes('.claude/secret.env'), false, 'the private identity cannot enter the app index');
+  const env = scaffoldIdentityEnv(first.root);
+  if (!resolveSops(env) || !resolveRealTool('age', { env }) || !resolveRealTool('age-keygen', { env })) {
+    t.diagnostic('native SOPS/age unavailable: verified generated envelope structure and app-specific recipient');
+    return;
+  }
+  const own = defaultSops(env, first.root);
+  for (const member of members)
+    assert.ok(Object.keys(own.decrypt(member, 'dotenv')).length > 0, 'the app key decrypts its generated member');
+  const other = defaultSops(scaffoldIdentityEnv(second.root), second.root);
+  assert.throws(() => other.decrypt(members[0], 'dotenv'), 'another app key cannot decrypt the generated member');
 });

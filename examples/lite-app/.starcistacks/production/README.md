@@ -6,10 +6,11 @@ routes both public hosts, and `runtime/env/KEYS.md` lists the app's environment 
 declared ingress and the only component publishing ports, using Swarm ingress mode on 80 and 443.
 
 Application image digests are illustrative all-zero placeholders and identify no published release.
-The tracked `secrets/*.enc` files are explicitly marked structural SOPS envelope examples: their
-ciphertext and MAC stand-ins cannot be decrypted and contain no usable credential. They exercise
-the custody shape only. Replace them with actual owner-sealed members before deployment; keep the
-age identity only in the owner's untracked `.claude/secret.env` as `SOPS_AGE_KEY`.
+The public runtime tracks member names without any `secrets/*.enc` files. Runtime CI, example render
+checks and specs generate sealed placeholders with an ephemeral age identity in a disposable copy
+under `os.tmpdir()` and remove it afterwards (the runtime example materializer and sealed-member writer). These placeholders supply no deployment credential.
+A product seals its actual members to its own recipient and keeps the age identity only in the
+owner's untracked local custody.
 
 Public release and recovery records under `infra/swarm/release/` and `infra/swarm/recovery/` explicitly state pending owner evidence.
 Neither those records nor the tracked stack claim a completed deployment, accepted release or restore.
@@ -33,14 +34,11 @@ Neither those records nor the tracked stack claim a completed deployment, accept
 
 ## Deploy
 
-From the product repository root, replace every structural sealed example using the secret command.
+From the product repository root, create the declared sealed members using the secret command.
 Supply each value through stdin; never materialize or track plaintext files.
-First configure `.sops.yaml` with the intended public recipient whose matching identity is held in
-host custody. In the copied product, remove only the three members marked STRUCTURAL EXAMPLE ONLY
-(`.starcistacks/production/secrets/primary-db-url.enc`, `.starcistacks/production/secrets/supabase-service-role-key.enc`,
-`.starcistacks/production/secrets/calendar-webhook-secret.enc`) before the
-first `secret set`: updating an existing member would try to decrypt its unusable stand-in. The
-commands then create genuine sealed members. Retain genuine existing members during later rotation.
+First run `npx starci app secret init` to configure `.sops.yaml` with that product's public recipient
+and keep its matching identity in host custody. The runtime example supplies no existing envelope
+to remove. Update members with the same product identity during later rotation.
 
 ```sh
 npx starci app secret set production primary-db-url PRIMARY_DB_URL
@@ -100,7 +98,7 @@ and retain only public receipts. Remove the stack only on the owner's removal de
 
 | Command | Operation |
 | --- | --- |
-| prepare | Complete the owner actions, replace structural secret members and illustrative image digests, then provision external secrets and volumes. |
+| prepare | Complete the owner actions, seal the declared secret members and replace illustrative image digests, then provision external secrets and volumes. |
 | doctor | Run `docker stack config -c infra/swarm/stack.yaml` and confirm the declared secrets, config and volumes on the labelled manager. |
 | up | Run the deploy command after reviewing the rendered model and verified image roster. |
 | status | Run `docker stack services lite-app` and retain the convergence result. |

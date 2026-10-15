@@ -147,10 +147,10 @@ jobs:
       # tsc over be/, then turbo typecheck over every fe workspace (the packages are built first: ^build).
       - name: Typecheck both sides
         run: npm run typecheck
-      # THE lint of the app (ESLint with both canons, stylelint, starci app check), also written as the one Sonar import file.
+      # The app lint runs in a temporary copy with fresh sealed members; only its Sonar report returns to the source tree.
       - name: starci app lint
         working-directory: .
-        run: npm run starci --silent -- app lint --cwd "$APP_DIR" --sonar "reports/lint.sonar.json"
+        run: node scripts/hfs/example-secrets.mjs --run "$APP_DIR" -- node "$GITHUB_WORKSPACE/packages/cli/bin/starci.mjs" app lint --cwd . --sonar reports/lint.sonar.json
       - name: Unit tests with coverage (per-file 100 on the logic of be/src/modules/**; writes be/coverage/lcov.info)
         if: ${{ !cancelled() && steps.policy.outputs.tests == 'true' }}
         run: npm test -- --ci

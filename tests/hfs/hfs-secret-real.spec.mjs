@@ -6,6 +6,7 @@ import path from "node:path";
 import { resolveRealTool } from "../../scripts/api/process/resolve-real-tool.mjs";
 import { resolveSops } from "../../scripts/api/sops/resolve-sops.mjs";
 import { formatOf } from "../../scripts/hfs/secret.mjs";
+import { ageIdentityEnv } from "../../scripts/hfs/secret-init.mjs";
 import { app, run, privateAbsent } from "../helpers/hfs-secret-fixture.mjs";
 
 test("real throwaway age identity runs init, set, generated set, get, list and materialize", (t) => {
@@ -27,23 +28,14 @@ test("real throwaway age identity runs init, set, generated set, get, list and m
   );
   const initialized = run(["init"], { cwd: root, env });
   assert.equal(initialized.code, 0);
-  const base =
-    process.platform === "darwin"
-      ? path.join(env.HOME, "Library", "Application Support")
-      : process.platform === "win32"
-        ? env.APPDATA
-        : env.XDG_CONFIG_HOME;
-  const keyFile = path.join(base, "sops", "age", "keys.txt");
+  const keyFile = path.join(root, ".claude", "secret.env");
   const identity = fs.readFileSync(keyFile, "utf8");
-  const privateLine = identity
-    .split(/\r?\n/u)
-    .find((line) => line.startsWith("AGE-SECRET-KEY-"));
+  const privateLine = ageIdentityEnv(root, {}).SOPS_AGE_KEY;
   assert.ok(
-    typeof privateLine === "string",
-    "init generated a throwaway identity",
+    typeof privateLine === "string" && privateLine.startsWith("AGE-SECRET-KEY-"),
+    "init generated an app-owned throwaway identity",
   );
   privateAbsent(initialized, [privateLine]);
-  env.SOPS_AGE_KEY_FILE = keyFile;
   const values = {
     TOKEN: "throwaway-private-lifecycle-value",
     MULTILINE_TOKEN:

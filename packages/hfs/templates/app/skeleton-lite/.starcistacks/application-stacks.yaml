@@ -65,19 +65,19 @@ environments:
         retention: Seven daily exports
         owner: Development operator
         restoreProof: .starcistacks/dev/infra/swarm/recovery/restore-proof.md
-    # The .enc twins are structural examples only; replace them with real sealed members before use.
+    # Scaffolding seals generated placeholders to this app's own recipient; set real values before use.
     secrets:
       - name: primary-db-url
         runtimeName: "{{project}}-dev-primary-db-url-v1"
         version: 1
         where: secrets/primary-db-url
-        recipientPolicy: The shared master age recipient configured before sealing
+        recipientPolicy: This app's own age recipient configured in .sops.yaml
         keyCustody: SOPS_AGE_KEY in the host's untracked .claude/secret.env
       - name: supabase-service-role-key
         runtimeName: "{{project}}-dev-supabase-service-role-key-v1"
         version: 1
         where: secrets/supabase-service-role-key
-        recipientPolicy: The shared master age recipient configured before sealing
+        recipientPolicy: This app's own age recipient configured in .sops.yaml
         keyCustody: SOPS_AGE_KEY in the host's untracked .claude/secret.env
   production:
     status: supported
@@ -117,19 +117,19 @@ environments:
         retention: Seven days PITR and thirty daily exports
         owner: Production operator
         restoreProof: .starcistacks/production/infra/swarm/recovery/restore-proof.md
-    # The .enc twins are structural examples only; replace them with real sealed members before use.
+    # Scaffolding seals generated placeholders to this app's own recipient; set real values before use.
     secrets:
       - name: primary-db-url
         runtimeName: "{{project}}-production-primary-db-url-v1"
         version: 1
         where: secrets/primary-db-url
-        recipientPolicy: The shared master age recipient configured before sealing
+        recipientPolicy: This app's own age recipient configured in .sops.yaml
         keyCustody: SOPS_AGE_KEY in the host's untracked .claude/secret.env
       - name: supabase-service-role-key
         runtimeName: "{{project}}-production-supabase-service-role-key-v1"
         version: 1
         where: secrets/supabase-service-role-key
-        recipientPolicy: The shared master age recipient configured before sealing
+        recipientPolicy: This app's own age recipient configured in .sops.yaml
         keyCustody: SOPS_AGE_KEY in the host's untracked .claude/secret.env
 k8s:
   status: deferred
