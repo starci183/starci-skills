@@ -4406,3 +4406,10 @@ requirements:
     text: "R249 `ENV_VALUE_SHAPE`: secret verification validates decrypted environment value shapes in memory against the application's typed configuration and reports only key names and violated rules; concrete environment-example values obey the same shapes."
     status: enforced
     rules: [R249]
+  - id: A16-STACK-TASK-UNDECLARED
+    source: docs/application-stacks.md#swarm-deploy-tooling
+    sourceLine: 252
+    editions: [lite, full]
+    statement: "`starci app stack task <name>` refuses a missing or unknown task name with `STACK_TASK_UNDECLARED` (exit 2) and lists the declared names."
+    status: advisory
+    reason: Runtime behavior of the `task` verb of the canon CLI, proved by tests/packages-hfs/hfs-stack-task.spec.mjs; it is not a property of app source, so no lint rule can enforce it.
