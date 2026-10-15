@@ -286,6 +286,6 @@ export function normalizeDeploy(block, { project, probe }) {
     jobs: jobs(c, block.jobs, services),
     backup: backup(c, block.backup),
   };
-  if (!NAME.test(String(config.stack))) c.problem('deploy.stack', `the stack name ${config.stack} must match ${NAME}`);
+  if (block.stack === undefined && !NAME.test(String(project))) c.problem('deploy.stack', `the project name ${project} is not a valid stack name (${NAME}); declare deploy.stack`);
   return { config: c.problems.length === 0 ? config : null, problems: c.problems };
 }
