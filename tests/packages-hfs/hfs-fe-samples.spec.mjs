@@ -123,9 +123,9 @@ for (const edition of ['lite', 'full']) {
     const vi = JSON.parse(read(root, `${catalogs}/vi.json`));
     const en = JSON.parse(read(root, `${catalogs}/en.json`));
     assert.deepEqual(keysOf(vi), keysOf(en));
-    assert.equal(vi.app.home.title, 'Trang chủ');
-    assert.equal(vi.app.signIn.title, 'Đăng nhập');
-    assert.equal(vi.app.guide.close, 'Đóng');
+    assert.equal(vi.app.home.title, 'Trang ch\u1ee7');
+    assert.equal(vi.app.signIn.title, '\u0110\u0103ng nh\u1eadp');
+    assert.equal(vi.app.guide.close, '\u0110\u00f3ng');
     assert.equal(en.app.home.title, 'Home');
     assert.equal(en.app.guide.close, 'Close');
     const routing = edition === 'lite' ? `fe/apps/${app}/src/modules/i18n/routing.ts` : 'fe/packages/sample-i18n/src/routing.ts';

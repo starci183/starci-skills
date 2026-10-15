@@ -652,7 +652,7 @@ test('check-hfs-rules detects an edition without an enforcer and respects justif
   ruleOf(context).enforcers[0].editions = ['full'];
   const findingContext = {
     catalog: context.catalog, plugins: {},
-    failureCodes: { [SAMPLE]: { title_vi: 'Tiêu đề', meaning_vi: 'Ý nghĩa của lỗi', nextStep_vi: 'Bước tiếp theo' } },
+    failureCodes: { [SAMPLE]: { title_vi: 'Ti\u00eau \u0111\u1ec1', meaning_vi: '\u00dd ngh\u0129a c\u1ee7a l\u1ed7i', nextStep_vi: 'B\u01b0\u1edbc ti\u1ebfp theo' } },
     files: { exists: (file) => context.files.has(file), read: (file) => context.files.get(file) },
   };
   assert.ok(hfsRulesFindings(findingContext).some((finding) => finding.code === 'HFS_RULE_NO_ENFORCER' && /lite/.test(finding.message)));

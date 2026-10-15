@@ -248,7 +248,7 @@ export function addFePage({ root, app, name, route = name, messages }) {
   requireNewFeOwner(context, routeFile);
   const catalogs = planFeCatalogs(context, {
     group: "pages", name, messages,
-    defaults: { vi: { title: "Trang mới" }, en: { title: "New page" } },
+    defaults: { vi: { title: "Trang m\u1edbi" }, en: { title: "New page" } },
   });
   const routeSymbol = `${name.replaceAll("-", "_").toUpperCase()}_PAGE_ROUTE`;
   const routesFile = `${context.source}/modules/routes/index.ts`;

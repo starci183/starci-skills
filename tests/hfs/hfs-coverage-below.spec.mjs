@@ -115,10 +115,11 @@ test('HFS_COVERAGE_BELOW: the alpha.15 registry judges an explicit report and ac
 
 test('HFS_COVERAGE_BELOW: app and be-relative SF paths, absolute POSIX/Windows paths, file URIs and CRLF resolve the same measured file', (t) => {
   const context = fixture(t, 'lite', record(LOGIC));
+  const posixSource = path.posix.join(path.posix.sep, 'ci', 'project', LOGIC);
+  const windowsSource = path.win32.resolve('C:', os.tmpdir(), 'ci', 'project', LOGIC);
   const sources = [
     LOGIC, LOGIC.slice(3), `./${LOGIC}`, path.join(context.repoRoot, LOGIC),
-    `/home/runner/project/${LOGIC}`, `C:\\ci\\project\\${LOGIC.replaceAll('/', '\\')}`,
-    `C:\\CI\\PROJECT\\${LOGIC.toUpperCase().replaceAll('/', '\\')}`,
+    posixSource, windowsSource, windowsSource.toUpperCase(),
     pathToFileURL(path.join(context.repoRoot, LOGIC)).href,
   ];
   for (const source of sources) {

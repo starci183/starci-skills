@@ -79,10 +79,10 @@ for (const edition of ['lite', 'full']) {
 }
 
 test('HFS_APP_LEXICON: literal punctuation, Unicode words and identifier separators use exact vocabulary boundaries', (t) => {
-  const files = { 'README.md': 'C++ is removed. C+++ also names C++.\nĐƠN CŨ and đơn cũ.\n', 'src/old.ts': 'const OLD_CART = true; const shoppingCart = true; const Cartesian = true;' };
-  const repo = { profile: 'be', edition: 'full', lexicon: { removed: ['C++', 'đơn cũ', 'cart'] } };
+  const files = { 'README.md': 'C++ is removed. C+++ also names C++.\n\u0110\u01a0N C\u0168 and \u0111\u01a1n c\u0169.\n', 'src/old.ts': 'const OLD_CART = true; const shoppingCart = true; const Cartesian = true;' };
+  const repo = { profile: 'be', edition: 'full', lexicon: { removed: ['C++', '\u0111\u01a1n c\u0169', 'cart'] } };
   const findings = lexiconFindings({ repoRoot: tree(t, files), files: Object.keys(files), repo });
-  assert.deepEqual(findings.map((item) => [item.path, item.word, item.line]), [['README.md', 'C++', 1], ['README.md', 'đơn cũ', 2], ['src/old.ts', 'cart', 1]]);
+  assert.deepEqual(findings.map((item) => [item.path, item.word, item.line]), [['README.md', 'C++', 1], ['README.md', '\u0111\u01a1n c\u0169', 2], ['src/old.ts', 'cart', 1]]);
 });
 
 test('HFS_APP_LEXICON: acronym boundaries are identifier segments and longer all-caps words pass', (t) => {
