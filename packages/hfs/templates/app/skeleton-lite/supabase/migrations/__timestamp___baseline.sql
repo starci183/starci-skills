@@ -6,7 +6,8 @@ begin
 end;
 $$;
 
-alter role app_be login noinherit nosuperuser nobypassrls nocreatedb nocreaterole;
+-- The attributes a Supabase migration role may change: SUPERUSER and BYPASSRLS stay as create role set them (the role migration owner is no superuser).
+alter role app_be login noinherit nocreatedb nocreaterole;
 
 create schema if not exists private;
 
