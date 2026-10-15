@@ -352,6 +352,9 @@ json-exceptions:
     - path: examples/lite-app/.starcistacks/dev/environment.json
       reason: >
         The lite example's checked development environment descriptor; the stack tooling reads JSON.
+    - path: examples/lite-app/.starcistacks/production/environment.json
+      reason: >
+        Value-free rendered environment descriptor; environment.json is the canon-named file of the <env> stack directory (knowledge/hfs/slots.yaml:707, modules/schemas/stacks-layout.yaml); the canon slot stays JSON. The lite example production descriptor.
     - path: examples/lite-app/be/nest-cli.json
       reason: >
         Nest CLI monorepo map inside the lite-app back end; the Nest toolchain reads JSON.
@@ -367,6 +370,9 @@ json-exceptions:
     - path: examples/lite-app/fe/apps/web/package.json
       reason: >
         npm workspace manifest of the lite-app product front end; npm requires JSON.
+    - path: examples/lite-app/fe/apps/web/src/modules/i18n/messages/en.json
+      reason: >
+        English message catalog loaded as ./messages/${locale}.json by the app i18n request/index module and parsed as JSON by scripts/hfs/rules/frontend-tree.mjs; JSON by the next-intl catalog contract. The lite example web app.
     - path: examples/lite-app/fe/apps/web/src/modules/i18n/messages/vi.json
       reason: >
         i18n message catalog inside the lite-app product source; next-intl consumes JSON.
@@ -488,9 +494,21 @@ json-exceptions:
     - path: packages/hfs/templates/app/package-scripts/package.json
       reason: >
         Managed app-root package-scripts template @starci/hfs writes into a product repository (README script names the architecture machine reads); npm requires JSON.
+    - path: packages/hfs/templates/app/package-scripts/supabase.json
+      reason: >
+        npm scripts fragment (textual JSON with template placeholders) that the scaffold renders into the package.json scripts of a repository that keeps a Supabase connection; package.json is a tool-mandated JSON format.
     - path: packages/hfs/templates/app/skeleton-lite/.starcistacks/dev/environment.json
       reason: >
         Environment descriptor template of the lite scaffold (.starcistacks/dev/environment.json); the stack tooling reads JSON.
+    - path: packages/hfs/templates/app/skeleton-lite/.starcistacks/production/environment.json
+      reason: >
+        Value-free rendered environment descriptor; environment.json is the canon-named file of the <env> stack directory (knowledge/hfs/slots.yaml:707, modules/schemas/stacks-layout.yaml); the canon slot stays JSON. The skeleton-lite production template.
+    - path: packages/hfs/templates/app/skeleton/.starcistacks/dev/environment.json
+      reason: >
+        Value-free rendered environment descriptor; environment.json is the canon-named file of the <env> stack directory (knowledge/hfs/slots.yaml:707, modules/schemas/stacks-layout.yaml); the canon slot stays JSON. The full skeleton dev template.
+    - path: packages/hfs/templates/app/skeleton/.starcistacks/production/environment.json
+      reason: >
+        Value-free rendered environment descriptor; environment.json is the canon-named file of the <env> stack directory (knowledge/hfs/slots.yaml:707, modules/schemas/stacks-layout.yaml); the canon slot stays JSON. The full skeleton production template.
     - path: packages/hfs/templates/app/task-graph/turbo.json
       reason: >
         Managed app-root turbo task graph template @starci/hfs writes into a product repository (slot app.task-graph); turbo reads only turbo.json.
@@ -509,12 +527,21 @@ json-exceptions:
     - path: packages/hfs/templates/fe/app/tsconfig.json
       reason: >
         TypeScript config template of a front-end app starci app add app writes into a product repository; tsc reads JSON (with comments).
+    - path: packages/hfs/templates/fe/skeleton-lite/apps/web/src/modules/i18n/messages/en.json
+      reason: >
+        English message catalog loaded as ./messages/${locale}.json by the app i18n request/index module and parsed as JSON by scripts/hfs/rules/frontend-tree.mjs; JSON by the next-intl catalog contract. The skeleton-lite web template.
     - path: packages/hfs/templates/fe/skeleton-lite/apps/web/src/modules/i18n/messages/vi.json
       reason: >
         next-intl message catalogue template for the lite scaffold app (fe/apps/web); next-intl requires JSON.
+    - path: packages/hfs/templates/fe/skeleton/apps/app/src/modules/i18n/messages/en.json
+      reason: >
+        English message catalog loaded as ./messages/${locale}.json by the app i18n request/index module and parsed as JSON by scripts/hfs/rules/frontend-tree.mjs; JSON by the next-intl catalog contract. The full skeleton product-app template.
     - path: packages/hfs/templates/fe/skeleton/apps/app/src/modules/i18n/messages/vi.json
       reason: >
         next-intl message catalogue template for the scaffolded product app (fe/apps/app); next-intl requires JSON.
+    - path: packages/hfs/templates/fe/skeleton/apps/landing/src/modules/i18n/messages/en.json
+      reason: >
+        English message catalog loaded as ./messages/${locale}.json by the app i18n request/index module and parsed as JSON by scripts/hfs/rules/frontend-tree.mjs; JSON by the next-intl catalog contract. The full skeleton landing-app template.
     - path: packages/hfs/templates/fe/skeleton/apps/landing/src/modules/i18n/messages/vi.json
       reason: >
         next-intl message catalogue template for the scaffolded landing app (fe/apps/landing); next-intl requires JSON.
