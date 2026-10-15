@@ -83,9 +83,9 @@ environments:
       owner: Product operator
       receipt: README.md#owner-actions-declared-never-automated (pending Caddy issuance and persistent certificate receipt)
     release:
-      imagesLock: .starcistacks/production/infra/swarm/release/images.lock.json
-      pointer: .starcistacks/production/infra/swarm/release/current.json
-      previous: .starcistacks/production/infra/swarm/release/previous.json
+      imagesLock: .starcistacks/production/infra/swarm/release/images.lock.yaml
+      pointer: .starcistacks/production/infra/swarm/release/current.yaml
+      previous: .starcistacks/production/infra/swarm/release/previous.yaml
       healthAssertions:
         - API /health/live and /health/ready succeed before promotion.
         - Web /health/live, TLS, signed-in GraphQL and queued-job completion succeed before promotion.
@@ -94,17 +94,17 @@ environments:
         target: Supabase provider backup with an encrypted export to the operator's off-host archive
         retention: Daily backups retained 30 days
         owner: Product operator
-        restoreProof: .starcistacks/production/infra/swarm/recovery/supabase.json
+        restoreProof: .starcistacks/production/infra/swarm/recovery/supabase.yaml
       - component: ingress
         target: Encrypted off-host operator archive of lite-app-production-caddy-data and lite-app-production-caddy-config
         retention: Daily backups retained 30 days
         owner: Product operator
-        restoreProof: .starcistacks/production/infra/swarm/recovery/ingress.json
+        restoreProof: .starcistacks/production/infra/swarm/recovery/ingress.yaml
       - component: n8n
         target: Encrypted off-host operator archive of lite-app-production-n8n-data
         retention: Daily backups retained 30 days
         owner: Product operator
-        restoreProof: .starcistacks/production/infra/swarm/recovery/n8n.json
+        restoreProof: .starcistacks/production/infra/swarm/recovery/n8n.yaml
     secrets:
       - name: primary-db-url
         runtimeName: lite-app-primary-db-url-v1

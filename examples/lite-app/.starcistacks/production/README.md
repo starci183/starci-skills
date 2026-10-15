@@ -26,7 +26,7 @@ Neither those records nor the tracked stack claim a completed deployment, accept
    `lite-app-production-n8n-data` volumes on the labelled manager. Caddy persists certificate custody in
    its data volume; n8n persists its SQLite database in its own volume.
 6. Build and publish the API and web images by digest. Update the declaration, stack and
-   `infra/swarm/release/images.lock.json` with verified digests. Web public configuration is supplied
+   `infra/swarm/release/images.lock.yaml` with verified digests. Web public configuration is supplied
    at build time. Preserve Caddy and n8n's declared digest pins.
 7. Record DNS and Caddy TLS issuance/persistence receipts in the declaration. Complete the encrypted
    off-host backup and isolated restore verification for Supabase, Caddy and n8n before production use.
@@ -83,14 +83,14 @@ no recurring scheduler. Do not install a host scheduler.
 
 Retain the reviewed model, images lock and health receipts under `/srv/lite-app/releases/<digest>`.
 After successful TLS, API readiness/liveness, web liveness, signed-in GraphQL and queued-job completion,
-record the immutable release in `infra/swarm/release/current.json`. Retain the previous accepted
-release in `.starcistacks/production/infra/swarm/release/previous.json` before promotion so it remains available for rollback. The initial pointers
+record the immutable release in `infra/swarm/release/current.yaml`. Retain the previous accepted
+release in `.starcistacks/production/infra/swarm/release/previous.yaml` before promotion so it remains available for rollback. The initial pointers
 truthfully contain no accepted release. Database changes follow an expand/contract sequence.
 
 The declaration assigns each stateful component and managed backing exactly one backup policy:
 Supabase provider backups plus encrypted exports, both Caddy volumes, and n8n's SQLite volume are
 retained daily for 30 days in operator-owned off-host custody. Before first production use, restore
-each into isolated infrastructure and replace `infra/swarm/recovery/<component>.json` with a
+each into isolated infrastructure and replace `infra/swarm/recovery/<component>.yaml` with a
 timestamp, backup hash, isolated destination and verification receipt. The example records are pending
 plans, never receipts for an executed restore.
 

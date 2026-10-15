@@ -1,0 +1,4 @@
+status: "pending-first-release"
+release: null
+imagesLock: ".starcistacks/production/infra/swarm/release/images.lock.yaml"
+ownerAction: "Record the accepted immutable release and health receipts after verification, before promotion."

@@ -1,0 +1,3 @@
+status: "pending-first-release"
+release: null
+ownerAction: "Retain the previous accepted release pointer when promoting a verified release."

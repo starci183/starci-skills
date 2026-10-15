@@ -1,0 +1,5 @@
+component: "ingress"
+status: "pending-owner-restore-proof"
+executedAt: null
+plan: "Restore encrypted Caddy data and config volume backups on an isolated labelled manager and verify certificate custody and routes."
+ownerAction: "Replace this example record with the backup hash, isolated destination, timestamp and verification receipt before production."

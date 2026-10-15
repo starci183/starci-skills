@@ -1,0 +1,7 @@
+status: "illustrative-not-published"
+images:
+  api: "lite-app/api:1.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  web: "lite-app/web:1.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  ingress: "caddy:2.10.2@sha256:c3d7ee5d2b11f9dc54f947f68a734c84e9c9666c92c88a7f30b9cba5da182adb"
+  n8n: "docker.n8n.io/n8nio/n8n:1.64.3@sha256:4d9116228d426ce24c442a744e9c11ee7c1187713f93f21dd5a34a12584708c1"
+ownerAction: "Replace illustrative application digests with verified published images before deployment."
