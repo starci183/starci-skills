@@ -2,6 +2,7 @@
 // proves: HFS_TS_STRICT@full
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { tsStrictFindings } from '../../packages/hfs/sync/ts-strict.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -44,4 +45,16 @@ for (const edition of ['lite', 'full']) {
       assert.deepEqual(await findings(), []);
     });
   }
+}
+
+for (const edition of ['lite', 'full']) {
+  test(`${edition}: ts-strict rejects a lowered compiler flag`, () => {
+    const expected = JSON.stringify({ extends: '@starci/tsconfig/next.json', exclude: ['node_modules'] });
+    const actual = JSON.stringify({ extends: '@starci/tsconfig/next.json', exclude: ['node_modules'], compilerOptions: { strict: false } });
+    assert.equal(tsStrictFindings(actual, expected)[0].code, 'HFS_TS_STRICT');
+  });
+  test(`${edition}: ts-strict accepts the strict preset configuration`, () => {
+    const expected = JSON.stringify({ extends: '@starci/tsconfig/next.json', exclude: ['node_modules'] });
+    assert.deepEqual(tsStrictFindings(expected, expected), []);
+  });
 }
