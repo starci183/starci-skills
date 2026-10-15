@@ -11,7 +11,6 @@ export const KEY = /^[A-Z][A-Z0-9_]*$/u;
 const VOLUME = /^[A-Za-z0-9][A-Za-z0-9_.-]*$/u;
 const HOST_ALIAS = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
 const REMOTE_BASE = /^\/[A-Za-z0-9._/-]+$/u;
-const IMAGE_REPOSITORY = /^[a-z0-9][a-z0-9./_-]*$/u;
 const HTTP_URL = /^https?:\/\/[^\s]+$/u;
 const PINNED_HELPER_IMAGE = /^[a-z0-9./_-]+(?::[A-Za-z0-9._-]+)?@sha256:(?!0{64}$)[0-9a-f]{64}$/u;
 const ARGUMENT = /^[A-Za-z0-9_@%+=:,./-]+$/u;
@@ -21,7 +20,7 @@ const FIELDS = {
   deploy: ['stack', 'remote', 'images', 'volumes', 'secrets', 'environment', 'configs', 'passEnv', 'verify', 'jobs', 'backup'],
   remote: ['host', 'releasesBase', 'sealed'],
   sealed: ['ops', 'sshKey', 'knownHosts'],
-  image: ['app', 'repository', 'buildArgs'],
+  image: ['app', 'buildArgs'],
   buildArgs: ['values', 'sealed'],
   secrets: ['grants', 'settings'],
   grant: ['service', 'filePointers', 'from'],
@@ -116,8 +115,7 @@ function images(c, block, services, members) {
     if (services.size > 0 && !services.has(service)) c.problem(at, `${service} is not a service of the stack source`);
     if (!closedFields(c, at, entry, FIELDS.image)) continue;
     nameField(c, `${at}.app`, entry.app);
-    if (entry.repository !== undefined && !IMAGE_REPOSITORY.test(String(entry.repository))) c.problem(`${at}.repository`, `must match ${IMAGE_REPOSITORY}`);
-    out[service] = { app: entry.app, repository: entry.repository ?? null, buildArgs: imageBuildArgs(c, `${at}.buildArgs`, entry.buildArgs, members) };
+    out[service] = { app: entry.app, buildArgs: imageBuildArgs(c, `${at}.buildArgs`, entry.buildArgs, members) };
   }
   return out;
 }

@@ -1,6 +1,7 @@
 // context.mjs - the seams every stack module runs through: spawning tools, sleeping, the clock and the output.
 // Production uses the real implementations; the specs inject fakes (tests/helpers/stack-fakes.mjs).
 import { spawnSync } from 'node:child_process';
+import { defaultSops } from '../runtime/scripts/hfs/secret-sops.mjs';
 
 const MAX_BUFFER = 1 << 24;
 
@@ -17,19 +18,27 @@ const realSleep = (ms) => new Promise((done) => { setTimeout(done, ms); });
  *   spawn          (command, args, { input, env, cwd }) -> { status, stdout, stderr, error }; never a shell
  *   sleep, now     await sleep(ms); now() -> epoch ms
  *   stdout, stderr text writers
- *   sops           the secret seam (decrypt(file, format) -> map; decryptBinary(file) -> text); created lazily by the caller
+ *   fetch          the HTTP seam of verify (url, init) -> Response
+ *   sops           the secret seam (decrypt(file, format) -> map; decryptBinary(file) -> text); `io.sops` or, on first use, the app's own sops/age tools
  */
 export function stackContext(io = {}) {
+  const cwd = io.cwd ?? process.cwd();
+  const env = io.env ?? process.env;
+  let sops = io.sops;
   return Object.freeze({
-    cwd: io.cwd ?? process.cwd(),
-    env: io.env ?? process.env,
+    cwd,
+    env,
     spawn: io.spawn ?? realSpawn,
     sleep: io.sleep ?? realSleep,
     now: io.now ?? Date.now,
     stdout: io.stdout ?? ((text) => process.stdout.write(text)),
     stderr: io.stderr ?? ((text) => process.stderr.write(text)),
-    sops: io.sops,
-    fs: io.fs,
+    fetch: io.fetch ?? globalThis.fetch,
+    /** The secret seam: the app's own sops/age tools, created on first use so verbs that open no custody never need them. */
+    get sops() {
+      sops ??= defaultSops(env, cwd);
+      return sops;
+    },
   });
 }
 
