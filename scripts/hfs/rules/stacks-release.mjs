@@ -312,8 +312,9 @@ function recurringSourceIssues({ doc, repoRoot, files }) {
   for (const file of paths) {
     const observations = recurringObservations({ doc, repoRoot, files, file, issues });
     for (const observation of observations) {
-      if (observation.remove) cron.delete(observation.remove);
-      else cron.set(observation.id ?? observation.at, observation);
+      if ('remove' in observation) {
+        if (observation.remove) cron.delete(observation.remove);
+      } else cron.set(observation.id ?? observation.at, observation);
     }
   }
   for (const observation of cron.values()) if (!matchingJob(doc, observation))
