@@ -185,3 +185,10 @@ excluding none slots, specs and declared generated output. Its
 `coverage/lcov.info` report is distinct from a product's `be/coverage/lcov.info`.
 R247's coverage matrix concerns links across the standard, not a code-coverage
 percentage.
+
+## R204 coverage scope
+
+`HFS_COVERAGE_SCOPE_DRIFT` means a managed coverage declaration differs from the
+scope derived from the slot manifest in lite or full. Keep `be/jest.config.js`,
+`codecov.yml` and `sonar.coverage.exclusions` at their rendered values; regenerate
+them with `starci app sync --write` instead of changing thresholds or exclusions.

@@ -1,6 +1,14 @@
 Owner: modules/models/code-patterns.yaml
 # Code pattern enforcement
 
+## R203 thin features
+
+`BE_FEATURE_THIN` reports business decisions, computation or extra delegation in a thin
+feature role in both lite and full. A handler maps input and delegates once to its
+module service; move branches, loops and calculations into the covered modules.
+The edition-specific RuleTester witnesses accept a direct service delegation and
+reject a handler that branches and makes a second delegation.
+
 `modules/models/code-patterns.yaml` is the executable inventory for the fixed StarCi NestJS and Next.js code profiles. The authored manifest, not every rule exported by an installed lint package, decides which code obligations apply. The runtime reads this authored manifest directly.
 
 ## Command and operation

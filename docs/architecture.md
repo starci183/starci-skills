@@ -457,3 +457,23 @@ the cited-path scan over live prose; then every retained self-check of
 `modules/kernel/allowlist.yaml` (`starci/allowlist@1`): every exception a check keeps is a named,
 shrink-only section of it, and `scripts/checks/check-one-allowlist.mjs` refuses a second one
 (`RT_ALLOWLIST_SPRAWL`).
+
+## Documentation ownership {#r205}
+
+`RT_DOC_NO_OWNER` requires each tracked `docs/*.md` to start with one ownership
+header: `Owner: <knowledge/ or modules/ path that exists>` for a source explanation,
+or `Task: <one task>` for a how-to. Keep exactly one header and a document title.
+Task names are unique after normalizing case and whitespace. Documents whose titles
+share at least two topic words and whose sentences overlap by at least 30% of the
+shorter document belong in one merged document. The same check applies in lite and full.
+
+## Runtime independence from examples {#r206}
+
+Runtime sources and managed templates serve every application in lite and full.
+`RT_EXAMPLE_COUPLING` refuses literal `examples/<name>` paths;
+`RT_PRODUCT_NAME_IN_SOURCE` refuses the closed shipped-product names and incident
+tokens prefixed by them; `RT_HOST_PATH_IN_TEMPLATE` refuses hard-coded host paths.
+Use relative paths, the runtime root, temporary directories or configuration values.
+Declare an actual runtime read of an example once in `scripts/lib/example-refs.mjs`
+and import its constant wherever it is consumed. Specs, tests and generated runtime
+copies are outside this source scan; managed templates remain in scope.
