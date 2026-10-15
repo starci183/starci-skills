@@ -1,6 +1,26 @@
 Owner: modules/models/code-patterns.yaml
 # Code pattern enforcement
 
+## Backend event bus rules
+
+Both editions use typed event contracts and transactional outbox writes.
+`BE_EVENT_CLASS_CONTRACT` requires each event class under
+`be/src/modules/events/<service>/` to match its vendored
+`be/contracts/<service>/events.json` name and version; every contract entry also
+needs its class, and the filename replaces event-name dots with dashes.
+
+`BE_OUTBOX_WRITE_TX` requires a domain service to publish events or call typed
+queue producers with its own transaction manager. A transaction callback manager
+or a typed transaction parameter is accepted; an injected shared manager, a
+missing manager or an outbox write from a feature is refused.
+
+`BE_EVENT_CONSUMER_SHAPE` requires an `EventConsumer` in
+`transport/message/<event>.consumer.ts`, with its filename derived from the
+typed event's literal name. Its handler reads `delivery.eventId` so the command
+can preserve the deduplication key. `BE_QUEUE_PRODUCER_SHAPE` requires every
+queue producer that writes `QueueOutbox` to declare an `EntityManager` parameter
+and pass that same parameter to the outbox write.
+
 `modules/models/code-patterns.yaml` is the executable inventory for the fixed StarCi NestJS and Next.js code profiles. The authored manifest, not every rule exported by an installed lint package, decides which code obligations apply. The runtime reads this authored manifest directly.
 
 ## Command and operation
@@ -136,6 +156,23 @@ forbidden-dependency aliases, or renamed forbidden facades. Verify the exact pro
 were included in real checks. Existing suppressions and tool blind spots grant no bypass. A
 legitimate tool defect needs a narrow reviewed correction and regression coverage; product
 conformance remains unproved until the underlying convention is independently verified.
+
+## Backend jobs and projections rules
+
+Both editions keep the job row under `modules/platform/jobs`. `BE_JOB_WRITE_OUTSIDE_OWNER`
+refuses direct writes from another owner; use the `JobClaims` port. `BE_JOB_FENCE_REQUIRED`
+requires a non-optional numeric `expectedFencingToken` on guarded writes, refuses casts
+around that token and requires a catch around a guarded write to rethrow. A stale worker
+must stop when it loses its claim. `BE_JOB_RUN_KEY` requires every integration call from
+a job step to carry a `RunKey` produced by `JobClaims.runKey(job, step)`, without a cast.
+`BE_JOB_SHAPE` places `<job>.processor.ts` in that job's `transport/queue/` directory,
+extends `FencedProcessor`, and keeps `JobStep` implementations in the job's `steps/` directory.
+
+`BE_PROJECTION_WRITE_OWNER` allows writes to a projection entity only from its own
+`*.projection.ts` file; other owners read it or request a recompute. `BE_PROJECTION_SHAPE`
+limits public projection methods to `recompute*` and `get*`, keeps entity exports inside
+the projection and refuses an API feature calling `recompute*`. A reactor, job or CLI
+command triggers recomputation; API features call `get*`. These laws apply in lite and full.
 
 ## Evidence limits
 

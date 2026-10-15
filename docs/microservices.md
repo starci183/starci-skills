@@ -26,6 +26,10 @@ The code requirements apply equally to lite and full. The database requirements 
 
 ## One place for a service
 
+<a id="r163"></a>
+
+R163 `HFS_SERVICE_PLACEMENT` applies to lite and full: keep service Dockerfiles in `be/apps/<service>/` and share the repository's package manifest.
+
 Every back-end service is a Nest app at `be/apps/<service>/` (`main.ts`, `<service>.env.ts` for typed, fail-fast parsing,
 `<service>.options.ts` for env-derived values and port bindings, `app.module.ts`, its `compose/<area>.ts` groups, its `Dockerfile`).
 `main.ts` constructs the `EnvSource`; `<service>.env.ts` alone parses the app's environment through its interface and
@@ -44,6 +48,14 @@ Scheduled work is owned by the app's scheduler and queue, an enqueue-only pg_cro
 the CLI command. Production does not install host crontabs or host timers.
 
 ## Images
+
+<a id="r164"></a>
+
+R164 `HFS_IMAGE_UNPINNED` applies to every component of a product with multiple back-end services in either edition. Exact version tags and SHA-256 digests pass; moving image references fail.
+
+<a id="r165"></a>
+
+R165 `HFS_SERVICE_STACK_DECLARATION` requires every API and worker app of that product to have a component with the same name and `role: service`, in lite and full.
 
 `.starcistacks/application-stacks.yaml` declares every service as a component with `role: service` (`HFS_SERVICE_STACK_DECLARATION`,
 R165). Every `image` of a product with more than one service is pinned (`HFS_IMAGE_UNPINNED`, R164): a digest
