@@ -103,3 +103,12 @@ test('the operator docker config is found through USERPROFILE when there is no H
   await withDockerTransport(ctx, config, {}, async (inner) => { inner.spawn('docker', ['info']); });
   assert.equal(calls[0].options.env.DOCKER_CONFIG.replaceAll(String.fromCodePoint(92), '/'), '/profile/.docker');
 });
+
+test('on win32 the key, known_hosts and the private ssh config are all restricted to the current user with icacls', async () => {
+  const { config } = sealedApp();
+  const { ctx, calls } = operator();
+  await withDockerTransport({ ...ctx, platform: 'win32', username: 'op' }, config, {}, async () => {});
+  const restricted = calls.filter((call) => call.command === 'icacls');
+  assert.deepEqual(restricted.map((call) => call.args.slice(1)), [['/inheritance:r', '/grant:r', 'op:R'], ['/inheritance:r', '/grant:r', 'op:R'], ['/inheritance:r', '/grant:r', 'op:R'], ['/inheritance:r', '/grant:r', 'op:F']]);
+  assert.ok(restricted[2].args[0].endsWith('config'));
+});

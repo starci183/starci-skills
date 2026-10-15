@@ -1,6 +1,7 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { buildImages } from '../../packages/hfs/stack/build.mjs';
 import { makeApp, MEMBERS } from '../helpers/stack-release-fakes.mjs';
@@ -21,7 +22,7 @@ after(() => apps.forEach((made) => made.dispose()));
 const ok = (stdout = '') => ({ status: 0, stdout, stderr: '' });
 
 /** A git and docker shim: answers by command, writes the buildx metadata file, records every call. */
-function shim({ dirty = '', tags = 'v0.1.0\nnot-a-release\n', remote = 'https://github.com/Starci183/nivo-lite.git', buildFails = null, noDigest = false, head = SHA, gitFails = null, emptyMetadata = false, silentFailure = false, imageLeak = false, pushFails = false, pushNoDigest = false, scanBroken = false } = {}) {
+function shim({ dirty = '', tags = 'v0.1.0\nnot-a-release\n', remote = 'https://github.com/Starci183/nivo-lite.git', buildFails = null, noDigest = false, head = SHA, gitFails = null, emptyMetadata = false, silentFailure = false, imageLeak = false, pushFails = false, pushSilent = false, pushNoDigest = false, scanBroken = false } = {}) {
   const calls = [];
   const spawn = (command, args, options = {}) => {
     calls.push({ command, args, cwd: options.cwd });
@@ -44,6 +45,7 @@ function shim({ dirty = '', tags = 'v0.1.0\nnot-a-release\n', remote = 'https://
       return ok();
     }
     if (command === 'docker' && args[0] === 'push') {
+      if (pushSilent) return { status: 1, stdout: '', stderr: '' };
       if (pushFails) return { status: 1, stdout: '', stderr: 'denied: push refused\nsecond' };
       return ok(pushNoDigest ? 'pushed\n' : `latest: digest: ${DIGEST(args[1].includes('-web:') ? 'web' : 'api')} size: 1\n`);
     }
@@ -56,7 +58,7 @@ function shim({ dirty = '', tags = 'v0.1.0\nnot-a-release\n', remote = 'https://
 /** The docker answers of the image scan: a clean image, or one whose build history carries a private key block. */
 function scanAnswer(args, { imageLeak, scanBroken }) {
   if (scanBroken && args[0] === 'inspect') return { status: 1, stdout: '', stderr: 'inspect broke' };
-  if (args[0] === 'history') return ok(imageLeak ? ['RUN echo -----BEGIN OPENSSH', 'PRIVATE KEY-----'].join(' ') : 'COPY dir:abc in /app');
+  if (args[0] === 'history') return ok(imageLeak ? Array.from({ length: imageLeak === true ? 1 : imageLeak }, () => ['RUN echo -----BEGIN OPENSSH', 'PRIVATE KEY-----'].join(' ')).join(String.fromCharCode(10)) : 'COPY dir:abc in /app');
   if (args[0] === 'inspect') return ok('["PATH=/usr/bin"]');
   if (args[0] === 'create') return ok('cid1\n');
   if (args[0] === 'export') { fs.writeFileSync(args[2], Buffer.alloc(1024)); return ok(); }
@@ -70,7 +72,7 @@ const anonymousRegistry = (state) => async (url) => {
   return { status: state === 'private' ? 401 : 200 };
 };
 const registryOf = (made, visibility) => ({ ...made.config, registry: { ...made.config.registry, visibility } });
-const run = (made, options, extra) => buildImages(made.ctx({ spawn: extra.spawn, fetch: extra.fetch ?? anonymousRegistry('public') }), extra.config ?? made.config, options);
+const run = (made, options, extra) => buildImages(made.ctx({ env: { STARCI_SECRET_VERSION_KEY: 'fixture-version-key', SOPS_AGE_KEY: 'AGE-SECRET-KEY-FAKE' }, spawn: extra.spawn, fetch: extra.fetch ?? anonymousRegistry('public') }), extra.config ?? made.config, options);
 
 test('a dry run prints the release, the Dockerfiles and the tags, and builds nothing', async () => {
   const made = app();
@@ -232,4 +234,26 @@ test('visibility: a package that is still private fails a public declaration wit
 test('build supports ghcr.io only', async () => {
   const made = app();
   await assert.rejects(run(made, {}, { ...shim(), config: { ...made.config, registry: { host: 'registry.example', visibility: 'public' } } }), (error) => error.code === 'STACK_BUILD_REGISTRY');
+});
+
+test('a build that opens the sealed build values refuses up front, naming the age identity, when none is available', async () => {
+  const made = app();
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-home-'));
+  const env = { USERPROFILE: home, HOME: home, APPDATA: path.join(home, 'AppData'), XDG_CONFIG_HOME: path.join(home, 'cfg') };
+  const s = shim();
+  try {
+    await assert.rejects(buildImages(made.ctx({ env, spawn: s.spawn }), made.config, { push: true, execute: true }), (error) => error.code === 'STACK_AGE_IDENTITY_MISSING' && error.message.includes('load the age identity into SOPS_AGE_KEY'));
+    assert.equal(s.builds().length, 0, 'nothing was built');
+    assert.equal((await buildImages(made.ctx({ env, spawn: s.spawn }), made.config, {})).ok, true, 'a dry run opens nothing');
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('public: a silent docker push failure gets a default message, and a long hit list is cut with a count', async () => {
+  const made = app();
+  const silent = await run(made, { push: true, execute: true }, shim({ pushSilent: true }));
+  assert.ok(silent.lines.includes('push of api FAILED: docker push failed'));
+  const leaky = await run(made, { push: true, execute: true }, shim({ imageLeak: 25 }));
+  assert.ok(leaky.lines.some((line) => line === '  ... and 5 more'));
 });

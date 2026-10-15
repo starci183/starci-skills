@@ -12,6 +12,7 @@ import path from 'node:path';
 import { buildArgs } from './build-args.mjs';
 import { firstLine, lines as splitLines, tool } from './context.mjs';
 import { failure, refusal } from './errors.mjs';
+import { requireAgeIdentity } from './sealed.mjs';
 import { scanImage } from './image-scan.mjs';
 
 const RELEASE_TAG = /^v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/u;
@@ -111,7 +112,7 @@ function processImage(ctx, config, item, args, { push }) {
 const ownerStep = (name) => `owner step: GitHub -> Packages -> ${name} -> Package settings -> Change visibility -> Public (GitHub has no API for this)`;
 
 /** 'public' when an ANONYMOUS client can fetch the manifest of the pushed digest, 'private' when the registry refuses it, 'unknown' on a network error. */
-export async function visibilityOf(ctx, host, repository, digest) {
+async function visibilityOf(ctx, host, repository, digest) {
   try {
     const token = await ctx.fetch(`https://${host}/token?scope=repository:${repository}:pull&service=${host}`, { signal: AbortSignal.timeout(15000) });
     const bearer = token.ok ? (await token.json()).token : null;
@@ -155,6 +156,7 @@ export async function buildImages(ctx, config, { push = false, execute = false }
     const scan = config.registry.visibility === 'public' ? ', scan for secret material' : '';
     return { ok: true, lines: [...lines, `dry run: would build${scan}${push ? ' and push' : ' (local only, no digest without --push)'}; nothing was built`], data: { tag: release.tag, images: {} } };
   }
+  if (items.some((item) => config.images[item.service].buildArgs.sealed !== null)) requireAgeIdentity(ctx, config, 'build');
   const images = {};
   for (const item of items) {
     const outcome = processImage(ctx, config, item, await argsOf(ctx, config, item.app, item.hasBuildArgs), { push });

@@ -5,6 +5,7 @@
 // a private temp directory that is overwritten and removed when the verb ends; it is never in argv, a line or an error.
 import fs from 'node:fs';
 import path from 'node:path';
+import { writePrivate } from './private-file.mjs';
 import { openSealedSession } from './remote.mjs';
 
 const ALIAS = 'stack-vps';
@@ -31,7 +32,7 @@ function sshConfig(session) {
 function dockerEnvironment(ctx, session) {
   const home = path.join(session.dir, 'home');
   fs.mkdirSync(path.join(home, '.ssh'), { recursive: true });
-  fs.writeFileSync(path.join(home, '.ssh', 'config'), sshConfig(session), { mode: 0o600 });
+  writePrivate(ctx, path.join(home, '.ssh', 'config'), sshConfig(session));
   const operatorHome = ctx.env.HOME ?? ctx.env.USERPROFILE ?? '';
   const dockerConfig = ctx.env.DOCKER_CONFIG ?? (operatorHome ? path.join(operatorHome, '.docker') : undefined);
   return { ...ctx.env, HOME: home, USERPROFILE: home, DOCKER_HOST: `ssh://${ALIAS}`, ...(dockerConfig ? { DOCKER_CONFIG: dockerConfig } : {}) };

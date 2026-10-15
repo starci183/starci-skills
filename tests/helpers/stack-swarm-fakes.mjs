@@ -16,8 +16,8 @@ export const testConfig = (extra = {}) => ({
 });
 
 /** Seeds `<stack>_<name>` with `replicas` desired and `running` running tasks; `extra` tasks and `update` status are added as given. */
-export function seedService(host, name, { replicas = 1, running = replicas, update, tasks = [] } = {}) {
-  host.state.services.set(name, { replicas, image: 'img', update });
+export function seedService(host, name, { replicas = 1, running = replicas, update, tasks = [], template } = {}) {
+  host.state.services.set(name, { replicas, image: 'img', update, template });
   host.state.tasks = host.state.tasks.filter((task) => task.service !== name);
   const stamp = new Date(host.state.time).toISOString();
   for (let index = 0; index < running; index += 1) host.state.tasks.push({ id: `${name}.${index + 1}`, service: name, desired: 'running', state: 'running', timestamp: stamp, error: '' });
