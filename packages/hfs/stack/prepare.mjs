@@ -4,6 +4,7 @@
 import { firstLine, lines as splitLines } from './context.mjs';
 import { RELEASE_ID } from './digest.mjs';
 import { approvalMissing, refusal } from './errors.mjs';
+import { installAge } from './age-install.mjs';
 import { checkLiveRestore, fixLiveRestore } from './live-restore.mjs';
 import { remoteDocker, shellQuote, withRunner } from './remote.mjs';
 
@@ -164,10 +165,7 @@ function ensureTools(run, report, config) {
     if (made.status === 0) report.note(`created ${base} owned by the deploy user`);
     else report.bad(`cannot create ${base}: ${firstLine(made.stderr)} (needs passwordless sudo once, or create it by hand)`);
   }
-  if (run('command -v age').status === 0) return;
-  const installed = run('sudo -n apt-get install -y age');
-  if (installed.status === 0) report.note('installed age on the manager');
-  else report.bad(`cannot install age: ${firstLine(installed.stderr)} (needs passwordless sudo once, or run apt-get install age by hand)`);
+  installAge(run, report);
 }
 
 /** prepare: read-only checks; with execute also the missing volumes and (initSwarm, approved) the one-time swarm init. */
@@ -181,7 +179,7 @@ export async function prepareHost(ctx, config, { execute = false, initSwarm: wan
     notes.forEach(report.note);
     const data = { created: [], swarmInitialized: false };
     if (swarmInfo(run).reachable) {
-      if (wantFix) data.liveRestore = await fixLiveRestore(ctx, run, report, { execute, ownerApproved });
+      if (wantFix) data.liveRestore = await fixLiveRestore(ctx, run, report, { execute, ownerApproved, config });
       if (wantInit) data.swarmInitialized = initSwarm(run, report, { execute, advertise });
       data.created = createVolumes(run, report, config, execute);
       if (execute) ensureTools(run, report, config);

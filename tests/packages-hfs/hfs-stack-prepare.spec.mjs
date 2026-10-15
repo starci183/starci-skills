@@ -254,22 +254,23 @@ test('--owner-approved replaces the approval variable for the one-time swarm ini
 });
 
 test('prepare --execute creates the releases directory and installs age with passwordless sudo, once', async () => {
-  const table = { 'elif [ ! -w': () => ({ status: 0, stdout: 'missing\n', stderr: '' }), 'command -v age': () => bad('', 1), 'sudo -n mkdir': () => ({ status: 0, stdout: '', stderr: '' }), 'sudo -n apt-get': () => ({ status: 0, stdout: '', stderr: '' }), ...withoutAgeAndDirectory() };
+  let installed = false;
+  const table = { 'elif [ ! -w': () => ({ status: 0, stdout: 'missing\n', stderr: '' }), 'command -v age': () => (installed ? { status: 0, stdout: '/usr/bin/age', stderr: '' } : bad('', 1)), 'sudo -n mkdir': () => ({ status: 0, stdout: '', stderr: '' }), 'for m in dnf': () => ({ status: 0, stdout: 'dnf\n', stderr: '' }), 'sudo -n dnf': () => { installed = true; return { status: 0, stdout: '', stderr: '' }; }, ...withoutAgeAndDirectory() };
   const { ctx, deps, run } = setup({ table });
   const result = await prepareHost(ctx, config, { execute: true }, deps);
   assert.ok(result.lines.includes('created /srv/shop owned by the deploy user'));
-  assert.ok(result.lines.includes('installed age on the manager'));
+  assert.ok(result.lines.includes('installed age with dnf'));
   assert.ok(run.commands.some((entry) => entry.command.startsWith('sudo -n mkdir -p') && entry.command.includes('chown "$(id -un)"')));
 });
 
 test('prepare --execute reports sudo refusals instead of hiding them', async () => {
   const refused = () => bad('sudo: a password is required');
-  const table = { 'elif [ ! -w': () => ({ status: 0, stdout: 'missing\n', stderr: '' }), 'command -v age': () => bad('', 1), 'sudo -n mkdir': refused, 'sudo -n apt-get': refused, ...withoutAgeAndDirectory() };
+  const table = { 'elif [ ! -w': () => ({ status: 0, stdout: 'missing\n', stderr: '' }), 'command -v age': () => bad('', 1), 'sudo -n mkdir': refused, 'for m in dnf': () => ({ status: 0, stdout: 'apt-get\n', stderr: '' }), 'sudo -n apt-get': refused, 'curl -fsSL': refused, ...withoutAgeAndDirectory() };
   const { ctx, deps } = setup({ table });
   const result = await prepareHost(ctx, config, { execute: true }, deps);
   assert.equal(result.ok, false);
   assert.ok(result.lines.some((line) => line.startsWith('FAIL  cannot create /srv/shop: sudo: a password is required')));
-  assert.ok(result.lines.some((line) => line.startsWith('FAIL  cannot install age: sudo: a password is required')));
+  assert.ok(result.lines.some((line) => line.startsWith('FAIL  cannot install age (apt-get could not install age: sudo: a password is required); the static install failed too: sudo: a password is required')));
 });
 
 function withoutAgeAndDirectory() {
