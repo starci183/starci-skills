@@ -220,6 +220,7 @@ create a full or lite StarCi app, including an empty unborn main Git repository
 | flag | type | |
 | --- | --- | --- |
 | `--into` | string |  |
+| `--registry-visibility` | enum public|private |  |
 
 Positionals: name
 
