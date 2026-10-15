@@ -3,7 +3,7 @@
 // docker compose) tenants are reached over the overlay by a UNIQUE alias, or by a host address (`hostAddress`).
 // Pure given the block and a probe of the app tree. `normalizeDeploy` (stack-deploy-config.mjs) hooks it in as `config.ingress`;
 // `starci app stack ingress plan|attach|takeover` (packages/hfs/stack/ingress.mjs) consumes the normalised result.
-import path from 'node:path';
+import { closedFields, collector, patternField, treeFile } from './stack-config-kit.mjs';
 import { isPlainObject as plain } from '../../engine/plain-object.mjs';
 import { NAME } from './stack-deploy-config.mjs';
 
@@ -26,21 +26,8 @@ const FIELDS = {
   takeover: ['gateSeconds'],
 };
 
-function collector() {
-  const problems = [];
-  return { problems, problem: (at, message) => { problems.push({ at, message }); } };
-}
-
-function closed(c, at, value, allowed) {
-  if (!plain(value)) { c.problem(at, 'must be a mapping'); return false; }
-  for (const key of Object.keys(value)) if (!allowed.includes(key)) c.problem(`${at}.${key}`, 'is not a field of the ingress block');
-  return true;
-}
-
-function matching(c, at, value, pattern) {
-  if (typeof value !== 'string' || !pattern.test(value)) { c.problem(at, `must match ${pattern}`); return false; }
-  return true;
-}
+const closed = (c, at, value, allowed) => closedFields(c, at, value, allowed, 'ingress');
+const matching = patternField;
 
 function remotePath(c, at, value) {
   if (typeof value !== 'string' || !REMOTE_PATH.test(value) || value.split('/').includes('..')) c.problem(at, 'must be an absolute path without ..');
@@ -61,15 +48,6 @@ function list(c, at, value, check) {
 }
 
 const names = (c, pattern) => (where, item) => { matching(c, where, item, pattern); };
-
-/** A path inside .starcistacks/<env>/ : relative, forward slashes, no `..`, and present in the tree. */
-function treeFile(c, at, value, probe) {
-  if (typeof value !== 'string' || value === '' || path.posix.isAbsolute(value) || value.includes('\\') || path.posix.normalize(value).split('/').includes('..')) {
-    c.problem(at, 'must be a relative path inside the environment directory');
-    return;
-  }
-  if (!probe.exists(value)) c.problem(at, `${value} does not exist under the environment directory`);
-}
 
 function legacy(c, block) {
   if (!closed(c, 'deploy.ingress.legacy', block, FIELDS.legacy)) return null;

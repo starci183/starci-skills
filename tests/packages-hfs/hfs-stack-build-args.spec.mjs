@@ -47,7 +47,7 @@ test('in GitHub Actions sealed values are masked first and the lines are appende
   fs.writeFileSync(output, 'earlier=1\n');
   const result = await buildArgs(ctx({ env: { STARCI_SECRET_VERSION_KEY: 'k', GITHUB_ACTIONS: 'true', GITHUB_OUTPUT: output } }), config, { app: 'web' });
   assert.deepEqual(result.lines, [`::add-mask::${MEMBERS.web.PUBLIC_KEY}`, 'PUBLIC_URL=https://app.example.test', `PUBLIC_KEY=${MEMBERS.web.PUBLIC_KEY}`]);
-  assert.equal(fs.readFileSync(output, 'utf8'), `earlier=1\nargs<<STARCI_BUILD_ARGS_END\nPUBLIC_URL=https://app.example.test\nPUBLIC_KEY=${MEMBERS.web.PUBLIC_KEY}\nSTARCI_BUILD_ARGS_END\n`);
+  assert.equal(fs.readFileSync(output, 'utf8'), `earlier=1\nargs<<BUILD_ARGS_OUTPUT_END\nPUBLIC_URL=https://app.example.test\nPUBLIC_KEY=${MEMBERS.web.PUBLIC_KEY}\nBUILD_ARGS_OUTPUT_END\n`);
 });
 
 test('in GitHub Actions without an output file only the masks are added', async () => {

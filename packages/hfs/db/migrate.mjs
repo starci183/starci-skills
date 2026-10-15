@@ -18,7 +18,7 @@ import { firstLine, tool } from '../stack/context.mjs';
 import { approvalMissing, failure, refusal } from '../stack/errors.mjs';
 import { readDeclaration, runVerb } from '../release/index.mjs';
 
-export const DATABASE_CODE = 'DB_CONFIG_INVALID';
+const DATABASE_CODE = 'DB_CONFIG_INVALID';
 
 const SEGMENT = /^[A-Za-z0-9._-]+$/u;
 const NAME = /^[A-Za-z0-9][A-Za-z0-9_-]*$/u;

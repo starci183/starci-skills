@@ -10,7 +10,7 @@ const POLL_MS = 3000;
 const NO_POLICY = new Set(['', 'no']);
 
 /** True when dockerd runs with live-restore (docker info reports it). */
-export function liveRestoreEnabled(run) {
+function liveRestoreEnabled(run) {
   return remoteDocker(run, ['info', '--format', '{{.LiveRestoreEnabled}}']).stdout.trim() === 'true';
 }
 

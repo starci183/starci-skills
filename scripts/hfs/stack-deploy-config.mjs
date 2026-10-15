@@ -1,8 +1,8 @@
 // stack-deploy-config.mjs - the ONE reader of `environments.<env>.deploy` in .starcistacks/application-stacks.yaml (R294).
 // `starci app stack ...` (packages/hfs/stack) normalises the block through it and `starci app check` (rules/stacks-deploy.mjs)
 // judges the same block through it, so the verbs and the rule can never disagree. Pure given the block and a probe of the app tree.
-import path from 'node:path';
 import { isPlainObject as plain } from '../../engine/plain-object.mjs';
+import { closedFields, collector, patternField, treeFile } from './stack-config-kit.mjs';
 import { list } from '../lib/list.mjs';
 import { normalizeIngress } from './stack-ingress-config.mjs';
 
@@ -39,32 +39,9 @@ const FIELDS = {
   backupVolume: ['name', 'volume'],
 };
 
-/** Collects problems with the path they concern; `problem(at, message)` is the only way to add one. */
-function collector() {
-  const problems = [];
-  return { problems, problem: (at, message) => { problems.push({ at, message }); } };
-}
-
 const text = (value) => typeof value === 'string' && value.length > 0;
 
-function closedFields(c, at, value, allowed) {
-  if (!plain(value)) { c.problem(at, 'must be a mapping'); return false; }
-  for (const key of Object.keys(value)) if (!allowed.includes(key)) c.problem(`${at}.${key}`, 'is not a field of the deploy block');
-  return true;
-}
-
-function nameField(c, at, value, pattern = NAME) {
-  if (typeof value !== 'string' || !pattern.test(value)) { c.problem(at, `must match ${pattern}`); return false; }
-  return true;
-}
-
-/** A path inside .starcistacks/<env>/ : relative, forward slashes, no `..`, and present in the tree. */
-function treeFile(c, at, value, probe) {
-  if (!text(value) || path.posix.isAbsolute(value) || value.includes('\\') || path.posix.normalize(value).split('/').includes('..')) {
-    c.problem(at, 'must be a relative path inside the environment directory'); return;
-  }
-  if (!probe.exists(value)) c.problem(at, `${value} does not exist under the environment directory`);
-}
+const nameField = (c, at, value, pattern = NAME) => patternField(c, at, value, pattern);
 
 function stringList(c, at, value, itemPattern, { nonEmpty = false } = {}) {
   if (!Array.isArray(value) || (nonEmpty && value.length === 0)) { c.problem(at, 'must be a list'); return []; }
@@ -296,6 +273,6 @@ export function normalizeDeploy(block, { project, probe }) {
     backup: backup(c, block.backup),
     ingress: ingress(c, block.ingress, probe),
   };
-  if (block.stack === undefined && !NAME.test(String(project))) c.problem('deploy.stack', `the project name ${project} is not a valid stack name (${NAME}); declare deploy.stack`);
+  if (block.stack === undefined && !NAME.test(String(project))) c.problem('deploy.stack', `the stack name ${project} must match ${NAME}`);
   return { config: c.problems.length === 0 ? config : null, problems: c.problems };
 }

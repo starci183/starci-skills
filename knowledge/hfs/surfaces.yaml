@@ -353,6 +353,7 @@ surfaces:
         - app.ci
         - app.ci-images
         - app.ci-db
+        - app.ci-stack-deploy
         - app.deploy
         - app.ci-deploy
         - app.ci-authorize-deploy-key
@@ -376,6 +377,7 @@ surfaces:
         - app.ci
         - app.ci-images
         - app.ci-db
+        - app.ci-stack-deploy
         - app.deploy
         - app.ci-deploy
         - app.ci-authorize-deploy-key

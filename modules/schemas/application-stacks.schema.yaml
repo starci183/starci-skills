@@ -398,7 +398,7 @@ $defs:
         type: array
         items: {$ref: '#/$defs/deployConfig'}
       passEnv:
-        description: Host variable names interpolated by `docker stack config` (names only).
+        description: Host variable names interpolated into the rendered stack (names only).
         type: array
         items: {$ref: '#/$defs/deployKey'}
       verify: {$ref: '#/$defs/deployVerify'}

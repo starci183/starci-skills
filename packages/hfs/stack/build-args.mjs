@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { refusal } from './errors.mjs';
 import { openMember } from './sealed.mjs';
 
-const OUTPUT_DELIMITER = 'STARCI_BUILD_ARGS_END';
+const OUTPUT_DELIMITER = 'BUILD_ARGS_OUTPUT_END';
 const ONE_LINE = /^[^\r\n]+$/u;
 
 function imageOf(config, app) {
