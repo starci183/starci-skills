@@ -134,7 +134,7 @@ function execInTask(args, state) {
 }
 
 function containerList(args, state) {
-  const service = args.flatMap((arg, index) => (args[index - 1] === '--filter' && arg.startsWith('label=com.docker.swarm.service.name=') ? [arg.slice(37)] : []))[0];
+  const service = args.flatMap((arg, index) => (args[index - 1] === '--filter' && arg.startsWith('label=com.docker.swarm.service.name=') ? [arg.slice(36)] : []))[0];
   const running = state.tasks.filter((task) => task.service === service && task.state === 'running');
   return ok(running.map((task) => `${task.container ?? task.id}\n`).join(''));
 }

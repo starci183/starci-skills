@@ -7,7 +7,7 @@ import { stackContext } from './context.mjs';
 import { loadDeployConfig } from './config.mjs';
 import { StackError, EXIT, refusal } from './errors.mjs';
 
-export const ACTIONS = Object.freeze(['prepare', 'doctor', 'connect', 'disconnect', 'build-args', 'render', 'deploy', 'converge', 'verify', 'rollback', 'prune', 'backup', 'jobs']);
+export const ACTIONS = Object.freeze(['prepare', 'doctor', 'connect', 'disconnect', 'build-args', 'render', 'deploy', 'converge', 'verify', 'rollback', 'prune', 'backup', 'jobs', 'ingress']);
 
 const BOOLEAN = new Set(['--execute', '--json', '--swarm-state', '--init-swarm', '--skip-public', '--skip-internal', '--allow-unpinned']);
 const VALUE = new Set(['--env', '--image', '--source-sha', '--previous', '--out', '--release', '--since', '--timeout', '--retry', '--keep', '--app', '--ssh-cmd', '--extra-compose']);
@@ -72,6 +72,7 @@ const OPTIONS = {
   rollback: ({ flags }) => ({ release: flags.release ?? null, execute: flags.execute === true, timeoutSeconds: number(flags, 'timeout') }),
   prune: ({ flags, cwd }) => ({ keepFiles: (flags.keep ?? []).map((file) => path.resolve(cwd, file)), execute: flags.execute === true }),
   backup: ({ flags }) => ({ swarmState: flags['swarm-state'] === true, execute: flags.execute === true }),
+  ingress: ({ flags, positional }) => ({ action: positional[0], execute: flags.execute === true, args: positional.slice(1) }),
   jobs: ({ flags, positional }) => ({ action: positional[0], args: positional.slice(1), execute: flags.execute === true }),
 };
 
@@ -82,6 +83,7 @@ const MODULES = {
   deploy: ['./deploy.mjs', 'deployRelease'], converge: ['./converge.mjs', 'convergeStack'],
   verify: ['./verify.mjs', 'verifyStack'], rollback: ['./deploy.mjs', 'rollbackRelease'],
   prune: ['./prune.mjs', 'pruneStack'], backup: ['./backup.mjs', 'backupVolumes'], jobs: ['./jobs.mjs', 'runJobs'],
+  ingress: ['./ingress.mjs', 'runIngress'],
 };
 
 async function handlerOf(action, importer) {

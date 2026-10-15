@@ -4,7 +4,7 @@ owner: "@starci/hfs"
 summary: Swarm deploy tooling of an app (prepare to rollback) and the full edition test-world infrastructure
 impl: null
 positional:
-  - {name: action, enum: [up, down, status, prepare, doctor, connect, disconnect, build-args, render, deploy, converge, verify, rollback, prune, backup, jobs], required: true, variadic: false}
+  - {name: action, enum: [up, down, status, prepare, doctor, connect, disconnect, build-args, render, deploy, converge, verify, rollback, prune, backup, jobs, ingress], required: true, variadic: false}
   - {name: args, required: false, variadic: true}
 flags:
   - {name: stack, type: string, summary: "up, down, status: stack definition directory"}
@@ -49,4 +49,5 @@ examples:
   - starci app stack rollback --env production --release <16 hex> --execute
   - starci app stack backup --env production --swarm-state --execute
   - starci app stack jobs stats --env production
+  - starci app stack ingress plan --env production
 editions: [full, lite]

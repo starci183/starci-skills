@@ -273,6 +273,7 @@ starci app stack deploy --env production --image api=ghcr.io/org/app-api@sha256:
 starci app stack rollback --env production --release <16 hex> --execute
 starci app stack backup --env production --swarm-state --execute
 starci app stack jobs stats --env production
+starci app stack ingress plan --env production
 ```
 
 ### starci app sync

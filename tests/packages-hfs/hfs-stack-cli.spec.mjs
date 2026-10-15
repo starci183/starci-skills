@@ -66,6 +66,7 @@ test('every action reaches its module with the options built from the flags', as
     rollback: ['rollbackRelease', ['--release', '0123456789abcdef', '--execute', '--timeout', '60'], { release: '0123456789abcdef', execute: true, timeoutSeconds: 60 }],
     prune: ['pruneStack', ['--keep', 'a.json', '--keep', 'b.json', '--execute'], { execute: true }],
     backup: ['backupVolumes', ['--swarm-state', '--execute'], { swarmState: true, execute: true }],
+    ingress: ['runIngress', ['takeover', '--execute'], { action: 'takeover', execute: true, args: [] }],
     jobs: ['runJobs', ['retry', '42', '--execute'], { action: 'retry', args: ['42'], execute: true }],
   };
   for (const [action, [name, flags, expected]] of Object.entries(expectations)) {
