@@ -997,11 +997,23 @@ rules:
       - {kind: eslint-fe, id: page-exports-metadata}
       - {kind: eslint-fe, id: route-files-thin}
       - {kind: eslint-fe, id: route-adapter}
+    editions: [lite, full]
+    docs: [docs/architecture.md#r54]
+    exemplifiedBy:
+      - {"path":"packages/hfs/templates/fe/skeleton-lite/apps/web/src/app/[locale]/page.tsx","edition":"lite"}
+      - {"path":"packages/hfs/templates/fe/skeleton/apps/app/src/app/[locale]/page.tsx","edition":"full"}
+      - {"path":"packages/eslint/fe/a16-r54-route-files-thin.spec.mjs","editions":["lite","full"]}
+    proves:
+      - {"path":"packages/eslint/fe/a16-r54-route-files-thin.spec.mjs","editions":["lite","full"]}
+    witness:
+      - {"path":"packages/eslint/fe/a16-r54-route-files-thin.spec.mjs","edition":"lite","codes":["FE_ROUTE_FILES_THIN","FE_NEXT_CONVENTIONS","FE_PAGE_METADATA_MISSING","FE_ROUTE_ONE_PAGE","FE_ROUTE_DRAWING_DECISION","FE_ROUTE_CLIENT_BOUNDARY","FE_ROUTE_CLIENT_HOOK","FE_ROUTE_DEFAULT_EXPORT"]}
+      - {"path":"packages/eslint/fe/a16-r54-route-files-thin.spec.mjs","edition":"full","codes":["FE_ROUTE_FILES_THIN","FE_NEXT_CONVENTIONS","FE_PAGE_METADATA_MISSING","FE_ROUTE_ONE_PAGE","FE_ROUTE_DRAWING_DECISION","FE_ROUTE_CLIENT_BOUNDARY","FE_ROUTE_CLIENT_HOOK","FE_ROUTE_DEFAULT_EXPORT"]}
+
   - id: R55
     code: "FE_CLIENT_BOUNDARY"
     law: "Server first; `\"use client\"` only where allowed."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: ["pre-commit", "settle", "land", "ci"]
     failureCodes: ["FE_CLIENT_BOUNDARY", "FE_CLIENT_SERVER_IMPORT", "FE_CLIENT_REACHES_SERVER", "FE_SERVER_ONLY_MARK", "FE_STORAGE_OUTSIDE_MODULES", "FE_DANGEROUS_HTML"]
     enforcers:
       - {kind: eslint-fe, id: use-client-only-at-boundary}
@@ -1010,6 +1022,17 @@ rules:
       - {kind: eslint-fe, id: web-storage-only-in-modules}
       - {kind: eslint-fe, id: no-dangerous-html}
       - {kind: eslint-fe, id: client-reaches-server}
+    editions: [lite, full]
+    docs: [docs/architecture.md#r55]
+    exemplifiedBy:
+      - {"path":"packages/hfs/templates/fe/skeleton/apps/__app__/src/components/blocks/SignInForm/index.tsx","editions":["lite","full"]}
+      - {"path":"packages/eslint/fe/a16-r55-client-boundary.spec.mjs","editions":["lite","full"]}
+    proves:
+      - {"path":"packages/eslint/fe/a16-r55-client-boundary.spec.mjs","editions":["lite","full"]}
+    witness:
+      - {"path":"packages/eslint/fe/a16-r55-client-boundary.spec.mjs","edition":"lite","codes":["FE_CLIENT_BOUNDARY","FE_CLIENT_SERVER_IMPORT","FE_CLIENT_REACHES_SERVER","FE_SERVER_ONLY_MARK","FE_STORAGE_OUTSIDE_MODULES","FE_DANGEROUS_HTML"]}
+      - {"path":"packages/eslint/fe/a16-r55-client-boundary.spec.mjs","edition":"full","codes":["FE_CLIENT_BOUNDARY","FE_CLIENT_SERVER_IMPORT","FE_CLIENT_REACHES_SERVER","FE_SERVER_ONLY_MARK","FE_STORAGE_OUTSIDE_MODULES","FE_DANGEROUS_HTML"]}
+
   - id: R56
     code: "FE_HOOKS_ARE_HOOKS"
     law: "`hooks/` hold hooks only: `hooks/swr` (one SWR wrapper per modules/api operation), `hooks/rhf` (forms), `hooks/zustand/<store>`, `hooks/socketio`, `hooks/effects`, `hooks/reuseables` and `hooks/<domain>` with one shared file per domain; a product hook is defined only there and imported through its index."
@@ -1022,6 +1045,16 @@ rules:
       - {kind: eslint-fe, id: hook-location}
   - id: R57
     code: "FE_OWNER_REACHABLE"
+    editions: [lite, full]
+    docs: [docs/architecture.md#r57]
+    proves:
+      - {path: packages/eslint/fe/owner-reachable-coverage.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/fe/skeleton-lite/apps/web/src, edition: lite}
+      - {path: packages/hfs/templates/fe/skeleton/apps/app/src, edition: full}
+      - {path: packages/eslint/fe/owner-reachable-coverage.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: packages/eslint/fe/owner-reachable-coverage.spec.mjs, editions: [lite, full]}
     law: "Every owner is mounted; every href resolves to a route."
     kinds: [lint, design]
     gates: [settle, land, ci]
@@ -1029,18 +1062,43 @@ rules:
     enforcers:
       - {kind: eslint-fe, id: no-hardcoded-route}
       - {kind: eslint-fe, id: owner-reachable}
+
   - id: R58
     code: "FE_I18N_LITERAL"
+    editions: [lite, full]
+    docs: [docs/architecture.md#r58]
+    proves:
+      - {path: packages/eslint/fe/i18n-literal-coverage.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/fe/skeleton-lite/apps/web/src, edition: lite}
+      - {path: packages/hfs/templates/fe/skeleton/apps/app/src, edition: full}
+      - {path: packages/eslint/fe/i18n-literal-coverage.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: packages/eslint/fe/i18n-literal-coverage.spec.mjs, editions: [lite, full]}
     law: "No display text at any tier, no escape comment."
     kinds: [lint, codemod]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: ["pre-commit", "settle", "land", "ci"]
     failureCodes: ["FE_I18N_LITERAL"]
     enforcers:
       - {kind: eslint-fe, id: no-hardcoded-copy}
       - {kind: eslint-fe, id: html-lang-from-locale}
       - {kind: eslint-fe, id: no-copy-resolution-below-block}
+
   - id: R59
     code: "FE_I18N_PLACEMENT"
+    editions: [lite, full]
+    docs: [docs/architecture.md#r59]
+    proves:
+      - {path: packages/eslint/fe/i18n-placement-coverage.spec.mjs, editions: [lite, full]}
+      - {path: tests/hfs/hfs-i18n-placement-coverage.spec.mjs, editions: [lite, full], codes: [FE_I18N_PLACEMENT]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/fe/skeleton-lite/apps/web/src/modules/i18n, edition: lite}
+      - {path: packages/hfs/templates/fe/skeleton/packages/__project__-i18n/src, edition: full}
+      - {path: packages/eslint/fe/i18n-placement-coverage.spec.mjs, editions: [lite, full]}
+      - {path: tests/hfs/hfs-i18n-placement-coverage.spec.mjs, editions: [lite, full], codes: [FE_I18N_PLACEMENT]}
+    witness:
+      - {path: packages/eslint/fe/i18n-placement-coverage.spec.mjs, editions: [lite, full]}
+      - {path: tests/hfs/hfs-i18n-placement-coverage.spec.mjs, editions: [lite, full], codes: [FE_I18N_PLACEMENT]}
     law: "`next-intl` with `[locale]`; the next-intl stack is written once per front end: `fe/packages/<family>-i18n` (`createAppI18n`) called by each app's `modules/i18n/index.ts`, or the only app's `modules/i18n/`."
     kinds: [check, codemod, lint]
     gates: [settle, land, ci]
@@ -1053,14 +1111,26 @@ rules:
       - {kind: eslint-fe, id: no-native-anchor}
       - {kind: eslint-fe, id: use-intl-formatter}
       - {kind: hfs, id: i18n-placement, at: scripts/hfs/rules/frontend-tree.mjs}
+
   - id: R60
     code: "FE_I18N_CATALOG"
+    editions: [lite, full]
+    docs: [docs/architecture.md#r60]
+    proves:
+      - {path: tests/hfs/hfs-i18n-catalog-coverage.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/fe/skeleton-lite/apps/web/src/modules/i18n/messages, edition: lite}
+      - {path: packages/hfs/templates/fe/skeleton/apps/app/src/modules/i18n/messages, edition: full}
+      - {path: tests/hfs/hfs-i18n-catalog-coverage.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-i18n-catalog-coverage.spec.mjs, editions: [lite, full]}
     law: "Same keys in every catalog, `pick` for clients."
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["FE_I18N_CATALOG"]
     enforcers:
       - {kind: hfs, id: i18n-catalog, at: scripts/hfs/rules/frontend-tree.mjs}
+
   - id: R61
     code: "FE_STYLE_TOKEN_ONLY"
     law: "Token-only CSS; colour only in `brand.css`; every `@source` resolves (sub-check `FE_STYLE_SOURCE_UNRESOLVED`). Status colours follow HeroUI soft pairs: every status tone has `--<tone>-soft` and `--<tone>-soft-foreground` in light and dark, the soft foreground reaches 3:1 on its tint and on `--background`, body text 4.5:1, a solid tone is never text below 4.5:1, and text and icons take the soft foreground, never the solid tone."
@@ -1090,17 +1160,39 @@ rules:
       - {kind: eslint-fe, id: status-text-uses-soft-foreground}
   - id: R62
     code: "FE_NATIVE_FORM_CONTROL"
+    editions: [lite, full]
+    docs: [docs/architecture.md#r62]
+    proves:
+      - {path: packages/eslint/fe/r62-native-controls-coverage.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/fe/skeleton-lite/apps/web/src/features/pages/AppHomePage/component.tsx, edition: lite}
+      - {path: packages/hfs/templates/fe/skeleton/apps/__app__/src/components/blocks/SignInForm/component.tsx, edition: full}
+      - {path: packages/eslint/fe/r62-native-controls-coverage.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: packages/eslint/fe/r62-native-controls-coverage.spec.mjs, edition: lite, codes: [FE_NATIVE_FORM_CONTROL, FE_NATIVE_IMAGE]}
+      - {path: packages/eslint/fe/r62-native-controls-coverage.spec.mjs, edition: full, codes: [FE_NATIVE_FORM_CONTROL, FE_NATIVE_IMAGE]}
     law: "No raw form controls, native images or raw structural tags in product tiers; the grammar renders them."
     kinds: [lint, design]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: ["pre-commit", "settle", "land", "ci"]
     failureCodes: ["FE_NATIVE_FORM_CONTROL", "FE_NATIVE_IMAGE"]
     enforcers:
       - {kind: eslint-fe, id: no-native-form-control}
       - {kind: eslint-fe, id: no-native-img}
       - {kind: eslint-fe, id: no-raw-structural-element}
       - {kind: eslint-fe, id: image-has-size}
+
   - id: R63
     code: "FE_PACKAGE_SHAPE"
+    editions: [lite, full]
+    docs: [docs/architecture.md#r63]
+    templateNa: "Shared package manifests are authored by the app; the frontend scaffold creates app workspaces rather than shared package owners."
+    proves:
+      - {path: tests/repo/architecture-package-shape-coverage.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: tests/repo/architecture-package-shape-coverage.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/repo/architecture-package-shape-coverage.spec.mjs, edition: lite, codes: [FE_PACKAGE_SHAPE]}
+      - {path: tests/repo/architecture-package-shape-coverage.spec.mjs, edition: full, codes: [FE_PACKAGE_SHAPE]}
     law: "Packages build to `dist` with explicit exports and no dead unit."
     kinds: [check, design]
     gates: [land, ci]
@@ -1115,6 +1207,18 @@ rules:
     failureCodes: ["FE_APP_ISOLATION"]
     enforcers:
       - {kind: eslint-fe, id: app-isolation}
+    editions: [lite, full]
+    docs: [docs/architecture.md#r64-fe-app-isolation]
+    proves:
+      - {path: packages/eslint/fe/r64-app-isolation-coverage.spec.mjs, editions: [lite, full], codes: [FE_APP_ISOLATION]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/fe/skeleton-lite/apps/web/src/features/pages/AppHomePage/component.tsx, edition: lite}
+      - {path: packages/hfs/templates/fe/skeleton/apps/__app__/src/components/blocks/SignOutButton/component.tsx, edition: full}
+      - {path: packages/eslint/fe/r64-app-isolation-coverage.spec.mjs, editions: [lite, full], codes: [FE_APP_ISOLATION]}
+    witness:
+      - {path: packages/eslint/fe/r64-app-isolation-coverage.spec.mjs, edition: lite, codes: [FE_APP_ISOLATION]}
+      - {path: packages/eslint/fe/r64-app-isolation-coverage.spec.mjs, edition: full, codes: [FE_APP_ISOLATION]}
+
   - id: R65
     code: "FE_SIZE_AND_STATE_BUDGET"
     law: "Hook and state budgets; no hand-written poll loop; keyed lists; everything an effect starts is released by its cleanup; no swallowed error or console."
@@ -1131,6 +1235,18 @@ rules:
       - {kind: eslint-fe, id: effect-subscription-needs-cleanup}
       - {kind: eslint-fe, id: no-empty-catch}
       - {kind: eslint-fe, id: no-console}
+    editions: [lite, full]
+    docs: [docs/architecture.md#r65-fe-size-and-state-budget]
+    proves:
+      - {path: packages/eslint/fe/r65-size-and-state-budget-coverage.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/fe/skeleton-lite/apps/web/src/features/pages/AppHomePage/component.tsx, edition: lite}
+      - {path: packages/hfs/templates/fe/skeleton/apps/__app__/src/components/blocks/SignOutButton/component.tsx, edition: full}
+      - {path: packages/eslint/fe/r65-size-and-state-budget-coverage.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: packages/eslint/fe/r65-size-and-state-budget-coverage.spec.mjs, edition: lite, codes: [FE_SIZE_AND_STATE_BUDGET, FE_LIST_KEY, FE_EFFECT_CLEANUP, FE_SWALLOWED_ERROR, FE_CONSOLE_CALL]}
+      - {path: packages/eslint/fe/r65-size-and-state-budget-coverage.spec.mjs, edition: full, codes: [FE_SIZE_AND_STATE_BUDGET, FE_LIST_KEY, FE_EFFECT_CLEANUP, FE_SWALLOWED_ERROR, FE_CONSOLE_CALL]}
+
   - id: R68
     code: "BE_SQL_INTERPOLATED"
     editions: [lite, full]
