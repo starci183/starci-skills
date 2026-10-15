@@ -58,6 +58,55 @@ The architecture adapters keep their guides beside this file:
 of SWR is not applicable; selecting SWR without a supported contract is
 unavailable.
 
+<a id="r49"></a>
+## Frontend environment owner (R49)
+
+`FE_ENV_OWNER` keeps environment reads in `modules/config`. Other frontend modules receive
+validated configuration from that owner instead of reading the environment themselves.
+An endpoint or secret must not fall back to localhost, a hardcoded address or a default value;
+missing configuration must remain visible.
+
+<a id="r50"></a>
+## Frontend transport and data lifecycle (R50)
+
+`FE_TRANSPORT_OWNER` requires one owned GraphQL transport and its auth/no-auth client link
+chains, plus the owned REST client for uploads, presigned URLs and auth endpoints. Several
+frontend apps share the API package when they share that transport. Tokens and locale belong
+to the request and session owners, rather than module state. `FE_EFFECT_FETCH` refuses data
+fetching in component effects; components read through their SWR hooks.
+
+`FE_SWR_KEY_IDENTITY` requires each SWR key to carry every input that identifies its result;
+a gated request uses a null key until its inputs are ready. `FE_SWR_MUTATION_RESOURCE_IDENTITY`
+requires a mutation hook to retain the identity of the resource it changes. See the
+[Next data lifecycle guide](next-data-lifecycle-check.md) for the checked SWR contract.
+
+<a id="r51"></a>
+## Frontend response outcomes (R51)
+
+`FE_HTTP_STATUS_COLLAPSE` requires the frontend's one `GraphQLResponse<T>` envelope with
+`success`, `message`, `error` and `data`. A failed request keeps its failure reason instead of
+becoming empty successful data. An UNAUTHENTICATED or FORBIDDEN answer, including HTTP 401
+or 403, becomes `refused`; the error link refreshes once before the session sends the user
+to sign-in. `FE_OUTCOME_KIND_UNHANDLED` requires consumers to handle every outcome kind
+explicitly when the outcome union changes.
+
+<a id="r52"></a>
+## Frontend generated wire types (R52)
+
+`FE_WIRE_GENERATED` requires graphql-codegen to read `be/contracts/<app>/schema.graphql`
+in place and generate the wire types in the frontend API owner's GraphQL `__generated__`
+directory. Operation request and response types re-export those generated types instead of
+declaring wire shapes or response type assertions by hand. Keep the codegen script and the
+generated directory's `.schema-sha256` stamp current with the schema.
+
+<a id="r53"></a>
+## Frontend error and pending boundaries (R53)
+
+`FE_ERROR_BOUNDARY_MISSING` requires each Next.js frontend's global error boundary and its
+locale error, not-found and loading boundaries. `FE_SUSPENSE_NULL_FALLBACK` requires a
+visible pending state for Suspense: a missing fallback, `null` or `undefined` leaves the
+pending interface blank and is refused.
+
 ## Comment and executable verification obligations
 
 **REF-COMMENT-1 — Caller contracts and decision rationale.** Public APIs carry non-empty English

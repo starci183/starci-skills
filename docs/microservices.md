@@ -143,3 +143,40 @@ Supabase CLI stack; it has no e2e world.
 `order.placed`, records an invoice, announces a rejection) and `migrate`; the order service also consumes `billing.invoice-rejected`, the compensating
 step of its saga. Its e2e specs `billing/order-placed` and `order/invoice-rejected` prove the asynchronous path, the redelivery and
 the compensation on the real stack; `integration/messaging` proves the queue adapter against Redis.
+
+## Back-end ownership checks
+
+<a id="r40"></a>
+### Logging
+
+`BE_LOGGER_REQUIRED` requires the platform logging port and an accounted catch: handle the failure, rethrow it, or record it with its cause. Keep log event identity stable, put changing values in structured fields, and avoid framework loggers, interpolated messages and error wording used as event identity.
+
+<a id="r41"></a>
+### Default deny
+
+`BE_DEFAULT_DENY` requires the app's default-deny `APP_GUARD`, explicit reasons for public doors, typed request bodies and timing-safe credential comparisons. Authentication belongs to the app guard chain rather than route-level `UseGuards` declarations.
+
+<a id="r42"></a>
+### Bounded input
+
+`BE_INPUT_BOUNDED` requires input DTO fields to declare bounds appropriate to their types. Use cursor pagination instead of offsets, and give authentication handshakes and signed webhook doors their strict rate tier.
+
+<a id="r43"></a>
+### Configuration ownership
+
+`BE_CONFIG_OWNER` confines environment reads and parsing to their declared configuration, boot and test-world owners. Parse configuration at boot and pass typed options into capabilities instead of reading the environment from a service.
+
+<a id="r44"></a>
+### Required secrets
+
+`BE_SECRET_DEFAULT` refuses default arguments and fallback values for secrets and infrastructure URLs supplied by the configuration owner. Read the required value through `EnvSource` without a default so its absence stops boot and identifies the missing key.
+
+<a id="r45"></a>
+### Module composition
+
+`BE_MODULE_SHAPE` requires owned capability and transport modules, typed module definitions and static registration. Keep global scope decisions at the app root, avoid cross-owner module imports and register each capability once. `BE_MODULE_HANDLER_REGISTRATION` requires transport handlers to be registered in their owning module, and `BE_MODULE_PROVIDER_REREGISTRATION` refuses registering a provider again outside its owner.
+
+<a id="r46"></a>
+### Owned background work
+
+`BE_BACKGROUND_UNOWNED` requires every sweep, retry or outbox to have a job or consumer composed by an app. Keep the work in its owning service or compose a worker app when it needs independent scaling.

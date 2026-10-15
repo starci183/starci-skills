@@ -185,3 +185,8 @@ excluding none slots, specs and declared generated output. Its
 `coverage/lcov.info` report is distinct from a product's `be/coverage/lcov.info`.
 R247's coverage matrix concerns links across the standard, not a code-coverage
 percentage.
+
+<a id="r48"></a>
+### Behavioral spec quality
+
+`BE_SPEC_QUALITY` requires specs to assert results or persisted state with exact values. Build a unit subject through a providers-only `TestingModule`, obtain it from the module reference, and supply infrastructure doubles from the test kit. Avoid source-reading assertions, module mocks, constructing the subject directly, sleeps and model calls in end-to-end flows. Enter end-to-end scenarios through production transport and read the persisted effect back. Specs must run without skip, focus, todo or conditional runner selection; the test-world library alone may skip a contract sandbox when its configuration is absent.
