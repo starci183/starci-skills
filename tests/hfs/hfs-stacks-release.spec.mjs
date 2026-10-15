@@ -350,6 +350,14 @@ for (const edition of ['lite', 'full']) {
     });
   });
 
+  test('HFS_SCHEDULE_UNDECLARED@' + edition + ': an unschedule whose job name is not a literal removes nothing known and is not a finding of its own', () => {
+    withFixture(edition, value => {
+      writeTracked(value, 'supabase/migrations/202610150003_drop.sql', "DO $$ DECLARE legacy record; BEGIN FOR legacy IN SELECT jobname FROM cron.job LOOP PERFORM cron.unschedule(legacy.jobname); END LOOP; END $$;");
+      assert.deepEqual(scheduleIssues(value), []);
+      for (const issue of scheduleIssues(value)) assert.equal(typeof issue.path, 'string');
+    });
+  });
+
   test('HFS_SCHEDULE_UNDECLARED@' + edition + ': dynamic pg_cron ids and anonymous recurring callbacks cannot silently pass', () => {
     withFixture(edition, value => {
       writeTracked(value, 'be/src/modules/jobs/register.ts', 'db.query("SELECT cron.schedule($1, $2, $3)", args); setInterval(() => run(), 60000);');
