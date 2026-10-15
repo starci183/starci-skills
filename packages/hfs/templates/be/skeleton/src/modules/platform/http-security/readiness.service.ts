@@ -23,11 +23,11 @@ export class ReadinessService {
                     )
                 }),
             ])
-            return { ok: true }
         } catch {
             throw new ServiceUnavailableException("Required database is unavailable")
         } finally {
             clearTimeout(timer)
         }
+        return { ok: true }
     }
 }
