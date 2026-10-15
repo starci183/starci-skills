@@ -20,7 +20,11 @@ export const AppGuideOverlayBase = (props: AppGuideOverlayBaseProps) => (
         onOpenChange={props.on.openChange}
         title={props.props.title}
         closeLabel={props.props.closeLabel}
-        trigger={<Button variant="secondary" startContent={<Icon />}>{props.props.triggerLabel}</Button>}
+        trigger={
+            <Button variant="secondary" startContent={<Icon />}>
+                {props.props.triggerLabel}
+            </Button>
+        }
     >
         <Text>{props.props.description}</Text>
     </Dialog>

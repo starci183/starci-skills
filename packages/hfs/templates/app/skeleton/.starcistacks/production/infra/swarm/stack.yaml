@@ -1,8 +1,8 @@
-# Rendered production model. App images and owner infrastructure must be provisioned before use.
+# Rendered production model. All-zero app digests are illustrative; publish verified images before use.
 version: "3.8"
 services:
   core:
-    image: "{{project}}/core:v0.0.0"
+    image: "{{project}}/core:v0.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000"
     environment:
       NODE_ENV: production
       PORT: "3001"
@@ -34,7 +34,7 @@ services:
         condition: on-failure
         delay: 5s
   app:
-    image: "{{project}}/app:v0.0.0"
+    image: "{{project}}/app:v0.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000"
     environment:
       NODE_ENV: production
       PORT: "3000"
@@ -63,7 +63,7 @@ services:
         condition: on-failure
         delay: 5s
   landing:
-    image: "{{project}}/landing:v0.0.0"
+    image: "{{project}}/landing:v0.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000"
     environment:
       NODE_ENV: production
       PORT: "3002"

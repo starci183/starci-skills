@@ -1,19 +1,26 @@
 # The app declares its topology before any owner provisions a deployment.
+# All-zero application digests are illustrative and must be replaced by verified release digests.
 schema: starci/application-stacks@1
 sources:
   - repository: "{{project}}"
+backing:
+  primary:
+    provider: external-postgres
+    managed: true
 components:
   core:
     role: service
-    image: "{{project}}/core:v0.0.0"
+    image: "{{project}}/core:v0.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000"
   app:
     role: service
-    image: "{{project}}/app:v0.0.0"
+    image: "{{project}}/app:v0.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000"
   landing:
     role: service
-    image: "{{project}}/landing:v0.0.0"
+    image: "{{project}}/landing:v0.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000"
   ingress:
     role: ingress
+    stateful: true
+    volumes: [ingress-data, ingress-config-data]
     image: caddy:2.10.2@sha256:c3d7ee5d2b11f9dc54f947f68a734c84e9c9666c92c88a7f30b9cba5da182adb
     purpose: The single public entry point; TLS state stays on its declared persistent volume.
   postgres:
@@ -43,8 +50,46 @@ environments:
       landing: { port: 3002 }
       ingress: { httpPort: 80, httpsPort: 443 }
     runbook: README.md
-    # External Swarm secret names are declared in the model. Real sealed members are owner-provisioned.
-    secrets: []
+    ingress:
+      component: ingress
+      hosts: ["{{project}}.example.invalid", "api.{{project}}.example.invalid", "www.{{project}}.example.invalid"]
+    dns:
+      - host: "{{project}}.example.invalid"
+        owner: Production operator
+        receipt: .starcistacks/production/infra/swarm/owner-actions.md#dns
+      - host: "api.{{project}}.example.invalid"
+        owner: Production operator
+        receipt: .starcistacks/production/infra/swarm/owner-actions.md#dns
+      - host: "www.{{project}}.example.invalid"
+        owner: Production operator
+        receipt: .starcistacks/production/infra/swarm/owner-actions.md#dns
+    tls:
+      owner: Production operator
+      receipt: .starcistacks/production/infra/swarm/owner-actions.md#tls
+    release:
+      imagesLock: .starcistacks/production/infra/swarm/releases/images.lock.yaml
+      pointer: .starcistacks/production/infra/swarm/releases/current.yaml
+      previous: .starcistacks/production/infra/swarm/releases/previous.yaml
+      healthAssertions: [API /health/live, API /health/ready, App /health/live, Landing /health/live, Signed-in GraphQL request over TLS]
+    backup:
+      - component: ingress
+        target: Owner-provisioned encrypted off-host storage for both ingress volumes
+        retention: Thirty daily snapshots
+        owner: Production operator
+        restoreProof: .starcistacks/production/infra/swarm/recovery/restore-proof.md
+      - component: primary
+        target: Provider recovery plus owner-provisioned encrypted off-host database exports
+        retention: Thirty daily exports
+        owner: Production operator
+        restoreProof: .starcistacks/production/infra/swarm/recovery/restore-proof.md
+    # Scaffolding seals generated placeholders to this app's own recipient; set real values before use.
+    secrets:
+      - name: primary-db-url
+        runtimeName: "{{project}}-production-primary-db-url-v1"
+        version: 1
+        where: secrets/primary-db-url
+        recipientPolicy: This app's own age recipient configured in .sops.yaml
+        keyCustody: SOPS_AGE_KEY in the host's untracked .claude/secret.env
 k8s:
   status: deferred
   reason: This starter declares Docker Swarm production; no Kubernetes environment is provisioned.

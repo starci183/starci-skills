@@ -214,7 +214,7 @@ const LITE_FE_APP_DEPENDENCIES = Object.freeze({
  * ./routing, client-safe: the default locale a client boundary reads).
  */
 const FE_PACKAGES = Object.freeze({
-  ui: { exports: ['.'], dependencies: { '@heroui/react': null, '@starci/grammar': null, '@xyflow/react': null, 'next-intl': null, react: null } },
+  ui: { exports: ['.'], dependencies: { '@heroui/react': null, '@starci/grammar': null, '@starci/heroicons': null, '@xyflow/react': null, 'next-intl': null, react: null } },
   i18n: { exports: ['.', './proxy', './routing'], dependencies: { next: null, 'next-intl': null, 'server-only': null } },
 });
 
@@ -455,6 +455,10 @@ function fixedSkeletonFiles(context, relative, source) {
 
 function variableSkeletonFiles(context, relative, source) {
   const { scope, directory, app, vars, apps } = context;
+  const leaves = `apps/${APP_DIR}/src/components/leaves/`;
+  if (scope === 'fe' && app.edition === 'full' && relative.startsWith(leaves)) {
+    return fixedSkeletonFiles(context, relative.replace(leaves, `packages/${PROJECT_DIR}-ui/src/leaves/`), source);
+  }
   const selectedApps = scope === 'fe' ? coreFeApps(apps) : apps;
   return selectedApps.map(entry => ({
     path: skeletonOutputPath(relative.split(APP_DIR).join(entry.name), context),
@@ -470,7 +474,8 @@ function skeletonDirectory(scope, directory, app, vars, include = () => true) {
   const context = { scope, directory, app, vars, apps };
   const files = [];
   for (const rel of listFiles(dir).filter(relative => include(relative))) {
-    const source = render(fs.readFileSync(path.join(dir, rel), 'utf8').replace(/\r\n/g, '\n'), PARTIAL_VARIABLES);
+    let source = render(fs.readFileSync(path.join(dir, rel), 'utf8').replace(/\r\n/g, '\n'), PARTIAL_VARIABLES);
+    if (scope === 'fe' && app.edition === 'full') source = source.replaceAll('"@/components/leaves/Icon"', `"@${app.project}/ui"`);
     const rendered = rel.includes(APP_DIR) ? variableSkeletonFiles(context, rel, source) : fixedSkeletonFiles(context, rel, source);
     files.push(...rendered);
   }

@@ -27,9 +27,7 @@ describe("ReadinessService", () => {
         const entityManager = mockEntityManager()
         entityManager.transaction.mockRejectedValue(new Error("connection unavailable"))
         const service = await build(entityManager)
-        await expect(service.probeRequired()).rejects.toBeInstanceOf(
-            ServiceUnavailableException,
-        )
+        await expect(service.probeRequired()).rejects.toBeInstanceOf(ServiceUnavailableException)
     })
 
     it("reports 503 within the bounded timeout when the required database never answers", async () => {
@@ -37,9 +35,7 @@ describe("ReadinessService", () => {
         const entityManager = mockEntityManager()
         entityManager.transaction.mockReturnValue(new Promise(() => undefined))
         const service = await build(entityManager)
-        const expected = expect(service.probeRequired()).rejects.toBeInstanceOf(
-            ServiceUnavailableException,
-        )
+        const expected = expect(service.probeRequired()).rejects.toBeInstanceOf(ServiceUnavailableException)
         await jest.advanceTimersByTimeAsync(1000)
         await expected
         expect(jest.getTimerCount()).toBe(0)

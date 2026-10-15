@@ -1,0 +1,9 @@
+# Illustrative inventory only. Replace application digests with verified published images.
+schema: starci/images-lock@1
+environment: production
+status: pending-owner-release
+images:
+  core: "{{project}}/core:v0.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  app: "{{project}}/app:v0.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  landing: "{{project}}/landing:v0.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  ingress: caddy:2.10.2@sha256:c3d7ee5d2b11f9dc54f947f68a734c84e9c9666c92c88a7f30b9cba5da182adb
