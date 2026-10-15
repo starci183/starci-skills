@@ -132,7 +132,7 @@ secrets:
     name: "{{project}}-production-primary-db-url-v1"
 configs:
   ingress-config:
-    file: ../../runtime/config/Caddyfile
+    file: ./Caddyfile
 volumes:
   ingress-data:
     external: true

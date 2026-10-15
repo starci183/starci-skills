@@ -50,7 +50,7 @@ export const applyHttpSecurity = (app: INestApplication, options: HttpSecurityOp
             code: HttpSecurityErrorCode.RequestInvalid,
             params: { fields: "HTTP_SECURITY_TRUST_PROXY" },
         })
-    const server = app.getHttpAdapter().getInstance<Express>()
+    const server: Express = app.getHttpAdapter().getInstance()
     server.disable("x-powered-by")
     server.set("trust proxy", edge.trustProxy)
     app.use(securityHeaders)

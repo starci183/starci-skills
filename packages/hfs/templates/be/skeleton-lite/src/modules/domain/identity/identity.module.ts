@@ -20,7 +20,7 @@ export class IdentityModule extends ConfigurableModuleClass {
                 },
                 AuthGuard,
             ],
-            exports: [AuthGuard],
+            exports: [AuthGuard, ACCESS_TOKEN_VERIFIER],
         }
     }
 }

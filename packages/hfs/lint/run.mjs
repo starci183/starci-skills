@@ -94,7 +94,7 @@ async function runLinter({ cwd, pkg, bin, args, bound = null }) {
   // ESLint prints its report on stdout; stylelint uses stderr. JSON does not prove a completed child: only exits 0/1
   // without a spawn error or signal are measurable, and exit 1 must carry findings.
   let results;
-  try { results = JSON.parse(run.stdout.trim() || run.stderr); } catch { return { error: `${pkg} produced no json report in ${path.basename(cwd)}/ (exit ${run.status}): ${String(run.stderr || run.stdout).trim().split('\n')[0]}` }; }
+  try { results = JSON.parse(run.stdout.trim() || run.stderr); } catch { return { error: `${pkg} produced no json report in ${path.basename(cwd)}/ (exit ${run.status}): ${String(run.stderr || run.stdout).trim().split('\n').slice(0, 8).join(' | ')}` }; }
   if (!Array.isArray(results)) return { error: `${pkg} produced a report that is not a result list` };
   const completed = !run.error && !run.signal && [0, 1].includes(run.status)
     && (run.status === 0 || results.some((result) => result?.messages?.length || result?.warnings?.length));

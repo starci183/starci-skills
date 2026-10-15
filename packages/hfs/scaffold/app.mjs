@@ -203,7 +203,7 @@ const FE_APP_DEPENDENCIES = Object.freeze({
  * the front end is the Auth client of modules/auth only) and server-only for its own next-intl request config.
  */
 const LITE_FE_APP_DEPENDENCIES = Object.freeze({
-  '@heroui/react': null, '@heroui/styles': null, '@starci/grammar': null, '@xyflow/react': null,
+  '@heroicons/react': null, '@heroui/react': null, '@heroui/styles': null, '@starci/grammar': null, '@starci/heroicons': null, '@xyflow/react': null,
   '@supabase/supabase-js': null, next: null, 'next-intl': null, react: null, 'react-dom': null, 'server-only': null,
 });
 

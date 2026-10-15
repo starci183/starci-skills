@@ -164,13 +164,16 @@ const compositionTypes = (checker) => {
     const arrayElement = (type) => checker.isArrayType(type) || checker.isTupleType(type)
         ? checker.getIndexTypeOfType(type, ts.IndexKind.Number)
         : type.getSymbol()?.name === "ReadonlyArray" ? checker.getTypeArguments(type)[0] : null
-    const contains = (type, constructors = false, seen = new Set()) => {
+    const MAX_DEPTH = 12
+    const contains = (type, constructors = false, seen = new Set(), depth = 0) => {
+        // A library type graph (the application, an HTTP adapter) can be deep and cyclic through member types: a bounded walk never overflows the stack.
+        if (depth > MAX_DEPTH) return false
         if (!type || seen.has(type) || type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.TypeParameter)) return false
         seen.add(type)
-        if (type.isUnionOrIntersection()) return type.types.some((part) => contains(part, constructors, new Set(seen)))
+        if (type.isUnionOrIntersection()) return type.types.some((part) => contains(part, constructors, new Set(seen), depth + 1))
         // Async bootstrap returns Promise<void>; walk its result rather than recursively instantiating .then/.catch.
         const awaited = checker.getAwaitedType(type)
-        if (awaited && awaited !== type) return contains(awaited, constructors, seen)
+        if (awaited && awaited !== type) return contains(awaited, constructors, seen, depth + 1)
         const origins = originsOfType(checker, type)
         if (origins.some((origin) => origin.module === "@nestjs/common" && ["DynamicModule", "Type", "Provider"].includes(origin.name))) return true
         if (constructor(type)) return constructors || moduleConstructor(type)
@@ -181,15 +184,15 @@ const compositionTypes = (checker) => {
         // Primitive options values and their library methods never compose an app.
         if (!(type.flags & ts.TypeFlags.Object)) return false
         const element = arrayElement(type)
-        if (element) return contains(element, true, seen)
+        if (element) return contains(element, true, seen, depth + 1)
         // Index signatures retain the Type<unknown> contract of a module map, unlike a plain adapter port map.
         for (const index of checker.getIndexInfosOfType(type)) {
-            if (contains(index.type, false, new Set(seen))) return true
+            if (contains(index.type, false, new Set(seen), depth + 1)) return true
         }
         for (const signature of type.getCallSignatures()) {
-            if (contains(checker.getReturnTypeOfSignature(signature), false, new Set(seen))) return true
+            if (contains(checker.getReturnTypeOfSignature(signature), false, new Set(seen), depth + 1)) return true
         }
-        return type.getProperties().some((property) => contains(propertyType(type, property.name), false, new Set(seen)))
+        return type.getProperties().some((property) => contains(propertyType(type, property.name), false, new Set(seen), depth + 1))
     }
     const typedList = (type) => {
         const element = arrayElement(type)

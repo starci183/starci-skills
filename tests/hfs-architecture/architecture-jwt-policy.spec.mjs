@@ -7,18 +7,19 @@ import { buildTypeScriptContext } from '../../scripts/hfs/architecture/typescrip
 import { buildHfsGraph } from '../../scripts/hfs/architecture/hfs-graph.mjs';
 import { checkJwtPolicy } from '../../scripts/hfs/architecture/supabase.mjs';
 
-const verifier = (algorithms) => `
+const verifier = (algorithms, shorthandIssuer = false) => `
 import { jwtVerify } from 'jose';
 interface Options { url: string }
 export async function verify(token: string, options: Options) {
+  const issuer = options.url + '/auth/v1';
   const { payload } = await jwtVerify(token, {}, {
-    issuer: options.url, audience: 'authenticated', algorithms: ${algorithms},
+    ${shorthandIssuer ? 'issuer' : 'issuer: options.url'}, audience: 'authenticated', algorithms: ${algorithms},
   });
   if (payload.role !== 'authenticated') return null;
   return { id: payload.sub, role: 'authenticated' };
 }`;
 
-const jwtPolicyFindings = (t, edition, algorithms) => {
+const jwtPolicyFindings = (t, edition, algorithms, shorthandIssuer = false) => {
   const declaration = appDeclaration('be', {
     apps: [{ name: 'core', kind: 'api' }],
     connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'schema', provider: 'supabase' }],
@@ -28,7 +29,7 @@ const jwtPolicyFindings = (t, edition, algorithms) => {
     '../hfs.json': JSON.stringify(declaration),
     '../node_modules/jose/package.json': JSON.stringify({ name: 'jose', version: '1.0.0', types: 'index.d.ts' }),
     '../node_modules/jose/index.d.ts': 'export declare function jwtVerify(token: string, keys: unknown, options: unknown): Promise<{payload: {role: string; sub: string}}>;',
-    'src/modules/integrations/supabase/supabase.jwks.ts': verifier(algorithms),
+    'src/modules/integrations/supabase/supabase.jwks.ts': verifier(algorithms, shorthandIssuer),
   } });
   const config = loadArchitectureConfig(root);
   const context = buildTypeScriptContext(config, ts, []);
@@ -39,6 +40,10 @@ const jwtPolicyFindings = (t, edition, algorithms) => {
 for (const edition of ['lite', 'full']) {
   test(`R260 BE_JWT_ALG_PINNED accepts the literal asymmetric algorithm allowlist (${edition})`, (t) => {
     assert.deepEqual(jwtPolicyFindings(t, edition, "['ES256', 'RS256', 'EdDSA']"), []);
+  });
+
+  test(`R260 BE_JWT_ALG_PINNED traces a shorthand issuer property to the typed configuration (${edition})`, (t) => {
+    assert.deepEqual(jwtPolicyFindings(t, edition, "['ES256']", true), []);
   });
 
   test(`R260 BE_JWT_ALG_PINNED rejects a shared-secret algorithm (${edition})`, (t) => {

@@ -2,10 +2,7 @@ import { getDataSourceToken } from "@nestjs/typeorm"
 import { Secret } from "@modules/platform/config"
 import { PRIMARY_CONNECTION } from "@modules/platform/database"
 import { ACCESS_TOKEN_VERIFIER } from "@modules/domain/identity"
-import {
-    SUPABASE_ACCESS_TOKEN_VERIFIER,
-    SUPABASE_ADMIN_CLIENT,
-} from "@modules/integrations/supabase"
+import { SUPABASE_ACCESS_TOKEN_VERIFIER, SUPABASE_ADMIN_CLIENT } from "@modules/integrations/supabase"
 
 /** Compiles the real API root with public configuration and explicit infrastructure doubles. */
 export const buildWiringProof = () => ({
