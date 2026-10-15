@@ -5,7 +5,7 @@ import { constructorDependencies } from './constructor-deps.mjs';
 import { treeOf } from './required-files.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 import { importsOf } from '../../lib/ts-analysis.mjs';
-import { checkFunctionSubject, functionSubjectExports } from './function-spec-providers.mjs';
+import { checkFunctionSubject, functionSubjectExports, keyOf as literalKey } from './function-spec-providers.mjs';
 
 /**
  * R48 `unit-spec-providers` (BE_SPEC_QUALITY), the unit test standard's rule 3: the unit spec of a service builds its
@@ -39,7 +39,6 @@ function testingModules(ts, sourceFile) {
   return calls;
 }
 
-const literalKey = (ts, property) => (ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property)) && (ts.isIdentifier(property.name) || ts.isStringLiteralLike(property.name)) ? property.name.text : null;
 
 function providerList(ts, call, rel, report) {
   const options = call.arguments[0];

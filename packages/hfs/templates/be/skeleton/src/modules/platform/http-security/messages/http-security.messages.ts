@@ -3,7 +3,7 @@ import type { MessageBundle } from "@modules/platform/i18n"
 /** Display text of the http-security codes, Vietnamese and English. */
 export const HTTP_SECURITY_MESSAGES: MessageBundle = {
     vi: {
-        "errors.HTTP_SECURITY_REQUIRED_DEPENDENCY_UNAVAILABLE": "Cơ sở dữ liệu bắt buộc hiện không khả dụng.",
+        "errors.HTTP_SECURITY_REQUIRED_DEPENDENCY_UNAVAILABLE": "C\u01a1 s\u1edf d\u1eef li\u1ec7u b\u1eaft bu\u1ed9c hi\u1ec7n kh\u00f4ng kh\u1ea3 d\u1ee5ng.",
         "errors.HTTP_SECURITY_ORIGIN_REJECTED":
             "Ngu\u1ed3n g\u1eedi y\u00eau c\u1ea7u kh\u00f4ng \u0111\u01b0\u1ee3c ph\u00e9p.",
         "errors.HTTP_SECURITY_RATE_LIMITED":
