@@ -40,7 +40,7 @@ rules:
     code: "HFS_SLOT_UNDECLARED"
     law: "Every tracked path matches exactly one slot."
     kinds: [check, lint]
-    gates: [pre-push, settle, land, ci, runtime]
+    gates: [settle, land, ci, runtime]
     failureCodes: ["HFS_SLOT_UNDECLARED", "HFS_SLOT_AMBIGUOUS", "HFS_SLOT_NOT_ENABLED", "HFS_FORBIDDEN_PRESENT", "HFS_TRACKED_MUST_BE_IGNORED", "HFS_ROOT_ENTRY_FORBIDDEN", "HFS_ROOT_MARKDOWN_FORBIDDEN", "HFS_ROOT_SRC_FORBIDDEN_FE", "HFS_SRC_LAYOUT_INVALID", "HFS_MODULE_TIER_INVALID", "HFS_WORK_IN_FE", "HFS_STACKS_IN_SIDE"]
     enforcers:
       - {kind: hfs, id: slot-undeclared, at: scripts/hfs/check.mjs}
@@ -48,6 +48,23 @@ rules:
       - {kind: eslint-fe, id: slot-undeclared}
       - {kind: machine, id: repository-tree-layout, at: scripts/hfs/architecture/hfs.mjs}
       - {kind: runtime, id: runtime-tree, at: scripts/hfs/runtime-check.mjs}
+    editions: [lite, full]
+    docs: [docs/architecture.md#r01]
+    templateNa: "Slot ownership judges where a path sits in the tree, not what a file holds: the managed templates render files into the slots that own them, and no template exists for a path that no slot, two slots or a forbidden slot own."
+    proves:
+      - {path: tests/hfs-proofs/hfs-slot-ownership.spec.mjs, editions: [lite, full], codes: [HFS_SLOT_UNDECLARED, HFS_SLOT_AMBIGUOUS, HFS_SLOT_NOT_ENABLED, HFS_FORBIDDEN_PRESENT, HFS_TRACKED_MUST_BE_IGNORED]}
+      - {path: tests/hfs-proofs/hfs-repository-tree-layout.spec.mjs, editions: [lite, full], codes: [HFS_ROOT_ENTRY_FORBIDDEN, HFS_ROOT_MARKDOWN_FORBIDDEN, HFS_ROOT_SRC_FORBIDDEN_FE, HFS_SRC_LAYOUT_INVALID, HFS_MODULE_TIER_INVALID, HFS_WORK_IN_FE, HFS_STACKS_IN_SIDE]}
+      - {path: packages/eslint/be/slot-ownership.spec.mjs, editions: [lite, full], codes: [HFS_SLOT_UNDECLARED, HFS_SLOT_AMBIGUOUS, HFS_SLOT_NOT_ENABLED]}
+      - {path: packages/eslint/fe/slot-ownership.spec.mjs, editions: [lite, full], codes: [HFS_SLOT_UNDECLARED, HFS_SLOT_AMBIGUOUS, HFS_SLOT_NOT_ENABLED]}
+    exemplifiedBy:
+      - {path: examples/lite-app/be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts, edition: lite}
+      - {path: examples/ecommerce-app/be/src/features/webhooks/sepay/transport/http/sepay.webhook.ts, edition: full}
+      - {path: tests/hfs-proofs/hfs-slot-ownership.spec.mjs, editions: [lite, full], codes: [HFS_SLOT_UNDECLARED, HFS_SLOT_AMBIGUOUS, HFS_SLOT_NOT_ENABLED, HFS_FORBIDDEN_PRESENT, HFS_TRACKED_MUST_BE_IGNORED]}
+    witness:
+      - {path: tests/hfs-proofs/hfs-slot-ownership.spec.mjs, edition: lite, codes: [HFS_SLOT_UNDECLARED, HFS_SLOT_AMBIGUOUS, HFS_SLOT_NOT_ENABLED, HFS_FORBIDDEN_PRESENT, HFS_TRACKED_MUST_BE_IGNORED]}
+      - {path: tests/hfs-proofs/hfs-slot-ownership.spec.mjs, edition: full, codes: [HFS_SLOT_UNDECLARED, HFS_SLOT_AMBIGUOUS, HFS_SLOT_NOT_ENABLED, HFS_FORBIDDEN_PRESENT, HFS_TRACKED_MUST_BE_IGNORED]}
+      - {path: tests/hfs-proofs/hfs-repository-tree-layout.spec.mjs, edition: lite, codes: [HFS_ROOT_ENTRY_FORBIDDEN, HFS_ROOT_MARKDOWN_FORBIDDEN, HFS_ROOT_SRC_FORBIDDEN_FE, HFS_SRC_LAYOUT_INVALID, HFS_MODULE_TIER_INVALID, HFS_WORK_IN_FE, HFS_STACKS_IN_SIDE]}
+      - {path: tests/hfs-proofs/hfs-repository-tree-layout.spec.mjs, edition: full, codes: [HFS_ROOT_ENTRY_FORBIDDEN, HFS_ROOT_MARKDOWN_FORBIDDEN, HFS_ROOT_SRC_FORBIDDEN_FE, HFS_SRC_LAYOUT_INVALID, HFS_MODULE_TIER_INVALID, HFS_WORK_IN_FE, HFS_STACKS_IN_SIDE]}
   - id: R02
     code: "HFS_SLOT_REQUIRED_MISSING"
     law: "A slot is missing a required file (feature `index.ts`, app `main.ts`, FE `global-error.tsx`), or the root README breaks its standard shape (title, description, standard sections in order, Work pointer, live badges only, no private URL)."

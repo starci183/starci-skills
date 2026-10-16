@@ -119,9 +119,8 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
   const baseRev = base === undefined ? baseRevision(repoRoot) : base;
   const ctx = { repoRoot, root, manifest: runtimeManifest, resolver, params, files: tracked, fileSet, sources, sourceSet: new Set(sourcePaths), parsed, read, readBytes, base: baseRev };
 
-  const findings = [];
   const treeResult = checkRepo({ repoRoot, root, manifest: runtimeManifest, files: tracked, tree });
-  findings.push(
+  const findings = [
     ...treeResult.findings.filter((f) => f.level === 'error'),
     ...slotAllowsFindings(ctx),
     ...externalOwnerFindings(ctx),
@@ -149,7 +148,7 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
     ...releaseNotesRepoFindings(ctx),
     ...hookShapeFindings(ctx),
     ...rightsPolicyFindings(ctx),
-  );
+  ];
   let driftList = drift;
   if (drift === undefined && path.resolve(repoRoot) === path.resolve(skillRoot)) {
     // The copies are git-ignored: a checkout without them is the normal state, so the check regenerates them first and a
