@@ -10,7 +10,7 @@ import { managedFindings } from '../../packages/hfs/sync/managed.mjs';
 import { APP, PRESETS } from '../helpers/hfs-cli-fixture.mjs';
 
 function synced(context, edition) {
-  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'coverage-scope-evidence-'));
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-coverage-scope-evidence-'));
   context.after(() => fs.rmSync(repoRoot, { recursive: true, force: true }));
   const declaration = { ...structuredClone(APP), edition };
   fs.writeFileSync(path.join(repoRoot, 'hfs.json'), JSON.stringify(declaration));

@@ -20,7 +20,7 @@ const actionInput = (edition, files) => ({
 });
 
 function manifestInput(t, edition, dependencies) {
-  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'frontend-stack-coverage-'));
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-frontend-stack-coverage-'));
   t.after(() => fs.rmSync(repoRoot, { recursive: true, force: true }));
   fs.mkdirSync(path.join(repoRoot, 'apps/web'), { recursive: true });
   fs.writeFileSync(path.join(repoRoot, 'apps/web/package.json'), JSON.stringify(dependencies));

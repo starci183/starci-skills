@@ -57,10 +57,11 @@ test('a new lite-forbidden slot produces HFS_FORBIDDEN_PRESENT without an editio
 
 test('a copied rules catalog marked full-only drives the central findings filter in lite and full', (t) => {
   const original = fs.readFileSync(path.join(root, 'knowledge/hfs/rules.yaml'), 'utf8');
-  const text = original.replace(
-    /(  - id: R01\r?\n    code: "HFS_SLOT_UNDECLARED"\r?\n)/,
-    '$1    editions: [full]\n',
-  );
+  // R01 may already declare editions (its coverage metadata): mark it full-only by replacing that line, else by adding one.
+  const declared = /(  - id: R01\r?\n    code: "HFS_SLOT_UNDECLARED"\r?\n(?:(?!  - id: ).*\r?\n)*?)    editions: \[[^\]]*\]/;
+  const text = declared.test(original)
+    ? original.replace(declared, '$1    editions: [full]')
+    : original.replace(/(  - id: R01\r?\n    code: "HFS_SLOT_UNDECLARED"\r?\n)/, '$1    editions: [full]\n');
   assert.notEqual(text, original, 'the copied catalog marked R01 full-only');
   const manifest = loadSlotManifest();
   const catalog = loadRuleCatalog({ text, manifest });
