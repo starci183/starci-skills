@@ -393,3 +393,17 @@ export const a = rows(text); export const b = rows(useTranslations("admin"));`,
     assert.deepEqual(namesOf(fixture(t, contents), edition), ['other.dead', 'other.memberDisabled']);
   });
 }
+
+for (const edition of ['lite', 'full']) {
+  test(`HFS_UNUSED_SYMBOL ${edition}: an imported key table indexed by a dynamic key reads every value it holds in the translator's namespace`, t => {
+    const contents = {
+      'apps/web/src/modules/i18n/messages/en.json': JSON.stringify({ roles: { roleOwner: 'Owner', roleAdmin: 'Admin', retired: 'Retired' }, other: { roleOwner: 'Other' } }),
+      'apps/web/src/features/labels.ts': 'export const ROLE_LABELS = { owner: "roleOwner", admin: "roleAdmin" } as const;',
+      'apps/web/src/features/role.tsx': `import { ROLE_LABELS } from './labels';
+const t = useTranslations("roles"); export const label = (role: string) => t(ROLE_LABELS[role]);`,
+    };
+    assert.deepEqual(namesOf(fixture(t, contents), edition), ['other.roleOwner', 'roles.retired']);
+    contents['apps/web/src/features/role.tsx'] += ' export const loose = (text: (k: string) => string) => text("retired");';
+    assert.deepEqual(namesOf(fixture(t, contents), edition), ['other.roleOwner']);
+  });
+}

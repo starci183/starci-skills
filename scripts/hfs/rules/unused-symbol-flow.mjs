@@ -19,6 +19,18 @@ function propertyValues(state, owner, name) {
   return attributes.map(entry => ts.isJsxExpression(entry.initializer) ? entry.initializer.expression : entry.initializer).filter(Boolean);
 }
 
+/** `TABLE[key]`: the entry of a literal key, else every value of the table (any of them can be read). */
+function tableValues(state, node, seen) {
+  const { ts } = state;
+  const literal = ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
+  return valuesOf(state, node.expression, seen).flatMap(owner => {
+    if (ts.isArrayLiteralExpression(owner)) return [...owner.elements];
+    if (!ts.isObjectLiteralExpression(owner)) return [];
+    if (literal !== null) return propertyValues(state, owner, literal);
+    return owner.properties.filter(entry => ts.isPropertyAssignment(entry)).map(entry => entry.initializer);
+  });
+}
+
 const resolveAll = (state, nodes, seen) => nodes.flatMap(node => valuesOf(state, node, seen));
 
 function elementsOf(state, expression, seen) {
@@ -68,6 +80,7 @@ export function valuesOf(state, expression, visited = new Set()) {
   const seen = new Set([...visited, node]);
   if (ts.isConditionalExpression(node)) return [...valuesOf(state, node.whenTrue, seen), ...valuesOf(state, node.whenFalse, seen)];
   if (ts.isPropertyAccessExpression(node)) return resolveAll(state, valuesOf(state, node.expression, seen).flatMap(owner => propertyValues(state, owner, node.name.text)), seen);
+  if (ts.isElementAccessExpression(node)) return resolveAll(state, tableValues(state, node, seen), seen);
   if (!ts.isIdentifier(node)) return [node];
   const symbol = symbolAt(state, node);
   if (!symbol?.valueDeclaration || state.translators.has(symbol)) return [node];
