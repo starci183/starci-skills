@@ -74,6 +74,15 @@ const withNpxFallback = (run, platform) => (file, args, options = {}) => {
 /** The first meaningful line of a failure output, for the error a human acts on. */
 const firstLine = (text) => String(text ?? '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean)[0];
 
+const START_TAIL_LINES = 12;
+const START_LINE_CHARS = 300;
+/** The last lines (bounded) of a failed `supabase start`: its cause (42501 permission denied to alter role) sits after the first progress lines, so the first line alone hid it. */
+const startDetail = (started) => {
+  const text = [started?.stderr, started?.stdout, started?.error?.message ?? started?.error].map((part) => String(part ?? '')).find((part) => part.trim()) ?? '';
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => (line.length > START_LINE_CHARS ? `${line.slice(0, START_LINE_CHARS)}...` : line));
+  return lines.length ? lines.slice(-START_TAIL_LINES).join(' | ') : 'no output';
+};
+
 /**
  * The schemas `supabase/config.toml` exposes under [api] (`[]` when the file or the list is absent - the CLI then reads its
  * own defaults). A config that does not parse is a refusal: L08 reads the same file and the emit must not guess.
@@ -127,7 +136,7 @@ export function generateDbTypes({ root, run = spawn, platform = process.platform
   const started = execute(SUPABASE_CLI, ['start', '-x', 'studio,mailpit,logflare,vector,edge-runtime,imgproxy,supavisor'], { cwd: root });
   const already = /already (?:running|started)/i.test(`${started?.stderr ?? ''}${started?.stdout ?? ''}`);
   if (started?.error || (started?.status !== 0 && !already)) {
-    throw new DbTypesError(`\`${SUPABASE_CLI} start\` failed${started?.status != null ? ` (exit ${started.status})` : ''}: ${firstLine(started?.stderr) ?? firstLine(started?.error?.message ?? started?.error) ?? 'no output'}; Docker must be running`, { file: dbTypesPath });
+    throw new DbTypesError(`\`${SUPABASE_CLI} start\` failed${started?.status != null ? ` (exit ${started.status})` : ''}: ${startDetail(started)} (the last ${START_TAIL_LINES} output lines at most; with no cause among them, Docker must be running)`, { file: dbTypesPath });
   }
   try {
     return emitDbTypesWithRunner({ root, run: execute });

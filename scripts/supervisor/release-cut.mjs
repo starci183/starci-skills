@@ -40,6 +40,7 @@ import { withHostLock as holdHostLock } from '../machine/host-lock.mjs';
 import { writeL4Record } from '../guards/release-record.mjs';
 import { suiteModeOf } from '../guards/release-suite-mode.mjs';
 import { writeCiRecord } from './release-ci-status.mjs';
+import { advanceLocalMain } from '../machine/local-main.mjs';
 
 /** A release tag: `v` and a version. Anything else is never pushed by the release flow. */
 const RELEASE_TAG = /^v\d[\w.+-]*$/;
@@ -161,7 +162,10 @@ function pushedResult({ out, repo, head, tag, branch, remote, mode, deps }) {
   (deps.writeCi ?? writeCiRecord)({ repo, head, tag, suite: mode, state: 'pending' });
   const watch = `starci release ci-status --tag ${tag} --wait`;
   const judged = mode === 'ci' ? `; the full suite now runs only on GitHub (suite: ci) - watch it: ${watch}` : `; CI runs next - ${watch}`;
-  return { ...out, ok: true, verdict: 'pushed', why: `${branch} and ${tag} pushed to ${remote} in one atomic push${judged}`, pushed: true, ciWatch: watch };
+  // The pushed commit is on origin/main now: a local main left behind (a shared repository, another checkout) is fast-forwarded to it when that is safe.
+  const mainAdvance = (deps.advanceMain ?? advanceLocalMain)({ root: repo, to: head, branch, remote });
+  const moved = mainAdvance.moved ? '; ' + mainAdvance.why : '';
+  return { ...out, ok: true, verdict: 'pushed', why: `${branch} and ${tag} pushed to ${remote} in one atomic push${judged}${moved}`, pushed: true, ciWatch: watch, mainAdvance };
 }
 
 /**

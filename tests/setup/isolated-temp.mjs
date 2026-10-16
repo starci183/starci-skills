@@ -24,6 +24,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { GUARDS_ROOT_ENV } from '../../scripts/guards/guards-root.mjs';
+import './repo-root-guard.mjs';
 
 export const TEST_TEMP_ENV = 'STARCI_TEST_TEMP_DIR';
 const INFRA = name => name === 'node-compile-cache' || name.startsWith('starci-test-registry-') || name.startsWith('starci-test-guards-');

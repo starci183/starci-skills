@@ -20,6 +20,7 @@ import { npmRegistry } from './release-registry.mjs';
 import { proveRuntimePackage } from './runtime-package-clean.mjs';
 import { releaseNotesFindings } from '../hfs/runtime-rules/release-notes.mjs';
 import fs from 'node:fs';
+import { advanceLocalMain } from '../machine/local-main.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const USAGE = 'usage: starci release publish [--runtime-package] [--publish --npm-user <name> [--poll-minutes <n>] [--pre-land-ref <sha>]]';
@@ -188,6 +189,12 @@ const finishPublish = ({ runtimePackage, node, root, out }, plan) => {
   return EXIT.done;
 };
 
+/** Published: a local main left behind the released commit is fast-forwarded when that is safe (a spec that injects a git seam has no real repository to move). */
+const advanceMainAfter = ({ root, head, deps, out }) => {
+  const advanced = (deps.advanceMain ?? (deps.git ? () => null : advanceLocalMain))({ root, to: head });
+  if (advanced?.moved) out(`release-publish: ${advanced.why}`);
+};
+
 /**
  * Run the plan or publish it. deps (seams of a spec): registry, node (process runner), ci (npm ci), git ({status, branch, head}),
  * sleep, out (a line writer), plan (receives the machine-readable plan summary). Returns the exit code; every line goes through `out`.
@@ -211,6 +218,7 @@ export function releasePublish({ root = runtimeRoot, publish = false, runtimePac
   const ctx = { root, runtimePackage, publicationTag, pollMinutes, env, head, deps, out, registry, node, install, sleep, git };
   const publishCode = publishPlannedRows(plan.toPublish, ctx);
   if (publishCode !== null) return publishCode;
+  advanceMainAfter({ root, head, deps, out });
   return finishPublish({ runtimePackage, node, root, out }, plan);
 }
 

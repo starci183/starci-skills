@@ -204,6 +204,23 @@ test('generateDbTypes: starts the app stack, emits, stops what it started; a sta
   assert.deepEqual(stops, ['start', 'gen', 'stop'], 'the stack is stopped even when the types failed');
 });
 
+test('generateDbTypes: a failed start reports the real cause from the tail of the output, bounded, not only the first progress line', () => {
+  const dir = appRoot({ 'supabase/config.toml': CONFIG }, 'supabase');
+  const progress = Array.from({ length: 40 }, (_, index) => `Pulling image ${index}`);
+  const stderr = [...progress, 'ERROR: permission denied to alter role (SQLSTATE 42501)', `${'x'.repeat(500)}`].join('\n');
+  let message = '';
+  try { generateDbTypes({ root: dir, run: () => ({ status: 1, stdout: '', stderr }) }); } catch (error) { message = String(error.message); }
+  assert.match(message, /42501/);
+  assert.doesNotMatch(message, /Pulling image 0\b/, 'only the last lines are kept');
+  assert.equal(message.split(' | ').length, 12);
+  assert.ok(!message.includes('x'.repeat(301)), 'a long line is clipped');
+  assert.match(message, /\(exit 1\)/);
+  const spawnFailure = Object.assign(new Error('spawn supabase ENOENT'), { code: 'ENOENT' });
+  assert.throws(() => generateDbTypes({ root: dir, run: () => ({ status: null, stdout: '', stderr: '', error: spawnFailure }) }), /ENOENT/);
+  assert.throws(() => generateDbTypes({ root: dir, run: () => ({ status: 1, stdout: 'out line only', stderr: '' }) }), /out line only/);
+  assert.throws(() => generateDbTypes({ root: dir, run: () => ({ status: 1, stdout: '', stderr: '' }) }), /no output.*Docker must be running/);
+});
+
 test('generateDbTypes falls back from a missing supabase binary to the canon-pinned npx command through the injected runner', () => {
   const dir = appRoot({ 'supabase/config.toml': CONFIG }, 'supabase');
   for (const platform of ['linux', 'win32']) {
