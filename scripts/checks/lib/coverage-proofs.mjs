@@ -5,6 +5,7 @@ import { astChildren, expressionReach, nodeName, resolvedExpression, sourceIndex
 import { lintEnforcersForCode, registeredLintRules } from './coverage-routing.mjs';
 import { bindPattern, evaluate, invocation, localScope, scopedWalk, UNKNOWN } from './coverage-evaluation.mjs';
 import { resultReach, returnedExpressions } from './coverage-results.mjs';
+import { collectorExpressions } from './coverage-collectors.mjs';
 
 const NEGATIVE = /\b(?:invalid|violat\w*|refus\w*|reject\w*|deni\w*|fail\w*|negative|forbid\w*|missing)\b/i;
 const POSITIVE = /\b(?:valid|pass\w*|accept\w*|conform\w*|positive|clean)\b/i;
@@ -119,7 +120,9 @@ function returnedCode(context, index, node, code, seen = new Set()) {
 function functionReturnsCode(context, target, code, seen = new Set()) {
   const local = expressionReach(context, target.index, target.node).get(target.index.file) ?? [];
   if (local.some((node) => codeLiteral(node, code))) return true;
-  return returnedExpressions(context, target).some((entry) => returnedCode(context, entry.index, entry.node, code, seen));
+  const returns = returnedExpressions(context, target);
+  return [...returns, ...collectorExpressions(context, target, returns)]
+    .some((entry) => returnedCode(context, entry.index, entry.node, code, seen));
 }
 
 function delegatedTargets(context, file, reached, code) {
