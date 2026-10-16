@@ -21,6 +21,7 @@ import { propertyText } from '../../lib/ts-ast.mjs';
 import { folded, readEventClasses, snapshotText } from '../../lib/event-contract.mjs';
 import { found, readText } from './read.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
+import { eventTableFindings, eventTableServices } from './event-tables.mjs';
 
 const SERVICE_PLACEMENT = 'HFS_SERVICE_PLACEMENT';
 const IMAGE_UNPINNED = 'HFS_IMAGE_UNPINNED';
@@ -165,11 +166,9 @@ function undeclaredCompensationFindings(classes, declared) {
     .map((event) => found(EVENT_CONTRACT, event.file, `${event.file}: event "${event.name}" compensates "${event.compensates}", which no event class declares; name the event whose step it undoes.`, { service: event.service, event: event.name }));
 }
 
-/** Findings of R166: each service's event classes are the one source of its vendored `events.json`, and a compensating event names a declared event. */
+/** Findings of R166: event classes and literal tables match their snapshots, consumers agree, and compensation targets exist. */
 function eventContractFindings({ repoRoot, files }) {
-  const classFiles = files.filter((file) => EVENT_CLASS_FILE.test(file));
   const snapshots = files.filter((file) => SNAPSHOT.test(file));
-  if (classFiles.length === 0 && snapshots.length === 0) return [];
   const ts = typescriptFor(repoRoot);
   if (ts === null) return [];
   const tracked = new Set(files);
@@ -177,7 +176,8 @@ function eventContractFindings({ repoRoot, files }) {
   const findings = problems.map(({ service, file, problem }) => found(EVENT_CONTRACT, file, `${file} is not an event class the contract can be emitted from: ${problem}.`, { service }));
   const services = [...new Set(classes.map((event) => event.service))].sort(byCodeUnit);
   const declared = new Set(classes.map((event) => event.name));
-  findings.push(...snapshotDriftFindings(repoRoot, tracked, services, classes), ...leftBehindSnapshotFindings(snapshots, services, problems), ...undeclaredCompensationFindings(classes, declared));
+  const providers = [...services, ...eventTableServices(files)];
+  findings.push(...snapshotDriftFindings(repoRoot, tracked, services, classes), ...leftBehindSnapshotFindings(snapshots, providers, problems), ...undeclaredCompensationFindings(classes, declared), ...eventTableFindings({ ts, repoRoot, files }));
   return findings;
 }
 
