@@ -11,7 +11,7 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: 0ba9836a979de65d346873ab3b139b3d1032be229ba176dbdbb95c4533781bf1
+        value: 414e33f2b6ad4e51020d3cbd8a0fcb7651bef41cca7b380949ef76ab438429c0
         files: 256
     sourceRuleRoots:
       - knowledge/patterns/be
@@ -244,11 +244,11 @@ profiles:
         sourceRuleIds: [BE-IMPORTS-6, BE-ERROR-5]
         applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.d.ts', '**/*.spec.ts'] }
         mechanical:
-          requirement: Bodies and arguments are typed and no GraphQLJSON tunnel exists; an open door carries a reason; only platform config reads the environment; no secret or URL default in source; secrets compare with timingSafeEqual.
+          requirement: Bodies and arguments are typed and no GraphQLJSON tunnel exists; an open door carries a reason; no guard injects another guard; only platform config reads the environment; no secret or URL default in source; secrets compare with timingSafeEqual.
           check:
             kind: eslint
             sourceOnly: true
-            ruleIds: [starci-be/no-untyped-body, starci-be/public-needs-reason, starci-be/auth-door-strict-rate-tier, starci-be/no-direct-env-read, starci-be/config-parsed-in-main, starci-be/no-secret-default, starci-be/secret-compare-timing-safe]
+            ruleIds: [starci-be/no-untyped-body, starci-be/public-needs-reason, starci-be/no-guard-injects-guard, starci-be/auth-door-strict-rate-tier, starci-be/no-direct-env-read, starci-be/config-parsed-in-main, starci-be/no-secret-default, starci-be/secret-compare-timing-safe]
             expected: { severity: error }
         semantic:
           guidance: knowledge/patterns/be/error.yaml
@@ -716,7 +716,7 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: 2c66a602aa74abf4a7906016d11c9aae1918259c72002c4a96bb5b9c13892341
+        value: 00c37db67f4c5cc11eeae30da2320e0753c5a5d8e1895fb97828e994dd5bf678
         files: 247
     sourceRuleRoots:
       - knowledge/patterns/fe

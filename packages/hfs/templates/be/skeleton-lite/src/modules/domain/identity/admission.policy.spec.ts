@@ -51,6 +51,32 @@ describe("admit", () => {
         expect(subject(undefined, principal)).toSucceedWith(principal)
     })
 
+    it("admits a credential door whose principal has the required kind", () => {
+        const credentialPrincipal = { kind: "api-key", subject: "key-1", workspaceId: "ws-1" } as const
+        const credential = { required: { kind: "api-key" }, principal: credentialPrincipal } as const
+
+        expect(subject(undefined, undefined, credential)).toSucceedWith(credentialPrincipal)
+        expect(subject(undefined, principal, credential)).toSucceedWith(credentialPrincipal)
+        expect(subject({ reason: PublicReason.Health }, principal, credential)).toSucceedWith(credentialPrincipal)
+    })
+
+    it("refuses a credential door without a credential principal, even with a session or public metadata", () => {
+        const credential = { required: { kind: "api-key" }, principal: undefined } as const
+
+        expect(subject(undefined, undefined, credential)).toBeRefused(IdentityErrorCode.Unauthenticated)
+        expect(subject(undefined, principal, credential)).toBeRefused(IdentityErrorCode.Unauthenticated)
+        expect(subject({ reason: PublicReason.Health }, principal, credential)).toBeRefused(IdentityErrorCode.Unauthenticated)
+    })
+
+    it("refuses a credential principal of another kind, even with a session or public metadata", () => {
+        const credentialPrincipal = { kind: "tool-token", subject: "tool-1", workspaceId: "ws-1" } as const
+        const credential = { required: { kind: "api-key" }, principal: credentialPrincipal } as const
+
+        expect(subject(undefined, undefined, credential)).toBeRefused(IdentityErrorCode.Unauthenticated)
+        expect(subject(undefined, principal, credential)).toBeRefused(IdentityErrorCode.Unauthenticated)
+        expect(subject({ reason: PublicReason.Health }, principal, credential)).toBeRefused(IdentityErrorCode.Unauthenticated)
+    })
+
     it("refuses a door that is not public when no principal was verified", () => {
         expect(subject(undefined, undefined)).toBeRefused(IdentityErrorCode.Unauthenticated)
     })

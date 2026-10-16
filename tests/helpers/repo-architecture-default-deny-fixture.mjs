@@ -20,7 +20,8 @@ const SHARED_FILES = {
   'src/modules/platform/http-security/csrf-origin.guard.ts': 'export class CsrfOriginGuard { canActivate(context: { headers: { origin?: string } }): boolean { return context.headers.origin !== undefined; } }\n',
   'src/modules/platform/http-security/app-throttler.guard.ts': "import { ThrottlerGuard } from '@nestjs/throttler';\nexport class AppThrottlerGuard extends ThrottlerGuard {}\n",
   'src/modules/platform/http-security/tier.guard.ts': TIER_GUARDS,
-  'src/modules/domain/identity/index.ts': "export { AuthGuard } from './auth.guard';\nexport { Lookalike } from './lookalike';\n",
+  'src/modules/domain/identity/index.ts': "export { AuthGuard } from './auth.guard';\nexport { CredentialGuard } from './credential.guard';\nexport { Lookalike } from './lookalike';\n",
+  'src/modules/domain/identity/credential.guard.ts': 'export class CredentialGuard { canActivate(): boolean { return true; } }\n',
   'src/modules/domain/identity/auth.guard.ts': 'export class AuthGuard { canActivate(): boolean { return true; } }\n',
   'src/modules/domain/identity/lookalike.ts': 'export class Lookalike { canActivate(): boolean { return true; } }\n',
 };
@@ -29,7 +30,7 @@ const appModule = guards => `import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { AppThrottlerGuard, CsrfOriginGuard, PlainGuard, StrayTierGuard, TierGuard } from '../../../src/modules/platform/http-security';
-import { AuthGuard, Lookalike } from '../../../src/modules/domain/identity';
+import { AuthGuard, CredentialGuard, Lookalike } from '../../../src/modules/domain/identity';
 @Module({ providers: [${guards.map(name => `{ provide: APP_GUARD, useClass: ${name} }`).join(', ')}] })
 export class AppModule {}
 `;
@@ -37,7 +38,7 @@ export class AppModule {}
 const helper = guards => `import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { CsrfOriginGuard } from '../../../src/modules/platform/http-security';
-import { AuthGuard } from '../../../src/modules/domain/identity';
+import { AuthGuard, CredentialGuard } from '../../../src/modules/domain/identity';
 export const guardChain = () => [${guards.map(name => `{ provide: APP_GUARD, useClass: ${name} }`).join(', ')}];
 export const GUARD_PROVIDERS = [${guards.map(name => `{ provide: APP_GUARD, useClass: ${name} }`).join(', ')}];
 `;
@@ -49,27 +50,32 @@ export class AppModule {}
 `;
 
 const scenarios = [
-  ['good-package', ['ThrottlerGuard', 'CsrfOriginGuard', 'AuthGuard']],
-  ['good-subclass', ['AppThrottlerGuard', 'CsrfOriginGuard', 'AuthGuard']],
-  ['good-tier', ['TierGuard', 'CsrfOriginGuard', 'AuthGuard']],
-  ['good-extra', ['ThrottlerGuard', 'Lookalike', 'CsrfOriginGuard', 'AuthGuard']],
-  ['missing-throttler', ['CsrfOriginGuard', 'AuthGuard']],
-  ['missing-csrf', ['ThrottlerGuard', 'AuthGuard']],
-  ['missing-auth', ['ThrottlerGuard', 'CsrfOriginGuard']],
+  ['good-package', ['ThrottlerGuard', 'CsrfOriginGuard', 'CredentialGuard', 'AuthGuard']],
+  ['good-subclass', ['AppThrottlerGuard', 'CsrfOriginGuard', 'CredentialGuard', 'AuthGuard']],
+  ['good-tier', ['TierGuard', 'CsrfOriginGuard', 'CredentialGuard', 'AuthGuard']],
+  ['good-extra', ['ThrottlerGuard', 'Lookalike', 'CsrfOriginGuard', 'CredentialGuard', 'AuthGuard']],
+  ['missing-throttler', ['CsrfOriginGuard', 'CredentialGuard', 'AuthGuard']],
+  ['missing-csrf', ['ThrottlerGuard', 'CredentialGuard', 'AuthGuard']],
+  ['missing-auth', ['ThrottlerGuard', 'CsrfOriginGuard', 'CredentialGuard']],
   ['missing-all', []],
-  ['auth-lookalike', ['ThrottlerGuard', 'CsrfOriginGuard', 'Lookalike']],
-  ['reordered-auth-first', ['AuthGuard', 'ThrottlerGuard', 'CsrfOriginGuard']],
-  ['reordered-auth-middle', ['ThrottlerGuard', 'AuthGuard', 'CsrfOriginGuard']],
-  ['repeated-auth', ['ThrottlerGuard', 'CsrfOriginGuard', 'AuthGuard', 'AuthGuard']],
-  ['swapped-http-security', ['CsrfOriginGuard', 'TierGuard', 'AuthGuard']],
-  ['not-throttler-plain', ['PlainGuard', 'CsrfOriginGuard', 'AuthGuard']],
-  ['not-throttler-stray', ['StrayTierGuard', 'CsrfOriginGuard', 'AuthGuard']],
-  ['helper-call-good', ['ThrottlerGuard', 'CsrfOriginGuard', 'AuthGuard'], '...guardChain()'],
-  ['helper-call-missing', ['ThrottlerGuard', 'CsrfOriginGuard'], '...guardChain()'],
-  ['helper-call-reordered', ['AuthGuard', 'ThrottlerGuard', 'CsrfOriginGuard'], '...guardChain()'],
-  ['helper-spread-good', ['ThrottlerGuard', 'CsrfOriginGuard', 'AuthGuard'], '...GUARD_PROVIDERS'],
-  ['helper-spread-missing', ['ThrottlerGuard', 'CsrfOriginGuard'], '...GUARD_PROVIDERS'],
-  ['helper-spread-reordered', ['AuthGuard', 'ThrottlerGuard', 'CsrfOriginGuard'], '...GUARD_PROVIDERS'],
+  ['auth-lookalike', ['ThrottlerGuard', 'CsrfOriginGuard', 'CredentialGuard', 'Lookalike']],
+  ['reordered-auth-first', ['AuthGuard', 'ThrottlerGuard', 'CsrfOriginGuard', 'CredentialGuard']],
+  ['reordered-auth-middle', ['ThrottlerGuard', 'CredentialGuard', 'AuthGuard', 'CsrfOriginGuard']],
+  ['repeated-auth', ['ThrottlerGuard', 'CsrfOriginGuard', 'CredentialGuard', 'AuthGuard', 'AuthGuard']],
+  ['swapped-http-security', ['CsrfOriginGuard', 'TierGuard', 'CredentialGuard', 'AuthGuard']],
+  ['not-throttler-plain', ['PlainGuard', 'CsrfOriginGuard', 'CredentialGuard', 'AuthGuard']],
+  ['not-throttler-stray', ['StrayTierGuard', 'CsrfOriginGuard', 'CredentialGuard', 'AuthGuard']],
+  ['helper-call-good', ['ThrottlerGuard', 'CsrfOriginGuard', 'CredentialGuard', 'AuthGuard'], '...guardChain()'],
+  ['helper-call-missing', ['ThrottlerGuard', 'CsrfOriginGuard', 'CredentialGuard'], '...guardChain()'],
+  ['helper-call-reordered', ['AuthGuard', 'ThrottlerGuard', 'CsrfOriginGuard', 'CredentialGuard'], '...guardChain()'],
+  ['helper-spread-good', ['ThrottlerGuard', 'CsrfOriginGuard', 'CredentialGuard', 'AuthGuard'], '...GUARD_PROVIDERS'],
+  ['helper-spread-missing', ['ThrottlerGuard', 'CsrfOriginGuard', 'CredentialGuard'], '...GUARD_PROVIDERS'],
+  ['helper-spread-reordered', ['AuthGuard', 'ThrottlerGuard', 'CsrfOriginGuard', 'CredentialGuard'], '...GUARD_PROVIDERS'],
+  ['missing-credential', ['ThrottlerGuard', 'CsrfOriginGuard', 'AuthGuard']],
+  ['credential-after-auth', ['ThrottlerGuard', 'CsrfOriginGuard', 'AuthGuard', 'CredentialGuard']],
+  ['credential-before-csrf', ['ThrottlerGuard', 'CredentialGuard', 'CsrfOriginGuard', 'AuthGuard']],
+  ['repeated-credential', ['ThrottlerGuard', 'CsrfOriginGuard', 'CredentialGuard', 'CredentialGuard', 'AuthGuard']],
+  ['credential-lookalike', ['ThrottlerGuard', 'CsrfOriginGuard', 'Lookalike', 'AuthGuard']],
 ];
 
 export const scenarioCount = scenarios.length;

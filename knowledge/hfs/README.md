@@ -451,9 +451,9 @@ throws a platform error. Display text is resolved by code through the message ca
 
 ### 5.5 Default deny (R41, R42)
 
-`domain/identity` exports `AuthGuard`, `@Public({ reason: PublicReason.X })`, `@Roles()` and `@CurrentPrincipal()`. Every api
-app registers `APP_GUARD` throttler, then the CSRF origin guard, then `AuthGuard`, and that chain is the only authentication
-and authorization: no `@UseGuards`. A public operation carries `@Public({ reason: PublicReason.X })` with a member of the
+`domain/identity` exports `AuthGuard`, `CredentialGuard`, `@Public({ reason: PublicReason.X })`, `@Credential({ kind })`, the `CREDENTIAL_AUTHENTICATOR` port, `@Roles()` and `@CurrentPrincipal()`. Every api
+app registers four global `APP_GUARD`s in this order: `RateLimitGuard`, `OriginGuard`, `CredentialGuard`, `AuthGuard`. That chain is the only authentication
+and authorization: no `@UseGuards`, and no guard injected into another guard. `CredentialGuard` acts only on a handler marked `@Credential({ kind })` (`api-key`, `run-token`, `tool-token`, `link-token`, `posting`) and sets the request's credential principal through the port; `AuthGuard` stays default-deny. A public operation carries `@Public({ reason: PublicReason.X })` with a member of the
 closed `PublicReason` enum of `domain/identity` (`Health`, `AuthHandshake`, `SignedWebhook`, `CatalogRead`); a string or
 another enum is refused. Webhooks use the shared signature verifier or a domain verifier with per-connection secrets and
 compare secrets with `timingSafeEqual`. No

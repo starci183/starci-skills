@@ -1,7 +1,7 @@
 import { NestFactory } from "@nestjs/core"
 import { SystemClockService } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
-import { applyHttpSecurity, RequestValidationService } from "@modules/platform/http-security"
+import { applyHttpSecurity } from "@modules/platform/http-security"
 import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
 import { readApiEnv } from "./api.env"
 import { AppModule } from "./app.module"
@@ -13,7 +13,6 @@ const bootstrap = async (): Promise<void> => {
     const app = await NestFactory.create(AppModule.register(options), { rawBody: true })
     applyHttpSecurity(app, options.httpSecurity, { trustProxy: 1 })
     app.enableShutdownHooks()
-    app.useGlobalPipes(app.get(RequestValidationService))
     await app.listen(options.server.port)
     createJsonLogger(new SystemClockService()).info(LoggingLogEvent.ServerStarted, {
         service: "api",

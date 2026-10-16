@@ -263,7 +263,7 @@ These backend rules apply to both lite and full.
 <a id="r41"></a>
 ### Default deny
 
-`BE_DEFAULT_DENY` requires the app's default-deny `APP_GUARD`, explicit reasons for public doors, typed request bodies and timing-safe credential comparisons. Authentication belongs to the app guard chain rather than route-level `UseGuards` declarations.
+`BE_DEFAULT_DENY` requires the app's default-deny `APP_GUARD`, explicit reasons for public doors, typed request bodies and timing-safe credential comparisons. Authentication belongs to the four global `APP_GUARD`s of the api root, in the order `RateLimitGuard`, `OriginGuard`, `CredentialGuard`, `AuthGuard` (a door marked `@Credential({ kind })` is authenticated by `CredentialGuard` through the identity `CREDENTIAL_AUTHENTICATOR` port), rather than route-level `UseGuards` declarations; a guard never injects another guard (`no-guard-injects-guard`).
 
 <a id="r42"></a>
 ### Bounded input

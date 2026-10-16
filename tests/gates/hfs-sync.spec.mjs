@@ -782,7 +782,7 @@ describe('starci app scaffold: the first tree', () => {
     assert.match(read(root, 'be/src/features/api/system-health/application/check-liveness.handler.ts'), /return this\.liveness\.check\(\)/);
     const module = read(root, 'be/apps/core/src/app.module.ts');
     assert.match(module, /static register\(options: CoreOptions\): DynamicModule/);
-    assert.match(module, /APP_FILTER, useClass: ErrorsFilter[\s\S]*APP_GUARD, useClass: RateLimitGuard[\s\S]*APP_GUARD, useClass: OriginGuard[\s\S]*APP_GUARD, useClass: AuthGuard/, 'throttler, then the CSRF origin guard, then AuthGuard');
+    assert.match(module, /APP_FILTER, useClass: ErrorsFilter[\s\S]*APP_GUARD, useClass: RateLimitGuard[\s\S]*APP_GUARD, useClass: OriginGuard[\s\S]*APP_GUARD, useClass: CredentialGuard[\s\S]*APP_GUARD, useClass: AuthGuard/, 'throttler, the CSRF origin guard, CredentialGuard, then AuthGuard');
     assert.match(read(root, 'be/apps/core/src/main.ts'), /EnvSource\.fromProcess\(\)/);
     // The core app composes in groups (R245): the root spreads compose/platform.ts, which opens the primary connection with the
     // note capability's arrays; the cli app migrates the same arrays.

@@ -2,22 +2,23 @@ import { machineKit } from './machine-ast.mjs';
 
 /**
  * R41 `default-deny-app-guard` (BE_DEFAULT_DENY). Every api app root provides its `APP_GUARD` entries in the order
- * throttler -> CSRF origin guard -> AuthGuard, each exactly once, so no request reaches a handler before it was
- * rate-limited, origin-checked and authenticated. A guard is classified by structure, never by name or folder alone
+ * throttler -> CSRF origin guard -> CredentialGuard -> AuthGuard, each exactly once, so no request reaches a handler before it was
+ * rate-limited, origin-checked, credential-authenticated and admitted. A guard is classified by structure, never by name or folder alone
  * (BE-CONVENTION 1.7 names the roles, not a library):
  *   - throttler: a class of @nestjs/throttler or one that extends it, or a guard that reads through a Reflector the
  *     per-door metadata (the `@RateLimit(tier)` decorator) that a SetMetadata call of its own capability writes;
  *   - CSRF origin guard: a guard declared in platform/http-security that reads the request origin or referer header;
+ *   - CredentialGuard: the `CredentialGuard` class declared in domain/identity;
  *   - AuthGuard: the `AuthGuard` class declared in domain/identity.
  * Other guards are permitted between them; a missing, repeated or reordered one of the three is a finding.
  */
 export const DEFAULT_DENY_RULE_IDS = ['BE_DEFAULT_DENY'];
 
 const RULE = 'BE_DEFAULT_DENY';
-const ORDER = ['throttler', 'csrf', 'auth'];
+const ORDER = ['throttler', 'csrf', 'credential', 'auth'];
 const ORIGIN_HEADERS = new Set(['origin', 'referer', 'referrer']);
 const METADATA_READERS = new Set(['get', 'getAll', 'getAllAndMerge', 'getAllAndOverride']);
-const LABEL = { throttler: 'the throttler guard', csrf: 'the CSRF origin guard of platform/http-security', auth: 'AuthGuard of domain/identity' };
+const LABEL = { throttler: 'the throttler guard', csrf: 'the CSRF origin guard of platform/http-security', credential: 'CredentialGuard of domain/identity', auth: 'AuthGuard of domain/identity' };
 
 const keySymbol = (kit, checker, node) => (node ? kit.aliased(checker, kit.symbolAt(checker, node)) ?? null : null);
 
@@ -98,6 +99,7 @@ const classifyDeclaration = (kit, graph, keyCache, declaration) => {
     if (readsDoorMetadata(kit, graph, keyCache, declaration, owner)) return 'throttler';
   }
   if (owner?.tier === 'domain' && owner.name === 'identity' && ts.isClassDeclaration(declaration) && declaration.name?.text === 'AuthGuard') return 'auth';
+  if (owner?.tier === 'domain' && owner.name === 'identity' && ts.isClassDeclaration(declaration) && declaration.name?.text === 'CredentialGuard') return 'credential';
   return null;
 };
 
@@ -117,7 +119,7 @@ const roleMessages = (app, roles, anchor) => {
   const out = [];
   for (const role of ORDER) {
     const entries = roles.filter(item => item.role === role);
-    if (entries.length === 0) out.push({ node: anchor, message: `App ${app.name} does not provide ${LABEL[role]} as an APP_GUARD; an api app is denied by default: throttler, then CSRF origin guard, then AuthGuard.` });
+    if (entries.length === 0) out.push({ node: anchor, message: `App ${app.name} does not provide ${LABEL[role]} as an APP_GUARD; an api app is denied by default: throttler, then CSRF origin guard, then CredentialGuard, then AuthGuard.` });
     else if (entries.length > 1) out.push({ node: entries[1].guard.node, message: `App ${app.name} provides ${LABEL[role]} more than once as an APP_GUARD.` });
   }
   return out;
@@ -128,7 +130,7 @@ const orderMessages = (app, roles) => {
   if (!indexes.every(index => index >= 0)) return [];
   const out = [];
   for (let i = 1; i < indexes.length; i += 1) {
-    if (indexes[i] < indexes[i - 1]) out.push({ node: roles[indexes[i]].guard.node, message: `App ${app.name} provides ${LABEL[ORDER[i]]} before ${LABEL[ORDER[i - 1]]}; the APP_GUARD order is throttler, CSRF origin guard, AuthGuard.` });
+    if (indexes[i] < indexes[i - 1]) out.push({ node: roles[indexes[i]].guard.node, message: `App ${app.name} provides ${LABEL[ORDER[i]]} before ${LABEL[ORDER[i - 1]]}; the APP_GUARD order is throttler, CSRF origin guard, CredentialGuard, AuthGuard.` });
   }
   return out;
 };

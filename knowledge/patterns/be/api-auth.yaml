@@ -31,25 +31,36 @@ rules:
     kind: mandatory
     hfsRules: [R41, R02, R290]
     requirement: |-
-      `domain/identity` exports `AuthGuard`, `@Public({ reason: PublicReason.X })`, `@Roles(...)` and `@CurrentPrincipal()`.
-      Every api app registers, in this order, the `APP_GUARD` throttler, the CSRF origin guard and `AuthGuard`. `PublicReason`
-      is an enum closed at `Health | AuthHandshake | SignedWebhook | CatalogRead`. API-key and tool-token routes use their
-      own authentication guard rather than adding a public reason. An
-      operation is open only when it carries `@Public({ reason })`; any other operation requires the authenticated principal.
-      `@UseGuards` is not used for authentication or authorization. A worker or cli app exposes no route.
+      `domain/identity` exports `AuthGuard`, `CredentialGuard`, `@Public({ reason: PublicReason.X })`, `@Credential({ kind })`,
+      the `CREDENTIAL_AUTHENTICATOR` port, `@Roles(...)` and `@CurrentPrincipal()`. Guards are only global `APP_GUARD`
+      bindings of the api root, registered exactly once each in this order: `RateLimitGuard`, `OriginGuard`,
+      `CredentialGuard`, `AuthGuard`. `CredentialGuard` acts only on a handler marked `@Credential({ kind })`, where kind is
+      closed at `api-key | run-token | tool-token | link-token | posting`; it authenticates through the identity-owned
+      `CREDENTIAL_AUTHENTICATOR` port (`authenticate(metadata, authorization, resourceId?)`, bound by the app) and sets
+      `request.credentialPrincipal`; on any other handler it passes through. `AuthGuard` stays default-deny: it passes a
+      credential-marked handler only when the credential principal is set, passes a handler with `@Public({ reason })`, and
+      otherwise requires a session principal; its constructor takes the reflector and the access-token verifier only. No
+      guard is injected into another guard (no `CanActivate`-typed constructor parameter) and no guard-dispatch layer
+      exists. `PublicReason` is an enum closed at `Health | AuthHandshake | SignedWebhook | CatalogRead`; API-key,
+      run-token, tool-token and link-token routes use `@Credential`, never a public reason. An operation is open only when
+      it carries `@Public({ reason })` or `@Credential({ kind })`. `@UseGuards` is not used for authentication or
+      authorization. A worker or cli app exposes no route.
     rationale: |-
       With allow-by-default a forgotten decorator publishes an operation unnoticed. With default deny it fails closed and the
       exception carries a reason a reviewer can read.
     cases:
       - id: case-1
         when: Registration
-        write: 'the api app''s be/apps/<app>/src/app.module.ts (slot be.app.api) provides { provide: APP_GUARD, useClass: RateLimitGuard }, { provide: APP_GUARD, useClass: OriginGuard } and { provide: APP_GUARD, useClass: AuthGuard } in that order.'
+        write: 'the api app''s be/apps/<app>/src/app.module.ts (slot be.app.api) provides { provide: APP_GUARD, useClass: RateLimitGuard }, { provide: APP_GUARD, useClass: OriginGuard }, { provide: APP_GUARD, useClass: CredentialGuard } and { provide: APP_GUARD, useClass: AuthGuard } in that order.'
       - id: case-2
         when: An open door
         write: '@Public({ reason: PublicReason.AuthHandshake }) on the signIn operation'
       - id: case-3
         when: A role-restricted operation
         write: '@Roles("admin") on the resolver method, checked by the same guard.'
+      - id: case-4
+        when: A tool-token door
+        write: '@Credential({ kind: "tool-token" }) on the handler; CredentialGuard authenticates it through CREDENTIAL_AUTHENTICATOR and AuthGuard admits it.'
     verification:
       automated:
         - BE_DEFAULT_DENY
@@ -69,6 +80,7 @@ rules:
         - HFS_README_BADGE_NOT_LIVE
         - BE_PUBLIC_REASON_CLOSED
       manual:
+        - Review each `@Credential` kind and confirm the authenticator verifies that credential for that door.
         - Review each `@Public` reason and confirm that the operation may be reached without a session.
     relatedExamples: []
   - id: BE-AUTH-2

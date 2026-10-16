@@ -806,6 +806,7 @@ rules:
       - {kind: eslint-be, id: public-needs-reason}
       - {kind: eslint-be, id: secret-compare-timing-safe}
       - {kind: eslint-be, id: no-auth-use-guards}
+      - {kind: eslint-be, id: no-guard-injects-guard}
       - {kind: eslint-be, id: default-deny-app-guard}
   - id: R42
     code: "BE_INPUT_BOUNDED"
