@@ -1,5 +1,5 @@
 /** The closed set of alternate credential families a door can accept. */
-export type CredentialKind = "api-key" | "run-token" | "tool-token" | "link-token" | "posting" | "posting"
+export type CredentialKind = "api-key" | "run-token" | "tool-token" | "link-token" | "posting"
 
 /** Alternate credentials accepted only by doors marked with `@Credential`. */
 export interface CredentialMetadata {

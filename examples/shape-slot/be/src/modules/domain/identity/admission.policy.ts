@@ -13,7 +13,10 @@ export interface CredentialAdmission {
     readonly principal: CredentialPrincipal | undefined
 }
 
-const admitCredential = ({ required, principal }: CredentialAdmission): Outcome<CredentialPrincipal, IdentityErrorCode> =>
+const admitCredential = ({
+    required,
+    principal,
+}: CredentialAdmission): Outcome<CredentialPrincipal, IdentityErrorCode> =>
     principal?.kind === required.kind ? ok(principal) : refused(IdentityErrorCode.Unauthenticated)
 
 /**

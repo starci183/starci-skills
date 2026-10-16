@@ -65,7 +65,9 @@ describe("admit", () => {
 
         expect(subject(undefined, undefined, credential)).toBeRefused(IdentityErrorCode.Unauthenticated)
         expect(subject(undefined, principal, credential)).toBeRefused(IdentityErrorCode.Unauthenticated)
-        expect(subject({ reason: PublicReason.Health }, principal, credential)).toBeRefused(IdentityErrorCode.Unauthenticated)
+        expect(subject({ reason: PublicReason.Health }, principal, credential)).toBeRefused(
+            IdentityErrorCode.Unauthenticated,
+        )
     })
 
     it("refuses a credential principal of another kind, even with a session or public metadata", () => {
@@ -74,7 +76,9 @@ describe("admit", () => {
 
         expect(subject(undefined, undefined, credential)).toBeRefused(IdentityErrorCode.Unauthenticated)
         expect(subject(undefined, principal, credential)).toBeRefused(IdentityErrorCode.Unauthenticated)
-        expect(subject({ reason: PublicReason.Health }, principal, credential)).toBeRefused(IdentityErrorCode.Unauthenticated)
+        expect(subject({ reason: PublicReason.Health }, principal, credential)).toBeRefused(
+            IdentityErrorCode.Unauthenticated,
+        )
     })
 
     it("refuses a door that is not public when no principal was verified", () => {

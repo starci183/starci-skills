@@ -56,7 +56,9 @@ const build = async (authorization?: string, door: DoorMetadata = {}) => {
 
 describe("AuthGuard", () => {
     it("opens a door carrying public metadata without authenticating", async () => {
-        const { guard, context, reflector, verify } = await build("Bearer access-token", { metadata: { reason: PublicReason.Health } })
+        const { guard, context, reflector, verify } = await build("Bearer access-token", {
+            metadata: { reason: PublicReason.Health },
+        })
 
         await expect(guard.canActivate(context)).resolves.toBe(true)
 

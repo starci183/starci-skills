@@ -18,7 +18,9 @@ interface Door {
 
 const build = async ({ credential, metadata }: Door) => {
     const reflector = mock<Reflector>()
-    reflector.getAllAndOverride.mockImplementation((key: unknown) => (key === CREDENTIAL_KEY ? credential : key === PUBLIC_KEY ? metadata : undefined))
+    reflector.getAllAndOverride.mockImplementation((key: unknown) =>
+        key === CREDENTIAL_KEY ? credential : key === PUBLIC_KEY ? metadata : undefined,
+    )
     const moduleRef = await Test.createTestingModule({
         providers: [AuthGuard, { provide: Reflector, useValue: reflector }],
     }).compile()
@@ -31,7 +33,7 @@ const contextOf = (principal?: CredentialPrincipal) => {
     context.getClass.mockReturnValue(class DoorClass {})
     context.getType.mockReturnValue("http")
     const host = mock<HttpArgumentsHost>()
-    host.getRequest.mockReturnValue(({ credentialPrincipal: principal }))
+    host.getRequest.mockReturnValue({ credentialPrincipal: principal })
     context.switchToHttp.mockReturnValue(host)
     return context
 }

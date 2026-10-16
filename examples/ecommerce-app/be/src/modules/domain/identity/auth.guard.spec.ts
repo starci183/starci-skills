@@ -53,14 +53,17 @@ const build = async (authorization?: string, metadata: DoorMetadata = {}) => {
 }
 
 describe("AuthGuard", () => {
-    it.each(Object.values(PublicReason))("opens a door with the public reason %s without authenticating", async (reason) => {
-        const { guard, context, reflector, verifier } = await build(undefined, { public: { reason } })
+    it.each(Object.values(PublicReason))(
+        "opens a door with the public reason %s without authenticating",
+        async (reason) => {
+            const { guard, context, reflector, verifier } = await build(undefined, { public: { reason } })
 
-        await expect(guard.canActivate(context)).resolves.toBe(true)
+            await expect(guard.canActivate(context)).resolves.toBe(true)
 
-        expect(reflector.getAllAndOverride).toHaveBeenCalledWith(PUBLIC_KEY, [handler, Door])
-        expect(verifier.verify).not.toHaveBeenCalled()
-    })
+            expect(reflector.getAllAndOverride).toHaveBeenCalledWith(PUBLIC_KEY, [handler, Door])
+            expect(verifier.verify).not.toHaveBeenCalled()
+        },
+    )
 
     it("requires authentication when public metadata has an unknown reason", async () => {
         const { guard, context, reflector, verifier } = await build()
@@ -117,7 +120,9 @@ describe("AuthGuard", () => {
     })
 
     it("refuses a door when the principal lacks one required role", async () => {
-        const { guard, context, verifier, request } = await build("Bearer session-token", { roles: ["member", "admin"] })
+        const { guard, context, verifier, request } = await build("Bearer session-token", {
+            roles: ["member", "admin"],
+        })
         verifier.verify.mockResolvedValue({ personId: "person-1" })
 
         await expect(guard.canActivate(context)).rejects.toMatchObject({ code: IdentityErrorCode.Forbidden })

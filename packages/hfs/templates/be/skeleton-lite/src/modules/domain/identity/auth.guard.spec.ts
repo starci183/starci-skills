@@ -21,7 +21,9 @@ const TOOL_TOKEN: CredentialPrincipal = { kind: "tool-token", subject: "tool-1",
 const build = async (metadata: PublicMetadata | undefined, credential?: CredentialMetadata) => {
     const verifier = mock<{ verify: VerifySupabaseAccessToken }>()
     const reflector = mock<Reflector>()
-    reflector.getAllAndOverride.mockImplementation((key: unknown) => (key === CREDENTIAL_KEY ? credential : key === PUBLIC_KEY ? metadata : undefined))
+    reflector.getAllAndOverride.mockImplementation((key: unknown) =>
+        key === CREDENTIAL_KEY ? credential : key === PUBLIC_KEY ? metadata : undefined,
+    )
     const moduleRef = await Test.createTestingModule({
         providers: [
             AuthGuard,
@@ -32,7 +34,11 @@ const build = async (metadata: PublicMetadata | undefined, credential?: Credenti
     return { guard: moduleRef.get(AuthGuard), verify: verifier.verify }
 }
 
-const contextOf = (authorization: string | undefined, credentialPrincipal?: CredentialPrincipal, sessionPrincipal?: Principal) => {
+const contextOf = (
+    authorization: string | undefined,
+    credentialPrincipal?: CredentialPrincipal,
+    sessionPrincipal?: Principal,
+) => {
     const request = mock<Request>()
     request.headers = authorization === undefined ? {} : { authorization }
     request.principal = sessionPrincipal
@@ -85,27 +91,33 @@ describe("AuthGuard", () => {
     it.each([
         { label: "missing", credentialPrincipal: undefined },
         { label: "of another kind", credentialPrincipal: TOOL_TOKEN },
-    ])("refuses a credential door when its credential principal is $label, even with a valid session", async ({ credentialPrincipal }) => {
-        const { guard, verify } = await build(undefined, { kind: "api-key" })
-        verify.mockResolvedValue(ok(principal))
-        const { context } = contextOf("Bearer signed-token", credentialPrincipal, principal)
+    ])(
+        "refuses a credential door when its credential principal is $label, even with a valid session",
+        async ({ credentialPrincipal }) => {
+            const { guard, verify } = await build(undefined, { kind: "api-key" })
+            verify.mockResolvedValue(ok(principal))
+            const { context } = contextOf("Bearer signed-token", credentialPrincipal, principal)
 
-        await expect(guard.canActivate(context)).rejects.toThrow(unauthenticated)
+            await expect(guard.canActivate(context)).rejects.toThrow(unauthenticated)
 
-        expect(verify).not.toHaveBeenCalled()
-    })
+            expect(verify).not.toHaveBeenCalled()
+        },
+    )
 
     it.each([
         { label: "missing", credentialPrincipal: undefined },
         { label: "of another kind", credentialPrincipal: TOOL_TOKEN },
-    ])("refuses a credential door with public metadata when its credential principal is $label", async ({ credentialPrincipal }) => {
-        const { guard, verify } = await build({ reason: PublicReason.Health }, { kind: "api-key" })
-        const { context } = contextOf("Bearer signed-token", credentialPrincipal, principal)
+    ])(
+        "refuses a credential door with public metadata when its credential principal is $label",
+        async ({ credentialPrincipal }) => {
+            const { guard, verify } = await build({ reason: PublicReason.Health }, { kind: "api-key" })
+            const { context } = contextOf("Bearer signed-token", credentialPrincipal, principal)
 
-        await expect(guard.canActivate(context)).rejects.toThrow(unauthenticated)
+            await expect(guard.canActivate(context)).rejects.toThrow(unauthenticated)
 
-        expect(verify).not.toHaveBeenCalled()
-    })
+            expect(verify).not.toHaveBeenCalled()
+        },
+    )
 
     it("refuses a door that is not public when the token fails verification", async () => {
         const { guard, verify } = await build(undefined)

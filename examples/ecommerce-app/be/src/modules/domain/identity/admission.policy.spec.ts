@@ -41,14 +41,18 @@ describe("admit", () => {
     it("refuses a credential door without a principal of the required kind", () => {
         const principal = { kind: "tool-token", subject: "tool-1", workspaceId: "ws-1" } as const
 
-        expect(subject(undefined, { required: { kind: "api-key" }, principal })).toBeRefused(IdentityErrorCode.Unauthenticated)
-        expect(subject(undefined, { required: { kind: "api-key" }, principal: undefined })).toBeRefused(IdentityErrorCode.Unauthenticated)
+        expect(subject(undefined, { required: { kind: "api-key" }, principal })).toBeRefused(
+            IdentityErrorCode.Unauthenticated,
+        )
+        expect(subject(undefined, { required: { kind: "api-key" }, principal: undefined })).toBeRefused(
+            IdentityErrorCode.Unauthenticated,
+        )
     })
 
     it("does not admit a public credential door without the required credential principal", () => {
-        expect(subject({ reason: PublicReason.Health }, { required: { kind: "api-key" }, principal: undefined })).toBeRefused(
-            IdentityErrorCode.Unauthenticated,
-        )
+        expect(
+            subject({ reason: PublicReason.Health }, { required: { kind: "api-key" }, principal: undefined }),
+        ).toBeRefused(IdentityErrorCode.Unauthenticated)
     })
 
     it("refuses a door that is not public", () => {

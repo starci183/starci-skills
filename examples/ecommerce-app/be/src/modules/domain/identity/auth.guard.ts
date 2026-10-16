@@ -31,7 +31,10 @@ export class AuthGuard implements CanActivate {
         const metadata = this.reflector.getAllAndOverride<PublicMetadata | undefined>(PUBLIC_KEY, targets)
         if (credential !== undefined) {
             const request: OperationRequest & { credentialPrincipal?: CredentialPrincipal } = requestOf(context)
-            unwrapOutcome(admit(metadata, { required: credential, principal: request.credentialPrincipal }), IdentityError)
+            unwrapOutcome(
+                admit(metadata, { required: credential, principal: request.credentialPrincipal }),
+                IdentityError,
+            )
             return true
         }
         if (admit(metadata).kind === "ok") return true

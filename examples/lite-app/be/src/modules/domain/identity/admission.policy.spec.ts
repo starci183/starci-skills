@@ -19,22 +19,28 @@ describe("admit", () => {
     })
 
     it("admits a credential door whose principal has the required kind", () => {
-        expect(admit(undefined, undefined, { required: { kind: "api-key" }, principal: credentialPrincipal })).toSucceedWith(
-            credentialPrincipal,
-        )
+        expect(
+            admit(undefined, undefined, { required: { kind: "api-key" }, principal: credentialPrincipal }),
+        ).toSucceedWith(credentialPrincipal)
     })
 
     it("refuses a credential door without a principal of the required kind", () => {
         const required = { kind: "tool-token" } as const
 
-        expect(admit(undefined, undefined, { required, principal: credentialPrincipal })).toBeRefused(IdentityErrorCode.Unauthenticated)
-        expect(admit(undefined, undefined, { required, principal: undefined })).toBeRefused(IdentityErrorCode.Unauthenticated)
+        expect(admit(undefined, undefined, { required, principal: credentialPrincipal })).toBeRefused(
+            IdentityErrorCode.Unauthenticated,
+        )
+        expect(admit(undefined, undefined, { required, principal: undefined })).toBeRefused(
+            IdentityErrorCode.Unauthenticated,
+        )
     })
 
     it("requires a matching credential even when the door is public or the session is verified", () => {
         const credential = { required: { kind: "api-key" }, principal: undefined } as const
 
-        expect(admit({ reason: PublicReason.Health }, principal, credential)).toBeRefused(IdentityErrorCode.Unauthenticated)
+        expect(admit({ reason: PublicReason.Health }, principal, credential)).toBeRefused(
+            IdentityErrorCode.Unauthenticated,
+        )
     })
 
     it("refuses a door that is not public when no principal was verified", () => {
