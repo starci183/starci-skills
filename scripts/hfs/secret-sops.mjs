@@ -6,6 +6,7 @@ import { resolveRealTool } from "../api/process/resolve-real-tool.mjs";
 import { decrypt as sopsDecrypt } from "../api/sops/decrypt.mjs";
 import { seal as sopsSeal } from "../api/sops/seal.mjs";
 import { invocationDir } from "../lib/roots.mjs";
+import { envelopeOf } from "./secret-document.mjs";
 import { ageIdentityEnv, configuredRecipients, secretTools } from "./secret-init.mjs";
 import { outsideRepository, secretRoots } from "./secret-files.mjs";
 import { SecretError, publicStorage } from "./secret-errors.mjs";
@@ -85,11 +86,23 @@ export function defaultSops(
       }
       return map;
     },
-    /** A sops BINARY envelope (the ssh key and known_hosts of the deploy custody): the plaintext is the file itself. */
+    /**
+     * The ssh key and known_hosts of the deploy custody. A classic sops BINARY envelope (one `data` property) yields the file itself;
+     * a JSON envelope under another property name (privateKey, knownHosts, ciPrivateKey) yields the JSON text of its properties,
+     * which the stack remote code unwraps by name.
+     */
     decryptBinary(file) {
+      const envelope = envelopeOf(fs.readFileSync(file, "utf8"));
+      const classic =
+        envelope.format === "json" &&
+        envelope.keys.length === 1 &&
+        envelope.keys[0] === "data";
+      const types = classic
+        ? ["binary", "binary"]
+        : [envelope.format, "json"];
       const result = sopsDecrypt(
         binary,
-        ["decrypt", "--input-type", "binary", "--output-type", "binary", file],
+        ["decrypt", "--input-type", types[0], "--output-type", types[1], file],
         { env: selectedEnv, cwd: repoRoot, invocation },
       );
       if (result.status !== 0)

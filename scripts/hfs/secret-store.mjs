@@ -86,6 +86,21 @@ function publishSealed(file, sealed, write) {
   }
 }
 
+function underClaim(file, action) {
+  const held = claimFile(path.resolve(file));
+  if (!held.ok)
+    throw new SecretError("the sealed secret is being updated; retry after that write settles");
+  try {
+    action();
+  } finally { held.release(); }
+}
+
+/** Replace one existing sealed member with an already validated envelope: same claim and atomic publish as set. */
+export const replaceSealed = (file, sealed) => underClaim(file, () => publishSealed(file, sealed));
+
+/** Delete one sealed member under the writer claim. */
+export const deleteSealed = (file) => underClaim(file, () => fs.unlinkSync(file));
+
 /** Seal named values; a supplied writer owns its own claim and rollback (the fresh-app scaffold). */
 export function writeSecret({ file, values, age, sops, write }) {
   for (const key of Object.keys(values)) validateKey(key);

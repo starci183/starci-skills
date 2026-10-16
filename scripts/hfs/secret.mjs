@@ -1,6 +1,7 @@
-// secret.mjs - app secret init|set|get|materialize|list|verify: sealed custody and private KEY files.
+// secret.mjs - app secret init|set|get|unset|rename|remove|materialize|list|verify: sealed custody and private KEY files.
 // SOPS plaintext travels on stdin and stays in memory; normal CLI output contains names and local file paths only.
 // Every verb runs at the app root or --cwd. Exit 0 done, 2 refusal; --reveal is the only plaintext stdout path.
+// unset, rename and remove edit one sealed member and are dry runs until --execute (scripts/hfs/secret-edit.mjs).
 // verify decrypts each member in memory and names only keys and violated shapes, never a value (R249).
 import fs from "node:fs";
 import path from "node:path";
@@ -12,12 +13,14 @@ import { defaultSops } from "./secret-sops.mjs";
 import { fileOf, secretsDirectory, writeSecret } from "./secret-store.mjs";
 import { getSecret, listSecrets, materializeSecrets } from "./secret-output.mjs";
 import { SecretError, publicStorage, secretErrorMessage } from "./secret-errors.mjs";
+import { editSecret, validateEditNames } from "./secret-edit.mjs";
 import { verifySecrets } from "./rules/env-value-shape.mjs";
 
 export { envelopeOf, formatOf, plaintextOf } from "./secret-document.mjs";
 export { setSecretValues } from "./secret-store.mjs";
 
-const VERBS = new Set(["init", "list", "get", "set", "materialize", "verify"]);
+const VERBS = new Set(["init", "list", "get", "set", "unset", "rename", "remove", "materialize", "verify"]);
+const EDIT_VERBS = new Set(["unset", "rename", "remove"]);
 
 function valueOption(opts, flag, value) {
   if (value === undefined || value.startsWith("--"))
@@ -34,7 +37,7 @@ function parse(argv) {
     const [flag, inline] = arg.split(/=(.*)/su);
     if (["--cwd", "--generate"].includes(flag)) {
       valueOption(opts, flag, inline ?? argv[++i]);
-    } else if (["--to-file", "--reveal"].includes(flag)) {
+    } else if (["--to-file", "--reveal", "--execute", "--force-nonempty"].includes(flag)) {
       if (inline !== undefined && !["true", "false"].includes(inline))
         throw new SecretError(`${flag} expects true or false`);
       opts[flag.slice(2)] = inline !== "false";
@@ -57,7 +60,17 @@ function usageArguments(verb) {
   if (verb === "init") return "";
   if (verb === "set") return "<env> <slug> <KEY> [--generate <bytes>]";
   if (verb === "get") return "<env> <slug> [KEY] --to-file [--reveal]";
+  if (verb === "unset") return "<env> <slug> <KEY> [--execute]";
+  if (verb === "rename") return "<env> <slug> <OLD> <NEW> [--execute]";
+  if (verb === "remove") return "<env> <slug> [--execute] [--force-nonempty]";
   return "<env>";
+}
+
+function editOptionsFor(verb, opts) {
+  if (opts.execute !== undefined && !EDIT_VERBS.has(verb))
+    throw new SecretError("--execute is only valid for unset, rename and remove");
+  if (opts["force-nonempty"] !== undefined && verb !== "remove")
+    throw new SecretError("--force-nonempty is only valid for remove");
 }
 
 function outputOptionsFor(verb, opts) {
@@ -79,6 +92,9 @@ function optionsFor(verb, opts) {
     verify: [1, 1],
     set: [3, 3],
     get: [2, 3],
+    unset: [3, 3],
+    rename: [4, 4],
+    remove: [2, 2],
   }[verb];
   if (count < bounds[0] || count > bounds[1])
     throw new SecretError(
@@ -87,6 +103,8 @@ function optionsFor(verb, opts) {
   if (opts.generate !== undefined && verb !== "set")
     throw new SecretError("--generate is only valid for set");
   outputOptionsFor(verb, opts);
+  editOptionsFor(verb, opts);
+  if (EDIT_VERBS.has(verb)) validateEditNames(verb, opts.positional.slice(2));
   if (verb === "set") validateKey(opts.positional[2]);
   if (verb === "get" && opts.positional[2] !== undefined)
     validateKey(opts.positional[2]);
@@ -133,7 +151,7 @@ export function secretMain(
   try {
     if (!VERBS.has(verb))
       throw new SecretError(
-        "usage: starci app secret init | set <env> <slug> <KEY> | get <env> <slug> [KEY] --to-file | materialize <env> | list <env> | verify <env>",
+        "usage: starci app secret init | set <env> <slug> <KEY> | get <env> <slug> [KEY] --to-file | unset <env> <slug> <KEY> | rename <env> <slug> <OLD> <NEW> | remove <env> <slug> | materialize <env> | list <env> | verify <env>",
       );
     const opts = parse(rest);
     optionsFor(verb, opts);
@@ -145,7 +163,13 @@ export function secretMain(
     const [environment, slug, key] = opts.positional;
     const directory = secretsDirectory(repoRoot, environment);
     if (verb === "list") return listSecrets(directory, stdout);
-    const seam = sops ?? defaultSops(env, repoRoot, platform, tools);
+    const open = () => sops ?? defaultSops(env, repoRoot, platform, tools);
+    if (EDIT_VERBS.has(verb))
+      return editSecret(verb, {
+        directory, environment, slug, names: opts.positional.slice(2),
+        execute: opts.execute === true, force: opts["force-nonempty"] === true, sops: open, stdout,
+      });
+    const seam = open();
     if (verb === "verify")
       return verifySecrets({ repoRoot, directory, environment, sops: seam, stdout });
     const output = { repoRoot, environment, env, platform, stdout };
