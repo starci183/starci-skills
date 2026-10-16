@@ -386,3 +386,35 @@ rulings:
     supersedes: []
     amendmentScope: The clause of R142 that said ambient ids are used only inside platform/ids "specs included", without the test-world exception.
     enforcedBy: [R142]
+
+  - id: feature-type-file-register-enum-type
+    date: '2026-10-16'
+    topic: code.be-graphql-enum
+    status: live
+    ownerRuling: 13
+    source: owner ruling 2026-10-16 "Theo ý trò" (alpha.18 NIVO canon request D); packages/eslint/be/feature-thin.mjs
+    statement: >-
+      A registerEnumType(...) call of @nestjs/graphql is allowed at module top level of a feature GraphQL
+      <name>.type.ts file of the be.transport.graphql slot, because starci app emit loads only the resolver,
+      scalar and include module files and the schema enum must be registered in a file the resolver imports.
+      The same call in any other role or slot, nested in a function, or imported from another module still
+      fails HFS_FEATURE_LOGIC_ROLE.
+    supersedes: []
+    amendmentScope: Clause of R264 that allowed no executable call in a feature <name>.type.ts file, for registerEnumType only.
+    enforcedBy: [R264]
+
+  - id: hooks-compose-hooks
+    date: '2026-10-16'
+    topic: code.fe-hooks
+    status: live
+    ownerRuling: 14
+    source: owner ruling 2026-10-16 "Theo ý trò" (alpha.18 NIVO canon request C); packages/eslint/fe/hooks-folder.mjs
+    statement: >-
+      A function in a hooks folder is a hook when it calls a hook: a React, SWR or Redux hook, a use* function
+      imported from the app's own hooks folders (hooks/swr wrappers, sibling domain hooks; resolved by TypeScript
+      symbol resolution through barrels), or an explicitly listed library hook (next-intl useTranslations,
+      useLocale, useFormatter, useNow, useTimeZone, useMessages; next/navigation; react-hook-form; zustand). A file
+      that exports a non-hook (a helper, a constant, a component) still fails.
+    supersedes: []
+    amendmentScope: The direct-call-only reading of FE_HOOKS_ARE_HOOKS fake-hook detection in R56.
+    enforcedBy: [R56]

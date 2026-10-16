@@ -289,6 +289,17 @@ const isCqrsDataConstructor = (context, node) => {
     return false
 }
 
+/**
+ * `registerEnumType(...)` of `@nestjs/graphql` at module top level of a `<name>.type.ts` file of the GraphQL transport slot
+ * (`be.transport.graphql`). It declares a schema enum: `starci app emit` loads only the resolver, scalar and `include` module files, so the
+ * registration must sit in a file the resolver imports, and the `.type.ts` is that file (owner ruling 2026-10-16 "Theo y tro", docs/microservices.md#r264).
+ * The same call in any other role or slot, or nested in a function, stays executable logic.
+ */
+const isEnumRegistration = (context, hfs, node, role) => role === "type"
+    && hfs.slotOf(context.filename) === "be.transport.graphql"
+    && node.parent?.type === "ExpressionStatement" && node.parent.parent?.type === "Program"
+    && isImportedFrom(context, node.callee, "@nestjs/graphql", ["registerEnumType"])
+
 /** Non-door feature roles declare data; renaming a policy or a guard must never hide business logic from R203. */
 export const featureLogicRole = {
     meta: {
@@ -323,7 +334,7 @@ export const featureLogicRole = {
             if (node.expressions.length > 0) report(node, "a template literal with an expression")
         }
         visitors.CallExpression = (node) => {
-            if (!isDecoratorApplication(node) && !isCqrsDataConstructor(context, node)) report(node, `the call \`${context.sourceCode.getText(node.callee)}\``)
+            if (!isDecoratorApplication(node) && !isCqrsDataConstructor(context, node) && !isEnumRegistration(context, hfs, node, role)) report(node, `the call \`${context.sourceCode.getText(node.callee)}\``)
         }
         visitors.TaggedTemplateExpression = (node) => report(node, `the tagged call \`${context.sourceCode.getText(node.tag)}\``)
         visitors.NewExpression = (node) => report(node, `the construction \`${context.sourceCode.getText(node.callee)}\``)

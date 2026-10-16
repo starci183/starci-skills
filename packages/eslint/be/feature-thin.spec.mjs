@@ -29,6 +29,8 @@ const HANDLER_SPEC = at("src/features/api/checkout/application/place-order.handl
 const DECLARATION_FILE = at("src/features/api/checkout/application/place-order.d.ts")
 const DOMAIN_SERVICE = at("src/modules/domain/order/order.service.ts")
 
+const GRAPHQL_TYPE = at("src/features/api/checkout/transport/graphql/dto/price.type.ts")
+
 const SERVICES = `import { OrderService } from "@modules/domain/order"
 `
 
@@ -117,6 +119,10 @@ export class PriceInput {
                 // R203 remains the sole thin-role judge; no duplicate findings from R264.
                 { filename: HANDLER, code: "export const choose = (ok: boolean) => ok ? 1 : 0" },
                 { filename: DOMAIN_SERVICE, code: "export const choose = (ok: boolean) => ok ? 1 : 0" },
+                // Owner ruling 2026-10-16: a top-level registerEnumType is the schema enum declaration, allowed in a graphql transport `.type.ts`.
+                { filename: GRAPHQL_TYPE, code: `import { registerEnumType } from "@nestjs/graphql"
+export enum Status { open = "open" }
+registerEnumType(Status, { name: "Status" })` },
                 { filename: support("policy").replace(".ts", ".spec.ts"), code: "if (true) throw new Error('proof')" },
                 { filename: support("policy").replace(".ts", ".d.ts"), code: "export declare const x: number" },
             ],
@@ -137,6 +143,26 @@ export class PriceInput {
                 { filename: support("client"), code: 'export const parse = (text: string) => JSON.parse(text)', errors: [logic] },
                 { filename: support("policy"), code: 'declare const mutate: (parts: TemplateStringsArray) => void; export const execute = () => mutate`delivery`', errors: [logic] },
                 { filename: support("contracts"), code: "export const now = new Date()", errors: [logic] },
+                // The exemption is for the graphql transport `.type.ts` only: another role, another slot, a nested call or another import still fail.
+                { filename: support("policy"), code: `import { registerEnumType } from "@nestjs/graphql"
+export enum Status { open = "open" }
+registerEnumType(Status, { name: "Status" })`, errors: [logic] },
+                { filename: at("src/features/api/checkout/transport/graphql/dto/price.input.ts"), code: `import { registerEnumType } from "@nestjs/graphql"
+export enum Status { open = "open" }
+registerEnumType(Status, { name: "Status" })`, errors: [logic] },
+                { filename: at("src/features/api/checkout/transport/http/dto/price.type.ts"), code: `import { registerEnumType } from "@nestjs/graphql"
+export enum Status { open = "open" }
+registerEnumType(Status, { name: "Status" })`, errors: [logic] },
+                { filename: GRAPHQL_TYPE, code: `import { registerEnumType } from "@nestjs/graphql"
+export enum Status { open = "open" }
+export const register = () => { registerEnumType(Status, { name: "Status" }) }`, errors: [logic] },
+                { filename: GRAPHQL_TYPE, code: `import { registerEnumType } from "./local"
+export enum Status { open = "open" }
+registerEnumType(Status, { name: "Status" })`, errors: [logic] },
+                { filename: GRAPHQL_TYPE, code: `import { registerEnumType } from "@nestjs/graphql"
+export enum Status { open = "open" }
+registerEnumType(Status, { name: "Status" })
+console.log("x")`, errors: [logic] },
                 // A module suffix under support/ cannot buy the composition exception.
                 { filename: support("module"), code: 'export const parsed = JSON.parse("{}")', errors: [logic] },
                 // Only the decorator application is metadata; an inner executable call is judged.

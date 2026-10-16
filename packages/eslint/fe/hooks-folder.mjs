@@ -26,6 +26,7 @@
  */
 
 import { importedReduxHook } from "./lib/redux-hook-origin.mjs"
+import { importedOwnHook } from "./lib/own-hook-origin.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { walk } from "./lib/ast.mjs"
 import { functionOf, isFn, unwrap, variableOf } from "./lib/bindings.mjs"
@@ -86,7 +87,19 @@ const SWR_HOOKS = new Map([
   ["swr/mutation", new Set(["useSWRMutation"])],
 ])
 const SWR_DEFAULTS = new Map([["swr", "useSWR"], ["swr/immutable", "useSWRImmutable"], ["swr/infinite", "useSWRInfinite"], ["swr/mutation", "useSWRMutation"]])
-const builtinHook = (origin) => origin?.source === "react-redux" || (origin?.source === "react" ? REACT_HOOKS.has(origin.name) : Boolean(SWR_HOOKS.get(origin?.source)?.has(origin.name)))
+/**
+ * The library hooks a composite hook may stand on (an explicit list, owner ruling 2026-10-16): next-intl, next/navigation,
+ * react-hook-form and zustand's React entry points. A name outside the list is not a hook by its spelling.
+ */
+const LIBRARY_HOOKS = new Map([
+  ["next-intl", new Set(["useTranslations", "useLocale", "useFormatter", "useNow", "useTimeZone", "useMessages"])],
+  ["next/navigation", new Set(["useRouter", "usePathname", "useSearchParams", "useParams", "useSelectedLayoutSegment", "useSelectedLayoutSegments"])],
+  ["react-hook-form", new Set(["useForm", "useFormContext", "useWatch", "useController", "useFieldArray", "useFormState"])],
+  ["zustand", new Set(["useStore"])],
+  ["zustand/react/shallow", new Set(["useShallow"])],
+])
+const OWN_HOOK = "own-hooks"
+const builtinHook = (origin) => origin?.source === OWN_HOOK || Boolean(LIBRARY_HOOKS.get(origin?.source)?.has(origin.name)) || origin?.source === "react-redux" || (origin?.source === "react" ? REACT_HOOKS.has(origin.name) : Boolean(SWR_HOOKS.get(origin?.source)?.has(origin.name)))
 const propertyName = (node) => {
   if (!node.computed && node.property.type === "Identifier") return node.property.name
   return node.property.type === "Literal" ? node.property.value : null
@@ -95,6 +108,7 @@ const propertyName = (node) => {
 /** SWR request hooks are default exports; its root also names useSWRConfig. */
 const namedOrigin = (source, name) => {
   if (source === "react") return { source, name }
+  if (LIBRARY_HOOKS.get(source)?.has(name)) return { source, name }
   if (name === "default" && SWR_DEFAULTS.has(source)) return { source, name: SWR_DEFAULTS.get(source) }
   return source === "swr" && name === "useSWRConfig" ? { source, name } : null
 }
@@ -104,7 +118,7 @@ const importOrigin = (definition) => {
   const specifier = definition.node
   const source = String(definition.parent.source.value)
   if (definition.parent.importKind === "type" || specifier.importKind === "type") return null
-  if (source !== "react" && !SWR_HOOKS.has(source)) return null
+  if (source !== "react" && !SWR_HOOKS.has(source) && !LIBRARY_HOOKS.has(source)) return null
   if (specifier.type === "ImportSpecifier") return namedOrigin(source, specifier.imported.name ?? specifier.imported.value)
   if (specifier.type === "ImportDefaultSpecifier" && SWR_DEFAULTS.has(source)) return { source, name: SWR_DEFAULTS.get(source) }
   return { source, name: null }
@@ -140,7 +154,8 @@ const hookOrigin = (context, input, seen = new Set()) => {
   if (definition.type === "ImportBinding") {
     const origin = importOrigin(definition)
     if (origin) return origin
-    return importedReduxHook(context, definition) ? { source: "react-redux", name: "hook" } : null
+    if (importedReduxHook(context, definition)) return { source: "react-redux", name: "hook" }
+    return importedOwnHook(context, definition) ? { source: OWN_HOOK, name: "hook" } : null
   }
   return constantOrigin(context, definition, variable, new Set([...seen, variable]))
 }
@@ -222,11 +237,11 @@ export const hooksFolderHoldsHooksOnly = {
       many:
         "This file exports {{count}} hooks. One hook per file keeps a hook findable by its name and keeps a change to one from re-running the tests of the others.",
       missing:
-        "FE_HOOKS_ARE_HOOKS: a hook file exports exactly one named use* function that calls a React, Redux or SWR hook. Non-hook helpers belong in the domain's shared helper file.",
+        "FE_HOOKS_ARE_HOOKS: a hook file exports exactly one named use* function that calls a hook (React, Redux, SWR, a listed library hook or a use* hook of the app's own hooks folders). Non-hook helpers belong in the domain's shared helper file.",
       defaultExport:
         "FE_HOOKS_ARE_HOOKS: export the hook as a named use* function. A default export does not identify the hook this file owns.",
       fake:
-        "FE_HOOKS_ARE_HOOKS: `{{name}}` must be a function that calls a real React, Redux or SWR hook; a use* name alone does not make a reader or helper a hook.",
+        "FE_HOOKS_ARE_HOOKS: `{{name}}` must be a function that calls a real hook: a React, Redux or SWR hook, a listed library hook (next-intl, next/navigation, react-hook-form, zustand) or a hook of the app's own `hooks/` folders. A use* name alone does not make a reader or helper a hook.",
       sharedHook:
         "`{{name}}` is a hook exported from the shared helper file. That file holds non-hook helpers; a hook there is a hook nobody will find. Give it its own `use<Name>.ts`.",
       server:
