@@ -305,3 +305,11 @@ In lite and full, `BE_SQL_RETURNING_SHAPE` refuses a bare `UPDATE ... RETURNING`
 persistence SQL constant: `EntityManager.query` returns `[rows, affectedCount]` for those statements. Wrap the write in
 `WITH changed AS (UPDATE ... RETURNING ...) SELECT ... FROM changed` to return rows instead. The same wrapper applies to a
 deleting CTE; `INSERT ... RETURNING` and writes without `RETURNING` remain valid.
+
+<a id="r166"></a>
+
+R166 `HFS_EVENT_CONTRACT` checks literal `EVENTS` providers and `CONSUMES` consumers in lite and full. Commit the provider snapshot with the same schema, service, events, versions and payloads. Every consumed event and version must exist in its provider snapshot; compensation targets must exist in a vendored contract. Typed event-class snapshot checks also remain enforced.
+
+<a id="r172"></a>
+
+R172 `BE_SAGA_CONSUMER_DEDUPE` requires the saga consumer to forward its handler delivery parameter's `eventId` into every command dispatched through `execute`, including nested request objects. An unused read, a return of the key alone, or a key from an unrelated object does not supply the inbox deduplication key. This applies in lite and full.

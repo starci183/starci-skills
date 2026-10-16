@@ -2749,6 +2749,15 @@ rules:
       - {kind: hfs, id: services-stack-declaration, at: scripts/hfs/rules/services.mjs}
   - id: R166
     code: "HFS_EVENT_CONTRACT"
+    editions: [lite, full]
+    docs: [docs/microservices.md#r166]
+    templateNa: "Provider EVENTS and consumer CONSUMES tables are product-specific contracts; the app scaffold has no literal service event table to generate."
+    proves:
+      - {path: tests/hfs/hfs-event-table-contract.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-event-table-contract.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-event-table-contract.spec.mjs, editions: [lite, full], codes: ["HFS_EVENT_CONTRACT"]}
     law: "The async contract between services is vendored under `be/contracts/<service>/events.json` (`starci/event-contract@1`, emitted by `starci app emit` from the literal `EVENTS` table of `be/apps/<service>/src/events.ts`, never written by hand) and equals that table; an event that undoes the step of another declares `compensates: \"<event>\"` and the named event must exist in a contract; a consumer declares what it reads in the literal `CONSUMES` table of `be/apps/<app>/src/consumes.ts` (service, event, version), every entry must exist in the provider's vendored snapshot at the same version, and a missing or stale snapshot, an unknown event or a version mismatch is a finding."
     kinds: [check, codemod]
     gates: [land, ci]
@@ -2841,6 +2850,15 @@ rules:
       - {kind: hfs, id: saga-event-contract, at: scripts/hfs/rules/saga.mjs}
   - id: R172
     code: "BE_SAGA_CONSUMER_DEDUPE"
+    editions: [lite, full]
+    docs: [docs/microservices.md#r172]
+    proves:
+      - {path: tests/hfs/hfs-saga-consumer-dedupe.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: tests/hfs/hfs-saga-consumer-dedupe.spec.mjs, editions: [lite, full]}
+      - {path: packages/hfs/templates/be/patterns/saga/saga.done.consumer.ts.tpl, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-saga-consumer-dedupe.spec.mjs, editions: [lite, full], codes: ["BE_SAGA_CONSUMER_DEDUPE"]}
     law: "A consumer of a saga (`be/src/features/saga/<saga>/transport/message/<event>.consumer.ts`) passes the id of the delivery on (`message.eventId`) to the command it dispatches: the saga takes every event through the inbox (R80), so the consumer must hand it the dedupe key."
     kinds: [check]
     gates: [land, ci]

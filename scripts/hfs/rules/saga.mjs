@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { loadTypescript } from '../../lib/package-at.mjs';
 import { found, readJson, readText } from './read.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
+import { forwardsDeliveryKey } from './saga-delivery.mjs';
 
 const SAGA_STEP_COMPENSATION = 'BE_SAGA_STEP_COMPENSATION';
 const SAGA_STATE_VERSIONED = 'BE_SAGA_STATE_VERSIONED';
@@ -79,17 +80,6 @@ function statesVersion(ts, sourceFile) {
     if (named.has('status') && named.get('version')?.kind === ts.SyntaxKind.NumberKeyword) versioned = true;
   }
   return versioned;
-}
-
-/** Whether a source text reads `.eventId` of something (the id of the delivery travels on). */
-function readsEventId(ts, sourceFile) {
-  let read = false;
-  const visit = (node) => {
-    if (ts.isPropertyAccessExpression(node) && node.name.text === 'eventId') read = true;
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-  return read;
 }
 
 /** The sagas of the app: every folder of the saga kind (`be/src/features/saga/<saga>/`). */
@@ -186,7 +176,7 @@ function consumerFindings(ts, repoRoot, feature, files) {
   const findings = [];
   for (const file of filesForFeature(files, CONSUMER, feature)) {
     const text = readText(repoRoot, file);
-    if (text !== null && !readsEventId(ts, parse(ts, text))) findings.push(found(SAGA_CONSUMER_DEDUPE, file, `${file} is a consumer of the saga ${feature} but never passes the id of the delivery on (\`message.eventId\`); the saga takes every event through the inbox, so the consumer hands the id to its command.`, { feature }));
+    if (text !== null && !forwardsDeliveryKey(ts, parse(ts, text))) findings.push(found(SAGA_CONSUMER_DEDUPE, file, `${file} is a consumer of the saga ${feature} but does not pass the delivery id (\`message.eventId\`) to every dispatched command; the saga takes every event through the inbox, so the consumer hands the id to its command.`, { feature }));
   }
   return findings;
 }

@@ -43,7 +43,7 @@ const STEP_TS = 'export class ReserveStep {\n  readonly event = "order.placed"\n
 const COMPENSATION_TS = 'export class ReserveCompensation {\n  readonly event = "billing.invoice-rejected"\n}\n';
 const ORCHESTRATOR_TS = "import { SagaService } from '../../../modules/platform/saga';\nimport { ReserveStep } from './steps/reserve.saga-step';\nimport { ReserveCompensation } from './compensations/reserve.compensation';\nexport class PlaceSaga { constructor(readonly s: SagaService, readonly a: ReserveStep, readonly b: ReserveCompensation) {} }\n";
 const STATE_TS = "export interface PlaceSagaState {\n  readonly status: 'running' | 'compensated'\n  readonly version: number\n}\n";
-const CONSUMER_TS = 'export class InvoiceRejectedConsumer {\n  handle(message: { eventId: string }): string { return message.eventId }\n}\n';
+const CONSUMER_TS = 'export class InvoiceRejectedConsumer {\n  handle(message: { eventId: string }) { return this.commandBus.execute(new CancelOrder({ eventId: message.eventId })) }\n}\n';
 const CONTRACTS = {
   'be/contracts/orders/events.json': `${JSON.stringify({ events: { 'order.placed': { payload: {}, version: 1 } }, schema: 'starci/event-contract@1', service: 'orders' }, null, 2)}\n`,
   'be/contracts/billing/events.json': `${JSON.stringify({ events: { 'billing.invoice-rejected': { compensates: 'order.placed', payload: {}, version: 1 } }, schema: 'starci/event-contract@1', service: 'billing' }, null, 2)}\n`,
