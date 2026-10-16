@@ -38,13 +38,9 @@ function proseDeclaration(manifest, examples) {
   };
 }
 
-const PLACEHOLDER = '<[^>]+>';
-const BE_APP_PLACEHOLDER = new RegExp(`^(be/apps/)${PLACEHOLDER}`);
-const FE_APP_PLACEHOLDER = new RegExp(`^(fe/apps/)${PLACEHOLDER}`);
 const STAR_RUN = /\*+/g;
 
-export const sample = (token) => replacePlaceholders(token
-  .replace(BE_APP_PLACEHOLDER, '$1identity').replace(FE_APP_PLACEHOLDER, '$1app'), 'x').replace(STAR_RUN, 'x');
+export const sample = (token) => replacePlaceholders(token, 'x').replace(STAR_RUN, 'x');
 
 const segmentMatches = (a, b) => a === b || a === 'x' || b === 'x' || /[<*]/.test(b);
 
@@ -68,9 +64,15 @@ export function createProseResolver(ctx, manifest) {
   if (!examples.length) return null;
   const resolver = createSlotResolver(manifest, resolveRepoDeclaration(manifest, proseDeclaration(manifest, examples)));
   const slotPaths = resolver.slots().flatMap((slot) => slot.profiles.flatMap((profile) => braceVariants(slot.path).map((p) => ((['be', 'fe'].includes(profile) ? `${profile}/` : '') + p).split('/').filter(Boolean))));
-  const appNames = new Set(examples.flatMap((d) => ['be', 'fe'].flatMap((side) => (d.sides?.[side]?.apps ?? []).map((a) => a.name))));
-  const declaredApp = (p) => { const m = /^(?:be|fe)\/apps\/([^/]+)/.exec(p); return !m || m[1] === 'x' || appNames.has(m[1]); };
-  const owned = (p) => declaredApp(p) && ([p, ...FOLDERS_BELOW.map((below) => `${p}/${below}`)].some((q) => resolver.classifyPath(q).status !== 'no-slot') || aboveSlot(p.split('/'), slotPaths));
+  const appNames = (side) => [...new Set(examples.flatMap((d) => (d.sides?.[side]?.apps ?? []).map((a) => a.name)))];
+  const ownedPath = (p) => [p, ...FOLDERS_BELOW.map((below) => `${p}/${below}`)].some((q) => resolver.classifyPath(q).status !== 'no-slot') || aboveSlot(p.split('/'), slotPaths);
+  const owned = (p) => {
+    const match = /^(be|fe)\/apps\/([^/]+)/.exec(p);
+    if (!match) return ownedPath(p);
+    const names = appNames(match[1]);
+    if (match[2] !== 'x') return names.includes(match[2]) && ownedPath(p);
+    return names.some((name) => ownedPath(p.replace(`${match[1]}/apps/x`, `${match[1]}/apps/${name}`)));
+  };
   return { owned, classify: (p) => resolver.classifyPath(p), sample };
 }
 
