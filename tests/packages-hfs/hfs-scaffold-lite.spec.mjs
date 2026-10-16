@@ -60,6 +60,8 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'be/src/features/api/system-health/transport/http/system-health-http.module-definition.ts', 'be/src/features/api/system-health/transport/http/system-health-http.module.ts', 'be/src/features/api/system-health/transport/http/system-health-http.options.ts',
   'be/src/modules/domain/identity/admission.policy.spec.ts', 'be/src/modules/domain/identity/admission.policy.ts',
   'be/src/modules/domain/identity/auth.guard.spec.ts', 'be/src/modules/domain/identity/auth.guard.ts',
+  'be/src/modules/domain/identity/credential.contracts.ts', 'be/src/modules/domain/identity/credential.guard.spec.ts',
+  'be/src/modules/domain/identity/credential.guard.ts',
   'be/src/modules/domain/identity/errors/identity.error.ts', 'be/src/modules/domain/identity/identity.contracts.ts',
   'be/src/modules/domain/identity/identity.decorators.ts', 'be/src/modules/domain/identity/identity.module-definition.ts',
   'be/src/modules/domain/identity/identity.module.ts', 'be/src/modules/domain/identity/identity.options.ts',

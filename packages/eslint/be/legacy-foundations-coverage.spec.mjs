@@ -9,7 +9,7 @@ import { at, BE_DECLARATION, ruleTester, TYPED_ROOT } from "./fixtures/typed/tes
 import { hfsFromDeclaration } from "./lib/hfs.mjs"
 import { catchMustAccount } from "./error-handling.mjs"
 import { noUntypedBody, publicNeedsReason } from "./default-deny.mjs"
-import { noAuthUseGuards } from "./authorization.mjs"
+import { noAuthUseGuards, noGuardInjectsGuard } from "./authorization.mjs"
 import { configParsedInMain, noDirectEnvRead, secretCompareTimingSafe } from "./config-owner.mjs"
 import { noErrorWordingAsLogIdentity, noFrameworkLogger, noInterpolatedLogMessage } from "./observability.mjs"
 import { authDoorStrictRateTier, inputBounded, noOffsetPagination } from "./input-bounds.mjs"
@@ -77,6 +77,10 @@ for (const edition of ["lite", "full"]) {
         tester.run("no-auth-use-guards", noAuthUseGuards, {
             valid: [{ filename: CONTROLLER, code: "class C { @Roles('admin') list() {} }" }],
             invalid: [{ filename: CONTROLLER, code: "class C { @UseGuards(AuthGuard) list() {} }", errors: [{ messageId: "useGuards" }] }],
+        })
+        tester.run("no-guard-injects-guard", noGuardInjectsGuard, {
+            valid: [{ filename: CONTROLLER, code: "class AuthGuard implements CanActivate { constructor(private readonly reflector: Reflector) {} }" }],
+            invalid: [{ filename: CONTROLLER, code: "class AuthGuard implements CanActivate { constructor(private readonly credentials: CredentialGuard) {} }", errors: [{ messageId: "guardInGuard" }] }],
         })
         tester.run("secret-compare-timing-safe", secretCompareTimingSafe, {
             valid: [{ filename: SERVICE, code: "if (timingSafeEqual(a, b)) {}" }],

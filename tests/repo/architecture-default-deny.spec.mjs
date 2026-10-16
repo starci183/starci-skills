@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { defaultDenyFixture, scenarioCount } from '../helpers/repo-architecture-default-deny-fixture.mjs';
 
 // R41 default-deny-app-guard (BE_DEFAULT_DENY): the api app root provides APP_GUARD entries in the order throttler ->
-// CSRF origin guard (platform/http-security) -> AuthGuard (domain/identity). A guard is judged by structure, never by its
+// CSRF origin guard (platform/http-security) -> CredentialGuard -> AuthGuard (both domain/identity). A guard is judged by structure, never by its
 // name or folder alone (BE-CONVENTION 1.7 names the roles, not a library): the throttler is a @nestjs/throttler class or a
 // guard reading the per-door metadata its own capability's decorator writes; the CSRF guard is an http-security guard that
 // reads the request origin.
@@ -14,7 +14,7 @@ before(() => { fixture = defaultDenyFixture(cleanup => cleanups.push(cleanup)); 
 after(() => { for (const cleanup of cleanups) cleanup(); });
 const hits = name => fixture.hits(name);
 
-test('BE: throttler, CSRF, AuthGuard in that order raise nothing (the throttler may be the package class, a subclass or a rate limiter reading its door metadata)', () => {
+test('BE: throttler, CSRF, CredentialGuard, AuthGuard in that order raise nothing (the throttler may be the package class, a subclass or a rate limiter reading its door metadata)', () => {
   for (const name of ['good-package', 'good-subclass', 'good-tier', 'good-extra']) {
     assert.deepEqual(hits(name), [], name);
   }
@@ -26,7 +26,18 @@ test('BE: a missing guard is one finding naming it', () => {
   assert.match(hits('missing-throttler')[0].message, /does not provide the throttler guard/);
   assert.match(hits('missing-csrf')[0].message, /does not provide the CSRF origin guard/);
   assert.match(hits('missing-auth')[0].message, /does not provide AuthGuard/);
-  assert.equal(hits('missing-all').length, 3);
+  assert.equal(hits('missing-all').length, 4);
+});
+
+test('BE: a missing, late, early, repeated or look-alike CredentialGuard is refused', () => {
+  assert.match(hits('missing-credential')[0].message, /does not provide CredentialGuard of domain\/identity/);
+  assert.equal(hits('credential-lookalike').length, 1);
+  assert.match(hits('credential-lookalike')[0].message, /does not provide CredentialGuard/);
+  assert.equal(hits('credential-after-auth').length, 1);
+  assert.match(hits('credential-after-auth')[0].message, /AuthGuard of domain\/identity before CredentialGuard/);
+  assert.equal(hits('credential-before-csrf').length, 1);
+  assert.match(hits('credential-before-csrf')[0].message, /CredentialGuard of domain\/identity before the CSRF origin guard/);
+  assert.match(hits('repeated-credential')[0].message, /CredentialGuard of domain\/identity more than once/);
 });
 
 test('BE: a guard that only looks like AuthGuard, declared elsewhere, does not count', () => {

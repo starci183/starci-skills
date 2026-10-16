@@ -111,12 +111,13 @@ function writeFeature(put, write) {
 }
 
 function writePlatform(write) {
-  // An api app is denied by default (throttler, CSRF origin guard, AuthGuard) and masks its errors through the one filter of platform/errors.
+  // An api app is denied by default (throttler, CSRF origin guard, CredentialGuard, AuthGuard) and masks its errors through the one filter of platform/errors.
   write('be/src/modules/platform/errors/index.ts', "export { AllExceptionsFilter } from './all-exceptions.filter';\n");
   write('be/src/modules/platform/errors/all-exceptions.filter.ts', 'export class AllExceptionsFilter { catch(): void {} }\n');
   write('be/src/modules/platform/http-security/index.ts', "export { CsrfOriginGuard } from './csrf-origin.guard';\n");
   write('be/src/modules/platform/http-security/csrf-origin.guard.ts', 'interface RequestHeaders { origin?: string }\ninterface HttpRequest { headers: RequestHeaders }\ninterface HttpHost { getRequest(): HttpRequest }\ninterface GuardContext { switchToHttp(): HttpHost }\nexport class CsrfOriginGuard { canActivate(context: GuardContext): boolean { return context.switchToHttp().getRequest().headers.origin !== undefined; } }\n');
-  write('be/src/modules/domain/identity/index.ts', "export { AuthGuard } from './auth.guard';\n");
+  write('be/src/modules/domain/identity/index.ts', "export { AuthGuard } from './auth.guard';\nexport { CredentialGuard } from './credential.guard';\n");
+  write('be/src/modules/domain/identity/credential.guard.ts', 'export class CredentialGuard { canActivate(): boolean { return true; } }\n');
   write('be/src/modules/domain/identity/auth.guard.ts', 'export class AuthGuard { canActivate(): boolean { return true; } }\n');
   write('be/src/modules/platform/config/index.ts', [
     'export class EnvSource {', '  static fromProcess(): EnvSource { return new EnvSource(); }',
@@ -146,9 +147,9 @@ function writeApiApp(app, write) {
   write(`be/apps/${app.name}/src/app.module.ts`, [
       "import { Module } from '@nestjs/common';", "import { APP_FILTER, APP_GUARD } from '@nestjs/core';", "import { ThrottlerGuard } from '@nestjs/throttler';",
       "import { AllExceptionsFilter } from '../../../src/modules/platform/errors';", "import { CsrfOriginGuard } from '../../../src/modules/platform/http-security';",
-      "import { AuthGuard } from '../../../src/modules/domain/identity';",
+      "import { AuthGuard, CredentialGuard } from '../../../src/modules/domain/identity';",
       "import { healthModules } from './compose/health';",
-      '@Module({ imports: [...healthModules], providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }, { provide: APP_GUARD, useClass: ThrottlerGuard }, { provide: APP_GUARD, useClass: CsrfOriginGuard }, { provide: APP_GUARD, useClass: AuthGuard }] })',
+      '@Module({ imports: [...healthModules], providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }, { provide: APP_GUARD, useClass: ThrottlerGuard }, { provide: APP_GUARD, useClass: CsrfOriginGuard }, { provide: APP_GUARD, useClass: CredentialGuard }, { provide: APP_GUARD, useClass: AuthGuard }] })',
       'export class AppModule {', '  static register(_options: object) { return { module: AppModule, imports: [], providers: [] }; }', '}', ''].join('\n'));
 }
 

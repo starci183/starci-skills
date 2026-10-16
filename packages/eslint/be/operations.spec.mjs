@@ -79,8 +79,13 @@ for (const edition of ["lite", "full"]) {
         const editionTester = ruleTester({ root: TYPED_ROOT, hfs })
         const head = `import { Body, Controller, Get, Post, Redirect, StreamableFile } from "@nestjs/common"\nimport { Public, PublicReason } from "@modules/domain/identity"\n`
         const contracts = `import { query } from "@modules/platform/operations"\nimport type { OperationRequest, OperationReply } from "@modules/platform/operations"\n`
+        const cred = head.replace("{ Public, PublicReason }", "{ Credential, Public, PublicReason }")
         editionTester.run("rest-route-declared", restRouteDeclared, {
             valid: [
+                { filename: CONTROLLER, code: `${cred}@Controller("loyalty") class C { @Credential({ kind: "api-key" }) @Post() earn() { return { ok: true } } }` },
+                { filename: CONTROLLER, code: `${cred}@Credential({ kind: "run-token" }) @Controller("n8n") class C { @Post("a") a() { return 1 } @Credential({ kind: "run-token", workflow: "x" }) @Post("b") b() { return 1 } }` },
+                { filename: CONTROLLER, code: `${cred}import { Credential as Door } from "@modules/domain/identity"
+@Controller("tools") class C { @Door({ kind: "tool-token" }) @Post() run() { return 1 } }` },
                 { filename: CONTROLLER, code: `${ROUTE_HEAD}@Controller("api/v1") class C { @Post("operations") async handle(@Body() request: OperationRequest<Table>): Promise<OperationReply<Table>> { return null as never } }` },
                 { filename: CONTROLLER, code: `${head}${contracts}import { defineOperations as register } from "@modules/platform/operations"\nconst entries = { "plan.read@1": query<{ readonly id: string }, { readonly ok: boolean }>() }; const OPS = register(entries)\n@Controller("api/v1") class C { @Post("operations") async handle(@Body() request: OperationRequest<typeof OPS>): Promise<OperationReply<typeof OPS>> { return null as never } }` },
                 { filename: CONTROLLER, code: `${head}@Controller("health") class C { @Public({ reason: PublicReason.Health }) @Get() live() { return { ok: true } } }` },
@@ -94,6 +99,20 @@ for (const edition of ["lite", "full"]) {
                 { filename: CONTROLLER, code: `${head}class C { @Get() helper() { return { ok: true } } }` },
             ],
             invalid: [
+                // unguarded route
+                { filename: CONTROLLER, code: `${cred}@Controller("loyalty") class C { @Post() earn() { return { ok: true } } }`, errors: [{ messageId: "undeclared" }] },
+                // a guard that is not the credential guard proves nothing
+                { filename: CONTROLLER, code: `${cred}import { UseGuards } from "@nestjs/common"
+class PlainGuard { canActivate() { return true } }
+@Controller("loyalty") class C { @UseGuards(PlainGuard) @Post() earn() { return 1 } }`, errors: [{ messageId: "undeclared" }] },
+                // a same-named local decorator is not the identity capability credential
+                { filename: CONTROLLER, code: `${head}const Credential = (_o: { kind: string }): MethodDecorator => () => undefined
+@Controller("loyalty") class C { @Credential({ kind: "api-key" }) @Post() earn() { return 1 } }`, errors: [{ messageId: "undeclared" }] },
+                // the kind is declared as a literal, not computed
+                { filename: CONTROLLER, code: `${cred}const kind = String(1)
+@Controller("loyalty") class C { @Credential({ kind }) @Post() earn() { return 1 } }`, errors: [{ messageId: "undeclared" }] },
+                // an anonymous route without a closed PublicReason still fails
+                { filename: CONTROLLER, code: `${cred}@Controller("loyalty") class C { @Public({ reason: "ToolToken" as never }) @Get() list() { return 1 } }`, errors: [{ messageId: "undeclared" }] },
                 { filename: CONTROLLER, code: `${head}@Controller("api/v1") class C { @Get("orders") list() { return { items: [] } } }`, errors: [{ messageId: "undeclared" }] },
                 { filename: CONTROLLER, code: `${ROUTE_HEAD}@Controller("api/v1") class C { @Post() list(@Body() body: { id: string }) { return body } }`, errors: [{ messageId: "undeclared" }] },
                 { filename: CONTROLLER, code: `${ROUTE_HEAD}@Controller("api/v1") class C { @Post() async handle(@Body() request: OperationRequest<Table>): Promise<OperationReply<typeof OTHER>> { return null as never } }`, errors: [{ messageId: "undeclared" }] },

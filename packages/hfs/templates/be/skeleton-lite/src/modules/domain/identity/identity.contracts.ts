@@ -1,8 +1,11 @@
 import type { Principal } from "@modules/platform/cqrs"
+import type { CredentialPrincipal } from "./credential.contracts"
 
 declare module "express-serve-static-core" {
-    /** The request carries the principal established by the default-deny auth guard. */
+    /** The request carries the separate principals established by the identity guards. */
     interface Request {
+        /** The identity `CredentialGuard` authenticated on a door marked `@Credential`; never a session principal. */
+        credentialPrincipal?: CredentialPrincipal
         /** The authenticated Supabase caller, when the door is not public. */
         principal?: Principal
     }
@@ -27,4 +30,4 @@ export interface PublicMetadata {
 }
 
 /** What identity admission returns to the guard. */
-export type IdentityAdmission = Principal | PublicReason
+export type IdentityAdmission = Principal | CredentialPrincipal | PublicReason

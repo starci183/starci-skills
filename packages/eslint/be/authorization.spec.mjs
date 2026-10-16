@@ -5,13 +5,13 @@
  */
 import test from "node:test"
 import { at, typedTester } from "./fixtures/typed/tester.mjs"
-import { noAuthUseGuards, rules } from "./authorization.mjs"
+import { noAuthUseGuards, noGuardInjectsGuard, rules } from "./authorization.mjs"
 
 const tester = typedTester()
 const CONTROLLER = at("src/features/api/plan/transport/http/create-plan.controller.ts")
 
-test("the law publishes exactly the guard rule", () => {
-    if (Object.keys(rules).join() !== "no-auth-use-guards") throw new Error("authorization law must ship only no-auth-use-guards")
+test("the law publishes exactly the guard rules", () => {
+    if (Object.keys(rules).join() !== "no-auth-use-guards,no-guard-injects-guard") throw new Error("authorization law must ship the use-guards and guard-in-guard rules")
 })
 
 test("no door picks its own guard", () => {
@@ -33,6 +33,26 @@ test("no door picks its own guard", () => {
             { filename: at("src/features/api/plan/transport/http/create-plan.controller.spec.ts"), code: "@UseGuards(X)\nclass C {}", errors: [{ messageId: "useGuards" }] },
             // an owner outside transport is not exempt either
             { filename: at("src/modules/domain/plan/plan.service.ts"), code: "@UseGuards(X)\nclass C {}", errors: [{ messageId: "useGuards" }] },
+        ],
+    })
+})
+
+const GUARD = at("src/modules/domain/identity/auth.guard.ts")
+
+test("no guard injects another guard", () => {
+    tester.run("no-guard-injects-guard", noGuardInjectsGuard, {
+        valid: [
+            { filename: GUARD, code: "class AuthGuard implements CanActivate { constructor(private readonly reflector: Reflector) {} }" },
+            { filename: GUARD, code: "class CredentialGuard implements CanActivate { constructor(@InjectReflector() private readonly reflector: Reflector, @InjectCredentialAuthenticator() private readonly authenticator: CredentialAuthenticator) {} }" },
+            // a class that is not a guard may receive a guard
+            { filename: GUARD, code: "class Registry { constructor(private readonly guard: AuthGuard) {} }" },
+        ],
+        invalid: [
+            { filename: GUARD, code: "class AuthGuard implements CanActivate { constructor(private readonly credentials: CredentialGuard) {} }", errors: [{ messageId: "guardInGuard" }] },
+            { filename: GUARD, code: "class AuthGuard implements CanActivate { constructor(guard: CanActivate) {} }", errors: [{ messageId: "guardInGuard" }] },
+            { filename: GUARD, code: "class AuthGuard implements CanActivate { constructor(private readonly guard: Type<CanActivate>) {} }", errors: [{ messageId: "guardInGuard" }] },
+            { filename: GUARD, code: "class ThrottlerLikeGuard { constructor(private readonly origin: OriginGuard) {} }", errors: [{ messageId: "guardInGuard" }] },
+            { filename: GUARD, code: "class AuthGuard implements CanActivate { constructor(@Inject(CredentialGuard) private readonly guard: unknown) {} }", errors: [{ messageId: "guardInGuard" }] },
         ],
     })
 })

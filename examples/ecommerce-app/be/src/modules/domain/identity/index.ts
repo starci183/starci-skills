@@ -1,4 +1,5 @@
 export { AuthGuard } from "./auth.guard"
+export { CredentialGuard } from "./credential.guard"
 export { IDENTITY_ERROR_KINDS } from "./errors/identity.error"
 export { BearerToken, CurrentPrincipal, Public, Roles } from "./identity.decorators"
 export { IdentityModule } from "./identity.module"

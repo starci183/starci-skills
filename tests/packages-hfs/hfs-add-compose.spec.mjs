@@ -108,7 +108,7 @@ for (const edition of ['lite', 'full']) {
       assert.equal(occurrences(domain, 'IdentityModule.register('), 1);
       assert.equal(occurrences(domain, 'LivenessModule.register('), 1);
       assert.equal(occurrences(domain, 'NoteModule.register('), edition === 'full' ? 1 : 0);
-      assert.ok(app.includes('import { AuthGuard } from "@modules/domain/identity"'));
+      assert.ok(app.includes('import { AuthGuard, CredentialGuard } from "@modules/domain/identity"'));
       assert.ok(app.includes(edition === 'lite' ? '...domainModules(verifyAccessToken)' : '...domainModules()'));
       assert.equal(app.split('            providers: [')[1], original.split('            providers: [')[1]);
       assert.equal(read(root, 'be/apps/api/src/compose/platform.ts'), platform);

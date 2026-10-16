@@ -1,4 +1,5 @@
 export { AuthGuard } from "./auth.guard"
+export { CredentialGuard } from "./credential.guard"
 export { IDENTITY_ERROR_KINDS } from "./errors/identity.error"
 export { IDENTITY_MESSAGES } from "./messages/identity.messages"
 export { PublicReason } from "./identity.contracts"
