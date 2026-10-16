@@ -157,3 +157,41 @@ test('R275 HFS finder leaves unavailable rendered model evidence to R267', () =>
     assert.deepEqual(stacksIngressFindings(context), []);
   });
 });
+
+// An application whose ingress is a shared stack outside its own (nivo): `ingress.external.stack` instead of `ingress.component`.
+function externalFixture(edition) {
+  const value = fixture(edition);
+  delete value.doc.components.edge;
+  delete value.spec.components.edge;
+  delete value.model.services.edge;
+  value.spec.ingress = { external: { stack: 'ingress' }, hosts: ['app.example.test'] };
+  return value;
+}
+
+for (const edition of ['lite', 'full']) {
+  test(`STACKS_INGRESS_UNDECLARED@${edition}: an external shared ingress passes when the stack renders no ingress of its own`, () => {
+    assert.deepEqual(ingressIssues(externalFixture(edition)), []);
+  });
+
+  test(`STACKS_INGRESS_UNDECLARED@${edition}: an external ingress needs its stack name, its hosts and no component`, () => {
+    const mutations = [
+      value => { value.spec.ingress.external = {}; },
+      value => { value.spec.ingress.external = { stack: '  ' }; },
+      value => { value.spec.ingress.external = 'ingress'; },
+      value => { delete value.spec.ingress.hosts; },
+      value => { value.spec.ingress.hosts = []; },
+      value => { value.spec.ingress.component = 'edge'; },
+    ];
+    for (const mutate of mutations) {
+      const value = externalFixture(edition);
+      mutate(value);
+      assert.ok(issuesFor(value, 'STACKS_INGRESS_UNDECLARED').length > 0);
+    }
+  });
+
+  test(`STACKS_SECOND_INGRESS@${edition}: an external ingress next to an ingress rendered in the stack is refused`, () => {
+    const value = externalFixture(edition);
+    value.model.services.edge = { image: pinned('traefik:v3.6') };
+    assert.equal(issuesFor(value, 'STACKS_SECOND_INGRESS').length, 1);
+  });
+}

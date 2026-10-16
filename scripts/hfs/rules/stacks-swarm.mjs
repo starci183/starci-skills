@@ -9,6 +9,7 @@ import { isInside } from '../../lib/walk.mjs';
 import { readTypeScriptProject, resolveTypeScriptModule } from '../typescript-programs.mjs';
 import { parseSource, ts } from '../runtime-rules/source-ast.mjs';
 import { readText } from './read.mjs';
+import { externalIngressStack } from './stacks-ingress.mjs';
 import { stacksDeploymentFindings } from './stacks-runtime.mjs';
 
 const mapping = value => plain(value) ? value : {};
@@ -223,7 +224,8 @@ function publicRoutingIssues(input, add) {
   for (const host of new Set([...declared, ...routed])) {
     if (!dns.some(entry => hostOf(entry?.host) === host && present(entry.owner) && present(entry.receipt)))
       add('STACKS_DNS_UNDECLARED', `environments.${input.environment}.dns`, 'Each public host must declare its DNS owner and receipt');
-    if (!declared.has(host) || !routed.has(host))
+    // An external shared ingress routes the hosts from its own dynamic files (published by `starci app stack ingress publish`), not from labels here.
+    if (!declared.has(host) || (externalIngressStack(spec) === null && !routed.has(host)))
       add('STACKS_HOST_UNROUTED', `environments.${input.environment}.ingress.hosts`, 'Each public host must be declared and bound by an actual ingress route');
   }
   const ingress = mapping(input.model.services)[spec.ingress?.component];
