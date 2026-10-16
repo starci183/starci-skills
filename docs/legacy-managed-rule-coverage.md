@@ -14,3 +14,7 @@ HFS_MANAGED_FILE_DRIFT reports an existing managed file or the root package scri
 ## R11
 
 HFS_SONAR_CONFIG reports a changed managed `sonar-project.properties` setting or a Sonar stack declaration that names a different quality gate. The rendered properties state no host URL, keep sources separate from tests, import the back end lcov and lint report, and derive the logic coverage scope from the slot manifest. Every application names the canonical quality gate for its edition. Restore the generated configuration with `npx starci app sync --write`. The proof changes a noncoverage encoding setting, checks the finding, and restores the passing render in each edition; coverage-scope edits have their own finding.
+
+## R06 plaintext secrets
+
+HFS_PLAINTEXT_SECRET refuses tracked plaintext secret paths and invalid sealed envelopes in both editions. The pre-commit `starci app hygiene` command judges staged paths and blobs; app lint/check judges the repository tree at land and CI. Seal secrets with `starci app secret set` into `.starcistacks/<env>/secrets/<slug>.enc`. Pre-push checks release admission and does not run this secret judgement.
