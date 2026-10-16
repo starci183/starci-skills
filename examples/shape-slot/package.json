@@ -85,6 +85,8 @@
     "contract:emit": "starci app emit"
   },
   "overrides": {
-    "@xyflow/react": "12.11.6"
+    "@xyflow/react": "12.11.6",
+    "dayjs": "1.11.21",
+    "zustand": "5.0.12"
   }
 }
