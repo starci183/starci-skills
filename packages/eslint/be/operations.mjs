@@ -263,7 +263,7 @@ const credentialGuardDeclared = (context, decoratorCallee_) => {
  * `@Credential({ kind: "<literal>" })` imported from the domain identity capability, and that capability declares a
  * `CredentialGuard implements CanActivate`. A same-named local decorator, a `@UseGuards` of any other guard and a non-literal kind prove nothing.
  */
-export const credentialGuardEvidence = (context, method) => {
+const credentialGuardEvidence = (context, method) => {
     const carriers = [...(method.decorators ?? []), ...(method.parent?.parent?.decorators ?? [])]
     for (const decorator of carriers) {
         const callee = decoratorCallee(decorator)
