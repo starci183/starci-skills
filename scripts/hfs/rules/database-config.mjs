@@ -133,7 +133,7 @@ export async function typesFindings({ repoRoot, files, emitTypes, declaration })
   return [];
 }
 
-const DEFAULT_EXTENSIONS = ['pgmq', 'pg_cron', 'pgcrypto', 'pg_trgm', 'vector', 'uuid-ossp', 'pg_net', 'supabase_vault'];
+const DEFAULT_EXTENSIONS = ['pgmq', 'pg_cron', 'pgcrypto', 'pg_trgm', 'vector', 'uuid-ossp', 'pg_net', 'supabase_vault', 'unaccent'];
 const DEFAULT_API_SCHEMAS = ['public', 'graphql_public'];
 const FORBIDDEN_API_SCHEMAS = new Set(['pgmq', 'pgmq_public']);
 const word = (token, value) => token?.t === 'word' && token.v === value;

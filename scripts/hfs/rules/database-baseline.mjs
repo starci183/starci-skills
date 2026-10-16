@@ -71,7 +71,7 @@ function shapeFindings(repoRoot, active, archived) {
     findings.push(found(DB_BASELINE_SHAPE, MIGRATIONS_DIR, 'a nonempty _archive requires exactly one active -- starci:baseline <archived-last-stamp> header marker'));
     return { findings, marked };
   }
-  const latest = archived.map(stampOf).filter(Boolean).sort((left, right) => left.localeCompare(right)).at(-1);
+  const latest = archived.map(stampOf).filter((stamp) => stamp && migrationStamp(stamp) !== null).sort((left, right) => left.localeCompare(right)).at(-1);
   const marker = marked[0];
   const current = stampOf(marker.file);
   if (!latest || marker.stamp !== latest || migrationStamp(marker.stamp) === null) {
@@ -81,7 +81,8 @@ function shapeFindings(repoRoot, active, archived) {
     findings.push(found(DB_BASELINE_SHAPE, marker.file, 'the baseline stamp must follow the archive boundary, or document the exact boundary and replacement in a -- starci:restamp <old> <new> header'));
   }
   for (const file of archived) {
-    if (!ARCHIVED.test(file) || migrationStamp(stampOf(file) ?? '') === null) findings.push(found(DB_BASELINE_SHAPE, file, 'archived migrations retain their original timestamped SQL filename'));
+    // Archived files are immutable history and never applied: only the name shape is checked, not stamp validity.
+    if (!ARCHIVED.test(file)) findings.push(found(DB_BASELINE_SHAPE, file, 'archived migrations retain their original timestamped SQL filename'));
   }
   return { findings, marked };
 }

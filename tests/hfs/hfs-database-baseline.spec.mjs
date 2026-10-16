@@ -108,6 +108,17 @@ for (const edition of ['lite', 'full']) {
     assert.deepEqual(judge(fixture(edition, { [old]: 'select 1;' }), edition, { [old]: 'select 1;' }), []);
   });
 
+  test(`DB_BASELINE_SHAPE ${edition}: an archived file with an impossible stamp is accepted, the active baseline stays strict`, () => {
+    const impossible = `${archive}/20261006300000_x.sql`;
+    const valid = { [retired]: 'select 1;', [impossible]: 'select 1;', [baseline]: marked };
+    assert.deepEqual(judge(fixture(edition, valid), edition, valid, history(valid)), []);
+    const impossibleBaseline = `${migrations}/20261006300000_baseline.sql`;
+    const active = { [retired]: 'select 1;', [impossibleBaseline]: marked };
+    assert.ok(judge(fixture(edition, active), edition, active).some((item) => item.code === 'DB_BASELINE_SHAPE' && item.path === impossibleBaseline));
+    const misnamed = { [retired]: 'select 1;', [`${archive}/x_20261006300000.sql`]: 'select 1;', [baseline]: marked };
+    assert.ok(judge(fixture(edition, misnamed), edition, misnamed).some((item) => item.code === 'DB_BASELINE_SHAPE'));
+  });
+
   test(`DB_BASELINE_SHAPE violating ${edition}: missing, duplicate, mismatched and invalid baseline markers`, () => {
     for (const text of ['select 1;', `${marked}\n-- starci:baseline ${first}\n`, `-- starci:baseline ${second}\nselect 1;`, '-- starci:baseline 20261301000000\nselect 1;']) {
       // A marker after SQL is deliberately ignored, so duplicate headers are a separate case.
