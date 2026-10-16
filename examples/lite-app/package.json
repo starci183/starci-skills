@@ -36,7 +36,7 @@
     "@starci/cli": "1.4.0",
     "@starci/eslint-canon-be": "3.4.0",
     "@starci/eslint-canon-fe": "8.4.0",
-    "@starci/jest-preset": "2.2.7",
+    "@starci/jest-preset": "2.3.0",
     "@starci/prettier-config": "1.0.3",
     "@starci/stylelint-canon": "2.0.9",
     "@starci/tsconfig": "2.0.4",
