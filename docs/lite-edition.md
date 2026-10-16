@@ -203,3 +203,7 @@ R215 applies in lite and full. `DB_DEFINER_SAFE` requires pinned search paths, s
 
 <a id="r216"></a>
 R216 applies in lite and full. `DB_CONFIG_POLICY` rejects literal credentials, excessive JWT lifetime and authentication settings that contradict hfs.json. `DB_TYPES_DRIFT` rejects missing or stale committed generated database types; regenerate them from the migrations with the app's contract emitter. The opt-in `check --db-types` path compares freshly emitted text without rewriting the committed file.
+
+## Edition validation
+
+`HFS_EDITION_INVALID` rejects an unknown hfs.json edition in both lite and full contexts; select `lite` or `full` (omitting it defaults to full). In lite, `HFS_EDITION_FORBIDDEN_PRESENT` rejects infrastructure and test surfaces excluded by the edition, and `HFS_STARCIWORK_LITE_FORBIDDEN` rejects Work content beyond .gitignore, workspace.yaml and brand/. Remove the forbidden surface; full retains its complete Work and test infrastructure.
