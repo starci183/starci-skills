@@ -1141,7 +1141,7 @@ rules:
 
   - id: R56
     code: "FE_HOOKS_ARE_HOOKS"
-    law: "`hooks/` hold hooks only: `hooks/swr` (one SWR wrapper per modules/api operation), `hooks/rhf` (forms), `hooks/zustand/<store>`, `hooks/socketio`, `hooks/effects`, `hooks/reuseables` and `hooks/<domain>` with one shared file per domain; a product hook is defined only there and imported through its index. A function in `hooks/` is a hook when it calls a hook: a React, SWR or Redux hook, a `use*` of the app's own `hooks/` folders (a `hooks/swr` wrapper, a sibling domain hook; resolved by TypeScript symbol resolution), or a listed library hook (next-intl, next/navigation, react-hook-form, zustand); a file that exports a non-hook still fails (owner ruling 2026-10-16 \"Theo ý trò\")."
+    law: "`hooks/` hold hooks only: `hooks/swr` (one SWR wrapper per modules/api operation), `hooks/rhf` (forms), `hooks/zustand/<store>`, `hooks/socketio`, `hooks/effects`, `hooks/reuseables` and `hooks/<domain>` with one shared file per domain; a product hook is defined only there and imported through its index. A function in `hooks/` is a hook when it calls a hook: a React, SWR or Redux hook, a `use*` of the app's own `hooks/` folders (a `hooks/swr` wrapper, a sibling domain hook; resolved by TypeScript symbol resolution), or a listed library hook (next-intl, next/navigation, react-hook-form, zustand); a file that exports a non-hook still fails (owner ruling 2026-10-16 \"Theo y tro\")."
     kinds: [lint, codemod]
     gates: [settle, land, ci]
     failureCodes: ["FE_HOOKS_ARE_HOOKS", "FE_CUSTOM_HOOK_LOCATION", "FE_BLOCK_PRODUCT_HOOK_DEFINITION", "FE_COMPONENT_DEEP_HOOK_IMPORT"]
@@ -4725,7 +4725,7 @@ rules:
       - {"path":"packages/eslint/be/webhook-handoff-inbox.spec.mjs","edition":"full","codes":["BE_WEBHOOK_INBOX_KEY"]}
   - id: R264
     code: "HFS_FEATURE_LOGIC_ROLE"
-    law: "A non-door role in the feature tier declares data, types and DTO metadata only: a support policy, guard, client, filter, interceptor, projection or contracts file cannot hide a decision, loop, computation or executable call by changing its suffix. Business logic belongs in tested modules; thin feature roles remain governed by R203 and feature module composition keeps its module laws. One exemption (owner ruling 2026-10-16 \"Theo ý trò\"): a `registerEnumType(...)` call of `@nestjs/graphql` at module top level of a `<name>.type.ts` file of the GraphQL transport slot (`be.transport.graphql`) declares a schema enum that `starci app emit` loads from that file; the same call in any other role or slot, or nested in a function, is still logic."
+    law: "A non-door role in the feature tier declares data, types and DTO metadata only: a support policy, guard, client, filter, interceptor, projection or contracts file cannot hide a decision, loop, computation or executable call by changing its suffix. Business logic belongs in tested modules; thin feature roles remain governed by R203 and feature module composition keeps its module laws. One exemption (owner ruling 2026-10-16 \"Theo y tro\"): a `registerEnumType(...)` call of `@nestjs/graphql` at module top level of a `<name>.type.ts` file of the GraphQL transport slot (`be.transport.graphql`) declares a schema enum that `starci app emit` loads from that file; the same call in any other role or slot, or nested in a function, is still logic."
     kinds: [lint]
     gates: ["pre-commit","settle","land","ci"]
     failureCodes: ["HFS_FEATURE_LOGIC_ROLE"]
