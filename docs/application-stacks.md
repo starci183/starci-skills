@@ -331,11 +331,11 @@ In both editions, `HFS_DOCKER_BASE_PIN` refuses moving base tags and unresolved 
 
 ## App image build context {#r187}
 
-In lite and full, `HFS_DOCKER_BUILD_CONTEXT` requires a Dockerfile header stating `starci docker build <app>` for that app, or its explicit `docker build -f <side>/apps/<app>/Dockerfile -t <image> .` equivalent. The context is the app root. COPY and ADD sources must stay inside it; absolute paths and `..` segments are refused.
+In lite and full, `HFS_DOCKER_BUILD_CONTEXT` requires a Dockerfile header stating `starci docker build <app>` for that app, or the explicit Dockerfile-path build from the app root that earlier headers state. The context is the app root. COPY and ADD sources must stay inside it; absolute paths and `..` segments are refused.
 
 ## App image stages {#r188}
 
-In both editions, `HFS_DOCKER_STAGES` requires a `build` stage and a final `runtime` stage ending as `USER node`. Every install uses `npm ci`; local and global `npm install` or `npm i` are refused. The runtime never builds. A back-end runtime uses `npm ci --omit=dev --ignore-scripts`; a Next runtime installs nothing.
+In both editions, `HFS_DOCKER_STAGES` requires a `build` stage and a final `runtime` stage ending as `USER node`. Every install is a clean lockfile install (`starci npm ci` on hosts); local and global `npm install` or `npm i` are refused. The runtime never builds. A back-end runtime installs production dependencies only and runs no lifecycle scripts; a Next runtime installs nothing.
 
 ## App image secret inputs {#r191}
 

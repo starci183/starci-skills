@@ -5,7 +5,7 @@ Owner: knowledge/hfs/rules.yaml
 ## R102
 
 `BE_SPEC_PLACEMENT` keeps back-end tests in their owning layers in both lite and full. Unit tests sit beside a unit-tested role as `<name>.service.spec.ts` or `<name>.cli.spec.ts`;
-Integration, e2e and contract tests belong below `be/src/tests/{integration,e2e,contract}`.
+Integration, e2e and contract tests belong in the integration, e2e and contract folders below `be/src/tests`.
 A spec or test placed under an application folder or any other directory outside those layers produces this finding.
 Move the test into its layer; operational scripts carry no specs. Lite permits contract tests while its separate edition rules still restrict e2e execution.
 

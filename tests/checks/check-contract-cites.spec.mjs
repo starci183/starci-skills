@@ -177,3 +177,20 @@ test('a skill reference cited as references/<file>.md resolves under the skill f
     assert.deepEqual(checkContractCites(root).dead.map(({target}) => target), ['skills/starci/references/gone.md']);
   } finally { fs.rmSync(root, {recursive: true, force: true}); }
 });
+
+test('a managed template cited with its .tpl suffix is judged as a whole path', () => {
+  const root = fixtureTree({
+    'templates/real.sql.tpl': 'select 1;',
+    'modules/kernel/fixture.yaml': [
+      'a:',
+      '  citation: "templates/real.sql.tpl is here; templates/ghost.sql.tpl is not"',
+      '',
+    ].join(String.fromCharCode(10)),
+  });
+  try {
+    const report = checkContractCites(root);
+    assert.deepEqual(report.dead.map((d) => d.target), ['templates/ghost.sql.tpl']);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
