@@ -98,7 +98,7 @@ const parses = (text) =>
     compilerOptions: { experimentalDecorators: true },
   }).diagnostics.length === 0;
 
-test("ensureLiteCli writes the unit spec of every built-in command, each parseable and naming its command (ruling:R212/case-1, amended by ruling:R212/case-4)", () => {
+test("ensureLiteCli writes the unit spec of every built-in command, each parseable and naming its command (ruling:R212/case-1 (owner:lite-production-swarm), amended by ruling:R212/case-4)", () => {
   const root = appRoot();
   const created = ensureLiteCli({ root, manifest, repo: repoAt(root) });
   const specs = created.filter((relative) => relative.endsWith(".cli.spec.ts")).sort((left, right) => left.localeCompare(right));
