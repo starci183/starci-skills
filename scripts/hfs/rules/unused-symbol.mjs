@@ -5,9 +5,9 @@ import { createRequire } from 'node:module';
 import { found, readText } from './read.mjs';
 import { nameText } from '../../lib/ts-ast.mjs';
 import { unwrapCatalogExpression as unwrap } from '../../lib/ts-analysis.mjs';
-import { argumentBindings, jsonCatalogBindings, jsonCatalogRead, staticStrings } from './unused-symbol-values.mjs';
+import { argumentBindings, callable, jsonCatalogBindings, jsonCatalogRead, staticStrings } from './unused-symbol-values.mjs';
 import { catalogNamespace, translationBindings } from './unused-symbol-translators.mjs';
-import { valuesOf } from './unused-symbol-flow.mjs';
+import { returnedExpressions, valuesOf } from './unused-symbol-flow.mjs';
 
 export const HFS_UNUSED_SYMBOL = 'HFS_UNUSED_SYMBOL';
 const SOURCE = /\.[cm]?[jt]sx?$/u;
@@ -196,22 +196,39 @@ function ignoredRead(state, node, source) {
 
 const readKey = (state, prefix, value) => (prefix === null ? state.looseReads : state.catalogReads).add(prefix === null ? value : `${prefix}${value}`);
 
-function catalogArguments(state, node, prefix) {
+const hasLiteral = template => Boolean(template.head.text) || template.templateSpans.some(span => span.literal.text);
+
+/** The function a call runs, when it is a local or imported arrow or declaration. */
+function calledFunction(state, call) {
+  const target = callable(state, call.expression);
+  return target && (state.ts.isArrowFunction(target) || state.ts.isFunctionExpression(target) || state.ts.isFunctionDeclaration(target)) ? target : null;
+}
+
+/** What an argument that is no literal can still spell: resolved values, wrapper arguments, and what a key builder returns. */
+function indirectArguments(state, argument, prefix, seen) {
+  const { ts } = state;
+  for (const value of staticStrings(state, argument)) readKey(state, prefix, value);
+  for (const leaf of valuesOf(state, argument)) if (leaf !== argument) catalogArguments(state, leaf, prefix, seen);
+  const builder = ts.isCallExpression(argument) ? calledFunction(state, argument) : null;
+  for (const returned of builder ? returnedExpressions(ts, builder) : []) catalogArguments(state, returned, prefix, seen);
+}
+
+function templateArguments(state, template, prefix) {
+  // A literal head or tail makes the template a key pattern; a template of holes only proves nothing.
+  if (prefix !== null && hasLiteral(template)) state.templates.push([`${prefix}${template.head.text}`, ...template.templateSpans.map(span => span.literal.text)]);
+}
+
+function catalogArguments(state, node, prefix, seen = new Set()) {
   const { ts } = state;
   const argument = unwrap(ts, node);
-  if (!argument) return;
+  if (!argument || seen.has(argument)) return;
+  seen.add(argument);
   if (ts.isConditionalExpression(argument)) {
-    catalogArguments(state, argument.whenTrue, prefix);
-    catalogArguments(state, argument.whenFalse, prefix);
+    catalogArguments(state, argument.whenTrue, prefix, seen);
+    catalogArguments(state, argument.whenFalse, prefix, seen);
   } else if (ts.isStringLiteralLike(argument)) readKey(state, prefix, argument.text);
-  else if (ts.isTemplateExpression(argument)) {
-    // A static head is a key prefix: every defined key below it is read. A template with no static head proves nothing.
-    if (prefix !== null) state.templates.push([`${prefix}${argument.head.text}`, ...argument.templateSpans.map(span => span.literal.text)]);
-  } else {
-    for (const value of staticStrings(state, argument)) readKey(state, prefix, value);
-    // A key handed to a wrapper parameter can be a template at the call site.
-    for (const leaf of valuesOf(state, argument)) if (leaf !== argument) catalogArguments(state, leaf, prefix);
-  }
+  else if (ts.isTemplateExpression(argument)) templateArguments(state, argument, prefix);
+  else indirectArguments(state, argument, prefix, seen);
 }
 
 function namespacePrefix(namespace) {

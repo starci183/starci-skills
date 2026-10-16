@@ -73,3 +73,16 @@ export function valuesOf(state, expression, visited = new Set()) {
   if (!symbol?.valueDeclaration || state.translators.has(symbol)) return [node];
   return declarationValues(state, symbol.valueDeclaration, seen);
 }
+
+/** The expressions a function returns: its expression body, or the operand of each return outside nested functions. */
+export function returnedExpressions(ts, fn) {
+  if (!fn.body) return [];
+  if (!ts.isBlock(fn.body)) return [fn.body];
+  const found = [];
+  const visit = node => {
+    if (ts.isReturnStatement(node) && node.expression) found.push(node.expression);
+    if (!ts.isFunctionLike(node)) ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(fn.body, visit);
+  return found;
+}

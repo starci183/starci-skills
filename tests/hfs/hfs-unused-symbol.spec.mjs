@@ -314,3 +314,48 @@ const t = useTranslations("footer"); export const keys = COLS.map(c => c.links.m
     assert.deepEqual(namesOf(fixture(t, contents), edition), ['footer.retired']);
   });
 }
+
+for (const edition of ['lite', 'full']) {
+  test(`HFS_UNUSED_SYMBOL ${edition}: a key builder returning a template and inline templates with unknown holes read the keys they can spell, in their own namespace only`, t => {
+    const contents = {
+      'apps/web/src/modules/i18n/messages/en.json': JSON.stringify({ connections: { catalog_airtable_blurb: 'A', filterGmail: 'G', retired: 'Retired' }, other: { catalog_a_b: 'Other' } }),
+      'apps/web/src/features/catalog.tsx': `const keyOf = (id: string, part: "name" | "blurb") => \`catalog_\${id}_\${part}\`;
+const t = useTranslations("connections");
+export const label = t(keyOf(entry.id, "blurb"));
+export const filter = (id: string) => t(\`filter\${id.charAt(0).toUpperCase()}\${id.slice(1)}\`);
+export const anything = (x: string) => t(\`\${x}\`);`,
+    };
+    assert.deepEqual(namesOf(fixture(t, contents), edition), ['connections.retired', 'other.catalog_a_b']);
+    contents['apps/web/src/features/catalog.tsx'] += ' export const direct = t("retired");';
+    assert.deepEqual(namesOf(fixture(t, contents), edition), ['other.catalog_a_b']);
+  });
+
+  test(`HFS_UNUSED_SYMBOL ${edition}: a translator hook or forwarding wrapper keeps the namespace of the translator it forwards to`, t => {
+    const contents = {
+      'apps/web/src/modules/i18n/messages/en.json': JSON.stringify({ hiring: { applyWebsite: 'Apply', retired: 'Retired' }, audit: { auditDetail: 'Detail', retired: 'Retired' }, other: { applyWebsite: 'Other' } }),
+      'apps/web/src/features/use-say.ts': 'export const useHiringSay = () => { const t = useTranslations("hiring"); return useCallback((key: string, values?: any) => t(key, values), [t]); };',
+      'apps/web/src/features/apply.tsx': `import { useHiringSay } from './use-say';
+const say = useHiringSay(); export const a = say("applyWebsite");
+const audit = useTranslations("audit"); const text = (key: string) => audit(key);
+export function Row(props: { text: (key: string) => string }) { return props.text("auditDetail"); }
+export const row = <Row text={text} />;`,
+    };
+    assert.deepEqual(namesOf(fixture(t, contents), edition), ['audit.retired', 'hiring.retired', 'other.applyWebsite']);
+    contents['apps/web/src/features/apply.tsx'] += ' export const b = say("retired");';
+    assert.deepEqual(namesOf(fixture(t, contents), edition), ['audit.retired', 'other.applyWebsite']);
+  });
+
+  test(`HFS_UNUSED_SYMBOL ${edition}: an imported key table consumed through a wrapper reads the property that is handed on, not its siblings`, t => {
+    const contents = {
+      'apps/web/src/modules/i18n/messages/en.json': JSON.stringify({ smtpPresets: { gmail_label: 'Gmail', gmail_hint: 'Hint', retired: 'Retired' } }),
+      'apps/web/src/features/presets.ts': 'export const PRESETS = [{ label: "gmail_label", hint: "gmail_hint" }] as const;',
+      'apps/web/src/features/use-say.ts': 'export const useSmtpSay = () => { const t = useTranslations("smtpPresets"); return useCallback((key: string) => t(key), [t]); };',
+      'apps/web/src/features/form.tsx': `import { PRESETS } from './presets';
+import { useSmtpSay } from './use-say';
+const say = useSmtpSay(); export const options = PRESETS.map(p => ({ label: say(p.label) }));`,
+    };
+    assert.deepEqual(namesOf(fixture(t, contents), edition), ['smtpPresets.gmail_hint', 'smtpPresets.retired']);
+    contents['apps/web/src/features/form.tsx'] += ' export const hints = () => { for (const p of PRESETS) say(p.hint); };';
+    assert.deepEqual(namesOf(fixture(t, contents), edition), ['smtpPresets.retired']);
+  });
+}

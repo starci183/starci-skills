@@ -1,8 +1,8 @@
 // Translators of R280: which catalog namespace a `t(...)` call reads, followed through destructuring and props.
 import { nameText } from '../../lib/ts-ast.mjs';
 import { unwrapCatalogExpression as unwrap } from '../../lib/ts-analysis.mjs';
-import { staticStrings } from './unused-symbol-values.mjs';
-import { symbolAt, valuesOf } from './unused-symbol-flow.mjs';
+import { callable, staticStrings } from './unused-symbol-values.mjs';
+import { returnedExpressions, symbolAt, valuesOf } from './unused-symbol-flow.mjs';
 
 const TRANSLATOR_NAME = /^(?:t|translate)$/u;
 
@@ -36,10 +36,45 @@ function translatorList(ts, initializer) {
   return list && ts.isArrayLiteralExpression(list) ? list.elements : [];
 }
 
+const isFunction = (ts, node) => Boolean(node) && (ts.isArrowFunction(node) || ts.isFunctionExpression(node) || ts.isFunctionDeclaration(node));
+
+/** A function whose result is a call on a bound translator with its own first parameter is that translator. */
+function forwardedNamespaces(state, fn) {
+  const { ts, checker } = state;
+  const parameter = fn.parameters[0];
+  if (!parameter || !ts.isIdentifier(parameter.name)) return [];
+  const own = checker.getSymbolAtLocation(parameter.name);
+  return returnedExpressions(ts, fn).flatMap(expression => {
+    const call = unwrap(ts, expression);
+    const first = call && ts.isCallExpression(call) ? unwrap(ts, call.arguments[0]) : null;
+    if (!first || !ts.isIdentifier(first) || checker.getSymbolAtLocation(first) !== own) return [];
+    return receiverNamespaces(state, call.expression);
+  });
+}
+
+/** A hook returns such a forwarding function, bare or wrapped in useCallback. */
+function hookNamespaces(state, hook) {
+  const { ts } = state;
+  return returnedExpressions(ts, hook).flatMap(expression => {
+    let inner = unwrap(ts, expression);
+    if (inner && ts.isCallExpression(inner) && leafName(ts, inner.expression) === 'useCallback') inner = unwrap(ts, inner.arguments[0]);
+    return isFunction(ts, inner) ? forwardedNamespaces(state, inner) : [];
+  });
+}
+
+function wrapperNamespaces(state, initializer) {
+  const { ts } = state;
+  let init = unwrap(ts, initializer);
+  if (init && ts.isAwaitExpression(init)) init = unwrap(ts, init.expression);
+  if (isFunction(ts, init)) return forwardedNamespaces(state, init);
+  const target = init && ts.isCallExpression(init) ? callable(state, init.expression) : null;
+  return isFunction(ts, target) ? hookNamespaces(state, target) : [];
+}
+
 function bindTranslator(state, name, initializer, factories) {
   const { ts, checker } = state;
   if (ts.isIdentifier(name)) {
-    const namespaces = translatorNamespace(state, initializer, factories);
+    const namespaces = translatorNamespace(state, initializer, factories) ?? wrapperNamespaces(state, initializer);
     if (namespaces?.length) state.translators.set(checker.getSymbolAtLocation(name), namespaces);
   } else if (ts.isArrayBindingPattern(name)) {
     const elements = translatorList(ts, initializer);
@@ -47,14 +82,18 @@ function bindTranslator(state, name, initializer, factories) {
   }
 }
 
+/** Wrappers depend on translators bound in other modules, so bind until nothing new appears. */
 export function translationBindings(state, sources) {
-  for (const source of sources.values()) {
-    const factories = translationFactories(state.ts, source);
-    const visit = node => {
-      if (state.ts.isVariableDeclaration(node) && node.initializer) bindTranslator(state, node.name, node.initializer, factories);
-      state.ts.forEachChild(node, visit);
-    };
-    visit(source);
+  const factories = new Map([...sources.values()].map(source => [source, translationFactories(state.ts, source)]));
+  for (let pass = 0, size = -1; pass < 4 && size !== state.translators.size; pass++) {
+    size = state.translators.size;
+    for (const source of sources.values()) {
+      const visit = node => {
+        if (state.ts.isVariableDeclaration(node) && node.initializer) bindTranslator(state, node.name, node.initializer, factories.get(source));
+        state.ts.forEachChild(node, visit);
+      };
+      visit(source);
+    }
   }
 }
 

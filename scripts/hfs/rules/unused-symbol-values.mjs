@@ -5,7 +5,7 @@ import { symbolAt, valuesOf } from './unused-symbol-flow.mjs';
 
 const JSON_CATALOG = /(?:^|\/)(?:messages|locales)\/[^/]+\.json$|\.catalog\.json$/u;
 
-function callable(state, node) {
+export function callable(state, node) {
   const declaration = symbolAt(state, node)?.valueDeclaration;
   if (declaration && state.ts.isVariableDeclaration(declaration)) return unwrap(state.ts, declaration.initializer);
   return declaration;
