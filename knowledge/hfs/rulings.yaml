@@ -392,7 +392,7 @@ rulings:
     topic: code.be-graphql-enum
     status: live
     ownerRuling: 13
-    source: owner ruling 2026-10-16 "Theo ý trò" (alpha.18 NIVO canon request D); packages/eslint/be/feature-thin.mjs
+    source: owner ruling 2026-10-16 "Theo y tro" (the owner delegated the decision to main) (alpha.18 NIVO canon request D); packages/eslint/be/feature-thin.mjs
     statement: >-
       A registerEnumType(...) call of @nestjs/graphql is allowed at module top level of a feature GraphQL
       <name>.type.ts file of the be.transport.graphql slot, because starci app emit loads only the resolver,
@@ -408,7 +408,7 @@ rulings:
     topic: code.fe-hooks
     status: live
     ownerRuling: 14
-    source: owner ruling 2026-10-16 "Theo ý trò" (alpha.18 NIVO canon request C); packages/eslint/fe/hooks-folder.mjs
+    source: owner ruling 2026-10-16 "Theo y tro" (the owner delegated the decision to main) (alpha.18 NIVO canon request C); packages/eslint/fe/hooks-folder.mjs
     statement: >-
       A function in a hooks folder is a hook when it calls a hook: a React, SWR or Redux hook, a use* function
       imported from the app's own hooks folders (hooks/swr wrappers, sibling domain hooks; resolved by TypeScript

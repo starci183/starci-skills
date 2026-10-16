@@ -1,25 +1,8 @@
 /** Resolve typed Redux hook factories by their import provenance, never by a local use* name. */
 import ts from "typescript"
-import path from "node:path"
+import { programFor } from "./program-for.mjs"
 
 const REDUX_HOOKS = new Set(["useSelector", "useDispatch", "useStore"])
-const programs = new WeakMap()
-
-function programFor(context) {
-  if (programs.has(context)) return programs.get(context)
-  const services = context.sourceCode?.parserServices
-  if (services?.program) return services.program
-  const filename = context.filename
-  const configPath = ts.findConfigFile(path.dirname(filename), ts.sys.fileExists)
-  let options = { moduleResolution: ts.ModuleResolutionKind.Bundler, module: ts.ModuleKind.ESNext }
-  if (configPath) {
-    const config = ts.readConfigFile(configPath, ts.sys.readFile)
-    options = { ...options, ...ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(configPath)).options }
-  }
-  const program = ts.createProgram([filename], options)
-  programs.set(context, program)
-  return program
-}
 
 function reduxImport(declaration) {
   if (!ts.isImportSpecifier(declaration) || declaration.isTypeOnly) return false
