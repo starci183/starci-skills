@@ -222,3 +222,13 @@ for one of that pattern's required scenario ids in `ruleParams.be.patternScenari
 Full accepts tracked e2e or integration specs under `be/src/tests`; lite requires
 runnable tests in tracked `be/src/tests/integration/*.integration-spec.ts` files,
 including nested folders. Adding the missing scenario proof clears the finding.
+
+<a id="r142"></a>
+### Ambient identifier ownership
+
+In lite and full, R142 reports `BE_AMBIENT_ID` for ambient identifier sources
+outside `platform/ids`, including ordinary specs. The test world
+(slot `be.tests.world`) remains exempt as the composition root that names real
+test resources, under owner ruling `ambient-id-test-world-exemption`.
+Application code asks the injected `Ids` port through `ids.next()`; ordinary
+specs supply deterministic identifiers through `fakeIds()`.

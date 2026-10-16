@@ -2444,10 +2444,19 @@ rules:
     law: "`randomUUID` of Node's crypto (named, namespace or global), the `v1`, `v4`, `v6` and `v7` generators of `uuid`, `nanoid` and `ulid` are used only inside `platform/ids`, specs included, with one exception: the test world (slot `be.tests.world`), the composition root of tests that names real resources; code asks the injected `Ids` port (`ids.next()`) and specs use `fakeIds()`."
     amendedBy: [owner:ambient-id-test-world-exemption]
     kinds: [lint, codemod]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_AMBIENT_ID"]
     enforcers:
       - {kind: eslint-be, id: no-ambient-id}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r142]
+    templateNa: "Ambient identifier sources are a negative lint constraint; the spec exercises owned, test-world and injected identifiers rather than a scaffolded surface."
+    proves: [packages/eslint/be/ambient-id.spec.mjs]
+    exemplifiedBy:
+      - {path: packages/eslint/be/ambient-id.spec.mjs, editions: [lite, full], codes: [BE_AMBIENT_ID]}
+    witness:
+      - {path: packages/eslint/be/ambient-id.spec.mjs, edition: lite, codes: [BE_AMBIENT_ID]}
+      - {path: packages/eslint/be/ambient-id.spec.mjs, edition: full, codes: [BE_AMBIENT_ID]}
   - id: R143
     code: "HFS_MONO_WORKSPACES"
     law: "Every app is a monorepo, even with one service: the app root package.json declares `workspaces` exactly `[\"fe/apps/*\", \"fe/packages/*\"]`, `packageManager` as `npm@<exact version>` and `turbo` in its devDependencies (at the canon pin), the app root holds the one `package-lock.json` and the managed `turbo.json` (app.task-graph: build, dev, lint and typecheck, build depending on `^build` with cached `.next` and `dist` outputs)."
@@ -2675,7 +2684,20 @@ rules:
     gates: [land, ci]
     failureCodes: ["BE_PATTERN_SPEC_MISSING"]
     enforcers:
-      - {kind: hfs, id: pattern-spec-missing, at: scripts/hfs/rules/event-bus.mjs}
+      - {kind: hfs, id: pattern-spec-missing, at: scripts/hfs/rules/event-bus.mjs, editions: [full]}
+      - {kind: hfs, id: lite-proof-lane, at: scripts/hfs/rules/lite-proof-lane.mjs, editions: [lite]}
+    editionWhy: "owner:gate-loosening-e77ca91cded7 approves the per-edition enforcer split; ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4) gives lite its integration proof lane while full retains e2e or integration proofs."
+    docs: [docs/quality-bar.md#r155]
+    templateNa: "Pattern scenarios depend on application behavior and providers; no universal runnable scenario proof is scaffolded."
+    proves:
+      - {path: tests/hfs-proofs/hfs-pattern-spec-missing.spec.mjs, editions: [full], codes: [BE_PATTERN_SPEC_MISSING]}
+      - {path: tests/hfs/hfs-lite-proof-lane.spec.mjs, editions: [lite], codes: [BE_PATTERN_SPEC_MISSING]}
+    exemplifiedBy:
+      - {path: tests/hfs-proofs/hfs-pattern-spec-missing.spec.mjs, editions: [full], codes: [BE_PATTERN_SPEC_MISSING]}
+      - {path: tests/hfs/hfs-lite-proof-lane.spec.mjs, editions: [lite], codes: [BE_PATTERN_SPEC_MISSING]}
+    witness:
+      - {path: tests/hfs-proofs/hfs-pattern-spec-missing.spec.mjs, edition: full, codes: [BE_PATTERN_SPEC_MISSING]}
+      - {path: tests/hfs/hfs-lite-proof-lane.spec.mjs, edition: lite, codes: [BE_PATTERN_SPEC_MISSING]}
   - id: R156
     code: "BE_KIND_ISOLATION"
     editions: [lite, full]
