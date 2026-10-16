@@ -51,6 +51,16 @@ The 2026-10-14 custody ruling places the private age identity only in the owner'
 
 `set <env> <slug> <KEY>` reads the value from stdin or creates it with `--generate <bytes>`. Feed stdin directly from an owner-controlled local secret source; do not put a value in argv, shell history, chat or an `echo` command. The command never prints the value. One trailing stdin line ending is removed; other supported value bytes are preserved. Multiline LF values are supported; carriage returns and a literal backslash followed by `n` are rejected without printing the value because SOPS dotenv cannot represent them losslessly. Each member is a SOPS dotenv document, and updating one key retains the other keys. `list <env>` prints key names only. New envelopes use dotenv; existing JSON/YAML envelopes can be read during migration.
 
+### Edit a sealed member
+
+```sh
+starci app secret unset production stack N8N_SIGNING_SECRET --execute
+starci app secret rename production vps-ssh-key data privateKey --execute
+starci app secret remove production web --force-nonempty --execute
+```
+
+`unset <env> <slug> <KEY>` removes one key, `rename <env> <slug> <OLD> <NEW>` renames a key and keeps its value, and `remove <env> <slug>` deletes a whole member file. All three are dry runs until `--execute`; a dry run reads only the public key names of the envelope, so it needs no age identity. They refuse an unknown member or key, an invalid key name, a rename onto an existing key, and `unset` of the last key of a member (a sealed member cannot be empty). `remove` deletes a member only when it holds no keys, or with `--force-nonempty`. An executed edit decrypts the member in memory, re-seals it to the same age recipients in the same sops format, checks the sealed result and replaces the file atomically; no value is printed. A sops binary envelope whose only property is `data` (the ssh key and known_hosts members) is re-sealed by `rename` as a JSON envelope under the new property name, for example `privateKey`, `knownHosts` or `ciPrivateKey`; the stack verbs read either shape.
+
 ### Materialize for a process
 
 ```sh

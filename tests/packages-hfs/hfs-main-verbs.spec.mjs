@@ -233,7 +233,7 @@ test('main check accepts both proof options and produces their JSON reports', as
 test('main rejects missing/duplicate coverage paths and unknown database verbs and advertises the public surface', async () => {
   const help = await cli(['--help']);
   assert.equal(help.code, 0);
-  for (const text of ['--wiring', '--coverage-from <lcov>', 'db baseline', 'db restamp', 'db plan', 'secret verify <env>']) assert.ok(help.out.includes(text), text);
+  for (const text of ['--wiring', '--coverage-from <lcov>', 'db baseline', 'db restamp', 'db plan', 'secret verify <env>', 'secret unset <env>', 'secret rename <env>', 'secret remove <env>']) assert.ok(help.out.includes(text), text);
   assert.ok(VERBS.includes('db'));
   const invalidDatabase = [[], ['unknown'], ['plan', '--map', 'restamp.yaml']];
   const databaseResults = await Promise.all(invalidDatabase.map(args => cli(['db', ...args])));

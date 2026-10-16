@@ -14,19 +14,19 @@ const capture = () => {
 
 test('the app secret catalog exposes current verbs and both editions, with help describing private file output', async () => {
   const command = CATALOG.groups.app.verbs.secret;
-  assert.deepEqual(command.positional[0].enum, ['init', 'set', 'get', 'materialize', 'list', 'verify']);
+  assert.deepEqual(command.positional[0].enum, ['init', 'set', 'get', 'unset', 'rename', 'remove', 'materialize', 'list', 'verify']);
   assert.deepEqual(command.editions, ['full', 'lite']);
   assert.equal(command.json, 'none');
   const help = capture();
   assert.equal(await cliMain(['app', 'secret', '--help'], help), 0);
-  for (const name of ['init', 'set', 'get', 'materialize', 'list', 'verify', '--generate', '--to-file', '--reveal']) assert.ok(help.value.out.includes(name), `secret help exposes ${name}`);
+  for (const name of ['init', 'set', 'get', 'unset', 'rename', 'remove', 'materialize', 'list', 'verify', '--generate', '--to-file', '--reveal', '--execute', '--force-nonempty']) assert.ok(help.value.out.includes(name), `secret help exposes ${name}`);
 });
 
 test('the package dispatcher accepts each secret verb in lite, forwards local flags, and preserves caller context', async t => {
   const cwd = mkdtemp(t, 'starci-secret-dispatch-');
   const env = { STARCI_ROLE: 'owner', FIXTURE_CONTEXT: 'kept' };
   const stdin = () => 'private-dispatch-input';
-  await Promise.all([['init'], ['set', 'production', 'app-be-db', 'DB_PASSWORD', '--generate', '32'], ['get', 'production', 'app-be-db', 'DB_PASSWORD', '--to-file'], ['materialize', 'production'], ['list', 'production'], ['verify', 'production']].map(async args => {
+  await Promise.all([['init'], ['set', 'production', 'app-be-db', 'DB_PASSWORD', '--generate', '32'], ['get', 'production', 'app-be-db', 'DB_PASSWORD', '--to-file'], ['materialize', 'production'], ['list', 'production'], ['verify', 'production'], ['unset', 'production', 'stack', 'OLD_KEY', '--execute'], ['rename', 'production', 'stack', 'OLD_KEY', 'NEW_KEY', '--execute'], ['remove', 'production', 'web', '--force-nonempty', '--execute']].map(async args => {
     const output = capture(); let received;
     const code = await cliMain(['app', 'secret', ...args, '--edition', 'lite', '--cwd', cwd], {
       ...output, cwd, env, stdin,

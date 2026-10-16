@@ -240,15 +240,17 @@ starci app scaffold demo --into projects
 
 ### starci app secret
 
-initialize, seal, materialize and verify app secrets
+initialize, seal, edit, materialize and verify app secrets
 
 | flag | type | |
 | --- | --- | --- |
 | `--generate` | number |  |
 | `--to-file` | boolean |  |
 | `--reveal` | boolean |  |
+| `--execute` | boolean |  |
+| `--force-nonempty` | boolean |  |
 
-Positionals: action, env?, slug?, key?
+Positionals: action, env?, slug?, key?, new-key?
 
 exit: 0 action completed; 2 verification findings or refusal or bad usage
 
@@ -258,6 +260,9 @@ json: none
 starci app secret init
 starci app secret set production app-be-db DB_PASSWORD --generate 32
 starci app secret get production app-be-db DB_PASSWORD --to-file
+starci app secret unset production stack N8N_SIGNING_SECRET --execute
+starci app secret rename production vps-ssh-key data privateKey --execute
+starci app secret remove production web --force-nonempty --execute
 starci app secret materialize production
 starci app secret list production
 starci app secret verify production

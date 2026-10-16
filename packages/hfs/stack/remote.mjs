@@ -50,7 +50,7 @@ function sshCommandArgv(sshCmd) {
   return parts;
 }
 
-/** A sealed binary member is the file itself; a JSON object around it ({ data | <names> }) is tolerated. */
+/** A sealed binary member is the file itself; a JSON object around it ({ data | <names> }, the re-sealed shape of `starci app secret rename`) is unwrapped. */
 function unwrap(text, names) {
   const body = lfOnly(text);
   const trimmed = body.trim();

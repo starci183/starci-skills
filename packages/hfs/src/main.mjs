@@ -39,6 +39,7 @@
 //   starci app stack prepare|doctor|connect|disconnect|build-args|render|deploy|converge|verify|rollback|prune|backup|jobs --env <env> [--execute]
 //                                            the Swarm deploy tooling of stack/ (dry run unless --execute; never prints a secret value; see docs/application-stacks.md).
 //   starci app secret init | set <env> <slug> <KEY> [--generate <bytes>] | get <env> <slug> [KEY] --to-file [--reveal]
+//   starci app secret unset <env> <slug> <KEY> [--execute] | rename <env> <slug> <OLD> <NEW> [--execute] | remove <env> <slug> [--execute] [--force-nonempty]
 //   starci app secret materialize <env> | list <env> | verify <env>
 //                                            dotenv custody in .starcistacks, public age rule initialization, private KEY files outside Git;
 //                                            values reach stdout only when get explicitly receives --reveal.
@@ -109,6 +110,9 @@ starci app new image [--cwd <dir>]
 starci app secret init [--cwd <dir>]
 starci app secret set <env> <slug> <KEY> [--generate <bytes>] [--cwd <dir>]
 starci app secret get <env> <slug> [KEY] --to-file [--reveal] [--cwd <dir>]
+starci app secret unset <env> <slug> <KEY> [--execute] [--cwd <dir>]
+starci app secret rename <env> <slug> <OLD> <NEW> [--execute] [--cwd <dir>]
+starci app secret remove <env> <slug> [--execute] [--force-nonempty] [--cwd <dir>]
 starci app secret materialize <env> [--cwd <dir>]
 starci app secret list <env> [--cwd <dir>]
 starci app secret verify <env> [--cwd <dir>]
