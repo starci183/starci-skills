@@ -5387,6 +5387,7 @@ rules:
     editions: [lite, full]
     docs:
       - {path: docs/application-stacks.md#r294, editions: [lite, full]}
+      - {path: docs/application-stacks.md#r294-edge, editions: [lite, full]}
     exemplifiedBy:
       - {path: packages/hfs/templates/app/skeleton-lite/.starcistacks, edition: lite}
       - {path: packages/hfs/templates/app/skeleton/.starcistacks, edition: full}

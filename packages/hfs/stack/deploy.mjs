@@ -60,7 +60,7 @@ function refuseSharedAliases(config, bytes) {
 }
 
 /**
- * Read-only preflight on the live edge networks: the implicit short name of a service (`api` for nivo_api) must not equal a name another container or
+ * Read-only preflight on the live edge networks: the implicit short name of a service (`api` for shop_api) must not equal a name another container or
  * service of the same external network resolves (docker stack deploy adds it as an alias, and the other tenant's `http://api` would reach this stack).
  */
 async function refuseEdgeCollisions(run, config, bytes) {

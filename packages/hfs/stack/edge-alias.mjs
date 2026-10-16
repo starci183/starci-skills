@@ -1,7 +1,7 @@
 // edge-alias.mjs - the network aliases of a service on a SHARED EXTERNAL (edge) overlay network.
 // `docker stack deploy` adds the compose service name (`api`) as an implicit alias on EVERY network a service joins, whatever `aliases:` the compose
 // file lists. On a network that other tenants share, `api` then resolves to this stack's service too (the 2026-10-15 incident: tayson-web proxied
-// http://api:3074 and got nivo_api for 17 hours). So an edge attachment must carry ONLY its declared aliases:
+// http://api:3074 and got shop_api for 17 hours). So an edge attachment must carry ONLY its declared aliases:
 //   edgeAttachments       the services of a rendered (or source) stack attached to an external network, with their declared aliases
 //   edgeCollisions        read-only preflight: does a short service name equal a name another container or service of that network resolves?
 //   reconcileEdgeAliases  after `docker stack deploy`: `service update --network-rm <edge>` then `--network-add name=<edge>,alias=<declared>`
@@ -52,7 +52,7 @@ async function networkNames(run, network) {
 }
 
 /**
- * Read-only: for each external network of `bytes`, which implicit short service names (`api` for nivo_api) another container or service of that
+ * Read-only: for each external network of `bytes`, which implicit short service names (`api` for shop_api) another container or service of that
  * network already resolves. Returns { networks, clashes: [{ service, alias, network, holder }] }; throws STACK_DEPLOY_EDGE_UNREADABLE when a
  * network cannot be inspected. This stack's own services (`<stack>_*`) are not "others".
  */
