@@ -1,3 +1,5 @@
+// proves: HFS_DOCKER_BUILD_CONTEXT@lite
+// proves: HFS_DOCKER_BUILD_CONTEXT@full
 // proves: HFS_DOCKER_STAGES@lite
 // proves: HFS_DOCKER_STAGES@full
 // proves: HFS_DOCKER_ENTRY@lite
@@ -11,6 +13,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { imageFiles } from '../../packages/hfs/sync/index.mjs';
 import { dockerFindings, NODE_IMAGE } from '../../scripts/hfs/rules/docker.mjs';
 
@@ -59,9 +62,27 @@ const judged = (t, edition, code, mutation) => dockerFindings(fixture(t, edition
 const change = (file, from, to) => ({ path: file, from, to });
 
 for (const edition of ['lite', 'full']) {
+  test(`${edition} accepts valid build headers and rejects invalid headers and escaping sources`, (t) => {
+    const code = 'HFS_DOCKER_BUILD_CONTEXT';
+    assert.deepEqual(judged(t, edition, code), []);
+    const header = 'docker build -f be/apps/cli/Dockerfile -t proof/cli:<tag> .';
+    assert.deepEqual(judged(t, edition, code, change(CLI, header, 'starci docker build cli')), []);
+    const nextHeader = 'docker build -f fe/apps/web/Dockerfile -t proof/web:<tag> .';
+    assert.deepEqual(judged(t, edition, code, change(NEXT, nextHeader, 'starci docker build web')), []);
+    for (const replacement of ['build this image', 'starci docker build other']) {
+      assert.deepEqual(judged(t, edition, code, change(CLI, header, replacement)), [code]);
+    }
+    for (const source of ['../outside', '/outside']) {
+      assert.deepEqual(judged(t, edition, code, change(CLI, 'USER node', `COPY ${source} ./input\nUSER node`)), [code]);
+    }
+  });
+
   test(`${edition} accepts valid image stages and rejects invalid stage discipline`, (t) => {
     assert.deepEqual(judged(t, edition, 'HFS_DOCKER_STAGES'), []);
     const invalid = [
+      change(CLI, 'USER node', 'RUN npm install -g turbo@2\nUSER node'),
+      change(CLI, 'USER node', 'RUN npm install --global turbo@2\nUSER node'),
+      change(CLI, 'RUN npm ci --ignore-scripts', 'RUN npm i -g turbo@2'),
       change(CLI, 'AS build', 'AS compilation'),
       change(CLI, 'AS runtime', 'AS final'),
       change(CLI, 'USER node', 'USER root'),
@@ -111,6 +132,7 @@ for (const edition of ['lite', 'full']) {
       assert.deepEqual(judged(t, edition, 'HFS_DOCKER_SECRETS', change(CLI, 'USER node', `${input}\nUSER node`)), []);
     }
     const invalid = [
+      'COPY .envbackup ./sample', 'ADD be/.envlocal ./sample', 'COPY .env.example.backup ./sample',
       'COPY .env ./sample', 'COPY be/.env.production ./sample', 'COPY .starcistacks/runtime ./sample',
       'COPY .secrets/input ./sample', 'COPY .volume/input ./sample', 'COPY certs/server.pem ./sample',
       'COPY be/kubeconfig.yaml ./sample', 'ADD https://example.com/tool.tgz ./tool.tgz',
@@ -119,5 +141,16 @@ for (const edition of ['lite', 'full']) {
     for (const input of invalid) {
       assert.deepEqual(judged(t, edition, 'HFS_DOCKER_SECRETS', change(CLI, 'USER node', `${input}\nUSER node`)), ['HFS_DOCKER_SECRETS']);
     }
+  });
+}
+
+for (const example of ['lite-app', 'ecommerce-app', 'shape-slot']) {
+  test(`${example} shipped Dockerfiles pass the adopted context stages and secret rules`, () => {
+    const repoRoot = path.resolve('examples', example);
+    const repo = JSON.parse(fs.readFileSync(path.join(repoRoot, 'hfs.json'), 'utf8'));
+    const files = execFileSync('git', ['ls-files', '--', '**/Dockerfile'], { cwd: repoRoot, encoding: 'utf8' }).trim().split(/\r?\n/).filter(Boolean);
+    assert.ok(files.length > 0);
+    const codes = new Set(['HFS_DOCKER_BUILD_CONTEXT', 'HFS_DOCKER_STAGES', 'HFS_DOCKER_SECRETS']);
+    assert.deepEqual(dockerFindings({ repoRoot, repo, files }).filter((finding) => codes.has(finding.code)), []);
   });
 }

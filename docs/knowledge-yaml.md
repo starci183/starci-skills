@@ -73,3 +73,7 @@ catalog sources. Refresh them with `starci runtime readme-blocks --write` or
 `RT_PROSE_RESTATES_SLOTS` rejects a line or fenced block naming at
 least three owned product paths, or a sentence listing at least three slot file
 names. Reference slot ids; generated blocks are the allowed catalog snapshot.
+
+## Product paths in prose {#r195}
+
+In lite and full, `RT_PROSE_PATH_NO_SLOT` rejects product paths in knowledge, docs and READMEs that no slot owns and that are not folders above a slot. Literal app names must belong to the shipped example declarations for that side. App placeholders resolve against those declared apps, including the lite example's API, instead of assuming a particular example name. Placeholders do not excuse an invented path below an app. Recursive globs and knowledge topic files are excluded from path checks.

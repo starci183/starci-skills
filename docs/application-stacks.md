@@ -267,3 +267,15 @@ The runtime repository is public and tracks no secret, not even ciphertext (`RT_
 ## App image base pins {#r190}
 
 In both editions, `HFS_DOCKER_BASE_PIN` refuses moving base tags and unresolved build arguments. Every `FROM` resolves to a prior stage, the exact Node and Alpine image named by `NODE_IMAGE` in `scripts/hfs/rules/docker.mjs`, or an image pinned by a complete `@sha256` digest.
+
+## App image build context {#r187}
+
+In lite and full, `HFS_DOCKER_BUILD_CONTEXT` requires a Dockerfile header stating `starci docker build <app>` for that app, or its explicit `docker build -f <side>/apps/<app>/Dockerfile -t <image> .` equivalent. The context is the app root. COPY and ADD sources must stay inside it; absolute paths and `..` segments are refused.
+
+## App image stages {#r188}
+
+In both editions, `HFS_DOCKER_STAGES` requires a `build` stage and a final `runtime` stage ending as `USER node`. Every install uses `npm ci`; local and global `npm install` or `npm i` are refused. The runtime never builds. A back-end runtime uses `npm ci --omit=dev --ignore-scripts`; a Next runtime installs nothing.
+
+## App image secret inputs {#r191}
+
+In both editions, `HFS_DOCKER_SECRETS` refuses COPY or ADD of `.env*` files, including names such as `.envbackup`; only the exact `.env.example` name is excepted. Secret directories, keys, certificates and kubeconfigs cannot enter the image. ADD URLs and credential ARG or ENV names are refused; published `NEXT_PUBLIC_*` inputs are permitted.

@@ -2,7 +2,7 @@
 // app; a Dockerfile anywhere else is owned by no slot) built from the APP ROOT, which holds the one package.json and the managed .dockerignore.
 // The Dockerfile is app-owned (starci app scaffold writes it once from templates/<side>/image) and judged here, structurally, from its parsed
 // instructions (scripts/lib/dockerfile.mjs), never by matching the text:
-//   HFS_DOCKER_BUILD_CONTEXT  the header comment states the app's own build command (`docker build -f <side>/apps/<app>/Dockerfile ... .`, the
+//   HFS_DOCKER_BUILD_CONTEXT  the header comment states the app's own build command (`starci docker build <app>` or `docker build -f <side>/apps/<app>/Dockerfile ... .`, the
 //                             context the app root) and no COPY or ADD source leaves the context (`..`, an absolute path)
 //   HFS_DOCKER_STAGES         a `build` stage and a last `runtime` stage; the runtime is unprivileged (`USER node`) and runs no build; every install
 //                             is `npm ci` (never `npm install`); a back-end runtime installs `--omit=dev --ignore-scripts`, a front-end runtime installs nothing
@@ -80,11 +80,12 @@ function envOf(stage) {
   return env;
 }
 
-/** True when a header comment states `docker build -f <wanted> ... .`. */
-const statesBuildCommand = (parsed, wanted) => parsed.comments.some((comment) => {
+/** Accept the app command or the equivalent explicit Dockerfile and root context. */
+const statesBuildCommand = (parsed, wanted, app) => parsed.comments.some((comment) => {
   const parts = words(comment.text);
   const build = parts.findIndex((part, index) => part === 'docker' && parts[index + 1] === 'build');
   if (build < 0) return false;
+  if (parts[build - 1] === 'starci') return parts[build + 2] === app;
   const flag = parts.indexOf('-f', build);
   return flag > 0 && parts[flag + 1] === wanted && parts.at(-1) === '.';
 });
@@ -107,7 +108,7 @@ function copySourceFindings(file, item) {
 function contextFindings(file, parsed, side, app) {
   const findings = [];
   const wanted = dockerfilePath(side, app);
-  if (!statesBuildCommand(parsed, wanted)) findings.push(found(DOCKER_BUILD_CONTEXT, file, `${file} does not state its build command in a header comment: \`docker build -f ${wanted} -t <image> .\` (the context is the app root, the folder with the one package.json and lockfile).`, { expected: wanted }));
+  if (!statesBuildCommand(parsed, wanted, app)) findings.push(found(DOCKER_BUILD_CONTEXT, file, `${file} does not state its build command in a header comment: \`starci docker build ${app}\` or \`docker build -f ${wanted} -t <image> .\` (the context is the app root, the folder with the one package.json and lockfile).`, { expected: wanted }));
   for (const item of parsed.instructions.filter((entry) => entry.keyword === 'COPY' || entry.keyword === 'ADD')) findings.push(...copySourceFindings(file, item));
   return findings;
 }
@@ -118,7 +119,7 @@ function stageInstallFindings(file, stages) {
   for (const stage of stages) {
     for (const command of commandsOf(stage)) {
       const call = npmCall(command.words);
-      if (call && (call.verb === 'install' || call.verb === 'i') && !call.args.some((arg) => arg === '-g' || arg === '--global')) findings.push(found(DOCKER_STAGES, file, `${file}:${command.line} runs \`npm ${call.verb}\`; an image installs with \`npm ci\` from the lockfile.`, { line: command.line }));
+      if (call && (call.verb === 'install' || call.verb === 'i')) findings.push(found(DOCKER_STAGES, file, `${file}:${command.line} runs \`npm ${call.verb}\`; an image installs with \`npm ci\` from the lockfile.`, { line: command.line }));
     }
   }
   return findings;
@@ -259,7 +260,7 @@ const isCredentialName = (name) => !name.startsWith('NEXT_PUBLIC_') && name.spli
 const isSecretPath = (source) => {
   const segments = source.split('/').filter((part) => part && part !== '.');
   const base = segments.at(-1) ?? '';
-  const env = base === '.env' || (base.startsWith('.env.') && base !== '.env.example');
+  const env = base.startsWith('.env') && base !== '.env.example';
   return env || segments.some((segment) => SECRET_FOLDERS.has(segment)) || SECRET_SUFFIXES.some((suffix) => base.endsWith(suffix)) || base.startsWith('kubeconfig');
 };
 

@@ -6,6 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 import { checkRepo } from '../../scripts/hfs/check.mjs';
 import { NODE_IMAGE } from '../../scripts/hfs/rules/docker.mjs';
 import { checkTargets, renderTargets } from '../../packages/hfs/sync/index.mjs';
@@ -69,7 +70,7 @@ test('the managed .dockerignore and images workflow are required at the app root
 const EDITED = ['# the app edited this file', 'FROM scratch', ''].join('\n');
 test('starci app new image writes the Dockerfile of every declared app that has none and never overwrites one', () => {
   const dir = repoOf(MIXED, (root) => { fs.rmSync(at(root, 'be/apps/jobs/Dockerfile')); fs.rmSync(at(root, 'fe/apps/app/Dockerfile')); put(root, 'be/apps/cli/Dockerfile', EDITED); });
-  assert.deepEqual(newImages({ repoRoot: dir }).sort(), ['be/apps/jobs/Dockerfile', 'fe/apps/app/Dockerfile']);
+  assert.deepEqual(newImages({ repoRoot: dir }).sort(byCodeUnit), ['be/apps/jobs/Dockerfile', 'fe/apps/app/Dockerfile']);
   assert.equal(fs.readFileSync(at(dir, 'be/apps/cli/Dockerfile'), 'utf8'), EDITED);
   assert.deepEqual(newImages({ repoRoot: dir }), []);
   const result = checked(dir);
@@ -111,7 +112,9 @@ test('HFS_DOCKER_STAGES: a runtime that is root, that builds, or a stage that ru
   assert.equal(builds.length, 1);
   assert.match(builds[0].message, /runs the build/);
   assert.equal(judged('HFS_DOCKER_STAGES', BE, replace('RUN npm ci --ignore-scripts\n', 'RUN npm install\n')).length, 1);
-  assert.equal(judged('HFS_DOCKER_STAGES', BE, replace('RUN npm ci --ignore-scripts\n', 'RUN npm install -g turbo && npm ci --ignore-scripts\n')).length, 0);
+  const globalInstall = judged('HFS_DOCKER_STAGES', BE, replace('RUN npm ci --ignore-scripts\n', 'RUN npm install -g turbo && npm ci --ignore-scripts\n'));
+  assert.equal(globalInstall.length, 1);
+  assert.match(globalInstall[0].message, /runs `npm install`/);
 });
 
 test('HFS_DOCKER_STAGES: a back-end runtime installs --omit=dev --ignore-scripts and a front-end runtime installs nothing', () => {
@@ -171,8 +174,9 @@ test('HFS_DOCKER_BASE_PIN: a moving or foreign base is refused in every stage', 
 
 test('HFS_DOCKER_BASE_PIN: the canon image, a prior stage, a digest-pinned image and a build argument that resolves to the canon are clean', () => {
   const digest = `FROM alpine:3.22@sha256:${'a'.repeat(64)} AS fetch\nRUN echo ok\n\n`;
+  const nodeFrom = `FROM ${NODE_IMAGE}`;
   assert.deepEqual(judged('HFS_DOCKER_BASE_PIN', BE, (text) => text.replace(`FROM ${NODE_IMAGE} AS build`, `${digest}FROM ${NODE_IMAGE} AS build`)), []);
-  assert.deepEqual(judged('HFS_DOCKER_BASE_PIN', BE, (text) => `ARG BASE=${NODE_IMAGE}\n${text.split(`FROM ${NODE_IMAGE}`).join('FROM ${BASE}')}`), []);
+  assert.deepEqual(judged('HFS_DOCKER_BASE_PIN', BE, (text) => `ARG BASE=${NODE_IMAGE}\n${text.split(nodeFrom).join('FROM ${BASE}')}`), []);
   assert.deepEqual(judged('HFS_DOCKER_BASE_PIN', BE, replace(`FROM ${NODE_IMAGE} AS runtime`, 'FROM build AS runtime')), []);
 });
 

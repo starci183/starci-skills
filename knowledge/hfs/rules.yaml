@@ -3103,6 +3103,16 @@ rules:
       - {kind: eslint-be, id: realtime-topic-scope}
   - id: R187
     code: "HFS_DOCKER_BUILD_CONTEXT"
+    editions: [lite, full]
+    docs: [docs/application-stacks.md#r187]
+    proves: [tests/hfs-proofs/docker-legacy-coverage.spec.mjs]
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/image/cli/Dockerfile, editions: [lite, full]}
+      - {path: packages/hfs/templates/fe/image/next/Dockerfile, editions: [lite, full]}
+      - {path: tests/hfs-proofs/docker-legacy-coverage.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-proofs/docker-legacy-coverage.spec.mjs, edition: lite, codes: ["HFS_DOCKER_BUILD_CONTEXT"]}
+      - {path: tests/hfs-proofs/docker-legacy-coverage.spec.mjs, edition: full, codes: ["HFS_DOCKER_BUILD_CONTEXT"]}
     law: "Every app image is built from the app root: the header comment of an app's Dockerfile states `starci docker build <app>` for its own path, and no COPY or ADD source leaves the build context (a `..` segment or an absolute path)."
     kinds: [check]
     gates: [settle, land, ci]
@@ -3111,6 +3121,16 @@ rules:
       - {kind: hfs, id: docker, at: scripts/hfs/rules/docker.mjs}
   - id: R188
     code: "HFS_DOCKER_STAGES"
+    editions: [lite, full]
+    docs: [docs/application-stacks.md#r188]
+    proves: [tests/hfs-proofs/docker-legacy-coverage.spec.mjs]
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/image/cli/Dockerfile, editions: [lite, full]}
+      - {path: packages/hfs/templates/fe/image/next/Dockerfile, editions: [lite, full]}
+      - {path: tests/hfs-proofs/docker-legacy-coverage.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-proofs/docker-legacy-coverage.spec.mjs, edition: lite, codes: ["HFS_DOCKER_STAGES"]}
+      - {path: tests/hfs-proofs/docker-legacy-coverage.spec.mjs, edition: full, codes: ["HFS_DOCKER_STAGES"]}
     law: "An app Dockerfile is multi-stage: a stage named `build` and a last stage named `runtime`; the runtime stage ends as `USER node` and runs no build (`npm run build*`, tsc, next, turbo, nest); every install is `npm ci`, never `npm install`; a back-end runtime runs `npm ci --omit=dev --ignore-scripts` and a front-end runtime installs nothing."
     kinds: [check]
     gates: [settle, land, ci]
@@ -3155,6 +3175,16 @@ rules:
       - {kind: hfs, id: docker, at: scripts/hfs/rules/docker.mjs}
   - id: R191
     code: "HFS_DOCKER_SECRETS"
+    editions: [lite, full]
+    docs: [docs/application-stacks.md#r191]
+    proves: [tests/hfs-proofs/docker-legacy-coverage.spec.mjs]
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/image/cli/Dockerfile, editions: [lite, full]}
+      - {path: packages/hfs/templates/fe/image/next/Dockerfile, editions: [lite, full]}
+      - {path: tests/hfs-proofs/docker-legacy-coverage.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-proofs/docker-legacy-coverage.spec.mjs, edition: lite, codes: ["HFS_DOCKER_SECRETS"]}
+      - {path: tests/hfs-proofs/docker-legacy-coverage.spec.mjs, edition: full, codes: ["HFS_DOCKER_SECRETS"]}
     law: "No secret enters an image: no COPY or ADD of an `.env*` file (except `.env.example`) or of a path under `.starcistacks`, `.secrets`, `.volume`, a key, certificate or kubeconfig; no ADD of a URL; no ARG or ENV whose name is a credential (PASSWORD, SECRET, TOKEN, KEY, CREDENTIAL, PRIVATE), `NEXT_PUBLIC_*` excepted because it is published by design."
     kinds: [check]
     gates: [settle, land, ci]
@@ -3214,10 +3244,19 @@ rules:
       - {kind: runtime, id: generated-block, at: scripts/hfs/runtime-rules/generated-block.mjs}
   - id: R195
     code: "RT_PROSE_PATH_NO_SLOT"
+    editions: [lite, full]
+    docs: [docs/knowledge-yaml.md#r195]
+    templateNa: "This rule judges authored runtime prose against slot catalogs and shipped example declarations; app templates do not scaffold this runtime surface."
+    proves: [tests/hfs-runtime-rules/prose-path-app-placeholder.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/hfs-runtime-rules/prose-path-app-placeholder.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-runtime-rules/prose-path-app-placeholder.spec.mjs, edition: lite, codes: ["RT_PROSE_PATH_NO_SLOT"]}
+      - {path: tests/hfs-runtime-rules/prose-path-app-placeholder.spec.mjs, edition: full, codes: ["RT_PROSE_PATH_NO_SLOT"]}
     law: "Every product path the knowledge, the docs and the READMEs name (a be/ or fe/ path, whole or with placeholders, globs and braces) is owned by a slot of knowledge/hfs/slots.yaml or is a folder above one; a path no slot owns is prose that invented a place or kept one a slot no longer has. App names are free: a literal app name is one a shipped examples/*/hfs.json declares, a placeholder stands for any; a ** glob and a topic file of the knowledge are not paths."
     scope: runtime
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_PROSE_PATH_NO_SLOT"]
     enforcers:
       - {kind: runtime, id: prose-path, at: scripts/hfs/runtime-rules/prose-path.mjs}
