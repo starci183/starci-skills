@@ -436,3 +436,52 @@ rulings:
     supersedes: []
     amendmentScope: Clause of R278 that allowed a public versioned operation table as the only evidence for a JSON REST route outside probes, handshakes, webhooks and byte streams.
     enforcedBy: [R278, R290]
+
+  - id: auth-callback-email-link
+    date: '2026-10-17'
+    topic: code.fe-route
+    status: live
+    ownerRuling: 16
+    source: owner ruling 2026-10-17 "Theo y tro" (the owner delegated the decision to main) (alpha.18.1 patch, NIVO canon request F); packages/eslint/fe/callback-shape.mjs
+    statement: >-
+      A Supabase auth callback route (fe.route.callback), owned by the auth module, may perform exactly the
+      one exchangeAuthCode(code) (or auth.exchangeCodeForSession(code)) and, for an email confirmation or recovery link,
+      exactly one awaited verifyOtp({ token_hash, type }) of the auth owner (the auth client, or verifyOtp from
+      modules/auth/server), whose two properties are read from the query values token_hash and type. Nothing else is
+      added: no other call, no cookie write, no data access, no second HTTP handler, no JSON response; a token_hash
+      never reaches a redirect target.
+    supersedes: []
+    amendmentScope: Clause of R287 that allowed the PKCE code exchange as the only credential exchange of the callback.
+    enforcedBy: [R287]
+
+  - id: oauth-redirect-not-webhook
+    date: '2026-10-17'
+    topic: code.be-transport
+    status: live
+    ownerRuling: 17
+    source: owner ruling 2026-10-17 "Theo y tro" (the owner delegated the decision to main) (alpha.18.1 patch, NIVO canon request G); packages/eslint/be/webhooks.mjs
+    statement: >-
+      A third-party OAuth redirect into the API (the consent callback of Google or Meta) is not a webhook door. A GET
+      route that declares @Public({ reason: PublicReason.AuthHandshake }) of the identity owner, on the route or on its
+      controller, is exempt from the webhook, callback and events path test of BE_WEBHOOK_SCOPE when its path is not a
+      webhook or events path. A POST route, a webhook or events path, any other reason (a local enum member included) and
+      every SignedWebhook route stay judged: signed deliveries still belong in the webhook door.
+    supersedes: []
+    amendmentScope: Clause of R263 that sent every public controller route containing webhook, callback or events into the webhook door.
+    enforcedBy: [R263]
+
+  - id: webhook-receipt-port
+    date: '2026-10-17'
+    topic: code.be-transport
+    status: live
+    ownerRuling: 18
+    source: owner ruling 2026-10-17 "Theo y tro" (the owner delegated the decision to main) (alpha.18.1 patch, NIVO canon request J); packages/eslint/be/lib/webhook-handoff-intake.mjs
+    statement: >-
+      The receipt transaction of a webhook intake records the inbox delivery and publishes its typed outbox event. A call
+      inside it on a domain receipt port is that record and not processing. A receipt port is a domain class with no
+      base class whose constructor takes only platform ports and TypeORM, at least one of them the platform Inbox. A call on any other
+      domain service, on the command or query bus, or a process callback inside the transaction is processing and fails
+      BE_WEBHOOK_SCOPE with the finding that names the intake, not the signed metadata.
+    supersedes: []
+    amendmentScope: Reading of R263 under which every domain service call inside the receipt transaction was business processing, including a domain receipt wrapper of the platform Inbox.
+    enforcedBy: [R263]

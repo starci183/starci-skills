@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Changed (R287 `FE_CALLBACK_SHAPE`, a18.1 NIVO request F, owner ruling `auth-callback-email-link`): the auth callback may await one `verifyOtp({ token_hash, type })` of the auth owner (`auth.verifyOtp` or `verifyOtp` from `modules/auth/server`), built from exactly the query values `token_hash` and `type`, beside the one `exchangeAuthCode(code)`; the token hash never reaches a redirect.
+- Fixed (R55 `FE_CLIENT_BOUNDARY`, a18.1 NIVO request I): the finding on a page or layout owner now says the owner stays a server component that renders the client block or overlay carrying the directive. The rule is unchanged.
+
 ## 8.3.0 - 2026-10-15
 - Changed: layouts may import overlays beside pages (tier edge `feature -> feature` from pages and layouts to overlays); a layout hosts the route-selected overlay through `components/branches/OverlayHost` while pages stay server components (pattern FE-BOUNDARY-5). Carries the runtime mirror of the manifest and pins, rebased onto alpha.13 (eslint-canon-fe 8.2.18).
 

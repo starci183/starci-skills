@@ -1,6 +1,6 @@
 /** R263: a receipt transaction records and publishes; a reactor/job processes after commit. */
 import ts from "typescript"
-import { baseName } from "./ports.mjs"
+import { baseName, ownerNameOf } from "./ports.mjs"
 import { originsOfType, typed } from "./types.mjs"
 
 /** Imported aliases and overload signatures retain the implementation's actual body. */
@@ -15,13 +15,13 @@ const bodiesOf = (checker, call) => {
     return [...new Set(declarations.map((declaration) => declaration?.body ?? declaration?.initializer?.body).filter(Boolean))]
 }
 
-/** Receiver ownership is established by its declared type, including aliases and inherited ports. */
+/** Receiver ownership is established by its declared type, including aliases and inherited ports; `accepts` also sees the type it came from. */
 const hasOrigin = (checker, receiver, accepts, seen = new Set()) => {
     const type = receiver && checker.getTypeAtLocation(receiver)
     const read = (current) => {
         if (!current || seen.has(current)) return false
         seen.add(current)
-        if (originsOfType(checker, current).some(accepts)) return true
+        if (originsOfType(checker, current).some((origin) => accepts(origin, current))) return true
         const parts = current.isUnionOrIntersection() ? current.types : []
         const bases = current.isClassOrInterface() ? checker.getBaseTypes(current) ?? [] : []
         return [...parts, ...bases].some(read)
@@ -50,6 +50,21 @@ const isBusinessOrigin = (hfs, origin) => {
     return origin.module === null && hfs.tierOf(origin.file) === "domain" && baseName(origin.file).endsWith(".service.ts")
 }
 
+/**
+ * A domain receipt port records a delivery and processes nothing: a class with no base class whose constructor takes only platform
+ * ports (and TypeORM), at least one of them the platform `Inbox`. It cannot reach another domain service or the CQRS buses, so a call
+ * on it inside the receipt transaction is the inbox record itself (owner ruling 2026-10-17 "Theo y tro": the owner delegated the decision to main).
+ */
+const isReceiptPort = (checker, hfs, type) => {
+    const declaration = type.getSymbol()?.getDeclarations()?.find(ts.isClassDeclaration)
+    const constructor = declaration && !declaration.heritageClauses ? declaration.members.find(ts.isConstructorDeclaration) : undefined
+    if (!constructor || constructor.parameters.length === 0) return false
+    const dependencies = constructor.parameters.map((parameter) => originsOfType(checker, checker.getTypeAtLocation(parameter)))
+    const isPort = (origin) => origin.module === "typeorm" || (origin.module === null && hfs.tierOf(origin.file) === "platform")
+    const isInbox = (origin) => origin.module === null && origin.name === "Inbox" && hfs.tierOf(origin.file) === "platform" && ownerNameOf(hfs, origin.file) === "inbox"
+    return dependencies.every((origins) => origins.length > 0 && origins.every(isPort)) && dependencies.some((origins) => origins.some(isInbox))
+}
+
 /** The transaction port's package establishes when the callback runs before commit. */
 const isTransactionCall = (checker, call, receiver) => memberName(call.expression) === "transaction"
     && hasOrigin(checker, receiver, (origin) => origin.module === "typeorm" && ["EntityManager", "DataSource"].includes(origin.name))
@@ -58,7 +73,7 @@ const isTransactionCall = (checker, call, receiver) => memberName(call.expressio
 const isBusinessCall = (checker, hfs, expression, seen = new Set()) => {
     if (!expression || seen.has(expression)) return false
     seen.add(expression)
-    const accepts = (origin) => isBusinessOrigin(hfs, origin)
+    const accepts = (origin, type) => isBusinessOrigin(hfs, origin) && !isReceiptPort(checker, hfs, type)
     if (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression) || ts.isSatisfiesExpression(expression)) return isBusinessCall(checker, hfs, expression.expression, seen)
     if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
         if (hasOrigin(checker, expression.expression, accepts)) return true

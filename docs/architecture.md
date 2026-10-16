@@ -527,7 +527,8 @@ apply in both lite and full editions.
 ## R55 Server and client boundaries
 
 Pages and layouts stay server components; an interactive block entry or leaf may declare a client
-boundary. `FE_CLIENT_BOUNDARY` rejects misplaced `use client` directives.
+boundary. A feature page owner or layout owner is such a server component too: it renders a client block
+or overlay and never carries the directive itself. `FE_CLIENT_BOUNDARY` rejects misplaced `use client` directives.
 `FE_CLIENT_SERVER_IMPORT` rejects direct server imports from client code, and
 `FE_CLIENT_REACHES_SERVER` rejects server surfaces reached through the import graph.
 `FE_SERVER_ONLY_MARK` requires server modules to open with `import 'server-only'`.

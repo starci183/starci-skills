@@ -225,8 +225,8 @@ const propertyValue = (checker, expression, name, seen = new Set()) => {
     return null
 }
 
-/** A SignedWebhook reason is the actual identity enum member, even behind a const options alias. */
-const signedReason = (context, decorator) => {
+/** A public reason is the actual `PublicReason` member of the identity owner, even behind a const options alias. */
+const publicReason = (context, decorator, member) => {
     const { checker, toTs } = typed(context)
     const options = decoratorArguments(decorator)[0]
     const reason = options && propertyValue(checker, toTs(options), "reason")
@@ -235,11 +235,14 @@ const signedReason = (context, decorator) => {
     const declaration = type.getSymbol()?.getDeclarations()?.[0]
     const owner = declaration?.parent
     if (!declaration || !ts.isEnumMember(declaration) || !owner || !ts.isEnumDeclaration(owner)
-        || owner.name.text !== "PublicReason" || declaration.name.getText().replace(/["']/g, "") !== "SignedWebhook") return false
+        || owner.name.text !== "PublicReason" || declaration.name.getText().replace(/["']/g, "") !== member) return false
     const hfs = hfsOf(context)
     const file = declaration.getSourceFile().fileName.replace(/\\/g, "/")
     return hfs.tierOf(file) === "domain" && hfs.ownerOf(file)?.split("/").at(-1) === "identity"
 }
+
+/** A SignedWebhook reason is the actual identity enum member, even behind a const options alias. */
+const signedReason = (context, decorator) => publicReason(context, decorator, "SignedWebhook")
 
 /** An explicit verifier exemption names the exact domain method in a webhook HTTP module's exported const array. */
 const declaredVerifier = (context, hfs, method) => {
@@ -286,14 +289,24 @@ const routePaths = (context, decorator) => {
     return decoratorArguments(decorator).flatMap((argument) => read(toTs(argument)))
 }
 
+/**
+ * A third-party OAuth redirect into the API (owner ruling 2026-10-17 "Theo y tro": the owner delegated the decision to main):
+ * a GET named `callback` that declares the closed reason `PublicReason.AuthHandshake`. It is a browser redirect with no
+ * signature to verify, so it is not a webhook door. A POST, a `webhook` or `events` path, or any other reason is still judged.
+ */
+const isOAuthRedirect = (context, route, publicMetadata, paths) =>
+    routeVerbs(context, route).every((verb) => verb === "Get") && publicMetadata.some((decorator) => publicReason(context, decorator, "AuthHandshake"))
+    && !paths.some((path) => /webhook|events/i.test(path))
+
 /** R263: public webhook traffic always enters the signed, verified webhook kind. */
 export const webhookScope = {
     meta: {
         type: "problem",
-        docs: { description: "SignedWebhook metadata belongs only to webhook doors or explicitly declared domain verifiers; public webhook/callback/events routes belong to the webhook kind." },
+        docs: { description: "SignedWebhook metadata belongs only to webhook doors or explicitly declared domain verifiers; public webhook/callback/events routes belong to the webhook kind, except a GET OAuth redirect that declares PublicReason.AuthHandshake." },
         schema: [],
         messages: {
-            scope: "[BE_WEBHOOK_SCOPE] SignedWebhook metadata is allowed only on a `<provider>.webhook.ts` door in the webhook HTTP slot or an exact domain method declared in its HTTP module's exported `webhookVerifiers`. Move public webhook, callback and events routes into that door so signature verification and inbox handoff are enforced.",
+            scope: "[BE_WEBHOOK_SCOPE] SignedWebhook metadata is allowed only on a `<provider>.webhook.ts` door in the webhook HTTP slot or an exact domain method declared in its HTTP module's exported `webhookVerifiers`. Move public webhook, callback and events routes into that door so signature verification and inbox handoff are enforced. A third-party OAuth redirect is exempt only as a GET with @Public({ reason: PublicReason.AuthHandshake }) on a path that is not a webhook or events route.",
+            intake: "[BE_WEBHOOK_SCOPE] The domain intake this webhook door calls processes the delivery inside its receipt transaction: a `process` callback, a call to the command or query bus, or a call to a domain service that is not a receipt port. The receipt transaction only records the inbox delivery (the platform Inbox, or a domain receipt port whose constructor takes only platform ports, one of them the Inbox) and publishes the typed outbox event; a reactor or job processes the delivery after commit.",
         },
     },
     create(context) {
@@ -304,7 +317,7 @@ export const webhookScope = {
         return {
             CallExpression(call) {
                 if (inDoor && call.callee.type === "MemberExpression" && isDomainServiceType(context, hfs, call.callee.object)
-                    && webhookIntakeProcessesDelivery(context, hfs, call)) context.report({ node: call, messageId: "scope" })
+                    && webhookIntakeProcessesDelivery(context, hfs, call)) context.report({ node: call, messageId: "intake" })
             },
             Decorator(decorator) {
                 if (!inDoor && isPublicDecorator(context, hfs, decorator) && signedReason(context, decorator)
@@ -318,7 +331,7 @@ export const webhookScope = {
                     const publicMetadata = [...classPublic, ...(method.decorators ?? []).filter((decorator) => isPublicDecorator(context, hfs, decorator))]
                     if (publicMetadata.length === 0 || publicMetadata.some((decorator) => signedReason(context, decorator))) continue
                     const paths = [...prefix, ...decoratorsFrom(context, method, "@nestjs/common", HTTP_VERBS).flatMap((decorator) => routePaths(context, decorator))]
-                    if (paths.some((path) => /webhook|callback|events/i.test(path))) context.report({ node: method.key, messageId: "scope" })
+                    if (paths.some((path) => /webhook|callback|events/i.test(path)) && !isOAuthRedirect(context, method, publicMetadata, paths)) context.report({ node: method.key, messageId: "scope" })
                 }
             },
         }

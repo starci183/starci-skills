@@ -4699,7 +4699,8 @@ rules:
 
   - id: R263
     code: "BE_WEBHOOK_SCOPE"
-    law: "SignedWebhook public metadata belongs only to a webhook HTTP door or an exact domain verifier declared in its HTTP module's exported webhookVerifiers array. A public controller route containing webhook, callback or events belongs in the webhook door. Domain intake methods identified by a first *Id parameter or DTO property, or raw-body signature input, claim the shared Inbox with the stable delivery key and return early on a duplicate before doing work. The receipt transaction records the inbox delivery and publishes its typed outbox event; process callbacks, domain processing and command dispatch run only after commit in a reactor or job."
+    amendedBy: [owner:oauth-redirect-not-webhook, owner:webhook-receipt-port]
+    law: "SignedWebhook public metadata belongs only to a webhook HTTP door or an exact domain verifier declared in its HTTP module's exported webhookVerifiers array. A public controller route containing webhook, callback or events belongs in the webhook door; the one exception is a third-party OAuth redirect (owner:oauth-redirect-not-webhook): a GET route that declares PublicReason.AuthHandshake and whose path is not a webhook or events path, which has no signature to verify and is not a door. A POST, a webhook or events path, and any other reason are still judged. A receipt transaction may call a domain receipt port (owner:webhook-receipt-port): a class with no base class whose constructor takes only platform ports and TypeORM, one of them the platform Inbox; a call on any other domain service or on a bus inside the transaction is processing. Domain intake methods identified by a first *Id parameter or DTO property, or raw-body signature input, claim the shared Inbox with the stable delivery key and return early on a duplicate before doing work. The receipt transaction records the inbox delivery and publishes its typed outbox event; process callbacks, domain processing and command dispatch run only after commit in a reactor or job."
     kinds: [lint]
     gates: ["pre-commit","settle","land","ci"]
     failureCodes: ["BE_WEBHOOK_SCOPE", "BE_WEBHOOK_INBOX_KEY"]
@@ -5233,7 +5234,8 @@ rules:
 
   - id: R287
     code: "FE_CALLBACK_SHAPE"
-    law: "The fe.route.callback handler performs only the auth code exchange and redirect: read the callback URL, obtain the auth client, exchange the code and redirect to the declared route. It carries no product data operation, business logic, additional request handler or JSON response."
+    amendedBy: [owner:auth-callback-email-link]
+    law: "The fe.route.callback handler performs only the auth code exchange and redirect: read the callback URL, obtain the auth client, exchange the code and redirect to the declared route. An email confirmation or recovery link (owner:auth-callback-email-link) arrives as the query values token_hash and type; the handler then awaits one verifyOtp({ token_hash, type }) of the auth owner (the auth client, or verifyOtp from modules/auth/server), built from exactly those two query values, in place of or beside the one code exchange. It carries no product data operation, business logic, additional request handler or JSON response."
     kinds: [lint]
     gates: [pre-commit, settle, land, ci]
     failureCodes: ["FE_CALLBACK_SHAPE"]

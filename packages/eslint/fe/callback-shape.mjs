@@ -1,5 +1,6 @@
 /**
- * R287 FE_CALLBACK_SHAPE: the Supabase callback only reads the PKCE code, exchanges it through the auth owner, and redirects.
+ * R287 FE_CALLBACK_SHAPE: the Supabase callback only reads the PKCE code (or the email-link `token_hash` and `type`), exchanges it
+ * through the auth owner with exactly one `exchangeAuthCode(code)` or one `verifyOtp({ token_hash, type })`, and redirects.
  * Cookie configuration and writes belong in the Supabase helper in fe.modules.auth; application data belongs in the back end.
  * This syntax check follows lexical bindings and local aliases rather than trusting a method's spelling.
  */
@@ -45,19 +46,22 @@ const patternPath = (pattern, name) => {
 const CONFIG_EXPORTS = new Set(["runtime", "dynamic", "revalidate", "fetchCache", "preferredRegion", "maxDuration"])
 const FUNCTIONS = new Set(["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"])
 const FORBIDDEN = new Set(["AssignmentExpression", "UpdateExpression", "ImportExpression", "TaggedTemplateExpression", "ClassDeclaration", "ClassExpression", "ForStatement", "ForInStatement", "ForOfStatement", "WhileStatement", "DoWhileStatement", "ThrowStatement", "YieldExpression", "SpreadElement", "ArrayPattern", "JSXElement", "JSXFragment"])
-const TEXT = new Set(["text", "code"])
-const CALLS = new Set(["factory", "exchange", "redirect", "params-get", "params-has", "text-guard"])
+const TEXT = new Set(["text", "code", "otp-type"])
+const CALLS = new Set(["factory", "exchange", "verify-otp", "redirect", "params-get", "params-has", "text-guard"])
 const URL_TEXT = new Set(["origin", "href", "pathname", "search", "hash", "host", "hostname", "protocol"])
-const CALL_RESULTS = new Map([["factory", "client"], ["exchange", "exchange-result"], ["redirect", "redirect-result"], ["params-has", "scalar"], ["text-guard", "scalar"]])
+const CALL_RESULTS = new Map([["factory", "client"], ["exchange", "exchange-result"], ["verify-otp", "exchange-result"], ["redirect", "redirect-result"], ["params-has", "scalar"], ["text-guard", "scalar"]])
 const MEMBERS = new Map([
   ["request", new Map([["nextUrl", "url"], ["url", "text"]])],
   ["url", new Map([["searchParams", "params"], ...[...URL_TEXT].map((key) => [key, "text"])])],
   ["params", new Map([["get", "params-get"], ["has", "params-has"]])],
   ["client", new Map([["auth", "auth"]])],
-  ["auth", new Map([["exchangeCodeForSession", "exchange"]])],
+  ["auth", new Map([["exchangeCodeForSession", "exchange"], ["verifyOtp", "verify-otp"]])],
   ["next-response", new Map([["redirect", "redirect"]])],
   ["exchange-result", new Map([["error", "exchange-error"]])],
 ])
+
+/** The query parameters whose provenance an exchange requires: the PKCE code, and the email link's token hash and type. */
+const PARAM_ORIGINS = new Map([["code", "code"], ["token_hash", "token-hash"], ["type", "otp-type"]])
 
 /** A locally exported binding's implementation. */
 const exportValue = (sourceCode, entry) => {
@@ -126,6 +130,7 @@ const ownerImportKind = (context, source, name) => {
   if (name === "APP_ROUTES" && isRoutesImport(context, source, slot)) return "routes"
   if (slot !== "fe.modules.auth") return null
   if (name === "exchangeAuthCode" && isServerAuthImport(context, source)) return "exchange"
+  if (name === "verifyOtp" && isServerAuthImport(context, source)) return "verify-otp"
   if (name === "exchangeCodeForSession") return "exchange"
   if (/^(?:create|get)\w*Client$/.test(name ?? "")) return "factory"
   if (["supabase", "supabaseClient", "authClient"].includes(name)) return "client"
@@ -189,7 +194,7 @@ const combinedOrigin = (kinds, conditional = false) => {
 /** The source of a call's return value, independent of argument validation. */
 const callOrigin = (node, seen, origin) => {
   const kind = origin(node.callee, seen)
-  if (kind === "params-get") return stringOf(node.arguments[0]) === "code" ? "code" : "text"
+  if (kind === "params-get") return PARAM_ORIGINS.get(stringOf(node.arguments[0])) ?? "text"
   return CALL_RESULTS.get(kind) ?? null
 }
 
@@ -240,10 +245,19 @@ const isRedirectStatus = (property) => {
 /** Arbitrary objects can invoke getters or toString during coercion; only redirect options belong here. */
 const isRedirectOptions = (node, origin) => node.parent.type === "CallExpression" && origin(node.parent.callee) === "redirect" && node.parent.arguments[1] === node && node.properties.every(isRedirectStatus)
 
+/** The one object `verifyOtp` takes: exactly `token_hash` read from the query `token_hash` and `type` read from the query `type`. */
+const isOtpArguments = (node, origin) => {
+  if (node.parent.type !== "CallExpression" || origin(node.parent.callee) !== "verify-otp" || node.parent.arguments[0] !== node) return false
+  const keyOf = (property) => property.type === "Property" && !property.computed && !property.method && property.kind === "init" ? property.key.name ?? property.key.value : null
+  const expected = new Map([["token_hash", "token-hash"], ["type", "otp-type"]])
+  return node.properties.length === expected.size && node.properties.every((property) => expected.get(keyOf(property)) === origin(property.value))
+    && new Set(node.properties.map(keyOf)).size === expected.size
+}
+
 /** Non-call expressions must preserve the callback's narrow set of values and effects. */
 const validExpression = (node, env, origin) => {
   if (node.type === "MemberExpression") return Boolean(origin(node))
-  if (node.type === "ObjectExpression") return isRedirectOptions(node, origin)
+  if (node.type === "ObjectExpression") return isRedirectOptions(node, origin) || isOtpArguments(node, origin)
   if (node.type === "VariableDeclarator" && node.id.type === "ObjectPattern") return env.sourceCode.getDeclaredVariables(node).every((variable) => origin(variable.identifiers[0]))
   if (node.type === "NewExpression") return isGlobal(env.sourceCode, node.callee, "URL") && node.arguments.length >= 1 && node.arguments.length <= 2 && node.arguments.every((argument) => TEXT.has(origin(argument)))
   if (node.type === "ReturnStatement") return insideHandler(node, env.handler) && origin(node.argument) === "redirect-result"
@@ -255,6 +269,7 @@ const validExpression = (node, env, origin) => {
 const validCall = (node, kind, env, origin) => {
   if (!insideHandler(node, env.handler) || !CALLS.has(kind) || node.arguments.some((argument) => argument.type === "SpreadElement")) return false
   if (kind === "exchange") return isAwaited(node, env.handler) && node.arguments.length === 1 && origin(node.arguments[0]) === "code"
+  if (kind === "verify-otp") return isAwaited(node, env.handler) && node.arguments.length === 1 && node.arguments[0].type === "ObjectExpression"
   if (kind === "redirect") return node.arguments.length >= 1 && node.arguments.length <= 2 && ["text", "url"].includes(origin(node.arguments[0]))
   if (kind === "factory") return node.arguments.length <= 1 && node.arguments.every((argument) => origin(argument) === "request")
   return node.arguments.length === 1 && TEXT.has(origin(node.arguments[0]))
@@ -277,7 +292,8 @@ const validOperations = (program, env) => {
     counts.set(kind, (counts.get(kind) ?? 0) + 1)
     return undefined
   })
-  return valid && counts.get("exchange") === 1 && (counts.get("factory") ?? 0) <= 1 && counts.get("redirect") > 0
+  const exchanges = (counts.get("exchange") ?? 0) + (counts.get("verify-otp") ?? 0)
+  return valid && exchanges >= 1 && (counts.get("exchange") ?? 0) <= 1 && (counts.get("verify-otp") ?? 0) <= 1 && (counts.get("factory") ?? 0) <= 1 && counts.get("redirect") > 0
 }
 
 /** The callback's request, imports and operations must all have known owners. */
@@ -293,10 +309,10 @@ const callbackVerdict = (context, program) => {
 export const callbackShape = {
   meta: {
     type: "problem",
-    docs: { description: "R287 FE_CALLBACK_SHAPE: the Supabase callback reads the PKCE code, exchanges it through modules/auth, and redirects only." },
+    docs: { description: "R287 FE_CALLBACK_SHAPE: the Supabase callback reads the PKCE code or the email-link token_hash and type, exchanges it through modules/auth (exchangeAuthCode or verifyOtp), and redirects only." },
     schema: [],
     messages: {
-      shape: "FE_CALLBACK_SHAPE: the auth callback must export an async GET that reads the query code, awaits one exchangeAuthCode(code) from modules/auth/server or auth.exchangeCodeForSession(code), and redirects with NextResponse.redirect or next/navigation redirect. Create the client in modules/auth; keep data access, cookie writes, other calls and additional HTTP handlers outside the callback.",
+      shape: "FE_CALLBACK_SHAPE: the auth callback must export an async GET that reads the query code (or the email-link token_hash and type), awaits one exchangeAuthCode(code) from modules/auth/server or auth.exchangeCodeForSession(code) and, for an email link, one verifyOtp({ token_hash, type }) built from exactly those two query values, and redirects with NextResponse.redirect or next/navigation redirect. Create the client in modules/auth; keep data access, cookie writes, other calls and additional HTTP handlers outside the callback.",
     },
   },
   create(context) {

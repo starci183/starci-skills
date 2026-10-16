@@ -29,8 +29,12 @@ for (const edition of ['lite', 'full']) {
       valid: [
         { filename: fixture.at('apps/web/src/components/blocks/Feed/index.tsx'), code: '"use client"; export const Feed = () => null;' },
         { filename: fixture.at('apps/web/src/features/pages/Home/index.tsx'), code: 'export const Home = () => null;' },
+        // A page owner stays a server component and renders the client block that carries the directive.
+        { filename: fixture.at('apps/web/src/features/pages/Home/index.tsx'), code: 'import { Feed } from "@/components/blocks/Feed"; export const Home = () => <Feed />;' },
       ],
       invalid: [
+        { filename: fixture.at('apps/web/src/features/pages/Home/index.tsx'), code: '"use client"; export const Home = () => null;', errors: [{ messageId: 'slot', data: { slot: 'page owner' } }] },
+        { filename: fixture.at('apps/web/src/features/layouts/Shell/index.tsx'), code: '"use client"; export const Shell = () => null;', errors: [{ messageId: 'slot', data: { slot: 'layout owner' } }] },
         { filename: fixture.at('apps/web/src/app/page.tsx'), code: '"use client"; export default function Page() { return null; }', errors: [{ messageId: 'slot' }] },
         { filename: fixture.at('apps/web/src/components/blocks/Feed/component.tsx'), code: '"use client"; export const FeedView = () => null;', errors: [{ messageId: 'elsewhere' }] },
       ],

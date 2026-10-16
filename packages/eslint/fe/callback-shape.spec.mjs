@@ -15,6 +15,9 @@ const IMPORTS = 'import { NextResponse, type NextRequest } from "next/server"\ni
 const BODY = 'const code = request.nextUrl.searchParams.get("code"); if (code) { const supabase = await createClient(); await supabase.auth.exchangeCodeForSession(code) } return NextResponse.redirect(new URL("/", request.url))'
 const OWNER_IMPORTS = 'import { NextResponse, type NextRequest } from "next/server"\nimport { exchangeAuthCode } from "@/modules/auth/server"\nimport { APP_ROUTES } from "@/modules/routes"'
 const OWNER_BODY = 'const url = new URL(request.url); const code = url.searchParams.get("code"); if (code) await exchangeAuthCode(code); return NextResponse.redirect(new URL(APP_ROUTES.home, url.origin))'
+const EMAIL_IMPORTS = OWNER_IMPORTS.replace("{ exchangeAuthCode }", "{ exchangeAuthCode, verifyOtp }")
+const EMAIL_BODY = 'const params = request.nextUrl.searchParams; const code = params.get("code"); const tokenHash = params.get("token_hash"); const type = params.get("type"); if (code) { await exchangeAuthCode(code) } else if (tokenHash && type) { await verifyOtp({ token_hash: tokenHash, type }) } return NextResponse.redirect(new URL(APP_ROUTES.home, request.url))'
+const emailCallback = (replacement = []) => callback(replacement.reduce((body, [from, to]) => body.replace(from, to), EMAIL_BODY), EMAIL_IMPORTS)
 const TEMPLATE_CALLBACK = readFileSync(new URL("../../hfs/templates/fe/skeleton/apps/__app__/src/app/auth/callback/route.ts", import.meta.url), "utf8")
 // The shipped example lives in the repository, not in the package: a package tested from its own copy has the template witness only.
 const EXAMPLE_URL = new URL("../../../examples/lite-app/fe/apps/web/src/app/auth/callback/route.ts", import.meta.url)
@@ -60,6 +63,11 @@ for (const edition of ["lite", "full"]) {
         { filename: CALLBACK, code: callback('const code = request.nextUrl.searchParams.get("code"); if (code) { const client = await createClient(); await client.auth.exchangeCodeForSession(code) } redirect("/")', 'import type { NextRequest } from "next/server"\nimport { redirect } from "next/navigation"\nimport { createClient } from "@/modules/auth/server"') },
         // The same single GET may be an arrow exported through a local export list.
         { filename: CALLBACK, code: `${IMPORTS}\nconst GET = async (request: NextRequest) => { ${BODY} }; export { GET }; export const runtime = "nodejs"` },
+        // Email confirmation and recovery: the PKCE code or one verifyOtp of exactly the query token_hash and type.
+        { filename: CALLBACK, code: emailCallback() },
+        { filename: CALLBACK, code: emailCallback([["if (code) { await exchangeAuthCode(code) } else if (tokenHash && type) { await verifyOtp({ token_hash: tokenHash, type }) }", "if (tokenHash && type) { await verifyOtp({ token_hash: tokenHash, type }) }"]]) },
+        { filename: CALLBACK, code: emailCallback([["await verifyOtp({ token_hash: tokenHash, type })", "await verifyOtp({ type: type, token_hash: tokenHash })"]]) },
+        { filename: CALLBACK, code: callback('const params = request.nextUrl.searchParams; const tokenHash = params.get("token_hash"); const type = params.get("type"); if (tokenHash && type) { const client = await createClient(request); const { error } = await client.auth.verifyOtp({ token_hash: tokenHash, type }); if (error) return NextResponse.redirect(new URL("/login", request.url)) } return NextResponse.redirect(new URL("/", request.url))') },
         // This rule judges only the callback slot.
         { filename: at("apps/web/src/modules/auth/server.ts"), code: 'export const writeCookies = () => cookies().set("session", "value")' },
         { filename: at("apps/web/src/app/health/live/route.ts"), code: 'export async function GET() { return Response.json({ alive: true }) }' },
@@ -104,6 +112,19 @@ for (const edition of ["lite", "full"]) {
         invalid(callback(BODY.replace("await supabase.auth.exchangeCodeForSession(code)", 'await supabase.auth.exchangeCodeForSession(code); await supabase.auth.exchangeCodeForSession(code)'))),
         invalid(callback().replace("async function GET", "async function* GET")),
         invalid(callback(BODY.replace("return NextResponse", 'const [profile] = request; return NextResponse'))),
+        // verifyOtp takes exactly the awaited object of the query token_hash and type, once, from the auth owner.
+        invalid(emailCallback([["{ token_hash: tokenHash, type }", '{ token_hash: tokenHash, type, email: "someone@example.com" }']])),
+        invalid(emailCallback([["{ token_hash: tokenHash, type }", "{ token_hash: code, type }"]])),
+        invalid(emailCallback([["{ token_hash: tokenHash, type }", '{ token_hash: tokenHash, type: params.get("next") }']])),
+        invalid(emailCallback([["{ token_hash: tokenHash, type }", "{ token_hash: tokenHash }"]])),
+        invalid(emailCallback([["{ token_hash: tokenHash, type }", "{ token_hash: tokenHash, token_hash: tokenHash }"]])),
+        invalid(emailCallback([["{ token_hash: tokenHash, type }", "params"]])),
+        invalid(emailCallback([["await verifyOtp(", "verifyOtp("]])),
+        invalid(emailCallback([["await verifyOtp({ token_hash: tokenHash, type })", "await verifyOtp({ token_hash: tokenHash, type }); await verifyOtp({ token_hash: tokenHash, type })"]])),
+        invalid(emailCallback([["new URL(APP_ROUTES.home, request.url)", "new URL(tokenHash, request.url)"]])),
+        invalid(callback(EMAIL_BODY, EMAIL_IMPORTS.replace("@/modules/auth/server", "@/modules/auth/client"))),
+        invalid(callback(BODY.replace("exchangeCodeForSession(code)", "verifyOtp({ token_hash: code, type: code })"))),
+        invalid(callback(BODY.replace("return NextResponse", 'const tokenHash = request.nextUrl.searchParams.get("token_hash"); await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "email" }); return NextResponse'))),
         invalid(callback(BODY.replace("return NextResponse", 'const snapshot = { ...request }; return NextResponse'))),
         invalid(callback(BODY.replace("return NextResponse", 'const snapshot = [...request]; return NextResponse'))),
         invalid(callback(BODY.replace('new URL("/", request.url)', 'new URL(`${{ toString: createClient }}`, request.url)'))),
