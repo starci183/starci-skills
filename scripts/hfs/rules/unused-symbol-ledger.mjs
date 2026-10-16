@@ -1,21 +1,21 @@
 // R280 safety net: the app-owned ledger of catalog keys the detector cannot see.
 // A side (fe or be) declares them in <side>/i18n-dynamic-keys.yaml; a key the ledger names counts as read, a stale
 // or malformed ledger is itself an HFS_UNUSED_SYMBOL finding, so the ledger cannot rot.
+import { isPlainObject } from '../../../engine/plain-object.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { found, readText } from './read.mjs';
 
-export const LEDGER_FILE = 'i18n-dynamic-keys.yaml';
+const LEDGER_FILE = 'i18n-dynamic-keys.yaml';
 export const LEDGER_SCHEMA = 'starci/i18n-dynamic-keys@1';
 const CODE = 'HFS_UNUSED_SYMBOL';
 const MATCHERS = ['key', 'prefix', 'suffix'];
 const FIELDS = new Set([...MATCHERS, 'reason']);
 const SIDES = new Set(['fe', 'be']);
-const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const text = value => typeof value === 'string' && value.trim() !== '';
 const describe = entry => `${entry.kind} ${JSON.stringify(entry.value)}`;
 
 /** The catalog namespace (the dotted path before the leaf; '' when none) and the leaf of a candidate name. */
-export function splitCatalogName(name) {
+function splitCatalogName(name) {
   const at = name.lastIndexOf('.');
   return at < 0 ? { namespace: '', leaf: name } : { namespace: name.slice(0, at), leaf: name.slice(at + 1) };
 }
@@ -24,7 +24,7 @@ const MATCH = { key: (leaf, value) => leaf === value, prefix: (leaf, value) => l
 const matches = (entry, leaf) => MATCH[entry.kind](leaf, entry.value);
 
 function entryProblem(entry) {
-  if (!plain(entry)) return 'is not a mapping';
+  if (!isPlainObject(entry)) return 'is not a mapping';
   const unknown = Object.keys(entry).filter(field => !FIELDS.has(field));
   if (unknown.length) return `has unknown field ${unknown.map(field => JSON.stringify(field)).join(', ')} (allowed: key, prefix, suffix, reason)`;
   const given = MATCHERS.filter(field => field in entry);
@@ -35,14 +35,14 @@ function entryProblem(entry) {
 }
 
 /** Parse the ledger text: `{ entries, problems }`; a problem is one precise message about the file's shape. */
-export function parseLedger(source) {
+function parseLedger(source) {
   let doc;
   try { doc = parseYaml(source); } catch { return { entries: [], problems: ['is not valid YAML'] }; }
-  if (!plain(doc)) return { entries: [], problems: ['must be a mapping with schema and namespaces'] };
+  if (!isPlainObject(doc)) return { entries: [], problems: ['must be a mapping with schema and namespaces'] };
   const problems = [];
   for (const field of Object.keys(doc)) if (!['schema', 'namespaces'].includes(field)) problems.push(`has unknown top-level field ${JSON.stringify(field)}`);
   if (doc.schema !== LEDGER_SCHEMA) problems.push(`schema must be ${LEDGER_SCHEMA}`);
-  if (!plain(doc.namespaces)) { problems.push('namespaces must be a mapping of namespace to a list of entries'); return { entries: [], problems }; }
+  if (!isPlainObject(doc.namespaces)) { problems.push('namespaces must be a mapping of namespace to a list of entries'); return { entries: [], problems }; }
   const entries = [];
   for (const [namespace, list] of Object.entries(doc.namespaces)) {
     if (!Array.isArray(list)) { problems.push(`namespace ${JSON.stringify(namespace)} must be a list of entries`); continue; }
