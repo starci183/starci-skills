@@ -76,6 +76,9 @@ describe("AuthGuard", () => {
         expect(request.principal).toEqual(principal)
     })
 
+})
+
+describe("AuthGuard credential doors", () => {
     it("admits a credential door with the required principal without verifying a session token", async () => {
         const { guard, verify } = await build(undefined, { kind: "api-key" })
         verify.mockResolvedValue(ok(principal))
