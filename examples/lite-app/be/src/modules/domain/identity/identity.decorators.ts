@@ -32,7 +32,7 @@ export const CREDENTIAL_AUTHENTICATOR: unique symbol = Symbol("domain.identity.c
 export const InjectCredentialAuthenticator = (): TypedParameterDecorator<CredentialAuthenticator> =>
     injector<CredentialAuthenticator>(CREDENTIAL_AUTHENTICATOR)
 
-/** Marks a door authenticated by its own credential: `CredentialGuard` authenticates it and `AuthGuard` admits it. */
+/** Marks a door authenticated by its own credential; `CredentialGuard` authenticates it and `AuthGuard` admits it. */
 export const Credential = (metadata: CredentialMetadata): ReturnType<typeof SetMetadata> =>
     SetMetadata(CREDENTIAL_KEY, metadata)
 

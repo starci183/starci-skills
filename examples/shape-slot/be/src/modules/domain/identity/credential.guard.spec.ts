@@ -5,15 +5,15 @@ import { Test } from "@nestjs/testing"
 import { mock } from "@starci/jest-preset"
 import { CredentialGuard } from "./credential.guard"
 import type { CredentialAuthenticator, CredentialMetadata, CredentialPrincipal } from "./credential.contracts"
-import { IdentityErrorCode } from "./errors/identity.error"
+import { IdentityError, IdentityErrorCode } from "./errors/identity.error"
 import { CREDENTIAL_AUTHENTICATOR } from "./identity.decorators"
 
 const PRINCIPAL: CredentialPrincipal = { kind: "tool-token", subject: "tool-1", workspaceId: "ws-1" }
 
 interface FakeRequest {
     credentialPrincipal?: CredentialPrincipal
-    readonly headers: { readonly authorization: string }
-    readonly params: { readonly id: string }
+    readonly headers: { readonly authorization?: string }
+    readonly params?: { readonly id?: unknown }
 }
 
 const build = async (metadata: CredentialMetadata | undefined, principal: CredentialPrincipal = PRINCIPAL) => {
@@ -47,8 +47,10 @@ const requestOf = (): FakeRequest => ({ headers: { authorization: "Bearer secret
 describe("CredentialGuard", () => {
     it("passes a door without credential metadata and authenticates nothing", async () => {
         const { guard, authenticator } = await build(undefined)
+        const request = { ...requestOf(), credentialPrincipal: PRINCIPAL }
 
-        await expect(guard.canActivate(contextOf(requestOf()))).resolves.toBe(true)
+        await expect(guard.canActivate(contextOf(request))).resolves.toBe(true)
+        expect(request.credentialPrincipal).toEqual(PRINCIPAL)
         expect(authenticator.authenticate).not.toHaveBeenCalled()
     })
 
@@ -67,5 +69,36 @@ describe("CredentialGuard", () => {
 
         await expect(guard.canActivate(contextOf(request))).rejects.toMatchObject({ code: IdentityErrorCode.Unauthenticated })
         expect(request.credentialPrincipal).toBeUndefined()
+    })
+
+    it.each([{ ...PRINCIPAL, subject: "" }, { ...PRINCIPAL, workspaceId: "" }])(
+        "refuses an incomplete credential principal (%o)",
+        async (principal) => {
+            const { guard } = await build({ kind: "tool-token" }, principal)
+            const request = requestOf()
+
+            await expect(guard.canActivate(contextOf(request))).rejects.toMatchObject({ code: IdentityErrorCode.Unauthenticated })
+            expect(request.credentialPrincipal).toBeUndefined()
+        },
+    )
+
+    it("clears an earlier credential principal when authentication refuses", async () => {
+        const { guard, authenticator } = await build({ kind: "tool-token" }, PRINCIPAL)
+        const refusal = new IdentityError({ code: IdentityErrorCode.Unauthenticated })
+        authenticator.authenticate.mockRejectedValue(refusal)
+        const request = { ...requestOf(), credentialPrincipal: PRINCIPAL }
+
+        await expect(guard.canActivate(contextOf(request))).rejects.toBe(refusal)
+        expect(request.credentialPrincipal).toBeUndefined()
+    })
+
+    it.each([undefined, { id: 1 }])("passes absent authorization and no string resource id to the authenticator (%o)", async (params) => {
+        const metadata = { kind: "tool-token", workflow: "checkout" } as const
+        const { guard, authenticator } = await build(metadata, PRINCIPAL)
+        const request: FakeRequest = { headers: {}, params }
+
+        await expect(guard.canActivate(contextOf(request))).resolves.toBe(true)
+        expect(authenticator.authenticate).toHaveBeenCalledWith(metadata, "", undefined)
+        expect(request.credentialPrincipal).toEqual(PRINCIPAL)
     })
 })
