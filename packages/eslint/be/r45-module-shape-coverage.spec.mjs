@@ -7,6 +7,7 @@ import { hfsFromDeclaration } from './lib/hfs.mjs';
 import {
   capabilityModuleShape,
   isGlobalOnlyInApp,
+  moduleDefinitionRequired,
   noCrossOwnerModuleImport,
   noGlobalDecorator,
   noModuleLet,
@@ -18,6 +19,7 @@ import {
 
 const MODULE = at('src/modules/domain/plan/plan.module.ts');
 const APP = at('apps/api/src/app.module.ts');
+const LEDGER = at('src/modules/domain/ledger/ledger.module.ts');
 
 for (const edition of ['lite', 'full']) {
   test(`${edition} accepts valid modules and rejects module-shape violations`, () => {
@@ -64,7 +66,21 @@ for (const edition of ['lite', 'full']) {
       invalid: [{
         filename: MODULE,
         settings,
-        code: '@Module({}) export class PlanModule {}',
+        code: 'import { ConfigurableModuleClass } from "./plan.module-definition"; @Module({}) export class PlanModule extends ConfigurableModuleClass { static register(options: PlanOptions) { return {} } }',
+        errors: [{ messageId: 'registerSignature' }],
+      }],
+    });
+
+    tester.run('module-definition-required', moduleDefinitionRequired, {
+      valid: [{
+        filename: LEDGER,
+        settings,
+        code: 'import { ConfigurableModuleClass } from "./ledger.module-definition"; @Module({}) export class LedgerModule extends ConfigurableModuleClass {}',
+      }],
+      invalid: [{
+        filename: LEDGER,
+        settings,
+        code: '@Module({}) export class LedgerModule {}',
         errors: [{ messageId: 'extendsBase' }],
       }],
     });
