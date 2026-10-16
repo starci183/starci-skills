@@ -1,17 +1,14 @@
 // affected-git-batch.mjs - the git answers `test affected` asks per changed file, fetched with a few git processes instead of one per file.
 // On a large diff (a release against the previous tag) the per-file `git diff -- <file>` and `git show <base>:<file>` calls were thousands of
 // process spawns, tens of minutes on Windows before the first spec ran. The answers below are the same bytes, read once per (root, base).
-import { spawnSync } from 'node:child_process';
+import { catFileBatch, changedNames, diffAll } from '../api/git/batch.mjs';
 
-const MAX_BUFFER = 1024 * 1024 * 1024;
 const caches = new Map();
-
-const git = (root, args, input) => spawnSync('git', args, { cwd: root, input, encoding: input === undefined ? 'utf8' : 'buffer', maxBuffer: MAX_BUFFER, windowsHide: true });
 
 /** The `-U0` diff text of every changed tracked file against `base`, by repository path (renames not detected, like a single-file diff). */
 function loadDiffs(root, base) {
   const diffs = new Map();
-  const result = git(root, ['diff', '-U0', '--no-color', '--no-renames', base]);
+  const result = diffAll(base, { cwd: root });
   if (result.status !== 0 || result.error) return null;
   for (const chunk of String(result.stdout).split(/^(?=diff --git )/m)) {
     const header = /^diff --git a\/(.+?) b\/(.+)\r?\n/.exec(chunk);
@@ -22,10 +19,10 @@ function loadDiffs(root, base) {
 
 /** `git cat-file --batch` over `base:<path>` for every changed path: the base text by path (absent for a path the base lacks). */
 function loadBaseTexts(root, base) {
-  const names = git(root, ['diff', '--name-only', '--no-renames', '--diff-filter=MD', base]);
+  const names = changedNames(base, 'MD', { cwd: root });
   if (names.status !== 0 || names.error) return null;
   const paths = String(names.stdout).split(/\r?\n/).filter(Boolean);
-  const result = git(root, ['cat-file', '--batch'], Buffer.from(paths.map((p) => `${base}:${p}\n`).join('')));
+  const result = catFileBatch(Buffer.from(paths.map((p) => `${base}:${p}\n`).join('')), { cwd: root });
   if (result.status !== 0 || result.error) return null;
   const out = result.stdout;
   const texts = new Map();

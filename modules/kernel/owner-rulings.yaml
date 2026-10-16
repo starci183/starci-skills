@@ -496,7 +496,7 @@ rulings:
   - id: graphql-13-advisory-accepted-until-a19
     date: '2026-10-16'
     source: knowledge/hfs/canon-pins.yaml '@nestjs/graphql' and '@nestjs/apollo'; packages/hfs/CHANGELOG.md Unreleased (a18 pins)
-    ruling: 'npm audit (--omit=dev --audit-level=high) reports high advisories on @nestjs/graphql and @nestjs/apollo 13.4.5 (and @graphql-tools/utils through them) whose fix is 14.0.3, a semver major. The canon keeps both packages on 13.x for alpha.18 as a documented accepted advisory; the major upgrade is deferred to alpha.19. The advisories fixed by non-major bumps are taken in alpha.18: next 16.4.2, axios 1.20.0, @nestjs/platform-express 11.2.7. Owner words "Theo y tro" (delegation relayed by main, 2026-10-16).'
+    ruling: 'npm audit (--omit=dev --audit-level=high) reports high advisories on @nestjs/graphql and the pinned @nestjs/apollo (and @graphql-tools/utils through them) whose fix is 14.0.3, a semver major. The canon keeps both packages on their current major for alpha.18 as a documented accepted advisory; the major upgrade is deferred to alpha.19. The advisories fixed by non-major bumps are taken in alpha.18: the next, axios and @nestjs/platform-express pins of knowledge/hfs/canon-pins.yaml. Owner words "Theo y tro" (delegation relayed by main, 2026-10-16).'
     supersedes: []
     enforcedBy: [scripts/checks/check-canon-pins.mjs]
 

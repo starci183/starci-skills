@@ -37,7 +37,7 @@ export function functionSubjectExports(ts, sourceFile) {
 const decoratorsOf = (ts, node) => (ts.canHaveDecorators(node) ? ts.getDecorators(node) ?? [] : []);
 
 /** A value object: an undecorated class whose constructor parameters carry no injection token, so Nest never builds it. */
-export function isValueObjectClass(ts, declaration) {
+function isValueObjectClass(ts, declaration) {
   if (decoratorsOf(ts, declaration).length > 0) return false;
   const constructors = declaration.members.filter(member => ts.isConstructorDeclaration(member));
   return constructors.every(constructor => constructor.parameters.every(parameter => decoratorsOf(ts, parameter).length === 0));
