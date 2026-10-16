@@ -109,11 +109,19 @@ rules:
     code: "HFS_PLAINTEXT_SECRET"
     law: "Secrets exist only as `.starcistacks/<env>/secrets/<slug>.enc`."
     kinds: [check, design]
-    gates: [pre-commit, pre-push, land, ci]
+    gates: [pre-commit, land, ci]
     failureCodes: ["HFS_PLAINTEXT_SECRET"]
     enforcers:
       - {kind: hfs, id: plaintext-secret, at: scripts/hfs/rules/secrets.mjs}
       - {kind: hfs, id: plaintext-secret-staged, at: packages/hfs/sync/hygiene.mjs}
+    editions: [lite, full]
+    docs: [docs/legacy-managed-rule-coverage.md#r06-plaintext-secrets]
+    templateNa: "Encrypted secrets are supplied by the app secret command; plaintext secret files are forbidden and are never scaffolded."
+    proves: [tests/hfs-proofs/hfs-plaintext-secret.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/hfs-proofs/hfs-plaintext-secret.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-proofs/hfs-plaintext-secret.spec.mjs, editions: [lite, full], codes: [HFS_PLAINTEXT_SECRET]}
   - id: R07
     code: "HFS_AGENT_DATA_TRACKED"
     law: "`.starciwork` holds product records only."
