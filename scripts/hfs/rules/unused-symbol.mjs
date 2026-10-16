@@ -6,6 +6,8 @@ import { found, readText } from './read.mjs';
 import { nameText } from '../../lib/ts-ast.mjs';
 import { unwrapCatalogExpression as unwrap } from '../../lib/ts-analysis.mjs';
 import { argumentBindings, jsonCatalogBindings, jsonCatalogRead, staticStrings } from './unused-symbol-values.mjs';
+import { catalogNamespace, translationBindings } from './unused-symbol-translators.mjs';
+import { valuesOf } from './unused-symbol-flow.mjs';
 
 export const HFS_UNUSED_SYMBOL = 'HFS_UNUSED_SYMBOL';
 const SOURCE = /\.[cm]?[jt]sx?$/u;
@@ -83,6 +85,7 @@ function addCandidate(state, source, node, kind, name, value, symbol) {
   const candidate = { path: slash(path.relative(state.repoRoot, source.fileName)), line: at.line + 1, column: at.character + 1, kind, name, value, used: false };
   state.candidates.push(candidate);
   if (symbol) state.symbols.set(symbol, candidate);
+  if (symbol?.valueDeclaration) state.decls.set(symbol.valueDeclaration, candidate);
   return candidate;
 }
 
@@ -178,7 +181,8 @@ function markReference(state, node) {
   const { ts, checker } = state;
   if (declarationName(ts, node)) return;
   const symbol = symbolOf(ts, checker, node);
-  const candidate = state.symbols.get(symbol);
+  // A property read through an imported object resolves to a transient widened symbol; its declaration is the candidate's.
+  const candidate = state.symbols.get(symbol) ?? state.decls.get(symbol?.valueDeclaration);
   if (candidate) candidate.used = true;
   const members = state.containers.get(symbol);
   if (members) markContainerRead(ts, members, node);
@@ -190,57 +194,7 @@ function ignoredRead(state, node, source) {
   return ts.isVariableDeclaration(node) && (state.symbols.has(state.checker.getSymbolAtLocation(node.name)) || state.containers.has(state.checker.getSymbolAtLocation(node.name)));
 }
 
-function translationFactories(ts, source) {
-  const factories = new Set(['useTranslations', 'getTranslations']);
-  for (const statement of source.statements) {
-    if (!ts.isImportDeclaration(statement) || !/^(?:next-intl|next-intl\/server)$/u.test(statement.moduleSpecifier.text)) continue;
-    const named = statement.importClause?.namedBindings;
-    if (named && ts.isNamedImports(named)) for (const element of named.elements) {
-      if (factories.has((element.propertyName ?? element.name).text)) factories.add(element.name.text);
-    }
-  }
-  return factories;
-}
-
-function translatorNamespace(state, initializer, factories) {
-  const { ts } = state;
-  let init = unwrap(ts, initializer);
-  if (ts.isAwaitExpression(init)) init = unwrap(ts, init.expression);
-  if (!ts.isCallExpression(init) || !ts.isIdentifier(init.expression) || !factories.has(init.expression.text)) return null;
-  let first = init.arguments[0];
-  if (first && ts.isObjectLiteralExpression(first)) first = first.properties.find(property => nameText(ts, property.name, { numbers: true }) === 'namespace')?.initializer;
-  return first ? staticStrings(state, first) : [''];
-}
-
-function translationBindings(state, sources) {
-  const { ts, checker } = state;
-  for (const source of sources.values()) {
-    const factories = translationFactories(ts, source);
-    const visit = node => {
-      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
-        const namespaces = translatorNamespace(state, node.initializer, factories);
-        if (namespaces?.length) state.translators.set(checker.getSymbolAtLocation(node.name), namespaces);
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(source);
-  }
-}
-
-function catalogNamespace(state, callee) {
-  const { ts, checker } = state;
-  let receiver = callee;
-  if (ts.isPropertyAccessExpression(callee) && /^(?:rich|raw|markup)$/u.test(callee.name.text)) receiver = callee.expression;
-  const translator = state.translators.get(checker.getSymbolAtLocation(receiver));
-  if (translator !== undefined) return translator;
-  if (ts.isPropertyAccessExpression(callee) && callee.name.text === 'get') {
-    const owner = callee.expression;
-    const name = nameText(ts, ts.isPropertyAccessExpression(owner) ? owner.name : owner, { numbers: true }) ?? '';
-    if (/message|catalog/iu.test(name)) return [''];
-  }
-  if (ts.isIdentifier(callee) && /^(?:t|translate)$/u.test(callee.text)) return [''];
-  return null;
-}
+const readKey = (state, prefix, value) => (prefix === null ? state.looseReads : state.catalogReads).add(prefix === null ? value : `${prefix}${value}`);
 
 function catalogArguments(state, node, prefix) {
   const { ts } = state;
@@ -249,9 +203,20 @@ function catalogArguments(state, node, prefix) {
   if (ts.isConditionalExpression(argument)) {
     catalogArguments(state, argument.whenTrue, prefix);
     catalogArguments(state, argument.whenFalse, prefix);
-  } else if (ts.isStringLiteralLike(argument)) state.catalogReads.add(`${prefix}${argument.text}`);
-  else if (ts.isTemplateExpression(argument)) state.templates.push([`${prefix}${argument.head.text}`, ...argument.templateSpans.map(span => span.literal.text)]);
-  else for (const value of staticStrings(state, argument)) state.catalogReads.add(`${prefix}${value}`);
+  } else if (ts.isStringLiteralLike(argument)) readKey(state, prefix, argument.text);
+  else if (ts.isTemplateExpression(argument)) {
+    // A static head is a key prefix: every defined key below it is read. A template with no static head proves nothing.
+    if (prefix !== null) state.templates.push([`${prefix}${argument.head.text}`, ...argument.templateSpans.map(span => span.literal.text)]);
+  } else {
+    for (const value of staticStrings(state, argument)) readKey(state, prefix, value);
+    // A key handed to a wrapper parameter can be a template at the call site.
+    for (const leaf of valuesOf(state, argument)) if (leaf !== argument) catalogArguments(state, leaf, prefix);
+  }
+}
+
+function namespacePrefix(namespace) {
+  if (namespace === null) return null;
+  return namespace ? `${namespace}.` : '';
 }
 
 function collectLiteralReads(state, node) {
@@ -259,8 +224,7 @@ function collectLiteralReads(state, node) {
   if (ts.isStringLiteralLike(node) && !declarationName(ts, node)) state.reads.add(node.text);
   jsonCatalogRead(state, node);
   if (!ts.isCallExpression(node)) return;
-  const namespaces = catalogNamespace(state, node.expression);
-  for (const namespace of namespaces ?? []) catalogArguments(state, node.arguments[0], namespace ? `${namespace}.` : '');
+  for (const namespace of catalogNamespace(state, node.expression)) catalogArguments(state, node.arguments[0], namespacePrefix(namespace));
 }
 
 function sourceReads(state, sources) {
@@ -289,9 +253,15 @@ function jsonCandidates(state, files) {
   }
 }
 
+/** R106's rule for a translator handed in without its namespace: a key is read when a string equals any tail of its dotted path. */
+function looseRead(state, name) {
+  const segments = name.split('.');
+  return segments.some((_, index) => state.looseReads.has(segments.slice(index).join('.')));
+}
+
 function catalogRead(state, candidate, liveCodes) {
   if (candidate.name.startsWith('errors.') && liveCodes.has(candidate.name.slice(7))) return true;
-  if (state.catalogReads.has(candidate.name)) return true;
+  if (state.catalogReads.has(candidate.name) || looseRead(state, candidate.name)) return true;
   return state.templates.some(parts => parts.some(Boolean) && (() => {
     const tail = candidate.name;
     let offset = 0;
@@ -312,7 +282,7 @@ export function unusedSymbolFindings({ repoRoot, files, repo = {}, isRoot = fals
   if (!ts) return [];
   const sources = sourceFiles(ts, repoRoot, files);
   const { program, resolveModule } = trackedProgram(ts, repoRoot, files, sources);
-  const state = { ts, checker: program.getTypeChecker(), resolveModule, repoRoot, candidates: [], symbols: new Map(), containers: new Map(), reads: new Set(), catalogReads: new Set(), translators: new Map(), templates: [], arguments: new Map(), catalogObjects: new Map() };
+  const state = { ts, checker: program.getTypeChecker(), resolveModule, repoRoot, candidates: [], symbols: new Map(), containers: new Map(), reads: new Set(), catalogReads: new Set(), translators: new Map(), templates: [], arguments: new Map(), catalogObjects: new Map(), decls: new Map(), looseReads: new Set() };
   collectCandidates(state, sources);
   argumentBindings(state, sources);
   jsonCatalogBindings(state, sources, files);

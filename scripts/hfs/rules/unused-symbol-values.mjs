@@ -1,18 +1,20 @@
 // Static values used at runtime by catalog consumers. A declaration alone is never a read.
 import path from 'node:path';
-import { nameText as nameOf } from '../../lib/ts-ast.mjs';
 import { unwrapCatalogExpression as unwrap } from '../../lib/ts-analysis.mjs';
+import { symbolAt, valuesOf } from './unused-symbol-flow.mjs';
 
 const JSON_CATALOG = /(?:^|\/)(?:messages|locales)\/[^/]+\.json$|\.catalog\.json$/u;
 
-const symbolAt = (state, node) => {
-  const symbol = state.checker.getSymbolAtLocation(node);
-  return symbol?.flags === state.ts.SymbolFlags.Alias ? state.checker.getAliasedSymbol(symbol) : symbol;
-};
 function callable(state, node) {
   const declaration = symbolAt(state, node)?.valueDeclaration;
   if (declaration && state.ts.isVariableDeclaration(declaration)) return unwrap(state.ts, declaration.initializer);
   return declaration;
+}
+
+function bindArgument(state, parameter, argument) {
+  if (!parameter || !argument) return;
+  const key = state.ts.isIdentifier(parameter.name) ? state.checker.getSymbolAtLocation(parameter.name) : parameter;
+  state.arguments.set(key, [...state.arguments.get(key) ?? [], argument]);
 }
 
 /** Record the actual arguments of local functions, including imported functions and arrow exports. */
@@ -21,14 +23,10 @@ export function argumentBindings(state, sources) {
     const visit = node => {
       if (state.ts.isCallExpression(node)) {
         const target = callable(state, node.expression);
-        for (const [index, parameter] of (target?.parameters ?? []).entries()) {
-          const argument = node.arguments[index];
-          if (!argument) continue;
-          const symbol = state.checker.getSymbolAtLocation(parameter.name);
-          const argumentsOf = state.arguments.get(symbol) ?? [];
-          argumentsOf.push(argument);
-          state.arguments.set(symbol, argumentsOf);
-        }
+        for (const [index, parameter] of (target?.parameters ?? []).entries()) bindArgument(state, parameter, node.arguments[index]);
+      } else if (state.ts.isJsxSelfClosingElement(node) || state.ts.isJsxOpeningElement(node)) {
+        // A component's props parameter receives the attribute list of every element that renders it.
+        bindArgument(state, callable(state, node.tagName)?.parameters?.[0], node.attributes);
       }
       state.ts.forEachChild(node, visit);
     };
@@ -42,25 +40,6 @@ function typeStrings(state, node) {
   return types.length && types.every(part => part.isStringLiteral()) ? types.map(part => part.value) : [];
 }
 
-function mappedProperty(state, node, seen) {
-  const { ts } = state;
-  if (!ts.isPropertyAccessExpression(node) || !ts.isIdentifier(node.expression)) return [];
-  const parameter = symbolAt(state, node.expression)?.valueDeclaration;
-  if (!parameter || !ts.isParameter(parameter)) return [];
-  const callback = parameter.parent;
-  const call = callback.parent;
-  if (!ts.isCallExpression(call) || !ts.isPropertyAccessExpression(call.expression) || call.expression.name.text !== 'map') return [];
-  const declaration = symbolAt(state, call.expression.expression)?.valueDeclaration;
-  const list = unwrap(ts, declaration?.initializer);
-  if (!list || !ts.isArrayLiteralExpression(list)) return [];
-  return list.elements.flatMap(element => {
-    const item = unwrap(ts, element);
-    if (!ts.isObjectLiteralExpression(item)) return [];
-    const property = item.properties.find(entry => ts.isPropertyAssignment(entry) && nameOf(ts, entry.name) === node.name.text);
-    return property ? staticStrings(state, property.initializer, seen) : [];
-  });
-}
-
 /** Follow finite literals only; a broad string or an unbounded dynamic expression gives no evidence. */
 export function staticStrings(state, expression, visited = new Set()) {
   const { ts } = state;
@@ -72,9 +51,11 @@ export function staticStrings(state, expression, visited = new Set()) {
   const typed = typeStrings(state, node);
   if (typed.length) return typed;
   const declaration = symbolAt(state, node)?.valueDeclaration;
-  if (declaration && ts.isVariableDeclaration(declaration)) return staticStrings(state, declaration.initializer, seen);
-  if (declaration && ts.isParameter(declaration)) return (state.arguments.get(symbolAt(state, node)) ?? []).flatMap(argument => staticStrings(state, argument, seen));
-  return mappedProperty(state, node, seen);
+  if (declaration && ts.isVariableDeclaration(declaration) && declaration.initializer) return staticStrings(state, declaration.initializer, seen);
+  const bound = declaration && ts.isParameter(declaration) ? state.arguments.get(symbolAt(state, node)) ?? [] : [];
+  if (bound.length) return bound.flatMap(argument => staticStrings(state, argument, seen));
+  // Tables, tuples, nested maps, for-of and destructured elements resolve to the literals they hold.
+  return valuesOf(state, node, visited).flatMap(leaf => leaf === node ? [] : staticStrings(state, leaf, seen));
 }
 
 /** JSON imports are catalog owners; their runtime member reads survive named aliases and re-exports. */
@@ -115,4 +96,8 @@ export function jsonCatalogRead(state, node) {
   if (!state.ts.isPropertyAccessExpression(node) && !state.ts.isElementAccessExpression(node)) return;
   const key = catalogObjectPath(state, node);
   if (key !== null) state.catalogReads.add(key.slice(0, -1));
+  if (state.ts.isElementAccessExpression(node) && !state.ts.isStringLiteralLike(node.argumentExpression)) {
+    const base = catalogObjectPath(state, node.expression);
+    if (base !== null) for (const value of staticStrings(state, node.argumentExpression)) state.catalogReads.add(`${base}${value}`);
+  }
 }

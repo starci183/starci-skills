@@ -241,3 +241,76 @@ test('HFS_UNUSED_EXPORT: JSDoc type references consume their export while docume
   assert.deepEqual(namespaceFindings(t, `${imported}/** @type {values.Keep} */\nlet example;`, undefined, true), ['Dead']);
   assert.deepEqual(namespaceFindings(t, `${imported}/** @see values.Keep */\nlet example;`, undefined, true), ['Dead', 'Keep']);
 });
+
+const namesOf = (context, edition, profile = 'fe') => unusedSymbolFindings({ ...context, repo: { profile, edition } }).map(finding => finding.name);
+
+for (const edition of ['lite', 'full']) {
+  test(`HFS_UNUSED_SYMBOL ${edition}: a catalog key read through an imported object, as const or nested, is live and its dead sibling is not`, t => {
+    const contents = {
+      'apps/api/src/m.messages.ts': 'export const COPY = { badEngine: "x", retired: "y" }; export const NESTED = { group: { deep: "a", dead: "b" } } as const;',
+      'apps/api/src/u.ts': 'import { COPY, NESTED } from "./m.messages"; export const v = COPY.badEngine; export const w = NESTED.group.deep;',
+    };
+    assert.deepEqual(namesOf(fixture(t, contents), edition, 'be'), ['group.dead', 'retired']);
+    contents['apps/api/src/u.ts'] += ' export const x = [COPY.retired, NESTED.group.dead];';
+    assert.deepEqual(namesOf(fixture(t, contents), edition, 'be'), []);
+  });
+
+  test(`HFS_UNUSED_SYMBOL ${edition}: a translator handed to a component through props keeps its own namespace keys and nothing else`, t => {
+    const context = fixture(t, {
+      'apps/web/src/modules/i18n/messages/en.json': JSON.stringify({ content: { queueOpen: 'Open', panelTitle: 'Panel', retired: 'Retired' }, other: { queueOpen: 'Other', floating: 'Floating', dead: 'Dead' } }),
+      'apps/web/src/features/page.tsx': `import { Card, Panel } from './card';
+const t = useTranslations("content"); export const page = <div><Card t={t} /><Panel t={t} /></div>;`,
+      'apps/web/src/features/card.tsx': `export function Card({ t }: { t: any }) { return t("queueOpen"); }
+export function Panel(props: { t: any }) { return props.t("panelTitle"); }
+export function Orphan({ t }: { t: any }) { return t("floating"); }`,
+    });
+    assert.deepEqual(namesOf(context, edition), ['content.retired', 'other.dead', 'other.queueOpen']);
+  });
+
+  test(`HFS_UNUSED_SYMBOL ${edition}: an array-destructured translator from Promise.all binds its namespace by position`, t => {
+    const contents = {
+      'apps/web/src/modules/i18n/messages/en.json': JSON.stringify({ landing: { hero: 'Hero', retired: 'Retired' }, other: { hero: 'Other' } }),
+      'apps/web/src/app/page.ts': 'export async function page() { const [t, locale] = await Promise.all([getTranslations("landing"), getLocale()]); return t("hero") + locale; }',
+    };
+    assert.deepEqual(namesOf(fixture(t, contents), edition), ['landing.retired', 'other.hero']);
+    contents['apps/web/src/app/page.ts'] += ' export const more = () => { const [u] = [useTranslations("other")]; return u("hero"); };';
+    assert.deepEqual(namesOf(fixture(t, contents), edition), ['landing.retired']);
+  });
+
+  test(`HFS_UNUSED_SYMBOL ${edition}: a template key passed to a wrapper parameter reads every key under its static head`, t => {
+    const contents = {
+      'apps/api/src/hiring.messages.ts': `export const HIRING = { "hiring.weekday.1": { vi: "a", en: "a" }, "hiring.weekday.2": { vi: "b", en: "b" }, "hiring.retired": { vi: "c", en: "c" } };`,
+      'apps/api/src/hiring.service.ts': `export class Hiring {
+  constructor(private catalog: any) {}
+  text(key: string) { return this.catalog.get(key, {}, "vi"); }
+  day(n: number) { return this.text(\`hiring.weekday.\${n}\`) + this.text(\`\${n}\`); }
+}`,
+    };
+    assert.deepEqual(namesOf(fixture(t, contents), edition, 'be'), ['hiring.retired']);
+    contents['apps/api/src/hiring.service.ts'] += ' export const direct = (catalog: any) => catalog.get("hiring.retired");';
+    assert.deepEqual(namesOf(fixture(t, contents), edition, 'be'), []);
+  });
+
+  test(`HFS_UNUSED_SYMBOL ${edition}: a JSON catalog read through a helper function counts the literal and array arguments it receives`, t => {
+    const contents = {
+      'apps/web/src/modules/i18n/messages/en.json': JSON.stringify({ a: { b: 'B', c: 'C', d: 'D', dead: 'Dead' } }),
+      'apps/web/src/modules/i18n/read.ts': `import vi from './messages/en.json';
+const read = (k: string) => vi[k]; export const one = read("a.b");
+export const list = (keys: string[]) => keys.map(k => vi[k]); export const many = list(["a.c", "a.d"]);`,
+    };
+    assert.deepEqual(namesOf(fixture(t, contents), edition), ['a.dead']);
+    contents['apps/web/src/modules/i18n/read.ts'] += ' export const last = read("a.dead");';
+    assert.deepEqual(namesOf(fixture(t, contents), edition), []);
+  });
+
+  test(`HFS_UNUSED_SYMBOL ${edition}: a key taken from a nested tuple table by destructuring consumes only the tuple slot that is read`, t => {
+    const contents = {
+      'apps/web/src/modules/i18n/messages/en.json': JSON.stringify({ footer: { linkTry: 'Try', login: 'Login', retired: 'Retired' } }),
+      'apps/web/src/features/footer.tsx': `const COLS = [{ id: "c", links: [["linkTry", "login"]] }] as const;
+const t = useTranslations("footer"); export const keys = COLS.map(c => c.links.map(([key]) => t(key)));`,
+    };
+    assert.deepEqual(namesOf(fixture(t, contents), edition), ['footer.login', 'footer.retired']);
+    contents['apps/web/src/features/footer.tsx'] += ' export const pages = COLS.map(c => c.links.map(([, page]) => t(page)));';
+    assert.deepEqual(namesOf(fixture(t, contents), edition), ['footer.retired']);
+  });
+}

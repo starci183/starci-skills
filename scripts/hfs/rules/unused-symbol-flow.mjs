@@ -1,0 +1,75 @@
+// Value flow for R280: the expressions an identifier, property or destructured element can hold,
+// followed through variables, parameters (state.arguments), array callbacks, for-of and literal tables.
+import { nameText as nameOf } from '../../lib/ts-ast.mjs';
+import { unwrapCatalogExpression as unwrap } from '../../lib/ts-analysis.mjs';
+
+const ARRAY_CALLBACK = /^(?:map|flatMap|forEach|filter|find|some|every)$/u;
+
+export const symbolAt = (state, node) => {
+  const symbol = state.checker.getSymbolAtLocation(node);
+  return symbol?.flags === state.ts.SymbolFlags.Alias ? state.checker.getAliasedSymbol(symbol) : symbol;
+};
+
+/** The expression bound to `name` in an object literal or a JSX attribute list. */
+function propertyValues(state, owner, name) {
+  const { ts } = state;
+  if (ts.isObjectLiteralExpression(owner)) return owner.properties.filter(entry => ts.isPropertyAssignment(entry) && nameOf(ts, entry.name) === name).map(entry => entry.initializer);
+  if (!ts.isJsxAttributes(owner)) return [];
+  const attributes = owner.properties.filter(entry => ts.isJsxAttribute(entry) && entry.name.text === name && entry.initializer);
+  return attributes.map(entry => ts.isJsxExpression(entry.initializer) ? entry.initializer.expression : entry.initializer).filter(Boolean);
+}
+
+const resolveAll = (state, nodes, seen) => nodes.flatMap(node => valuesOf(state, node, seen));
+
+function elementsOf(state, expression, seen) {
+  return valuesOf(state, expression, seen).flatMap(owner => state.ts.isArrayLiteralExpression(owner) ? [...owner.elements] : []);
+}
+
+function parameterValues(state, declaration, seen) {
+  const { ts } = state;
+  const callback = declaration.parent;
+  const call = callback.parent;
+  if (ts.isCallExpression(call) && call.arguments[0] === callback && callback.parameters[0] === declaration
+    && ts.isPropertyAccessExpression(call.expression) && ARRAY_CALLBACK.test(call.expression.name.text)) {
+    return resolveAll(state, elementsOf(state, call.expression.expression, seen), seen);
+  }
+  const key = ts.isIdentifier(declaration.name) ? state.checker.getSymbolAtLocation(declaration.name) : declaration;
+  return resolveAll(state, state.arguments.get(key) ?? [], seen);
+}
+
+function bindingValues(state, declaration, seen) {
+  const { ts } = state;
+  const pattern = declaration.parent;
+  if (declaration.dotDotDotToken) return [];
+  const owners = declarationValues(state, pattern.parent, seen);
+  if (ts.isObjectBindingPattern(pattern)) {
+    const name = nameOf(ts, declaration.propertyName ?? declaration.name);
+    return resolveAll(state, owners.flatMap(owner => propertyValues(state, owner, name)), seen);
+  }
+  const index = pattern.elements.indexOf(declaration);
+  return resolveAll(state, owners.flatMap(owner => ts.isArrayLiteralExpression(owner) && owner.elements[index] ? [owner.elements[index]] : []), seen);
+}
+
+function declarationValues(state, declaration, seen) {
+  const { ts } = state;
+  if (ts.isParameter(declaration)) return parameterValues(state, declaration, seen);
+  if (ts.isBindingElement(declaration)) return bindingValues(state, declaration, seen);
+  if (!ts.isVariableDeclaration(declaration)) return [];
+  const loop = declaration.parent?.parent;
+  if (loop && ts.isForOfStatement(loop)) return resolveAll(state, elementsOf(state, loop.expression, seen), seen);
+  return declaration.initializer ? valuesOf(state, declaration.initializer, seen) : [];
+}
+
+/** Leaf expressions `expression` may evaluate to. A translator variable and any unresolvable expression is its own leaf. */
+export function valuesOf(state, expression, visited = new Set()) {
+  const { ts } = state;
+  const node = unwrap(ts, expression);
+  if (!node || visited.has(node)) return [];
+  const seen = new Set([...visited, node]);
+  if (ts.isConditionalExpression(node)) return [...valuesOf(state, node.whenTrue, seen), ...valuesOf(state, node.whenFalse, seen)];
+  if (ts.isPropertyAccessExpression(node)) return resolveAll(state, valuesOf(state, node.expression, seen).flatMap(owner => propertyValues(state, owner, node.name.text)), seen);
+  if (!ts.isIdentifier(node)) return [node];
+  const symbol = symbolAt(state, node);
+  if (!symbol?.valueDeclaration || state.translators.has(symbol)) return [node];
+  return declarationValues(state, symbol.valueDeclaration, seen);
+}
