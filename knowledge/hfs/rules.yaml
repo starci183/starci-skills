@@ -1878,9 +1878,19 @@ rules:
       - {kind: eslint-be, id: tests-keep-constraints}
   - id: R101
     code: "BE_TEST_BUILDER_ARRANGES"
+    editions: [lite, full]
+    docs: [docs/test-builder-coverage.md#r101-deterministic-arrangement]
+    proves:
+      - {path: packages/eslint/be/legacy-unblock-coverage.spec.mjs, editions: [lite, full], codes: [BE_TEST_BUILDER_ARRANGES]}
+    exemplifiedBy:
+      - {path: packages/eslint/be/legacy-unblock-coverage.spec.mjs, editions: [lite, full], codes: [BE_TEST_BUILDER_ARRANGES]}
+    templateNa: "Product data builders depend on application entities and parent chains; the scaffold does not generate these builders."
+    witness:
+      - {path: packages/eslint/be/legacy-unblock-coverage.spec.mjs, edition: lite, codes: [BE_TEST_BUILDER_ARRANGES]}
+      - {path: packages/eslint/be/legacy-unblock-coverage.spec.mjs, edition: full, codes: [BE_TEST_BUILDER_ARRANGES]}
     law: "A test data builder arranges data only: it imports no assertion or test-framework global (`expect`, `@jest/globals` or the Jest namespace) and its defaults are deterministic (no `Date.now()`, argless `new Date()`, `Math.random()`, `randomUUID()` or `crypto.random*`)."
     kinds: [lint]
-    gates: [pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["BE_TEST_BUILDER_ARRANGES"]
     enforcers:
       - {kind: eslint-be, id: builder-arranges-only}
@@ -2775,9 +2785,19 @@ rules:
       - {kind: hfs, id: services-async-specs, at: scripts/hfs/rules/services.mjs}
   - id: R168
     code: "BE_SERVICE_ISOLATION"
+    editions: [lite, full]
+    docs: [docs/microservices.md#r168]
+    proves:
+      - {path: packages/eslint/be/legacy-unblock-coverage.spec.mjs, editions: [lite, full], codes: [BE_SERVICE_ISOLATION]}
+    exemplifiedBy:
+      - {path: packages/eslint/be/legacy-unblock-coverage.spec.mjs, editions: [lite, full], codes: [BE_SERVICE_ISOLATION]}
+    templateNa: "Sibling-service imports are product composition decisions; no scaffold generates cross-service source imports."
+    witness:
+      - {path: packages/eslint/be/legacy-unblock-coverage.spec.mjs, edition: lite, codes: [BE_SERVICE_ISOLATION]}
+      - {path: packages/eslint/be/legacy-unblock-coverage.spec.mjs, edition: full, codes: [BE_SERVICE_ISOLATION]}
     law: "A service app (`be/apps/<service>/`) imports no file of a sibling service app: the app that owns the importing file and the app that owns the file a specifier resolves to (a relative path or an alias of the program's own `compilerOptions.paths`) are read from the HFS slot view, and two different apps is a finding; services share only the `be/src` libraries and meet through the wire (a client of the sibling's API, or the events of its vendored contract under `be/contracts/<service>/`)."
     kinds: [lint]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_SERVICE_ISOLATION"]
     enforcers:
       - {kind: eslint-be, id: service-isolation}

@@ -59,6 +59,12 @@ share the libraries under `be/src` (`features/`, `modules/{domain,integrations,p
 Scheduled work is owned by the app's scheduler and queue, an enqueue-only pg_cron tick, or a declared replicated-job that runs
 the CLI command. Production does not install host crontabs or host timers.
 
+<a id="r168"></a>
+R168 `BE_SERVICE_ISOLATION` applies in lite and full to static imports,
+re-exports and literal dynamic `import()` expressions. A sibling app's source
+cannot be loaded through any of these forms. Dynamic imports of the same app
+and the shared `be/src` libraries remain valid; ownership comes from HFS slots.
+
 ## Images
 
 <a id="r164"></a>

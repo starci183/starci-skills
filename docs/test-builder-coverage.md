@@ -27,3 +27,11 @@ more than once, including through `Partial<Entity>`. Obtain additional rows from
 builder; spreading a builder result permits explicit overrides. One entity literal
 and repeated literals of a plain, non-entity type do not trigger the repetition rule.
 The dedicated specs exercise passing and violating arrangements for both editions.
+
+## R101 deterministic arrangement
+
+In lite and full, BE_TEST_BUILDER_ARRANGES requires builders to arrange data only.
+Importing `expect` (including an alias or namespace) or `@jest/globals` is a
+violation, as are framework-global assertions and nondeterministic defaults.
+Use fixed identifiers, injected IDs and explicit dates; a local function whose
+name happens to be `expect` is still an ordinary arrangement helper.
