@@ -3,6 +3,8 @@
 // A project rule judges nothing itself: the graph (the architecture machine's module graph and slot manifest, built once per
 // process) holds the findings of its codes, and the rule reports those of the file it is visiting, on the line the machine named.
 // `settings.starci.injectedTypeScript` is a fixtures-only seam, a function returning the compiler (RuleTester freezes settings, and a frozen compiler cannot run).
+// `settings.starci.injectedRuntimeRoot` is the second fixtures-only seam: a directory holding knowledge/hfs/slots.yaml that stands in for the shipped runtime, so a hermetic
+// fixture can hand the registered rule a manifest with a gap (two slots of equal specificity) that the shipped manifest, guarded by its specs, never has.
 // Both lint canons ship a byte copy of this file in runtime/ and build their rules with it.
 import path from 'node:path';
 import { projectGraph } from './project-graph.mjs';
@@ -22,7 +24,7 @@ export const projectRule = ({ enforcer, runtimeRoot, hfsOf }) => {
       const hfs = hfsOf(context);
       const rel = posixPath(path.relative(hfs.repoRoot, context.filename));
       if (rel.startsWith('..')) return {};
-      const { byFile } = projectGraph({ repoRoot: hfs.repoRoot, runtimeRoot, injectedTypeScript: context.settings?.starci?.injectedTypeScript?.() });
+      const { byFile } = projectGraph({ repoRoot: hfs.repoRoot, runtimeRoot: context.settings?.starci?.injectedRuntimeRoot ?? runtimeRoot, injectedTypeScript: context.settings?.starci?.injectedTypeScript?.() });
       const mine = (byFile.get(rel) ?? []).filter((finding) => belongsTo(enforcer, finding));
       return {
         Program(node) {

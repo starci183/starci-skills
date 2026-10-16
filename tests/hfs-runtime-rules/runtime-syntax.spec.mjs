@@ -1,5 +1,7 @@
 // runtime-syntax.spec.mjs - RT_SYNTAX_INVALID (scripts/hfs/runtime-rules/syntax.mjs): every tracked JavaScript file
 // parses, including specs and package sources that the runtime's Node-exact folder check does not reach.
+// proves: RT_SYNTAX_INVALID@lite
+// proves: RT_SYNTAX_INVALID@full
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -63,3 +65,15 @@ test('runtimeCheck registers RT_SYNTAX_INVALID for tracked sources outside its r
   assert.equal(finding?.path, 'tests/hfs-runtime-rules/broken.spec.mjs');
   assert.equal(finding?.line, 1);
 });
+
+for (const edition of ['lite', 'full']) {
+  test(`RT_SYNTAX_INVALID ${edition}: rejects invalid authored JavaScript`, () => {
+    const found = syntaxFindings(ctxOf({ 'tests/invalid.spec.mjs': 'export const value = {;\n' }));
+    assert.ok(found.some((finding) => finding.code === 'RT_SYNTAX_INVALID'));
+    assert.ok(found.every((finding) => finding.path === 'tests/invalid.spec.mjs' && finding.line === 1));
+  });
+
+  test(`RT_SYNTAX_INVALID ${edition}: accepts valid authored JavaScript`, () => {
+    assert.deepEqual(syntaxFindings(ctxOf({ 'tests/valid.spec.mjs': 'export const value = {};\n' })), []);
+  });
+}

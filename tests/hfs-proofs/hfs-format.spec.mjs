@@ -27,6 +27,7 @@ for (const edition of ['lite', 'full']) {
     const absolute = path.join(repoRoot, file);
     const source = 'export const example={value:1}\n';
     fs.writeFileSync(absolute, source);
+    assert.equal((await formatFindings({ repoRoot, files: [file] }))[0].code, 'HFS_FORMAT');
     const check = () => formatFindings({ repoRoot, files: [file], repo });
     const [finding] = await check();
     assert.equal(finding.code, CODE);
@@ -35,6 +36,7 @@ for (const edition of ['lite', 'full']) {
     const prettier = loadPrettier(repoRoot);
     const options = await prettier.resolveConfig(absolute);
     fs.writeFileSync(absolute, await prettier.format(source, { ...options, filepath: absolute }));
+    assert.deepEqual(await formatFindings({ repoRoot, files: [file] }), []);
     assert.deepEqual(await check(), []);
   });
 }

@@ -74,7 +74,7 @@ class WorldAnalysis {
     let found = false;
     const visit = node => {
       if (!found && this.ts.isCallExpression(node) && this.ts.isIdentifier(node.expression) && node.expression.text === 'fetch'
-        && !checker.getSymbolAtLocation(node.expression)) found = true;
+        && (checker.getSymbolAtLocation(node.expression)?.getDeclarations() ?? []).every(declaration => declaration.getSourceFile().isDeclarationFile)) found = true;
       if (!found) this.ts.forEachChild(node, visit);
     };
     visit(sourceFile);

@@ -1,10 +1,11 @@
 // A proves header is a claim; reachable checker results and nonempty test cases substantiate it.
 import { enforcerJudgedInEdition } from '../../hfs/edition-slots.mjs';
 import { evidenceFiles, evidenceInEdition } from './coverage-inventory.mjs';
-import { astChildren, expressionReach, nodeName, resolvedExpression, sourceIndex } from './coverage-ast.mjs';
+import { astChildren, astNodes, expressionReach, nodeName, resolvedExpression, sourceIndex } from './coverage-ast.mjs';
 import { lintEnforcersForCode, registeredLintRules } from './coverage-routing.mjs';
 import { bindPattern, evaluate, invocation, localScope, scopedWalk, UNKNOWN } from './coverage-evaluation.mjs';
 import { resultReach, returnedExpressions } from './coverage-results.mjs';
+import { collectorExpressions, collectorFacadeInvocation } from './coverage-collectors.mjs';
 
 const NEGATIVE = /\b(?:invalid|violat\w*|refus\w*|reject\w*|deni\w*|fail\w*|negative|forbid\w*|missing)\b/i;
 const POSITIVE = /\b(?:valid|pass\w*|accept\w*|conform\w*|positive|clean)\b/i;
@@ -73,7 +74,10 @@ function nodeContainsCode(context, file, nodes, code, reached) {
     || !source.tree;
 }
 
-const codeLiteral = (node, code) => node?.type === 'Literal' && typeof node.value === 'string' && node.value.includes(code);
+function codeLiteral(node, code) {
+  if (node?.type === 'Literal') return typeof node.value === 'string' && node.value.includes(code);
+  return node?.type === 'TemplateLiteral' && node.quasis.some((part) => part.value.cooked?.includes(code));
+}
 
 function importedCode(context, index, node, code, reached) {
   if (node.type !== 'Identifier' || !index.imports.has(node.name)) return false;
@@ -109,17 +113,68 @@ function returnedCode(context, index, node, code, seen = new Set()) {
   if (resolved.node !== node) return returnedCode(context, resolved.index, resolved.node, code, next);
   if (codeLiteral(node, code)) return true;
   if (node.type === 'CallExpression') {
-    const target = invocation(context, index, node);
+    const target = invocation(context, index, node) ?? collectorFacadeInvocation(context, index, node);
     if (target) return functionReturnsCode(context, target, code, next);
   }
   if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type)) return false;
   return astChildren(node).some((child) => returnedCode(context, index, child, code, next));
 }
 
+// An overapproximation: retain original children even when a member resolves to
+// an alias, and include uncalled declarations. A missing literal here is decisive;
+// a present literal still needs the existing return/collector consumption checks.
+function possibleCodeNodes(context, index, node) {
+  const literals = [];
+  const pending = [{ index, node }];
+  const seen = new WeakMap();
+  while (pending.length) {
+    const current = pending.pop();
+    if (!current.node) continue;
+    const scopes = seen.get(current.node) ?? new Set();
+    if (scopes.has(current.index)) continue;
+    scopes.add(current.index);
+    seen.set(current.node, scopes);
+    if (['Literal', 'TemplateLiteral'].includes(current.node.type)) literals.push(current.node);
+    const resolved = resolvedExpression(context, current.index, current.node);
+    if (resolved.node !== current.node) pending.push(resolved);
+    for (const child of astChildren(current.node)) pending.push({ index: current.index, node: child });
+  }
+  return literals;
+}
+
+function functionAnalysis(context, target) {
+  const functions = analysisCaches.get(context.files).functions;
+  let nodes = functions.get(target.index);
+  if (!nodes) { nodes = new WeakMap(); functions.set(target.index, nodes); }
+  let analysis = nodes.get(target.node);
+  if (!analysis) {
+    const reached = expressionReach(context, target.index, target.node);
+    analysis = { local: reached.get(target.index.file) ?? [] };
+    nodes.set(target.node, analysis);
+  }
+  return analysis;
+}
+
+function reachesCollectorFacade(context, target) {
+  return [...expressionReach(context, localScope(target.index), target.node)].some(([file, nodes]) => nodes.some((node) =>
+    node.type === 'CallExpression' && collectorFacadeInvocation(context, sourceIndex(context, file), node)));
+}
+
 function functionReturnsCode(context, target, code, seen = new Set()) {
-  const local = expressionReach(context, target.index, target.node).get(target.index.file) ?? [];
-  if (local.some((node) => codeLiteral(node, code))) return true;
-  return returnedExpressions(context, target).some((entry) => returnedCode(context, entry.index, entry.node, code, seen));
+  if (seen.has(target.node)) return false;
+  const next = new Set(seen).add(target.node);
+  const analysis = functionAnalysis(context, target);
+  if (analysis.local.some((node) => codeLiteral(node, code))) return true;
+  analysis.possible ??= possibleCodeNodes(context, target.index, target.node);
+  if (!analysis.possible.some((node) => codeLiteral(node, code))) {
+    analysis.facade ??= reachesCollectorFacade(context, target);
+    if (!analysis.facade) return false;
+  }
+  if (!analysis.returns) {
+    const returns = returnedExpressions(context, target);
+    analysis.returns = [...returns, ...collectorExpressions(context, target, returns)];
+  }
+  return analysis.returns.some((entry) => returnedCode(context, entry.index, entry.node, code, next));
 }
 
 function delegatedTargets(context, file, reached, code) {
@@ -207,13 +262,19 @@ function testEvidence(context, analysis, code, delegatedFiles) {
   return { roles, runs: analysis.runs };
 }
 
-function cachedTests(context, file, edition) {
+function analysisCache(context) {
   let cache = analysisCaches.get(context.files);
   if (!cache || cache.sources.size !== context.files.size
     || ![...cache.sources].every(([name, text]) => context.files.get(name) === text)) {
-    cache = { sources: new Map(context.files), tests: new Map(), declarations: new WeakMap() };
+    cache = { sources: new Map(context.files), tests: new Map(), declarations: new WeakMap(),
+      owners: new Map(), functions: new WeakMap() };
     analysisCaches.set(context.files, cache);
   }
+  return cache;
+}
+
+function cachedTests(context, file, edition) {
+  const cache = analysisCache(context);
   const key = `${file}@${edition}`;
   if (!cache.tests.has(key)) {
     const index = sourceIndex(context, file);
@@ -253,9 +314,34 @@ function helperIsUsed(context, file, ref, edition) {
     [...expressionReach(context, index, test.node).keys()].some((target) => helpers.has(target)));
 }
 
+function sourceOwnsCode(context, file, code) {
+  const owners = analysisCache(context).owners;
+  let codes = owners.get(file);
+  if (!codes) { codes = new Map(); owners.set(file, codes); }
+  if (!codes.has(code)) codes.set(code, computeSourceOwnership(context, file, code));
+  return codes.get(code);
+}
+
+function computeSourceOwnership(context, file, code) {
+  // A code absent even from raw text cannot be owned by this source.
+  if (!String(context.files.get(file) ?? '').includes(code)) return false;
+  const index = sourceIndex(context, file);
+  // Keep conservative ownership for declarative sources outside the JS parser.
+  if (!index.tree) return index.text.includes(code);
+  if (astNodes(index.tree).some((node) => codeLiteral(node, code))) return true;
+  // Delegating wrappers still need proof that they consume the checker's findings.
+  return [...index.exports.values()].some((expression) => {
+    const target = resolvedExpression(context, index, expression);
+    return ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(target.node?.type)
+      && ([...expressionReach(context, target.index, target.node).values()]
+        .some((nodes) => nodes.some((node) => codeLiteral(node, code)))
+        || functionReturnsCode(context, target, code));
+  });
+}
+
 function activeSourceEnforcers(context, rule, code, edition) {
   return (rule.enforcers ?? []).filter((entry) => sourceFamilies.has(entry.kind) && !entry.planned && entry.status !== 'planned'
-    && entry.at && context.files.has(entry.at) && String(context.files.get(entry.at)).includes(code)
+    && entry.at && context.files.has(entry.at) && sourceOwnsCode(context, entry.at, code)
     && enforcerJudgedInEdition(context.catalog.rules, entry.kind, entry.id, edition));
 }
 

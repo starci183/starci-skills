@@ -42,3 +42,18 @@ for (const edition of ['lite', 'full']) {
     assert.deepEqual(await findings(), []);
   });
 }
+
+// Direct checker calls also expose these real mutation cases to the coverage proof analysis.
+for (const edition of ['lite', 'full']) {
+  test(`${edition}: a missing managed ignore block is invalid and restoring its render passes`, async context => {
+    const { root, tracked } = synced(context, edition);
+    const input = { repoRoot: root, tracked, presets: PRESETS };
+    const file = path.join(root, '.gitignore');
+    const rendered = fs.readFileSync(file, 'utf8');
+    assert.deepEqual((await managedFindings(input)).map(finding => finding.code), []);
+    fs.writeFileSync(file, '# application ignores\nlocal-notes/\n');
+    assert.deepEqual((await managedFindings(input)).map(finding => finding.code), ['HFS_GITIGNORE_BLOCK_DRIFT']);
+    fs.writeFileSync(file, rendered);
+    assert.deepEqual((await managedFindings(input)).map(finding => finding.code), []);
+  });
+}

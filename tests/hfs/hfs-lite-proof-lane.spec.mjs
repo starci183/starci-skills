@@ -165,6 +165,10 @@ test('R284 owns BE_LITE_PROOF_LANE_MISSING once and R155 retains BE_PATTERN_SPEC
   assert.deepEqual(lane.failureCodes, ['BE_LITE_PROOF_LANE_MISSING']);
   assert.deepEqual(catalog.rules.filter((rule) => rule.failureCodes.includes('BE_PATTERN_SPEC_MISSING')).map((rule) => rule.id), ['R155']);
   assert.equal(catalog.rules.find((rule) => rule.id === 'R155').editions, undefined);
+  assert.deepEqual(catalog.rules.find((rule) => rule.id === 'R155').enforcers, [
+    { kind: 'hfs', id: 'pattern-spec-missing', at: 'scripts/hfs/rules/event-bus.mjs', editions: ['full'], planned: false },
+    { kind: 'hfs', id: 'lite-proof-lane', at: 'scripts/hfs/rules/lite-proof-lane.mjs', editions: ['lite'], planned: false },
+  ]);
 });
 
 test('BE_INTEGRATION_SPEC_MISSING: direct callers keep the full integration-world proof requirement and lite uses its own lane', (t) => {

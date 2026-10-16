@@ -371,3 +371,18 @@ rulings:
     amendedBy: [heroicons-family-icon-set]
     amendmentScope: The icon-vendor clause only; the front-end Supabase data-door removals remain.
     enforcedBy: [R93, R217]
+
+  - id: ambient-id-test-world-exemption
+    date: '2026-10-16'
+    topic: code.be-ambient-id
+    status: live
+    ownerRuling: 12
+    source: owner ruling 2026-10-16 "Theo y tro" (alpha.18 single release, a17 PROPOSALS section D, R142); packages/eslint/be/ambient-id.mjs
+    statement: >-
+      The test world (slot be.tests.world) is the composition root of tests and names real resources, so it is
+      exempt from BE_AMBIENT_ID exactly as it is from the clock rule: ambient id sources (randomUUID, uuid v1/v4/v6/v7,
+      nanoid, ulid) stay forbidden everywhere else, specs included, outside platform/ids. The enforcer's exemption and its
+      regression spec are the intended behaviour; the catalog law is amended to say so.
+    supersedes: []
+    amendmentScope: The clause of R142 that said ambient ids are used only inside platform/ids "specs included", without the test-world exception.
+    enforcedBy: [R142]

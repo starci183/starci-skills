@@ -53,3 +53,27 @@ Authored knowledge is validated as YAML by the test suite and readers. Rejected:
 ## English only
 
 Knowledge sources are English. Do not add translated `.vi` mirrors under `knowledge/`.
+
+## Runtime knowledge evidence
+
+The same authored knowledge checks apply to lite and full. `RT_FACT_FALSE`
+rejects a claim whose named slot does not require the stated entry or presence,
+and prose matching a fact's contradiction pattern. Cite the fact or slot id
+instead of copying its claim into prose.
+
+`RT_RULE_ID_UNKNOWN` rejects a reference to a rule absent from the rule catalog.
+`RT_RULE_UNCITED` rejects a product rule that no pattern topic names in
+`hfsRules`; rules about the runtime itself declare `scope: runtime`.
+
+`RT_GENERATED_BLOCK_STALE` rejects generated README blocks and derived pattern
+verification, slot references or lint explanation codes that differ from their
+catalog sources. Refresh them with `starci runtime readme-blocks --write` or
+`starci runtime derived-fields --write`.
+
+`RT_PROSE_RESTATES_SLOTS` rejects a line or fenced block naming at
+least three owned product paths, or a sentence listing at least three slot file
+names. Reference slot ids; generated blocks are the allowed catalog snapshot.
+
+## Product paths in prose {#r195}
+
+In lite and full, `RT_PROSE_PATH_NO_SLOT` rejects product paths in knowledge, docs and READMEs that no slot owns and that are not folders above a slot. Literal app names must belong to the shipped example declarations for that side. App placeholders resolve against those declared apps, including the lite example's API, instead of assuming a particular example name. Placeholders do not excuse an invented path below an app. Recursive globs and knowledge topic files are excluded from path checks.

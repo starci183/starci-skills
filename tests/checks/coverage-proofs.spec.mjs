@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { claimedSpecProof, coverageProofFindings } from '../../scripts/checks/lib/coverage-proofs.mjs';
 import { resultReach } from '../../scripts/checks/lib/coverage-results.mjs';
-import { sourceIndex } from '../../scripts/checks/lib/coverage-ast.mjs';
+import { astNodes, sourceIndex } from '../../scripts/checks/lib/coverage-ast.mjs';
 
 const CODE = 'RT_SAMPLE_FAILURE';
 const SPEC = 'tests/checks/sample.spec.mjs';
@@ -237,5 +237,89 @@ for (const edition of ['lite', 'full']) for (const [name, implementation] of che
     assert.deepEqual(coverageProofFindings(context, context.rule, CODE, edition), []);
     context.files.set(SPEC, context.files.get(SPEC).replace("['other', rules.other]", "['other', rules.sample]"));
     assert.match(coverageProofFindings(context, context.rule, CODE, edition)[0]?.message, /eslint-be:other/);
+  });
+}
+
+for (const edition of EDITIONS) {
+  test(`ignores comment-only additional source owners for ${edition}`, () => {
+    const context = fixture(`for (const edition of ['lite', 'full']) test('cases', () => { ${sourceChecks} });`);
+    const commentOnly = 'scripts/checks/comment-only.mjs';
+    context.rule.enforcers.push({ kind: 'runtime', id: 'comment-only', at: commentOnly });
+    for (const comment of [`// ${CODE}`, `/* ${CODE} */`]) {
+      context.files.set(commentOnly, comment + '\nexport function unrelated() { return []; }');
+      assert.deepEqual(coverageProofFindings(context, context.rule, CODE, edition), []);
+    }
+  });
+
+  test(`refuses a comment-only checker proof for ${edition}`, () => {
+    const context = fixture(`for (const edition of ['lite', 'full']) test('cases', () => { ${sourceChecks} });`);
+    context.files.set(ENFORCER, `// ${CODE}\nexport function sample() { return []; }`);
+    assert.equal(coverageProofFindings(context, context.rule, CODE, edition)[0]?.code, 'RT_COVERAGE_PROOF_VACUOUS');
+    assert.equal(claimedSpecProof(context, SPEC, CODE, edition), false);
+  });
+
+  test(`recognizes static diagnostic text in template literals for ${edition}`, () => {
+    const context = fixture(`for (const edition of ['lite', 'full']) test('cases', () => { ${sourceChecks} });`);
+    const tick = String.fromCodePoint(96);
+    for (const diagnostic of [CODE, '${invalid}: [' + CODE + ']']) {
+      context.files.set(ENFORCER, 'export function sample(invalid) { return invalid ? [{code: '
+        + tick + diagnostic + tick + '}] : []; }');
+      assert.deepEqual(coverageProofFindings(context, context.rule, CODE, edition), []);
+      assert.equal(claimedSpecProof(context, SPEC, CODE, edition), true);
+    }
+  });
+
+  test(`refuses discarded template diagnostic results for ${edition}`, () => {
+    const context = fixture(`const scan = invalid => { sample(invalid); return []; };
+for (const edition of ['lite', 'full']) test('cases', () => {
+assert.deepEqual(scan(true), ['${CODE}']); assert.deepEqual(scan(false), []); });`);
+    const tick = String.fromCodePoint(96);
+    context.files.set(ENFORCER, 'export function sample(invalid) { return invalid ? [{code: '
+      + tick + CODE + tick + '}] : []; }');
+    assert.equal(coverageProofFindings(context, context.rule, CODE, edition)[0]?.code, 'RT_COVERAGE_PROOF_VACUOUS');
+    assert.equal(claimedSpecProof(context, SPEC, CODE, edition), false);
+  });
+}
+
+for (const edition of EDITIONS) {
+  test(`bounds ownership work for a large unrelated enforcer in ${edition}`, () => {
+    const context = fixture(`for (const edition of ['lite', 'full']) test('cases', () => { ${sourceChecks} });`);
+    const large = 'scripts/checks/large.mjs';
+    const functions = Array.from({ length: 150 }, (_value, i) =>
+      `export function f${i}() { return [${Array.from({ length: 20 }, (_entry, j) => j).join(',')}]; }`).join('\n');
+    context.files.set(large, functions);
+    context.rule.enforcers.push({ kind: 'runtime', id: 'large', at: large });
+    const index = sourceIndex(context, large);
+    let scans = 0;
+    const values = index.exports.values.bind(index.exports);
+    index.exports.values = () => { scans++; return values(); };
+    assert.deepEqual(coverageProofFindings(context, context.rule, CODE, edition), []);
+    assert.equal(scans, 0, 'absent code must not scan exported functions');
+  });
+
+  test(`bounds repeated diamond delegation work in ${edition}`, () => {
+    const context = fixture(`for (const edition of ['lite', 'full']) test('cases', () => { ${sourceChecks} });`);
+    const large = 'scripts/checks/diamond.mjs';
+    const functions = Array.from({ length: 14 }, (_value, i) =>
+      `function f${i + 1}() { return [f${i}(), f${i}()]; }`).join('\n');
+    context.files.set(large, `// ${CODE}\nfunction f0() { return []; }\n${functions}\nexport function large() { return f14(); }`);
+    context.rule.enforcers.push({ kind: 'runtime', id: 'large', at: large });
+    let work = 0;
+    for (const node of astNodes(sourceIndex(context, large).tree).filter(entry => entry.type === 'FunctionDeclaration')) {
+      const body = node.body;
+      Object.defineProperty(node, 'body', { enumerable: true, get() {
+        assert.ok(++work < 2000, 'ownership traversal must stay bounded on a shared call graph');
+        return body;
+      } });
+    }
+    for (let scan = 0; scan < 3; scan++) {
+      assert.deepEqual(coverageProofFindings(context, context.rule, CODE, edition), []);
+    }
+    assert.ok(work > 0);
+    const source = context.files.get(large);
+    context.files.set(large, source.replace('return [];', `return [{code: '${CODE}'}];`));
+    assert.match(coverageProofFindings(context, context.rule, CODE, edition)[0]?.message, /runtime:large/);
+    context.files.set(large, source);
+    assert.deepEqual(coverageProofFindings(context, context.rule, CODE, edition), []);
   });
 }

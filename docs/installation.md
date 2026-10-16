@@ -185,3 +185,28 @@ The script asserts the `age-keygen` prerequisite by name. Run either sandbox as 
 | Runtime sources inconsistent | `starci runtime doctor --cwd <host> --quick`; report errors before running workflows. |
 | Interrupted install/update | Re-run the same `starci runtime install` or `starci runtime update` command, then `starci runtime doctor --cwd <host> --quick`. See [releasing](releasing.md). |
 | Local changes reported after update | Review kept files and run doctor; never erase them just to silence a warning. |
+
+## CLI catalog parity
+
+`RT_CLI_VERB_PARITY` means a catalog command, its implementation or its documented flags disagree.
+Both editions require each catalog verb to resolve to its handler, each kernel handler to have a catalog entry,
+and implementation flags to appear in the catalog. Repair the source declaration or handler before releasing;
+`starci runtime check --only cli-parity` checks this contract.
+
+## Managed app command boundary
+
+`RT_CLI_APP_ONLY_TEMPLATES` rejects a managed app template or its generated ESLint runtime copy when it invokes
+a CLI group other than `app`. Lite and full managed hooks use `starci app <verb>` for product actions;
+for example, the commit hook invokes `npx starci app hygiene`.
+
+## Catalog entry boundary
+
+`CLI_ONLY_ENTRY` rejects tracked action guidance that directly executes a catalog handler or an internal runtime
+entry, including package-script wrappers. Use the owning `starci <group> <verb>` command in both editions.
+The dispatcher and tests' own process-spawn helpers are explicit exceptions; a test document containing a raw
+handler invocation remains checked. `starci runtime check --only cli-only-entry` reports the replacement command.
+
+
+### R198 CLI catalog drift
+
+RT_CLI_CATALOG_DRIFT means a generated CLI catalog, completion, or documentation file differs from the command catalog. Run `starci runtime gen-catalog --write` and review the generated outputs, then run `starci runtime gen-catalog --check`. The runtime self-check verifies these outputs in both editions.

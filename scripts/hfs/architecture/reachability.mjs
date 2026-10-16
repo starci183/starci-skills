@@ -96,7 +96,21 @@ function checkBackend(graph) {
   const reached = reachFrom(graph, rootFiles);
   const violations = [];
   reportUncomposedBackendOwners(byUnit, reached, roots, counts, violations);
+  reportUncomposedTransports(graph, reached, roots, counts, violations);
   return { violations, coverage: { status: 'checked', ...counts } };
+}
+
+/** A reached feature does not compose its other transport modules. Judge each module's runtime path. */
+function reportUncomposedTransports(graph, reached, roots, counts, violations) {
+  for (const [rel, node] of graph.files) {
+    if (!node.owner || !rel.startsWith('src/features/') || TEST_FILE.test(rel)) continue;
+    if (!/\/transport\/[^/]+\/[^/]+\.module\.[cm]?[jt]sx?$/.test(rel) || reached.has(rel)) continue;
+    counts.notComposed += 1;
+    violations.push({
+      ruleId: 'BE_FEATURE_NOT_COMPOSED', path: rel, owner: node.owner.root, slot: node.slot, appRoots: roots,
+      message: `Transport module ${rel} is not composed into any app: no runtime import path leads from ${roots.join(', ')} to it (a type-only import composes nothing).`,
+    });
+  }
 }
 
 /** Route table of one app: arrays of segments, each {kind:'static'|'dyn'|'catch'|'optcatch', text}. */

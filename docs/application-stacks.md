@@ -320,3 +320,23 @@ Read 2026-09-15:
 ### Where a secret may live
 
 The runtime repository is public and tracks no secret, not even ciphertext (`RT_SECRET_TRACKED`). Every secret the host needs lives in the one untracked `.claude/secret.env`, read only through `engine/secrets.mjs` (`secret.env.example` lists the names). A product repository keeps its own custody in its own repository. Two Sonar servers, no overlap: **SonarCloud** serves everything that lives in the runtime repository (the runtime and the three example apps, one `SONAR_TOKEN`, the organization from `config.yaml` `sonar.organization` or the env `SONAR_ORGANIZATION`, project key `<organization>_<declared key>`); the **self-hosted `ext/sonar`** serves product repositories only, and its secrets are `secret.env` variables that `starci gate sonar up` passes to Compose (`docs/host-secrets.md`). An example declares `provider: sonarcloud`, `mode: hosted`, `host.public: https://sonarcloud.io`, `auth: token` and `runtimeSecrets`; a product declares the host stack and its custody as above.
+
+## App image entry and health {#r189}
+
+`HFS_DOCKER_ENTRY` requires the app's own built entry in exec form: `node be/dist/apps/<app>/src/main.js` for a back end, or `node server.js` from the standalone output for a Next app. In either edition an API or Next image sets `ENV PORT`, exposes that same port and declares a healthcheck. A worker declares a process healthcheck and exposes no port; a CLI declares `HEALTHCHECK NONE` and exposes no port. A Next build uses `turbo run build --filter=@<project>/<app>` and `next.config.ts` sets `output: "standalone"`.
+
+## App image base pins {#r190}
+
+In both editions, `HFS_DOCKER_BASE_PIN` refuses moving base tags and unresolved build arguments. Every `FROM` resolves to a prior stage, the exact Node and Alpine image named by `NODE_IMAGE` in `scripts/hfs/rules/docker.mjs`, or an image pinned by a complete `@sha256` digest.
+
+## App image build context {#r187}
+
+In lite and full, `HFS_DOCKER_BUILD_CONTEXT` requires a Dockerfile header stating `starci docker build <app>` for that app, or the explicit Dockerfile-path build from the app root that earlier headers state. The context is the app root. COPY and ADD sources must stay inside it; absolute paths and `..` segments are refused.
+
+## App image stages {#r188}
+
+In both editions, `HFS_DOCKER_STAGES` requires a `build` stage and a final `runtime` stage ending as `USER node`. Every install is a clean lockfile install (`starci npm ci` on hosts); local and global `npm install` or `npm i` are refused. The runtime never builds. A back-end runtime installs production dependencies only and runs no lifecycle scripts; a Next runtime installs nothing.
+
+## App image secret inputs {#r191}
+
+In both editions, `HFS_DOCKER_SECRETS` refuses COPY or ADD of `.env*` files, including names such as `.envbackup`; only the exact `.env.example` name is excepted. Secret directories, keys, certificates and kubeconfigs cannot enter the image. ADD URLs and credential ARG or ENV names are refused; published `NEXT_PUBLIC_*` inputs are permitted.

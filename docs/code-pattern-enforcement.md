@@ -1,6 +1,34 @@
 Owner: modules/models/code-patterns.yaml
 # Code pattern enforcement
 
+## Backend event bus rules
+
+Both editions use typed event contracts and transactional outbox writes.
+`BE_EVENT_CLASS_CONTRACT` requires each event class under
+`be/src/modules/events/<service>/` to match its vendored
+`be/contracts/<service>/events.json` name and version; every contract entry also
+needs its class, and the filename replaces event-name dots with dashes.
+
+`BE_OUTBOX_WRITE_TX` requires a domain service to publish events or call typed
+queue producers with its own transaction manager. A transaction callback manager
+or a typed transaction parameter is accepted; an injected shared manager, a
+missing manager or an outbox write from a feature is refused.
+
+`BE_EVENT_CONSUMER_SHAPE` requires an `EventConsumer` in
+`transport/message/<event>.consumer.ts`, with its filename derived from the
+typed event's literal name. Its handler reads `delivery.eventId` so the command
+can preserve the deduplication key. `BE_QUEUE_PRODUCER_SHAPE` requires every
+queue producer that writes `QueueOutbox` to declare an `EntityManager` parameter
+and pass that same parameter to the outbox write.
+
+## R203 thin features
+
+`BE_FEATURE_THIN` reports business decisions, computation or extra delegation in a thin
+feature role in both lite and full. A handler maps input and delegates once to its
+module service; move branches, loops and calculations into the covered modules.
+The edition-specific RuleTester witnesses accept a direct service delegation and
+reject a handler that branches and makes a second delegation.
+
 `modules/models/code-patterns.yaml` is the executable inventory for the fixed StarCi NestJS and Next.js code profiles. The authored manifest, not every rule exported by an installed lint package, decides which code obligations apply. The runtime reads this authored manifest directly.
 
 ## Command and operation
@@ -58,6 +86,55 @@ The architecture adapters keep their guides beside this file:
 of SWR is not applicable; selecting SWR without a supported contract is
 unavailable.
 
+<a id="r49"></a>
+## Frontend environment owner (R49)
+
+`FE_ENV_OWNER` keeps environment reads in `modules/config`. Other frontend modules receive
+validated configuration from that owner instead of reading the environment themselves.
+An endpoint or secret must not fall back to localhost, a hardcoded address or a default value;
+missing configuration must remain visible.
+
+<a id="r50"></a>
+## Frontend transport and data lifecycle (R50)
+
+`FE_TRANSPORT_OWNER` requires one owned GraphQL transport and its auth/no-auth client link
+chains, plus the owned REST client for uploads, presigned URLs and auth endpoints. Several
+frontend apps share the API package when they share that transport. Tokens and locale belong
+to the request and session owners, rather than module state. `FE_EFFECT_FETCH` refuses data
+fetching in component effects; components read through their SWR hooks.
+
+`FE_SWR_KEY_IDENTITY` requires each SWR key to carry every input that identifies its result;
+a gated request uses a null key until its inputs are ready. `FE_SWR_MUTATION_RESOURCE_IDENTITY`
+requires a mutation hook to retain the identity of the resource it changes. See the
+[Next data lifecycle guide](next-data-lifecycle-check.md) for the checked SWR contract.
+
+<a id="r51"></a>
+## Frontend response outcomes (R51)
+
+`FE_HTTP_STATUS_COLLAPSE` requires the frontend's one `GraphQLResponse<T>` envelope with
+`success`, `message`, `error` and `data`. A failed request keeps its failure reason instead of
+becoming empty successful data. An UNAUTHENTICATED or FORBIDDEN answer, including HTTP 401
+or 403, becomes `refused`; the error link refreshes once before the session sends the user
+to sign-in. `FE_OUTCOME_KIND_UNHANDLED` requires consumers to handle every outcome kind
+explicitly when the outcome union changes.
+
+<a id="r52"></a>
+## Frontend generated wire types (R52)
+
+`FE_WIRE_GENERATED` requires graphql-codegen to read `be/contracts/<app>/schema.graphql`
+in place and generate the wire types in the frontend API owner's GraphQL `__generated__`
+directory. Operation request and response types re-export those generated types instead of
+declaring wire shapes or response type assertions by hand. Keep the codegen script and the
+generated directory's `.schema-sha256` stamp current with the schema.
+
+<a id="r53"></a>
+## Frontend error and pending boundaries (R53)
+
+`FE_ERROR_BOUNDARY_MISSING` requires each Next.js frontend's global error boundary and its
+locale error, not-found and loading boundaries. `FE_SUSPENSE_NULL_FALLBACK` requires a
+visible pending state for Suspense: a missing fallback, `null` or `undefined` leaves the
+pending interface blank and is refused.
+
 ## Comment and executable verification obligations
 
 **REF-COMMENT-1 — Caller contracts and decision rationale.** Public APIs carry non-empty English
@@ -87,6 +164,23 @@ forbidden-dependency aliases, or renamed forbidden facades. Verify the exact pro
 were included in real checks. Existing suppressions and tool blind spots grant no bypass. A
 legitimate tool defect needs a narrow reviewed correction and regression coverage; product
 conformance remains unproved until the underlying convention is independently verified.
+
+## Backend jobs and projections rules
+
+Both editions keep the job row under `modules/platform/jobs`. `BE_JOB_WRITE_OUTSIDE_OWNER`
+refuses direct writes from another owner; use the `JobClaims` port. `BE_JOB_FENCE_REQUIRED`
+requires a non-optional numeric `expectedFencingToken` on guarded writes, refuses casts
+around that token and requires a catch around a guarded write to rethrow. A stale worker
+must stop when it loses its claim. `BE_JOB_RUN_KEY` requires every integration call from
+a job step to carry a `RunKey` produced by `JobClaims.runKey(job, step)`, without a cast.
+`BE_JOB_SHAPE` places `<job>.processor.ts` in that job's `transport/queue/` directory,
+extends `FencedProcessor`, and keeps `JobStep` implementations in the job's `steps/` directory.
+
+`BE_PROJECTION_WRITE_OWNER` allows writes to a projection entity only from its own
+`*.projection.ts` file; other owners read it or request a recompute. `BE_PROJECTION_SHAPE`
+limits public projection methods to `recompute*` and `get*`, keeps entity exports inside
+the projection and refuses an API feature calling `recompute*`. A reactor, job or CLI
+command triggers recomputation; API features call `get*`. These laws apply in lite and full.
 
 ## Evidence limits
 
@@ -178,3 +272,33 @@ compiler programs even when Git's dirty status has not changed. A valid report
 hash proves retained bytes, while a changed input still owes fresh applicable
 judgment. Independent operation verification, supervisor land, release and final
 delivery reconciliation each retain their separate authorities and receipts.
+
+## Front-end server boundary {#r243}
+
+R243 applies to every front-end app and package in both editions.
+`FE_SERVER_ACTION_FORBIDDEN` rejects a `"use server"` directive in a module or
+function prologue. `FE_ROUTE_HANDLER_FORBIDDEN` rejects handlers under an app's
+route tree except `health/live/route.ts` and the `fe.route.callback` auth callback
+slot. Move API, webhook and scheduled work to a back-end feature; the front end
+calls its operations through `modules/api` and the SWR hooks.
+
+## Canonical front-end dependencies {#r244}
+
+R244 uses `knowledge/hfs/fe-stack.yaml` in both editions.
+`FE_STACK_FORBIDDEN` rejects a forbidden alternative in a front-end manifest or
+source import, including package subpaths and type-only imports. Replace it with
+the concern's canonical library and remove the dependency. The mixed app-root
+manifest excludes libraries owned by the back end; front-end workspace manifests
+remain subject to the full forbidden list. The lint rule also confines Supabase
+imports to the `modules/auth` boundary.
+
+
+### R156 kind isolation
+
+BE_KIND_ISOLATION rejects imports between backend features whose owner slots name different trigger kinds. Static imports, dynamic imports, re-exports and type-only imports all count. Imports within one owner and imports into shared modules pass in both editions.
+
+## R93 vendor and Grammar ownership
+
+`FE_VENDOR_BOUNDARY` keeps vendor icons in the Icon leaf, uses the heroicons family at the declared glyph sizes, excludes decorative icons from metric cells, and requires a named owner for vendor primitives. These boundaries apply in lite and full.
+
+`ARCH_GRAMMAR_EXPORT_BYPASS` rejects imports outside the selected Grammar code and style entries. Source import findings belong to the `grammar-entry` ESLint rule. `ARCH_GRAMMAR_CONTRACT_INVALID` reports invalid installed package exports, peers, consumer dependencies or style contracts on a package manifest. The architecture machine retains these package findings in app check; they are never TSX lint reports. A valid installed contract and imports through the selected entries are clean in both editions.

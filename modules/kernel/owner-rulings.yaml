@@ -177,6 +177,16 @@ rulings:
       Consequences are only unused imports and pure declarations inside the same edited specs and one registry reproducer field pointing to the retained read-attestation replay; production exports, classifier, runtime coverage policy and example coverage are unchanged.
       There is no approval of unrelated or historical findings and no waiver of a red check. The former shutdown deadline is cancelled.
     enforcedBy: [scripts/lib/gate-loosening.mjs, scripts/checks/check-gate-loosening.mjs, scripts/supervisor/land-gate-loosening.mjs]
+  - id: gate-loosening-e77ca91cded7
+    date: '2026-10-16'
+    ruling: >-
+      The owner's words are "Theo y tro (chot alpha.18)", relayed by main for the single alpha.18 release (the a17 PROPOSALS approved as recommended, PROPOSALS.md section D, R155).
+      R155 (BE_PATTERN_SPEC_MISSING) applies to both editions (tests/hfs/hfs-lite-proof-lane.spec.mjs). Its catalog row names the full-edition enforcer hfs:pattern-spec-missing
+      (patternSpecFindings, which returns no findings for lite); the lite emitter is hfs:lite-proof-lane (liteProofLaneFindings), previously absent from the rule.
+      The change that follows this entry declares each enforcer for the edition it judges: pattern-spec-missing editions [full], lite-proof-lane editions [lite].
+      No finding is removed, no edition of the rule is dropped and no lite check is weakened: the rule gains an enforcer and lite's actual emitter becomes part of its chain.
+      The mechanical detector reports this as check-narrowed because the old row gains an editions restriction; this entry approves exactly that one finding and nothing else.
+    enforcedBy: [knowledge/hfs/rules.yaml, scripts/hfs/rules/lite-proof-lane.mjs, scripts/hfs/rules/event-bus.mjs]
   - id: purge-deleted-terminal-idempotent
     date: '2026-10-11'
     ruling: >-
@@ -468,6 +478,13 @@ rulings:
     ruling: "Declared by main under the owner's delegation of 2026-10-14; owner to ratify. Nine authored JSON files are declared in modules/kernel/allowlist.yaml json-exceptions, each by its exact path with a reason: four English i18n message catalogs (examples/lite-app and three FE skeleton templates), the npm scripts fragment packages/hfs/templates/app/package-scripts/supabase.json that renders into package.json (a tool-mandated format), and four environment.json files (the lite example production descriptor and the skeleton and skeleton-lite templates), the canon-named value-free rendered descriptor of knowledge/hfs/slots.yaml:707. The six lite swarm recovery and release records were converted to YAML instead."
     supersedes: []
     enforcedBy: [scripts/checks/check-json-exceptions.mjs]
+
+  - id: ambient-id-test-world-exemption
+    date: '2026-10-16'
+    source: knowledge/hfs/rulings.yaml ambient-id-test-world-exemption; packages/eslint/be/ambient-id.mjs
+    ruling: The test world (slot be.tests.world) keeps its exemption from BE_AMBIENT_ID, like the clock rule, because it is the composition root of tests and names real resources; the catalog law of R142 is amended to say so. Owner words "Theo y tro" (alpha.18 single release, relayed by main, a17 PROPOSALS section D).
+    supersedes: []
+    enforcedBy: [packages/eslint/be/ambient-id.mjs]
 
   - id: module-definition-everywhere
     date: '2026-10-15'

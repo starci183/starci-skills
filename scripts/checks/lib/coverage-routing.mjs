@@ -1,5 +1,7 @@
 // A source finding removed from app check must reach its profile's actual lint plugin.
 import { enforcerJudgedInEdition } from '../../hfs/edition-slots.mjs';
+import { guardedProfiles } from './coverage-profiles.mjs';
+import { invokedMachineProfiles } from './coverage-machine-profiles.mjs';
 import { astNodes, expressionReach, nodeName, objectProperties, resolvedExpression, sourceIndex, staticValues } from './coverage-ast.mjs';
 
 const SURFACE = 'scripts/hfs/architecture/surface.mjs';
@@ -101,15 +103,6 @@ export function lintEnforcersForCode(context, rule, code, edition) {
   });
 }
 
-function comparisonProfiles(node, current, positive) {
-  if (node?.type !== 'BinaryExpression' || !['===', '==', '!==', '!='].includes(node.operator)) return current;
-  const literal = node.right.type === 'Literal' ? node.right : node.left;
-  const subject = literal === node.right ? node.left : node.right;
-  if (subject.type !== 'MemberExpression' || nodeName(subject.property) !== 'profile' || !profiles.includes(literal.value)) return current;
-  const equality = ['===', '=='].includes(node.operator) === positive;
-  return current.filter((profile) => (profile === literal.value) === equality);
-}
-
 function emittedProfiles(context, index, code, initial) {
   const out = new Set();
   const pending = index.tree ? [{ node: index.tree, active: initial, parent: null }] : [];
@@ -117,8 +110,8 @@ function emittedProfiles(context, index, code, initial) {
     const { node, active, parent } = pending.pop();
     if (node.type === 'Literal' && node.value === code && parent?.type !== 'ArrayExpression') active.forEach((profile) => out.add(profile));
     if (node.type === 'ConditionalExpression' || node.type === 'IfStatement') {
-      pending.push({ node: node.consequent, active: comparisonProfiles(node.test, active, true), parent: node });
-      if (node.alternate) pending.push({ node: node.alternate, active: comparisonProfiles(node.test, active, false), parent: node });
+      pending.push({ node: node.consequent, active: guardedProfiles(context, index, node.test, active, true), parent: node });
+      if (node.alternate) pending.push({ node: node.alternate, active: guardedProfiles(context, index, node.test, active, false), parent: node });
       continue;
     }
     for (const child of Object.values(node).flat().filter((value) => value?.type)) pending.push({ node: child, active, parent: node });
@@ -140,7 +133,7 @@ function machineTableProfiles(context, file, code) {
   const index = sourceIndex(context, MACHINE);
   const selected = profiles.filter((profile) => objectProperties(context, index, index.bindings.get([profile === 'be' ? 'BACKEND' : 'FRONTEND', 'MACHINE'].join('_')))
     .some((entry) => tableEntryEmits(context, index, entry, file, code)));
-  return selected.length ? selected : profiles;
+  return selected.length ? selected : invokedMachineProfiles(context, MACHINE, file, code) ?? profiles;
 }
 
 function machineProfiles(context, rule, code, edition) {

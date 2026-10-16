@@ -186,3 +186,24 @@ R213 to R216 forbid a second schema authority, dynamic database DDL, unsafe poli
 configuration and stale generated types. R217, R219 and R220 forbid Supabase access outside its owners (the front end auth only),
 unverified principals, front-end service-role use and plaintext credentials. R243 and R244 hold in both editions: the front end
 serves no API and uses only the libraries of `knowledge/hfs/fe-stack.yaml`.
+
+## R217
+
+Both editions give Supabase one owner per side. `FE_SUPABASE_CLIENT_OWNER` refuses imports outside `fe.modules.auth` and front-end data, storage or realtime calls; the auth owner exports the session and access token. `BE_SUPABASE_CLIENT_OWNER` keeps imports and typed `SupabaseClient<Database>` clients in `be.integrations.supabase`, where the SDK serves Auth and Storage rather than database queries. `FE_SERVICE_ROLE_FORBIDDEN` refuses service-role names and credential-shaped environment reads in the front end; public product configuration belongs to `fe.modules.config`.
+
+## R219
+
+`BE_SUPABASE_JWT_VERIFIED` applies in both editions. The Supabase integration verifies access tokens with the project's remote JWKS, issuer, authenticated audience and pinned algorithms before accepting a principal. Unverified decoding, authorization claims from the request body and verification outside the integration are refused.
+
+<a id="r214"></a>
+R214 applies in lite and full. `DB_RLS_REQUIRED` rejects exposed tables without enabled (or declared forced) row-level security. `DB_DYNAMIC_DDL` rejects dynamically executed DDL and grants. `DB_POLICY_SHAPE` rejects unsafe policy predicates, naming, anonymous access and service-role grants. Repairs use static SQL, explicit RLS and bounded ownership policies.
+
+<a id="r215"></a>
+R215 applies in lite and full. `DB_DEFINER_SAFE` requires pinned search paths, safe exposed-function revokes, return types and safely quoted dynamic parameters. `DB_STORAGE_POLICY` requires explicit bucket visibility, size and MIME limits and a matching bounded objects policy in the same migration.
+
+<a id="r216"></a>
+R216 applies in lite and full. `DB_CONFIG_POLICY` rejects literal credentials, excessive JWT lifetime and authentication settings that contradict hfs.json. `DB_TYPES_DRIFT` rejects missing or stale committed generated database types; regenerate them from the migrations with the app's contract emitter. The opt-in `check --db-types` path compares freshly emitted text without rewriting the committed file.
+
+## Edition validation
+
+`HFS_EDITION_INVALID` rejects an unknown hfs.json edition in both lite and full contexts; select `lite` or `full` (omitting it defaults to full). In lite, `HFS_EDITION_FORBIDDEN_PRESENT` rejects infrastructure and test surfaces excluded by the edition, and `HFS_STARCIWORK_LITE_FORBIDDEN` rejects Work content beyond .gitignore, workspace.yaml and brand/. Remove the forbidden surface; full retains its complete Work and test infrastructure.

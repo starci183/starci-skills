@@ -438,6 +438,18 @@ contract, concurrency and recovery proof. [code-pattern enforcement](code-patter
 describes the executable inventory, and [nest contract check](nest-contract-check.md) and
 [next data lifecycle check](next-data-lifecycle-check.md) the specialized contract checkers.
 
+## R156: isolate feature trigger kinds
+
+`BE_KIND_ISOLATION` rejects an import between backend feature owners whose slots
+declare different trigger kinds. Static imports, dynamic imports, re-exports and
+type-only imports all count, including imports made by a file below the owner's
+root. Both lite and full use the slot's `trigger` value to identify the kind.
+
+A feature may import files within its own owner and allowed modules. Different
+kinds coordinate through the event bus: a domain service publishes with
+`eventBus.publish(event, tx)` and the receiving kind consumes that event. Replacing
+a cross-kind import with a type-only import does not remove the boundary.
+
 ## This repository's own layout
 
 The runtime repository is judged by the same engine with its own manifest,
@@ -458,3 +470,219 @@ the cited-path scan over live prose; then every retained self-check of
 `modules/kernel/allowlist.yaml` (`starci/allowlist@1`): every exception a check keeps is a named,
 shrink-only section of it, and `scripts/checks/check-one-allowlist.mjs` refuses a second one
 (`RT_ALLOWLIST_SPRAWL`).
+
+<a id="r01"></a>
+
+## R01 slot ownership
+
+Every tracked path matches exactly one slot of the manifest (`knowledge/hfs/slots.yaml` for a product, `knowledge/hfs/runtime-slots.yaml` for this runtime). HFS_SLOT_UNDECLARED names a path no slot owns, with the nearest slot. HFS_SLOT_AMBIGUOUS names a path two slots own at the same specificity: that is a gap of the manifest, reported and never guessed (the manifest loader refuses two slots with the same pattern text, so a gap needs two patterns that differ only in a variable name). HFS_SLOT_NOT_ENABLED names a path of an opt-in slot that hfs.json neither lists in `optionalSlots` nor implies through an app kind or a declared pattern. HFS_FORBIDDEN_PRESENT names a tracked path of a forbidden slot, and HFS_TRACKED_MUST_BE_IGNORED a tracked path of an ignored slot.
+
+The repository tree layout adds seven codes. HFS_ROOT_ENTRY_FORBIDDEN names a root entry that no slot of the side or of the app root names, and HFS_ROOT_MARKDOWN_FORBIDDEN a root Markdown file other than the README. HFS_ROOT_SRC_FORBIDDEN_FE names a `src/` tree at the root of the fe side. HFS_SRC_LAYOUT_INVALID names a child of the back-end `src/` or `src/tests/` that no slot knows, and HFS_MODULE_TIER_INVALID a `src/modules/` folder that is not a module tier. HFS_WORK_IN_FE and HFS_STACKS_IN_SIDE name a `.starciwork` tree in the fe side and a `.starcistacks` tree in a side: both belong to the app root.
+
+Lite and full share this law. The enforcers are the app check (`scripts/hfs/check.mjs`), the architecture machine (`scripts/hfs/architecture/hfs.mjs`), the runtime check (`scripts/hfs/runtime-check.mjs`) and the back-end and front-end `slot-undeclared` lint rules, which report the path codes on the TypeScript file they visit. The proofs are `tests/hfs-proofs/hfs-slot-ownership.spec.mjs`, `tests/hfs-proofs/hfs-repository-tree-layout.spec.mjs` and `slot-ownership.spec.mjs` of the two lint packages.
+
+<a id="r03-filesystem-residue"></a>
+
+## R03 filesystem residue
+
+HFS_UNTRACKED_ROOT_ENTRY rejects a Git-visible untracked entry outside an ignored slot. Track an intended path that satisfies the slot law, or remove the leftover. HFS_EMPTY_DIR rejects a directory tree with no files, which Git cannot retain. HFS_GHOST_TREE additionally identifies an empty directory whose name resembles an existing sibling; remove the stale spelling or populate the intended structure.
+
+Lite and full use the same tree law. App proofs select the real edition in hfs.json. Runtime repositories have no product-edition field: their shared tree checker enforces the same filesystem law for installations of either edition. Scaffolds do not create the accidental untracked files or empty and ghost directories that these checks reject.
+
+<a id="r36"></a>
+## SQL statements and query builders (R36)
+
+`BE_SQL_OUTSIDE_PERSISTENCE` keeps raw SQL in the owning capability's
+`persistence/<name>.sql.ts`. Export a statement built with the platform database
+`sql` tag and pass its branded `SqlText` to database `.query()` calls. Building SQL
+in a handler, passing an ordinary string to `.query()`, and using
+`createQueryBuilder()` violate this boundary in lite and full. Migration files
+may pass their schema-changing SQL directly to the migration runner.
+
+<a id="r37"></a>
+## Plain contracts across boundaries (R37)
+
+`BE_ENTITY_IN_CONTRACT` rejects ORM entities in contracts, messages, transport
+signatures, and handler `execute` signatures in lite and full. Return plain
+projections and pass identifiers across these boundaries. An entity remains a
+persistence declaration; GraphQL decorators and validation imports belong to
+transport DTOs. A plain interface whose name ends in `Entity` is still judged by
+its declaration rather than its name.
+
+<a id="r54"></a>
+
+## R54 Thin route adapters
+
+Route files mount one feature owner and leave rendering decisions, hooks, and client interaction
+inside that owner. `FE_ROUTE_FILES_THIN` rejects business logic in route adapters.
+`FE_NEXT_CONVENTIONS` requires `proxy.ts` instead of `middleware.ts`, and
+`FE_PAGE_METADATA_MISSING` requires page metadata. `FE_ROUTE_ONE_PAGE` rejects multiple page
+owners, while `FE_ROUTE_DRAWING_DECISION` rejects route-side drawing decisions.
+`FE_ROUTE_CLIENT_BOUNDARY` and `FE_ROUTE_CLIENT_HOOK` keep client boundaries and hooks below the
+route. `FE_ROUTE_DEFAULT_EXPORT` requires the route's default component export. These boundaries
+apply in both lite and full editions.
+
+<a id="r55"></a>
+
+## R55 Server and client boundaries
+
+Pages and layouts stay server components; an interactive block entry or leaf may declare a client
+boundary. `FE_CLIENT_BOUNDARY` rejects misplaced `use client` directives.
+`FE_CLIENT_SERVER_IMPORT` rejects direct server imports from client code, and
+`FE_CLIENT_REACHES_SERVER` rejects server surfaces reached through the import graph.
+`FE_SERVER_ONLY_MARK` requires server modules to open with `import 'server-only'`.
+`FE_STORAGE_OUTSIDE_MODULES` keeps browser storage behind modules, and `FE_DANGEROUS_HTML` rejects
+raw HTML on visible elements. These boundaries apply in both lite and full editions.
+
+<a id="r57"></a>
+
+## R57 Mounted pages and route destinations
+
+`FE_OWNER_REACHABLE` requires each page owner to be mounted by an app route. `FE_HREF_RESOLVES`
+rejects internal hrefs for which no route exists; route groups, locale prefixes, and dynamic
+segments retain their routing meaning. `FE_ROUTE_HARDCODED` requires href builders in
+`modules/routes` instead of copied route strings.
+
+<a id="r58"></a>
+
+## R58 Translation ownership
+
+`FE_I18N_LITERAL` rejects visible or spoken display text written directly in source, including a
+literal document language. Blocks resolve messages through `next-intl`; leaves and composites
+receive words as props. Set the HTML `lang` from the locale parameter and keep translated values
+in catalogs.
+
+<a id="r59"></a>
+
+## R59 Internationalization stack
+
+`FE_I18N_PLACEMENT` requires `next-intl`, a `[locale]` segment, `src/proxy.ts`, and the default `vi`
+catalog. Build the stack once in a shared i18n package, or in `modules/i18n` for a single app.
+`FE_I18N_NAVIGATION` requires locale-aware navigation and `Link` for internal destinations.
+`FE_I18N_FORMATTER` requires the `next-intl` formatter for displayed dates, numbers, and money.
+
+<a id="r64"></a>
+
+## R64 FE app isolation
+
+`FE_APP_ISOLATION` rejects imports from one application into another. Keep application code in
+its app and put reusable code in shared packages.
+
+## R60
+
+`FE_I18N_CATALOG` requires every locale catalog under an app's `modules/i18n/messages`
+to contain the same nested keys. Translate values freely while keeping key sets aligned.
+
+## R62
+
+`FE_NATIVE_FORM_CONTROL` refuses native form controls and raw structural tags in product
+tiers; compose grammar controls and structural components instead. `FE_NATIVE_IMAGE`
+refuses native `img` tags and `next/image` instances without width plus height, or fill
+with sizes. The grammar tier may render the underlying elements. These constraints
+apply in lite and full.
+
+## R63
+
+`FE_PACKAGE_SHAPE` requires each shared package to declare a build command and explicit
+exports into `./dist/`. Export subpaths cannot use wildcards or folder mappings; `main`,
+`module`, `types` and `typings` must also point into `./dist/` when present. Both editions
+judge the package manifest, so consumers use built output rather than source files.
+
+<a id="r65"></a>
+
+## R65 FE size and state budget
+
+`FE_SIZE_AND_STATE_BUDGET` keeps components and hooks within their line and state budgets
+and refuses hand-written polling. `FE_LIST_KEY` requires stable keys for rendered lists
+and avoids fresh object or array props on their components. `FE_EFFECT_CLEANUP` requires
+an effect or subscription to release every timer, listener and other resource it starts.
+`FE_SWALLOWED_ERROR` refuses empty catches and empty promise rejection handlers; handle
+or propagate the error. `FE_CONSOLE_CALL` keeps console calls out of product source.
+
+## Documentation ownership {#r205}
+
+`RT_DOC_NO_OWNER` requires each tracked `docs/*.md` to start with one ownership
+header: `Owner: <knowledge/ or modules/ path that exists>` for a source explanation,
+or `Task: <one task>` for a how-to. Keep exactly one header and a document title.
+Task names are unique after normalizing case and whitespace. Documents whose titles
+share at least two topic words and whose sentences overlap by at least 30% of the
+shorter document belong in one merged document. The same check applies in lite and full.
+
+## Runtime independence from examples {#r206}
+
+Runtime sources and managed templates serve every application in lite and full.
+`RT_EXAMPLE_COUPLING` refuses literal `examples/<name>` paths;
+`RT_PRODUCT_NAME_IN_SOURCE` refuses the closed shipped-product names and incident
+tokens prefixed by them; `RT_HOST_PATH_IN_TEMPLATE` refuses hard-coded host paths.
+Use relative paths, the runtime root, temporary directories or configuration values.
+Declare an actual runtime read of an example once in `scripts/lib/example-refs.mjs`
+and import its constant wherever it is consumed. Specs, tests and generated runtime
+copies are outside this source scan; managed templates remain in scope.
+
+<a id="r213"></a>
+## R213: Supabase migration history
+
+In lite and in full apps that use Supabase, `DB_MIGRATION_SHAPE` refuses an invalid
+`supabase/migrations/<ts14>_<kebab>.sql` name, impossible UTC timestamp, duplicate
+active stamp, invalid PostgreSQL, or migration that does not append after the active
+committed chain. Keep base migrations immutable and retire earlier history through
+the archive when introducing a baseline; neither wall-clock time nor archived stamps
+set the append boundary. The paired edition proof refuses February 30 and accepts a
+real UTC timestamp.
+
+## Runtime root ownership (R240)
+
+<a id="r240"></a>
+
+`RT_ROOT_ADHOC` refuses runtime source files that add raw `process.cwd()` calls or
+Work-directory literals beyond their count when the check landed. Resolve the
+invocation directory, runtime state, temporary paths and Work records through
+`scripts/lib/roots.mjs`; new files start with no raw inputs. This runtime ownership
+check applies equally when working on lite and full apps.
+
+## Workspace dependency declarations
+
+`HFS_MONO_WORKSPACE_DEP` requires each front-end workspace to declare the packages
+its sources import in its own manifest. Every declaration of a sibling workspace
+uses exactly `"*"` in dependencies, devDependencies, peerDependencies or
+optionalDependencies; version ranges, fixed versions and local protocols are refused.
+Relative imports, Node builtins and tsconfig aliases do not require package entries.
+The app root never declares a workspace package as a dependency.
+
+## Backend module composition
+
+`BE_FEATURE_NOT_COMPOSED` requires features and capability owners to be reachable
+from an app through runtime imports or re-exports. Every feature transport module
+must itself be reachable: reaching another file in its feature does not compose it.
+A type-only import composes nothing. Findings identify the uncomposed transport
+module or owner and the app roots examined, in both lite and full editions.
+
+<a id="r56"></a>
+## R56: Hooks own their implementations
+
+`FE_HOOKS_ARE_HOOKS` rejects helpers disguised as hooks, invalid exports and
+incorrect domain shared files. A hook must call an actual hook API; canonical
+Redux selectors and dispatch hooks created with `withTypes()` retain their hook
+identity through their barrel. A use-prefixed helper alone is insufficient.
+`FE_CUSTOM_HOOK_LOCATION` and `FE_BLOCK_PRODUCT_HOOK_DEFINITION` keep product
+hook definitions in hooks rather than visual owners. `FE_COMPONENT_DEEP_HOOK_IMPORT`
+requires components to import through the owning hooks barrel. These boundaries
+apply in lite and full.
+
+<a id="r92"></a>
+## R92: Component surfaces and world ownership
+
+`FE_COMPONENT_API` requires named props, closed styling doors, colocated class
+names, settled drawing inputs and status rendered through SlotView. Connected
+blocks have their exact sibling pure twin (`FE_CONNECTED_BLOCK_RENDER_PAIR`).
+`FE_COMPONENT_WORLD_OWNERSHIP` keeps data lifecycle out of lower visual tiers;
+`FE_WORLD_OWNER_RENDER_BOUNDARY` requires data owners to delegate every render
+path to a pure component. A hooks/ui function that calls global fetch is a world
+reader, even when imported through a barrel; a locally bound function named fetch
+is judged by its own ownership. Legitimate data hooks remain available to connected
+blocks that render through their pure twin.
+
+`FE_PURE_REACHES_DATA` rejects pure component imports reaching hooks or transport.
+`FE_PURE_WORLD_HOOK` rejects world hooks in the pure half, and
+`FE_PURE_WORLD_IMPORT` rejects router and locale imports there. These requirements
+apply equally to lite and full.

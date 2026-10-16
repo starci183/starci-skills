@@ -3,7 +3,8 @@
  * tsconfig and the files a case lists) whose project graph the project rules read, and a RuleTester over @typescript-eslint/parser
  * whose `settings.starci.hfs` is that side's view. `rootFiles` are written at the app root (`.starcistacks/` lives there). A case's `filename` is `at("src/modules/...")`, relative to the side folder; its
  * `code` is the text of that file (the rules judge the graph, which reads the disk). Used by the back-end and the front-end project
- * rule tests (`profile`).
+ * rule tests (`profile`). `manifestText` (the text of a slot manifest) is written to a separate runtime root that the registered rule reads instead of its shipped
+ * runtime (the `injectedRuntimeRoot` setting of scripts/hfs/project-rule.mjs): a hermetic manifest with a gap for the rule to report.
  */
 import fs from "node:fs"
 import os from "node:os"
@@ -21,10 +22,10 @@ const RUNTIME = path.join(import.meta.dirname, "..", "..", "runtime")
 const DEFAULT_APPS = { be: [{ name: "core", kind: "api" }], fe: [{ name: "web", kind: "next" }] }
 
 /**
- * @param {{ profile?: "be" | "fe", edition?: "full" | "lite", files?: Record<string, string | null>, rootFiles?: Record<string, string>, declaration?: object, apps?: object[] }} input
+ * @param {{ profile?: "be" | "fe", edition?: "full" | "lite", files?: Record<string, string | null>, rootFiles?: Record<string, string>, declaration?: object, apps?: object[], manifestText?: string }} input
  * @returns {{ root: string, at: (rel: string) => string, tester: RuleTester, cleanup: () => void }}
  */
-export const projectFixture = ({ profile = "be", edition, files = {}, rootFiles = {}, declaration = {}, apps = DEFAULT_APPS[profile] } = {}) => {
+export const projectFixture = ({ profile = "be", edition, files = {}, rootFiles = {}, declaration = {}, apps = DEFAULT_APPS[profile], manifestText } = {}) => {
     const appRoot = fs.mkdtempSync(path.join(os.tmpdir(), `starci-project-${profile}-`))
     const root = path.join(appRoot, profile)
     const app = apps[0].name
@@ -54,9 +55,15 @@ export const projectFixture = ({ profile = "be", edition, files = {}, rootFiles 
     }
     resetProjectGraphs()
     const hfs = declaredHfsView({ runtimeRoot: RUNTIME, declaration: hfsJson, repoRoot: fs.realpathSync(root), side: profile })
+    const runtimeRoot = manifestText === undefined ? undefined : fs.mkdtempSync(path.join(os.tmpdir(), `starci-manifest-${profile}-`))
+    if (runtimeRoot) write(runtimeRoot, "knowledge/hfs/slots.yaml", manifestText)
     const tester = new RuleTester({
         languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
-        settings: { starci: { hfs, injectedTypeScript: () => ts } },
+        settings: { starci: { hfs, injectedTypeScript: () => ts, ...(runtimeRoot ? { injectedRuntimeRoot: runtimeRoot } : {}) } },
     })
-    return { root: hfs.repoRoot, at: (rel) => path.join(hfs.repoRoot, ...rel.split("/")), tester, cleanup: () => fs.rmSync(appRoot, { recursive: true, force: true }) }
+    const cleanup = () => {
+        fs.rmSync(appRoot, { recursive: true, force: true })
+        if (runtimeRoot) fs.rmSync(runtimeRoot, { recursive: true, force: true })
+    }
+    return { root: hfs.repoRoot, at: (rel) => path.join(hfs.repoRoot, ...rel.split("/")), tester, cleanup }
 }

@@ -1,5 +1,7 @@
 // secret-tracked.spec.mjs - RT_SECRET_TRACKED (scripts/hfs/runtime-rules/secret-tracked.mjs): the public runtime repository tracks no sealed secret and no secret env file, except the paths
 // ruleParams.runtime.heldSecrets names; and the real runtime holds nothing outside that list.
+// proves: RT_SECRET_TRACKED@lite
+// proves: RT_SECRET_TRACKED@full
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -14,6 +16,16 @@ import { HELD_MEMBERS } from '../../scripts/gates/sonar-host-secrets.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const ctx = (files, heldSecrets = []) => ({ params: { heldSecrets }, files });
+
+for (const edition of ['lite', 'full']) {
+  test(`${edition} rejects tracked secret custody in the public runtime`, () => {
+    assert.deepEqual(secretTrackedFindings(ctx(['runtime/secrets/fixture.enc'])).map((finding) => finding.code), ['RT_SECRET_TRACKED']);
+  });
+
+  test(`${edition} accepts a declared custody directory without secret members`, () => {
+    assert.deepEqual(secretTrackedFindings(ctx(['runtime/secrets/.gitkeep', 'secret.env.example', '.env.example'])), []);
+  });
+}
 
 test('RT_SECRET_TRACKED: a tracked *.enc, secret.env or .env fails, wherever it lies, naming the way out', () => {
   const found = secretTrackedFindings(ctx(['ext/sonar/secrets/x.key.enc', 'secret.env', 'examples/app/.env', 'examples/app/.env.example', 'secret.env.example', 'scripts/a.mjs', 'examples/app/.starcistacks/dev/secrets/.gitkeep']));

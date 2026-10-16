@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { coverageGateFindings } from '../../scripts/checks/lib/coverage-gates.mjs';
+import { coverageProofFindings } from '../../scripts/checks/lib/coverage-proofs.mjs';
 import { workflowRunCommands } from '../../scripts/checks/lib/coverage-workflows.mjs';
 import { loadRuleCatalog } from '../../scripts/hfs/rule-catalog.mjs';
 import { ciWorkflowCommands } from '../../packages/hfs/sync/ci-commands.mjs';
@@ -195,3 +196,49 @@ test('workflow command binding resolution uses the renderer values and preserves
   assert.deepEqual(workflowRunCommands(workflow('{{unknownCiCommand}}')), ['template', 'npm run typecheck']);
   assert.deepEqual(workflowRunCommands(workflow('{{ciLint}}', '${{ false }}')), ['npm run typecheck']);
 });
+
+for (const edition of EDITIONS) {
+  test(`${edition}: hygiene invokes its staged-file enforcer`, () => {
+    const context = contextFor('hfs', ['pre-commit'], 'packages/hfs/sync/hygiene.mjs');
+    context.files.set('packages/hfs/templates/app/hooks/husky/pre-commit', 'npx starci app hygiene');
+    assert.deepEqual(findings(context, edition), []);
+  });
+
+  test(`${edition}: comments and other app verbs cannot prove hygiene execution`, () => {
+    for (const command of ['# npx starci app hygiene', 'npx starci app lint', 'npx starci app check', 'npm run hygiene']) {
+      const context = contextFor('hfs', ['pre-commit'], 'packages/hfs/sync/hygiene.mjs');
+      context.files.set('packages/hfs/templates/app/hooks/husky/pre-commit', command);
+      assert.equal(findings(context, edition)[0]?.code, 'RT_COVERAGE_GATE_LIE');
+    }
+  });
+
+  test(`${edition}: hygiene cannot prove unrelated content or architecture execution`, () => {
+    for (const kind of ['hfs', 'machine']) {
+      const context = contextFor(kind, ['pre-commit']);
+      context.files.set('packages/hfs/templates/app/hooks/husky/pre-commit', 'npx starci app hygiene');
+      assert.equal(findings(context, edition)[0]?.code, 'RT_COVERAGE_GATE_LIE');
+    }
+  });
+}
+
+for (const edition of EDITIONS) {
+  test(`${edition}: a real hygiene gate cannot admit a discarded, vacuous checker proof`, () => {
+    const at = 'packages/hfs/sync/hygiene.mjs';
+    const context = contextFor('hfs', ['pre-commit'], at);
+    const rule = context.catalog.rules[0];
+    rule.proves = ['tests/checks/sample.spec.mjs'];
+    context.files.set(at, "export function hygieneFindings(invalid) { return invalid ? [{code: 'SAMPLE_GATE'}] : []; }");
+    context.files.set('packages/hfs/templates/app/hooks/husky/pre-commit', 'npx starci app hygiene');
+    context.files.set(rule.proves[0], [
+      "import test from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      "import { hygieneFindings } from '../../packages/hfs/sync/hygiene.mjs';",
+      `// proves: SAMPLE_GATE@${edition}`,
+      `test('${edition}: invalid and valid', () => {`,
+      "hygieneFindings(true); hygieneFindings(false);",
+      "assert.equal('SAMPLE_GATE', 'SAMPLE_GATE'); assert.deepEqual([], []); });",
+    ].join('\n'));
+    assert.deepEqual(findings(context, edition), []);
+    assert.equal(coverageProofFindings(context, rule, 'SAMPLE_GATE', edition)[0]?.code, 'RT_COVERAGE_PROOF_VACUOUS');
+  });
+}

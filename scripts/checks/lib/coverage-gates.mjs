@@ -248,6 +248,10 @@ function runsEnforcer(context, rule, source, enforcer, emitters) {
 }
 
 function appRunsEnforcer(source, enforcer) {
+  // Hygiene has its own CLI route; lint/check do not invoke the staged-file guard.
+  if (enforcer.at === 'packages/hfs/sync/hygiene.mjs') {
+    return commandWords(source).some((words) => appCommandVerb(words) === 'hygiene' && words[0] !== 'npm');
+  }
   // app lint runs the fast content checks and the architecture machine; app check adds the stacks gate.
   const verbs = STACKS_GATE_FILES.has(enforcer.at) ? ['check'] : ['lint', 'check'];
   return commandWords(source).some((words) => verbs.includes(appCommandVerb(words)));
