@@ -1,12 +1,54 @@
 // Producers of returned arrays include writes through aliases and invoked parameters.
-import { astChildren, nodeName, resolvedExpression } from './coverage-ast.mjs';
+import { astChildren, astNodes, nodeName, resolvedExpression, sourceIndex, sourcePath } from './coverage-ast.mjs';
 import { bindPattern, evaluate, invocation, localScope, UNKNOWN } from './coverage-evaluation.mjs';
+import { returnedExpressions } from './coverage-results.mjs';
 
 const callable = (node) => ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node?.type);
 const callbackMethods = new Set(['forEach', 'map', 'filter', 'some', 'every', 'find']);
 
+function facadeTarget(context, index, name, visited = new Set()) {
+  const key = `${index.file}#${name}`;
+  if (visited.has(key)) return null;
+  visited.add(key);
+  const entry = index.tree?.body.find(item => item.type === 'ExportNamedDeclaration' && item.source
+    && item.specifiers.some(specifier => nodeName(specifier.exported) === name));
+  const file = entry && sourcePath(context.files, index.file, entry.source.value);
+  if (!file) return null;
+  const next = sourceIndex(context, file);
+  const specifier = entry.specifiers.find(item => nodeName(item.exported) === name);
+  const local = nodeName(specifier.local);
+  const resolved = resolvedExpression(context, next, next.exports.get(local));
+  return callable(resolved.node) ? resolved : facadeTarget(context, next, local, visited);
+}
+
+/** Resolve named relative facades only while tracing a consumed emitted value. */
+export function collectorFacadeInvocation(context, index, node) {
+  const imported = index.imports.get(node.callee.name);
+  if (!imported?.file || index.locals?.has(node.callee.name)) return null;
+  const target = facadeTarget(context, sourceIndex(context, imported.file), imported.name);
+  if (!target) return null;
+  const scope = localScope(index);
+  scope.locals.set(node.callee.name, target);
+  return invocation(context, scope, node);
+}
+
 function sameCollector(context, index, node, collector) {
   return resolvedExpression(context, index, node).node === collector;
+}
+
+function consumesCollectors(context, index, node, collectors) {
+  const pending = [{ index, node }];
+  const seen = new Set();
+  while (pending.length) {
+    const current = pending.pop();
+    if (!current.node || seen.has(current.node)) continue;
+    seen.add(current.node);
+    const resolved = resolvedExpression(context, current.index, current.node);
+    if (collectors.has(resolved.node)) return true;
+    if (resolved.node !== current.node && (!callable(resolved.node) || current.index.locals?.has(current.node.name))) pending.push(resolved);
+    for (const child of astChildren(current.node)) pending.push({ index: current.index, node: child });
+  }
+  return false;
 }
 
 function invokedCallback(context, index, node) {
@@ -28,10 +70,10 @@ function visitCall(context, index, node, state, stack) {
   if (receiver && sameCollector(context, index, receiver, state.collector)) {
     if (nodeName(node.callee.property) === 'push') {
       for (const argument of node.arguments) state.writes.push({ index: localScope(index), node: argument });
-    } else state.unsafe = true;
+    } else if (!callbackMethods.has(nodeName(node.callee.property))) state.unsafe = true;
   }
   const target = invocation(context, index, node) ?? invokedCallback(context, index, node);
-  if (target && !stack.has(target.node)) {
+  if (target && !stack.has(target.node) && consumesCollectors(context, target.index, target.node, new Set([state.collector]))) {
     walk(context, localScope(target.index), target.node.body, state, new Set(stack).add(target.node));
   }
 }
@@ -72,7 +114,7 @@ function walkLoop(context, index, node, state, stack) {
   if (Array.isArray(values) && values.length === 0) return false;
   const scope = localScope(index);
   bindPattern(context, scope, node.left.declarations?.[0]?.id ?? node.left,
-    { index: scope, node: { type: 'Literal', value: UNKNOWN } });
+    { index, node: node.right });
   walk(context, scope, node.body, state, stack);
   return false;
 }
@@ -89,13 +131,36 @@ function walkBranch(context, index, node, state, stack) {
 
 /** Only writes to the exact returned array count; unused callbacks and other arrays stay opaque. */
 export function collectorExpressions(context, target, returns) {
-  const collectors = new Set(returns.map((entry) => resolvedExpression(context, entry.index, entry.node).node)
-    .filter((node) => node?.type === 'ArrayExpression'));
+  const owned = new Set(astNodes(target.node.body).filter(node => node.type === 'ArrayExpression'));
+  if (!owned.size) return [];
+  const collectors = new Set();
+  const seen = new Set();
+  for (const entry of returns) returnedCollectors(context, entry, owned, collectors, seen);
   const out = [];
   for (const collector of collectors) {
     const state = { collector, writes: [], unsafe: false };
     walk(context, localScope(target.index), target.node.body, state, new Set([target.node]));
-    if (!state.unsafe) out.push(...state.writes);
+    if (!state.unsafe) out.push({ index: target.index, node: collector }, ...state.writes);
   }
   return out;
+}
+
+function returnedCollectors(context, entry, owned, collectors, seen) {
+  const { index, node } = resolvedExpression(context, entry.index, entry.node);
+  if (!node || seen.has(node) || callable(node)) return;
+  seen.add(node);
+  if (owned.has(node)) collectors.add(node);
+  if (node.type === 'CallExpression') {
+    const argumentsContainCollector = node.arguments.some(argument => astNodes(argument)
+      .some(child => owned.has(resolvedExpression(context, index, child).node)));
+    const target = invocation(context, index, node);
+    if (target) {
+      if (target.index.file !== index.file && !argumentsContainCollector) return;
+      for (const returned of returnedExpressions(context, target)) returnedCollectors(context, returned, owned, collectors, seen);
+    } else if (['map', 'filter'].includes(nodeName(node.callee.property))) {
+      returnedCollectors(context, { index, node: node.callee.object }, owned, collectors, seen);
+    }
+    return;
+  }
+  for (const child of astChildren(node)) returnedCollectors(context, { index, node: child }, owned, collectors, seen);
 }

@@ -5,7 +5,7 @@ import { astChildren, astNodes, expressionReach, nodeName, resolvedExpression, s
 import { lintEnforcersForCode, registeredLintRules } from './coverage-routing.mjs';
 import { bindPattern, evaluate, invocation, localScope, scopedWalk, UNKNOWN } from './coverage-evaluation.mjs';
 import { resultReach, returnedExpressions } from './coverage-results.mjs';
-import { collectorExpressions } from './coverage-collectors.mjs';
+import { collectorExpressions, collectorFacadeInvocation } from './coverage-collectors.mjs';
 
 const NEGATIVE = /\b(?:invalid|violat\w*|refus\w*|reject\w*|deni\w*|fail\w*|negative|forbid\w*|missing)\b/i;
 const POSITIVE = /\b(?:valid|pass\w*|accept\w*|conform\w*|positive|clean)\b/i;
@@ -113,7 +113,7 @@ function returnedCode(context, index, node, code, seen = new Set()) {
   if (resolved.node !== node) return returnedCode(context, resolved.index, resolved.node, code, next);
   if (codeLiteral(node, code)) return true;
   if (node.type === 'CallExpression') {
-    const target = invocation(context, index, node);
+    const target = invocation(context, index, node) ?? collectorFacadeInvocation(context, index, node);
     if (target) return functionReturnsCode(context, target, code, next);
   }
   if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type)) return false;
@@ -155,16 +155,26 @@ function functionAnalysis(context, target) {
   return analysis;
 }
 
+function reachesCollectorFacade(context, target) {
+  return [...expressionReach(context, localScope(target.index), target.node)].some(([file, nodes]) => nodes.some((node) =>
+    node.type === 'CallExpression' && collectorFacadeInvocation(context, sourceIndex(context, file), node)));
+}
+
 function functionReturnsCode(context, target, code, seen = new Set()) {
+  if (seen.has(target.node)) return false;
+  const next = new Set(seen).add(target.node);
   const analysis = functionAnalysis(context, target);
   if (analysis.local.some((node) => codeLiteral(node, code))) return true;
   analysis.possible ??= possibleCodeNodes(context, target.index, target.node);
-  if (!analysis.possible.some((node) => codeLiteral(node, code))) return false;
+  if (!analysis.possible.some((node) => codeLiteral(node, code))) {
+    analysis.facade ??= reachesCollectorFacade(context, target);
+    if (!analysis.facade) return false;
+  }
   if (!analysis.returns) {
     const returns = returnedExpressions(context, target);
     analysis.returns = [...returns, ...collectorExpressions(context, target, returns)];
   }
-  return analysis.returns.some((entry) => returnedCode(context, entry.index, entry.node, code, seen));
+  return analysis.returns.some((entry) => returnedCode(context, entry.index, entry.node, code, next));
 }
 
 function delegatedTargets(context, file, reached, code) {
