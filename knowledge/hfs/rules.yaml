@@ -2572,6 +2572,14 @@ rules:
       - {kind: hfs, id: pattern-spec-missing, at: scripts/hfs/rules/event-bus.mjs}
   - id: R156
     code: "BE_KIND_ISOLATION"
+    editions: [lite, full]
+    docs: [docs/code-pattern-enforcement.md#r156-kind-isolation]
+    templateNa: "Cross-kind imports are a negative architecture constraint; the spec supplies actual owner graphs in both editions."
+    proves: [tests/hfs-architecture/architecture-kind-isolation-coverage.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/hfs-architecture/architecture-kind-isolation-coverage.spec.mjs, editions: [lite, full], codes: [BE_KIND_ISOLATION]}
+    witness:
+      - {path: tests/hfs-architecture/architecture-kind-isolation-coverage.spec.mjs, editions: [lite, full], codes: [BE_KIND_ISOLATION]}
     law: "No trigger kind imports another: a feature whose owner slot names one `trigger` (api, webhooks, realtime, saga, reactors, jobs, cli) never imports (static, dynamic, re-export or type-only) a feature of another kind; each kind imports only `modules/*` and only be/apps/* compose features. The kinds meet through the event bus: a domain service publishes `eventBus.publish(event, tx)` and the other kind consumes it. The importing and imported owners are read from the slot view (slot field `trigger`), never from a folder name; the finding replaces BE_FEATURE_IMPORTS_FEATURE when both features name different kinds."
     kinds: [lint, design]
     gates: [settle, land, ci]
@@ -3240,10 +3248,18 @@ rules:
       - {kind: runtime, id: prose-restates, at: scripts/hfs/runtime-rules/prose-restates.mjs}
   - id: R198
     code: "RT_CLI_CATALOG_DRIFT"
+    editions: [lite, full]
+    docs: [docs/installation.md#r198-cli-catalog-drift]
+    templateNa: "The host CLI catalog generator is runtime source governance, not an app scaffold surface."
+    proves: [tests/hfs-proofs/cli-catalog-drift.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/hfs-proofs/cli-catalog-drift.spec.mjs, editions: [lite, full], codes: [RT_CLI_CATALOG_DRIFT]}
+    witness:
+      - {path: tests/hfs-proofs/cli-catalog-drift.spec.mjs, editions: [lite, full], codes: [RT_CLI_CATALOG_DRIFT]}
     law: "Every generated output of the unified CLI catalog (packages/cli/src/catalog.generated.mjs, docs/cli.md, packages/cli/completions/*) equals what scripts/cli/gen-catalog.mjs writes from modules/cli/commands."
     scope: runtime
     kinds: [check]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_CLI_CATALOG_DRIFT"]
     enforcers:
       - {kind: runtime, id: cli-catalog-drift, at: scripts/cli/gen-catalog.mjs}

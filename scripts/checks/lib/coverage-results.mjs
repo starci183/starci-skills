@@ -1,6 +1,7 @@
 // Trace the value an assertion consumes, including parameters of invoked test helpers.
 import { astChildren, expressionReach, nodeName, resolvedExpression, sourceIndex } from './coverage-ast.mjs';
 import { invocation, scopedWalk, testHelper } from './coverage-evaluation.mjs';
+import { subprocessReach } from './coverage-process.mjs';
 
 export function returnedExpressions(context, target) {
   if (target.node.body.type !== 'BlockStatement') return [{ index: target.index, node: target.node.body }];
@@ -13,6 +14,10 @@ export function returnedExpressions(context, target) {
 }
 
 function callDependencies(context, current, helpersOnly) {
+  const subprocess = !helpersOnly && subprocessReach(context, current.index, current.node);
+  if (subprocess) return [...subprocess].flatMap(([file, nodes]) => nodes.map(node => ({
+    index: sourceIndex(context, file), node, stack: current.stack, terminal: true,
+  })));
   const target = invocation(context, current.index, current.node);
   if (!target) return builtinDependencies(current);
   if (current.stack.has(target.node)) return [];

@@ -3,7 +3,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { byCodeUnit } from '../../scripts/lib/list.mjs';
-import { appDeclaration, archFixture, findings, runArch } from '../helpers/hfs-arch-fixture.mjs';
+import { appDeclaration, archFixture, findings, runArch, ts } from '../helpers/hfs-arch-fixture.mjs';
+import { loadArchitectureConfig } from '../../scripts/hfs/architecture/config.mjs';
+import { buildTypeScriptContext } from '../../scripts/hfs/architecture/typescript.mjs';
+import { buildHfsGraph } from '../../scripts/hfs/architecture/hfs-graph.mjs';
+import { checkTiers } from '../../scripts/hfs/architecture/tiers.mjs';
 import { projectFixture } from '../../packages/eslint/be/fixtures/project/tester.mjs';
 import { rules } from '../../packages/eslint/be/project-graph.mjs';
 
@@ -32,6 +36,21 @@ function machineFixture(t, edition, files) {
 }
 
 for (const edition of ['lite', 'full']) {
+  test(`${edition} direct tiers rejects imports across trigger kinds`, t => {
+    const root = machineFixture(t, edition, { ...passingFiles, ...violatingFiles });
+    const config = loadArchitectureConfig(root);
+    const graph = buildHfsGraph(config, buildTypeScriptContext(config, ts, []));
+    const codes = checkTiers(graph).violations.map(hit => hit.ruleId);
+    assert.deepEqual(codes, ['BE_KIND_ISOLATION', 'BE_KIND_ISOLATION', 'BE_KIND_ISOLATION', 'BE_KIND_ISOLATION']);
+  });
+
+  test(`${edition} direct tiers accepts one owner and shared modules`, t => {
+    const root = machineFixture(t, edition, passingFiles);
+    const config = loadArchitectureConfig(root);
+    const graph = buildHfsGraph(config, buildTypeScriptContext(config, ts, []));
+    assert.deepEqual(checkTiers(graph).violations, []);
+  });
+
   test(`${edition} kind isolation rejects static, dynamic, re-export and type-only cross-kind imports`, t => {
     const root = machineFixture(t, edition, { ...passingFiles, ...violatingFiles });
     const hits = findings(runArch(root), 'BE_KIND_ISOLATION');

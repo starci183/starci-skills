@@ -47,6 +47,47 @@ function bindingsOf(tree) {
   return bindings;
 }
 
+function constantsOf(tree) {
+  const declarations = new Map();
+  for (const node of astNodes(tree)) {
+    if (node.type !== 'VariableDeclaration') continue;
+    for (const entry of node.declarations) {
+      if (entry.id.type !== 'Identifier') continue;
+      const name = entry.id.name;
+      declarations.set(name, !declarations.has(name) && node.kind === 'const');
+    }
+  }
+  for (const name of shadowedConstants(tree)) declarations.set(name, false);
+  return new Set([...declarations].filter(([, constant]) => constant).map(([name]) => name));
+}
+
+function shadowedConstants(tree) {
+  const names = new Set();
+  const owners = constantOwners(tree);
+  for (const node of astNodes(tree)) {
+    const patterns = [...node.params ?? []];
+    if (node.type === 'CatchClause') patterns.push(node.param);
+    if (node.type === 'VariableDeclarator' && node.id.type !== 'Identifier') patterns.push(node.id);
+    for (const identifier of patterns.flatMap(astNodes).filter(entry => entry.type === 'Identifier')) {
+      const owner = owners.get(identifier.name);
+      if (owner && node.start >= owner.start && node.end <= owner.end) names.add(identifier.name);
+    }
+  }
+  return names;
+}
+
+function constantOwners(tree) {
+  const nodes = astNodes(tree);
+  const functions = nodes.filter(node => Array.isArray(node.params));
+  const owners = new Map();
+  for (const node of nodes.filter(entry => entry.type === 'VariableDeclarator' && entry.id.type === 'Identifier')) {
+    const enclosing = functions.filter(fn => fn.start <= node.start && fn.end >= node.end);
+    enclosing.sort((a, b) => (a.end - a.start) - (b.end - b.start));
+    owners.set(node.id.name, enclosing[0] ?? tree);
+  }
+  return owners;
+}
+
 function exportsOf(tree) {
   const exports = new Map();
   for (const node of tree?.body ?? []) {
@@ -67,7 +108,7 @@ export function sourceIndex(context, file) {
   if (previous?.text === text) return previous;
   let tree;
   try { tree = acorn.parse(text, { ecmaVersion: 'latest', sourceType: 'module', allowHashBang: true }); } catch { tree = null; }
-  const index = { file, text, tree, imports: importsOf(tree, file, context.files), bindings: bindingsOf(tree), exports: exportsOf(tree), reaches: new WeakMap() };
+  const index = { file, text, tree, imports: importsOf(tree, file, context.files), bindings: bindingsOf(tree), constants: constantsOf(tree), exports: exportsOf(tree), reaches: new WeakMap() };
   cache.set(file, index);
   return index;
 }
