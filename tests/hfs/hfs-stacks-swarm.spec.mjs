@@ -409,3 +409,27 @@ test('R266 config reads reject secret paths, parent traversal and symlinks', t =
   value.model.configs = { routes: { file: './Caddy-alias' } };
   assert.ok(issuesFor(value, 'STACKS_HOST_UNROUTED').length > 0);
 });
+
+for (const edition of ['lite', 'full']) {
+  test(`STACKS_HOST_UNROUTED@${edition}: an external shared ingress routes the declared hosts itself, but DNS, TLS and ports stay judged`, t => {
+    const value = fixture(t, edition);
+    const spec = value.manifest.environments.production;
+    delete value.manifest.components.ingress;
+    delete value.model.services.ingress;
+    delete spec.components?.ingress;
+    spec.ingress = { external: { stack: 'ingress' }, hosts: ['app.example.test'] };
+    value.model.services.api.deploy.labels = {};
+    assert.deepEqual(issuesFor(value, 'STACKS_HOST_UNROUTED'), []);
+    assert.deepEqual(issuesFor(value, 'STACKS_DNS_UNDECLARED'), []);
+    value.model.services.api.ports = [{ published: 443, target: 3000, mode: 'ingress' }];
+    assert.ok(issuesFor(value, 'STACKS_PORT_PUBLISHED').length > 0, 'only the shared ingress may publish ports');
+    delete spec.tls;
+    assert.ok(issuesFor(value, 'STACKS_TLS_UNDECLARED').length > 0);
+    spec.tls = { owner: 'application operator', receipt: 'docs/tls.md' };
+    spec.dns = [];
+    assert.ok(issuesFor(value, 'STACKS_DNS_UNDECLARED').length > 0);
+    delete spec.ingress.external;
+    spec.ingress.component = 'ingress';
+    assert.ok(issuesFor(value, 'STACKS_HOST_UNROUTED').length > 0, 'a declared component still needs a route');
+  });
+}

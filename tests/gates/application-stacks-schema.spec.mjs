@@ -78,3 +78,19 @@ test('managed backing entries require a provider and managed true with no undecl
     assert.ok(errors(doc).length > 0, JSON.stringify(entry));
   }
 });
+
+test('an environment ingress shape admits a component or external.stack (rule R275 judges which); hosts are always required', () => {
+  const doc = olderDeclaration();
+  const swarm = doc.environments.dev;
+  swarm.runtime = 'docker-swarm';
+  delete doc.k8s;
+  doc.k8s = { status: 'deferred', reason: 'This application runs on Docker.' };
+  swarm.ingress = { component: 'api', hosts: ['app.example.test'] };
+  assert.deepEqual(errors(doc), []);
+  swarm.ingress = { external: { stack: 'ingress' }, hosts: ['app.example.test'] };
+  assert.deepEqual(errors(doc), []);
+  for (const bad of [{ external: {}, hosts: ['a.test'] }, { external: { stack: '' }, hosts: ['a.test'] }, { external: { stack: 'ingress', extra: 1 }, hosts: ['a.test'] }, { external: { stack: 'ingress' } }]) {
+    swarm.ingress = bad;
+    assert.ok(errors(doc).length > 0, JSON.stringify(bad));
+  }
+});

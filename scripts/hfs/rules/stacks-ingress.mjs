@@ -1,4 +1,5 @@
-// R275 and R266: each Swarm environment has one declared, digest-pinned ingress.
+// R275 and R266: each Swarm environment has one declared, digest-pinned ingress, or declares that the ingress is an external shared stack
+// (`ingress.external: { stack }` with `hosts`): then the stack renders no ingress of its own and publishes no port.
 import { isPlainObject as plain } from '../../../engine/plain-object.mjs';
 import { repositoryOf } from '../../lib/stack-services.mjs';
 import { stacksDeploymentFindings } from './stacks-runtime.mjs';
@@ -22,6 +23,20 @@ function ingressIds(components, bindings, services, chosen) {
     if (component.role === 'ingress' || ingressImage(service.image)) ids.add(id);
   }
   return [...ids];
+}
+
+/** The name of the shared external ingress stack the environment declares, or null. */
+export const externalIngressStack = spec => present(spec?.ingress?.external?.stack) ? spec.ingress.external.stack : null;
+
+function externalIssues({ spec, candidates, at }) {
+  const ingress = mapping(spec.ingress), errors = [];
+  if (externalIngressStack(spec) === null || present(ingress.component) || !Array.isArray(ingress.hosts) || ingress.hosts.length === 0)
+    errors.push({ code: 'STACKS_INGRESS_UNDECLARED', at,
+      message: 'an external ingress is declared as ingress.external.stack with ingress.hosts and without ingress.component' });
+  if (candidates.length > 0)
+    errors.push({ code: 'STACKS_SECOND_INGRESS', at,
+      message: 'a stack that declares an external shared ingress must not render an ingress of its own' });
+  return errors;
 }
 
 function declarationIssues({ chosen, components, bindings, services, candidates, at }) {
@@ -59,6 +74,7 @@ export function ingressIssues({ doc, environment, spec = doc?.environments?.[env
   const components = mapping(doc?.components), bindings = mapping(spec.components), services = mapping(model?.services);
   const chosen = spec.ingress?.component, candidates = ingressIds(components, bindings, services, chosen);
   const at = `environments.${environment}.ingress`;
+  if (mapping(spec.ingress).external !== undefined) return externalIssues({ spec, candidates, at });
   return [
     ...declarationIssues({ chosen, components, bindings, services, candidates, at }),
     ...ingressImageIssues(candidates, components, services),
