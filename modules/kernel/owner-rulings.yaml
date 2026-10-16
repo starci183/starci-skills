@@ -500,6 +500,13 @@ rulings:
     supersedes: []
     enforcedBy: [scripts/checks/check-canon-pins.mjs]
 
+  - id: credential-guarded-rest-door
+    date: '2026-10-16'
+    source: knowledge/hfs/rulings.yaml credential-guarded-rest-door; packages/eslint/be/operations.mjs
+    ruling: A REST route that serves an external machine client (n8n, loyalty till, external API, agent tools) and is protected by a credential guard satisfies the evidence of BE_REST_DOOR_EVIDENCE and BE_REST_ROUTE_UNDECLARED through that guard, so its wire format is not forced into the defineOperations contract. The declaration is the route's or its controller's @Credential({ kind }) decorator from the domain identity capability, and the same capability declares a CredentialGuard implementing CanActivate, both resolved by TypeScript symbol. Anonymous public REST routes still need a closed PublicReason and an unguarded route still fails. Theo y tro (the owner delegated the decision to main, 2026-10-16).
+    supersedes: []
+    enforcedBy: [packages/eslint/be/operations.mjs]
+
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']
   'ruling:R212/case-4': ['ruling:R212/case-1', 'ruling:R212/case-2']
