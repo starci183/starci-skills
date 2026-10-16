@@ -411,16 +411,22 @@ test('starci kernel dispatch runs the environment pre-step for a walk: a foreign
   // ledgerFileFor({env}) seeds the file that resolution lands on.
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),STARCI_FAKE_ORCA_MODE:'healthy',
     STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),STARCI_LOCAL_ROOT:path.join(root,'localappdata'),
-    STARCI_PROJECTS_ROOT:path.join(root,'projects'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),STARCI_ENV_GATE:'',STARCI_ENV_PROBE_TIMEOUT_MS:'1500'};
+    STARCI_PROJECTS_ROOT:path.join(root,'projects'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),STARCI_ENV_GATE:'',STARCI_ENV_PROBE_TIMEOUT_MS:'4000'};
   const hung=net.createServer(()=>{});
   const hungPort=await new Promise(r=>hung.listen(0,'127.0.0.1',()=>r(hung.address().port)));
   t.after(()=>hung.close());
   // The ready server lives in its own process: spawnSync below blocks this one's event loop.
-  const webPort=await new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>r(p));});});
+  // The ready server lives in its own process and binds port 0 itself, then reports the port it got: asking for a free port here and
+  // handing it to the child leaves a window in which another process on the machine (a local stack, docker) can take it.
   const {spawn}=await import('node:child_process');
-  const web=spawn(process.execPath,['-e',`require('http').createServer((q,s)=>{s.writeHead(200);s.end('ok')}).listen(${webPort},'127.0.0.1')`],{stdio:'ignore',windowsHide:true});
+  const web=spawn(process.execPath,['-e',"const s=require('http').createServer((q,r)=>{r.writeHead(200);r.end('ok')});s.listen(0,'127.0.0.1',()=>process.stdout.write(s.address().port+'\\n'))"],{stdio:['ignore','pipe','ignore'],windowsHide:true});
   t.after(()=>{try{web.kill();}catch{}});
-  for(let i=0;i<50&&(await probe(`http://127.0.0.1:${webPort}/`,{timeoutMs:500})).state!=='answered';i+=1)await new Promise(r=>setTimeout(r,100));
+  const webPort=await new Promise((resolve,reject)=>{
+    let seen='';const timer=setTimeout(()=>reject(new Error('the ready server did not report its port')),60000);
+    web.stdout.on('data',chunk=>{seen+=chunk;if(seen.includes('\n')){clearTimeout(timer);resolve(Number(seen.trim()));}});
+    web.on('exit',()=>{clearTimeout(timer);reject(new Error('the ready server exited before it reported its port'));});
+  });
+  for(let i=0;i<150&&(await probe(`http://127.0.0.1:${webPort}/`,{timeoutMs:1000})).state!=='answered';i+=1)await new Promise(r=>setTimeout(r,100));
   const writeEnv=port=>{
     const dir=path.join(repo,'.starciwork','_resources','environments','login-local');fs.mkdirSync(dir,{recursive:true});
     fs.writeFileSync(path.join(dir,'resource.yaml'),`schema: work/resource@1\nid: environment.t.login-local\nkind: environment\ntarget:\n  origins:\n    web: http://127.0.0.1:${port}\nconfiguration:\n  ports:\n    web: ${port}\nprobes:\n  - {id: web-ready, method: http-get, target: 'http://127.0.0.1:${port}/', expect: 200}\n`);
