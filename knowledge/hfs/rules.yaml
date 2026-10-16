@@ -2441,7 +2441,8 @@ rules:
       - {path: packages/eslint/be/cookies-coverage.spec.mjs, edition: full, codes: ["BE_COOKIE_ATTRIBUTES"]}
   - id: R142
     code: "BE_AMBIENT_ID"
-    law: "`randomUUID` of Node's crypto (named, namespace or global), the `v1`, `v4`, `v6` and `v7` generators of `uuid`, `nanoid` and `ulid` are used only inside `platform/ids`, specs included; code asks the injected `Ids` port (`ids.next()`) and specs use `fakeIds()`."
+    law: "`randomUUID` of Node's crypto (named, namespace or global), the `v1`, `v4`, `v6` and `v7` generators of `uuid`, `nanoid` and `ulid` are used only inside `platform/ids`, specs included, with one exception: the test world (slot `be.tests.world`), the composition root of tests that names real resources; code asks the injected `Ids` port (`ids.next()`) and specs use `fakeIds()`."
+    amendedBy: [owner:ambient-id-test-world-exemption]
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_AMBIENT_ID"]
@@ -3645,7 +3646,7 @@ rules:
   - id: R212
     editions: [lite, full]
     codeEditions: {HFS_EDITION_FORBIDDEN_PRESENT: [lite], HFS_STARCIWORK_LITE_FORBIDDEN: [lite]}
-    editionWhy: "R212/case-3 and R212/case-4 preserve full Work and limit the lite infrastructure and Work surfaces."
+    editionWhy: "R212/case-3 and R212/case-4 (owner:lite-production-swarm) preserve full Work and limit the lite infrastructure and Work surfaces."
     docs: [docs/lite-edition.md#edition-validation]
     templateNa: "The hfs.json edition declaration is generated programmatically by packages/hfs/scaffold/app.mjs; no managed declaration template exists. Forbidden paths are rejected rather than scaffolded."
     proves:

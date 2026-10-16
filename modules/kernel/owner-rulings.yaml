@@ -479,6 +479,13 @@ rulings:
     supersedes: []
     enforcedBy: [scripts/checks/check-json-exceptions.mjs]
 
+  - id: ambient-id-test-world-exemption
+    date: '2026-10-16'
+    source: knowledge/hfs/rulings.yaml ambient-id-test-world-exemption; packages/eslint/be/ambient-id.mjs
+    ruling: The test world (slot be.tests.world) keeps its exemption from BE_AMBIENT_ID, like the clock rule, because it is the composition root of tests and names real resources; the catalog law of R142 is amended to say so. Owner words "Theo y tro" (alpha.18 single release, relayed by main, a17 PROPOSALS section D).
+    supersedes: []
+    enforcedBy: [packages/eslint/be/ambient-id.mjs]
+
   - id: module-definition-everywhere
     date: '2026-10-15'
     source: knowledge/hfs/rulings.yaml module-definition-everywhere; knowledge/patterns/be/folder.yaml BE-FOLDER-3
