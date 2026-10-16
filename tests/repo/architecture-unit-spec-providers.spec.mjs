@@ -96,3 +96,50 @@ test('BE_RAW_INJECT: a service injecting a private (non-exported) token is a fin
   assert.equal(found[0].path, 'src/modules/domain/cart/cart.decorators.ts');
   assert.match(found[0].message, /CLOCK, which is not exported/);
 });
+
+// A1: a function-only subject is judged by its callable subset; constants, enums, re-exports and overload signatures beside it do not matter.
+const MIXED = [
+  "export const LIMIT = 5;",
+  "export enum Kind { Short = 'short' }",
+  "export { total } from './price.service';",
+  'export function pad(value: string): string;',
+  'export function pad(value: number): string;',
+  'export function pad(value: string | number): string { return String(value).padStart(LIMIT, "0"); }',
+  'export const shout = (value: string): string => value.toUpperCase();',
+  '',
+].join('\n');
+const functionSpec = value => [
+  "import { Test } from '@nestjs/testing';",
+  "import { pad, shout } from './cart.service';",
+  'const CART = Symbol("cart");',
+  "it('pads', async () => {",
+  `  const moduleRef = await Test.createTestingModule({ providers: [{ provide: CART, useValue: ${value} }] }).compile();`,
+  '  const subject = moduleRef.get(CART);',
+  "  expect(subject.pad(1)).toBe('00001');",
+  '});',
+  '',
+].join('\n');
+
+test('BE_SPEC_QUALITY: a function subject beside a constant, an enum, a re-export and an overload is satisfied by its callable functions only', t => {
+  const found = messages(run(t, functionSpec('{ pad, shout }'), { 'src/modules/domain/cart/cart.service.ts': MIXED }));
+  assert.deepEqual(found, [], JSON.stringify(found));
+});
+
+test('BE_SPEC_QUALITY: a function subject provider that leaves out a callable export, or invents one, is still a finding', t => {
+  const missing = messages(run(t, functionSpec('{ pad }'), { 'src/modules/domain/cart/cart.service.ts': MIXED }));
+  assert.equal(missing.length, 1, JSON.stringify(missing));
+  assert.match(missing[0], /function-only subject needs exactly one/);
+  const handBuilt = messages(run(t, functionSpec('{ pad, shout: () => "" }'), { 'src/modules/domain/cart/cart.service.ts': MIXED }));
+  assert.equal(handBuilt.length, 1, JSON.stringify(handBuilt));
+});
+
+// A2: an undecorated class without a constructor injection token is a value object; Nest never builds it, a spec may use `new`.
+test('BE_SPEC_QUALITY: a value-object subject may be built with new, a decorated or token-injected subject may not', t => {
+  const spec = "import { CartService } from './cart.service';\nit('builds', () => { expect(new CartService(1, 2)).toBeDefined(); });\n";
+  const valueObject = 'export class CartService {\n  constructor(readonly from: number, readonly to: number) {}\n}\n';
+  assert.deepEqual(messages(run(t, spec, { 'src/modules/domain/cart/cart.service.ts': valueObject })), []);
+  const decorated = `declare function Injectable(): ClassDecorator;\n@Injectable()\n${valueObject}`;
+  assert.equal(messages(run(t, spec, { 'src/modules/domain/cart/cart.service.ts': decorated })).length, 1);
+  const tokened = "declare function Inject(token: string): ParameterDecorator;\nexport class CartService {\n  constructor(@Inject('FROM') readonly from: number) {}\n}\n";
+  assert.equal(messages(run(t, spec, { 'src/modules/domain/cart/cart.service.ts': tokened })).length, 1);
+});

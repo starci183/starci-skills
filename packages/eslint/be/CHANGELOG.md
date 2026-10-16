@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fixed (R281 `BE_SPEC_FORM_ALL_ROLES`, a18 NIVO request A): `spec-infra-double-from-kit` judges a function subject by the callable subset of the sibling's exports (constants, enums, `export ... from` re-exports and overload signatures no longer disable the check; overloads collapse to the implementation); a value-object subject (an undecorated class whose constructor parameters carry no injection token) may be built with `new` (`spec-no-new-subject`, `spec-builds-with-testing-module`, and `useValue: new Subject(...)` in `spec-infra-double-from-kit`) while a decorated or token-injected class stays mandatory; a member of a kit `mock<T>()` object (`mock<{ open: F }>().open`) counts as a kit double.
+
 ## 3.4.0 - 2026-10-15
 - Added: `module-definition-required` (R295 `BE_MODULE_DEFINITION_MISSING`, owner ruling 2026-10-15 `owner:module-definition-everywhere`): every `<x>.module.ts` of a feature, capability or projection has a sibling `<x>.module-definition.ts` and `<x>.options.ts`, its class extends the `ConfigurableModuleClass` of that definition, and a module of the product is listed in an `imports` array only as `X.register(...)`.
 - Changed: `capability-module-shape` judges the definition of every module: the representative module of a capability keeps `.setExtras({ isGlobal: false }, ...)` and the one `register` override; a sub-module, feature, transport module or cli group builds `.setClassMethodName("register").build()` and overrides nothing. A module definition in a feature is no longer refused.

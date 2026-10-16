@@ -5,7 +5,7 @@ import { constructorDependencies } from './constructor-deps.mjs';
 import { treeOf } from './required-files.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 import { importsOf } from '../../lib/ts-analysis.mjs';
-import { checkFunctionSubject, functionSubjectExports, keyOf as literalKey } from './function-spec-providers.mjs';
+import { checkFunctionSubject, functionSubjectExports, keyOf as literalKey, valueObjectSubjects } from './function-spec-providers.mjs';
 
 /**
  * R48 `unit-spec-providers` (BE_SPEC_QUALITY), the unit test standard's rule 3: the unit spec of a service builds its
@@ -17,7 +17,9 @@ import { checkFunctionSubject, functionSubjectExports, keyOf as literalKey } fro
  * the token that decorator's `injector<T>(TOKEN)` names; an undecorated parameter of a class type provides that class (see
  * constructor-deps.mjs). Providers are matched by the exported name of the imported binding (`import { CACHE as C }` is
  * CACHE), never by text. A provider is a class, or `{ provide: TOKEN, useValue: double }` and nothing else. A sibling
- * containing only exported functions instead provides its complete real function object and exercises it through module.get.
+ * containing only exported functions instead provides its complete real function object and exercises it through module.get;
+ * the constants, enums, re-exports and overload signatures beside those functions do not count. A value-object subject (an
+ * undecorated class whose constructor parameters carry no injection token) is built with `new`, Nest never constructs it.
  *
  * Findings: an extra provider, a missing provider, a service that is not the first provider, a dependency whose token cannot
  * be resolved, a spec with no createTestingModule providers array, and a provider that is neither a class nor
@@ -118,6 +120,7 @@ function checkServiceSpec({ config, graph, kit, ts, rel, violations }) {
   const serviceFile = graph.files.get(serviceRel);
   if (!serviceFile) { report(sourceFile, `${rel} has no ${path.posix.basename(serviceRel)} beside it; a service spec sits next to the service it tests.`); return true; }
   const modules = testingModules(ts, sourceFile);
+  if (!modules.length && valueObjectSubjects(ts, serviceFile.sourceFile)) return true;
   if (!modules.length) { report(sourceFile, `${rel} never calls Test.createTestingModule({ providers: [...] }); build the service from a testing module holding exactly its constructor dependencies.`); return true; }
   for (const call of modules) checkTestingModule({ ts, kit, rel, serviceRel, serviceFile, imports, call, report });
   return true;
