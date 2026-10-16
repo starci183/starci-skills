@@ -190,7 +190,7 @@ test("add table --fe stays database- and architecture-clean for every accepted t
   }
   const databaseIndex = fs.readFileSync(path.join(root, "be", "src", "modules", "platform", "database", "index.ts"), "utf8");
   assert.match(databaseIndex, /export \{ requireOwnedRow, sql \}/);
-  assert.match(databaseIndex, /export \{ InjectPrimaryEntityManager, PRIMARY_ENTITY_MANAGER \}/);
+  assert.match(databaseIndex, /export \{[^}]*\bInjectPrimaryEntityManager, PRIMARY_ENTITY_MANAGER\b[^}]*\} from "\.\/primary\.decorators"/);
 
   execFileSync("git", ["-c", "core.autocrlf=false", "add", "-A"], {
     cwd: root,

@@ -790,7 +790,9 @@ describe('starci app scaffold: the first tree', () => {
     const platform = read(root, 'be/apps/core/src/compose/platform.ts');
     assert.match(platform, /export const platformModules = \(options: CoreOptions\): Array<DynamicModule> => \[/);
     assert.match(platform, /DatabaseModule\.register\(\{[\s\S]*connections: \[\{ \.\.\.options\.database, entities: noteEntities, migrations: noteMigrations \}\]/);
-    assert.match(read(root, 'be/apps/cli/src/cli.options.ts'), /entities: noteEntities,\s*migrations: noteMigrations/);
+    // The cli app binds the same arrays in its own typed composition group (R265), not in cli.options.ts.
+    assert.match(read(root, 'be/apps/cli/src/compose/platform.ts'), /entities: noteEntities,\s*migrations: noteMigrations/);
+    assert.doesNotMatch(read(root, 'be/apps/cli/src/cli.options.ts'), /noteEntities|noteMigrations/);
     assert.match(read(root, 'be/apps/cli/src/main.ts'), /CommandFactory\.run\(/);
     assert.doesNotMatch(filesUnder(root).map(file => read(root, file)).join('\n'), /\{\{(project|app|appPascal|sonarGate)\}\}/i, 'no skeleton variable is left');
   });
