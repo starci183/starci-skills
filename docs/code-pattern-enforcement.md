@@ -291,3 +291,8 @@ the concern's canonical library and remove the dependency. The mixed app-root
 manifest excludes libraries owned by the back end; front-end workspace manifests
 remain subject to the full forbidden list. The lint rule also confines Supabase
 imports to the `modules/auth` boundary.
+
+
+### R156 kind isolation
+
+BE_KIND_ISOLATION rejects imports between backend features whose owner slots name different trigger kinds. Static imports, dynamic imports, re-exports and type-only imports all count. Imports within one owner and imports into shared modules pass in both editions.

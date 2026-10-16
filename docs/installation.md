@@ -205,3 +205,8 @@ for example, the commit hook invokes `npx starci app hygiene`.
 entry, including package-script wrappers. Use the owning `starci <group> <verb>` command in both editions.
 The dispatcher and tests' own process-spawn helpers are explicit exceptions; a test document containing a raw
 handler invocation remains checked. `starci runtime check --only cli-only-entry` reports the replacement command.
+
+
+### R198 CLI catalog drift
+
+RT_CLI_CATALOG_DRIFT means a generated CLI catalog, completion, or documentation file differs from the command catalog. Run `starci runtime gen-catalog --write` and review the generated outputs, then run `starci runtime gen-catalog --check`. The runtime self-check verifies these outputs in both editions.
