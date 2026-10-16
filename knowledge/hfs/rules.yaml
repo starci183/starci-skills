@@ -5086,20 +5086,23 @@ rules:
 
   - id: R280
     code: "HFS_UNUSED_SYMBOL"
-    law: "Every enum member, queue constant, error code and catalog key has a production consumer; an error's kind or message mapping and a test-only reference do not keep a dead symbol alive. Namespace imports consume the members actually read."
+    law: "Every enum member, queue constant, error code and catalog key has a production consumer; an error's kind or message mapping and a test-only reference do not keep a dead symbol alive. Namespace imports consume the members actually read. Keys the detector cannot see are declared with a reason in the side's i18n-dynamic-keys.yaml; a stale or malformed entry is itself a finding."
     kinds: [check]
     gates: [settle, land, ci]
     failureCodes: ["HFS_UNUSED_SYMBOL"]
     enforcers:
       - {kind: hfs, id: unused-symbol, at: scripts/hfs/rules/unused-symbol.mjs}
+      - {kind: hfs, id: unused-symbol-ledger, at: scripts/hfs/rules/unused-symbol-ledger.mjs}
     editions: [lite, full]
-    docs: [docs/quality-bar.md#r280]
+    docs: [docs/quality-bar.md#r280, docs/quality-bar.md#r280-ledger]
     exemplifiedBy:
       - {path: tests/hfs/hfs-unused-symbol.spec.mjs, editions: [lite, full], codes: [HFS_UNUSED_SYMBOL]}
+      - {path: tests/hfs/hfs-unused-symbol-ledger.spec.mjs, editions: [lite, full], codes: [HFS_UNUSED_SYMBOL]}
       - {path: packages/hfs/templates/be/skeleton/src/modules/domain/identity/errors/identity.error.ts, editions: [lite, full]}
       - {path: packages/hfs/templates/be/skeleton/src/modules/domain/identity/admission.policy.ts, editions: [lite, full]}
     proves:
       - {path: tests/hfs/hfs-unused-symbol.spec.mjs, editions: [lite, full], codes: [HFS_UNUSED_SYMBOL]}
+      - {path: tests/hfs/hfs-unused-symbol-ledger.spec.mjs, editions: [lite, full], codes: [HFS_UNUSED_SYMBOL]}
     witness:
       - {path: tests/hfs/hfs-unused-symbol.spec.mjs, editions: [lite, full], codes: [HFS_UNUSED_SYMBOL]}
 

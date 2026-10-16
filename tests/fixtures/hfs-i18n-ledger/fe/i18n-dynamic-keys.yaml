@@ -1,0 +1,5 @@
+schema: starci/i18n-dynamic-keys@1
+namespaces:
+  hiring:
+    - {key: applyWebsite, reason: "read through a wrapper hook the scanner cannot follow"}
+    - {prefix: weekday_, reason: "built as weekday_${n}"}
