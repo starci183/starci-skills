@@ -25,7 +25,7 @@ versioning:
 # overlays and `provider`, and `sides.<side>.reads` of an app-root tree) and the lite slots; an app without `edition` in its
 # hfs.json is edition full and every answer for it is unchanged.
 # 2.2.0 adds the declaration-only fe.modules.types.ambient owner.
-# 3.0.0 is a major (ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4)): lite is the full code structure deployed with Supabase backing services
+# 3.0.0 is a major (ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4)): lite is the full code structure deployed with Supabase backing services
 # and without e2e, and the front end is one standard for both editions (knowledge/hfs/fe-stack.yaml). The
 # front-end database slots and the Supabase realtime feature slot are removed (Supabase on the front end is auth only, realtime
 # is the socket.io gateway in both editions), fe.route holds pages, layouts and the one health/live route handler, and the slots
@@ -101,7 +101,7 @@ presenceValues: [required, optional, opt-in, forbidden]
 trackedValues: [tracked, ignored, external]
 testValues: [unit-beside, e2e, none]
 
-# The editions a repository declares in hfs.json `edition` (absent means full). ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite IS
+# The editions a repository declares in hfs.json `edition` (absent means full). ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite IS
 # the full architecture with Supabase backing services - the same monorepo, slots, CQRS shape and patterns (queue,
 # event bus, saga, reactors, projection, realtime, webhooks, fenced job), declared in hfs.json the same way, and the same unit
 # specs (unitRoles, logicRoles, 100 per file, @starci/jest-preset doubles, builders). What differs is ADAPTERS and DELIVERY, all
@@ -335,7 +335,7 @@ ruleParams:
     # Edition lite (ruleParams(manifest, 'be', 'lite') merges these keys over the base; a map merges one level deep): the schema
     # authority is the Supabase migration tree (supabase/migrations/*.sql, forward-only), so a lite back end holds no TypeORM
     # migration or entity under be/ (R34/R35 read schemaAuthority; be.persistence's lite overlay allows neither). The unit roles,
-    # logic roles and spec doubles are full's (owner ruling 2026-10-12, with the Work boundary amended by ruling:R212/case-4). infraOwners: the self-hosted libraries are owned nowhere -
+    # logic roles and spec doubles are full's (owner ruling 2026-10-12 (owner:lite-production-swarm), with the Work boundary amended by ruling:R212/case-4). infraOwners: the self-hosted libraries are owned nowhere -
     # platform/queue and platform/event-bus run Supabase Queues (pgmq) through the shared EntityManager, cache and locks are
     # Postgres (advisory locks or an unlogged table), and realtime is the same socket.io gateway as full, run inside the api
     # process with no Redis adapter (owner ruling 2026-10-13).
@@ -791,7 +791,7 @@ slots:
     exemplifiedBy:
       - packages/hfs/templates/app/skeleton-lite/supabase/
       - {path: tests/fixtures/hfs-callback-full/supabase/, edition: full}
-    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): Supabase is required in lite; full enables it only through a declared connection."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): Supabase is required in lite; full enables it only through a declared connection."
     # The one Supabase project directory, at the app root beside be/, fe/ and .starcistacks (never under a side).
     path: "supabase/"
     presence: opt-in              # enabled by a connection with provider: supabase; required under edition lite
@@ -806,7 +806,7 @@ slots:
     exemplifiedBy:
       - packages/hfs/templates/app/skeleton-lite/supabase/config.toml
       - {path: tests/fixtures/hfs-callback-full/supabase/config.toml, edition: full}
-    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite requires Supabase configuration; full requires it only when Supabase is declared."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite requires Supabase configuration; full requires it only when Supabase is declared."
     # The project configuration: auth keys are env(NAME) references, never literals (L08 judges its policy keys).
     path: "supabase/config.toml"
     presence: opt-in
@@ -821,7 +821,7 @@ slots:
     exemplifiedBy:
       - packages/hfs/templates/app/skeleton-lite/supabase/migrations/__timestamp___baseline.sql
       - {path: tests/fixtures/hfs-callback-full/supabase/migrations/20261014100000_baseline.sql, edition: full}
-    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite uses Supabase schema authority and requires a migration; full opts into that provider."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite uses Supabase schema authority and requires a migration; full opts into that provider."
     # The schema authority of an app on Supabase: forward-only SQL migrations named <timestamp14>_<kebab-name>.sql,
     # one file per change, immutable once on origin/main (L02-L08 judge them).
     path: "supabase/migrations/<stamp>_<name>.sql"
@@ -859,7 +859,7 @@ slots:
     templateNa: "Database row types are generated from the app's Supabase schema by contract:emit; a hand-authored scaffold template would invent the schema contract."
     exemplifiedBy:
       - {path: tests/fixtures/hfs-callback-full/supabase/types/database.types.ts, edition: full}
-    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite requires generated Supabase row types; full enables them with the provider."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite requires generated Supabase row types; full enables them with the provider."
     # The generated Database types (database.types.ts) contract:emit writes from the migrations; both sides read it
     # (sides.<side>.reads supabase/types/); drift against regeneration is L09.
     path: "supabase/types/database.types.ts"
@@ -923,7 +923,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    # Lite renders the same files (owner ruling 2026-10-12, with the Work boundary amended by ruling:R212/case-4): the unit run and its coverage are full's.
+    # Lite renders the same files (owner ruling 2026-10-12 (owner:lite-production-swarm), with the Work boundary amended by ruling:R212/case-4): the unit run and its coverage are full's.
     coverage: none
     managedBy: tool-config
     rules: [HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL, HFS_TS_STRICT]
@@ -1014,7 +1014,7 @@ slots:
       - packages/hfs/templates/be/image/cli/Dockerfile
       - {path: packages/hfs/templates/be/image/worker/Dockerfile, edition: full}
       - packages/hfs/templates/fe/image/next/Dockerfile
-    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite may host Next without its own image; back-end images stay required in both editions."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite may host Next without its own image; back-end images stay required in both editions."
     # One image per app: every declared app has its own Dockerfile (apps/<app>/Dockerfile), built from the APP ROOT (the folder with
     # the one package.json). It is app-owned (starci app scaffold writes it once from templates/<side>/image) and judged by the docker rules.
     # A Dockerfile anywhere else is owned by no slot.
@@ -1193,7 +1193,7 @@ slots:
   - id: be.app.cli
     since: 3.1.0
     profiles: [be]
-    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): Supabase CLI owns lite migrations; a lite cli app is optional for declared operator commands."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): Supabase CLI owns lite migrations; a lite cli app is optional for declared operator commands."
     # The ONE app of every one-off action (migrate, seed, sync, backup, any operator command): be/apps/cli, on nest-commander.
     # main.ts boots with CommandFactory.run (BE_CLI_BOOTSTRAP); app.module.ts composes the platform and the cli feature root
     # (src/features/cli/cli.module.ts); cli.env.ts exports CliEnv and readCliEnv(env: EnvSource): CliEnv, and cli.options.ts carries the env-derived values,
@@ -1387,7 +1387,7 @@ slots:
     profiles: [be]
     exemplifiedBy:
       - {path: tests/fixtures/hfs-lite-slots/be/src/features/realtime/order-status/, edition: lite}
-    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite runs socket.io in the api process, one instance without Redis; full may scale its gateway."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite runs socket.io in the api process, one instance without Redis; full may scale its gateway."
     path: "src/features/realtime/<channel>/"
     presence: opt-in              # a push channel: reads and pushes only (a socket gateway or a GraphQL subscription), no domain write
     pattern: realtime             # declaring the pattern (hfs.json sides.be.patterns) enables the kind (knowledge/patterns/be/realtime.yaml)
@@ -1408,10 +1408,10 @@ slots:
     since: 1.0.0
   - id: be.feature.realtime.graphql
     profiles: [be]
-    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite uses only the in-process socket.io gateway; the GraphQL subscription door remains full-only."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite uses only the in-process socket.io gateway; the GraphQL subscription door remains full-only."
     path: "src/features/realtime/<channel>/transport/graphql/"
     presence: opt-in              # a GraphQL subscription over graphql-ws
-    litePresence: forbidden       # ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite pushes through the api's in-process socket.io gateway
+    litePresence: forbidden       # ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite pushes through the api's in-process socket.io gateway
     pattern: realtime
     tracked: tracked
     tier: feature
@@ -1425,7 +1425,7 @@ slots:
     since: 1.0.0
   - id: be.feature.realtime.dto
     profiles: [be]
-    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): GraphQL subscription DTOs exist only with the full subscription door; lite uses socket.io contracts."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): GraphQL subscription DTOs exist only with the full subscription door; lite uses socket.io contracts."
     path: "src/features/realtime/<channel>/transport/graphql/dto/"
     presence: opt-in
     litePresence: forbidden       # the dto of the graphql door, which lite does not serve
@@ -1545,7 +1545,7 @@ slots:
   - id: be.persistence
     since: 3.1.0
     profiles: [be]
-    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): Supabase migrations own lite tables, with SQL and row types here; full keeps TypeORM entities and migrations here."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): Supabase migrations own lite tables, with SQL and row types here; full keeps TypeORM entities and migrations here."
     path: "src/modules/{domain,platform,projections}/<capability>/persistence/"
     # R178: the platform capabilities whose tables exist on EVERY connection that uses them (the event-bus outbox, the inbox of every service, the job table); their arrays may be
     # registered on several declared connections. Any other capability registers its arrays on exactly one (BE_SCHEMA_OWNER).
@@ -1593,7 +1593,7 @@ slots:
     profiles: [be]
     exemplifiedBy:
       - {path: tests/fixtures/hfs-lite-slots/be/src/modules/platform/event-bus/, edition: lite}
-    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite implements the event ports with outbox and pgmq; full uses its Kafka adapter."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite implements the event ports with outbox and pgmq; full uses its Kafka adapter."
     path: "src/modules/platform/event-bus/"
     presence: opt-in
     pattern: event-bus            # the ONE durable event transport: transactional outbox, relay, Kafka, inbox, retry and dead letter (knowledge/patterns/be/event-bus.yaml)
@@ -1614,7 +1614,7 @@ slots:
   - id: be.platform.queue
     since: 3.1.0
     profiles: [be]
-    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite implements queue ports with pgmq and pg_cron; full uses BullMQ and Redis."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite implements queue ports with pgmq and pg_cron; full uses BullMQ and Redis."
     path: "src/modules/platform/queue/"
     presence: opt-in
     pattern: queue                # the ONE BullMQ owner: the outbox relay into queues (jobId = outbox id) and job schedulers (knowledge/patterns/be/queues.yaml)
@@ -1719,7 +1719,7 @@ slots:
   - id: be.platform.jobs
     since: 3.1.0
     profiles: [be]
-    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite persists fenced claims in Supabase migrations and dispatches through pgmq; full uses TypeORM schema authority and its queue adapter."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite persists fenced claims in Supabase migrations and dispatches through pgmq; full uses TypeORM schema authority and its queue adapter."
     path: "src/modules/platform/jobs/"
     presence: opt-in
     pattern: fenced-job           # the ONE fencing primitive: the job entity, the claim that bumps the token, guarded writes (knowledge/patterns/be/jobs.yaml)
@@ -1736,7 +1736,7 @@ slots:
     profiles: [be]
     exemplifiedBy:
       - {path: tests/fixtures/hfs-lite-slots/be/src/modules/projections/order-summary/, edition: lite}
-    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite projection tables live in Supabase migrations; full keeps the TypeORM projection entity beside its projection."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite projection tables live in Supabase migrations; full keeps the TypeORM projection entity beside its projection."
     path: "src/modules/projections/<name>/"
     presence: opt-in
     pattern: projection           # a read model: only its projection writes its table; recompute is idempotent and replayable; readers use get*
@@ -1781,7 +1781,7 @@ slots:
     exemplifiedBy:
       - packages/hfs/templates/be/skeleton-lite/src/modules/integrations/supabase/
       - {path: tests/fixtures/hfs-callback-full/be/src/modules/integrations/supabase/, edition: full}
-    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite requires the Supabase Auth and Storage integration; full opts in through a connection."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite requires the Supabase Auth and Storage integration; full opts in through a connection."
     # The only be import of @supabase/* (L10): the Auth admin and Storage admin client, plus the JWKS-based verification of
     # the Supabase access token the guard chain reads (L16). The connection itself is ordinary Postgres (the shared
     # EntityManager of the declared connection); what lives here are the service calls no database role covers.
@@ -1807,7 +1807,7 @@ slots:
     profiles: [be]
     exemplifiedBy:
       - {path: tests/fixtures/hfs-lite-slots/be/src/tests/world/, edition: lite}
-    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite integration proofs use the local Supabase stack and network fakes; full also boots apps and self-hosted services."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite integration proofs use the local Supabase stack and network fakes; full also boots apps and self-hosted services."
     path: "src/tests/world/"
     presence: optional
     tracked: tracked
@@ -1884,7 +1884,7 @@ slots:
   - id: be.tests.integration
     since: 3.1.0
     profiles: [be]
-    editionWhy: "Lite integration specs use the local Supabase CLI stack without containers or toxiproxy (ruling:R212/case-1, amended by ruling:R212/case-2 and ruling:R212/case-4, with contracts allowed by owner:lite-contract-specs); R284 requires declared-pattern proofs there. Full additionally proves infrastructure outages through its world (R112)."
+    editionWhy: "Lite integration specs use the local Supabase CLI stack without containers or toxiproxy (ruling:R212/case-1, amended by ruling:R212/case-2 (owner:lite-production-swarm) and ruling:R212/case-4, with contracts allowed by owner:lite-contract-specs); R284 requires declared-pattern proofs there. Full additionally proves infrastructure outages through its world (R112)."
     path: "src/tests/integration/<capability>/*.integration-spec.ts"
     presence: optional
     tracked: tracked
@@ -1900,10 +1900,10 @@ slots:
   - id: be.tests.e2e
     since: 3.1.0
     profiles: [be]
-    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): full proves app flows through its e2e world; lite uses the R272 wiring proof and unit/integration specs."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): full proves app flows through its e2e world; lite uses the R272 wiring proof and unit/integration specs."
     path: "src/tests/e2e/<area>/*.e2e-spec.ts"
     presence: optional
-    litePresence: forbidden       # ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite has no e2e world
+    litePresence: forbidden       # ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite has no e2e world
     tracked: tracked
     tier: e2e
     tests: e2e
@@ -1965,7 +1965,7 @@ slots:
     presence: required
     tracked: tracked
     tier: route
-    # ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4) (lite = full): routes are thin and the front end serves no API - health/live is the one
+    # ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4) (lite = full): routes are thin and the front end serves no API - health/live is the one
     # route handler of this slot, the Supabase auth callback is fe.route.callback, and no file holds a Server Action
     # (FE_ROUTE_HANDLER_FORBIDDEN, FE_SERVER_ACTION_FORBIDDEN).
     allows: ["[locale]/**/{page,layout,template,loading,error,not-found,default}.tsx", "[locale]/providers.tsx",

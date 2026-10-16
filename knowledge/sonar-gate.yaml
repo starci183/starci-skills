@@ -82,7 +82,7 @@ overall:
     rule: typescript:S3776
     via: overall.issues
 # Lite is the same quality policy, coverage included: a lite back end keeps full's unit run and its 100 per file on the measured
-# logic files (owner ruling 2026-10-12, R212 case-1, with the Work boundary amended by ruling:R212/case-4). Readers select this block from hfs.json edition; the gate keeps its own
+# logic files (owner ruling 2026-10-12, R212 case-1 (owner:lite-production-swarm), with the Work boundary amended by ruling:R212/case-4). Readers select this block from hfs.json edition; the gate keeps its own
 # name so a lite project's server gate stays a separate object, and every threshold below equals full's.
 lite:
   gate:

@@ -70,7 +70,7 @@ test('every lite workflow is structurally valid and pins each action by SHA', ()
   }
 });
 
-test('lite managed workflow runs unit specs and uploads coverage without e2e, integration or browser jobs (ruling:R212/case-1, amended by ruling:R212/case-4)', () => {
+test('lite managed workflow runs unit specs and uploads coverage without e2e, integration or browser jobs (ruling:R212/case-1 (owner:lite-production-swarm), amended by ruling:R212/case-4)', () => {
   const ci = workflows['.github/workflows/ci.yml'];
   const dbTypes = ci.jobs['db-types'];
   assert.equal(ci.jobs.changes, undefined, 'no path-filter job: the tag run checks the database types unconditionally');

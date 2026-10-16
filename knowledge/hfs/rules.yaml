@@ -3269,7 +3269,7 @@ rules:
     witness:
       - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, edition: lite, codes: [BE_REALTIME_SHAPE]}
       - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, edition: full, codes: [BE_REALTIME_SHAPE]}
-    law: "A realtime file is the one door its role names: `<channel>.gateway.ts` holds one `@WebSocketGateway` class with `@SubscribeMessage` handlers and `<x>.subscription.ts` holds one `@Resolver` class with `@Subscription` operations, and neither carries a query, a mutation, a field resolver, a REST route or the other protocol. A lite app serves the same socket.io gateway from its api process and no graphql-ws subscription (R212 case-2, with the Work boundary amended by ruling:R212/case-4)."
+    law: "A realtime file is the one door its role names: `<channel>.gateway.ts` holds one `@WebSocketGateway` class with `@SubscribeMessage` handlers and `<x>.subscription.ts` holds one `@Resolver` class with `@Subscription` operations, and neither carries a query, a mutation, a field resolver, a REST route or the other protocol. A lite app serves the same socket.io gateway from its api process and no graphql-ws subscription (R212 case-2 (owner:lite-production-swarm), with the Work boundary amended by ruling:R212/case-4)."
     kinds: [lint]
     gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_REALTIME_SHAPE"]
@@ -4315,7 +4315,7 @@ rules:
       - {path: tests/hfs/frontend-boundary-coverage.spec.mjs, editions: [lite, full]}
     witness:
       - {path: tests/hfs/frontend-boundary-coverage.spec.mjs, editions: [lite, full], codes: [FE_SERVER_ACTION_FORBIDDEN, FE_ROUTE_HANDLER_FORBIDDEN]}
-    law: "The front end serves no API, in every app and edition (R212 case-2, with the Work boundary amended by ruling:R212/case-4): no file under `fe/` carries a `\"use server\"` directive (module or function level), and the only route handlers are `app/health/live/route.ts` and the auth callback of the `fe.route.callback` slot; reads and writes reach the back end through `modules/api` and the SWR hooks, and a webhook, cron, public API or third-party callback is a back-end feature."
+    law: "The front end serves no API, in every app and edition (R212 case-2 (owner:lite-production-swarm), with the Work boundary amended by ruling:R212/case-4): no file under `fe/` carries a `\"use server\"` directive (module or function level), and the only route handlers are `app/health/live/route.ts` and the auth callback of the `fe.route.callback` slot; reads and writes reach the back end through `modules/api` and the SWR hooks, and a webhook, cron, public API or third-party callback is a back-end feature."
     kinds: [check, lint]
     gates: [pre-commit, settle, land, ci]
     failureCodes: ["FE_SERVER_ACTION_FORBIDDEN", "FE_ROUTE_HANDLER_FORBIDDEN"]
@@ -5172,7 +5172,7 @@ rules:
     enforcers:
       - {kind: hfs, id: lite-proof-lane, at: scripts/hfs/rules/lite-proof-lane.mjs}
     editions: [lite]
-    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite has no e2e world and proves declared patterns in its integration lane; R284 owns only the lite lane code while full retains its existing pattern-proof rules."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite has no e2e world and proves declared patterns in its integration lane; R284 owns only the lite lane code while full retains its existing pattern-proof rules."
     docs: [docs/quality-bar.md#r284]
     templateNa: "Integration scenarios depend on the application patterns and providers; no universal runnable scenario lane is scaffolded."
     exemplifiedBy:
