@@ -18,7 +18,7 @@ export function queueProblem(state, code, file, message) {
   state.findings.push(found(code, file, `${file}: ${message}`));
 }
 
-function sourceValue(ts, node) {
+export function sourceValue(ts, node) {
   while (node && (ts.isAsExpression(node) || ts.isParenthesizedExpression(node) || ts.isSatisfiesExpression(node))) node = node.expression;
   return node;
 }

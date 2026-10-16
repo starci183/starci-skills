@@ -163,7 +163,7 @@ function templateValue(context, index, node, seen) {
   return node.quasis.map((part, position) => part.value.cooked + (values[position] ?? '')).join('');
 }
 
-function declareBindings(context, index, node) {
+export function declareBindings(context, index, node) {
   for (const declaration of node.declarations) bindPattern(context, index, declaration.id,
     { index: localScope(index), node: declaration.init });
 }

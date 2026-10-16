@@ -1,9 +1,10 @@
 // Trace the delivery parameter into command constructor arguments, rather than arbitrary reads.
 import { accessName, isConstVariable } from '../../lib/ts-ast.mjs';
+import { sourceValue } from './database-queue-sources.mjs';
 
 function unwrap(ts, node) {
-  while (node && (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isNonNullExpression(node))) node = node.expression;
-  return node;
+  const value = sourceValue(ts, node);
+  return value && ts.isNonNullExpression(value) ? unwrap(ts, value.expression) : value;
 }
 
 function resolve(ts, node, aliases, seen = new Set()) {
