@@ -43,3 +43,20 @@ for (const edition of ['lite', 'full']) {
     assert.deepEqual(await findings(), []);
   });
 }
+
+for (const edition of ['lite', 'full']) {
+  test(`${edition}: direct managed findings reject an override and accept the plain tool command`, async (context) => {
+    const { root, tracked } = synced(context, edition);
+    const relative = 'scripts/coverage-lint.mjs';
+    const file = path.join(root, relative);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    tracked.push(relative);
+    fs.writeFileSync(file, 'export const lint = "eslint src";\n');
+    assert.deepEqual(await managedFindings({ repoRoot: root, tracked, presets: PRESETS }), []);
+    fs.writeFileSync(file, 'export const lint = "eslint --config local.mjs src";\n');
+    assert.deepEqual((await managedFindings({ repoRoot: root, tracked, presets: PRESETS }))
+      .map((finding) => [finding.code, finding.path]), [['HFS_TOOL_CONFIG_LOCAL', relative]]);
+    fs.writeFileSync(file, 'export const lint = "eslint src";\n');
+    assert.deepEqual(await managedFindings({ repoRoot: root, tracked, presets: PRESETS }), []);
+  });
+}

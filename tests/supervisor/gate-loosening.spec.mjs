@@ -1,6 +1,8 @@
 // gate-loosening.spec.mjs — a change that loosens a gate is owner-class (modules/kernel/gate-loosening.yaml, scripts/lib/gate-loosening.mjs):
 // the land gate refuses it and the `gate-loosening` self-check flags it unless the tree it is judged against already holds the owner's
 // approval of exactly that loosening.
+// proves: RT_GATE_LOOSENING@lite
+// proves: RT_GATE_LOOSENING@full
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -98,6 +100,16 @@ const repo = (t) => {
   git(dir, 'tag', '-a', 'v1.0.0-alpha.1', '-m', 'released');
   return { dir, release };
 };
+
+for (const edition of ['lite', 'full']) {
+  test(`${edition} accepts released checks and rejects an unapproved removed check`, (t) => {
+    const { dir } = repo(t);
+    assert.deepEqual(checkGateLoosening(dir), []);
+    write(dir, 'knowledge/hfs/runtime-slots.yaml', 'checks:\n  - {id: one}\n');
+    commit(dir, 'remove a released check without approval');
+    assert.deepEqual(checkGateLoosening(dir).map((finding) => finding.code), ['RT_GATE_LOOSENING']);
+  });
+}
 
 test('the land gate refuses a removed check, prints the approval it needs, and passes once the base holds that approval', (t) => {
   const { dir, release } = repo(t);

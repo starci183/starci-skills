@@ -40,3 +40,18 @@ for (const edition of ['lite', 'full']) {
     assert.deepEqual(await findings(), []);
   });
 }
+
+// Direct checker calls also expose these real mutation cases to the coverage proof analysis.
+for (const edition of ['lite', 'full']) {
+  test(`${edition}: an edited managed formatter ignore file is invalid and restoring its render passes`, async context => {
+    const { root, tracked } = synced(context, edition);
+    const input = { repoRoot: root, tracked, presets: PRESETS };
+    const file = path.join(root, '.prettierignore');
+    const rendered = fs.readFileSync(file, 'utf8');
+    assert.deepEqual((await managedFindings(input)).map(finding => finding.code), []);
+    fs.writeFileSync(file, `${rendered}src/\n`);
+    assert.deepEqual((await managedFindings(input)).map(finding => finding.code), ['HFS_MANAGED_FILE_DRIFT']);
+    fs.writeFileSync(file, rendered);
+    assert.deepEqual((await managedFindings(input)).map(finding => finding.code), []);
+  });
+}

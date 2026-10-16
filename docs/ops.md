@@ -246,3 +246,15 @@ non-green decisions through `modules/kernel/driver-loop.yaml`
   - the Critic reached a path outside its directory: RIGHTS_CRITIC_REACH refusals of the command guard, logged with the terminal
 - Principles: P2 P3 P7 (modules/kernel/roles.yaml, principles).
 <!-- roles:end critic -->
+
+## Independent product judges (R242)
+
+<a id="r242"></a>
+
+`RT_OP_JUDGE_UNDECLARED` refuses an op contract whose `judge` list is absent,
+empty or inconsistent with the runtime's judgment tables. Each entry explains
+why its machine measure, Critic rubric, owner gate or reviewing next leg judges
+the product independently. The check compares declarations with
+`modules/kernel/op-judges.yaml`, the Critic coverage and applicable runtime gates;
+a maker-authored test or a report-only measure cannot be the sole product judge.
+The same runtime contract applies while working on lite and full apps.

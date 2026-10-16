@@ -98,3 +98,35 @@ Shipped, as checks and code:
 - R222 `RELEASE_NOTES`: a release tag needs its finished CHANGELOG section.
 - The release flow (`starci release cut`, `scripts/supervisor/release-cut.mjs`) is the only path that pushes a release tag, behind one lock function; it pushes main with a new
   annotated `v*` tag, refuses a non-release tag and a dirty tree, and runs L4 once. The pre-push hook of the runtime repository refuses every push of main or of a `v*` tag whose commit is not a release commit ([git governance](git-governance.md), rule 2): a push of the runtime main is a release.
+
+## R208
+
+`RT_PORT_RESTATED` reports a runtime port literal outside its owner, or a port repeated across runtime sources without one owner. Read the UI port through `ui/ports.mjs` and the Sonar host through its owning constant. A runtime reader references that owner instead of repeating its numeric value. Product stack declarations own their service ports and are outside this scan. Both editions share this runtime check.
+
+## R209
+
+`RT_CONFIG_DEFAULT_TWICE` reports a documented runtime configuration default repeated as a literal fallback outside its owner. Import the owner constant or call its accessor, including the owner-language accessor; do not derive a second default in a reader. Tests, generated copies, product templates and stories are outside this scan. Both editions share the same owner rules.
+
+## R210
+
+`RT_VERSION_RESTATED` reports a tracked reference that repeats a dependency's canon-pinned version near its package name. Refer to the pin in `knowledge/hfs/canon-pins.yaml`; package manifests and lockfiles are declared install and resolution sites. Refresher-owned `canon.version`, `provenance.version` and `identity.version` bindings are permitted. Both editions use this runtime check.
+
+## R211
+
+`RT_SLOT_ID_SHAPE` reports a malformed slot identifier or inconsistent suffix vocabulary in an authored slot manifest. Use lowercase kebab segments separated by dots, a declared prefix and an existing parent or shared family. App-kind identifiers name a declared kind. Keep live and banned suffixes disjoint, refuse undeclared synonym pairs and retain both members of a declared same-concept exception. The app and runtime manifests are checked for both editions.
+
+## R226
+
+`RT_SPEC_OVER_BUDGET` is an advisory information finding when an existing spec exceeds the duration record's limit. `RT_SPEC_BUDGET_STALE` is an error when a recorded spec path no longer exists. Keep the record current and reduce repeated setup without removing assertions or lengthening timeouts. A live spec exactly at its limit passes. Both editions share the runtime duration record and check.
+
+## R227
+
+`RT_SYNTAX_INVALID` reports each parser diagnostic in tracked `.mjs`, `.cjs` and `.js` authored source, with its file and line. Both editions use the same check. Generated roots, vendored build output and managed templates containing render tokens are excluded; clean authored JavaScript passes.
+
+## R228
+
+`RT_IDENTIFIER_UNDECLARED` reports runtime ES-module names without a declaration, import, parameter or permitted global in their enclosing scope. Restore the real binding after moving code; a re-export alone does not bind a local name. Browser globals are permitted only inside functions passed to page evaluation. Both editions use the same runtime module scan.
+
+## R229
+
+`RT_REMOVED_VOCABULARY` reports obsolete names taught by runtime instruction surfaces, including their file, line and replacement from the removed-name catalog. Update instructions to the replacement. Historical records and explicitly marked removed lists are exempt; specs may use an obsolete name when asserting its refusal. Both editions use the same catalog and scan.

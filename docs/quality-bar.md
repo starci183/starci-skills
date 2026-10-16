@@ -185,3 +185,40 @@ excluding none slots, specs and declared generated output. Its
 `coverage/lcov.info` report is distinct from a product's `be/coverage/lcov.info`.
 R247's coverage matrix concerns links across the standard, not a code-coverage
 percentage.
+
+<a id="r48"></a>
+### Behavioral spec quality
+
+`BE_SPEC_QUALITY` requires specs to assert results or persisted state with exact values. Build a unit subject through a providers-only `TestingModule`, obtain it from the module reference, and supply infrastructure doubles from the test kit. Avoid source-reading assertions, module mocks, constructing the subject directly, sleeps and model calls in end-to-end flows. Enter end-to-end scenarios through production transport and read the persisted effect back. Specs must run without skip, focus, todo or conditional runner selection; the test-world library alone may skip a contract sandbox when its configuration is absent.
+
+## R204 coverage scope
+
+`HFS_COVERAGE_SCOPE_DRIFT` means a managed coverage declaration differs from the
+scope derived from the slot manifest in lite or full. Keep `be/jest.config.js`,
+`codecov.yml` and `sonar.coverage.exclusions` at their rendered values; regenerate
+them with `starci app sync --write` instead of changing thresholds or exclusions.
+
+<a id="r235"></a>
+
+### Syntax smells
+
+`SCAN_SMELL` applies the same syntax policy in lite and full. The back-end and
+front-end lint canons reject sequential awaits inside bounded loops, UTF-16-only
+character helpers, avoidable backslash escaping, nested conditional expressions,
+unused imports, and imports used only for re-export. Use `Promise.all` for
+independent calls, code-point helpers, `String.raw`, named intermediate values,
+and direct `export ... from` declarations. `void` is reserved for discarded
+calls. Front-end components must read every member of their declared props type.
+The dedicated RuleTester specs exercise each published enforcer with passing
+and violating source in both editions; unit and end-to-end source specs retain
+the scan exclusion declared by the rule.
+
+<a id="r155"></a>
+### Declared pattern scenario proofs
+
+R155 reports `BE_PATTERN_SPEC_MISSING` when a back end declares a pattern in
+`hfs.json sides.be.patterns` but lacks a test titled `<pattern>/<scenario>: ...`
+for one of that pattern's required scenario ids in `ruleParams.be.patternScenarios`.
+Full accepts tracked e2e or integration specs under `be/src/tests`; lite requires
+runnable tests in tracked `be/src/tests/integration/*.integration-spec.ts` files,
+including nested folders. Adding the missing scenario proof clears the finding.

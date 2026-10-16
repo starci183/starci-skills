@@ -25,7 +25,23 @@ The code requirements apply equally to lite and full. The database requirements 
 - <a id="r290"></a> R290 `BE_PUBLIC_REASON_CLOSED`: in lite and full, `PublicReason` has exactly `Health`, `AuthHandshake`, `SignedWebhook` and `CatalogRead`. An API-key or tool-token route authenticates through its own guard; it cannot add a public reason to bypass authentication.
 - <a id="r295"></a> R295 `BE_MODULE_DEFINITION_MISSING`: every Nest module of the product has a module definition (owner:module-definition-everywhere), capabilities and sub-modules as well as features, transport modules and cli groups. A module `<x>` is three files: `<x>.module-definition.ts` (`export const { ConfigurableModuleClass, MODULE_OPTIONS_TOKEN, OPTIONS_TYPE } = new ConfigurableModuleBuilder<XOptions>().setClassMethodName("register").build()`), `<x>.options.ts` (`export type XOptions = Record<string, never>` with a one-line doc while it takes nothing) and `<x>.module.ts` (`@Module({ ... }) export class XModule extends ConfigurableModuleClass {}`). A capability's representative module keeps `.setExtras({ isGlobal: false }, ...)` and may override `register`; every other module declares only its `@Module` metadata. An `imports` array and an app composition group list a module only as `XModule.register({ ... })`. The `AppModule` of an app root and the test world are composition roots and are not judged. The lint rule `module-definition-required` and the architecture check `module-per-transport` judge it in lite and full.
 
+## App composition roles and budgets
+
+<a id="r245"></a>R245 `BE_APP_OPTIONS_COMPOSITION` keeps environment and options files free of module lists,
+queue registrations and scheduler composition in lite and full. Environment files parse typed configuration;
+options files declare values and port bindings. Move composition into `compose/<area>.ts` and spread its groups
+from `app.module.ts`. R289 requires `main.ts` to delegate parsing to the app's typed environment reader.
+
+<a id="r246"></a>R246 `BE_APP_COMPOSITION_BUDGET` applies the same absolute line limits in both editions:
+`main.ts` 80, `<app>.env.ts` 150, `<app>.options.ts` 200, `compose/<area>.ts` 120 and `app.module.ts` 250.
+A file exactly at its limit passes; one extra line fails. Move parsing into its environment reader or split
+an area's composition into another group when a file outgrows its role.
+
 ## One place for a service
+
+<a id="r163"></a>
+
+R163 `HFS_SERVICE_PLACEMENT` applies to lite and full: keep service Dockerfiles in `be/apps/<service>/` and share the repository's package manifest.
 
 Every back-end service is a Nest app at `be/apps/<service>/` (`main.ts`, `<service>.env.ts` for typed, fail-fast parsing,
 `<service>.options.ts` for env-derived values and port bindings, `app.module.ts`, its `compose/<area>.ts` groups, its `Dockerfile`).
@@ -45,6 +61,14 @@ Scheduled work is owned by the app's scheduler and queue, an enqueue-only pg_cro
 the CLI command. Production does not install host crontabs or host timers.
 
 ## Images
+
+<a id="r164"></a>
+
+R164 `HFS_IMAGE_UNPINNED` applies to every component of a product with multiple back-end services in either edition. Exact version tags and SHA-256 digests pass; moving image references fail.
+
+<a id="r165"></a>
+
+R165 `HFS_SERVICE_STACK_DECLARATION` requires every API and worker app of that product to have a component with the same name and `role: service`, in lite and full.
 
 `.starcistacks/application-stacks.yaml` declares every service as a component with `role: service` (`HFS_SERVICE_STACK_DECLARATION`,
 R165). Every `image` of a product with more than one service is pinned (`HFS_IMAGE_UNPINNED`, R164): a digest
@@ -85,6 +109,24 @@ export const CONSUMES = { order: { "order.placed": 1 } } as const
 snapshot does not declare, a version mismatch and an event that `compensates` an event no contract declares. A breaking change bumps the `version`; every consumer that has not
 followed fails the check.
 
+## Pinned event compatibility
+
+<a id="r177"></a>R177 `BE_CONTRACT_BREAKING` compares each service's `be/contracts/<service>/events.json`
+with its published `events.pin.json` in lite and full. Keep every pinned event, stream, version, payload field,
+type and optionality. Add optional fields or a new `<event>.v2` key beside the old event; removing a field or
+adding a required one breaks consumers already using the published contract. Pins are service-owned release snapshots.
+
+## Declared feature kinds
+
+<a id="r179"></a>R179 `BE_KIND_DECLARATION` requires `hfs.json` `sides.be.kinds` to equal the kinds
+present under `be/src/features/` in lite and full. Each used kind also declares its required patterns and tracks
+their platform capabilities. `starci app add` creates the first member and registers those dependencies; unused
+kind declarations, undeclared used kinds, missing patterns and missing capabilities fail the check.
+
+<a id="r180"></a>R180 `BE_KIND_EMPTY` requires a kind folder to contain instance folders with TypeScript
+source. A file directly under `be/src/features/<kind>/`, including `.gitkeep`, or a member containing only a
+README fails in either edition. Keep populated members such as `jobs/send/transport/queue/send.processor.ts`.
+
 ## Messages, idempotency, retries
 
 Asynchronous messages travel on the Kafka topics of `platform/event-bus`; the topic of an event is the events topic of its service. A
@@ -96,6 +138,12 @@ after an exponential backoff; a message that runs out of attempts stays in the d
 command reads it.
 
 ## Sagas and compensation
+
+<a id="r169"></a>R169 `BE_SAGA_STEP_COMPENSATION` requires matching steps and compensations and an orchestrator importing every pair in both editions.
+
+<a id="r170"></a>R170 `BE_SAGA_STATE_VERSIONED` requires an exported state type with `status` and a numeric `version`, and an orchestrator using the fenced `platform/saga` store in both editions.
+
+<a id="r171"></a>R171 `BE_SAGA_EVENT_CONTRACT` requires literal step and compensation events in vendored contracts, with the compensation declaring the forward event it undoes in both editions.
 
 <a id="r173"></a>
 
@@ -127,6 +175,38 @@ invoice; when the invoice is above the limit `billing.invoice-rejected` (which c
 cancel the order and release its stock, and `billing.invoice-issued` completes the run. The e2e spec
 `order/invoice-rejected` also cuts the order database while the rejection is delivered and proves the compensation resumes on the retry.
 
+## Webhook and realtime doors
+
+<a id="r182"></a>
+
+`BE_WEBHOOK_SHAPE` (R182) keeps a provider's webhook HTTP file to one signed POST intake and an optional signed GET
+challenge. The POST performs proof and one domain intake without branching or returning domain data; it returns empty or
+the feature's declared literal `PROVIDER_ACK`. The GET echoes only its declared verifier result. Command dispatch belongs
+after the durable receipt commits, in a reactor or job.
+
+<a id="r183"></a>
+
+`BE_WEBHOOK_UNVERIFIED` (R183) requires the first handler statement to complete the shared signature proof or declared domain
+verifier, awaiting an async proof. An intake, a data read or argument evaluation that performs work before proof is refused.
+The same ordering applies to a GET subscription challenge.
+
+<a id="r184"></a>
+
+`BE_REALTIME_SHAPE` (R184) requires one socket gateway or one GraphQL subscription resolver in the matching file role, with
+only that protocol's subscription operations or authenticated server push streams. API queries, mutations and REST routes
+belong in API features. Lite serves the socket.io gateway in its API process; GraphQL subscriptions belong to full.
+
+<a id="r185"></a>
+
+`BE_REALTIME_WRITES` (R185) permits a realtime door to inject only the platform `RealtimeHub`. Domain services, buses,
+repositories and queues stay outside the door; reactors feed the hub after their own work commits.
+
+<a id="r186"></a>
+
+`BE_REALTIME_TOPIC_SCOPE` (R186) requires every hub subscription topic to use the handler's authenticated
+`@CurrentPrincipal()` parameter, or the platform `Principal` supplied to a server push stream. A constant or client-only topic
+does not establish the subscriber's ownership. These webhook and realtime boundaries apply in both editions.
+
 ## Specs
 
 <a id="r167"></a>
@@ -144,3 +224,85 @@ Supabase CLI stack; it has no e2e world.
 `order.placed`, records an invoice, announces a rejection) and `migrate`; the order service also consumes `billing.invoice-rejected`, the compensating
 step of its saga. Its e2e specs `billing/order-placed` and `order/invoice-rejected` prove the asynchronous path, the redelivery and
 the compensation on the real stack; `integration/messaging` proves the queue adapter against Redis.
+
+## Backend implementation safety
+
+These backend rules apply to both lite and full.
+
+- <a id="r68"></a>R68 `BE_SQL_INTERPOLATED`: SQL values use numbered parameters. SQL text is never built from runtime values by interpolation or concatenation; the `sql` tag permits only checked `SqlIdent` substitutions for identifiers.
+- <a id="r69"></a>R69 `BE_QUERY_UNBOUNDED`: reads that can return many rows state a visible bound or use cursor pagination. EntityManager list reads supply `take`; replace unbounded `findBy` and `findAndCountBy` calls with bounded options.
+- <a id="r70"></a>R70 `BE_HTTP_TIMEOUT`: outbound fetch calls supply an abort signal, and axios or HttpService request configuration states a timeout or signal. An axios client created with `axios.create` also declares its deadline.
+- <a id="r71"></a>R71 `BE_LOG_SECRET`: Logger arguments exclude `Secret` and `Pii` values and raw credential or personal identifier fields. Log an id, count or masked value. Constructed errors also exclude secret values and credential text.
+- <a id="r72"></a>R72 `BE_TYPE_ESCAPE`: use typed call signatures and ordinary callbacks instead of the global `Function` type, `eval` or the `Function` constructor. The managed TypeScript rules also reject explicit `any`, non-null assertions and type assertions other than `as const`, including in specs.
+- <a id="r73"></a>R73 `BE_ASYNC_NO_AWAIT`: an async implementation awaits work; otherwise remove `async`. The enforcer retains the declared Promise contract exemptions for framework lifecycle and interface methods.
+- <a id="r74"></a>R74 `BE_MIGRATION_REVERSIBLE`: a TypeORM migration with `up()` declares a meaningful `down()` that reverses the change. An absent or empty body, or a body that only throws, does not provide a reversal.
+- <a id="r75"></a>R75 `BE_RETURN_TYPE`: handlers and public methods of Injectable, Resolver and Controller classes declare their return type. Keep the result contract visible at the method boundary.
+- <a id="r76"></a>R76 `BE_JSON_PARSE_UNGUARDED`: put `JSON.parse` inside a try block in the same function and return a typed failure outcome when parsing fails. A surrounding function, catch block or finally block does not guard a parse in its own right.
+- <a id="r77"></a>R77 `BE_QUERY_IN_LOOP`: batch shared EntityManager reads before iterating, using the collected keys. Do not repeat a database read for each element of a loop or collection callback.
+- <a id="r78"></a>R78 `BE_USER_COPY_LITERAL`: exception messages, notification text and response copy come from the capability messages catalog through the typed `MessageCatalog` port. Select a catalog entry instead of embedding user-facing text in source.
+- <a id="r79"></a>R79 `BE_AMBIENT_CLOCK`: read time through the injected `Clock` port and use `FakeClock` in specs. Ambient `Date.now`, bare `new Date()`, `performance.now`, `process.hrtime` and `Temporal.Now` belong only in the platform clock implementation.
+- <a id="r80"></a>R80 `BE_INBOX_DEDUPE_MISSING`: a delivery service claims the stable event id through the shared Inbox before other awaited work and returns early on a false claim. A receipt transaction claims first, records the receipt and writes its typed outbox event; processing and command dispatch follow commit.
+- <a id="r81"></a>R81 `BE_HAND_ROLLED_RETRY`: use the shared platform retry helper for an operation that catches a failure, waits and tries again. Keep application loops free of handwritten retry scheduling.
+- <a id="r82"></a>R82 `BE_TRANSACTION_EXTERNAL_CALL`: a transaction contains database work and same-transaction outbox publication. Commit before making external HTTP or other network calls, or record an outbox message for later delivery.
+- <a id="r83"></a>R83 `BE_UNNAMED_DATA_ACCESS`: inject a declared connection through its named EntityManager injector and call that manager directly. Repository injection or wrapper classes, eager relations, unnamed entity tables and use of the outer manager inside a transaction are rejected. Keep DataSource and QueryRunner ownership within the permitted platform database, CLI and test-world surfaces.
+
+
+## Back-end ownership checks
+
+<a id="r40"></a>
+### Logging
+
+`BE_LOGGER_REQUIRED` requires the platform logging port and an accounted catch: handle the failure, rethrow it, or record it with its cause. Keep log event identity stable, put changing values in structured fields, and avoid framework loggers, interpolated messages and error wording used as event identity.
+
+<a id="r41"></a>
+### Default deny
+
+`BE_DEFAULT_DENY` requires the app's default-deny `APP_GUARD`, explicit reasons for public doors, typed request bodies and timing-safe credential comparisons. Authentication belongs to the app guard chain rather than route-level `UseGuards` declarations.
+
+<a id="r42"></a>
+### Bounded input
+
+`BE_INPUT_BOUNDED` requires input DTO fields to declare bounds appropriate to their types. Use cursor pagination instead of offsets, and give authentication handshakes and signed webhook doors their strict rate tier.
+
+<a id="r43"></a>
+### Configuration ownership
+
+`BE_CONFIG_OWNER` confines environment reads and parsing to their declared configuration, boot and test-world owners. Parse configuration at boot and pass typed options into capabilities instead of reading the environment from a service.
+
+<a id="r44"></a>
+### Required secrets
+
+`BE_SECRET_DEFAULT` refuses default arguments and fallback values for secrets and infrastructure URLs supplied by the configuration owner. Read the required value through `EnvSource` without a default so its absence stops boot and identifies the missing key.
+
+<a id="r45"></a>
+### Module composition
+
+`BE_MODULE_SHAPE` requires owned capability and transport modules, typed module definitions and static registration. Keep global scope decisions at the app root, avoid cross-owner module imports and register each capability once. `BE_MODULE_HANDLER_REGISTRATION` requires transport handlers to be registered in their owning module, and `BE_MODULE_PROVIDER_REREGISTRATION` refuses registering a provider again outside its owner.
+
+<a id="r46"></a>
+### Owned background work
+
+`BE_BACKGROUND_UNOWNED` requires every sweep, retry or outbox to have a job or consumer composed by an app. Keep the work in its owning service or compose a worker app when it needs independent scaling.
+
+## Bounded contexts
+
+<a id="bounded-context-coverage"></a>
+
+Both lite and full identify a bounded context by its declared database connection.
+`BE_CONTEXT_OWNER` (R174) refuses app composition or imports of another app's context;
+CLI and migration apps compose every declared connection.
+`BE_CONTEXT_COUPLING` (R175) refuses cross-context capability imports, entity relations
+and migration foreign keys; connect contexts through events and store foreign IDs as plain columns.
+`BE_CONTEXT_TRANSACTION` (R176) keeps each transaction on one connection and refuses
+manager use or capability calls into another context; a saga coordinates their separate transactions.
+`BE_CONTEXT_PLATFORM_TABLES` (R178) requires a per-connection platform capability's
+entities and migrations on every connection whose manager its calls receive.
+
+## SQL returning rows
+
+<a id="r181"></a>
+
+In lite and full, `BE_SQL_RETURNING_SHAPE` refuses a bare `UPDATE ... RETURNING` or `DELETE ... RETURNING` in a capability's
+persistence SQL constant: `EntityManager.query` returns `[rows, affectedCount]` for those statements. Wrap the write in
+`WITH changed AS (UPDATE ... RETURNING ...) SELECT ... FROM changed` to return rows instead. The same wrapper applies to a
+deleting CTE; `INSERT ... RETURNING` and writes without `RETURNING` remain valid.
