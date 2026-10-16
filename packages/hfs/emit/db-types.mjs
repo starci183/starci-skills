@@ -77,7 +77,7 @@ const firstLine = (text) => String(text ?? '').split(/\r?\n/).map((line) => line
 const START_TAIL_LINES = 12;
 const START_LINE_CHARS = 300;
 /** The last lines (bounded) of a failed `supabase start`: its cause (42501 permission denied to alter role) sits after the first progress lines, so the first line alone hid it. */
-export const startDetail = (started) => {
+const startDetail = (started) => {
   const text = [started?.stderr, started?.stdout, started?.error?.message ?? started?.error].map((part) => String(part ?? '')).find((part) => part.trim()) ?? '';
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => (line.length > START_LINE_CHARS ? `${line.slice(0, START_LINE_CHARS)}...` : line));
   return lines.length ? lines.slice(-START_TAIL_LINES).join(' | ') : 'no output';
