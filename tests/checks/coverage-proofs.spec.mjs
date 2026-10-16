@@ -239,3 +239,44 @@ for (const edition of ['lite', 'full']) for (const [name, implementation] of che
     assert.match(coverageProofFindings(context, context.rule, CODE, edition)[0]?.message, /eslint-be:other/);
   });
 }
+
+for (const edition of EDITIONS) {
+  test(`ignores comment-only additional source owners for ${edition}`, () => {
+    const context = fixture(`for (const edition of ['lite', 'full']) test('cases', () => { ${sourceChecks} });`);
+    const commentOnly = 'scripts/checks/comment-only.mjs';
+    context.rule.enforcers.push({ kind: 'runtime', id: 'comment-only', at: commentOnly });
+    for (const comment of [`// ${CODE}`, `/* ${CODE} */`]) {
+      context.files.set(commentOnly, comment + '\nexport function unrelated() { return []; }');
+      assert.deepEqual(coverageProofFindings(context, context.rule, CODE, edition), []);
+    }
+  });
+
+  test(`refuses a comment-only checker proof for ${edition}`, () => {
+    const context = fixture(`for (const edition of ['lite', 'full']) test('cases', () => { ${sourceChecks} });`);
+    context.files.set(ENFORCER, `// ${CODE}\nexport function sample() { return []; }`);
+    assert.equal(coverageProofFindings(context, context.rule, CODE, edition)[0]?.code, 'RT_COVERAGE_PROOF_VACUOUS');
+    assert.equal(claimedSpecProof(context, SPEC, CODE, edition), false);
+  });
+
+  test(`recognizes static diagnostic text in template literals for ${edition}`, () => {
+    const context = fixture(`for (const edition of ['lite', 'full']) test('cases', () => { ${sourceChecks} });`);
+    const tick = String.fromCodePoint(96);
+    for (const diagnostic of [CODE, '${invalid}: [' + CODE + ']']) {
+      context.files.set(ENFORCER, 'export function sample(invalid) { return invalid ? [{code: '
+        + tick + diagnostic + tick + '}] : []; }');
+      assert.deepEqual(coverageProofFindings(context, context.rule, CODE, edition), []);
+      assert.equal(claimedSpecProof(context, SPEC, CODE, edition), true);
+    }
+  });
+
+  test(`refuses discarded template diagnostic results for ${edition}`, () => {
+    const context = fixture(`const scan = invalid => { sample(invalid); return []; };
+for (const edition of ['lite', 'full']) test('cases', () => {
+assert.deepEqual(scan(true), ['${CODE}']); assert.deepEqual(scan(false), []); });`);
+    const tick = String.fromCodePoint(96);
+    context.files.set(ENFORCER, 'export function sample(invalid) { return invalid ? [{code: '
+      + tick + CODE + tick + '}] : []; }');
+    assert.equal(coverageProofFindings(context, context.rule, CODE, edition)[0]?.code, 'RT_COVERAGE_PROOF_VACUOUS');
+    assert.equal(claimedSpecProof(context, SPEC, CODE, edition), false);
+  });
+}

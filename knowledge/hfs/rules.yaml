@@ -179,10 +179,21 @@ rules:
     enforcers:
       - {kind: machine, id: e2e-in-automatic-gate, at: scripts/hfs/architecture/hfs.mjs}
   - id: R13
+    editions: [lite, full]
+    docs: [docs/hfs-legacy-tooling.md#ci-and-hooks]
+    proves: [tests/hfs/hfs-pipeline-example.spec.mjs, tests/hfs-proofs/hfs-hooks-path-redirected.spec.mjs]
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/ci-workflows-lite, edition: lite}
+      - {path: packages/hfs/templates/app/ci-workflows, edition: full}
+      - {path: tests/hfs/hfs-pipeline-example.spec.mjs, editions: [lite, full]}
+      - {path: tests/hfs-proofs/hfs-hooks-path-redirected.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs/hfs-pipeline-example.spec.mjs, editions: [lite, full], codes: [HFS_CI_MISSING_CANON]}
+      - {path: tests/hfs-proofs/hfs-hooks-path-redirected.spec.mjs, editions: [lite, full], codes: [HFS_HOOKS_PATH_REDIRECTED]}
     code: "HFS_CI_MISSING_CANON"
     law: "CI runs the pinned `starci app lint` (`npm run lint`), and a clone never redirects `core.hooksPath` away from husky."
     kinds: [check, codemod]
-    gates: [pre-push, land, ci]
+    gates: [land, ci]
     failureCodes: ["HFS_CI_MISSING_CANON", "HFS_HOOKS_PATH_REDIRECTED"]
     enforcers:
       - {kind: machine, id: hooks-path-not-redirected, at: scripts/hfs/architecture/hfs.mjs}
@@ -2222,11 +2233,19 @@ rules:
       - {path: tests/hfs-runtime-rules/legacy-shape-coverage.spec.mjs, edition: lite, codes: ["RT_SOURCE_NAME"]}
       - {path: tests/hfs-runtime-rules/legacy-shape-coverage.spec.mjs, edition: full, codes: ["RT_SOURCE_NAME"]}
   - id: R121
+    editions: [lite, full]
+    docs: [docs/legacy-runtime-state.md#generated-runtime-output]
+    templateNa: "Generated runtime copies and the tracked runtime repository are not application scaffold surfaces."
+    proves: [tests/hfs-runtime-rules/generated-state-coverage.spec.mjs]
+    exemplifiedBy:
+      - {path: tests/hfs-runtime-rules/generated-state-coverage.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-runtime-rules/generated-state-coverage.spec.mjs, editions: [lite, full], codes: [RT_GENERATED_DRIFT, GENERATED_UNTRACKED]}
     code: "RT_GENERATED_DRIFT"
     law: "A generated root of ruleParams.runtime.generated is git-ignored output of its declared generatedBy: the repo's check regenerates every root, the runtime copies (packages/hfs/runtime, packages/eslint/be/runtime, packages/eslint/fe/runtime) are judged equal to what scripts/hfs/sync-runtime.mjs writes from the single source, and no git-tracked path lies under a generated root."
     scope: runtime
     kinds: [check, codemod]
-    gates: [land, runtime]
+    gates: [runtime]
     failureCodes: ["RT_GENERATED_DRIFT", "GENERATED_UNTRACKED"]
     enforcers:
       - {kind: runtime, id: generated-drift, at: scripts/hfs/sync-runtime.mjs}
@@ -3455,10 +3474,30 @@ rules:
     witness:
       - {path: tests/hfs-proofs/runtime-source-checks.spec.mjs, editions: [lite, full], codes: [RT_SLOT_ID_SHAPE]}
   - id: R212
+    editions: [lite, full]
+    codeEditions: {HFS_EDITION_FORBIDDEN_PRESENT: [lite], HFS_STARCIWORK_LITE_FORBIDDEN: [lite]}
+    editionWhy: "R212/case-3 and R212/case-4 preserve full Work and limit the lite infrastructure and Work surfaces."
+    docs: [docs/lite-edition.md#edition-validation]
+    templateNa: "The hfs.json edition declaration is generated programmatically by packages/hfs/scaffold/app.mjs; no managed declaration template exists. Forbidden paths are rejected rather than scaffolded."
+    proves:
+      - tests/hfs-proofs/hfs-edition-invalid.spec.mjs
+      - tests/hfs-proofs/hfs-edition-forbidden-present.spec.mjs
+      - tests/hfs-proofs/hfs-starciwork-lite-forbidden.spec.mjs
+      - tests/hfs-proofs/hfs-work-boundary-coverage.spec.mjs
+    exemplifiedBy:
+      - {path: tests/hfs-proofs/hfs-edition-invalid.spec.mjs, editions: [lite, full]}
+      - {path: tests/hfs-proofs/hfs-edition-forbidden-present.spec.mjs, edition: lite}
+      - {path: tests/hfs-proofs/hfs-starciwork-lite-forbidden.spec.mjs, edition: lite}
+      - {path: tests/hfs-proofs/hfs-work-boundary-coverage.spec.mjs, edition: lite}
+    witness:
+      - {path: tests/hfs-proofs/hfs-edition-invalid.spec.mjs, editions: [lite, full], codes: [HFS_EDITION_INVALID]}
+      - {path: tests/hfs-proofs/hfs-edition-forbidden-present.spec.mjs, edition: lite, codes: [HFS_EDITION_FORBIDDEN_PRESENT]}
+      - {path: tests/hfs-proofs/hfs-starciwork-lite-forbidden.spec.mjs, edition: lite, codes: [HFS_STARCIWORK_LITE_FORBIDDEN]}
+      - {path: tests/hfs-proofs/hfs-work-boundary-coverage.spec.mjs, edition: lite, codes: [HFS_STARCIWORK_LITE_FORBIDDEN]}
     code: "HFS_EDITION_INVALID"
     law: "hfs.json names an edition the manifest knows (full, or lite; absent means full). Lite follows the 2026-10-13 ruling: the same monorepo, code structure, slots, patterns and back-end unit specs, with only backing infrastructure swapped for managed Supabase (Postgres, Auth, Storage, Supabase Queues/pgmq for queue and event bus, Postgres locks, pg_cron); the api and sidecars run on docker-swarm on a VPS. The realtime pattern uses the same socket.io gateway inside the be api process (one instance, no Redis adapter), and both editions share knowledge/hfs/fe-stack.yaml. Lite requires application-stacks.yaml and permits environment metadata, runbooks, infra/swarm and encrypted-secret custody, while refusing infra/compose, infra/k8s, infra/terraform and components duplicating Supabase backing services (runtime/{config,env}, seeds and the sealed secrets of its environments are allowed). Contract specs and `test:contract` are allowed (owner 2026-10-14); it has no e2e spec, `test:e2e`, `test:stack` or `test:browser` script, e2e workflow, browser journey, Work catalog, shell, features, resources, UAT or br records, test container, toxiproxy, browser-runner, BullMQ, Kafka, Redis or graphql-ws dependency, or supabase/functions. Its .starciwork is optional and admits only .gitignore, workspace.yaml and brand/**; workspace.yaml is optional and carries project identity and repo roles for the Work tools."
     kinds: [check]
-    gates: [pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["HFS_EDITION_INVALID", "HFS_EDITION_FORBIDDEN_PRESENT", "HFS_STARCIWORK_LITE_FORBIDDEN"]
     enforcers:
       - {kind: hfs, id: edition, at: scripts/hfs/rules/edition.mjs}

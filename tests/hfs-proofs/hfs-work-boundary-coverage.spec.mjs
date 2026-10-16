@@ -1,3 +1,4 @@
+// proves: HFS_STARCIWORK_LITE_FORBIDDEN@lite
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

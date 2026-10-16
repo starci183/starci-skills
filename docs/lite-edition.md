@@ -194,3 +194,7 @@ Both editions give Supabase one owner per side. `FE_SUPABASE_CLIENT_OWNER` refus
 ## R219
 
 `BE_SUPABASE_JWT_VERIFIED` applies in both editions. The Supabase integration verifies access tokens with the project's remote JWKS, issuer, authenticated audience and pinned algorithms before accepting a principal. Unverified decoding, authorization claims from the request body and verification outside the integration are refused.
+
+## Edition validation
+
+`HFS_EDITION_INVALID` rejects an unknown hfs.json edition in both lite and full contexts; select `lite` or `full` (omitting it defaults to full). In lite, `HFS_EDITION_FORBIDDEN_PRESENT` rejects infrastructure and test surfaces excluded by the edition, and `HFS_STARCIWORK_LITE_FORBIDDEN` rejects Work content beyond .gitignore, workspace.yaml and brand/. Remove the forbidden surface; full retains its complete Work and test infrastructure.

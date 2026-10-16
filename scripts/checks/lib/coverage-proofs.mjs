@@ -1,7 +1,7 @@
 // A proves header is a claim; reachable checker results and nonempty test cases substantiate it.
 import { enforcerJudgedInEdition } from '../../hfs/edition-slots.mjs';
 import { evidenceFiles, evidenceInEdition } from './coverage-inventory.mjs';
-import { astChildren, expressionReach, nodeName, resolvedExpression, sourceIndex } from './coverage-ast.mjs';
+import { astChildren, astNodes, expressionReach, nodeName, resolvedExpression, sourceIndex } from './coverage-ast.mjs';
 import { lintEnforcersForCode, registeredLintRules } from './coverage-routing.mjs';
 import { bindPattern, evaluate, invocation, localScope, scopedWalk, UNKNOWN } from './coverage-evaluation.mjs';
 import { resultReach, returnedExpressions } from './coverage-results.mjs';
@@ -73,7 +73,10 @@ function nodeContainsCode(context, file, nodes, code, reached) {
     || !source.tree;
 }
 
-const codeLiteral = (node, code) => node?.type === 'Literal' && typeof node.value === 'string' && node.value.includes(code);
+function codeLiteral(node, code) {
+  if (node?.type === 'Literal') return typeof node.value === 'string' && node.value.includes(code);
+  return node?.type === 'TemplateLiteral' && node.quasis.some((part) => part.value.cooked?.includes(code));
+}
 
 function importedCode(context, index, node, code, reached) {
   if (node.type !== 'Identifier' || !index.imports.has(node.name)) return false;
@@ -253,9 +256,24 @@ function helperIsUsed(context, file, ref, edition) {
     [...expressionReach(context, index, test.node).keys()].some((target) => helpers.has(target)));
 }
 
+function sourceOwnsCode(context, file, code) {
+  const index = sourceIndex(context, file);
+  // Keep conservative ownership for declarative sources outside the JS parser.
+  if (!index.tree) return index.text.includes(code);
+  if (astNodes(index.tree).some((node) => codeLiteral(node, code))) return true;
+  // Delegating wrappers still need proof that they consume the checker's findings.
+  return [...index.exports.values()].some((expression) => {
+    const target = resolvedExpression(context, index, expression);
+    return ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(target.node?.type)
+      && (functionReturnsCode(context, target, code)
+        || [...expressionReach(context, target.index, target.node).values()]
+          .some((nodes) => nodes.some((node) => codeLiteral(node, code))));
+  });
+}
+
 function activeSourceEnforcers(context, rule, code, edition) {
   return (rule.enforcers ?? []).filter((entry) => sourceFamilies.has(entry.kind) && !entry.planned && entry.status !== 'planned'
-    && entry.at && context.files.has(entry.at) && String(context.files.get(entry.at)).includes(code)
+    && entry.at && context.files.has(entry.at) && sourceOwnsCode(context, entry.at, code)
     && enforcerJudgedInEdition(context.catalog.rules, entry.kind, entry.id, edition));
 }
 
