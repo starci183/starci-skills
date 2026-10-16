@@ -1081,6 +1081,21 @@ rules:
       - {kind: eslint-fe, id: hooks-folder-holds-hooks-only}
       - {kind: eslint-fe, id: hooks-are-hooks}
       - {kind: eslint-fe, id: hook-location}
+    editions: [lite, full]
+    docs: [docs/architecture.md#r56]
+    proves:
+      - {path: packages/eslint/fe/r56-redux-hooks.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/fe/hooks-folder.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/fe/r56-r92-graph-coverage.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/fe/skeleton/apps/__app__/src/hooks/auth/useSession.ts, editions: [lite, full]}
+      - {path: packages/eslint/fe/r56-redux-hooks.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/fe/hooks-folder.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/fe/r56-r92-graph-coverage.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: packages/eslint/fe/r56-redux-hooks.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/fe/hooks-folder.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/fe/r56-r92-graph-coverage.spec.mjs, editions: [lite, full]}
   - id: R57
     code: "FE_OWNER_REACHABLE"
     editions: [lite, full]
@@ -1750,7 +1765,7 @@ rules:
     code: "FE_COMPONENT_API"
     law: "A component exposes the canon surface: typed named props and slots, an exact sibling XBase presentational twin for every connected block, status through the slot view, no className or CSS doors, no resting twin or placeholder prop, class names in the colocated file; a pure component reaches no hook, router, locale or API, but may render a list of blocks supplied through render props without importing blocks or owning their data."
     kinds: [lint, design]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["FE_COMPONENT_API", "FE_COMPONENT_WORLD_OWNERSHIP", "FE_WORLD_OWNER_RENDER_BOUNDARY", "FE_CONNECTED_BLOCK_RENDER_PAIR", "FE_PURE_REACHES_DATA", "FE_PURE_WORLD_HOOK", "FE_PURE_WORLD_IMPORT"]
     enforcers:
       - {kind: eslint-fe, id: no-inline-parameter-type}
@@ -1772,6 +1787,21 @@ rules:
       - {kind: eslint-fe, id: class-names-in-colocated-file}
       - {kind: eslint-fe, id: cn-arguments-are-single-tokens}
       - {kind: eslint-fe, id: component-purity}
+    editions: [lite, full]
+    docs: [docs/architecture.md#r92]
+    proves:
+      - {path: packages/eslint/fe/r92-fetch-barrel.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/fe/r92-component-surface-coverage.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/fe/r56-r92-graph-coverage.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/fe/skeleton/apps/__app__/src/components/blocks/SignInForm/component.tsx, editions: [lite, full]}
+      - {path: packages/eslint/fe/r92-fetch-barrel.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/fe/r92-component-surface-coverage.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/fe/r56-r92-graph-coverage.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: packages/eslint/fe/r92-fetch-barrel.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/fe/r92-component-surface-coverage.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/fe/r56-r92-graph-coverage.spec.mjs, editions: [lite, full]}
   - id: R93
     code: "FE_VENDOR_BOUNDARY"
     law: "Vendor primitives and icons reach components only through their named owner: the one icon set of knowledge/hfs/fe-stack.yaml (the heroicons family) through the icon leaf at the glyph scale, every vendor primitive behind a named owner; the Grammar package is imported only through its selected code and style entry and keeps its declared contract."
