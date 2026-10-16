@@ -228,3 +228,13 @@ including nested folders. Adding the missing scenario proof clears the finding.
 In lite and full, `BE_TEST_TOPOLOGY` enforces back-end test topology: colocated unit `*.spec.ts` files, integration `*.integration-spec.ts`, e2e `*.e2e-spec.ts` and contract `*.contract-spec.ts` files in their matching `src/tests` folders, and one root Jest configuration. Unsupported `int-spec` and `harness-spec` suffixes are judged only on back-end graphs. Front-end files do not receive this back-end topology finding. Test infrastructure belongs in `src/tests/world`; tests cannot override providers, and integration and e2e tests must call `useTestWorld` with the appropriate literal `modules` or `apps` selection.
 
 `BE_CONTRACT_UNGUARDED` rejects a network fake's payload fixtures when no contract spec for that provider references those fixtures and compares the real provider's shape with the fixture's shape through the imported world `shapeOf` helper. A matching sandbox contract guards the fixtures; a fake without payload fixtures needs no such guard.
+
+<a id="r142"></a>
+### Ambient identifier ownership
+
+In lite and full, R142 reports `BE_AMBIENT_ID` for ambient identifier sources
+outside `platform/ids`, including ordinary specs. The test world
+(slot `be.tests.world`) remains exempt as the composition root that names real
+test resources, under owner ruling `ambient-id-test-world-exemption`.
+Application code asks the injected `Ids` port through `ids.next()`; ordinary
+specs supply deterministic identifiers through `fakeIds()`.
