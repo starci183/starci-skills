@@ -1,7 +1,9 @@
 // affected-git-batch.mjs - the git answers `test affected` asks per changed file, fetched with a few git processes instead of one per file.
 // On a large diff (a release against the previous tag) the per-file `git diff -- <file>` and `git show <base>:<file>` calls were thousands of
 // process spawns, tens of minutes on Windows before the first spec ran. The answers below are the same bytes, read once per (root, base).
-import { catFileBatch, changedNames, diffAll } from '../api/git/batch.mjs';
+import { catFileBatch } from '../api/git/cat-file-batch.mjs';
+import { changedNames } from '../api/git/changed-names.mjs';
+import { diffAll } from '../api/git/diff-all.mjs';
 
 const caches = new Map();
 

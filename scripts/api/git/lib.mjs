@@ -75,3 +75,6 @@ export const gitExecutable = (options = null) => {
   if (!options) cachedGit = found;
   return found;
 };
+
+/** The output ceiling of the whole-diff and `cat-file --batch` calls `test affected` batches (a release diff is tens of megabytes). */
+export const BATCH_MAX_BUFFER = 1024 * 1024 * 1024;
