@@ -39,7 +39,11 @@ export interface OrderStatusNamespace {
 @Module({
     providers: [
         OrderStatusGateway,
-        { provide: ACCESS_TOKEN_VERIFIER, useFactory: (options: OrderStatusWebsocketOptions) => options.verifyAccessToken, inject: [MODULE_OPTIONS_TOKEN] },
+        {
+            provide: ACCESS_TOKEN_VERIFIER,
+            useFactory: (options: OrderStatusWebsocketOptions) => options.verifyAccessToken,
+            inject: [MODULE_OPTIONS_TOKEN],
+        },
     ],
 })
 /** The socket transport: verifies each connection, forwards hub frames and releases every disconnected subscription. */
@@ -57,7 +61,10 @@ export class OrderStatusWebsocketModule extends ConfigurableModuleClass implemen
     /** Nest creates gateway namespaces before module initialization and starts listening afterwards. */
     onModuleInit(): void {
         this.gateway.namespace.use((client, next) => {
-            void this.authenticate(client).then(() => next(), () => next(new Error("Unauthorized")))
+            void this.authenticate(client).then(
+                () => next(),
+                () => next(new Error("Unauthorized")),
+            )
         })
         this.gateway.namespace.on("connection", (client) => {
             void this.push(client).catch(() => client.disconnect(true))
