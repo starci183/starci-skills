@@ -4,10 +4,11 @@
 // name and the superseded names.
 //   Preconditions (all or nothing): the routes file parses, no router or service name clashes with a tenant file, the ingress service runs, the old
 //   edge does not, every service of the app stack is healthy, the age recipient and the backup directory exist.
-//   --execute: baseline of every host -> age backup of each superseded file -> upload as <file>.tmp (ignored by the file provider because of its
+//   --execute: baseline of every host -> age backup of each superseded file AND of the current publish.file when it exists -> upload as <file>.tmp (ignored by the file provider because of its
 //   extension) -> ONE remote command swaps it in and removes the superseded files -> every host is verified (declared status exact, otherwise the
-//   baseline status class; a new host must answer 2xx-4xx; certificates of known hosts unchanged) -> any failure restores the superseded files from
-//   memory and re-verifies the baseline (RESTORED ok / RESTORE FAILED (manual: ...)).
+//   baseline status class; a host that did not answer before is new: it must answer 2xx-4xx over a certificate valid for its name, whatever the
+//   default certificate was; certificates of hosts that answered before unchanged) -> any failure puts the superseded files AND the previous
+//   publish.file back from memory (publish.file is removed only when there was none) and re-verifies the baseline (RESTORED ok / RESTORE FAILED (manual: ...)).
 // Route files may carry header values or tokens: they are held in memory only and NEVER printed; lines carry names, hosts and statuses.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -131,7 +132,7 @@ function swapIn(run, ingress, moves, removals) {
     const tmp = remoteFile(ingress, `${name}.tmp`);
     return `mv -f ${quote(tmp)} ${quote(remoteFile(ingress, name))}`;
   });
-  steps.push(`rm -f ${removals.map((name) => quote(remoteFile(ingress, name))).join(' ')}`);
+  if (removals.length > 0) steps.push(`rm -f ${removals.map((name) => quote(remoteFile(ingress, name))).join(' ')}`);
   const done = run(shScript(steps.join(' && ')));
   return done.status === 0 ? null : firstLine(done.stderr);
 }
@@ -147,19 +148,26 @@ function backupOne(ctx, run, ingress, kit, { recipient, name, content }) {
 
 // ---- verification -----------------------------------------------------------------------------------------------------------------------
 
-/** After the swap: a declared status is exact; otherwise the baseline class; a host without a baseline answer must answer 2xx-4xx; known certificates unchanged. */
+/** A host that did not answer before the swap (status 0: unrouted, with no certificate or the default one) is new: it gets a fresh certificate. */
+const isNew = (entry) => !answers(entry.code);
+
+/**
+ * After the swap: a declared status is exact; otherwise the baseline class. A new host must answer 2xx-4xx (curl verifies the certificate against the
+ * name, so an answer proves a valid certificate for it) and is never compared with its old default certificate; a host that answered before keeps
+ * its certificate.
+ */
 function forwardOk(entry, seen) {
   let statusOk = answers(seen.code);
   if (entry.target.status !== null) statusOk = seen.code === entry.target.status;
-  else if (answers(entry.code)) statusOk = classOf(seen.code) === classOf(entry.code);
-  return statusOk && (entry.certificate === null || seen.certificate === entry.certificate);
+  else if (!isNew(entry)) statusOk = classOf(seen.code) === classOf(entry.code);
+  return statusOk && (isNew(entry) || entry.certificate === null || seen.certificate === entry.certificate);
 }
 
 /** After a restore: every host that answered before answers in the same class with the same certificate. */
 const restoreOk = (entry, seen) => classOf(seen.code) === classOf(entry.code) && seen.certificate === entry.certificate;
 
 function certificateState(entry, seen) {
-  if (entry.certificate === null) return 'new';
+  if (isNew(entry) || entry.certificate === null) return 'new';
   return seen.certificate === entry.certificate ? 'equal' : 'different';
 }
 
@@ -179,12 +187,14 @@ function rowLine(row) {
 
 const hostsData = (rows) => rows.map((row) => ({ host: row.entry.target.host, path: row.entry.target.path, status: row.code, certificate: row.same }));
 
-/** Writes the superseded files back from memory (same atomic swap, deleting publish.file) and re-verifies the baseline. */
+/** Writes the superseded files and the previous publish.file back from memory (one atomic swap; publish.file is deleted only when there was none) and re-verifies the baseline. */
 async function restore(ctx, run, ingress, kit, context) {
-  const { contents, base, steps } = context;
-  const names = [...contents.keys()];
-  const failedUpload = names.map((name) => upload(run, ingress, name, contents.get(name))).find((error) => error !== null);
-  const failedSwap = failedUpload ?? swapIn(run, ingress, names, [ingress.publish.file]);
+  const { contents, previous, base, steps } = context;
+  const back = new Map(contents);
+  if (previous !== null) back.set(ingress.publish.file, previous);
+  const names = [...back.keys()];
+  const failedUpload = names.map((name) => upload(run, ingress, name, back.get(name))).find((error) => error !== null);
+  const failedSwap = failedUpload ?? swapIn(run, ingress, names, previous === null ? [ingress.publish.file] : []);
   steps.push('restore');
   const manual = `RESTORE FAILED (manual: encrypted backups in ${ingress.backup.dir})`;
   if (failedSwap) return { ok: false, line: manual };
@@ -194,7 +204,7 @@ async function restore(ctx, run, ingress, kit, context) {
 }
 
 async function apply(ctx, run, ingress, kit, context) {
-  const { own, base, lines, steps, contents, backups } = context;
+  const { own, base, lines, steps, contents, backups, previous } = context;
   const uploadError = upload(run, ingress, ingress.publish.file, own.text);
   steps.push('upload');
   if (uploadError) return result(false, [...lines, uploadError, 'publish refused: nothing was changed'], steps);
@@ -209,12 +219,12 @@ async function apply(ctx, run, ingress, kit, context) {
     return result(true, lines, steps, { backups, hosts: hostsData(proof.rows), restored: null });
   }
   lines.push(swapError ? `swap FAILED: ${swapError}` : 'verification FAILED');
-  const back = await restore(ctx, run, ingress, kit, { contents, base, steps });
+  const back = await restore(ctx, run, ingress, kit, { contents, previous, base, steps });
   lines.push(back.line);
   return result(false, lines, steps, { backups, hosts: hostsData(proof.rows), restored: back.ok ? 'ok' : 'failed' });
 }
 
-/** Reads and backs up every superseded file that exists; returns { contents, backups } or { error }. */
+/** Reads and backs up every superseded file that exists, then the current publish.file (about to be overwritten); returns { contents, previous, backups } or { error }. */
 function retire(ctx, run, ingress, kit, { recipient, names }) {
   const contents = new Map();
   const backups = [];
@@ -226,7 +236,13 @@ function retire(ctx, run, ingress, kit, { recipient, names }) {
     contents.set(name, content);
     backups.push(saved.file);
   }
-  return { contents, backups };
+  const previous = readRemote(run, ingress, ingress.publish.file);
+  if (previous !== null) {
+    const saved = backupOne(ctx, run, ingress, kit, { recipient, name: ingress.publish.file, content: previous });
+    if (saved.error) return { error: saved.error };
+    backups.push(saved.file);
+  }
+  return { contents, previous, backups };
 }
 
 /** `ingress publish`: see the top of the file. `kit` carries the shared probe helpers of ingress.mjs. */
