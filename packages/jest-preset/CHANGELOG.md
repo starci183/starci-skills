@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.3.0 - 2026-10-16
+
+- Added: a declared lite app (the edition of the `hfs.json` above its `be/`) runs its existing integration and contract specs without a test world: those projects exist only when their spec files do, and neither the world runner nor the world global setup and teardown is attached to a lite run.
+- Changed: a full app without a test world keeps only the unit project (an unfinished full scaffold), as before; the cited ruling is now ruling:R212/case-1 amended by ruling:R212/case-4.
+
 ## 2.2.7 - 2026-10-13
 
 - Fixed: the ESM-only runtime dependency `jose` (the Supabase access-token verifier of every lite back end) is compiled to CommonJS by ts-jest instead of being skipped with node_modules, so a lite app's unit run can load its guard (owner ruling 2026-10-12: lite keeps full's unit run).
