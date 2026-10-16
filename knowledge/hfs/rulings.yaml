@@ -454,6 +454,25 @@ rulings:
     amendmentScope: Clause of R287 that allowed the PKCE code exchange as the only credential exchange of the callback.
     enforcedBy: [R287]
 
+  - id: auth-callback-pure-helpers
+    date: '2026-10-17'
+    topic: code.fe-route
+    status: live
+    ownerRuling: 19
+    source: owner ruling 2026-10-17 "Theo y tro" (the owner delegated the decision to main) (alpha.18.1 patch, NIVO canon request F2); packages/eslint/fe/callback-shape.mjs
+    statement: >-
+      The auth callback may call pure helpers imported from the app's modules/routes or modules/auth to compute the
+      redirect target and to validate next (requestOrigin, safeNextPath), may read static route tables of modules/routes,
+      and may branch on the exchange outcome's success or ok flag. A pure helper is found by TypeScript symbol
+      resolution: a synchronous function that returns text, holds no await or yield, reaches no network, storage, DOM,
+      process, require or console global, and calls only locals, language built-ins, readers of modules/config and other
+      pure helpers of modules/routes or modules/auth. A helper that does I/O, awaits, imports a library value or a
+      module outside those owners, or returns a non-text value is refused, as is a credential (code, token_hash) passed
+      to a helper. Open-redirect protection is a security property and stays in the owner modules.
+    supersedes: []
+    amendmentScope: Clause of R287 that allowed only APP_ROUTES and inline expressions in the callback and an exchange outcome read only through error.
+    enforcedBy: [R287]
+
   - id: oauth-redirect-not-webhook
     date: '2026-10-17'
     topic: code.be-transport

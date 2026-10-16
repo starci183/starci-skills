@@ -1,11 +1,14 @@
 /**
  * R287 FE_CALLBACK_SHAPE: the Supabase callback only reads the PKCE code (or the email-link `token_hash` and `type`), exchanges it
- * through the auth owner with exactly one `exchangeAuthCode(code)` or one `verifyOtp({ token_hash, type })`, and redirects.
+ * through the auth owner with exactly one `exchangeAuthCode(code)` or one `verifyOtp({ token_hash, type })`, and redirects. It may read
+ * the exchange result's `success` or `ok` flag and call PURE text helpers of `modules/routes` or `modules/auth` (`requestOrigin`,
+ * `safeNextPath`), found by symbol resolution in lib/pure-owner-helper.mjs, so open-redirect protection stays in the app's owner modules.
  * Cookie configuration and writes belong in the Supabase helper in fe.modules.auth; application data belongs in the back end.
  * This syntax check follows lexical bindings and local aliases rather than trusting a method's spelling.
  */
 import { stringOf, walk } from "./lib/ast.mjs"
 import { normalizePath } from "./lib/path.mjs"
+import { ownerExportKind } from "./lib/pure-owner-helper.mjs"
 import { classifyImport, inSlot, resolveImport } from "./lib/scope.mjs"
 
 /** Runtime expression wrappers that preserve the value's source. */
@@ -47,9 +50,11 @@ const CONFIG_EXPORTS = new Set(["runtime", "dynamic", "revalidate", "fetchCache"
 const FUNCTIONS = new Set(["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"])
 const FORBIDDEN = new Set(["AssignmentExpression", "UpdateExpression", "ImportExpression", "TaggedTemplateExpression", "ClassDeclaration", "ClassExpression", "ForStatement", "ForInStatement", "ForOfStatement", "WhileStatement", "DoWhileStatement", "ThrowStatement", "YieldExpression", "SpreadElement", "ArrayPattern", "JSXElement", "JSXFragment"])
 const TEXT = new Set(["text", "code", "otp-type"])
-const CALLS = new Set(["factory", "exchange", "verify-otp", "redirect", "params-get", "params-has", "text-guard"])
+const CALLS = new Set(["factory", "exchange", "verify-otp", "pure", "redirect", "params-get", "params-has", "text-guard"])
+/** What a pure owner helper may be given: query text, the page URL or request, and plain values; never the credential itself. */
+const PURE_ARGUMENTS = new Set(["text", "otp-type", "scalar", "url", "request"])
 const URL_TEXT = new Set(["origin", "href", "pathname", "search", "hash", "host", "hostname", "protocol"])
-const CALL_RESULTS = new Map([["factory", "client"], ["exchange", "exchange-result"], ["verify-otp", "exchange-result"], ["redirect", "redirect-result"], ["params-has", "scalar"], ["text-guard", "scalar"]])
+const CALL_RESULTS = new Map([["factory", "client"], ["exchange", "exchange-result"], ["verify-otp", "exchange-result"], ["pure", "text"], ["redirect", "redirect-result"], ["params-has", "scalar"], ["text-guard", "scalar"]])
 const MEMBERS = new Map([
   ["request", new Map([["nextUrl", "url"], ["url", "text"]])],
   ["url", new Map([["searchParams", "params"], ...[...URL_TEXT].map((key) => [key, "text"])])],
@@ -57,7 +62,7 @@ const MEMBERS = new Map([
   ["client", new Map([["auth", "auth"]])],
   ["auth", new Map([["exchangeCodeForSession", "exchange"], ["verifyOtp", "verify-otp"]])],
   ["next-response", new Map([["redirect", "redirect"]])],
-  ["exchange-result", new Map([["error", "exchange-error"]])],
+  ["exchange-result", new Map([["error", "exchange-error"], ["success", "scalar"], ["ok", "scalar"]])],
 ])
 
 /** The query parameters whose provenance an exchange requires: the PKCE code, and the email link's token hash and type. */
@@ -124,17 +129,23 @@ const isServerAuthImport = (context, source) => {
 /** A directory import resolves to its index, before the generic modules slot's hypothetical routes.ts. */
 const isRoutesImport = (context, source, slot) => slot === "fe.modules.routes" || classifyImport(context, `${source}/index`)?.slot === "fe.modules.routes"
 
-/** Auth helpers and static route values must come from their declared HFS owners. */
-const ownerImportKind = (context, source, name) => {
-  const slot = classifyImport(context, source)?.slot
-  if (name === "APP_ROUTES" && isRoutesImport(context, source, slot)) return "routes"
-  if (slot !== "fe.modules.auth") return null
+/** The exchange, client and factory names of the auth owner. */
+const authImportKind = (context, source, name) => {
   if (name === "exchangeAuthCode" && isServerAuthImport(context, source)) return "exchange"
   if (name === "verifyOtp" && isServerAuthImport(context, source)) return "verify-otp"
   if (name === "exchangeCodeForSession") return "exchange"
   if (/^(?:create|get)\w*Client$/.test(name ?? "")) return "factory"
   if (["supabase", "supabaseClient", "authClient"].includes(name)) return "client"
   return null
+}
+
+/** Auth helpers and static route values must come from their declared HFS owners; any other export of `modules/routes` or `modules/auth` counts only as a pure helper or a static table. */
+const ownerImportKind = (context, source, name) => {
+  const slot = classifyImport(context, source)?.slot
+  if (name === "APP_ROUTES" && isRoutesImport(context, source, slot)) return "routes"
+  const authKind = slot === "fe.modules.auth" ? authImportKind(context, source, name) : null
+  if (authKind || !(slot === "fe.modules.auth" || isRoutesImport(context, source, slot))) return authKind
+  return ownerExportKind(context, source, name)
 }
 
 /** Register the allowed bindings in a single import statement. */
@@ -215,7 +226,7 @@ const originOf = (env) => {
     const node = unwrap(input)
     if (!node) return null
     if (node.type === "Identifier") return identifierOrigin(node, seen, env, origin)
-    if (node.type === "Literal") return typeof node.value === "string" ? "text" : "scalar"
+    if (node.type === "Literal") return typeof node.value === "string" || node.value === null ? "text" : "scalar"
     return expressionOrigin(node, seen, env, origin)
   }
   return origin
@@ -270,6 +281,7 @@ const validCall = (node, kind, env, origin) => {
   if (!insideHandler(node, env.handler) || !CALLS.has(kind) || node.arguments.some((argument) => argument.type === "SpreadElement")) return false
   if (kind === "exchange") return isAwaited(node, env.handler) && node.arguments.length === 1 && origin(node.arguments[0]) === "code"
   if (kind === "verify-otp") return isAwaited(node, env.handler) && node.arguments.length === 1 && node.arguments[0].type === "ObjectExpression"
+  if (kind === "pure") return node.arguments.length <= 4 && node.arguments.every((argument) => PURE_ARGUMENTS.has(origin(argument)))
   if (kind === "redirect") return node.arguments.length >= 1 && node.arguments.length <= 2 && ["text", "url"].includes(origin(node.arguments[0]))
   if (kind === "factory") return node.arguments.length <= 1 && node.arguments.every((argument) => origin(argument) === "request")
   return node.arguments.length === 1 && TEXT.has(origin(node.arguments[0]))
@@ -312,7 +324,7 @@ export const callbackShape = {
     docs: { description: "R287 FE_CALLBACK_SHAPE: the Supabase callback reads the PKCE code or the email-link token_hash and type, exchanges it through modules/auth (exchangeAuthCode or verifyOtp), and redirects only." },
     schema: [],
     messages: {
-      shape: "FE_CALLBACK_SHAPE: the auth callback must export an async GET that reads the query code (or the email-link token_hash and type), awaits one exchangeAuthCode(code) from modules/auth/server or auth.exchangeCodeForSession(code) and, for an email link, one verifyOtp({ token_hash, type }) built from exactly those two query values, and redirects with NextResponse.redirect or next/navigation redirect. Create the client in modules/auth; keep data access, cookie writes, other calls and additional HTTP handlers outside the callback.",
+      shape: "FE_CALLBACK_SHAPE: the auth callback must export an async GET that reads the query code (or the email-link token_hash and type), awaits one exchangeAuthCode(code) from modules/auth/server or auth.exchangeCodeForSession(code) and, for an email link, one verifyOtp({ token_hash, type }) built from exactly those two query values, may call pure text helpers of modules/routes or modules/auth (no I/O, no await) to compute the target and validate next, and redirects with NextResponse.redirect or next/navigation redirect. Create the client in modules/auth; keep data access, cookie writes, other calls and additional HTTP handlers outside the callback.",
     },
   },
   create(context) {

@@ -514,6 +514,13 @@ rulings:
     supersedes: []
     enforcedBy: [packages/eslint/fe/callback-shape.mjs]
 
+  - id: auth-callback-pure-helpers
+    date: '2026-10-17'
+    source: knowledge/hfs/rulings.yaml auth-callback-pure-helpers; packages/eslint/fe/callback-shape.mjs
+    ruling: The auth callback may call pure helpers (synchronous, text-returning, no await and no I/O, found by symbol resolution) imported from the app's modules/routes or modules/auth to compute the redirect target and validate next, may use static route tables of modules/routes, and may branch on the exchange outcome's success or ok flag. A helper that does I/O, awaits or imports outside those owners is refused. Owner words "Theo y tro" (the owner delegated the decision to main, 2026-10-17).
+    supersedes: []
+    enforcedBy: [packages/eslint/fe/callback-shape.mjs]
+
   - id: oauth-redirect-not-webhook
     date: '2026-10-17'
     source: knowledge/hfs/rulings.yaml oauth-redirect-not-webhook; packages/eslint/be/webhooks.mjs

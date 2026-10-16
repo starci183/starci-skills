@@ -5234,8 +5234,8 @@ rules:
 
   - id: R287
     code: "FE_CALLBACK_SHAPE"
-    amendedBy: [owner:auth-callback-email-link]
-    law: "The fe.route.callback handler performs only the auth code exchange and redirect: read the callback URL, obtain the auth client, exchange the code and redirect to the declared route. An email confirmation or recovery link (owner:auth-callback-email-link) arrives as the query values token_hash and type; the handler then awaits one verifyOtp({ token_hash, type }) of the auth owner (the auth client, or verifyOtp from modules/auth/server), built from exactly those two query values, in place of or beside the one code exchange. It carries no product data operation, business logic, additional request handler or JSON response."
+    amendedBy: [owner:auth-callback-email-link, owner:auth-callback-pure-helpers]
+    law: "The fe.route.callback handler performs only the auth code exchange and redirect: read the callback URL, obtain the auth client, exchange the code and redirect to the declared route. An email confirmation or recovery link (owner:auth-callback-email-link) arrives as the query values token_hash and type; the handler then awaits one verifyOtp({ token_hash, type }) of the auth owner (the auth client, or verifyOtp from modules/auth/server), built from exactly those two query values, in place of or beside the one code exchange. The handler may read the exchange outcome's success or ok flag, and may call pure text helpers exported by the app's modules/routes or modules/auth (owner:auth-callback-pure-helpers): a synchronous function with no await, no network, storage, DOM, process or console access and no import beyond other such helpers, found by TypeScript symbol resolution, so the public origin and the same-origin validation of next stay in the owner modules. It carries no product data operation, business logic, additional request handler or JSON response."
     kinds: [lint]
     gates: [pre-commit, settle, land, ci]
     failureCodes: ["FE_CALLBACK_SHAPE"]

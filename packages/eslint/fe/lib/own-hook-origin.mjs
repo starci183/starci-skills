@@ -15,7 +15,7 @@ const isHookName = (name) => /^use[A-Z0-9]/.test(name)
 
 /** The program that holds the import target: the project program has it; a program rooted at the linted file alone (its disk text may differ from the linted text) is widened with it. */
 const widened = new WeakMap()
-function reaching(program, filename, targetFile) {
+export function reaching(program, filename, targetFile) {
   if (program.getSourceFile(targetFile)) return program
   const key = `${filename}\0${targetFile}`
   const cache = widened.get(program) ?? new Map()
