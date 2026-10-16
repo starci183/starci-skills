@@ -470,6 +470,16 @@ the cited-path scan over live prose; then every retained self-check of
 shrink-only section of it, and `scripts/checks/check-one-allowlist.mjs` refuses a second one
 (`RT_ALLOWLIST_SPRAWL`).
 
+<a id="r01"></a>
+
+## R01 slot ownership
+
+Every tracked path matches exactly one slot of the manifest (`knowledge/hfs/slots.yaml` for a product, `knowledge/hfs/runtime-slots.yaml` for this runtime). HFS_SLOT_UNDECLARED names a path no slot owns, with the nearest slot. HFS_SLOT_AMBIGUOUS names a path two slots own at the same specificity: that is a gap of the manifest, reported and never guessed (the manifest loader refuses two slots with the same pattern text, so a gap needs two patterns that differ only in a variable name). HFS_SLOT_NOT_ENABLED names a path of an opt-in slot that hfs.json neither lists in `optionalSlots` nor implies through an app kind or a declared pattern. HFS_FORBIDDEN_PRESENT names a tracked path of a forbidden slot, and HFS_TRACKED_MUST_BE_IGNORED a tracked path of an ignored slot.
+
+The repository tree layout adds seven codes. HFS_ROOT_ENTRY_FORBIDDEN names a root entry that no slot of the side or of the app root names, and HFS_ROOT_MARKDOWN_FORBIDDEN a root Markdown file other than the README. HFS_ROOT_SRC_FORBIDDEN_FE names a `src/` tree at the root of the fe side. HFS_SRC_LAYOUT_INVALID names a child of the back-end `src/` or `src/tests/` that no slot knows, and HFS_MODULE_TIER_INVALID a `src/modules/` folder that is not a module tier. HFS_WORK_IN_FE and HFS_STACKS_IN_SIDE name a `.starciwork` tree in the fe side and a `.starcistacks` tree in a side: both belong to the app root.
+
+Lite and full share this law. The enforcers are the app check (`scripts/hfs/check.mjs`), the architecture machine (`scripts/hfs/architecture/hfs.mjs`), the runtime check (`scripts/hfs/runtime-check.mjs`) and the back-end and front-end `slot-undeclared` lint rules, which report the path codes on the TypeScript file they visit. The proofs are `tests/hfs-proofs/hfs-slot-ownership.spec.mjs`, `tests/hfs-proofs/hfs-repository-tree-layout.spec.mjs` and `slot-ownership.spec.mjs` of the two lint packages.
+
 <a id="r03-filesystem-residue"></a>
 
 ## R03 filesystem residue
