@@ -30,7 +30,7 @@ import { keyName, walk } from "./lib/ast.mjs"
 import { importOf, isImportedFrom } from "./lib/import-source.mjs"
 import { isPackageType, typeOrigins } from "./lib/types.mjs"
 import { baseOf, isServiceSpecFile, isUnitSpecFile, unitRoleOfSpec } from "./lib/unit-spec.mjs"
-import { isRealSubjectValue } from "./lib/subject-values.mjs"
+import { isRealSubjectValue, valueObjectsOfSibling } from "./lib/subject-values.mjs"
 
 const TESTING_PACKAGE = "@nestjs/testing"
 
@@ -78,6 +78,8 @@ export const specBuildsWithTestingModule = {
     },
     create(context) {
         if (!isFormSpecFile(hfsOf(context), context.filename || context.getFilename())) return {}
+        // a value-object subject (undecorated, no constructor injection token) is built with `new`: Nest never constructs it
+        const valueObjectSpec = valueObjectsOfSibling(context).length > 0
         let created = null
         let compiled = false
         let read = false
@@ -90,6 +92,7 @@ export const specBuildsWithTestingModule = {
                 if (callee.property.name === "get" && isPackageType(context, callee.object, "TestingModule", TESTING_PACKAGE)) read = true
             },
             "Program:exit"(node) {
+                if (created === null && valueObjectSpec) return
                 if (created === null) context.report({ node, messageId: "noModule" })
                 else if (!compiled) context.report({ node: created, messageId: "noCompile" })
                 else if (!read) context.report({ node: created, messageId: "noGet" })
@@ -119,10 +122,14 @@ export const specNoNewSubject = {
         const stem = baseOf(filename).replace(/\.spec\.ts$/, "")
         const locals = new Set()
         const namespaces = new Set()
+        const valueObjects = new Set(valueObjectsOfSibling(context))
         return {
             ImportDeclaration(node) {
                 if (moduleStem(node.source.value) !== stem) return
-                for (const specifier of node.specifiers) (specifier.type === "ImportNamespaceSpecifier" ? namespaces : locals).add(specifier.local.name)
+                for (const specifier of node.specifiers) {
+                    if (specifier.type === "ImportSpecifier" && valueObjects.has(specifier.imported.name ?? specifier.imported.value)) continue
+                    (specifier.type === "ImportNamespaceSpecifier" ? namespaces : locals).add(specifier.local.name)
+                }
             },
             NewExpression(node) {
                 const callee = node.callee
@@ -406,6 +413,12 @@ const formOf = (context, node, depth = 0) => {
             return null
         case "NewExpression":
             return value.callee.type === "Identifier" ? { form: "new", name: value.callee.name, node: value.callee } : null
+        case "MemberExpression": {
+            // a member of a kit `mock<T>()` object is that mock's double (`mock<{ open: F }>().open`)
+            if (value.computed || depth >= 3) return null
+            const owner = formOf(context, value.object, depth + 1)
+            return owner?.form === "call" && owner.name === "mock" ? owner : null
+        }
         case "ObjectExpression":
             return { form: "object" }
         case "ArrayExpression":

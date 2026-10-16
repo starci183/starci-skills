@@ -3,34 +3,51 @@ import path from 'node:path';
 export const keyOf = (ts, property) => (ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property)) && (ts.isIdentifier(property.name) || ts.isStringLiteralLike(property.name)) ? property.name.text : null;
 const exported = (ts, statement) => statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword) ?? false;
 
-/** A variable export is callable only when each declaration is a directly defined function. */
+/** The directly defined functions among the declarations of an exported variable statement; other values are not callable. */
 function callableVariables(ts, statement) {
   const names = [];
   for (const declaration of statement.declarationList.declarations) {
-    if (!ts.isIdentifier(declaration.name) || !declaration.initializer) return null;
-    if (!ts.isArrowFunction(declaration.initializer) && !ts.isFunctionExpression(declaration.initializer)) return null;
-    names.push(declaration.name.text);
+    const initializer = declaration.initializer;
+    if (ts.isIdentifier(declaration.name) && initializer && (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer))) names.push(declaration.name.text);
   }
   return names;
 }
 
-/** Callable declarations and type-only declarations of an exported statement. */
+/** The callable exports of one statement: an overload signature has no body and collapses into its implementation. */
 function callableExports(ts, statement) {
-  if (!exported(ts, statement) || ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement)) return [];
-  if (ts.isFunctionDeclaration(statement) && statement.name && statement.body) return [statement.name.text];
-  return ts.isVariableStatement(statement) ? callableVariables(ts, statement) : null;
+  if (!exported(ts, statement)) return [];
+  if (ts.isFunctionDeclaration(statement)) return statement.name && statement.body ? [statement.name.text] : [];
+  return ts.isVariableStatement(statement) ? callableVariables(ts, statement) : [];
 }
 
-/** The callable exports of a function-only subject; classes and other runtime exports keep the class-provider check. */
+/**
+ * The callable subset of a function subject's exports. Constants, enums, objects, types, `export ... from` re-exports and overload
+ * signatures do not change which functions the spec must provide; a class or a default-export assignment keeps the class-provider
+ * check (null), as does a module with no callable export.
+ */
 export function functionSubjectExports(ts, sourceFile) {
   const names = [];
   for (const statement of sourceFile.statements) {
-    if (ts.isClassDeclaration(statement) || ts.isExportDeclaration(statement) || ts.isExportAssignment(statement)) return null;
-    const callable = callableExports(ts, statement);
-    if (!callable) return null;
-    names.push(...callable);
+    if (ts.isClassDeclaration(statement) || ts.isExportAssignment(statement)) return null;
+    for (const name of callableExports(ts, statement)) if (!names.includes(name)) names.push(name);
   }
   return names.length ? names : null;
+}
+
+const decoratorsOf = (ts, node) => (ts.canHaveDecorators(node) ? ts.getDecorators(node) ?? [] : []);
+
+/** A value object: an undecorated class whose constructor parameters carry no injection token, so Nest never builds it. */
+export function isValueObjectClass(ts, declaration) {
+  if (decoratorsOf(ts, declaration).length > 0) return false;
+  const constructors = declaration.members.filter(member => ts.isConstructorDeclaration(member));
+  return constructors.every(constructor => constructor.parameters.every(parameter => decoratorsOf(ts, parameter).length === 0));
+}
+
+/** The names of the value-object classes a module exports, or null when it exports a class that is not one (or none). */
+export function valueObjectSubjects(ts, sourceFile) {
+  const classes = sourceFile.statements.filter(statement => ts.isClassDeclaration(statement) && statement.name && exported(ts, statement));
+  if (!classes.length || !classes.every(declaration => isValueObjectClass(ts, declaration))) return null;
+  return classes.map(declaration => declaration.name.text);
 }
 
 /** The value of one literal object property. */

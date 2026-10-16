@@ -246,6 +246,68 @@ for (const edition of ["lite", "full"]) test(`spec-infra-double-from-kit: ${edit
     })
 })
 
+test("spec-infra-double-from-kit: a function subject beside constants, enums, re-exports and overloads is judged by its callable subset (A1)", () => {
+    const filename = at("src/modules/domain/order/mixed-subject.mapper.spec.ts")
+    const functions = 'import { pad, shout } from "./mixed-subject.mapper"\n'
+    const subject = (value) => `${functions}const SUBJECT = Symbol("subject")\nconst provider = { provide: SUBJECT, useValue: ${value} }`
+    tester.run("spec-infra-double-from-kit", specInfraDoubleFromKit, {
+        valid: [
+            { filename, code: subject("pad") },
+            { filename, code: subject("{ pad, shout }") },
+        ],
+        invalid: [
+            // a hand-built stand-in for the overloaded function or for the arrow export is still a drift
+            { filename, code: subject("{ pad: () => '', shout }"), errors: [{ messageId: "wrong" }] },
+            { filename, code: subject("{ pad, shout: () => '' }"), errors: [{ messageId: "wrong" }] },
+            // a constant is not a callable subject function
+            { filename, code: 'import { LIMIT } from "./mixed-subject.mapper"\nconst provider = { provide: SUBJECT, useValue: LIMIT }', errors: [{ messageId: "unknown" }] },
+        ],
+    })
+})
+
+test("a value-object subject is built with new, a decorated or token-injected subject is not (A2)", () => {
+    const valueObject = at("src/modules/domain/order/value-object.mapper.spec.ts")
+    const injected = at("src/modules/domain/order/injected-subject.mapper.spec.ts")
+    const window = 'import { Window } from "./value-object.mapper"\nexport const subject = new Window(1, 2)'
+    const gate = 'import { Gate } from "./injected-subject.mapper"\nexport const subject = new Gate(1)'
+    tester.run("spec-no-new-subject", specNoNewSubject, {
+        valid: [
+            { filename: valueObject, code: window },
+            { filename: valueObject, code: 'import { Window as Span } from "./value-object.mapper"\nexport const subject = new Span(1, 2)' },
+        ],
+        invalid: [
+            { filename: injected, code: gate, errors: [{ messageId: "construct" }] },
+            { filename: injected, code: 'import { Tokened } from "./injected-subject.mapper"\nexport const subject = new Tokened(1)', errors: [{ messageId: "construct" }] },
+        ],
+    })
+    tester.run("spec-builds-with-testing-module", specBuildsWithTestingModule, {
+        valid: [{ filename: valueObject, code: window }],
+        invalid: [{ filename: injected, code: gate, errors: [{ messageId: "noModule" }] }],
+    })
+    tester.run("spec-infra-double-from-kit", specInfraDoubleFromKit, {
+        valid: [{ filename: valueObject, code: 'import { Window } from "./value-object.mapper"\nconst provider = { provide: SPAN, useValue: new Window(1, 2) }' }],
+        invalid: [{ filename: injected, code: 'import { Gate } from "./injected-subject.mapper"\nconst provider = { provide: GATE, useValue: new Gate(1) }', errors: [{ messageId: "wrong" }] }],
+    })
+})
+
+test("spec-infra-double-from-kit: a member of a kit mock object is a kit double (A3)", () => {
+    const base = 'import { mock, mockEntityManager } from "@starci/jest-preset"\ntype Open = (url: string) => void\n'
+    const provide = (token, value) => `${base}const provider = { provide: ${token}, useValue: ${value} }`
+    tester.run("spec-infra-double-from-kit", specInfraDoubleFromKit, {
+        valid: [
+            { filename: SPEC, code: provide("GATEWAY_SOCKET_FACTORY", "mock<{ open: Open }>().open") },
+            { filename: SPEC, code: `${base}const sockets = mock<{ open: Open }>()\nconst provider = { provide: GATEWAY_SOCKET_FACTORY, useValue: sockets.open }` },
+        ],
+        invalid: [
+            // a member of an untraceable object, a mock member for a token that calls for another double, and a lookalike mock
+            { filename: SPEC, code: `${base}declare const harness: { open: Open }\nconst provider = { provide: GATEWAY_SOCKET_FACTORY, useValue: harness.open }`, errors: [{ messageId: "unknown" }] },
+            { filename: SPEC, code: provide("CLOCK", "mock<{ now: () => Date }>().now"), errors: [{ messageId: "wrong" }] },
+            { filename: SPEC, code: provide("GATEWAY_SOCKET_FACTORY", "mockEntityManager().find"), errors: [{ messageId: "unknown" }] },
+            { filename: SPEC, code: 'import { mock } from "./local-mock"\nconst provider = { provide: GATEWAY_SOCKET_FACTORY, useValue: mock<{ open: () => void }>().open }', errors: [{ messageId: "notKit" }] },
+        ],
+    })
+})
+
 test("spec-exact-values: a unit spec asserts the exact id and the exact date, never expect.any(String|Number|Date)", () => {
     const kit = 'import { FakeClock, fakeIds } from "@starci/jest-preset"\n'
     tester.run("spec-exact-values", specExactValues, {

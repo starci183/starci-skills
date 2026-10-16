@@ -180,7 +180,7 @@ pins:
     side: be
   # --- framework
   next:
-    version: 16.1.6
+    version: 16.4.2
     group: framework
     side: fe
   react:
@@ -206,7 +206,7 @@ pins:
     group: framework
     side: be
   '@nestjs/platform-express':
-    version: 11.2.5
+    version: 11.2.7
     group: framework
     side: be
   '@nestjs/testing':
@@ -316,7 +316,7 @@ pins:
     side: fe
     why: 'the codegen preset of the front-end wire types (fe-stack codegen); the latest registry version on 2026-10-13.'
   'axios':
-    version: 1.15.2
+    version: 1.20.0
     group: framework
     side: fe
     why: 'the REST client of the front end for uploads, presigned URLs and auth endpoints (fe-stack rest); version read from the starci-academy package-lock on 2026-10-13.'
@@ -465,12 +465,12 @@ pins:
     version: 13.4.5
     group: framework
     side: be
-    why: 'the GraphQL transport of every back end (be.transport.graphql) that the front end calls; the ecommerce-app resolution on 2026-10-13.'
+    why: 'the GraphQL transport of every back end (be.transport.graphql) that the front end calls; the ecommerce-app resolution on 2026-10-13. Stays on 13.x for alpha.18: the npm-audit advisory fixed by 14.0.3 (semver major) is a documented accepted exception, upgrade deferred to alpha.19 (owner ruling graphql-13-advisory-accepted-until-a19, 2026-10-16).'
   '@nestjs/apollo':
     version: 13.4.5
     group: framework
     side: be
-    why: 'the Apollo driver of @nestjs/graphql; the ecommerce-app resolution on 2026-10-13.'
+    why: 'the Apollo driver of @nestjs/graphql; the ecommerce-app resolution on 2026-10-13. Stays on 13.x with @nestjs/graphql (accepted advisory, major deferred to alpha.19).'
   '@apollo/server':
     version: 5.5.1
     group: framework
