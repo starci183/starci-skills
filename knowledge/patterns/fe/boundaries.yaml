@@ -27,7 +27,7 @@ rules:
   - id: FE-BOUNDARY-1
     title: Mandatory error, not-found and loading boundaries
     kind: mandatory
-    hfsRules: [R53], R53]
+    hfsRules: [R53]
     requirement: |-
       Every app has `app/global-error.tsx`, `app/[locale]/error.tsx`, `app/[locale]/not-found.tsx` and
       `app/[locale]/layout.tsx`, and a `loading.tsx` for every route group that reads data. `error.tsx` and
@@ -57,7 +57,7 @@ rules:
   - id: FE-BOUNDARY-2
     title: Boundaries render a slot, not an error status
     kind: mandatory
-    hfsRules: [R51, R53, R92], R92]
+    hfsRules: [R51, R53, R92]
     requirement: |-
       A boundary and a connected block turn an SWR read (its data, its error and the GraphQLResponse it carries) or a caught
       error into a slot through `toSlot`; they never read `error.status`. A refused read shows the forbidden notice or
@@ -87,7 +87,7 @@ rules:
   - id: FE-BOUNDARY-3
     title: Server first
     kind: mandatory
-    hfsRules: [R55, R54], R54]
+    hfsRules: [R55, R54]
     requirement: |-
       Route files (page, layout, template, loading, not-found) are server components. `"use client"` appears only in the
       `index.tsx` of a block or overlay that has interaction or client data hooks, in a leaf with intrinsic interaction, and in
@@ -138,7 +138,7 @@ rules:
   - id: FE-BOUNDARY-4
     title: A cookie is written by the server with its attributes stated
     kind: mandatory
-    hfsRules: [R107], R107]
+    hfsRules: [R107]
     requirement: |-
       A session cookie is written by the back end only (an HttpOnly refresh-token cookie of the auth endpoint, sent back by
       the Apollo http link and axios with credentials); the front end serves no route handler or Server Action that could
@@ -167,7 +167,7 @@ rules:
   - id: FE-BOUNDARY-5
     title: Layout-level overlay host
     kind: mandatory
-    hfsRules: [R26, R27, R53, R55, R56, R65, R92], R92]
+    hfsRules: [R26, R27, R53, R55, R56, R65, R92]
     requirement: |-
       A server feature layout imports its overlay public entries and a client OverlayRouteHost overlay entry, then
       supplies rendered ReactNode candidates to the host. The host owns `"use client"` and calls a route-state hook under

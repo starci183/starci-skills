@@ -47,27 +47,19 @@ export class PaymentIntakeService {
         private readonly inherited: InheritedReceiptService,
     ) {}
 
-    async throughReceiptPort(deliveryId: string): Promise<void> {
-        await this.database.transaction(async (manager) => {
-            if (!(await this.receipts.claim(manager, deliveryId))) return
-        })
+    throughReceiptPort(deliveryId: string): Promise<void> {
+        return this.database.transaction(async (manager) => void (await this.receipts.claim(manager, deliveryId)))
     }
 
-    async throughProcessingReceipt(deliveryId: string): Promise<void> {
-        await this.database.transaction(async (manager) => {
-            if (!(await this.processing.claim(manager, deliveryId))) return
-        })
+    throughProcessingReceipt(deliveryId: string): Promise<void> {
+        return this.database.transaction(async (manager) => void (await this.processing.claim(manager, deliveryId)))
     }
 
-    async throughBookService(deliveryId: string): Promise<void> {
-        await this.database.transaction(async (manager) => {
-            if (!(await this.books.book(manager, deliveryId))) return
-        })
+    throughBookService(deliveryId: string): Promise<void> {
+        return this.database.transaction(async (manager) => void (await this.books.book(manager, deliveryId)))
     }
 
-    async throughInheritedReceipt(deliveryId: string): Promise<void> {
-        await this.database.transaction(async (manager) => {
-            if (!(await this.inherited.claim(manager, deliveryId))) return
-        })
+    throughInheritedReceipt(deliveryId: string): Promise<void> {
+        return this.database.transaction(async (manager) => void (await this.inherited.claim(manager, deliveryId)))
     }
 }
