@@ -183,10 +183,23 @@ function workspaceMissingDependencies(repoRoot, files, folder, names, ts) {
   const pkg = readJson(repoRoot, manifest);
   if (!pkg) return [];
   const missing = undeclaredImports(repoRoot, files, folder, pkg, declaredIn(pkg), ts);
-  return [...missing].sort(byCodeUnit).map(([name, file]) => {
+  const findings = [...missing].sort(byCodeUnit).map(([name, file]) => {
     const declaration = names.get(name) ? `declare the workspace package ${name} as "*"` : `declare ${name} in the dependencies of ${manifest} (one version across the workspace, R14)`;
     return found(MONO_WORKSPACE_DEP, manifest, `${file} imports ${name}, which ${manifest} does not declare; ${declaration}.`, { dependency: name, importedBy: file });
   });
+  return [...findings, ...workspaceVersionFindings(manifest, pkg, names)];
+}
+
+/** Every declaration of a sibling workspace uses npm's local workspace version, in every dependency section. */
+function workspaceVersionFindings(manifest, pkg, names) {
+  const findings = [];
+  for (const section of DEP_SECTIONS) {
+    for (const [name, version] of Object.entries(pkg[section] ?? {})) {
+      if (!names.has(name) || name === pkg.name || version === '*') continue;
+      findings.push(found(MONO_WORKSPACE_DEP, manifest, `${manifest} declares sibling workspace ${name} as ${JSON.stringify(version)} in ${section}; declare the workspace package as "*".`, { dependency: name, section, version }));
+    }
+  }
+  return findings;
 }
 
 /** R146: what each fe workspace imports, it declares; the root declares no workspace package. */

@@ -513,6 +513,16 @@ rules:
       - {path: packages/eslint/be/a16-r30-public-surface.spec.mjs, editions: [lite, full], codes: [BE_PUBLIC_SURFACE, ARCH_OWNER_EXPORT_BYPASS, ARCH_OWNER_EXPORT_STAR, HFS_ALIAS_REEXPORT, ARCH_PACKAGE_EXPORT_BYPASS]}
   - id: R31
     code: "BE_FEATURE_NOT_COMPOSED"
+    editions: [lite, full]
+    docs: [docs/architecture.md#backend-module-composition]
+    proves:
+      - {path: packages/eslint/be/r31-composition-coverage.spec.mjs, editions: [lite, full], codes: [BE_FEATURE_NOT_COMPOSED]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/skeleton/src/features/api/system-health/index.ts, editions: [lite, full]}
+      - {path: packages/eslint/be/r31-composition-coverage.spec.mjs, editions: [lite, full], codes: [BE_FEATURE_NOT_COMPOSED]}
+    witness:
+      - {path: packages/eslint/be/r31-composition-coverage.spec.mjs, edition: lite, codes: [BE_FEATURE_NOT_COMPOSED]}
+      - {path: packages/eslint/be/r31-composition-coverage.spec.mjs, edition: full, codes: [BE_FEATURE_NOT_COMPOSED]}
     law: "Every feature, transport module and capability module is composed by an app."
     kinds: [lint, design]
     gates: [land, ci]
@@ -2410,6 +2420,16 @@ rules:
       - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
   - id: R146
     code: "HFS_MONO_WORKSPACE_DEP"
+    editions: [lite, full]
+    docs: [docs/architecture.md#workspace-dependency-declarations]
+    proves:
+      - {path: tests/hfs/r146-workspace-version-coverage.spec.mjs, editions: [lite, full], codes: [HFS_MONO_WORKSPACE_DEP]}
+    templateNa: "Sibling workspace dependencies depend on the product's imports; no scaffold can declare that product-specific dependency graph."
+    exemplifiedBy:
+      - {path: tests/hfs/r146-workspace-version-coverage.spec.mjs, editions: [lite, full], codes: [HFS_MONO_WORKSPACE_DEP]}
+    witness:
+      - {path: tests/hfs/r146-workspace-version-coverage.spec.mjs, edition: lite, codes: [HFS_MONO_WORKSPACE_DEP]}
+      - {path: tests/hfs/r146-workspace-version-coverage.spec.mjs, edition: full, codes: [HFS_MONO_WORKSPACE_DEP]}
     law: "An fe workspace declares every package its files import (read with TypeScript's import pre-processor, its tsconfig path aliases excluded) in its own `package.json`, a sibling workspace package at `\"*\"`; the app root `package.json` never declares a workspace package."
     kinds: [check]
     gates: [settle, land, ci]

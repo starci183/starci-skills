@@ -629,3 +629,20 @@ Work-directory literals beyond their count when the check landed. Resolve the
 invocation directory, runtime state, temporary paths and Work records through
 `scripts/lib/roots.mjs`; new files start with no raw inputs. This runtime ownership
 check applies equally when working on lite and full apps.
+
+## Workspace dependency declarations
+
+`HFS_MONO_WORKSPACE_DEP` requires each front-end workspace to declare the packages
+its sources import in its own manifest. Every declaration of a sibling workspace
+uses exactly `"*"` in dependencies, devDependencies, peerDependencies or
+optionalDependencies; version ranges, fixed versions and local protocols are refused.
+Relative imports, Node builtins and tsconfig aliases do not require package entries.
+The app root never declares a workspace package as a dependency.
+
+## Backend module composition
+
+`BE_FEATURE_NOT_COMPOSED` requires features and capability owners to be reachable
+from an app through runtime imports or re-exports. Every feature transport module
+must itself be reachable: reaching another file in its feature does not compose it.
+A type-only import composes nothing. Findings identify the uncomposed transport
+module or owner and the app roots examined, in both lite and full editions.
