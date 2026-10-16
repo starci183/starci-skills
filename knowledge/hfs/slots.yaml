@@ -182,7 +182,8 @@ crossApp: apps never import each other; shared code is a packages/<pkg> slot.
 ruleParams:
   db:
     # R259: btree_gist supplies UUID equality for the booking interval exclusion constraint.
-    extensions: [pgmq, pg_cron, pgcrypto, pg_trgm, vector, uuid-ossp, pg_net, supabase_vault, btree_gist]
+    # R259: unaccent is a first-party Supabase extension used by Vietnamese-content search functions.
+    extensions: [pgmq, pg_cron, pgcrypto, pg_trgm, vector, uuid-ossp, pg_net, supabase_vault, unaccent, btree_gist]
   common:
     # HFS_SIZE_GROWTH: a file above soft may not grow against its parent commit; a new file stays within soft. Slot
     # budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.

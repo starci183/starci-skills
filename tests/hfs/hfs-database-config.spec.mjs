@@ -75,6 +75,11 @@ for (const edition of ['lite', 'full']) {
     has(findings({ [MIGRATION]: 'create extension pgcrypto;' }, edition, { manifest: { ruleParams: { db: { extensions: [] } } } }), 'DB_EXTENSION_ALLOWED');
   });
 
+  test(`${edition}: DB_EXTENSION_ALLOWED accepts unaccent and still refuses a made-up extension`, () => {
+    assert.deepEqual(findings({ [MIGRATION]: 'create extension unaccent with schema extensions;' }, edition), []);
+    has(findings({ [MIGRATION]: 'create extension not_a_real_extension with schema extensions;' }, edition), 'DB_EXTENSION_ALLOWED');
+  });
+
   for (const sql of [
     "select vault.create_secret('fixture-value');",
     "select vault.update_secret('fixture-id', 'fixture-value');",

@@ -4583,7 +4583,7 @@ rules:
       - {path: tests/hfs/hfs-database-baseline.spec.mjs, edition: lite, codes: [DB_BASELINE_SHAPE, DB_ARCHIVE_MUTATED]}
     witness:
       - {path: tests/hfs/hfs-database-baseline.spec.mjs, edition: lite, codes: [DB_BASELINE_SHAPE, DB_ARCHIVE_MUTATED]}
-    law: "An archived migration chain has exactly one active baseline marked -- starci:baseline <archived-last-stamp>, with a later valid stamp or an explicit restamp. Archive contents are immutable against repository history; an active migration enters the archive unchanged only in the same diff that adds the replacement baseline. The app db baseline, restamp and plan verbs are read-only unless --apply is explicit."
+    law: "An archived migration chain has exactly one active baseline marked -- starci:baseline <archived-last-stamp>, with a later valid stamp or an explicit restamp. Archived files only need the digits-stamp_name.sql shape, whatever the stamp value (they are immutable history and never applied); the baseline and active migrations keep the real-instant stamp check. Archive contents are immutable against repository history; an active migration enters the archive unchanged only in the same diff that adds the replacement baseline. The app db baseline, restamp and plan verbs are read-only unless --apply is explicit."
     kinds: [check]
     gates: [settle, land, ci]
     failureCodes: ["DB_BASELINE_SHAPE", "DB_ARCHIVE_MUTATED"]
