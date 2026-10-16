@@ -120,7 +120,11 @@ test("FE_TIER_DIRECTION: an import goes only to a tier the slot matrix allows", 
             "apps/web/src/modules/config/index.ts": "export const c = 1\n",
             "apps/web/src/modules/api/index.ts": "export const call = 1\n",
             // a hook reaches the transport and another domain (through its index)
-            "apps/web/src/hooks/shop/index.ts": "import { call } from '../../modules/api'\nimport { useCart } from '../cart'\nexport const useShop = [call, useCart]\n",
+            // only hooks/swr imports an operation of the transport (slots.yaml fe tier matrix, mayImportSlots; owner decision
+            // 2026-10-14); a domain hook reaches data through the swr wrapper and another domain through its index
+            "apps/web/src/hooks/swr/index.ts": "import { call } from '../../modules/api'\nexport const useCall = () => call\n",
+            "apps/web/src/hooks/shop/index.ts": "import { useCall } from '../swr'\nimport { useCart } from '../cart'\nexport const useShop = [useCall, useCart]\n",
+            "apps/web/src/hooks/orders/index.ts": "import { call } from '../../modules/api'\nexport const useOrders = call\n",
             "apps/web/src/hooks/cart/index.ts": "export const useCart = 1\n",
             // a module may not import a hook
             "apps/web/src/modules/catalog/types.ts": "import { useCart } from '../../hooks/cart'\nexport type CatalogValue = ReturnType<typeof useCart>\n",
@@ -131,10 +135,12 @@ test("FE_TIER_DIRECTION: an import goes only to a tier the slot matrix allows", 
             s.good("apps/web/src/modules/i18n/index.ts"),
             s.good("apps/web/src/app/[locale]/page.tsx"),
             s.good("apps/web/src/components/blocks/Card/index.tsx"),
+            s.good("apps/web/src/hooks/swr/index.ts"),
             s.good("apps/web/src/hooks/shop/index.ts"),
             s.good("apps/web/src/hooks/cart/index.ts"),
         ],
         invalid: [
+            s.bad("apps/web/src/hooks/orders/index.ts", 1),
             s.bad("apps/web/src/features/pages/A/index.tsx", 1),
             s.bad("apps/web/src/components/leaves/Btn/index.tsx", 1, 3),
             s.bad("apps/web/src/modules/catalog/types.ts", 1),
