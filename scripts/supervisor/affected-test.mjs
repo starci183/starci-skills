@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { diff } from '../api/git/diff.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
-import { mergeBase } from '../api/git/merge-base.mjs';
+import { baseChoice, baseLine } from './diff-base.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
 import { execNode } from '../api/node/exec-node.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
@@ -30,10 +30,9 @@ const TAIL_LINES = 25;
 const lines = (text) => String(text ?? '').split(/\r?\n/).filter(Boolean);
 const succeeded = (result) => result?.status === 0 && !result.error;
 
-/** The merge-base of HEAD with the base ref (`main`, else `origin/main`, unless a ref is named), or null. */
+/** The merge-base of HEAD with the base ref (the newest of local main, origin/main and the latest release tag, unless a ref is named), or null; baseChoice says which and why. */
 export function baseOf(root, ref, deps = {}) {
-  const candidates = ref ? [ref] : ['main', 'origin/main'];
-  return candidates.map((candidate) => (deps.mergeBase ?? mergeBase)(root, 'HEAD', candidate)).find(Boolean) ?? null;
+  return baseChoice(root, ref, deps).base;
 }
 
 /** The repository files changed since `base`: committed, staged, working and untracked, deletions included. */
@@ -185,11 +184,18 @@ async function runSelection({ root, picked, changed, args, deps, base, policy })
  * file when asked (`receiptFile`) and as the proven receipt of its base..tip pair (`provenFile`, clean ok runs only): the content is the file, never a long output to parse.
  */
 export async function testAffected(ctx, deps = {}) {
-  const answer = await affectedAnswer(ctx, deps);
+  const answer = withBaseLine(await affectedAnswer(ctx, deps));
   const receipt = answer?.data?.receipt;
   if (!ctx?.args?.run || !receipt) return answer;
   const root = path.resolve(ctx?.cwd ?? process.cwd(), ctx?.args?.root ?? '.');
   return { ...answer, data: { ...answer.data, ...leaveReceipts({ root, receipt, requested: ctx.args['receipt-file'] }) } };
+}
+
+// The chosen base and why, as the first line of the text and as data (an answer that diffed against nothing has none).
+function withBaseLine(answer) {
+  const choice = answer?.data?.baseChoice;
+  return choice?.base ? { ...answer, text: `${baseLine(choice)}
+${answer.text}` } : answer;
 }
 
 async function affectedAnswer(ctx, deps) {
@@ -197,7 +203,8 @@ async function affectedAnswer(ctx, deps) {
   if (args.by !== undefined && !['file', 'symbol'].includes(args.by)) return reply(2, 'starci test affected: --by is file or symbol', { ok: false, scope: [] });
   const root = path.resolve(ctx?.cwd ?? process.cwd(), args.root ?? '.');
   const explicit = pathList(args.changed);
-  const base = explicit.length && !args.base ? null : baseOf(root, args.base, deps);
+  const choice = explicit.length && !args.base ? { base: null, ref: null, why: null } : baseChoice(root, args.base, deps);
+  const base = choice.base;
   if (!explicit.length && !base) return reply(2, 'starci test affected: no base to diff against (no main or origin/main here); pass --base <ref> or --changed <file...>', { ok: false, scope: [] });
   const changed = explicit.length ? explicit : changedSince(root, base, deps);
   const policy = policyOf(deps);
@@ -208,12 +215,12 @@ async function affectedAnswer(ctx, deps) {
     exists: deps.exists ?? ((file) => fs.existsSync(path.join(root, file))), symbolsOf: (file) => symbolsAgainst({ root, base: diffBase, deps }, file),
   };
   const picked = args.by === 'file' ? affectedSelection(common) : affectedBySymbol({ ...common, depth: policy.symbolDepth, baseSource: (file) => baseSourceOf({ root, base: diffBase, deps }, file) });
-  const data = { ok: true, scope: picked.files, changed, base, readers: picked.readers, narrowed: picked.narrowed, large: picked.over, maxFiles: picked.maxFiles, reasons: picked.reasons ?? {}, ...symbolData(picked) };
+  const data = { ok: true, scope: picked.files, changed, base, baseChoice: choice, readers: picked.readers, narrowed: picked.narrowed, large: picked.over, maxFiles: picked.maxFiles, reasons: picked.reasons ?? {}, ...symbolData(picked) };
   const header = picked.over ? [largeText(picked)] : [];
   if (args.plan) return reply(0, [...selectionHead({ base, changed, picked }), ...header, ...planLines(picked)].join('\n'), data);
   if (!args.run) return reply(0, [...selectionText({ base, changed, picked }), ...header].join('\n'), data);
   // The diagnostic graph belongs to the plan; a run transports every selected file, result and receipt without repeating that graph.
-  const runData = { base, changed, large: data.large, maxFiles: data.maxFiles, narrowed: data.narrowed, mode: data.mode };
+  const runData = { base, baseChoice: choice, changed, large: data.large, maxFiles: data.maxFiles, narrowed: data.narrowed, mode: data.mode };
   const empty = { concurrency: 0 };
   if (!picked.files.length) return reply(0, 'affected: 0 files, 0 pass, 0 fail', { ...runData, ok: true, scope: [], results: [], receipt: receiptOf({ root, base: diffBase, picked, results: [], concurrency: empty, startedAt: Date.now(), budgetMs: policy.budgetMs, deps }) });
   const run = await runSelection({ root, picked, changed, args, deps, base: diffBase, policy });

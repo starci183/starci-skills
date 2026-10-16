@@ -50,6 +50,21 @@ test('a clean commit with a green check and green affected specs is verified: on
   assert.deepEqual([found.record.check, found.record.affected.passed, found.record.affected.total, found.record.affected.reused], [{ pass: 2301, total: 2301 }, 3, 3, 1]);
 });
 
+test('the first line (and the first progress line) says which base was chosen and why; the last line stays the verdict', async (t) => {
+  const why = 'newest merge base of main, origin/main with HEAD is origin/main; main (fa2eccd22) is behind it';
+  const chosen = await verify(t, { base: () => ({ base: BASE, ref: 'origin/main', why }) });
+  assert.equal(chosen.out.code, 0, chosen.out.text);
+  assert.equal(chosen.out.text.split(String.fromCharCode(10))[0], `base: ${BASE.slice(0, 9)} (${why})`);
+  assert.equal(chosen.lines[0], chosen.out.text.split(String.fromCharCode(10))[0]);
+  assert.match(last(chosen.out), /^verified /);
+  assert.equal(chosen.out.data.baseWhy, chosen.lines[0]);
+  const refused = await verify(t, { base: () => ({ base: null, ref: null, why: 'none of main, origin/main has a merge base with HEAD' }) });
+  assert.match(refused.out.text.split(String.fromCharCode(10))[0], /^base: none \(none of main/);
+  assert.match(last(refused.out), /^NOT VERIFIED /);
+  const bare = await verify(t);
+  assert.doesNotMatch(bare.out.text, /^base:/m, 'a seam that answers a bare sha has no reason to print');
+});
+
 test('NOT VERIFIED, each with its reason: a dirty tree, no base, a red check (the specs are not run), red spec files listed, an unfinished run, a tree that moved', async (t) => {
   const dirty = await verify(t, { facts: () => ({ sha: SHA, tree: 't', dirty: true }) });
   assert.equal(dirty.out.code, 1);

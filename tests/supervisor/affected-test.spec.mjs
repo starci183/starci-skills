@@ -60,7 +60,7 @@ test('a deleted spec is not selected', (t) => {
 const passing = () => Promise.resolve({ error: null, stdout: 'ok', stderr: '' });
 const context = (args) => ({ args, cwd: process.cwd() });
 const deps = (t, extra = {}) => ({
-  policy: POLICY, mergeBase: () => 'abcdef123456', exists: () => true, sources: [], hostSample: () => ({ logicalThreads: 16, cpuBusy: 0, totalRamBytes: 64 * 1024 ** 3, freeRamBytes: 48 * 1024 ** 3 }),
+  policy: POLICY, mergeBase: () => 'abcdef123456', latestTag: () => null, exists: () => true, sources: [], hostSample: () => ({ logicalThreads: 16, cpuBusy: 0, totalRamBytes: 64 * 1024 ** 3, freeRamBytes: 48 * 1024 ** 3 }),
   root: tree(t), revParse: () => 'tip0123456789', diff: () => ({ status: 0, stdout: '' }), lsFiles: () => ({ status: 0, stdout: '' }), ...extra,
 });
 
@@ -71,7 +71,7 @@ test('without --run the verb prints the selection and starts nothing', async (t)
   const d = deps(t, { changedFiles: () => ['scripts/lib/core.mjs'], execNode: (a) => { calls.push(a); return passing(); } });
   const out = await testAffected(ctxOf(d, {}), d);
   assert.equal(out.code, 0);
-  assert.match(out.text, /^affected: 1 spec file\(s\) for 1 changed file\(s\) since abcdef123/);
+  assert.match(out.text, /^base: abcdef123 [^\r\n]*\r?\naffected: 1 spec file\(s\) for 1 changed file\(s\) since abcdef123/);
   assert.match(out.text, /tests\/core\.spec\.mjs/);
   assert.deepEqual(calls, []);
 });
@@ -121,7 +121,7 @@ test('all green exits 0 and an empty selection runs nothing', async (t) => {
   const empty = deps(t, { changedFiles: () => ['docs/readme.md'], execNode: () => assert.fail('nothing is selected') });
   const none = await testAffected(ctxOf(empty, { run: true }), empty);
   assert.equal(none.code, 0);
-  assert.equal(none.text, 'affected: 0 files, 0 pass, 0 fail');
+  assert.equal(none.text.split(String.fromCharCode(10)).slice(1).join(String.fromCharCode(10)), 'affected: 0 files, 0 pass, 0 fail');
 });
 
 test('a large selection is announced and still run; --plan names the reason of each file', async (t) => {
@@ -166,12 +166,26 @@ test('--changed names the files itself, and no base without --changed is a usage
   assert.match(named.text, /tests\/core\.spec\.mjs/);
 });
 
-test('the base is main, else origin/main, unless a ref is named', () => {
+test('the base is the newest of main, origin/main and the latest release tag, unless a ref is named', () => {
   const asked = [];
-  const base = baseOf('.', undefined, { mergeBase: (_root, _head, ref) => { asked.push(ref); return ref === 'origin/main' ? 'sha' : null; } });
+  const base = baseOf('.', undefined, { latestTag: () => null, mergeBase: (_root, _head, ref) => { asked.push(ref); return ref === 'origin/main' ? 'sha' : null; } });
   assert.equal(base, 'sha');
   assert.deepEqual(asked, ['main', 'origin/main']);
   assert.equal(baseOf('.', 'topic', { mergeBase: (_r, _h, ref) => ref }), 'topic');
+});
+
+test('the first line of the answer says which base was chosen and why, with and without --run', async (t) => {
+  const d = deps(t, { changedFiles: () => ['scripts/lib/core.mjs'], execNode: passing, progress: () => {} });
+  const first = (out) => out.text.split(String.fromCharCode(10))[0];
+  const planned = await testAffected(ctxOf(d, {}), d);
+  assert.match(first(planned), /^base: abcdef123 \(newest merge base of main, origin\/main with HEAD is main\)$/);
+  assert.equal(planned.data.baseChoice.ref, 'main');
+  const ran = await testAffected(ctxOf(d, { run: true }), d);
+  assert.match(first(ran), /^base: abcdef123 \(/);
+  const named = await testAffected(ctxOf(d, { base: 'topic' }), d);
+  assert.match(first(named), /named by --base topic/);
+  const byFile = await testAffected(ctxOf(d, { changed: ['scripts/lib/core.mjs'] }), d);
+  assert.doesNotMatch(byFile.text, /^base:/, '--changed alone diffs against nothing');
 });
 
 test('the runner never has more files in flight than the limit and keeps the order of the files', async () => {

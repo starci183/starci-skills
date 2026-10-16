@@ -9,7 +9,7 @@ import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { runLandFullCheck } from '../supervisor/git-land-verify.mjs';
-import { baseOf } from '../supervisor/affected-test.mjs';
+import { baseChoice, baseLine } from '../supervisor/diff-base.mjs';
 import { verdictOf, verifyRecord, writeVerifyReceipt } from '../supervisor/verify-receipt.mjs';
 import { judgedIn } from '../gates/commit-proof.mjs';
 import { diffNames } from '../api/git/diff-names.mjs';
@@ -34,7 +34,7 @@ function factsOf(root) {
 function defaultSeams({ env }) {
   return {
     facts: factsOf,
-    base: (root, ref) => baseOf(root, ref),
+    base: (root, ref) => baseChoice(root, ref),
     runCheck: (root) => runLandFullCheck(root),
     changedSpecs: (root, base) => (diffNames(root, base, 'HEAD') ?? []).filter((file) => /^tests\/.*\.spec\.mjs$/.test(file)),
     provenAffected: (root, base, tip) => provenFor({ dir: root, base, tip }),
@@ -42,7 +42,10 @@ function defaultSeams({ env }) {
   };
 }
 
-const answer = (code, data, lines) => ({ code, text: [...lines, data.verdict].join('\n'), data: { schema: VERIFY_SCHEMA_ANSWER, ok: code === 0, partial: code === PARTIAL_EXIT, ...data } });
+// The first line says which base was chosen and why (a seam that answers a bare sha has no reason to give).
+const baseHead = (choice) => (choice?.why ? [baseLine(choice)] : []);
+
+const answer = (code, data, lines) => ({ code, text: [...(data.baseWhy ? [data.baseWhy] : []), ...lines, data.verdict].join('\n'), data: { schema: VERIFY_SCHEMA_ANSWER, ok: code === 0, partial: code === PARTIAL_EXIT, ...data } });
 
 /** The affected numbers of a receipt that judged `root`, with the lane's own changed specs checked against the files not started: {passed, total, failed, notStarted, changedSpecsRan, reused, files, ms}. */
 function affectedOf({ receipt, unfinished = [], changedSpecs = [] }) {
@@ -93,9 +96,13 @@ export async function runtimeVerify(ctx, deps = {}) {
   const seams = { ...defaultSeams({ env: ctx?.env ?? process.env }), ...deps.seams };
   const progress = deps.progress ?? ((line) => (ctx?.io?.stderr ? ctx.io.stderr(`${line}\n`) : process.stderr.write(`${line}\n`)));
   const facts = seams.facts(root);
-  const base = facts.sha ? seams.base(root, args.base) : null;
+  const picked = facts.sha ? seams.base(root, args.base) : null;
+  const choice = picked && typeof picked === 'object' ? picked : { base: picked ?? null, why: null };
+  const base = choice.base;
+  const [baseWhy = null] = baseHead(choice);
+  if (baseWhy) progress(baseWhy);
   const refused = startProblems({ facts, base });
-  const fail = (problems, extra = {}, lines = []) => answer(1, { sha: facts.sha, base, check: null, affected: null, problems, receiptFile: null, verdict: verdictOf({ sha: facts.sha, base, problems, red: extra.red }), ...extra }, lines);
+  const fail = (problems, extra = {}, lines = []) => answer(1, { sha: facts.sha, base, baseWhy, check: null, affected: null, problems, receiptFile: null, verdict: verdictOf({ sha: facts.sha, base, problems, red: extra.red }), ...extra }, lines);
   if (refused.length) return fail(refused);
   progress(`check: running starci runtime check in ${root} (minutes)`);
   const checked = seams.runCheck(root);
@@ -107,5 +114,5 @@ export async function runtimeVerify(ctx, deps = {}) {
   if (after.sha !== facts.sha || after.dirty) return fail(['the check or the specs changed the tree or HEAD moved while they ran; the receipt would not bind the commit'], { check });
   const record = verifyRecord({ sha: facts.sha, tree: facts.tree, root, base, check, affected: proof.affected });
   const receiptFile = writeVerifyReceipt(root, record);
-  return answer(proof.affected.notStarted > 0 ? PARTIAL_EXIT : 0, { sha: facts.sha, base, check, affected: proof.affected, problems: [], red: [], receiptFile, verdict: verdictOf({ sha: facts.sha, base, check, affected: proof.affected, problems: [] }) }, [`receipt: ${receiptFile}`]);
+  return answer(proof.affected.notStarted > 0 ? PARTIAL_EXIT : 0, { sha: facts.sha, base, baseWhy, check, affected: proof.affected, problems: [], red: [], receiptFile, verdict: verdictOf({ sha: facts.sha, base, check, affected: proof.affected, problems: [] }) }, [`receipt: ${receiptFile}`]);
 }
