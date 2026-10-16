@@ -114,7 +114,11 @@ function receiverNamespaces(state, receiver) {
   const { ts, checker } = state;
   const direct = state.translators.get(checker.getSymbolAtLocation(receiver));
   if (direct !== undefined) return direct;
-  return valuesOf(state, receiver).flatMap(leaf => ts.isIdentifier(leaf) ? state.translators.get(checker.getSymbolAtLocation(leaf)) ?? [] : []);
+  return valuesOf(state, receiver).flatMap(leaf => {
+    // A translator factory called in place as an argument: f(useTranslations("admin")).
+    if (ts.isCallExpression(leaf)) return translatorNamespace(state, leaf, translationFactories(ts, leaf.getSourceFile())) ?? [];
+    return ts.isIdentifier(leaf) ? state.translators.get(checker.getSymbolAtLocation(leaf)) ?? [] : [];
+  });
 }
 
 function handedIn(state, receiver) {
@@ -130,6 +134,16 @@ function leafName(ts, node) {
   return ts.isIdentifier(node) ? node.text : '';
 }
 
+/** A callback typed (string, ...) => string: the shape of a translator whatever its name. */
+function translatorShaped(state, receiver) {
+  const { checker } = state;
+  const [signature] = checker.getTypeAtLocation(receiver).getCallSignatures();
+  const first = signature?.getParameters()[0];
+  if (!first) return false;
+  const isString = type => Boolean(type.flags & state.ts.TypeFlags.String);
+  return isString(checker.getTypeOfSymbolAtLocation(first, receiver)) && isString(signature.getReturnType());
+}
+
 /**
  * Namespaces read by a call of `callee`; `null` stands for a translator handed in whose namespace cannot be followed
  * (R106 reads such a key by its leaf), and no result means the call is no catalog read.
@@ -140,7 +154,7 @@ export function catalogNamespace(state, callee) {
   if (ts.isPropertyAccessExpression(callee) && /^(?:rich|raw|markup)$/u.test(callee.name.text)) receiver = callee.expression;
   const resolved = receiverNamespaces(state, receiver);
   if (resolved.length) return resolved;
-  if (TRANSLATOR_NAME.test(leafName(ts, receiver)) && handedIn(state, receiver)) return [null];
+  if (handedIn(state, receiver) && (TRANSLATOR_NAME.test(leafName(ts, receiver)) || translatorShaped(state, receiver))) return [null];
   if (ts.isPropertyAccessExpression(callee) && callee.name.text === 'get') {
     const owner = callee.expression;
     const name = nameText(ts, ts.isPropertyAccessExpression(owner) ? owner.name : owner, { numbers: true }) ?? '';

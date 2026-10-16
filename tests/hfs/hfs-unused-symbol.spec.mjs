@@ -376,3 +376,20 @@ const local = useTranslations("local"); const text = useCallback((key: string) =
     assert.deepEqual(namesOf(fixture(t, contents), edition), []);
   });
 }
+
+for (const edition of ['lite', 'full']) {
+  test(`HFS_UNUSED_SYMBOL ${edition}: a typed text callback parameter binds the namespace of the translator it is called with, else reads loosely`, t => {
+    const contents = {
+      'apps/web/src/modules/i18n/messages/en.json': JSON.stringify({ admin: { memberDisabled: 'Disabled', retired: 'Retired' }, other: { memberDisabled: 'Other', orphanLabel: 'Orphan', dead: 'Dead' } }),
+      'apps/web/src/features/rows.ts': `export type AdminText = (k: string, v?: unknown) => string;
+export const rows = (text: AdminText) => [text("memberDisabled")];
+export const orphan = (label: AdminText) => label("orphanLabel");`,
+      'apps/web/src/features/page.tsx': `import { rows } from './rows';
+const t = useTranslations("admin"); const text: AdminText = (key, values) => t(key, values);
+export const a = rows(text); export const b = rows(useTranslations("admin"));`,
+    };
+    assert.deepEqual(namesOf(fixture(t, contents), edition), ['admin.retired', 'other.dead', 'other.memberDisabled']);
+    contents['apps/web/src/features/page.tsx'] += ' export const c = useTranslations("admin")("retired");';
+    assert.deepEqual(namesOf(fixture(t, contents), edition), ['other.dead', 'other.memberDisabled']);
+  });
+}
