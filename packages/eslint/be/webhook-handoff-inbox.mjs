@@ -9,6 +9,46 @@ import { webhookIntakeProcessesDelivery } from "./webhook-handoff-intake.mjs"
 
 const DELIVERY_ID = /Id$/
 
+/** The slot of provider webhook doors (`<provider>.webhook.ts`), the only entrance of a delivery intake. */
+const DOOR_SLOT = "be.feature.webhooks.http"
+
+/** The method declarations each program's webhook doors call, computed once per program. */
+const reachedByProgram = new WeakMap()
+
+/** Declarations a call resolves to: its signature's declaration and its (alias-resolved) callee symbol's declarations. */
+const calledDeclarations = (checker, call) => {
+    const expression = call.expression
+    const name = ts.isPropertyAccessExpression(expression) ? expression.name
+        : ts.isElementAccessExpression(expression) ? expression.argumentExpression : expression
+    const symbol = checker.getSymbolAtLocation(name)
+    const target = symbol && symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol
+    return [checker.getResolvedSignature(call)?.declaration, ...(target?.getDeclarations() ?? [])].filter(Boolean)
+}
+
+/** Every method a webhook door file (slot be.feature.webhooks.http, `*.webhook.ts`) calls, by resolved declaration. */
+const doorCalledDeclarations = (context, hfs) => {
+    const { program, checker } = typed(context)
+    const cached = reachedByProgram.get(program)
+    if (cached) return cached
+    const reached = new Set()
+    for (const source of program.getSourceFiles()) {
+        if (hfs.slotOf(source.fileName) !== DOOR_SLOT || !baseName(source.fileName).endsWith(".webhook.ts")) continue
+        const visit = (node) => {
+            if (ts.isCallExpression(node)) for (const declaration of calledDeclarations(checker, node)) reached.add(declaration)
+            ts.forEachChild(node, visit)
+        }
+        visit(source)
+    }
+    reachedByProgram.set(program, reached)
+    return reached
+}
+
+/** A method is a webhook delivery intake only when a webhook door's call resolves to it. */
+const isDoorIntake = (context, hfs, method) => {
+    const declaration = typed(context).toTs(method)
+    return !!declaration && doorCalledDeclarations(context, hfs).has(declaration)
+}
+
 /** Defaults keep the same first-parameter binding. */
 const parameterOf = (parameter) => parameter?.type === "AssignmentPattern" ? parameter.left : parameter
 
@@ -192,6 +232,8 @@ export const webhookInboxKey = {
             MethodDefinition(method) {
                 if (method.kind !== "method" || method.static || method.key.type === "PrivateIdentifier" || !method.value.body
                     || ["private", "protected"].includes(method.accessibility)) return
+                // A service no webhook door reaches is an ordinary domain service, whatever its first parameter is called.
+                if (!isDoorIntake(context, hfs, method)) return
                 const key = deliveryKey(context, method)
                 if (!key) return
                 if (webhookIntakeProcessesDelivery(context, hfs, method)) context.report({ node: method.key, messageId: "handoff" })
