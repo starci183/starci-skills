@@ -29,7 +29,7 @@ export function sizeGrowthSharedSpec({ side, tester, fileSizeGrowth, budget, fil
       if (run.error || run.status !== 0) throw run.error ?? new Error(`git ${args[0]} exited ${run.status}: ${run.stderr}`)
     }
     try {
-      git("init", "-q")
+      git("init", "-q", "-b", "main") // the rule's baseline is the merge base with main: the fixture names its own branch, whatever init.defaultBranch is
     } catch {
       t.skip("git is not available")
       return
