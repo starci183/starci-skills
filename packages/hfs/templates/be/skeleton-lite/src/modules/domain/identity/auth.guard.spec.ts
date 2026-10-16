@@ -75,7 +75,6 @@ describe("AuthGuard", () => {
         expect(verify).toHaveBeenCalledWith("signed-token")
         expect(request.principal).toEqual(principal)
     })
-
 })
 
 describe("AuthGuard credential doors", () => {
