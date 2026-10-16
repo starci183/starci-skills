@@ -7,6 +7,7 @@ import { nameText } from '../../lib/ts-ast.mjs';
 import { unwrapCatalogExpression as unwrap } from '../../lib/ts-analysis.mjs';
 import { argumentBindings, callable, jsonCatalogBindings, jsonCatalogRead, staticStrings } from './unused-symbol-values.mjs';
 import { catalogNamespace, translationBindings } from './unused-symbol-translators.mjs';
+import { applyDynamicKeysLedger } from './unused-symbol-ledger.mjs';
 import { returnedExpressions, valuesOf } from './unused-symbol-flow.mjs';
 
 export const HFS_UNUSED_SYMBOL = 'HFS_UNUSED_SYMBOL';
@@ -306,6 +307,7 @@ export function unusedSymbolFindings({ repoRoot, files, repo = {}, isRoot = fals
   translationBindings(state, sources);
   sourceReads(state, sources);
   jsonCandidates(state, files);
+  const ledgerFindings = applyDynamicKeysLedger(state, repo.profile);
   for (const candidate of state.candidates) if (candidate.kind === 'error code' && state.reads.has(candidate.value)) candidate.used = true;
   const liveCodes = new Set(state.candidates.filter(candidate => candidate.kind === 'error code' && candidate.used).map(candidate => candidate.value));
   const findings = new Map();
@@ -314,5 +316,5 @@ export function unusedSymbolFindings({ repoRoot, files, repo = {}, isRoot = fals
     const { used: _used, ...extra } = candidate;
     findings.set(`${candidate.path}:${candidate.name}`, found(HFS_UNUSED_SYMBOL, candidate.path, `${candidate.path} declares unused ${candidate.kind} ${candidate.name}; remove it or read it in production source (declarations, metadata maps and tests do not count).`, extra));
   }
-  return [...findings.values()].sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line || a.name.localeCompare(b.name));
+  return [...findings.values(), ...ledgerFindings.filter(finding => inScope(finding.path))].sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line || a.name.localeCompare(b.name));
 }

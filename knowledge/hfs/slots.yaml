@@ -995,6 +995,21 @@ slots:
     tests: none
     coverage: none
     budget: {bytes: 512000}
+  - id: repo.i18n-dynamic-keys
+    since: 3.3.0
+    profiles: [be, fe]
+    # The side's authored ledger of catalog keys the R280 detector cannot see (fe/i18n-dynamic-keys.yaml, be/i18n-dynamic-keys.yaml:
+    # each side owns its own catalogs). A key it names counts as read; an entry matching no catalog key, or a malformed file, is itself an R280 finding.
+    path: i18n-dynamic-keys.yaml
+    presence: opt-in
+    tracked: tracked
+    tier: none
+    tests: none
+    coverage: none
+    exemplifiedBy:
+      - {path: tests/fixtures/hfs-i18n-ledger/fe/i18n-dynamic-keys.yaml, editions: [lite, full]}
+      - {path: tests/fixtures/hfs-i18n-ledger/be/i18n-dynamic-keys.yaml, editions: [lite, full]}
+    rules: [HFS_UNUSED_SYMBOL]
   - id: repo.packages
     since: 3.1.0
     profiles: [be, fe]

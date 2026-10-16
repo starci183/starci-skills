@@ -1039,6 +1039,7 @@ surfaces:
         - repo.agent-output
         - repo.worktrees
         - be.assets
+        - repo.i18n-dynamic-keys
       examples:
         - examples/lite-app/.gitignore
         - examples/lite-app/supabase/types/database.types.ts
@@ -1062,6 +1063,7 @@ surfaces:
         - repo.agent-output
         - repo.worktrees
         - be.assets
+        - repo.i18n-dynamic-keys
       examples:
         - examples/ecommerce-app/.gitignore
       gap:
