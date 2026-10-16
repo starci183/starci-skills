@@ -1,10 +1,10 @@
 /** R263 extends inbox dedupe to scalar delivery ids and signed raw-body intakes. */
 import ts from "typescript"
-import { walk } from "./lib/ast.mjs"
-import { hfsOf } from "./lib/hfs.mjs"
-import { baseName, isOwnedType, ownerNameOf } from "./lib/ports.mjs"
-import { resolveVariable } from "./lib/transactions.mjs"
-import { isPackageType, typed } from "./lib/types.mjs"
+import { walk } from "./ast.mjs"
+import { hfsOf } from "./hfs.mjs"
+import { baseName, isOwnedType, ownerNameOf } from "./ports.mjs"
+import { resolveVariable } from "./transactions.mjs"
+import { isPackageType, typed } from "./types.mjs"
 import { webhookIntakeProcessesDelivery } from "./webhook-handoff-intake.mjs"
 
 const DELIVERY_ID = /Id$/

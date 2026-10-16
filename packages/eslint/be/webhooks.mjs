@@ -27,8 +27,8 @@ import { typed } from "./lib/types.mjs"
 import { isProviderAcknowledgement } from "./lib/webhook-ack.mjs"
 import { webhookForbiddenReferences, webhookIntakeDispatchesCommand } from "./lib/webhook-handoff.mjs"
 import { firstWebhookChallenge, firstWebhookVerification, isWebhookChallengeReturn, isWebhookDomainServiceType as isDomainServiceType, isWebhookSignatureType as isSignatureType } from "./lib/webhook-verifiers.mjs"
-import { webhookInboxKey } from "./webhook-handoff-inbox.mjs"
-import { webhookIntakeProcessesDelivery } from "./webhook-handoff-intake.mjs"
+import { webhookInboxKey } from "./lib/webhook-handoff-inbox.mjs"
+import { webhookIntakeProcessesDelivery } from "./lib/webhook-handoff-intake.mjs"
 
 /** The slot of provider webhook doors. */
 const SLOT = "be.feature.webhooks.http"

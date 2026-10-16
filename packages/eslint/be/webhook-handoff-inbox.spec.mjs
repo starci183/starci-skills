@@ -5,7 +5,7 @@ import test from "node:test"
 import { BE_DECLARATION, TYPED_ROOT, at, ruleTester } from "./fixtures/typed/tester.mjs"
 import { appDeclaration } from "./fixtures/app.mjs"
 import { hfsFromDeclaration } from "./lib/hfs.mjs"
-import { webhookInboxKey } from "./webhook-handoff-inbox.mjs"
+import { webhookInboxKey } from "./lib/webhook-handoff-inbox.mjs"
 import { rules, recommended } from "./webhooks.mjs"
 
 // The intake is reached by the on-disk door fixture (features/webhooks/intake/.../intake.webhook.ts), which calls DeliveryService.receive.

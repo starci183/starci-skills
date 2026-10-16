@@ -1,7 +1,7 @@
 /** R263: a receipt transaction records and publishes; a reactor/job processes after commit. */
 import ts from "typescript"
-import { baseName } from "./lib/ports.mjs"
-import { originsOfType, typed } from "./lib/types.mjs"
+import { baseName } from "./ports.mjs"
+import { originsOfType, typed } from "./types.mjs"
 
 /** Imported aliases and overload signatures retain the implementation's actual body. */
 const bodiesOf = (checker, call) => {
