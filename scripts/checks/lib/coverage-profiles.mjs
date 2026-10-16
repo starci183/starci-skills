@@ -41,6 +41,7 @@ function profileValue(context, index, node, profile, seen = new Set()) {
   switch (node.type) {
     case 'Literal': return node.value;
     case 'MemberExpression': return profileMember(node) ? profile : UNKNOWN;
+    case 'CallExpression': return kindGuard(node, profile);
     case 'LogicalExpression': return logical(context, index, node, profile, next);
     case 'ConditionalExpression': return conditional(context, index, node, profile, next);
     case 'BinaryExpression': return binary(node.operator,
@@ -51,6 +52,18 @@ function profileValue(context, index, node, profile, seen = new Set()) {
 }
 
 const profileMember = node => (!node.computed || node.property.type === 'Literal') && nodeName(node.property) === 'profile';
+
+// Architecture config derives kinds from the HFS profile, just as the graph derives profile.
+function kindGuard(node, profile) {
+  if (node.callee.computed && node.callee.property.type !== 'Literal') return UNKNOWN;
+  if (nodeName(node.callee.property) !== 'includes') return UNKNOWN;
+  const member = node.callee.object;
+  if (member?.type !== 'MemberExpression' || nodeName(member.property) !== 'kinds') return UNKNOWN;
+  if (member.computed && member.property.type !== 'Literal') return UNKNOWN;
+  const kind = node.arguments[0]?.value;
+  if (!['backend', 'frontend'].includes(kind)) return UNKNOWN;
+  return kind === (profile === 'be' ? 'backend' : 'frontend');
+}
 
 function negated(context, index, node, profile, seen) {
   if (node.operator !== '!') return UNKNOWN;

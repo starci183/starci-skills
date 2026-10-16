@@ -296,3 +296,9 @@ imports to the `modules/auth` boundary.
 ### R156 kind isolation
 
 BE_KIND_ISOLATION rejects imports between backend features whose owner slots name different trigger kinds. Static imports, dynamic imports, re-exports and type-only imports all count. Imports within one owner and imports into shared modules pass in both editions.
+
+## R93 vendor and Grammar ownership
+
+`FE_VENDOR_BOUNDARY` keeps vendor icons in the Icon leaf, uses the heroicons family at the declared glyph sizes, excludes decorative icons from metric cells, and requires a named owner for vendor primitives. These boundaries apply in lite and full.
+
+`ARCH_GRAMMAR_EXPORT_BYPASS` rejects imports outside the selected Grammar code and style entries. Source import findings belong to the `grammar-entry` ESLint rule. `ARCH_GRAMMAR_CONTRACT_INVALID` reports invalid installed package exports, peers, consumer dependencies or style contracts on a package manifest. The architecture machine retains these package findings in app check; they are never TSX lint reports. A valid installed contract and imports through the selected entries are clean in both editions.

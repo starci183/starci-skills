@@ -1841,7 +1841,7 @@ rules:
     code: "FE_VENDOR_BOUNDARY"
     law: "Vendor primitives and icons reach components only through their named owner: the one icon set of knowledge/hfs/fe-stack.yaml (the heroicons family) through the icon leaf at the glyph scale, every vendor primitive behind a named owner; the Grammar package is imported only through its selected code and style entry and keeps its declared contract."
     kinds: [lint, codemod]
-    gates: [pre-commit, pre-push, settle, land, ci]
+    gates: [pre-commit, settle, land, ci]
     failureCodes: ["FE_VENDOR_BOUNDARY", "ARCH_GRAMMAR_CONTRACT_INVALID", "ARCH_GRAMMAR_EXPORT_BYPASS"]
     enforcers:
       - {kind: eslint-fe, id: no-vendor-icon-outside-icon-leaf}
@@ -1850,6 +1850,19 @@ rules:
       - {kind: eslint-fe, id: no-decorative-icon-in-metric-cell}
       - {kind: eslint-fe, id: vendor-primitive-has-named-owner}
       - {kind: eslint-fe, id: grammar-entry}
+      - {kind: machine, id: grammar, at: scripts/hfs/architecture/frontend-grammar.mjs}
+    editions: [lite, full]
+    docs: ["docs/code-pattern-enforcement.md#r93-vendor-and-grammar-ownership"]
+    proves:
+      - packages/eslint/fe/r93-vendor-coverage.spec.mjs
+      - tests/hfs-architecture/r93-grammar-ownership.spec.mjs
+    templateNa: "Vendor boundary violations and installed Grammar package contracts are checked against consumer ownership; no managed template scaffolds a vendor install or a forbidden import."
+    exemplifiedBy:
+      - {path: packages/eslint/fe/r93-vendor-coverage.spec.mjs, editions: [lite, full]}
+      - {path: tests/hfs-architecture/r93-grammar-ownership.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: packages/eslint/fe/r93-vendor-coverage.spec.mjs, editions: [lite, full], codes: [FE_VENDOR_BOUNDARY]}
+      - {path: tests/hfs-architecture/r93-grammar-ownership.spec.mjs, editions: [lite, full], codes: [ARCH_GRAMMAR_CONTRACT_INVALID, ARCH_GRAMMAR_EXPORT_BYPASS]}
   - id: R94
     code: "FE_SLOT_FILE_ROLE"
     law: "A front-end file is owned by a slot and named by it: a slot that owns a directory (route, feature, components, hooks, api module) holds only the files its `allows` list names, and holds them inside a folder of its own."
