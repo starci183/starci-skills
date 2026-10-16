@@ -3636,22 +3636,73 @@ rules:
       - {kind: hfs, id: db-migration-shape, at: scripts/hfs/rules/database.mjs}
   - id: R214
     code: "DB_RLS_REQUIRED"
+    editions: [lite, full]
+    docs: [docs/lite-edition.md#r214]
+    proves:
+      - {path: tests/hfs-proofs/db-rls-required.spec.mjs, editions: [lite, full], codes: [DB_RLS_REQUIRED]}
+      - {path: tests/hfs-proofs/db-dynamic-ddl.spec.mjs, editions: [lite, full], codes: [DB_DYNAMIC_DDL]}
+      - {path: tests/hfs-proofs/db-policy-shape.spec.mjs, editions: [lite, full], codes: [DB_POLICY_SHAPE]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/be/table/migration.sql.tpl, editions: [lite, full]}
+      - {path: tests/hfs-proofs/db-rls-required.spec.mjs, editions: [lite, full]}
+      - {path: tests/hfs-proofs/db-dynamic-ddl.spec.mjs, editions: [lite, full]}
+      - {path: tests/hfs-proofs/db-policy-shape.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-proofs/db-rls-required.spec.mjs, edition: lite, codes: [DB_RLS_REQUIRED]}
+      - {path: tests/hfs-proofs/db-dynamic-ddl.spec.mjs, edition: lite, codes: [DB_DYNAMIC_DDL]}
+      - {path: tests/hfs-proofs/db-policy-shape.spec.mjs, edition: lite, codes: [DB_POLICY_SHAPE]}
+      - {path: tests/hfs-proofs/db-rls-required.spec.mjs, edition: full, codes: [DB_RLS_REQUIRED]}
+      - {path: tests/hfs-proofs/db-dynamic-ddl.spec.mjs, edition: full, codes: [DB_DYNAMIC_DDL]}
+      - {path: tests/hfs-proofs/db-policy-shape.spec.mjs, edition: full, codes: [DB_POLICY_SHAPE]}
     law: "Row level security is code a parser can read: every `create table` (or `create table as`) in an exposed schema (`public` plus the config.toml `[api] schemas`) is followed, in the same migration, by `alter table <t> enable row level security` (and `force` for a table hfs.json `supabase.forceRls` declares); no `DO` block or function runs dynamic SQL that builds DDL or grants; a write or `for all` policy never uses `(true)`, `to anon`/`to public` is legal only on a `for select` policy named `*_public_read`, every policy is named `<table>_<role>_<action>`, and `service_role` is never granted."
     kinds: [check, codemod]
-    gates: [pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["DB_RLS_REQUIRED", "DB_DYNAMIC_DDL", "DB_POLICY_SHAPE"]
     enforcers:
       - {kind: hfs, id: db-rls, at: scripts/hfs/rules/database.mjs}
   - id: R215
     code: "DB_DEFINER_SAFE"
+    editions: [lite, full]
+    docs: [docs/lite-edition.md#r215]
+    proves:
+      - {path: tests/hfs-proofs/db-definer-safe.spec.mjs, editions: [lite, full], codes: [DB_DEFINER_SAFE]}
+      - {path: tests/hfs-proofs/db-storage-policy.spec.mjs, editions: [lite, full], codes: [DB_STORAGE_POLICY]}
+    exemplifiedBy:
+      - {path: tests/hfs-proofs/db-definer-safe.spec.mjs, editions: [lite, full]}
+      - {path: tests/hfs-proofs/db-storage-policy.spec.mjs, editions: [lite, full]}
+    templateNa: "Security-definer functions and storage buckets are app-owned SQL objects; neither edition scaffolds them."
+    witness:
+      - {path: tests/hfs-proofs/db-definer-safe.spec.mjs, edition: lite, codes: [DB_DEFINER_SAFE]}
+      - {path: tests/hfs-proofs/db-storage-policy.spec.mjs, edition: lite, codes: [DB_STORAGE_POLICY]}
+      - {path: tests/hfs-proofs/db-definer-safe.spec.mjs, edition: full, codes: [DB_DEFINER_SAFE]}
+      - {path: tests/hfs-proofs/db-storage-policy.spec.mjs, edition: full, codes: [DB_STORAGE_POLICY]}
     law: "Privileged database objects are declared safely: a `security definer` function pins `search_path` (never `from current`), lives outside the exposed schemas or is `revoke execute ... from public` in the same migration, declares a return type and interpolates parameters into dynamic SQL only through `format('%I/%L')`; a bucket inserted into `storage.buckets` declares `public = false` (true only for an id ending `_public`), `file_size_limit` and `allowed_mime_types`, and has a `storage.objects` policy naming its `bucket_id` in the same migration."
     kinds: [check]
-    gates: [pre-push, settle, land, ci]
+    gates: [settle, land, ci]
     failureCodes: ["DB_DEFINER_SAFE", "DB_STORAGE_POLICY"]
     enforcers:
       - {kind: hfs, id: db-privileged-objects, at: scripts/hfs/rules/database.mjs}
   - id: R216
     code: "DB_CONFIG_POLICY"
+    editions: [lite, full]
+    docs: [docs/lite-edition.md#r216]
+    proves:
+      - {path: tests/hfs-proofs/db-types-returned-collector.spec.mjs, editions: [lite, full], codes: [DB_TYPES_DRIFT]}
+      - {path: tests/hfs-proofs/db-config-policy.spec.mjs, editions: [lite, full], codes: [DB_CONFIG_POLICY]}
+      - {path: tests/hfs-proofs/db-types-drift.spec.mjs, editions: [lite, full], codes: [DB_TYPES_DRIFT]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/skeleton-lite/supabase/config.toml, edition: lite}
+      - {path: tests/hfs-proofs/db-types-returned-collector.spec.mjs, editions: [lite, full]}
+      - {path: tests/hfs-proofs/db-config-policy.spec.mjs, editions: [lite, full]}
+      - {path: tests/hfs-proofs/db-types-drift.spec.mjs, editions: [lite, full]}
+    templateNa: "Database types are generated from each app migration set, not static templates; full-edition Supabase configuration is app-owned."
+    witness:
+      - {path: tests/hfs-proofs/db-types-returned-collector.spec.mjs, edition: lite, codes: [DB_TYPES_DRIFT]}
+      - {path: tests/hfs-proofs/db-types-returned-collector.spec.mjs, edition: full, codes: [DB_TYPES_DRIFT]}
+      - {path: tests/hfs-proofs/db-config-policy.spec.mjs, edition: lite, codes: [DB_CONFIG_POLICY]}
+      - {path: tests/hfs-proofs/db-types-drift.spec.mjs, edition: lite, codes: [DB_TYPES_DRIFT]}
+      - {path: tests/hfs-proofs/db-config-policy.spec.mjs, edition: full, codes: [DB_CONFIG_POLICY]}
+      - {path: tests/hfs-proofs/db-types-drift.spec.mjs, edition: full, codes: [DB_TYPES_DRIFT]}
     law: "The database configuration and its types are checked facts: `supabase/config.toml` carries no literal value under a credential key (the value is `env(NAME)`), `auth.jwt_expiry` is at most 3600, and signup, site url and redirect urls equal the Supabase block of hfs.json where it declares them; `supabase/types/database.types.ts` is committed and equals the text `contract:emit` regenerates from the migrations."
     kinds: [check]
     gates: [land, ci]

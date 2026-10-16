@@ -194,3 +194,12 @@ Both editions give Supabase one owner per side. `FE_SUPABASE_CLIENT_OWNER` refus
 ## R219
 
 `BE_SUPABASE_JWT_VERIFIED` applies in both editions. The Supabase integration verifies access tokens with the project's remote JWKS, issuer, authenticated audience and pinned algorithms before accepting a principal. Unverified decoding, authorization claims from the request body and verification outside the integration are refused.
+
+<a id="r214"></a>
+R214 applies in lite and full. `DB_RLS_REQUIRED` rejects exposed tables without enabled (or declared forced) row-level security. `DB_DYNAMIC_DDL` rejects dynamically executed DDL and grants. `DB_POLICY_SHAPE` rejects unsafe policy predicates, naming, anonymous access and service-role grants. Repairs use static SQL, explicit RLS and bounded ownership policies.
+
+<a id="r215"></a>
+R215 applies in lite and full. `DB_DEFINER_SAFE` requires pinned search paths, safe exposed-function revokes, return types and safely quoted dynamic parameters. `DB_STORAGE_POLICY` requires explicit bucket visibility, size and MIME limits and a matching bounded objects policy in the same migration.
+
+<a id="r216"></a>
+R216 applies in lite and full. `DB_CONFIG_POLICY` rejects literal credentials, excessive JWT lifetime and authentication settings that contradict hfs.json. `DB_TYPES_DRIFT` rejects missing or stale committed generated database types; regenerate them from the migrations with the app's contract emitter. The opt-in `check --db-types` path compares freshly emitted text without rewriting the committed file.
