@@ -65,7 +65,7 @@ for (const edition of Object.keys(TEMPLATES)) {
     assert.deepEqual([...config.volumes].sort(byCodeUnit), Object.values(stack.volumes).map(volume => volume.name).sort(byCodeUnit));
     assert.deepEqual(config.secrets.grants.flatMap(grant => grant.from.map(source => source.member)), members);
     assert.ok(config.verify.http.length > 0);
-    const caddy = fs.readFileSync(path.join(config.envDir, edition === 'lite' ? 'infra/swarm/Caddyfile' : 'runtime/config/Caddyfile'), 'utf8');
+    const caddy = fs.readFileSync(path.join(config.envDir, 'infra/swarm/Caddyfile'), 'utf8');
     for (const check of config.verify.http) {
       const { host } = new URL(check.url);
       assert.ok(hosts.includes(host), `${host} is a host of the template`);
