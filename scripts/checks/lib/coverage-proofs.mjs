@@ -120,12 +120,51 @@ function returnedCode(context, index, node, code, seen = new Set()) {
   return astChildren(node).some((child) => returnedCode(context, index, child, code, next));
 }
 
+// An overapproximation: retain original children even when a member resolves to
+// an alias, and include uncalled declarations. A missing literal here is decisive;
+// a present literal still needs the existing return/collector consumption checks.
+function possibleCodeNodes(context, index, node) {
+  const literals = [];
+  const pending = [{ index, node }];
+  const seen = new WeakMap();
+  while (pending.length) {
+    const current = pending.pop();
+    if (!current.node) continue;
+    const scopes = seen.get(current.node) ?? new Set();
+    if (scopes.has(current.index)) continue;
+    scopes.add(current.index);
+    seen.set(current.node, scopes);
+    if (['Literal', 'TemplateLiteral'].includes(current.node.type)) literals.push(current.node);
+    const resolved = resolvedExpression(context, current.index, current.node);
+    if (resolved.node !== current.node) pending.push(resolved);
+    for (const child of astChildren(current.node)) pending.push({ index: current.index, node: child });
+  }
+  return literals;
+}
+
+function functionAnalysis(context, target) {
+  const functions = analysisCaches.get(context.files).functions;
+  let nodes = functions.get(target.index);
+  if (!nodes) { nodes = new WeakMap(); functions.set(target.index, nodes); }
+  let analysis = nodes.get(target.node);
+  if (!analysis) {
+    const reached = expressionReach(context, target.index, target.node);
+    analysis = { local: reached.get(target.index.file) ?? [] };
+    nodes.set(target.node, analysis);
+  }
+  return analysis;
+}
+
 function functionReturnsCode(context, target, code, seen = new Set()) {
-  const local = expressionReach(context, target.index, target.node).get(target.index.file) ?? [];
-  if (local.some((node) => codeLiteral(node, code))) return true;
-  const returns = returnedExpressions(context, target);
-  return [...returns, ...collectorExpressions(context, target, returns)]
-    .some((entry) => returnedCode(context, entry.index, entry.node, code, seen));
+  const analysis = functionAnalysis(context, target);
+  if (analysis.local.some((node) => codeLiteral(node, code))) return true;
+  analysis.possible ??= possibleCodeNodes(context, target.index, target.node);
+  if (!analysis.possible.some((node) => codeLiteral(node, code))) return false;
+  if (!analysis.returns) {
+    const returns = returnedExpressions(context, target);
+    analysis.returns = [...returns, ...collectorExpressions(context, target, returns)];
+  }
+  return analysis.returns.some((entry) => returnedCode(context, entry.index, entry.node, code, seen));
 }
 
 function delegatedTargets(context, file, reached, code) {
@@ -213,13 +252,19 @@ function testEvidence(context, analysis, code, delegatedFiles) {
   return { roles, runs: analysis.runs };
 }
 
-function cachedTests(context, file, edition) {
+function analysisCache(context) {
   let cache = analysisCaches.get(context.files);
   if (!cache || cache.sources.size !== context.files.size
     || ![...cache.sources].every(([name, text]) => context.files.get(name) === text)) {
-    cache = { sources: new Map(context.files), tests: new Map(), declarations: new WeakMap() };
+    cache = { sources: new Map(context.files), tests: new Map(), declarations: new WeakMap(),
+      owners: new Map(), functions: new WeakMap() };
     analysisCaches.set(context.files, cache);
   }
+  return cache;
+}
+
+function cachedTests(context, file, edition) {
+  const cache = analysisCache(context);
   const key = `${file}@${edition}`;
   if (!cache.tests.has(key)) {
     const index = sourceIndex(context, file);
@@ -260,6 +305,16 @@ function helperIsUsed(context, file, ref, edition) {
 }
 
 function sourceOwnsCode(context, file, code) {
+  const owners = analysisCache(context).owners;
+  let codes = owners.get(file);
+  if (!codes) { codes = new Map(); owners.set(file, codes); }
+  if (!codes.has(code)) codes.set(code, computeSourceOwnership(context, file, code));
+  return codes.get(code);
+}
+
+function computeSourceOwnership(context, file, code) {
+  // A code absent even from raw text cannot be owned by this source.
+  if (!String(context.files.get(file) ?? '').includes(code)) return false;
   const index = sourceIndex(context, file);
   // Keep conservative ownership for declarative sources outside the JS parser.
   if (!index.tree) return index.text.includes(code);
@@ -268,9 +323,9 @@ function sourceOwnsCode(context, file, code) {
   return [...index.exports.values()].some((expression) => {
     const target = resolvedExpression(context, index, expression);
     return ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(target.node?.type)
-      && (functionReturnsCode(context, target, code)
-        || [...expressionReach(context, target.index, target.node).values()]
-          .some((nodes) => nodes.some((node) => codeLiteral(node, code))));
+      && ([...expressionReach(context, target.index, target.node).values()]
+        .some((nodes) => nodes.some((node) => codeLiteral(node, code)))
+        || functionReturnsCode(context, target, code));
   });
 }
 
