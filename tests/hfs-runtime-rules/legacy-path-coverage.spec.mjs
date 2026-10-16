@@ -16,7 +16,7 @@ const byteContext = (sources) => ({
   readBytes: (file) => sources[file],
 });
 
-const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'legacy-runtime-paths-'));
+const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-legacy-runtime-paths-'));
 const temporaryFile = path.join(temporaryRoot, 'state.json');
 const temporaryName = path.basename(temporaryRoot);
 // The synthetic path forms retain the real temp fixture's unique directory name.
