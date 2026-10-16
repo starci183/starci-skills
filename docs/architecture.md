@@ -628,3 +628,34 @@ Work-directory literals beyond their count when the check landed. Resolve the
 invocation directory, runtime state, temporary paths and Work records through
 `scripts/lib/roots.mjs`; new files start with no raw inputs. This runtime ownership
 check applies equally when working on lite and full apps.
+
+
+<a id="r56"></a>
+## R56: Hooks own their implementations
+
+`FE_HOOKS_ARE_HOOKS` rejects helpers disguised as hooks, invalid exports and
+incorrect domain shared files. A hook must call an actual hook API; canonical
+Redux selectors and dispatch hooks created with `withTypes()` retain their hook
+identity through their barrel. A use-prefixed helper alone is insufficient.
+`FE_CUSTOM_HOOK_LOCATION` and `FE_BLOCK_PRODUCT_HOOK_DEFINITION` keep product
+hook definitions in hooks rather than visual owners. `FE_COMPONENT_DEEP_HOOK_IMPORT`
+requires components to import through the owning hooks barrel. These boundaries
+apply in lite and full.
+
+<a id="r92"></a>
+## R92: Component surfaces and world ownership
+
+`FE_COMPONENT_API` requires named props, closed styling doors, colocated class
+names, settled drawing inputs and status rendered through SlotView. Connected
+blocks have their exact sibling pure twin (`FE_CONNECTED_BLOCK_RENDER_PAIR`).
+`FE_COMPONENT_WORLD_OWNERSHIP` keeps data lifecycle out of lower visual tiers;
+`FE_WORLD_OWNER_RENDER_BOUNDARY` requires data owners to delegate every render
+path to a pure component. A hooks/ui function that calls global fetch is a world
+reader, even when imported through a barrel; a locally bound function named fetch
+is judged by its own ownership. Legitimate data hooks remain available to connected
+blocks that render through their pure twin.
+
+`FE_PURE_REACHES_DATA` rejects pure component imports reaching hooks or transport.
+`FE_PURE_WORLD_HOOK` rejects world hooks in the pure half, and
+`FE_PURE_WORLD_IMPORT` rejects router and locale imports there. These requirements
+apply equally to lite and full.

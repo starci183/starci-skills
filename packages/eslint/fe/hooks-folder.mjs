@@ -25,6 +25,7 @@
  * architecture machine that sees the whole tree.
  */
 
+import { importedReduxHook } from "./lib/redux-hook-origin.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { walk } from "./lib/ast.mjs"
 import { functionOf, isFn, unwrap, variableOf } from "./lib/bindings.mjs"
@@ -85,7 +86,7 @@ const SWR_HOOKS = new Map([
   ["swr/mutation", new Set(["useSWRMutation"])],
 ])
 const SWR_DEFAULTS = new Map([["swr", "useSWR"], ["swr/immutable", "useSWRImmutable"], ["swr/infinite", "useSWRInfinite"], ["swr/mutation", "useSWRMutation"]])
-const builtinHook = (origin) => origin?.source === "react" ? REACT_HOOKS.has(origin.name) : Boolean(SWR_HOOKS.get(origin?.source)?.has(origin.name))
+const builtinHook = (origin) => origin?.source === "react-redux" || (origin?.source === "react" ? REACT_HOOKS.has(origin.name) : Boolean(SWR_HOOKS.get(origin?.source)?.has(origin.name)))
 const propertyName = (node) => {
   if (!node.computed && node.property.type === "Identifier") return node.property.name
   return node.property.type === "Literal" ? node.property.value : null
@@ -136,7 +137,11 @@ const hookOrigin = (context, input, seen = new Set()) => {
   if (!variable || seen.has(variable) || variable.defs.length !== 1) return null
   if (variable.references.some((reference) => reference.isWrite() && !reference.init)) return null
   const definition = variable.defs[0]
-  if (definition.type === "ImportBinding") return importOrigin(definition)
+  if (definition.type === "ImportBinding") {
+    const origin = importOrigin(definition)
+    if (origin) return origin
+    return importedReduxHook(context, definition) ? { source: "react-redux", name: "hook" } : null
+  }
   return constantOrigin(context, definition, variable, new Set([...seen, variable]))
 }
 
@@ -217,11 +222,11 @@ export const hooksFolderHoldsHooksOnly = {
       many:
         "This file exports {{count}} hooks. One hook per file keeps a hook findable by its name and keeps a change to one from re-running the tests of the others.",
       missing:
-        "FE_HOOKS_ARE_HOOKS: a hook file exports exactly one named use* function that calls a React or SWR hook. Non-hook helpers belong in the domain's shared helper file.",
+        "FE_HOOKS_ARE_HOOKS: a hook file exports exactly one named use* function that calls a React, Redux or SWR hook. Non-hook helpers belong in the domain's shared helper file.",
       defaultExport:
         "FE_HOOKS_ARE_HOOKS: export the hook as a named use* function. A default export does not identify the hook this file owns.",
       fake:
-        "FE_HOOKS_ARE_HOOKS: `{{name}}` must be a function that calls a real React or SWR hook; a use* name alone does not make a reader or helper a hook.",
+        "FE_HOOKS_ARE_HOOKS: `{{name}}` must be a function that calls a real React, Redux or SWR hook; a use* name alone does not make a reader or helper a hook.",
       sharedHook:
         "`{{name}}` is a hook exported from the shared helper file. That file holds non-hook helpers; a hook there is a hook nobody will find. Give it its own `use<Name>.ts`.",
       server:
