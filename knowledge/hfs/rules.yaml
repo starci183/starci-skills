@@ -5047,7 +5047,8 @@ rules:
 
   - id: R278
     code: "BE_REST_DOOR_EVIDENCE"
-    law: "GraphQL is the default door in lite and full. Each REST route carries its own evidence: a probe, auth handshake, signed webhook, actual byte stream or a public versioned operation served from the app's nonempty defineOperations table. A class-level reference or an unused StreamableFile import proves no route, and a public REST route absent from the operation table is refused."
+    amendedBy: [owner:credential-guarded-rest-door]
+    law: "GraphQL is the default door in lite and full. Each REST route carries its own evidence: a probe, auth handshake, signed webhook, actual byte stream, a public versioned operation served from the app's nonempty defineOperations table, or a credential-guarded route (owner:credential-guarded-rest-door): the route or its controller carries @Credential({ kind: \"<literal>\" }) imported from the domain identity capability, which also declares the CredentialGuard class implementing CanActivate (resolved by TypeScript symbol, never by name); a local decorator of the same name, a @UseGuards of any other guard and a computed kind prove nothing. A class-level reference or an unused StreamableFile import proves no route, and a public REST route absent from the operation table is refused."
     kinds: [lint]
     gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_REST_DOOR_EVIDENCE", "BE_REST_ROUTE_UNDECLARED"]
@@ -5294,7 +5295,8 @@ rules:
 
   - id: R290
     code: "BE_PUBLIC_REASON_CLOSED"
-    law: "In lite and full PublicReason has exactly Health, AuthHandshake, SignedWebhook and CatalogRead. An app-defined public reason such as ToolToken or ApiKey is refused; API-key and tool-token routes authenticate with their own guard instead of extending the public vocabulary."
+    amendedBy: [owner:credential-guarded-rest-door]
+    law: "In lite and full PublicReason has exactly Health, AuthHandshake, SignedWebhook and CatalogRead. An app-defined public reason such as ToolToken or ApiKey is refused; API-key, run-token and tool-token routes authenticate with their own credential guard (@Credential, R278) instead of extending the public vocabulary; an anonymous route without one of the four reasons still fails."
     kinds: [lint]
     gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_PUBLIC_REASON_CLOSED"]
