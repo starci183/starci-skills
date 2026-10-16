@@ -54,6 +54,48 @@ const negative = [
   ['unused sibling export', 'return [];', 'export function unused(invalid) { const findings = []; findings.push(...check(invalid)); return findings; }'],
 ];
 for (const edition of ['lite', 'full']) {
+  for (const [shape, body, helpers] of [
+    ['spread facade result', 'const findings = []; findings.push(...check(invalid)); return findings;', ''],
+    ['loop facade result', 'const findings = []; for (const item of check(invalid)) findings.push({code: item.code}); return findings;', ''],
+    ['built facade result', 'const findings = []; const add = code => findings.push({code}); for (const item of check(invalid)) add(item.code); return build({findings});',
+      'function build({findings}) { return {findings}; }'],
+    ['mapped initialized facade result', 'const findings = [...check(invalid)]; return {findings: findings.map(item => item)};', ''],
+  ]) test(`recognizes ${edition} ${shape} and refuses unresolved facades`, () => {
+    const context = fixture(body, helpers);
+    context.files.set(ENFORCER, context.files.get(ENFORCER).replace("'./child.mjs'", "'./facade.mjs'"));
+    if (shape.includes('built') || shape.includes('mapped')) context.files.set(SPEC, context.files.get(SPEC)
+      .replace('sample(true).map', 'sample(true).findings.map').replace('sample(false),', 'sample(false).findings,'));
+    const facade = 'scripts/checks/facade.mjs';
+    context.files.set(facade, "export { scan as check } from './bridge.mjs';");
+    context.files.set('scripts/checks/bridge.mjs', "export { check as scan } from './child.mjs';");
+    assert.deepEqual(coverageProofFindings(context, context.rule, CODE, edition), []);
+    for (const source of [
+      "export { check } from './facade.mjs';",
+      "export { check } from './missing.mjs';",
+      "export { absent as check } from './child.mjs';",
+      "export { check } from 'external-package';",
+    ]) {
+      context.files.set(facade, source);
+      assert.equal(coverageProofFindings(context, context.rule, CODE, edition)[0]?.code, 'RT_COVERAGE_PROOF_VACUOUS');
+    }
+  });
+  test(`refuses ${edition} facade emissions into a discarded sink`, () => {
+    const context = fixture('const findings = []; const ignored = []; ignored.push(...check(invalid)); return findings;');
+    context.files.set(ENFORCER, context.files.get(ENFORCER).replace("'./child.mjs'", "'./facade.mjs'"));
+    context.files.set('scripts/checks/facade.mjs', "export { check } from './child.mjs';");
+    assert.equal(coverageProofFindings(context, context.rule, CODE, edition)[0]?.code, 'RT_COVERAGE_PROOF_VACUOUS');
+  });
+  for (const [shape, body, helpers] of [
+    ['discarded builder argument', 'const findings = []; findings.push(...check(invalid)); return build({findings});', 'function build(input) { return []; }'],
+    ['different builder property', 'const findings = []; const other = []; findings.push(...check(invalid)); return build({findings, other});', 'function build({other}) { return other; }'],
+    ['shadowed facade', 'const check = () => []; const findings = []; findings.push(...check(invalid)); return findings;', ''],
+    ['empty facade loop', 'const findings = []; for (const item of []) findings.push(...check(invalid)); return findings;', ''],
+  ]) test(`refuses ${edition} ${shape}`, () => {
+    const context = fixture(body, helpers);
+    context.files.set(ENFORCER, context.files.get(ENFORCER).replace("'./child.mjs'", "'./facade.mjs'"));
+    context.files.set('scripts/checks/facade.mjs', "export { check } from './child.mjs';");
+    assert.equal(coverageProofFindings(context, context.rule, CODE, edition)[0]?.code, 'RT_COVERAGE_PROOF_VACUOUS');
+  });
   for (const [shape, body, helpers] of positive) test(`recognizes ${edition} ${shape}`, () => {
     const context = fixture(body, helpers);
     assert.deepEqual(coverageProofFindings(context, context.rule, CODE, edition), []);

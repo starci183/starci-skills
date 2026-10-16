@@ -78,9 +78,18 @@ rules:
       - {kind: runtime, id: runtime-required, at: scripts/hfs/runtime-check.mjs}
   - id: R03
     code: "HFS_UNTRACKED_ROOT_ENTRY"
+    editions: [lite, full]
+    docs: [docs/legacy-tree-rule-coverage.md#r03]
+    proves:
+      - {path: tests/hfs-proofs/hfs-untracked-root-entry.spec.mjs, editions: [lite, full]}
+    templateNa: "Untracked and empty directories are filesystem states, not scaffolded files."
+    exemplifiedBy:
+      - {path: tests/hfs-proofs/hfs-untracked-root-entry.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-proofs/hfs-untracked-root-entry.spec.mjs, editions: [lite, full]}
     law: "No untracked or ignored entry outside an `ignored` slot."
     kinds: [check, codemod]
-    gates: [pre-push, land, ci, runtime]
+    gates: [land, ci, runtime]
     failureCodes: ["HFS_UNTRACKED_ROOT_ENTRY", "HFS_EMPTY_DIR", "HFS_GHOST_TREE"]
     enforcers:
       - {kind: hfs, id: untracked-root-entry, at: scripts/hfs/check.mjs}
@@ -158,6 +167,19 @@ rules:
       - {kind: work-validate, id: identity-custody-role, at: scripts/work/validate/check-example-work.mjs}
   - id: R10
     code: "HFS_STACKS_SHAPE"
+    editions: [lite, full]
+    docs: [docs/legacy-tree-rule-coverage.md#r10]
+    proves:
+      - {path: tests/hfs-proofs/hfs-stacks-shape.spec.mjs, editions: [lite, full]}
+      - {path: tests/hfs-proofs/hfs-stacks-runtime-shape.spec.mjs, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/skeleton-lite/.starcistacks/application-stacks.yaml, edition: lite}
+      - {path: packages/hfs/templates/app/skeleton/.starcistacks/application-stacks.yaml, edition: full}
+      - {path: tests/hfs-proofs/hfs-stacks-shape.spec.mjs, editions: [lite, full]}
+      - {path: tests/hfs-proofs/hfs-stacks-runtime-shape.spec.mjs, editions: [lite, full]}
+    witness:
+      - {path: tests/hfs-proofs/hfs-stacks-shape.spec.mjs, editions: [lite, full]}
+      - {path: tests/hfs-proofs/hfs-stacks-runtime-shape.spec.mjs, editions: [lite, full]}
     law: "`.starcistacks` has the edition-aware standard shape and the host Sonar owner; Swarm stacks have digest-pinned images, healthchecks, rollout, rollback and restart policies, versioned external secrets, ingress-only published ports and declared schedulers for replicated jobs. Recurring work is app-owned; host crontab installation is forbidden. Lite declares Supabase as managed backing and runs no duplicate backing-service component."
     kinds: [check, codemod]
     gates: [settle, land, ci]

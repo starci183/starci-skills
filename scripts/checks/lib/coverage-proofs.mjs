@@ -5,7 +5,7 @@ import { astChildren, astNodes, expressionReach, nodeName, resolvedExpression, s
 import { lintEnforcersForCode, registeredLintRules } from './coverage-routing.mjs';
 import { bindPattern, evaluate, invocation, localScope, scopedWalk, UNKNOWN } from './coverage-evaluation.mjs';
 import { resultReach, returnedExpressions } from './coverage-results.mjs';
-import { collectorExpressions } from './coverage-collectors.mjs';
+import { collectorExpressions, collectorFacadeInvocation } from './coverage-collectors.mjs';
 
 const NEGATIVE = /\b(?:invalid|violat\w*|refus\w*|reject\w*|deni\w*|fail\w*|negative|forbid\w*|missing)\b/i;
 const POSITIVE = /\b(?:valid|pass\w*|accept\w*|conform\w*|positive|clean)\b/i;
@@ -113,7 +113,7 @@ function returnedCode(context, index, node, code, seen = new Set()) {
   if (resolved.node !== node) return returnedCode(context, resolved.index, resolved.node, code, next);
   if (codeLiteral(node, code)) return true;
   if (node.type === 'CallExpression') {
-    const target = invocation(context, index, node);
+    const target = invocation(context, index, node) ?? collectorFacadeInvocation(context, index, node);
     if (target) return functionReturnsCode(context, target, code, next);
   }
   if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type)) return false;
@@ -121,11 +121,19 @@ function returnedCode(context, index, node, code, seen = new Set()) {
 }
 
 function functionReturnsCode(context, target, code, seen = new Set()) {
-  const local = expressionReach(context, target.index, target.node).get(target.index.file) ?? [];
+  if (seen.has(target.node)) return false;
+  const next = new Set(seen).add(target.node);
+  const reached = expressionReach(context, localScope(target.index), target.node);
+  const local = reached.get(target.index.file) ?? [];
   if (local.some((node) => codeLiteral(node, code))) return true;
+  const reachableCode = [...reached.values()].some(nodes => nodes.some(node => codeLiteral(node, code)));
+  const reachableFacade = !reachableCode && [...reached].some(([file, nodes]) => nodes.some(node =>
+    node.type === 'CallExpression' && collectorFacadeInvocation(context, sourceIndex(context, file), node)));
+  if (!reachableCode && !reachableFacade) return false;
   const returns = returnedExpressions(context, target);
-  return [...returns, ...collectorExpressions(context, target, returns)]
-    .some((entry) => returnedCode(context, entry.index, entry.node, code, seen));
+  if (collectorExpressions(context, target, returns).some(entry => returnedCode(context, entry.index, entry.node, code, next))) return true;
+  if (!reachableCode) return false;
+  return returns.some(entry => returnedCode(context, entry.index, entry.node, code, next));
 }
 
 function delegatedTargets(context, file, reached, code) {
@@ -268,9 +276,9 @@ function sourceOwnsCode(context, file, code) {
   return [...index.exports.values()].some((expression) => {
     const target = resolvedExpression(context, index, expression);
     return ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(target.node?.type)
-      && (functionReturnsCode(context, target, code)
-        || [...expressionReach(context, target.index, target.node).values()]
-          .some((nodes) => nodes.some((node) => codeLiteral(node, code))));
+      && ([...expressionReach(context, target.index, target.node).values()]
+        .some((nodes) => nodes.some((node) => codeLiteral(node, code)))
+        || functionReturnsCode(context, target, code));
   });
 }
 
