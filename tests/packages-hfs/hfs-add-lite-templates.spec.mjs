@@ -20,6 +20,10 @@ test("the lite API skeleton installs one typed global validation pipe", () => {
     new URL("../../packages/hfs/templates/be/skeleton-lite/apps/api/src/main.ts", import.meta.url),
     "utf8",
   );
+  const security = fs.readFileSync(
+    new URL("../../packages/hfs/templates/be/skeleton-lite/src/modules/platform/http-security/http-security.module.ts", import.meta.url),
+    "utf8",
+  );
   const validation = fs.readFileSync(
     new URL("../../packages/hfs/templates/be/skeleton/src/modules/platform/http-security/request-validation.service.ts", import.meta.url),
     "utf8",
@@ -28,8 +32,9 @@ test("the lite API skeleton installs one typed global validation pipe", () => {
     new URL("../../packages/hfs/templates/be/skeleton/src/modules/platform/http-security/errors/http-security.error.ts", import.meta.url),
     "utf8",
   );
-  assert.match(main, /app\.useGlobalPipes\(app\.get\(RequestValidationService\)\)/);
-  assert.ok(main.indexOf("useGlobalPipes") < main.indexOf("await app.listen"));
+  // One typed global pipe, installed by the container (a single APP_PIPE of the http-security module), never by main.ts.
+  assert.equal(main.includes("useGlobalPipes"), false, "main.ts installs no pipe by hand");
+  assert.equal(security.match(/provide:\s*APP_PIPE,\s*useClass:\s*RequestValidationService/g)?.length, 1, "exactly one APP_PIPE of the typed validation service");
   assert.match(validation, /whitelist: true/);
   assert.match(validation, /forbidNonWhitelisted: true/);
   assert.match(validation, /transform: true/);
