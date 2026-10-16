@@ -9,6 +9,7 @@ import { DEFAULT_DEPS, acceptRelease, deployRelease, importModule, lazy, rollbac
 import { StackError } from '../../packages/hfs/stack/errors.mjs';
 import { createReleaseStore } from '../../packages/hfs/stack/release-store.mjs';
 import { fakeHost } from '../helpers/stack-fakes.mjs';
+import { shellWords } from '../helpers/stack-remote-fakes.mjs';
 import { psRunning, releaseSsh, testConfig } from '../helpers/stack-swarm-fakes.mjs';
 
 const OLD = 'a'.repeat(64);
@@ -44,7 +45,7 @@ afterEach(() => { for (const each of remotes.splice(0)) each.dispose(); });
  * A world: the docker shim, a remote release store, stub render/provision that write the release files, and a trace of what happened.
  *   build.stack(api)  the stack bytes the stub renders;  failSsh(needle)  makes remote commands containing it fail
  */
-async function world({ previous = true, stackFor = () => stackText(NEW), spies = {}, overrides = {}, failSsh = [], hook } = {}) {
+async function world({ previous = true, previousText = stackText(OLD), stackFor = () => stackText(NEW), spies = {}, overrides = {}, failSsh = [], hook } = {}) {
   const host = fakeHost({ overrides: { docker: { 'ps -q': psRunning, ...overrides } }, fileReader: (file) => fs.readFileSync(file, 'utf8') });
   remote = releaseSsh();
   remotes.push(remote);
@@ -56,6 +57,7 @@ async function world({ previous = true, stackFor = () => stackText(NEW), spies =
   };
   const ssh = async (command, options) => {
     trace.push(`ssh:${kindOf(command)}`);
+    if (command.startsWith("docker 'network' 'inspect'")) return host.spawn('docker', shellWords(command).slice(1));
     if (failSsh.some((needle) => command.includes(needle))) return { status: 1, stdout: '', stderr: 'ssh: simulated failure' };
     return remote.ssh(command, options);
   };
@@ -89,15 +91,15 @@ async function world({ previous = true, stackFor = () => stackText(NEW), spies =
   const ctx = host.ctx({ spawn });
   const out = path.join(work, `out-${Math.random().toString(16).slice(2)}`);
   const world_ = { host, ctx, deps, trace, calls, out, ssh };
-  if (previous) await seedPrevious(world_);
+  if (previous) await seedPrevious(world_, previousText);
   return world_;
 }
 
 /** An accepted previous release stored on the remote, whose services run the OLD image. */
-async function seedPrevious(w) {
+async function seedPrevious(w, text = stackText(OLD)) {
   const dir = path.join(work, `prev-${Math.random().toString(16).slice(2)}`);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'stack.yaml'), stackText(OLD));
+  fs.writeFileSync(path.join(dir, 'stack.yaml'), text);
   fs.writeFileSync(path.join(dir, 'release.json'), JSON.stringify({ secrets: [{ key: 'T', runtimeName: 'app-t-v1' }], configs: [] }));
   const store = createReleaseStore(config, remote.ssh);
   await store.store(dir, OLD_ID);
@@ -111,7 +113,7 @@ const currentPointer = () => createReleaseStore(config, remote.ssh).current();
 const dockerWrites = (trace) => trace.filter((entry) => entry.startsWith('docker:') && !/^docker:(service|inspect)/u.test(entry));
 
 test('the defaults load their collaborators lazily, so a missing sibling module never breaks the import', async () => {
-  assert.deepEqual(Object.keys(DEFAULT_DEPS).sort(), ['convergeStack', 'provisionRelease', 'pruneStack', 'releaseStore', 'renderRelease', 'ssh', 'verifyStack']);
+  assert.deepEqual(Object.keys(DEFAULT_DEPS).sort(), ['convergeStack', 'provisionRelease', 'pruneStack', 'reconcileEdge', 'releaseStore', 'renderRelease', 'ssh', 'verifyStack']);
   const refusalOf = lazy('./errors.mjs', 'refusal');
   const error = await refusalOf('X_CODE', 'message');
   assert.ok(error instanceof StackError);
@@ -175,7 +177,7 @@ test('a successful deploy runs every step in order and moves the pointers last',
   assert.equal(w.calls.render[1].previous, OLD_ID);
   assert.deepEqual(w.calls.provision[0], { execute: true, out: w.out, releaseFile: path.join(w.out, 'release.json') });
   assert.deepEqual(w.calls.converge[0], { since: new Date(deploy.at - 60_000).toISOString(), timeoutSeconds: 900 });
-  assert.deepEqual(w.calls.verify[0], { retrySeconds: 240, skipPublic: false });
+  assert.deepEqual(w.calls.verify[0], { retrySeconds: 240, skipPublic: false, stackFile: path.join(w.out, 'stack.yaml') });
   assert.deepEqual(w.calls.prune[0], { keepFiles: [path.join(w.out, 'release.json'), path.join(w.out, 'previous', 'release.json')], execute: true });
   assert.deepEqual(w.host.state.removed, [{ kind: 'secret', name: 'app-t-v0' }]);
   assert.equal(await currentPointer(), NEW_ID);
@@ -183,7 +185,7 @@ test('a successful deploy runs every step in order and moves the pointers last',
   assert.equal(result.data.rolledBack, false);
   assert.equal(result.data.releaseId, NEW_ID);
   assert.equal(result.data.previous, OLD_ID);
-  assert.deepEqual(result.data.steps.map((entry) => entry.step), ['render', 'provision', 'store', 'pre-pull', 'deploy', 'converge', 'verify', 'accept']);
+  assert.deepEqual(result.data.steps.map((entry) => entry.step), ['render', 'provision', 'store', 'pre-pull', 'deploy', 'edge', 'converge', 'verify', 'accept']);
   assert.ok(result.data.steps.every((entry) => entry.ok));
   assert.equal(result.lines.at(-1), `deployed release ${NEW_ID}`);
 });
@@ -276,7 +278,7 @@ test('a rolled back update redeploys the previous release from its stored bytes 
   assert.ok(result.lines.includes('deploy failed at converge'));
   assert.ok(result.lines.includes(`ROLLING BACK to the previous accepted release ${OLD_ID}`));
   assert.equal(result.lines.at(-1), `rolled back to ${OLD_ID}`);
-  assert.deepEqual(result.data.steps.slice(-3), [{ step: 'rollback-fetch', ok: true }, { step: 'rollback-deploy', ok: true }, { step: 'rollback-converge', ok: true }]);
+  assert.deepEqual(result.data.steps.slice(-3), [{ step: 'rollback-deploy', ok: true }, { step: 'rollback-edge', ok: true }, { step: 'rollback-converge', ok: true }]);
   assert.equal(w.host.state.deployed.length, 2);
   assert.equal(w.host.state.deployed[1].file, path.join(w.out, 'previous', 'stack.yaml'));
   assert.equal(w.host.state.services.get('app_api').image, `ghcr.io/o/app-api@sha256:${OLD}`);
@@ -407,14 +409,15 @@ test('rollback redeploys the stored bytes, converges, verifies and only then mov
   w.ctx.env.RELEASE = '$(id)';
   const result = await rollbackRelease(w.ctx, config, { release: OLD_ID, execute: true }, w.deps);
   assert.equal(result.ok, true, result.lines.join('\n'));
-  assert.deepEqual(result.data.steps.map((entry) => entry.step), ['fetch', 'deploy', 'converge', 'verify', 'accept']);
+  assert.deepEqual(result.data.steps.map((entry) => entry.step), ['fetch', 'deploy', 'edge', 'converge', 'verify', 'accept']);
   assert.equal(result.lines.at(-1), `rolled back to release ${OLD_ID}; a rollback cannot undo data effects`);
   const deployed = w.host.state.deployed[0];
   assert.equal(path.basename(deployed.file), 'stack.yaml');
   assert.equal(fs.existsSync(deployed.file), false);
   assert.equal(deployed.model.services.api.image, `ghcr.io/o/app-api@sha256:${OLD}`);
   assert.deepEqual(w.calls.converge[0].timeoutSeconds, 600);
-  assert.deepEqual(w.calls.verify[0], { retrySeconds: 180 });
+  assert.deepEqual(w.calls.verify[0].retrySeconds, 180);
+  assert.match(w.calls.verify[0].stackFile, /stack.yaml$/u);
   assert.equal(await currentPointer(), OLD_ID);
 });
 
@@ -472,12 +475,12 @@ test('a first deploy into a shared ingress (--skip-public) verifies inside the s
   const w = await world();
   const result = await deployRelease(w.ctx, config, base(w, { skipPublic: true, retrySeconds: 60 }), w.deps);
   assert.equal(result.ok, true, result.lines.join('\n'));
-  assert.deepEqual(w.calls.verify[0], { retrySeconds: 60, skipPublic: true });
+  assert.deepEqual(w.calls.verify[0], { retrySeconds: 60, skipPublic: true, stackFile: path.join(w.out, 'stack.yaml') });
   assert.equal(w.trace.includes('ssh:accept'), false, 'the pointer does not move');
   assert.equal(w.trace.includes('prune'), false, 'nothing is pruned before the accept');
   assert.equal(await currentPointer(), OLD_ID);
   assert.equal(result.data.pendingAccept, true);
-  assert.deepEqual(result.data.steps.map((entry) => entry.step), ['render', 'provision', 'store', 'pre-pull', 'deploy', 'converge', 'verify']);
+  assert.deepEqual(result.data.steps.map((entry) => entry.step), ['render', 'provision', 'store', 'pre-pull', 'deploy', 'edge', 'converge', 'verify']);
   assert.match(result.lines.at(-2), /the public hosts were NOT checked and the release is NOT accepted yet/u);
   assert.equal(result.lines.at(-1), `next: starci app stack ingress publish, then starci app stack accept --release ${NEW_ID} --execute`);
 });
@@ -507,7 +510,8 @@ test('accept needs a release id, a stored record and the FULL verification befor
   const calls = w.calls.verify.length;
   const done = await acceptRelease(w.ctx, config, { release: NEW_ID, execute: true, retrySeconds: 30 }, w.deps);
   assert.equal(done.ok, true, done.lines.join('\n'));
-  assert.deepEqual(w.calls.verify[calls], { retrySeconds: 30 });
+  assert.equal(w.calls.verify[calls].retrySeconds, 30);
+  assert.match(w.calls.verify[calls].stackFile, /stack.yaml$/u);
   assert.equal(await currentPointer(), NEW_ID);
   assert.equal(await createReleaseStore(config, remote.ssh).previous(), OLD_ID);
   assert.ok(done.lines.includes(`accepted release ${NEW_ID}`));
@@ -561,4 +565,93 @@ test('its own alias, a host-address upstream and a stack without networks are ac
     const result = await deployRelease(w.ctx, cfg, base(w, { execute: false }), { ...w.deps, renderRelease: render(text) });
     assert.equal(result.ok, true);
   }
+});
+
+// ---- the shared edge network: the stack short name must never stay on it ----
+const EDGE = 'shared-edge';
+const edgeText = (api) => `services:
+  api:
+    image: ghcr.io/o/app-api@sha256:${api}
+    networks:
+      edge:
+        aliases:
+          - app-api
+networks:
+  edge:
+    external: true
+    name: ${EDGE}
+`;
+const aliasesOnEdge = (w) => w.host.state.services.get('app_api').networks.map((entry) => entry.aliases);
+const withEdge = (w, names = ['tayson-web']) => { w.host.state.networks.set(EDGE, { containers: names, services: [] }); return w; };
+const edgeWorld = async (extra = {}) => withEdge(await world({ stackFor: () => edgeText(NEW), previousText: edgeText(OLD), ...extra }), extra.names);
+
+test('a service whose short name another tenant already resolves on the edge network is refused before anything is changed', async () => {
+  const w = await edgeWorld({ names: ['tayson-web', 'api'] });
+  const refused = (error) => error.code === 'STACK_DEPLOY_ALIAS_SHARED' && /app_api/u.test(error.message) && /alias api/u.test(error.message) && /shared-edge/u.test(error.message);
+  await assert.rejects(deployRelease(w.ctx, config, base(w), w.deps), refused);
+  assert.equal(w.trace.includes('provision'), false);
+  assert.equal(w.trace.some((entry) => entry.startsWith('docker:stack deploy') || entry.startsWith('docker:pull')), false);
+  assert.equal(w.host.state.deployed.length, 0);
+});
+
+test('an unreadable edge network refuses the deploy before provisioning', async () => {
+  const w = await world({ stackFor: () => edgeText(NEW) });
+  await assert.rejects(deployRelease(w.ctx, config, base(w), w.deps), (error) => error.code === 'STACK_DEPLOY_EDGE_UNREADABLE');
+  assert.equal(w.trace.includes('provision'), false);
+});
+
+test('a deploy reconciles the edge attachment to the declared aliases before converge, verify and accept (docker stack deploy added the short name)', async () => {
+  const w = await edgeWorld();
+  const result = await deployRelease(w.ctx, config, base(w), w.deps);
+  assert.equal(result.ok, true);
+  assert.deepEqual(aliasesOnEdge(w), [['app-api']], 'only the declared alias remains: never api');
+  assert.deepEqual(result.data.steps.map((entry) => entry.step).slice(-4), ['edge', 'converge', 'verify', 'accept']);
+  assert.ok(result.lines.some((line) => line.includes('aliases [app-api, api] -> [app-api]')));
+  assert.ok(w.trace.indexOf('converge') > w.trace.lastIndexOf('docker:service update'));
+  assert.equal(w.trace.indexOf('ssh:accept') > w.trace.indexOf('verify'), true);
+  assert.equal(await currentPointer(), idOf(edgeText(NEW)));
+  const again = await deployRelease(w.ctx, config, base(w, { out: path.join(work, 'again') }), w.deps);
+  assert.equal(again.ok, true);
+  assert.deepEqual(aliasesOnEdge(w), [['app-api']]);
+});
+
+test('a --skip-public first deploy also reconciles the edge before the release is left pending', async () => {
+  const w = await edgeWorld({ previous: false });
+  const result = await deployRelease(w.ctx, config, base(w, { skipPublic: true }), w.deps);
+  assert.equal(result.ok, true);
+  assert.equal(result.data.pendingAccept, true);
+  assert.deepEqual(aliasesOnEdge(w), [['app-api']]);
+  assert.equal(await currentPointer(), '');
+});
+
+test('a reconcile that cannot reach the declared aliases fails the deploy with its code, before converge and accept', async () => {
+  const w = await edgeWorld({ previous: false, overrides: { 'service update': () => ({ status: 0, stdout: '', stderr: '' }) } });
+  const result = await deployRelease(w.ctx, config, base(w), w.deps);
+  assert.equal(result.ok, false);
+  assert.ok(result.lines.some((line) => line.includes('STACK_DEPLOY_EDGE_ALIAS')));
+  assert.equal(result.data.steps.at(-1).step, 'edge');
+  assert.equal(w.trace.includes('converge'), false);
+  assert.equal(await currentPointer(), '');
+});
+
+test('a failed deploy rolls back to the stored release and reconciles its edge attachment too', async () => {
+  const w = await edgeWorld({ spies: { verify: async () => ({ ok: false, lines: ['verify: FAIL'] }) } });
+  const result = await deployRelease(w.ctx, config, base(w), w.deps);
+  assert.equal(result.ok, false);
+  assert.equal(result.data.rolledBack, true);
+  assert.ok(result.data.steps.some((entry) => entry.step === 'rollback-edge' && entry.ok));
+  assert.deepEqual(aliasesOnEdge(w), [['app-api']]);
+});
+
+test('rollback and accept pass the stored stack file to the edge reconcile and to the verification', async () => {
+  const w = await edgeWorld();
+  const rolled = await rollbackRelease(w.ctx, config, { execute: true, release: OLD_ID }, w.deps);
+  assert.equal(rolled.ok, true);
+  assert.deepEqual(aliasesOnEdge(w), [['app-api']]);
+  assert.match(w.calls.verify.at(-1).stackFile, /stack.yaml$/u);
+  const accepting = await edgeWorld({ previous: false });
+  await accepting.deps.releaseStore(config, accepting.ssh).store(await (async () => { const dir = path.join(work, 'pend'); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, 'stack.yaml'), edgeText(NEW)); fs.writeFileSync(path.join(dir, 'release.json'), '{"secrets":[],"configs":[]}'); return dir; })(), NEW_ID);
+  const accepted = await acceptRelease(accepting.ctx, config, { release: NEW_ID, execute: true }, accepting.deps);
+  assert.equal(accepted.ok, true);
+  assert.match(accepting.calls.verify.at(-1).stackFile, /stack.yaml$/u);
 });

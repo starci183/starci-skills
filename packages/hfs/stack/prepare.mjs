@@ -1,10 +1,12 @@
 // prepare.mjs - `starci app stack prepare` and `doctor`: read-only checks of the Swarm manager, plus (prepare, --execute) the missing external
 // volumes and the ONE-TIME, owner-approved `docker swarm init`. Every docker call runs ON the manager through the ssh runner (remote.mjs), so the
 // same code serves CI and the owner's machine. Lines are `ok    text` / `FAIL  text`; a failing check makes the result not ok but all checks run.
+import fs from 'node:fs';
 import { firstLine, lines as splitLines } from './context.mjs';
 import { RELEASE_ID } from './digest.mjs';
 import { approvalMissing, refusal } from './errors.mjs';
 import { installAge } from './age-install.mjs';
+import { describeClash, edgeCollisions } from './edge-alias.mjs';
 import { checkLiveRestore, fixLiveRestore } from './live-restore.mjs';
 import { remoteDocker, shellQuote, withRunner } from './remote.mjs';
 
@@ -231,9 +233,23 @@ function checkPointers(run, report, config) {
   return pointers;
 }
 
+/** The short service names of the stack source against the names the external (edge) networks already resolve (STACK_DEPLOY_ALIAS_SHARED at deploy). */
+async function checkEdgeNames(run, report, config) {
+  if (!config.stackFile) return;
+  let found;
+  try {
+    found = await edgeCollisions(run, config, fs.readFileSync(config.stackFile, 'utf8'));
+  } catch (error) {
+    report.bad(`edge networks: ${error.message}`);
+    return;
+  }
+  for (const clash of found.clashes) report.bad(`STACK_DEPLOY_ALIAS_SHARED: ${describeClash(clash)}`);
+  if (found.clashes.length === 0) report.ok(`edge networks (${found.networks.length}): no short service name is resolved by another tenant`);
+}
+
 /** doctor: the prepare checks plus services, managed secrets and configs and the release pointers. Changes nothing. */
 export async function doctorHost(ctx, config, { sshCmd = null } = {}, deps = {}) {
-  return withRunner(ctx, config, { sshCmd }, deps, (run, notes) => {
+  return withRunner(ctx, config, { sshCmd }, deps, async (run, notes) => {
     const report = newReport();
     notes.forEach(report.note);
     const data = { services: 0, secrets: 0, configs: 0, releases: { current: null, previous: null } };
@@ -243,6 +259,7 @@ export async function doctorHost(ctx, config, { sshCmd = null } = {}, deps = {})
       data.configs = managedCount(run, 'config', config.stack);
       report.ok(`managed secrets: ${data.secrets}, configs: ${data.configs}`);
       data.releases = checkPointers(run, report, config);
+      await checkEdgeNames(run, report, config);
     }
     return { ok: !report.failed(), lines: report.lines(), data: { ...data, checks: report.checks() } };
   });

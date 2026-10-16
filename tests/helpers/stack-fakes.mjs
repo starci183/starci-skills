@@ -71,10 +71,15 @@ function removeObject(kind, args, state) {
   return ok(`${name}\n`);
 }
 
+/** The id the fake gives a network: `net-<name>`. */
+export const networkIdOf = (name) => `net-${name}`;
+
 function serviceInspect(name, state) {
   const service = state.services.get(name);
   if (!service) return bad(`Error: no such service: ${name}`);
-  const spec = { Name: name, Spec: { Mode: { Replicated: { Replicas: service.replicas } }, ...(service.template ? { TaskTemplate: service.template } : {}) }, UpdateStatus: service.update };
+  const networks = service.networks ? { Networks: service.networks.map((entry) => ({ Target: networkIdOf(entry.network), Aliases: entry.aliases })) } : {};
+  const template = service.template || service.networks ? { TaskTemplate: { ...service.template, ...networks } } : {};
+  const spec = { Name: name, Spec: { Mode: { Replicated: { Replicas: service.replicas } }, ...template }, UpdateStatus: service.update };
   return ok(`${JSON.stringify(spec)}\n`);
 }
 
@@ -94,6 +99,45 @@ function taskInspect(args, state) {
   return ok(rows.map((task) => `${task.desired}|${task.state}|${task.timestamp}|${task.error ?? ''}${specOf(task)}\n`).join(''));
 }
 
+/**
+ * What `docker stack deploy` attaches to the service on each external network: the declared aliases AND the compose service name, which docker adds
+ * as an implicit alias to every network the service joins (the incident: `api` on the shared edge). null when the service joins no external network.
+ */
+function edgeNetworks(service, spec, model) {
+  const list = Array.isArray(spec.networks) ? Object.fromEntries(spec.networks.map((key) => [key, null])) : spec.networks ?? {};
+  const entries = Object.entries(list).filter(([key]) => model.networks?.[key]?.external === true).map(([key, attachment]) => ({ network: model.networks[key].name ?? key, aliases: [...(attachment?.aliases ?? []), service] }));
+  return entries.length === 0 ? undefined : entries;
+}
+
+function networkInspect(args, state) {
+  const name = args[2];
+  const network = state.networks.get(name);
+  if (!network) return bad(`Error: No such network: ${name}`);
+  if (args.at(-1) === '{{.Id}}') return ok(`${networkIdOf(name)}
+`);
+  return ok(`${JSON.stringify({ Name: name, Id: networkIdOf(name), Containers: Object.fromEntries(network.containers.map((container, index) => [`c${index}`, { Name: container }])), Services: Object.fromEntries(network.services.map((service) => [service, {}])) })}
+`);
+}
+
+/** `docker service update` for the network flags the edge reconcile issues. */
+function serviceUpdate(args, state) {
+  const name = args.at(-1);
+  const service = state.services.get(name);
+  if (!service) return bad(`Error: no such service: ${name}`);
+  state.updates.push(args.slice(2));
+  const valueOf = (flag) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : undefined);
+  const removed = valueOf('--network-rm');
+  const added = valueOf('--network-add');
+  if (removed) service.networks = (service.networks ?? []).filter((entry) => entry.network !== removed);
+  if (added) {
+    const [head, ...rest] = added.split(',');
+    const network = head.slice(5);
+    if (!(service.networks ?? []).some((entry) => entry.network === network)) service.networks = [...(service.networks ?? []), { network, aliases: rest.map((item) => item.slice(6)) }];
+  }
+  return ok(`${name}
+`);
+}
+
 function stackDeploy(args, call, state, fileReader) {
   const file = flagValue(args, '-c');
   const stack = args.at(-1);
@@ -103,7 +147,7 @@ function stackDeploy(args, call, state, fileReader) {
   for (const [service, spec] of Object.entries(model?.services ?? {})) {
     const name = `${stack}_${service}`;
     const replicas = spec.deploy?.replicas ?? 1;
-    state.services.set(name, { replicas, image: spec.image, update: state.deployUpdate(name, spec), spec });
+    state.services.set(name, { replicas, image: spec.image, update: state.deployUpdate(name, spec), spec, networks: edgeNetworks(service, spec, model) });
     state.tasks = state.tasks.filter((task) => task.service !== name);
     for (let index = 0; index < replicas; index += 1) state.tasks.push({ id: `${name}.${index + 1}`, service: name, desired: 'running', state: 'running', timestamp: new Date(call.at).toISOString(), error: '' });
   }
@@ -166,6 +210,8 @@ function dockerTable(host) {
     'stack deploy': (args, call) => stackDeploy(args, call, state, fileReader),
     'service ls': () => ok([...state.services.keys()].map((name) => `${name}\n`).join('')),
     'service inspect': (args) => serviceInspect(args[2], state),
+    'service update': (args) => serviceUpdate(args, state),
+    'network inspect': (args) => networkInspect(args, state),
     'service ps': (args) => servicePs(args[2], state),
     'inspect --type': (args) => taskInspect(args, state),
     'node ls': () => ok(Array.from({ length: state.nodes }, (_, index) => `node${index + 1}\n`).join('')),
@@ -189,6 +235,8 @@ export function fakeHost({ overrides = {}, fileReader, clock = 1_800_000_000_000
     secrets: new Map(),
     configs: new Map(),
     services: new Map(),
+    networks: new Map(),
+    updates: [],
     tasks: [],
     containers: new Set(),
     busy: new Set(),

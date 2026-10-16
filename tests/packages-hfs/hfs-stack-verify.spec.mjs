@@ -1,4 +1,7 @@
 import test from 'node:test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import assert from 'node:assert/strict';
 import { verifyStack } from '../../packages/hfs/stack/verify.mjs';
 import { fakeHost } from '../helpers/stack-fakes.mjs';
@@ -141,4 +144,60 @@ test('each service gets its own running-task check', async () => {
 test('with nothing declared verification passes, options default', async () => {
   const { ctx } = setup();
   assert.deepEqual(await verifyStack(ctx, withChecks({})), { ok: true, lines: [], data: { checks: [] } });
+});
+
+// ---- the shared edge network: a service must carry only its declared aliases ----
+const EDGE_STACK = `services:
+  api:
+    image: x
+    networks:
+      edge:
+        aliases:
+          - app-api
+networks:
+  edge:
+    external: true
+    name: shared-edge
+`;
+const edgeName = 'edge aliases of api on shared-edge are exactly the declared ones';
+
+function edgeSetup(aliases) {
+  const host = fakeHost({ overrides: { docker: { 'ps -q': psRunning } } });
+  host.state.networks.set('shared-edge', { containers: [], services: [] });
+  seedService(host, 'app_api');
+  if (aliases) host.state.services.get('app_api').networks = [{ network: 'shared-edge', aliases }];
+  const file = path.join(os.tmpdir(), `hfs-verify-edge-${Math.random().toString(16).slice(2)}.yaml`);
+  fs.writeFileSync(file, EDGE_STACK);
+  return { host, ctx: host.ctx(), file, cleanup: () => fs.rmSync(file, { force: true }) };
+}
+
+test('verify refuses an edge-attached service that carries an alias that is not declared (the stack short name)', async () => {
+  const { ctx, file, cleanup } = edgeSetup(['app-api', 'api']);
+  const result = await verifyStack(ctx, testConfig(), { stackFile: file });
+  cleanup();
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.data.checks, [{ name: edgeName, ok: false }]);
+  assert.match(result.lines[0], /FAIL .*app_api carries the aliases \[app-api, api\] on shared-edge, declared \[app-api\]/u);
+});
+
+test('verify passes with exactly the declared aliases, also when the stack file is the config stack source', async () => {
+  const { ctx, file, cleanup } = edgeSetup(['app-api']);
+  const explicit = await verifyStack(ctx, testConfig(), { stackFile: file });
+  const fromConfig = await verifyStack(ctx, testConfig({ stackFile: file }));
+  cleanup();
+  assert.deepEqual(explicit.lines, [`PASS  ${edgeName}  aliases [app-api]`]);
+  assert.equal(fromConfig.ok, true);
+});
+
+test('verify fails on a missing attachment or an unreadable stack file, and skips the edge check with skipInternal', async () => {
+  const { ctx, file, cleanup, host } = edgeSetup(null);
+  const detached = await verifyStack(ctx, testConfig(), { stackFile: file });
+  assert.match(detached.lines[0], /FAIL .*app_api is not attached to shared-edge/u);
+  const missing = await verifyStack(ctx, testConfig(), { stackFile: path.join(os.tmpdir(), 'hfs-verify-edge-absent.yaml') });
+  assert.equal(missing.ok, false);
+  assert.match(missing.lines[0], /FAIL  edge aliases: the stack file is readable/u);
+  const skipped = await verifyStack(ctx, testConfig(), { stackFile: file, skipInternal: true });
+  assert.deepEqual(skipped.lines, []);
+  assert.equal(host.calls.some((call) => call.args[0] === 'network'), true);
+  cleanup();
 });

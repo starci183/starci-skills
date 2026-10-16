@@ -1,4 +1,6 @@
 import test, { after } from 'node:test';
+import fs from 'node:fs';
+import path from 'node:path';
 import assert from 'node:assert/strict';
 import { doctorHost, prepareHost } from '../../packages/hfs/stack/prepare.mjs';
 import { fakeHost } from '../helpers/stack-fakes.mjs';
@@ -319,4 +321,42 @@ test('prepare --execute also ensures the releases directory under the releases r
   assert.equal(made.length, 1);
   assert.ok(made[0].startsWith("install -d -m 750 '/srv/shop/releases' || sudo -n install -d -o "));
   assert.ok(result.lines.includes('created /srv/shop/releases (mode 750, owned by the deploy user)'));
+});
+
+// ---- doctor: the short service names against the names of the shared edge network ----
+function edgeApp(names) {
+  const file = path.join(app.root, `edge-${Math.random().toString(16).slice(2)}.yaml`);
+  fs.writeFileSync(file, 'services:\n  api:\n    image: x\n    networks:\n      - edge\nnetworks:\n  edge:\n    external: true\n    name: shared-edge\n');
+  const context = setup();
+  context.host.state.networks.set('shared-edge', { containers: names, services: [] });
+  return { ...context, file, edgeConfig: { ...config, stackFile: file } };
+}
+
+test('doctor refuses a short service name that another tenant resolves on the edge network, naming alias, service and network', async () => {
+  const { ctx, deps, edgeConfig } = edgeApp(['tayson-web', 'api']);
+  const result = await doctorHost(ctx, edgeConfig, {}, deps);
+  assert.equal(result.ok, false);
+  const line = marked(result, 'FAIL').find((text) => text.includes('STACK_DEPLOY_ALIAS_SHARED'));
+  assert.ok(line.includes('shop_api') && line.includes('alias api') && line.includes('shared-edge'), line);
+});
+
+test('doctor accepts an edge network with no colliding name and reports an unreadable network or stack source', async () => {
+  const clean = edgeApp(['tayson-web']);
+  const ok = await doctorHost(clean.ctx, clean.edgeConfig, {}, clean.deps);
+  assert.equal(ok.ok, true);
+  assert.ok(ok.lines.includes('ok    edge networks (1): no short service name is resolved by another tenant'));
+  const noNetwork = edgeApp([]);
+  noNetwork.host.state.networks.clear();
+  const unreadable = await doctorHost(noNetwork.ctx, noNetwork.edgeConfig, {}, noNetwork.deps);
+  assert.ok(marked(unreadable, 'FAIL').some((text) => text.includes('STACK_DEPLOY_EDGE_UNREADABLE')));
+  const missing = await doctorHost(clean.ctx, { ...config, stackFile: path.join(app.root, 'absent.yaml') }, {}, clean.deps);
+  assert.ok(marked(missing, 'FAIL').some((text) => text.startsWith('FAIL  edge networks:')));
+  assert.equal(dockerCalls(clean.run, 'inspect').every((entry) => !/'(rm|update|create)'/u.test(entry.command)), true);
+});
+
+test('doctor without a stack source skips the edge network check', async () => {
+  const { ctx, deps, run } = setup();
+  const result = await doctorHost(ctx, { ...config, stackFile: undefined }, {}, deps);
+  assert.equal(result.ok, true);
+  assert.equal(dockerCalls(run, 'network').length, 0);
 });

@@ -4,6 +4,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { eachInOrder, repeatInOrder } from '../runtime/scripts/lib/in-order.mjs';
 import { lines as splitLines, tool } from './context.mjs';
+import { edgeAttachmentsOf, verifyEdgeAttachment } from './edge-alias.mjs';
 
 const RETRY_MS = 6000;
 const HTTP_TIMEOUT_MS = 8000;
@@ -66,15 +67,29 @@ async function verifyService(ctx, config, results, service) {
   await eachInOrder(config.verify.exec.filter((entry) => entry.service === service), (check) => runCheck(ctx, results, check.name, () => probeExec(ctx, container, check)));
 }
 
+/** Every edge-attached service carries exactly its declared aliases (never the implicit short name) on the shared external network. */
+async function verifyEdge(ctx, config, results, file) {
+  let attachments;
+  try {
+    attachments = edgeAttachmentsOf(file);
+  } catch (error) {
+    results.push({ name: 'edge aliases: the stack file is readable', ok: false, detail: String(error.message) });
+    return;
+  }
+  await eachInOrder(attachments, (item) => runCheck(ctx, results, `edge aliases of ${item.service} on ${item.network} are exactly the declared ones`, () => verifyEdgeAttachment(ctx, config, item)));
+}
+
 const verifyExec = (ctx, config, results) => eachInOrder([...new Set(config.verify.exec.map((check) => check.service))], (service) => verifyService(ctx, config, results, service));
 
 /**
  * Runs the declared verification. Returns { ok, lines, data: { checks: [{ name, ok }] } }; the lines read `PASS|FAIL  name  detail`.
- * `skipPublic` skips the HTTP journeys, `skipInternal` the checks inside a task.
+ * `skipPublic` skips the HTTP journeys, `skipInternal` the checks inside a task. `stackFile` (default: the stack source) is read for the services
+ * attached to an external network: each must carry exactly its declared aliases, never the implicit short name.
  */
-export async function verifyStack(ctx, config, { retrySeconds = 180, skipPublic = false, skipInternal = false } = {}) {
+export async function verifyStack(ctx, config, { retrySeconds = 180, skipPublic = false, skipInternal = false, stackFile = config.stackFile } = {}) {
   const results = [];
   if (!skipPublic) await eachInOrder(config.verify.http, (check) => runCheck(ctx, results, check.name, () => probeHttp(ctx, check), { retry: check.retry, retrySeconds }));
+  if (!skipInternal && stackFile) await verifyEdge(ctx, config, results, stackFile);
   if (!skipInternal) await verifyExec(ctx, config, results);
   return {
     ok: results.every((entry) => entry.ok),

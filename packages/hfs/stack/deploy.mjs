@@ -13,6 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { findInOrder } from '../runtime/scripts/lib/in-order.mjs';
 import { convergeStack } from './converge.mjs';
+import { describeClash, edgeCollisions, reconcileEdgeAliases } from './edge-alias.mjs';
 import { firstLine, tool } from './context.mjs';
 import { hasPlaceholderDigest, isReleaseId } from './digest.mjs';
 import { failure, refusal } from './errors.mjs';
@@ -31,6 +32,7 @@ export const DEFAULT_DEPS = Object.freeze({
   renderRelease: lazy('./render.mjs', 'renderRelease'),
   provisionRelease: lazy('./provision.mjs', 'provisionRelease'),
   convergeStack,
+  reconcileEdge: reconcileEdgeAliases,
   verifyStack,
   pruneStack,
   releaseStore: createReleaseStore,
@@ -57,6 +59,15 @@ function refuseSharedAliases(config, bytes) {
   if (clash) throw refusal('STACK_DEPLOY_ALIAS_SHARED', `service ${clash.service} claims the network alias ${clash.alias}, which the live upstream ${live.get(clash.alias)} of deploy.ingress.upstreams still answers to: give the swarm service its own alias (for example ${clash.alias}-swarm) and point the published routes at it; nothing was changed`);
 }
 
+/**
+ * Read-only preflight on the live edge networks: the implicit short name of a service (`api` for nivo_api) must not equal a name another container or
+ * service of the same external network resolves (docker stack deploy adds it as an alias, and the other tenant's `http://api` would reach this stack).
+ */
+async function refuseEdgeCollisions(run, config, bytes) {
+  const { clashes } = await edgeCollisions(run, config, bytes);
+  if (clashes.length > 0) throw refusal('STACK_DEPLOY_ALIAS_SHARED', describeClash(clashes[0]));
+}
+
 /** The release id (first 16 hex of the sha256 of the rendered stack bytes) and the distinct images of a rendered release. */
 function inspectRendered(out, config) {
   const bytes = fs.readFileSync(path.join(out, 'stack.yaml'), 'utf8');
@@ -65,7 +76,7 @@ function inspectRendered(out, config) {
   const images = [...new Set([...bytes.matchAll(IMAGE_LINE)].map((match) => match[1].replaceAll(QUOTE, '')))];
   const unsafe = images.find((image) => !IMAGE_REF.test(image));
   if (unsafe) throw refusal('STACK_DEPLOY_IMAGE', `the rendered stack names an image that is not a plain reference (${unsafe}); nothing was changed`);
-  return { releaseId: createHash('sha256').update(bytes).digest('hex').slice(0, 16), images };
+  return { releaseId: createHash('sha256').update(bytes).digest('hex').slice(0, 16), images, bytes };
 }
 
 function renderOptions(options, out, previous) {
@@ -102,11 +113,13 @@ async function runSteps(plan, lines, steps) {
 const isoBefore = (ctx, seconds) => new Date(ctx.now() - seconds * 1000).toISOString();
 
 /** Opens the release store over the ssh runner of this invocation; the runner's cleanup is queued on `cleanups` (sealed session files). */
-async function openStore(ctx, config, options, d, cleanups) {
+async function openRunner(ctx, config, options, d, cleanups) {
   const run = await d.ssh(ctx, config, { sshCmd: options.sshCmd ?? null });
   cleanups.push(() => run.cleanup?.());
-  return d.releaseStore(config, run);
+  return run;
 }
+
+const openStore = async (ctx, config, options, d, cleanups) => d.releaseStore(config, await openRunner(ctx, config, options, d, cleanups));
 
 /** Redeploys a stored release after a failed deploy: fetch, stack deploy, converge. Returns the lines to print. */
 async function redeployStored(ctx, config, d, store, previous, out, steps) {
@@ -115,6 +128,7 @@ async function redeployStored(ctx, config, d, store, previous, out, steps) {
   const failed = await runSteps([
     ['rollback-fetch', async () => { await store.fetch(previous, dir); return { ok: true, lines: [] }; }],
     ['rollback-deploy', () => stackDeploy(ctx, config, path.join(dir, 'stack.yaml'))],
+    ['rollback-edge', async () => d.reconcileEdge(ctx, config, path.join(dir, 'stack.yaml'))],
     ['rollback-converge', () => d.convergeStack(ctx, config, { since: isoBefore(ctx, 30), timeoutSeconds: 600 })],
   ], lines, steps);
   lines.push(failed ? 'ROLLBACK DID NOT CONVERGE: follow the stack runbook, Rollback' : `rolled back to ${previous}`);
@@ -148,10 +162,12 @@ function prePull(ctx, images) {
 
 /** Everything before the stack deploy: any failure here leaves the services untouched. Returns { ok, lines, releaseId, images, previous }. */
 async function prepareRelease(ctx, config, options, d, out, cleanups) {
-  const store = await openStore(ctx, config, options, d, cleanups);
+  const run = await openRunner(ctx, config, options, d, cleanups);
+  const store = d.releaseStore(config, run);
   const previous = await store.current();
   const rendered = await d.renderRelease(ctx, config, renderOptions(options, out, previous || null));
-  const { releaseId, images } = inspectRendered(out, config);
+  const { releaseId, images, bytes } = inspectRendered(out, config);
+  await refuseEdgeCollisions(run, config, bytes);
   const lines = [...(rendered.lines ?? [])];
   const provisioned = await d.provisionRelease(ctx, config, { execute: true, out, releaseFile: path.join(out, 'release.json') });
   lines.push(...(provisioned.lines ?? []));
@@ -172,8 +188,9 @@ async function deployExecute(ctx, config, options, d, out, cleanups) {
   const { skipPublic } = options;
   const failed = await runSteps([
     ['deploy', () => stackDeploy(ctx, config, path.join(out, 'stack.yaml'))],
+    ['edge', async () => d.reconcileEdge(ctx, config, path.join(out, 'stack.yaml'))],
     ['converge', () => d.convergeStack(ctx, config, { since, timeoutSeconds: options.timeoutSeconds })],
-    ['verify', () => d.verifyStack(ctx, config, { retrySeconds: options.retrySeconds, skipPublic: skipPublic === true })],
+    ['verify', () => d.verifyStack(ctx, config, { retrySeconds: options.retrySeconds, skipPublic: skipPublic === true, stackFile: path.join(out, 'stack.yaml') })],
     ...(skipPublic ? [] : [['accept', async () => { await store.accept(releaseId); return { ok: true, lines: [`accepted release ${releaseId}`] }; }]]),
   ], lines, steps);
   if (!failed && skipPublic) {
@@ -241,8 +258,9 @@ export async function rollbackRelease(ctx, config, options = {}, deps = {}) {
     const failed = await runSteps([
       ['fetch', async () => { await store.fetch(target, dir); return { ok: true, lines: [] }; }],
       ['deploy', () => stackDeploy(ctx, config, path.join(dir, 'stack.yaml'))],
+      ['edge', async () => d.reconcileEdge(ctx, config, path.join(dir, 'stack.yaml'))],
       ['converge', () => d.convergeStack(ctx, config, { since, timeoutSeconds: options.timeoutSeconds ?? 600 })],
-      ['verify', () => d.verifyStack(ctx, config, { retrySeconds: 180 })],
+      ['verify', () => d.verifyStack(ctx, config, { retrySeconds: 180, stackFile: path.join(dir, 'stack.yaml') })],
       ['accept', async () => { await store.accept(target); return { ok: true, lines: [] }; }],
     ], lines, steps);
     lines.push(failed ? `rollback to ${target} failed at ${failed}` : `rolled back to release ${target}; a rollback cannot undo data effects`);
@@ -269,7 +287,7 @@ export async function acceptRelease(ctx, config, options = {}, deps = {}) {
     const previous = await store.current();
     if (previous === release) return { ok: true, lines: [`release ${release} is already the accepted release`], data: { release, accepted: true, executed: options.execute === true } };
     if (options.execute !== true) return { ok: true, lines: [`dry run: would run the full verification (public hosts and checks inside the stack) and then accept release ${release}`], data: { release, accepted: false, executed: false } };
-    const verified = await d.verifyStack(ctx, config, { retrySeconds: options.retrySeconds });
+    const verified = await d.verifyStack(ctx, config, { retrySeconds: options.retrySeconds, stackFile: path.join(out, 'stack.yaml') });
     const lines = [...(verified.lines ?? [])];
     if (!verified.ok) return { ok: false, lines: [...lines, `release ${release} is NOT accepted: the full verification failed`], data: { release, accepted: false, executed: true } };
     await store.accept(release);
