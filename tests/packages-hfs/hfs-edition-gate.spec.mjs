@@ -91,7 +91,7 @@ test('a lite app refuses every pattern noun whose topic carries a liteAdapter: t
   assert.match(event.err, /HFS_ADD_NOUN_UNKNOWN/);
 });
 
-test('a lite app writes `new service` with its unit spec - a lite back end keeps full\'s unit specs (ruling:R212/case-1, amended by ruling:R212/case-4)', async () => {
+test('a lite app writes `new service` with its unit spec - a lite back end keeps full\'s unit specs (ruling:R212/case-1 (owner:lite-production-swarm), amended by ruling:R212/case-4)', async () => {
   const dir = repo(LITE);
   installTypeScript(dir);
   const result = await cli(['new', 'service', 'be/src/modules/domain/commission', 'commission', '--cwd', dir]);

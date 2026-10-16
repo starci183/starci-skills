@@ -1,6 +1,6 @@
 schema: starci/fe-stack@1
 purpose: >-
-  The front-end stack of every app, lite and full alike (owner ruling 2026-10-13, R212 case-2, with the Work boundary amended by ruling:R212/case-4): for each common front-end concern the
+  The front-end stack of every app, lite and full alike (owner ruling 2026-10-13, R212 case-2 (owner:lite-production-swarm), with the Work boundary amended by ruling:R212/case-4): for each common front-end concern the
   ONE canonical library, its HFS home (slot ids of knowledge/hfs/slots.yaml), the pattern id that teaches it
   (knowledge/patterns/fe/*.yaml) and the alternatives a front end never depends on or imports. Versions live in
   knowledge/hfs/canon-pins.yaml only. `tier: core` packages are installed by every scaffold; `opt` packages are added when a feature

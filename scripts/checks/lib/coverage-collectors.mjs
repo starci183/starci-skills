@@ -1,6 +1,6 @@
 // Producers of returned arrays include writes through aliases and invoked parameters.
 import { astChildren, astNodes, nodeName, resolvedExpression, sourceIndex, sourcePath } from './coverage-ast.mjs';
-import { bindPattern, evaluate, invocation, localScope, UNKNOWN } from './coverage-evaluation.mjs';
+import { bindPattern, declareBindings, evaluate, invocation, localScope, UNKNOWN } from './coverage-evaluation.mjs';
 import { returnedExpressions } from './coverage-results.mjs';
 
 const callable = (node) => ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node?.type);
@@ -78,11 +78,6 @@ function visitCall(context, index, node, state, stack) {
   }
 }
 
-function declare(context, index, node) {
-  for (const entry of node.declarations) bindPattern(context, index, entry.id,
-    { index: localScope(index), node: entry.init });
-}
-
 function assignment(context, index, node, state) {
   const left = node.left ?? node.argument;
   const receiver = left.type === 'MemberExpression' ? left.object : left;
@@ -94,7 +89,7 @@ function assignment(context, index, node, state) {
 function walk(context, index, node, state, stack) {
   if (!node || callable(node)) return false;
   if (node.type === 'BlockStatement') return walkBlock(context, index, node, state, stack);
-  if (node.type === 'VariableDeclaration') declare(context, index, node);
+  if (node.type === 'VariableDeclaration') declareBindings(context, index, node);
   if (node.type === 'IfStatement') return walkBranch(context, index, node, state, stack);
   if (node.type === 'ForOfStatement') return walkLoop(context, index, node, state, stack);
   if (['AssignmentExpression', 'UpdateExpression'].includes(node.type)) assignment(context, index, node, state);
