@@ -40,7 +40,7 @@ import { withHostLock as holdHostLock } from '../machine/host-lock.mjs';
 import { writeL4Record } from '../guards/release-record.mjs';
 import { suiteModeOf } from '../guards/release-suite-mode.mjs';
 import { writeCiRecord } from './release-ci-status.mjs';
-import { advanceLocalMain } from './local-main.mjs';
+import { advanceLocalMain } from '../machine/local-main.mjs';
 
 /** A release tag: `v` and a version. Anything else is never pushed by the release flow. */
 const RELEASE_TAG = /^v\d[\w.+-]*$/;

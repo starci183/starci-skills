@@ -1,11 +1,11 @@
-// local-main.spec.mjs - a release fast-forwards the LOCAL main ref when that is safe (scripts/supervisor/local-main.mjs): the released commit is on origin/main,
+// local-main.spec.mjs - a release fast-forwards the LOCAL main ref when that is safe (scripts/machine/local-main.mjs): the released commit is on origin/main,
 // the local main is an ancestor of it, and no worktree has main checked out. Real temp repositories; nothing outside them is touched.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
-import { advanceLocalMain } from '../../scripts/supervisor/local-main.mjs';
+import { advanceLocalMain } from '../../scripts/machine/local-main.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_PREFIX']) delete process.env[key];

@@ -20,7 +20,7 @@ import { npmRegistry } from './release-registry.mjs';
 import { proveRuntimePackage } from './runtime-package-clean.mjs';
 import { releaseNotesFindings } from '../hfs/runtime-rules/release-notes.mjs';
 import fs from 'node:fs';
-import { advanceLocalMain } from '../supervisor/local-main.mjs';
+import { advanceLocalMain } from '../machine/local-main.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const USAGE = 'usage: starci release publish [--runtime-package] [--publish --npm-user <name> [--poll-minutes <n>] [--pre-land-ref <sha>]]';
