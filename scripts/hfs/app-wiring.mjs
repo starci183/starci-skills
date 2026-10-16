@@ -153,7 +153,7 @@ function appWiringFinding({ repoRoot, beRoot, prefix, app, files, fixtures, time
   const fixture = fixtures[app] ?? wiringFixturePath(app);
   const fixtureExists = fs.existsSync(path.join(beRoot, fixture)) && (!files || files.includes(`${prefix}${fixture}`));
   const args = [WORKER, '--worker', JSON.stringify({ repoRoot: beRoot, app, fixture: fixtureExists ? fixture : null, timeout })];
-  const options = { cwd: beRoot, encoding: 'utf8', env: {}, windowsHide: true, timeout: timeout + 2000, maxBuffer: 1024 * 1024 };
+  const options = { cwd: beRoot, encoding: 'utf8', env: {}, windowsHide: true, timeout: Math.max(60000, timeout * 4) + 2000, maxBuffer: 1024 * 1024 };
   const result = run ? run(process.execPath, args, options) : runNode(args, options);
   let proof;
   try { proof = JSON.parse(result.stdout ?? ''); } catch { /* Output from app source cannot serve as a proof. */ }

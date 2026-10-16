@@ -5246,7 +5246,7 @@ rules:
 
   - id: R288
     code: "FE_STACK_UNLISTED"
-    law: "Every FE workspace dependency belongs to knowledge/hfs/fe-stack.yaml or is declared in hfs.json fe.extraPackages with its name and a nonempty reason. Every product Next app declares the catalog's core runtime packages; codegen, lint, TypeScript and Tailwind tools may be installed once at the app root. The full marketing landing app is exempt from core presence. GraphQL documents, including gql templates, match the back-end contracts, and SWR keys carry fetcher identities without an opt-in declaration."
+    law: "Every FE workspace dependency belongs to knowledge/hfs/fe-stack.yaml or is declared in hfs.json fe.extraPackages with its name and a nonempty reason. Every product Next app declares the catalog's core runtime packages; codegen, lint, TypeScript and Tailwind tools may be installed once at the app root. The marketing landing app is exempt (lite and full) from core presence. GraphQL documents, including gql templates, match the back-end contracts, and SWR keys carry fetcher identities without an opt-in declaration."
     kinds: [check]
     gates: [settle, land, ci]
     failureCodes: ["FE_STACK_UNLISTED", "FE_STACK_CORE_MISSING"]

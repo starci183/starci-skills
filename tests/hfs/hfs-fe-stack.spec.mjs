@@ -152,12 +152,14 @@ for (const edition of ['lite', 'full']) {
   });
 }
 
-test('FE_STACK_CORE_MISSING exempts the full marketing landing only', t => {
+test('FE_STACK_CORE_MISSING exempts the marketing landing in lite and full, and nothing else', t => {
   const files = { 'fe/apps/landing/package.json': { name: '@demo/landing', dependencies: { next: '1.0.0' } } };
   const root = tree(t, files);
   const apps = [{ name: 'landing', kind: 'next' }];
   assert.deepEqual(allowlist(root, files, 'full', { apps }), []);
-  assert.ok(allowlist(root, files, 'lite', { apps }).some(finding => finding.code === 'FE_STACK_CORE_MISSING'));
+  assert.deepEqual(allowlist(root, files, 'lite', { apps }), []);
+  const other = { 'fe/apps/shop/package.json': { name: '@demo/shop', dependencies: { next: '1.0.0' } } };
+  assert.ok(allowlist(tree(t, other), other, 'lite', { apps: [{ name: 'shop', kind: 'next' }] }).some(finding => finding.code === 'FE_STACK_CORE_MISSING'));
 });
 
 test('FE_STACK_UNLISTED uses hfs.json reasoned declarations and keeps forbidden alternatives refused', t => {

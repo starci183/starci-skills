@@ -110,7 +110,7 @@ rules:
     requirement: |-
       Every FE workspace dependency appears in knowledge/hfs/fe-stack.yaml or in hfs.json fe.extraPackages with its
       name and a nonempty reason. Every product Next app declares the catalog's core runtime packages. Codegen, lint,
-      TypeScript and Tailwind tools may be installed once at the app root; the full marketing landing app is exempt
+      TypeScript and Tailwind tools may be installed once at the app root; the marketing landing app is exempt
       from core package presence. These requirements apply in lite and full.
     rationale: |-
       A declared stack keeps each concern on one library and makes an additional dependency an explicit product decision.

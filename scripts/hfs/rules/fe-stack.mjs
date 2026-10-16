@@ -116,7 +116,7 @@ export function feStackAllowlistFindings({ repoRoot, files, all = files, repo, i
   const findings = [...packages].filter(([file]) => inScope(file)).flatMap(([file, pkg]) => unlistedFindings(file, pkg, allowed, extras, workspaces));
   const rootTools = dependenciesOf(readJson(repoRoot, '../package.json'));
   for (const app of repo.apps ?? []) {
-    if (app.kind !== 'next' || ((repo.edition ?? 'full') === 'full' && app.name === 'landing')) continue;
+    if (app.kind !== 'next' || app.name === 'landing') continue;
     const rel = `apps/${app.name}/package.json`;
     const installed = dependenciesOf(packages.get(rel));
     for (const [name, entry] of core) {
