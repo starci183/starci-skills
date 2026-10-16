@@ -262,8 +262,13 @@ for (const edition of ["lite", "full"]) {
         const editionTester = ruleTester({ root: TYPED_ROOT, hfs })
         const head = `import { Controller, Get, Post, Body, Redirect, StreamableFile } from "@nestjs/common"\nimport { Public as Open, PublicReason as Reason } from "@modules/domain/identity"\n`
         const operations = `import { defineOperations as register, query } from "@modules/platform/operations"\nimport type { OperationRequest, OperationReply } from "@modules/platform/operations"\nconst OPERATIONS = register({ "plan.read@1": query<{ readonly id: string }, { readonly ok: boolean }>() })\ntype Table = typeof OPERATIONS\n`
+        const cred = head.replace("{ Public as Open, PublicReason as Reason }", "{ Credential, Public, PublicReason }")
         editionTester.run("rest-door-needs-a-reason", restDoorNeedsAReason, {
             valid: [
+                { filename: CONTROLLER, code: `${cred}@Controller("loyalty") class C { @Credential({ kind: "api-key" }) @Post() earn() { return { ok: true } } }` },
+                { filename: CONTROLLER, code: `${cred}@Credential({ kind: "run-token" }) @Controller("n8n") class C { @Post("a") a() { return 1 } @Credential({ kind: "run-token", workflow: "x" }) @Post("b") b() { return 1 } }` },
+                { filename: CONTROLLER, code: `${cred}import { Credential as Door } from "@modules/domain/identity"
+@Controller("tools") class C { @Door({ kind: "tool-token" }) @Post() run() { return 1 } }` },
                 { filename: CONTROLLER, code: `${head}@Controller("health") class C { @Open({ reason: Reason.Health }) @Get() live() { return { ok: true } } }` },
                 { filename: CONTROLLER, code: `${head}@Controller("auth") class C { @Open({ reason: Reason.AuthHandshake }) @Get() auth() { return { ok: true } } }` },
                 { filename: CONTROLLER, code: `${head}@Controller("hooks") class C { @Open({ reason: Reason.SignedWebhook }) @Post() hook() { return { ok: true } } }` },
@@ -273,6 +278,20 @@ for (const edition of ["lite", "full"]) {
                 { filename: CONTROLLER, code: `${head}${operations}@Controller("api/v1") class C { @Post("operations") async invoke(@Body() body: OperationRequest<Table>): Promise<OperationReply<Table>> { return null as never } }` },
             ],
             invalid: [
+                // unguarded route
+                { filename: CONTROLLER, code: `${cred}@Controller("loyalty") class C { @Post() earn() { return { ok: true } } }`, errors: [{ messageId: "unjustified" }] },
+                // a guard that is not the credential guard proves nothing
+                { filename: CONTROLLER, code: `${cred}import { UseGuards } from "@nestjs/common"
+class PlainGuard { canActivate() { return true } }
+@Controller("loyalty") class C { @UseGuards(PlainGuard) @Post() earn() { return 1 } }`, errors: [{ messageId: "unjustified" }] },
+                // a same-named local decorator is not the identity capability credential
+                { filename: CONTROLLER, code: `${head}const Credential = (_o: { kind: string }): MethodDecorator => () => undefined
+@Controller("loyalty") class C { @Credential({ kind: "api-key" }) @Post() earn() { return 1 } }`, errors: [{ messageId: "unjustified" }] },
+                // the kind is declared as a literal, not computed
+                { filename: CONTROLLER, code: `${cred}const kind = String(1)
+@Controller("loyalty") class C { @Credential({ kind }) @Post() earn() { return 1 } }`, errors: [{ messageId: "unjustified" }] },
+                // an anonymous route without a closed PublicReason still fails
+                { filename: CONTROLLER, code: `${cred}@Controller("loyalty") class C { @Public({ reason: "ToolToken" as never }) @Get() list() { return 1 } }`, errors: [{ messageId: "unjustified" }] },
                 { filename: CONTROLLER, code: `${head}@Controller("orders") class C { @Get() list() { return { items: [] } } }`, errors: [{ messageId: "unjustified" }] },
                 // An import, a constructor reference and an unused stream do not turn JSON into bytes.
                 { filename: CONTROLLER, code: `${head}@Controller("orders") class C { @Get() list() { const stream = StreamableFile; return { stream: Boolean(stream) } } }`, errors: [{ messageId: "unjustified" }] },

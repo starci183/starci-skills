@@ -418,3 +418,21 @@ rulings:
     supersedes: []
     amendmentScope: The direct-call-only reading of FE_HOOKS_ARE_HOOKS fake-hook detection in R56.
     enforcedBy: [R56]
+
+  - id: credential-guarded-rest-door
+    date: '2026-10-16'
+    topic: code.be-transport
+    status: live
+    ownerRuling: 15
+    source: owner ruling 2026-10-16 "Theo y tro" (the owner delegated the decision to main) (alpha.18.1 patch, NIVO findings rest-door-needs-a-reason and rest-route-declared); packages/eslint/be/operations.mjs
+    statement: >-
+      A REST route that serves an external machine client (n8n, loyalty till, external API, agent tools) and is
+      protected by a credential guard satisfies the evidence of BE_REST_DOOR_EVIDENCE and BE_REST_ROUTE_UNDECLARED
+      through that guard, so its wire format is not forced into the defineOperations contract. The declaration is
+      the route's (or its controller's) @Credential({ kind: "<literal>" }) decorator imported from the domain identity
+      capability, and the same capability declares a CredentialGuard class implementing CanActivate; both are resolved by
+      TypeScript symbol resolution. Anonymous public REST routes still need one of the four closed PublicReason values
+      and an unguarded route still fails.
+    supersedes: []
+    amendmentScope: Clause of R278 that allowed a public versioned operation table as the only evidence for a JSON REST route outside probes, handshakes, webhooks and byte streams.
+    enforcedBy: [R278, R290]

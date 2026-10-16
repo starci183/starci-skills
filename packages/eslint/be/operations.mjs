@@ -232,8 +232,52 @@ const returnsBytes = (context, method) => {
     return found
 }
 
-/** Route-level evidence for probes, auth handshakes, signed webhooks, redirects and byte transfers. */
+/** True when a class declaration implements the `CanActivate` of `@nestjs/common` (resolved by symbol, not by spelling). */
+const implementsCanActivate = (checker, declaration) =>
+    (declaration.heritageClauses ?? []).some((clause) => clause.token === ts.SyntaxKind.ImplementsKeyword && clause.types.some((type) => {
+        const symbol = checker.getSymbolAtLocation(type.expression)
+        return declarationsOfSymbol(checker, symbol).some((found) => found.name?.text === "CanActivate" && /[\/]@nestjs[\/]common[\/]/.test(String(found.getSourceFile().fileName)))
+    }))
+
+/**
+ * True when the identity capability that declares `Credential` also declares the canon `CredentialGuard`, a class implementing
+ * `CanActivate`. The decorator only selects the credential kind; this guard is what authenticates it.
+ */
+const credentialGuardDeclared = (context, decoratorCallee_) => {
+    const hfs = hfsOf(context)
+    const { program, checker, toTs } = typed(context)
+    const target = toTs(decoratorCallee_)
+    const home = declarationsOfSymbol(checker, target ? checker.getSymbolAtLocation(target) : undefined).find((declaration) => declaration.name?.text === "Credential")
+    const owner = home && hfs.ownerOf(home.getSourceFile().fileName)
+    if (!owner) return false
+    for (const source of program.getSourceFiles()) {
+        if (source.isDeclarationFile || hfs.ownerOf(source.fileName) !== owner) continue
+        const found = source.statements.some((statement) => ts.isClassDeclaration(statement) && statement.name?.text === "CredentialGuard" && implementsCanActivate(checker, statement))
+        if (found) return true
+    }
+    return false
+}
+
+/**
+ * Credential-guarded route (BE_REST_DOOR_EVIDENCE, owner delegation 2026-10-16): the route, or its controller class, carries
+ * `@Credential({ kind: "<literal>" })` imported from the domain identity capability, and that capability declares a
+ * `CredentialGuard implements CanActivate`. A same-named local decorator, a `@UseGuards` of any other guard and a non-literal kind prove nothing.
+ */
+export const credentialGuardEvidence = (context, method) => {
+    const carriers = [...(method.decorators ?? []), ...(method.parent?.parent?.decorators ?? [])]
+    for (const decorator of carriers) {
+        const callee = decoratorCallee(decorator)
+        if (!identityExport(context, callee, "Credential")) continue
+        const options = decoratorArguments(decorator)[0]
+        const kind = options?.type === "ObjectExpression" ? options.properties.find((property) => property.type === "Property" && keyName(property.key) === "kind")?.value : null
+        if (kind?.type === "Literal" && typeof kind.value === "string" && kind.value !== "" && credentialGuardDeclared(context, callee)) return true
+    }
+    return false
+}
+
+/** Route-level evidence for probes, auth handshakes, signed webhooks, redirects, byte transfers and credential-guarded routes. */
 export const restExceptionEvidence = (context, method) => {
+    if (credentialGuardEvidence(context, method)) return true
     for (const decorator of method.decorators ?? []) {
         const callee = decoratorCallee(decorator)
         if (isImportedFrom(context, callee, "@nestjs/common", "Redirect")) return true
