@@ -19,6 +19,9 @@ const isRelative = (specifier) => specifier === "." || specifier === ".." || spe
 
 /** Calls `check(node, specifier)` for every import and re-export that names a module. */
 const onSpecifiers = (check) => ({
+  ImportExpression(node) {
+    check(node.source, node.source.value)
+  },
   ImportDeclaration(node) {
     check(node.source, node.source.value)
   },

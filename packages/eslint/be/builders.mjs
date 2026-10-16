@@ -72,7 +72,7 @@ const isEntityClass = (checker, declaration) => {
         const callee = ts.isCallExpression(decorator.expression) ? decorator.expression.expression : decorator.expression
         const symbol = checker.getSymbolAtLocation(callee)
         if (!symbol) return false
-        const target = (symbol.flags & ts.SymbolFlags.Alias) !== 0 ? checker.getAliasedSymbol(symbol) : symbol
+        const target = ts.skipAlias(symbol, checker)
         return (target.getDeclarations?.() ?? []).some((found) => moduleOf(found, String(found.getSourceFile().fileName).replace(/\\/g, "/")) === "typeorm")
     })
 }
@@ -212,7 +212,7 @@ export const builderArrangesOnly = {
         }
         return {
             ImportDeclaration(node) {
-                if (node.source.value === "@jest/globals") context.report({ node, messageId: "assertion", data: { name: "@jest/globals" } })
+                if (["expect", "@jest/globals"].includes(node.source.value)) context.report({ node, messageId: "assertion", data: { name: node.source.value } })
             },
             Identifier(node) {
                 const parent = node.parent
