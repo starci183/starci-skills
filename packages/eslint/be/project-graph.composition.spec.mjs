@@ -187,7 +187,8 @@ const GUARD_FILES = {
     "src/modules/platform/http-security/csrf-origin.guard.ts": "export class CsrfOriginGuard { canActivate(context: { headers: { origin?: string } }): boolean { return context.headers.origin !== undefined; } }\n",
     "src/modules/platform/http-security/app-throttler.guard.ts": "import { ThrottlerGuard } from '@nestjs/throttler';\nexport class AppThrottlerGuard extends ThrottlerGuard {}\n",
     "src/modules/platform/http-security/tier.guard.ts": TIER_GUARDS,
-    "src/modules/domain/identity/index.ts": "export { AuthGuard } from './auth.guard';\nexport { Lookalike } from './lookalike';\n",
+    "src/modules/domain/identity/index.ts": "export { AuthGuard } from './auth.guard';\nexport { CredentialGuard } from './credential.guard';\nexport { Lookalike } from './lookalike';\n",
+    "src/modules/domain/identity/credential.guard.ts": "export class CredentialGuard { canActivate(): boolean { return true; } }\n",
     "src/modules/domain/identity/auth.guard.ts": "export class AuthGuard { canActivate(): boolean { return true; } }\n",
     "src/modules/domain/identity/lookalike.ts": "export class Lookalike { canActivate(): boolean { return true; } }\n",
 }
@@ -195,30 +196,33 @@ const GUARD_APP = (guards) => `import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { AppThrottlerGuard, CsrfOriginGuard, PlainGuard, StrayTierGuard, TierGuard } from '../../../src/modules/platform/http-security';
-import { AuthGuard, Lookalike } from '../../../src/modules/domain/identity';
+import { AuthGuard, CredentialGuard, Lookalike } from '../../../src/modules/domain/identity';
 @Module({ providers: [${guards.map((name) => `{ provide: APP_GUARD, useClass: ${name} }`).join(", ")}] })
 export class AppModule {}
 `
-test("default-deny-app-guard: an api app provides throttler, CSRF origin guard, AuthGuard in that order", (t) => {
+test("default-deny-app-guard: an api app provides throttler, CSRF origin guard, CredentialGuard, AuthGuard in that order", (t) => {
     const T = "ThrottlerGuard"
     const C = "CsrfOriginGuard"
+    const R = "CredentialGuard"
     const A = "AuthGuard"
     const variants = {
-        core: [T, C, A],
-        subclass: ["AppThrottlerGuard", C, A],
-        tier: ["TierGuard", C, A],
-        extra: [T, "Lookalike", C, A],
-        nothrottler: [C, A],
-        nocsrf: [T, A],
-        noauth: [T, C],
+        core: [T, C, R, A],
+        subclass: ["AppThrottlerGuard", C, R, A],
+        tier: ["TierGuard", C, R, A],
+        extra: [T, "Lookalike", C, R, A],
+        nothrottler: [C, R, A],
+        nocsrf: [T, R, A],
+        nocredential: [T, C, A],
+        noauth: [T, C, R],
         empty: [],
-        lookalike: [T, C, "Lookalike"],
-        reordered: [A, T, C],
-        reordered2: [T, A, C],
-        repeated: [T, C, A, A],
-        swapped: [C, "TierGuard", A],
-        plain: ["PlainGuard", C, A],
-        stray: ["StrayTierGuard", C, A],
+        lookalike: [T, C, R, "Lookalike"],
+        reordered: [A, T, C, R],
+        reordered2: [T, A, C, R],
+        credentialafter: [T, C, A, R],
+        repeated: [T, C, R, A, A],
+        swapped: [C, "TierGuard", R, A],
+        plain: ["PlainGuard", C, R, A],
+        stray: ["StrayTierGuard", C, R, A],
     }
     const names = Object.keys(variants)
     const f = repo(t, {
@@ -234,11 +238,13 @@ test("default-deny-app-guard: an api app provides throttler, CSRF origin guard, 
         invalid: [...bad(f, [
             [at("nothrottler"), [6, /does not provide the throttler guard/]],
             [at("nocsrf"), [6, /does not provide the CSRF origin guard/]],
+            [at("nocredential"), [6, /does not provide CredentialGuard/]],
             [at("noauth"), [6, /does not provide AuthGuard/]],
-            [at("empty"), 1, 1, 1],
+            [at("empty"), 1, 1, 1, 1],
             [at("lookalike"), [6, /does not provide AuthGuard/]],
             [at("reordered"), 6],
             [at("reordered2"), 6],
+            [at("credentialafter"), 6],
             [at("repeated"), [6, /more than once/]],
             [at("swapped"), [6, /before the throttler guard/]],
             [at("plain"), [6, /does not provide the throttler guard/]],
