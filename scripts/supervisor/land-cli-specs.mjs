@@ -87,7 +87,16 @@ const textOf = (root, file, texts) => {
 };
 const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 // the verb written as a quoted argument, or as `starci <group> <verb>` / `<group> <verb>`
-const namesVerb = (code, entry) => new RegExp(String.raw`['"\`]${escapeRe(entry.verb)}['"\`]|\b${escapeRe(entry.group)}\s+${escapeRe(entry.verb)}\b`).test(code);
+const verbPatterns = new Map();
+const namesVerb = (code, entry) => {
+  const key = `${entry.group} ${entry.verb}`;
+  let pattern = verbPatterns.get(key);
+  if (!pattern) {
+    pattern = new RegExp(String.raw`['"\`]${escapeRe(entry.verb)}['"\`]|\b${escapeRe(entry.group)}\s+${escapeRe(entry.verb)}\b`);
+    verbPatterns.set(key, pattern);
+  }
+  return pattern.test(code);
+};
 
 /**
  * The specs that spawn the CLI entry of a changed verb and name that verb. `specs` = [{file, code}] (code without comment lines);
@@ -105,8 +114,10 @@ export function specsRunningVerbs({ root, hit, specs, cache = new Map() }) {
   // the spec or a test helper it reaches runs packages/cli/bin/starci.mjs
   const runsStarci = (spec, reach) => spec.code.includes(CLI_BIN_FILE) || [...reach].some((file) => file.startsWith('tests/helpers/') && textOf(root, file, texts).includes(CLI_BIN_FILE));
   return specs.filter((spec) => {
+    const named = hit.filter((entry) => namesVerb(spec.code, entry));
+    if (!named.length) return false;
     const reach = reachableFrom(root, spec.file, { cache });
-    return hit.some((entry) => namesVerb(spec.code, entry) && (reach.has(entry.dispatcher) || runsStarci(spec, reach)));
+    return named.some((entry) => reach.has(entry.dispatcher) || runsStarci(spec, reach));
   }).map((spec) => spec.file);
 }
 

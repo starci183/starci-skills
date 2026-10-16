@@ -15,6 +15,7 @@ import { changedExports, headRanges } from './land-specs.mjs';
 import { affectedSelection, readSources } from './affected-select.mjs';
 import { affectedBySymbol, symbolData, symbolLines } from './affected-symbols.mjs';
 import { show } from '../api/git/show.mjs';
+import { batchedBaseText, batchedDiff } from './affected-git-batch.mjs';
 import { pathList } from '../machine/test-ladder.mjs';
 import { resolveTestConcurrency } from '../machine/test-concurrency.mjs';
 import { liveLimit } from './affected-concurrency.mjs';
@@ -43,17 +44,22 @@ export function changedSince(root, base, deps = {}) {
   return pathList([...lines(tracked.stdout), ...lines(untracked.stdout)]).sort(byCodeUnit);
 }
 
+// The -U0 diff of one changed file against `base`: read once for the whole diff (affected-git-batch.mjs) unless a test injects its own diff.
+function fileDiff({ root, base, deps }, file) {
+  return (deps.diff ? null : batchedDiff(root, base, file)) ?? (deps.diff ?? diff)(['-U0', '--no-color', base, '--', file], { cwd: root });
+}
+
 // The exports the diff of one changed file against `base` reaches (the land gate's hub narrowing), or an unmapped answer.
 export function symbolsAgainst({ root, base, deps }, file) {
   if (!file.endsWith('.mjs')) return { symbols: null, why: 'not a .mjs file' };
-  const result = (deps.diff ?? diff)(['-U0', '--no-color', base, '--', file], { cwd: root });
+  const result = fileDiff({ root, base, deps }, file);
   let source;
   try { source = fs.readFileSync(path.join(root, file), 'utf8'); } catch { return { symbols: null, why: 'file unreadable' }; }
   return succeeded(result) ? changedExports({ source, ranges: headRanges(result.stdout) }) : { symbols: null, why: 'diff unreadable' };
 }
 // The lines the diff of `file` against `base` adds and removes (affected-data.mjs): a file git cannot diff adds and removes nothing it can name.
 function diffLinesAgainst({ root, base, deps }, file) {
-  const result = (deps.diff ?? diff)(['-U0', '--no-color', base, '--', file], { cwd: root });
+  const result = fileDiff({ root, base, deps }, file);
   const lines = succeeded(result) ? String(result.stdout ?? '').split(/\r?\n/) : [];
   const pick = (sign) => lines.filter((line) => line.startsWith(sign) && !line.startsWith(sign.repeat(3))).map((line) => line.slice(1));
   return { added: pick('+'), removed: pick('-') };
@@ -61,7 +67,7 @@ function diffLinesAgainst({ root, base, deps }, file) {
 
 // The text of `file` at the diff base, or null when the base has none (a new file) or git cannot answer.
 function baseSourceOf({ root, base, deps }, file) {
-  const result = (deps.show ?? show)([`${base}:${file}`], { cwd: root });
+  const result = (deps.show ? null : batchedBaseText(root, base, file)) ?? (deps.show ?? show)([`${base}:${file}`], { cwd: root });
   return succeeded(result) ? String(result.stdout) : null;
 }
 

@@ -88,14 +88,38 @@ export function dataRefsOf(text) {
   return [...out];
 }
 
-const dataRefSelectsChange = (root, reached, wanted, readFile) => {
+const defaultReadFile = (p) => fs.readFileSync(p, 'utf8');
+/** Per reader, the data refs of each test file read so far: a helper shared by many specs is read and scanned once. */
+const refsCaches = new WeakMap();
+const refsOfTestFile = (root, file, readFile) => {
+  let byFile = refsCaches.get(readFile);
+  if (!byFile) { byFile = new Map(); refsCaches.set(readFile, byFile); }
+  const key = path.join(root, file);
+  if (byFile.has(key)) return byFile.get(key);
+  let refs = [];
+  try { refs = dataRefsOf(readFile(key)); } catch { refs = []; }
+  byFile.set(key, refs);
+  return refs;
+};
+/** Per changed set, every changed path and every directory above one: a data ref selects the change when it is one of them. */
+const wantedPrefixes = new WeakMap();
+const prefixesOf = (wanted) => {
+  let prefixes = wantedPrefixes.get(wanted);
+  if (prefixes) return prefixes;
+  prefixes = new Set();
+  for (const changedFile of wanted) {
+    prefixes.add(changedFile);
+    for (let at = changedFile.lastIndexOf('/'); at > 0; at = changedFile.lastIndexOf('/', at - 1)) prefixes.add(changedFile.slice(0, at));
+  }
+  wantedPrefixes.set(wanted, prefixes);
+  return prefixes;
+};
+
+const dataRefSelectsChange = (root, reached, wanted, readFile = defaultReadFile) => {
+  const prefixes = prefixesOf(wanted);
   for (const file of reached) {
     if (!file.startsWith('tests/')) continue;
-    let text;
-    try { text = (readFile ?? ((p) => fs.readFileSync(p, 'utf8')))(path.join(root, file)); } catch { continue; }
-    for (const ref of dataRefsOf(text)) {
-      for (const changedFile of wanted) if (changedFile === ref || changedFile.startsWith(ref + '/')) return true;
-    }
+    for (const ref of refsOfTestFile(root, file, readFile)) if (prefixes.has(ref)) return true;
   }
   return false;
 };
@@ -120,10 +144,18 @@ export function specsDependingOn(root, changed, specs, { readFile } = {}) {
  * The specs that read a changed file AS DATA (a quoted path or path segments below the named tree, in the spec or a test helper it
  * imports), whether or not they import it: the part of specsDependingOn that is a direct use, not a distant import.
  */
+/** Per root, the import lists and the reach sets already computed: the files do not change while one process asks for many changed files. */
+const sharedReach = new Map();
+const reachOf = (root, spec, readFile) => {
+  if (readFile) return reachableFrom(root, spec, { cache: new Map(), readFile });
+  let shared = sharedReach.get(root);
+  if (!shared) { shared = { cache: new Map(), reach: new Map() }; sharedReach.set(root, shared); }
+  if (!shared.reach.has(spec)) shared.reach.set(spec, reachableFrom(root, spec, { cache: shared.cache }));
+  return shared.reach.get(spec);
+};
 export function specsReadingData(root, changed, specs, { readFile } = {}) {
   const wanted = new Set(changed.map(posix));
-  const cache = new Map();
-  return specs.filter((spec) => dataRefSelectsChange(root, reachableFrom(root, spec, { cache, readFile }), wanted, readFile));
+  return specs.filter((spec) => dataRefSelectsChange(root, reachOf(root, spec, readFile), wanted, readFile));
 }
 
 // Internal entry: spawned by scripts/supervisor/land.mjs; not invoked directly.

@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -29,7 +29,7 @@ networks:
     driver: overlay
 `;
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stack-edge-'));
-process.on('exit', () => fs.rmSync(work, { recursive: true, force: true }));
+after(() => fs.rmSync(work, { recursive: true, force: true }));
 const fileOf = (text) => {
   const file = path.join(work, `stack-${Math.random().toString(16).slice(2)}.yaml`);
   fs.writeFileSync(file, text);
