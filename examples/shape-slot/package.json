@@ -11,7 +11,7 @@
     "@nestjs/common": "11.2.5",
     "@nestjs/core": "11.2.5",
     "@nestjs/cqrs": "11.0.3",
-    "@nestjs/platform-express": "11.2.5",
+    "@nestjs/platform-express": "11.2.7",
     "@nestjs/typeorm": "11.0.3",
     "nest-commander": "3.21.0",
     "pg": "8.23.1",

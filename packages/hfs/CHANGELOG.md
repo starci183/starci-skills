@@ -124,6 +124,8 @@
 ## Unreleased (a18 R281)
 
 - Fixed: the bundled architecture machine (`function-spec-providers.mjs`, `unit-spec-providers.mjs`) takes the callable subset of a function-only subject's exports (constants, enums, re-exports and overload signatures are ignored) and lets the spec of a value-object class (undecorated, no constructor injection token) construct it with `new`.
+- Security (canon pins, npm audit of 2026-10-16): `next` 16.1.6 to 16.4.2 (critical, with the `postcss` and `sharp` highs it brings), `axios` 1.15.2 to 1.20.0 and `@nestjs/platform-express` 11.2.5 to 11.2.7 (with `multer`) in `knowledge/hfs/canon-pins.yaml`; the example apps (`ecommerce-app`, `lite-app`, `shape-slot`) and `packages/test-world` carry the new pins and lockfiles.
+- Known advisory, accepted (owner ruling `graphql-13-advisory-accepted-until-a19`, 2026-10-16): `@nestjs/graphql` and `@nestjs/apollo` stay on 13.4.5. `npm audit --omit=dev --audit-level=high` still reports their highs (and `@graphql-tools/utils` through them); the fix is 14.0.3, a semver major, deferred to alpha.19.
 
 ## Unreleased (C0 batch)
 
