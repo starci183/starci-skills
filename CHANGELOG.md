@@ -6,15 +6,15 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
-## [1.0.0-alpha.16]
+## [1.0.0-alpha.18] — 2026-10-16
 
-### Added
-- R295 `BE_MODULE_DEFINITION_MISSING` (owner ruling 2026-10-15, `owner:module-definition-everywhere`): every NestJS module of a product has a module definition (`<x>.module-definition.ts`, `<x>.options.ts`, a `<x>.module.ts` extending `ConfigurableModuleClass`) and is listed only as `XModule.register({...})`, including features, transport modules and cli groups. It supersedes the clause of BE-FOLDER-3 that forbade a module-definition in an api feature. The `module-definition-required` lint rule enforces it; the skeletons, the `starci app add` generators and both examples carry the new shape.
-
-## [1.0.0-alpha.15] — 2026-10-15
+One release carries what was planned as alpha.15, alpha.16 and alpha.17 (owner ruling 2026-10-16): the HFS standard, the module-definition ruling, the stack-tooling fixes and the release-tooling fixes.
 
 ### Added
 - The complete HFS standard for lite and full apps (owner ruling 2026-10-14): rules R247 to R292, the meta-enforcer `starci runtime` coverage gate (`check-hfs-coverage`, R247) that requires every rule and slot to name its enforcer, template, example, documentation and spec per edition, and the surface map in `knowledge/hfs/surfaces.yaml`. Added areas: environment parity and value shape (R248, R249, R289), deploy workflows, scripts and host scheduling (R250 to R252, R268), secret custody (R253, R277), database access, baseline, queues, extensions and migrations (R254 to R259), edge hardening, JWT, readiness (R260 to R262), webhook, door and spec form (R263 to R265, R278 to R281, R290), docker-swarm stacks with any single declared ingress (R266, R267, R275, R276), supply chain and release provenance (R269 to R273), ruling citations (R274), front-end data, copy and stack (R285 to R288), function and feature budgets (R291, R292).
+- R295 `BE_MODULE_DEFINITION_MISSING` (owner ruling 2026-10-15, `owner:module-definition-everywhere`): every NestJS module of a product has a module definition (`<x>.module-definition.ts`, `<x>.options.ts`, a `<x>.module.ts` extending `ConfigurableModuleClass`) and is listed only as `XModule.register({...})`, including features, transport modules and cli groups. It supersedes the clause of BE-FOLDER-3 that forbade a module-definition in an api feature. The `module-definition-required` lint rule enforces it; the skeletons, the `starci app add` generators and both examples carry the new shape.
+- Stack tooling (`starci app stack`): the `task` and `converge` verbs, the deploy block of `application-stacks.yaml` with `deploy.registry.visibility` (a public image is scanned before push and its real visibility checked after; `scaffold --registry-visibility`), deploy, accept and rollback reaching the manager through the sealed ssh session from an operator machine, the Windows ssh handling and `icacls` ACL on private files, the age-identity hint, and the ingress publish outage fix (the current `publish.file` is age-backed-up before the swap and restored with a re-verify; a host that did not answer before is expected-new; a re-publish that only adds a host passes).
+- Release tooling: `runtime verify` takes the newest of local main, origin/main and the latest release tag as its base and prints the choice; `release cut` and `release publish` fast-forward local main when that is safe; a repo-root guard (`tests/setup/repo-root-guard.mjs`) fails any spec process that leaves files under the repo root; a failed `supabase start` reports its last 12 output lines.
 - `starci runtime example-secrets`: runs a command in a disposable copy of a runtime example whose declared sealed members are freshly generated with an ephemeral age key.
 
 ### Changed
@@ -24,8 +24,9 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - Native `sops` and `age` are required by the secret round-trip specs under `CI=true` or `STARCI_REQUIRE_NATIVE_CRYPTO=1`; the CI workflow installs them.
 
 ### Release
-- Packages to publish, and the canon pins, code-pattern bindings and example pins to rebind at publish: `@starci/hfs` 4.4.0, `@starci/eslint-canon-be` 3.4.0, `@starci/eslint-canon-fe` 8.4.0 and `@starci/cli` 1.4.0 (pins HFS 4.4.0, carries runtime 1.0.0-alpha.15).
-- **Legacy rules are ratcheted, not yet fully gated.** The meta-enforcer fully gates R247 to R292 and every slot added in this release (slot `since` is required). The 221 older rules (R01 to R246) that carry no coverage metadata are reported as warnings and counted, not gated: a legacy rule becomes gated the day it gains any meta field (editions, docs, exemplifiedBy, proves, witness). The per-rule backlog is `docs/legacy-backlog.md` (LEGACY-BACKLOG, generated from the coverage gate) and is the alpha.16 plan.
+- Packages to publish, and the canon pins, code-pattern bindings and example pins to rebind at publish: `@starci/hfs` 4.4.0, `@starci/eslint-canon-be` 3.4.0, `@starci/eslint-canon-fe` 8.4.0 and `@starci/cli` 1.4.0 (pins HFS 4.4.0, carries runtime 1.0.0-alpha.18) and `@starci/jest-preset` 2.3.0 (lite integration and contract lanes without a test world).
+- **Legacy rules are ratcheted, not yet fully gated.** The meta-enforcer fully gates R247 to R292 and every slot added in this release (slot `since` is required). The 221 older rules (R01 to R246) that carry no coverage metadata are reported as warnings and counted, not gated: a legacy rule becomes gated the day it gains any meta field (editions, docs, exemplifiedBy, proves, witness). The per-rule backlog is `docs/legacy-backlog.md` (LEGACY-BACKLOG, generated from the coverage gate) and is the alpha.19 plan.
+- **Deferred to alpha.19:** the legacy backfill of R20 and R21, R223 to R225, and R07 and R09 is not part of this release; those rules stay in the ratchet above.
 
 ## [1.0.0-alpha.14] — 2026-10-15
 
