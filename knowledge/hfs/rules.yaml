@@ -860,7 +860,6 @@ rules:
     witness:
       - {path: packages/eslint/be/r45-project-graph-coverage.spec.mjs, edition: lite, codes: ["BE_MODULE_SHAPE", "BE_MODULE_HANDLER_REGISTRATION", "BE_MODULE_PROVIDER_REREGISTRATION"]}
       - {path: packages/eslint/be/r45-project-graph-coverage.spec.mjs, edition: full, codes: ["BE_MODULE_SHAPE", "BE_MODULE_HANDLER_REGISTRATION", "BE_MODULE_PROVIDER_REREGISTRATION"]}
-    law: "`@Global` nowhere and `isGlobal: true` only at app roots; no cross-owner module imports; typed options; one module per transport; every handler and provider registered exactly once."
     kinds: [lint, codemod]
     gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_MODULE_SHAPE", "BE_MODULE_HANDLER_REGISTRATION", "BE_MODULE_PROVIDER_REREGISTRATION"]
