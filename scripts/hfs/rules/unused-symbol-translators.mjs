@@ -52,19 +52,31 @@ function forwardedNamespaces(state, fn) {
   });
 }
 
-/** A hook returns such a forwarding function, bare or wrapped in useCallback. */
+/** useCallback(fn, deps) and useMemo(() => fn, deps) are the function fn. */
+function transparentFunction(state, expression) {
+  const { ts } = state;
+  const node = unwrap(ts, expression);
+  if (!node || !ts.isCallExpression(node)) return node;
+  const name = leafName(ts, node.expression);
+  const inner = /^(?:useCallback|useMemo)$/u.test(name) ? unwrap(ts, node.arguments[0]) : null;
+  if (!inner) return node;
+  if (name === 'useCallback') return inner;
+  if (!isFunction(ts, inner)) return node;
+  return returnedExpressions(ts, inner).map(returned => unwrap(ts, returned)).find(candidate => isFunction(ts, candidate)) ?? node;
+}
+
+/** A hook returns such a forwarding function, bare or wrapped in useCallback or useMemo. */
 function hookNamespaces(state, hook) {
   const { ts } = state;
   return returnedExpressions(ts, hook).flatMap(expression => {
-    let inner = unwrap(ts, expression);
-    if (inner && ts.isCallExpression(inner) && leafName(ts, inner.expression) === 'useCallback') inner = unwrap(ts, inner.arguments[0]);
+    const inner = transparentFunction(state, expression);
     return isFunction(ts, inner) ? forwardedNamespaces(state, inner) : [];
   });
 }
 
 function wrapperNamespaces(state, initializer) {
   const { ts } = state;
-  let init = unwrap(ts, initializer);
+  let init = transparentFunction(state, initializer);
   if (init && ts.isAwaitExpression(init)) init = unwrap(ts, init.expression);
   if (isFunction(ts, init)) return forwardedNamespaces(state, init);
   const target = init && ts.isCallExpression(init) ? callable(state, init.expression) : null;

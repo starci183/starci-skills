@@ -359,3 +359,20 @@ const say = useSmtpSay(); export const options = PRESETS.map(p => ({ label: say(
     assert.deepEqual(namesOf(fixture(t, contents), edition), ['smtpPresets.retired']);
   });
 }
+
+for (const edition of ['lite', 'full']) {
+  test(`HFS_UNUSED_SYMBOL ${edition}: useCallback and useMemo are transparent when a hook or wrapper forwards to a bound translator`, t => {
+    const contents = {
+      'apps/web/src/modules/i18n/messages/en.json': JSON.stringify({ hiring: { applyWebsite: 'Apply', retired: 'Retired' }, memo: { shown: 'Shown', retired: 'Retired' }, local: { saved: 'Saved', retired: 'Retired' } }),
+      'apps/web/src/features/use-say.ts': `type HiringSay = (key: string, values?: unknown) => string;
+export const useHiringSay = (): HiringSay => { const t = useTranslations("hiring"); return useCallback((key, values) => t(key, values), [t]); };
+export const useMemoSay = () => { const t = useTranslations("memo"); return useMemo(() => (key: string) => t(key), [t]); };`,
+      'apps/web/src/features/apply.tsx': `import { useHiringSay, useMemoSay } from './use-say';
+const say = useHiringSay(); const memo = useMemoSay(); export const a = [say("applyWebsite"), memo("shown")];
+const local = useTranslations("local"); const text = useCallback((key: string) => local(key), [local]); export const b = text("saved");`,
+    };
+    assert.deepEqual(namesOf(fixture(t, contents), edition), ['hiring.retired', 'local.retired', 'memo.retired']);
+    contents['apps/web/src/features/apply.tsx'] += ' export const c = [say("retired"), memo("retired"), text("retired")];';
+    assert.deepEqual(namesOf(fixture(t, contents), edition), []);
+  });
+}
