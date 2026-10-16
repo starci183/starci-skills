@@ -297,11 +297,11 @@ function checkTestTopology(state) {
   // Test kinds and folders that do not exist: int-spec, harness-spec, src/tests/harness and live/;
   // a backend spec sits by its kind (beside its subject, or under src/tests/{integration,e2e,contract}/).
   for (const file of state.tree.files()) {
-    if (UNSUPPORTED_TEST_SUFFIX.test(file))
+    if (state.backend && state.profile === 'be' && UNSUPPORTED_TEST_SUFFIX.test(file))
       state.finding('BE_TEST_TOPOLOGY', file, `${file} uses an unsupported test kind. Only unit *.spec.ts, *.integration-spec.ts, *.e2e-spec.ts and *.contract-spec.ts exist, each in its own folder under src/tests/.`);
-    else if (state.backend && UNSUPPORTED_TEST_FOLDER.test(file))
+    else if (state.backend && state.profile === 'be' && UNSUPPORTED_TEST_FOLDER.test(file))
       state.finding('BE_TEST_TOPOLOGY', file, `${file} sits in an unsupported test folder. Unit specs sit beside their subject, flows go under src/tests/e2e/<area>/ and test infrastructure under src/tests/world/.`);
-    else if (state.backend && file.startsWith('src/tests/') && isExtraTestConfig(file))
+    else if (state.backend && state.profile === 'be' && file.startsWith('src/tests/') && isExtraTestConfig(file))
       state.finding('BE_TEST_TOPOLOGY', file, `${file} is a per-lane test config. One root jest.config.js declares exactly the unit, integration, e2e and contract projects.`);
   }
 }
