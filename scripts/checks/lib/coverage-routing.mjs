@@ -1,6 +1,7 @@
 // A source finding removed from app check must reach its profile's actual lint plugin.
 import { enforcerJudgedInEdition } from '../../hfs/edition-slots.mjs';
 import { guardedProfiles } from './coverage-profiles.mjs';
+import { invokedMachineProfiles } from './coverage-machine-profiles.mjs';
 import { astNodes, expressionReach, nodeName, objectProperties, resolvedExpression, sourceIndex, staticValues } from './coverage-ast.mjs';
 
 const SURFACE = 'scripts/hfs/architecture/surface.mjs';
@@ -132,7 +133,7 @@ function machineTableProfiles(context, file, code) {
   const index = sourceIndex(context, MACHINE);
   const selected = profiles.filter((profile) => objectProperties(context, index, index.bindings.get([profile === 'be' ? 'BACKEND' : 'FRONTEND', 'MACHINE'].join('_')))
     .some((entry) => tableEntryEmits(context, index, entry, file, code)));
-  return selected.length ? selected : profiles;
+  return selected.length ? selected : invokedMachineProfiles(context, MACHINE, file, code) ?? profiles;
 }
 
 function machineProfiles(context, rule, code, edition) {

@@ -64,7 +64,8 @@ export const LINT_ENFORCERS = Object.freeze([
   enforcer('public-contract-form', BE, ['BE_PUBLIC_CONTRACT_FORM'], 'A public signature is typed by a named contract, never inline or untyped.'),
   enforcer('frontend-source-layout', FE, ['FE_SOURCE_LAYOUT_INVALID'], 'A front-end source file sits in a tier folder.'),
   enforcer('component-purity', FE, ['FE_COMPONENT_WORLD_OWNERSHIP', 'FE_WORLD_OWNER_RENDER_BOUNDARY', 'FE_CONNECTED_BLOCK_RENDER_PAIR', 'FE_PURE_REACHES_DATA', 'FE_PURE_WORLD_HOOK', 'FE_PURE_WORLD_IMPORT'], 'A pure component reaches no data or world state; its connected entry owns them.'),
-  enforcer('grammar-entry', FE, ['ARCH_GRAMMAR_CONTRACT_INVALID', 'ARCH_GRAMMAR_EXPORT_BYPASS'], 'Vendor grammar is reached only through its owner entry.'),
+  // Package-manifest contract findings stay with app check; only source import bypasses belong to lint.
+  enforcer('grammar-entry', FE, ['ARCH_GRAMMAR_EXPORT_BYPASS'], 'Vendor grammar is reached only through its owner entry.'),
   enforcer('i18n-keys', FE, ['FE_I18N_KEYS'], 'Translation keys read by source and keys held by catalogs agree both ways.'),
   // The per-path judgements of the slot manifest (scripts/hfs/path-findings.mjs), on a tracked TypeScript file.
   enforcer('slot-undeclared', BOTH, ['HFS_SLOT_UNDECLARED', 'HFS_SLOT_AMBIGUOUS', 'HFS_SLOT_NOT_ENABLED'], 'A TypeScript file is owned by exactly one slot of the repository.', { origin: 'repo' }),
