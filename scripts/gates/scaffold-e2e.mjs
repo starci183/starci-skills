@@ -5,6 +5,9 @@
 // e2e/hfs-scaffold-lite.e2e.spec.mjs (the lite scaffold over its own local Supabase stack) under the e2e preloads (e2e/setup: low priority and the file
 // watchdog, a private temp root with the repository-root guard, a private machine registry, the regenerated runtime copies).
 // A skipped test is red here: the proof is that every scaffold test RAN (Docker, npm and the source canon registry are prerequisites, never optional).
+// Before the run it prepares the built output the source canon registry packs (it packs with --ignore-scripts, so a package's prepack never builds it): the
+// grammar dist (scripts/gates/grammar-build.mjs) when it is not fresh, and the heroicons dist when it is missing or older than its source, each from its own
+// lockfile install. A fresh lane and CI therefore need no separate build step.
 //
 //   starci release scaffold-e2e        exit 0 every test passed and none skipped, 1 a test failed, was cancelled or skipped, 2 the run could not start
 import fs from 'node:fs';
@@ -16,6 +19,11 @@ import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { tapSummary } from '../lib/tap-summary.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { ci } from '../api/npm/ci.mjs';
+import { runNpm } from '../api/npm/run-npm.mjs';
+import { walkFiles } from '../lib/walk.mjs';
+import { buildGrammar } from './grammar-build.mjs';
+import { grammarDistStatus } from './grammar-dist.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 /** The scaffold e2e files, run in this order (each is its own test process). */
@@ -23,6 +31,35 @@ const E2E_FILES = Object.freeze(['e2e/hfs-scaffold-app.e2e.spec.mjs', 'e2e/hfs-s
 /** The preloads every e2e process loads first. */
 const E2E_PRELOADS = Object.freeze(['e2e/setup/low-priority.mjs', 'e2e/setup/isolated-temp.mjs', 'e2e/setup/isolated-registry.mjs', 'e2e/setup/runtime-copies.mjs']);
 const MAX_BUFFER = 512 * 1024 * 1024;
+
+const newest = (dir) => (fs.existsSync(dir) ? Math.max(0, ...walkFiles(dir, { exclude: (name) => name === 'node_modules' }).map((file) => fs.statSync(file).mtimeMs)) : 0);
+
+/** Whether the built `dist` of a package is missing or older than its `src`. */
+const distStale = (packageRoot) => !fs.existsSync(path.join(packageRoot, 'dist')) || newest(path.join(packageRoot, 'src')) > newest(path.join(packageRoot, 'dist'));
+
+/** Build the heroicons dist from its own lockfile install when it is stale: {ok, detail}. */
+function prepareHeroicons(root, env) {
+  const dir = path.join(root, 'packages', 'heroicons');
+  if (!fs.existsSync(path.join(dir, 'package.json')) || !distStale(dir)) return { ok: true, detail: 'heroicons dist fresh' };
+  const install = ci(dir, { env });
+  if (!install.ok) return { ok: false, detail: `heroicons npm ci exit ${install.status}: ${install.stderr.slice(0, 200)}` };
+  const build = runNpm(['run', 'build'], { cwd: dir, env, timeout: 600_000 });
+  return build.status === 0 && !distStale(dir) ? { ok: true, detail: 'heroicons dist built' } : { ok: false, detail: `heroicons npm run build exit ${build.status ?? build.error?.message}` };
+}
+
+/** Build the grammar dist when it is not fresh: {ok, detail}. */
+function prepareGrammar(root, env) {
+  const status = grammarDistStatus(path.join(root, 'packages', 'grammar'));
+  if (status.state === 'fresh') return { ok: true, detail: 'grammar dist fresh' };
+  const built = buildGrammar({ root, env });
+  return built.ok ? { ok: true, detail: 'grammar dist built' } : { ok: false, detail: `grammar ${built.step}: ${built.detail}` };
+}
+
+/** The built output the source canon registry packs, prepared before the run: {ok, lines}. `deps` replaces the two steps. */
+function prepareE2e({ root = runtimeRoot, env = process.env, deps = {} } = {}) {
+  const steps = [(deps.grammar ?? prepareGrammar)(root, env), (deps.heroicons ?? prepareHeroicons)(root, env)];
+  return { ok: steps.every((step) => step.ok), lines: steps.map((step) => step.detail) };
+}
 
 /** The node arguments of one e2e run writing its TAP report to `tapFile`. */
 const e2eArgs = (tapFile, files = E2E_FILES) => [...E2E_PRELOADS.flatMap((file) => ['--import', `./${file}`]), '--test', '--test-concurrency=1',
@@ -39,6 +76,8 @@ function e2eVerdict(status, summary) {
 /** Runs the scaffold e2e in `root`: {ok, pass, total, failed, skipped, failing, line, ms, output, unrun}. `deps.runNode` is the process seam. */
 export function runScaffoldE2e({ root = runtimeRoot, env = process.env, stdio = 'pipe', deps = {} } = {}) {
   const node = deps.runNode ?? runNode;
+  const prepared = (deps.prepare ?? prepareE2e)({ root, env });
+  if (!prepared.ok) return { ok: false, unrun: true, pass: 0, total: 0, failed: 0, skipped: 0, failing: [], ms: 0, output: '', line: `scaffold-e2e: the preparation failed (${prepared.lines.join('; ')})` };
   const dir = makeTempDir('scaffold-e2e-');
   const tapFile = path.join(dir, 'e2e.tap');
   const started = Date.now();

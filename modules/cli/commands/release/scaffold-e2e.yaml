@@ -6,6 +6,7 @@ impl: {script: scripts/gates/scaffold-e2e.mjs}
 conventions:
   - "With release clean-test, the real test proof of the runtime (owner ruling no-runtime-specs): the runtime has no specs."
   - "A skipped test is red: every scaffold test must run (Docker, npm and the source canon registry are prerequisites)."
+  - "Builds the grammar and heroicons dist first when they are stale, from their own lockfiles: a fresh lane needs no build step."
 flags: []
 exit:
   "0": every scaffold e2e test ran and passed

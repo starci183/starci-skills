@@ -3236,6 +3236,7 @@ Conventions:
 
 - With release clean-test, the real test proof of the runtime (owner ruling no-runtime-specs): the runtime has no specs.
 - A skipped test is red: every scaffold test must run (Docker, npm and the source canon registry are prerequisites).
+- Builds the grammar and heroicons dist first when they are stale, from their own lockfiles: a fresh lane needs no build step.
 
 exit: 0 every scaffold e2e test ran and passed; 1 a scaffold e2e test failed, was cancelled or was skipped; 2 the run could not start or bad usage
 
