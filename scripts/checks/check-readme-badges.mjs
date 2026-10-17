@@ -4,11 +4,11 @@ import path from 'node:path';
 import prettier from 'prettier';
 import prettierConfig from '../../packages/prettier-config/index.cjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
+import { discoverExampleApps, EXAMPLES_ROOT } from '../lib/example-refs.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 const CODE = 'RT_README_BADGE_MISSING';
 const FORMAT_CODE = 'RT_README_NOT_PRETTIER';
-const READMES = ['README.md', ...['lite-app', 'ecommerce-app', 'shape-slot'].map(name => `examples/${name}/README.md`)];
 const USAGE = 'usage: starci runtime check --only readme-badges [-- --root <runtime tree>]';
 const REQUIRED = [
   { name: 'ci', image: /^https:\/\/github\.com\/[^/]+\/[^/]+\/actions\/workflows\/ci\.yml\/badge\.svg(?:\?|$)/u },
@@ -44,7 +44,8 @@ function readmeBadgeFindings(root = skillRoot) {
 
 /** Every runtime and example README must be present and pass the canon Markdown formatter after sync. */
 async function readmeFormatFindings(root) {
-  const results = await Promise.all(READMES.map(async file => {
+  const readmes = ['README.md', ...discoverExampleApps(root).map(name => `${EXAMPLES_ROOT}/${name}/README.md`)];
+  const results = await Promise.all(readmes.map(async file => {
     const absolute = path.join(root, file);
     const formatted = fs.existsSync(absolute) && await prettier.check(fs.readFileSync(absolute, 'utf8'), { ...prettierConfig, parser: 'markdown' });
     return formatted ? [] : [{ code: FORMAT_CODE, path: file, message: 'README is missing or not formatted by prettier; run npm run format.' }];
