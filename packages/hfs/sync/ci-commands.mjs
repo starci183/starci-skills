@@ -1,4 +1,7 @@
 import fs from 'node:fs';
+import { parseYaml } from '../runtime/engine/yaml.mjs';
+import { refusal } from '../stack/errors.mjs';
+import { byCodeUnit } from '../report/order.mjs';
 
 // One command vocabulary for managed CI rendering and the runtime coverage gate.
 const exampleCommand = (source, command) => source?.runtimeExample
@@ -38,6 +41,7 @@ function sonarJob(sonar, lcovReport, lcovArtifact, nodeMajor) {
   const header = [
     '  sonar:',
     '    needs: [fast, test]',
+    '    timeout-minutes: 20',
     '    runs-on: ubuntu-latest',
     '    env:',
     `      SONAR_TOKEN: \${{ secrets.${sonar.token} }}`,
@@ -71,6 +75,44 @@ function sonarJob(sonar, lcovReport, lcovArtifact, nodeMajor) {
     .trimEnd();
 }
 
+/** The app source reader is be-relative; the authored manifest lives one directory above that side. */
+function buildDeclaration(source) {
+  if (!source?.read) return {};
+  try {
+    return parseYaml(source.read('../.starcistacks/application-stacks.yaml')) ?? {};
+  } catch (error) {
+    if (error.code === 'ENOENT') return {};
+    throw error;
+  }
+}
+
+/** Static CI values are strings with valid environment names; expressions cannot turn public config into runtime secret reads. */
+function mergeBuildValues(values, entries) {
+  for (const [key, value] of Object.entries(entries ?? {})) {
+    if (!/^[A-Z][A-Z0-9_]*$/u.test(key) || typeof value !== 'string' || value.includes('${{')) {
+      throw refusal('STACK_BUILD_ARG_INVALID', 'CI build values must map environment names to literal strings');
+    }
+    if (values.has(key) && values.get(key) !== value) {
+      throw refusal('STACK_BUILD_ARG_INVALID', 'CI build values disagree for ' + key);
+    }
+    values.set(key, value);
+  }
+}
+
+/** CI builds render only plain values from the images.yml environment plus the explicit build-fe gate; sealed members stay unopened. */
+function buildEnv(source) {
+  const declaration = buildDeclaration(source);
+  const environments = Object.keys(source?.stack?.imageEnvironments ?? {});
+  const environment = environments.length > 1 ? 'production' : environments[0];
+  const images = declaration.environments?.[environment]?.deploy?.images ?? {};
+  const values = new Map();
+  for (const image of Object.values(images)) mergeBuildValues(values, image?.buildArgs?.values);
+  const gates = declaration.release?.gates ?? [];
+  for (const gate of gates.filter(entry => entry.name === 'build-fe')) mergeBuildValues(values, gate.env);
+  if (!values.size) return '';
+  return ['        env:', ...[...values.keys()].sort(byCodeUnit).map(key => '          ' + key + ': ' + JSON.stringify(values.get(key)))].join('\n');
+}
+
 /** An omitted quality declaration preserves hosted Sonar, required OIDC Codecov, and the high production dependency audit. */
 export function ciWorkflowCommands(source, lcovReport = 'be/coverage/lcov.info', quality = undefined, { nodeMajor = '22' } = {}) {
   const configuredSonar = quality === undefined ? { token: 'SONAR_TOKEN', hostVar: 'SONAR_HOST_URL' } : quality.sonar;
@@ -79,6 +121,7 @@ export function ciWorkflowCommands(source, lcovReport = 'be/coverage/lcov.info',
   const audit = quality?.audit ?? { level: 'high', omitDev: true };
   const lcovArtifact = 'coverage-lcov';
   return {
+    ciBuildEnv: buildEnv(source),
     ciLint: exampleCommand(source, 'npm run lint'),
     ciLintSonar: exampleCommand(source, 'npm run lint -- --sonar reports/lint.sonar.json'),
     ciCoverageProof: exampleCommand(source, 'npx starci app check --coverage-from ' + lcovReport),

@@ -22,6 +22,7 @@ concurrency:
 
 jobs:
   deploy:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     env:

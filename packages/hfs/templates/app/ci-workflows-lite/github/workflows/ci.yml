@@ -16,10 +16,12 @@ concurrency:
 
 jobs:
   fast:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
 {{sonarEnv}}
     steps:
 {{> app/ci-workflows/install-steps.yml}}
+{{> app/ci-workflows/lint-base.yml}}
       - name: production dependency audit
         run: {{auditCommand}}
 {{ciLintSteps}}
@@ -29,6 +31,7 @@ jobs:
         run: npm run typecheck
 
   test:
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     # Codecov OIDC authentication requires a job-scoped identity token.
     permissions:
@@ -36,8 +39,9 @@ jobs:
       id-token: write
     steps:
 {{> app/ci-workflows/install-steps.yml}}
+{{> app/ci-workflows/jest-cache.yml}}
       - name: unit
-        run: npm test -- --ci
+        run: npm test -- --ci --forceExit --cacheDirectory .jest-cache
       - name: coverage proof
         run: {{ciCoverageProof}}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -48,6 +52,7 @@ jobs:
 {{codecovSteps}}
 
   build:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
 {{> app/ci-workflows/install-steps.yml}}
@@ -55,12 +60,14 @@ jobs:
         run: npm run build:be
       - name: build fe
         run: npm run build:fe
+{{ciBuildEnv}}
       - name: database migration checks
         run: {{ciDatabaseLint}}
 
 {{sonarJob}}
 
   db-types:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
 {{> app/ci-workflows/install-steps.yml}}

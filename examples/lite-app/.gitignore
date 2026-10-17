@@ -31,6 +31,8 @@ nul
 .worktrees/
 # StarCi runtime state of the repository (ledger), never tracked.
 .starci/
+# Jest transforms reused by the CI test job
+.jest-cache/
 # Supabase CLI state is local Docker metadata, never application source.
 supabase/.temp/
 supabase/.branches/

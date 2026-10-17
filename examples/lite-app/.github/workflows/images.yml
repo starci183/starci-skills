@@ -17,6 +17,7 @@ concurrency:
 
 jobs:
   image:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     environment: production
     env:

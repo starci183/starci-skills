@@ -16,11 +16,14 @@ concurrency:
 
 jobs:
   fast:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
@@ -41,6 +44,22 @@ jobs:
             ${{ runner.os }}-node22-build-
       - run: npm ci --ignore-scripts
         if: steps.deps.outputs.cache-hit != 'true'
+      - name: lint baseline
+        shell: bash
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          base="origin/$DEFAULT_BRANCH"
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            base="origin/$BASE_BRANCH"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            base=$(git describe --tags --abbrev=0 "$GITHUB_REF^" 2>/dev/null) || base="origin/$DEFAULT_BRANCH"
+          elif [[ "$GITHUB_EVENT_NAME" == push && -n "$BEFORE" && ! "$BEFORE" =~ ^0+$ ]]; then
+            base="$BEFORE"
+          fi
+          echo "STARCI_BASE_REF=$base" >> "$GITHUB_ENV"
       - name: production dependency audit
         run: npm audit --omit=dev --audit-level=high
       - name: lint be
@@ -69,6 +88,7 @@ jobs:
         run: npm run typecheck
 
   test:
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     # Codecov OIDC authentication requires a job-scoped identity token.
     permissions:
@@ -76,6 +96,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
@@ -96,8 +118,16 @@ jobs:
             ${{ runner.os }}-node22-build-
       - run: npm ci --ignore-scripts
         if: steps.deps.outputs.cache-hit != 'true'
+      - name: Jest cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .jest-cache
+          key: ${{ runner.os }}-node22-jest-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-node22-jest-${{ hashFiles('package-lock.json') }}-
+            ${{ runner.os }}-node22-jest-
       - name: unit
-        run: npm test -- --ci
+        run: npm test -- --ci --forceExit --cacheDirectory .jest-cache
       - name: coverage proof
         run: node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npx starci app check --coverage-from be/coverage/lcov.info
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -120,9 +150,12 @@ jobs:
           fail_ci_if_error: true
 
   build:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
@@ -147,17 +180,25 @@ jobs:
         run: npm run build:be
       - name: build fe
         run: npm run build:fe
+        env:
+          NEXT_PUBLIC_GRAPHQL_URL: "https://api.lite-app.example/graphql"
+          NEXT_PUBLIC_SITE_URL: "https://lite-app.example"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_fake_example_lite_app_public_key"
+          NEXT_PUBLIC_SUPABASE_URL: "https://example-project.supabase.co"
       - name: database migration checks
         run: node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npm run db:lint
 
   sonar:
     needs: [fast, test]
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
@@ -195,9 +236,12 @@ jobs:
         timeout-minutes: 10
 
   db-types:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22

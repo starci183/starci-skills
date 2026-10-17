@@ -1,0 +1,16 @@
+      - name: lint baseline
+        shell: bash
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          base="origin/$DEFAULT_BRANCH"
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            base="origin/$BASE_BRANCH"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            base=$(git describe --tags --abbrev=0 "$GITHUB_REF^" 2>/dev/null) || base="origin/$DEFAULT_BRANCH"
+          elif [[ "$GITHUB_EVENT_NAME" == push && -n "$BEFORE" && ! "$BEFORE" =~ ^0+$ ]]; then
+            base="$BEFORE"
+          fi
+          echo "STARCI_BASE_REF=$base" >> "$GITHUB_ENV"

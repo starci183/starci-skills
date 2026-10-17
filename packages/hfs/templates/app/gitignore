@@ -1,4 +1,6 @@
 {{> common/gitignore.base}}
+# Jest transforms reused by the CI test job
+.jest-cache/
 # be: the schema Nest writes when it boots GraphQL
 schema.gql
 # fe: Next build output and its generated type file

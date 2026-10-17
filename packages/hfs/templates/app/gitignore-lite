@@ -1,4 +1,6 @@
 {{> common/gitignore.base}}
+# Jest transforms reused by the CI test job
+.jest-cache/
 # Supabase CLI state is local Docker metadata, never application source.
 supabase/.temp/
 supabase/.branches/
