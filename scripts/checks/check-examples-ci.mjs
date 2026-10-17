@@ -35,7 +35,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { appSource, componentsYaml, renderTargets } from '../../packages/hfs/sync/index.mjs';
 import { codecovPaths, coverageComponents } from '../hfs/coverage-scope.mjs';
 import { loadSlotManifest } from '../hfs/slots.mjs';
-import { RUNTIME_FLAG, renderRuntimeSonar, runtimeCodecovPaths } from '../hfs/runtime-coverage-scope.mjs';
+import { renderRuntimeSonar } from '../hfs/runtime-coverage-scope.mjs';
 import { declaredSonarKeys, repositoryName, DECLARATION } from '../../packages/hfs/sync/sonar-key.mjs';
 import { dockerfilePath } from '../hfs/rules/docker.mjs';
 import { discoverExampleApps } from '../lib/example-refs.mjs';
@@ -45,9 +45,9 @@ import { isFile } from '../lib/fs-kind.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const WORKFLOW = '.github/workflows/examples.yml';
-export const CODECOV = 'codecov.yml';
+const CODECOV = 'codecov.yml';
 /** The root Sonar project of the runtime itself, rendered from scripts/hfs/runtime-coverage-scope.mjs. */
-export const RUNTIME_SONAR = 'sonar-project.properties';
+const RUNTIME_SONAR = 'sonar-project.properties';
 /** The step that prints the matrix, and the expression every matrix job reads it through. */
 const MATRIX_COMMAND = 'starci runtime check --only examples-ci -- --matrix';
 const checkoutCommand = (command) => command.replace(/^starci\s+/, 'npm run starci --silent -- ');
@@ -61,16 +61,16 @@ export function exampleApps(root = ROOT) {
 }
 
 /** Whether an example declares an app whose generated contract includes unit tests and coverage: every edition does (a lite back end keeps full's unit run, owner ruling 2026-10-12). */
-export function exampleHasTests(app, root = ROOT) {
+function exampleHasTests(app, root = ROOT) {
   try { return JSON.parse(fs.readFileSync(path.join(root, 'examples', app, 'hfs.json'), 'utf8')).kind === 'app'; }
   catch { return false; }
 }
 
 /** Example apps that own the test/coverage contract: every example app, lite included. */
-export const coverageExampleApps = (root = ROOT) => exampleApps(root).filter(app => exampleHasTests(app, root));
+const coverageExampleApps = (root = ROOT) => exampleApps(root).filter(app => exampleHasTests(app, root));
 
 /** The coverage paths of one example app from the repository root: the measured roots of its be side under examples/<app>/. */
-export function appCoverageScope(app, root = ROOT) {
+function appCoverageScope(app, root = ROOT) {
   return codecovPaths(loadSlotManifest()).map((glob) => `examples/${app}/${glob}`);
 }
 
@@ -92,17 +92,17 @@ function sonarKeyOf(appRoot, project) {
 }
 
 /** The quality files of an example rendered from the source slot manifest: [{ path, content, mode, hash }] (codecov.yml, sonar-project.properties, be/jest.config.js). */
-export function appQualityTargets(app, root = ROOT) {
+function appQualityTargets(app, root = ROOT) {
   const appRoot = path.join(root, 'examples', app);
   const hfs = JSON.parse(fs.readFileSync(path.join(appRoot, 'hfs.json'), 'utf8'));
   const preset = createRequire(import.meta.url)(path.join(root, 'packages', 'jest-preset', 'index.cjs'));
   const presets = { sonarExclusions: preset.sonarExclusions() };
   return renderTargets(hfs, presets, { sonarKey: sonarKeyOf(appRoot, hfs.project), manifest: loadSlotManifest(), source: appSource(appRoot) }).filter((target) => APP_QUALITY_FILES.includes(target.path));
 }
-export const APP_QUALITY_FILES = Object.freeze(['codecov.yml', 'sonar-project.properties', 'be/jest.config.js']);
+const APP_QUALITY_FILES = Object.freeze(['codecov.yml', 'sonar-project.properties', 'be/jest.config.js']);
 
 /** Every declared app image: be and full fe are required; lite fe joins when its optional Dockerfile exists. */
-export function exampleImages(root = ROOT) {
+function exampleImages(root = ROOT) {
   return exampleApps(root).flatMap((app) => {
     const appRoot = path.join(root, 'examples', app);
     const declaration = JSON.parse(fs.readFileSync(path.join(appRoot, 'hfs.json'), 'utf8'));
@@ -116,18 +116,16 @@ const IMAGES_COMMAND = 'starci runtime check --only examples-ci -- --images';
 const IMAGES_JOB = 'images';
 
 /** The root codecov.yml: one flag per example app over its measured roots and one component per service app plus platform, project and patch at 100 per flag and component. */
-export function renderCodecov(root = ROOT) {
+function renderCodecov(root = ROOT) {
   const flags = coverageExampleApps(root).map((app) => [`    - name: ${app}`, '      paths:', ...appCoverageScope(app, root).map((glob) => `        - ${JSON.stringify(glob)}`)].join('\n'));
   const components = coverageExampleApps(root).flatMap((app) => appComponents(app, root));
   const exampleFlags = coverageExampleApps(root).map((app) => `          - ${app}`).join('\n');
-  const runtimeFlag = [`    - name: ${RUNTIME_FLAG}`, '      paths:', ...runtimeCodecovPaths().map((glob) => `        - ${JSON.stringify(glob)}`), '      statuses:', '        - type: project', '          informational: true', '        - type: patch', '          informational: true'].join('\n');
   return `# Generated by scripts/checks/check-examples-ci.mjs --write. Do not edit: npm run check fails on any difference.
 # One flag per example app (both editions run the unit project with coverage), uploaded by .github/workflows/examples.yml. The paths are the app's coverage
 # scope (the logic of be/src/modules/**: the slot manifest's \`coverage\` field, derived once by scripts/hfs/coverage-scope.mjs, the same scope the
 # app's own codecov.yml, be/jest.config.js and sonar.coverage.exclusions render); every flag is held at 100 on the project and on the patch,
-# and so is every component (one per service app of each example, plus its platform). The flag runtime is the runtime's own first-party source
-# (scripts/hfs/runtime-coverage-scope.mjs), uploaded by .github/workflows/ci.yml in the tag run; it has never been measured, so its project and patch
-# statuses are informational (never red) until a baseline exists, and the overall statuses above read the example flags only.
+# and so is every component (one per service app of each example, plus its platform). The runtime has no flag: it has no specs of its own
+# (owner ruling no-runtime-specs, 2026-10-17), so nothing of it is measured.
 codecov:
   require_ci_to_pass: true
 coverage:
@@ -155,7 +153,7 @@ flag_management:
         target: 100%
         threshold: 0%
   individual_flags:
-${[...flags, runtimeFlag].join('\n')}
+${flags.join('\n')}
 component_management:
   default_rules:
     statuses:
@@ -258,7 +256,7 @@ const driftFindings = (root, apps, add) => {
 };
 
 /** Every finding of the examples CI contract at `root`: [{code, path, message}]. */
-export function checkExamplesCi(root = ROOT) {
+function checkExamplesCi(root = ROOT) {
   const findings = [];
   const add = (code, at, message) => findings.push({ code, path: at, message });
   const apps = exampleApps(root);
@@ -274,7 +272,7 @@ export function checkExamplesCi(root = ROOT) {
   return { apps, findings };
 }
 
-export function examplesCiMain(argv = [], { root = ROOT, out = (s) => process.stdout.write(s) } = {}) {
+function examplesCiMain(argv = [], { root = ROOT, out = (s) => process.stdout.write(s) } = {}) {
   if (argv.includes('--matrix')) { out(`${JSON.stringify(exampleApps(root))}\n`); return 0; }
   if (argv.includes('--images')) { out(`${JSON.stringify(exampleImages(root))}\n`); return 0; }
   if (argv.includes('--write')) {

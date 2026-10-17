@@ -2,7 +2,7 @@ name: runtime-artifact
 
 # Every push to main, and a person dispatching it, produces the runtime archive of one exact commit: the `npm pack` tarball of the root package, whose
 # `files` list is the one release inventory (no second inventory here). It builds, packs and verifies the inventory; it does not run
-# `npm run check` or `npm test` (ci.yml runs those). Triggers are a push to main and workflow_dispatch
+# `npm run check` or the real tests (ci.yml runs those). Triggers are a push to main and workflow_dispatch
 # (docs/git-governance.md, rule CI_TRIGGERS_RELEASE_ONLY).
 
 on:

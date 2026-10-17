@@ -2,9 +2,8 @@
 # One flag per example app (both editions run the unit project with coverage), uploaded by .github/workflows/examples.yml. The paths are the app's coverage
 # scope (the logic of be/src/modules/**: the slot manifest's `coverage` field, derived once by scripts/hfs/coverage-scope.mjs, the same scope the
 # app's own codecov.yml, be/jest.config.js and sonar.coverage.exclusions render); every flag is held at 100 on the project and on the patch,
-# and so is every component (one per service app of each example, plus its platform). The flag runtime is the runtime's own first-party source
-# (scripts/hfs/runtime-coverage-scope.mjs), uploaded by .github/workflows/ci.yml in the tag run; it has never been measured, so its project and patch
-# statuses are informational (never red) until a baseline exists, and the overall statuses above read the example flags only.
+# and so is every component (one per service app of each example, plus its platform). The runtime has no flag: it has no specs of its own
+# (owner ruling no-runtime-specs, 2026-10-17), so nothing of it is measured.
 codecov:
   require_ci_to_pass: true
 coverage:
@@ -54,75 +53,6 @@ flag_management:
         - "examples/shape-slot/be/src/modules/integrations/*/**"
         - "examples/shape-slot/be/src/modules/platform/*/**"
         - "examples/shape-slot/be/src/modules/projections/*/**"
-    - name: runtime
-      paths:
-        - "engine/admission.mjs"
-        - "engine/by-code-unit.mjs"
-        - "engine/canonical-json.mjs"
-        - "engine/config.mjs"
-        - "engine/constants.mjs"
-        - "engine/db/attempt-overrun.mjs"
-        - "engine/db/authorizer.mjs"
-        - "engine/db/blob.mjs"
-        - "engine/db/event-compact.mjs"
-        - "engine/db/event-payload.mjs"
-        - "engine/db/ledger-open.mjs"
-        - "engine/db/ledger-paths.mjs"
-        - "engine/db/ledger.mjs"
-        - "engine/db/machine-connection.mjs"
-        - "engine/db/machine-open.mjs"
-        - "engine/db/machine-schema.mjs"
-        - "engine/db/machine.mjs"
-        - "engine/db/provider-reservations.mjs"
-        - "engine/db/ref-value.mjs"
-        - "engine/digest.mjs"
-        - "engine/invalid-config.mjs"
-        - "engine/model-config.mjs"
-        - "engine/orca-config.mjs"
-        - "engine/plain-object.mjs"
-        - "engine/refuse.mjs"
-        - "engine/release-config.mjs"
-        - "engine/removed-vocabulary.mjs"
-        - "engine/resources-config.mjs"
-        - "engine/runtime-root.mjs"
-        - "engine/secrets.mjs"
-        - "engine/sonar-config.mjs"
-        - "engine/temp-root.mjs"
-        - "packages/cli/bin/starci.mjs"
-        - "packages/cli/src/**/*.mjs"
-        - "scripts/agent/**/*.mjs"
-        - "scripts/api/*/**/*.mjs"
-        - "scripts/checks/check-*.mjs"
-        - "scripts/checks/lib/*.mjs"
-        - "scripts/cli/**/*.mjs"
-        - "scripts/connectors/**/*.mjs"
-        - "scripts/context/**/*.mjs"
-        - "scripts/example/**/*.mjs"
-        - "scripts/gates/*.mjs"
-        - "scripts/gates/commit-proof.mjs"
-        - "scripts/goal/**/*.mjs"
-        - "scripts/guards/**/*.mjs"
-        - "scripts/hfs/**/*.mjs"
-        - "scripts/housekeeping/**/*.mjs"
-        - "scripts/install/**/*.mjs"
-        - "scripts/kernel/**/*.mjs"
-        - "scripts/lib/*.mjs"
-        - "scripts/machine/*.mjs"
-        - "scripts/reconciler/**/*.mjs"
-        - "scripts/route/**/*.mjs"
-        - "scripts/supervisor/*.mjs"
-        - "scripts/uat/**/*.mjs"
-        - "scripts/work/**/*.mjs"
-        - "ui/api/**/*.mjs"
-        - "ui/harness-process.mjs"
-        - "ui/harness-verbs.mjs"
-        - "ui/ports.mjs"
-        - "ui/server.mjs"
-      statuses:
-        - type: project
-          informational: true
-        - type: patch
-          informational: true
 component_management:
   default_rules:
     statuses:

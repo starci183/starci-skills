@@ -1,13 +1,12 @@
 name: grammar-package
 
 # Gates for the published @starci/grammar package (packages/grammar), which has its own install and
-# is not part of the root `npm test`. One job, in order:
+# is not part of the root checks. One job, in order:
 #   typecheck         - the shipped sources plus stories (tsconfig.stories.json)
 #   build             - the dist the package ships
 #   pack:check        - `npm pack --dry-run` of that dist
 #   build-storybook   - the static Storybook still builds
-# The grammar carries no spec suites (owner 2026-10-12): its proof is typecheck + build; the UI contracts live in
-# the runtime (tests/work-ui) and the grammar DNA snapshot.
+# The grammar carries no spec suites (owner 2026-10-12): its proof is typecheck + build and the grammar DNA snapshot.
 # It runs ONCE per release, on the push of a v* tag (and when a person dispatches it): never on a branch push or a pull request (rule CI_TRIGGERS_RELEASE_ONLY).
 
 on:
