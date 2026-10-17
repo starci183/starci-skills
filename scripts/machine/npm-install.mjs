@@ -11,6 +11,7 @@ import { withoutSeatEnv } from '../lib/seat-env.mjs';
 import { refusal as verbRefusal, resultOk as success, resultOutput as output } from '../lib/verb-call.mjs';
 import { ownedTreeRefusal, linkedNodeModules, lockedValue } from './npm-ci.mjs';
 import { underHostLock, hostLockRetryBudget } from './verb-lock.mjs';
+import { canonInstallPlan } from './npm-install-locations.mjs';
 
 const PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
 const EXACT_VERSION = /^\d+\.\d+\.\d+$/;
@@ -68,9 +69,11 @@ function resolveInstallPackages(requested, pins) {
 
 /** Each pin result retains its exact status and optional refusal reason. */
 function pinResultText(item) {
-  const status = item.status === 'moved' ? 'pin moved' : 'NPM_INSTALL_REFUSED: pin refused';
+  const labels = { moved: 'pin moved', skipped: 'pin skipped', refused: 'NPM_INSTALL_REFUSED: pin refused' };
+  const status = labels[item.status];
+  const location = item.location ? ` (${item.location})` : '';
   const reason = item.reason ? `: ${item.reason}` : '';
-  return `${status} ${item.package}${reason}`;
+  return `${status} ${item.package}${location}${reason}`;
 }
 
 /** Finish an install with its manifest diff, elapsed time and pin outcomes. */
@@ -87,15 +90,51 @@ function finishInstall(state, error = null, code = 1) {
 }
 
 /** Convert an injected npm result or exception to its existing failure text. */
-async function runInstall(api, cwd, dev, specs) {
+async function runInstall(api, cwd, options, specs) {
   try {
-    const result = await api.install(cwd, specs, { dev });
+    const result = await api.install(cwd, specs, options);
     return success(result) ? null : String(result?.stderr ?? result?.error?.message ?? '').trim() || `npm exited ${String(result?.status ?? 'without a status')}`;
   } catch (error) { return String(error?.message ?? error); }
 }
 
+/** Execute one npm mutation at a time because every location shares the tree's lockfile. */
+async function installPinGroups(state, groups, index = 0) {
+  if (index >= groups.length) return null;
+  const { specs, options } = groups[index];
+  const failure = await runInstall(state.api, state.cwd, options, specs);
+  for (const spec of specs) {
+    const item = { package: spec, status: failure ? 'refused' : 'moved' };
+    if (options.workspace) item.location = options.workspace;
+    if (failure) item.reason = failure;
+    state.pinResults.push(item);
+  }
+  if (failure) return failure;
+  state.packages.push(...specs.filter((spec) => !state.packages.includes(spec)));
+  return installPinGroups(state, groups, index + 1);
+}
+
+/** Resolve declarations before explicit installs can add new dependency declarations. */
+async function moveCanonPins(state, family, final) {
+  const { cwd, pinResults, packages, finish, run } = state;
+  let plan;
+  try { plan = canonInstallPlan(cwd, family); } catch (error) {
+    return finish(`cannot read package locations: ${String(error?.message ?? error)}`);
+  }
+  pinResults.push({ package: `@starci/cli@${state.target}`, status: 'moved' }, ...plan.skipped);
+  const familySpecs = new Set(family.map(([name, version]) => `${name}@${version}`));
+  const explicit = final.packages.filter((spec) => !familySpecs.has(spec));
+  if (explicit.length) {
+    const failure = await run(explicit);
+    if (failure) return finish(`canon install failed: ${failure}`);
+    packages.push(...explicit);
+  }
+  const failure = await installPinGroups(state, plan.groups);
+  return failure ? finish(`canon install failed: ${failure}`) : finish();
+}
+
 /** Move the family only after reading and validating the installed target CLI canon. */
-async function installCanonFamily({ api, cwd, target, requested, pinResults, packages, finish, run }) {
+async function installCanonFamily(state) {
+  const { api, cwd, target, requested, pinResults, finish } = state;
   let targetPins;
   try { targetPins = api.loadTargetPins(cwd, target); } catch (error) {
     return finish(`target @starci/cli@${target} installed; canon pins refused: ${String(error?.message ?? error)}`);
@@ -111,11 +150,7 @@ async function installCanonFamily({ api, cwd, target, requested, pinResults, pac
     for (const [name, version] of family) pinResults.push({ package: `${name}@${version}`, status: 'refused', reason });
     return finish(reason, 2);
   }
-  const failure = await run(final.packages);
-  for (const [name, version] of family) pinResults.push({ package: `${name}@${version}`, status: failure ? 'refused' : 'moved', ...(failure ? { reason: failure } : {}) });
-  if (failure) return finish(`canon install failed: ${failure}`);
-  packages.splice(0, packages.length, ...final.packages);
-  return finish();
+  return moveCanonPins(state, family, final);
 }
 
 /** Install exact dependencies under the host lock; a CLI upgrade reads pins only after the target CLI has installed. */
@@ -126,7 +161,7 @@ export async function npmInstall(ctx, deps = {}) {
   const runner = deps.runNpm ?? runNpm;
   const api = {
     diff: deps.diff ?? diff,
-    install: deps.install ?? ((location, packages, { dev }) => runner(['install', '--prefer-offline', '--no-audit', '--no-fund', '--save-exact', ...(dev ? ['--save-dev'] : []), ...packages],
+    install: deps.install ?? ((location, packages, { dev, optional, workspace }) => runner(['install', '--prefer-offline', '--no-audit', '--no-fund', '--save-exact', ...(dev ? ['--save-dev'] : []), ...(optional ? ['--save-optional'] : []), ...(workspace ? ['-w', workspace] : []), ...packages],
       { cwd: location, timeout: 900_000, env: withoutSeatEnv(ctx?.env ?? process.env) })),
     loadPins: deps.loadPins ?? loadCanonPins,
     loadTargetPins: deps.loadTargetPins ?? loadTargetPins,
@@ -165,7 +200,7 @@ export async function npmInstall(ctx, deps = {}) {
       const dev = Boolean(ctx?.args?.dev);
       const state = { api, cwd, packages, dev, started, pinResults, refusal };
       const finish = (error, code) => finishInstall(state, error, code);
-      const run = (specs) => runInstall(api, cwd, dev, specs);
+      const run = (specs) => runInstall(api, cwd, { dev, optional: false, workspace: undefined }, specs);
       const failure = await run(resolved.packages);
       if (failure) {
         if (canon) pinResults.push({ package: resolved.packages[0], status: 'refused', reason: failure });
