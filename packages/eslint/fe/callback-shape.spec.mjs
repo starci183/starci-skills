@@ -1,7 +1,7 @@
 // proves: FE_CALLBACK_SHAPE@lite FE_CALLBACK_SHAPE@full
 /** R287: callbacks are PKCE exchanges and redirects in both editions, with lexical provenance for the allowed calls. */
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import test from "node:test"
 import tsParser from "@typescript-eslint/parser"
 import { RuleTester } from "eslint"
@@ -16,7 +16,9 @@ const BODY = 'const code = request.nextUrl.searchParams.get("code"); if (code) {
 const OWNER_IMPORTS = 'import { NextResponse, type NextRequest } from "next/server"\nimport { exchangeAuthCode } from "@/modules/auth/server"\nimport { APP_ROUTES } from "@/modules/routes"'
 const OWNER_BODY = 'const url = new URL(request.url); const code = url.searchParams.get("code"); if (code) await exchangeAuthCode(code); return NextResponse.redirect(new URL(APP_ROUTES.home, url.origin))'
 const TEMPLATE_CALLBACK = readFileSync(new URL("../../hfs/templates/fe/skeleton/apps/__app__/src/app/auth/callback/route.ts", import.meta.url), "utf8")
-const EXAMPLE_CALLBACK = readFileSync(new URL("../../../examples/lite-app/fe/apps/web/src/app/auth/callback/route.ts", import.meta.url), "utf8")
+// The shipped example lives in the repository, not in the package: a package tested from its own copy has the template witness only.
+const EXAMPLE_URL = new URL("../../../examples/lite-app/fe/apps/web/src/app/auth/callback/route.ts", import.meta.url)
+const EXAMPLE_WITNESS = existsSync(EXAMPLE_URL) ? [{ filename: CALLBACK, code: readFileSync(EXAMPLE_URL, "utf8") }] : []
 const callback = (body = BODY, imports = IMPORTS) => `${imports}\nexport async function GET(request: NextRequest) { ${body} }`
 const invalid = (code) => ({ filename: CALLBACK, code, errors: [{ messageId: "shape" }] })
 
@@ -42,7 +44,7 @@ for (const edition of ["lite", "full"]) {
       valid: [
         // These exact shipped sources are R287 witnesses, not just copied fixture shapes.
         { filename: CALLBACK, code: TEMPLATE_CALLBACK },
-        { filename: CALLBACK, code: EXAMPLE_CALLBACK },
+        ...EXAMPLE_WITNESS,
         { filename: CALLBACK, code: callback(OWNER_BODY, OWNER_IMPORTS) },
         // The server helper and routes retain their provenance through import and local aliases.
         { filename: CALLBACK, code: callback('const params = request.nextUrl.searchParams; const code = params.get("code"); const run = exchange; const routes = paths; const { home: destination } = routes; if (code) await run(code); return Reply.redirect(new URL(destination, request.url))', 'import { NextResponse as Reply, type NextRequest } from "next/server"\nimport { exchangeAuthCode as exchange } from "../../../modules/auth/server.ts"\nimport { APP_ROUTES as paths } from "../../../modules/routes"') },

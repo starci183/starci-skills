@@ -21,12 +21,12 @@
 import test from "node:test"
 import fs from "node:fs"
 import path from "node:path"
-import { parseYaml } from "../../../engine/yaml.mjs"
+import { parseYaml } from "./runtime/engine/yaml.mjs"
 import { projectFixture } from "../be/fixtures/project/tester.mjs"
 import { rules } from "./project-graph.mjs"
 
 const EXPORT = "export const value = 1;\n"
-const SHIPPED = parseYaml(fs.readFileSync(path.join(import.meta.dirname, "..", "..", "..", "knowledge", "hfs", "slots.yaml"), "utf8"))
+const SHIPPED = parseYaml(fs.readFileSync(path.join(import.meta.dirname, "runtime", "knowledge", "hfs", "slots.yaml"), "utf8"))
 const TEMPLATE = SHIPPED.slots.find((slot) => slot.id === "repo.build-output")
 const OWNED = "apps/web/src/modules/hooks/x.ts"
 

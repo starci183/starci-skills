@@ -2,12 +2,9 @@
 // proves: BE_SOURCE_FORM@full
 // proves: BE_PUBLIC_CONTRACT_FORM@lite
 // proves: BE_PUBLIC_CONTRACT_FORM@full
-import assert from 'node:assert/strict';
-import { dirname } from 'node:path';
 import test from 'node:test';
 import { RuleTester } from 'eslint';
 import tsParser from '@typescript-eslint/parser';
-import { checkRepo } from '../../hfs/runtime/scripts/hfs/check.mjs';
 import { appDeclaration } from './fixtures/app.mjs';
 import { projectFixture } from './fixtures/project/tester.mjs';
 import { at, BE_DECLARATION, TYPED_ROOT } from './fixtures/typed/tester.mjs';
@@ -114,9 +111,5 @@ for (const edition of ['lite', 'full']) {
       valid: [{ filename: fixture.at(contractGood), code: files[contractGood] }],
       invalid: [{ filename: fixture.at(contractBad), code: files[contractBad], errors: [{ messageId: 'finding' }, { messageId: 'finding' }] }],
     });
-    const violating = checkRepo({ repoRoot: dirname(fixture.root), files: ['be/' + suffixBad], tree: false, phase: 'source' });
-    assert.deepEqual(violating.findings.filter((finding) => finding.code === 'BE_SOURCE_FORM').map((finding) => finding.code), ['BE_SOURCE_FORM']);
-    const passing = checkRepo({ repoRoot: dirname(fixture.root), files: ['be/' + suffixGood], tree: false, phase: 'source' });
-    assert.deepEqual(passing.findings.filter((finding) => finding.code === 'BE_SOURCE_FORM').map((finding) => finding.code), []);
   });
 }

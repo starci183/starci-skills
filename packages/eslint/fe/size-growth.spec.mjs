@@ -5,6 +5,10 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { runGit } from "../be/runtime/scripts/api/git/lib.mjs"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import { fixtureHfs } from "./fixtures/typed/tester.mjs"
@@ -33,7 +37,16 @@ test("fe: the parameters come from the shipped manifest, and the law declares it
   assert.deepEqual(Object.keys(rules), ["file-size-growth"])
 })
 
-test("fe: a new file over the manifest budget is refused, in a component and a hook alike", () => {
+test("fe: a new file over the manifest budget is refused, in a component and a hook alike", (t) => {
+  // The probe paths are relative to the working directory: run in a throwaway git repository with one empty commit, where no file has a recorded size
+  // (the rule reads the recorded size from git; a package tested from a copy without git history would answer "unavailable").
+  const probeRoot = mkdtempSync(join(tmpdir(), "starci-fe-budget-probe-"))
+  const home = process.cwd()
+  t.after(() => { process.chdir(home); rmSync(probeRoot, { recursive: true, force: true }) })
+  const git = (...args) => runGit(args, { dir: probeRoot, config: { "user.email": "t@example.com", "user.name": "t" } })
+  git("init", "-q", "-b", "main")
+  git("commit", "-q", "--allow-empty", "-m", "seed")
+  process.chdir(probeRoot)
   tester.run("file-size-growth", fileSizeGrowth, {
     valid: [
       { filename: "repo/src/components/Card/index.tsx", code: lines(BUDGET) },
