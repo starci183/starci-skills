@@ -99,6 +99,7 @@ _starci() {
     'app:db:--green-at') return 0 ;;
     'app:lint:--changed') return 0 ;;
     'app:lint:--workspace') return 0 ;;
+    'app:lint:--side') _values 'values' 'be' 'fe'; return 0 ;;
     'app:lint:--format') _values 'values' 'text' 'json'; return 0 ;;
     'app:lint:--sonar') return 0 ;;
     'app:new:--inject') return 0 ;;
@@ -1017,7 +1018,7 @@ _starci() {
     'app:emit') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:explain') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:hygiene') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'app:lint') _values 'flags' '--changed' '--workspace' '--fix' '--format' '--sonar' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'app:lint') _values 'flags' '--changed' '--workspace' '--side' '--fix' '--format' '--sonar' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:new') _values 'flags' '--inject' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:release') _values 'flags' '--execute' '--source' '--tag-prefix' '--sonar' '--remote' '--json' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:scaffold') _values 'flags' '--into' '--registry-visibility' '--json' '--cwd' '--quiet' '--help' '--edition' ;;

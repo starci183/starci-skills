@@ -73,6 +73,7 @@ _starci() {
         app:db:--green-at) return 0;;
         app:lint:--changed) return 0;;
         app:lint:--workspace) return 0;;
+        app:lint:--side) COMPREPLY=( $(compgen -W "be fe" -- "$cur") ); return 0;;
         app:lint:--format) COMPREPLY=( $(compgen -W "text json" -- "$cur") ); return 0;;
         app:lint:--sonar) return 0;;
         app:new:--inject) return 0;;
@@ -991,7 +992,7 @@ _starci() {
         app:emit) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         app:explain) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         app:hygiene) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
-        app:lint) COMPREPLY=( $(compgen -W "--changed --workspace --fix --format --sonar --json --cwd --quiet --help --edition" -- "$cur") );;
+        app:lint) COMPREPLY=( $(compgen -W "--changed --workspace --side --fix --format --sonar --json --cwd --quiet --help --edition" -- "$cur") );;
         app:new) COMPREPLY=( $(compgen -W "--inject --json --cwd --quiet --help --edition" -- "$cur") );;
         app:release) COMPREPLY=( $(compgen -W "--execute --source --tag-prefix --sonar --remote --json --json --cwd --quiet --help --edition" -- "$cur") );;
         app:scaffold) COMPREPLY=( $(compgen -W "--into --registry-visibility --json --cwd --quiet --help --edition" -- "$cur") );;

@@ -6,6 +6,7 @@ impl: null
 flags:
   - {name: changed, type: list, summary: app-relative files to judge (space-separated; not with --workspace)}
   - {name: workspace, type: string, summary: one frontend workspace to judge}
+  - {name: side, type: enum, enum: [be, fe], summary: judge one side (root findings belong to be; not with --sonar)}
   - {name: fix, type: boolean, summary: let ESLint and stylelint apply safe fixes}
   - {name: format, type: enum, enum: [text, json], default: text, summary: report format}
   - {name: sonar, type: string, summary: write the Sonar Generic Issue Import report}

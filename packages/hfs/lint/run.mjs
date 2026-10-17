@@ -1,6 +1,6 @@
 // starci app lint - the ONE lint entry and the ONE report of a StarCi app.
 //
-//   starci app lint [--cwd <dir>] [--changed <file>...] [--workspace <dir>] [--fix] [--format text|json] [--sonar <file>]
+//   starci app lint [--cwd <dir>] [--changed <file>...] [--workspace <dir>] [--side be|fe] [--fix] [--format text|json] [--sonar <file>]
 //
 // It runs at the app root (the folder of hfs.json), over the app (or over the app-relative files named by --changed):
 //   1. ESLint once per side, from the side folder, through the app's own install and that side's eslint.config.mjs (be/ the be canon,
@@ -26,6 +26,7 @@ import { STYLE_GLOB } from '../sync/index.mjs';
 import { byCodeUnit } from '../report/order.mjs';
 import { braceVariants, globExpression } from '../runtime/scripts/lib/glob.mjs';
 
+// --side judges only that side; root HFS findings belong to be, and Sonar always requires the full lint.
 export const LINT_SCHEMA = 'starci/lint@1';
 /** The side whose stylesheets stylelint judges. */
 const STYLE_SIDE = 'fe';
@@ -41,6 +42,22 @@ export function workspaceOf(workspace) {
   return rel;
 }
 
+/** Side scopes partition the full lint; Sonar requires the complete report and a frontend workspace cannot belong to be. */
+function validateSide(opts) {
+  if (opts.side === undefined) return;
+  if (!SIDES.includes(opts.side)) throw new Error('LINT_SIDE_INVALID: --side is be or fe');
+  if (opts.sonar !== undefined) throw new Error('LINT_SIDE_SONAR_CONFLICT: --side and --sonar do not combine');
+  if (opts.side === 'be' && opts.workspace !== undefined) throw new Error('LINT_SIDE_WORKSPACE_CONFLICT: --side be cannot judge a frontend workspace');
+}
+
+/** Side findings stay with their side; findings outside both sides belong to the backend lint. */
+function findingOnSide(finding, side) {
+  if (side === undefined) return true;
+  const file = posix(finding.path ?? '');
+  const owner = SIDES.find((candidate) => file === candidate || file.startsWith(`${candidate}/`));
+  return (owner ?? 'be') === side;
+}
+
 /** The flags of `starci app lint`; `--changed` takes every argument up to the next flag, and a repeated `--changed` adds to the list (the
  *  catalog's list flag, `--changed a --changed b`, as the CLI dispatcher passes it through). */
 export function parseLintArgs(argv) {
@@ -52,13 +69,15 @@ export function parseLintArgs(argv) {
       while (i + 1 < argv.length && !argv[i + 1].startsWith('--')) opts.changed.push(posix(argv[++i]));
     } else if (arg === '--fix') opts.fix = true;
     else if (arg === '--json') opts.format = 'json';
-    else if (['--format', '--sonar', '--workspace'].includes(arg)) {
+    else if (['--format', '--sonar', '--workspace', '--side'].includes(arg)) {
+      if (arg === '--side' && (argv[i + 1] === undefined || argv[i + 1].startsWith('--'))) throw new Error('LINT_SIDE_INVALID: --side needs be or fe');
       if (argv[i + 1] === undefined) throw new Error(`${arg} needs a value`);
       opts[arg.slice(2)] = argv[++i];
     } else throw new Error(`unknown argument ${arg}`);
   }
   if (!['text', 'json'].includes(opts.format)) throw new Error('--format is text or json');
   if (opts.workspace !== undefined && opts.changed !== null) throw new Error('--workspace and --changed do not combine: a workspace lint judges the whole workspace');
+  validateSide(opts);
   return opts;
 }
 
@@ -182,7 +201,7 @@ function checkedEslintResults({ results, expected, cwd, scope, changed }) {
 /** Starts the ESLint child of every side that has work and returns one record per side: skipped, a scope error, or the running child. */
 async function launchEslint({ app, repoRoot, opts, changed, existing, workspace, onFe }) {
   const launches = [];
-  for (const side of app ? SIDES : []) {
+  for (const side of app ? SIDES.filter((candidate) => opts.side === undefined || opts.side === candidate) : []) {
     if (workspace !== null && side !== STYLE_SIDE) { launches.push({ side, skipped: `outside --workspace ${workspace}` }); continue; }
     const sources = onSide(existing, side).filter((file) => /\.(?:[cm]?[jt]sx?)$/.test(file));
     if (changed !== null && !sources.length) { launches.push({ side, skipped: 'no changed source file' }); continue; }
@@ -197,6 +216,7 @@ async function launchEslint({ app, repoRoot, opts, changed, existing, workspace,
 
 /** Starts stylelint over the fe stylesheets (the running child), or returns null when no stylesheet is in scope. */
 function launchStylelint({ repoRoot, opts, changed, existing, onFe }) {
+  if (opts.side === 'be') return null;
   const styles = onSide(existing, STYLE_SIDE).filter((file) => file.endsWith('.css'));
   if (changed !== null && !styles.length) return null;
   return runLinter({ cwd: path.join(repoRoot, STYLE_SIDE), pkg: 'stylelint', bin: 'stylelint', args: [...(changed ? styles : [onFe ? `${onFe}/src/**/*.css` : STYLE_GLOB]), '--formatter', 'json', ...(opts.fix ? ['--fix'] : [])] });
@@ -210,6 +230,8 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
   const changed = opts.changed === null ? null : new Set(opts.changed);
   const errors = [];
   let workspace = null;
+  let validSide = true;
+  try { validateSide(opts); } catch (error) { errors.push(String(error?.message ?? error)); validSide = false; }
   if (opts.workspace !== undefined) {
     try { workspace = workspaceOf(opts.workspace); } catch (error) { errors.push(String(error?.message ?? error)); }
   }
@@ -223,7 +245,7 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
   let app = null;
   try { app = readRepoDeclaration(loadSlotManifest(), repoRoot); } catch (error) { errors.push(`starci app lint runs at the app root: ${String(error?.message ?? error)}`); }
   if (app && !app.sides) { errors.push(`${repoRoot} is the ${app.side} side of an app; starci app lint runs at the app root, the folder of hfs.json`); app = null; }
-  if (opts.workspace !== undefined && workspace === null) app = null;
+  if (!validSide || (opts.workspace !== undefined && workspace === null)) app = null;
   if (workspace !== null && !fs.existsSync(path.join(repoRoot, workspace, 'package.json'))) { errors.push(`--workspace ${workspace} holds no package.json; it is not a workspace of this app`); app = null; }
   /** The workspace folder relative to the fe side folder (apps/<app> or packages/<pkg>). */
   const onFe = workspace === null ? null : workspace.slice(STYLE_SIDE.length + 1);
@@ -277,7 +299,7 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
     if (settled.error) errors.push(`starci app check could not run: ${String(settled.error?.message ?? settled.error)}`);
     else checked = settled.value;
   }
-  const repoErrors = checked.findings.filter((finding) => finding.level === 'error');
+  const repoErrors = checked.findings.filter((finding) => finding.level === 'error' && findingOnSide(finding, opts.side));
   // A workspace lint keeps only the app findings inside the workspace; the rest belong to the root lint of the whole app.
   const kept = workspace !== null
     ? repoErrors.filter((finding) => finding.path && inWorkspace(finding.path))
@@ -297,7 +319,7 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
     linterReport('eslint', raw.eslint, { root: repoRoot, sourceRoots, tracked }),
     linterReport('stylelint', raw.stylelint, { root: repoRoot, sourceRoots, tracked }),
   ]);
-  const report = { schema: LINT_SCHEMA, ok: findings.length === 0 && errors.length === 0, repoRoot, changed: changed ? [...changed].sort(byCodeUnit) : null, workspace, counts: { error: findings.length }, engines, errors, findings };
+  const report = { schema: LINT_SCHEMA, ok: findings.length === 0 && errors.length === 0, repoRoot, changed: changed ? [...changed].sort(byCodeUnit) : null, workspace, ...(opts.side === undefined ? {} : { side: opts.side }), counts: { error: findings.length }, engines, errors, findings };
   return { report, sonar, exit: errors.length ? 2 : findings.length ? 1 : 0 };
 }
 

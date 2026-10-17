@@ -195,6 +195,7 @@ lint both app sides and report repository, ESLint and stylelint findings togethe
 | --- | --- | --- |
 | `--changed` | list |  |
 | `--workspace` | string |  |
+| `--side` | enum be|fe |  |
 | `--fix` | boolean |  |
 | `--format` | enum text|json (default text) |  |
 | `--sonar` | string |  |

@@ -88,11 +88,13 @@ export function ciWorkflowCommands(source, lcovReport = 'be/coverage/lcov.info',
     sonarHostVar: sonar?.hostVar ?? 'SONAR_HOST_URL',
     sonarEnv: sonar ? `    env:\n      SONAR_TOKEN: \${{ secrets.${sonar.token} }}` : '',
     ciLintSteps: [
-      '      - name: lint',
-      ...(sonar ? ["        if: env.SONAR_TOKEN == ''"] : []),
-      `        run: ${exampleCommand(source, 'npm run lint')}`,
-      '        env:',
-      '          NODE_OPTIONS: --max-old-space-size=6144',
+      ...['be', 'fe'].flatMap((side) => [
+        '      - name: lint ' + side,
+        ...(sonar ? ["        if: env.SONAR_TOKEN == ''"] : []),
+        `        run: ${exampleCommand(source, 'npm run lint -- --side ' + side)}`,
+        '        env:',
+        '          NODE_OPTIONS: --max-old-space-size=6144',
+      ]),
       ...(sonar ? [
         '      - name: lint with Sonar import',
         "        if: env.SONAR_TOKEN != ''",

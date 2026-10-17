@@ -360,6 +360,7 @@ complete -c starci -n '__starci_using_command app db' -l owner-confirms-old-app-
 complete -c starci -n '__starci_using_command app db' -l json -d 'plan, migrate, post-cutover, dump, reset: print the result as JSON'
 complete -c starci -n '__starci_using_command app lint' -l changed -r -d 'app-relative files to judge (space-separated; not with --workspace)'
 complete -c starci -n '__starci_using_command app lint' -l workspace -r -d 'one frontend workspace to judge'
+complete -c starci -n '__starci_using_command app lint' -l side -r -a 'be fe' -d 'judge one side (root findings belong to be; not with --sonar)'
 complete -c starci -n '__starci_using_command app lint' -l fix -d 'let ESLint and stylelint apply safe fixes'
 complete -c starci -n '__starci_using_command app lint' -l format -r -a 'text json' -d 'report format'
 complete -c starci -n '__starci_using_command app lint' -l sonar -r -d 'write the Sonar Generic Issue Import report'

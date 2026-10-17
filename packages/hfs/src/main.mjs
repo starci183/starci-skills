@@ -15,7 +15,7 @@
 //                                            runs on those owners without clones and dead exports. No merge-base is a refusal
 //                                            (exit 2), never a silent full pass. Exit 1 on any error-level finding. The root checks run once and
 //                                            the side checks and the machine once per side, the side folder as their root; every path is app-relative.
-//   starci app lint [--cwd <dir>] [--changed <file>...] [--workspace <dir>] [--fix] [--format text|json] [--sonar <file>]
+//   starci app lint [--cwd <dir>] [--changed <file>...] [--workspace <dir>] [--side be|fe] [--fix] [--format text|json] [--sonar <file>]
 //                                            the ONE lint entry (npm run lint): ESLint per side with that side's canon config (per-file rules and
 //                                            the project-graph rules), this check's findings, and stylelint over the fe side, as one starci/lint@1
 //                                            report; --sonar writes the one Sonar import file. Exit 0 clean, 1 findings, 2 a tool could not run (lint/run.mjs).
@@ -94,7 +94,7 @@ const DATABASE_VERBS = new Map([['baseline', dbBaselineMain], ['restamp', dbRest
 
 const USAGE = `starci app scaffold <name> [--into <dir>] [--edition full|lite] [--registry-visibility public|private] [--cwd <dir>]
 starci app add <api|webhook|realtime|saga|job|reactor|queue|projection|cli|table|app> <name> [options] [--cwd <dir>]
-starci app lint [--cwd <dir>] [--changed <file>...] [--workspace <dir>] [--fix] [--format text|json] [--sonar <file>]
+starci app lint [--cwd <dir>] [--changed <file>...] [--workspace <dir>] [--side be|fe] [--fix] [--format text|json] [--sonar <file>]
 starci app sync (--check | --write) [--cwd <dir>]
 starci app check [--cwd <dir>] [--json] [--fast] [--base <ref>] [--edition full] [--db-types] [--wiring] [--coverage-from <lcov>]
 starci app db baseline [--stamp <version>] [--local] [--apply] [--cwd <dir>]
