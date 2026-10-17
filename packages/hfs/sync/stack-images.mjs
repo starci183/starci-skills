@@ -51,8 +51,15 @@ function declaredPassEnv(declaration) {
   return [...new Set(names)].sort(byCodeUnit);
 }
 
+/** Release builds select the sole image environment, or production on tags and a protected environment input on dispatch. */
+function imageEnvironments(declaration) {
+  return Object.fromEntries(Object.entries(declaration?.environments ?? {})
+    .filter(([name, environment]) => NAME.test(name) && environmentImages(environment).length > 0)
+    .map(([name, environment]) => [name, environmentImages(environment).map(image => image.app)]));
+}
+
 /**
- * What the managed workflow renders from the declaration of the app at `root`: { images, passEnv } (both empty when the app has no
+ * What the managed workflows render from the declaration at `root`: { images, passEnv, imageEnvironments } (empty when the app has no
  * declaration, no deploy block or a declaration that does not parse; `starci app check` judges those). `parseYaml(text)` is injected.
  */
 export function readDeclaredStack(root, { parseYaml = bundledParseYaml } = {}) {
@@ -64,7 +71,7 @@ export function readDeclaredStack(root, { parseYaml = bundledParseYaml } = {}) {
   } catch {
     return { images: [], passEnv: [] };
   }
-  return { images: declaredStackImages(declaration), passEnv: declaredPassEnv(declaration) };
+  return { images: declaredStackImages(declaration), passEnv: declaredPassEnv(declaration), imageEnvironments: imageEnvironments(declaration) };
 }
 
 const envName = service => `IMAGE_${service.toUpperCase().replaceAll('-', '_')}`;
@@ -109,7 +116,7 @@ function buildPushStep(image, dockerfile) {
  *   stackPassEnv     the env entries of the deploy step for the declared host variables (vars.<NAME>)
  * `dockerfileOf(app)` names the Dockerfile of an app (the sync module knows the layout).
  */
-export function stackWorkflowVariables({ images = [], passEnv = [] }, project, dockerfileOf) {
+export function stackWorkflowVariables({ images = [], passEnv = [], imageEnvironments: environments = {} }, project, dockerfileOf) {
   const guard = images.length ? '' : block([
     '- name: require a declared image',
     '  shell: bash',
@@ -117,11 +124,40 @@ export function stackWorkflowVariables({ images = [], passEnv = [] }, project, d
   ]);
   const names = images.map(image => `echo "${image.service}=ghcr.io/\${owner}/${project}-${image.app}" >> "$GITHUB_OUTPUT"`);
   return {
+    ...releaseImageVariables(environments),
     stackGuard: guard,
     stackNames: block(names, ' '.repeat(10)),
     stackImageSteps: images.map(image => block([...(image.buildArgs ? buildArgsStep(image) : []), ...buildPushStep(image, dockerfileOf(image.app))])).join(''),
     stackImageEnv: block(images.map(image => `${envName(image.service)}: \${{ steps.names.outputs.${image.service} }}@\${{ steps.build-${image.service}.outputs.digest }}`), ' '.repeat(10)),
     stackImageArgs: block(images.map(image => `--image "${image.service}=$${envName(image.service)}" ${CONTINUE}`), ' '.repeat(12)),
     stackPassEnv: block(passEnv.map(name => `${name}: \${{ vars.${name} }}`), ' '.repeat(10)),
+  };
+}
+
+/** The matrix uses the deploy verb only for apps the selected environment deploys; undeployed images retain Dockerfile defaults. */
+function releaseImageVariables(environments) {
+  const names = Object.keys(environments);
+  const selectedApp = names.map(name => `(env.STACK_ENVIRONMENT == '${name}' && contains(fromJSON('${JSON.stringify(environments[name])}'), matrix.name))`).join(' || ') || 'false';
+  const multiple = names.length > 1;
+  const environment = multiple ? "${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}" : names[0] ?? 'production';
+  const dispatch = multiple ? [
+    '  workflow_dispatch:',
+    '    inputs:',
+    '      environment:',
+    '        description: Environment whose public build values the release images use',
+    '        required: true',
+    '        type: environment',
+    '        default: production',
+  ].join('\n') : '  workflow_dispatch: {}';
+  return {
+    imageDispatch: dispatch,
+    imageEnvironment: environment,
+    imageJobEnvironment: names.length ? `\n    environment: ${environment}` : '',
+    imageEnvironmentGuard: multiple ? block([
+      '- name: require a declared image environment',
+      `  if: \${{ !contains(fromJSON('${JSON.stringify(names)}'), env.STACK_ENVIRONMENT) }}`,
+      '  run: \'echo "::error::STACKS_DEPLOY_ENV_UNKNOWN: selected environment declares no deploy images"; exit 1\'',
+    ]) : '',
+    imageBuildArgsIf: `\${{ ${selectedApp} }}`,
   };
 }
