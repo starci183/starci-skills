@@ -7,6 +7,7 @@ AI agents write code fast and check it badly. StarCi makes every step pass a gat
 [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=starci183_starci-skills&metric=bugs)](https://sonarcloud.io/summary/new_code?id=starci183_starci-skills)
 [![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=starci183_starci-skills&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=starci183_starci-skills)
 [![codecov](https://codecov.io/gh/starci183/starci-skills/branch/main/graph/badge.svg)](https://codecov.io/gh/starci183/starci-skills)
+[![Dependabot](https://github.com/starci183/starci-skills/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/starci183/starci-skills/actions/workflows/dependabot/dependabot-updates)
 [![release](https://img.shields.io/github/v/release/starci183/starci-skills?include_prereleases)](https://github.com/starci183/starci-skills/releases)
 [![license](https://img.shields.io/github/license/starci183/starci-skills)](LICENSE)
 

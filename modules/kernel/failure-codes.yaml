@@ -5258,6 +5258,17 @@ RT_GENERATED_DRIFT:
   owner: supervisor
   kind: check-finding
 
+RT_README_BADGE_MISSING:
+  title: "Required runtime README badge is missing"
+  title_vi: "README runtime thiếu huy hiệu bắt buộc"
+  meaning_vi: "README.md của runtime thiếu dòng huy hiệu CI, cổng chất lượng Sonar, Codecov hoặc Dependabot khi có cấu hình Dependabot."
+  causes_vi:
+    - "Xóa dòng huy hiệu hoặc thay URL ảnh bằng URL không đúng dịch vụ"
+    - "Thêm cấu hình Dependabot nhưng chưa thêm huy hiệu tương ứng"
+  nextStep_vi: "Khôi phục dòng huy hiệu dịch vụ được nêu trong thông báo rồi chạy lại kiểm tra readme-badges."
+  owner: runtime-core
+  kind: check-finding
+
 RT_CITED_PATH_MISSING:
   title: "Cited runtime path does not exist"
   title_vi: "Đường dẫn được trích dẫn không tồn tại"

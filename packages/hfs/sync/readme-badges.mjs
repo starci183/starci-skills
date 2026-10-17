@@ -9,7 +9,7 @@ function githubRepository(repository) {
 
 const badge = (name, image, link) => `[![${name}](${image})](${link})`;
 
-/** Render live CI, coverage and quality gate badges only when a GitHub repository is declared or inferable; no network is used. */
+/** Render live CI, coverage, quality gate and Dependabot badges only when a GitHub repository is declared or inferable; no network is used. */
 export function renderReadmeBadges(doc, { repository, example = false } = {}) {
   const github = doc?.ci?.github ?? {};
   const repo = github.repository ?? githubRepository(repository);
@@ -25,6 +25,10 @@ export function renderReadmeBadges(doc, { repository, example = false } = {}) {
   }
   const sonar = sonarBadge(doc, quality.sonar, example);
   if (sonar) lines.push(sonar);
+  if (quality.dependabot.ecosystems.length) {
+    const updates = `${base}/actions/workflows/dependabot/dependabot-updates`;
+    lines.push(badge('Dependabot', `${updates}/badge.svg`, updates));
+  }
   return lines.join('\n');
 }
 
