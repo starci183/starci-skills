@@ -1,6 +1,6 @@
 import { Test } from "@nestjs/testing"
 import { mockEntityManager } from "@starci/jest-preset"
-import { READ_BOOKING_SCHEDULE, REGISTER_BOOKING_SCHEDULE, RUN_BOOKING_TICK } from "./persistence/scheduler.sql"
+import { READ_BOOKING_SCHEDULE, RUN_BOOKING_TICK } from "./persistence/scheduler.sql"
 import { SchedulerClient } from "./scheduler.client"
 
 const build = async () => {
@@ -30,15 +30,15 @@ describe("SchedulerClient", () => {
         expect(manager.query).toHaveBeenCalledTimes(1)
     })
 
-    it("returns the stable identity when the fixed named registration is reapplied", async () => {
+    it("returns the stable identity when the migration owner's named registration is reapplied", async () => {
         const client = await build()
         const rows = [{ jobid: "7" }]
-        const manager = mockEntityManager({ query: [REGISTER_BOOKING_SCHEDULE, rows] })
+        const reapply = jest.fn().mockResolvedValue(rows)
 
-        await expect(client.register(manager)).resolves.toEqual(rows)
-        await expect(client.register(manager)).resolves.toEqual(rows)
+        await expect(client.register(reapply)).resolves.toEqual(rows)
+        await expect(client.register(reapply)).resolves.toEqual(rows)
 
-        expect(manager.query.mock.calls).toEqual([[REGISTER_BOOKING_SCHEDULE], [REGISTER_BOOKING_SCHEDULE]])
+        expect(reapply.mock.calls).toEqual([[], []])
     })
 
     it("runs exactly one enqueue-only tick and discards the database result", async () => {

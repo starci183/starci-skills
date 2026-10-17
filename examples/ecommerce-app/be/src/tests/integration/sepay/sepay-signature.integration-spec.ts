@@ -19,7 +19,7 @@ describe("sepay: notifier signature (integration)", () => {
                     toleranceMs: 300_000,
                 }),
         ],
-        apps: ["billing"],
+        apps: ["identity", "order", "billing"],
     })
 
     const verify = (delivery: Awaited<ReturnType<typeof world.fake.sepay.replayWebhook>>) =>

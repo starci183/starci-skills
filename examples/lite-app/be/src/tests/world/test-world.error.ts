@@ -1,7 +1,9 @@
 import { DomainError } from "@modules/platform/errors"
 
-/** Deliberate failures injected by the integration proofs. */
+/** Infrastructure failures and deliberate failures injected by the integration proofs. */
 export enum TestWorldErrorCode {
+    /** The local CLI returned malformed scheduler output. */
+    SchedulerResponseInvalid = "TEST_WORLD_SCHEDULER_RESPONSE_INVALID",
     /** Aborts an enqueue transaction to prove that both writes roll back. */
     BookingRefused = "TEST_WORLD_BOOKING_REFUSED",
     /** Restores the scheduler registration and tick after the proof. */
@@ -10,5 +12,5 @@ export enum TestWorldErrorCode {
     ProviderDown = "TEST_WORLD_PROVIDER_DOWN",
 }
 
-/** A coded failure used to exercise rollback and retry behavior. */
+/** A coded infrastructure failure or an injected rollback and retry failure. */
 export class TestWorldError extends DomainError<TestWorldErrorCode> {}

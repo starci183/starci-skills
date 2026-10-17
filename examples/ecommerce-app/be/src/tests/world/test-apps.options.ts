@@ -217,14 +217,10 @@ export const billingOptions = (w: EcommerceWiring): BillingAppOptions => ({
     port: w.apps.billing.port,
     database: billingDatabase(w),
     identityApi: identityApiOptionsOf(w),
-    httpSecurity: {
-        ...httpSecurity,
-        webhooks: {
-            sepay: {
-                secret: new Secret(fakeValue(w.fake.sepay.values, "webhookSecret")),
-                toleranceMs: WEBHOOK_TOLERANCE_MS,
-            },
-        },
+    httpSecurity,
+    sepay: {
+        secret: new Secret(fakeValue(w.fake.sepay.values, "webhookSecret")),
+        toleranceMs: WEBHOOK_TOLERANCE_MS,
     },
     eventBus: eventBusOptionsOf(w, "billing"),
     invoice: { maxTotalMinorUnits: BILLING_LIMIT_MINOR_UNITS },

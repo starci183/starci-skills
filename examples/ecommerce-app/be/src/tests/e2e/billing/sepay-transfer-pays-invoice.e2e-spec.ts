@@ -1,6 +1,6 @@
 import { QueryFailedError } from "typeorm"
+import { PaymentService } from "@modules/domain/payment"
 import { PaymentConfirmedEvent } from "@modules/events/billing"
-import { ErrorsFilter } from "@modules/platform/errors"
 import { productBuilder } from "../../fixtures/builders/catalog.builder"
 import { present } from "../../fixtures/present.mapper"
 import type { PlaceOrderData } from "../../fixtures/e2e-views.contracts"
@@ -22,23 +22,13 @@ const STALE_AGE_MS = 10 * 60_000
 /**
  * The signed bank transfer webhook of the billing service, end to end, against the SePay fake at the network edge: a buyer
  * places an order, billing issues its invoice, and the notifier tells billing the buyer transferred the money. Billing proves
- * every delivery first (signature and replay window, on the exact bytes), then records the payment and marks the invoice paid
- * in one transaction; a refused or repeated delivery changes nothing. The Postgres reads are out-of-band verification only.
+ * every delivery first (signature and replay window, on the exact bytes), then commits a receipt for the reactor to record the payment and mark the invoice paid
+ * in its own transaction; a refused or repeated delivery changes nothing. The Postgres reads are out-of-band verification only.
  *
  * Run: npm run test:e2e -- billing/sepay-transfer-pays-invoice
  */
 describe("sepay transfer pays an invoice", () => {
-    let filterSpy: jest.SpiedFunction<ErrorsFilter["catch"]>
-
-    beforeAll(() => {
-        filterSpy = jest.spyOn(ErrorsFilter.prototype, "catch")
-    })
-
     const world = useTestWorld({ apps: ["identity", "order", "billing"] })
-
-    afterAll(() => {
-        filterSpy.mockRestore()
-    })
 
     beforeAll(async () => {
         await productBuilder(world.db.order).build({ id: "sku-desk", priceMinorUnits: 4500, stock: 10 })
@@ -82,7 +72,7 @@ describe("sepay transfer pays an invoice", () => {
         keepsWrongAmountOpen(world, orderWithInvoice))
 
     it("webhooks/failed-transaction-keeps-transfer-retryable: claim, payment and confirmation roll back together even when compensating DELETE is refused", () =>
-        retriesRolledBackTransfer(world, orderWithInvoice, confirmationCountOf, filterSpy))
+        retriesRolledBackTransfer(world, orderWithInvoice, confirmationCountOf))
 })
 
 async function refusesBadSignature(
@@ -163,15 +153,17 @@ async function retriesRolledBackTransfer(
     world: ReturnType<typeof useTestWorld>,
     orderWithInvoice: (name: string) => Promise<string>,
     confirmationCountOf: (orderId: string) => Promise<number>,
-    filterSpy: jest.SpiedFunction<ErrorsFilter["catch"]>,
 ): Promise<void> {
-    filterSpy.mockClear()
     const controlOrderId = await orderWithInvoice("sepay-delete-control")
     const orderId = await orderWithInvoice("sepay-rollback-retry")
     const control = present(
         await world.fake.sepay.settle({ reference: controlOrderId, amount: 4500 }),
         "committed DELETE-control delivery",
     )
+    await world.waitFor("the control transfer has a committed settlement claim", async () => {
+        const rows = await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [controlOrderId])
+        return rows[0] ?? null
+    })
     await world.fake.sepay.failNext({ badSignature: true })
     const original = present(
         await world.fake.sepay.settle({ reference: orderId, amount: 4500 }),
@@ -182,17 +174,23 @@ async function retriesRolledBackTransfer(
     const outboxFault = billing.writeFault("event_outbox", "insert")
     const deleteFault = billing.writeFault("inbox_claims", "delete")
     const faultNames = [outboxFault.name, deleteFault.name]
+    const failures: Array<unknown> = []
+    const settlementSpy = observeSettlementFailure(orderId, outboxFault, failures)
 
     // The database is slot-isolated, not test-isolated: Root schedules this spec alone and serially.
     try {
-        await installBillingFaults(world, control, original, orderId, outboxFault, deleteFault, faultNames)
+        await installBillingFaults(world, control, original, deleteFault, faultNames)
         // Re-sign the captured body freshly; subsequent replays preserve these exact valid headers and bytes.
         faultDelivery = await world.fake.sepay.replayWebhook(orderId, { ageMs: 1 })
         expect(faultDelivery.body).toBe(original.body)
-        expect(faultDelivery.status).toBe(500)
-        await verifyBillingRollback(world, orderId, faultDelivery, confirmationCountOf, filterSpy, outboxFault)
+        expect(faultDelivery.status).toBe(204)
+        await verifyBillingRollback(world, orderId, faultDelivery, confirmationCountOf, failures, outboxFault)
     } finally {
-        await restoreBillingFaults(world, control, outboxFault, deleteFault, faultNames)
+        try {
+            await restoreBillingFaults(world, control, outboxFault, deleteFault, faultNames)
+        } finally {
+            settlementSpy.mockRestore()
+        }
     }
 
     const retried = await world.fake.sepay.replayWebhook(orderId)
@@ -200,7 +198,13 @@ async function retriesRolledBackTransfer(
     expect(retried.headers).toEqual(faultDelivery.headers)
     expect(retried.status).toBe(204)
     expect(await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", retried.body])).toEqual([{ count: 1 }])
-    expect(await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId])).toHaveLength(1)
+    await world.waitFor("the committed receipt is retried and pays the invoice", async () => {
+        const rows = await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId])
+        return rows.length === 1 ? rows[0] : null
+    })
+    expect(
+        await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["billing.bank-transfer-received", retried.body]),
+    ).toEqual([{ count: 1 }])
     expect((await readRows(world.db.billing, INVOICES_OF_ORDER, [orderId]))[0]?.status).toBe("paid")
     expect(await confirmationCountOf(orderId)).toBe(1)
 
@@ -217,34 +221,61 @@ type BillingWorld = ReturnType<typeof useTestWorld>
 type BillingFault = ReturnType<ReturnType<BillingWorld["infra"]["postgresql"]["connection"]>["writeFault"]>
 type TransferDelivery = Awaited<ReturnType<BillingWorld["fake"]["sepay"]["replayWebhook"]>>
 
+/** Observes the real settlement transaction, injecting its failure after the receipt has committed. */
+function observeSettlementFailure(
+    orderId: string,
+    outboxFault: BillingFault,
+    failures: Array<unknown>,
+): jest.SpiedFunction<PaymentService["acceptBankTransfer"]> {
+    const acceptBankTransfer = PaymentService.prototype.acceptBankTransfer
+    let faultInstalled = false
+    // Install the outbox fault only after intake has committed its receipt, before settlement starts.
+    return jest.spyOn(PaymentService.prototype, "acceptBankTransfer").mockImplementation(async function (
+        this: PaymentService,
+        notice,
+    ) {
+        if (notice.code !== orderId) return acceptBankTransfer.call(this, notice)
+        if (!faultInstalled) {
+            await outboxFault.install()
+            faultInstalled = true
+        }
+        try {
+            return await acceptBankTransfer.call(this, notice)
+        } catch (cause) {
+            failures.push(cause)
+            throw cause
+        }
+    })
+}
+
 async function installBillingFaults(
     world: BillingWorld,
     control: TransferDelivery,
     original: TransferDelivery,
-    orderId: string,
-    outboxFault: BillingFault,
     deleteFault: BillingFault,
     faultNames: Array<string>,
 ): Promise<void> {
     expect(control.status).toBe(204)
     expect(original.status).toBe(401)
-    expect(await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", control.body])).toEqual([{ count: 1 }])
+    expect(
+        await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["billing.bank-transfer-received", control.body]),
+    ).toEqual([{ count: 1 }])
     expect(await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", original.body])).toEqual([{ count: 0 }])
     expect(await readRows(world.db.billing, BILLING_FAULT_OBJECT_COUNT, faultNames)).toEqual([{ count: 0 }])
 
-    await outboxFault.install()
     await deleteFault.install()
-    expect(await readRows(world.db.billing, BILLING_FAULT_OBJECT_COUNT, faultNames)).toEqual([{ count: 4 }])
+    expect(await readRows(world.db.billing, BILLING_FAULT_OBJECT_COUNT, faultNames)).toEqual([{ count: 2 }])
 
     // A BEFORE ROW fault is not invoked when the DELETE matches no row.
     await world.db.billing.query(DELETE_TRANSFER_CLAIM, ["sepay", original.body])
-    await expect(world.db.billing.query(DELETE_TRANSFER_CLAIM, ["sepay", control.body])).rejects.toMatchObject({
+    await expect(
+        world.db.billing.query(DELETE_TRANSFER_CLAIM, ["billing.bank-transfer-received", control.body]),
+    ).rejects.toMatchObject({
         driverError: { code: deleteFault.errorCode, detail: deleteFault.name },
     })
-    expect(await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", control.body])).toEqual([{ count: 1 }])
-    await expect(world.db.billing.query(DUPLICATE_OUTBOX_ROW, [orderId])).rejects.toMatchObject({
-        driverError: { code: outboxFault.errorCode, detail: outboxFault.name },
-    })
+    expect(
+        await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["billing.bank-transfer-received", control.body]),
+    ).toEqual([{ count: 1 }])
 }
 
 async function verifyBillingRollback(
@@ -252,11 +283,27 @@ async function verifyBillingRollback(
     orderId: string,
     faultDelivery: TransferDelivery,
     confirmationCountOf: (orderId: string) => Promise<number>,
-    filterSpy: jest.SpiedFunction<ErrorsFilter["catch"]>,
+    failures: ReadonlyArray<unknown>,
     outboxFault: BillingFault,
 ): Promise<void> {
+    const settlementError = await world.waitFor("the reactor fails its confirmation insert", () =>
+        Promise.resolve(failures.find((error): error is QueryFailedError => error instanceof QueryFailedError) ?? null),
+    )
+    expect(settlementError.query.startsWith("INSERT INTO event_outbox")).toBe(true)
+    expect(await readRows(world.db.billing, BILLING_FAULT_OBJECT_COUNT, [outboxFault.name, outboxFault.name])).toEqual([
+        { count: 2 },
+    ])
+    await expect(world.db.billing.query(DUPLICATE_OUTBOX_ROW, [orderId])).rejects.toMatchObject({
+        driverError: { code: outboxFault.errorCode, detail: outboxFault.name },
+    })
+    expect(await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", faultDelivery.body])).toEqual([
+        { count: 1 },
+    ])
     const rollbackState = {
-        claims: await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", faultDelivery.body]),
+        claims: await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, [
+            "billing.bank-transfer-received",
+            faultDelivery.body,
+        ]),
         payments: await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId]),
         invoiceStatus: (await readRows(world.db.billing, INVOICES_OF_ORDER, [orderId]))[0]?.status,
         confirmations: await confirmationCountOf(orderId),
@@ -267,22 +314,11 @@ async function verifyBillingRollback(
         invoiceStatus: "issued",
         confirmations: 0,
     })
-    const routeError = present(
-        filterSpy.mock.calls
-            .map(([error]) => error)
-            .find(
-                (error): error is QueryFailedError =>
-                    error instanceof QueryFailedError &&
-                    error.query.startsWith("INSERT INTO event_outbox") &&
-                    error.parameters?.[0] === orderId,
-            ),
-        "the actual billing HTTP route's outbox failure",
-    )
-    expect(routeError.driverError).toMatchObject({
+    expect(settlementError.driverError).toMatchObject({
         code: outboxFault.errorCode,
         detail: outboxFault.name,
     })
-    expect(routeError.parameters).toEqual([
+    expect(settlementError.parameters).toEqual([
         orderId,
         PaymentConfirmedEvent.eventName,
         expect.any(String),
@@ -302,11 +338,11 @@ async function restoreBillingFaults(
     // Attempt both removals even if one fails, then attempt control cleanup and both independent reads.
     const removed = await Promise.allSettled([deleteFault.restore(), outboxFault.restore()])
     const controlRemoved = await Promise.allSettled([
-        world.db.billing.query(DELETE_TRANSFER_CLAIM, ["sepay", control.body]),
+        world.db.billing.query(DELETE_TRANSFER_CLAIM, ["billing.bank-transfer-received", control.body]),
     ])
     const readable = await Promise.allSettled([
         readRows(world.db.billing, BILLING_FAULT_OBJECT_COUNT, faultNames),
-        readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", control.body]),
+        readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["billing.bank-transfer-received", control.body]),
     ])
     expect(removed).toEqual([
         expect.objectContaining({ status: "fulfilled" }),

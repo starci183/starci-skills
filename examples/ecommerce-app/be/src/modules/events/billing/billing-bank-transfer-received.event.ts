@@ -21,7 +21,7 @@ const isBankTransferReceivedPayload = (
 ): payload is Record<string, unknown> & BankTransferReceivedPayload =>
     typeof payload.eventId === "string" &&
     typeof payload.code === "string" &&
-    (payload.transferType === "in" || payload.transferType === "out") &&
+    typeof payload.transferType === "string" &&
     typeof payload.transferAmount === "number" &&
     typeof payload.referenceCode === "string"
 

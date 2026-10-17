@@ -37,7 +37,7 @@ export const createCalendarProof = async (
     const transport = new PgmqQueueTransportClient(options, db.primary, mock<Logger>())
     const queue = new CalendarDeliveryQueue(new QueueOutboxService(transport, clock))
     return {
-        builder: createCalendarBuilder(db.primary),
+        builder: createCalendarBuilder(db.owner),
         close: () => context.close(),
         doorOf: (inbox: CalendarInboxService) =>
             new CalendarWebhook(new WebhookSignatureService(security, clock), inbox),

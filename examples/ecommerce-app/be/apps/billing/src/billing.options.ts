@@ -2,7 +2,7 @@ import type { InvoiceOptions } from "@modules/domain/invoice"
 import type { IdentityApiOptions } from "@modules/integrations/identity-api"
 import type { DatabaseConnectionConfig } from "@modules/platform/database"
 import type { EventBusConfig } from "@modules/platform/event-bus"
-import type { HttpSecurityOptions } from "@modules/platform/http-security"
+import type { HttpSecurityOptions, WebhookProviderOptions } from "@modules/platform/http-security"
 
 /** Everything the billing api needs from its environment, parsed once in main.ts. */
 export interface BillingAppOptions {
@@ -18,4 +18,6 @@ export interface BillingAppOptions {
     readonly eventBus: EventBusConfig
     /** The billing limit. */
     readonly invoice: InvoiceOptions
+    /** The notifier's signing secret and replay tolerance. */
+    readonly sepay: WebhookProviderOptions
 }

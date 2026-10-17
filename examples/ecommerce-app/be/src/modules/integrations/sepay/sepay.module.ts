@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
-import { WebhookSignatureService } from "@modules/platform/http-security"
+import { WEBHOOK_SIGNATURE, WebhookSignatureService } from "@modules/platform/http-security"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./sepay.module-definition"
 import { SepaySignatureService } from "./sepay-signature.service"
 
@@ -15,8 +15,9 @@ export class SepayModule extends ConfigurableModuleClass {
             providers: [
                 ...(base.providers ?? []),
                 { provide: WebhookSignatureService, useClass: SepaySignatureService },
+                { provide: WEBHOOK_SIGNATURE, useExisting: WebhookSignatureService },
             ],
-            exports: [WebhookSignatureService],
+            exports: [WebhookSignatureService, WEBHOOK_SIGNATURE],
         }
     }
 }

@@ -86,15 +86,15 @@ const registerSchedulerProof = (proof: () => QueueProof) => {
         const { world } = proof()
         const rolledBack = new TestWorldError({ code: TestWorldErrorCode.SchedulerRollback })
         await expect(
-            world.db.primary.transaction(async (tx) => {
+            world.db.owner.transaction(async (tx) => {
                 const jobs = await world.modules.schedules(tx)
                 expect(jobs).toHaveLength(1)
                 const [job] = jobs
                 assert(job, "Apply the example's public-surface Supabase migration before integration proofs")
                 expect(job.schedule).toBe("*/15 * * * *")
                 expect(job.command.trim()).toBe(world.modules.tickCommand)
-                const first = await world.modules.builder.registerSchedule(tx)
-                const second = await world.modules.builder.registerSchedule(tx)
+                const first = await world.modules.builder.registerSchedule()
+                const second = await world.modules.builder.registerSchedule()
                 expect(first).toEqual(second)
                 expect(await world.modules.scheduleIds(tx)).toEqual([{ jobid: job.jobid }])
                 const count = () => world.modules.countTicks(tx)

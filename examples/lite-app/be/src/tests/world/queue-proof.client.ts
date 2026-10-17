@@ -21,7 +21,7 @@ export const createQueueProof = (db: TestDatabases, options: QueueOptions) => {
     const scheduler = new SchedulerClient()
     const transport = new PgmqQueueTransportClient(options, db.primary, mock<Logger>())
     return {
-        builder: createQueueBuilder(db.primary),
+        builder: createQueueBuilder(db.primary, db.owner, db.reapplyBookingSchedule),
         transport,
         producer: new BookingReminderQueue(new QueueOutboxService(transport, new FakeClock())),
         relay: () => new QueueRelayService(options, [db.primary], transport, new FakeClock(), mock<Logger>()),

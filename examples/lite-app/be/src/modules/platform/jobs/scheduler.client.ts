@@ -1,5 +1,5 @@
 import type { EntityManager } from "typeorm"
-import { READ_BOOKING_SCHEDULE, REGISTER_BOOKING_SCHEDULE, RUN_BOOKING_TICK } from "./persistence/scheduler.sql"
+import { READ_BOOKING_SCHEDULE, RUN_BOOKING_TICK } from "./persistence/scheduler.sql"
 
 /** A migration-owned scheduler registration. */
 export interface ScheduleRow {
@@ -10,11 +10,13 @@ export interface ScheduleRow {
     /** The enqueue-only SQL command. */
     readonly command: string
 }
-/** The identity returned when the named schedule is reapplied. */
+/** The identity returned when the migration's named schedule is reapplied. */
 export interface ScheduleIdentity {
     /** The stable named registration identity. */
     readonly jobid: string
 }
+/** The test world's capability to reapply the migration-owned declaration. */
+export type ScheduleRegistration = () => Promise<Array<ScheduleIdentity>>
 /** Local diagnostics for the migration-owned booking reminder schedule. */
 export class SchedulerClient {
     /** The fixed command the migration schedules. */
@@ -23,9 +25,9 @@ export class SchedulerClient {
     schedules(manager: EntityManager): Promise<Array<ScheduleRow>> {
         return manager.query<Array<ScheduleRow>>(READ_BOOKING_SCHEDULE)
     }
-    /** Reapplies the fixed named registration, returning its identity. */
-    register(manager: EntityManager): Promise<Array<ScheduleIdentity>> {
-        return manager.query<Array<ScheduleIdentity>>(REGISTER_BOOKING_SCHEDULE)
+    /** Reapplies the declaration supplied by the local migration owner. */
+    register(reapply: ScheduleRegistration): Promise<Array<ScheduleIdentity>> {
+        return reapply()
     }
     /** Executes exactly one enqueue-only tick in the caller's transaction. */
     async tick(manager: EntityManager): Promise<void> {
