@@ -43,11 +43,11 @@ const SECRET_NAME = [
   String.raw`[A-Za-z_$][A-Za-z0-9_$.-]*\s*[:=]\s*`,
 ].join('');
 
-// `password = "hunter2hunter2"` — the quoted literal. `env(NAME)` is a reference, never a secret.
+// `password = "example-password-1"` — the quoted literal. `env(NAME)` is a reference, never a secret.
 const ASSIGNED_QUOTED = new RegExp(
   SECRET_NAME + String.raw`['"\`](?!env\([A-Z_][A-Z0-9_]*\)['"\`])([^'"\`\n\s$<{]{12,})['"\`]`,
 );
-// `DB_PASSWORD=hunter2hunter2` — the compose list-item and dotenv form; the dotenv value has no `:` so
+// `DB_PASSWORD=example-password-1` — the compose list-item and dotenv form; the dotenv value has no `:` so
 // `password: secret:db/password` and `token: ref:vault/api` stay references, and the end boundary keeps
 // calls and member/index references such as `secret = credentialsSource.current` out of the literals.
 const ASSIGNED_UNQUOTED = new RegExp(

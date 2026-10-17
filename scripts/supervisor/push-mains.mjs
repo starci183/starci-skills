@@ -99,7 +99,7 @@ function diffScanner(files = [], { encText = null } = {}) {
       if (raw.startsWith('+')) {
         const text = raw.slice(1);
         if (enc) { enc.added.push(text); enc.line ??= line; }
-        for (const pattern of secretHits(file, text)) (enc ? enc.findings : findings).push({ file, line, pattern });
+        for (const pattern of secretHits(file?.replace(/\.tpl$/, ''), text)) (enc ? enc.findings : findings).push({ file, line, pattern });
         line += 1;
       } else if (!raw.startsWith('-')) line += 1;
     },

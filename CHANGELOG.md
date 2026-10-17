@@ -8,7 +8,11 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## 1.0.0-alpha.20 (unreleased)
 
+This release supersedes the alpha.19 cut, which was never tagged (its push secret-scan refused template false positives): it carries everything listed under 1.0.0-alpha.19 below, plus the changes here.
+
 ### Added
+- `starci app sync` renders live status badges (CI, Codecov, the Sonar quality gate of the declared host, Dependabot) into a managed README block from the ci/services declaration; a missing or stale block is sync drift. The runtime README is held by the `readme-badges` self-check (RT_README_BADGE_MISSING).
+- `starci app lint --side be|fe`; the managed CI lints each side in its own step with a 6 GB heap (a whole-repo lint ran out of memory on the GitHub runner).
 - Examples CI runs digest-pinned actionlint over the rendered example workflows.
 - Secrets and config by consumer: app secrets remain sealed, public app config stays in the manifest, Actions secrets and vars use GitHub stores, and Dependabot has its own secrets. `starci app ci` sets declared names and verifies custody; R296-R298 refuse collisions and declaration drift.
 - Manifest services render Sonar, Codecov, Dependabot and audit files; the public examples use SonarCloud and Codecov OIDC with no secret file, while a scaffolded (private) app declares its own Sonar host. Dependabot groups minor/patch and security updates and ignores canon-managed @starci pins.
@@ -18,6 +22,9 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 ### Fixed
 - Managed deploy workflows put runner-local paths in step env; R299 refuses expressions using contexts unavailable at their workflow key.
 - CI release images use the deployment environment and shared build-args command; R300 refuses missing required public front-end build values.
+- Stack verbs open one SSH connection per command (POSIX ControlMaster; on Windows one command-owned Docker-socket tunnel, a private unix socket when OpenSSH supports it, else 127.0.0.1 on a fresh ephemeral port, never written to a file, closed in finally and on SIGINT/SIGTERM); release-store batches its remote round trips. A deploy burst no longer trips sshd MaxStartups or fail2ban.
+- `starci release scaffold-e2e` prepares packages/test-world itself (`npm ci --ignore-scripts` when missing or stale) on a fresh worktree.
+- The push secret-scan judges a `*.tpl` template as the file type it renders to (no new exemption).
 - `starci gate sonar up --public` activates the public Compose profile and verifies tunnel readiness; database password mismatch and tunnel failures have scrubbed diagnostics.
 
 ### Removed
