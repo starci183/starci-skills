@@ -42,25 +42,13 @@ import { escapeRegExp } from '../lib/regex.mjs';
 import { isInfrastructureValueFile } from './starcistacks-value-file.mjs';
 import { STACK_DECLARATION_TEMPLATE } from '../lib/example-refs.mjs';
 import { checkSecretForm, kindOf } from './starcistacks-form.mjs';
-import { readCiDeclaration } from '../hfs/ci-declaration.mjs';
+import { SERVICE_CATALOG, checkServiceForm, checkCiDeclaration, checkQualityService } from './starcistacks-ci.mjs';
 import { applicationStackFindings } from './starcistacks-runtime.mjs';
 export { DECLARATION, STACK_ROOT, findStackDeclaration };
 const RESULT_SCHEMA = 'starci/starcistacks-check@1';
 const DECLARATION_SCHEMA = 'starci/application-stacks@1';
 const FOLLOW_UP = { op: 'workspace.manage', params: { mode: 'stacks' },
   detail: `author the services block of the repository stack declaration (sonar and every other delivery/quality service) from ${STACK_DECLARATION_TEMPLATE}` };
-/** The closed service catalog: its providers and the CI text that shows a workflow calls it. */
-const SERVICE_CATALOG = {
-  codecov: { providers: ['codecov'], words: ['codecov'], ci: [/codecov\/codecov-action/i] },
-  dependabot: { providers: ['github'], words: ['dependabot'], ci: [] },
-  audit: { providers: ['npm'], words: ['audit'], ci: [/\bnpm audit\b/] },
-  sonar: { providers: ['sonarqube', 'sonarcloud'], words: ['sonar', 'sonarqube', 'sonarcloud'],
-    ci: [/SonarSource\/sonar(?:qube|cloud)-[a-z-]+-action/i, /\bsonar-scanner\b/i, /\bSONAR_TOKEN\b/] },
-  'container-registry': { providers: ['ghcr', 'dockerhub', 'ecr', 'gar'], words: ['ghcr', 'registry', 'docker hub', 'dockerhub'],
-    ci: [/docker\/login-action/i] },
-  analytics: { providers: ['posthog', 'plausible', 'umami', 'google-analytics'], words: ['posthog', 'plausible', 'umami', 'analytics'], ci: [] },
-  'error-tracking': { providers: ['sentry', 'glitchtip'], words: ['sentry', 'glitchtip'], ci: [/getsentry\/action-release/i, /\bSENTRY_AUTH_TOKEN\b/] },
-};
 /** Every finding code this check can emit. */
 export const CODES = [
   'STACKS_DECLARATION_MISSING', 'STACKS_DECLARATION_INVALID', 'STACKS_SERVICES_MISSING',
@@ -73,11 +61,9 @@ export const CODES = [
   'CI_DECLARATION_INVALID', 'STACKS_CI_LEGACY_FORM',
   'STACKS_EXAMPLE_FORM', 'STACKS_PRODUCT_FORM', 'HFS_STACKS_SHAPE',
 ];
-/** A plaintext value file inside infra/** (compose, terraform): env files, keys, certificates, tfvars. */
 /** Paths (under <root>/<environment>/) the ignore rules must deny; they need not exist. */
 const INFRA_VALUE_PROBES = ['infra/compose/.env', 'infra/compose/.env.generated', 'infra/compose/service/.env.local',
   'infra/compose/tls.key', 'infra/terraform/terraform.tfvars'];
-// ---- schema ---------------------------------------------------------------------------------------------
 let schemaCache = null;
 function declarationSchema() {
   if (!schemaCache) schemaCache = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'schemas', 'application-stacks.schema.yaml'), 'utf8'));
@@ -290,19 +276,6 @@ const checkEnabledService = (service, id, at, { governing, name, ciUses, ciText,
   if (!service.projects.length) ambiguous('an enabled service lists the project key of every repository it serves');
   checkServiceCi(service, id, at, { governing, name, ciUses, ciText, add, ambiguous });
 };
-const checkServiceForm = (service, id, entry, at, kind, add, ambiguous) => {
-  if (service.provider && !SERVICE_CATALOG[id].providers.includes(service.provider))
-    add('refuse', 'STACKS_PROVIDER_UNKNOWN', `${at}.provider`, `${service.provider} is not a ${id} provider (${SERVICE_CATALOG[id].providers.join(', ')})`);
-  if (Object.hasOwn(entry?.ci ?? {}, 'secrets') || Object.hasOwn(entry?.ci ?? {}, 'vars'))
-    add('suspect', 'STACKS_CI_LEGACY_FORM', `${at}.ci`, 'move the names to the top-level ci block and name them by services.<id>.ci.token / hostVar');
-  if (id === 'sonar' && service.provider === 'sonarcloud' && !service.organization
-    && !(kind === 'example' && service.runtimeSecrets.length && !service.credentials.length && service.ci.organizationVar))
-    ambiguous('provider sonarcloud requires organization; the runtime example form may use ci.organizationVar');
-  if (kind === 'example' && id === 'sonar' && service.provider !== 'sonarcloud')
-    add('refuse', 'STACKS_EXAMPLE_FORM', at, 'an example sonar provider must be sonarcloud');
-  if (kind === 'example' && id === 'codecov' && (service.auth !== 'oidc' || service.ci.token))
-    add('refuse', 'STACKS_EXAMPLE_FORM', at, 'an example codecov service uses auth oidc without a token');
-};
 const checkService = (id, entry, { schema, declFile, declaration, governing, name, ciUses, ciText, normalized, add, kind }) => {
   if (!Object.hasOwn(SERVICE_CATALOG, id)) {
     add('refuse', 'STACKS_SERVICE_UNKNOWN', `${declFile}#services.${id}`, `${id} is not a catalogued service (${Object.keys(SERVICE_CATALOG).join(', ')}); a service the catalog does not know is one nobody can read unambiguously`);
@@ -316,12 +289,7 @@ const checkService = (id, entry, { schema, declFile, declaration, governing, nam
   const ambiguous = (message) => add('refuse', 'STACKS_SERVICE_AMBIGUOUS', at, message);
   checkServiceForm(service, id, entry, at, kind, add, ambiguous);
   if (checkDisabledService(service, id, at, ciUses, ambiguous, add)) return;
-  if (['codecov', 'dependabot', 'audit'].includes(id)) {
-    if (id === 'codecov' && !['oidc', 'token'].includes(service.auth)) ambiguous('codecov auth must be oidc or token');
-    if (id === 'codecov' && service.auth === 'token' && !service.ci.token) ambiguous('codecov auth token requires ci.token');
-    checkServiceCi(service, id, at, { governing, name, ciUses, ciText, add, ambiguous });
-    return;
-  }
+  if (checkQualityService(service, id, at, { governing, name, ciUses, ciText, add, ambiguous }, checkServiceCi)) return;
   checkEnabledService(service, id, at, { governing, name, ciUses, ciText, add, kind }, ambiguous);
 };
 const checkUndeclared = ({ repo, ciUses, normalized, services, declFile, add }) => {
@@ -439,10 +407,6 @@ const checkDeclarationIgnore = (own, repo, shown, add) => {
     if (ignored?.status === 0) add('suspect', 'STACKS_DECLARATION_IGNORED', shown(own.file), `the ignore rules hide the declaration; re-include it (!${slash(path.relative(repo, own.file))}) so every machine reads the same services`);
   }
 };
-/** Examples may document optional workflow secret names, but never a Codecov token or a required extra secret. */
-function forbiddenExampleSecret(item) {
-  return item.name === ('CODECOV' + '_TOKEN') || (item.name !== 'SONAR_TOKEN' && item.optional !== true);
-}
 /**
  * The whole check for one repository. `newRepo`: the leg creates this repository, so what it lacks is
  * refused under the current declaration and custody rules.
@@ -456,14 +420,7 @@ export function checkStarciStacks(repoRoot, { newRepo = false, examplesRoot = pa
   const governing = own.missing ? governingDeclaration(repo) : null;
   const shown = (file) => slash(path.relative(repo, file)) || '.';
   const { declaration, services, declFile } = declarationView(own, governing, missingLevel, shown, add);
-  if (declaration?.doc && Object.hasOwn(declaration.doc, 'ci')) {
-    for (const issue of schemaErrors(declaration.doc.ci, declarationSchema().$defs.ciDeclaration, 'ci'))
-      add('refuse', 'CI_DECLARATION_INVALID', `${declFile}#${issue.path}`, issue.message);
-    const ci = readCiDeclaration(declaration.doc);
-    for (const problem of ci.problems) add('refuse', problem.code, `${declFile}#${problem.at}`, problem.message);
-    if (kindOf(repo, examplesRoot) === 'example' && ci.secrets.some(forbiddenExampleSecret))
-      add('refuse', 'STACKS_EXAMPLE_FORM', `${declFile}#ci.secrets`, 'STACKS_EXAMPLE_FORM: an example declares CI secrets other than SONAR_TOKEN only with optional: true to document workflow names; no Codecov token or stored credentials');
-  }
+  checkCiDeclaration(declaration, declFile, kindOf(repo, examplesRoot), declarationSchema, schemaErrors, add);
   // CI evidence: which services the workflows call, and which secret/variable names they read.
   const workflows = workflowTexts(repo);
   const ciText = workflows.map((workflow) => workflow.text).join('\n');

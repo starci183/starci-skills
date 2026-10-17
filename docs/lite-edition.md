@@ -204,7 +204,7 @@ R215 applies in lite and full. `DB_DEFINER_SAFE` requires pinned search paths, s
 <a id="r216"></a>
 R216 applies in lite and full. `DB_CONFIG_POLICY` rejects literal credentials, excessive JWT lifetime and authentication settings that contradict hfs.json. `DB_TYPES_DRIFT` rejects missing or stale committed generated database types; regenerate them from the migrations with the app's contract emitter. The opt-in `check --db-types` path compares freshly emitted text without rewriting the committed file.
 
-`HFS_EMIT_DB_TYPES_STALE` refuses type emission unless the complete applied local migration version set equals the SQL filename stamps in `supabase/migrations`. Run `npm run db:reset`, then `starci app emit`. Lint and check report type drift without writing `supabase/types`.
+`HFS_EMIT_DB_TYPES_STALE` refuses type emission unless the complete applied local migration version set equals the SQL filename stamps in `supabase/migrations`. Inspect drift with `starci app db plan --local`, reconcile the local database with the migration files, then run `starci app emit`. Lint and check report type drift without writing `supabase/types`.
 
 ## Edition validation
 

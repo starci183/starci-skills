@@ -143,7 +143,6 @@ services:
     projects: [{repository: ecommerce-app, key: ecommerce-app}]
     ci:
       wiring: optional-follow-up
-      workflow: .github/workflows/stack-deploy.yml
       provisioning: The public example has no deploy images; a real app grants packages write to its automatic GitHub workflow token.
     ownerAction: none
 k8s:

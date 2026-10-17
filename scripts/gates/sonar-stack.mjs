@@ -4,6 +4,7 @@
 // passes it to the child, never on argv, never in a file, never in the report. A missing variable is a typed refusal naming it.
 import path from 'node:path';
 import {setTimeout as delay} from 'node:timers/promises';
+import {composeStop} from '../api/docker/compose-stop.mjs';
 import {runProgram} from '../api/process/run-program.mjs';
 import {STACK_VARIABLES,hostSecretRefusal,missingVariables} from './sonar-host-secrets.mjs';
 
@@ -15,6 +16,7 @@ function stackCompose(cfg,command,files,env,publicTunnel){
   const profiles=publicTunnel?['public']:[];
   const custom=cfg.stackRun.composeRunner?.[command];
   if(custom)return custom({files,projectName:'starci',wait:false,profiles},{cwd:cfg.stackRun.extRoot,docker:cfg.docker,env});
+  if(command==='stop')return composeStop({files,projectName:'starci',profiles},{cwd:cfg.stackRun.extRoot,docker:cfg.docker,env,spawn:cfg.stackRun.spawn});
   return stackSpawn(cfg,['compose','--project-directory',cfg.stackRun.extRoot,...files.flatMap(file=>['-f',file]),
     '--project-name','starci',...profiles.flatMap(profile=>['--profile',profile]),command,...(command==='up'?['-d']:[])],env,command==='up'?150000:120000);
 }

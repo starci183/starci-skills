@@ -71,5 +71,5 @@ services:
     host: {public: 'https://ghcr.io'}
     auth: github-token
     projects: [{repository: shape-slot, key: shape-slot}]
-    ci: {wiring: optional-follow-up, workflow: .github/workflows/stack-deploy.yml}
+    ci: {wiring: optional-follow-up}
     ownerAction: none

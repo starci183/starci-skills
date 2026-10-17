@@ -238,5 +238,5 @@ services:
     host: {public: https://ghcr.io}
     auth: github-token
     projects: [{repository: "{{project}}", key: "{{project}}"}]
-    ci: {wiring: optional-follow-up, workflow: .github/workflows/images.yml}
+    ci: {wiring: optional-follow-up}
     ownerAction: none

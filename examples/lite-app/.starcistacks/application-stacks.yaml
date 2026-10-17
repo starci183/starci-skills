@@ -242,5 +242,5 @@ services:
     auth: github-token
     projects:
       - {repository: lite-app, key: lite-app}
-    ci: {wiring: optional-follow-up, workflow: .github/workflows/stack-deploy.yml}
+    ci: {wiring: optional-follow-up}
     ownerAction: none
