@@ -12,6 +12,24 @@ import { sonarCloudFindings } from './release-sonarcloud.mjs';
 import { buildPlan, planSummary } from '../gates/release-plan.mjs';
 import { npmRegistry } from '../gates/release-registry.mjs';
 import { leftoversRefusal } from '../gates/release-leftovers.mjs';
+import { ghSpawn } from '../api/gh/lib.mjs';
+import { ciPolicy } from './release-ci-rows.mjs';
+import { readCiOverride } from './release-ci-override.mjs';
+
+/** A cut requires the newest completed main CI run to succeed, or both owner override proofs for that run's SHA; unreadable CI never permits a cut. */
+export function ciPreflight({ repo, deps = {} }) {
+  try {
+    const reply = (deps.gh ?? ghSpawn)(['run', 'list', '--workflow', ciPolicy().workflow, '--branch', 'main', '--status', 'completed', '--limit', '1', '--json', 'databaseId,status,conclusion,url,headSha,createdAt'], { cwd: repo });
+    const runs = reply.status === 0 ? JSON.parse(reply.stdout) : null;
+    const run = Array.isArray(runs) ? runs[0] : null;
+    if (!run || run.status !== 'completed' || !/^[a-f0-9]{40}$/.test(run.headSha) || !run.url || !run.conclusion) throw new Error('no readable completed CI run on main');
+    if (run.conclusion === 'success') return null;
+    if (readCiOverride({ repo, sha: run.headSha, commonDir: deps.commonDir, requireRuling: true })) return null;
+    return { verdict: 'RELEASE_CI_RED', why: `RELEASE_CI_RED: latest completed main CI is ${run.conclusion}: ${run.url} headSha ${run.headSha}; the owner may use starci release ci-override`, findings: [] };
+  } catch {
+    return { verdict: 'RELEASE_CI_UNKNOWN', why: 'RELEASE_CI_UNKNOWN: cannot read the latest completed main CI run; a cut must not proceed blind', findings: [] };
+  }
+}
 
 /** The head the remote main points at ('' for a remote with no main), or null when the remote cannot be read. */
 function remoteMainHead({ run, cwd, remote, branch }) {
@@ -44,9 +62,9 @@ export function publishPlanRefusal({ repo, deps = {} }) {
   return { verdict: 'publish-plan', why: `the publish plan (starci release check) is not clean: ${findings.join('; ')}`, findings };
 }
 
-/** The refusal of a cut before any suite runs: leftovers in the checkout, the release definition, the publish plan, then SonarCloud (only when a Sonar proof will run); null when none refuses. */
+/** The refusal of a cut before any suite runs: latest completed main CI, leftovers in the checkout, the release definition, the publish plan, then SonarCloud (only when a Sonar proof will run); null when none refuses. */
 export async function preSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps = {}, sonar = true }) {
-  return leftoversRefusal({ repo, deps }) ?? definitionRefusal({ run, cwd, head, remote, branch, tag, deps }) ?? publishPlanRefusal({ repo, deps }) ?? (sonar ? await sonarCloudRefusal({ repo, deps }) : null);
+  return ciPreflight({ repo, deps }) ?? leftoversRefusal({ repo, deps }) ?? definitionRefusal({ run, cwd, head, remote, branch, tag, deps }) ?? publishPlanRefusal({ repo, deps }) ?? (sonar ? await sonarCloudRefusal({ repo, deps }) : null);
 }
 
 /** The result of `release cut --plan`: every row of the cut with what happens to it (run, or stand in from this commit or an earlier one, and why), the push it makes, the record the pre-push hook then asks for. */

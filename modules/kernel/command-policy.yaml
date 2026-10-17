@@ -78,7 +78,7 @@ op:
   use: "an Op runs the capability verbs of its work (starci app stack for servers, starci work draw-render for renders, starci work imagegen for images, starci gate unit for tests) and reports to its Kernel with starci kernel report"
 # Release path: refused to every bound role.
 release:
-  verbs: [cut, publish]
+  verbs: [cut, publish, ci-override]
   scripts: [release:cut, release:publish]
   use: starci release cut is owner-approved and moves main plus its tag; starci release publish publishes packages from that release; starci release notes prints or writes a tag CHANGELOG section and is not owner-gated
 # Programs that cannot change state, with any arguments.
