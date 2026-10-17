@@ -8,9 +8,11 @@
 // Before the run it prepares the built output the source canon registry packs (it packs with --ignore-scripts, so a package's prepack never builds it): the
 // grammar dist (scripts/gates/grammar-build.mjs) when it is not fresh, and the heroicons dist when it is missing or older than its source, each from its own
 // lockfile install. A fresh lane and CI therefore need no separate build step.
+// It also prepares test-world's own node_modules with lifecycle scripts disabled, refusing borrowed installs through links.
 //
 //   starci release scaffold-e2e        exit 0 every test passed and none skipped, 1 a test failed, was cancelled or skipped, 2 the run could not start
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runNode } from '../api/node/run-node.mjs';
@@ -24,6 +26,8 @@ import { runNpm } from '../api/npm/run-npm.mjs';
 import { walkFiles } from '../lib/walk.mjs';
 import { buildGrammar } from './grammar-build.mjs';
 import { grammarDistStatus } from './grammar-dist.mjs';
+import { linkedNodeModules } from '../machine/npm-ci.mjs';
+import { withoutSeatEnv } from '../lib/seat-env.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 /** The scaffold e2e files, run in this order (each is its own test process). */
@@ -55,9 +59,43 @@ function prepareGrammar(root, env) {
   return built.ok ? { ok: true, detail: 'grammar dist built' } : { ok: false, detail: `grammar ${built.step}: ${built.detail}` };
 }
 
-/** The built output the source canon registry packs, prepared before the run: {ok, lines}. `deps` replaces the two steps. */
-function prepareE2e({ root = runtimeRoot, env = process.env, deps = {} } = {}) {
-  const steps = [(deps.grammar ?? prepareGrammar)(root, env), (deps.heroicons ?? prepareHeroicons)(root, env)];
+/** The hidden npm install record, or null for a missing or unreadable record. */
+function testWorldInstallRecord(dir) {
+  try { return JSON.parse(fs.readFileSync(path.join(dir, 'node_modules', '.package-lock.json'), 'utf8')); } catch { return null; }
+}
+
+/** A local test-world install is stale when absent, older than its lockfile, or its recorded SHA-256 lock hash differs. Older npm records without a hash remain usable by timestamp. */
+function testWorldInstallStale(dir, hash, record) {
+  const modules = path.join(dir, 'node_modules');
+  if (!fs.existsSync(modules) || !record) return true;
+  if (fs.statSync(modules).mtimeMs < fs.statSync(path.join(dir, 'package-lock.json')).mtimeMs) return true;
+  return record.starciLockHash !== undefined && record.starciLockHash !== hash;
+}
+
+/** Prepare only test-world's local lockfile install; the injected npm call never uses a shell and no linked node_modules is read or installed through. */
+export function prepareTestWorld(root, env = process.env, deps = {}) {
+  const dir = path.join(root, 'packages', 'test-world');
+  const fail = (code, detail) => ({ ok: false, detail: `${code}: test-world ${detail}` });
+  const link = linkedNodeModules(dir, deps.lstat ?? fs.lstatSync);
+  if (!link.ok) return fail('SCAFFOLD_E2E_TEST_WORLD_PREPARE', `cannot inspect node_modules: ${link.error}`);
+  if (link.linked) return fail('RT_NODE_MODULES_LINK', 'node_modules is a junction or symbolic link; remove it before preparation');
+  try {
+    const hash = createHash('sha256').update(fs.readFileSync(path.join(dir, 'package-lock.json'))).digest('hex');
+    if (!testWorldInstallStale(dir, hash, testWorldInstallRecord(dir))) return { ok: true, detail: 'test-world node_modules fresh' };
+    const install = (deps.runNpm ?? runNpm)(['ci', '--ignore-scripts'], { cwd: dir, env: withoutSeatEnv(env), timeout: 900_000 });
+    if (install.error || install.status !== 0) return fail('SCAFFOLD_E2E_TEST_WORLD_PREPARE', `npm ci --ignore-scripts exit ${install.status ?? install.error?.message}: ${String(install.stderr ?? '').slice(0, 200)}`);
+    const record = testWorldInstallRecord(dir);
+    if (!record) return fail('SCAFFOLD_E2E_TEST_WORLD_PREPARE', 'npm ci did not produce node_modules/.package-lock.json');
+    fs.writeFileSync(path.join(dir, 'node_modules', '.package-lock.json'), `${JSON.stringify({ ...record, starciLockHash: hash }, null, 2)}\n`);
+    return { ok: true, detail: 'test-world node_modules prepared (npm ci --ignore-scripts)' };
+  } catch (error) {
+    return fail('SCAFFOLD_E2E_TEST_WORLD_PREPARE', String(error?.message ?? error));
+  }
+}
+
+/** The built output and test-world dependencies prepared before the run: {ok, lines}. `deps` replaces each preparation step. */
+export function prepareE2e({ root = runtimeRoot, env = process.env, deps = {} } = {}) {
+  const steps = [(deps.grammar ?? prepareGrammar)(root, env), (deps.heroicons ?? prepareHeroicons)(root, env), (deps.testWorld ?? prepareTestWorld)(root, env)];
   return { ok: steps.every((step) => step.ok), lines: steps.map((step) => step.detail) };
 }
 
@@ -77,6 +115,7 @@ function e2eVerdict(status, summary) {
 export function runScaffoldE2e({ root = runtimeRoot, env = process.env, stdio = 'pipe', deps = {} } = {}) {
   const node = deps.runNode ?? runNode;
   const prepared = (deps.prepare ?? prepareE2e)({ root, env });
+  for (const line of prepared.lines) (deps.progress ?? ((text) => process.stdout.write(`scaffold-e2e: ${text}\n`)))(line);
   if (!prepared.ok) return { ok: false, unrun: true, pass: 0, total: 0, failed: 0, skipped: 0, failing: [], ms: 0, output: '', line: `scaffold-e2e: the preparation failed (${prepared.lines.join('; ')})` };
   const dir = makeTempDir('scaffold-e2e-');
   const tapFile = path.join(dir, 'e2e.tap');
