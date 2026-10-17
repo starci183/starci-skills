@@ -152,10 +152,31 @@ jobs:
       # tsc over be/, then turbo typecheck over every fe workspace (the packages are built first: ^build).
       - name: Typecheck both sides
         run: npm run typecheck
-      # The app lint runs in a temporary copy with fresh sealed members; only its Sonar report returns to the source tree.
-      - name: starci app lint
+      # The app lint runs per side with a 6 GB heap, as the rendered app CI does (the CI standard, knowledge/hfs/ci-standard.yaml: sonar-lint-per-side, heap-per-step),
+      # each in a temporary copy with fresh sealed members; only its Sonar report returns to the source tree, and the two reports merge into the one
+      # reports/lint.sonar.json the Sonar scan imports.
+      - name: starci app lint be
         working-directory: .
-        run: node packages/cli/bin/starci.mjs runtime example-secrets --run "$APP_DIR" -- node "$GITHUB_WORKSPACE/packages/cli/bin/starci.mjs" app lint --cwd . --sonar reports/lint.sonar.json
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: node packages/cli/bin/starci.mjs runtime example-secrets --run "$APP_DIR" -- node "$GITHUB_WORKSPACE/packages/cli/bin/starci.mjs" app lint --cwd . --side be --sonar reports/lint.be.sonar.json
+      - name: starci app lint fe
+        working-directory: .
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: node packages/cli/bin/starci.mjs runtime example-secrets --run "$APP_DIR" -- node "$GITHUB_WORKSPACE/packages/cli/bin/starci.mjs" app lint --cwd . --side fe --sonar reports/lint.fe.sonar.json
+      - name: merge Sonar lint reports
+        if: ${{ !cancelled() }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const files = ['reports/lint.be.sonar.json', 'reports/lint.fe.sonar.json'];
+          const reports = files.filter(file => fs.existsSync(file)).map(file => JSON.parse(fs.readFileSync(file, 'utf8')));
+          const rules = [...new Map(reports.flatMap(report => report.rules).map(rule => [rule.id, rule])).values()];
+          const issues = reports.flatMap(report => report.issues);
+          fs.mkdirSync('reports', { recursive: true });
+          fs.writeFileSync('reports/lint.sonar.json', JSON.stringify({ rules, issues }, null, 2) + '\n');
+          NODE
       - name: Unit tests with coverage (per-file 100 on the logic of be/src/modules/**; writes be/coverage/lcov.info)
         if: ${{ !cancelled() && steps.policy.outputs.tests == 'true' }}
         run: npm test -- --ci
