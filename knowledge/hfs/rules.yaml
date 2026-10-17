@@ -1782,9 +1782,9 @@ rules:
       - {kind: eslint-be, id: public-contract-form}
     editions: ["lite","full"]
     docs: ["docs/be-shape-coverage.md#r89"]
-    proves: [{"path":"packages/eslint/be/r89-source-form-coverage.spec.mjs","editions":["lite","full"]}]
-    exemplifiedBy: [{"path":"packages/hfs/templates/be/patterns/api/graphql.input.ts.tpl","editions":["lite","full"]},{"path":"packages/eslint/be/r89-source-form-coverage.spec.mjs","editions":["lite","full"]}]
-    witness: [{"path":"packages/eslint/be/r89-source-form-coverage.spec.mjs","edition":"lite","codes":["BE_SOURCE_FORM","BE_PUBLIC_CONTRACT_FORM"]},{"path":"packages/eslint/be/r89-source-form-coverage.spec.mjs","edition":"full","codes":["BE_SOURCE_FORM","BE_PUBLIC_CONTRACT_FORM"]}]
+    proves: [{"path":"tests/hfs-proofs/be-r89-source-form-coverage.spec.mjs","editions":["lite","full"]}]
+    exemplifiedBy: [{"path":"packages/hfs/templates/be/patterns/api/graphql.input.ts.tpl","editions":["lite","full"]},{"path":"tests/hfs-proofs/be-r89-source-form-coverage.spec.mjs","editions":["lite","full"]}]
+    witness: [{"path":"tests/hfs-proofs/be-r89-source-form-coverage.spec.mjs","edition":"lite","codes":["BE_SOURCE_FORM","BE_PUBLIC_CONTRACT_FORM"]},{"path":"tests/hfs-proofs/be-r89-source-form-coverage.spec.mjs","edition":"full","codes":["BE_SOURCE_FORM","BE_PUBLIC_CONTRACT_FORM"]}]
     gates: ["pre-commit","settle","land","ci"]
   - id: R90
     code: "BE_INFRA_OWNER"
@@ -4691,11 +4691,14 @@ rules:
       - {"path":"packages/hfs/templates/be/skeleton/src/features/api/system-health/transport/http/ready.controller.ts","editions":["lite","full"]}
       - {"path":"packages/hfs/templates/be/skeleton/src/modules/platform/http-security/readiness.service.ts","editions":["lite","full"]}
       - {"path":"packages/hfs/templates/be/image/api/Dockerfile","editions":["lite","full"]}
-      - {"path":"packages/eslint/be/health-ready.spec.mjs","editions":["lite","full"],"codes":["BE_READY_REAL","BE_HEALTH_SIGNALS","HFS_DOCKER_HEALTHCHECK_FAKE"]}
+      - {"path":"packages/eslint/be/health-ready.spec.mjs","editions":["lite","full"],"codes":["BE_READY_REAL","BE_HEALTH_SIGNALS"]}
+      - {"path":"tests/hfs-proofs/be-docker-health.spec.mjs","editions":["lite","full"],"codes":["HFS_DOCKER_HEALTHCHECK_FAKE"]}
     proves:
-      - "packages/eslint/be/health-ready.spec.mjs"
+      - {"path":"packages/eslint/be/health-ready.spec.mjs","editions":["lite","full"],"codes":["BE_READY_REAL","BE_HEALTH_SIGNALS"]}
+      - {"path":"tests/hfs-proofs/be-docker-health.spec.mjs","editions":["lite","full"],"codes":["HFS_DOCKER_HEALTHCHECK_FAKE"]}
     witness:
-      - {"path":"packages/eslint/be/health-ready.spec.mjs","editions":["lite","full"],"codes":["BE_READY_REAL","BE_HEALTH_SIGNALS","HFS_DOCKER_HEALTHCHECK_FAKE"]}
+      - {"path":"packages/eslint/be/health-ready.spec.mjs","editions":["lite","full"],"codes":["BE_READY_REAL","BE_HEALTH_SIGNALS"]}
+      - {"path":"tests/hfs-proofs/be-docker-health.spec.mjs","editions":["lite","full"],"codes":["HFS_DOCKER_HEALTHCHECK_FAKE"]}
 
   - id: R263
     code: "BE_WEBHOOK_SCOPE"
