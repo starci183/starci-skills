@@ -2,6 +2,7 @@
 // `starci release cut`: the entry of cutRelease (scripts/supervisor/release-cut.mjs), the only path that pushes main and a release tag.
 import path from 'node:path';
 import process from 'node:process';
+import { cliInput } from '../lib/cli-input.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { cutRelease } from './release-cut.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -27,10 +28,9 @@ export function parseArgs(argv) {
 
 /** Run the release cut: exit 0 when the release was cut (or would be, by the result's own verdict), 1 when it was refused, 2 on bad usage. */
 export async function main(argv = process.argv.slice(2), io = {}) {
-  const write = io.stdout ?? ((text) => process.stdout.write(text));
-  const fail = io.stderr ?? ((text) => process.stderr.write(text));
-  let options;
-  try { options = parseArgs(argv); } catch (error) { fail(`starci release cut: ${error.message}\n`); return 2; }
+  const input = cliInput(argv, io, parseArgs, 'starci release cut');
+  if (!input) return 2;
+  const { options, write } = input;
   const cut = io.cutRelease ?? cutRelease;
   const result = await cut({ repo: path.resolve(options.repo ?? skillRoot), remote: options.remote, branch: options.branch, tag: options.tag ?? null, plan: options.plan === true, rows: options.rows ? options.rows.split(',').map((row) => row.trim()).filter(Boolean) : null, reuse: options['no-reuse'] !== true });
   let output;

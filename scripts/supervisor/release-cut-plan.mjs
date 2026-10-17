@@ -12,14 +12,14 @@ import { sonarCloudFindings } from './release-sonarcloud.mjs';
 import { buildPlan, planSummary } from '../gates/release-plan.mjs';
 import { npmRegistry } from '../gates/release-registry.mjs';
 import { leftoversRefusal } from '../gates/release-leftovers.mjs';
-import { ghSpawn } from '../api/gh/lib.mjs';
+import { workflowRuns } from '../api/gh/workflow-runs.mjs';
 import { ciPolicy } from './release-ci-rows.mjs';
 import { readCiOverride } from './release-ci-override.mjs';
 
 /** A cut requires the newest completed main CI run to succeed, or both owner override proofs for that run's SHA; unreadable CI never permits a cut. */
-export function ciPreflight({ repo, deps = {} }) {
+function ciPreflight({ repo, deps = {} }) {
   try {
-    const reply = (deps.gh ?? ghSpawn)(['run', 'list', '--workflow', ciPolicy().workflow, '--branch', 'main', '--status', 'completed', '--limit', '1', '--json', 'databaseId,status,conclusion,url,headSha,createdAt'], { cwd: repo });
+    const reply = (deps.workflowRuns ?? workflowRuns)({ workflow: ciPolicy().workflow, branch: 'main', status: 'completed', limit: 1 }, { cwd: repo });
     const runs = reply.status === 0 ? JSON.parse(reply.stdout) : null;
     const run = Array.isArray(runs) ? runs[0] : null;
     if (!run || run.status !== 'completed' || !/^[a-f0-9]{40}$/.test(run.headSha) || !run.url || !run.conclusion) throw new Error('no readable completed CI run on main');

@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import path from 'node:path';
 import process from 'node:process';
+import { cliInput } from '../lib/cli-input.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { invocationDir } from '../lib/roots.mjs';
 import { ciOverride } from './release-ci-override.mjs';
 
 /** Only an exact SHA, a reason and an optional repository are accepted by the owner override verb. */
@@ -19,11 +21,10 @@ export function parseArgs(argv) {
 
 /** Print the exact files written, or the code-first refusal; owner and usage refusals exit 2. */
 export async function main(argv = process.argv.slice(2), io = {}) {
-  const write = io.stdout ?? ((text) => process.stdout.write(text));
-  const fail = io.stderr ?? ((text) => process.stderr.write(text));
-  let args;
-  try { args = parseArgs(argv); } catch (error) { fail(`RELEASE_CI_OVERRIDE_USAGE: ${error.message}\n`); return 2; }
-  const result = await (io.ciOverride ?? ciOverride)({ ...args, repo: path.resolve(args.repo ?? process.cwd()) });
+  const input = cliInput(argv, io, parseArgs, 'RELEASE_CI_OVERRIDE_USAGE');
+  if (!input) return 2;
+  const { options: args, write, fail } = input;
+  const result = await (io.ciOverride ?? ciOverride)({ ...args, repo: path.resolve(args.repo ?? invocationDir()) });
   if (!result.ok) fail(`${result.why}\n`);
   else {
     const ruling = result.ruling ? `\nWrote ${result.ruling}` : '';
