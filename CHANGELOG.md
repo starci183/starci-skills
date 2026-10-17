@@ -26,6 +26,10 @@ This release supersedes the alpha.19 cut, which was never tagged (its push secre
 - `starci release scaffold-e2e` prepares packages/test-world itself (`npm ci --ignore-scripts` when missing or stale) on a fresh worktree.
 - The push secret-scan judges a `*.tpl` template as the file type it renders to (no new exemption).
 - `starci gate sonar up --public` activates the public Compose profile and verifies tunnel readiness; database password mismatch and tunnel failures have scrubbed diagnostics.
+- The managed README badge block is prettier-stable (a blank line inside its markers); the `readme-badges` self-check refuses a runtime or example README the canon prettier config would reformat (RT_README_NOT_PRETTIER). The alpha.20 cut on hfs 4.5.0 was refused on this (HFS_FORMAT in every example's lint, format:check and sonar rows).
+- Rendered app CI (from NIVO's v0.2.2 tag run): every lint job checks out full history and sets STARCI_BASE_REF per event (pull request base, previous tag, push before, else the default branch), so file-size-growth has its base; the build fe step gets the manifest's plain public build values (deploy.images.*.buildArgs.values and release.gates[build-fe].env) as static env, never a secret or an environment; the unit step runs with --forceExit and a cached `.jest-cache`; every rendered job has timeout-minutes.
+- `@starci/jest-preset`: the unit project transpiles each file on its own (isolatedModules), so a 2-vCPU runner no longer builds a type program per test file (type checks stay the typecheck gate); only the compiler-emitted `design:paramtypes` metadata guard injected by the transform is kept out of coverage, never app source.
+- Scaffolded apps declare their public front-end build values (R300) as manifest placeholders; DB type emission reads the Supabase CLI's JSON migration history.
 
 ### Removed
 - The alpha.19 one-release bootstrap accepting a legacy 0/0 affected receipt; verification requires the current package and scaffold proof.

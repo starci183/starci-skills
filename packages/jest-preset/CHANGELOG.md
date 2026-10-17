@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Fixed: coverage excludes only compiler-emitted constructor `design:paramtypes` metadata guards injected by the preset transform; application source is never excluded, and the generated anchor is omitted from LCOV.
+- Changed: unit transforms use isolated transpilation instead of a per-file type program. A bundled ts-jest after-transformer preserves constructor metadata guards while mapping only those generated calls to a dedicated generated-metadata coverage anchor, keeping per-file 100 coverage reachable without hiding source branches. `importHelpers` stays enabled; type checking remains a separate gate. The bundled LCOV reporter gives repeated callback names unique identities so the app coverage gate can verify function totals.
+
 ## 2.3.0 - 2026-10-16
 
 - Added: a declared lite app (the edition of the `hfs.json` above its `be/`) runs its existing integration and contract specs without a test world: those projects exist only when their spec files do, and neither the world runner nor the world global setup and teardown is attached to a lite run.

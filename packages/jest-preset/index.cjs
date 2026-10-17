@@ -72,21 +72,15 @@ function esmDependencyTransform() {
 /** node_modules stay untransformed except the ESM-only dependencies above. */
 const TRANSFORM_IGNORE_PATTERNS = Object.freeze([String.raw`[\\/]node_modules[\\/](?!(?:${ESM_ONLY_DEPENDENCIES.join("|")})[\\/])`])
 
-/**
- * The compiler options the UNIT project overlays on the repository tsconfig (ts-jest merges an inline `tsconfig` object over the
- * `tsconfig.json` it finds under `rootDir`). They exist so that per-file 100 coverage is reachable for a decorated service:
- *  - `isolatedModules: false`: with it on, TypeScript cannot tell whether an imported name is a class, and emits a
- *    `typeof (_a = typeof Dep !== "undefined" && Dep) === "function" ? _a : Object` guard per class-typed constructor parameter for
- *    `design:paramtypes`; the `Object` arm can never run, so the branch stays uncovered. With the full language service the
- *    metadata is emitted as plain `Dep`.
- *  - `importHelpers: true`: the decorator helpers (`__decorate`, `__param`, `__metadata`) come from `tslib`, not inlined per file
- *    with branches of their own. The repository lists `tslib` in its devDependencies.
- * Integration, e2e and contract keep the repository setting: they measure nothing.
- */
-const UNIT_COMPILER_OPTIONS = Object.freeze({ isolatedModules: false, importHelpers: true })
+/** The unit project transpiles each file independently; helpers stay in tslib, source maps distinguish generated metadata, and type checks run separately. */
+const UNIT_COMPILER_OPTIONS = Object.freeze({ isolatedModules: true, importHelpers: true, sourceMap: true })
 
+/** Generated constructor metadata keeps its runtime guards, mapped to a generated-metadata coverage anchor instead of source parameters. */
 function unitTransform() {
-  return transform({ ...UNIT_COMPILER_OPTIONS })
+  const transforms = transform({ ...UNIT_COMPILER_OPTIONS })
+  transforms[TS_TRANSFORM][0] = require.resolve("./unit-metadata.cjs")
+  transforms[TS_TRANSFORM][1].astTransformers = { after: [require.resolve("./unit-metadata.cjs")] }
+  return transforms
 }
 
 /**
@@ -237,7 +231,7 @@ function starciJestConfig(options) {
     coverageThreshold: Object.fromEntries(coverage.roots.map((root) => rootGlob(root, coverage.roles)).filter((glob) => hasCoverageSubjects(process.cwd(), glob)).map((glob) => [`./${glob}`, { ...COVERAGE_THRESHOLD }])),
     coverageDirectory: "coverage",
     // lcov is what Sonar imports (coverage/lcov.info); text-summary and text are what the developer reads.
-    coverageReporters: ["text-summary", "text", "lcov"],
+    coverageReporters: ["text-summary", "text", [require.resolve("./lcov.cjs"), {}]],
     projects: [
       {
         ...shared,

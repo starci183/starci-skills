@@ -189,14 +189,15 @@ test('starciJestConfig is unit + integration + e2e + contract, ts-jest, diagnost
   assert.deepEqual(config.projects.map((p) => p.displayName), ['unit', 'integration', 'e2e', 'contract']);
   for (const project of config.projects) {
     const [name, options] = project.transform[String.raw`^.+\.ts$`];
-    assert.equal(name, 'ts-jest');
+    assert.equal(name, project.displayName === 'unit' ? require.resolve('./unit-metadata.cjs') : 'ts-jest');
     assert.equal(options.diagnostics, false);
+    assert.equal(Boolean(options.astTransformers), project.displayName === 'unit');
     assert.equal('isolatedModules' in options, false, 'the deprecated ts-jest option is not set; the tsconfig carries it');
   }
   // The unit project overlays compiler options over the repository tsconfig; the other projects use the file as it is.
   const [, unit] = config.projects[0].transform[String.raw`^.+\.ts$`];
-  assert.deepEqual(unit.tsconfig, { isolatedModules: false, importHelpers: true });
-  assert.deepEqual(preset.UNIT_COMPILER_OPTIONS, { isolatedModules: false, importHelpers: true });
+  assert.deepEqual(unit.tsconfig, { isolatedModules: true, importHelpers: true, sourceMap: true });
+  assert.deepEqual(preset.UNIT_COMPILER_OPTIONS, { isolatedModules: true, importHelpers: true, sourceMap: true });
   for (const project of config.projects.slice(1)) assert.equal(typeof project.transform[String.raw`^.+\.ts$`][1].tsconfig, 'string');
   assert.equal(new RegExp(String.raw`^.+\.ts$`).test('a.ts'), true);
   assert.equal(new RegExp(String.raw`^.+\.ts$`).test('a.tsx'), false);
@@ -256,7 +257,7 @@ test('each test kind is its own project, matched by folder and suffix together; 
     assert.equal(byName[name].globalTeardown, '<rootDir>/src/tests/world/global-teardown.ts', name);
     assert.equal('setupFilesAfterEnv' in byName[name], false, name);
   }
-  assert.deepEqual(byName.unit.transform[String.raw`^.+\.ts$`][1].tsconfig, { isolatedModules: false, importHelpers: true });
+  assert.deepEqual(byName.unit.transform[String.raw`^.+\.ts$`][1].tsconfig, { isolatedModules: true, importHelpers: true, sourceMap: true });
   assert.equal('globalSetup' in byName.unit, false, 'unit specs need no world');
   assert.equal('runner' in byName.unit, false, 'unit specs run on the stock runner');
   assert.equal(path.basename(preset.WORLD_RUNNER), 'world-runner.cjs');
@@ -302,7 +303,7 @@ test('the unit run writes the lcov Sonar imports, keeps the text summary, and re
   assert.equal(preset.sonarCoverageExclusions, undefined);
   assert.equal(preset.sonarExclusions(), '**/*.spec.ts,**/*.e2e-spec.ts,**/dist/**,**/coverage/**');
   const config = preset.starciJestConfig(OPTIONS);
-  assert.ok(config.coverageReporters.includes('lcov'), 'lcov is the report Sonar imports (sonar.javascript.lcov.reportPaths)');
+  assert.ok(config.coverageReporters.some((reporter) => Array.isArray(reporter) && reporter[0] === require.resolve('./lcov.cjs')), 'lcov is the report Sonar imports (sonar.javascript.lcov.reportPaths)');
   assert.ok(config.coverageReporters.includes('text-summary'));
   assert.equal(config.coverageDirectory, 'coverage');
   // The scope is NOT a constant of the preset: starci app sync derives it from the slot manifest (scripts/hfs/coverage-scope.mjs) into the repository's jest.config.js.
@@ -836,4 +837,27 @@ test('a state file of another test-world protocol is a typed pair mismatch namin
       fs.rmSync(root, { recursive: true, force: true });
     }
   }
+});
+
+
+test('the unit metadata transformer preserves emitted JavaScript and leaves source metadata calls mapped', () => {
+  const ts = require('typescript');
+  const transformer = require('./unit-metadata.cjs');
+  const source = `import { Dep } from "./dep"
+declare function decorate(target: Function): void
+@decorate
+export class Service { constructor(readonly dep: Dep) {} }
+function __metadata(_key: string, value: unknown) { return value }
+__metadata("design:paramtypes", [Math.random() ? Object : String])
+`;
+  const options = { fileName: 'service.ts', compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, experimentalDecorators: true, emitDecoratorMetadata: true, isolatedModules: true, importHelpers: true, sourceMap: true, sourceMap: true } };
+  const original = ts.transpileModule(source, options);
+  const transformed = ts.transpileModule(source, { ...options, transformers: { after: [transformer.factory({ configSet: { compilerModule: ts } })] } });
+  assert.equal(transformed.outputText, original.outputText, 'runtime behavior is byte-for-byte unchanged');
+  assert.notEqual(transformed.sourceMapText, original.sourceMapText);
+  assert.match(transformed.outputText, /typeof .*Dep/);
+  const sourceCall = 'function __metadata(_key: string, value: unknown) { return value }; __metadata("design:paramtypes", [Math.random() ? Object : String])';
+  const sourceOriginal = ts.transpileModule(sourceCall, options);
+  const sourceTransformed = ts.transpileModule(sourceCall, { ...options, transformers: { after: [transformer.factory({ configSet: { compilerModule: ts } })] } });
+  assert.equal(sourceTransformed.sourceMapText, sourceOriginal.sourceMapText, 'source metadata calls keep every mapping');
 });

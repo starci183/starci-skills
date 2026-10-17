@@ -36,11 +36,14 @@ and the exclusions. A repository has no other jest setting to tune.
   `{ lines: 100, branches: 100, functions: 100, statements: 100 }` on each of those globs — a glob key applies to each file on its own, so every file of a
   `ruleParams.be.logicRoles` role inside a measured slot must reach 100 on every metric (an average never passes). The
   managed `test` script runs the unit project with `--coverage` and fails below it. Coverage is measured by v8, which counts the
-  real source. The unit project overlays `isolatedModules: false` and `importHelpers: true` on the repository tsconfig (ts-jest merges an
-  inline `tsconfig` object over the `tsconfig.json` it finds): with `isolatedModules` on, TypeScript emits an unreachable
-  `typeof Dep !== "undefined" ? Dep : Object` guard per class-typed constructor parameter, and inlined decorator helpers carry branches
-  of their own, so 100 would be unreachable. The repository lists `tslib` in its devDependencies (`UNIT_COMPILER_OPTIONS`). Reporters are `text-summary`,
-  `text` and `lcov`: the run writes `coverage/lcov.info` under the repository (be/) root.
+  real source. The unit project overlays `isolatedModules: true`, `importHelpers: true` and `sourceMap: true` on the repository tsconfig, so ts-jest
+  transpiles each file without building a type program. `unit-metadata.cjs`, a ts-jest wrapper and after-transformer, maps
+  only synthetic `typeof value === "function" ? value : Object` guards inside TypeScript's generated `__metadata("design:paramtypes", ...)` calls to the dedicated `unit-metadata.generated.cjs` coverage anchor. Their runtime guards remain unchanged, including
+  the fallback to `Object` for an undefined or non-class dependency; generated branches are not attributed to source parameters.
+  The wrapper restores that second source after ts-jest emits its map. The anchor ignores generated guards only and is omitted from LCOV. Application source calls and guards remain measured. Source maps are enabled even when the build config disables them.
+  Source conditionals, including branches on the same constructor line, still count toward per-file 100 coverage. Decorator helpers
+  come from `tslib`, which the repository lists in its devDependencies (`UNIT_COMPILER_OPTIONS`). Reporters are `text-summary`,
+  `text` and the bundled LCOV reporter (which gives same-named callbacks unique function identities): the run writes `coverage/lcov.info` under the repository (be/) root.
 - **Sonar and Codecov import that lcov, scoped to the same measured files.** `starci app sync` renders `sonar.coverage.exclusions` (the complement of the measured files: SonarQube has no coverage inclusions) and the `codecov.yml`
   status paths and components from the one derivation (`scripts/hfs/coverage-scope.mjs`), so jest, Sonar and Codecov measure the same files;
   the Sonar gate holds coverage at 100 overall, on new code and per file. `sonarExclusions()` still renders `sonar.exclusions`
