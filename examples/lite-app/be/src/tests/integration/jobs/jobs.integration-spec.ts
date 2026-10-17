@@ -1,48 +1,15 @@
 import assert from "node:assert/strict"
-import { FakeClock, fakeIds, mock } from "@starci/jest-preset"
 import type { ClaimedJob, FencedProcessor } from "@modules/platform/jobs"
-import { JobClaimService } from "@modules/platform/jobs/job-claim.service"
-import { JobRunnerService } from "@modules/platform/jobs/job-runner.service"
-import { JobsLogEvent } from "@modules/platform/jobs/jobs.log-events"
-import type { Logger } from "@modules/platform/logging"
-import type { QueueDelivery, QueueWorkerRegistry } from "@modules/platform/queue"
-import { createJobsDatabaseWorld } from "../../world/jobs.database.builder"
+import { useTestWorld, TestWorldError, TestWorldErrorCode } from "../../world"
+import { createJobsProof } from "../../world"
 
 const LEASE_MS = 100
-const database = createJobsDatabaseWorld(fakeIds())
-
-const build = (scenario: string) => {
-    const delivery: QueueDelivery = {
-        id: database.key(scenario),
-        queue: "receipt",
-        payload: { id: "order-1" },
-        attempt: 1,
-    }
-    const clock = new FakeClock("2026-10-14T00:00:00.000Z")
-    const claims = new JobClaimService([database.manager], clock)
-    const successorClaims = new JobClaimService([database.manager], clock)
-    const logger = mock<Logger>()
-    const runner = new JobRunnerService(
-        { connection: "primary", workerId: "worker-1", leaseMs: LEASE_MS },
-        claims,
-        mock<QueueWorkerRegistry>(),
-        logger,
-    )
-    const claim = (worker: JobClaimService, workerId: string) =>
-        worker.claim({
-            kind: delivery.queue,
-            jobKey: delivery.id,
-            payload: delivery.payload,
-            workerId,
-            leaseMs: LEASE_MS,
-        })
-    return { clock, claims, successorClaims, logger, runner, claim, delivery }
-}
+const world = useTestWorld({ modules: createJobsProof, rollback: true })
 
 /** Collaboration proofs use the real claim and runner services and the migrated local Supabase job table. */
 const registerClaimProof = () => {
     it("fenced-job/claim-bumps-token: a live lease blocks a second worker and expiration advances the same row's token", async () => {
-        const { clock, claims, successorClaims, claim, delivery } = build("claim")
+        const { clock, claims, successorClaims, claim, delivery } = world.modules.build("claim")
         const results = await Promise.all([claim(claims, "worker-1"), claim(successorClaims, "worker-2")])
         const first = results.find((job) => job !== null)
         assert(first !== undefined && first !== null)
@@ -57,7 +24,10 @@ const registerClaimProof = () => {
 
         expect(successor.jobId).toBe(first.jobId)
         expect(successor.fencingToken).toBe(first.fencingToken + 1)
-        expect(await database.snapshot(delivery.id)).toMatchObject({ status: "running", fencing_token: "2" })
+        expect(await world.modules.database.snapshot(delivery.id)).toMatchObject({
+            status: "running",
+            fencing_token: "2",
+        })
         await successorClaims.complete({ jobId: successor.jobId, expectedFencingToken: successor.fencingToken })
         clock.advance(LEASE_MS + 1)
         expect(await claim(claims, "worker-1")).toBeNull()
@@ -66,7 +36,7 @@ const registerClaimProof = () => {
 
 const registerZombieProof = () => {
     it("fenced-job/zombie-fenced-out: stale writes and runner settlement cannot overwrite the successor's progress", async () => {
-        const { clock, claims, successorClaims, claim, runner, logger, delivery } = build("zombie")
+        const { clock, claims, successorClaims, claim, runner, logger, delivery } = world.modules.build("zombie")
         const attempts: Array<ClaimedJob> = []
         let release = () => {}
         const gate = new Promise<void>((resolve) => {
@@ -96,7 +66,7 @@ const registerZombieProof = () => {
             expectedFencingToken: owner.fencingToken,
             step: "archived",
         })
-        const before = await database.snapshot(delivery.id)
+        const before = await world.modules.database.snapshot(delivery.id)
 
         await expect(claims.advance({ ...stale, step: "late" })).rejects.toMatchObject({ code: "JOBS_FENCED_OUT" })
         await expect(claims.complete(stale)).rejects.toMatchObject({ code: "JOBS_FENCED_OUT" })
@@ -106,11 +76,11 @@ const registerZombieProof = () => {
         release()
         await expect(pending).resolves.toBeUndefined()
 
-        expect(await database.snapshot(delivery.id)).toEqual(before)
-        expect(logger.warn).toHaveBeenCalledWith(JobsLogEvent.FencedOut, { jobId: zombie.jobId })
+        expect(await world.modules.database.snapshot(delivery.id)).toEqual(before)
+        expect(logger.warn).toHaveBeenCalledWith(world.modules.events.FencedOut, { jobId: zombie.jobId })
         expect(logger.error).not.toHaveBeenCalled()
         await successorClaims.complete({ jobId: owner.jobId, expectedFencingToken: owner.fencingToken })
-        expect(await database.snapshot(delivery.id)).toMatchObject({
+        expect(await world.modules.database.snapshot(delivery.id)).toMatchObject({
             status: "done",
             current_step: "archived",
             fencing_token: "2",
@@ -120,10 +90,10 @@ const registerZombieProof = () => {
 
 const registerRedispatchProof = () => {
     it("fenced-job/redispatch-isolated: runner retries preserve progress while replacing the token and external run key", async () => {
-        const { claims, runner, delivery } = build("redispatch")
+        const { claims, runner, delivery } = world.modules.build("redispatch")
         const attempts: Array<ClaimedJob> = []
         const keys: Array<string> = []
-        const providerDown = new Error("provider down")
+        const providerDown = new TestWorldError({ code: TestWorldErrorCode.ProviderDown })
         const processor: FencedProcessor = {
             queue: delivery.queue,
             process: async (job) => {
@@ -135,9 +105,9 @@ const registerRedispatchProof = () => {
             },
         }
         await expect(runner.run(processor, delivery)).rejects.toBe(providerDown)
-        expect(await database.snapshot(delivery.id)).toMatchObject({
+        expect(await world.modules.database.snapshot(delivery.id)).toMatchObject({
             status: "failed",
-            error: "provider down",
+            error: TestWorldErrorCode.ProviderDown,
             fencing_token: "1",
         })
         await runner.run(processor, { ...delivery, attempt: 2 })
@@ -153,7 +123,7 @@ const registerRedispatchProof = () => {
         await expect(
             claims.fail({ jobId: first.jobId, expectedFencingToken: first.fencingToken, reason: "late" }),
         ).rejects.toMatchObject({ code: "JOBS_FENCED_OUT" })
-        expect(await database.snapshot(delivery.id)).toMatchObject({
+        expect(await world.modules.database.snapshot(delivery.id)).toMatchObject({
             status: "done",
             current_step: "archived",
             fencing_token: "2",
@@ -165,18 +135,6 @@ const registerRedispatchProof = () => {
 }
 
 describe("fenced jobs (lite integration)", () => {
-    beforeAll(async () => {
-        await database.open()
-    })
-    beforeEach(async () => {
-        await database.begin()
-    })
-    afterEach(async () => {
-        await database.rollback()
-    })
-    afterAll(async () => {
-        await database.close()
-    })
     registerClaimProof()
     registerZombieProof()
     registerRedispatchProof()

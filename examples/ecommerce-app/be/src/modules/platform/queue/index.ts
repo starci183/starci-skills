@@ -5,3 +5,7 @@ export { InjectQueueOutbox, InjectQueueWorkerRegistry, QUEUE_WORKER_REGISTRY } f
 export { QueueModule } from "./queue.module"
 export type { QueueOutbox, QueueWorkerRegistry } from "./queue.port"
 export { queueEntities, queueMigrations } from "./persistence/connection"
+export { QueueOutboxService } from "./queue-outbox.service"
+export { QueueRelayService } from "./queue-relay.service"
+export { QueueWorkerService } from "./queue-worker.service"
+export { QUEUE_FACTORY, QUEUE_OUTBOX, QUEUE_TRANSPORT } from "./queue.decorators"

@@ -15,7 +15,16 @@ import { BILLING_ENTITY_MANAGER, ORDER_ENTITY_MANAGER } from "@modules/platform/
 import { EventBusModule } from "@modules/platform/event-bus"
 import { InboxModule } from "@modules/platform/inbox"
 import { JobsModule } from "@modules/platform/jobs"
-import { QueueModule } from "@modules/platform/queue"
+import {
+    QueueModule,
+    QueueOutboxService,
+    QueueRelayService,
+    QueueWorkerService,
+    QUEUE_FACTORY,
+    QUEUE_OUTBOX,
+    QUEUE_TRANSPORT,
+    QUEUE_WORKER_REGISTRY,
+} from "@modules/platform/queue"
 import { RealtimeModule } from "@modules/platform/realtime"
 import { OrderSummaryModule } from "@modules/projections/order-summary"
 import type { QueueSchedulerDefinition } from "@modules/platform/queue"
@@ -123,3 +132,19 @@ export const JOBS_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
         }),
     () => ({ module: ProbeJobModule }),
 ]
+
+/** A one-off producer has the writer but never starts delivery lifecycle providers. */
+export const QUEUE_OUTBOX_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
+    () => QueueModule.register({ isGlobal: true, outboxOnly: true }),
+]
+
+/** The provider identities of the queue wiring that registration proofs resolve in the world. */
+export const QUEUE_REGISTRATION_TOKENS = {
+    writer: QueueOutboxService,
+    outbox: QUEUE_OUTBOX,
+    relay: QueueRelayService,
+    worker: QueueWorkerService,
+    factory: QUEUE_FACTORY,
+    transport: QUEUE_TRANSPORT,
+    workerRegistry: QUEUE_WORKER_REGISTRY,
+}

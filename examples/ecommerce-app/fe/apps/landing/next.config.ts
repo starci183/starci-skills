@@ -14,8 +14,8 @@ const nextConfig: NextConfig = {
     reactStrictMode: true,
     experimental: { rootParams: true },
     poweredByHeader: false,
-    async headers() {
-        return [
+    headers() {
+        return Promise.resolve([
             {
                 source: "/:path*",
                 headers: [
@@ -29,7 +29,7 @@ const nextConfig: NextConfig = {
                     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
                 ],
             },
-        ]
+        ])
     },
     outputFileTracingRoot: WORKSPACE_ROOT,
     turbopack: { root: WORKSPACE_ROOT },

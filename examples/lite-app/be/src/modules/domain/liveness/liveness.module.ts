@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
+import { RetryModule } from "@modules/platform/retry"
 import { LivenessService } from "./liveness.service"
 import { ReadinessService } from "./readiness.service"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./liveness.module-definition"
@@ -12,6 +13,7 @@ export class LivenessModule extends ConfigurableModuleClass {
         const base = super.register(options)
         return {
             ...base,
+            imports: [...(base.imports ?? []), RetryModule.register({})],
             providers: [...(base.providers ?? []), LivenessService, ReadinessService],
             exports: [LivenessService, ReadinessService],
         }

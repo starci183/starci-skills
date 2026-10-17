@@ -3,7 +3,7 @@ import { NestFactory } from "@nestjs/core"
 import type { Application } from "express"
 import { SystemClock } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
-import { applySecurityHeaders } from "@modules/platform/http-security"
+import { securityHeaders } from "@modules/platform/http-security"
 import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
 import { AppModule } from "./app.module"
 import { readBillingEnv } from "./billing.env"
@@ -14,8 +14,9 @@ async function bootstrap(): Promise<void> {
     const options = readBillingEnv(env)
     const app = await NestFactory.create(AppModule.register(options), { rawBody: true })
     app.enableShutdownHooks()
-    applySecurityHeaders(app)
     const server: Application = app.getHttpAdapter().getInstance()
+    server.disable("x-powered-by")
+    app.use(securityHeaders)
     server.set("trust proxy", 0)
     app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
     await app.listen(options.port)

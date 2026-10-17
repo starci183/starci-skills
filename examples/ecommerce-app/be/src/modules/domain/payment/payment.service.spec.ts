@@ -30,7 +30,7 @@ const openInvoice = { invoiceId: "inv-1", orderId: "o-1", personId: "p-1", total
 
 const build = async (entityManager: MockEntityManager, claimed = true) => {
     const inbox = fakeInbox()
-    if (!claimed) inbox.seen("sepay", "92704")
+    if (!claimed) inbox.seen("billing.bank-transfer-received", "92704")
     const claim = jest.spyOn(inbox, "claim")
     const release = jest.spyOn(inbox, "release")
     const bus = recordingEventBus()
@@ -58,12 +58,12 @@ const registerSettlementTests = (): void => {
 
         await service.acceptBankTransfer(notice)
 
-        expect(inbox.claims).toEqual([{ source: "sepay", eventId: "92704" }])
+        expect(inbox.claims).toEqual([{ source: "billing.bank-transfer-received", eventId: "92704" }])
         const manager = invoices.findOpen.mock.calls[0]?.[0]?.manager
         expect(manager).toBeDefined()
         expect(manager).not.toBe(tx.em)
         expect(claim).toHaveBeenCalledTimes(1)
-        expect(claim).toHaveBeenCalledWith("sepay", "92704", manager)
+        expect(claim).toHaveBeenCalledWith("billing.bank-transfer-received", "92704", manager)
         expect(release).not.toHaveBeenCalled()
         expect(invoices.findOpen).toHaveBeenCalledWith({ manager, orderId: "o-1" })
         expect(invoices.markPaid).toHaveBeenCalledWith({
@@ -118,7 +118,7 @@ const registerIgnoredTransferTests = (): void => {
         expect(tx.em.transaction).toHaveBeenCalledTimes(1)
         expect(tx.commits).toBe(1)
         expect(tx.committedWrites).toEqual([])
-        expect(inbox.claims).toEqual([{ source: "sepay", eventId: "92704" }])
+        expect(inbox.claims).toEqual([{ source: "billing.bank-transfer-received", eventId: "92704" }])
         expect(release).not.toHaveBeenCalled()
         expect(invoices.findOpen).not.toHaveBeenCalled()
         expect(bus.writes).toEqual([])
@@ -163,7 +163,7 @@ const registerSettlementRollbackTests = (): void => {
         const manager = invoices.findOpen.mock.calls[0]?.[0]?.manager
         expect(manager).toBeDefined()
         expect(manager).not.toBe(tx.em)
-        expect(claim).toHaveBeenCalledWith("sepay", "92704", manager)
+        expect(claim).toHaveBeenCalledWith("billing.bank-transfer-received", "92704", manager)
         expect(tx.rollbacks).toBe(1)
         expect(tx.commits).toBe(0)
         expect(tx.committedWrites).toEqual([])

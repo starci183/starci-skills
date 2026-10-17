@@ -1,7 +1,8 @@
-import { fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import { fakeInbox, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
 import { Test } from "@nestjs/testing"
 import { CalendarsService } from "@modules/domain/calendars"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { INBOX } from "@modules/platform/inbox"
 import { CalendarDeliveryQueue } from "@modules/queues/calendar-delivery"
 import { CalendarInboxService } from "./calendar-inbox.service"
 import {
@@ -10,11 +11,12 @@ import {
     INSERT_CALENDAR_INBOX,
 } from "./persistence/calendar-inbox.sql"
 
-import type { PendingCalendarReceipt } from "./types/calendar-delivery"
+import type { PendingCalendarReceipt } from "./types/calendar-delivery.contracts"
 
 const build = async (
     claimed: ReadonlyArray<{ id: string }> = [],
     pending: ReadonlyArray<PendingCalendarReceipt> = [],
+    firstClaim = claimed.length > 0,
 ) => {
     const tx = fakeTransaction(
         mockEntityManager({
@@ -30,20 +32,29 @@ const build = async (
     calendars.acceptCalendarDelivery.mockResolvedValue(undefined)
     const queue = mock<CalendarDeliveryQueue>()
     queue.enqueueDeliveryRecorded.mockResolvedValue(undefined)
+    const claims = fakeInbox()
+    if (!firstClaim) claims.seen("webhook.calendar", "delivery-1")
+    const claimDelivery = claims.claim.bind(claims)
+    const claim = jest.spyOn(claims, "claim").mockImplementation((source, eventId) => {
+        expect(tx.em.query).not.toHaveBeenCalled()
+        expect(tx.commits).toBe(0)
+        return claimDelivery(source, eventId)
+    })
     const moduleRef = await Test.createTestingModule({
         providers: [
             CalendarInboxService,
             { provide: PRIMARY_ENTITY_MANAGER, useValue: tx.em },
+            { provide: INBOX, useValue: claims },
             { provide: CalendarDeliveryQueue, useValue: queue },
             { provide: CalendarsService, useValue: calendars },
         ],
     }).compile()
-    return { inbox: moduleRef.get(CalendarInboxService), tx, calendars, queue }
+    return { inbox: moduleRef.get(CalendarInboxService), tx, calendars, queue, claims, claim }
 }
 
 describe("CalendarInboxService.acceptCalendarDelivery", () => {
     it("records the receipt and queues its identity together before committing", async () => {
-        const { inbox, tx, calendars, queue } = await build([{ id: "inbox-1" }])
+        const { inbox, tx, calendars, queue, claim } = await build([{ id: "inbox-1" }])
         let commitsAtEnqueue = -1
         queue.enqueueDeliveryRecorded.mockImplementation(() => {
             commitsAtEnqueue = tx.commits
@@ -60,18 +71,24 @@ describe("CalendarInboxService.acceptCalendarDelivery", () => {
             JSON.stringify({ id: "calendar-1" }),
         ])
         expect(tx.em.query).toHaveBeenCalledTimes(1)
+        expect(claim).toHaveBeenCalledWith(
+            "webhook.calendar",
+            "delivery-1",
+            queue.enqueueDeliveryRecorded.mock.calls[0]?.[1],
+        )
         expect(queue.enqueueDeliveryRecorded).toHaveBeenCalledWith({ receiptId: "inbox-1" }, expect.any(Object))
         expect(queue.enqueueDeliveryRecorded.mock.calls[0]?.[1]).not.toBe(tx.em)
         expect(calendars.acceptCalendarDelivery).not.toHaveBeenCalled()
     })
 
     it("acknowledges a duplicate without queuing or processing it again", async () => {
-        const { inbox, tx, calendars, queue } = await build()
+        const { inbox, tx, calendars, queue, claim } = await build()
 
         await inbox.acceptCalendarDelivery("delivery-1", { id: "calendar-1" })
 
         expect(tx.commits).toBe(1)
-        expect(tx.em.query).toHaveBeenCalledTimes(1)
+        expect(tx.em.query).not.toHaveBeenCalled()
+        expect(claim).toHaveBeenCalledWith("webhook.calendar", "delivery-1", expect.any(Object))
         expect(queue.enqueueDeliveryRecorded).not.toHaveBeenCalled()
         expect(calendars.acceptCalendarDelivery).not.toHaveBeenCalled()
     })
@@ -87,6 +104,37 @@ describe("CalendarInboxService.acceptCalendarDelivery", () => {
         expect(tx.committedWrites).toEqual([])
         expect(tx.rolledBackWrites).toHaveLength(1)
         expect(tx.em.query).toHaveBeenCalledTimes(1)
+        expect(calendars.acceptCalendarDelivery).not.toHaveBeenCalled()
+    })
+})
+
+describe("CalendarInboxService.acceptCalendarDelivery refusals", () => {
+    it("acknowledges an existing receipt when the shared claim is new", async () => {
+        const { inbox, tx, calendars, queue } = await build([], [], true)
+
+        await inbox.acceptCalendarDelivery("delivery-1", { id: "calendar-1" })
+
+        expect(tx.commits).toBe(1)
+        expect(tx.em.query).toHaveBeenNthCalledWith(1, INSERT_CALENDAR_INBOX, [
+            "calendar",
+            "delivery-1",
+            JSON.stringify({ id: "calendar-1" }),
+        ])
+        expect(tx.em.query).toHaveBeenCalledTimes(1)
+        expect(queue.enqueueDeliveryRecorded).not.toHaveBeenCalled()
+        expect(calendars.acceptCalendarDelivery).not.toHaveBeenCalled()
+    })
+
+    it("propagates a refused claim before writing a receipt", async () => {
+        const { inbox, tx, calendars, queue, claims } = await build()
+        const failure = new TypeError("claim unavailable")
+        claims.failNext("claim", failure)
+
+        await expect(inbox.acceptCalendarDelivery("delivery-1", { id: "calendar-1" })).rejects.toBe(failure)
+
+        expect(tx.rollbacks).toBe(1)
+        expect(tx.em.query).not.toHaveBeenCalled()
+        expect(queue.enqueueDeliveryRecorded).not.toHaveBeenCalled()
         expect(calendars.acceptCalendarDelivery).not.toHaveBeenCalled()
     })
 })

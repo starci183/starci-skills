@@ -15,8 +15,8 @@ const nextConfig: NextConfig = {
     experimental: { rootParams: true },
     // The shop is the authenticated app: it does not advertise the framework that serves it.
     poweredByHeader: false,
-    async headers() {
-        return [
+    headers() {
+        return Promise.resolve([
             {
                 source: "/:path*",
                 headers: [
@@ -30,7 +30,7 @@ const nextConfig: NextConfig = {
                     { key: "Referrer-Policy", value: "no-referrer" },
                 ],
             },
-        ]
+        ])
     },
     outputFileTracingRoot: WORKSPACE_ROOT,
     turbopack: { root: WORKSPACE_ROOT },

@@ -3,22 +3,16 @@ import { createHmac } from "node:crypto"
 import type { RawBodyRequest } from "@nestjs/common"
 import type { Request } from "express"
 import { FakeClock, fakeIds, mock } from "@starci/jest-preset"
-import { CalendarWebhook } from "@features/webhooks/calendar/transport/http/calendar.webhook"
-import { CalendarDeliveryProcessor } from "@features/jobs/calendar-delivery/transport/queue/calendar-delivery.processor"
-import { ProcessCalendarDeliveryStep } from "@features/jobs/calendar-delivery/steps/process-calendar-delivery.step"
 import { CalendarInboxService } from "@modules/domain/calendar-inbox"
 import { CalendarsService } from "@modules/domain/calendars"
 import { Secret } from "@modules/platform/config"
-import { WebhookSignatureService } from "@modules/platform/http-security"
+import { HttpSecurityErrorCode } from "@modules/platform/http-security"
 import type { HttpSecurityOptions } from "@modules/platform/http-security"
-import { HttpSecurityErrorCode } from "@modules/platform/http-security/errors/http-security.error"
 import type { JobClaims } from "@modules/platform/jobs"
-import type { Logger } from "@modules/platform/logging"
-import { PgmqQueueTransportClient } from "@modules/platform/queue/pgmq-queue-transport.client"
-import { QueueOutboxService } from "@modules/platform/queue/queue-outbox.service"
-import type { QueueOptions } from "@modules/platform/queue/queue.options"
-import { CalendarDeliveryQueue, CALENDAR_DELIVERY_QUEUE } from "@modules/queues/calendar-delivery"
-import { createQueueDatabaseWorld } from "../../world/queue.database.builder"
+import type { QueueOptions, RecordedJobRow } from "@modules/platform/queue"
+import { CALENDAR_DELIVERY_QUEUE } from "@modules/queues/calendar-delivery"
+import { useTestWorld } from "../../world"
+import { createCalendarProof } from "../../world"
 
 const clock = new FakeClock("2026-10-14T00:00:00.000Z")
 const signingFixture = "integration-calendar-provider-fixture"
@@ -44,8 +38,7 @@ const signature = (timestamp: string, rawBody: Buffer = body): string => {
     return `sha256=${digest}`
 }
 
-const doorOf = (inbox: CalendarInboxService) =>
-    new CalendarWebhook(new WebhookSignatureService(securityOptions, clock), inbox)
+const doorOf = (inbox: CalendarInboxService) => world.modules.doorOf(inbox)
 
 /** Signature and replay refusal use the actual door and verifier, with the untouched intake as the collaborator. */
 describe("calendar webhook verification collaboration", () => {
@@ -75,57 +68,43 @@ describe("calendar webhook verification collaboration", () => {
 })
 
 /** Real receipt/pgmq transactions prove concurrent intake dedupe and deferred, locked receipt consumption. */
-const world = createQueueDatabaseWorld()
+const world = useTestWorld({
+    modules: (db) => createCalendarProof(db, clock, securityOptions, queueOptions),
+    cleanup: async ({ builder, close }) => {
+        try {
+            await builder.cleanup(deliveryId)
+        } finally {
+            await close()
+        }
+    },
+})
 
 const deliveryId = `webhook-proof-${fakeIds().next()}`
 
 const receiptIds: Array<string> = []
 
-interface CalendarReceiptIdRow {
-    readonly id: string
-}
-
-interface CalendarReceiptRow extends CalendarReceiptIdRow {
-    readonly processed_at: Date | null
-}
-
-interface CalendarReceiptReference {
-    readonly receiptId: string
-}
-
-interface RecordedJob {
-    readonly id: string
-    readonly payload: CalendarReceiptReference
-}
-
-const committedHandoff = async (): Promise<RecordedJob> => {
-    const receipts: Array<CalendarReceiptRow> = await world.manager.query(
-        "SELECT id, processed_at FROM public.calendar_inbox WHERE provider = $1 AND delivery_id = $2",
-        ["calendar", deliveryId],
-    )
+const committedHandoff = async (): Promise<RecordedJobRow> => {
+    const receipts = await world.modules.receipts(deliveryId)
     receiptIds.push(...receipts.map((receipt) => receipt.id))
     expect(receipts).toHaveLength(1)
     expect(receipts[0]?.processed_at).toBeNull()
-    const jobs: Array<RecordedJob> = await world.manager.query(
-        "SELECT id, payload FROM public.queue WHERE queue = $1 AND payload->>'receiptId' = ANY($2::text[])",
-        [CALENDAR_DELIVERY_QUEUE, receiptIds],
-    )
+    const jobs = await world.modules.jobs(receiptIds)
     expect(jobs).toHaveLength(1)
     const [job] = jobs
     assert(job !== undefined, "Accepted calendar receipt must publish a typed queue outbox message")
     expect(job.payload).toEqual({ receiptId: receipts[0]?.id })
-    expect(
-        await world.manager.query("SELECT message FROM pgmq.q_calendar_delivery WHERE message->>'jobId' = $1", [
-            job.id,
-        ]),
-    ).toEqual([{ message: { jobId: job.id, payload: job.payload } }])
+    expect(await world.modules.messages(job.id)).toEqual([{ message: { jobId: job.id, payload: job.payload } }])
     return job
 }
 
-const consumeCommittedReceipt = async (inbox: CalendarInboxService, calendars: CalendarsService, job: RecordedJob) => {
+const consumeCommittedReceipt = async (
+    inbox: CalendarInboxService,
+    calendars: CalendarsService,
+    job: RecordedJobRow,
+) => {
     const claims = mock<JobClaims>()
     claims.advance.mockResolvedValue(undefined)
-    const processor = new CalendarDeliveryProcessor(new ProcessCalendarDeliveryStep(inbox, claims))
+    const processor = world.modules.processor(inbox, claims)
     const delivery = {
         jobId: job.id,
         kind: CALENDAR_DELIVERY_QUEUE,
@@ -137,21 +116,14 @@ const consumeCommittedReceipt = async (inbox: CalendarInboxService, calendars: C
 
     expect(calendars.acceptCalendarDelivery).toHaveBeenCalledTimes(1)
     expect(calendars.acceptCalendarDelivery).toHaveBeenCalledWith(payload, expect.any(Object))
-    expect(
-        await world.manager.query(
-            "SELECT processed_at IS NOT NULL AS processed FROM public.calendar_inbox WHERE id = $1",
-            [job.payload.receiptId],
-        ),
-    ).toEqual([{ processed: true }])
+    expect(await world.modules.processed(job.payload.receiptId)).toEqual([{ processed: true }])
 }
 
 const registerCalendarHandoffProof = () => {
     it("webhooks/accepted-delivery-publishes-once: concurrent redeliveries commit one receipt and one typed job, then the deferred processor consumes once", async () => {
         const calendars = mock<CalendarsService>()
         calendars.acceptCalendarDelivery.mockResolvedValue(undefined)
-        const transport = new PgmqQueueTransportClient(queueOptions, world.manager, mock<Logger>())
-        const queue = new CalendarDeliveryQueue(new QueueOutboxService(transport, clock))
-        const inbox = new CalendarInboxService(world.manager, queue, calendars)
+        const inbox = world.modules.intake(calendars)
         const door = doorOf(inbox)
         const timestamp = String(clock.now().getTime())
 
@@ -167,33 +139,5 @@ const registerCalendarHandoffProof = () => {
 }
 
 describe("calendar webhook handoff (local Supabase integration)", () => {
-    beforeAll(async () => {
-        await world.open()
-    })
-    afterAll(async () => {
-        try {
-            if (world.isOpen) {
-                const receipts: Array<CalendarReceiptIdRow> = await world.manager.query(
-                    "SELECT id FROM public.calendar_inbox WHERE provider = $1 AND delivery_id = $2",
-                    ["calendar", deliveryId],
-                )
-                const cleanupIds = receipts.map((receipt) => receipt.id)
-                await world.manager.query(
-                    "DELETE FROM pgmq.q_calendar_delivery WHERE message->'payload'->>'receiptId' = ANY($1::text[])",
-                    [cleanupIds],
-                )
-                await world.manager.query(
-                    "DELETE FROM public.queue WHERE queue = $1 AND payload->>'receiptId' = ANY($2::text[])",
-                    [CALENDAR_DELIVERY_QUEUE, cleanupIds],
-                )
-                await world.manager.query(
-                    "DELETE FROM public.calendar_inbox WHERE provider = $1 AND delivery_id = $2",
-                    ["calendar", deliveryId],
-                )
-            }
-        } finally {
-            await world.close()
-        }
-    })
     registerCalendarHandoffProof()
 })

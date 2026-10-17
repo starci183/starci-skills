@@ -4,7 +4,7 @@ import type { Reflector } from "@nestjs/core"
 import { InjectReflector } from "@modules/platform/composition"
 import { requestOf } from "@modules/platform/http-security"
 import type { CredentialAuthenticator, CredentialMetadata } from "./credential.contracts"
-import type { CredentialRequest } from "./types/credential-request"
+import type { CredentialRequest } from "./types/credential.request"
 import { IdentityError, IdentityErrorCode } from "./errors/identity.error"
 import { CREDENTIAL_KEY, InjectCredentialAuthenticator } from "./identity.decorators"
 

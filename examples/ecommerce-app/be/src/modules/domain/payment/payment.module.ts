@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./payment.module-definition"
 import { PAYMENT_SERVICE } from "./payment.decorators"
+import { PaymentReceiptService } from "./payment-receipt.service"
 import { PaymentService } from "./payment.service"
 
 @Module({})
@@ -15,9 +16,10 @@ export class PaymentModule extends ConfigurableModuleClass {
             providers: [
                 ...(base.providers ?? []),
                 PaymentService,
+                PaymentReceiptService,
                 { provide: PAYMENT_SERVICE, useExisting: PaymentService },
             ],
-            exports: [PaymentService, PAYMENT_SERVICE],
+            exports: [PaymentReceiptService, PaymentService, PAYMENT_SERVICE],
         }
     }
 }

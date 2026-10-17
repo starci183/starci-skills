@@ -5,7 +5,7 @@ export interface BankTransferNotice {
     /** The payment code the buyer wrote in the transfer: the id of the order it pays. */
     readonly code: string
     /** `in` is money received; only that can pay an invoice. */
-    readonly transferType: "in" | "out"
+    readonly transferType: string
     /** The transferred amount in minor units. */
     readonly transferAmount: number
     /** The bank reference of the transfer, kept on the payment record. */

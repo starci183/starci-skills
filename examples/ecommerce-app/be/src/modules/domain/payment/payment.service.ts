@@ -16,21 +16,14 @@ import type { BankTransferNotice } from "./payment.contracts"
 import { PaymentLogEvent } from "./payment.log-events"
 import { PaymentEntity } from "./persistence/entities/payment.entity"
 
-/** The inbox source of the transfers the bank transfer notifier delivers. */
-const NOTIFIER_SOURCE = "sepay"
+/** The processing inbox source, separate from the SePay delivery receipt. */
+const SETTLEMENT_SOURCE = "billing.bank-transfer-received"
 
 /** Why a transfer that names an open invoice does not pay it. */
 const AMOUNT_MISMATCH = "amount-mismatch"
 
 @Injectable()
-/**
- * The intake of the bank transfer notifier. `acceptBankTransfer` takes a verified delivery: it claims the transfer in the
- * inbox inside the transaction that matches the transfer to the open invoice of the order
- * its payment code names and publishes the outcome: `billing.payment-confirmed` when the amount equals the invoice total
- * (the invoice is marked paid and a payment record is written), `billing.payment-failed` when it differs (nothing else
- * changes, the invoice stays open for a correct transfer). A transfer that is not money received, or names no open
- * invoice, is acknowledged and ignored.
- */
+/** Settles committed bank-transfer events in an idempotent billing transaction. */
 export class PaymentService {
     constructor(
         @InjectBillingEntityManager() private readonly entityManager: EntityManager,
@@ -41,10 +34,10 @@ export class PaymentService {
         @InjectInvoiceService() private readonly invoices: InvoiceService,
     ) {}
 
-    /** Commits the claim, payment and outcome of one verified transfer in the same transaction. */
+    /** Commits the processing claim, payment and outcome of one received transfer together. */
     async acceptBankTransfer(notice: BankTransferNotice): Promise<void> {
         await this.entityManager.transaction(async (manager) => {
-            if (!(await this.inbox.claim(NOTIFIER_SOURCE, notice.eventId, manager))) return
+            if (!(await this.inbox.claim(SETTLEMENT_SOURCE, notice.eventId, manager))) return
             await this.settle(manager, notice)
         })
     }

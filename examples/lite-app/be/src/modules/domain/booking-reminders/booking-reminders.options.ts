@@ -1,2 +1,2 @@
-/** The booking-reminders module takes no options yet. */
-export type BookingRemindersOptions = Record<string, never>
+/** The capability takes no options; the empty record keeps `isGlobal` assignable through the configurable module. */
+export type BookingRemindersOptions = Record<never, never>

@@ -4,6 +4,8 @@ import type { MockEntityManager } from "@starci/jest-preset"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
 import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
+import { TIMER } from "@modules/platform/retry"
+import type { Timer } from "@modules/platform/retry"
 import { LivenessError, LivenessErrorCode } from "./errors/liveness.error"
 import { CHECK_READINESS_DATABASE, CHECK_READINESS_JOBS } from "./persistence/readiness.sql"
 import { LivenessLogEvent } from "./readiness.log-events"
@@ -11,21 +13,23 @@ import { ReadinessService } from "./readiness.service"
 
 const build = async (manager: MockEntityManager = mockEntityManager()) => {
     const logger = mock<Logger>()
+    const timer = mock<Timer>()
+    const cancel = jest.fn()
+    timer.schedule.mockReturnValue(cancel)
     const moduleRef = await Test.createTestingModule({
         providers: [
             ReadinessService,
             { provide: PRIMARY_ENTITY_MANAGER, useValue: manager },
             { provide: LOGGER, useValue: logger },
+            { provide: TIMER, useValue: timer },
         ],
     }).compile()
-    return { readiness: moduleRef.get(ReadinessService), manager, logger }
+    return { readiness: moduleRef.get(ReadinessService), manager, logger, timer, cancel }
 }
 
 describe("ReadinessService", () => {
-    afterEach(() => jest.useRealTimers())
-
     it("answers ready with every named check once each probe returns", async () => {
-        const { readiness, manager } = await build(
+        const { readiness, manager, timer, cancel } = await build(
             mockEntityManager({
                 query: [
                     [CHECK_READINESS_DATABASE, [{ ready: 1 }]],
@@ -33,7 +37,6 @@ describe("ReadinessService", () => {
                 ],
             }),
         )
-        jest.useFakeTimers()
 
         await expect(readiness.check()).resolves.toEqual({
             status: "ready",
@@ -42,7 +45,9 @@ describe("ReadinessService", () => {
 
         expect(manager.query).toHaveBeenCalledWith(CHECK_READINESS_DATABASE)
         expect(manager.query).toHaveBeenCalledWith(CHECK_READINESS_JOBS)
-        expect(jest.getTimerCount()).toBe(0)
+        expect(timer.schedule).toHaveBeenCalledTimes(2)
+        expect(timer.schedule).toHaveBeenCalledWith(expect.any(Function), 3000)
+        expect(cancel).toHaveBeenCalledTimes(2)
     })
 
     it("fails the check closed when a dependency probe throws", async () => {
@@ -63,17 +68,17 @@ describe("ReadinessService", () => {
         manager.query.mockImplementation(() => {
             throw failure
         })
-        const { readiness, logger } = await build(manager)
+        const { readiness, logger, timer, cancel } = await build(manager)
 
         await expect(readiness.check()).rejects.toMatchObject({ code: LivenessErrorCode.Unavailable })
         expect(logger.error).toHaveBeenCalledWith(LivenessLogEvent.CheckFailed, failure, { check: "database" })
         expect(logger.error).toHaveBeenCalledWith(LivenessLogEvent.CheckFailed, failure, { check: "jobs" })
+        expect(timer.schedule).not.toHaveBeenCalled()
+        expect(cancel).not.toHaveBeenCalled()
     })
 })
 
 describe("ReadinessService probe responses", () => {
-    afterEach(() => jest.useRealTimers())
-
     it.each([
         [[], [{ stats: {} }]],
         [[{ ready: 0 }], [{ stats: {} }]],
@@ -98,17 +103,19 @@ describe("ReadinessService probe responses", () => {
     it("bounds a stalled dependency and clears its timer after failing closed", async () => {
         const manager = mockEntityManager()
         manager.query.mockImplementation(() => new Promise(() => undefined))
-        const { readiness, logger } = await build(manager)
-        jest.useFakeTimers()
+        const { readiness, logger, timer, cancel } = await build(manager)
         const failed = expect(readiness.check()).rejects.toMatchObject({ code: LivenessErrorCode.Unavailable })
 
-        await jest.advanceTimersByTimeAsync(3000)
+        expect(timer.schedule).toHaveBeenCalledTimes(2)
+        for (const [callback] of timer.schedule.mock.calls) callback()
         await failed
 
         expect(logger.error).toHaveBeenCalledWith(LivenessLogEvent.CheckFailed, expect.any(Error), {
             check: "database",
         })
         expect(logger.error).toHaveBeenCalledWith(LivenessLogEvent.CheckFailed, expect.any(Error), { check: "jobs" })
-        expect(jest.getTimerCount()).toBe(0)
+        expect(timer.schedule).toHaveBeenCalledTimes(2)
+        expect(timer.schedule).toHaveBeenCalledWith(expect.any(Function), 3000)
+        expect(cancel).toHaveBeenCalledTimes(2)
     })
 })

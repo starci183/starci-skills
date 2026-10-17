@@ -28,6 +28,8 @@ export const backgroundModules = (options: OrderAppOptions): Array<DynamicModule
     QueueModule.register({
         isGlobal: true,
         ...options.queue,
+        // Select the running provider graph explicitly so contract emission can resolve it.
+        outboxOnly: false,
         connections: [ORDER_ENTITY_MANAGER],
         schedulers: [orderExpirySchedulerOf(options.orderExpiry)],
     }),

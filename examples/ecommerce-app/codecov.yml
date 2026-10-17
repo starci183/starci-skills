@@ -64,6 +64,7 @@ component_management:
       paths:
         - "be/src/modules/domain/order-expiry-ticks/**"
         - "be/src/modules/integrations/identity-api/**"
+        - "be/src/modules/integrations/sepay/**"
         - "be/src/modules/platform/*/**"
 ignore:
   - "fe/**"

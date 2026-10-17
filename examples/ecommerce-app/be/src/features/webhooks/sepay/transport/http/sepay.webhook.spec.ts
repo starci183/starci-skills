@@ -2,7 +2,7 @@ import { FakeClock, mock } from "@starci/jest-preset"
 import type { RawBodyRequest } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
 import type { Request } from "express"
-import { PaymentService } from "@modules/domain/payment"
+import { PaymentReceiptService } from "@modules/domain/payment"
 import { Secret } from "@modules/platform/config"
 import { HttpSecurityErrorCode, WEBHOOK_SIGNATURE, WebhookSignatureService } from "@modules/platform/http-security"
 import type { HttpSecurityOptions } from "@modules/platform/http-security"
@@ -47,13 +47,13 @@ const OPTIONS: HttpSecurityOptions = {
 
 /** Resolves the real configured verifier through the door token; only the downstream intake is doubled. */
 const build = async () => {
-    const payments = mock<PaymentService>()
+    const payments = mock<PaymentReceiptService>()
     const verifier = new WebhookSignatureService(OPTIONS, new FakeClock(NOW))
     const moduleRef = await Test.createTestingModule({
         controllers: [SepayWebhook],
         providers: [
             { provide: WEBHOOK_SIGNATURE, useValue: verifier },
-            { provide: PaymentService, useValue: payments },
+            { provide: PaymentReceiptService, useValue: payments },
         ],
     }).compile()
     return { door: moduleRef.get(SepayWebhook), payments }
@@ -66,8 +66,8 @@ describe("SepayWebhook", () => {
 
             await door.receive(REQUEST, SIGNATURE, TIMESTAMP, NOTICE)
 
-            expect(payments.acceptBankTransfer).toHaveBeenCalledTimes(1)
-            expect(payments.acceptBankTransfer).toHaveBeenCalledWith(NOTICE)
+            expect(payments.recordBankTransfer).toHaveBeenCalledTimes(1)
+            expect(payments.recordBankTransfer).toHaveBeenCalledWith(NOTICE)
         })
 
         it("refuses altered raw bytes before the intake, even when the parsed notice is unchanged", async () => {
@@ -78,7 +78,7 @@ describe("SepayWebhook", () => {
                 code: HttpSecurityErrorCode.WebhookSignatureInvalid,
             })
 
-            expect(payments.acceptBankTransfer).not.toHaveBeenCalled()
+            expect(payments.recordBankTransfer).not.toHaveBeenCalled()
         })
 
         it("refuses absent proof headers before the intake", async () => {
@@ -88,7 +88,7 @@ describe("SepayWebhook", () => {
                 code: HttpSecurityErrorCode.WebhookSignatureInvalid,
             })
 
-            expect(payments.acceptBankTransfer).not.toHaveBeenCalled()
+            expect(payments.recordBankTransfer).not.toHaveBeenCalled()
         })
 
         it("refuses a correctly signed delivery outside the replay window before the intake", async () => {
@@ -98,17 +98,17 @@ describe("SepayWebhook", () => {
                 code: HttpSecurityErrorCode.WebhookReplayed,
             })
 
-            expect(payments.acceptBankTransfer).not.toHaveBeenCalled()
+            expect(payments.recordBankTransfer).not.toHaveBeenCalled()
         })
 
         it("propagates an intake failure instead of acknowledging the signed delivery", async () => {
             const { door, payments } = await build()
             const failure = new Error("billing transaction failed")
-            payments.acceptBankTransfer.mockRejectedValue(failure)
+            payments.recordBankTransfer.mockRejectedValue(failure)
 
             await expect(door.receive(REQUEST, SIGNATURE, TIMESTAMP, NOTICE)).rejects.toBe(failure)
 
-            expect(payments.acceptBankTransfer).toHaveBeenCalledTimes(1)
+            expect(payments.recordBankTransfer).toHaveBeenCalledTimes(1)
         })
     })
 })

@@ -18,8 +18,8 @@ const nextConfig: NextConfig = {
     turbopack: { root: WORKSPACE_ROOT },
     // The product app is the authenticated one: it does not advertise the framework that serves it.
     poweredByHeader: false,
-    async headers() {
-        return [
+    headers() {
+        return Promise.resolve([
             {
                 source: "/:path*",
                 headers: [
@@ -33,7 +33,7 @@ const nextConfig: NextConfig = {
                     },
                 ],
             },
-        ]
+        ])
     },
 }
 

@@ -1,5 +1,15 @@
 {
   "events": {
+    "billing.bank-transfer-received": {
+      "payload": {
+        "code": "string",
+        "eventId": "string",
+        "referenceCode": "string",
+        "transferAmount": "number",
+        "transferType": "string"
+      },
+      "version": 1
+    },
     "billing.invoice-issued": {
       "payload": {
         "orderId": "string",
