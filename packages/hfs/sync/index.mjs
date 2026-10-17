@@ -7,11 +7,11 @@
 // templates/<scope or common>/<managedBy>/<file path with each leading dot dropped>, with dotted skeleton paths tried when no
 // undotted template exists. The scope is app for a root slot and the
 // side (be, fe) for a side slot, whose files land under that side's folder. Two targets are not whole files of a managedBy slot
-// and are listed in this module: the marked block of the root .gitignore, and .starciwork/.gitignore, which lives inside the
+// and are listed in this module: the marked blocks of the root .gitignore and README.md, and .starciwork/.gitignore, which lives inside the
 // .starciwork directory slot. Every file is rendered with the app's hfs.json (both sides and their apps) and, for the Sonar
 // exclusions, the jest preset the app installs for its be side and the one coverage scope derived from the slot manifest
 // (scripts/hfs/coverage-scope.mjs: the be/jest.config.js scope, sonar.coverage.exclusions and the codecov.yml paths and components). `--check` compares the sha256 of the rendered content with the
-// file on disk and fails on any drift; `--write` rewrites the drifted files. `.gitignore` is the one shared file: only the marked
+// file on disk and fails on any drift; `--write` rewrites the drifted files. `.gitignore` and README.md are shared files: only the marked
 // block is managed and the app's own lines around it are left alone. The root package.json is managed by its `scripts` block
 // only (mode scripts, compared as parsed JSON): the rest of the file (dependencies, the npm workspaces fe/apps/* and fe/packages/*,
 // HFS_MONO_WORKSPACES) is the app's. The fe side runs through turbo (turbo.json, app.task-graph): each fe app and package is a workspace.
@@ -31,7 +31,7 @@ import { readDeclaredStack, stackWorkflowVariables } from './stack-images.mjs';
 import { byCodeUnit } from '../report/order.mjs';
 import { isRuntimeExampleApp } from '../runtime/scripts/lib/runtime-example.mjs';
 import { ciWorkflowCommands } from './ci-commands.mjs';
-import { dependabotUpdates, hasDeclaredServices, readDeclaredQuality, sonarHostLine } from './quality-services.mjs';
+import { dependabotUpdates, hasDeclaredServices, readDeclaredQuality, readDeclaredBadges, sonarHostLine } from './quality-services.mjs';
 import { qualityServices } from '../runtime/scripts/hfs/ci-declaration.mjs';
 
 export const TEMPLATES_DIR = path.join(import.meta.dirname, '..', 'templates');
@@ -183,6 +183,7 @@ export function appSource(root, { parseYaml } = {}) {
   return { runtimeExample: isRuntimeExampleApp(root), files: files.sort(byCodeUnit), read: file => fs.readFileSync(path.join(root, 'be', file), 'utf8'),
     workPresent: fs.existsSync(path.join(root, '.starciwork')), hasImage: file => isFile(path.join(root, file), { followLinks: false }),
     stack: readDeclaredStack(root, { parseYaml }), quality: readDeclaredQuality(root, { parseYaml }),
+    badges: readDeclaredBadges(root, { parseYaml }),
     qualityDeclared: hasDeclaredServices(root, { parseYaml }) };
 }
 
@@ -305,6 +306,7 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
   const quality = source.quality ?? qualityServices({});
   return {
     header: HEADER(scope),
+    readmeBadges: source.badges ?? '',
     project: app.project,
     appBinary: APP_BINARY,
     appScripts: appScripts(app, source),
@@ -360,7 +362,9 @@ export function renderTargets(hfs, presets, { sonarKey, readTemplate = readBundl
   const hasTemplate = name => { try { return readTemplate(name) !== undefined; } catch { return false; } };
   return SCOPES.flatMap(scope => {
     const vars = variables(app, scope, presets, sonarKey, manifest, source);
-    const targets = targetsOf(scope, { edition: app.edition, manifest, hasTemplate })
+    const declaredTargets = targetsOf(scope, { edition: app.edition, manifest, hasTemplate });
+    if (scope === APP_SCOPE && source?.badges) declaredTargets.push({ path: 'README.md', mode: 'block', markdown: true, template: 'app/readme-badges/README.md' });
+    const targets = declaredTargets
       .filter(target => !(app.edition === 'lite' && source?.workPresent === false && target.path === '.starciwork/.gitignore'));
     return targets.map(target => {
       const template = target.path === 'codecov.yml' && source?.quality?.codecov.enabled === false
@@ -374,21 +378,22 @@ export function renderTargets(hfs, presets, { sonarKey, readTemplate = readBundl
         const content = scriptsText(scripts);
         return { path: where, scope, mode: 'scripts', content, hash: hashOf(content), scripts };
       }
-      const managed = target.mode === 'block' ? `${BLOCK_BEGIN}\n${trailingNewline(body)}${BLOCK_END}\n` : body;
-      return { path: where, scope, mode: target.mode, content: managed, hash: hashOf(managed) };
+      const markers = target.markdown ? { begin: '<!-- >>> starci app sync (managed block; do not edit) >>> -->', end: '<!-- <<< starci app sync <<< -->' } : { begin: BLOCK_BEGIN, end: BLOCK_END };
+      const managed = target.mode === 'block' ? `${markers.begin}\n${trailingNewline(body)}${markers.end}\n` : body;
+      return { path: where, scope, mode: target.mode, markdown: target.markdown, markers, content: managed, hash: hashOf(managed) };
     });
   });
 }
 
 // The part of a file sync manages: all of it, the marked block, or the scripts block as text.
-function managedPart(mode, text) {
+function managedPart(mode, text, markers = { begin: BLOCK_BEGIN, end: BLOCK_END }) {
   if (mode === 'file') return text;
   if (mode === 'scripts') {
     const scripts = parseScripts(text);
     return scripts ? scriptsText(scripts) : null;
   }
-  const start = text.indexOf(BLOCK_BEGIN);
-  const end = text.indexOf(BLOCK_END);
+  const start = text.indexOf(markers.begin);
+  const end = text.indexOf(markers.end);
   if (start < 0 || end < start) return null;
   const stop = text.indexOf('\n', end);
   return text.slice(start, stop < 0 ? text.length : stop + 1);
@@ -407,12 +412,20 @@ export function checkTargets(root, targets) {
   return targets.map(target => {
     const file = path.join(root, target.path);
     if (!fs.existsSync(file)) return { path: target.path, status: 'missing', expectedHash: target.hash };
-    const part = managedPart(target.mode, lf(fs.readFileSync(file, 'utf8')));
+    const part = managedPart(target.mode, lf(fs.readFileSync(file, 'utf8')), target.markers);
     if (part === null) return { path: target.path, status: 'missing', expectedHash: target.hash };
     const actualHash = hashOf(part);
     if (actualHash === target.hash) return { path: target.path, status: 'ok', expectedHash: target.hash, actualHash };
     return { path: target.path, status: 'drift', expectedHash: target.hash, actualHash, difference: firstDifference(target.content, part) };
   });
+}
+
+function insertAfterTitle(existing, content) {
+  const title = /^# [^\n]*(?:\n|$)/m.exec(existing);
+  if (!title) return `${content}\n${existing}`;
+  const end = title.index + title[0].length;
+  const heading = trailingNewline(existing.slice(0, end));
+  return `${heading}\n${content}${existing.slice(end)}`;
 }
 
 /** Rewrite the missing or drifted targets; returns the paths written. */
@@ -425,8 +438,10 @@ function writtenContent(target, existing) {
     return `${JSON.stringify({ ...pkg, scripts: target.scripts }, null, 2)}\n`;
   }
   if (target.mode === 'block' && existing) {
-    const current = managedPart('block', existing);
-    return current === null ? `${target.content}\n${existing}` : existing.replace(current, () => target.content);
+    const current = managedPart('block', existing, target.markers);
+    if (current !== null) return existing.replace(current, () => target.content);
+    if (target.markdown) return insertAfterTitle(existing, target.content);
+    return `${target.content}\n${existing}`;
   }
   return target.content;
 }

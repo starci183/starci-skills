@@ -3,6 +3,7 @@ sources:
   - repository: ecommerce-app
 # Public example CI names only; no real deployment is configured.
 ci:
+  github: {repository: starci183/starci-skills, defaultBranch: main, workflow: examples.yml}
   secrets:
     - {name: SONAR_TOKEN, scope: repository, purpose: Optional SonarCloud analysis token for the host repository, optional: true}
     - {name: SOPS_AGE_KEY, scope: repository, purpose: Unused example deploy workflow age identity, optional: true}
@@ -10,7 +11,7 @@ ci:
     - {name: VPS_KNOWN_HOSTS, scope: repository, purpose: Unused example deploy workflow pinned SSH host keys, optional: true}
   vars:
     - {name: SONAR_HOST_URL, scope: repository, value: https://sonarcloud.io, purpose: Public SonarCloud analysis endpoint, optional: true}
-    - {name: SONAR_ORGANIZATION, scope: repository, value: your-organization, purpose: Documentation placeholder for the host repository SonarCloud organization key, optional: true}
+    - {name: SONAR_ORGANIZATION, scope: repository, value: starci183, purpose: The SonarCloud organization of the runtime repository (starci183/starci-skills), optional: true}
     - {name: VPS_HOST, scope: repository, value: 203.0.113.10, purpose: Documentation address for the unused example deploy workflow, optional: true}
     - {name: VPS_USER, scope: repository, value: deploy, purpose: Documentation user for the unused example deploy workflow, optional: true}
 components:
@@ -106,6 +107,7 @@ services:
       reason: the runtime repository is public and holds no secret, so the token lives only in the owner's untracked secret.env and in GitHub.
   codecov:
     provider: codecov
+    flag: ecommerce-app
     mode: hosted
     purpose: Public example coverage uploads using GitHub OIDC.
     auth: oidc

@@ -1,4 +1,6 @@
 schema: starci/application-stacks@1
+# To render README badges, declare ci.github: {repository: owner/repo, defaultBranch: main}.
+# A GitHub package.json repository URL also enables the managed block.
 sources:
   - repository: "{{project}}"
 components:

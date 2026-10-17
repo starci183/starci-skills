@@ -145,6 +145,7 @@ $defs:
           server (host.public required); disabled - not used (reason required, CI must not call it).
         enum: [local, hosted, disabled]
       organization: {type: string, minLength: 1}
+      flag: {type: string, minLength: 1}
       target: {type: number, minimum: 0, maximum: 100}
       components: {enum: [auto]}
       required: {type: boolean}
@@ -263,6 +264,14 @@ $defs:
     type: object
     additionalProperties: false
     properties:
+      github:
+        type: object
+        additionalProperties: false
+        required: [repository]
+        properties:
+          repository: {type: string, pattern: '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'}
+          defaultBranch: {type: string, minLength: 1, default: main}
+          workflow: {type: string, pattern: '^[A-Za-z0-9_.-]+\.ya?ml$', default: ci.yml}
       secrets: {type: array, items: {$ref: '#/$defs/ciSecret'}}
       vars: {type: array, items: {$ref: '#/$defs/ciVariable'}}
       dependabot:

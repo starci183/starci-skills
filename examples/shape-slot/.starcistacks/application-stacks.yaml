@@ -1,6 +1,7 @@
 # The stack declaration of the app, at the app root beside be/, fe/ and .starciwork (never under a side).
 schema: starci/application-stacks@1
 ci:
+  github: {repository: starci183/starci-skills, defaultBranch: main, workflow: examples.yml}
   secrets:
     - {name: SONAR_TOKEN, scope: repository, purpose: Optional SonarCloud analysis token for the public example, optional: true}
     - {name: SOPS_AGE_KEY, scope: repository, purpose: Documentation-only deploy age identity; this example has no real deploy, optional: true}
@@ -8,7 +9,7 @@ ci:
     - {name: VPS_KNOWN_HOSTS, scope: repository, purpose: Documentation-only pinned host keys; this example has no real deploy, optional: true}
   vars:
     - {name: SONAR_HOST_URL, scope: repository, value: 'https://sonarcloud.io', purpose: Optional SonarCloud analysis host, optional: true}
-    - {name: SONAR_ORGANIZATION, scope: repository, value: your-organization, purpose: Documentation-only SonarCloud organization key; replace when enabling analysis, optional: true}
+    - {name: SONAR_ORGANIZATION, scope: repository, value: starci183, purpose: Public SonarCloud organization key for the runtime example, optional: true}
     - {name: VPS_HOST, scope: repository, value: '203.0.113.10', purpose: Documentation-only deploy host; this example has no real deploy, optional: true}
     - {name: VPS_USER, scope: repository, value: deploy, purpose: Documentation-only deploy user; this example has no real deploy, optional: true}
 services:
@@ -38,6 +39,7 @@ services:
       reason: the runtime repository is public and holds no secret, so the token lives only in the owner's untracked secret.env and in GitHub.
   codecov:
     provider: codecov
+    flag: shape-slot
     mode: hosted
     purpose: Public example coverage reporting through Codecov OIDC.
     auth: oidc

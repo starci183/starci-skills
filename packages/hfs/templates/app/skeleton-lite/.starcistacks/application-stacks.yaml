@@ -2,6 +2,8 @@
 # The source models declare intended compute; they prove no completed deployment.
 # All-zero application digests are illustrative and must be replaced by verified release digests.
 schema: starci/application-stacks@1
+# To render README badges, declare ci.github: {repository: owner/repo, defaultBranch: main}.
+# A GitHub package.json repository URL also enables the managed block.
 sources:
   - repository: {{project}}
 backing:

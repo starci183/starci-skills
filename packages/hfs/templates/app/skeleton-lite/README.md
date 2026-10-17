@@ -18,6 +18,10 @@ TypeScript everywhere, NestJS in `be/`, Next.js with next-intl in `fe/`, Supabas
 - `.starcistacks/`: value-free environment metadata and encrypted-secret custody.
 - `.starciwork/`: `.gitignore`, `.starciwork/workspace.yaml` project metadata and repo roles, and optional brand drawing records, references, and assets.
 
+## Status badges
+
+Declare `ci.github.repository` and `ci.github.defaultBranch` in `.starcistacks/application-stacks.yaml` (or set the GitHub `repository` URL in `package.json`), then run `npx starci app sync --write`. Sync inserts a managed badge block after the title; `npx starci app sync --check` verifies it.
+
 ## Development
 
 ```sh

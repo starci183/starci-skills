@@ -11,6 +11,7 @@
 # a product initializes its own recipient and seals real members before deployment.
 schema: starci/application-stacks@1
 ci:
+  github: {repository: starci183/starci-skills, defaultBranch: main, workflow: examples.yml}
   secrets:
     - {name: SONAR_TOKEN, scope: repository, purpose: Optional example SonarCloud analysis token, optional: true}
     - {name: SOPS_AGE_KEY, scope: environment, environment: production, purpose: Optional demonstration database deployment identity; no real deploy, optional: true}
@@ -18,7 +19,7 @@ ci:
     - {name: VPS_KNOWN_HOSTS, scope: environment, environment: production, purpose: Optional demonstration SSH host verification; no real deploy, optional: true}
   vars:
     - {name: SONAR_HOST_URL, scope: repository, value: 'https://sonarcloud.io', purpose: Optional example SonarCloud host, optional: true}
-    - {name: SONAR_ORGANIZATION, scope: repository, value: your-organization, purpose: Documentation placeholder for the optional SonarCloud organization, optional: true}
+    - {name: SONAR_ORGANIZATION, scope: repository, value: starci183, purpose: The SonarCloud organization of the runtime repository (starci183/starci-skills), optional: true}
     - {name: VPS_HOST, scope: environment, environment: production, value: '203.0.113.10', purpose: Documentation address for demonstration deployment; no real deploy, optional: true}
     - {name: VPS_USER, scope: environment, environment: production, value: deploy, purpose: Documentation user for demonstration deployment; no real deploy, optional: true}
 sources:
@@ -208,6 +209,7 @@ services:
       reason: the runtime repository is public and holds no secret, so the token lives only in the owner's untracked secret.env and in GitHub.
   codecov:
     provider: codecov
+    flag: lite-app
     mode: hosted
     purpose: Public example coverage reporting through GitHub OIDC.
     auth: oidc
