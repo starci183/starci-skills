@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.6.0 - 2026-10-18
+- Added: `services.codecov|sonar.badgeToken` README badge tokens and `ci.github.visibility` with a private-repository notice (sync, ci verify); `ci.vars` `ownerValue: true` (var sync skips, var set reads stdin, verify checks the name).
+- Fixed: the app release gate counts tag-push CI runs reachable from origin/main, main or HEAD; the secret scans exempt only declared badge tokens.
+- Fixed: empty placeholder lines vanish so every managed file is prettier-stable; CI coverage proof heap, per-side Sonar lint reports merged for the import, per-fe-app build env; `app lint --side` combines with `--sonar`.
+
 ## 4.5.1 - 2026-10-18
 - Fixed: managed CI base refs, public build values, caching and timeouts; optional quality service handling, README formatting and Supabase migration-history parsing.
 

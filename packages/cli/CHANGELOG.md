@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.0 - 2026-10-18
+- Changed: pins @starci/hfs 4.6.0 and carries runtime 1.0.0-alpha.21; `npm install` moves a StarCi pin only where a package.json declares it; `app ci` help documents ownerValue variables.
+
 ## 1.5.1 - 2026-10-18
 - Changed: pins @starci/hfs 4.5.1 and carries runtime 1.0.0-alpha.20 with the refreshed release catalog.
 

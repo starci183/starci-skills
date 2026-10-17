@@ -6,6 +6,20 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+## [1.0.0-alpha.21] — 2026-10-18
+
+This release supersedes the alpha.20 cut, which was never tagged (its cut on 31440f234 was refused: the rendered ecommerce-app and shape-slot ci.yml were not prettier-stable); the alpha.20 packages stay published. It carries everything listed under 1.0.0-alpha.20 below, plus the changes here.
+
+### Added
+- README badge tokens for private repositories: `services.codecov.badgeToken` and `services.sonar.badgeToken` (read-only, public-safe) are appended to the badge image URL; `ci.github.visibility: private` (or `gh repo view` inside `starci app ci verify`) without a token prints the `README_BADGE_TOKEN_MISSING` notice, never an error. A badgeToken on another service refuses `STACKS_BADGE_TOKEN_SERVICE`. The secret scans (app check, app hygiene, push scan) exempt only those two manifest key paths and the `token=` query of a badge image on the declared host inside the managed README block.
+- `ci.vars` entries may declare `ownerValue: true` instead of a value (NIVO): `starci app ci var sync` skips them with a note, `var set` reads the value from stdin only, `ci verify` checks the name.
+
+### Fixed
+- `starci npm install` moves each StarCi canon pin only in the root or workspace package.json that declares it, keeping its section; an undeclared pin is reported skipped (NIVO: @starci/grammar and @starci/heroicons became root dependencies).
+- The app release gate counts tag-push CI runs whose commit is reachable from origin/main, main or HEAD (NIVO: a red tag run on the main tip read as RELEASE_CI_UNKNOWN).
+- Every rendered managed file is exactly what prettier writes with the canon config: a template line holding only a placeholder that renders empty disappears (an empty build env left a blank line in ci.yml, HFS_FORMAT). The new `rendered-prettier` self-check (RT_RENDERED_NOT_PRETTIER) prettier-checks every managed file of the examples, the full/lite/shape-slot scaffolds and a service-combination matrix.
+- Rendered app CI (from NIVO's v0.2.2 run): the coverage proof step gets the 6 GB heap; with a Sonar token each side lints with its own `--sonar` report (`starci app lint` combines `--side` and `--sonar`) and an inline step merges them into the one imported reports/lint.sonar.json; the build job builds each deployed fe app with its own image buildArgs values (the build-fe gate env fills only missing keys), so two fe apps keep their own public URLs.
+
 ## [1.0.0-alpha.20] — 2026-10-17
 
 This release supersedes the alpha.19 cut, which was never tagged (its push secret-scan refused template false positives): it carries everything listed under 1.0.0-alpha.19 below, plus the changes here.

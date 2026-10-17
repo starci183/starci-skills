@@ -1,6 +1,6 @@
 {
   "name": "@starci/hfs",
-  "version": "4.5.1",
+  "version": "4.6.0",
   "description": "The StarCi app command implementation for scaffolding, linting, checking and synchronizing one product repository.",
   "type": "module",
   "license": "MIT",

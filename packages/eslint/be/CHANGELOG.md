@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.4.4 - 2026-10-18
+- Changed: bundled runtime copies follow runtime 1.0.0-alpha.21 (canon pins, failure codes, the narrowed secret patterns); canon rules are unchanged.
+
 ## 3.4.3 - 2026-10-18
 - Changed: bundled runtime copies include the refreshed canon pins for the alpha.20 patch set; canon rules are unchanged.
 
