@@ -32,6 +32,12 @@ const EXAMPLE_SCRIPTS = Object.freeze(['codegen', 'typecheck', 'typecheck:tests'
 const LITE_NO_SCRIPTS = Object.freeze(['test:contract', 'test:e2e']);
 /** The scripts of an app's row: none for a test layer the app holds no spec file in (`layers`, read from the checkout by exampleApps; absent means every layer), and a lite app never has the e2e or contract script. */
 export const scriptsOf = (app) => EXAMPLE_SCRIPTS.filter((script) => !(app.edition === 'lite' && LITE_NO_SCRIPTS.includes(script)) && !idleScripts(app.layers).some((idle) => idle.script === script));
+/** The scripts that judge an app's sealed members: run in a disposable copy with fresh nondeployable envelopes (release-sealed-run.mjs), as the app's own ci.yml runs its lint; the runtime tracks no ciphertext. */
+const SEALED_SCRIPTS = Object.freeze(['lint']);
+/** The command of one app script row: `npm run <script>`, through release-sealed-run.mjs for SEALED_SCRIPTS. */
+const scriptCommand = (runtime, app, script) => (SEALED_SCRIPTS.includes(script)
+  ? { cmd: 'node', args: [path.join(runtime, 'scripts', 'supervisor', 'release-sealed-run.mjs'), app.dir, '--', 'npm', 'run', script] }
+  : { cmd: 'npm', args: ['run', script] });
 /** The proofs of the checks column that only a tool outside npm scripts can give (Sonar: release-l4-sonar.mjs): each must answer {ok, log}. */
 const L4_PROOFS = Object.freeze(['sonar']);
 const STEP_TIMEOUT_MS = 60 * 60_000;
@@ -129,7 +135,7 @@ export function planL4(repo, { runtimeRoot, mode = 'local' } = {}) {
     try { scripts = JSON.parse(fs.readFileSync(path.join(app.dir, 'package.json'), 'utf8')).scripts ?? {}; } catch { scripts = {}; }
     for (const script of scriptsOf(app)) {
       const name = `${app.name}: npm run ${script}`;
-      steps.push(scripts[script] ? { name, cmd: 'npm', args: ['run', script], cwd: app.dir, nextBuild: true } : { name, absent: true, cwd: app.dir });
+      steps.push(scripts[script] ? { name, ...scriptCommand(runtimeRoot ?? repo, app, script), cwd: app.dir, nextBuild: true } : { name, absent: true, cwd: app.dir });
     }
     notPlanned.push(...idleScripts(app.layers).filter((idle) => !(app.edition === 'lite' && LITE_NO_SCRIPTS.includes(idle.script))).map((idle) => ({ name: `${app.name}: npm run ${idle.script}`, why: idle.why })));
   }

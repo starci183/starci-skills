@@ -4,7 +4,12 @@
 // path as `sonar.externalIssuesReportPaths`. The lint exit code is not the verdict here (findings are imported and the gate counts them); the file is.
 import fs from 'node:fs';
 import path from 'node:path';
-import { runNpm } from '../api/npm/run-npm.mjs';
+import { fileURLToPath } from 'node:url';
+import { runProgram } from '../api/process/run-program.mjs';
+
+/** The lint runs in a disposable copy with fresh nondeployable sealed members (release-sealed-run.mjs), as the app's own ci.yml runs it before its scan. */
+const SEALED_RUN = path.join(path.dirname(fileURLToPath(import.meta.url)), 'release-sealed-run.mjs');
+const runSealed = (args, options) => runProgram(process.execPath, [SEALED_RUN, options.cwd, '--', 'npm', ...args], options);
 
 const REPORT_NAME = 'lint.sonar.json';
 const TIMEOUT_MS = 20 * 60_000;
@@ -16,7 +21,7 @@ export const lintReportFile = (dir) => path.join(dir, REPORT_NAME);
 export const lintReportDefine = (file) => `-Dsonar.externalIssuesReportPaths=${file}`;
 
 /** Write the report of the app in `appDir` to the absolute `file`: {ok: true} when the file exists afterwards, else {ok: false, reason} with the tail of the lint output. `run` is the npm runner (spec seam). */
-export function writeLintReport(appDir, file, { run = runNpm } = {}) {
+export function writeLintReport(appDir, file, { run = runSealed } = {}) {
   fs.rmSync(file, { force: true }); // a report of an earlier run is never the report of this one
   const r = run(['exec', '--no-install', '--', 'starci', 'app', 'lint', '--sonar', file], { cwd: appDir, encoding: 'utf8', timeout: TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 });
   if (fs.existsSync(file)) return { ok: true };
